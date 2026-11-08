@@ -98,9 +98,10 @@ class ToolChoiceSurfaceTest {
         }
 
         // 这三个取的东西每轮都已注入系统提示（ContextAssemblerService），下发只是白花一次往返
+        // （V3 起已整个删除，不再只是不下发）
         for (String duplicate : List.of("get_user_profile", "get_project_context", "get_conversation_summary")) {
             assertFalse(offered.contains(duplicate), duplicate + " 与每轮注入的上下文重复，不该下发");
-            descriptionOf(registry, duplicate); // 登记仍在：老会话回放与 XML 兜底照常执行
+            assertTrue(registry.resolve(duplicate).isEmpty(), duplicate + " 已在 V3 删除，不应再登记");
         }
     }
 
@@ -138,14 +139,8 @@ class ToolChoiceSurfaceTest {
     void theThreeReadersCrossReferenceEachOther() {
         RecordingToolRegistry registry = registry();
 
-        String readDocument = descriptionOf(registry, "read_document");
-        assertTrue(readDocument.contains("extract_file_text"),
-                "read_document 是 base-tools 的兜底工具，没 skill 时模型大概率挑它——"
-                        + "它必须指出「id 可能是文件夹时用 extract_file_text」，"
-                        + "否则「把一个卷宗文件夹当材料范围交进来」这条能力永远不会被发现：" + readDocument);
-        assertTrue(readDocument.contains("OCR"), "要说清会自动 OCR，模型才不会转头去调 run_python：" + readDocument);
-        assertTrue(readDocument.length() > 200,
-                "改动前它只有一句 79 字的英文，信息量远低于同功能的 extract_file_text：" + readDocument);
+        // read_document 已在 V3 删除（Java 方法留给上下文组装与 run_python），不再是模型可选的读取入口
+        assertTrue(registry.resolve("read_document").isEmpty(), "read_document 已在 V3 删除，不应再登记");
 
         String readFile = descriptionOf(registry, "read_file");
         assertTrue(readFile.contains("extract_file_text"), "read_file 要说清「有 fileId 时用哪个」：" + readFile);
@@ -166,14 +161,9 @@ class ToolChoiceSurfaceTest {
                             + inventory);
         }
 
-        for (Map.Entry<String, String> e : Map.of(
-                "pdf_list_files", "PDF",
-                "pptx_list_files", "PPTX").entrySet()) {
-            String d = descriptionOf(registry, e.getKey());
-            assertTrue(d.contains("doc_list_project_files"),
-                    e.getKey() + " 要自报是权威清单按类型过滤后的子集，否则模型会为了凑齐全貌挨个调一遍：" + d);
-            assertFalse(d.contains("唯一来源"),
-                    e.getKey() + " 不再是「唯一来源」——那句话现在是错的：" + d);
+        // 按类型过滤的子集 pdf_list_files / pptx_list_files 已在 V3 删除，权威清单是唯一入口
+        for (String subset : List.of("pdf_list_files", "pptx_list_files")) {
+            assertTrue(registry.resolve(subset).isEmpty(), subset + " 已在 V3 删除，不应再登记");
         }
 
         String listFiles = descriptionOf(registry, "list_files");
@@ -276,14 +266,23 @@ class ToolChoiceSurfaceTest {
 
         // 判据只认 @ToolMeta(offerToModel = false)：isAvailable() 那类进程级闸（本机有没有 Docker）
         // 随机器而变，把它算进来会让同一条断言在不同机器上一红一绿。
-        List<String> retired = registry.toolNamesLongestFirst().stream()
-                .filter(name -> registry.resolve(name)
-                        .map(t -> t.meta() != null && !t.meta().offerToModel())
-                        .orElse(false))
-                .sorted()
-                .toList();
+        // V3 起长期隐藏工具已整个删除，名单改为这份固定清单（仍把注解里现取的 offerToModel=false 并进来）；
+        // 描述里再点名其中任何一个，模型就会经 XML 兜底去调一个不存在的名字。
+        List<String> retired = java.util.stream.Stream.concat(
+                        registry.toolNamesLongestFirst().stream()
+                                .filter(name -> registry.resolve(name)
+                                        .map(t -> t.meta() != null && !t.meta().offerToModel())
+                                        .orElse(false)),
+                        java.util.stream.Stream.of(
+                                "doc_get_selection", "doc_set_selection", "doc_replace_nth_match", "doc_delete_match",
+                                "doc_delete_text", "doc_search_related_docs", "doc_debug_revisions", "scan_files",
+                                "delete_file", "move_file", "read_document", "get_user_profile", "get_project_context",
+                                "search_knowledge_base", "deep_search", "get_conversation_summary", "pdf_list_files",
+                                "pptx_list_files", "pptx_search_files", "pptx_open_file", "pptx_apply_format",
+                                "pptx_edit_page"))
+                .distinct().sorted().toList();
         assertTrue(retired.contains("pptx_apply_format") && retired.contains("delete_file"),
-                "名单是从注解里现取的，取空了这条断言就成了空断言：" + retired);
+                "名单取空了这条断言就成了空断言：" + retired);
 
         List<String> offenders = new java.util.ArrayList<>();
         for (ToolSpecification spec : registry.getAllSpecifications()) {

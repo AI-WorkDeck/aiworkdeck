@@ -736,111 +736,6 @@ public class FileTools implements AgentToolComponent {
         }
     }
 
-    // dev-board#1065（审计 T-07）：它存在的唯一理由是 write_file 写不进子文件夹、要靠它补登记——
-    // 而它只扫项目根目录，那一步其实补不上。write_file 有了 parentFolderId 之后它就只是个维护动作，
-    // 只登记不下发（老会话回放与 XML 兜底照常执行）。
-    @ToolMeta(displayName = "扫描项目文件", category = "file", offerToModel = false)
-    @Tool("Actively scan the project directory and register any missing files to the database. Repair DB inconsistency.")
-    public String scan_files(
-        @P("Project ID") Long projectId
-    ) {
-        try {
-            Path projectRoot = storageResolver.projectRoot(projectId);
-            if (!Files.exists(projectRoot)) return "Project directory not found: " + projectRoot;
-
-            StringBuilder report = new StringBuilder("Scan Report:\n");
-            
-            // Scan depth 1 for now (Root of project)
-            try (java.util.stream.Stream<Path> stream = Files.list(projectRoot)) {
-                stream.forEach(entry -> {
-                    if (Files.isRegularFile(entry)) {
-                        String name = entry.getFileName().toString();
-                        if (name.startsWith(".")) return; // ignore hidden
-                        if (!name.contains(".")) return; // ignore no extension?
-                        
-                        String ext = name.substring(name.lastIndexOf(".") + 1);
-                        long size = 0;
-                        try { size = Files.size(entry); } catch(IOException ignore){}
-                        
-                        String wpsId = "scan_" + System.currentTimeMillis() + "_" + name.hashCode();
-                        String storageRelPath = "projects/" + projectId + "/" + name;
-                        
-                        try {
-                           // Use AGENT_USER_ID (1) or System?
-                           projectFileService.createOrUpdateFile(projectId, null, name, ext, size, storageRelPath, null, AGENT_USER_ID);
-                           report.append("- Synced: ").append(name).append("\n");
-                        } catch(Exception e) {
-                           report.append("- Failed: ").append(name).append(" (").append(e.getMessage()).append(")\n");
-                        }
-                    }
-                });
-            }
-            
-            // 通知前端刷新文件列表
-            editorBridgeService.sendRefreshFilesAction();
-            
-            return report.toString();
-        } catch (Exception e) {
-             // "Error" 前缀是 ToolResult.success() 的失败判据，不能丢
-             return "Error: Scan failed: " + e.getMessage();
-        }
-    }
-
-    // 永久停用的工具不下发规格（审计 A15）：本仓的口径一直是「只裁 spec、不裁
-    // resolve/execute」，delete_file 正是这条口径的教科书案例——登记该留（模型经 XML 兜底
-    // 路径调到时拿的是下面那句可行动的拒绝，好过 "Tool not found" 让它以为删文件这件事
-    // 整个不存在），规格该裁（每轮白付一份 schema，而且用户说「把这个文件删掉」时
-    // 模型会先调一次再转述拒绝，白烧一个往返）。
-    @ToolMeta(displayName = "删除文件", category = "file", offerToModel = false)
-    @Tool("Delete a file. DISABLED: AI Agent is not allowed to delete files.")
-    public String delete_file(String filePath) {
-        log.info("Tool: delete_file called for {} - DENIED (AI Agent cannot delete files)", filePath);
-        // AI Agent 不允许永久删除；可恢复的删除走 move_to_trash（dev-board#1044）
-        return "Error: Permission Denied. AI Agent is not allowed to permanently delete files. "
-                + "Use move_to_trash to move them to the project recycle bin (the user can restore them).";
-    }
-
-    // dev-board#1065（审计 T-06）：路径式移动/改名的唯一入口是 move_files_batch（单条同样走它，
-    // 两者共用 moveOnePath，拒绝理由一字不差）。本工具只登记不下发，老会话回放与 XML 兜底照常执行。
-    @ToolMeta(displayName = "移动文件", category = "file", refreshFiles = true, offerToModel = false)
-    @Tool("Move or rename a project file/folder by path (file tree and storage stay in sync). " +
-            "Paths are relative to the project root, e.g. move_file('会议记录.txt', '归档/会议记录.txt'). " +
-            "If destPath is an existing folder, the file is moved into it keeping its name. " +
-            "Missing destination folders are created automatically. Path-based equivalent of move_project_file.")
-    public String move_file(
-            @P("Source path (relative to project root)") String sourcePath,
-            @P("Destination path: target folder, or full path with new name") String destPath
-    ) {
-        // 2026-08 由「停用回错误」复活为 DB 感知版：真机日志实证（conv-1785993773100），
-        // 非文档/非 PDF 文件（如 txt）在任何列表工具里都拿不到 fileId，模型对着停用
-        // 提示只能绕道 read_file+write_file 整篇重写——既移不动文件又撑爆输出。
-        // 本实现按路径解析 project_file 记录后走与 move_project_file 完全相同的服务路径。
-        log.info("Tool: move_file called {} -> {}", sourcePath, destPath);
-        if (!StringUtils.hasText(sourcePath) || !StringUtils.hasText(destPath)) {
-            return "Error: sourcePath and destPath are required.";
-        }
-        Long projectId = com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong();
-        if (projectId == null) {
-            return "Error: no project context for this request.";
-        }
-        String src = normalizeRelPath(sourcePath);
-        String dest = normalizeRelPath(destPath);
-        if (src == null || dest == null) {
-            return "Error: Access denied. Paths must stay inside the project directory (no '..').";
-        }
-        try {
-            MoveOutcome outcome = moveOnePath(projectId, dbPathIndex(projectId), src, dest);
-            return "Successfully moved '" + src + "' to '" + outcome.path()
-                    + "' (fileId=" + outcome.file().getId() + ").";
-        } catch (IllegalArgumentException e) {
-            // 可行动的拒绝（源未登记、目标那段是文件…）：原样把理由交给模型，文案与拆出共用实现前逐字一致
-            return "Error: " + e.getMessage();
-        } catch (Exception e) {
-            log.warn("move_file failed {} -> {}", sourcePath, destPath, e);
-            return "Error moving file: " + e.getMessage();
-        }
-    }
-
     /** 一次 move_files_batch 最多移动多少份（与 office_replace_batch 的 MAX_BATCH_EDITS 同值同口径） */
     private static final int MAX_BATCH_MOVES = 50;
 
@@ -1083,7 +978,7 @@ public class FileTools implements AgentToolComponent {
     }
 
     /**
-     * 单条路径移动的实现，{@link #move_file} 与 {@link #move_files_batch} 共用——
+     * 单条路径移动的实现，曾由已删除的 move_file 与 {@link #move_files_batch} 共用——
      * 两个入口对同一件事的行为与拒绝理由不能有出入。
      *
      * @param index 调用方持有的路径索引（批量时每成功一项后重建）

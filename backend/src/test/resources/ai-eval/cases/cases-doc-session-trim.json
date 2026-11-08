@@ -332,11 +332,11 @@
   },
   {
     "id": "doc-trim-xml-call-to-hidden-tool-puts-siblings-back",
-    "title": "类目裁剪：模型经 XML 兜底直接点名调了没下发的 pdf_list_files（#1065 起只登记不下发，仍可经 XML 调到）——当轮照常执行，下一轮 PDF 整类回来（dev-board#1064）",
+    "title": "类目裁剪：模型经 XML 兜底直接点名调了被类目裁掉的 pptx_check_service——当轮照常执行，下一轮 PPT 整类回来（dev-board#1064）",
     "category": "files",
     "protocol": "xml",
     "docSessionCategoryTrim": true,
-    "userInput": "看看项目里有哪些扫描件",
+    "userInput": "先确认一下那个外部生成服务现在能不能用，再看看汇报稿的页数",
     "activeDocument": {
       "id": "1001",
       "name": "股权转让协议.docx",
@@ -344,12 +344,12 @@
     },
     "turns": [
       {
-        "text": "<tool_code>pdf_list_files()</tool_code>"
+        "text": "<tool_code>pptx_check_service()</tool_code>"
       },
       {
         "toolCalls": [
           {
-            "name": "pdf_inspect",
+            "name": "pptx_inspect_format",
             "arguments": {
               "fileId": "2001"
             }
@@ -357,29 +357,29 @@
         ]
       },
       {
-        "text": "<final>项目里有 1 份扫描件：起诉状.pdf，共 3 页。</final>"
+        "text": "<final>PPT 服务正常，汇报稿共 3 页、版式正常。</final>"
       }
     ],
     "toolStubs": {
-      "pdf_list_files": "1. 起诉状.pdf (fileId=2001)",
-      "pdf_inspect": "共 3 页，文本型。"
+      "pptx_check_service": "PPTX 生成服务运行正常，可以开始生成 PPT。",
+      "pptx_inspect_format": "共 3 页，版式正常。"
     },
     "expect": {
       "toolCalls": [
         {
-          "name": "pdf_list_files"
+          "name": "pptx_check_service"
         },
         {
-          "name": "pdf_inspect"
+          "name": "pptx_inspect_format"
         }
       ],
       "offeredToolsExcludeFirstCall": [
-        "pdf_inspect",
-        "pdf_to_word"
+        "pptx_inspect_format",
+        "pptx_generate"
       ],
       "offeredToolsIncludeLastCall": [
-        "pdf_inspect",
-        "pdf_to_word"
+        "pptx_inspect_format",
+        "pptx_generate"
       ],
       "structureContains": [
         "<final>"

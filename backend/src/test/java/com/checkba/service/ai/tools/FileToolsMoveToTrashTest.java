@@ -225,16 +225,15 @@ class FileToolsMoveToTrashTest {
     }
 
     @Test
-    @DisplayName("契约：file 类目、refreshFiles 由编排器刷一次、方法体不自己刷；delete_file 仍不下发")
+    @DisplayName("契约：file 类目、refreshFiles 由编排器刷一次、方法体不自己刷；delete_file 已删除")
     void toolMetaContract() throws Exception {
         ToolMeta meta = FileTools.class.getMethod("move_to_trash", String.class).getAnnotation(ToolMeta.class);
         assertNotNull(meta);
         assertTrue(meta.refreshFiles());
         assertTrue(meta.offerToModel());
         assertEquals("file", meta.category());
-        ToolMeta del = FileTools.class.getMethod("delete_file", String.class).getAnnotation(ToolMeta.class);
-        assertFalse(del.offerToModel(), "永久删除维持不下发");
-        assertTrue(tools.delete_file("a.txt").contains("move_to_trash"), "XML 兜底调到 delete_file 时要指路");
+        assertThrows(NoSuchMethodException.class, () -> FileTools.class.getMethod("delete_file", String.class),
+                "delete_file 已在 V3 删除，move_to_trash 是唯一入口");
         verify(bridge, never()).sendRefreshFilesAction();
     }
 

@@ -97,7 +97,7 @@ class MemoryToolsScopeTest {
     }
 
     @Test
-    @DisplayName("修复：search_knowledge_base 传 scope=conversation 时要能找到绑定当前对话的记忆")
+    @DisplayName("修复：query_memory(depth=hybrid) 传 scope=conversation 时要能找到绑定当前对话的记忆")
     void searchKnowledgeBaseFindsConversationScopedEntry() {
         MemoryEntry convEntry = MemoryEntry.builder()
                 .id(77L).projectId(1L).memoryType("fact")
@@ -106,7 +106,7 @@ class MemoryToolsScopeTest {
         when(memoryManager.hybridSearch(eq(1L), any(), anyInt())).thenReturn(List.of());
         when(memoryManager.retrieveConversationMemories(1L, "conv-1")).thenReturn(List.of(convEntry));
 
-        String result = tools.search_knowledge_base("不相关的词", 5, "conversation", null);
+        String result = tools.query_memory("不相关的词", null, "conversation", null, "hybrid", 5);
 
         assertFalse(result.contains("未在项目记忆中找到相关信息"), "明确按对话 scope 查找时不该说没找到: " + result);
         assertTrue(result.contains("本次对话讨论的要点"));
@@ -114,11 +114,11 @@ class MemoryToolsScopeTest {
     }
 
     @Test
-    @DisplayName("修复：deep_search 传 scope=file 时要能找到绑定该文件的记忆")
+    @DisplayName("修复：query_memory(depth=deep) 传 scope=file 时要能找到绑定该文件的记忆")
     void deepSearchFindsFileScopedEntry() {
         when(memoryManager.retrieveFileMemories(1L, 42L)).thenReturn(List.of(fileScopedEntry()));
 
-        String result = tools.deep_search("不相关的词", 10, "file", 42L);
+        String result = tools.query_memory("不相关的词", null, "file", 42L, "deep", 10);
 
         assertFalse(result.contains("未在项目记忆中找到相关信息"), "明确按文件 scope 查找时不该说没找到: " + result);
         assertTrue(result.contains("该合同第 5 条存在争议"));
@@ -164,16 +164,5 @@ class MemoryToolsScopeTest {
 
         assertTrue(result.contains("未找到相关记忆"), result);
         verify(memoryManager).retrieveMemories(eq(1L), any(), any(), anyInt());
-    }
-
-    @Test
-    @DisplayName("兼容入口仍然可执行，并在结果末尾指路 query_memory")
-    void compatEntriesStillRunAndPointAtQueryMemory() {
-        when(memoryManager.hybridSearch(eq(1L), any(), anyInt())).thenReturn(List.of(fileScopedEntry()));
-
-        String result = tools.search_knowledge_base("争议", 5, null, null);
-
-        assertTrue(result.contains("该合同第 5 条存在争议"), "兼容入口必须照常把结果给出来: " + result);
-        assertTrue(result.contains("query_memory"), "末尾要指路，否则模型会一直照抄旧名字: " + result);
     }
 }

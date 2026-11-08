@@ -62,24 +62,24 @@
   },
   {
     "id": "memory-user-profile-noarg-xml",
-    "title": "无参工具调用 get_user_profile（XML 协议；该工具已不下发，验的是兼容入口仍能执行）",
+    "title": "无参工具调用 memory_list()（XML 协议；验的是无参 XML 调用仍能执行）",
     "category": "memory",
     "protocol": "xml",
     "userInput": "按我平时的习惯格式，整理一份会议纪要模板的要点",
     "turns": [
       {
-        "text": "<process name=\"读取用户偏好\"><tool_code>get_user_profile()</tool_code></process>"
+        "text": "<process name=\"列出记忆文件\"><tool_code>memory_list()</tool_code></process>"
       },
       {
         "text": "<final>根据您的偏好（要点式、先结论后论证），会议纪要模板建议包含：会议要素、结论清单、分歧与待办、责任人与期限。</final>"
       }
     ],
     "toolStubs": {
-      "get_user_profile": "用户偏好：要点式表达；先结论后论证；文书默认宋体小四。"
+      "memory_list": "user 记忆文件：偏好.md（要点式表达；先结论后论证；文书默认宋体小四）。"
     },
     "expect": {
       "toolCalls": [
-        { "name": "get_user_profile" }
+        { "name": "memory_list" }
       ],
       "structureContains": ["<process", "<final>"],
       "bubbleEndStatus": "finished"

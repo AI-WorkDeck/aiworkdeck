@@ -201,11 +201,10 @@ class ToolSchemaBudgetTest {
         // 改动前在这些会话里同样下发的「桌面专属 + 永久停用」工具。它们一个前缀都不带，
         // 所以旧规则下每种会话都放行；这里按名字取回规格，算出改动前的体量做对照。
         List<String> hiddenByDeclaration = List.of(
-                "pptx_open_file", "pptx_generate", "pptx_apply_format",
+                "pptx_generate",
                 "litigation_render", "litigation_timeline_render",
                 "pdf_to_word", "pdf_highlight", "pdf_annotate", "pdf_redact", "pdf_replace_text",
-                "text_write_file", "text_find_replace",
-                "delete_file");
+                "text_write_file", "text_find_replace");
         List<ToolSpecification> hiddenSpecs = hiddenByDeclaration.stream()
                 .map(n -> registry.resolve(n).orElseThrow(
                         () -> new AssertionError("登记必须保留（只裁 spec、不裁 resolve）：" + n)).spec())

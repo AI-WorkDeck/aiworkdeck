@@ -63,13 +63,11 @@ class ToolDeclarationContractTest {
      *
      * <p>判据是上面那四个 send。逐条来历：
      * <ul>
-     *   <li>{@code pptx_open_file} / {@code litigation_render} /
+     *   <li>{@code litigation_render} /
      *       {@code litigation_timeline_render} / {@code pdf_to_word} —— sendOpenFileAction，
      *       交付物是「在桌面编辑器里打开给用户看」，返回文案也这么写；</li>
      *   <li>{@code pptx_generate} —— sendPptConfigAction，发完就返回「等待用户操作...」，
      *       而那个配置界面在任务窗格里根本不存在，模型会停在那里等一个永远不会来的确认；</li>
-     *   <li>{@code pptx_apply_format} —— sendReloadFileAction；PowerPoint 任务窗格还另有
-     *       office_ppt_* 作用在真正打开的那份 deck 上，两套同时可见会索引打架（审计 B-09）；</li>
      *   <li>{@code pdf_highlight} / {@code pdf_annotate} / {@code pdf_redact} /
      *       {@code pdf_replace_text} —— PdfTools.finishModification 里的 sendReloadFileAction；</li>
      *   <li>{@code text_write_file} / {@code text_find_replace} ——
@@ -94,9 +92,7 @@ class ToolDeclarationContractTest {
      * 不是顺手扩大的——改口径要连同 {@code ToolMeta.requiresHost} 的 javadoc 一起改。
      */
     private static final Set<String> EXPECTED_LOWA_ONLY = new TreeSet<>(Set.of(
-            "pptx_open_file",
             "pptx_generate",
-            "pptx_apply_format",
             "litigation_render",
             "litigation_timeline_render",
             "pdf_to_word",
@@ -142,64 +138,26 @@ class ToolDeclarationContractTest {
             "LitigationTimelineTools.java", 1, // litigation_timeline_render
             "LitigationVisualTools.java", 1,   // litigation_render
             "PdfTools.java", 4,                // pdf_to_word 三个分支 + finishModification
-            "PptxTools.java", 3,               // pptx_open_file / pptx_generate / pptx_apply_format
+            "PptxTools.java", 1,               // pptx_generate
             "TextFileEditTools.java", 1));     // writeBack（text_write_file 与 text_find_replace 共用）
 
     /**
-     * 只登记、不下发规格的工具（审计 A15 / A13 / B-09）。
+     * 只登记、不下发规格的工具（offerToModel = false）。
      *
-     * <p>三类，理由各不相同：
-     * <ul>
-     *   <li><b>永久停用 / 调试类</b>（delete_file、doc_debug_revisions）：不该出现在律师面前；</li>
-     *   <li><b>已合并的旧入口</b>（search_knowledge_base、deep_search，dev-board#807）：
-     *       三个雷同的记忆检索工具合成了 {@code query_memory(depth=quick|hybrid|deep)}，
-     *       旧名保留为兼容入口，规格不再下发，模型不会再在三个同义工具之间摇摆；</li>
-     *   <li><b>非权威编辑面</b>（pptx_open_file、pptx_apply_format、pptx_edit_page，dev-board#808）：
-     *       PPTX 的权威编辑面是 slide_*（编辑器内存、页码 1 起）。这三个走 pptx-service 直接改磁盘、
-     *       索引 0 起，与 slide_* 大面积重合；两套同时可见时模型混用必然错页，而 pptx_apply_format
-     *       改完还会强制 reload，把编辑器里尚未保存的修改静默丢掉。</li>
-     *   <li><b>与每轮注入的上下文重复</b>（get_user_profile、get_project_context、get_conversation_summary，
-     *       dev-board#1065 T-13）：它们取的东西 ContextAssemblerService 每轮都已放进上下文，
-     *       下发只会让模型多花一次往返去取一份它已经有的东西。</li>
-     *   <li><b>文件与读取面的同义入口</b>（dev-board#1065，审计 T-03/T-05/T-06/T-07/T-27）：
-     *       pdf_list_files / pptx_list_files / pptx_search_files 是 doc_list_project_files 按类型过滤的子集
-     *       （后者如今在每一类会话里都可见）；read_document 与 extract_file_text 是同一个抽取器的两个入口；
-     *       move_file 是 move_files_batch 的单条形态；scan_files 只为 write_file 写不进子文件夹而存在；
-     *       doc_search_related_docs 自称搜内容、实际只比文件名，已由 search_project_content 取代。</li>
-     *   <li><b>同一件事的多余路径</b>（dev-board#1065 T-14 / T-15）：文档里删一句原先有八条路，
-     *       {@code doc_delete_text} / {@code doc_delete_match} / {@code doc_replace_nth_match} 的描述
-     *       不给判据，删除一律走 doc_replace_at_anchor / doc_find_replace 传空串；
-     *       {@code doc_get_selection} 被 doc_get_cursor_context 覆盖；{@code doc_set_selection} 用的是
-     *       本仓明令禁止的整数字符偏移。worker 的这几个 action 仍被插件（DOC_ACTIONS）直接调用。</li>
-     * </ul>
-     *
-     * <p>五类都<b>只裁 spec、不裁 execute</b>：老会话回放与 XML 兜底路径调到时照常执行，
-     * 拿到的是工具自己那句可行动的说明，好过一句 "Tool not found"。
+     * <p>tool-system-v2 V3 已删除全部 22 个长期隐藏工具（delete_file、read_document、
+     * search_knowledge_base、pptx_open_file 等），此名单现为空：任何新增的 offerToModel = false
+     * 都要回来改这份清单并说明理由。已删除的名字由 {@code permanentlyHiddenToolsAreStillRegistered}
+     * 旁的 {@code deletedHiddenToolsAreGone} 钉住「不再注册」。
      */
-    private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>(Set.of(
-            "delete_file",
-            "doc_debug_revisions",
-            "search_knowledge_base",
-            "deep_search",
-            "pptx_open_file",
-            "pptx_apply_format",
-            "pptx_edit_page",
-            "get_user_profile",
-            "get_project_context",
-            "get_conversation_summary",
-            // dev-board#1065
-            "pdf_list_files",
-            "pptx_list_files",
-            "pptx_search_files",
-            "read_document",
-            "move_file",
-            "scan_files",
-            "doc_search_related_docs",
-            "doc_delete_text",
-            "doc_delete_match",
-            "doc_replace_nth_match",
-            "doc_get_selection",
-            "doc_set_selection"));
+    private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>();
+
+    /** V3 删除的 22 个长期隐藏工具（docs/plans/tool-system-v2-inventory.csv 里 verdict=deprecate 的行）。 */
+    private static final Set<String> DELETED_IN_V3 = new TreeSet<>(Set.of(
+            "doc_get_selection", "doc_set_selection", "doc_replace_nth_match", "doc_delete_match",
+            "doc_delete_text", "doc_search_related_docs", "doc_debug_revisions", "scan_files",
+            "delete_file", "move_file", "read_document", "get_user_profile", "get_project_context",
+            "search_knowledge_base", "deep_search", "get_conversation_summary", "pdf_list_files",
+            "pptx_list_files", "pptx_search_files", "pptx_open_file", "pptx_apply_format", "pptx_edit_page"));
 
     private static RecordingToolRegistry registry() {
         RecordingToolRegistry registry =
@@ -345,6 +303,24 @@ class ToolDeclarationContractTest {
             assertTrue(registry.resolve(tool).isPresent(),
                     tool + " 的登记要保留：XML 兜底路径调到时，工具自己那句可行动的错误"
                             + "远好过一句 'Tool not found'（后者会让模型以为这个能力整个不存在）");
+        }
+    }
+
+    @Test
+    @DisplayName("V3 删除的 22 个长期隐藏工具不再注册，也没有任何 @Tool 方法")
+    void deletedHiddenToolsAreGone() {
+        RecordingToolRegistry registry = registry();
+        Set<String> declared = new TreeSet<>();
+        for (AgentToolComponent bean : RealToolBeans.instantiateAll()) {
+            for (Method m : bean.getClass().getDeclaredMethods()) {
+                if (m.isAnnotationPresent(Tool.class)) {
+                    declared.add(m.getName());
+                }
+            }
+        }
+        for (String tool : DELETED_IN_V3) {
+            assertFalse(declared.contains(tool), tool + " 应已删除，却仍有 @Tool 方法");
+            assertTrue(registry.resolve(tool).isEmpty(), tool + " 应已删除，却仍在注册表里");
         }
     }
 

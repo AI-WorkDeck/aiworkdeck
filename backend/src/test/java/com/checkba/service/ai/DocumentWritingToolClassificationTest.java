@@ -60,7 +60,6 @@ class DocumentWritingToolClassificationTest {
     private static final Set<String> EXPECTED_READ_ONLY = new TreeSet<>(List.of(
             // —— doc_：读取 ——
             "doc_audit_structure",
-            "doc_debug_revisions",
             "doc_find_text",
             "doc_get_clauses",
             "doc_get_comments",
@@ -69,18 +68,15 @@ class DocumentWritingToolClassificationTest {
             "doc_get_formatting",
             "doc_get_outline",
             "doc_get_paragraph",
-            "doc_get_selection",
             "doc_list_evidence",
             "doc_list_project_files",
             "doc_list_revisions",
-            "doc_search_related_docs",
             "doc_table_read",
             // —— doc_：定位 / 打开 ——
             "doc_goto",
             "doc_open_file",
             "doc_select_anchor",
             "doc_select_paragraph",
-            "doc_set_selection",
             // —— doc_：导出（产出一份新 PDF，不改文档本身，dev-board#1065 T-25）——
             "doc_export_pdf",
             // —— sheet_ ——
@@ -146,7 +142,7 @@ class DocumentWritingToolClassificationTest {
         assertFalse(ClientCapabilityService.isDocumentWritingTool("doc_find_text"));
 
         // selection 不能做子串匹配：挪选区是只读，对选区动手是写入。
-        assertFalse(ClientCapabilityService.isDocumentWritingTool("doc_set_selection"));
+        assertFalse(ClientCapabilityService.isDocumentWritingTool("doc_select_anchor"));
         assertTrue(ClientCapabilityService.isDocumentWritingTool("doc_replace_selection"));
         assertTrue(ClientCapabilityService.isDocumentWritingTool("doc_delete_selection"));
         assertTrue(ClientCapabilityService.isDocumentWritingTool("doc_format_selection"));
@@ -162,7 +158,7 @@ class DocumentWritingToolClassificationTest {
     @DisplayName("「先读文档再起草」的典型序列：读取工具一个都不该被算成改过文档")
     void readThenDraftIsNotAnEdit() {
         for (String readOnly : List.of("doc_open_file", "doc_get_document_text", "doc_get_outline",
-                "doc_get_clauses", "doc_list_project_files", "doc_search_related_docs",
+                "doc_get_clauses", "doc_list_project_files",
                 "doc_find_text", "doc_goto", "doc_select_paragraph", "sheet_read_range")) {
             assertFalse(ClientCapabilityService.isDocumentWritingTool(readOnly),
                     readOnly + " 是读取类，算成「改过文档」会把最该出按钮那一轮的按钮藏掉");

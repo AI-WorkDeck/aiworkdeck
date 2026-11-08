@@ -61,43 +61,6 @@ public class PdfTools implements AgentToolComponent {
 
     // ==================== 读取 ====================
 
-    // dev-board#1065（审计 T-27）：doc_list_project_files 如今在每一类会话里都可见，是唯一的权威清单；
-    // 这份按类型过滤的子集只登记不下发（老会话回放与 XML 兜底照常执行）。
-    @ToolMeta(displayName = "列出PDF文件", category = "pdf", offerToModel = false)
-    @Tool("PDF 专用清单：等价于 doc_list_project_files 只保留 .pdf 的那一份结果，返回文件 ID、名称和位置。"
-            + "**要看项目里有哪些文件（含 Word / Excel / PPT / 文本 / 图片）请直接用 doc_list_project_files，一次列全**，"
-            + "它给出的 fileId 同样可以直接喂给 pdf_* 工具；只有在结果太多、确实只想看 PDF 时才用本工具。")
-    public String pdf_list_files(
-            @P("项目 ID") Long projectId
-    ) {
-        log.info("Tool: pdf_list_files called for projectId={}", projectId);
-        try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
-            List<ProjectFile> pdfs = allFiles.stream()
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
-                    .filter(f -> f.getName() != null && f.getName().toLowerCase().endsWith(".pdf"))
-                    .toList();
-            if (pdfs.isEmpty()) {
-                return "项目中没有 PDF 文件。";
-            }
-            StringBuilder sb = new StringBuilder("项目中的 PDF 文件 (共 " + pdfs.size() + " 个):\n");
-            for (ProjectFile f : pdfs) {
-                sb.append(String.format("- ID: %d, 名称: %s\n", f.getId(), f.getName()));
-            }
-            sb.append("\n后续全部 pdf_* 工具都使用上述 ID：\n")
-                    .append("- 读与标注：pdf_inspect（逐页读，支持 offset 续读）/ pdf_highlight / pdf_annotate / pdf_redact / pdf_replace_text\n")
-                    .append("- 页级组织（都产出新文件、原件不动）：pdf_merge 合并成册、pdf_split 按范围拆分、")
-                    .append("pdf_extract_pages 提取指定页、pdf_delete_pages 删页、pdf_rotate_pages 旋转页、")
-                    .append("pdf_add_page_numbers 编页码或贝茨编号\n")
-                    .append("- 大范围改内容：pdf_to_word 转成 Word 后用 doc_* 编辑");
-            return sb.toString();
-        } catch (Exception e) {
-            log.error("Failed to list PDF files", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
     @ToolMeta(displayName = "读取PDF内容", category = "pdf")
     @Tool("读取 PDF 文件的逐页文本与基本信息（页数、每页字符数、是否有文本层、当前旋转角度）。" +
           "本工具的 pageIndex 从 0 开始（注意：页操作类工具的 ranges 用的是 1 基页码）。" +

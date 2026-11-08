@@ -894,6 +894,16 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
   `doc_get_cursor_context` 覆盖）、`doc_set_selection`（T-15：用的是本仓禁止的整数字符偏移）。
   它们的 worker action 仍在 `PluginHostImpl.DOC_ACTIONS` 里给插件用，登记也保留。完整清单见
   `ToolDeclarationContractTest.EXPECTED_NOT_OFFERED`（逐名钉住 + 断言登记仍在）。
+  **tool-system-v2 V3 已把上述全部 22 个长期隐藏工具整个删除**（不再登记，XML 兜底调到会得到「Tool not found」）：
+  `doc_get_selection` / `doc_set_selection` / `doc_replace_nth_match` / `doc_delete_match` / `doc_delete_text` /
+  `doc_search_related_docs` / `doc_debug_revisions` / `scan_files` / `delete_file` / `move_file` / `read_document` /
+  `get_user_profile` / `get_project_context` / `search_knowledge_base` / `deep_search` / `get_conversation_summary` /
+  `pdf_list_files` / `pptx_list_files` / `pptx_search_files` / `pptx_open_file` / `pptx_apply_format` / `pptx_edit_page`。
+  现在 `EXPECTED_NOT_OFFERED` 是空集，`ToolDeclarationContractTest.deletedHiddenToolsAreGone` 钉住「不再有 @Tool 方法」；
+  回放用例里原来写在 `offeredToolsExclude` 的它们改写进 `expect.toolsNotRegistered`（断言真实工具 bean 里没有该 @Tool）。
+  **例外：`LegalTools.read_document` 的 Java 方法保留**（只去掉 `@Tool`/`@ToolMeta`），上下文组装的附件与活跃文档注入、
+  `run_python` 的 default_api 仍直接调它；评测里别再脚本化调这些名字。worker 的 set_selection / replace_nth_match /
+  delete_match / delete_text action 仍在 `PluginHostImpl.DOC_ACTIONS` 给插件用。
   **skill 白名单放不回 `offerToModel = false` 的工具**（T-26 核实）：`SkillRouter.visibleTools` 只在
   `getAllSpecifications` 给出的候选集里挑，而候选集来自 `builtinSpecifications`，这类工具在注册时就没进去。
   所以「先藏起来、命中某个 skill 再放出来」这条路走不通——要做只能另开机制。开发者向的
