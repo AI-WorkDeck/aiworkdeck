@@ -346,25 +346,29 @@ public class HarnessDiagnosticService {
                 || HTTP_ERROR.matcher(resultText).find();
     }
 
-    private static final java.util.regex.Pattern HTTP_403 = java.util.regex.Pattern.compile("(?<!\\d)403(?!\\d)");
+    private static final java.util.regex.Pattern HTTP_403 = java.util.regex.Pattern.compile(
+            "(?i)(http|status)\\s*:?\\s*403\\b|\\b403\\s+forbidden");
 
     /**
-     * 权限拒绝类结果（Not permitted / 无权 / 没有权限 / access denied / forbidden / 403）。
+     * 权限拒绝类的失败结果（Not permitted / 无权 / 没有权限 / access denied / forbidden / HTTP 403）。
      * 与「不可用」同样不展开类目、不触发 ask_user 护栏；缺权限不是缺事实，问用户补材料没用。
+     *
+     * <p>只能用于已判定失败的工具结果（调用方已要求 success=false），且短语必须出现在开头 200 字内：
+     * 法律文书正文常含「无权代理」「无权处分」「forbidden」「403」，成功输出绝不能被它命中。
      */
     public static boolean isPermissionDenied(String resultText) {
         if (resultText == null || resultText.isBlank()) {
             return false;
         }
-        String lower = resultText.toLowerCase(Locale.ROOT);
+        String head = resultText.length() > 200 ? resultText.substring(0, 200) : resultText;
+        String lower = head.toLowerCase(Locale.ROOT);
         return lower.contains("not permitted")
                 || lower.contains("permission denied")
                 || lower.contains("access denied")
-                || lower.contains("forbidden")
-                || resultText.contains("无权")
-                || resultText.contains("没有权限")
-                || resultText.contains("无权限")
-                || HTTP_403.matcher(resultText).find();
+                || lower.contains("forbidden:")
+                || head.contains("无权访问") || head.contains("无权查看") || head.contains("无权限")
+                || head.contains("没有权限")
+                || HTTP_403.matcher(head).find();
     }
 
     private static boolean isAnchorOrMatchMiss(String resultText) {
