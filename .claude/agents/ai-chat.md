@@ -35,6 +35,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 - `@ToolMeta.access()` 默认 INFERRED，由 `service/ai/capability/CapabilityCatalog` 按工具名动词推断 read/write/destructive（认不出算 write），并推出 scope `awd:<领域>.<read|write>`。`docs/capability-catalog.md` 由 `CapabilityCatalogDocTest` 生成并做漂移比对：**增删改工具后要重新生成**（`AWD_WRITE_CAPABILITY_CATALOG=1 mvn test -Dtest=CapabilityCatalogDocTest`），推断不对就在 `@ToolMeta` 显式写 access。
 - AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，除 `propose_revision` 外全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read；唯一的写工具是 `propose_revision`（access=write，scope `awd:project.propose`，`CapabilityCatalogDocTest` 点名放行，不改文件只落 `PendingRevision`，契约见 `ai-doc-bridge.md`「外部 Agent 待审修订」）。`read_file` 返回 `version`（= 更新时间毫秒-字节数），即提案的 `baseVersion`。`tools/call` 来源标注取请求头 User-Agent（无状态，拿不到 initialize 的 clientInfo），净化后写成 `mcp:<client>`。
 
+## 工具调用审计（agent-app-control C8）
+
+`ToolRegistry.execute` 结束后异步（单线程守护执行器，失败仅 WARN）写 `UserActivityLog`：`actionType=ai_tool`，`targetName=工具名`，`metaInfo={source: agent|mcp|plugin-ui, access, pluginId?, argsDigest(sha256), ok, durationMs}`，绝不记参数值与输出。source：`conversationId` 以 `mcp:` 开头为 mcp，`PluginController` 直调走四参重载传 `plugin-ui`，其余 agent；`list_tools`/`use_skill`、未知工具、无 userId 不记。ok=输出不以 `Error` 开头。前端活动日志暂无 source 过滤，`ai_tool` 行无专属 i18n（回退显示原值）。回归 `ToolRegistryAuditTest`。
+
 ## 独立 MCP 连接（dev-board#1599）
 
 `UserMcpConnectionService` 与 `/api/mcp/{presets,connections}` 独立于 Plugin 启停，按本地 userId + 当前平台账户指纹隔离配置。`PluginCredentialStore` 加密保存 Bearer、请求头、env 及 OAuth 凭据；API 不回显秘密。GET 离线列预置/状态，显式 test 才 initialize/tools-list，显式 enable 才向 AI 提供工具。公网 HTTPS Streamable HTTP 复用 `PluginMcpEndpointPolicy`/`PluginMcpHttpClient`；桌面 stdio 经版本绑定确认后由 `UserMcpStdioClient` 启动；OAuth 由 `UserMcpOAuthService` 标准发现、PKCE、加密刷新，测试和业务调用都使用同一解析入口。新增配置导入/授权契约见 plugin-marketplace.md 的 MCP 高级连接节（#1601–1603）。
