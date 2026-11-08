@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Sürümler",
   "railLabelFeedback": "Bildirim",
   "railLabelLitigation": "Grafikler",
-  "railLabelBaoqingtian": "Olaylar",
+  "railLabelBaoqingtian": "Davalar",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Büro",
   "railLabelTmeet": "Toplantı",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Eklenti",
   "pluginLabels": {
     "tencentMeeting": "Tencent Meeting Toplantıları",
-    "baoqingtian": "Baoqingtian · Olay Zaman Çizelgesi ve Çelişki İncelemesi",
+    "baoqingtian": "Baoqingtian · Davalar ve notlar",
     "dpiaWorkbench": "DPIA Uyum Çalışma Tezgahı",
     "lawfirmManagement": "Hukuk Bürosu Yönetimi",
     "projectIm": "Proje Sohbeti"

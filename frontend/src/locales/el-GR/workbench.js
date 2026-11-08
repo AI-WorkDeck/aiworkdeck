@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Εκδόσεις",
   "railLabelFeedback": "Σχόλια",
   "railLabelLitigation": "Γραφήματα",
-  "railLabelBaoqingtian": "Γεγονότα",
+  "railLabelBaoqingtian": "Υποθέσεις",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Γραφείο",
   "railLabelTmeet": "Σύσκεψη",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Πρόσθετο",
   "pluginLabels": {
     "tencentMeeting": "Συσκέψεις Tencent Meeting",
-    "baoqingtian": "Baoqingtian · Χρονολόγιο γεγονότων & έλεγχος αντιφάσεων",
+    "baoqingtian": "Baoqingtian · Υποθέσεις & σημειώσεις",
     "dpiaWorkbench": "Περιβάλλον συμμόρφωσης DPIA",
     "lawfirmManagement": "Διαχείριση δικηγορικού γραφείου",
     "projectIm": "Συνομιλία έργου"

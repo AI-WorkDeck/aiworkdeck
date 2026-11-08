@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Версии",
   "railLabelFeedback": "Отзыв",
   "railLabelLitigation": "Схемы",
-  "railLabelBaoqingtian": "Факты",
+  "railLabelBaoqingtian": "Дела",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Фирма",
   "railLabelTmeet": "Встреча",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Плагин",
   "pluginLabels": {
     "tencentMeeting": "Встречи Tencent Meeting",
-    "baoqingtian": "Бао Цинтянь · Хронология фактов и проверка противоречий",
+    "baoqingtian": "Baoqingtian · Дела и заметки",
     "dpiaWorkbench": "Рабочее место комплаенса DPIA",
     "lawfirmManagement": "Управление юридической фирмой",
     "projectIm": "Чат проекта"

@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Versi",
   "railLabelFeedback": "Cadangan",
   "railLabelLitigation": "Carta",
-  "railLabelBaoqingtian": "Fakta",
+  "railLabelBaoqingtian": "Kes",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Firma",
   "railLabelTmeet": "Mesyuarat",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Pemalam",
   "pluginLabels": {
     "tencentMeeting": "Mesyuarat Tencent (Tencent Meeting)",
-    "baoqingtian": "Baoqingtian · Garis Masa Fakta & Semakan Percanggahan",
+    "baoqingtian": "Baoqingtian · Kes & nota",
     "dpiaWorkbench": "Meja Kerja Pematuhan Data DPIA",
     "lawfirmManagement": "Pengurusan Firma Guaman",
     "projectIm": "Sembang Projek"

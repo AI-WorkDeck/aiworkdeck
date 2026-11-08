@@ -196,7 +196,7 @@ export default {
   railLabelVersion: '版本',
   railLabelFeedback: '反馈',
   railLabelLitigation: '诉讼图表',
-  railLabelBaoqingtian: '包青天',
+  railLabelBaoqingtian: '包晴天',
   railLabelDpia: 'DPIA',
   railLabelLawfirm: '律所管理',
   railLabelTmeet: '腾讯会议',
@@ -380,7 +380,7 @@ export default {
   pluginFallbackName: '插件',
   pluginLabels: {
     tencentMeeting: '腾讯会议',
-    baoqingtian: '包青天 · 事实时间线与矛盾审查',
+    baoqingtian: '包晴天 · 案源与笔记',
     dpiaWorkbench: 'DPIA 数据合规工作台',
     lawfirmManagement: '律所管理',
     projectIm: '项目群聊',

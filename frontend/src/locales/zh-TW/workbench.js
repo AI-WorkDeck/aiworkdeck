@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "版本",
   "railLabelFeedback": "回饋",
   "railLabelLitigation": "訴訟圖表",
-  "railLabelBaoqingtian": "包青天",
+  "railLabelBaoqingtian": "包晴天",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "律所管理",
   "railLabelTmeet": "騰訊會議",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "外掛",
   "pluginLabels": {
     "tencentMeeting": "騰訊會議",
-    "baoqingtian": "包青天 · 事實時間線與矛盾審查",
+    "baoqingtian": "包晴天 · 案源與筆記",
     "dpiaWorkbench": "DPIA 數據合規工作台",
     "lawfirmManagement": "律所管理",
     "projectIm": "項目群聊"
