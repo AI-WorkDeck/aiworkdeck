@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,6 +85,40 @@ class CapabilityCatalogDocTest {
         }
     }
 
+    /** 对外 MCP = 精修工具 + ToolRegistry 投影（C7）：投影出来的内置工具必须全是 READ，写入类只有精修的 propose_revision。 */
+    @Test
+    void mcpProjectionOfRealRegistryIsReadOnlyBuiltins() {
+        org.objenesis.ObjenesisStd objenesis = new org.objenesis.ObjenesisStd();
+        List<com.checkba.service.ai.tools.AgentToolComponent> beans = new ArrayList<>();
+        for (Class<?> type : toolClasses()) {
+            if (!java.lang.reflect.Modifier.isAbstract(type.getModifiers())) {
+                beans.add((com.checkba.service.ai.tools.AgentToolComponent) objenesis.newInstance(type));
+            }
+        }
+        var registry = new com.checkba.service.ai.ToolRegistry(beans,
+                org.mockito.Mockito.mock(com.checkba.service.ai.PluginService.class),
+                new com.checkba.service.ai.ClientCapabilityService());
+        registry.init();
+        Map<String, CapabilityCatalog.Capability> byId = catalog().stream()
+                .collect(Collectors.toMap(CapabilityCatalog.Capability::id, Function.identity()));
+        List<String> projected = registry.mcpCandidates().stream().map(c -> c.spec().name()).toList();
+        assertTrue(projected.contains("task_list"), projected.toString());
+        for (var candidate : registry.mcpCandidates()) {
+            String name = candidate.spec().name();
+            assertEquals(ToolMeta.Access.READ, candidate.access(), name);
+            var capability = byId.get(name);
+            assertEquals(ToolMeta.Access.READ, capability.access(), name);
+            assertEquals("NONE", capability.host(), name);
+            assertTrue(capability.offeredToModel(), name);
+            assertTrue(Stream.of("doc_", "sheet_", "slide_", "office_", "ref_").noneMatch(name::startsWith), name);
+        }
+        for (String writer : List.of("task_create", "write_docx", "doc_find_replace", "delete_file", "memory_delete", "ask_user", "list_tools",
+                "search_web", "qichacha_ipr", "qichacha_query", "tushare_query", "law_search", "law_search_keyword",
+                "law_recognition", "get_law_article", "case_search")) {
+            assertTrue(!projected.contains(writer), writer);
+        }
+    }
+
     @Test
     void committedDocMatchesGeneratedCatalog() throws Exception {
         String generated = CapabilityCatalog.renderMarkdown(catalog());
@@ -99,6 +134,10 @@ class CapabilityCatalogDocTest {
 
     /** 口径同 ToolRegistry / ToolDisplayNameCoverageTest：扫 AgentToolComponent 的生产实现类。 */
     private static List<CapabilityCatalog.Capability> catalog() {
+        return CapabilityCatalog.fromToolClasses(toolClasses());
+    }
+
+    private static List<Class<?>> toolClasses() {
         ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AssignableTypeFilter(AgentToolComponent.class));
         List<Class<?>> classes = new ArrayList<>();
@@ -113,6 +152,6 @@ class CapabilityCatalogDocTest {
                 throw new IllegalStateException(e);
             }
         }
-        return CapabilityCatalog.fromToolClasses(classes);
+        return classes;
     }
 }

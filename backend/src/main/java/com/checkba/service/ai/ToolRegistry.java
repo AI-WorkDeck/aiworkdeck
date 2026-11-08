@@ -649,6 +649,64 @@ public class ToolRegistry {
         return null;
     }
 
+    /** 对外 MCP 投影的候选（docs/plans/agent-app-control.md C7）：规格已摘掉服务端注入参数，needsProject 标明是否要调用方显式给 projectId。 */
+    public record McpCandidate(ToolSpecification spec, ToolMeta.Access access, boolean needsProject) {}
+
+    /** 这些前缀的工具依赖编辑器/Office 宿主会话，即使没声明 requiresHost 也不对外投影。 */
+    private static final List<String> MCP_HOST_PREFIXES = List.of("doc_", "sheet_", "slide_", "office_", "ref_");
+
+    /** 只对应应用内对话流程（向用户提问、工具目录、本轮附件），对外 Agent 没有可用语义，不投影。 */
+    private static final Set<String> MCP_IN_APP_ONLY = Set.of("ask_user", "list_tools", "list_attached_files");
+
+    /**
+     * 按量计费的外部服务工具（搜索/企查查/Tushare/北大法宝，即 {@code ExternalServiceProvider} 的 SEARCH/QICHACHA/TUSHARE/PKULAW）
+     * 不对外投影：外部 Agent 可能循环调用、在用户看不见的地方花光积分。工具类上没有可读的「走付费网关」信号
+     * （档位判定在各工具方法体内，经 ExternalServiceAvailability），所以这里是显式名单，新增此类工具须同步登记。
+     */
+    private static final Set<String> MCP_METERED_EXTERNAL = Set.of("search_web", "tushare_query",
+            "law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
+    private static final String MCP_METERED_PREFIX = "qichacha_";
+
+    /**
+     * 可投影到对外 MCP 的工具：内置工具只放 access=READ 且 requiresHost=NONE 且 offerToModel；
+     * 声明式插件工具 read 缺省投影、write 须显式 {@code mcp:true}，{@code mcp:false} 一律不投；destructive 永不投影。
+     * 此刻不可用的工具（{@link #unusableToolNames()}）与已停用插件的工具不在其中。插件 JAR 的 @Tool 不投影。
+     */
+    public List<McpCandidate> mcpCandidates() {
+        List<McpCandidate> out = new ArrayList<>();
+        Set<String> unusable = unusableToolNames();
+        Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
+        boolean tmeetPluginActive = tencentMeetingPluginActive();
+        for (ToolSpecification spec : builtinSpecifications) {
+            String name = spec.name();
+            RegisteredTool registered = builtinTools.get(name);
+            ToolMeta meta = registered.meta();
+            if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
+                    || name.startsWith(MCP_METERED_PREFIX) || (tmeetPluginActive && name.startsWith("tmeet_"))
+                    || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
+                    || (meta != null && meta.requiresHost() != ToolMeta.Host.NONE)
+                    || com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ) continue;
+            if (registered.bean() instanceof AgentToolComponent component
+                    && !availability.computeIfAbsent(component, this::componentAvailable)) continue;
+            boolean needsProject = registered.method() != null && java.util.Arrays.stream(registered.method().getParameters())
+                    .anyMatch(p -> "projectId".equals(p.getName()));
+            out.add(new McpCandidate(spec, ToolMeta.Access.READ, needsProject));
+        }
+        for (DeclaredToolBinding b : declaredBindings()) {
+            String name = b.specification().name();
+            if (unusable.contains(name) || builtinTools.containsKey(name)) continue;
+            ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, b.tool().getAccess());
+            Boolean mcp = b.tool().getMcp();
+            boolean projected = access == ToolMeta.Access.READ ? !Boolean.FALSE.equals(mcp)
+                    : access == ToolMeta.Access.WRITE && Boolean.TRUE.equals(mcp);
+            if (!projected) continue;
+            var params = b.specification().parameters();
+            out.add(new McpCandidate(b.specification(), access,
+                    params != null && params.properties() != null && params.properties().containsKey("projectId")));
+        }
+        return out;
+    }
+
     /** 声明式 read 工具名：ASK 模式放行（与 AgentOrchestrator.ASK_READ_TOOLS 并集）。 */
     public Set<String> declaredReadToolNames() {
         Set<String> names = new java.util.HashSet<>();

@@ -12,6 +12,7 @@ import com.checkba.service.ContentSearchService;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.ProjectService;
+import com.checkba.service.UserActivityLogService;
 import com.checkba.service.ai.tools.ToolMeta;
 import com.checkba.service.file.ProjectFileTextExtractor;
 import com.checkba.service.revision.PendingRevisionService;
@@ -90,12 +91,17 @@ public class LocalMcpServerTools {
                     proposeSchema(),
                     ToolMeta.Access.WRITE, "awd:project.propose", List.of()));
 
+    public static boolean isCurated(String name) {
+        return DEFINITIONS.stream().anyMatch(d -> d.name().equals(name));
+    }
+
     private final ProjectService projectService;
     private final ProjectMemberService projectMemberService;
     private final ProjectFileRepository projectFileRepository;
     private final ProjectFileTextExtractor textExtractor;
     private final ContentSearchService contentSearchService;
     private final PendingRevisionService pendingRevisionService;
+    private final UserActivityLogService activityLog;
 
     /** 执行一个工具，返回可 JSON 序列化的结果；参数或权限问题抛 {@link ToolError}。 */
     public Object call(String name, Map<String, Object> args, Long userId) {
@@ -104,6 +110,49 @@ public class LocalMcpServerTools {
 
     /** clientName 来自 MCP 请求头，只用于标注待审修订的来源（mcp:&lt;clientName&gt;）。 */
     public Object call(String name, Map<String, Object> args, Long userId, String clientName) {
+        long started = System.currentTimeMillis();
+        boolean ok = false;
+        try {
+            Object result = dispatch(name, args, userId, clientName);
+            ok = true;
+            return result;
+        } finally {
+            audit(name, args, userId, ok, System.currentTimeMillis() - started);
+        }
+    }
+
+    /**
+     * 精修工具不经 ToolRegistry，在这里补与 ToolRegistry.execute 同形的审计（agent-app-control.md C8）：
+     * actionType=ai_tool，metaInfo 只有 source/access/argsDigest/ok/durationMs，不记参数值与输出。审计失败不影响调用。
+     */
+    private void audit(String name, Map<String, Object> args, Long userId, boolean ok, long durationMs) {
+        try {
+            String access = DEFINITIONS.stream().filter(d -> d.name().equals(name)).findFirst()
+                    .map(d -> d.access().name().toLowerCase(java.util.Locale.ROOT)).orElse("unknown");
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("source", "mcp");
+            meta.put("access", access);
+            meta.put("argsDigest", argsDigest(args));
+            meta.put("ok", ok);
+            meta.put("durationMs", durationMs);
+            Object projectId = args == null ? null : args.get("projectId");
+            Long pid = projectId instanceof Number n ? n.longValue() : null;
+            activityLog.logActivity(userId, "ai_tool", null, name == null ? "" : name, durationMs,
+                    new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(meta), pid);
+        } catch (Exception e) {
+            log.warn("MCP audit failed for {}: {}", name, e.getMessage());
+        }
+    }
+
+    private static String argsDigest(Map<String, Object> args) throws Exception {
+        String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .writeValueAsString(args == null ? Map.of() : args);
+        byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return java.util.HexFormat.of().formatHex(d);
+    }
+
+    private Object dispatch(String name, Map<String, Object> args, Long userId, String clientName) {
         Map<String, Object> a = args == null ? Map.of() : args;
         return switch (name == null ? "" : name) {
             case "list_projects" -> listProjects(userId);
