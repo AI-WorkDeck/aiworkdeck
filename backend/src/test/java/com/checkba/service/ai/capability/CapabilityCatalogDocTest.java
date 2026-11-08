@@ -112,7 +112,9 @@ class CapabilityCatalogDocTest {
             assertTrue(capability.offeredToModel(), name);
             assertTrue(Stream.of("doc_", "sheet_", "slide_", "office_", "ref_").noneMatch(name::startsWith), name);
         }
-        for (String writer : List.of("task_create", "write_docx", "doc_find_replace", "delete_file", "memory_delete", "ask_user", "list_tools")) {
+        for (String writer : List.of("task_create", "write_docx", "doc_find_replace", "delete_file", "memory_delete", "ask_user", "list_tools",
+                "search_web", "qichacha_ipr", "qichacha_query", "tushare_query", "law_search", "law_search_keyword",
+                "law_recognition", "get_law_article", "case_search")) {
             assertTrue(!projected.contains(writer), writer);
         }
     }

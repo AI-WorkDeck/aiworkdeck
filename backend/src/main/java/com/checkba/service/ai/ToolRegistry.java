@@ -659,6 +659,15 @@ public class ToolRegistry {
     private static final Set<String> MCP_IN_APP_ONLY = Set.of("ask_user", "list_tools", "list_attached_files");
 
     /**
+     * 按量计费的外部服务工具（搜索/企查查/Tushare/北大法宝，即 {@code ExternalServiceProvider} 的 SEARCH/QICHACHA/TUSHARE/PKULAW）
+     * 不对外投影：外部 Agent 可能循环调用、在用户看不见的地方花光积分。工具类上没有可读的「走付费网关」信号
+     * （档位判定在各工具方法体内，经 ExternalServiceAvailability），所以这里是显式名单，新增此类工具须同步登记。
+     */
+    private static final Set<String> MCP_METERED_EXTERNAL = Set.of("search_web", "tushare_query",
+            "law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
+    private static final String MCP_METERED_PREFIX = "qichacha_";
+
+    /**
      * 可投影到对外 MCP 的工具：内置工具只放 access=READ 且 requiresHost=NONE 且 offerToModel；
      * 声明式插件工具 read 缺省投影、write 须显式 {@code mcp:true}，{@code mcp:false} 一律不投；destructive 永不投影。
      * 此刻不可用的工具（{@link #unusableToolNames()}）与已停用插件的工具不在其中。插件 JAR 的 @Tool 不投影。
@@ -672,7 +681,8 @@ public class ToolRegistry {
             String name = spec.name();
             RegisteredTool registered = builtinTools.get(name);
             ToolMeta meta = registered.meta();
-            if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || (tmeetPluginActive && name.startsWith("tmeet_"))
+            if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
+                    || name.startsWith(MCP_METERED_PREFIX) || (tmeetPluginActive && name.startsWith("tmeet_"))
                     || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
                     || (meta != null && meta.requiresHost() != ToolMeta.Host.NONE)
                     || com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ) continue;
