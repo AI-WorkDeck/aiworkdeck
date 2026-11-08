@@ -421,6 +421,8 @@ public class AgentOrchestrator {
          *
          * <p>写在分发线程、读在下一轮的组装处，故用并发集合。
          */
+        /** 生效 skill 白名单点名的工具名（只增不减）：按名放行，不连带整个类目。 */
+        final java.util.Set<String> skillToolNames = java.util.concurrent.ConcurrentHashMap.newKeySet();
         final java.util.Set<String> expandedToolCategories = java.util.concurrent.ConcurrentHashMap.newKeySet();
         /**
          * 本轮候选工具集（三层闸过完、渐进披露收窄之前）。{@code list_tools} 要列的
@@ -3632,11 +3634,9 @@ public class AgentOrchestrator {
         if (def.isEmpty()) {
             return;
         }
-        java.util.Set<String> putBack = policy == null
-                ? java.util.Set.of() : policy.categoriesCoveredBy(def.get().getAllowedTools());
-        guard.expandedToolCategories.addAll(putBack);
-        if (policy != null && policy.namesDocEditPrimitive(def.get().getAllowedTools())) {
-            guard.noFileEntrySet = false;
+        java.util.Set<String> putBack = java.util.Set.of();
+        if (def.get().getAllowedTools() != null) {
+            guard.skillToolNames.addAll(def.get().getAllowedTools());
         }
         log.info("[Skill] conv={} 模型调 use_skill 生效 {}，放回类目 {}（下一轮生效），当前展开集 {}",
                 guard.conversationId, def.get().getId(), putBack, guard.expandedToolCategories);
@@ -3676,9 +3676,8 @@ public class AgentOrchestrator {
         }
         java.util.Set<String> putBack = new java.util.LinkedHashSet<>(policy.categoriesPutBackFor(userMessage));
         for (com.checkba.service.ai.skill.SkillRouter.ActiveSkill skill : skillRouter.activeSkills(guard.runId)) {
-            putBack.addAll(policy.categoriesCoveredBy(skill.definition().getAllowedTools()));
-            if (policy.namesDocEditPrimitive(skill.definition().getAllowedTools())) {
-                guard.noFileEntrySet = false;
+            if (skill.definition().getAllowedTools() != null) {
+                guard.skillToolNames.addAll(skill.definition().getAllowedTools());
             }
         }
         guard.expandedToolCategories.addAll(putBack);
@@ -3717,13 +3716,14 @@ public class AgentOrchestrator {
         // 活跃文档类目裁剪（dev-board#1064）排在核心集收窄之前，两者都是「只留 核心集 ∪ 已放回类目」
         // 的形状，叠起来仍是那个形状。放在决策辅助之后，它刚放回的类目本轮就生效。
         List<ToolSpecification> candidates = guard.docCategoryTrimActive
-                ? policy.trimForDocKind(allCandidates, guard.activeDocKind, guard.expandedToolCategories)
+                ? policy.trimForDocKind(allCandidates, guard.activeDocKind, guard.expandedToolCategories, guard.skillToolNames)
                 : allCandidates;
         guard.roundTrimmed = allCandidates.size() - candidates.size();
         if (guard.decisionContext != null && guard.decisionAbandoned) return candidates;
         if (!policy.isEnabled() && !guard.assistedDisclosure) return candidates;
         List<ToolSpecification> disclosed = policy.narrow(candidates, guard.expandedToolCategories,
-                guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories));
+                guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories),
+                guard.skillToolNames);
         // The static rollout may be off: expose only this safe catalog, not other unavailable tools.
         if (guard.assistedDisclosure && disclosed.stream().noneMatch(s -> ToolDisclosurePolicy.CATALOG_TOOL.equals(s.name()))) {
             toolRegistry.resolve(ToolDisclosurePolicy.CATALOG_TOOL, guard.conversationId)

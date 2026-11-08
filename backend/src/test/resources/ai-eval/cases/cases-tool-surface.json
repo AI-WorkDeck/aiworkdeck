@@ -222,5 +222,18 @@
       ],
       "maxOfferedToolsFirstCall": 70
     }
+  },
+  {
+    "id": "surface-nofile-skill-keeps-offer-within-budget",
+    "title": "没开文件 + 命中 skill（证据目录）+ 「表格」关键词：skill 只按名字放行白名单工具、不连带整类，首轮 ≤45 且 sheet_create_file 可见",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把项目里的证据目录整理成表格",
+    "turns": [{ "text": "<final>好的。</final>" }],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsFirstCall": 45,
+      "offeredToolsInclude": ["sheet_create_file", "list_tools"]
+    }
   }
 ]

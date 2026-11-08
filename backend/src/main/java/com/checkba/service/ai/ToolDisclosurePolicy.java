@@ -399,6 +399,12 @@ public class ToolDisclosurePolicy {
      */
     public List<ToolSpecification> trimForDocKind(List<ToolSpecification> candidates, String activeDocKind,
                                                   Set<String> expanded) {
+        return trimForDocKind(candidates, activeDocKind, expanded, Set.of());
+    }
+
+    /** @param extraNames 生效 skill 白名单点名的工具：即使所在类目被藏也按名保留。 */
+    public List<ToolSpecification> trimForDocKind(List<ToolSpecification> candidates, String activeDocKind,
+                                                  Set<String> expanded, Set<String> extraNames) {
         Set<String> hidden = hiddenCategoriesFor(activeDocKind);
         if (hidden.isEmpty() || candidates == null) {
             return candidates;
@@ -407,7 +413,8 @@ public class ToolDisclosurePolicy {
         List<ToolSpecification> kept = new ArrayList<>();
         for (ToolSpecification spec : candidates) {
             String category = categoryOf(spec.name());
-            if (!hidden.contains(category) || open.contains(category)) {
+            if (!hidden.contains(category) || open.contains(category)
+                    || (extraNames != null && extraNames.contains(spec.name()))) {
                 kept.add(spec);
             }
         }
@@ -518,23 +525,6 @@ public class ToolDisclosurePolicy {
         return covered;
     }
 
-    /**
-     * skill 白名单里点名了「没开文件态」不下发的文档编辑原语 = 这个 skill 要在文档上干活，
-     * 编排器据此结束没开文件态（skill 作者写了就是要用，与 {@link #categoriesCoveredBy} 同一口径）。
-     */
-    public boolean namesDocEditPrimitive(Collection<String> toolNames) {
-        if (toolNames == null) {
-            return false;
-        }
-        for (String name : toolNames) {
-            if (name != null && isDocEditPrimitive(name) && !NOFILE_KEPT_DOC_TOOLS.contains(name)
-                    && !NOFILE_ENTRY_EXTRA.contains(name)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** 核心集（只读）。供契约测试核对「名字是不是真的存在」与常用链的覆盖面。 */
     public Set<String> coreToolNames() {
         return CORE;
@@ -619,12 +609,20 @@ public class ToolDisclosurePolicy {
      *               其余类目照常按展开集放行。
      */
     public List<ToolSpecification> narrow(List<ToolSpecification> candidates, Set<String> expanded, boolean noFile) {
+        return narrow(candidates, expanded, noFile, Set.of());
+    }
+
+    /** @param extraNames 生效 skill 白名单里点名的工具：按名字放行，不连带整个类目。 */
+    public List<ToolSpecification> narrow(List<ToolSpecification> candidates, Set<String> expanded, boolean noFile,
+                                          Set<String> extraNames) {
         Set<String> open = expanded == null ? Set.of() : expanded;
         List<ToolSpecification> kept = new ArrayList<>();
         for (ToolSpecification spec : candidates) {
             String name = spec.name();
             String category = categoryOf(name);
-            if (noFile && NOFILE_ENTRY_EXTRA.contains(name)) {
+            if (extraNames != null && extraNames.contains(name)) {
+                kept.add(spec);
+            } else if (noFile && NOFILE_ENTRY_EXTRA.contains(name)) {
                 kept.add(spec);
             } else if (noFile && isDocEditPrimitive(name) && !NOFILE_KEPT_DOC_TOOLS.contains(name)) {
                 // 没有文档时编辑原语（含被关键词放回的类目里的）一个都用不上；打开 / 新建后 noFile 清零，随展开集回来
