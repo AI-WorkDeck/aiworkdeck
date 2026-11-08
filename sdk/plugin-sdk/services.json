@@ -22,6 +22,19 @@
         "preview": { "access": "read", "requiredPermissions": ["file_read", "file_write"] },
         "redact": { "access": "write", "requiredPermissions": ["file_read", "file_write"] }
       }
+    },
+    "lawfirm": {
+      "operations": {
+        "overview": { "access": "read", "requiredPermissions": ["lawfirm"] },
+        "conflictCheck": { "access": "read", "requiredPermissions": ["lawfirm"] },
+        "feeLedger": { "access": "read", "requiredPermissions": ["lawfirm"] }
+      }
+    },
+    "im": {
+      "operations": {
+        "listConversations": { "access": "read", "requiredPermissions": ["im"] },
+        "readMessages": { "access": "read", "requiredPermissions": ["im"] }
+      }
     }
   }
 }

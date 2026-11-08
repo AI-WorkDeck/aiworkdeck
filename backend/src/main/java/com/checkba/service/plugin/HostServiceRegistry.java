@@ -10,6 +10,8 @@ import com.checkba.service.ContentSearchService;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.TagService;
+import com.checkba.service.im.ImGatewayService;
+import com.checkba.service.lawfirm.LawFirmManagementService;
 import com.checkba.service.task.ProjectTaskService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -61,7 +63,14 @@ public class HostServiceRegistry {
                     "tags", new Spec("read", List.of("file_read"))),
             "sensitive", Map.of(
                     "preview", new Spec("read", List.of("file_read", "file_write")),
-                    "redact", new Spec("write", List.of("file_read", "file_write"))));
+                    "redact", new Spec("write", List.of("file_read", "file_write"))),
+            "lawfirm", Map.of(
+                    "overview", new Spec("read", List.of("lawfirm")),
+                    "conflictCheck", new Spec("read", List.of("lawfirm")),
+                    "feeLedger", new Spec("read", List.of("lawfirm"))),
+            "im", Map.of(
+                    "listConversations", new Spec("read", List.of("im")),
+                    "readMessages", new Spec("read", List.of("im"))));
 
     /** 单次返回给模型的字符上限，超出截断并注明。 */
     static final int MAX_RESULT_CHARS = 30_000;
@@ -71,15 +80,20 @@ public class HostServiceRegistry {
     private final ContentSearchService search;
     private final TagService tags;
     private final ObjectProvider<SensitiveController> sensitive;
+    private final ObjectProvider<LawFirmManagementService> lawfirm;
+    private final ObjectProvider<ImGatewayService> im;
     private final Map<String, Map<String, Handler>> handlers = new LinkedHashMap<>();
 
     public HostServiceRegistry(ProjectTaskService tasks, ProjectMemberService members, ContentSearchService search,
-                               TagService tags, ObjectProvider<SensitiveController> sensitive) {
+                               TagService tags, ObjectProvider<SensitiveController> sensitive,
+                               ObjectProvider<LawFirmManagementService> lawfirm, ObjectProvider<ImGatewayService> im) {
         this.tasks = tasks;
         this.members = members;
         this.search = search;
         this.tags = tags;
         this.sensitive = sensitive;
+        this.lawfirm = lawfirm;
+        this.im = im;
         register("calendar", "list", this::calendarList);
         register("calendar", "listForUser", this::calendarListForUser);
         register("calendar", "create", this::calendarCreate);
@@ -89,6 +103,11 @@ public class HostServiceRegistry {
         register("search", "tags", this::searchTags);
         register("sensitive", "preview", call -> sensitiveRun(call, "preview"));
         register("sensitive", "redact", call -> sensitiveRun(call, "desensitize"));
+        register("lawfirm", "overview", this::lawfirmOverview);
+        register("lawfirm", "conflictCheck", this::lawfirmConflictCheck);
+        register("lawfirm", "feeLedger", this::lawfirmFeeLedger);
+        register("im", "listConversations", this::imListConversations);
+        register("im", "readMessages", this::imReadMessages);
     }
 
     private void register(String service, String operation, Handler handler) {
@@ -234,6 +253,10 @@ public class HostServiceRegistry {
 
     // ---- sensitive ----
 
+    /** 脱敏面板默认勾选的策略（panel 的 selectedStrategies 初始值）。 */
+    static final List<String> SENSITIVE_DEFAULT_STRATEGIES = List.of("COMPANY", "CHINESE_NAME", "PHONE", "ID_CARD",
+            "UNIFIED_SOCIAL_CREDIT", "LAWYER_LICENSE", "EMAIL", "BANK_CARD", "ADDRESS");
+
     /** 走 SensitiveController 同一条路径（读/写权限闸、落盘、重名处理）；恢复密钥与原词映射不回给模型。 */
     private Object sensitiveRun(Call call, String action) {
         SensitiveController controller = sensitive.getIfAvailable();
@@ -241,14 +264,20 @@ public class HostServiceRegistry {
         Map<String, Object> a = call.args();
         Long fileId = longArg(a, "fileId");
         if (fileId == null) throw new IllegalArgumentException(LangText.of("缺少 fileId", "fileId is required"));
-        var request = new SensitiveController.Request(fileId, strings(a.get("strategies")),
-                "preview".equals(action) ? text(a, "mode") : "MASK".equals(text(a, "mode")) ? "MASK" : "TOKEN",
-                strings(a.get("customTerms")), strings(a.get("excludedTerms")), null, null);
+        // Agent 只用 MASK：TOKEN 需要用户自选的复敏密码，绝不经 Agent（传 null 只会得到「请输入复敏密码」，模型会反复重试）
+        List<String> customTerms = strings(a.get("customTerms"));
+        List<String> strategies = strings(a.get("strategies"));
+        if ((strategies == null || strategies.isEmpty()) && (customTerms == null || customTerms.isEmpty())) {
+            strategies = SENSITIVE_DEFAULT_STRATEGIES; // 与脱敏面板默认勾选一致
+        }
+        var request = new SensitiveController.Request(fileId, strategies, "MASK",
+                customTerms, strings(a.get("excludedTerms")), null, null);
         ResponseEntity<?> response = controller.executeAs(request, call.userId(), action);
         Object body = response.getBody();
         if (!response.getStatusCode().is2xxSuccessful()) {
             Object error = body instanceof Map<?, ?> m ? m.get("error") : null;
-            throw new IllegalArgumentException(String.valueOf(error == null ? "Sensitive operation failed" : error));
+            throw new IllegalArgumentException(String.valueOf(error == null ? "Sensitive operation failed" : error)
+                    + " [Not retryable with the same arguments; do not retry, tell the user what failed.]");
         }
         if ("preview".equals(action) || !(body instanceof Map<?, ?> map)) return body;
         Map<String, Object> safe = new LinkedHashMap<>();
@@ -259,6 +288,136 @@ public class HostServiceRegistry {
         for (String key : List.of("counts", "suspects", "warnings")) safe.put(key, map.get(key));
         safe.put("recoveryKitSaved", map.get("recoveryKit") instanceof String k && !k.isEmpty());
         return safe;
+    }
+
+    // ---- lawfirm（只读；与 PluginLawFirmController 同一入口 LawFirmManagementService.execute。
+    //      全所数据（收费台账、全所看板）要 canViewFirmWide：系统管理员 / 律所管理员 / 桌面单机；conflictCheck 与 UI 收案表单同口径，登录即可）----
+
+    private static final int LAWFIRM_ROW_LIMIT = 30;
+
+    private Map<String, Object> lawfirmExecute(Call call, String action, Map<String, Object> params, Long projectId) {
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        return service.execute(call.userId(), projectId, action, params);
+    }
+
+    /** 传了 projectId 就先核该项目读权限（比 REST 更严，不会让模型跨项目窥探）；不传则是全所视图，同 REST。 */
+    private Long optionalReadableProject(Call call) {
+        if (call.projectId() == null || longArg(call.args(), "projectId") == null) return null;
+        return requireProject(call, false);
+    }
+
+    private Object lawfirmOverview(Call call) {
+        Long projectId = optionalReadableProject(call);
+        Map<String, Object> a = call.args();
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        if (!service.canViewFirmWide(call.userId())) {
+            // 没有全所查看资格：只给「有读权限的某项目」的事项级数据，绝不给全所看板/收费
+            if (projectId == null) service.requireFirmWide(call.userId());
+            Map<String, Object> scoped = new LinkedHashMap<>();
+            scoped.put("restricted", true);
+            scoped.put("matters", filterRows(service.listProjectMatters(projectId), null, text(a, "query"), limit(a, LAWFIRM_ROW_LIMIT)));
+            return scoped;
+        }
+        String scope = "mine".equals(text(a, "scope")) ? "mine" : "all";
+        Map<String, Object> full = lawfirmExecute(call, "overview", Map.of("scope", scope), projectId);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("summary", full.get("summary"));
+        out.put("kpi", full.get("kpi"));
+        out.put("matters", filterRows(full.get("matters"), projectId, text(a, "query"), limit(a, LAWFIRM_ROW_LIMIT)));
+        out.put("pendingClearances", filterRows(full.get("pendingClearances"), null, null, LAWFIRM_ROW_LIMIT));
+        return out;
+    }
+
+    private Object lawfirmConflictCheck(Call call) {
+        Map<String, Object> a = call.args();
+        Map<String, Object> params = new LinkedHashMap<>();
+        for (String key : List.of("title", "practiceArea", "clientName", "clientCreditCode", "clientRole", "counterpartyName",
+                "counterpartyCreditCode", "relatedParties", "relatedPartyName", "relatedPartyRole", "feeMode",
+                "contractAmountYuan", "disputeTargetYuan", "ethicalWallApplied", "clientWaiverUploaded")) {
+            if (a.get(key) != null) params.put(key, a.get(key));
+        }
+        if (text(a, "clientName") == null && text(a, "counterpartyName") == null && text(a, "relatedPartyName") == null) {
+            throw new IllegalArgumentException(LangText.of("请至少提供 clientName 或 counterpartyName", "Provide at least clientName or counterpartyName"));
+        }
+        return lawfirmExecute(call, "precheckConflict", params, optionalReadableProject(call));
+    }
+
+    private Object lawfirmFeeLedger(Call call) {
+        // 收费台账是全所数据：即便传了 projectId，也只有全所查看资格者可读
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireFirmWide(call.userId());
+        Long projectId = optionalReadableProject(call);
+        Map<String, Object> a = call.args();
+        Map<String, Object> full = lawfirmExecute(call, "overview", Map.of("scope", "all"), projectId);
+        String kind = text(a, "kind") == null ? "both" : text(a, "kind");
+        int limit = limit(a, 50);
+        Map<String, Object> out = new LinkedHashMap<>();
+        Object summary = full.get("summary");
+        if (summary instanceof Map<?, ?> s) {
+            Map<String, Object> money = new LinkedHashMap<>();
+            for (String key : List.of("arTotalCents", "collectionRatePercent", "billingRatePercent", "pendingInvoiceCount")) money.put(key, s.get(key));
+            out.put("summary", money);
+        }
+        if (!"collections".equals(kind)) out.put("invoices", filterRows(full.get("invoices"), projectId, text(a, "query"), limit));
+        if (!"invoices".equals(kind)) out.put("collections", filterRows(full.get("collections"), projectId, text(a, "query"), limit));
+        return out;
+    }
+
+    private static int limit(Map<String, Object> a, int fallback) {
+        Integer v = intArg(a, "limit");
+        return v == null ? fallback : Math.max(1, Math.min(100, v));
+    }
+
+    /** 按项目 id / 关键字过滤并截断；行里没有 projectId 字段时不按项目滤。 */
+    private static List<Object> filterRows(Object rows, Long projectId, String query, int limit) {
+        List<Object> out = new ArrayList<>();
+        if (!(rows instanceof List<?> list)) return out;
+        String needle = query == null || query.isBlank() ? null : query.trim().toLowerCase(java.util.Locale.ROOT);
+        for (Object row : list) {
+            if (out.size() >= limit) break;
+            if (projectId != null && row instanceof Map<?, ?> m && m.containsKey("projectId")
+                    && !String.valueOf(projectId).equals(String.valueOf(m.get("projectId")))) continue;
+            if (needle != null && !cn.hutool.json.JSONUtil.toJsonStr(row).toLowerCase(java.util.Locale.ROOT).contains(needle)) continue;
+            out.add(row);
+        }
+        return out;
+    }
+
+    // ---- im（只读；走 ImGatewayService，会话成员资格与代理范围由 ImService 校验）----
+
+    private Object imExecute(Call call, String action, Map<String, Object> params) {
+        ImGatewayService gateway = im.getIfAvailable();
+        if (gateway == null) throw new IllegalArgumentException("IM service unavailable");
+        return gateway.execute(call.userId(), action, params);
+    }
+
+    private Object imListConversations(Call call) {
+        Object result = imExecute(call, "list", Map.of());
+        if (result instanceof Map<?, ?> m && m.get("conversations") instanceof List<?> list) {
+            return Map.of("conversations", list.stream().limit(100).toList());
+        }
+        return result;
+    }
+
+    private Object imReadMessages(Call call) {
+        Map<String, Object> a = call.args();
+        // 不能叫 conversationId：ToolRegistry.executeDeclared 会剥掉模型传的 conversationId（那是 Agent 会话 id）
+        String conversationId = text(a, "imConversationId");
+        if (conversationId == null || conversationId.isBlank()) {
+            throw new IllegalArgumentException(LangText.of("缺少 imConversationId", "imConversationId is required"));
+        }
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("conversationId", conversationId.trim());
+        params.put("limit", limit(a, 30));
+        if (a.get("beforeId") != null && a.get("afterId") != null) {
+            throw new IllegalArgumentException(LangText.of("beforeId 与 afterId 只能二选一", "Use either beforeId or afterId"));
+        }
+        if (a.get("beforeId") != null) params.put("beforeId", longArg(a, "beforeId"));
+        if (a.get("afterId") != null) params.put("afterId", longArg(a, "afterId"));
+        return imExecute(call, "messages", params);
     }
 
     // ---- 参数容错 ----

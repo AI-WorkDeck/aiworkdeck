@@ -1,4 +1,6 @@
 {
   "plugin.name": "Messagerie de projet",
-  "plugin.description": "Communication au sein du cabinet, des équipes et des projets : assistant partagé, messages directs, archivage de fichiers et références IA. Actuellement disponible uniquement pour les comptes de Chine continentale."
+  "plugin.description": "Communication au sein du cabinet, des équipes et des projets : assistant partagé, messages directs, archivage de fichiers et références IA. Actuellement disponible uniquement pour les comptes de Chine continentale.",
+  "tool.project_im_list_conversations.desc": "À utiliser quand l'utilisateur demande quels groupes de discussion ou conversations existent, y compris le groupe du projet. Liste les conversations de messagerie de l'utilisateur (lecture seule).",
+  "tool.project_im_read_messages.desc": "À utiliser quand l'utilisateur demande de quoi un groupe de discussion ou le groupe du projet a récemment parlé, ou veut l'historique des échanges (récupérer d'abord l'identifiant de conversation avec project_im_list_conversations). Lit les derniers messages d'une conversation à laquelle l'utilisateur participe (lecture seule)."
 }

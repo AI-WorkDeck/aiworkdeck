@@ -1,5 +1,7 @@
 {
   "plugin.name": "Ocultação de Conteúdo em Arquivos",
   "plugin.description": "Inspecione informações sensíveis, gere cópias desensibilizadas e restaure com pacotes de recuperação.",
-  "view.main.name": "Ocultação de Conteúdo em Arquivos"
+  "view.main.name": "Ocultação de Conteúdo em Arquivos",
+  "tool.desensitize_preview.desc": "Use quando o usuário quiser pré-visualizar quais dados sensíveis de um arquivo seriam ocultados. Pré-visualiza quais dados sensíveis de um arquivo do projeto seriam ocultados (somente leitura, não cria arquivo).",
+  "tool.desensitize_redact.desc": "Use quando o usuário pedir para ocultar, anonimizar ou mascarar um arquivo (modo máscara, não reversível). Oculta dados sensíveis de um arquivo do projeto e salva uma NOVA cópia anonimizada; o original nunca é sobrescrito."
 }

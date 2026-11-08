@@ -1,5 +1,7 @@
 {
   "plugin.name": "Oscuramento dei file",
   "plugin.description": "Ispeziona le informazioni sensibili, genera copie desensibilizzate e ripristina con pacchetti di recupero.",
-  "view.main.name": "Oscuramento dei file"
+  "view.main.name": "Oscuramento dei file",
+  "tool.desensitize_preview.desc": "Da usare quando l'utente vuole vedere in anteprima quali informazioni sensibili di un file verrebbero oscurate. Anteprima delle informazioni sensibili che verrebbero oscurate in un file di progetto (sola lettura, non crea file).",
+  "tool.desensitize_redact.desc": "Da usare quando l'utente chiede di oscurare, anonimizzare o mascherare un file (modalità maschera, non reversibile). Oscura le informazioni sensibili di un file di progetto e salva una NUOVA copia oscurata; l'originale non viene mai sovrascritto."
 }

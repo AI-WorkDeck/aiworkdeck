@@ -16,6 +16,8 @@
     return TABLE[locale]?.[key] ?? TABLE['en-US']?.[key] ?? TABLE['zh-CN']?.[key] ?? key;
   }
 
+  window.AWD_LAWFIRM_T = t;
+
   function pickLocale(lang) {
     if (!lang) return 'zh-CN';
     if (TABLE[lang]) return lang;

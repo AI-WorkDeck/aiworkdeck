@@ -905,6 +905,13 @@
     if (epoch !== state.epoch) return;
     normalizeOverview(data || {});
     renderAll();
+    const banner = $('restrictedBanner');
+    if (banner) {
+      banner.hidden = !data?.restricted;
+      banner.textContent = data?.restricted
+        ? (window.AWD_LAWFIRM_T?.('access.restricted') || '无权查看全所数据：仅显示与你相关的收案、放行、发票与回款。全所收费台账与看板仅限律所管理员。')
+        : '';
+    }
   }
 
   const EN_EXACT = {

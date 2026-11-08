@@ -68,8 +68,8 @@ public class LawFirmManagementController {
 
     @GetMapping("/finance/export-csv")
     public ResponseEntity<byte[]> exportCsv(@RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireUser(sessionId);
-        byte[] bytes = service.exportFinanceCsv().getBytes(StandardCharsets.UTF_8);
+        Long userId = requireUser(sessionId);
+        byte[] bytes = service.exportFinanceCsvFor(userId).getBytes(StandardCharsets.UTF_8);
         String filename = "lawfirm-finance-ledger-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

@@ -1,13 +1,225 @@
 {
   "id": "lawfirm-management",
   "name": "律所管理",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "律所收案立项、法规级利益冲突检索与站内信协同放行、发票与财务收费台账（支持手动核销与金蝶/用友对接）、律师工作负荷与管理决策看板。",
   "author": "AI WorkDeck",
   "minHostVersion": "0.71.0",
-  "permissions": ["lawfirm", "im", "file_read", "file_write"],
+  "permissions": [
+    "lawfirm",
+    "im",
+    "file_read",
+    "file_write"
+  ],
   "frontendEntry": "web/index.html",
   "backendJars": [],
-  "tools": [],
+  "tools": [
+    {
+      "name": "lawfirm_management_matter_overview",
+      "description": "%tool.lawfirm_management_matter_overview.desc%",
+      "access": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "all",
+              "mine"
+            ],
+            "description": "all = whole firm (default); mine = only the current user's matters"
+          },
+          "projectId": {
+            "type": "integer",
+            "description": "Optional: only matters linked to this project (requires project read access)"
+          },
+          "query": {
+            "type": "string",
+            "description": "Optional keyword matched against matter fields"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max rows, 1-100 (default 30)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "handler": {
+        "type": "service",
+        "service": "lawfirm",
+        "operation": "overview"
+      },
+      "permissions": [
+        "lawfirm"
+      ],
+      "keywords": [
+        "收费",
+        "费用",
+        "回款",
+        "账单",
+        "发票",
+        "台账",
+        "利冲",
+        "冲突",
+        "收案",
+        "案源",
+        "全所",
+        "律所",
+        "收费台账",
+        "利益冲突",
+        "law firm",
+        "fee ledger",
+        "conflict check",
+        "collections",
+        "receivable"
+      ]
+    },
+    {
+      "name": "lawfirm_management_conflict_check",
+      "description": "%tool.lawfirm_management_conflict_check.desc%",
+      "access": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clientName": {
+            "type": "string",
+            "description": "Client (engaging party) name"
+          },
+          "counterpartyName": {
+            "type": "string",
+            "description": "Opposing party name"
+          },
+          "clientCreditCode": {
+            "type": "string",
+            "description": "Client unified social credit code"
+          },
+          "counterpartyCreditCode": {
+            "type": "string",
+            "description": "Opposing party unified social credit code"
+          },
+          "relatedParties": {
+            "type": "array",
+            "description": "Other related parties",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "description": "e.g. AFFILIATE, SHAREHOLDER"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Party name"
+                },
+                "creditCode": {
+                  "type": "string",
+                  "description": "Credit code"
+                }
+              }
+            }
+          },
+          "title": {
+            "type": "string",
+            "description": "Matter title"
+          },
+          "practiceArea": {
+            "type": "string",
+            "description": "Practice area code, e.g. CORPORATE_MA, LITIGATION"
+          }
+        },
+        "additionalProperties": false
+      },
+      "handler": {
+        "type": "service",
+        "service": "lawfirm",
+        "operation": "conflictCheck"
+      },
+      "permissions": [
+        "lawfirm"
+      ],
+      "keywords": [
+        "收费",
+        "费用",
+        "回款",
+        "账单",
+        "发票",
+        "台账",
+        "利冲",
+        "冲突",
+        "收案",
+        "案源",
+        "全所",
+        "律所",
+        "收费台账",
+        "利益冲突",
+        "law firm",
+        "fee ledger",
+        "conflict check",
+        "collections",
+        "receivable"
+      ]
+    },
+    {
+      "name": "lawfirm_management_fee_ledger",
+      "description": "%tool.lawfirm_management_fee_ledger.desc%",
+      "access": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "invoices",
+              "collections",
+              "both"
+            ],
+            "description": "Which ledger to return (default both)"
+          },
+          "projectId": {
+            "type": "integer",
+            "description": "Optional: only rows linked to this project (requires project read access)"
+          },
+          "query": {
+            "type": "string",
+            "description": "Optional keyword matched against ledger rows (matter, payer, number)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max rows per list, 1-100 (default 50)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "handler": {
+        "type": "service",
+        "service": "lawfirm",
+        "operation": "feeLedger"
+      },
+      "permissions": [
+        "lawfirm"
+      ],
+      "keywords": [
+        "收费",
+        "费用",
+        "回款",
+        "账单",
+        "发票",
+        "台账",
+        "利冲",
+        "冲突",
+        "收案",
+        "案源",
+        "全所",
+        "律所",
+        "收费台账",
+        "利益冲突",
+        "law firm",
+        "fee ledger",
+        "conflict check",
+        "collections",
+        "receivable"
+      ]
+    }
+  ],
   "skills": []
 }

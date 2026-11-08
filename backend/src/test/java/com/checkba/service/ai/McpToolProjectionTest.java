@@ -51,7 +51,7 @@ class McpToolProjectionTest {
         doAnswer(i -> store.put(i.getArgument(0), i.getArgument(1))).when(settings).set(anyString(), anyString());
         plugins = new PluginService(settings, pluginsDir.toString());
         ToolRegistry registry = new ToolRegistry(List.of(new TaskTools(tasks)), plugins, new ClientCapabilityService());
-        registry.setHostServiceRegistry(new HostServiceRegistry(tasks, members, null, null, null));
+        registry.setHostServiceRegistry(new HostServiceRegistry(tasks, members, null, null, null, null, null));
         registry.init();
         projection = new McpToolProjection(registry, members, new ObjectMapper());
     }

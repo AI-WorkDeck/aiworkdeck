@@ -42,5 +42,9 @@
   "expense.saved": "费用已登记。",
   "expense.updated": "费用已更新。",
   "expense.deleted": "费用已删除。",
-  "expense.quota": "本机插件存储已满（64 KB），请先删除已结算的旧记录。"
+  "expense.quota": "本机插件存储已满（64 KB），请先删除已结算的旧记录。",
+  "tool.lawfirm_management_matter_overview.desc": "用户问「律所/全所的收案、案件、利冲进展、本月业务概况」时用。律所管理概览（只读）：收案/事项状态、KPI、待处理的利冲放行；可按项目或关键词过滤。",
+  "tool.lawfirm_management_conflict_check.desc": "用户问「某客户/对方有没有利益冲突、利冲检索」时用。利益冲突检索（只读，不保存任何内容）：按委托人与对方当事人比对已有事项。",
+  "tool.lawfirm_management_fee_ledger.desc": "用户问「全所/本月收费情况、回款、账单、发票、应收」时用。查询收费台账（只读）：发票、回款、应收与回款率；可按项目或关键词过滤。仅律所管理员可用。",
+  "access.restricted": "无权查看全所数据：仅显示与你相关的收案、放行、发票与回款。全所收费台账与看板仅限律所管理员。"
 }

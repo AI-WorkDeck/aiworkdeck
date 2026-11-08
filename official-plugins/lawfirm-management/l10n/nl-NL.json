@@ -42,5 +42,9 @@
   "expense.saved": "Kosten geregistreerd.",
   "expense.updated": "Kosten bijgewerkt.",
   "expense.deleted": "Kosten verwijderd.",
-  "expense.quota": "De lokale pluginopslag is vol (64 KB). Verwijder eerst oudere afgerekende posten."
+  "expense.quota": "De lokale pluginopslag is vol (64 KB). Verwijder eerst oudere afgerekende posten.",
+  "tool.lawfirm_management_matter_overview.desc": "Gebruiken wanneer de gebruiker vraagt naar intakes, zaken, de voortgang van belangenconflict-vrijgaves of het maandelijkse bedrijfsoverzicht van het kantoor. Kantooroverzicht (alleen lezen): status van intakes en zaken, kengetallen en openstaande belangenconflict-vrijgaves; optioneel filter op project of trefwoord.",
+  "tool.lawfirm_management_conflict_check.desc": "Gebruiken wanneer de gebruiker vraagt of een cliënt of wederpartij een belangenconflict heeft. Belangenconflictcontrole (alleen lezen, er wordt niets opgeslagen): vergelijkt cliënt en wederpartij met bestaande zaken.",
+  "tool.lawfirm_management_fee_ledger.desc": "Gebruiken wanneer de gebruiker vraagt naar kantoorbrede honoraria, ontvangsten, declaraties, facturen of debiteuren (alleen kantoorbeheerders). Declaratiegrootboek raadplegen (alleen lezen): facturen, ontvangsten, debiteuren en incassopercentage; filter op project of trefwoord.",
+  "access.restricted": "U heeft geen toestemming om kantoorbrede gegevens te bekijken. Alleen items die u betreffen worden getoond. Het kantoorbrede declaratiegrootboek en de dashboards zijn voorbehouden aan kantoorbeheerders."
 }

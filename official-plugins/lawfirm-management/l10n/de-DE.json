@@ -42,5 +42,9 @@
   "expense.saved": "Auslage erfasst.",
   "expense.updated": "Auslage aktualisiert.",
   "expense.deleted": "Auslage gelöscht.",
-  "expense.quota": "Der lokale Plugin-Speicher ist voll (64 KB). Bitte zuerst ältere abgerechnete Einträge löschen."
+  "expense.quota": "Der lokale Plugin-Speicher ist voll (64 KB). Bitte zuerst ältere abgerechnete Einträge löschen.",
+  "tool.lawfirm_management_matter_overview.desc": "Verwenden, wenn der Nutzer nach Mandatsaufnahmen, Mandaten, dem Stand der Kollisionsfreigaben oder der monatlichen Geschäftsübersicht der Kanzlei fragt. Kanzleiübersicht (nur lesen): Mandats-/Aufnahmestatus, Kennzahlen und offene Interessenkollisions-Freigaben; optional nach Projekt oder Stichwort filtern.",
+  "tool.lawfirm_management_conflict_check.desc": "Verwenden, wenn der Nutzer fragt, ob bei einem Mandanten oder einer Gegenpartei ein Interessenkonflikt besteht. Interessenkollisionsprüfung (nur lesen, es wird nichts gespeichert): gleicht Mandant und Gegenpartei mit bestehenden Mandaten ab.",
+  "tool.lawfirm_management_fee_ledger.desc": "Verwenden, wenn der Nutzer nach kanzleiweiten Honoraren, Zahlungseingängen, Abrechnungen, Rechnungen oder Forderungen fragt (nur Kanzleiadministratoren). Honorarbuch lesen (nur lesen): Rechnungen, Zahlungseingänge, Forderungen und Einzugsquote; nach Projekt oder Stichwort filterbar.",
+  "access.restricted": "Keine Berechtigung für kanzleiweite Daten. Es werden nur Vorgänge angezeigt, die Sie betreffen. Das kanzleiweite Honorarbuch und die Dashboards sind Kanzleiadministratoren vorbehalten."
 }
