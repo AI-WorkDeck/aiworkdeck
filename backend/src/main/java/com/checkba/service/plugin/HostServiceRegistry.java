@@ -280,7 +280,8 @@ public class HostServiceRegistry {
         return safe;
     }
 
-    // ---- lawfirm（只读；与 PluginLawFirmController 同一入口 LawFirmManagementService.execute，该服务按登录用户鉴权、无更细角色闸）----
+    // ---- lawfirm（只读；与 PluginLawFirmController 同一入口 LawFirmManagementService.execute。
+    //      全所数据（收费台账、全所看板）要 canViewFirmWide：系统管理员 / 律所管理员 / 桌面单机；conflictCheck 与 UI 收案表单同口径，登录即可）----
 
     private static final int LAWFIRM_ROW_LIMIT = 30;
 
@@ -299,6 +300,16 @@ public class HostServiceRegistry {
     private Object lawfirmOverview(Call call) {
         Long projectId = optionalReadableProject(call);
         Map<String, Object> a = call.args();
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        if (!service.canViewFirmWide(call.userId())) {
+            // 没有全所查看资格：只给「有读权限的某项目」的事项级数据，绝不给全所看板/收费
+            if (projectId == null) service.requireFirmWide(call.userId());
+            Map<String, Object> scoped = new LinkedHashMap<>();
+            scoped.put("restricted", true);
+            scoped.put("matters", filterRows(service.listProjectMatters(projectId), null, text(a, "query"), limit(a, LAWFIRM_ROW_LIMIT)));
+            return scoped;
+        }
         String scope = "mine".equals(text(a, "scope")) ? "mine" : "all";
         Map<String, Object> full = lawfirmExecute(call, "overview", Map.of("scope", scope), projectId);
         Map<String, Object> out = new LinkedHashMap<>();
@@ -324,6 +335,10 @@ public class HostServiceRegistry {
     }
 
     private Object lawfirmFeeLedger(Call call) {
+        // 收费台账是全所数据：即便传了 projectId，也只有全所查看资格者可读
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireFirmWide(call.userId());
         Long projectId = optionalReadableProject(call);
         Map<String, Object> a = call.args();
         Map<String, Object> full = lawfirmExecute(call, "overview", Map.of("scope", "all"), projectId);

@@ -45,5 +45,6 @@
   "expense.quota": "Yerel eklenti depolama alanı dolu (64 KB). Önce eski hesaplaşılmış kayıtları silin.",
   "tool.lawfirm_management_matter_overview.desc": "Hukuk bürosu genel görünümü (salt okunur): kabul/dosya durumu, göstergeler ve bekleyen çıkar çatışması onayları; isteğe bağlı proje veya anahtar sözcük filtresi.",
   "tool.lawfirm_management_conflict_check.desc": "Çıkar çatışması kontrolü (salt okunur, hiçbir şey kaydedilmez): müvekkil ve karşı tarafı mevcut dosyalarla karşılaştırır.",
-  "tool.lawfirm_management_fee_ledger.desc": "Ücret defterini görüntüle (salt okunur): faturalar, tahsilatlar, alacaklar ve tahsilat oranı; proje veya anahtar sözcükle filtrelenebilir."
+  "tool.lawfirm_management_fee_ledger.desc": "Ücret defterini görüntüle (salt okunur): faturalar, tahsilatlar, alacaklar ve tahsilat oranı; proje veya anahtar sözcükle filtrelenebilir.",
+  "access.restricted": "Büro genelindeki verileri görüntüleme izniniz yok. Yalnızca sizinle ilgili öğeler gösterilir. Büro genelindeki ücret defteri ve panolar yalnızca büro yöneticilerine açıktır."
 }

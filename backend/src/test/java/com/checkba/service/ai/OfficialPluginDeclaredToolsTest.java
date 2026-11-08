@@ -64,6 +64,7 @@ class OfficialPluginDeclaredToolsTest {
         ObjectProvider<LawFirmManagementService> lawfirmProvider = mock(ObjectProvider.class);
         ObjectProvider<ImGatewayService> imProvider = mock(ObjectProvider.class);
         when(lawfirmProvider.getIfAvailable()).thenReturn(lawfirm);
+        when(lawfirm.canViewFirmWide(7L)).thenReturn(true);
         when(imProvider.getIfAvailable()).thenReturn(im);
         registry.setHostServiceRegistry(new HostServiceRegistry(mock(ProjectTaskService.class), mock(ProjectMemberService.class),
                 null, null, null, lawfirmProvider, imProvider));
@@ -137,6 +138,16 @@ class OfficialPluginDeclaredToolsTest {
         when(lawfirm.execute(eq(7L), isNull(), eq("overview"), any())).thenReturn(Map.of("summary", Map.of("totalIntakes", 3)));
         var r = registry.execute("lawfirm_management_matter_overview", "{\"userId\":99}", ctx);
         assertTrue(r.output().contains("totalIntakes"), r.output());
+    }
+
+    @Test
+    void lawfirmFeeLedgerToolDeniedForMemberAllowedForAdmin() throws IOException {
+        install("lawfirm-management");
+        when(lawfirm.execute(eq(7L), any(), eq("overview"), any())).thenReturn(Map.of("summary", Map.of("arTotalCents", 1), "invoices", List.of()));
+        assertFalse(registry.execute("lawfirm_management_fee_ledger", "{}", ctx).output().startsWith("Error"));
+        doThrow(new IllegalArgumentException("无权查看：全所收费台账与看板仅限律所管理员")).when(lawfirm).requireFirmWide(7L);
+        var denied = registry.execute("lawfirm_management_fee_ledger", "{}", ctx);
+        assertTrue(denied.output().startsWith("Error") && denied.output().contains("无权查看"), denied.output());
     }
 
     @Test

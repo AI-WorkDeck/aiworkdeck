@@ -45,5 +45,6 @@
   "expense.quota": "Bộ nhớ cục bộ của plugin đã đầy (64 KB). Vui lòng xóa các bản ghi cũ đã quyết toán trước.",
   "tool.lawfirm_management_matter_overview.desc": "Tổng quan văn phòng luật (chỉ đọc): trạng thái tiếp nhận/vụ việc, KPI và các phê duyệt xung đột lợi ích đang chờ; có thể lọc theo dự án hoặc từ khóa.",
   "tool.lawfirm_management_conflict_check.desc": "Kiểm tra xung đột lợi ích (chỉ đọc, không lưu gì): đối chiếu khách hàng và bên đối lập với các vụ việc hiện có.",
-  "tool.lawfirm_management_fee_ledger.desc": "Xem sổ phí dịch vụ (chỉ đọc): hóa đơn, khoản đã thu, công nợ phải thu và tỷ lệ thu hồi; lọc theo dự án hoặc từ khóa."
+  "tool.lawfirm_management_fee_ledger.desc": "Xem sổ phí dịch vụ (chỉ đọc): hóa đơn, khoản đã thu, công nợ phải thu và tỷ lệ thu hồi; lọc theo dự án hoặc từ khóa.",
+  "access.restricted": "Bạn không có quyền xem dữ liệu toàn văn phòng. Chỉ hiển thị các mục liên quan đến bạn. Sổ phí và bảng điều khiển toàn văn phòng chỉ dành cho quản trị viên văn phòng."
 }

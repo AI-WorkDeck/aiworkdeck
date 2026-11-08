@@ -45,5 +45,6 @@
   "expense.quota": "De lokale pluginopslag is vol (64 KB). Verwijder eerst oudere afgerekende posten.",
   "tool.lawfirm_management_matter_overview.desc": "Kantooroverzicht (alleen lezen): status van intakes en zaken, kengetallen en openstaande belangenconflict-vrijgaves; optioneel filter op project of trefwoord.",
   "tool.lawfirm_management_conflict_check.desc": "Belangenconflictcontrole (alleen lezen, er wordt niets opgeslagen): vergelijkt cliënt en wederpartij met bestaande zaken.",
-  "tool.lawfirm_management_fee_ledger.desc": "Declaratiegrootboek raadplegen (alleen lezen): facturen, ontvangsten, debiteuren en incassopercentage; filter op project of trefwoord."
+  "tool.lawfirm_management_fee_ledger.desc": "Declaratiegrootboek raadplegen (alleen lezen): facturen, ontvangsten, debiteuren en incassopercentage; filter op project of trefwoord.",
+  "access.restricted": "U heeft geen toestemming om kantoorbrede gegevens te bekijken. Alleen items die u betreffen worden getoond. Het kantoorbrede declaratiegrootboek en de dashboards zijn voorbehouden aan kantoorbeheerders."
 }

@@ -85,6 +85,7 @@ public class LawFirmManagementService {
     private final ImService imService;
     private final PluginService pluginService;
     private final ObjectMapper objectMapper;
+    private final LawFirmAccessPolicy access;
 
     /**
      * 桌面单机（local-mode）只有一个真人：他同时是申请人、被征询律师与利冲委员（单人所/演示）。
@@ -114,15 +115,42 @@ public class LawFirmManagementService {
             case "issueInvoice", "approveInvoice" -> issueInvoice(effectiveUserId, params);
             case "voidInvoice" -> voidInvoice(effectiveUserId, params);
             case "recordCollection", "createCollection" -> recordCollection(effectiveUserId, params);
-            case "syncErp", "financeSyncErp" -> syncErp(effectiveUserId, params);
-            case "confirmErpSync" -> confirmErpSync(effectiveUserId, params);
+            case "syncErp", "financeSyncErp" -> { access.requireFirmWide(effectiveUserId); yield syncErp(effectiveUserId, params); }
+            case "confirmErpSync" -> { access.requireFirmWide(effectiveUserId); yield confirmErpSync(effectiveUserId, params); }
             case "exportCsv", "financeExportCsv" -> Map.of(
-                    "csv", exportFinanceCsv(),
+                    "csv", exportFinanceCsvFor(effectiveUserId),
                     "filename", "lawfirm-finance-ledger-" + LocalDate.now() + ".csv"
             );
             case "seedDemo", "seedDemoData" -> seedDemoData(effectiveUserId, params);
             default -> throw new IllegalArgumentException(LangText.of("不支持的律所管理操作：", "Unsupported law firm management action: ") + act);
         };
+    }
+
+    /** 全所数据（收费台账、全所看板、ERP 导出）的查看资格；与 REST 入口和 Agent 工具共用。 */
+    public boolean canViewFirmWide(Long userId) {
+        return access.canViewFirmWide(userId);
+    }
+
+    public void requireFirmWide(Long userId) {
+        access.requireFirmWide(userId);
+    }
+
+    /** 收费台账 CSV 含全所发票与回款：只给有全所查看资格的人。 */
+    public String exportFinanceCsvFor(Long userId) {
+        access.requireFirmWide(userId);
+        return exportFinanceCsv();
+    }
+
+    /** 某项目关联的收案/事项视图（事项级数据，调用方须已核该项目读权限）；不含收费台账。 */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listProjectMatters(Long projectId) {
+        Map<Long, List<LawFirmConflictClearance>> byIntake = clearanceRepository.findAllByOrderByIdDesc().stream()
+                .filter(c -> c.getIntakeId() != null)
+                .collect(Collectors.groupingBy(LawFirmConflictClearance::getIntakeId));
+        return intakeRepository.findAllByOrderByCreatedAtDescIdDesc().stream()
+                .filter(i -> Objects.equals(i.getProjectId(), projectId))
+                .map(i -> toIntakeView(i, byIntake.getOrDefault(i.getId(), List.of())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -131,10 +159,28 @@ public class LawFirmManagementService {
         Map<Long, String> userNames = loadUserDisplayNames();
         String currentUserName = userNames.getOrDefault(userId, "当前律师");
 
-        List<LawFirmMatterIntake> allIntakes = intakeRepository.findAllByOrderByCreatedAtDescIdDesc();
-        List<LawFirmConflictClearance> allClearances = clearanceRepository.findAllByOrderByIdDesc();
-        List<LawFirmInvoice> allInvoices = invoiceRepository.findAllByOrderByCreatedAtDescIdDesc();
-        List<LawFirmCollection> allCollections = collectionRepository.findAllByOrderByCreatedAtDescIdDesc();
+        // 无全所查看资格（非系统管理员/律所管理员，且非单人本机）只看与自己相关的行；看板/KPI/汇总随之只统计这部分
+        final boolean firmWide = access.canViewFirmWide(userId);
+        List<LawFirmMatterIntake> rawIntakes = intakeRepository.findAllByOrderByCreatedAtDescIdDesc();
+        List<LawFirmConflictClearance> rawClearances = clearanceRepository.findAllByOrderByIdDesc();
+        List<LawFirmInvoice> rawInvoices = invoiceRepository.findAllByOrderByCreatedAtDescIdDesc();
+        List<LawFirmCollection> rawCollections = collectionRepository.findAllByOrderByCreatedAtDescIdDesc();
+        final Set<Long> mineIntakeIds = rawIntakes.stream()
+                .filter(i -> Objects.equals(i.getApplicantUserId(), userId) || Objects.equals(i.getLeadLawyerUserId(), userId)
+                        || Objects.equals(i.getCommitteeReviewerId(), userId))
+                .map(LawFirmMatterIntake::getId).collect(Collectors.toSet());
+        rawClearances.stream().filter(c -> Objects.equals(c.getTargetUserId(), userId)).map(LawFirmConflictClearance::getIntakeId)
+                .filter(Objects::nonNull).forEach(mineIntakeIds::add);
+        List<LawFirmMatterIntake> allIntakes = firmWide ? rawIntakes
+                : rawIntakes.stream().filter(i -> mineIntakeIds.contains(i.getId())).toList();
+        List<LawFirmConflictClearance> allClearances = firmWide ? rawClearances
+                : rawClearances.stream().filter(c -> mineIntakeIds.contains(c.getIntakeId())).toList();
+        List<LawFirmInvoice> allInvoices = firmWide ? rawInvoices
+                : rawInvoices.stream().filter(v -> Objects.equals(v.getApplicantUserId(), userId)
+                        || Objects.equals(v.getLeadLawyerUserId(), userId)).toList();
+        List<LawFirmCollection> allCollections = firmWide ? rawCollections
+                : rawCollections.stream().filter(c -> Objects.equals(c.getRecordedByUserId(), userId)
+                        || Objects.equals(c.getLeadLawyerUserId(), userId)).toList();
 
         Map<Long, List<LawFirmConflictClearance>> clearancesByIntake = allClearances.stream()
                 .filter(c -> c.getIntakeId() != null)
@@ -263,6 +309,7 @@ public class LawFirmManagementService {
         out.put("kpis", kpi);
         out.put("summary", summary);
         out.put("users", userOptions);
+        out.put("restricted", !firmWide);
         return out;
     }
 

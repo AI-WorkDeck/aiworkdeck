@@ -46,6 +46,7 @@ class HostServiceRegistryTest {
     private HostServiceRegistry newRegistry() {
         when(lawfirmProvider.getIfAvailable()).thenReturn(lawfirm);
         when(imProvider.getIfAvailable()).thenReturn(im);
+        when(lawfirm.canViewFirmWide(7L)).thenReturn(true); // 默认律所管理员；普通成员用例里改成 false
         return new HostServiceRegistry(tasks, members, null, null, null, lawfirmProvider, imProvider);
     }
 
@@ -170,6 +171,42 @@ class HostServiceRegistryTest {
         String out = registry.invoke("lawfirm", "overview", 7L, null, Map.of("projectId", 5, "query", "并购"));
         assertTrue(out.contains("甲公司并购"));
         assertFalse(out.contains("乙公司诉讼"));
+    }
+
+    private void makeMember() {
+        when(lawfirm.canViewFirmWide(7L)).thenReturn(false);
+        doThrow(new IllegalArgumentException("无权查看：全所收费台账与看板仅限律所管理员")).when(lawfirm).requireFirmWide(7L);
+    }
+
+    @Test
+    void lawfirmFirmWideOverviewIsDeniedForPlainMember() {
+        makeMember();
+        var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "overview", 7L, null, Map.of()));
+        assertTrue(e.getMessage().contains("无权查看"));
+        verify(lawfirm, never()).execute(any(), any(), any(), any());
+    }
+
+    @Test
+    void lawfirmOverviewForMemberWithProjectIsMatterLevelOnly() {
+        makeMember();
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        when(lawfirm.listProjectMatters(5L)).thenReturn(List.of(Map.of("id", 1, "title", "项目事项")));
+        String out = registry.invoke("lawfirm", "overview", 7L, null, Map.of("projectId", 5));
+        assertTrue(out.contains("项目事项") && out.contains("\"restricted\":true"), out);
+        assertFalse(out.contains("kpi") || out.contains("summary"), "不回全所看板/汇总");
+        verify(lawfirm, never()).execute(any(), any(), any(), any());
+        // 没有该项目读权限仍被拒
+        when(members.hasReadPermission(9L, 7L)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "overview", 7L, null, Map.of("projectId", 9)));
+    }
+
+    @Test
+    void lawfirmFeeLedgerIsDeniedForPlainMemberEvenWithProject() {
+        makeMember();
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "feeLedger", 7L, null, Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", "feeLedger", 7L, null, Map.of("projectId", 5)));
+        verify(lawfirm, never()).execute(any(), any(), any(), any());
     }
 
     @Test

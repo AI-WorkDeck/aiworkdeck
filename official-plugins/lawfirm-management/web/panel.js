@@ -905,6 +905,7 @@
     if (epoch !== state.epoch) return;
     normalizeOverview(data || {});
     renderAll();
+    if (data?.restricted) notice(window.AWD_LAWFIRM_T?.('access.restricted') || '你没有全所数据查看权限，仅显示与你相关的收案、放行、发票与回款。无权查看全所台账与看板。');
   }
 
   const EN_EXACT = {
