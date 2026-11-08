@@ -61,6 +61,8 @@ class ToolInventoryContractTest {
 
     private static final Pattern QUOTED = Pattern.compile("`[^`]*`|<[^>]*>|'[^']*'|\"[^\"]*\"|「[^」]*」");
     private static final Pattern LATIN = Pattern.compile("[A-Za-z][A-Za-z0-9_'\\-]*");
+    /** 括号里纯 ASCII 的英文同义词（A5 允许，如 {@code （compare, redline）}）与文件扩展名（{@code .docx}）不算行文。 */
+    private static final Pattern ALLOWED_ASCII = Pattern.compile("[（(][\\x00-\\x7F]*[）)]|\\.[A-Za-z0-9]+");
     private static final Set<String> SHORT_PROSE = Set.of("the", "and", "for", "not", "use", "with", "all", "can");
 
     /** zh = 含中日韩字符且没有英文行文词；en = 无中日韩字符；mixed = 中文里夹英文词组。标识符 / 引用 / 大写专名 / 缩写不算。 */
@@ -68,7 +70,7 @@ class ToolInventoryContractTest {
         if (!line.codePoints().anyMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN)) {
             return "en";
         }
-        Matcher m = LATIN.matcher(QUOTED.matcher(line).replaceAll(""));
+        Matcher m = LATIN.matcher(ALLOWED_ASCII.matcher(QUOTED.matcher(line).replaceAll("")).replaceAll(""));
         while (m.find()) {
             String w = m.group();
             boolean identifier = w.contains("_") || w.matches(".*\\d.*") || w.matches(".*[a-z][A-Z].*");
@@ -105,6 +107,8 @@ class ToolInventoryContractTest {
         assertTrue(violations("【批注】删除一条批注（commentId 来自 doc_get_comments 返回的 id）。").isEmpty());
         assertTrue(violations("Ask the user ONE clarifying question.").toString().contains("en"));
         assertTrue(violations("按 the plan 读取").toString().contains("mixed"));
+        assertTrue(violations("比对两份合同（compare, redline）").isEmpty());
+        assertTrue(violations("用 Markdown 新建 .docx 文件").isEmpty());
         assertTrue(violations("用户问到群聊时用。").toString().contains("动词"));
         assertTrue(violations("读".repeat(81)).toString().contains("81"));
     }
