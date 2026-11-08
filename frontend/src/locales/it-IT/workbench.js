@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Versioni",
   "railLabelFeedback": "Feedback",
   "railLabelLitigation": "Grafici",
-  "railLabelBaoqingtian": "Fatti",
+  "railLabelBaoqingtian": "Incarichi",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Studio",
   "railLabelTmeet": "Riunione",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Estensione",
   "pluginLabels": {
     "tencentMeeting": "Riunione Tencent",
-    "baoqingtian": "Baoqingtian · Cronologia dei fatti e revisione delle contraddizioni",
+    "baoqingtian": "Baoqingtian · Incarichi e note",
     "dpiaWorkbench": "Postazione di conformità DPIA",
     "lawfirmManagement": "Gestione dello studio legale",
     "projectIm": "Chat del progetto"

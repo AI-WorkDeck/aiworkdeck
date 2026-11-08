@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Versies",
   "railLabelFeedback": "Feedback",
   "railLabelLitigation": "Grafieken",
-  "railLabelBaoqingtian": "Feiten",
+  "railLabelBaoqingtian": "Zaken",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Kantoor",
   "railLabelTmeet": "Overleg",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Plug-in",
   "pluginLabels": {
     "tencentMeeting": "Tencent Meeting (Vergadering)",
-    "baoqingtian": "Baoqingtian · Feitenchronologie & contra dictiecontrole",
+    "baoqingtian": "Baoqingtian · Zaken & notities",
     "dpiaWorkbench": "DPIA-compliance-werkbank",
     "lawfirmManagement": "Kantoorbeheer",
     "projectIm": "Projectchat"
