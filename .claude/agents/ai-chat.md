@@ -655,6 +655,12 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
   ⑤ **渐进披露**（dev-board#810，`ToolDisclosurePolicy`，**2026-09-29 起默认开**，dev-board#1064 第二步）：只下发核心集 + 本轮已展开的类目。
      与 ②b 叠用时先按类目裁、再按核心集收窄，两者都是「核心集 ∪ 已展开类目」的形状，叠起来仍是那个形状。
      见下文「工具规格瘦身与渐进披露」一节。
+     **没开文件态（tool-surface-audit S1）**：LOWA 会话且起跑时无活跃文档（`RunGuard.noFileEntrySet`，主前端默认落点）只下发入口核心集——
+     找 / 开 / 建文件（`doc_open_file / doc_start_stream / sheet_create_file / slide_create_file / write_docx`）、搜索、事项、记忆、法源、`ask_user / list_tools / use_skill`；
+     doc_/sheet_/slide_ 编辑原语（核心集与关键词放回类目里的）暂不下发，`doc_open_file` / 新建成功 / skill 白名单点名编辑原语后清零（只放宽）；
+     之后 `list_tools` / 点名 / 决策辅助明确要的类目不再过滤。`sheet_create_file / slide_create_file` 不再常驻核心集（已拍板 #1），有文档开着时靠「表格 / excel / ppt / 幻灯片」关键词预放回，建成后其类目随展开集放回。
+     关键词预放回每轮最多 3 类（`categoriesPutBackFor`：命中词总长度降序，同分按 `PUTBACK_PRIORITY`），skill 白名单类目不受限。
+     首轮体量由 `ToolSurfaceBudgetTest` + `cases-tool-surface.json` 钉住（没开文件中性 25 个 / 6.5k token）。
   - **为什么值得做②**：工具规格**每一轮都要重发**，一条消息跑三五个往返就付三五遍。
     本机实测 202 个工具 59045 prompt token / 首轮 26.4s，裁到 16 个 18854 token / 6.1s；
     本仓离线实测（`ToolSchemaBudgetTest`）docx 省 27.6%、xlsx 省 38.8%、pptx 省 39.7% 的 schema 体量
