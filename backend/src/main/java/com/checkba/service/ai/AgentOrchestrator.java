@@ -3945,6 +3945,12 @@ public class AgentOrchestrator {
             merged.addAll(com.checkba.service.ai.tools.LegalTools.pkulawToolNames());
             guard.unusableTools = merged;
         }
+        // 权限拒绝：同样不展开类目、不走 ask_user 护栏；让模型如实告知用户缺权限，不重试
+        if (com.checkba.service.ai.harness.HarnessDiagnosticService.isPermissionDenied(resultText)) {
+            return resultText + "\n\n" + com.checkba.service.LangText.of(
+                    "[Harness 权限不足] " + toolName + " 被拒绝：当前用户没有该操作的权限。请直接告知用户其无此权限、需由有权限的人（如律所管理员或项目负责人）授权，不要重试，也不要向用户索要事实材料。",
+                    "[Harness Permission Denied] " + toolName + " was refused: the current user lacks permission. Tell the user plainly they do not have permission and who can grant it (e.g. a law firm administrator or the project owner); do not retry and do not ask the user for facts.");
+        }
         // 配置/凭证/上游不可用：不做类目展开与 ask_user 护栏，只告诉模型这个工具本轮不可用
         if (com.checkba.service.ai.harness.HarnessDiagnosticService.isToolUnavailable(resultText)) {
             if (com.checkba.service.ai.tools.LegalTools.isVendorUnavailable(resultText)) {

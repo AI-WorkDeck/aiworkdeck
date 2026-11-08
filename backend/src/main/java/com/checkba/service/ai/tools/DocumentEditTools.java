@@ -960,7 +960,9 @@ public class DocumentEditTools implements AgentToolComponent {
     ) {
         log.info("Tool: doc_search_related_docs called keyword={}, projectId={}", keyword, projectId);
         try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
+            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId).stream()
+                    .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
+                    .collect(Collectors.toList());
             
             // 1. 首先按文件名匹配
             List<ProjectFile> matchedByName = allFiles.stream()

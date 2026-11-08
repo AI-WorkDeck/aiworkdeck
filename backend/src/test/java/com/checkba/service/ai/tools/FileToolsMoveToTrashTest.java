@@ -61,12 +61,13 @@ class FileToolsMoveToTrashTest {
     private LocalProjectService localProjects;
     private EditorBridgeService bridge;
     private FileTools tools;
+    private ProjectStorageResolver resolver;
 
     @BeforeEach
     void setUp(@TempDir Path tmp) {
         StorageProperties props = new StorageProperties();
         props.getLocal().setRootPath(tmp.resolve("appdata").toAbsolutePath().toString());
-        ProjectStorageResolver resolver = new ProjectStorageResolver(props, projectRepository);
+        resolver = new ProjectStorageResolver(props, projectRepository);
 
         com.checkba.storage.StorageServiceFactory storageFactory = mock(com.checkba.storage.StorageServiceFactory.class);
         when(storageFactory.getStorageService()).thenReturn(mock(com.checkba.storage.StorageService.class));
@@ -90,7 +91,7 @@ class FileToolsMoveToTrashTest {
                 transactionManager);
 
         bridge = mock(EditorBridgeService.class);
-        tools = new FileTools(projectFileService, projectFileRepository, bridge, null, null, null, null, null, null);
+        tools = new FileTools(projectFileService, projectFileRepository, bridge, null, resolver, null, null, null, null);
     }
 
     @AfterEach
@@ -108,6 +109,26 @@ class FileToolsMoveToTrashTest {
     private ProjectFile row(Long pid, String name) {
         return projectFileRepository.findByProjectId(pid).stream()
                 .filter(f -> name.equals(f.getName())).findFirst().orElseThrow();
+    }
+
+    @Test
+    @DisplayName("回收站文件对 Agent 不可见：按路径/按 id 读不到，搜索与目录列表不出现")
+    void softDeletedFileIsInvisibleByPathAndId(@TempDir Path folder) throws Exception {
+        Files.createDirectories(folder.resolve("卷宗"));
+        Files.writeString(folder.resolve("卷宗/证据目录.xlsx"), "secret");
+        Files.writeString(folder.resolve("合同.txt"), "keep");
+        Long pid = openProject(folder);
+        Long evidenceId = row(pid, "证据目录.xlsx").getId();
+        projectFileService.delete(evidenceId, 1L);
+
+        assertTrue(tools.read_file("卷宗/证据目录.xlsx").startsWith("Error: File does not exist"));
+        assertTrue(tools.read_file(folder.resolve("卷宗/证据目录.xlsx").toString()).startsWith("Error: File does not exist"));
+        assertTrue(tools.extract_file_text(evidenceId, null, null).startsWith("Error"));
+        String found = tools.search_project_files("证据目录", null);
+        assertTrue(found.startsWith("No files found"), found);
+        assertFalse(tools.search_project_files("*", null).contains("证据目录"));
+        assertFalse(tools.list_files(pid, "卷宗").contains("证据目录"));
+        assertTrue(tools.list_files(pid, ".").contains("合同.txt"), "没删的文件照常列出");
     }
 
     @Test

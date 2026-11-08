@@ -106,6 +106,8 @@ public class FileTools implements AgentToolComponent {
             return "Error: fileNamePattern is required.";
         }
         List<String> matches = new ArrayList<>();
+        final java.util.function.Predicate<Path> trashed =
+                trashedPathFilter(com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong());
         
         Path root = currentProjectRoot();
         Path startDir = root;
@@ -131,7 +133,7 @@ public class FileTools implements AgentToolComponent {
 
                     if (matcher.matches(file) || file.getFileName().toString().contains(fileNamePattern.replace("*", ""))) {
                          // Return relative path for readability
-                         matches.add(root.relativize(file).toString());
+                         if (!trashed.test(file)) matches.add(root.relativize(file).toString());
                     }
                     if (matches.size() >= 50) return FileVisitResult.TERMINATE; 
                     return FileVisitResult.CONTINUE;
@@ -194,7 +196,7 @@ public class FileTools implements AgentToolComponent {
         log.info("Tool: read_file called for {}", filePath);
         try {
             Path path = resolvePath(filePath);
-            if (!Files.exists(path)) return "Error: File does not exist.";
+            if (!Files.exists(path) || isTrashedPath(path)) return "Error: File does not exist.";
             if (Files.isDirectory(path)) return "Error: Path is a directory.";
             if (SensitiveRecoveryKit.isRecoveryFile(path.getFileName().toString())) return SensitiveRecoveryKit.aiReadNotice();
             if (Files.size(path) > 10 * 1024 * 1024) return "Error: File too large (>10MB).";
@@ -271,11 +273,13 @@ public class FileTools implements AgentToolComponent {
             // 物理条目 join DB 记录：所有文件类型（含 txt 等非文档）都直接拿到 fileId，
             // 供 move_project_file / rename_project_file 使用，不必再绕 doc/pdf 专用列表
             var index = dbPathIndex(projectId);
+            final java.util.function.Predicate<Path> trashed = trashedPathFilter(projectId);
             String prefix = projectDataDir.relativize(dir.normalize()).toString().replace('\\', '/');
 
             // Stream and sort: Directories first, then files
             try (var stream = Files.list(dir)) {
                 stream.filter(p -> !p.getFileName().toString().startsWith(".")) // ignore hidden, incl. .awd/
+                        .filter(p -> !trashed.test(p)) // 回收站里的条目磁盘上还在，但对 Agent 不可见
                         .sorted((p1, p2) -> {
                     boolean d1 = Files.isDirectory(p1);
                     boolean d2 = Files.isDirectory(p2);
@@ -1360,6 +1364,54 @@ public class FileTools implements AgentToolComponent {
             if (parent == null || !visited.add(parent.getId())
                     || !Boolean.TRUE.equals(parent.getIsFolder()) || Boolean.TRUE.equals(parent.getIsDeleted())
                     || !java.util.Objects.equals(file.getProjectId(), parent.getProjectId())) break;
+            path.insert(0, parent.getName() + "/");
+            current = parent;
+        }
+        return path.toString();
+    }
+
+    /**
+     * 磁盘路径是否指向回收站里的条目（软删不碰磁盘）：路径等于某条已软删行的相对路径或落在其下，
+     * 且该路径没有存活行占用（同名新文件覆盖了位置则放行）。无项目上下文时不拦。
+     */
+    private boolean isTrashedPath(Path path) {
+        return trashedPathFilter(com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong()).test(path);
+    }
+
+    /** 一次读库、可对多个路径复用的回收站判定（遍历目录时不要逐个文件重读库）。 */
+    private java.util.function.Predicate<Path> trashedPathFilter(Long projectId) {
+        if (projectId == null || projectFileRepository == null) return p -> false;
+        Path root = storageResolver.projectRoot(projectId).normalize();
+        List<ProjectFile> rows = projectFileRepository.findByProjectId(projectId);
+        java.util.Map<Long, ProjectFile> byId = new java.util.HashMap<>();
+        for (ProjectFile f : rows) byId.put(f.getId(), f);
+        java.util.Set<String> live = new java.util.HashSet<>();
+        java.util.Set<String> trashed = new java.util.HashSet<>();
+        for (ProjectFile f : rows) {
+            (Boolean.TRUE.equals(f.getIsDeleted()) ? trashed : live).add(fullRelativePath(f, byId));
+        }
+        if (trashed.isEmpty()) return p -> false;
+        return path -> {
+            Path abs = path.toAbsolutePath().normalize();
+            if (!abs.startsWith(root) || abs.equals(root)) return false;
+            String rel = root.relativize(abs).toString().replace('\\', '/');
+            if (live.contains(rel)) return false;
+            for (String t : trashed) {
+                if (rel.equals(t) || rel.startsWith(t + "/")) return true;
+            }
+            return false;
+        };
+    }
+
+    /** 与 relativeProjectPath 同口径，但穿过已软删的父目录（回收站整棵子树都要算出路径）。 */
+    private static String fullRelativePath(ProjectFile file, java.util.Map<Long, ProjectFile> byId) {
+        StringBuilder path = new StringBuilder(file.getName());
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        visited.add(file.getId());
+        ProjectFile current = file;
+        while (current.getParentId() != null) {
+            ProjectFile parent = byId.get(current.getParentId());
+            if (parent == null || !visited.add(parent.getId()) || !Boolean.TRUE.equals(parent.getIsFolder())) break;
             path.insert(0, parent.getName() + "/");
             current = parent;
         }

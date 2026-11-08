@@ -145,6 +145,20 @@ class HarnessDiagnosticServiceTest {
     }
 
     @Test
+    void permissionRefusalsAreNotGuardedAsEvidenceGaps() {
+        String[] refusals = {
+                "Not permitted: firm-wide fee ledger and dashboards are limited to law firm administrators",
+                "无权访问该项目", "没有权限查看此文件", "Access denied", "HTTP 403 Forbidden", "403"};
+        for (String r : refusals) {
+            assertTrue(HarnessDiagnosticService.isPermissionDenied(r), r);
+            assertTrue(diagnosticService.diagnoseAndAdapt("c", "r", "查一下", "search_project_files",
+                    "{}", r, 2, new HashSet<>(), List.of()).isEmpty(), r);
+        }
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("Error: no files matched"));
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("amount 14030 yuan"));
+    }
+
+    @Test
     void credentialAndKeyMissingErrorsAreUnavailableNotCategoryHintsOrGuard() {
         String noCred = "Error: MCP server has no credential: pkulaw-semantic";
         String noKey = "错误：网络搜索未配置：当前部署未提供博查（Bocha AI）搜索的 API Key。本次已跳过网络搜索";

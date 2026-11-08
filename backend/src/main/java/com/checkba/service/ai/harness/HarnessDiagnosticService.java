@@ -175,7 +175,7 @@ public class HarnessDiagnosticService {
 
         // 2. INVARIANT 层：检查是否需要展开尚未披露的工具类目
         Set<String> candidateCategories = new LinkedHashSet<>();
-        if (!safeTool.isEmpty() && !isToolUnavailable(safeResult)) {
+        if (!safeTool.isEmpty() && !isToolUnavailable(safeResult) && !isPermissionDenied(safeResult)) {
             String toolCategory = toolDisclosurePolicy.categoryOf(safeTool);
             if (!"core".equals(toolCategory) && !ToolDisclosurePolicy.FALLBACK_CATEGORY.equals(toolCategory)) {
                 candidateCategories.add(toolCategory);
@@ -266,7 +266,7 @@ public class HarnessDiagnosticService {
         // 4. DOMAIN 层：连续检索/查找无结果或累计失败 >= 2 次时，处方立即向用户澄清而非盲猜
         // 供应商不可用（上游 MCP 报错）不是盲猜关键词，让用户补材料没用，不触发
         if ((SEARCH_LOOKUP_TOOLS.contains(safeTool) || consecutiveFailures >= 2)
-                && !isToolUnavailable(safeResult)
+                && !isToolUnavailable(safeResult) && !isPermissionDenied(safeResult)
                 && !alreadyTriggered(existingAdaptations, ACTION_CLARIFY_WITH_USER, safeTool)) {
             String title = LangText.of(
                     "Harness 自愈：阻断盲目重试，切换为证据缺口澄清",
@@ -344,6 +344,27 @@ public class HarnessDiagnosticService {
                 || resultText.contains("尚未连接")
                 || resultText.contains("本次已跳过")
                 || HTTP_ERROR.matcher(resultText).find();
+    }
+
+    private static final java.util.regex.Pattern HTTP_403 = java.util.regex.Pattern.compile("(?<!\\d)403(?!\\d)");
+
+    /**
+     * 权限拒绝类结果（Not permitted / 无权 / 没有权限 / access denied / forbidden / 403）。
+     * 与「不可用」同样不展开类目、不触发 ask_user 护栏；缺权限不是缺事实，问用户补材料没用。
+     */
+    public static boolean isPermissionDenied(String resultText) {
+        if (resultText == null || resultText.isBlank()) {
+            return false;
+        }
+        String lower = resultText.toLowerCase(Locale.ROOT);
+        return lower.contains("not permitted")
+                || lower.contains("permission denied")
+                || lower.contains("access denied")
+                || lower.contains("forbidden")
+                || resultText.contains("无权")
+                || resultText.contains("没有权限")
+                || resultText.contains("无权限")
+                || HTTP_403.matcher(resultText).find();
     }
 
     private static boolean isAnchorOrMatchMiss(String resultText) {
