@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "เวอร์ชัน",
   "railLabelFeedback": "ความเห็น",
   "railLabelLitigation": "แผนภาพ",
-  "railLabelBaoqingtian": "ข้อเท็จจริง",
+  "railLabelBaoqingtian": "คดี",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "สำนักงาน",
   "railLabelTmeet": "ประชุม",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "ปลั๊กอิน",
   "pluginLabels": {
     "tencentMeeting": "เทนเซ็นต์ มีตติ้ง (Tencent Meeting)",
-    "baoqingtian": "Baoqingtian · ไทม์ไลน์ข้อเท็จจริงและการทบทวนข้อขัดแย้ง",
+    "baoqingtian": "Baoqingtian · คดีและบันทึก",
     "dpiaWorkbench": "เวิร์กเบนช์การปฏิบัติตามข้อกำหนดข้อมูล DPIA",
     "lawfirmManagement": "การจัดการสำนักงานกฎหมาย",
     "projectIm": "แชทของโปรเจกต์"

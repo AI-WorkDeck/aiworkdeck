@@ -63,6 +63,7 @@
 import { getUserActivityHistory } from '@/services/api.js'
 import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import { toolDisplayName } from '@/utils/toolDisplayNames.js'
 
 // dev-board BUG-45：actionType → i18n key。取值范围见 backend
 // UserActivityLog.actionType 的文档注释（LOGIN/OPEN_FILE/CLOSE_FILE/PAGE_VIEW/
@@ -80,6 +81,7 @@ const ACTION_TYPE_I18N_KEYS = {
   OPEN_URL: 'account.actionOpenUrl',
   CLOSE_URL: 'account.actionCloseUrl',
   WORK: 'account.actionWork',
+  ai_tool: 'account.actionAiTool',
 }
 
 export default {
@@ -194,6 +196,13 @@ export default {
     getLogObject(log) {
       if (log.actionType === 'OPEN_FILE' || log.actionType === 'CLOSE_FILE') return log.targetName
       if (log.actionType === 'WORK') return '-'
+      if (log.actionType === 'ai_tool') {
+        // 工具显示名 + 来源（metaInfo 只含摘要，不含参数/输出）
+        let source = 'agent'
+        try { source = JSON.parse(log.metaInfo || '{}').source || 'agent' } catch (e) { /* 老数据/非 JSON */ }
+        const key = { agent: 'aiToolSourceAgent', mcp: 'aiToolSourceMcp', 'plugin-ui': 'aiToolSourcePlugin' }[source] || 'aiToolSourceAgent'
+        return `${toolDisplayName(log.targetName)}（${this.$t('account.' + key)}）`
+      }
       return log.targetName || '-'
     },
     getLogStartTime(log) {

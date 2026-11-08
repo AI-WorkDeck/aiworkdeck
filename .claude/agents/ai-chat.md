@@ -33,7 +33,13 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 ## 能力目录与本机 MCP 服务器（Stella 对齐，docs/plans/stella-alignment/mcp-server.md）
 
 - `@ToolMeta.access()` 默认 INFERRED，由 `service/ai/capability/CapabilityCatalog` 按工具名动词推断 read/write/destructive（认不出算 write），并推出 scope `awd:<领域>.<read|write>`。`docs/capability-catalog.md` 由 `CapabilityCatalogDocTest` 生成并做漂移比对：**增删改工具后要重新生成**（`AWD_WRITE_CAPABILITY_CATALOG=1 mvn test -Dtest=CapabilityCatalogDocTest`），推断不对就在 `@ToolMeta` 显式写 access。
-- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，除 `propose_revision` 外全部只读、不经 ToolRegistry、读文件不走 OCR。新增 MCP 工具必须登记 `DEFINITIONS`，只能是 read；唯一的写工具是 `propose_revision`（access=write，scope `awd:project.propose`，`CapabilityCatalogDocTest` 点名放行，不改文件只落 `PendingRevision`，契约见 `ai-doc-bridge.md`「外部 Agent 待审修订」）。`read_file` 返回 `version`（= 更新时间毫秒-字节数），即提案的 `baseVersion`。`tools/call` 来源标注取请求头 User-Agent（无状态，拿不到 initialize 的 clientInfo），净化后写成 `mcp:<client>`。
+- AWD 自身作为 MCP 服务器：`LocalMcpServerController` 的 `POST /mcp`（只在 local-mode，默认关闭=404，`Authorization: Bearer awdm_...`，带 Origin 拒绝）与 `/api/mcp-server/{status,enable,disable}`；工具在 `service/mcpserver/LocalMcpServerTools`，除 `propose_revision` 外全部只读、不经 ToolRegistry、读文件不走 OCR。新增手工精修 MCP 工具必须登记 `DEFINITIONS`，只能是 read；唯一的写工具是 `propose_revision`（access=write，scope `awd:project.propose`，`CapabilityCatalogDocTest` 点名放行，不改文件只落 `PendingRevision`，契约见 `ai-doc-bridge.md`「外部 Agent 待审修订」）。`read_file` 返回 `version`（= 更新时间毫秒-字节数），即提案的 `baseVersion`。`tools/call` 来源标注取请求头 User-Agent（无状态，拿不到 initialize 的 clientInfo），净化后写成 `mcp:<client>`。
+
+- **MCP 投影（agent-app-control.md C7，P1-4）**：`tools/list` = 上面的精修工具 + `service/mcpserver/McpToolProjection` 从 `ToolRegistry.mcpCandidates()` 投影的工具，同一张注册表两个消费者。规则：内置工具 `access=READ ∧ requiresHost=NONE ∧ offerToModel`，且排除 `doc_/sheet_/slide_/office_/ref_` 前缀、`ask_user/list_tools/list_attached_files`、按量计费外部服务工具（`search_web`、`qichacha_*`、`tushare_query`、北大法宝 5 个，显式名单 `MCP_METERED_EXTERNAL`，防外部 Agent 循环烧积分；新增此类工具须登记）与 `unusableToolNames()`；声明式插件工具 read 缺省投影、write 须显式 `mcp:true`、`mcp:false` 不投、destructive 永不；插件 JAR `@Tool` 与用户自配 MCP 不投。精修工具重名时胜出，其余按名排序。`inputSchema` 由 `JsonSchemaElementHelper.toMap` 转出，`userId/conversationId/userMessage` 不暴露；内置工具规格里 `projectId` 已被 `offerable()` 摘掉，投影补回一个**可选** `projectId`（规格看不出哪些工具必须绑项目，缺了由工具自己报错；task_list 缺省查全部项目），传了就按本机用户核读权限（write 工具核写权限）。`tools/call` → `ToolRegistry.execute`，`ToolContext(projectId=args.projectId, conversationId="mcp:"+令牌 SHA-256 前 8 位, userId=本机用户)`——**`mcp:` 前缀是审计 source 判据，不要改**；输出原文作 text content，`Error` 开头或未知工具作 `isError`。内置 `task_create` 等写工具暂不标 mcp（`ToolMeta` 无该标志，留给 P2-5）。精修工具不经注册表，由 `LocalMcpServerTools.call` 自己写 `ai_tool` 审计（`source=mcp`、`argsDigest`、`ok`、`durationMs`，不记参数值与输出）。回归：`McpToolProjectionTest`、`LocalMcpServerControllerTest`、`CapabilityCatalogDocTest.mcpProjectionOfRealRegistryIsReadOnlyBuiltins`。
+
+## 工具调用审计（agent-app-control C8）
+
+`ToolRegistry.execute` 结束后异步（单线程守护执行器，失败仅 WARN）写 `UserActivityLog`：`actionType=ai_tool`，`targetName=工具名`，`metaInfo={source: agent|mcp|plugin-ui, access, pluginId?, argsDigest(sha256), ok, durationMs}`，绝不记参数值与输出。source：`conversationId` 以 `mcp:` 开头为 mcp，`PluginController` 直调走四参重载传 `plugin-ui`，其余 agent；`list_tools`/`use_skill`、未知工具、无 userId 不记。ok=输出不以 `Error` 开头。前端活动日志暂无 source 过滤，`ai_tool` 行无专属 i18n（回退显示原值）。回归 `ToolRegistryAuditTest`。
 
 ## 独立 MCP 连接（dev-board#1599）
 
@@ -655,6 +661,12 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
   ⑤ **渐进披露**（dev-board#810，`ToolDisclosurePolicy`，**2026-09-29 起默认开**，dev-board#1064 第二步）：只下发核心集 + 本轮已展开的类目。
      与 ②b 叠用时先按类目裁、再按核心集收窄，两者都是「核心集 ∪ 已展开类目」的形状，叠起来仍是那个形状。
      见下文「工具规格瘦身与渐进披露」一节。
+     **没开文件态（tool-surface-audit S1）**：LOWA 会话且起跑时无活跃文档（`RunGuard.noFileEntrySet`，主前端默认落点）只下发入口核心集——
+     找 / 开 / 建文件（`doc_open_file / doc_start_stream / sheet_create_file / slide_create_file / write_docx`）、搜索、事项、记忆、法源、`ask_user / list_tools / use_skill`；
+     doc_/sheet_/slide_ 编辑原语（核心集与关键词放回类目里的）暂不下发，`doc_open_file` / 新建成功 / skill 白名单点名编辑原语后清零（只放宽）；
+     之后 `list_tools` / 点名 / 决策辅助明确要的类目不再过滤。`sheet_create_file / slide_create_file` 不再常驻核心集（已拍板 #1），有文档开着时靠「表格 / excel / ppt / 幻灯片」关键词预放回，建成后其类目随展开集放回。
+     关键词预放回每轮最多 3 类（`categoriesPutBackFor`：命中词总长度降序，同分按 `PUTBACK_PRIORITY`），skill 白名单类目不受限。
+     首轮体量由 `ToolSurfaceBudgetTest` + `cases-tool-surface.json` 钉住（没开文件中性 25 个 / 6.5k token）。
   - **为什么值得做②**：工具规格**每一轮都要重发**，一条消息跑三五个往返就付三五遍。
     本机实测 202 个工具 59045 prompt token / 首轮 26.4s，裁到 16 个 18854 token / 6.1s；
     本仓离线实测（`ToolSchemaBudgetTest`）docx 省 27.6%、xlsx 省 38.8%、pptx 省 39.7% 的 schema 体量

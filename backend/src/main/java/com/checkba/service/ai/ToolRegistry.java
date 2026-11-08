@@ -649,6 +649,64 @@ public class ToolRegistry {
         return null;
     }
 
+    /** 对外 MCP 投影的候选（docs/plans/agent-app-control.md C7）：规格已摘掉服务端注入参数，needsProject 标明是否要调用方显式给 projectId。 */
+    public record McpCandidate(ToolSpecification spec, ToolMeta.Access access, boolean needsProject) {}
+
+    /** 这些前缀的工具依赖编辑器/Office 宿主会话，即使没声明 requiresHost 也不对外投影。 */
+    private static final List<String> MCP_HOST_PREFIXES = List.of("doc_", "sheet_", "slide_", "office_", "ref_");
+
+    /** 只对应应用内对话流程（向用户提问、工具目录、本轮附件），对外 Agent 没有可用语义，不投影。 */
+    private static final Set<String> MCP_IN_APP_ONLY = Set.of("ask_user", "list_tools", "list_attached_files");
+
+    /**
+     * 按量计费的外部服务工具（搜索/企查查/Tushare/北大法宝，即 {@code ExternalServiceProvider} 的 SEARCH/QICHACHA/TUSHARE/PKULAW）
+     * 不对外投影：外部 Agent 可能循环调用、在用户看不见的地方花光积分。工具类上没有可读的「走付费网关」信号
+     * （档位判定在各工具方法体内，经 ExternalServiceAvailability），所以这里是显式名单，新增此类工具须同步登记。
+     */
+    private static final Set<String> MCP_METERED_EXTERNAL = Set.of("search_web", "tushare_query",
+            "law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
+    private static final String MCP_METERED_PREFIX = "qichacha_";
+
+    /**
+     * 可投影到对外 MCP 的工具：内置工具只放 access=READ 且 requiresHost=NONE 且 offerToModel；
+     * 声明式插件工具 read 缺省投影、write 须显式 {@code mcp:true}，{@code mcp:false} 一律不投；destructive 永不投影。
+     * 此刻不可用的工具（{@link #unusableToolNames()}）与已停用插件的工具不在其中。插件 JAR 的 @Tool 不投影。
+     */
+    public List<McpCandidate> mcpCandidates() {
+        List<McpCandidate> out = new ArrayList<>();
+        Set<String> unusable = unusableToolNames();
+        Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
+        boolean tmeetPluginActive = tencentMeetingPluginActive();
+        for (ToolSpecification spec : builtinSpecifications) {
+            String name = spec.name();
+            RegisteredTool registered = builtinTools.get(name);
+            ToolMeta meta = registered.meta();
+            if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
+                    || name.startsWith(MCP_METERED_PREFIX) || (tmeetPluginActive && name.startsWith("tmeet_"))
+                    || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
+                    || (meta != null && meta.requiresHost() != ToolMeta.Host.NONE)
+                    || com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ) continue;
+            if (registered.bean() instanceof AgentToolComponent component
+                    && !availability.computeIfAbsent(component, this::componentAvailable)) continue;
+            boolean needsProject = registered.method() != null && java.util.Arrays.stream(registered.method().getParameters())
+                    .anyMatch(p -> "projectId".equals(p.getName()));
+            out.add(new McpCandidate(spec, ToolMeta.Access.READ, needsProject));
+        }
+        for (DeclaredToolBinding b : declaredBindings()) {
+            String name = b.specification().name();
+            if (unusable.contains(name) || builtinTools.containsKey(name)) continue;
+            ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, b.tool().getAccess());
+            Boolean mcp = b.tool().getMcp();
+            boolean projected = access == ToolMeta.Access.READ ? !Boolean.FALSE.equals(mcp)
+                    : access == ToolMeta.Access.WRITE && Boolean.TRUE.equals(mcp);
+            if (!projected) continue;
+            var params = b.specification().parameters();
+            out.add(new McpCandidate(b.specification(), access,
+                    params != null && params.properties() != null && params.properties().containsKey("projectId")));
+        }
+        return out;
+    }
+
     /** 声明式 read 工具名：ASK 模式放行（与 AgentOrchestrator.ASK_READ_TOOLS 并集）。 */
     public Set<String> declaredReadToolNames() {
         Set<String> names = new java.util.HashSet<>();
@@ -1078,6 +1136,81 @@ public class ToolRegistry {
      * @param ctx      服务端上下文（覆盖同名参数）
      */
     public ToolResult execute(String name, String argsJson, ToolContext ctx) {
+        return execute(name, argsJson, ctx, null);
+    }
+
+    /** source 显式指定审计来源（agent|mcp|plugin-ui）；null = 按 ctx 推断（conversationId 以 "mcp:" 开头为 mcp，否则 agent）。 */
+    public ToolResult execute(String name, String argsJson, ToolContext ctx, String source) {
+        long started = System.nanoTime();
+        ToolResult result = null;
+        try {
+            result = doExecute(name, argsJson, ctx);
+            return result;
+        } finally {
+            audit(TOOL_NAME_ALIASES.getOrDefault(name, name), argsJson, ctx, source, result, started);
+        }
+    }
+
+    // 审计（agent-app-control C8）：只记工具名与参数摘要，绝不记参数值/输出（律师保密）。
+    private static final Set<String> AUDIT_SKIPPED = Set.of("list_tools", "use_skill");
+    private static final java.util.concurrent.Executor AUDIT_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "tool-audit");
+                t.setDaemon(true);
+                return t;
+            });
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserActivityLogService activityLogService;
+
+    /** 测试可替换为同步执行器。 */
+    java.util.concurrent.Executor auditExecutor = AUDIT_EXECUTOR;
+
+    private void audit(String name, String argsJson, ToolContext ctx, String source, ToolResult result, long started) {
+        try {
+            if (activityLogService == null || ctx == null || ctx.userId() == null || name == null
+                    || AUDIT_SKIPPED.contains(name) || (result != null && !result.found())) return;
+            long durationMs = (System.nanoTime() - started) / 1_000_000;
+            boolean ok = result != null && !(result.output() != null && result.output().startsWith("Error"));
+            String src = source != null ? source
+                    : ctx.conversationId() != null && ctx.conversationId().startsWith("mcp:") ? "mcp" : "agent";
+            RegisteredTool tool = result == null ? null : result.tool();
+            DeclaredToolBinding declared = tool != null && tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry
+                    ? declaredBinding(name) : null;
+            String access = (declared != null
+                    ? com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, declared.tool().getAccess())
+                    : com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, tool == null ? null : tool.meta()))
+                    .name().toLowerCase(java.util.Locale.ROOT);
+            String pluginId = declared != null ? declared.pluginId() : pluginService.getPluginIdForTool(name);
+            Map<String, Object> meta = new java.util.LinkedHashMap<>();
+            meta.put("source", src);
+            meta.put("access", access);
+            if (pluginId != null) meta.put("pluginId", pluginId);
+            meta.put("argsDigest", sha256(argsJson == null ? "" : argsJson));
+            meta.put("ok", ok);
+            meta.put("durationMs", durationMs);
+            String metaJson = cn.hutool.json.JSONUtil.toJsonStr(meta);
+            Long userId = ctx.userId();
+            Long projectId = ctx.projectId();
+            auditExecutor.execute(() -> {
+                try {
+                    activityLogService.logActivity(userId, "ai_tool", null, name, durationMs, metaJson, projectId);
+                } catch (Exception e) {
+                    log.warn("Tool audit write failed for '{}': {}", name, e.toString());
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Tool audit failed for '{}': {}", name, e.toString());
+        }
+    }
+
+    private static String sha256(String text) throws java.security.NoSuchAlgorithmException {
+        byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return java.util.HexFormat.of().formatHex(d);
+    }
+
+    private ToolResult doExecute(String name, String argsJson, ToolContext ctx) {
         String resolvedName = TOOL_NAME_ALIASES.getOrDefault(name, name);
         if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
             var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());

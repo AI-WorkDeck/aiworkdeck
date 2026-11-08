@@ -393,6 +393,16 @@ public class AgentOrchestrator {
          */
         String activeDocKind;
         /**
+         * 没开文件态（tool-surface-audit S1）：LOWA 会话且起跑时没有活跃文档。此态下核心集不含文档编辑原语，
+         * 打开 / 新建文档成功后清零（只放宽，与 activeDocKind 的中途放宽同一契约）。
+         */
+        volatile boolean noFileEntrySet;
+        /**
+         * 起跑时（关键词 / skill 预放回之后）的展开集快照。展开集之后再增长 = 模型经 list_tools / 点名 / 决策辅助
+         * 明确要了某个类目，此时没开文件态的编辑原语过滤不再适用（明确要的就给全）。null = 没有快照，按不过滤处理。
+         */
+        volatile java.util.Set<String> noFileBaselineCategories;
+        /**
          * 本轮确定用不了、因而不下发给模型的工具名（dev-board#750）：账户没连时的
          * law_* / search_web / qichacha_* / tushare_query 之类。
          *
@@ -411,6 +421,8 @@ public class AgentOrchestrator {
          *
          * <p>写在分发线程、读在下一轮的组装处，故用并发集合。
          */
+        /** 生效 skill 白名单点名的工具名（只增不减）：按名放行，不连带整个类目。 */
+        final java.util.Set<String> skillToolNames = java.util.concurrent.ConcurrentHashMap.newKeySet();
         final java.util.Set<String> expandedToolCategories = java.util.concurrent.ConcurrentHashMap.newKeySet();
         /**
          * 本轮候选工具集（三层闸过完、渐进披露收窄之前）。{@code list_tools} 要列的
@@ -1248,6 +1260,13 @@ public class AgentOrchestrator {
         // 还被裁着——模型第一步做成了、第二步没有工具可用，这是最坏的一种半途而废。
         if (guard != null && result.success()) {
             String createdKind = NEW_DOCUMENT_TOOL_KINDS.get(toolName);
+            if (createdKind != null) {
+                guard.noFileEntrySet = false;
+                // sheet_create_file / slide_create_file 已不在核心集：建成后要填内容的 sheet_* / slide_* 随类目放回
+                if (toolDisclosurePolicy != null && !"doc_start_stream".equals(toolName)) {
+                    guard.expandedToolCategories.add(toolDisclosurePolicy.ruleCategoryOf(toolName));
+                }
+            }
             if (createdKind != null && com.checkba.service.ai.tools.GeneratedFileLocation
                     .parentParameter(toolName, extractArg(argsJson, "fileId")) != null) {
                 var created = com.checkba.service.ai.tools.GeneratedFileLocation
@@ -1289,6 +1308,7 @@ public class AgentOrchestrator {
     /** 新建并打开的文档与本轮裁剪用的类型不一致时放回全集；一致时什么都不做。 */
     private void widenDocKindAfterDocumentSwitch(RunGuard guard, String createdKind,
                                                  String toolName, String conversationId) {
+        guard.noFileEntrySet = false;
         if (guard.activeDocKind == null || guard.activeDocKind.equals(createdKind)) {
             return;
         }
@@ -1306,6 +1326,7 @@ public class AgentOrchestrator {
      * （文件不存在 / 查库失败）同样按「不裁」处理。
      */
     private void widenDocKindIfTypeChanged(RunGuard guard, Long openedId, String conversationId) {
+        guard.noFileEntrySet = false;
         if (guard.activeDocKind == null) {
             return;
         }
@@ -1943,6 +1964,7 @@ public class AgentOrchestrator {
         json.put("opinionTargetFileName", guard.opinionTargetFileName);
         json.put("activeDocKind", guard.activeDocKind);
         json.put("docCategoryTrimActive", guard.docCategoryTrimActive);
+        json.put("noFileEntrySet", guard.noFileEntrySet);
         json.put("catalogOffered", guard.catalogOffered);
         json.put("llmRounds", guard.llmRounds);
         json.put("promptTokensRecorded", guard.promptTokensRecorded);
@@ -1982,6 +2004,7 @@ public class AgentOrchestrator {
         guard.opinionTargetFileName = json.path("opinionTargetFileName").asText(null);
         guard.activeDocKind = json.path("activeDocKind").asText(null);
         guard.docCategoryTrimActive = json.path("docCategoryTrimActive").asBoolean();
+        guard.noFileEntrySet = json.path("noFileEntrySet").asBoolean();
         guard.catalogOffered = json.path("catalogOffered").asBoolean();
         guard.llmRounds = json.path("llmRounds").asInt();
         guard.promptTokensRecorded = json.path("promptTokensRecorded").asBoolean();
@@ -2388,6 +2411,10 @@ public class AgentOrchestrator {
             // 工具可见性按活跃文档类型收窄（dev-board#729 ①）：本轮只算这一次，
             // 之后每轮递归都沿用，保证同一轮工具集不变
             guard.activeDocKind = initialDocKind(request.getActiveContext());
+            guard.noFileEntrySet = (request.getActiveContext() == null || request.getActiveContext().getId() == null
+                    || request.getActiveContext().getId().isEmpty())
+                    && (clientCapabilities == null
+                    || clientCapabilities.capabilityOf(conversationId) == ClientCapabilityService.Capability.LOWA);
             if (guard.activeDocKind != null) {
                 log.info("[ToolVisibility] conv={} 活跃文档类型={}，本轮按该类型裁剪 doc_/sheet_/slide_ 工具集",
                         conversationId, guard.activeDocKind);
@@ -3607,9 +3634,10 @@ public class AgentOrchestrator {
         if (def.isEmpty()) {
             return;
         }
-        java.util.Set<String> putBack = policy == null
-                ? java.util.Set.of() : policy.categoriesCoveredBy(def.get().getAllowedTools());
-        guard.expandedToolCategories.addAll(putBack);
+        java.util.Set<String> putBack = java.util.Set.of();
+        if (def.get().getAllowedTools() != null) {
+            guard.skillToolNames.addAll(def.get().getAllowedTools());
+        }
         log.info("[Skill] conv={} 模型调 use_skill 生效 {}，放回类目 {}（下一轮生效），当前展开集 {}",
                 guard.conversationId, def.get().getId(), putBack, guard.expandedToolCategories);
     }
@@ -3646,11 +3674,14 @@ public class AgentOrchestrator {
         if (!guard.docCategoryTrimActive && !policy.isEnabled()) {
             return;
         }
-        java.util.Set<String> putBack = new java.util.LinkedHashSet<>(policy.categoriesHintedBy(userMessage));
+        java.util.Set<String> putBack = new java.util.LinkedHashSet<>(policy.categoriesPutBackFor(userMessage));
         for (com.checkba.service.ai.skill.SkillRouter.ActiveSkill skill : skillRouter.activeSkills(guard.runId)) {
-            putBack.addAll(policy.categoriesCoveredBy(skill.definition().getAllowedTools()));
+            if (skill.definition().getAllowedTools() != null) {
+                guard.skillToolNames.addAll(skill.definition().getAllowedTools());
+            }
         }
         guard.expandedToolCategories.addAll(putBack);
+        guard.noFileBaselineCategories = new java.util.HashSet<>(guard.expandedToolCategories);
         log.info("[ToolVisibility] conv={} 活跃文档 {} 按类目裁剪 {}，渐进披露 {}，预先放回类目 {}（关键词/skill）",
                 guard.conversationId, guard.activeDocKind,
                 policy.hiddenCategoriesFor(guard.activeDocKind), policy.isEnabled() ? "开" : "关", putBack);
@@ -3685,12 +3716,14 @@ public class AgentOrchestrator {
         // 活跃文档类目裁剪（dev-board#1064）排在核心集收窄之前，两者都是「只留 核心集 ∪ 已放回类目」
         // 的形状，叠起来仍是那个形状。放在决策辅助之后，它刚放回的类目本轮就生效。
         List<ToolSpecification> candidates = guard.docCategoryTrimActive
-                ? policy.trimForDocKind(allCandidates, guard.activeDocKind, guard.expandedToolCategories)
+                ? policy.trimForDocKind(allCandidates, guard.activeDocKind, guard.expandedToolCategories, guard.skillToolNames)
                 : allCandidates;
         guard.roundTrimmed = allCandidates.size() - candidates.size();
         if (guard.decisionContext != null && guard.decisionAbandoned) return candidates;
         if (!policy.isEnabled() && !guard.assistedDisclosure) return candidates;
-        List<ToolSpecification> disclosed = policy.narrow(candidates, guard.expandedToolCategories);
+        List<ToolSpecification> disclosed = policy.narrow(candidates, guard.expandedToolCategories,
+                guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories),
+                guard.skillToolNames);
         // The static rollout may be off: expose only this safe catalog, not other unavailable tools.
         if (guard.assistedDisclosure && disclosed.stream().noneMatch(s -> ToolDisclosurePolicy.CATALOG_TOOL.equals(s.name()))) {
             toolRegistry.resolve(ToolDisclosurePolicy.CATALOG_TOOL, guard.conversationId)

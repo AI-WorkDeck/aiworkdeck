@@ -55,6 +55,10 @@ export default {
   actionOpenUrl: '打开网页',
   actionCloseUrl: '关闭网页',
   actionWork: '工作',
+  actionAiTool: 'AI 工具调用',
+  aiToolSourceAgent: '智能体',
+  aiToolSourceMcp: '外部 MCP',
+  aiToolSourcePlugin: '插件',
 
   // ---- 设置页「全部收藏」（dev-board#872：跨项目汇总，按项目分组）----
   favoritesSubtitle: '汇总你在所有项目里收藏的内容；工作台里的收藏夹只看当前项目，并可直接插入文档',

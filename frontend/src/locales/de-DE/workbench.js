@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Versionen",
   "railLabelFeedback": "Feedback",
   "railLabelLitigation": "Grafiken",
-  "railLabelBaoqingtian": "Zeitachse",
+  "railLabelBaoqingtian": "Mandate",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Kanzlei",
   "railLabelTmeet": "Meeting",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Erweiterung",
   "pluginLabels": {
     "tencentMeeting": "Tencent-Meeting-Konferenz",
-    "baoqingtian": "Baoqingtian · Faktenchronologie & Widerspruchsprüfung",
+    "baoqingtian": "Baoqingtian · Mandatsanfragen & Notizen",
     "dpiaWorkbench": "DSFA-Compliance-Workbench",
     "lawfirmManagement": "Kanzleimanagement",
     "projectIm": "Projekt-Chat"

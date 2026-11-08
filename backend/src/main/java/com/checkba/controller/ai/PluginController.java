@@ -252,7 +252,7 @@ public class PluginController {
             return ResponseEntity.badRequest().body(error(LangText.of("args 不是合法 JSON 对象", "args is not a valid JSON object")));
         }
         ToolRegistry.ToolResult result = toolRegistry.execute(toolName,
-                argsJson, new ToolContext(projectId, null, userId, null));
+                argsJson, new ToolContext(projectId, null, userId, null), "plugin-ui");
         Map<String, Object> out = new HashMap<>();
         out.put("code", result.found() ? 0 : 1);
         out.put("output", result.output());

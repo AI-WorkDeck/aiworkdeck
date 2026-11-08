@@ -196,7 +196,7 @@ export default {
   railLabelVersion: 'Versions',
   railLabelFeedback: 'Feedback',
   railLabelLitigation: 'Charts',
-  railLabelBaoqingtian: 'Timeline',
+  railLabelBaoqingtian: 'Leads',
   railLabelDpia: 'DPIA',
   railLabelLawfirm: 'Firm',
   railLabelTmeet: 'Meeting',
@@ -381,7 +381,7 @@ export default {
   pluginFallbackName: 'Plugin',
   pluginLabels: {
     tencentMeeting: 'Tencent Meeting',
-    baoqingtian: 'Baoqingtian · Fact Timeline & Contradiction Review',
+    baoqingtian: 'Baoqingtian · Case Leads & Notes',
     dpiaWorkbench: 'DPIA Compliance Workbench',
     lawfirmManagement: 'Law Firm Management',
     projectIm: 'Project Chat',

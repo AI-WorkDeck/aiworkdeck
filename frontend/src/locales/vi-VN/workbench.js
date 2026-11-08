@@ -185,7 +185,7 @@ export default {
   "railLabelVersion": "Phiên bản",
   "railLabelFeedback": "Phản hồi",
   "railLabelLitigation": "Biểu đồ",
-  "railLabelBaoqingtian": "Sự kiện",
+  "railLabelBaoqingtian": "Vụ việc",
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "Văn phòng",
   "railLabelTmeet": "Họp",
@@ -350,7 +350,7 @@ export default {
   "pluginFallbackName": "Tiện ích mở rộng",
   "pluginLabels": {
     "tencentMeeting": "Hội nghị Tencent Meeting",
-    "baoqingtian": "Baoqingtian · Dòng thời gian sự kiện & Rà soát mâu thuẫn",
+    "baoqingtian": "Baoqingtian · Vụ việc & ghi chú",
     "dpiaWorkbench": "Bàn làm việc tuân thủ DPIA",
     "lawfirmManagement": "Quản lý công ty luật",
     "projectIm": "Trò chuyện dự án"

@@ -7,6 +7,7 @@ import com.checkba.service.LangText;
 import com.checkba.service.LocalIdentityService;
 import com.checkba.service.mcpserver.LocalMcpServerSettings;
 import com.checkba.service.mcpserver.LocalMcpServerTools;
+import com.checkba.service.mcpserver.McpToolProjection;
 import com.checkba.util.ProductIdentity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * AI WorkDeck 作为 MCP 服务器（第一期：本机、只读，docs/plans/stella-alignment/mcp-server.md）。
@@ -48,13 +50,16 @@ public class LocalMcpServerController {
 
     private final LocalMcpServerSettings settings;
     private final LocalMcpServerTools tools;
+    private final McpToolProjection projection;
     private final LocalIdentityService localIdentity;
     private final ObjectMapper objectMapper;
 
     public LocalMcpServerController(LocalMcpServerSettings settings, LocalMcpServerTools tools,
+                                    McpToolProjection projection,
                                     LocalIdentityService localIdentity, ObjectMapper objectMapper) {
         this.settings = settings;
         this.tools = tools;
+        this.projection = projection;
         this.localIdentity = localIdentity;
         this.objectMapper = objectMapper;
     }
@@ -145,7 +150,7 @@ public class LocalMcpServerController {
             case "initialize" -> result = initializeResult(message.path("params").path("protocolVersion").asText(""));
             case "ping" -> result = Map.of();
             case "tools/list" -> result = Map.of("tools", toolList());
-            case "tools/call" -> result = callTool(message.path("params"), clientName);
+            case "tools/call" -> result = callTool(message.path("params"), clientName, token);
             default -> {
                 return ResponseEntity.ok(error(id, -32601, "Method not found: " + method));
             }
@@ -172,7 +177,7 @@ public class LocalMcpServerController {
     }
 
     private List<Map<String, Object>> toolList() {
-        return LocalMcpServerTools.DEFINITIONS.stream().map(def -> {
+        List<Map<String, Object>> list = new java.util.ArrayList<>(LocalMcpServerTools.DEFINITIONS.stream().map(def -> {
             Map<String, Object> tool = new LinkedHashMap<>();
             tool.put("name", def.name());
             tool.put("description", def.description());
@@ -181,11 +186,22 @@ public class LocalMcpServerController {
             tool.put("annotations", Map.of("readOnlyHint", read, "destructiveHint", false,
                     "idempotentHint", read, "openWorldHint", false));
             return tool;
-        }).toList();
+        }).toList());
+        for (McpToolProjection.Projected p : projection.list()) {
+            Map<String, Object> tool = new LinkedHashMap<>();
+            tool.put("name", p.name());
+            tool.put("description", p.description());
+            tool.put("inputSchema", p.inputSchema());
+            boolean read = p.access() == com.checkba.service.ai.tools.ToolMeta.Access.READ;
+            tool.put("annotations", Map.of("readOnlyHint", read, "destructiveHint", false,
+                    "idempotentHint", read, "openWorldHint", false));
+            list.add(tool);
+        }
+        return list;
     }
 
     /** 工具层错误按 MCP 约定放进 result（isError=true），让调用它的模型看得见、能改参数重试。 */
-    private Map<String, Object> callTool(JsonNode params, String clientName) {
+    private Map<String, Object> callTool(JsonNode params, String clientName, String token) {
         if (!params.path("name").isTextual()) return null;
         String name = params.get("name").asText();
         JsonNode argsNode = params.path("arguments");
@@ -196,8 +212,15 @@ public class LocalMcpServerController {
         log.info("MCP tools/call name={} projectId={} fileId={}", name, args.get("projectId"), args.get("fileId"));
         Map<String, Object> result = new LinkedHashMap<>();
         try {
-            Object value = tools.call(name, args, userId, clientName);
-            result.put("content", List.of(Map.of("type", "text", "text", objectMapper.writeValueAsString(value))));
+            Object value;
+            Optional<McpToolProjection.Projected> projected = LocalMcpServerTools.isCurated(name)
+                    ? Optional.empty() : projection.find(name);
+            if (projected.isPresent()) {
+                value = projection.call(projected.get(), args, userId, "mcp:" + tokenDigest(token));
+            } else {
+                value = tools.call(name, args, userId, clientName);
+            }
+            result.put("content", List.of(Map.of("type", "text", "text", value instanceof String text ? text : objectMapper.writeValueAsString(value))));
             result.put("isError", false);
         } catch (LocalMcpServerTools.ToolError e) {
             result.put("content", List.of(Map.of("type", "text", "text", e.getMessage())));
@@ -209,6 +232,17 @@ public class LocalMcpServerController {
             result.put("isError", true);
         }
         return result;
+    }
+
+    /** 令牌 SHA-256 前 8 位：只用来区分不同接入的会话标识，不可逆推令牌。 */
+    private static String tokenDigest(String token) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest((token == null ? "" : token).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d).substring(0, 8);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Map<String, Object> error(JsonNode id, int code, String message) {
