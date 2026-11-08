@@ -36,10 +36,14 @@ const LOCALIZED_NAMES = {
 }
 
 const NAMES = {
+  // 注：tool-system-v2 V3 已删除 22 个长期隐藏工具（get_user_profile、read_document、pptx_open_file 等），
+  // 它们在下面保留的条目是 history-only：只为老会话的过程卡继续显示友好名，不对应任何现存工具。
   // 计划 / 项目
   todo_write: { zh: '更新任务清单', en: 'Update plan' },
   ask_user: { zh: '向用户提问', en: 'Ask the user' },
+  get_project_context: { zh: '获取项目信息', en: 'Get project context' },
   update_project_info: { zh: '更新项目信息', en: 'Update project info' },
+  get_conversation_summary: { zh: '回顾会话记录', en: 'Recall conversation' },
   list_project_folders: { zh: '列出项目文件夹', en: 'List folders' },
   version_status: { zh: '查看版本状态', en: 'Check version status' },
   version_history: { zh: '查看版本历史', en: 'View version history' },
@@ -55,6 +59,8 @@ const NAMES = {
   // 网络
   search_web: { zh: '网络搜索', en: 'Web search' },
   browse_url: { zh: '浏览网页', en: 'Browse page' },
+  deep_search: { zh: '深度检索', en: 'Deep search' },
+  search_knowledge_base: { zh: '搜索知识库', en: 'Search knowledge base' },
   // 企业与金融数据。P4 起是 Java 侧一等工具（原来由 AI 写 Python 脚本直连上游，
   // platform 档下没有可注入的凭证，失败会表现成「查不到数据」而不是「未配置」）。
   // 文案与后端 @ToolMeta(displayName) 逐字对齐，两侧有护栏用例钉着，别改措辞。
@@ -67,6 +73,7 @@ const NAMES = {
   law_recognition: { zh: '法条识别与溯源', en: 'Identify citations' },
   get_law_article: { zh: '查询法条', en: 'Look up article' },
   // 文件
+  read_document: { zh: '读取文档', en: 'Read document' },
   search_project_files: { zh: '搜索项目文件', en: 'Search files' },
   search_across_projects: { zh: '跨项目搜索文件', en: 'Search files across projects' },
   search_project_content: { zh: '搜索文件内容', en: 'Search file contents' },
@@ -90,6 +97,9 @@ const NAMES = {
   capability_select: { zh: '切换能力实现', en: 'Switch capability' },
   plugin_dev_scaffold: { zh: '创建插件骨架', en: 'Scaffold plugin' },
   plugin_dev_install: { zh: '安装插件到本机', en: 'Install plugin locally' },
+  scan_files: { zh: '扫描项目文件', en: 'Scan files' },
+  delete_file: { zh: '删除文件', en: 'Delete file' },
+  move_file: { zh: '移动文件', en: 'Move file' },
   create_folder: { zh: '新建文件夹', en: 'Create folder' },
   rename_project_file: { zh: '重命名文件', en: 'Rename file' },
   move_project_file: { zh: '移动文件', en: 'Move file' },
@@ -110,6 +120,7 @@ const NAMES = {
   save_memory: { zh: '保存记忆', en: 'Save memory' },
   query_memory: { zh: '检索记忆', en: 'Query memory' },
   retrieve_evidence: { zh: '检索证据', en: 'Retrieve evidence' },
+  get_user_profile: { zh: '获取用户画像', en: 'Get user profile' },
   // 子任务 / Python
   dispatch_subtask: { zh: '委派子任务', en: 'Delegate subtask' },
   // 工具目录（dev-board#810 渐进披露）：模型查「还有哪些工具」时走它
@@ -127,16 +138,22 @@ const NAMES = {
   doc_get_clauses: { zh: '识别合同条款', en: 'Map contract clauses' },
   doc_audit_structure: { zh: '结构审计', en: 'Audit contract structure' },
   doc_get_outline: { zh: '获取文档大纲', en: 'Get outline' },
+  doc_get_selection: { zh: '读取选区', en: 'Read selection' },
   doc_get_cursor_context: { zh: '查看光标位置', en: 'Inspect cursor' },
   doc_get_paragraph: { zh: '读取段落', en: 'Read paragraph' },
   doc_goto: { zh: '跳转光标', en: 'Move cursor' },
+  doc_set_selection: { zh: '设置选区', en: 'Set selection' },
   doc_find_text: { zh: '查找定位', en: 'Find in document' },
   doc_find_replace: { zh: '查找替换', en: 'Find & replace' },
+  doc_replace_nth_match: { zh: '替换指定匹配', en: 'Replace match' },
+  doc_delete_match: { zh: '删除匹配文本', en: 'Delete match' },
+  doc_delete_text: { zh: '删除文本', en: 'Delete text' },
   doc_replace_selection: { zh: '替换选区', en: 'Replace selection' },
   doc_insert_at_cursor: { zh: '插入文本', en: 'Insert text' },
   doc_modify_paragraph: { zh: '修改段落', en: 'Edit paragraph' },
   doc_insert_under_heading: { zh: '标题下插入', en: 'Insert under heading' },
   doc_export_pdf: { zh: '导出为PDF', en: 'Export to PDF' },
+  doc_search_related_docs: { zh: '搜索相关文档', en: 'Find related docs' },
   doc_select_anchor: { zh: '选中定位点', en: 'Select anchor' },
   doc_select_paragraph: { zh: '选中段落', en: 'Select paragraph' },
   doc_collapse_cursor: { zh: '收起光标', en: 'Collapse cursor' },
@@ -161,6 +178,7 @@ const NAMES = {
   doc_undo: { zh: '撤销修改', en: 'Undo' },
   doc_redo: { zh: '重做修改', en: 'Redo' },
   doc_add_comment: { zh: '添加批注', en: 'Add comment' },
+  doc_debug_revisions: { zh: '检查修订记录', en: 'Inspect revisions' },
   doc_restore_checkpoint: { zh: '恢复文档快照', en: 'Restore snapshot' },
   // Word 二期批注/修订/结构面（能力矩阵 §4.2）
   doc_get_comments: { zh: '查看批注', en: 'View comments' },
@@ -342,10 +360,16 @@ const NAMES = {
   pptx_generate: { zh: '生成PPT演示文稿', en: 'Generate slides' },
   pptx_generate_outline: { zh: '生成PPT大纲', en: 'Outline slides' },
   pptx_refine_outline: { zh: '优化PPT大纲', en: 'Refine outline' },
+  pptx_open_file: { zh: '打开PPT', en: 'Open slides' },
+  pptx_list_files: { zh: '列出PPT文件', en: 'List slide files' },
+  pptx_search_files: { zh: '搜索PPT文件', en: 'Search slide files' },
   pptx_get_project_pages: { zh: '读取PPT页面', en: 'Get slide pages' },
+  pptx_edit_page: { zh: '编辑幻灯片', en: 'Edit slide' },
   pptx_export_editable: { zh: '导出可编辑PPT', en: 'Export editable slides' },
   pptx_inspect_format: { zh: '读取PPT格式', en: 'Inspect slide formatting' },
+  pptx_apply_format: { zh: '设置PPT格式', en: 'Format slides' },
   // PDF
+  pdf_list_files: { zh: '列出PDF文件', en: 'List PDF files' },
   pdf_inspect_visual: { zh: '检查页面设计', en: 'Inspect page design' },
   pdf_inspect: { zh: '读取PDF内容', en: 'Inspect PDF' },
   pdf_highlight: { zh: '高亮PDF文本', en: 'Highlight PDF text' },
