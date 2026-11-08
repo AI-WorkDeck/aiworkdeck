@@ -171,9 +171,8 @@ public class SlideEditTools implements AgentToolComponent {
             "PPT 没有修订机制，改动直接生效，无法像 Word 那样在审阅面板里逐条撤销；" +
             "误改请用 doc_restore_checkpoint 回滚到本轮开始前的快照。";
 
-    @Tool("【幻灯片·看】查看当前打开的演示文稿（pptx/odp）总览：每页的页码、名称、版式、母版、标题文字、" +
-          "形状数、是否有备注、是否含表格。打开演示文稿后先用本工具了解结构，再决定读哪一页、改哪个形状。" +
-          "Word 文档请用 doc_* 工具，电子表格请用 sheet_* 工具，本工具仅对演示文稿有效。")
+    @Tool("【幻灯片·看】查看当前打开的演示文稿（pptx/odp）总览：每页的页码、名称、版式、母版、标题、形状数、是否有备注、是否含表格。\n"
+            + "打开演示文稿后先用它了解结构，再决定读哪页、改哪个形状。仅对演示文稿有效，Word 文档用 doc_* 工具，电子表格用 sheet_* 工具。")
     public String slide_get_overview() {
         log.info("Tool: slide_get_overview called");
         try {
@@ -184,11 +183,8 @@ public class SlideEditTools implements AgentToolComponent {
         }
     }
 
-    @Tool("【幻灯片·看】读取指定页的明细：页面尺寸（磅）、版式、母版、备注文字，以及该页每个形状的名称、" +
-          "类型、位置尺寸（磅）、文字、填充边框、页面背景及段落/run 格式（字体字号、行距、段距与缩进）。" +
-          "textDetails 标明 available/truncated；不足以替代视觉对照。表格形状另带行列数。返回的 shapeName 是后续原语" +
-          "（slide_set_shape_text / slide_goto 等）定位该形状的依据——未命名形状会被自动分配一个稳定名" +
-          "（形如 __awd_shape_3），此后按名定位，不受形状顺序变化影响。")
+    @Tool("【幻灯片·看】读取指定页的明细：页面尺寸（磅）、版式、母版、备注，以及每个形状的名称、类型、位置尺寸、文字、填充边框、页面背景和段落格式。\n"
+            + "返回的 shapeName 是 slide_set_shape_text / slide_goto 等定位形状的依据；未命名形状会自动分配稳定名（如 __awd_shape_3）。textDetails 标明 available/truncated，不足以替代视觉对照；表格形状另带行列数。")
     public String slide_get_page(
             @P("页码，1 开始") Integer slideNumber
     ) {
@@ -338,14 +334,10 @@ public class SlideEditTools implements AgentToolComponent {
     // ==================== Phase 2：页与形状结构 ====================
 
     @ToolMeta(displayName = "插入幻灯片", category = "document", fileEffect = "MODIFIED")
-    @Tool("【幻灯片·写】插入一页新幻灯片。insertAfterPage 指插到第 N 页**之后**（页码 1 开始；" +
-          "不传则插到末尾，插到末尾时可能连带让另一对既有页的相对顺序也换一次，不丢内容只是顺序细节）。" +
-          "注意方向：这里是「插在第 N 页之后」，而 Office 任务窗格里的 office_ppt_add_slide 是" +
-          "「插在第 N 页之前」——同一句「插在第 3 页」在两族里差一页，而错页不报错、" +
-          "要用户自己翻页才发现，所以按页码插入前先用 slide_get_overview 核对当前页序；" +
-          "title/body 可选，写在新页的标题/内容占位符；layout（版式常量）是独立参数，与 title/body " +
-          "无关联，谨慎使用（多页文档上给已有页设置版式，真机实测过有清空相邻页占位符内容的风险，" +
-          "改前后建议用 slide_get_overview 核对）。" + NO_REVISION_NOTE)
+    @Tool("【幻灯片·写】在第 insertAfterPage 页之后插入一页新幻灯片，不传则插到末尾。\n"
+            + "方向要小心：本工具插在第 N 页之后，Office 任务窗格的 office_ppt_add_slide 插在第 N 页之前；同一句「插在第 3 页」两族差一页且不报错，按页码插入前先用 slide_get_overview 核对页序。\n"
+            + "title/body 可选，写在新页的标题/内容占位符。layout（版式常量）独立生效、与 title/body 无关，谨慎使用：多页文档上给已有页设版式，实测有清空相邻页占位符内容的风险，前后用 slide_get_overview 核对。\n"
+            + NO_REVISION_NOTE)
     public String slide_add_page(
             @P(value = "【已弃用，等价于 insertAfterPage】插到第 N 页之后，1 开始", required = false) Integer position,
             @P(value = "版式常量（可选，独立生效，与 title/body 无关；多页文档上谨慎使用，见工具说明）", required = false) Integer layout,

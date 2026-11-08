@@ -63,13 +63,9 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 文件管理工具 ====================
 
     @ToolMeta(displayName = "列出项目文件", category = "document")
-    @Tool("**项目文件的权威清单，一次列全**：Word / Excel / PPT / PDF / 纯文本(txt,md,csv…) / 图片 / 其他，"
-            + "每条给出 fileId、名称、项目相对路径与类型标注，同名文件按路径区分（父目录异常时仅列已知路径部分）。"
-            + "它是文件 ID 的主要来源——doc_open_file、extract_file_text、pdf_inspect、"
-            + "rename_project_file / move_project_file 的 fileId 从这里取；文件夹 ID 用 list_project_folders。\n"
-            + "用户问「项目里都有什么」时调这一个就够了。按文件名找用 search_project_files，"
-            + "按正文内容找用 search_project_content；只列文件夹用 list_project_folders；"
-            + "只要物理磁盘路径不要 ID 才用 list_files。")
+    @Tool("列出项目全部文件的权威清单，一次列全：每条有 fileId、名称、项目相对路径和类型。\n"
+            + "覆盖 Word / Excel / PPT / PDF / 纯文本 / 图片 / 其他。何时用：用户问「项目里都有什么」，或需要 fileId（doc_open_file、extract_file_text、pdf_inspect、rename_project_file、move_project_file 的 fileId 都从这里取）。\n"
+            + "何时不用：按文件名找用 search_project_files，按正文找用 search_project_content；只要文件夹用 list_project_folders；只要物理磁盘路径用 list_files。")
     public String doc_list_project_files(
             @P("项目ID") Long projectId
     ) {
@@ -287,14 +283,10 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "流式写入文档", category = "document", fileEffect = "MODIFIED")
-    @Tool("开始实时流式写入文档。使用此工具后，模型生成的后续内容将直接写入打开的文档中。" +
-          "**重要：创建新文件时必须提供 fileName 参数（fileId 传 null）。** " +
-          "用户指名了要放进哪个文件夹时，先调 list_project_folders 拿到该文件夹的 ID，再作为 parentFolderId 传进来；" +
-          "省略则沿用本轮开始时打开文档所在目录，没有有效文档才用根目录；传0明确放根目录。" +
-          "调用此工具后，你必须立即开始生成文档内容，并且必须使用严格的 Markdown 格式（Markdown Heading #, ##, ### 等）。" +
-          "不要在调用此工具后输出任何非文档内容的闲聊，也不要把正文包进 <artifact>/<process>/<thinking> 等协议标签"
-          + "（标签内的文字不会进入文档，会得到一份空白文件），直接开始输出文档标题和正文。"
-          + "与 write_docx 的取舍：篇幅长、要让用户看着一段段写出来的起草用本工具；一次性落盘一份写好的文书用 write_docx。")
+    @Tool("开始流式写入文档：调用后你生成的内容直接写进打开的文档。\n"
+            + "何时用：篇幅长、要让用户看着逐段写出的起草；一次性落盘写好的文书用 write_docx。\n"
+            + "新建文件必须传 fileName（fileId 传 null）。用户指名文件夹时，先 list_project_folders 取 ID 作 parentFolderId；省略则沿用本轮打开文档所在目录，传 0 放根目录。\n"
+            + "调用后立即输出严格 Markdown（#、##、### 标题等），不要闲聊，不要把正文包进 <artifact>/<process>/<thinking> 等标签（标签内文字不进文档，会得到空白文件）。")
     public String doc_start_stream(
             @P("要打开的文件ID (如果是新建文件则传 null)") Long fileId,
             @P("新建文件名 (如 '法律意见书.docx')，仅当 fileId=null 时必填") String fileName,
@@ -482,10 +474,11 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 查找和替换 ====================
 
     @ToolMeta(displayName = "查找定位", category = "document")
-    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效，目标原文未变时可复用；目标原文变化须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
-          "支持自动编号回退匹配：若段落使用 Word/Writer 自动编号（如 ListLabelString 为「第一条」「一、」「1.1」），搜索「第一条 服务内容」或「第一条」会自动匹配编号标签+正文，并额外返回 paragraphIndex 与 numbering。" +
-          "有多个匹配时先根据上下文确认哪一个才是目标，再用 anchorId 直接 doc_replace_at_anchor（精准替换，会自动滚动定位并返回改后段落）。" +
-          "单处修改先定位并核对上下文，不凭印象判断全文唯一。正文查找排除已删除修订；删除历史用 doc_list_revisions。多处独立修改拿到各自 anchorId 后连续调用。")
+    @Tool("【找】在文档中查找文本，返回每处命中的 anchorId 和上下文，供 doc_replace_at_anchor 等精确编辑。\n"
+            + "anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位。每个匹配含 text、matchIndex（从 1 开始）、anchorId、前后文、paragraph（最多 160 字，paragraphTruncated=true 时须回读完整段落）。\n"
+            + "anchorId 是随编辑移动的临时书签，并非用一次就失效：目标原文未变时可复用，原文变了须重新查找；切换或重开文档、清理锚点后失效（按引文建证据链接也会清理），失效时重新查找。\n"
+            + "自动编号段落可连编号带正文搜（如「第一条 服务内容」），并返回 paragraphIndex 与 numbering。\n"
+            + "先据上下文确认目标再改，不凭印象判断全文唯一；多处独立修改拿到各自 anchorId 后连续调用。查找排除已删除修订，删除历史用 doc_list_revisions。")
     public String doc_find_text(
             @P("要查找的文本") String keyword,
             @P("是否区分大小写，默认 false") Boolean matchCase
@@ -526,11 +519,10 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查找替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("仅在用户明确要求全文统一修改时使用查找替换；单处修改先 doc_find_text 核对上下文，再 doc_replace_at_anchor。查找以最终正文为准，排除已删除修订。所有修改将以修订模式进行，用户可以审阅后接受或拒绝。" +
-          "全文替换一次调用即可完成（大量命中也很快；纯插入型替换会分批处理并回传进度），不要因为耗时较长而重复调用；" +
-          "返回 replaced（已替换数）与 total（命中数），cancelled=true 表示用户中途取消、done 为已完成数。" +
-          "replaceText 传空字符串即删除（以修订删除痕迹呈现）。" +
-          REDLINE_GRANULARITY_NOTE)
+    @Tool("全文查找并替换，以修订模式进行（用户可审阅后接受或拒绝）。\n"
+            + "何时用：仅在用户明确要求全文统一修改时使用；单处修改先 doc_find_text 核对上下文，再 doc_replace_at_anchor。\n"
+            + "一次调用完成全文替换，不要因耗时长而重复调用。回执 replaced（已替换）、total（命中），cancelled=true 表示用户中途取消。查找以最终正文为准，排除已删除修订；replaceText 传空字符串即删除。\n"
+            + REDLINE_GRANULARITY_NOTE)
     public String doc_find_replace(
             @P("要查找的文本") String findText,
             @P("替换为的文本") String replaceText,
@@ -660,11 +652,9 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 插入和修改 ====================
 
     @ToolMeta(displayName = "插入文本", category = "document", fileEffect = "MODIFIED")
-    @Tool("插入文本，以修订模式进行。不给 anchorId 时插在当前光标处；" +
-          "要在某句话之前/之后插入：先 doc_find_text 拿到那句话的 anchorId，再调本工具并传 anchorId " +
-          "与 position（before=插在它前面，after=插在它后面，默认 after），一次调用完成定位与插入，" +
-          "不需要先 doc_select_anchor / doc_collapse_cursor。before/after 是锚点文字边界，不会自动换段；" +
-          "独立标题/段落须在 text 中提供实际换行符（段末插入以换行开头，段首插入以换行结尾），插入后回读相邻段落核对。")
+    @Tool("插入文本，以修订模式进行；默认插在光标处，给 anchorId 则插在该锚点前后。\n"
+            + "何时用：在某句话前/后插入——先 doc_find_text 取 anchorId，再传 anchorId 与 position（before/after，默认 after），不必先 doc_select_anchor。\n"
+            + "before/after 是锚点文字边界，不会自动换段：独立标题/段落须在 text 里给实际换行符（段末插入以换行开头，段首插入以换行结尾），插入后回读相邻段落核对。")
     public String doc_insert_at_cursor(
             @P("要插入的文本内容；独立标题/段落用实际换行符分隔，不能只靠 Markdown 标记") String text,
             @P(value = "doc_find_text 返回的 anchorId；给了就插在这个锚点的前面或后面，不给就插在当前光标处",
@@ -849,11 +839,10 @@ public class DocumentEditTools implements AgentToolComponent {
     // （ToolDeclarationContractTest）一眼看得出它离不开桌面编辑器——字节是编辑器里的引擎导出来的。
     @ToolMeta(displayName = "导出为PDF", category = "document", refreshFiles = true,
             requiresHost = ToolMeta.Host.LOWA)
-    @Tool("把编辑器里当前打开的文档导出为 PDF，存进项目、放在原文档所在的文件夹（同名不覆盖，自动加序号），原文档不动。" +
-          "导出的是编辑器此刻的内容（不必先保存），版面按编辑器当前的显示方式（修订痕迹若在显示中也会印出来）。" +
-          "返回新 PDF 的文件名与文件 ID，之后可用 pdf_* 工具处理它。")
+    @Tool("把编辑器里当前打开的文档导出为 PDF，存进项目、放在原文档所在文件夹，原文档不动。\n"
+            + "导出的是编辑器此刻的内容（不必先保存），版面按当前显示方式（显示中的修订痕迹也会印出）；同名不覆盖，自动加序号。回执含新 PDF 的文件名与文件 ID，之后可用 pdf_* 工具处理。")
     public String doc_export_pdf(
-            @P(value = "导出的文件名（可选；默认与原文档同名，扩展名自动改为 .pdf）", required = false) String fileName
+            @P(value = "导出文件名（可选；默认与原文档同名，扩展名自动改为 .pdf）", required = false) String fileName
     ) {
         log.info("Tool: doc_export_pdf called fileName={}", fileName);
         String raw;
@@ -1011,10 +1000,9 @@ public class DocumentEditTools implements AgentToolComponent {
     // 禁止使用整数字符偏移（跨富文本必然错位）。
 
     @ToolMeta(displayName = "通读文档", category = "document")
-    @Tool("【看】分段读取文档正文。返回带编号的段落列表（含标题级别与自动编号元数据 numbering），是了解文档内容的首选工具。" +
-          "每段含 index（0 开始）、text（段落纯文本）和 numbering（{available, label, level, hasLabel}）：当段落使用 Word/Writer 自动编号时，可见编号前缀在 numbering.label（如 '第一条'、'一、'、'1.1'），不在 text 中。" +
-          "文档很长时结果会分页：返回 truncated=true 和 nextStartParagraph，用它继续读下一段。" +
-          "多段或结构调整后，最后一次修改结束须回读改动范围及相邻段落，核对标题分段、编号和句意完整，再交付。")
+    @Tool("【看】分段读取文档正文，返回带编号的段落列表，是了解文档内容的首选工具。\n"
+            + "每段含 index（0 起）、text 和 numbering（{available, label, level, hasLabel}）；自动编号的可见前缀（如「第一条」「一、」「1.1」）在 numbering.label，不在 text 里。\n"
+            + "文档长时分页：truncated=true 时用 nextStartParagraph 继续读。多段或结构性修改后，最后一次修改结束须回读改动范围及相邻段落，核对标题分段、编号和句意，再交付。")
     public String doc_get_document_text(
             @P("起始段落号（0 开始，默认 0）") Integer startParagraph,
             @P("最多返回的段落数（默认 200）") Integer maxParagraphs
@@ -1032,11 +1020,9 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "识别合同条款", category = "document")
-    @Tool("【看】识别合同/协议的条款结构。同时识别正文手打编号与 Word/Writer 自动编号（ListLabelString，如「第X条 / 第X章 / 一、二、 / （一） / 1.」），" +
-          "把段落归并成条款，返回每条条款的编号、标题、段落范围（startParagraph~endParagraph）及是否自动编号（autoNumbered/listLabel）。" +
-          "统计条款数、按条款定位或整条修改格式时必须先用本工具，禁止把段落数/行数当条款数。" +
-          "目录最多返回 300 条，totalClauseCount 为完整目录数量；truncated=true 时用 nextStartParagraph 继续读取剩余正文。" +
-          "拿到段落范围后可用 doc_get_document_text(startParagraph) 精读某条条款，或将 startParagraph/endParagraph 传给 doc_format_selection / doc_set_paragraph_format 批量调整条款格式。")
+    @Tool("【看】识别合同/协议的条款结构，返回编号、标题、段落范围和是否自动编号。\n"
+            + "何时用：统计条款数、按条款定位或整条改格式前必须先用本工具，不要把段落数/行数当条款数。同时识别手打编号与自动编号（第X条、第X章、一、、（一）、1.），每条给 startParagraph~endParagraph。\n"
+            + "目录最多 300 条，totalClauseCount 为完整数量；truncated=true 时用 nextStartParagraph 续读。拿到范围后用 doc_get_document_text(startParagraph) 精读某条，或把 startParagraph/endParagraph 传给 doc_format_selection / doc_set_paragraph_format 批量改格式。")
     public String doc_get_clauses() {
         log.info("Tool: doc_get_clauses called");
         try {
@@ -1112,10 +1098,11 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "锚点替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改】仅把 anchorId 覆盖的 matches[].text 替换为 newText，以修订模式进行，锚点外文字保持不变。contextBefore/contextAfter 和 paragraph 仅供定位，不要把它们拼进 newText。整段重写须先查找完整原段取得整段锚点，或用 doc_modify_paragraph；仅被替换范围内未改动的字需照抄。会自动把编辑器视图滚动到该处；返回 paragraphAfterEdit（最多200字）及完整长度 paragraphAfterEditLength；paragraphAfterEditTruncated=true 时用 doc_get_paragraph 回读完整目标段落（段号未知先用 doc_get_document_text 定位），不得把片段当作完整验证；未截断时核对回执即可，不需要先 doc_select_anchor。" +
-          "先 doc_find_text 拿到带上下文的匹配列表，选定目标的 anchorId 后用本工具替换；执行前自动核对锚点原文，变化或失效则拒绝，须重新查找核对，不能用全文替换绕过；多处独立替换在同一轮连续输出多个调用。" +
-          "newText 传空字符串即删除该处文本（以修订删除痕迹呈现）。" +
-          REDLINE_GRANULARITY_NOTE)
+    @Tool("【改】把 anchorId 对应的匹配文本替换为 newText，以修订模式进行，锚点外文字不变。\n"
+            + "何时用：doc_find_text 取得 anchorId 并核对上下文后的精准替换。执行前自动核对锚点原文，变了或失效则拒绝，须重新查找，不能用全文替换绕过；多处独立替换同一轮连续调用。\n"
+            + "newText 只放 matches[].text 被替换范围的新文本；contextBefore/contextAfter 和 paragraph 仅供定位，不要拼入。空字符串即删除。整段重写先查完整原段取整段锚点，或用 doc_modify_paragraph。\n"
+            + "回执含 paragraphAfterEdit（最多 200 字）；paragraphAfterEditTruncated=true 时用 doc_get_paragraph 回读完整段落，未截断时核对回执即可，不必先 doc_select_anchor。\n"
+            + REDLINE_GRANULARITY_NOTE)
     public String doc_replace_at_anchor(
             @P("doc_find_text 返回的 anchorId") String anchorId,
             @P("仅替换该锚点 matches[].text 的新文本；不要拼回锚点外的周边文字，空字符串表示删除该匹配") String newText
@@ -1569,23 +1556,19 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "应用标准格式", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】对整篇文档应用律所标准格式（支持传参覆盖默认正文格式）：默认正文楷体_GB2312/西文 Arial 12 号黑色、两端对齐、段前 0 段后 18 磅、" +
-          "行距最小值 16 磅、首行缩进 2 字符（自动编号列表项不额外加首行缩进）；首段短文本视为主标题（16 号加粗居中）；" +
-          "章/节/条标题（含第X章/第X条/一、，无论手打还是自动编号）整段加粗；" +
-          "表格套 Grid 1.5 磅边框、10 号字、首行加粗居中、数字居右；表格后首段段前 18 磅。" +
-          "用户要求'规范格式/按标准排版'时用本工具，正文中既有的加粗强调不会被抹掉，且会穿透清除段落内残留的局部字体/字号直接格式。" +
-          "若用户同时指定了具体字体/字号/行距/缩进/段前段后（如'全文改为宋体小四、1.5倍行距'），可直接传入对应可选参数覆盖默认值。" +
-          "系统提醒说「本项目模板画像：无」时，排版一律用本工具，不要去找模板文件夹。" +
-          "长文档会分批处理并回传进度（最长约 2 分钟），一次调用即可完成，不要重复调用；返回 truncated=false 表示全文已处理。")
+    @Tool("【格式】对整篇文档套用律所标准格式，可传参覆盖默认正文格式。\n"
+            + "何时用：用户要求「规范格式 / 按标准排版」；系统提醒「本项目模板画像：无」时排版一律用它，不要去找模板文件夹。用户指定了字体/字号/行距/缩进/段间距时，传对应可选参数覆盖。\n"
+            + "默认：正文楷体_GB2312 / 西文 Arial 12 号、两端对齐、段后 18 磅、行距最小值 16 磅、首行缩进 2 字符；首段短文本为主标题（16 号加粗居中）；章节条标题加粗；表格 Grid 1.5 磅边框、10 号字、首行加粗居中、数字居右。不抹掉既有加粗强调。\n"
+            + "长文档分批处理（最长约 2 分钟），一次调用即可；truncated=false 表示全文已处理。")
     public String doc_apply_standard_format(
-            @P(value = "覆盖正文中文字体（如 宋体、仿宋_GB2312、楷体_GB2312），不传用默认", required = false) String fontNameAsian,
-            @P(value = "覆盖正文西文字体（如 Times New Roman、Arial），不传用默认", required = false) String fontNameWestern,
-            @P(value = "覆盖正文字号（磅，如 小四=12、四号=14），不传用默认", required = false) Double fontSize,
-            @P(value = "覆盖正文行距模式（single/1.5/double/multiple/proportional/atLeast/exactly），不传用默认", required = false) String lineSpacingMode,
-            @P(value = "覆盖正文行距值（倍数如 1.5、百分比如 150、或磅数如 20），不传用默认", required = false) Double lineSpacingValue,
-            @P(value = "覆盖正文首行缩进字符数（如 2；传 0 取消缩进），不传用默认", required = false) Double firstLineIndentChars,
-            @P(value = "覆盖正文段前间距（磅），不传用默认", required = false) Double spaceBeforePt,
-            @P(value = "覆盖正文段后间距（磅），不传用默认", required = false) Double spaceAfterPt
+            @P(value = "正文中文字体，如 宋体、仿宋_GB2312；不传用默认", required = false) String fontNameAsian,
+            @P(value = "正文西文字体，如 Times New Roman；不传用默认", required = false) String fontNameWestern,
+            @P(value = "正文字号（磅，小四=12、四号=14）；不传用默认", required = false) Double fontSize,
+            @P(value = "行距模式：single/1.5/double/multiple/proportional/atLeast/exactly；不传用默认", required = false) String lineSpacingMode,
+            @P(value = "行距值（倍数 1.5、百分比 150 或磅数 20）；不传用默认", required = false) Double lineSpacingValue,
+            @P(value = "首行缩进字符数（0 取消缩进）；不传用默认", required = false) Double firstLineIndentChars,
+            @P(value = "段前间距（磅）；不传用默认", required = false) Double spaceBeforePt,
+            @P(value = "段后间距（磅）；不传用默认", required = false) Double spaceAfterPt
     ) {
         log.info("Tool: doc_apply_standard_format called");
         try {
@@ -1735,9 +1718,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "添加批注", category = "document", fileEffect = "MODIFIED")
-    @Tool("【批注】在指定锚点处的文本上添加 Word 批注（comment）。修订文档时，解释、说明、修改理由等不属于正文的内容" +
-          "**必须**用本工具以批注呈现，禁止写入正文。先 doc_find_text 拿到目标文本的 anchorId，再对它加批注；" +
-          "批注署名 AI WorkDeck，附着在目标文本上，保存为 docx 后可在 Word 中查看。")
+    @Tool("【批注】在锚点文本上添加 Word 批注，署名 AI WorkDeck，保存为 .docx 后可在 Word 中查看。\n"
+            + "何时用：修订文档时，解释、说明、修改理由等不属于正文的内容必须用批注呈现，禁止写入正文。先 doc_find_text 取目标文本的 anchorId 再加批注。")
     public String doc_add_comment(
             @P("doc_find_text 返回的 anchorId（批注附着的目标文本）") String anchorId,
             @P("批注内容（解释/说明/修改理由）") String comment
@@ -2402,8 +2384,8 @@ public class DocumentEditTools implements AgentToolComponent {
     // 首次修改前的文档检查点（fileEffect=MODIFIED）仍是最后防线。
 
     @ToolMeta(displayName = "查看工作表结构", category = "document")
-    @Tool("【表格·看】查看当前打开的电子表格（xlsx）的工作表结构：每张工作表的名称、序号、已用区域和行列数。" +
-          "打开 xlsx 后先用本工具了解结构，再决定读哪个区域。Word 文档请用 doc_* 工具，本工具仅对表格文档有效。")
+    @Tool("【表格·看】查看当前打开的电子表格（xlsx）的工作表结构：名称、序号、已用区域、行列数。\n"
+            + "打开 xlsx 后先用它了解结构，再决定读哪个区域。仅对表格文档有效，Word 文档用 doc_* 工具。")
     public String sheet_get_overview() {
         log.info("Tool: sheet_get_overview called");
         try {
@@ -2415,12 +2397,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "读取单元格区域", category = "document")
-    @Tool("【表格·看】读取电子表格指定区域的单元格内容。返回二维数组 rows（文本为字符串、数值/公式结果为数字，日期是序列数）" +
-          "和公式清单 formulas。range 不传则读整个已用区域；区域过大会截断并提示分块读取。" +
-          "withFormat=true 时另返回 format：按「格式相同的连续行」分组，每列只列与默认格式不同的项" +
-          "（fontName/fontNameAsian/fontSize/bold/italic/color/background/hAlign/vAlign/numberFormat/wrap/borders，" +
-          "键名与 sheet_format_cells 参数同名，可原样套回去；borders 为 all/none 或 t/b/l/r 子集），上限 400 格。" +
-          "新增行列或往表里插内容前，用它看清相邻格式，再用 sheet_format_cells/sheet_set_borders 对齐。")
+    @Tool("【表格·看】读取电子表格指定区域的单元格内容，返回二维数组（rows）和公式清单（formulas）。\n"
+            + "文本为字符串，数值/公式结果为数字，日期是序列数。range 不传读整个已用区域，过大会截断并提示分块读。withFormat=true 另返回 format：按格式相同的连续行分组，每列只列与默认不同的项，键名与 sheet_format_cells 参数同名、可原样套回，上限 400 格。往表里新增行列或插内容前，用它看清相邻格式，再用 sheet_format_cells / sheet_set_borders 对齐。")
     public String sheet_read_range(
             @P(value = "区域，如 'A1:D20' 或单个单元格 'B3'；不传则读整个已用区域", required = false) String range,
             @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet,
@@ -2440,17 +2418,10 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "写入单元格", category = "document", fileEffect = "MODIFIED")
-    @Tool("【表格·写】从起始单元格开始按二维数组批量写入。rowsJson 是 JSON 二维数组，如 " +
-          "[[\"项目\",\"金额\"],[\"咨询费\",10000],[\"合计\",\"=SUM(B2:B2)\"]]：数字与数字样式字符串写为数值，" +
-          "'=' 开头写为公式，其余写为文本；null 跳过不动该格。写入即生效（无修订痕迹），返回实际写入区域和首行回读值供核对。" +
-          "公式用英文函数名，按 Excel 习惯写即可（逗号分隔、跨表 Sheet!A1 会自动归一为引擎方言）；" +
-          "SUM/AVERAGE/IF/COUNT/VLOOKUP/SUMIF/COUNTIF/INDEX+MATCH/IFERROR/TEXT/日期函数等均可用，" +
-          "但引擎是 LibreOffice 24.2，**不支持 XLOOKUP 等新函数**（用 VLOOKUP 或 INDEX+MATCH 代替）。" +
-          "任何公式出错都会在返回值 formulaErrors 里列出（单元格/公式/错误码），看到后必须修正并重写该格。" +
-          "**往表格末尾追加行时自动沿用上一行格式**：某行写入前在写入列范围内全空、且上方两行都有内容并格式一致时，" +
-          "先把紧邻上一行对应列的格式（字体/字号/加粗/对齐/数字格式/边框/底色/行高）抄过来再写值，" +
-          "返回值 formatInherited 列出沿用了哪几行（如 [{row:9, from:8}]）。表头下第一条数据、新增列、中间插入等情形不会自动沿用，" +
-          "需先 sheet_read_range(withFormat=true) 看相邻格式再用 sheet_format_cells/sheet_set_borders 对齐。inheritFormat=false 可关闭沿用。")
+    @Tool("【表格·写】从起始单元格起批量写入二维数组 rowsJson，写入即生效（无修订痕迹），回执含实际写入区域和首行回读值。\n"
+            + "rowsJson 如 [[\"项目\",\"金额\"],[\"咨询费\",10000],[\"合计\",\"=SUM(B2:B2)\"]]：数字及数字样式字符串写为数值，「=」开头写为公式，其余写为文本，null 跳过该格。\n"
+            + "公式用英文函数名、Excel 写法（逗号分隔，跨表 Sheet!A1 自动归一）；引擎是 LibreOffice 24.2，不支持 XLOOKUP 等新函数，用 VLOOKUP 或 INDEX+MATCH。公式出错会列在 formulaErrors（单元格/公式/错误码），必须修正并重写该格。\n"
+            + "往表格末尾追加行时自动沿用上一行格式（写入列全空、上方两行有内容且格式一致），回执 formatInherited 列出沿用的行，如 [{row:9, from:8}]；表头下第一行、新增列、中间插入不沿用，先 sheet_read_range(withFormat=true) 看相邻格式，再用 sheet_format_cells / sheet_set_borders 对齐。inheritFormat=false 关闭沿用。")
     public String sheet_write_cells(
             @P("起始单元格，如 'A1'") String startCell,
             @P("写入内容，JSON 二维数组") String rowsJson,
@@ -2600,13 +2571,13 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "新建演示文稿", category = "slides", fileEffect = "ADDED")
-    @Tool("Start a new PPT here, including when a Word reference is active: create a native editable 16:9 PPTX with one blank slide and open it. If a reference is supplied, inspect its structure AND actual rendered pages first (doc_export_pdf then pdf_inspect_visual purpose=reference); structured text alone does not establish its appearance. Other slide_* tools may be hidden until this succeeds; do not wait to discover them before creating. "
-            + "Use slide_* primitives to compose content, backgrounds and formatting. No image-generation service is required. "
-            + "When a destination folder is specified, first resolve its ID with list_project_folders. Existing files are not overwritten. Omitted parentFolderId follows the source document folder; 0 selects the root.")
+    @Tool("新建一个原生可编辑的 16:9 PPTX（含一页空白）并打开；已有 Word 参考文档时也在这里新建。\n"
+            + "何时用：用户要做 PPT。slide_* 工具在创建成功前可能不可见，不要等它们出现再建。有参考文档时先看结构和实际渲染（doc_export_pdf 后 pdf_inspect_visual purpose=reference），只有结构化文字不能确定外观。\n"
+            + "内容、背景、格式用 slide_* 原语编排，不需要图像生成服务。指定目标文件夹时先用 list_project_folders 取 ID；已有文件不会被覆盖；省略 parentFolderId 沿用源文档目录，0 表示根目录。")
     public String slide_create_file(
-            @P("File name, with optional .pptx suffix") String fileName,
-            @P("Project ID") Long projectId,
-            @P(value = "Optional destination folder database ID; resolve with list_project_folders", required = false) Long parentFolderId) {
+            @P("文件名，可省略 .pptx 后缀") String fileName,
+            @P("项目 ID") Long projectId,
+            @P(value = "可选。目标文件夹 ID，用 list_project_folders 取", required = false) Long parentFolderId) {
         if (fileName == null || fileName.isBlank() || projectId == null)
             return "Error: " + com.checkba.service.LangText.of("请提供文件名与项目", "File name and project are required");
         try {
@@ -2630,10 +2601,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "新建表格文件", category = "document", fileEffect = "ADDED")
-    @Tool("【表格·建】在项目中新建一个空白 Excel 表格文件（.xlsx）并在编辑器中打开。" +
-          "创建后用 sheet_write_cells 写入数据、sheet_format_cells 等做格式。重名会自动加序号。" +
-          "用户指名了要放进哪个文件夹时，先调 list_project_folders 拿到该文件夹的 ID 再传 parentFolderId；" +
-          "不传就落在项目根目录。")
+    @Tool("【表格·建】在项目中新建空白 Excel 文件（.xlsx）并在编辑器中打开，重名自动加序号。\n"
+            + "创建后用 sheet_write_cells 写数据、sheet_format_cells 等设格式。用户指名了文件夹时，先 list_project_folders 取 ID 传 parentFolderId；不传落在项目根目录。")
     public String sheet_create_file(
             @P("文件名，如 '费用明细表.xlsx'（.xlsx 后缀可省略）") String fileName,
             @P("项目ID") Long projectId,
@@ -3023,16 +2992,12 @@ public class DocumentEditTools implements AgentToolComponent {
     public static final int MAX_SHEET_REPLACEMENTS = 2000;
 
     @ToolMeta(displayName = "表格内替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("【表格·写】在电子表格区域内查找并替换文本，只改命中的那些格——区域内其他格一个字都不动。" +
-          "成批改写一律用本工具，不要「sheet_search 查坐标 + sheet_write_cells 回写」：" +
-          "后者按矩形区域写，会把区域内不该动的格子一起覆盖掉。区域不传则用整个已用区域；" +
-          "缺省是包含匹配、不区分大小写，wholeCell=true 时要求整格内容与 find 完全相等。" +
-          "只动纯文本格：公式格与数值格即使显示出来的文本命中也跳过不改" +
-          "（改了会毁掉公式、或把数字变成文本），跳过多少格在返回值里如实交代。" +
-          "返回 {replaced 改了几格, occurrences 共替换几处, cells 前若干个坐标, truncated}。" +
-          "上限 20000 格扫描、单次最多替换 " + MAX_SHEET_REPLACEMENTS + " 格，超限先缩小 range 分块做。" +
-          "电子表格没有修订机制，写入即刻生效、不留修订痕迹——改错了立刻用 doc_undo 撤销。" +
-          "仅对表格文档有效（Word 文档用 doc_find_replace）。")
+    @Tool("【表格·写】在电子表格区域内查找并替换文本，只改命中的格，区域内其他格不动。\n"
+            + "何时用：成批改写一律用它，不要「sheet_search 查坐标 + sheet_write_cells 回写」（后者按矩形覆盖，会连带改掉不该动的格）。Word 文档用 doc_find_replace。\n"
+            + "range 不传用整个已用区域；默认包含匹配、不区分大小写，wholeCell=true 要求整格相等。只改纯文本格，公式格与数值格即使命中也跳过（改了会毁掉公式或把数字变成文本），跳过数在回执里交代。回执 {replaced, occurrences, cells, truncated}；扫描上限 20000 格，单次最多替换 "
+            + MAX_SHEET_REPLACEMENTS
+            + " 格，超限缩小 range 分块做。\n"
+            + "电子表格没有修订机制，写入即生效，改错了立刻 doc_undo。")
     public String sheet_find_replace(
             @P("查找内容（字面量，不是正则）") String find,
             @P("替换成什么；传空字符串表示删除命中的文本。不能省略") String replace,

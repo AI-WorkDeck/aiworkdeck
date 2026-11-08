@@ -23,16 +23,13 @@ public class CheckpointTools implements AgentToolComponent {
 
     private final DocumentCheckpointService documentCheckpointService;
 
-    @Tool("【恢复】把文档恢复到本轮开始前的快照（检查点）。这是最后手段：" +
-          "仅在文档已被改乱、无法逐步撤销时使用。" +
-          "恢复会丢弃本轮的所有修改（包括修订标记）并让编辑器重新加载文档。" +
-          "这不是导出、保存或预览工具，不得为这些目的调用。" +
-          "调用者必须明确选择丢弃本轮全部修改：confirmation 精确填写 discard_current_turn_changes，" +
-          "reason 填写恢复原因。常规纠错优先精确编辑或可用的 doc_undo。")
+    @Tool("【恢复】把文档恢复到本轮开始前的快照，丢弃本轮所有修改（含修订标记）并让编辑器重新加载。\n"
+            + "何时用：最后手段，仅在文档已被改乱、无法逐步撤销时；常规纠错优先精确编辑或 doc_undo。不是导出、保存或预览工具，不得为这些目的调用。\n"
+            + "必须明确选择丢弃：confirmation 精确填 discard_current_turn_changes，reason 填恢复原因。")
     @ToolMeta(displayName = "恢复文档快照", category = "document", fileEffect = "MODIFIED")
     public String doc_restore_checkpoint(
-            @P(value = "Explicitly discard ALL current-turn changes: must be exactly discard_current_turn_changes", required = true) String confirmation,
-            @P(value = "Nonempty reason for discarding all current-turn changes; this is not export or save", required = true) String reason) {
+            @P(value = "必须精确填 discard_current_turn_changes，表示明确丢弃本轮全部修改", required = true) String confirmation,
+            @P(value = "恢复原因，不能为空", required = true) String reason) {
         if (!"discard_current_turn_changes".equals(confirmation)) {
             return "Error: " + LangText.of(
                     "未执行恢复。恢复会丢弃本轮全部修改，不是导出或保存。必须明确选择此操作，并将 confirmation 精确填写为 discard_current_turn_changes。",

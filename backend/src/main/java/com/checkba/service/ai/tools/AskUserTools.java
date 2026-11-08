@@ -25,34 +25,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class AskUserTools implements AgentToolComponent {
 
-    @Tool("Ask the user ONE clarifying question and END this turn. The UI shows the question with "
-            + "clickable options plus an 'Other' free-text box; the user's answer arrives as the NEXT user "
-            + "message starting with <ask_user_answer id=...>. Nothing else runs after this call in the same turn, "
-            + "so do not batch other tools after it.\n"
-            + "CALL IT BEFORE ACTING when: (1) the request is a yes/no-style question about whether you can do "
-            + "something and the action it implies is unclear (e.g. '你能帮我清理一下这个文档么'); "
-            + "(2) the key verb has no stated standard or scope ('清理', '整理', '优化一下', '规范一下', 'clean up', "
-            + "'tidy up', 'improve') and several reasonable readings would produce different edits; "
-            + "(3) the action would delete or rewrite a large part of a document (many paragraphs, whole sections) "
-            + "and the user has not explicitly authorised that scope.\n"
-            + "DO NOT CALL IT when the instruction already names the target and the action (e.g. '把第12到21段删掉', "
-            + "'把甲方全部改成乙方', 'delete paragraphs 12-21'): just do it. Do not ask about things you can read from "
-            + "the open document, project files, history or memory - look them up instead. Do not ask twice about "
-            + "the same point; once the user has answered, proceed.\n"
-            + "Give 2-4 options, each a DISTINCT concrete interpretation (short label + one-line description of what "
-            + "you would do). Do NOT add an 'Other' option yourself. Put the option you recommend first.")
+    @Tool("向用户提一个澄清问题并结束本轮，答复在下一条用户消息里（以 <ask_user_answer id=...> 开头）。\n"
+            + "何时用：请求含糊、多种读法会产生不同改动（「清理」「整理」「优化一下」没有标准或范围）；要删除或重写大段内容而用户没授权范围；「你能帮我…么」这类动作不明的提问。\n"
+            + "何时不用：指令已写明对象和动作（「把第12到21段删掉」）就直接做；能从文档、项目文件、历史、记忆查到的不要问；同一点只问一次。\n"
+            + "给 2-4 个互不重叠的具体理解，推荐项放第一个，不要自己加「其他」。调用后本轮不再调用其他工具。")
     @ToolMeta(displayName = "向用户提问", category = "planning")
     public String ask_user(
-            @P("The single question to ask, in the user's language. One sentence; state what is ambiguous.")
+            @P("要问的一个问题，用用户的语言，一句话说清哪里含糊")
             String question,
-            @P(value = "Optional JSON array of 2-4 choices: [{\"label\":\"short choice (<=15 chars)\","
-                    + "\"description\":\"what you would do if chosen\"}, ...]. Omit for a free-text question.",
+            @P(value = "可选。2-4 个选项的 JSON 数组 [{\"label\":\"≤15字\",\"description\":\"选它会怎么做\"}]；省略则为自由文本问题",
                     required = false)
             String options,
-            @P(value = "Optional. true when the user may pick several options at once (default false).",
+            @P(value = "可选。可多选时为 true，默认 false",
                     required = false)
             Boolean multi_select,
-            @P(value = "Optional very short topic tag shown above the question (<=8 chars), e.g. '清理范围'.",
+            @P(value = "可选。问题上方的话题短标签（≤8 字）",
                     required = false)
             String header) {
         try {

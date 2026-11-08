@@ -91,15 +91,12 @@ public class FileTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "搜索项目文件", category = "file")
-    @Tool("Locate files by NAME PATTERN (glob, or a plain fragment of the name). Returns up to 50 project-relative "
-            + "paths; every entry registered in the project database carries its id as '(fileId=N)', usable directly "
-            + "with extract_file_text, rename_project_file, move_project_file and copy_files. "
-            + "This searches file NAMES only - to find which file MENTIONS a phrase, use search_project_content; "
-            + "for a complete inventory of every file with its id, use doc_list_project_files. "
-            + "Can be limited to a sub-directory.")
+    @Tool("按文件名模式（glob）或名称片段查找项目文件，最多 50 条，返回项目相对路径。\n"
+            + "已登记的条目带 (fileId=N)，可直接给 extract_file_text、rename_project_file、move_project_file、copy_files 用；dirPath 可限定子目录。\n"
+            + "何时不用：找哪个文件「提到」某句话用 search_project_content；要带 ID 的完整清单用 doc_list_project_files。")
     public String search_project_files(
-            @P("File name pattern, e.g. '*起诉状*', '合同*' or '*.pdf'; a plain fragment such as '证据' also matches") String fileNamePattern,
-            @P("Optional: Sub-directory to search in, relative to the project folder. Default is the project root.") String dirPath
+            @P("文件名模式，如 '*起诉状*'、'合同*'、'*.pdf'；纯片段如 '证据' 也能匹配") String fileNamePattern,
+            @P("可选。相对项目根的子目录，默认项目根") String dirPath
     ) {
         log.info("Tool: search_project_files called pattern='{}', dir='{}'", fileNamePattern, dirPath);
         if (fileNamePattern == null || fileNamePattern.isBlank()) {
@@ -303,26 +300,16 @@ public class FileTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "提取文档全文", category = "file")
-    @Tool("Read the plain text of any project file by its database file ID: Word/Excel/PowerPoint, PDF, plain text "
-            + "(UTF-8 or GBK), images, and audio/video that has been transcribed. "
-            + "Images and scanned PDFs are OCR'd automatically in the cloud (no local setup, no Docker, no script); "
-            + "when recognition fails the reply states the real reason (e.g. insufficient Credits, OCR not enabled) - "
-            + "relay that reason to the user verbatim instead of inferring one. "
-            + "Returns at most " + ToolFileGuard.MAX_TOOL_TEXT_CHARS + " characters per call: when the reply says "
-            + "there is more ('还有 N 字符未读', nextStart=N), call again with offset=N to continue - "
-            + "do not re-read from the start. To find where a phrase appears, use search_project_content first. "
-            + "If the ID is a FOLDER, returns a paged listing of its direct children (id + name + type), not their text. "
-            + "For folders offset is a child index; follow nextOffset until complete, and recurse into each subfolder by ID. "
-            + "Read each required file separately; listing a name does not mean its contents were read. "
-            + "Folder pages contain up to 200 items; maxChars bounds the response (default 12000, minimum 1024). "
-            + "This is the fileId entry point; read_file is the same extraction addressed BY PATH, "
-            + "for files that have no database id yet.")
+    @Tool("按数据库 fileId 读取项目文件的纯文本：Word/Excel/PowerPoint、PDF、纯文本、图片，以及已转写的音视频。\n"
+            + "何时用：已有 fileId 要看内容；不知道哪个文件含某句话先 search_project_content；没有 fileId 的按路径用 read_file。\n"
+            + "每次最多 "
+            + ToolFileGuard.MAX_TOOL_TEXT_CHARS
+            + " 字符：回执说「还有 N 字符未读」（nextStart=N）时用 offset=N 续读，不要从头重读。文件夹 ID 返回直接子项的分页清单（id、名称、类型），不含正文：offset 是子项序号，按 nextOffset 翻页，再逐个读需要的文件。\n"
+            + "图片和扫描 PDF 自动云端 OCR；失败时回执写明真实原因（如积分不足），原样转告用户，不要自行推测。")
     public String extract_file_text(
-            @P("Project file database ID (from doc_list_project_files / material list). May also be a folder ID — you get its contents listed.") Long fileId,
-            @P(value = "Optional: character offset to start from (0-based, default 0). "
-                    + "For a long file pass nextStart; for a folder pass nextOffset (child index).", required = false) Integer offset,
-            @P(value = "Optional: max characters to return this call (default and upper limit "
-                    + ToolFileGuard.MAX_TOOL_TEXT_CHARS + "); folder pages default to 12000, minimum 1024", required = false) Integer maxChars
+            @P("项目文件 ID（来自 doc_list_project_files 或材料清单）；也可以是文件夹 ID，返回其子项清单") Long fileId,
+            @P(value = "可选。起始位置（0 起）：长文件用 nextStart，文件夹用 nextOffset（子项序号）", required = false) Integer offset,
+            @P(value = "可选。本次最多返回字符数，默认与上限均为 " + ToolFileGuard.MAX_TOOL_TEXT_CHARS + "；文件夹分页默认 12000，下限 1024", required = false) Integer maxChars
     ) {
         log.info("Tool: extract_file_text called for fileId={}, offset={}, maxChars={}", fileId, offset, maxChars);
         if (fileId == null) {
@@ -606,16 +593,15 @@ public class FileTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "生成Word文档", category = "file", fileEffect = "ADDED", fileArg = "fileName", refreshFiles = true)
-    @Tool("【STRICTLY NEW FILES ONLY】Create a NEW .docx from Markdown. FORBIDDEN for 'revise', 'update', or 'modify' tasks. If a similar file exists, you MUST use doc_open_file to edit it. DO NOT create 'Revised_Version.docx'. "
-            + "Choosing between this and doc_start_stream: a long draft the user watches being written, in a desktop "
-            + "editor session -> doc_start_stream; a one-shot save, or an Office add-in / plain chat session -> write_docx.")
+    @Tool("用 Markdown 新建一个 .docx 文件（只用于新文件）。\n"
+            + "何时用：一次性落盘写好的文书，或 Office 加载项 / 纯聊天会话；桌面编辑器里要让用户看着逐步写出长稿用 doc_start_stream。\n"
+            + "何时不用：修改已有文档——用 doc_open_file 打开后编辑，不要另建「修订版」副本。")
     public String write_docx(
-            @P("新文件名 (如 '报告.docx')") String fileName,
+            @P("新文件名，如 '报告.docx'") String fileName,
             @P("Markdown 内容") String markdownContent,
             @P("项目ID") Long projectId,
-            @P(value = "目标文件夹ID（可选；省略沿用本轮开始时打开文档所在目录，没有有效文档则根目录；传0明确放根目录）", required = false) Long parentFolderId,
-            @P(value = "样式画像 JSON（可选；docx_inspect_template 的输出或其子集。不填自动取项目 _模板/画像.json，"
-                    + "没有则用系统默认 / 律所标准格式）", required = false) String styleProfileJson
+            @P(value = "目标文件夹 ID（可选；省略沿用本轮打开文档所在目录，传 0 放根目录）", required = false) Long parentFolderId,
+            @P(value = "样式画像 JSON（可选；不填取项目 _模板/画像.json，没有则用律所标准格式）", required = false) String styleProfileJson
     ) {
         // 同一轮对同一目标再生成一次：直接复用第一次那份（dev-board#1017）。编辑器没就绪时模型常转头
         // 用 write_docx 重来，而带文件夹的路径走 ConflictPolicy.RENAME——每试一次多一份「 (n)」同名文档。
@@ -869,20 +855,14 @@ public class FileTools implements AgentToolComponent {
     private record MoveOutcome(ProjectFile file, String path) {}
 
     @ToolMeta(displayName = "批量移动文件", category = "file", refreshFiles = true)
-    @Tool("Move MANY project files/folders in ONE call (file tree and storage stay in sync). " +
-            "movesJson is a JSON array of {\"sourcePath\":\"a.docx\",\"destPath\":\"01 Pleadings/a.docx\"}, " +
-            "at most " + MAX_BATCH_MOVES + " entries per batch; paths are relative to the project root. " +
-            "[Organising a folder, archiving, sorting several files into categories MUST go through this tool in one call - " +
-            "do NOT call move_project_file / create_folder once per file] - " +
-            "one call per file runs out of the turn's step budget half way. " +
-            "Missing destination folders are created automatically - you do NOT need create_folder first. " +
-            "If destPath is an existing folder the file keeps its name; otherwise the last segment becomes the new name " +
-            "(so a move can rename at the same time). " +
-            "This is also THE tool for moving or renaming a single file by path - just pass a one-entry array. " +
-            "The report gives 'moved: N' plus a per-item list; retry ONLY the entries under FAILED, never resend the whole " +
-            "batch (the ones that succeeded would be moved twice).")
+    @Tool("批量移动项目文件/文件夹（一次调用）；单个文件按路径移动或改名也用它，传一项数组即可。\n"
+            + "何时用：整理文件夹、归档、把多个文件分类必须一次调完，不要逐个调 move_project_file / create_folder（会耗尽本轮步数）。\n"
+            + "movesJson 是 [{\"sourcePath\":\"a.docx\",\"destPath\":\"01 起诉状/a.docx\"}]，路径相对项目根，每批最多 "
+            + MAX_BATCH_MOVES
+            + " 项。目标文件夹不存在自动创建；destPath 是已有文件夹则保留原名，否则最后一段即新名。\n"
+            + "回执 moved: N 加逐项清单；只重试 FAILED 项，不要整批重发。")
     public String move_files_batch(
-            @P("Move list, JSON array: [{\"sourcePath\":\"...\",\"destPath\":\"...\"}, ...]") String movesJson
+            @P("移动清单，JSON 数组 [{\"sourcePath\":\"...\",\"destPath\":\"...\"}]") String movesJson
     ) {
         // dev-board#466：文件树的变更原语全是单项的，而步数预算按 LLM 轮数计
         // （AgentOrchestrator.MAX_LOOP_DEPTH=30）。弱模型一轮只发一个调用时，
@@ -981,16 +961,13 @@ public class FileTools implements AgentToolComponent {
             "已移入回收站，可在资源管理器的回收站中恢复。 / Moved to the recycle bin; restore it from the recycle bin in the file explorer.";
 
     @ToolMeta(displayName = "移入回收站", category = "file", refreshFiles = true)
-    @Tool("Move project files/folders to the project RECYCLE BIN (recoverable - this is NOT a permanent delete). " +
-            "Same action as the user pressing Delete in the file explorer: the entries disappear from the file tree " +
-            "and can be restored from the recycle bin; a folder goes in together with everything inside it. " +
-            "targetsJson is a JSON array whose items are either a path relative to the project root (string) " +
-            "or a numeric fileId, e.g. [\"草稿/临时摘录.txt\", 1234]; at most " + MAX_BATCH_TRASH + " items per call. " +
-            "Use it to clean up intermediate/temporary files you created - do NOT create a 'to delete' folder instead. " +
-            "Only trash files the user asked to remove or that you produced yourself as scratch output. " +
-            "The report gives 'trashed: N' plus a per-item list; retry ONLY the entries under FAILED.")
+    @Tool("把项目文件/文件夹移入项目回收站（可恢复，不是永久删除），等同用户在文件管理器按 Delete；文件夹连同内部内容一起进入。\n"
+            + "何时用：用户要求删除文件，或清理你自己生成的临时文件（不要另建「待删除」文件夹）。只删用户要求删除的或你自己产出的临时文件。\n"
+            + "targetsJson 是数组，元素为项目相对路径或数字 fileId，如 [\"草稿/临时摘录.txt\", 1234]，每次最多 "
+            + MAX_BATCH_TRASH
+            + " 项。回执 trashed: N 加逐项清单；只重试 FAILED 项。")
     public String move_to_trash(
-            @P("Items to trash, JSON array of project-relative paths and/or numeric fileIds: [\"a.txt\", 123]") String targetsJson
+            @P("要移入回收站的项目，JSON 数组，元素为项目相对路径或数字 fileId：[\"a.txt\", 123]") String targetsJson
     ) {
         // dev-board#1044（D25）：AI 此前没有任何删除途径（delete_file 永久停用），被要求「清掉中间产物」
         // 时只能建一个「待删除」文件夹把东西挪进去。这里给一个可恢复的原语：走 ProjectFileService.delete
@@ -1164,12 +1141,12 @@ public class FileTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "新建文件夹", category = "file", refreshFiles = true)
-    @Tool("Create a new folder in the project file tree. Returns the new folderId. " +
-            "Use parentFolderId to nest inside an existing folder (IDs from doc_list_project_files); omit for project root.")
+    @Tool("在项目文件树中新建文件夹，返回新 folderId。\n"
+            + "parentFolderId 指定父文件夹（ID 取自 doc_list_project_files）以嵌套，省略则建在项目根目录。")
     public String create_folder(
-            @P("Folder name") String folderName,
-            @P("Project ID") Long projectId,
-            @P(value = "Parent folder ID (optional; omit for project root)", required = false) Long parentFolderId
+            @P("文件夹名称") String folderName,
+            @P("项目 ID") Long projectId,
+            @P(value = "父文件夹 ID（可选；省略建在项目根）", required = false) Long parentFolderId
     ) {
         log.info("Tool: create_folder '{}' parent={} project={}", folderName, parentFolderId, projectId);
         try {

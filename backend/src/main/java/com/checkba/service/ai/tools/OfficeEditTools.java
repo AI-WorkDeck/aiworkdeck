@@ -465,13 +465,13 @@ public class OfficeEditTools implements AgentToolComponent {
     /** 不传 maxChars 时一次给多少字符（与插件端 textPaging.GET_TEXT_DEFAULT_CHARS 同值）。 */
     private static final int GET_TEXT_DEFAULT_CHARS = 50_000;
 
-    @Tool("读取当前 Word 文档的正文纯文本，**分页返回**。startChar 是本次从第几个字符开始读"
-            + "（0 开始，缺省 0），maxChars 是本次最多读多少字符（缺省 " + GET_TEXT_DEFAULT_CHARS
-            + "，上限 " + GET_TEXT_MAX_CHARS + "）。"
-            + "返回值里 totalChars 是全文长度；**nextStart 有值就表示还没读完，用它作为下一次的 startChar 接着读**，"
-            + "没有 nextStart 就是已经读到文末。"
-            + "长文档不要为了「先看全」而一页页读到底——那要烧掉一连串执行步；"
-            + "先用 office_search 定位，或用 office_pass_step 分段过卷。")
+    @Tool("分页读取当前 Word 文档的正文纯文本。\n"
+            + "startChar 是从第几个字符读起（0 起），maxChars 是本次最多读多少字符（缺省 "
+            + GET_TEXT_DEFAULT_CHARS
+            + "，上限 "
+            + GET_TEXT_MAX_CHARS
+            + "）。回执 totalChars 为全文长度；有 nextStart 表示没读完，用它作下一次的 startChar，没有就是读到文末。\n"
+            + "长文档不要为「先看全」而一页页读到底（会烧掉一连串执行步）：先用 office_search 定位，或用 office_pass_step 分段过卷。")
     @ToolMeta(displayName = "读取文档", category = "office")
     public String office_get_text(
             @P("会话ID（系统自动注入）") String conversationId,
@@ -517,16 +517,15 @@ public class OfficeEditTools implements AgentToolComponent {
 
     // ==================== 修改（Word 原生修订） ====================
 
-    @Tool("在当前 Word 文档中查找并替换文本，修改以 Word 原生修订（Track Changes）形式呈现。" +
-          "searchText 必须与文档中的文本精确一致；replaceAll=false 时只替换第一处。" +
-          "replaceText 必须是纯文本，不要携带 Markdown 记号（---、**、# 等）——它们只会成为文档里的字面字符，排版请改用格式化工具。")
+    @Tool("在当前 Word 文档中查找并替换文本，以 Word 原生修订（Track Changes）呈现。\n"
+            + "何时用：单处或几处修改；整篇、成批修改用 office_replace_batch 或 office_pass_step。searchText 须与文档精确一致；replaceAll=false 只改第一处。replaceText 必须是纯文本，不要带 Markdown 记号（---、**、# 等）。")
     @ToolMeta(displayName = "替换文本（修订）", category = "office", fileEffect = "MODIFIED")
     public String office_replace_text(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要查找的原文（须与文档精确一致）") String searchText,
             @P("替换后的新文本") String replaceText,
             @P("是否替换所有匹配（false=仅第一处）") Boolean replaceAll,
-            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
+            @P(value = "可选。修改理由，简短说明目的，供修订卡片展示", required = false) String reason
     ) {
         log.info("Tool: office_replace_text called, search={}, replaceAll={}", searchText, replaceAll);
         if (searchText == null || searchText.isBlank()) {
@@ -549,13 +548,12 @@ public class OfficeEditTools implements AgentToolComponent {
     /** 一次 office_replace_batch 最多改多少处（与插件端 batchEdits.MAX_BATCH_ITEMS 同值） */
     private static final int MAX_BATCH_EDITS = 50;
 
-    @Tool("在当前 Word 文档中一次完成多处查找替换，全部以 Word 原生修订（Track Changes）形式呈现。" +
-          "editsJson 是 JSON 数组，每个元素形如 {\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}，一批最多 " + MAX_BATCH_EDITS + " 处。" +
-          "【整篇校对、整篇润色、批量改称谓这类要改很多处的任务，必须用本工具成批提交，不要逐处调用 office_replace_text】" +
-          "——逐处调用每处都要占一整个执行步（单轮上限 30 步），一份合同改不完就会中途暂停。" +
-          "每条的 searchText 须与文档精确一致、不得跨段落、不超 255 字；各条之间不得重复、也不得互相包含（会把同一段文字改两遍）；" +
-          "replaceText 必须是纯文本，不要携带 Markdown 记号。" +
-          "返回值里 replaced 是成功处数，failed 逐条列出没定位到的条目——只需针对 failed 里的条目换锚点重试，不要整批重发（会写入两遍）。")
+    @Tool("一次完成多处查找替换，全部以 Word 原生修订（Track Changes）呈现。\n"
+            + "何时用：整篇校对、润色、批量改称谓这类要改很多处的任务必须成批提交，不要逐处调 office_replace_text（每处占一个执行步，单轮上限 30 步，一份合同改不完会中途暂停）。整篇逐块推进用 office_pass_step。\n"
+            + "editsJson 是数组 [{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"理由（可选）\"}]，一批最多 "
+            + MAX_BATCH_EDITS
+            + " 处；searchText 须与文档精确一致、不跨段落、不超 255 字，各条之间不得重复或互相包含（会改两遍）；replaceText 为纯文本，不带 Markdown 记号。\n"
+            + "回执 replaced 是成功处数，failed 逐条列出没定位到的条目：只对 failed 换锚点重试，不要整批重发（会写入两遍）。")
     @ToolMeta(displayName = "批量替换（修订）", category = "office", fileEffect = "MODIFIED")
     public String office_replace_batch(
             @P("会话ID（系统自动注入）") String conversationId,
@@ -663,22 +661,17 @@ public class OfficeEditTools implements AgentToolComponent {
 
     // ==================== 整篇过卷（dev-board#422） ====================
 
-    @Tool("整篇分段过卷：把「整篇/全文/所有」的逐处修改任务按块推进，一次处理一块。" +
-          "【用户要求对整篇做逐处修改（校对错别字与病句、整篇润色、统一称谓、全文替换某类表述）时，必须用本工具分块推进，" +
-          "不要试图一轮列全整篇的修改。】单处、几处或选区内的修改仍用 office_replace_text / office_replace_batch。" +
-          "用法：首次调用 editsJson 传 [] 拿第一块；看完这一块后把该块的修改清单传给下一次调用，同时拿到下一块；" +
-          "本块不需要改就传 []；想提前结束传 stop=true。" +
-          "editsJson 的格式与校验口径与 office_replace_batch 完全一致（每条 {\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}，" +
-          "一批最多 " + MAX_BATCH_EDITS + " 处，searchText 须与文档精确一致、不跨段落、不超 255 字，各条之间不得重复或互相包含）。" +
-          "清单按【全文查找】落笔而不限于当前块——处理某一块时发现别处需要连带修改，可以一并写进同一份清单。" +
-          "返回值里 pass 是进度（chunk/total/done），applied 是上一份清单的落笔结果，paragraphs 是本块正文（带段落号）。" +
-          "applied.failed 里的条目不阻塞推进：下一次调用时换更长、更唯一的原文重试即可，不要整批重发。")
+    @Tool("整篇分段过卷：把「整篇/全文/所有」的逐处修改任务按块推进，一次处理一块。\n"
+            + "何时用：整篇校对错别字与病句、整篇润色、统一称谓、全文替换某类表述，必须用本工具分块推进，不要试图一轮列全。单处、几处或选区内的修改仍用 office_replace_text / office_replace_batch。\n"
+            + "用法：首次 editsJson 传 [] 拿第一块；看完后把该块的修改清单传给下一次调用，同时拿到下一块；本块无需改传 []；想提前结束传 stop=true。editsJson 的格式与校验同 office_replace_batch（一批最多 "
+            + MAX_BATCH_EDITS
+            + " 处）。清单按全文查找落笔，不限于当前块，处理某块时发现别处需连带修改可一并写进。\n"
+            + "回执 pass 是进度（chunk/total/done），applied 是上一份清单的落笔结果，paragraphs 是本块正文（带段落号）。applied.failed 不阻塞推进，下次换更长、更唯一的原文重试，不要整批重发。")
     @ToolMeta(displayName = "分段过卷", category = "office", fileEffect = "MODIFIED")
     public String office_pass_step(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("对上一块（或任意位置）的修改清单，JSON 数组：[{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"修改理由（可选）\"}, ...]；"
-                    + "首次调用与本块无需修改时传 []") String editsJson,
-            @P("提前结束过卷（true=落笔后返回汇总并结束；缺省 false）") Boolean stop
+            @P("对上一块（或任意位置）的修改清单，JSON 数组 [{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"理由（可选）\"}]；首次调用与本块无需修改时传 []") String editsJson,
+            @P("true 表示落笔后返回汇总并提前结束，缺省 false") Boolean stop
     ) {
         log.info("Tool: office_pass_step called");
         // 切的必须是模型看到的那一份字节——段落序号才能和模型上下文里的正文对得上
@@ -861,16 +854,15 @@ public class OfficeEditTools implements AgentToolComponent {
         }
     }
 
-    @Tool("在当前 Word 文档中插入文本，插入以 Word 原生修订（Track Changes）形式呈现。" +
-          "提供 anchorText 时在该锚点前/后插入（锚点须与文档精确一致）；不提供时在用户当前光标/选区处插入。" +
-          "text 必须是纯文本，不要携带 Markdown 记号（---、**、# 等）——它们只会成为文档里的字面字符，排版请改用格式化工具。")
+    @Tool("在当前 Word 文档中插入文本，以 Word 原生修订（Track Changes）呈现。\n"
+            + "给 anchorText（须与文档精确一致）则插在该锚点前/后，position 取 before 或 after（默认 after）；不给则插在用户当前光标/选区处。text 必须是纯文本，不要带 Markdown 记号（---、**、# 等，会变成文档里的字面字符），排版请用格式化工具。")
     @ToolMeta(displayName = "插入文本（修订）", category = "office", fileEffect = "MODIFIED")
     public String office_insert_text(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要插入的文本") String text,
             @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
             @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position,
-            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
+            @P(value = "可选。修改理由，简短说明目的，供修订卡片展示", required = false) String reason
     ) {
         log.info("Tool: office_insert_text called, anchor={}, position={}", anchorText, position);
         if (text == null || text.isEmpty()) {
@@ -1652,12 +1644,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
     // ==================== Excel（office_excel_*，仅 Excel 会话可见） ====================
 
-    @Tool("读取当前 Excel 工作表的区域值。不指定 rangeAddress 时读取已用区域（used range）。" +
-          "sheetName 缺省为当前活动工作表。返回二维数组与区域地址。" +
-          "withFormat=true 时另回 format：baseFont（区域内最常见的字体名/字号）、columns（各列数据区共有的格式）、" +
-          "cells（与所在列不同的单元格，如表头），字段为 fontName/fontSize/bold/italic/color/background/" +
-          "hAlign/vAlign/numberFormat/borders/wrap，只列与默认不同的项；最多扫 400 格。" +
-          "要让新增的行列与既有表格格式一致时用它看格式。")
+    @Tool("读取当前 Excel 工作表的区域值，返回二维数组与区域地址。\n"
+            + "rangeAddress 不传读已用区域，sheetName 缺省为当前活动表。withFormat=true 另回 format：baseFont（最常见字体/字号）、columns（各列共有格式）、cells（与所在列不同的单元格，如表头），只列与默认不同的项，最多扫 400 格；要让新增行列与既有表格格式一致时用它。")
     @ToolMeta(displayName = "读取区域", category = "office")
     public String office_excel_get_range(
             @P("会话ID（系统自动注入）") String conversationId,
@@ -1677,14 +1665,9 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_get_range", args);
     }
 
-    @Tool("向当前 Excel 工作表的区域写入值（直接生效，Excel 没有修订机制）。" +
-          "valuesJson 是 JSON 二维数组（按行），如 [[\"名称\",\"金额\"],[\"甲\",100]]。" +
-          "rangeAddress 为单元格（如 B2）时按 values 尺寸向右下展开写入；为区域时尺寸必须与 values 一致。" +
-          "默认沿用上一行格式：某行写入前在写入列内全空、上方至少两行连续数据、且这两行格式一致" +
-          "（字体/字号/加粗/水平对齐/数字格式/边框，至少一半的列相同；字色与底色不算）时，先把上一行的格式" +
-          "（字体/填充/对齐/边框/数字格式/行高）复制过来再写值，一次追加多行逐行沿用；非空行的格式不动。" +
-          "返回值 formatInherited 列出沿用了格式的行 [{row, from}]。表头下第一行不会沿用" +
-          "（上方只有表头，或标题行紧贴表头、两行格式不一致）。")
+    @Tool("向当前 Excel 工作表的区域写入值，直接生效（Excel 没有修订机制）。\n"
+            + "valuesJson 是按行的二维数组，如 [[\"名称\",\"金额\"],[\"甲\",100]]。rangeAddress 为单元格（如 B2）时按 values 尺寸向右下展开；为区域时尺寸必须与 values 一致。\n"
+            + "默认沿用上一行格式：写入前该行在写入列内全空、上方至少两行连续数据且格式一致时，先复制上一行的格式（字体/填充/对齐/边框/数字格式/行高）再写值，多行逐行沿用；回执 formatInherited 列出 [{row, from}]。表头下第一行不沿用。inheritFormat=false 只写值、不动格式。")
     @ToolMeta(displayName = "写入区域", category = "office", fileEffect = "MODIFIED")
     public String office_excel_set_values(
             @P("会话ID（系统自动注入）") String conversationId,
@@ -1766,16 +1749,12 @@ public class OfficeEditTools implements AgentToolComponent {
         return office_excel_search(conversationId, sheetName, query, null, null);
     }
 
-    @Tool("在 Excel 区域内查找并替换文本，只改命中的那些格——区域内其他格一个字都不动。" +
-          "成批改写一律用本工具，不要「office_excel_search 查地址 + office_excel_set_values 回写」：" +
-          "后者按矩形区域写，会把区域内不该动的格子一起覆盖掉。" +
-          "rangeAddress 不传则用整张表的已用区域；缺省是包含匹配、不区分大小写，" +
-          "wholeCell=true 时要求整格内容与 find 完全相等。" +
-          "只动纯文本格：公式格与数值格即使显示出来的文本命中也跳过不改" +
-          "（改了会毁掉公式、或把数字变成文本），跳过多少格在返回值里如实交代。" +
-          "返回 {replaced 改了几格, occurrences 共替换几处, cells 前若干个地址, truncated}。" +
-          "单次最多替换 " + MAX_EXCEL_REPLACEMENTS + " 格，超限先缩小 rangeAddress 分块做。" +
-          "Excel 没有修订机制，写入即刻生效——改错了在 Excel 里按 Ctrl+Z 撤销，或用任务窗格的修订记录回退。")
+    @Tool("在 Excel 区域内查找并替换文本，只改命中的格，区域内其他格不动。\n"
+            + "何时用：成批改写一律用它，不要「office_excel_search 查地址 + office_excel_set_values 回写」（后者按矩形覆盖，会连带改掉不该动的格）。\n"
+            + "rangeAddress 不传用整张表的已用区域；默认包含匹配、不区分大小写，wholeCell=true 要求整格相等。只改纯文本格，公式格与数值格即使命中也跳过（改了会毁掉公式或把数字变成文本），跳过数在回执里交代。回执 {replaced, occurrences, cells, truncated}；单次最多替换 "
+            + MAX_EXCEL_REPLACEMENTS
+            + " 格，超限缩小 rangeAddress 分块做。\n"
+            + "写入即生效，改错了在 Excel 里 Ctrl+Z 撤销，或用任务窗格的修订记录回退。")
     @ToolMeta(displayName = "替换单元格文本", category = "office", fileEffect = "MODIFIED")
     public String office_excel_replace(
             @P("会话ID（系统自动注入）") String conversationId,
@@ -2152,8 +2131,8 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_set_formulas", args);
     }
 
-    @Tool("读取当前 Excel 工作簿总览：所有工作表清单（名称、是否为当前活动表）+ 各表已用区域尺寸" +
-          "（行数/列数/地址，空表为 null）。适合在动手改表前先建立全局认知，对标桌面端 sheet_get_overview。")
+    @Tool("读取当前 Excel 工作簿总览：工作表清单及各表已用区域尺寸。\n"
+            + "清单含名称和是否活动表；尺寸含行数、列数、地址，空表为 null。动手改表前先用它建立全局认知；对应桌面端的 sheet_get_overview。")
     @ToolMeta(displayName = "读取总览", category = "office")
     public String office_excel_get_overview(
             @P("会话ID（系统自动注入）") String conversationId
@@ -2411,8 +2390,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
     // ==================== PowerPoint（office_ppt_*，仅 PowerPoint 会话可见） ====================
 
-    @Tool("读取当前 PowerPoint 演示文稿各页的文本清单（每页各形状的文字）。" +
-          "需要 PowerPointApi 1.4（Microsoft 365 较新版本），旧版宿主会返回明确错误。")
+    @Tool("读取当前 PowerPoint 演示文稿各页的文本清单（每页各形状的文字）。\n"
+            + "需要 PowerPointApi 1.4（较新的 Microsoft 365），旧版宿主返回明确错误。")
     @ToolMeta(displayName = "读取幻灯片", category = "office")
     public String office_ppt_get_slides(
             @P("会话ID（系统自动注入）") String conversationId
@@ -2421,9 +2400,8 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, "ppt_get_slides", Map.of());
     }
 
-    @Tool("在当前 PowerPoint 演示文稿中跨页查找并替换文本（直接生效，PowerPoint 没有修订机制）。" +
-          "searchText 必须与幻灯片中的文本精确一致（区分大小写的包含匹配）。" +
-          "需要 PowerPointApi 1.4，旧版宿主会返回明确错误。")
+    @Tool("在当前 PowerPoint 演示文稿中跨页查找并替换文本，直接生效（PowerPoint 没有修订机制）。\n"
+            + "searchText 须与幻灯片文本精确一致（区分大小写的包含匹配）；slideNumber、shapeId、expectedText 可收窄范围并核验原文。需要 PowerPointApi 1.4，旧版宿主返回明确错误。")
     @ToolMeta(displayName = "替换幻灯片文本", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_replace_text(
             @P("会话ID（系统自动注入）") String conversationId,
@@ -2502,14 +2480,12 @@ public class OfficeEditTools implements AgentToolComponent {
         return office_ppt_replace_text(conversationId, searchText, replaceText, null, null, null, null);
     }
 
-    @Tool("在当前 PowerPoint 演示文稿中查找文本并设置其字符格式：字体、字号、加粗、斜体、下划线、颜色。" +
-          "searchText 须与幻灯片文本精确一致（区分大小写），默认只对第一处匹配生效，applyToAll=true 对所有匹配生效。" +
-          "格式参数至少要给一个，没传的保持原样。直接生效（PowerPoint 没有修订机制）。" +
-          "需要 PowerPointApi 1.4，旧版宿主会返回明确错误。")
+    @Tool("在当前 PowerPoint 演示文稿中查找文本并设置字符格式：字体、字号、加粗、斜体、下划线、颜色。\n"
+            + "searchText 须与幻灯片文本精确一致（区分大小写），默认只改第一处，applyToAll=true 改全部；格式参数至少给一个，没传的保持原样。不给 searchText 而给 shapeId 时，格式化整个形状的文字。直接生效（没有修订机制）。需要 PowerPointApi 1.4，旧版宿主返回明确错误。")
     @ToolMeta(displayName = "设置幻灯片文字格式", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_format_text(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "Text within target; omit with exact shapeId to format its entire text", required = false) String searchText,
+            @P(value = "目标文字；省略且给了 shapeId 时格式化该形状的全部文字", required = false) String searchText,
             @P("是否对所有匹配生效（false=仅第一处）") Boolean applyToAll,
             @P("字体名（不改则不传）") String fontName,
             @P("字号（磅）（不改则不传）") Double fontSize,
@@ -2517,10 +2493,10 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("斜体 true/false（不改则不传）") Boolean italic,
             @P("下划线线型：none/single/double/dotted/wave（不改则不传）") String underline,
             @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color,
-            @P(value = "Optional 1-based target slide", required = false) Integer slideNumber,
-            @P(value = "Optional exact shape ID; requires slideNumber", required = false) String shapeId,
-            @P(value = "Optional complete expected shape text; requires shapeId", required = false) String expectedText,
-            @P(value = "Paragraph options: alignment left/center/right/justify on both hosts. WPS additionally supports spaceBeforePt/spaceAfterPt/spaceBeforeLines/spaceAfterLines and lineSpacingMode single/1.5/double/multiple/proportional/exactly with lineSpacingValue. Unsupported options reject before any formatting.", required = false) Map<String, Object> paragraphFormat
+            @P(value = "可选。目标页码，1 起", required = false) Integer slideNumber,
+            @P(value = "可选。精确形状 ID，须同时给 slideNumber", required = false) String shapeId,
+            @P(value = "可选。形状完整原文，须同时给 shapeId；已变化则拒绝", required = false) String expectedText,
+            @P(value = "可选。段落格式：alignment（left/center/right/justify，两种宿主都支持）；WPS 另支持 spaceBeforePt/spaceAfterPt/spaceBeforeLines/spaceAfterLines，以及 lineSpacingMode（single/1.5/double/multiple/proportional/exactly）配 lineSpacingValue；不支持的选项会在改动前整体拒绝", required = false) Map<String, Object> paragraphFormat
     ) {
         log.info("Tool: office_ppt_format_text called, search={}, applyToAll={}", searchText, applyToAll);
         if ((searchText == null || searchText.isBlank()) && shapeId == null) {
@@ -2566,12 +2542,9 @@ public class OfficeEditTools implements AgentToolComponent {
                 bold, italic, underline, color, null, null, null, null);
     }
 
-    @Tool("在当前 PowerPoint 演示文稿中新增一页幻灯片，可选写入标题与正文文本框。" +
-          "position 指定新页插入后成为第几页（1 起，即插在原第 position 页**之前**；不传则追加到末尾）。" +
-          "注意方向：本工具是「插在第 N 页之前」，而桌面编辑器里的 slide_add_page 是「插在第 N 页之后」——" +
-          "同一句「插在第 3 页」在两族里差一页，而错页不报错、要用户自己翻页才发现。——PowerPoint JS API 只能把新页加到末尾" +
-          "再挪动位置，挪动需要 PowerPointApi 1.8（较新 Microsoft 365），旧版宿主上会追加到末尾但不挪动位置，" +
-          "返回值 moved/note 字段说明实际情况。title/body 用文本框承载（需要 PowerPointApi 1.4），位置尺寸用固定默认值。")
+    @Tool("在当前 PowerPoint 演示文稿中新增一页，可选写入标题与正文文本框。\n"
+            + "position 是新页成为第几页（1 起），即插在原第 position 页之前，不传追加到末尾。方向要小心：桌面编辑器的 slide_add_page 插在第 N 页之后，同一句「插在第 3 页」两族差一页且不报错。\n"
+            + "移动位置需要 PowerPointApi 1.8，旧版宿主会追加到末尾而不移动，回执 moved/note 字段说明实际情况；title/body 用文本框承载（需要 PowerPointApi 1.4），位置尺寸用固定默认值。")
     @ToolMeta(displayName = "新增幻灯片", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_add_slide(
             @P("会话ID（系统自动注入）") String conversationId,

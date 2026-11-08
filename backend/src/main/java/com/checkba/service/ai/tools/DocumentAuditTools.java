@@ -45,11 +45,9 @@ public class DocumentAuditTools implements AgentToolComponent {
     private final EditorBridgeService editorBridgeService;
 
     @ToolMeta(displayName = "结构审计", category = "document")
-    @Tool("【看·审查合同必用】对当前打开的文档做一次机械核对并返回报告：全文字形（繁體/简体）与混入段落、"
-            + "各套条款编号是否连续（第X条 / N. / N.M / (一) / (a) / (1)）、正文引用的「第X条」「附表X」是否都存在、"
-            + "空白与待定处、金额/股数台账与同段「股数×每股价=总价」算术复核、多币种并存、前一轮修订按作者/类型汇总与大段删除。"
-            + "只报事实不下法律结论；审查/审阅合同时在通读之后、动手修改之前调用一次，把报告里的每一项都核成结论或排除。"
-            + "本工具自己会把全文分页读完，不需要先调 doc_get_document_text。")
+    @Tool("【看·审查合同必用】对当前打开的文档做一次机械核对，返回事实报告。\n"
+            + "核对项：繁简字形与混入段落、各套条款编号是否连续、「第X条」「附表X」引用是否存在、空白与待定处、金额/股数台账与「股数×每股价=总价」算术、多币种并存、前一轮修订汇总与大段删除。\n"
+            + "何时用：审查合同时在通读之后、动手修改之前调用一次，把报告里每一项核成结论或排除。只报事实不下法律结论；自己会把全文读完，不必先 doc_get_document_text。")
     public String doc_audit_structure() {
         log.info("Tool: doc_audit_structure called");
         List<Paragraph> paragraphs = new ArrayList<>();
