@@ -169,7 +169,8 @@ test('前端镜像与后端归类逐名一致（全部 113 个工具）', () => 
   assert.ok(listStart > 0, '后端归类清单挪位置了，对拍失效')
   const listBody = javaTest.slice(listStart, javaTest.indexOf('));', listStart))
   const expectedReadOnly = new Set([...listBody.matchAll(/"((?:doc|sheet|slide)_\w+)"/g)].map(m => m[1]))
-  assert.ok(expectedReadOnly.size >= 30, `只解析到 ${expectedReadOnly.size} 条只读工具，解析口径坏了`)
+  // 下限只防「正则解析坏了」：工具体系 v2 V3 删了长期隐藏的只读 doc_ 工具后剩 28 条，下限随之放到 25。
+  assert.ok(expectedReadOnly.size >= 25, `只解析到 ${expectedReadOnly.size} 条只读工具，解析口径坏了`)
 
   // 全部工具名：扫真实工具类的 public 方法（与 ToolRegistry 取名口径一致）
   const toolMethod = /public\s+(?:static\s+)?[\w<>[\],\s.]+?\s+((?:doc|sheet|slide)_[a-zA-Z_0-9]+)\s*\(/g
