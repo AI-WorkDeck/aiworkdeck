@@ -145,6 +145,31 @@ class HarnessDiagnosticServiceTest {
     }
 
     @Test
+    void permissionRefusalsAreNotGuardedAsEvidenceGaps() {
+        String[] refusals = {
+                "Not permitted: firm-wide fee ledger and dashboards are limited to law firm administrators",
+                "无权访问该项目", "没有权限查看此文件", "Access denied", "HTTP 403 Forbidden", "Error: 403 Forbidden"};
+        for (String r : refusals) {
+            assertTrue(HarnessDiagnosticService.isPermissionDenied(r), r);
+            assertTrue(diagnosticService.diagnoseAndAdapt("c", "r", "查一下", "search_project_files",
+                    "{}", r, 2, new HashSet<>(), List.of()).isEmpty(), r);
+        }
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("Error: no files matched"));
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("amount 14030 yuan"));
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("Error: code 403"), "裸 403 不算");
+        // 短语不在开头 200 字内不算
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("x".repeat(300) + " Access denied"));
+    }
+
+    @Test
+    void legalTextContainingRefusalWordsIsNeverTreatedAsPermissionDenied() {
+        String content = "本案系无权代理，无权处分他人财产；对方称 forbidden；案号 403。";
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied(content));
+        // 成功输出不走诊断（调用方仅在 success=false 时调用）；即便直接送入，也不得被当作权限拒绝而吞掉类目展开
+        assertTrue(!HarnessDiagnosticService.isPermissionDenied("文件内容：\n" + content));
+    }
+
+    @Test
     void credentialAndKeyMissingErrorsAreUnavailableNotCategoryHintsOrGuard() {
         String noCred = "Error: MCP server has no credential: pkulaw-semantic";
         String noKey = "错误：网络搜索未配置：当前部署未提供博查（Bocha AI）搜索的 API Key。本次已跳过网络搜索";

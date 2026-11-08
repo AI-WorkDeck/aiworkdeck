@@ -75,6 +75,15 @@ class LocalMcpServerToolsTest {
     }
 
     @Test
+    void softDeletedFileIsNotReadableById() throws Exception {
+        ProjectFile deleted = file(11, 1, "证据目录.xlsx");
+        deleted.setIsDeleted(true);
+        when(files.findById(11L)).thenReturn(Optional.of(deleted));
+        assertThrows(LocalMcpServerTools.ToolError.class, () -> tools.call("read_file", Map.of("fileId", 11), USER));
+        verify(extractor, never()).extract(any());
+    }
+
+    @Test
     void readFilePagesWithoutOcrAndHidesOtherProjects() throws Exception {
         when(files.findById(10L)).thenReturn(Optional.of(file(10, 1, "合同.docx")));
         when(extractor.extract(any())).thenReturn("0123456789");
