@@ -1,0 +1,86 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
+# 真实模型 A/B 矩阵（model-matrix）
+
+对比两个 git ref 在若干真实模型、一组句子上的 Agent 行为（首工具、必用/禁用工具、最终状态、tokens、轮数、耗时）。
+原先「17 句 × 2 模型 × 2 分支」靠无头浏览器串行 + 90 秒静默等待，6–10 小时；本工具直连后端 HTTP/SSE，
+实例并行、以 `bubble_end` 事件判定本轮结束，没有固定静默等待。
+
+## 用法
+
+```bash
+export OPENROUTER_API_KEY=...        # 只从环境读取，只传给后端子进程，不打印、不落盘
+node scripts/eval/model-matrix.mjs \
+  --before origin/master --after feat/my-branch \
+  --models deepseek/deepseek-v4-flash,qwen/qwen3.8-max-0902 \
+  --sentences scripts/eval/sentences/core-17.json \
+  --runs 3 --concurrency 4
+```
+
+| 参数 | 说明 |
+|---|---|
+| `--before/--after` | git ref。各自在临时 worktree 里 `mvn package`（同一 ref 只建一次） |
+| `--models` | 逗号分隔的 OpenRouter 模型 id，随请求的 `model` 字段下发 |
+| `--sentences` | 句子集 JSON（见下） |
+| `--runs N` | 每句重复次数（默认 1） |
+| `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题 |
+| `--only id1,id2` | 只跑指定句子 |
+| `--api-only` | 当前即默认行为：需要编辑器的句子标 `SKIPPED` |
+| `--run-timeout 秒` | 单句硬上限（默认 300），超时会取消并记 `timeout` |
+| `--keep` | 保留临时目录（worktree、库、后端 home）以便排查 |
+
+需要：JDK 21（自动找 `/usr/libexec/java_home -v 21`，或设 `JAVA_HOME`）、Maven、PostgreSQL 17 二进制
+（`PG_BIN` 或 Homebrew 默认路径）。
+
+## 隔离方式
+
+- 脚本在临时目录里 `initdb` 一个**自己的** PostgreSQL 集群（随机端口、`fsync=off`），不碰任何已在运行的库或 9696/5173。
+- 每个 ref×模型一个后端实例：独立数据库、随机端口、独立 `user.home`/存储/插件目录，server 模式（`SECURITY_LOCAL_MODE=false`，
+  `AI_MOCK_ENABLED=false`），供应商 OpenRouter。每个实例注册一个测试用户。
+- 每次运行前清空记忆表，并新建一个全新项目再按 `seed` 灌入数据；同一实例内串行，实例之间并行。
+- 唯一出站请求是后端对 OpenRouter 的模型调用；脚本本身不发任何外网请求。
+
+## 句子集 schema
+
+```jsonc
+{ "sentences": [{
+  "id": "s08-move-to-archive",
+  "text": "把合同.docx移到归档文件夹",
+  "hostState": "nofile",            // nofile | docx:<夹具> | xlsx:<夹具> | pptx | attachments（后四类需要编辑器）
+  "seed": {
+    "folders": ["归档"],
+    "files": [{ "name": "合同.docx", "fixture": "contract.docx", "folder": "归档" /* 可选 */ }],
+    "tasks": [{ "title": "提交答辩状", "dueInDays": 1 }],
+    "memory": [{ "key": "客户偏好", "content": "客户偏好周五开会", "type": "preference", "scope": "user" }]
+  },
+  "expect": {
+    "firstToolAnyOf": ["move_files_batch"],      // 第一个工具须命中其一；"<none>" 表示允许不调工具；"/正则/" 也可
+    "mustUse": [["move_files_batch", "move_project_file"]],  // 每个子数组是「任一」，各组都要满足
+    "mustNotUse": ["move_to_trash"],
+    "finalTextIncludes": ["沟通记录"],           // 可选：最终回复须包含
+    "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.name==='合同.docx');"  // 可选：JS 函数体
+  }
+}]}
+```
+
+`outcomeCheck` 是 async 函数体，参数 `ctx`：`files()`、`tasks()`、`memory()`（查库返回行数组）、`rows(sql)`、`sql(sql)`、
+`api(method,url,body)`（以测试用户身份调后端）、`tools`、`finalText`、`projectId`。句子文件是受信的本地文件，会被 `eval` 执行。
+一次运行「通过」= 本轮正常结束（`bubble_end` 且 status=finished）且所有已声明的检查都为真。
+
+夹具在 `fixtures/`（虚构内容），由 `python3 fixtures/make_fixtures.py` 生成：`contract.docx`（第三条/甲方/违约金/仲裁）、
+`contract-tracked.docx`（含修订）、`contract-draft.docx`、`mention-zhangsan.docx`、`plain-notes.docx`。
+
+## 编辑器句子为什么跳过
+
+`doc_*` 编辑原语经 `client_action` 桥到前端 LOWA 编辑器执行，没有编辑器时这些工具无法落地，所以 `hostState` 为 docx/xlsx/pptx 的句子
+目前一律记 `SKIPPED`（不计入对比）。接入 Playwright 自带 Chromium + 每实例一个 H5 前端是后续工作；
+`core-17.json` 里这类句子已写好期望，接入后即可直接跑。
+
+## 产物
+
+`scripts/eval/out/<时间戳>/`（已 gitignore）：`results.json`（每次运行的工具序列、轮数、每轮提供的工具数、tokens、耗时、
+检查结果、最终回复、SSE 事件计数）、`report.md`（汇总 + 逐句对比 + 未通过明细 + 结论行
+`AFTER ≥ BEFORE on correctness for all models: yes/no`）、各实例后端日志 `backend-*.log`。
+
+tokens 来自后端 `token_usage` 表（按会话汇总）；轮数与每轮提供的工具数来自后端 `[Round]` 日志，工具序列来自编排器日志。
