@@ -1040,7 +1040,8 @@ public class FileTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "新建文件夹", category = "file", refreshFiles = true)
-    @Tool("在项目文件树中新建文件夹，返回新 folderId。\n"
+    @Tool("在项目文件树中直接新建文件夹，返回 folderId。\n"
+            + "不必先列文件夹；同名已存在时不报错，回执给出已有 folderId（幂等）。\n"
             + "parentFolderId 指定父文件夹（ID 取自 doc_list_project_files）以嵌套，省略则建在项目根目录。")
     public String create_folder(
             @P("文件夹名称") String folderName,
@@ -1052,6 +1053,18 @@ public class FileTools implements AgentToolComponent {
             ProjectFile folder = projectFileService.createFolder(projectId, parentFolderId, folderName, toolUserId());
             return "Successfully created folder '" + folder.getName() + "' (folderId=" + folder.getId() + ").";
         } catch (Exception e) {
+            // 幂等：同名文件夹已在，直接把它的 folderId 交回去，模型不必为此先列文件夹或重试
+            try {
+                Long parent = projectFileService.resolveParentId(projectId, parentFolderId);
+                java.util.Optional<ProjectFile> existing = projectFileRepository
+                        .findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, parent, folderName == null ? null : folderName.trim());
+                if (existing.isPresent() && Boolean.TRUE.equals(existing.get().getIsFolder())) {
+                    return "Folder '" + existing.get().getName() + "' already exists (folderId=" + existing.get().getId()
+                            + "); nothing to create.";
+                }
+            } catch (Exception ignored) {
+                // 查不到就按原错误回
+            }
             return "Error creating folder: " + e.getMessage();
         }
     }

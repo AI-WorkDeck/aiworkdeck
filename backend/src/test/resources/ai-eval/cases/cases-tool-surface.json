@@ -766,5 +766,97 @@
         "copy_files"
       ]
     }
+  },
+  {
+    "id": "surface-v2-s13-new-folder-none-chat",
+    "title": "V2 句13「新建一个文件夹叫证据」在项目聊天（无编辑器能力）态首轮同样含 create_folder，后续每轮 ≤45",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "新建一个文件夹叫证据",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "create_folder",
+            "arguments": {
+              "folderName": "证据"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "OK"
+    },
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 45,
+      "offeredToolsInclude": [
+        "create_folder",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "list_files",
+        "copy_files",
+        "rename_project_file"
+      ],
+      "toolCalls": [
+        {
+          "name": "create_folder"
+        }
+      ]
+    },
+    "clientCapability": "none"
+  },
+  {
+    "id": "surface-v2-s13-new-folder-lowa-docx",
+    "title": "V2 句13「新建一个文件夹叫证据」在LOWA 开着 docx态首轮同样含 create_folder，后续每轮 ≤45",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "新建一个文件夹叫证据",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "create_folder",
+            "arguments": {
+              "folderName": "证据"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "OK"
+    },
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 45,
+      "offeredToolsInclude": [
+        "create_folder",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "list_files",
+        "copy_files",
+        "rename_project_file"
+      ],
+      "toolCalls": [
+        {
+          "name": "create_folder"
+        }
+      ]
+    },
+    "activeDocument": {
+      "id": "1001",
+      "name": "合同.docx",
+      "fileType": "docx"
+    }
   }
 ]
