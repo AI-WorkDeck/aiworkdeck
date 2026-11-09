@@ -16,8 +16,8 @@ import java.time.LocalDateTime;
  * （{@code service/optimizer}）按天/周读取 status=NEW 的行做分诊，再分流到
  * 「开 PR」或「发邮件」两条出口。
  *
- * <p><b>红线：行只改状态、绝不删除。</b>用户报过的问题永远留痕，
- * 分诊结论（triageJson）与出口（prUrl / 邮件时间）都回写到同一行，
+ * <p><b>红线：行绝不删除。</b>用户报过的问题永远留痕，
+ * 分诊结论（triageJson）、出口与当前结案摘要都回写到同一行，
  * 便于事后复盘「优化者当时凭什么这么判」。
  */
 @Entity
@@ -40,10 +40,15 @@ public class UserFeedback {
     public static final String STATUS_SKIPPED = "SKIPPED";
     /** 本轮处理出错，等下一轮重试 */
     public static final String STATUS_FAILED = "FAILED";
+    /** AI 内容举报已由管理员记录人工结论与实际措施并结案 */
+    public static final String STATUS_RESOLVED = "RESOLVED";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    private long version;
 
     /** 本机提交的原始反馈 */
     public static final String SOURCE_LOCAL = "LOCAL";
@@ -108,7 +113,7 @@ public class UserFeedback {
     @Column(name = "context_json", columnDefinition = "TEXT")
     private String contextJson;
 
-    /** NEW / PR_OPENED / EMAILED / SKIPPED / FAILED */
+    /** NEW / PR_OPENED / EMAILED / SKIPPED / FAILED / RESOLVED */
     @Column(name = "status", length = 32, nullable = false)
     private String status;
 
@@ -137,4 +142,17 @@ public class UserFeedback {
 
     @Column(name = "handled_at")
     private LocalDateTime handledAt;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
+
+    @Column(name = "resolved_by", length = 128)
+    private String resolvedBy;
+
+    /** 已发布到反馈记录、可由举报人本人读取的答复；不代表推送或已读。 */
+    @Column(name = "reporter_response", columnDefinition = "TEXT")
+    private String reporterResponse;
+
+    @Column(name = "response_published_at")
+    private LocalDateTime responsePublishedAt;
 }

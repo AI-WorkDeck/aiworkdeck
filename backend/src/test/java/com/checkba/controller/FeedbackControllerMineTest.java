@@ -7,6 +7,7 @@ import com.checkba.model.entity.UserFeedback;
 import com.checkba.repository.UserFeedbackRepository;
 import com.checkba.repository.UserRepository;
 import com.checkba.service.AdminAccessService;
+import com.checkba.service.feedback.FeedbackAiReportService;
 import com.checkba.service.feedback.FeedbackService;
 import com.checkba.service.feedback.FeedbackUploadService;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,8 @@ class FeedbackControllerMineTest {
     private UserRepository userRepository;
     @Mock
     private AdminAccessService adminAccessService;
+    @Mock
+    private FeedbackAiReportService aiReportService;
 
     @InjectMocks
     private FeedbackController controller;
@@ -94,6 +97,31 @@ class FeedbackControllerMineTest {
             assertEquals(3L, item.get("id"));
             assertEquals(Boolean.TRUE, item.get("uploaded"));
             assertFalse(item.containsKey("lastError"), "内部字段不许带给用户");
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void publishesOnlyReporterResponseNotInternalHandlingFields() {
+        UserFeedback fb = row(3L, 7L, UserFeedback.STATUS_RESOLVED, true);
+        fb.setReporterResponse("The cited answer was removed.");
+        fb.setResponsePublishedAt(LocalDateTime.of(2026, 11, 9, 11, 0));
+        fb.setResolvedAt(LocalDateTime.of(2026, 11, 9, 11, 0));
+        fb.setResolvedBy("internal-admin");
+        fb.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");
+        when(feedbackService.listByUser(7L, 100)).thenReturn(List.of(fb));
+        when(userRepository.findById(7L)).thenReturn(Optional.empty());
+
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
+            Map<String, Object> item = ((List<Map<String, Object>>) data(controller.mine("sess")).get("items")).get(0);
+            assertEquals("The cited answer was removed.", item.get("reporterResponse"));
+            assertEquals("2026-11-09T11:00", item.get("responsePublishedAt"));
+            assertEquals(UserFeedback.STATUS_RESOLVED, item.get("status"));
+            for (String internal : List.of("lastError", "resolvedBy", "version", "handlingEvents",
+                    "conclusion", "actionTaken", "evidenceRef", "handlerName", "contextJson", "triageJson")) {
+                assertFalse(item.containsKey(internal), internal);
+            }
         }
     }
 
