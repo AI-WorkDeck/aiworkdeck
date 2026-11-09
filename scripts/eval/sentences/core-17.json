@@ -1,0 +1,444 @@
+{
+  "_comment": "核心 17 句。hostState 为 docx:<夹具> 的句子由 Playwright 打开 LOWA 编辑器后在页面里发送（宿主文件固定叫 合同.docx）；nofile 句纯后端 SSE。夹具见 ../fixtures。校准记录：s03/s15 的答案已在注入的文档/记忆里，不调工具直接答是正确的，所以允许 <none>；s08 的 doc_list_project_files 是合理的首个查询；s17 的『改一下措辞』未给出新措辞，ask_user 反问视为合理停点（计入 mustUse）。",
+  "sentences": [
+    {
+      "id": "s01-replace-all",
+      "text": "把第三条里的『甲方』全部改成『委托人』",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_find_replace"
+        ],
+        "mustUse": [
+          [
+            "doc_find_replace",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s02-comment",
+      "text": "给这份合同加一个批注：违约金过高",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_add_comment"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s03-ask-arbitration",
+      "text": "这份合同里有没有提到仲裁？",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "search_project_content",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph",
+          "doc_add_comment",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s04-standard-format",
+      "text": "把全文统一成律所标准格式",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "list_tools",
+          "use_skill",
+          "doc_apply_standard_format"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s05-export-pdf",
+      "text": "导出成PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_export_pdf"
+        ],
+        "mustUse": [
+          [
+            "doc_export_pdf"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s06-accept-all-revisions",
+      "text": "接受所有修订",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_list_revisions",
+          "doc_accept_all_revisions"
+        ],
+        "mustUse": [
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s07-new-word",
+      "text": "新建一份Word文档，标题是『法律意见书』",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "write_docx",
+          "search_project_files",
+          "list_project_folders"
+        ],
+        "mustUse": [
+          [
+            "write_docx"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => !x.is_deleted && !x.is_folder && /法律意见书/.test(x.name));"
+      }
+    },
+    {
+      "id": "s08-move-to-archive",
+      "text": "把合同.docx移到归档文件夹",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "归档"
+        ],
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "list_project_folders",
+          "search_project_files",
+          "move_files_batch",
+          "move_project_file",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "move_files_batch",
+            "move_project_file"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); const dir = f.find(x => x.is_folder && x.name === '归档'); const c = f.find(x => x.name === '合同.docx' && !x.is_deleted); return !!(dir && c && c.parent_id === dir.id);"
+      }
+    },
+    {
+      "id": "s09-who-mentions",
+      "text": "项目里哪些文件提到了张三？",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "沟通记录.docx",
+            "fixture": "mention-zhangsan.docx"
+          },
+          {
+            "name": "会议纪要.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_content",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "search_project_content",
+            "search_project_files"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "move_files_batch",
+          "write_docx"
+        ],
+        "finalTextIncludes": [
+          "沟通记录"
+        ]
+      }
+    },
+    {
+      "id": "s10-deadlines-this-week",
+      "text": "我这周有哪些截止事项",
+      "hostState": "nofile",
+      "seed": {
+        "tasks": [
+          {
+            "title": "提交答辩状",
+            "dueInDays": 1
+          },
+          {
+            "title": "补充证据清单",
+            "dueInDays": 2
+          },
+          {
+            "title": "明年复盘",
+            "dueInDays": 200
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_list"
+        ],
+        "mustUse": [
+          [
+            "task_list"
+          ]
+        ],
+        "mustNotUse": [
+          "task_create",
+          "ask_user",
+          "move_to_trash"
+        ],
+        "finalTextIncludes": [
+          "答辩状"
+        ]
+      }
+    },
+    {
+      "id": "s11-remember",
+      "text": "记住：客户偏好周五开会",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "save_memory"
+        ],
+        "mustUse": [
+          [
+            "save_memory"
+          ]
+        ],
+        "mustNotUse": [
+          "task_create",
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s12-civil-code-1082",
+      "text": "民法典第1082条是什么",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "get_law_article",
+          "law_search",
+          "search_web"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "task_create",
+          "save_memory"
+        ]
+      }
+    },
+    {
+      "id": "s13-new-folder",
+      "text": "新建一个文件夹叫证据",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "create_folder",
+          "list_project_folders"
+        ],
+        "mustUse": [
+          [
+            "create_folder"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.is_folder && x.name === '证据' && !x.is_deleted);"
+      }
+    },
+    {
+      "id": "s14-delete-to-recycle-bin",
+      "text": "把合同草稿.docx删了",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同草稿.docx",
+            "fixture": "contract-draft.docx"
+          },
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_files",
+          "list_project_folders",
+          "move_to_trash"
+        ],
+        "mustUse": [
+          [
+            "move_to_trash"
+          ]
+        ],
+        "mustNotUse": [
+          "permanent_delete",
+          "delete_file_permanently"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.name === '合同草稿.docx'); const k = f.find(x => x.name === '合同.docx'); return !!(d && d.is_deleted && k && !k.is_deleted);"
+      }
+    },
+    {
+      "id": "s15-recall-preference",
+      "text": "你还记得我上次说的客户偏好吗",
+      "hostState": "nofile",
+      "seed": {
+        "memory": [
+          {
+            "key": "客户偏好",
+            "content": "客户偏好周五开会"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "query_memory",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "save_memory",
+          "task_create",
+          "write_docx"
+        ],
+        "finalTextIncludes": [
+          "周五"
+        ]
+      }
+    },
+    {
+      "id": "s16-format-then-pdf",
+      "text": "统一成律所格式然后导出PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "list_tools",
+          "use_skill",
+          "doc_apply_standard_format"
+        ],
+        "mustUse": [
+          [
+            "doc_export_pdf"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s17-four-step",
+      "text": "先把第三条改一下措辞，再加批注，再接受所有修订，最后导出PDF",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_list_revisions",
+          "ask_user"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment",
+            "ask_user"
+          ],
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "ask_user"
+          ],
+          [
+            "doc_export_pdf",
+            "ask_user"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    }
+  ]
+}
