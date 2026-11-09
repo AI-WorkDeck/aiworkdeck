@@ -205,7 +205,7 @@
   },
   {
     "id": "list-tools-query-expands-the-hit-categories-next-round",
-    "title": "list_tools(query=…)：docx 会话里 PDF 整类被类目裁剪藏着，按关键词搜到 pdf_merge——命中工具的类目经 ToolContext 回写，下一轮原生可见（dev-board#1065）",
+    "title": "list_tools(query=…)：docx 会话里 PDF 整类被类目裁剪藏着，按关键词搜到 pdf_merge——命中的工具名经 ToolContext 回写，下一轮原生可见；V2 起只放回命中的工具、不连带整个 pdf 类目（dev-board#1065）",
     "category": "files",
     "protocol": "native",
     "docSessionCategoryTrim": true,
@@ -245,7 +245,6 @@
       ],
       "offeredToolsIncludeLastCall": [
         "pdf_merge",
-        "pdf_split",
         "doc_find_replace"
       ],
       "promptContains": [

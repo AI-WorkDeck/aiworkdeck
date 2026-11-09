@@ -1,11 +1,11 @@
 name,source,family,host,access,core_now,offered_now,params,tokens_est,first_line_len,first_line_lang,desc_lang,verdict,target_name,target_category,core_lowa_docx,core_lowa_xlsx,core_lowa_pptx,core_lowa_nofile,core_office_word,core_office_excel,core_office_ppt,core_none,mcp_eligible,rationale
 ask_user,builtin,agent,ALL,read,Y,Y,4,341,58,zh,en,keep,ask_user,agent,Y,Y,Y,Y,Y,Y,Y,Y,N,V1: description rewritten to the A5 template
-list_attached_files,builtin,files,ALL,read,Y,Y,2,137,31,zh,en,keep,list_attached_files,files,C,C,C,C,C,C,C,C,N,V1: description rewritten to the A5 template
+list_attached_files,builtin,files,ALL,read,cond,Y,2,137,31,zh,en,keep,list_attached_files,files,C,C,C,C,C,C,C,C,N,V1: description rewritten to the A5 template
 capability_list,builtin,capability,ALL,read,N,Y,0,98,44,zh,zh,keep,capability_list,developer,N,N,N,N,N,N,N,N,Y,"single job, zh, short first line"
 capability_install,builtin,capability,ALL,write,N,Y,1,207,76,mixed,mixed,keep+rewrite-desc,capability_install,developer,N,N,N,N,N,N,N,N,N,first line mixed
 capability_apply,builtin,capability,ALL,write,N,Y,1,113,49,zh,zh,merge→capability_install,capability_install,developer,N,N,N,N,N,N,N,N,N,two-phase folded into confirm gate (confirm=always)
 capability_select,builtin,capability,ALL,write,N,Y,2,145,28,zh,mixed,keep+rewrite-desc,capability_select,developer,N,N,N,N,N,N,N,N,N,body mixed
-doc_restore_checkpoint,builtin,doc,LOWA,destructive,Y,Y,2,188,43,zh,zh,keep,doc_restore_checkpoint,docx-edit,C,C,Y,N,N,N,N,N,N,state-conditional core: offered once a checkpoint exists (pptx: always)
+doc_restore_checkpoint,builtin,doc,LOWA,destructive,cond,Y,2,188,43,zh,zh,keep,doc_restore_checkpoint,docx-edit,C,C,Y,N,N,N,N,N,N,state-conditional core: offered once a checkpoint exists (pptx: always)
 search_project_content,builtin,search,ALL,read,Y,Y,4,288,76,zh,en,keep,search_project_content,files,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 list_contributed_templates,builtin,template,ALL,read,N,Y,0,93,25,zh,zh,keep,list_contributed_templates,template,N,N,N,N,N,N,N,N,Y,"single job, zh, short first line"
 create_file_from_template,builtin,template,ALL,write,N,Y,4,177,26,zh,zh,keep,create_file_from_template,template,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -23,7 +23,7 @@ doc_get_paragraph,builtin,doc,LOWA,read,N,Y,1,106,15,zh,zh,keep,doc_get_paragrap
 doc_modify_paragraph,builtin,doc,LOWA,write,N,Y,2,135,42,zh,zh,keep,doc_modify_paragraph,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_get_outline,builtin,doc,LOWA,read,N,Y,0,116,21,zh,zh,keep,doc_get_outline,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_insert_under_heading,builtin,doc,LOWA,write,N,Y,2,125,16,zh,zh,keep,doc_insert_under_heading,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-doc_export_pdf,builtin,doc,LOWA,write,Y,Y,1,162,41,zh,zh,keep,doc_export_pdf,files,N,N,N,N,N,N,N,N,N,leaves core; files/pdf keyword puts it back
+doc_export_pdf,builtin,doc,LOWA,write,N,Y,1,162,41,zh,zh,keep,doc_export_pdf,files,N,N,N,N,N,N,N,N,N,leaves core; files/pdf keyword puts it back; V2: category pdf (doc_export_pdf rule precedes format wildcard)
 doc_get_document_text,builtin,doc,LOWA,read,Y,Y,2,220,35,zh,mixed,keep,doc_get_document_text,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_clauses,builtin,doc,LOWA,read,Y,Y,0,192,35,zh,mixed,keep,doc_get_clauses,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_cursor_context,builtin,doc,LOWA,read,Y,Y,0,71,33,zh,zh,keep,doc_get_cursor_context,docx-edit,Y,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -44,7 +44,7 @@ doc_table_delete_row,builtin,doc_table,LOWA,destructive,N,Y,5,306,14,zh,zh,merge
 doc_table_add_col,builtin,doc_table,LOWA,write,N,Y,5,301,15,zh,zh,merge→doc_table_insert,doc_table_insert,table,N,N,N,N,N,N,N,N,N,axis=col
 doc_table_delete_col,builtin,doc_table,LOWA,destructive,N,Y,5,282,14,zh,zh,merge→doc_table_delete,doc_table_delete,table,N,N,N,N,N,N,N,N,N,axis=col; destructive stays separate
 doc_get_formatting,builtin,doc,LOWA,read,N,Y,1,204,230,zh,zh,keep+rewrite-desc,doc_get_formatting,docx-format,N,N,N,N,N,N,N,N,N,first line 230 chars
-doc_apply_standard_format,builtin,doc,LOWA,write,Y,Y,8,483,29,zh,zh,keep,doc_apply_standard_format,docx-format,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
+doc_apply_standard_format,builtin,doc,LOWA,write,N,Y,8,483,29,zh,zh,keep,doc_apply_standard_format,docx-format,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_apply_style_profile,builtin,doc,LOWA,write,N,Y,1,226,69,mixed,mixed,keep+rewrite-desc,doc_apply_style_profile,template,N,N,N,N,N,N,N,N,N,first line mixed
 doc_insert_toc,builtin,doc,LOWA,write,N,Y,3,188,56,mixed,mixed,keep+rewrite-desc,doc_insert_toc,docx-format,N,N,N,N,N,N,N,N,N,first line mixed
 doc_set_page_setup,builtin,doc,LOWA,write,N,Y,7,285,144,mixed,mixed,keep+rewrite-desc,doc_set_page_setup,docx-format,N,N,N,N,N,N,N,N,N,first line 144 chars; first line mixed
@@ -108,9 +108,9 @@ extract_file_text,builtin,files,ALL,read,Y,Y,3,322,65,zh,en,keep,extract_file_te
 search_across_projects,builtin,search,ALL,read,N,Y,1,107,97,en,en,merge→search_project_files,search_project_files,files,N,N,N,N,N,N,N,N,Y,scope=all
 write_file,builtin,files,ALL,write,N,Y,3,243,155,en,en,keep+rewrite-desc,write_file,files,N,N,N,N,N,N,N,N,W,first line 155 chars; first line en
 write_docx,builtin,files,ALL,write,Y,Y,4,232,32,zh,en,keep,write_docx,files,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
-move_files_batch,builtin,files,ALL,write,Y,Y,1,221,42,zh,en,rename→move_files,move_files,files,N,N,N,N,N,N,N,N,W,only move tool left; drop _batch suffix; shim one release
-move_to_trash,builtin,files,ALL,destructive,Y,Y,1,214,61,zh,en,keep,move_to_trash,files,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
-create_folder,builtin,files,ALL,write,Y,Y,2,118,25,zh,en,keep,create_folder,files,N,N,N,N,N,N,N,N,W,V1: description rewritten to the A5 template
+move_files_batch,builtin,files,ALL,write,N,Y,1,221,42,zh,en,rename→move_files,move_files,files,N,N,N,N,N,N,N,N,W,only move tool left; drop _batch suffix; shim one release
+move_to_trash,builtin,files,ALL,destructive,N,Y,1,214,61,zh,en,keep,move_to_trash,files,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
+create_folder,builtin,files,ALL,write,N,Y,2,118,25,zh,en,keep,create_folder,files,N,N,N,N,N,N,N,N,W,V1: description rewritten to the A5 template
 rename_project_file,builtin,files,ALL,write,N,Y,2,96,68,en,en,keep+rewrite-desc,rename_project_file,files,N,N,N,N,N,N,N,N,W,first line en
 move_project_file,builtin,files,ALL,write,N,Y,2,116,86,en,en,merge→move_files,move_files,files,N,N,N,N,N,N,N,N,N,single move = array of 1
 copy_files,builtin,files,ALL,write,N,Y,2,243,155,en,en,keep+rewrite-desc,copy_files,files,N,N,N,N,N,N,N,N,N,first line 155 chars; first line en
@@ -134,7 +134,7 @@ query_memory,builtin,memory,ALL,read,Y,Y,6,381,54,zh,mixed,keep,query_memory,mem
 update_project_info,builtin,memory,ALL,write,N,Y,2,91,27,zh,zh,keep,update_project_info,memory,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 memory_list,builtin,memory,ALL,read,fixed,Y,1,109,22,zh,mixed,keep,memory_list,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 memory_read,builtin,memory,ALL,read,fixed,Y,2,112,20,zh,mixed,keep,memory_read,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
-memory_search,builtin,memory,ALL,read,fixed,Y,2,137,41,zh,mixed,keep,memory_search,memory,N,N,N,N,N,N,N,N,Y,V1: description rewritten to the A5 template
+memory_search,builtin,memory,ALL,read,N,Y,2,137,41,zh,mixed,keep,memory_search,memory,N,N,N,N,N,N,N,N,Y,V1: description rewritten to the A5 template
 memory_write,builtin,memory,ALL,write,N,Y,4,314,22,mixed,mixed,keep+rewrite-desc,memory_write,memory,N,N,N,N,N,N,N,N,W,first line mixed
 memory_edit,builtin,memory,ALL,write,N,Y,5,194,25,mixed,mixed,keep+rewrite-desc,memory_edit,memory,N,N,N,N,N,N,N,N,N,first line mixed
 memory_delete,builtin,memory,ALL,destructive,N,Y,3,139,23,mixed,mixed,keep+rewrite-desc,memory_delete,memory,N,N,N,N,N,N,N,N,N,first line mixed

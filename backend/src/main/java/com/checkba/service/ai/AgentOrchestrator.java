@@ -52,6 +52,8 @@ public class AgentOrchestrator {
 
     /** ASK remains read-only but can inspect the user's durable memory. */
     static final Set<String> ASK_MEMORY_TOOLS = Set.of("memory_list", "memory_read", "memory_search");
+    /** Agent/Plan 每轮固定补的只读记忆工具（V2：memory_search 退到 memory 类目，由「记得 / 之前说过」等关键词放回）。 */
+    static final Set<String> ALWAYS_MEMORY_TOOLS = Set.of("memory_list", "memory_read");
     static final Set<String> ASK_READ_TOOLS = Set.of("memory_list", "memory_read", "memory_search",
             "version_status", "version_history", "version_changes", "extract_file_text", "list_attached_files");
     /**
@@ -421,6 +423,17 @@ public class AgentOrchestrator {
          *
          * <p>写在分发线程、读在下一轮的组装处，故用并发集合。
          */
+        /** 本轮用户消息带附件（起跑时算定，轮内不变）：决定条件核心 list_attached_files。 */
+        volatile boolean hasAttachments;
+        /** 类目 → 最近一次放回或被调用时的 LLM 往返序号（中途增长封顶的 LRU 依据，V2）。 */
+        final java.util.Map<String, Integer> categoryLastUsed = new java.util.concurrent.ConcurrentHashMap<>();
+        /** 类目 → 模型最近一次用 list_tools 明确要它时的往返序号（该类目之后两轮内不被收回）。 */
+        final java.util.Map<String, Integer> categoryAskedAt = new java.util.concurrent.ConcurrentHashMap<>();
+        /**
+         * 按名放回的工具（工具名 → 放回时的往返序号）：起跑时的精确关键词（{@code TOOL_KEYWORDS}）与
+         * {@code list_tools(names|query)} 写入。只放这几个工具，不连带整个类目；可被中途封顶按 LRU 收回。
+         */
+        final java.util.Map<String, Integer> requestedToolNames = new java.util.concurrent.ConcurrentHashMap<>();
         /** 生效 skill 白名单点名的工具名（只增不减）：按名放行，不连带整个类目。 */
         final java.util.Set<String> skillToolNames = java.util.concurrent.ConcurrentHashMap.newKeySet();
         final java.util.Set<String> expandedToolCategories = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -2422,6 +2435,9 @@ public class AgentOrchestrator {
             // 活跃文档类目裁剪与渐进披露（dev-board#1064）：起跑时一次算定要不要按类目裁，并把本轮
             // 用户输入的关键词与生效 skill 的白名单涉及的类目预先放回（写进同一份展开集，只增不减）。
             guard.userMessage = request.getMessage();
+            guard.hasAttachments = request.getContextItems() != null
+                    ? !request.getContextItems().isEmpty()
+                    : request.getFileIds() != null && !request.getFileIds().isEmpty();
             prepareToolCategoryPutBack(guard, request.getMessage(), agentMode);
             // 运行期不可用的工具也在同一处算定（dev-board#750）：账户没连时那些工具每次都只会回
             // 一句「尚未连接 AI WorkDeck 账户」，而模型会为此白花一整轮（3~5 秒）
@@ -3484,8 +3500,12 @@ public class AgentOrchestrator {
             java.util.Set<String> offeredBefore = guard.roundOffered == null ? java.util.Set.of() : guard.roundOffered;
             for (ToolSpecification spec : registered) {
                 String name = spec.name();
-                boolean keep = ASK_MEMORY_TOOLS.contains(name)
-                        || "extract_file_text".equals(name) || "list_attached_files".equals(name)
+                // V2 条件核心：list_attached_files 只在本轮有附件时补；doc_restore_checkpoint 只在 pptx 会话
+                // 或本轮已有检查点时补（检查点在第一个修改类工具执行前建，之后每轮都补，只增不减）
+                boolean keep = ALWAYS_MEMORY_TOOLS.contains(name)
+                        || "extract_file_text".equals(name)
+                        || ("list_attached_files".equals(name) && guard.hasAttachments)
+                        || ("doc_restore_checkpoint".equals(name) && restoreCheckpointOffered(guard, conversationId))
                         || (MEMORY_TOOLS.contains(name) && (narrowedBySkill || offeredBefore.contains(name)));
                 if (keep && visible.stream().noneMatch(v -> v.name().equals(name))) {
                     visible.add(spec);
@@ -3573,6 +3593,12 @@ public class AgentOrchestrator {
         if (guard == null || result == null) {
             return;
         }
+        if (policy != null && toolName != null) {
+            // LRU 依据：被调用过的工具所在类目算「刚用过」
+            String used = policy.ruleCategoryOf(toolName);
+            guard.categoryLastUsed.put(used, guard.llmRounds);
+            guard.categoryLastUsed.put(ToolDisclosurePolicy.TOOL_KEY + toolName, guard.llmRounds);
+        }
         // use_skill 的生效登记与披露开关无关（dev-board#1065）：restrict skill 的白名单要登记，
         // 哪怕这一轮既没开渐进披露、也没开着文档。
         if (com.checkba.service.ai.tools.SkillTools.TOOL_NAME.equals(toolName)) {
@@ -3596,10 +3622,22 @@ public class AgentOrchestrator {
                     ? java.util.Set.of() : policy.parseCategories(extractArg(argsJson, "category")));
             if (disclosedCategories != null) {
                 for (String category : disclosedCategories) {
-                    if (policy.categoryNames().contains(category)) {
+                    if (category.startsWith(ToolDisclosurePolicy.TOOL_KEY)) {
+                        // names / query 模式：只放回这几个工具，不连带类目；本轮与下一轮内不被封顶收回
+                        String name = category.substring(ToolDisclosurePolicy.TOOL_KEY.length());
+                        if (guard.requestedToolNames.put(name, guard.llmRounds) == null) {
+                            log.info("[Disclosure] conv={} list_tools 按名放回 {}（下一轮生效）", guard.conversationId, name);
+                        }
+                        guard.categoryAskedAt.put(category, guard.llmRounds);
+                        guard.categoryLastUsed.put(category, guard.llmRounds);
+                    } else if (policy.categoryNames().contains(category)) {
                         expanded.add(category);
                     }
                 }
+            }
+            for (String category : expanded) {
+                guard.categoryAskedAt.put(category, guard.llmRounds);
+                guard.categoryLastUsed.put(category, guard.llmRounds);
             }
             if (!expanded.isEmpty() && guard.expandedToolCategories.addAll(expanded)) {
                 log.info("[Disclosure] conv={} 展开类目 {}（下一轮生效），当前展开集 {}",
@@ -3682,6 +3720,9 @@ public class AgentOrchestrator {
             }
         }
         guard.expandedToolCategories.addAll(putBack);
+        for (String name : policy.toolsHintedBy(userMessage)) {
+            guard.requestedToolNames.putIfAbsent(name, 0);
+        }
         guard.noFileBaselineCategories = new java.util.HashSet<>(guard.expandedToolCategories);
         log.info("[ToolVisibility] conv={} 活跃文档 {} 按类目裁剪 {}，渐进披露 {}，预先放回类目 {}（关键词/skill）",
                 guard.conversationId, guard.activeDocKind,
@@ -3717,14 +3758,15 @@ public class AgentOrchestrator {
         // 活跃文档类目裁剪（dev-board#1064）排在核心集收窄之前，两者都是「只留 核心集 ∪ 已放回类目」
         // 的形状，叠起来仍是那个形状。放在决策辅助之后，它刚放回的类目本轮就生效。
         List<ToolSpecification> candidates = guard.docCategoryTrimActive
-                ? policy.trimForDocKind(allCandidates, guard.activeDocKind, guard.expandedToolCategories, guard.skillToolNames)
+                ? policy.trimForDocKind(allCandidates, guard.activeDocKind, guard.expandedToolCategories, extraToolNames(guard))
                 : allCandidates;
         guard.roundTrimmed = allCandidates.size() - candidates.size();
         if (guard.decisionContext != null && guard.decisionAbandoned) return candidates;
         if (!policy.isEnabled() && !guard.assistedDisclosure) return candidates;
+        evictOverBudget(candidates, guard, policy);
         List<ToolSpecification> disclosed = policy.narrow(candidates, guard.expandedToolCategories,
                 guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories),
-                guard.skillToolNames);
+                extraToolNames(guard));
         // The static rollout may be off: expose only this safe catalog, not other unavailable tools.
         if (guard.assistedDisclosure && disclosed.stream().noneMatch(s -> ToolDisclosurePolicy.CATALOG_TOOL.equals(s.name()))) {
             toolRegistry.resolve(ToolDisclosurePolicy.CATALOG_TOOL, guard.conversationId)
@@ -3733,6 +3775,64 @@ public class AgentOrchestrator {
         log.info("[Disclosure] conv={} candidates={} disclosed={} expanded={}",
                 guard.conversationId, candidates.size(), disclosed.size(), guard.expandedToolCategories);
         return guard.decisionContext != null && guard.decisionAbandoned ? candidates : disclosed;
+    }
+
+    /**
+     * 中途增长封顶（tool-system-v2 V2）：展开集只增不减会让长任务的工具数一路涨到 80+。
+     * 第 2 个往返起（首轮保持关键词 / skill 预放回原样），下发总数超过
+     * {@link ToolDisclosurePolicy#MAX_OFFERED_PER_ROUND} 就按 LRU 收回已展开类目。
+     * 保护：本轮刚放回或刚用过的类目、模型最近两轮用 list_tools 要的类目；核心集与 skill 点名的工具不属于类目。
+     */
+    private void evictOverBudget(List<ToolSpecification> candidates, RunGuard guard, ToolDisclosurePolicy policy) {
+        int round = guard.llmRounds;
+        java.util.List<String> keys = new java.util.ArrayList<>(guard.expandedToolCategories);
+        guard.requestedToolNames.keySet().forEach(n -> keys.add(ToolDisclosurePolicy.TOOL_KEY + n));
+        for (String key : keys) {
+            guard.categoryLastUsed.putIfAbsent(key, round);
+        }
+        if (round < 1) {
+            return;
+        }
+        java.util.Set<String> protectedKeys = new java.util.HashSet<>();
+        for (String key : keys) {
+            Integer used = guard.categoryLastUsed.get(key);
+            Integer asked = guard.categoryAskedAt.get(key);
+            if ((used != null && used >= round)
+                    || (asked != null && round - asked < ToolDisclosurePolicy.LIST_TOOLS_PROTECT_ROUNDS)) {
+                protectedKeys.add(key);
+            }
+        }
+        // reserve：编排器在收窄之后另补的 memory_list / memory_read，加条件核心（附件 / 检查点）
+        int reserve = ALWAYS_MEMORY_TOOLS.size() + (guard.hasAttachments ? 1 : 0) + 1;
+        java.util.Set<String> evicted = policy.evictToBudget(candidates, guard.expandedToolCategories,
+                guard.requestedToolNames.keySet(),
+                guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories),
+                guard.skillToolNames, guard.categoryLastUsed, protectedKeys, reserve);
+        if (!evicted.isEmpty()) {
+            for (String key : evicted) {
+                if (key.startsWith(ToolDisclosurePolicy.TOOL_KEY)) {
+                    guard.requestedToolNames.remove(key.substring(ToolDisclosurePolicy.TOOL_KEY.length()));
+                } else {
+                    guard.expandedToolCategories.remove(key);
+                }
+            }
+            log.info("[Disclosure] conv={} 下发总数封顶 {}，按 LRU 收回 {}，当前展开集 {} 按名 {}",
+                    guard.conversationId, ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND, evicted,
+                    guard.expandedToolCategories, guard.requestedToolNames.keySet());
+        }
+    }
+
+    /** 按名放行的工具：skill 白名单点名的 ∪ 精确关键词 / list_tools(names|query) 放回的。 */
+    private static java.util.Set<String> extraToolNames(RunGuard guard) {
+        java.util.Set<String> names = new java.util.HashSet<>(guard.skillToolNames);
+        names.addAll(guard.requestedToolNames.keySet());
+        return names;
+    }
+
+    /** doc_restore_checkpoint 是否本轮补：pptx 会话常驻（Impress 的 doc_undo 是空操作），其余需已有检查点。 */
+    private boolean restoreCheckpointOffered(RunGuard guard, String conversationId) {
+        return "slide".equals(guard.activeDocKind)
+                || (documentCheckpointService != null && documentCheckpointService.hasCheckpoint(conversationId));
     }
 
     private void prepareToolDecision(List<ToolSpecification> candidates, RunGuard guard) {

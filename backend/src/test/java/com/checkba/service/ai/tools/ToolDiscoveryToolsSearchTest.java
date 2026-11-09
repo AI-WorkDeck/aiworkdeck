@@ -73,7 +73,7 @@ class ToolDiscoveryToolsSearchTest {
         assertFalse(out.contains("doc_insert_page_number("), "没有 pdf 这个词的不算：" + out);
         assertTrue(out.contains("from the NEXT turn on"), "尾句必须还在：" + out);
         assertTrue(out.contains("<tool_code>"), out);
-        assertEquals(Set.of("pdf"), disclosed, "命中工具的类目要回写给编排器");
+        assertEquals(Set.of("tool:pdf_add_page_numbers", "tool:pdf_split"), disclosed, "V2：只回写命中的工具名，不连带类目");
     }
 
     @Test
@@ -113,7 +113,7 @@ class ToolDiscoveryToolsSearchTest {
         assertFalse(out.contains("- pdf_split("), "names 是精确匹配，不是前缀：" + out);
         assertTrue(out.contains("not found in this session: pdf_mer, nope"), out);
         assertFalse(out.startsWith("Error"), "部分命中不算失败：" + out);
-        assertEquals(Set.of("pdf", "litigation"), disclosed);
+        assertEquals(Set.of("tool:pdf_merge", "tool:litigation_render"), disclosed);
     }
 
     @Test
@@ -139,7 +139,7 @@ class ToolDiscoveryToolsSearchTest {
         String byQuery = tools().list_tools("litigation", "merge", null, "conv");
         assertTrue(byQuery.contains("- pdf_merge("), byQuery);
         assertFalse(byQuery.contains("litigation_render("), byQuery);
-        assertEquals(Set.of("pdf"), disclosed);
+        assertEquals(Set.of("tool:pdf_merge"), disclosed);
     }
 
     @Test

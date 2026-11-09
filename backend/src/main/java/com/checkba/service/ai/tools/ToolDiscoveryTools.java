@@ -257,7 +257,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         if (found.isEmpty()) {
             return sb.toString().trim();
         }
-        record(ctx, categoriesOf(found));
+        recordNames(ctx, found);
         appendTrailer(sb, found.size());
         return sb.toString();
     }
@@ -296,7 +296,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         if (hits.isEmpty()) {
             return sb.toString().trim();
         }
-        record(ctx, categoriesOf(hits));
+        recordNames(ctx, hits);
         appendTrailer(sb, hits.size());
         return sb.toString();
     }
@@ -385,10 +385,19 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         }
     }
 
-    private Set<String> categoriesOf(List<ToolSpecification> specs) {
-        Set<String> categories = new LinkedHashSet<>();
-        specs.forEach(spec -> categories.add(policy.categoryOf(spec.name())));
-        return categories;
+    /**
+     * names / query 模式只把<b>这几个工具</b>写给编排器（键 {@code tool:<name>}），不连带它们所在的整个类目——
+     * 否则要一个 move_to_trash 就把 files 全类放回来，绕过每轮下发封顶（tool-system-v2 V2）。核心集不算。
+     */
+    private void recordNames(ToolContext ctx, List<ToolSpecification> specs) {
+        if (ctx == null || ctx.disclosedCategories() == null) {
+            return;
+        }
+        for (ToolSpecification spec : specs) {
+            if (!"core".equals(policy.categoryOf(spec.name()))) {
+                ctx.disclosedCategories().add(ToolDisclosurePolicy.TOOL_KEY + spec.name());
+            }
+        }
     }
 
     /** 按类目分组给全签名（query / names 共用；类目按首次出现的顺序）。 */

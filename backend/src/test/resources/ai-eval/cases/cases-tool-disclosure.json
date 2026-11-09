@@ -355,7 +355,7 @@
   },
   {
     "id": "disclosure-memory-read-trio-always-write-trio-behind-category",
-    "title": "渐进披露：记忆只读三个（list/read/search）每轮都下发（每轮注入的记忆索引点名要 memory_read），写入三个（write/edit/delete）不再每轮兜底，归 memory 类目（dev-board#1073）",
+    "title": "渐进披露：记忆只读 list/read 每轮都下发（每轮注入的记忆索引点名要 memory_read），memory_search 与写入三个（write/edit/delete）归 memory 类目（dev-board#1073；V2 起 memory_search 退出固定追加）",
     "category": "memory",
     "protocol": "native",
     "progressiveDisclosure": true,
@@ -371,12 +371,12 @@
       "offeredToolsInclude": [
         "memory_list",
         "memory_read",
-        "memory_search",
         "query_memory",
         "save_memory",
         "list_tools"
       ],
       "offeredToolsExclude": [
+        "memory_search",
         "memory_write",
         "memory_edit",
         "memory_delete"

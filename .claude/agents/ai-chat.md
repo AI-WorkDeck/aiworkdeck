@@ -671,6 +671,10 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
      之后 `list_tools` / 点名 / 决策辅助明确要的类目不再过滤。`sheet_create_file / slide_create_file` 不再常驻核心集（已拍板 #1），有文档开着时靠「表格 / excel / ppt / 幻灯片」关键词预放回，建成后其类目随展开集放回。
      关键词预放回每轮最多 3 类（`categoriesPutBackFor`：命中词总长度降序，同分按 `PUTBACK_PRIORITY`），skill 白名单类目不受限。
      首轮体量由 `ToolSurfaceBudgetTest` + `cases-tool-surface.json` 钉住（没开文件中性 25 个 / 6.5k token）。
+     **核心集重切（tool-system-v2 V2）**：`create_folder / move_files_batch / move_to_trash` 退到 `files`、`doc_apply_standard_format` 留 `format`、`doc_export_pdf` 归 `pdf`（`pdf` 规则排在 `format` 的 `doc_` 通配之前）、`memory_search` 退出编排器固定追加（只剩 `memory_list / memory_read`，归 `memory` 类目），都靠关键词首轮放回（files 补「删除文件 / 文件删了」等，memory 补「记得 / 之前说过」；「标准格式」「导出PDF」已被「格式」「pdf」覆盖）。
+     **精确放回（真实模型矩阵后修正）**：8 个退出核心集的工具里说法明确的 6 个走 `ToolDisclosurePolicy.TOOL_KEYWORDS`（文件夹→`create_folder`、移动/移到/归档→`move_files_batch`、删除/删掉/删了/回收站→`move_to_trash`、标准格式/统一格式/律所格式/排版→`doc_apply_standard_format`、导出/转PDF→`doc_export_pdf`、记得/之前说过→`memory_search`），首轮只放该工具（`RunGuard.requestedToolNames`），命中短语先从文本抠掉再匹配类目关键词（「标准格式」不再拉 format 全类）；类目关键词只留更宽的说法。`list_tools(names|query)` 同样只按名放回（`disclosedCategories` 里带 `tool:` 前缀），不连带类目；`list_tools(category)` 放回整类但受封顶。封顶的 LRU 池里类目与按名放回同池。
+     **状态条件核心**（编排器每轮在收窄之后补，轮内只增不减）：`list_attached_files` 仅本轮带附件（`RunGuard.hasAttachments`，起跑时算定）；`doc_restore_checkpoint` 仅 pptx 会话常驻、其余需 `DocumentCheckpointService.hasCheckpoint`（第一个修改类工具执行前建检查点，之后的轮次才下发）。ASK 模式不变。
+     **中途增长封顶**：展开集只增不减，长任务会涨到 80+ 个工具。第 2 个往返起 `evictOverBudget` 在下发总数（含另补）> `ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND`（45）时按 LRU 逐个从展开集收回类目（`evictToBudget`，纯函数；依据 `RunGuard.categoryLastUsed`：放回或被调用时的往返序号，同分按类目名）。不收：核心集、skill 点名的工具（按名放行）、本轮刚放回/刚用过的类目、模型最近 2 轮用 `list_tools` 明确要的类目（`categoryAskedAt`）；首轮不封顶（关键词/skill 预放回原样）。回归：`ToolDisclosurePolicyTest.evictToBudgetIsLruAndRespectsProtection`、`cases-tool-surface.json` 的 `surface-v2-*`。
   - **为什么值得做②**：工具规格**每一轮都要重发**，一条消息跑三五个往返就付三五遍。
     本机实测 202 个工具 59045 prompt token / 首轮 26.4s，裁到 16 个 18854 token / 6.1s；
     本仓离线实测（`ToolSchemaBudgetTest`）docx 省 27.6%、xlsx 省 38.8%、pptx 省 39.7% 的 schema 体量
