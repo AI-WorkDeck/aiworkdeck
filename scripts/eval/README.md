@@ -94,3 +94,8 @@ node scripts/eval/model-matrix.mjs \
 `AFTER ≥ BEFORE on correctness for all models: yes/no`）、各实例后端日志 `backend-*.log`。
 
 tokens 来自后端 `token_usage` 表（按会话汇总）；轮数与每轮提供的工具数来自后端 `[Round]` 日志，工具序列来自编排器日志。
+
+## 句子集清单
+
+- `sentences/core-17.json`：核心 17 句（读/找/改/批注/法条/记忆/新建）。V4 起期望里合并后的新名与旧名并列，可对拍合并前后两个 ref。
+- `sentences/v4-merged.json`：tool-system-v2 V4 合并工具专用 6 句（接受/拒绝修订、回复批注、表格插行、PDF 删页/抽页），夹具 `contract-commented.docx` / `contract-table.docx` / `dossier-24p.pdf`（`python3 fixtures/make_fixtures.py` 生成）。
