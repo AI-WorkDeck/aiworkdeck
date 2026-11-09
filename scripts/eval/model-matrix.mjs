@@ -7,6 +7,7 @@
 
 import { spawn, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
@@ -19,7 +20,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a)
 
 // ---------- 参数 ----------
 function parseArgs(argv) {
-  const o = { runs: 1, concurrency: 4, apiOnly: false, keep: false, runTimeout: 300, out: path.join(HERE, 'out') }
+  const o = { lowaDir: path.join(os.homedir(), '.cache/awd-matrix/lowa'), runs: 1, concurrency: 4, apiOnly: false, keep: false, runTimeout: 300, out: path.join(HERE, 'out') }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     const next = () => argv[++i]
@@ -33,7 +34,9 @@ function parseArgs(argv) {
     else if (a === '--run-timeout') o.runTimeout = Number(next())
     else if (a === '--out') o.out = path.resolve(next())
     else if (a === '--api-only') o.apiOnly = true
+    else if (a === '--lowa-dir') o.lowaDir = path.resolve(next())
     else if (a === '--keep') o.keep = true
+    else if (a === '--workdir') { o.workdir = path.resolve(next()); o.keep = true }
     else if (a === '--help' || a === '-h') o.help = true
     else throw new Error('未知参数：' + a)
   }
@@ -88,6 +91,15 @@ function loadSentences(file, only) {
   return list
 }
 const needsEditor = s => s.hostState !== 'nofile'
+// docx:<夹具> 的宿主文件：种子里自动加一份 合同.docx（hostFile 可改名）
+function withHostFile(s) {
+  const m = /^docx:(.+)$/.exec(s.hostState)
+  if (!m) throw new Error(`hostState=${s.hostState} 暂不支持（目前只支持 nofile 与 docx:<夹具>）`)
+  const seed = { ...(s.seed || {}) }
+  seed.files = [{ name: s.hostFile || '合同.docx', fixture: m[1] + '.docx' }, ...(seed.files || [])]
+  return { ...s, seed }
+}
+const editorSupported = s => s.hostState === 'nofile' || s.hostState.startsWith('docx:')
 
 // ---------- 评分 ----------
 const nameMatch = (pat, tool) => (pat.startsWith('/') && pat.lastIndexOf('/') > 0)
@@ -126,17 +138,77 @@ async function startPg(tmp) {
 }
 
 // ---------- 构建每个 ref ----------
-async function buildRef(ref, tmp, java) {
+async function buildRef(ref, tmp, java, o, needFrontend) {
   const sha = execFileSync('git', ['rev-parse', '--verify', ref + '^{commit}'], { cwd: REPO, encoding: 'utf8' }).trim()
   const wt = path.join(tmp, 'wt-' + sha.slice(0, 10))
   if (!fs.existsSync(wt)) await run('git', ['worktree', 'add', '--detach', wt, sha], { cwd: REPO })
+  const jarsDone = () => fs.existsSync(path.join(wt, 'backend/target')) && fs.readdirSync(path.join(wt, 'backend/target')).some(f => /^backend-.*\.jar$/.test(f))
+  const feDone = !needFrontend || fs.existsSync(path.join(wt, 'frontend/dist/zetaoffice/lowa/soffice.wasm'))
   log(`构建 ${ref} (${sha.slice(0, 10)}) ...`)
   const t0 = Date.now()
-  await run('mvn', ['-q', '-B', '-DskipTests', 'package'], { cwd: path.join(wt, 'backend'), env: { ...process.env, JAVA_HOME: java, PATH: path.join(java, 'bin') + ':' + process.env.PATH } })
+  const backend = jarsDone() ? Promise.resolve() : run('mvn', ['-q', '-B', '-DskipTests', 'package'], { cwd: path.join(wt, 'backend'), env: { ...process.env, JAVA_HOME: java, PATH: path.join(java, 'bin') + ':' + process.env.PATH } })
+  const frontend = needFrontend && !feDone ? buildFrontend(wt, o) : Promise.resolve()
+  await Promise.all([backend, frontend])
   const jars = fs.readdirSync(path.join(wt, 'backend/target')).filter(f => /^backend-.*\.jar$/.test(f) && !f.includes('original'))
   if (!jars.length) throw new Error('未找到后端 jar：' + ref)
   log(`构建 ${ref} 完成 ${Math.round((Date.now() - t0) / 1000)}s`)
-  return { ref, sha, wt, jar: path.join(wt, 'backend/target', jars[0]) }
+  return { ref, sha, wt, jar: path.join(wt, 'backend/target', jars[0]), h5: needFrontend ? path.join(wt, 'frontend/dist/build/h5') : null, zeta: needFrontend ? path.join(wt, 'frontend/dist/zetaoffice') : null }
+}
+
+// H5 以占位符 API 地址静态构建（构建时烘焙），每个实例的静态服务器在响应里把占位符替换成自己后端的地址；
+// LOWA 运行时（~100MB）从缓存目录拷入，缓存缺失时用 desktop/scripts/fetch-lowa-assets.js 拉取一次。
+const API_PLACEHOLDER = 'http://awd-matrix-api.invalid'
+async function buildFrontend(wt, o) {
+  const fe = path.join(wt, 'frontend')
+  try { await run('npm', ['ci', '--no-audit', '--no-fund'], { cwd: fe }) } catch { await run('npm', ['install', '--no-audit', '--no-fund'], { cwd: fe }) }
+  const env = { ...process.env, VITE_API_BASE_URL: API_PLACEHOLDER }
+  await run('npx', ['uni', 'build'], { cwd: fe, env })
+  await run('npm', ['run', 'build:zetaoffice'], { cwd: fe, env })
+  const dest = path.join(fe, 'dist/zetaoffice')
+  if (!fs.existsSync(path.join(o.lowaDir, 'lowa/soffice.wasm'))) {
+    log('LOWA 缓存缺失，拉取运行时（一次性）...')
+    await run('node', [path.join(wt, 'desktop/scripts/fetch-lowa-assets.js')], { cwd: wt })
+    fs.mkdirSync(o.lowaDir, { recursive: true })
+    fs.cpSync(path.join(dest, 'lowa'), path.join(o.lowaDir, 'lowa'), { recursive: true })
+    for (const f of fs.readdirSync(dest).filter(f => f.startsWith('cjk'))) fs.copyFileSync(path.join(dest, f), path.join(o.lowaDir, f))
+  } else fs.cpSync(o.lowaDir, dest, { recursive: true })
+}
+
+// 每实例一个静态 H5 服务：带 COOP/COEP（LOWA 需要 SharedArrayBuffer），/zetaoffice/* 回放 .encodings.json 里的 Content-Encoding
+function serveH5(build, apiBase) {
+  const mime = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.wasm': 'application/wasm', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ttf': 'font/ttf', '.otf': 'font/otf', '.ttc': 'font/collection', '.woff2': 'font/woff2' }
+  const H = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Cross-Origin-Resource-Policy': 'cross-origin' }
+  let enc = {}
+  try { enc = JSON.parse(fs.readFileSync(path.join(build.zeta, 'lowa/.encodings.json'), 'utf8')) } catch { /* 无 */ }
+  const server = http.createServer((req, res) => {
+    const u = new URL(req.url, 'http://x')
+    let root = build.h5, rel = decodeURIComponent(u.pathname)
+    if (rel.startsWith('/zetaoffice/')) { root = build.zeta; rel = rel.slice('/zetaoffice/'.length) } else rel = rel.slice(1)
+    let f = path.resolve(root, rel || 'index.html')
+    if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404, H); return res.end() }
+    const ext = path.extname(f)
+    const h = { ...H, 'Content-Type': mime[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' }
+    if (root === build.zeta && rel.startsWith('lowa/') && enc[path.basename(f)]) h['Content-Encoding'] = enc[path.basename(f)]
+    if (['.js', '.html', '.mjs'].includes(ext) && root === build.h5) { res.writeHead(200, h); return res.end(fs.readFileSync(f, 'utf8').split(API_PLACEHOLDER).join(apiBase)) }
+    res.writeHead(200, h); fs.createReadStream(f).pipe(res)
+  })
+  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port })))
+}
+
+// Playwright 自带 Chromium（headless，绝不启用系统 Chrome）；包装在缓存目录里按需安装
+async function loadPlaywright() {
+  const dir = path.join(os.homedir(), '.cache/awd-matrix/pw')
+  if (!fs.existsSync(path.join(dir, 'node_modules/playwright'))) {
+    log('安装 playwright（一次性）...')
+    fs.mkdirSync(dir, { recursive: true })
+    await run('npm', ['install', '--no-audit', '--no-fund', '--prefix', dir, 'playwright@1.65'])
+  }
+  const { createRequire } = await import('node:module')
+  const { chromium } = createRequire(path.join(dir, 'x.js'))('playwright')
+  try { return await chromium.launch({ headless: true }) } catch {
+    await run('npx', ['--prefix', dir, 'playwright', 'install', 'chromium'], { cwd: dir })
+    return chromium.launch({ headless: true })
+  }
 }
 
 // ---------- 后端实例 ----------
@@ -176,6 +248,7 @@ class Instance {
     if (r?.code !== 0) throw new Error(`注册测试用户失败（${this.label}）：${JSON.stringify(r).slice(0, 200)}`)
     this.sid = r.data.sessionId
     this.userId = r.data.user.id
+    this.username = user
     this.cursor = 0
   }
   async http(method, url, body) {
@@ -235,6 +308,68 @@ class Instance {
         values (gen_random_uuid()::text, ${this.userId}, ${pid}, ${q(m.type || 'preference')}, ${q(m.key)}, ${q(m.content)}, false, 0.7, ${q(m.scope || 'user')}, now(), now())`)
     }
     return pid
+  }
+
+  // 编辑器句子：client_action 经页面自己的 SSE 会话桥到 LOWA 执行，所以必须由页面发消息、持有 SSE。
+  // 流程：打开项目 → 点开文件 → 等编辑器就绪 → 在聊天框发送；会话 id 从页面发出的 /api/agent/chat 请求里取；
+  // 结束判据是后端日志里的 "Agent Loop Finished for <conv>"（编排循环真正收尾），不是静默等待。
+  async chatInEditor(browser, pid, sentence, hostFile, timeoutSec) {
+    const t0 = Date.now()
+    const ctx = await browser.newContext({ viewport: { width: 1500, height: 950 } })
+    const rec = { pageText: null, conversationId: null, status: null, error: null, text: '', events: [], logOffset: fs.statSync(this.logFile).size }
+    try {
+      // 护栏：只放行本机请求（页面里有写死的外链图片等），也绝不触达默认端口 9696 上别人的后端
+      await ctx.route(u => !/^(http:\/\/(localhost|127\.0\.0\.1):\d+\/|data:|blob:)/.test(u.href) || /:9696\//.test(u.href), r => r.abort())
+      // 纯浏览器 H5 没有桌面壳：让「本地内容协议」探针按 404 回退到普通下载路径（与既有 e2e 做法一致）
+      await ctx.route('**/api/desktop/startup-health', r => r.fulfill({ status: 404, body: '' }))
+      const user = { id: this.userId, username: this.username }
+      await ctx.addInitScript(([sid, u, m]) => {
+        localStorage.setItem('checkba_app_language', 'zh-CN')
+        localStorage.setItem('checkba_session_id', JSON.stringify({ type: 'string', data: sid }))
+        localStorage.setItem('checkba_user', JSON.stringify({ type: 'object', data: u }))
+        localStorage.setItem('ai_selected_model', JSON.stringify({ type: 'string', data: m }))
+      }, [this.sid, user, this.model])
+      const page = await ctx.newPage()
+      const diag = []
+      page.on('requestfailed', rq => diag.push('FAIL ' + rq.url().slice(0, 120) + ' ' + rq.failure()?.errorText))
+      page.on('response', rs => { if (rs.status() >= 400) diag.push(rs.status() + ' ' + rs.url().slice(0, 120)) })
+      page.on('console', m => { if (m.type() === 'error') diag.push('console ' + m.text().slice(0, 150)) })
+      rec.diag = diag
+      page.on('request', rq => {
+        if (rq.method() === 'POST' && rq.url().endsWith('/api/agent/chat')) { try { rec.conversationId = JSON.parse(rq.postData()).conversationId } catch { /* ignore */ } }
+      })
+      await page.goto(`http://localhost:${this.h5.port}/#/pages/project-overview/project-overview?id=${pid}`)
+      await page.getByText(hostFile).first().click({ timeout: 60000 })
+      // 编辑器就绪：状态栏出现 Saved/Saving/Unsaved 且不再显示引擎启动文案
+      const deadline = Date.now() + 120000
+      for (;;) {
+        const body = await page.locator('body').innerText()
+        if (/Saved|Saving|Unsaved|已保存|保存中|未保存/.test(body) && !/Starting the document engine|正在启动文档引擎/.test(body)) break
+        if (Date.now() > deadline) throw new Error('编辑器 120 秒内未就绪')
+        await sleep(500)
+      }
+      rec.editorReadyMs = Date.now() - t0
+      const t1 = Date.now()
+      const box = page.locator('.chat-input-rich').last()
+      await box.click()
+      await page.keyboard.insertText(sentence.text)
+      await page.keyboard.press('Enter')
+      for (let i = 0; i < 100 && !rec.conversationId; i++) await sleep(100)
+      if (!rec.conversationId) throw new Error('页面没有发出 /api/agent/chat 请求')
+      const needle = `Agent Loop Finished for ${rec.conversationId}`
+      for (;;) {
+        const fd = fs.openSync(this.logFile, 'r'); const size = fs.fstatSync(fd).size
+        const buf = Buffer.alloc(size - rec.logOffset); fs.readSync(fd, buf, 0, buf.length, rec.logOffset); fs.closeSync(fd)
+        if (buf.toString('utf8').includes(needle)) { rec.status = 'finished'; break }
+        if (Date.now() - t1 > timeoutSec * 1000) { rec.status = 'timeout'; await this.http('POST', `/api/agent/cancel/${rec.conversationId}`); break }
+        await sleep(500)
+      }
+      rec.durationMs = Date.now() - t1
+      rec.text = (await this.rows(`select content from project_ai_message where conversation_id='${rec.conversationId}' and role='ASSISTANT' order by id desc limit 1`))[0]?.content || ''
+    } catch (e) {
+      try { const pg = ctx.pages()[0]; if (pg) { await pg.screenshot({ path: path.join(this.outDir, `fail-${sanitize(this.label)}-${Date.now()}.png`) }); rec.pageText = (rec.diag || []).slice(0, 12).join('\n') } } catch { /* ignore */ }
+      rec.status = rec.status || 'harness_error'; rec.error = String(e.message).slice(0, 300); rec.durationMs = rec.durationMs ?? Date.now() - t0 } finally { await ctx.close().catch(() => {}) }
+    return rec
   }
 
   // 发一条消息，消费 SSE 直到 bubble_end（真实的「本轮结束」事件）；无任何固定静默等待
@@ -302,8 +437,10 @@ async function runOne(inst, sentence, runIdx, opts) {
   const t0 = Date.now()
   try {
     await inst.reset()
-    const pid = await inst.seed(sentence)
-    const c = await inst.chat(pid, sentence.text, opts.runTimeout)
+    const pid = await inst.seed(needsEditor(sentence) ? withHostFile(sentence) : sentence)
+    const c = needsEditor(sentence)
+      ? await inst.chatInEditor(opts.browser, pid, sentence, sentence.hostFile || '合同.docx', opts.runTimeout)
+      : await inst.chat(pid, sentence.text, opts.runTimeout)
     await sleep(300) // 让日志/用量落盘（落盘延迟，不是等模型）
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
     const buf = Buffer.alloc(size - c.logOffset); fs.readSync(fd, buf, 0, buf.length, c.logOffset); fs.closeSync(fd)
@@ -313,7 +450,7 @@ async function runOne(inst, sentence, runIdx, opts) {
       status: c.status, error: c.error, tools, firstTool: tools[0] || null,
       rounds: rounds.length, toolsOffered: rounds.map(r => r.toolsOffered),
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
-      durationMs: c.durationMs, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events), conversationId: c.conversationId,
+      durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
     const ctx = {
       projectId: pid, tools, finalText: c.text || '', api: (m, u, b) => inst.http(m, u, b), sql: q => inst.sql(q), rows: q => inst.rows(q),
@@ -341,7 +478,7 @@ function buildReport(meta, results, sentences) {
     `- 模型: ${models.join(', ')}；每句 ${meta.runs} 次；并发实例 ${meta.concurrency}`,
     `- 总墙钟: ${(meta.wallMs / 1000).toFixed(0)}s（其中构建+启动 ${(meta.setupMs / 1000).toFixed(0)}s，跑题 ${(meta.runMs / 1000).toFixed(0)}s）`, '')
   const skipped = sentences.filter(s => results.some(r => r.sentence === s.id && r.status === 'SKIPPED'))
-  if (skipped.length) L.push(`SKIPPED（需要编辑器，当前仅 API 模式）：${skipped.map(s => s.id).join(', ')}`, '')
+  if (skipped.length) L.push(`SKIPPED（需要编辑器但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
   L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 补全 tokens | 轮数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|')
   for (const m of models) for (const side of ['before', 'after']) {
     // before=after 同 ref 时 results 里靠 side 区分
@@ -389,16 +526,21 @@ async function main() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const outDir = path.join(o.out, timestamp)
   fs.mkdirSync(outDir, { recursive: true })
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-matrix-'))
+  const tmp = o.workdir ? (fs.mkdirSync(o.workdir, { recursive: true }), o.workdir) : fs.mkdtempSync(path.join(os.tmpdir(), 'awd-matrix-'))
+  for (const d of ['pgdata']) fs.rmSync(path.join(tmp, d), { recursive: true, force: true })
   const java = findJava21()
   const T0 = Date.now()
   let pg = null
   const instances = []
   let builds = []
+  let browser = null
+  const servers = []
   const cleanup = async () => {
+    await browser?.close().catch(() => {})
+    for (const sv of servers) sv.close()
     await Promise.all(instances.map(i => i.stop()))
     if (pg) await pg.stop()
-    for (const b of builds) await run('git', ['worktree', 'remove', '--force', b.wt], { cwd: REPO }).catch(() => {})
+    if (!o.keep) for (const b of builds) await run('git', ['worktree', 'remove', '--force', b.wt], { cwd: REPO }).catch(() => {})
     await run('git', ['worktree', 'prune'], { cwd: REPO }).catch(() => {})
     if (!o.keep) fs.rmSync(tmp, { recursive: true, force: true })
   }
@@ -408,7 +550,9 @@ async function main() {
   try {
     log(`输出目录 ${outDir}`)
     const refs = [...new Set([o.before, o.after])]
-    const [pgRes, ...built] = await Promise.all([startPg(tmp), ...refs.map(r => buildRef(r, tmp, java))])
+    const runsEditor = s => needsEditor(s) && !o.apiOnly && editorSupported(s)
+    const needFrontend = sentences.some(runsEditor)
+    const [pgRes, ...built] = await Promise.all([startPg(tmp), ...refs.map(r => buildRef(r, tmp, java, o, needFrontend))])
     pg = pgRes; builds = built
     const byRef = Object.fromEntries(built.map(b => [b.ref, b]))
     const sides = []
@@ -419,7 +563,13 @@ async function main() {
     const queue = (items, k, fn) => { let i = 0; return Promise.all(Array.from({ length: Math.min(k, items.length) }, async () => { while (i < items.length) await fn(items[i++]) })) }
     log(`启动 ${instances.length} 个后端实例（并发 ${o.concurrency}）...`)
     await queue(instances, o.concurrency, async inst => { await inst.start(); log(`实例就绪 ${inst.label} :${inst.port}`) })
+    if (needFrontend) {
+      browser = await loadPlaywright()
+      o.browser = browser
+      for (const inst of instances) { inst.h5 = await serveH5(inst.build, inst.base); servers.push(inst.h5.server) }
+    }
     const setupMs = Date.now() - T0
+    if (process.env.AWD_MATRIX_HOLD) { log('HOLD ' + JSON.stringify(instances.map(i => ({ l: i.label, api: i.port, h5: i.h5?.port, sid: i.sid, uid: i.userId, user: i.username })))); await new Promise(() => {}) }
 
     // 每实例串行跑题，实例之间并行（所有实例已起，并行度 = 实例数；K 限制的是同时启动数）
     const results = []
@@ -427,7 +577,7 @@ async function main() {
     await Promise.all(instances.map(async inst => {
       for (const s of sentences) for (let r = 1; r <= o.runs; r++) {
         let rec
-        if (needsEditor(s)) rec = { instance: inst.label, ref: inst.build.ref, model: inst.model, sentence: s.id, run: r, status: 'SKIPPED', reason: `hostState=${s.hostState} 需要编辑器，--api-only/当前版本不支持`, pass: null }
+        if (needsEditor(s) && !runsEditor(s)) rec = { instance: inst.label, ref: inst.build.ref, model: inst.model, sentence: s.id, run: r, status: 'SKIPPED', reason: `hostState=${s.hostState} 需要编辑器（--api-only 或该宿主类型暂不支持）`, pass: null }
         else rec = await runOne(inst, s, r, o)
         rec.side = inst.side
         results.push(rec)
@@ -435,7 +585,7 @@ async function main() {
       }
     }))
     const runMs = Date.now() - tRun
-    const meta = { timestamp, before: { ref: o.before, sha: byRef[o.before].sha }, after: { ref: o.after, sha: byRef[o.after].sha }, models: o.models, runs: o.runs, concurrency: o.concurrency, wallMs: Date.now() - T0, setupMs, runMs, apiOnly: true }
+    const meta = { timestamp, before: { ref: o.before, sha: byRef[o.before].sha }, after: { ref: o.after, sha: byRef[o.after].sha }, models: o.models, runs: o.runs, concurrency: o.concurrency, wallMs: Date.now() - T0, setupMs, runMs, apiOnly: o.apiOnly }
     fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ meta, results }, null, 2))
     fs.writeFileSync(path.join(outDir, 'report.md'), buildReport(meta, results, sentences))
     log(`完成：总 ${(meta.wallMs / 1000).toFixed(0)}s（准备 ${(setupMs / 1000).toFixed(0)}s，跑题 ${(runMs / 1000).toFixed(0)}s）。报告 ${path.join(outDir, 'report.md')}`)

@@ -26,12 +26,13 @@ node scripts/eval/model-matrix.mjs \
 | `--runs N` | 每句重复次数（默认 1） |
 | `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题 |
 | `--only id1,id2` | 只跑指定句子 |
-| `--api-only` | 当前即默认行为：需要编辑器的句子标 `SKIPPED` |
+| `--api-only` | 跳过需要编辑器的句子（标 `SKIPPED`），也不构建前端、不启动浏览器 |
+| `--lowa-dir 目录` | LOWA 运行时缓存目录（默认 `~/.cache/awd-matrix/lowa`） |
 | `--run-timeout 秒` | 单句硬上限（默认 300），超时会取消并记 `timeout` |
 | `--keep` | 保留临时目录（worktree、库、后端 home）以便排查 |
 
 需要：JDK 21（自动找 `/usr/libexec/java_home -v 21`，或设 `JAVA_HOME`）、Maven、PostgreSQL 17 二进制
-（`PG_BIN` 或 Homebrew 默认路径）。
+（`PG_BIN` 或 Homebrew 默认路径）、Node 20+/npm（编辑器句子需要）。
 
 ## 隔离方式
 
@@ -47,7 +48,7 @@ node scripts/eval/model-matrix.mjs \
 { "sentences": [{
   "id": "s08-move-to-archive",
   "text": "把合同.docx移到归档文件夹",
-  "hostState": "nofile",            // nofile | docx:<夹具> | xlsx:<夹具> | pptx | attachments（后四类需要编辑器）
+  "hostState": "nofile",            // nofile | docx:<夹具>（xlsx/pptx/attachments 暂不支持，SKIPPED）
   "seed": {
     "folders": ["归档"],
     "files": [{ "name": "合同.docx", "fixture": "contract.docx", "folder": "归档" /* 可选 */ }],
@@ -71,11 +72,20 @@ node scripts/eval/model-matrix.mjs \
 夹具在 `fixtures/`（虚构内容），由 `python3 fixtures/make_fixtures.py` 生成：`contract.docx`（第三条/甲方/违约金/仲裁）、
 `contract-tracked.docx`（含修订）、`contract-draft.docx`、`mention-zhangsan.docx`、`plain-notes.docx`。
 
-## 编辑器句子为什么跳过
+## 编辑器句子（docx 宿主）
 
-`doc_*` 编辑原语经 `client_action` 桥到前端 LOWA 编辑器执行，没有编辑器时这些工具无法落地，所以 `hostState` 为 docx/xlsx/pptx 的句子
-目前一律记 `SKIPPED`（不计入对比）。接入 Playwright 自带 Chromium + 每实例一个 H5 前端是后续工作；
-`core-17.json` 里这类句子已写好期望，接入后即可直接跑。
+`doc_*` 编辑原语经 `client_action` 走**页面自己的 SSE 会话**桥到前端 LOWA 执行，纯 API 客户端接不住，所以 `hostState` 为 `docx:<夹具>`
+的句子由 Playwright 自带 Chromium（headless，不用系统 Chrome）驱动：
+
+1. 每个 ref 额外构建一次 H5（`uni build`，API 地址为占位符）和 zetaoffice 胶水（`build:zetaoffice`），LOWA 运行时与 CJK 字体从
+   `~/.cache/awd-matrix/lowa`（`--lowa-dir` 可改）拷入，缓存缺失时用 `desktop/scripts/fetch-lowa-assets.js` 拉一次并回填。
+2. 每个后端实例一个进程内静态服务：带 COOP/COEP，回放 `.encodings.json` 的 Content-Encoding，并把占位符替换成该实例后端地址。
+   页面只允许访问本机请求，对 9696 一律拦截；`/api/desktop/startup-health` 回 404（纯浏览器没有桌面壳，让本地内容协议回退到普通下载）。
+3. 每次运行：新建项目并上传夹具 → 打开项目页并点开 `合同.docx` → 等编辑器就绪（状态栏出现已保存状态且引擎启动文案消失）→ 在聊天框发送；
+   会话 id 取自页面发出的 `/api/agent/chat` 请求，**结束判据是后端日志 `Agent Loop Finished for <conv>`**，不是静默等待。
+4. Playwright 首次使用时装到 `~/.cache/awd-matrix/pw`（首次约 2–3 分钟，含浏览器下载）。
+
+`--api-only` 跳过这类句子（标 `SKIPPED`）；xlsx/pptx/attachments 宿主暂不支持，也标 `SKIPPED`。
 
 ## 产物
 
