@@ -112,6 +112,24 @@ class FeedbackResolutionSyncServiceTest {
     }
 
     @Test
+    void legacyReceiptWithoutReplyFieldsPreservesExistingPublishedResponse() {
+        UserFeedback row = localRow(9L, UserFeedback.STATUS_EMAILED);
+        row.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");
+        row.setReporterResponse("Keep this published reply");
+        row.setResponsePublishedAt(LocalDateTime.of(2026, 11, 9, 11, 30));
+        row.setResolvedAt(LocalDateTime.of(2026, 11, 9, 11, 20));
+        stubPending(row);
+
+        service((url, body) -> new FeedbackResolutionSyncService.Response(200,
+                "{\"code\":0,\"data\":{\"items\":[{\"clientRef\":\"9\",\"status\":\"EMAILED\"}]}}")).sync();
+
+        assertEquals("Keep this published reply", row.getReporterResponse());
+        assertEquals(LocalDateTime.of(2026, 11, 9, 11, 30), row.getResponsePublishedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 9, 11, 20), row.getResolvedAt());
+        verify(repo).save(row);
+    }
+
+    @Test
     void staleCloudReceiptCannotReopenResolvedAiReport() {
         UserFeedback row = localRow(9L, UserFeedback.STATUS_RESOLVED);
         row.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");

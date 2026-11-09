@@ -520,13 +520,25 @@ class MobileAssistantServiceTest {
         assertThrows(IllegalArgumentException.class,()->service.chat(user,input));
         assertThrows(IllegalArgumentException.class,()->service.chat(user,input));
         verifyNoInteractions(model);assertTrue(turns.findByUserIdAndRequestId(user,input.requestId()).isEmpty());
-        var tickets=feedback.findAll();assertEquals(1,tickets.size());var ticket=tickets.get(0);
+        var tickets=feedback.findAll().stream().filter(row -> user.equals(row.getUserId())).toList();assertEquals(1,tickets.size());var ticket=tickets.get(0);
         assertEquals(user,ticket.getUserId());assertEquals(UserFeedback.STATUS_NEW,ticket.getStatus());
         assertTrue(ticket.getContextJson().contains("ai-content-report"));
         assertTrue(ticket.getContextJson().contains("systemGenerated"));
         assertFalse(ticket.getText().contains("自杀"));assertFalse(ticket.getContextJson().contains("自杀"));
         assertEquals(2,auditRows().size());
         assertTrue(auditRows().stream().allMatch(row -> ticket.getId().equals(row.getTargetId())));
+    }
+
+    @Test void concurrentReviewRetriesCreateOnlyOneTicket() throws Exception {
+        enable();var input=chat("我想自杀");
+        var start=new java.util.concurrent.CountDownLatch(1);var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first=pool.submit(()->{start.await();assertThrows(IllegalArgumentException.class,()->service.chat(user,input));return true;});
+            var second=pool.submit(()->{start.await();assertThrows(IllegalArgumentException.class,()->service.chat(user,input));return true;});
+            start.countDown();assertTrue(first.get(10,java.util.concurrent.TimeUnit.SECONDS));assertTrue(second.get(10,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(1,feedback.findAll().stream().filter(row -> user.equals(row.getUserId())).count());
+            assertTrue(turns.findByUserIdAndRequestId(user,input.requestId()).isEmpty());verifyNoInteractions(model);
+        } finally {pool.shutdownNow();}
     }
 
 }
