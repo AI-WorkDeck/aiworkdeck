@@ -2842,6 +2842,7 @@ public class AgentOrchestrator {
             
             String content = aiMessage.text();
             if (content == null) content = "";
+            content = XmlToolCallParser.normalizeLeakedClosers(content);
 
             // 2. Check for XML Tool Requests (Fallback for Root Bubble Protocol)
             // Pattern: <tool_code>legal_tools.method(args)</tool_code> OR <code>...</code>

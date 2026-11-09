@@ -122,7 +122,7 @@ async function judge(sentence, rec, ctx) {
     } catch (err) { r.outcome = false; r.outcomeError = String(err.message || err).slice(0, 200) }
   }
   const checks = Object.entries(r).filter(([k]) => ['firstTool', 'mustUse', 'mustNotUse', 'finalText', 'outcome'].includes(k))
-  r.pass = rec.status === 'finished' && checks.every(([, v]) => v === true)
+  r.pass = (rec.status === 'finished' || rec.status === 'awaiting_input') && checks.every(([, v]) => v === true)
   return r
 }
 
@@ -357,10 +357,15 @@ class Instance {
       for (let i = 0; i < 100 && !rec.conversationId; i++) await sleep(100)
       if (!rec.conversationId) throw new Error('页面没有发出 /api/agent/chat 请求')
       const needle = `Agent Loop Finished for ${rec.conversationId}`
+      // ask_user 停机（等用户回答）不会打印 "Agent Loop Finished"，只有 "Detected <question> for"；
+      // 只认前者会把每次合法的反问记成 300 秒 timeout
+      const askNeedle = `Detected <question> for ${rec.conversationId}`
       for (;;) {
         const fd = fs.openSync(this.logFile, 'r'); const size = fs.fstatSync(fd).size
         const buf = Buffer.alloc(size - rec.logOffset); fs.readSync(fd, buf, 0, buf.length, rec.logOffset); fs.closeSync(fd)
-        if (buf.toString('utf8').includes(needle)) { rec.status = 'finished'; break }
+        const logText = buf.toString('utf8')
+        if (logText.includes(needle)) { rec.status = 'finished'; break }
+        if (logText.includes(askNeedle)) { rec.status = 'awaiting_input'; break }
         if (Date.now() - t1 > timeoutSec * 1000) { rec.status = 'timeout'; await this.http('POST', `/api/agent/cancel/${rec.conversationId}`); break }
         await sleep(500)
       }
