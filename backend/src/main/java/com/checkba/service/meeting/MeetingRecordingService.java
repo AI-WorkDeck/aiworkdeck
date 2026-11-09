@@ -372,12 +372,12 @@ public class MeetingRecordingService {
         }
         if (en) {
             sb.append("\nFirst call the meeting_get_transcript tool (meetingId=").append(meeting.getId())
-                    .append(") to read the full transcript and summary material, then produce the "
+                    .append(", source=recording) to read the full transcript and summary material, then produce the "
                             + "meeting minutes docx as the skill specifies.");
             return sb.toString();
         }
         sb.append("\n请先调用 meeting_get_transcript 工具（meetingId=").append(meeting.getId())
-                .append("）读取完整转写稿与摘要素材，再按 skill 约定生成会议纪要 docx。");
+                .append("，source=recording）读取完整转写稿与摘要素材，再按 skill 约定生成会议纪要 docx。");
         return sb.toString();
     }
 
@@ -403,7 +403,7 @@ public class MeetingRecordingService {
             if (!time.isEmpty()) sb.append("Recorded at: ").append(time).append('\n');
             if (!speakers.isEmpty()) sb.append("Speakers (from speaker separation): ").append(speakers).append('\n');
             sb.append("\nFirst call the meeting_get_transcript tool (meetingId=").append(meeting.getId())
-                    .append(") to read the full transcript, then follow the skill's interview record format: "
+                    .append(", source=recording) to read the full transcript, then follow the skill's interview record format: "
                             + "title, time, place (only if stated), interviewee / interviewer (use the speaker names above), "
                             + "then the body as alternating \"Q: ... A: ...\" paragraphs, faithful to the original words - "
                             + "remove only filler words and repetition, do not summarize or add conclusions. "
@@ -417,7 +417,7 @@ public class MeetingRecordingService {
         if (!time.isEmpty()) sb.append("录音时间：").append(time).append('\n');
         if (!speakers.isEmpty()) sb.append("说话人（说话人分离结果）：").append(speakers).append('\n');
         sb.append("\n请先调用 meeting_get_transcript 工具（meetingId=").append(meeting.getId())
-                .append("）读取完整转写稿，再按 skill 约定的访谈笔录格式整理：标题、时间、地点（转写稿提到才写）、"
+                .append("，source=recording）读取完整转写稿，再按 skill 约定的访谈笔录格式整理：标题、时间、地点（转写稿提到才写）、"
                         + "被访谈人 / 访谈人（取上面的说话人名），正文按「问：…… 答：……」逐段整理，忠于原话，"
                         + "只去掉口头语和重复，不概括、不加结论；末尾写「以上笔录经被访谈人核对无误」并留签字栏。"
                         + "用 write_docx 保存为「")

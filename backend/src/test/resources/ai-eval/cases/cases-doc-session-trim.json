@@ -50,7 +50,7 @@
         "qichacha_query",
         "plugin_dev_scaffold",
         "capability_install",
-        "meeting_list_recordings",
+        "meeting_list",
         "run_python"
       ],
       "structureContains": [
@@ -109,7 +109,7 @@
         "qichacha_query",
         "plugin_dev_scaffold",
         "capability_install",
-        "meeting_list_recordings",
+        "meeting_list",
         "run_python"
       ],
       "structureContains": [

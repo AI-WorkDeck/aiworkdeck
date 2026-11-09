@@ -35,14 +35,20 @@ public class TencentMeetingTools implements AgentToolComponent {
     private final TencentMeetingService tencentMeetingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @ToolMeta(displayName = "列出腾讯会议", category = "meeting")
-    @Tool("List synchronized Tencent Meeting records of the current project or workspace. "
-            + "Returns recordId, subject, startTime, duration and status. "
-            + "Call this when the user asks about Tencent meetings or wants to find a meeting to summarize.")
+    /** 旧名 tmeet_list_meetings：并入 meeting_list（V5），保留一版兼容壳，始终读内置同步表。 */
+    @ToolShim(replacedBy = "meeting_list")
+    @ToolMeta(displayName = "列出腾讯会议", category = "meeting", offerToModel = false, access = ToolMeta.Access.READ)
+    @Tool("列出已同步的腾讯会议记录。")
     public String tmeet_list_meetings(
             @P("Project id (injected by runtime)") Long projectId,
-            @P(value = "Optional keyword to filter meetings by subject", required = false) String keyword) {
-        log.info("Tool: tmeet_list_meetings projectId={} keyword={}", projectId, keyword);
+            @P(value = "按会议主题过滤的关键词", required = false) String keyword) {
+        return ToolShims.hint(listSynced(projectId, keyword, null, null), "meeting_list",
+                "meeting_list(source=tencent, keyword)");
+    }
+
+    /** 内置同步表的会议列表（meeting_list 在插件未装/未启用时走这里）；from/to 含端点，按开会日期过滤。 */
+    public String listSynced(Long projectId, String keyword, java.time.LocalDate from, java.time.LocalDate to) {
+        log.info("Tool: meeting_list(tencent builtin) projectId={} keyword={}", projectId, keyword);
 
         List<TencentMeetingRecord> list;
         if (projectId != null) {
@@ -66,6 +72,12 @@ public class TencentMeetingTools implements AgentToolComponent {
             }
         }
 
+        if (list != null && (from != null || to != null)) {
+            list = list.stream().filter(m -> m.getStartTime() == null
+                    || ((from == null || !m.getStartTime().toLocalDate().isBefore(from))
+                    && (to == null || !m.getStartTime().toLocalDate().isAfter(to)))).toList();
+        }
+
         if (list == null || list.isEmpty()) {
             return LangText.of(
                     "暂无已同步的腾讯会议记录。用户可在左栏「腾讯会议」插件面板中扫码并点击同步。",
@@ -75,7 +87,7 @@ public class TencentMeetingTools implements AgentToolComponent {
         StringBuilder sb = new StringBuilder(LangText.of(
                 "腾讯会议列表：\n", "Tencent meeting list:\n"));
         for (TencentMeetingRecord m : list) {
-            sb.append("- recordId=").append(m.getId())
+            sb.append("- source=tencent | meetingId=").append(m.getId())
                     .append(" | 会议：").append(m.getSubject());
             if (m.getMeetingCode() != null && !m.getMeetingCode().isBlank()) {
                 sb.append("（会议号：").append(m.getMeetingCode()).append("）");
@@ -92,13 +104,20 @@ public class TencentMeetingTools implements AgentToolComponent {
         return sb.toString();
     }
 
-    @ToolMeta(displayName = "读取腾讯会议转写稿", category = "meeting")
-    @Tool("Read the full transcript (diarized with timestamps and speakers) and smart minutes of a Tencent Meeting by recordId. "
-            + "Use this to prepare meeting minutes or extract todo items.")
+    /** 旧名 tmeet_get_transcript：并入 meeting_get_transcript（V5），保留一版兼容壳，始终读内置同步表。 */
+    @ToolShim(replacedBy = "meeting_get_transcript")
+    @ToolMeta(displayName = "读取腾讯会议转写稿", category = "meeting", offerToModel = false, access = ToolMeta.Access.READ)
+    @Tool("读取一条已同步腾讯会议的逐字稿与智能纪要。")
     public String tmeet_get_transcript(
             @P("Project id (injected by runtime)") Long projectId,
             @P("Tencent meeting record id") Long recordId) {
-        log.info("Tool: tmeet_get_transcript projectId={} recordId={}", projectId, recordId);
+        return ToolShims.hint(transcript(projectId, recordId), "meeting_get_transcript",
+                "meeting_get_transcript(meetingId, source=tencent)");
+    }
+
+    /** 内置同步表的逐字稿（meeting_get_transcript 在插件未装/未启用，或 meetingId 是内置数字 id 时走这里）。 */
+    public String transcript(Long projectId, Long recordId) {
+        log.info("Tool: meeting_get_transcript(tencent builtin) projectId={} recordId={}", projectId, recordId);
 
         Optional<TencentMeetingRecord> opt = recordRepository.findById(recordId);
         if (opt.isEmpty()) {

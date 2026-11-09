@@ -46,7 +46,7 @@ class MeetingToolsLanguageTest {
         MeetingRecordingService service = new MeetingRecordingService(
                 meetingRepository, mock(ProjectFileRepository.class),
                 mock(ProjectFileService.class), mock(StorageServiceFactory.class));
-        tools = new MeetingTools(service);
+        tools = new MeetingTools(service, null, null);
     }
 
     @AfterEach
@@ -77,7 +77,7 @@ class MeetingToolsLanguageTest {
     void transcriptToolScaffoldingIsEnglish() {
         transcribed();
         switchToEnglish();
-        String out = tools.meeting_get_transcript(1L, 9L);
+        String out = tools.meeting_get_transcript(1L, "9", "recording");
         assertTrue(out.startsWith("Meeting: 尽调访谈"), "标题是用户数据，不翻：" + out);
         assertTrue(out.contains("=== Transcript ([time] speaker: text) ==="), out);
         assertTrue(out.contains("Speaker 1: 我方认为价款应分期支付"), "转写内容原样：" + out);
@@ -92,13 +92,13 @@ class MeetingToolsLanguageTest {
         m.setStatus(MeetingRecording.STATUS_RECORDED);
         switchToEnglish();
 
-        String notReady = tools.meeting_get_transcript(1L, 9L);
+        String notReady = tools.meeting_get_transcript(1L, "9", "recording");
         assertTrue(notReady.contains("recorded (not transcribed)"), notReady);
         assertTrue(notReady.contains("Meeting Recording panel"), notReady);
         assertFalse(notReady.contains("请用户"), notReady);
 
         when(meetingRepository.findByProjectIdOrderByCreatedAtDesc(2L)).thenReturn(List.of());
-        String empty = tools.meeting_list_recordings(2L);
+        String empty = tools.meeting_list(2L, "recording", null, null, null);
         assertTrue(empty.startsWith("This project has no meeting recordings yet"), empty);
     }
 
@@ -106,7 +106,7 @@ class MeetingToolsLanguageTest {
     @DisplayName("中文（默认/未登记语言）下这些串逐字不变")
     void chineseUnchanged() {
         transcribed();
-        String out = tools.meeting_get_transcript(1L, 9L);
+        String out = tools.meeting_get_transcript(1L, "9", "recording");
         assertTrue(out.startsWith("会议：尽调访谈"), out);
         assertTrue(out.contains("=== 转写稿（[时间] 说话人：内容）==="), out);
         assertTrue(out.contains("说话人1：我方认为价款应分期支付"), out);

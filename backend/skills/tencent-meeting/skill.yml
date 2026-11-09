@@ -1,7 +1,7 @@
 # 腾讯会议插件 Skill（打包规范见 docs/SKILL_SPEC.md）
 #
 # 接入腾讯会议官方 CLI（tmeet），支持扫码登录与多频次自动/手动同步。
-# 命中本 skill 后，AI 可直接调用 tmeet_get_transcript 读取会议逐字稿与智能纪要，
+# 命中本 skill 后，AI 可直接调用 meeting_get_transcript(source=tencent) 读取会议逐字稿与智能纪要，
 # 并调用 task_create 将行动项落入系统项目日程，或生成结构化会议纪要文档。
 id: tencent-meeting
 name: 腾讯会议
@@ -49,9 +49,9 @@ tool_policy: restrict
 
 allowed_tools:
   # 腾讯会议专用工具
-  - tmeet_list_meetings
-  - tmeet_get_transcript
-  # 腾讯会议插件已安装并启用时以插件工具为准（此时 tmeet_* 不下发给模型）
+  - meeting_list
+  - meeting_get_transcript
+  # 插件专有动作（登录/同步/导出归档/自动同步）；列会议与取逐字稿一律走上面两个
   - tencent_meeting_action
   # 日程与任务（落入系统项目日程管理）
   - task_create

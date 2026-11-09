@@ -52,6 +52,9 @@ class ToolShimContractTest {
             "law_search_keyword", "text_write_file", "move_files_batch", "move_project_file",
             "list_project_folders", "search_across_projects", "capability_apply");
 
+    /** V5 会议合流留下的 3 个旧名壳（0.83 删除）。 */
+    static final Set<String> V5_SHIMS = Set.of("meeting_list_recordings", "tmeet_list_meetings", "tmeet_get_transcript");
+
     private record Shim(String name, ToolShim shim, ToolMeta meta) {
     }
 
@@ -73,7 +76,9 @@ class ToolShimContractTest {
     @DisplayName("兼容壳逐名钉住；每个壳都是只登记不下发，且指向的新工具已注册并下发")
     void shimsArePinnedHiddenAndPointAtOfferedTools() {
         Map<String, Shim> shims = declaredShims();
-        assertEquals(new TreeSet<>(V4_SHIMS), shims.keySet());
+        Set<String> expected = new TreeSet<>(V4_SHIMS);
+        expected.addAll(V5_SHIMS);
+        assertEquals(expected, shims.keySet());
 
         ToolRegistry registry = new RecordingToolRegistry(RealToolBeans.instantiateAll(), new PluginService());
         ((RecordingToolRegistry) registry).init();
