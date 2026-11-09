@@ -4,7 +4,9 @@ package com.checkba.controller;
 
 import com.checkba.exception.UnauthorizedException;
 import com.checkba.service.LangText;
+import com.checkba.service.UserActivityLogService;
 import com.checkba.service.mobile.MobileAssistantService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
@@ -44,8 +46,11 @@ public class MobileAssistantController {
         return ok(includeRemoved ? service.cleanupCandidates(user(session)) : service.search(user(session),query));
     }
     @PostMapping("/chat")
-    public Map<String,Object> chat(@RequestHeader(value="X-Session-Id",required=false) String session,@RequestBody MobileAssistantService.ChatInput request) {
-        return ok(service.chat(user(session),request));
+    public Map<String,Object> chat(@RequestHeader(value="X-Session-Id",required=false) String session,
+            @RequestHeader(value="User-Agent",required=false) String userAgent,
+            @RequestBody MobileAssistantService.ChatInput request, HttpServletRequest http) {
+        var metadata=new UserActivityLogService.RequestMetadata(http.getRemoteAddr(),http.getRemotePort(),userAgent);
+        return ok(service.chat(user(session),request,metadata));
     }
     @GetMapping("/requests/{id}")
     public Map<String,Object> requestStatus(@RequestHeader(value="X-Session-Id",required=false) String session,@PathVariable String id) {

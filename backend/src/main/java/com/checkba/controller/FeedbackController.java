@@ -4,12 +4,14 @@
 package com.checkba.controller;
 
 import com.checkba.model.entity.FeedbackAttachment;
+import com.checkba.model.entity.FeedbackHandlingEvent;
 import com.checkba.model.entity.User;
 import com.checkba.model.entity.UserFeedback;
 import com.checkba.repository.UserFeedbackRepository;
 import com.checkba.repository.UserRepository;
 import com.checkba.service.AdminAccessService;
 import com.checkba.service.LangText;
+import com.checkba.service.feedback.FeedbackAiReportService;
 import com.checkba.service.feedback.FeedbackService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +48,7 @@ public class FeedbackController {
     private final UserFeedbackRepository feedbackRepository;
     private final UserRepository userRepository;
     private final AdminAccessService adminAccessService;
+    private final FeedbackAiReportService aiReportService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @org.springframework.beans.factory.annotation.Value("${feedback.optimizer-token:}")
@@ -106,6 +109,39 @@ public class FeedbackController {
         return ResponseEntity.ok(success(Map.of("items", items)));
     }
 
+    @PostMapping("/{id}/ai-report-resolution")
+    public ResponseEntity<?> resolveAiReport(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @PathVariable Long id,
+            @RequestBody(required = false) FeedbackAiReportService.AiReportResolutionCommand command) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
+        }
+        User admin = userRepository.findById(userId).filter(adminAccessService::isAdmin).orElse(null);
+        if (admin == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("需要管理员权限", "Admin access required")));
+        }
+        try {
+            UserFeedback saved = aiReportService.record(id, admin, command);
+            return ResponseEntity.ok(success(Map.of(
+                    "id", saved.getId(), "status", saved.getStatus(), "version", saved.getVersion())));
+        } catch (FeedbackAiReportService.NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(LangText.of("反馈不存在", "Feedback not found")));
+        } catch (FeedbackAiReportService.ConflictException
+                 | org.springframework.dao.OptimisticLockingFailureException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error(e.getMessage() == null
+                    ? LangText.of("记录已被其他人更新，请重新加载后再提交", "The record changed. Reload it before submitting again")
+                    : e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("AI 内容举报人工处置失败 feedbackId={}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error(LangText.of(
+                    "保存处置记录失败，请稍后重试", "Could not save the handling record. Please try again")));
+        }
+    }
+
     @GetMapping
     public ResponseEntity<?> list(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
@@ -148,7 +184,25 @@ public class FeedbackController {
                     "sizeBytes", a.getSizeBytes()));
         }
         data.put("attachments", atts);
+        if (FeedbackAiReportService.isAiContentReport(fb)) {
+            List<Map<String, Object>> events = new ArrayList<>();
+            for (FeedbackHandlingEvent event : aiReportService.history(id)) events.add(eventView(event));
+            data.put("handlingEvents", events);
+        }
         return ResponseEntity.ok(success(data));
+    }
+
+    private Map<String, Object> eventView(FeedbackHandlingEvent event) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", event.getId());
+        m.put("eventType", event.getEventType());
+        m.put("conclusion", event.getConclusion());
+        m.put("actionTaken", event.getActionTaken());
+        m.put("handlerName", event.getHandlerName());
+        m.put("occurredAt", event.getOccurredAt() == null ? null : event.getOccurredAt().toString());
+        m.put("evidenceRef", event.getEvidenceRef());
+        m.put("reporterResponse", event.getReporterResponse());
+        return m;
     }
 
     @GetMapping("/{id}/attachment/{attachmentId}")
@@ -199,14 +253,21 @@ public class FeedbackController {
         m.put("attempts", fb.getAttempts());
         m.put("createdAt", fb.getCreatedAt() == null ? null : fb.getCreatedAt().toString());
         m.put("handledAt", fb.getHandledAt() == null ? null : fb.getHandledAt().toString());
+        m.put("resolvedAt", fb.getResolvedAt() == null ? null : fb.getResolvedAt().toString());
+        m.put("resolvedBy", fb.getResolvedBy());
+        m.put("reporterResponse", fb.getReporterResponse());
+        m.put("responsePublishedAt", fb.getResponsePublishedAt() == null ? null : fb.getResponsePublishedAt().toString());
+        m.put("version", fb.getVersion());
+        m.put("aiContentReport", FeedbackAiReportService.isAiContentReport(fb));
         return m;
     }
 
-    /** {@link #brief} 去掉 lastError 这种内部字段，加上 uploaded——
-     * 用户视角要能分清「待发送」（还没传到云端）与「已送达」（云端已收到，排队处理中）。 */
+    /** 用户只能看到发布给自己的答复，不能看到内部结论、措施、证据或处理人。 */
     private Map<String, Object> mineBrief(UserFeedback fb) {
         Map<String, Object> m = brief(fb);
         m.remove("lastError");
+        m.remove("resolvedBy");
+        m.remove("version");
         m.put("uploaded", fb.isUploaded());
         return m;
     }

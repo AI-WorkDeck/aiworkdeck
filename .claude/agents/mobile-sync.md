@@ -601,6 +601,14 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 
 `MobileAssistantTranscript.from` 是云端项目复制与电脑转存的共用文本出口：每条已完成assistant回答前增加LangText可见AI说明，用户问题不标，保留来源段与时间且不改原始turn。旧快照不回填；文本前缀不是文件标准隐式元数据。测试 `MobileAssistantTranscriptTest` 与 `MobileAssistantServiceTest`；其他客户端复制/导出另验。
 
+## 个人助理内容安全与审计（dev-board#1717）
+
+`MobileAssistantContentSafetyService` 在 `MobileAssistantService.chat()` 中对输入和最终输出分别执行本地规则检查，不向另一家审核服务发送正文。BLOCK 输入在建 turn 和调用模型前停止；BLOCK/REVIEW 输出不保存或展示；REVIEW 通过既有 `user_feedback` 的 `ai-content-report` 队列生成幂等人工复核单，正文不自动附入复核单。
+
+审核事件复用 `UserActivityLog`（`actionType=mobile_assistant_content`），保留账户、时间、会话/请求 ID、阶段、SHA-256、类别、规则版本、决定及复核单 ID；`UserActivityLogService.RequestMetadata` 另保存经可信反代还原的来源 IP/端口和 User-Agent。不得在 metaInfo 写完整输入、输出或来源文件内容。该表由既有每日任务清理 180 天前记录；安全审计留存与账户业务内容删除是不同边界。
+
+`MobileAssistantController` 必须从 `HttpServletRequest` 和 User-Agent 构造 RequestMetadata；客户端不得自报来源 IP。回归：`MobileAssistantServiceTest`、`UserActivityLogServiceTest` 与举报结案域测试。规则初筛不等于全量风险识别或生产人工值守证明。
+
 ### #1703 云按量能力与清理后的备份暂停
 
 原subscriptionActive继续表示真实订阅；客户端功能准入读cloudAccess而非订阅。mobile-v1.yaml含cloud-state/postpaid-accept/resume-cloud、quote报价hash及content expectedHash。所有新增云写带当前epoch；桌面relay会话捕获同一次epoch，旧会话不能跨generation重新发布。

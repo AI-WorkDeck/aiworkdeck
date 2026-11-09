@@ -19,10 +19,11 @@ description: 用户反馈闭环领域。任务涉及右下角反馈浮窗、反�
 - `frontend/src/App.vue` `onLaunch` — 挂载点；`frontend/src/services/api.js` — `submitFeedback` 等
 
 **存储与接口（后端 `com.checkba`）**
-- `model/entity/UserFeedback` / `FeedbackAttachment`，`repository/UserFeedbackRepository` 等
+- `model/entity/UserFeedback` / `FeedbackAttachment` / `FeedbackHandlingEvent`，`repository/UserFeedbackRepository` /
+  `FeedbackHandlingEventRepository` 等；处置事件 append-only，JPA 拒绝更新和删除
 - `service/feedback/FeedbackService` — 一次 multipart 落库 + 落盘；`FeedbackContextCollector` — 版本/环境/日志尾巴；
-  `VoiceTranscriptionService` — 可选 OpenAI 兼容转写
-- `controller/FeedbackController` — `/api/feedback`（提交任何用户；查看要管理员）
+  `VoiceTranscriptionService` — 可选 OpenAI 兼容转写；`FeedbackAiReportService` — AI 举报人工进展/结案、版本校验与历史
+- `controller/FeedbackController` — `/api/feedback`（提交登录用户；查看要管理员；`/{id}/ai-report-resolution` 仅管理员会话写 AI 举报）
 
 **云端收件箱（收各安装上传的反馈）**
 - `controller/FeedbackIngestController` — `/api/feedback/ingest`（公开+配额）、
@@ -67,13 +68,16 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
   官网实例 env 需配 `AWD_FEEDBACK_INBOX_TOKEN`（= 收件箱 FEEDBACK_OPTIMIZER_TOKEN）。
   为此 `GET /api/feedback` 列表/详情也认 X-Optimizer-Token（只读，密钥本就能取
   全部待办与附件，未升格信任级；没配密钥恒拒绝）。
+- AI 举报详情有人工处置历史、进展与结案表单；写入只认管理员会话，新增文案按浏览器语言提供中英切换。
+  提交有等待/失败状态、版本冲突提示与重复点击防护；结案后表单只读。
 - 页面安全约定：用户可控文本一律 textContent 渲染；附件用 fetch + `X-Session-Id`
   头取 blob 再喂给 `<img>`/`<audio>`，凭据不进 URL（URL 里的 token 会落 nginx access log）。
   登录支持 4005 二次验证（totp/sms/mail）。会话键与 h5 同名 `checkba_session_id`。
 
 ## 不变式（改之前先读）
 
-1. **反馈行只改状态，永不删除**，附件同理。用户报过的问题永远留痕。
+1. **反馈行与处置历史永不删除**，附件同理。用户报过的问题永远留痕；人工处置只能追加事件，
+   当前结案摘要可写 `UserFeedback`，不能覆盖历史。
 2. **优化者永不合并**：只出现 `gh pr create`，没有任何 merge 路径；
    工作分支名必须以前缀开头且不等于 baseBranch，否则在发命令之前就失败。
 3. **受保护路径（`.github/`、`deploy/`、`desktop/scripts/`、`.git/`）被改就不开 PR**——
@@ -122,7 +126,8 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 
 ## 验证
 
-- `cd backend && mvn test`（JDK 21）：五个 *Test 覆盖落库、分诊规则、安全护栏、分流、邮件
+- `cd backend && mvn test`（JDK 21）：反馈 *Test 覆盖落库、分诊规则、安全护栏、分流、邮件、人工处置授权与历史
+- 人工处置定向回归：`mvn -Dtest=FeedbackAiReportServiceTest,FeedbackAiReportAuthorizationTest,FeedbackHandlingEventTest,FeedbackHandlingEventRepositoryTest,FeedbackControllerMineTest,FeedbackIngestStatusTest,FeedbackResolutionAuthorizationTest,FeedbackResolutionSyncServiceTest,LocalFeedbackSourceTest,FeedbackConsoleAiReportTest test`（JDK 21）
 - `cd frontend && npm run test:feedback-widget`：入口契约（浮钮不许回来、面板落点、三处入口）
 - `cd frontend && npm run test:feedback-e2e`：dev Electron + CDP 真截图真录音真提交真回读
   （入口选择器是 rail 上的 `[title="报告问题 / 提建议"]`，不再是 `.awdfb-launcher`）
@@ -136,4 +141,5 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 
 - `FeedbackService` 识别 `clientContext.type=ai-content-report`，仅保留 type/platform/conversationId，不采集诊断。conversationId是未验证的用户线索，不代表归属或访问授权。
 - `OptimizerAgentService` 在模型分诊之前直接转人工通知，跳过模型、代码修复与NOISE自动跳过；演练不发通知，失败保持原重试。EMAILED/handledAt仅证明通知环节，不代表投诉结案。
-- 既有控制台只读，resolution仅优化者密钥可写，无专用人工回复/结案UI。具体操作、证据和残余范围见 `docs/operations/mobile-ai-content-reports.md`；测试 `OptimizerAgentServiceTest` 的 aiReport/aiContentReport 用例。
+- `FeedbackAiReportService` + `FeedbackHandlingEvent` 提供 append-only 人工进展/结案历史；`RESOLVED` 必须有人工结论和实际措施，答复可为空。处理人/时间由服务端生成，`UserFeedback.version` 防并发覆盖；优化者密钥不能结案或改写已结案 AI 举报。
+- 既有控制台显示历史与进展/结案表单。非空答复发布到同一反馈记录，经 `/mine` 仅对举报人本人可见；这只是记录内发布，不是推送、送达或已读证明。云端答复由既有回执同步回本机。操作边界见 `docs/operations/mobile-ai-content-reports.md`。

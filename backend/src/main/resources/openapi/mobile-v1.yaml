@@ -748,6 +748,39 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MobileAssistantSource"
+    FeedbackMineItem:
+      type: object
+      required: [id, kind, status, uploaded, aiContentReport]
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64, nullable: true }
+        username: { type: string }
+        projectId: { type: integer, format: int64, nullable: true }
+        kind: { type: string, enum: [BUG, IDEA] }
+        text: { type: string, nullable: true }
+        voiceTranscript: { type: string, nullable: true }
+        page: { type: string, nullable: true }
+        appVersion: { type: string, nullable: true }
+        platform: { type: string, nullable: true }
+        status: { type: string, enum: [NEW, PR_OPENED, EMAILED, SKIPPED, FAILED, RESOLVED] }
+        triageVerdict: { type: string, nullable: true }
+        prUrl: { type: string, nullable: true }
+        attempts: { type: integer }
+        createdAt: { type: string, nullable: true }
+        handledAt: { type: string, nullable: true }
+        resolvedAt: { type: string, nullable: true }
+        reporterResponse: { type: string, nullable: true, description: 已发布给举报人的答复；不表示推送、送达或已读 }
+        responsePublishedAt: { type: string, nullable: true }
+        aiContentReport: { type: boolean }
+        uploaded: { type: boolean }
+    FeedbackMine:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackMineItem"
     MobileAssistantChatInput:
       type: object
       required:
@@ -1305,6 +1338,30 @@ paths:
                         properties:
                           registered: *a2
                   - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/feedback/mine:
+    get:
+      summary: 当前账户自己的反馈状态与已发布人工答复；不包含内部处置记录
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: 当前账户反馈；未登录返回统一错误信封
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required: [code, data]
+                    properties:
+                      code: { type: integer, enum: [0] }
+                      message: { type: string }
+                      data: { $ref: "#/components/schemas/FeedbackMine" }
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+        "401":
+          description: 未提供有效会话
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MobileWorkspaceError" }
   /api/mobile/assistant/status:
     get:
       summary: 云端个人助理权益、授权、摘要数量与开通原因

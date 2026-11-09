@@ -33,17 +33,16 @@ import java.util.Map;
  * 把云端收件箱里的处理结果拉回本机这一行反馈。
  *
  * <p>为什么要有这个：{@link FeedbackUploadService} 只管把本机反馈送到云端，没有回读——
- * 优化者在维护者机器上处理完，结论只写进云端收件箱那一行，本机这一行的 status 永远停在
- * NEW，用户提交完在自己的浮窗里看不到任何进展。这个服务定时把
- * (status / triageVerdict / prUrl / handledAt) 拉回来，写在本机同一行上：
- * 不新增字段、不新增表，本机这行的字段本来就够表达这些状态。
+ * 优化者或人工处理人在云端处理完，结果只写进云端收件箱那一行，本机这一行的 status 永远停在
+ * NEW，用户提交完在自己的浮窗里看不到任何进展。这个服务定时把状态、既有出口及
+ * 已发布给举报人的答复拉回来，写在本机同一行上；内部处置历史不会经此接口下发。
  *
  * <p>节奏与 {@link FeedbackUploadService} 的补传对齐（30 分钟一轮 + 启动后跑一次）。
  * 地址复用 {@code feedback.upload.url}（同一个云端）拼上 {@code /status}，落在
  * {@link com.checkba.controller.FeedbackIngestController#ingestStatus} 这个新增端点上——
  * 不新增一个容易配歪的地址项。
  *
- * <p>红线：只改状态、绝不删行；拉不到（网络失败/云端还没处理这条）就静默保持原样，
+ * <p>红线：只改当前反馈摘要、绝不删行或处置历史；拉不到（网络失败/云端还没处理这条）就静默保持原样，
  * 绝不影响用户提交这条主链路。
  */
 @Slf4j
@@ -134,7 +133,7 @@ public class FeedbackResolutionSyncService {
         try {
             List<UserFeedback> pending = feedbackRepository.findByUploadedTrueAndSourceAndStatusInOrderByIdAsc(
                     UserFeedback.SOURCE_LOCAL,
-                    List.of(UserFeedback.STATUS_NEW, UserFeedback.STATUS_FAILED),
+                    List.of(UserFeedback.STATUS_NEW, UserFeedback.STATUS_FAILED, UserFeedback.STATUS_EMAILED),
                     PageRequest.of(0, BATCH));
             if (pending.isEmpty()) return;
             Map<String, JsonNode> byRef = fetch(pending);
@@ -175,17 +174,19 @@ public class FeedbackResolutionSyncService {
             String status = text(item, "status");
             if (status == null || status.isBlank()) continue; // 拿不到有效状态就不动本地这行
 
+            if (UserFeedback.STATUS_RESOLVED.equals(fb.getStatus())
+                    && FeedbackAiReportService.isAiContentReport(fb)
+                    && !UserFeedback.STATUS_RESOLVED.equals(status)) {
+                continue;
+            }
             fb.setStatus(status);
             fb.setTriageVerdict(text(item, "triageVerdict"));
             fb.setPrUrl(text(item, "prUrl"));
+            fb.setResolvedAt(parseTime(text(item, "resolvedAt")));
+            fb.setReporterResponse(text(item, "reporterResponse"));
+            fb.setResponsePublishedAt(parseTime(text(item, "responsePublishedAt")));
             String handledAt = text(item, "handledAt");
-            if (handledAt != null && !handledAt.isBlank()) {
-                try {
-                    fb.setHandledAt(LocalDateTime.parse(handledAt));
-                } catch (Exception ignored) {
-                    // 时间解析失败不影响状态回写，缺一个时间戳而已
-                }
-            }
+            if (handledAt != null && !handledAt.isBlank()) fb.setHandledAt(parseTime(handledAt));
             feedbackRepository.save(fb);
         }
     }
@@ -193,5 +194,14 @@ public class FeedbackResolutionSyncService {
     private static String text(JsonNode n, String field) {
         JsonNode v = n.get(field);
         return v == null || v.isNull() ? null : v.asText();
+    }
+
+    private static LocalDateTime parseTime(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return LocalDateTime.parse(value);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

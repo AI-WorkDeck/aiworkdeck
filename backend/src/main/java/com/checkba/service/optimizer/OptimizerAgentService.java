@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p><b>不变式：</b>
  * <ol>
- *   <li>反馈行只改状态，永不删除；每条的分诊结论与去向都回写同一行。</li>
+ *   <li>反馈行与人工处置历史永不删除；每条的分诊结论与去向都回写同一反馈行。</li>
  *   <li>一条反馈最多重试 {@code maxAttempts} 轮，之后停在 FAILED 等人；不会无限烧 token。</li>
  *   <li>两条出口都走不通时记 FAILED 并写明原因，**绝不悄悄标成已处理**。</li>
  *   <li>同时只允许一轮在跑。</li>
