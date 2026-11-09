@@ -109,6 +109,7 @@ class ToolDeclarationContractTest {
             "litigation_timeline_step",
             "pptx_generate_outline",
             "pptx_refine_outline",
+            "pptx_outline",
             "pptx_get_project_pages",
             "pptx_check_service",
             "pptx_export_editable",
@@ -145,11 +146,12 @@ class ToolDeclarationContractTest {
      * 只登记、不下发规格的工具（offerToModel = false）。
      *
      * <p>tool-system-v2 V3 已删除全部 22 个长期隐藏工具（delete_file、read_document、
-     * search_knowledge_base、pptx_open_file 等），此名单现为空：任何新增的 offerToModel = false
+     * search_knowledge_base、pptx_open_file 等）；V4 起名单只剩合并留下的兼容壳
+     * （{@link ToolShimContractTest#V4_SHIMS}，0.83 删），任何新增的 offerToModel = false
      * 都要回来改这份清单并说明理由。已删除的名字由 {@code permanentlyHiddenToolsAreStillRegistered}
      * 旁的 {@code deletedHiddenToolsAreGone} 钉住「不再注册」。
      */
-    private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>();
+    private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>(ToolShimContractTest.V4_SHIMS);
 
     /** V3 删除的 22 个长期隐藏工具（docs/plans/tool-system-v2-inventory.csv 里 verdict=deprecate 的行）。 */
     private static final Set<String> DELETED_IN_V3 = new TreeSet<>(Set.of(
@@ -346,7 +348,7 @@ class ToolDeclarationContractTest {
         List<String> offered = registry.getAllSpecifications().stream()
                 .map(ToolSpecification::name).toList();
         List<String> missing = new ArrayList<>();
-        for (String name : new String[]{"write_docx", "create_folder", "move_files_batch", "move_to_trash",
+        for (String name : new String[]{"write_docx", "create_folder", "move_files", "move_to_trash",
                 "extract_file_text", "read_file", "search_project_content", "copy_files", "write_file", "search_web", "todo_write", "dispatch_subtask",
                 "doc_find_replace", "doc_undo", "doc_list_revisions", "sheet_write_cells"}) {
             if (!offered.contains(name)) {

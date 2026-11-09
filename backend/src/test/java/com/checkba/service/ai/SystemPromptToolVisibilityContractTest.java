@@ -59,7 +59,7 @@ class SystemPromptToolVisibilityContractTest {
         for (String suffix : List.of(".md", ".en.md")) {
             String text = Files.readString(PROMPTS_DIR.resolve("tools-office-word" + suffix));
             for (String name : List.of("office_insert_break", "office_set_hyperlink", "office_edit_header_footer",
-                    "office_insert_footnote", "office_insert_endnote", "office_insert_image",
+                    "office_insert_note", "office_insert_image",
                     "office_manage_content_control", "office_set_document_properties")) {
                 assertTrue(text.contains("`" + name + "`"), name + " 从 " + suffix + " 的工具指路中丢失");
             }
@@ -122,6 +122,7 @@ class SystemPromptToolVisibilityContractTest {
             Map.entry("litigation_timeline_start", ToolMeta.Host.LOWA),
             Map.entry("litigation_timeline_step", ToolMeta.Host.LOWA),
             Map.entry("pptx_generate_outline", ToolMeta.Host.LOWA),
+            Map.entry("pptx_outline", ToolMeta.Host.LOWA),
             Map.entry("pptx_refine_outline", ToolMeta.Host.LOWA),
             Map.entry("pptx_get_project_pages", ToolMeta.Host.LOWA),
             Map.entry("pptx_check_service", ToolMeta.Host.LOWA),

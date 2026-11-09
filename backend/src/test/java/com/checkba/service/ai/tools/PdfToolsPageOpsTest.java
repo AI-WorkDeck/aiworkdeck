@@ -159,6 +159,22 @@ class PdfToolsPageOpsTest {
     }
 
     @Test
+    @DisplayName("pdf_pages（V4）：op=extract 与旧名 pdf_extract_pages 产出同样的文件，旧名多一句「已并入」；未知 op 报错")
+    void pdfPagesRoutesByOpAndShimsDelegate() throws IOException {
+        long id = givenPdf("卷宗.pdf", 12);
+
+        ProjectFile viaNew = createdFrom(tools.pdf_pages(id, "extract", "10-12", null, null));
+        assertEquals(3, pagesOf(viaNew));
+
+        String shim = tools.pdf_extract_pages(id, "4-6", null);
+        assertTrue(shim.contains("已并入 pdf_pages"), shim);
+        assertEquals(3, pagesOf(createdFrom(shim.substring(0, shim.indexOf("\n（提示")))));
+
+        assertTrue(tools.pdf_pages(id, "rotate", "1", null, null).startsWith("Error"), "rotate 缺 degrees 必须报错");
+        assertTrue(tools.pdf_pages(id, "shred", "1", null, null).startsWith("Error"));
+    }
+
+    @Test
     @DisplayName("合并：产出新文件、落在第一份原件所在目录、两份原件都不动")
     void mergeProducesANewFileAndLeavesSourcesAlone() throws IOException {
         long a = givenPdf("证据一.pdf", 3);

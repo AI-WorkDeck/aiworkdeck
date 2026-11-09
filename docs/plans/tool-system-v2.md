@@ -222,3 +222,9 @@ MCP：`McpToolProjection` 加 A10 的会话内生排除表；`mcp:true` 白名�
 1. 日历插件不声明工具：已在 #1418 落地（calendar_agenda / calendar_create 已删），日程只走 `task_*`。
 2. 真实模型验收预算：同意约 250 次（DeepSeek V4 Flash + qwen3.8-max），走 OpenRouter 测试 key。
 3. `doc_compare`：优先用编辑器内 LOWA 的 `.uno:CompareDocuments` 产出原生修订（不新增服务端部署依赖）；无编辑器场景（MCP / 后台）退到服务端段落级 diff，结果以修订建议（propose_revision 同形）呈现，不直接改文件。
+
+## H. V4 实施记录（2026-11-09，feat/tool-v2-v4-merges）
+1. **实际合并 22 个目标名 / 45 个旧名**。E 节"24 个"里的 `meeting_list` / `meeting_get_transcript`（含 `tmeet_*` 共 4 个旧名）依赖 V5 的插件来源路由，仍留给 V5，所以 V4 只做另外 22 个；其中 16 个是新名（`doc_revisions`、`office_revisions`、`doc_update_comment`、`office_update_comment`、`office_excel_update_comment`、`doc_table_insert`、`doc_table_delete`、`office_table_insert`、`office_table_delete`、`doc_insert_note`、`office_insert_note`、`doc_select`、`pdf_pages`、`office_file`、`pptx_outline`、`move_files`），6 个并入既有名字（`law_search`、`write_file`、`doc_list_project_files`、`search_project_files`、`office_excel_set_values`、`capability_install`）。
+2. **注册数**：V3 后 331 → 现 347（+16 个新名；45 个旧名作为 `@ToolShim` 壳继续注册但不下发）；0.83 删壳后 302，V5 再并 meeting 得 300。下发数不变或更少（典型句 docx 50→49）。
+3. **与计划的差异**：① `capability_apply` 并入 `capability_install` 时确认闸（P2-1）尚未落地，所以做成"只传 url = 出计划、只传 planId = 安装"，两阶段仍是两次工具调用，没有折成一次；② `write_file(mode=overwrite)` 的执行体是 `TextFileEditTools.overwriteText`（旧名壳 `text_write_file` 仍声明 `requiresHost=LOWA`，新入口不挑宿主——任务窗格会话里改纯文本文件可用，只是没有文本标签可刷新）；③ `move_project_file`（按 fileId 移动）并入的是"路径数组 `move_files`"，壳里保留 id 实现；④ `office_revisions` 的 action 比 CSV 多了 `accept_all` / `reject_all`，与 `doc_revisions` 同形，覆盖旧 `acceptAll`/`rejectAll` 布尔；⑤ SkillRegistry 对用户自建 skill 的旧名迁移提前到了 V4（B5 ①），而不是等 V9。
+4. **门禁**：`ToolShimContractTest`（壳逐名钉住、到 0.83 变红）、`ToolChoiceSurfaceTest.eachMergedFamilyOffersExactlyOneName`、`MergedToolsDispatchTest`、`cases-tool-merge.json`（21 条）。真实模型矩阵结果见 PR 说明与 `.claude/agents/ai-chat.md`「工具合并与兼容壳」。

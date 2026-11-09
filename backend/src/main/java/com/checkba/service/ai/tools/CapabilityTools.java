@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>确认流程</b>：{@code capability_install} 只做 plan（拉取 + 校验，不落盘），把计划
  * 原样交给模型；模型必须用 {@code <question>} 把仓库、commit、文件数、权限、目标槽念给
- * 用户听并停机等回答，用户点头后才调 {@code capability_apply(planId)}。
+ * 用户听并停机等回答，用户点头后才调 {@code capability_install(planId)}（旧名 capability_apply 是兼容壳）。
  */
 @Component
 @Slf4j
@@ -70,15 +70,23 @@ public class CapabilityTools implements AgentToolComponent {
         return sb.toString();
     }
 
-    @ToolMeta(displayName = "准备能力升级", category = "plugin")
-    @Tool("从一个 GitHub 仓库链接拉取能力包源码并校验，返回「安装计划」（仓库、commit、文件数、"
-            + "声明的权限、落到哪个能力槽、能否自动安装、拒绝理由）。**本工具不安装任何东西**。"
-            + "拿到计划后必须用 <question> 把计划念给用户听并停机等确认，用户明确同意后再调 "
-            + "capability_apply(planId)。计划里有拒绝理由时不要重试安装，先按理由逐条修复或如实告诉用户。"
-            + "只收 https://github.com/<owner>/<repo> 或 .../tree/<分支或标签> 形态的链接。")
+    @ToolMeta(displayName = "安装能力包", category = "plugin", access = ToolMeta.Access.WRITE)
+    @Tool("从 GitHub 仓库链接拉取能力包并校验出「安装计划」，用户确认后按 planId 安装并启用。分两步，缺一不可：\n"
+            + "第一步只传 url：返回计划（仓库、commit、文件数、声明的权限、落到哪个能力槽、能否自动安装、拒绝理由），**不安装任何东西**。"
+            + "拿到计划后必须用 <question> 把计划念给用户听并停机等确认；计划里有拒绝理由时不要重试安装，先按理由逐条修复或如实告诉用户。\n"
+            + "第二步只传 planId：**只有在用户以 <question> 明确确认之后才允许调用**，落盘并启用能力包；"
+            + "若它提供了某个能力槽的实现，还要用 capability_select 切过去才会生效。\n"
+            + "url 只收 https://github.com/<owner>/<repo> 或 .../tree/<分支或标签> 形态的链接。")
     public String capability_install(
-            @P("GitHub 仓库链接，如 https://github.com/acme/litviz-engine 或 .../tree/v2") String url
+            @P(value = "GitHub 仓库链接，如 https://github.com/acme/litviz-engine 或 .../tree/v2；第一步用", required = false) String url,
+            @P(value = "第一步返回的 planId；仅在用户明确确认后传，第二步用", required = false) String planId
     ) {
+        if (planId != null && !planId.isBlank()) {
+            return applyPlan(planId);
+        }
+        if (url == null || url.isBlank()) {
+            return "Error: 缺少参数：第一步传 url（GitHub 仓库链接），用户确认后第二步传 planId。";
+        }
         log.info("Tool: capability_install called for url={}", url);
         String denied = requireAdmin();
         if (denied != null) {
@@ -102,7 +110,7 @@ public class CapabilityTools implements AgentToolComponent {
                     .append(plan.totalBytes() / 1024).append(" KB\n");
             if (plan.canAutoInstall()) {
                 sb.append("可以自动安装。请用 <question> 把以上信息念给用户并等他确认，"
-                        + "确认后调用 capability_apply(\"").append(plan.planId()).append("\")。");
+                        + "确认后调用 capability_install(planId=\"").append(plan.planId()).append("\")。");
             } else {
                 sb.append("不能自动安装，理由:\n");
                 for (String r : plan.reasons()) {
@@ -117,14 +125,17 @@ public class CapabilityTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "执行能力升级", category = "plugin")
-    @Tool("按 capability_install 返回的 planId 真正安装能力包（落盘 + 启用）。"
-            + "**只有在用户以 <question> 明确确认之后才允许调用**。安装完成后如果这个包提供了"
-            + "某个能力槽的实现，还要用 capability_select 切过去才会生效。")
+    @ToolShim(replacedBy = "capability_install")
+    @ToolMeta(displayName = "执行能力升级", category = "plugin", offerToModel = false, access = ToolMeta.Access.WRITE)
+    @Tool("按 capability_install 返回的 planId 真正安装能力包。只有用户以 <question> 明确确认之后才允许调用。")
     public String capability_apply(
             @P("capability_install 返回的 planId") String planId
     ) {
-        log.info("Tool: capability_apply called for planId={}", planId);
+        return ToolShims.hint(applyPlan(planId), "capability_install", "capability_install(planId)");
+    }
+
+    private String applyPlan(String planId) {
+        log.info("Tool: capability_install (apply) called for planId={}", planId);
         String denied = requireAdmin();
         if (denied != null) {
             return denied;

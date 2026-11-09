@@ -73,7 +73,7 @@ prompt: prompt.md
 # 编排类工具（todo_write / dispatch_subtask）恒定可见，不要为「保险」抄进来——
 # 回放用例 skill-orchestration-tools-not-trimmed 靠「不在清单里却仍可见」守这条不变式。
 # 本 skill 是一个聚焦模式，要限制本轮可见工具（dev-board#799）：审查的每一处改动都必须
-# 带修订痕迹，放开全集等于把 doc_start_stream / text_write_file 这类整篇覆写的原语
+# 带修订痕迹，放开全集等于把 doc_start_stream / write_file 这类整篇覆写的原语
 # 也摆到模型面前。下面这份清单已经覆盖「看/找/选/改/批注/安全网」以及 law_*、search_web、
 # 附件对照，LOWA 与 Word 插件两族都列全了，所以限制不会挡住任何审查要做的动作。
 tool_policy: restrict
@@ -94,9 +94,7 @@ allowed_tools:
   # 找
   - doc_find_text
   # 选
-  - doc_select_anchor
-  - doc_select_paragraph
-  - doc_collapse_cursor
+  - doc_select
   # 改（全部带修订痕迹）。删除走 doc_replace_at_anchor / doc_find_replace 传空串——
   # doc_replace_nth_match / doc_delete_match 已不下发（dev-board#1065 T-14），列在这里也放不回来
   - doc_replace_at_anchor
@@ -108,8 +106,7 @@ allowed_tools:
   - doc_table_set_cell
   # 批注：说明与风险提示的唯一去处
   - doc_add_comment
-  - doc_reply_comment
-  - doc_resolve_comment
+  - doc_update_comment
   # 标记改过的法律用语（与 office_format_text 成对，dev-board#806）
   - doc_format_selection
   # 安全网
@@ -127,8 +124,7 @@ allowed_tools:
   - office_table_set_cell
   # 与 LOWA 面逐条对齐（dev-board#806，审计 A10）：少了它们，同一个 skill 在 Word 插件里
   # 就比在工作台里弱一截——回复对方律师的批注、标记改过的用语都做不了。
-  - office_reply_comment
-  - office_resolve_comment
+  - office_update_comment
   - office_format_text
   # 插件面专属，没有 doc_ 对应物：Office.js 每处改动要一次宿主往返，整篇合同逐处调用
   # office_replace_text 会在十几处之后撞上单轮步数上限（用户看到的是「审到一半停了」）。
@@ -138,7 +134,6 @@ allowed_tools:
   - office_pass_step
   # 法源核实：law_* 只覆盖中国大陆法；其他法域用 search_web / browse_url 查权威来源
   - law_search
-  - law_search_keyword
   - get_law_article
   - search_web
   - browse_url

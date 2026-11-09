@@ -109,7 +109,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
                     required = false) String category,
             @P(value = "搜工具名和描述的关键词，如 \"pdf merge\"，每个词都要命中；最多 15 条",
                     required = false) String query,
-            @P(value = "精确工具名，逗号分隔，如 \"pdf_merge,pdf_split\"",
+            @P(value = "精确工具名，逗号分隔，如 \"pdf_merge,pdf_pages\"",
                     required = false) String names,
             String conversationId
     ) {

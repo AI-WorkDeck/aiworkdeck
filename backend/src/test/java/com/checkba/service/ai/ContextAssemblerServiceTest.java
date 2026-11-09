@@ -1065,7 +1065,7 @@ class ContextAssemblerServiceTest {
 
         String systemText = assembleSystemText(officeDoc("名称\t金额\n甲\t100"));
         assertTrue(systemText.contains("office_excel_get_range"), "活跃文档段应指引 office_excel_* 读取");
-        assertTrue(systemText.contains("office_excel_set_formulas"), "活跃文档段应点名公式工具（批次6）");
+        assertTrue(systemText.contains("office_excel_set_values"), "活跃文档段应点名写值/公式工具（批次6；公式并入 set_values，V4）");
         assertTrue(systemText.contains("office_excel_get_overview"), "活跃文档段应点名总览工具（批次6追加）");
         assertFalse(systemText.contains("office_get_text"), "活跃文档段不应再点名 Word 面工具");
     }

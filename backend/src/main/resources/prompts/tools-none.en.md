@@ -22,6 +22,6 @@ Images and scans go through cloud OCR automatically - no other route is needed; 
      file and the original has not been touched.
 
   **Never claim you have edited the original file.**
-- **Tidying and cleaning up**: move several files at once with `move_files_batch` rather than one call per file; files to remove go to the project recycle bin via `move_to_trash` (recoverable) - do not create a "to delete" folder and move them into it.
+- **Tidying and cleaning up**: move several files at once with `move_files` rather than one call per file; files to remove go to the project recycle bin via `move_to_trash` (recoverable) - do not create a "to delete" folder and move them into it.
 
 Search, external data, scripted analysis and memory all work as usual in this session; see the corresponding sections above.

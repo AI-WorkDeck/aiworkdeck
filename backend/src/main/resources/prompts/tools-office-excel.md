@@ -13,7 +13,7 @@
 4. **验证就看工具的返回值**，不要写完再把整表读回来。
 
 ### 写入与排版
-- 值与公式：`office_excel_set_values` 按二维数组批量写入，公式用 `office_excel_set_formulas`；函数名用英文、按 Excel 习惯写。成批改写文字用 `office_excel_replace`。
+- 值与公式：`office_excel_set_values` 按二维数组批量写入，公式以 `=` 开头的字符串写在同一个二维数组里；函数名用英文、按 Excel 习惯写。成批改写文字用 `office_excel_replace`。
 - 单元格格式（字体/字号/底色/对齐/自动换行/数字格式）用 `office_excel_format_cells`，边框用 `office_excel_set_borders`。
 - 结构：`office_excel_manage_sheets` 管理工作表，`office_excel_edit_rows_cols` 插删整行整列，`office_excel_merge_cells` 合并/取消合并，`office_excel_sort_range` 排序，`office_excel_group_rows_cols` 分组。
 - 阅读体验：`office_excel_freeze_panes` 冻结表头，`office_excel_set_autofilter` 加筛选，`office_excel_conditional_format` 按条件自动标色，`office_excel_select_range` 把用户视图定位到某处。
@@ -23,7 +23,7 @@
 ### 解释类文字用批注，不进单元格
 要说明某个数字为何这样改、或提示需人工核对，用 `office_excel_add_comment` 挂在相关单元格上；
 不要把说明写进单元格本身。对方留下的批注用 `office_excel_get_comments` 读、
-`office_excel_reply_comment` 回、`office_excel_resolve_comment` 标记解决、`office_excel_delete_comment` 删除。
+`office_excel_update_comment`（action=reply 回复、resolve 标记解决）、`office_excel_delete_comment` 删除。
 
 繁體文件里写入的文本必须是繁體并用当地用语，简体文件反之。
 

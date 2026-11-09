@@ -1,5 +1,5 @@
 {
-  "_comment": "核心 17 句。hostState 为 docx:<夹具> 的句子由 Playwright 打开 LOWA 编辑器后在页面里发送（宿主文件固定叫 合同.docx）；nofile 句纯后端 SSE。夹具见 ../fixtures。校准记录：s03/s15 的答案已在注入的文档/记忆里，不调工具直接答是正确的，所以允许 <none>；s08 的 doc_list_project_files 是合理的首个查询；s17 的『改一下措辞』未给出新措辞，ask_user 反问视为合理停点（计入 mustUse）。",
+  "_comment": "核心 17 句。hostState 为 docx:<夹具> 的句子由 Playwright 打开 LOWA 编辑器后在页面里发送（宿主文件固定叫 合同.docx）；nofile 句纯后端 SSE。夹具见 ../fixtures。校准记录：s03/s15 的答案已在注入的文档/记忆里，不调工具直接答是正确的，所以允许 <none>；s08 的 doc_list_project_files 是合理的首个查询；s17 的『改一下措辞』未给出新措辞，ask_user 反问视为合理停点（计入 mustUse）。 2026-11-09 V4：合并后的新名（doc_revisions / move_files …）与旧名并列，同一份句集可对拍合并前后两个 ref。",
   "sentences": [
     {
       "id": "s01-replace-all",
@@ -113,12 +113,14 @@
       "expect": {
         "firstToolAnyOf": [
           "doc_list_revisions",
-          "doc_accept_all_revisions"
+          "doc_accept_all_revisions",
+          "doc_revisions"
         ],
         "mustUse": [
           [
             "doc_accept_all_revisions",
-            "doc_accept_revision"
+            "doc_accept_revision",
+            "doc_revisions"
           ]
         ],
         "mustNotUse": [
@@ -169,12 +171,14 @@
           "search_project_files",
           "move_files_batch",
           "move_project_file",
-          "doc_list_project_files"
+          "doc_list_project_files",
+          "move_files"
         ],
         "mustUse": [
           [
             "move_files_batch",
-            "move_project_file"
+            "move_project_file",
+            "move_files"
           ]
         ],
         "mustNotUse": [
@@ -217,7 +221,8 @@
         "mustNotUse": [
           "move_to_trash",
           "move_files_batch",
-          "write_docx"
+          "write_docx",
+          "move_files"
         ],
         "finalTextIncludes": [
           "沟通记录"
@@ -309,7 +314,8 @@
       "expect": {
         "firstToolAnyOf": [
           "create_folder",
-          "list_project_folders"
+          "list_project_folders",
+          "doc_list_project_files"
         ],
         "mustUse": [
           [
@@ -343,7 +349,8 @@
         "firstToolAnyOf": [
           "search_project_files",
           "list_project_folders",
-          "move_to_trash"
+          "move_to_trash",
+          "doc_list_project_files"
         ],
         "mustUse": [
           [
@@ -429,7 +436,8 @@
           [
             "doc_accept_all_revisions",
             "doc_accept_revision",
-            "ask_user"
+            "ask_user",
+            "doc_revisions"
           ],
           [
             "doc_export_pdf",

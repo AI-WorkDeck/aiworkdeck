@@ -60,7 +60,7 @@
         "office_get_text",
         "ref_list",
         "pdf_highlight",
-        "text_write_file"
+        "text_find_replace"
       ],
       "toolsNotRegistered": [
         "read_document",
@@ -185,7 +185,7 @@
         "office_excel_get_range",
         "office_ppt_get_slides",
         "pdf_highlight",
-        "text_write_file"
+        "text_find_replace"
       ],
       "toolsNotRegistered": [
         "read_document",
@@ -249,7 +249,7 @@
         "sheet_create_file",
         "write_docx",
         "pdf_highlight",
-        "text_write_file"
+        "text_find_replace"
       ],
       "offeredToolsExclude": [
         "office_search",

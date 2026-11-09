@@ -124,14 +124,14 @@
     "turns": [
       {
         "toolCalls": [
-          { "name": "doc_select_paragraph", "arguments": { "index": 11 } },
+          { "name": "doc_select", "arguments": { "target": "paragraph", "index": 11 } },
           { "name": "doc_delete_selection", "arguments": {} }
         ]
       },
       { "text": "<final>已删除第 12 至 21 段。</final>" }
     ],
     "expect": {
-      "toolCalls": [ { "name": "doc_select_paragraph" }, { "name": "doc_delete_selection" } ],
+      "toolCalls": [ { "name": "doc_select", "argsContain": { "target": "paragraph" } }, { "name": "doc_delete_selection" } ],
       "bubbleEndStatus": "finished",
       "offeredToolsInclude": [ "ask_user" ]
     }

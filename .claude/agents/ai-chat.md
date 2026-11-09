@@ -37,6 +37,38 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 - **MCP 投影（agent-app-control.md C7，P1-4）**：`tools/list` = 上面的精修工具 + `service/mcpserver/McpToolProjection` 从 `ToolRegistry.mcpCandidates()` 投影的工具，同一张注册表两个消费者。规则：内置工具 `access=READ ∧ requiresHost=NONE ∧ offerToModel`，且排除 `doc_/sheet_/slide_/office_/ref_` 前缀、`ask_user/list_tools/list_attached_files`、按量计费外部服务工具（`search_web`、`qichacha_*`、`tushare_query`、北大法宝 5 个，显式名单 `MCP_METERED_EXTERNAL`，防外部 Agent 循环烧积分；新增此类工具须登记）与 `unusableToolNames()`；声明式插件工具 read 缺省投影、write 须显式 `mcp:true`、`mcp:false` 不投、destructive 永不；插件 JAR `@Tool` 与用户自配 MCP 不投。精修工具重名时胜出，其余按名排序。`inputSchema` 由 `JsonSchemaElementHelper.toMap` 转出，`userId/conversationId/userMessage` 不暴露；内置工具规格里 `projectId` 已被 `offerable()` 摘掉，投影补回一个**可选** `projectId`（规格看不出哪些工具必须绑项目，缺了由工具自己报错；task_list 缺省查全部项目），传了就按本机用户核读权限（write 工具核写权限）。`tools/call` → `ToolRegistry.execute`，`ToolContext(projectId=args.projectId, conversationId="mcp:"+令牌 SHA-256 前 8 位, userId=本机用户)`——**`mcp:` 前缀是审计 source 判据，不要改**；输出原文作 text content，`Error` 开头或未知工具作 `isError`。内置 `task_create` 等写工具暂不标 mcp（`ToolMeta` 无该标志，留给 P2-5）。精修工具不经注册表，由 `LocalMcpServerTools.call` 自己写 `ai_tool` 审计（`source=mcp`、`argsDigest`、`ok`、`durationMs`，不记参数值与输出）。回归：`McpToolProjectionTest`、`LocalMcpServerControllerTest`、`CapabilityCatalogDocTest.mcpProjectionOfRealRegistryIsReadOnlyBuiltins`。
 
+## 工具合并与兼容壳（tool-system-v2 V4，2026-11-09）
+
+22 族低歧义合并（45 个旧名）→ 新名下发，旧名转 **`@ToolShim` 兼容壳**。设计与逐名裁决见 `docs/plans/tool-system-v2.md` E 节与 `tool-system-v2-inventory.csv`（壳行 verdict=`shim→X`，新名行 verdict=`new`）。
+
+| 新名 | 并入的旧名 | 判别参数 |
+|---|---|---|
+| `doc_revisions` / `office_revisions` | doc_{accept,reject}_{,all_}revision(s) / office_{accept,reject}_revision | `action=accept\|reject\|accept_all\|reject_all`（`index` / `revisionIndex`） |
+| `doc_update_comment` / `office_update_comment` / `office_excel_update_comment` | {doc,office,office_excel}_{reply,resolve}_comment | `action=reply\|resolve\|reopen` |
+| `doc_table_insert` / `doc_table_delete` / `office_table_insert` / `office_table_delete` | {doc,office}_table_{add,delete}_{row,col} | `axis=row\|col`；**删除另立**（destructive 不并入插入的 action 枚举） |
+| `doc_insert_note` / `office_insert_note` | {doc,office}_insert_{foot,end}note | `kind=footnote\|endnote` |
+| `doc_select` | doc_goto / select_anchor / select_paragraph / collapse_cursor | `target=start\|end\|anchor\|paragraph\|collapse_start\|collapse_end`（access=read） |
+| `pdf_pages` | pdf_split / extract_pages / rotate_pages | `op=extract\|split\|rotate`；**`pdf_delete_pages` 不并**（destructive） |
+| `office_file` | office_file_{create,save,export_pdf,open} | `action` |
+| `pptx_outline` | pptx_generate_outline / pptx_refine_outline | `action=create\|refine` |
+| `law_search` | law_search_keyword | `mode=semantic\|keyword`（`title` / `fulltext`） |
+| `write_file` | text_write_file | `mode=overwrite` + `fileId`（执行体 `TextFileEditTools.overwriteText`，经字段注入的 `FileTools.textFileEditTools`） |
+| `move_files` | move_files_batch（改名）/ move_project_file | 路径数组，一份也用它 |
+| `doc_list_project_files` | list_project_folders | `foldersOnly=true`（`DocumentEditTools.folderListing` 与旧壳共用） |
+| `search_project_files` | search_across_projects | `scope=all` |
+| `office_excel_set_values` | office_excel_set_formulas | 整块 `=` 开头 → 走 `excel_set_formulas` 命令（带读回与 formulaErrors） |
+| `capability_install` | capability_apply | 只传 `url` = 出计划（不安装）；只传 `planId` = 安装（用户 `<question>` 确认之后）——两阶段仍是两次调用，确认闸（P2-1）落地前不折成一次 |
+
+- **壳的写法**：`@ToolShim(replacedBy)`（`tools/ToolShim.java`）+ `@ToolMeta(offerToModel=false)`，方法体只做参数映射后调新工具，回执经 `ToolShims.hint` 末尾追加「（提示：此工具已并入 X，下次请直接调用 X(…)）」。不用 `TOOL_NAME_ALIASES`（仍是空表，`ToolShimContractTest.aliasTableStaysEmpty` 钉着）。壳仍在 `ToolDisclosurePolicy.CATEGORIES` 里（旧名被点名调到时据此放回类目），新名按「事」归类：`doc_revisions`/`doc_update_comment`→revision、`doc_select`→edit、`doc_table_*`→table（前缀）、`move_files`→files。
+- **到期绊线**：`ToolShimContractTest`——壳逐名钉在 `V4_SHIMS`（45 个）、每个壳 `offerToModel=false` 且指向的新名已注册并下发、`ToolShims.replacements()` 与各注解逐项一致；`shimsMustBeDeletedBeforeTheirUntilVersion` 读 `desktop/package.json` 版本，**到 0.83 变红**，提醒删掉所有 `@ToolShim` 方法 + `V4_SHIMS` + `ToolShims` 映射 + CSV 壳行（toolDisplayNames 旧键保留）。`ToolDeclarationContractTest.EXPECTED_NOT_OFFERED` 现等于 `V4_SHIMS`。
+- **用户自建 skill**：`SkillRegistry.migrateRenamedTools` 加载时把 `allowed_tools` 里的旧名经 `ToolShims.canonical` 映射成新名（WARN 提示作者更新），不静默裁掉能力；13 个内置 skill 已改新名。`check-tool-parity.mjs` 的扫描**排除** `@ToolShim` 方法，矩阵只认新名。
+- **访问级别修正**：`doc_delete_selection`（修订模式下的删除可撤回）与 `image_get_generation`（导入文件）= write；`doc_select`、`sheet_select_range`、`office_excel_select_range`、`litigation_reference`、`litigation_checkpoint` = read（只动视图 / 只读规范）；`slide_goto`、`doc_goto` 按名推断本来就是 read。`doc_table_delete` / `office_table_delete` 显式 `DESTRUCTIVE`（直接删行列不留修订痕迹）。
+- **基底 prompt 的坑**：`system_prompt*.md` 与 `tools-none*.md` 一个 `doc_` 都不许出现（`SystemPromptToolVisibilityContractTest`），所以「按文件夹名取 ID」在基底 prompt 里写 `list_files`（行末带 folderId），`ContextAssemblerService` 的整理规则写「项目文件清单工具的文件夹模式（`foldersOnly=true`）」，只有 `FileContextLoader` 的附件目录说明与工具描述可以直接写 `doc_list_project_files(foldersOnly=true)`。
+- **token**：吸收合并参数的三个核心工具略涨（`law_search` +130、`doc_list_project_files` +60、`search_project_files` +65），首轮基线上升约 2.5%（docx 中性 6753→6920），已更新 `tool-surface-baseline.csv`；合并本身把"下发名"收成单个，换来的是 doc 表格/修订/批注类目里工具数下降（典型句 docx 50→49）。**`write_file(mode=overwrite)` 的 file_change 事件按 `fileEffect=ADDED` 发**（注解是常量，覆盖已有文件会被记成"新增"，只影响改动卡片文案）。
+- **验证**：`mvn test -Dtest='ToolShimContractTest,MergedToolsDispatchTest,ToolChoiceSurfaceTest,ToolInventoryContractTest,ToolDeclarationContractTest,ToolSurfaceBudgetTest,OrchestratorReplayEvalTest,SkillRegistryTest'`；回放新增 `cases-tool-merge.json`（21 条，每族一条，旧名走 `offeredToolsExclude`，非核心工具用 `offeredToolsIncludeLastCall`）；真实模型句集 `scripts/eval/sentences/v4-merged.json`（6 句）+ 夹具 `contract-commented.docx` / `contract-table.docx` / `dossier-24p.pdf`，`core-17.json` 的期望里新旧名并列以便对拍合并前后两个 ref。
+
+- **真实模型矩阵实测（2026-11-09，before=v2-core+master，after=V4+master，2 模型×每句 2 次）**：core-17（各 34 次/模型）deepseek 33→32、qwen 27→28，合计 60/68 持平；v4-merged 6 句（各 12 次/模型）deepseek 12→11、qwen 9→8。差异全在单次噪声内：qwen v01「接受第二条修订」两版都会 `ask_user` 反问是哪一条（after 两次都停在反问）；v04「价目表末尾插一行」qwen 两版都先 `list_tools`（首工具判据不过，但 after 正确走到 `doc_table_insert`），deepseek after 有一次绕去 `doc_find_text`/`doc_insert_at_cursor`——句子里没有「表格」二字，table 类目没被关键词放回；deepseek s08/s11 各退 1 次、s10 进 1 次。新名被模型正确使用：`doc_revisions` 在 s06/v02 两模型 after 都被调到，`doc_table_insert` 被 qwen 正确调用。**结论：未见系统性回退，但 v04 暴露「价目表」不触发 table 类目，后续可补关键词。** 注意 deepseek after 提示词 token 总量偏高主要来自 s12 一次 30 轮长跑。
+
 ## 权限拒绝与回收站可见性（followups）
 
 `HarnessDiagnosticService.isPermissionDenied`（Not permitted/无权/没有权限/access denied/forbidden/403）与 `isToolUnavailable` 同级：不展开类目、不给 ask_user 护栏，`AgentOrchestrator` 追加「如实告知用户缺权限、谁可授权、不重试」。回收站文件对 Agent/MCP 不可见：id 路径由 `ToolFileGuard` 两个守卫拒绝 isDeleted；路径路径（磁盘字节软删后仍在）由 `FileTools.trashedPathFilter` 在 read_file/search_project_files/list_files 排除。新增按路径读磁盘的工具必须过它。
@@ -211,7 +243,7 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
 - `ContextAssemblerService` 的活跃文档禁令只禁止重新发现/打开已知目标，不能阻止列出其他参考；Office 产出去向限制只管创建/写入项目文件。Office 参考来源用对应 reader，不能把 `open:` / `desk:` 交给只查服务端项目索引的 `search_project_content`。
 - `doc_list_project_files` 返回项目相对路径；与 `FileTools.dbPathIndex` 共用按父链构建的路径 helper，不暴露宿主绝对路径。缺失/删除/非目录/跨项目父节点停止，循环截断，清单仍保留每个存活文件 ID。
 - `FileContextLoader` 的目录及预读正文显示相对路径，显式报告深度上限、已列文件数、成功预读、不可读和配额未读数量；数量指已列部分，不能称全项目已读。原深度 5、成功正文配额与字符上限保持。
-- 文件夹整理边界（dev-board#1108）：上述路径以**附件目录**为基准，目录说明标明其 ID，不能直接当作 `move_files_batch` 的项目根相对路径；移动前按目录 ID 从项目清单核对完整路径，不凭同名目录或宿主路径猜测。`ContextAssemblerService` 的中英末位批量整理规则要求默认在指定目录内分类、保留指定目录本身（变空也不删除）；确认分类方式不扩大该边界，用户明确移出、扁平化到指定父级或删除目录的指示仍按范围执行。未新增硬工具权限闸。`FileContextLoaderTest` 与 `ContextAssemblerServiceTest` 覆盖实际注入及配额耗尽路径；提示接线测试不证明实模遵守。
+- 文件夹整理边界（dev-board#1108）：上述路径以**附件目录**为基准，目录说明标明其 ID，不能直接当作 `move_files` 的项目根相对路径；移动前按目录 ID 从项目清单核对完整路径，不凭同名目录或宿主路径猜测。`ContextAssemblerService` 的中英末位批量整理规则要求默认在指定目录内分类、保留指定目录本身（变空也不删除）；确认分类方式不扩大该边界，用户明确移出、扁平化到指定父级或删除目录的指示仍按范围执行。未新增硬工具权限闸。`FileContextLoaderTest` 与 `ContextAssemblerServiceTest` 覆盖实际注入及配额耗尽路径；提示接线测试不证明实模遵守。
 - CORE 不绕过 skill restrict：`contract-review` 需显式保留 `doc_list_project_files` / `search_project_content` / `ref_list` / `ref_read`，再按宿主过滤；不增加跨文档写入权限。`BuiltinSkillsTest` 用实际 skill + router + registry + disclosure 验证五种宿主。
 - 验证：`ContextAssemblerServiceTest`、`ContextAssemblerAskUserTest`、`FileContextLoaderTest`、`DocumentEditToolsProjectFilesTest`、`BuiltinSkillsTest`；行为需另看真实模型已执行工具及返回正文，模型输出的工具样式文字不算执行，编辑器 ACK 桩不算真实 LOWA 修订成功。
 
