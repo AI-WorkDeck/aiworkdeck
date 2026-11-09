@@ -50,13 +50,13 @@
       ],
       "offeredToolsExcludeFirstCall": [
         "doc_format_table",
-        "doc_table_add_row",
+        "doc_table_insert",
         "litigation_render",
         "pdf_highlight"
       ],
       "offeredToolsIncludeLastCall": [
         "doc_format_table",
-        "doc_table_add_row"
+        "doc_table_insert"
       ],
       "structureContains": [
         "<final>"
@@ -141,7 +141,7 @@
         "text": "先看看还有哪些表格工具。\n<tool_code>list_tools(category=\"table\")</tool_code>"
       },
       {
-        "text": "<tool_code>doc_table_add_row(count=1)</tool_code>"
+        "text": "<tool_code>doc_table_insert(axis=\"row\", count=1)</tool_code>"
       },
       {
         "text": "<final>已在表尾追加一行。</final>"
@@ -153,11 +153,11 @@
           "name": "list_tools"
         },
         {
-          "name": "doc_table_add_row"
+          "name": "doc_table_insert"
         }
       ],
       "offeredToolsExcludeFirstCall": [
-        "doc_table_add_row"
+        "doc_table_insert"
       ],
       "structureContains": [
         "<final>"

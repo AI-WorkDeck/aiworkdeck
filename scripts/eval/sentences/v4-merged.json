@@ -1,0 +1,67 @@
+{
+  "_comment": "tool-system-v2 V4 合并工具专用 6 句：修订 / 批注 / 表格行列 / PDF 页操作各一到两句。期望里新名（合并后）与旧名（兼容壳 / 合并前）并列，可对拍 before=合并前 ref 与 after=合并后 ref。hostState 为 docx:<夹具> 的句子要 Playwright 打开 LOWA 编辑器；pdf 两句纯后端 SSE，种子里放 dossier-24p.pdf（24 页，每页一行『Dossier page N』）。",
+  "sentences": [
+    {
+      "id": "v01-accept-one-revision",
+      "text": "接受第二条修订",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": ["doc_list_revisions", "doc_revisions", "doc_accept_revision"],
+        "mustUse": [["doc_revisions", "doc_accept_revision"]],
+        "mustNotUse": ["write_docx", "move_to_trash", "doc_reject_all_revisions"]
+      }
+    },
+    {
+      "id": "v02-reject-all-revisions",
+      "text": "拒绝所有修订",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": ["doc_list_revisions", "doc_revisions", "doc_reject_all_revisions", "doc_reject_revision"],
+        "mustUse": [["doc_revisions", "doc_reject_all_revisions", "doc_reject_revision"]],
+        "mustNotUse": ["write_docx", "move_to_trash", "doc_accept_all_revisions"]
+      }
+    },
+    {
+      "id": "v03-reply-comment",
+      "text": "回复文档里的那条批注：同意下调，改为 20%",
+      "hostState": "docx:contract-commented",
+      "expect": {
+        "firstToolAnyOf": ["doc_get_comments", "doc_update_comment", "doc_reply_comment"],
+        "mustUse": [["doc_update_comment", "doc_reply_comment"]],
+        "mustNotUse": ["write_docx", "move_to_trash", "doc_delete_comment"]
+      }
+    },
+    {
+      "id": "v04-insert-table-row",
+      "text": "在价目表最后插入一行：监控摄像头，200，350",
+      "hostState": "docx:contract-table",
+      "expect": {
+        "firstToolAnyOf": ["doc_table_read", "doc_get_document_text", "doc_table_insert", "doc_table_add_row"],
+        "mustUse": [["doc_table_insert", "doc_table_add_row"]],
+        "mustNotUse": ["write_docx", "move_to_trash", "doc_table_delete", "doc_table_delete_row"]
+      }
+    },
+    {
+      "id": "v05-delete-pdf-page",
+      "text": "把卷宗.pdf 的第 2 页删掉",
+      "hostState": "nofile",
+      "seed": { "files": [{ "name": "卷宗.pdf", "fixture": "dossier-24p.pdf" }] },
+      "expect": {
+        "firstToolAnyOf": ["doc_list_project_files", "search_project_files", "pdf_inspect", "pdf_delete_pages"],
+        "mustUse": [["pdf_delete_pages"]],
+        "mustNotUse": ["move_to_trash", "write_docx", "pdf_pages", "pdf_extract_pages", "pdf_split"]
+      }
+    },
+    {
+      "id": "v06-extract-pdf-pages",
+      "text": "把卷宗.pdf 的第 10 到 20 页抽出来存成一个新文件",
+      "hostState": "nofile",
+      "seed": { "files": [{ "name": "卷宗.pdf", "fixture": "dossier-24p.pdf" }] },
+      "expect": {
+        "firstToolAnyOf": ["doc_list_project_files", "search_project_files", "pdf_inspect", "pdf_pages", "pdf_extract_pages"],
+        "mustUse": [["pdf_pages", "pdf_extract_pages"]],
+        "mustNotUse": ["move_to_trash", "write_docx", "pdf_delete_pages"]
+      }
+    }
+  ]
+}

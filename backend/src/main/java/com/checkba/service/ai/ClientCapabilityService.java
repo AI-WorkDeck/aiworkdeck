@@ -267,8 +267,9 @@ public class ClientCapabilityService {
         if (!satisfiesDeclaredHost(toolName, conversationId)) {
             return false;
         }
-        if (java.util.Set.of("office_file_open", "office_file_create", "office_file_save", "office_file_export_pdf").contains(toolName)) {
+        if (java.util.Set.of("office_file", "office_file_open", "office_file_create", "office_file_save", "office_file_export_pdf").contains(toolName)) {
             if (capabilityOf(conversationId) != Capability.OFFICE) return false;
+            // office_file 是合并后的单名（含 save 动作）：PowerPoint 窗格里 save 在非 WPS 上不可用，由工具自己报错
             return !"office_file_save".equals(toolName)
                     || officeHostOf(conversationId) != OfficeHost.POWERPOINT
                     || officeFamilyOf(conversationId) == OfficeFamily.WPS;

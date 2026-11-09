@@ -34,23 +34,22 @@ formatting to the whole document with `office_apply_standard_format`, or a named
 the document with `office_apply_style`.
 Tables: create with `office_insert_table`, read the coordinates with `office_table_read` before
 touching anything, then write cells with `office_table_set_cell`; rows and columns are
-`office_table_add_row` / `office_table_delete_row` / `office_table_add_col` /
-`office_table_delete_col` (row and column deletions are not tracked - only undo can take them back);
+`office_table_insert` / `office_table_delete` (axis=row|col; row and column deletions are not tracked - only undo can take them back);
 borders and column widths are `office_format_table`.
 
 Page/section breaks use `office_insert_break`, hyperlinks use `office_set_hyperlink`, and headers/footers use `office_edit_header_footer` (first section only).
-Footnotes/endnotes use `office_insert_footnote` / `office_insert_endnote`; images use `office_insert_image` (project fileId, 2MB limit);
+Footnotes/endnotes use `office_insert_note` (kind=footnote|endnote); images use `office_insert_image` (project fileId, 2MB limit);
 content controls use `office_manage_content_control`; title/author and other properties use `office_set_document_properties`.
 
 Revisions left by an earlier round: list them with `office_get_revisions`, then act with
-`office_accept_revision` / `office_reject_revision`, one by one or all at once.
+`office_revisions` (action=accept|reject|accept_all|reject_all), one by one or all at once.
 
 ### Explanations belong in comments, never in the body
 To explain why you changed something, or to flag a spot that needs a human decision, attach
 `office_add_comment` to the relevant text; never insert explanatory prose into the body (the body
 carries only what the document itself should say).
-Comments left by others: read with `office_get_comments`, answer with `office_reply_comment`,
-close with `office_resolve_comment`.
+Comments left by others: read with `office_get_comments`, answer with `office_update_comment` (action=reply),
+close with `office_update_comment` (action=resolve).
 
 In a Traditional Chinese file, inserted and replaced text must be Traditional and use local
 terminology; the reverse in a Simplified file.

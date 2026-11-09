@@ -39,26 +39,26 @@
   },
   {
     "id": "pptx-outline-longest-name-match-xml",
-    "title": "pptx_generate_outline 不被 pptx_generate 抢占（最长名优先回归）",
+    "title": "pptx_outline 不被 pptx_generate 抢占（最长名优先回归）",
     "category": "pptx",
     "protocol": "xml",
     "userInput": "先给我出一个数据合规专题培训的 PPT 大纲",
     "turns": [
       {
-        "text": "<process name=\"生成PPT大纲\"><tool_code>pptx_generate_outline(topic=\"数据合规专题培训：合规义务、跨境传输与执法案例\", language=\"zh\")</tool_code></process>"
+        "text": "<process name=\"生成PPT大纲\"><tool_code>pptx_outline(action=\"create\", topic=\"数据合规专题培训：合规义务、跨境传输与执法案例\", language=\"zh\")</tool_code></process>"
       },
       {
         "text": "<final>已生成《数据合规专题培训》PPT 大纲，共 8 个章节，您确认后我再生成完整 PPT。</final>"
       }
     ],
     "toolStubs": {
-      "pptx_generate_outline": "{\"outline\":[\"一、数据合规监管框架\",\"二、企业合规义务\",\"三、跨境数据传输\"]}"
+      "pptx_outline": "{\"outline\":[\"一、数据合规监管框架\",\"二、企业合规义务\",\"三、跨境数据传输\"]}"
     },
     "expect": {
       "toolCalls": [
         {
-          "name": "pptx_generate_outline",
-          "argsContain": { "topic": "数据合规", "language": "zh" }
+          "name": "pptx_outline",
+          "argsContain": { "action": "create", "topic": "数据合规", "language": "zh" }
         }
       ],
       "structureContains": ["<process", "<final>"],

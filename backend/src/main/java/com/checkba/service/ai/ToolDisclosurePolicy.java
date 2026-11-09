@@ -121,13 +121,13 @@ public class ToolDisclosurePolicy {
             // 跨文件硬规则要求先列后读；reference 没有关键词预放回，不能再让模型先查目录。
             "ref_list", "ref_read",
 
-            // V2：create_folder / move_files_batch / move_to_trash 退到 files 类目（关键词预放回）；
+            // V2：create_folder / move_files（原 move_files_batch）/ move_to_trash 退到 files 类目（关键词预放回）；
             // list_attached_files 改为条件核心（本轮有附件时由编排器补）。
             // —— 记忆：检索与保存各一个（memory_list/read 由编排器每轮另补，memory_search 退到 memory 类目；write/edit/delete 走 memory 类目，skill 收窄时由编排器兜底，dev-board#1073）——
             "query_memory", "save_memory",
 
-            // —— 法源与公网：律师最高频的外部检索。law_search_keyword 是 law_search 的精确检索变体，
-            //    退到 legal 类目（「法规」「法条」等关键词会在起跑时把它预先放回）——
+            // —— 法源与公网：律师最高频的外部检索。law_search 的 mode=keyword 已并入（V4），
+            //    law_recognition 等退到 legal 类目（「法规」「法条」等关键词会在起跑时把它预先放回）——
             "law_search", "get_law_article", "search_web", "browse_url",
 
             // ==================== LOWA 文字（docx）段：15 个 ====================
@@ -140,7 +140,7 @@ public class ToolDisclosurePolicy {
             // —— 写：改一处、插一段（含锚点前后插入，T-16）、整篇起草、插表、套标准格式 ——
             // doc_insert_table 进核心集：活跃文档末位提醒点名要求「新表整表一次提交」，
             // 被点名的工具藏在目录里，弱模型就会改成逐行写表把步数耗光（2026-09-07 实测回归 B4）。
-            // doc_replace_selection / doc_select_anchor / doc_select_paragraph 退到 edit 类目：
+            // doc_replace_selection / doc_select（原 select_anchor / select_paragraph）退到 edit 类目：
             // 锚点替换与查找替换已覆盖「改一处」，先选中再替换是两步走的旧路。
             "doc_find_replace", "doc_replace_at_anchor", "doc_insert_at_cursor", "doc_start_stream",
             "doc_insert_table",
@@ -204,7 +204,9 @@ public class ToolDisclosurePolicy {
     static {
         CATEGORIES.put("table", List.of("doc_table_", "name:doc_insert_table"));
         CATEGORIES.put("revision", List.of(
-                "name:doc_restore_checkpoint", "name:doc_get_comments", "name:doc_list_revisions", "name:doc_accept_revision", "name:doc_reject_revision",
+                "name:doc_restore_checkpoint", "name:doc_get_comments", "name:doc_list_revisions", "name:doc_revisions", "name:doc_update_comment",
+                // 以下是 V4 的兼容壳旧名（0.83 删），仍要归 revision：模型点名调它们时据此放回类目
+                "name:doc_accept_revision", "name:doc_reject_revision",
                 "name:doc_accept_all_revisions", "name:doc_reject_all_revisions",
                 "name:doc_reply_comment", "name:doc_resolve_comment", "name:doc_delete_comment"));
         CATEGORIES.put("evidence", List.of(
@@ -218,10 +220,11 @@ public class ToolDisclosurePolicy {
                 "name:contribute_template"));
         // 定位 / 删改 / 按段落取改（dev-board#1065 T-19）。原先它们都掉进下面的 doc_ 通配归了 format，
         // 模型想「删掉选中的字」「改第 3 段」时不会去查一个叫 format 的类目。
-        // doc_select_anchor / doc_select_paragraph / doc_get_paragraph / doc_get_outline / doc_replace_selection
+        // doc_select / doc_get_paragraph / doc_get_outline / doc_replace_selection
         // 在 #1064 第二步退出核心集后就归这里。必须排在 format 之前。
         CATEGORIES.put("edit", List.of(
-                "name:doc_goto", "name:doc_collapse_cursor", "name:doc_delete_selection", "name:doc_redo",
+                "name:doc_select", "name:doc_delete_selection", "name:doc_redo",
+                "name:doc_goto", "name:doc_collapse_cursor",
                 "name:doc_select_anchor", "name:doc_select_paragraph", "name:doc_modify_paragraph",
                 "name:doc_get_paragraph",
                 "name:doc_get_outline", "name:doc_insert_under_heading", "name:doc_replace_selection"));
@@ -229,7 +232,7 @@ public class ToolDisclosurePolicy {
         // V2：doc_export_pdf 从核心集退到 pdf 类目（「导出PDF / 转PDF」命中 pdf 关键词）。
         CATEGORIES.put("pdf", List.of("name:doc_export_pdf", "pdf_"));
         CATEGORIES.put("files", List.of(
-                "name:create_folder", "name:move_files_batch", "name:move_to_trash",
+                "name:create_folder", "name:move_files", "name:move_files_batch", "name:move_to_trash",
                 "name:list_files", "name:read_file", "name:write_file",
                 "name:move_project_file", "name:rename_project_file",
                 "name:list_project_folders", "text_",
@@ -245,7 +248,7 @@ public class ToolDisclosurePolicy {
         // update_project_info 写的是项目记忆（project_memory），不是外部企业数据（T-19）
         CATEGORIES.put("memory", List.of("memory_", "name:update_project_info"));
         CATEGORIES.put("enterprise-data", List.of("qichacha_", "name:tushare_query"));
-        // law_search / law_search_keyword / get_law_article 在核心集，这里收的是剩下的 law_recognition：
+        // law_search / get_law_article 在核心集，这里收的是剩下的 law_recognition：
         // 归进 legal 比落 misc 好找——模型要的是「法规这一族还有什么」，不是「杂项里翻翻看」。
         CATEGORIES.put("legal", List.of("law_", "name:get_law_article", "name:case_search"));
         CATEGORIES.put("meeting", List.of("meeting_", "tmeet_"));
@@ -363,7 +366,7 @@ public class ToolDisclosurePolicy {
 
     static {
         TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder"));
-        TOOL_KEYWORDS.put("move_files_batch", List.of("移动", "移到", "归档", "move files"));
+        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "move files"));
         TOOL_KEYWORDS.put("move_to_trash", List.of("回收站", "删除", "删掉", "删了", "move to trash", "delete file"));
         TOOL_KEYWORDS.put("doc_apply_standard_format", List.of("标准格式", "统一格式", "律所格式", "排版"));
         TOOL_KEYWORDS.put("doc_export_pdf", List.of("导出pdf", "导出成pdf", "导出为pdf", "转pdf", "转成pdf", "存成pdf",

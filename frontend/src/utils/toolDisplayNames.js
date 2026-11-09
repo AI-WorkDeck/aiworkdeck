@@ -36,6 +36,23 @@ const LOCALIZED_NAMES = {
 }
 
 const NAMES = {
+  // tool-system-v2 V4 合并后的新名（旧名条目保留：老会话过程卡与兼容壳期内的调用仍显示友好名）
+  doc_revisions: { zh: '处置修订', en: 'Resolve revisions' },
+  office_revisions: { zh: '处置修订', en: 'Resolve revisions' },
+  doc_update_comment: { zh: '更新批注', en: 'Update comment' },
+  office_update_comment: { zh: '更新批注', en: 'Update comment' },
+  office_excel_update_comment: { zh: '更新批注', en: 'Update comment' },
+  doc_table_insert: { zh: '插入表格行列', en: 'Insert table rows/columns' },
+  doc_table_delete: { zh: '删除表格行列', en: 'Delete table rows/columns' },
+  office_table_insert: { zh: '插入表格行列', en: 'Insert table rows/columns' },
+  office_table_delete: { zh: '删除表格行列', en: 'Delete table rows/columns' },
+  doc_insert_note: { zh: '插入脚注尾注', en: 'Insert footnote/endnote' },
+  office_insert_note: { zh: '插入脚注尾注', en: 'Insert footnote/endnote' },
+  doc_select: { zh: '选中定位', en: 'Select or move cursor' },
+  pdf_pages: { zh: 'PDF页面操作', en: 'PDF page operations' },
+  office_file: { zh: '宿主文件操作', en: 'Host file action' },
+  pptx_outline: { zh: 'PPT大纲', en: 'PPT outline' },
+  move_files: { zh: '移动文件', en: 'Move files' },
   // 注：tool-system-v2 V3 已删除 22 个长期隐藏工具（get_user_profile、read_document、pptx_open_file 等），
   // 它们在下面保留的条目是 history-only：只为老会话的过程卡继续显示友好名，不对应任何现存工具。
   // 计划 / 项目
@@ -68,7 +85,7 @@ const NAMES = {
   qichacha_ipr: { zh: '查询企业知识产权', en: 'Company IP lookup' },
   tushare_query: { zh: '查询金融数据', en: 'Financial data lookup' },
   // 法律
-  law_search: { zh: '语义搜索法规', en: 'Search regulations' },
+  law_search: { zh: '检索法规', en: 'Search regulations' },
   law_search_keyword: { zh: '关键词搜索法规', en: 'Keyword law search' },
   law_recognition: { zh: '法条识别与溯源', en: 'Identify citations' },
   get_law_article: { zh: '查询法条', en: 'Look up article' },
@@ -92,7 +109,7 @@ const NAMES = {
   text_find_replace: { zh: '文本查找替换', en: 'Text find and replace' },
   // 插件开发形态（PluginDevTools，dev-board#61）
   capability_list: { zh: '查看能力实现', en: 'List capabilities' },
-  capability_install: { zh: '准备能力升级', en: 'Prepare capability upgrade' },
+  capability_install: { zh: '安装能力包', en: 'Install capability' },
   capability_apply: { zh: '执行能力升级', en: 'Apply capability upgrade' },
   capability_select: { zh: '切换能力实现', en: 'Switch capability' },
   plugin_dev_scaffold: { zh: '创建插件骨架', en: 'Scaffold plugin' },

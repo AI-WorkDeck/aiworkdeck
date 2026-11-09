@@ -280,16 +280,10 @@ public class PdfTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "拆分PDF", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
-    @Tool("按页码范围把一份 PDF 拆成多份：每个逗号分段产出一份新文件。" +
-          "例如 ranges=\"1-3,5,8-\" 会产出三份（第 1-3 页 / 第 5 页 / 第 8 页到末页）。" + RANGES_DOC +
-          "原件保持不变；产出文件与原件同目录，命名为『<原名>_第N-M页.pdf』，同名自动加 (n)。" +
-          "只要某几页的话用 pdf_extract_pages（只产出一份）。")
-    public String pdf_split(
+    private String splitPages(
             @P("文件 ID") Long fileId,
             @P("页码范围，如 \"1-3,5,8-\"（1 基页码）。每个逗号分段产出一份文件") String ranges
     ) {
-        log.info("Tool: pdf_split called, fileId={}, ranges={}", fileId, ranges);
         try {
             ProjectFile file = getPdfFile(fileId);
             Path localPath = resolveExisting(file);
@@ -331,18 +325,11 @@ public class PdfTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "提取PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
-    @Tool("从一份 PDF 里提取指定页，产出一份新 PDF（从大卷宗里只要第 10-20 页时用它）。" +
-          RANGES_DOC +
-          "产物保持原文档页序（提页不改变页序，重复页只取一次）。原件保持不变；" +
-          "产出文件与原件同目录，不传 outputName 时命名为『<原名>_摘取.pdf』，同名自动加 (n)。" +
-          "要一次拆成多份用 pdf_split。")
-    public String pdf_extract_pages(
+    private String extractPages(
             @P("文件 ID") Long fileId,
             @P("要保留的页码范围，如 \"10-20\" 或 \"1,5,9-12\"（1 基页码）") String ranges,
             @P(value = "输出文件名（可选，默认『<原名>_摘取.pdf』）", required = false) String outputName
     ) {
-        log.info("Tool: pdf_extract_pages called, fileId={}, ranges={}", fileId, ranges);
         try {
             ProjectFile file = getPdfFile(fileId);
             Path localPath = resolveExisting(file);
@@ -388,18 +375,11 @@ public class PdfTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "旋转PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
-    @Tool("把 PDF 的指定页旋转（扫描歪了的证据页转正），产出一份新 PDF。" +
-          RANGES_DOC +
-          "degrees 只接受 90 / 180 / 270（顺时针），并且是在该页**当前角度基础上叠加**——" +
-          "各页当前角度可先用 pdf_inspect 读 rotation 字段。" +
-          "原件保持不变；产出文件与原件同目录，命名为『<原名>_旋转.pdf』，同名自动加 (n)。")
-    public String pdf_rotate_pages(
+    private String rotatePages(
             @P("文件 ID") Long fileId,
             @P("要旋转的页码范围，如 \"3\" 或 \"1-5\"（1 基页码）") String ranges,
             @P("顺时针旋转角度，只能是 90、180 或 270；在该页当前角度上叠加") Integer degrees
     ) {
-        log.info("Tool: pdf_rotate_pages called, fileId={}, ranges={}, degrees={}", fileId, ranges, degrees);
         try {
             if (degrees == null) {
                 return "Error: degrees 不能为空，只支持 90 / 180 / 270（顺时针）。";
@@ -419,6 +399,62 @@ public class PdfTools implements AgentToolComponent {
         }
     }
 
+    @ToolMeta(displayName = "PDF页面操作", category = "pdf", fileEffect = "ADDED", refreshFiles = true, access = ToolMeta.Access.WRITE)
+    @Tool("拆分、提取或旋转 PDF 的页面，产出新 PDF，原件保持不变。op 取值：\n"
+          + "extract 提取指定页产出一份（大卷宗里只要第 10-20 页时用它，产物保持原页序，可传 outputName）；"
+          + "split 按逗号分段拆成多份，每段一份（ranges=\"1-3,5,8-\" 产出三份，一次最多 " + MAX_SPLIT_PARTS + " 份）；"
+          + "rotate 把指定页顺时针旋转（扫描歪了的证据页转正，需 degrees=90/180/270，在该页当前角度上叠加，各页角度可先用 pdf_inspect 读 rotation）。\n"
+          + RANGES_DOC
+          + "产出文件与原件同目录，同名自动加 (n)。删掉某几页用 pdf_delete_pages，合并多份用 pdf_merge。")
+    public String pdf_pages(
+            @P("文件 ID") Long fileId,
+            @P("extract=提取页 / split=拆成多份 / rotate=旋转页") String op,
+            @P("页码范围，如 \"10-20\" 或 \"1,5,9-12\"（1 基页码）；split 时每个逗号分段产出一份") String ranges,
+            @P(value = "旋转角度 90 / 180 / 270，仅 op=rotate 用", required = false) Integer degrees,
+            @P(value = "输出文件名，仅 op=extract 用（可选，默认『<原名>_摘取.pdf』）", required = false) String outputName
+    ) {
+        log.info("Tool: pdf_pages called, fileId={}, op={}, ranges={}, degrees={}", fileId, op, ranges, degrees);
+        String o = op == null ? "" : op.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (o) {
+            case "extract" -> extractPages(fileId, ranges, outputName);
+            case "split" -> splitPages(fileId, ranges);
+            case "rotate" -> rotatePages(fileId, ranges, degrees);
+            default -> "Error: op 须为 extract / split / rotate";
+        };
+    }
+
+    @ToolShim(replacedBy = "pdf_pages")
+    @ToolMeta(displayName = "拆分PDF", category = "pdf", fileEffect = "ADDED", refreshFiles = true, offerToModel = false)
+    @Tool("按页码范围把一份 PDF 拆成多份。")
+    public String pdf_split(
+            @P("文件 ID") Long fileId,
+            @P("页码范围，如 \"1-3,5,8-\"（1 基页码）。每个逗号分段产出一份文件") String ranges
+    ) {
+        return ToolShims.hint(pdf_pages(fileId, "split", ranges, null, null), "pdf_pages", "pdf_pages(fileId, op=split, ranges)");
+    }
+
+    @ToolShim(replacedBy = "pdf_pages")
+    @ToolMeta(displayName = "提取PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true, offerToModel = false)
+    @Tool("从一份 PDF 里提取指定页，产出一份新 PDF。")
+    public String pdf_extract_pages(
+            @P("文件 ID") Long fileId,
+            @P("要保留的页码范围，如 \"10-20\" 或 \"1,5,9-12\"（1 基页码）") String ranges,
+            @P(value = "输出文件名（可选，默认『<原名>_摘取.pdf』）", required = false) String outputName
+    ) {
+        return ToolShims.hint(pdf_pages(fileId, "extract", ranges, null, outputName), "pdf_pages", "pdf_pages(fileId, op=extract, ranges)");
+    }
+
+    @ToolShim(replacedBy = "pdf_pages")
+    @ToolMeta(displayName = "旋转PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true, offerToModel = false)
+    @Tool("把 PDF 的指定页旋转，产出一份新 PDF。")
+    public String pdf_rotate_pages(
+            @P("文件 ID") Long fileId,
+            @P("要旋转的页码范围，如 \"3\" 或 \"1-5\"（1 基页码）") String ranges,
+            @P("顺时针旋转角度，只能是 90、180 或 270；在该页当前角度上叠加") Integer degrees
+    ) {
+        return ToolShims.hint(pdf_pages(fileId, "rotate", ranges, degrees, null), "pdf_pages", "pdf_pages(fileId, op=rotate, ranges, degrees)");
+    }
+
     @ToolMeta(displayName = "PDF编页码", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
     @Tool("给整册 PDF 逐页写入页码或贝茨编号（Bates number），产出一份新 PDF。" +
           "format 是模板：{n} 是本页号、{total} 是总页数、{n:6} 是零填充到 6 位。" +
@@ -426,7 +462,7 @@ public class PdfTools implements AgentToolComponent {
           "模板里必须有 {n}，否则整册会印上同一个数。" +
           "position 只支持 bottom-center（默认）与 bottom-right。startAt 是第一页印的号（默认 1），" +
           "多册连号时把上一册的末号加一传进来。" +
-          "页码跟着页面的显示方向走，所以可以先 pdf_rotate_pages 转正再编号。" +
+          "页码跟着页面的显示方向走，所以可以先 pdf_pages(op=rotate) 转正再编号。" +
           "中文模板需要本机有可嵌入的中文字体，没有时会明确报错并建议改用纯英数模板。" +
           "原件保持不变；产出文件与原件同目录，命名为『<原名>_页码.pdf』，同名自动加 (n)。")
     public String pdf_add_page_numbers(

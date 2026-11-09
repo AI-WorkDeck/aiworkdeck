@@ -944,7 +944,7 @@ public class ContextAssemblerService {
                         }
                         case "text" -> {
                             systemText.append("这是一份纯文本文件（txt/md），在轻量文本编辑器中打开，没有修订机制。" +
-                                    "读取用 extract_file_text，修改用 text_write_file（整篇覆盖）或 " +
+                                    "读取用 extract_file_text，修改用 write_file(mode=overwrite)（整篇覆盖）或 " +
                                     "text_find_replace（字面量查找替换），改动直接生效、自动进入版本记录并同步刷新" +
                                     "用户打开的文本标签——**无需也不要**对它调用 doc_* / sheet_* / slide_* 工具。\n\n");
                         }
@@ -1093,35 +1093,35 @@ public class ContextAssemblerService {
         if (clientCapabilityService.capabilityOf(conversationId) != ClientCapabilityService.Capability.OFFICE) {
             if (english) {
                 systemText.append("**When organising, archiving or re-filing SEVERAL project files, you MUST submit them in one ");
-                systemText.append("`move_files_batch` call (up to 50 entries per batch); do NOT call ");
-                systemText.append("`move_project_file` / `create_folder` once per file.** ");
+                systemText.append("`move_files` call (up to 50 entries per batch); do NOT call ");
+                systemText.append("`move_files` / `create_folder` once per file.** ");
                 systemText.append("One item per round adds avoidable model round trips, leaving the user waiting ");
                 systemText.append("with the tidy-up unfinished. ");
                 systemText.append("Missing destination folders are created automatically, so you do not need `create_folder` first. ");
                 systemText.append("Retry only the entries the report lists under FAILED - never resend the whole batch. ");
-                systemText.append("A single file goes through `move_files_batch` too (one entry). ");
+                systemText.append("A single file goes through `move_files` too (one entry). ");
                 systemText.append("For \"organize this folder\", work inside the specified folder and preserve that folder itself: ");
                 systemText.append("create groups beneath it. Confirming a grouping method does not authorize moving outside it or deleting it, even after it becomes empty. ");
                 systemText.append("Only an explicit user instruction to move outside, flatten into a named parent or delete the specified folder changes this boundary; follow that instruction within its scope. ");
-                systemText.append("For `move_files_batch`, source and destination must both be project-relative paths; an attached folder's listing may instead be folder-relative. ");
-                systemText.append("Resolve the folder ID to its full project path with `list_project_folders` before moving; retain its prefix on both sides for internal organization. ");
+                systemText.append("For `move_files`, source and destination must both be project-relative paths; an attached folder's listing may instead be folder-relative. ");
+                systemText.append("Resolve the folder ID to its full project path with the project file inventory tool in folders-only mode (`foldersOnly=true`) before moving; retain its prefix on both sides for internal organization. ");
                 systemText.append("Intermediate or temporary files you no longer need go to the recycle bin with `move_to_trash` ");
                 systemText.append("(recoverable by the user); never create a \"to delete\" folder as a workaround. ");
                 systemText.append("More generally: tool calls that do not depend on each other's results belong in the SAME turn ");
                 systemText.append("(emit several `<tool_code>` blocks back to back); one call per turn burns the step budget.\n\n");
             } else {
-                systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用 `move_files_batch` 一次提交一批");
-                systemText.append("（每批最多 50 条），不要逐个调用 `move_project_file` / `create_folder`。** ");
+                systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用 `move_files` 一次提交一批");
+                systemText.append("（每批最多 50 条），不要逐个调用 `move_files` / `create_folder`。** ");
                 systemText.append("逐个调用会增加模型往返，避免让用户长时间等在中途，");
                 systemText.append("用户看到的是「文件整理了一半停住了」。");
                 systemText.append("缺失的目标文件夹会自动补建，不需要先调 `create_folder`。");
                 systemText.append("返回值里 FAILED 段列出的条目单独重试，**绝不要整批重发**——已成功的会被搬第二遍。");
-                systemText.append("只移动一份文件也用 `move_files_batch`（传一条）。");
+                systemText.append("只移动一份文件也用 `move_files`（传一条）。");
                 systemText.append("用户说「整理这个文件夹」时，默认在指定目录内部整理并保留该目录本身，分类目录建在它下面。");
                 systemText.append("确认归类方式不等于授权移出或删除该目录，即使整理后它已空也不例外。");
                 systemText.append("只有用户明确要求移出、扁平化到指定父级或删除指定目录时，才按指示改变该边界，并遵守指示范围。");
-                systemText.append("`move_files_batch` 的 source 和 destination 均须使用项目相对路径；附件目录清单可能是相对附件目录的路径。");
-                systemText.append("移动前用 `list_project_folders` 按目录 ID 核对其完整项目路径；内部整理时两端都保留该目录前缀。");
+                systemText.append("`move_files` 的 source 和 destination 均须使用项目相对路径；附件目录清单可能是相对附件目录的路径。");
+                systemText.append("移动前用项目文件清单工具的文件夹模式（`foldersOnly=true`）按目录 ID 核对其完整项目路径；内部整理时两端都保留该目录前缀。");
                 systemText.append("不再需要的中间文件、临时文件用 `move_to_trash` 移入回收站（用户可恢复），不要另建「待删除」文件夹绕行。");
                 systemText.append("同理，彼此之间不需要看对方结果的工具调用要放在同一轮里并行发出");
                 systemText.append("（连续输出多个 `<tool_code>` 块），一轮一个地挤牙膏会白白烧掉步数预算。\n\n");
@@ -1993,7 +1993,7 @@ public class ContextAssemblerService {
                 case "text" -> "\n\n[系统提醒] 用户此刻打开的是纯文本文件" + docLabel + "（id="
                         + activeContext.getId() + "），其内容见 system prompt 的 <active_document>。"
                         + "用户未指明别的文件时，「这个」「当前文件」「改一下」等都指它——"
-                        + "读取用 extract_file_text，修改用 text_write_file / text_find_replace"
+                        + "读取用 extract_file_text，修改用 write_file(mode=overwrite) / text_find_replace"
                         + "（写入直接生效并进入版本记录），**禁止**对它调用 doc_* / sheet_* / slide_* 工具。";
                 default -> "\n\n[系统提醒] 编辑器中当前已打开文档" + docLabel + "（id="
                         + activeContext.getId() + "），其正文见 system prompt 的 <active_document>。"
@@ -2630,7 +2630,7 @@ This is a spreadsheet. Read and modify it exclusively with the sheet_* tools (sh
 """;
 
     private static final String EN_GUIDE_LOWA_TEXT = """
-This is a plain-text file (txt/md), open in the lightweight text editor; it has no track-changes mechanism. Read it with extract_file_text; modify it with text_write_file (whole-file overwrite) or text_find_replace (literal find and replace). Changes take effect immediately, enter the version history automatically, and refresh the user's open text tab. You need NOT - and must NOT - call doc_* / sheet_* / slide_* tools on it.
+This is a plain-text file (txt/md), open in the lightweight text editor; it has no track-changes mechanism. Read it with extract_file_text; modify it with write_file(mode=overwrite) (whole-file overwrite) or text_find_replace (literal find and replace). Changes take effect immediately, enter the version history automatically, and refresh the user's open text tab. You need NOT - and must NOT - call doc_* / sheet_* / slide_* tools on it.
 
 """;
 
@@ -2782,7 +2782,7 @@ All doc_* editing and reading tools act directly on this document. You need NOT 
                         + " (id=" + activeContext.getId() + ") open; its content is in the system prompt's "
                         + "<active_document>. Unless the user names another file, \"this\", \"the current file\", "
                         + "\"change it\", and the like refer to it - read it with extract_file_text and modify it with "
-                        + "text_write_file / text_find_replace (writes take effect immediately and enter the version "
+                        + "write_file(mode=overwrite) / text_find_replace (writes take effect immediately and enter the version "
                         + "history). Calling doc_* / sheet_* / slide_* tools on it is **FORBIDDEN**.";
                 default -> "\n\n[System reminder] The editor currently has the document " + docLabel
                         + " (id=" + activeContext.getId() + ") open; its body text is in the system prompt's "

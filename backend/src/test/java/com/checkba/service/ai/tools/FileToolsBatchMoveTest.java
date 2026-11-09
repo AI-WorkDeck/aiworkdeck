@@ -224,9 +224,8 @@ class FileToolsBatchMoveTest {
                 assertTrue(in != null, name + " 应存在");
                 text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             }
-            assertTrue(text.contains("move_files_batch"), name + " 的文件操作表应点名批量移动工具");
+            assertTrue(text.contains("move_files"), name + " 的文件操作表应点名批量移动工具");
             assertTrue(text.contains("create_folder"), name + " 的文件操作表缺 create_folder");
-            assertTrue(text.contains("move_project_file"), name + " 的文件操作表缺 move_project_file");
             assertTrue(text.contains("rename_project_file"), name + " 的文件操作表缺 rename_project_file");
         }
     }

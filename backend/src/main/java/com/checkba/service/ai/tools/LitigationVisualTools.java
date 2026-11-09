@@ -146,7 +146,7 @@ public class LitigationVisualTools implements AgentToolComponent {
     // litigation_render 产出，而它声明了 requiresHost = LOWA；前置步骤在 Office / none 会话里
     // 可见的话，模型会陪用户走完几轮确认，走到最后一步才发现出不了图。
     @ToolMeta(displayName = "查阅制图规范", category = "litigation-visual",
-            requiresHost = ToolMeta.Host.LOWA)
+            requiresHost = ToolMeta.Host.LOWA, access = ToolMeta.Access.READ)
     @Tool("Read one reference document of the litigation-diagram standard. Call this BEFORE writing a "
             + "semantic map when you are unsure about fields, shapes or the extraction discipline — the "
             + "docs are large and are NOT preloaded. Names: standards (authoritative, read first), "
@@ -171,7 +171,7 @@ public class LitigationVisualTools implements AgentToolComponent {
     // ==================== 出图前的三问 ====================
 
     @ToolMeta(displayName = "出图前确认", category = "litigation-visual",
-            requiresHost = ToolMeta.Host.LOWA)
+            requiresHost = ToolMeta.Host.LOWA, access = ToolMeta.Access.READ)
     @Tool("Generate the three pre-render confirmation questions (structure / style / emphasis) for a "
             + "semantic map. Pass the map INLINE as a JSON string — never save it to a project file "
             + "with write_file and never re-read it with read_file; it stays in this conversation. "

@@ -30,9 +30,8 @@ allowed_tools:
   - doc_insert_at_cursor
   - doc_insert_under_heading
   - doc_add_comment
-  - doc_reply_comment
-  - doc_select_anchor
-  - doc_select_paragraph
+  - doc_update_comment
+  - doc_select
   - doc_format_selection
   - doc_undo
   - doc_restore_checkpoint
@@ -43,7 +42,7 @@ allowed_tools:
   - office_pass_step
   - office_insert_text
   - office_add_comment
-  - office_reply_comment
+  - office_update_comment
   - office_get_comments
   - office_get_revisions
   - office_format_text
@@ -55,7 +54,6 @@ allowed_tools:
   - search_project_content
   - doc_list_project_files
   - law_search
-  - law_search_keyword
   - get_law_article
   - search_web
   - browse_url

@@ -26,7 +26,7 @@
         { "name": "law_search", "argsContain": { "query": "股东出资责任" } }
       ],
       "promptContains": ["不是法源"],
-      "offeredToolsInclude": ["law_search", "law_search_keyword", "get_law_article"],
+      "offeredToolsInclude": ["law_search", "get_law_article"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -231,19 +231,19 @@
       {
         "toolCalls": [
           {
-            "name": "law_search_keyword",
-            "arguments": { "title": "劳动合同法", "fulltext": "经济补偿" }
+            "name": "law_search",
+            "arguments": { "mode": "keyword", "title": "劳动合同法", "fulltext": "经济补偿" }
           }
         ]
       },
       { "text": "<final>经济补偿标准规定在《劳动合同法》第四十七条。</final>" }
     ],
     "toolStubs": {
-      "law_search_keyword": "《中华人民共和国劳动合同法》第四十七条：经济补偿按劳动者在本单位工作的年限……"
+      "law_search": "《中华人民共和国劳动合同法》第四十七条：经济补偿按劳动者在本单位工作的年限……"
     },
     "expect": {
-      "toolCalls": [{ "name": "law_search_keyword" }],
-      "offeredToolsInclude": ["law_search", "law_search_keyword", "get_law_article"],
+      "toolCalls": [{ "name": "law_search", "argsContain": { "mode": "keyword" } }],
+      "offeredToolsInclude": ["law_search", "get_law_article"],
       "offeredToolsExclude": ["search_laws"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"

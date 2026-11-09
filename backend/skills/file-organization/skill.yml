@@ -45,16 +45,15 @@ allowed_tools:
   - search_project_files
   - extract_file_text
   - create_folder
-  - move_files_batch
-  - move_project_file
+  - move_files
   - rename_project_file
   - copy_files
   - move_to_trash
 
 output: |
   按「当前目录盘点 → 分类与命名规则 → 已执行的整理动作（或待确认的归档方案）→ 需人工核实的零散/存疑文件」结构汇报；
-  需要实际移动多个文件时优先使用 move_files_batch 一次性批量提交，避免逐个移动耗尽步数预算。
+  需要实际移动多个文件时优先使用 move_files 一次性批量提交，避免逐个移动耗尽步数预算。
 
 output_en: |
   Report in the structure: "Current Directory Inventory -> Classification & Naming Rules -> Executed Moves/Renames (or Proposed Archiving Plan) -> Ambiguous Files Requiring Human Confirmation".
-  When moving multiple files, always batch operations with move_files_batch in a single step rather than moving files one by one.
+  When moving multiple files, always batch operations with move_files in a single step rather than moving files one by one.

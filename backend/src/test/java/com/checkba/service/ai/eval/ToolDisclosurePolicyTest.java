@@ -114,7 +114,7 @@ class ToolDisclosurePolicyTest {
         assertTrue(docx.containsAll(List.of("query_memory", "todo_write", "dispatch_subtask", "ask_user", "use_skill")),
                 "记忆检索与编排工具必须在核心集：" + docx);
         // V2：整理文件三件套、标准格式、导出 PDF 退出核心集，靠关键词预放回（见 v2LeftCoreToolsAreSurfacedByKeywords）
-        for (String left : List.of("create_folder", "move_files_batch", "move_to_trash", "doc_apply_standard_format",
+        for (String left : List.of("create_folder", "move_files", "move_to_trash", "doc_apply_standard_format",
                 "doc_export_pdf", "list_attached_files", "doc_restore_checkpoint", "memory_search")) {
             assertFalse(docx.contains(left), left + " 应已退出 docx 核心集：" + docx);
         }
@@ -131,7 +131,7 @@ class ToolDisclosurePolicyTest {
         expectations.put("导出成PDF", "doc_export_pdf");
         expectations.put("转PDF发给客户", "doc_export_pdf");
         expectations.put("新建一个文件夹叫证据", "create_folder");
-        expectations.put("把这几份文件移动到归档", "move_files_batch");
+        expectations.put("把这几份文件移动到归档", "move_files");
         expectations.put("把合同草稿.docx删了", "move_to_trash");
         expectations.put("放进回收站", "move_to_trash");
         expectations.put("你还记得我之前说过的偏好吗", "memory_search");
@@ -605,8 +605,8 @@ class ToolDisclosurePolicyTest {
         assertEquals(Set.of(), TRIM.categoriesHintedBy("项目目录下有什么"),
                 "单独的「目录」多半是文件夹，不许把整个 format 类目放回");
         assertEquals(Set.of(), TRIM.categoriesHintedBy("把这几份文件移动到「往来函件」文件夹"),
-                "V2：移动 / 文件夹只精确放回 move_files_batch / create_folder，不拉整个 files 类目");
-        assertEquals(Set.of("move_files_batch", "create_folder"),
+                "V2：移动 / 文件夹只精确放回 move_files / create_folder，不拉整个 files 类目");
+        assertEquals(Set.of("move_files", "create_folder"),
                 TRIM.toolsHintedBy("把这几份文件移动到「往来函件」文件夹"));
         assertEquals(Set.of("files"), TRIM.categoriesHintedBy("把这几个文件重命名"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("这段话引用了哪条司法解释？"));

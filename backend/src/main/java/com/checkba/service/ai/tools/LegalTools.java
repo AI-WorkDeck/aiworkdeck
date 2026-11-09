@@ -77,11 +77,11 @@ public class LegalTools implements AgentToolComponent {
         String reason = raw.length() > 300 ? raw.substring(0, 300) + "…" : raw;
         return com.checkba.service.LangText.of(
                 "Error: " + VENDOR_UNAVAILABLE_MARKER + " 北大法宝法源暂时不可用（" + reason + "）。"
-                        + "不要重试其他法宝工具（law_search / law_search_keyword / get_law_article / law_recognition / case_search 同源，本轮已下线）。"
+                        + "不要重试其他法宝工具（law_search / get_law_article / law_recognition / case_search 同源，本轮已下线）。"
                         + "如改用 search_web / browse_url，只能作为线索，并须在回答中注明「非权威来源，待核实」；"
                         + "优先国家法律法规数据库 flk.npc.gov.cn 原文。",
                 "Error: " + VENDOR_UNAVAILABLE_MARKER + " The PKULaw legal source is temporarily unavailable (" + reason + "). "
-                        + "Do not retry other PKULaw tools (law_search / law_search_keyword / get_law_article / law_recognition / case_search share the same source and are disabled for this run). "
+                        + "Do not retry other PKULaw tools (law_search / get_law_article / law_recognition / case_search share the same source and are disabled for this run). "
                         + "If you fall back to search_web / browse_url, treat results as leads only and state in your answer "
                         + "\"non-authoritative source, to be verified\"; prefer the original text on the National Laws and Regulations Database flk.npc.gov.cn.");
     }
@@ -185,10 +185,31 @@ public class LegalTools implements AgentToolComponent {
 
     // --- PKULaw MCP Integration（服务器名对应配置 mcp.servers[].name）---
 
-    @ToolMeta(displayName = "语义搜索法规", category = "legal")
-    @Tool("用北大法宝语义检索法律法规，返回相关条文列表。\n"
-            + "何时用：一般法律问题。已知法规名和条号用 get_law_article；中国大陆以外的法域用 search_web。")
-    public String law_search(@P("要检索的法律问题或关键词，用自然语言描述即可") String query) {
+    @ToolMeta(displayName = "检索法规", category = "legal", access = ToolMeta.Access.READ)
+    @Tool("用北大法宝检索法律法规，返回相关条文或法规列表。mode=semantic（缺省）按 query 语义检索；mode=keyword 按 title/fulltext 关键词找法规。\n"
+            + "已知法规名和条号用 get_law_article；中国大陆以外的法域用 search_web。")
+    public String law_search(
+            @P(value = "法律问题或关键词，自然语言；semantic 必填", required = false) String query,
+            @P(value = "semantic（缺省）/ keyword", required = false) String mode,
+            @P(value = "法规名关键词如「公司法」，keyword 用", required = false) String title,
+            @P(value = "法规正文关键词，keyword 用", required = false) String fulltext) {
+        String m = mode == null ? "semantic" : mode.trim().toLowerCase(java.util.Locale.ROOT);
+        if (m.isEmpty()) m = "semantic";
+        if ("keyword".equals(m)) {
+            log.info("Tool: law_search (keyword) called for title='{}', fulltext='{}'", title, fulltext);
+            Map<String, Object> args = new HashMap<>();
+            // 模型常把关键词放进 query：title / fulltext 都没给时，query 当法规名关键词
+            String t = StringUtils.hasText(title) ? title : (StringUtils.hasText(fulltext) ? null : query);
+            if (StringUtils.hasText(t)) args.put("title", t.trim());
+            if (StringUtils.hasText(fulltext)) args.put("fulltext", fulltext.trim());
+            if (args.isEmpty()) {
+                return "Error: title or fulltext is required.";
+            }
+            return callPkulaw("pkulaw-keyword", "get_law_list", args);
+        }
+        if (!"semantic".equals(m)) {
+            return "Error: mode 须为 semantic 或 keyword。";
+        }
         log.info("Tool: law_search (semantic) called for query='{}'", query);
         // 先校验再解引用：query 缺省时 Map.of("query", query) 会直接抛 NPE（getMessage()==null），
         // 被 ToolRegistry 的通用异常处理兜成一句不可行动的 "Error executing tool: null"——
@@ -200,6 +221,11 @@ public class LegalTools implements AgentToolComponent {
         // search_case 同口径）；传 query 会触发上游 FastMCP/Pydantic 校验错误：
         // "1 validation error for call[search_article] text Missing required argument"。
         return callPkulaw("pkulaw-semantic", "search_article", Map.of("text", query.trim()));
+    }
+
+    /** 语义检索的便捷重载（非工具入口）。 */
+    public String law_search(String query) {
+        return law_search(query, null, null, null);
     }
 
     @ToolMeta(displayName = "检索司法案例", category = "legal")
@@ -214,20 +240,14 @@ public class LegalTools implements AgentToolComponent {
         return callPkulaw("pkulaw-case-semantic", "search_case", Map.of("text", query.trim()));
     }
 
-    @ToolMeta(displayName = "关键词搜索法规", category = "legal")
-    @Tool("Search for laws by keywords in title or fulltext. Use this when you need specific laws by name.")
+    @ToolShim(replacedBy = "law_search")
+    @ToolMeta(displayName = "关键词搜索法规", category = "legal", offerToModel = false, access = ToolMeta.Access.READ)
+    @Tool("按法规名称或正文关键词检索法规。")
     public String law_search_keyword(
             @P(value = "法规名称中的关键词（如「公司法」）；与 fulltext 至少给一个", required = false) String title,
             @P(value = "法规正文中的关键词；与 title 至少给一个", required = false) String fulltext) {
-        log.info("Tool: law_search_keyword called for title='{}', fulltext='{}'", title, fulltext);
-        Map<String, Object> args = new HashMap<>();
-        if (StringUtils.hasText(title)) args.put("title", title.trim());
-        if (StringUtils.hasText(fulltext)) args.put("fulltext", fulltext.trim());
-        if (args.isEmpty()) {
-            return "Error: title or fulltext is required.";
-        }
-
-        return callPkulaw("pkulaw-keyword", "get_law_list", args);
+        return ToolShims.hint(law_search(null, "keyword", title, fulltext), "law_search",
+                "law_search(mode=keyword, title, fulltext)");
     }
 
     @ToolMeta(displayName = "法条识别与溯源", category = "legal")

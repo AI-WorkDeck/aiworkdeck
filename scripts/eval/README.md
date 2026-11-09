@@ -56,8 +56,8 @@ node scripts/eval/model-matrix.mjs \
     "memory": [{ "key": "客户偏好", "content": "客户偏好周五开会", "type": "preference", "scope": "user" }]
   },
   "expect": {
-    "firstToolAnyOf": ["move_files_batch"],      // 第一个工具须命中其一；"<none>" 表示允许不调工具；"/正则/" 也可
-    "mustUse": [["move_files_batch", "move_project_file"]],  // 每个子数组是「任一」，各组都要满足
+    "firstToolAnyOf": ["move_files"],            // 第一个工具须命中其一；"<none>" 表示允许不调工具；"/正则/" 也可
+    "mustUse": [["move_files", "move_project_file"]],  // 每个子数组是「任一」，各组都要满足
     "mustNotUse": ["move_to_trash"],
     "finalTextIncludes": ["沟通记录"],           // 可选：最终回复须包含
     "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.name==='合同.docx');"  // 可选：JS 函数体

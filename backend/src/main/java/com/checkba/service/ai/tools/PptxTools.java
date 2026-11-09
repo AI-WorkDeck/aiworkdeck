@@ -67,38 +67,17 @@ public class PptxTools implements AgentToolComponent {
 
     // ==================== 文件管理工具 ====================
 
-    @Tool("只列文件夹、不列文件，是 folderId 的来源：write_docx 的 parentFolderId、move_project_file 的 targetFolderId "
-            + "都可从这里取（新建文件夹用 create_folder，文件的 fileId 用 doc_list_project_files）。"
-            + "返回文件夹 ID、名称和路径。仅当用户明确指定要保存到某个特定文件夹时才需要调用此工具。")
+    @ToolShim(replacedBy = "doc_list_project_files")
+    @ToolMeta(displayName = "列出文件夹", category = "file", offerToModel = false, access = ToolMeta.Access.READ)
+    @Tool("只列文件夹、不列文件，是 folderId 的来源。")
     public String list_project_folders(
             @P("项目 ID") Long projectId
     ) {
         log.info("Tool: list_project_folders called for projectId={}", projectId);
         try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
-            
-            // 筛选出所有文件夹
-            List<ProjectFile> folders = allFiles.stream()
-                    .filter(f -> Boolean.TRUE.equals(f.getIsFolder()))
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
-                    .collect(Collectors.toList());
-            
-            if (folders.isEmpty()) {
-                return "项目中没有文件夹。可传 parentId=0 明确保存到项目根目录。";
-            }
-            
-            StringBuilder sb = new StringBuilder("项目文件夹列表 (共 " + folders.size() + " 个):\n");
-            sb.append("- ID: 0, 名称: 根目录 (明确选择；省略时沿用本轮源文档目录)\n");
-            
-            for (ProjectFile f : folders) {
-                String folderPath = getFileFolderPath(f.getParentId(), allFiles);
-                String fullPath = folderPath.isEmpty() ? f.getName() : folderPath + "/" + f.getName();
-                sb.append(String.format("- ID: %d, 名称: %s, 完整路径: /%s\n", 
-                        f.getId(), f.getName(), fullPath));
-            }
-            sb.append("\n提示：在 pptx_generate 中使用上述文件夹 ID 作为 parentId，可以将生成的 PPT 保存到对应文件夹。");
-            return sb.toString();
-            
+            return ToolShims.hint(
+                    DocumentEditTools.folderListing(projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId)),
+                    "doc_list_project_files", "doc_list_project_files(foldersOnly=true)");
         } catch (Exception e) {
             log.error("Failed to list project folders", e);
             return "Error: " + e.getMessage();
@@ -180,7 +159,7 @@ public class PptxTools implements AgentToolComponent {
     public String pptx_generate(
             @P("PPT 主题或详细描述，如：'AI 在法律行业的应用' 或 '公司年度总结报告，包含业绩、成就和未来规划'") String topic,
             @P("项目 ID，生成的 PPTX 将关联到此项目") Long projectId,
-            @P("父文件夹 ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。可以调用 list_project_folders 获取可用的文件夹 ID。") Long parentId,
+            @P("父文件夹 ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。可以调用 doc_list_project_files(foldersOnly=true) 获取可用的文件夹 ID。") Long parentId,
             @P("自定义文件名（可选，不含扩展名）。不指定则自动生成。") String fileName,
             @P("PPT 风格描述（可选），如：'科技风'、'商务简约'、'学术正式'。留空则使用默认风格。") String style,
             @P("输出语言：zh（中文，默认）、en（英文）、ja（日语）") String language
@@ -395,7 +374,7 @@ public class PptxTools implements AgentToolComponent {
                 
                 successMsg.append("**页面修改**: 可以使用以下工具进行修改：\n");
                 successMsg.append("- pptx_get_project_pages: 查看所有页面\n");
-                successMsg.append("- pptx_refine_outline: 修改大纲结构（增删页面）\n");
+                successMsg.append("- pptx_outline(action=refine): 修改大纲结构（增删页面）\n");
                                 successMsg.append("- 在编辑器中打开生成的文件后，用 slide_get_page 查看、slide_* 工具修改文本与格式（可编辑版适用）");
                 
                 // 标记后台任务完成
@@ -437,16 +416,41 @@ public class PptxTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "生成PPT大纲", category = "pptx", requiresHost = ToolMeta.Host.LOWA)
-    @Tool("生成 PPTX 大纲（不生成完整 PPT）。用于让用户先审阅和修改大纲结构，确认后再生成完整 PPT。")
+    @ToolMeta(displayName = "PPT大纲", category = "pptx", requiresHost = ToolMeta.Host.LOWA, access = ToolMeta.Access.WRITE)
+    @Tool("生成或修改 PPT 大纲（不生成完整 PPT），让用户先审阅大纲结构，确认后再用 pptx_generate 生成。action: create 按主题生成大纲，refine 按自然语言要求修改已有大纲。\n"
+          + "create 需 topic，返回服务项目 ID；refine 需 serviceProjectId（create 返回的）与 userRequirement，可增删页面、合并页面、调整顺序。")
+    public String pptx_outline(
+            @P("create=生成大纲 / refine=修改大纲") String action,
+            @P(value = "PPT 主题或详细描述，仅 action=create 用", required = false) String topic,
+            @P(value = "输出语言：zh（中文，默认）、en（英文）、ja（日语）", required = false) String language,
+            @P(value = "PPTX 服务中的项目 ID（create 返回的），仅 action=refine 用", required = false) String serviceProjectId,
+            @P(value = "用户的修改要求，如：'增加一页关于市场分析的内容'、'把第3页和第4页合并'、'删除结论页'，仅 action=refine 用", required = false) String userRequirement
+    ) {
+        String a = action == null ? "" : action.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("create".equals(a)) {
+            if (topic == null || topic.isBlank()) return "Error: action=create 需要 topic 参数（PPT 主题）";
+            // 模型 ID 由 ToolRegistry 通过线程上下文透传
+            return pptx_generate_outline(topic, language, ToolContextHolder.currentModelId());
+        }
+        if ("refine".equals(a)) {
+            if (serviceProjectId == null || serviceProjectId.isBlank() || userRequirement == null || userRequirement.isBlank()) {
+                return "Error: action=refine 需要 serviceProjectId（action=create 返回的服务项目 ID）与 userRequirement";
+            }
+            return refineOutline(serviceProjectId, userRequirement, language);
+        }
+        return "Error: action 须为 create 或 refine";
+    }
+
+    @ToolShim(replacedBy = "pptx_outline")
+    @ToolMeta(displayName = "生成PPT大纲", category = "pptx", requiresHost = ToolMeta.Host.LOWA, offerToModel = false)
+    @Tool("生成 PPTX 大纲（不生成完整 PPT）。")
     public String pptx_generate_outline(
             @P("PPT 主题或详细描述") String topic,
             @P("输出语言：zh（中文，默认）、en（英文）、ja（日语）") String language
     ) {
-        // 模型 ID 由 ToolRegistry 通过线程上下文透传
-        return pptx_generate_outline(topic, language, ToolContextHolder.currentModelId());
+        return ToolShims.hint(pptx_outline("create", topic, language, null, null), "pptx_outline", "pptx_outline(action=create, topic)");
     }
-    
+
     /**
      * 带 modelId 参数的 pptx_generate_outline 内部版本
      */
@@ -599,7 +603,7 @@ public class PptxTools implements AgentToolComponent {
                 sb.append(String.format("  - 有图片: %s\n\n", imagePath != null ? "是" : "否"));
             }
             
-            sb.append("要修改页面，请在编辑器中打开生成的 PPTX 后用 slide_* 工具修改，或用 pptx_refine_outline 调整大纲。");
+            sb.append("要修改页面，请在编辑器中打开生成的 PPTX 后用 slide_* 工具修改，或用 pptx_outline(action=refine) 调整大纲。");
             return sb.toString();
             
         } catch (Exception e) {
@@ -608,14 +612,24 @@ public class PptxTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(requiresHost = ToolMeta.Host.LOWA)
-    @Tool("使用自然语言修改 PPT 大纲结构。可以增加、删除、修改页面，调整顺序等。")
+    @ToolShim(replacedBy = "pptx_outline")
+    @ToolMeta(requiresHost = ToolMeta.Host.LOWA, offerToModel = false, access = ToolMeta.Access.WRITE)
+    @Tool("使用自然语言修改 PPT 大纲结构。")
     public String pptx_refine_outline(
             @P("PPTX 服务中的项目 ID") String serviceProjectId,
             @P("用户的修改要求，如：'增加一页关于市场分析的内容'、'把第3页和第4页合并'、'删除结论页'") String userRequirement,
             @P("输出语言：zh（中文，默认）、en（英文）") String language
     ) {
-        log.info("Tool: pptx_refine_outline called, projectId={}, requirement={}", 
+        return ToolShims.hint(pptx_outline("refine", null, language, serviceProjectId, userRequirement),
+                "pptx_outline", "pptx_outline(action=refine, serviceProjectId, userRequirement)");
+    }
+
+    private String refineOutline(
+            String serviceProjectId,
+            String userRequirement,
+            String language
+    ) {
+        log.info("Tool: pptx_outline(refine) called, projectId={}, requirement={}", 
                 serviceProjectId, userRequirement.length() > 50 ? userRequirement.substring(0, 50) + "..." : userRequirement);
         
         try {
