@@ -130,7 +130,7 @@
     "category": "files",
     "protocol": "xml",
     "progressiveDisclosure": true,
-    "userInput": "在正文那张表的末尾加一行",
+    "userInput": "在正文那张表的末尾追加一条记录",
     "activeDocument": {
       "id": "1001",
       "name": "股权转让协议.docx",

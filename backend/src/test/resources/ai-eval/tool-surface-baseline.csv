@@ -7,7 +7,7 @@
 # 2026-11-08 tool-system-v2 V2（核心集重切 8 个名字退出 + 条件核心 list_attached_files/doc_restore_checkpoint + memory_search 退出固定追加）后重测；V2 前基线见 git 历史
 # 2026-11-09 tool-system-v2 V4（22 族合并为单名、旧名转 @ToolShim 隐藏；law_search/search_project_files/doc_list_project_files 吸收合并参数）后重测；V4 前基线见 git 历史
 lowa-docx,neutral,31,6920
-lowa-docx,typical,49,13056
+lowa-docx,typical,39,9308
 lowa-docx,worst,35,7253
 lowa-xlsx,neutral,25,5918
 lowa-xlsx,typical,50,11802

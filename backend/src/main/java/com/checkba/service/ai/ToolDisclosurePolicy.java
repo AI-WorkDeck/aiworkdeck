@@ -324,7 +324,9 @@ public class ToolDisclosurePolicy {
         // 「表格」两边都放：docx 里说的「表格」是文档内的表（table 类目的 doc_table_*），
         // xlsx 会话或「做一张表格」说的是电子表格；分不清就两类都放回，多付的是一轮里两类的规格。
         CATEGORY_KEYWORDS.put("spreadsheet", List.of("表格", "excel", "xlsx", "工作表", "电子表格", "一张表"));
-        CATEGORY_KEYWORDS.put("table", List.of("表格", "table", "单元格", "合并单元格"));
+        // 不含「表格」二字的说法也要放回（V4 矩阵：「价目表最后插一行」没命中）；不收光秃秃的「行」「列」。
+        CATEGORY_KEYWORDS.put("table", List.of("表格", "table", "单元格", "合并单元格",
+                "价目表", "表里", "这张表", "表中", "那一行"));
         CATEGORY_KEYWORDS.put("task", List.of("事项", "日程", "提醒", "待办", "截止", "deadline",
                 "期限", "到期", "开庭", "庭审", "时效", "截止日"));
         // 以下几类是渐进披露默认打开后补的（dev-board#1064 第二步）：律师最常说的几类请求，
@@ -367,6 +369,10 @@ public class ToolDisclosurePolicy {
     static {
         TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder"));
         TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "move files"));
+        TOOL_KEYWORDS.put("doc_table_insert", List.of("插一行", "插入一行", "加一行", "新增一行", "插一列", "插入一列", "加一列", "新增一列"));
+        TOOL_KEYWORDS.put("doc_table_delete", List.of("删一行", "删除一行", "删掉一行", "删一列", "删除一列", "删掉一列"));
+        TOOL_KEYWORDS.put("office_table_insert", List.of("插一行", "插入一行", "加一行", "新增一行", "插一列", "插入一列", "加一列", "新增一列"));
+        TOOL_KEYWORDS.put("office_table_delete", List.of("删一行", "删除一行", "删掉一行", "删一列", "删除一列", "删掉一列"));
         TOOL_KEYWORDS.put("move_to_trash", List.of("回收站", "删除", "删掉", "删了", "move to trash", "delete file"));
         TOOL_KEYWORDS.put("doc_apply_standard_format", List.of("标准格式", "统一格式", "律所格式", "排版"));
         TOOL_KEYWORDS.put("doc_export_pdf", List.of("导出pdf", "导出成pdf", "导出为pdf", "转pdf", "转成pdf", "存成pdf",

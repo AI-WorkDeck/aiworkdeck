@@ -985,5 +985,50 @@
         "pptx_outline"
       ]
     }
+  },
+  {
+    "id": "merge-doc-table-insert-pricelist-turn1",
+    "title": "V4：「在价目表最后插一行」不含「表格」二字，首轮也要下发 doc_table_insert（精确放回）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在价目表最后插一行",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_table_insert",
+            "arguments": {
+              "axis": "row"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已插入。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_table_insert": "{\"success\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_table_insert",
+          "argsContain": {
+            "axis": "row"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_table_insert",
+        "doc_table_read"
+      ],
+      "bubbleEndStatus": "finished"
+    }
   }
 ]
