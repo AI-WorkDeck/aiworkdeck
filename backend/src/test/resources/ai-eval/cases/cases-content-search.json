@@ -21,7 +21,7 @@
         { "name": "search_project_content", "argsContain": { "query": "违约金" } }
       ],
       "offeredToolsInclude": ["search_project_content", "search_project_files", "extract_file_text"],
-      "offeredToolsExclude": ["doc_search_related_docs", "read_document"],
+      "toolsNotRegistered": ["doc_search_related_docs", "read_document"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -49,7 +49,8 @@
         { "name": "search_project_content" }
       ],
       "offeredToolsInclude": ["search_project_content", "doc_list_project_files", "extract_file_text"],
-      "offeredToolsExclude": ["doc_search_related_docs", "doc_open_file", "pdf_list_files"],
+      "offeredToolsExclude": ["doc_open_file"],
+      "toolsNotRegistered": ["doc_search_related_docs", "pdf_list_files"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }

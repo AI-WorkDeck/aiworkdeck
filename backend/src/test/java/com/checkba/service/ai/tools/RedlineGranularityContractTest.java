@@ -28,7 +28,7 @@ class RedlineGranularityContractTest {
 
     /** 会在修订模式下产生「删 X 插 Y」片段的替换类工具。 */
     private static final List<String> REPLACE_TOOLS = List.of(
-            "doc_find_replace", "doc_replace_nth_match", "doc_replace_selection",
+            "doc_find_replace", "doc_replace_selection",
             "doc_modify_paragraph", "doc_replace_at_anchor");
 
     private static String toolDescription(String name) {

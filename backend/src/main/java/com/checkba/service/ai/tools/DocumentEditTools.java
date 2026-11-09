@@ -418,20 +418,6 @@ public class DocumentEditTools implements AgentToolComponent {
 
     // ==================== 选区和光标操作 ====================
 
-    // 只登记、不下发（dev-board#1065 T-15）：内容被 doc_get_cursor_context（选中内容 + 前后文 +
-    // 所在段落）完全覆盖，两个「看选区」同时摆着只会让模型二选一。
-    @ToolMeta(displayName = "读取选区", category = "document", offerToModel = false)
-    @Tool("获取文档中当前选区的文本内容和位置信息。用于了解用户当前光标位置和选中的文本。")
-    public String doc_get_selection() {
-        log.info("Tool: doc_get_selection called");
-        try {
-            return editorBridgeService.executeEditorCommand("get_selection", null);
-        } catch (Exception e) {
-            log.error("Failed to get selection", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
     // 只宣告编辑器真的实现了的两种：office_thread.js 的 goto() 只处理 start/end，
     // paragraph/bookmark/line 一律返回 "goto type not supported yet"。
     // 描述里挂着做不到的能力 = 模型反复往死路上撞、白烧步数预算。
@@ -448,25 +434,6 @@ public class DocumentEditTools implements AgentToolComponent {
                     java.util.Map.of("type", type, "target", target != null ? target : ""));
         } catch (Exception e) {
             log.error("Failed to goto position", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-15）：参数是 0 基字符偏移，而本类的设计原则写明「禁止使用
-    // 整数字符偏移（跨富文本必然错位）」，模型也拿不到可靠的偏移。选中某处一律走 doc_find_text →
-    // doc_select_anchor。worker 的 set_selection 仍被 doc_select_anchor 与插件使用。
-    @ToolMeta(displayName = "设置选区", category = "document", offerToModel = false)
-    @Tool("设置文档的选区范围（精确控制光标/选区）。Start 和 End 是字符索引位置。")
-    public String doc_set_selection(
-            @P("选区开始位置 (0-based 字符索引)") Integer start,
-            @P("选区结束位置 (0-based 字符索引)") Integer end
-    ) {
-        log.info("Tool: doc_set_selection called start={}, end={}", start, end);
-        try {
-            return editorBridgeService.executeEditorCommand("set_selection", 
-                    java.util.Map.of("start", start, "end", end));
-        } catch (Exception e) {
-            log.error("Failed to set selection", e);
             return "Error: " + e.getMessage();
         }
     }
@@ -497,8 +464,8 @@ public class DocumentEditTools implements AgentToolComponent {
 
     /**
      * worker 的 find_text_locations 返回 matchIndex: i（0 起）；模型面的 matchIndex 一律 1 基
-     * （doc_replace_nth_match / doc_delete_match 下发前减 1）。回给模型前加 1，模型从这里看到的
-     * 序号才能原样喂给 doc_replace_nth_match——否则「第二个匹配 matchIndex=1」传过去减一改的是第一个。
+     * （doc_replace_nth_match / doc_delete_match 两个工具已于 V3 删除，worker action 仍留给插件）。
+     * 回给模型前加 1，模型看到的序号与 doc_find_text 描述里的「从 1 开始」一致。
      * 解析失败（error / 非 JSON）原样透传。
      */
     static String oneBasedMatchIndexes(String raw) {
@@ -541,88 +508,6 @@ public class DocumentEditTools implements AgentToolComponent {
                     ));
         } catch (Exception e) {
             log.error("Failed to find and replace", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-14）：文档里「删一句 / 改第 N 处」原先有八条路，
-    // 这三条描述里没有任何判据，模型在它们与 doc_find_replace / doc_replace_at_anchor 之间随机挑。
-    // 删除一律走 doc_replace_at_anchor(anchorId, "") 或 doc_find_replace(…, "")；第 N 处先
-    // doc_find_text 按上下文挑出那一处的 anchorId。登记保留（插件经 DOC_ACTIONS 按 worker 契约
-    // 直接调这几个 action，老会话回放与 XML 兜底路径调到时照常执行）。
-    @ToolMeta(displayName = "替换指定匹配", category = "document", fileEffect = "MODIFIED",
-            offerToModel = false)
-    @Tool("将文档中第 N 个可见匹配项替换为新文本。" +
-          "索引从 1 开始，只计算用户可见的匹配（排除修订模式下被删除的内容）。" +
-          "如果要删除文本，将 replaceText 设置为空字符串即可。" +
-          REDLINE_GRANULARITY_NOTE)
-    public String doc_replace_nth_match(
-            @P("要查找的文本") String findText,
-            @P("替换为的文本") String replaceText,
-            @P("第几个可见匹配（从 1 开始）") Integer matchIndex
-    ) {
-        log.info("Tool: doc_replace_nth_match called find={}, replace={}, index={}", findText, replaceText, matchIndex);
-        try {
-            if (matchIndex == null || matchIndex < 1) {
-                return "Error: matchIndex 必须是从 1 开始的正整数";
-            }
-            // 模型面 1 基（描述/prompt/LEGACY_DEFAULTS 一致），worker 的 replace_nth_match 与它的
-            // 其它整数定位一样 0 基，且插件经 PluginHostImpl.DOC_ACTIONS 直接按 worker 契约调用——
-            // 归一只能落在这里：下发前减 1（MatchIndexBaseTest 钉着）。
-            return editorBridgeService.executeEditorCommand("replace_nth_match",
-                    java.util.Map.of(
-                            "findText", findText,
-                            "replaceText", replaceText,
-                            "matchIndex", matchIndex - 1
-                    ));
-        } catch (Exception e) {
-            log.error("Failed to replace nth match", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-14），理由见 doc_replace_nth_match 上方。
-    @ToolMeta(displayName = "删除匹配文本", category = "document", fileEffect = "MODIFIED",
-            offerToModel = false)
-    @Tool("删除文档中第 N 个可见的匹配文本。专门用于删除操作，通过查找文本并执行删除。")
-    public String doc_delete_match(
-            @P("要删除的文本内容") String findText,
-            @P("第几个可见匹配（从 1 开始）") Integer matchIndex
-    ) {
-        log.info("Tool: doc_delete_match called find={}, index={}", findText, matchIndex);
-        try {
-            if (matchIndex == null || matchIndex < 1) {
-                return "Error: matchIndex 必须是从 1 开始的正整数";
-            }
-            // 同 doc_replace_nth_match：模型面 1 基 → worker 0 基，下发前减 1。
-            return editorBridgeService.executeEditorCommand("delete_match",
-                    java.util.Map.of(
-                            "findText", findText,
-                            "matchIndex", matchIndex - 1
-                    ));
-        } catch (Exception e) {
-            log.error("Failed to delete match", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-14），理由见 doc_replace_nth_match 上方。
-    @ToolMeta(displayName = "删除文本", category = "document", fileEffect = "MODIFIED",
-            offerToModel = false)
-    @Tool("删除文档中的文本内容。可以删除所有匹配项，或只删除第一个匹配项。")
-    public String doc_delete_text(
-            @P("要删除的文本内容") String text,
-            @P("是否删除所有匹配项；不传只删第一处，要全部删掉必须显式传 true") Boolean deleteAll
-    ) {
-        log.info("Tool: doc_delete_text called text={}, all={}", text, deleteAll);
-        try {
-            return editorBridgeService.executeEditorCommand("delete_text", 
-                    java.util.Map.of(
-                            "text", text, 
-                            "deleteAll", deleteAll != null ? deleteAll : true
-                    ));
-        } catch (Exception e) {
-            log.error("Failed to delete text", e);
             return "Error: " + e.getMessage();
         }
     }
@@ -937,64 +822,6 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     // ==================== 智能搜索 ====================
-
-    // dev-board#1065（审计 T-03）：描述说「在文件名和文档内容中搜索」，实现只比文件名（内容搜索是个 TODO），
-    // 无命中时还回「项目里前 10 个可编辑文档」冒充结果。全文检索由 search_project_content 承担，
-    // 本工具只登记不下发（老会话回放与 XML 兜底照常执行）。
-    @ToolMeta(displayName = "搜索相关文档", category = "document", offerToModel = false)
-    @Tool("搜索项目中可能需要修改的相关文档。根据关键词在文件名和文档内容中搜索。")
-    public String doc_search_related_docs(
-            @P("搜索关键词，如'交易方案'、'股东决议'等") String keyword,
-            @P("项目ID") Long projectId
-    ) {
-        log.info("Tool: doc_search_related_docs called keyword={}, projectId={}", keyword, projectId);
-        try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId).stream()
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
-                    .collect(Collectors.toList());
-            
-            // 1. 首先按文件名匹配
-            List<ProjectFile> matchedByName = allFiles.stream()
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                    .filter(f -> isEditableDocument(f.getName()))
-                    .filter(f -> f.getName().contains(keyword))
-                    .collect(Collectors.toList());
-            
-            // 2. 如果文件名匹配不够，可以考虑内容搜索（使用 RAG 服务）
-            // TODO: 集成 ProjectRagService 进行内容搜索
-            
-            if (matchedByName.isEmpty()) {
-                // 返回所有可编辑文档供参考
-                List<ProjectFile> editableFiles = allFiles.stream()
-                        .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                        .filter(f -> isEditableDocument(f.getName()))
-                        .limit(10)
-                        .collect(Collectors.toList());
-                
-                if (editableFiles.isEmpty()) {
-                    return "未找到包含关键词'" + keyword + "'的文档，项目中也没有其他可编辑文档。";
-                }
-                
-                StringBuilder sb = new StringBuilder("未找到包含关键词'" + keyword + "'的文档。以下是项目中的可编辑文档供参考:\n");
-                for (ProjectFile f : editableFiles) {
-                    sb.append(String.format("- ID: %d, 名称: %s\n", f.getId(), f.getName()));
-                }
-                return sb.toString();
-            }
-            
-            StringBuilder sb = new StringBuilder("找到 " + matchedByName.size() + " 个可能相关的文档:\n");
-            for (ProjectFile f : matchedByName) {
-                sb.append(String.format("- ID: %d, 名称: %s, 类型: %s\n", 
-                        f.getId(), f.getName(), f.getFileType()));
-            }
-            sb.append("\n建议：使用 doc_open_file 打开需要修改的文档，然后使用其他文档编辑工具进行编辑。");
-            return sb.toString();
-            
-        } catch (Exception e) {
-            log.error("Failed to search related docs", e);
-            return "Error: " + e.getMessage();
-        }
-    }
 
     // ==================== 拟人式原语（嵌入式 LibreOffice 编辑器） ====================
     // 设计文档：docs/AI_EDITOR_PRIMITIVES.md。工作循环：看 → 找 → 选 → 改 → 验。
@@ -3151,21 +2978,6 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     // ==================== 调试工具 ====================
-
-    // 调试工具不下发规格（审计 A15）：它与 doc_list_revisions 功能重合、描述自称
-    // 「用于分析和诊断修订模式下的文本操作问题」，不该出现在律师面前的过程卡里。
-    // 同样只裁 spec：维护者排障时经 XML 兜底路径仍调得到。
-    @ToolMeta(displayName = "检查修订记录", category = "document", offerToModel = false)
-    @Tool("调试工具：获取文档中所有修订记录的详细信息，包括修订类型、位置、内容等。用于分析和诊断修订模式下的文本操作问题。")
-    public String doc_debug_revisions() {
-        log.info("Tool: doc_debug_revisions called");
-        try {
-            return editorBridgeService.executeEditorCommand("debug_revisions", null);
-        } catch (Exception e) {
-            log.error("Failed to debug revisions", e);
-            return "Error: " + e.getMessage();
-        }
-    }
 
     // ==================== 辅助方法 ====================
 

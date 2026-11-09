@@ -222,7 +222,9 @@
       "offeredToolsExclude": [
         "pdf_inspect",
         "task_create",
-        "doc_get_document_text",
+        "doc_get_document_text"
+      ],
+      "toolsNotRegistered": [
         "read_document"
       ],
       "structureContains": [
@@ -291,7 +293,9 @@
       "offeredToolsExclude": [
         "pdf_inspect",
         "task_create",
-        "doc_get_document_text",
+        "doc_get_document_text"
+      ],
+      "toolsNotRegistered": [
         "read_document"
       ],
       "structureContains": [

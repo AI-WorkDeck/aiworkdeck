@@ -115,7 +115,7 @@ public class ToolDisclosurePolicy {
             // —— 项目材料：找文件（按名 / 按正文）→ 拿 fileId → 读全文 → 落一份新文件 → 整理 ——
             // doc_list_project_files 自 dev-board#1065 T-01 起三档会话都可见（纯后端清单），
             // 所以纯对话与 Office 任务窗格会话也不必为「这是什么文件」先查一次目录（#1064 实测病灶）。
-            // read_document 已只登记不下发（T-05），入口统一是 extract_file_text。
+            // read_document 已删除（V3，Java 方法仅供内部调用），入口统一是 extract_file_text。
             "doc_list_project_files", "search_project_files", "search_project_content", "extract_file_text",
             "write_docx",
             // 跨文件硬规则要求先列后读；reference 没有关键词预放回，不能再让模型先查目录。
@@ -206,8 +206,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("revision", List.of(
                 "name:doc_restore_checkpoint", "name:doc_get_comments", "name:doc_list_revisions", "name:doc_accept_revision", "name:doc_reject_revision",
                 "name:doc_accept_all_revisions", "name:doc_reject_all_revisions",
-                "name:doc_reply_comment", "name:doc_resolve_comment", "name:doc_delete_comment",
-                "name:doc_debug_revisions"));
+                "name:doc_reply_comment", "name:doc_resolve_comment", "name:doc_delete_comment"));
         CATEGORIES.put("evidence", List.of(
                 "name:doc_link_evidence", "name:doc_list_evidence",
                 "name:evidence_verify", "name:retrieve_evidence",
@@ -224,17 +223,16 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("edit", List.of(
                 "name:doc_goto", "name:doc_collapse_cursor", "name:doc_delete_selection", "name:doc_redo",
                 "name:doc_select_anchor", "name:doc_select_paragraph", "name:doc_modify_paragraph",
-                "name:doc_replace_nth_match", "name:doc_delete_match", "name:doc_delete_text",
-                "name:doc_set_selection", "name:doc_get_selection", "name:doc_get_paragraph",
+                "name:doc_get_paragraph",
                 "name:doc_get_outline", "name:doc_insert_under_heading", "name:doc_replace_selection"));
         // pdf 与 files 排在 format 之前，只为 doc_export_pdf：它带 doc_ 前缀，排在后面就会被 format 通配吃掉。
         // V2：doc_export_pdf 从核心集退到 pdf 类目（「导出PDF / 转PDF」命中 pdf 关键词）。
         CATEGORIES.put("pdf", List.of("name:doc_export_pdf", "pdf_"));
         CATEGORIES.put("files", List.of(
                 "name:create_folder", "name:move_files_batch", "name:move_to_trash",
-                "name:list_files", "name:read_file", "name:write_file", "name:scan_files",
-                "name:move_file", "name:move_project_file", "name:rename_project_file",
-                "name:list_project_folders", "name:delete_file", "text_",
+                "name:list_files", "name:read_file", "name:write_file",
+                "name:move_project_file", "name:rename_project_file",
+                "name:list_project_folders", "text_",
                 "name:copy_files", "name:search_across_projects"));
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
@@ -339,9 +337,10 @@ public class ToolDisclosurePolicy {
                 "插入目录", "生成目录", "更新目录", "font", "format", "heading"));
         // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站在 V2 起也退到 files 类目（靠「文件夹 / 移动 / 回收站 / 删除文件」预放回）；
         // 但明确指文件归档的「文件整理」「整理文件」「归档」直接预先放回 files 全集（含单文件移动与重命名）。
-        CATEGORY_KEYWORDS.put("files", List.of("移动", "重命名", "文件夹", "回收站", "文件整理", "整理文件", "归档",
-                "删除文件", "删掉文件", "文件删了", "删了这个文件", "删除这个文件", "删掉这个文件",
-                "rename", "move", "folder", "organize files", "file organization"));
+        CATEGORY_KEYWORDS.put("files", List.of("重命名", "文件整理", "整理文件",
+                "rename", "organize files", "file organization"));
+        // 退出核心集的 8 个工具里「说法很明确」的那几个，改走下面 TOOL_KEYWORDS 的精确放回（只放该工具，不放整类）；
+        // 这里只留更宽的说法（重命名 / 整理文件），它们要的是 files 全集（含单文件移动与重命名）。
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
         CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》",
@@ -349,9 +348,58 @@ public class ToolDisclosurePolicy {
         // memory 类目里是 memory_write / memory_edit / memory_delete 三个写入工具（只读三个编排器每轮都补，
         // dev-board#1073）；「记下」「忘掉」是要改记忆文件的说法。不收「别忘」「forget」：
         // 「别忘了加页码」是叮嘱不是记忆。
-        CATEGORY_KEYWORDS.put("memory", List.of("记住", "记忆", "偏好", "记下", "忘掉", "记得", "之前说过", "上次说过", "之前提过", "remember", "memory"));
+        CATEGORY_KEYWORDS.put("memory", List.of("记住", "记忆", "偏好", "记下", "忘掉", "remember", "memory"));
         // edit 刻意不收关键词：「删除 / 改成 / 替换 / 插入」几乎每句改文档的话都有，而真正常用的
         // 删改原语（锚点替换、查找替换、光标处插入）本来就在核心集里。
+    }
+
+    /**
+     * 退出核心集的 8 个工具里说法明确的那几个：用户输入命中就在首轮<b>只放回该工具</b>（不连带整个类目），
+     * 比类目关键词精确——「统一成律所标准格式」只需要 {@code doc_apply_standard_format}，不该付 format 全类 40 个规格。
+     * 命中的短语会从文本里抠掉再去匹配类目关键词（「标准格式」里的「格式」不再把 format 类目拉回来）。
+     * 比较一律小写，口径同 {@link #CATEGORY_KEYWORDS}。tool-system-v2 V2。
+     */
+    static final Map<String, List<String>> TOOL_KEYWORDS = new LinkedHashMap<>();
+
+    static {
+        TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder"));
+        TOOL_KEYWORDS.put("move_files_batch", List.of("移动", "移到", "归档", "move files"));
+        TOOL_KEYWORDS.put("move_to_trash", List.of("回收站", "删除", "删掉", "删了", "move to trash", "delete file"));
+        TOOL_KEYWORDS.put("doc_apply_standard_format", List.of("标准格式", "统一格式", "律所格式", "排版"));
+        TOOL_KEYWORDS.put("doc_export_pdf", List.of("导出pdf", "导出成pdf", "导出为pdf", "转pdf", "转成pdf", "存成pdf",
+                "存为pdf", "另存为pdf", "export pdf", "export to pdf"));
+        TOOL_KEYWORDS.put("memory_search", List.of("记得", "之前说过", "上次说", "之前提过", "之前聊过"));
+    }
+
+    /** 用户这一句话精确点到了哪几个退出核心集的工具（{@link #TOOL_KEYWORDS}）。 */
+    public Set<String> toolsHintedBy(String userMessage) {
+        if (userMessage == null || userMessage.isBlank()) {
+            return Set.of();
+        }
+        String normalized = userMessage.toLowerCase(Locale.ROOT);
+        Set<String> hinted = new LinkedHashSet<>();
+        for (Map.Entry<String, List<String>> entry : TOOL_KEYWORDS.entrySet()) {
+            for (String keyword : entry.getValue()) {
+                if (SkillRouter.containsTrigger(normalized, keyword)) {
+                    hinted.add(entry.getKey());
+                    break;
+                }
+            }
+        }
+        return hinted;
+    }
+
+    /** 把命中的工具关键词短语抠掉（换成空格），再交给类目关键词匹配。 */
+    private static String withoutToolKeywords(String normalized) {
+        String text = normalized;
+        for (List<String> keywords : TOOL_KEYWORDS.values()) {
+            for (String keyword : keywords) {
+                if (SkillRouter.containsTrigger(text, keyword)) {
+                    text = text.replace(keyword, " ");
+                }
+            }
+        }
+        return text;
     }
 
     private final boolean enabled;
@@ -427,7 +475,7 @@ public class ToolDisclosurePolicy {
         if (userMessage == null || userMessage.isBlank()) {
             return Set.of();
         }
-        String normalized = userMessage.toLowerCase(Locale.ROOT);
+        String normalized = withoutToolKeywords(userMessage.toLowerCase(Locale.ROOT));
         Set<String> known = categoryNames();
         Set<String> hinted = new LinkedHashSet<>();
         for (Map.Entry<String, List<String>> entry : CATEGORY_KEYWORDS.entrySet()) {
@@ -476,7 +524,7 @@ public class ToolDisclosurePolicy {
         if (hinted.size() <= MAX_KEYWORD_PUTBACK) {
             return hinted;
         }
-        String normalized = userMessage.toLowerCase(Locale.ROOT);
+        String normalized = withoutToolKeywords(userMessage.toLowerCase(Locale.ROOT));
         Map<String, Integer> score = new LinkedHashMap<>();
         for (String category : hinted) {
             int total = 0;
@@ -650,12 +698,14 @@ public class ToolDisclosurePolicy {
      * 只考虑真对候选集有贡献的类目，收回一个零贡献的类目没有意义。
      *
      * @param lastUsed 类目 → 最近一次放回或被调用的轮次（缺省按 0）
-     * @return 被收回的类目（调用方据此从展开集移除）；不需要收回时为空集
+     * @param requestedNames 按名放回的工具（关键词精确放回 / list_tools(names|query)）：与类目同池 LRU，键带 {@link #TOOL_KEY} 前缀
+     * @return 被收回的键（类目名，或带前缀的工具名）；不需要收回时为空集
      */
-    public Set<String> evictToBudget(List<ToolSpecification> candidates, Set<String> expanded, boolean noFile,
-                                     Set<String> extraNames, Map<String, Integer> lastUsed,
-                                     Set<String> protectedCategories, int reserve) {
-        if (candidates == null || expanded == null || expanded.isEmpty()) {
+    public Set<String> evictToBudget(List<ToolSpecification> candidates, Set<String> expanded,
+                                     Set<String> requestedNames, boolean noFile,
+                                     Set<String> skillNames, Map<String, Integer> lastUsed,
+                                     Set<String> protectedKeys, int reserve) {
+        if (candidates == null || expanded == null || (expanded.isEmpty() && requestedNames.isEmpty())) {
             return Set.of();
         }
         Set<String> contributing = new LinkedHashSet<>();
@@ -663,23 +713,33 @@ public class ToolDisclosurePolicy {
             String category = categoryOf(spec.name());
             if (!"core".equals(category)) {
                 contributing.add(category);
+                if (!skillNames.contains(spec.name())) {
+                    contributing.add(TOOL_KEY + spec.name());
+                }
             }
         }
         Set<String> work = new LinkedHashSet<>(expanded);
+        requestedNames.forEach(n -> work.add(TOOL_KEY + n));
         Set<String> evicted = new LinkedHashSet<>();
-        while (narrow(candidates, work, noFile, extraNames).size() + reserve > MAX_OFFERED_PER_ROUND) {
+        int current;
+        while ((current = size(candidates, work, noFile, skillNames)) + reserve > MAX_OFFERED_PER_ROUND) {
             String victim = null;
-            for (String category : work) {
-                if (!contributing.contains(category) || protectedCategories.contains(category)) {
+            for (String key : work) {
+                if (!contributing.contains(key) || protectedKeys.contains(key)) {
                     continue;
+                }
+                Set<String> without = new LinkedHashSet<>(work);
+                without.remove(key);
+                if (size(candidates, without, noFile, skillNames) >= current) {
+                    continue; // 收回它省不下一个工具（已被别的类目 / skill 覆盖）
                 }
                 if (victim == null) {
-                    victim = category;
+                    victim = key;
                     continue;
                 }
-                int byUse = Integer.compare(lastUsed.getOrDefault(category, 0), lastUsed.getOrDefault(victim, 0));
-                if (byUse < 0 || (byUse == 0 && category.compareTo(victim) < 0)) {
-                    victim = category;
+                int byUse = Integer.compare(lastUsed.getOrDefault(key, 0), lastUsed.getOrDefault(victim, 0));
+                if (byUse < 0 || (byUse == 0 && key.compareTo(victim) < 0)) {
+                    victim = key;
                 }
             }
             if (victim == null) {
@@ -689,6 +749,22 @@ public class ToolDisclosurePolicy {
             evicted.add(victim);
         }
         return evicted;
+    }
+
+    /** {@link #evictToBudget} 里类目与「按名放回」共用一个键空间：按名的键带这个前缀。 */
+    public static final String TOOL_KEY = "tool:";
+
+    private int size(List<ToolSpecification> candidates, Set<String> work, boolean noFile, Set<String> skillNames) {
+        Set<String> cats = new LinkedHashSet<>();
+        Set<String> extra = new LinkedHashSet<>(skillNames);
+        for (String key : work) {
+            if (key.startsWith(TOOL_KEY)) {
+                extra.add(key.substring(TOOL_KEY.length()));
+            } else {
+                cats.add(key);
+            }
+        }
+        return narrow(candidates, cats, noFile, extra).size();
     }
 
     /**

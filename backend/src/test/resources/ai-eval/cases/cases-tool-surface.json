@@ -102,7 +102,7 @@
     "title": "一句话命中 16+ 类：只预放回 3 类，list_tools 仍在列",
     "category": "files",
     "protocol": "native",
-    "userInput": "pdf 版本 流程图 ppt mcp 工商 插件 transcript python 表格 事项 修订 模板 依据 格式 移动 法规 记住",
+    "userInput": "pdf 版本 流程图 ppt mcp 工商 插件 transcript python 表格 事项 修订 模板 依据 格式 重命名 法规 记住",
     "activeDocument": {
       "id": "1001",
       "name": "股权转让协议.docx",
@@ -601,6 +601,169 @@
       "offeredToolsIncludeLastCall": [
         "list_tools",
         "task_create"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-s13-new-folder",
+    "title": "V2 句13「新建一个文件夹叫证据」首轮含 create_folder 且不拉整个 files 类（无 scan/move 等）、后续每轮 ≤45",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "新建一个文件夹叫证据",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "create_folder",
+            "arguments": {
+              "folderName": "证据"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "OK"
+    },
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 45,
+      "offeredToolsInclude": [
+        "create_folder",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "list_files",
+        "copy_files",
+        "rename_project_file"
+      ],
+      "toolCalls": [
+        {
+          "name": "create_folder"
+        }
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-s14-delete",
+    "title": "V2 句14「把合同草稿.docx删了」首轮含 move_to_trash、不含 delete_file/整个 files 类、后续每轮 ≤45",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "把合同草稿.docx删了",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_to_trash",
+            "arguments": {
+              "files": "[\"合同草稿.docx\"]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "toolStubs": {
+      "move_to_trash": "OK"
+    },
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 45,
+      "offeredToolsInclude": [
+        "move_to_trash"
+      ],
+      "offeredToolsExclude": [
+        "delete_file",
+        "copy_files",
+        "rename_project_file"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-s16-format-then-pdf",
+    "title": "V2 句16「统一成律所格式然后导出PDF」首轮同时含 doc_apply_standard_format 与 doc_export_pdf，不拉 format / pdf 整类",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "统一成律所格式然后导出PDF",
+    "activeDocument": {
+      "id": "1001",
+      "name": "合同.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_apply_standard_format",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_apply_standard_format": "{\"success\": true}"
+    },
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 45,
+      "offeredToolsInclude": [
+        "doc_apply_standard_format",
+        "doc_export_pdf"
+      ],
+      "offeredToolsExclude": [
+        "doc_set_page_setup",
+        "doc_insert_toc",
+        "pdf_merge"
+      ]
+    }
+  },
+  {
+    "id": "surface-v2-list-tools-names-adds-only-that-tool",
+    "title": "V2：list_tools(names=move_to_trash) 只放回该工具，不连带 files 类目",
+    "category": "files",
+    "protocol": "native",
+    "userInput": "帮我看看这份合同还需要补什么",
+    "activeDocument": {
+      "id": "1001",
+      "name": "合同.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "list_tools",
+            "arguments": {
+              "names": "move_to_trash"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>好的。</final>"
+      }
+    ],
+    "expect": {
+      "bubbleEndStatus": "finished",
+      "maxOfferedToolsLaterCalls": 45,
+      "offeredToolsIncludeLastCall": [
+        "move_to_trash"
+      ],
+      "offeredToolsExcludeFirstCall": [
+        "move_to_trash"
+      ],
+      "offeredToolsExclude": [
+        "create_folder",
+        "move_files_batch",
+        "copy_files"
       ]
     }
   }

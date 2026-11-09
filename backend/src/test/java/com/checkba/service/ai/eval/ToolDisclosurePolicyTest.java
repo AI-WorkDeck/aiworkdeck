@@ -121,61 +121,75 @@ class ToolDisclosurePolicyTest {
     }
 
     @Test
-    @DisplayName("V2：退出核心集的工具由日常说法的关键词在首轮放回；失效词会让它们无处可寻")
+    @DisplayName("V2：退出核心集的工具由日常说法的精确关键词在首轮只放回该工具（不拉整类）")
     void v2LeftCoreToolsAreSurfacedByKeywords() {
         RecordingToolRegistry registry = registry();
         var candidates = registry.getAllSpecifications("conv", ClientCapabilityService.DOC_KIND_WRITER);
         java.util.Map<String, String> expectations = new java.util.LinkedHashMap<>();
         expectations.put("把全文统一成律所标准格式", "doc_apply_standard_format");
+        expectations.put("给合同排版", "doc_apply_standard_format");
         expectations.put("导出成PDF", "doc_export_pdf");
         expectations.put("转PDF发给客户", "doc_export_pdf");
         expectations.put("新建一个文件夹叫证据", "create_folder");
         expectations.put("把这几份文件移动到归档", "move_files_batch");
-        expectations.put("把这个文件删了", "move_to_trash");
+        expectations.put("把合同草稿.docx删了", "move_to_trash");
         expectations.put("放进回收站", "move_to_trash");
         expectations.put("你还记得我之前说过的偏好吗", "memory_search");
         for (var e : expectations.entrySet()) {
-            Set<String> offered = names(POLICY.narrow(candidates, POLICY.categoriesPutBackFor(e.getKey())));
+            Set<String> hinted = POLICY.toolsHintedBy(e.getKey());
+            assertTrue(hinted.contains(e.getValue()), e.getKey() + " 应精确点到 " + e.getValue() + "：" + hinted);
+            Set<String> offered = names(POLICY.narrow(candidates, POLICY.categoriesPutBackFor(e.getKey()), false, hinted));
             assertTrue(offered.contains(e.getValue()), e.getKey() + " 首轮应放回 " + e.getValue() + "：" + offered);
         }
+        // 只放该工具，不拉整类：「标准格式」里的「格式」、「PDF」「文件夹」不再触发 format / pdf / files 类目
+        assertTrue(POLICY.categoriesPutBackFor("把全文统一成律所标准格式").isEmpty());
+        assertTrue(POLICY.categoriesPutBackFor("导出成PDF").isEmpty());
+        assertTrue(POLICY.categoriesPutBackFor("新建一个文件夹叫证据").contains("evidence"));
+        assertFalse(POLICY.categoriesPutBackFor("新建一个文件夹叫证据").contains("files"));
+        // 更宽的说法仍走类目
+        assertTrue(POLICY.categoriesPutBackFor("把字体改成宋体").contains("format"));
+        assertTrue(POLICY.categoriesPutBackFor("给这几个文件重命名").contains("files"));
         assertTrue(POLICY.categoriesPutBackFor("这份合同有什么风险？").isEmpty());
+        assertTrue(POLICY.toolsHintedBy("这份合同有什么风险？").isEmpty());
         assertEquals(com.checkba.service.ai.tools.ToolMeta.Access.DESTRUCTIVE,
                 com.checkba.service.ai.capability.CapabilityCatalog.inferAccess("move_to_trash"),
                 "move_to_trash 放回后仍是 destructive（走确认闸）");
     }
 
     @Test
-    @DisplayName("V2 中途增长封顶：超过 45 个时按 LRU 收回，核心 / 受保护类目 / skill 点名工具不收")
+    @DisplayName("V2 中途增长封顶：超过 45 个时按 LRU 收回（类目与按名同池），核心 / 受保护 / skill 点名工具不收")
     void evictToBudgetIsLruAndRespectsProtection() {
         RecordingToolRegistry registry = registry();
         var candidates = registry.getAllSpecifications("conv", ClientCapabilityService.DOC_KIND_WRITER);
         Set<String> expanded = new java.util.LinkedHashSet<>(
                 List.of("format", "table", "revision", "files", "memory", "legal", "template", "evidence", "version", "task"));
-        int full = POLICY.narrow(candidates, expanded).size();
+        Set<String> requested = new java.util.LinkedHashSet<>(List.of("doc_export_pdf"));
+        int full = POLICY.narrow(candidates, expanded, false, requested).size();
         assertTrue(full > ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND, "前提：展开十类应超过上限，实际 " + full);
         java.util.Map<String, Integer> lastUsed = new java.util.HashMap<>();
         expanded.forEach(c -> lastUsed.put(c, 0));
         lastUsed.put("format", 5);
         lastUsed.put("task", 4);
-        Set<String> evicted = POLICY.evictToBudget(candidates, expanded, false, Set.of(), lastUsed, Set.of("files"), 2);
+        lastUsed.put("tool:doc_export_pdf", 1);
+        Set<String> protectedKeys = Set.of("files", "tool:doc_export_pdf");
+        Set<String> evicted = POLICY.evictToBudget(candidates, expanded, requested, false, Set.of(), lastUsed,
+                protectedKeys, 2);
         Set<String> kept = new java.util.LinkedHashSet<>(expanded);
         kept.removeAll(evicted);
         assertFalse(evicted.isEmpty());
-        assertTrue(POLICY.narrow(candidates, kept).size() + 2 <= ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND);
+        assertTrue(POLICY.narrow(candidates, kept, false, requested).size() + 2 <= ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND);
         assertFalse(evicted.contains("files"), "受保护类目不收回");
+        assertFalse(evicted.contains("tool:doc_export_pdf"), "受保护的按名放回不收回");
         List<String> order = new java.util.ArrayList<>(evicted);
         assertTrue(order.indexOf("task") < 0 || order.indexOf("task") > order.indexOf("evidence"),
                 "最近用过的 task 比从没用过的晚收回：" + order);
-        // 确定性：同输入同输出
-        assertEquals(evicted, POLICY.evictToBudget(candidates, expanded, false, Set.of(), lastUsed, Set.of("files"), 2));
-        // 核心集永不被收回
-        assertTrue(names(POLICY.narrow(candidates, kept)).containsAll(
-                names(POLICY.narrow(candidates, Set.of()))));
-        // skill 点名的工具即使类目被收回也按名保留
+        assertEquals(evicted, POLICY.evictToBudget(candidates, expanded, requested, false, Set.of(), lastUsed,
+                protectedKeys, 2));
+        assertTrue(names(POLICY.narrow(candidates, kept)).containsAll(names(POLICY.narrow(candidates, Set.of()))));
         Set<String> withSkill = names(POLICY.narrow(candidates, kept, false, Set.of("doc_apply_standard_format")));
         assertTrue(withSkill.contains("doc_apply_standard_format"));
-        // 没超就不动
-        assertTrue(POLICY.evictToBudget(candidates, Set.of("task"), false, Set.of(), java.util.Map.of(), Set.of(), 2).isEmpty());
+        assertTrue(POLICY.evictToBudget(candidates, Set.of("task"), Set.of(), false, Set.of(),
+                java.util.Map.of(), Set.of(), 2).isEmpty());
     }
 
     @Test
@@ -218,7 +232,8 @@ class ToolDisclosurePolicyTest {
             var candidates = registry.getAllSpecifications("export-lowa", kind);
             // V2：doc_export_pdf 退出核心集，「导出 / 转 PDF」的 pdf 关键词在首轮放回 pdf 类目
             assertFalse(names(POLICY.narrow(candidates, Set.of())).contains("doc_export_pdf"), kind + ": 不在核心集");
-            Set<String> offered = names(POLICY.narrow(candidates, POLICY.categoriesPutBackFor("导出成PDF")));
+            Set<String> offered = names(POLICY.narrow(candidates, POLICY.categoriesPutBackFor("导出成PDF"), false,
+                    POLICY.toolsHintedBy("导出成PDF")));
             assertTrue(offered.contains("doc_export_pdf"), kind + ": export must be surfaced by the keyword");
             assertFalse(offered.contains("delete_file"), "Export must not expose the files category");
             assertFalse(offered.contains("copy_files"), "Export must not expose the files category");
@@ -429,8 +444,7 @@ class ToolDisclosurePolicyTest {
     void categoryAssignmentsAfterTheSplit() {
         // edit：定位 / 删改 / 按段落取改。核心集里的几个照旧是 core（categoryOf 先判核心集）
         for (String name : List.of("doc_goto", "doc_collapse_cursor", "doc_delete_selection", "doc_redo",
-                "doc_modify_paragraph", "doc_replace_nth_match", "doc_delete_match", "doc_delete_text",
-                "doc_set_selection", "doc_get_selection", "doc_insert_under_heading")) {
+                "doc_modify_paragraph", "doc_insert_under_heading")) {
             assertEquals("edit", POLICY.categoryOf(name), name);
         }
         // #1064 第二步退出核心集后归 edit
@@ -590,7 +604,11 @@ class ToolDisclosurePolicyTest {
         assertEquals(Set.of("format"), TRIM.categoriesHintedBy("在第一页插入目录"));
         assertEquals(Set.of(), TRIM.categoriesHintedBy("项目目录下有什么"),
                 "单独的「目录」多半是文件夹，不许把整个 format 类目放回");
-        assertEquals(Set.of("files"), TRIM.categoriesHintedBy("把这几份文件移动到「往来函件」文件夹"));
+        assertEquals(Set.of(), TRIM.categoriesHintedBy("把这几份文件移动到「往来函件」文件夹"),
+                "V2：移动 / 文件夹只精确放回 move_files_batch / create_folder，不拉整个 files 类目");
+        assertEquals(Set.of("move_files_batch", "create_folder"),
+                TRIM.toolsHintedBy("把这几份文件移动到「往来函件」文件夹"));
+        assertEquals(Set.of("files"), TRIM.categoriesHintedBy("把这几个文件重命名"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("这段话引用了哪条司法解释？"));
         assertEquals("legal", POLICY.categoryOf("case_search"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("查询类似案例"));

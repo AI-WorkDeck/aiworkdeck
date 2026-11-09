@@ -115,6 +115,21 @@ class OrchestratorReplayEvalTest {
             }
         }
 
+        // 5.1.0 已删除的工具必须真的不在注册面上（V3：原 offeredToolsExclude 的隐藏工具名单）
+        if (!c.expect.toolsNotRegistered.isEmpty()) {
+            java.util.Set<String> registered = new java.util.HashSet<>();
+            for (var bean : RealToolBeans.instantiateAll()) {
+                for (var m : bean.getClass().getDeclaredMethods()) {
+                    if (m.isAnnotationPresent(dev.langchain4j.agent.tool.Tool.class)) {
+                        registered.add(m.getName());
+                    }
+                }
+            }
+            for (String name : c.expect.toolsNotRegistered) {
+                assertFalse(registered.contains(name), "工具 [" + name + "] 应已删除，但仍有 @Tool 方法");
+            }
+        }
+
         // 5.1.1 逐轮变化的可见性（dev-board#729 ①）：起跑时按活跃文档类型裁掉，
         // 中途新建/切换到别的类型的文档后放回全集。首尾两次调用分别断言。
         if (!c.expect.offeredToolsExcludeFirstCall.isEmpty()

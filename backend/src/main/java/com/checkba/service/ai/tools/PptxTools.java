@@ -23,11 +23,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -36,10 +34,8 @@ import java.util.stream.Collectors;
  * PPTX 工具集
  * 
  * 提供 Agent 操作 PPT 的完整能力：
- * 1. 搜索/列出项目中的 PPTX 文件
- * 2. 打开 PPTX 文件进行编辑
- * 3. 一键生成 PPTX（支持指定存放路径）
- * 4. 检查服务状态
+ * 1. 一键生成 PPTX（支持指定存放路径）
+ * 2. 检查服务状态
  * 
  * 技术说明：
  * - 生成功能调用 banana-slides Python 微服务（Docker 容器）
@@ -105,132 +101,6 @@ public class PptxTools implements AgentToolComponent {
             
         } catch (Exception e) {
             log.error("Failed to list project folders", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // dev-board#1065（审计 T-27）：doc_list_project_files 如今在每一类会话里都可见，是唯一的权威清单；
-    // 这份按类型过滤的子集只登记不下发（老会话回放与 XML 兜底照常执行）。
-    @ToolMeta(displayName = "列出PPT文件", category = "pptx", offerToModel = false)
-    @Tool("PPTX 专用清单：等价于 doc_list_project_files 只保留 .pptx 的那一份结果，返回文件 ID、名称和位置信息。"
-            + "**要看项目里有哪些文件（含 Word / Excel / PDF / 文本 / 图片）请直接用 doc_list_project_files，一次列全**；"
-            + "只有在结果太多、确实只想看演示文稿时才用本工具。")
-    public String pptx_list_files(
-            @P("项目 ID") Long projectId
-    ) {
-        log.info("Tool: pptx_list_files called for projectId={}", projectId);
-        try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
-            
-            List<ProjectFile> pptxFiles = allFiles.stream()
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
-                    .filter(f -> isPptxFile(f.getName()))
-                    .collect(Collectors.toList());
-            
-            if (pptxFiles.isEmpty()) {
-                return "项目中没有 PPTX 演示文稿文件。可以使用 pptx_generate 工具生成新的 PPT。";
-            }
-            
-            StringBuilder sb = new StringBuilder("项目中的 PPTX 文件列表 (共 " + pptxFiles.size() + " 个):\n");
-            for (ProjectFile f : pptxFiles) {
-                String folderPath = getFileFolderPath(f.getParentId(), allFiles);
-                sb.append(String.format("- ID: %d, 名称: %s, 位置: %s\n", 
-                        f.getId(), f.getName(), folderPath.isEmpty() ? "根目录" : folderPath));
-            }
-            sb.append("\n用 doc_open_file 打开指定文件后即可用 slide_* 编辑（桌面编辑器会话）。");
-            return sb.toString();
-            
-        } catch (Exception e) {
-            log.error("Failed to list PPTX files", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // dev-board#1065（审计 T-27）：按文件名找文件走 search_project_files，全类型清单走
-    // doc_list_project_files；这个只认 .pptx 的子集只登记不下发。
-    @ToolMeta(displayName = "搜索PPT文件", category = "pptx", offerToModel = false)
-    @Tool("搜索项目中的 PPTX 演示文稿文件。可以根据关键词搜索文件名。")
-    public String pptx_search_files(
-            @P("项目 ID") Long projectId,
-            @P("搜索关键词（文件名包含），留空则列出所有 PPTX 文件") String keyword
-    ) {
-        log.info("Tool: pptx_search_files called for projectId={}, keyword={}", projectId, keyword);
-        try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
-            
-            List<ProjectFile> pptxFiles = allFiles.stream()
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
-                    .filter(f -> isPptxFile(f.getName()))
-                    .filter(f -> !StringUtils.hasText(keyword) || 
-                            f.getName().toLowerCase().contains(keyword.toLowerCase()))
-                    .collect(Collectors.toList());
-            
-            if (pptxFiles.isEmpty()) {
-                if (StringUtils.hasText(keyword)) {
-                    return "未找到包含关键词 '" + keyword + "' 的 PPTX 文件。可以用 doc_list_project_files 查看项目里的全部文件。";
-                }
-                return "项目中没有 PPTX 演示文稿文件。可以使用 pptx_generate 工具生成新的 PPT。";
-            }
-            
-            StringBuilder sb = new StringBuilder();
-            if (StringUtils.hasText(keyword)) {
-                sb.append("搜索到 ").append(pptxFiles.size()).append(" 个包含 '").append(keyword).append("' 的 PPTX 文件:\n");
-            } else {
-                sb.append("项目中的 PPTX 文件 (共 ").append(pptxFiles.size()).append(" 个):\n");
-            }
-            
-            for (ProjectFile f : pptxFiles) {
-                String folderPath = getFileFolderPath(f.getParentId(), allFiles);
-                sb.append(String.format("- ID: %d, 名称: %s, 位置: %s\n", 
-                        f.getId(), f.getName(), folderPath.isEmpty() ? "根目录" : folderPath));
-            }
-            sb.append("\n用 doc_open_file 打开指定文件后即可用 slide_* 编辑（桌面编辑器会话）。");
-            return sb.toString();
-            
-        } catch (Exception e) {
-            log.error("Failed to search PPTX files", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 交付物就是「在桌面编辑器里打开」（sendOpenFileAction），没有 LOWA 前端时这一步
-    // 一个字节都不会发生，而返回文案还在说「已发送打开文件指令」——审计 A9。
-    //
-    // offerToModel = false（审计 B-09，dev-board#808）：打开一份 PPTX 只需要 doc_open_file
-    // 这一个入口，它开完之后活跃文档类型变成 pptx，slide_* 那套权威编辑面随之放出来。
-    // 两个「打开 PPT」的工具并存，模型走哪条决定了它接下来拿到哪一套索引基数（0 基 vs 1 基），
-    // 而选错不会报错、只会静默改错页。登记保留：老会话回放照常执行。
-    @ToolMeta(displayName = "打开PPT文件", category = "pptx",
-              requiresHost = ToolMeta.Host.LOWA, offerToModel = false)
-    @Tool("[已由 doc_open_file 取代] 打开指定的 PPTX 文件进行编辑。文件会在用户的文档编辑器中打开。")
-    public String pptx_open_file(
-            @P("文件 ID（从 doc_list_project_files 获取）") Long fileId
-    ) {
-        log.info("Tool: pptx_open_file called for fileId={}", fileId);
-        try {
-            ProjectFile file = projectFileService.getFile(fileId);
-            if (file == null) {
-                return "Error: 文件不存在，ID=" + fileId;
-            }
-            String denied = ToolFileGuard.rejectIfOutsideProject(file);
-            if (denied != null) return denied;
-
-            if (!isPptxFile(file.getName())) {
-                return "Error: 该文件不是 PPTX 格式: " + file.getName();
-            }
-            
-            // 通过 SSE 发送打开文件指令到前端
-            editorBridgeService.sendOpenFileAction(file);
-            
-            return String.format("已发送打开文件指令。文件名: %s。\n" +
-                    "查看内容与格式可用 pptx_inspect_format（无需等待加载），" +
-                    "修改文本与格式可用 pptx_apply_format（修改后编辑器自动重载）。",
-                    file.getName());
-            
-        } catch (Exception e) {
-            log.error("Failed to open PPTX file", e);
             return "Error: " + e.getMessage();
         }
     }
@@ -526,8 +396,7 @@ public class PptxTools implements AgentToolComponent {
                 successMsg.append("**页面修改**: 可以使用以下工具进行修改：\n");
                 successMsg.append("- pptx_get_project_pages: 查看所有页面\n");
                 successMsg.append("- pptx_refine_outline: 修改大纲结构（增删页面）\n");
-                // pptx_edit_page / pptx_apply_format 已不下发（dev-board#808），别在回执里再把模型指过去（#1065 T-09）
-                successMsg.append("- 在编辑器中打开生成的文件后，用 slide_get_page 查看、slide_* 工具修改文本与格式（可编辑版适用）");
+                                successMsg.append("- 在编辑器中打开生成的文件后，用 slide_get_page 查看、slide_* 工具修改文本与格式（可编辑版适用）");
                 
                 // 标记后台任务完成
                 if (taskId != null) {
@@ -693,142 +562,7 @@ public class PptxTools implements AgentToolComponent {
         }
     }
 
-    // 收尾三步的最后一步是 sendReloadFileAction，返回文案也明说「编辑器将自动重新加载」；
-    // 而且 PowerPoint 任务窗格会话里有 office_ppt_* 作用在真正打开的那份 deck 上，
-    // 本工具改的是服务端磁盘上的另一份，两套同时可见还会索引打架（审计 B-09）。
-    //
-    // offerToModel = false（审计 B-09，dev-board#808）：PPTX 的权威编辑面是 slide_*。
-    // 本工具改的是**磁盘上的字节**然后强制编辑器 reload，而编辑器里可能有尚未保存的修改
-    // （AI 刚用 slide_set_shape_text 改过、或用户手工改过）——reload 会把它们直接丢掉，
-    // 没有任何提示。再加上两套索引基数相反（这里 0 起、slide_* 1 起），模型在同一轮里
-    // 混用必然错页，而错页既不报错也不会被任何返回值戳穿。登记保留：老会话回放照常执行。
-    @ToolMeta(displayName = "设置PPT格式", category = "pptx", fileEffect = "MODIFIED",
-              requiresHost = ToolMeta.Host.LOWA, offerToModel = false)
-    @Tool("[已由 slide_* 取代，改幻灯片请用 slide_set_shape_text / slide_replace_text / slide_format_text] " +
-          "对 PPTX 文件批量执行文本与格式修改（直接改文件；完成后编辑器自动重载显示结果）。" +
-          "使用顺序：先 pptx_inspect_format 获取 0 起的定位索引，再调用本工具。opsJson 是 JSON 数组，每项一个操作，六种 action：\n" +
-          "1. {\"action\":\"set_run_format\",\"slide\":0,\"shape\":1,\"paragraph\":0,\"run\":0,\"format\":{…}}（省略 run 作用于该段全部 run，省略 paragraph 作用于全部段落）\n" +
-          "2. {\"action\":\"set_paragraph_format\",\"slide\":0,\"shape\":1,\"paragraph\":0,\"format\":{…}}（省略 paragraph 作用于全部段落）\n" +
-          "3. {\"action\":\"replace_text\",\"slide\":0,\"shape\":1,\"find\":\"旧文本\",\"replace\":\"新文本\"}（run 级匹配替换）\n" +
-          "4. {\"action\":\"set_shape_text\",\"slide\":0,\"shape\":1,\"text\":\"整框重写的多行文本\"}\n" +
-          "5. {\"action\":\"set_cell_text\",\"slide\":0,\"shape\":2,\"row\":0,\"col\":1,\"text\":\"单元格文本\"}\n" +
-          "6. {\"action\":\"set_cell_format\",\"slide\":0,\"shape\":2,\"row\":0,\"col\":1,\"format\":{…}}\n" +
-          "format 可用键——run 级：bold/italic/underline/strike(删除线)/highlight(高亮色如'#FFFF00')/color(文字色如'#FF0000')/" +
-          "font_name(西文字体)/ea_font(中文字体如'楷体')/size_pt(字号磅值)；" +
-          "段落级：align(left|center|right|justify)/line_spacing(行距倍数如1.5)/space_before_pt/space_after_pt/bullet(true|false)/number_start(编号起始值)。" +
-          "落字文本自动清除 markdown 标记并转为真实格式。本工具只能改文本与格式，不能编辑图片内容（AI 改图能力当前不可用）。")
-    public String pptx_apply_format(
-            @P("文件 ID（从 doc_list_project_files 获取）") Long fileId,
-            @P("操作数组的 JSON 字符串，见工具描述中的六种 action 示例") String opsJson
-    ) {
-        log.info("Tool: pptx_apply_format called, fileId={}, opsJson length={}",
-                fileId, opsJson != null ? opsJson.length() : 0);
-        try {
-            if (!StringUtils.hasText(opsJson)) {
-                return "Error: 缺少 opsJson 参数（JSON 操作数组）";
-            }
-            cn.hutool.json.JSONArray ops;
-            try {
-                ops = cn.hutool.json.JSONUtil.parseArray(opsJson);
-            } catch (Exception e) {
-                return "Error: opsJson 不是合法的 JSON 数组: " + e.getMessage();
-            }
-            if (ops.isEmpty()) {
-                return "Error: opsJson 不能为空数组";
-            }
-
-            ProjectFile file = projectFileService.getFile(fileId);
-            if (file == null) {
-                return "Error: 文件不存在，ID=" + fileId;
-            }
-            String denied = ToolFileGuard.rejectIfOutsideProject(file);
-            if (denied != null) return denied;
-            if (!isPptxFile(file.getName())) {
-                return "Error: 该文件不是 PPTX 格式: " + file.getName();
-            }
-            Path localPath = storageResolver.resolve(file.getFilePath());
-            if (!Files.exists(localPath)) {
-                return "Error: 文件不存在于本地磁盘: " + localPath;
-            }
-
-            cn.hutool.json.JSONObject data = pptxServiceClient.formatPptx(localPath.toString(), ops);
-            int applied = data.getInt("applied", 0);
-            int failed = data.getInt("failed", 0);
-
-            // 收尾三步：更新 wpsFileId 强制编辑器绕过缓存重新下载 → 存库 → 通知前端重载
-            String newWpsFileId = generateNewWpsFileId(file.getProjectId());
-            file.setWpsFileId(newWpsFileId);
-            file.setUpdatedAt(LocalDateTime.now());
-            try {
-                file.setFileSize(Files.size(localPath));
-            } catch (Exception e) {
-                log.warn("Failed to update file size: {}", e.getMessage());
-            }
-            projectFileRepository.save(file);
-            editorBridgeService.sendReloadFileAction(file);
-
-            StringBuilder sb = new StringBuilder();
-            sb.append(String.format("PPT 格式操作完成：成功 %d 项，失败 %d 项。\n", applied, failed));
-            if (failed > 0) {
-                cn.hutool.json.JSONArray results = data.getJSONArray("results");
-                sb.append("失败明细：\n");
-                for (int i = 0; i < results.size(); i++) {
-                    cn.hutool.json.JSONObject r = results.getJSONObject(i);
-                    if (!r.getBool("ok", true)) {
-                        sb.append(String.format("- op #%d (%s): %s\n",
-                                r.getInt("index", i), r.getStr("action"), r.getStr("error")));
-                    }
-                }
-                sb.append("可用 pptx_inspect_format 重新核对定位索引后重试失败项。\n");
-            }
-            sb.append("文件已更新，文档编辑器将自动重新加载显示修改结果。");
-            return sb.toString();
-
-        } catch (Exception e) {
-            log.error("Failed to apply PPTX format ops", e);
-            return "错误：PPT 格式操作失败: " + e.getMessage();
-        }
-    }
-
     // ==================== PPTX 编辑工具 ====================
-
-    // offerToModel = false（审计 B-09，dev-board#808）：它改的是 pptx-service 里那份**页面图片**，
-    // 不是项目文件树里的 PPTX，与 slide_* 改的根本不是同一个东西；而描述里「把标题改成红色」
-    // 这类例子恰好和 slide_format_text 的职责重合，模型据此挑错工具时，改动落在一份
-    // 用户根本没在看的中间产物上，然后报告「已完成」。登记保留：老会话回放照常执行。
-    @ToolMeta(offerToModel = false)
-    @Tool("[已由 slide_* 取代] 使用自然语言编辑 PPT 页面图片（改的是 pptx-service 中的生成产物，不是项目文件树里的 PPTX）。")
-    public String pptx_edit_page(
-            @P("PPTX 服务中的项目 ID（通过 pptx_generate 生成 PPT 时返回）") String serviceProjectId,
-            @P("页面 ID（从 pptx_get_project_pages 获取）") String pageId,
-            @P("自然语言修改指令，如：'把这个图换成饼图'、'标题字体加大'、'背景改成蓝色渐变'") String editInstruction
-    ) {
-        log.info("Tool: pptx_edit_page called, projectId={}, pageId={}, instruction={}", 
-                serviceProjectId, pageId, editInstruction.length() > 50 ? editInstruction.substring(0, 50) + "..." : editInstruction);
-        
-        try {
-            // 调用 PPTX 服务的页面编辑 API
-            String taskId = pptxServiceClient.editPageImage(serviceProjectId, pageId, editInstruction);
-            
-            // 等待任务完成
-            cn.hutool.json.JSONObject taskResult = pptxServiceClient.waitForTask(serviceProjectId, taskId);
-            
-            if (taskResult == null) {
-                return "错误：页面编辑失败：任务超时或执行出错";
-            }
-            
-            return String.format("页面编辑成功！\n" +
-                    "- 项目 ID: %s\n" +
-                    "- 页面 ID: %s\n" +
-                    "- 修改指令: %s\n\n" +
-                    "页面图片已更新。可以使用 pptx_export_editable 导出可编辑的 PPTX 文件。",
-                    serviceProjectId, pageId, editInstruction);
-            
-        } catch (Exception e) {
-            log.error("Failed to edit page", e);
-            return "错误：页面编辑失败: " + e.getMessage();
-        }
-    }
 
     @ToolMeta(requiresHost = ToolMeta.Host.LOWA)
     @Tool("获取项目中的所有页面信息。返回每个页面的 ID、标题、状态和缩略图 URL。")

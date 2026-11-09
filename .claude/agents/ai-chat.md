@@ -672,6 +672,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
      关键词预放回每轮最多 3 类（`categoriesPutBackFor`：命中词总长度降序，同分按 `PUTBACK_PRIORITY`），skill 白名单类目不受限。
      首轮体量由 `ToolSurfaceBudgetTest` + `cases-tool-surface.json` 钉住（没开文件中性 25 个 / 6.5k token）。
      **核心集重切（tool-system-v2 V2）**：`create_folder / move_files_batch / move_to_trash` 退到 `files`、`doc_apply_standard_format` 留 `format`、`doc_export_pdf` 归 `pdf`（`pdf` 规则排在 `format` 的 `doc_` 通配之前）、`memory_search` 退出编排器固定追加（只剩 `memory_list / memory_read`，归 `memory` 类目），都靠关键词首轮放回（files 补「删除文件 / 文件删了」等，memory 补「记得 / 之前说过」；「标准格式」「导出PDF」已被「格式」「pdf」覆盖）。
+     **精确放回（真实模型矩阵后修正）**：8 个退出核心集的工具里说法明确的 6 个走 `ToolDisclosurePolicy.TOOL_KEYWORDS`（文件夹→`create_folder`、移动/移到/归档→`move_files_batch`、删除/删掉/删了/回收站→`move_to_trash`、标准格式/统一格式/律所格式/排版→`doc_apply_standard_format`、导出/转PDF→`doc_export_pdf`、记得/之前说过→`memory_search`），首轮只放该工具（`RunGuard.requestedToolNames`），命中短语先从文本抠掉再匹配类目关键词（「标准格式」不再拉 format 全类）；类目关键词只留更宽的说法。`list_tools(names|query)` 同样只按名放回（`disclosedCategories` 里带 `tool:` 前缀），不连带类目；`list_tools(category)` 放回整类但受封顶。封顶的 LRU 池里类目与按名放回同池。
      **状态条件核心**（编排器每轮在收窄之后补，轮内只增不减）：`list_attached_files` 仅本轮带附件（`RunGuard.hasAttachments`，起跑时算定）；`doc_restore_checkpoint` 仅 pptx 会话常驻、其余需 `DocumentCheckpointService.hasCheckpoint`（第一个修改类工具执行前建检查点，之后的轮次才下发）。ASK 模式不变。
      **中途增长封顶**：展开集只增不减，长任务会涨到 80+ 个工具。第 2 个往返起 `evictOverBudget` 在下发总数（含另补）> `ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND`（45）时按 LRU 逐个从展开集收回类目（`evictToBudget`，纯函数；依据 `RunGuard.categoryLastUsed`：放回或被调用时的往返序号，同分按类目名）。不收：核心集、skill 点名的工具（按名放行）、本轮刚放回/刚用过的类目、模型最近 2 轮用 `list_tools` 明确要的类目（`categoryAskedAt`）；首轮不封顶（关键词/skill 预放回原样）。回归：`ToolDisclosurePolicyTest.evictToBudgetIsLruAndRespectsProtection`、`cases-tool-surface.json` 的 `surface-v2-*`。
   - **为什么值得做②**：工具规格**每一轮都要重发**，一条消息跑三五个往返就付三五遍。
@@ -897,6 +898,16 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
   `doc_get_cursor_context` 覆盖）、`doc_set_selection`（T-15：用的是本仓禁止的整数字符偏移）。
   它们的 worker action 仍在 `PluginHostImpl.DOC_ACTIONS` 里给插件用，登记也保留。完整清单见
   `ToolDeclarationContractTest.EXPECTED_NOT_OFFERED`（逐名钉住 + 断言登记仍在）。
+  **tool-system-v2 V3 已把上述全部 22 个长期隐藏工具整个删除**（不再登记，XML 兜底调到会得到「Tool not found」）：
+  `doc_get_selection` / `doc_set_selection` / `doc_replace_nth_match` / `doc_delete_match` / `doc_delete_text` /
+  `doc_search_related_docs` / `doc_debug_revisions` / `scan_files` / `delete_file` / `move_file` / `read_document` /
+  `get_user_profile` / `get_project_context` / `search_knowledge_base` / `deep_search` / `get_conversation_summary` /
+  `pdf_list_files` / `pptx_list_files` / `pptx_search_files` / `pptx_open_file` / `pptx_apply_format` / `pptx_edit_page`。
+  现在 `EXPECTED_NOT_OFFERED` 是空集，`ToolDeclarationContractTest.deletedHiddenToolsAreGone` 钉住「不再有 @Tool 方法」；
+  回放用例里原来写在 `offeredToolsExclude` 的它们改写进 `expect.toolsNotRegistered`（断言真实工具 bean 里没有该 @Tool）。
+  **例外：`LegalTools.read_document` 的 Java 方法保留**（只去掉 `@Tool`/`@ToolMeta`），上下文组装的附件与活跃文档注入、
+  `run_python` 的 default_api 仍直接调它；评测里别再脚本化调这些名字。worker 的 set_selection / replace_nth_match /
+  delete_match / delete_text action 仍在 `PluginHostImpl.DOC_ACTIONS` 给插件用。
   **skill 白名单放不回 `offerToModel = false` 的工具**（T-26 核实）：`SkillRouter.visibleTools` 只在
   `getAllSpecifications` 给出的候选集里挑，而候选集来自 `builtinSpecifications`，这类工具在注册时就没进去。
   所以「先藏起来、命中某个 skill 再放出来」这条路走不通——要做只能另开机制。开发者向的

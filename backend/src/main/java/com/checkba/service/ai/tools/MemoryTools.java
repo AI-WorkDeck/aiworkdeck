@@ -3,9 +3,7 @@
 
 package com.checkba.service.ai.tools;
 
-import com.checkba.model.entity.ConversationSummary;
 import com.checkba.model.entity.MemoryEntry;
-import com.checkba.model.entity.ProjectMemory;
 import com.checkba.service.ai.context.ProjectContextHolder;
 import com.checkba.service.ai.memory.AgenticRetriever;
 import com.checkba.service.ai.memory.MemoryManager;
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 增强版记忆工具
@@ -32,10 +29,7 @@ import java.util.Optional;
  * 工具列表：
  * 1. save_memory - 保存重要信息到项目记忆
  * 2. query_memory - 查询项目记忆（三档算法由 depth 参数选，见下）
- * 3. get_project_context - 获取项目核心信息
- * 4. update_project_info - 更新项目信息
- * 5. get_conversation_summary - 获取对话摘要
- * 6. search_knowledge_base / deep_search - query_memory 的旧入口，只登记不下发
+ * 3. update_project_info - 更新项目信息
  *
  * <p><b>「从记忆里找东西」只剩一个工具</b>（dev-board#807，审计 A13）。此前
  * query_memory / search_knowledge_base / deep_search 三个的入参几乎一样，
@@ -47,9 +41,9 @@ import java.util.Optional;
  * <p>现在三档算法收敛成 {@code query_memory} 的一个 {@code depth} 参数：
  * quick（关键词，今天 query_memory 的行为）/ hybrid（RRF 融合，原 search_knowledge_base）/
  * deep（Agentic 多轮召回，原 deep_search）。「要不要多花一次 LLM」从一道选工具的谜题
- * 变成一个模型能明确判断的参数。两个旧名保留为 {@code offerToModel = false} 的兼容入口：
- * 规格不下发（模型看不见即不会去试），但老会话回放 / XML 兜底路径调到时照常执行，
- * 并在结果里附一句指路——好过一句 "Tool not found" 让模型以为这个能力整个不存在。
+ * 变成一个模型能明确判断的参数。两个旧名兼容入口（search_knowledge_base / deep_search）
+ * 及 get_user_profile / get_project_context / get_conversation_summary 三个只登记不下发的
+ * 工具已在 tool-system-v2 V3 删除。
  */
 @Component
 @Slf4j
@@ -62,17 +56,6 @@ public class MemoryTools implements AgentToolComponent {
 
     @Autowired(required = false)
     private MemoryDocumentService memoryDocumentService;
-
-    /**
-     * 两个兼容入口在结果末尾附的指路（审计 A13）。
-     *
-     * <p>放在<b>末尾</b>而不是开头：模型读到的最后一句最管用，而这句的作用是
-     * 「这次的结果照收，下次别再找这个名字」。不写的话模型会继续在历史里照抄旧名字，
-     * 而旧名字的规格已经不下发了——它只是在不停地撞一个自己看不见的门。
-     */
-    private static final String MERGED_INTO_QUERY_MEMORY =
-            "\n(提示：本工具已并入 query_memory，下次请直接调 "
-                    + "query_memory(query=..., depth=\"hybrid\"/\"deep\")。)";
 
     /**
      * 保存结构化记忆
@@ -139,61 +122,6 @@ public class MemoryTools implements AgentToolComponent {
         } catch (Exception e) {
             log.error("Failed to save memory: {}", e.getMessage(), e);
             return "错误：保存记忆时出错: " + e.getMessage();
-        }
-    }
-
-    /**
-     * 获取用户画像（跨项目的用户级记忆）
-     *
-     * <p>{@code offerToModel = false}（dev-board#1065 T-13）：它返回的偏好与用户级记忆，
-     * ContextAssemblerService 每轮都已作为「用户偏好与习惯（跨项目记忆）」注入系统提示的易变段。
-     * 再下发一个同内容的工具只会让模型多花一次往返去取一份它已经有的东西。
-     * 登记保留：老会话回放 / XML 兜底路径调到时照常执行。
-     */
-    @Tool("获取当前用户的画像信息：跨项目的用户偏好、行文习惯、常用表达等。在需要个性化输出（如按用户习惯起草文书）时使用。")
-    @ToolMeta(displayName = "获取用户画像", category = "memory", offerToModel = false)
-    public String get_user_profile() {
-        log.info("Tool: get_user_profile called");
-
-        Long userId = ProjectContextHolder.getUserId();
-        if (userId == null) {
-            return "错误：无法获取当前用户ID。";
-        }
-
-        try {
-            StringBuilder sb = new StringBuilder("# 用户画像\n\n");
-            boolean hasContent = false;
-
-            // 1. UserMemory 结构化偏好
-            Optional<com.checkba.model.entity.UserMemory> umOpt = memoryManager.getUserMemory(userId);
-            if (umOpt.isPresent() && umOpt.get().getPreferences() != null && !umOpt.get().getPreferences().isEmpty()) {
-                sb.append("## 偏好设置\n");
-                umOpt.get().getPreferences().forEach((k, v) ->
-                        sb.append("- ").append(k).append(": ").append(v).append("\n"));
-                hasContent = true;
-            }
-
-            // 2. 用户级记忆条目
-            List<MemoryEntry> userMemories = memoryManager.retrieveUserMemories(userId, 20);
-            if (!userMemories.isEmpty()) {
-                sb.append("\n## 用户级记忆（跨项目）\n");
-                for (MemoryEntry mem : userMemories) {
-                    sb.append("- [").append(mem.getMemoryType()).append("] ");
-                    if (mem.getMemoryKey() != null) {
-                        sb.append(mem.getMemoryKey()).append(": ");
-                    }
-                    sb.append(mem.getMemoryValue()).append("\n");
-                }
-                hasContent = true;
-            }
-
-            if (!hasContent) {
-                return "当前用户暂无画像信息。可以使用 save_memory(scope=\"user\") 保存用户偏好与习惯。";
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            log.error("Failed to get user profile: {}", e.getMessage(), e);
-            return "错误：获取用户画像时出错: " + e.getMessage();
         }
     }
 
@@ -330,47 +258,6 @@ public class MemoryTools implements AgentToolComponent {
     }
 
     /**
-     * 获取项目核心信息
-     *
-     * <p>{@code offerToModel = false}（dev-board#1065 T-13）：返回的就是 {@code ProjectMemory.toCoreContext()}，
-     * 而 ContextAssemblerService 每轮都把同一段作为「项目记忆（长期记忆）」注入系统提示的易变段。
-     * 登记保留：老会话回放 / XML 兜底路径调到时照常执行。
-     */
-    @ToolMeta(offerToModel = false)
-    @Tool("获取当前项目的核心信息，包括项目类型、交易结构、当事人、关键日期等。")
-    public String get_project_context() {
-        log.info("Tool: get_project_context called");
-        
-        Long projectId = ProjectContextHolder.getProjectIdAsLong();
-        
-        if (projectId == null) {
-            return "错误：无法获取当前项目ID。";
-        }
-        
-        try {
-            Optional<ProjectMemory> pmOpt = memoryManager.getProjectMemory(projectId);
-            
-            if (pmOpt.isEmpty()) {
-                return "项目记忆尚未建立。系统会在对话过程中自动提取并保存项目信息，您也可以使用 update_project_info 手动更新。";
-            }
-            
-            ProjectMemory pm = pmOpt.get();
-            StringBuilder sb = new StringBuilder("# 项目核心信息\n\n");
-            sb.append(pm.toCoreContext());
-            
-            // 添加统计信息
-            Map<String, Object> stats = memoryManager.getMemoryStats(projectId);
-            sb.append("\n## 记忆统计\n");
-            sb.append("- 总记忆条目: ").append(stats.get("totalMemories")).append("\n");
-            
-            return sb.toString();
-        } catch (Exception e) {
-            log.error("Failed to get project context: {}", e.getMessage(), e);
-            return "错误：获取项目信息时出错: " + e.getMessage();
-        }
-    }
-
-    /**
      * 更新项目信息
      */
     @Tool("更新项目的核心信息，如项目名称、交易金额、关键日期等。")
@@ -392,108 +279,6 @@ public class MemoryTools implements AgentToolComponent {
         } catch (Exception e) {
             log.error("Failed to update project info: {}", e.getMessage(), e);
             return "错误：更新项目信息时出错: " + e.getMessage();
-        }
-    }
-
-    /**
-     * 兼容入口：原「智能混合搜索知识库（RRF 融合）」。
-     *
-     * <p>{@code offerToModel = false}——规格不下发，模型看不见即不会在三个同义工具之间摇摆
-     * （审计 A13）。老会话回放 / XML 兜底路径调到时仍然照常执行，等价于
-     * {@code query_memory(query, depth="hybrid")}，并在结果末尾附一句指路。
-     */
-    @ToolMeta(offerToModel = false)
-    @Tool("[已并入 query_memory(depth=\"hybrid\")] 兼容入口，请改用 query_memory。")
-    public String search_knowledge_base(
-            @P("搜索查询，描述你想查找的信息") String query,
-            @P("返回结果数量，默认5") int limit,
-            @P("按作用域精确定位(可选): file(需配 sourceFileId)/conversation(取当前对话)，"
-                    + "不传则和此前一样只按语义相关性在全项目范围检索") String scope,
-            @P("来源文件ID(可选)，scope=file 时必填") Long sourceFileId
-    ) {
-        log.info("Tool: search_knowledge_base (compat -> query_memory depth=hybrid) query='{}', limit={}, scope='{}'",
-                query, limit, scope);
-        return retrieveWithDepth(query, null, scope, sourceFileId, "hybrid", limit)
-                + MERGED_INTO_QUERY_MEMORY;
-    }
-
-    /**
-     * 兼容入口：原「Agentic 深度搜索（多轮召回）」。
-     *
-     * <p>同上，等价于 {@code query_memory(query, depth="deep")}。这一档会额外起一次辅助模型
-     * 做查询扩展，把它做成参数而不是一个单独的工具，正是为了让「要不要多花这一次调用」
-     * 成为模型能明确判断的事。
-     */
-    @ToolMeta(offerToModel = false)
-    @Tool("[已并入 query_memory(depth=\"deep\")] 兼容入口，请改用 query_memory。")
-    public String deep_search(
-            @P("搜索查询，描述你想查找的信息") String query,
-            @P("返回结果数量，默认10") int limit,
-            @P("按作用域精确定位(可选): file(需配 sourceFileId)/conversation(取当前对话)，"
-                    + "不传则和此前一样只按多轮召回在全项目范围检索") String scope,
-            @P("来源文件ID(可选)，scope=file 时必填") Long sourceFileId
-    ) {
-        log.info("Tool: deep_search (compat -> query_memory depth=deep) query='{}', limit={}, scope='{}'",
-                query, limit, scope);
-        return retrieveWithDepth(query, null, scope, sourceFileId, "deep", limit)
-                + MERGED_INTO_QUERY_MEMORY;
-    }
-
-    /**
-     * 获取对话摘要
-     *
-     * <p>{@code offerToModel = false}（dev-board#1065 T-13）：本对话的历史每轮都随消息栈发给模型，
-     * 历史过长触发压缩时 ContextAssemblerService 把同一份 ConversationSummary 折进压缩后的历史。
-     * 模型要的东西已经在它眼前，下发这个工具只是白花一次往返。
-     * 登记保留：老会话回放 / XML 兜底路径调到时照常执行。
-     */
-    @ToolMeta(offerToModel = false)
-    @Tool("获取当前对话的历史摘要，了解之前讨论的要点和结论。")
-    public String get_conversation_summary() {
-        log.info("Tool: get_conversation_summary called");
-        
-        String conversationId = ProjectContextHolder.getConversationId();
-        
-        if (conversationId == null || conversationId.isEmpty()) {
-            return "错误：无法获取当前对话ID。";
-        }
-        
-        try {
-            Optional<ConversationSummary> summaryOpt = memoryManager.getConversationSummary(conversationId);
-            
-            if (summaryOpt.isEmpty()) {
-                return "当前对话暂无摘要。系统会在对话累积足够消息后自动生成摘要。";
-            }
-            
-            ConversationSummary summary = summaryOpt.get();
-            StringBuilder sb = new StringBuilder("# 对话摘要\n\n");
-            sb.append(summary.getSummaryText()).append("\n");
-            
-            if (summary.getKeyPoints() != null && !summary.getKeyPoints().isEmpty()) {
-                sb.append("\n## 关键要点\n");
-                for (String point : summary.getKeyPoints()) {
-                    sb.append("- ").append(point).append("\n");
-                }
-            }
-            
-            if (summary.getLegalReferences() != null && !summary.getLegalReferences().isEmpty()) {
-                sb.append("\n## 法律引用\n");
-                for (String ref : summary.getLegalReferences()) {
-                    sb.append("- ").append(ref).append("\n");
-                }
-            }
-            
-            if (summary.getPendingTasks() != null && !summary.getPendingTasks().isEmpty()) {
-                sb.append("\n## 待办事项\n");
-                for (String task : summary.getPendingTasks()) {
-                    sb.append("- [ ] ").append(task).append("\n");
-                }
-            }
-            
-            return sb.toString();
-        } catch (Exception e) {
-            log.error("Failed to get conversation summary: {}", e.getMessage(), e);
-            return "错误：获取对话摘要时出错: " + e.getMessage();
         }
     }
 

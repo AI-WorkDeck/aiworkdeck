@@ -145,14 +145,6 @@ public class LegalTools implements AgentToolComponent {
      * OCR 失败一律 {@code Error:} 开头并带上底层原因——此前它以「[System: OCR 识别失败…]」形态
      * 返回，非空且无 Error 前缀，会被当成正文原样注进上下文。
      */
-    @ToolMeta(displayName = "读取文档", category = "file", offerToModel = false)
-    @Tool("Read a project file's full plain text by its database fileId (from doc_list_project_files). "
-            + "Handles Word/Excel/PowerPoint, PDF and plain text; images and scanned PDFs are OCR'd "
-            + "automatically in the cloud (no local setup, no Docker, no script). "
-            + "Very long documents are truncated (the reply says so; ask for a specific section instead of "
-            + "re-reading the whole file). "
-            + "**If the id might be a FOLDER, call extract_file_text instead** — it is the same extractor but "
-            + "answers a folder id with a listing of its children (id + name + type) rather than an error.")
     public String read_document(String fileId) {
         log.info("Tool: read_document called for fileId={}", fileId);
         try {

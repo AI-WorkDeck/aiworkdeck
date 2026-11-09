@@ -56,14 +56,16 @@
       ],
       "offeredToolsExclude": [
         "doc_open_file",
-        "read_document",
-        "pdf_list_files",
         "sheet_get_overview",
         "office_get_text",
         "ref_list",
         "pdf_highlight",
-        "pptx_apply_format",
         "text_write_file"
+      ],
+      "toolsNotRegistered": [
+        "read_document",
+        "pdf_list_files",
+        "pptx_apply_format"
       ],
       "structureContains": [
         "<final>"
@@ -180,12 +182,14 @@
       ],
       "offeredToolsExclude": [
         "doc_find_replace",
-        "read_document",
         "office_excel_get_range",
         "office_ppt_get_slides",
         "pdf_highlight",
-        "pptx_open_file",
         "text_write_file"
+      ],
+      "toolsNotRegistered": [
+        "read_document",
+        "pptx_open_file"
       ],
       "structureContains": [
         "<final>"

@@ -135,6 +135,12 @@ public class EvalCase {
         /** 每次携带工具的 LLM 调用中，可见工具应排除的名字（Skill 裁剪断言；空 = 不断言） */
         public List<String> offeredToolsExclude = new ArrayList<>();
         /**
+         * 这些工具名在真实工具 bean 里必须<b>不存在</b>（没有任何 {@code @Tool} 方法叫这个名字）。
+         * 用于已被 tool-system-v2 V3 删除的长期隐藏工具：删除前这里写在 offeredToolsExclude，
+         * 删除后那条断言恒过，改为直接断言「未注册」。
+         */
+        public List<String> toolsNotRegistered = new ArrayList<>();
+        /**
          * 只对**第一次**携带工具的调用断言排除（dev-board#729 ①）。
          * 用于「起跑时按活跃文档类型裁掉，中途新建/切换文档后又放回来」这种<b>逐轮变化</b>的形态——
          * 全轮次的 offeredToolsExclude 在这里必然自相矛盾。
