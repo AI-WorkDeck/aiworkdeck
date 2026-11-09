@@ -681,6 +681,8 @@ public class ToolRegistry {
         for (DeclaredToolBinding b : declaredBindings()) {
             String name = b.specification().name();
             if (unusable.contains(name) || builtinTools.containsKey(name)) continue;
+            // 外部 Agent 答不了确认卡：需要确认的工具（destructive / confirm:always）无论 mcp:true 都不投影
+            if (requiresConfirmation(name)) continue;
             ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, b.tool().getAccess());
             Boolean mcp = b.tool().getMcp();
             boolean projected = access == ToolMeta.Access.READ ? !Boolean.FALSE.equals(mcp)
