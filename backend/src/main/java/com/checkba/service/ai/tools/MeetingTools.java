@@ -40,6 +40,8 @@ public class MeetingTools implements AgentToolComponent {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern TMEET_KEY = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
+    private static final java.time.format.DateTimeFormatter TIME_FMT = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     private final MeetingRecordingService meetingService;
     private final TencentMeetingTools tmeetBuiltin;
     /** 懒取：ToolRegistry 持有全部工具组件，直接注入会成环。 */
@@ -126,7 +128,11 @@ public class MeetingTools implements AgentToolComponent {
                 "本项目的会议录音：\n", "Meeting recordings in this project:\n"));
         for (MeetingRecording m : meetings) {
             sb.append("- source=recording | meetingId=").append(m.getId())
-                    .append(" | ").append(m.getTitle())
+                    .append(" | ").append(m.getTitle());
+            if (m.getCreatedAt() != null) {
+                sb.append(LangText.of(" | 时间 ", " | time ")).append(m.getCreatedAt().format(TIME_FMT));
+            }
+            sb
                     .append(LangText.of(" | 时长 ", " | duration ")).append(m.getDurationMs() != null
                             ? MeetingRecordingService.formatMs(m.getDurationMs())
                             : LangText.of("未知", "unknown"))

@@ -95,8 +95,6 @@
           ]
         ],
         "mustNotUse": [
-          "write_docx",
-          "write_file",
           "tencent_meeting_action"
         ]
       }
@@ -145,8 +143,6 @@
           ]
         ],
         "mustNotUse": [
-          "write_docx",
-          "write_file",
           "tencent_meeting_action"
         ]
       }
