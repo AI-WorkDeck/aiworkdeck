@@ -649,7 +649,7 @@
   },
   {
     "id": "surface-v2-s14-delete",
-    "title": "V2 句14「把合同草稿.docx删了」首轮含 move_to_trash、不含 delete_file/整个 files 类、后续每轮 ≤45",
+    "title": "V2 句14「把合同草稿.docx删了」首轮含 move_to_trash、不含 delete_file/整个 files 类；move_to_trash 属 destructive，由确认闸暂停（P2-1）",
     "category": "files",
     "protocol": "native",
     "userInput": "把合同草稿.docx删了",
@@ -663,17 +663,16 @@
             }
           }
         ]
-      },
-      {
-        "text": "<final>好的。</final>"
       }
     ],
     "toolStubs": {
       "move_to_trash": "OK"
     },
     "expect": {
-      "bubbleEndStatus": "finished",
-      "maxOfferedToolsLaterCalls": 45,
+      "bubbleEndStatus": "awaiting_input",
+      "structureContains": [
+        "确认执行「"
+      ],
       "offeredToolsInclude": [
         "move_to_trash"
       ],

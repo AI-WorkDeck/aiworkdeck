@@ -574,11 +574,6 @@ public class ToolRegistry {
     private DeclaredToolBinding bind(PluginService.DeclaredTool declared) {
         PluginService.PluginToolInfo tool = declared.tool();
         String pluginId = declared.pluginId();
-        if (hostServices != null && "service".equals(tool.handlerType()) && isDestructive(tool)) {
-            log.info("Declared tool {} of plugin {} not registered: destructive declarative tools await confirmation gate (P2-1)",
-                    tool.getName(), pluginId);
-            return null;
-        }
         if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
                 || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
         try {
@@ -612,6 +607,22 @@ public class ToolRegistry {
         var h = tool.getHandler();
         return com.checkba.service.plugin.HostServiceRegistry.spec(h.getService(), h.getOperation())
                 .map(spec -> "destructive".equals(spec.access())).orElse(false);
+    }
+
+    /**
+     * 分发前是否必须先让用户确认（C5 / P2-1）：内置工具 access=DESTRUCTIVE；声明式插件工具 destructive
+     * 或 {@code confirm:always}。{@code confirm:never} 对 destructive 无效。插件 JAR @Tool 与 MCP 不在此列。
+     */
+    public boolean requiresConfirmation(String name) {
+        if (name == null) return false;
+        RegisteredTool builtin = builtinTools.get(name);
+        if (builtin != null) {
+            return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, builtin.meta())
+                    == ToolMeta.Access.DESTRUCTIVE;
+        }
+        DeclaredToolBinding declared = declaredBinding(name);
+        if (declared == null) return false;
+        return isDestructive(declared.tool()) || "always".equals(declared.tool().getConfirm());
     }
 
     DeclaredToolBinding declaredBinding(String name) {

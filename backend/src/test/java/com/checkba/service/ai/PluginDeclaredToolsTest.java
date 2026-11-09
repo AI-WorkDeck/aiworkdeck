@@ -135,21 +135,34 @@ class PluginDeclaredToolsTest {
     }
 
     @Test
-    void destructiveDeclarativeToolsAreNotRegistered() throws IOException {
-        // 声明为 destructive，以及绑定 calendar/delete（服务操作本身 destructive）的工具都通过校验但不注册
+    void destructiveDeclarativeToolsRegisterAndAreGatedByConfirmation() throws IOException {
+        // P2-1：声明为 destructive、绑定 calendar/delete（服务操作本身 destructive）、confirm:always 的写工具
+        // 都注册，且分发前都要确认；读/普通写工具不要
         String extra = ",{\"name\":\"hello_agent_tools_wipe\",\"description\":\"x\",\"access\":\"destructive\","
                 + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"update\"},\"permissions\":[\"tasks\"]},"
                 + "{\"name\":\"hello_agent_tools_del\",\"description\":\"x\",\"access\":\"write\","
-                + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"delete\"},\"permissions\":[\"tasks\"]}]";
+                + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"delete\"},\"permissions\":[\"tasks\"]},"
+                + "{\"name\":\"hello_agent_tools_always\",\"description\":\"x\",\"access\":\"write\",\"confirm\":\"always\","
+                + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"update\"},\"permissions\":[\"tasks\"]},"
+                + "{\"name\":\"hello_agent_tools_never\",\"description\":\"x\",\"access\":\"destructive\",\"confirm\":\"never\","
+                + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"update\"},\"permissions\":[\"tasks\"]}]";
         String withDestructive = manifest.replaceFirst("\\]\\s*,\\s*\"backendJars\"", java.util.regex.Matcher.quoteReplacement(extra) + ",\"backendJars\"");
         assertNotEquals(manifest, withDestructive);
         install(withDestructive);
         PluginManifestContractValidator.validateTools(plugins.getPlugin("hello-agent-tools"));
-        assertEquals(4, plugins.getDeclaredTools().size());
-        assertTrue(names().contains("hello_agent_tools_list_tasks"));
-        assertFalse(names().contains("hello_agent_tools_wipe"));
-        assertFalse(names().contains("hello_agent_tools_del"));
-        assertTrue(registry.resolve("hello_agent_tools_del").isEmpty());
+        assertEquals(6, plugins.getDeclaredTools().size());
+        for (String gated : List.of("hello_agent_tools_wipe", "hello_agent_tools_del",
+                "hello_agent_tools_always", "hello_agent_tools_never")) {
+            assertTrue(names().contains(gated), gated + " 应已注册");
+            assertTrue(registry.resolve(gated).isPresent(), gated);
+            assertTrue(registry.requiresConfirmation(gated), gated + " 必须过确认闸（never 对 destructive 无效）");
+        }
+        assertFalse(registry.requiresConfirmation("hello_agent_tools_list_tasks"));
+        assertFalse(registry.requiresConfirmation("hello_agent_tools_add_task"));
+        assertFalse(registry.requiresConfirmation("no_such_tool"));
+        // 仍永不投影到 MCP
+        assertTrue(registry.mcpCandidates().stream().noneMatch(c -> c.spec().name().startsWith("hello_agent_tools_w")
+                || c.spec().name().equals("hello_agent_tools_del")));
     }
 
     @Test
