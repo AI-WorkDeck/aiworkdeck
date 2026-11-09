@@ -116,7 +116,7 @@
   },
   {
     "id": "ask-user-clear-instruction-executes-directly",
-    "title": "指令明确（删第 12-21 段）：模型不另行提问，选段照常执行；破坏性的 doc_delete_selection 由确认闸暂停（P2-1），不执行",
+    "title": "指令明确（删第 12-21 段）：直接执行，工具集里有 ask_user 但不调用",
     "category": "question",
     "protocol": "native",
     "userInput": "把第 12 到 21 段删掉",
@@ -127,12 +127,12 @@
           { "name": "doc_select", "arguments": { "target": "paragraph", "index": 11 } },
           { "name": "doc_delete_selection", "arguments": {} }
         ]
-      }
+      },
+      { "text": "<final>已删除第 12 至 21 段。</final>" }
     ],
     "expect": {
-      "toolCalls": [ { "name": "doc_select", "argsContain": { "target": "paragraph" } } ],
-      "structureContains": [ "<question kind=\"ask_user\"", "确认执行「" ],
-      "bubbleEndStatus": "awaiting_input",
+      "toolCalls": [ { "name": "doc_select", "argsContain": { "target": "paragraph" } }, { "name": "doc_delete_selection" } ],
+      "bubbleEndStatus": "finished",
       "offeredToolsInclude": [ "ask_user" ]
     }
   }
