@@ -95,3 +95,52 @@ test('启动落点是工作台外壳（rail 底部有反馈入口），项目列
 test('反馈图标进 config/icons.js（唯一图标出处）', () => {
   assert.match(ICONS, /^\s*feedback:\s*\[/m, 'ICONS.feedback 缺失')
 })
+
+function loadMineFormatters(locale) {
+  const start = WIDGET.indexOf('const MINE_STATUS_LABELS = {')
+  const end = WIDGET.indexOf('\nexport default {', start)
+  assert.ok(start >= 0 && end > start, '找不到我的反馈格式化函数')
+  const messages = new Function(read(`locales/${locale}/feedback.js`).replace('export default', 'return'))()
+  const translate = (key, params = {}) => {
+    const template = messages[key.replace(/^feedback\./, '')]
+    assert.equal(typeof template, 'string', `${locale} 缺少词条 ${key}`)
+    return template.replace(/\{(\w+)\}/g, (match, name) => String(params[name] ?? match))
+  }
+  return new Function('t$', `${WIDGET.slice(start, end)}\nreturn { formatMineItem }`)(translate)
+}
+
+test('我的反馈把 RESOLVED 显示为已解决，不再落入处理中', () => {
+  const { formatMineItem } = loadMineFormatters('zh-CN')
+  const item = formatMineItem({ id: 'resolved', kind: 'BUG', text: '正文', status: 'RESOLVED' })
+  assert.equal(item.statusLabel, '已解决')
+  assert.notEqual(item.statusLabel, '处理中')
+})
+
+test('我的反馈保留公开答复正文并格式化发布时间', () => {
+  const { formatMineItem } = loadMineFormatters('zh-CN')
+  const item = formatMineItem({
+    id: 'answered', kind: 'BUG', text: '正文', status: 'RESOLVED',
+    reporterResponse: '  已修复，重启后再试。\n感谢反馈。  ',
+    responsePublishedAt: '2026-11-09T08:30:00Z',
+  })
+  assert.equal(item.reporterResponse, '已修复，重启后再试。\n感谢反馈。')
+  assert.match(item.responseTimeLabel, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/)
+  assert.match(WIDGET, /<div class="awdfb-mine-response-text">\{\{ item\.reporterResponse \}\}<\/div>/)
+  assert.match(WIDGET, /\$t\('feedback\.responsePublishedAt', \{ time: item\.responseTimeLabel \}\)/)
+})
+
+test('我的反馈没有公开答复或只有空白时不渲染答复区', () => {
+  const { formatMineItem } = loadMineFormatters('zh-CN')
+  for (const reporterResponse of [undefined, null, '', '  \n  ']) {
+    const item = formatMineItem({ id: 'unanswered', kind: 'BUG', text: '正文', status: 'RESOLVED', reporterResponse })
+    assert.equal(item.reporterResponse, '')
+  }
+  assert.match(WIDGET, /<div v-if="item\.reporterResponse" class="awdfb-mine-response">/)
+})
+
+test('我的反馈保留 NEW 的待发送与已送达状态', () => {
+  const { formatMineItem } = loadMineFormatters('zh-CN')
+  const base = { id: 'new', kind: 'BUG', text: '正文', status: 'NEW' }
+  assert.equal(formatMineItem({ ...base, uploaded: false }).statusLabel, '待发送')
+  assert.equal(formatMineItem({ ...base, uploaded: true }).statusLabel, '已送达，排队处理中')
+})

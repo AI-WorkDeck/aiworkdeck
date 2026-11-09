@@ -118,6 +118,22 @@
   }
   details summary { cursor: pointer; color: var(--ink-soft); font-size: 13px; }
   a.back { color: var(--accent); text-decoration: none; font-size: 14px; }
+  .lang-btn {
+    margin-inline-start: 12px; padding: 2px 8px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--card); color: var(--accent); cursor: pointer;
+  }
+  .field textarea {
+    width: 100%; min-height: 84px; resize: vertical; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card);
+    color: var(--ink); font: inherit;
+  }
+  .field textarea:focus { outline: none; border-color: var(--accent); }
+  .history-item { border-top: 1px solid var(--line); padding: 12px 0; }
+  .history-item:first-child { border-top: none; }
+  .history-title { font-weight: 600; }
+  .history-field { margin-top: 5px; white-space: pre-wrap; word-break: break-word; }
+  .history-label { color: var(--ink-soft); }
+  .handling-status { min-height: 1.7em; margin: 10px 0 0; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -126,6 +142,7 @@
   <header class="site">
     <h1>AI WorkDeck 反馈控制台</h1>
     <span class="who" id="who"></span>
+    <button class="lang-btn" id="btn-lang" type="button"></button>
   </header>
 
   <!-- 登录 -->
@@ -179,6 +196,34 @@
       <div class="sec-title">优化者分诊</div>
       <div id="d-triage" style="white-space:pre-wrap"></div>
     </div>
+    <section id="d-ai-handling" class="hidden">
+      <div class="sec-title" id="ai-handling-title"></div>
+      <p class="muted" id="ai-publish-note"></p>
+      <div id="ai-history"></div>
+      <p class="muted" id="ai-closed"></p>
+      <div id="ai-form">
+        <div class="field">
+          <label for="ai-conclusion" id="ai-conclusion-label"></label>
+          <textarea id="ai-conclusion" maxlength="20000"></textarea>
+        </div>
+        <div class="field">
+          <label for="ai-action" id="ai-action-label"></label>
+          <textarea id="ai-action" maxlength="20000"></textarea>
+        </div>
+        <div class="field">
+          <label for="ai-evidence" id="ai-evidence-label"></label>
+          <textarea id="ai-evidence" maxlength="2000"></textarea>
+        </div>
+        <div class="field">
+          <label for="ai-response" id="ai-response-label"></label>
+          <textarea id="ai-response" maxlength="20000"></textarea>
+        </div>
+        <p class="muted" id="ai-resolution-hint"></p>
+        <button class="btn" id="btn-ai-progress" type="button"></button>
+        <button class="btn ghost" id="btn-ai-resolve" type="button"></button>
+      </div>
+      <p class="handling-status" id="ai-handling-status" role="status" aria-live="polite"></p>
+    </section>
     <div id="d-ctx-wrap" class="hidden" style="margin-top:16px">
       <details><summary>运行现场（contextJson）</summary><pre class="ctx" id="d-ctx"></pre></details>
     </div>
@@ -195,8 +240,54 @@
   var qs = new URLSearchParams(location.search);
   var fbId = /^\d+$/.test(qs.get('fb') || '') ? qs.get('fb') : null;
   var pendingSecondFactor = null; // 4005 信封里的 method
+  var currentDetail = null;
+  var handlingBusy = false;
+  var LANG_KEY = 'awd_feedback_console_lang';
+  var savedLang = '';
+  try { savedLang = localStorage.getItem(LANG_KEY) || ''; } catch (e) {}
+  var lang = savedLang || ((navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en');
+  var I18N = {
+    zh: {
+      language: 'English', statusResolved: '已人工结案', aiHandling: 'AI 内容举报人工处置',
+      aiPublishNote: '非空答复会发布到反馈记录，举报人可在“我的反馈”查看；不表示已推送、送达或已读。',
+      aiNoHistory: '尚无人工处置记录。', aiClosed: '该举报已结案，处置历史保留为只读。',
+      aiConclusion: '人工核验结论', aiAction: '实际措施', aiEvidence: '证据定位 / 编号',
+      aiResponse: '给举报人的答复（可为空）', aiResolutionHint: '可先保存核查进展。结案必须填写人工核验结论和实际措施；答复可为空。',
+      aiSaveProgress: '保存核查进展', aiResolve: '保存并结案', aiSaving: '正在保存核查进展…',
+      aiResolving: '正在保存并结案…', aiProgressSaved: '核查进展已保存；非空答复已发布到反馈记录。',
+      aiResolved: '已结案；非空答复已发布到反馈记录。', aiRequired: '结案前请填写人工核验结论和实际措施。',
+      aiSaveFailed: '保存失败，请核对内容后重试。', aiNetworkError: '网络错误，处置记录未确认保存，请重试。',
+      aiSessionExpired: '会话已过期或不是 admin 账号，请重新登录', aiProgressTag: '核查进展',
+      aiResolvedTag: '人工结案', aiHandler: '处理人', aiNoResponse: '未发布答复'
+    },
+    en: {
+      language: '中文', statusResolved: 'Resolved by reviewer', aiHandling: 'Manual AI content report handling',
+      aiPublishNote: 'A non-empty response is published to the feedback record for the reporter in My feedback. It does not mean that a push, delivery, or read receipt occurred.',
+      aiNoHistory: 'No manual handling records yet.', aiClosed: 'This report is resolved. Its handling history is read-only.',
+      aiConclusion: 'Human review conclusion', aiAction: 'Action taken', aiEvidence: 'Evidence location / reference',
+      aiResponse: 'Response to reporter (optional)', aiResolutionHint: 'You can save review progress first. Resolving requires a human conclusion and action taken; a reporter response is optional.',
+      aiSaveProgress: 'Save progress', aiResolve: 'Save and resolve', aiSaving: 'Saving review progress…',
+      aiResolving: 'Saving and resolving…', aiProgressSaved: 'Progress saved. Any non-empty response was published to the feedback record.',
+      aiResolved: 'Resolved. Any non-empty response was published to the feedback record.', aiRequired: 'Enter the human conclusion and action taken before resolving.',
+      aiSaveFailed: 'Save failed. Check the entries and try again.', aiNetworkError: 'Network error. Saving was not confirmed; please retry.',
+      aiSessionExpired: 'Your session expired or is not an admin account. Please sign in again.', aiProgressTag: 'Review progress',
+      aiResolvedTag: 'Resolved by reviewer', aiHandler: 'Handled by', aiNoResponse: 'No response published'
+    }
+  };
 
+  function t(key) { return (I18N[lang] && I18N[lang][key]) || I18N.zh[key] || key; }
   function $(id) { return document.getElementById(id); }
+  function applyLanguage() {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    var labels = {
+      'btn-lang': 'language', 'ai-handling-title': 'aiHandling', 'ai-publish-note': 'aiPublishNote',
+      'ai-closed': 'aiClosed', 'ai-conclusion-label': 'aiConclusion', 'ai-action-label': 'aiAction',
+      'ai-evidence-label': 'aiEvidence', 'ai-response-label': 'aiResponse',
+      'ai-resolution-hint': 'aiResolutionHint', 'btn-ai-progress': 'aiSaveProgress', 'btn-ai-resolve': 'aiResolve'
+    };
+    Object.keys(labels).forEach(function (id) { $(id).textContent = t(labels[id]); });
+    if (currentDetail) renderAiHistory(currentDetail.handlingEvents || []);
+  }
   function show(id) { $(id).classList.remove('hidden'); }
   function hide(id) { $(id).classList.add('hidden'); }
   function sid() { try { return localStorage.getItem(SID_KEY) || ''; } catch (e) { return ''; } }
@@ -228,6 +319,7 @@
 
   function kindLabel(k) { return k === 'IDEA' ? '建议' : '报障'; }
   function statusLabel(s) {
+    if (s === 'RESOLVED') return t('statusResolved');
     return ({ NEW: '待处理', PR_OPENED: '已开 PR', EMAILED: '已发邮件',
       SKIPPED: '已跳过', FAILED: '处理失败' })[s] || s || '';
   }
@@ -340,7 +432,108 @@
   }
 
   // ---------- 详情 ----------
+  function renderAiHistory(events) {
+    var host = $('ai-history');
+    host.textContent = '';
+    if (!events.length) {
+      var empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.textContent = t('aiNoHistory');
+      host.appendChild(empty);
+      return;
+    }
+    events.forEach(function (event) {
+      var item = document.createElement('div');
+      item.className = 'history-item';
+      var title = document.createElement('div');
+      title.className = 'history-title';
+      title.textContent = t(event.eventType === 'RESOLVED' ? 'aiResolvedTag' : 'aiProgressTag')
+        + ' · ' + shortTime(event.occurredAt) + ' · ' + t('aiHandler') + ' ' + (event.handlerName || '');
+      item.appendChild(title);
+      [
+        ['aiConclusion', event.conclusion], ['aiAction', event.actionTaken],
+        ['aiEvidence', event.evidenceRef], ['aiResponse', event.reporterResponse]
+      ].forEach(function (field) {
+        if (!field[1]) return;
+        var line = document.createElement('div');
+        line.className = 'history-field';
+        var label = document.createElement('span');
+        label.className = 'history-label';
+        label.textContent = t(field[0]) + '：';
+        line.appendChild(label);
+        var value = document.createElement('span');
+        value.textContent = field[1];
+        line.appendChild(value);
+        item.appendChild(line);
+      });
+      host.appendChild(item);
+    });
+  }
+
+  function setHandlingBusy(busy) {
+    handlingBusy = busy;
+    var closed = currentDetail && currentDetail.status === 'RESOLVED';
+    ['ai-conclusion', 'ai-action', 'ai-evidence', 'ai-response'].forEach(function (id) {
+      $(id).disabled = busy || closed;
+    });
+    $('btn-ai-progress').disabled = busy || closed;
+    $('btn-ai-resolve').disabled = busy || closed;
+  }
+
+  function renderAiHandling(d) {
+    if (!d.aiContentReport) { hide('d-ai-handling'); return; }
+    show('d-ai-handling');
+    renderAiHistory(d.handlingEvents || []);
+    var closed = d.status === 'RESOLVED';
+    if (closed) { hide('ai-form'); show('ai-closed'); }
+    else { show('ai-form'); hide('ai-closed'); }
+    setHandlingBusy(handlingBusy);
+  }
+
+  function saveAiHandling(eventType) {
+    if (handlingBusy || !currentDetail || currentDetail.status === 'RESOLVED') return;
+    var conclusion = $('ai-conclusion').value.trim();
+    var actionTaken = $('ai-action').value.trim();
+    var status = $('ai-handling-status');
+    if (eventType === 'RESOLVED' && (!conclusion || !actionTaken)) {
+      status.style.color = 'var(--warn)';
+      status.textContent = t('aiRequired');
+      return;
+    }
+    var id = currentDetail.id;
+    var payload = {
+      eventType: eventType, conclusion: conclusion, actionTaken: actionTaken,
+      evidenceRef: $('ai-evidence').value.trim(), reporterResponse: $('ai-response').value.trim(),
+      expectedVersion: currentDetail.version
+    };
+    setHandlingBusy(true);
+    status.style.color = '';
+    status.textContent = t(eventType === 'RESOLVED' ? 'aiResolving' : 'aiSaving');
+    api('/api/feedback/' + id + '/ai-report-resolution', { method: 'POST', json: payload })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (needsLogin(r.status, body)) { showLogin(t('aiSessionExpired')); return null; }
+          if (body.code !== 0) {
+            status.style.color = 'var(--warn)';
+            status.textContent = body.message || t('aiSaveFailed');
+            return null;
+          }
+          return loadDetail(id).then(function () {
+            ['ai-conclusion', 'ai-action', 'ai-evidence', 'ai-response'].forEach(function (field) { $(field).value = ''; });
+            status.style.color = '';
+            status.textContent = t(eventType === 'RESOLVED' ? 'aiResolved' : 'aiProgressSaved');
+          });
+        });
+      })
+      .catch(function () {
+        status.style.color = 'var(--warn)';
+        status.textContent = t('aiNetworkError');
+      })
+      .finally(function () { setHandlingBusy(false); });
+  }
+
   function renderDetail(d) {
+    currentDetail = d;
     showView('view-detail');
     $('d-title').textContent = '反馈 #' + d.id + '（' + kindLabel(d.kind) + '）';
     var meta = [statusLabel(d.status), shortTime(d.createdAt), d.username,
@@ -379,6 +572,8 @@
       $('d-triage').textContent = triageLines.join('\n');
     }
 
+    renderAiHandling(d);
+
     if (d.contextJson) {
       show('d-ctx-wrap');
       var pretty = d.contextJson;
@@ -388,7 +583,7 @@
   }
 
   function loadDetail(id) {
-    api('/api/feedback/' + id).then(function (r) {
+    return api('/api/feedback/' + id).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
         if (needsLogin(r.status, body)) { showLogin(sid() ? '会话已过期或不是 admin 账号，请重新登录' : ''); return; }
         if (body.code === 0 && body.data) { renderDetail(body.data); return; }
@@ -462,10 +657,19 @@
 
   $('btn-login').addEventListener('click', doLogin);
   $('btn-resend').addEventListener('click', sendCode);
+  $('btn-ai-progress').addEventListener('click', function () { saveAiHandling('PROGRESS'); });
+  $('btn-ai-resolve').addEventListener('click', function () { saveAiHandling('RESOLVED'); });
+  $('btn-lang').addEventListener('click', function () {
+    lang = lang === 'zh' ? 'en' : 'zh';
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    applyLanguage();
+    if (currentDetail) renderAiHandling(currentDetail);
+  });
   ['in-pass', 'in-code'].forEach(function (id) {
     $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
   });
 
+  applyLanguage();
   init();
 })();
 </script>

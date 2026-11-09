@@ -74,6 +74,10 @@ class FeedbackIngestStatusTest {
     @Test
     void returnsOnlyStatusFieldsForMatchingInstall() {
         UserFeedback fb = cloudRow("install-a", "9", UserFeedback.STATUS_PR_OPENED, "https://github.com/a/b/pull/1");
+        fb.setReporterResponse("Published response");
+        fb.setResponsePublishedAt(LocalDateTime.of(2026, 11, 9, 11, 0));
+        fb.setResolvedBy("internal-admin");
+        fb.setLastError("internal-error");
         when(repo.findByInstallIdAndSourceAndClientRefIn(eq("install-a"), eq(UserFeedback.SOURCE_CLOUD), anyList()))
                 .thenReturn(List.of(fb));
 
@@ -88,8 +92,11 @@ class FeedbackIngestStatusTest {
         assertEquals("BUG", item.get("triageVerdict"));
         assertEquals("https://github.com/a/b/pull/1", item.get("prUrl"));
         assertNotNull(item.get("handledAt"));
-        // 只回状态字段：正文/附件/上下文一律不出现，最小化返回面
-        assertEquals(Set.of("clientRef", "status", "triageVerdict", "prUrl", "handledAt"), item.keySet());
+        assertEquals("Published response", item.get("reporterResponse"));
+        assertEquals("2026-11-09T11:00", item.get("responsePublishedAt"));
+        // 只回状态与公开答复：正文、附件、上下文和内部处理人/错误一律不出现
+        assertEquals(Set.of("clientRef", "status", "triageVerdict", "prUrl", "handledAt",
+                "resolvedAt", "reporterResponse", "responsePublishedAt"), item.keySet());
     }
 
     @Test
