@@ -1978,3 +1978,9 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 - 桌面 BYOK/直连：`application.yml` 的 `pkulaw-*` 全部指向聚合端点 `mcp-law-agg/mcp`，server 名不变。
 - 回归：`LegalToolsVendorFailureTest`、`LegalVendorFailureReplayEvalTest`、`HarnessDiagnosticServiceTest`、`ToolDiscoveryToolsSearchTest`。
 - **泛化（同日复测）**：类目展开永不从工具输出推导，只看用户指令/参数与失败工具名自身类目。`HarnessDiagnosticService.isToolUnavailable` 把「无凭证 / Key 未配置 / 未连接 / 上游 4xx5xx / 上游 Unknown tool」统一判为工具不可用：不展开类目、不触发 ask_user 护栏；编排器改追加「[Harness 工具不可用]」说明（法宝已带自己的说明并保留本轮整体下线）。`LegalTools` 把 `MCP server has no credential` 也归入法源不可用。
+
+## 2026-11-09 新建标题文档与矩阵 ask_user 判停（s07 / s17）
+
+- **DeepSeek 把原生 DSML 收尾泄漏进 XML 兜底**：模型写 `<tool_code>write_docx(...)` 却以 `</｜DSML｜parameter></｜DSML｜invoke></｜DSML｜tool_calls>` 收尾，没有 `</tool_code>`。解析器提不出调用、`endsWithUnclosedTag` 判截断，两轮「请重发」后整轮以截断说明收尾，文档没建而内容其实完整。`XmlToolCallParser.normalizeLeakedClosers` 在编排器取到 `content` 后立刻把第一个 DSML 收尾标签当作缺失的 `</tool_code>`、其余 DSML 标签丢弃；已闭合或真截断不动。回归：`XmlToolCallParserTest`（含真实日志原文回放）。
+- **「只有类型+标题」的新建请求不要问**：基底 Clarification 的「起草类缺要素就问、不要占位符」会让模型反问事项或编整套模板（长参数更易被截断）。「什么时候不要问」里加了一条（zh/en），回归：`SystemPromptTitleOnlyCreateTest`。
+- **矩阵编辑器句子的判停**：`ask_user` 停机不打印 `Agent Loop Finished`，只打 `Detected <question> for <conv>`；`model-matrix.mjs` 原先只认前者，把每次反问记成 300 秒 timeout。现两者都认，反问记 `awaiting_input`，且 `awaiting_input` 算「正常结束」（是否合格仍由 mustUse 决定：s17 的 mustUse 接受 ask_user，s07 不接受）。

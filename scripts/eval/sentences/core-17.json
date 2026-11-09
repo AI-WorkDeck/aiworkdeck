@@ -421,6 +421,7 @@
       "hostState": "docx:contract-tracked",
       "expect": {
         "firstToolAnyOf": [
+          "todo_write",
           "doc_get_document_text",
           "doc_get_clauses",
           "doc_find_text",

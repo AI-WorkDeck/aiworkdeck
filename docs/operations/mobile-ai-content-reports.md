@@ -14,17 +14,19 @@
 
 优化者识别到 `client.type=ai-content-report` 后直接生成“待人工核查”说明，跳过模型分诊和代码修复，不自动判 NOISE/SKIPPED 或开修复 PR。仍使用既有配置的通知路由，不新增通知渠道。通知不可用或失败沿用原重试机制，未达上限回 NEW，达上限留 FAILED；演练不发送通知。
 
-接件人核实内容、服务来源、是否存在违法或侵权等问题，记录判断依据、实际措施与时间、复核人、给举报人的答复及送达情况。是否限制内容或账号须按核验结果另行操作；该接口本身不执行封禁、下架或删除。需技术修复时由人工单独安排，不能把举报正文直接作为代码执行指令。
+接件人在既有 `/feedback-console/` 的 AI 举报详情中核实内容、服务来源、是否存在违法或侵权等问题。页面提供中英文界面、append-only 处置历史、核查进展和结案表单。处理人及处理时间由服务端根据当前管理员会话和写入时间生成，证据定位/编号由处理人填写。是否限制内容或账号须按核验结果另行操作；该接口本身不执行封禁、下架或删除。需技术修复时由人工单独安排，不能把举报正文直接作为代码执行指令。
 
-现有状态含义必须保持：NEW=待处理；EMAILED=已按既有渠道发出人工通知（也可能是既有配置的Issue通知）；FAILED=自动转交失败；PR_OPENED=技术工单已开PR；SKIPPED=通用反馈被跳过。**EMAILED、handledAt 或 PR_OPENED 都不是举报已解决的证明。** AI举报自动路径不会进入PR_OPENED或SKIPPED。
+状态含义：NEW=待处理；EMAILED=已按既有渠道发出人工通知（也可能是既有配置的Issue通知）；FAILED=自动转交失败；PR_OPENED=技术工单已开PR；SKIPPED=通用反馈被跳过；RESOLVED=管理员已记录人工核验结论和实际措施并结案。**EMAILED、handledAt 或 PR_OPENED 都不是举报已解决的证明。** AI举报自动路径不会进入PR_OPENED或SKIPPED。已结案的 AI 举报在控制台只读，当前没有重开端点。
 
-## 记录、回执与缺口
+## 记录、答复与回执
 
-现有 `POST /api/feedback/{id}/resolution` 仅持有 `X-Optimizer-Token` 的受权运维可调用，普通管理员会话不等于写回权限。密钥从总表登记的原位读取，不复制到URL、工单、截图或命令历史。写入前通过详情接口回读该条，保留已有分诊记录，不覆盖其他人的处理。该接口无版本并发守卫，自动优化者正在处理时不要同时写回。
+人工写入使用 `POST /api/feedback/{id}/ai-report-resolution`，只接受有效管理员 `X-Session-Id`；未登录、普通用户及只有 `X-Optimizer-Token` 的请求均不能结案。只有 `contextJson.client.type=ai-content-report` 的记录可用。请求体包含 `eventType=PROGRESS|RESOLVED`、`conclusion`、`actionTaken`、`evidenceRef`、`reporterResponse` 和详情返回的 `expectedVersion`。PROGRESS 至少填写一项；RESOLVED 必须有非空人工核验结论和实际措施，答复可为空。版本不匹配返回 409，处理人应重新加载、核对他人记录后再提交，避免覆盖并发更新。
 
-人工记录可在既有 triageJson 的 summary/reason 字段明确追加实际核验、措施和答复情况，并保留原记录；triageJson 通过请求体作为JSON字符串传递。未实际发出通知不能设置EMAILED；未开PR不能设置PR_OPENED；不要杜撰新状态或借SKIPPED表示解决。回写后重新GET详情核对，原始反馈及附件不得删除。本规程不自动调用写入接口。
+每次保存都新增一行 `feedback_handling_event`，包含类型、结论、实际措施、处理人、处理时间、证据定位/编号和答复；事件由持久化层禁止更新和删除，不用覆盖 triageJson 代替历史。结案只在 `user_feedback` 更新当前 RESOLVED 摘要，原始反馈、分诊和附件保留。既有 `POST /api/feedback/{id}/resolution` 仍仅供优化者写自动分诊回执，不能把 AI 举报设置为 RESOLVED，也不能改写已结案记录。
 
-当前管理员页是查看入口，无专用人工结案/回复按钮；用户 `/api/feedback/mine` 仅能看到自己的摘要、状态和去向，不含完整triageJson。用户答复使用已授权且与其关联的既有联系方式，发送前核对对象与内容；没有联系方式时保留“待补充联系/待送达”，不能声称已答复。完整的举报专属状态、双向回复与可追溯结案界面尚未实现，需要后续独立实现，不能在申报材料写成已有。
+非空 `reporterResponse` 会立即发布到同一反馈记录，并记录 `responsePublishedAt`。举报人通过既有 `GET /api/feedback/mine` 只能读取自己的状态、`reporterResponse`、答复发布时间和结案时间；人工结论、实际措施、证据定位、处理人、处置历史及内部错误不通过该接口公开。云端处理结果经既有 `/ingest/status` 回执同步回本机，EMAILED 记录也会继续轮询，以便后续结案和答复回本机。
+
+“已发布到反馈记录”仅表示举报人可在自己的反馈中读取，**不表示已经推送、送达或已读**；当前没有真实推送或已读回执。结案允许答复为空，此时只能在控制台留下完整内部处置记录，不能声称已答复举报人。保存进展和结案时控制台会显示等待状态并防止重复提交；失败保留表单内容，可核对后重试。若响应丢失，应先重新加载详情核对历史，避免重复追加语义相同的事件。
 
 ## 转存标识范围
 

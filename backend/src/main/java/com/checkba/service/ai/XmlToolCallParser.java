@@ -56,6 +56,30 @@ public class XmlToolCallParser {
         }
     }
 
+    /** DeepSeek 原生工具调用语法（全角竖线 DSML 标签）泄漏进正文时的收尾标签。 */
+    private static final Pattern LEAKED_DSML_TAG = Pattern.compile("</?[\\uFF5C|]DSML[\\uFF5C|][^>]*>");
+
+    /**
+     * 把泄漏的 DeepSeek DSML 收尾标签规整成本协议的 {@code </tool_code>}。
+     *
+     * <p>病灶（s07「新建一份Word文档」DeepSeek 0/5）：模型按 XML 兜底协议写出
+     * {@code <tool_code>write_docx(...)}，却用它原生格式的收尾
+     * {@code </｜DSML｜parameter></｜DSML｜invoke></｜DSML｜tool_calls>} 结尾，没有 {@code </tool_code>}。
+     * 解析器提不出调用、截断守卫又判定「标签未闭合」，两轮「请重发」后整轮以一句截断说明收尾，
+     * 文档始终没建——而内容其实一个字都没缺。这里把<b>第一个</b> DSML 收尾标签当作缺失的
+     * {@code </tool_code>}，其余 DSML 标签一律丢弃。
+     */
+    public static String normalizeLeakedClosers(String content) {
+        if (content == null || !content.contains("DSML")) return content;
+        Matcher m = LEAKED_DSML_TAG.matcher(content);
+        if (!m.find()) return content;
+        int open = content.lastIndexOf("<tool_code>", m.start());
+        boolean unclosed = open >= 0 && content.indexOf("</tool_code>", open) < 0;
+        String head = content.substring(0, m.start());
+        String tail = content.substring(m.start());
+        return head + (unclosed ? "</tool_code>" : "") + LEAKED_DSML_TAG.matcher(tail).replaceAll("");
+    }
+
     /**
      * 内容中是否包含 XML 工具调用标签。
      */

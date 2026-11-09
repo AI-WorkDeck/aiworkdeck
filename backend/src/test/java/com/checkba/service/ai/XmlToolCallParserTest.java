@@ -572,4 +572,38 @@ class XmlToolCallParserTest {
         assertEquals("选哪个？", q.question());
         assertEquals(2, q.options().size());
     }
+
+    /** s07 回放：DeepSeek 用原生 DSML 收尾代替 </tool_code>（真实日志原文，正文含换行与引号）。 */
+    @Test
+    @DisplayName("泄漏的 DSML 收尾标签当作缺失的 </tool_code>：不再被判截断，参数完整")
+    void leakedDsmlClosersAreTreatedAsToolCodeClose() {
+        String raw = "<process name=\"创建文档\">\n  <step>正在生成...</step>\n"
+                + "  <tool_code>write_docx(fileName=\"法律意见书.docx\", markdownContent=\"# 法律意见书\n\n**致：** [名称]\n\n"
+                + "## 一、依据\n\n1. 本所依据《律师法》出具。\")"
+                + "</\uFF5CDSML\uFF5Cparameter>\n</\uFF5CDSML\uFF5Cinvoke>\n</\uFF5CDSML\uFF5Ctool_calls>";
+        assertTrue(AgentOrchestrator.endsWithUnclosedTag(raw), "病灶还原：规整前被判为截断");
+
+        String fixed = XmlToolCallParser.normalizeLeakedClosers(raw);
+
+        assertFalse(AgentOrchestrator.endsWithUnclosedTag(fixed));
+        assertFalse(fixed.contains("DSML"));
+        var call = single(fixed);
+        assertNull(call.parseError());
+        assertEquals("write_docx", call.toolName());
+        var args = cn.hutool.json.JSONUtil.parseObj(call.argsJson());
+        assertEquals("法律意见书.docx", args.getStr("fileName"));
+        assertTrue(args.getStr("markdownContent").startsWith("# 法律意见书\n\n**致：**"), call.argsJson());
+        assertTrue(args.getStr("markdownContent").endsWith("出具。"), call.argsJson());
+    }
+
+    @Test
+    @DisplayName("已有 </tool_code> 或没有 DSML 时规整是恒等变换；真截断仍判截断")
+    void normalizeLeavesWellFormedAndTrulyTruncatedAlone() {
+        String ok = "<tool_code>todo_write(todos=\"[]\")</tool_code>";
+        assertEquals(ok, XmlToolCallParser.normalizeLeakedClosers(ok));
+        assertEquals(ok, XmlToolCallParser.normalizeLeakedClosers(ok + "</\uFF5CDSML\uFF5Ctool_calls>"));
+        String truncated = "<tool_code>write_docx(fileName=\"a.docx\", markdownContent=\"# 标";
+        assertEquals(truncated, XmlToolCallParser.normalizeLeakedClosers(truncated));
+        assertTrue(AgentOrchestrator.endsWithUnclosedTag(truncated));
+    }
 }
