@@ -48,6 +48,7 @@ public class UserFeedback {
     private Long id;
 
     @Version
+    @Column(name = "version", nullable = false, columnDefinition = "bigint default 0")
     private long version;
 
     /** 本机提交的原始反馈 */
