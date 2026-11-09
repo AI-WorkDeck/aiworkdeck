@@ -97,7 +97,7 @@
       "offeredToolsInclude": [
         "doc_find_replace",
         "doc_replace_at_anchor",
-        "doc_table_add_row",
+        "doc_table_insert",
         "doc_format_table",
         "list_tools"
       ],

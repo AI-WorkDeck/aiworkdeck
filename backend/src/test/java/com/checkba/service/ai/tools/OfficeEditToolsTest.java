@@ -994,14 +994,13 @@ class OfficeEditToolsTest {
         assertTrue(tools.office_excel_freeze_panes("conv-1", null, "pin", null, null).startsWith("Error"));
         assertTrue(tools.office_excel_freeze_panes("conv-1", null, "freeze_at", null, null).startsWith("Error"));
 
-        // set_formulas：地址为空 / JSON 非法 / 空数组 / 非矩形 / 元素不以 = 开头 / 超上限
-        assertTrue(tools.office_excel_set_formulas("conv-1", null, "", "[[\"=A1\"]]").startsWith("Error"));
-        assertTrue(tools.office_excel_set_formulas("conv-1", null, "A1", "not json").startsWith("Error"));
-        assertTrue(tools.office_excel_set_formulas("conv-1", null, "A1", "[]").startsWith("Error"));
-        assertTrue(tools.office_excel_set_formulas("conv-1", null, "A1", "[[\"=A1\"],[\"=A2\",\"=A3\"]]").startsWith("Error"));
-        assertTrue(tools.office_excel_set_formulas("conv-1", null, "A1", "[[\"B1+1\"]]").startsWith("Error"));
+        // set_values（公式已并入，V4）：地址为空 / JSON 非法 / 空数组 / 非矩形 / 超上限
+        assertTrue(tools.office_excel_set_values("conv-1", null, "", "[[\"=A1\"]]", null).startsWith("Error"));
+        assertTrue(tools.office_excel_set_values("conv-1", null, "A1", "not json", null).startsWith("Error"));
+        assertTrue(tools.office_excel_set_values("conv-1", null, "A1", "[]", null).startsWith("Error"));
+        assertTrue(tools.office_excel_set_values("conv-1", null, "A1", "[[\"=A1\"],[\"=A2\",\"=A3\"]]", null).startsWith("Error"));
         String hugeFormulas = "[[" + "\"=A1\",".repeat(2000) + "\"=A1\"]]";
-        assertTrue(tools.office_excel_set_formulas("conv-1", null, "A1", hugeFormulas).startsWith("Error"));
+        assertTrue(tools.office_excel_set_values("conv-1", null, "A1", hugeFormulas, null).startsWith("Error"));
     }
 
     // ==================== PowerPoint 能力对齐（批次7） ====================
@@ -1173,8 +1172,11 @@ class OfficeEditToolsTest {
 
         assertEquals("{\"added\":true}", tools.office_excel_add_comment("conv-1", "Sheet1", "B2", "核对金额"));
         assertEquals("{\"count\":0}", tools.office_excel_get_comments("conv-1", "Sheet1", null));
-        assertEquals("{\"replied\":true}", tools.office_excel_reply_comment("conv-1", "Sheet1", "B2", "已核对"));
-        assertEquals("{\"resolved\":true}", tools.office_excel_resolve_comment("conv-1", "Sheet1", "B2", null));
+        assertEquals("{\"replied\":true}", tools.office_excel_update_comment("conv-1", "reply", "Sheet1", "B2", "已核对"));
+        assertEquals("{\"resolved\":true}", tools.office_excel_update_comment("conv-1", "resolve", "Sheet1", "B2", null));
+        // 旧名兼容壳：同样下发，回执末尾多一句「已并入」
+        assertTrue(tools.office_excel_reply_comment("conv-1", "Sheet1", "B2", "已核对").startsWith("{\"replied\":true}"));
+        assertTrue(tools.office_excel_resolve_comment("conv-1", "Sheet1", "B2", null).contains("已并入 office_excel_update_comment"));
         assertEquals("{\"deleted\":true}", tools.office_excel_delete_comment("conv-1", "Sheet1", "B2"));
 
         @SuppressWarnings("unchecked")
@@ -1187,7 +1189,7 @@ class OfficeEditToolsTest {
         assertEquals("sheet", getArgs.getValue().get("scope"));
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> resolveArgs = ArgumentCaptor.forClass(Map.class);
-        verify(bridge).executeOfficeCommand(eq("conv-1"), eq("excel_resolve_comment"), resolveArgs.capture());
+        verify(bridge, org.mockito.Mockito.times(2)).executeOfficeCommand(eq("conv-1"), eq("excel_resolve_comment"), resolveArgs.capture());
         assertEquals(true, resolveArgs.getValue().get("resolved"));
     }
 
@@ -1309,8 +1311,9 @@ class OfficeEditToolsTest {
         when(bridge.executeOfficeCommand(any(), eq("manage_content_control"), anyMap())).thenReturn("{}");
         when(bridge.executeOfficeCommand(any(), eq("set_document_properties"), anyMap())).thenReturn("{}");
 
-        assertEquals("{}", tools.office_insert_footnote("conv-1", "第一条", "参见附件一", null));
-        assertEquals("{}", tools.office_insert_endnote("conv-1", "第一条", "参见附件一", null));
+        assertEquals("{}", tools.office_insert_note("conv-1", "footnote", "第一条", "参见附件一", null));
+        assertEquals("{}", tools.office_insert_note("conv-1", "endnote", "第一条", "参见附件一", null));
+        assertTrue(tools.office_insert_footnote("conv-1", "第一条", "参见附件一", null).contains("已并入 office_insert_note"));
         assertEquals("{}", tools.office_apply_style("conv-1", "标题", true, "标题 1"));
         assertEquals("{}", tools.office_manage_content_control("conv-1", "insert", "填空处", "field-1", "客户名称", null, null));
         assertEquals("{}", tools.office_set_document_properties("conv-1", "尽调报告", null, "AI WorkDeck", null, null, null));

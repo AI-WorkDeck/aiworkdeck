@@ -51,16 +51,20 @@ public class TextFileEditTools implements AgentToolComponent {
 
     // writeBack 收尾发 sendTextReloadFileAction，工具描述也明写「同步刷新用户已打开的文本标签」；
     // 任务窗格既没有文本标签也没有文件树，改完的纯文本文件在那里没有任何去处——审计 A9。
+    @ToolShim(replacedBy = "write_file")
     @ToolMeta(displayName = "写入文本文件", category = "file", fileEffect = "MODIFIED",
-            requiresHost = ToolMeta.Host.LOWA)
-    @Tool("整篇覆盖写入一个纯文本/代码文件（txt/md/json/js/html/css/yml 等，UTF-8）。docx/xlsx/pptx 等 Office 文档"
-            + "禁止用本工具，那些走 doc_* / sheet_* / slide_* 编辑原语。读取纯文本用 extract_file_text。"
-            + "写入即生效（纯文本没有修订机制），并自动进入版本记录、同步刷新用户已打开的文本标签。")
+            requiresHost = ToolMeta.Host.LOWA, offerToModel = false)
+    @Tool("整篇覆盖写入一个纯文本/代码文件（txt/md/json/js/html/css/yml 等，UTF-8）。")
     public String text_write_file(
             @P("项目文件数据库 ID（从 list_files / extract_file_text 等处获取）") Long fileId,
             @P("新的完整文件内容（整篇覆盖）") String content
     ) {
-        log.info("Tool: text_write_file called for fileId={}", fileId);
+        return ToolShims.hint(overwriteText(fileId, content), "write_file", "write_file(mode=overwrite, fileId, content)");
+    }
+
+    /** 整篇覆盖纯文本文件的执行体：write_file(mode=overwrite) 与旧名壳共用。 */
+    public String overwriteText(Long fileId, String content) {
+        log.info("overwriteText fileId={}", fileId);
         Resolved r = resolveTextFile(fileId);
         if (r.error != null) return r.error;
         String text = content == null ? "" : content;

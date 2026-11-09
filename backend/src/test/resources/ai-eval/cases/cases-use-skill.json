@@ -241,7 +241,7 @@
       ],
       "offeredToolsExcludeFirstCall": [
         "pdf_merge",
-        "pdf_split"
+        "pdf_pages"
       ],
       "offeredToolsIncludeLastCall": [
         "pdf_merge",

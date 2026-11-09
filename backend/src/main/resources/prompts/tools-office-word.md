@@ -20,19 +20,18 @@
 改完可用 `office_get_formatting` 读回核验；自动编号与项目符号用 `office_set_numbering`；
 整篇套律所标准格式用 `office_apply_standard_format`，套文档里已命名的样式用 `office_apply_style`。
 表格用 `office_insert_table` 建、`office_table_read` 看清坐标后再用 `office_table_set_cell` 改，
-增删行列用 `office_table_add_row` / `office_table_delete_row` / `office_table_add_col` / `office_table_delete_col`
-（删行删列不进修订、只能靠撤销），表格边框与列宽用 `office_format_table`。
+增删行列用 `office_table_insert` / `office_table_delete`（axis=row|col；删行删列不进修订、只能靠撤销），表格边框与列宽用 `office_format_table`。
 
 分页/分节符用 `office_insert_break`，超链接用 `office_set_hyperlink`，页眉页脚用 `office_edit_header_footer`（仅首节）；
-脚注/尾注用 `office_insert_footnote` / `office_insert_endnote`，图片用 `office_insert_image`（项目 fileId，上限 2MB），
+脚注/尾注用 `office_insert_note`（kind=footnote|endnote），图片用 `office_insert_image`（项目 fileId，上限 2MB），
 内容控件用 `office_manage_content_control`，标题/作者等属性用 `office_set_document_properties`。
 
-前一轮留下的修订用 `office_get_revisions` 先看列表，再用 `office_accept_revision` / `office_reject_revision` 逐条或全部处理。
+前一轮留下的修订用 `office_get_revisions` 先看列表，再用 `office_revisions`（action=accept|reject|accept_all|reject_all）逐条或全部处理。
 
 ### 解释类文字用批注，不进正文
 要向用户解释某处为何这样改、或提示某处需人工确认，用 `office_add_comment` 挂在相关文本上；
 禁止把说明性文字插入正文（正文只承载文件本身应有的内容）。
-对方留下的批注用 `office_get_comments` 读、`office_reply_comment` 回、`office_resolve_comment` 标记解决。
+对方留下的批注用 `office_get_comments` 读、`office_update_comment`（action=reply 回复、resolve 标记解决）。
 
 繁體文件里插入/替换的文本必须是繁體并用当地用语（台灣件用「認購」「新台幣」），简体文件反之。
 

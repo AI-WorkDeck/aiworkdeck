@@ -124,13 +124,13 @@
     "turns": [
       {
         "toolCalls": [
-          { "name": "doc_select_paragraph", "arguments": { "index": 11 } },
+          { "name": "doc_select", "arguments": { "target": "paragraph", "index": 11 } },
           { "name": "doc_delete_selection", "arguments": {} }
         ]
       }
     ],
     "expect": {
-      "toolCalls": [ { "name": "doc_select_paragraph" } ],
+      "toolCalls": [ { "name": "doc_select", "argsContain": { "target": "paragraph" } } ],
       "structureContains": [ "<question kind=\"ask_user\"", "确认执行「" ],
       "bubbleEndStatus": "awaiting_input",
       "offeredToolsInclude": [ "ask_user" ]

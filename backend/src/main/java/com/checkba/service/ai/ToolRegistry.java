@@ -113,11 +113,11 @@ public class ToolRegistry {
      * 别往里堆：每多一条就多一处「本该报错却被兜住」的地方。
      */
     private static final Map<String, String> UNKNOWN_TOOL_HINTS = Map.ofEntries(
-            Map.entry("search_laws", "法规检索请用 law_search（语义检索法源）、law_search_keyword"
-                    + "（按法规名+关键词）或 get_law_article（按条文号取原文）；"
+            Map.entry("search_laws", "法规检索请用 law_search（语义检索法源；mode=keyword 按法规名+关键词）"
+                    + "或 get_law_article（按条文号取原文）；"
                     + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。"),
-            Map.entry("search_law", "法规检索请用 law_search（语义检索法源）、law_search_keyword"
-                    + "（按法规名+关键词）或 get_law_article（按条文号取原文）；"
+            Map.entry("search_law", "法规检索请用 law_search（语义检索法源；mode=keyword 按法规名+关键词）"
+                    + "或 get_law_article（按条文号取原文）；"
                     + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。")
     );
 
@@ -134,6 +134,22 @@ public class ToolRegistry {
      * 当 LangText.isEnglish() 为 true 时，RegisteredTool.displayName() 返回对应的英文展示名。
      */
     private static final Map<String, String> ENGLISH_TOOL_DISPLAY_NAMES = Map.ofEntries(
+            Map.entry("doc_revisions", "Resolve revisions"),
+            Map.entry("office_revisions", "Resolve revisions"),
+            Map.entry("doc_update_comment", "Update comment"),
+            Map.entry("office_update_comment", "Update comment"),
+            Map.entry("office_excel_update_comment", "Update comment"),
+            Map.entry("doc_table_insert", "Insert table rows/columns"),
+            Map.entry("doc_table_delete", "Delete table rows/columns"),
+            Map.entry("office_table_insert", "Insert table rows/columns"),
+            Map.entry("office_table_delete", "Delete table rows/columns"),
+            Map.entry("doc_insert_note", "Insert footnote/endnote"),
+            Map.entry("office_insert_note", "Insert footnote/endnote"),
+            Map.entry("doc_select", "Select or move cursor"),
+            Map.entry("pdf_pages", "PDF page operations"),
+            Map.entry("office_file", "Host file action"),
+            Map.entry("pptx_outline", "PPT outline"),
+            Map.entry("move_files", "Move files"),
             Map.entry("todo_write", "Update plan"),
             Map.entry("ask_user", "Ask the user"),
             Map.entry("update_project_info", "Update project info"),
@@ -165,7 +181,7 @@ public class ToolRegistry {
             Map.entry("text_write_file", "Write text file"),
             Map.entry("text_find_replace", "Text find and replace"),
             Map.entry("capability_list", "List capabilities"),
-            Map.entry("capability_install", "Prepare capability upgrade"),
+            Map.entry("capability_install", "Install capability"),
             Map.entry("capability_apply", "Apply capability upgrade"),
             Map.entry("capability_select", "Switch capability"),
             Map.entry("plugin_dev_scaffold", "Scaffold plugin"),
@@ -615,8 +631,13 @@ public class ToolRegistry {
      */
     public boolean requiresConfirmation(String name) {
         if (name == null) return false;
+        name = TOOL_NAME_ALIASES.getOrDefault(name, name);
         RegisteredTool builtin = builtinTools.get(name);
         if (builtin != null) {
+            // 兼容壳（@ToolShim）本质是新工具的旧名：新工具要确认，壳也要
+            var shim = builtin.method() == null ? null
+                    : builtin.method().getAnnotation(com.checkba.service.ai.tools.ToolShim.class);
+            if (shim != null && !shim.replacedBy().equals(name) && requiresConfirmation(shim.replacedBy())) return true;
             return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, builtin.meta())
                     == ToolMeta.Access.DESTRUCTIVE;
         }
@@ -667,6 +688,7 @@ public class ToolRegistry {
             String name = spec.name();
             RegisteredTool registered = builtinTools.get(name);
             ToolMeta meta = registered.meta();
+            if (registered.method() != null && registered.method().isAnnotationPresent(com.checkba.service.ai.tools.ToolShim.class)) continue;
             if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
                     || name.startsWith(MCP_METERED_PREFIX) || (tmeetPluginActive && name.startsWith("tmeet_"))
                     || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)

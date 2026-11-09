@@ -50,30 +50,34 @@ class OfficeRevisionReasonContractTest {
 
     @Test
     void optionalReasonsSurviveAllSixTextWriteToolsAndOldCalls() throws Exception {
-        Map<String, String> arguments = Map.of(
-                "office_replace_text", "{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"replaceAll\":false}",
-                "office_insert_text", "{\"text\":\"补充条款\"}",
-                "office_table_set_cell", "{\"cell\":\"B2\",\"text\":\"金额\"}",
-                "office_edit_header_footer", "{\"part\":\"header\",\"text\":\"合同\"}",
-                "office_insert_footnote", "{\"anchorText\":\"术语\",\"text\":\"解释\"}",
-                "office_insert_endnote", "{\"anchorText\":\"术语\",\"text\":\"解释\"}");
-        for (var entry : arguments.entrySet()) {
-            var spec = registry.getAllSpecifications("reason-conv").stream()
-                    .filter(s -> s.name().equals(entry.getKey())).findFirst().orElseThrow();
-            assertTrue(spec.parameters().properties().containsKey("reason"), entry.getKey());
-            assertFalse(spec.parameters().required().contains("reason"), entry.getKey());
-            var args = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(entry.getValue());
+        // {工具名, 参数 JSON, 发给插件的命令名}：脚注 / 尾注已并入 office_insert_note（V4）
+        String[][] cases = {
+                {"office_replace_text", "{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"replaceAll\":false}", "replace_text"},
+                {"office_insert_text", "{\"text\":\"补充条款\"}", "insert_text"},
+                {"office_table_set_cell", "{\"cell\":\"B2\",\"text\":\"金额\"}", "table_set_cell"},
+                {"office_edit_header_footer", "{\"part\":\"header\",\"text\":\"合同\"}", "edit_header_footer"},
+                {"office_insert_note", "{\"kind\":\"footnote\",\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_footnote"},
+                {"office_insert_note", "{\"kind\":\"endnote\",\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_endnote"},
+                {"office_insert_footnote", "{\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_footnote"}};
+        for (String[] entry : cases) {
+            String toolName = entry[0];
+            String toolArgs = entry[1];
+            // 兼容壳不下发规格：按注册表解析，参数形状同样要有可选 reason
+            var spec = registry.resolve(toolName).orElseThrow().spec();
+            assertTrue(spec.parameters().properties().containsKey("reason"), toolName);
+            assertFalse(spec.parameters().required().contains("reason"), toolName);
+            var args = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(toolArgs);
             args.put("reason", "  统一术语并补充解释  ");
-            var result = registry.execute(entry.getKey(), mapper.writeValueAsString(args), context);
+            var result = registry.execute(toolName, mapper.writeValueAsString(args), context);
             assertTrue(result.success(), result.output());
             var payload = payloads.get(payloads.size() - 1);
-            assertEquals(entry.getKey().substring("office_".length()), payload.path("command").asText());
+            assertEquals(entry[2], payload.path("command").asText());
             assertEquals("统一术语并补充解释", payload.path("args").path("reason").asText());
             var data = mapper.readTree(result.output());
             assertTrue(data.path("changed").asBoolean());
             assertEquals("统一术语并补充解释", data.path("requestedReason").asText());
 
-            result = registry.execute(entry.getKey(), entry.getValue(), context);
+            result = registry.execute(toolName, toolArgs, context);
             assertTrue(result.success(), result.output());
             assertFalse(payloads.get(payloads.size() - 1).path("args").has("reason"));
             assertFalse(mapper.readTree(result.output()).has("requestedReason"));

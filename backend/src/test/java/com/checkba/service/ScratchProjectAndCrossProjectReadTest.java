@@ -242,7 +242,8 @@ class ScratchProjectAndCrossProjectReadTest {
         assertTrue(result.contains("(fileId=" + hit.getId() + ", type=txt)"), result);
         assertFalse(result.contains("无关文件"));
 
-        assertEquals("Error: keyword is required.", fileTools.search_across_projects(" "));
+        // V4 起 search_across_projects 是并入 search_project_files 的兼容壳，结果尾部附「已并入」提示。
+        assertTrue(fileTools.search_across_projects(" ").startsWith("Error: keyword is required."));
         assertTrue(fileTools.search_across_projects("绝不存在的关键字")
                 .startsWith("No files matching "));
     }

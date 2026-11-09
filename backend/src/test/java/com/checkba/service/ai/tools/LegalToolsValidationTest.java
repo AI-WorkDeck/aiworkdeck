@@ -137,4 +137,19 @@ class LegalToolsValidationTest {
         assertTrue(tools.currentlyUnusableTools().isEmpty());
     }
 
+
+    @Test
+    @DisplayName("V4：law_search(mode=keyword) 走 pkulaw-keyword.get_law_list；query 可兜底当法规名关键词；旧名壳多一句「已并入」")
+    void lawSearchKeywordModeAndShim() {
+        when(mcpClientService.callTool("pkulaw-keyword", "get_law_list", Map.of("title", "公司法", "fulltext", "出资")))
+                .thenReturn("LIST");
+        when(mcpClientService.callTool("pkulaw-keyword", "get_law_list", Map.of("title", "劳动合同法")))
+                .thenReturn("LIST2");
+
+        assertEquals("LIST", tools.law_search(null, "keyword", "公司法", "出资"));
+        assertEquals("LIST2", tools.law_search("劳动合同法", "keyword", null, null));
+        assertTrue(tools.law_search_keyword("公司法", "出资").contains("已并入 law_search"));
+        assertTrue(tools.law_search(null, "keyword", null, null).startsWith("Error"));
+        assertTrue(tools.law_search("x", "fuzzy", null, null).startsWith("Error"));
+    }
 }

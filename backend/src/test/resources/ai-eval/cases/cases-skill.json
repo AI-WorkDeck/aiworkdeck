@@ -32,7 +32,6 @@
       "bubbleEndStatus": "finished",
       "offeredToolsInclude": [
         "law_search",
-        "law_search_keyword",
         "get_law_article",
         "search_web",
         "write_docx",

@@ -159,7 +159,7 @@ admin 同 PluginDevController 口径）+ `service/ai/tools/CapabilityTools`（�
   至少一项声明式贡献」时放行）。这条同时惠及纯模板/画像包。改这里要记得 `installFiles` 是
   项目内 dev 直装与「从本地目录装」（能力包）的**唯一**共用实现，两条路的校验必须永远同一套。
 - **地雷**：① `capability_install` 只做 plan，绝不落盘；模型必须 `<question>` 停机等用户确认后才调
-  `capability_apply`。② 这四枚工具的登录+admin 闸写在 `CapabilityTools.requireAdmin()` 里，
+  `capability_install(planId)`（旧名 `capability_apply` 是 V4 兼容壳）。② 这四枚工具的登录+admin 闸写在 `CapabilityTools.requireAdmin()` 里，
   **不能靠 skill 的 allowed_tools**（只裁可见性不拦分发）。③ `CapabilitySourceFetchService` 是全系统
   唯一「从任意 URL 取代码到宿主机」的路径，URL 白名单/SsrfGuard/限额/解包安全闸四条缺一不可；
   测试注入 `setDownloader` 用本地 tar.gz，**永远不上网**。④ 选择位 `capability.<slot>.selected` 写空串

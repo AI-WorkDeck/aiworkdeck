@@ -17,7 +17,7 @@
 > v2.10（能力槽与能力包，dev-board#497）：`contributes.capabilities`（§15）把插件目录里的一份实现
 > 挂进宿主的某个「能力槽」，用户/AI 可切换、可回滚；首期只注册 `litigation.diagram` 一个槽。
 > 配套后端 `com.checkba.service.capability`（槽注册表 / 源码拉取 / 安装计划）+ `/api/capabilities`
-> + AI 工具 `capability_list` / `capability_install` / `capability_apply` / `capability_select`。
+> + AI 工具 `capability_list` / `capability_install`（先 url 出计划，确认后 planId 安装）/ `capability_select`。
 > 设计定稿见 docs/superpowers/specs/2026-09-07-capability-slots-self-upgrade-design.md。
 > 示例插件：[examples/hello-plugin/](../examples/hello-plugin/)（JAR 工具）、
 > [examples/hello-web-plugin/](../examples/hello-web-plugin/)（纯前端）。
@@ -937,7 +937,7 @@ manifest 摘要、档位、权限、文件数、目标槽、`canAutoInstall`、�
 - 撞广场已装的 id 在 `plan` 阶段就报，不进入 `apply`。
 
 AI 工具 `capability_install(url)` 内部只做 `plan`；模型必须用 `<question>` 停机把计划
-念给用户听，确认后才调 `capability_apply(planId)`。**工具的登录 + admin 闸写在代码里**，
+念给用户听，确认后才调 `capability_install(planId)`。**工具的登录 + admin 闸写在代码里**，
 不靠 skill 的 `allowed_tools`（那份白名单只裁可见性、不拦分发）。
 
 ## 16. 项目沟通与项目文件材料（v2.11，宿主 0.61.0+）

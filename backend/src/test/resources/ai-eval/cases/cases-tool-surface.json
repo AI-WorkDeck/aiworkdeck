@@ -386,7 +386,7 @@
       ],
       "offeredToolsExclude": [
         "create_folder",
-        "move_files_batch",
+        "move_files",
         "move_to_trash",
         "doc_apply_standard_format",
         "doc_export_pdf",
@@ -761,7 +761,7 @@
       ],
       "offeredToolsExclude": [
         "create_folder",
-        "move_files_batch",
+        "move_files",
         "copy_files"
       ]
     }

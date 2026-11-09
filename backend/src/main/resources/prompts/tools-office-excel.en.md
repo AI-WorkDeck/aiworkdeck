@@ -14,7 +14,7 @@ client cannot execute, so do not try it**.
 4. **Verification is the tool's return value** - do not read the sheet back after writing.
 
 ### Writing and formatting
-- Values and formulas: `office_excel_set_values` writes a 2-D array in one call; formulas go through `office_excel_set_formulas`. Use English function names, written the way Excel expects. Bulk text edits go through `office_excel_replace`.
+- Values and formulas: `office_excel_set_values` writes a 2-D array in one call; formulas are strings starting with `=` in the same 2-D array. Use English function names, written the way Excel expects. Bulk text edits go through `office_excel_replace`.
 - Cell formatting (font, size, fill, alignment, wrapping, number format) is `office_excel_format_cells`; borders are `office_excel_set_borders`.
 - Structure: `office_excel_manage_sheets` for worksheets, `office_excel_edit_rows_cols` to insert or delete whole rows and columns, `office_excel_merge_cells` to merge or unmerge, `office_excel_sort_range` to sort, `office_excel_group_rows_cols` to group.
 - Readability: `office_excel_freeze_panes` for the header row, `office_excel_set_autofilter` for filter dropdowns, `office_excel_conditional_format` to colour cells by rule, `office_excel_select_range` to scroll the user's view somewhere.
@@ -25,7 +25,7 @@ client cannot execute, so do not try it**.
 To explain why a number changed, or to flag something a human must check, attach
 `office_excel_add_comment` to the cell; do not write the explanation into the cell itself.
 Comments left by others: read with `office_excel_get_comments`, answer with
-`office_excel_reply_comment`, close with `office_excel_resolve_comment`, remove with
+`office_excel_update_comment` (action=reply to answer, resolve to close), remove with
 `office_excel_delete_comment`.
 
 In a Traditional Chinese file, text you write must be Traditional and use local terminology; the

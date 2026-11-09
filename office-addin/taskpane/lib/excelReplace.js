@@ -125,7 +125,7 @@ export function buildReplaceResult({
     notes.push(`已达单次替换上限（${cap} 格）并提前停下，剩余命中未处理——缩小 rangeAddress 或分批继续`)
   }
   if (skippedFormula) {
-    notes.push(`${skippedFormula} 个公式格显示的文本命中但未改动（改了会毁掉公式，公式请用 office_excel_set_formulas 重写）`)
+    notes.push(`${skippedFormula} 个公式格显示的文本命中但未改动（改了会毁掉公式，公式请用 office_excel_set_values 以 = 开头的公式字符串重写）`)
   }
   if (skippedNumeric) {
     notes.push(`${skippedNumeric} 个数值格显示的文本命中但未改动（改了会把数字变成文本，数值请用 office_excel_set_values 写）`)

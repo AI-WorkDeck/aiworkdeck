@@ -489,7 +489,7 @@ public class SkillRegistry {
         skill.setName(asString(raw.get("name")));
         skill.setDescription(asString(raw.get("description")));
         skill.setTriggers(asStringList(raw.get("triggers")));
-        skill.setAllowedTools(asStringList(raw.get("allowed_tools")));
+        skill.setAllowedTools(migrateRenamedTools(skill.getId(), asStringList(raw.get("allowed_tools"))));
         applyToolPolicy(skill, raw.get("tool_policy"));
         SkillDefinition.VerificationPolicy.parse(asString(raw.get("verification_policy")))
                 .ifPresent(skill::setVerificationPolicy);
@@ -583,6 +583,25 @@ public class SkillRegistry {
             log.info("Skill '{}' 有 allowed_tools 但 tool_policy 是 passthrough："
                     + "这份清单只作说明，不裁剪本轮工具集", skill.getId());
         }
+    }
+
+    /**
+     * allowed_tools 里的旧工具名经 {@link com.checkba.service.ai.tools.ToolShims} 映射到新名并 WARN（tool-system-v2 E1/B5）：
+     * 用户自建 skill 不必同步改名；旧名在 restrict 白名单里本来对不上任何下发的工具，等于把能力静默裁掉。
+     */
+    private static List<String> migrateRenamedTools(String skillId, List<String> tools) {
+        List<String> migrated = new ArrayList<>();
+        for (String tool : tools) {
+            String canonical = com.checkba.service.ai.tools.ToolShims.canonical(tool);
+            if (!canonical.equals(tool)) {
+                log.warn("Skill '{}' 的 allowed_tools 里 '{}' 已并入 '{}'，按新名生效；请更新 skill.yml（旧名兼容壳 0.83 删除）",
+                        skillId, tool, canonical);
+            }
+            if (!migrated.contains(canonical)) {
+                migrated.add(canonical);
+            }
+        }
+        return migrated;
     }
 
     private static String asString(Object v) {

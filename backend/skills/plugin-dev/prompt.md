@@ -9,7 +9,7 @@
 1. **新插件**：先用 `plugin_dev_scaffold(pluginId, displayName)` 建骨架。它会在项目「插件开发/<id>/」下生成 manifest.json、web/index.html、web/awd-plugin-sdk.js、类型声明和 manifest.schema.json，并返回源码文件夹 ID（后面安装要用）。
 2. **读现状**：改已有插件前，先用 `list_files` / `extract_file_text` / `read_file` 读 manifest.json 与 web/ 下的源码，弄清现有结构再动手。
 3. **写代码**：
-   - 修改已有文件用 `text_write_file`（整篇覆盖）或 `text_find_replace`（局部替换）；
+   - 修改已有文件用 `write_file(mode=overwrite)`（整篇覆盖）或 `text_find_replace`（局部替换）；
    - 新增文件用 `write_file`，路径写相对项目根的完整路径（如 `插件开发/<id>/web/app.js`）；
    - 不要改 `web/awd-plugin-sdk.js`（那是官方 SDK 副本，改了桥会断）。
 4. **装机自测**：改完调 `plugin_dev_install(folderId)`。源码每次改动后都必须重装才生效。校验失败会返回逐条错误明细——逐条修复后重装，不要原样重试。

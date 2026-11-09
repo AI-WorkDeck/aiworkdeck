@@ -75,6 +75,7 @@ class DocumentWritingToolClassificationTest {
             // —— doc_：定位 / 打开 ——
             "doc_goto",
             "doc_open_file",
+            "doc_select",
             "doc_select_anchor",
             "doc_select_paragraph",
             // —— doc_：导出（产出一份新 PDF，不改文档本身，dev-board#1065 T-25）——

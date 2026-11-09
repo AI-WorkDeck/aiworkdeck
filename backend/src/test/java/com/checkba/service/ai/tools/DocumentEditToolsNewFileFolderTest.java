@@ -141,7 +141,7 @@ class DocumentEditToolsNewFileFolderTest {
         String out = h.tools().doc_start_stream(null, "尽调报告.docx", PROJECT_ID, 12345L);
 
         assertTrue(out.startsWith("Error:"), "必须报错，实际：" + out);
-        assertTrue(out.contains("list_project_folders"), "报错要告诉模型怎么拿正确的 id，实际：" + out);
+        assertTrue(out.contains("doc_list_project_files"), "报错要告诉模型怎么拿正确的 id，实际：" + out);
         verify(h.fileService(), never()).createFile(anyLong(), any(), anyString(), anyString(), any(), any(),
                 anyString(), anyLong(), any());
         assertNull(dir.toFile().list().length == 0 ? null : "有文件被创建", "报错时不许在磁盘上留下任何文件");

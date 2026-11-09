@@ -16,7 +16,7 @@ This turn organizes, classifies, renames, or archives files and folders in the c
      - **Litigation / Arbitration**: `01-Standing & Jurisdiction`, `02-Pleadings & Procedural Filings`, `03-Claimant Evidence`, `04-Respondent Evidence`, `05-Research & Submissions`;
      - **Contract Management**: Group by `Main Agreements / Ancillary & Security / Closing & Performance / Correspondence` or by counterparty.
 
-3. **Execution Discipline: Create Target Folders First, Then Batch Move via `move_files_batch`**
+3. **Execution Discipline: Create Target Folders First, Then Batch Move via `move_files`**
    - If the user asks only for an archiving plan, present a clear mapping table (`Original Path -> Target Folder / Suggested Name`).
-   - If executing the reorganization, create target folders with `create_folder` first, then **must** use `move_files_batch` to move/rename all files in a single batch call rather than moving files one by one.
+   - If executing the reorganization, create target folders with `create_folder` first, then **must** use `move_files` to move/rename all files in a single batch call rather than moving files one by one.
    - **Safety Floor**: Never permanently delete user source files; if duplicate/blank temporary files must be cleaned up, use `move_to_trash` and list them explicitly in the summary.
