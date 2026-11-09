@@ -47,9 +47,8 @@ public class MobileAssistantController {
     }
     @PostMapping("/chat")
     public Map<String,Object> chat(@RequestHeader(value="X-Session-Id",required=false) String session,
-            @RequestHeader(value="User-Agent",required=false) String userAgent,
             @RequestBody MobileAssistantService.ChatInput request, HttpServletRequest http) {
-        var metadata=new UserActivityLogService.RequestMetadata(http.getRemoteAddr(),http.getRemotePort(),userAgent);
+        var metadata=new UserActivityLogService.RequestMetadata(http.getRemoteAddr(),http.getRemotePort(),http.getHeader("User-Agent"));
         return ok(service.chat(user(session),request,metadata));
     }
     @GetMapping("/requests/{id}")
