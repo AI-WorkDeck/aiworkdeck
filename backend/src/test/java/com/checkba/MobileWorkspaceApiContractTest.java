@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MobileWorkspaceApiContractTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
+    @Autowired com.checkba.repository.UserFeedbackRepository feedback;
     @MockBean WebTools webTools;
     @MockBean CloudStorageQuotaService quota;
     @MockBean ChatModelFactory models;
@@ -108,9 +109,28 @@ class MobileWorkspaceApiContractTest {
                 .andExpect(jsonPath("$.code").value(1));
         assertNotNull(AuthController.getUserIdFromSession(sid));
     }
+    @Test void feedbackMineReturnsOnlyOwnPublishedReplyAndMatchesOpenApi() throws Exception {
+        String sid=register(),other=register(),conversation=UUID.randomUUID().toString();
+        var payload=Map.of("kind","BUG","text","Synthetic AI report","page","mobile/personal/assistant",
+                "clientContext",Map.of("type","ai-content-report","platform","android","conversationId",conversation));
+        var created=mvc.perform(multipart("/api/feedback").param("payload",json.writeValueAsString(payload)).header("X-Session-Id",sid))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(0)).andReturn();
+        long id=json.readTree(created.getResponse().getContentAsString()).path("data").path("id").asLong();
+        var row=feedback.findById(id).orElseThrow();row.setStatus(com.checkba.model.entity.UserFeedback.STATUS_RESOLVED);
+        row.setReporterResponse("Synthetic published reply");row.setResponsePublishedAt(java.time.LocalDateTime.now());
+        row.setResolvedAt(java.time.LocalDateTime.now());row.setResolvedBy("internal-admin");feedback.saveAndFlush(row);
+        mvc.perform(get("/api/feedback/mine").header("X-Session-Id",sid)).andExpect(openApi().isValid(validator))
+                .andExpect(jsonPath("$.data.items[0].id").value(id))
+                .andExpect(jsonPath("$.data.items[0].reporterResponse").value("Synthetic published reply"))
+                .andExpect(jsonPath("$.data.items[0].resolvedBy").doesNotExist());
+        mvc.perform(get("/api/feedback/mine").header("X-Session-Id",other)).andExpect(openApi().isValid(validator))
+                .andExpect(jsonPath("$.data.items").isEmpty());
+    }
     @Test void unauthorizedRoutesNeverExposeUserData() throws Exception {
         for(String path:List.of("/api/mobile/calendar/events","/api/mobile/calendar/settings","/api/mobile/calendar/push/status",
                 "/api/mobile/assistant/status","/api/mobile/assistant/summaries","/api/mobile/assistant/requests/"+UUID.randomUUID()))
             mvc.perform(get(path)).andExpect(openApi().isValid(validator)).andExpect(jsonPath("$.code").value(4010));
+        mvc.perform(get("/api/feedback/mine")).andExpect(status().isUnauthorized())
+                .andExpect(openApi().isValid(validator)).andExpect(jsonPath("$.code").value(1));
     }
 }

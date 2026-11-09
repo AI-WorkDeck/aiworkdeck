@@ -28,7 +28,7 @@ public interface UserFeedbackRepository extends JpaRepository<UserFeedback, Long
     /** 待上传到云端收件箱的本机反馈（只传本机自己产生的，收上来的不再转发）。 */
     List<UserFeedback> findByUploadedFalseAndSourceOrderByIdAsc(String source, Pageable pageable);
 
-    /** 已上传、还在等云端处理结果的本机反馈（NEW/FAILED）：定时拉回执用。 */
+    /** 已上传、还在等云端处理结果的本机反馈（含已通知但仍可能人工结案的 EMAILED）。 */
     List<UserFeedback> findByUploadedTrueAndSourceAndStatusInOrderByIdAsc(
             String source, List<String> statuses, Pageable pageable);
 

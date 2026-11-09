@@ -134,7 +134,8 @@
         "firstToolAnyOf": [
           "write_docx",
           "search_project_files",
-          "list_project_folders"
+          "list_project_folders",
+          "doc_list_project_files"
         ],
         "mustUse": [
           [
@@ -413,6 +414,7 @@
       "hostState": "docx:contract-tracked",
       "expect": {
         "firstToolAnyOf": [
+          "todo_write",
           "doc_get_document_text",
           "doc_get_clauses",
           "doc_find_text",
