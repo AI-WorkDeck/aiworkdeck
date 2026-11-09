@@ -449,6 +449,7 @@ async function runOne(inst, sentence, runIdx, opts) {
     Object.assign(rec, {
       status: c.status, error: c.error, tools, firstTool: tools[0] || null,
       rounds: rounds.length, toolsOffered: rounds.map(r => r.toolsOffered),
+      maxToolsRound2plus: rounds.length > 1 ? Math.max(...rounds.slice(1).map(r => r.toolsOffered)) : null,
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
       durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
@@ -469,6 +470,9 @@ async function runOne(inst, sentence, runIdx, opts) {
 function summarizeEvents(evs) { const c = {}; for (const e of evs) c[e] = (c[e] || 0) + 1; return c }
 
 // ---------- 报告 ----------
+// 第 2 轮起每轮下发工具数的最大值（后端 [Round] 日志的 tools=N）；单次运行见 results.json 的 maxToolsRound2plus
+const maxLater = rs => { const v = rs.map(r => r.maxToolsRound2plus).filter(x => x != null); return v.length ? Math.max(...v) : '-' }
+
 function buildReport(meta, results, sentences) {
   const L = []
   const models = meta.models
@@ -479,26 +483,26 @@ function buildReport(meta, results, sentences) {
     `- 总墙钟: ${(meta.wallMs / 1000).toFixed(0)}s（其中构建+启动 ${(meta.setupMs / 1000).toFixed(0)}s，跑题 ${(meta.runMs / 1000).toFixed(0)}s）`, '')
   const skipped = sentences.filter(s => results.some(r => r.sentence === s.id && r.status === 'SKIPPED'))
   if (skipped.length) L.push(`SKIPPED（需要编辑器但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
-  L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 补全 tokens | 轮数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|')
+  L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 补全 tokens | 轮数 | ≥2轮最大工具数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|---|')
   for (const m of models) for (const side of ['before', 'after']) {
     // before=after 同 ref 时 results 里靠 side 区分
     const rs = results.filter(r => r.side === side && r.model === m && r.status !== 'SKIPPED')
     const f = k => rs.filter(r => r.checks?.[k] === true).length, g = k => rs.filter(r => r.checks && k in r.checks).length
     const sum = k => rs.reduce((a, r) => a + (r[k] || 0), 0)
-    L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('completionTokens')} | ${sum('rounds')} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
+    L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('completionTokens')} | ${sum('rounds')} | ${maxLater(rs)} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
   }
   L.push('', '## 逐句对比', '')
   for (const m of models) {
-    L.push(`### ${m}`, '', '| 句子 | before 通过 | after 通过 | before 首工具 | after 首工具 | before 轮/tokens | after 轮/tokens | 差异 |', '|---|---|---|---|---|---|---|---|')
+    L.push(`### ${m}`, '', '| 句子 | before 通过 | after 通过 | before 首工具 | after 首工具 | before 轮/tokens | after 轮/tokens | ≥2轮最大工具数 before/after | 差异 |', '|---|---|---|---|---|---|---|---|---|')
     for (const s of sentences) {
       const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id)
       const b = pick('before'), a = pick('after')
-      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | 需要编辑器 |`); continue }
+      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | 需要编辑器 |`); continue }
       const pr = rs => `${rs.filter(r => r.pass).length}/${rs.length}`
       const ft = rs => rs.map(r => r.firstTool || '-').join(' / ')
       const rt = rs => rs.map(r => `${r.rounds}r/${(r.promptTokens || 0) + (r.completionTokens || 0)}t`).join(' / ')
       const bp = b.filter(r => r.pass).length / (b.length || 1), ap = a.filter(r => r.pass).length / (a.length || 1)
-      L.push(`| ${s.id} | ${pr(b)} | ${pr(a)} | ${ft(b)} | ${ft(a)} | ${rt(b)} | ${rt(a)} | ${ap < bp ? '**退步**' : ap > bp ? '进步' : ''} |`)
+      L.push(`| ${s.id} | ${pr(b)} | ${pr(a)} | ${ft(b)} | ${ft(a)} | ${rt(b)} | ${rt(a)} | ${maxLater(b)} / ${maxLater(a)} | ${ap < bp ? '**退步**' : ap > bp ? '进步' : ''} |`)
     }
     L.push('')
   }
