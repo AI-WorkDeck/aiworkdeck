@@ -182,9 +182,9 @@ public class FeedbackResolutionSyncService {
             fb.setStatus(status);
             fb.setTriageVerdict(text(item, "triageVerdict"));
             fb.setPrUrl(text(item, "prUrl"));
-            fb.setResolvedAt(parseTime(text(item, "resolvedAt")));
-            fb.setReporterResponse(text(item, "reporterResponse"));
-            fb.setResponsePublishedAt(parseTime(text(item, "responsePublishedAt")));
+            if (item.has("resolvedAt")) fb.setResolvedAt(parseTime(text(item, "resolvedAt")));
+            if (item.has("reporterResponse")) fb.setReporterResponse(text(item, "reporterResponse"));
+            if (item.has("responsePublishedAt")) fb.setResponsePublishedAt(parseTime(text(item, "responsePublishedAt")));
             String handledAt = text(item, "handledAt");
             if (handledAt != null && !handledAt.isBlank()) fb.setHandledAt(parseTime(handledAt));
             feedbackRepository.save(fb);

@@ -89,41 +89,43 @@ public class MobileAssistantContentSafetyService {
 
     private Long reviewTicket(Long userId, String conversationId, String requestId, Stage stage,
                               String category, String contentHash) {
-        String installId = "mobile-assistant-" + userId;
-        String clientRef = "review-" + requestId + "-" + stage.name();
-        var existing = feedback.findByInstallIdAndClientRef(installId, clientRef);
-        if (existing.isPresent()) return existing.get().getId();
+        synchronized (feedback) {
+            String installId = "mobile-assistant-" + userId;
+            String clientRef = "review-" + requestId + "-" + stage.name();
+            var existing = feedback.findByInstallIdAndClientRef(installId, clientRef);
+            if (existing.isPresent()) return existing.get().getId();
 
-        UserFeedback row = new UserFeedback();
-        row.setUserId(userId);
-        row.setSource(UserFeedback.SOURCE_CLOUD);
-        row.setInstallId(installId);
-        row.setClientRef(clientRef);
-        row.setUploaded(true);
-        row.setKind(UserFeedback.KIND_BUG);
-        row.setText(LangText.of("个人助理内容安全复核（系统发起）", "Personal assistant content safety review (system-generated)"));
-        row.setPage("mobile/personal/assistant");
-        row.setPlatform("system-content-review");
-        row.setStatus(UserFeedback.STATUS_NEW);
-        row.setAttempts(0);
-        row.setCreatedAt(LocalDateTime.now());
-        Map<String, Object> client = new LinkedHashMap<>();
-        client.put("type", "ai-content-report");
-        client.put("platform", "system-content-review");
-        client.put("conversationId", conversationId);
-        Map<String, Object> review = new LinkedHashMap<>();
-        review.put("systemGenerated", true);
-        review.put("requestId", requestId);
-        review.put("stage", stage.name());
-        review.put("category", category);
-        review.put("contentSha256", contentHash);
-        review.put("rulesVersion", RULES_VERSION);
-        try {
-            row.setContextJson(json.writeValueAsString(Map.of("client", client, "review", review)));
-        } catch (Exception e) {
-            throw new IllegalStateException("Could not serialize content review metadata", e);
+            UserFeedback row = new UserFeedback();
+            row.setUserId(userId);
+            row.setSource(UserFeedback.SOURCE_CLOUD);
+            row.setInstallId(installId);
+            row.setClientRef(clientRef);
+            row.setUploaded(true);
+            row.setKind(UserFeedback.KIND_BUG);
+            row.setText(LangText.of("个人助理内容安全复核（系统发起）", "Personal assistant content safety review (system-generated)"));
+            row.setPage("mobile/personal/assistant");
+            row.setPlatform("system-content-review");
+            row.setStatus(UserFeedback.STATUS_NEW);
+            row.setAttempts(0);
+            row.setCreatedAt(LocalDateTime.now());
+            Map<String, Object> client = new LinkedHashMap<>();
+            client.put("type", "ai-content-report");
+            client.put("platform", "system-content-review");
+            client.put("conversationId", conversationId);
+            Map<String, Object> review = new LinkedHashMap<>();
+            review.put("systemGenerated", true);
+            review.put("requestId", requestId);
+            review.put("stage", stage.name());
+            review.put("category", category);
+            review.put("contentSha256", contentHash);
+            review.put("rulesVersion", RULES_VERSION);
+            try {
+                row.setContextJson(json.writeValueAsString(Map.of("client", client, "review", review)));
+            } catch (Exception e) {
+                throw new IllegalStateException("Could not serialize content review metadata", e);
+            }
+            return feedback.save(row).getId();
         }
-        return feedback.save(row).getId();
     }
 
     private void audit(Long userId, String conversationId, String requestId, Stage stage, Action action,
