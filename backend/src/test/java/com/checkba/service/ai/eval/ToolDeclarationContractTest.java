@@ -153,6 +153,10 @@ class ToolDeclarationContractTest {
      */
     private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>(ToolShimContractTest.V4_SHIMS);
 
+    static {
+        EXPECTED_NOT_OFFERED.addAll(ToolShimContractTest.V5_SHIMS);
+    }
+
     /** V3 删除的 22 个长期隐藏工具（docs/plans/tool-system-v2-inventory.csv 里 verdict=deprecate 的行）。 */
     private static final Set<String> DELETED_IN_V3 = new TreeSet<>(Set.of(
             "doc_get_selection", "doc_set_selection", "doc_replace_nth_match", "doc_delete_match",
