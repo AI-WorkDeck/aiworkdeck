@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "法定期限を計算",
     "listAttachedFiles": "このターンの添付一覧",
     "office_ppt_add_image": "スライドに画像を挿入",
     "office_ppt_add_chart": "スライドにグラフを挿入",

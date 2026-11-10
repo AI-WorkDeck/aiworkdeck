@@ -4,6 +4,7 @@
 // DocDiffViewer / CompareDocDialog / VariablePanel / DrawioEditor.
 export default {
   officeToolNames: {
+    "deadline_compute": "Compute deadline",
     "listAttachedFiles": "List turn attachments",
     "office_ppt_add_image": "Insert slide image",
     "office_ppt_add_chart": "Insert slide chart",

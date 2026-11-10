@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "समय-सीमा की गणना",
     "listAttachedFiles": "इस चरण के संलग्नक सूचीबद्ध करें",
     "office_ppt_add_image": "स्लाइड में चित्र डालें",
     "office_ppt_add_chart": "स्लाइड में चार्ट डालें",

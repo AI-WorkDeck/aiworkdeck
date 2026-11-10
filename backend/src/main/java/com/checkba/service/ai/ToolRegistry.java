@@ -157,6 +157,7 @@ public class ToolRegistry {
             Map.entry("task_create", "Create task"),
             Map.entry("task_list", "List tasks"),
             Map.entry("task_update", "Update task"),
+            Map.entry("deadline_compute", "Compute deadline"),
             Map.entry("search_web", "Web search"),
             Map.entry("browse_url", "Browse page"),
             Map.entry("qichacha_query", "Company registry lookup"),
