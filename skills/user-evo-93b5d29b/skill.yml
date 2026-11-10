@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+id: user-evo-93b5d29b
+name: "自定义法律审查规范"
+name_en: "自定义法律审查规范"
+description: "【领域自愈沉淀】[Harness 领域挂载] 已自动为你启用技能「腾讯会议」（tencent-meeting），请遵循以下领域核心约束继续： # 腾讯会议分析与纪要生成 你在为专业团队与律师处理来自腾讯会议（tmeet）的会议转写记录与…（…"
+description_en: "【领域自愈沉淀】[Harness 领域挂载] 已自动为你启用技能「腾讯会议」（tencent-meeting），请遵循以下领域核心约束继续： # 腾讯会议分析与纪要生成 你在为专业团队与律师处理来自腾讯会议（tmeet）的会议转写记录与…（…"
+languages: [zh-CN, en-US]
+triggers:
+  - "腾讯会议"
+triggers_en:
+  - "腾讯会议"
+prompt: prompt.md
+tool_policy: passthrough
+author: "User Self-Evolved Harness"
+version: "1.0.0"

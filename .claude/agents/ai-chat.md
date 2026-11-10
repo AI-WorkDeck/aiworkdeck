@@ -68,6 +68,7 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 - **验证**：`mvn test -Dtest='ToolShimContractTest,MergedToolsDispatchTest,ToolChoiceSurfaceTest,ToolInventoryContractTest,ToolDeclarationContractTest,ToolSurfaceBudgetTest,OrchestratorReplayEvalTest,SkillRegistryTest'`；回放新增 `cases-tool-merge.json`（21 条，每族一条，旧名走 `offeredToolsExclude`，非核心工具用 `offeredToolsIncludeLastCall`）；真实模型句集 `scripts/eval/sentences/v4-merged.json`（6 句）+ 夹具 `contract-commented.docx` / `contract-table.docx` / `dossier-24p.pdf`，`core-17.json` 的期望里新旧名并列以便对拍合并前后两个 ref。
 
 - **真实模型矩阵实测（2026-11-09，before=v2-core+master，after=V4+master，2 模型×每句 2 次）**：core-17（各 34 次/模型）deepseek 33→32、qwen 27→28，合计 60/68 持平；v4-merged 6 句（各 12 次/模型）deepseek 12→11、qwen 9→8。差异全在单次噪声内：qwen v01「接受第二条修订」两版都会 `ask_user` 反问是哪一条（after 两次都停在反问）；v04「价目表末尾插一行」qwen 两版都先 `list_tools`（首工具判据不过，但 after 正确走到 `doc_table_insert`），deepseek after 有一次绕去 `doc_find_text`/`doc_insert_at_cursor`——句子里没有「表格」二字，table 类目没被关键词放回；deepseek s08/s11 各退 1 次、s10 进 1 次。新名被模型正确使用：`doc_revisions` 在 s06/v02 两模型 after 都被调到，`doc_table_insert` 被 qwen 正确调用。**结论：未见系统性回退，但 v04 暴露「价目表」不触发 table 类目，后续可补关键词。** 注意 deepseek after 提示词 token 总量偏高主要来自 s12 一次 30 轮长跑。
+- **V5 会议合流矩阵实测（2026-11-10，before=origin/master，after=V5，2 模型×每句 2 次）**：v5-meetings 5 句（夹具写内置表，不碰真实 tmeet 账号）deepseek 10/10→10/10、qwen 10/10→10/10，首工具全部是 `meeting_list`；core-17 deepseek 33/34→33/34、qwen 31/34→33/34（两边唯一失分都是 s17-four-step 单次噪声：deepseek 超时、qwen 反问）。提示词 tokens 因会议类目 4 个工具收成 2 个略降。
 
 ## 权限拒绝与回收站可见性（followups）
 
