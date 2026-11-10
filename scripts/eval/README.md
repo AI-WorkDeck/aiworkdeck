@@ -129,7 +129,7 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
 句子、期望与工具对照真实行为校准过；下面是 master 上**真实存在**的失败，期望一律保持正确行为，不迁就。
 
 **cn（deepseek-v4-flash + qwen3.7-flash）**
-- `s14-delete-to-recycle-bin`（core-17）4/4 失败：期望文件已进回收站，但 master 的确认卡闸门（#1442）让 `move_to_trash` 停在 `awaiting_input`，与 `destructive-confirm.json` 的 d1 期望相反。core-17 按要求不改，**需要在后续 PR 里把 s14 改成 `status: awaiting_input`**。
+- `s14-delete-to-recycle-bin`（core-17）原先 4/4 失败：期望文件已进回收站，但 master 的确认卡闸门（#1442）让 `move_to_trash` 停在 `awaiting_input`。**已修正（见下方变更记录）**，不再是已知失败。
 - `g16-delete-third-clause`：编辑器里「删除第三条」仍会空转（deepseek 一次 29 轮、qwen 13 轮；另一次 7 轮通过），属真实循环。`g02-insert-clause`（qwen 22 轮）、`s17-four-step`（qwen 15 轮后漏接受修订）同类。
 - qwen3.7-flash 偏弱：`g18`（只 `list_tools`→`task_list`，没建事项）、`g14`（指代不明没反问）、`g15`/`s08`（没完成移动）。
 - DeepSeek 经 OpenRouter 约 10% 的运行返回空响应流，已由自动重跑吸收；不重跑时这些会算成失败。
@@ -159,3 +159,7 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
   | release 加量（intl）：claude-sonnet-5 / gpt-5.6-terra | ≈ $13.3 / $13.6（3 次），发版 2 次再 ×2/3 | $31.6 / $31.9 |
 
   外推值不含各家 tokenizer 差异、不含辅助模型（起标题/记忆抽取）与重试，仅作量级参考；`report.md` 末尾「成本与耗时估算」按实测自动给出本次所跑模型的数字。
+
+## 变更记录
+
+- 2026-11-10：core-17 / gate-35 / gate-35-en 的 `s14-delete-to-recycle-bin` 改为期望 `status: awaiting_input` 且文件仍在（#1442 起删除先走确认卡，与 g10 同模式）；这是 core-17 唯一一次期望变更，之前的矩阵结果里 s14 不可与之后对比。

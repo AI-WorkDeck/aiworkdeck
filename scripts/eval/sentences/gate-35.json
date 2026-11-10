@@ -361,7 +361,8 @@
           "permanent_delete",
           "delete_file_permanently"
         ],
-        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.name === '合同草稿.docx'); const k = f.find(x => x.name === '合同.docx'); return !!(d && d.is_deleted && k && !k.is_deleted);"
+        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.name === '合同草稿.docx'); const k = f.find(x => x.name === '合同.docx'); return !!(d && !d.is_deleted && k && !k.is_deleted);",
+        "status": "awaiting_input"
       }
     },
     {
