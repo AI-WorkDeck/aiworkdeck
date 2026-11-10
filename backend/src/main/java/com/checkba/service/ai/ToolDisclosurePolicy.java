@@ -311,56 +311,94 @@ public class ToolDisclosurePolicy {
     static {
         CATEGORY_KEYWORDS.put("pdf", List.of("pdf"));
         CATEGORY_KEYWORDS.put("compare", List.of("比对", "对比", "比较两", "比一下", "回稿", "修订稿", "改了哪", "改了什么", "动了哪", "差异", "有什么不同", "有何不同", "两个版本",
-                "compare", "redline", "comparison"));
-        CATEGORY_KEYWORDS.put("version", List.of("版本", "提交改动", "提交修改", "取回", "自动合并", "git", "commit", "pull", "restore"));
+                "compare", "redline", "comparison",
+                "diff", "compare versions", "compare two versions", "what changed", "differences between",
+                "what's different", "what is different"));
+        CATEGORY_KEYWORDS.put("version", List.of("版本", "提交改动", "提交修改", "取回", "自动合并", "git", "commit", "pull", "restore",
+                "version history", "previous version", "earlier version", "older version", "roll back", "rollback",
+                "revert"));
         CATEGORY_KEYWORDS.put("litigation", List.of("时间轴", "关系图", "流程图", "可视化",
-                "timeline", "diagram", "relationship graph"));
-        CATEGORY_KEYWORDS.put("slides", List.of("ppt", "pptx", "幻灯片", "演示文稿", "slides", "presentation"));
+                "timeline", "diagram", "relationship graph", "flowchart", "flow chart", "gantt", "chronology",
+                "org chart", "mind map", "visualize", "visualise", "visualization", "visualisation"));
+        CATEGORY_KEYWORDS.put("slides", List.of("ppt", "pptx", "幻灯片", "演示文稿", "slides", "slide", "presentation", "slide deck",
+                "pitch deck", "powerpoint", "keynote"));
         CATEGORY_KEYWORDS.put("mcp", List.of("mcp", "MCP", "外部连接", "自配连接", "GitHub", "Tavily", "元典"));
         CATEGORY_KEYWORDS.put("enterprise-data", List.of("工商", "企业信息", "企查查", "股东", "注册资本",
-                "公司背景", "tushare", "股票", "上市公司"));
-        CATEGORY_KEYWORDS.put("plugin", List.of("插件", "plugin", "能力安装", "capability"));
+                "公司背景", "tushare", "股票", "上市公司",
+                "qichacha", "business registration", "company registry", "corporate registry", "registered capital",
+                "company background", "company profile", "shareholder structure", "who owns", "beneficial owner",
+                "legal representative", "stock price", "listed company", "ticker"));
+        CATEGORY_KEYWORDS.put("plugin", List.of("插件", "plugin", "plugins", "能力安装", "capability", "capabilities"));
         // 不收裸「录音」：「整理这份录音文件夹」是文件整理，不是会议（V5 矩阵实测会误放回 meeting 类目）
         CATEGORY_KEYWORDS.put("meeting", List.of("会议", "纪要", "转写", "逐字稿", "会议录音", "录音转写", "录音逐字稿", "录音记录", "开会录的",
-                "会议的录音", "的录音", "meeting", "transcript"));
+                "会议的录音", "的录音", "meeting", "meetings", "transcript", "transcripts", "transcribe", "transcription",
+                "meeting minutes", "the minutes", "take minutes", "write minutes", "draft minutes", "generate minutes",
+                "minutes of", "recording", "recordings", "audio recording", "voice memo"));
         // 插件工具统一落 plugin-tools；腾讯会议插件的 tencent_meeting_action 靠这些词在首轮就可见
         CATEGORY_KEYWORDS.put("plugin-tools", List.of("会议", "纪要", "腾讯会议", "逐字稿", "转写",
-                "meeting minutes", "tencent meeting", "transcript"));
-        CATEGORY_KEYWORDS.put("python", List.of("python", "脚本", "计算一下", "跑一段代码"));
+                "meeting minutes", "tencent meeting", "transcript",
+                "the minutes", "take minutes", "write minutes", "draft minutes", "generate minutes", "minutes of",
+                "meeting recording", "meeting recordings", "transcripts", "meeting transcript"));
+        CATEGORY_KEYWORDS.put("python", List.of("python", "脚本", "计算一下", "跑一段代码",
+                "run code", "run a script", "run some code", "write a script", "python script"));
         // 「表格」两边都放：docx 里说的「表格」是文档内的表（table 类目的 doc_table_*），
         // xlsx 会话或「做一张表格」说的是电子表格；分不清就两类都放回，多付的是一轮里两类的规格。
-        CATEGORY_KEYWORDS.put("spreadsheet", List.of("表格", "excel", "xlsx", "工作表", "电子表格", "一张表"));
+        CATEGORY_KEYWORDS.put("spreadsheet", List.of("表格", "excel", "xlsx", "工作表", "电子表格", "一张表",
+                "spreadsheet", "spreadsheets", "worksheet", "worksheets", "workbook", "csv"));
         // 不含「表格」二字的说法也要放回（V4 矩阵：「价目表最后插一行」没命中）；不收光秃秃的「行」「列」。
         CATEGORY_KEYWORDS.put("table", List.of("表格", "table", "单元格", "合并单元格",
-                "价目表", "表里", "这张表", "表中", "那一行"));
+                "价目表", "表里", "这张表", "表中", "那一行",
+                "tables", "row", "rows", "column", "columns", "cells", "cell", "merge cells",
+                "price table", "pricing table", "price list", "fee table", "tabular"));
         CATEGORY_KEYWORDS.put("task", List.of("事项", "日程", "提醒", "待办", "截止", "deadline",
                 "期限", "到期", "开庭", "庭审", "时效", "截止日",
-                "上诉期", "答辩期", "举证期限", "几号到期", "哪天到期", "再审期限", "最迟", "届满"));
+                "上诉期", "答辩期", "举证期限", "几号到期", "哪天到期", "再审期限", "最迟", "届满",
+                // 英文：不收裸 due（due diligence）、裸 schedule（合同里的 Schedule A）、裸 minutes
+                "deadlines", "task", "tasks", "reminder", "reminders", "remind", "to-do", "to-dos", "todo", "todos",
+                "due date", "due dates", "due by", "due on", "due in", "due today", "due tomorrow", "overdue",
+                "hearing", "hearings", "court date", "trial date", "calendar", "my schedule", "schedule a hearing",
+                "schedule a call", "schedule a deposition", "schedule a task", "schedule a reminder", "schedule the", "appeal period", "appeal deadline", "limitation period",
+                "limitations period", "statute of limitations", "time limit",
+                "filing deadline", "expires", "expiry", "expiration", "this week", "next week", "this month",
+                "upcoming"));
         // 以下几类是渐进披露默认打开后补的（dev-board#1064 第二步）：律师最常说的几类请求，
         // 起跑时就把那一类放回，免得先花一轮查目录、再让下一轮的提示缓存整段失效。
         CATEGORY_KEYWORDS.put("revision", List.of("修订", "批注", "接受", "拒绝", "评论",
-                "comment", "revision", "track changes"));
-        CATEGORY_KEYWORDS.put("template", List.of("模板", "套用", "template"));
+                "comment", "comments", "commented", "revision", "revisions", "track changes", "tracked change",
+                "tracked changes", "track change", "annotate", "annotation",
+                "annotations", "accept all", "accept the", "accept this", "accept these", "accept every",
+                "accept each", "accept it", "reject all", "reject the", "reject this", "reject these",
+                "reject every", "reject each", "reject it", "resolve the comment", "resolve comments"));
+        CATEGORY_KEYWORDS.put("template", List.of("模板", "套用", "template", "templates", "house style", "style profile", "firm style"));
         CATEGORY_KEYWORDS.put("evidence", List.of("证据", "依据", "证据整理", "整理证据", "证据目录", "证据清单",
-                "evidence", "organize evidence"));
+                "evidence", "organize evidence", "organise evidence", "exhibit", "exhibits"));
         // 不收单独的「目录」：它在中文里也是「文件夹」（「项目目录下有什么」），误中就白付整个 format 类目
         // 四十个规格；只收明确指文档目录的短语。
         CATEGORY_KEYWORDS.put("format", List.of("格式", "字体", "字号", "段落", "页眉", "页脚", "脚注", "排版",
-                "插入目录", "生成目录", "更新目录", "font", "format", "heading"));
+                "插入目录", "生成目录", "更新目录", "font", "format", "heading",
+                "fonts", "font size", "formatting", "formatted", "headings", "line spacing", "indent", "indentation",
+                "margin", "margins", "footnote", "footnotes", "page number", "page numbers", "table of contents",
+                "bold", "italic", "underline", "typography"));
         // 不收「整理」：「整理一下录音 / 要点」远比「整理文件夹」常见，而建文件夹、批量移动、移入回收站在 V2 起也退到 files 类目（靠「文件夹 / 移动 / 回收站 / 删除文件」预放回）；
         // 但明确指文件归档的「文件整理」「整理文件」「归档」直接预先放回 files 全集（含单文件移动与重命名）。
         CATEGORY_KEYWORDS.put("files", List.of("重命名", "文件整理", "整理文件",
-                "rename", "organize files", "file organization"));
+                "rename", "organize files", "file organization",
+                "renamed", "organise files", "organize the files", "organise the files", "sort the files",
+                "tidy up the files", "clean up the files", "copy files", "copy the file"));
         // 退出核心集的 8 个工具里「说法很明确」的那几个，改走下面 TOOL_KEYWORDS 的精确放回（只放该工具，不放整类）；
         // 这里只留更宽的说法（重命名 / 整理文件），它们要的是 files 全集（含单文件移动与重命名）。
         // 「法》」「条例》」：用户一写书名号引一部法（《公司法》《劳动合同法》《著作权法实施条例》）就是在查法条，
         // 比「法规」「法条」这类泛称命中得准。
         CATEGORY_KEYWORDS.put("legal", List.of("法规", "法条", "条文", "司法解释", "法》", "条例》",
-                "案例", "判例", "查询案号", "检索案号", "判决书", "case law", "judgment"));
+                "案例", "判例", "查询案号", "检索案号", "判决书", "case law", "judgment",
+                "law", "laws", "statute", "statutes", "statutory", "regulation", "regulations", "legislation",
+                "civil code", "caselaw", "precedent", "precedents", "judgement", "ruling", "court decision",
+                "case number", "similar cases", "find cases"));
         // memory 类目里是 memory_write / memory_edit / memory_delete 三个写入工具（只读三个编排器每轮都补，
         // dev-board#1073）；「记下」「忘掉」是要改记忆文件的说法。不收「别忘」「forget」：
         // 「别忘了加页码」是叮嘱不是记忆。
-        CATEGORY_KEYWORDS.put("memory", List.of("记住", "记忆", "偏好", "记下", "忘掉", "remember", "memory"));
+        CATEGORY_KEYWORDS.put("memory", List.of("记住", "记忆", "偏好", "记下", "忘掉", "remember", "memory", "memories", "memorize", "memorise",
+                "preference", "preferences", "note down", "jot down"));
         // edit 刻意不收关键词：「删除 / 改成 / 替换 / 插入」几乎每句改文档的话都有，而真正常用的
         // 删改原语（锚点替换、查找替换、光标处插入）本来就在核心集里。
     }
@@ -373,25 +411,60 @@ public class ToolDisclosurePolicy {
      */
     static final Map<String, List<String>> TOOL_KEYWORDS = new LinkedHashMap<>();
 
+    /** 表格插/删行列的中英说法。英文用「动词 + 可选限定词 + row/column」展开，不收裸 row（交给 table 类目关键词）。 */
+    private static final List<String> TABLE_INSERT_ZH_EN = tableEditPhrases(
+            List.of("插一行", "插入一行", "加一行", "新增一行", "插一列", "插入一列", "加一列", "新增一列"),
+            List.of("insert", "add", "append"));
+    private static final List<String> TABLE_DELETE_ZH_EN = tableEditPhrases(
+            List.of("删一行", "删除一行", "删掉一行", "删一列", "删除一列", "删掉一列"),
+            List.of("delete", "remove", "drop"));
+
+    private static List<String> tableEditPhrases(List<String> zh, List<String> verbs) {
+        List<String> out = new ArrayList<>(zh);
+        for (String verb : verbs) {
+            for (String mid : List.of("", "a ", "an ", "one ", "another ", "a new ", "an extra ", "a blank ",
+                    "an empty ", "the ", "this ", "that ", "the first ", "the last ", "the second ", "the third ",
+                    "the top ", "the bottom ", "the empty ", "the blank ", "new ", "extra ")) {
+                for (String noun : List.of("row", "rows", "column", "columns")) {
+                    out.add(verb + " " + mid + noun);
+                }
+            }
+        }
+        return List.copyOf(out);
+    }
+
     static {
-        TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder"));
-        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "move files"));
-        TOOL_KEYWORDS.put("doc_table_insert", List.of("插一行", "插入一行", "加一行", "新增一行", "插一列", "插入一列", "加一列", "新增一列"));
-        TOOL_KEYWORDS.put("doc_table_delete", List.of("删一行", "删除一行", "删掉一行", "删一列", "删除一列", "删掉一列"));
-        TOOL_KEYWORDS.put("office_table_insert", List.of("插一行", "插入一行", "加一行", "新增一行", "插一列", "插入一列", "加一列", "新增一列"));
-        TOOL_KEYWORDS.put("office_table_delete", List.of("删一行", "删除一行", "删掉一行", "删一列", "删除一列", "删掉一列"));
-        TOOL_KEYWORDS.put("move_to_trash", List.of("回收站", "删除", "删掉", "删了", "move to trash", "delete file"));
-        TOOL_KEYWORDS.put("doc_apply_standard_format", List.of("标准格式", "统一格式", "律所格式", "排版"));
+        TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder",
+                "create a folder", "make a folder", "add a folder", "folder", "folders"));
+        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "move files",
+                "move", "moved", "moving", "archive", "archived", "archiving", "relocate", "put"));
+        TOOL_KEYWORDS.put("doc_table_insert", TABLE_INSERT_ZH_EN);
+        TOOL_KEYWORDS.put("doc_table_delete", TABLE_DELETE_ZH_EN);
+        TOOL_KEYWORDS.put("office_table_insert", TABLE_INSERT_ZH_EN);
+        TOOL_KEYWORDS.put("office_table_delete", TABLE_DELETE_ZH_EN);
+        TOOL_KEYWORDS.put("move_to_trash", List.of("回收站", "删除", "删掉", "删了", "move to trash", "delete file",
+                "delete", "deleted", "deleting", "trash", "recycle bin", "throw away", "get rid of"));
+        TOOL_KEYWORDS.put("doc_apply_standard_format", List.of("标准格式", "统一格式", "律所格式", "排版",
+                "standard format", "standard formatting", "firm's standard", "firm standard", "firm's format",
+                "firm format", "firm's style", "firm style", "house style", "house format", "uniform format",
+                "uniform formatting", "unify the format", "unify formatting", "standardize the format",
+                "standardise the format", "standardize formatting", "standardise formatting"));
         TOOL_KEYWORDS.put("doc_export_pdf", List.of("导出pdf", "导出成pdf", "导出为pdf", "转pdf", "转成pdf", "存成pdf",
-                "存为pdf", "另存为pdf", "export pdf", "export to pdf"));
-        TOOL_KEYWORDS.put("memory_search", List.of("记得", "之前说过", "上次说", "之前提过", "之前聊过"));
+                "存为pdf", "另存为pdf", "export pdf", "export to pdf",
+                "export as pdf", "export as a pdf", "export it as pdf", "export it as a pdf", "export it to pdf",
+                "export to a pdf", "save as pdf", "save as a pdf", "save it as pdf", "save it as a pdf",
+                "convert to pdf", "convert it to pdf", "convert into pdf", "print to pdf"));
+        TOOL_KEYWORDS.put("memory_search", List.of("记得", "之前说过", "上次说", "之前提过", "之前聊过",
+                "do you remember", "you remember", "did i tell you", "did i say", "did i mention", "what did i say",
+                "what did i tell", "i told you", "i mentioned", "last time", "we discussed", "we talked about",
+                "recall"));
     }
 
     /** 「删除/移动」这类动词在改文档的句子里是诱饵（「删除第三条」「把光标移到…」）：这两个工具要句子里提到文件才放回。 */
     private static final Set<String> FILE_VERB_TOOLS = Set.of("move_to_trash", "move_files");
     private static final List<String> FILE_CONTEXT_WORDS = List.of(
             "文件", "文档", "文件夹", "回收站", "草稿", ".docx", ".doc", ".pdf", ".xlsx", ".pptx", ".txt",
-            "file", "folder");
+            "file", "files", "folder", "folders", "document", "documents", "doc", "docs", "draft", "drafts");
 
     /** 用户这一句话精确点到了哪几个退出核心集的工具（{@link #TOOL_KEYWORDS}）；不知道有没有开文档，按没开处理。 */
     public Set<String> toolsHintedBy(String userMessage) {
@@ -405,9 +478,9 @@ public class ToolDisclosurePolicy {
         if (userMessage == null || userMessage.isBlank()) {
             return Set.of();
         }
-        String normalized = userMessage.toLowerCase(Locale.ROOT);
+        String normalized = normalize(userMessage);
         boolean mentionsFile = activeDocKind == null
-                || FILE_CONTEXT_WORDS.stream().anyMatch(normalized::contains);
+                || FILE_CONTEXT_WORDS.stream().anyMatch(w -> SkillRouter.containsTrigger(normalized, w));
         Set<String> hinted = new LinkedHashSet<>();
         for (Map.Entry<String, List<String>> entry : TOOL_KEYWORDS.entrySet()) {
             if (!mentionsFile && FILE_VERB_TOOLS.contains(entry.getKey())) {
@@ -423,17 +496,38 @@ public class ToolDisclosurePolicy {
         return hinted;
     }
 
+    /** 小写并把弯引号撇号换成直撇号（「firm’s」与「firm's」同一个词）。 */
+    private static String normalize(String text) {
+        return text.toLowerCase(Locale.ROOT).replace('\u2019', '\'');
+    }
+
     /** 把命中的工具关键词短语抠掉（换成空格），再交给类目关键词匹配。 */
     private static String withoutToolKeywords(String normalized) {
         String text = normalized;
         for (List<String> keywords : TOOL_KEYWORDS.values()) {
             for (String keyword : keywords) {
                 if (SkillRouter.containsTrigger(text, keyword)) {
-                    text = text.replace(keyword, " ");
+                    text = stripKeyword(text, keyword);
                 }
             }
         }
         return text;
+    }
+
+    /** 抠掉关键词：拉丁串两端按整词抠（「move」不吃「remove」的一截），中文照旧子串。 */
+    private static String stripKeyword(String text, String keyword) {
+        boolean latinStart = isAsciiWordChar(keyword.charAt(0));
+        boolean latinEnd = isAsciiWordChar(keyword.charAt(keyword.length() - 1));
+        if (!latinStart && !latinEnd) {
+            return text.replace(keyword, " ");
+        }
+        String pattern = (latinStart ? "(?<![a-z0-9])" : "") + java.util.regex.Pattern.quote(keyword)
+                + (latinEnd ? "(?![a-z0-9])" : "");
+        return text.replaceAll(pattern, " ");
+    }
+
+    private static boolean isAsciiWordChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
     }
 
     private final boolean enabled;
@@ -509,7 +603,7 @@ public class ToolDisclosurePolicy {
         if (userMessage == null || userMessage.isBlank()) {
             return Set.of();
         }
-        String normalized = withoutToolKeywords(userMessage.toLowerCase(Locale.ROOT));
+        String normalized = withoutToolKeywords(normalize(userMessage));
         Set<String> known = categoryNames();
         Set<String> hinted = new LinkedHashSet<>();
         for (Map.Entry<String, List<String>> entry : CATEGORY_KEYWORDS.entrySet()) {
@@ -558,7 +652,7 @@ public class ToolDisclosurePolicy {
         if (hinted.size() <= MAX_KEYWORD_PUTBACK) {
             return hinted;
         }
-        String normalized = withoutToolKeywords(userMessage.toLowerCase(Locale.ROOT));
+        String normalized = withoutToolKeywords(normalize(userMessage));
         Map<String, Integer> score = new LinkedHashMap<>();
         for (String category : hinted) {
             int total = 0;
