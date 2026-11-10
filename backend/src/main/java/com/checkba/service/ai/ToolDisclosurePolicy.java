@@ -105,7 +105,7 @@ public class ToolDisclosurePolicy {
      * 再加上 kind 无关的 {@code sheet_create_file}；逐会话的实数由
      * {@code ToolDisclosurePolicyTest.corePerSessionIsSmallAndComplete} 打印并钉住。
      */
-    static final Set<String> CORE = Set.of(
+    static final Set<String> CORE = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(java.util.Arrays.asList(
             // ==================== 通用段：任何会话都要有（21 个）====================
             // —— 目录入口与编排：少了 list_tools 整套机制就没有入口；ask_user 是「拿不准先问」
             //    的唯一入口（dev-board#868），藏进目录里等于让模型先查目录才能想起来问；
@@ -173,7 +173,7 @@ public class ToolDisclosurePolicy {
 
             // ==================== Office 任务窗格·PowerPoint 段：4 个（T-18）====================
             "office_ppt_get_slides", "office_ppt_replace_text", "office_ppt_format_text", "office_ppt_add_slide"
-    );
+    )));
 
     /**
      * 没开文件态（LOWA 且起跑时无活跃文档，tool-surface-audit S1）额外放进核心集的入口工具：
@@ -603,6 +603,35 @@ public class ToolDisclosurePolicy {
             }
         }
         return covered;
+    }
+
+    /**
+     * 下发给模型的工具规格的规范顺序：核心集按 {@link #CORE} 声明顺序在前，其余按（类目在 {@link #CATEGORIES}
+     * 里的声明序、plugin-tools、misc，再按名字）排。纯函数，与 JVM、bean 扫描顺序、反射方法顺序无关——
+     * 供应商的 prompt 缓存要求 tools 前缀逐字节一致，顺序漂移 = 跨会话缓存全废。
+     */
+    public List<ToolSpecification> canonicalOrder(List<ToolSpecification> specs) {
+        List<String> coreOrder = new ArrayList<>(CORE);
+        List<String> categoryOrder = new ArrayList<>(CATEGORIES.keySet());
+        categoryOrder.add(PLUGIN_TOOLS_CATEGORY);
+        categoryOrder.add(FALLBACK_CATEGORY);
+        Map<String, int[]> rank = new LinkedHashMap<>();
+        for (ToolSpecification spec : specs) {
+            String name = spec.name();
+            int core = coreOrder.indexOf(name);
+            if (core >= 0) {
+                rank.put(name, new int[] {0, core});
+            } else {
+                int cat = categoryOrder.indexOf(categoryOf(name));
+                rank.put(name, new int[] {1, cat < 0 ? categoryOrder.size() : cat});
+            }
+        }
+        List<ToolSpecification> sorted = new ArrayList<>(specs);
+        sorted.sort(java.util.Comparator
+                .<ToolSpecification>comparingInt(sp -> rank.get(sp.name())[0])
+                .thenComparingInt(sp -> rank.get(sp.name())[1])
+                .thenComparing(ToolSpecification::name));
+        return sorted;
     }
 
     /** 核心集（只读）。供契约测试核对「名字是不是真的存在」与常用链的覆盖面。 */
