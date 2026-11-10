@@ -1,6 +1,6 @@
 {
   "plugin.name": "Pesan Proyek",
   "plugin.description": "Komunikasi firma hukum, tim, dan proyek: asisten bersama, pesan langsung, pengarsipan berkas, dan referensi AI. Saat ini hanya tersedia untuk akun Daratan Tiongkok.",
-  "tool.project_im_list_conversations.desc": "Gunakan saat pengguna menanyakan grup obrolan atau percakapan apa saja yang ada, termasuk grup proyek. Daftar percakapan pesan pengguna (hanya baca).",
-  "tool.project_im_read_messages.desc": "Gunakan saat pengguna menanyakan apa yang baru-baru ini dibahas di grup obrolan atau grup proyek, atau ingin riwayat obrolan (ambil dulu id percakapan dari project_im_list_conversations). Baca pesan terbaru dari percakapan yang diikuti pengguna (hanya baca)."
+  "tool.project_im_list_conversations.desc": "Daftar percakapan pesan pengguna (hanya baca). Gunakan saat pengguna menanyakan grup obrolan atau percakapan apa saja yang ada, termasuk grup proyek.",
+  "tool.project_im_read_messages.desc": "Baca pesan terbaru dari percakapan yang diikuti pengguna (hanya baca). Gunakan saat pengguna menanyakan apa yang baru-baru ini dibahas di grup obrolan atau grup proyek, atau ingin riwayat obrolan (ambil dulu id percakapan dari project_im_list_conversations)."
 }

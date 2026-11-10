@@ -1068,13 +1068,18 @@ UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调�
 | 字段 | 必填 | 说明 |
 |---|---|---|
 | `name` | 是 | 非 JAR 工具必须以 `<pluginId 连字符转下划线>_` 开头 |
-| `description` | 是 | 非空；支持 l10n `%key%`（§14.4）；第一行进模型目录 |
+| `description` | 是 | 非空；支持 l10n `%key%`（§14.4）；第一行进模型目录，须满足下方「描述门禁」 |
 | `access` | 是 | `read` \| `write` \| `destructive`；读写分级是策略唯一轴 |
 | `inputSchema` | 否 | `mcpObjectSchema` 子集（§17.5） |
 | `handler` | 否 | 缺省 `{type:"jar"}`；`{type:"service",service,operation}`、`{type:"connection",connectionId,operation}`、`{type:"view",viewId}`（第四期） |
 | `permissions` | 否 | 运行所需，⊆ `manifest.permissions` |
-| `mcp` | 否 | 是否投影到对外 MCP；缺省 read→true，write/destructive→false |
+| `mcp` | 否 | 是否投影到对外 MCP；缺省 read→true，write/destructive→false。destructive、`confirm:always`、`agent:false` 的工具无论如何不投影（外部 Agent 答不了确认卡），`validate` 对这三类写 `mcp:true` 直接报错 |
 | `confirm` | 否 | `auto`（缺省，按 access；destructive 必确认）\| `always` \| `never` |
 | `keywords` | 否 | 命中即在起跑时放回本插件工具 |
+| `agent` | 否 | `false` = 登记但不下发给模型、不投影 MCP，仅供插件界面直调（对应内置 `offerToModel=false`）；缺省 `true`。**老形态（JAR）条目也可带 `agent:false`**，它不算声明式字段 |
+
+**描述门禁**（`docs/plans/tool-system-v2.md` A5，与内置工具同一把尺子）：`validate` 对声明式工具的 `description`（`%key%` 取 `l10n/zh-CN.json` 的译文；取不到则跳过）检查第一行——到第一个换行或「。」为止——① 不超过 80 字符；② 单一语言（中文；标识符、引号内容、括号里的纯 ASCII 同义词如 `（compare, redline）` 不算）；③ 动词开头，不以「用户」「当」「仅」「先」等名词/条件/禁令起手。「何时用 / 何时不用」写在第二行之后。其他语言的 l10n 译文保持同样的句序即可，不受此门禁检查。老形态条目不检查。
+
+内置 MCP 投影（`McpToolProjection`）另有一张会话内生排除表（`ask_user`、`list_tools`、`todo_write`、`use_skill`、`dispatch_subtask`、`list_attached_files`、`create_skill`）：这些工具只对一次对话有意义，不对外暴露。
 
 `validate` 规则：非 JAR 名字前缀；`access` 必填；`description` 非空；`inputSchema` 过 §17.5 子集；`service/operation` 必须在 `sdk/plugin-sdk/services.json`（宿主服务表发布副本，首批 `calendar`、`search`、`sensitive`，P2-3 增只读 `lawfirm`、`im`）；`connection` 必须是已声明的 `contributes.connections` 且操作存在；`view` 必须是已声明视图；`permissions` ⊆ `manifest.permissions`。SDK：`awd.tools.handle` 仅类型占位（第四期），`awd.tools.list()` 待宿主桥方法。

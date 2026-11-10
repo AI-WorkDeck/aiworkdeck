@@ -704,7 +704,7 @@
       ]
     },
     "legacyTool": {
-      "description": "Legacy JAR tool (name = @Tool method name). Must not carry any declarative field.",
+      "description": "Legacy JAR tool (name = @Tool method name). Must not carry any declarative field (the optional `agent` flag is allowed).",
       "type": "object",
       "properties": {
         "name": {
@@ -731,6 +731,10 @@
             ]
           },
           "uniqueItems": true
+        },
+        "agent": {
+          "type": "boolean",
+          "description": "false = registered but not offered to the model and never projected to MCP; the tool stays callable from the plugin UI. Default true."
         }
       },
       "required": [
@@ -818,7 +822,8 @@
           "uniqueItems": true
         },
         "mcp": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Project to the local MCP server. Default: read true, write false. Ignored (never projected) for destructive, confirm:always and agent:false tools; plugin-dev validate rejects mcp:true on them."
         },
         "confirm": {
           "enum": [
@@ -835,6 +840,10 @@
             "minLength": 1,
             "maxLength": 64
           }
+        },
+        "agent": {
+          "type": "boolean",
+          "description": "false = registered but not offered to the model and never projected to MCP; the tool stays callable from the plugin UI. Default true."
         }
       },
       "required": [
