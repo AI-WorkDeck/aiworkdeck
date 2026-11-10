@@ -2281,6 +2281,7 @@ public class AgentOrchestrator {
             AgentInboxService.Clarification clarification = inboxService == null ? null
                     : inboxService.takeClarification(conversationId, request.getProjectId(), userId, request.getMessage(),
                             request.getActiveContext() == null ? null : request.getActiveContext().getId());
+            AgentInboxService.PendingCall pendingCall = takePendingCall(conversationId, projectId, userId, request.getMessage());
             skillRouter.activateForTurn(conversationId, guard.runId, request.getMessage(),
                     request.getPinnedSkillId(), skillsEffective ? request.getSkillIds() : null);
             if (clarification != null && skillsEffective) {
@@ -2446,6 +2447,9 @@ public class AgentOrchestrator {
                 log.info("[ToolVisibility] conv={} 本轮不下发 {} 个当前用不了的工具：{}",
                         conversationId, guard.unusableTools.size(), guard.unusableTools);
             }
+            String replayNote = replayPendingCall(guard, pendingCall, request.getMessage(), projectId, conversationId,
+                    userId, effectiveModelId, agentMode, executionLog);
+            if (replayNote != null) messages.add(dev.langchain4j.data.message.UserMessage.from(replayNote));
             runLoop(model, messages, conversationId, projectId, userId, effectiveModelId, 0, executionLog, agentMode, guard);
 
         } catch (AttachmentsRequireTools e) {
@@ -2729,9 +2733,14 @@ public class AgentOrchestrator {
 
                     String result;
                     boolean success;
+                    AskUserQuestion confirmGate = null;
                     if (agentMode == AgentMode.ASK && !askAllows(req.name())) {
                         result = "Error: ASK mode permits only read-only attachment, memory and version inspection tools.";
                         success = false;
+                    } else if ((confirmGate = confirmationGate(guard, req.name(), req.arguments(), projectId, userId)) != null) {
+                        // 破坏性工具：不分发，先问用户（P2-1），答「执行」后下一轮按原参数重放
+                        result = askUserProcessNote();
+                        success = true;
                     } else {
                         ToolRegistry.ToolResult toolResult = dispatchTool(req.name(), req.arguments(),
                                 Long.parseLong(projectId), conversationId, userId, modelId, guard);
@@ -2747,7 +2756,8 @@ public class AgentOrchestrator {
                         success = false;
                     }
                     // ask_user（dev-board#868）：校验通过即结束本轮。过程卡里给一句人话而不是工具回执。
-                    AskUserQuestion askUser = success ? askUserFrom(req.name(), req.arguments()) : null;
+                    AskUserQuestion askUser = confirmGate != null ? confirmGate
+                            : success ? askUserFrom(req.name(), req.arguments()) : null;
                     if (askUser != null) {
                         result = askUserProcessNote();
                     }
@@ -2897,6 +2907,7 @@ public class AgentOrchestrator {
 
                     String result;
                     boolean xmlToolSuccess;
+                    AskUserQuestion xmlConfirmGate = null;
                     ToolRegistry.ToolResult toolResult = null;
                     if (call.parseError() != null) {
                         result = call.parseError();
@@ -2904,6 +2915,9 @@ public class AgentOrchestrator {
                     } else if (agentMode == AgentMode.ASK && !askAllows(call.toolName())) {
                         result = "Error: ASK mode permits only read-only attachment, memory and version inspection tools.";
                         xmlToolSuccess = false;
+                    } else if ((xmlConfirmGate = confirmationGate(guard, call.toolName(), call.argsJson(), projectId, userId)) != null) {
+                        result = askUserProcessNote();
+                        xmlToolSuccess = true;
                     } else {
                         toolResult = dispatchTool(call.toolName(), call.argsJson(),
                                 Long.parseLong(projectId), conversationId, userId, modelId, guard);
@@ -2923,7 +2937,8 @@ public class AgentOrchestrator {
                         xmlToolSuccess = false;
                     }
                     // ask_user（同原生分支）：XML 兜底是弱模型的主路径，只接原生分支等于换个模型就不停机
-                    AskUserQuestion xmlAskUser = xmlToolSuccess ? askUserFrom(call.toolName(), call.argsJson()) : null;
+                    AskUserQuestion xmlAskUser = xmlConfirmGate != null ? xmlConfirmGate
+                            : xmlToolSuccess ? askUserFrom(call.toolName(), call.argsJson()) : null;
                     if (xmlAskUser != null) {
                         result = askUserProcessNote();
                     }
@@ -4769,6 +4784,71 @@ public class AgentOrchestrator {
             log.warn("ask_user arguments rejected after a successful dispatch: {}", e.getMessage());
             return null;
         }
+    }
+
+    /** 未配 AgentInboxService（手工 new 的测试）时的挂起调用兜底；键 = 会话|问题 id。 */
+    private final java.util.concurrent.ConcurrentHashMap<String, AgentInboxService.PendingCall> memoryPendingCalls =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 破坏性确认闸（C5 / P2-1）：该工具需要确认就返回确认卡并把原调用存起来，否则 null。
+     * 每次都问；重放走 {@link #dispatchTool} 直连，不会再过闸。
+     */
+    private AskUserQuestion confirmationGate(RunGuard guard, String toolName, String argsJson,
+                                             String projectId, Long userId) {
+        if (!toolRegistry.requiresConfirmation(toolName)) return null;
+        String name = toolRegistry.resolve(toolName).map(ToolRegistry.RegisteredTool::displayName).orElse(toolName);
+        if (name == null || name.equals("工具执行") || name.equals("Tool execution")) name = toolName;
+        AskUserQuestion question = DestructiveConfirmation.question(name, argsJson, AskUserQuestion.newId());
+        AgentInboxService.PendingCall pending = new AgentInboxService.PendingCall(toolName, argsJson);
+        if (inboxService != null) {
+            if (isCurrentRun(guard)) inboxService.rememberPendingCall(guard.runId, question.id(), pending);
+        } else {
+            memoryPendingCalls.put(guard.conversationId + "|" + question.id(), pending);
+        }
+        log.info("Destructive tool {} for {} awaits user confirmation ({})", toolName, guard.conversationId, question.id());
+        return question;
+    }
+
+    /** 本轮用户消息若是对确认卡的回答，取走挂起的调用；不是（或已被取走）返回 null。 */
+    private AgentInboxService.PendingCall takePendingCall(String conversationId, String projectId, Long userId, String message) {
+        if (!AskUserQuestion.isAnswerMessage(message)) return null;
+        if (inboxService != null) {
+            return inboxService.takePendingCall(conversationId, Long.parseLong(projectId), userId, message);
+        }
+        var m = java.util.regex.Pattern.compile("^\\s*<ask_user_answer\\s+id=\"([^\"]+)\"").matcher(message);
+        return m.find() ? memoryPendingCalls.remove(conversationId + "|" + m.group(1)) : null;
+    }
+
+    /**
+     * 处理对确认卡的回答：「执行」→ 以原参数执行一次并把结果交给模型；其他 → 告诉模型已取消。
+     * 返回追加在消息栈末位的系统提醒，没有挂起调用时 null。
+     */
+    private String replayPendingCall(RunGuard guard, AgentInboxService.PendingCall pending, String message,
+                                     String projectId, String conversationId, Long userId, String modelId,
+                                     AgentMode agentMode, StringBuilder executionLog) {
+        if (pending == null) return null;
+        String name = toolRegistry.resolve(pending.tool()).map(ToolRegistry.RegisteredTool::displayName).orElse(pending.tool());
+        if (name == null || name.equals("工具执行") || name.equals("Tool execution")) name = pending.tool();
+        if (!DestructiveConfirmation.isApproval(message) || agentMode == AgentMode.ASK) {
+            return "[系统提醒] " + DestructiveConfirmation.cancelledNote(name);
+        }
+        sendTextDelta(guard, String.format("<process name=\"%s\"><tool_code>%s(%s)</tool_code></process>",
+                name.replace("\"", "'"), pending.tool(),
+                AgentTagProtocol.escape(truncate(pending.argsJson(), 200))));
+        ToolRegistry.ToolResult r = dispatchTool(pending.tool(), pending.argsJson(),
+                Long.parseLong(projectId), conversationId, userId, modelId, guard);
+        String out = org.springframework.util.StringUtils.hasText(r.output()) ? r.output() : BLANK_TOOL_OUTPUT;
+        String status = r.success() ? "SUCCESS" : "FAILURE";
+        int limit = toolOutputDisplayLimit(pending.tool());
+        sendTextDelta(guard, String.format("<tool_output status=\"%s\">%s</tool_output>", status,
+                AgentTagProtocol.escape(truncate(out, limit))));
+        appendBoundedExecutionLog(executionLog, String.format(
+                "<process name=\"%s\"><tool_code>%s(%s)</tool_code><tool_output status=\"%s\">%s</tool_output></process>\n",
+                name.replace("\"", "'"), pending.tool(), AgentTagProtocol.escape(truncate(pending.argsJson(), limit)),
+                status, AgentTagProtocol.escape(truncate(out, limit))));
+        return "[系统提醒] 用户已确认，已按原参数执行「" + name + "」（" + (r.success() ? "成功" : "失败")
+                + "）。结果：\n" + truncate(out, 4000) + "\n据此向用户汇报，不要再次执行这个操作。";
     }
 
     /** 过程卡里 ask_user 那一行的输出：给人看的一句话，不是工具回执。 */

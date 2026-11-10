@@ -262,7 +262,7 @@
   },
   {
     "id": "merge-doc-table-delete-col",
-    "title": "V4：删掉第 3 列 → doc_table_delete(axis=col)，destructive 单列不并入 insert",
+    "title": "V4：删掉第 3 列 → doc_table_delete(axis=col)，destructive 单列不并入 insert（destructive：P2-1 确认闸暂停，不执行）",
     "category": "tool-merge",
     "protocol": "native",
     "userInput": "把表格的第 3 列删掉",
@@ -282,29 +282,20 @@
             }
           }
         ]
-      },
-      {
-        "text": "<final>已完成。</final>"
       }
     ],
     "toolStubs": {
       "doc_table_delete": "{\"success\":true}"
     },
     "expect": {
-      "toolCalls": [
-        {
-          "name": "doc_table_delete",
-          "argsContain": {
-            "axis": "col",
-            "target": "3"
-          }
-        }
-      ],
       "offeredToolsInclude": [
         "doc_table_delete",
         "doc_table_insert"
       ],
-      "bubbleEndStatus": "finished"
+      "bubbleEndStatus": "awaiting_input",
+      "structureContains": [
+        "确认执行「"
+      ]
     }
   },
   {
@@ -458,7 +449,7 @@
   },
   {
     "id": "merge-pdf-delete-pages-stays-separate",
-    "title": "V4：删掉第 2 页仍走 pdf_delete_pages（destructive 不并入 op 枚举）",
+    "title": "V4：删掉第 2 页仍走 pdf_delete_pages（destructive 不并入 op 枚举）（destructive：P2-1 确认闸暂停，不执行）",
     "category": "tool-merge",
     "protocol": "native",
     "userInput": "把卷宗.pdf 的第 2 页删掉",
@@ -473,28 +464,20 @@
             }
           }
         ]
-      },
-      {
-        "text": "<final>已完成。</final>"
       }
     ],
     "toolStubs": {
       "pdf_delete_pages": "{\"status\":\"success\"}"
     },
     "expect": {
-      "toolCalls": [
-        {
-          "name": "pdf_delete_pages",
-          "argsContain": {
-            "ranges": "2"
-          }
-        }
-      ],
       "offeredToolsInclude": [
         "pdf_delete_pages",
         "pdf_pages"
       ],
-      "bubbleEndStatus": "finished"
+      "bubbleEndStatus": "awaiting_input",
+      "structureContains": [
+        "确认执行「"
+      ]
     }
   },
   {

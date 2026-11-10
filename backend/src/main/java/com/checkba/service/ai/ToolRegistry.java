@@ -591,11 +591,6 @@ public class ToolRegistry {
     private DeclaredToolBinding bind(PluginService.DeclaredTool declared) {
         PluginService.PluginToolInfo tool = declared.tool();
         String pluginId = declared.pluginId();
-        if (hostServices != null && "service".equals(tool.handlerType()) && isDestructive(tool)) {
-            log.info("Declared tool {} of plugin {} not registered: destructive declarative tools await confirmation gate (P2-1)",
-                    tool.getName(), pluginId);
-            return null;
-        }
         if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
                 || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
         try {
@@ -629,6 +624,27 @@ public class ToolRegistry {
         var h = tool.getHandler();
         return com.checkba.service.plugin.HostServiceRegistry.spec(h.getService(), h.getOperation())
                 .map(spec -> "destructive".equals(spec.access())).orElse(false);
+    }
+
+    /**
+     * 分发前是否必须先让用户确认（C5 / P2-1）：内置工具 access=DESTRUCTIVE；声明式插件工具 destructive
+     * 或 {@code confirm:always}。{@code confirm:never} 对 destructive 无效。插件 JAR @Tool 与 MCP 不在此列。
+     */
+    public boolean requiresConfirmation(String name) {
+        if (name == null) return false;
+        name = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        RegisteredTool builtin = builtinTools.get(name);
+        if (builtin != null) {
+            // 兼容壳（@ToolShim）本质是新工具的旧名：新工具要确认，壳也要
+            var shim = builtin.method() == null ? null
+                    : builtin.method().getAnnotation(com.checkba.service.ai.tools.ToolShim.class);
+            if (shim != null && !shim.replacedBy().equals(name) && requiresConfirmation(shim.replacedBy())) return true;
+            return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, builtin.meta())
+                    == ToolMeta.Access.DESTRUCTIVE;
+        }
+        DeclaredToolBinding declared = declaredBinding(name);
+        if (declared == null) return false;
+        return isDestructive(declared.tool()) || "always".equals(declared.tool().getConfirm());
     }
 
     DeclaredToolBinding declaredBinding(String name) {
@@ -672,6 +688,7 @@ public class ToolRegistry {
             String name = spec.name();
             RegisteredTool registered = builtinTools.get(name);
             ToolMeta meta = registered.meta();
+            if (registered.method() != null && registered.method().isAnnotationPresent(com.checkba.service.ai.tools.ToolShim.class)) continue;
             if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
                     || name.startsWith(MCP_METERED_PREFIX)
                     || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
@@ -686,6 +703,8 @@ public class ToolRegistry {
         for (DeclaredToolBinding b : declaredBindings()) {
             String name = b.specification().name();
             if (unusable.contains(name) || builtinTools.containsKey(name)) continue;
+            // 外部 Agent 答不了确认卡：需要确认的工具（destructive / confirm:always）无论 mcp:true 都不投影
+            if (requiresConfirmation(name)) continue;
             ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, b.tool().getAccess());
             Boolean mcp = b.tool().getMcp();
             boolean projected = access == ToolMeta.Access.READ ? !Boolean.FALSE.equals(mcp)
