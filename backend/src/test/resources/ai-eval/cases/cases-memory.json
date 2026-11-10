@@ -84,5 +84,146 @@
       "structureContains": ["<process", "<final>"],
       "bubbleEndStatus": "finished"
     }
+  },
+  {
+    "id": "remember-no-tool-nudged-native",
+    "title": "「记住」但模型只口头答已记录：补救一轮后调 save_memory（原生）",
+    "category": "memory",
+    "protocol": "native",
+    "userInput": "记住：客户偏好周五开会",
+    "turns": [
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "save_memory",
+            "arguments": {
+              "type": "preference",
+              "key": "客户开会偏好",
+              "value": "客户偏好周五开会",
+              "isProtected": false
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      }
+    ],
+    "toolStubs": {
+      "save_memory": "✓ 记忆已保存\n- 层级: L3\n- 类型: preference"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "save_memory",
+          "argsContain": {
+            "key": "客户开会偏好"
+          }
+        }
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-no-tool-nudged-xml",
+    "title": "「记住」但模型只口头答已记录：补救一轮后调 save_memory（XML）",
+    "category": "memory",
+    "protocol": "xml",
+    "userInput": "请记下客户偏好周五开会",
+    "turns": [
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      },
+      {
+        "text": "<process name=\"保存记忆\"><tool_code>save_memory(type=\"preference\", key=\"客户开会偏好\", value=\"客户偏好周五开会\", isProtected=false)</tool_code></process>"
+      },
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      }
+    ],
+    "toolStubs": {
+      "save_memory": "✓ 记忆已保存\n- 层级: L3\n- 类型: preference"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "save_memory",
+          "argsContain": {
+            "key": "客户开会偏好"
+          }
+        }
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-tool-first-no-nudge",
+    "title": "「记住」且模型先调 save_memory：不注入补救",
+    "category": "memory",
+    "protocol": "native",
+    "userInput": "记住：客户偏好周五开会",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "save_memory",
+            "arguments": {
+              "type": "preference",
+              "key": "客户开会偏好",
+              "value": "客户偏好周五开会",
+              "isProtected": false
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      }
+    ],
+    "toolStubs": {
+      "save_memory": "✓ 记忆已保存\n- 层级: L3\n- 类型: preference"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "save_memory",
+          "argsContain": {
+            "key": "客户开会偏好"
+          }
+        }
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-absent-no-nudge",
+    "title": "无「记住」措辞：直接收尾不注入补救",
+    "category": "memory",
+    "protocol": "native",
+    "userInput": "客户一般周几开会比较合适？",
+    "turns": [
+      {
+        "text": "<final>这个需要结合客户日程，建议先问对方助理。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
   }
 ]

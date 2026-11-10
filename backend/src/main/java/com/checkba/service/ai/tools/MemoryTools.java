@@ -61,7 +61,7 @@ public class MemoryTools implements AgentToolComponent {
      * 保存结构化记忆
      */
     @Tool("把需要长期保留的关键决策、结论、事实、法条引用、用户偏好存入记忆；与 query_memory 是「记一条 / 找一条」的默认入口。\n"
-            + "何时用：用户表达了跨项目的个人偏好、称谓、行文风格 → type=preference；用户拍板了项目决策，或经底稿/法规核实了核心事实、关键金额/日期 → scope=project 或 file，法条、金额、日期、拍板结论设 isProtected=true。\n"
+            + "何时用：用户说「记住/帮我记一下/以后都…/remember…」时必须调用本工具落盘，不能只口头答复已记录；用户表达了跨项目的个人偏好、称谓、行文风格 → type=preference；用户拍板了项目决策，或经底稿/法规核实了核心事实、关键金额/日期 → scope=project 或 file，法条、金额、日期、拍板结论设 isProtected=true。\n"
             + "何时不用：未经核实的单方陈述、闲聊、与既有记忆重复的内容。整理或编辑记忆文件本身（含团队/律所共享）用 memory_list / memory_read / memory_write。\n"
             + "value 首行写一句高密度结论摘要（成为 remember.md 总表钩子），换行写依据与适用条件。")
     @ToolMeta(displayName = "保存记忆", category = "memory")

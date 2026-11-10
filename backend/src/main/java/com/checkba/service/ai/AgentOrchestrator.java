@@ -343,7 +343,16 @@ public class AgentOrchestrator {
             if (success && ClientCapabilityService.isDocumentWritingTool(toolName)) {
                 documentEdited = true;
             }
+            if (success && ("save_memory".equals(toolName) || "memory_write".equals(toolName)
+                    || "update_project_info".equals(toolName))) {
+                memorySaved = true;
+            }
         }
+
+        /** 本轮是否已成功落盘记忆（save_memory / memory_write），供「记住」硬保险判定。 */
+        volatile boolean memorySaved;
+        /** 「记住」硬保险每轮最多补救一次。 */
+        boolean rememberNudged;
 
         boolean documentEdited() {
             return documentEdited;
@@ -1167,6 +1176,30 @@ public class AgentOrchestrator {
      * 分发一次工具调用并处理声明式副作用（文件变更通知、文件树刷新）。
      * 修改类工具（fileEffect=MODIFIED）执行前自动为活跃文档创建本轮检查点。
      */
+    private static final java.util.regex.Pattern REMEMBER_REQUEST = java.util.regex.Pattern.compile(
+            "记住|记一下|帮我记|请记下|\\b(?:note that|keep in mind)\\b"
+                    // remember 只认祈使句（句首/标点后/please 后），"Do you remember…" 是回忆提问不算
+                    + "|(?:^|[.!?;:,]\\s*|\\bplease,?\\s+)remember\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** 用户消息是否含明确的「记住」请求（中文子串匹配，英文按词边界）。 */
+    static boolean isExplicitRememberRequest(String userMessage) {
+        return userMessage != null && REMEMBER_REQUEST.matcher(userMessage).find();
+    }
+
+    /**
+     * 「记住」硬保险（回归：模型口头答「已记录」却没调 save_memory）：本轮要收尾、用户明确要求记住、
+     * 本轮又没成功落盘记忆时，返回一次性纠正提醒并置位；其余返回 null。每轮最多一次，不会循环。
+     */
+    static String rememberNudgeIfNeeded(RunGuard guard, AgentMode agentMode) {
+        if (guard == null || agentMode == AgentMode.ASK || guard.rememberNudged || guard.memorySaved
+                || !isExplicitRememberRequest(guard.userMessage)) {
+            return null;
+        }
+        guard.rememberNudged = true;
+        return "[系统提醒] 用户要求记住内容，但本轮尚未调用 save_memory；请先调用保存，再回答";
+    }
+
     /** ASK 只放内置只读集，外加插件声明的 read 工具（manifest tools[].access=read，规范 v2.13 §20）。 */
     private boolean askAllows(String toolName) {
         return ASK_READ_TOOLS.contains(toolName) || toolRegistry.declaredReadToolNames().contains(toolName);
@@ -3242,6 +3275,18 @@ public class AgentOrchestrator {
                 closeSse(guard);
                 endRun(guard);
                 return;
+            }
+
+            // 3.4 「记住」硬保险（原生与 XML 路径共用的无工具收尾点）：补救一轮，只一次
+            if (!summaryOnly) {
+                String rememberNudge = rememberNudgeIfNeeded(guard, agentMode);
+                if (rememberNudge != null) {
+                    log.warn("Remember request without save_memory in {}, injecting one corrective round", conversationId);
+                    messages.add(dev.langchain4j.data.message.UserMessage.from(rememberNudge));
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
             }
 
             // 4. Default: Loop Finished

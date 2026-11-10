@@ -111,6 +111,9 @@
     "turns": [
       {
         "text": "<final>好的。</final>"
+      },
+      {
+        "text": "<final>好的。</final>"
       }
     ],
     "expect": {
