@@ -829,7 +829,11 @@ public class ToolRegistry {
 
     /** Keep eligible specs registered; component readiness is checked when a new turn requests them. */
     private void registerBean(Object bean) {
-        for (Method method : bean.getClass().getDeclaredMethods()) {
+        // getDeclaredMethods() 的顺序 JVM 未规定；重名工具谁覆盖谁也取决于它，所以先定序
+        Method[] methods = bean.getClass().getDeclaredMethods();
+        java.util.Arrays.sort(methods, Comparator.comparing(Method::getName)
+                .thenComparing(m -> java.util.Arrays.toString(m.getParameterTypes())));
+        for (Method method : methods) {
             if (!method.isAnnotationPresent(Tool.class)) {
                 continue;
             }
@@ -980,6 +984,9 @@ public class ToolRegistry {
                 all.add(offerable(spec));
             }
         }
+        // 顺序只由规范序决定（见 ToolDisclosurePolicy#canonicalOrder），不取决于 bean 扫描 / 反射方法 / 插件加载顺序
+        if (disclosurePolicy != null) return disclosurePolicy.canonicalOrder(all);
+        all.sort(Comparator.comparing(ToolSpecification::name));
         return all;
     }
 
