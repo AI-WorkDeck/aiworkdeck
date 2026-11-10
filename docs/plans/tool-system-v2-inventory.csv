@@ -348,7 +348,7 @@ office_file,builtin,office_file,OFFICE-word,write,N,Y,3,327,45,zh,zh,new,office_
 pptx_outline,builtin,pptx,LOWA,write,N,Y,5,271,57,zh,zh,new,pptx_outline,slides,N,N,N,N,N,N,N,N,N,V4: merges pptx_generate_outline + pptx_refine_outline; action=create|refine
 move_files,builtin,files,ALL,write,N,Y,1,220,44,zh,zh,new,move_files,files,N,N,N,N,N,N,N,N,W,V4: renamed from move_files_batch; single move = array of 1; move_project_file stays as shim
 doc_compare,NEW,new,ALL,write,N,N,,,,,,new,doc_compare,files,N,N,N,N,N,N,N,N,N,D1 two-file redline compare; summary + redline docx
-deadline_compute,NEW,new,ALL,read,N,N,,,,,,new,deadline_compute,tasks,N,N,N,N,N,N,N,N,Y,D2 statutory deadline with holiday roll-forward; feeds task_create
+deadline_compute,builtin,task,ALL,read,N,Y,4,520,49,zh,zh,new,deadline_compute,tasks,N,N,N,N,N,N,N,N,Y,V7 D2: statutory deadline with holiday + make-up-workday roll-forward (bundled legal/cn-holidays-YYYY.json, no network); feeds task_create
 insight_entities,NEW,new,ALL,read,N,N,,,,,,new,insight_entities,plugin-tools,N,N,N,N,N,N,N,N,Y,D4 insight plugin declared tool: entity extraction of a file
 insight_consistency,NEW,new,ALL,read,N,N,,,,,,new,insight_consistency,plugin-tools,N,N,N,N,N,N,N,N,Y,D4 insight plugin declared tool: intra-document consistency check
 evidence_catalog,NEW,new,ALL,read,N,N,,,,,,new,evidence_catalog,evidence,N,N,N,N,N,N,N,N,Y,D6 structured evidence index of a folder (name/pages/hash/date)

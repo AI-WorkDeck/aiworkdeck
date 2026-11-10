@@ -41,6 +41,10 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 `ToolRegistry.requiresConfirmation(name)`：内置工具 `access=DESTRUCTIVE`（含按名推断），声明式插件工具 `destructive`/服务操作本身 destructive/`confirm:always`；`confirm:never` 对 destructive 无效。插件 JAR `@Tool` 与用户 MCP 不过闸。`AgentOrchestrator` 的原生与 XML 两条分发路径在 `dispatchTool` 之前调 `confirmationGate`：不分发，用 `DestructiveConfirmation.question` 生成 ask_user 卡（「确认执行「<展示名>」：<参数摘要>？」，选项 执行/取消，中英 LangText），走既有 `stopForAskUser`（AWAITING_INPUT，不新增状态），同批后续调用跳过。挂起的调用（工具名+原参数）经 `AgentInboxService.rememberPendingCall` 写进本轮请求快照（`_pendingCall*`，重启后仍在；未装配 inbox 的测试走内存兜底）。用户的回答是下一轮 `<ask_user_answer id>` 消息：`takePendingCall` 一次性取走，仅「单选执行/Run」时 `replayPendingCall` 以原参数直连 `dispatchTool` 执行一次（不再过闸，ASK 模式不重放），结果作末位 `[系统提醒]` 交给模型；其余答复（取消、其他自由输入、空）注入「用户取消了「X」」。每次都问，没有「本轮不再询问」。参数摘要 `summarizeArgs` 只给标识/数量并截断，`content/text/body…` 或超长字符串只报字数。声明式 destructive 工具因此恢复注册（此前被 bind 跳过）。MCP 投影仍永不含 destructive；凡 `requiresConfirmation` 为真的工具（destructive / `confirm:always`）一律不投影 MCP，哪怕声明 `mcp:true`（外部 Agent 答不了确认卡，`McpToolProjectionTest` 钉着）。回归 `AgentOrchestratorDestructiveConfirmTest`、`PluginDeclaredToolsTest`。
 
+## 期限计算工具（tool-system-v2 V7 D2）
+
+`deadline_compute(startDate, kind?, amount?, unit?)`（`DeadlineTools`，read / NONE / 类目 `task`，MCP 可投影）：起算当日不计入，按月/年取对应日（无则月末），最后一日遇周末或法定节假日顺延到下一个工作日（调休上班日算工作日）。节假日表是随包资源 `backend/src/main/resources/legal/cn-holidays-YYYY.json`（2024–2027，来自国办年度放假通知；字段 `holidays[{name,from,to}]` + `workdays[{name,date}]`），**每年国办通知发布后（通常 11 月）补下一年文件**；没有表的年份只按周末顺延，回执的「待核实」里会明说。`kind` 预设（上诉期判决15日/裁定10日、答辩期15日、举证期限15日、再审6个月、诉讼时效3年）只是默认值，回执一律标待核实。零出站请求。单测 `DeadlineToolsTest`；回放 `cases-tool-disclosure.json` 的 `deadline-*`；真实模型句集 `scripts/eval/sentences/v7-deadline.json`。
+
 ## 工具合并与兼容壳（tool-system-v2 V4，2026-11-09）
 
 22 族低歧义合并（45 个旧名）→ 新名下发，旧名转 **`@ToolShim` 兼容壳**。设计与逐名裁决见 `docs/plans/tool-system-v2.md` E 节与 `tool-system-v2-inventory.csv`（壳行 verdict=`shim→X`，新名行 verdict=`new`）。

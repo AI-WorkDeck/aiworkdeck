@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Kira tarikh akhir",
     "listAttachedFiles": "Senaraikan lampiran giliran ini",
     "office_ppt_add_image": "Sisipkan imej pada slaid",
     "office_ppt_add_chart": "Sisipkan carta pada slaid",

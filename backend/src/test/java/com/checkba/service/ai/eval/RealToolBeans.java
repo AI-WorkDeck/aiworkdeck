@@ -151,6 +151,7 @@ final class RealToolBeans {
                 ToolDiscoveryTools.class,
                 TagTools.class,
                 TaskTools.class,
+                com.checkba.service.ai.tools.DeadlineTools.class,
                 TencentMeetingTools.class,
                 TemplateTools.class,
                 WebTools.class,
