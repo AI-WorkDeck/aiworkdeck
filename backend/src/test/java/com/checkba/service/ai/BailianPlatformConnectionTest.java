@@ -98,12 +98,35 @@ class BailianPlatformConnectionTest {
         }
     }
 
+    @Test void catalogueRetriesTransientTimeoutWithoutRetryingCredentialRejection() {
+        PlatformAiChannel channel = mock(PlatformAiChannel.class);
+        when(channel.connection()).thenReturn(new PlatformAiKeyService.Resolved("awdai_a", "a", null, "bailian", BASE, "qwen3.8-flash"));
+        int[] transientCalls = {0};
+        PlatformModelCatalog recovered = new PlatformModelCatalog(channel, (method,url,key,body) -> {
+            transientCalls[0]++;
+            if (transientCalls[0] == 1) return new AccountTransport.Reply(AccountTransport.Reply.NETWORK_FAILURE, "");
+            return new AccountTransport.Reply(200, "{\"currency\":\"CNY\",\"models\":[{\"id\":\"qwen3.8-flash\",\"supportsTools\":true,\"inputPricePerMillion\":1,\"outputPricePerMillion\":2}]}");
+        }, "https://openrouter.ai/api/v1");
+        assertEquals("qwen3.8-flash", recovered.current().defaultModel());
+        assertEquals(2, transientCalls[0]);
+
+        int[] rejectedCalls = {0};
+        PlatformModelCatalog rejected = new PlatformModelCatalog(channel, (method,url,key,body) -> {
+            rejectedCalls[0]++;
+            return new AccountTransport.Reply(401, "{}");
+        }, "https://openrouter.ai/api/v1");
+        assertThrows(AccountException.class, rejected::current);
+        assertEquals(1, rejectedCalls[0]);
+    }
+
     @Test void unavailableCatalogueCannotBecomeEmptyFreeOrOpenRouterFallback() {
         PlatformAiChannel channel = mock(PlatformAiChannel.class);
         when(channel.connection()).thenReturn(new PlatformAiKeyService.Resolved("awdai_a", "a", null, "bailian", BASE, "qwen3.8-flash"));
+        int[] calls = {0};
         PlatformModelCatalog catalog = new PlatformModelCatalog(channel,
-                (method,url,key,body) -> new AccountTransport.Reply(503, "{}"), "https://openrouter.ai/api/v1");
+                (method,url,key,body) -> { calls[0]++; return new AccountTransport.Reply(503, "{}"); }, "https://openrouter.ai/api/v1");
         assertThrows(AccountException.class, catalog::current);
+        assertEquals(2, calls[0]);
     }
 
     @Test void internationalCircleGatewayAcceptsRestrictedGatewayTokenAndUsdCatalog() {

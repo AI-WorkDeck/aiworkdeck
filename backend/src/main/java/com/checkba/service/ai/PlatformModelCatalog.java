@@ -40,7 +40,11 @@ public class PlatformModelCatalog {
         String key = base + ":" + connection.fingerprint();
         Snapshot previous = cache.get(key);
         if (previous != null && previous.expiresAt() > System.currentTimeMillis()) return previous.catalog();
-        AccountTransport.Reply reply = transport.send("GET", base + "/models", connection.apiKey(), null);
+        AccountTransport.Reply reply = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            reply = transport.send("GET", base + "/models", connection.apiKey(), null);
+            if (!reply.networkFailure() && reply.status() != 502 && reply.status() != 503 && reply.status() != 504) break;
+        }
         if (reply.networkFailure() || reply.status() != 200) {
             throw new AccountException(AccountException.Kind.NETWORK,
                     LangText.of("模型目录暂时不可用，请稍后重试", "The model catalogue is temporarily unavailable. Retry shortly"));
