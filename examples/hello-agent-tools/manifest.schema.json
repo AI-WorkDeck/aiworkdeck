@@ -834,7 +834,7 @@
         },
         "keywords": {
           "type": "array",
-          "maxItems": 32,
+          "maxItems": 64,
           "items": {
             "type": "string",
             "minLength": 1,
