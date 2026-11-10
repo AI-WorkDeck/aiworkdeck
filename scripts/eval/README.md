@@ -123,6 +123,8 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
 - `sentences/core-17.json`：核心 17 句（读/找/改/批注/法条/记忆/新建）。V4 起期望里合并后的新名与旧名并列，可对拍合并前后两个 ref。
 - `sentences/v4-merged.json`：tool-system-v2 V4 合并工具专用 6 句（接受/拒绝修订、回复批注、表格插行、PDF 删页/抽页），夹具 `contract-commented.docx` / `contract-table.docx` / `dossier-24p.pdf`（`python3 fixtures/make_fixtures.py` 生成）。
 - `sentences/v5-meetings.json`：tool-system-v2 V5 会议合流专用 5 句（只看腾讯会议清单、整理纪要不指明来源、上周会议录音、昨天的逐字稿）。种子支持 `meetings`（写 `meeting_recording`）与 `tencentMeetings`（写内置同步表 `tencent_meeting_record`），都是虚构数据、`dayOffset` 相对今天；实例没有腾讯会议插件，tencent 来源走内置表，**绝不碰真实 tmeet 账号**。
+- `sentences/v7-compare.json`：tool-system-v2 V7 D1 两份 docx 比对专用 5 句（c01–c03 摘要，API 模式即可；c04–c05 编辑器宿主的修订对比稿，校验新 .docx 含 w:ins/w:del 且原件 sha256 不变），夹具 `compare-v1.docx` / `compare-v2.docx`（第三条付款期限、第五条违约金、新增第七条保密，第二条仅空白差异）；outcomeCheck 要求调用过 compare_docx_summary、回复点出三处改动、原件仍在且没有产生新文件（回复文本含工具输出，所以不做「不得提及未改动条款」的反向断言）。
+
 - `sentences/gate-35.json`：**回归门禁集 35 句** = core-17（原样）+ 18 个新句 g01–g18，覆盖真实律师工作流：合同审查加批注（g01）、条款插入（g02）、跨文件检索+概括（g03）、法条核对（g04，法宝在矩阵里不可用，接受「无法核实」路径，只要点出第 1082 条张冠李戴）、期限推算（g05，上诉期 2026-11-17）、同名项目歧义必须反问（g06）与点名项目不得反问且事项落在正确项目（g07）、会议录音清单（g08）、脱敏（g09，`requiresPlugin: desensitize`，实例没装就整句 SKIPPED）、删除文件夹走确认卡 `awaiting_input` 且文件夹仍在（g10）、表格改单元格（g11）、拒绝一处其余接受（g12）、记忆召回（g13）、指代不明该反问（g14）与信息已足不该反问（g15）、测试中出现过循环的「删除第三条」（g16，`maxRounds: 10`）、两句英文（g17 概括仲裁条款、g18 英文建提醒）。接受/拒绝全部修订、导出 PDF 已由 core-17 的 s06/s05/s16 覆盖；V4 的单条接受/拒绝、表格删行等在 `v4-merged.json`，不重复收进门禁。
 - `sentences/gate-35-en.json`：同一组期望与工具的**英文版**（`--profile intl` 默认）。夹具共用（内容仍是中国法下的虚构中文合同），文件/项目/文件夹名换成英文孪生名（`Contract.docx`、`Archive`、`Evidence`…），编辑器句子的宿主文件用 `hostFile: Contract.docx`；g17 额外检查回答是英文。cn 档位系统提示是中文，英文提问得到中文回答是产品现状，所以 gate-35 的 g17 只查内容。
 

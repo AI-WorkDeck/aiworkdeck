@@ -6,6 +6,7 @@
 // 用法与设计见 scripts/eval/README.md。密钥只从环境变量 OPENROUTER_API_KEY 读取，只传给子进程环境，从不打印、落盘。
 
 import { spawn, execFileSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import net from 'node:net'
@@ -532,6 +533,15 @@ async function runOne(inst, sentence, runIdx, opts) {
       files: () => inst.rows(`select id, name, parent_id, is_folder, is_deleted from project_file where project_id=${pid} order by id`),
       tasks: () => inst.rows(`select id, title, due_date, source from project_task where project_id=${pid} order by id`),
       memory: () => inst.rows('select memory_type, memory_key, memory_value, scope from memory_entry'),
+      // 二进制产物校验：下载项目文件字节、夹具 sha256、docx 的 word/document.xml
+      bytes: async id => Buffer.from(await (await fetch(`${inst.base}/api/files/${id}/download`, { headers: { 'X-Session-Id': inst.sid } })).arrayBuffer()),
+      sha256: buf => crypto.createHash('sha256').update(buf).digest('hex'),
+      fixtureSha256: name => crypto.createHash('sha256').update(fs.readFileSync(path.join(HERE, 'fixtures', name))).digest('hex'),
+      docxXml: buf => {
+        const tmp = path.join(os.tmpdir(), `matrix-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.docx`)
+        fs.writeFileSync(tmp, buf)
+        try { return execFileSync('unzip', ['-p', tmp, 'word/document.xml'], { maxBuffer: 64 << 20 }).toString('utf8') } finally { fs.unlinkSync(tmp) }
+      },
     }
     rec.checks = await judge(sentence, rec, ctx)
     rec.pass = rec.checks.pass

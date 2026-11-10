@@ -147,6 +147,9 @@ public class EditorBridgeService {
             Map.entry("export_pdf", 180),
             Map.entry("build_merge_draft", 180),
             Map.entry("build_comparison_document", 180),
+            // 宿主动作（agentClientActions.handleCompareDocxFiles）：取两份字节 + 隐藏引擎原生比较 + 导出 + 落盘，
+            // 比 build_comparison_document 多读写两段，给 240 秒；三处同表。
+            Map.entry("compare_docx_files", 240),
             // 整段插入类（dev-board#464）：一份十几页的报告经修订逐行落字远超 30s，
             // worker 那边照旧写完，后端却已经放弃等待。
             Map.entry("insert_at_cursor", 120),

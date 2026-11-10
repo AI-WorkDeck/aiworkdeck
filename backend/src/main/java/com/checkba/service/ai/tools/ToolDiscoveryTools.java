@@ -102,7 +102,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
     @ToolMeta(displayName = "查看工具目录", category = "agent")
     @Tool("查找本会话里存在、但不在当前工具清单中的工具，以及可用 use_skill 切换的专项技能。\n"
             + "何时用：告诉用户「做不了」之前先调它，能力常常就在这里。无参数时返回全部类目及其工具名，外加技能清单（便宜，先这样调）。\n"
-            + "类目：table、revision（含检查点恢复）、evidence、template、edit（光标选区、删除、改写段落）、files（含导出 PDF）、format（字体段落页面、目录、脚注、图片）、spreadsheet、slides、office、pdf、litigation、reference、memory、enterprise-data、legal、version（Git）、meeting、task、tag、plugin、python、plugin-tools、mcp、misc。\n"
+            + "类目：table、revision（含检查点恢复）、compare（比对两份 docx）、evidence、template、edit（光标选区、删除、改写段落）、files（含导出 PDF）、format（字体段落页面、目录、脚注、图片）、spreadsheet、slides、office、pdf、litigation、reference、memory、enterprise-data、legal、version（Git）、meeting、task、tag、plugin、python、plugin-tools、mcp、misc。\n"
             + "优先级 names > query > category。返回完整签名的工具从下一轮起进入常规清单；本轮立刻要用，写成 <tool_code>name(arg=\"value\")</tool_code>。")
     public String list_tools(
             @P(value = "要展开的类目，如 \"format\" 或 \"table,revision\"；省略则列出全部类目",

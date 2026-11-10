@@ -69,6 +69,7 @@
     "test:writing-desktop": "node tests/desktop-e2e/writing.mjs",
     "test:lowa-completion": "node tests/lowa-e2e/completion.mjs",
     "test:lowa-unit": "node --test tests/lowa-unit/*.test.mjs",
+    "test:lowa-comparison-contract": "node tests/lowa-e2e/comparison-contract-versions.mjs",
     "test:lowa-e2e": "node tests/lowa-e2e/run.mjs",
     "test:lowa-word-parity": "node tests/lowa-e2e/word-parity.mjs",
     "test:lowa-generated": "node tests/lowa-e2e/generated-docx.mjs",
