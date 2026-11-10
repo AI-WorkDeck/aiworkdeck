@@ -93,7 +93,7 @@ node scripts/eval/model-matrix.mjs \
 检查结果、最终回复、SSE 事件计数）、`report.md`（汇总 + 逐句对比 + 未通过明细 + 结论行
 `AFTER ≥ BEFORE on correctness for all models: yes/no`）、各实例后端日志 `backend-*.log`。
 
-tokens 来自后端 `token_usage` 表（按会话汇总）；轮数与每轮提供的工具数来自后端 `[Round]` 日志，工具序列来自编排器日志。
+tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / `cache_write_tokens`，旧 ref 没有这两列时缓存数记 0）；报告里 **计费等价 = 提示词 tokens − 0.9·缓存命中 tokens**（假设缓存读按输入价 0.1x，忽略缓存写溢价与输出价差，代理指标非账单）；**工具集变化轮数** = 与上一轮下发工具名集合不同的轮数，来自 `[Round]` 日志的 `toolsHash`（旧 ref 无此项记 `-`）；轮数与每轮提供的工具数来自后端 `[Round]` 日志，工具序列来自编排器日志。
 
 ## 句子集清单
 
