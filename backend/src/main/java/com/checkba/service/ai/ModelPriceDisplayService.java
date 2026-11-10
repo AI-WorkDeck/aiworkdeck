@@ -141,6 +141,12 @@ public class ModelPriceDisplayService {
     }
 
     private synchronized CompletableFuture<Snapshot> startFetch(String owner) {
+        // currentRate() 读 cached 与走到这里之间，上一次后台取数可能刚好完成并写入缓存（inflight 随即 isDone）；
+        // 不在锁内复核就会为同一份刚写好的结果再发一次出站请求。
+        Snapshot latest = cached;
+        if (latest != null && latest.freshFor(owner, System.currentTimeMillis())) {
+            return CompletableFuture.completedFuture(latest);
+        }
         if (inflight != null && owner.equals(inflight.owner()) && !inflight.future().isDone()) {
             return inflight.future();
         }

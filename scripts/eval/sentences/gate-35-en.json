@@ -1,0 +1,1057 @@
+{
+  "_comment": "gate-35 的英文版（--profile intl 默认句集）：同一组期望与工具，句子改写成自然英文；夹具共用（内容仍是中国法下的虚构中文合同），文件/项目/文件夹名换成英文孪生名。编辑器句子的宿主文件用 hostFile=Contract.docx。",
+  "sentences": [
+    {
+      "id": "s01-replace-all",
+      "text": "In Article 3, change every “甲方” (Party A) to “委托人” (Principal)",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_find_replace"
+        ],
+        "mustUse": [
+          [
+            "doc_find_replace",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s02-comment",
+      "text": "Add a comment to this contract: the liquidated damages are too high",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_add_comment"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s03-ask-arbitration",
+      "text": "Does this contract mention arbitration?",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "search_project_content",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph",
+          "doc_add_comment",
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s04-standard-format",
+      "text": "Apply the firm's standard formatting to the whole document",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "list_tools",
+          "use_skill",
+          "doc_apply_standard_format"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s05-export-pdf",
+      "text": "Export it as a PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_export_pdf"
+        ],
+        "mustUse": [
+          [
+            "doc_export_pdf"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s06-accept-all-revisions",
+      "text": "Accept all tracked changes",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_list_revisions",
+          "doc_accept_all_revisions",
+          "doc_revisions"
+        ],
+        "mustUse": [
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "doc_revisions"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s07-new-word",
+      "text": "Create a new Word document titled “Legal Opinion”",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "write_docx",
+          "search_project_files",
+          "list_project_folders",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "write_docx"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => !x.is_deleted && !x.is_folder && /legal.?opinion/i.test(x.name));"
+      }
+    },
+    {
+      "id": "s08-move-to-archive",
+      "text": "Move Contract.docx to the Archive folder",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "Archive"
+        ],
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "list_project_folders",
+          "search_project_files",
+          "move_files_batch",
+          "move_project_file",
+          "doc_list_project_files",
+          "move_files"
+        ],
+        "mustUse": [
+          [
+            "move_files_batch",
+            "move_project_file",
+            "move_files"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); const dir = f.find(x => x.is_folder && x.name === 'Archive'); const c = f.find(x => x.name === 'Contract.docx' && !x.is_deleted); return !!(dir && c && c.parent_id === dir.id);"
+      }
+    },
+    {
+      "id": "s09-who-mentions",
+      "text": "Which files in the project mention 张三 (Zhang San)?",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "Communication Log.docx",
+            "fixture": "mention-zhangsan.docx"
+          },
+          {
+            "name": "Meeting Notes.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_content",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "search_project_content",
+            "search_project_files"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "move_files_batch",
+          "write_docx",
+          "move_files"
+        ],
+        "outcomeCheck": "return /communication log/i.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "s10-deadlines-this-week",
+      "text": "What deadlines do I have this week?",
+      "hostState": "nofile",
+      "seed": {
+        "tasks": [
+          {
+            "title": "File the statement of defence",
+            "dueInDays": 1
+          },
+          {
+            "title": "Supplement the evidence list",
+            "dueInDays": 2
+          },
+          {
+            "title": "Annual review",
+            "dueInDays": 200
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_list"
+        ],
+        "mustUse": [
+          [
+            "task_list"
+          ]
+        ],
+        "mustNotUse": [
+          "task_create",
+          "ask_user",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "return /defen[cs]e/i.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "s11-remember",
+      "text": "Remember: the client prefers meetings on Fridays",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "save_memory"
+        ],
+        "mustUse": [
+          [
+            "save_memory"
+          ]
+        ],
+        "mustNotUse": [
+          "task_create",
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s12-civil-code-1082",
+      "text": "What does Article 1082 of the PRC Civil Code say?",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "get_law_article",
+          "law_search",
+          "search_web"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "task_create",
+          "save_memory"
+        ]
+      }
+    },
+    {
+      "id": "s13-new-folder",
+      "text": "Create a new folder called Evidence",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "create_folder",
+          "list_project_folders",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "create_folder"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.is_folder && x.name === 'Evidence' && !x.is_deleted);"
+      }
+    },
+    {
+      "id": "s14-delete-to-recycle-bin",
+      "text": "Delete Contract Draft.docx",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract Draft.docx",
+            "fixture": "contract-draft.docx"
+          },
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_files",
+          "list_project_folders",
+          "move_to_trash",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "move_to_trash"
+          ]
+        ],
+        "mustNotUse": [
+          "permanent_delete",
+          "delete_file_permanently"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.name === 'Contract Draft.docx'); const k = f.find(x => x.name === 'Contract.docx'); return !!(d && !d.is_deleted && k && !k.is_deleted);",
+        "status": "awaiting_input"
+      }
+    },
+    {
+      "id": "s15-recall-preference",
+      "text": "Do you remember the client preference I told you about last time?",
+      "hostState": "nofile",
+      "seed": {
+        "memory": [
+          {
+            "key": "Client preference",
+            "content": "The client prefers meetings on Fridays"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "query_memory",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "save_memory",
+          "task_create",
+          "write_docx"
+        ],
+        "outcomeCheck": "return /friday/i.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "s16-format-then-pdf",
+      "text": "Apply the firm's standard formatting and then export to PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "list_tools",
+          "use_skill",
+          "doc_apply_standard_format"
+        ],
+        "mustUse": [
+          [
+            "doc_export_pdf"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "s17-four-step",
+      "text": "First reword Article 3, then add a comment, then accept all tracked changes, and finally export to PDF",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "todo_write",
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_list_revisions",
+          "ask_user"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment",
+            "ask_user"
+          ],
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "ask_user",
+            "doc_revisions"
+          ],
+          [
+            "doc_export_pdf",
+            "ask_user"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g01-review-penalty",
+      "text": "Review the breach-of-contract liability clause in this contract and add comments",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_get_outline",
+          "use_skill",
+          "list_tools",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 16
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g02-insert-clause",
+      "text": "Insert a confidentiality clause before Article 5: both parties must keep this contract and any trade secrets learned in performance confidential for two years",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_get_outline",
+          "doc_insert_under_heading",
+          "doc_insert_at_cursor",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_insert_under_heading",
+            "doc_insert_at_cursor",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph",
+            "doc_insert_note",
+            "doc_insert_break"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 14
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g03-cross-file-penalty",
+      "text": "Which files in the project mention liquidated damages? Summarise how they are agreed",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "Communication Log.docx",
+            "fixture": "mention-zhangsan.docx"
+          },
+          {
+            "name": "Meeting Notes.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_content",
+          "search_project_files",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "search_project_content"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "write_docx",
+          "move_files",
+          "move_files_batch"
+        ],
+        "finalTextIncludes": [
+          "Contract"
+        ],
+        "outcomeCheck": "return /50\\s*%|fifty percent|half/i.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g04-check-citations",
+      "text": "Are the statutes cited in Opinion.docx correct?",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Opinion.docx",
+            "fixture": "opinion.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "法宝在矩阵实例里不可用，接受「无法核实」路径：只要求读了意见书、没有擅自改文件，并点出第1082条这处张冠李戴",
+        "firstToolAnyOf": [
+          "search_project_files",
+          "doc_list_project_files",
+          "extract_file_text",
+          "search_project_content",
+          "get_law_article",
+          "law_search",
+          "law_search_keyword",
+          "search_web"
+        ],
+        "mustUse": [
+          [
+            "extract_file_text",
+            "search_project_content",
+            "doc_get_document_text",
+            "read_document"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph"
+        ],
+        "outcomeCheck": "return /1082/.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g05-deadline-appeal",
+      "text": "A PRC first-instance civil judgment was served on us on 2 November 2026. When does the appeal period end?",
+      "hostState": "nofile",
+      "expect": {
+        "_note": "民事判决上诉期 15 日，送达当日不计，届满日 2026-11-17（周二，非节假日）；master 无 deadline_compute，模型自行推算也算对",
+        "firstToolAnyOf": [
+          "deadline_compute",
+          "get_law_article",
+          "law_search",
+          "law_search_keyword",
+          "search_web",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "task_create",
+          "write_docx",
+          "move_to_trash",
+          "save_memory"
+        ],
+        "outcomeCheck": "return /17(th)? November|November 17|Nov(\\.)? 17|17 Nov|2026-11-17/i.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g06-ambiguous-project",
+      "text": "Set up a reminder for the Xinghe Technology case: submit the evidence list next Wednesday",
+      "hostState": "nofile",
+      "seed": {
+        "projectName": "Xinghe Technology Sales Contract Dispute",
+        "otherProjects": [
+          {
+            "name": "Xinghe Technology Labour Dispute"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create",
+          "task_list",
+          "ask_user",
+          "search_across_projects",
+          "search_project_summaries"
+        ],
+        "mustUse": [
+          [
+            "ask_user"
+          ]
+        ],
+        "status": "awaiting_input",
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = await ctx.rows(\"select id from project_task where project_id in (select id from project where name like 'Xinghe Technology%')\"); return t.length === 0;"
+      }
+    },
+    {
+      "id": "g07-named-project-no-ask",
+      "text": "In the “Xinghe Technology Sales Contract Dispute” project, create a reminder for 18 November 2026: submit the evidence list",
+      "hostState": "nofile",
+      "seed": {
+        "projectName": "Xinghe Technology Sales Contract Dispute",
+        "otherProjects": [
+          {
+            "name": "Xinghe Technology Labour Dispute"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create"
+        ],
+        "mustUse": [
+          [
+            "task_create"
+          ]
+        ],
+        "mustNotUse": [
+          "ask_user",
+          "write_docx",
+          "move_to_trash"
+        ],
+        "status": "finished",
+        "outcomeCheck": "const t = await ctx.rows(\"select t.title, t.due_date::text as d, p.name from project_task t join project p on p.id = t.project_id where p.name = 'Xinghe Technology Sales Contract Dispute' and t.title ilike '%evidence%'\"); const other = await ctx.rows(\"select t.id from project_task t join project p on p.id = t.project_id where p.name = 'Xinghe Technology Labour Dispute'\"); return t.length === 1 && t[0].d.startsWith('2026-11-18') && other.length === 0;"
+      }
+    },
+    {
+      "id": "g08-meeting-list",
+      "text": "What meeting recordings do I have recently? List them",
+      "hostState": "nofile",
+      "seed": {
+        "meetings": [
+          {
+            "title": "Xinghe Technology settlement call",
+            "dayOffset": -1
+          },
+          {
+            "title": "Witness interview recording",
+            "dayOffset": -4
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "meeting_list",
+          "meeting_list_recordings",
+          "tmeet_list_meetings"
+        ],
+        "mustUse": [
+          [
+            "meeting_list",
+            "meeting_list_recordings",
+            "tmeet_list_meetings"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "write_docx",
+          "task_create"
+        ],
+        "finalTextIncludes": [
+          "settlement"
+        ]
+      }
+    },
+    {
+      "id": "g09-redact",
+      "text": "Redact the company names and personal names in Contract.docx",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "requiresPlugin": "desensitize",
+      "expect": {
+        "_note": "requiresPlugin：实例里没有 desensitize 插件时整句 SKIPPED",
+        "firstToolAnyOf": [
+          "desensitize_preview",
+          "desensitize_redact",
+          "search_project_files",
+          "doc_list_project_files",
+          "ask_user"
+        ],
+        "mustUse": [
+          [
+            "desensitize_preview",
+            "desensitize_redact"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "doc_find_replace",
+          "pdf_redact"
+        ]
+      }
+    },
+    {
+      "id": "g10-delete-folder-confirm",
+      "text": "Delete the whole Evidence folder",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "Evidence"
+        ],
+        "files": [
+          {
+            "name": "Contract Draft.docx",
+            "fixture": "contract-draft.docx",
+            "folder": "Evidence"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "删除走确认卡：本轮应停在 awaiting_input，文件夹此刻仍在",
+        "firstToolAnyOf": [
+          "list_project_folders",
+          "doc_list_project_files",
+          "search_project_files",
+          "move_to_trash"
+        ],
+        "mustUse": [
+          [
+            "move_to_trash"
+          ]
+        ],
+        "status": "awaiting_input",
+        "mustNotUse": [
+          "permanent_delete",
+          "delete_file_permanently"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.is_folder && x.name === 'Evidence' && !x.is_deleted) && f.some(x => x.name === 'Contract Draft.docx' && !x.is_deleted);"
+      }
+    },
+    {
+      "id": "g11-table-set-cell",
+      "text": "In the price table, change the unit price of the sensors (传感器) to 750",
+      "hostState": "docx:contract-table",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_table_read",
+          "doc_get_document_text",
+          "doc_find_text",
+          "doc_get_clauses"
+        ],
+        "mustUse": [
+          [
+            "doc_table_set_cell",
+            "doc_find_replace",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 12
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g12-reject-one-accept-rest",
+      "text": "Reject the first tracked change and accept all the others",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_list_revisions",
+          "doc_revisions",
+          "doc_reject_revision",
+          "doc_get_document_text"
+        ],
+        "mustUse": [
+          [
+            "doc_reject_revision",
+            "doc_revisions"
+          ],
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "doc_revisions"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 14
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g13-recall-style",
+      "text": "What are my requirements for document fonts?",
+      "hostState": "nofile",
+      "seed": {
+        "memory": [
+          {
+            "key": "Document font",
+            "content": "Statements of claim and defence: always size 16 FangSong (仿宋)"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "query_memory",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "save_memory",
+          "task_create",
+          "write_docx"
+        ],
+        "outcomeCheck": "return /fangsong|仿宋/i.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g14-vague-should-ask",
+      "text": "Can you take care of that contract for me?",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "Contract Draft.docx",
+            "fixture": "contract-draft.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "指代不明、动作不明，反问才是对的",
+        "firstToolAnyOf": [
+          "ask_user",
+          "doc_list_project_files",
+          "search_project_files",
+          "list_project_folders"
+        ],
+        "mustUse": [
+          [
+            "ask_user"
+          ]
+        ],
+        "status": "awaiting_input",
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "move_files",
+          "move_files_batch",
+          "create_folder",
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph"
+        ]
+      }
+    },
+    {
+      "id": "g15-enough-info-no-ask",
+      "text": "Create a folder called “Hearing Materials” and put Contract.docx in it",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "信息已经足够，反问才是错的",
+        "firstToolAnyOf": [
+          "create_folder",
+          "list_project_folders",
+          "doc_list_project_files",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "create_folder"
+          ],
+          [
+            "move_files",
+            "move_files_batch",
+            "move_project_file"
+          ]
+        ],
+        "mustNotUse": [
+          "ask_user",
+          "move_to_trash",
+          "write_docx"
+        ],
+        "status": "finished",
+        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.is_folder && x.name === 'Hearing Materials' && !x.is_deleted); const c = f.find(x => x.name === 'Contract.docx' && !x.is_deleted); return !!(d && c && c.parent_id === d.id);"
+      }
+    },
+    {
+      "id": "g16-delete-third-clause",
+      "text": "Delete Article 3",
+      "hostState": "docx:contract",
+      "expect": {
+        "_note": "测试中出现过循环的编辑器句子：maxRounds 防空转；删除或带理由的反问都算合理",
+        "firstToolAnyOf": [
+          "doc_get_clauses",
+          "doc_get_document_text",
+          "doc_find_text",
+          "doc_get_outline",
+          "doc_select_paragraph",
+          "doc_select_anchor",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph",
+            "doc_delete_selection",
+            "doc_find_replace",
+            "doc_replace_selection",
+            "ask_user"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 10
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g17-en-summarise-arbitration",
+      "text": "Please summarise the arbitration clause in Contract.docx",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "Contract.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_files",
+          "search_project_content",
+          "doc_list_project_files",
+          "extract_file_text"
+        ],
+        "mustUse": [
+          [
+            "extract_file_text",
+            "search_project_content",
+            "doc_get_document_text",
+            "read_document"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = ctx.finalText; const cjk = (t.match(/[\\u4e00-\\u9fff]/g) || []).length; return /arbitra/i.test(t) && cjk / Math.max(t.length, 1) < 0.3;",
+        "_note": "cn 档位系统提示是中文，英文提问得到中文回答是产品现状，所以这里只查内容；回答语言检查放在 gate-35-en.json"
+      }
+    },
+    {
+      "id": "g18-en-reminder",
+      "text": "Remind me on 2026-12-01 to file the opposition brief",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create",
+          "task_list",
+          "list_tools",
+          "use_skill"
+        ],
+        "mustUse": [
+          [
+            "task_create"
+          ]
+        ],
+        "mustNotUse": [
+          "ask_user",
+          "save_memory",
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = await ctx.tasks(); return t.some(x => String(x.due_date).startsWith('2026-12-01'));"
+      }
+    }
+  ]
+}

@@ -540,7 +540,15 @@ class LocalProjectServiceTest {
             long start = System.currentTimeMillis();
             long deadline = start + 30000;
             boolean found = false;
+            int touches = 0;
             while (System.currentTimeMillis() < deadline) {
+                // ensureWatch 返回时事件流未必已就绪，就绪前的写入只成为基线、不产生事件；
+                // 每 2 秒再碰一次 b.txt 的 mtime，让就绪后的事件一定能到（对账幂等，多触发无害）。
+                if (!found && (System.currentTimeMillis() - start) / 2000 > touches) {
+                    touches++;
+                    Files.setLastModifiedTime(folder.resolve("b.txt"),
+                            java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + touches));
+                }
                 found = projectFileRepository.findByProjectId(projectId).stream()
                         .anyMatch(f -> "b.txt".equals(f.getName()) && !Boolean.TRUE.equals(f.getIsDeleted()));
                 if (found) break;

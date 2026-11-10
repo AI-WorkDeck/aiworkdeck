@@ -1,0 +1,1052 @@
+{
+  "_comment": "门禁集 gate-35 = core-17（原样）+ 18 个新句（g01–g18，覆盖合同审查/条款插入/跨文件检索/法条核对/期限推算/项目歧义反问/按名建事项/会议/脱敏/删除确认卡/表格/修订/记忆/反问对错各一/循环句/英文）。校准依据与已知失败见 README。g09 需要实例里装有 desensitize 插件（requiresPlugin），否则整句 SKIPPED。expect.maxRounds 为新增的轮数上限检查。",
+  "sentences": [
+    {
+      "id": "s01-replace-all",
+      "text": "把第三条里的『甲方』全部改成『委托人』",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_find_replace"
+        ],
+        "mustUse": [
+          [
+            "doc_find_replace",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s02-comment",
+      "text": "给这份合同加一个批注：违约金过高",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_add_comment"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s03-ask-arbitration",
+      "text": "这份合同里有没有提到仲裁？",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "search_project_content",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph",
+          "doc_add_comment",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s04-standard-format",
+      "text": "把全文统一成律所标准格式",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "list_tools",
+          "use_skill",
+          "doc_apply_standard_format"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s05-export-pdf",
+      "text": "导出成PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_export_pdf"
+        ],
+        "mustUse": [
+          [
+            "doc_export_pdf"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s06-accept-all-revisions",
+      "text": "接受所有修订",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_list_revisions",
+          "doc_accept_all_revisions",
+          "doc_revisions"
+        ],
+        "mustUse": [
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "doc_revisions"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s07-new-word",
+      "text": "新建一份Word文档，标题是『法律意见书』",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "write_docx",
+          "search_project_files",
+          "list_project_folders",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "write_docx"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => !x.is_deleted && !x.is_folder && /法律意见书/.test(x.name));"
+      }
+    },
+    {
+      "id": "s08-move-to-archive",
+      "text": "把合同.docx移到归档文件夹",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "归档"
+        ],
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "list_project_folders",
+          "search_project_files",
+          "move_files_batch",
+          "move_project_file",
+          "doc_list_project_files",
+          "move_files"
+        ],
+        "mustUse": [
+          [
+            "move_files_batch",
+            "move_project_file",
+            "move_files"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); const dir = f.find(x => x.is_folder && x.name === '归档'); const c = f.find(x => x.name === '合同.docx' && !x.is_deleted); return !!(dir && c && c.parent_id === dir.id);"
+      }
+    },
+    {
+      "id": "s09-who-mentions",
+      "text": "项目里哪些文件提到了张三？",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "沟通记录.docx",
+            "fixture": "mention-zhangsan.docx"
+          },
+          {
+            "name": "会议纪要.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_content",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "search_project_content",
+            "search_project_files"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "move_files_batch",
+          "write_docx",
+          "move_files"
+        ],
+        "finalTextIncludes": [
+          "沟通记录"
+        ]
+      }
+    },
+    {
+      "id": "s10-deadlines-this-week",
+      "text": "我这周有哪些截止事项",
+      "hostState": "nofile",
+      "seed": {
+        "tasks": [
+          {
+            "title": "提交答辩状",
+            "dueInDays": 1
+          },
+          {
+            "title": "补充证据清单",
+            "dueInDays": 2
+          },
+          {
+            "title": "明年复盘",
+            "dueInDays": 200
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_list"
+        ],
+        "mustUse": [
+          [
+            "task_list"
+          ]
+        ],
+        "mustNotUse": [
+          "task_create",
+          "ask_user",
+          "move_to_trash"
+        ],
+        "finalTextIncludes": [
+          "答辩状"
+        ]
+      }
+    },
+    {
+      "id": "s11-remember",
+      "text": "记住：客户偏好周五开会",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "save_memory"
+        ],
+        "mustUse": [
+          [
+            "save_memory"
+          ]
+        ],
+        "mustNotUse": [
+          "task_create",
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s12-civil-code-1082",
+      "text": "民法典第1082条是什么",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "get_law_article",
+          "law_search",
+          "search_web"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "task_create",
+          "save_memory"
+        ]
+      }
+    },
+    {
+      "id": "s13-new-folder",
+      "text": "新建一个文件夹叫证据",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "create_folder",
+          "list_project_folders",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "create_folder"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.is_folder && x.name === '证据' && !x.is_deleted);"
+      }
+    },
+    {
+      "id": "s14-delete-to-recycle-bin",
+      "text": "把合同草稿.docx删了",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同草稿.docx",
+            "fixture": "contract-draft.docx"
+          },
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_files",
+          "list_project_folders",
+          "move_to_trash",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "move_to_trash"
+          ]
+        ],
+        "mustNotUse": [
+          "permanent_delete",
+          "delete_file_permanently"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.name === '合同草稿.docx'); const k = f.find(x => x.name === '合同.docx'); return !!(d && !d.is_deleted && k && !k.is_deleted);",
+        "status": "awaiting_input"
+      }
+    },
+    {
+      "id": "s15-recall-preference",
+      "text": "你还记得我上次说的客户偏好吗",
+      "hostState": "nofile",
+      "seed": {
+        "memory": [
+          {
+            "key": "客户偏好",
+            "content": "客户偏好周五开会"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "query_memory",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "save_memory",
+          "task_create",
+          "write_docx"
+        ],
+        "finalTextIncludes": [
+          "周五"
+        ]
+      }
+    },
+    {
+      "id": "s16-format-then-pdf",
+      "text": "统一成律所格式然后导出PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "list_tools",
+          "use_skill",
+          "doc_apply_standard_format"
+        ],
+        "mustUse": [
+          [
+            "doc_export_pdf"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "s17-four-step",
+      "text": "先把第三条改一下措辞，再加批注，再接受所有修订，最后导出PDF",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "todo_write",
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_list_revisions",
+          "ask_user"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment",
+            "ask_user"
+          ],
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "ask_user",
+            "doc_revisions"
+          ],
+          [
+            "doc_export_pdf",
+            "ask_user"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ]
+      }
+    },
+    {
+      "id": "g01-review-penalty",
+      "text": "审查这份合同的违约责任条款并加批注",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_get_outline",
+          "use_skill",
+          "list_tools",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_add_comment"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 16
+      }
+    },
+    {
+      "id": "g02-insert-clause",
+      "text": "在第五条前面加一条保密条款：双方对本合同内容及履行中知悉的商业秘密负有保密义务，期限两年",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_get_outline",
+          "doc_insert_under_heading",
+          "doc_insert_at_cursor",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_insert_under_heading",
+            "doc_insert_at_cursor",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph",
+            "doc_insert_note",
+            "doc_insert_break"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 14
+      }
+    },
+    {
+      "id": "g03-cross-file-penalty",
+      "text": "项目里哪些文件提到了违约金？帮我概括一下是怎么约定的",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "沟通记录.docx",
+            "fixture": "mention-zhangsan.docx"
+          },
+          {
+            "name": "会议纪要.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_content",
+          "search_project_files",
+          "doc_list_project_files"
+        ],
+        "mustUse": [
+          [
+            "search_project_content"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "write_docx",
+          "move_files",
+          "move_files_batch"
+        ],
+        "finalTextIncludes": [
+          "合同"
+        ],
+        "outcomeCheck": "return /50\\s*%|百分之五十|五成/.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g04-check-citations",
+      "text": "意见书.docx 引用的法条对吗？",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "意见书.docx",
+            "fixture": "opinion.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "法宝在矩阵实例里不可用，接受「无法核实」路径：只要求读了意见书、没有擅自改文件，并点出第1082条这处张冠李戴",
+        "firstToolAnyOf": [
+          "search_project_files",
+          "doc_list_project_files",
+          "extract_file_text",
+          "search_project_content",
+          "get_law_article",
+          "law_search",
+          "law_search_keyword",
+          "search_web"
+        ],
+        "mustUse": [
+          [
+            "extract_file_text",
+            "search_project_content",
+            "doc_get_document_text",
+            "read_document"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph"
+        ],
+        "outcomeCheck": "return /1082|一千零八十二/.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g05-deadline-appeal",
+      "text": "一审判决书2026年11月2日送达我方，上诉期到哪天？",
+      "hostState": "nofile",
+      "expect": {
+        "_note": "民事判决上诉期 15 日，送达当日不计，届满日 2026-11-17（周二，非节假日）；master 无 deadline_compute，模型自行推算也算对",
+        "firstToolAnyOf": [
+          "deadline_compute",
+          "get_law_article",
+          "law_search",
+          "law_search_keyword",
+          "search_web",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "task_create",
+          "write_docx",
+          "move_to_trash",
+          "save_memory"
+        ],
+        "outcomeCheck": "return /11月17日|11月17号|2026-11-17|11\\/17/.test(ctx.finalText);"
+      }
+    },
+    {
+      "id": "g06-ambiguous-project",
+      "text": "给星河科技那个案子建个提醒：下周三交证据清单",
+      "hostState": "nofile",
+      "seed": {
+        "projectName": "星河科技买卖合同纠纷",
+        "otherProjects": [
+          {
+            "name": "星河科技劳动争议"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create",
+          "task_list",
+          "ask_user",
+          "search_across_projects",
+          "search_project_summaries"
+        ],
+        "mustUse": [
+          [
+            "ask_user"
+          ]
+        ],
+        "status": "awaiting_input",
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = await ctx.rows(\"select id from project_task where project_id in (select id from project where name like '星河科技%')\"); return t.length === 0;"
+      }
+    },
+    {
+      "id": "g07-named-project-no-ask",
+      "text": "在「星河科技买卖合同纠纷」这个项目里建一条提醒：2026年11月18日交证据清单",
+      "hostState": "nofile",
+      "seed": {
+        "projectName": "星河科技买卖合同纠纷",
+        "otherProjects": [
+          {
+            "name": "星河科技劳动争议"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create"
+        ],
+        "mustUse": [
+          [
+            "task_create"
+          ]
+        ],
+        "mustNotUse": [
+          "ask_user",
+          "write_docx",
+          "move_to_trash"
+        ],
+        "status": "finished",
+        "outcomeCheck": "const t = await ctx.rows(\"select t.title, t.due_date::text as d, p.name from project_task t join project p on p.id = t.project_id where p.name = '星河科技买卖合同纠纷' and t.title like '%证据%'\"); const other = await ctx.rows(\"select t.id from project_task t join project p on p.id = t.project_id where p.name = '星河科技劳动争议'\"); return t.length === 1 && t[0].d.startsWith('2026-11-18') && other.length === 0;"
+      }
+    },
+    {
+      "id": "g08-meeting-list",
+      "text": "最近有哪些会议录音？列一下",
+      "hostState": "nofile",
+      "seed": {
+        "meetings": [
+          {
+            "title": "星河科技和解沟通会",
+            "dayOffset": -1
+          },
+          {
+            "title": "证人访谈录音",
+            "dayOffset": -4
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "meeting_list",
+          "meeting_list_recordings",
+          "tmeet_list_meetings"
+        ],
+        "mustUse": [
+          [
+            "meeting_list",
+            "meeting_list_recordings",
+            "tmeet_list_meetings"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash",
+          "write_docx",
+          "task_create"
+        ],
+        "finalTextIncludes": [
+          "和解沟通会"
+        ]
+      }
+    },
+    {
+      "id": "g09-redact",
+      "text": "把合同.docx里的公司名和人名脱敏",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "requiresPlugin": "desensitize",
+      "expect": {
+        "_note": "requiresPlugin：实例里没有 desensitize 插件时整句 SKIPPED",
+        "firstToolAnyOf": [
+          "desensitize_preview",
+          "desensitize_redact",
+          "search_project_files",
+          "doc_list_project_files",
+          "ask_user"
+        ],
+        "mustUse": [
+          [
+            "desensitize_preview",
+            "desensitize_redact"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "doc_find_replace",
+          "pdf_redact"
+        ]
+      }
+    },
+    {
+      "id": "g10-delete-folder-confirm",
+      "text": "把证据文件夹整个删掉",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "证据"
+        ],
+        "files": [
+          {
+            "name": "合同草稿.docx",
+            "fixture": "contract-draft.docx",
+            "folder": "证据"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "删除走确认卡：本轮应停在 awaiting_input，文件夹此刻仍在",
+        "firstToolAnyOf": [
+          "list_project_folders",
+          "doc_list_project_files",
+          "search_project_files",
+          "move_to_trash"
+        ],
+        "mustUse": [
+          [
+            "move_to_trash"
+          ]
+        ],
+        "status": "awaiting_input",
+        "mustNotUse": [
+          "permanent_delete",
+          "delete_file_permanently"
+        ],
+        "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.is_folder && x.name === '证据' && !x.is_deleted) && f.some(x => x.name === '合同草稿.docx' && !x.is_deleted);"
+      }
+    },
+    {
+      "id": "g11-table-set-cell",
+      "text": "把价目表里传感器的单价改成 750",
+      "hostState": "docx:contract-table",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_table_read",
+          "doc_get_document_text",
+          "doc_find_text",
+          "doc_get_clauses"
+        ],
+        "mustUse": [
+          [
+            "doc_table_set_cell",
+            "doc_find_replace",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 12
+      }
+    },
+    {
+      "id": "g12-reject-one-accept-rest",
+      "text": "拒绝第一处修订，其余的都接受",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_list_revisions",
+          "doc_revisions",
+          "doc_reject_revision",
+          "doc_get_document_text"
+        ],
+        "mustUse": [
+          [
+            "doc_reject_revision",
+            "doc_revisions"
+          ],
+          [
+            "doc_accept_all_revisions",
+            "doc_accept_revision",
+            "doc_revisions"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 14
+      }
+    },
+    {
+      "id": "g13-recall-style",
+      "text": "我对文书字体有什么要求？",
+      "hostState": "nofile",
+      "seed": {
+        "memory": [
+          {
+            "key": "文书字体",
+            "content": "起诉状、答辩状一律用三号仿宋"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "query_memory",
+          "<none>"
+        ],
+        "mustUse": [],
+        "mustNotUse": [
+          "save_memory",
+          "task_create",
+          "write_docx"
+        ],
+        "finalTextIncludes": [
+          "仿宋"
+        ]
+      }
+    },
+    {
+      "id": "g14-vague-should-ask",
+      "text": "帮我处理一下那个合同",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "合同草稿.docx",
+            "fixture": "contract-draft.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "指代不明、动作不明，反问才是对的",
+        "firstToolAnyOf": [
+          "ask_user",
+          "doc_list_project_files",
+          "search_project_files",
+          "list_project_folders"
+        ],
+        "mustUse": [
+          [
+            "ask_user"
+          ]
+        ],
+        "status": "awaiting_input",
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash",
+          "move_files",
+          "move_files_batch",
+          "create_folder",
+          "doc_find_replace",
+          "doc_replace_at_anchor",
+          "doc_modify_paragraph"
+        ]
+      }
+    },
+    {
+      "id": "g15-enough-info-no-ask",
+      "text": "新建一个文件夹叫「庭审材料」，把合同.docx放进去",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "信息已经足够，反问才是错的",
+        "firstToolAnyOf": [
+          "create_folder",
+          "list_project_folders",
+          "doc_list_project_files",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "create_folder"
+          ],
+          [
+            "move_files",
+            "move_files_batch",
+            "move_project_file"
+          ]
+        ],
+        "mustNotUse": [
+          "ask_user",
+          "move_to_trash",
+          "write_docx"
+        ],
+        "status": "finished",
+        "outcomeCheck": "const f = await ctx.files(); const d = f.find(x => x.is_folder && x.name === '庭审材料' && !x.is_deleted); const c = f.find(x => x.name === '合同.docx' && !x.is_deleted); return !!(d && c && c.parent_id === d.id);"
+      }
+    },
+    {
+      "id": "g16-delete-third-clause",
+      "text": "删除第三条",
+      "hostState": "docx:contract",
+      "expect": {
+        "_note": "测试中出现过循环的编辑器句子：maxRounds 防空转；删除或带理由的反问都算合理",
+        "firstToolAnyOf": [
+          "doc_get_clauses",
+          "doc_get_document_text",
+          "doc_find_text",
+          "doc_get_outline",
+          "doc_select_paragraph",
+          "doc_select_anchor",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph",
+            "doc_delete_selection",
+            "doc_find_replace",
+            "doc_replace_selection",
+            "ask_user"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 10
+      }
+    },
+    {
+      "id": "g17-en-summarise-arbitration",
+      "text": "Please summarise the arbitration clause in 合同.docx",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "search_project_files",
+          "search_project_content",
+          "doc_list_project_files",
+          "extract_file_text"
+        ],
+        "mustUse": [
+          [
+            "extract_file_text",
+            "search_project_content",
+            "doc_get_document_text",
+            "read_document"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "return /arbitra|仲裁/i.test(ctx.finalText);",
+        "_note": "cn 档位系统提示是中文，英文提问得到中文回答是产品现状，所以这里只查内容；回答语言检查放在 gate-35-en.json"
+      }
+    },
+    {
+      "id": "g18-en-reminder",
+      "text": "Remind me on 2026-12-01 to file the opposition brief",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create",
+          "task_list",
+          "list_tools",
+          "use_skill"
+        ],
+        "mustUse": [
+          [
+            "task_create"
+          ]
+        ],
+        "mustNotUse": [
+          "ask_user",
+          "save_memory",
+          "write_docx",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = await ctx.tasks(); return t.some(x => String(x.due_date).startsWith('2026-12-01'));"
+      }
+    }
+  ]
+}
