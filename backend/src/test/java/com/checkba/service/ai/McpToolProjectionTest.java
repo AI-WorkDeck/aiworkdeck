@@ -105,6 +105,17 @@ class McpToolProjectionTest {
     }
 
     @Test
+    void toolsRequiringConfirmationAreNeverProjectedEvenWithMcpTrue() throws IOException {
+        // 外部 Agent 答不了确认卡：confirm:always 的写工具即使 mcp:true 也不投影
+        String m = manifest.replace("\"permissions\": [\"tasks\"]\n    }\n  ],",
+                "\"permissions\": [\"tasks\"],\n      \"mcp\": true,\n      \"confirm\": \"always\"\n    }\n  ],");
+        assertNotEquals(manifest, m);
+        install(m);
+        assertFalse(names().contains("hello_agent_tools_add_task"), names().toString());
+        assertTrue(names().contains("hello_agent_tools_list_tasks"));
+    }
+
+    @Test
     void callRunsRegistryWithProjectPermission() throws IOException {
         install(manifest);
         when(tasks.listForUser(7L, null, null)).thenReturn(List.of(Map.of("id", 1, "title", "举证期限")));

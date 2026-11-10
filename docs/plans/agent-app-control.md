@@ -192,7 +192,7 @@
 
 | PR | 范围 | 标记 |
 |---|---|---|
-| P2-1 destructive 确认：编排器拦截 + `ask_user` 卡复用 + 重放；`confirm:always` | [设] |
+| P2-1 destructive 确认：编排器拦截 + `ask_user` 卡复用 + 重放；`confirm:always` | [已做] |
 | P2-2 `write_docx` 覆盖保护（已有文件 → 副本或拒绝） | [机] |
 | P2-3 `HostServiceRegistry` 加 lawfirm（只读 + 台账查询）、im（只读）、sensitive 写路径；desensitize/search/lawfirm 三插件声明工具 | [机] |
 | P2-4 connection 型 handler（插件自有 HTTPS 服务工具） | [设] |
