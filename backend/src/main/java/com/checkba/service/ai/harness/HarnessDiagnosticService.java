@@ -61,10 +61,6 @@ public class HarnessDiagnosticService {
             "office_replace_text", "office_replace_batch", "sheet_find_replace",
             "slide_replace_text", "office_ppt_replace_text");
 
-    private static final Set<String> SEARCH_LOOKUP_TOOLS = Set.of(
-            "search_project_files", "search_project_content", "law_search",
-            "law_search_keyword", "get_law_article", "extract_file_text", "ref_read");
-
     /**
      * 一次运行期自愈动作的结构化记录（同时作为 SSE {@code harness_adaptation} 的载荷）。
      */
@@ -132,10 +128,7 @@ public class HarnessDiagnosticService {
         }
         String safeTool = failedToolName == null ? "" : failedToolName.trim();
         String safeResult = resultText == null ? "" : resultText;
-        String combinedContext = (userInstruction == null ? "" : userInstruction)
-                + " " + (toolArgsSummary == null ? "" : toolArgsSummary)
-                + " " + safeResult;
-
+        // 技能挂载与类目展开只看用户指令+工具参数：工具输出（网页/文档正文）可被第三方控制，不得驱动挂载
         String hintContext = (userInstruction == null ? "" : userInstruction)
                 + " " + (toolArgsSummary == null ? "" : toolArgsSummary);
 
@@ -220,7 +213,7 @@ public class HarnessDiagnosticService {
         }
 
         // 3. DOMAIN 层：检查任务上下文是否命中尚未激活的领域 Skill，动态挂载其领域指引与白名单类目
-        Optional<SkillDefinition> matchedDomainSkill = findUnactivatedDomainSkill(runId, combinedContext);
+        Optional<SkillDefinition> matchedDomainSkill = findUnactivatedDomainSkill(runId, hintContext);
         if (matchedDomainSkill.isPresent()
                 && !alreadyTriggered(existingAdaptations, ACTION_MOUNT_DOMAIN_SKILL, matchedDomainSkill.get().getId())) {
             SkillDefinition skill = matchedDomainSkill.get();
@@ -263,9 +256,9 @@ public class HarnessDiagnosticService {
                     System.currentTimeMillis()));
         }
 
-        // 4. DOMAIN 层：连续检索/查找无结果或累计失败 >= 2 次时，处方立即向用户澄清而非盲猜
+        // 4. DOMAIN 层：连续检索/查找无结果或累计失败 >= 2 次时（所有工具一视同仁，首次未命中不触发），处方立即向用户澄清而非盲猜
         // 供应商不可用（上游 MCP 报错）不是盲猜关键词，让用户补材料没用，不触发
-        if ((SEARCH_LOOKUP_TOOLS.contains(safeTool) || consecutiveFailures >= 2)
+        if (consecutiveFailures >= 2
                 && !isToolUnavailable(safeResult) && !isPermissionDenied(safeResult)
                 && !alreadyTriggered(existingAdaptations, ACTION_CLARIFY_WITH_USER, safeTool)) {
             String title = LangText.of(

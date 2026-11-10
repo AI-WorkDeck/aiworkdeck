@@ -114,6 +114,7 @@ async function judge(sentence, rec, ctx) {
   }
   if (e.mustUse?.length) r.mustUse = e.mustUse.every(g => anyOf(g, rec.tools))
   if (e.mustNotUse?.length) r.mustNotUse = !anyOf(e.mustNotUse, rec.tools)
+  if (e.status) r.status = rec.status === e.status // 可选：要求本轮以指定状态结束（如 finished = 没有停在确认卡）
   if (e.finalTextIncludes?.length) r.finalText = e.finalTextIncludes.every(t => (rec.finalText || '').includes(t))
   if (e.outcomeCheck) {
     try {
@@ -121,7 +122,7 @@ async function judge(sentence, rec, ctx) {
       r.outcome = !!(await fn(ctx))
     } catch (err) { r.outcome = false; r.outcomeError = String(err.message || err).slice(0, 200) }
   }
-  const checks = Object.entries(r).filter(([k]) => ['firstTool', 'mustUse', 'mustNotUse', 'finalText', 'outcome'].includes(k))
+  const checks = Object.entries(r).filter(([k]) => ['firstTool', 'mustUse', 'mustNotUse', 'status', 'finalText', 'outcome'].includes(k))
   r.pass = (rec.status === 'finished' || rec.status === 'awaiting_input') && checks.every(([, v]) => v === true)
   return r
 }

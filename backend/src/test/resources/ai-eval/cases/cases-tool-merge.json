@@ -449,7 +449,7 @@
   },
   {
     "id": "merge-pdf-delete-pages-stays-separate",
-    "title": "V4：删掉第 2 页仍走 pdf_delete_pages（destructive 不并入 op 枚举）（destructive：P2-1 确认闸暂停，不执行）",
+    "title": "V4：删掉第 2 页仍走 pdf_delete_pages（删页产出新 PDF、原件不动，显式 WRITE，不弹确认卡）",
     "category": "tool-merge",
     "protocol": "native",
     "userInput": "把卷宗.pdf 的第 2 页删掉",
@@ -464,20 +464,28 @@
             }
           }
         ]
+      },
+      {
+        "text": "<final>已完成。</final>"
       }
     ],
     "toolStubs": {
       "pdf_delete_pages": "{\"status\":\"success\"}"
     },
     "expect": {
+      "toolCalls": [
+        {
+          "name": "pdf_delete_pages",
+          "argsContain": {
+            "ranges": "2"
+          }
+        }
+      ],
       "offeredToolsInclude": [
         "pdf_delete_pages",
         "pdf_pages"
       ],
-      "bubbleEndStatus": "awaiting_input",
-      "structureContains": [
-        "确认执行「"
-      ]
+      "bubbleEndStatus": "finished"
     }
   },
   {

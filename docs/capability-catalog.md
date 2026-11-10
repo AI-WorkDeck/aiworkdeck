@@ -11,7 +11,7 @@
 - 权限范围 `awd:<领域>.<read|write>`：project 项目文件与数据、editor 桌面编辑器、office-addin 任务窗格、memory 用户记忆、external 外部服务、system 代码执行与扩展安装。
 - 宿主：NONE 纯后端可完成；LOWA 需桌面编辑器；OFFICE 需 Office/WPS 任务窗格。
 
-合计 336 个工具：read 96，write 220，destructive 20。
+合计 336 个工具：read 96，write 227，destructive 13。
 
 ## MCP 服务器工具（本机 `/mcp`，只读）
 
@@ -34,7 +34,7 @@
 | `doc_apply_style_profile` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_audit_structure` | read | awd:editor.read | document | NONE | 是 | — |
 | `doc_collapse_cursor` | read | awd:editor.read | document | NONE | 否 | — |
-| `doc_delete_comment` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `doc_delete_comment` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_delete_selection` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_edit_header_footer` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_export_pdf` | write | awd:editor.write | document | LOWA | 是 | — |
@@ -117,7 +117,7 @@
 | `sheet_conditional_format` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_create_file` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_define_name` | write | awd:editor.write | document | NONE | 是 | — |
-| `sheet_delete_comment` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `sheet_delete_comment` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_edit_rows_cols` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_find_replace` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_format_cells` | write | awd:editor.write | document | NONE | 是 | — |
@@ -145,7 +145,7 @@
 | `slide_add_text_box` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_create_file` | write | awd:editor.write | slides | NONE | 是 | — |
 | `slide_delete_page` | destructive | awd:editor.write | document | NONE | 是 | — |
-| `slide_delete_shape` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `slide_delete_shape` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_chart` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_shape` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_text` | write | awd:editor.write | document | NONE | 是 | — |
@@ -214,14 +214,14 @@
 | `office_apply_style` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_apply_style_profile` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_audit_structure` | read | awd:office-addin.read | office | NONE | 是 | — |
-| `office_delete_comment` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_delete_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_edit_header_footer` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_add_chart` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_add_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_add_pivot_table` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_conditional_format` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_define_name` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_excel_delete_comment` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_excel_delete_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_edit_rows_cols` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_format_cells` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_freeze_panes` | write | awd:office-addin.write | office | NONE | 是 | — |
@@ -275,7 +275,7 @@
 | `office_ppt_add_slide` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_add_table` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_add_text_box` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_ppt_delete_shape` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_ppt_delete_shape` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_delete_slide` | destructive | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_format_chart` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_format_shape` | write | awd:office-addin.write | office | NONE | 是 | — |
@@ -347,7 +347,7 @@
 | `move_project_file` | write | awd:project.write | file | NONE | 否 | — |
 | `move_to_trash` | destructive | awd:project.write | file | NONE | 是 | — |
 | `pdf_add_page_numbers` | write | awd:project.write | pdf | NONE | 是 | — |
-| `pdf_delete_pages` | destructive | awd:project.write | pdf | NONE | 是 | — |
+| `pdf_delete_pages` | write | awd:project.write | pdf | NONE | 是 | — |
 | `pdf_extract_pages` | write | awd:project.write | pdf | NONE | 否 | — |
 | `pdf_inspect` | read | awd:project.read | pdf | NONE | 是 | — |
 | `pdf_inspect_visual` | read | awd:project.read | pdf | NONE | 是 | — |

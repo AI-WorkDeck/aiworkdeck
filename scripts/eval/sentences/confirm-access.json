@@ -1,0 +1,13 @@
+{ "_comment": "显式 access 与 TOOL_KEYWORDS 诱饵回归：删批注不弹确认卡、「删除第三条」改文档不挂 move_to_trash、真删文件仍走确认卡。",
+  "sentences": [
+  { "id": "c1-accept-revisions-delete-comments", "text": "接受全部修订并删除所有批注", "hostState": "docx:contract-commented",
+    "expect": { "mustUse": [["doc_delete_comment", "doc_update_comment", "doc_comments", "doc_revisions", "doc_accept_all_revisions"]],
+      "mustNotUse": ["move_to_trash"], "status": "finished" } },
+  { "id": "c2-delete-clause-three", "text": "删除第三条", "hostState": "docx:contract",
+    "expect": { "mustUse": [["doc_delete_paragraph", "doc_replace_at_anchor", "doc_find_replace", "doc_modify_paragraph", "doc_delete_range", "doc_delete_text", "/^doc_/"]],
+      "mustNotUse": ["move_to_trash"], "status": "finished" } },
+  { "id": "c3-delete-draft-file", "text": "把合同草稿.docx删了", "hostState": "nofile",
+    "seed": { "files": [{ "name": "合同草稿.docx", "fixture": "contract-draft.docx" }] },
+    "expect": { "mustUse": [["move_to_trash"]],
+      "outcomeCheck": "const f = await ctx.files(); return f.some(x => x.name==='合同草稿.docx' && !x.is_deleted);" } }
+] }

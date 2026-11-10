@@ -386,7 +386,8 @@ public class MemoryTools implements AgentToolComponent {
 
     @Tool("删除一个 Markdown 长期记忆主题文件。remember.md 不能删除；必须传入当前 revision。"
             + "管理记忆文件本身用本组 memory_* 工具；只想记一条或找一条时用 save_memory / query_memory。")
-    @ToolMeta(displayName = "删除记忆文件", category = "memory")
+    // access：删除长期记忆文件，用户无法从界面找回
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除记忆文件", category = "memory")
     public String memory_delete(@P("记忆范围: user/project/team/firm") String scope,
                                 @P("相对 Markdown 路径") String path,
                                 @P("memory_read 返回的当前 revision") long expectedRevision) {

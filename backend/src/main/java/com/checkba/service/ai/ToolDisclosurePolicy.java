@@ -380,14 +380,32 @@ public class ToolDisclosurePolicy {
         TOOL_KEYWORDS.put("memory_search", List.of("记得", "之前说过", "上次说", "之前提过", "之前聊过"));
     }
 
-    /** 用户这一句话精确点到了哪几个退出核心集的工具（{@link #TOOL_KEYWORDS}）。 */
+    /** 「删除/移动」这类动词在改文档的句子里是诱饵（「删除第三条」「把光标移到…」）：这两个工具要句子里提到文件才放回。 */
+    private static final Set<String> FILE_VERB_TOOLS = Set.of("move_to_trash", "move_files");
+    private static final List<String> FILE_CONTEXT_WORDS = List.of(
+            "文件", "文档", "文件夹", "回收站", "草稿", ".docx", ".doc", ".pdf", ".xlsx", ".pptx", ".txt",
+            "file", "folder");
+
+    /** 用户这一句话精确点到了哪几个退出核心集的工具（{@link #TOOL_KEYWORDS}）；不知道有没有开文档，按没开处理。 */
     public Set<String> toolsHintedBy(String userMessage) {
+        return toolsHintedBy(userMessage, null);
+    }
+
+    /**
+     * @param activeDocKind 当前活跃文档类型；非空表示已开着文档，此时 {@link #FILE_VERB_TOOLS} 只在句子提到文件时才放回。
+     */
+    public Set<String> toolsHintedBy(String userMessage, String activeDocKind) {
         if (userMessage == null || userMessage.isBlank()) {
             return Set.of();
         }
         String normalized = userMessage.toLowerCase(Locale.ROOT);
+        boolean mentionsFile = activeDocKind == null
+                || FILE_CONTEXT_WORDS.stream().anyMatch(normalized::contains);
         Set<String> hinted = new LinkedHashSet<>();
         for (Map.Entry<String, List<String>> entry : TOOL_KEYWORDS.entrySet()) {
+            if (!mentionsFile && FILE_VERB_TOOLS.contains(entry.getKey())) {
+                continue;
+            }
             for (String keyword : entry.getValue()) {
                 if (SkillRouter.containsTrigger(normalized, keyword)) {
                     hinted.add(entry.getKey());

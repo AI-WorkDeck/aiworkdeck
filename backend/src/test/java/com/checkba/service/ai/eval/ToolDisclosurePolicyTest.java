@@ -157,6 +157,34 @@ class ToolDisclosurePolicyTest {
     }
 
     @Test
+    @DisplayName("删除/移动诱饵：开着文档且句子没提文件时不放回 move_to_trash / move_files")
+    void fileVerbDecoysNeedFileContextWhenDocumentOpen() {
+        assertFalse(POLICY.toolsHintedBy("删除第三条", "docx").contains("move_to_trash"));
+        assertFalse(POLICY.toolsHintedBy("把光标移到第二段末尾", "docx").contains("move_files"));
+        assertTrue(POLICY.toolsHintedBy("把合同草稿.docx删了", "docx").contains("move_to_trash"));
+        assertTrue(POLICY.toolsHintedBy("把这几份文件移动到归档", "docx").contains("move_files"));
+        assertTrue(POLICY.toolsHintedBy("删除第三条", null).contains("move_to_trash"), "没开文档时保持原行为");
+    }
+
+    @Test
+    @DisplayName("批注删除是 WRITE，检查点回滚显式 DESTRUCTIVE")
+    void commentDeletionIsWriteAndCheckpointRestoreIsDestructive() throws Exception {
+        var meta = (java.util.function.BiFunction<Class<?>, String, com.checkba.service.ai.tools.ToolMeta.Access>) (c, n) -> {
+            for (var m : c.getDeclaredMethods()) {
+                if (m.getName().equals(n)) {
+                    return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(n,
+                            m.getAnnotation(com.checkba.service.ai.tools.ToolMeta.class));
+                }
+            }
+            throw new IllegalStateException(n);
+        };
+        assertEquals(com.checkba.service.ai.tools.ToolMeta.Access.WRITE,
+                meta.apply(com.checkba.service.ai.tools.DocumentEditTools.class, "doc_delete_comment"));
+        assertEquals(com.checkba.service.ai.tools.ToolMeta.Access.DESTRUCTIVE,
+                meta.apply(com.checkba.service.ai.tools.CheckpointTools.class, "doc_restore_checkpoint"));
+    }
+
+    @Test
     @DisplayName("V2 中途增长封顶：超过 45 个时按 LRU 收回（类目与按名同池），核心 / 受保护 / skill 点名工具不收")
     void evictToBudgetIsLruAndRespectsProtection() {
         RecordingToolRegistry registry = registry();
