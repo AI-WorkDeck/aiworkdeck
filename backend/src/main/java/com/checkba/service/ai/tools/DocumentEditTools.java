@@ -1398,7 +1398,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolShim(replacedBy = "doc_table_delete")
-    @ToolMeta(displayName = "删除表格行", category = "document", fileEffect = "MODIFIED", offerToModel = false)
+    // access：与 doc_table_delete 同级：整行删除不留修订痕迹（兼容 shim）
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格行", category = "document", fileEffect = "MODIFIED", offerToModel = false)
     @Tool("删除表格的整行（rowNumber1Based 为行号，1 开始）。")
     public String doc_table_delete_row(
             @P("【已弃用，等价于 rowNumber1Based】要删的行号（1 开始）") Integer position,
@@ -1428,7 +1429,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolShim(replacedBy = "doc_table_delete")
-    @ToolMeta(displayName = "删除表格列", category = "document", fileEffect = "MODIFIED", offerToModel = false)
+    // access：与 doc_table_delete 同级：整列删除不留修订痕迹（兼容 shim）
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格列", category = "document", fileEffect = "MODIFIED", offerToModel = false)
     @Tool("删除表格的整列（columnRef 为列字母或列号）。")
     public String doc_table_delete_col(
             @P("【已弃用，等价于 columnRef】要删的列字母（如 B）或列号（1 开始）") String position,
@@ -1732,7 +1734,8 @@ public class DocumentEditTools implements AgentToolComponent {
                 "doc_update_comment", "doc_update_comment(commentId, action=" + action + ")");
     }
 
-    @ToolMeta(displayName = "删除批注", category = "document", fileEffect = "MODIFIED")
+    // access：批注是审阅元数据，不是正文内容；批量清批注不应逐条弹确认
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除批注", category = "document", fileEffect = "MODIFIED")
     @Tool("【批注】删除一条批注（commentId 来自 doc_get_comments 返回的 id）。删除不可撤销为修订，删前先确认。")
     public String doc_delete_comment(
             @P("批注 id（来自 doc_get_comments）") String commentId
@@ -2841,7 +2844,8 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "删除单元格批注", category = "document", fileEffect = "MODIFIED")
+    // access：批注是审阅元数据，不是单元格内容
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除单元格批注", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·批注】删除指定单元格上的批注。一个单元格最多一条批注，按单元格地址定位删除。")
     public String sheet_delete_comment(
             @P("单元格，如 'B2'") String cell,

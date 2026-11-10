@@ -909,7 +909,8 @@ public class FileTools implements AgentToolComponent {
     static final String TRASH_RECOVERY_HINT =
             "已移入回收站，可在资源管理器的回收站中恢复。 / Moved to the recycle bin; restore it from the recycle bin in the file explorer.";
 
-    @ToolMeta(displayName = "移入回收站", category = "file", refreshFiles = true)
+    // access：移入回收站虽可恢复，但会影响文件夹内全部内容，需用户确认
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "移入回收站", category = "file", refreshFiles = true)
     @Tool("把项目文件/文件夹移入项目回收站（可恢复，不是永久删除），等同用户在文件管理器按 Delete；文件夹连同内部内容一起进入。\n"
             + "何时用：用户要求删除文件，或清理你自己生成的临时文件（不要另建「待删除」文件夹）。只删用户要求删除的或你自己产出的临时文件。\n"
             + "targetsJson 是数组，元素为项目相对路径或数字 fileId，如 [\"草稿/临时摘录.txt\", 1234]，每次最多 "

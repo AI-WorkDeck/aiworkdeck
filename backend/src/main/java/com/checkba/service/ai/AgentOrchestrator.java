@@ -3747,7 +3747,7 @@ public class AgentOrchestrator {
             }
         }
         guard.expandedToolCategories.addAll(putBack);
-        for (String name : policy.toolsHintedBy(userMessage)) {
+        for (String name : policy.toolsHintedBy(userMessage, guard.activeDocKind)) {
             guard.requestedToolNames.putIfAbsent(name, 0);
         }
         guard.noFileBaselineCategories = new java.util.HashSet<>(guard.expandedToolCategories);
