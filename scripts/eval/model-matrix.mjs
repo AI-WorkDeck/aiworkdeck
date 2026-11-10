@@ -91,8 +91,18 @@ function findJava21() {
 function findPgBin() {
   const c = [process.env.PG_BIN, '/opt/homebrew/opt/postgresql@17/bin', '/usr/lib/postgresql/17/bin', '/usr/local/opt/postgresql@17/bin'].filter(Boolean)
   for (const d of c) if (fs.existsSync(path.join(d, 'initdb'))) return d
+  try { const d = execFileSync('pg_config', ['--bindir'], { encoding: 'utf8' }).trim(); if (fs.existsSync(path.join(d, 'initdb'))) return d } catch { /* 无 pg_config */ }
   try { return path.dirname(execFileSync('which', ['initdb'], { encoding: 'utf8' }).trim()) } catch { /* ignore */ }
   throw new Error('找不到 PostgreSQL（initdb），请设置 PG_BIN')
+}
+// 兜底：产物目录里的任何文件若含密钥原文（后端日志、模型回显）一律替换，产物会被上传到 CI。
+function scrubSecret(dir) {
+  const key = process.env.OPENROUTER_API_KEY
+  if (!key) return
+  for (const f of fs.readdirSync(dir)) {
+    const file = path.join(dir, f)
+    try { const t = fs.readFileSync(file, 'utf8'); if (t.includes(key)) fs.writeFileSync(file, t.split(key).join('***')) } catch { /* 非文本/已删除 */ }
+  }
 }
 const sanitize = s => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()
 
@@ -775,6 +785,7 @@ async function main() {
     fs.writeFileSync(path.join(outDir, 'report.md'), buildReport(meta, results, sentences))
     log(`完成：总 ${(meta.wallMs / 1000).toFixed(0)}s（准备 ${(setupMs / 1000).toFixed(0)}s，跑题 ${(runMs / 1000).toFixed(0)}s）。报告 ${path.join(outDir, 'report.md')}`)
   } finally {
+    scrubSecret(outDir)
     if (!cleaning) { cleaning = true; await cleanup() }
   }
 }

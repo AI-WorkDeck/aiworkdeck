@@ -95,6 +95,21 @@ node scripts/eval/model-matrix.mjs \
 
 `--api-only` 跳过这类句子（标 `SKIPPED`）；xlsx/pptx/attachments 宿主暂不支持，也标 `SKIPPED`。
 
+## 在 GitHub 上跑（intl 模型只能在这里跑）
+
+本机对 OpenRouter 的 Google / Anthropic / OpenAI 模型返回 403，所以 intl 档位走 `.github/workflows/model-matrix.yml`（手动触发，GitHub 美国 runner，ubuntu-latest，超时 150 分钟，同时只允许一个矩阵在跑）：
+
+```bash
+gh workflow run model-matrix.yml -f profile=intl -f after=<分支>
+# 可选：-f tier=release -f before=master -f runs=3 -f sentences=scripts/eval/sentences/gate-35-en.json -f models=a/b,c/d
+```
+
+- workflow 只能从默认分支触发（新文件合并到 master 之后才可用）；脚本取 master 上的版本，`before/after` 是要对比的 ref（分支/tag/SHA，分支名按 `origin/<名>` 解析）。
+- 密钥为仓库 secret `EVAL_OPENROUTER_API_KEY`，只注入「Run model matrix」一步的环境变量 `OPENROUTER_API_KEY`；脚本结束时会把产物目录里出现的密钥原文替换为 `***` 再上传。权限仅 `contents: read`。
+- 步骤：JDK 21、Node 20、PostgreSQL 17（PGDG apt，脚本在 `/usr/lib/postgresql/17/bin` 找到 `initdb`）、Playwright Chromium（含系统依赖；`~/.cache/awd-matrix`、`~/.cache/ms-playwright` 走 actions/cache）、LOWA 运行时（缓存缺失时按 desktop-build 同一个 `LOWA_BASE_URL` 经 `fetch-lowa-assets.js` 拉取）。
+- 产物：`report.md` 写入作业摘要；`scripts/eval/out/**`（report.md、results.json、backend-*.log）作为 artifact `model-matrix-<profile>-<tier>` 保留 30 天。
+- 费用：intl cheap 门禁（每句 3 次、before+after）约 **$12**，会产生真实模型费用，所以没有任何自动触发。耗时约 1 小时到 1.5 小时。
+
 ## 产物
 
 `scripts/eval/out/<时间戳>/`（已 gitignore）：`results.json`（每次运行的工具序列、轮数、每轮提供的工具数、tokens、耗时、
