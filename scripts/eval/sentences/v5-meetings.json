@@ -1,5 +1,5 @@
 {
-  "_comment": "tool-system-v2 V5 会议合流专用 5 句。夹具直接写入实例库的内置表（meeting_recording / tencent_meeting_record），虚构数据，不碰真实腾讯会议账号或 tmeet CLI；实例未装腾讯会议插件，所以 tencent 来源走内置同步表。期望里新名（meeting_list）与旧名（meeting_list_recordings / tmeet_list_meetings）并列，可对拍 before=合并前 ref 与 after=合并后 ref。",
+  "_comment": "tool-system-v2 V5 会议合流专用 5 句。夹具直接写入实例库的内置表（meeting_recording / tencent_meeting_record），虚构数据，不碰真实腾讯会议账号或 tmeet CLI；实例未装腾讯会议插件，所以 tencent 来源走内置同步表。期望里新名（meeting_list）与旧名（meeting_list_recordings / tmeet_list_meetings）并列，可对拍 before=合并前 ref 与 after=合并后 ref。 末 3 句为反例：不该碰会议工具（mustNotUse 含全部会议工具名）。",
   "sentences": [
     {
       "id": "m01-tencent-list-only",
@@ -248,6 +248,144 @@
           "write_docx",
           "write_file",
           "tencent_meeting_action"
+        ]
+      }
+    },
+    {
+      "id": "n01-move-minutes-file",
+      "text": "把会议纪要.docx移到归档",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "归档"
+        ],
+        "files": [
+          {
+            "name": "会议纪要.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ],
+        "meetings": [
+          {
+            "title": "尽调访谈-财务总监",
+            "dayOffset": -3
+          }
+        ],
+        "tencentMeetings": [
+          {
+            "subject": "股权激励签约决议会",
+            "dayOffset": -1
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "move_files",
+          "move_project_file",
+          "move_files_batch",
+          "list_files",
+          "doc_list_project_files",
+          "list_tools"
+        ],
+        "mustUse": [
+          [
+            "move_files",
+            "move_project_file",
+            "move_files_batch"
+          ]
+        ],
+        "mustNotUse": [
+          "meeting_list",
+          "meeting_list_recordings",
+          "tmeet_list_meetings",
+          "meeting_get_transcript",
+          "tmeet_get_transcript",
+          "tencent_meeting_action"
+        ]
+      }
+    },
+    {
+      "id": "n02-hearing-reminder",
+      "text": "下周三开庭提醒",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "归档"
+        ],
+        "files": [
+          {
+            "name": "会议纪要.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ],
+        "meetings": [
+          {
+            "title": "尽调访谈-财务总监",
+            "dayOffset": -3
+          }
+        ],
+        "tencentMeetings": [
+          {
+            "subject": "股权激励签约决议会",
+            "dayOffset": -1
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "task_create",
+          "task_list",
+          "ask_user",
+          "list_tools"
+        ],
+        "mustNotUse": [
+          "meeting_list",
+          "meeting_list_recordings",
+          "tmeet_list_meetings",
+          "meeting_get_transcript",
+          "tmeet_get_transcript",
+          "tencent_meeting_action"
+        ]
+      }
+    },
+    {
+      "id": "n03-organize-recording-folder",
+      "text": "整理这份录音文件夹",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "录音"
+        ],
+        "files": [
+          {
+            "name": "访谈录音1.docx",
+            "fixture": "plain-notes.docx",
+            "folder": "录音"
+          }
+        ],
+        "meetings": [
+          {
+            "title": "尽调访谈-财务总监",
+            "dayOffset": -3
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_list_project_files",
+          "list_files",
+          "search_project_files",
+          "list_tools",
+          "ask_user"
+        ],
+        "mustNotUse": [
+          "meeting_list",
+          "meeting_list_recordings",
+          "tmeet_list_meetings",
+          "meeting_get_transcript",
+          "tmeet_get_transcript",
+          "tencent_meeting_action",
+          "write_docx"
         ]
       }
     }
