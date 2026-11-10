@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Υπολογισμός προθεσμίας",
     "listAttachedFiles": "Λίστα συνημμένων αυτού του γύρου",
     "office_ppt_add_image": "Εισαγωγή εικόνας στη διαφάνεια",
     "office_ppt_add_chart": "Εισαγωγή γραφήματος στη διαφάνεια",

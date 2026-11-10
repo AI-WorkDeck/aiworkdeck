@@ -4,6 +4,7 @@
 // CompareDocDialog / VariablePanel / DrawioEditor 的用户可见文案。
 export default {
   officeToolNames: {
+    "deadline_compute": "计算法定期限",
     "listAttachedFiles": "列出本轮附件",
     "office_ppt_add_image": "插入幻灯片图片",
     "office_ppt_add_chart": "插入幻灯片图表",

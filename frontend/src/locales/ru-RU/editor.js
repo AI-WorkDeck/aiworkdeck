@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Рассчитать срок",
     "listAttachedFiles": "Список вложений текущего запроса",
     "office_ppt_add_image": "Вставить изображение на слайд",
     "office_ppt_add_chart": "Вставить диаграмму на слайд",
