@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Süre hesapla",
     "listAttachedFiles": "Bu turun eklerini listele",
     "office_ppt_add_image": "Slayda resim ekle",
     "office_ppt_add_chart": "Slayda grafik ekle",

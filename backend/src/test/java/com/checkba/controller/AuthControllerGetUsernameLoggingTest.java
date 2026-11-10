@@ -73,6 +73,10 @@ class AuthControllerGetUsernameLoggingTest {
                 (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AuthController.class);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
+        // 其它测试（如 DesktopStartupReadinessTest 的 --logging.level.root=ERROR）会改全局日志级别且不还原，
+        // 继承来的级别随执行顺序漂移；这里显式钉住本 logger 的级别，用完还原。
+        Level previousLevel = logbackLogger.getLevel();
+        logbackLogger.setLevel(Level.WARN);
         logbackLogger.addAppender(appender);
 
         String result;
@@ -82,6 +86,7 @@ class AuthControllerGetUsernameLoggingTest {
             result = AuthController.getUsernameFromSession(null);
         } finally {
             logbackLogger.detachAppender(appender);
+            logbackLogger.setLevel(previousLevel);
         }
 
         assertNull(result, "行为不能变——吞异常返回 null 这件事本身不动");

@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Tính thời hạn",
     "listAttachedFiles": "Liệt kê tệp đính kèm lượt này",
     "office_ppt_add_image": "Chèn hình ảnh vào trang chiếu",
     "office_ppt_add_chart": "Chèn biểu đồ vào trang chiếu",

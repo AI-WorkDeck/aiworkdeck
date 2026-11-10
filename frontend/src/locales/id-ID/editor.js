@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Hitung tenggat",
     "listAttachedFiles": "Daftar lampiran giliran ini",
     "office_ppt_add_image": "Sisipkan gambar pada slide",
     "office_ppt_add_chart": "Sisipkan grafik pada slide",

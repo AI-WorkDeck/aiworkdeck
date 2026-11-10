@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "Frist berechnen",
     "listAttachedFiles": "Anhänge dieses Durchlaufs auflisten",
     "office_ppt_add_image": "Bild in Folie einfügen",
     "office_ppt_add_chart": "Diagramm in Folie einfügen",

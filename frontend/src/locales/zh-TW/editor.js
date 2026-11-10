@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "計算法定期限",
     "listAttachedFiles": "列出本輪附件",
     "office_ppt_add_image": "插入投影片圖片",
     "office_ppt_add_chart": "插入投影片圖表",

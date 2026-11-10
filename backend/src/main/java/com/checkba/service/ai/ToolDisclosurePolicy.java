@@ -252,7 +252,7 @@ public class ToolDisclosurePolicy {
         // 归进 legal 比落 misc 好找——模型要的是「法规这一族还有什么」，不是「杂项里翻翻看」。
         CATEGORIES.put("legal", List.of("law_", "name:get_law_article", "name:case_search"));
         CATEGORIES.put("meeting", List.of("meeting_", "tmeet_"));
-        CATEGORIES.put("task", List.of("task_"));
+        CATEGORIES.put("task", List.of("task_", "name:deadline_compute"));
         // 文件标签不是事项（T-19）：tag_list / tag_file / tag_remove_from_file 原先挂在 task 下
         CATEGORIES.put("tag", List.of("tag_"));
         CATEGORIES.put("mcp", List.of("user_mcp_"));
@@ -330,7 +330,8 @@ public class ToolDisclosurePolicy {
         CATEGORY_KEYWORDS.put("table", List.of("表格", "table", "单元格", "合并单元格",
                 "价目表", "表里", "这张表", "表中", "那一行"));
         CATEGORY_KEYWORDS.put("task", List.of("事项", "日程", "提醒", "待办", "截止", "deadline",
-                "期限", "到期", "开庭", "庭审", "时效", "截止日"));
+                "期限", "到期", "开庭", "庭审", "时效", "截止日",
+                "上诉期", "答辩期", "举证期限", "几号到期", "哪天到期", "再审期限", "最迟", "届满"));
         // 以下几类是渐进披露默认打开后补的（dev-board#1064 第二步）：律师最常说的几类请求，
         // 起跑时就把那一类放回，免得先花一轮查目录、再让下一轮的提示缓存整段失效。
         CATEGORY_KEYWORDS.put("revision", List.of("修订", "批注", "接受", "拒绝", "评论",
