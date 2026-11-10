@@ -30,8 +30,12 @@ import java.util.function.Supplier;
  * <p><b>做法</b>：默认只下发一份<b>核心集</b>，其余按<b>类目</b>收进目录，模型用
  * {@code list_tools} 查目录、按类目展开。展开<b>只在下一轮生效</b>——这是
  * {@code AgentOrchestrator.RunGuard.activeDocKind} 那条「一轮内工具集不变」契约的延伸：
- * 模型已经在 messages 里宣布要调的工具，下一轮不能消失，否则通道直接 400。
- * 本类的裁剪<b>只做加法</b>（展开集单调增长），所以永远不会让已宣布的工具消失。
+ * 模型已经在 messages 里宣布要调的工具，下一轮最好不消失（没有证据说它会让通道 400——评审 2026-11-10 §1.2 指出这句旧断言
+ * 未经验证——真正的代价是 tools 数组变了，服务商的提示缓存前缀整段失效）。
+ * 所以第 1 个往返之后展开集<b>单调增长</b>：本类的 {@link #narrow} 只做加法，编排器也不再按 LRU 收回
+ * （{@code AgentOrchestrator.evictOverBudget} 已停用收回；首轮本来就不封顶，{@link #evictToBudget} 保留为纯函数），
+ * 新增工具追加在数组末尾，已下发的顺序不变。唯一的非单调来源是上游闸（活跃文档类型 / 会话能力 / 运行期不可用）改变候选集，
+ * 那不是本类的裁剪。
  *
  * <p><b>三条安全性质</b>，缺一条这套机制就会变成「模型以为自己没这个能力」：
  * <ol>
@@ -691,7 +695,7 @@ public class ToolDisclosurePolicy {
         return kept;
     }
 
-    /** 每轮下发工具总数上限（tool-system-v2 B6 / V2）。超过时按 LRU 逐个收回已展开类目。 */
+    /** 下发工具总数上限（tool-system-v2 B6 / V2）。稳定前缀后编排器不再调用 {@link #evictToBudget}（保留为纯函数与测试）。 */
     public static final int MAX_OFFERED_PER_ROUND = 45;
 
     /** 模型经 {@code list_tools} 明确要的类目，在之后多少轮内不被收回。 */

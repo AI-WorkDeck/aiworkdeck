@@ -447,6 +447,8 @@ public class AgentOrchestrator {
          * 「有但没下发」的那些；分发时也据它判断模型是不是经 XML 兜底点名调了一个没下发的工具。
          */
         volatile java.util.Set<String> roundOffered = java.util.Set.of();
+        /** 本次运行已下发过的工具名，按首次下发顺序；后续轮次沿用此顺序、新工具追加在末尾（稳定前缀，见 {@link #stableToolOrder}）。 */
+        final java.util.List<String> offeredOrder = new java.util.ArrayList<>();
         /**
          * 本轮起跑时活跃文档类目裁剪是否生效（开关开着且这种文档类型确实有要藏的类目）。
          * <b>一轮内只算一次、不随中途换文档清掉</b>：它决定 list_tools 这一轮要不要下发，
@@ -3529,6 +3531,7 @@ public class AgentOrchestrator {
             dropIdleCatalog(visible, guard);
         }
         if (guard != null) {
+            visible = stableToolOrder(visible, guard);
             java.util.Set<String> offeredNames = new java.util.HashSet<>();
             for (ToolSpecification spec : visible) {
                 offeredNames.add(spec.name());
@@ -3571,6 +3574,28 @@ public class AgentOrchestrator {
             // 同步抛错与异步失败共用终态闸：取消看门狗并执行有限重试 / 模型切换。
             handler.onError(e);
         }
+    }
+
+    /**
+     * 稳定前缀的确定性排序：tools 数组在服务商的缓存前缀里，数组里任何位置的变化都会让其后的缓存整段失效。
+     * 已下发过的工具保持首次下发的相对顺序，本轮新增的按名字排序后追加在末尾——
+     * 于是「只加不减」的轮次之间，上一轮的数组恰好是这一轮数组的前缀。
+     */
+    static List<ToolSpecification> stableToolOrder(List<ToolSpecification> visible, RunGuard guard) {
+        java.util.Map<String, ToolSpecification> byName = new java.util.LinkedHashMap<>();
+        for (ToolSpecification spec : visible) byName.putIfAbsent(spec.name(), spec);
+        java.util.List<ToolSpecification> ordered = new java.util.ArrayList<>();
+        for (String name : guard.offeredOrder) {
+            ToolSpecification spec = byName.remove(name);
+            if (spec != null) ordered.add(spec);
+        }
+        java.util.List<String> fresh = new java.util.ArrayList<>(byName.keySet());
+        java.util.Collections.sort(fresh);
+        for (String name : fresh) {
+            ordered.add(byName.get(name));
+            guard.offeredOrder.add(name);
+        }
+        return ordered;
     }
 
     /**
@@ -3790,7 +3815,8 @@ public class AgentOrchestrator {
         guard.roundTrimmed = allCandidates.size() - candidates.size();
         if (guard.decisionContext != null && guard.decisionAbandoned) return candidates;
         if (!policy.isEnabled() && !guard.assistedDisclosure) return candidates;
-        evictOverBudget(candidates, guard, policy);
+        // 稳定前缀：不再 LRU 收回已展开的工具（原 evictOverBudget）。首轮本来就不封顶（lowa-xlsx 首轮 50 个 > 上限 45），
+        // 第 2 轮起收回只会让 tools 数组变短、提示缓存前缀整段失效。
         List<ToolSpecification> disclosed = policy.narrow(candidates, guard.expandedToolCategories,
                 guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories),
                 extraToolNames(guard));
@@ -3802,51 +3828,6 @@ public class AgentOrchestrator {
         log.info("[Disclosure] conv={} candidates={} disclosed={} expanded={}",
                 guard.conversationId, candidates.size(), disclosed.size(), guard.expandedToolCategories);
         return guard.decisionContext != null && guard.decisionAbandoned ? candidates : disclosed;
-    }
-
-    /**
-     * 中途增长封顶（tool-system-v2 V2）：展开集只增不减会让长任务的工具数一路涨到 80+。
-     * 第 2 个往返起（首轮保持关键词 / skill 预放回原样），下发总数超过
-     * {@link ToolDisclosurePolicy#MAX_OFFERED_PER_ROUND} 就按 LRU 收回已展开类目。
-     * 保护：本轮刚放回或刚用过的类目、模型最近两轮用 list_tools 要的类目；核心集与 skill 点名的工具不属于类目。
-     */
-    private void evictOverBudget(List<ToolSpecification> candidates, RunGuard guard, ToolDisclosurePolicy policy) {
-        int round = guard.llmRounds;
-        java.util.List<String> keys = new java.util.ArrayList<>(guard.expandedToolCategories);
-        guard.requestedToolNames.keySet().forEach(n -> keys.add(ToolDisclosurePolicy.TOOL_KEY + n));
-        for (String key : keys) {
-            guard.categoryLastUsed.putIfAbsent(key, round);
-        }
-        if (round < 1) {
-            return;
-        }
-        java.util.Set<String> protectedKeys = new java.util.HashSet<>();
-        for (String key : keys) {
-            Integer used = guard.categoryLastUsed.get(key);
-            Integer asked = guard.categoryAskedAt.get(key);
-            if ((used != null && used >= round)
-                    || (asked != null && round - asked < ToolDisclosurePolicy.LIST_TOOLS_PROTECT_ROUNDS)) {
-                protectedKeys.add(key);
-            }
-        }
-        // reserve：编排器在收窄之后另补的 memory_list / memory_read，加条件核心（附件 / 检查点）
-        int reserve = ALWAYS_MEMORY_TOOLS.size() + (guard.hasAttachments ? 1 : 0) + 1;
-        java.util.Set<String> evicted = policy.evictToBudget(candidates, guard.expandedToolCategories,
-                guard.requestedToolNames.keySet(),
-                guard.noFileEntrySet && guard.expandedToolCategories.equals(guard.noFileBaselineCategories),
-                guard.skillToolNames, guard.categoryLastUsed, protectedKeys, reserve);
-        if (!evicted.isEmpty()) {
-            for (String key : evicted) {
-                if (key.startsWith(ToolDisclosurePolicy.TOOL_KEY)) {
-                    guard.requestedToolNames.remove(key.substring(ToolDisclosurePolicy.TOOL_KEY.length()));
-                } else {
-                    guard.expandedToolCategories.remove(key);
-                }
-            }
-            log.info("[Disclosure] conv={} 下发总数封顶 {}，按 LRU 收回 {}，当前展开集 {} 按名 {}",
-                    guard.conversationId, ToolDisclosurePolicy.MAX_OFFERED_PER_ROUND, evicted,
-                    guard.expandedToolCategories, guard.requestedToolNames.keySet());
-        }
     }
 
     /** 按名放行的工具：skill 白名单点名的 ∪ 精确关键词 / list_tools(names|query) 放回的。 */
