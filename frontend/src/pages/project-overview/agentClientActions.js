@@ -977,8 +977,15 @@ export const agentClientActionMethods = {
             const ids = new Set([String(source.id), String(target.id)])
             const open = () => Object.values(this._libreRefs || {}).filter(inst =>
                 inst && inst.ready && !inst.docLoadFailed && inst.file && ids.has(String(inst.file.id)))
-            for (const inst of open().filter(i => (i.dirty || i.saving) && typeof i.flushSave === 'function')) {
-                await inst.flushSave({ timeoutMs: 10000 })
+            // 刚打开的文档会短暂处于 saving/dirty（装载后的首次自动保存）：落盘并等它们稳定，
+            // 最多等 20 秒；之后若仍变脏，recheckClean 才算「比对期间被改」。
+            for (let i = 0; i < 40; i++) {
+                const busy = open().filter(x => x.dirty || x.saving)
+                if (!busy.length) break
+                for (const inst of busy) {
+                    if (inst.dirty && typeof inst.flushSave === 'function') await inst.flushSave({ timeoutMs: 10000 })
+                }
+                await new Promise(resolve => setTimeout(resolve, 500))
             }
             const stem = String(target.name || '').replace(/\.docx$/i, '')
             const user = this.currentUser || {}
