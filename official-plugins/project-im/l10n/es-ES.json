@@ -1,6 +1,6 @@
 {
   "plugin.name": "Mensajería de proyecto",
   "plugin.description": "Comunicación de despacho, equipo y proyecto: asistente compartido, mensajes directos, archivo de documentos y referencias de IA. Actualmente disponible solo para cuentas de China continental.",
-  "tool.project_im_list_conversations.desc": "Úsalo cuando el usuario pregunte qué chats de grupo o conversaciones existen, incluido el grupo del proyecto. Lista las conversaciones de mensajería del usuario (solo lectura).",
-  "tool.project_im_read_messages.desc": "Úsalo cuando el usuario pregunte de qué ha hablado últimamente un chat de grupo o el grupo del proyecto, o quiera el historial (obtén antes el id de conversación con project_im_list_conversations). Lee los mensajes recientes de una conversación en la que participa el usuario (solo lectura)."
+  "tool.project_im_list_conversations.desc": "Lista las conversaciones de mensajería del usuario (solo lectura). Úsalo cuando el usuario pregunte qué chats de grupo o conversaciones existen, incluido el grupo del proyecto.",
+  "tool.project_im_read_messages.desc": "Lee los mensajes recientes de una conversación en la que participa el usuario (solo lectura). Úsalo cuando el usuario pregunte de qué ha hablado últimamente un chat de grupo o el grupo del proyecto, o quiera el historial (obtén antes el id de conversación con project_im_list_conversations)."
 }

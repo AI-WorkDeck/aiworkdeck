@@ -464,6 +464,8 @@ public class PluginService {
         private String confirm;
         /** 命中即在起跑时放回本插件工具（喂 ToolDisclosurePolicy） */
         private List<String> keywords;
+        /** false = 注册但不下发给模型，也不投影 MCP，仅供 UI 直调（A9）；缺省 = 下发。老形态条目也可带，不算声明式字段。 */
+        private Boolean agent;
 
         /** 带任一声明式字段即视为声明式条目；只有 name/description/permissions 的老条目返回 false。 */
         @com.fasterxml.jackson.annotation.JsonIgnore
@@ -1050,6 +1052,17 @@ public class PluginService {
     /** 工具所属的插件 id（内置工具不在此映射中，返回 null） */
     public String getPluginIdForTool(String toolName) {
         return toolToPluginId.get(toolName);
+    }
+
+    /** manifest 以 {@code agent:false} 标为仅供 UI 直调的工具名（不下发给模型、不投影 MCP）。 */
+    public boolean isAgentHidden(String toolName) {
+        for (PluginMetadata plugin : plugins) {
+            if (plugin.getTools() == null) continue;
+            for (PluginToolInfo tool : plugin.getTools()) {
+                if (tool != null && Boolean.FALSE.equals(tool.getAgent()) && Objects.equals(tool.getName(), toolName)) return true;
+            }
+        }
+        return false;
     }
 
     /** 已加载的插件元数据；未知 id 返回 null */

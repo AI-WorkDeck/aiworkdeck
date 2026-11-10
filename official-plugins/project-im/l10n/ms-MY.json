@@ -1,6 +1,6 @@
 {
   "plugin.name": "Pesangan Projek",
   "plugin.description": "Komunikasi firma guaman, pasukan dan projek: pembantu kongsi, mesej terus, pengarkiban fail dan rujukan AI. Buat masa ini hanya tersedia untuk akaun Tanah Besar China.",
-  "tool.project_im_list_conversations.desc": "Guna apabila pengguna bertanya kumpulan sembang atau perbualan apa yang wujud, termasuk kumpulan projek. Senaraikan perbualan mesej pengguna (baca sahaja).",
-  "tool.project_im_read_messages.desc": "Guna apabila pengguna bertanya apa yang dibincangkan baru-baru ini dalam kumpulan sembang atau kumpulan projek, atau mahu sejarah sembang (dapatkan id perbualan dahulu daripada project_im_list_conversations). Baca mesej terkini dalam perbualan yang disertai pengguna (baca sahaja)."
+  "tool.project_im_list_conversations.desc": "Senaraikan perbualan mesej pengguna (baca sahaja). Guna apabila pengguna bertanya kumpulan sembang atau perbualan apa yang wujud, termasuk kumpulan projek.",
+  "tool.project_im_read_messages.desc": "Baca mesej terkini dalam perbualan yang disertai pengguna (baca sahaja). Guna apabila pengguna bertanya apa yang dibincangkan baru-baru ini dalam kumpulan sembang atau kumpulan projek, atau mahu sejarah sembang (dapatkan id perbualan dahulu daripada project_im_list_conversations)."
 }
