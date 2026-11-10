@@ -1188,6 +1188,7 @@ public class PluginService {
             return;
         }
 
+        java.util.Arrays.sort(pluginDirs);
         for (File pluginDir : pluginDirs) {
             try {
                 File manifestFile = new File(pluginDir, "manifest.json");

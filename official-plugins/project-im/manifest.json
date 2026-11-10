@@ -46,7 +46,21 @@
         "chat",
         "messages",
         "conversation",
-        "discussion"
+        "discussion",
+        "group chats",
+        "chats",
+        "message",
+        "direct message",
+        "direct messages",
+        "dm",
+        "dms",
+        "chat history",
+        "conversations",
+        "discussions",
+        "who said",
+        "what did the team say",
+        "internal messages",
+        "inbox"
       ]
     },
     {
@@ -101,7 +115,21 @@
         "chat",
         "messages",
         "conversation",
-        "discussion"
+        "discussion",
+        "group chats",
+        "chats",
+        "message",
+        "direct message",
+        "direct messages",
+        "dm",
+        "dms",
+        "chat history",
+        "conversations",
+        "discussions",
+        "who said",
+        "what did the team say",
+        "internal messages",
+        "inbox"
       ]
     }
   ],
