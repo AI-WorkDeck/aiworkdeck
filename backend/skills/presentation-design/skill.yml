@@ -23,6 +23,12 @@ triggers_en:
   - make a presentation
   - create a slide deck
   - match the reference deck
+  - make a ppt
+  - create a ppt
+  - generate a ppt
+  - make a powerpoint
+  - create a powerpoint
+  - build a slide deck
 prompt: prompt.md
 tool_policy: passthrough
 allowed_tools: []

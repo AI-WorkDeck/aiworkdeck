@@ -662,6 +662,97 @@ class ToolDisclosurePolicyTest {
     }
 
     @Test
+    @DisplayName("英文说法：每类关键词与工具精确放回都认得出，英文走整词匹配")
+    void englishPhrasesHintTheRightCategoriesAndTools() {
+        java.util.Map<String, String> categories = new java.util.LinkedHashMap<>();
+        categories.put("Accept all tracked changes", "revision");
+        categories.put("Annotate the second paragraph", "revision");
+        categories.put("Add a comment on the penalty clause", "revision");
+        categories.put("What deadlines do I have this week?", "task");
+        categories.put("Set up a reminder for next Wednesday", "task");
+        categories.put("When does the appeal period end?", "task");
+        categories.put("Put the hearing on my calendar", "task");
+        categories.put("Change the unit price in the price table", "table");
+        categories.put("Merge the cells in the second row", "table");
+        categories.put("Write up the meeting minutes from the recording", "meeting");
+        categories.put("Find the transcript of yesterday's call", "meeting");
+        categories.put("What does the statute say about limitation?", "legal");
+        categories.put("Find case law on liquidated damages", "legal");
+        categories.put("Change the font size of the headings", "format");
+        categories.put("Rename these files", "files");
+        categories.put("Remember that I sign as the managing partner", "memory");
+        categories.put("Make a pitch deck from this memo", "slides");
+        categories.put("Put these numbers in a spreadsheet", "spreadsheet");
+        categories.put("Roll back to the previous version", "version");
+        for (var e : categories.entrySet()) {
+            assertTrue(TRIM.categoriesHintedBy(e.getKey()).contains(e.getValue()),
+                    e.getKey() + " 应放回 " + e.getValue() + "：" + TRIM.categoriesHintedBy(e.getKey()));
+        }
+        java.util.Map<String, String> tools = new java.util.LinkedHashMap<>();
+        tools.put("Create a new folder called Evidence", "create_folder");
+        tools.put("Move Contract.docx to the Archive folder", "move_files");
+        tools.put("Archive these files", "move_files");
+        tools.put("Add a row at the end of the table", "doc_table_insert");
+        tools.put("Insert a new column after the price", "office_table_insert");
+        tools.put("Delete the last row", "doc_table_delete");
+        tools.put("Delete Contract Draft.docx", "move_to_trash");
+        tools.put("Throw the old drafts in the recycle bin", "move_to_trash");
+        tools.put("Apply the firm\u2019s standard formatting to the whole document", "doc_apply_standard_format");
+        tools.put("Export it as a PDF", "doc_export_pdf");
+        tools.put("Save as PDF please", "doc_export_pdf");
+        tools.put("Do you remember what I told you last time?", "memory_search");
+        for (var e : tools.entrySet()) {
+            assertTrue(TRIM.toolsHintedBy(e.getKey()).contains(e.getValue()),
+                    e.getKey() + " 应精确点到 " + e.getValue() + "：" + TRIM.toolsHintedBy(e.getKey()));
+        }
+        // 「标准格式」类说法只放该工具，不拉 format / pdf 整类
+        assertTrue(TRIM.categoriesPutBackFor("Apply the firm's standard formatting and then export to PDF").isEmpty());
+        // file-mention 闸：开着文档且没提文件，英文的 delete / move 是改文档的诱饵
+        assertFalse(TRIM.toolsHintedBy("Delete Article 3", "docx").contains("move_to_trash"));
+        assertFalse(TRIM.toolsHintedBy("Move the cursor to the end of the second paragraph", "docx").contains("move_files"));
+        assertFalse(TRIM.toolsHintedBy("Delete the profile section", "docx").contains("move_to_trash"),
+                "profile 里的 file 不算提到文件");
+        assertTrue(TRIM.toolsHintedBy("Delete the old draft", "docx").contains("move_to_trash"));
+        assertTrue(TRIM.toolsHintedBy("Move it into the Archive folder", "docx").contains("move_files"));
+    }
+
+    @Test
+    @DisplayName("英文整词匹配：别的单词的一截不命中（tomorrow/row、cancel/cell、profile/file、due diligence 等）")
+    void englishKeywordsDoNotMatchInsideOtherWords() {
+        assertFalse(TRIM.categoriesHintedBy("I will send it tomorrow").contains("table"), "tomorrow 里的 row");
+        assertFalse(TRIM.categoriesHintedBy("Please cancel the call").contains("table"), "cancel 里的 cell");
+        assertFalse(TRIM.categoriesHintedBy("This is a scroll of honour").contains("table"), "scroll 里的 roll/row");
+        assertFalse(TRIM.categoriesHintedBy("Check the comments_total field name").contains("version"));
+        assertFalse(TRIM.categoriesHintedBy("Review the due diligence report").contains("task"), "due diligence 不是期限");
+        assertFalse(TRIM.categoriesHintedBy("Review Schedule A of the agreement").contains("task"), "合同里的 Schedule A 不是日程");
+        assertFalse(TRIM.categoriesHintedBy("Review the limitation of liability clause").contains("task"));
+        assertFalse(TRIM.categoriesHintedBy("It will take 30 minutes").contains("meeting"), "30 minutes 不是纪要");
+        assertFalse(TRIM.categoriesHintedBy("Summarise the lawsuit").contains("legal"), "lawsuit 里的 law");
+        assertFalse(TRIM.categoriesHintedBy("Where is the lawyer's address").contains("legal"));
+        assertFalse(TRIM.categoriesHintedBy("Check the cellular network clause").contains("table"));
+        assertFalse(TRIM.categoriesHintedBy("Is this accepted practice").contains("revision"));
+        assertFalse(TRIM.categoriesHintedBy("The backslash and the formatter").contains("format"), "formatter 不是 format");
+        assertFalse(TRIM.toolsHintedBy("Remove the movement clause").contains("move_files"), "movement 里的 move");
+        assertFalse(TRIM.toolsHintedBy("Undeleted items stay").contains("move_to_trash"), "undeleted 里的 delete");
+        assertFalse(TRIM.toolsHintedBy("Check the pigeonhole").contains("create_folder"));
+        // 复数 / 屈折形态要明列：整词匹配不认 rows / cells
+        assertTrue(TRIM.categoriesHintedBy("Sort the rows").contains("table"));
+        assertTrue(TRIM.categoriesHintedBy("Sum the cells").contains("table"));
+        // 弯撇号与直撇号同一个词
+        assertEquals(TRIM.toolsHintedBy("Use the firm\u2019s standard formatting"),
+                TRIM.toolsHintedBy("Use the firm's standard formatting"));
+    }
+
+    @Test
+    @DisplayName("英文句子同样受 ≤3 类上限约束")
+    void englishPutBackIsCappedAtThreeCategories() {
+        String sentence = "Accept all tracked changes, put the hearing on my calendar, format the font, "
+                + "turn it into a slide deck and find case law about the spreadsheet";
+        assertTrue(TRIM.categoriesHintedBy(sentence).size() > ToolDisclosurePolicy.MAX_KEYWORD_PUTBACK);
+        assertEquals(ToolDisclosurePolicy.MAX_KEYWORD_PUTBACK, TRIM.categoriesPutBackFor(sentence).size());
+    }
+
+    @Test
     @DisplayName("类目裁剪：skill 放回——白名单里点名的工具，它们所在的类目整类放回（core 不算）")
     void skillAllowedToolsMapToCategories() {
         assertEquals(Set.of("python", "litigation"),

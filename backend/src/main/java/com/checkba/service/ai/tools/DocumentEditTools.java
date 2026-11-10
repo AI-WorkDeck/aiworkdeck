@@ -990,11 +990,23 @@ public class DocumentEditTools implements AgentToolComponent {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("anchor", anchorId != null ? anchorId : "");
             params.put("newText", newText != null ? newText : "");
-            return editorBridgeService.executeEditorCommand("replace_at_position", params);
+            return withEmptyParagraphNote(editorBridgeService.executeEditorCommand("replace_at_position", params));
         } catch (Exception e) {
             log.error("Failed to replace at anchor", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    /**
+     * 整段删除后修订模式只标删文字、段落标记保留成空段落；模型曾因此反复找/选/替换空段落，
+     * 空转 13–42 轮（g16「删除第三条」）。回执为空段落时明确告知这是完成状态。
+     */
+    static String withEmptyParagraphNote(String result) {
+        if (result == null || !result.contains("\"paragraphAfterEdit\":\"\"")) return result;
+        int end = result.lastIndexOf('}');
+        if (end < 0) return result;
+        return result.substring(0, end)
+                + ",\"note\":\"整段文字已标删。修订模式下段落标记保留为一个空段落，这是正常结果、没有工具能单独删除它；不要再查找、选中或替换空段落，直接向用户汇报完成。\"}";
     }
 
     @ToolMeta(displayName = "删除选区", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.WRITE)
