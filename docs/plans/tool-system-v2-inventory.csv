@@ -127,8 +127,9 @@ litigation_timeline_render,builtin,litigation_timeline,LOWA,write,N,Y,3,234,48,e
 litigation_reference,builtin,litigation,LOWA,read,N,Y,1,163,62,en,en,keep+rewrite-desc,litigation_reference,litigation,N,N,N,N,N,N,N,N,N,first line en; access fixed to read in V4
 litigation_checkpoint,builtin,litigation,LOWA,read,N,Y,2,229,102,en,en,keep+rewrite-desc,litigation_checkpoint,litigation,N,N,N,N,N,N,N,N,N,first line 102 chars; first line en; access fixed to read in V4
 litigation_render,builtin,litigation,LOWA,write,N,Y,5,423,118,en,en,keep+rewrite-desc,litigation_render,litigation,N,N,N,N,N,N,N,N,N,first line 118 chars; first line en
-meeting_list_recordings,builtin,meeting,ALL,read,N,Y,0,62,102,en,en,merge→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,source=recording
-meeting_get_transcript,builtin,meeting,ALL,read,N,Y,1,94,123,en,en,merge→meeting_get_transcript,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,source=recording
+meeting_list,builtin,meeting,ALL,read,N,Y,5,0,0,zh,zh,new,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5: merges meeting_list_recordings + tmeet_list_meetings; source=recording|tencent|all; tencent routes to the plugin when installed+enabled (E4) else the built-in table"
+meeting_list_recordings,builtin,meeting,ALL,read,N,Y,0,62,102,en,en,shim→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5 shim (hidden, delegates to meeting_list, deleted at 0.83); source=recording"
+meeting_get_transcript,builtin,meeting,ALL,read,N,Y,3,94,123,en,en,keep,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,"V5: absorbs tmeet_get_transcript; meetingId is a string + source=recording|tencent; description rewritten"
 save_memory,builtin,memory,ALL,write,Y,Y,6,431,65,zh,mixed,keep,save_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
 query_memory,builtin,memory,ALL,read,Y,Y,6,381,54,zh,mixed,keep,query_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 update_project_info,builtin,memory,ALL,write,N,Y,2,91,27,zh,zh,keep,update_project_info,memory,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -304,8 +305,8 @@ task_create,builtin,task,ALL,write,N,Y,11,511,60,zh,zh,keep,task_create,tasks,N,
 task_update,builtin,task,ALL,write,N,Y,8,338,87,mixed,zh,keep+rewrite-desc,task_update,tasks,N,N,N,N,N,N,N,N,W,first line 87 chars; first line mixed
 task_list,builtin,task,ALL,read,N,Y,3,264,27,zh,zh,keep,task_list,tasks,N,N,N,N,N,N,N,N,Y,the only agenda read tool (no calendar_agenda); add 安排 keyword
 docx_inspect_template,builtin,template,ALL,read,N,Y,2,246,194,en,en,keep+rewrite-desc,docx_inspect_template,template,N,N,N,N,N,N,N,N,Y,first line 194 chars; first line en
-tmeet_list_meetings,builtin,tmeet,ALL,read,N,Y,1,90,77,en,en,merge→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,source=tencent
-tmeet_get_transcript,builtin,tmeet,ALL,read,N,Y,1,82,115,en,en,merge→meeting_get_transcript,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,source=tencent
+tmeet_list_meetings,builtin,meeting,ALL,read,N,Y,1,90,77,en,en,shim→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5 shim (hidden, delegates to meeting_list, deleted at 0.83); source=tencent (always the built-in table)"
+tmeet_get_transcript,builtin,meeting,ALL,read,N,Y,1,82,115,en,en,shim→meeting_get_transcript,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,"V5 shim (hidden, delegates to meeting_get_transcript, deleted at 0.83); source=tencent (always the built-in table)"
 text_write_file,builtin,text,LOWA,write,N,Y,2,171,54,mixed,mixed,shim→write_file,write_file,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to write_file, deleted at 0.83); mode=overwrite"
 text_find_replace,builtin,text,LOWA,write,N,Y,4,199,55,mixed,mixed,keep+rewrite-desc,text_find_replace,files,N,N,N,N,N,N,N,N,N,first line mixed
 todo_write,builtin,agent,ALL,write,Y,Y,1,317,27,zh,zh,keep,todo_write,agent,Y,Y,Y,Y,Y,Y,Y,Y,N,409 tokens for one param; <=150

@@ -113,7 +113,7 @@ class BuiltinSkillsTest {
                 ? List.of(readTool, "doc_find_text", "doc_find_replace", "doc_insert_at_cursor", "doc_insert_table")
                 : List.of(readTool, "office_search", "office_replace_text", "office_insert_text", "office_insert_table");
         assertTrue(visible.containsAll(editingTools), visible.toString());
-        assertTrue(visible.containsAll(List.of("tmeet_list_meetings", "tmeet_get_transcript", "task_create", "write_docx")),
+        assertTrue(visible.containsAll(List.of("meeting_list", "meeting_get_transcript", "task_create", "write_docx")),
                 visible.toString());
         assertFalse(visible.contains(otherHostTool), visible.toString());
         assertTrue(realToolNames.contains("doc_start_stream"));
@@ -132,19 +132,20 @@ class BuiltinSkillsTest {
         router.activateForTurn("c", "r1", "刚开完腾讯会议，帮我整理成会议纪要", null);
         assertEquals("tencent-meeting", router.activeSkill("r1").orElseThrow().getId());
         Set<String> v1 = names(router.visibleTools("r1", all));
-        assertTrue(v1.contains("tencent_meeting_action") && v1.contains("meeting_list_recordings"), v1.toString());
+        assertTrue(v1.contains("tencent_meeting_action") && v1.contains("meeting_list"), v1.toString());
 
         router.activateForTurn("c", "r2", "整理会议纪要，就是刚才腾讯会议那个", null);
         assertEquals("meeting-recorder", router.activeSkill("r2").orElseThrow().getId());
         Set<String> v2 = names(router.visibleTools("r2", all));
-        assertTrue(v2.contains("tencent_meeting_action") && v2.contains("meeting_list_recordings"), v2.toString());
+        assertTrue(v2.contains("tencent_meeting_action") && v2.contains("meeting_list"), v2.toString());
 
         router.activateForTurn("c", "r3", "帮我整理会议纪要", null);
         assertEquals("meeting-recorder", router.activeSkill("r3").orElseThrow().getId());
         Set<String> v3 = names(router.visibleTools("r3", all));
-        assertTrue(v3.contains("meeting_list_recordings"));
+        assertTrue(v3.contains("meeting_list"));
         assertFalse(v3.contains("tencent_meeting_action"), v3.toString());
         assertFalse(v3.contains("tmeet_get_transcript"), v3.toString());
+        assertTrue(v1.contains("meeting_get_transcript") && v2.contains("meeting_get_transcript"));
     }
 
     private static Set<String> names(List<ToolSpecification> specs) {
@@ -327,7 +328,7 @@ class BuiltinSkillsTest {
         assertTrue(s.getTriggers().contains("会议纪要"),
                 "面板 kick-off prompt 以「会议纪要」开头，触发词缺了整条链路断掉");
         assertTrue(s.getAllowedTools().containsAll(
-                        List.of("meeting_get_transcript", "meeting_list_recordings", "write_docx")),
+                        List.of("meeting_get_transcript", "meeting_list", "write_docx")),
                 "读稿两件套与 write_docx 必须都在白名单里：" + s.getAllowedTools());
         assertTrue(s.isEnabledByDefault(),
                 "「语音」合并插件成员默认启用（dev-board#66：与 text-to-speech 启停一体，"

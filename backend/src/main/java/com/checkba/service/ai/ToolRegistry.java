@@ -465,6 +465,7 @@ public class ToolRegistry {
             Map.entry("litigation_timeline_start", "Read timeline materials"),
             Map.entry("litigation_timeline_step", "Advance timeline pipeline"),
             Map.entry("litigation_timeline_render", "Draw case timeline"),
+            Map.entry("meeting_list", "List meetings"),
             Map.entry("meeting_list_recordings", "List meeting recordings"),
             Map.entry("meeting_get_transcript", "Read meeting transcript"),
             Map.entry("tmeet_list_meetings", "List Tencent meetings"),
@@ -690,7 +691,6 @@ public class ToolRegistry {
         List<McpCandidate> out = new ArrayList<>();
         Set<String> unusable = unusableToolNames();
         Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
-        boolean tmeetPluginActive = tencentMeetingPluginActive();
         for (ToolSpecification spec : builtinSpecifications) {
             String name = spec.name();
             RegisteredTool registered = builtinTools.get(name);
@@ -698,7 +698,7 @@ public class ToolRegistry {
             if (registered.method() != null && registered.method().isAnnotationPresent(com.checkba.service.ai.tools.ToolShim.class)) continue;
             boolean writeAllowed = MCP_WRITE_ALLOWED.contains(name) && !requiresConfirmation(name);
             if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
-                    || name.startsWith(MCP_METERED_PREFIX) || (tmeetPluginActive && name.startsWith("tmeet_"))
+                    || name.startsWith(MCP_METERED_PREFIX)
                     || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
                     || (meta != null && meta.requiresHost() != ToolMeta.Host.NONE)
                     || (!writeAllowed && com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ)) continue;
@@ -964,9 +964,7 @@ public class ToolRegistry {
     public List<ToolSpecification> getAllSpecifications() {
         List<ToolSpecification> all = new ArrayList<>();
         Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
-        boolean tmeetPluginActive = tencentMeetingPluginActive();
         for (ToolSpecification spec : builtinSpecifications) {
-            if (tmeetPluginActive && spec.name().startsWith("tmeet_")) continue;
             Object owner = builtinTools.get(spec.name()).bean();
             if (!(owner instanceof AgentToolComponent component)
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
@@ -1038,8 +1036,8 @@ public class ToolRegistry {
      * 插件启停过滤：内置工具（不属于任何插件，pid == null）恒可见；
      * 插件工具仅在所属插件启用时可见。
      */
-    /** 腾讯会议插件已安装且启用：以插件工具 tencent_meeting_action 为准，不再向模型提供内置 tmeet_*（未装则保留）。 */
-    private boolean tencentMeetingPluginActive() {
+    /** 腾讯会议插件已安装且启用：meeting_list/meeting_get_transcript 的 tencent 来源以插件为准（E4），未装则读内置同步表。 */
+    public boolean tencentMeetingPluginActive() {
         String pid = pluginService.getPluginIdForTool("tencent_meeting_action");
         return pid != null && pluginService.isEnabled(pid);
     }

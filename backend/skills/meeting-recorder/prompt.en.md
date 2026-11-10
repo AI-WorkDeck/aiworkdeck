@@ -7,8 +7,8 @@ sent to the client, or circulated to the team as it stands.
 
 ## Workflow
 
-1. Call `meeting_get_transcript` (with the meetingId from the kick-off prompt) to read the full
-   transcript. Machine-generated summary material (chapters / summary / to-do leads) may be
+1. Call `meeting_get_transcript` (with the meetingId and source from the kick-off prompt) to read the full
+   transcript; if the user gave no meetingId, call `meeting_list` first (`source=recording` is this project's recordings, `tencent` is Tencent Meeting, `all` when unsure) and only list - do not export first. Machine-generated summary material (chapters / summary / to-do leads) may be
    appended at the end - treat it as a hint only; the transcript text is authoritative.
 2. Read the whole transcript and identify: the subject of the meeting, the participants and their
    positions, the topics discussed, the conclusions and resolutions reached, the explicit action

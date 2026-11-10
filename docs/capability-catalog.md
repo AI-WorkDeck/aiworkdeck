@@ -11,7 +11,7 @@
 - 权限范围 `awd:<领域>.<read|write>`：project 项目文件与数据、editor 桌面编辑器、office-addin 任务窗格、memory 用户记忆、external 外部服务、system 代码执行与扩展安装。
 - 宿主：NONE 纯后端可完成；LOWA 需桌面编辑器；OFFICE 需 Office/WPS 任务窗格。
 
-合计 336 个工具：read 96，write 220，destructive 20。
+合计 337 个工具：read 97，write 220，destructive 20。
 
 ## MCP 服务器工具（本机 `/mcp`，只读）
 
@@ -186,8 +186,8 @@
 | `qichacha_ipr` | read | awd:external.read | data | NONE | 是 | — |
 | `qichacha_query` | read | awd:external.read | data | NONE | 是 | — |
 | `search_web` | read | awd:external.read | web | NONE | 是 | — |
-| `tmeet_get_transcript` | read | awd:external.read | meeting | NONE | 是 | — |
-| `tmeet_list_meetings` | read | awd:external.read | meeting | NONE | 是 | — |
+| `tmeet_get_transcript` | read | awd:external.read | meeting | NONE | 否 | — |
+| `tmeet_list_meetings` | read | awd:external.read | meeting | NONE | 否 | — |
 | `tushare_query` | read | awd:external.read | data | NONE | 是 | — |
 
 ## memory
@@ -341,7 +341,8 @@
 | `list_files` | read | awd:project.read | file | NONE | 是 | `list_project_files` |
 | `list_project_folders` | read | awd:project.read | file | NONE | 否 | — |
 | `meeting_get_transcript` | read | awd:project.read | meeting | NONE | 是 | — |
-| `meeting_list_recordings` | read | awd:project.read | meeting | NONE | 是 | — |
+| `meeting_list` | read | awd:project.read | meeting | NONE | 是 | — |
+| `meeting_list_recordings` | read | awd:project.read | meeting | NONE | 否 | — |
 | `move_files` | write | awd:project.write | file | NONE | 是 | — |
 | `move_files_batch` | write | awd:project.write | file | NONE | 否 | — |
 | `move_project_file` | write | awd:project.write | file | NONE | 否 | — |
