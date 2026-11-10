@@ -241,5 +241,42 @@
         "tmeet_get_transcript"
       ]
     }
+  },
+  {
+    "id": "meeting-v5-folder-not-meeting",
+    "title": "V5：「整理这份录音文件夹」是文件整理，meeting 类目不放回",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "整理这份录音文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_project_files",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_project_files": "录音/"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_project_files",
+          "argsContain": {}
+        }
+      ],
+      "offeredToolsExclude": [
+        "meeting_list",
+        "meeting_get_transcript",
+        "meeting_list_recordings"
+      ],
+      "bubbleEndStatus": "finished"
+    }
   }
 ]

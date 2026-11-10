@@ -280,12 +280,15 @@
       },
       "expect": {
         "firstToolAnyOf": [
-          "move_files",
-          "move_project_file",
-          "move_files_batch",
-          "list_files",
+          "search_project_files",
           "doc_list_project_files",
-          "list_tools"
+          "list_project_folders",
+          "list_files",
+          "list_tools",
+          "move_files",
+          "task_create",
+          "task_list",
+          "ask_user"
         ],
         "mustUse": [
           [
@@ -333,10 +336,15 @@
       },
       "expect": {
         "firstToolAnyOf": [
+          "search_project_files",
+          "doc_list_project_files",
+          "list_project_folders",
+          "list_files",
+          "list_tools",
+          "move_files",
           "task_create",
           "task_list",
-          "ask_user",
-          "list_tools"
+          "ask_user"
         ],
         "mustNotUse": [
           "meeting_list",
@@ -345,6 +353,11 @@
           "meeting_get_transcript",
           "tmeet_get_transcript",
           "tencent_meeting_action"
+        ],
+        "mustUse": [
+          [
+            "task_create"
+          ]
         ]
       }
     },
