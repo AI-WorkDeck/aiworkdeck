@@ -79,3 +79,6 @@ office-addin/node_modules
 # scripts/quickstart.sh 的本地数据（日志、存储、隔离 user.home）
 .quickstart/
 scripts/eval/out/
+
+# 运行期由 harness 进化生成的用户 skill（本地产物，不入库）
+/skills/user-evo-*/
