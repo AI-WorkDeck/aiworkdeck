@@ -272,7 +272,8 @@ export const librePoolMethods = {
     // isCancelled：调用方会话作废（取消比对）时立即放弃仍在冷启动的实例，不让它在后台
     // 跑满启动预算，也不让下一次比对再叠一套引擎抢 CPU。
     async acquireLibreHiddenInstance({ timeoutMs = 180000, isCancelled = null } = {}) {
-        if (!isDesktopHost()) return null
+        // 隐藏实例是按需冷启的（不像常驻备胎那样占内存），Web 态编辑器同样能渲染它——
+        // AI 的 compare_docx_redline 在 Web 版也要能用；预热的备胎只有桌面壳才建，下面 warm 为空即走冷启。
         const warm = this.libreSpares.find(x => x && !x.file && !x.hidden && !x.borrowed && x.executor)
         if (warm) {
             warm.borrowed = true
