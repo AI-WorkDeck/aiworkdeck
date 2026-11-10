@@ -36,6 +36,8 @@ triggers_en:
   - file organization
   - sort and archive project files
   - organize working papers
+  - archive project files
+  - tidy up the project files
 
 prompt: prompt.md
 
