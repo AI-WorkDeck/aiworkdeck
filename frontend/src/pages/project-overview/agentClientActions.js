@@ -4,7 +4,8 @@
 // doc 流式写入缓冲、编辑器打开/重载/命令执行与结果回传。
 // 经展开进组件 methods（纯搬移，Phase 1 外置），`this` 即 project-overview 页面实例。
 import { beginCheckpointSaveBarrier, endCheckpointSaveBarrier, checkpointSaveBarrier, findCheckpointSaveBarrier, reconcileCheckpointSaveBarrier, pendingDocumentSaveFileIds } from '@/utils/checkpointSaveBarrier.js'
-import { sendEditorResult, getFileDetail, getCheckpointRestoreWriteState } from '@/services/api.js'
+import { sendEditorResult, getFileDetail, getCheckpointRestoreWriteState, fetchProjectFileBytes, createComparisonFile } from '@/services/api.js'
+import { isDocxDoc, runDocxComparison } from '@/utils/docxComparison.js'
 import { createSerialQueue } from '@/utils/asyncSerialize.js'
 import { DOC_MUTATED_EVENT, DOC_MUTATED_DEBOUNCE_MS, isDocMutatingAction } from '@/utils/docEvents.js'
 import { actionBudgetMs } from '@/composables/zetaOfficeRelay.js'
@@ -951,12 +952,72 @@ export const agentClientActionMethods = {
             await sendEditorResult(conversationId, requestId, false, null, error.message || String(error))
         }
     },
+    // compare_docx_files：AI 工具 compare_docx_redline 的前端执行端（V7 D1）。与工作台「比对稿」同一条
+    // runDocxComparison 链路（原生 .uno:CompareDocuments → 导出 → 落成新文件），两份原件不写。
+    // 不要求当前开着文档：引擎是借来的隐藏实例。打开着且有未存改动的源文档先落盘，否则比对的是旧字节。
+    async handleCompareDocxFiles(action) {
+        const { conversationId, requestId } = action
+        const params = action.params || {}
+        const reply = (ok, data, err) => sendEditorResult(conversationId, requestId, ok, data, err)
+        if (!this.canWriteProject) return reply(false, null, this.$t('workbenchOps.compareNoWritePermission'))
+        const projectId = this.projectId
+        let handle = null
+        let released = false
+        const release = () => {
+            if (!handle || released) return
+            released = true
+            this.releaseLibreHiddenInstance(handle)
+        }
+        try {
+            const [source, target] = await Promise.all([
+                getFileDetail(projectId, params.baseFileId),
+                getFileDetail(projectId, params.revisedFileId),
+            ])
+            if (!isDocxDoc(source) || !isDocxDoc(target)) throw new Error(this.$t('editor.compare.failEmpty', { name: '' }))
+            const ids = new Set([String(source.id), String(target.id)])
+            const open = () => Object.values(this._libreRefs || {}).filter(inst =>
+                inst && inst.ready && !inst.docLoadFailed && inst.file && ids.has(String(inst.file.id)))
+            for (const inst of open().filter(i => (i.dirty || i.saving) && typeof i.flushSave === 'function')) {
+                await inst.flushSave({ timeoutMs: 10000 })
+            }
+            const stem = String(target.name || '').replace(/\.docx$/i, '')
+            const user = this.currentUser || {}
+            const created = await runDocxComparison({
+                source,
+                target,
+                t: (key, p) => this.$t(key, p),
+                name: this.$t('editor.compare.resultName', { name: stem }),
+                authorName: this.userDisplayName || user.displayName || '',
+                isCancelled: () => projectId !== this.projectId,
+                fetchBytes: (doc) => fetchProjectFileBytes(doc.id),
+                recheckClean: () => {
+                    const dirty = open().find(i => i.dirty || i.saving)
+                    if (dirty) throw new Error(this.$t('editor.compare.failChanged', { name: dirty.file.name }))
+                },
+                acquireEngine: async () => {
+                    handle = await this.acquireLibreHiddenInstance({ isCancelled: () => projectId !== this.projectId })
+                    return handle
+                },
+                releaseEngine: release,
+                saveFile: (payload) => createComparisonFile(projectId, payload),
+            })
+            await reply(true, { fileId: created.id, fileName: created.name })
+        } catch (e) {
+            console.error('[ProjectOverview] compare_docx_files failed:', e)
+            await reply(false, null, (e && e.message) || String(e))
+        } finally {
+            release()
+        }
+    },
+
     async handleEditorCommand(action) {
         if (this._projectVersionBusy) {
             await sendEditorResult(action.conversationId, action.requestId, false, null, this.$t('version.aiActionBusy'))
             return
         }
         if (action.action === 'doc_checkpoint_restore') return this.handleCheckpointRestore(action)
+        // compare_docx_files（V7 D1）：宿主动作，用隐藏引擎比对两份项目 docx，不碰当前打开的编辑器
+        if (action.action === 'compare_docx_files') return this.handleCompareDocxFiles(action)
         if (!this.acceptAgentEditorRun(action)) {
             await this.rejectAgentEditorTarget(action)
             return

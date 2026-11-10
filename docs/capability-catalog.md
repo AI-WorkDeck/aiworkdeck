@@ -11,7 +11,7 @@
 - 权限范围 `awd:<领域>.<read|write>`：project 项目文件与数据、editor 桌面编辑器、office-addin 任务窗格、memory 用户记忆、external 外部服务、system 代码执行与扩展安装。
 - 宿主：NONE 纯后端可完成；LOWA 需桌面编辑器；OFFICE 需 Office/WPS 任务窗格。
 
-合计 337 个工具：read 97，write 227，destructive 13。
+合计 339 个工具：read 98，write 228，destructive 13。
 
 ## MCP 服务器工具（本机 `/mcp`，只读）
 
@@ -27,6 +27,7 @@
 
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
+| `compare_docx_redline` | write | awd:editor.write | document | LOWA | 是 | — |
 | `doc_accept_all_revisions` | write | awd:editor.write | document | NONE | 否 | — |
 | `doc_accept_revision` | write | awd:editor.write | document | NONE | 否 | — |
 | `doc_add_comment` | write | awd:editor.write | document | NONE | 是 | — |
@@ -327,6 +328,7 @@
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ask_user` | read | awd:project.read | planning | NONE | 是 | — |
+| `compare_docx_summary` | read | awd:project.read | document | NONE | 是 | — |
 | `copy_files` | write | awd:project.write | file | NONE | 是 | — |
 | `create_file_from_template` | write | awd:project.write | - | NONE | 是 | — |
 | `create_folder` | write | awd:project.write | file | NONE | 是 | — |

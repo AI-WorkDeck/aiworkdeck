@@ -228,6 +228,8 @@ public class ToolDisclosurePolicy {
                 "name:doc_select_anchor", "name:doc_select_paragraph", "name:doc_modify_paragraph",
                 "name:doc_get_paragraph",
                 "name:doc_get_outline", "name:doc_insert_under_heading", "name:doc_replace_selection"));
+        // 两份 docx 比对（V7 D1）：不带 doc_ 前缀，归类只为让「比对 / 对比」关键词能预放回
+        CATEGORIES.put("compare", List.of("compare_docx_"));
         // pdf 与 files 排在 format 之前，只为 doc_export_pdf：它带 doc_ 前缀，排在后面就会被 format 通配吃掉。
         // V2：doc_export_pdf 从核心集退到 pdf 类目（「导出PDF / 转PDF」命中 pdf 关键词）。
         CATEGORIES.put("pdf", List.of("name:doc_export_pdf", "pdf_"));
@@ -308,6 +310,8 @@ public class ToolDisclosurePolicy {
 
     static {
         CATEGORY_KEYWORDS.put("pdf", List.of("pdf"));
+        CATEGORY_KEYWORDS.put("compare", List.of("比对", "对比", "比较两", "比一下", "回稿", "改了哪", "差异", "有什么不同", "有何不同",
+                "compare", "redline", "comparison"));
         CATEGORY_KEYWORDS.put("version", List.of("版本", "提交改动", "提交修改", "取回", "自动合并", "git", "commit", "pull", "restore"));
         CATEGORY_KEYWORDS.put("litigation", List.of("时间轴", "关系图", "流程图", "可视化",
                 "timeline", "diagram", "relationship graph"));

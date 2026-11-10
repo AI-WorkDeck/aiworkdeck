@@ -275,6 +275,8 @@ public class ToolRegistry {
             Map.entry("doc_link_evidence", "Link evidence"),
             Map.entry("doc_list_evidence", "List evidence links"),
             Map.entry("dd_export", "Export due-diligence deliverable"),
+            Map.entry("compare_docx_summary", "Compare documents"),
+            Map.entry("compare_docx_redline", "Build comparison document"),
             Map.entry("web_verify_import", "Import web-verification archive"),
             Map.entry("evidence_verify", "Verify evidence"),
             Map.entry("doc_insert_image", "Insert image"),
