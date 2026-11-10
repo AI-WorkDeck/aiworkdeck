@@ -93,9 +93,10 @@ node scripts/eval/model-matrix.mjs \
 检查结果、最终回复、SSE 事件计数）、`report.md`（汇总 + 逐句对比 + 未通过明细 + 结论行
 `AFTER ≥ BEFORE on correctness for all models: yes/no`）、各实例后端日志 `backend-*.log`。
 
-tokens 来自后端 `token_usage` 表（按会话汇总）；轮数与每轮提供的工具数来自后端 `[Round]` 日志，工具序列来自编排器日志。
+tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / `cache_write_tokens`，旧 ref 没有这两列时缓存数记 0）；报告里 **计费等价 = 提示词 tokens − 0.9·缓存命中 tokens**（假设缓存读按输入价 0.1x，忽略缓存写溢价与输出价差，代理指标非账单）；**工具集变化轮数** = 与上一轮下发工具名集合不同的轮数，来自 `[Round]` 日志的 `toolsHash`（旧 ref 无此项记 `-`）；轮数与每轮提供的工具数来自后端 `[Round]` 日志，工具序列来自编排器日志。
 
 ## 句子集清单
 
 - `sentences/core-17.json`：核心 17 句（读/找/改/批注/法条/记忆/新建）。V4 起期望里合并后的新名与旧名并列，可对拍合并前后两个 ref。
 - `sentences/v4-merged.json`：tool-system-v2 V4 合并工具专用 6 句（接受/拒绝修订、回复批注、表格插行、PDF 删页/抽页），夹具 `contract-commented.docx` / `contract-table.docx` / `dossier-24p.pdf`（`python3 fixtures/make_fixtures.py` 生成）。
+- `sentences/v5-meetings.json`：tool-system-v2 V5 会议合流专用 5 句（只看腾讯会议清单、整理纪要不指明来源、上周会议录音、昨天的逐字稿）。种子支持 `meetings`（写 `meeting_recording`）与 `tencentMeetings`（写内置同步表 `tencent_meeting_record`），都是虚构数据、`dayOffset` 相对今天；实例没有腾讯会议插件，tencent 来源走内置表，**绝不碰真实 tmeet 账号**。

@@ -58,7 +58,10 @@ public final class ToolShims {
             java.util.Map.entry("move_project_file", "move_files"),
             java.util.Map.entry("list_project_folders", "doc_list_project_files"),
             java.util.Map.entry("search_across_projects", "search_project_files"),
-            java.util.Map.entry("capability_apply", "capability_install"));
+            java.util.Map.entry("capability_apply", "capability_install"),
+            java.util.Map.entry("meeting_list_recordings", "meeting_list"),
+            java.util.Map.entry("tmeet_list_meetings", "meeting_list"),
+            java.util.Map.entry("tmeet_get_transcript", "meeting_get_transcript"));
 
     /** 旧名对应的新名；不是壳名字时原样返回。 */
     public static String canonical(String toolName) {

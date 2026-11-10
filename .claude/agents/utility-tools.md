@@ -288,7 +288,7 @@ project_file 上加列**。AI 侧读文件时经 `MeetingRecordingService.findBy
 mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不报错；② 扩展名表全仓只有
 `MeetingRecordingService.AUDIO_EXTENSIONS`（前端那份在 `frontend/src/utils/audioAttachment.js`，
 由 `tests/project-home/audio-attachment.test.mjs` 读 Java 源码对拍），`FileTree` 右键与
-`ChatInterface` 的未转写提示条共用它。`meeting_get_transcript` / `meeting_list_recordings`
+`ChatInterface` 的未转写提示条共用它。`meeting_get_transcript` / `meeting_list`（V5 起 `meeting_list_recordings` 只是兼容壳）
 是模型**主动**读会议的入口（按 meetingId），与这条「附件自动注入」互不替代。
 
 **QTA 转写（dev-board#1310）**：前后端音频判据含 `.qta`（大小写不敏感），可右键转写，

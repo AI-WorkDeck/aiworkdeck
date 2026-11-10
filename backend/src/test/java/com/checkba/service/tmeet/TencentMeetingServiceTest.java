@@ -87,7 +87,7 @@ class TencentMeetingServiceTest {
         assertTrue(minutesPrompt.contains("股权架构与投资人会议"));
         assertTrue(minutesPrompt.contains("123456789"));
         assertTrue(minutesPrompt.contains("recordId=88"));
-        assertTrue(minutesPrompt.contains("tmeet_get_transcript"));
+        assertTrue(minutesPrompt.contains("meeting_get_transcript") && minutesPrompt.contains("source=tencent"));
 
         String todosPrompt = service.buildTodosKickoffPrompt(record);
         assertTrue(todosPrompt.startsWith("腾讯会议待办："), "待办 prompt 必须以触发词开头以命中 skill 注入");

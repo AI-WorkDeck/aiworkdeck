@@ -706,22 +706,28 @@ class ToolDisclosurePolicyTest {
     }
 
     @Test
-    @DisplayName("腾讯会议插件已安装且启用 -> 不下发内置 tmeet_*；未安装 -> 保留")
-    void builtinTmeetToolsAreHiddenOnlyWhenThePluginIsActive() {
+    @DisplayName("会议合流（V5）：无论插件装没装，下发的都是 meeting_list/meeting_get_transcript，旧 tmeet_*/meeting_list_recordings 从不下发")
+    void meetingFamilyIsOfferedWhateverThePluginState() {
         PluginService plugins = org.mockito.Mockito.mock(PluginService.class);
         org.mockito.Mockito.when(plugins.getPluginTools()).thenReturn(java.util.Map.of());
         org.mockito.Mockito.when(plugins.getToolSpecifications()).thenReturn(List.of());
         RecordingToolRegistry registry = new RecordingToolRegistry(RealToolBeans.instantiateAll(), plugins);
         registry.init();
 
-        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("tmeet_get_transcript")));
+        assertMeetingFamilyOffered(registry);
 
         org.mockito.Mockito.when(plugins.getPluginIdForTool("tencent_meeting_action")).thenReturn("tencent-meeting");
         org.mockito.Mockito.when(plugins.isEnabled("tencent-meeting")).thenReturn(false);
-        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("tmeet_get_transcript")),
-                "插件已装但被禁用时仍应保留内置工具");
+        assertMeetingFamilyOffered(registry);
 
         org.mockito.Mockito.when(plugins.isEnabled("tencent-meeting")).thenReturn(true);
-        assertFalse(registry.getAllSpecifications().stream().anyMatch(s -> s.name().startsWith("tmeet_")));
+        assertMeetingFamilyOffered(registry);
+    }
+
+    private static void assertMeetingFamilyOffered(RecordingToolRegistry registry) {
+        java.util.Set<String> offered = registry.getAllSpecifications().stream()
+                .map(ToolSpecification::name).collect(java.util.stream.Collectors.toSet());
+        assertTrue(offered.containsAll(java.util.Set.of("meeting_list", "meeting_get_transcript")), offered.toString());
+        assertFalse(offered.stream().anyMatch(n -> n.startsWith("tmeet_") || n.equals("meeting_list_recordings")));
     }
 }

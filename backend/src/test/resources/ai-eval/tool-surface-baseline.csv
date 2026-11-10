@@ -6,30 +6,31 @@
 # 2026-11-07 tool-system-v2 V1（核心集描述按 A5 模板重写，不改名不改行为）后重测；V1 前基线见 git 历史
 # 2026-11-08 tool-system-v2 V2（核心集重切 8 个名字退出 + 条件核心 list_attached_files/doc_restore_checkpoint + memory_search 退出固定追加）后重测；V2 前基线见 git 历史
 # 2026-11-09 tool-system-v2 V4（22 族合并为单名、旧名转 @ToolShim 隐藏；law_search/search_project_files/doc_list_project_files 吸收合并参数）后重测；V4 前基线见 git 历史
+# 2026-11-09 tool-system-v2 V5（meeting_list_recordings/tmeet_* 并入 meeting_list，meeting_get_transcript 加 source）后重测：仅 worst 提示命中 meeting 类目，4 个工具 → 2 个；V5 前基线见 git 历史
 lowa-docx,neutral,31,6920
 lowa-docx,typical,39,9308
-lowa-docx,worst,35,7253
+lowa-docx,worst,33,7257
 lowa-xlsx,neutral,25,5918
 lowa-xlsx,typical,50,11802
-lowa-xlsx,worst,29,6251
+lowa-xlsx,worst,27,6255
 lowa-pptx,neutral,26,5982
 lowa-pptx,typical,30,7270
-lowa-pptx,worst,30,6315
+lowa-pptx,worst,28,6319
 lowa-nofile,neutral,22,5043
 lowa-nofile,typical,25,6128
-lowa-nofile,worst,26,5376
+lowa-nofile,worst,24,5380
 office-word,neutral,27,6021
 office-word,typical,30,7106
-office-word,worst,31,6354
+office-word,worst,29,6358
 office-excel,neutral,25,5843
 office-excel,typical,28,6928
-office-excel,worst,29,6176
+office-excel,worst,27,6180
 office-ppt,neutral,24,5620
 office-ppt,typical,27,6705
-office-ppt,worst,28,5953
+office-ppt,worst,26,5957
 none,neutral,18,4175
 none,typical,21,5260
-none,worst,22,4508
+none,worst,20,4512
 ask,neutral,8,1187
 ask,typical,8,1187
 ask,worst,8,1187

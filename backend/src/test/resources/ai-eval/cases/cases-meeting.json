@@ -1,0 +1,282 @@
+[
+  {
+    "id": "meeting-v5-list-recordings-last-week",
+    "title": "V5：上周有哪些会议录音 → meeting_list(source=recording)，不再下发 meeting_list_recordings",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "上周有哪些会议录音",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "meeting_list",
+            "arguments": {
+              "source": "recording",
+              "from": "2026-11-02",
+              "to": "2026-11-08"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "meeting_list": "- source=recording | meetingId=9 | 尽调访谈"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "meeting_list",
+          "argsContain": {
+            "source": "recording"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "meeting_list",
+        "meeting_get_transcript"
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsExclude": [
+        "meeting_list_recordings",
+        "tmeet_list_meetings",
+        "tmeet_get_transcript"
+      ]
+    }
+  },
+  {
+    "id": "meeting-v5-list-tencent-no-export",
+    "title": "V5：「只看有哪些会议，不要导出」→ 首个工具 meeting_list(source=tencent)，不是 tencent_meeting_action",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "刚开完腾讯会议，帮我整理成会议纪要（只看有哪些会议，不要导出）",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "meeting_list",
+            "arguments": {
+              "source": "tencent"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "meeting_list": "腾讯会议列表：\n- source=tencent | meetingId=101 | 股权激励签约决议会"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "meeting_list",
+          "argsContain": {
+            "source": "tencent"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "meeting_list",
+        "meeting_get_transcript"
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsExclude": [
+        "meeting_list_recordings",
+        "tmeet_list_meetings",
+        "tmeet_get_transcript"
+      ]
+    }
+  },
+  {
+    "id": "meeting-v5-minutes-tie-skill",
+    "title": "V5：「整理会议纪要，就是刚才腾讯会议那个」→ 先 meeting_list 找到会议",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "整理会议纪要，就是刚才腾讯会议那个",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "meeting_list",
+            "arguments": {
+              "source": "tencent"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "meeting_list": "腾讯会议列表：\n- source=tencent | meetingId=101 | 股权激励签约决议会"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "meeting_list",
+          "argsContain": {
+            "source": "tencent"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "meeting_list",
+        "meeting_get_transcript"
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsExclude": [
+        "meeting_list_recordings",
+        "tmeet_list_meetings",
+        "tmeet_get_transcript"
+      ]
+    }
+  },
+  {
+    "id": "meeting-v5-minutes-no-hint",
+    "title": "V5：「帮我整理会议纪要」无来源 → 先 meeting_list（缺省 all）",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "帮我整理会议纪要",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "meeting_list",
+            "arguments": {
+              "source": "all"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "meeting_list": "- source=recording | meetingId=9 | 尽调访谈"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "meeting_list",
+          "argsContain": {}
+        }
+      ],
+      "offeredToolsInclude": [
+        "meeting_list",
+        "meeting_get_transcript"
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsExclude": [
+        "meeting_list_recordings",
+        "tmeet_list_meetings",
+        "tmeet_get_transcript"
+      ]
+    }
+  },
+  {
+    "id": "meeting-v5-transcript-yesterday",
+    "title": "V5：把昨天那个会议的逐字稿调出来 → meeting_list 带日期，再 meeting_get_transcript(meetingId, source)",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "把昨天那个会议的逐字稿调出来",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "meeting_list",
+            "arguments": {
+              "from": "2026-11-08",
+              "to": "2026-11-08"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "meeting_get_transcript",
+            "arguments": {
+              "meetingId": "9",
+              "source": "recording"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "meeting_list": "- source=recording | meetingId=9 | 尽调访谈",
+      "meeting_get_transcript": "会议：尽调访谈"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "meeting_list",
+          "argsContain": {}
+        },
+        {
+          "name": "meeting_get_transcript",
+          "argsContain": {
+            "meetingId": "9",
+            "source": "recording"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "meeting_list",
+        "meeting_get_transcript"
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsExclude": [
+        "meeting_list_recordings",
+        "tmeet_list_meetings",
+        "tmeet_get_transcript"
+      ]
+    }
+  },
+  {
+    "id": "meeting-v5-folder-not-meeting",
+    "title": "V5：「整理这份录音文件夹」是文件整理，meeting 类目不放回",
+    "category": "meeting",
+    "protocol": "native",
+    "userInput": "整理这份录音文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_project_files",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_project_files": "录音/"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_project_files",
+          "argsContain": {}
+        }
+      ],
+      "offeredToolsExclude": [
+        "meeting_list",
+        "meeting_get_transcript",
+        "meeting_list_recordings"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  }
+]

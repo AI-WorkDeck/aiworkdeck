@@ -308,6 +308,22 @@ class Instance {
       await this.sql(`insert into memory_entry (uid, user_id, project_id, memory_type, memory_key, memory_value, is_protected, importance_score, scope, created_at, updated_at)
         values (gen_random_uuid()::text, ${this.userId}, ${pid}, ${q(m.type || 'preference')}, ${q(m.key)}, ${q(m.content)}, false, 0.7, ${q(m.scope || 'user')}, now(), now())`)
     }
+    // 会议夹具（V5）：直接写本实例库里的内置表——录音 meeting_recording、腾讯会议同步表 tencent_meeting_record。
+    // 只用虚构数据，绝不触达任何真实腾讯会议账号或 tmeet CLI。dayOffset 相对今天（-1 = 昨天）。
+    for (const m of seed.meetings || []) {
+      const q = s => "'" + String(s).replace(/'/g, "''") + "'"
+      const at = `((now() at time zone 'Asia/Shanghai') + interval '${m.dayOffset ?? 0} day')` // 北京时间的本地时刻：工具按日期过滤、模型按北京日期说「昨天」
+      const transcript = JSON.stringify((m.transcript || [{ speaker: '1', start: 1000, end: 4000, text: '同意按分期付款方案推进。' }]))
+      await this.sql(`insert into meeting_recording (project_id, title, status, duration_ms, transcript_json, created_by, created_at, updated_at)
+        values (${pid}, ${q(m.title)}, 'transcribed', ${m.durationMs ?? 1800000}, ${q(transcript)}, ${this.userId}, ${at}, ${at})`)
+    }
+    for (const m of seed.tencentMeetings || []) {
+      const q = s => "'" + String(s).replace(/'/g, "''") + "'"
+      const at = `((now() at time zone 'Asia/Shanghai') + interval '${m.dayOffset ?? 0} day')` // 北京时间的本地时刻：工具按日期过滤、模型按北京日期说「昨天」
+      const para = JSON.stringify([{ startTime: '00:00:05', speakerName: m.speaker || '张三', text: m.text || '本次会议确认股权激励方案，下周五前出协议草稿。' }])
+      await this.sql(`insert into tencent_meeting_record (project_id, user_id, meeting_id, meeting_code, record_file_id, subject, start_time, duration, status, transcript_json, smart_minutes_text, synced_at, created_at, updated_at)
+        values (${pid}, ${this.userId}, ${q('fx-' + Math.random().toString(36).slice(2, 10))}, ${q(m.meetingCode || '888-000-111')}, ${q('rf-' + Math.random().toString(36).slice(2, 10))}, ${q(m.subject)}, ${at}, ${q(m.duration || '30分钟')}, 'SYNCED', ${q(para)}, ${q(m.minutes || '')}, now(), now(), now())`)
+    }
     return pid
   }
 
@@ -430,10 +446,11 @@ function parseLogSlice(slice, conversationId) {
   const tools = []
   const rounds = []
   let m
-  const re = /\[Round\] conv=(\S+) depth=(\d+) round=(\d+) tools=(\d+)|name = "([a-zA-Z_0-9]+)", arguments|Parsed XML tool: ([a-zA-Z_0-9]+)/g
+  // toolsHash = 本轮下发工具名（排序后）的哈希，toolsOrderHash = 按下发顺序的哈希；旧版本日志没有这两项
+  const re = /\[Round\] conv=(\S+) depth=(\d+) round=(\d+) tools=(\d+)(?:.*? toolsHash=(\S+) toolsOrderHash=(\S+))?|name = "([a-zA-Z_0-9]+)", arguments|Parsed XML tool: ([a-zA-Z_0-9]+)/g
   while ((m = re.exec(slice))) {
-    if (m[1]) { if (m[1] === conversationId) rounds.push({ depth: +m[2], round: +m[3], toolsOffered: +m[4] }) }
-    else tools.push(m[5] || m[6])
+    if (m[1]) { if (m[1] === conversationId) rounds.push({ depth: +m[2], round: +m[3], toolsOffered: +m[4], toolsHash: m[5] || null, toolsOrderHash: m[6] || null }) }
+    else tools.push(m[7] || m[8])
   }
   return { tools, rounds }
 }
@@ -451,12 +468,17 @@ async function runOne(inst, sentence, runIdx, opts) {
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
     const buf = Buffer.alloc(size - c.logOffset); fs.readSync(fd, buf, 0, buf.length, c.logOffset); fs.closeSync(fd)
     const { tools, rounds } = parseLogSlice(buf.toString('utf8'), c.conversationId)
-    const usage = (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls from token_usage where conversation_id='${c.conversationId}'`).catch(() => []))[0] || {}
+    // cached_tokens / cache_write_tokens 列自本 PR 起才有；旧 ref 的库没有这两列时回退到不带缓存的查询（缓存数记 0）
+    let usage = (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls, coalesce(sum(cached_tokens),0)::int as cached, coalesce(sum(cache_write_tokens),0)::int as cache_write, count(cached_tokens)::int as cache_reported from token_usage where conversation_id='${c.conversationId}'`).catch(() => null))?.[0]
+    usage = usage || (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls from token_usage where conversation_id='${c.conversationId}'`).catch(() => []))[0] || {}
     Object.assign(rec, {
       status: c.status, error: c.error, tools, firstTool: tools[0] || null,
       rounds: rounds.length, toolsOffered: rounds.map(r => r.toolsOffered),
       maxToolsRound2plus: rounds.length > 1 ? Math.max(...rounds.slice(1).map(r => r.toolsOffered)) : null,
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
+      cachedTokens: usage.cached ?? 0, cacheWriteTokens: usage.cache_write ?? 0, cacheReportedCalls: usage.cache_reported ?? 0,
+      billedEq: billedEq(usage.p ?? 0, usage.cached ?? 0),
+      toolSetChanges: countChanges(rounds.map(r => r.toolsHash)), toolOrderChanges: countChanges(rounds.map(r => r.toolsOrderHash)),
       durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
     const ctx = {
@@ -473,9 +495,23 @@ async function runOne(inst, sentence, runIdx, opts) {
   rec.wallMs = Date.now() - t0
   return rec
 }
+// 相邻两轮哈希不同的次数（第 1 轮没有「上一轮」，不计）；日志里没有哈希（旧 ref）时返回 null
+function countChanges(hashes) {
+  if (!hashes.length || hashes.some(h => !h)) return null
+  let n = 0
+  for (let i = 1; i < hashes.length; i++) if (hashes[i] !== hashes[i - 1]) n++
+  return n
+}
 function summarizeEvents(evs) { const c = {}; for (const e of evs) c[e] = (c[e] || 0) + 1; return c }
 
 // ---------- 报告 ----------
+// billed-equivalent（计费等价输入 token）= prompt − 0.9·cached：假设缓存读按输入价的 1/10 计（DeepSeek / Qwen 隐式缓存的典型比例，
+// 对 Anthropic 缓存读也是 0.1x）；忽略缓存写溢价（1.25x，只在显式缓存的模型上有）和输出 token 的价差。
+// 只是同口径对比用的代理指标，不是账单；真实账单以平台对账为准。
+const CACHE_READ_DISCOUNT = 0.9
+function billedEq(prompt, cached) { return Math.round(prompt - CACHE_READ_DISCOUNT * cached) }
+const pct = (cached, prompt) => prompt ? (100 * cached / prompt).toFixed(1) + '%' : '-'
+const med = xs => { const v = xs.filter(x => x != null).sort((a, b) => a - b); return v.length ? v[Math.floor((v.length - 1) / 2)] : null }
 // 第 2 轮起每轮下发工具数的最大值（后端 [Round] 日志的 tools=N）；单次运行见 results.json 的 maxToolsRound2plus
 const maxLater = rs => { const v = rs.map(r => r.maxToolsRound2plus).filter(x => x != null); return v.length ? Math.max(...v) : '-' }
 
@@ -489,29 +525,38 @@ function buildReport(meta, results, sentences) {
     `- 总墙钟: ${(meta.wallMs / 1000).toFixed(0)}s（其中构建+启动 ${(meta.setupMs / 1000).toFixed(0)}s，跑题 ${(meta.runMs / 1000).toFixed(0)}s）`, '')
   const skipped = sentences.filter(s => results.some(r => r.sentence === s.id && r.status === 'SKIPPED'))
   if (skipped.length) L.push(`SKIPPED（需要编辑器但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
-  L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 补全 tokens | 轮数 | ≥2轮最大工具数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|---|')
+  L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 缓存命中 tokens | 命中率 | 计费等价 | 补全 tokens | 轮数 | 工具集变化轮数 | 顺序变化轮数 | ≥2轮最大工具数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const m of models) for (const side of ['before', 'after']) {
     // before=after 同 ref 时 results 里靠 side 区分
     const rs = results.filter(r => r.side === side && r.model === m && r.status !== 'SKIPPED')
     const f = k => rs.filter(r => r.checks?.[k] === true).length, g = k => rs.filter(r => r.checks && k in r.checks).length
     const sum = k => rs.reduce((a, r) => a + (r[k] || 0), 0)
-    L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('completionTokens')} | ${sum('rounds')} | ${maxLater(rs)} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
+    L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('cachedTokens')} | ${pct(sum('cachedTokens'), sum('promptTokens'))} | ${sum('billedEq')} | ${sum('completionTokens')} | ${sum('rounds')} | ${rs.some(r => r.toolSetChanges == null) ? '-' : sum('toolSetChanges')} | ${rs.some(r => r.toolOrderChanges == null) ? '-' : sum('toolOrderChanges')} | ${maxLater(rs)} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
   }
-  L.push('', '## 逐句对比', '')
+  L.push('', `> 计费等价 = 提示词 tokens − ${CACHE_READ_DISCOUNT}·缓存命中 tokens（假设缓存读按输入价 0.1x，忽略缓存写溢价与输出价差；代理指标，非账单）。工具集变化轮数 = 与上一轮下发工具名集合不同的轮数（[Round] 日志 toolsHash）；旧 ref 无该日志记 -。`, '', '## 逐句对比', '')
   for (const m of models) {
-    L.push(`### ${m}`, '', '| 句子 | before 通过 | after 通过 | before 首工具 | after 首工具 | before 轮/tokens | after 轮/tokens | ≥2轮最大工具数 before/after | 差异 |', '|---|---|---|---|---|---|---|---|---|')
+    L.push(`### ${m}`, '', '| 句子 | before 通过 | after 通过 | before 首工具 | after 首工具 | before 轮/tokens | after 轮/tokens | before 命中率/计费等价/集变化 | after 命中率/计费等价/集变化 | ≥2轮最大工具数 before/after | 差异 |', '|---|---|---|---|---|---|---|---|---|---|---|')
     for (const s of sentences) {
       const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id)
       const b = pick('before'), a = pick('after')
-      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | 需要编辑器 |`); continue }
+      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | | | 需要编辑器 |`); continue }
       const pr = rs => `${rs.filter(r => r.pass).length}/${rs.length}`
       const ft = rs => rs.map(r => r.firstTool || '-').join(' / ')
       const rt = rs => rs.map(r => `${r.rounds}r/${(r.promptTokens || 0) + (r.completionTokens || 0)}t`).join(' / ')
+      const cm = rs => `${pct(rs.reduce((x, r) => x + (r.cachedTokens || 0), 0), rs.reduce((x, r) => x + (r.promptTokens || 0), 0))} / ${rs.map(r => r.billedEq ?? 0).join(',')} / ${rs.map(r => r.toolSetChanges ?? '-').join(',')}`
       const bp = b.filter(r => r.pass).length / (b.length || 1), ap = a.filter(r => r.pass).length / (a.length || 1)
-      L.push(`| ${s.id} | ${pr(b)} | ${pr(a)} | ${ft(b)} | ${ft(a)} | ${rt(b)} | ${rt(a)} | ${maxLater(b)} / ${maxLater(a)} | ${ap < bp ? '**退步**' : ap > bp ? '进步' : ''} |`)
+      L.push(`| ${s.id} | ${pr(b)} | ${pr(a)} | ${ft(b)} | ${ft(a)} | ${rt(b)} | ${rt(a)} | ${cm(b)} | ${cm(a)} | ${maxLater(b)} / ${maxLater(a)} | ${ap < bp ? '**退步**' : ap > bp ? '进步' : ''} |`)
     }
     L.push('')
   }
+  L.push('## 逐次运行（每次运行一行）', '', '| 模型 | 版本 | 句子 | run | 通过 | 轮数 | LLM 调用 | 提示词 | 缓存命中 | 命中率 | 计费等价 | 补全 | 工具集变化 | 顺序变化 |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+  for (const r of total) L.push(`| ${r.model} | ${r.side} | ${r.sentence} | ${r.run} | ${r.pass ? 'Y' : 'N'} | ${r.rounds ?? '-'} | ${r.llmCalls ?? '-'} | ${r.promptTokens ?? 0} | ${r.cachedTokens ?? 0} | ${pct(r.cachedTokens || 0, r.promptTokens || 0)} | ${r.billedEq ?? 0} | ${r.completionTokens ?? 0} | ${r.toolSetChanges ?? '-'} | ${r.toolOrderChanges ?? '-'} |`)
+  L.push('', '## 中位数（按运行）', '', '| 模型 | 版本 | 轮数 | 提示词 | 计费等价 | 命中率 |', '|---|---|---|---|---|---|')
+  for (const m of models) for (const side of ['before', 'after']) {
+    const rs = total.filter(r => r.side === side && r.model === m)
+    L.push(`| ${m} | ${side} | ${med(rs.map(r => r.rounds))} | ${med(rs.map(r => r.promptTokens))} | ${med(rs.map(r => r.billedEq))} | ${med(rs.map(r => r.promptTokens ? 100 * (r.cachedTokens || 0) / r.promptTokens : null))?.toFixed(1)}% |`)
+  }
+  L.push('')
   const fails = total.filter(r => !r.pass)
   if (fails.length) {
     L.push('## 未通过明细', '')

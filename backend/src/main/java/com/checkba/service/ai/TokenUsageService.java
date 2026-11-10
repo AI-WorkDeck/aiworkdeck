@@ -37,6 +37,16 @@ public class TokenUsageService {
      */
     @Transactional
     public void recordUsage(Long projectId, Long userId, String modelId, dev.langchain4j.model.output.TokenUsage usage, String conversationId) {
+        recordUsage(projectId, userId, modelId, usage, conversationId, null, null);
+    }
+
+    /**
+     * 同上，并带上本次调用的提示缓存读/写 token 数（来自上游 usage 的 cached_tokens 等字段，只落库、不参与计费）。
+     * 两个参数为 null 表示上游没回缓存字段。
+     */
+    @Transactional
+    public void recordUsage(Long projectId, Long userId, String modelId, dev.langchain4j.model.output.TokenUsage usage,
+                            String conversationId, Integer cachedTokens, Integer cacheWriteTokens) {
         if (usage == null) return;
 
         try {
@@ -55,6 +65,8 @@ public class TokenUsageService {
             entity.setPromptTokens(promptTokens);
             entity.setCompletionTokens(completionTokens);
             entity.setTotalTokens(totalTokens);
+            entity.setCachedTokens(cachedTokens);
+            entity.setCacheWriteTokens(cacheWriteTokens);
 
             boolean platformChannel = isPlatformChannel();
             if (platformChannel) {
