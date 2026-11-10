@@ -135,7 +135,9 @@ class SystemPromptToolVisibilityContractTest {
             Map.entry("version_pull", ToolMeta.Host.LOWA),
             Map.entry("version_restore", ToolMeta.Host.LOWA),
             // 导出 PDF（T-25）：doc_ 前缀本来就锁在 LOWA，声明是冗余的显式化
-            Map.entry("doc_export_pdf", ToolMeta.Host.LOWA)));
+            Map.entry("doc_export_pdf", ToolMeta.Host.LOWA),
+            // 两份 docx 修订比对稿（V7 D1）：原生比较在编辑器隐藏引擎里跑；片段里没有教它（靠 list_tools 的 compare 类目发现）
+            Map.entry("compare_docx_redline", ToolMeta.Host.LOWA)));
 
     /** 片段文件 → 它服务的那一档会话。 */
     private record Fragment(String stem, Capability capability, OfficeHost host) {
