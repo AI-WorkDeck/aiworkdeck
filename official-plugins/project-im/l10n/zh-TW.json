@@ -1,6 +1,6 @@
 {
   "plugin.name": "項目溝通",
   "plugin.description": "律所、團隊與項目的溝通：共享助手、私聊、文件歸檔與 AI 引用。目前僅支持中國大陸站賬號，國際站暫未開通。",
-  "tool.project_im_list_conversations.desc": "使用者詢問「有哪些群聊／會話、專案群」時使用。列出使用者的溝通會話（唯讀）。",
-  "tool.project_im_read_messages.desc": "使用者詢問「這個專案的群聊／群裡最近在討論什麼、聊天記錄」時使用（先以 project_im_list_conversations 取得會話 id）。讀取使用者所在會話的最近訊息（唯讀）。"
+  "tool.project_im_list_conversations.desc": "列出使用者的溝通會話（唯讀）。使用者詢問「有哪些群聊／會話、專案群」時使用。",
+  "tool.project_im_read_messages.desc": "讀取使用者所在會話的最近訊息（唯讀）。使用者詢問「這個專案的群聊／群裡最近在討論什麼、聊天記錄」時使用（先以 project_im_list_conversations 取得會話 id）。"
 }

@@ -472,7 +472,7 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 
 ## 声明式 Agent 工具（规范 v2.13 §20，P1-1/P1-2/P1-3，设计 `docs/plans/agent-app-control.md`）
 
-纯 Web 插件不写 Java 也能被应用内 Agent 调用：manifest `tools[]` 条目带 `access`（必填 read|write|destructive）、`inputSchema`、`handler`、`permissions`、`mcp`、`confirm`、`keywords` 任一字段即为声明式条目；只有 name/description/permissions 的老条目照旧按 JAR 解释，零改动兼容。
+纯 Web 插件不写 Java 也能被应用内 Agent 调用：manifest `tools[]` 条目带 `access`（必填 read|write|destructive）、`inputSchema`、`handler`、`permissions`、`mcp`、`confirm`、`keywords` 任一字段即为声明式条目（`agent` 不算：`agent:false` 老形态 JAR 条目照旧，用来把仅供界面直调的 JAR 工具如 `baoqingtian_action`/`dpia_workbench_action` 对模型和 MCP 隐藏）；`plugin-dev validate` 对声明式 `description` 套 A5 门禁（首行 ≤80、单语言中文、动词开头；`%key%` 取 `l10n/zh-CN.json`），并拒绝 destructive/`confirm:always`/`agent:false` 工具的 `mcp:true`；只有 name/description/permissions 的老条目照旧按 JAR 解释，零改动兼容。
 
 **确认闸（P2-1）**：`access=destructive`（或绑定的服务操作本身 destructive，如 calendar/delete）与 `confirm:always` 的声明式工具照常注册，但编排器分发前一律暂停并发 ask_user 确认卡，用户答「执行」才以原参数重放一次；`confirm:never` 对 destructive 无效；仍永不投影到 MCP。细节见 ai-chat.md「破坏性确认闸」。
 

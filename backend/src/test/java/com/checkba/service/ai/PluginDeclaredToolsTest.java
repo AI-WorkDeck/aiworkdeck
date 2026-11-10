@@ -73,6 +73,17 @@ class PluginDeclaredToolsTest {
     }
 
     @Test
+    void agentFalseHidesToolFromModelButKeepsItExecutable() throws IOException {
+        install(manifest.replace("\"access\": \"read\",", "\"access\": \"read\",\n      \"agent\": false,"));
+        assertTrue(plugins.isAgentHidden("hello_agent_tools_list_tasks"));
+        assertFalse(names().contains("hello_agent_tools_list_tasks"));
+        assertFalse(registry.pluginToolNames().contains("hello_agent_tools_list_tasks"));
+        assertTrue(registry.mcpCandidates().stream().noneMatch(c -> c.spec().name().equals("hello_agent_tools_list_tasks")));
+        assertTrue(names().contains("hello_agent_tools_add_task"));
+        assertTrue(registry.resolve("hello_agent_tools_list_tasks").isPresent());
+    }
+
+    @Test
     void installedToolsAppearExecuteAndDisappearWhenDisabled() throws IOException {
         install(manifest);
         assertTrue(names().containsAll(List.of("hello_agent_tools_list_tasks", "hello_agent_tools_add_task")));

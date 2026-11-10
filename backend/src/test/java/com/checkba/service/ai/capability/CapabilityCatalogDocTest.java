@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -103,16 +104,24 @@ class CapabilityCatalogDocTest {
                 .collect(Collectors.toMap(CapabilityCatalog.Capability::id, Function.identity()));
         List<String> projected = registry.mcpCandidates().stream().map(c -> c.spec().name()).toList();
         assertTrue(projected.contains("task_list"), projected.toString());
+        // V8/P2-5：首批 write 白名单是唯一允许投影的内置写工具，且不是 destructive
+        List<String> writeAllowed = List.of("task_create", "task_update", "tag_file", "create_folder");
+        assertTrue(projected.containsAll(writeAllowed), projected.toString());
         for (var candidate : registry.mcpCandidates()) {
             String name = candidate.spec().name();
-            assertEquals(ToolMeta.Access.READ, candidate.access(), name);
             var capability = byId.get(name);
-            assertEquals(ToolMeta.Access.READ, capability.access(), name);
+            if (writeAllowed.contains(name)) {
+                assertEquals(ToolMeta.Access.WRITE, candidate.access(), name);
+                assertNotEquals(ToolMeta.Access.DESTRUCTIVE, capability.access(), name);
+            } else {
+                assertEquals(ToolMeta.Access.READ, candidate.access(), name);
+                assertEquals(ToolMeta.Access.READ, capability.access(), name);
+            }
             assertEquals("NONE", capability.host(), name);
             assertTrue(capability.offeredToModel(), name);
             assertTrue(Stream.of("doc_", "sheet_", "slide_", "office_", "ref_").noneMatch(name::startsWith), name);
         }
-        for (String writer : List.of("task_create", "write_docx", "doc_find_replace", "delete_file", "memory_delete", "ask_user", "list_tools",
+        for (String writer : List.of("write_docx", "doc_find_replace", "delete_file", "memory_delete", "ask_user", "list_tools", "todo_write", "use_skill", "dispatch_subtask", "create_skill",
                 "search_web", "qichacha_ipr", "qichacha_query", "tushare_query", "law_search", "law_search_keyword",
                 "law_recognition", "get_law_article", "case_search")) {
             assertTrue(!projected.contains(writer), writer);

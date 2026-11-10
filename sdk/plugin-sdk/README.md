@@ -133,7 +133,7 @@ node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugi
 
 ## 声明式 Agent 工具（规范 v2.13，宿主运行时随后续版本）
 
-`manifest.json` 的 `tools[]` 除老形态（JAR 工具：`name`/`description`/`permissions`）外，新增声明式形态：`name`（非 JAR 工具须以 `<插件id 连字符转下划线>_` 开头）、`description`（可用 `%key%`）、`access`（`read|write|destructive`）、`inputSchema`（与 `contributes.mcpServers` 相同的受限子集）、`handler`（`jar` | `service` | `connection` | `view`）、`permissions`（⊆ manifest.permissions）、`mcp`、`confirm`、`keywords`。`handler.type=service` 的服务与操作名取自 [services.json](services.json)（宿主服务表的发布副本，与 `awd.services.request` 同名）；`view` 属第四期，`awd.tools.handle` 目前只有类型占位，`awd.tools.list()` 待宿主桥方法。`init` 生成的模板带一个 read 样例工具，`validate` 离线检查全部规则。详见 docs/PLUGIN_SPEC.md §20。
+`manifest.json` 的 `tools[]` 除老形态（JAR 工具：`name`/`description`/`permissions`）外，新增声明式形态：`name`（非 JAR 工具须以 `<插件id 连字符转下划线>_` 开头）、`description`（可用 `%key%`）、`access`（`read|write|destructive`）、`inputSchema`（与 `contributes.mcpServers` 相同的受限子集）、`handler`（`jar` | `service` | `connection` | `view`）、`permissions`（⊆ manifest.permissions）、`mcp`、`confirm`、`keywords`、`agent`（`false` = 登记但不下发给模型、不投影 MCP，仅供插件界面直调；老形态 JAR 条目也可带）。`validate` 另按 A5 描述门禁检查声明式工具的 `description`（`%key%` 取 `l10n/zh-CN.json`）：首行 ≤80 字符、单一语言（中文）、动词开头，「何时用」写第二行起；并拒绝 destructive / `confirm:always` / `agent:false` 工具写 `mcp:true`。`handler.type=service` 的服务与操作名取自 [services.json](services.json)（宿主服务表的发布副本，与 `awd.services.request` 同名）；`view` 属第四期，`awd.tools.handle` 目前只有类型占位，`awd.tools.list()` 待宿主桥方法。`init` 生成的模板带一个 read 样例工具，`validate` 离线检查全部规则。详见 docs/PLUGIN_SPEC.md §20。
 
 ## 消息中心通知（SDK 1.7）
 

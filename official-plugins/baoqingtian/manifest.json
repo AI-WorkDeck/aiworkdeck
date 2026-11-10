@@ -18,6 +18,7 @@
     {
       "name": "baoqingtian_action",
       "description": "包晴天案源和平台笔记工作区。",
+      "agent": false,
       "permissions": [
         "file_read",
         "network"
