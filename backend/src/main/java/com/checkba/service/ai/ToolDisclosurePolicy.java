@@ -316,7 +316,9 @@ public class ToolDisclosurePolicy {
         CATEGORY_KEYWORDS.put("enterprise-data", List.of("工商", "企业信息", "企查查", "股东", "注册资本",
                 "公司背景", "tushare", "股票", "上市公司"));
         CATEGORY_KEYWORDS.put("plugin", List.of("插件", "plugin", "能力安装", "capability"));
-        CATEGORY_KEYWORDS.put("meeting", List.of("会议", "录音", "纪要", "转写", "meeting", "transcript"));
+        // 不收裸「录音」：「整理这份录音文件夹」是文件整理，不是会议（V5 矩阵实测会误放回 meeting 类目）
+        CATEGORY_KEYWORDS.put("meeting", List.of("会议", "纪要", "转写", "逐字稿", "会议录音", "录音转写", "录音逐字稿", "录音记录", "开会录的",
+                "会议的录音", "的录音", "meeting", "transcript"));
         // 插件工具统一落 plugin-tools；腾讯会议插件的 tencent_meeting_action 靠这些词在首轮就可见
         CATEGORY_KEYWORDS.put("plugin-tools", List.of("会议", "纪要", "腾讯会议", "逐字稿", "转写",
                 "meeting minutes", "tencent meeting", "transcript"));

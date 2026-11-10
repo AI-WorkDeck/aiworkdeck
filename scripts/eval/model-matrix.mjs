@@ -307,6 +307,22 @@ class Instance {
       await this.sql(`insert into memory_entry (uid, user_id, project_id, memory_type, memory_key, memory_value, is_protected, importance_score, scope, created_at, updated_at)
         values (gen_random_uuid()::text, ${this.userId}, ${pid}, ${q(m.type || 'preference')}, ${q(m.key)}, ${q(m.content)}, false, 0.7, ${q(m.scope || 'user')}, now(), now())`)
     }
+    // 会议夹具（V5）：直接写本实例库里的内置表——录音 meeting_recording、腾讯会议同步表 tencent_meeting_record。
+    // 只用虚构数据，绝不触达任何真实腾讯会议账号或 tmeet CLI。dayOffset 相对今天（-1 = 昨天）。
+    for (const m of seed.meetings || []) {
+      const q = s => "'" + String(s).replace(/'/g, "''") + "'"
+      const at = `((now() at time zone 'Asia/Shanghai') + interval '${m.dayOffset ?? 0} day')` // 北京时间的本地时刻：工具按日期过滤、模型按北京日期说「昨天」
+      const transcript = JSON.stringify((m.transcript || [{ speaker: '1', start: 1000, end: 4000, text: '同意按分期付款方案推进。' }]))
+      await this.sql(`insert into meeting_recording (project_id, title, status, duration_ms, transcript_json, created_by, created_at, updated_at)
+        values (${pid}, ${q(m.title)}, 'transcribed', ${m.durationMs ?? 1800000}, ${q(transcript)}, ${this.userId}, ${at}, ${at})`)
+    }
+    for (const m of seed.tencentMeetings || []) {
+      const q = s => "'" + String(s).replace(/'/g, "''") + "'"
+      const at = `((now() at time zone 'Asia/Shanghai') + interval '${m.dayOffset ?? 0} day')` // 北京时间的本地时刻：工具按日期过滤、模型按北京日期说「昨天」
+      const para = JSON.stringify([{ startTime: '00:00:05', speakerName: m.speaker || '张三', text: m.text || '本次会议确认股权激励方案，下周五前出协议草稿。' }])
+      await this.sql(`insert into tencent_meeting_record (project_id, user_id, meeting_id, meeting_code, record_file_id, subject, start_time, duration, status, transcript_json, smart_minutes_text, synced_at, created_at, updated_at)
+        values (${pid}, ${this.userId}, ${q('fx-' + Math.random().toString(36).slice(2, 10))}, ${q(m.meetingCode || '888-000-111')}, ${q('rf-' + Math.random().toString(36).slice(2, 10))}, ${q(m.subject)}, ${at}, ${q(m.duration || '30分钟')}, 'SYNCED', ${q(para)}, ${q(m.minutes || '')}, now(), now(), now())`)
+    }
     return pid
   }
 
