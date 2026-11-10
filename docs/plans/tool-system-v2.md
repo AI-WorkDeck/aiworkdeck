@@ -228,3 +228,10 @@ MCP：`McpToolProjection` 加 A10 的会话内生排除表；`mcp:true` 白名�
 2. **注册数**：V3 后 331 → 现 347（+16 个新名；45 个旧名作为 `@ToolShim` 壳继续注册但不下发）；0.83 删壳后 302，V5 再并 meeting 得 300。下发数不变或更少（典型句 docx 50→49）。
 3. **与计划的差异**：① `capability_apply` 并入 `capability_install` 时确认闸（P2-1）尚未落地，所以做成"只传 url = 出计划、只传 planId = 安装"，两阶段仍是两次工具调用，没有折成一次；② `write_file(mode=overwrite)` 的执行体是 `TextFileEditTools.overwriteText`（旧名壳 `text_write_file` 仍声明 `requiresHost=LOWA`，新入口不挑宿主——任务窗格会话里改纯文本文件可用，只是没有文本标签可刷新）；③ `move_project_file`（按 fileId 移动）并入的是"路径数组 `move_files`"，壳里保留 id 实现；④ `office_revisions` 的 action 比 CSV 多了 `accept_all` / `reject_all`，与 `doc_revisions` 同形，覆盖旧 `acceptAll`/`rejectAll` 布尔；⑤ SkillRegistry 对用户自建 skill 的旧名迁移提前到了 V4（B5 ①），而不是等 V9。
 4. **门禁**：`ToolShimContractTest`（壳逐名钉住、到 0.83 变红）、`ToolChoiceSurfaceTest.eachMergedFamilyOffersExactlyOneName`、`MergedToolsDispatchTest`、`cases-tool-merge.json`（21 条）。真实模型矩阵结果见 PR 说明与 `.claude/agents/ai-chat.md`「工具合并与兼容壳」。
+
+## I. V8 实施记录（feat/tool-v2-v8-plugin-mcp-parity）
+1. **`agent:false`**：manifest 老形态与声明式条目都可带；`PluginService.isAgentHidden` 命中的工具不进 `getAllSpecifications` / `pluginToolNames`（披露）/ `mcpCandidates`，但 `resolve/execute` 照常可达（插件界面直调）。`baoqingtian_action`、`dpia_workbench_action` 已标。
+2. **MCP**：会话内生排除表补全 `todo_write/use_skill/dispatch_subtask/create_skill`；内置 write 白名单 `MCP_WRITE_ALLOWED = task_create/task_update/tag_file/create_folder`（P2-5，均非 destructive、无确认卡；`requiresConfirmation` 为真即剔除）。CSV 中 `mcp_eligible=W` 的其余 7 个（`write_file`/`write_docx`/`rename_project_file`/`save_memory`/`memory_write`/`tag_remove_from_file`/`move_files`）本批不放：或碰文档正文、或会覆盖/改名已有内容，留待逐个评估。
+3. **`plugin-dev validate`**：声明式工具 `description` 套 V0 同一把尺子（首行 ≤80、单语言中文、动词开头；`%key%` 取 `l10n/zh-CN.json`，取不到跳过）；`mcp:true` 与 destructive / `confirm:always` / `agent:false` 互斥。宿主安装期校验（`PluginManifestContractValidator`）刻意**不**加这两条：已装插件不能因此整批丢工具，运行期 `mcpCandidates` 本就兜底不投影。
+4. **官方插件**：lawfirm-management / project-im / desensitize 的 7 条工具描述把触发句挪到第二句（20 个语言文件同序调整，译文不变）；CSV 对应行改 `keep`。
+5. 未改动模型在应用内能看到的工具（仅隐藏两个声明"AI 不可调用"的 UI 专用 JAR 工具），未跑真实模型矩阵。

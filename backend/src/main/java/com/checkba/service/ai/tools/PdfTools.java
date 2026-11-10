@@ -142,7 +142,8 @@ public class PdfTools implements AgentToolComponent {
 
     // ==================== 脱敏 ====================
 
-    @ToolMeta(displayName = "PDF脱敏", category = "pdf", fileEffect = "MODIFIED",
+    // access：真脱敏不可逆：移除页面文字层并转为图片页
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "PDF脱敏", category = "pdf", fileEffect = "MODIFIED",
             requiresHost = ToolMeta.Host.LOWA)
     @Tool("对 PDF 做真脱敏：黑框覆盖指定文本，并把涉及的页面转为图片页、彻底移除该页文字层" +
           "（黑框下的内容无法再复制或提取——单纯画黑框是伪脱敏）。代价是被处理的页面文字不可再选中，" +
@@ -347,7 +348,8 @@ public class PdfTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "删除PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
+    // access：只产出一份新 PDF，原件不动，可撤回
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
     @Tool("删掉一份 PDF 里的指定页，产出一份新 PDF（去掉多余的封面/空白页/重复件）。" +
           RANGES_DOC +
           "不能删光全部页。原件保持不变；产出文件与原件同目录，" +

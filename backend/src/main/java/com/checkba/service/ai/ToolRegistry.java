@@ -466,6 +466,7 @@ public class ToolRegistry {
             Map.entry("litigation_timeline_start", "Read timeline materials"),
             Map.entry("litigation_timeline_step", "Advance timeline pipeline"),
             Map.entry("litigation_timeline_render", "Draw case timeline"),
+            Map.entry("meeting_list", "List meetings"),
             Map.entry("meeting_list_recordings", "List meeting recordings"),
             Map.entry("meeting_get_transcript", "Read meeting transcript"),
             Map.entry("tmeet_list_meetings", "List Tencent meetings"),
@@ -664,7 +665,14 @@ public class ToolRegistry {
     private static final List<String> MCP_HOST_PREFIXES = List.of("doc_", "sheet_", "slide_", "office_", "ref_");
 
     /** 只对应应用内对话流程（向用户提问、工具目录、本轮附件），对外 Agent 没有可用语义，不投影。 */
-    private static final Set<String> MCP_IN_APP_ONLY = Set.of("ask_user", "list_tools", "list_attached_files");
+    private static final Set<String> MCP_IN_APP_ONLY = Set.of("ask_user", "list_tools", "list_attached_files",
+            "todo_write", "use_skill", "dispatch_subtask", "create_skill");
+
+    /**
+     * 首批对外投影的内置 write 工具（A10/P2-5）：都不是 destructive、不需确认卡（外部 Agent 答不了），
+     * 且不碰文档正文（文档内容只走 propose_revision）。新增须同步 McpToolProjectionTest。
+     */
+    private static final Set<String> MCP_WRITE_ALLOWED = Set.of("task_create", "task_update", "tag_file", "create_folder");
 
     /**
      * 按量计费的外部服务工具（搜索/企查查/Tushare/北大法宝，即 {@code ExternalServiceProvider} 的 SEARCH/QICHACHA/TUSHARE/PKULAW）
@@ -684,26 +692,26 @@ public class ToolRegistry {
         List<McpCandidate> out = new ArrayList<>();
         Set<String> unusable = unusableToolNames();
         Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
-        boolean tmeetPluginActive = tencentMeetingPluginActive();
         for (ToolSpecification spec : builtinSpecifications) {
             String name = spec.name();
             RegisteredTool registered = builtinTools.get(name);
             ToolMeta meta = registered.meta();
             if (registered.method() != null && registered.method().isAnnotationPresent(com.checkba.service.ai.tools.ToolShim.class)) continue;
+            boolean writeAllowed = MCP_WRITE_ALLOWED.contains(name) && !requiresConfirmation(name);
             if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
-                    || name.startsWith(MCP_METERED_PREFIX) || (tmeetPluginActive && name.startsWith("tmeet_"))
+                    || name.startsWith(MCP_METERED_PREFIX)
                     || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
                     || (meta != null && meta.requiresHost() != ToolMeta.Host.NONE)
-                    || com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ) continue;
+                    || (!writeAllowed && com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ)) continue;
             if (registered.bean() instanceof AgentToolComponent component
                     && !availability.computeIfAbsent(component, this::componentAvailable)) continue;
             boolean needsProject = registered.method() != null && java.util.Arrays.stream(registered.method().getParameters())
                     .anyMatch(p -> "projectId".equals(p.getName()));
-            out.add(new McpCandidate(spec, ToolMeta.Access.READ, needsProject));
+            out.add(new McpCandidate(spec, writeAllowed ? ToolMeta.Access.WRITE : ToolMeta.Access.READ, needsProject));
         }
         for (DeclaredToolBinding b : declaredBindings()) {
             String name = b.specification().name();
-            if (unusable.contains(name) || builtinTools.containsKey(name)) continue;
+            if (unusable.contains(name) || builtinTools.containsKey(name) || pluginService.isAgentHidden(name)) continue;
             // 外部 Agent 答不了确认卡：需要确认的工具（destructive / confirm:always）无论 mcp:true 都不投影
             if (requiresConfirmation(name)) continue;
             ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, b.tool().getAccess());
@@ -802,6 +810,7 @@ public class ToolRegistry {
         Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         declaredBindings().forEach(b -> names.add(b.specification().name()));
+        names.removeIf(pluginService::isAgentHidden);
         return java.util.Collections.unmodifiableSet(names);
     }
 
@@ -956,18 +965,16 @@ public class ToolRegistry {
     public List<ToolSpecification> getAllSpecifications() {
         List<ToolSpecification> all = new ArrayList<>();
         Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
-        boolean tmeetPluginActive = tencentMeetingPluginActive();
         for (ToolSpecification spec : builtinSpecifications) {
-            if (tmeetPluginActive && spec.name().startsWith("tmeet_")) continue;
             Object owner = builtinTools.get(spec.name()).bean();
             if (!(owner instanceof AgentToolComponent component)
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
-        declaredBindings().forEach(b -> all.add(b.specification()));
+        declaredBindings().forEach(b -> { if (!pluginService.isAgentHidden(b.specification().name())) all.add(b.specification()); });
         if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
-            if (pluginToolEnabled(spec.name())) {
+            if (pluginToolEnabled(spec.name()) && !pluginService.isAgentHidden(spec.name())) {
                 all.add(offerable(spec));
             }
         }
@@ -1030,8 +1037,8 @@ public class ToolRegistry {
      * 插件启停过滤：内置工具（不属于任何插件，pid == null）恒可见；
      * 插件工具仅在所属插件启用时可见。
      */
-    /** 腾讯会议插件已安装且启用：以插件工具 tencent_meeting_action 为准，不再向模型提供内置 tmeet_*（未装则保留）。 */
-    private boolean tencentMeetingPluginActive() {
+    /** 腾讯会议插件已安装且启用：meeting_list/meeting_get_transcript 的 tencent 来源以插件为准（E4），未装则读内置同步表。 */
+    public boolean tencentMeetingPluginActive() {
         String pid = pluginService.getPluginIdForTool("tencent_meeting_action");
         return pid != null && pluginService.isEnabled(pid);
     }

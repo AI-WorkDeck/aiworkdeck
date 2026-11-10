@@ -360,7 +360,8 @@ public class SlideEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "删除幻灯片", category = "document", fileEffect = "MODIFIED")
+    // access：整页删除不走修订、无法单步撤回
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除幻灯片", category = "document", fileEffect = "MODIFIED")
     @Tool("【幻灯片·写】删除指定页。演示文稿至少保留一页，删到只剩最后一页时会被拒绝。" + NO_REVISION_NOTE)
     public String slide_delete_page(
             @P("要删除的页码，1 开始") Integer slideNumber
@@ -513,7 +514,8 @@ public class SlideEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "删除形状", category = "document", fileEffect = "MODIFIED")
+    // access：单个形状删除属普通编辑，受检查点保护
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除形状", category = "document", fileEffect = "MODIFIED")
     @Tool("【幻灯片·写】按 shapeName 精确删除指定页的一个形状（来自 slide_get_page 返回的 shapeName）。" +
           NO_REVISION_NOTE)
     public String slide_delete_shape(

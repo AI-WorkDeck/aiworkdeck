@@ -144,7 +144,7 @@
       "bubbleEndStatus": "finished",
       "offeredToolsInclude": [
         "meeting_get_transcript",
-        "meeting_list_recordings",
+        "meeting_list",
         "write_docx",
         "doc_insert_at_cursor",
         "doc_insert_under_heading",

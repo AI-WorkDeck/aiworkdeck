@@ -3554,10 +3554,11 @@ public class AgentOrchestrator {
             guard.llmRounds++;
             telemetryTurnTracker.noteRound(conversationId);
         }
-        log.info("[Round] conv={} depth={} round={} tools={} trimmed={} expanded={} messages={}",
+        log.info("[Round] conv={} depth={} round={} tools={} trimmed={} expanded={} messages={} toolsHash={} toolsOrderHash={}",
                 conversationId, depth, guard == null ? -1 : guard.llmRounds, visible.size(),
                 guard == null ? 0 : guard.roundTrimmed,
-                guard == null ? java.util.Set.of() : guard.expandedToolCategories, messages.size());
+                guard == null ? java.util.Set.of() : guard.expandedToolCategories, messages.size(),
+                toolNamesHash(visible, true), toolNamesHash(visible, false));
         try {
             // 在途请求的句柄交给本轮的 RunGuard，「停止」才掐得断它（计划 K4 ①）。
             // trackInflight 自己会补查一次取消标志：请求刚发出、标志恰好落在这两步之间时，
@@ -3570,6 +3571,17 @@ public class AgentOrchestrator {
             // 同步抛错与异步失败共用终态闸：取消看门狗并执行有限重试 / 模型切换。
             handler.onError(e);
         }
+    }
+
+    /**
+     * 下发工具名的短哈希，只进 [Round] 日志（提示缓存观测）：tools 数组在服务商的缓存前缀里，
+     * 两轮之间 sorted=true 的哈希变了 = 下发集合变了，sorted=false 的哈希变了 = 集合或顺序变了，前缀缓存都会失效。
+     */
+    static String toolNamesHash(List<ToolSpecification> specs, boolean sorted) {
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (ToolSpecification spec : specs) names.add(spec.name());
+        if (sorted) java.util.Collections.sort(names);
+        return Integer.toHexString(String.join(",", names).hashCode());
     }
 
     private static boolean hasDocumentSummary(String content) {
@@ -3735,7 +3747,7 @@ public class AgentOrchestrator {
             }
         }
         guard.expandedToolCategories.addAll(putBack);
-        for (String name : policy.toolsHintedBy(userMessage)) {
+        for (String name : policy.toolsHintedBy(userMessage, guard.activeDocKind)) {
             guard.requestedToolNames.putIfAbsent(name, 0);
         }
         guard.noFileBaselineCategories = new java.util.HashSet<>(guard.expandedToolCategories);

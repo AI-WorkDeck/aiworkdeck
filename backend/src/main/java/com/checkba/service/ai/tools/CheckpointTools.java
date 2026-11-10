@@ -26,7 +26,8 @@ public class CheckpointTools implements AgentToolComponent {
     @Tool("【恢复】把文档恢复到本轮开始前的快照，丢弃本轮所有修改（含修订标记）并让编辑器重新加载。\n"
             + "何时用：最后手段，仅在文档已被改乱、无法逐步撤销时；常规纠错优先精确编辑或 doc_undo。不是导出、保存或预览工具，不得为这些目的调用。\n"
             + "必须明确选择丢弃：confirmation 精确填 discard_current_turn_changes，reason 填恢复原因。")
-    @ToolMeta(displayName = "恢复文档快照", category = "document", fileEffect = "MODIFIED")
+    // access：回滚会丢弃检查点之后的全部改动（含用户手改），属覆盖性操作
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "恢复文档快照", category = "document", fileEffect = "MODIFIED")
     public String doc_restore_checkpoint(
             @P(value = "必须精确填 discard_current_turn_changes，表示明确丢弃本轮全部修改", required = true) String confirmation,
             @P(value = "恢复原因，不能为空", required = true) String reason) {

@@ -29,7 +29,7 @@ export interface McpServerDeclaration {
   tools: { name: string; description: string; inputSchema: McpObjectSchema }[];
 }
 /** Legacy JAR tool: name is the @Tool method name. */
-export interface LegacyToolDeclaration { name: string; description?: string; permissions?: Permission[]; [key: string]: unknown }
+export interface LegacyToolDeclaration { name: string; description?: string; permissions?: Permission[]; /** false = UI-only JAR tool, hidden from the model and MCP. */ agent?: boolean; [key: string]: unknown }
 export type ToolHandler =
   | { type: 'jar' }
   | { type: 'service'; service: string; operation: string }
@@ -41,6 +41,8 @@ export interface DeclarativeToolDeclaration {
   name: string; description: string; access: 'read' | 'write' | 'destructive';
   inputSchema?: McpObjectSchema; handler?: ToolHandler; permissions?: Permission[];
   mcp?: boolean; confirm?: 'auto' | 'always' | 'never'; keywords?: string[];
+  /** false = registered but not offered to the model and never projected to MCP; callable from the plugin UI only. Default true. */
+  agent?: boolean;
 }
 export interface PluginManifest {
   $schema?: string; id: string; name: string; version: string; description?: string; author?: string; homepage?: string; icon?: string;

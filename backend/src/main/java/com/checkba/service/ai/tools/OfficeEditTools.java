@@ -1392,7 +1392,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
     @ToolShim(replacedBy = "office_table_delete")
     @Tool("删除当前 Word 文档里一张表格的整行。")
-    @ToolMeta(displayName = "删除表格行", category = "office", fileEffect = "MODIFIED", offerToModel = false)
+    // access：与 office_table_delete 同级（兼容 shim）
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格行", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_table_delete_row(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
@@ -1418,7 +1419,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
     @ToolShim(replacedBy = "office_table_delete")
     @Tool("删除当前 Word 文档里一张表格的整列。")
-    @ToolMeta(displayName = "删除表格列", category = "office", fileEffect = "MODIFIED", offerToModel = false)
+    // access：与 office_table_delete 同级（兼容 shim）
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格列", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_table_delete_col(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
@@ -1623,7 +1625,8 @@ public class OfficeEditTools implements AgentToolComponent {
             + "index（0 开始）定位，两者给一个即可（id 优先）。"
             + "审阅收尾时「把这些批注处理掉」用本工具；只想标记为已处理、保留痕迹请用 office_update_comment(action=resolve)。"
             + "删除后批注序号会重排，要接着删下一条必须重新调用 office_get_comments。需要 WordApi 1.4。")
-    @ToolMeta(displayName = "删除批注", category = "office", fileEffect = "MODIFIED")
+    // access：批注是审阅元数据，不是正文内容
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除批注", category = "office", fileEffect = "MODIFIED")
     public String office_delete_comment(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标批注的 id（来自 office_get_comments 的返回值，与 commentIndex 二选一，id 优先）") String commentId,
@@ -2611,7 +2614,8 @@ public class OfficeEditTools implements AgentToolComponent {
     @Tool("删除当前 PowerPoint 演示文稿中的指定幻灯片。slideNumber 从 1 起。" +
           "演示文稿只剩一页时拒绝删除（PowerPoint 不允许空演示文稿）。直接生效，无法通过审阅面板撤销——" +
           "误删的安全网是 office_ppt_add_slide 补建或用户在 Word/PowerPoint 里 Ctrl+Z。")
-    @ToolMeta(displayName = "删除幻灯片", category = "office", fileEffect = "MODIFIED")
+    // access：整页删除不走修订、无法单步撤回
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除幻灯片", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_delete_slide(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要删除的幻灯片页码（1 起）") Integer slideNumber
@@ -2765,7 +2769,8 @@ public class OfficeEditTools implements AgentToolComponent {
           "shapeId 是 office_ppt_get_slide_details 返回的形状 id（精确定位，推荐）；" +
           "不传 shapeId 时可传 textMatch，按形状文字内容精确匹配删除第一个命中的形状。" +
           "shapeId 与 textMatch 至少给一个。直接生效，无法通过审阅面板撤销。")
-    @ToolMeta(displayName = "删除形状", category = "office", fileEffect = "MODIFIED")
+    // access：单个形状删除属普通编辑，受检查点保护
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除形状", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_delete_shape(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
@@ -2897,7 +2902,8 @@ public class OfficeEditTools implements AgentToolComponent {
 
     @Tool("删除 Excel 中某单元格的整条批注线程（含全部回复）。cellAddress 定位目标单元格。不可撤销（无修订机制），" +
           "误删靠 Ctrl+Z 或文档检查点。")
-    @ToolMeta(displayName = "删除批注", category = "office", fileEffect = "MODIFIED")
+    // access：批注是审阅元数据，不是单元格内容
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除批注", category = "office", fileEffect = "MODIFIED")
     public String office_excel_delete_comment(
             @P("会话ID（系统自动注入）") String conversationId,
             @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,

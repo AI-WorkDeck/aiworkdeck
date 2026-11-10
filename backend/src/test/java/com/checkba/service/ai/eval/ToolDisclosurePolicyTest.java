@@ -157,6 +157,34 @@ class ToolDisclosurePolicyTest {
     }
 
     @Test
+    @DisplayName("删除/移动诱饵：开着文档且句子没提文件时不放回 move_to_trash / move_files")
+    void fileVerbDecoysNeedFileContextWhenDocumentOpen() {
+        assertFalse(POLICY.toolsHintedBy("删除第三条", "docx").contains("move_to_trash"));
+        assertFalse(POLICY.toolsHintedBy("把光标移到第二段末尾", "docx").contains("move_files"));
+        assertTrue(POLICY.toolsHintedBy("把合同草稿.docx删了", "docx").contains("move_to_trash"));
+        assertTrue(POLICY.toolsHintedBy("把这几份文件移动到归档", "docx").contains("move_files"));
+        assertTrue(POLICY.toolsHintedBy("删除第三条", null).contains("move_to_trash"), "没开文档时保持原行为");
+    }
+
+    @Test
+    @DisplayName("批注删除是 WRITE，检查点回滚显式 DESTRUCTIVE")
+    void commentDeletionIsWriteAndCheckpointRestoreIsDestructive() throws Exception {
+        var meta = (java.util.function.BiFunction<Class<?>, String, com.checkba.service.ai.tools.ToolMeta.Access>) (c, n) -> {
+            for (var m : c.getDeclaredMethods()) {
+                if (m.getName().equals(n)) {
+                    return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(n,
+                            m.getAnnotation(com.checkba.service.ai.tools.ToolMeta.class));
+                }
+            }
+            throw new IllegalStateException(n);
+        };
+        assertEquals(com.checkba.service.ai.tools.ToolMeta.Access.WRITE,
+                meta.apply(com.checkba.service.ai.tools.DocumentEditTools.class, "doc_delete_comment"));
+        assertEquals(com.checkba.service.ai.tools.ToolMeta.Access.DESTRUCTIVE,
+                meta.apply(com.checkba.service.ai.tools.CheckpointTools.class, "doc_restore_checkpoint"));
+    }
+
+    @Test
     @DisplayName("V2 中途增长封顶：超过 45 个时按 LRU 收回（类目与按名同池），核心 / 受保护 / skill 点名工具不收")
     void evictToBudgetIsLruAndRespectsProtection() {
         RecordingToolRegistry registry = registry();
@@ -678,22 +706,28 @@ class ToolDisclosurePolicyTest {
     }
 
     @Test
-    @DisplayName("腾讯会议插件已安装且启用 -> 不下发内置 tmeet_*；未安装 -> 保留")
-    void builtinTmeetToolsAreHiddenOnlyWhenThePluginIsActive() {
+    @DisplayName("会议合流（V5）：无论插件装没装，下发的都是 meeting_list/meeting_get_transcript，旧 tmeet_*/meeting_list_recordings 从不下发")
+    void meetingFamilyIsOfferedWhateverThePluginState() {
         PluginService plugins = org.mockito.Mockito.mock(PluginService.class);
         org.mockito.Mockito.when(plugins.getPluginTools()).thenReturn(java.util.Map.of());
         org.mockito.Mockito.when(plugins.getToolSpecifications()).thenReturn(List.of());
         RecordingToolRegistry registry = new RecordingToolRegistry(RealToolBeans.instantiateAll(), plugins);
         registry.init();
 
-        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("tmeet_get_transcript")));
+        assertMeetingFamilyOffered(registry);
 
         org.mockito.Mockito.when(plugins.getPluginIdForTool("tencent_meeting_action")).thenReturn("tencent-meeting");
         org.mockito.Mockito.when(plugins.isEnabled("tencent-meeting")).thenReturn(false);
-        assertTrue(registry.getAllSpecifications().stream().anyMatch(s -> s.name().equals("tmeet_get_transcript")),
-                "插件已装但被禁用时仍应保留内置工具");
+        assertMeetingFamilyOffered(registry);
 
         org.mockito.Mockito.when(plugins.isEnabled("tencent-meeting")).thenReturn(true);
-        assertFalse(registry.getAllSpecifications().stream().anyMatch(s -> s.name().startsWith("tmeet_")));
+        assertMeetingFamilyOffered(registry);
+    }
+
+    private static void assertMeetingFamilyOffered(RecordingToolRegistry registry) {
+        java.util.Set<String> offered = registry.getAllSpecifications().stream()
+                .map(ToolSpecification::name).collect(java.util.stream.Collectors.toSet());
+        assertTrue(offered.containsAll(java.util.Set.of("meeting_list", "meeting_get_transcript")), offered.toString());
+        assertFalse(offered.stream().anyMatch(n -> n.startsWith("tmeet_") || n.equals("meeting_list_recordings")));
     }
 }

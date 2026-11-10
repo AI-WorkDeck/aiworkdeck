@@ -90,7 +90,9 @@ export async function validatePlugin(directory) {
   if (!manifestFile) throw new Error('manifest.json is required at package root')
   let manifest
   try { manifest = JSON.parse(manifestFile.data.toString('utf8')) } catch { throw new Error('manifest.json: invalid JSON') }
-  validateDeclaredTools(manifest)
+  let zhL10n
+  try { zhL10n = JSON.parse((files.find(f => f.name === 'l10n/zh-CN.json')?.data ?? Buffer.from('{}')).toString('utf8')) } catch { zhL10n = {} }
+  validateDeclaredTools(manifest, zhL10n)
   const errors = validateSchema(manifest)
   if (errors.length) throw new Error(errors.join('\n'))
   const names = new Set(files.map(f => f.name))
@@ -149,9 +151,38 @@ export async function validatePlugin(directory) {
   return { root, manifest, files, excluded, bytes: total }
 }
 
+// Description gate (docs/plans/tool-system-v2.md A5; same rules as ToolInventoryContractTest): first line <= 80 chars,
+// one language (Chinese; identifiers, quotes and parenthesised ASCII synonyms do not count), verb-first.
+export const FIRST_LINE_MAX = 80
+export function firstLine(description) {
+  const t = description.replaceAll('\\n', '\n').trim()
+  const m = /[。\n]|\.(?=\s|$)/.exec(t)
+  return (m ? t.slice(0, m.index) : t).trim()
+}
+const NOT_VERB_FIRST = ['用户', '仅', '当', '如', '本工具', '该工具', '这个', '此工具', '只', '需要', '必须', '若', '凡', '每次', '先', '不要', '禁止', '不能', '不可', '所有', '任何', '一个', '工具']
+export function descriptionViolations(description) {
+  const line = firstLine(description)
+  const out = []
+  if ([...line].length > FIRST_LINE_MAX) out.push('first line is ' + [...line].length + ' chars (max ' + FIRST_LINE_MAX + ')')
+  let lang = 'en'
+  if (/\p{Script=Han}/u.test(line)) {
+    lang = 'zh'
+    const bare = line.replace(/`[^`]*`|<[^>]*>|'[^']*'|"[^"]*"|「[^」]*」/g, '').replace(/[（(][\x00-\x7F]*[）)]|\.[A-Za-z0-9]+/g, '')
+    for (const w of bare.match(/[A-Za-z][A-Za-z0-9_'\-]*/g) || []) {
+      const identifier = w.includes('_') || /\d/.test(w) || /[a-z][A-Z]/.test(w)
+      if (identifier || !/[a-z]/.test(w[0])) continue
+      if (w.length >= 4 || ['the', 'and', 'for', 'not', 'use', 'with', 'all', 'can'].includes(w)) { lang = 'mixed'; break }
+    }
+  }
+  if (lang !== 'zh') out.push('first line must be a single language (Chinese), found ' + lang)
+  const head = line.replace(/^(【[^】]*】\s*)+/, '')
+  if (!head || NOT_VERB_FIRST.some(w => head.startsWith(w))) out.push('first line must start with a verb, not a noun, condition or prohibition; put "when to use" on line 2')
+  return out
+}
+
 const DECLARATIVE_KEYS = ['access', 'handler', 'inputSchema', 'mcp', 'confirm', 'keywords']
 // Declarative Agent tools (spec section 20). Runs before schema validation so authors get a specific message.
-export function validateDeclaredTools(manifest) {
+export function validateDeclaredTools(manifest, zhL10n = {}) {
   if (!Array.isArray(manifest.tools)) return
   const prefix = String(manifest.id).replace(/-/g, '_') + '_'
   const seen = new Set()
@@ -162,6 +193,19 @@ export function validateDeclaredTools(manifest) {
     seen.add(tool.name)
     if (typeof tool.description !== 'string' || !tool.description.trim()) throw new Error(label + 'description must not be blank')
     if (!['read', 'write', 'destructive'].includes(tool.access)) throw new Error(label + 'access is required: read | write | destructive')
+    // %key% placeholders are judged on the zh-CN catalogue (product language); unresolved ones are left to the host.
+    const placeholder = /^%([^%]+)%$/.exec(tool.description.trim())
+    const text = placeholder ? zhL10n[placeholder[1]] : tool.description
+    if (typeof text === 'string') {
+      const problems = descriptionViolations(text)
+      if (problems.length) throw new Error(label + 'description: ' + problems.join('; '))
+    }
+    if (tool.agent !== undefined && typeof tool.agent !== 'boolean') throw new Error(label + 'agent must be a boolean')
+    if (tool.mcp === true) {
+      if (tool.access === 'destructive') throw new Error(label + 'destructive tools cannot set mcp:true (external agents cannot answer the confirmation card)')
+      if (tool.confirm === 'always') throw new Error(label + 'confirm:always tools are never projected to MCP; remove mcp:true')
+      if (tool.agent === false) throw new Error(label + 'agent:false tools are UI-only and cannot set mcp:true')
+    }
     const handler = tool.handler ?? { type: 'jar' }
     if (handler.type !== 'jar' && !String(tool.name).startsWith(prefix)) throw new Error(label + 'non-JAR tool name must start with ' + prefix)
     for (const permission of tool.permissions || []) {
@@ -231,7 +275,7 @@ export function zipFiles(files) {
 function exampleTool(id) {
   return {
     name: id.replace(/-/g, '_') + '_list_tasks',
-    description: 'List the user calendar tasks, optionally within a date range.',
+    description: '列出用户的日程事项，可按日期范围过滤。',
     access: 'read',
     inputSchema: { type: 'object', properties: { from: { type: 'string', description: 'Start date, YYYY-MM-DD' }, to: { type: 'string', description: 'End date, YYYY-MM-DD' } }, additionalProperties: false },
     handler: { type: 'service', service: 'calendar', operation: 'listForUser' },

@@ -409,6 +409,8 @@ const NAMES = {
   litigation_timeline_step: { zh: '推进时间轴管线', en: 'Advance timeline pipeline' },
   litigation_timeline_render: { zh: '生成案件时间轴', en: 'Draw case timeline' },
   // 会议录音与腾讯会议
+  meeting_list: { zh: '列出会议', en: 'List meetings' },
+  // 旧名保留给历史对话（V5 合流后不再下发）
   meeting_list_recordings: { zh: '列出会议录音', en: 'List meeting recordings' },
   meeting_get_transcript: { zh: '读取会议转写稿', en: 'Read meeting transcript' },
   tmeet_list_meetings: { zh: '列出腾讯会议', en: 'List Tencent meetings' },

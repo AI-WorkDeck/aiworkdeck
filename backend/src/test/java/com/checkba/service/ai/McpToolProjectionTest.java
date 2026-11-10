@@ -74,9 +74,14 @@ class McpToolProjectionTest {
         List<String> names = names();
         assertTrue(names.contains("task_list"), names.toString());
         assertTrue(names.contains("hello_agent_tools_list_tasks"), names.toString());
-        // write 工具（含内置 task_create/task_update 与未声明 mcp:true 的插件写工具）不投影
-        assertFalse(names.contains("task_create"));
-        assertFalse(names.contains("task_update"));
+        // 内置 write 白名单（P2-5）投影；未声明 mcp:true 的插件写工具不投影
+        assertTrue(names.contains("task_create"), names.toString());
+        assertTrue(names.contains("task_update"), names.toString());
+        assertEquals(com.checkba.service.ai.tools.ToolMeta.Access.WRITE, projection.find("task_create").orElseThrow().access());
+        // 会话内生工具永不投影
+        for (String inApp : List.of("ask_user", "list_tools", "todo_write", "use_skill", "dispatch_subtask", "list_attached_files", "create_skill")) {
+            assertFalse(names.contains(inApp), inApp);
+        }
         assertFalse(names.contains("hello_agent_tools_add_task"));
         // 精修工具由 LocalMcpServerTools 提供，投影层不重复
         assertTrue(names.stream().noneMatch(LocalMcpServerTools::isCurated));
