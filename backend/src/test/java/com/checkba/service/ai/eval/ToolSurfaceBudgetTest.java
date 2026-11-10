@@ -42,7 +42,7 @@ class ToolSurfaceBudgetTest {
     /** 最坏：每个关键词类目各命中一个词（下面 {@link #worstCasePromptHitsEveryCategory} 守住）。 */
     // 刻意避开会命中内置 skill 触发词的词（时间轴 / 会议 / 证据 ...）：skill 一命中就把工具裁成白名单，
     // 「最坏」就量不到了。
-    private static final String WORST = "pdf 版本 流程图 ppt mcp 工商 插件 transcript python 表格 事项 修订 模板 依据 格式 重命名 法规 记住";
+    private static final String WORST = "pdf 比对 版本 流程图 ppt mcp 工商 插件 transcript python 表格 事项 修订 模板 依据 格式 重命名 法规 记住";
 
     private record Host(String key, String mode, String capability, String officeHost, String fileType) {
     }

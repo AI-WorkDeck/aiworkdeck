@@ -6,6 +6,7 @@ package com.checkba.service.ai.eval;
 import com.checkba.service.ai.tools.AgentToolComponent;
 import com.checkba.service.ai.tools.AskUserTools;
 import com.checkba.service.ai.tools.DdExportTools;
+import com.checkba.service.ai.tools.DocCompareTools;
 import com.checkba.service.ai.tools.DocumentAuditTools;
 import com.checkba.service.ai.tools.DocumentEditTools;
 import com.checkba.service.ai.tools.EvidenceTools;
@@ -110,6 +111,7 @@ final class RealToolBeans {
                 ContentSearchTools.class,
                 ContributedTemplateTools.class,
                 DdExportTools.class,
+                DocCompareTools.class,
                 DocumentAuditTools.class,
                 DocumentEditTools.class,
                 EnterpriseDataTools.class,

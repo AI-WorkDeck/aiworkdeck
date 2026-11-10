@@ -6,6 +6,7 @@
 // 用法与设计见 scripts/eval/README.md。密钥只从环境变量 OPENROUTER_API_KEY 读取，只传给子进程环境，从不打印、落盘。
 
 import { spawn, execFileSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import net from 'node:net'
@@ -35,6 +36,8 @@ function parseArgs(argv) {
     else if (a === '--out') o.out = path.resolve(next())
     else if (a === '--api-only') o.apiOnly = true
     else if (a === '--lowa-dir') o.lowaDir = path.resolve(next())
+    else if (a === '--profile') o.profile = next()
+    else if (a === '--tier') o.tier = next()
     else if (a === '--keep') o.keep = true
     else if (a === '--workdir') { o.workdir = path.resolve(next()); o.keep = true }
     else if (a === '--help' || a === '-h') o.help = true
@@ -42,7 +45,24 @@ function parseArgs(argv) {
   }
   return o
 }
-const USAGE = `用法：node scripts/eval/model-matrix.mjs --before <ref> --after <ref> --models a,b --sentences <file.json>
+// 档位：profile 决定语言/站点配置与默认句集；tier 决定默认模型（cheap = 日常门禁，release = 再加贵模型做发版前抽检）。
+// 价格（美元 / 1M token：输入 / 输出 / 缓存读）用于报告里的成本估算，来自 OpenRouter 标价。
+const PROFILES = {
+  cn: { lang: 'zh-CN', accountBaseUrl: null, sentences: 'sentences/gate-35.json', cheap: ['deepseek/deepseek-v4-flash', 'qwen/qwen3.7-flash'], extra: ['qwen/qwen3.8-max-0902', 'deepseek/deepseek-v4-pro'] },
+  intl: { lang: 'en-US', accountBaseUrl: 'https://www.workdeck.ai', sentences: 'sentences/gate-35-en.json', cheap: ['google/gemini-3.6-flash', 'anthropic/claude-haiku-4.5'], extra: ['anthropic/claude-sonnet-5', 'openai/gpt-5.6-terra'] },
+}
+const PRICES = {
+  'deepseek/deepseek-v4-flash': [0.09, 0.18, 0.02], 'qwen/qwen3.7-flash': [0.03, 0.13, 0.01],
+  'google/gemini-3.6-flash': [0.75, 3.75, 0.07], 'anthropic/claude-haiku-4.5': [1, 5, 0.10],
+  'qwen/qwen3.8-max-0902': [2, 6, 0.25], 'deepseek/deepseek-v4-pro': [0.96, 1.91, 0.08],
+  'anthropic/claude-sonnet-5': [2, 10, 0.20], 'openai/gpt-5.6-terra': [2, 12, 0.20],
+}
+const costOf = (model, prompt, cached, completion) => {
+  const p = PRICES[model]; if (!p) return null
+  return ((prompt - cached) * p[0] + cached * p[2] + completion * p[1]) / 1e6
+}
+const USAGE = `用法：node scripts/eval/model-matrix.mjs --before <ref> --after <ref> [--profile cn|intl] [--tier cheap|release] [--models a,b] [--sentences <file.json>]
+        profile 缺省 cn；未给 --models 时按 profile+tier 取默认模型，未给 --sentences 时按 profile 取 gate-35 / gate-35-en
         [--runs N] [--concurrency K] [--only id1,id2] [--api-only] [--run-timeout 秒] [--out 目录] [--keep]
 环境变量：OPENROUTER_API_KEY（必需）；PG_BIN（可选，PostgreSQL bin 目录）；JAVA_HOME（需要 JDK 21，缺省自动找）`
 
@@ -72,8 +92,18 @@ function findJava21() {
 function findPgBin() {
   const c = [process.env.PG_BIN, '/opt/homebrew/opt/postgresql@17/bin', '/usr/lib/postgresql/17/bin', '/usr/local/opt/postgresql@17/bin'].filter(Boolean)
   for (const d of c) if (fs.existsSync(path.join(d, 'initdb'))) return d
+  try { const d = execFileSync('pg_config', ['--bindir'], { encoding: 'utf8' }).trim(); if (fs.existsSync(path.join(d, 'initdb'))) return d } catch { /* 无 pg_config */ }
   try { return path.dirname(execFileSync('which', ['initdb'], { encoding: 'utf8' }).trim()) } catch { /* ignore */ }
   throw new Error('找不到 PostgreSQL（initdb），请设置 PG_BIN')
+}
+// 兜底：产物目录里的任何文件若含密钥原文（后端日志、模型回显）一律替换，产物会被上传到 CI。
+function scrubSecret(dir) {
+  const key = process.env.OPENROUTER_API_KEY
+  if (!key) return
+  for (const f of fs.readdirSync(dir)) {
+    const file = path.join(dir, f)
+    try { const t = fs.readFileSync(file, 'utf8'); if (t.includes(key)) fs.writeFileSync(file, t.split(key).join('***')) } catch { /* 非文本/已删除 */ }
+  }
 }
 const sanitize = s => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()
 
@@ -114,7 +144,8 @@ async function judge(sentence, rec, ctx) {
   }
   if (e.mustUse?.length) r.mustUse = e.mustUse.every(g => anyOf(g, rec.tools))
   if (e.mustNotUse?.length) r.mustNotUse = !anyOf(e.mustNotUse, rec.tools)
-  if (e.status) r.status = rec.status === e.status // 可选：要求本轮以指定状态结束（如 finished = 没有停在确认卡）
+  if (e.status) r.status = rec.status === e.status // 可选：要求本轮以指定状态结束（如 finished = 没有停在确认卡；awaiting_input = 停在确认卡/反问）
+  if (e.maxRounds != null) r.maxRounds = (rec.rounds ?? 0) <= e.maxRounds // 可选：轮数上限（防循环：编辑器句子曾因 doc_* 反复重试而空转）
   if (e.finalTextIncludes?.length) r.finalText = e.finalTextIncludes.every(t => (rec.finalText || '').includes(t))
   if (e.outcomeCheck) {
     try {
@@ -122,7 +153,7 @@ async function judge(sentence, rec, ctx) {
       r.outcome = !!(await fn(ctx))
     } catch (err) { r.outcome = false; r.outcomeError = String(err.message || err).slice(0, 200) }
   }
-  const checks = Object.entries(r).filter(([k]) => ['firstTool', 'mustUse', 'mustNotUse', 'status', 'finalText', 'outcome'].includes(k))
+  const checks = Object.entries(r).filter(([k]) => ['firstTool', 'mustUse', 'mustNotUse', 'status', 'maxRounds', 'finalText', 'outcome'].includes(k))
   r.pass = (rec.status === 'finished' || rec.status === 'awaiting_input') && checks.every(([, v]) => v === true)
   return r
 }
@@ -214,8 +245,8 @@ async function loadPlaywright() {
 
 // ---------- 后端实例 ----------
 class Instance {
-  constructor({ label, build, model, pg, tmp, java, outDir }) {
-    Object.assign(this, { label, build, model, pg, tmp, java, outDir })
+  constructor({ label, build, model, pg, tmp, java, outDir, profile }) {
+    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile })
     this.db = 'awd_' + sanitize(label)
     this.dir = path.join(tmp, 'inst-' + sanitize(label))
     this.logFile = path.join(outDir, 'backend-' + sanitize(label) + '.log')
@@ -230,6 +261,8 @@ class Instance {
       JAVA_HOME: this.java,
       SPRING_PROFILES_ACTIVE: 'dev', SECURITY_LOCAL_MODE: 'false', AI_MOCK_ENABLED: 'false',
       SERVER_PORT: String(this.port),
+      // 国际站 = 账户站点指向 workdeck.ai（OfficialCloudEndpoint.isInternationalSite 按主机判定）；cn 保持默认的 aiworkdeck.com
+      ...(this.profile.accountBaseUrl ? { AI_ACCOUNT_BASE_URL: this.profile.accountBaseUrl } : {}),
       SPRING_DATASOURCE_URL: `jdbc:postgresql://127.0.0.1:${this.pg.port}/${this.db}`,
       SPRING_DATASOURCE_USERNAME: 'awd', SPRING_DATASOURCE_PASSWORD: 'x',
       STORAGE_LOCAL_ROOT_PATH: path.join(this.dir, 'storage'), AI_PLUGINS_DIR: path.join(this.dir, 'plugins'),
@@ -256,7 +289,7 @@ class Instance {
     const isForm = body instanceof FormData
     const res = await fetch(this.base + url, {
       method,
-      headers: { ...(this.sid ? { 'X-Session-Id': this.sid } : {}), ...(body && !isForm ? { 'content-type': 'application/json' } : {}) },
+      headers: { 'X-App-Language': this.profile.lang, ...(this.sid ? { 'X-Session-Id': this.sid } : {}), ...(body && !isForm ? { 'content-type': 'application/json' } : {}) },
       body: isForm ? body : body ? JSON.stringify(body) : undefined,
     })
     const text = await res.text()
@@ -271,10 +304,20 @@ class Instance {
   // 每个句子一个全新项目；用户级/项目级记忆表整体清空，保证互不污染
   async reset() {
     await this.sql('delete from memory_entry; delete from memory_document; delete from project_memory; delete from user_memory;').catch(() => {})
+    // 前几次运行留下的项目改成不可能被点名的名字：带 projectName/otherProjects 的句子（同名项目歧义、按名建事项）
+    // 才不会被上一次运行的同名项目污染
+    await this.sql(`update project set name = 'zz-prev-' || id where user_id = ${this.userId} and project_type = 'BLANK'`).catch(() => {})
   }
   async seed(sentence) {
     const seed = sentence.seed || {}
-    const proj = await this.http('POST', '/api/projects', { projectType: 'BLANK', name: 'matrix-' + sentence.id + '-' + Date.now() })
+    const isoDay = off => { const d = new Date(Date.now() + off * 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+    // seed.otherProjects：同一用户名下的其它项目（先建，当前项目最后建 = 最新），用来造「名字相近的两个项目」
+    for (const op of seed.otherProjects || []) {
+      const o = await this.http('POST', '/api/projects', { projectType: 'BLANK', name: op.name })
+      if (!o?.id) throw new Error('创建其它项目失败：' + JSON.stringify(o).slice(0, 200))
+      for (const t of op.tasks || []) await this.http('POST', '/api/tasks', { projectId: o.id, title: t.title, dueDate: isoDay(t.dueInDays ?? 0) })
+    }
+    const proj = await this.http('POST', '/api/projects', { projectType: 'BLANK', name: seed.projectName || 'matrix-' + sentence.id + '-' + Date.now() })
     if (!proj?.id) throw new Error('创建项目失败：' + JSON.stringify(proj).slice(0, 200))
     const pid = proj.id
     const folders = {}
@@ -340,12 +383,12 @@ class Instance {
       // 纯浏览器 H5 没有桌面壳：让「本地内容协议」探针按 404 回退到普通下载路径（与既有 e2e 做法一致）
       await ctx.route('**/api/desktop/startup-health', r => r.fulfill({ status: 404, body: '' }))
       const user = { id: this.userId, username: this.username }
-      await ctx.addInitScript(([sid, u, m]) => {
-        localStorage.setItem('checkba_app_language', 'zh-CN')
+      await ctx.addInitScript(([sid, u, m, lang]) => {
+        localStorage.setItem('checkba_app_language', lang)
         localStorage.setItem('checkba_session_id', JSON.stringify({ type: 'string', data: sid }))
         localStorage.setItem('checkba_user', JSON.stringify({ type: 'object', data: u }))
         localStorage.setItem('ai_selected_model', JSON.stringify({ type: 'string', data: m }))
-      }, [this.sid, user, this.model])
+      }, [this.sid, user, this.model, this.profile.lang])
       const page = await ctx.newPage()
       const diag = []
       page.on('requestfailed', rq => diag.push('FAIL ' + rq.url().slice(0, 120) + ' ' + rq.failure()?.errorText))
@@ -383,6 +426,8 @@ class Instance {
         const logText = buf.toString('utf8')
         if (logText.includes(needle)) { rec.status = 'finished'; break }
         if (logText.includes(askNeedle)) { rec.status = 'awaiting_input'; break }
+        // 模型流报错（如供应商返回空响应）后编排循环不会再打印 Finished，不识别的话每次白等到超时
+        if (logText.includes(`Stream error for ${rec.conversationId}`)) { rec.status = 'stream_error'; rec.error = '模型流报错（见后端日志 Stream error）' + (UNREACHABLE_RE.test(logText) ? ' prohibited due to a violation of provider Terms Of Service' : ''); break }
         if (Date.now() - t1 > timeoutSec * 1000) { rec.status = 'timeout'; await this.http('POST', `/api/agent/cancel/${rec.conversationId}`); break }
         await sleep(500)
       }
@@ -432,7 +477,7 @@ class Instance {
       })()
     })
     const logOffset = fs.statSync(this.logFile).size
-    const r = await this.http('POST', '/api/agent/chat', { projectId: pid, conversationId, message: text, mode: 'AGENT', model: this.model, clientCapability: 'none' })
+    const r = await this.http('POST', '/api/agent/chat', { projectId: pid, conversationId, message: text, mode: 'AGENT', model: this.model, clientCapability: 'none', appLanguage: this.profile.lang })
     if (r?.status === 'error' || r?._status >= 400) { ac.abort(); return { status: 'rejected', error: JSON.stringify(r).slice(0, 300), conversationId, events, durationMs: Date.now() - t0, logOffset } }
     await done
     if (status === 'timeout') await this.http('POST', `/api/agent/cancel/${conversationId}`)
@@ -478,6 +523,8 @@ async function runOne(inst, sentence, runIdx, opts) {
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
       cachedTokens: usage.cached ?? 0, cacheWriteTokens: usage.cache_write ?? 0, cacheReportedCalls: usage.cache_reported ?? 0,
       billedEq: billedEq(usage.p ?? 0, usage.cached ?? 0),
+      todoWrites: tools.filter(t => t === 'todo_write').length, askUser: tools.includes('ask_user'),
+      lookAround: isLookAround(tools[0], sentence.expect.firstToolAnyOf),
       toolSetChanges: countChanges(rounds.map(r => r.toolsHash)), toolOrderChanges: countChanges(rounds.map(r => r.toolsOrderHash)),
       durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
@@ -486,6 +533,15 @@ async function runOne(inst, sentence, runIdx, opts) {
       files: () => inst.rows(`select id, name, parent_id, is_folder, is_deleted from project_file where project_id=${pid} order by id`),
       tasks: () => inst.rows(`select id, title, due_date, source from project_task where project_id=${pid} order by id`),
       memory: () => inst.rows('select memory_type, memory_key, memory_value, scope from memory_entry'),
+      // 二进制产物校验：下载项目文件字节、夹具 sha256、docx 的 word/document.xml
+      bytes: async id => Buffer.from(await (await fetch(`${inst.base}/api/files/${id}/download`, { headers: { 'X-Session-Id': inst.sid } })).arrayBuffer()),
+      sha256: buf => crypto.createHash('sha256').update(buf).digest('hex'),
+      fixtureSha256: name => crypto.createHash('sha256').update(fs.readFileSync(path.join(HERE, 'fixtures', name))).digest('hex'),
+      docxXml: buf => {
+        const tmp = path.join(os.tmpdir(), `matrix-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.docx`)
+        fs.writeFileSync(tmp, buf)
+        try { return execFileSync('unzip', ['-p', tmp, 'word/document.xml'], { maxBuffer: 64 << 20 }).toString('utf8') } finally { fs.unlinkSync(tmp) }
+      },
     }
     rec.checks = await judge(sentence, rec, ctx)
     rec.pass = rec.checks.pass
@@ -501,6 +557,18 @@ function countChanges(hashes) {
   let n = 0
   for (let i = 1; i < hashes.length; i++) if (hashes[i] !== hashes[i - 1]) n++
   return n
+}
+const INFRA_RETRIES = 2
+// OpenRouter 对该模型/出口直接 403（地域或供应商条款）：不是模型行为，也不会因重试好转。连续 3 次后该实例剩余句子整体 SKIPPED
+const UNREACHABLE_RE = /prohibited due to a violation|No endpoints found|region/i
+const MAX_UNREACHABLE = 3
+const isInfraFailure = rec => !UNREACHABLE_RE.test(rec.error || '') && (rec.status === 'stream_error' || rec.status === 'harness_error' || (rec.status === 'error' && /Stream ended without usable/.test(rec.error || ''))
+  || (rec.status === 'timeout' && (rec.rounds ?? 0) <= 1))
+// 「四处看看」：第一个工具是列清单/目录类工具，且不在句子声明的 firstToolAnyOf 里（没声明 firstToolAnyOf 的句子不计）
+const LOOK_AROUND_RE = /^(list_[a-z_]+|doc_list_project_files|search_project_files|search_across_projects|search_project_summaries|task_list|meeting_list[a-z_]*|tmeet_list_meetings|memory_list|get_law_list)$/
+function isLookAround(first, allowed) {
+  if (!first || !allowed?.length) return false
+  return LOOK_AROUND_RE.test(first) && !anyOf(allowed, [first])
 }
 function summarizeEvents(evs) { const c = {}; for (const e of evs) c[e] = (c[e] || 0) + 1; return c }
 
@@ -521,10 +589,10 @@ function buildReport(meta, results, sentences) {
   const total = results.filter(r => r.status !== 'SKIPPED')
   L.push(`# 模型矩阵报告 ${meta.timestamp}`, '',
     `- before: \`${meta.before.ref}\` (${meta.before.sha.slice(0, 10)})`, `- after: \`${meta.after.ref}\` (${meta.after.sha.slice(0, 10)})`,
-    `- 模型: ${models.join(', ')}；每句 ${meta.runs} 次；并发实例 ${meta.concurrency}`,
+    `- profile: ${meta.profile}（${PROFILES[meta.profile].lang}）/ tier: ${meta.tier}；模型: ${models.join(', ')}；每句 ${meta.runs} 次；并发实例 ${meta.concurrency}`,
     `- 总墙钟: ${(meta.wallMs / 1000).toFixed(0)}s（其中构建+启动 ${(meta.setupMs / 1000).toFixed(0)}s，跑题 ${(meta.runMs / 1000).toFixed(0)}s）`, '')
   const skipped = sentences.filter(s => results.some(r => r.sentence === s.id && r.status === 'SKIPPED'))
-  if (skipped.length) L.push(`SKIPPED（需要编辑器但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
+  if (skipped.length) L.push(`SKIPPED（需要编辑器或插件但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
   L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 缓存命中 tokens | 命中率 | 计费等价 | 补全 tokens | 轮数 | 工具集变化轮数 | 顺序变化轮数 | ≥2轮最大工具数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const m of models) for (const side of ['before', 'after']) {
     // before=after 同 ref 时 results 里靠 side 区分
@@ -539,7 +607,7 @@ function buildReport(meta, results, sentences) {
     for (const s of sentences) {
       const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id)
       const b = pick('before'), a = pick('after')
-      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | | | 需要编辑器 |`); continue }
+      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | | | ${b[0].reason || '需要编辑器'} |`); continue }
       const pr = rs => `${rs.filter(r => r.pass).length}/${rs.length}`
       const ft = rs => rs.map(r => r.firstTool || '-').join(' / ')
       const rt = rs => rs.map(r => `${r.rounds}r/${(r.promptTokens || 0) + (r.completionTokens || 0)}t`).join(' / ')
@@ -569,13 +637,83 @@ function buildReport(meta, results, sentences) {
     return rate(p('after')) >= rate(p('before'))
   })
   L.push(`**AFTER ≥ BEFORE on correctness for all models: ${allOk ? 'yes' : 'no'}**`, '')
+  L.push(...buildGateSection(meta, results, sentences))
+  L.push(...buildCostSection(meta, results))
   return L.join('\n')
+}
+
+// ---------- 门禁（gate）汇总：逐句中位数、通过率、四处看看率、todo 次数、ask_user 率、判定与回退清单 ----------
+// 判定：每个模型的「通过句数当量」= Σ(句内通过次数 / 运行次数)；AFTER ≥ BEFORE − 1（容忍一句话的波动）才算该模型通过。
+// 回退清单：同一句子同一模型 AFTER 比 BEFORE 少通过 ≥2 次（--runs 1 时不可能触发）。
+const GATE_TOLERANCE_SENTENCES = 1
+const GATE_REGRESSION_RUNS = 2
+function buildGateSection(meta, results, sentences) {
+  const L = ['', '## 门禁汇总（逐句中位数，按模型）', '']
+  const verdicts = []
+  const regressions = []
+  const f1 = x => x == null ? '-' : (Math.round(x * 10) / 10).toString()
+  for (const m of meta.models) {
+    L.push(`### ${m}`, '', '| 句子 | 通过 B→A | 轮数中位 B/A | 计费等价中位 B/A | 命中率中位 B/A | 四处看看率 B/A | todo_write 中位 B/A | ask_user 率 B/A |', '|---|---|---|---|---|---|---|---|')
+    let eqB = 0, eqA = 0, n = 0
+    for (const s of sentences) {
+      const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id)
+      const b = pick('before'), a = pick('after')
+      if (!b.length || !a.length || b[0].status === 'SKIPPED' || a[0].status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | | | | | | |`); continue }
+      const pb = b.filter(r => r.pass).length, pa = a.filter(r => r.pass).length
+      eqB += pb / b.length; eqA += pa / a.length; n++
+      if (pb - pa >= GATE_REGRESSION_RUNS) regressions.push(`${m} / ${s.id}: ${pb}/${b.length} → ${pa}/${a.length}`)
+      const rate = (rs, k) => rs.length ? Math.round(100 * rs.filter(r => r[k]).length / rs.length) + '%' : '-'
+      const cache = rs => f1(med(rs.map(r => r.promptTokens ? 100 * (r.cachedTokens || 0) / r.promptTokens : null)))
+      L.push(`| ${s.id} | ${pb}/${b.length} → ${pa}/${a.length}${pb - pa >= GATE_REGRESSION_RUNS ? ' **回退**' : ''} | ${f1(med(b.map(r => r.rounds)))} / ${f1(med(a.map(r => r.rounds)))} | ${f1(med(b.map(r => r.billedEq)))} / ${f1(med(a.map(r => r.billedEq)))} | ${cache(b)}% / ${cache(a)}% | ${rate(b, 'lookAround')} / ${rate(a, 'lookAround')} | ${f1(med(b.map(r => r.todoWrites)))} / ${f1(med(a.map(r => r.todoWrites)))} | ${rate(b, 'askUser')} / ${rate(a, 'askUser')} |`)
+    }
+    const ok = eqA >= eqB - GATE_TOLERANCE_SENTENCES
+    verdicts.push(ok)
+    L.push('', `通过句数当量：BEFORE ${f1(eqB)} / ${n}，AFTER ${f1(eqA)} / ${n}（容忍 ${GATE_TOLERANCE_SENTENCES} 句）→ **${ok ? 'PASS' : 'FAIL'}**`, '')
+  }
+  L.push('### 回退清单（同句同模型 AFTER 少通过 ≥' + GATE_REGRESSION_RUNS + ' 次）', '')
+  if (meta.runs < GATE_REGRESSION_RUNS) L.push(`本次 --runs ${meta.runs} < ${GATE_REGRESSION_RUNS}，回退清单不适用。`)
+  else if (!regressions.length) L.push('无。')
+  else for (const r of regressions) L.push('- ' + r)
+  L.push('', `**GATE: ${verdicts.every(Boolean) ? 'PASS' : 'FAIL'}**（逐模型 ${meta.models.map((m, i) => `${m}=${verdicts[i] ? 'PASS' : 'FAIL'}`).join('，')}；回退 ${regressions.length} 句）`, '')
+  return L
+}
+
+// ---------- 成本与耗时估算：按本次实测外推到「全量门禁」（每句 TARGET_RUNS 次，before+after 两侧）----------
+const TARGET_RUNS = 3
+function buildCostSection(meta, results) {
+  const L = ['', `## 成本与耗时估算（外推到每句 ${TARGET_RUNS} 次、before+after 两侧）`, '',
+    '| 模型 | 本次实测每次运行均价(USD) | 实测总花费(USD) | 全量门禁估算(USD) | 备注 |', '|---|---|---|---|---|']
+  let sumEst = 0, unknown = false
+  const liveCount = results.filter(r => r.status !== 'SKIPPED').length
+  for (const m of meta.models) {
+    const rs = results.filter(r => r.model === m && r.status !== 'SKIPPED')
+    if (!rs.length) { L.push(`| ${m} | - | - | - | 全部 SKIPPED |`); continue }
+    const costs = rs.map(r => costOf(m, r.promptTokens || 0, r.cachedTokens || 0, r.completionTokens || 0))
+    if (costs.some(c => c == null)) { unknown = true; L.push(`| ${m} | - | - | - | 无标价，未估算 |`); continue }
+    const total = costs.reduce((a, b) => a + b, 0), avg = total / rs.length
+    const perSide = meta.sentenceCount // 近似：未跳过句数 ≈ 句集大小
+    const est = avg * perSide * TARGET_RUNS * 2
+    sumEst += est
+    L.push(`| ${m} | ${avg.toFixed(4)} | ${total.toFixed(3)} | ${est.toFixed(2)} | 不含辅助模型（起标题/记忆抽取）与 provider 重试 |`)
+  }
+  const factor = TARGET_RUNS / meta.runs
+  const estRun = meta.runMs * factor
+  L.push('', `- 全量门禁成本合计约 **$${sumEst.toFixed(2)}**${unknown ? '（不含无标价模型）' : ''}（价格：OpenRouter 标价，输入/输出/缓存读 每 1M token；缓存读按实测 cached_tokens 计）。`,
+    `- 耗时：本次跑题 ${(meta.runMs / 60000).toFixed(1)} min（每句 ${meta.runs} 次）；实例并行、同实例串行，外推到每句 ${TARGET_RUNS} 次 ≈ **${(estRun / 60000).toFixed(0)} min**，另加构建+启动约 ${(meta.setupMs / 60000).toFixed(1)} min（构建缓存命中时更短）。`, '')
+  return L
 }
 
 // ---------- 主流程 ----------
 async function main() {
   const o = parseArgs(process.argv.slice(2))
-  if (o.help || !o.before || !o.after || !o.models?.length || !o.sentences) { console.log(USAGE); process.exit(o.help ? 0 : 2) }
+  o.profile = o.profile || 'cn'
+  o.tier = o.tier || 'cheap'
+  const prof = PROFILES[o.profile]
+  if (!prof) { console.error('--profile 只能是 cn 或 intl'); process.exit(2) }
+  if (!['cheap', 'release'].includes(o.tier)) { console.error('--tier 只能是 cheap 或 release'); process.exit(2) }
+  o.models = o.models?.length ? o.models : (o.tier === 'release' ? [...prof.cheap, ...prof.extra] : prof.cheap)
+  o.sentences = o.sentences || path.join(HERE, prof.sentences)
+  if (o.help || !o.before || !o.after) { console.log(USAGE); process.exit(o.help ? 0 : 2) }
   if (!process.env.OPENROUTER_API_KEY) { console.error('缺少环境变量 OPENROUTER_API_KEY'); process.exit(2) }
   const sentences = loadSentences(path.resolve(o.sentences), o.only)
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
@@ -612,7 +750,7 @@ async function main() {
     const byRef = Object.fromEntries(built.map(b => [b.ref, b]))
     const sides = []
     for (const side of ['before', 'after']) for (const model of o.models) sides.push({ side, model, build: byRef[o[side]] })
-    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir }), { side: s.side }))
+    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile] }), { side: s.side }))
 
     // 以并发 K 启动实例
     const queue = (items, k, fn) => { let i = 0; return Promise.all(Array.from({ length: Math.min(k, items.length) }, async () => { while (i < items.length) await fn(items[i++]) })) }
@@ -630,21 +768,34 @@ async function main() {
     const results = []
     const tRun = Date.now()
     await Promise.all(instances.map(async inst => {
+      let unreachable = 0
       for (const s of sentences) for (let r = 1; r <= o.runs; r++) {
         let rec
         if (needsEditor(s) && !runsEditor(s)) rec = { instance: inst.label, ref: inst.build.ref, model: inst.model, sentence: s.id, run: r, status: 'SKIPPED', reason: `hostState=${s.hostState} 需要编辑器（--api-only 或该宿主类型暂不支持）`, pass: null }
-        else rec = await runOne(inst, s, r, o)
+        else if (unreachable >= MAX_UNREACHABLE) rec = { instance: inst.label, ref: inst.build.ref, model: inst.model, sentence: s.id, run: r, status: 'SKIPPED', reason: `SKIPPED：模型 ${inst.model} 在本机/本出口不可达（OpenRouter 连续 ${MAX_UNREACHABLE} 次 403）`, pass: null }
+        else if (s.requiresPlugin && !fs.existsSync(path.join(inst.dir, 'plugins', s.requiresPlugin, 'manifest.json'))) rec = { instance: inst.label, ref: inst.build.ref, model: inst.model, sentence: s.id, run: r, status: 'SKIPPED', reason: `SKIPPED：实例未安装插件 ${s.requiresPlugin}`, pass: null }
+        else {
+          // 供应商侧的瞬时故障（空响应流、第 1 轮就卡死）不是模型行为：自动重跑，最多 INFRA_RETRIES 次，次数记入 rec.infraRetries
+          for (let a = 0; ; a++) {
+            rec = await runOne(inst, s, r, o)
+            rec.infraRetries = a
+            if (a >= INFRA_RETRIES || !isInfraFailure(rec)) break
+            log(`${inst.label} ${s.id} #${r}: 供应商瞬时故障（${rec.status}），重跑 ${a + 1}/${INFRA_RETRIES}`)
+          }
+        }
         rec.side = inst.side
+        if (rec.status !== 'SKIPPED') unreachable = UNREACHABLE_RE.test(rec.error || '') && !rec.tools?.length ? unreachable + 1 : 0
         results.push(rec)
-        log(`${inst.label} ${s.id} #${r}: ${rec.status === 'SKIPPED' ? 'SKIPPED' : (rec.pass ? 'PASS' : 'FAIL')} ${rec.status !== 'SKIPPED' ? `first=${rec.firstTool} rounds=${rec.rounds} ${((rec.durationMs || 0) / 1000).toFixed(0)}s` : ''}`)
+        log(`${inst.label} ${s.id} #${r}: ${rec.status === 'SKIPPED' ? 'SKIPPED ' + (rec.reason || '') : (rec.pass ? 'PASS' : 'FAIL')} ${rec.status !== 'SKIPPED' ? `first=${rec.firstTool} rounds=${rec.rounds} ${((rec.durationMs || 0) / 1000).toFixed(0)}s` : ''}`)
       }
     }))
     const runMs = Date.now() - tRun
-    const meta = { timestamp, before: { ref: o.before, sha: byRef[o.before].sha }, after: { ref: o.after, sha: byRef[o.after].sha }, models: o.models, runs: o.runs, concurrency: o.concurrency, wallMs: Date.now() - T0, setupMs, runMs, apiOnly: o.apiOnly }
+    const meta = { timestamp, before: { ref: o.before, sha: byRef[o.before].sha }, after: { ref: o.after, sha: byRef[o.after].sha }, models: o.models, profile: o.profile, tier: o.tier, sentenceCount: sentences.length, runs: o.runs, concurrency: o.concurrency, wallMs: Date.now() - T0, setupMs, runMs, apiOnly: o.apiOnly }
     fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ meta, results }, null, 2))
     fs.writeFileSync(path.join(outDir, 'report.md'), buildReport(meta, results, sentences))
     log(`完成：总 ${(meta.wallMs / 1000).toFixed(0)}s（准备 ${(setupMs / 1000).toFixed(0)}s，跑题 ${(runMs / 1000).toFixed(0)}s）。报告 ${path.join(outDir, 'report.md')}`)
   } finally {
+    scrubSecret(outDir)
     if (!cleaning) { cleaning = true; await cleanup() }
   }
 }

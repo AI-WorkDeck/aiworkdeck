@@ -1,0 +1,160 @@
+{
+  "_comment": "tool-system-v2 V7 D1 两份 docx 比对专用 3 句。夹具 compare-v1/v2.docx（make_fixtures.py 生成）：第三条付款期限 10 日改 15 日、第五条违约金 10% 改 20%、新增第七条保密；第二条仅空白差异（不应被报为改动）。通过=用 compare_docx_summary 比对、compare_docx_summary 的结果里与最终回复都点出第三/第五/第七条、两份原件仍在且没有产生新文件。 c04/c05 是编辑器宿主句（docx 打开 = v1）：要求调用 compare_docx_redline，项目里出现新的 .docx（含 w:ins 与 w:del 修订），两份原件 sha256 与夹具一致。",
+  "sentences": [
+    {
+      "id": "c01-compare-v1-v2",
+      "text": "把股权转让协议v1和v2比对一下，看改了哪些条款",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "股权转让协议v1.docx",
+            "fixture": "compare-v1.docx"
+          },
+          {
+            "name": "股权转让协议v2.docx",
+            "fixture": "compare-v2.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "compare_docx_summary",
+          "doc_list_project_files",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "compare_docx_summary"
+          ]
+        ],
+        "mustNotUse": [
+          "compare_docx_redline",
+          "move_to_trash",
+          "write_docx"
+        ],
+        "outcomeCheck": "const t = ctx.finalText || ''; const files = await ctx.files(); return ctx.tools.includes('compare_docx_summary') && t.includes('第三条') && t.includes('第五条') && (t.includes('第七条') || t.includes('保密')) && files.filter(x => !x.is_deleted).length === 2;"
+      }
+    },
+    {
+      "id": "c02-counterparty-redraft",
+      "text": "对方发回了修订稿（v2），帮我看看他们动了哪些地方",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "股权转让协议v1.docx",
+            "fixture": "compare-v1.docx"
+          },
+          {
+            "name": "股权转让协议v2.docx",
+            "fixture": "compare-v2.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "compare_docx_summary",
+          "doc_list_project_files",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "compare_docx_summary"
+          ]
+        ],
+        "mustNotUse": [
+          "compare_docx_redline",
+          "move_to_trash",
+          "write_docx"
+        ],
+        "outcomeCheck": "const t = ctx.finalText || ''; const files = await ctx.files(); return ctx.tools.includes('compare_docx_summary') && t.includes('第三条') && t.includes('第五条') && (t.includes('第七条') || t.includes('保密')) && files.filter(x => !x.is_deleted).length === 2;"
+      }
+    },
+    {
+      "id": "c03-english-compare",
+      "text": "Compare the two versions of the share transfer agreement and tell me which clauses changed.",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "股权转让协议v1.docx",
+            "fixture": "compare-v1.docx"
+          },
+          {
+            "name": "股权转让协议v2.docx",
+            "fixture": "compare-v2.docx"
+          }
+        ]
+      },
+      "expect": {
+        "firstToolAnyOf": [
+          "compare_docx_summary",
+          "doc_list_project_files",
+          "search_project_files"
+        ],
+        "mustUse": [
+          [
+            "compare_docx_summary"
+          ]
+        ],
+        "mustNotUse": [
+          "compare_docx_redline",
+          "move_to_trash",
+          "write_docx"
+        ],
+        "outcomeCheck": "const t = (ctx.finalText || '').toLowerCase(); const files = await ctx.files(); const c3 = /(third|clause 3|article 3|section 3|第三条|3rd)/.test(t); const c5 = /(fifth|clause 5|article 5|section 5|第五条|5th)/.test(t); return ctx.tools.includes('compare_docx_summary') && c3 && c5 && /(7|seventh|confidential|保密)/.test(t) && files.filter(x => !x.is_deleted).length === 2;"
+      }
+    },
+    {
+      "id": "c04-redline-zh",
+      "text": "把合同v1和合同v2生成一份修订对比稿",
+      "hostState": "docx:compare-v1",
+      "hostFile": "合同v1.docx",
+      "seed": {
+        "files": [
+          {
+            "name": "合同v2.docx",
+            "fixture": "compare-v2.docx"
+          }
+        ]
+      },
+      "expect": {
+        "mustUse": [
+          [
+            "compare_docx_redline"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = (await ctx.files()).filter(x => !x.is_deleted && !x.is_folder); const v1 = f.find(x => x.name === '合同v1.docx'), v2 = f.find(x => x.name === '合同v2.docx'); if (!v1 || !v2) return false; const same = ctx.sha256(await ctx.bytes(v1.id)) === ctx.fixtureSha256('compare-v1.docx') && ctx.sha256(await ctx.bytes(v2.id)) === ctx.fixtureSha256('compare-v2.docx'); const fresh = f.filter(x => x.id !== v1.id && x.id !== v2.id && /\\.docx$/i.test(x.name)); for (const n of fresh) { const xml = ctx.docxXml(await ctx.bytes(n.id)); if (/<w:ins\\b/.test(xml) && /<w:del\\b/.test(xml)) return same; } return false;"
+      }
+    },
+    {
+      "id": "c05-redline-en",
+      "text": "Create a redline comparing Contract v1 and v2",
+      "hostState": "docx:compare-v1",
+      "hostFile": "合同v1.docx",
+      "seed": {
+        "files": [
+          {
+            "name": "合同v2.docx",
+            "fixture": "compare-v2.docx"
+          }
+        ]
+      },
+      "expect": {
+        "mustUse": [
+          [
+            "compare_docx_redline"
+          ]
+        ],
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const f = (await ctx.files()).filter(x => !x.is_deleted && !x.is_folder); const v1 = f.find(x => x.name === '合同v1.docx'), v2 = f.find(x => x.name === '合同v2.docx'); if (!v1 || !v2) return false; const same = ctx.sha256(await ctx.bytes(v1.id)) === ctx.fixtureSha256('compare-v1.docx') && ctx.sha256(await ctx.bytes(v2.id)) === ctx.fixtureSha256('compare-v2.docx'); const fresh = f.filter(x => x.id !== v1.id && x.id !== v2.id && /\\.docx$/i.test(x.name)); for (const n of fresh) { const xml = ctx.docxXml(await ctx.bytes(n.id)); if (/<w:ins\\b/.test(xml) && /<w:del\\b/.test(xml)) return same; } return false;"
+      }
+    }
+  ]
+}

@@ -2,36 +2,37 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # host,prompt,offeredTools,offeredSchemaTokens(o200k)
 # 2026-11-07 S1（没开文件态入口核心集 + 关键词预放回 ≤3 类 + create_file 退出核心集）后重测；S0 基线见 git 历史
+# 2026-11-10 V7 D1：list_tools 描述多念 compare 类目（非 ask 档各 +9 token）
 # 2026-11-07 取自 master 8ee11eadc，与 docs/plans/tool-surface-audit.md §1.1 一致
 # 2026-11-07 tool-system-v2 V1（核心集描述按 A5 模板重写，不改名不改行为）后重测；V1 前基线见 git 历史
 # 2026-11-08 tool-system-v2 V2（核心集重切 8 个名字退出 + 条件核心 list_attached_files/doc_restore_checkpoint + memory_search 退出固定追加）后重测；V2 前基线见 git 历史
 # 2026-11-09 tool-system-v2 V4（22 族合并为单名、旧名转 @ToolShim 隐藏；law_search/search_project_files/doc_list_project_files 吸收合并参数）后重测；V4 前基线见 git 历史
 # 2026-11-09 tool-system-v2 V5（meeting_list_recordings/tmeet_* 并入 meeting_list，meeting_get_transcript 加 source）后重测：仅 worst 提示命中 meeting 类目，4 个工具 → 2 个；V5 前基线见 git 历史
 # 2026-11-10 tool-system-v2 V7 D2（deadline_compute 进 task 类目；典型提示多命中 task 类目）合并 master 后重测
-lowa-docx,neutral,31,6920
-lowa-docx,typical,40,9752
-lowa-docx,worst,33,7257
-lowa-xlsx,neutral,25,5918
-lowa-xlsx,typical,51,12246
-lowa-xlsx,worst,27,6255
-lowa-pptx,neutral,26,5982
-lowa-pptx,typical,31,7714
-lowa-pptx,worst,28,6319
-lowa-nofile,neutral,22,5043
-lowa-nofile,typical,26,6572
-lowa-nofile,worst,24,5380
-office-word,neutral,27,6021
-office-word,typical,31,7550
-office-word,worst,29,6358
-office-excel,neutral,25,5843
-office-excel,typical,29,7372
-office-excel,worst,27,6180
-office-ppt,neutral,24,5620
-office-ppt,typical,28,7149
-office-ppt,worst,26,5957
-none,neutral,18,4175
-none,typical,22,5704
-none,worst,20,4512
+lowa-docx,neutral,31,6929
+lowa-docx,typical,40,9761
+lowa-docx,worst,33,7266
+lowa-xlsx,neutral,25,5927
+lowa-xlsx,typical,51,12255
+lowa-xlsx,worst,27,6264
+lowa-pptx,neutral,26,5991
+lowa-pptx,typical,31,7723
+lowa-pptx,worst,28,6328
+lowa-nofile,neutral,22,5052
+lowa-nofile,typical,26,6581
+lowa-nofile,worst,24,5389
+office-word,neutral,27,6030
+office-word,typical,31,7559
+office-word,worst,29,6367
+office-excel,neutral,25,5852
+office-excel,typical,29,7381
+office-excel,worst,27,6189
+office-ppt,neutral,24,5629
+office-ppt,typical,28,7158
+office-ppt,worst,26,5966
+none,neutral,18,4184
+none,typical,22,5713
+none,worst,20,4521
 ask,neutral,8,1187
 ask,typical,8,1187
 ask,worst,8,1187
