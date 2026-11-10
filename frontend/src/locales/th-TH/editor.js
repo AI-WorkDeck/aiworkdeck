@@ -3,6 +3,7 @@
 
 export default {
   officeToolNames: {
+    "deadline_compute": "คำนวณกำหนดเวลา",
     "listAttachedFiles": "แสดงไฟล์แนบของรอบนี้",
     "office_ppt_add_image": "แทรกรูปภาพในสไลด์",
     "office_ppt_add_chart": "แทรกแผนภูมิในสไลด์",

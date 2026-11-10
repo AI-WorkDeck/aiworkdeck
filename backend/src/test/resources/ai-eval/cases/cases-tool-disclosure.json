@@ -476,5 +476,107 @@
       ],
       "bubbleEndStatus": "finished"
     }
+  },
+  {
+    "id": "deadline-appeal-period-after-service",
+    "title": "V7 D2：「判决书11月3日送达，上诉期什么时候到期」起跑时按『上诉期』关键词预放回 task 类目，第一轮直接调 deadline_compute 而不是心算（tool-system-v2 D2）",
+    "category": "task",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "判决书11月3日送达，上诉期什么时候到期？",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "deadline_compute",
+            "arguments": {
+              "startDate": "2026-11-03",
+              "kind": "appeal_judgment"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>上诉期自送达次日起算 15 日，到期日为 2026 年 11 月 18 日（周三）。15 日是判决的常见默认值，请以判决书载明为准。</final>"
+      }
+    ],
+    "toolStubs": {
+      "deadline_compute": "到期日：2026-11-18周三\n待核实：期间长度 15日 是该类期限的常见默认值，请核实。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "deadline_compute",
+          "argsContain": {
+            "startDate": "2026-11-03"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "deadline_compute",
+        "task_create",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect",
+        "tag_file"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "deadline-limitation-with-holiday-roll",
+    "title": "V7 D2：「诉讼时效」说法也能直接命中 deadline_compute（kind=limitation），顺延结果由工具给出",
+    "category": "task",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "2023年10月1日知道权利被侵害，诉讼时效几号到期？",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "deadline_compute",
+            "arguments": {
+              "startDate": "2023-10-01",
+              "kind": "limitation"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>诉讼时效 3 年，最后一日 2026-10-01 在国庆假期，顺延至 2026 年 10 月 8 日（周四）；起算点与中断中止情形请核实。</final>"
+      }
+    ],
+    "toolStubs": {
+      "deadline_compute": "到期日：2026-10-08周四\n顺延：期间最后一日 2026-10-01周四（法定节假日·国庆节）不是工作日，顺延至 2026-10-08周四。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "deadline_compute",
+          "argsContain": {
+            "startDate": "2023-10-01"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "deadline_compute",
+        "task_create",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect",
+        "tag_file"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
   }
 ]
