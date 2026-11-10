@@ -159,4 +159,17 @@ class DocCompareToolsTest {
         assertEquals(ToolMeta.Host.LOWA, redline.requiresHost());
         assertEquals("ADDED", redline.fileEffect());
     }
+
+    @Test
+    @DisplayName("关键词：比对 / 回稿 / 动了哪些地方等说法起跑时预放回 compare 类目；中性问句不放回")
+    void compareKeywordsPutCategoryBack() {
+        com.checkba.service.ai.ToolDisclosurePolicy policy = new com.checkba.service.ai.ToolDisclosurePolicy(true, true);
+        for (String prompt : List.of("把合同v1和v2比对一下，看改了哪些条款", "对方发回了修订稿（v2），帮我看看他们动了哪些地方",
+                "对比这两份合同有什么不同", "Compare the two versions and tell me which clauses changed.")) {
+            assertTrue(policy.categoriesHintedBy(prompt).contains("compare"), prompt);
+        }
+        assertFalse(policy.categoriesHintedBy("这份合同有什么风险？").contains("compare"));
+        assertEquals("compare", policy.categoryOf("compare_docx_summary"));
+        assertEquals("compare", policy.categoryOf("compare_docx_redline"));
+    }
 }

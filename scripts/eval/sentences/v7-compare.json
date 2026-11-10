@@ -1,5 +1,5 @@
 {
-  "_comment": "tool-system-v2 V7 D1 两份 docx 比对专用 3 句。夹具 compare-v1/v2.docx（make_fixtures.py 生成）：第三条付款期限 10 日改 15 日、第五条违约金 10% 改 20%、新增第七条保密；第二条仅空白差异（不应被报为改动）。通过=用 compare_docx_summary 比对、最终回复点出第三/第五/第七条、不报未改动的第四条、两份原件仍在且没有产生新文件。",
+  "_comment": "tool-system-v2 V7 D1 两份 docx 比对专用 3 句。夹具 compare-v1/v2.docx（make_fixtures.py 生成）：第三条付款期限 10 日改 15 日、第五条违约金 10% 改 20%、新增第七条保密；第二条仅空白差异（不应被报为改动）。通过=用 compare_docx_summary 比对、compare_docx_summary 的结果里与最终回复都点出第三/第五/第七条、两份原件仍在且没有产生新文件。",
   "sentences": [
     {
       "id": "c01-compare-v1-v2",
@@ -33,7 +33,7 @@
           "move_to_trash",
           "write_docx"
         ],
-        "outcomeCheck": "const t = ctx.finalText || ''; const files = await ctx.files(); return t.includes('第三条') && t.includes('第五条') && (t.includes('第七条') || t.includes('保密')) && !t.includes('第四条 交割') && files.filter(x => !x.is_deleted).length === 2;"
+        "outcomeCheck": "const t = ctx.finalText || ''; const files = await ctx.files(); return ctx.tools.includes('compare_docx_summary') && t.includes('第三条') && t.includes('第五条') && (t.includes('第七条') || t.includes('保密')) && files.filter(x => !x.is_deleted).length === 2;"
       }
     },
     {
@@ -68,7 +68,7 @@
           "move_to_trash",
           "write_docx"
         ],
-        "outcomeCheck": "const t = ctx.finalText || ''; const files = await ctx.files(); return t.includes('第三条') && t.includes('第五条') && (t.includes('第七条') || t.includes('保密')) && !t.includes('第四条 交割') && files.filter(x => !x.is_deleted).length === 2;"
+        "outcomeCheck": "const t = ctx.finalText || ''; const files = await ctx.files(); return ctx.tools.includes('compare_docx_summary') && t.includes('第三条') && t.includes('第五条') && (t.includes('第七条') || t.includes('保密')) && files.filter(x => !x.is_deleted).length === 2;"
       }
     },
     {
@@ -103,7 +103,7 @@
           "move_to_trash",
           "write_docx"
         ],
-        "outcomeCheck": "const t = (ctx.finalText || '').toLowerCase(); const files = await ctx.files(); const c3 = /(third|clause 3|article 3|section 3|第三条|3rd)/.test(t); const c5 = /(fifth|clause 5|article 5|section 5|第五条|5th)/.test(t); return c3 && c5 && /(7|seventh|confidential|保密)/.test(t) && files.filter(x => !x.is_deleted).length === 2;"
+        "outcomeCheck": "const t = (ctx.finalText || '').toLowerCase(); const files = await ctx.files(); const c3 = /(third|clause 3|article 3|section 3|第三条|3rd)/.test(t); const c5 = /(fifth|clause 5|article 5|section 5|第五条|5th)/.test(t); return ctx.tools.includes('compare_docx_summary') && c3 && c5 && /(7|seventh|confidential|保密)/.test(t) && files.filter(x => !x.is_deleted).length === 2;"
       }
     }
   ]

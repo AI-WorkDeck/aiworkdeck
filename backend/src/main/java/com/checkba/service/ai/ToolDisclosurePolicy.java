@@ -310,7 +310,7 @@ public class ToolDisclosurePolicy {
 
     static {
         CATEGORY_KEYWORDS.put("pdf", List.of("pdf"));
-        CATEGORY_KEYWORDS.put("compare", List.of("比对", "对比", "比较两", "比一下", "回稿", "改了哪", "差异", "有什么不同", "有何不同",
+        CATEGORY_KEYWORDS.put("compare", List.of("比对", "对比", "比较两", "比一下", "回稿", "修订稿", "改了哪", "改了什么", "动了哪", "差异", "有什么不同", "有何不同", "两个版本",
                 "compare", "redline", "comparison"));
         CATEGORY_KEYWORDS.put("version", List.of("版本", "提交改动", "提交修改", "取回", "自动合并", "git", "commit", "pull", "restore"));
         CATEGORY_KEYWORDS.put("litigation", List.of("时间轴", "关系图", "流程图", "可视化",

@@ -100,4 +100,4 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
 - `sentences/core-17.json`：核心 17 句（读/找/改/批注/法条/记忆/新建）。V4 起期望里合并后的新名与旧名并列，可对拍合并前后两个 ref。
 - `sentences/v4-merged.json`：tool-system-v2 V4 合并工具专用 6 句（接受/拒绝修订、回复批注、表格插行、PDF 删页/抽页），夹具 `contract-commented.docx` / `contract-table.docx` / `dossier-24p.pdf`（`python3 fixtures/make_fixtures.py` 生成）。
 - `sentences/v5-meetings.json`：tool-system-v2 V5 会议合流专用 5 句（只看腾讯会议清单、整理纪要不指明来源、上周会议录音、昨天的逐字稿）。种子支持 `meetings`（写 `meeting_recording`）与 `tencentMeetings`（写内置同步表 `tencent_meeting_record`），都是虚构数据、`dayOffset` 相对今天；实例没有腾讯会议插件，tencent 来源走内置表，**绝不碰真实 tmeet 账号**。
-- `sentences/v7-compare.json`：tool-system-v2 V7 D1 两份 docx 比对专用 3 句（中文两句 + 英文一句），夹具 `compare-v1.docx` / `compare-v2.docx`（第三条付款期限、第五条违约金、新增第七条保密，第二条仅空白差异）；outcomeCheck 要求最终回复点出三处改动、不报未改动条款、原件仍在且没有产生新文件。
+- `sentences/v7-compare.json`：tool-system-v2 V7 D1 两份 docx 比对专用 3 句（中文两句 + 英文一句），夹具 `compare-v1.docx` / `compare-v2.docx`（第三条付款期限、第五条违约金、新增第七条保密，第二条仅空白差异）；outcomeCheck 要求调用过 compare_docx_summary、回复点出三处改动、原件仍在且没有产生新文件（回复文本含工具输出，所以不做「不得提及未改动条款」的反向断言）。
