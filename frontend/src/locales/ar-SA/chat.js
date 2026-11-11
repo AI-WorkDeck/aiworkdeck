@@ -125,7 +125,6 @@ export default {
   "nowDoing": "قيد التنفيذ الآن",
   "nowDoingThinking": "يفكّر",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "إيقاف هذه المهمة",
   "inputKeysHint": "Enter للإرسال، Shift+Enter لسطر جديد، اكتب {'@'} للإشارة إلى ملفات المشروع",
   "pluginReadOnlyNotice": "محادثة الوظيفة الإضافية ({source}) للقراءة فقط. أنشئ نسخة مشتقة للمتابعة هنا.",
   "forkToContinue": "أنشئ نسخة للمتابعة",

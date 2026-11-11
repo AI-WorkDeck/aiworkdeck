@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Nu bezig",
   "nowDoingThinking": "Denkt na",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Deze taak stoppen",
   "inputKeysHint": "Enter verzendt, Shift+Enter geeft een nieuwe regel, typ {'@'} om projectbestanden te verwijzen",
   "pluginReadOnlyNotice": "Het add-in-gesprek ({source}) is alleen-lezen. Maak een fork om hier verder te gaan.",
   "forkToContinue": "Forken om verder te gaan",

@@ -212,11 +212,10 @@ try {
     assert.ok(await page.$eval('.now-doing-strip', el => el.scrollWidth <= el.clientWidth + 1), `strip never overflows at ${width}px`)
   }
   await page.screenshot({ path: `${shots}/now-doing-strip.png` })
-  const cancelsAtStrip = await page.evaluate(() => window.cancelCalls || 0)
-  assert.equal(await page.$eval('.now-doing-stop', el => el.tagName), 'BUTTON')
-  await page.click('.now-doing-stop')
+  // 条只放信息：停止/暂停集中在输入区那一处，条里不许再长出控件
+  assert.equal(await page.$$eval('.now-doing-strip button, .now-doing-strip [role="button"]', els => els.length), 0, 'the strip is information only')
+  await page.click('.input-area-wrapper .stop-btn')
   await wait(() => !window.chatState.isStreaming && !document.querySelector('.now-doing-strip'))
-  assert.equal(await page.evaluate(() => window.cancelCalls || 0), cancelsAtStrip + 1, 'strip stop posts the same cancel as the composer stop')
   assert.equal(await placeholder(), '问点什么，或描述要做的事', 'idle placeholder comes back once the run stops')
   await page.evaluate(() => window.loadFixture('question'))
   await wait(() => document.querySelector('.question-card .q-choice:not(.q-choice-other)'))

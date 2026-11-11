@@ -769,7 +769,7 @@
                <text class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
            </view>
        </view>
-       <NowDoingStrip :active="isStreaming" :bubble="nowDoingBubble" @stop="handleAbort" />
+       <NowDoingStrip :active="isStreaming" :bubble="nowDoingBubble" />
        <AgentInbox
          :items="pendingInbox"
          :stream-ids="inboxStreamIds"

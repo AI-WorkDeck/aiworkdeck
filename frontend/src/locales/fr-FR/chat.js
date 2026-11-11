@@ -125,7 +125,6 @@ export default {
   "nowDoing": "En cours",
   "nowDoingThinking": "Réflexion en cours",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Arrêter cette tâche",
   "inputKeysHint": "Entrée pour envoyer, Maj+Entrée pour un saut de ligne, tapez {'@'} pour référencer des fichiers du projet",
   "pluginReadOnlyNotice": "La conversation du complément ({source}) est en lecture seule. Créez une copie pour continuer ici.",
   "forkToContinue": "Copier pour continuer",

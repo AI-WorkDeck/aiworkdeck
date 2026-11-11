@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Şu anda yapılıyor",
   "nowDoingThinking": "Düşünüyor",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Bu görevi durdur",
   "inputKeysHint": "Enter gönderir, Shift+Enter yeni satır açar, proje dosyalarına başvurmak için {'@'} yazın",
   "pluginReadOnlyNotice": "Eklenti görüşmesi ({source}) salt okunur. Burada devam etmek için çatal oluşturun.",
   "forkToContinue": "Devam etmek için çatalla",

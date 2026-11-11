@@ -3,16 +3,13 @@
 <template>
   <!-- 「正在做什么」常驻条（用户控制 6）：轮次在跑时钉在输入框上方的一行。
        只陈述、不打断：不弹窗、不抢焦点、不进 aria-live（每秒一跳的秒数会把读屏刷爆）。
-       停止键与输入区那颗是同一条路（父组件接 @stop → handleAbort）。 -->
+       刻意只放信息不放控件：停止/暂停集中在输入区，同一类操作只留一处入口。 -->
   <div v-if="active" class="now-doing-strip" :aria-label="t('chat.nowDoing')">
     <span class="now-doing-dot" aria-hidden="true"></span>
     <span class="now-doing-activity">{{ activity }}</span>
     <span v-if="progress" class="now-doing-progress">{{ progress }}</span>
     <span v-if="currentStep" class="now-doing-step">{{ currentStep }}</span>
     <span class="now-doing-elapsed">{{ elapsed }}</span>
-    <button type="button" class="now-doing-stop" :title="t('chat.nowDoingStop')" :aria-label="t('chat.nowDoingStop')" @click="$emit('stop')">
-      <span class="now-doing-stop-icon" aria-hidden="true"></span>
-    </button>
   </div>
 </template>
 
@@ -27,7 +24,6 @@ const props = defineProps({
   // 当前在写的助手气泡；切回后台仍在跑的会话时可能暂时没有
   bubble: { type: Object, default: null }
 })
-defineEmits(['stop'])
 
 // 秒表从本条出现时起算：插话会另起助手段，按气泡算会在用户插话那一刻归零。
 const since = ref(0)
@@ -81,7 +77,7 @@ const elapsed = computed(() => {
   min-width: 0;
   margin: 0 0 var(--awd-space-1);
   padding-block: 2px;
-  padding-inline: var(--awd-space-2) 2px;
+  padding-inline: var(--awd-space-2);
   font-size: var(--awd-panel-fs-meta);
   line-height: 1.5;
   color: var(--awd-text-2);
@@ -102,26 +98,4 @@ const elapsed = computed(() => {
 .now-doing-step { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now-doing-elapsed { flex-shrink: 0; margin-inline-start: auto; font-variant-numeric: tabular-nums; color: var(--awd-text-3); direction: ltr; unicode-bidi: isolate; }
 .now-doing-step + .now-doing-elapsed { margin-inline-start: 0; }
-.now-doing-stop {
-  appearance: none;
-  -webkit-appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--awd-border);
-  border-radius: var(--awd-radius-sm);
-  background: transparent;
-  color: var(--awd-text-2);
-  cursor: pointer;
-  line-height: 1;
-}
-.now-doing-stop::after { border: 0; }
-.now-doing-stop:hover { color: var(--awd-danger); border-color: var(--awd-danger); }
-.now-doing-stop:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent); outline-offset: var(--awd-focus-offset); }
-.now-doing-stop-icon { width: 8px; height: 8px; border-radius: 1px; background: currentColor; }
 </style>

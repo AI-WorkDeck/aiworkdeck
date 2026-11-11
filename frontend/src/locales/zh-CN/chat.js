@@ -140,7 +140,6 @@ export default {
   nowDoing: '正在进行',
   nowDoingThinking: '思考中',
   nowDoingProgress: '{done}/{total}',
-  nowDoingStop: '停止当前任务',
   inputKeysHint: 'Enter 发送，Shift+Enter 换行，输入 {\'@\'} 引用案卷文件',
   pluginReadOnlyNotice: '插件会话（{source}），只读——另起分支后可继续',
   forkToContinue: '另起分支继续',

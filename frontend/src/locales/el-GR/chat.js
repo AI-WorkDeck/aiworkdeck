@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Τρέχουσα ενέργεια",
   "nowDoingThinking": "Σκέφτεται",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Διακοπή αυτής της εργασίας",
   "inputKeysHint": "Enter για αποστολή, Shift+Enter για νέα γραμμή, πληκτρολογήστε {'@'} για αναφορά σε αρχεία του έργου",
   "pluginReadOnlyNotice": "Η συνομιλία του πρόσθετου ({source}) είναι μόνο για ανάγνωση. Δημιουργήστε αντίγραφο για να συνεχίσετε εδώ.",
   "forkToContinue": "Δημιουργία αντιγράφου για συνέχεια",

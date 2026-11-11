@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Сейчас выполняется",
   "nowDoingThinking": "Думает",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Остановить эту задачу",
   "inputKeysHint": "Enter отправляет, Shift+Enter переносит строку, введите {'@'}, чтобы сослаться на файлы проекта",
   "pluginReadOnlyNotice": "Беседа надстройки ({source}) доступна только для чтения. Создайте её копию, чтобы продолжить здесь.",
   "forkToContinue": "Создать копию для продолжения",

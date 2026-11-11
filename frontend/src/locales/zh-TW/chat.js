@@ -125,7 +125,6 @@ export default {
   "nowDoing": "正在進行",
   "nowDoingThinking": "思考中",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "停止目前任務",
   "inputKeysHint": "Enter 發送，Shift+Enter 換行，輸入 {'@'} 引用案卷檔案",
   "pluginReadOnlyNotice": "插件會話（{source}），只讀——另起分支後可繼續",
   "forkToContinue": "另起分支繼續",

@@ -138,7 +138,6 @@ export default {
   nowDoing: 'Now doing',
   nowDoingThinking: 'Thinking',
   nowDoingProgress: '{done}/{total}',
-  nowDoingStop: 'Stop this task',
   inputKeysHint: 'Enter to send, Shift+Enter for a new line, type {\'@\'} to reference project files',
   pluginReadOnlyNotice: 'Add-in conversation ({source}) is read-only. Fork it to continue here.',
   forkToContinue: 'Fork to continue',

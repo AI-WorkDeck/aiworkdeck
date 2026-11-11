@@ -125,7 +125,6 @@ export default {
   "nowDoing": "In corso",
   "nowDoingThinking": "Sta pensando",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Interrompi questa attività",
   "inputKeysHint": "Invio per inviare, Maiusc+Invio per andare a capo, digita {'@'} per fare riferimento ai file del progetto",
   "pluginReadOnlyNotice": "La conversazione del componente aggiuntivo ({source}) è di sola lettura. Crearne un fork per continuare qui.",
   "forkToContinue": "Esegui fork per continuare",

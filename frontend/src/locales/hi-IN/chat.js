@@ -125,7 +125,6 @@ export default {
   "nowDoing": "अभी चल रहा है",
   "nowDoingThinking": "सोच रहा है",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "यह कार्य रोकें",
   "inputKeysHint": "भेजने के लिए Enter, नई पंक्ति के लिए Shift+Enter, प्रोजेक्ट फ़ाइलों का संदर्भ देने के लिए {'@'} टाइप करें",
   "pluginReadOnlyNotice": "ऐड-इन बातचीत ({source}) केवल-पढ़ने के लिए है। यहाँ जारी रखने के लिए इसकी फॉर्क बनाएँ।",
   "forkToContinue": "जारी रखने के लिए फॉर्क करें",

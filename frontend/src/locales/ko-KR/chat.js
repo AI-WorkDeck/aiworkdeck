@@ -125,7 +125,6 @@ export default {
   "nowDoing": "진행 중",
   "nowDoingThinking": "생각 중",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "이 작업 중지",
   "inputKeysHint": "Enter로 전송, Shift+Enter로 줄바꿈, {'@'}를 입력해 프로젝트 파일을 참조하세요",
   "pluginReadOnlyNotice": "애드인 대화({source})는 읽기 전용입니다. 여기서 계속하려면 포크하세요.",
   "forkToContinue": "포크하여 계속",

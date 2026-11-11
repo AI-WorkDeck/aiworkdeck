@@ -125,7 +125,6 @@ export default {
   "nowDoing": "実行中",
   "nowDoingThinking": "思考中",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "このタスクを停止",
   "inputKeysHint": "Enter で送信、Shift+Enter で改行、{'@'} を入力するとプロジェクトのファイルを参照できます",
   "pluginReadOnlyNotice": "アドインの会話（{source}）は読み取り専用です。ここで続行するにはフォークしてください。",
   "forkToContinue": "フォークして続行",

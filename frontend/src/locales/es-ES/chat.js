@@ -125,7 +125,6 @@ export default {
   "nowDoing": "En curso",
   "nowDoingThinking": "Pensando",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Detener esta tarea",
   "inputKeysHint": "Intro envía, Mayús+Intro inserta salto de línea, escribe {'@'} para referenciar archivos del proyecto",
   "pluginReadOnlyNotice": "La conversación del complemento ({source}) es de solo lectura. Bifurquela para continuar aquí.",
   "forkToContinue": "Bifurcar para continuar",

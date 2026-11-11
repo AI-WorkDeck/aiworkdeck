@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Đang thực hiện",
   "nowDoingThinking": "Đang suy nghĩ",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Dừng tác vụ này",
   "inputKeysHint": "Enter để gửi, Shift+Enter để xuống dòng, nhập {'@'} để tham chiếu tệp của dự án",
   "pluginReadOnlyNotice": "Hội thoại Add-in ({source}) ở chế độ chỉ đọc. Fork để tiếp tục tại đây.",
   "forkToContinue": "Fork để tiếp tục",

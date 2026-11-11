@@ -125,7 +125,6 @@ export default {
   "nowDoing": "กำลังดำเนินการ",
   "nowDoingThinking": "กำลังคิด",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "หยุดงานนี้",
   "inputKeysHint": "กด Enter เพื่อส่ง Shift+Enter เพื่อขึ้นบรรทัดใหม่ พิมพ์ {'@'} เพื่ออ้างอิงไฟล์โปรเจกต์",
   "pluginReadOnlyNotice": "บทสนทนาของ Add-in ({source}) เป็นแบบอ่านอย่างเดียว ทำ Fork เพื่อดำเนินการต่อที่นี่",
   "forkToContinue": "Fork เพื่อดำเนินการต่อ",

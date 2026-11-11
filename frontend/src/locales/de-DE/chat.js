@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Aktuell in Arbeit",
   "nowDoingThinking": "Denkt nach",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Diese Aufgabe stoppen",
   "inputKeysHint": "Enter sendet, Umschalt+Enter fügt einen Zeilenumbruch ein, mit {'@'} Projektdateien referenzieren",
   "pluginReadOnlyNotice": "Das Add-in-Gespräch ({source}) ist schreibgeschützt. Erstellen Sie eine Kopie, um hier fortzufahren.",
   "forkToContinue": "Kopieren zum Fortfahren",

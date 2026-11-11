@@ -125,7 +125,6 @@ export default {
   "nowDoing": "Sedang berlangsung",
   "nowDoingThinking": "Sedang berpikir",
   "nowDoingProgress": "{done}/{total}",
-  "nowDoingStop": "Hentikan tugas ini",
   "inputKeysHint": "Enter untuk kirim, Shift+Enter untuk baris baru, ketik {'@'} untuk merujuk file proyek",
   "pluginReadOnlyNotice": "Percakapan Add-in ({source}) bersifat hanya baca. Fork untuk melanjutkan di sini.",
   "forkToContinue": "Fork untuk melanjutkan",
