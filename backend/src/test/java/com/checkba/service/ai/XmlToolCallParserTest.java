@@ -606,4 +606,33 @@ class XmlToolCallParserTest {
         assertEquals(truncated, XmlToolCallParser.normalizeLeakedClosers(truncated));
         assertTrue(AgentOrchestrator.endsWithUnclosedTag(truncated));
     }
+
+    @Test
+    @DisplayName("Qwen 原生模板泄漏进正文（<function=名> 与 <名> 两种头）按调用解析；代码块里的不算")
+    void qwenTemplateCallsAreSalvaged() {
+        String fn = "<function=save_memory>\n<parameter=key>\n客户会议时间偏好\n</parameter>\n"
+                + "<parameter=isProtected>\nfalse\n</parameter>\n</function>";
+        assertTrue(parser.containsToolCall(fn));
+        var calls = parser.parse(fn);
+        assertEquals(1, calls.size());
+        assertEquals("save_memory", calls.get(0).toolName());
+        assertEquals("{\"key\":\"客户会议时间偏好\",\"isProtected\":\"false\"}", calls.get(0).argsJson());
+
+        String bare = "好的。\n<create_folder>\n<parameter=folderName>\n证据\n</parameter>\n</function>";
+        var bareCalls = parser.parse(bare);
+        assertEquals(1, bareCalls.size());
+        assertEquals("create_folder", bareCalls.get(0).toolName());
+        assertEquals("{\"folderName\":\"证据\"}", bareCalls.get(0).argsJson());
+
+        String multi = "<write_docx>\n<parameter=fileName>\n法律意见书.docx\n</parameter>\n"
+                + "<parameter=markdownContent>\n# 法律意见书\n\n第一段\n</parameter>\n</function>";
+        assertEquals("{\"fileName\":\"法律意见书.docx\",\"markdownContent\":\"# 法律意见书\\n\\n第一段\"}",
+                parser.parse(multi).get(0).argsJson());
+
+        String fenced = "示例：\n```\n<function=save_memory><parameter=key>x</parameter></function>\n```";
+        assertFalse(parser.containsToolCall(fenced));
+        assertTrue(parser.parse(fenced).isEmpty());
+        // 裸标签没有参数不算（不把任意标签当工具）
+        assertTrue(parser.parse("<final>完成</final> </function>").isEmpty());
+    }
 }
