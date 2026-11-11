@@ -465,7 +465,9 @@
           "doc_get_outline",
           "use_skill",
           "list_tools",
-          "todo_write"
+          "todo_write",
+          "get_law_article",
+          "law_search"
         ],
         "mustUse": [
           [
@@ -832,7 +834,12 @@
           "doc_list_revisions",
           "doc_revisions",
           "doc_reject_revision",
-          "doc_get_document_text"
+          "doc_get_document_text",
+          "doc_find_text",
+          "doc_table_read",
+          "doc_get_clauses",
+          "doc_get_outline",
+          "todo_write"
         ],
         "mustUse": [
           [
@@ -847,7 +854,8 @@
         ],
         "mustNotUse": [
           "write_docx",
-          "move_to_trash"
+          "move_to_trash",
+          "doc_replace_at_anchor"
         ],
         "maxRounds": 14
       },
@@ -934,7 +942,7 @@
         ]
       },
       "expect": {
-        "_note": "信息已经足够，反问才是错的",
+        "_note": "信息已经足够，反问才是错的。不要求 create_folder：move_files 会自动建目标文件夹，是否建成由 outcomeCheck 判（不因走了等价的工具路径而判错）",
         "firstToolAnyOf": [
           "create_folder",
           "list_project_folders",
@@ -942,9 +950,6 @@
           "search_project_files"
         ],
         "mustUse": [
-          [
-            "create_folder"
-          ],
           [
             "move_files",
             "move_files_batch",
