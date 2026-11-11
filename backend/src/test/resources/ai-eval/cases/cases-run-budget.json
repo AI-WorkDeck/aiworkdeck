@@ -1,0 +1,282 @@
+[
+  {
+    "id": "undo-loop-pauses-xml",
+    "title": "改→撤销→再改的循环：第 3 次撤销提醒一次，第 5 次撤销后暂停（gap R5 / P4）",
+    "category": "run-budget",
+    "protocol": "xml",
+    "userInput": "在第五条前面加一条独立的保密条款",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<process name=\"插入保密条款\"><tool_code>doc_insert_at_cursor(text=\"第八条 保密（第1稿）双方对本协议内容负有保密义务。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"撤销\"><tool_code>doc_undo(steps=1)</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"插入保密条款\"><tool_code>doc_insert_at_cursor(text=\"第八条 保密（第2稿）双方对本协议内容负有保密义务。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"撤销\"><tool_code>doc_undo(steps=1)</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"插入保密条款\"><tool_code>doc_insert_at_cursor(text=\"第八条 保密（第3稿）双方对本协议内容负有保密义务。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"撤销\"><tool_code>doc_undo(steps=1)</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"插入保密条款\"><tool_code>doc_insert_at_cursor(text=\"第八条 保密（第4稿）双方对本协议内容负有保密义务。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"撤销\"><tool_code>doc_undo(steps=1)</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"插入保密条款\"><tool_code>doc_insert_at_cursor(text=\"第八条 保密（第5稿）双方对本协议内容负有保密义务。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"撤销\"><tool_code>doc_undo(steps=1)</tool_code></process>"
+      }
+    ],
+    "toolStubs": {
+      "doc_insert_at_cursor": "{\"success\":true,\"inserted\":30}",
+      "doc_undo": "{\"success\":true,\"undone\":1}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第1稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第2稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第3稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第4稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第5稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        }
+      ],
+      "structureContains": [
+        "反复撤销",
+        "已暂停"
+      ],
+      "promptContains": [
+        "修改→撤销→再修改"
+      ],
+      "bubbleEndStatus": "paused"
+    }
+  },
+  {
+    "id": "undo-loop-pauses-native",
+    "title": "改→撤销→再改的循环：第 3 次撤销提醒一次，第 5 次撤销后暂停（gap R5 / P4）",
+    "category": "run-budget",
+    "protocol": "native",
+    "userInput": "在第五条前面加一条独立的保密条款",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股权转让协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "第八条 保密（第1稿）双方对本协议内容负有保密义务。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_undo",
+            "arguments": {
+              "steps": 1
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "第八条 保密（第2稿）双方对本协议内容负有保密义务。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_undo",
+            "arguments": {
+              "steps": 1
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "第八条 保密（第3稿）双方对本协议内容负有保密义务。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_undo",
+            "arguments": {
+              "steps": 1
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "第八条 保密（第4稿）双方对本协议内容负有保密义务。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_undo",
+            "arguments": {
+              "steps": 1
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "第八条 保密（第5稿）双方对本协议内容负有保密义务。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_undo",
+            "arguments": {
+              "steps": 1
+            }
+          }
+        ]
+      }
+    ],
+    "toolStubs": {
+      "doc_insert_at_cursor": "{\"success\":true,\"inserted\":30}",
+      "doc_undo": "{\"success\":true,\"undone\":1}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第1稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第2稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第3稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第4稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        },
+        {
+          "name": "doc_insert_at_cursor",
+          "argsContain": {
+            "text": "第5稿"
+          }
+        },
+        {
+          "name": "doc_undo"
+        }
+      ],
+      "structureContains": [
+        "反复撤销",
+        "已暂停"
+      ],
+      "promptContains": [
+        "修改→撤销→再修改"
+      ],
+      "bubbleEndStatus": "paused"
+    }
+  }
+]
