@@ -407,7 +407,7 @@ class OfficeEditToolsTest {
     void tableAddRowDefaults() {
         when(bridge.executeOfficeCommand(any(), eq("table_add_row"), anyMap())).thenReturn("{}");
 
-        tools.office_table_add_row("conv-1", null, null, null);
+        tools.office_table_insert("conv-1", "row", null, null, null);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> args = ArgumentCaptor.forClass(Map.class);
@@ -420,7 +420,7 @@ class OfficeEditToolsTest {
     @Test
     @DisplayName("office_table_delete_row：rowIndex 必填，缺失时报错且不触碰桥")
     void tableDeleteRowRequiresRowIndex() {
-        assertTrue(tools.office_table_delete_row("conv-1", 0, null, 1).startsWith("Error"));
+        assertTrue(tools.office_table_delete("conv-1", "row", null, 1, 0).startsWith("Error"));
         verifyNoInteractions(bridge);
     }
 
@@ -430,8 +430,8 @@ class OfficeEditToolsTest {
         when(bridge.executeOfficeCommand(any(), eq("table_add_col"), anyMap())).thenReturn("{}");
         when(bridge.executeOfficeCommand(any(), eq("table_delete_col"), anyMap())).thenReturn("{}");
 
-        tools.office_table_add_col("conv-1", 1, 0, 2);
-        tools.office_table_delete_col("conv-1", 1, 2, 1);
+        tools.office_table_insert("conv-1", "col", 0, 2, 1);
+        tools.office_table_delete("conv-1", "col", 2, 1, 1);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> addArgs = ArgumentCaptor.forClass(Map.class);
@@ -458,10 +458,10 @@ class OfficeEditToolsTest {
         assertTrue(tools.office_table_set_cell("conv-1", -1, "B2", "x", null).startsWith("Error"));
         assertTrue(tools.office_table_set_cell("conv-1", 0, "", "x", null).startsWith("Error"));
         assertTrue(tools.office_table_set_cell("conv-1", 0, "2B", "x", null).startsWith("Error"));
-        assertTrue(tools.office_table_add_row("conv-1", -1, null, null).startsWith("Error"));
-        assertTrue(tools.office_table_add_row("conv-1", 0, null, 0).startsWith("Error"));
-        assertTrue(tools.office_table_add_row("conv-1", 0, null, 51).startsWith("Error"));
-        assertTrue(tools.office_table_delete_col("conv-1", 0, null, 1).startsWith("Error"));
+        assertTrue(tools.office_table_insert("conv-1", "row", null, null, -1).startsWith("Error"));
+        assertTrue(tools.office_table_insert("conv-1", "row", null, 0, 0).startsWith("Error"));
+        assertTrue(tools.office_table_insert("conv-1", "row", null, 51, 0).startsWith("Error"));
+        assertTrue(tools.office_table_delete("conv-1", "col", null, 1, 0).startsWith("Error"));
         verifyNoInteractions(bridge);
     }
 
@@ -520,7 +520,7 @@ class OfficeEditToolsTest {
         assertEquals("{\"comments\":[]}", tools.office_get_comments("conv-1"));
 
         when(bridge.executeOfficeCommand(any(), eq("reply_comment"), anyMap())).thenReturn("{}");
-        tools.office_reply_comment("conv-1", null, 0, "已核实");
+        tools.office_update_comment("conv-1", "reply", null, 0, "已核实");
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> replyArgs = ArgumentCaptor.forClass(Map.class);
         verify(bridge).executeOfficeCommand(eq("conv-1"), eq("reply_comment"), replyArgs.capture());
@@ -528,16 +528,16 @@ class OfficeEditToolsTest {
         assertEquals("已核实", replyArgs.getValue().get("reply"));
 
         when(bridge.executeOfficeCommand(any(), eq("resolve_comment"), anyMap())).thenReturn("{}");
-        tools.office_resolve_comment("conv-1", "cmt-123", null, null);
+        tools.office_update_comment("conv-1", "resolve", "cmt-123", null, null);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> resolveArgs = ArgumentCaptor.forClass(Map.class);
         verify(bridge).executeOfficeCommand(eq("conv-1"), eq("resolve_comment"), resolveArgs.capture());
         assertEquals("cmt-123", resolveArgs.getValue().get("commentId"));
         assertEquals(true, resolveArgs.getValue().get("resolved"));
 
-        assertTrue(tools.office_reply_comment("conv-1", null, null, "回复").startsWith("Error"));
-        assertTrue(tools.office_reply_comment("conv-1", null, 0, " ").startsWith("Error"));
-        assertTrue(tools.office_resolve_comment("conv-1", null, null, null).startsWith("Error"));
+        assertTrue(tools.office_update_comment("conv-1", "reply", null, null, "回复").startsWith("Error"));
+        assertTrue(tools.office_update_comment("conv-1", "reply", null, 0, " ").startsWith("Error"));
+        assertTrue(tools.office_update_comment("conv-1", "resolve", null, null, null).startsWith("Error"));
     }
 
     // ==================== Excel/PPT 面（宿主细分工具） ====================
@@ -829,7 +829,7 @@ class OfficeEditToolsTest {
         assertEquals(1, freezeArgs.getValue().get("count"));
 
         when(bridge.executeOfficeCommand(any(), eq("excel_set_formulas"), anyMap())).thenReturn("{}");
-        tools.office_excel_set_formulas("conv-1", "Sheet1", "B2", "[[\"=SUM(A1:A10)\"]]");
+        tools.office_excel_set_values("conv-1", "Sheet1", "B2", "[[\"=SUM(A1:A10)\"]]", null);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> formulaArgs = ArgumentCaptor.forClass(Map.class);
         verify(bridge).executeOfficeCommand(eq("conv-1"), eq("excel_set_formulas"), formulaArgs.capture());
@@ -1174,9 +1174,6 @@ class OfficeEditToolsTest {
         assertEquals("{\"count\":0}", tools.office_excel_get_comments("conv-1", "Sheet1", null));
         assertEquals("{\"replied\":true}", tools.office_excel_update_comment("conv-1", "reply", "Sheet1", "B2", "已核对"));
         assertEquals("{\"resolved\":true}", tools.office_excel_update_comment("conv-1", "resolve", "Sheet1", "B2", null));
-        // 旧名兼容壳：同样下发，回执末尾多一句「已并入」
-        assertTrue(tools.office_excel_reply_comment("conv-1", "Sheet1", "B2", "已核对").startsWith("{\"replied\":true}"));
-        assertTrue(tools.office_excel_resolve_comment("conv-1", "Sheet1", "B2", null).contains("已并入 office_excel_update_comment"));
         assertEquals("{\"deleted\":true}", tools.office_excel_delete_comment("conv-1", "Sheet1", "B2"));
 
         @SuppressWarnings("unchecked")
@@ -1189,7 +1186,7 @@ class OfficeEditToolsTest {
         assertEquals("sheet", getArgs.getValue().get("scope"));
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> resolveArgs = ArgumentCaptor.forClass(Map.class);
-        verify(bridge, org.mockito.Mockito.times(2)).executeOfficeCommand(eq("conv-1"), eq("excel_resolve_comment"), resolveArgs.capture());
+        verify(bridge).executeOfficeCommand(eq("conv-1"), eq("excel_resolve_comment"), resolveArgs.capture());
         assertEquals(true, resolveArgs.getValue().get("resolved"));
     }
 
@@ -1199,8 +1196,8 @@ class OfficeEditToolsTest {
         assertTrue(tools.office_excel_add_comment("conv-1", null, "B2:C3", "x").startsWith("Error"));
         assertTrue(tools.office_excel_add_comment("conv-1", null, "B2", " ").startsWith("Error"));
         assertTrue(tools.office_excel_get_comments("conv-1", null, "invalid").startsWith("Error"));
-        assertTrue(tools.office_excel_reply_comment("conv-1", null, "B2", "").startsWith("Error"));
-        assertTrue(tools.office_excel_resolve_comment("conv-1", null, "", null).startsWith("Error"));
+        assertTrue(tools.office_excel_update_comment("conv-1", "reply", null, "B2", "").startsWith("Error"));
+        assertTrue(tools.office_excel_update_comment("conv-1", "resolve", null, "", null).startsWith("Error"));
         assertTrue(tools.office_excel_delete_comment("conv-1", null, "B2:C3").startsWith("Error"));
         verifyNoInteractions(bridge);
     }
@@ -1276,8 +1273,8 @@ class OfficeEditToolsTest {
         when(bridge.executeOfficeCommand(any(), eq("reject_revision"), anyMap())).thenReturn("{}");
 
         assertEquals("{\"count\":0}", tools.office_get_revisions("conv-1"));
-        tools.office_accept_revision("conv-1", 2, null);
-        tools.office_reject_revision("conv-1", null, true);
+        tools.office_revisions("conv-1", "accept", 2);
+        tools.office_revisions("conv-1", "reject_all", null);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> acceptArgs = ArgumentCaptor.forClass(Map.class);
@@ -1295,8 +1292,8 @@ class OfficeEditToolsTest {
     @Test
     @DisplayName("修订接受/拒绝：既没有 index 也没有 all 时拦下")
     void wordRevisionValidationFailuresDoNotTouchBridge() {
-        assertTrue(tools.office_accept_revision("conv-1", null, null).startsWith("Error"));
-        assertTrue(tools.office_reject_revision("conv-1", null, false).startsWith("Error"));
+        assertTrue(tools.office_revisions("conv-1", "accept", null).startsWith("Error"));
+        assertTrue(tools.office_revisions("conv-1", "reject", null).startsWith("Error"));
         verifyNoInteractions(bridge);
     }
 
@@ -1313,7 +1310,6 @@ class OfficeEditToolsTest {
 
         assertEquals("{}", tools.office_insert_note("conv-1", "footnote", "第一条", "参见附件一", null));
         assertEquals("{}", tools.office_insert_note("conv-1", "endnote", "第一条", "参见附件一", null));
-        assertTrue(tools.office_insert_footnote("conv-1", "第一条", "参见附件一", null).contains("已并入 office_insert_note"));
         assertEquals("{}", tools.office_apply_style("conv-1", "标题", true, "标题 1"));
         assertEquals("{}", tools.office_manage_content_control("conv-1", "insert", "填空处", "field-1", "客户名称", null, null));
         assertEquals("{}", tools.office_set_document_properties("conv-1", "尽调报告", null, "AI WorkDeck", null, null, null));
@@ -1335,8 +1331,8 @@ class OfficeEditToolsTest {
     @Test
     @DisplayName("批次9 Word 杂项工具参数校验失败：拦下不触碰桥")
     void wordMiscBatch9ValidationFailuresDoNotTouchBridge() {
-        assertTrue(tools.office_insert_footnote("conv-1", "", "内容", null).startsWith("Error"));
-        assertTrue(tools.office_insert_endnote("conv-1", "锚点", "", null).startsWith("Error"));
+        assertTrue(tools.office_insert_note("conv-1", "footnote", "", "内容", null).startsWith("Error"));
+        assertTrue(tools.office_insert_note("conv-1", "endnote", "锚点", "", null).startsWith("Error"));
         assertTrue(tools.office_apply_style("conv-1", "", true, "标题 1").startsWith("Error"));
         assertTrue(tools.office_apply_style("conv-1", "标题", true, "").startsWith("Error"));
         assertTrue(tools.office_manage_content_control("conv-1", "insert", "", "tag1", null, null, null).startsWith("Error"));
@@ -1675,14 +1671,14 @@ class OfficeEditToolsTest {
 
     @Test
     void fileLifecycleCommandsAndFilenamePreflight() {
-        tools.office_file_create("c");
-        tools.office_file_save("c");
-        tools.office_file_export_pdf("c", "report.pdf");
+        tools.office_file("c", "create", null, null);
+        tools.office_file("c", "save", null, null);
+        tools.office_file("c", "export_pdf", null, "report.pdf");
         verify(bridge).executeOfficeCommand("c", "file_create", Map.of());
         verify(bridge).executeOfficeCommand("c", "file_save", Map.of());
         verify(bridge).executeOfficeCommand("c", "file_export_pdf", Map.of("fileName", "report.pdf"));
-        assertTrue(tools.office_file_export_pdf("c", "../report.pdf").startsWith("Error:"));
-        assertTrue(tools.office_file_export_pdf("c", "C:\\report.pdf").startsWith("Error:"));
+        assertTrue(tools.office_file("c", "export_pdf", null, "../report.pdf").startsWith("Error:"));
+        assertTrue(tools.office_file("c", "export_pdf", null, "C:\\report.pdf").startsWith("Error:"));
     }
 
     @Test
@@ -1690,7 +1686,7 @@ class OfficeEditToolsTest {
         var file = new com.checkba.model.entity.ProjectFile();
         file.setId(1L); file.setProjectId(10L); file.setName("report.xlsx"); file.setFilePath("stored-key");
         when(projectFileRepository.findById(1L)).thenReturn(java.util.Optional.of(file));
-        assertTrue(tools.office_file_open("c", 1L).startsWith("Error:"));
+        assertTrue(tools.office_file("c", "open", 1L, null).startsWith("Error:"));
         verifyNoInteractions(storageServiceFactory, bridge);
         com.checkba.service.ai.context.ProjectContextHolder.setProjectId("10");
         try {
@@ -1698,7 +1694,7 @@ class OfficeEditToolsTest {
             when(storageServiceFactory.getStorageService()).thenReturn(storage);
             byte[] bytes = new byte[]{'P', 'K', 3, 4, 1};
             when(storage.load("stored-key")).thenReturn(new org.springframework.core.io.ByteArrayResource(bytes));
-            tools.office_file_open("c", 1L);
+            tools.office_file("c", "open", 1L, null);
             verify(bridge).executeOfficeCommand("c", "file_open", Map.of("host", "excel", "fileId", 1L,
                     "fileName", "report.xlsx", "base64", java.util.Base64.getEncoder().encodeToString(bytes)));
         } finally { com.checkba.service.ai.context.ProjectContextHolder.clear(); }

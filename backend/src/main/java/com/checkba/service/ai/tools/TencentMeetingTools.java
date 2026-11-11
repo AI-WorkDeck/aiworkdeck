@@ -35,17 +35,6 @@ public class TencentMeetingTools implements AgentToolComponent {
     private final TencentMeetingService tencentMeetingService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** 旧名 tmeet_list_meetings：并入 meeting_list（V5），保留一版兼容壳，始终读内置同步表。 */
-    @ToolShim(replacedBy = "meeting_list")
-    @ToolMeta(displayName = "列出腾讯会议", category = "meeting", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("列出已同步的腾讯会议记录。")
-    public String tmeet_list_meetings(
-            @P("Project id (injected by runtime)") Long projectId,
-            @P(value = "按会议主题过滤的关键词", required = false) String keyword) {
-        return ToolShims.hint(listSynced(projectId, keyword, null, null), "meeting_list",
-                "meeting_list(source=tencent, keyword)");
-    }
-
     /** 内置同步表的会议列表（meeting_list 在插件未装/未启用时走这里）；from/to 含端点，按开会日期过滤。 */
     public String listSynced(Long projectId, String keyword, java.time.LocalDate from, java.time.LocalDate to) {
         log.info("Tool: meeting_list(tencent builtin) projectId={} keyword={}", projectId, keyword);
@@ -102,17 +91,6 @@ public class TencentMeetingTools implements AgentToolComponent {
                     .append('\n');
         }
         return sb.toString();
-    }
-
-    /** 旧名 tmeet_get_transcript：并入 meeting_get_transcript（V5），保留一版兼容壳，始终读内置同步表。 */
-    @ToolShim(replacedBy = "meeting_get_transcript")
-    @ToolMeta(displayName = "读取腾讯会议转写稿", category = "meeting", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("读取一条已同步腾讯会议的逐字稿与智能纪要。")
-    public String tmeet_get_transcript(
-            @P("Project id (injected by runtime)") Long projectId,
-            @P("Tencent meeting record id") Long recordId) {
-        return ToolShims.hint(transcript(projectId, recordId), "meeting_get_transcript",
-                "meeting_get_transcript(meetingId, source=tencent)");
     }
 
     /** 内置同步表的逐字稿（meeting_get_transcript 在插件未装/未启用，或 meetingId 是内置数字 id 时走这里）。 */

@@ -156,38 +156,6 @@ public class OfficeEditTools implements AgentToolComponent {
         };
     }
 
-    @ToolShim(replacedBy = "office_file")
-    @Tool("在当前 Office/WPS 宿主中新建空白文件。")
-    @ToolMeta(displayName = "新建宿主文件", category = "office", fileEffect = "CREATED", offerToModel = false)
-    public String office_file_create(@P("会话ID（系统自动注入）") String conversationId) {
-        return ToolShims.hint(office_file(conversationId, "create", null, null), "office_file", "office_file(action=create)");
-    }
-
-    @ToolShim(replacedBy = "office_file")
-    @Tool("保存当前 Office/WPS 原生文件到宿主管理的位置。")
-    @ToolMeta(displayName = "保存宿主文件", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_file_save(@P("会话ID（系统自动注入）") String conversationId) {
-        return ToolShims.hint(office_file(conversationId, "save", null, null), "office_file", "office_file(action=save)");
-    }
-
-    @ToolShim(replacedBy = "office_file")
-    @Tool("将当前原生文档导出PDF并上传当前项目。")
-    @ToolMeta(displayName = "导出宿主PDF", category = "office", fileEffect = "CREATED", offerToModel = false)
-    public String office_file_export_pdf(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "可选：PDF文件名，省略使用document.pdf", required = false) String fileName) {
-        return ToolShims.hint(office_file(conversationId, "export_pdf", null, fileName), "office_file", "office_file(action=export_pdf, fileName)");
-    }
-
-    @ToolShim(replacedBy = "office_file")
-    @Tool("打开当前项目中的原生Office文件为宿主中的新副本。")
-    @ToolMeta(displayName = "打开项目文件副本", category = "office", fileEffect = "CREATED", offerToModel = false)
-    public String office_file_open(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P("当前项目文件ID") Long fileId) {
-        return ToolShims.hint(office_file(conversationId, "open", fileId, null), "office_file", "office_file(action=open, fileId)");
-    }
-
     private String exportOfficePdf(String conversationId, String fileName) {
         if (fileName == null) return officeBridgeService.executeOfficeCommand(conversationId, "file_export_pdf", Map.of());
         String name = fileName.trim();
@@ -1377,60 +1345,6 @@ public class OfficeEditTools implements AgentToolComponent {
                 tableIndex, at, count, null);
     }
 
-    @ToolShim(replacedBy = "office_table_insert")
-    @Tool("给当前 Word 文档里的一张表格插入空白行。")
-    @ToolMeta(displayName = "插入表格行", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_table_add_row(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
-            @P(value = "插入位置行号，**0 开始**，新行插在该行之前；不传或 -1 则追加到表尾", required = false) Integer rowIndex,
-            @P(value = "插入几行，默认 1", required = false) Integer count
-    ) {
-        return ToolShims.hint(office_table_insert(conversationId, "row", rowIndex, count, tableIndex),
-                "office_table_insert", "office_table_insert(axis=row, at, count)");
-    }
-
-    @ToolShim(replacedBy = "office_table_delete")
-    @Tool("删除当前 Word 文档里一张表格的整行。")
-    // access：与 office_table_delete 同级（兼容 shim）
-    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格行", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_table_delete_row(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
-            @P("要删的行号，**0 开始**") Integer rowIndex,
-            @P(value = "连删几行，默认 1", required = false) Integer count
-    ) {
-        return ToolShims.hint(office_table_delete(conversationId, "row", rowIndex, count, tableIndex),
-                "office_table_delete", "office_table_delete(axis=row, at, count)");
-    }
-
-    @ToolShim(replacedBy = "office_table_insert")
-    @Tool("给当前 Word 文档里的一张表格插入空白列。")
-    @ToolMeta(displayName = "插入表格列", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_table_add_col(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
-            @P(value = "插入位置列号（0 开始，新列插在该列之前），不传或 -1 则追加到最右", required = false) Integer colIndex,
-            @P(value = "插入几列，默认 1", required = false) Integer count
-    ) {
-        return ToolShims.hint(office_table_insert(conversationId, "col", colIndex, count, tableIndex),
-                "office_table_insert", "office_table_insert(axis=col, at, count)");
-    }
-
-    @ToolShim(replacedBy = "office_table_delete")
-    @Tool("删除当前 Word 文档里一张表格的整列。")
-    // access：与 office_table_delete 同级（兼容 shim）
-    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格列", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_table_delete_col(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
-            @P("要删的列号（0 开始，必填）") Integer colIndex,
-            @P(value = "连删几列，默认 1", required = false) Integer count
-    ) {
-        return ToolShims.hint(office_table_delete(conversationId, "col", colIndex, count, tableIndex),
-                "office_table_delete", "office_table_delete(axis=col, at, count)");
-    }
-
     /**
      * 表格行/列增删四个原语的共同下发路径：tableIndex 定位 + position（行/列号）+ count 校验。
      * defaultPositionWhenNull 非 null 时表示 position 缺省值（add 系列缺省 -1=追加到末尾）；
@@ -1592,33 +1506,6 @@ public class OfficeEditTools implements AgentToolComponent {
         }
         args.put("resolved", "resolve".equals(a));
         return officeBridgeService.executeOfficeCommand(conversationId, "resolve_comment", args);
-    }
-
-    @ToolShim(replacedBy = "office_update_comment")
-    @Tool("回复当前 Word 文档中的一条批注（id 或 index 定位）。")
-    @ToolMeta(displayName = "回复批注", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_reply_comment(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P("目标批注的 id（来自 office_get_comments 的返回值，与 commentIndex 二选一，id 优先）") String commentId,
-            @P("目标批注的序号（0 开始，来自 office_get_comments 的返回值，与 commentId 二选一）") Integer commentIndex,
-            @P("回复内容") String reply
-    ) {
-        return ToolShims.hint(office_update_comment(conversationId, "reply", commentId, commentIndex, reply),
-                "office_update_comment", "office_update_comment(action=reply, commentId, reply)");
-    }
-
-    @ToolShim(replacedBy = "office_update_comment")
-    @Tool("标记当前 Word 文档中的一条批注为已解决（或重新打开）。")
-    @ToolMeta(displayName = "解决批注", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_resolve_comment(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P("目标批注的 id（来自 office_get_comments 的返回值，与 commentIndex 二选一，id 优先）") String commentId,
-            @P("目标批注的序号（0 开始，来自 office_get_comments 的返回值，与 commentId 二选一）") Integer commentIndex,
-            @P(value = "标记为已解决（true，缺省）还是重新打开（false）", required = false) Boolean resolved
-    ) {
-        String action = resolved == null || resolved ? "resolve" : "reopen";
-        return ToolShims.hint(office_update_comment(conversationId, action, commentId, commentIndex, null),
-                "office_update_comment", "office_update_comment(action=" + action + ", commentId)");
     }
 
     @Tool("删除当前 Word 文档中的一条批注（连同它的全部回复）。用 office_get_comments 返回的 id 或 "
@@ -2164,19 +2051,6 @@ public class OfficeEditTools implements AgentToolComponent {
             args.put("cellAddress", addr);
         }
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_freeze_panes", args);
-    }
-
-    @ToolShim(replacedBy = "office_excel_set_values")
-    @Tool("向 Excel 区域批量写入公式。")
-    @ToolMeta(displayName = "写入公式", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_excel_set_formulas(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
-            @P("起始单元格或区域地址，A1 表示法如 B2 或 B2:B10") String rangeAddress,
-            @P("要写入的公式，JSON 二维数组（按行），元素为以 = 开头的公式字符串") String formulasJson
-    ) {
-        return ToolShims.hint(office_excel_set_values(conversationId, sheetName, rangeAddress, formulasJson, null),
-                "office_excel_set_values", "office_excel_set_values(rangeAddress, valuesJson=[[\"=SUM(A1:A10)\"]])");
     }
 
     @Tool("读取当前 Excel 工作簿总览：工作表清单及各表已用区域尺寸。\n"
@@ -2873,33 +2747,6 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, "excel_resolve_comment", args);
     }
 
-    @ToolShim(replacedBy = "office_excel_update_comment")
-    @Tool("回复 Excel 中某单元格的批注线程。")
-    @ToolMeta(displayName = "回复批注", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_excel_reply_comment(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
-            @P("目标单元格地址，A1 表示法（须已有批注）") String cellAddress,
-            @P("回复内容") String reply
-    ) {
-        return ToolShims.hint(office_excel_update_comment(conversationId, "reply", sheetName, cellAddress, reply),
-                "office_excel_update_comment", "office_excel_update_comment(action=reply, cellAddress, reply)");
-    }
-
-    @ToolShim(replacedBy = "office_excel_update_comment")
-    @Tool("标记 Excel 中某单元格的批注线程为已解决（或重新打开）。")
-    @ToolMeta(displayName = "解决批注", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_excel_resolve_comment(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "工作表名（可选；为空取当前活动工作表）", required = false) String sheetName,
-            @P("目标单元格地址，A1 表示法（须已有批注）") String cellAddress,
-            @P(value = "标记为已解决（true，缺省）还是重新打开（false）", required = false) Boolean resolved
-    ) {
-        String action = resolved == null || resolved ? "resolve" : "reopen";
-        return ToolShims.hint(office_excel_update_comment(conversationId, action, sheetName, cellAddress, null),
-                "office_excel_update_comment", "office_excel_update_comment(action=" + action + ", cellAddress)");
-    }
-
     @Tool("删除 Excel 中某单元格的整条批注线程（含全部回复）。cellAddress 定位目标单元格。不可撤销（无修订机制），" +
           "误删靠 Ctrl+Z 或文档检查点。")
     // access：批注是审阅元数据，不是单元格内容
@@ -3258,32 +3105,6 @@ public class OfficeEditTools implements AgentToolComponent {
         return officeBridgeService.executeOfficeCommand(conversationId, accept ? "accept_revision" : "reject_revision", args);
     }
 
-    @ToolShim(replacedBy = "office_revisions")
-    @Tool("接受当前 Word 文档中的修订（单条或全部）。")
-    @ToolMeta(displayName = "接受修订", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_accept_revision(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "目标修订的序号（0 开始，来自 office_get_revisions；acceptAll=true 时可不传）", required = false) Integer revisionIndex,
-            @P("是否接受全部修订（true 时忽略 revisionIndex）") Boolean acceptAll
-    ) {
-        boolean all = acceptAll != null && acceptAll;
-        return ToolShims.hint(office_revisions(conversationId, all ? "accept_all" : "accept", revisionIndex),
-                "office_revisions", "office_revisions(action=accept|accept_all, revisionIndex)");
-    }
-
-    @ToolShim(replacedBy = "office_revisions")
-    @Tool("拒绝当前 Word 文档中的修订（单条或全部）。")
-    @ToolMeta(displayName = "拒绝修订", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_reject_revision(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P(value = "目标修订的序号（0 开始，来自 office_get_revisions；rejectAll=true 时可不传）", required = false) Integer revisionIndex,
-            @P("是否拒绝全部修订（true 时忽略 revisionIndex）") Boolean rejectAll
-    ) {
-        boolean all = rejectAll != null && rejectAll;
-        return ToolShims.hint(office_revisions(conversationId, all ? "reject_all" : "reject", revisionIndex),
-                "office_revisions", "office_revisions(action=reject|reject_all, revisionIndex)");
-    }
-
     // ==================== Word 脚注/尾注（office_*，批次 9，WordApi 1.5） ====================
 
     @Tool("在当前 Word 文档中为指定文本插入脚注或尾注。kind: footnote 当页页脚脚注，endnote 文档末尾尾注。\n"
@@ -3315,32 +3136,6 @@ public class OfficeEditTools implements AgentToolComponent {
         args.put("text", text);
         if (reason != null && !reason.isBlank()) args.put("reason", reason.trim());
         return officeBridgeService.executeOfficeCommand(conversationId, "insert_" + k, args);
-    }
-
-    @ToolShim(replacedBy = "office_insert_note")
-    @Tool("在当前 Word 文档中为指定文本插入脚注。")
-    @ToolMeta(displayName = "插入脚注", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_insert_footnote(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P("插入脚注标记的目标文本（须与文档精确一致）") String anchorText,
-            @P("脚注正文内容") String text,
-            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
-    ) {
-        return ToolShims.hint(office_insert_note(conversationId, "footnote", anchorText, text, reason),
-                "office_insert_note", "office_insert_note(kind=footnote, anchorText, text)");
-    }
-
-    @ToolShim(replacedBy = "office_insert_note")
-    @Tool("在当前 Word 文档中为指定文本插入尾注。")
-    @ToolMeta(displayName = "插入尾注", category = "office", fileEffect = "MODIFIED", offerToModel = false)
-    public String office_insert_endnote(
-            @P("会话ID（系统自动注入）") String conversationId,
-            @P("插入尾注标记的目标文本（须与文档精确一致）") String anchorText,
-            @P("尾注正文内容") String text,
-            @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
-    ) {
-        return ToolShims.hint(office_insert_note(conversationId, "endnote", anchorText, text, reason),
-                "office_insert_note", "office_insert_note(kind=endnote, anchorText, text)");
     }
 
     // ==================== Word 图片插入（office_insert_image，批次 9，WordApi 1.2） ====================

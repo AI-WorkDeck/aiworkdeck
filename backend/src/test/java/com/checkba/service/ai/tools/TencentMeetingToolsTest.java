@@ -65,7 +65,7 @@ class TencentMeetingToolsTest {
         when(recordRepository.findByProjectIdOrderByStartTimeDesc(1L)).thenReturn(Collections.emptyList());
         when(recordRepository.findAll()).thenReturn(Collections.emptyList());
 
-        String result = tools.tmeet_list_meetings(1L, null);
+        String result = tools.listSynced(1L, null, null, null);
         assertTrue(result.contains("暂无已同步的腾讯会议记录"));
     }
 
@@ -76,12 +76,12 @@ class TencentMeetingToolsTest {
         when(recordRepository.findByProjectIdAndSubjectContainingIgnoreCaseOrderByStartTimeDesc(1L, "股权"))
                 .thenReturn(List.of(record1));
 
-        String all = tools.tmeet_list_meetings(1L, null);
+        String all = tools.listSynced(1L, null, null, null);
         assertTrue(all.contains("股权激励签约决议会"));
         assertTrue(all.contains("法务周例会"));
         assertTrue(all.contains("888-999-111"));
 
-        String filtered = tools.tmeet_list_meetings(1L, "股权");
+        String filtered = tools.listSynced(1L, "股权", null, null);
         assertTrue(filtered.contains("股权激励签约决议会"));
         assertFalse(filtered.contains("法务周例会"));
     }
@@ -91,7 +91,7 @@ class TencentMeetingToolsTest {
     void testGetTranscript_NotFound() {
         when(recordRepository.findById(999L)).thenReturn(Optional.empty());
 
-        String result = tools.tmeet_get_transcript(1L, 999L);
+        String result = tools.transcript(1L, 999L);
         assertTrue(result.contains("未找到该腾讯会议记录"));
     }
 
@@ -102,7 +102,7 @@ class TencentMeetingToolsTest {
         when(tencentMeetingService.renderTranscriptText(record1))
                 .thenReturn("[00:05] 张律师：请各位确认最终期权池比例。\n[00:15] 李总：我们同意按5%执行。");
 
-        String result = tools.tmeet_get_transcript(1L, 101L);
+        String result = tools.transcript(1L, 101L);
 
         assertTrue(result.contains("股权激励签约决议会"));
         assertTrue(result.contains("888-999-111"));
@@ -118,7 +118,7 @@ class TencentMeetingToolsTest {
         when(recordRepository.findById(102L)).thenReturn(Optional.of(record2));
         when(tencentMeetingService.renderTranscriptText(record2)).thenReturn("");
 
-        tools.tmeet_get_transcript(5L, 102L);
+        tools.transcript(5L, 102L);
 
         verify(recordRepository).save(record2);
         org.junit.jupiter.api.Assertions.assertEquals(5L, record2.getProjectId());

@@ -244,9 +244,9 @@ class FileToolsBatchMoveTest {
 
     private Method batchMethod() {
         try {
-            return FileTools.class.getMethod("move_files_batch", String.class);
+            return FileTools.class.getMethod("move_files", String.class);
         } catch (NoSuchMethodException e) {
-            fail("FileTools 没有批量移动工具 move_files_batch(String)：文件树的每个变更原语都是单项的，"
+            fail("FileTools 没有批量移动工具 move_files(String)：文件树的每个变更原语都是单项的，"
                     + "整理十几份文件就会一轮一个地耗尽 30 步预算（dev-board#466）");
             throw new AssertionError("unreachable");
         }
@@ -256,7 +256,7 @@ class FileToolsBatchMoveTest {
         try {
             return String.valueOf(batchMethod().invoke(tools, movesJson));
         } catch (InvocationTargetException e) {
-            throw new AssertionError("move_files_batch 抛异常了（工具必须返回 Error: 文本，不能抛）", e.getCause());
+            throw new AssertionError("move_files 抛异常了（工具必须返回 Error: 文本，不能抛）", e.getCause());
         } catch (IllegalAccessException e) {
             throw new AssertionError(e);
         }

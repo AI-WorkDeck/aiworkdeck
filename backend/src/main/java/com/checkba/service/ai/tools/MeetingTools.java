@@ -102,14 +102,6 @@ public class MeetingTools implements AgentToolComponent {
         return recordingTranscript(projectId, Long.valueOf(id));
     }
 
-    /** 旧名 meeting_list_recordings：并入 meeting_list（V5），保留一版兼容壳。 */
-    @ToolShim(replacedBy = "meeting_list")
-    @ToolMeta(displayName = "列出会议录音", category = "meeting", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("列出本项目的会议录音。")
-    public String meeting_list_recordings(@P("Project id (injected by runtime)") Long projectId) {
-        return ToolShims.hint(listRecordings(projectId, null, null, null), "meeting_list", "meeting_list(source=recording)");
-    }
-
     // ---- 录音（本项目 MeetingRecording） ----
 
     private String listRecordings(Long projectId, LocalDate from, LocalDate to, String keyword) {

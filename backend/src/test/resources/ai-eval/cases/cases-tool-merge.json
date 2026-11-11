@@ -1,7 +1,7 @@
 [
   {
     "id": "merge-doc-revisions-accept-all",
-    "title": "V4：接受全部修订 → doc_revisions(action=accept_all)，不再下发四个旧名",
+    "title": "V4：接受全部修订 → doc_revisions(action=accept_all)，四个旧名已删除",
     "category": "tool-merge",
     "protocol": "native",
     "userInput": "接受文档里所有修订",
@@ -42,7 +42,7 @@
         "doc_list_revisions"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "doc_accept_all_revisions",
         "doc_accept_revision",
         "doc_reject_revision",
@@ -157,7 +157,7 @@
         "doc_update_comment"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "doc_reply_comment",
         "doc_resolve_comment"
       ]
@@ -252,7 +252,7 @@
         "doc_table_delete"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "doc_table_add_row",
         "doc_table_add_col",
         "doc_table_delete_row",
@@ -341,7 +341,7 @@
         "doc_insert_note"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "doc_insert_footnote",
         "doc_insert_endnote"
       ]
@@ -388,14 +388,14 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "offeredToolsIncludeLastCall": [
+        "doc_select"
+      ],
+      "toolsNotRegistered": [
         "doc_select_anchor",
         "doc_select_paragraph",
         "doc_goto",
         "doc_collapse_cursor"
-      ],
-      "offeredToolsIncludeLastCall": [
-        "doc_select"
       ]
     }
   },
@@ -440,7 +440,7 @@
         "pdf_delete_pages"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "pdf_split",
         "pdf_extract_pages",
         "pdf_rotate_pages"
@@ -525,7 +525,7 @@
         "doc_list_project_files"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "list_project_folders"
       ]
     }
@@ -568,7 +568,7 @@
         "search_project_files"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "search_across_projects"
       ]
     }
@@ -610,11 +610,11 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
-        "text_write_file"
-      ],
       "offeredToolsIncludeLastCall": [
         "write_file"
+      ],
+      "toolsNotRegistered": [
+        "text_write_file"
       ]
     }
   },
@@ -655,7 +655,7 @@
         "move_files"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "move_files_batch",
         "move_project_file"
       ]
@@ -695,11 +695,11 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
-        "capability_apply"
-      ],
       "offeredToolsIncludeLastCall": [
         "capability_install"
+      ],
+      "toolsNotRegistered": [
+        "capability_apply"
       ]
     }
   },
@@ -739,12 +739,12 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
-        "office_accept_revision",
-        "office_reject_revision"
-      ],
       "offeredToolsIncludeLastCall": [
         "office_revisions"
+      ],
+      "toolsNotRegistered": [
+        "office_accept_revision",
+        "office_reject_revision"
       ]
     }
   },
@@ -786,12 +786,12 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
-        "office_reply_comment",
-        "office_resolve_comment"
-      ],
       "offeredToolsIncludeLastCall": [
         "office_update_comment"
+      ],
+      "toolsNotRegistered": [
+        "office_reply_comment",
+        "office_resolve_comment"
       ]
     }
   },
@@ -831,12 +831,12 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
-        "office_table_add_row",
-        "office_table_add_col"
-      ],
       "offeredToolsIncludeLastCall": [
         "office_table_insert"
+      ],
+      "toolsNotRegistered": [
+        "office_table_add_row",
+        "office_table_add_col"
       ]
     }
   },
@@ -876,14 +876,14 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "offeredToolsIncludeLastCall": [
+        "office_file"
+      ],
+      "toolsNotRegistered": [
         "office_file_create",
         "office_file_open",
         "office_file_save",
         "office_file_export_pdf"
-      ],
-      "offeredToolsIncludeLastCall": [
-        "office_file"
       ]
     }
   },
@@ -927,7 +927,7 @@
         "office_excel_set_values"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "office_excel_set_formulas"
       ]
     }
@@ -968,12 +968,12 @@
         }
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
-        "pptx_generate_outline",
-        "pptx_refine_outline"
-      ],
       "offeredToolsIncludeLastCall": [
         "pptx_outline"
+      ],
+      "toolsNotRegistered": [
+        "pptx_generate_outline",
+        "pptx_refine_outline"
       ]
     }
   },
@@ -1020,6 +1020,108 @@
         "doc_table_read"
       ],
       "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "merge-removed-old-name-gets-rename-error",
+    "title": "V9：模型调到已删除的旧名 doc_accept_all_revisions → 回执「renamed to doc_revisions」，下一轮改调新名",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "接受文档里所有修订",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_accept_all_revisions",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_revisions",
+            "arguments": {
+              "action": "accept_all"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_revisions": "{\"resolved\":5}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_accept_all_revisions"
+        },
+        {
+          "name": "doc_revisions",
+          "argsContain": {
+            "action": "accept_all"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "promptContains": [
+        "was renamed to 'doc_revisions'",
+        "doc_revisions(action=accept_all)"
+      ],
+      "allowUnresolvedTools": true,
+      "toolsNotRegistered": [
+        "doc_accept_all_revisions"
+      ]
+    }
+  },
+  {
+    "id": "merge-removed-same-args-name-resolves",
+    "title": "V9：参数完全相同的旧名 move_files_batch 直接按 move_files 分发（不算未知工具）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把合同.docx 移到归档文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_files_batch",
+            "arguments": {
+              "movesJson": "[{\"sourcePath\":\"合同.docx\",\"destPath\":\"归档/合同.docx\"}]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "move_files": "moved: 1"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "move_files",
+          "argsContain": {
+            "movesJson": "归档/合同.docx"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "promptContains": [
+        "moved: 1"
+      ],
+      "toolsNotRegistered": [
+        "move_files_batch"
+      ]
     }
   }
 ]

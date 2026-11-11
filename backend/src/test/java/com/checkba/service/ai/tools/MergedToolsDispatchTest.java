@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * tool-system-v2 V4：合并后的新工具各 action 下发的编辑器 / 任务窗格命令逐条钉住，
- * 旧名兼容壳下发同一条命令、回执多一句「已并入 X」；destructive 的删除行列不与插入并名。
+ * destructive 的删除行列不与插入并名。（旧名兼容壳已于 V9 删除，旧名调用见 ToolShimContractTest。）
  */
 class MergedToolsDispatchTest {
 
@@ -65,17 +65,6 @@ class MergedToolsDispatchTest {
     }
 
     @Test
-    @DisplayName("旧名壳：同一条命令 + 回执末尾「已并入 doc_revisions」")
-    void shimsDelegateAndHint() {
-        String out = doc.doc_accept_all_revisions();
-        assertTrue(out.startsWith("OK"));
-        assertTrue(out.contains("已并入 doc_revisions"), out);
-        assertEquals(Map.of("action", "accept"), lastEditorParams("resolve_all_revisions"));
-        assertTrue(doc.doc_reject_revision(3).contains("已并入 doc_revisions"));
-        assertEquals(Map.of("index", 3, "action", "reject"), lastEditorParams("resolve_revision"));
-    }
-
-    @Test
     @DisplayName("doc_update_comment：reply / resolve / reopen 对应 reply_comment / set_comment_resolved")
     void docUpdateComment() {
         doc.doc_update_comment("c1", "reply", "同意");
@@ -84,7 +73,6 @@ class MergedToolsDispatchTest {
         assertEquals(Map.of("id", "c1", "resolved", false), lastEditorParams("set_comment_resolved"));
         assertTrue(doc.doc_update_comment(" ", "reply", "x").startsWith("Error"));
         assertTrue(doc.doc_update_comment("c1", "delete", null).startsWith("Error"));
-        assertTrue(doc.doc_resolve_comment("c1", null).contains("已并入 doc_update_comment"));
     }
 
     @Test
@@ -99,8 +87,6 @@ class MergedToolsDispatchTest {
         assertTrue(doc.doc_table_delete("row", null, null, null, null).startsWith("Error"));
         assertTrue(doc.doc_table_delete("row", "abc", null, null, null).startsWith("Error"));
         assertTrue(doc.doc_table_insert("diagonal", null, null, null, null).startsWith("Error"));
-        // 旧签名（含 position 弃用别名）仍可用
-        assertTrue(doc.doc_table_add_row(5, null, null, null, null).contains("已并入 doc_table_insert"));
     }
 
     @Test
@@ -115,7 +101,6 @@ class MergedToolsDispatchTest {
         doc.doc_select("collapse_start", null, null, null);
         assertEquals(Map.of("to", "start"), lastEditorParams("collapse_selection"));
         assertTrue(doc.doc_select("anchor", null, null, null).startsWith("Error"));
-        assertTrue(doc.doc_collapse_cursor("end").contains("已并入 doc_select"));
     }
 
     @Test
@@ -135,7 +120,6 @@ class MergedToolsDispatchTest {
         word.office_revisions("c", "reject", 1);
         verify(office).executeOfficeCommand(eq("c"), eq("reject_revision"), eq(Map.of("all", false, "revisionIndex", 1)));
         assertTrue(word.office_revisions("c", "accept", null).startsWith("Error"));
-        assertTrue(word.office_accept_revision("c", null, true).contains("已并入 office_revisions"));
     }
 
     @Test
@@ -148,7 +132,6 @@ class MergedToolsDispatchTest {
         verify(office).executeOfficeCommand(eq("c"), eq("table_delete_row"),
                 eq(Map.of("tableIndex", 1, "position", 2, "count", 3)));
         assertTrue(word.office_table_delete("c", "row", null, null, null).startsWith("Error"));
-        assertTrue(word.office_table_delete_col("c", null, 1, null).contains("已并入 office_table_delete"));
     }
 
     @Test
@@ -160,7 +143,6 @@ class MergedToolsDispatchTest {
         verify(office).executeOfficeCommand(eq("c"), eq("file_export_pdf"), eq(Map.of("fileName", "a.pdf")));
         assertTrue(word.office_file("c", "export_pdf", null, "../a.pdf").startsWith("Error"));
         assertTrue(word.office_file("c", "burn", null, null).startsWith("Error"));
-        assertTrue(word.office_file_save("c").contains("已并入 office_file"));
     }
 
     @Test

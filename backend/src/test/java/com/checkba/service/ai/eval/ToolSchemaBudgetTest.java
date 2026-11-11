@@ -204,7 +204,7 @@ class ToolSchemaBudgetTest {
                 "pptx_generate",
                 "litigation_render", "litigation_timeline_render",
                 "pdf_to_word", "pdf_highlight", "pdf_annotate", "pdf_redact", "pdf_replace_text",
-                "text_write_file", "text_find_replace");
+                "text_find_replace");
         List<ToolSpecification> hiddenSpecs = hiddenByDeclaration.stream()
                 .map(n -> registry.resolve(n).orElseThrow(
                         () -> new AssertionError("登记必须保留（只裁 spec、不裁 resolve）：" + n)).spec())
@@ -220,7 +220,7 @@ class ToolSchemaBudgetTest {
             // 这里只挑三个最能说明问题的：发 UI 指令的、发配置界面的、改纯文本的。
             assertFalse(names.contains("pptx_generate"), conv + "：" + names);
             assertFalse(names.contains("litigation_render"), conv + "：" + names);
-            assertFalse(names.contains("text_write_file"), conv + "：" + names);
+            assertFalse(names.contains("text_find_replace"), conv + "：" + names);
             // 只读面必须留着：收窄的是"改"，不是"读"
             assertTrue(names.contains("pdf_inspect"), conv + " 的 PDF 读取面不该跟着消失：" + names);
         }

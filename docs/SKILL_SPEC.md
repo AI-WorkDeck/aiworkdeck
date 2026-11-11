@@ -164,7 +164,7 @@ PR#146 起 SkillController 走此唯一出口，PluginController 待对齐）。
 
 | id | 名称 | 触发（节选） | 工具白名单 |
 |---|---|---|---|
-| `listing-pathway` | 上市路径选择比较分析 | 上市路径 / IPO / 科创板 / 北交所 / 红筹 / VIE / 借壳 / 证券化 / SPAC… | law_search、law_search_keyword、get_law_article、law_recognition、search_web、browse_url、write_docx |
+| `listing-pathway` | 上市路径选择比较分析 | 上市路径 / IPO / 科创板 / 北交所 / 红筹 / VIE / 借壳 / 证券化 / SPAC… | law_search、get_law_article、law_recognition、search_web、browse_url、write_docx |
 
 ## 10. 与架构不变式的关系（docs/AI_ARCHITECTURE.md §2）
 

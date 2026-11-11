@@ -425,38 +425,6 @@ public class PdfTools implements AgentToolComponent {
         };
     }
 
-    @ToolShim(replacedBy = "pdf_pages")
-    @ToolMeta(displayName = "拆分PDF", category = "pdf", fileEffect = "ADDED", refreshFiles = true, offerToModel = false)
-    @Tool("按页码范围把一份 PDF 拆成多份。")
-    public String pdf_split(
-            @P("文件 ID") Long fileId,
-            @P("页码范围，如 \"1-3,5,8-\"（1 基页码）。每个逗号分段产出一份文件") String ranges
-    ) {
-        return ToolShims.hint(pdf_pages(fileId, "split", ranges, null, null), "pdf_pages", "pdf_pages(fileId, op=split, ranges)");
-    }
-
-    @ToolShim(replacedBy = "pdf_pages")
-    @ToolMeta(displayName = "提取PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true, offerToModel = false)
-    @Tool("从一份 PDF 里提取指定页，产出一份新 PDF。")
-    public String pdf_extract_pages(
-            @P("文件 ID") Long fileId,
-            @P("要保留的页码范围，如 \"10-20\" 或 \"1,5,9-12\"（1 基页码）") String ranges,
-            @P(value = "输出文件名（可选，默认『<原名>_摘取.pdf』）", required = false) String outputName
-    ) {
-        return ToolShims.hint(pdf_pages(fileId, "extract", ranges, null, outputName), "pdf_pages", "pdf_pages(fileId, op=extract, ranges)");
-    }
-
-    @ToolShim(replacedBy = "pdf_pages")
-    @ToolMeta(displayName = "旋转PDF页", category = "pdf", fileEffect = "ADDED", refreshFiles = true, offerToModel = false)
-    @Tool("把 PDF 的指定页旋转，产出一份新 PDF。")
-    public String pdf_rotate_pages(
-            @P("文件 ID") Long fileId,
-            @P("要旋转的页码范围，如 \"3\" 或 \"1-5\"（1 基页码）") String ranges,
-            @P("顺时针旋转角度，只能是 90、180 或 270；在该页当前角度上叠加") Integer degrees
-    ) {
-        return ToolShims.hint(pdf_pages(fileId, "rotate", ranges, degrees, null), "pdf_pages", "pdf_pages(fileId, op=rotate, ranges, degrees)");
-    }
-
     @ToolMeta(displayName = "PDF编页码", category = "pdf", fileEffect = "ADDED", refreshFiles = true)
     @Tool("给整册 PDF 逐页写入页码或贝茨编号（Bates number），产出一份新 PDF。" +
           "format 是模板：{n} 是本页号、{total} 是总页数、{n:6} 是零填充到 6 位。" +

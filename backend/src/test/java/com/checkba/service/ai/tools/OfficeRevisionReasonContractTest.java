@@ -57,12 +57,10 @@ class OfficeRevisionReasonContractTest {
                 {"office_table_set_cell", "{\"cell\":\"B2\",\"text\":\"金额\"}", "table_set_cell"},
                 {"office_edit_header_footer", "{\"part\":\"header\",\"text\":\"合同\"}", "edit_header_footer"},
                 {"office_insert_note", "{\"kind\":\"footnote\",\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_footnote"},
-                {"office_insert_note", "{\"kind\":\"endnote\",\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_endnote"},
-                {"office_insert_footnote", "{\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_footnote"}};
+                {"office_insert_note", "{\"kind\":\"endnote\",\"anchorText\":\"术语\",\"text\":\"解释\"}", "insert_endnote"}};
         for (String[] entry : cases) {
             String toolName = entry[0];
             String toolArgs = entry[1];
-            // 兼容壳不下发规格：按注册表解析，参数形状同样要有可选 reason
             var spec = registry.resolve(toolName).orElseThrow().spec();
             assertTrue(spec.parameters().properties().containsKey("reason"), toolName);
             assertFalse(spec.parameters().required().contains("reason"), toolName);

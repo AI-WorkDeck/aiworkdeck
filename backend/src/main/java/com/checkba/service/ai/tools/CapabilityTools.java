@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>确认流程</b>：{@code capability_install} 只做 plan（拉取 + 校验，不落盘），把计划
  * 原样交给模型；模型必须用 {@code <question>} 把仓库、commit、文件数、权限、目标槽念给
- * 用户听并停机等回答，用户点头后才调 {@code capability_install(planId)}（旧名 capability_apply 是兼容壳）。
+ * 用户听并停机等回答，用户点头后才调 {@code capability_install(planId)}（旧名 capability_apply 已删，调到时按 capability_install 执行）。
  */
 @Component
 @Slf4j
@@ -123,15 +123,6 @@ public class CapabilityTools implements AgentToolComponent {
         } catch (Exception e) {
             return "Error: 拉取失败: " + e.getMessage();
         }
-    }
-
-    @ToolShim(replacedBy = "capability_install")
-    @ToolMeta(displayName = "执行能力升级", category = "plugin", offerToModel = false, access = ToolMeta.Access.WRITE)
-    @Tool("按 capability_install 返回的 planId 真正安装能力包。只有用户以 <question> 明确确认之后才允许调用。")
-    public String capability_apply(
-            @P("capability_install 返回的 planId") String planId
-    ) {
-        return ToolShims.hint(applyPlan(planId), "capability_install", "capability_install(planId)");
     }
 
     private String applyPlan(String planId) {

@@ -188,7 +188,7 @@ class ToolChoiceSurfaceTest {
         }
     }
 
-    /** V4 合并族：新名 → 被并入的旧名（旧名只剩 @ToolShim 壳）。meeting 两族属 V5，不在此列。 */
+    /** V4 合并族：新名 → 被并入的旧名（旧名的 @ToolShim 壳 V9 已删）。meeting 两族属 V5，不在此列。 */
     private static final Map<String, List<String>> V4_FAMILIES = Map.ofEntries(
             Map.entry("doc_revisions", List.of("doc_accept_revision", "doc_reject_revision", "doc_accept_all_revisions", "doc_reject_all_revisions")),
             Map.entry("office_revisions", List.of("office_accept_revision", "office_reject_revision")),
@@ -214,7 +214,7 @@ class ToolChoiceSurfaceTest {
             Map.entry("capability_install", List.of("capability_apply")));
 
     @Test
-    @DisplayName("V4 合并族：每族在会话里只剩新名下发，旧名只登记（兼容壳）不下发")
+    @DisplayName("V4 合并族：每族在会话里只剩新名下发，旧名已不再注册（V9 删壳）")
     void eachMergedFamilyOffersExactlyOneName() {
         RecordingToolRegistry registry = registry();
         registry.capabilities().record("conv-word", "office");
@@ -227,7 +227,7 @@ class ToolChoiceSurfaceTest {
             assertTrue(offeredAnywhere.contains(fresh), fresh + " 必须下发");
             for (String old : olds) {
                 assertFalse(offeredAnywhere.contains(old), old + " 已并入 " + fresh + "，不该再下发");
-                assertTrue(registry.resolve(old).isPresent(), old + " 兼容壳要继续注册（旧对话回放）");
+                assertTrue(registry.resolve(old).isEmpty(), old + " 的兼容壳 V9 已删，不该再注册");
             }
         });
     }
@@ -274,7 +274,7 @@ class ToolChoiceSurfaceTest {
         assertTrue(offered.contains("move_files"));
         assertFalse(offered.contains("move_file"), "单条移动也走 move_files");
         assertFalse(offered.contains("move_files_batch") || offered.contains("move_project_file"),
-                "移动只剩 move_files 一个下发名（V4：move_files_batch / move_project_file 是兼容壳）");
+                "移动只剩 move_files 一个下发名（V4 合并，旧名 V9 已删）");
         assertFalse(descriptionOf(registry, "move_files").contains("keep using move_file"),
                 "move_files 不许再把单条移动指回一个已不下发的工具");
         assertTrue(offered.contains("write_file"));
@@ -298,7 +298,7 @@ class ToolChoiceSurfaceTest {
         for (String law : List.of("law_search", "get_law_article", "law_recognition")) {
             assertTrue(offered.contains(law), law + " 必须下发：" + String.join(", ", offered));
         }
-        assertFalse(offered.contains("law_search_keyword"), "law_search_keyword 已并入 law_search(mode=keyword)，只留兼容壳");
+        assertFalse(offered.contains("law_search_keyword"), "law_search_keyword 已并入 law_search(mode=keyword)，旧名 V9 已删");
         assertTrue(descriptionOf(registry, "law_search").contains("keyword"), "law_search 要写明 mode=keyword");
         assertFalse(offered.contains("search_laws"), "search_laws 从来不是真工具，别把它注册出来");
         assertTrue(ToolRegistry.TOOL_NAME_ALIASES.isEmpty(),

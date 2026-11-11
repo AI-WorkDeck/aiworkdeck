@@ -49,20 +49,7 @@ public class TextFileEditTools implements AgentToolComponent {
     /** 大文件熔断：纯文本超过这个尺寸基本是日志/导出物，整篇改写没有意义还吃内存。 */
     private static final long MAX_TEXT_BYTES = 5L * 1024 * 1024;
 
-    // writeBack 收尾发 sendTextReloadFileAction，工具描述也明写「同步刷新用户已打开的文本标签」；
-    // 任务窗格既没有文本标签也没有文件树，改完的纯文本文件在那里没有任何去处——审计 A9。
-    @ToolShim(replacedBy = "write_file")
-    @ToolMeta(displayName = "写入文本文件", category = "file", fileEffect = "MODIFIED",
-            requiresHost = ToolMeta.Host.LOWA, offerToModel = false)
-    @Tool("整篇覆盖写入一个纯文本/代码文件（txt/md/json/js/html/css/yml 等，UTF-8）。")
-    public String text_write_file(
-            @P("项目文件数据库 ID（从 list_files / extract_file_text 等处获取）") Long fileId,
-            @P("新的完整文件内容（整篇覆盖）") String content
-    ) {
-        return ToolShims.hint(overwriteText(fileId, content), "write_file", "write_file(mode=overwrite, fileId, content)");
-    }
-
-    /** 整篇覆盖纯文本文件的执行体：write_file(mode=overwrite) 与旧名壳共用。 */
+    /** 整篇覆盖纯文本文件的执行体：write_file(mode=overwrite)。 */
     public String overwriteText(Long fileId, String content) {
         log.info("overwriteText fileId={}", fileId);
         Resolved r = resolveTextFile(fileId);

@@ -159,16 +159,12 @@ class PdfToolsPageOpsTest {
     }
 
     @Test
-    @DisplayName("pdf_pages（V4）：op=extract 与旧名 pdf_extract_pages 产出同样的文件，旧名多一句「已并入」；未知 op 报错")
-    void pdfPagesRoutesByOpAndShimsDelegate() throws IOException {
+    @DisplayName("pdf_pages（V4）：op=extract 产出指定页的新文件；rotate 缺 degrees 与未知 op 报错")
+    void pdfPagesRoutesByOp() throws IOException {
         long id = givenPdf("卷宗.pdf", 12);
 
         ProjectFile viaNew = createdFrom(tools.pdf_pages(id, "extract", "10-12", null, null));
         assertEquals(3, pagesOf(viaNew));
-
-        String shim = tools.pdf_extract_pages(id, "4-6", null);
-        assertTrue(shim.contains("已并入 pdf_pages"), shim);
-        assertEquals(3, pagesOf(createdFrom(shim.substring(0, shim.indexOf("\n（提示")))));
 
         assertTrue(tools.pdf_pages(id, "rotate", "1", null, null).startsWith("Error"), "rotate 缺 degrees 必须报错");
         assertTrue(tools.pdf_pages(id, "shred", "1", null, null).startsWith("Error"));
@@ -216,7 +212,7 @@ class PdfToolsPageOpsTest {
     void splitProducesOneFilePerSegment() throws IOException {
         long id = givenPdf("卷宗.pdf", 10);
 
-        String output = tools.pdf_split(id, "1-3,5,8-");
+        String output = tools.pdf_pages(id, "split", "1-3,5,8-", null, null);
 
         List<String> names = new ArrayList<>();
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("新文件『(.+?)』").matcher(output);
@@ -229,7 +225,7 @@ class PdfToolsPageOpsTest {
         long id = givenPdf("卷宗.pdf", 4);
         when(fileService.createFile(anyLong(), any(), org.mockito.ArgumentMatchers.eq("卷宗_第2页.pdf"),
                 any(), any(), any(), any(), anyLong(), any())).thenThrow(new IllegalStateException("disk unavailable"));
-        String output = tools.pdf_split(id, "1,2,3");
+        String output = tools.pdf_pages(id, "split", "1,2,3", null, null);
         var result = new com.fasterxml.jackson.databind.ObjectMapper().readTree(output);
         assertEquals("success", result.path("status").asText());
         assertEquals(2, result.path("files").size());
@@ -244,7 +240,7 @@ class PdfToolsPageOpsTest {
     void extractUsesDerivedDefaultName() throws IOException {
         long id = givenPdf("大卷宗.pdf", 20);
 
-        String output = tools.pdf_extract_pages(id, "10-12", null);
+        String output = tools.pdf_pages(id, "extract", "10-12", null, null);
 
         ProjectFile created = createdFrom(output);
         assertEquals("大卷宗_摘取.pdf", created.getName());
@@ -257,7 +253,7 @@ class PdfToolsPageOpsTest {
     void outOfRangeProducesNothing() throws IOException {
         long id = givenPdf("五页.pdf", 5);
 
-        String output = tools.pdf_extract_pages(id, "4-9", null);
+        String output = tools.pdf_pages(id, "extract", "4-9", null, null);
 
         assertTrue(output.startsWith("Error:"), output);
         assertTrue(output.contains("5"), output);
@@ -282,7 +278,7 @@ class PdfToolsPageOpsTest {
     void rotateProducesRotatedCopy() throws IOException {
         long id = givenPdf("扫描件.pdf", 3);
 
-        String output = tools.pdf_rotate_pages(id, "2", 90);
+        String output = tools.pdf_pages(id, "rotate", "2", 90, null);
 
         ProjectFile created = createdFrom(output);
         try (PDDocument doc = Loader.loadPDF(projectRoot.resolve(created.getFilePath()).toFile())) {
@@ -298,7 +294,7 @@ class PdfToolsPageOpsTest {
     @DisplayName("旋转角度非法时报错，不产出文件")
     void rotateRejectsBadAngle() throws IOException {
         long id = givenPdf("扫描件.pdf", 2);
-        String output = tools.pdf_rotate_pages(id, "1", 45);
+        String output = tools.pdf_pages(id, "rotate", "1", 45, null);
         assertTrue(output.startsWith("Error:"), output);
         assertFalse(output.contains("文件 ID: "), output);
     }
@@ -340,10 +336,10 @@ class PdfToolsPageOpsTest {
         registry.put(555L, notPdf);
 
         for (String output : List.of(
-                tools.pdf_extract_pages(555L, "1", null),      // 不是 PDF
+                tools.pdf_pages(555L, "extract", "1", null, null),      // 不是 PDF
                 tools.pdf_inspect(999L, null, null),           // 文件不存在
                 tools.pdf_merge("不是JSON", null),              // 参数坏了
-                tools.pdf_split(999L, "1"))) {
+                tools.pdf_pages(999L, "split", "1", null, null))) {
             assertTrue(output.startsWith("Error:"),
                     "失败返回没有 Error: 前缀，会被判成 SUCCESS 打上绿勾：" + output);
         }
@@ -366,8 +362,8 @@ class PdfToolsPageOpsTest {
     void failedOperationsLeaveNoTempFiles() throws IOException {
         long id = givenPdf("材料.pdf", 3);
 
-        tools.pdf_extract_pages(id, "9", null);
-        tools.pdf_rotate_pages(id, "1", 45);
+        tools.pdf_pages(id, "extract", "9", null, null);
+        tools.pdf_pages(id, "rotate", "1", 45, null);
         tools.pdf_add_page_numbers(id, null, null, "无占位符");
 
         try (var files = Files.list(projectRoot)) {
@@ -399,10 +395,10 @@ class PdfToolsPageOpsTest {
         long theirs = givenPdf("别人的.pdf", 3, 99L, null);
 
         for (String output : List.of(
-                tools.pdf_split(theirs, "1"),
-                tools.pdf_extract_pages(theirs, "1", null),
+                tools.pdf_pages(theirs, "split", "1", null, null),
+                tools.pdf_pages(theirs, "extract", "1", null, null),
                 tools.pdf_delete_pages(theirs, "1", null),
-                tools.pdf_rotate_pages(theirs, "1", 90),
+                tools.pdf_pages(theirs, "rotate", "1", 90, null),
                 tools.pdf_add_page_numbers(theirs, null, null, "{n}"),
                 tools.pdf_inspect(theirs, null, null))) {
             assertTrue(output.startsWith("Error:"), output);

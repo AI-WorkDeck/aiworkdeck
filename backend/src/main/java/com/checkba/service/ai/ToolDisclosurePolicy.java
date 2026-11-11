@@ -205,10 +205,7 @@ public class ToolDisclosurePolicy {
         CATEGORIES.put("table", List.of("doc_table_", "name:doc_insert_table"));
         CATEGORIES.put("revision", List.of(
                 "name:doc_restore_checkpoint", "name:doc_get_comments", "name:doc_list_revisions", "name:doc_revisions", "name:doc_update_comment",
-                // 以下是 V4 的兼容壳旧名（0.83 删），仍要归 revision：模型点名调它们时据此放回类目
-                "name:doc_accept_revision", "name:doc_reject_revision",
-                "name:doc_accept_all_revisions", "name:doc_reject_all_revisions",
-                "name:doc_reply_comment", "name:doc_resolve_comment", "name:doc_delete_comment"));
+                "name:doc_delete_comment"));
         CATEGORIES.put("evidence", List.of(
                 "name:doc_link_evidence", "name:doc_list_evidence",
                 "name:evidence_verify", "name:retrieve_evidence",
@@ -224,8 +221,7 @@ public class ToolDisclosurePolicy {
         // 在 #1064 第二步退出核心集后就归这里。必须排在 format 之前。
         CATEGORIES.put("edit", List.of(
                 "name:doc_select", "name:doc_delete_selection", "name:doc_redo",
-                "name:doc_goto", "name:doc_collapse_cursor",
-                "name:doc_select_anchor", "name:doc_select_paragraph", "name:doc_modify_paragraph",
+                "name:doc_modify_paragraph",
                 "name:doc_get_paragraph",
                 "name:doc_get_outline", "name:doc_insert_under_heading", "name:doc_replace_selection"));
         // 两份 docx 比对（V7 D1）：不带 doc_ 前缀，归类只为让「比对 / 对比」关键词能预放回
@@ -234,11 +230,10 @@ public class ToolDisclosurePolicy {
         // V2：doc_export_pdf 从核心集退到 pdf 类目（「导出PDF / 转PDF」命中 pdf 关键词）。
         CATEGORIES.put("pdf", List.of("name:doc_export_pdf", "pdf_"));
         CATEGORIES.put("files", List.of(
-                "name:create_folder", "name:move_files", "name:move_files_batch", "name:move_to_trash",
+                "name:create_folder", "name:move_files", "name:move_to_trash",
                 "name:list_files", "name:read_file", "name:write_file",
-                "name:move_project_file", "name:rename_project_file",
-                "name:list_project_folders", "text_",
-                "name:copy_files", "name:search_across_projects"));
+                "name:rename_project_file", "text_",
+                "name:copy_files"));
         // doc_* 里剩下的全是版式与排版：字符格式、段落格式、页面、页眉页脚、目录、脚注、图片、超链接……
         CATEGORIES.put("format", List.of("doc_"));
         CATEGORIES.put("spreadsheet", List.of("sheet_"));

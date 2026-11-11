@@ -111,7 +111,6 @@ class SystemPromptToolVisibilityContractTest {
             Map.entry("pdf_replace_text", ToolMeta.Host.LOWA),
             Map.entry("pdf_to_word", ToolMeta.Host.LOWA),
             // 纯文本：写入是纯后端的，但收尾要刷新用户打开的文本标签，任务窗格里没有去处
-            Map.entry("text_write_file", ToolMeta.Host.LOWA),
             Map.entry("text_find_replace", ToolMeta.Host.LOWA),
             // 诉讼可视化：出图后在编辑器里打开
             Map.entry("litigation_timeline_render", ToolMeta.Host.LOWA),
@@ -121,9 +120,7 @@ class SystemPromptToolVisibilityContractTest {
             Map.entry("litigation_checkpoint", ToolMeta.Host.LOWA),
             Map.entry("litigation_timeline_start", ToolMeta.Host.LOWA),
             Map.entry("litigation_timeline_step", ToolMeta.Host.LOWA),
-            Map.entry("pptx_generate_outline", ToolMeta.Host.LOWA),
             Map.entry("pptx_outline", ToolMeta.Host.LOWA),
-            Map.entry("pptx_refine_outline", ToolMeta.Host.LOWA),
             Map.entry("pptx_get_project_pages", ToolMeta.Host.LOWA),
             Map.entry("pptx_check_service", ToolMeta.Host.LOWA),
             Map.entry("pptx_export_editable", ToolMeta.Host.LOWA),

@@ -35,13 +35,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PdfToolsToolMetaContractTest {
 
-    /** 产出新文件的六个页操作工具（dev-board#805）。 */
+    /** 产出新文件的四个页操作工具（dev-board#805；split/extract/rotate 于 V4 并入 pdf_pages）。 */
     private static final Set<String> PAGE_OPS = new TreeSet<>(Set.of(
             "pdf_merge",
-            "pdf_split",
-            "pdf_extract_pages",
+            "pdf_pages",
             "pdf_delete_pages",
-            "pdf_rotate_pages",
             "pdf_add_page_numbers"));
 
     /** 纯读取、不碰磁盘的工具。 */
@@ -74,7 +72,7 @@ class PdfToolsToolMetaContractTest {
     }
 
     @Test
-    @DisplayName("六个页操作工具都在，声明 ADDED + refreshFiles，且不声明 LOWA 宿主")
+    @DisplayName("四个页操作工具都在，声明 ADDED + refreshFiles，且不声明 LOWA 宿主")
     void pageOperationsAddFilesAndNeedNoDesktopHost() {
         Set<String> seen = new TreeSet<>();
         List<String> wrong = new ArrayList<>();

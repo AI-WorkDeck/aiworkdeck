@@ -191,13 +191,7 @@ function registeredTools() {
   for (const name of readdirSync(TOOLS_DIR)) {
     if (!name.endsWith('.java')) continue
     const src = readFileSync(path.join(TOOLS_DIR, name), 'utf8')
-    for (const m of src.matchAll(TOOL_DECL)) {
-      // tool-system-v2 V4 的 @ToolShim 兼容壳（0.83 删）不参与对拍：它们是旧名，对拍表只认新名
-      const head = src.slice(0, m.index)
-      const methodStart = head.lastIndexOf('\n    }\n')
-      if (head.slice(Math.max(methodStart, 0)).includes('@ToolShim(')) continue
-      found.add(m[1])
-    }
+    for (const m of src.matchAll(TOOL_DECL)) found.add(m[1])
   }
   return found
 }
