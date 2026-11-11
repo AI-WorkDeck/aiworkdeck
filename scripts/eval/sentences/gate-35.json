@@ -667,9 +667,11 @@
         ]
       },
       "expect": {
+        "_note": "「下周三」先用 deadline_compute 换算日期是只读计算，算合理首步；要紧的是没建出事项（outcomeCheck）且停在 ask_user。多项目匹配时 task_create 已在工具层拒绝并要求 ask_user（TaskTools.ambiguous / mentionConflict）",
         "firstToolAnyOf": [
           "task_create",
           "task_list",
+          "deadline_compute",
           "ask_user",
           "search_across_projects",
           "search_project_summaries"
