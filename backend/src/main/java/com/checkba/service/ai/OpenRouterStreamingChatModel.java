@@ -895,6 +895,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 if (p != null && p.isTextual()) noteProvider(p.asText());
             }
             builder.append(chunk);
+            appendToolCallsBesideContent(root);
             JsonNode usage = root.path("usage");
             if (usage.path("prompt_tokens").isIntegralNumber() && usage.path("completion_tokens").isIntegralNumber()) {
                 int input = usage.path("prompt_tokens").asInt(), output = usage.path("completion_tokens").asInt();
@@ -922,6 +923,26 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 }
             }
             return false;
+        }
+
+        /**
+         * langchain4j 0.36 的 {@code OpenAiStreamingResponseBuilder.append} 见到 {@code delta.content} 非 null
+         * 就收下正文直接 return，同一分片里的 {@code tool_calls} 被丢掉。百炼 qwen 的每个工具调用分片都带
+         * {@code "content":""}（2026-11-11 实录），于是整条工具调用消失、本轮按「只说了一句话」收尾。
+         * 两者同在时，把去掉 content 的同一分片再 append 一次，工具调用照常按 index 拼装。
+         */
+        private void appendToolCallsBesideContent(JsonNode root) {
+            JsonNode delta = root.path("choices").path(0).path("delta");
+            JsonNode content = delta.get("content");
+            JsonNode toolCalls = delta.get("tool_calls");
+            if (content == null || content.isNull() || toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) return;
+            ObjectNode copy = root.deepCopy();
+            ((ObjectNode) copy.path("choices").path(0).path("delta")).remove("content");
+            try {
+                builder.append(LENIENT.treeToValue(copy, ChatCompletionResponse.class));
+            } catch (IOException e) {
+                log.warn("Tool-call part of SSE chunk could not be read, ignored");
+            }
         }
 
         /** OpenRouter 统一成 {@code delta.reasoning}；各家原生兼容端点多用 {@code reasoning_content}。 */
