@@ -1400,6 +1400,9 @@ public class ToolRegistry {
                         projectFileService, ctx == null ? null : ctx.projectId(), requested,
                         ctx == null ? null : ctx.defaultOutputFolderId()));
             }
+            if ("move_files".equals(resolvedName)) {
+                com.checkba.service.ai.tools.MoveFilesArgs.fold(args);
+            }
             Object[] boundArgs = bindArguments(resolvedName, tool.method(), args, ctx);
             Object result = tool.method().invoke(tool.bean(), boundArgs);
             return new ToolResult(result != null ? result.toString() : "", tool, true);
