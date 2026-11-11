@@ -123,7 +123,7 @@ select {
 
 .hint,
 small {
-  font-size: var(--awd-font-size-caption, 12px);
+  font-size: var(--awd-panel-fs, 12px);
   color: var(--awd-text-2, var(--fallback-muted));
 }
 
@@ -361,9 +361,9 @@ p {
 }
 
 .badge-green {
-  color: var(--awd-success-text, var(--fallback-success));
+  color: var(--awd-accent-text, var(--fallback-success));
   background: var(--fallback-success-wash);
-  border-color: var(--awd-success-text, var(--fallback-success));
+  border-color: var(--awd-accent-text, var(--fallback-success));
 }
 
 .badge-neutral {
@@ -458,8 +458,8 @@ p {
 
 .step-pill[data-state="done"] {
   background: var(--fallback-success-wash);
-  color: var(--awd-success-text, var(--fallback-success));
-  border-color: var(--awd-success-text, var(--fallback-success));
+  color: var(--awd-accent-text, var(--fallback-success));
+  border-color: var(--awd-accent-text, var(--fallback-success));
   font-weight: 600;
 }
 

@@ -29,6 +29,7 @@ SDK 必须排在业务脚本**之前**且用同步 `<script>`：宿主在 iframe
 
 **做界面前先读 [UI-GUIDELINES.md](UI-GUIDELINES.md)**：可直接用的 `.awd-*` 样式类、令牌写法、
 中文断行与表格防挤压、错误提示形制，以及交付前的三档宽度/四种数据截图自检。
+SDK 1.9 起自带表格 `.awd-table`、提示条 `.awd-notice`、空状态 `.awd-empty`，标签 `.awd-subnav-item` 不再折行。
 
 ## 表面
 

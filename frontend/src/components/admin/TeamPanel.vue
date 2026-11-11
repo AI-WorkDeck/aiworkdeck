@@ -1964,6 +1964,19 @@ export default {
   margin-top: 4px;
 }
 
+/* 设置页右侧有 AI 栏时面板只剩六七百像素：等分的六列会把「苏婉清（合伙人）」逐字折行。
+   给行一个最小宽度（表格本身可横向滚动），单元格不折行。 */
+.lf-dim-table .team-table-head,
+.lf-dim-table .team-table-row {
+  display: grid;
+  grid-template-columns: minmax(9.5em, 1.5fr) minmax(10.5em, 1.5fr) repeat(4, minmax(5.5em, 1fr));
+  min-width: max-content;
+}
+
+.lf-dim-table .col {
+  white-space: nowrap;
+}
+
 .scope-tabs {
   display: inline-flex;
   flex-wrap: wrap;

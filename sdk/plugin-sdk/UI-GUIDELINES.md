@@ -16,11 +16,19 @@ SDK 会自动注入 `awd-plugin-ui.css` 的核心规则，可直接用：
 | 卡片 | `.awd-card` `.awd-card-header` `.awd-card-title` |
 | 按钮 / 输入 | `.awd-btn` `.awd-btn-primary` `.awd-btn-sm` `.awd-input` `.awd-select` `.awd-textarea` |
 | 指标 | `.awd-kpi-grid` `.awd-kpi-card` `.awd-kpi-label` `.awd-kpi-value` |
-| 分段切换 | `.awd-subnav` `.awd-subnav-item` |
+| 标签 / 分段切换 | `.awd-subnav` `.awd-subnav-item`（不折行，放不下横向滚动） |
 | 徽标 | `.awd-badge` `.awd-badge-accent/-warning/-danger/-info/-gold` |
+| 表格（SDK 1.9） | `.awd-table-wrap` > `table.awd-table`；长文本列的 `td` 加 `.awd-cell-text` |
+| 提示条（SDK 1.9） | `.awd-notice` `.awd-notice-danger/-warning/-success` |
+| 空状态（SDK 1.9） | `.awd-empty` > `.awd-empty-title` + `.awd-empty-desc` |
 
-SDK 里没有的（表格、提示条、空状态），按下面第 3–5 条写，尺寸与宿主一致：
-正文 12–13px、卡片标题 14px/600、卡片内边距 12px 14px、圆角用 `--awd-radius-*`。
+```html
+<div class="awd-notice awd-notice-danger" role="alert">请先连接 AI WorkDeck 账户 <button class="awd-btn awd-btn-xs">去连接</button></div>
+<div class="awd-table-wrap"><table class="awd-table">…<td class="awd-cell-text">东海精密装备诉华星半导体…</td>…</table></div>
+<div class="awd-empty"><p class="awd-empty-title">还没有发票</p><p class="awd-empty-desc">在「提交发票申请」里开第一张</p></div>
+```
+
+自己写样式时尺寸与宿主一致：正文 12–13px、卡片标题 14px/600、卡片内边距 12px 14px、圆角用 `--awd-radius-*`。
 
 ## 2. 只用 `--awd-*` 令牌，名字要写对，并且带兜底值
 
@@ -33,7 +41,8 @@ background: var(--awd-danger-wash);          /* ✗ 宿主没有这个令牌，�
   可用的令牌以宿主下发的为准（`awd.context.themeTokens` 的键，或宿主 `frontend/src/App.vue`）。
   常用：`--awd-text` `--awd-text-2` `--awd-text-3` `--awd-surface` `--awd-surface-2` `--awd-bg`
   `--awd-border` `--awd-border-subtle` `--awd-accent` `--awd-accent-text` `--awd-accent-wash`
-  `--awd-danger-text` `--awd-danger-soft` `--awd-warning-text` `--awd-success-text`。
+  `--awd-danger-text` `--awd-danger-soft` `--awd-warning-text` `--awd-warning-soft`
+  `--awd-info-text` `--awd-info-soft`（宿主没有 `success` 系令牌，成功态用 `accent`）。
 - 插件可能跑在老宿主或独立预览里，**每个 `var()` 都给兜底值**。
 - 不写死颜色、不写死深浅色——深色主题下宿主会换一整套令牌值。
 
@@ -76,7 +85,13 @@ background: var(--awd-danger-wash);          /* ✗ 宿主没有这个令牌，�
   要先记下来，拿到 context 后再套用，否则会时有时无地出现两份列表。
 - 宿主标签页已经显示了插件名，面板刊头不需要再放一个同名大标题加同一句说明。
 
-## 8. 交付前自检（截图核对，不能只看代码）
+## 8. 自动检查
+
+`node scripts/check-ui-hygiene.mjs`（CI 必跑）会查官方插件与宿主前端：引用了宿主不存在的 `--awd-*` 令牌、
+插件里的 `var(--awd-*)` 没带兜底值、模板里用了却没有任何样式的类名。它只能挡住「写错了」，
+挡不住「挤、丑」——那要靠下一条的截图。
+
+## 9. 交付前自检（截图核对，不能只看代码）
 
 在宿主里打开插件，逐项截图看一遍：
 

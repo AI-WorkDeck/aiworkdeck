@@ -83,6 +83,9 @@
 .awd-subnav {
   display: inline-flex;
   align-items: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: auto;
   gap: 2px;
   padding: 3px;
   background: var(--awd-surface-2, #E9E6DC);
@@ -91,7 +94,10 @@
   margin-bottom: var(--awd-space-4, 16px);
 }
 
+/* 中文可在任意两字间折行：标签一律不折行，放不下时整条横向滚动 */
 .awd-subnav-item {
+  flex: none;
+  white-space: nowrap;
   appearance: none;
   border: 1px solid transparent;
   background: transparent;
@@ -381,4 +387,104 @@
   gap: 8px;
   font-size: 11.5px;
   color: var(--awd-text-2, #6B675C);
+}
+
+/* 7. 表格（SDK 1.9）：外层 .awd-table-wrap 横向滚动；单元格默认不折行，
+   只有标了 .awd-cell-text 的长文本列（案件名、主体名称）才折行 */
+.awd-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--awd-border, #DDD8CA);
+  border-radius: var(--awd-radius-md, 6px);
+}
+
+.awd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.awd-table th,
+.awd-table td {
+  padding: 8px 10px;
+  text-align: start;
+  white-space: nowrap;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--awd-border-subtle, #EAE7DD);
+}
+
+.awd-table th {
+  font-weight: 600;
+  color: var(--awd-text-2, #6B675C);
+  background: var(--awd-surface-2, #E9E6DC);
+}
+
+.awd-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.awd-table td.awd-cell-text {
+  white-space: normal;
+  min-width: 12em;
+  max-width: 22em;
+}
+
+/* 8. 提示条（SDK 1.9）：错误、警告、说明一律用它，不要一行裸红字 */
+.awd-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  border-inline-start: 3px solid var(--awd-info-text, #3C5A73);
+  border-radius: var(--awd-radius-sm, 4px);
+  background: var(--awd-info-soft, #E9EFF4);
+  color: var(--awd-text, #2B2A26);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.awd-notice-danger {
+  border-inline-start-color: var(--awd-danger-text, #B5483C);
+  background: var(--awd-danger-soft, #F9EBEA);
+  color: var(--awd-danger-text, #B5483C);
+}
+
+.awd-notice-warning {
+  border-inline-start-color: var(--awd-warning-text, #8A5D14);
+  background: var(--awd-warning-soft, #F8F0DF);
+  color: var(--awd-warning-text, #8A5D14);
+}
+
+.awd-notice-success {
+  border-inline-start-color: var(--awd-accent-text, #2E5A50);
+  background: var(--awd-accent-soft, #E3EDE9);
+  color: var(--awd-accent-text, #2E5A50);
+}
+
+/* 9. 空状态（SDK 1.9）：说清「为什么空、下一步做什么」 */
+.awd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--awd-space-6, 24px) var(--awd-space-4, 16px);
+  text-align: center;
+  color: var(--awd-text-2, #6B675C);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.awd-empty-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--awd-text, #2B2A26);
+}
+
+.awd-empty-desc {
+  margin: 0;
+  max-width: 36em;
 }

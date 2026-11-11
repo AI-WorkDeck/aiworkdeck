@@ -46,6 +46,7 @@ export default {
 
 .awd-set-section-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -53,8 +54,9 @@ export default {
   border-bottom: 1px solid var(--awd-border);
 }
 
+/* 说明文字至少留 280px；放不下时右侧按钮整组换到下一行，而不是把说明挤成一字宽的竖条 */
 .awd-set-section-head-text {
-  flex: 1;
+  flex: 1 1 280px;
   min-width: 0;
   display: flex;
   flex-direction: column;

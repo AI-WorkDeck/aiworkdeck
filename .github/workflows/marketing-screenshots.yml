@@ -119,8 +119,11 @@ jobs:
           done
           tail -n 80 "$H/stdout.log"
           exit 1
+      # 版式回归图（ui-baselines/）要装不随包的律所管理、项目沟通：拷进后端 cwd 下的插件目录
       - name: Capture and compare
         working-directory: frontend
+        env:
+          SHOTS_PLUGINS_DIR: ${{ runner.temp }}/awd-home/cwd/plugins
         run: node tests/marketing-screenshots/run.mjs
       - name: Backend log on failure
         if: failure()

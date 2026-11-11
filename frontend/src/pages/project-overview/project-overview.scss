@@ -1250,7 +1250,7 @@ $color-accent: var(--awd-mint); // Mint Green
 .tools-search-input:focus {
   background: var(--awd-surface);
   border-color: var(--awd-info); /* 聚焦蓝框 */
-  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-focus-ring, var(--awd-accent-soft));
+  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-soft);
 }
 .tools-search-clear {
   position: absolute;
@@ -1651,7 +1651,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .batch-menu-item:hover {
-  background: var(--awd-surface-hover, var(--awd-surface-2));
+  background: var(--awd-panel-hover);
 }
 
 .batch-menu-item.danger {
@@ -2626,7 +2626,7 @@ $color-accent: var(--awd-mint); // Mint Green
 
 .tools-search-input:focus {
   border-color: var(--awd-info);
-  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-focus-ring, var(--awd-accent-soft));
+  box-shadow: 0 0 0 var(--awd-focus-width) var(--awd-accent-soft);
 }
 
 .context-snippet.placeholder {
@@ -5217,7 +5217,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 .explorer-ocr-progress-title { font-weight: 600; }
 .explorer-ocr-progress-name {
-  color: var(--awd-text-secondary, var(--awd-text));
+  color: var(--awd-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

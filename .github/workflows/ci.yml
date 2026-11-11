@@ -28,6 +28,9 @@ jobs:
         run: node scripts/check-palette.mjs
       - name: Check migrated design tokens and iframe contract
         run: node scripts/check-design-system.mjs
+      # 静默失效守卫：不存在的 --awd-* 令牌、插件令牌缺兜底、模板类名毫无样式（只拦新增，基线见 scripts/ui-hygiene-baseline.json）
+      - name: Check UI hygiene (unknown tokens, unstyled classes)
+        run: node scripts/check-ui-hygiene.mjs
       - name: Test design token guards and control behavior
         run: node --test frontend/tests/design-system/*.test.mjs frontend/tests/plugin-sdk/theme-channel.test.mjs
       # 两族编辑工具对拍（dev-board#806）：同一件事在工作台（doc_/sheet_/slide_）与
