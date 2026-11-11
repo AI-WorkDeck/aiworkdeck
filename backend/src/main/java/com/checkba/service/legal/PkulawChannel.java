@@ -56,16 +56,45 @@ public class PkulawChannel {
      * @throws GatewayException 平台档下网关的分类失败（余额不足 / 未开放 / 不可达），带 kind
      */
     public String callTool(String server, String tool, Map<String, Object> args) {
-        if (server != null && server.startsWith(PKULAW_SERVER_PREFIX) && userMcp != null && userMcp.hasOverride("pkulaw")) {
-            return userMcp.callPreset("pkulaw", tool, args);
+        return call(server, tool, args, false);
+    }
+
+    /**
+     * 依据窗格用：平台档回包带 structuredContent 时，按改名前的字段形状返回 JSON（{@link PkulawCompat#legacyFromRaw}），
+     * 窗格的解析与空结果判定不用跟着法宝改；没有结构化数据（或不走网关）时与 {@link #callTool} 相同。
+     */
+    public String callToolForData(String server, String tool, Map<String, Object> args) {
+        return call(server, tool, args, true);
+    }
+
+    private String call(String server, String tool, Map<String, Object> args, boolean legacyData) {
+        boolean pkulaw = server != null && server.startsWith(PKULAW_SERVER_PREFIX);
+        // 不走网关的两档：法宝 2026-11 把分服务端点上的工具全部改了名，但用户自连的端点（10-29 tools/list 快照）
+        // 仍是旧名。先按原名打，上游说没有这个工具时再按现名重试一次（与官网网关同一张改名表）。
+        if (pkulaw && userMcp != null && userMcp.hasOverride("pkulaw")) {
+            try {
+                return userMcp.callPreset("pkulaw", tool, args);
+            } catch (com.checkba.service.ai.mcp.PluginMcpException e) {
+                PkulawCompat.Call c = PkulawCompat.translate(tool, args);
+                if (!"tool_unavailable".equals(e.code()) || c.tool().equals(tool)) throw e;
+                return userMcp.callPreset("pkulaw", c.tool(), c.args());
+            }
         }
         if (!viaPlatform(server)) {
-            return mcpClientService.callTool(server, tool, args);
+            String out = mcpClientService.callTool(server, tool, args);
+            if (!pkulaw || out == null || !out.startsWith("Error") || !out.contains("Unknown tool")) return out;
+            PkulawCompat.Call c = PkulawCompat.translate(tool, args);
+            return c.tool().equals(tool) ? out : mcpClientService.callTool(server, c.tool(), c.args());
         }
-        // 网关的 op 就是法宝的工具名；MCP 端点写死在服务端，客户端点不了别处
+        // 网关的 op 是改名前的工具名，官网 adapters/pkulaw.ts 换成现名；MCP 端点写死在服务端，客户端点不了别处
         PlatformGatewayClient.Result result =
                 platformGatewayClient.call("pkulaw", tool, Map.of("args", args), TIMEOUT_SECONDS);
-        String parsed = McpResponseParser.parse(result.data().path("raw").asText(""));
+        String raw = result.data().path("raw").asText("");
+        if (legacyData) {
+            String legacy = PkulawCompat.legacyFromRaw(tool, raw);
+            if (legacy != null) return legacy;
+        }
+        String parsed = McpResponseParser.parse(raw);
         // 上游裸文本 "Unknown tool: x"（无 Error 前缀）补齐前缀，两档对失败的判据一致
         if (parsed != null && parsed.stripLeading().startsWith("Unknown tool")) {
             return "Error from MCP server: " + parsed;

@@ -282,6 +282,7 @@ DOC 实体的 `detail`（命中项目文件时；`GET /entities/{id}` 才下发�
 `application-prod.yml` 不重复定义 `mcp` 列表（抄一份必然漂移），只在 `external.qichacha` 下留了 `QICHACHA_MCP_TOKEN` 的部署清单注释。
 
 ## 已知地雷
+- **法宝 2026-11 改名与回包换形（2026-11-11 实测）**：上游工具全部改名（get_article→get_law_article(law_title, article_number)、search_article→search_law_articles(query_text)、get_law_list→search_laws_by_keyword / search_law_articles_by_keyword、law_recognition→recognize_law_citations、search_case→search_cases、anhao_recognition→recognize_case_numbers、adjust_provisions→verify_law_citations(user_law[{law_title,…}], answer_law[…])），回包改成「可读文本 + `structuredContent`」，字段名也换了（law_title / article_content / document_no / implement_date…）。`McpResponseParser` 只拼 content 文本、丢 structuredContent，多条 content（search_article 10 条）会被拼成 `{…}{…}` 坏 JSON。对策：网关档由官网 adapters/pkulaw.ts 换名换参；依据窗格走 `PkulawChannel.callToolForData`，由 `legal/PkulawCompat.legacyFromRaw` 把 structuredContent 还原成本文件「数据模型」里的旧形状（下游解析、空结果判定、前端 insightDetail 都不用改）；「查无此条」上游当成功回（isError=false），换算成 article/content/text 全空 → NOT_FOUND。模型那条（LegalTools）仍吃可读文本。不走网关的两档（自备 Key、用户自建 MCP 连接）先按旧名打，上游回 Unknown tool / `tool_unavailable` 才按 `PkulawCompat.translate` 的现名重试——用户自连的端点 10-29 快照里仍是旧名。夹具：`backend/src/test/resources/pkulaw/2026-11/*.raw`（真实回包）。
 
 1. **桌面端上法宝凭证不在用户机器上，必须走平台网关**（dev-board#395 的病灶）。
    `PKULAW_TOKEN` / 系统设置 `external.pkulaw.token` 只在开发机与自建部署上有；打包发出去的桌面端两个都是空的。
