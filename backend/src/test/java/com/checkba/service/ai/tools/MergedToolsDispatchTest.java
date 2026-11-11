@@ -56,7 +56,10 @@ class MergedToolsDispatchTest {
     @Test
     @DisplayName("doc_revisions：四个 action 分别下发 resolve_revision / resolve_all_revisions；缺 index 与未知 action 报错且不碰桥")
     void docRevisions() {
-        assertEquals("OK", doc.doc_revisions("accept", 2));
+        when(editor.executeEditorCommand(eq("list_revisions"), any())).thenReturn("0: Insert \"15\"");
+        String accepted = doc.doc_revisions("accept", 2);
+        assertTrue(accepted.startsWith("OK"), accepted);
+        assertTrue(accepted.contains("0: Insert \"15\""), "回执附上重排后的剩余修订：" + accepted);
         assertEquals(Map.of("index", 2, "action", "accept"), lastEditorParams("resolve_revision"));
         assertEquals("OK", doc.doc_revisions("reject_all", null));
         assertEquals(Map.of("action", "reject"), lastEditorParams("resolve_all_revisions"));
@@ -117,8 +120,10 @@ class MergedToolsDispatchTest {
     void officeRevisions() {
         word.office_revisions("c", "accept_all", null);
         verify(office).executeOfficeCommand(eq("c"), eq("accept_revision"), eq(Map.of("all", true)));
-        word.office_revisions("c", "reject", 1);
+        when(office.executeOfficeCommand(eq("c"), eq("get_revisions"), anyMap())).thenReturn("0: Insert \"15\"");
+        String rejected = word.office_revisions("c", "reject", 1);
         verify(office).executeOfficeCommand(eq("c"), eq("reject_revision"), eq(Map.of("all", false, "revisionIndex", 1)));
+        assertTrue(rejected.contains("0: Insert \"15\""), "回执附上重排后的剩余修订：" + rejected);
         assertTrue(word.office_revisions("c", "accept", null).startsWith("Error"));
     }
 

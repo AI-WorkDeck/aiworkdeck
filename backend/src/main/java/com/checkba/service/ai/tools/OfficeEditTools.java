@@ -3102,7 +3102,15 @@ public class OfficeEditTools implements AgentToolComponent {
         Map<String, Object> args = new HashMap<>();
         args.put("all", all);
         if (!all) args.put("revisionIndex", revisionIndex);
-        return officeBridgeService.executeOfficeCommand(conversationId, accept ? "accept_revision" : "reject_revision", args);
+        String done = officeBridgeService.executeOfficeCommand(conversationId, accept ? "accept_revision" : "reject_revision", args);
+        if (all || done == null || done.startsWith("Error")) return done;
+        // 与 doc_revisions 同理：处置一条后其余 index 前移，回执附重排后的清单，免得模型按旧编号处置错条（tasks-10 t08）
+        String remaining = officeBridgeService.executeOfficeCommand(conversationId, "get_revisions", Map.of());
+        if (remaining == null || remaining.startsWith("Error")) return done;
+        return done + "\n\n" + com.checkba.service.LangText.of(
+                "处置后剩余修订（编号已重排，继续处置请用下面的 index）：",
+                "Remaining revisions after this change (renumbered; use these indexes for the next step):")
+                + "\n" + remaining;
     }
 
     // ==================== Word 脚注/尾注（office_*，批次 9，WordApi 1.5） ====================
