@@ -1689,7 +1689,16 @@ public class DocumentEditTools implements AgentToolComponent {
         switch (a) {
             case "accept", "reject" -> {
                 if (index == null) return "Error: action=" + a + " 需要 index 参数（来自 doc_list_revisions）";
-                return dispatchRevisionResolve(index, a);
+                String done = dispatchRevisionResolve(index, a);
+                if (done == null || done.startsWith("Error")) return done;
+                // 处置一条后其余 index 前移。光在说明里写，模型仍按旧编号接着处置（tasks-10 t08 实录：要拒绝 7→15 的
+                // 删除+插入两条，拒了 0 再拒「1」，实际拒掉的是原来的 2 号违约金条款）。回执直接附上重排后的清单。
+                String remaining = doc_list_revisions();
+                if (remaining == null || remaining.startsWith("Error")) return done;
+                return done + "\n\n" + com.checkba.service.LangText.of(
+                        "处置后剩余修订（编号已重排，继续处置请用下面的 index）：",
+                        "Remaining revisions after this change (renumbered; use these indexes for the next step):")
+                        + "\n" + remaining;
             }
             case "accept_all" -> {
                 return dispatchRevisionResolveAll("accept");
