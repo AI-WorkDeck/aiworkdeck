@@ -1406,6 +1406,30 @@ export default {
   border-bottom: 1rpx solid var(--awd-border);
 }
 
+.btn-extract {
+  margin: 0;
+  padding: 0 20rpx;
+  height: 52rpx;
+  line-height: 50rpx;
+  font-size: 24rpx;
+  color: var(--awd-text);
+  background: var(--awd-surface);
+  border: 1rpx solid var(--awd-border);
+  border-radius: 8rpx;
+}
+
+.btn-extract::after {
+  border: none;
+}
+
+.btn-extract:hover {
+  background: var(--awd-surface-2);
+}
+
+.btn-extract[disabled] {
+  opacity: 0.5;
+}
+
 .archive-count {
   font-size: 24rpx;
   color: var(--awd-text-2);

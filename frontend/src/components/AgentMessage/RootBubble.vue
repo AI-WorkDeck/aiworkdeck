@@ -612,4 +612,21 @@ function isApprovalPending(art) {
 .bubble-consent-card {
   margin-top: var(--awd-space-2);
 }
+/* 没有阅读标签页可开时（如全局对话），法规原文就地展开 */
+.legal-inline-reader {
+  margin-top: var(--awd-space-2);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-surface);
+  overflow: hidden;
+}
+.legal-inline-reader > summary {
+  padding: var(--awd-space-2) var(--awd-space-3);
+  color: var(--awd-text-2); font-size: var(--awd-panel-fs); line-height: 1.6;
+  cursor: pointer; overflow-wrap: anywhere;
+}
+.legal-inline-reader > summary:hover { color: var(--awd-text); }
+.legal-inline-reader > summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: -2px; }
+.legal-inline-reader[open] > summary { border-bottom: 1px solid var(--awd-border); }
+.legal-inline-reader > .legal-reference-pane { height: auto; max-height: min(70vh, 640px); }
 </style>
