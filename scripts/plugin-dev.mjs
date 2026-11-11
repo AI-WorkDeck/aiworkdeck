@@ -167,7 +167,10 @@ export function descriptionViolations(description) {
   let lang = 'en'
   if (/\p{Script=Han}/u.test(line)) {
     lang = 'zh'
-    const bare = line.replace(/`[^`]*`|<[^>]*>|'[^']*'|"[^"]*"|「[^」]*」/g, '').replace(/[（(][\x00-\x7F]*[）)]|\.[A-Za-z0-9]+/g, '')
+    // 只为判断语言剥掉代码/标签/引号片段，不产出 HTML；循环到不再变化（CodeQL js/incomplete-multi-character-sanitization）
+    let bare = line
+    for (let prev = null; prev !== bare;) { prev = bare; bare = bare.replace(/`[^`]*`|<[^>]*>|'[^']*'|"[^"]*"|「[^」]*」/g, '') }
+    bare = bare.replace(/[（(][\x00-\x7F]*[）)]|\.[A-Za-z0-9]+/g, '')
     for (const w of bare.match(/[A-Za-z][A-Za-z0-9_'\-]*/g) || []) {
       const identifier = w.includes('_') || /\d/.test(w) || /[a-z][A-Z]/.test(w)
       if (identifier || !/[a-z]/.test(w[0])) continue
