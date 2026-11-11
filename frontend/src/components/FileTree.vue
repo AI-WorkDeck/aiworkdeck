@@ -289,6 +289,15 @@
           </view>
           <text class="context-menu-text">{{ $t('fileTree.sendFile') }}</text>
         </view>
+        <view v-if="canPrintContext()" class="context-menu-item" @tap="handleContextPrint">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="6" y="14" width="12" height="8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.print') }}</text>
+        </view>
         <view v-if="canConvertContextToPdf()" class="context-menu-item" @tap="handleContextConvertToPdf">
           <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -317,6 +326,31 @@
             </svg>
           </view>
           <text class="context-menu-text">{{ $t('fileTree.duplicate') }}</text>
+        </view>
+        <view v-if="canMoveContext()" class="context-menu-item" @tap="handleContextMove">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.moveTo') }}</text>
+        </view>
+        <view v-if="canCompressContext()" class="context-menu-item" @tap="handleContextCompress">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.compressToZip') }}</text>
+        </view>
+        <view v-if="canExtractContext()" class="context-menu-item" @tap="handleContextExtract">
+          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 8v13H3V8M1 3h22v5H1z" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 11v7M9 15l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </view>
+          <text class="context-menu-text">{{ $t('fileTree.extractHere') }}</text>
         </view>
         <view v-if="contextMenu.targetItem" class="context-menu-item context-menu-item-danger" @tap="handleContextDelete">
           <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
@@ -782,7 +816,7 @@
 </template>
 
 <script>
-import { subscribeLocalProjectFileChanges, getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
+import { subscribeLocalProjectFileChanges, getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf, fetchPrintablePdf, compressFilesToZip, extractArchive, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 import { host, isDesktopHost } from '@/services/host.js'
 import { showDialog } from '@/utils/dialog.js'
@@ -797,6 +831,7 @@ import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffe
 import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
 import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
+import { canPrintItem, canExtractItem, canMoveItems, canCompressItems, printPdfBlob } from '@/utils/fileTreeExtraActions.js'
 import { canOcrItems } from '@/utils/explorerOcr.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import ExplorerCreateMenu from '@/components/ExplorerCreateMenu.vue'
@@ -921,6 +956,7 @@ export default {
       // 批量选择（勾选/框选）
       checkedMap: {}, // { [id]: true }
       pendingBatchAction: null, // 'move'|'cut'|'copy'
+      contextActionIds: null, // 右键「移动到…」的对象；为空时批量操作读勾选
       batchTargetParentId: null,
       // 框选状态（H5）
       marquee: {
@@ -2572,6 +2608,7 @@ export default {
         return
       }
 
+      this.contextActionIds = null
       this.pendingBatchAction = action
       this.batchTargetParentId = null
       this.showFolderSelector = true
@@ -2580,7 +2617,8 @@ export default {
       const action = this.pendingBatchAction
       // 文件夹连子孙都勾着时只发文件夹本身（与右键 contextTargetItems 一致）：
       // 原样发 [F,a,b] 复制会多出单独的 a、b，移动会把 a、b 从 F 里拔出来
-      const ids = collapseToTopmostSelected(this.normalizedCheckedIds(), this.checkTreeNodes()).roots
+      const ids = this.contextActionIds || collapseToTopmostSelected(this.normalizedCheckedIds(), this.checkTreeNodes()).roots
+      this.contextActionIds = null
       if (!action || !ids.length) return
       try {
         const projectId = typeof this.projectId === 'string' ? Number(this.projectId) : this.projectId
@@ -2709,6 +2747,81 @@ export default {
     canMergeContextToPdf() {
       if (!this.isContextMulti()) return false
       return canMergeItemsToPdf(this.contextTargetItems(), this.viewMode)
+    },
+
+    canPrintContext() {
+      return !this.isContextMulti() && canPrintItem(this.contextMenu && this.contextMenu.targetItem, this.viewMode)
+    },
+
+    canMoveContext() {
+      return !!(this.contextMenu && this.contextMenu.targetItem) && canMoveItems(this.contextTargetItems(), this.viewMode)
+    },
+
+    canCompressContext() {
+      return !!(this.contextMenu && this.contextMenu.targetItem) && canCompressItems(this.contextTargetItems(), this.viewMode)
+    },
+
+    canExtractContext() {
+      return !this.isContextMulti() && canExtractItem(this.contextMenu && this.contextMenu.targetItem, this.viewMode)
+    },
+
+    async handleContextPrint() {
+      const item = this.contextMenu && this.contextMenu.targetItem
+      this.closeContextMenu()
+      if (!item || !this.projectId) return
+      uni.showLoading({ title: this.$t('fileTree.preparingPrint') })
+      try {
+        const blob = await fetchPrintablePdf(this.projectId, item.id)
+        uni.hideLoading()
+        printPdfBlob(blob)
+      } catch (e) {
+        console.error('打印失败:', e)
+        uni.hideLoading()
+        uni.showToast({ title: e.message || this.$t('fileTree.printFailed'), icon: 'none' })
+      }
+    },
+
+    // 复用批量选择的「选择文件夹」弹窗；对象取右键作用的条目而不是勾选
+    handleContextMove() {
+      const ids = this.contextTargetItems().map(f => f.id)
+      this.closeContextMenu()
+      if (!ids.length) return
+      this.pendingBatchAction = 'move'
+      this.batchTargetParentId = null
+      this.showFolderSelector = true
+      this.contextActionIds = ids
+    },
+
+    async handleContextCompress() {
+      const ids = this.contextTargetItems().map(f => f.id)
+      this.closeContextMenu()
+      if (!ids.length || !this.projectId) return
+      await this.runContextCreateAction('fileTree.compressing', () => compressFilesToZip(this.projectId, ids), 'fileTree.compressSuccess', 'fileTree.compressFailed')
+    },
+
+    async handleContextExtract() {
+      const item = this.contextMenu && this.contextMenu.targetItem
+      this.closeContextMenu()
+      if (!item || !this.projectId) return
+      await this.runContextCreateAction('fileTree.extracting', () => extractArchive(this.projectId, item.id), 'fileTree.extractSuccess', 'fileTree.extractFailed')
+    },
+
+    // 压缩/解压：都在原位置新建一项，完成后刷新并定位到它
+    async runContextCreateAction(loadingKey, call, successKey, failKey) {
+      uni.showLoading({ title: this.$t(loadingKey) })
+      try {
+        const res = await call()
+        const created = res && (res.data || res)
+        await this.loadFiles()
+        this.$emit('files-changed')
+        if (created && created.id != null) this.revealFile(created.id)
+        uni.hideLoading()
+        uni.showToast({ title: this.$t(successKey, { name: (created && created.name) || '' }), icon: 'none' })
+      } catch (e) {
+        console.error(failKey, e)
+        uni.hideLoading()
+        uni.showToast({ title: e.message || this.$t(failKey), icon: 'none' })
+      }
     },
 
     async handleContextConvertToPdf() {

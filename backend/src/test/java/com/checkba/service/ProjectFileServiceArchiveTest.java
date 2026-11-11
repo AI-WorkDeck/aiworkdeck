@@ -385,6 +385,74 @@ class ProjectFileServiceArchiveTest {
     }
 
     @Test
+    void compressToZipIncludesFolderDescendantsAndDedupesNames() throws Exception {
+        ProjectFile folder = row(20L, null, "证据", true, null);
+        ProjectFile inner = row(21L, 20L, "a.pdf", false, "projects/1/证据/a.pdf");
+        ProjectFile top = row(22L, null, "a.pdf", false, "projects/1/a.pdf");
+        when(projectFileRepository.findById(anyLong()))
+                .thenAnswer(inv -> Optional.ofNullable(rows.get(inv.<Long>getArgument(0))));
+        when(projectFileRepository.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(PROJECT_ID, 20L))
+                .thenReturn(List.of(inner));
+        when(projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(projectFileRepository.findByProjectIdAndParentIdOrderBySortOrderAsc(anyLong(), any())).thenReturn(List.of());
+        AtomicLong ids = new AtomicLong(100);
+        when(projectFileRepository.save(any(ProjectFile.class))).thenAnswer(inv -> {
+            ProjectFile f = inv.getArgument(0);
+            if (f.getId() == null) f.setId(ids.incrementAndGet());
+            rows.put(f.getId(), f);
+            return f;
+        });
+        when(storageServiceFactory.getStorageService()).thenReturn(storageService);
+        when(storageService.load("projects/1/证据/a.pdf")).thenReturn(new ByteArrayResource("inner".getBytes(StandardCharsets.UTF_8)));
+        when(storageService.load("projects/1/a.pdf")).thenReturn(new ByteArrayResource("top".getBytes(StandardCharsets.UTF_8)));
+        Map<String, byte[]> written = new HashMap<>();
+        when(storageService.save(any(), any(java.io.InputStream.class))).thenAnswer(inv -> {
+            written.put(inv.getArgument(0), inv.<java.io.InputStream>getArgument(1).readAllBytes());
+            return inv.getArgument(0);
+        });
+
+        ProjectFile zip = projectFileService.compressToZip(PROJECT_ID, List.of(20L, 21L, 22L), 42L);
+
+        assertEquals("zip", zip.getFileType());
+        assertTrue(zip.getName().startsWith("证据") && zip.getName().endsWith(".zip"), zip.getName());
+        Map<String, String> entries = new java.util.LinkedHashMap<>();
+        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                new java.io.ByteArrayInputStream(written.get(zip.getFilePath())), StandardCharsets.UTF_8)) {
+            for (ZipEntry e; (e = zis.getNextEntry()) != null; ) {
+                entries.put(e.getName(), new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+        assertEquals(List.of("证据/", "证据/a.pdf", "a.pdf", "a (2).pdf"), new ArrayList<>(entries.keySet()));
+        assertEquals("inner", entries.get("证据/a.pdf"));
+        assertEquals("top", entries.get("a (2).pdf"));
+        assertEquals((long) written.get(zip.getFilePath()).length, zip.getFileSize());
+    }
+
+    @Test
+    void compressToZipRejectsFilesFromAnotherProject() {
+        ProjectFile foreign = row(30L, null, "x.pdf", false, "projects/2/x.pdf");
+        foreign.setProjectId(2L);
+        when(projectFileRepository.findById(anyLong()))
+                .thenAnswer(inv -> Optional.ofNullable(rows.get(inv.<Long>getArgument(0))));
+        assertThrows(IllegalArgumentException.class,
+                () -> projectFileService.compressToZip(PROJECT_ID, List.of(30L), 42L));
+        verify(storageService, never()).save(any(), any());
+    }
+
+    private ProjectFile row(Long id, Long parentId, String name, boolean folder, String path) {
+        ProjectFile f = new ProjectFile();
+        f.setId(id);
+        f.setProjectId(PROJECT_ID);
+        f.setParentId(parentId);
+        f.setIsFolder(folder);
+        f.setName(name);
+        f.setFilePath(path);
+        rows.put(id, f);
+        return f;
+    }
+
+    @Test
     void extractZipWithImplodedEntryDecodesContent() throws Exception {
         // 老 PKZIP 的 Implode(方法 6) 条目：解码走 commons-compress 的 BinaryTree，
         // 其内部调用 commons-lang3 的 ArrayFill(3.14 才有)。Spring Boot BOM 若把

@@ -1522,6 +1522,14 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - 前端 `FileTree.vue` 与 `utils/fileTreePdfActions.js`：单选可转 PDF 文件（`doc/docx/ppt/pptx/xls/xlsx` 及图片）右键菜单显示「转为 PDF」；多选（含已有 `pdf`）2 个及以上文件时右键菜单显示「合并为 PDF」。
 - 后端 `ProjectFileController`（`POST /api/projects/{projectId}/files/{fileId}/convert-pdf`、`POST /api/projects/{projectId}/files/batch/merge-pdf`）与 `ProjectFilePdfService`：Office 文档优先调本机 LibreOffice，不可用时走内置 POI + PDFBox 中文字体渲染兜底，在原目录生成同名（自动递增序号）PDF 并刷新文件树。回归：`ProjectFilePdfServiceTest`、`fileTreePdfActions.test.mjs`。
 
+## 资源管理器右键：打印 / 移动到… / 压缩为 ZIP / 解压到此处（2026-11-10）
+
+- 判定在 `frontend/src/utils/fileTreeExtraActions.js`：「打印…」单选、扩展名同可合并 PDF 集合（PDF/Office/图片）；「解压到此处」单选 zip/7z/rar 且非只读；「移动到…」「压缩为 ZIP」单选多选都给（文件夹连子孙勾着时只算文件夹，同 `contextTargetItems`）；回收站一律不给。
+- 打印：`GET /api/projects/{p}/files/{id}/print-pdf`（只读权限、`@CloudMeteredDownload`、不落新文件，`ProjectFilePdfService.renderPrintablePdf`）→ `printPdfBlob` 把 Blob 放进隐藏 iframe 调 `contentWindow.print()`，走 Chromium 内置 PDF 引擎。
+- 移动到…：复用批量选择的「选择文件夹」弹窗；对象存在 `contextActionIds`，`executeBatchAction` 优先用它、用完清空，`openBatchAction` 也会清，避免和勾选串味。
+- 压缩：`POST /api/projects/{p}/files/batch/zip`（写权限）→ `ProjectFileService.compressToZip`，先写临时文件再流进存储，条目数/总量沿用解压护栏（5000 条、1GB）；同一 zip 内重名条目加「 (2)」。解压复用既有 `archive/extract`。
+- 回归：`ProjectFileServiceArchiveTest`（compressToZip*）、`frontend/tests/project-home/file-tree-extra-menu.test.mjs`。
+
 ## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
 
 `FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
