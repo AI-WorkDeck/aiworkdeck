@@ -1,0 +1,212 @@
+{
+  "_comment": "tasks-10（agent-tier1-gap P6）：10 个 ≥3 步的律师任务，只按结果判分（不设 firstToolAnyOf / mustUse），每题有 maxRounds。task=true 的句子在报告里单列「多步任务」表。t10 用 followUps 脚本化第二轮（回答确认卡「执行」）。设计与基线见 README。",
+  "sentences": [
+    {
+      "id": "t01-four-step-explicit",
+      "text": "先把第三条里的「日内验收」改成「日内完成验收并出具书面验收单」，再在第四条上加一条批注「违约金比例需与客户确认」，然后接受所有修订，最后导出PDF",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "_note": "s17 改写成明确措辞（gap P6-1）：合同.docx 无残留 <w:ins>/<w:del>（含自己的修改都已接受），第三条含新措辞且 15 日已接受，第四条挂着批注且批注正文含「客户确认」，项目里有 PDF 且 PDF 正文含新措辞（导出在修改之后）",
+        "maxRounds": 16,
+        "outcomeCheck": "const all = await ctx.files(); const host = all.find(x => !x.is_deleted && !x.is_folder && x.name === '合同.docx'); if (!host) return false; const buf = await ctx.bytes(host.id); const xml = ctx.docxXml(buf); const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => ({ xml: p, text: (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') })); const part = (b, n) => { try { return ctx.docxXml(b, n) } catch { return '' } }; const textOf = async id => { const r = await ctx.api('GET', '/api/files/' + id + '/text'); return String(r?.data ?? ''); }; if (/<w:(ins|del)\\b/.test(xml)) return false; const P = paras(xml); const p3 = P.find(p => /^\\s*第三条/.test(p.text)), p4 = P.find(p => /^\\s*第四条/.test(p.text)); if (!p3 || !p4) return false; if (!/出具书面验收单/.test(p3.text) || !/15\\s*日/.test(p3.text)) return false; if (!/<w:comment(RangeStart|Reference)\\b/.test(p4.xml)) return false; if (!/客户确认/.test(part(buf, 'word/comments.xml').replace(/<[^>]+>/g, ''))) return false; const pdf = all.find(x => !x.is_deleted && !x.is_folder && /\\.pdf$/i.test(x.name)); return !!pdf && /书面验收单/.test((await textOf(pdf.id)).replace(/\\s+/g, ''));"
+      },
+      "task": true
+    },
+    {
+      "id": "t02-penalty-review-comments",
+      "text": "审查第四条违约金条款：分别就「违约金比例是否过高」和「是否区分违约情形」各加一条批注",
+      "hostState": "docx:contract",
+      "expect": {
+        "_note": "gap P6-2：第四条段落里锚定了至少 2 条不同的批注（commentRangeStart/commentReference 的 w:id 去重）",
+        "maxRounds": 12,
+        "outcomeCheck": "const all = await ctx.files(); const host = all.find(x => !x.is_deleted && !x.is_folder && x.name === '合同.docx'); if (!host) return false; const buf = await ctx.bytes(host.id); const xml = ctx.docxXml(buf); const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => ({ xml: p, text: (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') })); const p4 = paras(xml).find(p => /^\\s*第四条/.test(p.text)); if (!p4) return false; const ids = new Set([...p4.xml.matchAll(/<w:comment(?:RangeStart|Reference)\\b[^>]*\\bw:id=\"(\\d+)\"/g)].map(m => m[1])); return ids.size >= 2;"
+      },
+      "task": true
+    },
+    {
+      "id": "t03-compare-to-memo",
+      "text": "比对「股权转让协议v1.docx」和「股权转让协议v2.docx」，把实质性差异整理成一份新的Word文档「差异说明.docx」",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "股权转让协议v1.docx",
+            "fixture": "compare-v1.docx"
+          },
+          {
+            "name": "股权转让协议v2.docx",
+            "fixture": "compare-v2.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "gap P6-3：新 docx（名含「差异说明」）存在，正文点出三处已知差异（付款 10→15 日、违约金 10%→20%、新增保密条款）；两份原件仍在",
+        "maxRounds": 10,
+        "outcomeCheck": "const all = await ctx.files(); const live = all.filter(x => !x.is_deleted); const textOf = async id => { const r = await ctx.api('GET', '/api/files/' + id + '/text'); return String(r?.data ?? ''); }; if (!live.some(x => x.name === '股权转让协议v1.docx') || !live.some(x => x.name === '股权转让协议v2.docx')) return false; for (const m of live.filter(x => !x.is_folder && /差异说明.*\\.docx$/i.test(x.name))) { const t = (await textOf(m.id)).replace(/\\s+/g, ''); if (/15日/.test(t) && /20%/.test(t) && /保密/.test(t)) return true; } return false;"
+      },
+      "task": true
+    },
+    {
+      "id": "t04-penalty-table",
+      "text": "读一下「附件」文件夹里的三份合同，做一张违约金条款对比表（合同、相对方、违约金标准），存成Word文档「违约金对比表.docx」",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "附件"
+        ],
+        "files": [
+          {
+            "name": "设备采购合同-华东.docx",
+            "fixture": "penalty-east.docx",
+            "folder": "附件"
+          },
+          {
+            "name": "软件服务合同-华南.docx",
+            "fixture": "penalty-south.docx",
+            "folder": "附件"
+          },
+          {
+            "name": "厂房租赁合同-华北.docx",
+            "fixture": "penalty-north.docx",
+            "folder": "附件"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "gap P6-4：新 docx（名含「违约金对比表」）里有表格，三份合同各占一行（或一列：基线里 deepseek 做过合同作列的转置汇总表）且值正确：华东 0.5%/日（上限 10%）、华南 20%、华北 每日万分之五",
+        "maxRounds": 12,
+        "outcomeCheck": "const all = await ctx.files(); const live = all.filter(x => !x.is_deleted); const tx = x => (x.match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('').replace(/\\s+/g, ''); for (const m of live.filter(x => !x.is_folder && /违约金对比表.*\\.docx$/i.test(x.name))) { const xml = ctx.docxXml(await ctx.bytes(m.id)); const lines = []; for (const tb of xml.match(/<w:tbl>[\\s\\S]*?<\\/w:tbl>/g) || []) { const grid = (tb.match(/<w:tr[ >][\\s\\S]*?<\\/w:tr>/g) || []).map(r => (r.match(/<w:tc[ >][\\s\\S]*?<\\/w:tc>/g) || []).map(tx)); lines.push(...grid.map(r => r.join('|'))); const w = Math.max(0, ...grid.map(r => r.length)); for (let c = 0; c < w; c++) lines.push(grid.map(r => r[c] || '').join('|')); } const has = (k, v) => lines.some(t => k.test(t) && v.test(t)); if (has(/华东/, /0\\.5%|千分之五/) && has(/华南/, /20%|百分之二十/) && has(/华北/, /万分之五|0\\.05%/)) return true; } return false;"
+      },
+      "task": true
+    },
+    {
+      "id": "t05-appeal-deadline-reminder",
+      "text": "一审民事判决书2026年11月2日送达我方。算一下上诉期届满日，在本项目建一个「提交上诉状」的待办，截止日设为届满日",
+      "hostState": "nofile",
+      "expect": {
+        "_note": "gap P6-5：民事判决上诉期 15 日、送达次日起算，届满 2026-11-17；库里本项目有标题含「上诉」、due_date=2026-11-17 的事项，回复里也给出该日期",
+        "maxRounds": 8,
+        "outcomeCheck": "const t = await ctx.tasks(); return t.some(x => String(x.due_date).slice(0, 10) === '2026-11-17' && /上诉/.test(x.title)) && /11月17|2026-11-17|11\\/17/.test(ctx.finalText);"
+      },
+      "task": true
+    },
+    {
+      "id": "t06-organise-six-files",
+      "text": "把根目录这6个文件分好类：起诉状和代理词放「01 诉讼文书」，证据目录和两份证据放「02 证据」，会议纪要放「03 其他」",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "起诉状.docx",
+            "fixture": "contract-draft.docx"
+          },
+          {
+            "name": "代理词.docx",
+            "fixture": "opinion.docx"
+          },
+          {
+            "name": "证据目录.docx",
+            "fixture": "plain-notes.docx"
+          },
+          {
+            "name": "证据1-买卖合同.docx",
+            "fixture": "contract.docx"
+          },
+          {
+            "name": "证据2-沟通记录.docx",
+            "fixture": "mention-zhangsan.docx"
+          },
+          {
+            "name": "会议纪要.docx",
+            "fixture": "plain-notes.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "gap P6-6：6 个文件都在指定文件夹且没被删；且 move_files 最多调用 3 次（逐个搬 6 个文件至少 6 次；工具说明要求整理文件夹一次调完）。不用 ctx.calls 数每批项数：DeepSeek 常以泄露的 </｜DSML｜…> 收尾 XML 调用，调用照常执行但日志参数解析不到（基线实测 2 次误判）",
+        "maxRounds": 8,
+        "outcomeCheck": "const all = await ctx.files(); const live = all.filter(x => !x.is_deleted); const dir = n => live.find(x => x.is_folder && x.name.trim() === n); const want = { '01 诉讼文书': ['起诉状.docx', '代理词.docx'], '02 证据': ['证据目录.docx', '证据1-买卖合同.docx', '证据2-沟通记录.docx'], '03 其他': ['会议纪要.docx'] }; for (const [d, names] of Object.entries(want)) { const f = dir(d); if (!f) return false; for (const n of names) { const x = live.find(y => !y.is_folder && y.name === n); if (!x || x.parent_id !== f.id) return false; } } return ctx.tools.filter(t => t === 'move_files').length <= 3;"
+      },
+      "task": true
+    },
+    {
+      "id": "t07-rename-format-export",
+      "text": "把乙方名称改成「样例智能装备股份有限公司」，再统一成律所格式，最后导出PDF",
+      "hostState": "docx:contract",
+      "expect": {
+        "_note": "gap P6-7：合同.docx（去掉删除修订后）只剩新名称、带律所格式痕迹（楷体或首行缩进，夹具里两者都没有）；PDF 存在且正文含新名称里新增的「装备股份有限公司」（= 导出发生在修改之后；显示中的删除修订也会印进 PDF，所以不要求整串连续）",
+        "maxRounds": 14,
+        "outcomeCheck": "const all = await ctx.files(); const host = all.find(x => !x.is_deleted && !x.is_folder && x.name === '合同.docx'); if (!host) return false; const buf = await ctx.bytes(host.id); const xml = ctx.docxXml(buf); const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => ({ xml: p, text: (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') })); const part = (b, n) => { try { return ctx.docxXml(b, n) } catch { return '' } }; const textOf = async id => { const r = await ctx.api('GET', '/api/files/' + id + '/text'); return String(r?.data ?? ''); }; const body = paras(xml).map(p => p.text).join('\\n'); if (!/样例智能装备股份有限公司/.test(body) || /样例智能设备有限公司/.test(body)) return false; if (!/楷体|w:firstLine(Chars)?=\"[1-9]/.test(xml + part(buf, 'word/styles.xml'))) return false; const pdf = all.find(x => !x.is_deleted && !x.is_folder && /\\.pdf$/i.test(x.name)); return !!pdf && /装备股份有限公司/.test((await textOf(pdf.id)).replace(/\\s+/g, ''));"
+      },
+      "task": true
+    },
+    {
+      "id": "t08-reject-one-accept-rest",
+      "text": "第三条验收期限的修改（7日改15日）不接受，恢复为7日；其他修订全部接受",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "_note": "gap P6-8：合同.docx 无残留修订；第三条是「7 日」不是「15 日」；第四条已接受插入的「20%」",
+        "maxRounds": 12,
+        "outcomeCheck": "const all = await ctx.files(); const host = all.find(x => !x.is_deleted && !x.is_folder && x.name === '合同.docx'); if (!host) return false; const buf = await ctx.bytes(host.id); const xml = ctx.docxXml(buf); const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => ({ xml: p, text: (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') })); if (/<w:(ins|del)\\b/.test(xml)) return false; const P = paras(xml); const p3 = P.find(p => /^\\s*第三条/.test(p.text)), p4 = P.find(p => /^\\s*第四条/.test(p.text)); return !!(p3 && p4) && /后\\s*7\\s*日/.test(p3.text) && !/15/.test(p3.text) && /20\\s*%/.test(p4.text);"
+      },
+      "task": true
+    },
+    {
+      "id": "t09-citations-source-down",
+      "text": "帮我核对意见书.docx里引用的法条是否准确，逐条给结论",
+      "hostState": "nofile",
+      "seed": {
+        "files": [
+          {
+            "name": "意见书.docx",
+            "fixture": "opinion.docx"
+          }
+        ]
+      },
+      "expect": {
+        "_note": "gap P6-9：矩阵实例没有法宝凭证：法规工具照常下发，但每次调用都回 [pkulaw_unavailable]（MCP server has no credential → LegalTools.vendorUnavailable，与 gate-35 g04 同一前提）= 真实的法源不可用路径。回复要点出第 1082 条引错，并告诉用户结论没有经过法源核实（待核实/建议复核/说明法宝不可用都算；基线里模型用过这几种说法）；最多 6 轮；意见书不被改动",
+        "maxRounds": 6,
+        "outcomeCheck": "const f = (await ctx.files()).find(x => !x.is_deleted && x.name === '意见书.docx'); if (!f || ctx.sha256(await ctx.bytes(f.id)) !== ctx.fixtureSha256('opinion.docx')) return false; return /1082|一千零八十二/.test(ctx.finalText) && /待核实|未核实|无法核实|未能核实|需核实|需要核实|有待核实|建议核实|请核实|未经核实|核验|复核|最终确认|(法宝|法规库|法规数据库|数据库|检索|法源).{0,12}(不可用|无法使用|无法访问|未能)/.test(ctx.finalText);"
+      },
+      "task": true
+    },
+    {
+      "id": "t10-two-turn-delete-confirm",
+      "text": "把「旧稿」文件夹整个删掉，然后新建「定稿」文件夹，把合同.docx移进去",
+      "hostState": "nofile",
+      "seed": {
+        "folders": [
+          "旧稿"
+        ],
+        "files": [
+          {
+            "name": "合同草稿.docx",
+            "fixture": "contract-draft.docx",
+            "folder": "旧稿"
+          },
+          {
+            "name": "合同.docx",
+            "fixture": "contract.docx"
+          }
+        ]
+      },
+      "followUps": [
+        {
+          "whenStatus": "awaiting_input",
+          "text": "执行"
+        },
+        {
+          "whenStatus": "awaiting_input",
+          "text": "执行"
+        }
+      ],
+      "expect": {
+        "_note": "gap P6-10 两轮确认：删除走确认卡停在 awaiting_input，脚本回答「执行」后同一会话继续；最终 finished，旧稿已进回收站，定稿里有合同.docx 且未被删",
+        "status": "finished",
+        "maxRounds": 12,
+        "outcomeCheck": "const all = await ctx.files(); const old = all.find(x => x.is_folder && x.name === '旧稿'); const dir = all.find(x => x.is_folder && !x.is_deleted && x.name.trim() === '定稿'); const c = all.find(x => !x.is_folder && !x.is_deleted && x.name === '合同.docx'); return !!(old && old.is_deleted && dir && c && c.parent_id === dir.id);"
+      },
+      "task": true
+    }
+  ]
+}
