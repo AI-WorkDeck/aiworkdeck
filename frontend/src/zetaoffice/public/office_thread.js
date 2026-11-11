@@ -925,6 +925,14 @@ function insertNewParagraph(p) {
       if (idx > 0) out.previousParagraph = { index: idx - 1, text: clip(ix.ranges[idx - 1].getString()) };
       if (idx + lines < ix.total) out.nextParagraph = { index: idx + lines, text: clip(ix.ranges[idx + lines].getString()) };
     });
+    // 新段落自己的锚点：评测实录（g19 / v01）里模型插完新条款，接着拿插入时用的旧锚点去改「新条款」，
+    // 实际改到原段落，再 undo / 重来。回执直接给出覆盖新段落的锚点，后续改新条款就用它。
+    try {
+      out.newParagraphAnchor = anchorBookmark(block);
+      out.anchorNote = p.anchor
+        ? '后续修改新段落请用 newParagraphAnchor；' + p.anchor + ' 仍指向原来的文字 / Use newParagraphAnchor for further edits to the new paragraph; ' + p.anchor + ' still points at the original text'
+        : '后续修改新段落请用 newParagraphAnchor / Use newParagraphAnchor for further edits to the new paragraph';
+    } catch (e) { /* 别的 story 里建书签失败：回执照旧，不影响插入本身 */ }
     return out;
   } finally { if (um) { try { um.leaveUndoContext(); } catch (e) {} } }
 }

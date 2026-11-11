@@ -139,6 +139,11 @@ try {
     check('before：沿用相邻段样式（Heading 2）', p1[i1]?.style === 'Heading 2', JSON.stringify(p1[i1]))
     check('before：回执的段号与相邻段落与回读一致', r1.newParagraphIndex === i1 && r1.previousParagraph?.text === '第一条 甲。'
       && r1.nextParagraph?.text === '第二条 乙方义务。' && r1.newParagraphText === '第二条 保密：双方负有保密义务。', JSON.stringify(r1))
+    {
+      const sel = await exec('set_selection', { anchor: r1.newParagraphAnchor })
+      check('before：newParagraphAnchor 覆盖新段落（原锚点不变）', typeof r1.newParagraphAnchor === 'string' && r1.newParagraphAnchor !== a
+        && sel?.success !== false && JSON.stringify(sel).includes('第二条 保密'), JSON.stringify({ r1: r1.newParagraphAnchor, sel }))
+    }
     const revs = (await exec('list_revisions', { __agent: true })).revisions || []
     check('before：修订开着时落成插入修订', revBefore === 0 && revs.some((r) => r.type === 'Insert' && r.text.includes('保密')),
       revBefore + ' -> ' + JSON.stringify(revs.map((r) => [r.type, r.text])))
