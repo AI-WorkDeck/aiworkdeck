@@ -231,11 +231,16 @@ def outside_anchor_echo(anchor_text, before, after, new_text):
     return best.strip() or None
 
 
-def echo_edit_error(anchor_text, echo):
+def echo_edit_error(anchor_text, echo, paragraph=''):
     clip = lambda text: text[:30] + '…' if len(text) > 30 else text
+    para = paragraph.strip()
+    if para and len(para) <= 120 and '"' not in para:
+        how = ('要改写或删除这一整段：先 doc_find_text(keyword="' + para + '") 取覆盖整段的 anchorId，'
+               + '再一次替换（删除传 newText=""），不要逐句拆开删。')
+    else:
+        how = '要改写或删除整句/整段，先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。'
     return ('未执行编辑：newText 里的「' + clip(echo) + '」在锚点之外本来就有，锚点只覆盖「' + clip(anchor_text)
-            + '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；要改写或删除整句/整段，'
-            + '先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。')
+            + '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；' + how)
 
 
 def insert_text(cursor, text):
@@ -347,7 +352,9 @@ class NativeDocumentEdits:
             if action == 'replace_at_position':
                 echo = outside_anchor_echo(old, prefix[-200:], suffix[:200], new)
                 if echo:
-                    raise ValueError(echo_edit_error(old, echo))
+                    paragraph = (re.split(r'[\r\n]', prefix)[-1] + old + re.split(r'[\r\n]', suffix)[0]
+                                 if not re.search(r'[\r\n]', old) else '')
+                    raise ValueError(echo_edit_error(old, echo, paragraph))
             force_tracking = action in ('replace_at_position', 'modify_paragraph')
             recording = model.getPropertyValue('RecordChanges')
             if type(recording) is not bool:

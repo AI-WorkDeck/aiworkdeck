@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import vm from 'node:vm'
 import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../../src/zetaoffice/public/office_thread.js', import.meta.url), 'utf8')
-function setup(initial = '30日', around = { before: '', after: '' }) {
+function setup(initial = '30日', around = { before: '', after: '' }, paragraph = null) {
   let text = initial, selected = true, writes = 0
   const bookmarks = new Map()
   const range = { getString: () => text, getText: () => story }
@@ -16,7 +16,7 @@ function setup(initial = '30日', around = { before: '', after: '' }) {
       getBookmarks: () => ({ hasByName: n => bookmarks.has(n), getByName: n => bookmarks.get(n), getElementNames: () => [...bookmarks.keys()] }),
       getText: () => story, setPropertyValue() {},
     }, selectVisibly: () => selected, contextAround: () => around,
-    paragraphTextOf: () => text, applyMinimalRedline: (_, value) => { writes++; text = value; return true },
+    paragraphTextOf: () => paragraph ?? text, applyMinimalRedline: (_, value) => { writes++; text = value; return true },
   })
   vm.runInContext(source.slice(source.indexOf('const ANCHOR_PREFIX'), source.indexOf('// ---- EvidenceLink')), realm)
   const methods = vm.runInContext('({' + source.slice(source.indexOf('  set_selection(p) {'), source.indexOf('  // [verified-extend] insert a paragraph break')) + '})', realm)
@@ -103,4 +103,16 @@ test('multi-paragraph newText that re-types the neighbouring paragraph is reject
   assert.equal(result.success, false)
   assert.match(result.message, /随附文件/)
   assert.equal(s.writes(), 0)
+})
+// 复测：被退回后模型按句拆删多花 3–5 轮。段落不长时退回信息直接给整段查找词
+test('echo rejection hands over the whole-paragraph keyword when the paragraph is short', () => {
+  const para = '第三条 交付：甲方应在收到货物后 7 日内验收，甲方逾期验收视为合格；甲方不得无故拒收。'
+  const s = setup('第三条 交付', { before: '执行。\n', after: para.slice(6) + '\n第四条' }, para)
+  const result = s.methods.replace_at_position({ anchor: s.anchor, newText: para })
+  assert.equal(result.success, false)
+  assert.ok(result.message.includes('doc_find_text(keyword="' + para + '")'), result.message)
+  const long = setup('第三条 交付', { before: '', after: para.slice(6) }, para + '甲'.repeat(120))
+  const generic = long.methods.replace_at_position({ anchor: long.anchor, newText: para }).message
+  assert.ok(!generic.includes('keyword='), generic)
+  assert.match(generic, /查完整原句\/原段/)
 })

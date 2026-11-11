@@ -193,10 +193,16 @@ function outsideAnchorEcho(anchorText, before, after, newText) {
   }
   return best ? best.trim() : null;
 }
-function echoEditError(anchorText, echo) {
+// paragraph（锚点所在段全文）不长时直接给出整段查找词：复测里模型被退回后按句拆删，
+// 多花 3–5 轮（g16 2026-11-11 第二轮复测）
+function echoEditError(anchorText, echo, paragraph) {
   const clip = s => (s.length > 30 ? s.slice(0, 30) + '…' : s);
+  const para = String(paragraph || '').trim();
+  const how = para && para.length <= 120 && para.indexOf('"') < 0
+    ? '要改写或删除这一整段：先 doc_find_text(keyword="' + para + '") 取覆盖整段的 anchorId，再一次替换（删除传 newText=""），不要逐句拆开删。'
+    : '要改写或删除整句/整段，先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。';
   return '未执行编辑：newText 里的「' + clip(echo) + '」在锚点之外本来就有，锚点只覆盖「' + clip(String(anchorText)) +
-    '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；要改写或删除整句/整段，先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。';
+    '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；' + how;
 }
 // ---- EvidenceLink 书签原语 helpers（dev-board#103）-----------------------------
 function bmFail(msg) { return { success: false, error: msg, message: msg }; }
@@ -5688,7 +5694,7 @@ const EXEC = {
     const around = String(p.anchor).startsWith(ANCHOR_PREFIX) ? contextAround(range, 200) : null;
     const echo = around && outsideAnchorEcho(range.getString(), around.before, around.after, p.newText);
     if (echo) {
-      const echoError = echoEditError(range.getString(), echo);
+      const echoError = echoEditError(range.getString(), echo, paragraphTextOf(range));
       return { success: false, error: echoError, message: echoError };
     }
     if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };

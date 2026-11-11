@@ -45,6 +45,9 @@ class EditContracts(unittest.TestCase):
         self.assertTrue(edit.outside_anchor_echo('第三条 交付。', '执行。\n', '\n第四条 随附文件：乙方交货时应随附合格证。',
                                                  '第三条 交付。\n第四条 随附文件：乙方交货时应随附合格证。'))
         self.assertIn('锚点只覆盖「第三条」', edit.echo_edit_error('第三条', '交付：甲方'))
+        self.assertIn('doc_find_text(keyword="第三条 交付：甲方验收。")',
+                      edit.echo_edit_error('第三条', '交付：甲方', ' 第三条 交付：甲方验收。'))
+        self.assertNotIn('keyword=', edit.echo_edit_error('第三条', '交付：甲方', '甲' * 121))
 
     def test_readonly_rejects_before_model_identity_or_author_access(self):
         commands = edit.NativeDocumentEdits(document.NativeDocumentCommands())
