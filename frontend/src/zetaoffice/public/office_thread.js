@@ -5681,8 +5681,9 @@ const EXEC = {
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
     const anchorError = anchorEditError(p.anchor, range);
     if (anchorError) return { success: false, error: anchorError, message: anchorError };
-    const around = contextAround(range, 200);
-    const echo = outsideAnchorEcho(range.getString(), around.before, around.after, p.newText);
+    // 只管 AI 锚点（与 anchorEditError 同口径）；插件自己的书签替换不受影响
+    const around = String(p.anchor).startsWith(ANCHOR_PREFIX) ? contextAround(range, 200) : null;
+    const echo = around && outsideAnchorEcho(range.getString(), around.before, around.after, p.newText);
     if (echo) {
       const echoError = echoEditError(range.getString(), echo);
       return { success: false, error: echoError, message: echoError };

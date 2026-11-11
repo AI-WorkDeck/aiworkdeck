@@ -199,6 +199,41 @@ def story_snapshot(range):
     return text, prefix, old, suffix
 
 
+ECHO_MIN_CHARS = 6
+
+
+def outside_anchor_echo(anchor_text, before, after, new_text):
+    """与 LOWA worker 的 outsideAnchorEcho 同口径（eval 2026-11-11 g16/s01）：newText 里有至少
+    6 个非空白字的片段在同段锚点前后原样出现、却不在锚点原文里 = 模型把锚点外的原文也写进来了，
+    替换后这段文字会重复。返回该片段，否则 None。"""
+    if len(''.join(new_text.split())) < ECHO_MIN_CHARS:
+        return None
+    sides = [re.split(r'[\r\n]', before)[-1], re.split(r'[\r\n]', after)[0]]
+    best = ''
+    for side in sides:
+        prev = [0] * (len(side) + 1)
+        for i in range(1, len(new_text) + 1):
+            cur = [0] * (len(side) + 1)
+            for j in range(1, len(side) + 1):
+                if new_text[i - 1] != side[j - 1]:
+                    continue
+                length = cur[j] = prev[j - 1] + 1
+                if length <= len(best):
+                    continue
+                sub = new_text[i - length:i]
+                if len(''.join(sub.split())) >= ECHO_MIN_CHARS and sub not in anchor_text:
+                    best = sub
+            prev = cur
+    return best.strip() or None
+
+
+def echo_edit_error(anchor_text, echo):
+    clip = lambda text: text[:30] + '…' if len(text) > 30 else text
+    return ('未执行编辑：newText 里的「' + clip(echo) + '」在锚点之外本来就有，锚点只覆盖「' + clip(anchor_text)
+            + '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；要改写或删除整句/整段，'
+            + '先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。')
+
+
 def insert_text(cursor, text):
     story = cursor.getText()
     for index, part in enumerate(text.split('\n')):
@@ -305,6 +340,10 @@ class NativeDocumentEdits:
                 if action == 'insert_at_cursor' and not params.get('replaceSelection', False):
                     target.collapseToEnd()
             story, prefix, old, suffix = story_snapshot(target)
+            if action == 'replace_at_position':
+                echo = outside_anchor_echo(old, prefix[-200:], suffix[:200], new)
+                if echo:
+                    raise ValueError(echo_edit_error(old, echo))
             force_tracking = action in ('replace_at_position', 'modify_paragraph')
             recording = model.getPropertyValue('RecordChanges')
             if type(recording) is not bool:

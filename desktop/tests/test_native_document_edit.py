@@ -26,6 +26,23 @@ class EditContracts(unittest.TestCase):
         self.assertEqual(edit.ACTIONS, {'replace_at_position', 'replace_selection', 'insert_at_cursor',
                                         'modify_paragraph', 'collapse_selection', 'apply_review_edit'})
 
+    def test_anchor_echo_matches_lowa_worker(self):
+        # eval 2026-11-11 g16：锚点「第三条」、newText 整段 → 拒绝；普通替换、整段删除、只改数字 → 放行
+        after = ' 交付：甲方应在收到货物后 7 日内验收，甲方逾期验收视为合格；甲方不得无故拒收。\n第四条'
+        self.assertTrue(edit.outside_anchor_echo('第三条', '执行。\n', after,
+                                                 '第三条 交付：甲方应在收到货物后 7 日内验收，甲方逾期验收视为合格；甲方不得无故拒收。'))
+        self.assertTrue(edit.outside_anchor_echo('7 日内验收', '第三条 交付：甲方应在收到货物后 ', '，甲方逾期',
+                                                 '甲方应在收到货物后 10 日内验收'))
+        self.assertIsNone(edit.outside_anchor_echo('30 日', '发票后 ', '内支付全部货款。\n第三条', '45 日'))
+        self.assertIsNone(edit.outside_anchor_echo('第三条 交付：甲方应在收到货物后 7 日内验收。', '执行。\n',
+                                                   '\n第四条 违约金：任一方违约，应按合同总价的 50%', ''))
+        self.assertIsNone(edit.outside_anchor_echo('每逾期一日按合同总价的 0.1%', '乙方逾期交货的，',
+                                                   '向甲方支付违约金；逾期超过 10 日的，按合同总价的 0.2%',
+                                                   '每逾期一日按合同总价的 0.05%'))
+        self.assertIsNone(edit.outside_anchor_echo('第三条', '', '\n第四条 违约金：任一方违约，应按合同总价的 50%',
+                                                   '第三条 违约金：任一方违约，应按合同总价的 50%'))
+        self.assertIn('锚点只覆盖「第三条」', edit.echo_edit_error('第三条', '交付：甲方'))
+
     def test_readonly_rejects_before_model_identity_or_author_access(self):
         commands = edit.NativeDocumentEdits(document.NativeDocumentCommands())
         for action in edit.ACTIONS - {'collapse_selection'}:
