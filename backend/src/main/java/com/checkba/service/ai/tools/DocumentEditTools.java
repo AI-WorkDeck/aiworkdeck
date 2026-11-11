@@ -581,11 +581,8 @@ public class DocumentEditTools implements AgentToolComponent {
                 java.util.Map<String, Object> params = new java.util.HashMap<>();
                 params.put("text", text);
                 params.put("newParagraph", to);
-                if (anchorId == null || anchorId.isBlank()) {
-                    return editorBridgeService.executeEditorCommand("insert_at_cursor", params);
-                }
-                params.put("anchor", anchorId);
-                return withAnchorStaysNote(editorBridgeService.executeEditorCommand("insert_at_cursor", params), anchorId);
+                if (anchorId != null && !anchorId.isBlank()) params.put("anchor", anchorId);
+                return editorBridgeService.executeEditorCommand("insert_at_cursor", params);
             }
             if (anchorId != null && !anchorId.isBlank()) {
                 String to = normalizeInsertPosition(position);
@@ -615,20 +612,6 @@ public class DocumentEditTools implements AgentToolComponent {
             log.error("Failed to insert at cursor", e);
             return "Error: " + e.getMessage();
         }
-    }
-
-    /**
-     * 插入新段落后，模型曾把插入用的 anchorId 当成新段落去改：v01 把「第六条 违约责任」替换成
-     * 「第七条 不可抗力」、g19 把「第三条」替换成空，再花 5–8 轮修回（eval 2026-11-11）。
-     * 成功回执里说明锚点没跟着新段落走。
-     */
-    static String withAnchorStaysNote(String result, String anchorId) {
-        if (result == null || !result.contains("\"success\":true")) return result;
-        int end = result.lastIndexOf('}');
-        if (end < 0) return result;
-        return result.substring(0, end)
-                + ",\"anchorNote\":\"" + anchorId + " 仍指向原来的锚点文字，不是新插入的段落；"
-                + "要再改新段落或其后的条款，先 doc_find_text 取新的 anchorId。\"}";
     }
 
     /** position 归一：空 = after；认 before/after（忽略大小写与首尾空白），其余返回 null。 */
