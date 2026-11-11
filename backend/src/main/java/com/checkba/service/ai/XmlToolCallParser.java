@@ -453,6 +453,8 @@ public class XmlToolCallParser {
             ToolRegistry.RegisteredTool tool, List<String> params) {
         var names = new java.util.HashSet<>(params);
         for (String param : params) names.addAll(ToolRegistry.aliasesFor(param));
+        boolean moveFiles = "move_files".equals(ToolRegistry.TOOL_NAME_ALIASES.getOrDefault(toolName, toolName));
+        if (moveFiles) names.addAll(com.checkba.service.ai.tools.MoveFilesArgs.extraNames());
         var named = new java.util.LinkedHashMap<String, String>();
         List<String> positional = new ArrayList<>();
         String bareName = null;
@@ -487,6 +489,14 @@ public class XmlToolCallParser {
                 }
             }
             if (value != null) args.set(param, schemaArgument(tool, param, unquote(value.strip())));
+        }
+        if (moveFiles) {
+            // move_files 常见的自造参数名原样带过去，由 MoveFilesArgs.fold 在分发时折成 movesJson
+            for (var e : named.entrySet()) {
+                if (!args.containsKey(e.getKey()) && !params.contains(e.getKey())) {
+                    args.set(e.getKey(), unquote(e.getValue().strip()));
+                }
+            }
         }
         int index = 0;
         for (String param : params) {

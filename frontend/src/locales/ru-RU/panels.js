@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Перерисовка…",
   "litRestyledTo": "Переключено на {mode}",
   "litRedrawFailedFallback": "Не удалось перерисовать",
-  "litCreditText": "Движок диаграмм: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan (缪奇川) · Лицензия MIT",
+  "litCreditText": "Движок диаграмм: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan (缪奇川) · Лицензия AGPL-3.0",
   "litLayoutNumberedTimeline": "Хронология · С нумерацией",
   "litLayoutDatedTimeline": "Хронология · С датами",
   "litLayoutGantt": "Периодическая диаграмма · Гант",

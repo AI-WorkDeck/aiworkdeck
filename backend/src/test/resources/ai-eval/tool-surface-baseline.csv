@@ -12,30 +12,31 @@
 # 2026-11-11 P1（tracked-change 读法：doc_find_text / extract_file_text 描述补 ⟦⟧ 记号说明）后重测
 # 2026-11-11 P3（doc_insert_at_cursor 加 newParagraph）后重测 lowa-docx 三行
 # 2026-11-11 P7（case_search 进核心集；基础提示不再点名未下发工具）合并 P3 后重测
-lowa-docx,neutral,32,7254
-lowa-docx,typical,41,10074
-lowa-docx,worst,34,7591
-lowa-xlsx,neutral,26,6132
-lowa-xlsx,typical,52,12460
-lowa-xlsx,worst,28,6469
-lowa-pptx,neutral,27,6198
-lowa-pptx,typical,32,7930
-lowa-pptx,worst,29,6535
-lowa-nofile,neutral,23,5259
-lowa-nofile,typical,27,6788
-lowa-nofile,worst,25,5596
-office-word,neutral,28,6224
-office-word,typical,32,7753
-office-word,worst,30,6561
-office-excel,neutral,26,6059
-office-excel,typical,30,7588
-office-excel,worst,28,6396
-office-ppt,neutral,25,5816
-office-ppt,typical,29,7345
-office-ppt,worst,27,6153
-none,neutral,19,4391
-none,typical,23,5920
-none,worst,21,4728
+# 2026-11-11 write_docx 加 append 参数（同轮重写/分段写）合并 P7 后重测
+lowa-docx,neutral,32,7323
+lowa-docx,typical,41,10143
+lowa-docx,worst,34,7660
+lowa-xlsx,neutral,26,6201
+lowa-xlsx,typical,52,12529
+lowa-xlsx,worst,28,6538
+lowa-pptx,neutral,27,6267
+lowa-pptx,typical,32,7999
+lowa-pptx,worst,29,6604
+lowa-nofile,neutral,23,5328
+lowa-nofile,typical,27,6857
+lowa-nofile,worst,25,5665
+office-word,neutral,28,6293
+office-word,typical,32,7822
+office-word,worst,30,6630
+office-excel,neutral,26,6128
+office-excel,typical,30,7657
+office-excel,worst,28,6465
+office-ppt,neutral,25,5885
+office-ppt,typical,29,7414
+office-ppt,worst,27,6222
+none,neutral,19,4460
+none,typical,23,5989
+none,worst,21,4797
 ask,neutral,8,1253
 ask,typical,8,1253
 ask,worst,8,1253

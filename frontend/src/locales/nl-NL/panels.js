@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Opnieuw tekenen…",
   "litRestyledTo": "Overgeschakeld naar {mode}",
   "litRedrawFailedFallback": "Opnieuw tekenen mislukt",
-  "litCreditText": "Diagram-engine: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan · MIT-licentie",
+  "litCreditText": "Diagram-engine: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan · AGPL-3.0-licentie",
   "litLayoutNumberedTimeline": "Tijdlijn · Genummerd",
   "litLayoutDatedTimeline": "Tijdlijn · Met datums",
   "litLayoutGantt": "Periodediagram · Gantt",

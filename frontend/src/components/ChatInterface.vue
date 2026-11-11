@@ -437,6 +437,7 @@
                @answer-question="handleQuestionAnswer"
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
+               @consent-accepted="retryAfterConsent(index)"
                @stop-generation="handleAbort"
                @reading-interaction="followLatest = false"
              />
@@ -2595,6 +2596,13 @@ export default {
       // 只有对话框真开了才算数：openRollbackDialog 可能在流式中 / 定位不到时提前返回，
       // 那时把标志留成 true，下一次普通回退就会莫名其妙地自动重发。
       rollbackResend.value = showRollbackDialog.value
+    }
+
+    // 同意卡点了「同意并继续」：用户的意图就是「接着问刚才那句」，走重新生成同一条链路
+    // （截断 + 存档 + 原样重发），只是不再弹确认框——确认刚刚已经做过了
+    const retryAfterConsent = async (assistantIndex) => {
+      openRegenerateDialog(assistantIndex)
+      if (rollbackResend.value) await confirmRollback()
     }
 
     const cancelRollback = () => {
@@ -4908,6 +4916,7 @@ export default {
        rollbackLocator,
        rollbackResend,
        openRegenerateDialog,
+       retryAfterConsent,
        branchFromMessage,
        openRollbackDialog,
        cancelRollback,

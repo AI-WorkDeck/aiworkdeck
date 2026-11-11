@@ -52,6 +52,13 @@ FONT_PROFILES = {
 }
 _FONTS = dict(FONT_PROFILES["master"])
 _SVG_SRC = [""]                       # the source SVG, for resolving pattern fills
+# Title face (V7 0.9.0). Text marked data-title="1" is a Song title drawn at the
+# face's own weight (方正小标宋 has no bold; faking one made titles far too heavy).
+# When the caller knows the reader has the title face, it names it here and the
+# run is written in that face, not bold. Otherwise the run falls back to the
+# profile's serif face in bold, which is exactly what the deck looked like before
+# — so nothing changes for anyone who does not ask.
+_TITLE = [None]
 
 
 # A fixed timestamp on every ZIP entry. Otherwise the same map produces a
@@ -178,10 +185,14 @@ def parse_svg(svg):
             prims.append({"k": "text", "x": _f(a, "x") + ox, "y": _f(a, "y") + oy, "t": txt,
                           "fs": _f(a, "font-size", 13),
                           "bold": a.get("font-weight", "400") in ("600", "700", "bold"),
+                          "title": a.get("data-title") == "1",
                           "fill": _clean(a.get("fill"), "000000"),
                           "anchor": a.get("text-anchor", "start"),
                           "track": _f(a, "letter-spacing", 0.0),
-                          "family": a.get("font-family", "")})
+                          "family": a.get("font-family", ""),
+                          # 转过的字（V6 发射扇顺着辐条写的标签）：绕自己的 (x, y) 顺时针转这么多度
+                          "rot": float(rt.group(1)) if (rt := re.search(r"rotate\(\s*(-?[\d.]+)",
+                                                                        a.get("transform", ""))) else 0.0})
         elif kind == "rect":
             w, h = _f(a, "width"), _f(a, "height")
             if w <= 0 or h <= 0:
@@ -284,14 +295,18 @@ def attach_text(prims, W=None, H=None):
         a = _box(p)
         return b[0] - 1 <= a[0] and b[1] - 1 <= a[1] and a[2] <= b[2] + 1 and a[3] <= b[3] + 1
 
+    # A lone card holding only its own text also "contains everything" but is a
+    # host, not a backdrop (upstream guard: date + body lines fold into one card),
+    # so a backdrop must also enclose at least one other non-text primitive.
     backdrops = []
     for s in sorted((p for p in prims if p["k"] in ("rect", "ellipse", "poly")),
                     key=lambda p: p["w"] * p["h"], reverse=True):
-        if all(p is s or any(p is d for d in backdrops) or _inside(p, _box(s)) for p in prims):
+        rest = [p for p in prims if p is not s and not any(p is d for d in backdrops)]
+        if any(p["k"] != "text" for p in rest) and all(_inside(p, _box(s)) for p in rest):
             backdrops.append(s)
     shapes = [s for s in shapes if not any(s is d for d in backdrops)]
     for p in prims:
-        if p["k"] != "text":
+        if p["k"] != "text" or p.get("rot"):         # 转过的字不归入任何形状：自己一个文本框
             continue
         host, best = None, None
         for s in shapes:
@@ -311,6 +326,52 @@ def attach_text(prims, W=None, H=None):
         if host is not None:
             host.setdefault("lines", []).append(p)
             p["used"] = True
+
+    # Second pass: a card whose caption is MIXED — a centred date over a body
+    # that the renderer set flush-left or justified (three lines and more).
+    # The first pass adopted only the centred date, so the box carried one line
+    # and centred it vertically, while the body stayed as free text boxes on
+    # their true baselines: the date landed on top of the body, in PowerPoint
+    # and in ProcessOn alike.
+    #
+    # The fix is deliberately narrow, because a wide host swallowing labels is
+    # exactly the bug the first pass was written against. A shape takes the
+    # flush-left lines only when it is plainly ONE CARD:
+    #   * it already adopted a centred caption in the first pass;
+    #   * no other shape sits inside it (a panel holding bars is not a card);
+    #   * every flush-left line inside it shares one left edge, and all of them
+    #     lie below the centred caption (date on top, body underneath);
+    #   * nothing else inside it would be left behind.
+    # Anything failing a condition keeps the old behaviour exactly.
+    def inside(t, s):
+        return (s["x"] - 1 <= t["x"] <= s["x"] + s["w"] + 1
+                and s["y"] <= t["y"] <= s["y"] + s["h"])
+
+    for s in [q for q in shapes if q.get("lines")]:
+        if any(o is not s and o["x"] >= s["x"] - 0.5 and o["y"] >= s["y"] - 0.5
+               and o["x"] + o["w"] <= s["x"] + s["w"] + 0.5
+               and o["y"] + o["h"] <= s["y"] + s["h"] + 0.5 for o in shapes):
+            continue
+        loose = [t for t in prims if t["k"] == "text" and not t.get("used") and inside(t, s)]
+        body = [t for t in loose if t["anchor"] == "start"]
+        if not body or len(body) != len(loose):
+            continue
+        if max(t["x"] for t in body) - min(t["x"] for t in body) > 0.5:
+            continue
+        if min(t["y"] for t in body) <= max(l["y"] for l in s["lines"]):
+            continue
+        # 允许「标点悬挂」：中文排版里行末的逗号、句号、引号可以探出边界一点点
+        # （common.wrap 的避头避尾就是这么排的），实测有一行探出 8px 就让整张卡片
+        # 被这条判据挡掉，日期于是又被单独居中、压回正文上（真实运行记录里的那张
+        # 《沟通函》卡片）。文本框本来就设了 wrap="none"，悬挂不会触发重新折行，
+        # 所以这里放宽到一个字的宽度；真正排不下的（超过一个字）仍旧不收。
+        if any(t["x"] + _text_w(t["t"], t["fs"], t.get("track", 0))
+               > s["x"] + s["w"] + 1 + t["fs"] for t in body):
+            continue
+        for t in body:
+            t["marl"] = t["x"] - s["x"]
+            t["used"] = True
+        s["lines"] = sorted(s["lines"] + body, key=lambda l: l["y"])
     return prims
 
 
@@ -331,8 +392,9 @@ def _run(t):
     # the engineered texture that is half of what defines the mode.
     spc = int(round(float(t.get("track", 0) or 0) * PT_PER_PX * 100))
     spc_attr = f' spc="{spc}"' if spc else ""
+    bold = t["bold"] or (t.get("title") and not _TITLE[0])
     return (f'<a:r><a:rPr lang="zh-CN" altLang="en-US" sz="{sz}"{spc_attr} '
-            f'b="{1 if t["bold"] else 0}" dirty="0">{_solid(t["fill"])}{fam}</a:rPr>'
+            f'b="{1 if bold else 0}" dirty="0">{_solid(t["fill"])}{fam}</a:rPr>'
             f'<a:t>{escape(t["t"])}</a:t></a:r>')
 
 
@@ -342,6 +404,8 @@ def _face(p):
     "sans-serif" CONTAINS "serif" — testing for the latter first mapped every
     body stack ('PingFang SC', …, sans-serif) and 歸藏风's sans title onto the
     Song face. Sans is therefore tested FIRST."""
+    if p.get("title") and _TITLE[0]:
+        return _TITLE[0]
     low = p.get("family", "").lower()
     if "mono" in low:
         return _FONTS["mono"]
@@ -379,8 +443,14 @@ def _txbody(lines, align="ctr", anchor="ctr"):
     if not lines:
         return '<p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>'
     spc = _lnspc(lines)
+    def ppr(l):
+        # A flush-left body line inside a card keeps its own left edge; every
+        # other line keeps the box's alignment, byte-for-byte as before.
+        if l.get("marl") is not None:
+            return f'<a:pPr marL="{_emu(l["marl"])}" indent="0" algn="l">'
+        return f'<a:pPr algn="{align}">'
     paras = "".join(
-        f'<a:p><a:pPr algn="{align}">{spc}</a:pPr>{_run({**l, "face": _face(l)})}</a:p>'
+        f'<a:p>{ppr(l)}{spc}</a:pPr>{_run({**l, "face": _face(l)})}</a:p>'
         for l in lines)
     return ('<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" '
             f'anchor="{anchor}"><a:noAutofit/></a:bodyPr>'
@@ -532,8 +602,17 @@ def _connector(sid, p):
 
 def _text_w(s, fs, track=0.0):
     """Same metric the renderers wrap with (CJK ≈ 1 em, latin ≈ 0.56 em), plus
-    any tracking, which 歸藏风 applies to Latin runs."""
-    return sum(fs if ord(c) > 0x2E7F else fs * 0.56 for c in s) + track * max(0, len(s) - 1)
+    any tracking, which 歸藏风 applies to Latin runs.
+
+    Accumulated char by char, left to right — NOT with sum(). From Python 3.12
+    sum() does compensated summation on floats, so the same label could land
+    1 EMU apart on 3.11 and 3.12+ whenever the width sits on a rounding
+    boundary (found by V6 0.10.0: one text box in the converge example). The
+    plain loop gives the 3.11 answer on every version."""
+    w = 0.0
+    for c in s:
+        w += fs if ord(c) > 0x2E7F else fs * 0.56
+    return w + track * max(0, len(s) - 1)
 
 
 def _textbox(sid, p, W):
@@ -549,9 +628,17 @@ def _textbox(sid, p, W):
     # and makes "is it on the slide?" impossible to answer honestly.
     h = fs * 1.05
     y = p["y"] - fs * 0.88
+    rot = ""
+    if p.get("rot"):
+        # SVG 绕基线上的锚点转；PowerPoint 绕文本框中心转。把中心绕锚点转过去，框放在那里再标 rot，两者重合
+        a = math.radians(p["rot"])
+        cx, cy = x + w / 2 - p["x"], y + h / 2 - p["y"]
+        x = p["x"] + cx * math.cos(a) - cy * math.sin(a) - w / 2
+        y = p["y"] + cx * math.sin(a) + cy * math.cos(a) - h / 2
+        rot = f' rot="{int(round((p["rot"] % 360) * 60000))}"'
     return (f'<p:sp><p:nvSpPr><p:cNvPr id="{sid}" name="Text {sid}"/>'
             f'<p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>'
-            f'<a:xfrm><a:off x="{_emu(x)}" y="{_emu(y)}"/>'
+            f'<a:xfrm{rot}><a:off x="{_emu(x)}" y="{_emu(y)}"/>'
             f'<a:ext cx="{max(1, _emu(w))}" cy="{max(1, _emu(h))}"/></a:xfrm>'
             f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>'
             f'{_txbody([p], align, "ctr")}</p:sp>')
@@ -661,7 +748,7 @@ def _layout():
             '</p:clrMapOvr></p:sldLayout>')
 
 
-def export(svg_path, out_path, fonts="master"):
+def export(svg_path, out_path, fonts="master", title_face=None):
     """Write the deck.
 
     `_FONTS` and `_SVG_SRC` are module-level because the font face and the
@@ -675,9 +762,10 @@ def export(svg_path, out_path, fonts="master"):
     global _FONTS
     if fonts not in FONT_PROFILES:
         raise ValueError(f"unknown font profile {fonts!r}; use one of {sorted(FONT_PROFILES)}")
-    prev_fonts, prev_src = _FONTS, _SVG_SRC[0]
+    prev_fonts, prev_src, prev_title = _FONTS, _SVG_SRC[0], _TITLE[0]
     _FONTS = dict(FONT_PROFILES[fonts])
-    svg = open(svg_path, encoding="utf-8").read()
+    _TITLE[0] = title_face
+    svg = open(svg_path, encoding="utf-8-sig").read()
     _SVG_SRC[0] = svg
     mw = re.search(r'<svg[^>]*width="([\d.]+)"[^>]*height="([\d.]+)"', svg)
     W, H = (float(mw.group(1)), float(mw.group(2))) if mw else (960.0, 720.0)
@@ -744,11 +832,27 @@ def export(svg_path, out_path, fonts="master"):
             for name, data in parts.items():
                 _zip_write(z, name, data)
     finally:
-        _FONTS, _SVG_SRC[0] = prev_fonts, prev_src
+        _FONTS, _SVG_SRC[0], _TITLE[0] = prev_fonts, prev_src, prev_title
     return out_path, len(shapes)
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    import sys
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     import sys
     p, n = export(sys.argv[1], sys.argv[2],
                   sys.argv[3] if len(sys.argv) > 3 else "master")
@@ -787,6 +891,15 @@ def audit_deck(pptx_path):
         if not off:
             continue
         x, y, cx, cy = [int(v) / EMU_PER_PX for v in off.groups()]
+        rt = re.search(r'<a:xfrm[^>]* rot="(\d+)"', sp)
+        if rt:                                   # 转过的框：按转过之后的外接矩形核是否在页内
+            a = math.radians(int(rt.group(1)) / 60000)
+            mx, my = x + cx / 2, y + cy / 2
+            ex = abs(cx / 2 * math.cos(a)) + abs(cy / 2 * math.sin(a))
+            ey = abs(cx / 2 * math.sin(a)) + abs(cy / 2 * math.cos(a))
+            x, y, bw, bh = mx - ex, my - ey, 2 * ex, 2 * ey
+        else:
+            bw, bh = cx, cy
         runs = re.findall(r'sz="(\d+)"[^>]*>.*?<a:t>(.*?)</a:t>', sp, re.S)
         for pts, txt in runs:
             fs_px = int(pts) / 100.0 / PT_PER_PX
@@ -796,6 +909,6 @@ def audit_deck(pptx_path):
                            f"(font {fs_px:.1f}px)")
             if fs_px > cy + 1:
                 bad.append(f"{txt[:16]!r} is {fs_px:.1f}px tall in a {cy:.0f}px box")
-            if x < -1 or y < -1 or x + cx > W + 1 or y + cy > H + 1:
+            if x < -1 or y < -1 or x + bw > W + 1 or y + bh > H + 1:
                 bad.append(f"{txt[:16]!r} sits off the slide")
     return bad

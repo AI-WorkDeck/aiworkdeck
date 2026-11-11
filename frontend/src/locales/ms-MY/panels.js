@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Sedang melukis semula…",
   "litRestyledTo": "Telah beralih ke {mode}",
   "litRedrawFailedFallback": "Lukis semula gagal",
-  "litCreditText": "Enjin rajah: mqc-litigation-visual-redraw · Hak Cipta (c) 2026 Miao Qichuan · Lesen MIT",
+  "litCreditText": "Enjin rajah: new-litigation-visualization · Hak Cipta (c) 2026 Miao Qichuan · Lesen AGPL-3.0",
   "litLayoutNumberedTimeline": "Garis Masa · Bernombor",
   "litLayoutDatedTimeline": "Garis Masa · Bertarikh",
   "litLayoutGantt": "Carta Tempoh · Gantt",

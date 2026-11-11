@@ -372,6 +372,8 @@ public class AgentOrchestrator {
         final StuckDetector stuck = new StuckDetector();
         // 坏轮次的隐形自纠：工具轮数提醒 + 撤销打转提醒，只提醒不暂停（gap R5 / P4，阈值见 RunBudget）
         final RunBudget budget = new RunBudget();
+        // 法源不可用收口（gap P8）：法宝回不可用标记后，网页替代查询封顶 + 收尾一次「未核实」提醒
+        final LawSourceDownPolicy lawSource = new LawSourceDownPolicy();
         // 多处修改收尾时系统代做的写后核对（gap P5），每轮最多一次，干净时对用户不可见
         final PostWriteCheck writeCheck = new PostWriteCheck();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
@@ -1335,6 +1337,18 @@ public class AgentOrchestrator {
             }
         }
 
+        // 法源不可用后的网页替代查询封顶（gap P8）：超额的不执行，回一句「按已有资料作答并标未核实」。
+        // 放在分发层而不是提示词里：deepseek 在法源不可用后连续 8–10 轮 search_web/browse_url 实测过。
+        String lawSourceBlocked = guard == null ? null : guard.lawSource.admit(toolName);
+        if (lawSourceBlocked != null) {
+            log.info("[LawSourceDown] 替代查询已用满，未执行 {}（conv={}）", toolName, conversationId);
+            ToolRegistry.ToolResult blocked = new ToolRegistry.ToolResult(
+                    lawSourceBlocked, toolRegistry.resolve(toolName).orElse(null), true);
+            // 本方法有三个出口，三个都要记
+            guard.noteToolResult(toolName, blocked.success());
+            return blocked;
+        }
+
         // 工具回写「这次展示了哪些类目」的通道（dev-board#1065，list_tools 的 query / names 用）
         java.util.Set<String> disclosedCategories = java.util.concurrent.ConcurrentHashMap.newKeySet();
         com.checkba.service.ai.tools.ToolContext ctx =
@@ -1399,6 +1413,22 @@ public class AgentOrchestrator {
                     guard.activeFileId = opened;
                 }
             } catch (Exception ignore) { /* fileId 非数字时保持原值 */ }
+        }
+
+        // 法源不可用态（gap P8）：任何工具输出带法宝不可用标记即进入；放行的替代查询附「第几次 / 须标未核实」
+        if (guard != null) {
+            guard.lawSource.noteResult(result.output());
+            String lookupNotice = guard.lawSource.lookupNotice(toolName);
+            if (lookupNotice != null) {
+                result = new ToolRegistry.ToolResult(result.output() + "\n\n" + lookupNotice,
+                        result.tool(), result.found());
+            }
+            // 额度用完：网页工具本轮余下不再下发（与法宝整体下线同一机制，下一轮生效）。实测光回拒绝说明，
+            // 模型仍会再要一两次，白烧轮次；仍硬要调用的照样被 admit 拦下。
+            if (guard.lawSource.lookupsExhausted()) {
+                java.util.Set<String> merged = new java.util.HashSet<>(guard.unusableTools);
+                if (merged.addAll(LawSourceDownPolicy.WEB_LOOKUP_TOOLS)) guard.unusableTools = merged;
+            }
         }
 
         // 本轮有没有动过文档：原生 function calling 与 XML 兜底两条工具循环都经过这里，
@@ -2807,9 +2837,10 @@ public class AgentOrchestrator {
                     guard.malformedToolRounds++;
                     log.warn("LENGTH-truncated native tool calls for {} (correction round {}), asking model to re-emit",
                             conversationId, guard.malformedToolRounds);
+                    StringBuilder truncatedNames = new StringBuilder();
+                    aiMessage.toolExecutionRequests().forEach(r -> truncatedNames.append(r.name()).append(' '));
                     messages.add(dev.langchain4j.data.message.UserMessage.from(
-                            "[系统提醒] 你上一条输出因达到单次输出长度上限被截断，其中的工具调用参数不完整、"
-                            + "没有被执行。请把动作拆小，重新、完整地输出这次工具调用；一次只做一步也可以。"));
+                            truncationCorrection(true, truncatedNames.toString())));
                     continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth + 1, executionLog, agentMode, guard);
                     return;
@@ -3243,10 +3274,9 @@ public class AgentOrchestrator {
                     guard.malformedToolRounds++;
                     log.warn("Truncated tool_code detected for {} (correction round {}), asking model to re-emit",
                             conversationId, guard.malformedToolRounds);
+                    int lastToolCode = content.lastIndexOf("<tool_code");
                     messages.add(dev.langchain4j.data.message.UserMessage.from(
-                            "[系统提醒] 你上一条输出中的标签未闭合（<tool_code> / <todo_write> / <final> 之一，内容被截断），"
-                            + "这次输出没有生效。请重新、完整地输出这一步；参数很长时先拆小，"
-                            + "或改用能直接把内容写进文档的工具。若任务其实已完成，请直接输出最终总结。"));
+                            truncationCorrection(false, lastToolCode < 0 ? content : content.substring(lastToolCode))));
                     continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth + 1, executionLog, agentMode, guard);
                     return;
@@ -3421,7 +3451,24 @@ public class AgentOrchestrator {
                 }
             }
 
-            // 3.5 写后核对（gap P5，原生与 XML 共用收尾点）：多处/结构性修改后模型没回读就收尾时，
+            // 3.5 法源不可用收尾提醒（gap P8，原生与 XML 共用的无工具收尾点）：法宝本轮不可用、回答引用了
+            // 具体条文却没标「未核实」或自称已核实 → 补一轮简短说明，每轮最多一次。已流给用户的正文并进执行日志
+            // （历史与用户实时所见一致：正文 → 补充说明），提醒本身只进模型上下文。
+            if (!summaryOnly) {
+                String lawSourceReminder = guard.lawSource.finalAnswerReminder(content);
+                if (lawSourceReminder != null) {
+                    log.warn("[LawSourceDown] final answer cites statutes without an unverified marker in {}, "
+                            + "injecting one corrective round", conversationId);
+                    appendBoundedExecutionLog(executionLog, content + "\n");
+                    guard.takeStreamSnapshot();
+                    messages.add(dev.langchain4j.data.message.UserMessage.from(lawSourceReminder));
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
+            }
+
+            // 3.6 写后核对（gap P5，原生与 XML 共用收尾点）：多处/结构性修改后模型没回读就收尾时，
             // 系统读一遍改动处做三项机械核对；干净照常收尾，有问题隐形提醒一次后续跑
             if (!summaryOnly && postWriteReminder(guard, conversationId, executionLog, content, messages)) {
                 if (guard.isCancelled()) {
@@ -4536,6 +4583,40 @@ public class AgentOrchestrator {
                                             dev.langchain4j.data.message.AiMessage aiMessage) {
         return finishReason == dev.langchain4j.model.output.FinishReason.LENGTH
                 && aiMessage != null && aiMessage.hasToolExecutionRequests();
+    }
+
+    /**
+     * 截断纠正回路回喂给模型的提醒（原生 LENGTH 截断与 XML 标签未闭合两条路）。
+     * 被截断的调用是 write_docx 时补一句精确的恢复办法：分段写、后续段落带 append=true——
+     * tasks-10 t03 里 deepseek 把整份差异说明塞进一次参数，连续两次被截断，最后一份文件都没写成；
+     * 泛泛的「拆小」它不知道 write_docx 怎么拆。
+     *
+     * @param truncatedSource 被截断的那段输出（原生：工具名；XML：最后一个 {@code <tool_code} 起的尾巴）
+     */
+    static String truncationCorrection(boolean nativeLength, String truncatedSource) {
+        String base = nativeLength
+                ? LangText.of(
+                        "[系统提醒] 你上一条输出因达到单次输出长度上限被截断，其中的工具调用参数不完整、"
+                                + "没有被执行。请把动作拆小，重新、完整地输出这次工具调用；一次只做一步也可以。",
+                        "[System reminder] Your last output hit the per-response length limit and was cut off; the tool "
+                                + "call's arguments were incomplete and it was NOT executed. Split the action into smaller "
+                                + "steps and re-emit the tool call in full; doing one step at a time is fine.")
+                : LangText.of(
+                        "[系统提醒] 你上一条输出中的标签未闭合（<tool_code> / <todo_write> / <final> 之一，内容被截断），"
+                                + "这次输出没有生效。请重新、完整地输出这一步；参数很长时先拆小，"
+                                + "或改用能直接把内容写进文档的工具。若任务其实已完成，请直接输出最终总结。",
+                        "[System reminder] A tag in your last output was left unclosed (<tool_code> / <todo_write> / "
+                                + "<final>; the content was cut off), so that output had no effect. Re-emit this step in "
+                                + "full; split long arguments first, or use a tool that writes the content into the "
+                                + "document directly. If the task is actually done, output the final summary.");
+        if (truncatedSource == null || !truncatedSource.contains("write_docx")) return base;
+        return base + LangText.of(
+                "\n被截断的是 write_docx：整篇正文一次装不下，文件没有写成。请分段写——先用 write_docx 只写开头一两节，"
+                        + "再用同一个 fileName 加 append=true 逐段续写，每次不超过约 1500 字，直到写完；不要再把整篇塞进一次调用。",
+                "\nThe truncated call was write_docx: the whole document does not fit in one call and no file was "
+                        + "written. Write it in parts: first call write_docx with only the opening section or two, then "
+                        + "call it again with the same fileName and append=true for each further part (about 1,500 "
+                        + "characters at most per call) until done. Do not put the whole document into one call again.");
     }
 
     /**

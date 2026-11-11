@@ -5,7 +5,7 @@
 A guard that has never been seen to fail is not a guard. For each rule this
 mutates a good map so that exactly that rule should fire, then asserts it does.
 """
-import copy, json, os, re, sys, tempfile
+import copy, glob, json, os, re, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
@@ -760,7 +760,7 @@ def main_render_guards():
     # 示例的图名都短，一行就放下了，所以只用示例测不出标题折行 —— 两个探针（横向改回
     # 不折行、分页改回写死 30px 单行）都漏过。补一份**长图名**的形状进来，那才是能卡住
     # 这条的形状：40 字在横向要两行、在纵向要降档。
-    _lt = "东北大学秦皇岛分校与秦皇岛佳鑫诺教育科技有限公司买卖合同纠纷双方主张对读时间轴"
+    _lt = "某某大学某某某分校与某某某某某某教育科技有限公司买卖合同纠纷双方主张对读时间轴"
     for _src, _fn2, _land2 in (("横向长名", "render_multiband", True),
                                ("纵向长名", "render_vcolumns", False)):
         _mm8 = json.load(open(os.path.join(SKILL, "examples", "two-sides-numbered.json"),
@@ -1763,14 +1763,14 @@ def main_render_guards():
         _tj2.close()
         _td2 = _tj2.name.replace(".json", ".docx")
         _sp2.run(["node", os.path.join(SKILL, "scripts", "trace_index.js"),
-                  _tj2.name, _td2], capture_output=True, text=True, timeout=120)
+                  _tj2.name, _td2], capture_output=True, text=True, timeout=120, encoding="utf-8")
         if not os.path.exists(_td2):
             # **报清原因**，不要只说「没出来」。CI 上撞过一次：trace_index.js
             # require("docx")（npm 的包，本机是全局装的、仓库里没有 package.json），
             # CI 那台机器没有它，于是这条只印「没出来」，看不出该装什么。
             _why2 = ""
             _r2 = _sp2.run(["node", "-e", "require('docx')"],
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, timeout=60, encoding="utf-8")
             if _r2.returncode:
                 _why2 = ("：node 找不到 docx 包（npm install -g docx@9）"
                          if "Cannot find module" in (_r2.stderr or "")
@@ -3947,7 +3947,7 @@ def main_render_guards():
             _e7.pop("body", None)
         # 换成长图名：分页的标题最长（接上页那几张还要多带四个字），而守卫样本原来
         # 用的是短图名，于是「分页标题写死 30px 单行」这个改坏一直漏过。
-        _pm2["title_text"] = ("东北大学秦皇岛分校与秦皇岛佳鑫诺教育科技有限公司"
+        _pm2["title_text"] = ("某某大学某某某分校与某某某某某某教育科技有限公司"
                               "买卖合同纠纷双方主张对读时间轴")
         _pd = _tf3.mkdtemp()
         _pfiles, _pn = _pgm.paginate(_pm2, _pd)
@@ -4243,6 +4243,63 @@ def main_render_guards():
     return len(svgs), msgs
 
 
+
+def main_env_guards():
+    """Windows 中文环境的两道守卫（真实运行记录里撞上的）。
+
+    ① Python 3.11 不认「f-string 表达式里带反斜杠」，那是 3.12 才放开的写法。
+       用户电脑是 3.11.9，内核 render.py 连带导入 render_relation.py，一处这样的写法
+       就让 PNG 整个出不来；法律关系图大师在 3.11 上根本跑不起来。回归一直在 3.12
+       上跑，所以从没被抓到。静态扫全仓库（用 tokenize 认 f-string 的表达式部分，
+       不靠正则 —— 正则漏过跨行拼接的写法，实测漏了一处）；找得到 python3.11 时再真编译一遍。
+    ② Windows 控制台默认 GBK：不固定 UTF-8，外部 AI 读到的是乱码，自检直接崩溃。
+       用 PYTHONIOENCODING=gbk 跑入口命令，输出必须能按 UTF-8 读、进程不许崩溃。
+    """
+    import subprocess, shutil, tokenize, glob as _g
+    msgs = []
+    root = os.path.abspath(os.path.join(SKILL, ".."))
+    files = [f for f in _g.glob(os.path.join(root, "*", "**", "*.py"), recursive=True)
+             if "__pycache__" not in f]
+    fs_start = getattr(tokenize, "FSTRING_START", None)
+    for f in files:
+        if fs_start is None:
+            break                               # 3.11 及以下没有这类记号，交给真编译
+        depth, in_expr = 0, []
+        try:
+            toks = list(tokenize.generate_tokens(open(f, encoding="utf-8").readline))
+        except (tokenize.TokenError, SyntaxError) as e:
+            msgs.append(f"{os.path.relpath(f, root)} 无法解析：{e}")
+            continue
+        for t in toks:
+            if t.type == fs_start:
+                depth += 1
+            elif t.type == tokenize.FSTRING_END:
+                depth -= 1
+            elif depth and t.type != tokenize.FSTRING_MIDDLE and "\\" in t.string:
+                msgs.append(f"{os.path.relpath(f, root)}:{t.start[0]} f-string 表达式里有反斜杠"
+                            f" —— Python 3.11 会报语法错")
+                break
+    py311 = shutil.which("python3.11")
+    if py311:
+        for f in files:
+            r = subprocess.run([py311, "-m", "py_compile", f], capture_output=True, text=True, encoding="utf-8")
+            if r.returncode:
+                msgs.append(f"Python 3.11 编译失败：{os.path.relpath(f, root)}")
+    env = dict(os.environ, PYTHONIOENCODING="gbk")
+    for script, args in ((os.path.join(SKILL, "scripts", "pipeline.py"), ["steps"]),
+                         (os.path.join(root, "mqc-litigation-visual-redraw", "scripts",
+                                       "doctor.py"), [])):
+        r = subprocess.run([sys.executable, script, *args], capture_output=True, env=env,
+                           cwd=_TF.mkdtemp())
+        name = os.path.basename(script) + (" " + " ".join(args) if args else "")
+        try:
+            r.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            msgs.append(f"GBK 控制台下 {name} 的输出不是 UTF-8 —— 外部 AI 会读到乱码")
+        if b"Traceback" in r.stderr:
+            msgs.append(f"GBK 控制台下 {name} 崩溃：{r.stderr.decode('utf-8', 'replace').strip().splitlines()[-1][:80]}")
+    return msgs, (py311 is not None)
+
 def main():
     print("=== v1 的示例地图必须原样通过（纯增量的证明）===")
     v1bad = 0
@@ -4359,6 +4416,549 @@ def main():
     if ok_cls:
         read_msgs.append(f"模型输出校验误伤了合规输出：{ok_cls[:1]}")
 
+    # ---- 逐句判定只判勾选范围内的句子 ------------------------------------------------
+    # 起因是实测：四份材料 119 句，只勾一份剩 25 句、再勾一个年份剩 17 句，而原来仍要
+    # 写满 119 条判定。范围外的句子到算容量时本来就被剔掉、画不上图。改成只在范围内数
+    # 「一句不漏」之后，这几条盯住三件事：范围内漏判必须报；范围外不判不许报；不给范围
+    # 时必须与原来一样全文逐句数（照旧写满全部判定的做法不许被改坏）。
+    _S4 = ["甲公司与乙公司于2021年1月5日签订合同。", "本院认为构成违约。",
+           "乙公司于2022年3月1日付款。"]
+    _v4 = [{"i": 0, "is_event": True, "why": "签约"}]
+    _p4 = [{"id": 1, "name": "签约", "sids": [0], "first": "", "last": ""}]
+    for _tag4, _fn4, _want4 in (
+            ("范围内漏判一句", lambda: _ck.check_classify(_S4, _v4, scope={0, 2}), True),
+            ("范围外不判", lambda: _ck.check_classify(_S4, _v4, scope={0}), False),
+            ("不给范围仍全文逐句数", lambda: _ck.check_classify(_S4, _v4), True),
+            ("划分：范围内漏句", lambda: _ck.check_parts(_S4, _p4, scope={0, 2}), True),
+            ("划分：范围外不划", lambda: _ck.check_parts(_S4, _p4, scope={0}), False),
+            ("划分：不给范围仍全文数", lambda: _ck.check_parts(_S4, _p4), True),
+            # 叙述块在范围内没有事实句时，块里的非事实句可以不进部分（否则无解）……
+            ("划分：无事实的叙述块不必进部分", lambda: _ck.check_parts(
+                _S4, _p4, blocks={"查明": (0, 1), "理由": (1, 2), "付款": (2, 3)},
+                events=[0], scope={0, 1}), False),
+            # ……但事实句一句都不放行
+            ("划分：范围内的事实句漏了必须报", lambda: _ck.check_parts(
+                _S4, _p4, blocks={"查明": (0, 1), "理由": (1, 2), "付款": (2, 3)},
+                events=[0, 2], scope={0, 2}), True),
+            # ……有事实句的叙述块里，非事实句仍然一句不漏
+            ("划分：有事实的块里非事实句漏了必须报", lambda: _ck.check_parts(
+                _S4, _p4, blocks={"查明": (0, 2), "付款": (2, 3)},
+                events=[0], scope={0, 1}), True)):
+        _e4, _ = _fn4()
+        if bool(_e4) != _want4:
+            read_msgs.append(f"按范围校验「{_tag4}」应当{'报错' if _want4 else '放过'}，"
+                             f"实得{'报错' if _e4 else '放过'}")
+
+    # ---- 出图的时间、日期标签、出处，与只到年月事项的落位 ---------------------------------
+    # 真实运行里两个外部模型都撞上：出图只看 items 的 date，确定度、起止、锚点全丢，
+    # 只到年份的起诉、只知先后的二审驳回被排到最后；出处一律记成第一份材料。
+    # 而只把时间原样带过去又会错另一处：「2021年」按 1 月 1 日排到 3 月通知之前，
+    # 锚在它上面的驳回也跟着提前。所以三件事一起盯。
+    _pl7 = _mod("pipeline")
+    _g7 = _mod("geom")
+    _ev7 = [{"id": "a", "time": {"certainty": "exact", "date": "2021/3/26"}},
+            {"id": "b", "time": {"certainty": "exact", "date": "2021/5/19"}},
+            {"id": "c", "time": {"certainty": "range", "from": "2021/1/1", "to": "2021/12/31"}},
+            {"id": "d", "time": {"certainty": "order", "anchor": "c"}},
+            {"id": "e", "time": {"certainty": "exact", "date": "2024/11/11"}},
+            {"id": "f", "time": {"certainty": "range", "from": "2025/1/1", "to": "2025/1/31"}},
+            {"id": "g", "time": {"certainty": "exact", "date": "2025/1/20"}}]
+    _got7 = [e["id"] for e in _g7.order_by_time(_CP.deepcopy(_ev7))]
+    if _got7 != ["a", "b", "c", "d", "e", "f", "g"]:
+        read_msgs.append(f"只到年月的事项落位不对：{_got7}（期望 a b c d e f g —— "
+                         f"「2021年」不许按 1 月 1 日排到 3 月之前，锚在它上面的要跟着它）")
+    _st7 = _CP.deepcopy(json.load(open(os.path.join(SKILL, "examples", "stress-two-sides.json"),
+                                       encoding="utf-8")))
+    _want7 = ['1', '2', '3', '4', '5', '6', '33', '7', '8', '9', '32', '10', '11', '12', '13',
+              '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26',
+              '27', '28', '29', '30', '31']
+    if [e["id"] for e in _g7.order_by_time(_st7["events"])] != _want7:
+        read_msgs.append("改了只到年月的落位规则之后，stress-two-sides 示例的顺序变了 —— 新规则不许动现有示例")
+    _tb7 = {k: _pl7._time_block(v) for k, v in {
+        "exact": {"certainty": "exact", "kind": "sign", "raw": "2019年11月29日", "date": "2019/11/29"},
+        "year": {"certainty": "range", "raw": "2021 年", "from": "2021/1/1", "to": "2021/12/31"},
+        "order": {"certainty": "order", "raw": "驳回上诉", "anchor": "8"}}.items()}
+    for _k7, _want in (("exact", "2019.11.29"), ("year", "2021年"), ("order", "")):
+        if _tb7[_k7]["date_text"] != _want:
+            read_msgs.append(f"日期标签（{_k7}）应为「{_want}」，实得「{_tb7[_k7]['date_text']}」")
+    if _tb7["order"].get("anchor") != "8" or _tb7["year"].get("from") != "2021/1/1" \
+            or _tb7["exact"].get("kind") != "sign":
+        read_msgs.append(f"出图没把骨架里的锚点、起止或动作类型带过去：{_tb7}")
+    _src7 = _pl7._source_of([2, 3], {"origin": ["一审.txt"] * 3 + ["二审.txt"] * 2,
+                                     "files": ["一审.txt", "二审.txt"]})
+    if _src7["file"] != "一审.txt、二审.txt" or "二审.txt 句1" not in _src7["locator"] \
+            or "一审.txt 句3" not in _src7["locator"]:
+        read_msgs.append(f"出处没按句子所属的材料记、或定位没换成材料内句号：{_src7}")
+
+    # ---- 横向排不开时要说清卡在哪条约束 ---------------------------------------------------
+    # 真实运行记录：只说「过于密集」，模型据此以为事项太多，删了又删、重渲六次；
+    # 实际卡住的是某几项正文太长。报错要点名是哪一条、哪几项、怎么改。
+    import render_multiband as _rm20, copy as _cp20
+    _ev20 = [{"id": str(i + 1), "head": "设备价款结算与违约责任协商" * 6,
+              "time": {"certainty": "exact", "date": "2021/5/17", "date_text": "2021.05.17"},
+              "emphasis": False, "source": {"file": "x.pdf", "locator": "句1"}}
+             for i in range(18)]
+    try:
+        _rm20.render(_cp20.deepcopy({"style": "奇川风", "title": "测试", "form": "numbered",
+                                     "events": _ev20}), os.path.join(_TF.mkdtemp(), "d.svg"))
+        read_msgs.append("这份密集用例居然排下了，密集用例失效，守卫等于没验")
+    except ValueError as _e20:
+        _msg20 = str(_e20)
+        for _need20 in ("卡在这一条", "行", "可行的改法"):
+            if _need20 not in _msg20:
+                read_msgs.append(f"横向排不开的报错没说清卡在哪：{_msg20[:80]}")
+                break
+
+    # ---- 老式 Word（.doc）能直接读，不必先转 docx --------------------------------------
+    # 真实运行记录：使用者给的判决书是 .doc，技能不认，模型现场装 olefile 写解析。
+    # 这里用 LibreOffice 现造一份 .doc（有就造，没有就跳过），验证纯 Python 解析读得出中文。
+    import read_doc as _rd19, shutil as _sh19, subprocess as _sp19, tempfile as _tf19
+    _d19 = _tf19.mkdtemp()
+    _docx19 = os.path.join(SKILL, "tests", "fixtures", "m1-judgment.txt")
+    _soffice = _sh19.which("soffice")
+    if _soffice:
+        _txt19 = os.path.join(_d19, "s.txt")
+        open(_txt19, "w", encoding="utf-8").write("某某公司于2019年3月28日提起诉讼。\n本院认为，应予支持。\n")
+        _sp19.run([_soffice, "--headless", "--convert-to", "doc", "--outdir", _d19, _txt19],
+                  capture_output=True, timeout=180)
+        _doc19 = os.path.join(_d19, "s.doc")
+        if os.path.exists(_doc19):
+            _got19 = _rd19.read_doc(_doc19)
+            if "2019年3月28日" not in _got19 or "本院认为" not in _got19:
+                read_msgs.append(f".doc 读出来的内容不对：{_got19[:60]}")
+    # 两份副本必须一致（大事记表大师单独分发，拷了一份）
+    _other19 = os.path.join(SKILL, "..", "mqc-chronicle-master", "scripts", "read_doc.py")
+    if os.path.exists(_other19):
+        _strip19 = lambda t: "\n".join(l for l in t.splitlines()
+                                       if not l.startswith("# ⚠") and "单独分发" not in l)
+        if _strip19(open(os.path.join(SKILL, "scripts", "read_doc.py"), encoding="utf-8").read()) \
+                != _strip19(open(_other19, encoding="utf-8").read()):
+            read_msgs.append("大事记表大师里那份 read_doc.py 与时间轴的不一致了")
+
+    # ---- 格式可选 + 选了哪种风格、所有格式都是哪种风格 ------------------------------------
+    # 真实运行记录：① 一律五种全出，PNG 在典型 Windows 上出不来，模型只好现场装工具；
+    # ② 「改成歸藏风」只换了 SVG（另存成 -歸藏风.svg），PPTX / VSDX / drawio 仍从奇川风主图
+    # 转出，模型手工补了四步。这里直接调 export_formats.deliver 验：不选只出 SVG + PPTX；
+    # 歸藏风时 drawio 用歸藏配色、不再残留奇川深红。
+    import export_formats as _EF18, tempfile as _tf18, shutil as _sh18
+    _d18 = _tf18.mkdtemp()
+    _src18 = os.path.join(SKILL, "..", "mqc-litigation-visual-redraw", "examples", "timeline-points.json")
+    _m18 = json.load(open(_src18, encoding="utf-8"))
+    _svg18 = os.path.join(_d18, "t.svg")
+    _v1r = __import__("render")
+    _v1r.main(_src18, os.path.join(_d18, "t"), formats=("svg",))
+    _got18 = [f for f, p, _n in _EF18.deliver(_svg18, _m18, formats=("svg", "pptx")) if p]
+    if sorted(_got18) != ["PPTX", "SVG"]:
+        read_msgs.append(f"选了 SVG + PPTX 却出了 {_got18}")
+    _out18 = _EF18.deliver(_svg18, _m18, formats=("svg", "drawio"), style="歸藏风")
+    _dx18 = next((p for f, p, _n in _out18 if f == "drawio" and p), None)
+    if not _dx18 or "991B1B" in open(_dx18, encoding="utf-8").read().upper():
+        read_msgs.append("歸藏风的 drawio 仍是奇川风配色（深红 991B1B 还在）")
+    _pl18 = open(os.path.join(SKILL, "scripts", "pipeline.py"), encoding="utf-8").read()
+    if 'f"-{style}.svg"' in _pl18:
+        read_msgs.append("风格变换仍另存一份、主图留着奇川风 —— 其余格式会从奇川风转出")
+
+    # ---- 风格编号只有一处来源（pick.round_three），文档与提示不许手写另一套 --------------
+    # 真实运行记录：提示写「1 法官白描 / 2 当事人奇川风 / 3 同行歸藏风」，代码却是
+    # 「1 奇川风 / 2 歸藏风 / 3 白描」，照提示敲 style 2 拿到的是歸藏风；
+    # 不带参数的 style 还默认填 "2"。三处都会让使用者拿到不是自己选的风格。
+    import pick as _pk17
+    _order17 = [s["name"] for s in _pk17.round_three()]
+    _src17 = open(os.path.join(SKILL, "scripts", "pipeline.py"), encoding="utf-8").read()
+    _doc17 = open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8").read()
+    if 'else "2")' in _src17 or 'else "3")' in _src17:
+        read_msgs.append("style 不带参数时默认填了非第一档 —— 不回应当是 1")
+    # 只查会打印给使用者的语句（print 与 steps 表），注释里讲来龙去脉不算
+    _live17 = "\n".join(l for l in _src17.splitlines()
+                         if not l.lstrip().startswith("#") and ("print(" in l or '"style' in l))
+    if "style 2" in _live17 or "1 法官白描" in _live17:
+        read_msgs.append("pipeline.py 里仍有手写的风格编号（style 2 / 1 法官白描）")
+    for _n17, _name17 in enumerate(_order17, 1):
+        if f"{_n17} {_name17}" not in _doc17:
+            read_msgs.append(f"SKILL.md 没按代码写出「{_n17} {_name17}」—— 文档与代码的编号不一致")
+
+    # ---- 两条报错文案：让模型一次改对，而不是猜 -------------------------------------------
+    # 真实运行三轮都卡在同一处：跨句拼接的接缝上多了一个原句没有的字（多一个逗号、
+    # 多一个「提出」），旧报错只说「不是子序列」，模型便去换一句概括，离原文更远。
+    # 另一条：容量告警的门槛是「不足容量四成且不足原句六成」，模型读成「要写到接近容量」，
+    # 把八张卡片从三四十字扩写到上百字，白写一堆也多花时间。
+    _S16 = ["某某大酒店的上诉请求不能成立应予驳回；其主张不是本案审理范围，不予支持。",
+            "驳回上诉，维持原判。"]
+    _e16, _ = _ck.check_subsequence(
+        [{"id": "14", "src_sids": [0, 1],
+          "head": "其主张不是本案审理范围，不予支持，驳回上诉，维持原判"}], _S16)
+    if not _e16 or "卡在第" not in _e16[0] or "原句到这里往后写的是" not in _e16[0]:
+        read_msgs.append(f"子序列报错没指出卡在哪个字、原句该处是什么：{_e16[:1]}")
+    if _ck.check_subsequence([{"id": "14", "src_sids": [0, 1],
+                               "head": "其主张不是本案审理范围，不予支持。驳回上诉，维持原判"}],
+                             _S16)[0]:
+        read_msgs.append("接缝改成原句真有的字之后仍被拦 —— 判据被改严了")
+    _w16 = _ck.check_capacity([{"id": "3", "src_sids": [0], "head": "某某大酒店出具沟通函"}],
+                              140, 62, "图名", _S16 + ["2025年2月24日，某某大酒店、中农公司出具"
+                                                     "《关于三笔费用结算与确定最终赔偿方案的沟通函》，"
+                                                     "要求某某酒店公司提供书面的赔偿申请及相关凭证。"])[1]
+    if not _w16 or "字以上这条提醒就不再出现" not in _w16[0] or "不必逼近容量" not in _w16[0]:
+        read_msgs.append(f"容量告警没写明门槛，模型会误以为要写到接近容量：{_w16[:1]}")
+
+    # ---- 第二轮时间段：把判据与局限说清楚，并提示落在时段外的事项 --------------------------
+    # 真实运行里撞到的：勾了 2014–2015，344 句里只有 60 句带日期、其中 4 句落在该时段，
+    # 其余 284 句因为没有日期一律保留 —— 判定量几乎没降，图上也仍有 2021、2023 的事。
+    # 机制上无法替使用者删（没日期的事也可能是要画的事），但必须说清楚，别让人白等。
+    _src15 = open(os.path.join(SKILL, "scripts", "pipeline.py"), encoding="utf-8").read()
+    for _need15, _why15 in (("时间段只按「句子里有没有该时段的日期」筛", "scope 没讲清时间段的判据"),
+                            ("靠第四轮勾部分", "scope 没指出真正收窄要用勾部分"),
+                            ("个事项的年份不在你勾的时段", "capacity 不再提示落在时段外的事项")):
+        if _need15 not in _src15:
+            read_msgs.append(_why15)
+    # 行为级：勾一个窄时段，scope 要报出「带日期的句数 / 落在时段内的句数」
+    import subprocess as _sp15, shutil as _sh15
+    _d15 = _TF.mkdtemp()
+    _sh15.copy(os.path.join(SKILL, "tests", "fixtures", "m1-judgment.txt"), _d15 + "/m.txt")
+    _pipe15 = os.path.join(SKILL, "scripts", "pipeline.py")
+    _sp15.run([sys.executable, _pipe15, "read", "m.txt"], cwd=_d15, capture_output=True)
+    _r15 = _sp15.run([sys.executable, _pipe15, "span", "1"], cwd=_d15, capture_output=True, text=True, encoding="utf-8")
+    _sp15.run([sys.executable, _pipe15, "style", "1"], cwd=_d15, capture_output=True)
+    _o15 = _sp15.run([sys.executable, _pipe15, "scope"], cwd=_d15, capture_output=True, text=True, encoding="utf-8").stdout
+    if "句带日期" not in _o15 and "勾选范围是全部材料" not in _o15:
+        read_msgs.append(f"scope 没报出时间段筛掉了什么：{_o15[:120]}")
+
+    # ---- 计时账：每条命令记时刻，出图时给出各段用时 --------------------------------------
+    # 真实运行一轮 15 分 13 秒、12 积分，可命令本身只花几秒，时间全在两条命令之间
+    # （模型读材料、逐句判定、写骨架）。没有这本账就只能猜哪一段慢，而猜过两次都错了。
+    import io as _io14, contextlib as _ctx14, datetime as _dt14, tempfile as _tf14
+    _d14 = _TF.mkdtemp(); _cwd14 = os.getcwd()
+    try:
+        os.chdir(_d14)
+        json.dump({"sentences": ["甲"], "timing": [
+            {"cmd": "read", "at": (_dt14.datetime.now() - _dt14.timedelta(minutes=6)).isoformat(timespec="seconds")},
+            {"cmd": "offer", "at": _dt14.datetime.now().isoformat(timespec="seconds")}]},
+            open("state.json", "w", encoding="utf-8"), ensure_ascii=False)
+        _b14 = _io14.StringIO()
+        with _ctx14.redirect_stdout(_b14):
+            _pl7.stage_time()
+        _out14 = _b14.getvalue()
+        if "read" not in _out14 or "offer" not in _out14 or "6 分" not in _out14:
+            read_msgs.append(f"计时账没算对：{_out14[:120]}")
+    finally:
+        os.chdir(_cwd14)
+    if "stage_time()" not in open(os.path.join(SKILL, "scripts", "pipeline.py"),
+                                 encoding="utf-8").read().split("def stage_render")[1]:
+        read_msgs.append("出图后没有打印计时账 —— 下次还是不知道慢在哪一段")
+    # 行为级：真的跑两条命令，state 里必须留下时刻（只查写没写，不查内容）
+    import subprocess as _sp14, shutil as _sh14
+    _d14b = _TF.mkdtemp()
+    _sh14.copy(os.path.join(SKILL, "tests", "fixtures", "m1-judgment.txt"),
+               os.path.join(_d14b, "m.txt"))
+    _pipe14 = os.path.join(SKILL, "scripts", "pipeline.py")
+    for _args14 in (["read", "m.txt"], ["next"]):
+        _sp14.run([sys.executable, _pipe14, *_args14], cwd=_d14b, capture_output=True)
+    try:
+        _log14 = json.load(open(os.path.join(_d14b, "state.json"), encoding="utf-8")).get("timing")
+    except Exception:
+        _log14 = None
+    if not _log14 or len(_log14) < 2 or {x["cmd"] for x in _log14} != {"read", "next"}:
+        read_msgs.append(f"命令跑完没有把时刻记进计时账：{_log14}")
+
+    # ---- 卡片里「日期 + 正文」必须整块收进同一个形状（含标点悬挂的情形）-----------------
+    # 真实运行里第二次撞上：正文有一行行末是逗号，按中文排版规矩悬挂出边界 8px，
+    # 导出时那条「任何一行超出卡片就不收」的判据把整张卡片挡掉，日期又被单独居中、
+    # 压回正文上（PPT 与 ProcessOn 都会）。文本框本就 wrap="none"，悬挂不会重折行。
+    import importlib.util as _il13
+    _spec13 = _il13.spec_from_file_location("ep13", os.path.join(
+        SKILL, "..", "mqc-litigation-visual-redraw", "scripts", "export_pptx.py"))
+    _ep13 = _il13.module_from_spec(_spec13); _spec13.loader.exec_module(_ep13)
+    _card13 = ('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300">'
+               '<rect x="60" y="40" width="134" height="157" fill="#F3F4F6"/>'
+               '<text x="127" y="62" font-size="12" text-anchor="middle">2025.02.24</text>')
+    _body13 = ["某某大酒店、中农", "公司出具《沟通函》，", "鉴于《借款（垫款）"]
+    for _k13, _t13 in enumerate(_body13):
+        _card13 += (f'<text x="72" y="{81 + _k13 * 17}" font-size="13">{_t13}</text>')
+    _card13 += "</svg>"
+    _pr13 = _ep13.attach_text(_ep13.parse_svg(_card13), 400, 300)
+    _host13 = [p for p in _pr13 if p["k"] == "rect" and p.get("lines")]
+    if not _host13 or len(_host13[0]["lines"]) != 1 + len(_body13):
+        read_msgs.append(
+            f"卡片没把日期与正文整块收进同一个形状（收了 "
+            f"{len(_host13[0]['lines']) if _host13 else 0} 行，应为 {1 + len(_body13)} 行）"
+            f" —— 导出到 PPT / ProcessOn 时日期会压在正文上")
+
+    # ---- VSDX 的换行必须是显式段落标记（ProcessOn 不认纯换行符）---------------------
+    # 真实运行里撞上的：窄卡片上日期本来分两行写（「2019」「11.29」），ProcessOn 把两行
+    # 接成一行，显示成「201911.29」，正文同样被接成一长行、撑出卡片；PPT 与 Visio 认
+    # 纯换行符，所以只有 ProcessOn 出问题。每一行写成独立段落，三家都认。
+    import zipfile as _zip11, subprocess as _sp11
+    _d11 = _TF.mkdtemp()
+    _svg11 = os.path.join(_d11, "t.svg")
+    open(_svg11, "w", encoding="utf-8").write(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">'
+        '<rect x="20" y="20" width="160" height="90" fill="#F3F4F6" stroke="#D6DAE0" stroke-width="1"/>'
+        '<text x="100" y="45" font-size="12" font-weight="600" fill="#6B7280" text-anchor="middle">2019</text>'
+        '<text x="100" y="62" font-size="12" font-weight="600" fill="#6B7280" text-anchor="middle">11.29</text>'
+        '<text x="100" y="82" font-size="13" fill="#1F2933" text-anchor="middle">签署合同</text>'
+        '<text x="100" y="99" font-size="13" fill="#1F2933" text-anchor="middle">并交付场地</text></svg>')
+    _vsdx11 = os.path.join(_d11, "t.vsdx")
+    _sp11.run([sys.executable,
+               os.path.join(SKILL, "..", "mqc-litigation-visual-redraw", "scripts",
+                            "export_vsdx.py"), _svg11, _vsdx11], capture_output=True)
+    if not os.path.exists(_vsdx11):
+        read_msgs.append("VSDX 导出没跑起来，换行守卫无法验证")
+    else:
+        _xml11 = _zip11.ZipFile(_vsdx11).read("visio/pages/page1.xml").decode()
+        for _txt11 in re.findall(r"<Text>(.*?)</Text>", _xml11, re.S):
+            _n_line = _txt11.count("<cp ")
+            if _n_line > 1 and _txt11.count('<pp ') != _n_line:
+                read_msgs.append(f"VSDX 多行文字没有逐行写成独立段落，ProcessOn 会把它们接成一行：{_txt11[:60]}")
+                break
+
+    # ---- next 必须按「答案」判进度：read 顺带打出第一轮清单之后，仍要指向第一轮 -----------
+    import contextlib as _ctx10, io as _io10, shutil as _sh10
+    _cwd10 = os.getcwd(); _d10 = _TF.mkdtemp()
+    try:
+        os.chdir(_d10)
+        for _n10 in ("m1-judgment.txt", "m2-defence.txt"):
+            _sh10.copy(os.path.join(SKILL, "tests", "fixtures", _n10), _n10)
+        _say10 = []
+        for _args10 in ((_pl7.stage_read, (["m1-judgment.txt", "m2-defence.txt"],)),
+                        (_pl7.stage_pick, ("全部",))):
+            with _ctx10.redirect_stdout(_io10.StringIO()):
+                _args10[0](*_args10[1])
+            _b10 = _io10.StringIO()
+            with _ctx10.redirect_stdout(_b10):
+                _pl7.stage_next()
+            _say10.append(_b10.getvalue())
+        if "下一步：pick" not in _say10[0]:
+            read_msgs.append("两份材料读完、第一轮还没勾，next 却没有指向 pick —— 进度判错")
+        if "下一步：span" not in _say10[1]:
+            read_msgs.append("第一轮勾完、第二轮还没勾，next 却没有指向 span —— 进度判错")
+    except Exception as _e10:
+        read_msgs.append(f"next 进度守卫出错：{type(_e10).__name__}: {str(_e10)[:60]}")
+    finally:
+        os.chdir(_cwd10)
+
+    # ---- 提速的三处：判定紧凑行格式、划分区间写法、骨架来源不许越出勾选的部分 ----------
+    import contextlib as _ctx9, io as _io9
+    _cwd9 = os.getcwd(); _d9 = _TF.mkdtemp()
+    try:
+        os.chdir(_d9)
+        open("verdicts.txt", "w", encoding="utf-8").write(
+            "10 Y 本院于2025年3月19日立案，已发生的程序事实\n\n11 N 到庭人员，程序性叙述\n")
+        _v9 = _pl7._load_verdicts()
+        if _v9 != [{"i": 10, "is_event": True, "why": "本院于2025年3月19日立案，已发生的程序事实"},
+                   {"i": 11, "is_event": False, "why": "到庭人员，程序性叙述"}]:
+            read_msgs.append(f"verdicts.txt 紧凑行格式解析不对：{_v9}")
+        open("verdicts.txt", "w", encoding="utf-8").write("10 Y\n11 是 到庭人员\n")
+        try:
+            with _ctx9.redirect_stdout(_io9.StringIO()):
+                _pl7._load_verdicts()
+            read_msgs.append("verdicts.txt 缺理由、写成「是」却没被拦下")
+        except SystemExit:
+            pass
+        _st9 = {"sentences": ["x"] * 8, "origin": ["a"] * 8, "picked_files": None,
+                "picked_spans": None}
+        _p9 = _pl7._expand_parts([{"id": 1, "ranges": [[0, 2], [5, 6]]},
+                                  {"id": 2, "sids": [3, 4, 7]}], _st9)
+        if _p9[0].get("sids") != [0, 1, 2, 5, 6] or _p9[1].get("sids") != [3, 4, 7]:
+            read_msgs.append(f"部分划分的区间写法展开不对：{_p9}")
+    finally:
+        os.chdir(_cwd9)
+    _o9 = _pl7._items_outside_picked(
+        [{"id": "1", "src_sids": [5]}, {"id": "2", "src_sids": [1, 9]}, {"id": "3", "src_sids": [9]}],
+        {"picked_sids_all": [4, 5, 6, 7, 8, 9]})
+    if False:
+        pass
+    if _pl7._items_outside_picked([{"id": "8", "src_sids": [10]}, {"id": "9", "src_sids": [336, 343]}],
+                                  {"picked_sids_all": list(range(316, 344))}) != ["8"]:
+        read_msgs.append("capacity 不再拦「骨架事项的来源句全部取自没勾选的部分」")
+
+    # ---- assets 下的展示图必须标明「模型不要读」 -----------------------------------------
+    # 打包时发现的隐患：长图的 SVG 版对模型来说是纯文本（03-the-figure.svg 约 3.8 万 token），
+    # 运行一个字都用不到，但没有任何地方拦着模型去读。仓库里保留图，两处写明不要读。
+    _note12 = os.path.join(SKILL, "assets", "README.md")
+    if not os.path.exists(_note12):
+        read_msgs.append("assets/README.md 不见了（那是给模型的「不要读」告示）")
+    else:
+        _t12 = open(_note12, encoding="utf-8").read()
+        if "不要读" not in _t12 or "token" not in _t12:
+            read_msgs.append("assets/README.md 没写清楚为什么不要读")
+    _s12 = re.sub(r"\s+", " ", open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8").read())
+    if "不要打开 `assets/` 下的任何文件" not in _s12:
+        read_msgs.append("时间轴 SKILL.md 缺「不要读 assets」这条")
+
+    # ---- 出图后的收尾：文字核对清单、溯源索引退路、自检按 skill、示例与开工须知 ------------
+    import contextlib as _ctx8, io as _io8, subprocess as _sp8
+    _buf8 = _io8.StringIO()
+    with _ctx8.redirect_stdout(_buf8):
+        _pl7._print_checklist({"events": [
+            {"id": "2", "head": "发函", "time": {"certainty": "exact", "date": "2021/5/1",
+                                                 "date_text": "2021.05.01"},
+             "source": {"file": "a.txt", "locator": "句3"}},
+            {"id": "1", "head": "签约", "time": {"certainty": "exact", "date": "2020/1/1",
+                                                 "date_text": "2020.01.01"},
+             "source": {"file": "a.txt", "locator": "句1"}}]})
+    _ck8 = _buf8.getvalue()
+    if "不必查看图片" not in _ck8 or _ck8.find("签约") > _ck8.find("发函") or "a.txt 句1" not in _ck8:
+        read_msgs.append(f"出图后的文字核对清单不全或顺序不对：{_ck8[:120]}")
+    _d8 = _TF.mkdtemp()
+    with _ctx8.redirect_stdout(_io8.StringIO()):
+        _pl7._trace_md({"title": "测试・溯源索引",
+                        "rows": [{"no": "1", "head": "签约", "file": "a.txt", "locator": "句1",
+                                  "quote": "甲|乙签约"}]}, os.path.join(_d8, "f.svg"), "测试")
+    _md8 = os.path.join(_d8, "f-溯源索引.md")
+    if not os.path.exists(_md8) or "甲｜乙签约" not in open(_md8, encoding="utf-8").read():
+        read_msgs.append("缺 node/docx 时溯源索引没有退回 Markdown 版")
+    _doc8 = os.path.join(SKILL, "..", "mqc-litigation-visual-redraw", "scripts", "doctor.py")
+    _env8 = dict(os.environ, PATH=_d8)                         # 模拟连 graphviz 都没有的电脑
+    _t8 = _sp8.run([sys.executable, _doc8, "--for", "timeline"], capture_output=True, env=_env8)
+    if b"REQUIRED for flowcharts" in _t8.stdout:
+        read_msgs.append("给时间轴用的自检仍把 graphviz 报成必需 —— 那只是画流程图才要")
+    # 诉讼可视化重画后来去掉了 graphviz 依赖（没装时由内置排布算坐标，实测画布只差 2 像素），
+    # 所以「不带 --for timeline 就必须报 REQUIRED」这个旧口径已经不成立。现在的口径是：
+    # 无论哪种模式，都不许再把 graphviz 说成必需，且要讲清没装时会怎样。
+    _v8 = _sp8.run([sys.executable, _doc8], capture_output=True, env=_env8)
+    if b"REQUIRED for flowcharts" in _v8.stdout:
+        read_msgs.append("自检仍把 graphviz 报成必需 —— 它已有内置排布兜底，不该再拦人")
+    if _v8.returncode != 0:
+        read_msgs.append("只缺 graphviz 时自检仍判环境不合格")
+    _skill8 = open(os.path.join(SKILL, "SKILL.md"), encoding="utf-8").read()
+    for _need8 in ("pipeline.py next", "不许自己写脚本", "直接交给 `read`"):
+        if _need8 not in _skill8:
+            read_msgs.append(f"SKILL.md 缺开工须知：{_need8}")
+    for _f8 in glob.glob(os.path.join(SKILL, "examples", "*.json")):
+        if re.search(r'"date_text": "(上诉后|两次验收期间)"', open(_f8, encoding="utf-8").read()):
+            read_msgs.append(f"示例 {os.path.basename(_f8)} 仍在教推算出来的日期标签")
+
+    # ---- 直接读 PDF（有文字层的）--------------------------------------------------------
+    # 真实运行里两个外部模型都因为读不了 PDF 而自己写脚本转文字，其中一次花了 6 分钟。
+    # 这里现造 PDF（不入库任何真材料）：两页、带页码，读出来句子要对、页码要清掉；
+    # 没有文字层的 PDF 必须明说是扫描件并指向读图流程，不许把空白当成材料读进去。
+    # 两种抽取库都没装时只能跳过，跳过要打印出来，不许静默当作通过。
+    _rs6 = _mod("read_source")
+    try:
+        try:
+            import pymupdf as _mu6
+        except ImportError:
+            import fitz as _mu6
+    except ImportError:
+        _mu6 = None
+    if _mu6 is None:
+        print("  （本机没有 PyMuPDF，读 PDF 守卫跳过）")
+    else:
+        _d6 = _TF.mkdtemp()
+        _pdf6, _blank6 = os.path.join(_d6, "t.pdf"), os.path.join(_d6, "b.pdf")
+        _doc6 = _mu6.open()
+        for _k6, _txt6 in enumerate(["- 1 -\n甲公司与乙公司于2021年1月5日签订合同。\n双方约定",
+                                     "- 2 -\n乙公司于二〇二一年三月十日付款。"]):
+            _pg6 = _doc6.new_page()
+            _pg6.insert_text((72, 72), _txt6, fontname="china-s", fontsize=11)
+        _doc6.save(_pdf6)
+        _b6 = _mu6.open(); _b6.new_page(); _b6.save(_blank6)
+        try:
+            _S6 = _rs6.read_with_blocks(_pdf6)["sentences"]
+            if not any("签订合同" in x for x in _S6) or not any("付款" in x for x in _S6):
+                read_msgs.append(f"读 PDF 没读出正文：{_S6}")
+            if any(re.search(r"-\s*\d\s*-", x) for x in _S6):
+                read_msgs.append(f"读 PDF 后页码没清掉：{_S6}")
+        except Exception as _e6:
+            read_msgs.append(f"读有文字层的 PDF 失败：{type(_e6).__name__}: {str(_e6)[:60]}")
+        try:
+            _rs6.read_with_blocks(_blank6)
+            read_msgs.append("没有文字层的 PDF 被当成材料读进去了 —— 必须指向读图流程")
+        except _rs6.PdfTextUnavailable as _e6:
+            if "read_image.py" not in str(_e6):
+                read_msgs.append("扫描件的报错没有指向读图流程")
+
+    # ---- 汉字日期（判决书、裁定书的落款）---------------------------------------------
+    # 真实运行里撞上的：落款「二〇二五年十二月二十九日」认不出，一个模型只好把一审判决
+    # 改判成「起止同一天的区间」来凑过校验，另一个模型把落款句判成非事实，图上一审判决
+    # 那一项就没有日期。不同 PDF 抽取工具还会让落款变成字间带空格。
+    # 盯三件事：认得出（含字间空格）；只到年、日期对不上照样拦；条文、案号、金额不被误认。
+    _pk5 = _mod("pick")
+    _S5 = ["审判员王多二〇二五年十二月二十九日书记员杨青", "二 〇 二 六 年 四 月 九 日",
+           "二〇二五年", "依照第一百五十七条第一款第五项之规定，三笔费用合计一百二十二万元"]
+    for _tag5, _fn5, _want5 in (
+            ("落款汉字日期判 exact 应放过", lambda: _ck.check_dates(_S5, [
+                {"i": 0, "certainty": "exact", "raw": "二〇二五年十二月二十九日",
+                 "date": "2025/12/29"}])[0], False),
+            ("只到年的汉字日期判 exact 应拦", lambda: _ck.check_dates(_S5, [
+                {"i": 2, "certainty": "exact", "raw": "二〇二五年", "date": "2025/1/1"}])[0], True),
+            ("汉字日期与 date 对不上应拦", lambda: _ck.check_dates(_S5, [
+                {"i": 0, "certainty": "exact", "raw": "二〇二五年十二月二十九日",
+                 "date": "2025/12/28"}])[0], True)):
+        if bool(_fn5()) != _want5:
+            read_msgs.append(f"汉字日期「{_tag5}」没有做到")
+    import datetime as _dt5
+    if _pk5.dates_in(_S5[0]) != [_dt5.date(2025, 12, 29)]:
+        read_msgs.append(f"读不出落款汉字日期：{_pk5.dates_in(_S5[0])}")
+    if _pk5.dates_in(_S5[1]) != [_dt5.date(2026, 4, 9)]:
+        read_msgs.append(f"读不出字间带空格的汉字日期：{_pk5.dates_in(_S5[1])}")
+    if _pk5.dates_in(_S5[3]):
+        read_msgs.append(f"把条文或金额误认成日期：{_pk5.dates_in(_S5[3])}")
+
+    # 管线层：① 含勾中年份、但按第一个日期被筛掉的句子必须被明着列出，不许静默消失；
+    # ② 回头放宽勾选时，之前判过的句子沿用，只补新纳入的那几句；
+    # ③ 没有旧判定可沿用时，只补那几句必须报缺（沿用不是放水）。
+    import contextlib as _ctx4, io as _io4
+    _pl4 = _mod("pipeline")
+    _pk4 = _mod("pick")
+    _cwd4 = os.getcwd()
+    _d4 = _TF.mkdtemp()
+    try:
+        os.chdir(_d4)
+        open("a.txt", "w", encoding="utf-8").write(
+            "2020年1月1日双方签订合同，2022年3月1日乙公司付款。\n"
+            "2022年5月1日甲公司发函催告。\n2020年6月1日乙公司交货。\n")
+        _sink = _io4.StringIO()
+        with _ctx4.redirect_stdout(_sink):
+            _pl4.stage_read(["a.txt"])
+            _pl4.stage_pick(None)
+        _st4 = json.load(open("state.json", encoding="utf-8"))
+        _r2 = _st4.get("pick_r2") or []
+        _y22 = [r["id"] for r in _r2 if "2022" in r["label"]]
+        if not _y22:
+            read_msgs.append(f"按范围校验的管线样本没有分出 2022 年这一档：{_r2}")
+        else:
+            _st4["picked_spans"] = _y22
+            json.dump(_st4, open("state.json", "w", encoding="utf-8"), ensure_ascii=False)
+            if _pl4.scope_sids(_st4) != [1]:
+                read_msgs.append(f"只勾 2022 年时范围应只含句 1，实得 {_pl4.scope_sids(_st4)}")
+            if _pl4.borderline_sids(_st4) != [0]:
+                read_msgs.append(f"句 0 含 2022 年的日期却被筛掉，必须被明着列出；"
+                                 f"实得 {_pl4.borderline_sids(_st4)}")
+
+            def _offer4(verdicts, parts):
+                json.dump(verdicts, open("verdicts.json", "w", encoding="utf-8"),
+                          ensure_ascii=False)
+                json.dump(parts, open("parts.json", "w", encoding="utf-8"),
+                          ensure_ascii=False)
+                try:
+                    with _ctx4.redirect_stdout(_io4.StringIO()):
+                        _pl4.stage_offer()
+                    return True
+                except SystemExit:
+                    return False
+
+            _S = _st4["sentences"]
+            _one = lambda ids: [{"id": 1, "name": "经过", "sids": ids,
+                                 "first": _S[min(ids)], "last": _S[max(ids)]}]
+            if not _offer4([{"i": 1, "is_event": True, "why": "发函"}], _one([1])):
+                read_msgs.append("只判范围内的句子却没通过 offer —— 范围外的句子不该被要求判定")
+            _stw = json.load(open("state.json", encoding="utf-8"))
+            _stw["picked_spans"] = [r["id"] for r in _r2]
+            json.dump(_stw, open("state.json", "w", encoding="utf-8"), ensure_ascii=False)
+            _delta = [{"i": 0, "is_event": True, "why": "签约"},
+                      {"i": 2, "is_event": True, "why": "交货"}]
+            if not _offer4(_delta, _one([0, 1, 2])):
+                read_msgs.append("放宽勾选后只补新纳入的句子却没通过 —— 之前判过的应当沿用")
+            _stn = json.load(open("state.json", encoding="utf-8"))
+            _stn.pop("verdicts", None)
+            json.dump(_stn, open("state.json", "w", encoding="utf-8"), ensure_ascii=False)
+            if _offer4(_delta, _one([0, 1, 2])):
+                read_msgs.append("没有旧判定可沿用时只补两句却通过了 —— 范围内漏判一句必须报缺")
+    except Exception as _e4:
+        read_msgs.append(f"按范围校验的管线守卫出错：{type(_e4).__name__}: {str(_e4)[:80]}")
+    finally:
+        os.chdir(_cwd4)
+
     doc = os.path.join(SKILL, "references", "model-steps.md")
     if not os.path.exists(doc):
         read_msgs.append("缺少 references/model-steps.md，模型三步没有指令可依")
@@ -4423,10 +5023,10 @@ def main():
     PLANTS = [
         ("机构名不是占位符（文档）",
          _edit("references/model-steps.md",
-               "甲公司与丙公司签署", "金码大酒店与年年吉祥公司签署")),
+               "甲公司与丙公司签署", "朗月大酒店与岁岁平安公司签署")),
         ("机构名不是占位符（地图）",
          _edit("examples/gantt-periods.json",
-               "丙公司为目标公司", "丙公司为华鼎实业集团")),
+               "丙公司为目标公司", "丙公司为恒岳实业集团")),
         ("引文里内嵌专名",
          _edit("examples/two-sides-numbered.json",
                "原告因案涉设备购置项目公开招标",
@@ -4453,9 +5053,9 @@ def main():
         ("目标公司", False), ("控股公司", False), ("有限公司", False),
         ("某某人民法院", False), ("参照旧公司法解释三", False),
         ("无法在原场所继续经营酒店", False), ("北京某某律师事务所", False),
-        ("年年吉祥公司", True), ("金码大酒店", True),
-        ("华鼎实业集团", True), ("天元律师事务所", True),
-        ("丙公司为华鼎实业集团", True),   # 前一句的占位符不得掩护后面的真名
+        ("岁岁平安公司", True), ("朗月大酒店", True),
+        ("恒岳实业集团", True), ("明衡律师事务所", True),
+        ("丙公司为恒岳实业集团", True),   # 前一句的占位符不得掩护后面的真名
         ("原告甲学院与被告乙公司", False),
     ]
     probe_fail = 0
@@ -4469,6 +5069,14 @@ def main():
           f"{len(PROBES) - probe_fail}/{len(PROBES)} 个探针符合预期\n")
     plant_fail += probe_fail
 
+    print("=== Windows 中文环境守卫（Python 3.11 语法 / GBK 控制台）===")
+    envmsgs, _py311 = main_env_guards()
+    for x in envmsgs:
+        print(f"  FAIL {x}")
+    print(f"  {'全部通过' if not envmsgs else str(len(envmsgs)) + ' 项未过'}"
+          f"{'' if _py311 else '（本机没有 python3.11，只做了静态扫描）'}")
+    print()
+
     print("=== 渲染期守卫（直线像素对齐 / 唯一画线入口）===")
     nsvg, rmsgs = main_render_guards()
     for x in rmsgs:
@@ -4476,6 +5084,14 @@ def main():
     print(f"  渲染 {nsvg} 张，{'全部对齐且都在纸内' if not rmsgs else str(len(rmsgs)) + ' 项未过'}")
     for name, why in _refused():
         print(f"  已拒绝（设计如此，不是失败）{name}: {why}")
+    print()
+
+    print("=== 未上图披露（摘要图 + 强制披露，v2.2.0）===")
+    # 外部复核（原点平台）：主路由只画 head，body 写了也不上图，图照样生成、自检照样过。
+    # 守卫单独成文件，便于单跑；这里汇进总结论，CI 只跑这一个入口。
+    sys.path.insert(0, HERE)
+    import omission_checks as _omc
+    omit_msgs = _omc.main()
     print()
 
     print("=== 每条守卫故意改坏，必须报错 ===")
@@ -4498,7 +5114,7 @@ def main():
     print(f"{'未改动的好地图仍然通过':<34}{'是' if clean else '否':>6}")
     print(f"\n{len(CASES) - fail}/{len(CASES)} 条守卫确认可失败" + ("" if clean else "；但好地图被误伤"))
     return 1 if (fail or not clean or v1bad or ownbad or rmsgs or leaks
-                 or read_msgs or plant_fail) else 0
+                 or read_msgs or plant_fail or envmsgs or omit_msgs) else 0
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ import java.util.Map;
 /**
  * 诉讼可视化工具：把案件事实画成时间轴 / 流程图 / 当事人关系图。
  *
- * <p>出图引擎 vendor 自 mqc-litigation-visual-redraw（作者缪奇川，MIT），
+ * <p>出图引擎 vendor 自 new-litigation-visualization（作者缪奇川，AGPL-3.0-only），
  * 见仓库 {@code litviz/}。引擎有一条刻意的分工，这里完整继承：
  * <b>模型只做抽取，脚本负责画。</b>模型产出一份 semantic-map JSON，全部几何
  * （列宽、日期比例、折行、防重叠、连线路由）由确定性脚本计算。

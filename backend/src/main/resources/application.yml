@@ -778,16 +778,16 @@ langchain4j:
       model-name: nomic-embed-text
       timeout: 300s
 
-# 诉讼可视化（litviz）—— 出图引擎 vendor 自 mqc-litigation-visual-redraw（MIT，缪奇川），
+# 诉讼可视化（litviz）—— 出图引擎 vendor 自 new-litigation-visualization（AGPL-3.0-only，缪奇川），
 # 见仓库 litviz/。三项留空即走自动探测，正常无需配置：
 #   dir     litviz 目录。留空时：显式配置 → 环境变量 LITVIZ_DIR（桌面端注入）→ 相对
 #           后端工作目录往上找 litviz/（dev 态后端 cwd 是 backend/，命中 ../litviz）。
 #   python  解释器。留空时：配置 → LITVIZ_PYTHON → AWD_PYTHON_HOME 下的打包运行时 →
 #           PATH 上的 python3/python。**只接受 3.11 及以上**：引擎里有 PEP 701 语法，
-#           低版本 import 期就 SyntaxError（已由 litviz/PATCHES.md 的 PATCH 2 抹平到 3.9，
+#           低版本 import 期就 SyntaxError（上游 v1.1.0 已自行改掉，可 import 到 3.9，
 #           但下限仍按打包运行时 3.11 把关，避免用户机器上挑到远古 python2）。
-#   graphviz-dir  dot 所在目录。**只有流程图（graphviz_flow）需要**，其余六种布局零原生
-#           依赖。留空时找 litviz 同级的 graphviz/bin（打包态约定位置）。
+#   graphviz-dir  dot 所在目录。可选：引擎 v1.1.0 起流程图没有 dot 也会用纯 Python
+#           布局兜底，装了 dot 时流程图产物与以前逐字节相同。留空时找 litviz 同级的 graphviz/bin（打包态约定位置）。
 litviz:
   dir: ${LITVIZ_DIR:}
   python: ${LITVIZ_PYTHON:}

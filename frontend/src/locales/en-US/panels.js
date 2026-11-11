@@ -84,7 +84,7 @@ export default {
   litRedrawing: 'Redrawing…',
   litRestyledTo: 'Switched to {mode}',
   litRedrawFailedFallback: 'Redraw failed',
-  litCreditText: 'Diagram engine: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan (缪奇川) · MIT License',
+  litCreditText: 'Diagram engine: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan (缪奇川) · AGPL-3.0 License',
   litLayoutNumberedTimeline: 'Timeline · Numbered',
   litLayoutDatedTimeline: 'Timeline · Dated',
   litLayoutGantt: 'Period Chart · Gantt',

@@ -119,7 +119,7 @@
                    系统提示词的 OLLAMA / GEMINI 两个 tab 已随 v1 对话通道移除：
                    唯一读者是已删的 AiChatService，对四条通道本来就全部失效。
                    模型下拉是官方版里用户唯一还能选的 AI 参数。 -->
-              <view class="section-divider"></view>
+              <view v-if="legacyProvider" class="section-divider"></view>
               <view class="section-header-inline">
                   <text class="section-title-sm">{{ $t('admin.modelSelectionTitle') }}</text>
               </view>
@@ -580,7 +580,7 @@
                 />
               </SettingsRow>
 
-              <text v-if="!platformRemote.pricingAvailable" class="field-note">
+              <text v-if="!platformRemote.pricingAvailable" class="field-note region-summary-note">
                 {{ $t('platform.usageUnavailable') }}
               </text>
 
@@ -3409,6 +3409,7 @@ $brand-accent: $brand-mint;
 }
 
 .btn-save {
+  margin: 0;
   min-width: 120px;
   height: 28px;
   line-height: 28px;
@@ -3504,7 +3505,11 @@ $brand-accent: $brand-mint;
   margin-left: 16px;
 }
 
+/* uni-button 自带 margin-left/right: auto 且是块级：在块容器里会撑满整行，
+   在 flex 行里会被挤到中间。清掉，让按钮按内容宽、跟随容器对齐。 */
 .comp-btn {
+  display: inline-block;
+  margin: 0;
   height: 28px;
   line-height: 26px;
   font-size: var(--awd-panel-fs);

@@ -1,6 +1,6 @@
 # 诉讼可视化 Skill（打包格式见 docs/SKILL_SPEC.md）
 #
-# 出图引擎 vendor 自 mqc-litigation-visual-redraw（作者缪奇川，MIT），见仓库 litviz/。
+# 出图引擎 vendor 自 new-litigation-visualization（作者缪奇川，AGPL-3.0-only），见仓库 litviz/。
 # 本 skill 只教模型"怎么抽取"；几何全部由确定性脚本计算，模型不碰像素。
 id: litigation-visual
 name: 诉讼可视化
@@ -11,13 +11,13 @@ description: 把案件材料画成能直接进诉讼材料的专业图——事�
 author: AI Workdeck
 author_url: https://www.aiworkdeck.com
 version: 1.0.2
-license: MIT
+license: AGPL-3.0-or-later
 
-# 第三方内容署名：出图引擎 vendor 自 mqc-litigation-visual-redraw，MIT 协议要求保留版权声明。
-# 版权行原样抄自 litviz/engine/LICENSE，改引擎版本时这里也要跟着改。
+# 第三方内容署名：出图引擎 vendor 自 new-litigation-visualization。作者同意并入的条件是
+# 署名 + 开源（2026-11-11），AGPL 也要求保留版权声明。改引擎版本时这里也要跟着改。
 credits:
-  - "出图引擎 mqc-litigation-visual-redraw v1.0.2 —— Copyright (c) 2026 缪奇川 (Miao Qichuan)，MIT License"
-  - "时间轴管线 mqc-timeline-master v2.0.1 —— Copyright (c) 2026 缪奇川 (Miao Qichuan)，MIT License"
+  - "出图引擎 mqc-litigation-visual-redraw v1.1.0 —— Copyright (c) 2026 缪奇川 (Miao Qichuan)，AGPL-3.0-only，https://github.com/MiaoQichuan/new-litigation-visualization"
+  - "时间轴管线 mqc-timeline-master v2.2.0 —— Copyright (c) 2026 缪奇川 (Miao Qichuan)，AGPL-3.0-only，https://github.com/MiaoQichuan/new-litigation-visualization"
 
 # 默认不安装：出图引擎（Python + graphviz）体积较大，随安装包分发但默认关闭；
 # 用户在插件广场手动启用（= 安装），停用（= 卸载）不影响随包文件，见 SkillRegistry/SkillMarketService。

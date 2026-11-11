@@ -67,6 +67,8 @@
           </template>
 
             <LegalReferenceCard v-for="reference in toolReferences" :key="reference.id" :reference="reference" @open="openReference" />
+            <!-- 平台 AI 被跨境同意闸拦下：原地征求，同意后由 ChatInterface 把这一问原样重发 -->
+            <CrossBorderConsentCard v-if="bubble.consentRequired" class="bubble-consent-card" @accepted="onConsentAccepted" />
             <details v-if="inlineReference" open class="legal-inline-reader">
               <summary>{{ inlineReference.title }}</summary>
               <LegalReferencePane :reference="inlineReference" />
@@ -186,6 +188,7 @@ import QuestionCard from './QuestionCard.vue'
 import VerificationReportCard from './VerificationReportCard.vue'
 import SkillCreatedCard from './SkillCreatedCard.vue'
 import LegalReferenceCard from '../legal/LegalReferenceCard.vue'
+import CrossBorderConsentCard from '../account/CrossBorderConsentCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
 import { legalMessageParts, referencesFromTools, legalReadableText, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
@@ -206,7 +209,11 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+function onConsentAccepted() {
+  props.bubble.consentRequired = false
+  emit('consent-accepted')
+}
 
 // 计划文件的相对路径：历史回放没有 saved 事件，计划卡靠它反查 fileId。流式中不算（正文还在长）。
 const savedPath = computed(() => (props.bubble.isStreaming ? '' : resolveSavedPath(props.bubble.content) || ''))
@@ -601,5 +608,8 @@ function isApprovalPending(art) {
 }
 @media (pointer: coarse) {
   .turn-file { min-height: var(--awd-control-height-touch); }
+}
+.bubble-consent-card {
+  margin-top: var(--awd-space-2);
 }
 </style>

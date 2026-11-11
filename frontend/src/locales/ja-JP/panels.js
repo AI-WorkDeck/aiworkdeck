@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "再描画中…",
   "litRestyledTo": "{mode} に切り替えました",
   "litRedrawFailedFallback": "再描画に失敗しました",
-  "litCreditText": "図表エンジン: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan · MITライセンス",
+  "litCreditText": "図表エンジン: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan · AGPL-3.0ライセンス",
   "litLayoutNumberedTimeline": "タイムライン · 番号付き",
   "litLayoutDatedTimeline": "タイムライン · 日付付き",
   "litLayoutGantt": "期間チャート · ガント",

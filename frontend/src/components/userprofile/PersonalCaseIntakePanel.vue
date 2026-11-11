@@ -21,7 +21,7 @@
           </button>
         </view>
       </template>
-      <text class="field-label">{{ $t('account.caseLocalLedgerDisclaimer') }}</text>
+      <text class="field-label intake-disclaimer">{{ $t('account.caseLocalLedgerDisclaimer') }}</text>
 
       <!-- 顶部子视图切换胶囊 -->
       <view class="intake-subnav">
@@ -1066,6 +1066,12 @@ export default {
 .field-label {
   font-size: 11.5px;
   color: var(--awd-text-2);
+}
+
+.intake-disclaimer {
+  display: block;
+  margin-bottom: 10px;
+  line-height: 1.6;
 }
 
 .field-input {

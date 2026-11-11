@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "กำลังวาดใหม่…",
   "litRestyledTo": "เปลี่ยนไปที่ {mode} แล้ว",
   "litRedrawFailedFallback": "การวาดใหม่ไม่สำเร็จ",
-  "litCreditText": "เอนจินแผนภาพ: mqc-litigation-visual-redraw · ลิขสิทธิ์ (c) 2026 Miao Qichuan · สัญญาอนุญาต MIT",
+  "litCreditText": "เอนจินแผนภาพ: new-litigation-visualization · ลิขสิทธิ์ (c) 2026 Miao Qichuan · สัญญาอนุญาต AGPL-3.0",
   "litLayoutNumberedTimeline": "เส้นเวลา · แบบมีหมายเลข",
   "litLayoutDatedTimeline": "เส้นเวลา · แบบมีวันที่",
   "litLayoutGantt": "แผนภูมิช่วงเวลา · แกนต์",

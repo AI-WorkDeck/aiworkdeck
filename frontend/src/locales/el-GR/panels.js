@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Επανασχεδίαση…",
   "litRestyledTo": "Έγινε μετάβαση σε {mode}",
   "litRedrawFailedFallback": "Αποτυχία επανασχεδίασης",
-  "litCreditText": "Μηχανή διαγραμμάτων: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan (缪奇川) · Άδεια MIT",
+  "litCreditText": "Μηχανή διαγραμμάτων: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan (缪奇川) · Άδεια AGPL-3.0",
   "litLayoutNumberedTimeline": "Χρονολόγιο · Με αρίθμηση",
   "litLayoutDatedTimeline": "Χρονολόγιο · Με ημερομηνίες",
   "litLayoutGantt": "Διάγραμμα περιόδων · Gantt",

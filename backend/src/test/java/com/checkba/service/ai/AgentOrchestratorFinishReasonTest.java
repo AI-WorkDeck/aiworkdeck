@@ -55,4 +55,21 @@ class AgentOrchestratorFinishReasonTest {
                 "部分通道不回 finishReason（含回放评测），行为必须与改造前一致");
         assertFalse(AgentOrchestrator.isTruncatedToolCallRound(FinishReason.LENGTH, null));
     }
+
+    @Test
+    @DisplayName("截断纠正提醒：被截断的是 write_docx 时给出分段 + append=true 的精确恢复办法（tasks-10 t03），其余工具不加")
+    void truncationCorrectionNamesTheWriteDocxRecovery() {
+        String nativeDocx = AgentOrchestrator.truncationCorrection(true, "write_docx ");
+        assertTrue(nativeDocx.contains("单次输出长度上限"), nativeDocx);
+        assertTrue(nativeDocx.contains("append=true"), nativeDocx);
+
+        String xmlDocx = AgentOrchestrator.truncationCorrection(false,
+                "<tool_code>write_docx(fileName=\"差异说明.docx\", markdownContent=\"# 差异说明 一、");
+        assertTrue(xmlDocx.contains("标签未闭合"), xmlDocx);
+        assertTrue(xmlDocx.contains("append=true"), xmlDocx);
+
+        assertFalse(AgentOrchestrator.truncationCorrection(true, "write_file ").contains("append=true"));
+        assertFalse(AgentOrchestrator.truncationCorrection(false, "<todo_write").contains("append=true"));
+        assertFalse(AgentOrchestrator.truncationCorrection(false, null).contains("append=true"));
+    }
 }

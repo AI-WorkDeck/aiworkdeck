@@ -322,8 +322,8 @@ _PIPELINE = os.path.join(_TIMELINE_DIR, "scripts", "pipeline.py")
 #: 拼错的阶段名（pipeline 对未知子命令 exit 2、提示不友好），以及任何"把别的脚本
 #: 当阶段跑"的注入面。
 _TL_STAGES = frozenset({
-    "read", "pick", "span", "style", "offer", "budget", "capacity",
-    "title", "mark", "render", "next", "steps", "shape",
+    "read", "pick", "span", "style", "formats", "scope", "offer", "budget", "capacity",
+    "title", "mark", "render", "ack", "next", "steps", "shape",
 })
 
 #: 管线单阶段的墙钟上限。要卡在 Java 侧 90s 总闸之内，超时要死在这里——这样还能
@@ -354,6 +354,15 @@ def cmd_timeline(args):
     import subprocess
     cmd = [sys.executable, _PIPELINE, stage] + list(args.stage_args or [])
     env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+
+    # 上游 v3 起 render 默认只出 SVG+PPTX；宿主要 .drawio 在编辑器里打开（LitigationTimelineTools），
+    # 所以没人选过格式时，先用上游自己的 formats 命令要全部格式。
+    state_path = os.path.join(workdir, "state.json")
+    if stage == "render" and os.path.isfile(state_path):
+        with open(state_path, encoding="utf-8") as f:
+            if "formats" not in json.load(f):
+                subprocess.run([sys.executable, _PIPELINE, "formats", "全部"], cwd=workdir, env=env,
+                               capture_output=True, timeout=_TL_TIMEOUT_S)
     try:
         proc = subprocess.run(
             cmd, cwd=workdir, env=env,

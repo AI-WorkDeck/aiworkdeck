@@ -102,7 +102,7 @@ same style tokens + PNG fallback + human checkpoint apply. Adding a future
 variant means a sibling `render_*.py` module plus a `layout` value, without
 touching the shared layers.
 
-Note: `graphviz_flow` and `graphviz_relation` require `dot` (graphviz) on PATH for
+Note: `graphviz_flow` and `graphviz_relation` use `dot` (graphviz) when it is on PATH for
 positioning. The point timelines (`numbered_point_timeline`, `dated_point_timeline`),
 the gantt (`proportional_gantt`) and the hierarchical `relation_tree` need **no**
 graphviz — the tree computes its own tidy layout. `render.py` only invokes graphviz
@@ -110,7 +110,7 @@ for `graphviz_flow` and `graphviz_relation` maps.
 
 ---
 
-> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.0.2
+> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.1.0
 
 
 ## Editable hand-offs (v1.0.2)

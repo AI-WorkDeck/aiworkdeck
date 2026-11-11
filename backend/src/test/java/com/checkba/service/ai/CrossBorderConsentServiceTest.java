@@ -140,4 +140,26 @@ class CrossBorderConsentServiceTest {
         consent.stampIdentity(updates);
         assertEquals(1, updates.size());
     }
+
+    @Test
+    @DisplayName("就地征求：连着账户、旧版本同意（告知改版前）→ 需要征求；record() 后归当前账户与站点，不再需要")
+    void recordInPlaceForConnectedAccountWithStaleVersion() {
+        when(account.currentAccountIdOrNull()).thenReturn("acct-a");
+        stored.put(CrossBorderConsentService.KEY_AT, Instant.now().toString());
+        stored.put(CrossBorderConsentService.KEY_VERSION, "2026-08-08");
+        assertTrue(consent.isRequired());
+        consent.record();
+        assertFalse(consent.isRequired());
+        assertEquals("acct-a", stored.get(CrossBorderConsentService.KEY_ACCOUNT));
+        assertEquals("cn", stored.get(CrossBorderConsentService.KEY_SITE));
+        assertEquals(CrossBorderConsentService.NOTICE_VERSION, stored.get(CrossBorderConsentService.KEY_VERSION));
+        when(site.currentSite()).thenReturn("intl");
+        assertTrue(consent.isRequired(), "切站后要重新征求");
+    }
+
+    @Test
+    @DisplayName("未连接账户不需要征求（下游 4011 由登录弹层承接，登录弹层自己征求）")
+    void notRequiredWhenNotConnected() {
+        assertFalse(consent.isRequired());
+    }
 }

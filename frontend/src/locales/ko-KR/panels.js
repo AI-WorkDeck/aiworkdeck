@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "다시 그리는 중…",
   "litRestyledTo": "{mode}(으)로 전환되었습니다",
   "litRedrawFailedFallback": "다시 그리기 실패",
-  "litCreditText": "다이어그램 엔진: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan (缪奇川) · MIT License",
+  "litCreditText": "다이어그램 엔진: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan (缪奇川) · AGPL-3.0 License",
   "litLayoutNumberedTimeline": "타임라인 · 번호형",
   "litLayoutDatedTimeline": "타임라인 · 날짜형",
   "litLayoutGantt": "기간표 · 간트",

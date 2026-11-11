@@ -16,7 +16,6 @@
       "type": "string"
     },
     "layout": {
-      "_awd_patch_3": "见 litviz/PATCHES.md：上游这份枚举漏了 comparison_table，而 render.py 支持它、examples/ 里也有样例。schema 校验依赖可选的 jsonschema 包，没装就整段跳过，所以这个 bug 长期潜伏。",
       "enum": [
         "numbered_point_timeline",
         "dated_point_timeline",
@@ -86,6 +85,20 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/edge"
+      }
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/column"
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/row"
       }
     },
     "provenance": {
@@ -161,6 +174,21 @@
       "then": {
         "required": [
           "nodes"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "layout": {
+            "const": "comparison_table"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "columns",
+          "rows"
         ]
       }
     }
@@ -285,6 +313,9 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
         "from": {
           "$ref": "#/$defs/id"
         },
@@ -303,6 +334,44 @@
         },
         "emphasis": {
           "type": "boolean"
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "emphasis": {
+          "type": "boolean"
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "required": [
+        "cells"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "dimension": {
+          "type": "string"
+        },
+        "cells": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     }

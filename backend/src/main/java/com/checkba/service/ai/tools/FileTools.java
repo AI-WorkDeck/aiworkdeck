@@ -631,35 +631,105 @@ public class FileTools implements AgentToolComponent {
     @ToolMeta(displayName = "生成Word文档", category = "file", fileEffect = "ADDED", fileArg = "fileName", refreshFiles = true)
     @Tool("用 Markdown 新建一个 .docx 文件（只用于新文件）。\n"
             + "何时用：一次性落盘写好的文书，或 Office 加载项 / 纯聊天会话；桌面编辑器里要让用户看着逐步写出长稿用 doc_start_stream。\n"
+            + "长文分段写：第一次只写开头几节，之后同名再调并带 append=true 逐段续写，别把整篇塞进一次参数。\n"
             + "何时不用：修改已有文档——用 doc_open_file 打开后编辑，不要另建「修订版」副本。")
     public String write_docx(
             @P("新文件名，如 '报告.docx'") String fileName,
             @P("Markdown 内容") String markdownContent,
             @P("项目ID") Long projectId,
             @P(value = "目标文件夹 ID（可选；省略沿用本轮打开文档所在目录，传 0 放根目录）", required = false) Long parentFolderId,
-            @P(value = "样式画像 JSON（可选；不填取项目 _模板/画像.json，没有则用律所标准格式）", required = false) String styleProfileJson
+            @P(value = "样式画像 JSON（可选；不填取项目 _模板/画像.json，没有则用律所标准格式）", required = false) String styleProfileJson,
+            @P(value = "true = 接在本轮已用 write_docx 写过的同名文件末尾续写", required = false) Boolean append
     ) {
-        // 同一轮对同一目标再生成一次：直接复用第一次那份（dev-board#1017）。编辑器没就绪时模型常转头
-        // 用 write_docx 重来，而带文件夹的路径走 ConflictPolicy.RENAME——每试一次多一份「 (n)」同名文档。
+        // 同一轮对同一目标再写一次（dev-board#1017 的登记簿）：不新建第二份——带文件夹的路径走
+        // ConflictPolicy.RENAME，每试一次多一份「 (n)」同名文档。但也不能原样返回第一份装成功
+        //（tasks-10 t04：第二次写的是补全后的表格，文件没变，模型却告诉用户「已覆盖更新」）：
+        // 内容不同就重写本轮那一份，相同就明说未改动。
         String runKey = (fileName == null || fileName.isBlank()) ? null
                 : com.checkba.service.ai.EditorBridgeService.newDocxKey(parentFolderId, fileName);
         if (runKey != null) {
-            Long existingId = editorBridgeService.generatedInRun(runKey);
-            if (existingId != null) {
-                ProjectFile existing = projectFileService.findFile(existingId).orElse(null);
+            var earlier = editorBridgeService.generatedEntry(runKey);
+            if (earlier != null) {
+                ProjectFile existing = projectFileService.findFile(earlier.fileId()).orElse(null);
                 if (existing != null && !Boolean.TRUE.equals(existing.getIsDeleted())) {
-                    return GeneratedFileLocation.createdResult(existing,
-                            com.checkba.service.ai.EditorBridgeService.reusedGeneratedMessage(existing.getName(), existing.getId()));
+                    return rewriteGeneratedDocx(runKey, earlier, existing, markdownContent, projectId,
+                            styleProfileJson, Boolean.TRUE.equals(append));
                 }
                 editorBridgeService.forgetGenerated(runKey);
             }
         }
+        if (Boolean.TRUE.equals(append)) {
+            return LangText.of(
+                    "Error: append=true 只能续写本轮已用 write_docx 写过的同名文件，本轮还没有「" + fileName
+                            + "」，这次没有写入。请先不带 append 调用 write_docx 写第一段新建它，再带 append=true 续写后面的部分。",
+                    "Error: append=true only continues a file this run already wrote with write_docx, and there is no \""
+                            + fileName + "\" yet, so nothing was written. Call write_docx without append to create it "
+                            + "with the first part, then continue with append=true.");
+        }
         String out = writeDocxDispatch(fileName, markdownContent, projectId, parentFolderId, styleProfileJson);
         Long createdId = successDbId(out);
         if (runKey != null && createdId != null) {
-            editorBridgeService.noteGenerated(runKey, createdId);
+            editorBridgeService.noteGeneratedDocx(runKey, createdId,
+                    markdownContent == null ? "" : markdownContent, styleProfileJson);
         }
         return out;
+    }
+
+    /**
+     * 本轮已生成过同一目标时的第二次 write_docx：按整篇 Markdown 重渲染并覆盖本轮那一份（append 时接在末尾），
+     * 内容没变就带 {@code 未改动：} 前缀如实回报。绝不在没写的时候回成功。
+     */
+    private String rewriteGeneratedDocx(String runKey, com.checkba.service.ai.EditorBridgeService.Generated earlier,
+                                        ProjectFile existing, String markdownContent, Long projectId,
+                                        String styleProfileJson, boolean append) {
+        String name = existing.getName();
+        Long id = existing.getId();
+        if (earlier.markdown() == null) {
+            // doc_start_stream 建的那份开在编辑器里：拿 Markdown 整篇重写会和编辑器里的内容互相覆盖
+            return LangText.of(
+                    "Error: 本轮已用流式写入新建了『" + name + "』（文件 ID: " + id + "），它开在编辑器里，"
+                            + "write_docx 不会覆盖它，这次没有写入。要改内容请对这份文档用 doc_* 编辑工具。",
+                    "Error: \"" + name + "\" (file ID: " + id + ") was created by streaming in this run and is open "
+                            + "in the editor; write_docx will not overwrite it, so nothing was written. "
+                            + "Edit it with the doc_* tools.");
+        }
+        String chunk = markdownContent == null ? "" : markdownContent;
+        String previous = earlier.markdown();
+        boolean unchanged = append
+                ? chunk.isBlank() || previous.endsWith(chunk)
+                : chunk.equals(previous);
+        if (unchanged) {
+            return com.checkba.service.ai.ToolRegistry.ToolResult.UNCHANGED_PREFIX + LangText.of(
+                    (append ? "这一段已经在『" + name + "』末尾了" : "『" + name + "』的内容与本轮上一次写入相同")
+                            + "（文件 ID: " + id + "），文件没有改动。",
+                    (append ? "This part is already at the end of \"" + name + "\""
+                            : "\"" + name + "\" already has exactly this content from earlier in this run")
+                            + " (file ID: " + id + "); the file was not changed.");
+        }
+        String next = append ? previous + "\n\n" + chunk : chunk;
+        String profileJson = styleProfileJson != null ? styleProfileJson : earlier.styleProfileJson();
+        ProjectFile written;
+        try {
+            written = aiDocxExportService.overwriteMarkdownDocx(projectId, id, AGENT_USER_ID, next,
+                    resolveProfile(projectId, profileJson));
+        } catch (Exception e) {
+            log.warn("write_docx rewrite of run-generated file {} failed", id, e);
+            return LangText.of(
+                    "Error: 重写本轮生成的『" + name + "』（文件 ID: " + id + "）失败，文件保持上一次的内容：" + e.getMessage(),
+                    "Error: rewriting \"" + name + "\" (file ID: " + id + ") from this run failed; the file keeps its "
+                            + "previous content: " + e.getMessage());
+        }
+        editorBridgeService.noteGeneratedDocx(runKey, id, next, profileJson);
+        editorBridgeService.sendRefreshFilesAction();
+        return GeneratedFileLocation.createdResult(written != null ? written : existing, append
+                ? LangText.of("已把这一段追加到本轮生成的『" + name + "』末尾（文件 ID: " + id + "，现共 "
+                        + next.length() + " 字），没有另建副本。",
+                "Appended this part to the end of \"" + name + "\" from this run (file ID: " + id + ", now "
+                        + next.length() + " characters); no copy was created.")
+                : LangText.of("已用新内容覆盖本轮早先生成的『" + name + "』（文件 ID: " + id
+                        + "），没有另建副本；改动已进入版本记录。",
+                "Overwrote \"" + name + "\" generated earlier in this run (file ID: " + id
+                        + ") with the new content; no copy was created, and the change is in the version history."));
     }
 
     /** Parse the structured success receipt; names are never an identity. */
@@ -788,7 +858,8 @@ public class FileTools implements AgentToolComponent {
     @ToolMeta(displayName = "移动文件", category = "file", refreshFiles = true, access = ToolMeta.Access.WRITE)
     @Tool("移动项目文件/文件夹（一次调用，可批量）；单个文件按路径移动或改名也用它，传一项数组即可。\n"
             + "何时用：整理文件夹、归档、把多个文件分类必须一次调完，不要逐个调 move_files / create_folder（会耗尽本轮步数）。\n"
-            + "movesJson 是 [{\"sourcePath\":\"a.docx\",\"destPath\":\"01 起诉状/a.docx\"}]，路径相对项目根，每批最多 "
+            + "只有一个参数 movesJson（JSON 数组字符串，每项 sourcePath+destPath，路径相对项目根），多个目标文件夹也在同一个数组里，"
+            + "例：[{\"sourcePath\":\"起诉状.docx\",\"destPath\":\"01 诉讼文书/起诉状.docx\"},{\"sourcePath\":\"证据1.docx\",\"destPath\":\"02 证据/证据1.docx\"}]。每批最多 "
             + MAX_BATCH_MOVES
             + " 项。目标文件夹不存在自动创建；destPath 是已有文件夹则保留原名，否则最后一段即新名。\n"
             + "回执 moved: N 加逐项清单；只重试 FAILED 项，不要整批重发。")
@@ -805,15 +876,13 @@ public class FileTools implements AgentToolComponent {
             return "Error: no project context for this request.";
         }
         if (!StringUtils.hasText(movesJson)) {
-            return "Error: movesJson 不能为空，示例：[{\"sourcePath\":\"会议记录.txt\",\"destPath\":\"归档/会议记录.txt\"}]";
+            return "Error: movesJson 不能为空。正确写法：movesJson=" + MoveFilesArgs.EXAMPLE;
         }
-        List<java.util.Map<String, Object>> raw;
+        List<MoveFilesArgs.Move> raw;
         try {
-            raw = BATCH_MAPPER.readValue(movesJson,
-                    new com.fasterxml.jackson.core.type.TypeReference<List<java.util.Map<String, Object>>>() {});
-        } catch (Exception e) {
-            return "Error: movesJson 不是合法的 JSON 数组，示例："
-                    + "[{\"sourcePath\":\"会议记录.txt\",\"destPath\":\"归档/会议记录.txt\"}]";
+            raw = MoveFilesArgs.parse(movesJson);
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
         }
         if (raw == null || raw.isEmpty()) {
             return "Error: movesJson 至少要有一条移动";
@@ -828,11 +897,8 @@ public class FileTools implements AgentToolComponent {
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (int i = 0; i < raw.size(); i++) {
             int index = i + 1;
-            java.util.Map<String, Object> item = raw.get(i);
-            Object s = item == null ? null : item.get("sourcePath");
-            Object d = item == null ? null : item.get("destPath");
-            String srcRaw = s == null ? "" : String.valueOf(s);
-            String destRaw = d == null ? "" : String.valueOf(d);
+            String srcRaw = raw.get(i).sourcePath();
+            String destRaw = raw.get(i).destPath();
             if (!StringUtils.hasText(srcRaw)) {
                 return "Error: 第 " + index + " 条的 sourcePath 为空";
             }

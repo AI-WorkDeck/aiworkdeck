@@ -27,6 +27,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -83,6 +85,31 @@ class AiDocxExportXmlCharsTest {
                 "document.xml 不是合法 XML，编辑器打不开这份 docx");
         assertTrue(xml.contains("甲方"), xml);
         assertTrue(xml.contains("支付"), xml);
+    }
+
+    @Test
+    @DisplayName("overwriteMarkdownDocx：整篇重渲染后的字节交给 overwriteBinaryContent 覆盖原文件（不新建行），正文是新内容")
+    void overwriteRendersIntoTheExistingFile() throws Exception {
+        ProjectFileService files = mock(ProjectFileService.class);
+        ProjectFile pf = new ProjectFile();
+        pf.setId(11L);
+        pf.setFilePath("projects/3/out.docx");
+        AtomicReference<byte[]> saved = new AtomicReference<>();
+        when(files.overwriteBinaryContent(eq(3L), eq(11L), any(byte[].class), eq(1L))).thenAnswer(inv -> {
+            saved.set(inv.getArgument(2, byte[].class));
+            return pf;
+        });
+        AiDocxExportService svc = new AiDocxExportService(files, mock(StorageServiceFactory.class),
+                mock(ProjectRagService.class), mock(StyleProfileResolver.class));
+
+        svc.overwriteMarkdownDocx(3L, 11L, 1L, "| 合同 | 违约金 |\n|---|---|\n| 华北 | 万分之五\u0002 |",
+                StyleProfiles.houseDefault());
+
+        assertNotNull(saved.get(), "没有覆盖");
+        String xml = parseDocumentXml(saved.get());
+        assertTrue(xml.contains("万分之五"), xml);
+        verify(files, never()).createFile(anyLong(), any(), anyString(), anyString(), any(), any(), anyString(),
+                anyLong(), any());
     }
 
     @Test
