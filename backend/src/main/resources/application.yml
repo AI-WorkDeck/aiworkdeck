@@ -349,6 +349,12 @@ ai:
   # 首字节前只收到 OpenRouter 保活注释（请求排在某家供应商的队里）超过这么多秒，
   # 就掐掉本次请求、换一家供应商重发一次（只对启用了供应商路由的模型）。0 = 不重发。
   first-byte-requeue-seconds: 30
+  # 系统提示的工具协议（gap P2）：列在这里的通道，只要模型支持工具，提示里就只讲原生函数调用，
+  # 不再教 <thinking>/<tool_code> 文本协议（XML 解析器仍保留为兜底，旧会话照常解析）。
+  # 取值是通道名的逗号列表（AWD_CLOUD = 平台通道，OPENROUTER = 自备 Key）；留空 = 全部沿用文本协议提示。
+  # OLLAMA 不在默认值里：本地模型的原生工具调用不可靠。
+  prompt:
+    native-protocol: ${AI_PROMPT_NATIVE_PROTOCOL:AWD_CLOUD,OPENROUTER}
   # AI 上下文与压缩配置（对应 AiContextProperties，以下均为默认值，可按需覆盖）
   context:
     # 上下文总 token 预算的**兜底值**：只在模型标识解析不出上下文长度时用到

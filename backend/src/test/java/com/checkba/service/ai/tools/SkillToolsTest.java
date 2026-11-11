@@ -79,7 +79,8 @@ class SkillToolsTest {
         assertTrue(out.contains("# Skill: 核查流程 (verify)"), out);
         assertTrue(out.contains("逐字段三源对照，每项结论注明出处。"), "指引正文必须原样进结果：" + out);
         assertTrue(out.contains("Tools this skill uses: extract_file_text, run_python"), out);
-        assertTrue(out.contains("NEXT turn") && out.contains("<tool_code>"), out);
+        // gap P2：工具回执不再教文本调用写法（原生协议的模型会照着把调用写成文字）
+        assertTrue(out.contains("NEXT turn") && !out.contains("<tool_code>"), out);
     }
 
     @Test

@@ -490,7 +490,10 @@ public class ContextAssemblerService {
 
         // Load Base Prompt（按语言各缓存一份，见 loadBasePrompt——原来是每轮一次 classpath 读盘；
         // 缓存的是基底原文，工具指引片段按会话能力在 spliceToolGuidance 里拼，dev-board#809/#812）
-        systemText.append(spliceToolGuidance(loadBasePrompt(english), conversationId, english, agentMode));
+        // 工具协议变体（gap P2）：按通道与模型二选一，会话内不变，所以仍属稳定段。
+        final boolean nativeProtocol = resolveNativeProtocol(modelKey);
+        systemText.append(spliceToolGuidance(ToolProtocolPrompt.select(loadBasePrompt(english), nativeProtocol),
+                conversationId, english, agentMode));
 
         // Determine current phase based on state
         String currentPhase = determinePhase(planId, taskListId);
@@ -559,14 +562,16 @@ public class ContextAssemblerService {
 - When you receive `TOOL_RESULT`, you MUST continue execution. Do NOT ask "should I continue?".
 - Do NOT output `<final>` in the same turn as `<tool_code>`.
 """;
-        systemText.append(enforcement);
+        systemText.append(nativeProtocol ? ToolProtocolPrompt.nativeText(enforcement) : enforcement);
 
         // [Injection] Mode-Specific Constraints (CRITICAL)
-        systemText.append(english ? getModeConstraintsEn(agentMode) : getModeConstraints(agentMode));
+        String modeConstraints = english ? getModeConstraintsEn(agentMode) : getModeConstraints(agentMode);
+        systemText.append(nativeProtocol ? ToolProtocolPrompt.nativeText(modeConstraints) : modeConstraints);
 
         // [Injection] 工具渐进披露的硬规则（dev-board#810；活跃文档类目裁剪生效时同样注入，#1064）。
         // 两个开关都不适用时是空串。
-        systemText.append(toolDisclosureRule(english, activeContext, agentMode));
+        String disclosureRule = toolDisclosureRule(english, activeContext, agentMode);
+        systemText.append(nativeProtocol ? ToolProtocolPrompt.nativeText(disclosureRule) : disclosureRule);
 
         // [Injection] Skill（Phase 3B，规范见 docs/SKILL_SPEC.md）：
         // 把本轮生效的每个 skill 的 prompt 模板注入系统消息。
@@ -1108,7 +1113,9 @@ public class ContextAssemblerService {
                 systemText.append("Intermediate or temporary files you no longer need go to the recycle bin with the recycle-bin tool ");
                 systemText.append("(recoverable by the user); never create a \"to delete\" folder as a workaround. ");
                 systemText.append("More generally: tool calls that do not depend on each other's results belong in the SAME turn ");
-                systemText.append("(emit several `<tool_code>` blocks back to back); one call per turn burns the step budget.\n\n");
+                systemText.append(nativeProtocol
+                        ? "(issue several tool calls in one response); one call per turn burns the step budget.\n\n"
+                        : "(emit several `<tool_code>` blocks back to back); one call per turn burns the step budget.\n\n");
             } else {
                 systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用批量移动工具（files 类目）一次提交一批");
                 systemText.append("（每批最多 50 条），不要逐个调用移动或建文件夹工具。** ");
@@ -1124,7 +1131,9 @@ public class ContextAssemblerService {
                 systemText.append("移动前用项目文件清单工具的文件夹模式（`foldersOnly=true`）按目录 ID 核对其完整项目路径；内部整理时两端都保留该目录前缀。");
                 systemText.append("不再需要的中间文件、临时文件用回收站工具移入回收站（用户可恢复），不要另建「待删除」文件夹绕行。");
                 systemText.append("同理，彼此之间不需要看对方结果的工具调用要放在同一轮里并行发出");
-                systemText.append("（连续输出多个 `<tool_code>` 块），一轮一个地挤牙膏会白白烧掉步数预算。\n\n");
+                systemText.append(nativeProtocol
+                        ? "（在同一次响应里发出多个工具调用），一轮一个地挤牙膏会白白烧掉步数预算。\n\n"
+                        : "（连续输出多个 `<tool_code>` 块），一轮一个地挤牙膏会白白烧掉步数预算。\n\n");
             }
         }
 
@@ -1411,6 +1420,16 @@ public class ContextAssemblerService {
      * 模型：非白名单会被回落成默认模型、显式本地档会忽略云端模型，两条都只 warn 一行日志。
      * 按请求里那个 id 判，就会把 image 内容块发给一个读不了图的模型，换来一个英文 400。
      */
+    /** 本轮是否用原生工具协议的提示变体；判不出来就留在改造前的 XML 变体。 */
+    private boolean resolveNativeProtocol(String modelKey) {
+        try {
+            return chatModelFactory != null && chatModelFactory.nativeToolProtocol(modelKey);
+        } catch (Exception e) {
+            log.warn("[Protocol] Capability probe failed for model '{}', keeping the XML prompt variant", modelKey, e);
+            return false;
+        }
+    }
+
     private boolean resolveVisionCapable(String modelKey) {
         try {
             return chatModelFactory.effectiveModelSupportsVision(modelKey);

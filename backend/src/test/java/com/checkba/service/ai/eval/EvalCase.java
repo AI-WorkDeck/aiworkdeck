@@ -35,6 +35,8 @@ public class EvalCase {
     public String category;
     /** 协议标注（仅文档用途）：xml / native / mixed */
     public String protocol;
+    /** 本用例的模型是否走原生工具协议的提示变体（gap P2）；缺省 false = 改造前的 XML 文本协议 */
+    public boolean nativeProtocol;
     /** Agent 模式：AGENT（默认）/ PLAN / ASK */
     public String mode = "AGENT";
     /** 用户输入 */

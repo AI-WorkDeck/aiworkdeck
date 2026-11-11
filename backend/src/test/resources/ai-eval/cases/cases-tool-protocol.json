@@ -1,0 +1,258 @@
+[
+  {
+    "id": "text-tool-call-malformed-native-corrective-retry",
+    "title": "原生协议：畸形的文字工具调用不执行也不许静默收尾，纠正一次后走函数调用（gap R3）",
+    "category": "files",
+    "protocol": "mixed",
+    "nativeProtocol": true,
+    "userInput": "帮我建一个「尽调材料」文件夹",
+    "turns": [
+      {
+        "text": "<tool_code=create_folder>\n<parameter=folderName>尽调材料</parameter>\n</tool_code>"
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "create_folder",
+            "arguments": {
+              "folderName": "尽调材料",
+              "projectId": 1
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已新建「尽调材料」文件夹。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "Successfully created folder '尽调材料' (folderId=77)."
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "create_folder",
+          "argsContain": {
+            "folderName": "尽调材料"
+          }
+        }
+      ],
+      "promptContains": [
+        "把工具调用写成了文字"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "text-tool-call-malformed-xml-corrective-retry",
+    "title": "XML 协议：畸形 tool_code 同样纠正一次，提醒里给的是 XML 正确写法",
+    "category": "files",
+    "protocol": "xml",
+    "userInput": "帮我建一个「尽调材料」文件夹",
+    "turns": [
+      {
+        "text": "<tool_code=create_folder>\n<parameter=folderName>尽调材料</parameter>\n</tool_code>"
+      },
+      {
+        "text": "<process name=\"新建文件夹\"><tool_code>create_folder(folderName=\"尽调材料\", projectId=1)</tool_code></process>"
+      },
+      {
+        "text": "<final>已新建「尽调材料」文件夹。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "Successfully created folder '尽调材料' (folderId=77)."
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "create_folder",
+          "argsContain": {
+            "folderName": "尽调材料"
+          }
+        }
+      ],
+      "promptContains": [
+        "工具调用格式不对"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "text-ask-user-in-prose-corrective-retry",
+    "title": "正文里夹着 <ask_user><parameter=…>（严格边界外、解析器不执行）：纠正一次后原生提问并停机（qwen s17/g06 实录）",
+    "category": "question",
+    "protocol": "mixed",
+    "nativeProtocol": true,
+    "userInput": "把第三条改一下措辞",
+    "turns": [
+      {
+        "text": "已建好事项，下面向您确认。\n<ask_user>\n<parameter=question>第三条想改成哪种措辞？</parameter>\n</ask_user>"
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "ask_user",
+            "arguments": {
+              "question": "第三条想改成哪种措辞？",
+              "options": [
+                {
+                  "label": "更严格",
+                  "description": "收紧验收期限"
+                },
+                {
+                  "label": "更宽松",
+                  "description": "放宽验收期限"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "ask_user",
+          "argsContain": {
+            "question": "第三条"
+          }
+        }
+      ],
+      "promptContains": [
+        "把工具调用写成了文字"
+      ],
+      "bubbleEndStatus": "awaiting_input"
+    }
+  },
+  {
+    "id": "thinking-only-turn-corrective-retry",
+    "title": "整轮只有 <thinking>：不当正常完成，纠正一次后继续干活（gap R4）",
+    "category": "files",
+    "protocol": "mixed",
+    "nativeProtocol": true,
+    "userInput": "帮我建一个「尽调材料」文件夹",
+    "turns": [
+      {
+        "text": "<thinking>用户要新建文件夹，应调用 create_folder。</thinking>"
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "create_folder",
+            "arguments": {
+              "folderName": "尽调材料",
+              "projectId": 1
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已新建「尽调材料」文件夹。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "Successfully created folder '尽调材料' (folderId=77)."
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "create_folder",
+          "argsContain": {
+            "folderName": "尽调材料"
+          }
+        }
+      ],
+      "promptContains": [
+        "只有分析"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "text-tool-call-corrected-only-once",
+    "title": "协议纠正每轮只一次：第二次仍写成文字就照常收尾，不进死循环",
+    "category": "files",
+    "protocol": "mixed",
+    "nativeProtocol": true,
+    "userInput": "帮我建一个「尽调材料」文件夹",
+    "turns": [
+      {
+        "text": "<tool_code=create_folder>\n<parameter=folderName>尽调材料</parameter>\n</tool_code>"
+      },
+      {
+        "text": "<tool_code=create_folder>\n<parameter=folderName>尽调材料</parameter>\n</tool_code>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [],
+      "promptContains": [
+        "把工具调用写成了文字"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "xml-fallback-still-parsed-under-native-protocol",
+    "title": "原生协议的会话里模型仍写出合法 <tool_code>：解析器兜底照常执行（旧会话 / 偶发文本调用不坏）",
+    "category": "files",
+    "protocol": "xml",
+    "nativeProtocol": true,
+    "userInput": "帮我建一个「尽调材料」文件夹",
+    "turns": [
+      {
+        "text": "<process name=\"新建文件夹\"><tool_code>create_folder(folderName=\"尽调材料\", projectId=1)</tool_code></process>"
+      },
+      {
+        "text": "<final>已新建「尽调材料」文件夹。</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "Successfully created folder '尽调材料' (folderId=77)."
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "create_folder",
+          "argsContain": {
+            "folderName": "尽调材料"
+          }
+        }
+      ],
+      "structureContains": [
+        "<tool_output status=\"SUCCESS\">",
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "tool-syntax-in-code-fence-is-not-a-call-attempt",
+    "title": "回答里用代码围栏讲解调用语法不算调用痕迹：一轮正常收尾，不触发纠正",
+    "category": "chat",
+    "protocol": "native",
+    "nativeProtocol": true,
+    "userInput": "工具调用的文本写法长什么样？",
+    "turns": [
+      {
+        "text": "<final>早期的文本写法大致如下：\n```xml\n<function=law_search>{\"query\": \"股东会职权\"}</function>\n```\n行内写作 `<parameter=question>` 这类形式。现在统一走函数调用。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  }
+]

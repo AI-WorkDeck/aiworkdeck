@@ -363,6 +363,8 @@ public class AgentOrchestrator {
         volatile boolean memorySaved;
         /** 「记住」硬保险每轮最多补救一次。 */
         boolean rememberNudged;
+        /** 文字形式的工具调用未执行 / 只有 thinking 的轮次，每轮最多纠正一次（gap P2）。 */
+        boolean protocolNudged;
 
         boolean documentEdited() {
             return documentEdited;
@@ -3439,6 +3441,17 @@ public class AgentOrchestrator {
                 return;
             }
 
+            // 3.35 工具调用被写成文字而没执行、或整轮只有 <thinking>：不能当正常完成，纠正一轮，只一次（gap P2）
+            if (!summaryOnly) {
+                String protocolNudge = protocolNudgeIfNeeded(guard, content, agentMode, modelId);
+                if (protocolNudge != null) {
+                    messages.add(dev.langchain4j.data.message.UserMessage.from(protocolNudge));
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
+            }
+
             // 3.4 「记住」硬保险（原生与 XML 路径共用的无工具收尾点）：补救一轮，只一次
             if (!summaryOnly) {
                 String rememberNudge = rememberNudgeIfNeeded(guard, agentMode);
@@ -4561,6 +4574,42 @@ public class AgentOrchestrator {
         } catch (Exception e) {
             log.warn("Context compaction skipped for {} due to error", conversationId, e);
         }
+    }
+
+    /**
+     * 无工具收尾点上的协议纠正（gap P2 / R3 / R4）：走到这里说明本轮没有任何工具被执行。
+     * 正文里却有文字形式的工具调用痕迹（畸形 tool_code、严格边界外的 ask_user、泄漏的原生语法），
+     * 或者整轮只有 thinking——两种都会被当成「已完成」而其实什么都没做。回喂一次提醒让模型重发；
+     * 每轮只纠正一次，第二次照旧收尾，不会循环。未闭合标签由上面的截断守卫处理，这里不重复。
+     */
+    private String protocolNudgeIfNeeded(RunGuard guard, String content, AgentMode agentMode, String modelId) {
+        if (guard == null || guard.protocolNudged) return null;
+        if (XmlToolCallParser.isThinkingOnly(content)) {
+            guard.protocolNudged = true;
+            log.warn("Thinking-only turn for {}, injecting one corrective round", guard.conversationId);
+            return LangText.of(
+                    "[系统提醒] 你上一条输出只有分析，没有调用工具，也没有给出回答，用户什么都没看到。"
+                    + "请继续：需要工具就调用，已有结论就输出 `<final>`。",
+                    "[System reminder] Your last output contained only analysis: no tool call and no answer, so the user saw nothing. "
+                    + "Continue: call the tool you need, or output `<final>` if you already have the answer.");
+        }
+        if (agentMode == AgentMode.ASK || endsWithUnclosedTag(content)
+                || !XmlToolCallParser.containsUnexecutedCallAttempt(content)) {
+            return null;
+        }
+        guard.protocolNudged = true;
+        log.warn("Unexecuted text tool call for {}, injecting one corrective round", guard.conversationId);
+        return chatModelFactory.nativeToolProtocol(modelId)
+                ? LangText.of(
+                        "[系统提醒] 你上一条输出把工具调用写成了文字，系统没有执行它，任务没有推进。"
+                        + "请通过函数调用（function calling）重新发起这次调用，不要把调用写在正文里；若任务其实已完成，请直接输出最终回答。",
+                        "[System reminder] Your last output wrote a tool call as text. It was NOT executed and nothing happened. "
+                        + "Issue the call again through function calling, not in the answer text; if the task is in fact complete, output the final answer.")
+                : LangText.of(
+                        "[系统提醒] 你上一条输出里的工具调用格式不对，系统没有执行它，任务没有推进。"
+                        + "请按 <tool_code>工具名(参数=\"值\")</tool_code> 的完整格式重新输出这一步；若任务其实已完成，请直接输出最终回答。",
+                        "[System reminder] The tool call in your last output was malformed. It was NOT executed and nothing happened. "
+                        + "Re-emit this step in the full form <tool_code>tool_name(arg=\"value\")</tool_code>; if the task is in fact complete, output the final answer.");
     }
 
     /**

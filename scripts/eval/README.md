@@ -116,7 +116,7 @@ qwen3.7-flash 240 次运行有 171 次（71%）记为基础设施故障、deepse
 - `finalTextIncludes` 与 `outcomeCheck` 都用最终回复**全文**（`results.json` 的 `finalText` 现在存全文；旧产物是 1500 字截断）。
 - 文本 `<question>` 停问（后端日志 `Detected <question> for <会话>`）等同调用了 `ask_user`：补进 `tools` 末尾，`askedByText=true`。
 - 供应商/基础设施故障（限流 429、`AI_QUOTA_EXHAUSTED`、空流、地域 403、`harness_error`）不是模型行为：**不进通过率分母、门禁判定和回退清单**，在报告「基础设施故障」一节单列，逐次运行表里标 `INFRA`。后端自己的 `error` 仍算失败。
-- 每次运行新增过程指标（不参与判定，报告「过程指标」一节汇总）：`xmlTurns` / `nativeTurns`（每个 `[Round]` 回合走 XML 文本调用还是原生调用）、`verifyAfterWrite`（最后一次写操作之后是否读过；没写过记 null）、`maxSameTool`（同一工具最多被调用几次）。
+- 每次运行新增过程指标（不参与判定，报告「过程指标」一节汇总）：`xmlTurns` / `nativeTurns`（每个 `[Round]` 回合走 XML 文本调用还是原生调用）、`malformedRounds`（后端回喂「请重发」的纠正回合数：调用截断、调用被写成文字没执行、回合只有 thinking）、`verifyAfterWrite`（最后一次写操作之后是否读过；没写过记 null）、`maxSameTool`（同一工具最多被调用几次）。
 
 一次运行「通过」= 本轮正常结束（`bubble_end` 且 status=finished）且所有已声明的检查都为真。
 
