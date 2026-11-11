@@ -159,8 +159,8 @@
     }
   },
   {
-    "id": "post-write-verify-skipped-when-model-read-back",
-    "title": "模型自己在最后一次修改后回读过：系统不再核对（只读了底稿），不提醒（gap P5）",
+    "id": "post-write-verify-structural-checked-even-after-read-back",
+    "title": "插入新段落后模型自己回读过、仍没发现条号重复：结构性写入照样由系统核对，隐形提醒一次 → 模型顺延编号后收尾（gap P5；tasks-10 v01 实录）",
     "category": "post-write-verify",
     "protocol": "native",
     "userInput": "把第二条的付款期限改成 45 日，并在第六条后加一条不可抗力条款",
@@ -204,6 +204,42 @@
       },
       {
         "text": "<final>已完成，并已回读核对。</final>"
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_modify_paragraph",
+            "arguments": {
+              "paragraphIndex": 9,
+              "newText": "第八条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_modify_paragraph",
+            "arguments": {
+              "paragraphIndex": 10,
+              "newText": "第九条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_modify_paragraph",
+            "arguments": {
+              "paragraphIndex": 11,
+              "newText": "第十条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已顺延原第七条至第九条为第八条至第十条。</final>"
       }
     ],
     "toolStubs": {
@@ -228,13 +264,32 @@
         },
         {
           "name": "doc_get_document_text"
+        },
+        {
+          "name": "doc_modify_paragraph",
+          "argsContain": {
+            "newText": "第八条"
+          }
+        },
+        {
+          "name": "doc_modify_paragraph",
+          "argsContain": {
+            "newText": "第九条"
+          }
+        },
+        {
+          "name": "doc_modify_paragraph",
+          "argsContain": {
+            "newText": "第十条"
+          }
         }
       ],
-      "promptNotContains": [
-        "[系统提醒] 系统在你最后一次修改后回读了改动处"
-      ],
-      "editorReadCount": 1,
-      "bubbleEndStatus": "finished"
+      "editorReadCount": 2,
+      "bubbleEndStatus": "finished",
+      "promptContains": [
+        "[系统提醒] 系统在你最后一次修改后回读了改动处",
+        "编号断裂"
+      ]
     }
   },
   {
