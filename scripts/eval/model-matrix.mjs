@@ -519,7 +519,7 @@ function parseLogSlice(slice, conversationId) {
   const ra = /name = "([a-zA-Z_0-9]+)", arguments = "(.*?)" \}(?=, ToolExecutionRequest|\])/g
   while ((m = ra.exec(slice))) { let args = null; try { args = JSON.parse(m[2]) } catch { /* 截断或非 JSON */ } calls.push({ name: m[1], args }) }
   // XML 兜底路径（DeepSeek 等时而改用文本调用）：<tool_code>name(k=v, ...)</tool_code>
-  const rx = /<tool_code>\s*([a-zA-Z_0-9]+)\(([\s\S]*?)\)\s*<\/tool_code>/g
+  const rx = /<tool_code>\s*([a-zA-Z_0-9]+)\(([\s\S]*?)\)\s*(?:<\/tool_code>|<\/?｜DSML｜[^>]*>)/g // DeepSeek 偶尔以泄漏的 </｜DSML｜…> 收尾，后端 normalizeLeakedClosers 照常执行
   while ((m = rx.exec(slice))) calls.push({ name: m[1], args: parseKwargs(m[2]) })
   // 文本 <question> 停问（Detected <question> for <conv>）等同 ask_user：工具序列里没有时补在末尾（它是本轮最后一个动作）
   const askedByText = slice.includes(`Detected <question> for ${conversationId},`)
