@@ -208,7 +208,11 @@ def outside_anchor_echo(anchor_text, before, after, new_text):
     替换后这段文字会重复。返回该片段，否则 None。"""
     if len(''.join(new_text.split())) < ECHO_MIN_CHARS:
         return None
-    sides = [re.split(r'[\r\n]', before)[-1], re.split(r'[\r\n]', after)[0]]
+    # newText 自带换行（要写多段）时前后相邻段也比，否则只比同一段
+    if re.search(r'[\r\n]', new_text):
+        sides = [before, after]
+    else:
+        sides = [re.split(r'[\r\n]', before)[-1], re.split(r'[\r\n]', after)[0]]
     best = ''
     for side in sides:
         prev = [0] * (len(side) + 1)

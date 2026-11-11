@@ -170,8 +170,11 @@ const ECHO_MIN_CHARS = 6;
 function outsideAnchorEcho(anchorText, before, after, newText) {
   const t = String(newText || ''), a = String(anchorText || '');
   if (t.replace(/\s/g, '').length < ECHO_MIN_CHARS) return null;
-  // 只比同一段：contextAround 跨段带 \n
-  const sides = [String(before || '').split(/[\r\n]/).pop(), String(after || '').split(/[\r\n]/)[0]];
+  // 单段 newText 只比同一段（contextAround 跨段带 \n）；newText 自带换行 = 要写多段，
+  // 前后相邻段也比（g19：把刚插入的下一段又拼进锚点替换）
+  const multi = /[\r\n]/.test(t);
+  const sides = multi ? [String(before || ''), String(after || '')]
+    : [String(before || '').split(/[\r\n]/).pop(), String(after || '').split(/[\r\n]/)[0]];
   let best = '';
   for (const c of sides) {
     // 最长公共子串 DP；某格最长串若在锚点原文里，它的后缀也都在，故每格只查最长串

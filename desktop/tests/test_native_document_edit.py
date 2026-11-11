@@ -41,6 +41,9 @@ class EditContracts(unittest.TestCase):
                                                    '每逾期一日按合同总价的 0.05%'))
         self.assertIsNone(edit.outside_anchor_echo('第三条', '', '\n第四条 违约金：任一方违约，应按合同总价的 50%',
                                                    '第三条 违约金：任一方违约，应按合同总价的 50%'))
+        # newText 自带换行时相邻段也比（g19：把刚插入的下一段又拼进锚点替换）
+        self.assertTrue(edit.outside_anchor_echo('第三条 交付。', '执行。\n', '\n第四条 随附文件：乙方交货时应随附合格证。',
+                                                 '第三条 交付。\n第四条 随附文件：乙方交货时应随附合格证。'))
         self.assertIn('锚点只覆盖「第三条」', edit.echo_edit_error('第三条', '交付：甲方'))
 
     def test_readonly_rejects_before_model_identity_or_author_access(self):

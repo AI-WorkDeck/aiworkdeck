@@ -95,3 +95,12 @@ test('text in the next paragraph is not treated as an echo', () => {
   const s = setup('第三条', { before: '', after: '\n第四条 违约金：任一方违约，应按合同总价的 50%' })
   assert.equal(s.methods.replace_at_position({ anchor: s.anchor, newText: '第三条 违约金：任一方违约，应按合同总价的 50%' }).success, true)
 })
+// g19（2026-11-11 复测）：刚在第三条后插入新段，模型又把「第三条…\n新段」整体写进第三条的锚点
+test('multi-paragraph newText that re-types the neighbouring paragraph is rejected', () => {
+  const clause3 = '第三条 交付：甲方应在收到货物后 7 日内验收。'
+  const s = setup(clause3, { before: '执行。\n', after: '\n第四条 随附文件：乙方交货时应随附产品合格证和出厂检验报告。\n第四条 违约金' })
+  const result = s.methods.replace_at_position({ anchor: s.anchor, newText: clause3 + '\n第四条 随附文件：乙方交货时应随附产品合格证和出厂检验报告。' })
+  assert.equal(result.success, false)
+  assert.match(result.message, /随附文件/)
+  assert.equal(s.writes(), 0)
+})
