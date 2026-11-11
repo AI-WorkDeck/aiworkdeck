@@ -132,6 +132,8 @@ class ToolDisclosurePolicyTest {
         expectations.put("转PDF发给客户", "doc_export_pdf");
         expectations.put("新建一个文件夹叫证据", "create_folder");
         expectations.put("把这几份文件移动到归档", "move_files");
+        expectations.put("把根目录这6个文件分好类：起诉状和代理词放「01 诉讼文书」", "move_files");
+        expectations.put("把这些文件归类到对应文件夹", "move_files");
         expectations.put("把合同草稿.docx删了", "move_to_trash");
         expectations.put("放进回收站", "move_to_trash");
         expectations.put("你还记得我之前说过的偏好吗", "memory_search");
