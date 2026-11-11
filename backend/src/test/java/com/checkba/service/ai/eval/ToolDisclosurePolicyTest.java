@@ -471,17 +471,17 @@ class ToolDisclosurePolicyTest {
     @DisplayName("类目归属：edit 从 doc_ 通配里拆出来、tag 独立、记忆/证据各归其位，导出 PDF 不被 format 吃掉")
     void categoryAssignmentsAfterTheSplit() {
         // edit：定位 / 删改 / 按段落取改。核心集里的几个照旧是 core（categoryOf 先判核心集）
-        for (String name : List.of("doc_goto", "doc_collapse_cursor", "doc_delete_selection", "doc_redo",
+        for (String name : List.of("doc_select", "doc_delete_selection", "doc_redo",
                 "doc_modify_paragraph", "doc_insert_under_heading")) {
             assertEquals("edit", POLICY.categoryOf(name), name);
         }
         // #1064 第二步退出核心集后归 edit
-        for (String name : List.of("doc_select_anchor", "doc_select_paragraph", "doc_get_paragraph", "doc_get_outline",
+        for (String name : List.of("doc_get_paragraph", "doc_get_outline",
                 "doc_replace_selection")) {
             assertEquals("edit", POLICY.categoryOf(name), name);
         }
         assertEquals("revision", POLICY.categoryOf("doc_get_comments"), "看批注与回复 / 解决批注同类");
-        assertEquals("legal", POLICY.categoryOf("law_search_keyword"));
+        assertEquals("legal", POLICY.categoryOf("law_recognition"));
         // format 剩下的才是真·版式
         for (String name : List.of("doc_format_selection", "doc_set_paragraph_format", "doc_insert_toc",
                 "doc_set_page_setup", "doc_insert_image")) {

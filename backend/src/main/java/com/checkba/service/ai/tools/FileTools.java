@@ -394,16 +394,6 @@ public class FileTools implements AgentToolComponent {
         return extract_file_text(fileId, null, null);
     }
 
-    @ToolShim(replacedBy = "search_project_files")
-    @ToolMeta(displayName = "跨项目搜索文件", category = "file", offerToModel = false)
-    @Tool("按文件名关键词跨全部有权限的项目搜索文件。")
-    public String search_across_projects(
-            @P("Keyword or substring to match against file names across all user projects") String keyword
-    ) {
-        return ToolShims.hint(searchAcrossProjects(keyword), "search_project_files",
-                "search_project_files(fileNamePattern, scope=all)");
-    }
-
     private String searchAcrossProjects(String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return "Error: keyword is required.";
@@ -893,15 +883,6 @@ public class FileTools implements AgentToolComponent {
         return report.toString().trim();
     }
 
-    @ToolShim(replacedBy = "move_files")
-    @ToolMeta(displayName = "批量移动文件", category = "file", refreshFiles = true, offerToModel = false)
-    @Tool("批量移动项目文件/文件夹（一次调用）。")
-    public String move_files_batch(
-            @P("移动清单，JSON 数组 [{\"sourcePath\":\"...\",\"destPath\":\"...\"}]") String movesJson
-    ) {
-        return ToolShims.hint(move_files(movesJson), "move_files", "move_files(movesJson)");
-    }
-
     /** 一次 move_to_trash 最多多少项（与 move_files 同值同口径）。 */
     private static final int MAX_BATCH_TRASH = 50;
 
@@ -1133,24 +1114,6 @@ public class FileTools implements AgentToolComponent {
             return "Successfully renamed to '" + renamed.getName() + "' (fileId=" + renamed.getId() + ").";
         } catch (Exception e) {
             return "Error renaming: " + e.getMessage();
-        }
-    }
-
-    @ToolShim(replacedBy = "move_files")
-    @ToolMeta(displayName = "移动文件", category = "file", refreshFiles = true, offerToModel = false)
-    @Tool("按 ID 把项目文件或文件夹移入另一个文件夹。")
-    public String move_project_file(
-            @P("File or folder ID to move") Long fileId,
-            @P(value = "Target folder ID (optional; omit for project root)", required = false) Long targetFolderId
-    ) {
-        log.info("Tool: move_project_file {} -> folder {}", fileId, targetFolderId);
-        try {
-            ProjectFile moved = projectFileService.move(fileId, targetFolderId, null, toolUserId());
-            return ToolShims.hint("Successfully moved '" + moved.getName() + "' to "
-                    + (targetFolderId == null ? "project root" : "folder " + targetFolderId) + ".",
-                    "move_files", "move_files(movesJson=[{sourcePath, destPath}])");
-        } catch (Exception e) {
-            return "Error moving: " + e.getMessage();
         }
     }
 

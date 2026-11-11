@@ -3,39 +3,36 @@
 
 package com.checkba.service.ai.eval;
 
+import com.checkba.service.ai.ClientCapabilityService;
 import com.checkba.service.ai.PluginService;
 import com.checkba.service.ai.ToolRegistry;
 import com.checkba.service.ai.tools.AgentToolComponent;
 import com.checkba.service.ai.tools.ToolMeta;
-import com.checkba.service.ai.tools.ToolShim;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.checkba.service.ai.tools.ToolShims;
 import dev.langchain4j.agent.tool.Tool;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * V4 兼容壳的契约与到期绊线（docs/plans/tool-system-v2.md E1）。
+ * V4/V5 合并留下的旧工具名：V9 已删掉全部 {@code @ToolShim} 兼容壳（docs/plans/tool-system-v2.md E1）。
  *
- * <p>壳 = 带 {@link ToolShim} 的旧名方法：注册但不下发（offerToModel=false），指向的新工具必须存在且下发；
- * 逐名钉住，新增/删除都要来改 {@link #V4_SHIMS}。{@link #shimsMustBeDeletedBeforeTheirUntilVersion} 读
- * {@code desktop/package.json} 的版本号，到 0.83 变红——提醒删壳，别让兼容壳像 deep_search 一样滞留五个版本。
+ * <p>钉住三件事：旧名不再是注册的 {@code @Tool} 方法；{@link ToolShims} 的旧名 → 新名表覆盖全部 48 个旧名且新名都已注册并下发；
+ * 调到旧名时，参数完全相同的纯改名（{@code move_files_batch}、{@code capability_apply}）按新名执行，其余返回「已改名为 X」的错误。
  */
-class ToolShimContractTest {
+public class ToolShimContractTest {
 
-    /** V4 合并留下的 45 个旧名壳（0.83 删除）。 */
-    static final Set<String> V4_SHIMS = Set.of(
+    /** V4 合并删掉的 45 个旧名。 */
+    static final Set<String> V4_REMOVED = Set.of(
             "doc_accept_revision", "doc_reject_revision", "doc_accept_all_revisions", "doc_reject_all_revisions",
             "doc_reply_comment", "doc_resolve_comment",
             "doc_table_add_row", "doc_table_delete_row", "doc_table_add_col", "doc_table_delete_col",
@@ -52,93 +49,102 @@ class ToolShimContractTest {
             "law_search_keyword", "text_write_file", "move_files_batch", "move_project_file",
             "list_project_folders", "search_across_projects", "capability_apply");
 
-    /** V5 会议合流留下的 3 个旧名壳（0.83 删除）。 */
-    static final Set<String> V5_SHIMS = Set.of("meeting_list_recordings", "tmeet_list_meetings", "tmeet_get_transcript");
+    /** V5 会议合流删掉的 3 个旧名。 */
+    static final Set<String> V5_REMOVED = Set.of("meeting_list_recordings", "tmeet_list_meetings", "tmeet_get_transcript");
 
-    private record Shim(String name, ToolShim shim, ToolMeta meta) {
+    /** 参数与新工具完全相同、调到时直接按新名执行的旧名。 */
+    static final Set<String> SAME_ARGS = Set.of("move_files_batch", "capability_apply");
+
+    private static Set<String> allRemoved() {
+        Set<String> all = new TreeSet<>(V4_REMOVED);
+        all.addAll(V5_REMOVED);
+        return all;
     }
 
-    private static Map<String, Shim> declaredShims() {
-        Map<String, Shim> out = new TreeMap<>();
+    @Test
+    @DisplayName("旧名都不再是 @Tool 方法，也不再注册；映射表恰好覆盖这 48 个旧名，指向的新名已注册并下发")
+    void removedNamesAreGoneAndMapToOfferedTools() {
+        Set<String> toolMethods = new TreeSet<>();
         for (AgentToolComponent bean : RealToolBeans.instantiateAll()) {
             for (Method m : bean.getClass().getDeclaredMethods()) {
-                ToolShim shim = m.getAnnotation(ToolShim.class);
-                if (shim != null) {
-                    assertTrue(m.isAnnotationPresent(Tool.class), m.getName() + " 带 @ToolShim 却不是 @Tool");
-                    out.put(m.getName(), new Shim(m.getName(), shim, m.getAnnotation(ToolMeta.class)));
-                }
+                if (m.isAnnotationPresent(Tool.class)) toolMethods.add(m.getName());
             }
         }
-        return out;
-    }
+        Set<String> leftover = new TreeSet<>(allRemoved());
+        leftover.retainAll(toolMethods);
+        assertTrue(leftover.isEmpty(), "这些旧名又成了 @Tool 方法：" + leftover);
 
-    @Test
-    @DisplayName("兼容壳逐名钉住；每个壳都是只登记不下发，且指向的新工具已注册并下发")
-    void shimsArePinnedHiddenAndPointAtOfferedTools() {
-        Map<String, Shim> shims = declaredShims();
-        Set<String> expected = new TreeSet<>(V4_SHIMS);
-        expected.addAll(V5_SHIMS);
-        assertEquals(expected, shims.keySet());
+        assertEquals(allRemoved(), new TreeSet<>(ToolShims.replacements().keySet()));
 
-        ToolRegistry registry = new RecordingToolRegistry(RealToolBeans.instantiateAll(), new PluginService());
-        ((RecordingToolRegistry) registry).init();
+        RecordingToolRegistry registry = new RecordingToolRegistry(RealToolBeans.instantiateAll(), new PluginService());
+        registry.init();
         Set<String> offered = new TreeSet<>();
         registry.getAllSpecifications().forEach(spec -> offered.add(spec.name()));
-        for (Shim s : shims.values()) {
-            assertTrue(s.meta() != null && !s.meta().offerToModel(), s.name() + " 是兼容壳，必须 offerToModel=false");
-            assertTrue(registry.resolve(s.name()).isPresent(), s.name() + " 兼容壳必须仍注册（旧对话回放与 XML 兜底）");
-            assertFalse(offered.contains(s.name()), s.name() + " 不该下发给模型");
-            assertTrue(offered.contains(s.shim().replacedBy()), s.name() + " 指向的 " + s.shim().replacedBy() + " 必须已注册并下发");
-            assertTrue(registry.resolve(s.shim().replacedBy()).isPresent());
+        ToolShims.replacements().forEach((oldName, newName) -> {
+            assertTrue(registry.resolve(oldName).isEmpty(), oldName + " 不该再注册");
+            assertFalse(offered.contains(oldName), oldName);
+            assertTrue(offered.contains(newName), oldName + " 指向的 " + newName + " 必须已注册并下发");
+        });
+        assertEquals("doc_revisions", ToolShims.canonical("doc_accept_revision"));
+        assertEquals("doc_revisions", ToolShims.canonical("doc_revisions"));
+    }
+
+    @Test
+    @DisplayName("调到旧名：纯改名按新名执行并附提示，其余返回「renamed to X」错误且 found=false；未知名字仍是原那句")
+    void callingRemovedNamesResolvesOrErrs() {
+        for (String oldName : allRemoved()) {
+            String target = ToolShims.sameArgsTarget(oldName);
+            if (SAME_ARGS.contains(oldName)) {
+                assertEquals(ToolShims.canonical(oldName), target);
+            } else {
+                assertNull(target, oldName + " 参数和新工具不同，不能静默改道");
+                String msg = ToolRegistry.unknownToolMessage(oldName);
+                assertTrue(msg.startsWith("Error: tool '" + oldName + "' was renamed to '" + ToolShims.canonical(oldName) + "'"), msg);
+                assertTrue(msg.contains("Call " + ToolShims.canonical(oldName) + "("), msg);
+            }
         }
+        assertEquals("Tool not found or arguments invalid.", ToolRegistry.unknownToolMessage("no_such_tool"));
+
+        ToolRegistry registry = new ToolRegistry(List.of(new FakeTools()), new PluginService(), new ClientCapabilityService());
+        registry.init();
+        // 渲染期（无 ctx）也能走通：旧名 → 新名执行、回执末尾附提示
+        ToolRegistry.ToolResult moved = registry.execute("move_files_batch", "{\"movesJson\":\"[]\"}", null);
+        assertTrue(moved.found());
+        assertTrue(moved.output().startsWith("moved []"), moved.output());
+        assertTrue(moved.output().contains("move_files_batch 已并入 move_files"), moved.output());
+
+        ToolRegistry.ToolResult renamed = registry.execute("doc_accept_revision", "{\"index\":1}", null);
+        assertFalse(renamed.found());
+        assertTrue(renamed.output().contains("was renamed to 'doc_revisions'"), renamed.output());
     }
 
     @Test
-    @DisplayName("ToolShims 的旧名→新名映射表与各 @ToolShim(replacedBy) 逐项一致（SkillRegistry 迁移用户自建 skill 白名单靠它）")
-    void replacementTableMatchesAnnotations() {
-        Map<String, String> fromAnnotations = new TreeMap<>();
-        declaredShims().forEach((name, shim) -> fromAnnotations.put(name, shim.shim().replacedBy()));
-        assertEquals(fromAnnotations, new TreeMap<>(com.checkba.service.ai.tools.ToolShims.replacements()));
-        assertEquals("doc_revisions", com.checkba.service.ai.tools.ToolShims.canonical("doc_accept_revision"));
-        assertEquals("doc_revisions", com.checkba.service.ai.tools.ToolShims.canonical("doc_revisions"));
+    @DisplayName("确认闸按新名判：纯改名的旧名指向 destructive 工具时同样要确认")
+    void sameArgsRenameIsGatedLikeTheNewTool() {
+        ToolRegistry registry = new ToolRegistry(List.of(new FakeTools()), new PluginService(), new ClientCapabilityService());
+        registry.init();
+        assertTrue(registry.requiresConfirmation("capability_install"));
+        assertTrue(registry.requiresConfirmation("capability_apply"));
+        assertFalse(registry.requiresConfirmation("move_files_batch"));
     }
 
     @Test
-    @DisplayName("TOOL_NAME_ALIASES 保持空表：更名走 @ToolShim，不走静默别名")
+    @DisplayName("TOOL_NAME_ALIASES 保持空表：旧名走 ToolShims 的改名表，不走静默别名")
     void aliasTableStaysEmpty() {
         assertTrue(ToolRegistry.TOOL_NAME_ALIASES.isEmpty());
     }
 
-    @Test
-    @DisplayName("绊线：desktop/package.json 版本到兼容壳的 until（0.83）就变红——删掉所有 @ToolShim 方法、V4_SHIMS、CSV 里的壳行与 toolDisplayNames 之外的引用")
-    void shimsMustBeDeletedBeforeTheirUntilVersion() throws Exception {
-        Path pkg = Path.of("..", "desktop", "package.json");
-        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isRegularFile(pkg), "单独跑 backend 模块时没有 desktop/，跳过");
-        String version = new ObjectMapper().readTree(pkg.toFile()).path("version").asText();
-        for (Shim s : declaredShims().values()) {
-            assertTrue(compare(version, s.shim().until()) < 0,
-                    "当前版本 " + version + " 已到 " + s.name() + " 兼容壳的 until=" + s.shim().until()
-                            + "：按 tool-system-v2 E1 删除所有 @ToolShim 壳（V9 收尾），不要往后顺延");
-        }
-    }
+    public static class FakeTools implements AgentToolComponent {
+        @ToolMeta(displayName = "移动")
+        @Tool("move")
+        public String move_files(String movesJson) { return "moved " + movesJson; }
 
-    /** 逐段比较 major.minor.patch（忽略预发布后缀）。 */
-    static int compare(String a, String b) {
-        String[] x = a.split("[.-]");
-        String[] y = b.split("[.-]");
-        for (int i = 0; i < 3; i++) {
-            int xi = i < x.length && x[i].matches("\\d+") ? Integer.parseInt(x[i]) : 0;
-            int yi = i < y.length && y[i].matches("\\d+") ? Integer.parseInt(y[i]) : 0;
-            if (xi != yi) return Integer.compare(xi, yi);
-        }
-        return 0;
-    }
+        @ToolMeta(displayName = "安装", access = ToolMeta.Access.DESTRUCTIVE)
+        @Tool("install")
+        public String capability_install(String planId) { return "installed " + planId; }
 
-    @Test
-    @DisplayName("版本比较自检：0.82.9 < 0.83，0.83.0 == 0.83，0.100 > 0.83")
-    void versionCompareBehaves() {
-        assertTrue(compare("0.82.9", "0.83") < 0);
-        assertEquals(0, compare("0.83.0", "0.83"));
-        assertTrue(compare("0.100.0", "0.83") > 0);
+        @ToolMeta(displayName = "修订")
+        @Tool("revisions")
+        public String doc_revisions(String action, Integer index) { return "ok"; }
     }
 }

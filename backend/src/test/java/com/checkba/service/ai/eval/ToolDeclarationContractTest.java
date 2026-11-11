@@ -70,13 +70,13 @@ class ToolDeclarationContractTest {
      *       而那个配置界面在任务窗格里根本不存在，模型会停在那里等一个永远不会来的确认；</li>
      *   <li>{@code pdf_highlight} / {@code pdf_annotate} / {@code pdf_redact} /
      *       {@code pdf_replace_text} —— PdfTools.finishModification 里的 sendReloadFileAction；</li>
-     *   <li>{@code text_write_file} / {@code text_find_replace} ——
+     *   <li>{@code text_find_replace} ——
      *       TextFileEditTools.writeBack 里的 sendTextReloadFileAction。</li>
      *   <li><b>管线前置步骤跟随收尾工具</b>（dev-board#1065 T-10）：一个工具如果唯一的用途是给某个
      *       已声明 LOWA 的工具供料，它也声明 LOWA——否则模型在 Office / none 会话里陪用户走完几轮确认，
      *       走到最后一步才发现收尾工具不在清单里。{@code litigation_reference} / {@code litigation_checkpoint}
      *       供 litigation_render；{@code litigation_timeline_start} / {@code litigation_timeline_step} 供
-     *       litigation_timeline_render；{@code pptx_generate_outline} / {@code pptx_refine_outline} /
+     *       litigation_timeline_render；{@code pptx_outline} /
      *       {@code pptx_check_service} 为 pptx_generate 做准备，{@code pptx_get_project_pages} /
      *       {@code pptx_export_editable} 要的 serviceProjectId 只能来自 pptx_generate。
      *       这一组不发上述四个 send，所以不在下面的调用点绊线里，只靠这份清单钉住。</li>
@@ -100,15 +100,12 @@ class ToolDeclarationContractTest {
             "pdf_annotate",
             "pdf_redact",
             "pdf_replace_text",
-            "text_write_file",
             "text_find_replace",
             // 管线前置步骤（dev-board#1065 T-10）
             "litigation_reference",
             "litigation_checkpoint",
             "litigation_timeline_start",
             "litigation_timeline_step",
-            "pptx_generate_outline",
-            "pptx_refine_outline",
             "pptx_outline",
             "pptx_get_project_pages",
             "pptx_check_service",
@@ -148,16 +145,12 @@ class ToolDeclarationContractTest {
      * 只登记、不下发规格的工具（offerToModel = false）。
      *
      * <p>tool-system-v2 V3 已删除全部 22 个长期隐藏工具（delete_file、read_document、
-     * search_knowledge_base、pptx_open_file 等）；V4 起名单只剩合并留下的兼容壳
-     * （{@link ToolShimContractTest#V4_SHIMS}，0.83 删），任何新增的 offerToModel = false
+     * search_knowledge_base、pptx_open_file 等）；V9 又删掉了 V4/V5 合并留下的全部兼容壳
+     * （旧名见 {@link ToolShimContractTest#V4_REMOVED}），名单现为空。任何新增的 offerToModel = false
      * 都要回来改这份清单并说明理由。已删除的名字由 {@code permanentlyHiddenToolsAreStillRegistered}
      * 旁的 {@code deletedHiddenToolsAreGone} 钉住「不再注册」。
      */
-    private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>(ToolShimContractTest.V4_SHIMS);
-
-    static {
-        EXPECTED_NOT_OFFERED.addAll(ToolShimContractTest.V5_SHIMS);
-    }
+    private static final Set<String> EXPECTED_NOT_OFFERED = new TreeSet<>();
 
     /** V3 删除的 22 个长期隐藏工具（docs/plans/tool-system-v2-inventory.csv 里 verdict=deprecate 的行）。 */
     private static final Set<String> DELETED_IN_V3 = new TreeSet<>(Set.of(

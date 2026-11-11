@@ -3,7 +3,6 @@ ask_user,builtin,agent,ALL,read,Y,Y,4,341,58,zh,en,keep,ask_user,agent,Y,Y,Y,Y,Y
 list_attached_files,builtin,files,ALL,read,cond,Y,2,137,31,zh,en,keep,list_attached_files,files,C,C,C,C,C,C,C,C,N,V1: description rewritten to the A5 template
 capability_list,builtin,capability,ALL,read,N,Y,0,98,44,zh,zh,keep,capability_list,developer,N,N,N,N,N,N,N,N,Y,"single job, zh, short first line"
 capability_install,builtin,capability,ALL,write,N,Y,2,305,48,zh,mixed,keep,capability_install,developer,N,N,N,N,N,N,N,N,N,V4: absorbs merged tools (see shim rows); description rewritten to the A5 template
-capability_apply,builtin,capability,ALL,write,N,Y,1,113,49,zh,zh,shim→capability_install,capability_install,developer,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to capability_install, deleted at 0.83); two-phase folded into confirm gate (confirm=always)"
 capability_select,builtin,capability,ALL,write,N,Y,2,145,28,zh,mixed,keep+rewrite-desc,capability_select,developer,N,N,N,N,N,N,N,N,N,body mixed
 doc_restore_checkpoint,builtin,doc,LOWA,destructive,cond,Y,2,188,43,zh,zh,keep,doc_restore_checkpoint,docx-edit,C,C,Y,N,N,N,N,N,N,state-conditional core: offered once a checkpoint exists (pptx: always)
 search_project_content,builtin,search,ALL,read,Y,Y,4,288,76,zh,en,keep,search_project_content,files,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
@@ -14,7 +13,6 @@ doc_audit_structure,builtin,doc,LOWA,read,Y,Y,0,194,32,zh,zh,keep,doc_audit_stru
 doc_list_project_files,builtin,doc,ALL,read,Y,Y,1,228,42,zh,zh,keep,doc_list_project_files,files,Y,Y,Y,Y,Y,Y,Y,Y,Y,V4: absorbs merged tools (see shim rows); description rewritten to the A5 template
 doc_open_file,builtin,doc,LOWA,write,Y,Y,1,109,11,zh,zh,keep,doc_open_file,files,Y,Y,Y,Y,N,N,N,N,N,"single job, zh, short first line"
 doc_start_stream,builtin,doc,LOWA,write,Y,Y,3,305,27,zh,mixed,keep,doc_start_stream,files,Y,Y,Y,Y,N,N,N,N,N,V1: description rewritten to the A5 template
-doc_goto,builtin,doc,LOWA,read,N,Y,2,131,13,zh,mixed,shim→doc_select,doc_select,docx-edit,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_select, deleted at 0.83); target=start|end; access→read"
 doc_find_text,builtin,doc,LOWA,read,Y,Y,2,315,63,zh,mixed,keep,doc_find_text,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_find_replace,builtin,doc,LOWA,write,Y,Y,3,298,28,zh,mixed,keep,doc_find_replace,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_replace_selection,builtin,doc,LOWA,write,N,Y,2,176,19,zh,zh,keep,doc_replace_selection,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -27,9 +25,6 @@ doc_export_pdf,builtin,doc,LOWA,write,N,Y,1,162,41,zh,zh,keep,doc_export_pdf,fil
 doc_get_document_text,builtin,doc,LOWA,read,Y,Y,2,220,35,zh,mixed,keep,doc_get_document_text,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_clauses,builtin,doc,LOWA,read,Y,Y,0,192,35,zh,mixed,keep,doc_get_clauses,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_cursor_context,builtin,doc,LOWA,read,Y,Y,0,71,33,zh,zh,keep,doc_get_cursor_context,docx-edit,Y,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-doc_select_anchor,builtin,doc,LOWA,read,N,Y,1,113,40,zh,zh,shim→doc_select,doc_select,docx-edit,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_select, deleted at 0.83); target=anchor"
-doc_select_paragraph,builtin,doc,LOWA,read,N,Y,2,176,75,zh,mixed,shim→doc_select,doc_select,docx-edit,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_select, deleted at 0.83); target=paragraph"
-doc_collapse_cursor,builtin,doc,LOWA,read,N,Y,1,144,25,zh,mixed,shim→doc_select,doc_select,docx-edit,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_select, deleted at 0.83); target=collapse"
 doc_replace_at_anchor,builtin,doc,LOWA,write,Y,Y,2,369,48,zh,zh,keep,doc_replace_at_anchor,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_delete_selection,builtin,doc,LOWA,write,N,Y,0,70,20,zh,zh,keep,doc_delete_selection,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line; access fixed to write in V4 (tracked deletion is reversible)"
 doc_format_selection,builtin,doc,LOWA,write,N,Y,13,764,40,zh,mixed,keep+rewrite-desc,doc_format_selection,docx-format,N,N,N,N,N,N,N,N,N,13 flat params -> one style/rule object; 764 tokens
@@ -39,10 +34,6 @@ doc_format_table,builtin,doc,LOWA,write,N,Y,16,797,54,zh,mixed,keep+rewrite-desc
 doc_insert_table,builtin,doc,LOWA,write,Y,Y,2,157,56,zh,zh,keep,doc_insert_table,table,Y,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_table_read,builtin,doc_table,LOWA,read,N,Y,4,259,47,zh,zh,keep,doc_table_read,table,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_table_set_cell,builtin,doc_table,LOWA,write,N,Y,4,257,25,zh,zh,keep,doc_table_set_cell,table,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-doc_table_add_row,builtin,doc_table,LOWA,write,N,Y,5,321,15,zh,mixed,shim→doc_table_insert,doc_table_insert,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_table_insert, deleted at 0.83); axis=row"
-doc_table_delete_row,builtin,doc_table,LOWA,destructive,N,Y,5,306,14,zh,zh,shim→doc_table_delete,doc_table_delete,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_table_delete, deleted at 0.83); axis=row"
-doc_table_add_col,builtin,doc_table,LOWA,write,N,Y,5,301,15,zh,zh,shim→doc_table_insert,doc_table_insert,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_table_insert, deleted at 0.83); axis=col"
-doc_table_delete_col,builtin,doc_table,LOWA,destructive,N,Y,5,282,14,zh,zh,shim→doc_table_delete,doc_table_delete,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_table_delete, deleted at 0.83); axis=col; destructive stays separate"
 doc_get_formatting,builtin,doc,LOWA,read,N,Y,1,204,230,zh,zh,keep+rewrite-desc,doc_get_formatting,docx-format,N,N,N,N,N,N,N,N,N,first line 230 chars
 doc_apply_standard_format,builtin,doc,LOWA,write,N,Y,8,483,29,zh,zh,keep,doc_apply_standard_format,docx-format,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_apply_style_profile,builtin,doc,LOWA,write,N,Y,1,226,69,mixed,mixed,keep+rewrite-desc,doc_apply_style_profile,template,N,N,N,N,N,N,N,N,N,first line mixed
@@ -52,18 +43,10 @@ doc_undo,builtin,doc,LOWA,write,Y,Y,1,85,16,zh,zh,keep,doc_undo,docx-edit,Y,Y,N,
 doc_redo,builtin,doc,LOWA,write,N,Y,1,62,15,zh,zh,keep,doc_redo,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_add_comment,builtin,doc,LOWA,write,Y,Y,2,164,58,zh,mixed,keep,doc_add_comment,review,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_comments,builtin,doc,LOWA,read,N,Y,0,115,60,zh,zh,keep,doc_get_comments,review,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-doc_reply_comment,builtin,doc,LOWA,write,N,Y,2,119,51,zh,mixed,shim→doc_update_comment,doc_update_comment,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_update_comment, deleted at 0.83); action=reply"
-doc_resolve_comment,builtin,doc,LOWA,write,N,Y,2,109,60,zh,zh,shim→doc_update_comment,doc_update_comment,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_update_comment, deleted at 0.83); action=resolve|reopen"
 doc_delete_comment,builtin,doc,LOWA,destructive,N,Y,1,85,49,zh,zh,keep,doc_delete_comment,review,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_list_revisions,builtin,doc,LOWA,read,N,Y,0,134,77,mixed,mixed,keep+rewrite-desc,doc_list_revisions,review,N,N,N,N,N,N,N,N,N,first line mixed
-doc_accept_revision,builtin,doc,LOWA,write,N,Y,1,77,45,mixed,mixed,shim→doc_revisions,doc_revisions,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_revisions, deleted at 0.83); action=accept"
-doc_reject_revision,builtin,doc,LOWA,write,N,Y,1,79,45,mixed,mixed,shim→doc_revisions,doc_revisions,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_revisions, deleted at 0.83); action=reject"
-doc_accept_all_revisions,builtin,doc,LOWA,write,N,Y,0,68,18,zh,zh,shim→doc_revisions,doc_revisions,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_revisions, deleted at 0.83); action=accept_all"
-doc_reject_all_revisions,builtin,doc,LOWA,write,N,Y,0,48,18,zh,zh,shim→doc_revisions,doc_revisions,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_revisions, deleted at 0.83); action=reject_all"
 doc_edit_header_footer,builtin,doc,LOWA,write,N,Y,6,327,46,zh,mixed,keep+rewrite-desc,doc_edit_header_footer,docx-format,N,N,N,N,N,N,N,N,N,body mixed
 doc_insert_break,builtin,doc,LOWA,write,N,Y,1,113,36,zh,mixed,keep+rewrite-desc,doc_insert_break,docx-format,N,N,N,N,N,N,N,N,N,body mixed
-doc_insert_footnote,builtin,doc,LOWA,write,N,Y,2,140,42,zh,zh,shim→doc_insert_note,doc_insert_note,docx-format,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_insert_note, deleted at 0.83); kind=footnote"
-doc_insert_endnote,builtin,doc,LOWA,write,N,Y,2,129,26,zh,zh,shim→doc_insert_note,doc_insert_note,docx-format,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to doc_insert_note, deleted at 0.83); kind=endnote"
 doc_set_hyperlink,builtin,doc,LOWA,write,N,Y,2,184,19,zh,mixed,keep+rewrite-desc,doc_set_hyperlink,docx-format,N,N,N,N,N,N,N,N,N,body mixed
 doc_link_evidence,builtin,doc,LOWA,write,N,Y,7,515,64,mixed,mixed,keep+rewrite-desc,doc_link_evidence,evidence,N,N,N,N,N,N,N,N,N,first line mixed
 doc_list_evidence,builtin,doc,LOWA,read,N,Y,5,325,136,mixed,mixed,keep+rewrite-desc,doc_list_evidence,evidence,N,N,N,N,N,N,N,N,N,first line 136 chars; first line mixed
@@ -105,20 +88,16 @@ search_project_files,builtin,search,ALL,read,Y,Y,3,268,40,zh,en,keep,search_proj
 read_file,builtin,files,ALL,read,N,Y,1,200,70,en,en,keep+rewrite-desc,read_file,files,N,N,N,N,N,N,N,N,Y,first line en
 list_files,builtin,files,ALL,read,N,Y,1,203,142,en,en,keep+rewrite-desc,list_files,files,N,N,N,N,N,N,N,N,Y,first line 142 chars; first line en
 extract_file_text,builtin,files,ALL,read,Y,Y,3,322,65,zh,en,keep,extract_file_text,files,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
-search_across_projects,builtin,search,ALL,read,N,Y,1,107,97,en,en,shim→search_project_files,search_project_files,files,N,N,N,N,N,N,N,N,Y,"V4 shim (hidden, delegates to search_project_files, deleted at 0.83); scope=all"
 write_file,builtin,files,ALL,write,N,Y,5,362,34,zh,en,keep,write_file,files,N,N,N,N,N,N,N,N,W,V4: absorbs merged tools (see shim rows); description rewritten to the A5 template
 write_docx,builtin,files,ALL,write,Y,Y,4,232,32,zh,en,keep,write_docx,files,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
-move_files_batch,builtin,files,ALL,write,N,Y,1,221,42,zh,en,shim→move_files,move_files,files,N,N,N,N,N,N,N,N,W,"V4 shim (hidden, delegates to move_files, deleted at 0.83)"
 move_to_trash,builtin,files,ALL,destructive,N,Y,1,214,61,zh,en,keep,move_to_trash,files,N,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 create_folder,builtin,files,ALL,write,N,Y,2,118,25,zh,en,keep,create_folder,files,N,N,N,N,N,N,N,N,W,V1: description rewritten to the A5 template
 rename_project_file,builtin,files,ALL,write,N,Y,2,96,68,en,en,keep+rewrite-desc,rename_project_file,files,N,N,N,N,N,N,N,N,W,first line en
-move_project_file,builtin,files,ALL,write,N,Y,2,116,86,en,en,shim→move_files,move_files,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to move_files, deleted at 0.83); single move = array of 1"
 copy_files,builtin,files,ALL,write,N,Y,2,243,155,en,en,keep+rewrite-desc,copy_files,files,N,N,N,N,N,N,N,N,N,first line 155 chars; first line en
 image_generate_asset,builtin,image,ALL,write,N,Y,4,222,72,en,en,keep+rewrite-desc,image_generate_asset,slides,N,N,N,N,N,N,N,N,N,first line en
 image_get_generation,builtin,image,ALL,write,N,Y,1,102,79,en,en,keep+rewrite-desc,image_get_generation,slides,N,N,N,N,N,N,N,N,N,first line en; access fixed to write in V4 (imports file)
 law_search,builtin,law,ALL,read,Y,Y,4,236,23,zh,en,keep,law_search,legal,Y,Y,Y,Y,Y,Y,Y,Y,Y,V4: absorbs merged tools (see shim rows); description rewritten to the A5 template
 case_search,builtin,law,ALL,read,N,Y,1,113,102,en,en,keep+rewrite-desc,case_search,legal,N,N,N,N,N,N,N,N,Y,first line 102 chars; first line en
-law_search_keyword,builtin,law,ALL,read,N,Y,2,98,48,en,en,shim→law_search,law_search,legal,N,N,N,N,N,N,N,N,Y,"V4 shim (hidden, delegates to law_search, deleted at 0.83); mode=keyword"
 law_recognition,builtin,law,ALL,read,N,Y,1,64,65,en,en,keep+rewrite-desc,law_recognition,legal,N,N,N,N,N,N,N,N,Y,reposition as citation check: gains fileId/active-doc input (gap D5); first line en
 get_law_article,builtin,law,ALL,read,Y,Y,2,140,20,zh,en,keep,get_law_article,legal,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 litigation_timeline_start,builtin,litigation_timeline,LOWA,write,N,Y,1,186,178,en,en,keep+rewrite-desc,litigation_timeline_start,litigation,N,N,N,N,N,N,N,N,N,first line 178 chars; first line en
@@ -128,7 +107,6 @@ litigation_reference,builtin,litigation,LOWA,read,N,Y,1,163,62,en,en,keep+rewrit
 litigation_checkpoint,builtin,litigation,LOWA,read,N,Y,2,229,102,en,en,keep+rewrite-desc,litigation_checkpoint,litigation,N,N,N,N,N,N,N,N,N,first line 102 chars; first line en; access fixed to read in V4
 litigation_render,builtin,litigation,LOWA,write,N,Y,5,423,118,en,en,keep+rewrite-desc,litigation_render,litigation,N,N,N,N,N,N,N,N,N,first line 118 chars; first line en
 meeting_list,builtin,meeting,ALL,read,N,Y,5,0,0,zh,zh,new,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5: merges meeting_list_recordings + tmeet_list_meetings; source=recording|tencent|all; tencent routes to the plugin when installed+enabled (E4) else the built-in table"
-meeting_list_recordings,builtin,meeting,ALL,read,N,Y,0,62,102,en,en,shim→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5 shim (hidden, delegates to meeting_list, deleted at 0.83); source=recording"
 meeting_get_transcript,builtin,meeting,ALL,read,N,Y,3,94,123,en,en,keep,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,"V5: absorbs tmeet_get_transcript; meetingId is a string + source=recording|tencent; description rewritten"
 save_memory,builtin,memory,ALL,write,Y,Y,6,431,65,zh,mixed,keep,save_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
 query_memory,builtin,memory,ALL,read,Y,Y,6,381,54,zh,mixed,keep,query_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
@@ -143,10 +121,6 @@ office_ppt_add_image,builtin,office_ppt,OFFICE-ppt,write,N,Y,10,278,69,en,en,kee
 office_ppt_add_chart,builtin,office_ppt,OFFICE-ppt,write,N,Y,9,244,96,en,en,keep+rewrite-desc,office_ppt_add_chart,slides,N,N,N,N,N,N,N,N,N,first line 96 chars; first line en
 office_ppt_format_chart,builtin,office_ppt,OFFICE-ppt,write,N,Y,8,231,63,en,en,keep+rewrite-desc,office_ppt_format_chart,slides,N,N,N,N,N,N,N,N,N,first line en
 office_ppt_set_transition,builtin,office_ppt,OFFICE-ppt,write,N,Y,3,150,90,en,en,keep+rewrite-desc,office_ppt_set_transition,slides,N,N,N,N,N,N,N,N,N,first line 90 chars; first line en
-office_file_create,builtin,office_file,OFFICE-word,write,N,Y,0,119,25,mixed,mixed,shim→office_file,office_file,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_file, deleted at 0.83); action=create"
-office_file_save,builtin,office_file,OFFICE-word,write,N,Y,0,114,29,mixed,mixed,shim→office_file,office_file,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_file, deleted at 0.83); action=save"
-office_file_export_pdf,builtin,office_file,OFFICE-word,write,N,Y,1,108,20,mixed,mixed,shim→office_file,office_file,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_file, deleted at 0.83); action=export_pdf"
-office_file_open,builtin,office_file,OFFICE-word,write,N,Y,1,130,42,mixed,mixed,shim→office_file,office_file,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_file, deleted at 0.83); action=open"
 office_get_paragraphs,builtin,office,OFFICE-word,read,N,Y,2,108,24,mixed,mixed,keep+rewrite-desc,office_get_paragraphs,docx-edit,N,N,N,N,N,N,N,N,N,first line mixed
 office_get_outline,builtin,office,OFFICE-word,read,N,Y,0,61,23,mixed,mixed,keep+rewrite-desc,office_get_outline,docx-edit,N,N,N,N,N,N,N,N,N,first line mixed
 office_apply_style_profile,builtin,office,OFFICE-word,write,N,Y,1,99,25,mixed,mixed,keep+rewrite-desc,office_apply_style_profile,template,N,N,N,N,N,N,N,N,N,first line mixed
@@ -170,16 +144,10 @@ office_apply_standard_format,builtin,office,OFFICE-word,write,N,Y,1,237,80,mixed
 office_insert_table,builtin,office,OFFICE-word,write,N,Y,4,279,19,mixed,mixed,keep+rewrite-desc,office_insert_table,table,N,N,N,N,N,N,N,N,N,first line mixed
 office_table_read,builtin,office,OFFICE-word,read,N,Y,1,162,49,zh,mixed,keep+rewrite-desc,office_table_read,table,N,N,N,N,N,N,N,N,N,body mixed
 office_table_set_cell,builtin,office,OFFICE-word,write,N,Y,4,268,32,zh,mixed,keep+rewrite-desc,office_table_set_cell,table,N,N,N,N,N,N,N,N,N,body mixed
-office_table_add_row,builtin,office,OFFICE-word,write,N,Y,3,267,23,mixed,mixed,shim→office_table_insert,office_table_insert,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_table_insert, deleted at 0.83); axis=row"
-office_table_delete_row,builtin,office,OFFICE-word,destructive,N,Y,3,275,21,mixed,mixed,shim→office_table_delete,office_table_delete,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_table_delete, deleted at 0.83); axis=row"
-office_table_add_col,builtin,office,OFFICE-word,write,N,Y,3,289,23,mixed,mixed,shim→office_table_insert,office_table_insert,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_table_insert, deleted at 0.83); axis=col"
-office_table_delete_col,builtin,office,OFFICE-word,destructive,N,Y,3,210,21,mixed,mixed,shim→office_table_delete,office_table_delete,table,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_table_delete, deleted at 0.83); axis=col"
 office_insert_break,builtin,office,OFFICE-word,write,N,Y,3,223,22,mixed,mixed,keep+rewrite-desc,office_insert_break,docx-format,N,N,N,N,N,N,N,N,N,first line mixed
 office_set_hyperlink,builtin,office,OFFICE-word,write,N,Y,2,166,23,mixed,mixed,keep+rewrite-desc,office_set_hyperlink,docx-format,N,N,N,N,N,N,N,N,N,first line mixed
 office_edit_header_footer,builtin,office,OFFICE-word,write,N,Y,4,266,31,mixed,mixed,keep+rewrite-desc,office_edit_header_footer,docx-format,N,N,N,N,N,N,N,N,N,first line mixed
 office_get_comments,builtin,office,OFFICE-word,read,N,Y,0,86,53,mixed,mixed,keep+rewrite-desc,office_get_comments,review,N,N,N,N,N,N,N,N,N,first line mixed
-office_reply_comment,builtin,office,OFFICE-word,write,N,Y,3,171,19,mixed,mixed,shim→office_update_comment,office_update_comment,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_update_comment, deleted at 0.83); action=reply"
-office_resolve_comment,builtin,office,OFFICE-word,write,N,Y,3,206,30,mixed,mixed,shim→office_update_comment,office_update_comment,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_update_comment, deleted at 0.83); action=resolve|reopen"
 office_delete_comment,builtin,office,OFFICE-word,destructive,N,Y,2,215,29,mixed,mixed,keep+rewrite-desc,office_delete_comment,review,N,N,N,N,N,N,N,N,N,first line mixed
 office_insert_toc,builtin,office,OFFICE-word,write,N,Y,3,273,79,mixed,mixed,keep+rewrite-desc,office_insert_toc,docx-format,N,N,N,N,N,N,N,N,N,first line mixed
 office_set_page_setup,builtin,office,OFFICE-word,write,N,Y,6,377,28,mixed,mixed,keep+rewrite-desc,office_set_page_setup,docx-format,N,N,N,N,N,N,N,N,N,first line mixed
@@ -194,7 +162,6 @@ office_excel_merge_cells,builtin,office_excel,OFFICE-excel,write,N,Y,3,136,21,mi
 office_excel_sort_range,builtin,office_excel,OFFICE-excel,write,N,Y,5,215,17,mixed,mixed,keep+rewrite-desc,office_excel_sort_range,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
 office_excel_manage_sheets,builtin,office_excel,OFFICE-excel,write,N,Y,4,242,40,mixed,mixed,keep+rewrite-desc,office_excel_manage_sheets,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
 office_excel_freeze_panes,builtin,office_excel,OFFICE-excel,write,N,Y,4,241,21,mixed,mixed,keep+rewrite-desc,office_excel_freeze_panes,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
-office_excel_set_formulas,builtin,office_excel,OFFICE-excel,write,N,Y,3,332,36,mixed,mixed,shim→office_excel_set_values,office_excel_set_values,spreadsheet,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_excel_set_values, deleted at 0.83); ""="" prefix = formula, parity with sheet_write_cells"
 office_excel_get_overview,builtin,office_excel,OFFICE-excel,read,Y,Y,0,103,31,zh,zh,keep,office_excel_get_overview,spreadsheet,N,N,N,N,N,Y,N,N,N,V1: description rewritten to the A5 template
 office_excel_select_range,builtin,office_excel,OFFICE-excel,read,N,Y,2,146,57,zh,zh,keep,office_excel_select_range,spreadsheet,N,N,N,N,N,N,N,N,N,"single job, zh, short first line; access fixed to read in V4"
 office_excel_set_autofilter,builtin,office_excel,OFFICE-excel,write,N,Y,3,248,92,mixed,mixed,keep+rewrite-desc,office_excel_set_autofilter,spreadsheet,N,N,N,N,N,N,N,N,N,first line 92 chars; first line mixed
@@ -219,8 +186,6 @@ office_ppt_get_slide_details,builtin,office_ppt,OFFICE-ppt,read,N,Y,1,150,63,mix
 office_ppt_delete_shape,builtin,office_ppt,OFFICE-ppt,destructive,N,Y,3,213,33,mixed,zh,keep+rewrite-desc,office_ppt_delete_shape,slides,N,N,N,N,N,N,N,N,N,first line mixed
 office_excel_add_comment,builtin,office_excel,OFFICE-excel,write,N,Y,3,173,35,mixed,mixed,keep+rewrite-desc,office_excel_add_comment,review,N,N,N,N,N,N,N,N,N,first line mixed
 office_excel_get_comments,builtin,office_excel,OFFICE-excel,read,N,Y,2,159,55,zh,mixed,keep+rewrite-desc,office_excel_get_comments,review,N,N,N,N,N,N,N,N,N,body mixed
-office_excel_reply_comment,builtin,office_excel,OFFICE-excel,write,N,Y,3,143,20,mixed,mixed,shim→office_excel_update_comment,office_excel_update_comment,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_excel_update_comment, deleted at 0.83); action=reply"
-office_excel_resolve_comment,builtin,office_excel,OFFICE-excel,write,N,Y,3,156,31,mixed,mixed,shim→office_excel_update_comment,office_excel_update_comment,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_excel_update_comment, deleted at 0.83); action=resolve|reopen"
 office_excel_delete_comment,builtin,office_excel,OFFICE-excel,destructive,N,Y,2,133,29,mixed,mixed,keep+rewrite-desc,office_excel_delete_comment,review,N,N,N,N,N,N,N,N,N,first line mixed
 office_excel_set_data_validation,builtin,office_excel,OFFICE-excel,write,N,Y,13,533,22,mixed,mixed,keep+rewrite-desc,office_excel_set_data_validation,spreadsheet,N,N,N,N,N,N,N,N,N,13 flat params -> one style/rule object; 533 tokens
 office_excel_add_chart,builtin,office_excel,OFFICE-excel,write,N,Y,5,250,31,mixed,mixed,keep+rewrite-desc,office_excel_add_chart,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
@@ -229,10 +194,6 @@ office_excel_protect_sheet,builtin,office_excel,OFFICE-excel,write,N,Y,3,166,32,
 office_excel_group_rows_cols,builtin,office_excel,OFFICE-excel,write,N,Y,4,238,29,mixed,mixed,keep+rewrite-desc,office_excel_group_rows_cols,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
 office_excel_add_pivot_table,builtin,office_excel,OFFICE-excel,write,N,Y,6,388,39,zh,zh,keep,office_excel_add_pivot_table,spreadsheet,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 office_get_revisions,builtin,office,OFFICE-word,read,N,Y,0,92,70,mixed,mixed,keep+rewrite-desc,office_get_revisions,review,N,N,N,N,N,N,N,N,N,first line mixed
-office_accept_revision,builtin,office,OFFICE-word,write,N,Y,2,154,17,mixed,mixed,shim→office_revisions,office_revisions,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_revisions, deleted at 0.83); action=accept"
-office_reject_revision,builtin,office,OFFICE-word,write,N,Y,2,158,17,mixed,mixed,shim→office_revisions,office_revisions,review,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_revisions, deleted at 0.83); action=reject"
-office_insert_footnote,builtin,office,OFFICE-word,write,N,Y,3,182,22,mixed,mixed,shim→office_insert_note,office_insert_note,docx-format,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_insert_note, deleted at 0.83); kind=footnote"
-office_insert_endnote,builtin,office,OFFICE-word,write,N,Y,3,175,22,mixed,mixed,shim→office_insert_note,office_insert_note,docx-format,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to office_insert_note, deleted at 0.83); kind=endnote"
 office_insert_image,builtin,office,OFFICE-word,write,N,Y,4,284,32,zh,zh,keep,office_insert_image,docx-format,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 office_apply_style,builtin,office,OFFICE-word,write,N,Y,3,279,83,zh,zh,keep+rewrite-desc,office_apply_style,docx-format,N,N,N,N,N,N,N,N,N,first line 83 chars
 office_manage_content_control,builtin,office,OFFICE-word,write,N,Y,6,398,50,zh,mixed,keep+rewrite-desc,office_manage_content_control,docx-format,N,N,N,N,N,N,N,N,N,body mixed
@@ -247,22 +208,16 @@ pdf_annotate,builtin,pdf,LOWA,write,N,Y,4,190,28,zh,zh,keep,pdf_annotate,pdf,N,N
 pdf_redact,builtin,pdf,LOWA,destructive,N,Y,3,235,70,zh,zh,keep,pdf_redact,pdf,N,N,N,N,N,N,N,N,N,cross-reference desensitize_redact (file copy) vs in-place black box
 pdf_replace_text,builtin,pdf,LOWA,write,N,Y,4,241,25,zh,zh,keep,pdf_replace_text,pdf,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 pdf_merge,builtin,pdf,ALL,write,N,Y,2,253,25,zh,zh,keep,pdf_merge,pdf,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-pdf_split,builtin,pdf,ALL,write,N,Y,2,207,32,zh,zh,shim→pdf_pages,pdf_pages,pdf,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to pdf_pages, deleted at 0.83); op=split"
-pdf_extract_pages,builtin,pdf,ALL,write,N,Y,3,222,46,zh,zh,shim→pdf_pages,pdf_pages,pdf,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to pdf_pages, deleted at 0.83); op=extract"
 pdf_delete_pages,builtin,pdf,ALL,destructive,N,Y,3,188,42,zh,zh,keep,pdf_delete_pages,pdf,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-pdf_rotate_pages,builtin,pdf,ALL,write,N,Y,3,231,35,zh,mixed,shim→pdf_pages,pdf_pages,pdf,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to pdf_pages, deleted at 0.83); op=rotate"
 pdf_add_page_numbers,builtin,pdf,ALL,write,N,Y,4,396,44,mixed,mixed,keep+rewrite-desc,pdf_add_page_numbers,pdf,N,N,N,N,N,N,N,N,N,first line mixed
 pdf_to_word,builtin,pdf,LOWA,write,N,Y,3,433,78,zh,zh,keep,pdf_to_word,pdf,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 pdf_inspect_visual,builtin,pdf,ALL,read,N,Y,6,286,74,en,en,keep+rewrite-desc,pdf_inspect_visual,pdf,N,N,N,N,N,N,N,N,Y,first line en
 plugin_dev_scaffold,builtin,plugin_dev,ALL,write,N,Y,2,177,103,mixed,mixed,keep+rewrite-desc,plugin_dev_scaffold,developer,N,N,N,N,N,N,N,N,N,first line 103 chars; first line mixed
 plugin_dev_install,builtin,plugin_dev,ALL,write,N,Y,1,166,45,zh,zh,keep,plugin_dev_install,developer,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-list_project_folders,builtin,files,ALL,read,N,Y,0,113,154,zh,zh,shim→doc_list_project_files,doc_list_project_files,files,N,N,N,N,N,N,N,N,Y,"V4 shim (hidden, delegates to doc_list_project_files, deleted at 0.83); foldersOnly=true"
 pptx_check_service,builtin,pptx,LOWA,read,N,Y,0,54,17,zh,zh,hide-from-model,pptx_check_service,slides,N,N,N,N,N,N,N,N,N,health check is not a model action; orchestrator checks service
 pptx_generate,builtin,pptx,LOWA,write,N,Y,5,402,19,zh,zh,keep,pptx_generate,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-pptx_generate_outline,builtin,pptx,LOWA,write,N,Y,2,107,22,zh,zh,shim→pptx_outline,pptx_outline,slides,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to pptx_outline, deleted at 0.83); action=create"
 pptx_inspect_format,builtin,pptx,ALL,read,N,Y,2,253,39,zh,mixed,keep+rewrite-desc,pptx_inspect_format,slides,N,N,N,N,N,N,N,N,Y,body mixed
 pptx_get_project_pages,builtin,pptx,LOWA,read,N,Y,1,76,13,zh,zh,keep,pptx_get_project_pages,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-pptx_refine_outline,builtin,pptx,LOWA,write,N,Y,3,150,18,zh,zh,shim→pptx_outline,pptx_outline,slides,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to pptx_outline, deleted at 0.83); action=refine"
 pptx_export_editable,builtin,pptx,LOWA,write,N,Y,3,294,15,zh,zh,keep,pptx_export_editable,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 run_python,builtin,python,ALL,write,N,Y,1,234,123,en,en,keep+rewrite-desc,run_python,python,N,N,N,N,N,N,N,N,N,zh; mention sandbox limits once; first line 123 chars; first line en
 ref_list,builtin,ref,OFFICE,read,Y,Y,2,164,32,zh,mixed,keep,ref_list,reference,N,N,N,N,Y,Y,Y,N,N,V1: description rewritten to the A5 template
@@ -305,9 +260,6 @@ task_create,builtin,task,ALL,write,N,Y,11,511,60,zh,zh,keep,task_create,tasks,N,
 task_update,builtin,task,ALL,write,N,Y,8,338,87,mixed,zh,keep+rewrite-desc,task_update,tasks,N,N,N,N,N,N,N,N,W,first line 87 chars; first line mixed
 task_list,builtin,task,ALL,read,N,Y,3,264,27,zh,zh,keep,task_list,tasks,N,N,N,N,N,N,N,N,Y,the only agenda read tool (no calendar_agenda); add 安排 keyword
 docx_inspect_template,builtin,template,ALL,read,N,Y,2,246,194,en,en,keep+rewrite-desc,docx_inspect_template,template,N,N,N,N,N,N,N,N,Y,first line 194 chars; first line en
-tmeet_list_meetings,builtin,meeting,ALL,read,N,Y,1,90,77,en,en,shim→meeting_list,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5 shim (hidden, delegates to meeting_list, deleted at 0.83); source=tencent (always the built-in table)"
-tmeet_get_transcript,builtin,meeting,ALL,read,N,Y,1,82,115,en,en,shim→meeting_get_transcript,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,"V5 shim (hidden, delegates to meeting_get_transcript, deleted at 0.83); source=tencent (always the built-in table)"
-text_write_file,builtin,text,LOWA,write,N,Y,2,171,54,mixed,mixed,shim→write_file,write_file,files,N,N,N,N,N,N,N,N,N,"V4 shim (hidden, delegates to write_file, deleted at 0.83); mode=overwrite"
 text_find_replace,builtin,text,LOWA,write,N,Y,4,199,55,mixed,mixed,keep+rewrite-desc,text_find_replace,files,N,N,N,N,N,N,N,N,N,first line mixed
 todo_write,builtin,agent,ALL,write,Y,Y,1,317,27,zh,zh,keep,todo_write,agent,Y,Y,Y,Y,Y,Y,Y,Y,N,409 tokens for one param; <=150
 list_tools,builtin,agent,ALL,read,Y,Y,3,345,45,zh,en,keep,list_tools,agent,Y,Y,Y,Y,Y,Y,Y,Y,N,V1: description rewritten to the A5 template

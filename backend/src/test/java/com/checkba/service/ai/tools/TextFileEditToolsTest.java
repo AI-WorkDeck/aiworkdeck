@@ -160,7 +160,7 @@ class TextFileEditToolsTest {
         ProjectFile pf = textFile(14L, "合同.docx", "docx");
         when(repo.findById(14L)).thenReturn(Optional.of(pf));
 
-        String w = tools.text_write_file(14L, "x");
+        String w = tools.overwriteText(14L, "x");
         String r = tools.text_find_replace(14L, "a", "b", true);
 
         assertTrue(w.startsWith("Error"), w);
@@ -175,7 +175,7 @@ class TextFileEditToolsTest {
         ProjectFile pf = textFile(15L, "README.md", "md");
         when(repo.findById(15L)).thenReturn(Optional.of(pf));
 
-        String out = tools.text_write_file(15L, "# 新内容\n正文");
+        String out = tools.overwriteText(15L, "# 新内容\n正文");
 
         assertFalse(out.startsWith("Error"), out);
         assertEquals("# 新内容\n正文", savedContent(pf));
@@ -202,7 +202,7 @@ class TextFileEditToolsTest {
         pf.setProjectId(999L);
         when(repo.findById(16L)).thenReturn(Optional.of(pf));
 
-        String out = tools.text_write_file(16L, "x");
+        String out = tools.overwriteText(16L, "x");
 
         assertTrue(out.startsWith("Error"), out);
         verifyNoInteractions(storage);

@@ -332,7 +332,7 @@ class ExternalServiceDualTierRoutingTest {
             LegalTools t = tools(ExternalServiceProvider.PLATFORM, gateway, mcp);
 
             t.law_search("q");
-            t.law_search_keyword("民法典", null);
+            t.law_search(null, "keyword", "民法典", null);
             t.law_recognition("依据合同法");
             t.get_law_article("民法典", "509");
             t.case_search("合同解除");

@@ -85,7 +85,7 @@ class BuiltinSkillsTest {
         assertEquals(referencesVisible, visible.contains("ref_read"));
         Set<String> restrictedNames = restricted.stream().map(ToolSpecification::name)
                 .collect(java.util.stream.Collectors.toSet());
-        for (String writeTool : List.of("ref_edit", "doc_start_stream", "write_docx", "text_write_file")) {
+        for (String writeTool : List.of("ref_edit", "doc_start_stream", "write_docx", "write_file")) {
             assertTrue(realToolNames.contains(writeTool), writeTool + " must be a real tool for this guard to mean anything");
             assertFalse(restrictedNames.contains(writeTool), writeTool + " must remain restricted");
         }

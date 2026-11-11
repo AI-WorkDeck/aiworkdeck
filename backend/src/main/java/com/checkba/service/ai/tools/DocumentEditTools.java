@@ -125,7 +125,7 @@ public class DocumentEditTools implements AgentToolComponent {
         return doc_list_project_files(projectId, null);
     }
 
-    /** 只列文件夹的清单（doc_list_project_files foldersOnly=true；旧 list_project_folders 壳共用）。 */
+    /** 只列文件夹的清单（doc_list_project_files foldersOnly=true）。 */
     static String folderListing(List<ProjectFile> allFiles) {
         java.util.Map<Long, ProjectFile> byId = new java.util.HashMap<>();
         allFiles.stream().filter(f -> !Boolean.TRUE.equals(f.getIsDeleted())).forEach(f -> byId.put(f.getId(), f));
@@ -448,16 +448,6 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     // ==================== 选区和光标操作 ====================
-
-    @ToolShim(replacedBy = "doc_select")
-    @ToolMeta(displayName = "跳转光标", category = "document", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("把光标移到文档开头或结尾（type 只支持 start/end）。")
-    public String doc_goto(
-            @P("定位类型：start(文档开头) 或 end(文档结尾)") String type,
-            @P("保留参数，start/end 用不到，传空即可") String target
-    ) {
-        return ToolShims.hint(doc_select(type, null, null, null), "doc_select", "doc_select(target=start|end)");
-    }
 
     // ==================== 查找和替换 ====================
 
@@ -945,36 +935,6 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolShim(replacedBy = "doc_select")
-    @ToolMeta(displayName = "选中定位点", category = "document", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("选中 doc_find_text 返回的某个匹配（按 anchorId）。")
-    public String doc_select_anchor(
-            @P("doc_find_text 返回的 anchorId") String anchorId
-    ) {
-        return ToolShims.hint(doc_select("anchor", anchorId, null, null), "doc_select", "doc_select(target=anchor, anchorId)");
-    }
-
-    @ToolShim(replacedBy = "doc_select")
-    @ToolMeta(displayName = "选中段落", category = "document", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("按段落号选中单个段落或连续多段范围（0 开始）。")
-    public String doc_select_paragraph(
-            @P("段落号（0 开始）") Integer index,
-            @P(value = "结束段落号（0 开始，可选；传入则跨段选中 index..endIndex 闭区间）", required = false) Integer endIndex
-    ) {
-        return ToolShims.hint(doc_select("paragraph", null, index, endIndex),
-                "doc_select", "doc_select(target=paragraph, index, endIndex)");
-    }
-
-    @ToolShim(replacedBy = "doc_select")
-    @ToolMeta(displayName = "收起光标", category = "document", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("把光标落到当前选区的开头或结尾（取消选中）。")
-    public String doc_collapse_cursor(
-            @P("start=选区开头, end=选区结尾") String to
-    ) {
-        String t = "start".equals(to) ? "collapse_start" : "collapse_end";
-        return ToolShims.hint(doc_select(t, null, null, null), "doc_select", "doc_select(target=" + t + ")");
-    }
-
     @ToolMeta(displayName = "锚点替换", category = "document", fileEffect = "MODIFIED")
     @Tool("【改】把 anchorId 对应的匹配文本替换为 newText，以修订模式进行，锚点外文字不变。\n"
             + "何时用：doc_find_text 取得 anchorId 并核对上下文后的精准替换。执行前自动核对锚点原文，变了或失效则拒绝，须重新查找，不能用全文替换绕过；多处独立替换同一轮连续调用。\n"
@@ -1394,68 +1354,6 @@ public class DocumentEditTools implements AgentToolComponent {
         return "Error: axis 须为 row 或 col";
     }
 
-    @ToolShim(replacedBy = "doc_table_insert")
-    @ToolMeta(displayName = "插入表格行", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("给表格插入空白行（insertBeforeRow1Based 为行号，1 开始）。")
-    public String doc_table_add_row(
-            @P("【已弃用，等价于 insertBeforeRow1Based】插入位置行号（1 开始）") Integer position,
-            @P(value = "插入几行，默认 1", required = false) Integer count,
-            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P(value = "新行插在第几行之前，**行号 1 开始**；不传则追加到表尾", required = false) Integer insertBeforeRow1Based
-    ) {
-        Integer row = insertBeforeRow1Based != null ? insertBeforeRow1Based : position;
-        return ToolShims.hint(doc_table_insert("row", row == null ? null : String.valueOf(row), count, tableIndex, tableName),
-                "doc_table_insert", "doc_table_insert(axis=row, before, count)");
-    }
-
-    @ToolShim(replacedBy = "doc_table_delete")
-    // access：与 doc_table_delete 同级：整行删除不留修订痕迹（兼容 shim）
-    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格行", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("删除表格的整行（rowNumber1Based 为行号，1 开始）。")
-    public String doc_table_delete_row(
-            @P("【已弃用，等价于 rowNumber1Based】要删的行号（1 开始）") Integer position,
-            @P(value = "连删几行，默认 1", required = false) Integer count,
-            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P("要删的行号，**1 开始**（第一行 = 1）") Integer rowNumber1Based
-    ) {
-        Integer row = rowNumber1Based != null ? rowNumber1Based : position;
-        return ToolShims.hint(doc_table_delete("row", row == null ? null : String.valueOf(row), count, tableIndex, tableName),
-                "doc_table_delete", "doc_table_delete(axis=row, target, count)");
-    }
-
-    @ToolShim(replacedBy = "doc_table_insert")
-    @ToolMeta(displayName = "插入表格列", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("给表格插入空白列（insertBeforeColumn 为列字母或列号）。")
-    public String doc_table_add_col(
-            @P("【已弃用，等价于 insertBeforeColumn】列字母（如 B）或列号（1 开始）") String position,
-            @P(value = "插入几列，默认 1", required = false) Integer count,
-            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P(value = "新列插在哪一列之前：列字母（如 B）或列号（**1 开始**）；不传则追加到最右", required = false) String insertBeforeColumn
-    ) {
-        String col = (insertBeforeColumn != null && !insertBeforeColumn.isBlank()) ? insertBeforeColumn : position;
-        return ToolShims.hint(doc_table_insert("col", col, count, tableIndex, tableName),
-                "doc_table_insert", "doc_table_insert(axis=col, before, count)");
-    }
-
-    @ToolShim(replacedBy = "doc_table_delete")
-    // access：与 doc_table_delete 同级：整列删除不留修订痕迹（兼容 shim）
-    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格列", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("删除表格的整列（columnRef 为列字母或列号）。")
-    public String doc_table_delete_col(
-            @P("【已弃用，等价于 columnRef】要删的列字母（如 B）或列号（1 开始）") String position,
-            @P(value = "连删几列，默认 1", required = false) Integer count,
-            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P("要删的列：列字母（如 B）或列号（**1 开始**）") String columnRef
-    ) {
-        String col = (columnRef != null && !columnRef.isBlank()) ? columnRef : position;
-        return ToolShims.hint(doc_table_delete("col", col, count, tableIndex, tableName),
-                "doc_table_delete", "doc_table_delete(axis=col, target, count)");
-    }
-
     /**
      * 表格行/列增删四个原语的共同下发路径（参数形状一致：position/count + 表格定位）。
      * position 对行是 Integer、对列是列字母或列号字符串，一律原样透传给 worker 解析。
@@ -1723,29 +1621,6 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolShim(replacedBy = "doc_update_comment")
-    @ToolMeta(displayName = "回复批注", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("回复一条已有批注（commentId 来自 doc_get_comments 返回的 id）。")
-    public String doc_reply_comment(
-            @P("要回复的批注 id（来自 doc_get_comments）") String commentId,
-            @P("回复内容") String text
-    ) {
-        return ToolShims.hint(doc_update_comment(commentId, "reply", text),
-                "doc_update_comment", "doc_update_comment(commentId, action=reply, text)");
-    }
-
-    @ToolShim(replacedBy = "doc_update_comment")
-    @ToolMeta(displayName = "解决批注", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("把一条批注标记为已解决/取消已解决（commentId 来自 doc_get_comments 返回的 id）。")
-    public String doc_resolve_comment(
-            @P("批注 id（来自 doc_get_comments）") String commentId,
-            @P(value = "true=标记已解决，false=取消已解决，默认 true", required = false) Boolean resolved
-    ) {
-        String action = resolved == null || resolved ? "resolve" : "reopen";
-        return ToolShims.hint(doc_update_comment(commentId, action, null),
-                "doc_update_comment", "doc_update_comment(commentId, action=" + action + ")");
-    }
-
     // access：批注是审阅元数据，不是正文内容；批量清批注不应逐条弹确认
     @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除批注", category = "document", fileEffect = "MODIFIED")
     @Tool("【批注】删除一条批注（commentId 来自 doc_get_comments 返回的 id）。删除不可撤销为修订，删前先确认。")
@@ -1808,24 +1683,6 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolShim(replacedBy = "doc_revisions")
-    @ToolMeta(displayName = "接受修订", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("接受一条修订（index 来自 doc_list_revisions，0 开始）。")
-    public String doc_accept_revision(
-            @P("修订序号，0 开始（来自 doc_list_revisions）") Integer index
-    ) {
-        return ToolShims.hint(doc_revisions("accept", index), "doc_revisions", "doc_revisions(action=accept, index=…)");
-    }
-
-    @ToolShim(replacedBy = "doc_revisions")
-    @ToolMeta(displayName = "拒绝修订", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("拒绝一条修订（index 来自 doc_list_revisions，0 开始）。")
-    public String doc_reject_revision(
-            @P("修订序号，0 开始（来自 doc_list_revisions）") Integer index
-    ) {
-        return ToolShims.hint(doc_revisions("reject", index), "doc_revisions", "doc_revisions(action=reject, index=…)");
-    }
-
     private String dispatchRevisionResolve(Integer index, String action) {
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
@@ -1836,20 +1693,6 @@ public class DocumentEditTools implements AgentToolComponent {
             log.error("Failed to resolve revision", e);
             return "Error: " + e.getMessage();
         }
-    }
-
-    @ToolShim(replacedBy = "doc_revisions")
-    @ToolMeta(displayName = "接受全部修订", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("一次性接受文档中的全部修订。")
-    public String doc_accept_all_revisions() {
-        return ToolShims.hint(doc_revisions("accept_all", null), "doc_revisions", "doc_revisions(action=accept_all)");
-    }
-
-    @ToolShim(replacedBy = "doc_revisions")
-    @ToolMeta(displayName = "拒绝全部修订", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("一次性拒绝文档中的全部修订。")
-    public String doc_reject_all_revisions() {
-        return ToolShims.hint(doc_revisions("reject_all", null), "doc_revisions", "doc_revisions(action=reject_all)");
     }
 
     private String dispatchRevisionResolveAll(String action) {
@@ -1925,28 +1768,6 @@ public class DocumentEditTools implements AgentToolComponent {
         if ("footnote".equals(k)) return dispatchInsertNote("insert_footnote", anchorId, text);
         if ("endnote".equals(k)) return dispatchInsertNote("insert_endnote", anchorId, text);
         return "Error: kind 须为 footnote / endnote";
-    }
-
-    @ToolShim(replacedBy = "doc_insert_note")
-    @ToolMeta(displayName = "插入脚注", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("在文中位置插入一条脚注（页面底部编号注释）。")
-    public String doc_insert_footnote(
-            @P(value = "doc_find_text 返回的 anchorId，插入位置；不传则用当前光标", required = false) String anchorId,
-            @P("脚注正文内容") String text
-    ) {
-        return ToolShims.hint(doc_insert_note("footnote", text, anchorId),
-                "doc_insert_note", "doc_insert_note(kind=footnote, text, anchorId)");
-    }
-
-    @ToolShim(replacedBy = "doc_insert_note")
-    @ToolMeta(displayName = "插入尾注", category = "document", fileEffect = "MODIFIED", offerToModel = false)
-    @Tool("在文中位置插入一条尾注（文档末尾编号注释）。")
-    public String doc_insert_endnote(
-            @P(value = "doc_find_text 返回的 anchorId，插入位置；不传则用当前光标", required = false) String anchorId,
-            @P("尾注正文内容") String text
-    ) {
-        return ToolShims.hint(doc_insert_note("endnote", text, anchorId),
-                "doc_insert_note", "doc_insert_note(kind=endnote, text, anchorId)");
     }
 
     private String dispatchInsertNote(String action, String anchorId, String text) {

@@ -49,7 +49,6 @@
       "search_project_files",
       "read_file",
       "law_search",
-      "law_search_keyword",
       "get_law_article",
       "law_recognition",
       "write_docx",

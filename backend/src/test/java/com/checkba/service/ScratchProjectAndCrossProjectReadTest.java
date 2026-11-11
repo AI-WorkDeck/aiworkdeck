@@ -237,14 +237,13 @@ class ScratchProjectAndCrossProjectReadTest {
                 null, null, null, null, extractor);
         fileTools.setProjectService(projectService);
 
-        String result = fileTools.search_across_projects("代持");
+        String result = fileTools.search_project_files("代持", null, "all");
         assertTrue(result.contains("[项目: 检索项目 (projectId=" + projectId + ")]"), result);
         assertTrue(result.contains("(fileId=" + hit.getId() + ", type=txt)"), result);
         assertFalse(result.contains("无关文件"));
 
-        // V4 起 search_across_projects 是并入 search_project_files 的兼容壳，结果尾部附「已并入」提示。
-        assertTrue(fileTools.search_across_projects(" ").startsWith("Error: keyword is required."));
-        assertTrue(fileTools.search_across_projects("绝不存在的关键字")
+        assertTrue(fileTools.search_project_files(" ", null, "all").startsWith("Error: fileNamePattern is required."));
+        assertTrue(fileTools.search_project_files("绝不存在的关键字", null, "all")
                 .startsWith("No files matching "));
     }
 }

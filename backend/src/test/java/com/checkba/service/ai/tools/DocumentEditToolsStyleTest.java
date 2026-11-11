@@ -185,7 +185,7 @@ class DocumentEditToolsStyleTest {
         assertEquals(8, pf.get("endParagraph"));
 
         Mockito.clearInvocations(bridge);
-        tools.doc_select_paragraph(1, 4);
+        tools.doc_select("paragraph", null, 1, 4);
         Map<String, Object> sp = paramsOf("select_paragraph");
         assertEquals(1, sp.get("index"));
         assertEquals(4, sp.get("endIndex"));

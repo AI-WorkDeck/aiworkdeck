@@ -1,7 +1,7 @@
 [
   {
     "id": "meeting-v5-list-recordings-last-week",
-    "title": "V5：上周有哪些会议录音 → meeting_list(source=recording)，不再下发 meeting_list_recordings",
+    "title": "V5：上周有哪些会议录音 → meeting_list(source=recording)，旧名 meeting_list_recordings 已删除",
     "category": "meeting",
     "protocol": "native",
     "userInput": "上周有哪些会议录音",
@@ -39,7 +39,7 @@
         "meeting_get_transcript"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "meeting_list_recordings",
         "tmeet_list_meetings",
         "tmeet_get_transcript"
@@ -84,7 +84,7 @@
         "meeting_get_transcript"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "meeting_list_recordings",
         "tmeet_list_meetings",
         "tmeet_get_transcript"
@@ -129,7 +129,7 @@
         "meeting_get_transcript"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "meeting_list_recordings",
         "tmeet_list_meetings",
         "tmeet_get_transcript"
@@ -172,7 +172,7 @@
         "meeting_get_transcript"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "meeting_list_recordings",
         "tmeet_list_meetings",
         "tmeet_get_transcript"
@@ -235,7 +235,7 @@
         "meeting_get_transcript"
       ],
       "bubbleEndStatus": "finished",
-      "offeredToolsExclude": [
+      "toolsNotRegistered": [
         "meeting_list_recordings",
         "tmeet_list_meetings",
         "tmeet_get_transcript"
@@ -273,10 +273,12 @@
       ],
       "offeredToolsExclude": [
         "meeting_list",
-        "meeting_get_transcript",
-        "meeting_list_recordings"
+        "meeting_get_transcript"
       ],
-      "bubbleEndStatus": "finished"
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "meeting_list_recordings"
+      ]
     }
   }
 ]

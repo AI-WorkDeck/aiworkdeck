@@ -240,16 +240,6 @@ public class LegalTools implements AgentToolComponent {
         return callPkulaw("pkulaw-case-semantic", "search_case", Map.of("text", query.trim()));
     }
 
-    @ToolShim(replacedBy = "law_search")
-    @ToolMeta(displayName = "关键词搜索法规", category = "legal", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("按法规名称或正文关键词检索法规。")
-    public String law_search_keyword(
-            @P(value = "法规名称中的关键词（如「公司法」）；与 fulltext 至少给一个", required = false) String title,
-            @P(value = "法规正文中的关键词；与 title 至少给一个", required = false) String fulltext) {
-        return ToolShims.hint(law_search(null, "keyword", title, fulltext), "law_search",
-                "law_search(mode=keyword, title, fulltext)");
-    }
-
     @ToolMeta(displayName = "法条识别与溯源", category = "legal")
     @Tool("Identify law names and articles from text and trace their source.")
     public String law_recognition(@P("要识别其中法规名称与条文号的原文") String text) {

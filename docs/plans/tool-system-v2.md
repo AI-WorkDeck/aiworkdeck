@@ -235,3 +235,8 @@ MCP：`McpToolProjection` 加 A10 的会话内生排除表；`mcp:true` 白名�
 3. **`plugin-dev validate`**：声明式工具 `description` 套 V0 同一把尺子（首行 ≤80、单语言中文、动词开头；`%key%` 取 `l10n/zh-CN.json`，取不到跳过）；`mcp:true` 与 destructive / `confirm:always` / `agent:false` 互斥。宿主安装期校验（`PluginManifestContractValidator`）刻意**不**加这两条：已装插件不能因此整批丢工具，运行期 `mcpCandidates` 本就兜底不投影。
 4. **官方插件**：lawfirm-management / project-im / desensitize 的 7 条工具描述把触发句挪到第二句（20 个语言文件同序调整，译文不变）；CSV 对应行改 `keep`。
 5. 未改动模型在应用内能看到的工具（仅隐藏两个声明"AI 不可调用"的 UI 专用 JAR 工具），未跑真实模型矩阵。
+
+## J. V9 实施记录（2026-11-10，feat/v9-remove-tool-shims）
+1. 删除全部 48 个 `@ToolShim` 壳方法（V4 45 个 + V5 会议 3 个）与 `ToolShim` 注解；`ToolShimContractTest` 的 0.83 版本绊线随之移除，改为钉「旧名不再注册、改名表覆盖 48 个旧名、调到旧名时的行为」。
+2. 旧名仍可能从旧对话、XML 兜底、skill/插件白名单、本地 MCP 客户端出现，所以 `ToolShims` 的旧名 → 新名表保留：参数完全相同的 `move_files_batch`、`capability_apply` 直接按新名分发（回执附改名提示，确认闸按新名判）；其余 46 个返回 `Error: tool 'X' was renamed to 'Y' … Call Y(…) instead.`，不替模型猜判别参数。skill `allowed_tools` 里的旧名照旧在加载时映射为新名。
+3. 本文 CSV 删掉 48 行壳行；`docs/capability-catalog.md` 重新生成（340 → 292 个工具）。下发面不变（壳本来就不下发），`tool-surface-baseline.csv` 不用重测。

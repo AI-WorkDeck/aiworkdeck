@@ -586,7 +586,7 @@ public class SkillRegistry {
     }
 
     /**
-     * allowed_tools 里的旧工具名经 {@link com.checkba.service.ai.tools.ToolShims} 映射到新名并 WARN（tool-system-v2 E1/B5）：
+     * allowed_tools 里的旧工具名经 {@link com.checkba.service.ai.tools.ToolShims} 映射到新名并 WARN（tool-system-v2 E1/B5；V9 删壳后映射表仍保留）：
      * 用户自建 skill 不必同步改名；旧名在 restrict 白名单里本来对不上任何下发的工具，等于把能力静默裁掉。
      */
     private static List<String> migrateRenamedTools(String skillId, List<String> tools) {
@@ -594,7 +594,7 @@ public class SkillRegistry {
         for (String tool : tools) {
             String canonical = com.checkba.service.ai.tools.ToolShims.canonical(tool);
             if (!canonical.equals(tool)) {
-                log.warn("Skill '{}' 的 allowed_tools 里 '{}' 已并入 '{}'，按新名生效；请更新 skill.yml（旧名兼容壳 0.83 删除）",
+                log.warn("Skill '{}' 的 allowed_tools 里 '{}' 已并入 '{}'，按新名生效；请更新 skill.yml（旧名已不再注册为工具）",
                         skillId, tool, canonical);
             }
             if (!migrated.contains(canonical)) {

@@ -123,6 +123,9 @@ public class ToolRegistry {
 
     /** 未注册工具的统一反馈：有指路就带上，没有就保持原样那一句。 */
     public static String unknownToolMessage(String name) {
+        // V4/V5 合并后删掉的旧名（V9）：明说改成了什么、新调用怎么写，模型下一轮自己改调
+        String renamed = com.checkba.service.ai.tools.ToolShims.renamedMessage(name);
+        if (renamed != null) return renamed;
         String hint = name == null ? null : UNKNOWN_TOOL_HINTS.get(name);
         return hint == null
                 ? "Tool not found or arguments invalid."
@@ -635,13 +638,9 @@ public class ToolRegistry {
      */
     public boolean requiresConfirmation(String name) {
         if (name == null) return false;
-        name = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        name = dispatchName(name);
         RegisteredTool builtin = builtinTools.get(name);
         if (builtin != null) {
-            // 兼容壳（@ToolShim）本质是新工具的旧名：新工具要确认，壳也要
-            var shim = builtin.method() == null ? null
-                    : builtin.method().getAnnotation(com.checkba.service.ai.tools.ToolShim.class);
-            if (shim != null && !shim.replacedBy().equals(name) && requiresConfirmation(shim.replacedBy())) return true;
             return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, builtin.meta())
                     == ToolMeta.Access.DESTRUCTIVE;
         }
@@ -698,7 +697,6 @@ public class ToolRegistry {
             String name = spec.name();
             RegisteredTool registered = builtinTools.get(name);
             ToolMeta meta = registered.meta();
-            if (registered.method() != null && registered.method().isAnnotationPresent(com.checkba.service.ai.tools.ToolShim.class)) continue;
             boolean writeAllowed = MCP_WRITE_ALLOWED.contains(name) && !requiresConfirmation(name);
             if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
                     || name.startsWith(MCP_METERED_PREFIX)
@@ -1174,7 +1172,7 @@ public class ToolRegistry {
             result = doExecute(name, argsJson, ctx);
             return result;
         } finally {
-            audit(TOOL_NAME_ALIASES.getOrDefault(name, name), argsJson, ctx, source, result, started);
+            audit(dispatchName(name), argsJson, ctx, source, result, started);
         }
     }
 
@@ -1237,8 +1235,25 @@ public class ToolRegistry {
         return java.util.HexFormat.of().formatHex(d);
     }
 
+    /**
+     * 实际分发用的名字：别名表，再加参数完全相同的已删除旧名（{@link com.checkba.service.ai.tools.ToolShims#sameArgsTarget}）。
+     * 确认闸与审计都按它判，旧名调到 destructive 新工具同样过闸。
+     */
+    private static String dispatchName(String name) {
+        String resolved = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        String renamed = com.checkba.service.ai.tools.ToolShims.sameArgsTarget(resolved);
+        return renamed != null ? renamed : resolved;
+    }
+
     private ToolResult doExecute(String name, String argsJson, ToolContext ctx) {
         String resolvedName = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        String sameArgsTarget = com.checkba.service.ai.tools.ToolShims.sameArgsTarget(resolvedName);
+        if (sameArgsTarget != null) {
+            ToolResult r = doExecute(sameArgsTarget, argsJson, ctx);
+            return r.found()
+                    ? new ToolResult(com.checkba.service.ai.tools.ToolShims.hint(r.output(), resolvedName), r.tool(), true)
+                    : r;
+        }
         if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
             var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());
             if (binding == null || !clientCapabilityService.isToolVisible(resolvedName, ctx == null ? null : ctx.conversationId()))

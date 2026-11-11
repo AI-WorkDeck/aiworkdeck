@@ -67,23 +67,6 @@ public class PptxTools implements AgentToolComponent {
 
     // ==================== 文件管理工具 ====================
 
-    @ToolShim(replacedBy = "doc_list_project_files")
-    @ToolMeta(displayName = "列出文件夹", category = "file", offerToModel = false, access = ToolMeta.Access.READ)
-    @Tool("只列文件夹、不列文件，是 folderId 的来源。")
-    public String list_project_folders(
-            @P("项目 ID") Long projectId
-    ) {
-        log.info("Tool: list_project_folders called for projectId={}", projectId);
-        try {
-            return ToolShims.hint(
-                    DocumentEditTools.folderListing(projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId)),
-                    "doc_list_project_files", "doc_list_project_files(foldersOnly=true)");
-        } catch (Exception e) {
-            log.error("Failed to list project folders", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
     // ==================== 服务检查工具 ====================
 
     /**
@@ -441,16 +424,6 @@ public class PptxTools implements AgentToolComponent {
         return "Error: action 须为 create 或 refine";
     }
 
-    @ToolShim(replacedBy = "pptx_outline")
-    @ToolMeta(displayName = "生成PPT大纲", category = "pptx", requiresHost = ToolMeta.Host.LOWA, offerToModel = false)
-    @Tool("生成 PPTX 大纲（不生成完整 PPT）。")
-    public String pptx_generate_outline(
-            @P("PPT 主题或详细描述") String topic,
-            @P(value = "输出语言：zh（中文，默认）、en（英文）、ja（日语）", required = false) String language
-    ) {
-        return ToolShims.hint(pptx_outline("create", topic, language, null, null), "pptx_outline", "pptx_outline(action=create, topic)");
-    }
-
     /**
      * 带 modelId 参数的 pptx_generate_outline 内部版本
      */
@@ -610,18 +583,6 @@ public class PptxTools implements AgentToolComponent {
             log.error("Failed to get project pages", e);
             return "错误：获取项目页面失败: " + e.getMessage();
         }
-    }
-
-    @ToolShim(replacedBy = "pptx_outline")
-    @ToolMeta(requiresHost = ToolMeta.Host.LOWA, offerToModel = false, access = ToolMeta.Access.WRITE)
-    @Tool("使用自然语言修改 PPT 大纲结构。")
-    public String pptx_refine_outline(
-            @P("PPTX 服务中的项目 ID") String serviceProjectId,
-            @P("用户的修改要求，如：'增加一页关于市场分析的内容'、'把第3页和第4页合并'、'删除结论页'") String userRequirement,
-            @P(value = "输出语言：zh（中文，默认）、en（英文）", required = false) String language
-    ) {
-        return ToolShims.hint(pptx_outline("refine", null, language, serviceProjectId, userRequirement),
-                "pptx_outline", "pptx_outline(action=refine, serviceProjectId, userRequirement)");
     }
 
     private String refineOutline(

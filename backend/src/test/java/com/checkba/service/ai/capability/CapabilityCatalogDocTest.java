@@ -53,7 +53,7 @@ class CapabilityCatalogDocTest {
     void realToolsAreClassifiedAsExpected() {
         Map<String, CapabilityCatalog.Capability> byId = catalog().stream()
                 .collect(Collectors.toMap(CapabilityCatalog.Capability::id, Function.identity()));
-        assertTrue(byId.size() > 300, "扫到的工具太少，扫描口径坏了：" + byId.size());
+        assertTrue(byId.size() > 280, "扫到的工具太少，扫描口径坏了：" + byId.size());
         assertEquals("awd:project.read", byId.get("search_project_content").scope());
         assertEquals("awd:editor.write", byId.get("doc_replace_selection").scope());
         assertEquals("awd:memory.write", byId.get("memory_delete").scope());
