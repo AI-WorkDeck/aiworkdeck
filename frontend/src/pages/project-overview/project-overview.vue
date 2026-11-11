@@ -2259,6 +2259,18 @@
         @close="taskDialog.visible = false"
       />
 
+      <!-- 平台 AI 同意已失效（告知改版 / 换账户 / 切站点）：启动时原地征求一次，别等用户提问撞上报错 -->
+      <view v-if="showConsentPrompt" class="awd-dialog-mask" @tap="showConsentPrompt = false">
+        <view class="awd-dialog" @tap.stop>
+          <view class="awd-dialog-body">
+            <CrossBorderConsentCard bare :site="consentPromptSite" @accepted="showConsentPrompt = false" />
+          </view>
+          <view class="awd-dialog-footer">
+            <button class="awd-btn awd-btn-secondary" @tap="showConsentPrompt = false">{{ $t('onboarding.unlock.consentLater') }}</button>
+          </view>
+        </view>
+      </view>
+
       <!-- 试用版 / 宽限预警说明弹窗（同一个壳，文案与主按钮随 graceKind 切换） -->
       <view v-if="showTrialInfo" class="awd-dialog-mask" @tap="showTrialInfo = false">
         <view class="awd-dialog" @tap.stop>
@@ -2398,6 +2410,7 @@
 </template>
 
 <script>
+import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
 import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
 import { defineAsyncComponent } from 'vue'
 import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.js'
@@ -2510,6 +2523,7 @@ import {
   deleteProject,
   bindShareholderMeetingConversation, // 股东大会核查：会话绑定
   getAccountStatus,
+  getCrossBorderConsent,
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
   getCloudAccountGeneration,
@@ -2674,6 +2688,7 @@ export default {
     }
   },
   components: {
+    CrossBorderConsentCard,
     ScratchTransferDialog,
     BackendHealthStatus,
     MobileReceiveStatus,
@@ -2781,6 +2796,8 @@ export default {
       // 授权状态（试用版标识，商业化解锁门）
       licenseMode: '',
       showTrialInfo: false,
+      showConsentPrompt: false,
+      consentPromptSite: '',
       // 账户连接状态（商业化 PR-B）：已连接时不再显示任何 chip（「已连接账户」标注已删，dev-board#221），
       // 仍用于压掉「试用版」chip
       accountConnected: false,
@@ -4809,6 +4826,21 @@ export default {
     },
     // 授权标识：桌面端查授权模式与账户连接状态
     // （已连接账户 → 不显示 chip；未连接且 mode=trial → 「试用版」chip；dev-board#221）
+    // 每次启动最多问一次；查不到就不问（对话里还有同意卡兜底）
+    async checkCrossBorderConsentOnce() {
+      if (this._consentChecked) return
+      this._consentChecked = true
+      try {
+        const res = await getCrossBorderConsent()
+        const data = (res && res.data) || res || {}
+        if (data.required) {
+          this.consentPromptSite = data.site || ''
+          this.showConsentPrompt = true
+        }
+      } catch (e) {
+        // 网络或旧后端（没有这个端点）：静默
+      }
+    },
     async loadLicenseMode() {
       if (!isDesktopHost()) return
       const requestId = this._accountStateRequest = (this._accountStateRequest || 0) + 1
@@ -4820,6 +4852,7 @@ export default {
         this.licenseMode = (status && status.mode) || ''
         // 只有账户状态决定是否已登录，不能用尚在宽限期的授权票据代替。
         this.accountConnected = !!account?.connected
+        if (this.accountConnected) this.checkCrossBorderConsentOnce()
         // 宽限预警：后端只在真的需要提醒时才下发这两个字段（存量试用倒计时 /
         // 账户离线复验剩 ≤7 天），不需要提醒时形状与过去一模一样。
         this.graceKind = (status && status.graceKind) || ''

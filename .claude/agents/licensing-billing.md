@@ -609,6 +609,15 @@ mobile | meeting | dictation`（缺省不带这个键，前端用通用说明）
 失败不拦路）。**新增连接账户的入口必须接这一步**，并在连上后调 `AccountSwitchCleanup.afterConnect()`
 （它把这份 pending 同意绑到新账户）。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
 
+**同意失效时就地征求，不让用户跳设置页（2026-11-11）**：告知改版、换账户、切站后，已登录的人不会再经过登录弹层，
+以前只在对话里撞上一段「到设置 → AI 服务配置勾选」的长报错。现在两处原地征求，都用
+`components/account/CrossBorderConsentCard.vue`（措辞按站点取登录弹层同一套 `onboarding.unlock.crossBorder*[Domestic]`）：
+① 对话：SSE error 载荷 `reason === 'cross_border_consent_required'` → `useAgentStream` 给气泡置 `consentRequired`，
+RootBubble 出同意卡；「同意并继续」后 ChatInterface `retryAfterConsent` 走重新生成同一条链路（截断+存档+原样重发），不再弹确认框。
+② 启动：工作台 `loadLicenseMode` 确认已连账户后调 `GET /api/ai/cross-border-consent`，`required` 时弹一次征求框（可「以后再说」）。
+判据 `ChatModelFactory.crossBorderConsentRequired` 与运行时闸同一份；记录走 `POST /api/ai/cross-border-consent`
+→ `CrossBorderConsentService.record()`（写法同设置页勾选，盖当前账户与站点）。同意从不预设，只在用户点按钮时记。
+
 **跨境同意按「账户 + 站点」记录，且有运行时闸（dev-board#1713，问题 130）**：判定与记录只在
 `service/ai/CrossBorderConsentService`。键：`ai.crossBorder.consentAt/consentVersion`（原有）+
 `consentAccount`（官网 accountId，缺时 `fp:`+Key 指纹）+ `consentSite` + `consentPendingAt`。
