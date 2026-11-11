@@ -60,7 +60,7 @@
             </template>
             <div v-else-if="entry.type === 'text'" class="main-content" data-chat-answer>
               <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming)" :key="pi">
-                <LegalReferenceCard v-if="part.type === 'reference'" :reference="part.reference" @open="openReference" />
+                <LegalReferenceCard v-if="part.type === 'reference'" :reference="corroborateReference(part.reference, liveLawOutputs)" @open="openReference" />
                 <MarkdownPreview v-else :content="part.text" />
               </template>
             </div>
@@ -187,7 +187,7 @@ import VerificationReportCard from './VerificationReportCard.vue'
 import SkillCreatedCard from './SkillCreatedCard.vue'
 import LegalReferenceCard from '../legal/LegalReferenceCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
-import { legalMessageParts, referencesFromTools, legalReadableText } from '@/utils/legalReferences.js'
+import { legalMessageParts, referencesFromTools, legalReadableText, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'
@@ -219,6 +219,7 @@ function sendAction(type) {
 const openLegalReferenceTab = inject('openLegalReferenceTab', null)
 const inlineReference = ref(null)
 const toolReferences = computed(() => referencesFromTools(props.bubble.processes || []))
+const liveLawOutputs = computed(() => liveLawToolOutputs(props.bubble.processes || []))
 function openReference(reference) {
   emit('reading-interaction')
   if (openLegalReferenceTab) openLegalReferenceTab(reference)

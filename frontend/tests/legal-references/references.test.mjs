@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { retrievalSourceLabel } from '../../src/utils/insightDetail.js'
-import { referencesFromEntity, referenceFromModel, legalMessageParts, referencesFromTools, safeLegalUrl, legalReadableText } from '../../src/utils/legalReferences.js'
+import { referencesFromEntity, referenceFromModel, legalMessageParts, referencesFromTools, safeLegalUrl, legalReadableText, liveLawToolOutputs, corroborateReference } from '../../src/utils/legalReferences.js'
 import { legalReferenceTabMethods } from '../../src/pages/project-overview/legalReferenceTab.js'
 import { serializeTab } from '../../src/pages/project-overview/tabSnapshot.js'
 import { isContextEligibleTab } from '../../src/pages/project-overview/activeTabContext.js'
@@ -122,4 +122,40 @@ test('source field aliases and legal category labels preserve their meaning', ()
   assert.ok(!procedure.metadata.some(x => x.labelKey.endsWith('cause')))
   const modelCase = referenceFromModel({ kind: 'CASE', title: 'Case', authority: 'Court', documentNumber: 'TEST-CASE', date: '2026-10-29' })
   assert.deepEqual(modelCase.metadata.map(x => x.labelKey), ['legalReference.caseNumber', 'legalReference.court', 'legalReference.judgmentDate'])
+})
+
+// 真实会话（2026-11-11 民法典第1082条）：法宝网关现在回纯文本，模型卡片一直显示「来源待核验」。
+const PKULAW_TEXT = `《中华人民共和国民法典》第一千零八十二条（现行有效）
+施行日期：2021-01-01
+
+第一千零八十二条 女方在怀孕期间、分娩后一年内或者终止妊娠后六个月内，男方不得提出离婚；但是，女方提出离婚或者人民法院认为确有必要受理男方离婚请求的除外。
+
+gid：aa00daaeb5a4fe4ebdfb
+https://www.pkulaw.com/chl/aa00daaeb5a4fe4ebdfb.html?way=mcp#tiao_1082
+
+request_id: db9ef8b6-2004-43fc-a331-73c2b3a346c0`
+const card1082 = { kind: 'LAW', title: '中华人民共和国民法典 第一千零八十二条', documentNumber: '主席令第四十五号', authority: '全国人民代表大会',
+  date: '2020-05-28', effectiveDate: '2021-01-01', validity: '现行有效', source: '北大法宝',
+  url: 'https://www.pkulaw.com/chl/aa00daaeb5a4fe4ebdfb.html?way=mcp#tiao_1082',
+  excerpt: '女方在怀孕期间、分娩后一年内或者终止妊娠后六个月内，男方不得提出离婚；但是，女方提出离婚或者人民法院认为确有必要受理男方离婚请求的除外。' }
+const proc = (live, output = PKULAW_TEXT, status = 'success') => [{ items: [{ type: 'tool', status, live, code: 'get_law_article(title="中华人民共和国民法典", number="1082")', output }] }]
+
+test('model card matching a live PKULaw text output (URL + verbatim excerpt) becomes retrieved; unmatched metadata dropped', () => {
+  const ref = corroborateReference(referenceFromModel(card1082), liveLawToolOutputs(proc(true)))
+  assert.equal(ref.status, 'retrieved')
+  const shown = ref.metadata.map(item => item.value)
+  assert.ok(shown.includes('2021-01-01') && shown.includes('现行有效'))
+  for (const unsupported of ['主席令第四十五号', '全国人民代表大会', '2020-05-28']) assert.ok(!shown.includes(unsupported), unsupported)
+  assert.notEqual(ref.id, referenceFromModel(card1082).id)
+})
+
+test('corroboration refuses: history replay, failed tool, altered excerpt, other URL, non-law tool', () => {
+  const model = referenceFromModel(card1082)
+  assert.equal(corroborateReference(model, liveLawToolOutputs(proc(false))).status, 'unverified')
+  assert.equal(corroborateReference(model, liveLawToolOutputs(proc(true, PKULAW_TEXT, 'error'))).status, 'unverified')
+  assert.equal(corroborateReference(referenceFromModel({ ...card1082, excerpt: '男方在任何情况下都不得提出离婚。' }), liveLawToolOutputs(proc(true))).status, 'unverified')
+  assert.equal(corroborateReference(referenceFromModel({ ...card1082, url: 'https://www.pkulaw.com/chl/ffff.html' }), liveLawToolOutputs(proc(true))).status, 'unverified')
+  const web = [{ items: [{ type: 'tool', status: 'success', live: true, code: 'search_web(query="1082")', output: PKULAW_TEXT }] }]
+  assert.equal(corroborateReference(model, liveLawToolOutputs(web)).status, 'unverified')
+  assert.equal(corroborateReference(referenceFromModel({ ...card1082, excerpt: '' }), liveLawToolOutputs(proc(true))).status, 'unverified')
 })
