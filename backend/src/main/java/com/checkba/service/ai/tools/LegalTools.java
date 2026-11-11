@@ -78,12 +78,15 @@ public class LegalTools implements AgentToolComponent {
         return com.checkba.service.LangText.of(
                 "Error: " + VENDOR_UNAVAILABLE_MARKER + " 北大法宝法源暂时不可用（" + reason + "）。"
                         + "不要重试其他法宝工具（law_search / get_law_article / law_recognition / case_search 同源，本轮已下线）。"
-                        + "如改用 search_web / browse_url，只能作为线索，并须在回答中注明「非权威来源，待核实」；"
-                        + "优先国家法律法规数据库 flk.npc.gov.cn 原文。",
+                        + "本轮最多再用 search_web / browse_url 共 2 次查找条文（系统强制，超出不执行），结果只能作为线索，"
+                        + "优先国家法律法规数据库 flk.npc.gov.cn 原文；之后直接根据已有资料回答。"
+                        + "可以凭法律知识给出条文内容与结论，但凡没有从权威来源取得原文的，须逐条标注「未核实」，不得当作原文引用，也不得声称已核实。",
                 "Error: " + VENDOR_UNAVAILABLE_MARKER + " The PKULaw legal source is temporarily unavailable (" + reason + "). "
                         + "Do not retry other PKULaw tools (law_search / get_law_article / law_recognition / case_search share the same source and are disabled for this run). "
-                        + "If you fall back to search_web / browse_url, treat results as leads only and state in your answer "
-                        + "\"non-authoritative source, to be verified\"; prefer the original text on the National Laws and Regulations Database flk.npc.gov.cn.");
+                        + "You may use search_web / browse_url at most 2 more times in total to look for the text (enforced; further calls are not executed); "
+                        + "treat results as leads only and prefer the original text on the National Laws and Regulations Database flk.npc.gov.cn. "
+                        + "Then answer with what you have; you may give statute content and conclusions from legal knowledge, but mark every statute text "
+                        + "not retrieved from an authoritative source as \"unverified\", never present it as a verbatim quotation and never claim it was verified.");
     }
 
     private static boolean isVendorError(String out) {
