@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Sedang menggambar ulang…",
   "litRestyledTo": "Beralih ke {mode}",
   "litRedrawFailedFallback": "Gagal menggambar ulang",
-  "litCreditText": "Mesin diagram: mqc-litigation-visual-redraw · Hak Cipta (c) 2026 Miao Qichuan · Lisensi MIT",
+  "litCreditText": "Mesin diagram: new-litigation-visualization · Hak Cipta (c) 2026 Miao Qichuan · Lisensi AGPL-3.0",
   "litLayoutNumberedTimeline": "Lini Masa · Bernomor",
   "litLayoutDatedTimeline": "Lini Masa · Bertanggal",
   "litLayoutGantt": "Bagan Periode · Gantt",

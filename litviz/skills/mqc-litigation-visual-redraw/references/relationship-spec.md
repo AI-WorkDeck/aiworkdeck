@@ -3,7 +3,7 @@
 For party/entity diagrams: nodes are parties (债权人/债务人/保证人, companies,
 shareholders…), edges are labeled directed **relationships** (借贷, 担保, 追偿,
 连带清偿, 股权, 资金流, 控制…). Rendered by `render_relation.py`. Requires `dot`
-(graphviz) on PATH.
+(graphviz) on PATH when installed. graphviz is optional: when `dot` is absent the built-in layered layout (`layout_fallback.py`) computes the coordinates instead — measured on the shipped flowchart, the canvas differs from graphviz's by 2px. Installing graphviz only buys a slightly tighter packing.
 
 ## Layout is free-form — do NOT template it
 
@@ -164,4 +164,4 @@ guard, using a deliberately dense, fully-anonymized stress case.
 
 ---
 
-> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.0.2
+> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.1.0

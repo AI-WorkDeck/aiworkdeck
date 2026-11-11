@@ -102,7 +102,7 @@ def measured_cap(m, lo=1, hi=140):    # [C7] 容量既是上限也是目标
             # 容量必须是**在同一个图种里**的容量。
             form = f"{_k}·{form}"
             # 顺带核对行数：产物里最高的那张卡不许超过该档允许的行数
-            svg = open(tmp.name, encoding="utf-8").read()
+            svg = open(tmp.name, encoding="utf-8-sig").read()
             import re as _re
             hs = [float(x) for x in _re.findall(
                 r'<rect x="[\d.]+" y="[\d.]+" width="[\d.]+" height="([\d.]+)" rx="12"', svg)]
@@ -140,7 +140,7 @@ def _style_of(m):
         import json as _j
         import os as _o
         if _o.path.exists("state.json"):
-            return _j.load(open("state.json", encoding="utf-8")).get("style") or ""
+            return _j.load(open("state.json", encoding="utf-8-sig")).get("style") or ""
     except Exception:
         pass
     return ""
@@ -313,10 +313,25 @@ def probe(m):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     if len(sys.argv) < 2:
         print("用法: capacity.py <semantic-map.json>")
         sys.exit(2)
-    m = json.load(open(sys.argv[1], encoding="utf-8"))
+    m = json.load(open(sys.argv[1], encoding="utf-8-sig"))
     r = probe(m)
     if r["kind"] == "期间型":
         print(f"形态　期间型 · 横向　{r['n']} 段期间　标签 {r['fs_body']}px")

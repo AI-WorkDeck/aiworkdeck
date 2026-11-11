@@ -330,4 +330,4 @@ The renderer's `audit` re-checks the mechanical parts of this (element count, re
 count, whether uncertainties exist) and prints them — but the audit cannot know what
 you failed to read. This discipline is your responsibility, not the script's.
 
-> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.0.2
+> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.1.0

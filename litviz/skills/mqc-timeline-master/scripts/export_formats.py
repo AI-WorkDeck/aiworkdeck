@@ -104,7 +104,7 @@ def _svg_for_export(svg_path):
     幻灯片与画布本身就是白的。
     """
     import re as _re
-    src = open(svg_path, encoding="utf-8").read()
+    src = open(svg_path, encoding="utf-8-sig").read()
     cleaned = _re.sub(r'<rect data-role="canvas-bg"[^>]*/>\s*', "", src)
     if cleaned == src:
         return svg_path, None
@@ -113,7 +113,7 @@ def _svg_for_export(svg_path):
     return tmp, tmp
 
 
-def deliver(svg_path, m, base=None):
+def deliver(svg_path, m, base=None, formats=None, style=None):
     """出齐五种格式，返回 [(格式, 路径, 说明)]。
 
     **每一种都独立守护**：任何一种失败都只是少一种格式，绝不影响已经写好的 SVG。
@@ -121,39 +121,54 @@ def deliver(svg_path, m, base=None):
     """
     base = base or os.path.splitext(svg_path)[0]
     out = [("SVG", svg_path, "主交付物，全元素可编辑")]
+    # formats 为 None 时出全套（老调用方的行为不变）；管线会传入使用者的选择，
+    # 不选就是 SVG + PPTX。没选的格式一律不碰 —— PNG 尤其如此，它最常出不来。
+    want = set(formats) if formats else {"svg", "png", "pptx", "vsdx", "drawio"}
 
-    try:
+    if "png" in want:
+      try:
         import render as _v1render
         png = base + ".png"
         engine = _v1render.svg_to_png(svg_path, png)
         out.append(("PNG", png, f"位图预览与归档（{engine}）"))
-    except Exception as exc:
+      except Exception as exc:
         out.append(("PNG", "", f"未生成：{str(exc).splitlines()[0][:60]}"))
 
     # pptx / vsdx 读的是**摘掉背景矩形**的那一份（见 _svg_for_export）。
     _src, _tmp = _svg_for_export(svg_path)
-    try:
+    if "pptx" in want:
+      try:
         import export_pptx
         p, n = export_pptx.export(_src, base + ".pptx")
         out.append(("PPTX", p, f"{n} 个原生 PowerPoint 对象，逐个可改"))
-    except Exception as exc:
+      except Exception as exc:
         out.append(("PPTX", "", f"未生成：{str(exc).splitlines()[0][:60]}"))
 
-    try:
+    if "vsdx" in want:
+      try:
         import export_vsdx
         p, n = export_vsdx.export(_src, base + ".vsdx")
         out.append(("VSDX", p, f"{n} 个形状，ProcessOn / Visio / WPS 可打开编辑"))
-    except Exception as exc:
+      except Exception as exc:
         out.append(("VSDX", "", f"未生成：{str(exc).splitlines()[0][:60]}"))
 
+    if "drawio" not in want:
+        if _tmp and os.path.exists(_tmp):
+            os.unlink(_tmp)
+        return out
     try:
         import export_drawio
         mx, _a, _b = export_drawio.build_model(adapt_map(m))
+        # drawio 是从语义地图重建的，不读 SVG，所以风格要单独套一次（v1 自带 theme_drawio）。
+        # 真实运行记录：「改成歸藏风」后 SVG 换了，drawio 仍是灰 + 深红，模型只好手工改配色。
+        _mode = {"歸藏风": "guizang", "白描": "baimiao"}.get(style or "")
+        if _mode:
+            mx = export_drawio.theme_drawio(mx, _mode)
         p = base + ".drawio"
         open(p, "w", encoding="utf-8").write(mx)
         out.append(("drawio", p, f"{mx.count('<mxCell')} 个单元，draw.io 内可改"))
         try:
-            svg = open(svg_path, encoding="utf-8").read()
+            svg = open(svg_path, encoding="utf-8-sig").read()
             p2 = base + ".drawio.svg"
             open(p2, "w", encoding="utf-8").write(export_drawio.embed_in_svg(svg, mx))
             out.append(("drawio.svg", p2, "正常 SVG，同时内嵌可编辑模型"))
@@ -168,10 +183,25 @@ def deliver(svg_path, m, base=None):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     import json
     if len(sys.argv) < 3:
         print("用法：export_formats.py <出图.svg> <语义地图.json>")
         sys.exit(1)
     for fmt, path, note in deliver(sys.argv[1],
-                                   json.load(open(sys.argv[2], encoding="utf-8"))):
+                                   json.load(open(sys.argv[2], encoding="utf-8-sig"))):
         print(f"  {fmt:<11}{path or '（无）':<40}{note}")

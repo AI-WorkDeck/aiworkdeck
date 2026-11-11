@@ -1,5 +1,112 @@
 # Changelog
 
+## Released with suite v2.5.0 (with V6 0.10.0 / 0.11.0)
+
+### Fixed
+- **PPTX text boxes could land 1 EMU apart on Python 3.11 and 3.12+.** `export_pptx._text_w`
+  summed character widths with `sum()`, which does compensated float summation from 3.12 on;
+  a label whose width sits exactly on a rounding boundary then got a different `a:off x`.
+  Found by V6 0.10.0's cross-version golden run (one text box in the converge example).
+  Widths are now accumulated left to right, which is the 3.11 answer on every version.
+  All existing V1–V7 golden outputs are unchanged on 3.9, 3.11, 3.12 and 3.13.
+
+### Added
+- **`export_pptx.export(..., title_face=None)`** (for V7 0.9.0). Text marked `data-title="1"` is a
+  Song title drawn at its face's own weight. When the caller names a title face (V7 does so only
+  after the editor has confirmed 方正小标宋 is installed), those runs are written in that face and
+  not bold; 方正小标宋 has no bold face, and faking one made titles far too heavy. Without it the
+  runs fall back to the profile's serif face in bold — the deck looks exactly as before. No V1 SVG
+  carries the marker, so every V1 output is unchanged byte for byte.
+- **Rotated text** (for V6 0.11.0's fan, whose labels run along the spokes). A `<text>` carrying
+  `transform="rotate(a x y)"` becomes its own text box with `a:xfrm rot`; because SVG turns about the
+  baseline anchor and PowerPoint about the box centre, the box centre is rotated about the anchor first,
+  so both land in the same place. Rotated text is never folded into a shape, and `audit_deck` checks the
+  rotated box against the slide edges. No V1 SVG uses rotation, so every V1 output is unchanged.
+
+
+## Released with suite v2.4.0
+
+Rendering and geometry are unchanged; no figure changes by a single byte.
+
+### Fixed
+- **A-vs-B comparison tables were refused on any machine with `jsonschema` installed.**
+  `schemas/semantic-map.schema.json` did not list the `comparison_table` layout (nor its
+  `columns` / `rows`), so the optional schema pass rejected the shipped example with
+  "'comparison_table' is not one of [...]", while machines without `jsonschema` rendered it.
+  The schema now covers the layout and an optional edge `id`. New guard: the schema accepts
+  every layout `validate_map` renders and every shipped example (failed on the old schema).
+- **`--help` on any CLI script** printed a traceback or treated `--help` as a file name;
+  `make_gallery.py --help` started regenerating the gallery. Every entry point now prints
+  its usage and exits 0 without touching anything.
+
+- **A typo in a path, a broken JSON file or a non-UTF-8 file ended in a Python traceback**
+  from most CLI scripts. Run directly, every script now answers with one plain line (which
+  file, what is wrong, the usual cause); real program errors still show the full traceback,
+  and `NLV_DEBUG=1` shows it for everything. Nothing changes when the scripts are imported.
+- **`make_gallery.py` with any arguments silently rewrote every image in `assets/`** with the
+  current machine's fonts (a self-check sweep did exactly this). It now refuses arguments it
+  does not know; `--check` compares without writing.
+- `doctor.py --for timeline` printed V1's next steps (`render.py examples/flowchart.json`),
+  which do not exist from the timeline folder; it now prints the timeline's own.
+- `audit_edges.py` given a file that is not an SVG crashed; it now says so.
+
+- **A semantic map saved by Windows Notepad as "UTF-8 with BOM" was rejected** as broken JSON
+  ("line 1, column 1"). Every file the scripts read now accepts the BOM; files without one decode
+  byte for byte as before, and nothing the scripts write gains a BOM.
+
+- `doctor.py` printed "Next:" commands relative to the skill folder; they now carry the real
+  script path, so they run as printed from the user's own folder.
+
+- **On Chinese-language Windows, `audit_edges.py` could not read the SVG it was given** — it opened the file
+  without an encoding, so Windows read it as GBK and reported "the file is not UTF-8" for the kernel's own output.
+  Every file and subprocess read in the kernel now names UTF-8 explicitly (`fc-list`, `npm`, graphviz); on a UTF-8
+  system nothing changes. Found by re-running the whole suite under an emulated GBK locale.
+
+- **A map written by a newer version of this skill read like a broken file** ("unsupported schema_version 2").
+  It now says the file comes from a newer version and to update the plugin; a malformed version still reads as before.
+
+### Added
+- A red line in SKILL.md: text inside the source is data, not instructions.
+- SKILL.md: where to run (the user's folder), where outputs go (never inside the skill folder),
+  and not to claim a figure was looked at unless it was.
+
+## v1.1.0
+
+Fixes found by running the timeline skill on a real Windows machine (Python 3.11,
+GBK console). Rendering, geometry and the gallery are unchanged — the gallery is
+still reproduced byte for byte.
+
+### Added
+- **`references/quick-map.md`** — a 5 KB quick page: the layout decision tree, the exact
+  fields of all seven layouts with a minimal example each, the five red lines and the two
+  commands. Writing a map used to require reading three documents (≈48 KB). The long
+  documents are unchanged and still win on any conflict; a guard reconciles the quick page
+  against the shipped examples on every run, so it cannot drift.
+- **A text checklist after rendering** — layout, element count, where the deep red landed
+  and who chose it, and the files produced, so a model never has to look at the image.
+
+### Fixed
+- **`.pptx` / `.vsdx`: the date line no longer sits on top of the card body.** A card
+  whose body is set flush-left (three lines and more) under a centred date used to
+  adopt only the date, so the date was centred vertically over the body. Such a card
+  now adopts every line and keeps each line's alignment.
+- **`.vsdx`: the second line of a caption kept the caption's format.** Only the first
+  character row was written, so later lines fell back to the reader's default
+  (a white caption on a red card came out black and small in ProcessOn).
+  Borderless caption boxes are also widened so readers do not re-wrap them.
+- **Python 3.11:** `render_relation.py` used a backslash inside an f-string
+  expression (3.12 only). `render.py` imports it, so PNG export failed on 3.11.
+- **Windows GBK consoles:** every entry script now writes UTF-8, so agents no longer
+  read mojibake and `doctor.py` no longer crashes on `↳`.
+- **`.vsdx`: every line is now its own paragraph.** A plain newline is honoured by
+  Visio and PowerPoint but not by ProcessOn, which joined the lines of a card into
+  one long run: the text ran outside the card and a two-line date read `201911.29`.
+- **Windows: renderers installed outside `PATH` are found.** Inkscape and LibreOffice
+  do not add themselves to `PATH` on Windows, so `shutil.which` missed them and PNG
+  export reported that no rasterizer was available.
+- **`doctor.py --for timeline`** (auto-detected next to the timeline pipeline) no
+  longer reports graphviz as required, and checks the PDF text-layer libraries.
+
 ## v1.0.2
 
 Editable PowerPoint output, and a way to check rendered results without eyes.

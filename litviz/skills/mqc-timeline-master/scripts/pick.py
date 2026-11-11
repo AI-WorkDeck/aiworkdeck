@@ -42,6 +42,14 @@ _DATE = re.compile(
 _YM = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*年\s*(\d{1,2})\s*月(?!\s*\d{1,2}\s*日)(?!\s*个)")
 
 
+try:
+    from cndate import arabize as _arabize                      # 汉字日期：只用于识别
+except ImportError:                                              # 被按文件路径单独加载时
+    import os as _os, sys as _sys
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from cndate import arabize as _arabize
+
+
 def months_in(s):
     """一句话里只到**年月**的时间表述，返回该月的第一天与精度标记。
 
@@ -54,6 +62,7 @@ def months_in(s):
     完全认不出来，于是第二轮的时间段清单里 **2023 年整年消失**，
     而那正是本案「再次故障」的关键时点，律师勾时间段时根本看不到它。
     """
+    s = _arabize(s)                     # 汉字日期先换成数字（只用于识别）
     out = []
     for m in _YM.finditer(s):
         try:
@@ -70,6 +79,7 @@ def dates_in(s, month_precision=True):
     因为这个函数的调用方都是**列清单与过筛**，要的是「大致落在什么时候」。
     出图那一路不走这里，它由 `check_dates` 按四档确定度把关。
     """
+    s = _arabize(s)                     # 汉字日期先换成数字（只用于识别）
     out = []
     for m in _DATE.finditer(s):
         try:
@@ -229,6 +239,21 @@ def show(paths, picked_ids=None):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     show(sys.argv[1:])
 
 

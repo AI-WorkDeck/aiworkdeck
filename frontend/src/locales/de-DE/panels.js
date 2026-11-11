@@ -84,7 +84,7 @@ export default {
   "litRedrawing": "Wird neu gezeichnet…",
   "litRestyledTo": "Zu {mode} gewechselt",
   "litRedrawFailedFallback": "Neuzeichnen fehlgeschlagen",
-  "litCreditText": "Diagramm-Engine: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan · MIT-Lizenz",
+  "litCreditText": "Diagramm-Engine: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan · AGPL-3.0-Lizenz",
   "litLayoutNumberedTimeline": "Zeitleiste · Nummeriert",
   "litLayoutDatedTimeline": "Zeitleiste · Mit Datum",
   "litLayoutGantt": "Zeitraumdiagramm · Gantt",

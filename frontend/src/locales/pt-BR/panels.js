@@ -84,7 +84,7 @@ export default {
   "litRedrawing": "Redesenhando…",
   "litRestyledTo": "Alternado para {mode}",
   "litRedrawFailedFallback": "Falha ao redesenhar",
-  "litCreditText": "Motor de diagramas: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan · Licença MIT",
+  "litCreditText": "Motor de diagramas: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan · Licença AGPL-3.0",
   "litLayoutNumberedTimeline": "Linha do tempo · Numerada",
   "litLayoutDatedTimeline": "Linha do tempo · Datada",
   "litLayoutGantt": "Gráfico de períodos · Gantt",

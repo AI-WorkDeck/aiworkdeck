@@ -89,11 +89,15 @@ def build_dot(m):
 
 def run_dot(dot_src):
     try:
-        p = subprocess.run(["dot", "-Tplain"], input=dot_src, capture_output=True, text=True, check=True)
+        p = subprocess.run(["dot", "-Tplain"], input=dot_src, capture_output=True, text=True, check=True,
+                           encoding="utf-8")   # graphviz 读写 UTF-8
     except FileNotFoundError:
-        raise RuntimeError("graphviz 'dot' not found on PATH. Flowchart and "
-                           "relationship layouts need it — install graphviz "
-                           "(e.g. `apt-get install graphviz`).")
+        # 没装 graphviz 就用内置排布顶上。graphviz 在这里只算坐标，连线与画图本来就是
+        # 我们自己做的；而它要单独安装，律师的电脑上普遍没有（真实反馈里已经卡住两个人）。
+        import layout_fallback
+        print("graphviz 未安装，已用内置排布算坐标（连线与画图本来就由本技能自己完成）。"
+              "装上 graphviz 可得到更紧凑的分层。")
+        return layout_fallback.layout(dot_src)
     nodes, gh = {}, 0.0
     for ln in p.stdout.splitlines():
         t = ln.split()
@@ -287,4 +291,19 @@ def main(mapfile, out):
     print(f"[flow] wrote {out}  {w}x{h}  ratio={w/h:.2f}")
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "out.svg")
