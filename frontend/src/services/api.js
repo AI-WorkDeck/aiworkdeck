@@ -1430,6 +1430,16 @@ export function activateLicense(code) {
 
 // 当前站点与可选站点（双主站）。
 // 返回 { current, pinned, multiSite, sites: [{ id, displayName, baseUrl, accountPageUrl }] }
+// 平台 AI 跨境单独同意的就地征求（对话里的同意卡、启动时的征求框）。
+// GET → { required, site: 'cn'|'intl', noticeVersion }；POST 记同意（写法同设置页勾选）。
+export function getCrossBorderConsent() {
+  return request({ url: '/api/ai/cross-border-consent', method: 'GET' })
+}
+
+export function acceptCrossBorderConsent() {
+  return request({ url: '/api/ai/cross-border-consent', method: 'POST' })
+}
+
 export function getSiteStatus() {
   return request({
     url: '/api/site',

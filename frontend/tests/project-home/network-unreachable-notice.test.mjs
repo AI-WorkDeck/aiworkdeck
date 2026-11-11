@@ -56,8 +56,7 @@ function parseAccountPayload(dataStr) {
   }
 }
 
-function renderError(dataStr, prompts = []) {
-  const bubble = { value: { content: '' } }
+function renderError(dataStr, prompts = [], bubble = { value: { content: '' } }) {
   const run = new Function('dataStr', 'currentAssistantBubble', 't', 'accountPayload',
     'isAccountRequired', 'isCreditsRequired', 'promptAccountAction', 'bqtErrorCode', 'bqtErrorMessage', BRANCH)
   // This suite tests rendered error copy; the account dialog is verified in paid-service.mjs.
@@ -124,4 +123,18 @@ test('attachment timeout and occupied reader produce translated actionable error
   assert.match(renderError(JSON.stringify({ code: 'CONTEXT_PREPARATION_TIMEOUT', message: 'fallback' })), /chat\.contextPreparationTimeout/)
   assert.match(renderError(JSON.stringify({ code: 'ATTACHMENTS_REQUIRE_TOOLS', message: 'fallback' })), /chat\.attachmentsRequireTools/)
   assert.match(renderError(JSON.stringify({ code: 'ATTACHMENT_READER_BUSY', message: 'fallback' })), /chat\.attachmentReaderBusy/)
+})
+
+test('跨境同意闸（reason=cross_border_consent_required）：气泡挂同意卡，不贴后端长文案、不弹登录/充值层', () => {
+  const prompts = []
+  const bubble = { value: { content: '' } }
+  const payload = JSON.stringify({ message: '平台 AI 通道已停用：当前账户在本站点还没有有效的跨境传输单独同意（或已撤回）。到「设置 → AI 服务配置」勾选同意后即可继续', code: 409, kind: 'CONFLICT', reason: 'cross_border_consent_required' })
+  const content = renderError(payload, prompts, bubble)
+  assert.equal(bubble.value.consentRequired, true)
+  assert.equal(content, '', '不能再把「到设置 → AI 服务配置勾选」那段话贴进气泡')
+  assert.deepEqual(prompts, [])
+  // 防空断言：同为 CONFLICT、但不是这个 reason 的账户错误仍按原样显示
+  const other = { value: { content: '' } }
+  renderError(JSON.stringify({ message: 'x', code: 1, kind: 'CONFLICT', reason: 'other' }), [], other)
+  assert.notEqual(other.value.consentRequired, true)
 })

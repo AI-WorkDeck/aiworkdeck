@@ -637,6 +637,17 @@ public class ChatModelFactory {
         return defaultModel;
     }
 
+    /**
+     * 与 {@link #platformConnection()} 里的跨境同意闸同一判据：现在发一条平台 AI 请求会不会被拦。
+     * 给前端在用户开口之前就地征求同意（启动检查、对话里的同意卡），不必等撞上报错再去设置页。
+     */
+    public boolean crossBorderConsentRequired(Long userId) {
+        return crossBorderConsent != null
+                && resolveProvider() == AiModelProperties.Provider.AWD_CLOUD
+                && platformAiChannel.usesMachineKey(userId)
+                && crossBorderConsent.isRequired();
+    }
+
     /** Check before starting asynchronous paid work so callers receive the account error directly. */
     public void ensurePaidAccess(Long userId) {
         if (resolveProvider() == AiModelProperties.Provider.AWD_CLOUD) {

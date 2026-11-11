@@ -1961,6 +1961,10 @@ export function useAgentStream() {
                     currentAssistantBubble.value.content +=
                         '\n\n' + t('account.loginDialog.aiNotice') + '\n'
                     promptAccountAction(accountPayload)
+                } else if (accountPayload && accountPayload.reason === 'cross_border_consent_required') {
+                    // 跨境同意闸（后端 CrossBorderConsentService.REASON）：不贴后端那段长文案，
+                    // 气泡里就地出同意卡（RootBubble），同意后原样重发这一问——不让用户跳去设置页
+                    currentAssistantBubble.value.consentRequired = true
                 } else if (isCreditsRequired(accountPayload)) {
                     currentAssistantBubble.value.content += '\n\n' + errMsg + '\n'
                     promptAccountAction(accountPayload)
