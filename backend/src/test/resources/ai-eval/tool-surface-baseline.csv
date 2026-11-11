@@ -10,9 +10,10 @@
 # 2026-11-09 tool-system-v2 V5（meeting_list_recordings/tmeet_* 并入 meeting_list，meeting_get_transcript 加 source）后重测：仅 worst 提示命中 meeting 类目，4 个工具 → 2 个；V5 前基线见 git 历史
 # 2026-11-10 tool-system-v2 V7 D2（deadline_compute 进 task 类目；典型提示多命中 task 类目）合并 master 后重测
 # 2026-11-11 P1（tracked-change 读法：doc_find_text / extract_file_text 描述补 ⟦⟧ 记号说明）后重测
-lowa-docx,neutral,31,7048
-lowa-docx,typical,40,9868
-lowa-docx,worst,33,7385
+# 2026-11-11 P3（doc_insert_at_cursor 加 newParagraph）后重测 lowa-docx 三行
+lowa-docx,neutral,31,7130
+lowa-docx,typical,40,9950
+lowa-docx,worst,33,7467
 lowa-xlsx,neutral,25,6008
 lowa-xlsx,typical,51,12336
 lowa-xlsx,worst,27,6345
