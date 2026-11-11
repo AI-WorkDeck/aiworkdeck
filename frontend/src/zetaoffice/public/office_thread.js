@@ -819,6 +819,74 @@ function insertTextAtCursor(vc, text) {
   }
 }
 
+// AI「新增一条条款」：text 作为独立新段落落在锚点（无锚点 = 视图光标）所在段落之前/之后
+// （p.newParagraph = 'before' | 'after'）。旧路径只能落在锚点文字边界上，模型不会自己补
+// 换行，真实评测里 insert → undo 循环到 16–42 轮（gap 2026-11-11 R2）。
+// 做法同人按回车：段首/段末先插段落标记再写字，拆出来的新段落沿用原段的段落样式与直接段落
+// 格式（编号列表成员也随之），段末拆分时引擎可能换成「下一样式」，所以写完再对齐一次样式。
+// 修订开着时段落标记与文字都是插入修订；整个操作一个撤销组，doc_undo 一步撤回。
+// 回执带新段落段号（与 get_document_text 同为正文 0 基）与前后相邻段落原文，供模型直接核对。
+function insertNewParagraph(p) {
+  if (!isWriterDoc()) return tableFail('newParagraph 只适用于 Word 文档');
+  const where = p.newParagraph === 'before' ? 'before' : 'after';
+  const text = String(p.text || '').replace(/\r\n?/g, '\n').replace(/^\n+|\n+$/g, '');
+  if (!text) return tableFail('text 为空，未插入');
+  let range;
+  if (p.anchor) {
+    range = anchorRange(String(p.anchor));
+    if (!range) return tableFail('anchor not found: ' + p.anchor);
+    const anchorError = anchorEditError(p.anchor, range);
+    if (anchorError) return tableFail(anchorError);
+  } else range = ctrl.getViewCursor();
+  const story = range.getText();
+  const at = story.createTextCursorByRange(where === 'before' ? range.getStart() : range.getEnd());
+  if (where === 'before') at.gotoStartOfParagraph(false); else at.gotoEndOfParagraph(false);
+  let style = '';
+  try { style = String(at.getPropertyValue('ParaStyleName') || ''); } catch (e) {}
+  const vc = ctrl.getViewCursor();
+  let um = null;
+  try { um = xModel.getUndoManager(); um.enterUndoContext('插入段落'); } catch (e) { um = null; }
+  try {
+    story.insertControlCharacter(at, css.text.ControlCharacter.PARAGRAPH_BREAK, false);
+    at.collapseToEnd();
+    // before：光标在原段段首（分段标记之后），退一格回到刚拆出的空段；after：已在新空段段首。
+    if (where === 'before') at.goLeft(1, false);
+    vc.gotoRange(at, false);
+    if (MD_MARKER_RE.test(text)) insertInlineStyled(vc, text);
+    else insertTextAtCursor(vc, text);
+    vc.collapseToEnd();
+    const lines = text.split('\n').length;
+    const block = story.createTextCursorByRange(vc.getEnd());
+    block.gotoEndOfParagraph(false);
+    block.gotoStartOfParagraph(true);
+    for (let i = 1; i < lines; i++) block.gotoPreviousParagraph(true);
+    if (style) {
+      let now = '';
+      try { now = String(block.getPropertyValue('ParaStyleName') || ''); } catch (e) {}
+      if (now !== style) { try { block.setPropertyValue('ParaStyleName', style); } catch (e) {} }
+    }
+    invalidateParaIndex();
+    const out = { success: true, inserted: text, newParagraph: where, newParagraphCount: lines, paragraphStyle: style || null };
+    const clip = function (s) { s = String(s || ''); return s.length > 200 ? s.slice(0, 200) + '…' : s; };
+    withParaIndex(function (ix) {
+      let idx = -1;
+      try {
+        const body = xModel.getText();
+        const start = block.getStart();
+        for (let i = 0; i < ix.total; i++) {
+          if (body.compareRegionStarts(ix.ranges[i].getStart(), start) >= 0 && body.compareRegionEnds(ix.ranges[i].getEnd(), start) <= 0) { idx = i; break; }
+        }
+      } catch (e) { idx = -1; } // 表格单元格等别的 story：没有正文段号
+      if (idx < 0) { out.paragraphAfterEdit = clip(paragraphTextOf(vc)); return; }
+      out.newParagraphIndex = idx;
+      out.newParagraphText = clip(ix.ranges.slice(idx, idx + lines).map(function (el) { return el.getString(); }).join('\n'));
+      if (idx > 0) out.previousParagraph = { index: idx - 1, text: clip(ix.ranges[idx - 1].getString()) };
+      if (idx + lines < ix.total) out.nextParagraph = { index: idx + lines, text: clip(ix.ranges[idx + lines].getString()) };
+    });
+    return out;
+  } finally { if (um) { try { um.leaveUndoContext(); } catch (e) {} } }
+}
+
 // 用户手打覆盖选区（Word 语义）：选中一段再敲字 = 选区被删、新字落在原位置。
 // 旧实现一律 collapseToEnd 再插，选中的字原样留着、新字跟在后面（用户实测反馈）。
 // 只在 replace=true（IME 覆盖层的手打 / 回车 / Tab）时生效；AI 管线不带这个标记，
@@ -5107,6 +5175,7 @@ const EXEC = {
   // 选区、在原位置落字（Word 行为）。不带时仍是「塌到选区末尾追加」——AI / 插件管线
   // 先 select 再 insert_at_cursor 表示「插在后面」，那条契约不能被改掉。
   insert_at_cursor(p) {
+    if (p.newParagraph) return insertNewParagraph(p);
     if (nativeKeyDoc()) {
       const text = String(p.text || '');
       // Array.from 按码点切分（split('') 按 UTF-16 code unit，会把 emoji/扩展

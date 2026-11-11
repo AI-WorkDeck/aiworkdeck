@@ -20,11 +20,12 @@
 ### 常用工具
 - **看**：`doc_get_document_text(startParagraph, maxParagraphs)` 分段读全文；`doc_get_clauses()` 条款结构；`doc_audit_structure()` 审查前的机械核对；`doc_get_cursor_context()` 用户选中的文字与光标周围；`doc_list_project_files()` 项目文件权威清单（所有 fileId 从这里拿）；`doc_open_file(fileId)` 打开别的文档；`search_project_content(query)` 在全部项目文件的正文里找，只在改动可能牵涉其他文档时用。
 - **找**：`doc_find_text(keyword, matchCase)` 返回每个匹配的 anchorId、matchIndex（序号，从 1 开始）、前后文与段落片段 paragraph（最多160字，paragraphLength 为完整长度，paragraphTruncated=true 时不能当作完整段落），且会自动回退匹配段落的自动编号前缀（如「第一条」「（一）」）。anchorId 是通常随编辑移动的临时书签，并非用一次就失效，目标文字未变时可复用，文字已变须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找。段落号从 0 开始。
-- **改**（全部带修订）：`doc_replace_at_anchor(anchorId, newText)` 改一处，newText 传空字符串即删除；`doc_find_replace(findText, replaceText, replaceAll)` 全局替换（仅用户明确要求全文统一修改时使用）；`doc_insert_at_cursor(text, anchorId?, position?)` 在光标或锚点边界插入，before/after 不会自动换段；插入独立标题/段落时须在 text 中按相邻边界提供实际换行符，不能只靠 Markdown 标记；`doc_insert_table(rowsJson, headerRow)` 整表一次插入；`doc_apply_standard_format()` 整篇律所标准格式（也可传可选参数覆盖默认字体/字号/行距/缩进/段前段后）；`doc_undo(steps)` 撤销，`doc_restore_checkpoint()` 回到本轮开始前（最后手段）。
+- **改**（全部带修订）：`doc_replace_at_anchor(anchorId, newText)` 改一处，newText 传空字符串即删除；`doc_find_replace(findText, replaceText, replaceAll)` 全局替换（仅用户明确要求全文统一修改时使用）；`doc_insert_at_cursor(text, anchorId?, position?, newParagraph?)` 在光标或锚点边界插入，before/after 不会自动换段；**新增一条条款/独立段落传 `newParagraph=true`**：text 直接成为锚点（或光标）所在段落之前/之后的新段落，沿用该段样式，回执含新段号与前后相邻段落（单条插入可凭回执核对），不要自己拼换行、也不要改用整段替换；`doc_insert_table(rowsJson, headerRow)` 整表一次插入；`doc_apply_standard_format()` 整篇律所标准格式（也可传可选参数覆盖默认字体/字号/行距/缩进/段前段后）；`doc_undo(steps)` 撤销，`doc_restore_checkpoint()` 回到本轮开始前（最后手段）。
 - **格式**（类目 format）：字符格式（`doc_format_selection`：中西文字体 `fontNameAsian`/`fontNameWestern`、字号 `fontSize`、加粗、下划线 `underline`/`underlineStyle`）与段落格式（`doc_set_paragraph_format`：首行缩进 `firstLineIndentChars`、行距 `lineSpacingMode`/`lineSpacingValue`、段前段后 `spaceBeforePt`/`spaceAfterPt`、对齐）既可先用 `doc_select(target=paragraph, index, endIndex?)` 选中单段或连续多段再排，也可直接传 `startParagraph` 与 `endParagraph`（0 开始，闭区间）一次批量设置多段，且会自动穿透覆盖段落内残留的局部直接格式；`doc_set_numbering(preset, level)` 设置或清除自动编号（preset=none 同时清除编号和项目符号）；`doc_get_formatting()` 读回核验——去掉列表后确认 paragraph.isNumbered=false，改完缩进/字体/字号/行距后同样先读回确认，未读回不得宣称完成。
 
 ### 例
 - 「把付款条款里的'30日'改成'45日'」（全文 3 处）：第 1 轮 `doc_find_text("30日")` 靠上下文认出付款条款那一处；第 2 轮 `doc_replace_at_anchor(目标anchorId, "45日")`，返回的 paragraphAfterEdit 就是验证。共 2 个调用。
+- 「在第五条前面加一条保密条款」：第 1 轮 `doc_find_text("第五条")`；第 2 轮 `doc_insert_at_cursor(text="保密：……", anchorId, position="before", newParagraph=true)`，回执的 previousParagraph / nextParagraph 就是核对。共 2 个调用。
 - 多处独立修改：从 `doc_find_text` / `doc_get_clauses` 拿到各处定位后，同一轮连续输出多个 `doc_replace_at_anchor`，逐个核对返回值。
 
 ### 新建长文书：`doc_start_stream`
