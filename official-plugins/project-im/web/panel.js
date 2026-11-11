@@ -839,6 +839,7 @@
     for (const id of controlIds) if ($(id)) $(id).disabled = true;
     try {
       const context = await awd.call('context.get', {}); if (epoch !== state.epoch) return; state.context = context;
+      applyHostSidebar();
       maybeEnableEnglish(context);
       if (!context.projectId) { notice('请先选择一个项目，再使用项目沟通。'); return; }
       syncHostSidebar();
@@ -872,11 +873,18 @@
       finally { if (epoch === state.epoch) schedule(epoch); }
     }, 3000);
   }
+  function applyHostSidebar() {
+    const want = state.hostSidebar;
+    $('workspace').classList.toggle('host-sidebar', !!want && want.visible && want.projectId === String(state.context?.projectId));
+  }
   async function handleSidebarCommand(payload = {}) {
     const cmd = payload?.command;
     if (!cmd) return;
     if (cmd === 'host-sidebar') {
-      if (String(payload.projectId) === String(state.context?.projectId)) $('workspace').classList.toggle('host-sidebar', payload.visible === true);
+      // 宿主可能在 context 读回之前就发来这条：先记下，读到 context 后再套用；
+      // 否则插件自带的会话列表会和宿主侧栏同时出现两份。
+      state.hostSidebar = { projectId: String(payload.projectId), visible: payload.visible === true };
+      applyHostSidebar();
       return;
     }
     if (cmd === 'select-conversation') {

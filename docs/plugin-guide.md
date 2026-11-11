@@ -97,6 +97,8 @@ Load the SDK with a synchronous `<script>` before your code. The host sends `ini
 
 Every bridge message carries the envelope `awd: 1` (for example `{ awd: 1, type: "init", context: {...} }`, then `call` / `result` pairs). The iframe has no `allow-same-origin`, so the plugin talks to the host only through this bridge. The contract is append-only: new methods get new names, old ones are not changed, and unfinished methods carry an `x-` prefix. Beyond files, storage, and toasts, the bridge covers document read/write (`awd.doc.*`, `editor` permission), host events, theme tokens, AI requests billed to the user's Credits (`awd.ai.request`, `ai` permission), and calling the plugin's own JAR tools. An older host answers unknown methods with `unknown_method`, so plugins should degrade gracefully.
 
+**UI layout rules:** read [sdk/plugin-sdk/UI-GUIDELINES.md](../sdk/plugin-sdk/UI-GUIDELINES.md) before building a panel — the shared `.awd-*` classes, token naming with fallbacks, keeping CJK text from breaking mid-word in tables and tabs, error/empty-state patterns, and the screenshot checklist (three widths, four data states, error states, dark theme, English) required before release.
+
 ## Publish
 
 - Local drop-in: copy into `plugins/` (you trust that code).

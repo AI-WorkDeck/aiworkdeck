@@ -93,6 +93,14 @@
     dashboard: {}
   };
 
+  // 后端摘要里带内部规则码（「【RED · R2_RETAINER_ADVERSARY】」「Y1_… - 依据」），
+  // 风险等级已由卡片徽标表达，律师不需要看到机器码。只改显示，不改存储。
+  function plainRuleText(text) {
+    return String(text || '')
+      .replace(/^【[A-Z]+ · [A-Z0-9_]+】\s*/, '')
+      .replace(/^[A-Z][A-Z0-9]*_[A-Z0-9_]+ - /, '');
+  }
+
   function node(tag, text, className) {
     const el = document.createElement(tag);
     if (text !== undefined && text !== null) el.textContent = String(text);
@@ -315,20 +323,19 @@
     box.append(head);
 
     const summaryText = result.summary || result.conflictSummary || '已完成全所利益冲突扫描。';
-    box.append(node('p', summaryText));
+    box.append(node('p', plainRuleText(summaryText)));
 
     const hits = result.hits || result.conflictHits || parseJsonList(result.conflictHitsJson);
     if (hits.length > 0) {
       const ul = node('ul', null, 'hit-list');
       for (const hit of hits) {
         const li = node('li');
-        const ruleCode = hit.ruleCode ? `[${hit.ruleCode}] ` : '';
-        const ruleTitle = hit.ruleTitle || '命中冲突规则';
+                const ruleTitle = hit.ruleTitle || '命中冲突规则';
         const matchedMatter = hit.matchedMatterTitle ? ` · 关联案件：${hit.matchedMatterTitle}` : '';
         const matchedParty = hit.matchedPartyName ? ` · 冲突主体：${hit.matchedPartyName}` : '';
         const handler = hit.handlerUserName ? ` · 承办人：${hit.handlerUserName}` : '';
         const citation = hit.statutoryCitation || hit.conflictRuleCitation || '';
-        li.textContent = `${ruleCode}${ruleTitle}${matchedMatter}${matchedParty}${handler}${citation ? ' — 依据：' + citation : ''}`;
+        li.textContent = `${ruleTitle}${matchedMatter}${matchedParty}${handler}${citation ? ' — 依据：' + citation : ''}`;
         ul.append(li);
       }
       box.append(ul);
@@ -371,7 +378,7 @@
       card.append(meta);
 
       if (item.conflictSummary) {
-        card.append(node('p', item.conflictSummary, 'hint'));
+        card.append(node('p', plainRuleText(item.conflictSummary), 'hint'));
       }
 
       if (item.feeComplianceWarning) {
@@ -420,7 +427,7 @@
         card.append(meta);
 
         if (clr.conflictRuleCitation) {
-          card.append(node('p', `法规依据：${clr.conflictRuleCitation}`, 'hint'));
+          card.append(node('p', `法规依据：${plainRuleText(clr.conflictRuleCitation)}`, 'hint'));
         }
         if (clr.imConversationId) {
           card.append(node('p', `本机征询会话：${clr.imConversationId}（仅本机记录）`, 'hint'));
@@ -490,7 +497,7 @@
       card.append(meta);
 
       if (intake.conflictSummary) {
-        card.append(node('p', intake.conflictSummary, 'hint'));
+        card.append(node('p', plainRuleText(intake.conflictSummary), 'hint'));
       }
 
       const relatedClearances = intake.clearances || state.allClearances.filter((c) => String(c.intakeId) === String(intake.id));
@@ -616,9 +623,9 @@
         const noText = inv.invoiceNumber ? `${inv.invoiceAppNo || ''} / ${inv.invoiceNumber}` : (inv.invoiceAppNo || `INV-${inv.id}`);
         tr.append(
           node('td', noText),
-          node('td', `${inv.matterTitle || '-'}（${inv.departmentName || '-'}）`),
+          node('td', `${inv.matterTitle || '-'}（${inv.departmentName || '-'}）`, 'cell-text'),
           node('td', INVOICE_TYPE_LABELS[inv.invoiceType] || inv.invoiceType || '数电专票'),
-          node('td', `${inv.buyerName || '-'} ${inv.buyerTaxId ? '· ' + inv.buyerTaxId : ''}`),
+          node('td', `${inv.buyerName || '-'} ${inv.buyerTaxId ? '· ' + inv.buyerTaxId : ''}`, 'cell-text'),
           node('td', `${formatYuanFromCents(inv.amountCents)}（税额 ${formatYuanFromCents(inv.taxAmountCents)}）`),
           node('td', formatYuanFromCents(inv.collectedAmountCents))
         );
@@ -676,9 +683,9 @@
         const tr = node('tr');
         tr.append(
           node('td', col.collectionNo || `COL-${col.id}`),
-          node('td', col.matterTitle || col.intakeNo || '-'),
+          node('td', col.matterTitle || col.intakeNo || '-', 'cell-text'),
           node('td', col.invoiceAppNo || (col.invoiceId ? `#${col.invoiceId}` : '未绑定发票')),
-          node('td', col.payerName || '-'),
+          node('td', col.payerName || '-', 'cell-text'),
           node('td', formatYuanFromCents(col.amountCents)),
           node('td', PAYMENT_METHOD_LABELS[col.paymentMethod] || col.paymentMethod || '对公转账'),
           node('td', col.bankVoucherNo || '-'),
@@ -949,15 +956,13 @@
     '拟任主办负责人': 'Proposed Lead Counsel',
     '主办合伙人/律师姓名': 'Lead partner / lawyer name',
     '收费方式': 'Billing Mode',
-    '固定收费（FIXED）': 'Fixed Fee (FIXED)',
-    '按标的额比例收费（PROPORTIONAL）': 'Proportional Fee (PROPORTIONAL)',
-    '风险代理收费（CONTINGENCY）': 'Contingency Fee (CONTINGENCY)',
-    '计时收费（HOURLY）': 'Hourly Billing (HOURLY)',
-    '常年法律顾问（RETAINER）': 'Retainer Fee (RETAINER)',
     '固定收费': 'Fixed Fee',
+    '按标的额比例收费': 'Proportional Fee',
+    '风险代理收费': 'Contingency Fee',
+    '计时收费': 'Hourly Billing',
+    '常年法律顾问': 'Retainer Fee',
     '按标的额比例': 'Proportional Fee',
     '风险代理': 'Contingency Fee',
-    '计时收费': 'Hourly Fee',
     '常年顾问': 'Retainer',
     '委托人 / 客户名称': 'Client Name',
     '客户法定全称或自然人姓名': 'Full legal name of entity or individual client',

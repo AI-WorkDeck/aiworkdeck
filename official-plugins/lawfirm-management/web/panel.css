@@ -187,6 +187,8 @@ p {
 
 .tabbar {
   display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 3px;
   padding: 3px;
   margin-bottom: 10px;
@@ -197,6 +199,8 @@ p {
 }
 
 .tab-btn {
+  flex: none;
+  white-space: nowrap;
   border: 1px solid transparent;
   border-radius: var(--awd-radius-sm, 4px);
   background: transparent;
@@ -430,9 +434,10 @@ p {
 }
 
 /* 5-Step Progress Tracker */
+/* 五步固定 5 列在半宽卡片里会把「提交收案申请」逐字折成两行；按最小宽度自动换行 */
 .progress-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 6px;
   margin-top: 10px;
   padding-top: 8px;
@@ -440,6 +445,9 @@ p {
 }
 
 .step-pill {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 5px 6px;
   border-radius: var(--awd-radius-sm, 6px);
   border: 1px solid var(--awd-border, var(--fallback-border));
@@ -535,9 +543,12 @@ table {
   font-size: 12px;
 }
 
+/* 中文可在任意字间断行：表格被压窄时「苏婉清（合伙人）」会被拆成三行。
+   短值一律不折行、由 .table-wrap 横向滚动；长文本列显式标 .cell-text 才允许折行。 */
 th,
 td {
-  text-align: left;
+  white-space: nowrap;
+  text-align: start;
   padding: 8px 10px;
   border-bottom: 1px solid var(--awd-border, var(--fallback-border));
   vertical-align: middle;
@@ -548,6 +559,12 @@ th {
   color: var(--awd-text-2, var(--fallback-muted));
   background: var(--awd-surface-2, var(--fallback-surface-2));
   white-space: nowrap;
+}
+
+td.cell-text {
+  white-space: normal;
+  min-width: 12em;
+  max-width: 22em;
 }
 
 .workload-bar-wrap {
@@ -576,8 +593,5 @@ th {
   }
   .field-span-2 {
     grid-column: span 1;
-  }
-  .progress-steps {
-    grid-template-columns: minmax(0, 1fr);
   }
 }

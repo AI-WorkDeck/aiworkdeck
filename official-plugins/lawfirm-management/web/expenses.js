@@ -112,7 +112,7 @@
     body.replaceChildren();
     for (const [matter, row] of summarize()) {
       const tr = el('tr');
-      tr.append(el('td', matter), el('td', yuan(row.advanced)), el('td', yuan(row.pending)));
+      tr.append(el('td', matter, 'cell-text'), el('td', yuan(row.advanced)), el('td', yuan(row.pending)));
       const missing = el('td', yuan(row.noVoucher));
       if (row.noVoucher) missing.append(' ', el('span', t('expense.noVoucher'), 'badge badge-yellow'));
       tr.append(missing, el('td', yuan(row.client)));

@@ -26,7 +26,7 @@
         <div class="list-scroll">
           <template v-if="category === 'conversations'">
             <div v-if="availableAgents.length" class="scope-agents"><small>{{ $t('messageCenter.assistants') }}</small><button v-for="agent in availableAgents" :key="agent.scopeKey" :disabled="creating" @click="openAgent(agent)"><svg class="agent-avatar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4" /></svg><span>{{ agent.title || agent.name }}</span><small>{{ $t('messageCenter.' + agent.scope) }}</small></button></div>
-            <p v-if="projectReason" class="center-hint">{{ projectReason }}</p>
+            <p v-if="projectReason && projectReason !== error" class="center-hint">{{ projectReason }}</p>
           </template>
           <button v-for="item in items" :key="itemKey(item)" class="inbox-row" :class="{ selected: selection === itemKey(item), unread: category === 'conversations' ? item.unreadCount > 0 : !isNoticeRead(item) }" :aria-current="selection === itemKey(item) ? 'true' : undefined" @click="selectItem(item)">
             <span class="row-icon" :class="{ 'is-pending': item.actionState === 'pending' }" aria-hidden="true"><svg viewBox="0 0 24 24"><path v-if="item.agent" d="M12 3v3m-6 0h12a3 3 0 0 1 3 3v9H3V9a3 3 0 0 1 3-3Zm2 5h.01M16 11h.01M8 15h8M1 11v4m22-4v4" /><path v-else-if="category === 'conversations'" d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-3 3V11.5a9 9 0 1 1 18 0Z" /><path v-else-if="item.actionState === 'pending'" d="M8 4H5v17h14V4h-3M8 2h8v5H8zM8 14l3 3 5-6" /><path v-else d="M14 2H5v20h14V7l-5-5Zm0 0v6h5M8 12h8M8 16h6" /></svg></span>
@@ -304,10 +304,10 @@ export default {
 .center-placeholder p { font-size: 12px; max-width: 260px; line-height: 1.8; margin: 10px 0 0; }
 .center-empty { padding: 32px 12px; text-align: center; color: var(--awd-text-2); font-size: 12px; line-height: 1.7; }
 .center-empty svg { width: 28px; height: 28px; color: var(--awd-text-3); }
-.center-hint { font-size: 11px; color: var(--awd-text-2); line-height: 1.8; overflow-wrap: anywhere; }
+.center-hint { font-size: 11px; color: var(--awd-text-2); line-height: 1.8; overflow-wrap: anywhere; margin: 0; padding: 4px 8px; }
 .source-warning { padding: 10px 24px; margin: 0; background: var(--awd-warning-soft); color: var(--awd-warning-text); }
 .recent-only { border-top: 1px solid var(--awd-border-subtle); margin: 0; padding: 10px 16px; }
-.center-error { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--awd-danger-text, var(--awd-danger)); padding: 12px 16px; overflow-wrap: anywhere; margin: 0; }
+.center-error { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--awd-danger-text, var(--awd-danger)); padding: 8px 12px; overflow-wrap: anywhere; margin: 12px 16px 0; border-inline-start: 3px solid var(--awd-danger-text, var(--awd-danger)); border-radius: var(--awd-radius-sm, 4px); background: var(--awd-danger-soft); }
 .center-error > span { flex: 1; min-width: 120px; }
 .create-form { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
 .create-form input { width: 100%; }
