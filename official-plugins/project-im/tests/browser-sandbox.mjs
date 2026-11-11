@@ -72,6 +72,10 @@ test('real sandbox SDK bridge supports explicit import/export/member/leave confi
     assert.equal(layout.overflow, false, `${width} ${theme}`); assert.equal(layout.send, true);
   }
   // Actual plugin button + actual SDK request + host helper + physical mouse drop.
+  // Park the pointer first: the resizes below can slide the drag button under a stationary
+  // pointer, firing pointerenter (and files.prepareDrag) before dragHelpers exists. The later
+  // move onto the button would then not count as an entry, and no drag handle is ever made.
+  await page.mouse.move(1, 1);
   await page.setViewport({ width: 1000, height: 760 });
   await page.evaluate(async () => {
     window.dragHelpers = await import('/drag-helper.js'); window.dragOwner = { sessionGeneration: 1 };
