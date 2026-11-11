@@ -81,15 +81,24 @@ final class LawSourceDownPolicy {
                         + "\"unverified\", and never describe it as verified.");
     }
 
-    /** 放行的替代查询结果后面附一句：第几次、网页不是权威法源。非替代查询返回 null。 */
+    /** 替代查询额度已用完（编排器据此把网页工具本轮余下下线）。 */
+    synchronized boolean lookupsExhausted() {
+        return down && webLookups >= MAX_WEB_LOOKUPS_AFTER_DOWN;
+    }
+
+    /** 放行的替代查询结果后面附一句：第几次、网页不是权威法源；用完那次说明下一步直接作答。非替代查询返回 null。 */
     synchronized String lookupNotice(String toolName) {
         if (!down || toolName == null || !WEB_LOOKUP_TOOLS.contains(toolName)) return null;
+        boolean last = webLookups >= MAX_WEB_LOOKUPS_AFTER_DOWN;
         return LangText.of(
                 "[系统提示] 法源不可用后的替代查询 " + webLookups + "/" + MAX_WEB_LOOKUPS_AFTER_DOWN
-                        + "。网页内容不是权威法源，据此引用的条文须标「未核实」。",
+                        + "。网页内容不是权威法源，据此引用的条文须标「未核实」。"
+                        + (last ? "额度已用完，search_web / browse_url 本轮不再提供：下一步直接根据已有资料回答。" : ""),
                 "[System notice] Alternative lookup " + webLookups + "/" + MAX_WEB_LOOKUPS_AFTER_DOWN
                         + " after the legal source went down. Web pages are not an authoritative legal source; "
-                        + "statute text taken from them must be marked \"unverified\".");
+                        + "statute text taken from them must be marked \"unverified\"."
+                        + (last ? " The budget is used up and search_web / browse_url are withdrawn for this run: "
+                                + "answer next with what you have." : ""));
     }
 
     /**

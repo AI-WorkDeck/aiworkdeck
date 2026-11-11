@@ -38,8 +38,10 @@ class LawSourceDownPolicyTest {
         assertTrue(p.isDown());
         assertNull(p.admit("search_web"));
         assertTrue(p.lookupNotice("search_web").contains("1/2"));
+        assertFalse(p.lookupsExhausted());
         assertNull(p.admit("browse_url"));
         assertTrue(p.lookupNotice("browse_url").contains("2/2"));
+        assertTrue(p.lookupsExhausted());
         String refused = p.admit("search_web");
         assertNotNull(refused);
         assertTrue(refused.contains("已用满 2 次") && refused.contains("未核实"), refused);

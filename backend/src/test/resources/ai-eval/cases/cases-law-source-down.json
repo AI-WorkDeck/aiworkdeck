@@ -52,7 +52,8 @@
       "promptContains": [
         "替代查询（search_web / browse_url）已用满 2 次",
         "法源不可用后的替代查询 1/2",
-        "本轮北大法宝法源不可用，你的回答引用了具体条文"
+        "本轮北大法宝法源不可用，你的回答引用了具体条文",
+        "search_web / browse_url 本轮不再提供"
       ],
       "bubbleEndStatus": "finished"
     }
@@ -146,7 +147,8 @@
       "promptContains": [
         "替代查询（search_web / browse_url）已用满 2 次",
         "法源不可用后的替代查询 1/2",
-        "本轮北大法宝法源不可用，你的回答引用了具体条文"
+        "本轮北大法宝法源不可用，你的回答引用了具体条文",
+        "search_web / browse_url 本轮不再提供"
       ],
       "bubbleEndStatus": "finished"
     }

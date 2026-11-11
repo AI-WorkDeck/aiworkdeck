@@ -77,4 +77,36 @@ class LegalVendorFailureReplayEvalTest {
         assertFalse(round2.contains("law_search"), round2.toString());
         assertFalse(round2.contains("get_law_article"), round2.toString());
     }
+
+    /** gap P8：法源不可用后替代查询用满 2 次，网页工具下一轮起不再下发；之前确实下发过（防空断言）。 */
+    @Test
+    void webLookupToolsAreWithdrawnOnceTheSourceDownBudgetIsSpent() {
+        EvalCase c = new EvalCase();
+        c.id = "legal-source-down-withdraws-web";
+        c.title = "法宝不可用后 2 次替代查询用满即下线 search_web / browse_url";
+        c.mode = "AGENT";
+        c.userInput = "民法典第1082条是什么";
+        c.toolStubs = Map.of(
+                "get_law_article", "Error: " + LegalTools.VENDOR_UNAVAILABLE_MARKER + " 北大法宝法源暂时不可用",
+                "search_web", "[{\"title\":\"x\",\"url\":\"https://example.com/a\"}]",
+                "browse_url", "网页正文");
+        EvalCase.Turn t1 = new EvalCase.Turn();
+        t1.text = "<tool_code>get_law_article(title=\"中华人民共和国民法典\", number=\"1082\")</tool_code>";
+        EvalCase.Turn t2 = new EvalCase.Turn();
+        t2.text = "<tool_code>search_web(query=\"民法典第1082条\")</tool_code>";
+        EvalCase.Turn t3 = new EvalCase.Turn();
+        t3.text = "<tool_code>browse_url(url=\"https://example.com/a\")</tool_code>";
+        EvalCase.Turn t4 = new EvalCase.Turn();
+        t4.text = "<final>第1082条的内容来自非权威网页，未核实。</final>";
+        c.turns = List.of(t1, t2, t3, t4);
+
+        EvalHarness.RunResult r = EvalHarness.run(c);
+
+        assertEquals(0, r.remainingScriptTurns());
+        List<List<String>> offered = r.toolNamesOfferedPerLlmCall();
+        assertEquals(4, offered.size(), offered.toString());
+        assertTrue(offered.get(2).contains("browse_url"), "额度用满前应仍下发：" + offered.get(2));
+        assertFalse(offered.get(3).contains("search_web"), offered.get(3).toString());
+        assertFalse(offered.get(3).contains("browse_url"), offered.get(3).toString());
+    }
 }

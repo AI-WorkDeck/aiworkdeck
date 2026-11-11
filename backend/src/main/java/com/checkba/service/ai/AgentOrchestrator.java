@@ -1389,6 +1389,12 @@ public class AgentOrchestrator {
                 result = new ToolRegistry.ToolResult(result.output() + "\n\n" + lookupNotice,
                         result.tool(), result.found());
             }
+            // 额度用完：网页工具本轮余下不再下发（与法宝整体下线同一机制，下一轮生效）。实测光回拒绝说明，
+            // 模型仍会再要一两次，白烧轮次；仍硬要调用的照样被 admit 拦下。
+            if (guard.lawSource.lookupsExhausted()) {
+                java.util.Set<String> merged = new java.util.HashSet<>(guard.unusableTools);
+                if (merged.addAll(LawSourceDownPolicy.WEB_LOOKUP_TOOLS)) guard.unusableTools = merged;
+            }
         }
 
         // 本轮有没有动过文档：原生 function calling 与 XML 兜底两条工具循环都经过这里，
