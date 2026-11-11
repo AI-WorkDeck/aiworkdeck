@@ -57,7 +57,7 @@ for (const retrySucceeds of [true, false]) {
         if (requests.length === 2 || (requests.length === 3 && !retrySucceeds)) return json(miss, 409)
         return json({ status: 'ok' })
       }
-      if (url.includes('/api/agent/cancel/')) return json({})
+      if (url.includes('/api/agent/cancel/')) return json({ cancelled: false })
       throw new Error('Unexpected request: ' + url)
     }
     try {
@@ -107,7 +107,7 @@ test('pending inbox snapshot loss resends an initial full-body request with the 
       requests.push(JSON.parse(options.body))
       return requests.length === 1 ? json(miss, 409) : json({ status: 'ok' })
     }
-    if (url.includes('/api/agent/cancel/')) return json({})
+    if (url.includes('/api/agent/cancel/')) return json({ cancelled: false })
     throw new Error('Unexpected request: ' + url)
   }
   try {

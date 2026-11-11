@@ -769,6 +769,7 @@
                <text class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
            </view>
        </view>
+       <NowDoingStrip :active="isStreaming" :bubble="nowDoingBubble" />
        <AgentInbox
          :items="pendingInbox"
          :stream-ids="inboxStreamIds"
@@ -821,7 +822,7 @@
             @paste="handlePaste"
             @keydown="handleInputKeydown"
             @click="handleInputClick"
-            :data-placeholder="$t('chat.inputPlaceholder') + '\n' + $t('chat.inputKeysHint')"
+            :data-placeholder="composerPlaceholder"
           ></div>
           <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
           <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
@@ -1081,6 +1082,7 @@ import { buildChatTurns, isPlanSnapshotCall, pendingAttention, recoverPlanTodos 
 import { useChatReadingPosition } from '@/composables/useChatReadingPosition.js'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
+import NowDoingStrip from './AgentMessage/NowDoingStrip.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
@@ -1142,7 +1144,7 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, OptionalComponentCard },
+  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, NowDoingStrip, OptionalComponentCard },
   inject: { openSettingsTab: { default: null } },
   methods: {
     goToMcpManagement() {
@@ -1490,6 +1492,24 @@ export default {
      * 点它，后端 acceptInboxSubmission 是幂等的（进去先查活跃轮次，有就原样返回）。
      */
     const inboxRunActive = computed(() => isStreaming.value)
+    /**
+     * 输入框占位语（用户控制 1）：轮次在跑时告诉用户「现在打字会怎样」——
+     * 插话模式下一步就改方向，排队模式等这轮做完再跑。判据与发送路径同源
+     * （isStreaming + followUpMode），不另起状态。空态那只输入框只在没轮次时出现，不用跟。
+     */
+    // 常驻条读的是正在写的那条助手气泡（插话会另起一段，取最后一条即可）
+    const nowDoingBubble = computed(() => {
+      if (!isStreaming.value) return null
+      for (let i = bubbles.value.length - 1; i >= 0; i--) {
+        if (bubbles.value[i].role === 'ASSISTANT') return bubbles.value[i]
+      }
+      return null
+    })
+    const composerPlaceholder = computed(() => {
+      const lead = !isStreaming.value ? t('chat.inputPlaceholder')
+        : followUpMode.value === 'queue' ? t('chat.inputPlaceholderQueue') : t('chat.inputPlaceholderSteer')
+      return lead + '\n' + t('chat.inputKeysHint')
+    })
     const messageList = ref(null)
     const messageContent = ref(null)
     // 内容没变的轮次要保持同一个 turn 对象（dev-board#811 K31）：模板上那条 v-memo
@@ -4749,7 +4769,7 @@ export default {
        followLatest, handleMessageScroll, handleHistoryScroll, scrollToBottom, attentionNotice, jumpToAttention,
        historyHasMore, historyLoadingOlder, loadOlderMessages,
        activeTurnKey, handleTurnJump,
-       receiptLabel, inboxStreamIds, inboxRunActive, handleInboxLocate,
+       receiptLabel, inboxStreamIds, inboxRunActive, composerPlaceholder, nowDoingBubble, handleInboxLocate,
        contextFiles,
        pendingAudioFiles,
        handleTranscribeAudio,
