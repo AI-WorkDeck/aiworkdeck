@@ -305,7 +305,7 @@ public class ContentSearchService {
                     textCache == null || file.getId() == null ? null : documentTextService.stampOf(file);
             String cached = textCache == null ? null : textCache.find(file.getId(), stamp);
             if (cached != null) {
-                return cached;
+                return DocxPendingRevisionText.stripMarkers(cached);
             }
             // 纯文本按字节解码（UTF-8 严格、失败回退 GBK），与 AI 读文件同一份判据与口径（dev-board#1065）：
             // 交给 Tika 的话 GBK 中文 txt 抽回空串，search_project_content 就永远搜不到它
@@ -319,7 +319,8 @@ public class ContentSearchService {
             if (textCache != null && isUsableText(file, extracted)) {
                 textCache.store(file.getId(), stamp, ProjectFileTextCache.SOURCE_TEXT, extracted);
             }
-            return extracted;
+            // 缓存与 AI 共用「最终文本 + ⟦⟧ 修订标记」；检索按最终文本匹配，「15 日」不被标记隔开
+            return DocxPendingRevisionText.stripMarkers(extracted);
         } catch (Exception e) {
             log.warn("Failed to extract content from {}: {}", file.getName(), e.getMessage());
             return null;

@@ -456,12 +456,15 @@ public class DocumentEditTools implements AgentToolComponent {
             + "anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位。每个匹配含 text、matchIndex（从 1 开始）、anchorId、前后文、paragraph（最多 160 字，paragraphTruncated=true 时须回读完整段落）。\n"
             + "anchorId 是随编辑移动的临时书签，并非用一次就失效：目标原文未变时可复用，原文变了须重新查找；切换或重开文档、清理锚点后失效（按引文建证据链接也会清理），失效时重新查找。\n"
             + "自动编号段落可连编号带正文搜（如「第一条 服务内容」），并返回 paragraphIndex 与 numbering。\n"
-            + "先据上下文确认目标再改，不凭印象判断全文唯一；多处独立修改拿到各自 anchorId 后连续调用。查找排除已删除修订，删除历史用 doc_list_revisions。")
+            + "先据上下文确认目标再改，不凭印象判断全文唯一；多处独立修改拿到各自 anchorId 后连续调用。查找排除已删除修订，删除历史用 doc_list_revisions。\n"
+            + "注入正文里的修订标记 ⟦原:…⟧/⟦删:…⟧/⟦增:…⟧ 不是文档文字，keyword 不要带（误带时自动去掉）。")
     public String doc_find_text(
             @P("要查找的文本") String keyword,
             @P(value = "是否区分大小写，默认 false", required = false) Boolean matchCase
     ) {
         log.info("Tool: doc_find_text called keyword={}", keyword);
+        // 模型可能从注入正文整段照抄，带上 ⟦⟧ 修订标记；编辑器正文是最终文本，按最终文本找
+        keyword = com.checkba.service.DocxPendingRevisionText.stripMarkers(keyword);
         try {
             // Updated to call 'find_text_locations' which returns detailed positions
             String raw = editorBridgeService.executeEditorCommand("find_text_locations", 

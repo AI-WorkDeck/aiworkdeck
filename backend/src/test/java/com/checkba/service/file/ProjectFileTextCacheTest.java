@@ -93,6 +93,20 @@ class ProjectFileTextCacheTest {
     }
 
     @Test
+    @DisplayName("修订标记之前的旧口径行（source=text，可能是「715」拼接正文）文件没改也要重抽")
+    void legacyTextSourceIsReExtracted() {
+        FakeRepo repo = new FakeRepo();
+        ProjectFileTextCacheService svc = new ProjectFileTextCacheService(repo.mock, new AiContextProperties());
+        svc.store(7L, STAMP, ProjectFileTextCache.LEGACY_SOURCE_TEXT, "收到货物后 715 日内验收");
+
+        assertNull(svc.find(7L, STAMP), "旧口径正文不能再交给模型");
+        assertTrue(repo.rows.isEmpty(), "旧口径行就地删掉");
+
+        svc.store(7L, STAMP, ProjectFileTextCache.SOURCE_TEXT, "收到货物后 15⟦原:7⟧ 日内验收");
+        assertEquals("收到货物后 15⟦原:7⟧ 日内验收", svc.find(7L, STAMP));
+    }
+
+    @Test
     @DisplayName("拿不到文件指纹时一律未命中，绝不给陈旧正文")
     void noStampMeansNoCache() {
         FakeRepo repo = new FakeRepo();

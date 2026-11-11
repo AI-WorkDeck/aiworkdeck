@@ -49,6 +49,17 @@ LOWA 中英提示及工具描述默认“读 → 查找核对上下文 → 锚�
 
 回归：`anchorSafety.test.mjs`、`revisionView.test.mjs`、`RedlineGranularityContractTest`；`first-agent-edit.mjs` 增加 all/final/margin/balloons 下“已删除30日 + 两处正文30日”、过期锚点拒绝、无关目标继续可用和导出重开。模型遵从、完整客户端和 Microsoft Word/Office.js 插件另行验证，本改动仅嵌入式 LOWA。
 
+## 后端抽取的 docx 修订口径（gap-analysis R1，2026-11）
+
+编辑器 `doc_*` 读取（get_document_text / get_clauses / find_text_locations）走 `runAgentCommandInMarginView`，本来就是最终文本、不含删除文字，**不带任何标记**——锚点与偏移契约不变。出问题的是后端抽取：`DocumentTextService.parse` 用 Tika 抽 docx 时把 `w:delText` 和插入文字一起输出，`contract-tracked` 第三条「7 → 15」成了「715 日」，经 `LegalTools.read_document` → `ContextAssemblerService.resolveActiveDocumentContent` 注入 `<active_document>`（inline=false 的 LOWA 会话都走这条），模型以为是笔误停下来问。附件注入、`extract_file_text`、`read_file`、全文检索、文档解析同源。
+
+现在 `parse` 对 zip 容器先过 `DocxPendingRevisionText.render`：改写 document/header/footer/footnotes/endnotes 部件，正文按接受修订后显示，修订处内联 `15⟦原:7⟧`（改写：插入文字 + 被删原文，删/插先后都认）、`⟦删:X⟧`、`⟦增:X⟧`；`rPr/pPr/trPr` 里的属性修订不动。用 `⟦⟧` 不用〔〕：文号「〔2020〕」常见。说明写在两版基底提示「2. 文件」、`tools-lowa*.md` 第 3 条和 `extract_file_text` 描述。
+- **标记不是正文**：`doc_find_text` 入参先 `stripMarkers`（模型从注入正文照抄也能命中），`ContentSearchService` 返回前同样还原（「15 日」检索不被标记隔开）。新增读编辑器正文的路径别加标记，否则锚点原文校验对不上。
+- 抽取缓存 `ProjectFileTextCache.SOURCE_TEXT` 升到 `text-r2`，旧 `text` 行读到即删重抽（否则文件没改、模型永远读旧「715」）。
+- 改写异常/超限一律退回原字节交 Tika，不让抽取失败。
+- 跨格式：xlsx（Calc 无修订，Tika 不读修订日志）、pptx（无修订标记）、PDF（文字层，导出的修订稿删除线只是图形）不适用；Office/WPS 插件的 inlineContent 由宿主给，未改未验；.doc 二进制格式未处理。
+- 回归：`DocxPendingRevisionTextTest`、`DocumentTextServiceTest`（fixture `scripts/eval/fixtures/contract-tracked.docx`）、`ProjectFileTextCacheTest.legacyTextSourceIsReExtracted`。
+
 ## 插入与最终回读（dev-board#1089，2026-09-30）
 
 `doc_insert_at_cursor` 的 before/after 只定位锚点文字边界，不自动换段；独立标题/段落依赖 text 中实际换行符。多段或结构修订必须在最后一次写入后分页回读改动和相邻段落，核对分段、编号、重复及残句；完整单点回执仍可直接验证单点改动。契约在 LOWA 片段与工具描述，不能恢复成「每会话只读一次」。回归：`RedlineGranularityContractTest`、`DocumentEditToolsAnchorInsertAndPdfExportTest`；真实模型质量仍须实模验收。
