@@ -54,7 +54,9 @@ public class ProjectFileTextCacheService {
                 return null;
             }
             if (!equalsLong(row.getFileMtime(), stamp.lastModified())
-                    || !equalsLong(row.getFileSize(), stamp.size())) {
+                    || !equalsLong(row.getFileSize(), stamp.size())
+                    // 旧抽取口径（docx 修订删除与插入拼接，「715」）：文件没改也要重抽
+                    || ProjectFileTextCache.LEGACY_SOURCE_TEXT.equals(row.getSource())) {
                 // 文件改过了：这一行已经没用，就地删掉，省得它一直占着唯一键等 upsert
                 repository.delete(row);
                 return null;

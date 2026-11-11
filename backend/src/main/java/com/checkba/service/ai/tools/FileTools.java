@@ -327,7 +327,8 @@ public class FileTools implements AgentToolComponent {
             + "每次最多 "
             + ToolFileGuard.MAX_TOOL_TEXT_CHARS
             + " 字符：回执说「还有 N 字符未读」（nextStart=N）时用 offset=N 续读，不要从头重读。文件夹 ID 返回直接子项的分页清单（id、名称、类型），不含正文：offset 是子项序号，按 nextOffset 翻页，再逐个读需要的文件。\n"
-            + "图片和扫描 PDF 自动云端 OCR；失败时回执写明真实原因（如积分不足），原样转告用户，不要自行推测。")
+            + "图片和扫描 PDF 自动云端 OCR；失败时回执写明真实原因（如积分不足），原样转告用户，不要自行推测。\n"
+            + "Word 待处理修订按接受后的文本显示并内联标记：15⟦原:7⟧ 表示 7 改为 15，⟦删:X⟧ 删除 X，⟦增:X⟧ 新增 X；标记不是正文，修订尚未接受。")
     public String extract_file_text(
             @P("项目文件 ID（来自 doc_list_project_files 或材料清单）；也可以是文件夹 ID，返回其子项清单") Long fileId,
             @P(value = "可选。起始位置（0 起）：长文件用 nextStart，文件夹用 nextOffset（子项序号）", required = false) Integer offset,

@@ -178,12 +178,21 @@ public class DocumentTextService {
 
     /**
      * 非 PDF 格式的通用抽取（docx/xlsx/pptx/txt 等）。
+     * docx 的待处理修订先按 {@link DocxPendingRevisionText} 改写成「最终文本 + ⟦⟧ 标记」，
+     * 否则 Tika 会把删除与插入拼在一起（「7 → 15」读成「715」）。
      */
     public String parse(InputStream is) throws IOException, TikaException {
         Tika tika = new Tika();
         // 默认 100k chars 上限会截断长文档，放宽到 5M chars
         tika.setMaxStringLength(5 * 1024 * 1024);
-        return tika.parseToString(is);
+        // 只有 zip 容器（docx/xlsx/pptx）才读进内存改写——POI 打开 OOXML 本来就整包进内存；
+        // 其余格式照旧流式交给 Tika。
+        java.io.BufferedInputStream in = new java.io.BufferedInputStream(is);
+        in.mark(2);
+        boolean zip = in.read() == 'P' && in.read() == 'K';
+        in.reset();
+        if (!zip) return tika.parseToString(in);
+        return tika.parseToString(new java.io.ByteArrayInputStream(DocxPendingRevisionText.render(in.readAllBytes())));
     }
 
     /**

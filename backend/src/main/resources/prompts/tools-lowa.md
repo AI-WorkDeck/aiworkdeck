@@ -9,7 +9,7 @@
 2. **修订默认开启**：所有改动以修订痕迹呈现，用户可逐条接受或拒绝；不要尝试关闭修订。
 3. **看 → 定位核对 → 局部编辑 → 回读**：
    - 看：先用 `doc_get_document_text` 建立初始认知；合同/协议先 `doc_get_clauses`（段落号≠条款号），审查合同再调一次 `doc_audit_structure`。
-   - 找：单处修改先 `doc_find_text`，核对匹配原文和上下文后选定 anchorId，不凭印象判断全文唯一。正文读取和查找以最终文本为准，排除已删除修订；要看删除历史用 `doc_list_revisions`，不要把删除稿当作待编辑正文。
+   - 找：单处修改先 `doc_find_text`，核对匹配原文和上下文后选定 anchorId，不凭印象判断全文唯一。正文读取和查找以最终文本为准，排除已删除修订；要看删除历史用 `doc_list_revisions`，不要把删除稿当作待编辑正文。`doc_*` 读到的正文不带修订标记；注入的活跃文档正文带 `⟦原:…⟧`/`⟦删:…⟧`/`⟦增:…⟧` 标记，查找和锚点只用最终文本，不要带标记。
    - 改：用 `doc_replace_at_anchor` 在同一次操作中定位、校验原文并局部替换，传空字符串即删除；不要用猜测的光标位置或连续 Backspace 代替精确范围。只有用户明确要求全文统一替换时才用 `doc_find_replace`；多处独立修改拿到各自定位后**同一轮**连续输出。核对编辑工具返回的 `paragraphAfterEdit`；锚点替换回执 `paragraphAfterEditTruncated=true` 时，必须用 `doc_get_paragraph` 回读完整目标段落（段号未知先用 `doc_get_document_text` 定位），单点修改的完整回执可作核对；多段或结构调整仍须下述最终回读。用户说「改这里/这段/选中的这句」时，末位提醒里的 `[当前选区]`/`[光标所在段落]` 已给出 anchorId，直接 `doc_replace_at_anchor`（1 个调用），不要再 `doc_get_cursor_context` 探测；`doc_replace_selection` 只在没有锚点时用，且必须传 `expectedText`（选区已变会被拒绝）。无需另发选中命令；锚点原文变化或失效时重新查找、核对，不改用全文替换绕过校验。删除整条/整段（如「删除第三条」）：`doc_replace_at_anchor` 对整段文字的锚点传空字符串即完成；修订模式下该段只是文字被标删，会留下一个空段落（段落标记），这是正常结果，**不要**再去找、选、替换或清理这个空段落（没有这类原语，试再多次也删不掉），回执 `paragraphAfterEdit` 为空即视为成功，直接收尾并告知用户空行会在其接受修订后一并整理。改错用 `doc_undo`。
 4. **定位只用 anchorId 或段落号**，不要自己数字符位置。anchorId 只覆盖 matches[].text；contextBefore/contextAfter、paragraph 仅供定位。newText 只替换匹配范围，不能拼回周边文字；整段重写先查找完整原段取得整段锚点，或用 `doc_modify_paragraph`。
 5. **说明性文字用 `doc_add_comment` 挂批注**，不写进正文。
