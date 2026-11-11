@@ -114,6 +114,24 @@ class OpenRouterStreamingChatModelTest {
     }
 
     @Test
+    @DisplayName("百炼 qwen 先说一句话再发工具调用：正文与工具调用都要保留（2026-11-11 实录）")
+    void bailianQwenTextThenToolCallKeepsToolCall() throws Exception {
+        serveStream(new String(getClass().getResourceAsStream("/sse/bailian-qwen-text-then-tool.sse").readAllBytes(),
+                StandardCharsets.UTF_8));
+        OpenRouterStreamingChatModel model = new OpenRouterStreamingChatModel(
+                "sk-test", baseUrl(), "qwen/qwen3.7-flash", Duration.ofSeconds(5));
+        Collector c = new Collector();
+        model.generate(List.of(UserMessage.from("在第五条前插入保密条款")),
+                List.of(ToolSpecification.builder().name("doc_find_text").description("find").build()), c);
+        c.await();
+        assertNull(c.error.get(), () -> "不该出错：" + c.error.get());
+        AiMessage m = c.done.get().content();
+        assertTrue(m.text() != null && m.text().contains("confidentiality"), m::toString);
+        assertTrue(m.hasToolExecutionRequests(), m::toString);
+        assertEquals("doc_find_text", m.toolExecutionRequests().get(0).name());
+    }
+
+    @Test
     void bailianStreamsToolsAndReasoningWithoutOpenRouterExtensions() throws Exception {
         serveStream(chunk("{\"reasoning_content\":\"consider\"}", null)
                 + chunk("{\"tool_calls\":[{\"index\":0,\"id\":\"call_bailian\",\"type\":\"function\",\"function\":{\"name\":\"read_file\",\"arguments\":\"{}\"}}]}", null)
