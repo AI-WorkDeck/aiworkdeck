@@ -107,7 +107,7 @@ public class XmlToolCallParser {
      */
     public boolean containsToolCall(String content) {
         return content != null && (content.contains("<tool_code>") || content.contains("<code>")
-                || !bareAskUserCalls(content).isEmpty());
+                || !bareAskUserCalls(content).isEmpty() || !qwenTemplateCalls(content).isEmpty());
     }
 
     /**
@@ -142,11 +142,50 @@ public class XmlToolCallParser {
             }
         }
         calls.addAll(bareAskUserCalls(content));
+        calls.addAll(qwenTemplateCalls(content));
         calls.sort(java.util.Comparator.comparingInt(LocatedCall::offset));
         return calls.stream().map(LocatedCall::call).toList();
     }
 
     private record LocatedCall(int offset, ParsedCall call) {}
+
+    /**
+     * Qwen 原生工具模板泄漏进正文：{@code <function=名><parameter=键>值</parameter>…</function>}，
+     * 或把工具名直接当标签 {@code <名><parameter=键>值</parameter>…</function>}（2026-11-11 百炼 qwen3.7-flash 实录：
+     * 新建文档 / 新建文件夹 / 记住偏好时偶发，纠正一轮后仍照写，整轮什么都没做）。按调用执行，和 vLLM 的 qwen 工具解析同一思路。
+     * 代码围栏与行内代码里的不算；参数值一律按字符串传，类型由工具注册表照常转换。
+     */
+    private static final Pattern QWEN_TEMPLATE_CALL = Pattern.compile(
+            "(?s)<(?:function=([A-Za-z_]\\w*)|([A-Za-z_]\\w*))>\\s*((?:<parameter=[A-Za-z_]\\w*>.*?</parameter>\\s*)*)</function>");
+    private static final Pattern QWEN_TEMPLATE_PARAM = Pattern.compile(
+            "(?s)<parameter=([A-Za-z_]\\w*)>\\n?(.*?)\\n?</parameter>");
+
+    private List<LocatedCall> qwenTemplateCalls(String content) {
+        if (!content.contains("</function>")) return List.of();
+        String visible = blankCodeSpans(content);
+        List<LocatedCall> calls = new ArrayList<>();
+        Matcher m = QWEN_TEMPLATE_CALL.matcher(visible);
+        while (m.find()) {
+            if (m.group(2) != null && m.group(3).isBlank()) continue; // 裸标签形态至少要有一个参数，免得误认普通标签
+            String name = m.group(1) != null ? m.group(1) : m.group(2);
+            com.fasterxml.jackson.databind.node.ObjectNode args = JSON.createObjectNode();
+            Matcher p = QWEN_TEMPLATE_PARAM.matcher(content.substring(m.start(3), m.end(3)));
+            while (p.find()) args.put(p.group(1), p.group(2));
+            String raw = content.substring(m.start(), m.end());
+            calls.add(new LocatedCall(m.start(), new ParsedCall(name, args.toString(), raw, null)));
+        }
+        return calls;
+    }
+
+    /** 代码围栏 / 行内代码换成等长空白：偏移不变，里面的标签不被当成调用。 */
+    private static String blankCodeSpans(String content) {
+        Matcher m = CODE_SPAN.matcher(content);
+        StringBuilder out = new StringBuilder(content);
+        while (m.find()) {
+            for (int i = m.start(); i < m.end(); i++) if (out.charAt(i) != '\n') out.setCharAt(i, ' ');
+        }
+        return out.toString();
+    }
 
     /**
      * #1078: 部分模型把提问写成独立的自闭合标签。只恢复这一种别名，交给原分发、
