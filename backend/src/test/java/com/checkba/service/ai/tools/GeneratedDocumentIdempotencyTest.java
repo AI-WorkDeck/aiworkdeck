@@ -114,9 +114,21 @@ class GeneratedDocumentIdempotencyTest {
 
     // ==================== write_docx（真实登记簿） ====================
 
+    private static EditorBridgeService bridgeFor(String conv) {
+        EditorBridgeService bridge = new EditorBridgeService(mock(SseEmitterService.class), new ObjectMapper(),
+                mock(com.checkba.service.telemetry.TelemetryService.class));
+        bridge.setCurrentConversationId(conv);
+        return bridge;
+    }
+
+    private static FileTools writeDocxTools(ProjectFileService files, AiDocxExportService export,
+                                            EditorBridgeService bridge) {
+        return new FileTools(files, null, bridge, null, null, null, export, null, null);
+    }
+
     @Test
-    @DisplayName("write_docx 同一轮同名同文件夹第二次：直接复用，不再 RENAME 出「 (1)」；新一轮照常新建")
-    void writeDocxSameRunReusesAcrossCalls() throws Exception {
+    @DisplayName("write_docx 同一轮同名同文件夹第二次、内容相同：不再新建也不重写，回执明说「未改动」")
+    void writeDocxSameRunIdenticalContentIsUnchanged() throws Exception {
         ProjectFileService files = mock(ProjectFileService.class);
         AiDocxExportService export = mock(AiDocxExportService.class);
         ProjectFile made = new ProjectFile();
@@ -126,22 +138,112 @@ class GeneratedDocumentIdempotencyTest {
         when(export.exportMarkdownToDocx(eq(PROJECT_ID), eq(5L), anyLong(), eq("精简版.docx"), anyString(), any()))
                 .thenReturn(made);
         when(files.findFile(77L)).thenReturn(Optional.of(made));
-        EditorBridgeService bridge = new EditorBridgeService(mock(SseEmitterService.class), new ObjectMapper(),
-                mock(com.checkba.service.telemetry.TelemetryService.class));
-        bridge.setCurrentConversationId("conv-w");
-        FileTools tools = new FileTools(files, null, bridge, null, null, null, export, null, null);
+        EditorBridgeService bridge = bridgeFor("conv-w");
+        FileTools tools = writeDocxTools(files, export, bridge);
 
-        String first = tools.write_docx("精简版.docx", "# 正文", PROJECT_ID, 5L, null);
-        String second = tools.write_docx("精简版", "# 正文（重来）", PROJECT_ID, 5L, null);
+        String first = tools.write_docx("精简版.docx", "# 正文", PROJECT_ID, 5L, null, null);
+        String second = tools.write_docx("精简版", "# 正文", PROJECT_ID, 5L, null, null);
 
         assertTrue(first.contains("\"db_id\":77"), first);
-        assertTrue(second.contains("本轮已生成过"), second);
+        assertTrue(second.startsWith(com.checkba.service.ai.ToolRegistry.ToolResult.UNCHANGED_PREFIX), second);
         assertTrue(second.contains("77"), second);
         verify(export, times(1)).exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any());
+        verify(export, never()).overwriteMarkdownDocx(anyLong(), anyLong(), anyLong(), anyString(), any());
 
+        // 跨轮（用户说「重新生成」）照常新建
         bridge.clearForNewRun("conv-w");
-        tools.write_docx("精简版.docx", "# 正文", PROJECT_ID, 5L, null);
+        tools.write_docx("精简版.docx", "# 正文", PROJECT_ID, 5L, null, null);
         verify(export, times(2)).exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("write_docx 同一轮同名第二次、内容不同（tasks-10 t04）：覆盖本轮那一份，不新建、不报假成功")
+    void writeDocxSameRunDifferentContentOverwritesTheRunsOwnFile() throws Exception {
+        ProjectFileService files = mock(ProjectFileService.class);
+        AiDocxExportService export = mock(AiDocxExportService.class);
+        ProjectFile made = new ProjectFile();
+        made.setId(77L);
+        made.setProjectId(PROJECT_ID);
+        made.setName("违约金对比表.docx");
+        made.setFilePath("projects/42/违约金对比表.docx");
+        when(export.exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any())).thenReturn(made);
+        when(export.overwriteMarkdownDocx(anyLong(), anyLong(), anyLong(), anyString(), any())).thenReturn(made);
+        when(files.findFile(77L)).thenReturn(Optional.of(made));
+        FileTools tools = writeDocxTools(files, export, bridgeFor("conv-t04"));
+
+        tools.write_docx("违约金对比表.docx", "| 合同 | 违约金 |\n|---|---|\n| 华北 | 待确认 |", PROJECT_ID, 5L, null, null);
+        String second = tools.write_docx("违约金对比表.docx", "| 合同 | 违约金 |\n|---|---|\n| 华北 | 万分之五 |",
+                PROJECT_ID, 5L, null, null);
+
+        assertTrue(second.contains("\"status\":\"success\""), second);
+        assertTrue(second.contains("\"db_id\":77"), second);
+        assertTrue(!second.contains("本轮已生成过"), second);
+        assertTrue(second.contains("覆盖"), second);
+        verify(export, times(1)).exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any());
+        verify(export).overwriteMarkdownDocx(eq(PROJECT_ID), eq(77L), anyLong(),
+                eq("| 合同 | 违约金 |\n|---|---|\n| 华北 | 万分之五 |"), any());
+    }
+
+    @Test
+    @DisplayName("write_docx append=true（tasks-10 t03）：分段续写本轮那一份，整篇按累计正文重渲染；重复的一段不重复追加")
+    void writeDocxAppendExtendsTheRunsOwnFile() throws Exception {
+        ProjectFileService files = mock(ProjectFileService.class);
+        AiDocxExportService export = mock(AiDocxExportService.class);
+        ProjectFile made = new ProjectFile();
+        made.setId(88L);
+        made.setProjectId(PROJECT_ID);
+        made.setName("差异说明.docx");
+        made.setFilePath("projects/42/差异说明.docx");
+        when(export.exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any())).thenReturn(made);
+        when(export.overwriteMarkdownDocx(anyLong(), anyLong(), anyLong(), anyString(), any())).thenReturn(made);
+        when(files.findFile(88L)).thenReturn(Optional.of(made));
+        FileTools tools = writeDocxTools(files, export, bridgeFor("conv-t03"));
+
+        tools.write_docx("差异说明.docx", "# 差异说明\n\n一、付款期限", PROJECT_ID, 5L, null, null);
+        String second = tools.write_docx("差异说明.docx", "二、违约金", PROJECT_ID, 5L, null, true);
+        String dup = tools.write_docx("差异说明.docx", "二、违约金", PROJECT_ID, 5L, null, true);
+
+        assertTrue(second.contains("\"db_id\":88"), second);
+        assertTrue(second.contains("追加"), second);
+        verify(export).overwriteMarkdownDocx(eq(PROJECT_ID), eq(88L), anyLong(),
+                eq("# 差异说明\n\n一、付款期限\n\n二、违约金"), any());
+        assertTrue(dup.startsWith(com.checkba.service.ai.ToolRegistry.ToolResult.UNCHANGED_PREFIX), dup);
+        verify(export, times(1)).overwriteMarkdownDocx(anyLong(), anyLong(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("append=true 但本轮还没用 write_docx 建过这份：报错，不悄悄新建一份只有后半截的文档")
+    void writeDocxAppendWithoutEarlierFileIsAnError() {
+        ProjectFileService files = mock(ProjectFileService.class);
+        AiDocxExportService export = mock(AiDocxExportService.class);
+        FileTools tools = writeDocxTools(files, export, bridgeFor("conv-a"));
+
+        String out = tools.write_docx("差异说明.docx", "二、违约金", PROJECT_ID, null, null, true);
+
+        assertTrue(out.startsWith("Error"), out);
+        verify(export, never()).exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("本轮那份是 doc_start_stream 建的（开在编辑器里）：write_docx 不覆盖，也不报成功")
+    void writeDocxDoesNotOverwriteAStreamedDocument() {
+        ProjectFileService files = mock(ProjectFileService.class);
+        AiDocxExportService export = mock(AiDocxExportService.class);
+        ProjectFile streamed = new ProjectFile();
+        streamed.setId(99L);
+        streamed.setName("精简版.docx");
+        when(files.findFile(99L)).thenReturn(Optional.of(streamed));
+        EditorBridgeService bridge = new EditorBridgeService(mock(SseEmitterService.class), new ObjectMapper(),
+                mock(com.checkba.service.telemetry.TelemetryService.class));
+        bridge.setCurrentConversationId("conv-s");
+        bridge.noteGenerated(EditorBridgeService.newDocxKey(null, "精简版.docx"), 99L);
+        FileTools tools = new FileTools(files, null, bridge, null, null, null, export, null, null);
+
+        String out = tools.write_docx("精简版.docx", "# 新正文", PROJECT_ID, null, null, null);
+
+        assertTrue(out.startsWith("Error"), out);
+        assertTrue(out.contains("99"), out);
+        verify(export, never()).overwriteMarkdownDocx(anyLong(), anyLong(), anyLong(), anyString(), any());
     }
 
     @Test
@@ -163,8 +265,8 @@ class GeneratedDocumentIdempotencyTest {
         bridge.setCurrentConversationId("conv-d");
         FileTools tools = new FileTools(files, null, bridge, null, null, null, export, null, null);
 
-        tools.write_docx("a.docx", "x", PROJECT_ID, 5L, null);
-        String again = tools.write_docx("a.docx", "x", PROJECT_ID, 5L, null);
+        tools.write_docx("a.docx", "x", PROJECT_ID, 5L, null, null);
+        String again = tools.write_docx("a.docx", "x", PROJECT_ID, 5L, null, null);
 
         assertTrue(again.contains("\"db_id\":78"), again);
         verify(export, times(2)).exportMarkdownToDocx(anyLong(), any(), anyLong(), anyString(), anyString(), any());

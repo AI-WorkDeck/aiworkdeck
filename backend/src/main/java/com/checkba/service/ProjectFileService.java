@@ -1768,18 +1768,27 @@ public class ProjectFileService {
      */
     @Transactional
     public ProjectFile overwriteTextContent(Long projectId, Long fileId, String text, Long userId) {
+        return overwriteBinaryContent(projectId, fileId,
+                (text == null ? "" : text).getBytes(java.nio.charset.StandardCharsets.UTF_8), userId);
+    }
+
+    /**
+     * 用一段字节整篇覆盖已有文件（write_docx 同轮重写本轮自己生成的那份 docx，tasks-10 t04）。
+     * 收尾与 {@link #overwriteTextContent} 完全相同：落盘 → 回写 fileSize / updatedAt → signalChange 进版本记录。
+     */
+    @Transactional
+    public ProjectFile overwriteBinaryContent(Long projectId, Long fileId, byte[] bytes, Long userId) {
         ProjectFile file = getFile(fileId);
         if (!Objects.equals(projectId, file.getProjectId())) {
             throw new IllegalArgumentException(LangText.of("文件不属于该项目", "This file does not belong to this project"));
         }
         if (Boolean.TRUE.equals(file.getIsFolder())) {
-            throw new IllegalArgumentException(LangText.of("文件夹不能写入文本", "Cannot write text into a folder"));
+            throw new IllegalArgumentException(LangText.of("文件夹不能写入内容", "Cannot write content into a folder"));
         }
         String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
         if (!StringUtils.hasText(key)) {
             throw new IllegalStateException("文件没有存储路径: " + fileId);
         }
-        byte[] bytes = (text == null ? "" : text).getBytes(java.nio.charset.StandardCharsets.UTF_8);
         if (cloudStorageQuota != null) {
             cloudStorageQuota.requireFileCapacity(file, bytes.length, false);
             key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
