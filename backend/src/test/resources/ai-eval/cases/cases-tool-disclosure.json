@@ -578,5 +578,161 @@
       ],
       "bubbleEndStatus": "finished"
     }
+  },
+  {
+    "id": "p7-native-call-to-undisclosed-tool-runs-and-expands-its-category",
+    "title": "P7：原生调用点名一个本轮没下发、但本会话可用的工具（copy_files）——当轮照常分发，下一轮 files 类目放回（与 XML 兜底同一条路）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "给合同做个副本",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "copy_files",
+            "arguments": {
+              "fileIds": "[1001]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已复制一份合同。</final>"
+      }
+    ],
+    "toolStubs": {
+      "copy_files": "copied: 1; failed: 0\n- 【副本】合同.docx (fileId=1002)"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "copy_files"
+        }
+      ],
+      "offeredToolsExcludeFirstCall": [
+        "copy_files",
+        "move_files",
+        "create_folder"
+      ],
+      "offeredToolsIncludeLastCall": [
+        "copy_files",
+        "move_files",
+        "create_folder"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "p7-native-call-to-host-gated-tool-is-refused",
+    "title": "P7：纯对话会话里原生调用编辑器工具（doc_get_outline）——宿主闸照拒（Tool not found），不放回任何类目",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "这份合同有什么风险？",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_get_outline",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>请先告诉我是哪份合同。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_get_outline"
+        }
+      ],
+      "allowUnresolvedTools": true,
+      "promptContains": [
+        "Tool not found or arguments invalid."
+      ],
+      "offeredToolsExclude": [
+        "doc_get_outline",
+        "doc_get_paragraph"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "p7-native-call-to-undisclosed-destructive-tool-still-asks-first",
+    "title": "P7：原生调用点名一个没下发的破坏性工具（move_to_trash）——确认闸照常先问，不分发",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "把那个草稿清理掉",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_to_trash",
+            "arguments": {
+              "targetsJson": "[\"草稿.docx\"]"
+            }
+          }
+        ]
+      }
+    ],
+    "toolStubs": {
+      "move_to_trash": "trashed: 1"
+    },
+    "expect": {
+      "toolCalls": [],
+      "offeredToolsExclude": [
+        "move_to_trash"
+      ],
+      "bubbleEndStatus": "awaiting_input",
+      "structureContains": [
+        "确认执行「"
+      ]
+    }
+  },
+  {
+    "id": "p7-native-call-to-write-tool-in-ask-mode-is-refused",
+    "title": "P7：ASK 模式里原生调用写入工具（move_files）——ASK 闸照拒，不分发",
+    "category": "files",
+    "protocol": "native",
+    "mode": "ASK",
+    "userInput": "把合同.docx移到归档文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_files",
+            "arguments": {
+              "movesJson": "[{\"sourcePath\":\"合同.docx\",\"destPath\":\"归档/合同.docx\"}]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>对话模式下不能移动文件，请切换到 Agent 模式。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [],
+      "promptContains": [
+        "ASK mode permits only"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
   }
 ]

@@ -3814,7 +3814,8 @@ public class AgentOrchestrator {
             }
             return;
         }
-        // 模型经 XML 兜底直接点名调了一个本轮没下发的工具（dev-board#1064）：它要的就是那一类，
+        // 模型直接点名调了一个本轮没下发的工具（dev-board#1064；XML 兜底与原生 function calling 同一条路，
+        // 都经 dispatchTool 到这里——宿主/能力闸在 ToolRegistry.resolve、确认闸与 ASK 闸在分发之前，P7 回放钉住）：它要的就是那一类，
         // 把同类工具下一轮放回来——不然它每调一个同类工具都得再点一次名，或者干脆以为没有。
         // 只认真的登记着的工具（found）；本轮下发集为空说明还没进过 runLoop，不判。
         java.util.Set<String> offered = guard.roundOffered;

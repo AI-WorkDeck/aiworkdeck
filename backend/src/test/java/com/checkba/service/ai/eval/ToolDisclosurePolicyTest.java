@@ -162,6 +162,9 @@ class ToolDisclosurePolicyTest {
         assertFalse(POLICY.toolsHintedBy("删除第三条", "docx").contains("move_to_trash"));
         assertFalse(POLICY.toolsHintedBy("把光标移到第二段末尾", "docx").contains("move_files"));
         assertTrue(POLICY.toolsHintedBy("把合同草稿.docx删了", "docx").contains("move_to_trash"));
+        // P7：基底不再点名 move_files 之后，「放进去」这类说法要自己把它放回（gate-35 g15）
+        assertTrue(POLICY.toolsHintedBy("新建一个文件夹叫「庭审材料」，把合同.docx放进去").contains("move_files"));
+        assertFalse(POLICY.toolsHintedBy("把这句放进第三条里", "docx").contains("move_files"));
         assertTrue(POLICY.toolsHintedBy("把这几份文件移动到归档", "docx").contains("move_files"));
         assertTrue(POLICY.toolsHintedBy("删除第三条", null).contains("move_to_trash"), "没开文档时保持原行为");
     }
@@ -638,7 +641,8 @@ class ToolDisclosurePolicyTest {
                 TRIM.toolsHintedBy("把这几份文件移动到「往来函件」文件夹"));
         assertEquals(Set.of("files"), TRIM.categoriesHintedBy("把这几个文件重命名"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("这段话引用了哪条司法解释？"));
-        assertEquals("legal", POLICY.categoryOf("case_search"));
+        assertEquals("core", POLICY.categoryOf("case_search"), "P7：case_search 进核心集");
+        assertEquals("legal", POLICY.ruleCategoryOf("case_search"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("查询类似案例"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("find relevant case law"));
         assertEquals(Set.of("legal"), TRIM.categoriesHintedBy("《劳动合同法》里经济补偿的标准在哪一条？"));

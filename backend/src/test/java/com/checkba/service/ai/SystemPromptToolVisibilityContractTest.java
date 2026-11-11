@@ -552,4 +552,112 @@ class SystemPromptToolVisibilityContractTest {
             }
         }
     }
+
+    // ---------------------------------------------------------------- P7：点名 ⇒ 首轮下发（2026-11-11）
+
+    /**
+     * 一档宿主：能力档 + Office 宿主 + 活跃文档类型（null = 没开文档）。与 {@code ToolSurfaceBudgetTest} 的宿主表同口径，
+     * ASK 不在内（ASK 的模式约束本身就把工具收窄到只读几项，基底里的工具名在那一档本来就不可调）。
+     */
+    private record RoundOneHost(String key, String capability, String officeHost, String fileType) {
+    }
+
+    private static final List<RoundOneHost> ROUND_ONE_HOSTS = List.of(
+            new RoundOneHost("lowa-docx", "lowa", null, "docx"),
+            new RoundOneHost("lowa-xlsx", "lowa", null, "xlsx"),
+            new RoundOneHost("lowa-pptx", "lowa", null, "pptx"),
+            new RoundOneHost("lowa-nofile", "lowa", null, null),
+            new RoundOneHost("office-word", "office", "word", null),
+            new RoundOneHost("office-excel", "office", "excel", null),
+            new RoundOneHost("office-ppt", "office", "powerpoint", null),
+            new RoundOneHost("none", "none", null, null));
+
+    /** 不命中任何类目 / 精确放回关键词的中性提示（同 ToolSurfaceBudgetTest.NEUTRAL）：量的是「不靠关键词」的首轮。 */
+    private static final String NEUTRAL_PROMPT = "这份合同有什么风险？";
+
+    /** 真实编排器 + 回放模型（不调真模型）首轮下发的工具名。 */
+    private static Set<String> roundOneOffered(RoundOneHost host) {
+        com.checkba.service.ai.eval.EvalCase c = new com.checkba.service.ai.eval.EvalCase();
+        c.id = "p7-round-one-" + host.key();
+        c.title = c.id;
+        c.clientCapability = "lowa".equals(host.capability()) ? null : host.capability();
+        c.officeHost = host.officeHost();
+        c.userInput = NEUTRAL_PROMPT;
+        if (host.fileType() != null) {
+            com.checkba.service.ai.eval.EvalCase.ActiveDocument doc = new com.checkba.service.ai.eval.EvalCase.ActiveDocument();
+            doc.name = "合同." + host.fileType();
+            doc.fileType = host.fileType();
+            c.activeDocument = doc;
+        }
+        com.checkba.service.ai.eval.EvalCase.Turn turn = new com.checkba.service.ai.eval.EvalCase.Turn();
+        turn.text = "<final>ok</final>";
+        c.turns.add(turn);
+        com.checkba.service.ai.eval.EvalHarness.RunResult r = com.checkba.service.ai.eval.EvalHarness.run(c);
+        for (int i = 0; i < r.toolsOfferedPerLlmCall().size(); i++) {
+            if (r.toolsOfferedPerLlmCall().get(i)) {
+                return new TreeSet<>(r.toolNamesOfferedPerLlmCall().get(i));
+            }
+        }
+        return Set.of();
+    }
+
+    /**
+     * 生产组装器拼出来的 system 稳定段，去掉按能力拼进来的工具片段（tools-*.md）——剩下的就是
+     * 「三档共用、每轮都在」的部分：基底、enforcement、AGENT 模式约束、工具目录规则、非 Office 会话的文件整理末位规则。
+     */
+    private static String alwaysOnStableText(RoundOneHost host, boolean english) {
+        String conv = "p7-" + host.key() + (english ? "-en" : "-zh");
+        ClientCapabilityService capabilities = new ClientCapabilityService();
+        capabilities.record(conv, host.capability(), host.officeHost());
+        ContextAssemblerService assembler = SystemPromptSizeReportTest.newAssembler(capabilities, english);
+        com.checkba.controller.ai.AiAgentController.ContextItem active = null;
+        if (host.fileType() != null) {
+            active = new com.checkba.controller.ai.AiAgentController.ContextItem();
+            active.setId("1001");
+            active.setName("合同." + host.fileType());
+            active.setFileType(host.fileType());
+            active.setInlineContent("第一条 合同标的……");
+        }
+        List<dev.langchain4j.data.message.ChatMessage> messages = assembler.assemble(conv, "run-" + conv, NEUTRAL_PROMPT,
+                null, active, null, null, "88", com.checkba.model.ai.AgentMode.AGENT, 1L, null);
+        String system = ((dev.langchain4j.data.message.SystemMessage) messages.get(0)).text();
+        String stable = system.substring(0, system.indexOf(ContextAssemblerService.SYSTEM_VOLATILE_SEPARATOR));
+        String stem = ContextAssemblerService.toolGuidanceStem(
+                capabilities.capabilityOf(conv), capabilities.officeHostOf(conv));
+        String fragment = readPrompt(stem + (english ? ".en.md" : ".md"));
+        int at = stable.indexOf(fragment);
+        assertTrue(at >= 0, conv + "：稳定段里找不到原样拼入的片段 " + stem);
+        return stable.substring(0, at) + stable.substring(at + fragment.length());
+    }
+
+    @Test
+    @DisplayName("P7：基底与其他常驻段里点名的工具，在每一档宿主的首轮都真的下发（中英两版）")
+    void everyToolNamedInTheAlwaysOnPromptIsOfferedInRoundOneForEveryHost() {
+        Map<String, ToolFacts> tools = scanTools();
+        List<String> problems = new ArrayList<>();
+        int checked = 0;
+        for (RoundOneHost host : ROUND_ONE_HOSTS) {
+            Set<String> offered = roundOneOffered(host);
+            assertTrue(offered.contains(ToolDisclosurePolicy.CATALOG_TOOL),
+                    host.key() + " 首轮连 list_tools 都没有，测试装配不对：" + offered);
+            for (boolean english : new boolean[] {false, true}) {
+                for (String name : backtickedNames(alwaysOnStableText(host, english))) {
+                    ToolFacts facts = tools.get(name);
+                    if (facts == null || NON_TOOL_IDENTIFIERS.contains(name)) {
+                        continue; // 参数名、标签名、artifact 类型等由 basePromptOnlyNamesRealOfferedTools 管
+                    }
+                    checked++;
+                    if (!offered.contains(name)) {
+                        problems.add(host.key() + (english ? " en" : " zh") + "：`" + name + "` 首轮没下发");
+                    }
+                }
+            }
+        }
+        assertTrue(checked > 50, "一个名字都没对上，这条断言就是空断言：checked=" + checked);
+        assertTrue(problems.isEmpty(),
+                "常驻提示点名了首轮不下发的工具。模型照着点名调用时，严格供应商根本发不出这个原生调用，"
+                        + "弱模型则会把它和清单里的相近名字拼成一个不存在的名字（r083：qwen 的 list_project_files）。"
+                        + "要么把它放进 ToolDisclosurePolicy.CORE，要么改写提示别点名（按类目描述 + 「到工具目录的 X 类目里找」）：\n  "
+                        + String.join("\n  ", problems));
+    }
 }

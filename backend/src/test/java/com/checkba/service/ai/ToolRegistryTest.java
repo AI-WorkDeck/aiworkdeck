@@ -279,6 +279,15 @@ class ToolRegistryTest {
     }
 
     @Test
+    @DisplayName("P7：拼错的 list_project_files 拿到指向 doc_list_project_files 的指路，仍不改道执行")
+    void listProjectFilesGetsAHintNotAReroute() {
+        ToolRegistry.ToolResult r = registry.execute("list_project_files", "{\"foldersOnly\":\"true\"}", ctx);
+        assertFalse(r.found());
+        assertFalse(r.success());
+        assertTrue(r.output().contains("doc_list_project_files"), r.output());
+    }
+
+    @Test
     @DisplayName("别名表是空的：search_laws 不再被静默改道成公网搜索（审计 A11）")
     void searchLawsIsNoLongerSilentlyReroutedToWebSearch() {
         assertTrue(ToolRegistry.TOOL_NAME_ALIASES.isEmpty(),
