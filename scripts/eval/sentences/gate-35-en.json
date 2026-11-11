@@ -672,9 +672,11 @@
         ]
       },
       "expect": {
+        "_note": "Converting 'next Wednesday' with deadline_compute first is a read-only calculation and a reasonable first step; what matters is that no task is created (outcomeCheck) and the run stops at ask_user. task_create already refuses multi-project matches at the tool layer and asks for ask_user (TaskTools.ambiguous / mentionConflict)",
         "firstToolAnyOf": [
           "task_create",
           "task_list",
+          "deadline_compute",
           "ask_user",
           "search_across_projects",
           "search_project_summaries"

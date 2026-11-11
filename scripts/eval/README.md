@@ -286,3 +286,4 @@ qwen3.7-flash 这两次都被 OpenRouter 上游限流（429 `temporarily rate-li
 - 2026-11-11（gap P5）：tasks-10 加 v01-multi-edit / v02-broken-edit（夹具 contract-long.docx）；新增过程字段 `writes`、`harnessVerify`，过程指标表加「≥2 次写入且收尾前核对过」列。既有判分不变。
 - 2026-11-11（gap P6）：新增 `sentences/tasks-10.json`（多步任务集，只按结果判分）与离线单测 `tasks-10.test.mjs`；runner 新增 `followUps`（API 句的脚本化第二轮，按确认卡/反问卡回答）、`task: true` 的「多步任务」报告表、`docxXml(buf, part)`；编辑器句子关页面前等自动保存（同 #1470）。既有句集与判分不变。
 - 2026-11-11：新增 `--route openrouter|bailian`（默认 openrouter，行为不变）。bailian 经脚本内的本机转发口直连百炼（见「百炼路由」），报告头写明路由与模型映射、成本按人民币标价估算，并列出百炼上游 HTTP 状态计数。句集与判分不变。
+- 2026-11-11：gate-35 / gate-35-en 的 `g06-ambiguous-project` 的 `firstToolAnyOf` 加 `deadline_compute`。先把「下周三」换算成日期是只读计算；此前 DeepSeek 的 g06 失败都是这一项（task_create 均被工具层歧义守卫拒绝，没建出事项，随后 ask_user）。outcomeCheck、`mustUse ask_user`、`status` 不变。
