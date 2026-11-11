@@ -372,6 +372,8 @@ public class AgentOrchestrator {
         final StuckDetector stuck = new StuckDetector();
         // 坏轮次的隐形自纠：工具轮数提醒 + 撤销打转提醒，只提醒不暂停（gap R5 / P4，阈值见 RunBudget）
         final RunBudget budget = new RunBudget();
+        // 法源不可用收口（gap P8）：法宝回不可用标记后，网页替代查询封顶 + 收尾一次「未核实」提醒
+        final LawSourceDownPolicy lawSource = new LawSourceDownPolicy();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
         final Set<String> triedModels = new java.util.LinkedHashSet<>();
         int consecutiveFailures;
@@ -1304,6 +1306,18 @@ public class AgentOrchestrator {
             }
         }
 
+        // 法源不可用后的网页替代查询封顶（gap P8）：超额的不执行，回一句「按已有资料作答并标未核实」。
+        // 放在分发层而不是提示词里：deepseek 在法源不可用后连续 8–10 轮 search_web/browse_url 实测过。
+        String lawSourceBlocked = guard == null ? null : guard.lawSource.admit(toolName);
+        if (lawSourceBlocked != null) {
+            log.info("[LawSourceDown] 替代查询已用满，未执行 {}（conv={}）", toolName, conversationId);
+            ToolRegistry.ToolResult blocked = new ToolRegistry.ToolResult(
+                    lawSourceBlocked, toolRegistry.resolve(toolName).orElse(null), true);
+            // 本方法有三个出口，三个都要记
+            guard.noteToolResult(toolName, blocked.success());
+            return blocked;
+        }
+
         // 工具回写「这次展示了哪些类目」的通道（dev-board#1065，list_tools 的 query / names 用）
         java.util.Set<String> disclosedCategories = java.util.concurrent.ConcurrentHashMap.newKeySet();
         com.checkba.service.ai.tools.ToolContext ctx =
@@ -1365,6 +1379,16 @@ public class AgentOrchestrator {
                     guard.activeFileId = opened;
                 }
             } catch (Exception ignore) { /* fileId 非数字时保持原值 */ }
+        }
+
+        // 法源不可用态（gap P8）：任何工具输出带法宝不可用标记即进入；放行的替代查询附「第几次 / 须标未核实」
+        if (guard != null) {
+            guard.lawSource.noteResult(result.output());
+            String lookupNotice = guard.lawSource.lookupNotice(toolName);
+            if (lookupNotice != null) {
+                result = new ToolRegistry.ToolResult(result.output() + "\n\n" + lookupNotice,
+                        result.tool(), result.found());
+            }
         }
 
         // 本轮有没有动过文档：原生 function calling 与 XML 兜底两条工具循环都经过这里，
@@ -3380,6 +3404,23 @@ public class AgentOrchestrator {
                 if (rememberNudge != null) {
                     log.warn("Remember request without save_memory in {}, injecting one corrective round", conversationId);
                     messages.add(dev.langchain4j.data.message.UserMessage.from(rememberNudge));
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
+            }
+
+            // 3.5 法源不可用收尾提醒（gap P8，原生与 XML 共用的无工具收尾点）：法宝本轮不可用、回答引用了
+            // 具体条文却没标「未核实」或自称已核实 → 补一轮简短说明，每轮最多一次。已流给用户的正文并进执行日志
+            // （历史与用户实时所见一致：正文 → 补充说明），提醒本身只进模型上下文。
+            if (!summaryOnly) {
+                String lawSourceReminder = guard.lawSource.finalAnswerReminder(content);
+                if (lawSourceReminder != null) {
+                    log.warn("[LawSourceDown] final answer cites statutes without an unverified marker in {}, "
+                            + "injecting one corrective round", conversationId);
+                    appendBoundedExecutionLog(executionLog, content + "\n");
+                    guard.takeStreamSnapshot();
+                    messages.add(dev.langchain4j.data.message.UserMessage.from(lawSourceReminder));
                     continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth + 1, executionLog, agentMode, guard);
                     return;

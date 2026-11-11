@@ -34,7 +34,7 @@ class LegalToolsVendorFailureTest {
         assertTrue(LegalTools.isVendorUnavailable(out), out);
         assertTrue(out.contains("Unknown tool: get_article"), "原因原文要保留：" + out);
         assertTrue(out.contains("flk.npc.gov.cn"), out);
-        assertTrue(out.contains("待核实"), out);
+        assertTrue(out.contains("未核实"), out);
     }
 
     @Test

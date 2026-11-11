@@ -1067,6 +1067,13 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
   - 常量：`SOFT_NUDGE_ROUND=15`（一次性「批量推进，或用 <final> 说明已完成什么、卡在哪」）；`UNDO_NUDGES_AT=[3,6]`（`doc_undo`/`doc_redo` 累计次数，各提醒一次，一批里跨过两档只提醒一次）。`office_pass_step` 所在轮不计数。
   - 依据：r083 cn 矩阵 345 个有效运行轮数中位 2、P95 8、P99 14，通过的最多 14 轮；超过 14 轮的只有 g02 的 16/29/42 轮且全部失败。通过的运行 `doc_undo` 最多 3 次，失败的打转运行 7、12 次。
   - 系统提示 `Step Budget & Anti-Flailing` 段**不许承诺暂停或写轮数上限**（旧文「约 30 步预算，超出会被系统暂停」代码里早已不存在），只说「轮数拖长 / 反复撤销时系统会提醒」；`RunBudgetTest.systemPromptDoesNotPromiseAPause` 守着中英两份。护栏：`RunBudgetTest`、`AgentOrchestratorRunBudgetTest`、回放 `cases-run-budget.json`（XML + 原生撤销循环，断言第 3、6 次提醒且 finished）。
+- **法源不可用收口（gap P8，2026-11-11）**：`LawSourceDownPolicy`（挂 `RunGuard.lawSource`）。起因：法宝回 `[pkulaw_unavailable]` 后 deepseek 连续 8–10 轮 search_web/browse_url，一次编造民法典第1082条原文并声称「已全部核实」。
+  - **进入条件**：`dispatchTool` 里任何工具输出含 `LegalTools.VENDOR_UNAVAILABLE_MARKER`（只进不出；不依赖 Harness 诊断是否接线）。起跑时法宝就没下发（未连账户）不算——那时没有标记，也不封网页，免得误伤非法规查询。
+  - **替代查询封顶**：之后 `search_web` + `browse_url` 合计最多执行 `MAX_WEB_LOOKUPS_AFTER_DOWN=2` 次（一次搜索定位 + 一次打开原文；t09 要求整轮 ≤6 轮）。在 `dispatchTool` 入口拦（原生/XML 共用，第三个出口，同样 `noteToolResult`），超额的不执行，回一条**非 Error** 说明（按已有资料作答、未核实标注），不触发失败纠正与 Harness；放行的两次结果尾部附「替代查询 n/2，网页非权威，须标未核实」。封顶对本轮全部网页查询生效，不区分是否查法条。
+  - **收尾提醒**：3.5 无工具收尾点（原生/XML 共用，在「记住」硬保险之后），不可用态下回答提到 `第N条` / `Article N` 却没有未核实类标注、或自称「已核实/均已核实/verified」→ 已流出的正文并进执行日志，末位追加一次隐形提醒，模型只补一段简短 `<final>` 说明；每轮最多一次。判据是正则，不读语义：未提条文号的回答不管，提醒后模型仍不标也照收。
+  - `LegalTools.vendorUnavailable` 文案与系统提示「法规检索」段同步写明 2 次上限与「未核实、不凭记忆补写、不声称已核实」；`LawSourceDownPolicyTest.vendorUnavailableToolTextStatesTheSameBudgetAsTheServerEnforces` 钉住文案与常量一致。
+  - 不新增出站目的地（第二法源要在 `legal/PRIVACY.md` 声明，另行决定）。未覆盖：`run_python` 的 `default_api.search_web/browse_url` 不经 `dispatchTool`；子 Agent 的工具调用不共享本轮 guard。
+  - 护栏：`LawSourceDownPolicyTest`、回放 `cases-law-source-down.json`（XML + 原生：4 次网页查询只分发 2 次、自称已核实的回答被补一轮「未核实」说明）。真实矩阵：tasks-10 `t09-citations-source-down`、gate-35 `s12-civil-code-1082`。
 - **StuckDetector**（先干预后熔断）：RunGuard 的单槽 lastCallSignature 换成 6 格滑动窗口，识别 A/A/A 与 **A/B/A/B 交替**（旧实现对交替完全无感，一路空转到步数预算耗尽）。首次检出只往 **messages 末位**追加 `[系统提醒]` UserMessage、工具照常执行；二次检出才拒绝执行并回喂 `Error:` 前缀的熔断反馈。末位是硬要求——只写 system prompt 的约束会被弱模型无视（PR#209 实证）。
 - 截断 `<tool_code>`（有开无闭）不再静默正常收尾：回喂纠正提示重试，最多 2 轮（RunGuard.malformedToolRounds）。
 - **工具执行期可取消**：两条工具循环（原生分支与 XML 兜底分支）都在**每个工具执行前**查一次 `isCancelled`，命中即 `handleCancellation` 并丢弃本轮剩余工具。此前只在 runLoop 入口与 onComplete 开头各查一次，于是「停止」在 `dispatch_subtask`（可跑 630 秒）或 AI PPT（十几分钟）中间完全不生效。已跑完的工具副作用不回滚（取消的固有语义）。**新增工具循环必须带这个检查点**。
