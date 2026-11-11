@@ -761,6 +761,14 @@ export async function postChat({ serverUrl, token }, payload) {
     }
     throw err
   }
+  // 受理回执（AgentInboxService.Receipt：messageId/state/submissionMode）。插话靠它挂「尚未读取/已送达」；
+  // 旧后端或非 JSON 响应回 null，调用方按「已受理、状态未知」处理
+  try {
+    const body = await resp.json()
+    return body && body.data ? body.data : body
+  } catch (_) {
+    return null
+  }
 }
 
 /**
@@ -906,15 +914,27 @@ export async function deleteGitLink({ serverUrl, token }, id) {
 /**
  * 请求后端停止当前会话的执行。
  */
+/**
+ * 返回「值不值得等后端的 cancelled 事件」：请求被受理且打中了活跃轮次才是 true。
+ * 后端明确回 `cancelled:false`（那一轮恰好自己收尾了）、HTTP 失败、网络失败都是 false，
+ * 调用方当场本地收尾。旧后端不带 cancelled 字段按「打中了」处理（等不到有兜底计时器）。
+ */
 export async function postCancel({ serverUrl, token }, conversationId) {
   const base = normalizeBaseUrl(serverUrl)
   try {
-    await cloudFetch(`${base}/api/agent/cancel/${conversationId}`, {
+    const resp = await cloudFetch(`${base}/api/agent/cancel/${conversationId}`, {
       method: 'POST',
       headers: headers(token)
     })
+    if (!resp.ok) return false
+    try {
+      const body = await resp.json()
+      if (body && body.cancelled === false) return false
+    } catch (_) { /* 响应体读不出来不改变结论 */ }
+    return true
   } catch (e) {
     // 停止是尽力而为：连接断了也要允许前端解锁
+    return false
   }
 }
 

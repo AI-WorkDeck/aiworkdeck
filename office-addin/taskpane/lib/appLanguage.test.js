@@ -99,7 +99,7 @@ test('POST /api/agent/chat 的请求体带 appLanguage（池线程上的那一�
     if (url.includes('/api/agent/connect/')) return sseOkResponse()
     if (url.endsWith('/api/agent/chat')) return jsonReply({ code: 0 })
     if (url.includes('/api/ai/models') || url.includes('/api/skills/list')) return jsonReply([], false, 404)
-    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    if (url.includes('/api/agent/cancel/')) return jsonReply({ cancelled: false })
     return jsonReply({}, false, 404)
   })
   try {

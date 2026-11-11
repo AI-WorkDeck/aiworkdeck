@@ -97,7 +97,7 @@ test('chat 403（会话已失效）：丢弃死 ID → 重新签发 → 自动�
       if (cid === 'conv-dead') return jsonReply({ status: 'error', message: '无权操作该会话' }, false, 403)
       return jsonReply({ status: 'ok' })
     }
-    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    if (url.includes('/api/agent/cancel/')) return jsonReply({ cancelled: false })
     throw new Error(`未预期的请求: ${url}`)
   })
   try {
@@ -128,7 +128,7 @@ test('重发仍失败才报错，且文案说清下一步（不是裸的 HTTP 40
     if (url.endsWith('/api/agent/conversations')) { issued++; return jsonReply({ conversationId: 'conv-' + issued }) }
     if (url.includes('/api/agent/connect/')) return sseOkResponse()
     if (url.endsWith('/api/agent/chat')) return jsonReply({ status: 'error' }, false, 403)
-    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    if (url.includes('/api/agent/cancel/')) return jsonReply({ cancelled: false })
     throw new Error(`未预期的请求: ${url}`)
   })
   try {
@@ -155,7 +155,7 @@ test('有落库历史的会话 403 不换 ID（那是归属问题），文案如
     if (url.endsWith('/api/agent/conversations')) { issued++; return jsonReply({ conversationId: 'conv-new' }) }
     if (url.includes('/api/agent/connect/')) return sseOkResponse()
     if (url.endsWith('/api/agent/chat')) return jsonReply({ status: 'error' }, false, 403)
-    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    if (url.includes('/api/agent/cancel/')) return jsonReply({ cancelled: false })
     throw new Error(`未预期的请求: ${url}`)
   })
   try {
@@ -187,7 +187,7 @@ test('chat 404（会话不存在）与 403 同一条自愈路径', async () => {
       if (cid === 'conv-gone') return jsonReply({ status: 'error' }, false, 404)
       return jsonReply({ status: 'ok' })
     }
-    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    if (url.includes('/api/agent/cancel/')) return jsonReply({ cancelled: false })
     throw new Error(`未预期的请求: ${url}`)
   })
   try {
@@ -214,7 +214,7 @@ test('发送路径上的 connect 403 同样自愈（旧判据 !messages.length �
       return dead.has(cid) ? jsonReply({}, false, 403) : sseOkResponse()
     }
     if (url.endsWith('/api/agent/chat')) return jsonReply({ status: 'ok' })
-    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    if (url.includes('/api/agent/cancel/')) return jsonReply({ cancelled: false })
     throw new Error(`未预期的请求: ${url}`)
   })
   try {
