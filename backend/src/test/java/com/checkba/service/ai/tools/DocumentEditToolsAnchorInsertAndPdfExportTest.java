@@ -197,13 +197,27 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
             EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
             when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
 
-            assertEquals(OK, toolsWithBridge(bridge).doc_insert_at_cursor("第五条 保密", "__ai_anchor_2", position, true));
+            String out = toolsWithBridge(bridge).doc_insert_at_cursor("第五条 保密", "__ai_anchor_2", position, true);
+            assertTrue(out.startsWith("{\"success\":true,\"anchorNote\":\"__ai_anchor_2 仍指向原来的锚点文字")
+                    && out.endsWith("\"}"), out);
 
             List<Map<String, Object>> params = paramsInOrder(bridge, List.of("insert_at_cursor"));
             String side = "before".equals(position) ? "before" : "after";
             assertEquals(Map.of("text", "第五条 保密", "newParagraph", side, "anchor", "__ai_anchor_2"), params.get(0),
                     "position=" + position);
         }
+    }
+
+    @Test
+    @DisplayName("锚点说明只加在成功回执上；失败回执、无锚点插入原样返回")
+    void anchorStaysNoteOnlyOnAnchoredSuccess() {
+        String fail = "{\"success\":false,\"message\":\"anchor not found\"}";
+        assertEquals(fail, DocumentEditTools.withAnchorStaysNote(fail, "__ai_anchor_2"));
+        assertEquals("Error: boom", DocumentEditTools.withAnchorStaysNote("Error: boom", "__ai_anchor_2"));
+
+        EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
+        when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
+        assertEquals(OK, toolsWithBridge(bridge).doc_insert_at_cursor("新段落", null, "after", true));
     }
 
     @Test

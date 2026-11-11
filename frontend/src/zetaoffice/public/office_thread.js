@@ -162,6 +162,39 @@ function anchorEditError(name, range) {
   }
   return null;
 }
+// 模型常把锚点之外的原文也写进 newText：锚点只覆盖「第三条」，newText 却是整段条文。
+// 替换照样成功，同段那几句原文就出现两遍，模型再 undo、重找、重替换，空转到 19 轮
+// （eval 2026-11-11 g16「删除第三条」、s01）。写之前拦下：newText 里有至少 6 个非空白字的
+// 片段在同段锚点前后原样出现、却不在锚点原文里，就退回并说明锚点覆盖的范围。
+const ECHO_MIN_CHARS = 6;
+function outsideAnchorEcho(anchorText, before, after, newText) {
+  const t = String(newText || ''), a = String(anchorText || '');
+  if (t.replace(/\s/g, '').length < ECHO_MIN_CHARS) return null;
+  // 只比同一段：contextAround 跨段带 \n
+  const sides = [String(before || '').split(/[\r\n]/).pop(), String(after || '').split(/[\r\n]/)[0]];
+  let best = '';
+  for (const c of sides) {
+    // 最长公共子串 DP；某格最长串若在锚点原文里，它的后缀也都在，故每格只查最长串
+    let prev = new Array(c.length + 1).fill(0);
+    for (let i = 1; i <= t.length; i++) {
+      const cur = new Array(c.length + 1).fill(0);
+      for (let j = 1; j <= c.length; j++) {
+        if (t[i - 1] !== c[j - 1]) continue;
+        const len = cur[j] = prev[j - 1] + 1;
+        if (len <= best.length) continue;
+        const sub = t.slice(i - len, i);
+        if (sub.replace(/\s/g, '').length >= ECHO_MIN_CHARS && a.indexOf(sub) < 0) best = sub;
+      }
+      prev = cur;
+    }
+  }
+  return best ? best.trim() : null;
+}
+function echoEditError(anchorText, echo) {
+  const clip = s => (s.length > 30 ? s.slice(0, 30) + '…' : s);
+  return '未执行编辑：newText 里的「' + clip(echo) + '」在锚点之外本来就有，锚点只覆盖「' + clip(String(anchorText)) +
+    '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；要改写或删除整句/整段，先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。';
+}
 // ---- EvidenceLink 书签原语 helpers（dev-board#103）-----------------------------
 function bmFail(msg) { return { success: false, error: msg, message: msg }; }
 // 当前选区的第一个 range（无选区 → null）。
@@ -5648,6 +5681,12 @@ const EXEC = {
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
     const anchorError = anchorEditError(p.anchor, range);
     if (anchorError) return { success: false, error: anchorError, message: anchorError };
+    const around = contextAround(range, 200);
+    const echo = outsideAnchorEcho(range.getString(), around.before, around.after, p.newText);
+    if (echo) {
+      const echoError = echoEditError(range.getString(), echo);
+      return { success: false, error: echoError, message: echoError };
+    }
     if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };
     if (!applyMinimalRedline(range, String(p.newText || ''))) range.setString(String(p.newText || ''));
     // Keep the excerpt budget, but expose whether verification needs a full paragraph read.
