@@ -360,6 +360,8 @@ public class AgentOrchestrator {
 
         // 原地打转检测：滑动窗口，识别 A/A/A 与 A/B/A/B 两种重复模式，先干预后熔断
         final StuckDetector stuck = new StuckDetector();
+        // 坏轮次的隐形自纠：工具轮数提醒 + 撤销打转提醒，只提醒不暂停（gap R5 / P4，阈值见 RunBudget）
+        final RunBudget budget = new RunBudget();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
         final Set<String> triedModels = new java.util.LinkedHashSet<>();
         int consecutiveFailures;
@@ -1111,6 +1113,34 @@ public class AgentOrchestrator {
             sendTextDelta(guard, "<tool_output status=\"CANCELLED\">"
                     + AgentTagProtocol.escape(STEERING_CANCELLED_TOOL) + "</tool_output>");
         }
+    }
+
+    /**
+     * 轮数/撤销的一次性提醒（挂在整栈末位）；不需要提醒时返回 null。
+     * 只提醒不暂停（所有者决定 2026-11-11）：律师要的是结果，停止、挂起、改方向都由用户自己随时做。
+     */
+    static String runBudgetNudge(RunBudget.Action action, RunBudget budget) {
+        if (action == RunBudget.Action.ROUND_NUDGE) {
+            return LangText.of(
+                    "[系统提醒] 本轮已执行 " + budget.rounds() + " 轮工具调用。若任务仍在推进，"
+                            + "把剩下互不依赖的修改放进同一轮批量发出；若卡住了，停下来用 <final> 向用户说明"
+                            + "已完成什么、卡在哪里。",
+                    "[System reminder] This run has used " + budget.rounds() + " tool rounds. If the task "
+                            + "is still progressing, batch the remaining independent edits into one round; if you are "
+                            + "stuck, stop and use <final> to tell the user what is done and what blocks you.");
+        }
+        if (action == RunBudget.Action.UNDO_NUDGE) {
+            return LangText.of(
+                    "[系统提醒] 你已撤销/重做 " + budget.undos() + " 次，陷入了「修改→撤销→再修改」的循环。"
+                            + "不要再撤销：先用读取类工具确认目标段落现在的真实内容，再用一次定位准确的修改完成；"
+                            + "如果现有工具做不到用户要的效果，停下来用 <final> 如实说明文档现状。",
+                    "[System reminder] You have undone/redone " + budget.undos() + " times and are in an "
+                            + "\"edit -> undo -> edit\" loop. Stop undoing: read the target paragraph to confirm its "
+                            + "current text, then make one precisely located edit; if the available tools cannot "
+                            + "produce what the user wants, stop and use <final> to state the document's current "
+                            + "state.");
+        }
+        return null;
     }
 
     private void pauseForNoProgress(RunGuard guard, String projectId, Long userId,
@@ -2798,6 +2828,7 @@ public class AgentOrchestrator {
                     boolean editorBooting = !success && EditorBridgeService.isEditorBootingOutput(result);
                     StuckDetector.Verdict verdict = guard.stuck.record(
                             req.name(), req.arguments(), result, success);
+                    guard.budget.noteCall(req.name());
                     boolean pauseForNoProgress = verdict == StuckDetector.Verdict.CIRCUIT_BREAK;
                     if (verdict == StuckDetector.Verdict.INTERVENE) {
                         log.warn("Stuck detector intervention for {}: {}", conversationId, guard.stuck.lastPattern());
@@ -2873,6 +2904,15 @@ public class AgentOrchestrator {
                 // 末位才是注意力最高的位置（PR#209 实证）
                 if (stuckNudge != null) {
                     messages.add(dev.langchain4j.data.message.UserMessage.from(stuckInterventionMessage(stuckNudge)));
+                }
+                // 轮数/撤销提醒：整批执行完才判（一批只算一轮），只挂末位提醒、从不暂停
+                String budgetNudge = runBudgetNudge(guard.budget.endRound(
+                        nativeRequests.stream().map(dev.langchain4j.agent.tool.ToolExecutionRequest::name).toList()),
+                        guard.budget);
+                if (budgetNudge != null) {
+                    log.warn("Run budget nudge for {} (rounds={}, undos={})", conversationId,
+                            guard.budget.rounds(), guard.budget.undos());
+                    messages.add(dev.langchain4j.data.message.UserMessage.from(budgetNudge));
                 }
 
                 // 增量保存：在工具执行后立即保存AI消息和工具输出，防止对话中断导致上下文丢失
@@ -2978,6 +3018,7 @@ public class AgentOrchestrator {
                     boolean xmlEditorBooting = !xmlToolSuccess && EditorBridgeService.isEditorBootingOutput(result);
                     StuckDetector.Verdict verdict = guard.stuck.record(
                             call.toolName(), call.argsJson(), result, xmlToolSuccess);
+                    guard.budget.noteCall(call.toolName());
                     boolean pauseForNoProgress = verdict == StuckDetector.Verdict.CIRCUIT_BREAK;
                     if (verdict == StuckDetector.Verdict.INTERVENE) {
                         log.warn("Stuck detector intervention for {}: {}", conversationId, guard.stuck.lastPattern());
@@ -3077,6 +3118,15 @@ public class AgentOrchestrator {
                      // 打转干预挂在整栈末位（同原生分支：system prompt 里的约束会被弱模型无视）
                      if (stuckNudge != null) {
                          messages.add(dev.langchain4j.data.message.UserMessage.from(stuckInterventionMessage(stuckNudge)));
+                     }
+                     // 轮数/撤销提醒（同原生分支：整批执行完才判，从不暂停）
+                     String budgetNudge = runBudgetNudge(guard.budget.endRound(
+                             xmlCalls.stream().map(XmlToolCallParser.ParsedCall::toolName).toList()),
+                             guard.budget);
+                     if (budgetNudge != null) {
+                         log.warn("Run budget nudge for {} (rounds={}, undos={})", conversationId,
+                                 guard.budget.rounds(), guard.budget.undos());
+                         messages.add(dev.langchain4j.data.message.UserMessage.from(budgetNudge));
                      }
                      // 增量保存：在XML工具执行后立即保存AI消息和工具输出，防止对话中断导致上下文丢失
                      String intermediateXmlContent = content + "\n" + executionLog.toString();
