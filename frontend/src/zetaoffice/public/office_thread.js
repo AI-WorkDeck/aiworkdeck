@@ -162,6 +162,48 @@ function anchorEditError(name, range) {
   }
   return null;
 }
+// 模型常把锚点之外的原文也写进 newText：锚点只覆盖「第三条」，newText 却是整段条文。
+// 替换照样成功，同段那几句原文就出现两遍，模型再 undo、重找、重替换，空转到 19 轮
+// （eval 2026-11-11 g16「删除第三条」、s01）。写之前拦下：newText 里有至少 6 个非空白字的
+// 片段在同段锚点前后原样出现、却不在锚点原文里，就退回并说明锚点覆盖的范围。
+const ECHO_MIN_CHARS = 6;
+function outsideAnchorEcho(anchorText, before, after, newText) {
+  const t = String(newText || ''), a = String(anchorText || '');
+  if (t.replace(/\s/g, '').length < ECHO_MIN_CHARS) return null;
+  // 单段 newText 只比同一段（contextAround 跨段带 \n）；newText 自带换行 = 要写多段，
+  // 前后相邻段也比（g19：把刚插入的下一段又拼进锚点替换）
+  const multi = /[\r\n]/.test(t);
+  const sides = multi ? [String(before || ''), String(after || '')]
+    : [String(before || '').split(/[\r\n]/).pop(), String(after || '').split(/[\r\n]/)[0]];
+  let best = '';
+  for (const c of sides) {
+    // 最长公共子串 DP；某格最长串若在锚点原文里，它的后缀也都在，故每格只查最长串
+    let prev = new Array(c.length + 1).fill(0);
+    for (let i = 1; i <= t.length; i++) {
+      const cur = new Array(c.length + 1).fill(0);
+      for (let j = 1; j <= c.length; j++) {
+        if (t[i - 1] !== c[j - 1]) continue;
+        const len = cur[j] = prev[j - 1] + 1;
+        if (len <= best.length) continue;
+        const sub = t.slice(i - len, i);
+        if (sub.replace(/\s/g, '').length >= ECHO_MIN_CHARS && a.indexOf(sub) < 0) best = sub;
+      }
+      prev = cur;
+    }
+  }
+  return best ? best.trim() : null;
+}
+// paragraph（锚点所在段全文）不长时直接给出整段查找词：复测里模型被退回后按句拆删，
+// 多花 3–5 轮（g16 2026-11-11 第二轮复测）
+function echoEditError(anchorText, echo, paragraph) {
+  const clip = s => (s.length > 30 ? s.slice(0, 30) + '…' : s);
+  const para = String(paragraph || '').trim();
+  const how = para && para.length <= 120 && para.indexOf('"') < 0
+    ? '要改写或删除这一整段：先 doc_find_text(keyword="' + para + '") 取覆盖整段的 anchorId，再一次替换（删除传 newText=""），不要逐句拆开删。'
+    : '要改写或删除整句/整段，先 doc_find_text 查完整原句/原段取得覆盖它的 anchorId，再替换（删除传 newText=""）。';
+  return '未执行编辑：newText 里的「' + clip(echo) + '」在锚点之外本来就有，锚点只覆盖「' + clip(String(anchorText)) +
+    '」，照此替换这段文字会重复出现。newText 只写锚点文字本身的新版本；' + how;
+}
 // ---- EvidenceLink 书签原语 helpers（dev-board#103）-----------------------------
 function bmFail(msg) { return { success: false, error: msg, message: msg }; }
 // 当前选区的第一个 range（无选区 → null）。
@@ -5648,6 +5690,13 @@ const EXEC = {
     if (!range) return { success: false, message: 'anchor not found: ' + p.anchor };
     const anchorError = anchorEditError(p.anchor, range);
     if (anchorError) return { success: false, error: anchorError, message: anchorError };
+    // 只管 AI 锚点（与 anchorEditError 同口径）；插件自己的书签替换不受影响
+    const around = String(p.anchor).startsWith(ANCHOR_PREFIX) ? contextAround(range, 200) : null;
+    const echo = around && outsideAnchorEcho(range.getString(), around.before, around.after, p.newText);
+    if (echo) {
+      const echoError = echoEditError(range.getString(), echo, paragraphTextOf(range));
+      return { success: false, error: echoError, message: echoError };
+    }
     if (!selectVisibly(range)) return { success: false, message: 'could not select anchor: ' + p.anchor };
     if (!applyMinimalRedline(range, String(p.newText || ''))) range.setString(String(p.newText || ''));
     // Keep the excerpt budget, but expose whether verification needs a full paragraph read.

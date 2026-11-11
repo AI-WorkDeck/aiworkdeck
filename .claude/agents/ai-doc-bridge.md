@@ -47,6 +47,8 @@ LOWA 中英提示及工具描述默认“读 → 查找核对上下文 → 锚�
 
 `runAgentCommandInMarginView` 尝试 final、margin 后仍为 all 时拒绝读写，不能在混有删除稿的正文中继续操作。原显示模式按既有路径恢复。锚点前后插入仍走后端既有三命令流程，本次不把它宣称为原子写入。
 
+**锚点外原文回声（eval 2026-11-11 g16/s01）**：锚点只覆盖「第三条」、newText 却是整段条文时，替换照样成功、同段原文重复，模型随后 undo/重找/重替换空转到 19 轮。`replace_at_position` 对 AI 锚点在写之前跑 `outsideAnchorEcho`：newText 里有 ≥6 个非空白字的片段在**同段**锚点前/后原样出现（newText 自带换行时连相邻段一起比）、又不在锚点原文里，就退回（`锚点只覆盖「…」`，指引查完整原句/原段再替换，删除传空串），不写。桌面原生编辑器 `native_document_edit_uno.py` 有同口径的 `outside_anchor_echo`。未解决：插入新段落后模型偶尔把插入用的 anchorId 当成新段落去改条号（g19/v01），回执加说明实测无效，未合入。
+
 回归：`anchorSafety.test.mjs`、`revisionView.test.mjs`、`RedlineGranularityContractTest`；`first-agent-edit.mjs` 增加 all/final/margin/balloons 下“已删除30日 + 两处正文30日”、过期锚点拒绝、无关目标继续可用和导出重开。模型遵从、完整客户端和 Microsoft Word/Office.js 插件另行验证，本改动仅嵌入式 LOWA。
 
 ## 后端抽取的 docx 修订口径（gap-analysis R1，2026-11）
