@@ -1529,6 +1529,9 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - 移动到…：复用批量选择的「选择文件夹」弹窗；对象存在 `contextActionIds`，`executeBatchAction` 优先用它、用完清空，`openBatchAction` 也会清，避免和勾选串味。
 - 压缩：`POST /api/projects/{p}/files/batch/zip`（写权限）→ `ProjectFileService.compressToZip`，先写临时文件再流进存储，条目数/总量沿用解压护栏（5000 条、1GB）；同一 zip 内重名条目加「 (2)」。解压复用既有 `archive/extract`。
 - 回归：`ProjectFileServiceArchiveTest`（compressToZip*）、`frontend/tests/project-home/file-tree-extra-menu.test.mjs`。
+- 菜单版式：六个 `.context-menu-group`（AI/内容 → 编辑 → 事项与权限 → 输出与转换 → 位置与历史+其他 → 删除），分隔线只画在非空组之间（`:empty` 隐藏全被 v-if 掉的组，依赖 Vue 把空白文本节点压掉）；行高 32、4px 内边距、accent 悬停，同 `ExplorerCreateMenu`。打开后 `clampContextMenu` 把菜单挪回视口。
+- 子菜单「识别文字（OCR）」「其他」悬停展开为侧边浮层（`ctxSub` + `.context-menu-flyout`，放不下翻到左侧），离开触发行走 `utils/menuAim.js` 的斜移宽限。「其他」里放「复制路径」（桌面、仅文件，走 `/local-path`）与「复制相对路径」（父链拼项目内路径）。刻意不做「下载」「用其他应用打开」（本地应用，访达里就有）。
+- 现有测试按「`<view v-if=` 紧挨 `$t('key')`」在模板里找菜单项（BUG-73），菜单项保持模板逐行写法，不要改成数据驱动渲染。
 
 ## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
 

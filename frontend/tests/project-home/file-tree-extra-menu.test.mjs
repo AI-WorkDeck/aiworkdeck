@@ -19,7 +19,7 @@ const FILES = [
 ]
 
 function makeVm() {
-  const calls = { printed: [], fetched: [], zipped: [], extracted: [], moved: [], toasts: [], emits: [] }
+  const calls = { printed: [], fetched: [], zipped: [], extracted: [], moved: [], toasts: [], emits: [], copied: [] }
   const stubs = {
     collapseToTopmostSelected, canPrintItem, canExtractItem, canMoveItems, canCompressItems,
     fetchPrintablePdf: async (...a) => { calls.fetched.push(a); return 'BLOB' },
@@ -27,6 +27,8 @@ function makeVm() {
     compressFilesToZip: async (...a) => { calls.zipped.push(a); return { data: { id: 99, name: '证据.zip' } } },
     extractArchive: async (...a) => { calls.extracted.push(a); return { id: 98, name: '附件' } },
     batchMoveFiles: async (...a) => { calls.moved.push(a); return { data: { files: [] } } },
+    copyToClipboard: (text, key) => { calls.copied.push([text, key]); return true },
+    getFileLocalPath: async (id) => ({ data: { path: `/Users/me/案件/${id}.docx`, exists: true } }),
     ICONS: {},
     host: {},
   }
@@ -43,6 +45,7 @@ function makeVm() {
   Object.defineProperty(vm, 'checkedIds', { get: () => Object.keys(vm.checkedMap).filter(k => vm.checkedMap[k]).map(Number) })
   vm.$t = (k, params) => (params ? `${k}:${JSON.stringify(params)}` : k)
   vm.$emit = (...a) => { calls.emits.push(a) }
+  vm.$nextTick = fn => fn()
   vm.loadFiles = async () => {}
   vm.revealFile = () => true
   vm.clearChecked = () => { vm.checkedMap = {} }
@@ -123,4 +126,39 @@ test('菜单模板四项都接了 i18n 键', () => {
   for (const key of ['fileTree.print', 'fileTree.moveTo', 'fileTree.compressToZip', 'fileTree.extractHere']) {
     assert.ok(SRC.includes(`$t('${key}')`), key)
   }
+})
+
+test('其他 › 复制相对路径：按父链拼项目内路径；复制路径：取本机绝对路径', async () => {
+  const vm = makeVm()
+  vm.handleContextMenu(FILES[1], rightClick())
+  await vm.handleContextCopyPath(true)
+  vm.handleContextMenu(FILES[1], rightClick())
+  await vm.handleContextCopyPath(false)
+  assert.deepEqual(vm.calls.copied, [['证据/合同.docx', 'fileTree.pathCopied'], ['/Users/me/案件/11.docx', 'fileTree.pathCopied']])
+  assert.equal(vm.contextMenu.visible, false)
+})
+
+test('子菜单浮层：悬停/点击打开，关菜单与重新右键都收起', () => {
+  const vm = makeVm()
+  vm.handleContextMenu(FILES[2], rightClick())
+  vm.openCtxSub('ocr')
+  assert.equal(vm.ctxSub, 'ocr')
+  vm.openCtxSub('more')
+  assert.equal(vm.ctxSub, 'more')
+  vm.handleContextMenu(FILES[1], rightClick())
+  assert.equal(vm.ctxSub, null)
+  vm.openCtxSub('more')
+  vm.closeContextMenu()
+  assert.equal(vm.ctxSub, null)
+})
+
+test('菜单分组：每一项都在 .context-menu-group 里，删除单独成组在最后；不提供下载/用其他应用打开', () => {
+  const tpl = SRC.slice(SRC.indexOf('class="context-menu"'), SRC.indexOf('class="context-menu context-menu-flyout"'))
+  const groups = tpl.split('<view class="context-menu-group">').slice(1)
+  assert.equal(groups.length, 6)
+  assert.match(groups[5], /handleContextDelete/)
+  assert.ok(!/handleContextDelete/.test(groups.slice(0, 5).join('')))
+  assert.ok(!/fileTree\.(download|openWith)/.test(SRC))
+  assert.match(SRC, /data-sub="ocr"/)
+  assert.match(SRC, /data-sub="more"/)
 })

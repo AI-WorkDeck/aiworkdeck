@@ -137,7 +137,8 @@
 
     <ExplorerCreateMenu ref="createMenu" @select="onCreateMenuSelect" @close="createMenuOpen = false" />
 
-    <!-- 右键上下文菜单 -->
+    <!-- 右键上下文菜单：分组之间的分隔线由 CSS 按「非空组」画（.context-menu-group:empty 隐藏）；
+         识别文字、其他两个子菜单悬停展开为侧边浮层，menu-aim 防斜移误关（同 ExplorerCreateMenu） -->
     <view
       v-if="contextMenu.visible"
       class="context-menu-mask"
@@ -146,224 +147,262 @@
     >
       <view
         class="context-menu"
+        role="menu"
         :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
         @tap.stop
+        @mousemove="onCtxPointerMove"
       >
-        <!-- 多选（批量选择态的勾选 / ⌘ 加选）时：标题行点明作用范围，只留能批量作用的项
-             （v0.49.0 BUG-73）；单文件项一律带 !isContextMulti() -->
         <view v-if="isContextMulti()" class="context-menu-header">
           <text class="context-menu-header-text">{{ $t('fileTree.selectedCount', { count: contextMenu.selectionIds.length }) }}</text>
         </view>
-        <view v-if="isContextMulti() && canCompareDocuments()" class="context-menu-item" @tap="startDocumentCompare">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 19V5M15 19V5" stroke-linecap="round" stroke-linejoin="round"/>
-              <rect x="3" y="3" width="18" height="18" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <view class="context-menu-group">
+          <view v-if="isContextMulti() && canCompareDocuments()" class="context-menu-item" @tap="startDocumentCompare">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 19V5M15 19V5" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="3" y="3" width="18" height="18" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.compareDocuments') }}</text>
           </view>
-          <text class="context-menu-text">{{ $t('fileTree.compareDocuments') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && transcribeEnabled && isTranscribableMedia(contextMenu.targetItem)" class="context-menu-item" @tap="$emit('transcribe-audio', contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke-linecap="round" stroke-linejoin="round"/>
-              <line x1="12" y1="19" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+          <view v-if="contextMenu.targetItem && !isContextMulti() && transcribeEnabled && isTranscribableMedia(contextMenu.targetItem)" class="context-menu-item" @tap="$emit('transcribe-audio', contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="12" y1="19" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.transcribe') }}</text>
           </view>
-          <text class="context-menu-text">{{ $t('fileTree.transcribe') }}</text>
-        </view>
-        <!-- 识别文字（OCR，tutorial-series#155）：PDF 与图片，单选/多选均可；点开五项子菜单（后两项为保留版式 Word / 可搜索 PDF），
-             执行交给宿主 onExplorerOcr（批量队列、进度与取消、云端告知、并排校对都在宿主） -->
-        <view v-if="canOcrContext()" class="context-menu-item" :aria-expanded="ocrMenuOpen ? 'true' : 'false'" @tap="ocrMenuOpen = !ocrMenuOpen">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M8 9h8M12 9v7" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+          <!-- 识别文字（OCR，tutorial-series#155）：PDF 与图片，单选/多选均可；点开五项子菜单（后两项为保留版式 Word / 可搜索 PDF），
+               执行交给宿主 onExplorerOcr（批量队列、进度与取消、云端告知、并排校对都在宿主） -->
+          <view v-if="canOcrContext()" class="context-menu-item" :class="{ 'is-open': ctxSub === 'ocr' }" data-sub="ocr" aria-haspopup="menu" :aria-expanded="ctxSub === 'ocr' ? 'true' : 'false'" @tap="openCtxSub('ocr')" @mouseenter="openCtxSub('ocr')">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 9h8M12 9v7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.ocrMenu') }}</text>
+            <text class="context-menu-submenu-arrow" aria-hidden="true">›</text>
           </view>
-          <text class="context-menu-text">{{ $t('fileTree.ocrMenu') }}</text>
-          <text class="context-menu-submenu-arrow" aria-hidden="true">{{ ocrMenuOpen ? '▾' : '▸' }}</text>
+          <!-- 加入 AI 对话（dev-board#794 K15 ②）：与拖到 AI 面板同一条路，
+               文件夹同样受 10 个文件的上限约束（宿主 addDraggedFileToAiContext 判） -->
+          <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextAddToAi">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.addToAiChat') }}</text>
+          </view>
         </view>
-        <template v-if="canOcrContext() && ocrMenuOpen">
-          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('copy')">
+        <view class="context-menu-group">
+          <view v-if="contextMenu.targetItem && !isContextMulti()" class="context-menu-item" @tap="handleRename(contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.rename') }}</text>
+          </view>
+          <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextDuplicate">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.duplicate') }}</text>
+          </view>
+          <view v-if="canMoveContext()" class="context-menu-item" @tap="handleContextMove">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.moveTo') }}</text>
+          </view>
+          <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="openTagEditDialog(contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="7" y1="7" x2="7.01" y2="7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.manageTags') }}</text>
+          </view>
+        </view>
+        <view class="context-menu-group">
+          <!-- 事项（dev-board#900）：「添加事项…」交给宿主开工作台唯一的 TaskDialog（预置关联这份文件）；
+               这份文件有未完成事项时多一项「查看事项 (N)」，宿主打开 rail 日程面板并按文件过滤 -->
+          <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="$emit('add-task', contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M16 2v4" stroke-linecap="round"/>
+                <path d="M8 2v4" stroke-linecap="round"/>
+                <path d="M3 10h18" stroke-linecap="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('calendar.fileAddTask') }}</text>
+          </view>
+          <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && openTaskCount(contextMenu.targetItem.id) > 0" class="context-menu-item" @tap="$emit('view-tasks', contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/>
+                <path d="M4 6h.01M4 12h.01M4 18h.01" stroke-linecap="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('calendar.fileViewTasks', { count: openTaskCount(contextMenu.targetItem.id) }) }}</text>
+          </view>
+          <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && !contextMenu.targetItem.readOnly && viewMode !== 'recycle'" class="context-menu-item" @tap="handleFileClientAccess(contextMenu.targetItem)">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <rect x="5" y="10" width="14" height="11" rx="2"/>
+                <path d="M8 10V6a4 4 0 0 1 8 0v4" stroke-linecap="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.clientAccessTitle') }}</text>
+          </view>
+        </view>
+        <view class="context-menu-group">
+          <view v-if="canPrintContext()" class="context-menu-item" @tap="handleContextPrint">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="6" y="14" width="12" height="8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.print') }}</text>
+          </view>
+          <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && canShareFile" class="context-menu-item"
+            @tap="$emit('share-file', contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M22 2L15 22l-4-9-9-4z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.sendFile') }}</text>
+          </view>
+          <view v-if="canConvertContextToPdf()" class="context-menu-item" @tap="handleContextConvertToPdf">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
+                <polyline points="14 2 14 8 20 8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M9 15h6" stroke-linecap="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.convertToPdf') }}</text>
+          </view>
+          <view v-if="canMergeContextToPdf()" class="context-menu-item" @tap="handleContextMergeToPdf">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="4" y="2" width="12" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 10h4M10 8v4" stroke-linecap="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.mergeToPdf') }}</text>
+          </view>
+          <view v-if="canCompressContext()" class="context-menu-item" @tap="handleContextCompress">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.compressToZip') }}</text>
+          </view>
+          <view v-if="canExtractContext()" class="context-menu-item" @tap="handleContextExtract">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 8v13H3V8M1 3h22v5H1z" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 11v7M9 15l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.extractHere') }}</text>
+          </view>
+        </view>
+        <view class="context-menu-group">
+          <view v-if="contextMenu.targetItem && !isContextMulti() && isDesktopShell" class="context-menu-item"
+            @tap="$emit('reveal-file', contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t(revealInFolderKey) }}</text>
+          </view>
+          <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item"
+            @tap="$emit('file-history', contextMenu.targetItem); closeContextMenu()">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.fileHistory') }}</text>
+          </view>
+          <!-- 其他（悬停展开）：不常用的放这里，主菜单保持短 -->
+          <view v-if="contextMenu.targetItem && !isContextMulti()" class="context-menu-item" :class="{ 'is-open': ctxSub === 'more' }" data-sub="more" aria-haspopup="menu" :aria-expanded="ctxSub === 'more' ? 'true' : 'false'" @tap="openCtxSub('more')" @mouseenter="openCtxSub('more')">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.moreActions') }}</text>
+            <text class="context-menu-submenu-arrow" aria-hidden="true">›</text>
+          </view>
+        </view>
+        <view class="context-menu-group">
+          <view v-if="contextMenu.targetItem" class="context-menu-item context-menu-item-danger" @tap="handleContextDelete">
+            <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </view>
+            <text class="context-menu-text">{{ $t('fileTree.delete') }}</text>
+          </view>
+        </view>
+      </view>
+      <view
+        v-if="ctxSub"
+        class="context-menu context-menu-flyout"
+        role="menu"
+        :style="{ left: ctxSubPos.x + 'px', top: ctxSubPos.y + 'px' }"
+        @tap.stop
+        @mouseenter="clearCtxAimTimer"
+      >
+        <template v-if="ctxSub === 'ocr'">
+          <view class="context-menu-item" @tap="handleContextOcr('copy')">
             <text class="context-menu-text">{{ $t('fileTree.ocrCopy') }}</text>
           </view>
-          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('txt')">
+          <view class="context-menu-item" @tap="handleContextOcr('txt')">
             <text class="context-menu-text">{{ $t('fileTree.ocrExportTxt') }}</text>
           </view>
-          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('docx')">
+          <view class="context-menu-item" @tap="handleContextOcr('docx')">
             <text class="context-menu-text">{{ $t('fileTree.ocrExportDocx') }}</text>
           </view>
-          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('layoutDocx')">
+          <view class="context-menu-item" @tap="handleContextOcr('layoutDocx')">
             <text class="context-menu-text">{{ $t('fileTree.ocrExportLayoutDocx') }}</text>
           </view>
-          <view class="context-menu-item context-menu-subitem" @tap="handleContextOcr('searchablePdf')">
+          <view class="context-menu-item" @tap="handleContextOcr('searchablePdf')">
             <text class="context-menu-text">{{ $t('fileTree.ocrSearchablePdf') }}</text>
           </view>
         </template>
-        <!-- 加入 AI 对话（dev-board#794 K15 ②）：与拖到 AI 面板同一条路，
-             文件夹同样受 10 个文件的上限约束（宿主 addDraggedFileToAiContext 判） -->
-        <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextAddToAi">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+        <template v-else>
+          <view v-if="isDesktopShell && contextMenu.targetItem && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="handleContextCopyPath(false)">
+            <text class="context-menu-text">{{ $t('fileTree.copyPath') }}</text>
           </view>
-          <text class="context-menu-text">{{ $t('fileTree.addToAiChat') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti()" class="context-menu-item" @tap="handleRename(contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+          <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextCopyPath(true)">
+            <text class="context-menu-text">{{ $t('fileTree.copyRelativePath') }}</text>
           </view>
-          <text class="context-menu-text">{{ $t('fileTree.rename') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="openTagEditDialog(contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke-linecap="round" stroke-linejoin="round"/>
-              <line x1="7" y1="7" x2="7.01" y2="7" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.manageTags') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && !contextMenu.targetItem.readOnly && viewMode !== 'recycle'" class="context-menu-item" @tap="handleFileClientAccess(contextMenu.targetItem)">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <rect x="5" y="10" width="14" height="11" rx="2"/>
-              <path d="M8 10V6a4 4 0 0 1 8 0v4" stroke-linecap="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.clientAccessTitle') }}</text>
-        </view>
-        <!-- 事项（dev-board#900）：「添加事项…」交给宿主开工作台唯一的 TaskDialog（预置关联这份文件）；
-             这份文件有未完成事项时多一项「查看事项 (N)」，宿主打开 rail 日程面板并按文件过滤 -->
-        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item" @tap="$emit('add-task', contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M16 2v4" stroke-linecap="round"/>
-              <path d="M8 2v4" stroke-linecap="round"/>
-              <path d="M3 10h18" stroke-linecap="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('calendar.fileAddTask') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && openTaskCount(contextMenu.targetItem.id) > 0" class="context-menu-item" @tap="$emit('view-tasks', contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 6h11M9 12h11M9 18h11" stroke-linecap="round"/>
-              <path d="M4 6h.01M4 12h.01M4 18h.01" stroke-linecap="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('calendar.fileViewTasks', { count: openTaskCount(contextMenu.targetItem.id) }) }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder" class="context-menu-item"
-          @tap="$emit('file-history', contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.fileHistory') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && isDesktopShell" class="context-menu-item"
-          @tap="$emit('reveal-file', contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t(revealInFolderKey) }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem && !isContextMulti() && !contextMenu.targetItem.isFolder && canShareFile" class="context-menu-item"
-          @tap="$emit('share-file', contextMenu.targetItem); closeContextMenu()">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M22 2L15 22l-4-9-9-4z" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.sendFile') }}</text>
-        </view>
-        <view v-if="canPrintContext()" class="context-menu-item" @tap="handleContextPrint">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" stroke-linecap="round" stroke-linejoin="round"/>
-              <rect x="6" y="14" width="12" height="8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.print') }}</text>
-        </view>
-        <view v-if="canConvertContextToPdf()" class="context-menu-item" @tap="handleContextConvertToPdf">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linecap="round" stroke-linejoin="round"/>
-              <polyline points="14 2 14 8 20 8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M9 15h6" stroke-linecap="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.convertToPdf') }}</text>
-        </view>
-        <view v-if="canMergeContextToPdf()" class="context-menu-item" @tap="handleContextMergeToPdf">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
-              <rect x="4" y="2" width="12" height="16" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M8 10h4M10 8v4" stroke-linecap="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.mergeToPdf') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem" class="context-menu-item" @tap="handleContextDuplicate">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.duplicate') }}</text>
-        </view>
-        <view v-if="canMoveContext()" class="context-menu-item" @tap="handleContextMove">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.moveTo') }}</text>
-        </view>
-        <view v-if="canCompressContext()" class="context-menu-item" @tap="handleContextCompress">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.compressToZip') }}</text>
-        </view>
-        <view v-if="canExtractContext()" class="context-menu-item" @tap="handleContextExtract">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 8v13H3V8M1 3h22v5H1z" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M12 11v7M9 15l3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.extractHere') }}</text>
-        </view>
-        <view v-if="contextMenu.targetItem" class="context-menu-item context-menu-item-danger" @tap="handleContextDelete">
-          <view class="context-menu-icon" style="display: flex; align-items: center; justify-content: center;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </view>
-          <text class="context-menu-text">{{ $t('fileTree.delete') }}</text>
-        </view>
+        </template>
       </view>
     </view>
-
     <view v-if="isTagView" class="tag-view-summary" aria-live="polite">
       <component :is="'button'" type="button" class="tag-view-back" @click.stop="setTagView(false)">
         <text aria-hidden="true">‹</text> {{ $t('files.tagViewFolders') }}
@@ -832,6 +871,8 @@ import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } fro
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
 import { canConvertItemToPdf, canMergeItemsToPdf, pdfConversionRecoveryOptions } from '@/utils/fileTreePdfActions.js'
 import { canPrintItem, canExtractItem, canMoveItems, canCompressItems, printPdfBlob } from '@/utils/fileTreeExtraActions.js'
+import { isWithinSubmenuAim } from '@/utils/menuAim.js'
+import { copyToClipboard } from '@/utils/chatClipboard.js'
 import { canOcrItems } from '@/utils/explorerOcr.js'
 import FileTypeIcon from '@/components/FileTypeIcon.vue'
 import ExplorerCreateMenu from '@/components/ExplorerCreateMenu.vue'
@@ -1015,7 +1056,9 @@ export default {
       multiSelectedIds: [], // 多选的文件 ID 数组
 
       // 右键菜单状态
-      ocrMenuOpen: false,
+      ctxSub: null, // 右键子菜单浮层：'ocr' | 'more' | null
+      ctxSubPos: { x: 0, y: 0 },
+      ctxSubSide: 'right',
       contextMenu: {
         visible: false,
         x: 0,
@@ -2669,7 +2712,7 @@ export default {
           this.selectedFileId = item.id
         }
 
-        this.ocrMenuOpen = false
+        this.closeCtxSub()
         this.contextMenu = {
           visible: true,
           x: event.clientX || event.pageX || 0,
@@ -2677,6 +2720,87 @@ export default {
           targetItem: item,
           selectionIds: inSelection ? current.slice() : [item.id]
         }
+        this.$nextTick(() => this.clampContextMenu())
+      }
+    },
+
+    // 菜单贴着点击点打开，靠近窗口底部/右侧时整体挪回可视区（项多时不再被截掉）
+    clampContextMenu() {
+      const el = typeof document !== 'undefined' && document.querySelector('.context-menu:not(.context-menu-flyout)')
+      if (!el || !this.contextMenu.visible) return
+      const r = el.getBoundingClientRect()
+      this.contextMenu.x = Math.max(8, Math.min(this.contextMenu.x, window.innerWidth - r.width - 8))
+      this.contextMenu.y = Math.max(8, Math.min(this.contextMenu.y, window.innerHeight - r.height - 8))
+    },
+
+    // 子菜单浮层：贴在触发行右侧（放不下翻到左侧），与行顶对齐
+    openCtxSub(key) {
+      this.clearCtxAimTimer()
+      if (this.ctxSub === key) return
+      this.ctxSub = key
+      this.$nextTick(() => {
+        if (typeof document === 'undefined' || this.ctxSub !== key) return
+        const row = document.querySelector(`.context-menu [data-sub="${key}"]`)
+        const flyout = document.querySelector('.context-menu-flyout')
+        if (!row || !flyout) return
+        const root = row.closest('.context-menu').getBoundingClientRect()
+        const rowRect = row.getBoundingClientRect()
+        const rect = flyout.getBoundingClientRect()
+        this.ctxSubSide = root.right + 2 + rect.width <= window.innerWidth - 8 ? 'right' : 'left'
+        const x = this.ctxSubSide === 'right' ? root.right + 2 : root.left - rect.width - 2
+        this.ctxSubPos = { x, y: Math.max(8, Math.min(rowRect.top - 5, window.innerHeight - rect.height - 8)) }
+        this.ctxAimOrigin = null
+      })
+    },
+
+    closeCtxSub() {
+      this.clearCtxAimTimer()
+      this.ctxSub = null
+    },
+
+    clearCtxAimTimer() {
+      clearTimeout(this.ctxAimTimer)
+      this.ctxAimTimer = null
+    },
+
+    // 指针离开子菜单的触发行：朝浮层斜移时宽限 350ms，否则立即收起（menu-aim，同 ExplorerCreateMenu）
+    onCtxPointerMove(event) {
+      if (!this.ctxSub || typeof document === 'undefined') return
+      const row = event.target && event.target.closest && event.target.closest('[data-sub]')
+      if (row) {
+        this.ctxAimOrigin = { x: event.clientX, y: event.clientY }
+        return
+      }
+      const flyout = document.querySelector('.context-menu-flyout')
+      if (!flyout) return
+      if (isWithinSubmenuAim({ x: event.clientX, y: event.clientY }, this.ctxAimOrigin, flyout.getBoundingClientRect(), this.ctxSubSide)) {
+        this.clearCtxAimTimer()
+        this.ctxAimTimer = setTimeout(() => this.closeCtxSub(), 350)
+      } else {
+        this.closeCtxSub()
+      }
+    },
+
+    // 其他 › 复制路径（本机绝对路径，同「在访达中显示」走 /local-path）/ 复制相对路径（项目内路径）
+    async handleContextCopyPath(relative) {
+      const item = this.contextMenu && this.contextMenu.targetItem
+      this.closeContextMenu()
+      if (!item) return
+      if (relative) {
+        const parts = []
+        for (let cur = item; cur; cur = cur.parentId != null ? this.allFiles.find(f => String(f.id) === String(cur.parentId)) : null) {
+          parts.unshift(cur.name)
+        }
+        copyToClipboard(parts.join('/'), 'fileTree.pathCopied')
+        return
+      }
+      try {
+        const res = await getFileLocalPath(item.id)
+        const path = res && res.data && res.data.path
+        if (!path) throw new Error(this.$t('workbench.fileNotOnDisk'))
+        copyToClipboard(path, 'fileTree.pathCopied')
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || this.$t('fileTree.copyPathFailed'), icon: 'none' })
       }
     },
 
@@ -2686,7 +2810,7 @@ export default {
     closeContextMenu() {
       this.contextMenu.visible = false
       this.contextMenu.targetItem = null
-      this.ocrMenuOpen = false
+      this.closeCtxSub()
     },
 
     /** 当前多选：批量选择态读勾选（checkedMap），否则读 ⌘ 加选（multiSelectedIds） */
@@ -4471,68 +4595,101 @@ export default {
 
 .context-menu {
   position: fixed;
-  min-width: 160px;
+  min-width: 208px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 4px;
   background: var(--awd-surface);
-  border-radius: var(--awd-radius-md);
-  box-shadow: var(--awd-shadow-md);
-  padding: 4px 0;
-  z-index: 10000;
+  color: var(--awd-text);
   border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-dialog, 8px);
+  box-shadow: var(--awd-shadow-lg);
+  z-index: 10000;
+}
+
+.context-menu-flyout {
+  min-width: 168px;
+  z-index: 10001;
 }
 
 .context-menu-header {
-  padding: 6px 12px 4px;
+  padding: 4px 10px 6px;
   border-bottom: 1px solid var(--awd-border);
   margin-bottom: 4px;
 }
 
 .context-menu-header-text {
   font-size: var(--awd-panel-fs-meta);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--awd-text-2);
+}
+
+/* 分组：空组（子项全被 v-if 掉，只剩注释节点）不占位；非空组之间画一条分隔线 */
+.context-menu-group:empty {
+  display: none;
+}
+.context-menu-group:not(:empty) ~ .context-menu-group:not(:empty) {
+  border-top: 1px solid var(--awd-border);
+  margin-top: 4px;
+  padding-top: 4px;
 }
 
 .context-menu-item {
   display: flex;
   align-items: center;
-  padding: 10px 16px;
+  gap: 10px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border-radius: var(--awd-radius-sm, 4px);
+  color: var(--awd-text);
   cursor: pointer;
-  transition: background 0.15s;
+  white-space: nowrap;
 }
 
-.context-menu-item:hover {
-  background: var(--awd-surface-2);
+.context-menu-item:hover,
+.context-menu-item.is-open {
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
+.context-menu-item-danger {
+  color: var(--awd-danger-text);
+}
 .context-menu-item-danger:hover {
   background: var(--awd-danger-soft);
-}
-
-.context-menu-item-danger .context-menu-text {
   color: var(--awd-danger-text);
 }
 
 .context-menu-icon {
-  font-size: var(--awd-font-size-body);
-  margin-right: 10px;
-  width: 20px;
-  text-align: center;
+  flex: none;
+  width: 16px;
+  color: var(--awd-text-2);
+}
+.context-menu-item:hover .context-menu-icon,
+.context-menu-item.is-open .context-menu-icon,
+.context-menu-item-danger .context-menu-icon {
+  color: inherit;
 }
 
 .context-menu-text {
-  font-size: var(--awd-font-size-body);
-  color: var(--awd-text);
+  font-size: 13px;
+  line-height: 20px;
+  color: inherit;
 }
 
-/* 识别文字子菜单（tutorial-series#155）：就地展开，子项与图标列对齐缩进 */
 .context-menu-submenu-arrow {
   margin-inline-start: auto;
-  padding-inline-start: 12px;
-  color: var(--awd-text-2);
-  font-size: var(--awd-panel-fs-meta);
+  padding-inline-start: 16px;
+  font-size: 16px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.7;
 }
-.context-menu-subitem {
-  padding-inline-start: 46px;
+[dir="rtl"] .context-menu-submenu-arrow {
+  transform: scaleX(-1);
 }
 
 /* 文档对比按钮栏 */
