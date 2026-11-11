@@ -106,7 +106,7 @@ public class ToolDisclosurePolicy {
      * {@code ToolDisclosurePolicyTest.corePerSessionIsSmallAndComplete} 打印并钉住。
      */
     static final Set<String> CORE = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(java.util.Arrays.asList(
-            // ==================== 通用段：任何会话都要有（21 个）====================
+            // ==================== 通用段：任何会话都要有（22 个）====================
             // —— 目录入口与编排：少了 list_tools 整套机制就没有入口；ask_user 是「拿不准先问」
             //    的唯一入口（dev-board#868），藏进目录里等于让模型先查目录才能想起来问；
             //    use_skill 是模型自己切到专门流程的入口（dev-board#1065），与 list_tools 的 skill 目录配套 ——
@@ -127,8 +127,10 @@ public class ToolDisclosurePolicy {
             "query_memory", "save_memory",
 
             // —— 法源与公网：律师最高频的外部检索。law_search 的 mode=keyword 已并入（V4），
-            //    law_recognition 等退到 legal 类目（「法规」「法条」等关键词会在起跑时把它预先放回）——
-            "law_search", "get_law_article", "search_web", "browse_url",
+            //    law_recognition 等退到 legal 类目（「法规」「法条」等关键词会在起跑时把它预先放回）。
+            //    case_search（P7，2026-11-11）：基底 prompt 的法规检索一节把「法条 + 案例」当一条链教，
+            //    被点名的工具首轮就得在清单里；同源同闸（法宝），规格约 126 token，比改写那一节划算 ——
+            "law_search", "get_law_article", "case_search", "search_web", "browse_url",
 
             // ==================== LOWA 文字（docx）段：15 个 ====================
             // 能力闸与活跃文档闸会把它们从 xlsx / pptx / 任务窗格 / 纯对话会话里裁掉，不占位。
@@ -431,7 +433,8 @@ public class ToolDisclosurePolicy {
     static {
         TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder",
                 "create a folder", "make a folder", "add a folder", "folder", "folders"));
-        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "move files",
+        // 「放进 / 放入」（P7）：「新建文件夹叫 X，把合同.docx放进去」（gate-35 g15）原先只靠基底 prompt 点名 move_files 兜住
+        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "放进", "放入", "move files",
                 "move", "moved", "moving", "archive", "archived", "archiving", "relocate", "put"));
         TOOL_KEYWORDS.put("doc_table_insert", TABLE_INSERT_ZH_EN);
         TOOL_KEYWORDS.put("doc_table_delete", TABLE_DELETE_ZH_EN);

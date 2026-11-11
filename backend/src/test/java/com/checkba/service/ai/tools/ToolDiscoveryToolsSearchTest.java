@@ -214,6 +214,6 @@ class ToolDiscoveryToolsSearchTest {
         assertTrue(out.contains("- law_search (already available)"), out);
         assertTrue(out.contains("- get_law_article (already available)"), out);
         assertTrue(out.contains("- law_search_keyword("), "非核心的仍给全签名：" + out);
-        assertTrue(out.contains("- case_search("), out);
+        assertTrue(out.contains("- case_search (already available)"), "P7 起 case_search 在核心集：" + out);
     }
 }

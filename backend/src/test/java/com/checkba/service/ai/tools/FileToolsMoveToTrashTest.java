@@ -247,7 +247,9 @@ class FileToolsMoveToTrashTest {
                 assertNotNull(in, name + " 应存在");
                 text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             }
-            assertTrue(text.contains("`move_to_trash`"), name + " 没教 move_to_trash");
+            // P7：基底不再点名 move_to_trash（非核心，首轮不下发），改说「回收站工具」；tools-none 片段仍点名
+            assertTrue(name.contains("tools-none") ? text.contains("`move_to_trash`")
+                    : text.contains("回收站工具") || text.contains("recycle-bin tool"), name + " 没教移入回收站");
             assertTrue(text.contains("待删除") || text.contains("to delete"), name + " 没说别建待删除文件夹");
         }
     }

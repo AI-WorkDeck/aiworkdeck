@@ -392,7 +392,7 @@ class SystemPromptSizeReportTest {
         }
     }
 
-    private static ContextAssemblerService newAssembler(ClientCapabilityService capabilities, boolean english) {
+    static ContextAssemblerService newAssembler(ClientCapabilityService capabilities, boolean english) {
         LegalTools legalTools = mock(LegalTools.class);
         ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);
         when(messageService.listByConversationId(anyString())).thenReturn(Collections.emptyList());

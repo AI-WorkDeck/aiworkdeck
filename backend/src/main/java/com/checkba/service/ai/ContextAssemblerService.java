@@ -537,7 +537,7 @@ public class ContextAssemblerService {
 1. `<thinking>` - Brief intent analysis (always required)
 2. `<title>` - Session title (complex tasks only)
 3. `<process>` - Tool invocations (if any)
-4. `<artifact>` - Only `implementation_plan` or `task_list` (if applicable)
+4. `<artifact>` - Only `type="implementation_plan"` or `type="task_list"` (if applicable)
 5. `<final>` - **MAIN ANSWER** (REQUIRED for all non-chitchat responses)
    - EXCEPTION: when the turn ends with `<question>` or an `ask_user` call, `<final>` is
      NOT required and you SHOULD omit it. Do NOT invent an answer just to satisfy this rule - you are asking
@@ -630,7 +630,7 @@ public class ContextAssemblerService {
                 break;
             case "EXECUTE":
                 volatileText.append("- You are in EXECUTION phase. The plan has been approved.\n");
-                volatileText.append("- Output `task_list` first (optional), then execute tools.\n");
+                volatileText.append("- Output `<artifact type=\"task_list\">` first (optional), then execute tools.\n");
                 volatileText.append("- After completion, output `<final>` with main answer.\n");
                 break;
             case "CHAT":
@@ -1093,36 +1093,36 @@ public class ContextAssemblerService {
         if (clientCapabilityService.capabilityOf(conversationId) != ClientCapabilityService.Capability.OFFICE) {
             if (english) {
                 systemText.append("**When organising, archiving or re-filing SEVERAL project files, you MUST submit them in one ");
-                systemText.append("`move_files` call (up to 50 entries per batch); do NOT call ");
-                systemText.append("`move_files` / `create_folder` once per file.** ");
+                systemText.append("call to the batch move tool (files category, up to 50 entries per batch); do NOT call ");
+                systemText.append("the move or create-folder tool once per file.** ");
                 systemText.append("One item per round adds avoidable model round trips, leaving the user waiting ");
                 systemText.append("with the tidy-up unfinished. ");
-                systemText.append("Missing destination folders are created automatically, so you do not need `create_folder` first. ");
+                systemText.append("Missing destination folders are created automatically, so you do not need to create folders first. ");
                 systemText.append("Retry only the entries the report lists under FAILED - never resend the whole batch. ");
-                systemText.append("A single file goes through `move_files` too (one entry). ");
+                systemText.append("A single file goes through the batch move tool too (one entry). ");
                 systemText.append("For \"organize this folder\", work inside the specified folder and preserve that folder itself: ");
                 systemText.append("create groups beneath it. Confirming a grouping method does not authorize moving outside it or deleting it, even after it becomes empty. ");
                 systemText.append("Only an explicit user instruction to move outside, flatten into a named parent or delete the specified folder changes this boundary; follow that instruction within its scope. ");
-                systemText.append("For `move_files`, source and destination must both be project-relative paths; an attached folder's listing may instead be folder-relative. ");
+                systemText.append("For batch moves, source and destination must both be project-relative paths; an attached folder's listing may instead be folder-relative. ");
                 systemText.append("Resolve the folder ID to its full project path with the project file inventory tool in folders-only mode (`foldersOnly=true`) before moving; retain its prefix on both sides for internal organization. ");
-                systemText.append("Intermediate or temporary files you no longer need go to the recycle bin with `move_to_trash` ");
+                systemText.append("Intermediate or temporary files you no longer need go to the recycle bin with the recycle-bin tool ");
                 systemText.append("(recoverable by the user); never create a \"to delete\" folder as a workaround. ");
                 systemText.append("More generally: tool calls that do not depend on each other's results belong in the SAME turn ");
                 systemText.append("(emit several `<tool_code>` blocks back to back); one call per turn burns the step budget.\n\n");
             } else {
-                systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用 `move_files` 一次提交一批");
-                systemText.append("（每批最多 50 条），不要逐个调用 `move_files` / `create_folder`。** ");
+                systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用批量移动工具（files 类目）一次提交一批");
+                systemText.append("（每批最多 50 条），不要逐个调用移动或建文件夹工具。** ");
                 systemText.append("逐个调用会增加模型往返，避免让用户长时间等在中途，");
                 systemText.append("用户看到的是「文件整理了一半停住了」。");
-                systemText.append("缺失的目标文件夹会自动补建，不需要先调 `create_folder`。");
+                systemText.append("缺失的目标文件夹会自动补建，不需要先建文件夹。");
                 systemText.append("返回值里 FAILED 段列出的条目单独重试，**绝不要整批重发**——已成功的会被搬第二遍。");
-                systemText.append("只移动一份文件也用 `move_files`（传一条）。");
+                systemText.append("只移动一份文件也用批量移动工具（传一条）。");
                 systemText.append("用户说「整理这个文件夹」时，默认在指定目录内部整理并保留该目录本身，分类目录建在它下面。");
                 systemText.append("确认归类方式不等于授权移出或删除该目录，即使整理后它已空也不例外。");
                 systemText.append("只有用户明确要求移出、扁平化到指定父级或删除指定目录时，才按指示改变该边界，并遵守指示范围。");
-                systemText.append("`move_files` 的 source 和 destination 均须使用项目相对路径；附件目录清单可能是相对附件目录的路径。");
+                systemText.append("批量移动的 source 和 destination 均须使用项目相对路径；附件目录清单可能是相对附件目录的路径。");
                 systemText.append("移动前用项目文件清单工具的文件夹模式（`foldersOnly=true`）按目录 ID 核对其完整项目路径；内部整理时两端都保留该目录前缀。");
-                systemText.append("不再需要的中间文件、临时文件用 `move_to_trash` 移入回收站（用户可恢复），不要另建「待删除」文件夹绕行。");
+                systemText.append("不再需要的中间文件、临时文件用回收站工具移入回收站（用户可恢复），不要另建「待删除」文件夹绕行。");
                 systemText.append("同理，彼此之间不需要看对方结果的工具调用要放在同一轮里并行发出");
                 systemText.append("（连续输出多个 `<tool_code>` 块），一轮一个地挤牙膏会白白烧掉步数预算。\n\n");
             }
@@ -2427,7 +2427,7 @@ public class ContextAssemblerService {
    动作词没说标准（「清理」「整理」「优化一下」「规范一下」）、或者一个动作会大范围
    删改文档而用户没有明确授权这个范围——可先只读了解相关材料，改动前先调 `ask_user` 给 2-4 个具体选项，回答后才改动。
    指令明确（说清了改哪里、怎么改，如「把第 12 到 21 段删掉」）就直接执行，不要反问。
-2. **智能规划**: 对于复杂任务可以生成 `task_list`（但不会停止等待确认）
+2. **智能规划**: 对于复杂任务可以生成 `<artifact type="task_list">`（但不会停止等待确认）
 3. **工具使用**: 可以使用所有可用工具（搜索、读写文件、法律研究等）
 4. **正常流程**: 按照标准的 [Thought -> Action -> Observation] 循环执行
 """;
@@ -2472,7 +2472,7 @@ public class ContextAssemblerService {
 1. `<thinking>` - Brief intent analysis (always required)
 2. `<title>` - Session title (complex tasks only)
 3. `<process>` - Tool invocations (if any)
-4. `<artifact>` - Only `implementation_plan` or `task_list` (if applicable)
+4. `<artifact>` - Only `type="implementation_plan"` or `type="task_list"` (if applicable)
 5. `<final>` - **MAIN ANSWER** (REQUIRED for all non-chitchat responses)
    - EXCEPTION: when the turn ends with `<question>` or an `ask_user` call, `<final>` is
      NOT required and you SHOULD omit it. Do NOT invent an answer just to satisfy this rule - you are asking
@@ -2592,7 +2592,7 @@ You are in Agent mode, the default full-capability mode:
    without the user explicitly authorising that scope - call `ask_user` with 2-4 concrete
    options before editing; read-only discovery of relevant materials may precede the question. When the instruction is specific (it says what to change and how,
    e.g. "delete paragraphs 12 to 21"), just do it - do not ask back.
-2. **Smart planning**: for complex tasks you may produce a `task_list` (which does NOT stop and wait for confirmation)
+2. **Smart planning**: for complex tasks you may produce an `<artifact type="task_list">` (which does NOT stop and wait for confirmation)
 3. **Tool use**: all available tools may be used (search, file read/write, legal research, etc.)
 4. **Normal flow**: follow the standard [Thought -> Action -> Observation] loop
 """;
