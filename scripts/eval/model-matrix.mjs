@@ -456,11 +456,11 @@ class Instance {
   }
 
   // 发一条消息，消费 SSE 直到 bubble_end（真实的「本轮结束」事件）；无任何固定静默等待
-  async chat(pid, text, timeoutSec) {
-    const conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+  // conversationId 给出时在同一会话里续一轮（followUps：脚本化的第二条用户消息）
+  async chat(pid, text, timeoutSec, conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`) {
     const ac = new AbortController()
     const events = []
-    let text_ = '', status = null, error = null
+    let text_ = '', status = null, error = null, ask = null
     const t0 = Date.now()
     const sse = await fetch(`${this.base}/api/agent/connect/${conversationId}`, { headers: { 'X-Session-Id': this.sid, Accept: 'text/event-stream' }, signal: ac.signal })
     if (!sse.ok) throw new Error('SSE 连接失败 HTTP ' + sse.status)
@@ -484,6 +484,7 @@ class Instance {
               let j = null; try { j = JSON.parse(data) } catch { /* 非 JSON */ }
               if (ev === 'text_delta') text_ += typeof j === 'string' ? j : (j?.content ?? j?.text ?? j?.delta ?? '')
               if (ev === 'error') { error = data.slice(0, 300) }
+              if (ev === 'ask_user' && j?.id) ask = { id: String(j.id), question: String(j.question || '') } // 确认卡/反问卡：followUps 按卡片回答
               if (ev === 'bubble_end') { status = j?.status || 'finished'; clearTimeout(timer); return resolve() }
               if (ev === 'error' || ev === 'cancelled') { status = ev; clearTimeout(timer); return resolve() }
             }
@@ -498,7 +499,7 @@ class Instance {
     await done
     if (status === 'timeout') await this.http('POST', `/api/agent/cancel/${conversationId}`)
     ac.abort()
-    return { status, error, conversationId, events, text: text_, durationMs: Date.now() - t0, logOffset }
+    return { status, error, conversationId, events, text: text_, durationMs: Date.now() - t0, logOffset, ask }
   }
 }
 
@@ -518,7 +519,7 @@ function parseLogSlice(slice, conversationId) {
   const ra = /name = "([a-zA-Z_0-9]+)", arguments = "(.*?)" \}(?=, ToolExecutionRequest|\])/g
   while ((m = ra.exec(slice))) { let args = null; try { args = JSON.parse(m[2]) } catch { /* 截断或非 JSON */ } calls.push({ name: m[1], args }) }
   // XML 兜底路径（DeepSeek 等时而改用文本调用）：<tool_code>name(k=v, ...)</tool_code>
-  const rx = /<tool_code>\s*([a-zA-Z_0-9]+)\(([\s\S]*?)\)\s*<\/tool_code>/g
+  const rx = /<tool_code>\s*([a-zA-Z_0-9]+)\(([\s\S]*?)\)\s*(?:<\/tool_code>|<\/?｜DSML｜[^>]*>)/g // DeepSeek 偶尔以泄漏的 </｜DSML｜…> 收尾，后端 normalizeLeakedClosers 照常执行
   while ((m = rx.exec(slice))) calls.push({ name: m[1], args: parseKwargs(m[2]) })
   // 文本 <question> 停问（Detected <question> for <conv>）等同 ask_user：工具序列里没有时补在末尾（它是本轮最后一个动作）
   const askedByText = slice.includes(`Detected <question> for ${conversationId},`)
@@ -582,15 +583,31 @@ function parseKwargs(src) {
   } catch { return null }
 }
 
+// 对 ask_user 卡的回答与前端 formatAskUserAnswer 同形（后端 AskUserQuestion.isAnswerMessage / DestructiveConfirmation.isApproval 认这个形状）
+function followUpMessage(text, ask) {
+  if (!ask) return text
+  const one = s => String(s).replace(/</g, '＜').replace(/>/g, '＞').replace(/\s*\n\s*/g, ' ').trim()
+  return [`<ask_user_answer id="${ask.id.replace(/[^A-Za-z0-9_-]/g, '')}">`, ...(ask.question ? [`Question: ${one(ask.question)}`] : []), 'Selected:', `- ${one(text)}`, '</ask_user_answer>'].join('\n')
+}
+
 async function runOne(inst, sentence, runIdx, opts) {
   const rec = { instance: inst.label, ref: inst.build.ref, model: inst.model, sentence: sentence.id, run: runIdx }
   const t0 = Date.now()
   try {
     await inst.reset()
     const pid = await inst.seed(needsEditor(sentence) ? withHostFile(sentence) : sentence)
-    const c = needsEditor(sentence)
+    let c = needsEditor(sentence)
       ? await inst.chatInEditor(opts.browser, pid, sentence, sentence.hostFile || '合同.docx', opts.runTimeout)
       : await inst.chat(pid, sentence.text, opts.runTimeout)
+    // followUps（仅 API 句）：本轮以 whenStatus 结束时，在同一会话里发下一条脚本化的用户消息，每条最多用一次、按顺序。
+    // 上一轮停在 ask_user 卡（确认卡/反问卡）时按卡片回答（Selected: - <text>），否则作为普通消息发出。
+    let turns = 1
+    for (const f of needsEditor(sentence) ? [] : sentence.followUps || []) {
+      if (c.status !== f.whenStatus) continue
+      const next = await inst.chat(pid, followUpMessage(f.text, c.ask), opts.runTimeout, c.conversationId)
+      turns++
+      c = { ...next, logOffset: c.logOffset, events: [...c.events, ...next.events], durationMs: c.durationMs + next.durationMs }
+    }
     await sleep(300) // 让日志/用量落盘（落盘延迟，不是等模型）
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
     const buf = Buffer.alloc(size - c.logOffset); fs.readSync(fd, buf, 0, buf.length, c.logOffset); fs.closeSync(fd)
@@ -605,7 +622,7 @@ async function runOne(inst, sentence, runIdx, opts) {
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
       cachedTokens: usage.cached ?? 0, cacheWriteTokens: usage.cache_write ?? 0, cacheReportedCalls: usage.cache_reported ?? 0,
       billedEq: billedEq(usage.p ?? 0, usage.cached ?? 0),
-      askedByText, xmlTurns, nativeTurns, verifyAfterWrite, maxSameTool,
+      askedByText, xmlTurns, nativeTurns, verifyAfterWrite, maxSameTool, turns,
       todoWrites: tools.filter(t => t === 'todo_write').length, askUser: tools.includes('ask_user'),
       lookAround: isLookAround(tools[0], sentence.expect.firstToolAnyOf),
       toolSetChanges: countChanges(rounds.map(r => r.toolsHash)), toolOrderChanges: countChanges(rounds.map(r => r.toolsOrderHash)),
@@ -620,10 +637,10 @@ async function runOne(inst, sentence, runIdx, opts) {
       bytes: async id => Buffer.from(await (await fetch(`${inst.base}/api/files/${id}/download`, { headers: { 'X-Session-Id': inst.sid } })).arrayBuffer()),
       sha256: buf => crypto.createHash('sha256').update(buf).digest('hex'),
       fixtureSha256: name => crypto.createHash('sha256').update(fs.readFileSync(path.join(HERE, 'fixtures', name))).digest('hex'),
-      docxXml: buf => {
+      docxXml: (buf, part = 'word/document.xml') => {
         const tmp = path.join(os.tmpdir(), `matrix-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.docx`)
         fs.writeFileSync(tmp, buf)
-        try { return execFileSync('unzip', ['-p', tmp, 'word/document.xml'], { maxBuffer: 64 << 20 }).toString('utf8') } finally { fs.unlinkSync(tmp) }
+        try { return execFileSync('unzip', ['-p', tmp, part], { maxBuffer: 64 << 20 }).toString('utf8') } finally { fs.unlinkSync(tmp) }
       },
     }
     rec.checks = await judge(sentence, rec, ctx)
@@ -690,6 +707,7 @@ function buildReport(meta, results, sentences) {
     const sum = k => rs.reduce((a, r) => a + (r[k] || 0), 0)
     L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length}${nInfra ? `（另 ${nInfra} 次基础设施故障已排除）` : ''} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('cachedTokens')} | ${pct(sum('cachedTokens'), sum('promptTokens'))} | ${sum('billedEq')} | ${sum('completionTokens')} | ${sum('rounds')} | ${rs.some(r => r.toolSetChanges == null) ? '-' : sum('toolSetChanges')} | ${rs.some(r => r.toolOrderChanges == null) ? '-' : sum('toolOrderChanges')} | ${maxLater(rs)} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
   }
+  L.push(...buildTaskSection(meta, results, sentences))
   L.push('', `> 计费等价 = 提示词 tokens − ${CACHE_READ_DISCOUNT}·缓存命中 tokens（假设缓存读按输入价 0.1x，忽略缓存写溢价与输出价差；代理指标，非账单）。工具集变化轮数 = 与上一轮下发工具名集合不同的轮数（[Round] 日志 toolsHash）；旧 ref 无该日志记 -。`, '', '## 逐句对比', '')
   for (const m of models) {
     L.push(`### ${m}`, '', '| 句子 | before 通过 | after 通过 | before 首工具 | after 首工具 | before 轮/tokens | after 轮/tokens | before 命中率/计费等价/集变化 | after 命中率/计费等价/集变化 | ≥2轮最大工具数 before/after | 差异 |', '|---|---|---|---|---|---|---|---|---|---|---|')
@@ -738,6 +756,29 @@ function buildReport(meta, results, sentences) {
   L.push(...buildProcessSection(meta, results))
   L.push(...buildCostSection(meta, results))
   return L.join('\n')
+}
+
+// ---------- 多步任务（sentence.task=true，只按结果判分）：单独一张表，逐任务逐模型通过次数与轮数中位 ----------
+function buildTaskSection(meta, results, sentences) {
+  const tasks = sentences.filter(s => s.task)
+  if (!tasks.length) return []
+  const f1 = x => x == null ? '-' : (Math.round(x * 10) / 10).toString()
+  const L = ['', '## 多步任务（只按结果判分；有效运行）', '',
+    '| 任务 | ' + meta.models.map(m => `${m} 通过 B→A | ${m} 轮数中位 B/A`).join(' | ') + ' |',
+    '|---|' + meta.models.map(() => '---|---|').join('')]
+  const tot = Object.fromEntries(meta.models.map(m => [m, { b: [0, 0], a: [0, 0] }]))
+  for (const s of tasks) {
+    const cells = meta.models.map(m => {
+      const pick = side => validRuns(results.filter(r => r.side === side && r.model === m && r.sentence === s.id))
+      const b = pick('before'), a = pick('after')
+      const pb = b.filter(r => r.pass).length, pa = a.filter(r => r.pass).length
+      tot[m].b[0] += pb; tot[m].b[1] += b.length; tot[m].a[0] += pa; tot[m].a[1] += a.length
+      return `${pb}/${b.length} → ${pa}/${a.length} | ${f1(med(b.map(r => r.rounds)))} / ${f1(med(a.map(r => r.rounds)))}`
+    })
+    L.push(`| ${s.id} | ${cells.join(' | ')} |`)
+  }
+  L.push(`| **合计** | ${meta.models.map(m => `**${tot[m].b[0]}/${tot[m].b[1]} → ${tot[m].a[0]}/${tot[m].a[1]}** | `).join(' | ')} |`, '')
+  return L
 }
 
 // ---------- 门禁（gate）汇总：逐句中位数、通过率、四处看看率、todo 次数、ask_user 率、判定与回退清单 ----------

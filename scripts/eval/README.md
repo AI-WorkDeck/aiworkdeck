@@ -54,6 +54,8 @@ node scripts/eval/model-matrix.mjs \
   "text": "把合同.docx移到归档文件夹",
   "hostState": "nofile",            // nofile | docx:<夹具>（xlsx/pptx/attachments 暂不支持，SKIPPED）
   "requiresPlugin": "desensitize",  // 可选：实例 plugins/ 里没有该插件时整句 SKIPPED（报告里写明原因）
+  "task": true,                     // 可选：多步任务（只按结果判分），报告里单列「多步任务」表
+  "followUps": [{ "whenStatus": "awaiting_input", "text": "执行" }], // 可选，仅 API 句：本轮以 whenStatus 结束时在同一会话里再发一条（按顺序、每条最多一次）；上一轮停在 ask_user 卡（确认卡/反问卡）时按卡片回答「Selected: - 执行」，否则作为普通消息
   "seed": {
     "projectName": "星河科技买卖合同纠纷",        // 可选：当前项目名（默认 matrix-<id>-<时间>）
     "otherProjects": [{ "name": "星河科技劳动争议", "tasks": [{ "title": "x", "dueInDays": 3 }] }], // 可选：同一用户名下的其它项目
@@ -75,7 +77,8 @@ node scripts/eval/model-matrix.mjs \
 ```
 
 `outcomeCheck` 是 async 函数体，参数 `ctx`：`files()`、`tasks()`、`memory()`（查库返回行数组）、`rows(sql)`、`sql(sql)`、
-`api(method,url,body)`（以测试用户身份调后端）、`tools`、`finalText`、`projectId`。句子文件是受信的本地文件，会被 `eval` 执行。
+`api(method,url,body)`（以测试用户身份调后端；文件正文用 `GET /api/files/<id>/text`，PDF 也行）、`tools`、`calls`（`[{name,args}]`，后端日志里的调用参数）、`finalText`（多轮时是最后一轮的回复）、`projectId`、
+`bytes(id)`、`sha256(buf)`、`fixtureSha256(name)`、`docxXml(buf, part='word/document.xml')`（part 可取 `word/comments.xml`、`word/styles.xml`，缺部件时抛错）。句子文件是受信的本地文件，会被 `eval` 执行。
 判分规则（P0 起）：
 - `finalTextIncludes` 与 `outcomeCheck` 都用最终回复**全文**（`results.json` 的 `finalText` 现在存全文；旧产物是 1500 字截断）。
 - 文本 `<question>` 停问（后端日志 `Detected <question> for <会话>`）等同调用了 `ask_user`：补进 `tools` 末尾，`askedByText=true`。
@@ -132,8 +135,63 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
 - `sentences/v5-meetings.json`：tool-system-v2 V5 会议合流专用 5 句（只看腾讯会议清单、整理纪要不指明来源、上周会议录音、昨天的逐字稿）。种子支持 `meetings`（写 `meeting_recording`）与 `tencentMeetings`（写内置同步表 `tencent_meeting_record`），都是虚构数据、`dayOffset` 相对今天；实例没有腾讯会议插件，tencent 来源走内置表，**绝不碰真实 tmeet 账号**。
 - `sentences/v7-compare.json`：tool-system-v2 V7 D1 两份 docx 比对专用 5 句（c01–c03 摘要，API 模式即可；c04–c05 编辑器宿主的修订对比稿，校验新 .docx 含 w:ins/w:del 且原件 sha256 不变），夹具 `compare-v1.docx` / `compare-v2.docx`（第三条付款期限、第五条违约金、新增第七条保密，第二条仅空白差异）；outcomeCheck 要求调用过 compare_docx_summary、回复点出三处改动、原件仍在且没有产生新文件（回复文本含工具输出，所以不做「不得提及未改动条款」的反向断言）。
 
+- `sentences/tasks-10.json`：**多步任务集**（agent-tier1-gap P6）：10 个 ≥3 步的律师任务，**只按结果判分**（不设 `firstToolAnyOf` / `mustUse`，走哪条工具路径都行），每题有 `maxRounds`，句子带 `task: true`，报告里单列「多步任务」表。详见下方「多步任务集 tasks-10」。
 - `sentences/gate-35.json`：**回归门禁集 35 句** = core-17（原样）+ 18 个新句 g01–g18，覆盖真实律师工作流：合同审查加批注（g01）、条款插入（g02）、跨文件检索+概括（g03）、法条核对（g04，法宝在矩阵里不可用，接受「无法核实」路径，只要点出第 1082 条张冠李戴）、期限推算（g05，上诉期 2026-11-17）、同名项目歧义必须反问（g06）与点名项目不得反问且事项落在正确项目（g07）、会议录音清单（g08）、脱敏（g09，`requiresPlugin: desensitize`，实例没装就整句 SKIPPED）、删除文件夹走确认卡 `awaiting_input` 且文件夹仍在（g10）、表格改单元格（g11）、拒绝一处其余接受（g12）、记忆召回（g13）、指代不明该反问（g14）与信息已足不该反问（g15）、测试中出现过循环的「删除第三条」（g16，`maxRounds: 10`）、两句英文（g17 概括仲裁条款、g18 英文建提醒）。接受/拒绝全部修订、导出 PDF 已由 core-17 的 s06/s05/s16 覆盖；V4 的单条接受/拒绝、表格删行等在 `v4-merged.json`，不重复收进门禁。
 - `sentences/gate-35-en.json`：同一组期望与工具的**英文版**（`--profile intl` 默认）。夹具共用（内容仍是中国法下的虚构中文合同），文件/项目/文件夹名换成英文孪生名（`Contract.docx`、`Archive`、`Evidence`…），编辑器句子的宿主文件用 `hostFile: Contract.docx`；g17 额外检查回答是英文。cn 档位系统提示是中文，英文提问得到中文回答是产品现状，所以 gate-35 的 g17 只查内容。
+
+## 多步任务集 tasks-10（P6）
+
+| 任务 | 宿主 | 步骤 | 结果判据（outcomeCheck） | maxRounds |
+|---|---|---|---|---|
+| t01-four-step-explicit | docx:contract-tracked | 改第三条措辞 → 第四条加批注 → 接受所有修订 → 导出 PDF | 合同.docx 无 `<w:ins>/<w:del>`；第三条含新措辞且 15 日已接受；第四条挂批注、`comments.xml` 含「客户确认」；PDF 正文（`/api/files/<id>/text`）含新措辞 | 16 |
+| t02-penalty-review-comments | docx:contract | 读第四条 → 两个角度各加一条批注 | 第四条段落里 ≥2 个不同批注 id | 12 |
+| t03-compare-to-memo | nofile | 读两版协议 → 比对 → 写「差异说明.docx」 | 新 docx 正文含 15 日、20%、保密；两份原件仍在 | 10 |
+| t04-penalty-table | nofile | 读「附件」里三份合同 → 抽违约金 → 写表格 docx | 「违约金对比表.docx」的表格里华东 0.5%、华南 20%、华北 万分之五 各占一行 | 12 |
+| t05-appeal-deadline-reminder | nofile | 推算上诉期 → 建待办 → 回复 | 本项目事项 due_date=2026-11-17 且标题含「上诉」；回复含该日期 | 8 |
+| t06-organise-six-files | nofile | 6 个文件分到 3 个文件夹 | 每个文件在指定文件夹、未删；`move_files` ≤3 次（不逐个搬） | 8 |
+| t07-rename-format-export | docx:contract | 改乙方名称 → 律所格式 → 导出 PDF | 正文只剩新名称；有楷体或首行缩进（夹具里都没有）；PDF 含新增的「装备股份有限公司」 | 14 |
+| t08-reject-one-accept-rest | docx:contract-tracked | 拒绝第三条修订 → 接受其余 | 无残留修订；第三条「7 日」无 15；第四条含 20% | 12 |
+| t09-citations-source-down | nofile | 读意见书 → 逐条核对 → 结论 | 回复点出第 1082 条、并说明未经法源核实（待核实/复核/法宝不可用）；意见书 sha256 不变 | 6 |
+| t10-two-turn-delete-confirm | nofile | 删「旧稿」（确认卡）→ 脚本答「执行」→ 建「定稿」→ 移合同 | `followUps` 两轮；最终 finished；旧稿已进回收站、合同在定稿里 | 12 |
+
+- **法源不可用（t09）**：矩阵实例没有法宝凭证，法规工具照常下发，但每次调用都回 `[pkulaw_unavailable]`（`MCP server has no credential` → `LegalTools.vendorUnavailable`），就是线上法宝故障时模型看到的那条路径，不需要另外模拟。
+- **两轮（t10）**：`followUps` 只对 API 句生效；确认卡的回答按前端 `formatAskUserAnswer` 的形状发（`<ask_user_answer id=…>` + `Selected:\n- 执行`），后端据此重放挂起的 `move_to_trash`。轮数、工具、tokens 按整个会话累计，`finalText` 是最后一轮的回复。
+- 所有 outcomeCheck 有离线单测：`node --test scripts/eval/tasks-10.test.mjs`（手工 ctx 桩，每题至少一个通过、一个不通过用例）。改判据先改单测。
+- 夹具：t04 的三份合同 `penalty-east/south/north.docx`（虚构，`make_fixtures.py` 生成），其余复用已有夹具。
+- 编辑器句子在本轮结束后、关页面前等自动保存落盘（与 #1470 同一段等待），否则 docx 类判据读到旧稿。
+
+### 基线（2026-11-11，before = after = origin/master `bb5d731e0`，cn cheap，`--runs 2`）
+
+两次实跑：第一次用来校准判据（修了 3 处坏判据，见下），第二次是记录的基线。下表 = 第二次，t04 按修正后的判据离线重判过一次运行（before/deepseek run2，真实产物，从 FAIL 改判 PASS）。
+qwen3.7-flash 这两次都被 OpenRouter 上游限流（429 `temporarily rate-limited upstream`）和空流打掉约一半运行，按 P0 规则不进分母，所以 qwen 的样本少、只作参考。
+
+| 任务 | deepseek-v4-flash B / A | qwen3.7-flash B / A |
+|---|---|---|
+| t01-four-step-explicit | 2/2 / 2/2 | 1/1 / 2/2 |
+| t02-penalty-review-comments | 2/2 / 2/2 | 2/2 / 1/1 |
+| t03-compare-to-memo | 2/2 / 2/2 | 1/1 / 1/1 |
+| t04-penalty-table | 2/2 / 2/2 | 0/0 / 1/1 |
+| t05-appeal-deadline-reminder | 2/2 / 2/2 | 1/2 / 2/2 |
+| t06-organise-six-files | 2/2 / 2/2 | 0/0 / 1/1 |
+| t07-rename-format-export | 2/2 / 2/2 | 1/1 / 1/1 |
+| t08-reject-one-accept-rest | 2/2 / 2/2 | 0/0 / 0/1 |
+| t09-citations-source-down | 0/2 / 0/2 | 0/0 / 0/1 |
+| t10-two-turn-delete-confirm | 2/2 / 2/2 | 1/1 / 1/1 |
+| **合计** | **18/20 / 18/20** | **7/8 / 10/12**（另 20 次基础设施故障已排除） |
+
+两次实跑里的真实失败（判据已确认可信，期望保持正确行为、不迁就）：
+- **t09 法源不可用**：deepseek 4/4 次、qwen 1/1 次超过 6 轮（8–10 轮），拿到 `[pkulaw_unavailable]` 后转去 `search_web` / `browse_url` 反复检索（P8）。另有 1 次（deepseek）没有注明未核实，还凭记忆编出「第 1082 条是禁止买卖婚姻」「已逐一核实」。
+- **t03 长参数被截断**：deepseek 1 次把整份差异说明塞进 `write_docx` 参数，输出两次被截断，最后没写成文件。
+- **t03 文本协议泄漏**：qwen 1 次写出畸形的 `<tool_code=search_project_files(...)` 文本，一个工具都没执行，本轮按 finished 结束（R3/R4）。
+- **t04 同轮重写被静默复用**：qwen 读完前两份就先 `write_docx`（第三行写「待确认」），读完再写同名文件时被「同一轮同一目标复用第一份」逻辑原样返回成功，文件没更新，模型却说「已覆盖更新」。
+- **t05 中途停下**：qwen 1 次 `deadline_compute` 算对 11-17 后多查了一次文件清单就结束，没建待办、没有结论（R4）。
+- **t06 参数写错被暂停**：deepseek 1 次 `move_files` 连续 4 次 `unknown or duplicate tool argument` 后被打转检测暂停；另有多次第一次调用自造 `sources/destinations` 参数、第二次才改对（P2）。
+- **t08 用文本替换代替拒绝修订**：qwen 2 次——一次 `doc_undo` + `doc_restore_checkpoint` 把文档弄乱后停在恢复确认卡；一次用 `doc_replace_at_anchor` 改合并后的文本，第三条读起来是 7 日，但留下 AI 自己的 `<w:del>15</w:del>` 修订（与 g12 同一问题）。
+
+校准中修掉的坏判据（不是 agent 的错）：
+- t06 原先用 `ctx.calls` 判「一批 ≥5 项」：DeepSeek 常用泄露的 `</｜DSML｜…>` 收尾 XML 调用，调用照常执行，但 runner 的日志解析拿不到参数，2 次正确运行被判失败。改为 `move_files` 调用 ≤3 次。`ctx.calls` 的这个盲区对其它句子同样存在，用它的判据要注意。
+- t09 原先只认「待核实/未核实」等几个词：模型实际说的是「建议通过 flk.npc.gov.cn 复核」「做最终确认」「法宝暂时不可用」。改为这些也算。
+- t04 原先只按行找「华东…0.5%」：deepseek 做过合同作列的转置汇总表，内容全对却被判失败。改为行、列两个方向都认。
 
 ## 门禁用法与策略
 
@@ -189,3 +247,4 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
 - 2026-11-10：core-17 / gate-35 / gate-35-en 的 `s14-delete-to-recycle-bin` 改为期望 `status: awaiting_input` 且文件仍在（#1442 起删除先走确认卡，与 g10 同模式）；这是 core-17 唯一一次期望变更，之前的矩阵结果里 s14 不可与之后对比。
 - 2026-11-11：判分修正（agent-tier1-gap P0），**旧报告与新报告不可直接对比，需重新建基线**。`finalTextIncludes` 改用全文；文本 `<question>` 停问计为 `ask_user`；基础设施故障不进分母/门禁/回退；新增 `xmlTurns` / `nativeTurns` / `verifyAfterWrite` / `maxSameTool` 与 `--rescore`。gate-35 / gate-35-en：g15 去掉 `mustUse create_folder`（`move_files` 会自动建文件夹，结果由 outcomeCheck 判）；g01 的 `firstToolAnyOf` 加 `get_law_article` / `law_search`；g12 的 `firstToolAnyOf` 加只读探查类工具（`doc_find_text`、`doc_table_read`、`doc_get_clauses`、`doc_get_outline`、`todo_write`），同时 `mustNotUse` 加 `doc_replace_at_anchor`（拒绝/接受修订不该走文本替换）。
 - 2026-11-11（gap P3）：gate-35 / gate-35-en 的 `g02-insert-clause` 加 `outcomeCheck`，读宿主 docx 的 `word/document.xml`（去掉 `<w:del>` 块后拼 `<w:t>`）：含「保密」的段落都要独立成段、落在第四条与第五条原文段之间、带 `<w:ins>`；此前 g02 只判工具名，新旧结果不可直接对比。新增 `g19-insert-clause-after`（「在第三条后面新增一条……」，同法判第三、四条之间，`maxRounds: 10`），集名沿用 gate-35。另：编辑器句子在本轮结束后、关页面前等状态栏离开「更改待保存/保存中」（最多 20 秒），否则自动保存还没上传，docx 类 outcomeCheck 判到旧稿（首轮实测 g02 一次正确插入被判失败即此原因）。
+- 2026-11-11（gap P6）：新增 `sentences/tasks-10.json`（多步任务集，只按结果判分）与离线单测 `tasks-10.test.mjs`；runner 新增 `followUps`（API 句的脚本化第二轮，按确认卡/反问卡回答）、`task: true` 的「多步任务」报告表、`docxXml(buf, part)`；编辑器句子关页面前等自动保存（同 #1470）。既有句集与判分不变。
