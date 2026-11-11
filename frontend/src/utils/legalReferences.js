@@ -138,7 +138,7 @@ export function referencesFromTools(processes = []) {
   const found = new Map()
   for (const process of processes) for (const item of process.items || []) {
     if (item.type !== 'tool' || item.status !== 'success') continue
-    const tool = /\b(law_search_keyword|law_search|law_recognition|get_law_article|case_search)\s*\(/.exec(item.code || '')?.[1]
+    const tool = LAW_TOOL_RE.exec(item.code || '')?.[1]
     const result = parse(item.output)
     if (!tool || !result || result.error || result.isError) continue
     for (const reference of referencesFromEntity({ kind: tool === 'case_search' ? 'CASE' : 'LAW', retrievalStatus: 'OK', detail: { source: 'pkulaw', result } })) {
@@ -151,6 +151,37 @@ export function referencesFromTools(processes = []) {
     }
   }
   return [...found.values()]
+}
+
+const LAW_TOOL_RE = /\b(law_search_keyword|law_search|law_recognition|get_law_article|case_search)\s*\(/
+const squash = value => String(value || '').replace(/\s+/g, '')
+
+/** Raw outputs of law tools that succeeded in this turn's live stream (same trust rule as referencesFromTools). */
+export function liveLawToolOutputs(processes = []) {
+  const outputs = []
+  for (const process of processes) for (const item of process.items || []) {
+    if (item.type === 'tool' && item.status === 'success' && item.live === true && LAW_TOOL_RE.test(item.code || '') && item.output) outputs.push(String(item.output))
+  }
+  return outputs
+}
+
+/**
+ * A model-authored card is promoted to "retrieved" only when a live law-tool output in the same turn
+ * contains both its source URL and its excerpt verbatim (whitespace ignored). The PKULaw gateway now
+ * answers in plain text, so referencesFromTools cannot build a card itself; corroboration is how the
+ * retrieved article keeps its provenance. Metadata the output does not contain is dropped rather than
+ * shown under a "retrieved" label.
+ */
+export function corroborateReference(reference, outputs = []) {
+  if (!reference || reference.status !== 'unverified' || !reference.url || !outputs.length) return reference
+  const excerpt = squash(reference.sections.find(item => item.labelKey === 'legalReference.excerpt')?.text)
+  if (!excerpt) return reference
+  let page = reference.url
+  try { const url = new URL(reference.url); page = url.origin + url.pathname } catch { /* safeLegalUrl already vetted it */ }
+  const output = outputs.find(text => text.includes(page) && squash(text).includes(excerpt))
+  if (!output) return reference
+  const haystack = squash(output)
+  return finish({ ...reference, status: 'retrieved', metadata: reference.metadata.filter(item => haystack.includes(squash(item.value))) })
 }
 
 /** Keep presentation JSON out of copy, insert, replacement and exported documents. */
