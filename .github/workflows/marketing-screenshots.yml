@@ -76,10 +76,34 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      # 截图基线依赖这一版 Noto CJK 的逐字形渲染，所以钉死版本与 sha256，并缓存 .deb：
+      # 2026-11-11 Azure runner 解析不了 Ubuntu 软件源达数小时，apt-get 直接失败，所有 PR 的截图检查全红。
+      # 先用缓存；未命中时依次试 runner 默认源与两个公共镜像，任何来源都必须对上 sha256
+      # （与 noble main 的 Packages 索引一致，三个来源逐字节相同）。无依赖，dpkg -i 与 apt 安装等价。
+      - name: Restore CJK font package
+        id: noto-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/fonts-noto-cjk.deb
+          key: fonts-noto-cjk-20230817+repack1-3
       - name: Install CJK fonts
+        env:
+          NOTO_FILE: fonts-noto-cjk_20230817%2brepack1-3_all.deb
+          NOTO_SHA256: 7d64b985f6fe128c99eae5610d5c047338e572bdcfb2bb09736be01b824a7f6c
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          DEB="$HOME/fonts-noto-cjk.deb"
+          verified() { [ -f "$DEB" ] && echo "$NOTO_SHA256  $DEB" | sha256sum -c --quiet; }
+          if ! verified; then
+            for base in http://azure.archive.ubuntu.com/ubuntu https://mirrors.edge.kernel.org/ubuntu https://mirror.math.princeton.edu/pub/ubuntu; do
+              rm -f "$DEB"
+              if curl -fsSL --retry 3 --retry-delay 5 --max-time 600 -o "$DEB" "$base/pool/main/f/fonts-noto-cjk/$NOTO_FILE" && verified; then
+                echo "fonts-noto-cjk from $base"; break
+              fi
+            done
+          fi
+          verified || { echo "取不到校验通过的 fonts-noto-cjk"; exit 1; }
+          sudo dpkg -i "$DEB"
+          fc-cache -f > /dev/null
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
