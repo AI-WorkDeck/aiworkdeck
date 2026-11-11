@@ -1,5 +1,5 @@
 {
-  "_comment": "tasks-10（agent-tier1-gap P6）：10 个 ≥3 步的律师任务，只按结果判分（不设 firstToolAnyOf / mustUse），每题有 maxRounds。task=true 的句子在报告里单列「多步任务」表。t10 用 followUps 脚本化第二轮（回答确认卡「执行」）。设计与基线见 README。",
+  "_comment": "tasks-10（agent-tier1-gap P6）：10 个 ≥3 步的律师任务 + 2 个写后核对句（gap P5：v01/v02，多处修改后成品是否正确），只按结果判分（不设 firstToolAnyOf / mustUse），每题有 maxRounds。task=true 的句子在报告里单列「多步任务」表。t10 用 followUps 脚本化第二轮（回答确认卡「执行」）。设计与基线见 README。",
   "sentences": [
     {
       "id": "t01-four-step-explicit",
@@ -205,6 +205,28 @@
         "status": "finished",
         "maxRounds": 12,
         "outcomeCheck": "const all = await ctx.files(); const old = all.find(x => x.is_folder && x.name === '旧稿'); const dir = all.find(x => x.is_folder && !x.is_deleted && x.name.trim() === '定稿'); const c = all.find(x => !x.is_folder && !x.is_deleted && x.name === '合同.docx'); return !!(old && old.is_deleted && dir && c && c.parent_id === dir.id);"
+      },
+      "task": true
+    },
+    {
+      "id": "v01-multi-edit",
+      "text": "把第二条的付款期限改成 45 日，并在第六条后加一条不可抗力条款",
+      "hostState": "docx:contract-long",
+      "expect": {
+        "_note": "gap P5：两处修改（≥2 次写入、含一次新增段落）。合同.docx（去掉删除修订后）：第二条含 45 日、不再有 30 日；第六条之后紧跟一个独立的不可抗力段落（没有并进第六条那一段）；所有「第X条」从 1 起连续、不重复（加了第七条就要把原第七条起顺延；不编号直接加段也算对）；没有重复段落",
+        "maxRounds": 14,
+        "outcomeCheck": "const all = await ctx.files(); const host = all.find(x => !x.is_deleted && !x.is_folder && x.name === '合同.docx'); if (!host) return false; const xml = ctx.docxXml(await ctx.bytes(host.id)); const P = (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('').trim()); const cn = s => { const d = '零一二三四五六七八九'; if (/^\\d+$/.test(s)) return +s; const i = s.indexOf('十'); if (i < 0) return d.indexOf(s); return (i === 0 ? 1 : d.indexOf(s[0])) * 10 + (i === s.length - 1 ? 0 : d.indexOf(s[i + 1])); }; const nums = P.map(t => /^第([一二三四五六七八九十\\d]+)条/.exec(t)).filter(Boolean).map(m => cn(m[1])); const seq = nums.every((n, i) => n === i + 1); const texts = P.filter(t => t.replace(/\\s/g, '').length >= 8); const noDup = new Set(texts).size === texts.length; const p2 = P.find(t => /^第二条/.test(t)); const i6 = P.findIndex(t => /^第六条/.test(t)); const next = P.slice(i6 + 1).find(t => t !== ''); const standalone = i6 >= 0 && !/不可抗力/.test(P[i6]) && !!next && /不可抗力/.test(next); return !!p2 && /45\\s*日/.test(p2) && !/30\\s*日/.test(p2) && standalone && seq && noDup;"
+      },
+      "task": true
+    },
+    {
+      "id": "v02-broken-edit",
+      "text": "在第六条最后一句「每逾期一日按合同总价的 0.1% 向甲方支付违约金。」后面接着写上「第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。」，原第七条及以后各条顺延编号",
+      "hostState": "docx:contract-long",
+      "expect": {
+        "_note": "gap P5：措辞诱导第一次插入落进第六条那一段（「后面接着写上」）。通过 = 成品正确（不可抗力是第六条之后独立一段、以「第七条」开头，全文「第X条」1–10 连续不重复，无重复段落），或最终回复如实说出缺陷（新条款没单独成段 / 编号不连续或重复）",
+        "maxRounds": 14,
+        "outcomeCheck": "const all = await ctx.files(); const host = all.find(x => !x.is_deleted && !x.is_folder && x.name === '合同.docx'); if (!host) return false; const xml = ctx.docxXml(await ctx.bytes(host.id)); const P = (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('').trim()); const cn = s => { const d = '零一二三四五六七八九'; if (/^\\d+$/.test(s)) return +s; const i = s.indexOf('十'); if (i < 0) return d.indexOf(s); return (i === 0 ? 1 : d.indexOf(s[0])) * 10 + (i === s.length - 1 ? 0 : d.indexOf(s[i + 1])); }; const nums = P.map(t => /^第([一二三四五六七八九十\\d]+)条/.exec(t)).filter(Boolean).map(m => cn(m[1])); const seq = nums.every((n, i) => n === i + 1); const texts = P.filter(t => t.replace(/\\s/g, '').length >= 8); const noDup = new Set(texts).size === texts.length; const p2 = P.find(t => /^第二条/.test(t)); const i6 = P.findIndex(t => /^第六条/.test(t)); const next = P.slice(i6 + 1).find(t => t !== ''); const standalone = i6 >= 0 && !/不可抗力/.test(P[i6]) && !!next && /不可抗力/.test(next); const ok = standalone && /^第七条/.test(next) && seq && nums.length === 10 && noDup; return ok || /(同一段|同一个段落|并入第六条|合并在第六条|没有单独成段|未单独成段|未能单独成段|没有另起一段|未另起一段|编号.{0,8}(不连续|断|重复|跳))/.test(ctx.finalText);"
       },
       "task": true
     }

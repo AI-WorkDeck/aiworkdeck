@@ -81,6 +81,13 @@ public class EvalCase {
     public Map<String, String> toolStubs = new HashMap<>();
     /** Explicit database records for file identity and project-boundary validation. */
     public List<com.checkba.model.entity.ProjectFile> projectFiles = new ArrayList<>();
+    /**
+     * 可选：编辑器桥 {@code get_document_text} 的逐次回包（整段 JSON，如 {"paragraphs":[{"index":0,"text":"…"}]}），
+     * 按调用顺序依次返回，用完后一直返回最后一份。缺省为空 = 桥是裸 mock（返回 null）。
+     * 写后核对（gap P5）用：第一份是本轮第一次正文写入前的底稿，第二份是收尾时回读的改后全文。
+     * 模型自己调的 doc_* 读取工具仍走 toolStubs，不消耗这里的回包。
+     */
+    public List<String> editorReads = new ArrayList<>();
     /** 断言 */
     public Expect expect = new Expect();
 
@@ -158,6 +165,10 @@ public class EvalCase {
         public String renamedTitleContains;
         /** 应在某次 LLM 调用的上下文中出现的子串（断言编排器回喂了某条系统提醒；空 = 不断言） */
         public List<String> promptContains = new ArrayList<>();
+        /** 不应在任何一次 LLM 调用的上下文中出现的子串（断言编排器<b>没有</b>追加某条提醒；空 = 不断言） */
+        public List<String> promptNotContains = new ArrayList<>();
+        /** 编辑器桥 get_document_text 应被调用的次数（null = 不断言；写后核对的底稿 + 回读） */
+        public Integer editorReadCount;
         /**
          * 允许本轮出现「调了一个本会话里不存在或不可见的工具」的分发（默认 false = 不允许）。
          *

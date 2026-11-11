@@ -542,9 +542,13 @@ function processMetrics(slice, conversationId, tools) {
   flush()
   const lastWrite = tools.findLastIndex(t => WRITE_TOOL_RE.test(t))
   const count = {}; for (const t of tools) count[t] = (count[t] || 0) + 1
+  // 系统写后核对（gap P5）：后端收尾时代读并核对，日志 [PostWriteVerify] conv=<id> result=clean|issues|unavailable|skipped
+  const hv = new RegExp(`\\[PostWriteVerify\\] conv=${conversationId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} result=(\\w+)`).exec(slice)
   return {
     xmlTurns, nativeTurns,
-    verifyAfterWrite: lastWrite < 0 ? null : tools.slice(lastWrite + 1).some(t => READ_TOOL_RE.test(t)), // null = 本次没有写操作
+    verifyAfterWrite: lastWrite < 0 ? null : tools.slice(lastWrite + 1).some(t => READ_TOOL_RE.test(t)), // null = 本次没有写操作；只看模型自己的读取
+    writes: tools.filter(t => WRITE_TOOL_RE.test(t)).length,
+    harnessVerify: hv ? hv[1] : null, // clean / issues = 系统核对过；null = 没触发（旧版本或不满足条件）
     maxSameTool: Math.max(0, ...Object.values(count)),
   }
 }
@@ -611,7 +615,7 @@ async function runOne(inst, sentence, runIdx, opts) {
     await sleep(300) // 让日志/用量落盘（落盘延迟，不是等模型）
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
     const buf = Buffer.alloc(size - c.logOffset); fs.readSync(fd, buf, 0, buf.length, c.logOffset); fs.closeSync(fd)
-    const { tools, rounds, calls, askedByText, xmlTurns, nativeTurns, verifyAfterWrite, maxSameTool } = parseLogSlice(buf.toString('utf8'), c.conversationId)
+    const { tools, rounds, calls, askedByText, xmlTurns, nativeTurns, verifyAfterWrite, writes, harnessVerify, maxSameTool } = parseLogSlice(buf.toString('utf8'), c.conversationId)
     // cached_tokens / cache_write_tokens 列自本 PR 起才有；旧 ref 的库没有这两列时回退到不带缓存的查询（缓存数记 0）
     let usage = (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls, coalesce(sum(cached_tokens),0)::int as cached, coalesce(sum(cache_write_tokens),0)::int as cache_write, count(cached_tokens)::int as cache_reported from token_usage where conversation_id='${c.conversationId}'`).catch(() => null))?.[0]
     usage = usage || (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls from token_usage where conversation_id='${c.conversationId}'`).catch(() => []))[0] || {}
@@ -622,7 +626,7 @@ async function runOne(inst, sentence, runIdx, opts) {
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
       cachedTokens: usage.cached ?? 0, cacheWriteTokens: usage.cache_write ?? 0, cacheReportedCalls: usage.cache_reported ?? 0,
       billedEq: billedEq(usage.p ?? 0, usage.cached ?? 0),
-      askedByText, xmlTurns, nativeTurns, verifyAfterWrite, maxSameTool, turns,
+      askedByText, xmlTurns, nativeTurns, verifyAfterWrite, writes, harnessVerify, maxSameTool, turns,
       todoWrites: tools.filter(t => t === 'todo_write').length, askUser: tools.includes('ask_user'),
       lookAround: isLookAround(tools[0], sentence.expect.firstToolAnyOf),
       toolSetChanges: countChanges(rounds.map(r => r.toolsHash)), toolOrderChanges: countChanges(rounds.map(r => r.toolsOrderHash)),
@@ -823,15 +827,17 @@ const TARGET_RUNS = 3
 // ---------- 过程指标（不进判定，用来看协议/验证/打转）----------
 function buildProcessSection(meta, results) {
   const L = ['', '## 过程指标（有效运行；不影响判定）', '',
-    '| 模型 | 版本 | XML 回合占比（xmlTurns/回合） | 写后读过的运行占比（verifyAfterWrite） | maxSameTool 中位 | maxSameTool 最大 |', '|---|---|---|---|---|---|']
+    '| 模型 | 版本 | XML 回合占比（xmlTurns/回合） | 写后读过的运行占比（verifyAfterWrite） | ≥2 次写入且收尾前核对过（模型回读或系统核对） | maxSameTool 中位 | maxSameTool 最大 |', '|---|---|---|---|---|---|---|']
   for (const m of meta.models) for (const side of ['before', 'after']) {
     const rs = validRuns(results.filter(r => r.side === side && r.model === m))
     const xml = rs.reduce((a, r) => a + (r.xmlTurns || 0), 0), nat = rs.reduce((a, r) => a + (r.nativeTurns || 0), 0)
     const w = rs.filter(r => r.verifyAfterWrite != null)
     const ms = rs.map(r => r.maxSameTool).filter(x => x != null)
-    L.push(`| ${m} | ${side} | ${xml + nat ? Math.round(1000 * xml / (xml + nat)) / 10 + '%' : '-'} (${xml}/${xml + nat}) | ${w.length ? Math.round(100 * w.filter(r => r.verifyAfterWrite).length / w.length) + '%' : '-'} (${w.filter(r => r.verifyAfterWrite).length}/${w.length}) | ${med(ms) ?? '-'} | ${ms.length ? Math.max(...ms) : '-'} |`)
+    const w2 = rs.filter(r => (r.writes || 0) >= 2), v2 = w2.filter(r => r.verifyAfterWrite || r.harnessVerify === 'clean' || r.harnessVerify === 'issues')
+    const pct = (a, b) => b.length ? Math.round(100 * a.length / b.length) + '%' : '-'
+    L.push(`| ${m} | ${side} | ${xml + nat ? Math.round(1000 * xml / (xml + nat)) / 10 + '%' : '-'} (${xml}/${xml + nat}) | ${pct(w.filter(r => r.verifyAfterWrite), w)} (${w.filter(r => r.verifyAfterWrite).length}/${w.length}) | ${pct(v2, w2)} (${v2.length}/${w2.length}；系统核对 ${w2.filter(r => r.harnessVerify === 'clean' || r.harnessVerify === 'issues').length}，其中报问题 ${w2.filter(r => r.harnessVerify === 'issues').length}) | ${med(ms) ?? '-'} | ${ms.length ? Math.max(...ms) : '-'} |`)
   }
-  L.push('', '> 回合 = 两个 `[Round]` 日志之间；同回合出现 `Parsed XML tool` 记 XML，出现 `Detected Native Tool Requests` 记原生。verifyAfterWrite 只统计有写操作的运行。旧产物（无这些字段）显示 `-`，可用 `--rescore` 从后端日志补算。', '')
+  L.push('', '> 回合 = 两个 `[Round]` 日志之间；同回合出现 `Parsed XML tool` 记 XML，出现 `Detected Native Tool Requests` 记原生。verifyAfterWrite 只统计有写操作的运行、只认模型自己的读取；「≥2 次写入且核对过」另认后端 `[PostWriteVerify] … result=clean|issues`（gap P5 系统写后核对）。旧产物（无这些字段）显示 `-`，可用 `--rescore` 从后端日志补算。', '')
   return L
 }
 
@@ -888,7 +894,7 @@ async function rescore(o) {
     if (slice) {
       const p = parseLogSlice(slice, old.conversationId)
       if (JSON.stringify(p.tools.filter(t => t !== 'ask_user' || old.tools.includes('ask_user'))) !== JSON.stringify(old.tools)) console.warn(`警告：${old.instance} ${old.sentence} run${old.run} 日志重解析的工具序列与记录不一致`)
-      Object.assign(rec, { tools: p.tools, firstTool: p.tools[0] || null, askUser: p.tools.includes('ask_user'), askedByText: p.askedByText, xmlTurns: p.xmlTurns, nativeTurns: p.nativeTurns, verifyAfterWrite: p.verifyAfterWrite, maxSameTool: p.maxSameTool })
+      Object.assign(rec, { tools: p.tools, firstTool: p.tools[0] || null, askUser: p.tools.includes('ask_user'), askedByText: p.askedByText, xmlTurns: p.xmlTurns, nativeTurns: p.nativeTurns, verifyAfterWrite: p.verifyAfterWrite, writes: p.writes, harnessVerify: p.harnessVerify, maxSameTool: p.maxSameTool })
     } else console.warn(`警告：找不到 ${old.instance} ${old.sentence} run${old.run} 的日志，沿用旧工具序列`)
     rec.lookAround = isLookAround(rec.firstTool, sent.expect.firstToolAnyOf)
     rec.checks = await judge(sent, rec, null, old.checks || {})

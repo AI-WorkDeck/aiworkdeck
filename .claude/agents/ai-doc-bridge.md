@@ -143,6 +143,10 @@ LOWA 中英提示及工具描述默认“读 → 查找核对上下文 → 锚�
 **system prompt 第 7 节表里已登记**（zh/en 同步），Precise Execution 加了第 4 条「审查类任务的边界是整份文件」，
 Operational Rules 第 2 条那句「revision mode disabled、改动立即生效」是陈年错话，已改成修订痕迹口径。
 
+分页读取抽成 `DocumentAuditTools.readParagraphs(bridge, maxPages)`（返回段落 + error + complete），工具本身行为不变；
+编排器的系统写后核对（gap P5，`PostWriteCheck` / `review/PostWriteAudit`，见 ai-chat.md「系统写后核对」）复用它读底稿与改后全文，
+编号检查直接调 `ContractStructureAudit.run(...).numbering` 并只取改前没有的发现。改这份读取或编号检查的口径时两边一起看。
+
 ### 原生编号元数据（dev-board#1176）
 
 `get_document_text` / `get_document_outline` / `get_review_context` 的段落另带
