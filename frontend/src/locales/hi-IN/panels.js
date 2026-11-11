@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "दोबारा बनाया जा रहा है…",
   "litRestyledTo": "{mode} पर स्विच किया गया",
   "litRedrawFailedFallback": "दोबारा बनाने में विफल",
-  "litCreditText": "डायग्राम इंजन: mqc-litigation-visual-redraw · कॉपीराइट (c) 2026 Miao Qichuan (缪奇川) · MIT लाइसेंस",
+  "litCreditText": "डायग्राम इंजन: new-litigation-visualization · कॉपीराइट (c) 2026 Miao Qichuan (缪奇川) · AGPL-3.0 लाइसेंस",
   "litLayoutNumberedTimeline": "टाइमलाइन · क्रमांकित",
   "litLayoutDatedTimeline": "टाइमलाइन · दिनांकित",
   "litLayoutGantt": "अवधि चार्ट · Gantt",

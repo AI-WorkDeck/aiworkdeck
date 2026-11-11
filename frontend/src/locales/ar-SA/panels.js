@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "جارٍ إعادة الرسم…",
   "litRestyledTo": "تم التحويل إلى {mode}",
   "litRedrawFailedFallback": "فشلت إعادة الرسم",
-  "litCreditText": "محرك المخططات: mqc-litigation-visual-redraw · حقوق النشر (c) 2026 Miao Qichuan (缪奇川) · رخصة MIT",
+  "litCreditText": "محرك المخططات: new-litigation-visualization · حقوق النشر (c) 2026 Miao Qichuan (缪奇川) · رخصة AGPL-3.0",
   "litLayoutNumberedTimeline": "خط زمني · مرقّم",
   "litLayoutDatedTimeline": "خط زمني · بتواريخ",
   "litLayoutGantt": "مخطط المدد · غانت",

@@ -84,7 +84,7 @@ export default {
   "litRedrawing": "Redibujando…",
   "litRestyledTo": "Cambiado a {mode}",
   "litRedrawFailedFallback": "Error al redibujar",
-  "litCreditText": "Motor de diagramas: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan (缪奇川) · Licencia MIT",
+  "litCreditText": "Motor de diagramas: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan (缪奇川) · Licencia AGPL-3.0",
   "litLayoutNumberedTimeline": "Cronología · Numerada",
   "litLayoutDatedTimeline": "Cronología · Con fechas",
   "litLayoutGantt": "Gráfico de periodos · Gantt",

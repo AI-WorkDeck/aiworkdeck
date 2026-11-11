@@ -65,7 +65,7 @@ LAYOUT_WHY = {
     "graphviz_relation":        ("关系图 · 网络",      "主体之间多向关联，存在多个来源"),
     "relation_tree":            ("关系图 · 层级树",    "自上而下的单一从属关系"),
     "comparison_table":         ("关系图 · 对比表",    "两个对象逐维度对读"),
-    "numbered_point_timeline":  ("时间轴 · 编号型",    "只有先后顺序，无精确日期"),
+    "numbered_point_timeline":  ("时间轴 · 编号型",    "按先后等距排列，不按真实时距"),
     "dated_point_timeline":     ("时间轴 · 日期型",    "有精确日期，真实时距有意义"),
     "proportional_gantt":       ("时间轴 · 期间型",    "期间的长短与重叠本身就是法律要点"),
 }
@@ -121,8 +121,38 @@ def _siblings(layout):
     return None, []
 
 
+# 输出格式菜单。默认只出 SVG 与 PPTX：两者都不依赖任何外部工具，任何一台 Windows
+# 都能一次出齐；PNG 最容易出不来（真实运行里五个 skill 无一幸免），选了才出。
+FORMAT_MENU = (
+    ("svg",    "SVG",    "主交付物，插进 Word 再编辑，永远会出"),
+    ("png",    "PNG",    "位图预览，微信发、打印；需要本机有转图工具"),
+    ("pptx",   "PPTX",   "PowerPoint / WPS 里逐个可改"),
+    ("vsdx",   "VSDX",   "ProcessOn / Visio / WPS 可打开编辑"),
+    ("drawio", "drawio", "draw.io 里可改"),
+)
+DEFAULT_FORMATS = ("svg", "pptx")
+
+
+def parse_formats(ans):
+    """把使用者的回答（「1,3」「全部」「svg,pptx」或空）变成格式元组。SVG 永远在内。"""
+    a = str(ans or "").strip().lower().replace("，", ",").replace("、", ",")
+    if not a:
+        return DEFAULT_FORMATS
+    if a in ("全部", "all", "所有"):
+        return tuple(k for k, _, _ in FORMAT_MENU)
+    keys = [k for k, _, _ in FORMAT_MENU]
+    out = []
+    for tok in [x.strip() for x in a.split(",") if x.strip()]:
+        if tok.isdigit() and 1 <= int(tok) <= len(keys):
+            out.append(keys[int(tok) - 1])
+        elif tok in keys:
+            out.append(tok)
+    out = [k for k in keys if k in out]
+    return tuple(["svg"] + [k for k in out if k != "svg"]) if out else DEFAULT_FORMATS
+
+
 def render_questions(m, suggest=None):
-    """The three questions, worded identically every time.
+    """The four questions, worded identically every time.
 
     Kept deliberately spare. This is read by a lawyer mid-case who wants a figure,
     not a form to fill in: three blocks, each answerable with one character, each
@@ -138,6 +168,12 @@ def render_questions(m, suggest=None):
     L = []
     A = L.append
     A("出图前请确认三件事 · 回编号即可，也可以直接说「都按默认」")
+    A("")
+    # 交互里提醒源图格式：位图要靠读图还原，慢、贵，环境不让读图时还会读不成；
+    # 矢量原件里的文字是真文字，逐字抄下来即可。真实运行里就撞到过：一张截图，
+    # 模型读不了，只能拿像素去估文本边界「还原」文字，既慢又不可靠。
+    A("　下次更省：源图若有矢量原件（SVG，或 PPT / drawio / Figma / Visio 导出的 SVG），")
+    A("　直接给 SVG，文字可逐字照抄；截图与照片只能靠读图还原，慢、费用高，也更容易读错。")
     A("")
     A("① 结构 ─────────────────────────────")
     A(f"   图种　{name}　·　{why}")
@@ -175,6 +211,12 @@ def render_questions(m, suggest=None):
         # case: let them name the element instead of hunting for its number.
         A(f"　　（共 {len(cand)} 处可选，直接说要标哪一处即可，用图里的说法）")
     A("")
+    A("④ 格式 ─────────────────────────────")
+    A("   要哪几种？可多选，回编号即可（如「1,2,4」）。")
+    for i, (key, name, note) in enumerate(FORMAT_MENU, 1):
+        A(f"   {i}　{name}　{note}")
+    A("   ▸ 不回 = 1,3（SVG + PPTX）　·　回「全部」= 五种都出")
+    A("")
     A("确认前的产物一律命名 *-draft。")
     return "\n".join(L)
 
@@ -184,7 +226,7 @@ def main(argv):
         print(__doc__.strip())
         return 1
     path = argv[0]
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8-sig") as f:
         m = json.load(f)
     sug = None
     for a in argv[1:]:
@@ -217,5 +259,20 @@ def _quiet_broken_pipe():
         pass
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     _quiet_broken_pipe()
     sys.exit(main(sys.argv[1:]) or 0)

@@ -84,7 +84,7 @@ export default {
   "litRedrawing": "Ridisegno in corso…",
   "litRestyledTo": "Passato a {mode}",
   "litRedrawFailedFallback": "Ridisegno non riuscito",
-  "litCreditText": "Motore dei diagrammi: mqc-litigation-visual-redraw · Copyright (c) 2026 Miao Qichuan · Licenza MIT",
+  "litCreditText": "Motore dei diagrammi: new-litigation-visualization · Copyright (c) 2026 Miao Qichuan · Licenza AGPL-3.0",
   "litLayoutNumberedTimeline": "Cronologia · Numerata",
   "litLayoutDatedTimeline": "Cronologia · Con date",
   "litLayoutGantt": "Grafico dei periodi · Gantt",

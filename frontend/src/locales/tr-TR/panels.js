@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Yeniden çiziliyor…",
   "litRestyledTo": "{mode} moduna geçildi",
   "litRedrawFailedFallback": "Yeniden çizme başarısız oldu",
-  "litCreditText": "Diyagram motoru: mqc-litigation-visual-redraw · Telif Hakkı (c) 2026 Miao Qichuan (缪奇川) · MIT Lisansı",
+  "litCreditText": "Diyagram motoru: new-litigation-visualization · Telif Hakkı (c) 2026 Miao Qichuan (缪奇川) · AGPL-3.0 Lisansı",
   "litLayoutNumberedTimeline": "Zaman Çizelgesi · Numaralı",
   "litLayoutDatedTimeline": "Zaman Çizelgesi · Tarihli",
   "litLayoutGantt": "Dönem Grafiği · Gantt",

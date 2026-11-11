@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "重畫中…",
   "litRestyledTo": "已換成{mode}",
   "litRedrawFailedFallback": "重畫失敗",
-  "litCreditText": "出圖引擎 mqc-litigation-visual-redraw · Copyright (c) 2026 繆奇川 (Miao Qichuan) · MIT License",
+  "litCreditText": "出圖引擎 new-litigation-visualization · Copyright (c) 2026 繆奇川 (Miao Qichuan) · AGPL-3.0 License",
   "litLayoutNumberedTimeline": "時間軸 · 編號型",
   "litLayoutDatedTimeline": "時間軸 · 日期型",
   "litLayoutGantt": "期間圖 · 甘特",

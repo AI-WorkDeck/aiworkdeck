@@ -85,7 +85,7 @@ export default {
   "litRedrawing": "Đang vẽ lại…",
   "litRestyledTo": "Đã chuyển sang {mode}",
   "litRedrawFailedFallback": "Vẽ lại thất bại",
-  "litCreditText": "Cơ sở sơ đồ: mqc-litigation-visual-redraw · Bản quyền (c) 2026 Miao Qichuan · Giấy phép MIT",
+  "litCreditText": "Cơ sở sơ đồ: new-litigation-visualization · Bản quyền (c) 2026 Miao Qichuan · Giấy phép AGPL-3.0",
   "litLayoutNumberedTimeline": "Dòng thời gian · Đánh số",
   "litLayoutDatedTimeline": "Dòng thời gian · Có ngày tháng",
   "litLayoutGantt": "Biểu đồ giai đoạn · Gantt",

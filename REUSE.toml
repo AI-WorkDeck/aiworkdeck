@@ -6,18 +6,19 @@ SPDX-PackageSupplier = "北京京微资易科技有限公司"
 # scripts/spdx-scope.mjs 的排除范围一起看。可被机械加头的一方源码不在这里，
 # 它们的 SPDX 标记直接写在文件顶部。
 
-# litviz 的两个 vendor 模块：上游原样拷贝，MIT。见 litviz/UPSTREAM.md。
+# litviz 的两个 vendor 模块：上游拷贝（本地补丁见 litviz/PATCHES.md）。上游 v3.0.0 起
+# 改为 AGPL-3.0-only；作者同意以署名 + 开源为条件并入本产品。见 litviz/UPSTREAM.md。
 [[annotations]]
 path = "litviz/skills/mqc-litigation-visual-redraw/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "缪奇川 (Miao Qichuan)"
-SPDX-License-Identifier = "MIT"
+SPDX-License-Identifier = "AGPL-3.0-only"
 
 [[annotations]]
 path = "litviz/skills/mqc-timeline-master/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "缪奇川 (Miao Qichuan)"
-SPDX-License-Identifier = "MIT"
+SPDX-License-Identifier = "AGPL-3.0-only"
 
 # zetajs vendor 文件（LibreOffice WASM 编组胶水层），MIT，来自
 # https://github.com/allotropia/zetajs。

@@ -25,7 +25,9 @@ _EXAMPLES = os.path.join(_LITVIZ, "skills", "mqc-litigation-visual-redraw", "exa
 # 只有流程图真的要 dot。graphviz_relation 名字里带 graphviz，但 v1.0.2 已经换成
 # 确定性的无 graphviz 布局（_layout_nodes），run_dot 在那个文件里是死代码。
 # 这条矩阵是我们决定"不装 graphviz 时功能降级到什么程度"的依据，别凭名字猜。
-NEEDS_GRAPHVIZ = {"flowchart", "flow-contract-review"}
+# 2026-11-11 引擎 v1.1.0：上游新增 layout_fallback.py（纯 Python 分层布局），
+# 流程图离了 dot 也能出图，矩阵清空——八种布局都不再依赖 graphviz。
+NEEDS_GRAPHVIZ = set()
 ALL_EXAMPLES = ["timeline-points", "timeline-dated", "timeline-gantt",
                 "relationship", "relation-tree", "comparison-table",
                 "flowchart", "flow-contract-review"]
@@ -178,7 +180,9 @@ def main():
     out, rc, _ = run_tl("read", "materials/催告经过.txt")
     check("timeline read: ok 且 stdout 一行 JSON", out.get("ok") is True and rc == 0,
           str(out)[:120])
-    check("timeline read: 转达管线文本（含 shape 指引）", "verdicts.json" in out.get("text", ""))
+    # 上游 v3.1.0 起 read 不再先给 verdicts.json 的写法（模型会在问用户之前就判句），
+    # 改为指引「先三轮勾选、再跑 scope」。
+    check("timeline read: 转达管线文本（含下一步指引）", "scope" in out.get("text", ""))
     state = json.load(open(os.path.join(tl_work, "state.json"), encoding="utf-8"))
     sentences = state["sentences"]
     check("timeline read: state.json 落在 workdir", len(sentences) >= 5,
