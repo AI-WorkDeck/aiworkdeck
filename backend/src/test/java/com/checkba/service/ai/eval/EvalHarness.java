@@ -251,7 +251,8 @@ public final class EvalHarness {
         when(editorBridge.isStreamingMode(any())).thenReturn(false);
         java.util.concurrent.atomic.AtomicInteger editorReadCalls = new java.util.concurrent.atomic.AtomicInteger();
         if (!c.editorReads.isEmpty()) {
-            when(editorBridge.executeEditorCommand(org.mockito.ArgumentMatchers.eq("get_document_text"), any()))
+            when(editorBridge.executeEditorCommand(org.mockito.ArgumentMatchers.eq("get_document_text"), any(),
+                    org.mockito.ArgumentMatchers.anyInt()))
                     .thenAnswer(inv -> c.editorReads.get(Math.min(editorReadCalls.getAndIncrement(), c.editorReads.size() - 1)));
         }
 

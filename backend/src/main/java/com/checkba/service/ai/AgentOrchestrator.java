@@ -1273,6 +1273,11 @@ public class AgentOrchestrator {
         return "[系统提醒] 用户要求记住内容，但本轮尚未调用 save_memory；请先调用保存，再回答";
     }
 
+    /** 写后核对的只读桥调用：用户没在等它，编辑器不在时最多等 {@link PostWriteCheck#READ_TIMEOUT_SECONDS} 秒。 */
+    private String harnessEditorRead(String action, Map<String, Object> params) {
+        return editorBridgeService.executeEditorCommand(action, params, PostWriteCheck.READ_TIMEOUT_SECONDS);
+    }
+
     /** 嵌入式编辑器会话（Office/WPS 任务窗格没有 get_document_text，写后核对不适用）。 */
     private boolean isLowaSession(String conversationId) {
         return clientCapabilities == null
@@ -1289,7 +1294,7 @@ public class AgentOrchestrator {
             return false;
         }
         String reminder = guard.writeCheck.verify(conversationId, guard.activeFileId,
-                editorBridgeService::executeEditorCommand);
+                this::harnessEditorRead);
         if (reminder == null) return false;
         appendBoundedExecutionLog(executionLog, content + "\n");
         guard.takeStreamSnapshot();
@@ -1349,7 +1354,7 @@ public class AgentOrchestrator {
                     (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn), ctx.userMessage());
         }
         if (guard != null && isLowaSession(conversationId)) {
-            guard.writeCheck.beforeTool(toolName, guard.activeFileId, editorBridgeService::executeEditorCommand);
+            guard.writeCheck.beforeTool(toolName, guard.activeFileId, this::harnessEditorRead);
         }
         long toolStartMs = System.currentTimeMillis();
         final com.checkba.service.ai.tools.ToolContext readContext = ctx;

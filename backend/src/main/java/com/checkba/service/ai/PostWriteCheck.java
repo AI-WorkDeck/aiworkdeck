@@ -46,6 +46,11 @@ final class PostWriteCheck {
 
     /** 底稿/改后全文最多读几页（每页 500 段、15000 字）；读不完就不核对。 */
     static final int MAX_PAGES = 8;
+    /**
+     * 每次读取的等待上限（秒）。读取类默认等 120 秒；这里用户没在等这一步，编辑器不在了（标签关了）时
+     * 干等 120 秒会让已经流完的回答迟迟不收尾（11-11 矩阵实测一次）。正常读一份合同几十到几百毫秒。
+     */
+    static final int READ_TIMEOUT_SECONDS = 15;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 

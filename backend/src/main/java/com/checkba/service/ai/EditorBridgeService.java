@@ -725,6 +725,15 @@ public class EditorBridgeService {
      * @return 执行结果的 JSON 字符串
      */
     public String executeEditorCommand(String action, Map<String, Object> params) {
+        return executeEditorCommand(action, params, timeoutSecondsFor(action));
+    }
+
+    /**
+     * 同上，但由调用方给等待上限（秒）。给系统自己发起、用户没在等的只读命令用（写后核对，gap P5）：
+     * 编辑器不在了（标签关了、页面没了）时不能按读取类的 120 秒干等，否则模型的回答早流完了、
+     * 本轮却迟迟不结束。
+     */
+    public String executeEditorCommand(String action, Map<String, Object> params, int timeoutSeconds) {
         String conversationId = currentConversationId.get();
         if (conversationId == null) {
             return "{\"error\": \"No active conversation. Please ensure a document is open.\"}";
@@ -760,7 +769,7 @@ public class EditorBridgeService {
             log.info("Sent editor command: action={}, requestId={}", action, requestId);
 
             // 等待前端执行结果
-            EditorActionResult result = future.get(timeoutSecondsFor(action), TimeUnit.SECONDS);
+            EditorActionResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
             
             if (result.isSuccess()) {
                 recordBridge(action, "ok", conversationId, bridgeStartMs);
