@@ -26,7 +26,15 @@ function walk(dir, out = []) {
 }
 const read = p => readFileSync(p, 'utf8')
 const rel = p => relative(root, p)
-const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:'"\w])\/\/[^\n]*/g, '$1')
+// 反复剥到不再变化：单趟替换会让「<!-<!---->-」这类嵌套残留出新的注释起始符
+function stripComments(s) {
+  let prev
+  do {
+    prev = s
+    s = s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '')
+  } while (s !== prev)
+  return s.replace(/(^|[^:'"\w])\/\/[^\n]*/g, '$1')
+}
 
 const frontend = walk(join(root, 'frontend/src')).filter(p => /\.(vue|scss|css|js|html)$/.test(p))
 // 官方插件只查手写源码：web/assets/ 是从 frontend 构建出来的产物，awd-plugin-sdk.js 是 SDK 的逐字副本
