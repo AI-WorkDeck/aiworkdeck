@@ -1,0 +1,292 @@
+[
+  {
+    "id": "post-write-verify-clean-multi-edit-native",
+    "title": "两处修改后模型没回读就收尾：系统读底稿+改后全文核对，干净 → 不提醒、照常收尾（gap P5）",
+    "category": "post-write-verify",
+    "protocol": "native",
+    "userInput": "把第二条的付款期限改成 45 日，并在第六条后加一条不可抗力条款",
+    "activeDocument": {
+      "id": "1001",
+      "name": "设备买卖合同.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_replace_at_anchor",
+            "arguments": {
+              "anchorId": "a1",
+              "newText": "45"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。",
+              "position": "after",
+              "anchorId": "a6",
+              "newParagraph": true
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已将第二条付款期限改为 45 日，并在第六条后新增不可抗力条款。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_replace_at_anchor": "{\"success\":true,\"paragraphAfterEdit\":\"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}",
+      "doc_find_text": "{\"matches\":[{\"anchorId\":\"a1\",\"text\":\"30\"}]}",
+      "doc_insert_at_cursor": "{\"success\":true,\"newParagraphIndex\":9}",
+      "doc_modify_paragraph": "{\"success\":true}",
+      "doc_get_document_text": "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "doc_get_paragraph": "{\"index\":10,\"text\":\"第七条 保密：…\"}"
+    },
+    "editorReads": [
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 30 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 9, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 10, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 11, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}"
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_replace_at_anchor"
+        },
+        {
+          "name": "doc_insert_at_cursor"
+        }
+      ],
+      "promptNotContains": [
+        "[系统提醒] 系统在你最后一次修改后回读了改动处"
+      ],
+      "editorReadCount": 2,
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "post-write-verify-broken-numbering-xml",
+    "title": "新插的第七条没顺延原第七条：系统核对报编号断裂，隐形提醒一次 → 模型回读、顺延编号后收尾，不再二次核对（gap P5）",
+    "category": "post-write-verify",
+    "protocol": "xml",
+    "userInput": "把第二条的付款期限改成 45 日，并在第六条后加一条不可抗力条款",
+    "activeDocument": {
+      "id": "1001",
+      "name": "设备买卖合同.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "text": "<process name=\"改付款期限\"><tool_code>doc_replace_at_anchor(anchorId=\"a1\", newText=\"45\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"新增不可抗力条款\"><tool_code>doc_insert_at_cursor(text=\"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\", position=\"after\", anchorId=\"a6\", newParagraph=true)</tool_code></process>"
+      },
+      {
+        "text": "<final>已完成两处修改。</final>"
+      },
+      {
+        "text": "<process name=\"回读\"><tool_code>doc_get_document_text()</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"顺延编号\"><tool_code>doc_modify_paragraph(paragraphIndex=10, newText=\"第八条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"顺延编号\"><tool_code>doc_modify_paragraph(paragraphIndex=11, newText=\"第九条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"顺延编号\"><tool_code>doc_modify_paragraph(paragraphIndex=12, newText=\"第十条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\")</tool_code></process>"
+      },
+      {
+        "text": "<final>已将第二条付款期限改为 45 日，在第六条后新增第七条不可抗力，原第七条至第九条顺延为第八条至第十条。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_replace_at_anchor": "{\"success\":true,\"paragraphAfterEdit\":\"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}",
+      "doc_find_text": "{\"matches\":[{\"anchorId\":\"a1\",\"text\":\"30\"}]}",
+      "doc_insert_at_cursor": "{\"success\":true,\"newParagraphIndex\":9}",
+      "doc_modify_paragraph": "{\"success\":true}",
+      "doc_get_document_text": "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "doc_get_paragraph": "{\"index\":10,\"text\":\"第七条 保密：…\"}"
+    },
+    "editorReads": [
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 30 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 9, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 10, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 11, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}"
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_replace_at_anchor"
+        },
+        {
+          "name": "doc_insert_at_cursor"
+        },
+        {
+          "name": "doc_get_document_text"
+        },
+        {
+          "name": "doc_modify_paragraph",
+          "argsContain": {
+            "newText": "第八条"
+          }
+        },
+        {
+          "name": "doc_modify_paragraph",
+          "argsContain": {
+            "newText": "第九条"
+          }
+        },
+        {
+          "name": "doc_modify_paragraph",
+          "argsContain": {
+            "newText": "第十条"
+          }
+        }
+      ],
+      "promptContains": [
+        "[系统提醒] 系统在你最后一次修改后回读了改动处",
+        "编号断裂"
+      ],
+      "editorReadCount": 2,
+      "structureContains": [
+        "已完成两处修改",
+        "顺延为第八条至第十条"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "post-write-verify-skipped-when-model-read-back",
+    "title": "模型自己在最后一次修改后回读过：系统不再核对（只读了底稿），不提醒（gap P5）",
+    "category": "post-write-verify",
+    "protocol": "native",
+    "userInput": "把第二条的付款期限改成 45 日，并在第六条后加一条不可抗力条款",
+    "activeDocument": {
+      "id": "1001",
+      "name": "设备买卖合同.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_replace_at_anchor",
+            "arguments": {
+              "anchorId": "a1",
+              "newText": "45"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_at_cursor",
+            "arguments": {
+              "text": "第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。",
+              "position": "after",
+              "anchorId": "a6",
+              "newParagraph": true
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_get_document_text",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成，并已回读核对。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_replace_at_anchor": "{\"success\":true,\"paragraphAfterEdit\":\"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}",
+      "doc_find_text": "{\"matches\":[{\"anchorId\":\"a1\",\"text\":\"30\"}]}",
+      "doc_insert_at_cursor": "{\"success\":true,\"newParagraphIndex\":9}",
+      "doc_modify_paragraph": "{\"success\":true}",
+      "doc_get_document_text": "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "doc_get_paragraph": "{\"index\":10,\"text\":\"第七条 保密：…\"}"
+    },
+    "editorReads": [
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 30 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 9, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 10, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 11, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}"
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_replace_at_anchor"
+        },
+        {
+          "name": "doc_insert_at_cursor"
+        },
+        {
+          "name": "doc_get_document_text"
+        }
+      ],
+      "promptNotContains": [
+        "[系统提醒] 系统在你最后一次修改后回读了改动处"
+      ],
+      "editorReadCount": 1,
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "post-write-verify-single-edit-relies-on-receipt",
+    "title": "只改一处（非结构性）：靠 paragraphAfterEdit 回执，系统不核对（gap P5）",
+    "category": "post-write-verify",
+    "protocol": "native",
+    "userInput": "把第二条的付款期限改成 45 日",
+    "activeDocument": {
+      "id": "1001",
+      "name": "设备买卖合同.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_replace_at_anchor",
+            "arguments": {
+              "anchorId": "a1",
+              "newText": "45"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已将第二条付款期限改为 45 日。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_replace_at_anchor": "{\"success\":true,\"paragraphAfterEdit\":\"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}",
+      "doc_find_text": "{\"matches\":[{\"anchorId\":\"a1\",\"text\":\"30\"}]}",
+      "doc_insert_at_cursor": "{\"success\":true,\"newParagraphIndex\":9}",
+      "doc_modify_paragraph": "{\"success\":true}",
+      "doc_get_document_text": "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "doc_get_paragraph": "{\"index\":10,\"text\":\"第七条 保密：…\"}"
+    },
+    "editorReads": [
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 30 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 9, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 10, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 11, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}",
+      "{\"paragraphs\": [{\"index\": 0, \"text\": \"设备买卖合同（虚构示范）\"}, {\"index\": 1, \"text\": \"甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。\"}, {\"index\": 2, \"text\": \"第一条 标的：乙方向甲方出售数控机床 2 台，总价 1200000 元。\"}, {\"index\": 3, \"text\": \"第二条 付款：甲方应在收到乙方开具的增值税专用发票后 45 日内支付全部货款。\"}, {\"index\": 4, \"text\": \"第三条 交付：乙方应于 2026 年 12 月 31 日前将设备运至甲方指定厂房。\"}, {\"index\": 5, \"text\": \"第四条 验收：甲方应在设备安装调试完毕后 10 日内组织验收。\"}, {\"index\": 6, \"text\": \"第五条 质量保证：质保期为验收合格之日起 12 个月。\"}, {\"index\": 7, \"text\": \"第六条 违约责任：乙方逾期交货的，每逾期一日按合同总价的 0.1% 向甲方支付违约金。\"}, {\"index\": 8, \"text\": \"第七条 不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。\"}, {\"index\": 9, \"text\": \"第七条 保密：双方对因履行本合同知悉的对方商业秘密负有保密义务。\"}, {\"index\": 10, \"text\": \"第八条 争议解决：因本合同引起的争议，提交示范仲裁委员会仲裁。\"}, {\"index\": 11, \"text\": \"第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。\"}, {\"index\": 12, \"text\": \"甲方（盖章）：                乙方（盖章）：\"}], \"truncated\": false}"
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_replace_at_anchor"
+        }
+      ],
+      "promptNotContains": [
+        "[系统提醒] 系统在你最后一次修改后回读了改动处"
+      ],
+      "editorReadCount": 1,
+      "bubbleEndStatus": "finished"
+    }
+  }
+]

@@ -372,6 +372,8 @@ public class AgentOrchestrator {
         final StuckDetector stuck = new StuckDetector();
         // 坏轮次的隐形自纠：工具轮数提醒 + 撤销打转提醒，只提醒不暂停（gap R5 / P4，阈值见 RunBudget）
         final RunBudget budget = new RunBudget();
+        // 多处修改收尾时系统代做的写后核对（gap P5），每轮最多一次，干净时对用户不可见
+        final PostWriteCheck writeCheck = new PostWriteCheck();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
         final Set<String> triedModels = new java.util.LinkedHashSet<>();
         int consecutiveFailures;
@@ -1271,6 +1273,30 @@ public class AgentOrchestrator {
         return "[系统提醒] 用户要求记住内容，但本轮尚未调用 save_memory；请先调用保存，再回答";
     }
 
+    /** 嵌入式编辑器会话（Office/WPS 任务窗格没有 get_document_text，写后核对不适用）。 */
+    private boolean isLowaSession(String conversationId) {
+        return clientCapabilities == null
+                || clientCapabilities.capabilityOf(conversationId) == ClientCapabilityService.Capability.LOWA;
+    }
+
+    /**
+     * 写后核对（gap P5，机制见 {@link PostWriteCheck}）。返回 true 表示已把一条提醒追加到 messages 末位、
+     * 调用方应续跑一轮；收尾前已流出的正文并入执行日志，留在历史里。
+     */
+    private boolean postWriteReminder(RunGuard guard, String conversationId, StringBuilder executionLog,
+                                      String content, List<dev.langchain4j.data.message.ChatMessage> messages) {
+        if (guard == null || !guard.writeCheck.due() || !isCurrentRun(guard) || !isLowaSession(conversationId)) {
+            return false;
+        }
+        String reminder = guard.writeCheck.verify(conversationId, guard.activeFileId,
+                editorBridgeService::executeEditorCommand);
+        if (reminder == null) return false;
+        appendBoundedExecutionLog(executionLog, content + "\n");
+        guard.takeStreamSnapshot();
+        messages.add(dev.langchain4j.data.message.UserMessage.from(reminder));
+        return true;
+    }
+
     /** ASK 只放内置只读集，外加插件声明的 read 工具（manifest tools[].access=read，规范 v2.13 §20）。 */
     private boolean askAllows(String toolName) {
         return ASK_READ_TOOLS.contains(toolName) || toolRegistry.declaredReadToolNames().contains(toolName);
@@ -1322,6 +1348,9 @@ public class AgentOrchestrator {
                     ctx.cancellationCheck(), ctx.defaultOutputFolderId(), ctx.activeFileId(),
                     (id, kind) -> notifyVerifiedFile(conversationId, id, kind, projectId, effectTurn), ctx.userMessage());
         }
+        if (guard != null && isLowaSession(conversationId)) {
+            guard.writeCheck.beforeTool(toolName, guard.activeFileId, editorBridgeService::executeEditorCommand);
+        }
         long toolStartMs = System.currentTimeMillis();
         final com.checkba.service.ai.tools.ToolContext readContext = ctx;
         ToolRegistry.ToolResult result;
@@ -1371,6 +1400,7 @@ public class AgentOrchestrator {
         // 记在这一处就够了。收尾时随 bubble_end 下发（dev-board#728）。
         if (guard != null) {
             guard.noteToolResult(toolName, result.success());
+            guard.writeCheck.afterTool(toolName, argsJson, result.success());
         }
         // 「新建并打开一份别的类型的文档」同样要把工具集放回全集（dev-board#729 ①）：
         // 在 Word 会话里 sheet_create_file 建了张表，接下来要填内容的 sheet_write_cells
@@ -3384,6 +3414,18 @@ public class AgentOrchestrator {
                             depth + 1, executionLog, agentMode, guard);
                     return;
                 }
+            }
+
+            // 3.5 写后核对（gap P5，原生与 XML 共用收尾点）：多处/结构性修改后模型没回读就收尾时，
+            // 系统读一遍改动处做三项机械核对；干净照常收尾，有问题隐形提醒一次后续跑
+            if (!summaryOnly && postWriteReminder(guard, conversationId, executionLog, content, messages)) {
+                if (guard.isCancelled()) {
+                    handleCancellation(guard, projectId, userId, executionLog);
+                    return;
+                }
+                continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                        depth + 1, executionLog, agentMode, guard);
+                return;
             }
 
             // 4. Default: Loop Finished

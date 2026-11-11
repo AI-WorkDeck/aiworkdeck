@@ -180,6 +180,14 @@ class OrchestratorReplayEvalTest {
                             + " 次调用里都没有出现");
         }
 
+        for (String marker : c.expect.promptNotContains) {
+            assertTrue(r.promptTexts().stream().noneMatch(p -> p.contains(marker)),
+                    "不应有任何一次 LLM 调用的上下文包含 [" + marker + "]");
+        }
+        if (c.expect.editorReadCount != null) {
+            assertEquals(c.expect.editorReadCount.intValue(), r.editorReadCount(), "编辑器桥 get_document_text 调用次数");
+        }
+
         // 5.2.1 一次 Tool not found = 白烧一整轮模型往返（dev-board#809 实测「发现 A」的形态）。
         // 默认不允许，只有专门在验这件事本身的用例才放行。
         //

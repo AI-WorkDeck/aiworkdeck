@@ -70,7 +70,8 @@ public final class EvalHarness {
             List<Long> checkpointFileIds,
             int remainingScriptTurns,
             List<Integer> offeredToolCountPerCall,
-            List<Integer> offeredSchemaTokensPerCall) {
+            List<Integer> offeredSchemaTokensPerCall,
+            int editorReadCount) {
 
         /** 第一次携带工具的 LLM 调用的下发工具数（没有则 0） */
         public int firstCallOfferedTools() {
@@ -248,6 +249,11 @@ public final class EvalHarness {
 
         EditorBridgeService editorBridge = mock(EditorBridgeService.class);
         when(editorBridge.isStreamingMode(any())).thenReturn(false);
+        java.util.concurrent.atomic.AtomicInteger editorReadCalls = new java.util.concurrent.atomic.AtomicInteger();
+        if (!c.editorReads.isEmpty()) {
+            when(editorBridge.executeEditorCommand(org.mockito.ArgumentMatchers.eq("get_document_text"), any()))
+                    .thenAnswer(inv -> c.editorReads.get(Math.min(editorReadCalls.getAndIncrement(), c.editorReads.size() - 1)));
+        }
 
         ConversationFileChangeService fileChange = mock(ConversationFileChangeService.class);
 
@@ -345,7 +351,7 @@ public final class EvalHarness {
                 List.copyOf(artifactSaves), List.copyOf(folderRenames),
                 scripted.toolsOfferedPerCall(), scripted.toolNamesOfferedPerCall(),
                 scripted.promptTextPerCall(), List.copyOf(checkpointFileIds), scripted.remainingTurns(),
-                scripted.offeredToolCountPerCall(), scripted.offeredSchemaTokensPerCall());
+                scripted.offeredToolCountPerCall(), scripted.offeredSchemaTokensPerCall(), editorReadCalls.get());
     }
 
     /** 内置 skills 目录（与 EvalCase.casesDir 同思路：兼容从 backend/ 或仓库根目录跑测试） */

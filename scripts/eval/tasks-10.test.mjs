@@ -53,8 +53,8 @@ function ctx({ files = [], tasks = [], tools = [], finalText = '' } = {}) {
 const pass = async (id, c) => assert.equal(await check(id, c), true, id + ' 应通过')
 const fail = async (id, c, why) => assert.equal(await check(id, c), false, id + ' 应不通过：' + why)
 
-test('tasks-10 结构：10 题、都是 task、无 firstToolAnyOf/mustUse、都有 maxRounds 与 outcomeCheck', () => {
-  assert.equal(sentences.length, 10)
+test('tasks-10 结构：10 题 + v01/v02 写后核对句、都是 task、无 firstToolAnyOf/mustUse、都有 maxRounds 与 outcomeCheck', () => {
+  assert.equal(sentences.length, 12)
   for (const s of sentences) {
     assert.equal(s.task, true, s.id)
     assert.equal(s.expect.firstToolAnyOf, undefined, s.id)
@@ -165,4 +165,35 @@ test('t10 两轮确认：删旧稿、建定稿、移合同', async () => {
   await fail('t10-two-turn-delete-confirm', ctx({ files: done.map(f => f.id === 1 ? { ...f, is_deleted: false } : f) }), '旧稿还在（停在确认卡没继续）')
   await fail('t10-two-turn-delete-confirm', ctx({ files: done.map(f => f.id === 4 ? { ...f, parent_id: null } : f) }), '合同没移进定稿')
   await fail('t10-two-turn-delete-confirm', ctx({ files: done.map(f => f.id === 4 ? { ...f, is_deleted: true } : f) }), '合同被删了')
+})
+
+// ---- gap P5 写后核对句（夹具 contract-long.docx 的九条） ----
+const LONG = ['设备买卖合同（虚构示范）', '甲方：示范精密制造有限公司；乙方：样例智能设备有限公司。', '第一条 标的：数控机床 2 台。',
+  '第二条 付款：甲方应在收到乙方开具的增值税专用发票后 30 日内支付全部货款。', '第三条 交付：年底前运至甲方厂房。', '第四条 验收：调试完毕后 10 日内验收。',
+  '第五条 质量保证：质保期 12 个月。', '第六条 违约责任：每逾期一日按合同总价的 0.1% 向甲方支付违约金。', '第七条 保密：双方负有保密义务。',
+  '第八条 争议解决：提交示范仲裁委员会仲裁。', '第九条 其他：本合同一式两份。']
+const FM = '不可抗力：因不可抗力不能履行合同的，根据不可抗力的影响，部分或者全部免除责任。'
+const CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+const longDoc = ({ pay = '45', insert = '第七条 ' + FM, inline = false, renumber = true, dup = false } = {}) => {
+  const ps = LONG.map(x => x.replace('30 日', pay + ' 日'))
+  const i6 = ps.findIndex(x => x.startsWith('第六条'))
+  const tail = ps.slice(i6 + 1).map(x => renumber && /^第[七八九]条/.test(x) ? x.replace(/^第(.)条/, (_, c) => '第' + CN[CN.indexOf(c) + 1] + '条') : x)
+  const body = inline ? [...ps.slice(0, i6), ps[i6] + insert, ...tail] : [...ps.slice(0, i6 + 1), insert, ...(dup ? [insert] : []), ...tail]
+  return { id: 1, name: '合同.docx', doc: doc(...body.map(x => p(t(x)))) }
+}
+
+test('v01 多处修改：45 日 + 第六条后独立的不可抗力段、编号连续', async () => {
+  await pass('v01-multi-edit', ctx({ files: [longDoc()] }))
+  await pass('v01-multi-edit', ctx({ files: [longDoc({ insert: FM, renumber: false })] }))
+  await fail('v01-multi-edit', ctx({ files: [longDoc({ pay: '30' })] }), '付款期限没改')
+  await fail('v01-multi-edit', ctx({ files: [longDoc({ renumber: false })] }), '新第七条与原第七条重号')
+  await fail('v01-multi-edit', ctx({ files: [longDoc({ inline: true })] }), '新条款并进了第六条那一段')
+  await fail('v01-multi-edit', ctx({ files: [longDoc({ dup: true, insert: FM, renumber: false })] }), '同一条款插了两遍')
+})
+
+test('v02 诱导段内插入：成品正确，或如实说出缺陷', async () => {
+  await pass('v02-broken-edit', ctx({ files: [longDoc()] }))
+  await fail('v02-broken-edit', ctx({ files: [longDoc({ inline: true })], finalText: '已在第六条后加入第七条不可抗力，并顺延编号。' }), '落进第六条那一段还说做好了')
+  await pass('v02-broken-edit', ctx({ files: [longDoc({ inline: true })], finalText: '新增的第七条目前与第六条在同一段内，未能单独成段，请手动回车分段。' }))
+  await fail('v02-broken-edit', ctx({ files: [longDoc({ insert: FM })] }), '新段没有「第七条」，原条款却已顺延，编号从第六条跳到第八条')
 })
