@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "Önceki bir puan kesintisi başarısız oldu. Baoqingtian uygulamasından puan yükleyin, ardından destekle iletişime geçin.",
   "bqtUnavailable": "Baoqingtian hizmeti geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
   "bqtRechargeViaBqt": "Baoqingtian üyeleri Baoqingtian uygulamasında yükleme yapar veya yeniler; AI WorkDeck bu hesap için ödeme almaz.",
+  "stopConfirmedWithEdits": "Durduruldu. {count} belge düzenlemesi zaten uygulanmıştı."
 }

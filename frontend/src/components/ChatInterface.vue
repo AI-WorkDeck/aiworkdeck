@@ -440,6 +440,12 @@
                @stop-generation="handleAbort"
                @reading-interaction="followLatest = false"
              />
+             <!-- 撤销本次 AI 修改（用户控制 3/4）：只挂在最后一条、改过文档且快照仍在的气泡下 -->
+             <view v-if="showRunUndo(msg, index)" class="run-undo-row">
+                <text v-if="runUndo.state === 'done'" class="run-undo-done">{{ $t('chat.undoRunDoneLabel') }}</text>
+                <text v-else class="run-undo-link" :class="{ 'is-busy': runUndo.state === 'running' }"
+                      :title="$t('chat.undoRunTitle')" @tap="handleUndoRun">{{ runUndo.state === 'running' ? $t('chat.undoRunRunning') : $t('chat.undoRun') }}</text>
+             </view>
              <!-- <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span> -->
           </div>
         </view>
@@ -616,6 +622,7 @@
                     <view v-if="isStreaming" class="alternate-send" @tap="handleSubmit(followUpMode === 'steer' ? 'queue' : 'steer')">
                        {{ followUpMode === 'steer' ? $t('chat.queueInstead') : $t('chat.steerInstead') }}
                     </view>
+                    <button :title="pausePending ? $t('chat.pausePending') : $t('chat.pauseRun')" v-if="isStreaming" type="button" class="pause-btn" :class="{ 'is-pending': pausePending }" :aria-label="$t('chat.pauseRun')" :disabled="pausePending" @click="handlePause"><text>❚❚</text></button>
                     <button :title="$t('chat.stop')" v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
                     <button :title="$t('chat.sendAria')" type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
                        <text class="send-icon">↑</text>
@@ -689,6 +696,10 @@
        <!-- 任务清单进度卡已随消息流内联展示（RootBubble），不再常驻输入框上方，
             避免与气泡内的步骤分组重复（用户反馈：线性时序结构） -->
        <!-- 步数超限暂停 / 上次进程被杀：一键继续，免得用户手动输入「继续」 -->
+       <!-- 用户点了暂停：后端在下一个安全步骤（当前这批工具跑完、下一次调用模型前）才停 -->
+       <view v-if="isStreaming && pausePending" class="link-bar">
+          <text class="link-hint">{{ $t('chat.pausePending') }}</text>
+       </view>
        <view v-if="agentPaused && !isStreaming" class="continue-bar">
           <text class="continue-hint">{{ continueHint }}</text>
           <view class="continue-btn" @tap="handleContinue">{{ $t('chat.continueRun') }}</view>
@@ -935,6 +946,7 @@
                 <view v-if="isStreaming" class="alternate-send" @tap="handleSubmit(followUpMode === 'steer' ? 'queue' : 'steer')">
                    {{ followUpMode === 'steer' ? $t('chat.queueInstead') : $t('chat.steerInstead') }}
                 </view>
+                <button :title="pausePending ? $t('chat.pausePending') : $t('chat.pauseRun')" v-if="isStreaming" type="button" class="pause-btn" :class="{ 'is-pending': pausePending }" :aria-label="$t('chat.pauseRun')" :disabled="pausePending" @click="handlePause"><text>❚❚</text></button>
                 <button :title="$t('chat.stop')" v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
                 <button :title="$t('chat.sendAria')" type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
                    <text class="send-icon">↑</text>
@@ -1082,6 +1094,7 @@ import { useChatReadingPosition } from '@/composables/useChatReadingPosition.js'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
+import { formatUndoFiles, shouldOfferRunUndo, undoResultView } from '@/utils/agentRunControl.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
@@ -1215,6 +1228,8 @@ export default {
       isStreaming,
       sendMessage: sendAgentMessage,
       abort,
+      pause,
+      pausePending,
       setConversationId,
       clearBubbles,
       parseAssistantHistory,
@@ -3046,6 +3061,71 @@ export default {
       return abort()
     }
 
+    // 暂停（用户控制 5）：后端在下一个安全步骤收尾成 paused/user_pause，之后用「继续执行」续跑
+    const handlePause = async () => {
+      if (!isStreaming.value || pausePending.value) return
+      const outcome = await pause()
+      if (outcome === 'failed') uni.showToast({ title: t('chat.pauseFailed'), icon: 'none' })
+    }
+
+    // 撤销本次 AI 修改（用户控制 3/4）。快照只在后端内存里（24 小时、新一轮开始即替换），
+    // 所以入口出不出要问后端；按「会话 + 最后一条气泡」记一份，换了就重新问。
+    const runUndo = ref({ key: '', available: false, files: [], state: 'idle' })
+    const agentRunApi = (path, method = 'GET') => fetch(`${getApiBaseUrl()}/api/agent/${path}/${currentConversationId.value}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': getSessionId() || '' }
+    })
+    const lastBubbleUndoKey = computed(() => {
+      const list = bubbles.value
+      const last = list.length ? list[list.length - 1] : null
+      if (!currentConversationId.value || !shouldOfferRunUndo(last, { isLatest: true, isStreaming: isStreaming.value })) return ''
+      return `${currentConversationId.value}:${last.id}`
+    })
+    watch(lastBubbleUndoKey, async (key) => {
+      if (runUndo.value.key === key) return
+      runUndo.value = { key, available: false, files: [], state: 'idle' }
+      if (!key) return
+      try {
+        const response = await agentRunApi('undo')
+        const body = response.ok ? await response.json() : null
+        if (runUndo.value.key !== key) return
+        runUndo.value = { key, available: !!(body && body.available), files: (body && body.files) || [], state: 'idle' }
+      } catch (e) {
+        console.warn('[ChatInterface] undo status unavailable:', e)
+      }
+    })
+    const showRunUndo = (msg, index) => {
+      if (!runUndo.value.key || !(runUndo.value.available || runUndo.value.state === 'done')) return false
+      return shouldOfferRunUndo(msg, { isLatest: index === bubbles.value.length - 1, isStreaming: isStreaming.value })
+    }
+    const handleUndoRun = () => {
+      const current = runUndo.value
+      if (current.state !== 'idle' || !current.available || isStreaming.value) return
+      uni.showModal({
+        title: t('chat.undoRunConfirmTitle'),
+        content: t('chat.undoRunConfirmContent', { files: formatUndoFiles(current.files, t) }),
+        confirmText: t('chat.undoRunConfirmOk'),
+        success: async (res) => {
+          if (!res.confirm || runUndo.value !== current) return
+          current.state = 'running'
+          let view
+          try {
+            const response = await agentRunApi('undo', 'POST')
+            let body = null
+            try { body = await response.json() } catch (e) { /* 读不出来按状态码判 */ }
+            view = undoResultView(response.status, body, t)
+          } catch (e) {
+            view = { state: 'idle', message: t('chat.undoRunFailed', { error: e.message || String(e) }) }
+          }
+          if (runUndo.value !== current) return
+          current.state = view.state === 'gone' ? 'idle' : view.state
+          if (view.state === 'gone') current.available = false
+          if (view.state === 'done') uni.showToast({ title: view.message, icon: 'none' })
+          else uni.showModal({ title: t('chat.undoRunConfirmTitle'), content: view.message, showCancel: false, confirmText: t('chat.gotIt') })
+        }
+      })
+    }
+
     const toggleFollowUpMode = () => {
       followUpMode.value = followUpMode.value === 'steer' ? 'queue' : 'steer'
       try { uni.setStorageSync('awd_agent_follow_up_mode', followUpMode.value) } catch (e) { /* ignore */ }
@@ -3148,9 +3228,11 @@ export default {
 
     // 续跑提示文案：区分「步数用完」和「上次进程被杀」两种中断来源
     const continueHint = computed(() => {
-      return agentPaused.value && agentPaused.value.reason === 'process_interrupted'
-        ? t('chat.continueHintInterrupted')
-        : t('chat.continueHintPaused')
+      const reason = agentPaused.value && agentPaused.value.reason
+      if (reason === 'process_interrupted') return t('chat.continueHintInterrupted')
+      if (reason === 'user_pause') return t('chat.continueHintUserPaused')
+      if (reason === 'max_depth') return t('chat.continueHintPaused')
+      return t('chat.continueHintPausedGeneric')
     })
 
     // 一键续跑（步数超限暂停 / 进程中断）：等价于用户输入「继续」（后端 depth 归零重新起循环），
@@ -4768,6 +4850,11 @@ export default {
        isUploadingPasted,
        handleSubmit,
        handleAbort,
+       handlePause,
+       pausePending,
+       runUndo,
+       showRunUndo,
+       handleUndoRun,
        handleRichInput,
        handleInputClick,
        handlePaste,
@@ -5756,7 +5843,8 @@ export default {
 /* 发送 / 停止改成真 <button>（K16 ④）：能 Tab 到、能回车按。uni-h5 的 button 自带
    一套默认样式与 ::after 边框，这里整片打平——照 .return-to-latest button 的既有写法。 */
 .send-btn,
-.stop-btn {
+.stop-btn,
+.pause-btn {
   appearance: none;
   -webkit-appearance: none;
   border: none;
@@ -5767,7 +5855,8 @@ export default {
   overflow: visible;
 }
 .send-btn::after,
-.stop-btn::after { border: 0; }
+.stop-btn::after,
+.pause-btn::after { border: 0; }
 
 .send-btn {
   background: var(--awd-accent);
@@ -5787,6 +5876,15 @@ export default {
 .follow-mode { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .alternate-send:hover { background: var(--awd-surface-2); }
 .stop-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-danger); color: var(--awd-text-on-accent); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
+/* 暂停：与停止同尺寸的中性圆钮，不抢停止键的颜色 */
+.pause-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-surface-2); color: var(--awd-text); font-size: var(--awd-panel-fs-meta); letter-spacing: -2px; cursor: pointer; }
+.pause-btn.is-pending { opacity: 0.5; cursor: default; }
+/* 撤销本次 AI 修改：气泡下一行安静的文字操作 */
+.run-undo-row { padding: 0 4px 12px; font-size: var(--awd-panel-fs-meta); text-align: start; }
+.run-undo-link { color: var(--awd-text-2); text-decoration: underline; cursor: pointer; }
+.run-undo-link:hover { color: var(--awd-accent-text); }
+.run-undo-link.is-busy { cursor: default; text-decoration: none; opacity: 0.7; }
+.run-undo-done { color: var(--awd-text-3); }
 .send-btn:hover {
   background: var(--awd-accent-hover);
 }

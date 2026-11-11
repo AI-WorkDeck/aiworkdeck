@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "Pemotongan poin sebelumnya gagal. Isi ulang poin di aplikasi Baoqingtian lalu hubungi dukungan.",
   "bqtUnavailable": "Layanan Baoqingtian sementara tidak tersedia. Silakan coba lagi nanti.",
   "bqtRechargeViaBqt": "Anggota Baoqingtian mengisi ulang atau memperpanjang di aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akun ini.",
+  "stopConfirmedWithEdits": "Dihentikan. {count} suntingan dokumen sudah diterapkan."
 }

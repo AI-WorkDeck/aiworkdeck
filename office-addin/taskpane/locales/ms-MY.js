@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "Pilih bahasa",
   "languageFollowSystem": "Ikut sistem",
   "languageSearchPlaceholder": "Cari bahasa…",
-  "languageNoMatch": "Tiada bahasa yang sepadan"
+  "languageNoMatch": "Tiada bahasa yang sepadan",
+  "pausedByUser": "(Dijeda atas permintaan anda. Hantar “teruskan” untuk menyambung tugas yang sama.)"
 }

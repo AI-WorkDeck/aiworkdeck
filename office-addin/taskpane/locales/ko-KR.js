@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "시스템 설정 따르기",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(요청하신 대로 일시 중지했습니다. 같은 작업을 이어서 하려면 ‘계속’을 보내세요.)"
 }

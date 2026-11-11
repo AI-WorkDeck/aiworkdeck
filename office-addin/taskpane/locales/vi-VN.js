@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "Theo hệ thống",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(Đã tạm dừng theo yêu cầu của bạn. Gửi “tiếp tục” để làm tiếp cùng tác vụ.)"
 }

@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "Μια προηγούμενη αφαίρεση πόντων απέτυχε. Φορτίστε πόντους στην εφαρμογή Baoqingtian και επικοινωνήστε με την υποστήριξη.",
   "bqtUnavailable": "Η υπηρεσία Baoqingtian δεν είναι προσωρινά διαθέσιμη. Δοκιμάστε ξανά αργότερα.",
   "bqtRechargeViaBqt": "Τα μέλη του Baoqingtian φορτίζουν ή ανανεώνουν στην εφαρμογή Baoqingtian· το AI WorkDeck δεν δέχεται πληρωμές για αυτόν τον λογαριασμό.",
+  "stopConfirmedWithEdits": "Διακόπηκε. Είχαν ήδη εφαρμοστεί {count} επεξεργασίες εγγράφων."
 }

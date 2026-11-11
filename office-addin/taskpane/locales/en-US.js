@@ -556,5 +556,6 @@ export const EN = {
   languageFollowSystem: 'Follow system',
   languageSearchPlaceholder: 'Search languages…',
   languageNoMatch: 'No matching languages',
+  pausedByUser: '(Paused at your request. Send "continue" to resume the same task.)',
 }
 export default EN

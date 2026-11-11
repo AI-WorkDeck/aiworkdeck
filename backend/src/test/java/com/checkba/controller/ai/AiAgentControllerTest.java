@@ -274,6 +274,80 @@ class AiAgentControllerTest {
         return r;
     }
 
+    private com.checkba.service.ai.DocumentCheckpointService injectCheckpoints() {
+        var checkpoints = mock(com.checkba.service.ai.DocumentCheckpointService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "documentCheckpointService", checkpoints);
+        return checkpoints;
+    }
+
+    @Test
+    @DisplayName("暂停：会话无权 403 且不碰编排器；打中/没打中都回 200 并如实带 paused")
+    void pauseAuthAndShape() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(false);
+            assertEquals(403, controller.pauseGeneration("conv-1", "s").getStatusCode().value());
+            verify(agentOrchestrator, never()).requestPause(any());
+
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(agentOrchestrator.requestPause("conv-1")).thenReturn(true);
+            ResponseEntity<?> hit = controller.pauseGeneration("conv-1", "s");
+            assertEquals(200, hit.getStatusCode().value());
+            assertEquals(Boolean.TRUE, ((java.util.Map<?, ?>) hit.getBody()).get("paused"));
+
+            when(agentOrchestrator.requestPause("conv-1")).thenReturn(false);
+            ResponseEntity<?> miss = controller.pauseGeneration("conv-1", "s");
+            assertEquals(200, miss.getStatusCode().value(), "没有活跃轮次不是错误");
+            assertEquals(Boolean.FALSE, ((java.util.Map<?, ?>) miss.getBody()).get("paused"));
+        }
+    }
+
+    @Test
+    @DisplayName("撤销本次 AI 修改：无权 403 不碰快照；轮次在跑 409；没有快照 404；成功/部分失败如实回报")
+    void undoAuthStatesAndShape() {
+        var checkpoints = injectCheckpoints();
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(false);
+            assertEquals(403, controller.undoRun("conv-1", "s").getStatusCode().value());
+            assertEquals(403, controller.undoStatus("conv-1", "s").getStatusCode().value());
+            verify(checkpoints, never()).restoreForUser(any());
+            verify(checkpoints, never()).describeCheckpoint(any());
+
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(agentOrchestrator.hasActiveRun("conv-1")).thenReturn(true);
+            ResponseEntity<?> busy = controller.undoRun("conv-1", "s");
+            assertEquals(409, busy.getStatusCode().value());
+            assertEquals("RUN_ACTIVE", ((java.util.Map<?, ?>) busy.getBody()).get("code"));
+            verify(checkpoints, never()).restoreForUser(any());
+
+            when(agentOrchestrator.hasActiveRun("conv-1")).thenReturn(false);
+            when(checkpoints.restoreForUser("conv-1")).thenReturn(new com.checkba.service.ai.DocumentCheckpointService.UserRestoreResult(
+                    com.checkba.service.ai.DocumentCheckpointService.UserRestoreStatus.NO_CHECKPOINT, null));
+            ResponseEntity<?> none = controller.undoRun("conv-1", "s");
+            assertEquals(404, none.getStatusCode().value());
+            assertEquals("NO_CHECKPOINT", ((java.util.Map<?, ?>) none.getBody()).get("code"));
+
+            when(checkpoints.restoreForUser("conv-1")).thenReturn(new com.checkba.service.ai.DocumentCheckpointService.UserRestoreResult(
+                    com.checkba.service.ai.DocumentCheckpointService.UserRestoreStatus.DONE,
+                    new com.checkba.service.ai.DocumentCheckpointService.RestoreOutcome(java.util.List.of("A.docx"), java.util.List.of(
+                            new com.checkba.service.ai.DocumentCheckpointService.RestoreFailure(2L, "B.docx", "reload failed", false)))));
+            ResponseEntity<?> partial = controller.undoRun("conv-1", "s");
+            assertEquals(200, partial.getStatusCode().value());
+            var body = (java.util.Map<?, ?>) partial.getBody();
+            assertEquals("partial", body.get("status"));
+            assertEquals(java.util.List.of("A.docx"), body.get("restored"));
+            assertTrue(String.valueOf(body.get("failures")).contains("B.docx"), "失败的文件要点名：" + body);
+
+            when(checkpoints.describeCheckpoint("conv-1")).thenReturn(java.util.List.of());
+            assertEquals(Boolean.FALSE, ((java.util.Map<?, ?>) controller.undoStatus("conv-1", "s").getBody()).get("available"));
+            when(checkpoints.describeCheckpoint("conv-1")).thenReturn(java.util.List.of(java.util.Map.of("fileId", 1L, "name", "A.docx")));
+            var status = (java.util.Map<?, ?>) controller.undoStatus("conv-1", "s").getBody();
+            assertEquals(Boolean.TRUE, status.get("available"));
+            assertTrue(String.valueOf(status.get("files")).contains("A.docx"));
+        }
+    }
+
     @Test
     @DisplayName("子任务取消：会话无权 403 且不碰服务；已结束 404；成功 200 且文案只说正在停止")
     void subtaskCancelAuthAndShape() {

@@ -44,6 +44,10 @@ public class AiAgentController {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ai.InlineContentCache inlineContentCache;
 
+    /** 字段注入（同 inlineContentCache）：不动构造器，既有手工装配的测试一行不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ai.DocumentCheckpointService documentCheckpointService;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
@@ -324,6 +328,78 @@ public class AiAgentController {
             log.error("Cancel failed", e);
             return ResponseEntity.status(500).body("{\"status\":\"error\", \"message\":\"Cancel failed\"}");
         }
+    }
+
+    private static ResponseEntity<?> forbidden() {
+        return ResponseEntity.status(403).body(java.util.Map.of("status", "error", "message",
+                LangText.of("无权操作该会话", "You do not have permission for this conversation")));
+    }
+
+    /**
+     * 暂停当前轮次（用户控制）：只置标志，轮次在下一个安全边界（下一次调用模型之前，
+     * 与插话同一处）收尾为 PAUSED / reason=user_pause；「继续」走既有续跑。
+     * paused=false 表示没有活跃轮次（那一轮已经自己结束了），同 /cancel 不回 404。
+     */
+    @PostMapping("/pause/{conversationId}")
+    public ResponseEntity<?> pauseGeneration(@PathVariable String conversationId,
+                                             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        boolean paused = agentOrchestrator.requestPause(conversationId);
+        log.info("Pause request received: conv={}, user={}, hit={}", conversationId, userId, paused);
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "paused", paused));
+    }
+
+    /**
+     * 「撤销本次 AI 修改」能不能做：本会话最近一轮的文档快照还在（内存登记，24 小时 TTL，
+     * 新一轮开始即被替换）时列出它覆盖的文件，供确认框写清楚会恢复哪几份。
+     */
+    @GetMapping("/undo/{conversationId}")
+    public ResponseEntity<?> undoStatus(@PathVariable String conversationId,
+                                        @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        java.util.List<java.util.Map<String, Object>> files = documentCheckpointService.describeCheckpoint(conversationId);
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "available", !files.isEmpty(), "files", files));
+    }
+
+    /**
+     * 用户撤销本次 AI 修改：把最近一轮快照覆盖的全部文件恢复到这一轮开始前
+     * （与 doc_restore_checkpoint 同一条 prepare → 写回 → reload 路径；用户亲手发起，不过模型确认闸）。
+     * 轮次还在跑时拒绝（409 RUN_ACTIVE）：它随时可能再写一笔，恢复与它会互相覆盖。
+     */
+    @PostMapping("/undo/{conversationId}")
+    public ResponseEntity<?> undoRun(@PathVariable String conversationId,
+                                     @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        if (agentOrchestrator.hasActiveRun(conversationId)) {
+            return ResponseEntity.status(409).body(java.util.Map.of("status", "error", "code", "RUN_ACTIVE",
+                    "message", LangText.of("AI 仍在运行，请等它停下后再撤销", "The AI is still running. Undo after it stops.")));
+        }
+        log.info("Undo run requested: conv={}, user={}", conversationId, userId);
+        var result = documentCheckpointService.restoreForUser(conversationId);
+        switch (result.status()) {
+            case NO_CHECKPOINT:
+                return ResponseEntity.status(404).body(java.util.Map.of("status", "error", "code", "NO_CHECKPOINT",
+                        "message", LangText.of("本次修改的快照已不可用，无法撤销",
+                                "The snapshot for this run is no longer available, so it cannot be undone")));
+            case IN_PROGRESS:
+                return ResponseEntity.status(409).body(java.util.Map.of("status", "error", "code", "UNDO_IN_PROGRESS",
+                        "message", LangText.of("撤销正在进行中", "An undo is already in progress")));
+            default:
+                break;
+        }
+        var outcome = result.outcome();
+        java.util.List<java.util.Map<String, Object>> failures = outcome.failures().stream()
+                .map(f -> java.util.Map.<String, Object>of(
+                        "fileId", f.fileId(),
+                        "name", f.name() == null ? "" : f.name(),
+                        "error", f.missing() ? LangText.of("文件已不存在", "The file no longer exists")
+                                : (f.error() == null ? "" : f.error())))
+                .toList();
+        String status = failures.isEmpty() ? "ok" : outcome.restored().isEmpty() ? "failed" : "partial";
+        return ResponseEntity.ok(java.util.Map.of("status", status, "restored", outcome.restored(), "failures", failures));
     }
 
     /**

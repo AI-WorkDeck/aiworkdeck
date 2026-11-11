@@ -212,6 +212,15 @@ public class AgentOrchestrator {
         /** 本轮的取消标志。只有 {@link AgentOrchestrator#setCancelled} 解析到的那一轮会被置位。 */
         private final java.util.concurrent.atomic.AtomicBoolean cancelled =
                 new java.util.concurrent.atomic.AtomicBoolean();
+        /**
+         * 用户点了「暂停」：只在下一次调用模型之前生效（上一批工具已全部执行完、结果已入栈），
+         * 绝不停在工具中间。轮次级，新一轮是新的 RunGuard，不会粘到下一轮。
+         */
+        private final java.util.concurrent.atomic.AtomicBoolean pauseRequested =
+                new java.util.concurrent.atomic.AtomicBoolean();
+        /** 本轮成功的文档写入类工具调用次数（停止时的「已完成 N 次修改」）。 */
+        private final java.util.concurrent.atomic.AtomicInteger documentEdits =
+                new java.util.concurrent.atomic.AtomicInteger();
         /** One optional decision on the original input; never include later steering text. */
         private volatile DecisionAssistContext decisionContext;
         private String decisionInput;
@@ -342,6 +351,7 @@ public class AgentOrchestrator {
         void noteToolResult(String toolName, boolean success) {
             if (success && ClientCapabilityService.isDocumentWritingTool(toolName)) {
                 documentEdited = true;
+                documentEdits.incrementAndGet();
             }
             if (success && ("save_memory".equals(toolName) || "memory_write".equals(toolName)
                     || "update_project_info".equals(toolName))) {
@@ -689,6 +699,34 @@ public class AgentOrchestrator {
     }
 
     /**
+     * 用户「暂停」：给当前活跃轮次置暂停标志，由 {@link #runLoop} 在下一次调用模型之前收尾成
+     * PAUSED（reason=user_pause）。不掐在途请求、不打断工具——正在执行的那一批工具照常跑完，
+     * 结果入栈、落库之后才停，「继续」接着做时历史是完整的。
+     *
+     * @return 是否打中了一个活跃轮次（没有就是该轮次已经结束，前端据此撤掉「正在暂停」）
+     */
+    public boolean requestPause(String conversationId) {
+        RunGuard guard = activeRuns.get(conversationId);
+        if (guard == null || guard.isCancelled()) return false;
+        guard.pauseRequested.set(true);
+        log.info("Pause requested for conversation {} (run {})", conversationId, guard.runId);
+        return true;
+    }
+
+    /** 用户暂停在安全边界上生效：同 pauseForNoProgress 的收尾，提示语说明「继续」会接着做同一个任务。 */
+    private void pauseForUser(RunGuard guard, String projectId, Long userId, StringBuilder executionLog) {
+        String notice = LangText.of(
+                "\n\n> 已按你的要求暂停。点击「继续」会从这里接着做同一个任务。",
+                "\n\n> Paused at your request. Click Continue to resume the same task from here.");
+        sendTextDelta(guard, notice);
+        saveAssistantMessage(guard, projectId, userId, executionLog + guard.streamSnapshot() + notice);
+        markRunState(guard, AgentRunStateService.RunStatus.PAUSED);
+        sendRunEvent(guard, "bubble_end", bubbleEndPayload(guard, "paused", "user_pause"));
+        closeSse(guard);
+        endRun(guard);
+    }
+
+    /**
      * 收尾关闭本轮 SSE 连接：带上本轮开始时记下的代次，交给 SseEmitterService 做匹配判断。
      * 已被新一轮取代时直接跳过——关掉的会是新轮次正在用的那条流。
      */
@@ -965,8 +1003,11 @@ public class AgentOrchestrator {
             officePassStateStore.clear(conversationId);
         }
         // 发送取消事件
+        // documentEdited / documentEdits：前端据此写「已停止。已完成 N 次文档修改」并给出撤销入口
         sendRunEvent(guard, "cancelled",
-                "{\"message\":\"" + LangText.of("用户已停止生成", "Generation stopped by the user") + "\"}");
+                "{\"message\":\"" + LangText.of("用户已停止生成", "Generation stopped by the user")
+                        + "\",\"documentEdited\":" + guard.documentEdited()
+                        + ",\"documentEdits\":" + guard.documentEdits.get() + "}");
         closeSse(guard);
 
         // 清理状态
@@ -2530,6 +2571,12 @@ public class AgentOrchestrator {
         if (guard.isCancelled()) {
             log.info("Conversation {} was cancelled, stopping loop at depth {}", conversationId, depth);
             handleCancellation(guard, projectId, userId, executionLog);
+            return;
+        }
+        // 用户暂停：这里是安全边界——上一批工具都已执行完、结果已入栈并增量落库，下一次模型调用还没发
+        if (guard.pauseRequested.get()) {
+            log.info("Conversation {} paused by the user at depth {}", conversationId, depth);
+            pauseForUser(guard, projectId, userId, executionLog);
             return;
         }
 

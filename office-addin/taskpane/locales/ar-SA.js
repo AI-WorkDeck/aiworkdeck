@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "اختيار اللغة",
   "languageFollowSystem": "اتباع النظام",
   "languageSearchPlaceholder": "البحث في اللغات…",
-  "languageNoMatch": "لا توجد لغات مطابقة"
+  "languageNoMatch": "لا توجد لغات مطابقة",
+  "pausedByUser": "(تم الإيقاف المؤقت بناءً على طلبك. أرسل «متابعة» لاستئناف المهمة نفسها.)"
 }

@@ -164,9 +164,10 @@ test('响应体没有 cancelled 字段时按打中处理，不回退成未确认
 
 // 两条 cancelled 分支都要把「正在停止…」落成终态文案，缺一条就会一直停在「正在停止」。
 test('cancelled 事件的两条分支都调 noteStopConfirmed', () => {
-  assert.match(CODE, /evt === 'cancelled'\) noteStopConfirmed\(\)/,
+  // 两条分支都把 cancelled 载荷交进去（本轮已完成的修改次数决定终态文案，用户控制 4）
+  assert.match(CODE, /evt === 'cancelled'\) noteStopConfirmed\(d\)/,
     '气泡指针为 null 的兜底分支也要认这条事件')
   const cancelledBranch = CODE.slice(CODE.indexOf("} else if (evt === 'cancelled') {"))
-  assert.match(cancelledBranch.slice(0, 900), /noteStopConfirmed\(\)/,
+  assert.match(cancelledBranch.slice(0, 1800), /noteStopConfirmed\(cancelledPayload\)/,
     '正常分支要把 stopNotice 落成「已停止生成」')
 })

@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "Systeem volgen",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(Gepauzeerd op jouw verzoek. Stuur “doorgaan” om dezelfde taak te hervatten.)"
 }

@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "Une déduction de points précédente a échoué. Rechargez des points dans l'app Baoqingtian puis contactez le support.",
   "bqtUnavailable": "Le service Baoqingtian est temporairement indisponible. Veuillez réessayer plus tard.",
   "bqtRechargeViaBqt": "Les membres Baoqingtian rechargent ou renouvellent dans l'app Baoqingtian ; AI WorkDeck n'accepte pas de paiements pour ce compte.",
+  "stopConfirmedWithEdits": "Arrêté. {count} modifications de documents avaient déjà été appliquées."
 }

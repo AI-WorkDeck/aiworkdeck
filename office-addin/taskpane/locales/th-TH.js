@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "ตามระบบ",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(หยุดชั่วคราวตามคำขอของคุณ ส่ง “ทำต่อ” เพื่อดำเนินงานเดิมต่อ)"
 }

@@ -499,5 +499,6 @@ export default {
   "languagePickerLabel": "選擇界面語言",
   "languageFollowSystem": "跟隨系統",
   "languageSearchPlaceholder": "搜索語言…",
-  "languageNoMatch": "無匹配語言"
+  "languageNoMatch": "無匹配語言",
+  "pausedByUser": "（已依你的要求暫停。直接傳送一則「繼續」即可接著做同一個任務。）"
 }
