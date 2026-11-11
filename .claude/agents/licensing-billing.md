@@ -380,7 +380,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
 
 **手机号强制登录与补绑期（2026-08-18）**
 - 设计 `docs/superpowers/specs/2026-08-17-phone-login-design.md` §5。官网侧同一口径的参照实现是
-  `aiworkdeck_website` 的 `lib/phone-policy.ts`（`gateForUser()`）+ `app/api/auth/login/route.ts`。
+  官网仓 `aiworkdeck-website` 的 `lib/phone-policy.ts`（`gateForUser()`）+ `app/api/auth/login/route.ts`。
 - `config/PhoneLoginGuard.java` 一个类兼两职：**启动期**断言（开了强制但短信网关是暗的 → 拒绝启动，
   不静默降级成谁都进不来）＋**运行期**三态闸 `gateFor(user)` → `OK` / `MUST_BIND` / `BLOCKED`。
   `required = phone-login-required && !local-mode`——local-mode 免登没有登录环节，闸恒不生效。

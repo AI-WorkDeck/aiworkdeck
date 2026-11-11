@@ -63,7 +63,7 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 - 直达地址可用 `optimizer.remote.console-url`（env `OPTIMIZER_REMOTE_CONSOLE_URL`，
   `{id}` 占位）改指官网 admin 的「用户反馈」分区（dev-board#152）：
   `https://www.aiworkdeck.com/zh/admin?tab=feedback&fb={id}`——维护者只登录官网后台一处。
-- 官网侧（aiworkdeck_website 仓）：`app/[lang]/admin/FeedbackInbox.tsx` 分区 +
+- 官网侧（`AI-WorkDeck/aiworkdeck-website` 仓）：`app/[lang]/admin/FeedbackInbox.tsx` 分区 +
   `/api/admin/feedback/*` 三条服务端代理（admin cookie 鉴权，取件密钥只在服务端）；
   官网实例 env 需配 `AWD_FEEDBACK_INBOX_TOKEN`（= 收件箱 FEEDBACK_OPTIMIZER_TOKEN）。
   为此 `GET /api/feedback` 列表/详情也认 X-Optimizer-Token（只读，密钥本就能取
