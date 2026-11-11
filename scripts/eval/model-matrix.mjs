@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // 真实模型 A/B 矩阵：before/after 两个 git ref × N 个模型 × 句子集，并行跑 Agent，直接走后端 HTTP/SSE。
-// 用法与设计见 scripts/eval/README.md。密钥只从环境变量 OPENROUTER_API_KEY 读取，只传给子进程环境，从不打印、落盘。
+// 用法与设计见 scripts/eval/README.md。密钥只从环境变量读取（openrouter 路由：OPENROUTER_API_KEY，传给子进程环境；
+// bailian 路由：DASHSCOPE_API_KEY，只留在本进程的本机转发口里），从不打印、落盘。
 
 import { spawn, execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
@@ -38,6 +39,7 @@ function parseArgs(argv) {
     else if (a === '--lowa-dir') o.lowaDir = path.resolve(next())
     else if (a === '--profile') o.profile = next()
     else if (a === '--tier') o.tier = next()
+    else if (a === '--route') o.route = next()
     else if (a === '--keep') o.keep = true
     else if (a === '--rescore') o.rescore = path.resolve(next())
     else if (a === '--workdir') { o.workdir = path.resolve(next()); o.keep = true }
@@ -58,15 +60,31 @@ const PRICES = {
   'qwen/qwen3.8-max-0902': [2, 6, 0.25], 'deepseek/deepseek-v4-pro': [0.96, 1.91, 0.08],
   'anthropic/claude-sonnet-5': [2, 10, 0.20], 'openai/gpt-5.6-terra': [2, 12, 0.20],
 }
-const costOf = (model, prompt, cached, completion) => {
-  const p = PRICES[model]; if (!p) return null
+// --route bailian：矩阵里的模型 id 仍写 OpenRouter id（后端白名单、能力判定、辅助模型与 failover 跟 openrouter 路由同口径），
+// 由本机转发口在出站前换成百炼 id。DeepSeek 取生产平台通道实际用的 id（官网 lib/platform-ai/config.ts 的 BAILIAN_CHAT_MODELS）；
+// qwen3.7-flash 取同名模型以便与 OpenRouter 路由对比（生产的辅助模型已迁到 qwen3.8-flash，要测它就 --models 不变、改这里）。
+const BAILIAN_MODELS = {
+  'deepseek/deepseek-v4-flash': 'deepseek-v4.1-flash-1017', 'qwen/qwen3.7-flash': 'qwen3.7-flash',
+  'qwen/qwen3.8-max-0902': 'qwen3.8-max-0902', 'deepseek/deepseek-v4-pro': 'deepseek-v4-pro-0813',
+}
+// 百炼标价（人民币 / 1M token：输入 / 输出 / 隐式缓存命中），2026-11-11 取自 DashScope /api/v1/models：
+// DeepSeek 分时计价取高峰档（低谷减半）；qwen3.7-flash 阶梯计价取单次输入 ≤32k 档（32k–256k 档为 0.6 / 2.4 / 0.12）。
+const BAILIAN_PRICES = {
+  'deepseek/deepseek-v4-flash': [2, 8, 0.04], 'qwen/qwen3.7-flash': [0.2, 0.8, 0.04],
+  'qwen/qwen3.8-max-0902': [12, 36, 1.5], 'deepseek/deepseek-v4-pro': [9, 27, 0.9],
+}
+const ROUTES = { openrouter: { prices: PRICES, currency: 'USD', sym: '$', label: 'OpenRouter 标价' }, bailian: { prices: BAILIAN_PRICES, currency: 'CNY', sym: '¥', label: '百炼标价（DeepSeek 高峰档、qwen3.7-flash ≤32k 档）' } }
+const routeOf = meta => ROUTES[meta.route || 'openrouter']
+const costOf = (model, prompt, cached, completion, route = 'openrouter') => {
+  const p = ROUTES[route].prices[model]; if (!p) return null
   return ((prompt - cached) * p[0] + cached * p[2] + completion * p[1]) / 1e6
 }
 const USAGE = `用法：node scripts/eval/model-matrix.mjs --before <ref> --after <ref> [--profile cn|intl] [--tier cheap|release] [--models a,b] [--sentences <file.json>]
         profile 缺省 cn；未给 --models 时按 profile+tier 取默认模型，未给 --sentences 时按 profile 取 gate-35 / gate-35-en
+        [--route openrouter|bailian]   缺省 openrouter；bailian 经本机转发口直连阿里云百炼（仅 cn 档的模型有映射）
         [--runs N] [--concurrency K] [--only id1,id2] [--api-only] [--run-timeout 秒] [--out 目录] [--keep]
        node scripts/eval/model-matrix.mjs --rescore <已有产物目录> [--sentences <file.json>]   离线重判已有 results.json（不调模型、不需要密钥）
-环境变量：OPENROUTER_API_KEY（必需）；PG_BIN（可选，PostgreSQL bin 目录）；JAVA_HOME（需要 JDK 21，缺省自动找）`
+环境变量：OPENROUTER_API_KEY（openrouter 路由必需）；DASHSCOPE_API_KEY + BAILIAN_BASE_URL（bailian 路由必需）；PG_BIN（可选，PostgreSQL bin 目录）；JAVA_HOME（需要 JDK 21，缺省自动找）`
 
 // ---------- 小工具 ----------
 function run(cmd, args, opts = {}) {
@@ -100,12 +118,64 @@ function findPgBin() {
 }
 // 兜底：产物目录里的任何文件若含密钥原文（后端日志、模型回显）一律替换，产物会被上传到 CI。
 function scrubSecret(dir) {
-  const key = process.env.OPENROUTER_API_KEY
-  if (!key) return
-  for (const f of fs.readdirSync(dir)) {
-    const file = path.join(dir, f)
-    try { const t = fs.readFileSync(file, 'utf8'); if (t.includes(key)) fs.writeFileSync(file, t.split(key).join('***')) } catch { /* 非文本/已删除 */ }
+  for (const key of [process.env.OPENROUTER_API_KEY, process.env.DASHSCOPE_API_KEY].filter(Boolean)) {
+    for (const f of fs.readdirSync(dir)) {
+      const file = path.join(dir, f)
+      try { const t = fs.readFileSync(file, 'utf8'); if (t.includes(key)) fs.writeFileSync(file, t.split(key).join('***')) } catch { /* 非文本/已删除 */ }
+    }
   }
+}
+
+// ---------- 百炼路由的本机转发口 ----------
+// 后端实例照常跑 BYOK OpenRouter 档，只把 ai.model.open-router.base-url 指到这里；这里改写模型 id、按官网平台网关
+// （lib/platform-ai/proxy.ts validateChat）的口径收敛请求体，再带 DASHSCOPE_API_KEY 发往 BAILIAN_BASE_URL。
+// 后端子进程只拿到一个占位 key，百炼密钥不进子进程环境、不进后端日志。
+const GATEWAY_KEYS = new Set(['model', 'messages', 'tools', 'tool_choice', 'temperature', 'top_p', 'stop', 'response_format', 'seed', 'max_tokens', 'max_completion_tokens', 'stream', 'stream_options', 'frequency_penalty', 'presence_penalty', 'parallel_tool_calls', 'enable_thinking', 'thinking_budget', 'reasoning_effort'])
+function toBailianBody(raw) {
+  // OpenRouter 专有字段（provider 路由、reasoning 对象等）百炼不认，与生产网关一样丢掉
+  const body = Object.fromEntries(Object.entries(raw).filter(([k]) => GATEWAY_KEYS.has(k)))
+  body.model = BAILIAN_MODELS[raw.model] || raw.model
+  if (body.max_completion_tokens != null) { body.max_tokens ??= body.max_completion_tokens; delete body.max_completion_tokens }
+  body.enable_thinking = raw.enable_thinking === true // 网关对 flash 档显式关思考
+  if (!body.enable_thinking) delete body.thinking_budget
+  if (body.stream) body.stream_options = { include_usage: true }; else delete body.stream_options
+  return body
+}
+async function startBailianProxy() {
+  const base = process.env.BAILIAN_BASE_URL.replace(/\/+$/, '')
+  const stats = {} // `${百炼模型} ${HTTP 状态}` → 次数（含后端自己的重试），写进 meta 供对比路由的故障率
+  const server = http.createServer(async (req, res) => {
+    const ac = new AbortController()
+    res.on('close', () => ac.abort()) // 后端取消（超时/停止）时一并掐断上游
+    let model = '-'
+    try {
+      const chunks = []
+      for await (const c of req) chunks.push(c)
+      let body = Buffer.concat(chunks)
+      const sub = req.url.replace(/^\/v1(?=\/|$)/, '')
+      if (req.method === 'POST' && sub.startsWith('/chat/completions')) {
+        const b = toBailianBody(JSON.parse(body.toString('utf8')))
+        model = b.model
+        body = Buffer.from(JSON.stringify(b))
+      }
+      const up = await fetch(base + sub, {
+        method: req.method, signal: ac.signal, redirect: 'error',
+        headers: { authorization: `Bearer ${process.env.DASHSCOPE_API_KEY}`, 'content-type': req.headers['content-type'] || 'application/json', accept: req.headers.accept || '*/*' },
+        body: ['GET', 'HEAD'].includes(req.method) ? undefined : body,
+      })
+      const k = `${model} ${up.status}`; stats[k] = (stats[k] || 0) + 1
+      res.writeHead(up.status, { 'content-type': up.headers.get('content-type') || 'application/json' })
+      if (up.body) for await (const c of up.body) res.write(c)
+      res.end()
+    } catch (e) {
+      if (ac.signal.aborted) return
+      const k = `${model} proxy_error`; stats[k] = (stats[k] || 0) + 1
+      if (!res.headersSent) res.writeHead(502, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: { code: 502, message: 'bailian proxy: ' + String(e.message || e).slice(0, 200) } }))
+    }
+  })
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+  return { server, stats, baseUrl: `http://127.0.0.1:${server.address().port}/v1` }
 }
 const sanitize = s => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()
 
@@ -254,8 +324,8 @@ async function loadPlaywright() {
 
 // ---------- 后端实例 ----------
 class Instance {
-  constructor({ label, build, model, pg, tmp, java, outDir, profile }) {
-    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile })
+  constructor({ label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl }) {
+    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl })
     this.db = 'awd_' + sanitize(label)
     this.dir = path.join(tmp, 'inst-' + sanitize(label))
     this.logFile = path.join(outDir, 'backend-' + sanitize(label) + '.log')
@@ -277,8 +347,11 @@ class Instance {
       STORAGE_LOCAL_ROOT_PATH: path.join(this.dir, 'storage'), AI_PLUGINS_DIR: path.join(this.dir, 'plugins'),
       AI_SKILLS_BUILTIN_DIR: path.join(this.build.wt, 'backend/skills'), AI_PLUGINS_BUNDLED_DIR: path.join(this.build.wt, 'official-plugins'),
     }
+    // bailian 路由：BYOK OpenRouter 档的地址指向本机转发口，key 只是占位（真 key 由转发口加上）
+    if (this.llmBaseUrl) { env.OPENROUTER_API_KEY = 'matrix-bailian-proxy'; delete env.DASHSCOPE_API_KEY }
+    const sysProps = this.llmBaseUrl ? [`-Dai.model.open-router.base-url=${this.llmBaseUrl}`] : []
     const out = fs.openSync(this.logFile, 'w')
-    this.proc = spawn(path.join(this.java, 'bin/java'), [`-Duser.home=${path.join(this.dir, 'home')}`, '-Xmx1g', '-jar', this.build.jar], { env, stdio: ['ignore', out, out] })
+    this.proc = spawn(path.join(this.java, 'bin/java'), [`-Duser.home=${path.join(this.dir, 'home')}`, ...sysProps, '-Xmx1g', '-jar', this.build.jar], { env, stdio: ['ignore', out, out] })
     this.proc.on('exit', () => { this.exited = true })
     for (let i = 0; i < 150; i++) {
       if (this.exited) throw new Error(`后端 ${this.label} 启动失败，见 ${this.logFile}`)
@@ -695,6 +768,7 @@ function buildReport(meta, results, sentences) {
   L.push(`# 模型矩阵报告 ${meta.timestamp}`, '',
     `- before: \`${meta.before.ref}\` (${meta.before.sha.slice(0, 10)})`, `- after: \`${meta.after.ref}\` (${meta.after.sha.slice(0, 10)})`,
     `- profile: ${meta.profile}（${PROFILES[meta.profile].lang}）/ tier: ${meta.tier}；模型: ${models.join(', ')}；每句 ${meta.runs} 次；并发实例 ${meta.concurrency}`,
+    `- 路由: ${meta.route || 'openrouter'}${meta.route === 'bailian' ? `（${models.map(m => `${m} → ${BAILIAN_MODELS[m]}`).join('，')}）` : ''}`,
     `- 总墙钟: ${(meta.wallMs / 1000).toFixed(0)}s（其中构建+启动 ${(meta.setupMs / 1000).toFixed(0)}s，跑题 ${(meta.runMs / 1000).toFixed(0)}s）`, '')
   const skipped = sentences.filter(s => results.some(r => r.sentence === s.id && r.status === 'SKIPPED'))
   if (skipped.length) L.push(`SKIPPED（需要编辑器或插件但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
@@ -740,6 +814,7 @@ function buildReport(meta, results, sentences) {
     for (const [k, n] of Object.entries(byKind)) L.push(`- ${n} 次：${k}`)
     L.push('')
   }
+  if (meta.bailianUpstream) L.push('## 百炼上游响应（转发口计数，含后端自己的重试）', '', ...Object.entries(meta.bailianUpstream).sort().map(([k, n]) => `- ${k}：${n} 次`), '')
   const fails = validRuns(total).filter(r => !r.pass)
   if (fails.length) {
     L.push('## 未通过明细', '')
@@ -837,13 +912,13 @@ function buildProcessSection(meta, results) {
 
 function buildCostSection(meta, results) {
   const L = ['', `## 成本与耗时估算（外推到每句 ${TARGET_RUNS} 次、before+after 两侧）`, '',
-    '| 模型 | 本次实测每次运行均价(USD) | 实测总花费(USD) | 全量门禁估算(USD) | 备注 |', '|---|---|---|---|---|']
+    `| 模型 | 本次实测每次运行均价(${routeOf(meta).currency}) | 实测总花费(${routeOf(meta).currency}) | 全量门禁估算(${routeOf(meta).currency}) | 备注 |`, '|---|---|---|---|---|']
   let sumEst = 0, unknown = false
   const liveCount = results.filter(r => r.status !== 'SKIPPED').length
   for (const m of meta.models) {
     const rs = results.filter(r => r.model === m && r.status !== 'SKIPPED')
     if (!rs.length) { L.push(`| ${m} | - | - | - | 全部 SKIPPED |`); continue }
-    const costs = rs.map(r => costOf(m, r.promptTokens || 0, r.cachedTokens || 0, r.completionTokens || 0))
+    const costs = rs.map(r => costOf(m, r.promptTokens || 0, r.cachedTokens || 0, r.completionTokens || 0, meta.route))
     if (costs.some(c => c == null)) { unknown = true; L.push(`| ${m} | - | - | - | 无标价，未估算 |`); continue }
     const total = costs.reduce((a, b) => a + b, 0), avg = total / rs.length
     const perSide = meta.sentenceCount // 近似：未跳过句数 ≈ 句集大小
@@ -853,7 +928,7 @@ function buildCostSection(meta, results) {
   }
   const factor = TARGET_RUNS / meta.runs
   const estRun = meta.runMs * factor
-  L.push('', `- 全量门禁成本合计约 **$${sumEst.toFixed(2)}**${unknown ? '（不含无标价模型）' : ''}（价格：OpenRouter 标价，输入/输出/缓存读 每 1M token；缓存读按实测 cached_tokens 计）。`,
+  L.push('', `- 全量门禁成本合计约 **${routeOf(meta).sym}${sumEst.toFixed(2)}**${unknown ? '（不含无标价模型）' : ''}（价格：${routeOf(meta).label}，输入/输出/缓存读 每 1M token；缓存读按实测 cached_tokens 计）。`,
     `- 耗时：本次跑题 ${(meta.runMs / 60000).toFixed(1)} min（每句 ${meta.runs} 次）；实例并行、同实例串行，外推到每句 ${TARGET_RUNS} 次 ≈ **${(estRun / 60000).toFixed(0)} min**，另加构建+启动约 ${(meta.setupMs / 60000).toFixed(1)} min（构建缓存命中时更短）。`, '')
   return L
 }
@@ -914,10 +989,18 @@ async function main() {
   const prof = PROFILES[o.profile]
   if (!prof) { console.error('--profile 只能是 cn 或 intl'); process.exit(2) }
   if (!['cheap', 'release'].includes(o.tier)) { console.error('--tier 只能是 cheap 或 release'); process.exit(2) }
+  o.route = o.route || 'openrouter'
+  if (!ROUTES[o.route]) { console.error('--route 只能是 openrouter 或 bailian'); process.exit(2) }
   o.models = o.models?.length ? o.models : (o.tier === 'release' ? [...prof.cheap, ...prof.extra] : prof.cheap)
   o.sentences = o.sentences || path.join(HERE, prof.sentences)
   if (o.help || !o.before || !o.after) { console.log(USAGE); process.exit(o.help ? 0 : 2) }
-  if (!process.env.OPENROUTER_API_KEY) { console.error('缺少环境变量 OPENROUTER_API_KEY'); process.exit(2) }
+  if (o.route === 'openrouter' && !process.env.OPENROUTER_API_KEY) { console.error('缺少环境变量 OPENROUTER_API_KEY'); process.exit(2) }
+  if (o.route === 'bailian') {
+    if (!process.env.DASHSCOPE_API_KEY || !process.env.BAILIAN_BASE_URL) { console.error('bailian 路由缺少环境变量 DASHSCOPE_API_KEY / BAILIAN_BASE_URL'); process.exit(2) }
+    // 没有映射的 id 会被后端白名单回落成默认模型、再被换成百炼的 DeepSeek，结果张冠李戴，所以直接拒绝
+    const unmapped = o.models.filter(m => !BAILIAN_MODELS[m])
+    if (unmapped.length) { console.error(`bailian 路由没有这些模型的映射：${unmapped.join(', ')}（可用：${Object.keys(BAILIAN_MODELS).join(', ')}）`); process.exit(2) }
+  }
   const sentences = loadSentences(path.resolve(o.sentences), o.only)
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const outDir = path.join(o.out, timestamp)
@@ -930,10 +1013,12 @@ async function main() {
   const instances = []
   let builds = []
   let browser = null
+  let proxy = null
   const servers = []
   const cleanup = async () => {
     await browser?.close().catch(() => {})
     for (const sv of servers) sv.close()
+    proxy?.server.closeAllConnections(); proxy?.server.close()
     await Promise.all(instances.map(i => i.stop()))
     if (pg) await pg.stop()
     if (!o.keep) for (const b of builds) await run('git', ['worktree', 'remove', '--force', b.wt], { cwd: REPO }).catch(() => {})
@@ -950,10 +1035,11 @@ async function main() {
     const needFrontend = sentences.some(runsEditor)
     const [pgRes, ...built] = await Promise.all([startPg(tmp), ...refs.map(r => buildRef(r, tmp, java, o, needFrontend))])
     pg = pgRes; builds = built
+    if (o.route === 'bailian') { proxy = await startBailianProxy(); log(`百炼转发口 ${proxy.baseUrl}（上游 ${process.env.BAILIAN_BASE_URL}）`) }
     const byRef = Object.fromEntries(built.map(b => [b.ref, b]))
     const sides = []
     for (const side of ['before', 'after']) for (const model of o.models) sides.push({ side, model, build: byRef[o[side]] })
-    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile] }), { side: s.side }))
+    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile], llmBaseUrl: proxy?.baseUrl }), { side: s.side }))
 
     // 以并发 K 启动实例
     const queue = (items, k, fn) => { let i = 0; return Promise.all(Array.from({ length: Math.min(k, items.length) }, async () => { while (i < items.length) await fn(items[i++]) })) }
@@ -993,7 +1079,7 @@ async function main() {
       }
     }))
     const runMs = Date.now() - tRun
-    const meta = { timestamp, before: { ref: o.before, sha: byRef[o.before].sha }, after: { ref: o.after, sha: byRef[o.after].sha }, models: o.models, profile: o.profile, tier: o.tier, sentenceCount: sentences.length, runs: o.runs, concurrency: o.concurrency, wallMs: Date.now() - T0, setupMs, runMs, apiOnly: o.apiOnly }
+    const meta = { timestamp, before: { ref: o.before, sha: byRef[o.before].sha }, after: { ref: o.after, sha: byRef[o.after].sha }, models: o.models, profile: o.profile, tier: o.tier, route: o.route, ...(proxy ? { bailianUpstream: proxy.stats } : {}), sentenceCount: sentences.length, runs: o.runs, concurrency: o.concurrency, wallMs: Date.now() - T0, setupMs, runMs, apiOnly: o.apiOnly }
     fs.writeFileSync(path.join(outDir, 'results.json'), JSON.stringify({ meta, results }, null, 2))
     fs.writeFileSync(path.join(outDir, 'report.md'), buildReport(meta, results, sentences))
     log(`完成：总 ${(meta.wallMs / 1000).toFixed(0)}s（准备 ${(setupMs / 1000).toFixed(0)}s，跑题 ${(runMs / 1000).toFixed(0)}s）。报告 ${path.join(outDir, 'report.md')}`)

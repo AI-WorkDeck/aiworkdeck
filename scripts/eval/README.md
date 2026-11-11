@@ -26,6 +26,7 @@ node scripts/eval/model-matrix.mjs \
 | `--runs N` | 每句重复次数（默认 1） |
 | `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题 |
 | `--profile cn\|intl` | 站点/语言档位（默认 `cn`）。`cn`：界面语言 zh-CN（`system_prompt.md` + 中文 LangText），账户站点保持默认 aiworkdeck.com；`intl`：界面语言 en-US（`system_prompt.en.md` + 英文 LangText），实例设 `AI_ACCOUNT_BASE_URL=https://www.workdeck.ai`（`OfficialCloudEndpoint.isInternationalSite` 按主机判定的就是它）。语言经请求体 `appLanguage` + `X-App-Language` 头下发，编辑器句子经浏览器 `checkba_app_language` |
+| `--route openrouter\|bailian` | 模型走哪条线（默认 `openrouter`，行为不变）。`bailian` 直连阿里云百炼（国内用户的生产路径），见下节「百炼路由」 |
 | `--tier cheap\|release` | 默认模型档（默认 `cheap`）。cn cheap = `deepseek/deepseek-v4-flash` + `qwen/qwen3.7-flash`；intl cheap = `google/gemini-3.6-flash` + `anthropic/claude-haiku-4.5`；`release` 在 cheap 之上再加 cn：`qwen/qwen3.8-max-0902`、`deepseek/deepseek-v4-pro`，intl：`anthropic/claude-sonnet-5`、`openai/gpt-5.6-terra`。`--models` 显式给出时覆盖 |
 | `--sentences` 缺省 | cn → `sentences/gate-35.json`，intl → `sentences/gate-35-en.json` |
 | `--only id1,id2` | 只跑指定句子 |
@@ -38,13 +39,45 @@ node scripts/eval/model-matrix.mjs \
 需要：JDK 21（自动找 `/usr/libexec/java_home -v 21`，或设 `JAVA_HOME`）、Maven、PostgreSQL 17 二进制
 （`PG_BIN` 或 Homebrew 默认路径）、Node 20+/npm（编辑器句子需要）。
 
+## 百炼路由（`--route bailian`）
+
+OpenRouter 上的 qwen 经常被上游 429（2026-11-11 当天 cn 矩阵里 qwen3.7-flash 有七成运行记为基础设施故障），
+而国内用户的生产路径本来就是百炼。用法：
+
+```bash
+set -a; . ~/.local/share/aiworkdeck-ops/credentials/bailian-cn.env; set +a   # 提供 DASHSCOPE_API_KEY、BAILIAN_BASE_URL（compatible-mode/v1）
+node scripts/eval/model-matrix.mjs --before origin/master --after feat/x --route bailian --profile cn --tier cheap
+```
+
+做法（不改后端代码）：后端实例照常跑 BYOK OpenRouter 档，模型 id 仍是白名单里的 OpenRouter id（能力判定、辅助模型、
+failover 与 openrouter 路由同口径），只用 `-Dai.model.open-router.base-url` 把地址指到脚本进程里的本机转发口。
+转发口把 `model` 换成百炼 id、按官网平台网关（`lib/platform-ai/proxy.ts` 的 `validateChat`）的口径收敛请求体
+（丢掉 `provider`、`reasoning` 等 OpenRouter 专有字段，`enable_thinking` 显式置 false，流式带 `include_usage`），
+再带 `DASHSCOPE_API_KEY` 发往 `BAILIAN_BASE_URL`。后端子进程只拿到占位 key，百炼密钥不进子进程环境与后端日志；
+产物照样做密钥兜底替换。报告头写明路由与映射，并多一节「百炼上游响应」（转发口按模型×HTTP 状态计数，含后端自己的重试）。
+
+| 矩阵模型 id | 百炼 id | 百炼标价（元 / 1M：输入 / 输出 / 缓存命中） |
+|---|---|---|
+| `deepseek/deepseek-v4-flash` | `deepseek-v4.1-flash-1017`（生产平台通道用的 DeepSeek Flash） | 2 / 8 / 0.04（高峰档；00:00–08:00、22:00 后低谷 1 / 4 / 0.02） |
+| `qwen/qwen3.7-flash` | `qwen3.7-flash`（同名模型；生产辅助模型已迁到 `qwen3.8-flash`） | 0.2 / 0.8 / 0.04（单次输入 ≤32k 档；32k–256k 为 0.6 / 2.4 / 0.12） |
+| `qwen/qwen3.8-max-0902`（release） | `qwen3.8-max-0902` | 12 / 36 / 1.5 |
+| `deepseek/deepseek-v4-pro`（release） | `deepseek-v4-pro-0813`（生产所用） | 9 / 27 / 0.9（高峰档） |
+
+价格 2026-11-11 取自 DashScope `/api/v1/models`；报告里的成本估算按上表以人民币计（DeepSeek 按高峰档，偏保守）。
+没有映射的模型（含 intl 档）直接报错退出——白名单外的 id 会被后端回落成默认模型，结果会张冠李戴。
+
+验证（2026-11-11，before = after = origin/master `ab7353c98`，cn cheap，s01/s12/g02 × `--runs 2`）：24 次运行 0 次基础设施故障
+（1 次 qwen 空响应流自动重跑后通过），转发口 147 次上游请求全部 200、0 次 429；同日 OpenRouter 路由的 cn 矩阵里
+qwen3.7-flash 240 次运行有 171 次（71%）记为基础设施故障、deepseek-v4-flash 9/240（4%）。qwen 在 s01 上 3/4 次只输出思考文字不调工具，
+是模型行为不是故障（OpenRouter 路由同句也常见）。
+
 ## 隔离方式
 
 - 脚本在临时目录里 `initdb` 一个**自己的** PostgreSQL 集群（随机端口、`fsync=off`），不碰任何已在运行的库或 9696/5173。
 - 每个 ref×模型一个后端实例：独立数据库、随机端口、独立 `user.home`/存储/插件目录，server 模式（`SECURITY_LOCAL_MODE=false`，
   `AI_MOCK_ENABLED=false`），供应商 OpenRouter。每个实例注册一个测试用户。
 - 每次运行前清空记忆表、把此前运行留下的项目改名为 `zz-prev-<id>`（防同名项目互相污染），并新建一个全新项目再按 `seed` 灌入数据；同一实例内串行，实例之间并行。
-- 唯一出站请求是后端对 OpenRouter 的模型调用；脚本本身不发任何外网请求。
+- 唯一出站请求是后端对 OpenRouter 的模型调用；脚本本身不发任何外网请求（`--route bailian` 时例外：模型调用改由脚本的本机转发口发往百炼）。
 
 ## 句子集 schema
 
@@ -248,3 +281,4 @@ qwen3.7-flash 这两次都被 OpenRouter 上游限流（429 `temporarily rate-li
 - 2026-11-11：判分修正（agent-tier1-gap P0），**旧报告与新报告不可直接对比，需重新建基线**。`finalTextIncludes` 改用全文；文本 `<question>` 停问计为 `ask_user`；基础设施故障不进分母/门禁/回退；新增 `xmlTurns` / `nativeTurns` / `verifyAfterWrite` / `maxSameTool` 与 `--rescore`。gate-35 / gate-35-en：g15 去掉 `mustUse create_folder`（`move_files` 会自动建文件夹，结果由 outcomeCheck 判）；g01 的 `firstToolAnyOf` 加 `get_law_article` / `law_search`；g12 的 `firstToolAnyOf` 加只读探查类工具（`doc_find_text`、`doc_table_read`、`doc_get_clauses`、`doc_get_outline`、`todo_write`），同时 `mustNotUse` 加 `doc_replace_at_anchor`（拒绝/接受修订不该走文本替换）。
 - 2026-11-11（gap P3）：gate-35 / gate-35-en 的 `g02-insert-clause` 加 `outcomeCheck`，读宿主 docx 的 `word/document.xml`（去掉 `<w:del>` 块后拼 `<w:t>`）：含「保密」的段落都要独立成段、落在第四条与第五条原文段之间、带 `<w:ins>`；此前 g02 只判工具名，新旧结果不可直接对比。新增 `g19-insert-clause-after`（「在第三条后面新增一条……」，同法判第三、四条之间，`maxRounds: 10`），集名沿用 gate-35。另：编辑器句子在本轮结束后、关页面前等状态栏离开「更改待保存/保存中」（最多 20 秒），否则自动保存还没上传，docx 类 outcomeCheck 判到旧稿（首轮实测 g02 一次正确插入被判失败即此原因）。
 - 2026-11-11（gap P6）：新增 `sentences/tasks-10.json`（多步任务集，只按结果判分）与离线单测 `tasks-10.test.mjs`；runner 新增 `followUps`（API 句的脚本化第二轮，按确认卡/反问卡回答）、`task: true` 的「多步任务」报告表、`docxXml(buf, part)`；编辑器句子关页面前等自动保存（同 #1470）。既有句集与判分不变。
+- 2026-11-11：新增 `--route openrouter|bailian`（默认 openrouter，行为不变）。bailian 经脚本内的本机转发口直连百炼（见「百炼路由」），报告头写明路由与模型映射、成本按人民币标价估算，并列出百炼上游 HTTP 状态计数。句集与判分不变。
