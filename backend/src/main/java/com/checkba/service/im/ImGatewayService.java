@@ -36,7 +36,7 @@ public class ImGatewayService {
     public String captureAccountScope() {
         if (!localMode) return "server";
         String scope = account.accountFingerprintOrNull();
-        if (scope == null) throw new IllegalArgumentException(com.checkba.service.LangText.of("请先连接AI WorkDeck账户", "Please connect your AI WorkDeck account first"));
+        if (scope == null) throw new IllegalArgumentException(com.checkba.service.LangText.of("请先连接 AI WorkDeck 账户", "Please connect your AI WorkDeck account first"));
         return scope;
     }
 

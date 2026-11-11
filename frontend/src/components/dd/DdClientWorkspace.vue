@@ -533,9 +533,10 @@ p {
   flex: 1;
   border-bottom: 0;
   display: flex;
-  align-items: center;
+  /* 垂直居中在高窗口里会在卡片上方留出半屏空白；靠上放，留一段与窗口高度相称的上边距 */
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--awd-space-8) var(--awd-space-6);
+  padding: clamp(32px, 10vh, 96px) var(--awd-space-6) var(--awd-space-8);
   background: radial-gradient(circle at 50% 0%, var(--awd-halo-1), transparent 72%);
 }
 

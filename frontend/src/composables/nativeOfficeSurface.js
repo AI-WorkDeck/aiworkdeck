@@ -20,7 +20,7 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
   for (const [node, axis] of [[horizontalRuler, 'horizontal'], [verticalRuler, 'vertical']]) {
     node.dataset.nativeRuler = axis
     Object.assign(node.style, { position: 'absolute', zIndex: '2', overflow: 'hidden', pointerEvents: 'none',
-      background: 'var(--awd-surface)', color: 'var(--awd-text-muted)', fontSize: '10px' })
+      background: 'var(--awd-surface)', color: 'var(--awd-text-3)', fontSize: '10px' })
     element.appendChild(node)
   }
   const listeners = new Set()

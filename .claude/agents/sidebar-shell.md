@@ -306,6 +306,16 @@ type/priority/notes/assigneeId/remindBefore 与多文件关联表 `project_task_
 `type="date"/"time"` 会静默降级成文本框。日期/时间输入一律用 `components/AwdDatePicker.vue`
 （mounted 手工挂真原生 input 绕开 uni 模板劫持；只监听 change 防中间值上抛）。同理 `MentionInput` 用 `<component :is="'textarea'">` 绕开 uni 的 textarea（140 字上限/100ms 节流/不透传 keydown）。
 
+## 地雷：uni-h5 内置元素的默认版式（2026-11 设置页/插件版式排查）
+
+- **`<button>` → `<uni-button>`，自带 `margin-left/right: auto` 且是块级**：在 flex 行里被挤到中间，
+  在块容器里撑满整行。按钮类一律写 `margin: 0`（`.comp-btn` / `.btn-save` 已补）。
+- **`<form>` → `<uni-form><span>…</span></uni-form>`**：写在 form 上的 flex/grid/gap 只作用到中间那层 span，
+  子元素全挤在一起。`App.vue` 已全局 `uni-form > span { display: contents }`，不要删。
+- **模板里用了类名却没写样式不会报错**（团队看板 `scope-tab` 曾渲染成三行裸大字），
+  `<text>` 不设字号会继承 16px。新组件交付前按 `sdk/plugin-sdk/UI-GUIDELINES.md` 第 8 条截图自检。
+- `var(--awd-xxx)` 名字写错同样静默失效；`scripts/check-design-system.mjs` 只查 MIGRATED_FILES 里的文件。
+
 ## 地雷：uni-app H5 把 `<view>` 上的事件重建成普通对象，`button` 一类字段全丢
 
 uni-h5 的 `createNativeEvent` 收到 `<view>`（以及别的内置元素）上的原生事件后，

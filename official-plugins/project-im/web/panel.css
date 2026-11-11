@@ -19,6 +19,8 @@ p{margin:8px 0}
 #notice{padding:7px 12px;background:var(--awd-accent-wash,var(--fallback-wash));overflow-wrap:anywhere}
 #notice:empty{display:none}
 #notice[data-error="true"],#dialog-error{color:var(--awd-danger-text,var(--fallback-danger))}
+/* 出错时是一条提示条而不是一行裸红字：左侧色条 + 浅底，和宿主的 awd-set-note 同一形制 */
+#notice[data-error="true"]{margin:8px 12px 0;padding:8px 12px;border-inline-start:3px solid var(--awd-danger-text,var(--fallback-danger));border-radius:var(--awd-radius-sm,4px);background:var(--awd-danger-soft,var(--fallback-danger-wash,#fbeeee));font-size:12px}
 #workspace{display:grid;grid-template-columns:250px minmax(0,1fr);min-height:0;min-width:0;flex:1;overflow:hidden}
 #sidebar{padding:12px 10px;overflow-y:auto;overflow-x:hidden;min-width:0;border-right:1px solid var(--awd-border,var(--fallback-border));background:var(--awd-surface,var(--fallback-surface))}
 .list-tools{display:flex;gap:5px;flex-wrap:wrap}
