@@ -2772,9 +2772,10 @@ public class AgentOrchestrator {
                     guard.malformedToolRounds++;
                     log.warn("LENGTH-truncated native tool calls for {} (correction round {}), asking model to re-emit",
                             conversationId, guard.malformedToolRounds);
+                    StringBuilder truncatedNames = new StringBuilder();
+                    aiMessage.toolExecutionRequests().forEach(r -> truncatedNames.append(r.name()).append(' '));
                     messages.add(dev.langchain4j.data.message.UserMessage.from(
-                            "[系统提醒] 你上一条输出因达到单次输出长度上限被截断，其中的工具调用参数不完整、"
-                            + "没有被执行。请把动作拆小，重新、完整地输出这次工具调用；一次只做一步也可以。"));
+                            truncationCorrection(true, truncatedNames.toString())));
                     continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth + 1, executionLog, agentMode, guard);
                     return;
@@ -3208,10 +3209,9 @@ public class AgentOrchestrator {
                     guard.malformedToolRounds++;
                     log.warn("Truncated tool_code detected for {} (correction round {}), asking model to re-emit",
                             conversationId, guard.malformedToolRounds);
+                    int lastToolCode = content.lastIndexOf("<tool_code");
                     messages.add(dev.langchain4j.data.message.UserMessage.from(
-                            "[系统提醒] 你上一条输出中的标签未闭合（<tool_code> / <todo_write> / <final> 之一，内容被截断），"
-                            + "这次输出没有生效。请重新、完整地输出这一步；参数很长时先拆小，"
-                            + "或改用能直接把内容写进文档的工具。若任务其实已完成，请直接输出最终总结。"));
+                            truncationCorrection(false, lastToolCode < 0 ? content : content.substring(lastToolCode))));
                     continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth + 1, executionLog, agentMode, guard);
                     return;
@@ -4489,6 +4489,40 @@ public class AgentOrchestrator {
                                             dev.langchain4j.data.message.AiMessage aiMessage) {
         return finishReason == dev.langchain4j.model.output.FinishReason.LENGTH
                 && aiMessage != null && aiMessage.hasToolExecutionRequests();
+    }
+
+    /**
+     * 截断纠正回路回喂给模型的提醒（原生 LENGTH 截断与 XML 标签未闭合两条路）。
+     * 被截断的调用是 write_docx 时补一句精确的恢复办法：分段写、后续段落带 append=true——
+     * tasks-10 t03 里 deepseek 把整份差异说明塞进一次参数，连续两次被截断，最后一份文件都没写成；
+     * 泛泛的「拆小」它不知道 write_docx 怎么拆。
+     *
+     * @param truncatedSource 被截断的那段输出（原生：工具名；XML：最后一个 {@code <tool_code} 起的尾巴）
+     */
+    static String truncationCorrection(boolean nativeLength, String truncatedSource) {
+        String base = nativeLength
+                ? LangText.of(
+                        "[系统提醒] 你上一条输出因达到单次输出长度上限被截断，其中的工具调用参数不完整、"
+                                + "没有被执行。请把动作拆小，重新、完整地输出这次工具调用；一次只做一步也可以。",
+                        "[System reminder] Your last output hit the per-response length limit and was cut off; the tool "
+                                + "call's arguments were incomplete and it was NOT executed. Split the action into smaller "
+                                + "steps and re-emit the tool call in full; doing one step at a time is fine.")
+                : LangText.of(
+                        "[系统提醒] 你上一条输出中的标签未闭合（<tool_code> / <todo_write> / <final> 之一，内容被截断），"
+                                + "这次输出没有生效。请重新、完整地输出这一步；参数很长时先拆小，"
+                                + "或改用能直接把内容写进文档的工具。若任务其实已完成，请直接输出最终总结。",
+                        "[System reminder] A tag in your last output was left unclosed (<tool_code> / <todo_write> / "
+                                + "<final>; the content was cut off), so that output had no effect. Re-emit this step in "
+                                + "full; split long arguments first, or use a tool that writes the content into the "
+                                + "document directly. If the task is actually done, output the final summary.");
+        if (truncatedSource == null || !truncatedSource.contains("write_docx")) return base;
+        return base + LangText.of(
+                "\n被截断的是 write_docx：整篇正文一次装不下，文件没有写成。请分段写——先用 write_docx 只写开头一两节，"
+                        + "再用同一个 fileName 加 append=true 逐段续写，每次不超过约 1500 字，直到写完；不要再把整篇塞进一次调用。",
+                "\nThe truncated call was write_docx: the whole document does not fit in one call and no file was "
+                        + "written. Write it in parts: first call write_docx with only the opening section or two, then "
+                        + "call it again with the same fileName and append=true for each further part (about 1,500 "
+                        + "characters at most per call) until done. Do not put the whole document into one call again.");
     }
 
     /**
