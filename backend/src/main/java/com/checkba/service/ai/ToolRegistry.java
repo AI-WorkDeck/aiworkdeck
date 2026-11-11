@@ -118,7 +118,11 @@ public class ToolRegistry {
                     + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。"),
             Map.entry("search_law", "法规检索请用 law_search（语义检索法源；mode=keyword 按法规名+关键词）"
                     + "或 get_law_article（按条文号取原文）；"
-                    + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。")
+                    + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。"),
+            // P7：qwen 在 gate-35 g10/g15 反复拼出这个假名（r083 cn 2 次、P7 矩阵 3 次），拿回裸 not-found 后
+            // 还要再查两轮目录才找到真名
+            Map.entry("list_project_files", "列项目文件与文件夹请用 doc_list_project_files"
+                    + "（foldersOnly=true 只列文件夹，取 folderId）；按文件名找用 search_project_files。")
     );
 
     /** 未注册工具的统一反馈：有指路就带上，没有就保持原样那一句。 */
