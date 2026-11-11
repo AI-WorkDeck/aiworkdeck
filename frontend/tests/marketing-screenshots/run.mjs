@@ -19,6 +19,11 @@
 //
 // Env: SHOTS_BACKEND（默认 http://127.0.0.1:9696）/ SHOTS_PORT（默认 18930）/ PUPPETEER_EXECUTABLE_PATH /
 //      SHOTS_MODE / SHOTS_OUT（默认 <tmp>/marketing-shots）/ SHOTS_ONLY（逗号分隔的截图 id）
+//      SHOTS_PLUGINS_DIR（后端的插件安装目录，即后端 cwd 下的 plugins/；律所管理、项目沟通不随包，
+//      版式回归图要把它们从 official-plugins/ 拷进去）
+//
+// 两组截图：营销图（docs/images/marketing/e2e/，README/官网用，2x）与版式回归图（ui-baselines/，1x）。
+// 版式回归图覆盖曾经「静默变丑」的设置分区与插件面板，含窄窗口——见 sdk/plugin-sdk/UI-GUIDELINES.md。
 
 import fs from 'node:fs'
 import http from 'node:http'
@@ -32,7 +37,8 @@ const REPO = path.resolve(HERE, '../../..')
 const H5_DIR = path.join(REPO, 'frontend/dist/build/h5')
 const DEMO_DIR = path.join(REPO, 'fixtures/evidence-demo-1076')
 const REGISTRY_DIR = path.join(REPO, 'fixtures/marketing-demo')
-const BASELINE_DIR = path.join(REPO, 'docs/images/marketing/e2e')
+const BASELINE_DIRS = { marketing: path.join(REPO, 'docs/images/marketing/e2e'), ui: path.join(HERE, 'ui-baselines') }
+const PLUGINS_DIR = process.env.SHOTS_PLUGINS_DIR || ''
 const BACKEND = process.env.SHOTS_BACKEND || 'http://127.0.0.1:9696'
 const PORT = Number(process.env.SHOTS_PORT || 18930)
 const CHROME = process.env.PUPPETEER_EXECUTABLE_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -41,6 +47,9 @@ const OUT = process.env.SHOTS_OUT || path.join(os.tmpdir(), 'marketing-shots')
 const ONLY = (process.env.SHOTS_ONLY || '').split(',').filter(Boolean)
 // 2x 设备像素：文件 2880×1800，与 README 现有截图同规格，高分屏不糊
 const VIEWPORT = { width: 1440, height: 900, deviceScaleFactor: 2 }
+// 版式回归图 1x：只看版式，不进 README，基线体积小一半以上；窄档对应「工作台右栏展开、面板被挤窄」
+const UI_WIDE = { width: 1440, height: 900, deviceScaleFactor: 1 }
+const UI_NARROW = { width: 1100, height: 900, deviceScaleFactor: 1 }
 // 容差：单像素任一通道差 > PIXEL_DELTA 记为不同；不同像素占比 > MAX_DIFF_RATIO 判红。
 // 基线与比对在同一 runner 镜像、同一 Chrome 上渲染，只需覆盖抗锯齿级的噪声。
 const PIXEL_DELTA = 40
@@ -125,7 +134,8 @@ const FREEZE_CSS = `*,*::before,*::after{animation:none!important;transition:non
 // 时间字段归一化：相对时间（N 分钟前）与日期时刻随运行时刻变化，统一改写成固定值。
 // 只改时间文本，不动其他内容；设计文档列明了这一处理。
 async function normalizeTimes(page) {
-  await page.evaluate(() => {
+  // 插件面板在沙箱 iframe 里（无 same-origin），要逐个 frame 改写
+  for (const frame of page.frames()) await frame.evaluate(() => {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
     let n
     while ((n = walker.nextNode())) {
@@ -136,7 +146,7 @@ async function normalizeTimes(page) {
         .replace(/\d{4}-\d{2}-\d{2}/g, '2026-03-18')
       if (v !== t) n.textContent = v
     }
-  })
+  }).catch(() => {})
 }
 
 // ---------- 像素比对：在浏览器里用 canvas 解码 PNG，不引入额外依赖 ----------
@@ -189,8 +199,64 @@ async function clickText(page, text) {
   if (!p) throw new Error('找不到可见文字: ' + text)
   await page.mouse.click(p.x, p.y)
 }
-async function openWorkbench(page, base, projectId) {
-  await page.goto(base + '/#/pages/project-overview/project-overview?id=' + projectId, { waitUntil: 'networkidle0', timeout: 60000 })
+// 插件面板在 iframe 里：等某段文字出现在任一 frame，返回那个 frame
+async function waitFrameText(page, text, timeout = 30000) {
+  const deadline = Date.now() + timeout
+  for (;;) {
+    for (const frame of page.frames()) {
+      if (frame === page.mainFrame()) continue
+      const hit = await frame.evaluate((t) => !!document.body && document.body.innerText.includes(t), text).catch(() => false)
+      if (hit) return frame
+    }
+    if (Date.now() > deadline) throw new Error('插件面板里等不到文字: ' + text)
+    await sleep(300)
+  }
+}
+async function clickFrameText(page, text) {
+  const frame = await waitFrameText(page, text)
+  const handle = await frame.evaluateHandle((t) => {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    let n
+    while ((n = w.nextNode())) if (n.textContent.trim() === t && n.parentElement.getClientRects().length) return n.parentElement
+    return null
+  }, text)
+  const el = handle.asElement()
+  if (!el) throw new Error('插件面板里找不到可点的文字: ' + text)
+  await el.click()
+}
+async function openSettings(page, base, projectId, section) {
+  await openWorkbench(page, base, projectId)
+  await clickText(page, '设置')
+  await waitText(page, '我的工作')
+  await clickText(page, section)
+}
+
+// 版式回归图的数据：装上不随包的律所管理、项目沟通，填律所样板数据
+async function seedUiFixtures() {
+  if (!PLUGINS_DIR) throw new Error('缺 SHOTS_PLUGINS_DIR（后端 cwd 下的 plugins/），版式回归图要装律所管理与项目沟通')
+  for (const id of ['lawfirm-management', 'project-im']) {
+    const target = path.join(PLUGINS_DIR, id)
+    fs.rmSync(target, { recursive: true, force: true })
+    for (const sub of ['manifest.json', 'web', 'l10n']) {
+      const from = path.join(REPO, 'official-plugins', id, sub)
+      if (fs.existsSync(from)) fs.cpSync(from, path.join(target, sub), { recursive: true })
+    }
+    fs.copyFileSync(path.join(REPO, 'sdk/plugin-sdk/awd-plugin-sdk.js'), path.join(target, 'web/awd-plugin-sdk.js'))
+  }
+  await api('/api/plugins/rescan', { method: 'POST' })
+  for (const id of ['lawfirm-management', 'project-im']) await api('/api/plugins/' + id + '/enable', { method: 'POST' })
+  const login = await api('/api/auth/login', { method: 'POST', body: { username: 'admin', password: '123' } })
+  const session = login && login.data && login.data.sessionId
+  if (!session) throw new Error('本机登录失败，填不了律所样板数据')
+  const r = await fetch(BACKEND + '/api/lawfirm/action', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Session-Id': session },
+    body: JSON.stringify({ action: 'seedDemoData', params: {} }),
+  }).then((x) => x.json())
+  if (!r || r.code !== 0) throw new Error('律所样板数据失败: ' + JSON.stringify(r).slice(0, 200))
+}
+
+async function openWorkbench(page, base, projectId, extraQuery = '') {
+  await page.goto(base + '/#/pages/project-overview/project-overview?id=' + projectId + extraQuery, { waitUntil: 'networkidle0', timeout: 60000 })
   await page.waitForSelector('[title="资源管理器"]', { timeout: 30000 })
   await waitText(page, '01-购销合同.docx')
 }
@@ -228,12 +294,90 @@ const SHOTS = [
       await waitText(page, 'startup-agreement-drafter')
     },
   },
+
+  // ---------- 版式回归图（2026-11 版式排查中出过问题的界面；宽窄两档） ----------
+  {
+    id: 'ui-settings-team', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openSettings(page, base, projectId, '团队')
+      await waitText(page, '按主办律师')
+      await waitText(page, '资本市场与证券部')
+    },
+  },
+  {
+    id: 'ui-settings-mcp', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openSettings(page, base, projectId, '外部工具连接（MCP）')
+      await waitText(page, '添加连接')
+      await waitText(page, '北大法宝')
+    },
+  },
+  {
+    id: 'ui-settings-ai', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openSettings(page, base, projectId, 'AI 功能设置')
+      await waitText(page, '扫描件识别')
+      await waitText(page, '编辑规则')
+    },
+  },
+  {
+    id: 'ui-message-center', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openWorkbench(page, base, projectId, '&tab=messages')
+      await waitText(page, '消息中心')
+      await clickText(page, '新建会话')
+      await waitText(page, '会话名称')
+    },
+  },
+  {
+    id: 'ui-client-collab', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openWorkbench(page, base, projectId)
+      await clickTitle(page, '客户协作')
+      await waitText(page, '律师发送的邀请码')
+    },
+  },
+  {
+    id: 'ui-lawfirm-intake', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openWorkbench(page, base, projectId)
+      await clickTitle(page, '律所管理')
+      await waitFrameText(page, 'LF-2026-0004')
+    },
+  },
+  {
+    id: 'ui-lawfirm-intake-narrow', dir: 'ui', viewport: UI_NARROW,
+    async prepare(page, { base, projectId }) {
+      await openWorkbench(page, base, projectId)
+      await clickTitle(page, '律所管理')
+      await waitFrameText(page, 'LF-2026-0004')
+    },
+  },
+  {
+    id: 'ui-lawfirm-dashboard', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openWorkbench(page, base, projectId)
+      await clickTitle(page, '律所管理')
+      await waitFrameText(page, 'LF-2026-0004')
+      await clickFrameText(page, '决策与业务看板')
+      await waitFrameText(page, '资本市场与证券部')
+    },
+  },
+  {
+    id: 'ui-project-im', dir: 'ui', viewport: UI_WIDE,
+    async prepare(page, { base, projectId }) {
+      await openWorkbench(page, base, projectId)
+      await clickTitle(page, '项目群聊')
+      await waitFrameText(page, '请先连接')
+    },
+  },
 ]
 
 // ---------- main ----------
 const server = await startServer()
 const base = 'http://127.0.0.1:' + PORT
 const projectId = await seedDemoProject()
+if (SHOTS.some((s) => s.dir === 'ui' && (!ONLY.length || ONLY.includes(s.id)))) await seedUiFixtures()
 console.log('演示项目 #' + projectId + '，H5 ' + base + '，模式 ' + MODE)
 const browser = await puppeteer.launch({
   executablePath: CHROME, headless: 'new',
@@ -248,6 +392,7 @@ try {
     // 共用上下文会让上一张图的状态串进下一张。
     const context = await browser.createBrowserContext()
     const page = await context.newPage()
+    if (shot.viewport) await page.setViewport(shot.viewport)
     const errors = []
     page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
     await page.evaluateOnNewDocument((apiBase) => {
@@ -274,7 +419,7 @@ try {
     try {
       await shot.prepare(page, { base, projectId })
       await page.addStyleTag({ content: FREEZE_CSS })
-      await page.mouse.move(0, VIEWPORT.height - 1) // 鼠标挪开，避免悬停态进截图
+      await page.mouse.move(0, (shot.viewport || VIEWPORT).height - 1) // 鼠标挪开，避免悬停态进截图
       await page.evaluate(() => document.fonts.ready)
       await sleep(800)
       await normalizeTimes(page)
@@ -286,7 +431,7 @@ try {
       await context.close()
       continue
     }
-    const baseline = path.join(BASELINE_DIR, shot.id + '.png')
+    const baseline = path.join(BASELINE_DIRS[shot.dir || 'marketing'], shot.id + '.png')
     if (MODE === 'update') {
       console.log('  [UPDATE] ' + shot.id + ' -> ' + actual)
     } else if (!fs.existsSync(baseline)) {

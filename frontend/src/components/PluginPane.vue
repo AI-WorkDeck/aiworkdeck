@@ -1292,7 +1292,7 @@ export default {
   gap: 16px;
   padding: 32px;
   line-height: 1.7;
-  button { background: var(--awd-accent); color: var(--awd-on-accent, #fff); border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+  button { background: var(--awd-accent); color: var(--awd-text-on-accent); border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
 }
 .plugin-error {
   padding: var(--awd-panel-gap-lg) var(--awd-panel-pad-x);

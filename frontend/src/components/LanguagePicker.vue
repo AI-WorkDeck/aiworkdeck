@@ -310,8 +310,8 @@ export default {
   padding: 5px 10px;
   border-radius: 6px;
   border: 1px solid var(--awd-border, rgba(15, 23, 42, 0.14));
-  background: var(--awd-surface-1, var(--awd-bg-elevated, #ffffff));
-  color: var(--awd-text-primary, #1f2329);
+  background: var(--awd-surface-elevated);
+  color: var(--awd-text);
   font-size: 13px;
   line-height: 1.3;
   cursor: pointer;
@@ -324,13 +324,13 @@ export default {
   font-size: 12px;
   background: transparent;
   border-color: var(--awd-border-subtle, rgba(15, 23, 42, 0.12));
-  color: var(--awd-text-secondary, #4e5969);
+  color: var(--awd-text-2);
 }
 
 .awd-lang-trigger:hover,
 .awd-lang-picker.is-open .awd-lang-trigger {
   border-color: var(--awd-accent, #2563eb);
-  color: var(--awd-text-primary, #1f2329);
+  color: var(--awd-text);
 }
 
 .awd-lang-globe {
@@ -361,7 +361,7 @@ export default {
   max-width: calc(100vw - 24px);
   border-radius: 8px;
   border: 1px solid var(--awd-border, rgba(15, 23, 42, 0.14));
-  background: var(--awd-surface-1, var(--awd-bg-elevated, #ffffff));
+  background: var(--awd-surface-elevated);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
   overflow: hidden;
 }
@@ -389,7 +389,7 @@ export default {
   border-radius: 6px;
   border: 1px solid var(--awd-border, rgba(15, 23, 42, 0.14));
   background: var(--awd-surface-2, rgba(15, 23, 42, 0.03));
-  color: var(--awd-text-primary, #1f2329);
+  color: var(--awd-text);
   font-size: 12px;
   outline: none;
 }
@@ -414,7 +414,7 @@ export default {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--awd-text-primary, #1f2329);
+  color: var(--awd-text);
   font-size: 13px;
   text-align: start;
   cursor: pointer;
@@ -428,7 +428,7 @@ export default {
 
 .awd-lang-option:hover,
 .awd-lang-option.is-active {
-  background: var(--awd-surface-hover, rgba(37, 99, 235, 0.08));
+  background: var(--awd-panel-hover);
 }
 
 .awd-lang-option.is-selected {
@@ -452,7 +452,7 @@ export default {
 .awd-lang-opt-sub {
   font-size: 11px;
   font-weight: 400;
-  color: var(--awd-text-tertiary, #86909c);
+  color: var(--awd-text-3);
   line-height: 1.2;
 }
 
@@ -469,7 +469,7 @@ export default {
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--awd-surface-2, rgba(15, 23, 42, 0.06));
-  color: var(--awd-text-secondary, #4e5969);
+  color: var(--awd-text-2);
 }
 
 .awd-lang-opt-check {
@@ -483,6 +483,6 @@ export default {
   padding: 14px 10px;
   text-align: center;
   font-size: 12px;
-  color: var(--awd-text-tertiary, #86909c);
+  color: var(--awd-text-3);
 }
 </style>
