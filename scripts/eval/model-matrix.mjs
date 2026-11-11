@@ -497,7 +497,11 @@ function parseLogSlice(slice, conversationId) {
     if (m[1]) { if (m[1] === conversationId) rounds.push({ depth: +m[2], round: +m[3], toolsOffered: +m[4], toolsHash: m[5] || null, toolsOrderHash: m[6] || null }) }
     else tools.push(m[7] || m[8])
   }
-  return { tools, rounds }
+  // 原生工具调用的参数（XML 路径不记）：outcomeCheck 用 ctx.calls 判「有没有多填没让改的参数」
+  const calls = []
+  const ra = /name = "([a-zA-Z_0-9]+)", arguments = "(.*?)" \}(?=, ToolExecutionRequest|\])/g
+  while ((m = ra.exec(slice))) { let args = null; try { args = JSON.parse(m[2]) } catch { /* 截断或非 JSON */ } calls.push({ name: m[1], args }) }
+  return { tools, rounds, calls }
 }
 
 async function runOne(inst, sentence, runIdx, opts) {
@@ -512,7 +516,7 @@ async function runOne(inst, sentence, runIdx, opts) {
     await sleep(300) // 让日志/用量落盘（落盘延迟，不是等模型）
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
     const buf = Buffer.alloc(size - c.logOffset); fs.readSync(fd, buf, 0, buf.length, c.logOffset); fs.closeSync(fd)
-    const { tools, rounds } = parseLogSlice(buf.toString('utf8'), c.conversationId)
+    const { tools, rounds, calls } = parseLogSlice(buf.toString('utf8'), c.conversationId)
     // cached_tokens / cache_write_tokens 列自本 PR 起才有；旧 ref 的库没有这两列时回退到不带缓存的查询（缓存数记 0）
     let usage = (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls, coalesce(sum(cached_tokens),0)::int as cached, coalesce(sum(cache_write_tokens),0)::int as cache_write, count(cached_tokens)::int as cache_reported from token_usage where conversation_id='${c.conversationId}'`).catch(() => null))?.[0]
     usage = usage || (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls from token_usage where conversation_id='${c.conversationId}'`).catch(() => []))[0] || {}
@@ -529,7 +533,7 @@ async function runOne(inst, sentence, runIdx, opts) {
       durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
     const ctx = {
-      projectId: pid, tools, finalText: c.text || '', api: (m, u, b) => inst.http(m, u, b), sql: q => inst.sql(q), rows: q => inst.rows(q),
+      projectId: pid, tools, calls, finalText: c.text || '', api: (m, u, b) => inst.http(m, u, b), sql: q => inst.sql(q), rows: q => inst.rows(q),
       files: () => inst.rows(`select id, name, parent_id, is_folder, is_deleted from project_file where project_id=${pid} order by id`),
       tasks: () => inst.rows(`select id, title, due_date, source from project_task where project_id=${pid} order by id`),
       memory: () => inst.rows('select memory_type, memory_key, memory_value, scope from memory_entry'),

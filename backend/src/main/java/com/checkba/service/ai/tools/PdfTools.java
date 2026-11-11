@@ -71,7 +71,7 @@ public class PdfTools implements AgentToolComponent {
           "但在桌面端会话里，pdf_to_word 可以直接对它做本地 MinerU OCR 转成可编辑 Word。加密的 PDF 会直接报错，请用户先解除密码。")
     public String pdf_inspect(
             @P("文件 ID（从 doc_list_project_files 获取）") Long fileId,
-            @P("页码（从 0 开始，可选）。指定后只返回该页；传 null 返回全部页") Integer pageIndex,
+            @P(value = "页码（从 0 开始，可选）。指定后只返回该页；传 null 返回全部页", required = false) Integer pageIndex,
             @P(value = "续读位点（可选）：上一次返回的 next_offset。给了它就必须同时指定 pageIndex",
                     required = false) Integer offset
     ) {
@@ -99,9 +99,9 @@ public class PdfTools implements AgentToolComponent {
     public String pdf_highlight(
             @P("文件 ID") Long fileId,
             @P("要高亮的原文文本（逐字一致）") String text,
-            @P("页码（从 0 开始，可选）。指定后只在该页查找；传 null 全文查找") Integer pageIndex,
-            @P("高亮颜色，十六进制如 '#FFFF00'（可选，默认黄色）") String color,
-            @P("附着在高亮上的说明文字（可选，悬停/点开可见）") String note
+            @P(value = "页码（从 0 开始，可选）。指定后只在该页查找；传 null 全文查找", required = false) Integer pageIndex,
+            @P(value = "高亮颜色，十六进制如 '#FFFF00'（可选，默认黄色）", required = false) String color,
+            @P(value = "附着在高亮上的说明文字（可选，悬停/点开可见）", required = false) String note
     ) {
         log.info("Tool: pdf_highlight called, fileId={}, text={}, pageIndex={}", fileId, brief(text), pageIndex);
         try {
@@ -123,7 +123,7 @@ public class PdfTools implements AgentToolComponent {
             @P("文件 ID") Long fileId,
             @P("锚点原文文本（批注加在它旁边，需与原文逐字一致）") String anchorText,
             @P("批注内容") String comment,
-            @P("页码（从 0 开始，可选）；传 null 全文查找第一处") Integer pageIndex
+            @P(value = "页码（从 0 开始，可选）；传 null 全文查找第一处", required = false) Integer pageIndex
     ) {
         log.info("Tool: pdf_annotate called, fileId={}, anchor={}, pageIndex={}", fileId, brief(anchorText), pageIndex);
         try {
@@ -152,7 +152,7 @@ public class PdfTools implements AgentToolComponent {
     public String pdf_redact(
             @P("文件 ID") Long fileId,
             @P("要脱敏的文本列表，JSON 字符串数组，如 [\"张三\",\"110101199001011234\"]，每项需与原文逐字一致") String textsJson,
-            @P("页码（从 0 开始，可选）；传 null 全文查找") Integer pageIndex
+            @P(value = "页码（从 0 开始，可选）；传 null 全文查找", required = false) Integer pageIndex
     ) {
         log.info("Tool: pdf_redact called, fileId={}, pageIndex={}", fileId, pageIndex);
         try {
@@ -192,7 +192,7 @@ public class PdfTools implements AgentToolComponent {
             @P("文件 ID") Long fileId,
             @P("要替换的原文文本（逐字一致、不跨行）") String find,
             @P("新文本") String replace,
-            @P("页码（从 0 开始，可选）；传 null 全文替换所有匹配") Integer pageIndex
+            @P(value = "页码（从 0 开始，可选）；传 null 全文替换所有匹配", required = false) Integer pageIndex
     ) {
         log.info("Tool: pdf_replace_text called, fileId={}, find={}, pageIndex={}", fileId, brief(find), pageIndex);
         try {
@@ -509,7 +509,7 @@ public class PdfTools implements AgentToolComponent {
           "返回信息会注明实际使用的转换路径，向用户如实转述。同一轮里对同一份 PDF 再调一次会直接复用已转出的那份。")
     public String pdf_to_word(
             @P("PDF 文件 ID") Long fileId,
-            @P("目标文件夹 ID（可选，省略跟随源 PDF 所在目录；传 0 明确放项目根目录）") Long parentId,
+            @P(value = "目标文件夹 ID（可选，省略跟随源 PDF 所在目录；传 0 明确放项目根目录）", required = false) Long parentId,
             @P(value = "版式级转换失败时是否允许退回只保留文字的结构级转换（表格与版式会丢失）。"
                     + "默认 false；只有用户明确同意后才传 true", required = false) Boolean allowStructuralFallback
     ) {

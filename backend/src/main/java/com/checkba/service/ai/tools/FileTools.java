@@ -259,7 +259,7 @@ public class FileTools implements AgentToolComponent {
             + "with its id in one call); use this one when the on-disk folder structure itself is what matters.")
     public String list_files(
             @P("Project ID - files will be listed from data/projects/{projectId}/") Long projectId,
-            @P("Optional: Subdirectory path within the project folder. Use '.' or empty for project root.") String subPath
+            @P(value = "Optional: Subdirectory path within the project folder. Use '.' or empty for project root.", required = false) String subPath
     ) {
         log.info("Tool: list_files called for projectId={}, subPath={}", projectId, subPath);
         try {

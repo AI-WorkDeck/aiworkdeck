@@ -363,4 +363,29 @@ class ToolDeclarationContractTest {
         }
         assertTrue(missing.isEmpty(), "这些工具不该受本次改动影响，却不见了：" + missing);
     }
+    /**
+     * 描述里写着「不传 / 可选 / 默认 / optional」的参数不能标成 required（langchain4j 的 {@code @P} 缺省
+     * required = true）。标错时严格的模型（Claude / GPT）会被逼着把每个「不改则不传」的格式参数都填上，
+     * 例如 doc_set_paragraph_format 填 headingLevel=0 就把标题打回正文。只看参数自己的说明，
+     * 说明里的 JSON 示例（如 {@code "reason":"…（可选）"}）不算。
+     */
+    private static final java.util.regex.Pattern OPTIONAL_WORDING =
+            java.util.regex.Pattern.compile("不传|可选|不填|[Oo]ptional|默认|缺省|留空");
+
+    @Test
+    @DisplayName("说明里写了可不传的参数不得是 required")
+    void optionalWordingIsNeverRequired() throws Exception {
+        List<String> wrong = new ArrayList<>();
+        for (ToolSpecification spec : registry().getAllSpecifications()) {
+            if (spec.parameters() == null || spec.parameters().required() == null) continue;
+            for (String name : spec.parameters().required()) {
+                Object prop = spec.parameters().properties().get(name);
+                if (prop == null) continue;
+                Object desc = prop.getClass().getMethod("description").invoke(prop);
+                String own = desc == null ? "" : desc.toString().replaceAll("\\[\\{.*?\\}\\]?", "");
+                if (OPTIONAL_WORDING.matcher(own).find()) wrong.add(spec.name() + "." + name);
+            }
+        }
+        assertTrue(wrong.isEmpty(), "这些参数说明写着可不传，却被标成 required（给 @P 加 required = false）：" + wrong);
+    }
 }
