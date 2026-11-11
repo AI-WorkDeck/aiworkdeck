@@ -132,6 +132,31 @@ class OpenRouterStreamingChatModelTest {
     }
 
     @Test
+    @DisplayName("首个工具调用的 id/name 与正文同一分片到达：不能变成无名调用（deepseek 并行调用实录形态）")
+    void toolCallHeaderBesideContentKeepsName() throws Exception {
+        serveStream(chunk("{\"content\":\"先定位。\",\"tool_calls\":[{\"index\":0,\"id\":\"call_a\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"doc_find_text\",\"arguments\":\"\"}}]}", null)
+                + chunk("{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"keyword\\\":\\\"第三条\\\"}\"}}]}", null)
+                + chunk("{\"tool_calls\":[{\"index\":1,\"id\":\"call_b\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"doc_find_text\",\"arguments\":\"{\\\"keyword\\\":\\\"第四条\\\"}\"}}]}", null)
+                + chunk("{}", "tool_calls") + "data: [DONE]\n\n");
+        OpenRouterStreamingChatModel model = new OpenRouterStreamingChatModel(
+                "sk-test", baseUrl(), "deepseek/deepseek-v4-flash", Duration.ofSeconds(5));
+        Collector c = new Collector();
+        model.generate(List.of(UserMessage.from("改第三条和第四条")),
+                List.of(ToolSpecification.builder().name("doc_find_text").description("find").build()), c);
+        c.await();
+        assertNull(c.error.get(), () -> "不该出错：" + c.error.get());
+        AiMessage m = c.done.get().content();
+        assertEquals("先定位。", m.text());
+        assertEquals(2, m.toolExecutionRequests().size(), m::toString);
+        assertEquals("call_a", m.toolExecutionRequests().get(0).id());
+        assertEquals("doc_find_text", m.toolExecutionRequests().get(0).name());
+        assertEquals("{\"keyword\":\"第三条\"}", m.toolExecutionRequests().get(0).arguments());
+        assertEquals("doc_find_text", m.toolExecutionRequests().get(1).name());
+    }
+
+    @Test
     void bailianStreamsToolsAndReasoningWithoutOpenRouterExtensions() throws Exception {
         serveStream(chunk("{\"reasoning_content\":\"consider\"}", null)
                 + chunk("{\"tool_calls\":[{\"index\":0,\"id\":\"call_bailian\",\"type\":\"function\",\"function\":{\"name\":\"read_file\",\"arguments\":\"{}\"}}]}", null)
