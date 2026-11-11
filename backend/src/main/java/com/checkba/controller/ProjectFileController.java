@@ -639,6 +639,50 @@ public class ProjectFileController {
     }
 
     /**
+     * 右键「打印」：返回可打印的 PDF 字节（Office/图片现转，PDF 原样），不落新文件，只要读权限。
+     * GET /api/projects/{projectId}/files/{fileId}/print-pdf
+     */
+    @GetMapping("/{fileId}/print-pdf")
+    @com.checkba.service.mobile.CloudMeteredDownload
+    public ResponseEntity<byte[]> printPdf(
+            @PathVariable Long projectId,
+            @PathVariable Long fileId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileTreeAccess(projectId, userId);
+        checkFileInProject(fileId, projectId);
+        byte[] pdf = projectFilePdfService.renderPrintablePdf(projectId, fileId, userId);
+        com.checkba.service.mobile.CloudDownloadContext.mark(userId, "print:" + projectId + ":" + fileId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Cache-Control", "private, no-store")
+                .contentLength(pdf.length)
+                .body(pdf);
+    }
+
+    /**
+     * 右键「压缩为 ZIP」：把选中的文件/文件夹（文件夹连子孙）打成一个 zip，存在首项所在目录。
+     * POST /api/projects/{projectId}/files/batch/zip
+     */
+    @PostMapping("/batch/zip")
+    public Map<String, Object> compressToZip(
+            @PathVariable Long projectId,
+            @RequestBody ProjectFileBatchRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new UnauthorizedException("请先登录");
+        checkFileWriteAccess(projectId, userId);
+        ProjectFile created = projectFileService.compressToZip(projectId, request == null ? null : request.getFileIds(), userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("message", com.checkba.service.LangText.of("已压缩", "Compressed"));
+        result.put("data", created);
+        return result;
+    }
+
+    /**
      * 将多个文件分别转为 PDF 后按顺序合并为一个 PDF（dev-board#1291）。
      * POST /api/projects/{projectId}/files/batch/merge-pdf
      */

@@ -2366,6 +2366,107 @@ public class ProjectFileService {
         return root;
     }
 
+    /**
+     * 右键「压缩为 ZIP」：把选中的文件/文件夹（文件夹连子孙）打成一个 zip，存在首项所在目录
+     * （重名自动加序号）。单项取其名，多项为「首项名等N项.zip」。条目数与总量沿用解压的护栏。
+     */
+    @Transactional
+    public ProjectFile compressToZip(Long projectId, List<Long> fileIds, Long userId) {
+        if (fileIds == null || fileIds.stream().noneMatch(Objects::nonNull)) {
+            throw new IllegalArgumentException(LangText.of("请选择要压缩的文件", "Please select files to compress"));
+        }
+        List<ProjectFile> roots = new ArrayList<>();
+        for (Long id : new java.util.LinkedHashSet<>(fileIds)) {
+            if (id == null) continue;
+            ProjectFile f = getFile(id);
+            if (!Objects.equals(projectId, f.getProjectId()) || Boolean.TRUE.equals(f.getIsDeleted())) {
+                throw new IllegalArgumentException(LangText.of("文件不存在或不属于该项目", "File does not exist or does not belong to this project"));
+            }
+            roots.add(f);
+        }
+        ProjectFile first = roots.get(0);
+        String stem = first.getName();
+        int dot = Boolean.TRUE.equals(first.getIsFolder()) ? -1 : stem.lastIndexOf('.');
+        if (dot > 0) stem = stem.substring(0, dot);
+        String zipName = roots.size() == 1 ? stem + ".zip"
+                : stem + LangText.of("等" + roots.size() + "项.zip", "_and_" + (roots.size() - 1) + "_more.zip");
+
+        java.nio.file.Path tmp = null;
+        try {
+            tmp = java.nio.file.Files.createTempFile("awd-zip-", ".zip");
+            long[] totals = { 0L, 0L }; // entries, bytes
+            java.util.Set<String> used = new java.util.HashSet<>();
+            try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
+                    java.nio.file.Files.newOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8)) {
+                for (ProjectFile root : roots) {
+                    zipRecursive(zos, root, "", used, totals);
+                }
+            }
+            long size = java.nio.file.Files.size(tmp);
+            ProjectFile created = createFile(projectId, first.getParentId(), zipName, "zip", size,
+                    null, generateWpsFileId(projectId), userId, ConflictPolicy.RENAME);
+            try (java.io.InputStream in = java.nio.file.Files.newInputStream(tmp)) {
+                storageServiceFactory.getStorageService().save(created.getFilePath(), in);
+            }
+            signalChange(projectId, userId);
+            log.info("压缩完成: {} 项 -> 「{}」({} 条目, {} bytes)", roots.size(), created.getName(), totals[0], totals[1]);
+            return created;
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException(LangText.of("压缩失败: ", "Compression failed: ") + e.getMessage(), e);
+        } finally {
+            if (tmp != null) {
+                try { java.nio.file.Files.deleteIfExists(tmp); } catch (java.io.IOException ignored) { }
+            }
+        }
+    }
+
+    private void zipRecursive(java.util.zip.ZipOutputStream zos, ProjectFile node, String prefix,
+                              java.util.Set<String> used, long[] totals) throws Exception {
+        if (++totals[0] > MAX_ARCHIVE_ENTRIES) {
+            throw new IllegalArgumentException(LangText.of("文件过多，无法压缩（上限 ", "Too many files to compress (limit ") + MAX_ARCHIVE_ENTRIES + LangText.of("）", ")"));
+        }
+        boolean folder = Boolean.TRUE.equals(node.getIsFolder());
+        String entryName = uniqueEntryName(prefix, node.getName(), folder, used);
+        if (folder) {
+            zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+            zos.closeEntry();
+            for (ProjectFile child : projectFileRepository.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(node.getProjectId(), node.getId())) {
+                zipRecursive(zos, child, entryName, used, totals);
+            }
+            return;
+        }
+        zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+        if (StringUtils.hasText(node.getFilePath())) {
+            try (java.io.InputStream in = storageServiceFactory.getStorageService().load(node.getFilePath()).getInputStream()) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    totals[1] += n;
+                    if (totals[1] > MAX_ARCHIVE_BYTES) {
+                        throw new IllegalArgumentException(LangText.of("文件总量超过 1GB，无法压缩", "Total size exceeds 1GB and cannot be compressed"));
+                    }
+                    zos.write(buf, 0, n);
+                }
+            }
+        }
+        zos.closeEntry();
+    }
+
+    /** 同一 zip 内条目名去重（跨目录选中的同名项、选中项与其子孙同时被选）："a.pdf" → "a (2).pdf"。 */
+    private static String uniqueEntryName(String prefix, String name, boolean folder, java.util.Set<String> used) {
+        String suffix = folder ? "/" : "";
+        String candidate = prefix + name + suffix;
+        int dot = folder ? -1 : name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
+        for (int i = 2; !used.add(candidate); i++) {
+            candidate = prefix + base + " (" + i + ")" + ext + suffix;
+        }
+        return candidate;
+    }
+
     private String archiveType(ProjectFile pf) {
         String t = pf.getFileType() == null ? "" : pf.getFileType().toLowerCase();
         if (!ARCHIVE_TYPES.contains(t)) throw new IllegalArgumentException(LangText.of("不支持的压缩包类型: ", "Unsupported archive type: ") + t);

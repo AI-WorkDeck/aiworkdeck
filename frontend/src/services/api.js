@@ -2447,6 +2447,34 @@ export function batchCopyFiles(projectId, fileIds, targetParentId) {
   });
 }
 
+// 右键「打印」：取可打印的 PDF 字节（Office/图片后端现转，不落新文件），返回 Blob
+export async function fetchPrintablePdf(projectId, fileId) {
+  const res = await fetch(`${getApiBaseUrl()}/api/projects/${projectId}/files/${fileId}/print-pdf`, {
+    headers: getAuthHeaders() || {},
+  })
+  if (!res.ok) {
+    let message = ''
+    try { message = (await res.json()).message || '' } catch (e) { /* 非 JSON 报错体 */ }
+    throw new Error(message || `HTTP ${res.status}`)
+  }
+  return res.blob()
+}
+
+// 右键「压缩为 ZIP」：选中的文件/文件夹打成一个 zip，存在首项所在目录
+export function compressFilesToZip(projectId, fileIds) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/zip`,
+    method: 'POST',
+    timeout: 300000,
+    data: {
+      fileIds,
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 单个文件（Word/PPT/Excel/图片）转为 PDF（dev-board#1291）
 export function convertFileToPdf(projectId, fileId) {
   return request({

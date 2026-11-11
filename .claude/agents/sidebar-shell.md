@@ -1522,6 +1522,17 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - 前端 `FileTree.vue` 与 `utils/fileTreePdfActions.js`：单选可转 PDF 文件（`doc/docx/ppt/pptx/xls/xlsx` 及图片）右键菜单显示「转为 PDF」；多选（含已有 `pdf`）2 个及以上文件时右键菜单显示「合并为 PDF」。
 - 后端 `ProjectFileController`（`POST /api/projects/{projectId}/files/{fileId}/convert-pdf`、`POST /api/projects/{projectId}/files/batch/merge-pdf`）与 `ProjectFilePdfService`：Office 文档优先调本机 LibreOffice，不可用时走内置 POI + PDFBox 中文字体渲染兜底，在原目录生成同名（自动递增序号）PDF 并刷新文件树。回归：`ProjectFilePdfServiceTest`、`fileTreePdfActions.test.mjs`。
 
+## 资源管理器右键：打印 / 移动到… / 压缩为 ZIP / 解压到此处（2026-11-10）
+
+- 判定在 `frontend/src/utils/fileTreeExtraActions.js`：「打印…」单选、扩展名同可合并 PDF 集合（PDF/Office/图片）；「解压到此处」单选 zip/7z/rar 且非只读；「移动到…」「压缩为 ZIP」单选多选都给（文件夹连子孙勾着时只算文件夹，同 `contextTargetItems`）；回收站一律不给。
+- 打印：`GET /api/projects/{p}/files/{id}/print-pdf`（只读权限、`@CloudMeteredDownload`、不落新文件，`ProjectFilePdfService.renderPrintablePdf`）→ `printPdfBlob` 把 Blob 放进隐藏 iframe 调 `contentWindow.print()`，走 Chromium 内置 PDF 引擎。
+- 移动到…：复用批量选择的「选择文件夹」弹窗；对象存在 `contextActionIds`，`executeBatchAction` 优先用它、用完清空，`openBatchAction` 也会清，避免和勾选串味。
+- 压缩：`POST /api/projects/{p}/files/batch/zip`（写权限）→ `ProjectFileService.compressToZip`，先写临时文件再流进存储，条目数/总量沿用解压护栏（5000 条、1GB）；同一 zip 内重名条目加「 (2)」。解压复用既有 `archive/extract`。
+- 回归：`ProjectFileServiceArchiveTest`（compressToZip*）、`frontend/tests/project-home/file-tree-extra-menu.test.mjs`。
+- 菜单版式：六个 `.context-menu-group`（AI/内容 → 编辑 → 事项与权限 → 输出与转换 → 位置与历史+其他 → 删除），分隔线只画在非空组之间（`:empty` 隐藏全被 v-if 掉的组，依赖 Vue 把空白文本节点压掉）；行高 32、4px 内边距、accent 悬停，同 `ExplorerCreateMenu`。打开后 `clampContextMenu` 把菜单挪回视口。
+- 子菜单「识别文字（OCR）」「其他」悬停展开为侧边浮层（`ctxSub` + `.context-menu-flyout`，放不下翻到左侧），离开触发行走 `utils/menuAim.js` 的斜移宽限。「其他」里放「复制路径」（桌面、仅文件，走 `/local-path`）与「复制相对路径」（父链拼项目内路径）。刻意不做「下载」「用其他应用打开」（本地应用，访达里就有）。
+- 现有测试按「`<view v-if=` 紧挨 `$t('key')`」在模板里找菜单项（BUG-73），菜单项保持模板逐行写法，不要改成数据驱动渲染。
+
 ## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
 
 `FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
