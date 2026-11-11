@@ -1,0 +1,149 @@
+{
+  "_comment": "V6 探针：格式工具只许改用户要求的那一项。outcomeCheck 读 ctx.calls（原生工具调用参数），doc_set_paragraph_format / doc_format_selection 里任何非 null 且不在本句允许集、也不是定位参数的键都判失败（例如只要缩进却带了 headingLevel=0 会把标题打回正文）。",
+  "sentences": [
+    {
+      "id": "f1-indent",
+      "text": "把第三条首行缩进2字符",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_set_paragraph_format"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['firstLineIndentChars','firstLineIndentPt']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f2-linespacing",
+      "text": "把全文行距改成1.5倍",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_set_paragraph_format"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['lineSpacingMode','lineSpacingValue']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f3-center-title",
+      "text": "把标题「设备购销合同（虚构示范）」居中",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_set_paragraph_format"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['alignment']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f4-bold",
+      "text": "把第四条加粗",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_format_selection"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['bold']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f5-font",
+      "text": "把第五条字体改成楷体",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_format_selection"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['fontName','fontNameAsian','fontNameWestern']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f6-space-after",
+      "text": "把第一条的段后间距设为6磅",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_set_paragraph_format"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['spaceAfterPt','spaceAfterLines']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f7-size",
+      "text": "把第二条字号改成小四",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_format_selection"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['fontSize']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    },
+    {
+      "id": "f8-highlight",
+      "text": "把第三条标成黄色高亮",
+      "hostState": "docx:contract",
+      "expect": {
+        "mustUse": [
+          [
+            "doc_format_selection"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 8,
+        "outcomeCheck": "const A=new Set(['highlight']),L=new Set(['startParagraph','endParagraph','anchorId','anchorText']);const c=ctx.calls.filter(x=>['doc_set_paragraph_format','doc_format_selection'].includes(x.name));return c.length>0&&c.every(x=>x.args&&Object.entries(x.args).every(([k,v])=>v===null||A.has(k)||L.has(k)));"
+      }
+    }
+  ]
+}

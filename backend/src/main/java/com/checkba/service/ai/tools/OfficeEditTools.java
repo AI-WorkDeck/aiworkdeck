@@ -506,8 +506,8 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "读取文档", category = "office")
     public String office_get_text(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("起始字符位置（0 开始，缺省 0；续读时填上一次返回的 nextStart）") Integer startChar,
-            @P("本次最多读取的字符数（缺省 " + GET_TEXT_DEFAULT_CHARS + "，上限 " + GET_TEXT_MAX_CHARS + "）") Integer maxChars
+            @P(value = "起始字符位置（0 开始，缺省 0；续读时填上一次返回的 nextStart）", required = false) Integer startChar,
+            @P(value = "本次最多读取的字符数（缺省 " + GET_TEXT_DEFAULT_CHARS + "，上限 " + GET_TEXT_MAX_CHARS + "）", required = false) Integer maxChars
     ) {
         log.info("Tool: office_get_text called, startChar={}, maxChars={}", startChar, maxChars);
         // 上限在后端也夹一道：插件端已经夹过，但工具结果的 80k 口径是后端的事
@@ -702,7 +702,7 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_pass_step(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("对上一块（或任意位置）的修改清单，JSON 数组 [{\"searchText\":\"原文\",\"replaceText\":\"新文\",\"reason\":\"理由（可选）\"}]；首次调用与本块无需修改时传 []") String editsJson,
-            @P("true 表示落笔后返回汇总并提前结束，缺省 false") Boolean stop
+            @P(value = "true 表示落笔后返回汇总并提前结束，缺省 false", required = false) Boolean stop
     ) {
         log.info("Tool: office_pass_step called");
         // 切的必须是模型看到的那一份字节——段落序号才能和模型上下文里的正文对得上
@@ -891,8 +891,8 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_text(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要插入的文本") String text,
-            @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
-            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position,
+            @P(value = "定位锚点文本（可选；为空则在当前光标/选区处插入）", required = false) String anchorText,
+            @P(value = "相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）", required = false) String position,
             @P(value = "可选。修改理由，简短说明目的，供修订卡片展示", required = false) String reason
     ) {
         log.info("Tool: office_insert_text called, anchor={}, position={}", anchorText, position);
@@ -950,14 +950,14 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("要设置格式的目标文本（须与文档精确一致）") String anchorText,
             @P("是否对所有匹配生效（false=仅第一处）") Boolean applyToAll,
-            @P("字体名，如 宋体 / 楷体_GB2312 / Times New Roman（不改则不传）") String fontName,
-            @P("字号（磅），如 小四=12、四号=14、三号=16（不改则不传）") Double fontSize,
-            @P("加粗 true/false（不改则不传）") Boolean bold,
-            @P("斜体 true/false（不改则不传）") Boolean italic,
-            @P("下划线线型：none/single/double/dotted/wave（wave=波浪线；不改则不传）") String underline,
-            @P("删除线 true/false（不改则不传）") Boolean strikeThrough,
-            @P("双删除线 true/false（不改则不传）") Boolean doubleStrikeThrough,
-            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color,
+            @P(value = "字体名，如 宋体 / 楷体_GB2312 / Times New Roman（不改则不传）", required = false) String fontName,
+            @P(value = "字号（磅），如 小四=12、四号=14、三号=16（不改则不传）", required = false) Double fontSize,
+            @P(value = "加粗 true/false（不改则不传）", required = false) Boolean bold,
+            @P(value = "斜体 true/false（不改则不传）", required = false) Boolean italic,
+            @P(value = "下划线线型：none/single/double/dotted/wave（wave=波浪线；不改则不传）", required = false) String underline,
+            @P(value = "删除线 true/false（不改则不传）", required = false) Boolean strikeThrough,
+            @P(value = "双删除线 true/false（不改则不传）", required = false) Boolean doubleStrikeThrough,
+            @P(value = "文字颜色 #RRGGBB，如 #C00000（不改则不传）", required = false) String color,
             @P(value = "中文字体名（如 宋体 / 仿宋_GB2312 / 楷体_GB2312，不改则不传）", required = false) String fontNameAsian,
             @P(value = "西文字体名（如 Times New Roman / Arial，不改则不传）", required = false) String fontNameWestern,
             @P(value = "从锚点所在段落起连续套用整段字符格式的段数（可选，1~200；不传则仅对锚点文本本身生效）", required = false) Integer paragraphCount
@@ -1021,14 +1021,14 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标段落中的一段文本（须与文档精确一致）") String anchorText,
             @P("是否对所有匹配所在段落生效（false=仅第一处）") Boolean applyToAll,
-            @P("对齐方式：left/center/right/justify（不改则不传）") String alignment,
-            @P("行距（磅，如 12 磅字的 1.5 倍行距填 18；传 <=5 的倍数如 1.5 会自动折算为 18 磅）（不改则不传）") Double lineSpacing,
-            @P("段前间距（磅）（不改则不传）") Double spaceBefore,
-            @P("段后间距（磅）（不改则不传）") Double spaceAfter,
-            @P("首行缩进（磅），正值缩进；12 磅字缩进 2 字符填 24，传 0 取消缩进（不改则不传）") Double firstLineIndent,
-            @P("左缩进（磅）（不改则不传）") Double leftIndent,
-            @P("右缩进（磅）（不改则不传）") Double rightIndent,
-            @P("段落样式（标题级别）：normal/heading1/heading2/heading3/heading4（不改则不传）") String styleBuiltIn,
+            @P(value = "对齐方式：left/center/right/justify（不改则不传）", required = false) String alignment,
+            @P(value = "行距（磅，如 12 磅字的 1.5 倍行距填 18；传 <=5 的倍数如 1.5 会自动折算为 18 磅）（不改则不传）", required = false) Double lineSpacing,
+            @P(value = "段前间距（磅）（不改则不传）", required = false) Double spaceBefore,
+            @P(value = "段后间距（磅）（不改则不传）", required = false) Double spaceAfter,
+            @P(value = "首行缩进（磅），正值缩进；12 磅字缩进 2 字符填 24，传 0 取消缩进（不改则不传）", required = false) Double firstLineIndent,
+            @P(value = "左缩进（磅）（不改则不传）", required = false) Double leftIndent,
+            @P(value = "右缩进（磅）（不改则不传）", required = false) Double rightIndent,
+            @P(value = "段落样式（标题级别）：normal/heading1/heading2/heading3/heading4（不改则不传）", required = false) String styleBuiltIn,
             @P(value = "首行缩进（字符数，如 2；传 0 取消缩进顶格；按 12 磅字折算，与 firstLineIndent 二选一）", required = false) Double firstLineIndentChars,
             @P(value = "从命中段落起连续套用段落格式的段数（可选，1~200，缺省 1）", required = false) Integer paragraphCount
     ) {
@@ -1088,7 +1088,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "读取格式", category = "office")
     public String office_get_formatting(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("目标文本（可选；为空则读当前选区/光标处）") String anchorText
+            @P(value = "目标文本（可选；为空则读当前选区/光标处）", required = false) String anchorText
     ) {
         log.info("Tool: office_get_formatting called, anchor={}", anchorText);
         if (anchorText != null && anchorText.length() > 255) {
@@ -1110,7 +1110,7 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_set_numbering(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("起始段落中的一段文本（须与文档精确一致）") String anchorText,
-            @P("从起始段起连续套用的段数（缺省 1，上限 200）") Integer paragraphCount,
+            @P(value = "从起始段起连续套用的段数（缺省 1，上限 200）", required = false) Integer paragraphCount,
             @P("编号类型：bullet/decimal/chinese/none") String kind
     ) {
         log.info("Tool: office_set_numbering called, anchor={}, count={}, kind={}", anchorText, paragraphCount, kind);
@@ -1150,14 +1150,14 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置表格格式", category = "office", fileEffect = "MODIFIED")
     public String office_format_table(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 起，缺省 0）") Integer tableIndex,
-            @P("边框范围：all/outside/inside/none（不改则不传）") String borders,
-            @P("边框颜色 #RRGGBB（缺省 #000000，仅 borders 非 none 时有效）") String borderColor,
-            @P("边框粗细（磅，缺省 1，仅 borders 非 none 时有效）") Double borderWidth,
-            @P("表格整体对齐：left/center/right（不改则不传）") String alignment,
-            @P("首行是否加粗（不改则不传）") Boolean headerBold,
-            @P("是否自动调整列宽到页面宽度（不改则不传）") Boolean autoFit,
-            @P("全表字号（磅）（不改则不传）") Double fontSize
+            @P(value = "表格序号（0 起，缺省 0）", required = false) Integer tableIndex,
+            @P(value = "边框范围：all/outside/inside/none（不改则不传）", required = false) String borders,
+            @P(value = "边框颜色 #RRGGBB（缺省 #000000，仅 borders 非 none 时有效）", required = false) String borderColor,
+            @P(value = "边框粗细（磅，缺省 1，仅 borders 非 none 时有效）", required = false) Double borderWidth,
+            @P(value = "表格整体对齐：left/center/right（不改则不传）", required = false) String alignment,
+            @P(value = "首行是否加粗（不改则不传）", required = false) Boolean headerBold,
+            @P(value = "是否自动调整列宽到页面宽度（不改则不传）", required = false) Boolean autoFit,
+            @P(value = "全表字号（磅）（不改则不传）", required = false) Double fontSize
     ) {
         log.info("Tool: office_format_table called, index={}, borders={}, alignment={}", tableIndex, borders, alignment);
         int index = tableIndex == null ? 0 : tableIndex;
@@ -1221,7 +1221,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "套用标准格式", category = "office", fileEffect = "MODIFIED")
     public String office_apply_standard_format(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("套用范围：document（全文，缺省）或 selection（当前选区）") String scope
+            @P(value = "套用范围：document（全文，缺省）或 selection（当前选区）", required = false) String scope
     ) {
         log.info("Tool: office_apply_standard_format called, scope={}", scope);
         String scopeValue;
@@ -1245,9 +1245,9 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_table(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("表格内容，JSON 二维字符串数组（矩形），第一行为表头") String rowsJson,
-            @P("首行是否加粗（不改则不传）") Boolean headerBold,
-            @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
-            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position
+            @P(value = "首行是否加粗（不改则不传）", required = false) Boolean headerBold,
+            @P(value = "定位锚点文本（可选；为空则在当前光标/选区处插入）", required = false) String anchorText,
+            @P(value = "相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）", required = false) String position
     ) {
         log.info("Tool: office_insert_table called, json length={}, anchor={}",
                 rowsJson != null ? rowsJson.length() : 0, anchorText);
@@ -1292,7 +1292,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "读取表格", category = "office")
     public String office_table_read(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 开始，缺省 0）") Integer tableIndex
+            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex
     ) {
         log.info("Tool: office_table_read called, index={}", tableIndex);
         int index = tableIndex == null ? 0 : tableIndex;
@@ -1310,7 +1310,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "修改单元格", category = "office", fileEffect = "MODIFIED")
     public String office_table_set_cell(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
+            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
             @P("单元格坐标，如 B2（列字母 + 行号，行号 1 开始）") String cell,
             @P("该单元格的新文本") String text,
             @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
@@ -1382,9 +1382,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入表格行", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_table_add_row(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
-            @P("插入位置行号，**0 开始**，新行插在该行之前；不传或 -1 则追加到表尾") Integer rowIndex,
-            @P("插入几行，默认 1") Integer count
+            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
+            @P(value = "插入位置行号，**0 开始**，新行插在该行之前；不传或 -1 则追加到表尾", required = false) Integer rowIndex,
+            @P(value = "插入几行，默认 1", required = false) Integer count
     ) {
         return ToolShims.hint(office_table_insert(conversationId, "row", rowIndex, count, tableIndex),
                 "office_table_insert", "office_table_insert(axis=row, at, count)");
@@ -1396,9 +1396,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格行", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_table_delete_row(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
+            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
             @P("要删的行号，**0 开始**") Integer rowIndex,
-            @P("连删几行，默认 1") Integer count
+            @P(value = "连删几行，默认 1", required = false) Integer count
     ) {
         return ToolShims.hint(office_table_delete(conversationId, "row", rowIndex, count, tableIndex),
                 "office_table_delete", "office_table_delete(axis=row, at, count)");
@@ -1409,9 +1409,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入表格列", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_table_add_col(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
-            @P("插入位置列号（0 开始，新列插在该列之前），不传或 -1 则追加到最右") Integer colIndex,
-            @P("插入几列，默认 1") Integer count
+            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
+            @P(value = "插入位置列号（0 开始，新列插在该列之前），不传或 -1 则追加到最右", required = false) Integer colIndex,
+            @P(value = "插入几列，默认 1", required = false) Integer count
     ) {
         return ToolShims.hint(office_table_insert(conversationId, "col", colIndex, count, tableIndex),
                 "office_table_insert", "office_table_insert(axis=col, at, count)");
@@ -1423,9 +1423,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除表格列", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_table_delete_col(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("表格序号（0 开始，缺省 0）") Integer tableIndex,
+            @P(value = "表格序号（0 开始，缺省 0）", required = false) Integer tableIndex,
             @P("要删的列号（0 开始，必填）") Integer colIndex,
-            @P("连删几列，默认 1") Integer count
+            @P(value = "连删几列，默认 1", required = false) Integer count
     ) {
         return ToolShims.hint(office_table_delete(conversationId, "col", colIndex, count, tableIndex),
                 "office_table_delete", "office_table_delete(axis=col, at, count)");
@@ -1467,9 +1467,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入分页符", category = "office", fileEffect = "MODIFIED")
     public String office_insert_break(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("分页类型：page（分页符，缺省）或 sectionNext（下一页分节符）") String breakType,
-            @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
-            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position
+            @P(value = "分页类型：page（分页符，缺省）或 sectionNext（下一页分节符）", required = false) String breakType,
+            @P(value = "定位锚点文本（可选；为空则在当前光标/选区处插入）", required = false) String anchorText,
+            @P(value = "相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）", required = false) String position
     ) {
         log.info("Tool: office_insert_break called, breakType={}, anchor={}", breakType, anchorText);
         String typeValue;
@@ -1526,7 +1526,7 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("header（页眉）或 footer（页脚）") String part,
             @P("要写入的文本，覆盖原有内容（空字符串等于清空）") String text,
-            @P("对齐方式：left/center/right/justify（不改则不传）") String alignment,
+            @P(value = "对齐方式：left/center/right/justify（不改则不传）", required = false) String alignment,
             @P(value = "修改理由：每次文字修改应简短说明目的，供插件修订卡片展示；旧调用可省略", required = false) String reason
     ) {
         log.info("Tool: office_edit_header_footer called, part={}", part);
@@ -1614,7 +1614,7 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标批注的 id（来自 office_get_comments 的返回值，与 commentIndex 二选一，id 优先）") String commentId,
             @P("目标批注的序号（0 开始，来自 office_get_comments 的返回值，与 commentId 二选一）") Integer commentIndex,
-            @P("标记为已解决（true，缺省）还是重新打开（false）") Boolean resolved
+            @P(value = "标记为已解决（true，缺省）还是重新打开（false）", required = false) Boolean resolved
     ) {
         String action = resolved == null || resolved ? "resolve" : "reopen";
         return ToolShims.hint(office_update_comment(conversationId, action, commentId, commentIndex, null),
@@ -1657,9 +1657,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入目录", category = "office", fileEffect = "MODIFIED")
     public String office_insert_toc(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("收入目录的标题级数 1-" + MAX_TOC_LEVELS + "，默认 3") Integer levels,
-            @P("目录标题文本，默认「目录」；传空字符串则不插标题段") String title,
-            @P("插入位置：cursor=光标处（默认）/ start=文首") String position
+            @P(value = "收入目录的标题级数 1-" + MAX_TOC_LEVELS + "，默认 3", required = false) Integer levels,
+            @P(value = "目录标题文本，默认「目录」；传空字符串则不插标题段", required = false) String title,
+            @P(value = "插入位置：cursor=光标处（默认）/ start=文首", required = false) String position
     ) {
         log.info("Tool: office_insert_toc called, levels={}, position={}", levels, position);
         if (levels != null && (levels < 1 || levels > MAX_TOC_LEVELS)) {
@@ -1685,12 +1685,12 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "页面设置", category = "office", fileEffect = "MODIFIED")
     public String office_set_page_setup(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("上边距（磅），不改则不传") Double marginTopPt,
-            @P("下边距（磅），不改则不传") Double marginBottomPt,
-            @P("左边距（磅），不改则不传") Double marginLeftPt,
-            @P("右边距（磅），不改则不传") Double marginRightPt,
-            @P("页面方向：portrait / landscape，不改则不传") String orientation,
-            @P("纸张：a3/a4/a5/b4/b5/letter/legal，不改则不传") String paperSize
+            @P(value = "上边距（磅），不改则不传", required = false) Double marginTopPt,
+            @P(value = "下边距（磅），不改则不传", required = false) Double marginBottomPt,
+            @P(value = "左边距（磅），不改则不传", required = false) Double marginLeftPt,
+            @P(value = "右边距（磅），不改则不传", required = false) Double marginRightPt,
+            @P(value = "页面方向：portrait / landscape，不改则不传", required = false) String orientation,
+            @P(value = "纸张：a3/a4/a5/b4/b5/letter/legal，不改则不传", required = false) String paperSize
     ) {
         log.info("Tool: office_set_page_setup called, orientation={}, paperSize={}", orientation, paperSize);
         Map<String, Object> args = new HashMap<>();
@@ -2535,12 +2535,12 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P(value = "目标文字；省略且给了 shapeId 时格式化该形状的全部文字", required = false) String searchText,
             @P("是否对所有匹配生效（false=仅第一处）") Boolean applyToAll,
-            @P("字体名（不改则不传）") String fontName,
-            @P("字号（磅）（不改则不传）") Double fontSize,
-            @P("加粗 true/false（不改则不传）") Boolean bold,
-            @P("斜体 true/false（不改则不传）") Boolean italic,
-            @P("下划线线型：none/single/double/dotted/wave（不改则不传）") String underline,
-            @P("文字颜色 #RRGGBB，如 #C00000（不改则不传）") String color,
+            @P(value = "字体名（不改则不传）", required = false) String fontName,
+            @P(value = "字号（磅）（不改则不传）", required = false) Double fontSize,
+            @P(value = "加粗 true/false（不改则不传）", required = false) Boolean bold,
+            @P(value = "斜体 true/false（不改则不传）", required = false) Boolean italic,
+            @P(value = "下划线线型：none/single/double/dotted/wave（不改则不传）", required = false) String underline,
+            @P(value = "文字颜色 #RRGGBB，如 #C00000（不改则不传）", required = false) String color,
             @P(value = "可选。目标页码，1 起", required = false) Integer slideNumber,
             @P(value = "可选。精确形状 ID，须同时给 slideNumber", required = false) String shapeId,
             @P(value = "可选。形状完整原文，须同时给 shapeId；已变化则拒绝", required = false) String expectedText,
@@ -2596,9 +2596,9 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "新增幻灯片", category = "office", fileEffect = "MODIFIED")
     public String office_ppt_add_slide(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("新页插入后成为第几页（1 起，即插在原第 position 页之前；不传则追加到末尾）") Integer position,
-            @P("标题文本（可选）") String title,
-            @P("正文文本（可选）") String body
+            @P(value = "新页插入后成为第几页（1 起，即插在原第 position 页之前；不传则追加到末尾）", required = false) Integer position,
+            @P(value = "标题文本（可选）", required = false) String title,
+            @P(value = "正文文本（可选）", required = false) String body
     ) {
         log.info("Tool: office_ppt_add_slide called, position={}", position);
         if (position != null && (position < 1 || position > MAX_PPT_SLIDE_NUMBER)) {
@@ -2638,13 +2638,13 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
             @P("文本框内容") String text,
-            @P("左边距（磅）（不传则用默认值 50）") Double left,
-            @P("上边距（磅）（不传则用默认值 50）") Double top,
-            @P("宽度（磅）（不传则用默认值 400）") Double width,
-            @P("高度（磅）（不传则用默认值 100）") Double height,
-            @P("字号（磅）（不改则不传）") Double fontSize,
-            @P("加粗 true/false（不改则不传）") Boolean bold,
-            @P("文字颜色 #RRGGBB（不改则不传）") String color
+            @P(value = "左边距（磅）（不传则用默认值 50）", required = false) Double left,
+            @P(value = "上边距（磅）（不传则用默认值 50）", required = false) Double top,
+            @P(value = "宽度（磅）（不传则用默认值 400）", required = false) Double width,
+            @P(value = "高度（磅）（不传则用默认值 100）", required = false) Double height,
+            @P(value = "字号（磅）（不改则不传）", required = false) Double fontSize,
+            @P(value = "加粗 true/false（不改则不传）", required = false) Boolean bold,
+            @P(value = "文字颜色 #RRGGBB（不改则不传）", required = false) String color
     ) {
         log.info("Tool: office_ppt_add_text_box called, slideNumber={}", slideNumber);
         if (slideNumber == null || slideNumber < 1 || slideNumber > MAX_PPT_SLIDE_NUMBER) {
@@ -2709,11 +2709,11 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
             @P("形状类型：rectangle/ellipse/triangle") String shapeType,
-            @P("左边距（磅）（不传则用默认值 50）") Double left,
-            @P("上边距（磅）（不传则用默认值 50）") Double top,
-            @P("宽度（磅）（不传则用默认值 200）") Double width,
-            @P("高度（磅）（不传则用默认值 150）") Double height,
-            @P("填充色 #RRGGBB（不传则用形状默认填充）") String fillColor
+            @P(value = "左边距（磅）（不传则用默认值 50）", required = false) Double left,
+            @P(value = "上边距（磅）（不传则用默认值 50）", required = false) Double top,
+            @P(value = "宽度（磅）（不传则用默认值 200）", required = false) Double width,
+            @P(value = "高度（磅）（不传则用默认值 150）", required = false) Double height,
+            @P(value = "填充色 #RRGGBB（不传则用形状默认填充）", required = false) String fillColor
     ) {
         log.info("Tool: office_ppt_add_shape called, slideNumber={}, shapeType={}", slideNumber, shapeType);
         if (slideNumber == null || slideNumber < 1 || slideNumber > MAX_PPT_SLIDE_NUMBER) {
@@ -2774,8 +2774,8 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_ppt_delete_shape(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
-            @P("形状 id（office_ppt_get_slide_details 返回，可选）") String shapeId,
-            @P("按形状文字内容精确匹配（可选，shapeId 未给时使用）") String textMatch
+            @P(value = "形状 id（office_ppt_get_slide_details 返回，可选）", required = false) String shapeId,
+            @P(value = "按形状文字内容精确匹配（可选，shapeId 未给时使用）", required = false) String textMatch
     ) {
         log.info("Tool: office_ppt_delete_shape called, slideNumber={}, shapeId={}", slideNumber, shapeId);
         if (slideNumber == null || slideNumber < 1 || slideNumber > MAX_PPT_SLIDE_NUMBER) {
@@ -3263,7 +3263,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "接受修订", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_accept_revision(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("目标修订的序号（0 开始，来自 office_get_revisions；acceptAll=true 时可不传）") Integer revisionIndex,
+            @P(value = "目标修订的序号（0 开始，来自 office_get_revisions；acceptAll=true 时可不传）", required = false) Integer revisionIndex,
             @P("是否接受全部修订（true 时忽略 revisionIndex）") Boolean acceptAll
     ) {
         boolean all = acceptAll != null && acceptAll;
@@ -3276,7 +3276,7 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "拒绝修订", category = "office", fileEffect = "MODIFIED", offerToModel = false)
     public String office_reject_revision(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("目标修订的序号（0 开始，来自 office_get_revisions；rejectAll=true 时可不传）") Integer revisionIndex,
+            @P(value = "目标修订的序号（0 开始，来自 office_get_revisions；rejectAll=true 时可不传）", required = false) Integer revisionIndex,
             @P("是否拒绝全部修订（true 时忽略 revisionIndex）") Boolean rejectAll
     ) {
         boolean all = rejectAll != null && rejectAll;
@@ -3353,9 +3353,9 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_insert_image(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("项目文件的数据库 ID（图片文件）") Long fileId,
-            @P("定位锚点文本（可选；为空则在当前光标/选区处插入）") String anchorText,
-            @P("相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）") String position,
-            @P("图片显示宽度（磅）（不改则不传，用原始尺寸）") Double width
+            @P(value = "定位锚点文本（可选；为空则在当前光标/选区处插入）", required = false) String anchorText,
+            @P(value = "相对锚点的位置：before 或 after（默认 after，仅提供锚点时有效）", required = false) String position,
+            @P(value = "图片显示宽度（磅）（不改则不传，用原始尺寸）", required = false) Double width
     ) {
         log.info("Tool: office_insert_image called, fileId={}, anchor={}", fileId, anchorText);
         if (fileId == null) {
@@ -3451,9 +3451,9 @@ public class OfficeEditTools implements AgentToolComponent {
             @P("动作：insert/read/set_text/delete") String action,
             @P("定位锚点文本（insert 时必填，须与文档精确一致）") String anchorText,
             @P("内容控件标识（insert 时必填用于新建；read/set_text/delete 时必填用于定位）") String tag,
-            @P("控件显示标签（可选，仅 insert 用）") String title,
+            @P(value = "控件显示标签（可选，仅 insert 用）", required = false) String title,
             @P("新文本内容（set_text 时必填）") String text,
-            @P("delete 时是否保留内容只删控件外壳（缺省 false）") Boolean keepContent
+            @P(value = "delete 时是否保留内容只删控件外壳（缺省 false）", required = false) Boolean keepContent
     ) {
         log.info("Tool: office_manage_content_control called, action={}, tag={}", action, tag);
         String actionValue;
@@ -3504,12 +3504,12 @@ public class OfficeEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置文档属性", category = "office", fileEffect = "MODIFIED")
     public String office_set_document_properties(
             @P("会话ID（系统自动注入）") String conversationId,
-            @P("标题（不改则不传）") String title,
-            @P("主题（不改则不传）") String subject,
-            @P("作者（不改则不传）") String author,
-            @P("关键词（不改则不传）") String keywords,
-            @P("备注（不改则不传）") String comments,
-            @P("分类（不改则不传）") String category
+            @P(value = "标题（不改则不传）", required = false) String title,
+            @P(value = "主题（不改则不传）", required = false) String subject,
+            @P(value = "作者（不改则不传）", required = false) String author,
+            @P(value = "关键词（不改则不传）", required = false) String keywords,
+            @P(value = "备注（不改则不传）", required = false) String comments,
+            @P(value = "分类（不改则不传）", required = false) String category
     ) {
         log.info("Tool: office_set_document_properties called");
         Map<String, Object> args = new HashMap<>();
@@ -3535,13 +3535,13 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_ppt_add_table(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
-            @P("表格内容，JSON 二维字符串数组（矩形）（可选；不传则用 rows/cols 建空表）") String rowsJson,
+            @P(value = "表格内容，JSON 二维字符串数组（矩形）（可选；不传则用 rows/cols 建空表）", required = false) String rowsJson,
             @P("行数（rowsJson 未给时必填）") Integer rows,
             @P("列数（rowsJson 未给时必填）") Integer cols,
-            @P("左边距（磅）（不传则用默认值）") Double left,
-            @P("上边距（磅）（不传则用默认值）") Double top,
-            @P("宽度（磅）（不传则用默认值）") Double width,
-            @P("高度（磅）（不传则用默认值）") Double height
+            @P(value = "左边距（磅）（不传则用默认值）", required = false) Double left,
+            @P(value = "上边距（磅）（不传则用默认值）", required = false) Double top,
+            @P(value = "宽度（磅）（不传则用默认值）", required = false) Double width,
+            @P(value = "高度（磅）（不传则用默认值）", required = false) Double height
     ) {
         log.info("Tool: office_ppt_add_table called, slideNumber={}", slideNumber);
         if (slideNumber == null || slideNumber < 1 || slideNumber > MAX_PPT_SLIDE_NUMBER) {
@@ -3591,7 +3591,7 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_ppt_table_read(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
-            @P("表格所在形状 id（可选；不传则取该页第一张表格）") String shapeId
+            @P(value = "表格所在形状 id（可选；不传则取该页第一张表格）", required = false) String shapeId
     ) {
         log.info("Tool: office_ppt_table_read called, slideNumber={}, shapeId={}", slideNumber, shapeId);
         if (slideNumber == null || slideNumber < 1 || slideNumber > MAX_PPT_SLIDE_NUMBER) {
@@ -3610,7 +3610,7 @@ public class OfficeEditTools implements AgentToolComponent {
     public String office_ppt_table_set_cell(
             @P("会话ID（系统自动注入）") String conversationId,
             @P("目标幻灯片页码（1 起）") Integer slideNumber,
-            @P("表格所在形状 id（可选；不传则取该页第一张表格）") String shapeId,
+            @P(value = "表格所在形状 id（可选；不传则取该页第一张表格）", required = false) String shapeId,
             @P("行号（0 开始）") Integer row,
             @P("列号（0 开始）") Integer col,
             @P("该单元格的新文本") String text

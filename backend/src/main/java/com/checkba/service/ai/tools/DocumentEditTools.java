@@ -469,7 +469,7 @@ public class DocumentEditTools implements AgentToolComponent {
             + "先据上下文确认目标再改，不凭印象判断全文唯一；多处独立修改拿到各自 anchorId 后连续调用。查找排除已删除修订，删除历史用 doc_list_revisions。")
     public String doc_find_text(
             @P("要查找的文本") String keyword,
-            @P("是否区分大小写，默认 false") Boolean matchCase
+            @P(value = "是否区分大小写，默认 false", required = false) Boolean matchCase
     ) {
         log.info("Tool: doc_find_text called keyword={}", keyword);
         try {
@@ -514,7 +514,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String doc_find_replace(
             @P("要查找的文本") String findText,
             @P("替换为的文本") String replaceText,
-            @P("是否替换全部匹配项；不传即替换全部。只想改第一处必须显式传 false") Boolean replaceAll
+            @P(value = "是否替换全部匹配项；不传即替换全部。只想改第一处必须显式传 false", required = false) Boolean replaceAll
     ) {
         log.info("Tool: doc_find_replace called find={}, replace={}", findText, replaceText);
         if (findText == null || findText.isEmpty() || replaceText == null) {
@@ -854,8 +854,8 @@ public class DocumentEditTools implements AgentToolComponent {
             + "每段含 index（0 起）、text 和 numbering（{available, label, level, hasLabel}）；自动编号的可见前缀（如「第一条」「一、」「1.1」）在 numbering.label，不在 text 里。\n"
             + "文档长时分页：truncated=true 时用 nextStartParagraph 继续读。多段或结构性修改后，最后一次修改结束须回读改动范围及相邻段落，核对标题分段、编号和句意，再交付。")
     public String doc_get_document_text(
-            @P("起始段落号（0 开始，默认 0）") Integer startParagraph,
-            @P("最多返回的段落数（默认 200）") Integer maxParagraphs
+            @P(value = "起始段落号（0 开始，默认 0）", required = false) Integer startParagraph,
+            @P(value = "最多返回的段落数（默认 200）", required = false) Integer maxParagraphs
     ) {
         log.info("Tool: doc_get_document_text called start={}, max={}", startParagraph, maxParagraphs);
         try {
@@ -1029,15 +1029,15 @@ public class DocumentEditTools implements AgentToolComponent {
           "下划线：underline=true/false，或用 underlineStyle 指定 single/double/dotted/dashed/wave/bold/none。" +
           "高亮支持 yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB；none 取消高亮。")
     public String doc_format_selection(
-            @P("加粗 true/false，不改则不传") Boolean bold,
-            @P("斜体 true/false，不改则不传") Boolean italic,
-            @P("下划线 true/false，不改则不传") Boolean underline,
-            @P("删除线 true/false，不改则不传") Boolean strikeout,
-            @P("高亮颜色：yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB，不改则不传") String highlight,
-            @P("文字颜色：#RRGGBB 或 auto，不改则不传") String color,
-            @P("字号（磅，如 小四=12、五号=10.5、四号=14、小三=15、三号=16、小二=18、二号=22），不改则不传") Double fontSize,
-            @P("字体名（中西文一起改），不改则不传") String fontName,
-            @P("中文字体名（只改中文，如 宋体、仿宋_GB2312、楷体_GB2312、黑体；与 fontName 同给时以它为准），不改则不传") String fontNameAsian,
+            @P(value = "加粗 true/false，不改则不传", required = false) Boolean bold,
+            @P(value = "斜体 true/false，不改则不传", required = false) Boolean italic,
+            @P(value = "下划线 true/false，不改则不传", required = false) Boolean underline,
+            @P(value = "删除线 true/false，不改则不传", required = false) Boolean strikeout,
+            @P(value = "高亮颜色：yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB，不改则不传", required = false) String highlight,
+            @P(value = "文字颜色：#RRGGBB 或 auto，不改则不传", required = false) String color,
+            @P(value = "字号（磅，如 小四=12、五号=10.5、四号=14、小三=15、三号=16、小二=18、二号=22），不改则不传", required = false) Double fontSize,
+            @P(value = "字体名（中西文一起改），不改则不传", required = false) String fontName,
+            @P(value = "中文字体名（只改中文，如 宋体、仿宋_GB2312、楷体_GB2312、黑体；与 fontName 同给时以它为准），不改则不传", required = false) String fontNameAsian,
             @P(value = "西文字体名（只改西文与数字，如 Times New Roman、Arial、Calibri），不改则不传", required = false) String fontNameWestern,
             @P(value = "下划线线型（single/double/dotted/dashed/wave/bold/none；传了优先于 underline），不改则不传", required = false) String underlineStyle,
             @P(value = "起始段落号（0 开始，可选；传入则无需预先选中，直接对该段或 startParagraph..endParagraph 范围设格式）", required = false) Integer startParagraph,
@@ -1076,15 +1076,15 @@ public class DocumentEditTools implements AgentToolComponent {
           "缩进：firstLineIndentChars 首行缩进字符数（中文合同常用 2；传 0 取消首行缩进并顶格，按段落当前中文字号精算），" +
           "firstLineIndentPt 首行缩进磅数，leftIndentChars 左缩进字符数，leftIndentPt/rightIndentPt 左右缩进磅数。")
     public String doc_set_paragraph_format(
-            @P("对齐：left/right/center/justify，不改则不传") String alignment,
-            @P("标题级别：1-9 为标题，0 恢复正文，不改则不传") Integer headingLevel,
-            @P("行距模式：single/1.5/double/multiple/proportional/atLeast/exactly，不改则不传") String lineSpacingMode,
+            @P(value = "对齐：left/right/center/justify，不改则不传", required = false) String alignment,
+            @P(value = "标题级别：1-9 为标题，0 恢复正文，不改则不传", required = false) Integer headingLevel,
+            @P(value = "行距模式：single/1.5/double/multiple/proportional/atLeast/exactly，不改则不传", required = false) String lineSpacingMode,
             @P("行距值：proportional/multiple 时为百分比(如 150)或倍数(如 1.5)，atLeast/exactly 时为磅数(如 20)") Double lineSpacingValue,
-            @P("段前间距（磅），不改则不传") Double spaceBeforePt,
-            @P("段后间距（磅），不改则不传") Double spaceAfterPt,
-            @P("首行缩进（字符数，如 2；传 0 取消缩进顶格），不改则不传") Double firstLineIndentChars,
-            @P("左缩进（磅），不改则不传") Double leftIndentPt,
-            @P("右缩进（磅），不改则不传") Double rightIndentPt,
+            @P(value = "段前间距（磅），不改则不传", required = false) Double spaceBeforePt,
+            @P(value = "段后间距（磅），不改则不传", required = false) Double spaceAfterPt,
+            @P(value = "首行缩进（字符数，如 2；传 0 取消缩进顶格），不改则不传", required = false) Double firstLineIndentChars,
+            @P(value = "左缩进（磅），不改则不传", required = false) Double leftIndentPt,
+            @P(value = "右缩进（磅），不改则不传", required = false) Double rightIndentPt,
             @P(value = "首行缩进（磅；传 0 取消缩进），不改则不传", required = false) Double firstLineIndentPt,
             @P(value = "左缩进（字符数，如 2），不改则不传", required = false) Double leftIndentChars,
             @P(value = "段前间距（行数，如 0.5 或 1），不改则不传", required = false) Double spaceBeforeLines,
@@ -1127,7 +1127,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "level: 编号层级 1-9，默认 1；multilevel 配合不同 level 形成 1.1、1.1.1 结构。")
     public String doc_set_numbering(
             @P("编号类型：bullet/decimal/chinese/clause/paren_chinese/multilevel/none") String preset,
-            @P("编号层级 1-9，默认 1") Integer level
+            @P(value = "编号层级 1-9，默认 1", required = false) Integer level
     ) {
         log.info("Tool: doc_set_numbering called preset={}, level={}", preset, level);
         try {
@@ -1153,20 +1153,20 @@ public class DocumentEditTools implements AgentToolComponent {
           "不要试图用其他工具绕（插入新表、整表重写都改不了列宽）。")
     public String doc_format_table(
             @P("一键套标准表格式 true/false") Boolean applyStandard,
-            @P("边框线宽（磅，如 1.5），不改则不传") Double borderWidthPt,
-            @P("表格字号（磅），不改则不传") Double fontSizePt,
-            @P("首行加粗 true/false，不改则不传") Boolean firstRowBold,
-            @P("单元格垂直对齐：top/center/bottom，不改则不传") String cellVerticalAlign,
+            @P(value = "边框线宽（磅，如 1.5），不改则不传", required = false) Double borderWidthPt,
+            @P(value = "表格字号（磅），不改则不传", required = false) Double fontSizePt,
+            @P(value = "首行加粗 true/false，不改则不传", required = false) Boolean firstRowBold,
+            @P(value = "单元格垂直对齐：top/center/bottom，不改则不传", required = false) String cellVerticalAlign,
             @P("【已弃用，本引擎做不到，传了也不会生效】列宽百分比") String columnWidthsPercent,
-            @P("行高（磅），不改则不传") Double rowHeightPt,
-            @P("行高规则：min(最小值,默认)/exact(固定值)") String rowHeightRule,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
-            @P("边框颜色 #RRGGBB，不改则不传") String borderColor,
-            @P("边框线型：single/double/dashed，不改则不传") String borderStyle,
-            @P("外框线宽（磅），不改则不传") Double outsideBorderWidthPt,
-            @P("内框线宽（磅），不改则不传") Double insideBorderWidthPt,
-            @P("表头底纹：#RRGGBB 或 none 清除，不改则不传") String headerFill,
-            @P("跨页重复表头 true/false，不改则不传") Boolean repeatHeader,
+            @P(value = "行高（磅），不改则不传", required = false) Double rowHeightPt,
+            @P(value = "行高规则：min(最小值,默认)/exact(固定值)", required = false) String rowHeightRule,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
+            @P(value = "边框颜色 #RRGGBB，不改则不传", required = false) String borderColor,
+            @P(value = "边框线型：single/double/dashed，不改则不传", required = false) String borderStyle,
+            @P(value = "外框线宽（磅），不改则不传", required = false) Double outsideBorderWidthPt,
+            @P(value = "内框线宽（磅），不改则不传", required = false) Double insideBorderWidthPt,
+            @P(value = "表头底纹：#RRGGBB 或 none 清除，不改则不传", required = false) String headerFill,
+            @P(value = "跨页重复表头 true/false，不改则不传", required = false) Boolean repeatHeader,
             @P("【已弃用，本引擎做不到，传了也不会生效】列宽厘米") String columnWidthsCm
     ) {
         log.info("Tool: doc_format_table called standard={}, border={}, tableIndex={}", applyStandard, borderWidthPt, tableIndex);
@@ -1253,7 +1253,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "rowsJson 是 JSON 二维数组，如 [[\"项目\",\"金额\"],[\"咨询费\",\"10000\"]]，第一行默认为表头。")
     public String doc_insert_table(
             @P("表格内容，JSON 二维字符串数组，第一行为表头") String rowsJson,
-            @P("第一行是否表头，默认 true") Boolean headerRow
+            @P(value = "第一行是否表头，默认 true", required = false) Boolean headerRow
     ) {
         log.info("Tool: doc_insert_table called, json length={}", rowsJson != null ? rowsJson.length() : 0);
         if (rowsJson == null || rowsJson.isBlank()) {
@@ -1284,10 +1284,10 @@ public class DocumentEditTools implements AgentToolComponent {
           "返回的 cells 按行给出，行号从 1 开始、列号从 A 开始（左上角是 A1），" +
           "doc_table_set_cell 的 cell 参数就用这套坐标。表里有合并/拆分单元格时返回 note 说明。")
     public String doc_table_read(
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名（如 Table1），一般不用传") String tableName,
-            @P("最多读多少行，默认 200") Integer maxRows,
-            @P("最多读多少列，默认 30") Integer maxCols
+            @P(value = "最多读多少行，默认 200", required = false) Integer maxRows,
+            @P(value = "最多读多少列，默认 30", required = false) Integer maxCols
     ) {
         log.info("Tool: doc_table_read called tableIndex={}, tableName={}", tableIndex, tableName);
         try {
@@ -1311,7 +1311,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String doc_table_set_cell(
             @P("单元格坐标，如 B2（列字母 + 行号，行号 1 开始）") String cell,
             @P("该单元格的新文本") String text,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名，一般不用传") String tableName
     ) {
         log.info("Tool: doc_table_set_cell called cell={}, tableIndex={}", cell, tableIndex);
@@ -1399,10 +1399,10 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("给表格插入空白行（insertBeforeRow1Based 为行号，1 开始）。")
     public String doc_table_add_row(
             @P("【已弃用，等价于 insertBeforeRow1Based】插入位置行号（1 开始）") Integer position,
-            @P("插入几行，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "插入几行，默认 1", required = false) Integer count,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名，一般不用传") String tableName,
-            @P("新行插在第几行之前，**行号 1 开始**；不传则追加到表尾") Integer insertBeforeRow1Based
+            @P(value = "新行插在第几行之前，**行号 1 开始**；不传则追加到表尾", required = false) Integer insertBeforeRow1Based
     ) {
         Integer row = insertBeforeRow1Based != null ? insertBeforeRow1Based : position;
         return ToolShims.hint(doc_table_insert("row", row == null ? null : String.valueOf(row), count, tableIndex, tableName),
@@ -1415,8 +1415,8 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("删除表格的整行（rowNumber1Based 为行号，1 开始）。")
     public String doc_table_delete_row(
             @P("【已弃用，等价于 rowNumber1Based】要删的行号（1 开始）") Integer position,
-            @P("连删几行，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "连删几行，默认 1", required = false) Integer count,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名，一般不用传") String tableName,
             @P("要删的行号，**1 开始**（第一行 = 1）") Integer rowNumber1Based
     ) {
@@ -1430,10 +1430,10 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("给表格插入空白列（insertBeforeColumn 为列字母或列号）。")
     public String doc_table_add_col(
             @P("【已弃用，等价于 insertBeforeColumn】列字母（如 B）或列号（1 开始）") String position,
-            @P("插入几列，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "插入几列，默认 1", required = false) Integer count,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名，一般不用传") String tableName,
-            @P("新列插在哪一列之前：列字母（如 B）或列号（**1 开始**）；不传则追加到最右") String insertBeforeColumn
+            @P(value = "新列插在哪一列之前：列字母（如 B）或列号（**1 开始**）；不传则追加到最右", required = false) String insertBeforeColumn
     ) {
         String col = (insertBeforeColumn != null && !insertBeforeColumn.isBlank()) ? insertBeforeColumn : position;
         return ToolShims.hint(doc_table_insert("col", col, count, tableIndex, tableName),
@@ -1446,8 +1446,8 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("删除表格的整列（columnRef 为列字母或列号）。")
     public String doc_table_delete_col(
             @P("【已弃用，等价于 columnRef】要删的列字母（如 B）或列号（1 开始）") String position,
-            @P("连删几列，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "连删几列，默认 1", required = false) Integer count,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名，一般不用传") String tableName,
             @P("要删的列：列字母（如 B）或列号（**1 开始**）") String columnRef
     ) {
@@ -1552,7 +1552,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "不要为了确认这件事去 list_files / search_project_files 翻模板文件夹——那要白花一整轮。" +
           "长文档分批处理并回传进度，一次调用即可，truncated=false 表示全文已处理。")
     public String doc_apply_style_profile(
-            @P("document=全文（默认）/ selection=选区 / styles-only=只改样式定义") String scope
+            @P(value = "document=全文（默认）/ selection=选区 / styles-only=只改样式定义", required = false) String scope
     ) {
         log.info("Tool: doc_apply_style_profile called scope={}", scope);
         try {
@@ -1576,9 +1576,9 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【结构】在光标处（position=start 时在文首）插入由标题级别自动生成的目录（真正的目录域，可更新）。" +
           "levels 收几级标题（默认 3），title 目录标题（默认 '目录'）。文档里的标题要先用 doc_set_paragraph_format 的 headingLevel 标好级别，否则目录为空。")
     public String doc_insert_toc(
-            @P("收入目录的标题级数 1-10，默认 3") Integer levels,
-            @P("目录标题文本，默认 '目录'") String title,
-            @P("插入位置（不是序号、不是页码）：cursor=光标处（默认）/ start=文首") String position
+            @P(value = "收入目录的标题级数 1-10，默认 3", required = false) Integer levels,
+            @P(value = "目录标题文本，默认 '目录'", required = false) String title,
+            @P(value = "插入位置（不是序号、不是页码）：cursor=光标处（默认）/ start=文首", required = false) String position
     ) {
         log.info("Tool: doc_insert_toc called levels={}, title={}", levels, title);
         try {
@@ -1597,13 +1597,13 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【结构】设置纸张与页边距（单位毫米）：widthMm/heightMm 纸张尺寸（A4 为 210x297）、orientation portrait/landscape、" +
           "marginTopMm/marginBottomMm/marginLeftMm/marginRightMm 页边距。只传需要改的参数；只给 orientation 时按当前纸张旋转。")
     public String doc_set_page_setup(
-            @P("纸张宽（毫米），不改则不传") Double widthMm,
-            @P("纸张高（毫米），不改则不传") Double heightMm,
-            @P("方向：portrait/landscape，不改则不传") String orientation,
-            @P("上边距（毫米），不改则不传") Double marginTopMm,
-            @P("下边距（毫米），不改则不传") Double marginBottomMm,
-            @P("左边距（毫米），不改则不传") Double marginLeftMm,
-            @P("右边距（毫米），不改则不传") Double marginRightMm
+            @P(value = "纸张宽（毫米），不改则不传", required = false) Double widthMm,
+            @P(value = "纸张高（毫米），不改则不传", required = false) Double heightMm,
+            @P(value = "方向：portrait/landscape，不改则不传", required = false) String orientation,
+            @P(value = "上边距（毫米），不改则不传", required = false) Double marginTopMm,
+            @P(value = "下边距（毫米），不改则不传", required = false) Double marginBottomMm,
+            @P(value = "左边距（毫米），不改则不传", required = false) Double marginLeftMm,
+            @P(value = "右边距（毫米），不改则不传", required = false) Double marginRightMm
     ) {
         log.info("Tool: doc_set_page_setup called w={}, h={}, orientation={}", widthMm, heightMm, orientation);
         try {
@@ -1630,7 +1630,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "撤销修改", category = "document", fileEffect = "MODIFIED")
     @Tool("【验/撤销】撤销最近的编辑操作。改错了（核对返回的段落文本发现不对）就用它退回，再重新操作。")
     public String doc_undo(
-            @P("撤销步数，默认 1") Integer steps
+            @P(value = "撤销步数，默认 1", required = false) Integer steps
     ) {
         log.info("Tool: doc_undo called steps={}", steps);
         try {
@@ -1646,7 +1646,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "重做修改", category = "document", fileEffect = "MODIFIED")
     @Tool("【验/撤销】重做刚撤销的操作。")
     public String doc_redo(
-            @P("重做步数，默认 1") Integer steps
+            @P(value = "重做步数，默认 1", required = false) Integer steps
     ) {
         log.info("Tool: doc_redo called steps={}", steps);
         try {
@@ -1739,7 +1739,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("把一条批注标记为已解决/取消已解决（commentId 来自 doc_get_comments 返回的 id）。")
     public String doc_resolve_comment(
             @P("批注 id（来自 doc_get_comments）") String commentId,
-            @P("true=标记已解决，false=取消已解决，默认 true") Boolean resolved
+            @P(value = "true=标记已解决，false=取消已解决，默认 true", required = false) Boolean resolved
     ) {
         String action = resolved == null || resolved ? "resolve" : "reopen";
         return ToolShims.hint(doc_update_comment(commentId, action, null),
@@ -1870,11 +1870,11 @@ public class DocumentEditTools implements AgentToolComponent {
           "fontName/fontSize 设页眉页脚的字体字号。")
     public String doc_edit_header_footer(
             @P("header=页眉，footer=页脚") String target,
-            @P("页眉/页脚文本（只放页码时可不传）") String text,
-            @P("对齐：left/center/right/justify，不改则不传") String align,
-            @P("页码模板，{PAGE}=当前页 {NUMPAGES}=总页数，如 '第 {PAGE} 页 共 {NUMPAGES} 页'；不要页码则不传") String pageNumberPattern,
-            @P("字体名，不改则不传") String fontName,
-            @P("字号（磅），不改则不传") Double fontSize
+            @P(value = "页眉/页脚文本（只放页码时可不传）", required = false) String text,
+            @P(value = "对齐：left/center/right/justify，不改则不传", required = false) String align,
+            @P(value = "页码模板，{PAGE}=当前页 {NUMPAGES}=总页数，如 '第 {PAGE} 页 共 {NUMPAGES} 页'；不要页码则不传", required = false) String pageNumberPattern,
+            @P(value = "字体名，不改则不传", required = false) String fontName,
+            @P(value = "字号（磅），不改则不传", required = false) Double fontSize
     ) {
         log.info("Tool: doc_edit_header_footer called target={}", target);
         if (text == null && (pageNumberPattern == null || pageNumberPattern.isBlank())) {
@@ -1931,7 +1931,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入脚注", category = "document", fileEffect = "MODIFIED", offerToModel = false)
     @Tool("在文中位置插入一条脚注（页面底部编号注释）。")
     public String doc_insert_footnote(
-            @P("doc_find_text 返回的 anchorId，插入位置；不传则用当前光标") String anchorId,
+            @P(value = "doc_find_text 返回的 anchorId，插入位置；不传则用当前光标", required = false) String anchorId,
             @P("脚注正文内容") String text
     ) {
         return ToolShims.hint(doc_insert_note("footnote", text, anchorId),
@@ -1942,7 +1942,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入尾注", category = "document", fileEffect = "MODIFIED", offerToModel = false)
     @Tool("在文中位置插入一条尾注（文档末尾编号注释）。")
     public String doc_insert_endnote(
-            @P("doc_find_text 返回的 anchorId，插入位置；不传则用当前光标") String anchorId,
+            @P(value = "doc_find_text 返回的 anchorId，插入位置；不传则用当前光标", required = false) String anchorId,
             @P("尾注正文内容") String text
     ) {
         return ToolShims.hint(doc_insert_note("endnote", text, anchorId),
@@ -2015,9 +2015,9 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("报告原文片段，必须在文档中恰好出现一次；与 anchorId 二选一") String anchorQuote,
             @P("doc_find_text 返回的 anchorId；给了就不再按 anchorQuote 查找") String anchorId,
             @P("底稿清单 JSON 数组：[{fileId 或 path, locator?, relation?, method?, note?}]") String targetsJson,
-            @P("默认核查方式 written_review/written_statement/web_check/third_party/interview（单条 target 可覆盖），可不传") String method,
-            @P("默认关系 supports（默认）/contradicts/partial（单条 target 可覆盖）") String relation,
-            @P("默认备注，可不传") String note
+            @P(value = "默认核查方式 written_review/written_statement/web_check/third_party/interview（单条 target 可覆盖），可不传", required = false) String method,
+            @P(value = "默认关系 supports（默认）/contradicts/partial（单条 target 可覆盖）", required = false) String relation,
+            @P(value = "默认备注，可不传", required = false) String note
     ) {
         log.info("Tool: doc_link_evidence called docFileId={}, anchorId={}, quote={}", docFileId, anchorId, anchorQuote);
         Long projectId = com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong();
@@ -2085,9 +2085,9 @@ public class DocumentEditTools implements AgentToolComponent {
     public String doc_list_evidence(
             @P("报告文件 ID（系统提醒里的 id=）；与 fileId 二选一") Long docFileId,
             @P("底稿文件 ID：反查它被哪些锚点引用；给了就忽略 docFileId 之外的过滤") Long fileId,
-            @P("章节前缀过滤，如 \"一/（二）\"，可不传") String sectionPath,
-            @P("状态过滤 active/unverified/stale/orphan，可不传") String status,
-            @P("最多返回多少条，默认 100，上限 500；超出时 truncated=true，用 sectionPath/status 缩小范围") Integer limit
+            @P(value = "章节前缀过滤，如 \"一/（二）\"，可不传", required = false) String sectionPath,
+            @P(value = "状态过滤 active/unverified/stale/orphan，可不传", required = false) String status,
+            @P(value = "最多返回多少条，默认 100，上限 500；超出时 truncated=true，用 sectionPath/status 缩小范围", required = false) Integer limit
     ) {
         log.info("Tool: doc_list_evidence called docFileId={}, fileId={}, sectionPath={}, status={}, limit={}", docFileId, fileId, sectionPath, status, limit);
         Long projectId = com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong();
@@ -2331,7 +2331,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "样式名不存在会报错并列出可用样式名供改用。")
     public String doc_set_style(
             @P("样式名，如 'Heading 1'、'Quotations'（引擎内部样式名，不是中文标题）") String styleName,
-            @P("paragraph=段落样式（默认），character=字符样式") String kind
+            @P(value = "paragraph=段落样式（默认），character=字符样式", required = false) String kind
     ) {
         log.info("Tool: doc_set_style called styleName={}, kind={}", styleName, kind);
         if (styleName == null || styleName.isBlank()) {

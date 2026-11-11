@@ -70,8 +70,8 @@ public class MemoryTools implements AgentToolComponent {
             @P("记忆标题或关键词，用于检索和 remember.md 总表标题") String key,
             @P("首行一句话结论摘要，换行写依据与适用规则") String value,
             @P("法条引用、金额、日期等关键信息设 true，压缩时不丢") boolean isProtected,
-            @P("可选。user（preference 缺省）/ project（其余缺省）/ conversation / file（需 sourceFileId）/ global") String scope,
-            @P("可选。来源文件 ID，scope=file 时必填") Long sourceFileId
+            @P(value = "可选。user（preference 缺省）/ project（其余缺省）/ conversation / file（需 sourceFileId）/ global", required = false) String scope,
+            @P(value = "可选。来源文件 ID，scope=file 时必填", required = false) Long sourceFileId
     ) {
         log.info("Tool: save_memory called type={}, key={}, protected={}, scope={}", type, key, isProtected, scope);
 
@@ -134,11 +134,11 @@ public class MemoryTools implements AgentToolComponent {
             + "要可靠找回绑定过 file/conversation 作用域的记忆，传 scope（及 sourceFileId），否则只能靠相关性。")
     public String query_memory(
             @P("查询关键词") String query,
-            @P("可选。类型过滤：decision/conclusion/fact/reference/preference/all，默认 all") String type,
-            @P("可选。file（需 sourceFileId）或 conversation；不传则全项目按关键词检索") String scope,
-            @P("可选。来源文件 ID，scope=file 时必填") Long sourceFileId,
-            @P("可选。quick（默认）/ hybrid / deep") String depth,
-            @P("可选。返回条数 1-20，不传按档位取默认值") Integer limit
+            @P(value = "可选。类型过滤：decision/conclusion/fact/reference/preference/all，默认 all", required = false) String type,
+            @P(value = "可选。file（需 sourceFileId）或 conversation；不传则全项目按关键词检索", required = false) String scope,
+            @P(value = "可选。来源文件 ID，scope=file 时必填", required = false) Long sourceFileId,
+            @P(value = "可选。quick（默认）/ hybrid / deep", required = false) String depth,
+            @P(value = "可选。返回条数 1-20，不传按档位取默认值", required = false) Integer limit
     ) {
         log.info("Tool: query_memory called query='{}', type='{}', scope='{}', depth='{}'", query, type, scope, depth);
         return retrieveWithDepth(query, type, scope, sourceFileId, depth, limit);

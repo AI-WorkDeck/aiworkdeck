@@ -159,10 +159,10 @@ public class PptxTools implements AgentToolComponent {
     public String pptx_generate(
             @P("PPT 主题或详细描述，如：'AI 在法律行业的应用' 或 '公司年度总结报告，包含业绩、成就和未来规划'") String topic,
             @P("项目 ID，生成的 PPTX 将关联到此项目") Long projectId,
-            @P("父文件夹 ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。可以调用 doc_list_project_files(foldersOnly=true) 获取可用的文件夹 ID。") Long parentId,
-            @P("自定义文件名（可选，不含扩展名）。不指定则自动生成。") String fileName,
-            @P("PPT 风格描述（可选），如：'科技风'、'商务简约'、'学术正式'。留空则使用默认风格。") String style,
-            @P("输出语言：zh（中文，默认）、en（英文）、ja（日语）") String language
+            @P(value = "父文件夹 ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。可以调用 doc_list_project_files(foldersOnly=true) 获取可用的文件夹 ID。", required = false) Long parentId,
+            @P(value = "自定义文件名（可选，不含扩展名）。不指定则自动生成。", required = false) String fileName,
+            @P(value = "PPT 风格描述（可选），如：'科技风'、'商务简约'、'学术正式'。留空则使用默认风格。", required = false) String style,
+            @P(value = "输出语言：zh（中文，默认）、en（英文）、ja（日语）", required = false) String language
     ) {
         // 模型 ID 由 ToolRegistry 通过线程上下文透传（不暴露给 LLM 参数）
         return pptx_generate(topic, projectId, parentId, fileName, style, language, ToolContextHolder.currentModelId());
@@ -446,7 +446,7 @@ public class PptxTools implements AgentToolComponent {
     @Tool("生成 PPTX 大纲（不生成完整 PPT）。")
     public String pptx_generate_outline(
             @P("PPT 主题或详细描述") String topic,
-            @P("输出语言：zh（中文，默认）、en（英文）、ja（日语）") String language
+            @P(value = "输出语言：zh（中文，默认）、en（英文）、ja（日语）", required = false) String language
     ) {
         return ToolShims.hint(pptx_outline("create", topic, language, null, null), "pptx_outline", "pptx_outline(action=create, topic)");
     }
@@ -526,7 +526,7 @@ public class PptxTools implements AgentToolComponent {
           "已在编辑器中打开的 PPTX 请用 slide_get_page 查看、用 slide_* 工具修改。")
     public String pptx_inspect_format(
             @P("文件 ID（从 doc_list_project_files 获取）") Long fileId,
-            @P("页码（从 0 开始，可选）。指定后只返回该页（推荐，输出更精简）；传 null 返回全部页") Integer slideIndex
+            @P(value = "页码（从 0 开始，可选）。指定后只返回该页（推荐，输出更精简）；传 null 返回全部页", required = false) Integer slideIndex
     ) {
         log.info("Tool: pptx_inspect_format called, fileId={}, slideIndex={}", fileId, slideIndex);
         try {
@@ -618,7 +618,7 @@ public class PptxTools implements AgentToolComponent {
     public String pptx_refine_outline(
             @P("PPTX 服务中的项目 ID") String serviceProjectId,
             @P("用户的修改要求，如：'增加一页关于市场分析的内容'、'把第3页和第4页合并'、'删除结论页'") String userRequirement,
-            @P("输出语言：zh（中文，默认）、en（英文）") String language
+            @P(value = "输出语言：zh（中文，默认）、en（英文）", required = false) String language
     ) {
         return ToolShims.hint(pptx_outline("refine", null, language, serviceProjectId, userRequirement),
                 "pptx_outline", "pptx_outline(action=refine, serviceProjectId, userRequirement)");
@@ -672,8 +672,8 @@ public class PptxTools implements AgentToolComponent {
           + "这是 beta 功能：版面复杂的页面可能提取不全，导出后提示用户核对。")
     public String pptx_export_editable(
             @P("PPTX 服务中的项目 ID") String serviceProjectId,
-            @P("导出文件名（不含扩展名，可选）") String filename,
-            @P("使用的 AI 模型 ID（可选，用于生成干净背景图）") String modelId
+            @P(value = "导出文件名（不含扩展名，可选）", required = false) String filename,
+            @P(value = "使用的 AI 模型 ID（可选，用于生成干净背景图）", required = false) String modelId
     ) {
         log.info("Tool: pptx_export_editable called, projectId={}, filename={}, modelId={}", 
                 serviceProjectId, filename, modelId);
