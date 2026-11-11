@@ -788,7 +788,8 @@ public class FileTools implements AgentToolComponent {
     @ToolMeta(displayName = "移动文件", category = "file", refreshFiles = true, access = ToolMeta.Access.WRITE)
     @Tool("移动项目文件/文件夹（一次调用，可批量）；单个文件按路径移动或改名也用它，传一项数组即可。\n"
             + "何时用：整理文件夹、归档、把多个文件分类必须一次调完，不要逐个调 move_files / create_folder（会耗尽本轮步数）。\n"
-            + "movesJson 是 [{\"sourcePath\":\"a.docx\",\"destPath\":\"01 起诉状/a.docx\"}]，路径相对项目根，每批最多 "
+            + "只有一个参数 movesJson（JSON 数组字符串，每项 sourcePath+destPath，路径相对项目根），多个目标文件夹也在同一个数组里，"
+            + "例：[{\"sourcePath\":\"起诉状.docx\",\"destPath\":\"01 诉讼文书/起诉状.docx\"},{\"sourcePath\":\"证据1.docx\",\"destPath\":\"02 证据/证据1.docx\"}]。每批最多 "
             + MAX_BATCH_MOVES
             + " 项。目标文件夹不存在自动创建；destPath 是已有文件夹则保留原名，否则最后一段即新名。\n"
             + "回执 moved: N 加逐项清单；只重试 FAILED 项，不要整批重发。")
@@ -805,15 +806,13 @@ public class FileTools implements AgentToolComponent {
             return "Error: no project context for this request.";
         }
         if (!StringUtils.hasText(movesJson)) {
-            return "Error: movesJson 不能为空，示例：[{\"sourcePath\":\"会议记录.txt\",\"destPath\":\"归档/会议记录.txt\"}]";
+            return "Error: movesJson 不能为空。正确写法：movesJson=" + MoveFilesArgs.EXAMPLE;
         }
-        List<java.util.Map<String, Object>> raw;
+        List<MoveFilesArgs.Move> raw;
         try {
-            raw = BATCH_MAPPER.readValue(movesJson,
-                    new com.fasterxml.jackson.core.type.TypeReference<List<java.util.Map<String, Object>>>() {});
-        } catch (Exception e) {
-            return "Error: movesJson 不是合法的 JSON 数组，示例："
-                    + "[{\"sourcePath\":\"会议记录.txt\",\"destPath\":\"归档/会议记录.txt\"}]";
+            raw = MoveFilesArgs.parse(movesJson);
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
         }
         if (raw == null || raw.isEmpty()) {
             return "Error: movesJson 至少要有一条移动";
@@ -828,11 +827,8 @@ public class FileTools implements AgentToolComponent {
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (int i = 0; i < raw.size(); i++) {
             int index = i + 1;
-            java.util.Map<String, Object> item = raw.get(i);
-            Object s = item == null ? null : item.get("sourcePath");
-            Object d = item == null ? null : item.get("destPath");
-            String srcRaw = s == null ? "" : String.valueOf(s);
-            String destRaw = d == null ? "" : String.valueOf(d);
+            String srcRaw = raw.get(i).sourcePath();
+            String destRaw = raw.get(i).destPath();
             if (!StringUtils.hasText(srcRaw)) {
                 return "Error: 第 " + index + " 条的 sourcePath 为空";
             }
