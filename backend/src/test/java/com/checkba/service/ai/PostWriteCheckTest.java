@@ -106,6 +106,16 @@ class PostWriteCheckTest {
     }
 
     @Test
+    void structuralWriteIsCheckedEvenAfterModelReadBack() {
+        Bridge bridge = new Bridge(BEFORE);
+        PostWriteCheck c = new PostWriteCheck();
+        c.beforeTool("doc_insert_at_cursor", 1L, bridge);
+        c.afterTool("doc_insert_at_cursor", "{\"newParagraph\":true}", true);
+        c.afterTool("doc_get_document_text", "{}", true);
+        assertTrue(c.due(), "插入新段落后模型回读过也要系统核对（模型回读常看不出条号重复）");
+    }
+
+    @Test
     void failedWritesAndFormattingDoNotCount() {
         Bridge bridge = new Bridge(BEFORE);
         PostWriteCheck c = new PostWriteCheck();

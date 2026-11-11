@@ -88,9 +88,13 @@ final class PostWriteCheck {
         }
     }
 
-    /** 收尾时要不要由系统核对。 */
+    /**
+     * 收尾时要不要由系统核对。结构性写入（新增/删除段落）即使模型回读过也核对：评测实录（tasks-10 v01，
+     * deepseek 3 次里 2 次）模型插入「第七条 不可抗力」后回读了全文，却没发现原第七条起没顺延、条号重复，
+     * 照样收尾。系统这一读是隐形的，干净就不说话。普通多处改字仍以模型回读为准。
+     */
     synchronized boolean due() {
-        return !done && baseline != null && (writes >= 2 || structural) && !readAfterLastWrite;
+        return !done && baseline != null && (structural || (writes >= 2 && !readAfterLastWrite));
     }
 
     /**
