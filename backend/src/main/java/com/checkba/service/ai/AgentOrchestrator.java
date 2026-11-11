@@ -349,6 +349,7 @@ public class AgentOrchestrator {
          * 置位后不再清零：本轮改过就是改过，后面再跑几个读取工具也不会把它改回来。
          */
         void noteToolResult(String toolName, boolean success) {
+            if (toolName != null) toolsRun.add(toolName);
             if (success && ClientCapabilityService.isDocumentWritingTool(toolName)) {
                 documentEdited = true;
                 documentEdits.incrementAndGet();
@@ -359,6 +360,10 @@ public class AgentOrchestrator {
             }
         }
 
+        /** 本轮实际执行过的工具（不论成败），供「声称做了却没调用」检查。 */
+        final java.util.Set<String> toolsRun = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        /** 「声称做了却没调用」每轮最多纠正一次。 */
+        boolean claimNudged;
         /** 本轮是否已成功落盘记忆（save_memory / memory_write），供「记住」硬保险判定。 */
         volatile boolean memorySaved;
         /** 「记住」硬保险每轮最多补救一次。 */
@@ -1258,6 +1263,38 @@ public class AgentOrchestrator {
                     // remember 只认祈使句（句首/标点后/please 后），"Do you remember…" 是回忆提问不算
                     + "|(?:^|[.!?;:,]\\s*|\\bplease,?\\s+)remember\\b",
             java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    private static final java.util.regex.Pattern CLAIM_NOISE = java.util.regex.Pattern.compile(
+            "(?s)```.*?(?:```|$)|~~~.*?(?:~~~|$)|`[^`\\n]*`|<(tool_code|process)\\b.*?(?:</\\1>|$)|<[^>]*>");
+    private static final java.util.regex.Pattern SNAKE_TOOL_TOKEN =
+            java.util.regex.Pattern.compile("(?<![A-Za-z0-9_])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![A-Za-z0-9_])");
+
+    /**
+     * 「声称做了却没调用」：本轮<b>一个工具都没执行</b>，收尾回答却点名了已注册的工具（下划线形式的工具名），
+     * 说明模型以为自己做了。返回一次性纠正提醒并置位；其余 null。只在零工具的轮次触发，后续轮次回顾
+     * 前一轮动作不会误报；每轮最多一次，不会循环。
+     */
+    static String claimedToolNudgeIfNeeded(RunGuard guard, String content, AgentMode agentMode,
+                                           java.util.function.Predicate<String> isTool) {
+        if (guard == null || content == null || agentMode == AgentMode.ASK || guard.claimNudged
+                || guard.protocolNudged || !guard.toolsRun.isEmpty()) {
+            return null;
+        }
+        // 只看正文叙述：代码块（在讲解写法）、tool_code/process 块（截断与文字调用另有纠正路径）、
+        // 标签本身（<artifact type="task_list"> 的属性值）都不算「声称」
+        String prose = CLAIM_NOISE.matcher(content).replaceAll(" ");
+        java.util.Set<String> named = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(prose);
+        while (m.find()) if (isTool.test(m.group())) named.add(m.group());
+        if (named.isEmpty()) return null;
+        guard.claimNudged = true;
+        String list = String.join(", ", named);
+        return LangText.of(
+                "[系统提醒] 你的回答提到了 " + list + "，但本轮没有执行任何工具，用户要的操作实际上没有发生。"
+                        + "现在通过函数调用真正执行它；完成后再简短回答，不要先写「已完成」。",
+                "[System reminder] Your answer mentions " + list + ", but no tool ran in this turn, so the requested action did not happen. "
+                        + "Call it now through function calling, then answer briefly; do not claim it is done before it runs.");
+    }
 
     /** 用户消息是否含明确的「记住」请求（中文子串匹配，英文按词边界）。 */
     static boolean isExplicitRememberRequest(String userMessage) {
@@ -3446,6 +3483,19 @@ public class AgentOrchestrator {
                 String protocolNudge = protocolNudgeIfNeeded(guard, content, agentMode, modelId);
                 if (protocolNudge != null) {
                     messages.add(dev.langchain4j.data.message.UserMessage.from(protocolNudge));
+                    continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                            depth + 1, executionLog, agentMode, guard);
+                    return;
+                }
+            }
+
+            // 3.37 声称做了却没调用：本轮一个工具都没执行，回答却点名了真实工具（「我调用了 save_memory」）。
+            // 百炼 qwen 实录（s05 导出 PDF / s11 记住）：只写「已导出 / 已记录」就收尾，「记住」硬保险提醒后仍照写。
+            if (!summaryOnly) {
+                String claimNudge = claimedToolNudgeIfNeeded(guard, content, agentMode, toolRegistry::hasTool);
+                if (claimNudge != null) {
+                    log.warn("Answer names tools that never ran in {}, injecting one corrective round", conversationId);
+                    messages.add(dev.langchain4j.data.message.UserMessage.from(claimNudge));
                     continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                             depth + 1, executionLog, agentMode, guard);
                     return;
