@@ -36,15 +36,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 轮数预算（gap R5 / P4）走真实编排器循环：无进展地一轮一轮读下去会在第 30 轮工具调用后暂停并汇报，
- * 批量调用只算一轮，所以「二十多轮、每轮好几条批注」的长审查照常做完。
+ * 轮数提醒（gap R5 / P4）走真实编排器循环：长跑的轮次在第 15 轮看到一次末位提醒，但从不暂停
+ * （所有者决定：只提醒不暂停）；批量调用只算一轮。
  */
 class AgentOrchestratorRunBudgetTest {
 
@@ -171,36 +169,28 @@ class AgentOrchestratorRunBudgetTest {
     }
 
     @Test
-    void unfinishedRunPausesAfterTheHardStopRoundWithAVisibleSummary() {
-        when(todoListService.unfinishedItems(any())).thenReturn(List.of("核对违约金条款"));
-        ScriptModel model = new ScriptModel(1000, n -> reads(n, 1));
-        run(model, "conv-round-cap");
+    void longRunIsNeverPausedAndSeesTheRoundNudgeOnce() {
+        ScriptModel model = new ScriptModel(60, n -> reads(n, 1));
+        run(model, "conv-long-run");
 
-        assertEquals(RunBudget.HARD_STOP_ROUND, model.calls.get(), "the model is not called again after the stop");
+        assertEquals(61, model.calls.get(), "all 60 tool rounds and the final answer run");
         String end = bubbleEndData();
-        assertTrue(end.contains("paused") && end.contains("max_depth"), end);
+        assertTrue(end.contains("finished"), end);
+        assertFalse(end.contains("paused"), end);
 
-        // the soft nudge is seen exactly once, by the call right after round SOFT_NUDGE_ROUND
         for (int i = 0; i < model.lastUserText.size(); i++) {
             boolean nudged = model.lastUserText.get(i).contains("轮工具调用");
             assertEquals(i == RunBudget.SOFT_NUDGE_ROUND, nudged, "call " + (i + 1) + ": " + model.lastUserText.get(i));
         }
-
-        org.mockito.ArgumentCaptor<String> saved = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(messageService, atLeastOnce()).upsertAssistantMessage(any(), any(), any(), any(), saved.capture());
-        String last = saved.getAllValues().get(saved.getAllValues().size() - 1);
-        assertTrue(last.contains("已执行 " + RunBudget.HARD_STOP_ROUND + " 轮工具调用"), last);
-        assertTrue(last.contains("doc_get_paragraph ×" + RunBudget.HARD_STOP_ROUND), last);
-        assertTrue(last.contains("核对违约金条款"), last);
     }
 
     @Test
-    void longReviewWithBatchedCallsFinishesUnderTheCap() {
+    void longReviewWithBatchedCallsFinishes() {
         // 29 rounds × 4 calls = 116 tool calls (e.g. many comments): rounds, not calls, are counted
-        ScriptModel model = new ScriptModel(RunBudget.HARD_STOP_ROUND - 1, n -> reads(n, 4));
+        ScriptModel model = new ScriptModel(29, n -> reads(n, 4));
         run(model, "conv-long-review");
 
-        assertEquals(RunBudget.HARD_STOP_ROUND, model.calls.get());
+        assertEquals(30, model.calls.get());
         String end = bubbleEndData();
         assertTrue(end.contains("finished"), end);
         assertFalse(end.contains("paused"), end);

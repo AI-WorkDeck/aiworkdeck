@@ -360,7 +360,7 @@ public class AgentOrchestrator {
 
         // 原地打转检测：滑动窗口，识别 A/A/A 与 A/B/A/B 两种重复模式，先干预后熔断
         final StuckDetector stuck = new StuckDetector();
-        // 坏轮次上限：工具轮数软提醒/硬暂停 + 撤销打转（gap R5 / P4，阈值见 RunBudget）
+        // 坏轮次的隐形自纠：工具轮数提醒 + 撤销打转提醒，只提醒不暂停（gap R5 / P4，阈值见 RunBudget）
         final RunBudget budget = new RunBudget();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
         final Set<String> triedModels = new java.util.LinkedHashSet<>();
@@ -1115,83 +1115,32 @@ public class AgentOrchestrator {
         }
     }
 
-    static boolean isRunBudgetStop(RunBudget.Action action) {
-        return action == RunBudget.Action.ROUND_STOP || action == RunBudget.Action.UNDO_STOP;
-    }
-
-    /** 轮数/撤销预算的一次性提醒（挂在整栈末位）；不需要提醒时返回 null。 */
-    static String runBudgetNudge(RunBudget.Action action) {
+    /**
+     * 轮数/撤销的一次性提醒（挂在整栈末位）；不需要提醒时返回 null。
+     * 只提醒不暂停（所有者决定 2026-11-11）：律师要的是结果，停止、挂起、改方向都由用户自己随时做。
+     */
+    static String runBudgetNudge(RunBudget.Action action, RunBudget budget) {
         if (action == RunBudget.Action.ROUND_NUDGE) {
             return LangText.of(
-                    "[系统提醒] 本轮已执行 " + RunBudget.SOFT_NUDGE_ROUND + " 轮工具调用。若任务仍在推进，"
+                    "[系统提醒] 本轮已执行 " + budget.rounds() + " 轮工具调用。若任务仍在推进，"
                             + "把剩下互不依赖的修改放进同一轮批量发出；若卡住了，停下来用 <final> 向用户说明"
-                            + "已完成什么、卡在哪里。到第 " + RunBudget.HARD_STOP_ROUND + " 轮系统会暂停本轮。",
-                    "[System reminder] This run has used " + RunBudget.SOFT_NUDGE_ROUND + " tool rounds. If the task "
+                            + "已完成什么、卡在哪里。",
+                    "[System reminder] This run has used " + budget.rounds() + " tool rounds. If the task "
                             + "is still progressing, batch the remaining independent edits into one round; if you are "
-                            + "stuck, stop and use <final> to tell the user what is done and what blocks you. The "
-                            + "system pauses the run at round " + RunBudget.HARD_STOP_ROUND + ".");
+                            + "stuck, stop and use <final> to tell the user what is done and what blocks you.");
         }
         if (action == RunBudget.Action.UNDO_NUDGE) {
             return LangText.of(
-                    "[系统提醒] 你已撤销/重做 " + RunBudget.UNDO_NUDGE_AT + " 次，陷入了「修改→撤销→再修改」的循环。"
+                    "[系统提醒] 你已撤销/重做 " + budget.undos() + " 次，陷入了「修改→撤销→再修改」的循环。"
                             + "不要再撤销：先用读取类工具确认目标段落现在的真实内容，再用一次定位准确的修改完成；"
-                            + "如果现有工具做不到用户要的效果，停下来用 <final> 如实说明文档现状。"
-                            + "再撤销/重做 " + (RunBudget.UNDO_STOP_AT - RunBudget.UNDO_NUDGE_AT) + " 次系统会暂停本轮。",
-                    "[System reminder] You have undone/redone " + RunBudget.UNDO_NUDGE_AT + " times and are in an "
+                            + "如果现有工具做不到用户要的效果，停下来用 <final> 如实说明文档现状。",
+                    "[System reminder] You have undone/redone " + budget.undos() + " times and are in an "
                             + "\"edit -> undo -> edit\" loop. Stop undoing: read the target paragraph to confirm its "
                             + "current text, then make one precisely located edit; if the available tools cannot "
                             + "produce what the user wants, stop and use <final> to state the document's current "
-                            + "state. " + (RunBudget.UNDO_STOP_AT - RunBudget.UNDO_NUDGE_AT)
-                            + " more undo/redo calls will pause the run.");
+                            + "state.");
         }
         return null;
-    }
-
-    /**
-     * 轮数/撤销预算用尽：在一批工具执行完之后暂停（确认闸、反问、插话都已先行处理），
-     * 给用户一段看得见的汇报——做了什么、清单里还剩什么——再按 paused 收尾，「继续」可接着做。
-     */
-    private void pauseForRunBudget(RunGuard guard, String projectId, Long userId,
-                                   StringBuilder executionLog, RunBudget.Action action) {
-        log.warn("Run budget stop for {}: {} (rounds={}, undos={})", guard.conversationId, action,
-                guard.budget.rounds(), guard.budget.undos());
-        java.util.List<String> done = new java.util.ArrayList<>();
-        guard.budget.succeeded().forEach((name, count) -> done.add(toolRegistry.resolve(name)
-                .map(ToolRegistry.RegisteredTool::displayName).orElse(name) + " ×" + count));
-        java.util.List<String> pending = todoListService.unfinishedItems(guard.conversationId);
-        String notice = runBudgetStopNotice(action, guard.budget.rounds(), done, pending);
-        sendTextDelta(guard, notice);
-        saveAssistantMessage(guard, projectId, userId, executionLog + guard.streamSnapshot() + notice);
-        markRunState(guard, AgentRunStateService.RunStatus.PAUSED);
-        sendRunEvent(guard, "bubble_end", bubbleEndPayload(guard, "paused",
-                action == RunBudget.Action.UNDO_STOP ? "no_progress" : "max_depth"));
-        closeSse(guard);
-        endRun(guard);
-    }
-
-    static String runBudgetStopNotice(RunBudget.Action action, int rounds,
-                                      java.util.List<String> done, java.util.List<String> pending) {
-        StringBuilder sb = new StringBuilder("\n\n> ");
-        sb.append(action == RunBudget.Action.UNDO_STOP
-                ? LangText.of("反复撤销、重做同一处修改，任务没有推进，已暂停。文档停在最后一步操作之后的状态，请先核对。",
-                        "The run kept undoing and redoing the same edit without progress, so it is paused. "
-                                + "The document is in the state after the last step; please check it.")
-                : LangText.of("本轮已执行 " + rounds + " 轮工具调用仍未收尾，已暂停，避免继续空转。",
-                        "This run used " + rounds + " tool rounds without finishing, so it is paused to avoid "
-                                + "spinning further."));
-        int shown = Math.min(done.size(), 8);
-        if (shown > 0) {
-            sb.append("\n> ").append(LangText.of("已执行：", "Done: "))
-                    .append(String.join(LangText.of("、", ", "), done.subList(0, shown)));
-            if (done.size() > shown) sb.append(LangText.of(" 等", " and more"));
-        }
-        if (pending != null && !pending.isEmpty()) {
-            sb.append("\n> ").append(LangText.of("尚未完成：", "Still pending: "))
-                    .append(String.join(LangText.of("；", "; "), pending));
-        }
-        sb.append("\n> ").append(LangText.of("可补充说明，或点击「继续」接着做。",
-                "Add guidance, or click Continue to resume."));
-        return sb.toString();
     }
 
     private void pauseForNoProgress(RunGuard guard, String projectId, Long userId,
@@ -2879,7 +2828,7 @@ public class AgentOrchestrator {
                     boolean editorBooting = !success && EditorBridgeService.isEditorBootingOutput(result);
                     StuckDetector.Verdict verdict = guard.stuck.record(
                             req.name(), req.arguments(), result, success);
-                    guard.budget.noteCall(req.name(), success);
+                    guard.budget.noteCall(req.name());
                     boolean pauseForNoProgress = verdict == StuckDetector.Verdict.CIRCUIT_BREAK;
                     if (verdict == StuckDetector.Verdict.INTERVENE) {
                         log.warn("Stuck detector intervention for {}: {}", conversationId, guard.stuck.lastPattern());
@@ -2956,12 +2905,12 @@ public class AgentOrchestrator {
                 if (stuckNudge != null) {
                     messages.add(dev.langchain4j.data.message.UserMessage.from(stuckInterventionMessage(stuckNudge)));
                 }
-                // 轮数/撤销预算：整批执行完才判，暂停只发生在批与批之间（不会停在一次多步修改的中间）
-                RunBudget.Action budgetAction = guard.budget.endRound(
-                        nativeRequests.stream().map(dev.langchain4j.agent.tool.ToolExecutionRequest::name).toList());
-                String budgetNudge = runBudgetNudge(budgetAction);
+                // 轮数/撤销提醒：整批执行完才判（一批只算一轮），只挂末位提醒、从不暂停
+                String budgetNudge = runBudgetNudge(guard.budget.endRound(
+                        nativeRequests.stream().map(dev.langchain4j.agent.tool.ToolExecutionRequest::name).toList()),
+                        guard.budget);
                 if (budgetNudge != null) {
-                    log.warn("Run budget nudge for {}: {} (rounds={}, undos={})", conversationId, budgetAction,
+                    log.warn("Run budget nudge for {} (rounds={}, undos={})", conversationId,
                             guard.budget.rounds(), guard.budget.undos());
                     messages.add(dev.langchain4j.data.message.UserMessage.from(budgetNudge));
                 }
@@ -2983,11 +2932,6 @@ public class AgentOrchestrator {
                 // 结果已落库，此处停机等回答即可。
                 if (containsQuestion(aiContent)) {
                     stopForUserQuestion(guard, projectId, userId, intermediateContent);
-                    return;
-                }
-
-                if (isRunBudgetStop(budgetAction)) {
-                    pauseForRunBudget(guard, projectId, userId, executionLog, budgetAction);
                     return;
                 }
 
@@ -3074,7 +3018,7 @@ public class AgentOrchestrator {
                     boolean xmlEditorBooting = !xmlToolSuccess && EditorBridgeService.isEditorBootingOutput(result);
                     StuckDetector.Verdict verdict = guard.stuck.record(
                             call.toolName(), call.argsJson(), result, xmlToolSuccess);
-                    guard.budget.noteCall(call.toolName(), xmlToolSuccess);
+                    guard.budget.noteCall(call.toolName());
                     boolean pauseForNoProgress = verdict == StuckDetector.Verdict.CIRCUIT_BREAK;
                     if (verdict == StuckDetector.Verdict.INTERVENE) {
                         log.warn("Stuck detector intervention for {}: {}", conversationId, guard.stuck.lastPattern());
@@ -3175,12 +3119,12 @@ public class AgentOrchestrator {
                      if (stuckNudge != null) {
                          messages.add(dev.langchain4j.data.message.UserMessage.from(stuckInterventionMessage(stuckNudge)));
                      }
-                     // 轮数/撤销预算（同原生分支：整批执行完才判）
-                     RunBudget.Action budgetAction = guard.budget.endRound(
-                             xmlCalls.stream().map(XmlToolCallParser.ParsedCall::toolName).toList());
-                     String budgetNudge = runBudgetNudge(budgetAction);
+                     // 轮数/撤销提醒（同原生分支：整批执行完才判，从不暂停）
+                     String budgetNudge = runBudgetNudge(guard.budget.endRound(
+                             xmlCalls.stream().map(XmlToolCallParser.ParsedCall::toolName).toList()),
+                             guard.budget);
                      if (budgetNudge != null) {
-                         log.warn("Run budget nudge for {}: {} (rounds={}, undos={})", conversationId, budgetAction,
+                         log.warn("Run budget nudge for {} (rounds={}, undos={})", conversationId,
                                  guard.budget.rounds(), guard.budget.undos());
                          messages.add(dev.langchain4j.data.message.UserMessage.from(budgetNudge));
                      }
@@ -3198,11 +3142,6 @@ public class AgentOrchestrator {
                      // 反问优先于递归（同原生分支）
                      if (containsQuestion(content)) {
                          stopForUserQuestion(guard, projectId, userId, intermediateXmlContent);
-                         return;
-                     }
-
-                     if (isRunBudgetStop(budgetAction)) {
-                         pauseForRunBudget(guard, projectId, userId, executionLog, budgetAction);
                          return;
                      }
 

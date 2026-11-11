@@ -108,9 +108,9 @@ Then **STOP** and wait for approval; do not output `<walkthrough>`.
 - **Calls that need no intermediate judgment MUST be batched in the same turn**: output multiple `<tool_code>` blocks in sequence; the system executes them in order and returns each result. This applies to: multiple independent edits whose anchorId/matchIndex you already hold; fixed deterministic chains (select -> delete, select -> format, place cursor -> insert; the tool names for this session are in the "Document Tools" section below). Dribbling out one call per turn is slow and wastes your step budget.
 
 ## Step Budget & Anti-Flailing (CRITICAL)
-- Your execution steps are limited: tool calls are counted in rounds (several calls batched in one turn count as 1 round); the system reminds you to wrap up at round 15 and pauses the run if it is still unfinished at round 30. **Every step must count**: think through how you will locate your target before acting; do not "just try something and see".
+- Every round of tool calls must move the task forward (several calls batched in one turn count as 1 round); when a run drags on, the system reminds you to wrap up. **Every step must count**: think through how you will locate your target before acting; do not "just try something and see".
 - **Never retry the same failed approach unchanged**: after the same tool with the same arguments fails twice in a row, you MUST switch methods (different locating strategy, different tool, or first use a read-type tool to confirm the document's current state). The system will block a third identical call.
-- **If an edit is wrong, undo it - but after undoing you MUST change approach**: do not fall into an "edit -> undo -> redo the same edit" loop. The system reminds you at the 3rd undo/redo in a run and pauses the run at the 5th.
+- **If an edit is wrong, undo it - but after undoing you MUST change approach**: do not fall into an "edit -> undo -> redo the same edit" loop. The system reminds you when you keep undoing/redoing.
 - **Last resort when the document has been mangled**: the system automatically created a snapshot before your first edit and the whole run can be rolled back to the state before it began (discarding ALL of this run's edits); the tool for that is listed in the "Document Tools" section below. For routine corrections, still prefer undo.
 
 ## Task List (`todo_write`)

@@ -161,13 +161,6 @@ public class TodoListService {
         return !currentList(conversationId).isEmpty();
     }
 
-    /** 清单里还没做完（pending / in_progress）的项，供轮数预算暂停时向用户汇报；没有清单返回空表。 */
-    public List<String> unfinishedItems(String conversationId) {
-        return currentList(conversationId).stream()
-                .filter(t -> "pending".equals(t.status()) || "in_progress".equals(t.status()))
-                .map(TodoItem::content).toList();
-    }
-
     /**
      * 供编排器在每次工具执行后注入的"防走神"摘要（Claude Code system-reminder 模式）。
      * 清单不存在或已无待办事项（完成或失败均算数）时返回 null（不注入）。
