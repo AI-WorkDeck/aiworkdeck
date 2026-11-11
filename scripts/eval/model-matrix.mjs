@@ -39,6 +39,7 @@ function parseArgs(argv) {
     else if (a === '--profile') o.profile = next()
     else if (a === '--tier') o.tier = next()
     else if (a === '--keep') o.keep = true
+    else if (a === '--rescore') o.rescore = path.resolve(next())
     else if (a === '--workdir') { o.workdir = path.resolve(next()); o.keep = true }
     else if (a === '--help' || a === '-h') o.help = true
     else throw new Error('未知参数：' + a)
@@ -64,6 +65,7 @@ const costOf = (model, prompt, cached, completion) => {
 const USAGE = `用法：node scripts/eval/model-matrix.mjs --before <ref> --after <ref> [--profile cn|intl] [--tier cheap|release] [--models a,b] [--sentences <file.json>]
         profile 缺省 cn；未给 --models 时按 profile+tier 取默认模型，未给 --sentences 时按 profile 取 gate-35 / gate-35-en
         [--runs N] [--concurrency K] [--only id1,id2] [--api-only] [--run-timeout 秒] [--out 目录] [--keep]
+       node scripts/eval/model-matrix.mjs --rescore <已有产物目录> [--sentences <file.json>]   离线重判已有 results.json（不调模型、不需要密钥）
 环境变量：OPENROUTER_API_KEY（必需）；PG_BIN（可选，PostgreSQL bin 目录）；JAVA_HOME（需要 JDK 21，缺省自动找）`
 
 // ---------- 小工具 ----------
@@ -132,11 +134,14 @@ function withHostFile(s) {
 const editorSupported = s => s.hostState === 'nofile' || s.hostState.startsWith('docx:')
 
 // ---------- 评分 ----------
+const LEGACY_FINALTEXT_SLICE = 1500 // 旧版 runner 把 finalText 截到 1500 字再判 finalTextIncludes，新版存全文
 const nameMatch = (pat, tool) => (pat.startsWith('/') && pat.lastIndexOf('/') > 0)
   ? new RegExp(pat.slice(1, pat.lastIndexOf('/')), pat.slice(pat.lastIndexOf('/') + 1)).test(tool) : pat === tool
 const anyOf = (pats, tools) => (Array.isArray(pats) ? pats : [pats]).some(p => tools.some(t => nameMatch(p, t)))
 
-async function judge(sentence, rec, ctx) {
+// prior：离线重判时传入旧记录里的检查结果——outcomeCheck 要查库/下载产物，离线跑不了，沿用旧结果；
+// 旧产物的 finalText 被截成 1500 字，截断后「找不到」不代表答案里没有，沿用旧结果（不冒充已验证）。
+async function judge(sentence, rec, ctx, prior = null) {
   const e = sentence.expect
   const r = {}
   if (e.firstToolAnyOf?.length) {
@@ -146,8 +151,12 @@ async function judge(sentence, rec, ctx) {
   if (e.mustNotUse?.length) r.mustNotUse = !anyOf(e.mustNotUse, rec.tools)
   if (e.status) r.status = rec.status === e.status // 可选：要求本轮以指定状态结束（如 finished = 没有停在确认卡；awaiting_input = 停在确认卡/反问）
   if (e.maxRounds != null) r.maxRounds = (rec.rounds ?? 0) <= e.maxRounds // 可选：轮数上限（防循环：编辑器句子曾因 doc_* 反复重试而空转）
-  if (e.finalTextIncludes?.length) r.finalText = e.finalTextIncludes.every(t => (rec.finalText || '').includes(t))
-  if (e.outcomeCheck) {
+  if (e.finalTextIncludes?.length) {
+    r.finalText = e.finalTextIncludes.every(t => (rec.finalText || '').includes(t))
+    if (prior && !r.finalText && (rec.finalText || '').length >= LEGACY_FINALTEXT_SLICE && prior.finalText !== undefined) r.finalText = prior.finalText
+  }
+  if (e.outcomeCheck && prior) { if (prior.outcome !== undefined) r.outcome = prior.outcome }
+  else if (e.outcomeCheck) {
     try {
       const fn = new (Object.getPrototypeOf(async function () {}).constructor)('ctx', e.outcomeCheck)
       r.outcome = !!(await fn(ctx))
@@ -504,7 +513,32 @@ function parseLogSlice(slice, conversationId) {
   // XML 兜底路径（DeepSeek 等时而改用文本调用）：<tool_code>name(k=v, ...)</tool_code>
   const rx = /<tool_code>\s*([a-zA-Z_0-9]+)\(([\s\S]*?)\)\s*<\/tool_code>/g
   while ((m = rx.exec(slice))) calls.push({ name: m[1], args: parseKwargs(m[2]) })
-  return { tools, rounds, calls }
+  // 文本 <question> 停问（Detected <question> for <conv>）等同 ask_user：工具序列里没有时补在末尾（它是本轮最后一个动作）
+  const askedByText = slice.includes(`Detected <question> for ${conversationId},`)
+  if (askedByText && !tools.includes('ask_user')) tools.push('ask_user')
+  return { tools, rounds, calls, askedByText, ...processMetrics(slice, conversationId, tools) }
+}
+
+// 过程指标：每个 [Round] 之后到下一个 [Round] 之前是一次 LLM 回合；回合里有 "Parsed XML tool" 记 XML 回合，有 "Detected Native Tool Requests" 记原生回合
+const WRITE_TOOL_RE = /^(doc_(replace|insert|modify|delete|add_comment|apply|accept|reject|table_set|undo|restore)|write_docx)/
+const READ_TOOL_RE = /^(doc_(get_|find_text|table_read|list_revisions|audit)|extract_file_text|read_)/
+function processMetrics(slice, conversationId, tools) {
+  let xmlTurns = 0, nativeTurns = 0, cur = null
+  const flush = () => { if (cur?.xml) xmlTurns++; if (cur?.native) nativeTurns++ }
+  const re = /\[Round\] conv=(\S+) |Parsed XML tool: |Detected Native Tool Requests/g
+  let m
+  while ((m = re.exec(slice))) {
+    if (m[1]) { if (m[1] === conversationId) { flush(); cur = { xml: false, native: false } } }
+    else if (cur) { if (m[0].startsWith('Parsed')) cur.xml = true; else cur.native = true }
+  }
+  flush()
+  const lastWrite = tools.findLastIndex(t => WRITE_TOOL_RE.test(t))
+  const count = {}; for (const t of tools) count[t] = (count[t] || 0) + 1
+  return {
+    xmlTurns, nativeTurns,
+    verifyAfterWrite: lastWrite < 0 ? null : tools.slice(lastWrite + 1).some(t => READ_TOOL_RE.test(t)), // null = 本次没有写操作
+    maxSameTool: Math.max(0, ...Object.values(count)),
+  }
 }
 
 // 解析 k=v, k2="..." 形式的关键字参数；值支持带引号字符串、数字、true/false/None/null 与 JSON 数组/对象。解析失败返回 null。
@@ -553,7 +587,7 @@ async function runOne(inst, sentence, runIdx, opts) {
     await sleep(300) // 让日志/用量落盘（落盘延迟，不是等模型）
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
     const buf = Buffer.alloc(size - c.logOffset); fs.readSync(fd, buf, 0, buf.length, c.logOffset); fs.closeSync(fd)
-    const { tools, rounds, calls } = parseLogSlice(buf.toString('utf8'), c.conversationId)
+    const { tools, rounds, calls, askedByText, xmlTurns, nativeTurns, verifyAfterWrite, maxSameTool } = parseLogSlice(buf.toString('utf8'), c.conversationId)
     // cached_tokens / cache_write_tokens 列自本 PR 起才有；旧 ref 的库没有这两列时回退到不带缓存的查询（缓存数记 0）
     let usage = (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls, coalesce(sum(cached_tokens),0)::int as cached, coalesce(sum(cache_write_tokens),0)::int as cache_write, count(cached_tokens)::int as cache_reported from token_usage where conversation_id='${c.conversationId}'`).catch(() => null))?.[0]
     usage = usage || (await inst.rows(`select coalesce(sum(prompt_tokens),0)::int as p, coalesce(sum(completion_tokens),0)::int as c, count(*)::int as calls from token_usage where conversation_id='${c.conversationId}'`).catch(() => []))[0] || {}
@@ -564,10 +598,11 @@ async function runOne(inst, sentence, runIdx, opts) {
       promptTokens: usage.p ?? 0, completionTokens: usage.c ?? 0, llmCalls: usage.calls ?? 0,
       cachedTokens: usage.cached ?? 0, cacheWriteTokens: usage.cache_write ?? 0, cacheReportedCalls: usage.cache_reported ?? 0,
       billedEq: billedEq(usage.p ?? 0, usage.cached ?? 0),
+      askedByText, xmlTurns, nativeTurns, verifyAfterWrite, maxSameTool,
       todoWrites: tools.filter(t => t === 'todo_write').length, askUser: tools.includes('ask_user'),
       lookAround: isLookAround(tools[0], sentence.expect.firstToolAnyOf),
       toolSetChanges: countChanges(rounds.map(r => r.toolsHash)), toolOrderChanges: countChanges(rounds.map(r => r.toolsOrderHash)),
-      durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: (c.text || '').slice(0, 1500), events: summarizeEvents(c.events || []), conversationId: c.conversationId,
+      durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: c.text || '', events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
     const ctx = {
       projectId: pid, tools, calls, finalText: c.text || '', api: (m, u, b) => inst.http(m, u, b), sql: q => inst.sql(q), rows: q => inst.rows(q),
@@ -605,6 +640,11 @@ const UNREACHABLE_RE = /prohibited due to a violation|No endpoints found|region/
 const MAX_UNREACHABLE = 3
 const isInfraFailure = rec => !UNREACHABLE_RE.test(rec.error || '') && (rec.status === 'stream_error' || rec.status === 'harness_error' || (rec.status === 'error' && /Stream ended without usable/.test(rec.error || ''))
   || (rec.status === 'timeout' && (rec.rounds ?? 0) <= 1))
+// 供应商/基础设施故障（限流、额度、空流、403 地域）：不是模型行为，不进通过率分母，不进门禁判定与回退清单，在报告里单列。
+// status=error 只在错误信息明确是供应商 429/额度/5xx 时才算（后端自己的错误仍记为失败）。
+const INFRA_ERR_RE = /\b429\b|AI_QUOTA_EXHAUSTED|rate.?limit|quota|Provider returned error|overloaded|\b50[0-4]\b/i
+const isInfraRun = rec => rec.status !== 'SKIPPED' && (UNREACHABLE_RE.test(rec.error || '') || isInfraFailure(rec) || (rec.status === 'error' && INFRA_ERR_RE.test(rec.error || '')))
+const validRuns = rs => rs.filter(r => r.status !== 'SKIPPED' && !isInfraRun(r))
 // 「四处看看」：第一个工具是列清单/目录类工具，且不在句子声明的 firstToolAnyOf 里（没声明 firstToolAnyOf 的句子不计）
 const LOOK_AROUND_RE = /^(list_[a-z_]+|doc_list_project_files|search_project_files|search_across_projects|search_project_summaries|task_list|meeting_list[a-z_]*|tmeet_list_meetings|memory_list|get_law_list)$/
 function isLookAround(first, allowed) {
@@ -634,21 +674,22 @@ function buildReport(meta, results, sentences) {
     `- 总墙钟: ${(meta.wallMs / 1000).toFixed(0)}s（其中构建+启动 ${(meta.setupMs / 1000).toFixed(0)}s，跑题 ${(meta.runMs / 1000).toFixed(0)}s）`, '')
   const skipped = sentences.filter(s => results.some(r => r.sentence === s.id && r.status === 'SKIPPED'))
   if (skipped.length) L.push(`SKIPPED（需要编辑器或插件但本次未运行）：${skipped.map(s => s.id).join(', ')}`, '')
-  L.push('## 汇总', '', '| 模型 | 版本 | 通过 | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 缓存命中 tokens | 命中率 | 计费等价 | 补全 tokens | 轮数 | 工具集变化轮数 | 顺序变化轮数 | ≥2轮最大工具数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+  L.push('## 汇总', '', '| 模型 | 版本 | 通过（有效运行） | 首工具正确 | mustUse 满足 | 结果校验 | 提示词 tokens | 缓存命中 tokens | 命中率 | 计费等价 | 补全 tokens | 轮数 | 工具集变化轮数 | 顺序变化轮数 | ≥2轮最大工具数 | 耗时(s) |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const m of models) for (const side of ['before', 'after']) {
     // before=after 同 ref 时 results 里靠 side 区分
-    const rs = results.filter(r => r.side === side && r.model === m && r.status !== 'SKIPPED')
+    const all = results.filter(r => r.side === side && r.model === m && r.status !== 'SKIPPED')
+    const rs = validRuns(all), nInfra = all.length - rs.length
     const f = k => rs.filter(r => r.checks?.[k] === true).length, g = k => rs.filter(r => r.checks && k in r.checks).length
     const sum = k => rs.reduce((a, r) => a + (r[k] || 0), 0)
-    L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('cachedTokens')} | ${pct(sum('cachedTokens'), sum('promptTokens'))} | ${sum('billedEq')} | ${sum('completionTokens')} | ${sum('rounds')} | ${rs.some(r => r.toolSetChanges == null) ? '-' : sum('toolSetChanges')} | ${rs.some(r => r.toolOrderChanges == null) ? '-' : sum('toolOrderChanges')} | ${maxLater(rs)} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
+    L.push(`| ${m} | ${side} | ${rs.filter(r => r.pass).length}/${rs.length}${nInfra ? `（另 ${nInfra} 次基础设施故障已排除）` : ''} | ${f('firstTool')}/${g('firstTool')} | ${f('mustUse')}/${g('mustUse')} | ${f('outcome')}/${g('outcome')} | ${sum('promptTokens')} | ${sum('cachedTokens')} | ${pct(sum('cachedTokens'), sum('promptTokens'))} | ${sum('billedEq')} | ${sum('completionTokens')} | ${sum('rounds')} | ${rs.some(r => r.toolSetChanges == null) ? '-' : sum('toolSetChanges')} | ${rs.some(r => r.toolOrderChanges == null) ? '-' : sum('toolOrderChanges')} | ${maxLater(rs)} | ${(sum('durationMs') / 1000).toFixed(0)} |`)
   }
   L.push('', `> 计费等价 = 提示词 tokens − ${CACHE_READ_DISCOUNT}·缓存命中 tokens（假设缓存读按输入价 0.1x，忽略缓存写溢价与输出价差；代理指标，非账单）。工具集变化轮数 = 与上一轮下发工具名集合不同的轮数（[Round] 日志 toolsHash）；旧 ref 无该日志记 -。`, '', '## 逐句对比', '')
   for (const m of models) {
     L.push(`### ${m}`, '', '| 句子 | before 通过 | after 通过 | before 首工具 | after 首工具 | before 轮/tokens | after 轮/tokens | before 命中率/计费等价/集变化 | after 命中率/计费等价/集变化 | ≥2轮最大工具数 before/after | 差异 |', '|---|---|---|---|---|---|---|---|---|---|---|')
     for (const s of sentences) {
-      const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id)
+      const pick = side => validRuns(results.filter(r => r.side === side && r.model === m && r.sentence === s.id))
       const b = pick('before'), a = pick('after')
-      if (b[0]?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | | | ${b[0].reason || '需要编辑器'} |`); continue }
+      if (results.find(r => r.side === 'before' && r.model === m && r.sentence === s.id)?.status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | SKIPPED | | | | | | | | ${results.find(r => r.sentence === s.id && r.status === 'SKIPPED')?.reason || '需要编辑器'} |`); continue }
       const pr = rs => `${rs.filter(r => r.pass).length}/${rs.length}`
       const ft = rs => rs.map(r => r.firstTool || '-').join(' / ')
       const rt = rs => rs.map(r => `${r.rounds}r/${(r.promptTokens || 0) + (r.completionTokens || 0)}t`).join(' / ')
@@ -659,26 +700,35 @@ function buildReport(meta, results, sentences) {
     L.push('')
   }
   L.push('## 逐次运行（每次运行一行）', '', '| 模型 | 版本 | 句子 | run | 通过 | 轮数 | LLM 调用 | 提示词 | 缓存命中 | 命中率 | 计费等价 | 补全 | 工具集变化 | 顺序变化 |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
-  for (const r of total) L.push(`| ${r.model} | ${r.side} | ${r.sentence} | ${r.run} | ${r.pass ? 'Y' : 'N'} | ${r.rounds ?? '-'} | ${r.llmCalls ?? '-'} | ${r.promptTokens ?? 0} | ${r.cachedTokens ?? 0} | ${pct(r.cachedTokens || 0, r.promptTokens || 0)} | ${r.billedEq ?? 0} | ${r.completionTokens ?? 0} | ${r.toolSetChanges ?? '-'} | ${r.toolOrderChanges ?? '-'} |`)
+  for (const r of total) L.push(`| ${r.model} | ${r.side} | ${r.sentence} | ${r.run} | ${isInfraRun(r) ? 'INFRA' : r.pass ? 'Y' : 'N'} | ${r.rounds ?? '-'} | ${r.llmCalls ?? '-'} | ${r.promptTokens ?? 0} | ${r.cachedTokens ?? 0} | ${pct(r.cachedTokens || 0, r.promptTokens || 0)} | ${r.billedEq ?? 0} | ${r.completionTokens ?? 0} | ${r.toolSetChanges ?? '-'} | ${r.toolOrderChanges ?? '-'} |`)
   L.push('', '## 中位数（按运行）', '', '| 模型 | 版本 | 轮数 | 提示词 | 计费等价 | 命中率 |', '|---|---|---|---|---|---|')
   for (const m of models) for (const side of ['before', 'after']) {
     const rs = total.filter(r => r.side === side && r.model === m)
     L.push(`| ${m} | ${side} | ${med(rs.map(r => r.rounds))} | ${med(rs.map(r => r.promptTokens))} | ${med(rs.map(r => r.billedEq))} | ${med(rs.map(r => r.promptTokens ? 100 * (r.cachedTokens || 0) / r.promptTokens : null))?.toFixed(1)}% |`)
   }
   L.push('')
-  const fails = total.filter(r => !r.pass)
+  const infraRuns = total.filter(isInfraRun)
+  if (infraRuns.length) {
+    L.push('## 基础设施故障（已从通过率、门禁判定、回退清单中排除）', '')
+    const byKind = {}
+    for (const r of infraRuns) { const k = `${r.side}/${r.model} status=${r.status} ${String(r.error || '').replace(/\s+/g, ' ').slice(0, 80)}`; byKind[k] = (byKind[k] || 0) + 1 }
+    for (const [k, n] of Object.entries(byKind)) L.push(`- ${n} 次：${k}`)
+    L.push('')
+  }
+  const fails = validRuns(total).filter(r => !r.pass)
   if (fails.length) {
     L.push('## 未通过明细', '')
     for (const r of fails) L.push(`- [${r.side}/${r.model}] ${r.sentence} run${r.run}: status=${r.status}${r.error ? ' error=' + String(r.error).replace(/\s+/g, ' ').slice(0, 120) : ''} tools=[${(r.tools || []).join(',')}] checks=${JSON.stringify(Object.fromEntries(Object.entries(r.checks || {}).filter(([k]) => k !== 'pass')))}`)
     L.push('')
   }
   const allOk = models.every(m => {
-    const p = side => results.filter(r => r.side === side && r.model === m && r.status !== 'SKIPPED')
+    const p = side => validRuns(results.filter(r => r.side === side && r.model === m))
     const rate = rs => rs.length ? rs.filter(r => r.pass).length / rs.length : 0
     return rate(p('after')) >= rate(p('before'))
   })
   L.push(`**AFTER ≥ BEFORE on correctness for all models: ${allOk ? 'yes' : 'no'}**`, '')
   L.push(...buildGateSection(meta, results, sentences))
+  L.push(...buildProcessSection(meta, results))
   L.push(...buildCostSection(meta, results))
   return L.join('\n')
 }
@@ -688,7 +738,7 @@ function buildReport(meta, results, sentences) {
 // 回退清单：同一句子同一模型 AFTER 比 BEFORE 少通过 ≥2 次（--runs 1 时不可能触发）。
 const GATE_TOLERANCE_SENTENCES = 1
 const GATE_REGRESSION_RUNS = 2
-function buildGateSection(meta, results, sentences) {
+function buildGateSection(meta, results, sentences, validOnly = true) {
   const L = ['', '## 门禁汇总（逐句中位数，按模型）', '']
   const verdicts = []
   const regressions = []
@@ -697,19 +747,20 @@ function buildGateSection(meta, results, sentences) {
     L.push(`### ${m}`, '', '| 句子 | 通过 B→A | 轮数中位 B/A | 计费等价中位 B/A | 命中率中位 B/A | 四处看看率 B/A | todo_write 中位 B/A | ask_user 率 B/A |', '|---|---|---|---|---|---|---|---|')
     let eqB = 0, eqA = 0, n = 0
     for (const s of sentences) {
-      const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id)
+      const pick = side => results.filter(r => r.side === side && r.model === m && r.sentence === s.id && r.status !== 'SKIPPED' && (!validOnly || !isInfraRun(r)))
       const b = pick('before'), a = pick('after')
-      if (!b.length || !a.length || b[0].status === 'SKIPPED' || a[0].status === 'SKIPPED') { L.push(`| ${s.id} | SKIPPED | | | | | | |`); continue }
+      if (!b.length || !a.length) { L.push(`| ${s.id} | ${results.some(r => r.model === m && r.sentence === s.id && r.status === 'SKIPPED') ? 'SKIPPED' : '无有效运行'} | | | | | | |`); continue }
       const pb = b.filter(r => r.pass).length, pa = a.filter(r => r.pass).length
       eqB += pb / b.length; eqA += pa / a.length; n++
-      if (pb - pa >= GATE_REGRESSION_RUNS) regressions.push(`${m} / ${s.id}: ${pb}/${b.length} → ${pa}/${a.length}`)
+      const regressed = (pb / b.length - pa / a.length) * meta.runs >= GATE_REGRESSION_RUNS - 1e-9 // 有效运行数不等时按通过率折算回 --runs 次
+      if (regressed) regressions.push(`${m} / ${s.id}: ${pb}/${b.length} → ${pa}/${a.length}`)
       const rate = (rs, k) => rs.length ? Math.round(100 * rs.filter(r => r[k]).length / rs.length) + '%' : '-'
       const cache = rs => f1(med(rs.map(r => r.promptTokens ? 100 * (r.cachedTokens || 0) / r.promptTokens : null)))
-      L.push(`| ${s.id} | ${pb}/${b.length} → ${pa}/${a.length}${pb - pa >= GATE_REGRESSION_RUNS ? ' **回退**' : ''} | ${f1(med(b.map(r => r.rounds)))} / ${f1(med(a.map(r => r.rounds)))} | ${f1(med(b.map(r => r.billedEq)))} / ${f1(med(a.map(r => r.billedEq)))} | ${cache(b)}% / ${cache(a)}% | ${rate(b, 'lookAround')} / ${rate(a, 'lookAround')} | ${f1(med(b.map(r => r.todoWrites)))} / ${f1(med(a.map(r => r.todoWrites)))} | ${rate(b, 'askUser')} / ${rate(a, 'askUser')} |`)
+      L.push(`| ${s.id} | ${pb}/${b.length} → ${pa}/${a.length}${regressed ? ' **回退**' : ''} | ${f1(med(b.map(r => r.rounds)))} / ${f1(med(a.map(r => r.rounds)))} | ${f1(med(b.map(r => r.billedEq)))} / ${f1(med(a.map(r => r.billedEq)))} | ${cache(b)}% / ${cache(a)}% | ${rate(b, 'lookAround')} / ${rate(a, 'lookAround')} | ${f1(med(b.map(r => r.todoWrites)))} / ${f1(med(a.map(r => r.todoWrites)))} | ${rate(b, 'askUser')} / ${rate(a, 'askUser')} |`)
     }
     const ok = eqA >= eqB - GATE_TOLERANCE_SENTENCES
     verdicts.push(ok)
-    L.push('', `通过句数当量：BEFORE ${f1(eqB)} / ${n}，AFTER ${f1(eqA)} / ${n}（容忍 ${GATE_TOLERANCE_SENTENCES} 句）→ **${ok ? 'PASS' : 'FAIL'}**`, '')
+    L.push('', `（只统计有效运行：供应商限流/额度/空流等基础设施故障已排除）`, `通过句数当量：BEFORE ${f1(eqB)} / ${n}，AFTER ${f1(eqA)} / ${n}（容忍 ${GATE_TOLERANCE_SENTENCES} 句）→ **${ok ? 'PASS' : 'FAIL'}**`, '')
   }
   L.push('### 回退清单（同句同模型 AFTER 少通过 ≥' + GATE_REGRESSION_RUNS + ' 次）', '')
   if (meta.runs < GATE_REGRESSION_RUNS) L.push(`本次 --runs ${meta.runs} < ${GATE_REGRESSION_RUNS}，回退清单不适用。`)
@@ -721,6 +772,21 @@ function buildGateSection(meta, results, sentences) {
 
 // ---------- 成本与耗时估算：按本次实测外推到「全量门禁」（每句 TARGET_RUNS 次，before+after 两侧）----------
 const TARGET_RUNS = 3
+// ---------- 过程指标（不进判定，用来看协议/验证/打转）----------
+function buildProcessSection(meta, results) {
+  const L = ['', '## 过程指标（有效运行；不影响判定）', '',
+    '| 模型 | 版本 | XML 回合占比（xmlTurns/回合） | 写后读过的运行占比（verifyAfterWrite） | maxSameTool 中位 | maxSameTool 最大 |', '|---|---|---|---|---|---|']
+  for (const m of meta.models) for (const side of ['before', 'after']) {
+    const rs = validRuns(results.filter(r => r.side === side && r.model === m))
+    const xml = rs.reduce((a, r) => a + (r.xmlTurns || 0), 0), nat = rs.reduce((a, r) => a + (r.nativeTurns || 0), 0)
+    const w = rs.filter(r => r.verifyAfterWrite != null)
+    const ms = rs.map(r => r.maxSameTool).filter(x => x != null)
+    L.push(`| ${m} | ${side} | ${xml + nat ? Math.round(1000 * xml / (xml + nat)) / 10 + '%' : '-'} (${xml}/${xml + nat}) | ${w.length ? Math.round(100 * w.filter(r => r.verifyAfterWrite).length / w.length) + '%' : '-'} (${w.filter(r => r.verifyAfterWrite).length}/${w.length}) | ${med(ms) ?? '-'} | ${ms.length ? Math.max(...ms) : '-'} |`)
+  }
+  L.push('', '> 回合 = 两个 `[Round]` 日志之间；同回合出现 `Parsed XML tool` 记 XML，出现 `Detected Native Tool Requests` 记原生。verifyAfterWrite 只统计有写操作的运行。旧产物（无这些字段）显示 `-`，可用 `--rescore` 从后端日志补算。', '')
+  return L
+}
+
 function buildCostSection(meta, results) {
   const L = ['', `## 成本与耗时估算（外推到每句 ${TARGET_RUNS} 次、before+after 两侧）`, '',
     '| 模型 | 本次实测每次运行均价(USD) | 实测总花费(USD) | 全量门禁估算(USD) | 备注 |', '|---|---|---|---|---|']
@@ -744,9 +810,57 @@ function buildCostSection(meta, results) {
   return L
 }
 
+// ---------- 离线重判：用当前判分逻辑 + 当前句子集重算已有产物（不调模型）----------
+// 工具序列/过程指标从 backend-*.log 里按会话号重新解析（与在线路径同一份 parseLogSlice）；outcomeCheck 与被旧版截断的 finalText 沿用旧结果。
+async function rescore(o) {
+  const dir = o.rescore
+  const { meta, results } = JSON.parse(fs.readFileSync(path.join(dir, 'results.json'), 'utf8'))
+  const prof = PROFILES[meta.profile] || PROFILES.cn
+  const sentences = loadSentences(path.resolve(o.sentences || path.join(HERE, prof.sentences)))
+  const byId = Object.fromEntries(sentences.map(x => [x.id, x]))
+  const logs = {}
+  const sliceOf = (label, conv) => {
+    const f = path.join(dir, 'backend-' + sanitize(label) + '.log')
+    if (!fs.existsSync(f)) return null
+    const lines = (logs[f] ||= fs.readFileSync(f, 'utf8').split('\n'))
+    const isRound = (l, c) => l.includes('[Round] conv=' + c + ' ')
+    const first = lines.findIndex(l => isRound(l, conv))
+    if (first < 0) return null
+    let end = lines.length
+    for (let i = first; i < lines.length; i++) { const m = /\[Round\] conv=(\S+) /.exec(lines[i]); if (m && m[1] !== conv) { end = i; break } }
+    // 文本 <question> 停问行在最后一个 [Round] 之后、下一会话 [Round] 之前
+    return lines.slice(first, end).join('\n')
+  }
+  const out = [], flips = []
+  for (const old of results) {
+    if (old.status === 'SKIPPED' || !byId[old.sentence]) { out.push(old); continue }
+    const sent = byId[old.sentence]
+    const rec = { ...old }
+    const slice = old.conversationId ? sliceOf(old.instance, old.conversationId) : null
+    if (slice) {
+      const p = parseLogSlice(slice, old.conversationId)
+      if (JSON.stringify(p.tools.filter(t => t !== 'ask_user' || old.tools.includes('ask_user'))) !== JSON.stringify(old.tools)) console.warn(`警告：${old.instance} ${old.sentence} run${old.run} 日志重解析的工具序列与记录不一致`)
+      Object.assign(rec, { tools: p.tools, firstTool: p.tools[0] || null, askUser: p.tools.includes('ask_user'), askedByText: p.askedByText, xmlTurns: p.xmlTurns, nativeTurns: p.nativeTurns, verifyAfterWrite: p.verifyAfterWrite, maxSameTool: p.maxSameTool })
+    } else console.warn(`警告：找不到 ${old.instance} ${old.sentence} run${old.run} 的日志，沿用旧工具序列`)
+    rec.lookAround = isLookAround(rec.firstTool, sent.expect.firstToolAnyOf)
+    rec.checks = await judge(sent, rec, null, old.checks || {})
+    rec.pass = rec.checks.pass
+    out.push(rec)
+    const infra = isInfraRun(rec)
+    if (!!old.pass !== !!rec.pass || infra) flips.push({ key: `${old.side}/${old.model}/${old.sentence}/run${old.run}`, before: old.pass, after: rec.pass, infra, status: old.status, oldChecks: old.checks, newChecks: rec.checks, tools: rec.tools })
+  }
+  fs.writeFileSync(path.join(dir, 'results-rescored.json'), JSON.stringify({ meta, results: out }, null, 2))
+  fs.writeFileSync(path.join(dir, 'report-rescored.md'), buildReport(meta, out, sentences))
+  const oldGate = buildGateSection(meta, results, sentences, false).find(l => l.startsWith('**GATE'))
+  const newGate = buildGateSection(meta, out, sentences, true).find(l => l.startsWith('**GATE'))
+  console.log(JSON.stringify({ flips: flips.filter(f => !f.infra), infraExcluded: flips.filter(f => f.infra).length, oldGate, newGate }, null, 1))
+  console.log(`已写 ${path.join(dir, 'report-rescored.md')}`)
+}
+
 // ---------- 主流程 ----------
 async function main() {
   const o = parseArgs(process.argv.slice(2))
+  if (o.rescore) return rescore(o) // 句集默认值取产物 meta.profile，不能用下面的 cn 缺省
   o.profile = o.profile || 'cn'
   o.tier = o.tier || 'cheap'
   const prof = PROFILES[o.profile]

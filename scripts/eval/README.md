@@ -32,6 +32,7 @@ node scripts/eval/model-matrix.mjs \
 | `--api-only` | 跳过需要编辑器的句子（标 `SKIPPED`），也不构建前端、不启动浏览器 |
 | `--lowa-dir 目录` | LOWA 运行时缓存目录（默认 `~/.cache/awd-matrix/lowa`） |
 | `--run-timeout 秒` | 单句硬上限（默认 300），超时会取消并记 `timeout` |
+| `--rescore 目录` | 离线重判已有产物（`results.json` + `backend-*.log`），不调模型、不需要密钥：按当前判分逻辑与当前句集（默认取产物 `meta.profile` 对应的句集，可用 `--sentences` 覆盖）重算，写 `results-rescored.json` / `report-rescored.md` 并打印翻转清单。工具序列与过程指标从后端日志重新解析；`outcomeCheck`（要查库/下载产物）与被旧版截成 1500 字的 `finalText` 检查沿用旧结果，不冒充已验证 |
 | `--keep` | 保留临时目录（worktree、库、后端 home）以便排查 |
 
 需要：JDK 21（自动找 `/usr/libexec/java_home -v 21`，或设 `JAVA_HOME`）、Maven、PostgreSQL 17 二进制
@@ -75,6 +76,12 @@ node scripts/eval/model-matrix.mjs \
 
 `outcomeCheck` 是 async 函数体，参数 `ctx`：`files()`、`tasks()`、`memory()`（查库返回行数组）、`rows(sql)`、`sql(sql)`、
 `api(method,url,body)`（以测试用户身份调后端）、`tools`、`finalText`、`projectId`。句子文件是受信的本地文件，会被 `eval` 执行。
+判分规则（P0 起）：
+- `finalTextIncludes` 与 `outcomeCheck` 都用最终回复**全文**（`results.json` 的 `finalText` 现在存全文；旧产物是 1500 字截断）。
+- 文本 `<question>` 停问（后端日志 `Detected <question> for <会话>`）等同调用了 `ask_user`：补进 `tools` 末尾，`askedByText=true`。
+- 供应商/基础设施故障（限流 429、`AI_QUOTA_EXHAUSTED`、空流、地域 403、`harness_error`）不是模型行为：**不进通过率分母、门禁判定和回退清单**，在报告「基础设施故障」一节单列，逐次运行表里标 `INFRA`。后端自己的 `error` 仍算失败。
+- 每次运行新增过程指标（不参与判定，报告「过程指标」一节汇总）：`xmlTurns` / `nativeTurns`（每个 `[Round]` 回合走 XML 文本调用还是原生调用）、`verifyAfterWrite`（最后一次写操作之后是否读过；没写过记 null）、`maxSameTool`（同一工具最多被调用几次）。
+
 一次运行「通过」= 本轮正常结束（`bubble_end` 且 status=finished）且所有已声明的检查都为真。
 
 夹具在 `fixtures/`（虚构内容），由 `python3 fixtures/make_fixtures.py` 生成：`contract.docx`（第三条/甲方/违约金/仲裁）、
@@ -180,3 +187,4 @@ tokens 来自后端 `token_usage` 表（按会话汇总，含 `cached_tokens` / 
 ## 变更记录
 
 - 2026-11-10：core-17 / gate-35 / gate-35-en 的 `s14-delete-to-recycle-bin` 改为期望 `status: awaiting_input` 且文件仍在（#1442 起删除先走确认卡，与 g10 同模式）；这是 core-17 唯一一次期望变更，之前的矩阵结果里 s14 不可与之后对比。
+- 2026-11-11：判分修正（agent-tier1-gap P0），**旧报告与新报告不可直接对比，需重新建基线**。`finalTextIncludes` 改用全文；文本 `<question>` 停问计为 `ask_user`；基础设施故障不进分母/门禁/回退；新增 `xmlTurns` / `nativeTurns` / `verifyAfterWrite` / `maxSameTool` 与 `--rescore`。gate-35 / gate-35-en：g15 去掉 `mustUse create_folder`（`move_files` 会自动建文件夹，结果由 outcomeCheck 判）；g01 的 `firstToolAnyOf` 加 `get_law_article` / `law_search`；g12 的 `firstToolAnyOf` 加只读探查类工具（`doc_find_text`、`doc_table_read`、`doc_get_clauses`、`doc_get_outline`、`todo_write`），同时 `mustNotUse` 加 `doc_replace_at_anchor`（拒绝/接受修订不该走文本替换）。
