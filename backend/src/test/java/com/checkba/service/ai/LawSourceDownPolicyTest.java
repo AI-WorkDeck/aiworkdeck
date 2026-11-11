@@ -76,6 +76,8 @@ class LawSourceDownPolicyTest {
         assertNull(p.finalAnswerReminder("第1082条的内容来自网页，未核实，请以官方原文为准。"));
         assertNull(p.finalAnswerReminder("Article 1082 (unverified: PKULaw was unavailable)."));
         assertNull(p.finalAnswerReminder("法宝暂时不可用，暂时无法给出条文内容。"));
+        // 否定式「不得声称已核实」不是自称已核实；「无法从权威来源取得」本身就是未核实标注（t09/s12 实测误触发）
+        assertNull(p.finalAnswerReminder("无法从权威来源获取民法典第1082条原文，按规定不得声称已核实。"));
         // 上面几次都没触发，置位还在：真正需要时仍能提醒一次
         assertNotNull(p.finalAnswerReminder("第1082条规定男方不得提出离婚。"));
     }

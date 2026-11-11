@@ -41,10 +41,12 @@ final class LawSourceDownPolicy {
     /** 已有「未核实」类标注。 */
     private static final Pattern UNVERIFIED_MARK = Pattern.compile(
             "未核实|待核实|未经核实|无法核实|未能核实|尚未核实|需核实|需要核实|有待核实|请核实|建议核实|非权威来源"
+                    + "|(?:未|未能|无法|没有)从权威"
                     + "|(?i)unverified|not\\s+(?:been\\s+)?verified|to\\s+be\\s+verified|non-authoritative");
     /** 自称已核实。 */
     private static final Pattern VERIFIED_CLAIM = Pattern.compile(
-            "(?:已|均已|已经|都已)(?:逐条|全部)?(?:核实|核验|验证)|(?i)\\b(?:all|fully|have|has been|were|was)\\s+verified\\b");
+            "(?<!不得声称|不能声称|不得称|不能称|不得写成|不得|不能|不应|并非|不是|未|没有)(?:已|均已|已经|都已)(?:逐条|全部)?(?:核实|核验|验证)"
+                    + "|(?i)\\b(?:all|fully|have|has been|were|was)\\s+verified\\b");
 
     private boolean down;
     private int webLookups;
@@ -72,12 +74,12 @@ final class LawSourceDownPolicy {
         return LangText.of(
                 "[系统提示] 北大法宝法源本轮不可用，替代查询（search_web / browse_url）已用满 "
                         + MAX_WEB_LOOKUPS_AFTER_DOWN + " 次，本次 " + toolName + " 未执行。"
-                        + "不要再查找法条原文：现在就根据已有资料回答用户；凡没有从权威来源取得原文的条文内容，"
+                        + "不要再查找法条原文：现在就根据已有资料和你的法律知识回答用户；凡没有从权威来源取得原文的条文内容，"
                         + "逐条标注「未核实」，不得写成已核实或已核对。",
                 "[System notice] The PKULaw legal source is unavailable for this run and the alternative lookup budget "
                         + "(search_web / browse_url, " + MAX_WEB_LOOKUPS_AFTER_DOWN + " calls) is used up; this "
                         + toolName + " call was not executed. Stop looking for statute text: answer the user now with "
-                        + "what you have, mark every statute text not retrieved from an authoritative source as "
+                        + "what you have and your legal knowledge, mark every statute text not retrieved from an authoritative source as "
                         + "\"unverified\", and never describe it as verified.");
     }
 
