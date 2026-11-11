@@ -150,7 +150,7 @@ PR#146 起 SkillController 走此唯一出口，PluginController 待对齐）。
 
 ## 8.1 在线 Skill 广场（官网 registry，PR#146）
 
-官网（仓库 `zeweihan/aiworkdeck_website`）提供公开注册表，桌面端 `SkillMarketService` 消费，
+官网（仓库 `AI-WorkDeck/aiworkdeck-website`）提供公开注册表，桌面端 `SkillMarketService` 消费，
 配置键 `ai.skills.registry-url`（默认 `https://www.aiworkdeck.com/api/registry/skills`）：
 
 - `GET {registry-url}`：数组，元素含 `id/name/description/icon/version/author/authorDisplayName/triggers/allowedTools/downloads/updatedAt/homepage`；

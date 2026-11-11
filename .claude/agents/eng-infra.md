@@ -161,7 +161,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    的 `LOWA_BASE_URL` 变了 → `publish-lowa-engine.sh publish/verify` 先于打 tag。
    内置 skill（`backend/skills/*`，脱敏等）只随完整安装包走，不在此列。它们由 extraResources 放到 `Resources/skills`，SkillRegistry 从该物理目录加载；`backend-app` 补丁只有 `app.jar`，没有 skill 资源或 classpath 补偿。`patch-gate.sh` 拒绝内置 skill 变更的小版本（dev-board#1114），必须升 `0.(X+1).0`；临时 Git 仓回归见 `desktop/tests/patch-gate.test.js`。
 4.8. **官网版本记录是发版硬步骤（2026-09-23 维护者定，dev-board#862）**：
-   每发一个 0.X 大版本，就在官网仓 `zeweihan/aiworkdeck_website`（本机 `1-1 aiworkdeckweb`）的
+   每发一个 0.X 大版本，就在官网仓 `AI-WorkDeck/aiworkdeck-website`（2026-11-11 起公开新仓；旧 `aiworkdeck_website` 已归档只读；本机 `1-1 aiworkdeckweb` 的 origin 已指向新仓）的
    `content/releases.ts` 数组头部加一条：`version`（0.X.0）、`date`（tag 日期）、`headline` 一句、
    `items` 三到五条，中英双语。**补丁版 0.X.Y 并入所在大版本那条**，不单独立卡。写给律师看——
    「这一版你能多做什么 / 什么不再烦你」，不写内部重构、测试、CI、文档、营销件；口吻照该文件
