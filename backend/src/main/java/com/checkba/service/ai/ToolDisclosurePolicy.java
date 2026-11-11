@@ -434,8 +434,10 @@ public class ToolDisclosurePolicy {
         TOOL_KEYWORDS.put("create_folder", List.of("新建文件夹", "建个文件夹", "创建文件夹", "建文件夹", "文件夹", "create folder", "new folder",
                 "create a folder", "make a folder", "add a folder", "folder", "folders"));
         // 「放进 / 放入」（P7）：「新建文件夹叫 X，把合同.docx放进去」（gate-35 g15）原先只靠基底 prompt 点名 move_files 兜住
-        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "放进", "放入", "move files",
-                "move", "moved", "moving", "archive", "archived", "archiving", "relocate", "put"));
+        // 「分好类 / 归类 / 放到 / 放「X」」（tasks-10 t06）：律师整理文件的常见说法，原先漏了，模型得先 list_tools 找 move_files
+        TOOL_KEYWORDS.put("move_files", List.of("移动", "移到", "归档", "放进", "放入", "分类", "分好类", "归类", "放到", "挪到",
+                "放「", "放“", "move files",
+                "move", "moved", "moving", "archive", "archived", "archiving", "relocate", "put", "file them into"));
         TOOL_KEYWORDS.put("doc_table_insert", TABLE_INSERT_ZH_EN);
         TOOL_KEYWORDS.put("doc_table_delete", TABLE_DELETE_ZH_EN);
         TOOL_KEYWORDS.put("office_table_insert", TABLE_INSERT_ZH_EN);
