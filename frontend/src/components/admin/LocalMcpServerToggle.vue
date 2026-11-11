@@ -69,17 +69,19 @@ export default {
 }
 </script>
 <style scoped>
-.local-mcp { padding: 16px; margin-block: 16px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); min-width: 0; }
+.local-mcp { padding: 12px 14px; margin-block: 0 12px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); min-width: 0; }
 .local-mcp-heading, .local-mcp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .local-mcp-heading { justify-content: space-between; }
-.local-mcp h3 { font-size: 16px; margin: 0; }
-.local-mcp-state { font-size: 13px; color: var(--awd-text-2); }
-.local-mcp-note { color: var(--awd-text-2); font-size: 13px; overflow-wrap: anywhere; }
+.local-mcp h3 { font-size: 14px; font-weight: 600; margin: 0; }
+.local-mcp p { margin: 4px 0 0; }
+.local-mcp-actions { margin-block-start: 8px; }
+.local-mcp-state { font-size: 12px; color: var(--awd-text-2); }
+.local-mcp-note { color: var(--awd-text-2); font-size: 12px; overflow-wrap: anywhere; }
 .local-mcp-warn { color: var(--awd-danger); font-size: 13px; overflow-wrap: anywhere; }
 .local-mcp-error { color: var(--awd-danger); overflow-wrap: anywhere; }
 .local-mcp-snippet { margin-block: 12px; min-width: 0; }
 .local-mcp pre { margin: 6px 0 0; padding: 8px; border: 1px solid var(--awd-border); border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: isolate; text-align: start; font-size: 12px; }
-.local-mcp button { margin: 0; padding: 6px 12px; font-size: 13px; line-height: 1.5; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 6px; cursor: pointer; }
+.local-mcp button { margin: 0; padding: 4px 12px; font-size: 12px; line-height: 1.5; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 6px; cursor: pointer; }
 .local-mcp button:disabled { opacity: .5; cursor: default; }
 .local-mcp button:focus-visible { outline: var(--awd-focus-width, 2px) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset, 2px); }
 </style>

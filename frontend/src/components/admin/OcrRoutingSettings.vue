@@ -2,13 +2,13 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <SettingsSection :title="t('admin.ocrSettingsTitle')" :description="t('admin.ocrSettingsDesc')">
-    <text v-if="error" role="alert">{{ error }}</text>
-    <text v-if="notice">{{ notice }}</text>
+    <text v-if="error" class="ocr-settings-note is-error" role="alert">{{ error }}</text>
+    <text v-if="notice" class="ocr-settings-note">{{ notice }}</text>
     <view class="ocr-settings-actions">
       <button v-for="option in options" :key="option.value" :disabled="busy || !version" :class="{ selected: choice === option.value }" @click="save(option.value)">{{ option.label }}</button>
       <button v-if="error" :disabled="busy" @click="load">{{ t('admin.ocrSettingsReload') }}</button>
     </view>
-    <text v-if="saved" role="status">{{ t('admin.ocrSettingsSaved') }}</text>
+    <text v-if="saved" class="ocr-settings-note" role="status">{{ t('admin.ocrSettingsSaved') }}</text>
   </SettingsSection>
 </template>
 <script setup>
@@ -37,7 +37,10 @@ async function save(value) {
 onMounted(load)
 </script>
 <style scoped>
-.ocr-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.ocr-settings-note { display: block; font-size: 12px; line-height: 1.6; color: var(--awd-text-2); }
+.ocr-settings-note.is-error { color: var(--awd-danger-text); }
+.ocr-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
 .ocr-settings-actions button { font-size: 13px; margin: 0; }
+.ocr-settings-actions + .ocr-settings-note { margin-top: 8px; }
 .ocr-settings-actions .selected { border-color: var(--awd-accent, #315f54); color: var(--awd-accent, #315f54); }
 </style>
