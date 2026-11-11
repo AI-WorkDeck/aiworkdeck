@@ -4604,7 +4604,7 @@ export default {
   background: var(--awd-surface);
   color: var(--awd-text);
   border: 1px solid var(--awd-border);
-  border-radius: var(--awd-radius-dialog, 8px);
+  border-radius: var(--awd-radius-dialog);
   box-shadow: var(--awd-shadow-lg);
   z-index: 10000;
 }
@@ -4643,7 +4643,7 @@ export default {
   min-height: 32px;
   box-sizing: border-box;
   padding: 6px 10px;
-  border-radius: var(--awd-radius-sm, 4px);
+  border-radius: var(--awd-radius-sm);
   color: var(--awd-text);
   cursor: pointer;
   white-space: nowrap;
@@ -4675,7 +4675,7 @@ export default {
 }
 
 .context-menu-text {
-  font-size: 13px;
+  font-size: var(--awd-font-size-body);
   line-height: 20px;
   color: inherit;
 }
@@ -4683,7 +4683,7 @@ export default {
 .context-menu-submenu-arrow {
   margin-inline-start: auto;
   padding-inline-start: 16px;
-  font-size: 16px;
+  font-size: var(--awd-font-size-title);
   line-height: 1;
   color: inherit;
   opacity: 0.7;
