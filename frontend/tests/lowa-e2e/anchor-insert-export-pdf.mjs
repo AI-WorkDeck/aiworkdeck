@@ -10,6 +10,8 @@
 //     collapse_selection(start) 之后光标已经是收起的，再 collapseToEnd 不会挪走。
 // [B] 删除改走「传空字符串」（T-14 让三个删除专用工具退出下发）：find_replace 与
 //     replace_at_position 传空串真的把字删掉。
+// [D] newParagraph（gap 2026-11-11 P3）：一条 insert_at_cursor 在锚点所在段落之前/之后
+//     拆出独立新段落，沿用相邻段样式、记成插入修订、一次 undo 撤回，回执段号与回读一致。
 // [C] doc_export_pdf 的前端一半：真 export_pdf 回执 → agentPdfExportResult → base64，
 //     node 侧解码回来必须是一份 %PDF 开头、字节数对得上的文件。后端存进项目那一半由
 //     DocumentEditToolsAnchorInsertAndPdfExportTest 覆盖（本页没有后端）。
@@ -113,6 +115,49 @@ try {
       JSON.stringify(out.keys) === JSON.stringify(['base64', 'size', 'sourceFileId', 'success']) && out.sourceFileId === 42,
       JSON.stringify(out.keys))
     check('导出不改文档', (await doc()) === BASE, await doc())
+  }
+
+  console.log('\n[D] newParagraph：整段插在锚点所在段落之前/之后（gap 2026-11-11 P3）')
+  {
+    // 从干净文档起步：撤到底，再写三段；第二段设成标题样式，好看出新段落是否沿用相邻段样式
+    await exec('undo', { steps: 20 })
+    await exec('insert_at_cursor', { text: '第一条 甲。\n第二条 乙方义务。\n第三条 丙。', __agent: true })
+    await exec('set_paragraph_format', { startParagraph: 1, endParagraph: 1, headingLevel: 2, __agent: true })
+    const paras = async () => (await exec('get_document_text', { __agent: true })).paragraphs
+    const start = await paras()
+    const base = start.map((x) => x.text)
+    check('准备：三段，第 2 段是 Heading 2', base.length >= 3 && start[base.indexOf('第二条 乙方义务。')]?.style === 'Heading 2', JSON.stringify(start))
+    await exec('resolve_all_revisions', { action: 'accept' }) // 起步稿不带修订，新修订才数得清
+    const revBefore = (await exec('list_revisions', { __agent: true })).revisions?.length ?? 0
+
+    const a = await anchorOf('乙方')   // 锚点在段中，不在段首：before 也必须落到整段之前
+    const r1 = await exec('insert_at_cursor', { text: '第二条 保密：双方负有保密义务。', newParagraph: 'before', anchor: a, __agent: true })
+    const p1 = await paras()
+    const i1 = p1.findIndex((x) => x.text === '第二条 保密：双方负有保密义务。')
+    check('before：成功并独立成段', r1.success === true && i1 >= 0, JSON.stringify(r1))
+    check('before：紧贴在锚点所在段落之前，原段原样', p1[i1 + 1]?.text === '第二条 乙方义务。' && p1[i1 - 1]?.text === '第一条 甲。', JSON.stringify(p1.map((x) => x.text)))
+    check('before：沿用相邻段样式（Heading 2）', p1[i1]?.style === 'Heading 2', JSON.stringify(p1[i1]))
+    check('before：回执的段号与相邻段落与回读一致', r1.newParagraphIndex === i1 && r1.previousParagraph?.text === '第一条 甲。'
+      && r1.nextParagraph?.text === '第二条 乙方义务。' && r1.newParagraphText === '第二条 保密：双方负有保密义务。', JSON.stringify(r1))
+    const revs = (await exec('list_revisions', { __agent: true })).revisions || []
+    check('before：修订开着时落成插入修订', revBefore === 0 && revs.some((r) => r.type === 'Insert' && r.text.includes('保密')),
+      revBefore + ' -> ' + JSON.stringify(revs.map((r) => [r.type, r.text])))
+
+    const u = await exec('undo', { steps: 1 })
+    check('一次 undo 整段撤回', u.success === true && JSON.stringify((await paras()).map((x) => x.text)) === JSON.stringify(base),
+      JSON.stringify((await paras()).map((x) => x.text)))
+
+    const b = await anchorOf('乙方')
+    const r2 = await exec('insert_at_cursor', { text: '\n补充一：甲。\n补充二：乙。\n', newParagraph: 'after', anchor: b, __agent: true })
+    const p2 = (await paras()).map((x) => x.text)
+    const i2 = p2.indexOf('第二条 乙方义务。')
+    check('after：两段新段落紧跟在原段之后（首尾换行被去掉，不留空段）',
+      r2.success === true && p2[i2 + 1] === '补充一：甲。' && p2[i2 + 2] === '补充二：乙。' && p2[i2 + 3] === '第三条 丙。', JSON.stringify(p2))
+    check('after：回执 newParagraphCount=2、nextParagraph 是第三条', r2.newParagraphCount === 2 && r2.nextParagraph?.text === '第三条 丙。', JSON.stringify(r2))
+    check('after：段末拆分也沿用相邻段样式', (await paras())[i2 + 1]?.style === 'Heading 2', JSON.stringify((await paras())[i2 + 1]))
+
+    const bad = await exec('insert_at_cursor', { text: 'X', newParagraph: 'before', anchor: '__ai_anchor_does_not_exist', __agent: true })
+    check('锚点不存在：明确失败、不落字', bad.success === false && JSON.stringify((await paras()).map((x) => x.text)) === JSON.stringify(p2), JSON.stringify(bad))
   }
 
   console.log('\n结果 / result: ' + passed + ' passed, ' + failed + ' failed')

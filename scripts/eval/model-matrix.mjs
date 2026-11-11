@@ -441,7 +441,14 @@ class Instance {
         await sleep(500)
       }
       rec.durationMs = Date.now() - t1
-      rec.text = (await this.rows(`select content from project_ai_message where conversation_id='${rec.conversationId}' and role='ASSISTANT' order by id desc limit 1`))[0]?.content || ''
+      // outcomeCheck 读的是服务器上的 docx：本轮最后一次写入后编辑器的自动保存可能还没上传，
+      // 关页面前等状态栏离开「更改待保存/保存中」（连续两次，最多 20 秒），否则判到的是旧稿（2026-11-11 g02 实例）
+      for (let i = 0, clean = 0; i < 40 && clean < 2; i++) {
+        const body = await page.locator('body').innerText().catch(() => '')
+        clean = /更改待保存|保存中|Changes pending save|Saving/.test(body) ? 0 : clean + 1
+        if (clean < 2) await sleep(500)
+      }
+      rec.text =(await this.rows(`select content from project_ai_message where conversation_id='${rec.conversationId}' and role='ASSISTANT' order by id desc limit 1`))[0]?.content || ''
     } catch (e) {
       try { const pg = ctx.pages()[0]; if (pg) { await pg.screenshot({ path: path.join(this.outDir, `fail-${sanitize(this.label)}-${Date.now()}.png`) }); rec.pageText = (rec.diag || []).slice(0, 12).join('\n') } } catch { /* ignore */ }
       rec.status = rec.status || 'harness_error'; rec.error = String(e.message).slice(0, 300); rec.durationMs = rec.durationMs ?? Date.now() - t0 } finally { await ctx.close().catch(() => {}) }

@@ -553,20 +553,37 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入文本", category = "document", fileEffect = "MODIFIED")
     @Tool("插入文本，以修订模式进行；默认插在光标处，给 anchorId 则插在该锚点前后。\n"
             + "何时用：在某句话前/后插入——先 doc_find_text 取 anchorId，再传 anchorId 与 position（before/after，默认 after），不必先 doc_select(target=anchor)。\n"
-            + "before/after 是锚点文字边界，不会自动换段：独立标题/段落须在 text 里给实际换行符（段末插入以换行开头，段首插入以换行结尾），插入后回读相邻段落核对。")
+            + "新增一条条款/独立段落：传 newParagraph=true，text 成为锚点（或光标）所在段落之前/之后的新段落，沿用该段样式，一次调用完成；"
+            + "回执给出新段落段号与前后相邻段落，可直接核对，不必另行回读。\n"
+            + "不传 newParagraph 时 before/after 只是锚点文字边界，不会自动换段，text 里的实际换行符才会分段。")
     public String doc_insert_at_cursor(
-            @P("要插入的文本内容；独立标题/段落用实际换行符分隔，不能只靠 Markdown 标记") String text,
+            @P("要插入的文本内容；多段之间用实际换行符分隔，不能只靠 Markdown 标记") String text,
             @P(value = "doc_find_text 返回的 anchorId；给了就插在这个锚点的前面或后面，不给就插在当前光标处",
                     required = false) String anchorId,
-            @P(value = "相对锚点的位置：before 或 after（默认 after）；不给 anchorId 时忽略",
-                    required = false) String position
+            @P(value = "before 或 after（默认 after）：相对锚点；newParagraph=true 时相对锚点或光标所在段落",
+                    required = false) String position,
+            @P(value = "true = 作为独立新段落插在所在段落之前/之后（新增条款用它）", required = false)
+                    Boolean newParagraph
     ) {
-        log.info("Tool: doc_insert_at_cursor called, text length={}, anchor={}, position={}",
-                text == null ? -1 : text.length(), anchorId, position);
+        log.info("Tool: doc_insert_at_cursor called, text length={}, anchor={}, position={}, newParagraph={}",
+                text == null ? -1 : text.length(), anchorId, position, newParagraph);
         if (text == null) {
             return "Error: 缺少必填参数 text。";
         }
         try {
+            if (Boolean.TRUE.equals(newParagraph)) {
+                String to = normalizeInsertPosition(position);
+                if (to == null) {
+                    return "Error: position 只能是 before 或 after（收到：" + position + "）。";
+                }
+                // 一条 worker 命令完成「定位所在段落 → 分段 → 写入 → 沿用相邻段样式」，
+                // 同一撤销组；不再走下面三步串（那条路只能落在锚点文字边界上）。
+                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                params.put("text", text);
+                params.put("newParagraph", to);
+                if (anchorId != null && !anchorId.isBlank()) params.put("anchor", anchorId);
+                return editorBridgeService.executeEditorCommand("insert_at_cursor", params);
+            }
             if (anchorId != null && !anchorId.isBlank()) {
                 String to = normalizeInsertPosition(position);
                 if (to == null) {

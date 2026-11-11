@@ -105,14 +105,18 @@ class RedlineGranularityContractTest {
     @Test
     void insertionAndFinalReadContractsSeparateParagraphBoundariesFromAnchorBoundaries() throws Exception {
         String insertion = toolDescription("doc_insert_at_cursor");
-        assertTrue(insertion.contains("不会自动换段"), insertion);
-        assertTrue(insertion.contains("实际换行符") && insertion.contains("回读"), insertion);
-        var method = DocumentEditTools.class.getMethod("doc_insert_at_cursor", String.class, String.class, String.class);
+        assertTrue(insertion.contains("不会自动换段") && insertion.contains("实际换行符"), insertion);
+        // 新增条款走 newParagraph 一次完成（gap 2026-11-11 P3）：描述必须点名，回执即核对
+        assertTrue(insertion.contains("newParagraph=true") && insertion.contains("相邻段落"), insertion);
+        var method = DocumentEditTools.class.getMethod("doc_insert_at_cursor",
+                String.class, String.class, String.class, Boolean.class);
         assertTrue(method.getParameters()[0].getAnnotation(P.class).value().contains("实际换行符"));
+        assertTrue(!method.getParameters()[3].getAnnotation(P.class).required(), "newParagraph 必须是可选参数");
         assertTrue(toolDescription("doc_get_document_text").contains("最后一次"));
         for (boolean en : new boolean[] {false, true}) {
             String text = readResource(en ? "prompts/tools-lowa.en.md" : "prompts/tools-lowa.md");
             assertTrue(text.contains(en ? "does not create a paragraph" : "不会自动换段"), text);
+            assertTrue(text.contains("newParagraph=true"), text);
             assertTrue(text.contains(en ? "after the last" : "最后一次"), text);
             assertTrue(text.contains("doc_get_document_text") && text.contains("nextStartParagraph"), text);
             assertTrue(text.contains(en ? "headings" : "标题") && text.contains(en ? "incomplete" : "残缺"), text);

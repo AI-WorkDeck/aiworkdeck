@@ -1,5 +1,5 @@
 {
-  "_comment": "gate-35 的英文版（--profile intl 默认句集）：同一组期望与工具，句子改写成自然英文；夹具共用（内容仍是中国法下的虚构中文合同），文件/项目/文件夹名换成英文孪生名。编辑器句子的宿主文件用 hostFile=Contract.docx。",
+  "_comment": "gate-35 的英文版（--profile intl 默认句集）：同一组期望与工具，句子改写成自然英文；夹具共用（内容仍是中国法下的虚构中文合同），文件/项目/文件夹名换成英文孪生名。编辑器句子的宿主文件用 hostFile=Contract.docx。 g19 (clause inserted after an article, outcome-graded on the docx) was added on 2026-11-11 (P3); the set keeps the gate-35 name.",
   "sentences": [
     {
       "id": "s01-replace-all",
@@ -510,7 +510,43 @@
           "write_docx",
           "move_to_trash"
         ],
-        "maxRounds": 14
+        "maxRounds": 14,
+        "_note": "outcomeCheck（gap 2026-11-11 P3）：保密条款在最终 docx 里独立成段（不与第四/第五条同段）、位于第四条与第五条之间、带插入修订 <w:ins>；修订颗粒度之外的写法（标题+正文两段、顺延条号）都算对",
+        "outcomeCheck": "const HOST = 'Contract.docx'; const f = (await ctx.files()).find(x => !x.is_deleted && !x.is_folder && x.name === HOST); if (!f) return false; const xml = ctx.docxXml(await ctx.bytes(f.id)); const ps = (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => ({ xml: p, text: (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') })); const at = re => ps.findIndex(p => re.test(p.text)); const prev = at(/按合同总价的/), next = at(/示范仲裁委员会/); const hit = ps.map((p, i) => /保密|confidential/i.test(p.text) ? i : -1).filter(i => i >= 0); return prev >= 0 && next > prev && hit.length > 0 && hit.every(i => i > prev && i < next && !/按合同总价的/.test(ps[i].text) && !/示范仲裁委员会/.test(ps[i].text) && /<w:ins\\b/.test(ps[i].xml));"
+      },
+      "hostFile": "Contract.docx"
+    },
+    {
+      "id": "g19-insert-clause-after",
+      "text": "Add a new clause after Article 3: the Seller shall deliver a product certificate of conformity and a factory inspection report with the goods",
+      "hostState": "docx:contract",
+      "expect": {
+        "firstToolAnyOf": [
+          "doc_get_document_text",
+          "doc_get_clauses",
+          "doc_find_text",
+          "doc_get_outline",
+          "doc_insert_under_heading",
+          "doc_insert_at_cursor",
+          "todo_write"
+        ],
+        "mustUse": [
+          [
+            "doc_insert_under_heading",
+            "doc_insert_at_cursor",
+            "doc_replace_at_anchor",
+            "doc_modify_paragraph",
+            "doc_insert_note",
+            "doc_insert_break"
+          ]
+        ],
+        "mustNotUse": [
+          "write_docx",
+          "move_to_trash"
+        ],
+        "maxRounds": 10,
+        "_note": "g02 的「之后」版（gap 2026-11-11 P3）：新条款在最终 docx 里独立成段、位于第三条与第四条之间、带 <w:ins>；maxRounds 10 = P3 的「无一轮超过 10」",
+        "outcomeCheck": "const HOST = 'Contract.docx'; const f = (await ctx.files()).find(x => !x.is_deleted && !x.is_folder && x.name === HOST); if (!f) return false; const xml = ctx.docxXml(await ctx.bytes(f.id)); const ps = (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g) || []).map(p => ({ xml: p, text: (p.replace(/<w:del\\b[^>]*[^\\/]>[\\s\\S]*?<\\/w:del>/g, '').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') })); const at = re => ps.findIndex(p => re.test(p.text)); const prev = at(/收到货物后/), next = at(/按合同总价的/); const hit = ps.map((p, i) => /合格证|certificate/i.test(p.text) ? i : -1).filter(i => i >= 0); return prev >= 0 && next > prev && hit.length > 0 && hit.every(i => i > prev && i < next && !/收到货物后/.test(ps[i].text) && !/按合同总价的/.test(ps[i].text) && /<w:ins\\b/.test(ps[i].xml));"
       },
       "hostFile": "Contract.docx"
     },
