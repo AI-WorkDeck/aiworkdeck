@@ -39,5 +39,15 @@ class ClaimedToolNudgeTest {
         assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(guard(), "I called doc_export_pdf.", AgentMode.ASK, TOOLS));
         assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(guard(), "字段 due_date 与 user_id 都有值。", AgentMode.AGENT, TOOLS));
         assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(guard(), "合同第三条约定 7 日内验收。", AgentMode.AGENT, TOOLS));
+        // 回放用例里的真实形态：标签属性、代码块、截断的 tool_code、已发过文字调用纠正
+        assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(guard(),
+                "<artifact type=\"save_memory\" name=\"x\">1. a</artifact><final>已生成。</final>", AgentMode.AGENT, TOOLS));
+        assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(guard(),
+                "写法如下：\n```\n<tool_code>write_docx(fileName=\"a.docx\")</tool_code>\n```", AgentMode.AGENT, TOOLS));
+        assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(guard(),
+                "<tool_code>write_docx(fileName=\"a.docx\", markdownContent=\"# 标", AgentMode.AGENT, TOOLS));
+        var nudged = guard();
+        nudged.protocolNudged = true;
+        assertNull(AgentOrchestrator.claimedToolNudgeIfNeeded(nudged, "I called save_memory.", AgentMode.AGENT, TOOLS));
     }
 }

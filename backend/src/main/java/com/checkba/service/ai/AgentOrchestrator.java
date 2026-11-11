@@ -1264,6 +1264,8 @@ public class AgentOrchestrator {
                     + "|(?:^|[.!?;:,]\\s*|\\bplease,?\\s+)remember\\b",
             java.util.regex.Pattern.CASE_INSENSITIVE);
 
+    private static final java.util.regex.Pattern CLAIM_NOISE = java.util.regex.Pattern.compile(
+            "(?s)```.*?(?:```|$)|~~~.*?(?:~~~|$)|`[^`\\n]*`|<(tool_code|process)\\b.*?(?:</\\1>|$)|<[^>]*>");
     private static final java.util.regex.Pattern SNAKE_TOOL_TOKEN =
             java.util.regex.Pattern.compile("(?<![A-Za-z0-9_])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![A-Za-z0-9_])");
 
@@ -1275,11 +1277,14 @@ public class AgentOrchestrator {
     static String claimedToolNudgeIfNeeded(RunGuard guard, String content, AgentMode agentMode,
                                            java.util.function.Predicate<String> isTool) {
         if (guard == null || content == null || agentMode == AgentMode.ASK || guard.claimNudged
-                || !guard.toolsRun.isEmpty()) {
+                || guard.protocolNudged || !guard.toolsRun.isEmpty()) {
             return null;
         }
+        // 只看正文叙述：代码块（在讲解写法）、tool_code/process 块（截断与文字调用另有纠正路径）、
+        // 标签本身（<artifact type="task_list"> 的属性值）都不算「声称」
+        String prose = CLAIM_NOISE.matcher(content).replaceAll(" ");
         java.util.Set<String> named = new java.util.LinkedHashSet<>();
-        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(content);
+        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(prose);
         while (m.find()) if (isTool.test(m.group())) named.add(m.group());
         if (named.isEmpty()) return null;
         guard.claimNudged = true;
