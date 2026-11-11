@@ -80,6 +80,28 @@ public class XmlToolCallParser {
         return head + (unclosed ? "</tool_code>" : "") + LEAKED_DSML_TAG.matcher(tail).replaceAll("");
     }
 
+    private static final Pattern CODE_SPAN = Pattern.compile("(?s)```.*?(?:```|$)|~~~.*?(?:~~~|$)|`[^`\\n]*`");
+    private static final Pattern CALL_ATTEMPT = Pattern.compile(
+            "<(?:tool_code|tool_calls?\\b|function_calls?\\b|function=|invoke\\b|parameter[=\\s]|ask_user[\\s>/]"
+            + "|[\\uFF5C|]DSML[\\uFF5C|]|\\|tool_call)");
+    private static final Pattern THINKING_OR_TITLE =
+            Pattern.compile("(?s)<thinking>.*?(?:</thinking>|$)|<title>.*?</title>");
+
+    /**
+     * 正文里有没有「写成文字的工具调用」痕迹（gap R3）：畸形的 {@code <tool_code=…}、严格边界外的
+     * {@code <ask_user><parameter=…>}、泄漏的原生调用语法等。只在本轮<b>没有任何工具被执行</b>时用来判
+     * 「这一轮不能当正常完成」；代码围栏与行内代码里的不算（那是在讲解，不是在调用）。
+     */
+    public static boolean containsUnexecutedCallAttempt(String content) {
+        return content != null && CALL_ATTEMPT.matcher(CODE_SPAN.matcher(content).replaceAll("")).find();
+    }
+
+    /** 整轮只有 {@code <thinking>}（可带 {@code <title>}），没有任何给用户看的正文（gap R4）。 */
+    public static boolean isThinkingOnly(String content) {
+        return content != null && content.contains("<thinking>")
+                && THINKING_OR_TITLE.matcher(content).replaceAll("").isBlank();
+    }
+
     /**
      * 内容中是否包含 XML 工具调用标签。
      */

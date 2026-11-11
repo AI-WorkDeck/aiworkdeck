@@ -188,6 +188,7 @@ public final class EvalHarness {
 
         ChatModelFactory chatModelFactory = mock(ChatModelFactory.class);
         when(chatModelFactory.getStreamingChatModel(any())).thenReturn(scripted);
+        when(chatModelFactory.nativeToolProtocol(any())).thenReturn(c.nativeProtocol);
 
         List<SavedMessage> savedMessages = new CopyOnWriteArrayList<>();
         ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);

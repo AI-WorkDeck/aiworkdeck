@@ -564,6 +564,22 @@ public class ChatModelFactory {
         return model != null && model.supportsTools();
     }
 
+    /**
+     * 哪些通道的系统提示只讲原生工具协议（gap P2）。逗号分隔的 {@link AiModelProperties.Provider} 名，
+     * 留空 = 全部沿用 XML 文本协议的提示。OLLAMA 不在默认值里：本地模型的原生工具调用不可靠。
+     */
+    @org.springframework.beans.factory.annotation.Value("${ai.prompt.native-protocol:AWD_CLOUD,OPENROUTER}")
+    private String nativeProtocolProviders;
+
+    /** 本轮实际生效的通道与模型是否只用原生工具协议（提示里不再教 XML 文本调用；解析器仍兜底）。 */
+    public boolean nativeToolProtocol(String modelId) {
+        if (nativeProtocolProviders == null || nativeProtocolProviders.isBlank()) return false;
+        String channel = resolveTarget(modelId, false).channel().name();
+        return java.util.Arrays.stream(nativeProtocolProviders.split(","))
+                .anyMatch(p -> p.trim().equalsIgnoreCase(channel))
+                && effectiveModelSupportsTools(modelId);
+    }
+
     public void ensureToolCapableModel(String modelId) {
         if (!effectiveModelSupportsTools(modelId)) {
             throw new com.checkba.service.account.AccountException(

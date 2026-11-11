@@ -231,7 +231,9 @@ class SystemPromptSizeReportTest {
 
         // 1) 基底 + 能力片段。沿生产拼接器处理能力相关区段（含 Office 的法律资料卡裁剪），
         // 然后按原始能力片段切开，保留逐字节首段、顺序重组及总长度断言。
-        String base = resource(english ? "prompts/system_prompt.en.md" : "prompts/system_prompt.md");
+        // 本报告量的是 XML 协议变体（mock 工厂下 nativeToolProtocol=false，gap P2）
+        String base = ToolProtocolPrompt.select(
+                resource(english ? "prompts/system_prompt.en.md" : "prompts/system_prompt.md"), false);
         String fragment = english ? resource("prompts/" + stem + ".en.md") : resource("prompts/" + stem + ".md");
         int ph = base.indexOf(PLACEHOLDER);
         assertTrue(ph >= 0 && ph == base.lastIndexOf(PLACEHOLDER), "基底里的工具指引占位标记应恰好一处");

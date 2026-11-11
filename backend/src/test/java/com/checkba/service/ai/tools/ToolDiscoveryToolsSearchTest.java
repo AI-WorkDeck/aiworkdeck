@@ -72,7 +72,7 @@ class ToolDiscoveryToolsSearchTest {
         assertFalse(out.contains("pdf_merge("), "只命中一个词的不算：" + out);
         assertFalse(out.contains("doc_insert_page_number("), "没有 pdf 这个词的不算：" + out);
         assertTrue(out.contains("from the NEXT turn on"), "尾句必须还在：" + out);
-        assertTrue(out.contains("<tool_code>"), out);
+        assertFalse(out.contains("<tool_code>"), "gap P2：回执不再教文本调用写法：" + out);
         assertEquals(Set.of("tool:pdf_add_page_numbers", "tool:pdf_split"), disclosed, "V2：只回写命中的工具名，不连带类目");
     }
 
