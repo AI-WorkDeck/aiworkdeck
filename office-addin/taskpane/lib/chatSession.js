@@ -1244,7 +1244,7 @@ function handleEvent(evt, dataStr) {
       reason = String(d.reason || '')
     } catch (e) { /* 无 status 按普通收尾 */ }
     const lower = status.toLowerCase()
-    // 后端的 bubble_end 有五种 status：finished / paused(max_depth|max_tokens) /
+    // 后端的 bubble_end 有五种 status：finished / paused(max_depth|max_tokens|no_progress|user_pause) /
     // awaiting_approval / awaiting_input / 无（空信封）。
     // **只有 finished 与空信封算"写完了"**——paused 是编排器撞上步数或长度预算主动停机，
     // awaiting_* 是球在用户这边。此前它们统统被渲染成「已完成 · N 秒」，
@@ -1256,7 +1256,9 @@ function handleEvent(evt, dataStr) {
     // 只有正常收尾后端才会自动接续待处理的插话；其余收尾队列暂停，如实告诉用户
     if (stoppedEarly || ballWithUser) holdPendingSteers()
     if (stoppedEarly && finished) {
-      finished.notice = reason === 'max_tokens' ? t('pausedMaxTokens') : t('pausedMaxDepth')
+      // user_pause：桌面端用户点了「暂停」（任务窗格没有暂停键，但同一会话会镜像过来）
+      finished.notice = reason === 'max_tokens' ? t('pausedMaxTokens')
+        : reason === 'user_pause' ? t('pausedByUser') : t('pausedMaxDepth')
     }
     if (ballWithUser && lower === 'awaiting_approval') notice.value = t('awaitingConfirmation')
     // 显式完成态（dev-board#147）：光标消失太隐晦，「写完了没」要有明示。

@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "Предыдущее списание баллов не удалось. Пополните баллы в приложении Baoqingtian, затем обратитесь в поддержку.",
   "bqtUnavailable": "Сервис Baoqingtian временно недоступен. Повторите попытку позже.",
   "bqtRechargeViaBqt": "Участники Baoqingtian пополняют баллы или продлевают членство в приложении Baoqingtian; AI WorkDeck не принимает платежи для этого аккаунта.",
+  "stopConfirmedWithEdits": "Остановлено. Уже применено правок документов: {count}."
 }

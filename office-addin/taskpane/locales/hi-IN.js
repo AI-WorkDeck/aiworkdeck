@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "सिस्टम के अनुसार",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(आपके अनुरोध पर रोका गया। उसी कार्य को आगे बढ़ाने के लिए “जारी रखें” भेजें।)"
 }

@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "システムに従う",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(ご要望により一時停止しました。同じタスクを再開するには「続行」と送信してください。)"
 }

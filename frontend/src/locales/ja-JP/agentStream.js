@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "以前のポイント差引に失敗しています。包晴天アプリでポイントをチャージしてから、サポートまでお問い合わせください。",
   "bqtUnavailable": "包晴天サービスは一時的にご利用できません。しばらくしてからもう一度お試しください。",
   "bqtRechargeViaBqt": "包晴天会員は包晴天アプリでチャージまたは更新してください。AI WorkDeck ではこのアカウントの決済は行えません。",
+  "stopConfirmedWithEdits": "停止しました。ドキュメントの編集 {count} 件はすでに適用されています。"
 }

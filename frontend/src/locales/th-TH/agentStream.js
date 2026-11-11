@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "การหักคะแนนครั้งก่อนไม่สำเร็จ โปรดเติมคะแนนในแอป Baoqingtian แล้วติดต่อฝ่ายสนับสนุน",
   "bqtUnavailable": "บริการ Baoqingtian ไม่พร้อมใช้งานชั่วคราว โปรดลองอีกครั้งในภายหลัง",
   "bqtRechargeViaBqt": "สมาชิก Baoqingtian เติมคะแนนหรือต่ออายุในแอป Baoqingtian; AI WorkDeck ไม่รับชำระเงินสำหรับบัญชีนี้",
+  "stopConfirmedWithEdits": "หยุดแล้ว มีการแก้ไขเอกสาร {count} ครั้งที่ดำเนินการไปแล้ว"
 }

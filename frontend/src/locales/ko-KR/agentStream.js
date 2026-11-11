@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "이전 포인트 차감이 실패했습니다. 바오칭톈 앱에서 포인트를 충전한 후 고객 지원에 문의해 주세요.",
   "bqtUnavailable": "바오칭톈 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
   "bqtRechargeViaBqt": "바오칭톈 멤버는 바오칭톈 앱에서 충전 또는 갱신하세요. AI WorkDeck에서는 이 계정의 결제를 받지 않습니다.",
+  "stopConfirmedWithEdits": "중지했습니다. 문서 편집 {count}건이 이미 적용되었습니다."
 }

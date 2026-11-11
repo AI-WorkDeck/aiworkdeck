@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "पिछली पॉइंट कटौती विफल रही। Baoqingtian ऐप में पॉइंट्स रिचार्ज करें, फिर सहायता से संपर्क करें।",
   "bqtUnavailable": "Baoqingtian सेवा अस्थायी रूप से उपलब्ध नहीं है। कृपया बाद में पुनः प्रयास करें।",
   "bqtRechargeViaBqt": "Baoqingtian सदस्य Baoqingtian ऐप में रिचार्ज या नवीनीकरण करें; AI WorkDeck इस खाते के लिए भुगतान स्वीकार नहीं करता।",
+  "stopConfirmedWithEdits": "रोका गया। {count} दस्तावेज़ संपादन पहले ही लागू हो चुके थे।"
 }

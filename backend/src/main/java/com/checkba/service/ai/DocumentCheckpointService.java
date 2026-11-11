@@ -130,27 +130,102 @@ public class DocumentCheckpointService {
         }
     }
 
+    /** 一个文件没能恢复的原因。missing=true 表示文件已被删除（没有可写回的位置）。 */
+    public record RestoreFailure(Long fileId, String name, String error, boolean missing) {}
+
+    /** 一次恢复的结果：恢复成功的文件名（按快照登记序）与失败清单。 */
+    public record RestoreOutcome(java.util.List<String> restored, java.util.List<RestoreFailure> failures) {}
+
+    /** 本会话当前快照覆盖的文件（fileId + 文件名），给「撤销本次 AI 修改」的确认框列清单用。 */
+    public java.util.List<Map<String, Object>> describeCheckpoint(String conversationId) {
+        Map<Long, Checkpoint> perFile = checkpoints.get(conversationId);
+        if (perFile == null || perFile.isEmpty()) return java.util.List.of();
+        java.util.List<Map<String, Object>> files = new java.util.ArrayList<>();
+        for (Checkpoint cp : perFile.values()) {
+            ProjectFile file = projectFileService.getFile(cp.fileId());
+            if (file == null) continue;
+            files.add(Map.of("fileId", cp.fileId(), "name", file.getName() == null ? "" : file.getName()));
+        }
+        return files;
+    }
+
     /**
      * 恢复本轮快照：把本轮碰过的<b>全部</b>文件的快照内容写回原存储路径，并逐个通知编辑器重载。
      * 返回给模型的结果描述（多文件时合并成一条，个别文件失败不影响其余文件继续恢复）。
      */
     public String restore(String conversationId) {
+        RestoreOutcome outcome = restoreAll(conversationId);
+        if (outcome == null) {
+            return "Error: 本轮没有可恢复的文档快照（本轮尚未执行过修改类工具，或快照创建失败）。请改用 doc_undo 逐步撤销。";
+        }
+        java.util.List<String> failures = outcome.failures().stream()
+                .map(f -> f.missing() ? "文件 " + f.fileId() + " 已不存在"
+                        : "文件 " + f.fileId() + " 恢复失败：" + f.error())
+                .toList();
+        if (outcome.restored().isEmpty()) {
+            return "Error: 快照恢复失败：" + String.join("；", failures);
+        }
+        String names = outcome.restored().stream()
+                .map(n -> "《" + n + "》")
+                .collect(java.util.stream.Collectors.joining("、"));
+        String failureSuffix = failures.isEmpty() ? "" : "（另有恢复失败：" + String.join("；", failures) + "）";
+        return String.format("已将%s恢复到本轮开始前的快照，编辑器已完成重新加载。这些文件的本轮修改（含修订）已丢弃，请重新规划后再操作。%s",
+                names, failureSuffix);
+    }
+
+    /** 同一会话同时只允许一次用户发起的撤销（双击、两个窗口）。 */
+    private final java.util.Set<String> userRestores = ConcurrentHashMap.newKeySet();
+
+    /** 用户发起撤销时的三种拒绝/结果。 */
+    public enum UserRestoreStatus { NO_CHECKPOINT, IN_PROGRESS, DONE }
+
+    public record UserRestoreResult(UserRestoreStatus status, RestoreOutcome outcome) {}
+
+    /**
+     * 用户点「撤销本次 AI 修改」：与 doc_restore_checkpoint 同一条恢复路径（prepare → 写回 → reload），
+     * 只是由用户直接发起，不经模型的确认闸。编辑器指令按 conversationId 寻址，控制器线程上没有
+     * 编排器设的 ThreadLocal，这里自己设、用完清掉。
+     *
+     * <p>全部文件恢复成功后清掉本会话快照：再点一次会把此后的手动修改也一并抹掉，
+     * 那不是用户想要的「撤销」。有失败时保留，便于重试失败的那几份。
+     */
+    public UserRestoreResult restoreForUser(String conversationId) {
+        if (!hasCheckpoint(conversationId)) return new UserRestoreResult(UserRestoreStatus.NO_CHECKPOINT, null);
+        if (!userRestores.add(conversationId)) return new UserRestoreResult(UserRestoreStatus.IN_PROGRESS, null);
+        String previous = editorBridgeService.getCurrentConversationId();
+        try {
+            editorBridgeService.setCurrentConversationId(conversationId);
+            RestoreOutcome outcome = restoreAll(conversationId);
+            if (outcome == null) return new UserRestoreResult(UserRestoreStatus.NO_CHECKPOINT, null);
+            if (outcome.failures().isEmpty()) clearForNewRun(conversationId);
+            return new UserRestoreResult(UserRestoreStatus.DONE, outcome);
+        } finally {
+            if (previous == null) editorBridgeService.clearCurrentConversationId();
+            else editorBridgeService.setCurrentConversationId(previous);
+            userRestores.remove(conversationId);
+        }
+    }
+
+    /** 恢复全部快照文件；本会话没有快照时返回 null。 */
+    RestoreOutcome restoreAll(String conversationId) {
         Map<Long, Checkpoint> perFile = checkpoints.get(conversationId);
         if (perFile == null || perFile.isEmpty()) {
-            return "Error: 本轮没有可恢复的文档快照（本轮尚未执行过修改类工具，或快照创建失败）。请改用 doc_undo 逐步撤销。";
+            return null;
         }
         StorageService storage = storageServiceFactory.getStorageService();
         java.util.List<String> restoredNames = new java.util.ArrayList<>();
-        java.util.List<String> failures = new java.util.ArrayList<>();
+        java.util.List<RestoreFailure> failures = new java.util.ArrayList<>();
         for (Checkpoint cp : perFile.values()) {
             String restoreId = java.util.UUID.randomUUID().toString();
             boolean needsAbort = false;
+            String name = null;
             try {
                 ProjectFile file = projectFileService.getFile(cp.fileId());
                 if (file == null || file.getFilePath() == null) {
-                    failures.add("文件 " + cp.fileId() + " 已不存在");
+                    failures.add(new RestoreFailure(cp.fileId(), null, null, true));
                     continue;
                 }
+                name = file.getName();
                 // Pause autosave and drain uploads before changing authoritative bytes.
                 // A later reload alone cannot undo an old upload racing this write.
                 needsAbort = true; // also abort a prepare whose acknowledgement timed out
@@ -172,7 +247,7 @@ public class DocumentCheckpointService {
                         conversationId, cp.fileId(), cp.checkpointKey());
             } catch (Exception e) {
                 log.error("Failed to restore document checkpoint for conv={}, fileId={}", conversationId, cp.fileId(), e);
-                failures.add("文件 " + cp.fileId() + " 恢复失败：" + e.getMessage());
+                failures.add(new RestoreFailure(cp.fileId(), name, e.getMessage(), false));
             } finally {
                 if (needsAbort) {
                     try { checkpointAction(cp.fileId(), restoreId, "abort"); }
@@ -180,15 +255,7 @@ public class DocumentCheckpointService {
                 }
             }
         }
-        if (restoredNames.isEmpty()) {
-            return "Error: 快照恢复失败：" + String.join("；", failures);
-        }
-        String names = restoredNames.stream()
-                .map(n -> "《" + n + "》")
-                .collect(java.util.stream.Collectors.joining("、"));
-        String failureSuffix = failures.isEmpty() ? "" : "（另有恢复失败：" + String.join("；", failures) + "）";
-        return String.format("已将%s恢复到本轮开始前的快照，编辑器已完成重新加载。这些文件的本轮修改（含修订）已丢弃，请重新规划后再操作。%s",
-                names, failureSuffix);
+        return new RestoreOutcome(restoredNames, failures);
     }
 
     private void checkpointAction(Long fileId, String restoreId, String phase) throws Exception {
@@ -196,8 +263,10 @@ public class DocumentCheckpointService {
                 Map.of("fileId", fileId, "restoreId", restoreId, "phase", phase));
         var response = result == null ? null : objectMapper.readTree(result);
         if (response == null || !response.path("success").asBoolean(false)) {
-            throw new IllegalStateException(response == null ? "编辑器没有确认恢复阶段 " + phase
-                    : response.path("error").asText("编辑器没有完成恢复阶段 " + phase));
+            throw new IllegalStateException(response == null
+                    ? com.checkba.service.LangText.of("编辑器没有确认恢复阶段 ", "The editor did not confirm restore phase ") + phase
+                    : response.path("error").asText(com.checkba.service.LangText.of("编辑器没有完成恢复阶段 ",
+                            "The editor did not complete restore phase ") + phase));
         }
     }
 

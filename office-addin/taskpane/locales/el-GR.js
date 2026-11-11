@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "Ακολουθία συστήματος",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(Σε παύση κατόπιν αιτήματός σας. Στείλτε «συνέχεια» για να συνεχίσετε την ίδια εργασία.)"
 }

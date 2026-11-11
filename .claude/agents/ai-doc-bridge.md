@@ -103,6 +103,7 @@ LOWA 中英提示及工具描述默认“读 → 查找核对上下文 → 锚�
 
 - `DocumentCheckpointService.restore` 通过宿主专用 `doc_checkpoint_restore`（复用 editor_command 的 requestId/ACK，180秒）按 `prepare → 写回快照 → reload` 串行执行；只有实际重载完成才报告恢复成功。普通 `doc_reload_file` 仍保留对用户活动编辑器的保护，不能把它当作检查点已重载的依据。
 - prepare 按文件暂停全部已打开实例的自动保存并等待在途上传；失败或上传结果未知时不写回快照。处理中阻挡旧模型命令。恢复标识及实例身份在异步步骤后复核，迟到旧结果不得解除新锁；abort/加载失败阻止旧画面再次覆盖后端，需重新加载后再编辑。
+- **用户发起的撤销**（「撤销本次 AI 修改」，`POST /api/agent/undo/{cid}`）走同一条路径：`restoreForUser` → `restoreAll`（结构化结果，`restore` 只是把它格式化成给模型的旧文案）。控制器线程没有编排器设的会话 ThreadLocal，`restoreForUser` 自己设、用完复原；client_action 在 SSE 断开时会缓冲重放。失败原因原样取编辑器回执（即 `agentStream.checkpoint*Error` 本地化文案）。全部成功后清快照，部分失败保留。契约与局限见 ai-chat.md「用户控制」。
 - 后端 checkpoint/bridge 测试验证顺序与失败回执；`project-home/checkpoint-restore.test.mjs`、`version-history/reloadChrome.test.mjs` 覆盖保存、迟到回调及实例变化。还须实际桌面验证改动后恢复、随后读取及保存重开，不能只测发送了reload事件。
 
 ## 空替换参数（dev-board#1086）

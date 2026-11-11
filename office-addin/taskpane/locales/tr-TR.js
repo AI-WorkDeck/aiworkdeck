@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "Sistemi takip et",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(İsteğiniz üzerine duraklatıldı. Aynı görevi sürdürmek için “devam” yazıp gönderin.)"
 }

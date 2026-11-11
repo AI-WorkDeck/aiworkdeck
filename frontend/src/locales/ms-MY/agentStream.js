@@ -66,4 +66,5 @@ export default {
   "bqtOutstandingDebt": "Potongan mata sebelum ini gagal. Tambah nilai mata dalam aplikasi Baoqingtian kemudian hubungi sokongan.",
   "bqtUnavailable": "Perkhidmatan Baoqingtian tidak tersedia buat sementara waktu. Sila cuba lagi kemudian.",
   "bqtRechargeViaBqt": "Ahli Baoqingtian menambah nilai atau memperbaharui dalam aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akaun ini.",
+  "stopConfirmedWithEdits": "Dihentikan. {count} suntingan dokumen telah pun dilaksanakan."
 }

@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Выбрать язык",
   "languageFollowSystem": "Как в системе",
   "languageSearchPlaceholder": "Поиск языков…",
-  "languageNoMatch": "Подходящих языков не найдено"
+  "languageNoMatch": "Подходящих языков не найдено",
+  "pausedByUser": "(Приостановлено по вашей просьбе. Отправьте «продолжить», чтобы возобновить ту же задачу.)"
 }

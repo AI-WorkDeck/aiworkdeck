@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Select language",
   "languageFollowSystem": "Ikuti sistem",
   "languageSearchPlaceholder": "Search languages…",
-  "languageNoMatch": "No matching languages"
+  "languageNoMatch": "No matching languages",
+  "pausedByUser": "(Dijeda atas permintaan Anda. Kirim “lanjutkan” untuk meneruskan tugas yang sama.)"
 }

@@ -507,5 +507,6 @@ export default {
   "languagePickerLabel": "Sprache auswählen",
   "languageFollowSystem": "System folgen",
   "languageSearchPlaceholder": "Sprachen suchen…",
-  "languageNoMatch": "Keine übereinstimmenden Sprachen"
+  "languageNoMatch": "Keine übereinstimmenden Sprachen",
+  "pausedByUser": "(Auf Ihren Wunsch pausiert. Senden Sie „weiter“, um dieselbe Aufgabe fortzusetzen.)"
 }

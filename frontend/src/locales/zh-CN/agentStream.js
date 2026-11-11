@@ -82,4 +82,5 @@ export default {
   "bqtOutstandingDebt": "此前有一笔扣点未成功。请在包晴天 App 充值积分，然后联系客服处理。",
   "bqtUnavailable": "包晴天服务暂时不可用，请稍后重试。",
   "bqtRechargeViaBqt": "包晴天会员请在包晴天 App 充值或续费，AI WorkDeck 内不提供充值。",
+  "stopConfirmedWithEdits": "已停止。已完成 {count} 次文档修改。"
 }

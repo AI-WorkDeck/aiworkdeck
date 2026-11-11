@@ -576,5 +576,6 @@ export const ZH = {
   languageFollowSystem: '跟随系统',
   languageSearchPlaceholder: '搜索语言…',
   languageNoMatch: '无匹配语言',
+  pausedByUser: '（已按你的要求暂停。直接发一条「继续」即可接着做同一个任务。）',
 }
 export default ZH
