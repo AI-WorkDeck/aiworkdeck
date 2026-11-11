@@ -2,10 +2,12 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <section class="mcp-panel" :aria-label="$t('mcp.title')">
-    <h2>{{ $t('mcp.title') }}</h2>
-    <p>{{ $t('mcp.description') }}</p>
-    <p class="mcp-note">{{ $t('mcp.billing') }}</p>
-    <p class="mcp-note">{{ $t('mcp.transport') }}</p>
+    <header class="mcp-intro">
+      <h2>{{ $t('mcp.title') }}</h2>
+      <p>{{ $t('mcp.description') }}</p>
+      <p class="mcp-note">{{ $t('mcp.billing') }}</p>
+      <p class="mcp-note">{{ $t('mcp.transport') }}</p>
+    </header>
     <LocalMcpServerToggle />
     <div class="mcp-actions">
       <button :disabled="!!busy || !scopeToken" @click="edit(null)">{{ $t('mcp.add') }}</button>
@@ -321,15 +323,22 @@ export default {
 }
 </script>
 <style scoped>
-.mcp-panel { padding: 24px; color: var(--awd-text); font-size: 14px; line-height: 1.6; min-width: 0; }
-.mcp-panel h2 { font-size: 22px; margin: 0 0 12px; }
-.mcp-panel h3 { font-size: 16px; margin: 0; overflow-wrap: anywhere; }
-.mcp-note, .mcp-url { color: var(--awd-text-2); font-size: 13px; overflow-wrap: anywhere; }
+/* 版式对齐其它设置分区（SettingsSection）：14px 标题、12–13px 正文、卡片 12px 14px 内边距 */
+.mcp-panel { color: var(--awd-text); font-size: 13px; line-height: 1.6; min-width: 0; }
+.mcp-panel p { margin: 4px 0 0; }
+.mcp-intro { padding: 12px 14px; margin-block-end: 12px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); }
+.mcp-panel h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.mcp-intro p { font-size: 12px; }
+.mcp-panel h3 { font-size: 14px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.mcp-heading > span { font-size: 12px; color: var(--awd-text-2); }
+.mcp-note, .mcp-url { color: var(--awd-text-2); font-size: 12px; overflow-wrap: anywhere; }
 .mcp-url { white-space: pre-wrap; unicode-bidi: isolate; }
-.mcp-card, .mcp-editor { padding: 16px; margin-block: 16px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); min-width: 0; }
+.mcp-card, .mcp-editor { padding: 12px 14px; margin-block: 0 12px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); min-width: 0; }
 .mcp-heading, .mcp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mcp-actions { margin-block: 8px 0; }
+.mcp-panel > .mcp-actions { margin-block: 0 12px; }
 .mcp-heading { justify-content: space-between; }
-.mcp-panel button { margin: 0; padding: 6px 12px; font-size: 13px; line-height: 1.5; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
+.mcp-panel button { margin: 0; padding: 4px 12px; font-size: 12px; line-height: 1.5; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
 .mcp-panel button:disabled { opacity: .5; cursor: default; }
 .mcp-editor label { display: flex; flex-direction: column; gap: 4px; margin-block: 12px; }
 .mcp-editor input, .mcp-editor select, .mcp-editor textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 36px; padding: 8px; border: 1px solid var(--awd-border); border-radius: 4px; background: var(--awd-surface); color: var(--awd-text); font: inherit; }

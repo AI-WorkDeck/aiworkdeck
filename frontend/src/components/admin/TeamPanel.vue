@@ -1963,4 +1963,35 @@ export default {
 .lf-dim-table {
   margin-top: 4px;
 }
+
+.scope-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  background: var(--awd-surface-2);
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: 6px;
+}
+
+.scope-tab {
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--awd-text-2);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scope-tab:hover {
+  color: var(--awd-text);
+}
+
+.scope-tab.active {
+  background: var(--awd-surface);
+  color: var(--awd-accent-text, var(--awd-accent));
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
 </style>
