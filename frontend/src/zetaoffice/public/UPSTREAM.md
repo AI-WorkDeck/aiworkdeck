@@ -26,15 +26,19 @@
 
 ### 我们对 `zeta.js` 的本地改动
 
-上游原文之外只有一处改动，仍在 MIT 之下：
+上游原文之外有两处改动，仍在 MIT 之下：
 
 - 2026-08-01，PR #230（commit `c7402cb4`）：`translateTypeDescriptionAndDelete` 补
   `TypeClass.TYPEDEF` 分支，解析 typedef（如 `com.sun.star.util.Color = long`）到被引用类型，
   对齐更新的上游实现。不打这个补丁，任何带 typedef 成员的 struct
   （`BorderLine2.Color` -> `TableBorder2`）双向编组都会报 "bad type description"。
   共 11 行，见该 commit 的 diff。
+- 2026-11-12，office-tier1 O8b：`translateFromEmbind` / `translateToEmbind` 的 SEQUENCE 分支对
+  `sequence<byte>` 走快路径，逐字节直接拷贝，不再每个字节递归做一次类型分派（字节在两个方向本来就原样透传，
+  结果等价）。每次导出（自动保存）和打开都过这里：导出 5 MB 演示文稿 ~1.0 s → ~0.33 s，14 MB 演示文稿
+  ~2.6 s → ~0.72 s。代码处有 `AI WorkDeck local change` 注释。
 
-**不要给 `zeta.js` 加我们自己的版权头，也不要把它挪出本目录**：它是上游原文（加一处对齐上游的修复），
+**不要给 `zeta.js` 加我们自己的版权头，也不要把它挪出本目录**：它是上游原文（加一处对齐上游的修复和一处字节序列快路径），
 且引导器按相对路径取它——`frontend/src/composables/zetaOfficeBoot.js` 的默认值
 `zetaJsUrl = './zeta.js'`，`frontend/src/zetaoffice/editor-main.js` 也只在 URL 参数缺席时回落到它。
 本目录是 publicDir，文件原样进产物，路径就是运行期路径，挪走等于加载失败。

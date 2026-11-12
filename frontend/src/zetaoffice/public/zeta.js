@@ -138,8 +138,13 @@ Module.zetajs = new Promise(function (resolve, reject) {
               const ctype = type.getSequenceComponentType();
               const seq = new (getEmbindSequenceCtor(ctype))(
                   obj.length, Module.uno_Sequence.FromSize);
-              for (let i = 0; i !== obj.length; ++i) {
-                  seq.set(i, translateToEmbind(obj[i], ctype, toDelete));
+              // AI WorkDeck local change (office-tier1): bytes pass through translateToEmbind unchanged.
+              if (ctype.getTypeClass() === Module.uno.com.sun.star.uno.TypeClass.BYTE) {
+                  for (let i = 0; i !== obj.length; ++i) seq.set(i, obj[i]);
+              } else {
+                  for (let i = 0; i !== obj.length; ++i) {
+                      seq.set(i, translateToEmbind(obj[i], ctype, toDelete));
+                  }
               }
               ctype.delete();
               toDelete.push(seq);
@@ -256,9 +261,18 @@ Module.zetajs = new Promise(function (resolve, reject) {
       case Module.uno.com.sun.star.uno.TypeClass.SEQUENCE:
         {
           const td = type.getSequenceComponentType();
-          const arr = [];
-          for (let i = 0; i !== val.size(); ++i) {
-            arr.push(translateFromEmbind(val.get(i), td, precise, cleanUpVal));
+          let arr;
+          // AI WorkDeck local change (office-tier1, see UPSTREAM.md): sequence<byte> skips the
+          // per-element type dispatch; export of a 14 MB deck spent ~2 s here.
+          if (td.getTypeClass() === Module.uno.com.sun.star.uno.TypeClass.BYTE) {
+            const n = val.size();
+            arr = new Array(n);
+            for (let i = 0; i !== n; ++i) arr[i] = val.get(i);
+          } else {
+            arr = [];
+            for (let i = 0; i !== val.size(); ++i) {
+              arr.push(translateFromEmbind(val.get(i), td, precise, cleanUpVal));
+            }
           }
           if (cleanUpVal) {
             val.delete();
