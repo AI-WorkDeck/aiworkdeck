@@ -137,6 +137,7 @@ const MATRIX = [
  * 插件面补不了这些**不是缺口**——理由必须说清为什么补不了或不该补。
  */
 const LOWA_ONLY = {
+  '看真实画面靠桌面引擎把当前文档导出 PDF 再渲染（office-tier1）；Office.js 没有页面渲染/截图接口，插件在真 Word/PPT 里由用户自己看': ['doc_view_pages'],
   '新建演示/表格、导出PDF由插件 office_file 的 create / export_pdf 动作覆盖（V4 合并）；插件返回未保存文稿，桌面创建项目文件': ['slide_create_file', 'sheet_create_file', 'doc_export_pdf'],
   '桌面引擎历史/检查点/流式调试机制；Office无公开撤销栈，WPS未在本桥暴露对应命令；不与接受/拒绝修订混同': [
     'doc_undo', 'doc_redo', 'doc_restore_checkpoint', 'doc_start_stream'
