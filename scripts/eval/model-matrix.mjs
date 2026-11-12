@@ -338,7 +338,7 @@ class Instance {
   async start() {
     await this.pg.psql('postgres', `create database ${this.db}`)
     this.port = await freePort()
-    for (const d of ['home', 'storage', 'plugins']) fs.mkdirSync(path.join(this.dir, d), { recursive: true })
+    for (const d of ['home', 'storage', 'plugins', 'skills']) fs.mkdirSync(path.join(this.dir, d), { recursive: true })
     const env = {
       ...process.env, // OPENROUTER_API_KEY 随环境继承给子进程，不经过任何日志
       JAVA_HOME: this.java,
@@ -349,6 +349,9 @@ class Instance {
       SPRING_DATASOURCE_URL: `jdbc:postgresql://127.0.0.1:${this.pg.port}/${this.db}`,
       SPRING_DATASOURCE_USERNAME: 'awd', SPRING_DATASOURCE_PASSWORD: 'x',
       STORAGE_LOCAL_ROOT_PATH: path.join(this.dir, 'storage'), AI_PLUGINS_DIR: path.join(this.dir, 'plugins'),
+      // 可写 skill 目录按实例隔离：默认是相对 cwd 的 skills/，自进化升格的 user-evo-* 会落在跑评测的目录里，
+      // 下一次运行照样加载并自动激活（O11 实测一条 user-evo skill 跨运行生效），污染对照
+      AI_SKILLS_DIR: path.join(this.dir, 'skills'),
       AI_SKILLS_BUILTIN_DIR: path.join(this.build.wt, 'backend/skills'), AI_PLUGINS_BUNDLED_DIR: path.join(this.build.wt, 'official-plugins'),
     }
     // bailian 路由：BYOK OpenRouter 档的地址指向本机转发口，key 只是占位（真 key 由转发口加上）
