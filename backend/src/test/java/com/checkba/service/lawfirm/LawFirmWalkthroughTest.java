@@ -95,6 +95,8 @@ class LawFirmWalkthroughTest {
     @BeforeEach
     void setUpUsers() {
         lawFirmService.localMode = false;
+        // 走查测多账户业务链路：服务器上台账本已拒绝（见 LawFirmFirmWideAccessTest），这里在被代理实例上打开台账
+        org.springframework.test.util.AopTestUtils.<LawFirmManagementService>getUltimateTargetObject(lawFirmService).ledgerAvailable = true;
         org.mockito.Mockito.when(accessPolicy.canViewFirmWide(org.mockito.ArgumentMatchers.any())).thenReturn(true);
         userA = createUser("lawyer_a", "苏婉清（合伙人）");
         userB = createUser("lawyer_b", "周铭泽（主办律师）");

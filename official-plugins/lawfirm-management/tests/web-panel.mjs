@@ -696,3 +696,25 @@ test('6. Restricted-view banner stays visible after a refresh overwrites the sta
   t.after(() => admin.dom.window.close());
   assert.equal(admin.$('restrictedBanner').hidden, true);
 });
+
+test('7. On a team server the local ledger is refused: panel shows the message and stays usable', async (t) => {
+  const refusal = '本机收费台账仅在桌面端可用。团队服务器上请使用「律所云端利冲协作」。';
+  const p = await mountPanel({
+    onCall: (msg) => {
+      if (msg.method === 'lawfirm.request' && !String(msg.params?.action || '').startsWith('workflow')) {
+        throw new Error(refusal);
+      }
+    }
+  });
+  t.after(() => p.dom.window.close());
+  assert.equal(p.$('notice').textContent, refusal);
+  assert.equal(p.$('notice').dataset.error, 'true');
+  assert.equal(p.$('restrictedBanner').hidden, true);
+
+  p.$('tab-conflict').click();
+  await tick();
+  assert.equal(p.$('panel-conflict').hidden, false, 'tabs still switch');
+  p.$('refresh-data').click();
+  await tick(8);
+  assert.equal(p.$('notice').textContent, refusal, 'refresh shows the refusal again instead of crashing');
+});

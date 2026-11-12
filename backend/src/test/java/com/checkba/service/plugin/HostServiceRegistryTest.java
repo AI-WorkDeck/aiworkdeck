@@ -216,6 +216,20 @@ class HostServiceRegistryTest {
         assertFalse(out.contains("乙公司诉讼"));
     }
 
+    /** 团队服务器（非 local-mode）：三个 lawfirm 只读操作读的都是本机台账，即便是管理员也一律拒绝，且不触达台账。 */
+    @Test
+    void lawfirmReadsAreRefusedOnServerProfile() {
+        doThrow(new IllegalArgumentException("本机收费台账仅在桌面端可用")).when(lawfirm).requireLocalLedger();
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        for (var op : List.of(Map.entry("overview", Map.<String, Object>of()), Map.entry("overview", Map.<String, Object>of("projectId", 5)),
+                Map.entry("feeLedger", Map.<String, Object>of()), Map.entry("conflictCheck", Map.<String, Object>of("clientName", "甲公司")))) {
+            var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", op.getKey(), 7L, null, op.getValue()), op.getKey());
+            assertTrue(e.getMessage().contains("本机收费台账仅在桌面端可用"), e.getMessage());
+        }
+        verify(lawfirm, never()).execute(any(), any(), any(), any());
+        verify(lawfirm, never()).listProjectMatters(any());
+    }
+
     private void makeMember() {
         when(lawfirm.canViewFirmWide(7L)).thenReturn(false);
         doThrow(new IllegalArgumentException("无权查看：全所收费台账与看板仅限律所管理员")).when(lawfirm).requireFirmWide(7L);

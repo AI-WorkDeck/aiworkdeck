@@ -94,6 +94,32 @@ public class LawFirmManagementService {
     @org.springframework.beans.factory.annotation.Value("${security.local-mode:false}")
     boolean localMode;
 
+    /**
+     * 本机台账（收案、利冲预检、发票、回款、看板、CSV/ERP 导出、演示数据）只在桌面单机可用。
+     * 这几张旧表没有律所归属，团队服务器上无法按律所隔离，故一律拒绝；服务器上的跨账户利冲走
+     * {@link LawFirmWorkflowService}（/api/lawfirm/workflow），不经过这里。与 {@link #localMode} 同源，
+     * 单独成字段只为测试能在关掉单机语义的同时保留台账，验证下面的逐条操作权限。
+     */
+    @org.springframework.beans.factory.annotation.Value("${security.local-mode:false}")
+    boolean ledgerAvailable;
+
+    public void requireLocalLedger() {
+        if (!ledgerAvailable) {
+            throw new IllegalArgumentException(LangText.of("本机收费台账仅在桌面端可用。团队服务器上请使用「律所云端利冲协作」。",
+                    "The local fee ledger is only available in the desktop app. On team servers, use Firm Cloud Conflict Collaboration."));
+        }
+    }
+
+    /** 写台账的逐条权限：相关当事人（申请人/主办律师）或全所资格者（桌面单机、系统管理员、律所管理员）。 */
+    private void requireLedgerActor(Long userId, Long... involvedUserIds) {
+        for (Long id : involvedUserIds) {
+            if (id != null && id.equals(userId)) return;
+        }
+        if (access.canViewFirmWide(userId)) return;
+        throw new IllegalStateException(LangText.of("无权处理这条记录：仅申请人、主办律师或律所管理员可以操作",
+                "Not permitted: only the applicant, the lead lawyer or a law firm administrator can act on this record"));
+    }
+
     boolean canActFor(Long userId, Long targetUserId) {
         return localMode || targetUserId == null || targetUserId.equals(userId);
     }
@@ -101,6 +127,7 @@ public class LawFirmManagementService {
     @Transactional
     public Map<String, Object> execute(Long userId, Long projectId, String action, Map<String, Object> rawParams) {
         if (userId == null) throw new IllegalArgumentException("请先登录");
+        requireLocalLedger();
         Map<String, Object> params = rawParams == null ? Map.of() : rawParams;
         Long effectiveUserId = userId;
         String act = action == null || action.isBlank() ? "overview" : action.trim();
@@ -137,6 +164,7 @@ public class LawFirmManagementService {
 
     /** 收费台账 CSV 含全所发票与回款：只给有全所查看资格的人。 */
     public String exportFinanceCsvFor(Long userId) {
+        requireLocalLedger();
         access.requireFirmWide(userId);
         return exportFinanceCsv();
     }
@@ -144,6 +172,7 @@ public class LawFirmManagementService {
     /** 某项目关联的收案/事项视图（事项级数据，调用方须已核该项目读权限）；不含收费台账。 */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listProjectMatters(Long projectId) {
+        requireLocalLedger();
         Map<Long, List<LawFirmConflictClearance>> byIntake = clearanceRepository.findAllByOrderByIdDesc().stream()
                 .filter(c -> c.getIntakeId() != null)
                 .collect(Collectors.groupingBy(LawFirmConflictClearance::getIntakeId));
@@ -541,6 +570,8 @@ public class LawFirmManagementService {
                 || Objects.equals(intake.getLeadLawyerUserId(), userId))) {
             throw new IllegalStateException(LangText.of("申请人或主办律师不能终审自己的收案申请，请由其他利冲委员审查", "The applicant or lead lawyer cannot finalize their own intake; please have another conflict committee member review it"));
         }
+        // 旧台账没有委员指派记录：终审由全所资格者（桌面单机本人、系统/律所管理员）代行委员职责
+        requireLedgerActor(userId);
         String comment = string(params, "comment", "");
         Boolean ethicalWall = boolVal(params.get("ethicalWallApplied"));
         if (ethicalWall == null) {
@@ -768,6 +799,7 @@ public class LawFirmManagementService {
         final Long invoiceIdRef = invoiceId;
         LawFirmInvoice invoice = invoiceRepository.findById(invoiceIdRef)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("发票申请单不存在：", "Invoice application not found: ") + invoiceIdRef));
+        requireLedgerActor(userId, invoice.getApplicantUserId(), invoice.getLeadLawyerUserId());
         if (!"PENDING_APPROVAL".equals(invoice.getStatus())) {
             throw new IllegalStateException(LangText.of("只有待开票的申请可以登记开票，当前状态：", "Only pending invoice applications can be issued; current status: ") + invoice.getStatus());
         }
@@ -805,6 +837,7 @@ public class LawFirmManagementService {
         final Long voidId = invoiceId;
         LawFirmInvoice invoice = invoiceRepository.findById(voidId)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("发票申请单不存在：", "Invoice application not found: ") + voidId));
+        requireLedgerActor(userId, invoice.getApplicantUserId(), invoice.getLeadLawyerUserId());
         String mode = string(params, "mode", "VOIDED");
         invoice.setStatus("RED_INVOICED".equalsIgnoreCase(mode) ? "RED_INVOICED" : "VOIDED");
         invoice.setUpdatedAt(Instant.now());
@@ -827,6 +860,10 @@ public class LawFirmManagementService {
             intakeId = invoice.getIntakeId();
         }
         LawFirmMatterIntake intake = intakeId != null ? intakeRepository.findById(intakeId).orElse(null) : null;
+        // 未关联发票/收案的独立回款只有全所资格者可登记
+        requireLedgerActor(userId,
+                invoice != null ? invoice.getApplicantUserId() : null, invoice != null ? invoice.getLeadLawyerUserId() : null,
+                intake != null ? intake.getApplicantUserId() : null, intake != null ? intake.getLeadLawyerUserId() : null);
 
         Map<Long, String> userNames = loadUserDisplayNames();
         String recordedByName = firstNonBlank(
