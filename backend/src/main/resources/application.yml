@@ -32,9 +32,9 @@ spring:
   servlet:
     multipart:
       enabled: true
-      # 单请求上限与项目总量闸同源（storage.project-size-limit）
-      max-file-size: ${storage.project-size-limit:20GB}
-      max-request-size: ${storage.project-size-limit:20GB}
+      # 单请求上限 = storage.max-upload-size（默认与项目总量闸同值；云端/案件库 profile 显式收紧）
+      max-file-size: ${storage.max-upload-size:20GB}
+      max-request-size: ${storage.max-upload-size:20GB}
       # 超过这个大小的分块才落临时盘；1GB 意味着一个大分块整块压在堆里
       file-size-threshold: 8MB
 
@@ -742,8 +742,12 @@ addin:
 storage:
   # 存储类型：只支持 local（本地文件系统）
   type: local
-  # 单个项目的文件总量上限（上传与本机导入共用；multipart 单请求上限也引用它）
+  # 单个项目的文件总量上限（上传与本机导入共用）
   project-size-limit: 20GB
+  # 单次上传请求的字节上限：multipart 与裸 octet-stream（FileController.uploadFile 按
+  # Content-Length 拦，413 UPLOAD_TOO_LARGE）共用。默认跟项目总量闸走，桌面行为不变；
+  # 公网 server profile 显式收紧（cloud 200MB / case 2GB），并与 nginx client_max_body_size 对齐。
+  max-upload-size: ${storage.project-size-limit:20GB}
   # 本机文件夹项目（打开本机文件夹的项目）是否豁免上面的总量闸；桌面 profile 打开
   exempt-local-folder-projects: false
   # 本地存储配置
@@ -770,6 +774,23 @@ security:
   # 缺失直接拒绝启动——明文降级属于潜伏逃生门，不留。
   # local-mode 与未开桥接的团队服务器不受影响：它们走机器级密钥文件，不碰这条路。
   platform-key-secret: ${AWD_PLATFORM_KEY_SECRET:}
+  # 按用户限频（UserRateLimiter，令牌桶：桶容量 = 每分钟额度，按额度/60 每秒匀速回填）。
+  # 只在 server 模式生效（cloud / case / prod）；local-mode（桌面/dev）整体旁路。超限 → HTTP 429
+  # + Retry-After。进程内计数：重启归零、多实例各算各的（那时以 nginx limit_req 为准）。
+  # 取值依据：真实律师手速远到不了这些数，只挡脚本/盗用会话的连发。<=0 关闭该项。
+  rate-limit:
+    # POST /api/agent/chat（含插话、ask_user 回答）与 /api/agent/ppt/generate：一分钟 30 条
+    # 已是两秒一条的持续发送
+    chat-per-minute: 30
+    # /api/files/{id}/upload 的「一次上传开头」（offset 缺省或 0；分片续传不计）。
+    # 浏览器拖入整个案卷文件夹是逐个串行上传，几百个小文件一口气传完要靠这个桶；
+    # 编辑器自动保存（3 秒防抖）也走这条路
+    upload-per-minute: 300
+    # /api/ocr/recognize 与 /api/projects/{p}/files/{f}/ocr：批量识别由前端逐个串行，
+    # 扫描件一份就要几秒到几分钟
+    ocr-per-minute: 20
+    # /api/browser/proxy：只有导航（地址栏/点链接）走代理，子资源直连原站，即每分钟翻页数
+    browser-proxy-per-minute: 120
 
 # LangChain4j Ollama Configuration
 langchain4j:

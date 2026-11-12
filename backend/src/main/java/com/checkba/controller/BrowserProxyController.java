@@ -111,6 +111,10 @@ public class BrowserProxyController {
 
     private java.time.Clock clock = java.time.Clock.systemUTC();
 
+    /** 按用户限频（server 模式；按票据里的用户计）。可缺省：手工装配的测试不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
     /** 会话 → 用户。local-mode 下 {@link AuthController#getUserIdFromSession} 不看头、一律回本机用户。 */
     private java.util.function.Function<String, Long> sessionResolver = AuthController::getUserIdFromSession;
 
@@ -139,6 +143,15 @@ public class BrowserProxyController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(LangText.of(
                     "网页面板凭证缺失或已过期，请在地址栏重新打开该网址",
                     "The web panel credential is missing or expired; reopen the address from the address bar"));
+        }
+        // 面板里只有导航（地址栏/点链接）才走代理，页面子资源靠 <base> 直连原站，
+        // 所以这里的计数就是「每分钟打开多少页」。iframe 里看的是正文，回纯文本与本端点其余报错一致。
+        long wait = rateLimiter == null ? 0
+                : rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.BROWSER_PROXY, verified[0]);
+        if (wait > 0) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header("Retry-After", String.valueOf(wait))
+                    .body(com.checkba.exception.RateLimitedException.message(wait));
         }
         if (!StringUtils.hasText(url)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(LangText.of("url 不能为空", "url must not be empty"));

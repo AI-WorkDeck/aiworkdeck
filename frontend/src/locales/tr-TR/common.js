@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Ayarlar'a git",
   "later": "Daha sonra",
   "requestFailedWithStatus": "İstek başarısız oldu ({status})",
+  "tooManyRequests": "Çok fazla istek. Lütfen biraz bekleyip tekrar deneyin",
   "smsVerificationRequired": "Bu işlem SMS doğrulaması gerektirir",
   "freeQuotaExceeded": "Tüm ücretsiz kredilerinizi kullandınız",
   "serviceErrorRetryLater": "Hizmet hatası. Lütfen daha sonra tekrar deneyin",

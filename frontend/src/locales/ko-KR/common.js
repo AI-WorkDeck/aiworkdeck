@@ -31,6 +31,7 @@ export default {
   "goToSettings": "설정으로 이동",
   "later": "나중에",
   "requestFailedWithStatus": "요청 실패 ({status})",
+  "tooManyRequests": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요",
   "smsVerificationRequired": "이 작업에는 SMS 인증이 필요합니다",
   "freeQuotaExceeded": "무료 크레딧을 모두 사용했습니다",
   "serviceErrorRetryLater": "서비스 오류입니다. 나중에 다시 시도해 주세요",

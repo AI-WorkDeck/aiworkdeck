@@ -32,6 +32,7 @@ export default {
   goToSettings: 'Go to Settings',
   later: 'Later',
   requestFailedWithStatus: 'Request failed ({status})',
+  tooManyRequests: 'Too many requests. Please wait a moment and try again',
   smsVerificationRequired: 'This action requires SMS verification',
   freeQuotaExceeded: 'You have used all your free credits',
   serviceErrorRetryLater: 'Service error. Please try again later',

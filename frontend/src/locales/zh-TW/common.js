@@ -31,6 +31,7 @@ export default {
   "goToSettings": "前往設定",
   "later": "稍後",
   "requestFailedWithStatus": "請求失敗 ({status})",
+  "tooManyRequests": "操作太頻繁，請稍候再試",
   "smsVerificationRequired": "本次操作需要短信驗證",
   "freeQuotaExceeded": "免費額度已滿",
   "serviceErrorRetryLater": "服務異常，請稍後重試",

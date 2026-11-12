@@ -85,6 +85,18 @@ public class FileController {
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
 
+    /** 按用户限频（server 模式；local-mode 内部旁路）。可缺省：手工装配的测试不用改。 */
+    @Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
+    /**
+     * 单次上传请求的字节上限（storage.max-upload-size）。multipart 由 Spring 的
+     * spring.servlet.multipart.* 管，但浏览器与桌面的主路径是裸 octet-stream，那条路
+     * Spring 不管，必须在这里按 Content-Length 拦。桌面默认等于项目总量闸（行为不变）。
+     */
+    @org.springframework.beans.factory.annotation.Value("${storage.max-upload-size:20GB}")
+    private org.springframework.util.unit.DataSize maxUploadSize = org.springframework.util.unit.DataSize.ofGigabytes(20);
+
     private static final java.util.concurrent.ExecutorService FALLBACK_UPLOAD_EXECUTOR =
             new java.util.concurrent.ThreadPoolExecutor(
                     2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
@@ -480,6 +492,16 @@ public class FileController {
                 if (storageResolver.exceedsProjectSizeLimit(projectId, totalSize, 0L)) {
                      return ResponseEntity.status(400).body(Map.of("code", -1, "message", storageResolver.projectSizeLimitMessage()));
                 }
+                // 限频只计「一次上传的开头」（offset 缺省或 0）：录音等分片续传（offset>0）
+                // 属于同一份文件，按片计数会把正常的长录音掐断
+                if (rateLimiter != null && (offset == null || offset == 0)) {
+                    String limitSid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
+                    long wait = rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.UPLOAD,
+                            AuthController.getUserIdFromSession(limitSid));
+                    if (wait > 0) {
+                        return com.checkba.config.GlobalExceptionHandler.rateLimitedResponse(wait);
+                    }
+                }
             } else {
                 // 找不到文件记录就无从判断归属：此前只要求登录，resolveUploadStoragePath
                 // 会把裸 fileId 当存储键，任何登录用户都能凭它往存储根写字节
@@ -540,6 +562,12 @@ public class FileController {
                     } catch (NumberFormatException ignored) {
                         // 头解析不了不是这里要处理的问题，交给后续既有逻辑
                     }
+                }
+                if (maxUploadSize != null && request.getContentLengthLong() > maxUploadSize.toBytes()) {
+                    return ResponseEntity.status(413).body(Map.of("code", -1, "reason", "UPLOAD_TOO_LARGE",
+                            "message", com.checkba.service.LangText.of(
+                                    "单个文件超过上传上限（" + maxUploadSize.toMegabytes() + " MB）",
+                                    "The file exceeds the upload limit (" + maxUploadSize.toMegabytes() + " MB)")));
                 }
                 inputStream = request.getInputStream();
             }

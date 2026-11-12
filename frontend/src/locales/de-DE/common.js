@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Zu den Einstellungen",
   "later": "Später",
   "requestFailedWithStatus": "Anfrage fehlgeschlagen ({status})",
+  "tooManyRequests": "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut",
   "smsVerificationRequired": "Diese Aktion erfordert eine SMS-Verifizierung",
   "freeQuotaExceeded": "Sie haben alle Ihre kostenlosen Guthaben verbraucht",
   "serviceErrorRetryLater": "Dienstfehler. Bitte versuchen Sie es später erneut",

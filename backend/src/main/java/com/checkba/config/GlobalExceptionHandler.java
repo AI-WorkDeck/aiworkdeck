@@ -41,6 +41,28 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 按用户限频（UserRateLimiter）：真 HTTP 429 + Retry-After，不走「统一 200」口径——
+     * 前端 request() 对非 200 直接拿 message 报错，fetch 调用方按 status 识别。
+     */
+    @ExceptionHandler(com.checkba.exception.RateLimitedException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimited(com.checkba.exception.RateLimitedException e) {
+        return rateLimitedResponse(e.getRetryAfterSeconds());
+    }
+
+    /** 同一份 429 响应，供自带 catch-all 的控制器（如上传）直接返回。 */
+    public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 4290);
+        result.put("status", "error");
+        result.put("reason", "RATE_LIMITED");
+        result.put("message", com.checkba.exception.RateLimitedException.message(retryAfterSeconds));
+        result.put("retryAfterSeconds", retryAfterSeconds);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(retryAfterSeconds))
+                .body(result);
+    }
+
+    /**
      * 功能未配置：返回可识别的 code=4001 + feature 字段，前端据此引导"去设置"
      * 而非显示通用报错。/ Feature not configured — return a recognizable
      * code=4001 with a feature id so the frontend can prompt "go to settings".

@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Đi tới Cài đặt",
   "later": "Để sau",
   "requestFailedWithStatus": "Yêu cầu thất bại ({status})",
+  "tooManyRequests": "Quá nhiều yêu cầu. Vui lòng đợi một lát rồi thử lại",
   "smsVerificationRequired": "Hành động này yêu cầu xác minh qua SMS",
   "freeQuotaExceeded": "Bạn đã sử dụng hết lượt miễn phí",
   "serviceErrorRetryLater": "Lỗi dịch vụ. Vui lòng thử lại sau",

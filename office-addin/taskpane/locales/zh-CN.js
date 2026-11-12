@@ -382,6 +382,7 @@ export const ZH = {
   apiConversationIssueFailedHttp: '会话签发失败（HTTP {status}）',
   apiChatUnreachable: '后端不可达：消息未送出',
   apiChatFailedHttp: '对话请求失败（HTTP {status}）',
+  apiChatRateLimited: '操作太频繁，请稍候再试',
   // 会话失效自愈（dev-board#715）：文案里不出现「登录/未授权/请先」三个子串（见 api.js 文件头）
   conversationRenewedNotice: '原会话已失效，已自动新建一场会话并把这条消息重新发出。',
   conversationExpiredRetryFailed: '会话已失效：自动新建会话后重发仍未成功。请点击底部的「新对话」重新开始；若仍然失败，请检查网络连接或稍后再试。',

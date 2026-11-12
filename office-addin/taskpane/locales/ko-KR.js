@@ -332,6 +332,7 @@ export default {
   "apiConversationIssueFailedHttp": "Failed to issue conversation (HTTP {status})",
   "apiChatUnreachable": "Backend unreachable: message not sent",
   "apiChatFailedHttp": "Chat request failed (HTTP {status})",
+  "apiChatRateLimited": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요",
   "conversationRenewedNotice": "The previous conversation was no longer valid. A new one was started and this message was sent again.",
   "conversationExpiredRetryFailed": "This conversation is no longer valid, and resending it in a new conversation also failed. Tap \"New chat\" at the bottom to start over; if it keeps failing, check your network connection or try again later.",
   "conversationDenied": "This conversation cannot be continued: it may belong to another device or another account. Tap \"New chat\" at the bottom to start over.",

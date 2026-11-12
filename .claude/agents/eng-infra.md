@@ -404,6 +404,26 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
   data 断言解压后字节数等于 metadata 里的 `remote_package_size`（emscripten 自带真值，
   下游 fetch-lowa-assets.js 对 data 只查「长度 ≥1024」，兜不住双重压缩）。
   落盘先落 web root 之外的暂存区、校验通过再 rename 换入，旧版本自动备份到 `/root/lowa-engine-backup/`。
+- **server 模式按用户限频与单次上传上限（S2，2026-11-12）**：`service/UserRateLimiter`（令牌桶，桶容量 =
+  每分钟额度，按额度/60 每秒回填；按 (类别, userId) 分桶；`security.local-mode=true` 整体旁路，所以桌面/dev 零变化）。
+  配置 `security.rate-limit.*`（application.yml，`<=0` 关闭该项）：`chat-per-minute: 30`（`POST /api/agent/chat`
+  含插话、`/api/agent/ppt/generate`）、`upload-per-minute: 300`（`/api/files/{id}/upload` 只计 offset 缺省/0 的「上传开头」，
+  录音等分片续传不计；浏览器拖入文件夹逐个串行上传、编辑器 3 秒防抖自动保存都走这条）、`ocr-per-minute: 20`
+  （`/api/ocr/recognize` + `/api/projects/{p}/files/{f}/ocr`）、`browser-proxy-per-minute: 120`（`/api/browser/proxy`，
+  按票据里的 userId；只有导航走代理，子资源靠 `<base>` 直连原站）。超限 → **真 HTTP 429** + `Retry-After` +
+  `{code:4290, reason:"RATE_LIMITED", message, retryAfterSeconds}`（`RateLimitedException` → `GlobalExceptionHandler`；
+  上传与代理在控制器内直接回，代理回纯文本给 iframe）。文案不得含「登录/未授权/请先」。前端：`request()` 对非 200
+  直接用 body.message；`useAgentStream` 与 `ChatInterface.uploadFileContent` 的 429 → `common.tooManyRequests`；
+  Office 加载项 `postChat` 429 → `apiChatRateLimited`。资源管理器批量 OCR 遇 429 按 `retryAfterSeconds` 等待重试（`explorerOcrHost.test.mjs`）。**进程内计数**：重启归零、多实例各算各的——多实例时以 nginx
+  `limit_req` 为准（与 `AuthAbuseGuard` 同一立场）。控制器里都是 `@Autowired(required=false)` 字段注入并判空，手工装配的测试不用改。
+  **单次上传上限 `storage.max-upload-size`**：默认 `${storage.project-size-limit:20GB}`（桌面不变），multipart 的
+  `max-file-size/max-request-size` 引用它；裸 octet-stream（浏览器/桌面/Office 的主上传路径，Spring multipart 管不到）
+  由 `FileController.uploadFile` 按 Content-Length 拦，413 `UPLOAD_TOO_LARGE`。cloud / prod = 200MB（对齐
+  `deploy/cloud/nginx-addin.conf.example`、`deploy/web/nginx.conf.example` 的 `client_max_body_size 200m`），case = 2GB
+  （对齐 `deploy/case/nginx-case*.conf.example` 里 `/api/` 的 2g；整段案卷历史走 `/git/` 的 4g，不受此限）。
+  改任一侧要两处同改；接线由 `ProjectStorageResolverTest.profilesWireTheSizeLimit` 钉住。
+  回归：`UserRateLimiterTest`、`FileControllerUploadLimitsTest`、`AiAgentControllerTest`、`BrowserProxyControllerTest`、
+  `FileOcrControllerTest`、前端 `tests/project-home/server-rate-limit-429.test.mjs`、加载项 `postChatRateLimit.test.js`。
 - 官网部署在独立仓库（website/，gitignore 掉），服务器 ssh -i ~/.ssh/aiworkdeck_ops root@47.92.111.102；ECS 8.137.95.63(~/.ssh/checkba_ecs)。
 - **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror，经 `model-fetch.py --source hf` 读取固定 revision 与逐文件 metadata，大小及 LFS SHA256 / Git blob SHA1 验证后才发布 refs/main（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
 - 模型不进包：mineru/kokoro/asr 模型首启在"组件管理"下载（下载进度按字节级整体，PR#142）。asr 的 faster-whisper medium 约 1.5GB，依赖闭包 182MB（压缩后约 57MB 进安装包，大头是 onnxruntime 70MB + PyAV 44MB，两者都是 faster-whisper 的硬依赖）。

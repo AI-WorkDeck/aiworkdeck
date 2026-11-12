@@ -82,6 +82,9 @@ security:
 
 storage:
   type: local
+  # 单次上传请求上限：案卷附件经 API 上传（大案卷整段历史走 /git/，不受此限），
+  # 与 deploy/case/nginx-case*.conf.example 里 /api/ 的 client_max_body_size 2g 同值
+  max-upload-size: 2GB
   # 全部数据落在一个可整体搬走的根下（迁移单元，见 deploy/case/README.md）。
   # repos/（裸库）、projects/（托管工作区）、template.docx 都在 root-path 之下：
   #   ProjectRepoService: gitDir  = {globalRoot}/repos/project-{id}.git

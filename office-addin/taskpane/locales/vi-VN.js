@@ -332,6 +332,7 @@ export default {
   "apiConversationIssueFailedHttp": "Failed to issue conversation (HTTP {status})",
   "apiChatUnreachable": "Backend unreachable: message not sent",
   "apiChatFailedHttp": "Chat request failed (HTTP {status})",
+  "apiChatRateLimited": "Quá nhiều yêu cầu. Vui lòng đợi một lát rồi thử lại",
   "conversationRenewedNotice": "The previous conversation was no longer valid. A new one was started and this message was sent again.",
   "conversationExpiredRetryFailed": "This conversation is no longer valid, and resending it in a new conversation also failed. Tap \"New chat\" at the bottom to start over; if it keeps failing, check your network connection or try again later.",
   "conversationDenied": "Không thể tiếp tục cuộc trò chuyện này: có thể nó thuộc về thiết bị hoặc tài khoản khác. Nhấn \"New chat\" ở bên dưới để bắt đầu lại.",

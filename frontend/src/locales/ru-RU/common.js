@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Перейти в настройки",
   "later": "Позже",
   "requestFailedWithStatus": "Ошибка запроса ({status})",
+  "tooManyRequests": "Слишком много запросов. Подождите немного и повторите попытку",
   "smsVerificationRequired": "Для этого действия требуется подтверждение по SMS",
   "freeQuotaExceeded": "Вы использовали все бесплатные кредиты",
   "serviceErrorRetryLater": "Ошибка сервиса. Повторите попытку позже",
