@@ -1,0 +1,37 @@
+{
+ "_comment": "office-tier1 O6：需要看图才能发现的版面问题（夹具见 make_office_fixtures.py 的视觉核验段）。宿主名沿用 案件汇报.pptx / 案件台账.xlsx。",
+ "sentences": [
+  {
+   "id": "v01-ppt-overflow-fix",
+   "text": "第2页的内容在幻灯片上是不是都能完整看到？有显示不全的地方就帮我调整好",
+   "hostState": "pptx:case-report-overflow",
+   "expect": {
+    "_note": "O6：第2页正文 36 磅、起点偏低，后两条要点超出页面下沿（结构读回看不出，只有看图才知道）。通过：正文字号降到 ≤26 磅，或把内容拆到新的一页（受理法院出现在第3页）；四条要点都还在。",
+    "maxRounds": 14,
+    "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const all = S.map(s => s.text).join('\\n'); if (!/原告/.test(all) || !/被告/.test(all) || !/标的额/.test(all) || !/受理法院/.test(all)) return false; const s2 = S[1]; const sizes = [...s2.xml.matchAll(/<a:rPr\\b[^>]*\\bsz=\"(\\d+)\"/g)].map(m => Number(m[1]) / 100).filter(n => n > 0); const bodySizes = sizes.filter(n => n < 40); const shrunk = bodySizes.length > 0 && Math.max(...bodySizes) <= 26; const split = S.length >= 6 && !/受理法院/.test(s2.text); return shrunk || split;"
+   }
+  },
+  {
+   "id": "v02-xlsx-hash-fix",
+   "text": "检查一下台账表现在显示得正不正常，有显示不全的列就修好",
+   "hostState": "xlsx:case-ledger-narrow",
+   "expect": {
+    "_note": "O6：标的额（D 列）宽 4，屏幕上显示成 ###，读值是完整数字。通过：D 列宽 ≥ 10（或设为自动宽度），数据不变。",
+    "maxRounds": 12,
+    "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const L = wb.sheet('台账'); if (!L || L.cells.D2?.v !== 1280000) return false; const col = [...L.xml.matchAll(/<col\\b[^>]*>/g)].map(m => m[0]).find(c => { const a = Number(/\\bmin=\"(\\d+)\"/.exec(c)?.[1]), b = Number(/\\bmax=\"(\\d+)\"/.exec(c)?.[1]); return a <= 4 && 4 <= b; }); const w = col ? Number(/\\bwidth=\"([\\d.]+)\"/.exec(col)?.[1]) : NaN; return w >= 10;"
+   }
+  },
+  {
+   "id": "v03-ppt-describe",
+   "text": "第2页现在实际显示出来是什么样子？简单描述一下版面",
+   "hostState": "pptx:case-report-overflow",
+   "expect": {
+    "_note": "O6：只读；必须真的看图（doc_view_pages），并点出内容超出页面/显示不全。",
+    "maxRounds": 6,
+    "mustUse": [
+     "doc_view_pages"
+    ]
+   }
+  }
+ ]
+}

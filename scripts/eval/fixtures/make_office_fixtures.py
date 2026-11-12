@@ -55,3 +55,26 @@ for m, a, b in [('1月', 42000, 3800), ('2月', 38000, 2100), ('3月', 51000, 46
     fee.append([m, a, b])
 wb.save(os.path.join(HERE, 'case-ledger.xlsx'))
 print('ok')
+
+# ---- 视觉核验夹具（office-tier1 O6）：结构读回看不出、只有看图才发现的版面问题 ----
+from pptx.util import Emu, Pt
+from openpyxl import load_workbook
+prs = Presentation(os.path.join(HERE, 'case-report.pptx'))
+body = prs.slides[1].placeholders[1]
+body.text_frame.text = '原告：示范科技有限公司（统一社会信用代码 91110105MA00EXAMPL，住所地示范市示范区示范大道 100 号）'
+for line in ['被告：样例贸易有限公司（住所地样例市样例区样例路 200 号，法定代表人 张某某）',
+             '标的额：人民币 1,280,000 元及自 2025 年 3 月 2 日起按 LPR 计算的逾期付款利息',
+             '受理法院：示范市中级人民法院，案号 (2025)示01民初1001号，承办法官 李某某']:
+    body.text_frame.add_paragraph().text = line
+for p in body.text_frame.paragraphs:
+    for r in p.runs:
+        r.font.size = Pt(36)
+# 框太矮、起点太低：四段 36 磅正文溢出文本框并超出页面下沿（看图才看得出被裁）（四个几何量都显式给出，只给高度会让占位缺位置）
+body.left, body.top = Emu(int(prs.slide_width * 0.06)), Emu(int(prs.slide_height * 0.40))
+body.width, body.height = Emu(int(prs.slide_width * 0.88)), Emu(int(prs.slide_height * 0.22))
+prs.save(os.path.join(HERE, 'case-report-overflow.pptx'))
+
+wb = load_workbook(os.path.join(HERE, 'case-ledger.xlsx'))
+wb['台账'].column_dimensions['D'].width = 4  # 标的额列太窄：显示成 ###，读值照常是完整数字
+wb.save(os.path.join(HERE, 'case-ledger-narrow.xlsx'))
+print('ok view fixtures')
