@@ -11,7 +11,7 @@
 - 权限范围 `awd:<领域>.<read|write>`：project 项目文件与数据、editor 桌面编辑器、office-addin 任务窗格、memory 用户记忆、external 外部服务、system 代码执行与扩展安装。
 - 宿主：NONE 纯后端可完成；LOWA 需桌面编辑器；OFFICE 需 Office/WPS 任务窗格。
 
-合计 292 个工具：read 89，write 194，destructive 9。
+合计 293 个工具：read 90，write 195，destructive 8。
 
 ## MCP 服务器工具（本机 `/mcp`，只读）
 
@@ -78,6 +78,7 @@
 | `doc_table_set_cell` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_undo` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_update_comment` | write | awd:editor.write | document | NONE | 是 | — |
+| `doc_view_pages` | read | awd:editor.read | document | LOWA | 是 | — |
 | `litigation_checkpoint` | read | awd:editor.read | litigation-visual | LOWA | 是 | — |
 | `litigation_reference` | read | awd:editor.read | litigation-visual | LOWA | 是 | — |
 | `litigation_render` | write | awd:editor.write | litigation-visual | LOWA | 是 | — |
@@ -127,7 +128,7 @@
 | `slide_add_table` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_add_text_box` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_create_file` | write | awd:editor.write | slides | NONE | 是 | — |
-| `slide_delete_page` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `slide_delete_page` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_delete_shape` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_chart` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_shape` | write | awd:editor.write | document | NONE | 是 | — |

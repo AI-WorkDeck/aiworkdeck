@@ -126,6 +126,8 @@ final class RealToolBeans {
                 OfficeEditTools.class,
                 PdfTools.class,
                 com.checkba.service.ai.tools.PdfVisualTools.class,
+                // doc_view_pages（office-tier1）：看编辑器里文档的真实渲染画面
+                com.checkba.service.ai.tools.DocViewTools.class,
                 PluginDevTools.class,
                 PptxTools.class,
                 PythonTools.class,

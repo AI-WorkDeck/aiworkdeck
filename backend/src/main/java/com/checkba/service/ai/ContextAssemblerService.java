@@ -3,6 +3,8 @@
 
 package com.checkba.service.ai;
 
+import com.checkba.service.ai.context.OfficeOutlineText;
+
 import com.checkba.config.AiContextProperties;
 import com.checkba.model.ai.AgentMode;
 import com.checkba.model.entity.ConversationSummary;
@@ -2203,7 +2205,21 @@ public class ContextAssemblerService {
             }
             return cached;
         }
-        return legalTools.read_document(activeContext.getId());
+        String text = legalTools.read_document(activeContext.getId());
+        // xlsx / pptx：权限与抽取都过了之后换成带行号列标 / 页码的版本（office-tier1）；任何失败都退回纯文本
+        if (projectFileService != null && OfficeOutlineText.supports(activeContext.getName())
+                && text != null && !text.startsWith("Error") && !text.startsWith("Warning")) {
+            try {
+                String outline = OfficeOutlineText.of(activeContext.getName(),
+                        projectFileService.getFileBytes(Long.parseLong(activeContext.getId())));
+                return com.checkba.service.ai.tools.ToolFileGuard.capToolText(activeContext.getName(),
+                        Long.parseLong(activeContext.getId()), outline);
+            } catch (Exception e) {
+                log.warn("[Context] office outline failed for {}, falling back to plain text: {}",
+                        activeContext.getName(), e.toString());
+            }
+        }
+        return text;
     }
 
     // Chinese and other non-ASCII text can consume substantially more than chars/2.

@@ -635,4 +635,27 @@ class XmlToolCallParserTest {
         // 裸标签没有参数不算（不把任意标签当工具）
         assertTrue(parser.parse("<final>完成</final> </function>").isEmpty());
     }
+
+    @Test
+    @DisplayName("Qwen 把工具名当外层标签、参数各自成标签：整段只有这一块且子标签都是参数时才执行")
+    void bareToolTagWithChildParametersIsSalvagedOnlyWhenUnambiguous() {
+        var bridge = org.mockito.Mockito.mock(EditorBridgeService.class);
+        var registry = new ToolRegistry(List.of(new com.checkba.service.ai.tools.SlideEditTools(bridge)),
+                new PluginService(), new ClientCapabilityService());
+        registry.init();
+        var slideParser = new XmlToolCallParser(registry);
+        String leaked = "<slide_write_notes>\n<slideNumber>1</slideNumber>\n<text>开场先介绍承办律师团队 &amp; 分工</text>\n</slide_write_notes>";
+        assertTrue(slideParser.containsToolCall(leaked));
+        var calls = slideParser.parse(leaked);
+        assertEquals(1, calls.size());
+        assertEquals("slide_write_notes", calls.get(0).toolName());
+        assertEquals("{\"slideNumber\":\"1\",\"text\":\"开场先介绍承办律师团队 & 分工\"}", calls.get(0).argsJson());
+        // 允许前置 <thinking>
+        assertEquals(1, slideParser.parse("<thinking>写备注</thinking>\n" + leaked).size());
+        // 不认：正文夹带、未知工具、非参数子标签、空块
+        assertTrue(slideParser.parse("已为你写好：\n" + leaked).isEmpty());
+        assertTrue(slideParser.parse("<not_a_tool><text>x</text></not_a_tool>").isEmpty());
+        assertTrue(slideParser.parse("<slide_write_notes><bogus>1</bogus></slide_write_notes>").isEmpty());
+        assertTrue(slideParser.parse("<slide_write_notes></slide_write_notes>").isEmpty());
+    }
 }

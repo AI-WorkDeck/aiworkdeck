@@ -13,15 +13,16 @@
 # 2026-11-11 P3（doc_insert_at_cursor 加 newParagraph）后重测 lowa-docx 三行
 # 2026-11-11 P7（case_search 进核心集；基础提示不再点名未下发工具）合并 P3 后重测
 # 2026-11-11 write_docx 加 append 参数（同轮重写/分段写）合并 P7 后重测
-lowa-docx,neutral,32,7323
-lowa-docx,typical,41,10143
-lowa-docx,worst,34,7660
-lowa-xlsx,neutral,26,6201
-lowa-xlsx,typical,52,12529
-lowa-xlsx,worst,28,6538
-lowa-pptx,neutral,27,6267
-lowa-pptx,typical,32,7999
-lowa-pptx,worst,29,6604
+# 2026-11-12 office-tier1：doc_view_pages 进核心集（各宿主 +1 工具）；xlsx/pptx 会话常用 sheet_*/slide_* 进核心集
+lowa-docx,neutral,33,7557
+lowa-docx,typical,42,10377
+lowa-docx,worst,35,7894
+lowa-xlsx,neutral,34,8216
+lowa-xlsx,typical,53,13005
+lowa-xlsx,worst,36,8553
+lowa-pptx,neutral,35,8605
+lowa-pptx,typical,40,10337
+lowa-pptx,worst,37,8942
 lowa-nofile,neutral,23,5328
 lowa-nofile,typical,27,6857
 lowa-nofile,worst,25,5665

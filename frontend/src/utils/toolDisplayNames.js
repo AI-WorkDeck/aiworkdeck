@@ -392,6 +392,7 @@ const NAMES = {
   // PDF
   pdf_list_files: { zh: '列出PDF文件', en: 'List PDF files' },
   pdf_inspect_visual: { zh: '检查页面设计', en: 'Inspect page design' },
+  doc_view_pages: { zh: '查看页面画面', en: 'View rendered pages' },
   pdf_inspect: { zh: '读取PDF内容', en: 'Inspect PDF' },
   pdf_highlight: { zh: '高亮PDF文本', en: 'Highlight PDF text' },
   pdf_annotate: { zh: '添加PDF批注', en: 'Annotate PDF' },

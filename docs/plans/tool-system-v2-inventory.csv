@@ -22,6 +22,7 @@ doc_modify_paragraph,builtin,doc,LOWA,write,N,Y,2,135,42,zh,zh,keep,doc_modify_p
 doc_get_outline,builtin,doc,LOWA,read,N,Y,0,116,21,zh,zh,keep,doc_get_outline,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_insert_under_heading,builtin,doc,LOWA,write,N,Y,2,125,16,zh,zh,keep,doc_insert_under_heading,docx-edit,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 doc_export_pdf,builtin,doc,LOWA,write,N,Y,1,162,41,zh,zh,keep,doc_export_pdf,files,N,N,N,N,N,N,N,N,N,leaves core; files/pdf keyword puts it back; V2: category pdf (doc_export_pdf rule precedes format wildcard)
+doc_view_pages,builtin,doc,LOWA,read,Y,Y,3,330,60,zh,zh,new,doc_view_pages,document,Y,Y,Y,N,N,N,N,N,N,office-tier1: render the live document (Word/PPT/Excel) to page images for the model or an aux vision model
 doc_get_document_text,builtin,doc,LOWA,read,Y,Y,2,220,35,zh,mixed,keep,doc_get_document_text,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_clauses,builtin,doc,LOWA,read,Y,Y,0,192,35,zh,mixed,keep,doc_get_clauses,docx-edit,Y,N,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 doc_get_cursor_context,builtin,doc,LOWA,read,Y,Y,0,71,33,zh,zh,keep,doc_get_cursor_context,docx-edit,Y,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -56,23 +57,23 @@ sheet_get_overview,builtin,sheet,LOWA,read,Y,Y,0,96,44,zh,mixed,keep,sheet_get_o
 sheet_read_range,builtin,sheet,LOWA,read,Y,Y,3,275,50,zh,mixed,keep,sheet_read_range,spreadsheet,N,Y,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 sheet_write_cells,builtin,sheet,LOWA,write,Y,Y,4,428,59,zh,zh,keep,sheet_write_cells,spreadsheet,N,Y,N,N,N,N,N,N,N,"single job, zh, short first line"
 sheet_select_range,builtin,sheet,LOWA,read,N,Y,2,138,46,zh,zh,keep,sheet_select_range,spreadsheet,N,N,N,N,N,N,N,N,N,"single job, zh, short first line; access fixed to read in V4"
-sheet_format_cells,builtin,sheet,LOWA,write,N,Y,13,455,216,mixed,mixed,keep+rewrite-desc,sheet_format_cells,spreadsheet,N,N,N,N,N,N,N,N,N,13 flat params -> one style/rule object; 455 tokens
+sheet_format_cells,builtin,sheet,LOWA,write,Y,Y,13,455,216,mixed,mixed,keep+rewrite-desc,sheet_format_cells,spreadsheet,N,Y,N,N,N,N,N,N,N,13 flat params -> one style/rule object; 455 tokens; office-tier1: core in xlsx sessions
 sheet_set_borders,builtin,sheet,LOWA,write,N,Y,5,221,19,zh,mixed,keep+rewrite-desc,sheet_set_borders,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
 sheet_set_row_col,builtin,sheet,LOWA,write,N,Y,6,256,39,mixed,zh,keep+rewrite-desc,sheet_set_row_col,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
 slide_create_file,builtin,slide,LOWA,write,nofile,Y,2,236,50,zh,en,keep,slide_create_file,slides,N,N,N,Y,N,N,N,N,N,V1: description rewritten to the A5 template
 sheet_create_file,builtin,sheet,LOWA,write,nofile,Y,2,195,46,zh,zh,keep,sheet_create_file,spreadsheet,N,N,N,Y,N,N,N,N,N,V1: description rewritten to the A5 template
 sheet_manage_sheets,builtin,sheet,LOWA,write,N,Y,4,223,113,mixed,mixed,keep+rewrite-desc,sheet_manage_sheets,spreadsheet,N,N,N,N,N,N,N,N,N,first line 113 chars; first line mixed
-sheet_edit_rows_cols,builtin,sheet,LOWA,write,N,Y,4,208,18,zh,mixed,keep+rewrite-desc,sheet_edit_rows_cols,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
-sheet_merge_cells,builtin,sheet,LOWA,write,N,Y,3,134,20,zh,mixed,keep+rewrite-desc,sheet_merge_cells,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
-sheet_sort_range,builtin,sheet,LOWA,write,N,Y,5,246,16,zh,mixed,keep+rewrite-desc,sheet_sort_range,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
+sheet_edit_rows_cols,builtin,sheet,LOWA,write,Y,Y,4,208,18,zh,mixed,keep+rewrite-desc,sheet_edit_rows_cols,spreadsheet,N,Y,N,N,N,N,N,N,N,body mixed; office-tier1: core in xlsx sessions
+sheet_merge_cells,builtin,sheet,LOWA,write,Y,Y,3,134,20,zh,mixed,keep+rewrite-desc,sheet_merge_cells,spreadsheet,N,Y,N,N,N,N,N,N,N,body mixed; office-tier1: core in xlsx sessions
+sheet_sort_range,builtin,sheet,LOWA,write,Y,Y,5,246,16,zh,mixed,keep+rewrite-desc,sheet_sort_range,spreadsheet,N,Y,N,N,N,N,N,N,N,body mixed; office-tier1: core in xlsx sessions
 sheet_set_autofilter,builtin,sheet,LOWA,write,N,Y,3,140,30,zh,mixed,keep+rewrite-desc,sheet_set_autofilter,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
-sheet_freeze_panes,builtin,sheet,LOWA,write,N,Y,3,154,56,mixed,mixed,keep+rewrite-desc,sheet_freeze_panes,spreadsheet,N,N,N,N,N,N,N,N,N,first line mixed
+sheet_freeze_panes,builtin,sheet,LOWA,write,Y,Y,3,154,56,mixed,mixed,keep+rewrite-desc,sheet_freeze_panes,spreadsheet,N,Y,N,N,N,N,N,N,N,first line mixed; office-tier1: core in xlsx sessions
 sheet_conditional_format,builtin,sheet,LOWA,write,N,Y,9,362,32,zh,mixed,keep+rewrite-desc,sheet_conditional_format,spreadsheet,N,N,N,N,N,N,N,N,N,9 flat params -> one style/rule object; 362 tokens
-sheet_add_comment,builtin,sheet,LOWA,write,N,Y,3,154,20,zh,zh,keep,sheet_add_comment,review,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
+sheet_add_comment,builtin,sheet,LOWA,write,Y,Y,3,154,20,zh,zh,keep,sheet_add_comment,review,N,Y,N,N,N,N,N,N,N,"single job, zh, short first line; office-tier1: core in xlsx sessions"
 sheet_get_comments,builtin,sheet,LOWA,read,N,Y,1,106,39,zh,mixed,keep+rewrite-desc,sheet_get_comments,review,N,N,N,N,N,N,N,N,N,body mixed
 sheet_delete_comment,builtin,sheet,LOWA,destructive,N,Y,2,110,19,zh,zh,keep,sheet_delete_comment,review,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 sheet_set_data_validation,builtin,sheet,LOWA,write,N,Y,12,484,19,zh,mixed,keep+rewrite-desc,sheet_set_data_validation,spreadsheet,N,N,N,N,N,N,N,N,N,12 flat params -> one style/rule object; 484 tokens
-sheet_add_chart,builtin,sheet,LOWA,write,N,Y,5,224,18,zh,mixed,keep+rewrite-desc,sheet_add_chart,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
+sheet_add_chart,builtin,sheet,LOWA,write,Y,Y,5,224,18,zh,mixed,keep+rewrite-desc,sheet_add_chart,spreadsheet,N,Y,N,N,N,N,N,N,N,body mixed; office-tier1: core in xlsx sessions
 sheet_search,builtin,sheet,LOWA,read,N,Y,4,245,37,zh,zh,keep,sheet_search,spreadsheet,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 sheet_find_replace,builtin,sheet,LOWA,write,Y,Y,7,448,37,zh,mixed,keep,sheet_find_replace,spreadsheet,N,Y,N,N,N,N,N,N,N,V1: description rewritten to the A5 template
 sheet_define_name,builtin,sheet,LOWA,write,N,Y,4,191,18,zh,mixed,keep+rewrite-desc,sheet_define_name,spreadsheet,N,N,N,N,N,N,N,N,N,body mixed
@@ -106,8 +107,8 @@ litigation_timeline_render,builtin,litigation_timeline,LOWA,write,N,Y,3,234,48,e
 litigation_reference,builtin,litigation,LOWA,read,N,Y,1,163,62,en,en,keep+rewrite-desc,litigation_reference,litigation,N,N,N,N,N,N,N,N,N,first line en; access fixed to read in V4
 litigation_checkpoint,builtin,litigation,LOWA,read,N,Y,2,229,102,en,en,keep+rewrite-desc,litigation_checkpoint,litigation,N,N,N,N,N,N,N,N,N,first line 102 chars; first line en; access fixed to read in V4
 litigation_render,builtin,litigation,LOWA,write,N,Y,5,423,118,en,en,keep+rewrite-desc,litigation_render,litigation,N,N,N,N,N,N,N,N,N,first line 118 chars; first line en
-meeting_list,builtin,meeting,ALL,read,N,Y,5,0,0,zh,zh,new,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,"V5: merges meeting_list_recordings + tmeet_list_meetings; source=recording|tencent|all; tencent routes to the plugin when installed+enabled (E4) else the built-in table"
-meeting_get_transcript,builtin,meeting,ALL,read,N,Y,3,94,123,en,en,keep,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,"V5: absorbs tmeet_get_transcript; meetingId is a string + source=recording|tencent; description rewritten"
+meeting_list,builtin,meeting,ALL,read,N,Y,5,0,0,zh,zh,new,meeting_list,meeting,N,N,N,N,N,N,N,N,Y,V5: merges meeting_list_recordings + tmeet_list_meetings; source=recording|tencent|all; tencent routes to the plugin when installed+enabled (E4) else the built-in table
+meeting_get_transcript,builtin,meeting,ALL,read,N,Y,3,94,123,en,en,keep,meeting_get_transcript,meeting,N,N,N,N,N,N,N,N,Y,V5: absorbs tmeet_get_transcript; meetingId is a string + source=recording|tencent; description rewritten
 save_memory,builtin,memory,ALL,write,Y,Y,6,431,65,zh,mixed,keep,save_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,W,V1: description rewritten to the A5 template
 query_memory,builtin,memory,ALL,read,Y,Y,6,381,54,zh,mixed,keep,query_memory,memory,Y,Y,Y,Y,Y,Y,Y,Y,Y,V1: description rewritten to the A5 template
 update_project_info,builtin,memory,ALL,write,N,Y,2,91,27,zh,zh,keep,update_project_info,memory,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
@@ -232,23 +233,23 @@ slide_set_transition,builtin,slide,LOWA,write,N,Y,3,135,93,en,en,keep+rewrite-de
 slide_get_overview,builtin,slide,LOWA,read,Y,Y,0,132,64,zh,mixed,keep,slide_get_overview,slides,N,N,Y,N,N,N,N,N,N,V1: description rewritten to the A5 template
 slide_get_page,builtin,slide,LOWA,read,Y,Y,1,168,68,zh,mixed,keep,slide_get_page,slides,N,N,Y,N,N,N,N,N,N,V1: description rewritten to the A5 template
 slide_read_notes,builtin,slide,LOWA,read,N,Y,1,83,30,mixed,mixed,keep+rewrite-desc,slide_read_notes,slides,N,N,N,N,N,N,N,N,N,first line mixed
-slide_write_notes,builtin,slide,LOWA,write,N,Y,2,93,42,mixed,mixed,keep+rewrite-desc,slide_write_notes,slides,N,N,N,N,N,N,N,N,N,first line mixed
+slide_write_notes,builtin,slide,LOWA,write,Y,Y,2,93,42,mixed,mixed,keep+rewrite-desc,slide_write_notes,slides,N,N,Y,N,N,N,N,N,N,first line mixed; office-tier1: core in pptx sessions
 slide_goto,builtin,slide,LOWA,read,N,Y,2,140,50,zh,zh,keep,slide_goto,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line; access→read"
 slide_set_shape_text,builtin,slide,LOWA,write,Y,Y,3,154,37,zh,zh,keep,slide_set_shape_text,slides,N,N,Y,N,N,N,N,N,N,"single job, zh, short first line"
 slide_replace_text,builtin,slide,LOWA,write,Y,Y,6,288,36,zh,zh,keep,slide_replace_text,slides,N,N,Y,N,N,N,N,N,N,"single job, zh, short first line"
 slide_add_page,builtin,slide,LOWA,write,Y,Y,5,379,45,zh,zh,keep,slide_add_page,slides,N,N,Y,N,N,N,N,N,N,"single job, zh, short first line"
-slide_delete_page,builtin,slide,LOWA,destructive,N,Y,1,85,13,zh,zh,keep,slide_delete_page,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-slide_move_page,builtin,slide,LOWA,write,N,Y,2,169,24,zh,zh,keep,slide_move_page,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
+slide_delete_page,builtin,slide,LOWA,write,Y,Y,1,85,13,zh,zh,keep,slide_delete_page,slides,N,N,Y,N,N,N,N,N,N,"single job, zh, short first line; office-tier1: core in pptx sessions; access write: in-editor delete is one-step undoable"
+slide_move_page,builtin,slide,LOWA,write,Y,Y,2,169,24,zh,zh,keep,slide_move_page,slides,N,N,Y,N,N,N,N,N,N,"single job, zh, short first line; office-tier1: core in pptx sessions"
 slide_set_layout,builtin,slide,LOWA,write,N,Y,4,258,92,mixed,mixed,keep+rewrite-desc,slide_set_layout,slides,N,N,N,N,N,N,N,N,N,first line 92 chars; first line mixed
-slide_add_text_box,builtin,slide,LOWA,write,N,Y,9,268,20,zh,mixed,keep+rewrite-desc,slide_add_text_box,slides,N,N,N,N,N,N,N,N,N,body mixed
+slide_add_text_box,builtin,slide,LOWA,write,Y,Y,9,268,20,zh,mixed,keep+rewrite-desc,slide_add_text_box,slides,N,N,Y,N,N,N,N,N,N,body mixed; office-tier1: core in pptx sessions
 slide_add_shape,builtin,slide,LOWA,write,N,Y,8,288,72,mixed,mixed,keep+rewrite-desc,slide_add_shape,slides,N,N,N,N,N,N,N,N,N,first line mixed
 slide_delete_shape,builtin,slide,LOWA,destructive,N,Y,2,106,65,zh,zh,keep,slide_delete_shape,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 slide_set_shape_geometry,builtin,slide,LOWA,write,N,Y,6,212,27,zh,mixed,keep+rewrite-desc,slide_set_shape_geometry,slides,N,N,N,N,N,N,N,N,N,body mixed
-slide_format_text,builtin,slide,LOWA,write,N,Y,22,666,43,zh,zh,keep+rewrite-desc,slide_format_text,slides,N,N,N,N,N,N,N,N,N,22 flat params -> one style/rule object; 666 tokens
+slide_format_text,builtin,slide,LOWA,write,Y,Y,22,666,43,zh,zh,keep+rewrite-desc,slide_format_text,slides,N,N,Y,N,N,N,N,N,N,22 flat params -> one style/rule object; 666 tokens; office-tier1: core in pptx sessions
 slide_format_shape,builtin,slide,LOWA,write,N,Y,8,275,30,zh,zh,keep,slide_format_shape,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-slide_add_table,builtin,slide,LOWA,write,N,Y,8,348,18,zh,mixed,keep+rewrite-desc,slide_add_table,table,N,N,N,N,N,N,N,N,N,body mixed
+slide_add_table,builtin,slide,LOWA,write,Y,Y,8,348,18,zh,mixed,keep+rewrite-desc,slide_add_table,table,N,N,Y,N,N,N,N,N,N,body mixed; office-tier1: core in pptx sessions
 slide_table_read,builtin,slide,LOWA,read,N,Y,4,192,36,zh,zh,keep,slide_table_read,table,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
-slide_table_set_cell,builtin,slide,LOWA,write,N,Y,5,183,23,zh,zh,keep,slide_table_set_cell,table,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
+slide_table_set_cell,builtin,slide,LOWA,write,Y,Y,5,183,23,zh,zh,keep,slide_table_set_cell,table,N,N,Y,N,N,N,N,N,N,"single job, zh, short first line; office-tier1: core in pptx sessions"
 slide_table_set_style,builtin,slide,LOWA,write,N,Y,17,635,47,zh,mixed,keep+rewrite-desc,slide_table_set_style,table,N,N,N,N,N,N,N,N,N,17 flat params -> one style/rule object; 635 tokens
 slide_set_hyperlink,builtin,slide,LOWA,write,N,Y,3,220,42,zh,zh,keep,slide_set_hyperlink,slides,N,N,N,N,N,N,N,N,N,"single job, zh, short first line"
 slide_add_image,builtin,slide,LOWA,write,N,Y,10,359,71,en,en,keep+rewrite-desc,slide_add_image,slides,N,N,N,N,N,N,N,N,N,first line en
@@ -306,4 +307,4 @@ insight_consistency,NEW,new,ALL,read,N,N,,,,,,new,insight_consistency,plugin-too
 evidence_catalog,NEW,new,ALL,read,N,N,,,,,,new,evidence_catalog,evidence,N,N,N,N,N,N,N,N,Y,D6 structured evidence index of a folder (name/pages/hash/date)
 resolve_project,NEW,new,ALL,read,N,N,,,,,,new,resolve_project,files,N,N,N,N,N,N,N,N,Y,agent-app-control P1-6 (already planned)
 compare_docx_summary,builtin,doc,ALL,read,N,Y,3,260,41,zh,zh,new,compare_docx_summary,document,N,N,N,N,N,N,N,N,Y,"V7 D1: paragraph-level diff of two docx (pure backend, READ, MCP-eligible); includeEdits=true adds propose_revision-shaped edits"
-compare_docx_redline,builtin,doc,LOWA,write,N,Y,2,220,32,zh,zh,new,compare_docx_redline,document,N,N,N,N,N,N,N,N,N,"V7 D1: LOWA native CompareDocuments in a hidden engine -> new redline docx via host action compare_docx_files; desktop only"
+compare_docx_redline,builtin,doc,LOWA,write,N,Y,2,220,32,zh,zh,new,compare_docx_redline,document,N,N,N,N,N,N,N,N,N,V7 D1: LOWA native CompareDocuments in a hidden engine -> new redline docx via host action compare_docx_files; desktop only
