@@ -248,8 +248,10 @@ public class ProjectTreeManifestService {
                             "清单缺少创建者信息，无法新建节点: project=" + projectId + " nodeId=" + node.id());
                 }
 
+                // 新行一律走 IDENTITY 生成 id，清单 id 只经 remap 映射。不能把清单 id 塞进新实体：
+                // Hibernate 6.6 起 merge 一个库里不存在的生成型 id 会抛 StaleObjectState；
+                // 若该 id 恰是别的项目的行，merge 还会把那一行改写到本项目名下。
                 ProjectFile fresh = new ProjectFile();
-                if (existing == null) fresh.setId(node.id());
                 fresh.setProjectId(projectId);
                 fresh.setUserId(userId);
                 fresh.setCreatedAt(LocalDateTime.now());

@@ -74,6 +74,11 @@ class TreeManifestSyncTest {
                 mock(UserRepository.class), mock(ProjectRepository.class));
     }
 
+    /** 新建行的 id 由库生成（与真实 IDENTITY 一致），不沿用清单 id，按名字找。 */
+    private ProjectFile byName(String name) {
+        return db.values().stream().filter(p -> name.equals(p.getName())).findFirst().orElseThrow();
+    }
+
     @Test
     void createsMissingNode() {
         TreeManifest m = new TreeManifest(1, List.of(
@@ -82,7 +87,7 @@ class TreeManifestSyncTest {
         var r = svc.applyToDatabase(7L, m);
 
         assertEquals(1, r.created());
-        assertEquals("合同.docx", db.get(1L).getName());
+        assertEquals("合同.docx", byName("合同.docx").getName());
     }
 
     @Test
@@ -93,7 +98,7 @@ class TreeManifestSyncTest {
 
         svc.applyToDatabase(7L, m);
 
-        assertEquals(42L, db.get(1L).getUserId(), "新建节点的 userId 必须采用清单里的值");
+        assertEquals(42L, byName("合同.docx").getUserId(), "新建节点的 userId 必须采用清单里的值");
     }
 
     @Test
@@ -187,7 +192,7 @@ class TreeManifestSyncTest {
         assertEquals(1, r.updated());
         assertEquals(1, r.created());
         assertEquals("新名.docx", db.get(1L).getName(), "稿侧属性应覆盖同一行");
-        assertEquals("稿新增.docx", db.get(9L).getName(), "稿独有的行应新建");
+        assertEquals("稿新增.docx", byName("稿新增.docx").getName(), "稿独有的行应新建");
     }
 
     @Test
