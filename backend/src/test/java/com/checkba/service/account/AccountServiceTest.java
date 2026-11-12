@@ -543,6 +543,22 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("ai-key 首次网络失败（官网冷启动）：自动重试一次，用户无需再登录")
+    void aiKeyRetriesOnceOnNetworkFailure() {
+        AccountService service = connected();
+        transport.enqueueNetworkFailure().enqueue(200, "{\"openrouterKey\":\"sk-or-v1-retry\",\"limitUsd\":5.0}");
+        assertEquals("sk-or-v1-retry", service.fetchAiKey().get("openrouterKey"));
+    }
+
+    @Test
+    @DisplayName("ai-key 连续两次网络失败：仍报 NETWORK，不无限重试")
+    void aiKeyRetryIsBounded() {
+        AccountService service = connected();
+        transport.enqueueNetworkFailure().enqueueNetworkFailure();
+        assertEquals(AccountException.Kind.NETWORK, assertThrows(AccountException.class, service::fetchAiKey).getKind());
+    }
+
+    @Test
     @DisplayName("ai-usage：返回额度三个数，hasKey 区分「未分配额度」")
     void aiUsageReturnsQuota() {
         AccountService service = connected();

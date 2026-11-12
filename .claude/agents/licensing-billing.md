@@ -168,6 +168,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   `connect/disconnect/status/fetchProfile/fetchEntitlements/fetchLedger/fetchAiUsage/fetchAiKey/currentKeyOrNull`，
   以及个人档案那一组 `profileIdentity/updateDisplayName/uploadAvatar/deleteAvatar`（见下方「身份展示」一节）。
 - `service/account/AccountTransport.java` + `HttpAccountTransport.java` — 出站 HTTP 缝（单测打桩不依赖网络）；固定 HTTP/1.1。
+- `POST /api/account/ai-key` 是账户请求里唯一不按 5 秒超时的：`HttpAccountTransport.AI_KEY_TIMEOUT`=15 秒（官网重启后首次拉平台模型目录冷启动约 5.7 秒；5 秒会让新用户首次登录落成「额度尚未就绪」，而桥接登录的 `tryProvision` 只记日志不重试，用户只有这一次机会）。`AccountService.fetchAiKeyWith` 遇网络失败再重试一次（幂等端点，仅一次）。回归：`HttpAccountTransportColdStartTest`、`AccountServiceTest.aiKey*Retr*`。
   `sendMultipart(method,url,bearer,Multipart)` 是头像上传那条路，**默认实现直接抛**——
   给个默认返回值会让「桩根本没接这条路」在测试里表现成一次成功的上传。
 - `service/account/AccountEndpoint.java` — 授权服务器地址的协议校验（https，回环 http 例外），`LicenseService` 与 `AccountService` 共用。
