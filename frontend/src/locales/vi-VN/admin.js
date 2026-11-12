@@ -469,5 +469,8 @@ export default {
   "bqtDebtWarning": "{count} lần trừ điểm không thành công, còn nợ {amount} Credits. Hãy nạp điểm trong ứng dụng Baoqingtian rồi liên hệ bộ phận hỗ trợ.",
   "bqtPayInApp": "Nạp điểm hoặc gia hạn trong ứng dụng Baoqingtian",
   "bqtPriorityNote": "Mức sử dụng DeepSeek được trừ trước vào điểm Baoqingtian của bạn; khi hết điểm sẽ tự động dùng số dư tài khoản. Các mô hình và dịch vụ khác dùng số dư tài khoản.",
+  "bqtRenewHint": "Điểm Baoqingtian chỉ dùng được khi tư cách thành viên Baoqingtian còn hiệu lực và đã bật AI Workbench. Hãy kích hoạt thành viên trong ứng dụng luật sư Baoqingtian → Hồ sơ để dùng {points} điểm; trước đó, mức sử dụng được trừ vào số dư tài khoản.",
+  "bqtWalletHint": "Hiện mọi mức sử dụng đều trừ vào số dư tài khoản. Nếu không đủ, hãy nạp tiền.",
+  "bqtRenewRechargeNote": "Bạn còn {points} điểm Baoqingtian, nhưng cần tư cách thành viên Baoqingtian còn hiệu lực để dùng. Hãy kích hoạt trong ứng dụng luật sư Baoqingtian → Hồ sơ để thanh toán bằng điểm, hoặc nạp tiền tại đây.",
   "bqtRechargeNote": "Số dư của bạn được quy đổi từ điểm Baoqingtian và quyền lợi theo tư cách thành viên Baoqingtian của bạn. Hãy nạp điểm hoặc gia hạn trong ứng dụng Baoqingtian; AI WorkDeck không nhận thanh toán cho tài khoản này.",
 }

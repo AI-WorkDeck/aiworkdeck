@@ -59,6 +59,12 @@ test('member view converts cents to credits and flags failed deductions', () => 
   assert.equal(bqtMemberView({ ...member, levelCode: 'LIGHT', outstandingCents: 0, failedCount: 0 }).hasDebt, false)
   assert.equal(bqtMemberView({ ...member, levelCode: null }).levelKey, 'admin.bqtLevelNone')
   assert.equal(bqtMemberView(null), null)
+  // 积分只在会员有效且开了 AI 工作台时扣；否则有积分引导去包晴天开会员，没积分引导本站充值
+  assert.equal(view.guidance, 'priority')
+  assert.equal(bqtMemberView({ ...member, status: 'EXPIRED' }).guidance, 'renew')
+  assert.equal(bqtMemberView({ ...member, aiWorkbench: false }).guidance, 'renew')
+  assert.equal(bqtMemberView({ ...member, status: 'EXPIRED', points: '0.00' }).guidance, 'wallet')
+  assert.equal(bqtMemberView({ ...member, points: '0.00' }).guidance, 'priority')
 })
 
 const admin = read('../../src/components/admin/AdminPane.vue')

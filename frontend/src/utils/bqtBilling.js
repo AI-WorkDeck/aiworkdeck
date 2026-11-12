@@ -52,5 +52,8 @@ export function bqtMemberView(member) {
     outstandingCredits: Number.isFinite(outstanding) ? (outstanding / 100).toFixed(2) : '0.00',
     failedCount: Number.isFinite(failed) ? failed : 0,
     hasDebt: (Number.isFinite(outstanding) && outstanding > 0) || (Number.isFinite(failed) && failed > 0),
+    // 积分只在会员有效且开了 AI 工作台时扣。否则：还有积分 → 引导去包晴天开会员（renew）；没积分 → 引导本站充值（wallet）
+    guidance: member.status === 'ACTIVE' && member.aiWorkbench !== false ? 'priority'
+      : Number(member.points) > 0 ? 'renew' : 'wallet',
   }
 }

@@ -469,5 +469,8 @@ export default {
   "bqtDebtWarning": "{count} pemotongan poin gagal dan {amount} Credits belum lunas. Isi ulang poin di aplikasi Baoqingtian lalu hubungi dukungan.",
   "bqtPayInApp": "Isi ulang atau perpanjang di aplikasi Baoqingtian",
   "bqtPriorityNote": "Penggunaan DeepSeek dibayar lebih dulu dengan poin Baoqingtian Anda; jika poin habis, saldo akun otomatis digunakan. Model dan layanan lain menggunakan saldo akun.",
+  "bqtRenewHint": "Poin Baoqingtian hanya dapat digunakan saat keanggotaan Baoqingtian aktif dan AI Workbench diaktifkan. Aktifkan keanggotaan di aplikasi pengacara Baoqingtian → Profil untuk memakai {points} poin Anda; sampai saat itu, penggunaan ditagihkan ke saldo akun.",
+  "bqtWalletHint": "Semua penggunaan saat ini ditagihkan ke saldo akun Anda. Jika kurang, cukup isi ulang.",
+  "bqtRenewRechargeNote": "Anda masih punya {points} poin Baoqingtian, tetapi poin memerlukan keanggotaan Baoqingtian yang aktif. Aktifkan di aplikasi pengacara Baoqingtian → Profil untuk membayar dengan poin, atau isi ulang di sini.",
   "bqtRechargeNote": "Saldo Anda dikonversi dari poin Baoqingtian dan manfaat Anda mengikuti keanggotaan Baoqingtian Anda. Isi ulang poin atau perpanjang di aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akun ini.",
 }

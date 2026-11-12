@@ -9,6 +9,8 @@
       </div>
       <div class="awd-body">
         <!-- 包晴天积分通道：余额由包晴天积分折算，只能在包晴天 App 充值/续费 -->
+        <!-- 包晴天还有积分但会员不可用：先告诉用户开会员就能用积分，本站充值照常 -->
+        <span v-if="!bqtOnly && bqtRenewPoints" class="recharge-hint">{{ $t('admin.bqtRenewRechargeNote', { points: bqtRenewPoints }) }}</span>
         <span v-if="bqtOnly" class="recharge-hint">{{ $t('admin.bqtRechargeNote') }}</span>
         <!-- 步骤一：选金额 -->
         <template v-else-if="step === 'pick'">
@@ -88,7 +90,7 @@
 // 轮询清理红线（本仓踩过：Stripe 回跳轮询被 cleanup 掐死）：定时器句柄存在组件实例上，
 // beforeUnmount 与「关闭弹窗」都只清**自己的**定时器，不写任何全局 [open] 态互斥逻辑。
 import { createAccountRecharge, getRechargeStatus, getAccountBalance } from '@/services/api.js'
-import { isBqtBillingLine } from '@/utils/bqtBilling.js'
+import { isBqtBillingLine, bqtMemberView } from '@/utils/bqtBilling.js'
 import { siteLinks } from '@/utils/siteLinks.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 
@@ -119,6 +121,7 @@ export default {
       amountCents: 0,
       pollTimedOut: false,
       bqtOnly: false,
+      bqtRenewPoints: '',
     }
   },
   computed: {
@@ -168,6 +171,7 @@ export default {
   methods: {
     resetState() {
       this.stopPolling()
+      this.bqtRenewPoints = ''
       this.step = 'pick'
       this.selectedCents = this.presetCents[0]
       this.customInput = ''
@@ -183,7 +187,10 @@ export default {
     async checkBillingLine() {
       try {
         const balance = await getAccountBalance()
-        if (this.visible) this.bqtOnly = isBqtBillingLine(balance)
+        if (!this.visible) return
+        this.bqtOnly = isBqtBillingLine(balance)
+        const member = bqtMemberView(balance && balance.bqtMember)
+        this.bqtRenewPoints = member && member.guidance === 'renew' ? member.points : ''
       } catch (e) {
         // 查不到不改变原有行为
       }
