@@ -338,7 +338,7 @@
                     <text style="font-size: 13px;">{{ $t('admin.walletQingtianBalance', { remaining: walletBqtQingtian.remainingCoins, monthly: walletBqtQingtian.monthlyCoins }) }}</text>
                     <text style="font-size: 12px; opacity: 0.75;">{{ $t('admin.walletQingtianRatio', { creditsPerCoin: walletBqtQingtian.creditsPerCoin }) }}</text>
                   </view>
-                  <!-- 包晴天会员（积分通道）：等级、状态、到期、积分与折算 Credits；取代上面的晴天币月度额度 -->
+                  <!-- 包晴天会员：等级、状态、到期、积分与折算 Credits（DeepSeek 用量优先扣积分）；取代上面的晴天币月度额度 -->
                   <view v-if="walletBqtMember" class="bqt-member-card">
                     <view class="bqt-member-head">
                       <text class="bqt-member-title">{{ $t('admin.bqtMemberTitle') }} · {{ $t(walletBqtMember.levelKey) }}</text>
@@ -350,7 +350,7 @@
                     <text class="account-note">{{ $t('admin.bqtPointsLine', { points: walletBqtMember.points, credits: walletBqtMember.credits }) }}</text>
                     <text v-if="walletBqtMember.active && !walletBqtMember.aiWorkbench" class="bqt-member-warn">{{ $t('agentStream.bqtAiClosed') }}</text>
                     <text v-if="walletBqtMember.hasDebt" class="bqt-member-warn">{{ $t('admin.bqtDebtWarning', { count: walletBqtMember.failedCount, amount: walletBqtMember.outstandingCredits }) }}</text>
-                    <text class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                    <text class="account-note">{{ isBqtBilling ? $t('admin.bqtPayInApp') : $t('admin.bqtPriorityNote') }}</text>
                   </view>
                   <!-- 兑换码 / Circle 联盟所邀请码绑定入口（储值入口，包晴天积分通道不显示） -->
                   <view v-if="!isBqtBilling" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">

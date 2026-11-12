@@ -860,12 +860,25 @@ class AccountServiceTest {
     @DisplayName("balance：旧官网没有 billingLine 时记 standard、bqtMember 为 null")
     void balanceSnapshotDefaultsToStandardLine() {
         AccountService service = connected();
-        transport.enqueue(200, "{\"balanceCents\":500,\"plan\":\"free\",\"bqtMember\":{\"points\":\"1\"}}");
+        transport.enqueue(200, "{\"balanceCents\":500,\"plan\":\"free\"}");
         transport.enqueue(200, "{}");
         Map<String, Object> result = service.balanceSnapshot();
         assertEquals("standard", result.get("billingLine"));
         assertTrue(result.containsKey("bqtMember"));
         assertNull(result.get("bqtMember"));
+    }
+
+    @Test
+    @DisplayName("balance：普通计费线也透传 bqtMember（绑定了包晴天的账户，积分优先抵 DeepSeek）")
+    void balanceSnapshotPassesBqtMemberOnStandardLine() {
+        AccountService service = connected();
+        transport.enqueue(200, "{\"balanceCents\":500,\"plan\":\"free\",\"billingLine\":\"standard\",\"bqtMember\":{\"points\":\"1\"}}");
+        transport.enqueue(200, "{}");
+        Map<String, Object> result = service.balanceSnapshot();
+        assertEquals("standard", result.get("billingLine"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> member = (Map<String, Object>) result.get("bqtMember");
+        assertEquals("1", member.get("points"));
     }
 
     @Test

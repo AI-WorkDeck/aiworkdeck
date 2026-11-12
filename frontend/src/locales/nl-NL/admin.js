@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} Baoqingtian-punten, gelijk aan {credits} Credits",
   "bqtDebtWarning": "{count} puntenafschrijving(en) mislukt, {amount} Credits openstaand. Laad punten op in de Baoqingtian-app en neem daarna contact op met de support.",
   "bqtPayInApp": "Opladen of verlengen in de Baoqingtian-app",
+  "bqtPriorityNote": "DeepSeek-gebruik wordt eerst betaald met je Baoqingtian-punten; zijn die op, dan wordt automatisch je accountsaldo gebruikt. Andere modellen en diensten gebruiken je accountsaldo.",
   "bqtRechargeNote": "Je saldo wordt omgerekend uit Baoqingtian-punten en je voordelen volgen je Baoqingtian-lidmaatschap. Laad punten op of verleng in de Baoqingtian-app; AI WorkDeck accepteert geen betalingen voor dit account.",
 }

@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} mata Baoqingtian, bersamaan {credits} Credits",
   "bqtDebtWarning": "{count} potongan mata gagal dan {amount} Credits belum dijelaskan. Tambah nilai mata dalam aplikasi Baoqingtian kemudian hubungi sokongan.",
   "bqtPayInApp": "Tambah nilai atau perbaharui dalam aplikasi Baoqingtian",
+  "bqtPriorityNote": "Penggunaan DeepSeek dibayar dahulu dengan mata Baoqingtian anda; apabila mata habis, baki akaun digunakan secara automatik. Model dan perkhidmatan lain menggunakan baki akaun.",
   "bqtRechargeNote": "Baki anda ditukar daripada mata Baoqingtian dan faedah anda mengikut keahlian Baoqingtian anda. Tambah nilai mata atau perbaharui dalam aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akaun ini.",
 }

@@ -33,13 +33,14 @@ public final class BqtBilling {
     /**
      * 把官网账户响应里的 billingLine/bqtMember 抄到给前端的 map。旧官网没有这两个字段：
      * billingLine 记 standard、bqtMember 记 null，前端据此保持原有行为。
+     * 2026-11-12 起官网对绑定了包晴天的普通账户也回 bqtMember（billingLine 仍是 standard）：照样透传，前端多显示一张积分卡。
      */
     public static void copyBillingFields(Map<String, Object> source, Map<String, Object> target) {
         Object line = source == null ? null : source.get("billingLine");
         String billingLine = line instanceof String s && BILLING_LINES.contains(s) ? s : "standard";
         Object member = source == null ? null : source.get("bqtMember");
         target.put("billingLine", billingLine);
-        target.put("bqtMember", "bqt".equals(billingLine) && member instanceof Map<?, ?> ? member : null);
+        target.put("bqtMember", member instanceof Map<?, ?> ? member : null);
     }
 
     /** 文本（响应体、异常 message）里出现的第一个 bqt 错误码；没有则 null。 */

@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} Baoqingtian puanı, {credits} Credits karşılığı",
   "bqtDebtWarning": "{count} puan kesintisi başarısız oldu ve {amount} Credits ödenmemiş durumda. Baoqingtian uygulamasından puan yükleyin, ardından destekle iletişime geçin.",
   "bqtPayInApp": "Baoqingtian uygulamasında yükleyin veya yenileyin",
+  "bqtPriorityNote": "DeepSeek kullanımı önce Baoqingtian puanlarınızdan ödenir; puanlar bitince otomatik olarak hesap bakiyeniz kullanılır. Diğer modeller ve hizmetler hesap bakiyenizi kullanır.",
   "bqtRechargeNote": "Bakiyeniz Baoqingtian puanlarından dönüştürülür ve avantajlarınız Baoqingtian üyeliğinize bağlıdır. Puan yüklemek veya yenilemek için Baoqingtian uygulamasını kullanın; AI WorkDeck bu hesap için ödeme almaz.",
 }
