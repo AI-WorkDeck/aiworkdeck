@@ -1,4 +1,40 @@
 <div align="center">
+# hello-web-plugin
+
+English twin of the Chinese [README.md](README.md). A minimal web plugin for AI WorkDeck that shows how a sandboxed iframe talks to the host through the `awd` bridge.
+
+## Install
+
+Two supported paths:
+
+1. **Plugin manager** — install the `examples/hello-web-plugin` folder from the app's plugin settings.
+2. **Manual copy** — copy the `hello-web-plugin` folder into your user plugins directory and restart AI WorkDeck.
+
+Both paths load the same `web/index.html`; no build step is required.
+
+## What the demo shows
+
+- `awd.ready` — handshake with the host; resolves once the bridge is available.
+- `awd.files` — list, read and write files in the current project.
+- `awd.toast` — show a short message to the user.
+- `awd.storage` — per-plugin key/value storage.
+- `awd.evidence.list` — list evidence links for a document.
+
+## Sandbox boundaries
+
+The plugin runs inside an iframe with a strict CSP. It cannot access the host DOM, read local files directly, or make arbitrary network requests. Every host capability is reached through the `awd` bridge and checked against the permissions declared by the plugin; calls outside those permissions are rejected.
+
+## SDK and spec
+
+- Runtime: [`web/awd-plugin-sdk.js`](web/awd-plugin-sdk.js)
+- Types: [`web/awd-plugin-sdk.d.ts`](web/awd-plugin-sdk.d.ts)
+- Plugin spec: [`PLUGIN_SPEC.md`](../../docs/PLUGIN_SPEC.md)
+
+## Files
+
+- `web/index.html` — the demo UI.
+- `web/awd-plugin-sdk.js` — the `awd` bridge runtime.
+- `web/awd-plugin-sdk.d.ts` — TypeScript definitions.
 
 <img width="256" src="https://github.com/user-attachments/assets/6f9e4cf9-912d-4faa-9d37-54fb676f547e">
 
