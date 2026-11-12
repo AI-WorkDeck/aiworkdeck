@@ -22,6 +22,10 @@
         <tomcat.version>10.1.61</tomcat.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
         <log4j2.version>2.25.5</log4j2.version>
+        <!-- Boot 3.5 BOM 的 surefire 3.5.6 把 XML 报告里 testcase 的 classname 写成 @DisplayName
+             （3.5.3 起；3.5.2 及以前正常），CI「Surefire report integrity」会判为串套件。
+             保持与升级前相同的 3.1.2，等上游修好再跟回 BOM。 -->
+        <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
     </properties>
     <dependencies>
         <!-- Validate standalone MCP schemas locally, including nullable/union constraints. -->
@@ -448,6 +452,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
+                    <!-- 全量套件跑到末尾常驻约 3.5GB（50+ 个 Spring 测试上下文同时存活）。不写的话堆上限是
+                         机器内存的 1/4：CI 的 16GB runner 只有约 3.9GB，再多一个上下文就 Java heap space
+                         （PR#1519 首次 CI 即如此）。显式给定，本机与 CI 一致。 -->
+                    <argLine>-Xmx6g</argLine>
                 </configuration>
             </plugin>
 
