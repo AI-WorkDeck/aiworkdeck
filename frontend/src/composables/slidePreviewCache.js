@@ -7,7 +7,8 @@
 // 宁可不显示也不显示错的画面。图片在本机 IndexedDB，不出网。
 
 export const PREVIEW_SLIDES = 3
-export const PREVIEW_WIDTH = 960
+// 1280：在 Retina 屏上按 ~690 CSS px 显示仍清晰（960 会被放大 1.4 倍发虚，O8 实机截图）
+export const PREVIEW_WIDTH = 1280
 const MAX_ENTRIES = 40
 const DB_NAME = 'awd-slide-preview'
 const STORE = 'decks'

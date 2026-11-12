@@ -368,6 +368,10 @@ async function fetchAsset(a) {
 async function main() {
   console.log('Fetching LOWA runtime + CJK font into ' + distRoot);
   if (usingCustomBase) console.log('  LOWA source: ' + LOWA_BASE + ' (LOWA_BASE_URL)');
+  // 未设 LOWA_BASE_URL 时拿的是上游通用 zetaoffice_latest，不是发版用的自建 zh-CN 引擎
+  // （desktop-build.yml / model-matrix.yml 固定 24.2.8-zhcn-r8）。本地测性能或对拍时会量错引擎（office-tier1 O8 实踩）。
+  else console.warn('  ⚠ LOWA_BASE_URL is unset: fetching the generic upstream engine (' + LOWA_CDN + '), NOT the production build.\n' +
+    '    For production parity use LOWA_BASE_URL=https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r8/ (the pin in .github/workflows/desktop-build.yml).');
 
   // Build the sidecar from the encoding ACTUALLY stored per file, so a
   // self-hosted identity engine records nothing (served raw) while the CDN's
