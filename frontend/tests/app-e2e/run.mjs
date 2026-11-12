@@ -1327,7 +1327,11 @@ try {
   // SECURITY_BROWSER_PROXY_E2E_ALLOWED_HOSTS=127.0.0.1 起。没开就显式 skip，不静默假绿。
   const siteReachable = await (async () => {
     try {
-      const r = await fetch(BACKEND + '/api/browser/proxy?url=' + encodeURIComponent(SITE + '/a') + '&token=probe')
+      // 代理要带一张已登录换来的票据（BrowserProxyController#ticket；e2e 后端是 local-mode，免登即可换）
+      const t = await fetch(BACKEND + '/api/browser/ticket', { method: 'POST' })
+      const ticket = (await t.json())?.data?.ticket || ''
+      const r = await fetch(BACKEND + '/api/browser/proxy?url=' + encodeURIComponent(SITE + '/a')
+        + '&token=probe&ticket=' + encodeURIComponent(ticket))
       return r.status === 200
     } catch (e) { return false }
   })()

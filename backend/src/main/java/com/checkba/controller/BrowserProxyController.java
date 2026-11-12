@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +25,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Map;
 
 /**
  * 简易网页代理：
@@ -89,10 +92,54 @@ public class BrowserProxyController {
         return false;
     }
 
+    /**
+     * 代理票据的签名密钥：进程内随机生成，不落盘、不进配置。
+     *
+     * <p>为什么要票据：服务器部署（cloud / case / prod）里这个端点曾对任何调用方开放，
+     * 后端等于一台公开的网页中转。iframe 发不了 {@code X-Session-Id} 头，会话 id 又绝不能
+     * 进 URL（会落进访问日志、Referer、浏览历史），所以由已登录的请求换一张短时票据，
+     * 票据绑定用户、HMAC 签名，随代理链接走。重启后旧票据全部作废——它本来就只活几分钟，
+     * 面板重新导航时会再换一张。多实例部署若不做会话粘滞，跨实例的票据会验不过。
+     */
+    private final byte[] ticketKey = newTicketKey();
+
+    /** 单张票据的有效期。代理回 HTML 时会续一张新的注入页面，页内连续浏览不受影响。 */
+    static final Duration TICKET_TTL = Duration.ofMinutes(10);
+
+    /** 一条续签链从最初换票起算的总寿命上限：页内续签不能让一张票据无限活下去。 */
+    static final Duration TICKET_MAX_CHAIN = Duration.ofHours(8);
+
+    private java.time.Clock clock = java.time.Clock.systemUTC();
+
+    /** 会话 → 用户。local-mode 下 {@link AuthController#getUserIdFromSession} 不看头、一律回本机用户。 */
+    private java.util.function.Function<String, Long> sessionResolver = AuthController::getUserIdFromSession;
+
+    /** 用已登录请求换一张代理票据（Web/H5 浏览器面板在 iframe 导航前调用）。 */
+    @PostMapping("/ticket")
+    public ResponseEntity<?> ticket(@RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = sessionResolver.apply(sessionId);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "code", 1, "message", LangText.of("请先登录", "Please sign in first")));
+        }
+        long now = clock.millis();
+        long exp = now + TICKET_TTL.toMillis();
+        return ResponseEntity.ok(Map.of("code", 0, "data", Map.of(
+                "ticket", signTicket(userId, now, exp), "expiresAt", exp)));
+    }
+
     @GetMapping("/proxy")
     public ResponseEntity<?> proxy(
             @RequestParam("url") String url,
-            @RequestParam(value = "token", required = false) String token) {
+            @RequestParam(value = "token", required = false) String token,
+            @RequestParam(value = "ticket", required = false) String ticket) {
+        // 先验票再做任何事：没有有效票据的请求不能让服务端替它去抓外站
+        long[] verified = verifyTicket(ticket);
+        if (verified == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(LangText.of(
+                    "网页面板凭证缺失或已过期，请在地址栏重新打开该网址",
+                    "The web panel credential is missing or expired; reopen the address from the address bar"));
+        }
         if (!StringUtils.hasText(url)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(LangText.of("url 不能为空", "url must not be empty"));
         }
@@ -170,7 +217,7 @@ public class BrowserProxyController {
                 // （windows-1252）去解我们发出去的 UTF-8 字节，中文页面整页乱码。
                 // 已知没覆盖的一档：只在 <meta charset> 里声明、响应头不带的 GBK 页面。
                 String html = new String(payload, charsetOf(contentType));
-                String injected = inject(html, uri.toString(), token);
+                String injected = inject(html, uri.toString(), token, renewTicket(verified));
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8));
                 headers.setCacheControl("no-store");
@@ -188,6 +235,62 @@ public class BrowserProxyController {
         } catch (Exception e) {
             log.warn("BrowserProxy failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(LangText.of("代理失败: ", "Proxy failed: ") + e.getMessage());
+        }
+    }
+
+    private static byte[] newTicketKey() {
+        byte[] k = new byte[32];
+        new java.security.SecureRandom().nextBytes(k);
+        return k;
+    }
+
+    /** 票据格式：{@code v1.<userId>.<首次换票毫秒>.<过期毫秒>.<HMAC-SHA256 base64url>}。 */
+    String signTicket(long userId, long issuedAt, long expiresAt) {
+        String payload = "v1." + userId + "." + issuedAt + "." + expiresAt;
+        return payload + "." + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hmac(payload));
+    }
+
+    /** 验签 + 验期；通过回 {userId, 首次换票毫秒}，否则 null。 */
+    long[] verifyTicket(String ticket) {
+        if (ticket == null || ticket.length() > 200) return null;
+        int cut = ticket.lastIndexOf('.');
+        if (cut <= 0) return null;
+        String payload = ticket.substring(0, cut);
+        String[] parts = payload.split("\\.");
+        if (parts.length != 4 || !"v1".equals(parts[0])) return null;
+        byte[] sig;
+        try {
+            sig = java.util.Base64.getUrlDecoder().decode(ticket.substring(cut + 1));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        if (!java.security.MessageDigest.isEqual(sig, hmac(payload))) return null;
+        try {
+            long userId = Long.parseLong(parts[1]);
+            long issuedAt = Long.parseLong(parts[2]);
+            long expiresAt = Long.parseLong(parts[3]);
+            long now = clock.millis();
+            if (now >= expiresAt || expiresAt - issuedAt > TICKET_MAX_CHAIN.toMillis()) return null;
+            return new long[]{userId, issuedAt};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** 给页面续一张新票据：沿用首次换票时间，过期点不超过续签链上限。 */
+    private String renewTicket(long[] verified) {
+        long now = clock.millis();
+        long exp = Math.min(now + TICKET_TTL.toMillis(), verified[1] + TICKET_MAX_CHAIN.toMillis());
+        return signTicket(verified[0], verified[1], exp);
+    }
+
+    private byte[] hmac(String payload) {
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(ticketKey, "HmacSHA256"));
+            return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+        } catch (java.security.GeneralSecurityException e) {
+            throw new IllegalStateException("HmacSHA256 unavailable", e);
         }
     }
 
@@ -235,9 +338,10 @@ public class BrowserProxyController {
         return StandardCharsets.UTF_8;
     }
 
-    private String inject(String html, String baseUrl, String token) {
+    private String inject(String html, String baseUrl, String token, String ticket) {
         String safeBase = escapeHtmlAttr(baseUrl);
         String safeToken = escapeJsString(token);
+        String safeTicket = escapeJsString(ticket);
         // 页面的真实地址（跟完重定向之后那个）。注入进去是因为 iframe 自己的
         // location 是代理地址，页面无从知道“我到底在哪一页”，而渲染层要靠它更新标签地址。
         String safePageUrl = escapeJsString(baseUrl);
@@ -256,6 +360,7 @@ public class BrowserProxyController {
         // 现象是“点了没反应”，很容易误判成 CSP 拦截）。要写注释只能用 /* */。
         String script = "<script>(function(){"
                 + "var TOKEN='" + safeToken + "';"
+                + "var TICKET='" + safeTicket + "';"
                 + "var PAGE_URL='" + safePageUrl + "';"
                 + "function post(type,url){try{window.parent && window.parent.postMessage({__checkbaBrowser:true,token:TOKEN,type:type,url:url},'*');}catch(e){}}"
                 + "function debug(msg){post('DEBUG',String(msg||''));}"
@@ -265,7 +370,7 @@ public class BrowserProxyController {
                    http://被访站/api/browser/proxy?url=... 的四不像，站点回 404）。
                    拿当前文档地址（就是代理端点本身）换 query 最稳：不依赖后端知道
                    前端从哪个 origin/子路径来，也不怕应用部署在子路径下。 */
-                + "function proxify(url){var q='?url='+encodeURIComponent(url)+'&token='+encodeURIComponent(TOKEN);"
+                + "function proxify(url){var q='?url='+encodeURIComponent(url)+'&token='+encodeURIComponent(TOKEN)+'&ticket='+encodeURIComponent(TICKET);"
                 + "try{var u=new URL(location.href);u.search=q;return u.toString();}catch(e){return '/api/browser/proxy'+q;}}"
                 /* 每次文档加载都回报一次真实地址：页内点链接、站点自己 302、SPA 换页
                    都会重新走一遍代理，渲染层据此让 tab.url 跟上。不报的话标签永远停在

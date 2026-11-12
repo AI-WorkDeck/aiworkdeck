@@ -11,10 +11,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 浏览器面板代理（Web/H5 那条链路）的契约。
@@ -91,12 +97,105 @@ class BrowserProxyControllerTest {
      * 大文件下载链接也不例外；上游响应此前全量进堆（ofByteArray），没有任何体积闸。
      * 后端是所有用户共用的一个 JVM，一次几百 MB 的下载就能把堆顶起来。
      */
+    /**
+     * 服务器部署（cloud / case / prod）里这个端点曾对任何调用方开放：不带会话也会替人
+     * 去抓外站，后端等于一台公开的网页中转。没有有效票据的请求必须在发起抓取之前就被拒。
+     */
+    @Test
+    void requestWithoutTicketIsRejectedBeforeFetching() throws Exception {
+        ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(get("/api/browser/proxy").param("url", siteUrl).param("token", "tok"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /** 正常链路：已登录请求换票 → 带票代理 → 页面里注入续签的新票，页内跳转继续带着它。 */
+    @Test
+    void ticketMintedBySignedInUserOpensThePage() throws Exception {
+        ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
+        ReflectionTestUtils.setField(controller, "sessionResolver",
+                (java.util.function.Function<String, Long>) sid -> "sess-ok".equals(sid) ? 42L : null);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        String json = mvc.perform(post("/api/browser/ticket").header("X-Session-Id", "sess-ok"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"ticket\":\"([^\"]+)\"").matcher(json);
+        assertTrue(m.find(), "换票响应里应有 ticket：" + json);
+        String ticket = m.group(1);
+        assertFalse(ticket.contains("sess-ok"), "票据里绝不能带会话 id");
+
+        String html = mvc.perform(get("/api/browser/proxy")
+                        .param("url", siteUrl).param("token", "tok").param("ticket", ticket))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        String script = extractInjectedScript(html);
+        assertTrue(script.contains("'&ticket='+encodeURIComponent(TICKET)"), "页内跳转必须继续带票：" + script);
+        java.util.regex.Matcher renewed = java.util.regex.Pattern.compile("var TICKET='([^']+)'").matcher(script);
+        assertTrue(renewed.find(), "页面里应注入续签票据");
+        assertNotNull(controller.verifyTicket(renewed.group(1)), "注入的续签票据自己必须验得过");
+        assertEquals(42L, controller.verifyTicket(renewed.group(1))[0], "续签票据仍绑定原用户");
+    }
+
+    @Test
+    void ticketEndpointRequiresSignedInUser() throws Exception {
+        ReflectionTestUtils.setField(controller, "sessionResolver",
+                (java.util.function.Function<String, Long>) sid -> null);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(post("/api/browser/ticket")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/browser/ticket").header("X-Session-Id", "expired")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void forgedExpiredOrOverlongTicketsAreRejected() {
+        ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
+        long now = System.currentTimeMillis();
+        String good = validTicket();
+        // 改用户 id 而不重签
+        String forged = good.replaceFirst("^v1\\.1\\.", "v1.2.");
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.proxy(siteUrl, "tok", forged).getStatusCode());
+        // 另一个进程（另一把密钥）签出的票
+        String foreign = new BrowserProxyController().signTicket(1L, now, now + 60_000);
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.proxy(siteUrl, "tok", foreign).getStatusCode());
+        // 已过期
+        String expired = controller.signTicket(1L, now - 120_000, now - 1);
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.proxy(siteUrl, "tok", expired).getStatusCode());
+        // 自称有效期超过续签链上限（就算签名对，也不认）
+        String overlong = controller.signTicket(1L, now,
+                now + BrowserProxyController.TICKET_MAX_CHAIN.toMillis() + 1);
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.proxy(siteUrl, "tok", overlong).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.proxy(siteUrl, "tok", "garbage").getStatusCode());
+        assertEquals(HttpStatus.OK, controller.proxy(siteUrl, "tok", good).getStatusCode(), "护栏：有效票照常放行");
+    }
+
+    /** 续签不能让一条链无限延长：过了上限，页面里注入的票据过期点封顶在链上限。 */
+    @Test
+    void renewalNeverExtendsPastTheChainCap() {
+        ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
+        long now = System.currentTimeMillis();
+        long firstIssued = now - BrowserProxyController.TICKET_MAX_CHAIN.toMillis() + 60_000; // 链只剩 1 分钟
+        String nearCap = controller.signTicket(7L, firstIssued, now + 30_000);
+        ResponseEntity<?> resp = controller.proxy(siteUrl, "tok", nearCap);
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        java.util.regex.Matcher renewed = java.util.regex.Pattern.compile("var TICKET='v1\\.7\\.(\\d+)\\.(\\d+)\\.")
+                .matcher(extractInjectedScript(String.valueOf(resp.getBody())));
+        assertTrue(renewed.find());
+        assertEquals(firstIssued, Long.parseLong(renewed.group(1)), "续签沿用首次换票时间");
+        assertEquals(firstIssued + BrowserProxyController.TICKET_MAX_CHAIN.toMillis(), Long.parseLong(renewed.group(2)),
+                "过期点封顶在链上限，而不是 now+TTL");
+    }
+
+    private String validTicket() {
+        long now = System.currentTimeMillis();
+        return controller.signTicket(1L, now, now + BrowserProxyController.TICKET_TTL.toMillis());
+    }
+
     @Test
     void oversizedResponseIsRejectedInsteadOfBuffered() {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
         ReflectionTestUtils.setField(controller, "maxBytes", 64L * 1024);
         assertEquals(HttpStatus.PAYLOAD_TOO_LARGE,
-                controller.proxy(bigUrl, "tok").getStatusCode(),
+                controller.proxy(bigUrl, "tok", validTicket()).getStatusCode(),
                 "超过上限必须直接拒绝，而不是先全量读进内存");
     }
 
@@ -106,7 +205,7 @@ class BrowserProxyControllerTest {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
         ReflectionTestUtils.setField(controller, "maxBytes", 64L * 1024);
         assertEquals(HttpStatus.PAYLOAD_TOO_LARGE,
-                controller.proxy(chunkedUrl, "tok").getStatusCode(),
+                controller.proxy(chunkedUrl, "tok", validTicket()).getStatusCode(),
                 "没有 Content-Length 也必须能停手");
     }
 
@@ -119,7 +218,7 @@ class BrowserProxyControllerTest {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
         ReflectionTestUtils.setField(controller, "deadlineSeconds", 1L);
         long started = System.nanoTime();
-        HttpStatus status = (HttpStatus) controller.proxy(slowUrl, "tok").getStatusCode();
+        HttpStatus status = (HttpStatus) controller.proxy(slowUrl, "tok", validTicket()).getStatusCode();
         long elapsedMs = (System.nanoTime() - started) / 1_000_000;
         assertTrue(elapsedMs < 2500, "必须在总预算内收手，实际耗时 " + elapsedMs + "ms");
         assertTrue(status == HttpStatus.GATEWAY_TIMEOUT || status == HttpStatus.BAD_GATEWAY,
@@ -130,27 +229,27 @@ class BrowserProxyControllerTest {
     void normalSizedResponseStillPassesThrough() {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
         ReflectionTestUtils.setField(controller, "maxBytes", 64L * 1024);
-        assertEquals(HttpStatus.OK, controller.proxy(siteUrl, "tok").getStatusCode(),
+        assertEquals(HttpStatus.OK, controller.proxy(siteUrl, "tok", validTicket()).getStatusCode(),
                 "护栏：别把正常页面一起拦掉");
     }
 
     @Test
     void loopbackBlockedWhenAllowListUnset() {
-        assertEquals(HttpStatus.FORBIDDEN, controller.proxy(siteUrl, "tok").getStatusCode(),
+        assertEquals(HttpStatus.FORBIDDEN, controller.proxy(siteUrl, "tok", validTicket()).getStatusCode(),
                 "例外名单为空时必须照常拦回环——这个默认值是发行版唯一会用到的那个");
     }
 
     @Test
     void loopbackBlockedWhenAllowListNamesAnotherHost() {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "example.invalid");
-        assertEquals(HttpStatus.FORBIDDEN, controller.proxy(siteUrl, "tok").getStatusCode(),
+        assertEquals(HttpStatus.FORBIDDEN, controller.proxy(siteUrl, "tok", validTicket()).getStatusCode(),
                 "名单是精确匹配，别的主机在名单里不等于放行本机");
     }
 
     @Test
     void injectedScriptParsesAndCarriesNavigationContract() {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
-        ResponseEntity<?> resp = controller.proxy(siteUrl, "br_tok_1");
+        ResponseEntity<?> resp = controller.proxy(siteUrl, "br_tok_1", validTicket());
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         String script = extractInjectedScript(String.valueOf(resp.getBody()));
 
@@ -172,7 +271,7 @@ class BrowserProxyControllerTest {
         // 不声明 charset 的话浏览器拿默认编码（windows-1252）去解我们发出去的 UTF-8 字节，
         // 中文页面在浏览器面板里整页乱码（"去第二页" → "åŽ»ç¬¬äºŒé¡µ"）
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
-        ResponseEntity<?> resp = controller.proxy(siteUrl, "tok");
+        ResponseEntity<?> resp = controller.proxy(siteUrl, "tok", validTicket());
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         assertEquals(StandardCharsets.UTF_8, resp.getHeaders().getContentType().getCharset(),
                 "回给浏览器的 HTML 必须声明 charset=utf-8");

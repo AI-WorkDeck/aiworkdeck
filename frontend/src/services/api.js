@@ -2703,6 +2703,12 @@ export function generateTtsAudio(payload, options = {}) {
   });
 }
 
+// 浏览器面板（Web/H5 iframe 链路）的代理票据：iframe 发不了 X-Session-Id 头、会话 id 又不能进 URL，
+// 由这次已登录请求换一张绑定用户、几分钟有效的签名票据，随 /api/browser/proxy 链接走
+export function createBrowserProxyTicket() {
+  return request({ url: '/api/browser/ticket', method: 'POST', accountPrompt: false })
+}
+
 export function createProjectFavorite(projectId, payload) {
   return request({
     url: `/api/projects/${projectId}/favorites`,

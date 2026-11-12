@@ -90,6 +90,14 @@ metaInfo 追加 `IdleSegments: <开始毫秒>-<结束毫秒>;...`，`PersonalWor
 - 跨窗格双开在 Web 下是**两个独立 iframe**（`tabDragSplit.moveTabTo` 跨窗格复制了 tab 对象，
   左右各有自己的 `tab.url`），与桌面端「一个 BrowserView、`wanted` 计数」不是一回事。
 
+**代理要票据（改这块之前必读）**：`/api/browser/proxy` 不带有效 `ticket` 一律 401，在发起任何抓取之前——
+服务器部署（cloud/case/prod）里它曾对任何调用方开放。iframe 发不了 `X-Session-Id`、会话 id 又绝不能进 URL，
+所以 BrowserPane 先 `POST /api/browser/ticket`（`createBrowserProxyTicket`，走正常鉴权；local-mode 免登照样换得到）
+换一张绑定用户的 HMAC 票据（`v1.<userId>.<首次换票ms>.<过期ms>.<sig>`，有效 10 分钟，密钥进程内随机、重启即作废），
+`loadInIframe` 把票据与地址**同一拍**写进 `iframeTicket`/`iframeUrl`（单独换票会让 src 变、整页重载）。
+代理回 HTML 时注入续签的 `TICKET`，`proxify` 带着它，页内连续浏览不断；续签沿用首次换票时间，整条链封顶 8 小时。
+桌面端走 BrowserView，不经这个端点。护栏：`BrowserProxyControllerTest`、`frontend/tests/browser/proxy-ticket.test.mjs`。
+
 **注入脚本的三条硬规则**（`BrowserProxyController.inject`，`BrowserProxyControllerTest` 钉住）：
 1. **整段拼成一行，里面绝不能出现 `//` 行注释**——它会把后面全部代码一起注释掉。
    这个 bug 从写下那天一直活到 2026-08：页面上只留一句
