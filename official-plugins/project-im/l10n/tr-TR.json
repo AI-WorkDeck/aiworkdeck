@@ -2,5 +2,10 @@
   "plugin.name": "Proje Mesajlaşması",
   "plugin.description": "Hukuk bürosu, ekip ve proje iletişimi: paylaşılan asistan, doğrudan mesajlar, dosya arşivleme ve AI referansları. Şu anda yalnızca Anakara Çin hesapları için kullanılabilir.",
   "tool.project_im_list_conversations.desc": "Kullanıcının mesajlaşma konuşmalarını listeler (salt okunur). Kullanıcı hangi grup sohbetlerinin veya konuşmaların bulunduğunu (proje grubu dahil) sorduğunda kullanın.",
-  "tool.project_im_read_messages.desc": "Kullanıcının üyesi olduğu bir konuşmanın son mesajlarını okur (salt okunur). Kullanıcı bir grup sohbetinde veya proje grubunda son zamanlarda ne konuşulduğunu sorduğunda ya da sohbet geçmişini istediğinde kullanın (önce project_im_list_conversations ile konuşma kimliğini alın)."
+  "tool.project_im_read_messages.desc": "Kullanıcının üyesi olduğu bir konuşmanın son mesajlarını okur (salt okunur). Kullanıcı bir grup sohbetinde veya proje grubunda son zamanlarda ne konuşulduğunu sorduğunda ya da sohbet geçmişini istediğinde kullanın (önce project_im_list_conversations ile konuşma kimliğini alın).",
+  "panel.historyScope": "Müvekkilin görebileceği mesajlar",
+  "panel.historyAfterJoin": "Yalnızca katıldıktan sonraki mesajlar",
+  "panel.historyWithEarlier": "Önceki mesajlar da",
+  "panel.inviteHintAfterJoin": "Bu kodla katılan müvekkil yalnızca katıldıktan sonra gönderilen mesajları ve dosyaları görür. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir",
+  "panel.inviteHintWithHistory": "Bu kodla katılan müvekkil önceki mesajları da okuyabilir; dosyalar yine erişim izinlerine göre tek tek açılır. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir"
 }

@@ -2,5 +2,10 @@
   "plugin.name": "Projektmessaging",
   "plugin.description": "Kommunikation für Kanzlei, Team und Projekt: geteilter Assistent, Direktnachrichten, Dateiarchivierung und KI-Verweise. Derzeit nur für Konten in Festlandchina verfügbar.",
   "tool.project_im_list_conversations.desc": "Listet die Nachrichten-Unterhaltungen des Nutzers auf (nur lesen). Verwenden, wenn der Nutzer fragt, welche Gruppenchats oder Unterhaltungen es gibt, einschließlich der Projektgruppe.",
-  "tool.project_im_read_messages.desc": "Liest die letzten Nachrichten einer Unterhaltung, an der der Nutzer beteiligt ist (nur lesen). Verwenden, wenn der Nutzer wissen will, worüber in einem Gruppenchat oder in der Projektgruppe zuletzt gesprochen wurde, oder den Chatverlauf braucht (Unterhaltungs-ID zuvor mit project_im_list_conversations holen)."
+  "tool.project_im_read_messages.desc": "Liest die letzten Nachrichten einer Unterhaltung, an der der Nutzer beteiligt ist (nur lesen). Verwenden, wenn der Nutzer wissen will, worüber in einem Gruppenchat oder in der Projektgruppe zuletzt gesprochen wurde, oder den Chatverlauf braucht (Unterhaltungs-ID zuvor mit project_im_list_conversations holen).",
+  "panel.historyScope": "Für den Mandanten sichtbare Nachrichten",
+  "panel.historyAfterJoin": "Nur Nachrichten nach dem Beitritt",
+  "panel.historyWithEarlier": "Auch frühere Nachrichten",
+  "panel.inviteHintAfterJoin": "Ein Mandant, der mit diesem Code beitritt, sieht nur Nachrichten und Dateien, die nach seinem Beitritt gesendet werden. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}",
+  "panel.inviteHintWithHistory": "Ein Mandant, der mit diesem Code beitritt, kann auch frühere Nachrichten lesen; Dateien werden weiterhin einzeln gemäß ihren Zugriffsrechten freigegeben. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}"
 }

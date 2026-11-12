@@ -13,4 +13,6 @@ public class ImMember {
  @Column(nullable=false,length=16) private String role;
  @Column(nullable=false) private long lastReadId;
  @Column(nullable=false) private java.time.Instant joinedAt;
+ /** Null = full history (staff, and every membership created before this column existed). Otherwise only message ids above this are readable. */
+ @Column(name="history_after_id") private Long historyAfterId;
 }

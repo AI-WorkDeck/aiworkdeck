@@ -13,4 +13,6 @@ public class ImInvitation {
  @Column(nullable=false) private Long issuedBy;
  @Column(nullable=false) private java.time.Instant expiresAt;
  private java.time.Instant usedAt;
+ /** True only when the issuer deliberately opened earlier messages to a client redeeming this code. */
+ private Boolean shareHistory;
 }

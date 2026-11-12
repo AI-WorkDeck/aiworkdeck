@@ -14,6 +14,8 @@
   const request = (action, params = {}) => awd.call('im.request', { action, params });
   const scope = () => ({ epoch: state.epoch, selection: state.selection, id: state.active?.id });
   const current = (s) => s.epoch === state.epoch && s.selection === state.selection && s.id === state.active?.id;
+  // 新增文案走 l10n/<locale>.json（panel.*，由 scripts/sync-panel-l10n.mjs 生成 panel-l10n.js）。
+  const t = (key, vars = {}) => ((window.AWD_IM_L10N[state.context?.language] || window.AWD_IM_L10N['zh-CN'])['panel.' + key] || '').replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
   const node = (tag, text, className) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (className) el.className = className; return el; };
   function avatar(name, url, assistant = false) {
     const el = node('span', assistant ? null : (name || '').slice(0, 1), 'avatar' + (assistant ? ' assistant-avatar' : ''));
@@ -589,11 +591,18 @@
     if (!privateAgent() && (!state.active.agent || state.active.agent.scope === 'project') && state.active.role === 'OWNER') {
       const body = $('dialog-body');
       const role = selectField('邀请身份', [['MEMBER', '成员'], ['CLIENT', '客户']]);
+      // 客户默认只看入群之后的消息；开放此前的消息须在邀请时明确选择。
+      const history = selectField(t('historyScope'), [['after', t('historyAfterJoin')], ['all', t('historyWithEarlier')]]);
+      const showHistory = () => { history.parentElement.hidden = role.value !== 'CLIENT'; }; role.addEventListener('change', showHistory); showHistory();
       const actions = node('div', null, 'dialog-actions'); actions.append(button('生成邀请码', async () => {
-        const invite = await request('invite', { conversationId: s.id, role: role.value }); if (!current(s) || !$('dialog').open || !body.contains(role)) return;
+        const client = role.value === 'CLIENT';
+        const invite = await request('invite', { conversationId: s.id, role: role.value, ...(client ? { shareHistory: history.value === 'all' } : {}) }); if (!current(s) || !$('dialog').open || !body.contains(role)) return;
         const old = $('invite-result'); if (old) old.remove();
         const box = node('div'); box.id = 'invite-result'; const input = node('input'); input.value = invite.code; input.readOnly = true; input.setAttribute('aria-label', '生成的邀请码'); box.append(input);
-        box.append(node('p', '持码人可加入会话并查看历史消息。文件按访问权限开放，请仅交给预期成员。有效期至 ' + time(invite.expiresAt), 'hint'));
+        // 旧版协作服务不回 shareHistory，也不限制历史：此时如实沿用原提示。
+        box.append(node('p', client && typeof invite.shareHistory === 'boolean'
+          ? t(invite.shareHistory ? 'inviteHintWithHistory' : 'inviteHintAfterJoin', { time: time(invite.expiresAt) })
+          : '持码人可加入会话并查看历史消息。文件按访问权限开放，请仅交给预期成员。有效期至 ' + time(invite.expiresAt), 'hint'));
         box.append(button('复制邀请码', async () => {
           input.focus(); input.select();
           try { await navigator.clipboard.writeText(invite.code); notice('邀请码已复制。'); }

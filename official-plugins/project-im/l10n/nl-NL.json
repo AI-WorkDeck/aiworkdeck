@@ -2,5 +2,10 @@
   "plugin.name": "Projectberichten",
   "plugin.description": "Communicatie binnen advocatenkantoor, team en project: gedeelde assistent, directe berichten, bestandsarchivering en AI-referenties. Momenteel alleen beschikbaar voor accounts in vasteland China.",
   "tool.project_im_list_conversations.desc": "Toont de berichtgesprekken van de gebruiker (alleen lezen). Gebruiken wanneer de gebruiker vraagt welke groepschats of gesprekken er zijn, inclusief de projectgroep.",
-  "tool.project_im_read_messages.desc": "Leest recente berichten van een gesprek waar de gebruiker deel van uitmaakt (alleen lezen). Gebruiken wanneer de gebruiker vraagt waarover in een groepschat of de projectgroep recent is gesproken, of de chatgeschiedenis wil (haal eerst de gesprek-id op met project_im_list_conversations)."
+  "tool.project_im_read_messages.desc": "Leest recente berichten van een gesprek waar de gebruiker deel van uitmaakt (alleen lezen). Gebruiken wanneer de gebruiker vraagt waarover in een groepschat of de projectgroep recent is gesproken, of de chatgeschiedenis wil (haal eerst de gesprek-id op met project_im_list_conversations).",
+  "panel.historyScope": "Berichten die de cliënt kan zien",
+  "panel.historyAfterJoin": "Alleen berichten van na deelname",
+  "panel.historyWithEarlier": "Ook eerdere berichten",
+  "panel.inviteHintAfterJoin": "Een cliënt die met deze code deelneemt, ziet alleen berichten en bestanden die na deelname zijn verzonden. Deel de code alleen met de beoogde persoon. Geldig tot {time}",
+  "panel.inviteHintWithHistory": "Een cliënt die met deze code deelneemt, kan ook eerdere berichten lezen; bestanden worden nog steeds per stuk opengesteld volgens hun toegangsrechten. Deel de code alleen met de beoogde persoon. Geldig tot {time}"
 }

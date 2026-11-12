@@ -57,7 +57,7 @@ test('assistant group, retry and private chat work through native browser input 
     else if (req.url === '/vue.js') { text = readFileSync(require.resolve('vue/dist/vue.global.prod.js')); type = 'text/javascript'; }
     else if (req.url === '/summary.js') { text = summaryBridge; type = 'text/javascript'; }
     else if (req.url === '/awd-plugin-sdk.js') { text = readFileSync(new URL('../../../sdk/plugin-sdk/awd-plugin-sdk.js', import.meta.url)); type = 'text/javascript'; }
-    else if (['/index.html', '/panel.js', '/panel.css'].includes(req.url)) { text = readFileSync(new URL('../web' + req.url, import.meta.url)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
+    else if (['/index.html', '/panel.js', '/panel-l10n.js', '/panel.css'].includes(req.url)) { text = readFileSync(new URL('../web' + req.url, import.meta.url)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
     else { res.writeHead(404); res.end(); return; }
     res.setHeader('Content-Type', type + '; charset=utf-8'); res.end(text);
   });

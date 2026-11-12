@@ -124,8 +124,8 @@ public class ImService {
             conversations.saveAndFlush(c);
         }
         ImMember member = members.findByConversationIdAndUserId(c.getId(), userId).orElse(null);
-        if (member == null) member = addMember(c.getId(), userId,
-                Objects.equals(c.getOwnerId(), userId) ? "OWNER" : projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER");
+        if (member == null) member = limitClientHistory(addMember(c.getId(), userId,
+                Objects.equals(c.getOwnerId(), userId) ? "OWNER" : projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER"));
         return view(c, member);
     }
 
@@ -136,14 +136,18 @@ public class ImService {
         if ("DIRECT".equals(c.getType()) && members.countByConversationId(c.getId()) >= 2) throw bad(com.checkba.service.LangText.of("私聊已有两位参与人", "Direct conversation already has two participants"));
         String role = required(p, "role", 16);
         if (!Set.of("MEMBER", "CLIENT").contains(role)) throw bad(com.checkba.service.LangText.of("邀请角色无效", "Invalid invitation role"));
+        if (p.containsKey("shareHistory") && !(p.get("shareHistory") instanceof Boolean)) throw bad(com.checkba.service.LangText.of("shareHistory必须为布尔值", "shareHistory must be a boolean"));
+        boolean shareHistory = Boolean.TRUE.equals(p.get("shareHistory"));
         // A fresh invitation replaces outstanding codes, limiting stale invitations and storage growth.
         invitations.deleteByConversationIdAndIssuedBy(c.getId(), me.getUserId());
         byte[] entropy = new byte[24]; new SecureRandom().nextBytes(entropy);
         String code = Base64.getUrlEncoder().withoutPadding().encodeToString(entropy);
         ImInvitation invite = new ImInvitation(); invite.setTokenHash(sha(code.getBytes(StandardCharsets.UTF_8)));
         invite.setConversationId(c.getId()); invite.setRole(role); invite.setIssuedBy(me.getUserId());
+        invite.setShareHistory(shareHistory);
         invite.setExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS)); invitations.save(invite);
-        return Map.of("code", code, "expiresAt", invite.getExpiresAt());
+        // Echoed so a panel can tell a server that enforces the choice from an older one that ignores it.
+        return Map.of("code", code, "expiresAt", invite.getExpiresAt(), "shareHistory", shareHistory);
     }
 
     private Object join(Long userId, Map<String,Object> p) {
@@ -159,7 +163,8 @@ public class ImService {
         long size = members.countByConversationId(c.getId());
         if (size >= ("DIRECT".equals(c.getType()) ? 2 : 100)) throw bad(com.checkba.service.LangText.of("会话人数已满", "Conversation has reached its member limit"));
         invite.setUsedAt(Instant.now()); invitations.save(invite);
-        return view(c, addMember(c.getId(), userId, invite.getRole()));
+        ImMember member = addMember(c.getId(), userId, invite.getRole());
+        return view(c, Boolean.TRUE.equals(invite.getShareHistory()) ? member : limitClientHistory(member));
     }
 
     private Object remove(ImConversation c, ImMember me, long targetId) {
@@ -184,14 +189,17 @@ public class ImService {
         int limit = (int)Math.max(1, Math.min(100, number(p, "limit", 50)));
         long after = number(p, "afterId", 0), before = number(p, "beforeId", Long.MAX_VALUE);
         if (after < 0 || before < 1 || (p.containsKey("afterId") && p.containsKey("beforeId"))) throw bad(com.checkba.service.LangText.of("消息分页参数无效", "Invalid message pagination parameters"));
+        long floor = historyFloor(me);
         var page = p.containsKey("afterId")
-                ? messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(c.getId(), after, PageRequest.of(0, limit))
-                : messages.findByConversationIdAndIdLessThanOrderByIdDesc(c.getId(), before, PageRequest.of(0, limit));
+                ? messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(c.getId(), Math.max(after, floor), PageRequest.of(0, limit))
+                : messages.findByConversationIdAndIdGreaterThanAndIdLessThanOrderByIdDesc(c.getId(), floor, before, PageRequest.of(0, limit));
         List<ImMessage> rows = new ArrayList<>(page.getContent());
         rows.sort(Comparator.comparing(ImMessage::getId));
         Map<String,Object> result = new LinkedHashMap<>();
         result.put("messages", rows.stream().map(m -> messageView(m, me)).toList()); result.put("hasMore", page.hasNext());
-        result.put("agentStatus", c.getAgentScope() == null ? null : agentService().status(c.getId()));
+        Map<String,Object> agentStatus = c.getAgentScope() == null ? null : agentService().status(c.getId());
+        if (agentStatus != null && agentStatus.get("messageId") instanceof Number source && source.longValue() <= floor) agentStatus = null;
+        result.put("agentStatus", agentStatus);
         return result;
     }
 
@@ -269,6 +277,11 @@ public class ImService {
         var metadata = attachments.metadata(attachmentId, c.getId());
         if (metadata.isEmpty() || !canRead(me, (Long)metadata.get(0)[4], Boolean.TRUE.equals(metadata.get(0)[5])))
             throw bad(fileUnavailable());
+        // A file posted only before a history-limited client joined stays out of reach even if it was opened to clients.
+        long floor = historyFloor(me);
+        if (floor > 0 && !me.getUserId().equals(metadata.get(0)[4])
+                && !messages.existsByConversationIdAndAttachmentIdAndIdGreaterThan(c.getId(), attachmentId, floor))
+            throw bad(fileUnavailable());
         ImAttachment file = requireAttachment(c.getId(), attachmentId);
         Map<String,Object> result = new LinkedHashMap<>(attachmentView(file, me));
         result.put("base64", Base64.getEncoder().encodeToString(file.getContent()));
@@ -314,10 +327,16 @@ public class ImService {
         ImMember member = new ImMember(); member.setConversationId(id); member.setUserId(userId);
         member.setRole(role); member.setJoinedAt(Instant.now()); return members.save(member);
     }
+    /** Callers hold the conversation lock, so no send can land between this read and the membership. */
+    private ImMember limitClientHistory(ImMember member) {
+        if (!client(member)) return member;
+        member.setHistoryAfterId(messages.maxId(member.getConversationId())); return members.save(member);
+    }
+    private static long historyFloor(ImMember member) { return member.getHistoryAfterId() == null ? 0 : member.getHistoryAfterId(); }
     private Map<String,Object> view(ImConversation c, ImMember member) {
         Map<String,Object> result = new LinkedHashMap<>(Map.of("id", c.getId(), "title", c.getTitle(), "type", c.getType(), "role", member.getRole(),
                 "createdAt", c.getCreatedAt(), "lastMessageAt", c.getLastMessageAt(), "lastReadId", member.getLastReadId(),
-                "unreadCount", messages.countByConversationIdAndIdGreaterThanAndSenderIdNot(c.getId(), member.getLastReadId(), member.getUserId())));
+                "unreadCount", messages.countByConversationIdAndIdGreaterThanAndSenderIdNot(c.getId(), Math.max(member.getLastReadId(), historyFloor(member)), member.getUserId())));
         if (c.getAgentScope() != null) {
             result.put("agent", ImAgentService.agentView(c));
             result.put("canRequestAgent", (c.getProjectId() == null && c.getAgentProjectId() == null) || !client(member));
