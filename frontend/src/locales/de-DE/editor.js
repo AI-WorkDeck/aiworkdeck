@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "Das Dokument kann nicht geöffnet werden: Der Editor reagiert nicht oder die Datei ist beschädigt",
     "encryptedTitle": "Diese Datei ist mit einem Öffnungskennwort geschützt, das der Editor noch nicht öffnen kann. Entfernen Sie das Kennwort in Excel, Word, PowerPoint oder WPS und öffnen Sie sie erneut, oder laden Sie das Original herunter.",
+    "passwordPrompt": "Diese Datei ist mit einem Öffnungskennwort geschützt. Geben Sie das Kennwort ein, um sie zu öffnen.",
+    "passwordPlaceholder": "Kennwort",
+    "passwordOpen": "Öffnen",
+    "passwordChecking": "Wird geprüft…",
+    "passwordWrong": "Falsches Kennwort. Bitte erneut versuchen.",
+    "passwordError": "Diese Datei kann nicht gelesen werden. Laden Sie das Original herunter, um sie zu prüfen.",
+    "passwordNote": "Das Kennwort wird nur zum Öffnen verwendet und nicht gespeichert. Beim Speichern bleibt die Datei mit demselben Kennwort verschlüsselt.",
     "code": "Diagnosecode: {code}",
     "previewNotice": "Das Dokument konnte im Editor nicht geöffnet werden (Code {code}); es wird eine schreibgeschützte Vorschau angezeigt",
     "readOnlyPreview": "Schreibgeschützte Vorschau öffnen",

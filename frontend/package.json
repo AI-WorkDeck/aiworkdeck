@@ -163,6 +163,7 @@
     "@fullcalendar/timegrid": "^6.1.21",
     "@fullcalendar/vue3": "^6.1.21",
     "animejs": "^4.2.2",
+    "cfb": "^1.2.2",
     "chinese-days": "^1.5.9",
     "docx-preview": "^0.3.7",
     "entities": "^7.0.0",

@@ -142,6 +142,13 @@ export default {
   openFailed: {
     title: '文档无法打开：引擎无响应或文件损坏',
     encryptedTitle: '这个文件设置了打开密码，编辑器暂不能直接打开。请在 Excel / Word / PowerPoint 或 WPS 中去掉打开密码后再打开，或下载原文件。',
+    passwordPrompt: '这个文件设置了打开密码，请输入密码。',
+    passwordPlaceholder: '打开密码',
+    passwordOpen: '打开',
+    passwordChecking: '正在验证…',
+    passwordWrong: '密码不正确，请重试。',
+    passwordError: '无法读取这个文件，请下载原文件后检查。',
+    passwordNote: '密码只用于这次打开，不会保存；保存时仍按原密码加密。',
     code: '诊断码：{code}',
     previewNotice: '文档无法在编辑器中打开（诊断码：{code}），以下为只读预览',
     readOnlyPreview: '用只读预览打开',

@@ -90,7 +90,7 @@ export const STATUS_OPEN_FAILED = 'docOpenFailed'
 /** 诊断码：引擎读了字节但两条装载路径都拒收（loadComponentFromURL 返回 null / 抛异常）。 */
 export const DIAG_DOC_REJECTED = 'DOC_REJECTED'
 // 设了「打开密码」的 Word/Excel/PPT（office-tier1）：OOXML 加密后整个文件是 CFB 复合文档（D0 CF 11 E0 …），
-// 引擎不带密码只会拒收。单独一个诊断码，加载面板说清楚原因，不让用户对着「文件损坏」反复重试。
+// 引擎带不带密码都拒收（O14 真机探针），由宿主解密（officeEncryption.js）。没有密钥时落这个诊断码，加载面板请用户输密码。
 export const DIAG_DOC_ENCRYPTED = 'DOC_ENCRYPTED'
 const CFB_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
 export function isEncryptedOoxml(bytes, name) {
@@ -130,6 +130,8 @@ export function loadBudgetMs(byteLength) {
  */
 export function openFailureOf(err, alreadyHealed) {
   if (err && err.code === DIAG_DOC_REJECTED) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_DOC_REJECTED }
+  // 宿主侧发现文件有打开密码且手里没有密钥（O14）：落终态，加载面板请用户输入密码
+  if (err && err.code === DIAG_DOC_ENCRYPTED) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_DOC_ENCRYPTED }
   if (alreadyHealed && isRelayTimeout(err)) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_LOAD_TIMEOUT }
   return null
 }

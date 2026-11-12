@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: editor tidak merespons atau berkas rusak",
     "encryptedTitle": "File ini dilindungi kata sandi pembuka yang belum dapat dibuka oleh editor. Hapus kata sandi di Excel, Word, PowerPoint, atau WPS lalu buka lagi, atau unduh file aslinya.",
+    "passwordPrompt": "File ini dilindungi kata sandi pembuka. Masukkan kata sandi untuk membukanya.",
+    "passwordPlaceholder": "Kata sandi",
+    "passwordOpen": "Buka",
+    "passwordChecking": "Memeriksa…",
+    "passwordWrong": "Kata sandi salah. Coba lagi.",
+    "passwordError": "File ini tidak dapat dibaca. Unduh file asli untuk memeriksanya.",
+    "passwordNote": "Kata sandi hanya dipakai untuk membuka file dan tidak disimpan. Saat disimpan, file tetap terenkripsi dengan kata sandi yang sama.",
     "code": "Kode diagnostik: {code}",
     "previewNotice": "Dokumen tidak dapat dibuka di editor (kode {code}); menampilkan pratinjau hanya-baca",
     "readOnlyPreview": "Buka pratinjau hanya-baca",

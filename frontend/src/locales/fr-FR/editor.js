@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "Impossible d’ouvrir le document : l’éditeur ne répond pas ou le fichier est endommagé",
     "encryptedTitle": "Ce fichier est protégé par un mot de passe d’ouverture que l’éditeur ne peut pas encore ouvrir. Supprimez le mot de passe dans Excel, Word, PowerPoint ou WPS puis rouvrez-le, ou téléchargez l’original.",
+    "passwordPrompt": "Ce fichier est protégé par un mot de passe d’ouverture. Saisissez le mot de passe pour l’ouvrir.",
+    "passwordPlaceholder": "Mot de passe",
+    "passwordOpen": "Ouvrir",
+    "passwordChecking": "Vérification…",
+    "passwordWrong": "Mot de passe incorrect. Réessayez.",
+    "passwordError": "Impossible de lire ce fichier. Téléchargez l’original pour le vérifier.",
+    "passwordNote": "Le mot de passe sert uniquement à ouvrir le fichier et n’est pas enregistré. Les enregistrements restent chiffrés avec le même mot de passe.",
     "code": "Code de diagnostic : {code}",
     "previewNotice": "Le document n’a pas pu être ouvert dans l’éditeur (code {code}) ; affichage d’un aperçu en lecture seule",
     "readOnlyPreview": "Ouvrir l’aperçu en lecture seule",

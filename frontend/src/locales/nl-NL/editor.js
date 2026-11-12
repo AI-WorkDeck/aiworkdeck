@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "Het document kan niet worden geopend: de editor reageert niet of het bestand is beschadigd",
     "encryptedTitle": "Dit bestand is beveiligd met een openingswachtwoord dat de editor nog niet kan openen. Verwijder het wachtwoord in Excel, Word, PowerPoint of WPS en open het opnieuw, of download het origineel.",
+    "passwordPrompt": "Dit bestand is beveiligd met een openingswachtwoord. Voer het wachtwoord in om het te openen.",
+    "passwordPlaceholder": "Wachtwoord",
+    "passwordOpen": "Openen",
+    "passwordChecking": "Controleren…",
+    "passwordWrong": "Onjuist wachtwoord. Probeer het opnieuw.",
+    "passwordError": "Dit bestand kan niet worden gelezen. Download het origineel om het te controleren.",
+    "passwordNote": "Het wachtwoord wordt alleen gebruikt om het bestand te openen en niet opgeslagen. Bij opslaan blijft het bestand versleuteld met hetzelfde wachtwoord.",
     "code": "Diagnosecode: {code}",
     "previewNotice": "Het document kon niet in de editor worden geopend (code {code}); er wordt een alleen-lezen voorbeeld getoond",
     "readOnlyPreview": "Alleen-lezen voorbeeld openen",

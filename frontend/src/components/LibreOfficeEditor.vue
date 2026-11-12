@@ -19,8 +19,23 @@
            说清楚、给诊断码、给出路（只读预览 / 下载原文件 / 重启再试），不再对着 95% 干等。 -->
       <view v-if="!previewReady && openFailed" class="libre-loading-card libre-open-failed">
         <text class="libre-loading-name">{{ loadingTitle }}</text>
-        <text class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : $t('editor.openFailed.title') }}</text>
-        <text class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
+        <!-- 设了打开密码（O14）：在这里输密码，宿主解密后交给引擎；不支持的加密方式退回原说明 -->
+        <view v-if="openFailCode === 'DOC_ENCRYPTED' && passwordState !== 'unsupported'" class="libre-password">
+          <text class="libre-loading-error">{{ $t('editor.openFailed.passwordPrompt') }}</text>
+          <input v-model="passwordInput" class="libre-password-input" type="password" password focus
+            :placeholder="$t('editor.openFailed.passwordPlaceholder')" :disabled="passwordState === 'checking'" @confirm="submitPassword" />
+          <text v-if="passwordState === 'wrong' || passwordState === 'error'" class="libre-password-error">
+            {{ passwordState === 'wrong' ? $t('editor.openFailed.passwordWrong') : $t('editor.openFailed.passwordError') }}
+          </text>
+          <view class="libre-loading-retry libre-password-submit" :class="{ busy: passwordState === 'checking' }" @click="submitPassword">
+            <text>{{ passwordState === 'checking' ? $t('editor.openFailed.passwordChecking') : $t('editor.openFailed.passwordOpen') }}</text>
+          </view>
+          <text class="libre-loading-dl">{{ $t('editor.openFailed.passwordNote') }}</text>
+        </view>
+        <template v-else>
+          <text class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : $t('editor.openFailed.title') }}</text>
+          <text class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
+        </template>
         <view v-if="canReadOnlyPreview && openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="openReadOnlyPreview">
           <text>{{ $t('editor.openFailed.readOnlyPreview') }}</text>
         </view>
@@ -376,6 +391,9 @@ export default {
       stuck: false,
       // 「文档无法打开」终态的诊断码（DOC_REJECTED / EDITOR_LOAD_TIMEOUT，见 editorLoadFailure.js）
       openFailCode: '',
+      // 打开密码框（O14）：输入值只在提交前存在；state '' | checking | wrong | error | unsupported
+      passwordInput: '',
+      passwordState: '',
       // 客体页 boot 失败时的原因串（lo-relay 'boot-failed'），显示在加载面板上。
       bootFailReason: '',
       // 改字 stale 提示条当前展示的条目 [{linkKey, text, link}]（合并规则见 StaleQueue）
@@ -1708,10 +1726,6 @@ export default {
           // 下载超时/网络错 = 请检查网络、其余（含引擎装载失败与 relay 超时）
           // 沿用 loadFailed。几个 key 都以 'Failed' 结尾，既有判据不必改。
           if (open) this.openFailCode = open.code
-          if (open && open.code === DIAG_DOC_REJECTED) {
-            const raw = await (this._bytesPromise || Promise.resolve(null)).catch(() => null)
-            if (seq === this._docLoadSeq && isEncryptedOoxml(raw, this.file?.name || this.file?.fileName)) this.openFailCode = DIAG_DOC_ENCRYPTED
-          }
           this.statusKey = open ? open.statusKey : classifyLoadFailure(e)
           // 记下这次失败时的世代号——迟到的 load_document 结果（见
           // onLateLoadResult）只在世代仍相符（没有更晚的装载尝试发生过）时
@@ -1851,6 +1865,8 @@ export default {
     scheduleSlidePreviewCapture(bytes) {
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
       if (t !== 'pptx' || !bytes || !this.executor) return
+      // 有密码的演示文稿不把渲染页写进本机缓存（IndexedDB 不加密，等于把受保护内容落盘）
+      if (this._docCrypto || isEncryptedOoxml(bytes, '.' + t)) return
       clearTimeout(this._slidePreviewTimer)
       const seq = this._docLoadSeq, fileId = this.file?.id
       const isCurrent = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
@@ -1875,6 +1891,7 @@ export default {
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
       if (t !== 'docx' && t !== 'doc' && t !== 'pptx' && t !== 'xlsx') return
+      if (isEncryptedOoxml(buf, '.' + t)) return // 有密码：等用户输入后由引擎显示
       // PPT：只显示「上次打开时引擎自己渲染、按文件字节命中」的前几页（slidePreviewCache）；
       // 没有缓存就保持进度卡片——前端解析 pptx 的画面在真实课件上错位裁切，不如不显示。
       let cached = null
@@ -2022,7 +2039,7 @@ export default {
         }
       }
       assertCurrentGeneration()
-      const bytes = new Uint8Array(buf || new ArrayBuffer(0))
+      let bytes = new Uint8Array(buf || new ArrayBuffer(0))
       const name = f.name || (String(fileId) + '.' + String(f.fileType || 'docx'))
       // Empty body = a brand-new / unsaved document — the backend streams HTTP
       // 200 with 0 bytes for it. That's NOT a load failure: keep the clean blank
@@ -2048,10 +2065,24 @@ export default {
           this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e))
         }
         assertCurrentGeneration()
+        this._docCrypto = null
         this._localContentMetadata = this._contentSnapshots?.get(buf) || null
         this._checkpointGeneration = generation
         this._checkpointInvalidated = false
         return false
+      }
+      // 设了打开密码的 Word/Excel/PPT（O14）：引擎带密码也打不开，由宿主解密后交明文。
+      // 已用密码解开过（_pendingCrypto）或本文件重载（保存后/引擎重启，_docCrypto）用内存里的文件密钥；
+      // 没有就落 DOC_ENCRYPTED，加载面板请用户输入密码（submitPassword）。
+      let crypt = null
+      if (isEncryptedOoxml(bytes, name)) {
+        const held = [this._pendingCrypto, this._docCrypto].find(c => c && c.fileId === fileId) || null
+        const { decryptWithSession } = await import('@/utils/officeEncryption.js')
+        const plain = held ? await decryptWithSession(bytes, held.session) : null
+        assertCurrentGeneration()
+        if (!plain) throw Object.assign(new Error('document is password protected'), { code: DIAG_DOC_ENCRYPTED })
+        crypt = held
+        bytes = plain
       }
       // office 是单线程消息循环，两条 load_document 会按到达顺序依次执行，后到的
       // 那条把先装好的文档整个换掉——被取代的这次到此为止，不再发命令。
@@ -2084,6 +2115,9 @@ export default {
       this._checkpointGeneration = generation
       this._checkpointInvalidated = false
       if (res.kind) this.docKind = res.kind
+      // 之后每一笔保存都按它重新加密（sealForStorage）；明文文件清空
+      this._docCrypto = crypt
+      this._pendingCrypto = null
       // 换文档后工具栏必须重读一次激活态：worker 的 retarget 会把修订显示方式
       // 复位到默认（上一份文档设过「最终稿」就在这一步被打回来），工具栏若还
       // 端着上一份的读数，显示的态就跟画布对不上。
@@ -2790,6 +2824,7 @@ export default {
           return false
         }
         u8 = await this.stampGeneratorMetadata(u8)
+        u8 = await this.sealForStorage(u8, fileId)
         if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
             documentCheckpointGeneration(this.projectId, fileId) !== generation) return false
         this.appendLog('  ← exported ' + u8.length + ' bytes, uploading…')
@@ -2944,6 +2979,12 @@ export default {
         return false
       }
       u8 = await this.stampGeneratorMetadata(u8)
+      try { u8 = await this.sealForStorage(u8, f.id) } catch (e) {
+        this._copyExporting = false
+        this.appendLog('save copy failed: ' + (e && e.message ? e.message : e))
+        uni.showToast({ title: this.$t('editor.saveCopyAsFailed', { reason: (e && e.message) || 'encrypt' }), icon: 'none' })
+        return false
+      }
       this._copyExporting = false
       const url = URL.createObjectURL(new Blob([u8], { type: 'application/octet-stream' }))
       const link = document.createElement('a')
@@ -2953,6 +2994,46 @@ export default {
       setTimeout(() => URL.revokeObjectURL(url), 60000)
       uni.showToast({ title: this.$t('editor.savedCopyAs', { name }), icon: 'none' })
       return true
+    },
+    // 打开时有密码的文件，导出的明文在离开编辑器前按同一密码重新加密（O14）。
+    // 加密失败就让这笔保存失败——绝不把明文写回用户的加密文件。
+    async sealForStorage(u8, fileId) {
+      const c = this._docCrypto
+      if (!c) return u8
+      if (c.fileId !== fileId) throw new Error('encrypted document session does not match file ' + fileId)
+      const { encryptOoxml } = await import('@/utils/officeEncryption.js')
+      const sealed = await encryptOoxml(u8, c.session)
+      this.appendLog('  ← re-encrypted ' + u8.length + ' → ' + sealed.length + ' bytes')
+      return sealed
+    },
+    // 加载面板上的密码框（O14）：先在宿主验证密码，对了才重新走装载；密码本身不保存。
+    async submitPassword() {
+      const password = this.passwordInput
+      if (!password || this.passwordState === 'checking' || !this.file?.id) return
+      const fileId = this.file.id, seq = this._docLoadSeq
+      this.passwordState = 'checking'
+      try {
+        if (!this._bytesPromise) this.prefetchBytes()
+        const buf = await this._bytesPromise
+        if (!buf) throw new Error('download failed')
+        const { decryptOoxml } = await import('@/utils/officeEncryption.js')
+        const { session } = await decryptOoxml(new Uint8Array(buf), password)
+        if (fileId !== this.file?.id || seq !== this._docLoadSeq) return
+        this._pendingCrypto = { fileId, session }
+        this.passwordInput = ''
+        this.passwordState = ''
+        this.appendLog('密码已验证，重新装载 / password accepted, loading')
+        this.openFailCode = ''
+        this.docLoadFailed = false
+        this.statusKey = 'loadingDoc'
+        this.bootStageKey = 'openingDoc'
+        this.bootCap = Math.max(this.bootCap, 95)
+        this.startBootTrickle()
+        this.finishDocLoad()
+      } catch (e) {
+        if (fileId !== this.file?.id) return
+        this.passwordState = e?.code === 'WRONG_PASSWORD' ? 'wrong' : e?.code === 'UNSUPPORTED_ENCRYPTION' ? 'unsupported' : 'error'
+      }
     },
     // 文档 Generator 元数据（可溯源性设计规范附录 B4）：把导出件 docProps/app.xml 的
     // <Application> 换成「AI WorkDeck <版本>」。引擎 API 改不到这个字段（oox 导出器硬写
@@ -3105,6 +3186,13 @@ export default {
 .libre-strip-error { color: var(--awd-danger); }
 .libre-open-failed .libre-loading-error { font-size: 13px; margin-top: 10px; }
 .libre-open-failed .libre-loading-retry + .libre-loading-retry { margin-top: 6px; }
+.libre-password { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.libre-password-input { box-sizing: border-box; width: min(280px, 100%); height: 34px; margin-top: 4px; padding-inline: 10px;
+  border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); color: var(--awd-text);
+  font-size: 13px; text-align: start; direction: ltr; }
+.libre-password-error { font-size: 12px; color: var(--awd-danger); }
+.libre-password-submit.busy { opacity: 0.6; cursor: progress; }
+.libre-password + .libre-loading-retry { margin-top: 6px; }
 .libre-preview-host { position: absolute; inset: 0; top: 34px; overflow-y: auto; background: var(--awd-surface-2); }
 /* docx-preview 生成的页面居中呈现（deep：内容是运行时注入的非 scoped DOM） */
 .libre-preview-host :deep(.docx-wrapper) { background: transparent; padding: 16px 0; }
