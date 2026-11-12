@@ -1507,6 +1507,30 @@ function parseColor(v, names) {
 }
 // Set a char property together with its Asian/Complex siblings so CJK runs
 // (the product's main language) pick up the format too.
+// 文字颜色：pptx/xlsx/docx 里常见主题色（schemeClr dk1 等）。LO 24.2 只写 CharColor 时主题链接仍在，
+// 导出照样写回主题色，用户看到的颜色没变（office-tier1 实测「改成红色」落盘仍是 dk1）。
+// 写具体颜色时同时把 CharColorTheme 置 -1 断开主题；auto(-1) 不动主题。
+function setCharColor(ps, color) {
+  ps.setPropertyValue('CharColor', color);
+  if (color === -1) return;
+  try {
+    const info = ps.getPropertySetInfo && ps.getPropertySetInfo();
+    if (info && info.hasPropertyByName('CharColorTheme')) ps.setPropertyValue('CharColorTheme', new zetajs.Any(zetajs.type.short, -1));
+  } catch (e) { /* 无主题属性的对象（图表标题等）照常 */ }
+}
+// Calc 单元格字体颜色：工作簿默认样式带主题色（openpyxl/Excel 生成的 xlsx 常见）时，单元格区域没有
+// CharColorTheme，API 写 CharColor 断不开 CharComplexColor 的主题链接，导出仍是 <color theme="1"/>。
+// 走界面同一条 .uno:Color 派发（真引擎实测导出 rgb="FFC00000"），失败再退回属性写入。
+function setCalcFontColor(range, color) {
+  if (color !== -1) {
+    try {
+      ctrl.select(range);
+      css.frame.DispatchHelper.create(context).executeDispatch(ctrl.getFrame(), '.uno:Color', '', 0, [mkProp('Color', color)]);
+      if (Number(range.getPropertyValue('CharColor')) === color) return;
+    } catch (e) { /* 退回属性写入 */ }
+  }
+  setCharColor(range, color);
+}
 function setCharProp(ps, base, value) {
   ps.setPropertyValue(base, value);
   for (const sfx of ['Asian', 'Complex']) {
@@ -1830,7 +1854,7 @@ function applyHouseChar(ps, opts) {
   if (!o.keepWeight) {
     try { setCharProp(ps, 'CharWeight', o.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL); } catch (e) {}
   }
-  try { ps.setPropertyValue('CharColor', color); } catch (e) {}
+  try { setCharColor(ps, color); } catch (e) {}
 }
 // 同时对段落对象与跨整段的 XTextCursor 设字符格式，确保 Word 导入的 <w:rPr> run 级直接格式被覆盖。
 function applyHouseCharDeep(el, opts) {
@@ -2337,6 +2361,40 @@ function sheetRangeName(addr) {
 }
 // 绝对引用形式的单元格坐标（'$A$1'），命名区域公式拼接用。
 function absCellRef(col, row) { return '$' + colLetterOf(col) + '$' + (row + 1); }
+// 结构改动后的「新现状」（office-tier1）：页码 / 行列号整体漂移后，模型若仍按旧编号接着改就会改错对象。
+// 删页 / 移页 / 插页回执带当前页序；插删行列回执带新的已用区域与第 1 行（表头）的「地址=值」。
+function slidePageListBrief() {
+  const out = [];
+  try {
+    const pages = xModel.getDrawPages();
+    for (let i = 0; i < pages.getCount(); i++) {
+      let title = '';
+      try {
+        const page = pages.getByIndex(i);
+        for (let s = 0; s < page.getCount(); s++) {
+          const shape = page.getByIndex(s);
+          if (shapeKind(shape) === 'title') { title = shapeText(shape); break; }
+        }
+      } catch (e) {}
+      out.push({ number: i + 1, title: String(title || '').slice(0, 40) });
+    }
+  } catch (e) {}
+  return out;
+}
+function sheetLayoutBrief(sheet) {
+  const out = {};
+  try {
+    const a = usedRangeAddress(sheet);
+    out.usedRange = sheetRangeName(a);
+    const header = {};
+    for (let c = a.StartColumn; c <= Math.min(a.EndColumn, a.StartColumn + 14); c++) {
+      const v = readCellOut(sheet.getCellByPosition(c, a.StartRow));
+      if (v !== '') header[colLetterOf(c) + (a.StartRow + 1)] = v;
+    }
+    out.headerRow = header;
+  } catch (e) {}
+  return out;
+}
 function usedRangeAddress(sheet) {
   const cur = sheet.createCursor();
   cur.gotoStartOfUsedArea(false);
@@ -2364,6 +2422,72 @@ function readCellOut(cell) {
 // 写入时把"长得像数字"的字符串落成数值（同 NUMERIC_CELL_RE 的 house 口径，但
 // 更严格：前导 0 的编号（如 '001'）保持文本，避免证照号/编号被吞前导零）。
 const SHEET_NUMERIC_RE = /^-?(0|[1-9]\d*)(\.\d+)?$/;
+// 写入字符串的类型判定（office-tier1）：只认律师表格里常见、无歧义的写法，并给出该落的数字格式。
+// 返回 { text } 保持文本，或 { value, format }（format 为 null 表示不改格式）。
+// - 超过 15 位有效数字的数字串（身份证号、银行卡号）保持文本：Calc/Excel 的双精度只有 15 位，落成数值会吞掉尾数；
+// - 千分位「10,000」「1,234.56」、百分比「15%」、日期「2024-01-01」「2024/1/5」「2024年1月5日」、
+//   带 ¥/￥ 的金额按数值写入并配对应格式，否则求和会把它们当文本静默跳过；
+// - 「3/4」「TRUE」「12:30」「001」等仍按原样处理（不猜）。
+function sheetTypedInput(raw) {
+  const s = String(raw).trim();
+  if (SHEET_NUMERIC_RE.test(s)) {
+    if (s.replace(/^-/, '').replace('.', '').replace(/^0+/, '').length > 15) return { text: s };
+    return { value: Number(s), format: null };
+  }
+  let m = /^([-+]?)([¥￥]?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?$/.exec(s);
+  if (m && (m[2] || m[3].includes(','))) {
+    const digits = m[3].replace(/,/g, '');
+    if (digits.length + (m[4] ? m[4].length - 1 : 0) > 15) return { text: s };
+    const dec = m[4] ? m[4].length - 1 : 0;
+    const body = '#,##0' + (dec ? '.' + '0'.repeat(dec) : '');
+    return { value: Number(m[1] + digits + (m[4] || '')), format: m[2] ? '"¥"' + body : body };
+  }
+  m = /^([-+]?\d+(?:\.(\d+))?)%$/.exec(s);
+  if (m) {
+    const dec = m[2] ? m[2].length : 0;
+    return { value: Number((Number(m[1]) / 100).toFixed(dec + 2)), format: '0' + (dec ? '.' + '0'.repeat(dec) : '') + '%' };
+  }
+  m = /^(\d{4})(?:([-/])(\d{1,2})\2(\d{1,2})|年(\d{1,2})月(\d{1,2})日)$/.exec(s);
+  if (m) {
+    const y = Number(m[1]), mo = Number(m[3] || m[5]), d = Number(m[4] || m[6]);
+    const t = Date.UTC(y, mo - 1, d);
+    const back = new Date(t);
+    if (y < 1900 || back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) return { text: s };
+    return { value: Math.round((t - Date.UTC(1899, 11, 30)) / 86400000), format: m[5] ? 'yyyy"年"m"月"d"日"' : 'yyyy-mm-dd' };
+  }
+  return { text: s };
+}
+// 数字格式是日期/时间类时返回单元格显示文本，否则 null。按格式键缓存类型判定。
+function sheetDateText(cell, cache) {
+  try {
+    const key = cell.getPropertyValue('NumberFormat');
+    let isDate = cache.get(key);
+    if (isDate == null) {
+      const type = Number(xModel.getNumberFormats().getByKey(key).getPropertyValue('Type'));
+      const NF = css.util.NumberFormat;
+      const mask = (NF && NF.DATE != null ? NF.DATE : 2) | (NF && NF.TIME != null ? NF.TIME : 4);
+      isDate = (type & mask) !== 0;
+      cache.set(key, isDate);
+    }
+    return isDate ? String(cell.getString()) : null;
+  } catch (e) { return null; }
+}
+function sheetCellIsGeneral(cell) {
+  try {
+    const key = cell.getPropertyValue('NumberFormat');
+    const fs = xModel.getNumberFormats().getByKey(key).getPropertyValue('FormatString');
+    return /^(General|Standard)$/i.test(String(fs));
+  } catch (e) { return false; }
+}
+function setCellNumberFormat(cell, fmt) {
+  try {
+    const formats = xModel.getNumberFormats();
+    const loc = new css.lang.Locale({ Language: '', Country: '', Variant: '' });
+    let key = formats.queryKey(fmt, loc, false);
+    if (key === -1) key = formats.addNew(fmt, loc);
+    cell.setPropertyValue('NumberFormat', key);
+  } catch (e) { /* 格式失败不影响已写入的数值 */ }
+}
 // 列标解析：'B'→1、'AA'→26；也接受 1 开始的数字串（'2'→1）。返回 0 开始的列号，无效返回 -1。
 function colIndexOf(s) {
   const t = String(s == null ? '' : s).trim().toUpperCase();
@@ -2759,6 +2883,34 @@ function locatePageIndex(page, out) {
 // 把 page 逐步移动到 toIndex（0-based），每步之间用 Number 属性核对是否真的挪动
 // 了一步再继续——.uno:MovePageUp/Down 偶发不生效，不能假设一次 dispatch 必定
 // 生效一步。不处理"挪进真正最后一页"这个特殊情形（见 movePageTo）。
+// .uno:MovePage* 是界面派发：刚插过页、刚打开文档时，引擎主循环还没处理完上一步，派发会被静默忽略
+// （office-tier1 实测：插页后立即移页原地不动，等 1.5s 再移就成）。没挪到位时让出事件循环再试，
+// 最多约 1.5s；仍失败才如实报错。
+//
+// 另一种静默失效（office-tier1 实测）：宿主把菜单栏、状态栏、工具栏三样**同时**藏掉后，
+// .uno:MovePage* 派发一律不生效（任两样藏掉都正常）；把状态栏显示一下再藏回去即恢复，且之后一直正常。
+// 所以第一次没挪动时先做这一步（每份文档至多一次、状态栏一闪），再按上面的节奏重试。
+async function slideMoveRetry(page, from, to, toIndex) {
+  let finalIndex = -1;
+  try {
+    const shown = EXEC.set_chrome({ statusbar: true });
+    if (shown && shown.applied && shown.applied.statusbar === true) EXEC.set_chrome({ statusbar: false });
+    finalIndex = movePageTo(page, toIndex);
+    if (finalIndex === toIndex) {
+      return { success: true, from: from + 1, to: to, slides: slidePageListBrief(), note: '页码已重排，后续操作以 slides 里的新页码为准' };
+    }
+  } catch (e) { /* 照常走下面的让出重试 */ }
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try { Module.resumeMainLoop(); } catch (e) {}
+    await new Promise(function (r) { setTimeout(r, 150); });
+    finalIndex = movePageTo(page, toIndex);
+    if (finalIndex === toIndex) {
+      return { success: true, from: from + 1, to: to, slides: slidePageListBrief(), note: '页码已重排，后续操作以 slides 里的新页码为准' };
+    }
+    if (finalIndex < 0) break;
+  }
+  return slideFail('移动幻灯片未达预期位置: 目标第 ' + to + ' 页，实际落在第 ' + (finalIndex + 1) + ' 页');
+}
 function movePageStepwise(page, toIndex, maxSteps) {
   const cap = maxSteps || 50;
   let curIndex = -1;
@@ -3029,6 +3181,10 @@ function slideReplaceTextRange(text, search, replacement, all) {
     if (offsets[i] && !cur.goRight(offsets[i], false)) throw new Error('Cannot locate replacement start');
     if (!cur.goRight(search.length, true) || cur.getString() !== search) throw new Error('Replacement text changed');
     cur.setString(replacement);
+    // Title placeholders keep the pre-edit portion length until the text is read again:
+    // exporting right after the write truncated 「案件概况」→「案件基本情况」 to 「案件基本」.
+    // Reading the frame back re-syncs it (office-tier1, 2026-11-12).
+    text.getString();
     // Impress text UNO writes do not set the model dirty or emit modify events.
     // Mark each completed edit so a later failed replacement still gets saved.
     xModel.setModified(true);
@@ -3850,6 +4006,7 @@ function rememberInlineUndo() {
 }
 // One undo or redo step through `run` (the UndoManager, or Writer's own command).
 function undoStep(um, kind, run) {
+  noteRedlinesMayHaveBeenRemoved();
   const other = kind === 'undo' ? 'redo' : 'undo';
   const detour = isWriterDoc() && readShowChangesInMargin() === true
     && sameUndoEntry(inlineUndoEntries[kind], topUndoEntry(um, kind));
@@ -3898,14 +4055,34 @@ function resetRevisionView() { return applyRevisionView(DEFAULT_REVISION_VIEW); 
 // Writer's final-text view can lose/rename the private bookmarks that its DOCX
 // exporter uses for move ranges, while native RedlineMovedID remains intact.
 // Restore only complete native pairs; never infer movement from matching text.
+// 逐条取 redline 在这个引擎上每条 2–7ms：4107 条修订的定稿每次导出（=每次自动保存）白耗 10s
+// （office-tier1 实测 article.docx：导出 11.7s，其中本函数 10.3s，引擎 storeToURL 只 0.9s）。
+// 跳过条件：上次全扫整篇没有移动、期间没有接受/拒绝/撤销/重做/重载（纪元未变），且条数只增加了 0 或 1。
+// 新的移动对要新增 ≥2 条 redline 才会出现（修订模式下打字通常每处只 +1，不能因此每次全扫）。
+// 已知取舍：引擎把一条新插入与「早已存在的同文删除」配成移动时只 +1，这一次会漏修书签——
+// 后果是 Word 里显示为普通删除+插入而不是移动（与 2026-10 加修复前相同），正文不丢；下次条数 +2 或纪元变化即补扫。
+let moveRepairCache = { model: null, count: -1, epoch: -1 };
+let redlineRemovalEpoch = 0;
+function noteRedlinesMayHaveBeenRemoved() { redlineRemovalEpoch++; }
 function repairMoveRangeBookmarks() {
   if (!isWriterDoc()) return;
+  let count = -1;
+  try { count = xModel.getRedlines().getCount(); } catch (e) { count = -1; }
+  if (count === 0) return;
+  if (count > 0 && moveRepairCache.model === xModel && moveRepairCache.epoch === redlineRemovalEpoch
+    && count - moveRepairCache.count >= 0 && count - moveRepairCache.count <= 1) {
+    moveRepairCache.count = count;
+    return;
+  }
+  const scanned = { model: xModel, count: count, epoch: redlineRemovalEpoch };
   const groups = Object.create(null), en = xModel.getRedlines().createEnumeration();
+  let sawMove = false;
   while (en.hasMoreElements()) {
     const redline = en.nextElement();
     let id;
     try { id = Number(redline.getPropertyValue('RedlineMovedID')); } catch (e) { return; }
     if (!(id > 1)) continue;
+    sawMove = true;
     const type = String(redline.getPropertyValue('RedlineType'));
     if (type !== 'Delete' && type !== 'Insert') continue;
     const group = groups[id] || (groups[id] = { Delete: [], Insert: [] });
@@ -3914,6 +4091,8 @@ function repairMoveRangeBookmarks() {
     if (start.getText().compareRegionStarts(start, end) < 0) { const tmp = start; start = end; end = tmp; }
     group[type].push({ start: start, end: end });
   }
+  // 只有确认整篇没有任何移动 redline 时才记缓存；有移动的文档每次导出都照旧核对配对书签
+  if (!sawMove) moveRepairCache = scanned;
   const ids = Object.keys(groups).filter(id => groups[id].Delete.length && groups[id].Insert.length);
   if (!ids.length) return;
   const span = function (parts) {
@@ -7267,7 +7446,7 @@ const EXEC = {
       if (ulSpec != null) target.setPropertyValue('CharUnderline', ulSpec.value);
       if (p.strikeout != null) target.setPropertyValue('CharStrikeout', p.strikeout ? css.awt.FontStrikeout.SINGLE : css.awt.FontStrikeout.NONE);
       if (hiColor != null) target.setPropertyValue('CharHighlight', hiColor);
-      if (fgColor != null) target.setPropertyValue('CharColor', fgColor);
+      if (fgColor != null) setCharColor(target, fgColor);
       if (parsedSize != null) setCharProp(target, 'CharHeight', parsedSize);
       if (p.fontName != null) setCharProp(target, 'CharFontName', String(p.fontName));
       // 西文字体单独设（不覆盖 CharFontNameAsian）；中文字体单独设时放在后面确保生效
@@ -9972,11 +10151,14 @@ const EXEC = {
     const rowCap = Math.min(nRows, Math.max(1, Math.floor(MAX_CELLS / colCap)));
     const rows = [];
     const formulas = [];
+    const dateFmtCache = new Map();
     for (let r = 0; r < rowCap; r++) {
       const row = [];
       for (let c = 0; c < colCap; c++) {
         const cell = range.getCellByPosition(c, r);
-        row.push(readCellOut(cell));
+        const v = readCellOut(cell);
+        // 日期/时间格式的数值回显示文本（office-tier1）：只给序列号 45718 时模型会照念或算错日期
+        row.push(typeof v === 'number' ? (sheetDateText(cell, dateFmtCache) ?? v) : v);
         try {
           if (enumEq(cell.getType(), css.table.CellContentType.FORMULA)) {
             formulas.push({ cell: colLetterOf(addr.StartColumn + c) + (addr.StartRow + r + 1), formula: normalizeFormula(cell.getFormula(), true) });
@@ -10063,6 +10245,19 @@ const EXEC = {
       }
     }
     let written = 0;
+    // 被覆盖的原有非空值（office-tier1）：回执里点名「A2 原来是 …」，模型写错格时能看出来并改回
+    const overwrote = {};
+    let overwroteCount = 0;
+    for (let r = 0; r < rows.length && overwroteCount < 20; r++) {
+      const line = Array.isArray(rows[r]) ? rows[r] : [rows[r]];
+      for (let c = 0; c < line.length && overwroteCount < 20; c++) {
+        if (line[c] == null) continue;
+        try {
+          const old = readCellOut(sheet.getCellByPosition(a0.StartColumn + c, a0.StartRow + r));
+          if (old !== '' && String(old) !== String(line[c])) { overwrote[colLetterOf(a0.StartColumn + c) + (a0.StartRow + r + 1)] = old; overwroteCount++; }
+        } catch (e) {}
+      }
+    }
     const formulaCells = []; // 写完统一验错：解析失败/求值出错的公式要报给 AI 自纠
     // 追加到表格下方时沿用上一行格式（dev-board#844，判定见 shouldInheritRowFormat）。
     // inheritFormat 缺省开，显式 false 才关。逐行判定、逐行级联：多行追加时第 2 行
@@ -10101,8 +10296,15 @@ const EXEC = {
             cell.setFormula(normalizeFormula(s));
             formulaCells.push({ cell: cell, name: colLetterOf(a0.StartColumn + c) + (a0.StartRow + r + 1), input: s });
           }
-          else if (SHEET_NUMERIC_RE.test(s.trim())) cell.setValue(Number(s.trim()));
-          else cell.setString(s);
+          else {
+            const typed = sheetTypedInput(s);
+            if (typed.text != null) cell.setString(s);
+            else {
+              cell.setValue(typed.value);
+              // 只在单元格还是「常规」格式时配格式：已有日期/金额格式的列保留用户自己的格式
+              if (typed.format && sheetCellIsGeneral(cell)) setCellNumberFormat(cell, typed.format);
+            }
+          }
         }
         written++;
       }
@@ -10130,7 +10332,21 @@ const EXEC = {
       const vr = sheet.getCellRangeByName(wrote);
       for (let c = 0; c < Math.min(nCols, 10); c++) firstRowAfterWrite.push(readCellOut(vr.getCellByPosition(c, 0)));
     } catch (e) {}
-    const res = { success: true, sheet: sheet.getName(), range: wrote, cellsWritten: written, firstRowAfterWrite: firstRowAfterWrite };
+    // 带地址的回读（office-tier1）：首行、末行与每个公式格的「地址=值」。弱模型常把「合计」标签写进目标列、
+    // 公式被挤到右边一格；只给值列表看不出落点，有地址才能一眼对上「D10 应该是求和」。
+    const cellsAfterWrite = {};
+    try {
+      const vr = sheet.getCellRangeByName(wrote);
+      const put = (c, r) => { cellsAfterWrite[colLetterOf(a0.StartColumn + c) + (a0.StartRow + r + 1)] = readCellOut(vr.getCellByPosition(c, r)); };
+      for (let c = 0; c < Math.min(nCols, 10); c++) put(c, 0);
+      if (rows.length > 1) for (let c = 0; c < Math.min(nCols, 10); c++) put(c, rows.length - 1);
+      for (let i = 0; i < Math.min(formulaCells.length, 20); i++) cellsAfterWrite[formulaCells[i].name] = readCellOut(formulaCells[i].cell);
+    } catch (e) {}
+    const res = { success: true, sheet: sheet.getName(), range: wrote, cellsWritten: written, firstRowAfterWrite: firstRowAfterWrite, cellsAfterWrite: cellsAfterWrite };
+    if (overwroteCount) {
+      res.overwrote = overwrote;
+      res.overwroteNote = '这些格原有内容已被替换（左为地址、右为原值）；若不是用户要改的那一格，立刻把原值写回';
+    }
     if (formatInherited.length) {
       res.formatInherited = formatInherited;
       res.formatNote = '新写入的行位于表格下方且原本为空，已沿用上一行的格式（字体/字号/对齐/数字格式/边框/底色/行高）；from 是被沿用的行号。不需要时传 inheritFormat=false。';
@@ -10179,7 +10395,7 @@ const EXEC = {
     if (p.color != null) {
       const c = parseColor(p.color, { auto: -1 });
       if (c == null) return { success: false, message: 'bad color: ' + p.color + ' (use #RRGGBB or auto)' };
-      range.setPropertyValue('CharColor', c); applied.color = String(p.color);
+      setCalcFontColor(range, c); applied.color = String(p.color);
     }
     if (p.background != null) {
       const c = parseColor(p.background, { none: -1 });
@@ -10366,7 +10582,8 @@ const EXEC = {
       if (op.indexOf('insert') === 0) coll.insertByIndex(idx, count);
       else coll.removeByIndex(idx, count);
     } catch (e) { return { success: false, message: '行列操作失败: ' + errStr(e) }; }
-    return { success: true, op: op, start: String(startRaw), count: count, sheet: sheet.getName() };
+    return Object.assign({ success: true, op: op, start: String(startRaw), count: count, sheet: sheet.getName() }, sheetLayoutBrief(sheet),
+      { note: '行号/列标已整体移动，后续操作以这里的新地址为准' });
   },
   // [表格·结构] 合并/取消合并单元格区域（XMergeable）。合并后内容以左上格为准。
   sheet_merge_cells(p) {
@@ -10545,7 +10762,7 @@ const EXEC = {
       if (fgIn != null) {
         const c = parseColor(fgIn, { auto: -1 });
         if (c == null) return { success: false, message: 'bad color: ' + fgIn };
-        style.setPropertyValue('CharColor', c);
+        setCharColor(style, c);
       }
       if (p.bold) style.setPropertyValue('CharWeight', css.awt.FontWeight.BOLD);
       if (bgIn == null && fgIn == null && !p.bold) {
@@ -11203,7 +11420,7 @@ const EXEC = {
         const targets=[model.getTitle(),model.getLegend()];
         if(!circular && diagram.getPropertyValue('HasXAxis'))targets.push(diagram.getXAxis());
         if(!circular && diagram.getPropertyValue('HasYAxis'))targets.push(diagram.getYAxis());
-        for(const target of targets){if(p.fontSize!=null)target.setPropertyValue('CharHeight',new zetajs.Any(zetajs.type.float,p.fontSize));if(p.textColor!=null)target.setPropertyValue('CharColor',parseColor(p.textColor));}
+        for(const target of targets){if(p.fontSize!=null)target.setPropertyValue('CharHeight',new zetajs.Any(zetajs.type.float,p.fontSize));if(p.textColor!=null)setCharColor(target,parseColor(p.textColor));}
       }
       if(p.seriesColors!=null){
         const nativeSeries=model.getFirstDiagram().getCoordinateSystems().flatMap(system=>system.getChartTypes().flatMap(type=>type.getDataSeries()));
@@ -11675,7 +11892,10 @@ const EXEC = {
         ensureShapeNames(page);
         try { if (ctrl && ctrl.setCurrentPage) ctrl.setCurrentPage(page); } catch (e) {}
         let layoutOut = null; try { layoutOut = page.getPropertyValue('Layout'); } catch (e) {}
-        return { success: true, slideNumber: insertIndex + 1, layout: layoutOut };
+        const shapes = [];
+        try { for (let i = 0; i < page.getCount(); i++) { const sh = page.getByIndex(i); shapes.push({ shapeName: sh.getName(), kind: shapeKind(sh) }); } } catch (e) {}
+        return { success: true, slideNumber: insertIndex + 1, layout: layoutOut, shapes: shapes, slides: slidePageListBrief(),
+          note: '新页之后的页码都已后移一位，后续操作以 slides 里的新页码为准；改新页文字用 shapes 里的 shapeName' };
       } catch (e) { return partial('initialize', errStr(e)); }
     } finally {
       resumeModifyListener();
@@ -11691,7 +11911,7 @@ const EXEC = {
     try { pages = xModel.getDrawPages(); } catch (e) { return slideFail('读取幻灯片列表失败: ' + errStr(e)); }
     if (pages.getCount() <= 1) return slideFail('无法删除：演示文稿只剩最后一页');
     try { pages.remove(r0.page); } catch (e) { return slideFail('删除幻灯片失败: ' + errStr(e)); }
-    return { success: true, slideCount: pages.getCount() };
+    return { success: true, slideCount: pages.getCount(), slides: slidePageListBrief(), note: '页码已重排，后续操作以 slides 里的新页码为准' };
   },
   // [幻灯片·写] 把指定页移到新位置。XDrawPages 只有 insert/remove、无直接 move API
   // （GenericDrawPage.Number 只读），走 .uno:MovePageUp/Down/First/Last 派发（同「删除键
@@ -11712,10 +11932,11 @@ const EXEC = {
     const from = r0.index;
     const toIndex = to - 1;
     const finalIndex = movePageTo(r0.page, toIndex);
+    if (finalIndex !== toIndex && finalIndex >= 0) return slideMoveRetry(r0.page, from, to, toIndex);
     if (finalIndex !== toIndex) {
       return slideFail('移动幻灯片未达预期位置: 目标第 ' + to + ' 页，实际落在第 ' + (finalIndex + 1) + ' 页');
     }
-    return { success: true, from: from + 1, to: to };
+    return { success: true, from: from + 1, to: to, slides: slidePageListBrief(), note: '页码已重排，后续操作以 slides 里的新页码为准' };
   },
   // [幻灯片·写] 设置版式（AutoLayout short 常量）与/或母版（按名匹配 XMasterPagesSupplier）。
   // 至少给一个参数。
@@ -11782,7 +12003,7 @@ const EXEC = {
         cur.gotoStart(false); cur.gotoEnd(true);
         if (p.fontSize != null) setCharProp(cur, 'CharHeight', Number(p.fontSize));
         if (p.bold != null) setCharProp(cur, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL);
-        if (p.color != null) { const c = parseColor(p.color); if (c != null) setCharProp(cur, 'CharColor', c); }
+        if (p.color != null) { const c = parseColor(p.color); if (c != null) setCharColor(cur, c); }
       } catch (e) {}
     }
     ensureShapeNames(r0.page);
@@ -11952,7 +12173,7 @@ const EXEC = {
     if (p.color != null) {
       const c = parseColor(p.color, { auto: -1 });
       if (c == null) return slideFail('颜色格式非法: ' + p.color + '（用 #RRGGBB 或 auto）');
-      try { cur.setPropertyValue('CharColor', c); applied.color = String(p.color); }
+      try { setCharColor(cur, c); applied.color = String(p.color); }
       catch (e) { return slideFail('设置颜色失败: ' + errStr(e)); }
     }
     if (p.alignment != null) {
@@ -12215,7 +12436,7 @@ const EXEC = {
               if (p.fontName != null) setCharProp(cur, 'CharFontName', String(p.fontName));
               if (p.fontSize != null) setCharProp(cur, 'CharHeight', Number(p.fontSize));
               if (p.bold != null) setCharProp(cur, 'CharWeight', p.bold ? css.awt.FontWeight.BOLD : css.awt.FontWeight.NORMAL);
-              if (color != null) cur.setPropertyValue('CharColor', color);
+              if (color != null) setCharColor(cur, color);
               if (alignment != null) cur.setPropertyValue('ParaAdjust', alignment);
             }
             cellsOk++;
@@ -12570,6 +12791,7 @@ function execCommand(reqId, action, params) {
     return;
   }
   INFLIGHT[reqId] = true;
+  if (/revision|undo|redo|accept|reject|load_document|restore/.test(action)) noteRedlinesMayHaveBeenRemoved();
   let result;
   try {
     const p = params || {};
@@ -12591,11 +12813,22 @@ function execCommand(reqId, action, params) {
   } catch (e) {
     result = { success: false, message: errStr(e) };
   }
+  markSlideWriteModified(action, result);
   if (result && typeof result.then === 'function') {
     result.then(finish, function (e) { finish({ success: false, message: errStr(e) }); });
   } else {
     finish(result);
   }
+}
+
+// Impress 的不少 UNO 写入（备注、字符格式等）不置 modified、也不发修改事件：宿主收不到「有改动」，
+// 自动保存永远不触发，用户关掉就丢（office-tier1 实测 slide_write_notes / slide_format_text）。
+// 成功的 slide_* 写命令在这里统一标脏；读类命令按名排除。
+const SLIDE_READ_ACTION_RE = /^slide_(get_|read_|goto$|table_read$|count$|show_)/;
+function markSlideWriteModified(action, result) {
+  if (!/^slide_/.test(action) || SLIDE_READ_ACTION_RE.test(action)) return;
+  if (!result || typeof result.then === 'function' || result.success !== true) return;
+  try { if (isImpressDoc() && !xModel.isModified()) xModel.setModified(true); } catch (e) { /* ignore */ }
 }
 
 // ---- message loop --------------------------------------------------------

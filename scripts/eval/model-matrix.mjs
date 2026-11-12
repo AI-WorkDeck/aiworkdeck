@@ -14,6 +14,7 @@ import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readXlsx, readPptx, zipPart } from './office-xml.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const REPO = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: HERE, encoding: 'utf8' }).trim()
@@ -193,15 +194,18 @@ function loadSentences(file, only) {
   return list
 }
 const needsEditor = s => s.hostState !== 'nofile'
-// docx:<夹具> 的宿主文件：种子里自动加一份 合同.docx（hostFile 可改名）
+// <docx|pptx|xlsx>:<夹具> 的宿主文件：种子里自动加一份宿主文件（默认 合同.docx / 案件汇报.pptx / 案件台账.xlsx，hostFile 可改名）
+const HOST_RE = /^(docx|pptx|xlsx):(.+)$/
+const DEFAULT_HOST = { docx: '合同.docx', pptx: '案件汇报.pptx', xlsx: '案件台账.xlsx' }
+const hostFileName = s => s.hostFile || DEFAULT_HOST[HOST_RE.exec(s.hostState)?.[1]] || '合同.docx'
 function withHostFile(s) {
-  const m = /^docx:(.+)$/.exec(s.hostState)
-  if (!m) throw new Error(`hostState=${s.hostState} 暂不支持（目前只支持 nofile 与 docx:<夹具>）`)
+  const m = HOST_RE.exec(s.hostState)
+  if (!m) throw new Error(`hostState=${s.hostState} 暂不支持（目前只支持 nofile 与 docx:/pptx:/xlsx:<夹具>）`)
   const seed = { ...(s.seed || {}) }
-  seed.files = [{ name: s.hostFile || '合同.docx', fixture: m[1] + '.docx' }, ...(seed.files || [])]
+  seed.files = [{ name: hostFileName(s), fixture: `${m[2]}.${m[1]}` }, ...(seed.files || [])]
   return { ...s, seed }
 }
-const editorSupported = s => s.hostState === 'nofile' || s.hostState.startsWith('docx:')
+const editorSupported = s => s.hostState === 'nofile' || HOST_RE.test(s.hostState)
 
 // ---------- 评分 ----------
 const LEGACY_FINALTEXT_SLICE = 1500 // 旧版 runner 把 finalText 截到 1500 字再判 finalTextIncludes，新版存全文
@@ -677,7 +681,7 @@ async function runOne(inst, sentence, runIdx, opts) {
     await inst.reset()
     const pid = await inst.seed(needsEditor(sentence) ? withHostFile(sentence) : sentence)
     let c = needsEditor(sentence)
-      ? await inst.chatInEditor(opts.browser, pid, sentence, sentence.hostFile || '合同.docx', opts.runTimeout)
+      ? await inst.chatInEditor(opts.browser, pid, sentence, hostFileName(sentence), opts.runTimeout)
       : await inst.chat(pid, sentence.text, opts.runTimeout)
     // followUps（仅 API 句）：本轮以 whenStatus 结束时，在同一会话里发下一条脚本化的用户消息，每条最多用一次、按顺序。
     // 上一轮停在 ask_user 卡（确认卡/反问卡）时按卡片回答（Selected: - <text>），否则作为普通消息发出。
@@ -722,6 +726,10 @@ async function runOne(inst, sentence, runIdx, opts) {
         fs.writeFileSync(tmp, buf)
         try { return execFileSync('unzip', ['-p', tmp, part], { maxBuffer: 64 << 20 }).toString('utf8') } finally { fs.unlinkSync(tmp) }
       },
+      // xlsx/pptx：readXlsx(buf).sheet(名称) → { cells: { A1: { v, f } }, rows }；readPptx(buf) → [{ index, paragraphs, text, hasTable, hasChart, notes }]
+      xlsx: buf => readXlsx(buf), pptx: buf => readPptx(buf), zipPart,
+      // 按文件名取宿主（未删除、非文件夹）的字节
+      hostBytes: async name => { const f = (await inst.rows(`select id, name, is_folder, is_deleted from project_file where project_id=${pid} order by id`)).find(x => !x.is_deleted && !x.is_folder && x.name === name); return f ? Buffer.from(await (await fetch(`${inst.base}/api/files/${f.id}/download`, { headers: { 'X-Session-Id': inst.sid } })).arrayBuffer()) : null },
     }
     rec.checks = await judge(sentence, rec, ctx)
     rec.pass = rec.checks.pass

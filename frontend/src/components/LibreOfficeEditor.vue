@@ -214,6 +214,8 @@ import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
 import { buildAiFormatPrompt, buildAiSelectionRevisePrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import { getResolvedTheme, APP_THEME_EVENT } from '@/utils/appTheme.js'
+// 冷启动 PPT 只读预览的体量上限（office-tier1）：更大的演示文稿本地解析会拖慢引擎启动，直接等可编辑视图
+const PPTX_PREVIEW_MAX_BYTES = 15 * 1024 * 1024
 import { isEnglish, getAppLanguage } from '@/utils/appLanguage.js'
 import { stampApplication } from '@/utils/docxAppProps.js'
 import { documentStampApplication } from '@/utils/documentGeneratorSetting.js'
@@ -458,10 +460,10 @@ export default {
     openFailed() {
       return this.statusKey === STATUS_OPEN_FAILED
     },
-    // 只读预览只对 Word 生效（docx-preview）；表格/演示只给下载出口。
+    // 只读预览：Word 用 docx-preview，PPT 用 pptx-preview（office-tier1：冷启动时演示文稿也先给可读画面）；表格只给下载出口。
     canReadOnlyPreview() {
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
-      return t === 'docx' || t === 'doc'
+      return t === 'docx' || t === 'doc' || t === 'pptx'
     },
     loadingOverlayVisible() {
       // Model readiness precedes native menu hiding. Keep the guest covered
@@ -1805,19 +1807,25 @@ export default {
       if (!force && this._endpointUp) { this._previewSkippedForWarmEngine = true; return }
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
-      if (t !== 'docx' && t !== 'doc') return
+      if (t !== 'docx' && t !== 'doc' && t !== 'pptx') return
+      // 大演示文稿的本地解析会和引擎启动抢主线程：只给常见体量的 PPT 做冷启动预览
+      if (t === 'pptx' && !force && buf.byteLength > PPTX_PREVIEW_MAX_BYTES) return
       const seq = this._docLoadSeq, fileId = this.file?.id
       const generation = documentCheckpointGeneration(this.projectId, fileId)
       const current = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
         && generation === documentCheckpointGeneration(this.projectId, fileId)
       try {
-        const { renderAsync } = await import('docx-preview')
+        const renderer = t === 'pptx' ? await import('pptx-preview') : await import('docx-preview')
         await this.$nextTick() // 过继路径上 overlay 可能刚重新显示，等 ref 挂上
         const ref = this.$refs.docxPreviewHost
         const container = ref && (ref.$el || ref)
         if (!container || !current() || (!force && (this._endpointUp || this.ready))) return
         container.innerHTML = ''
-        await renderAsync(buf, container, null, {
+        if (t === 'pptx') {
+          const width = Math.max(320, (container.clientWidth || 960) - 32)
+          await renderer.init(container, { width, height: Math.round(width * 9 / 16) }).preview(buf)
+        } else {
+        await renderer.renderAsync(buf, container, null, {
           className: 'docx',
           inWrapper: true,
           ignoreWidth: false,
@@ -1825,6 +1833,7 @@ export default {
           breakPages: true,
           experimental: true,
         })
+        }
         if (!current() || (!force && this.ready)) return
         this.previewReady = true
         this.appendLog('只读预览就绪（引擎继续后台启动）')
@@ -1832,7 +1841,7 @@ export default {
       } catch (e) {
         if (!current()) return
         this.previewFailed = true
-        this.appendLog('docx 预览渲染失败（保留进度面板）: ' + (e && e.message ? e.message : e))
+        this.appendLog('只读预览渲染失败（保留进度面板）: ' + (e && e.message ? e.message : e))
         if (force) throw e
       }
     },
