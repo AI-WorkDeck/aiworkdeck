@@ -36,9 +36,10 @@ const flush = () => new Promise((r) => setTimeout(r, 0))
 
 function makeBrowserPane(server, bus) {
   const names = ['getApiBaseUrl', 'createProjectFavorite', 'getProjectFavorites', 'getMyFavorites',
-    'ICONS', 'host', 'shouldShowLoadError', 'loadErrorMessageKey', 'uni']
+    'ICONS', 'host', 'shouldShowLoadError', 'loadErrorMessageKey', 'uni', 'createBrowserProxyTicket']
   const deps = {
     getApiBaseUrl: () => '',
+    createBrowserProxyTicket: async () => ({ code: 0, data: { ticket: 't', expiresAt: Date.now() + 600000 } }),
     createProjectFavorite: async (pid, body) => {
       const row = { id: server.nextId++, sourceUrl: body.sourceUrl, title: body.title }
       server.rows.push(row)
