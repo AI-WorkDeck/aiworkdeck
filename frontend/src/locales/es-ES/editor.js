@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "No se puede abrir el documento: el editor no responde o el archivo está dañado",
     "encryptedTitle": "Este archivo está protegido con una contraseña de apertura que el editor aún no puede abrir. Quite la contraseña en Excel, Word, PowerPoint o WPS y vuelva a abrirlo, o descargue el original.",
+    "passwordPrompt": "Este archivo está protegido con una contraseña de apertura. Introduzca la contraseña para abrirlo.",
+    "passwordPlaceholder": "Contraseña",
+    "passwordOpen": "Abrir",
+    "passwordChecking": "Comprobando…",
+    "passwordWrong": "Contraseña incorrecta. Inténtelo de nuevo.",
+    "passwordError": "No se puede leer este archivo. Descargue el original para comprobarlo.",
+    "passwordNote": "La contraseña solo se usa para abrir el archivo y no se guarda. Al guardar, el archivo sigue cifrado con la misma contraseña.",
     "code": "Código de diagnóstico: {code}",
     "previewNotice": "No se pudo abrir el documento en el editor (código {code}); se muestra una vista previa de solo lectura",
     "readOnlyPreview": "Abrir vista previa de solo lectura",

@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "Belge açılamıyor: düzenleyici yanıt vermiyor veya dosya hasar görmüş",
     "encryptedTitle": "Bu dosya, düzenleyicinin henüz açamadığı bir açılış parolasıyla korunuyor. Parolayı Excel, Word, PowerPoint veya WPS’te kaldırıp yeniden açın ya da orijinal dosyayı indirin.",
+    "passwordPrompt": "Bu dosya bir açılış parolasıyla korunuyor. Açmak için parolayı girin.",
+    "passwordPlaceholder": "Parola",
+    "passwordOpen": "Aç",
+    "passwordChecking": "Denetleniyor…",
+    "passwordWrong": "Parola yanlış. Yeniden deneyin.",
+    "passwordError": "Bu dosya okunamadı. Denetlemek için orijinal dosyayı indirin.",
+    "passwordNote": "Parola yalnızca dosyayı açmak için kullanılır ve saklanmaz. Kaydederken dosya aynı parolayla şifreli kalır.",
     "code": "Tanılama kodu: {code}",
     "previewNotice": "Belge düzenleyicide açılamadı (kod {code}); salt okunur önizleme gösteriliyor",
     "readOnlyPreview": "Salt okunur önizlemeyi aç",

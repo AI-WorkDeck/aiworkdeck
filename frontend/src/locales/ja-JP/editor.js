@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "文書を開けません：エディタが応答しないか、ファイルが破損しています",
     "encryptedTitle": "このファイルには読み取りパスワードが設定されているため、エディタではまだ開けません。Excel・Word・PowerPoint または WPS でパスワードを解除してから開き直すか、元のファイルをダウンロードしてください。",
+    "passwordPrompt": "このファイルには読み取りパスワードが設定されています。パスワードを入力してください。",
+    "passwordPlaceholder": "パスワード",
+    "passwordOpen": "開く",
+    "passwordChecking": "確認しています…",
+    "passwordWrong": "パスワードが正しくありません。もう一度お試しください。",
+    "passwordError": "このファイルを読み取れません。元のファイルをダウンロードして確認してください。",
+    "passwordNote": "パスワードは今回開くためだけに使われ、保存されません。保存時も同じパスワードで暗号化されます。",
     "code": "診断コード：{code}",
     "previewNotice": "エディタで文書を開けなかったため（診断コード：{code}）、読み取り専用プレビューを表示しています",
     "readOnlyPreview": "読み取り専用プレビューで開く",

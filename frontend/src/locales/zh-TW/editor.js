@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "文檔無法打開：引擎無響應或文件損壞",
     "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",
+    "passwordPrompt": "這個檔案設定了開啟密碼，請輸入密碼。",
+    "passwordPlaceholder": "開啟密碼",
+    "passwordOpen": "開啟",
+    "passwordChecking": "正在驗證…",
+    "passwordWrong": "密碼不正確，請再試一次。",
+    "passwordError": "無法讀取這個檔案，請下載原始檔案後檢查。",
+    "passwordNote": "密碼只用於這次開啟，不會儲存；儲存時仍按原密碼加密。",
     "code": "診斷碼：{code}",
     "previewNotice": "文檔無法在編輯器中打開（診斷碼：{code}），以下為只讀預覽",
     "readOnlyPreview": "用只讀預覽打開",

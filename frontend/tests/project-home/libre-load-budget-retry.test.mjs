@@ -27,13 +27,14 @@ function loadOptions() {
   const body = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
+    .replace(/import\('@\/utils\/officeEncryption\.js'\)/g, '__officeEncryption()')
     .replace(/export default \{/, 'return {')
-  const factory = new Function(...Object.keys(barriers),
+  const factory = new Function('__officeEncryption', ...Object.keys(barriers),
     'getFileBytesUrl', 'getCurrentUser', 'createRelayExecutor',
     'webviewTransport', 'iframeTransport', 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar',
     'getAuthHeaders', 'host', 'classifyLoadFailure', 'shouldSelfHealLoadFailure',
     'createAuthorNameResolver', 'loadBudgetMs', 'openFailureOf', 'STATUS_OPEN_FAILED', 'DIAG_DOC_REJECTED', 'DIAG_DOC_ENCRYPTED', 'isEncryptedOoxml', body)
-  return factory(...Object.values(barriers), (id) => '/download/' + id, () => ({ name: '测试用户' }),
+  return factory(() => import('../../src/utils/officeEncryption.js'), ...Object.values(barriers), (id) => '/download/' + id, () => ({ name: '测试用户' }),
     null, null, null, null, null, null, null,
     { zetaoffice: { getEditor: async () => ({ kind: 'iframe', url: 'about:blank' }) } },
     classifyLoadFailure, shouldSelfHealLoadFailure, createAuthorNameResolver,
@@ -119,16 +120,69 @@ test('引擎明确拒收（DOC_REJECTED）：直接落「文档无法打开」+ 
     '失败原因与出路只有加载面板能放，终态下面板必须留着')
 })
 
-test('设了打开密码的 xlsx 被拒收：诊断码改为 DOC_ENCRYPTED，普通拒收仍是 DOC_REJECTED（office-tier1）', async () => {
+test('普通拒收仍是 DOC_REJECTED；CFB 头但不是加密包的 xlsx 落 DOC_ENCRYPTED 等用户输密码，不交给引擎', async () => {
   const cfb = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]).buffer
-  for (const [bytes, want] of [[cfb, DIAG_DOC_ENCRYPTED], [new ArrayBuffer(16), DIAG_DOC_REJECTED]]) {
+  for (const [bytes, want, engineCalls] of [[cfb, DIAG_DOC_ENCRYPTED, 0], [new ArrayBuffer(16), DIAG_DOC_REJECTED, 1]]) {
     const vm = makeVm(async () => ({ success: false, code: 'DOC_REJECTED', message: 'load_document failed' }))
     vm.file = { id: 7, name: '员工信息.xlsx', fileType: 'xlsx', fileSize: 16 }
     vm._bytesPromise = Promise.resolve(bytes)
     await vm.finishDocLoad()
     assert.equal(vm.statusKey, STATUS_OPEN_FAILED)
     assert.equal(vm.openFailCode, want)
+    assert.equal(vm.calls.filter(c => c.action === 'load_document').length, engineCalls)
   }
+})
+
+test('设了打开密码（O14）：输对密码后引擎拿到明文；保存按原密码重新加密；重载沿用密钥；明文文件清掉密钥', async () => {
+  const { decryptOoxml } = await import('../../src/utils/officeEncryption.js')
+  const encrypted = new Uint8Array(readFileSync(new URL('../lowa-e2e/fixtures/encrypted/case-ledger.xlsx', import.meta.url)))
+  const plain = new Uint8Array(readFileSync(new URL('../../../scripts/eval/fixtures/case-ledger.xlsx', import.meta.url)))
+  const vm = makeVm(async (action) => action === 'load_document' ? { success: true, kind: 'calc' } : { success: true })
+  vm.file = { id: 7, name: '案件台账.xlsx', fileType: 'xlsx', fileSize: encrypted.length }
+  vm.passwordInput = ''
+  vm.passwordState = ''
+  vm.passwordAttempts = 0
+  for (const name of ['submitPassword', 'sealForStorage', 'scheduleSlidePreviewCapture']) vm[name] = METHODS[name].bind(vm)
+  vm._bytesPromise = Promise.resolve(encrypted.slice().buffer)
+  const loads = () => vm.calls.filter(c => c.action === 'load_document' && c.params.bytes)
+
+  await vm.finishDocLoad()
+  assert.equal(vm.openFailCode, DIAG_DOC_ENCRYPTED)
+  assert.equal(vm.docLoadFailed, true, '没解开之前保存闸关着')
+  assert.equal(loads().length, 0, '密文不交给引擎')
+
+  vm.passwordInput = 'awd-0415'
+  await vm.submitPassword()
+  assert.equal(vm.passwordState, 'wrong')
+  assert.equal(vm.passwordInput, '', '输错清空，直接重输')
+  assert.equal(vm.openFailCode, DIAG_DOC_ENCRYPTED)
+
+  // 回车时 v-model 还没跟上（只到 'awd-0'）：以输入框随 confirm 事件带来的值为准
+  vm.passwordInput = 'awd-0'
+  await vm.submitPassword({ detail: { value: 'awd-0414' } })
+  for (let i = 0; i < 50 && vm.statusKey !== 'ready'; i++) await tick()
+  assert.equal(vm.statusKey, 'ready')
+  assert.equal(vm.docLoadFailed, false)
+  assert.equal(vm.passwordInput, '', '密码提交后不留在组件里')
+  assert.deepEqual(new Uint8Array(loads().at(-1).params.bytes), plain, '引擎拿到的是解开的明文')
+
+  const sealed = await vm.sealForStorage(plain, 7)
+  assert.equal(isEncryptedOoxml(sealed, 'a.xlsx'), true, '保存出去仍是加密文件')
+  assert.deepEqual((await decryptOoxml(sealed, 'awd-0414')).plain, plain, '原密码能打开保存后的文件')
+  await assert.rejects(vm.sealForStorage(plain, 8), '换了文件 id 绝不按别的文件的密钥写，也不写明文')
+
+  // 保存后的重载 / 引擎重启：用内存里的文件密钥直接解，不再问密码
+  vm._bytesPromise = Promise.resolve(sealed.slice().buffer)
+  await vm.finishDocLoad()
+  assert.equal(vm.openFailCode, '')
+  assert.deepEqual(new Uint8Array(loads().at(-1).params.bytes), plain)
+  assert.ok(vm._docCrypto, '重载后仍按密码保存')
+
+  // 文件在别处去掉了密码：明文装载后清掉密钥，之后保存写明文（与磁盘上的文件一致）
+  vm._bytesPromise = Promise.resolve(plain.slice().buffer)
+  await vm.finishDocLoad()
+  assert.equal(vm._docCrypto, null)
+  assert.equal(await vm.sealForStorage(plain, 7), plain)
 })
 
 test('第一次超时自愈重装一次；第二次超时落「文档无法打开」+ EDITOR_LOAD_TIMEOUT', async () => {

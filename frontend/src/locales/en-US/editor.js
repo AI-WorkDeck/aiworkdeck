@@ -138,6 +138,13 @@ export default {
   openFailed: {
     title: 'The document cannot be opened: the editor is not responding or the file is damaged',
     encryptedTitle: 'This file is protected with an open password, which the editor can’t open yet. Remove the password in Excel, Word, PowerPoint or WPS and open it again, or download the original.',
+    passwordPrompt: 'This file is protected with an open password. Enter the password to open it.',
+    passwordPlaceholder: 'Password',
+    passwordOpen: 'Open',
+    passwordChecking: 'Checking…',
+    passwordWrong: 'Incorrect password. Try again.',
+    passwordError: 'This file couldn’t be read. Download the original to check it.',
+    passwordNote: 'The password is used only to open the file and isn’t stored. Saves keep the file encrypted with the same password.',
     code: 'Diagnostic code: {code}',
     previewNotice: 'The document could not be opened in the editor (code {code}); showing a read-only preview',
     readOnlyPreview: 'Open read-only preview',

@@ -135,6 +135,13 @@ export default {
   "openFailed": {
     "title": "문서를 열 수 없습니다: 편집기가 응답하지 않거나 파일이 손상되었습니다",
     "encryptedTitle": "이 파일에는 열기 암호가 설정되어 있어 편집기에서 아직 열 수 없습니다. Excel, Word, PowerPoint 또는 WPS에서 암호를 해제한 뒤 다시 열거나 원본 파일을 다운로드하세요.",
+    "passwordPrompt": "이 파일에는 열기 암호가 설정되어 있습니다. 암호를 입력하세요.",
+    "passwordPlaceholder": "암호",
+    "passwordOpen": "열기",
+    "passwordChecking": "확인 중…",
+    "passwordWrong": "암호가 올바르지 않습니다. 다시 시도하세요.",
+    "passwordError": "이 파일을 읽을 수 없습니다. 원본 파일을 다운로드해 확인하세요.",
+    "passwordNote": "암호는 이번에 파일을 여는 데만 사용되며 저장되지 않습니다. 저장할 때도 같은 암호로 암호화됩니다.",
     "code": "진단 코드: {code}",
     "previewNotice": "편집기에서 문서를 열 수 없습니다(코드 {code}). 읽기 전용 미리보기를 표시합니다",
     "readOnlyPreview": "읽기 전용 미리보기로 열기",
