@@ -354,7 +354,8 @@ async function checkFile(src) {
   r.autosaveLanded = await until(() => fs.statSync(file).mtimeMs > mtime0, 120000, 300).then(() => true).catch(() => false)
   await until(() => editor(name, e => !e.saving && !e.dirty), 60000, 300).catch(() => {})
   r.diskStillEncrypted = isCfb(file)
-  r.diskDecryptsWithPassword = await decryptedText(file, PASSWORD).then(t => t.includes(TYPED)).catch(e => 'error: ' + e.message)
+  // 第一笔自动保存可能早于单元格提交（编辑态未提交的字不在导出里），按产品节奏等后续那笔
+  r.diskDecryptsWithPassword = await until(() => decryptedText(file, PASSWORD).then(t => t.includes(TYPED)), 90000, 1000).then(() => true).catch(e => 'error: ' + e.message)
   r.diskRejectsWrongPassword = await decryptedText(file, 'wrong-password').then(() => false).catch(() => true)
   await close(name)
   // 重开：新实例不带密钥，必须再次要密码；输入后内容含编辑
