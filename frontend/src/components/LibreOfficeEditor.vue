@@ -22,7 +22,7 @@
         <!-- 设了打开密码（O14）：在这里输密码，宿主解密后交给引擎；不支持的加密方式退回原说明 -->
         <view v-if="passwordPromptVisible" class="libre-password">
           <text class="libre-loading-error">{{ $t('editor.openFailed.passwordPrompt') }}</text>
-          <input v-model="passwordInput" class="libre-password-input" type="password" password focus
+          <input :key="'pw' + passwordAttempts" v-model="passwordInput" class="libre-password-input" type="password" password focus
             :placeholder="$t('editor.openFailed.passwordPlaceholder')" :disabled="passwordState === 'checking'" @confirm="submitPassword" />
           <text v-if="passwordState === 'wrong' || passwordState === 'error'" class="libre-password-error">
             {{ passwordState === 'wrong' ? $t('editor.openFailed.passwordWrong') : $t('editor.openFailed.passwordError') }}
@@ -392,6 +392,7 @@ export default {
       // 打开密码框（O14）：输入值只在提交前存在；state '' | checking | wrong | error | unsupported
       passwordInput: '',
       passwordState: '',
+      passwordAttempts: 0,
       // 客体页 boot 失败时的原因串（lo-relay 'boot-failed'），显示在加载面板上。
       bootFailReason: '',
       // 改字 stale 提示条当前展示的条目 [{linkKey, text, link}]（合并规则见 StaleQueue）
@@ -3035,7 +3036,8 @@ export default {
       } catch (e) {
         if (fileId !== this.file?.id) return
         this.passwordState = e?.code === 'WRONG_PASSWORD' ? 'wrong' : e?.code === 'UNSUPPORTED_ENCRYPTION' ? 'unsupported' : 'error'
-        if (e?.code === 'WRONG_PASSWORD') this.passwordInput = '' // 同系统登录框：输错清空，直接重输
+        // 同系统登录框：输错清空、重新聚焦。uni 的 input 不随 v-model 置空刷新，换 key 重建它
+        if (e?.code === 'WRONG_PASSWORD') { this.passwordInput = ''; this.passwordAttempts++ }
       }
     },
     // 文档 Generator 元数据（可溯源性设计规范附录 B4）：把导出件 docProps/app.xml 的

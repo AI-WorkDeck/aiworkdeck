@@ -148,6 +148,22 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 
 测试 `tests/lowa-unit/xlsx-quick-preview.test.mjs`。
 
+**设了打开密码的 Word/Excel/PPT（office-tier1 O14）**：LOWA 24.2 引擎带不带 `Password` 都拒收加密 OOXML（真机探针：
+三种格式、file/stream 两条路、带/不带 FilterName 一律返回 null），所以由宿主解：`utils/officeEncryption.js`
+（MS-OFFCRYPTO Agile，WebCrypto + `cfb` 读写复合文档）。链路：`loadDocument` 发现 CFB 头 → 手里没有密钥就抛
+`DOC_ENCRYPTED`（**密文不发给引擎**）→ 加载面板显示密码框（`passwordPromptVisible`/`submitPassword`）→ 宿主验密码、
+拿到文件密钥 `_pendingCrypto` → 重走装载，引擎拿明文 → `_docCrypto` 记下密钥。`saveDocument` 与 `saveCopyAs`
+在 stamp 之后过 `sealForStorage`：同一文件密钥重新加密（只换 keyData 盐与 HMAC，不需要密码、不重做 10 万次哈希），
+**加密失败整笔保存失败，绝不写明文**。保存后的重载/引擎重启用内存里的密钥直接解；新开的实例重新要密码；密码本身不保存。
+地雷：
+- WebCrypto 的 AES-CBC 只做 PKCS#7；Agile 是无填充整块——解密要补一个特制尾块（见 `aesDecryptRaw`）；
+- `CFB.find` 是模糊匹配，会把 `EncryptedPackage` 找成 `EncryptionInfo`，按完整路径精确取；
+- 演示文稿冷启动预览缓存（IndexedDB 明文）对加密文件一律不写不读；
+- 只支持 Agile（Office 2010+ / WPS 默认）；Standard 等报 `UNSUPPORTED_ENCRYPTION`，面板回到「请先去掉密码」的说明；
+- 版本合并、比对等隐藏引擎路径直接拿后端字节，加密文件在那里仍会被引擎拒收（安全失败，不写明文）。
+测试：`tests/lowa-unit/office-encryption.test.mjs`（夹具由独立实现 msoffcrypto-tool 加密，含 node:crypto 独立核 HMAC）、
+`tests/project-home/libre-load-budget-retry.test.mjs`、`external-rename-save.test.mjs`；真机 `tests/desktop-e2e/office-password.mjs`。
+
 **非空文件冷开的首个模型（dev-board#1474）**：`LibreOfficeEditor.mountEditor` 只在挂载时已知 `fileSize>0` 才向 guest 传 `initialDocument=1`，`editor-main`→`bootZetaOffice` 的 pthread bootstrap shim 转给 worker。worker 先建立 UNO desktop，首个模型直接由既有 `load_document` 装入，避免先建空白 Writer 再替换；spare、隐藏合并实例（file=null）、新空文件和大小未知的旧入口仍用空白 boot。relay ready 表示命令通道已接好，`ui_ready` 只在首个模型真正成功后发出，失败不得显示可编辑空白。模型出现前，模型命令回 `DOCUMENT_NOT_READY`；主题、右键配置和样式画像这三种引擎级配置仍可执行。缺 `bytes` 的 `load_document` 只更新署名，绝不能被异步作者解析抢先触发空白模型；显式空字节才允许必要的空白初始化。宿主空文件支路明确传空字节，无模型实例初始化失败继续落保存保护；已有空白实例的署名失败沿用容错。回归：`tests/lowa-unit/first-document-boot.test.mjs`、`tests/revision-view/boot-resize.test.mjs`、`tests/project-home/libre-redline-author.test.mjs`、`tests/toolbar/open-critical-path.test.mjs`。完整性能必须另测未预热实例的正文首帧、IME 和原文件保存，不能把跳过的 blank span 全当净收益（首次 native 公共初始化仍由真实文档承担）。
 
 **空工作台预热挂载（dev-board#1474）**：`.editors-grid` 必须常驻，空态用同级绝对定位覆盖层呈现。原 `v-else` 导致空标签时虽在 4 秒后创建 spare 条目，却没有组件/webview；首开 Word 才冷启，关闭最后一个欢迎标签还会销毁已热实例。常驻网格保留原父容器与 key，空态、过继及分屏切换都不搬 webview、不使用 `display:none`；4 秒调度、低内存预算和关闭保存链路不变。`tests/project-home/libre-spare-mount.test.mjs` 编译实际相关模板并用 Vue renderer 验证首开前挂载、过继实例恒等和欢迎/分屏切换不卸载。宿主 `ready` 只表示装载应答，完整性能验证还须单独观察实际纸张墨迹与编辑保存，不把 ready 截图点当首次可用首屏。

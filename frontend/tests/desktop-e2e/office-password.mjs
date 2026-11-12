@@ -332,7 +332,10 @@ async function checkFile(src) {
   await page.screenshot({ path: path.join(run, kind + '-1-prompt.png') })
   await enterPassword(name, 'wrong-password')
   await page.waitForFunction((expr, name) => (0, eval)(expr)(name)?.passwordState === 'wrong', { timeout: 60000, polling: 100 }, editorExpr, name)
-  r.wrongPasswordCleared = await editor(name, e => e.passwordInput === '')
+  r.wrongPasswordCleared = await until(() => page.evaluate(() => {
+    const el = [...document.querySelectorAll('.libre-password-input input, input.libre-password-input')].find(i => i.getBoundingClientRect().width)
+    return el && el.value === '' && document.activeElement === el
+  }), 5000, 100).then(() => true).catch(() => false)
   r.wrongPasswordShown = await page.evaluate(() => [...document.querySelectorAll('.libre-password-error')].some(e => e.getBoundingClientRect().width))
   await page.screenshot({ path: path.join(run, kind + '-2-wrong.png') })
   const t0 = Date.now()

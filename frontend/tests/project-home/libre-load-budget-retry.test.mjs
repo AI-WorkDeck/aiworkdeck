@@ -141,6 +141,7 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   vm.file = { id: 7, name: '案件台账.xlsx', fileType: 'xlsx', fileSize: encrypted.length }
   vm.passwordInput = ''
   vm.passwordState = ''
+  vm.passwordAttempts = 0
   for (const name of ['submitPassword', 'sealForStorage', 'scheduleSlidePreviewCapture']) vm[name] = METHODS[name].bind(vm)
   vm._bytesPromise = Promise.resolve(encrypted.slice().buffer)
   const loads = () => vm.calls.filter(c => c.action === 'load_document' && c.params.bytes)
