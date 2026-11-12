@@ -2800,8 +2800,9 @@ function postNativeKeys(keys) {
     keyRobot.keyRelease(ev);
   }
   scheduleNativeKeySelectionRefresh();
-  // Wake Qt's idle queue so Impress paints the posted input promptly.
-  if (isImpressDoc()) Module.resumeMainLoop();
+  // Wake Qt's idle queue so Impress and Calc paint the posted input promptly
+  // (office-tier1 O8: Calc bursts painted only after the last key, 0.9-1.8 s late).
+  if (isImpressDoc() || isCalcDoc()) Module.resumeMainLoop();
   return { success: true, native: true, keys: keys.length };
 }
 // 全屏标志在引擎处理完投递的 Esc 之后才翻（异步，时点不定），所以 1.5 秒内每
@@ -7241,8 +7242,13 @@ const EXEC = {
   // 走段落索引缓存：O(窗口) 而非 O(全文)，total 直接取索引长度。
   get_document_text(p) {
     const start = Math.max(0, Number(p && p.startParagraph) || 0);
-    const maxParas = Math.max(1, Math.min(Number(p && p.maxParagraphs) || 200, 500));
-    const charBudget = 15000;
+    // bulk：宿主自己的后台读者（写作辅助词表、即时审校快照）一次取全文。__agent 读要切到最终稿视图、
+    // 每次切换都让段落索引失效重建（2006 段的稿子每页 ~650ms，分页通读要 8–10 次，office-tier1 O8）；
+    // 一次读完只建一次索引。AI 工具不带 bulk，仍按 500 段 / 15000 字分页。
+    const bulk = !!(p && p.bulk === true);
+    const maxParas = bulk ? Math.max(1, Math.min(Number(p && p.maxParagraphs) || 10000, 10000))
+      : Math.max(1, Math.min(Number(p && p.maxParagraphs) || 200, 500));
+    const charBudget = bulk ? 200000 : 15000;
     return withParaIndex(function (ix) {
       const total = ix.total;
       const paragraphs = [];
@@ -10034,7 +10040,10 @@ const EXEC = {
     const number = Number(p && p.slideNumber);
     if (!Number.isInteger(number) || number < 1 || number > pages.getCount()) return slideFail('页码越界');
     const page = pages.getByIndex(number - 1);
-    const width = Math.max(80, Math.min(480, Math.round(Number(p && p.width) || 240)));
+    // preview:true（冷启动预览缓存，office-tier1）允许到 1280px；format:'jpeg' 体积约为 PNG 的 1/15
+    const maxWidth = p && p.preview === true ? 1280 : 480;
+    const width = Math.max(80, Math.min(maxWidth, Math.round(Number(p && p.width) || 240)));
+    const jpeg = !!(p && p.format === 'jpeg');
     const pageWidth = Number(page.getPropertyValue('Width'));
     const pageHeight = Number(page.getPropertyValue('Height'));
     const height = Math.max(1, Math.round(width * pageHeight / pageWidth));
@@ -10052,16 +10061,16 @@ const EXEC = {
     try {
       const exporter = context.getServiceManager().createInstanceWithContext('com.sun.star.drawing.GraphicExportFilter', context);
       exporter.setSourceDocument(page);
-      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [
-        mkProp('PixelWidth', width), mkProp('PixelHeight', height),
-      ]);
-      if (!exporter.filter([mkProp('MediaType', 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
+      const filterProps = [mkProp('PixelWidth', width), mkProp('PixelHeight', height)];
+      if (jpeg) filterProps.push(mkProp('Quality', 82));
+      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), filterProps);
+      if (!exporter.filter([mkProp('MediaType', jpeg ? 'image/jpeg' : 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
         return slideFail('缩略图导出失败');
       if (!total) return slideFail('缩略图为空');
       const bytes = new Uint8Array(total);
       let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-      return { success: true, slideNumber: number, width: width, height: height, bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
+      return { success: true, slideNumber: number, width: width, height: height, total: pages.getCount(), format: jpeg ? 'jpeg' : 'png', bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
     } catch (e) { return slideFail(errStr(e)); }
     finally {
       try { if (xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) {}

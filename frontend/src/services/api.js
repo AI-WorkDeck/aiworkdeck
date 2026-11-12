@@ -2786,19 +2786,22 @@ export function refreshDocInsightEntity(projectId, entityId) {
 }
 
 // Local writing vocabulary. Only lookupWritingSelection performs external retrieval.
+// 打开文档时的后台读写（词表、设置、学习、自动补全）不弹账户/登录框：会话失效时静默失败，
+// 由用户主动操作（改写、采用建议）时再提示（office-tier1 O8：无账户时打字途中冒出登录框）。
 export function listWritingCompletions(projectId) {
-  return request({ url: `/api/projects/${projectId}/completion`, method: 'GET' })
+  return request({ url: `/api/projects/${projectId}/completion`, method: 'GET', accountPrompt: false })
 }
 
 // Explicit semantic writing requests; merely opening a document never generates text.
 export function getSemanticWritingSettings(projectId) {
-  return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'GET' })
+  return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'GET', accountPrompt: false })
 }
 export function saveSemanticWritingSettings(projectId, data) {
   return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'PUT', data })
 }
 export function createSemanticWritingSuggestion(projectId, data) {
-  return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions`, method: 'POST', data, timeout: 120000 })
+  return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions`, method: 'POST', data, timeout: 120000,
+    ...(data && data.mode === 'autocomplete' ? { accountPrompt: false } : {}) })
 }
 export function getSemanticWritingSuggestion(projectId, id) {
   return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions/${encodeURIComponent(id)}`, method: 'GET' })
@@ -2813,7 +2816,7 @@ export function getWritingCompletionDetail(projectId, id) {
   return request({ url: `/api/projects/${projectId}/completion/entries/${encodeURIComponent(id)}`, method: 'GET' })
 }
 export function learnWritingCompletions(projectId, data) {
-  return request({ url: `/api/projects/${projectId}/completion/learn`, method: 'POST', data })
+  return request({ url: `/api/projects/${projectId}/completion/learn`, method: 'POST', data, accountPrompt: false })
 }
 export function deleteWritingCompletion(projectId, id) {
   return request({ url: `/api/projects/${projectId}/completion/entries/${encodeURIComponent(id)}`, method: 'DELETE' })

@@ -133,6 +133,7 @@ export default {
   },
   reviewBtn: '审阅',
   previewReadableHint: '已可阅读，编辑器就绪后可直接编辑',
+  slidePreviewMore: '还有 {count} 页，编辑器就绪后可查看',
   preparingEditor: '正在准备编辑器',
   dlProgress: '文档内容 {loaded} / {total}',
   dlLoadedOnly: '已读取文档内容 {size}',
@@ -140,6 +141,7 @@ export default {
   // 「文档无法打开」终态（dev-board#1018）：引擎拒收损坏文件，或重启重装后仍无响应。
   openFailed: {
     title: '文档无法打开：引擎无响应或文件损坏',
+    encryptedTitle: '这个文件设置了打开密码，编辑器暂不能直接打开。请在 Excel / Word / PowerPoint 或 WPS 中去掉打开密码后再打开，或下载原文件。',
     code: '诊断码：{code}',
     previewNotice: '文档无法在编辑器中打开（诊断码：{code}），以下为只读预览',
     readOnlyPreview: '用只读预览打开',

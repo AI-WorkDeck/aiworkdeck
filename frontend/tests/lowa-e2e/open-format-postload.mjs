@@ -13,7 +13,15 @@ const docs = extra.length ? extra.map(f => ({ name: f.split('/').pop(), bytes: A
   { name: 'impress-smoke.pptx', bytes: read('./fixtures/impress-smoke.pptx'), slides: true },
   { name: 'case-ledger.xlsx', bytes: read('../../../scripts/eval/fixtures/case-ledger.xlsx') },
 ]
-const server = await startServer()
+// OPEN_POSTLOAD_STRIP_LEAK=1：服务 soffice.js 时去掉 Embind 调试版的泄漏告警栈（office-tier1 O8 对照）
+const LEAK_RE = /var err=new Error\(`Embind found a leaked C\+\+ instance[\s\S]*?info\.leakWarning=err\.stack\.replace\(\/\^Error: \/,""\);/
+const server = await startServer({ patchServed(url, bytes) {
+  if (process.env.OPEN_POSTLOAD_STRIP_LEAK === '1' && url === '/lowa/soffice.js') {
+    const s = bytes.toString('utf8'); if (!LEAK_RE.test(s)) throw new Error('leak-warning anchor not found')
+    return Buffer.from(s.replace(LEAK_RE, ''))
+  }
+  return bytes
+} })
 const browser = await launchBrowser(await loadPuppeteer())
 try {
   for (const doc of docs) {

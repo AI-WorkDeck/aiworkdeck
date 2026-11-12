@@ -89,6 +89,15 @@ export function shouldSelfHealLoadFailure(err, alreadyHealed) {
 export const STATUS_OPEN_FAILED = 'docOpenFailed'
 /** 诊断码：引擎读了字节但两条装载路径都拒收（loadComponentFromURL 返回 null / 抛异常）。 */
 export const DIAG_DOC_REJECTED = 'DOC_REJECTED'
+// 设了「打开密码」的 Word/Excel/PPT（office-tier1）：OOXML 加密后整个文件是 CFB 复合文档（D0 CF 11 E0 …），
+// 引擎不带密码只会拒收。单独一个诊断码，加载面板说清楚原因，不让用户对着「文件损坏」反复重试。
+export const DIAG_DOC_ENCRYPTED = 'DOC_ENCRYPTED'
+const CFB_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+export function isEncryptedOoxml(bytes, name) {
+  if (!/\.(docx|xlsx|pptx|docm|xlsm|pptm)$/i.test(String(name || ''))) return false
+  const u8 = bytes instanceof Uint8Array ? bytes : bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : null
+  return !!u8 && u8.length >= 8 && CFB_MAGIC.every((b, i) => u8[i] === b)
+}
 /** 诊断码：重启引擎重装一次后 load_document 仍超过预算没有回音。 */
 export const DIAG_LOAD_TIMEOUT = 'EDITOR_LOAD_TIMEOUT'
 

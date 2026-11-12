@@ -137,7 +137,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
     const paragraphs = []
     let revision, start = 0, chars = 0, stop = false
     for (let page = 0; page < 1000 && !stop; page++) {
-      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: 200, __agent: true }).catch(() => null)
+      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: 10000, bulk: true, __agent: true }).catch(() => null)
       if (!current() || !result?.success || result.revision == null || !Array.isArray(result.paragraphs)) return
       if (revision == null) revision = result.revision
       if (result.revision !== revision) return

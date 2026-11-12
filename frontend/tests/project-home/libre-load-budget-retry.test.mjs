@@ -17,7 +17,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED,
-  DIAG_DOC_REJECTED, DIAG_LOAD_TIMEOUT,
+  DIAG_DOC_REJECTED, DIAG_LOAD_TIMEOUT, DIAG_DOC_ENCRYPTED, isEncryptedOoxml,
 } from '../../src/utils/editorLoadFailure.js'
 import { createAuthorNameResolver } from '../../src/utils/editorAuthor.js'
 
@@ -32,12 +32,12 @@ function loadOptions() {
     'getFileBytesUrl', 'getCurrentUser', 'createRelayExecutor',
     'webviewTransport', 'iframeTransport', 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar',
     'getAuthHeaders', 'host', 'classifyLoadFailure', 'shouldSelfHealLoadFailure',
-    'createAuthorNameResolver', 'loadBudgetMs', 'openFailureOf', 'STATUS_OPEN_FAILED', body)
+    'createAuthorNameResolver', 'loadBudgetMs', 'openFailureOf', 'STATUS_OPEN_FAILED', 'DIAG_DOC_REJECTED', 'DIAG_DOC_ENCRYPTED', 'isEncryptedOoxml', body)
   return factory(...Object.values(barriers), (id) => '/download/' + id, () => ({ name: '测试用户' }),
     null, null, null, null, null, null, null,
     { zetaoffice: { getEditor: async () => ({ kind: 'iframe', url: 'about:blank' }) } },
     classifyLoadFailure, shouldSelfHealLoadFailure, createAuthorNameResolver,
-    loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED)
+    loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED, DIAG_DOC_REJECTED, DIAG_DOC_ENCRYPTED, isEncryptedOoxml)
 }
 const OPTIONS = loadOptions()
 const METHODS = OPTIONS.methods
@@ -117,6 +117,18 @@ test('引擎明确拒收（DOC_REJECTED）：直接落「文档无法打开」+ 
   assert.equal(vm.docLoadFailed, true, '保存闸必须落下：画布上是空白原型')
   assert.equal(OPTIONS.computed.loadingOverlayVisible.call({ statusKey: STATUS_OPEN_FAILED, ready: true, isError: true }), true,
     '失败原因与出路只有加载面板能放，终态下面板必须留着')
+})
+
+test('设了打开密码的 xlsx 被拒收：诊断码改为 DOC_ENCRYPTED，普通拒收仍是 DOC_REJECTED（office-tier1）', async () => {
+  const cfb = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]).buffer
+  for (const [bytes, want] of [[cfb, DIAG_DOC_ENCRYPTED], [new ArrayBuffer(16), DIAG_DOC_REJECTED]]) {
+    const vm = makeVm(async () => ({ success: false, code: 'DOC_REJECTED', message: 'load_document failed' }))
+    vm.file = { id: 7, name: '员工信息.xlsx', fileType: 'xlsx', fileSize: 16 }
+    vm._bytesPromise = Promise.resolve(bytes)
+    await vm.finishDocLoad()
+    assert.equal(vm.statusKey, STATUS_OPEN_FAILED)
+    assert.equal(vm.openFailCode, want)
+  }
 })
 
 test('第一次超时自愈重装一次；第二次超时落「文档无法打开」+ EDITOR_LOAD_TIMEOUT', async () => {

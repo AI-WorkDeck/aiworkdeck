@@ -7,6 +7,16 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## 交互卡顿根因（office-tier1 O8，2026-11-12）
+
+整机测量：`frontend/tests/desktop-e2e/office-interaction-latency.mjs`（真 Electron + 备胎 + 正常自动保存，Word/PPT/Excel 同链路；`OFFICE_LATENCY_*` 环境变量传本机文件）。根因与处理：
+- **soffice.js 是 Embind ASSERTIONS 版**：`attachFinalizer` 给每个传到 JS 的智能指针造 `new Error`+`captureStackTrace`+`.stack`，只为 GC 时打印「leaked C++ instance」。整机 trace 占 office worker CPU 约 40%。`desktop/scripts/fetch-lowa-assets.js` 取件时经 `lowa-js-patches.js` 摘掉这段（保留 finalizer 注册），引擎内实测 get_ui_state 114→28ms、读页 110→16、写格 127→17、首存 article.docx 11.5→3.6s。下次重烧引擎改用非 ASSERTIONS 构建从源头去掉。
+- **自动保存空闲门**固定 1.5s → 大演示文稿每次停笔都整篇导出（14MB 冻 2.5–4s）。改为 `autoSaveIdleMs` = 上次导出耗时×2，夹在 1.5–8s；`forceAfter` 兜底不变。
+- **Calc 逐键不重绘**：`postNativeKeys` 原只给 Impress 唤醒 Qt 空闲循环，Calc 连打时最后一键才上屏；现两者都按批唤醒一次（不逐键、不轮询）。
+- **审阅气泡轮询**：非 Writer 文档回 `available:false` 后，逐键 resume/documentChanged 不再排 `get_review_layout`；换文档（load_document/比对构建）复位。
+- **后台写作调用**（设置/词表/学习/自动补全）`accountPrompt:false`：会话失效时静默失败，不在打字途中弹登录框；改写/采用等主动操作照常提示。
+- 待办：三个写作辅助宿主各自分页通读全文（大文档 Word 主因），宜按 revision 共享一次读取；PPT 缩略图与备胎启动在打开后 10s 内与交互争 worker。
+
 ## PPT/Excel 一流化（office-tier1，2026-11-12）
 
 2026-11-12 在真实 LOWA 引擎实测。

@@ -13,3 +13,14 @@ for (const name of ['getSemanticWritingSettings','saveSemanticWritingSettings','
     assert.equal(options.logBody, false)
   })
 }
+
+// office-tier1 O8：打开文档时的后台调用不弹账户/登录框；用户主动的改写/采用仍按原样提示
+const fn = name => new Function('request', `return ${source.match(new RegExp(`export function ${name}\\([^]*?\\n}`))[0].replace('export ', '')}`)(o => o)
+test('background writing calls never open the account prompt; explicit requests still may', () => {
+  assert.equal(fn('getSemanticWritingSettings')(1).accountPrompt, false)
+  assert.equal(fn('listWritingCompletions')(1).accountPrompt, false)
+  assert.equal(fn('learnWritingCompletions')(1, { entries: [] }).accountPrompt, false)
+  assert.equal(fn('createSemanticWritingSuggestion')(1, { mode: 'autocomplete' }).accountPrompt, false)
+  assert.equal(fn('createSemanticWritingSuggestion')(1, { mode: 'rewrite' }).accountPrompt, undefined)
+  assert.equal(fn('acceptSemanticWritingSuggestion')(1, 'id', {}).accountPrompt, undefined)
+})
