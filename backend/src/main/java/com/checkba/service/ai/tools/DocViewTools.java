@@ -123,10 +123,12 @@ public class DocViewTools implements AgentToolComponent {
                     images);
             return LangText.of("已渲染第 " + range + " 页（共 " + total + " 页），图片附在下一条消息里——请直接看图核对"
                             + (focus == null || focus.isBlank() ? "版面" : "：" + focus) + "；只对看到的页下结论。"
-                            + "用户要你调整/修好时，发现问题就直接用最小改动修（缩小字号、调列宽/文本框、必要时拆页），改完再看一眼；不必先问用哪种改法。",
+                            + "看到问题且用户要你调整/修好时，直接用最小改动修（缩小字号、调列宽/文本框、必要时拆页），不必先问用哪种改法；"
+                            + "修完看一次确认即可，画面已正常就直接向用户交付，不要反复查看同一页。",
                     "Rendered page(s) " + range + " of " + total + "; the images follow in the next message. Inspect them directly"
                             + (focus == null || focus.isBlank() ? "" : " for: " + focus) + "; conclude only about the pages shown."
-                            + " If the user asked you to fix the layout, fix what you see with the smallest change (smaller font, wider column or box, split a slide if needed) and look again; don't ask which fix to use.");
+                            + " If you see a problem and the user asked you to fix the layout, fix it with the smallest change (smaller font, wider column or box, split a slide if needed) without asking which fix to use;"
+                            + " after a fix look once to confirm, and once the page looks right report back instead of viewing the same page again.");
         }
         return describeWithAuxModel(images, range, total, focus);
     }
