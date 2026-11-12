@@ -151,16 +151,28 @@ public class ToolDisclosurePolicy {
             // Impress 上 doc_undo 是空操作（引擎不记撤销栈，lowa-e2e undo-redo-kinds 实测），
             // pptx 会话里 doc_restore_checkpoint 是唯一的后悔药，所以 pptx 常驻（条件核心）。
             "doc_add_comment", "doc_undo",
+            // office-tier1：看真实画面（Word/PPT/Excel 通用，ClientCapabilityService 列为 kind 无关）
+            "doc_view_pages",
             // V2：doc_restore_checkpoint 改为条件核心（本轮已有检查点、或 pptx 会话时由编排器补）；
             // doc_apply_standard_format 退到 format 类目、doc_export_pdf 退到 pdf 类目（关键词预放回）。
 
-            // ==================== LOWA 表格（xlsx）段：5 个 ====================
+            // ==================== LOWA 表格（xlsx）段：11 个（边框 / 行高列宽 / 筛选靠 TOOL_KEYWORDS 按名放回；「批注」是 revision 类目关键词，不能再挂工具关键词）====================
             // sheet_create_file / slide_create_file 不在核心集（tool-surface-audit S1，已拍板 #1）：
             // 有文档开着时靠「表格 / excel / ppt / 幻灯片」关键词预放回；没开文件时见 NOFILE_ENTRY_EXTRA。
             "sheet_get_overview", "sheet_read_range", "sheet_write_cells", "sheet_find_replace",
+            // office-tier1（2026-11-12）：开着 xlsx 时律师最常说的「加一列 / 排序 / 冻结首行 / 加粗标黄 / 做个图 /
+            // 加个工作表 / 合并单元格 / 加边框 / 调列宽 / 筛选 / 批注」原先都要先 list_tools，弱模型常直接说「做不到」。
+            // 上游 visibleForDocKind 只在 xlsx 会话放行 sheet_*，docx/pptx 会话不为它们付规格。
+            "sheet_format_cells", "sheet_edit_rows_cols", "sheet_sort_range", "sheet_freeze_panes",
+            // sheet_manage_sheets 不进：「工作表」是 spreadsheet 类目关键词，「加一个工作表」整类放回
+            "sheet_add_chart", "sheet_merge_cells", "sheet_add_comment",
 
-            // ==================== LOWA 演示（pptx）段：6 个 ====================
+            // ==================== LOWA 演示（pptx）段：12 个 ====================
             "slide_get_overview", "slide_get_page", "slide_set_shape_text", "slide_replace_text", "slide_add_page",
+            // office-tier1：删页 / 调页序 / 改字体颜色加粗 / 插表 / 加文本框 / 写备注 / 改表格单元格，
+            // 同上只在 pptx 会话放行（visibleForDocKind 按 slide_ 前缀）。删形状不进（每会话核心集上限 32）。
+            "slide_delete_page", "slide_move_page", "slide_format_text", "slide_add_table", "slide_add_text_box",
+            "slide_write_notes", "slide_table_set_cell",
 
             // ==================== Office 任务窗格·Word 段：7 个（T-18）====================
             // office_pass_step 是 Word 窗格整篇大改的入口（分段过卷，dev-board#422）；office_add_comment 是审查的交付物。
@@ -454,6 +466,10 @@ public class ToolDisclosurePolicy {
                 "export as pdf", "export as a pdf", "export it as pdf", "export it as a pdf", "export it to pdf",
                 "export to a pdf", "save as pdf", "save as a pdf", "save it as pdf", "save it as a pdf",
                 "convert to pdf", "convert it to pdf", "convert into pdf", "print to pdf"));
+        // office-tier1：xlsx 会话里不在核心集的常用格式工具，按说法精确放回（上游只在 xlsx 会话放行 sheet_*）
+        TOOL_KEYWORDS.put("sheet_set_borders", List.of("边框", "框线", "加框", "border", "borders", "gridlines"));
+        TOOL_KEYWORDS.put("sheet_set_row_col", List.of("列宽", "行高", "调宽", "调高", "加宽", "自适应宽", "column width", "row height", "autofit"));
+        TOOL_KEYWORDS.put("sheet_set_autofilter", List.of("筛选", "过滤", "filter", "autofilter"));
         TOOL_KEYWORDS.put("memory_search", List.of("记得", "之前说过", "上次说", "之前提过", "之前聊过",
                 "do you remember", "you remember", "did i tell you", "did i say", "did i mention", "what did i say",
                 "what did i tell", "i told you", "i mentioned", "last time", "we discussed", "we talked about",

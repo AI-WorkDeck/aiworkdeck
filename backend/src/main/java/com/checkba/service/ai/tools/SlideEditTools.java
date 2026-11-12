@@ -360,8 +360,9 @@ public class SlideEditTools implements AgentToolComponent {
         }
     }
 
-    // access：整页删除不走修订、无法单步撤回
-    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "删除幻灯片", category = "document", fileEffect = "MODIFIED")
+    // access：编辑器内删页是可撤回的文档编辑——doc_undo 一步即恢复（真引擎实测 2026-11-12），
+    // 本轮检查点与「撤销本次 AI 修改」也覆盖；与删形状、Excel 删行同级，不再弹确认卡打断用户明确的「删掉这页」
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除幻灯片", category = "document", fileEffect = "MODIFIED")
     @Tool("【幻灯片·写】删除指定页。演示文稿至少保留一页，删到只剩最后一页时会被拒绝。" + NO_REVISION_NOTE)
     public String slide_delete_page(
             @P("要删除的页码，1 开始") Integer slideNumber
@@ -768,8 +769,8 @@ public class SlideEditTools implements AgentToolComponent {
     public String slide_table_set_cell(
             @P("页码，1 开始") Integer slideNumber,
             @P(value = "表格形状名（可选；不传则要求该页只有一张表格）", required = false) String shapeName,
-            @P("行号，0 开始") Integer row,
-            @P("列号，0 开始") Integer col,
+            @P("行号，0 开始：表头行是 0，用户说「第 2 行」就传 1") Integer row,
+            @P("列号，0 开始：第一列是 0，用户说「第 3 列」就传 2") Integer col,
             @P("新文本") String text
     ) {
         log.info("Tool: slide_table_set_cell called slideNumber={}, row={}, col={}", slideNumber, row, col);

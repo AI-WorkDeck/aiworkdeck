@@ -119,6 +119,7 @@ class ToolDeclarationContractTest {
             "version_restore",
             // 导出 PDF（dev-board#1065 T-25）
             "doc_export_pdf",
+            "doc_view_pages",
             // 两份 docx 修订比对稿（V7 D1）：原生比较在桌面隐藏引擎里跑
             "compare_docx_redline"));
 

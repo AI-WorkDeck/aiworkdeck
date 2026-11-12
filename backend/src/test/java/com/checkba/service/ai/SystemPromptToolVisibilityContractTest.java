@@ -104,6 +104,8 @@ class SystemPromptToolVisibilityContractTest {
     private static final Map<String, ToolMeta.Host> EXPECTED_HOST_REQUIREMENTS = new TreeMap<>(Map.ofEntries(
             // PPT：打开 / 生成 / 改格式都要桌面前端（生成还要一个只存在于桌面端的配置界面）
             Map.entry("pptx_generate", ToolMeta.Host.LOWA),
+            // 看真实画面（office-tier1）：字节由编辑器里的引擎导出
+            Map.entry("doc_view_pages", ToolMeta.Host.LOWA),
             // PDF：写入类收尾都会让编辑器打开/重载那份文件
             Map.entry("pdf_highlight", ToolMeta.Host.LOWA),
             Map.entry("pdf_annotate", ToolMeta.Host.LOWA),

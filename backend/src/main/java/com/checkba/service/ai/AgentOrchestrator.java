@@ -531,6 +531,9 @@ public class AgentOrchestrator {
     private com.checkba.service.ai.subagent.SubAgentService subAgentService;
     private final ConversationFileChangeService conversationFileChangeService;
     private final TodoListService todoListService;
+    /** doc_view_pages 渲染的页面图（office-tier1）；手工装配的测试里为 null，不影响。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ToolImageInbox toolImageInbox;
     private final DocumentCheckpointService documentCheckpointService;
     private final AgentRunStateService agentRunStateService;
     private final com.checkba.version.WorkSessionService workSessionService;
@@ -3041,6 +3044,8 @@ public class AgentOrchestrator {
                     }
                 }
 
+                attachViewedPages(messages, conversationId);
+
                 // 防走神注入（Claude Code system-reminder 模式）：每次工具执行后带上任务清单状态，
                 // 防止长任务中模型忘记目标。刚更新过清单的轮次不注入（避免重复唠叨）。
                 boolean justWroteTodo = aiMessage.toolExecutionRequests().stream()
@@ -3219,6 +3224,7 @@ public class AgentOrchestrator {
                     }
 
                     messages.add(dev.langchain4j.data.message.UserMessage.from(feedbackMsg));
+                    attachViewedPages(messages, conversationId);
 
                     // Log for history persistence (include status attribute)
                     // 优先使用LLM选择的process name，否则用工具元数据里的中文显示名
@@ -4154,6 +4160,36 @@ public class AgentOrchestrator {
         java.util.Set<String> names = new java.util.HashSet<>(guard.skillToolNames);
         names.addAll(guard.requestedToolNames.keySet());
         return names;
+    }
+
+    /** 已被新一次查看取代的页面图换成这行字：只保留最新一批图，避免长任务里每轮都重付旧图。 */
+    static final String VIEWED_PAGES_SUPERSEDED = "[此前 doc_view_pages 的页面图已移除，以最新一次查看为准]";
+
+    /**
+     * doc_view_pages 把渲染的页面图放进 {@link ToolImageInbox}；这里在工具结果之后挂一条带图的用户消息，
+     * 让能看图的主模型亲眼核对版面。旧的查看图先换成一行说明（工具调用与结果的配对不受影响：只改 UserMessage）。
+     */
+    void attachViewedPages(List<dev.langchain4j.data.message.ChatMessage> messages, String conversationId) {
+        if (toolImageInbox == null) return;
+        ToolImageInbox.Batch batch = toolImageInbox.take(conversationId);
+        if (batch == null) return;
+        appendViewedPages(messages, batch);
+        log.info("[View] conv={} attached {} rendered page image(s)", conversationId, batch.images().size());
+    }
+
+    static void appendViewedPages(List<dev.langchain4j.data.message.ChatMessage> messages, ToolImageInbox.Batch batch) {
+        for (int i = 0; i < messages.size(); i++) {
+            if (messages.get(i) instanceof dev.langchain4j.data.message.UserMessage um
+                    && um.contents().stream().anyMatch(c -> c instanceof dev.langchain4j.data.message.ImageContent)
+                    && um.contents().stream().anyMatch(c -> c instanceof dev.langchain4j.data.message.TextContent t
+                            && t.text().contains("doc_view_pages"))) {
+                messages.set(i, dev.langchain4j.data.message.UserMessage.from(VIEWED_PAGES_SUPERSEDED));
+            }
+        }
+        List<dev.langchain4j.data.message.Content> content = new java.util.ArrayList<>();
+        content.add(dev.langchain4j.data.message.TextContent.from(batch.caption()));
+        content.addAll(batch.images());
+        messages.add(dev.langchain4j.data.message.UserMessage.from(content));
     }
 
     /** doc_restore_checkpoint 是否本轮补：pptx 会话常驻（Impress 的 doc_undo 是空操作），其余需已有检查点。 */

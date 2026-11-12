@@ -107,7 +107,8 @@ public class XmlToolCallParser {
      */
     public boolean containsToolCall(String content) {
         return content != null && (content.contains("<tool_code>") || content.contains("<code>")
-                || !bareAskUserCalls(content).isEmpty() || !qwenTemplateCalls(content).isEmpty());
+                || !bareAskUserCalls(content).isEmpty() || !qwenTemplateCalls(content).isEmpty()
+                || !bareToolTagCalls(content).isEmpty());
     }
 
     /**
@@ -143,6 +144,7 @@ public class XmlToolCallParser {
         }
         calls.addAll(bareAskUserCalls(content));
         calls.addAll(qwenTemplateCalls(content));
+        calls.addAll(bareToolTagCalls(content));
         calls.sort(java.util.Comparator.comparingInt(LocatedCall::offset));
         return calls.stream().map(LocatedCall::call).toList();
     }
@@ -192,6 +194,52 @@ public class XmlToolCallParser {
             }
         }
         return calls;
+    }
+
+    /**
+     * Qwen 另一种泄漏形态（office-tier1，2026-11-12 百炼 qwen3.7-flash 实录）：工具名当外层标签、参数各自成标签，
+     * {@code <slide_write_notes><slideNumber>1</slideNumber><text>…</text></slide_write_notes>}，整轮只输出这一块，什么都没执行。
+     * 只在三条都满足时当调用：外层名是已注册工具；子标签全是该工具的参数名（或别名）且至少一个；
+     * 整段输出除这些块外只剩空白或 {@code <thinking>}。正文里夹带的 XML 片段一律不认。
+     */
+    private static final Pattern BARE_TOOL_CHILD = Pattern.compile("(?s)\\s*<([A-Za-z_]\\w*)>(.*?)</\\1>");
+
+    private List<LocatedCall> bareToolTagCalls(String content) {
+        if (toolRegistry == null || content == null || content.indexOf('<') < 0) return List.of();
+        String visible = blankCodeSpans(THINKING_OR_TITLE.matcher(content).replaceAll(m -> " ".repeat(m.group().length())));
+        List<LocatedCall> calls = new ArrayList<>();
+        int cursor = 0;
+        while (cursor < visible.length()) {
+            while (cursor < visible.length() && Character.isWhitespace(visible.charAt(cursor))) cursor++;
+            if (cursor >= visible.length()) break;
+            Matcher head = TAG_HEAD.matcher(visible).region(cursor, visible.length());
+            if (!head.lookingAt() || !head.group(1).isEmpty()) return List.of();
+            String name = head.group(2);
+            var tool = toolRegistry.resolve(name);
+            if (tool.isEmpty() || tool.get().method() == null) return List.of();
+            String closeTag = "</" + name + ">";
+            int close = visible.indexOf(closeTag, head.end());
+            if (close < 0) return List.of();
+            java.util.Set<String> params = new java.util.HashSet<>();
+            for (java.lang.reflect.Parameter prm : tool.get().method().getParameters()) params.add(prm.getName());
+            com.fasterxml.jackson.databind.node.ObjectNode args = JSON.createObjectNode();
+            Matcher child = BARE_TOOL_CHILD.matcher(content).region(head.end(), close);
+            int pos = head.end();
+            while (pos < close && child.region(pos, close).lookingAt()) {
+                if (!params.contains(child.group(1))) return List.of();
+                args.put(child.group(1), unescapeXml(child.group(2).strip()));
+                pos = child.end();
+            }
+            if (args.isEmpty() || !content.substring(pos, close).isBlank()) return List.of();
+            int end = close + closeTag.length();
+            calls.add(new LocatedCall(cursor, new ParsedCall(name, args.toString(), content.substring(cursor, end), null)));
+            cursor = end;
+        }
+        return calls;
+    }
+
+    private static String unescapeXml(String s) {
+        return s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
     }
 
     /** 代码围栏 / 行内代码换成等长空白：偏移不变，里面的标签不被当成调用。 */

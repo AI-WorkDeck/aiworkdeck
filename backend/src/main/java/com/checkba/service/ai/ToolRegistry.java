@@ -235,6 +235,7 @@ public class ToolRegistry {
             Map.entry("doc_insert_under_heading", "Insert under heading"),
             Map.entry("doc_export_pdf", "Export to PDF"),
             Map.entry("pdf_inspect_visual", "Inspect page design"),
+            Map.entry("doc_view_pages", "View rendered pages"),
             Map.entry("doc_select_anchor", "Select anchor"),
             Map.entry("doc_select_paragraph", "Select paragraph"),
             Map.entry("doc_collapse_cursor", "Collapse cursor"),
@@ -1405,7 +1406,10 @@ public class ToolRegistry {
             }
             Object[] boundArgs = bindArguments(resolvedName, tool.method(), args, ctx);
             Object result = tool.method().invoke(tool.bean(), boundArgs);
-            return new ToolResult(result != null ? result.toString() : "", tool, true);
+            String out = result != null ? result.toString() : "";
+            // 只对改文件的工具补注：ask_user 等协议型工具的输出会被编排器解析，不能动
+            boolean modifies = tool.meta() != null && "MODIFIED".equals(tool.meta().fileEffect());
+            return new ToolResult(modifies ? out + ignoredArgumentsNote(tool.method(), args, out) : out, tool, true);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             ToolResult accountResult = accountActionResult(cause, tool, ctx);
@@ -1498,6 +1502,30 @@ public class ToolRegistry {
             values[i] = value;
         }
         return values;
+    }
+
+    /**
+     * 模型传了本工具没有的参数名（如把 color 写成 textColor）时，langchain 式绑定会静默丢掉它，
+     * 工具照常成功、模型就以为改到了（office-tier1：Qwen「改成红色」只加粗了）。不拒绝调用——
+     * 多余的无害键很常见——而是在结果末尾点名被忽略的参数与可用参数，让模型下一轮自己补上。
+     */
+    static String ignoredArgumentsNote(Method method, cn.hutool.json.JSONObject args, String out) {
+        if (args == null || args.isEmpty() || out == null || out.startsWith("Error")) return "";
+        java.util.Set<String> known = new java.util.LinkedHashSet<>();
+        java.util.List<String> offered = new java.util.ArrayList<>();
+        for (Parameter p : method.getParameters()) {
+            known.add(p.getName());
+            known.addAll(ARG_ALIASES.getOrDefault(p.getName(), List.of()));
+            if (!SERVER_CONTEXT_PARAMS.contains(p.getName())) offered.add(p.getName());
+        }
+        java.util.List<String> ignored = new java.util.ArrayList<>();
+        for (String key : args.keySet()) {
+            if (!known.contains(key) && !SERVER_CONTEXT_PARAMS.contains(key)) ignored.add(key);
+        }
+        if (ignored.isEmpty()) return "";
+        return "\n" + com.checkba.service.LangText.of(
+                "[注意] 参数 " + String.join("、", ignored) + " 不是本工具的参数，已被忽略——想靠它们做的修改没有发生，需要的话换成正确参数重调。可用参数：" + String.join(", ", offered),
+                "[Note] Argument(s) " + String.join(", ", ignored) + " are not parameters of this tool and were ignored; anything you meant them to change did NOT happen — re-call with the right parameter if needed. Valid parameters: " + String.join(", ", offered));
     }
 
     /** 显式空串是有效值；只有缺失/null 才尝试历史别名。 */

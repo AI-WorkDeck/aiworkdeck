@@ -2263,8 +2263,10 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "写入单元格", category = "document", fileEffect = "MODIFIED")
-    @Tool("【表格·写】从起始单元格起批量写入二维数组 rowsJson，写入即生效（无修订痕迹），回执含实际写入区域和首行回读值。\n"
-            + "rowsJson 如 [[\"项目\",\"金额\"],[\"咨询费\",10000],[\"合计\",\"=SUM(B2:B2)\"]]：数字及数字样式字符串写为数值，「=」开头写为公式，其余写为文本，null 跳过该格。\n"
+    @Tool("【表格·写】从起始单元格起批量写入二维数组 rowsJson，写入即生效（无修订痕迹），回执带各格地址与回读值。\n"
+            + "回执 cellsAfterWrite 列出首行、末行与每个公式格的「地址=回读值」，写完对照地址确认落点。\n"
+            + "startCell 是 rowsJson 第一个值落的格子，每行从左往右依次落到相邻列：要在 D10 放求和、C10 放「合计」，写 startCell=C10、rowsJson=[[\"合计\",\"=SUM(D2:D9)\"]]；只写一格时 startCell 就是目标格。\n"
+            + "rowsJson 如 [[\"项目\",\"金额\"],[\"咨询费\",10000],[\"合计\",\"=SUM(B2:B2)\"]]：数字写为数值；「10,000」「¥1,000.00」「15%」「2024-01-01」「2024年1月5日」写为数值并配千分位/金额/百分比/日期格式；超过 15 位的数字串（身份证号、银行卡号）和 0 开头的编号保持文本，请以字符串传入；「=」开头写为公式，其余写为文本，null 跳过该格。\n"
             + "公式用英文函数名、Excel 写法（逗号分隔，跨表 Sheet!A1 自动归一）；引擎是 LibreOffice 24.2，不支持 XLOOKUP 等新函数，用 VLOOKUP 或 INDEX+MATCH。公式出错会列在 formulaErrors（单元格/公式/错误码），必须修正并重写该格。\n"
             + "往表格末尾追加行时自动沿用上一行格式（写入列全空、上方两行有内容且格式一致），回执 formatInherited 列出沿用的行，如 [{row:9, from:8}]；表头下第一行、新增列、中间插入不沿用，先 sheet_read_range(withFormat=true) 看相邻格式，再用 sheet_format_cells / sheet_set_borders 对齐。inheritFormat=false 关闭沿用。")
     public String sheet_write_cells(
@@ -2515,7 +2517,8 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "插入删除行列", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·结构】插入或删除整行/整列。op: insert_rows/delete_rows/insert_cols/delete_cols；" +
-          "start 是 1 开始的行号（如 '3'）或列标（如 'B'）；count 默认 1。插入的新行/列占据 start 的位置（原内容后移）。")
+          "start 是 1 开始的行号（如 '3'）或列标（如 'B'）；count 默认 1。插入的新行/列占据 start 的位置（原内容后移）。" +
+          "「在 C 列后面加一列」= insert_cols start='D'；「在第 5 行下面加一行」= insert_rows start='6'。插入后再用 sheet_write_cells 往新列/行填表头和内容——不要用写入覆盖相邻列来「挪」数据。")
     public String sheet_edit_rows_cols(
             @P("操作：insert_rows/delete_rows/insert_cols/delete_cols") String op,
             @P("起始位置：行号（1 开始，如 '3'）或列标（如 'B'）") String start,

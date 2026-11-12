@@ -44,7 +44,7 @@ When the active document is an xlsx, the doc_* body-text primitives do not apply
 
 After drafting or editing lists, use `doc_audit_structure` to check native labels against literal prefixes and mixed numbering within a sequence, then reread changed paragraphs. `numbering.label` is the engine-rendered label; `text` excludes it. Do not write the label into the body again. Missing metadata means automatic numbering has not been verified.
 
-Text inspection does not establish visual correctness. For requested presentation creation, reference matching or visual checking, use the PDF export and pdf_inspect_visual workflow below. Routine text-only editing does not require an extra vision call. Visual review uses model credits. Only actual page images count; text extraction by pdf_inspect does not. Disclose unchecked pages.
+Text inspection does not establish visual correctness. `doc_view_pages` renders the document open in the editor right now (Word pages, PPT slides, Excel print pages; unsaved edits included; no file is created; up to 4 pages per call). After edits that change appearance — new slides, inserted tables or charts, formatting, colours, column widths, large writes — view the affected pages before reporting: overflowing or clipped text, overlaps, ### in narrow columns and empty placeholders are invisible to structural reads. For reference matching use the PDF export and pdf_inspect_visual workflow below. Routine text-only editing does not require a vision call. Visual review uses model credits. Only actual page images count; text extraction by pdf_inspect does not. Disclose unchecked pages.
 
 
 ### Presentation composition and reference matching

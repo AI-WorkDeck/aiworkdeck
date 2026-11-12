@@ -7,6 +7,16 @@ description: AI↔文档编辑桥接领域。任务涉及 doc_*/sheet_*/slide_* 
 
 职责边界：AI 侧发出编辑指令 → 编辑器执行 的整条链路。不含编辑器内核本身（那是 doc-editor 领域），不含对话编排（ai-chat 领域）。
 
+## PPT/Excel 工具面（office-tier1，2026-11-12）
+
+- 评测：`scripts/eval/model-matrix.mjs` 支持 `hostState: pptx:<夹具>` / `xlsx:<夹具>`（默认宿主 案件汇报.pptx / 案件台账.xlsx），outcomeCheck 里 `ctx.pptx(buf)` / `ctx.xlsx(buf)`（`scripts/eval/office-xml.mjs`）、`ctx.hostBytes(name)`；句集 `scripts/eval/sentences/office-18.json`，夹具由 `fixtures/make_office_fixtures.py` 生成。基线（Bailian cn cheap，每句 4 次）：origin/master DeepSeek 52/72、Qwen 42/72 → 本分支 62/72、63/72。
+- 披露：xlsx/pptx 会话常用工具进核心集（sheet_format_cells/edit_rows_cols/sort_range/freeze_panes/add_chart/merge_cells/add_comment；slide_delete_page/move_page/format_text/add_table/add_text_box/write_notes/table_set_cell），上游 visibleForDocKind 只在对应会话放行；边框/行高列宽/筛选靠 TOOL_KEYWORDS。每会话核心集上限 32（ToolDisclosurePolicyTest）；「批注」是 revision 类目关键词，不能挂工具关键词（会被抠掉）。
+- `slide_delete_page` 改为 WRITE（不再弹确认卡）：编辑器内删页 doc_undo 一步即恢复（实测），检查点与「撤销本次 AI 修改」也覆盖。Office 加载项的 office_ppt_delete_slide 不变。
+- ToolRegistry：改文件的工具（fileEffect=MODIFIED）收到不认识的参数名时，结果末尾追加「参数 X 不是本工具的参数，已被忽略…可用参数：…」（Qwen 把 color 写成 textColor 曾静默只加粗）。协议型工具（ask_user 等）不追加。
+- 活跃 xlsx/pptx 的 <active_document> 改为带坐标正文（`context/OfficeOutlineText`：行号+列标=值、公式「=公式 → 结果」；页码+标题+要点+表格+备注），失败退回 Tika 纯文本。
+- XmlToolCallParser 新增 `bareToolTagCalls`：Qwen 把工具名当外层标签、参数各自成子标签（`<slide_write_notes><slideNumber>1</slideNumber>…`）时，仅当外层是已注册工具、子标签全是其参数、整段只有这些块（可带 `<thinking>`）才执行；正文夹带的一律不认。
+- 新工具 `doc_view_pages`（DocViewTools，核心集，Word/PPT/Excel 通用、requiresHost=LOWA）：编辑器 export_pdf 字节（不落项目文件）→ PDFBox 渲染 ≤4 页 PNG。主模型能看图时经 `ToolImageInbox` 在本批工具结果后挂一条带图 UserMessage（只保留最新一批，旧的换成一行说明，`AgentOrchestrator.appendViewedPages`）；不能看图（DeepSeek）时交辅助视觉模型描述成文字。pdf_inspect_visual 仍用于参考对照。
+
 ## 新建文档打开与下一步编辑（2026-11-04，dev-board#1707）
 
 `doc_open_file` 与 `editor_command` 携带工具上下文的 `editorRunId`，编辑命令另带可信 `targetFileId`，不能用模型参数中的 fileId 替代。打开事件附 conversationId；前端在读取文件详情之前登记目标屏障，等待对应 executor 就绪，不能借用仍活动的参考文档执行器。新轮次清退旧屏障，已观察且退休的轮次拒绝迟到命令；用户切换、打开失败及详情请求超时禁止迟到打开抢焦点。已打开但加载未完返回 `EDITOR_BOOTING` 可重试。实际执行前再次核对目标。同轮工具显式打开的目标优先于可能滞后的上下文 activeFileId（pptx_open_file/pdf_to_word 等）；命令开始时捕获该打开条目，不能执行前改派到后来打开的文件。同步 doc_open_file_sync 也须替换屏障并等待真实目标后才能初始化流。
