@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # 项目沟通
 
-纯 Web IM 插件。0.2.0 的沟通助手需要包含 `agentScopes`、`ensureAgent`、`agentReply` 的 AI WorkDeck 0.69.0 或更新宿主及相应协作服务；仅更新插件无法增加旧服务端的能力。当前使用中国大陆站 AI WorkDeck 账号，连接 `case.aiworkdeck.com` 官方协作服务；国际站账号暂不支持。源码、宿主和云服务分别发布，实际可用状态以插件广场及正式版本为准。
+纯 Web IM 插件。0.2.0 的沟通助手需要包含 `agentScopes`、`ensureAgent`、`agentReply` 的 AI WorkDeck 0.82.0 或更新宿主及相应协作服务；仅更新插件无法增加旧服务端的能力。当前使用中国大陆站 AI WorkDeck 账号，连接 `case.aiworkdeck.com` 官方协作服务；国际站账号暂不支持。源码、宿主和云服务分别发布，实际可用状态以插件广场及正式版本为准。
 
 ## 助手与会话
 
@@ -28,7 +28,7 @@
 
 ## 构建与验证
 
-执行 `./official-plugins/project-im/build.sh`。测试复用前端安装的 jsdom（先按仓库指引安装 frontend 依赖），输出 `dist/project-im-0.2.0.zip`。构建从仓库 `sdk/plugin-sdk/awd-plugin-sdk.js` 直接放入 ZIP，避免维护过期 SDK 副本。
+执行 `./official-plugins/project-im/build.sh`。测试复用前端安装的 jsdom（先按仓库指引安装 frontend 依赖），输出 `dist/project-im-0.2.5.zip`。构建从仓库 `sdk/plugin-sdk/awd-plugin-sdk.js` 直接放入 ZIP，避免维护过期 SDK 副本。
 
 测试覆盖合成 DOM 流程与安全边界；跨账号真实联网、正式安装/启用/工作区及客户端发版须由集成验收单独确认。
 
