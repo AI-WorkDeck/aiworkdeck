@@ -48,12 +48,14 @@ for (const kind of ['writer', 'calc', 'impress']) {
 }
 test('blank spare hides native chrome before readiness; adoption prepares the new layout again', async () => {
   const h = host('writer', null)
+  // 备胎就绪后还会发一条 warm_engine 预热（999568b86），这里只数 set_chrome
+  const chromeCalls = () => h.commands.filter(c => c.action === 'set_chrome').length
   await h.vm.finishDocLoad()
-  assert.equal(h.commands.length, 1)
+  assert.equal(chromeCalls(), 1)
   assert.equal(h.vm.chromeInitialized, true)
   h.vm.file = { id: 2 }
   await h.vm.finishDocLoad()
-  assert.equal(h.commands.length, 2)
+  assert.equal(chromeCalls(), 2)
 })
 for (const response of [null, { success: false }, { ...hidden, applied: { ...hidden.applied, menubar: true } }]) {
   test(`failed/visible native layout stays covered and retries without reloading: ${JSON.stringify(response)}`, async () => {
