@@ -32,7 +32,7 @@ Restart=always
 RestartSec=5
 
 # ---- 共享 4c8G 机器上的资源护栏 ----
-# 同机还有：官网 Next.js(PM2 :3000)、globalventure(:3001)、插件云后端(MemoryMax 2560M)、
+# 同机还有：官网 Next.js(PM2 :3000)、globalventure(:3001)、插件云后端(MemoryMax 4096M)、
 # PostgreSQL 14、MySQL、宝塔面板。所以这里刻意给小。
 #
 # 堆为什么是 768m：JGit 的常驻内存不是大头（core.packedGitLimit 默认只有 10MB，

@@ -11,4 +11,8 @@ public interface ImMemberRepository extends JpaRepository<ImMember, Long> {
  java.util.List<ImMember> findByUserId(Long userId);
  java.util.List<ImMember> findByConversationId(String conversationId);
  long countByConversationId(String conversationId);
+ /** Atomic and monotonic, so a read cursor needs no conversation lock; a member row removed meanwhile matches nothing. */
+ @org.springframework.data.jpa.repository.Modifying
+ @org.springframework.data.jpa.repository.Query("update ImMember m set m.lastReadId=:lastReadId where m.id=:id and m.lastReadId<:lastReadId")
+ int advanceLastRead(Long id, long lastReadId);
 }

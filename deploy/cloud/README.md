@@ -80,6 +80,15 @@
 ## 日常运维
 
 - 日志：`journalctl -u aiworkdeck-cloud -f`
+- 内存：unit 模板是 `-Xmx3072m` + `MemoryMax=4096M`（2026-11 起；此前 1536m / 2560M）。
+  依据是首次容量压测（2 核 8G，官网 + 云后端 + 案件库 + PostgreSQL 同机，模型为模拟服务）：
+  旧值在 75 人同时活跃起反复出现 4–5 秒的全量回收停顿；3072m 下同样 200 人，
+  最长 GC 停顿 4.9 秒 → 0.6 秒，AI 对话失败率 6.06% → 0.11%，项目列表 p95 3.7 秒 → 0.27 秒。
+  `MemoryMax` 不能跟着堆只加一点：进程常驻内存实测比堆多约 0.85G（3072m 堆时峰值 3.9G），
+  所以是 4096M。同机可用内存最低值相应从约 3.1G 降到约 1.5G。
+  **已在跑的机器不会自动变**：改 `/etc/systemd/system/aiworkdeck-cloud.service` 后
+  `systemctl daemon-reload && systemctl restart aiworkdeck-cloud`；改之前先 `free -m`
+  确认同机其他进程（官网、案件库 2048M、数据库）之外还有余量。
 - 更新后端：本地重新 package → scp 覆盖 backend.jar → `systemctl restart aiworkdeck-cloud`
 
   **package 必须带 `-Djavacpp.platform=linux-x86_64`**：

@@ -467,7 +467,7 @@ vhost 里 `/client/` 的 location 用 `root /opt/aiworkdeck/case/web` 而不是 
   awdk 桥接的连接方式，要么在案件库上另开口子。本目录只准备部署侧，
   这一条属于客户端改造，需要主会话确认由谁做、什么时候做——**在它落地之前，
   案件库对普通用户是连不上的**。
-- 8G 共机的内存余量是纸面推算（addin `MemoryMax=2560M` + case `2048M` + PG + MySQL +
+- 8G 共机的内存余量是纸面推算（addin `MemoryMax=4096M` + case `2048M` + PG + MySQL +
   Next.js），上线前需要在机器上 `free -m` / `systemd-cgtop` 实核一次。
 
 ## 尽调发布与验收（dev-board#1421）
