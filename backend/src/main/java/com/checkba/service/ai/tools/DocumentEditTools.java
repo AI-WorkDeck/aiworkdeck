@@ -2326,7 +2326,8 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置单元格格式", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·格式】设置电子表格区域的格式，只传需要改的参数：加粗/斜体/下划线、字号、字体、字色、底色、" +
           "水平对齐 hAlign(left/center/right/standard)、垂直对齐 vAlign(top/center/bottom/standard)、自动换行 wrap、" +
-          "数字格式 numberFormat（LibreOffice 格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'、'@'=文本）。")
+          "数字格式 numberFormat（LibreOffice 格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'、'@'=文本）。" +
+          "列宽、行高（含显示成 ### 的列加宽）不归这里，用 sheet_set_row_col。")
     public String sheet_format_cells(
             @P("区域，如 'A1:D1'") String range,
             @P(value = "加粗 true/false，不改则不传", required = false) Boolean bold,
