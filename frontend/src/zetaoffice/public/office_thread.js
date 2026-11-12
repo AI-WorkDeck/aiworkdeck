@@ -7242,8 +7242,13 @@ const EXEC = {
   // 走段落索引缓存：O(窗口) 而非 O(全文)，total 直接取索引长度。
   get_document_text(p) {
     const start = Math.max(0, Number(p && p.startParagraph) || 0);
-    const maxParas = Math.max(1, Math.min(Number(p && p.maxParagraphs) || 200, 500));
-    const charBudget = 15000;
+    // bulk：宿主自己的后台读者（写作辅助词表、即时审校快照）一次取全文。__agent 读要切到最终稿视图、
+    // 每次切换都让段落索引失效重建（2006 段的稿子每页 ~650ms，分页通读要 8–10 次，office-tier1 O8）；
+    // 一次读完只建一次索引。AI 工具不带 bulk，仍按 500 段 / 15000 字分页。
+    const bulk = !!(p && p.bulk === true);
+    const maxParas = bulk ? Math.max(1, Math.min(Number(p && p.maxParagraphs) || 10000, 10000))
+      : Math.max(1, Math.min(Number(p && p.maxParagraphs) || 200, 500));
+    const charBudget = bulk ? 200000 : 15000;
     return withParaIndex(function (ix) {
       const total = ix.total;
       const paragraphs = [];

@@ -125,7 +125,7 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
     let revision, start = 0, chars = 0, truncated = false, exhausted = false
     // Pagination has a revision fence: never splice paragraphs from different edits.
     for (let page = 0; page < 60; page++) {
-      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: 500, __agent: true })
+      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: 10000, bulk: true, __agent: true })
       if (!current(gen)) return null
       if (!result?.success || result.revision == null || !Array.isArray(result.paragraphs)) throw new Error('REVIEW_SNAPSHOT_FAILED')
       if (revision == null) revision = result.revision
