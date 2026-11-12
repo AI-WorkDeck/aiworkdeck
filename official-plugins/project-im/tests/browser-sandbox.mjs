@@ -36,7 +36,7 @@ test('real sandbox SDK bridge supports explicit import/export/member/leave confi
     if (req.url === '/') text = host;
     else if (req.url === '/drag-helper.js') { text = readFileSync(new URL('../../../frontend/src/utils/pluginImDrag.js', import.meta.url)); type = 'text/javascript'; }
     else if (req.url === '/awd-plugin-sdk.js') { text = readFileSync(new URL('../../../sdk/plugin-sdk/awd-plugin-sdk.js', import.meta.url)); type = 'text/javascript'; }
-    else if (['/index.html','/panel.js','/panel.css'].includes(req.url)) { text = readFileSync(new URL(req.url.slice(1), webRoot)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
+    else if (['/index.html','/panel.js','/panel-l10n.js','/panel.css'].includes(req.url)) { text = readFileSync(new URL(req.url.slice(1), webRoot)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
     else { res.writeHead(404); res.end(); return; }
     res.setHeader('Content-Type', type + '; charset=utf-8'); res.end(text);
   });

@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ImMessageRepository extends JpaRepository<ImMessage, Long> {
  java.util.Optional<ImMessage> findByConversationIdAndSenderIdAndClientMessageId(String conversationId,Long senderId,String clientMessageId);
  org.springframework.data.domain.Page<ImMessage> findByConversationIdAndIdGreaterThanOrderByIdAsc(String conversationId,long id,org.springframework.data.domain.Pageable pageable);
- org.springframework.data.domain.Page<ImMessage> findByConversationIdAndIdLessThanOrderByIdDesc(String conversationId,long id,org.springframework.data.domain.Pageable pageable);
  long countByConversationIdAndIdGreaterThanAndSenderIdNot(String conversationId,long id,Long senderId);
+ org.springframework.data.domain.Page<ImMessage> findByConversationIdAndIdGreaterThanAndIdLessThanOrderByIdDesc(String conversationId,long after,long before,org.springframework.data.domain.Pageable pageable);
+ boolean existsByConversationIdAndAttachmentIdAndIdGreaterThan(String conversationId,String attachmentId,long id);
+ @org.springframework.data.jpa.repository.Query("select coalesce(max(m.id),0) from ImMessage m where m.conversationId=:conversationId")
+ long maxId(String conversationId);
 }

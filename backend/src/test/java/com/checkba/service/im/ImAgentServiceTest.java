@@ -129,6 +129,20 @@ class ImAgentServiceTest {
         assertEquals("AGENT",history(client,id).get(history(client,id).size()-1).get("actorType"));
     }
 
+    @Test void sharedReplyNeverDrawsOnMessagesHiddenFromAHistoryLimitedClient() {
+        String id=group(); send(owner,id,"入群前的内部策略"); join(client,id,"CLIENT");
+        long source=send(owner,id,"请总结目前进展"); reply(owner,id,source); jobs.remove().run();
+        assertEquals("completed",turns.findById(source).orElseThrow().getStatus());
+        assertTrue(prompt.get().contains("请总结目前进展")); assertFalse(prompt.get().contains("入群前的内部策略"));
+    }
+
+    @Test void sharedReplyKeepsEarlierMessagesWhenTheClientWasGivenHistoryOrOnlyStaffArePresent() {
+        String id=group(); send(owner,id,"入群前的讨论"); join(colleague,id,"MEMBER");
+        call(client,"join",Map.of("code",call(owner,"invite",Map.of("conversationId",id,"role","CLIENT","shareHistory",true)).get("code")));
+        long source=send(owner,id,"请总结目前进展"); reply(owner,id,source); jobs.remove().run();
+        assertTrue(prompt.get().contains("入群前的讨论"));
+    }
+
     @Test void revokedBoundProjectBeforeGenerationNeverCallsModel() {
         Long projectId=boundProject(); String id=(String)call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");
         long source=send(owner,id,"权限可撤销"); reply(owner,id,source); projectAccess.remove(projectId+":"+owner); jobs.remove().run();

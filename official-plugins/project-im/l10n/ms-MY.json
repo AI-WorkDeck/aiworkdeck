@@ -2,5 +2,10 @@
   "plugin.name": "Pesangan Projek",
   "plugin.description": "Komunikasi firma guaman, pasukan dan projek: pembantu kongsi, mesej terus, pengarkiban fail dan rujukan AI. Buat masa ini hanya tersedia untuk akaun Tanah Besar China.",
   "tool.project_im_list_conversations.desc": "Senaraikan perbualan mesej pengguna (baca sahaja). Guna apabila pengguna bertanya kumpulan sembang atau perbualan apa yang wujud, termasuk kumpulan projek.",
-  "tool.project_im_read_messages.desc": "Baca mesej terkini dalam perbualan yang disertai pengguna (baca sahaja). Guna apabila pengguna bertanya apa yang dibincangkan baru-baru ini dalam kumpulan sembang atau kumpulan projek, atau mahu sejarah sembang (dapatkan id perbualan dahulu daripada project_im_list_conversations)."
+  "tool.project_im_read_messages.desc": "Baca mesej terkini dalam perbualan yang disertai pengguna (baca sahaja). Guna apabila pengguna bertanya apa yang dibincangkan baru-baru ini dalam kumpulan sembang atau kumpulan projek, atau mahu sejarah sembang (dapatkan id perbualan dahulu daripada project_im_list_conversations).",
+  "panel.historyScope": "Mesej yang boleh dilihat anak guam",
+  "panel.historyAfterJoin": "Hanya mesej selepas menyertai",
+  "panel.historyWithEarlier": "Termasuk mesej terdahulu",
+  "panel.inviteHintAfterJoin": "Anak guam yang menyertai dengan kod ini hanya melihat mesej dan fail yang dihantar selepas dia menyertai. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}",
+  "panel.inviteHintWithHistory": "Anak guam yang menyertai dengan kod ini juga boleh membaca mesej terdahulu; fail masih dibuka satu demi satu mengikut kebenaran akses. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}"
 }

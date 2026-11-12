@@ -2,5 +2,10 @@
   "plugin.name": "Project Messaging",
   "plugin.description": "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.",
   "tool.project_im_list_conversations.desc": "List the user's messaging conversations (read-only). Use when the user asks which group chats or conversations exist, including the project group.",
-  "tool.project_im_read_messages.desc": "Read recent messages of a conversation the user belongs to (read-only). Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first)."
+  "tool.project_im_read_messages.desc": "Read recent messages of a conversation the user belongs to (read-only). Use when the user asks what a group chat or project group has been discussing, or wants the chat history (get the conversation id from project_im_list_conversations first).",
+  "panel.historyScope": "Messages the client can see",
+  "panel.historyAfterJoin": "Only messages sent after they join",
+  "panel.historyWithEarlier": "Earlier messages as well",
+  "panel.inviteHintAfterJoin": "A client who joins with this code sees only messages and files sent after they join. Share it only with the intended person. Valid until {time}",
+  "panel.inviteHintWithHistory": "A client who joins with this code can also read earlier messages; files are still opened one by one under their access settings. Share it only with the intended person. Valid until {time}"
 }
