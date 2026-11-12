@@ -55,6 +55,9 @@ public class ProjectController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.checkba.service.DeviceTokenService deviceTokenService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.version.WorkSessionService workSessionService;
+
     public ProjectController(ProjectService projectService, ProjectMemberService projectMemberService,
                              com.checkba.service.LocalProjectService localProjectService,
                              com.checkba.storage.ProjectStorageResolver storageResolver) {
@@ -365,6 +368,22 @@ public class ProjectController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("code", 400, "message", e.getMessage()));
         }
+    }
+
+    @GetMapping("/exit-projects")
+    public Map<String, List<Long>> exitProjects(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = getUserIdFromSession(sessionId);
+        if (userId == null) throw new IllegalArgumentException(com.checkba.service.LangText.of("请先登录", "Please sign in first"));
+        if (workSessionService == null) return Map.of("projectIds", List.of());
+        java.util.Set<Long> changed = workSessionService.sessionChangedProjectIds();
+        java.time.LocalDateTime startedAt = workSessionService.sessionStartedAt();
+        List<Long> ids = filterLinkedShadows(projectService.getUserProjectCardDTOs(userId), userId).stream()
+                .filter(card -> changed.contains(card.getId()) || (card.getLastActivityAt() != null
+                        && !card.getLastActivityAt().isBefore(startedAt)))
+                .map(com.checkba.model.dto.ProjectCardDTO::getId)
+                .toList();
+        return Map.of("projectIds", ids);
     }
 
     private Long getUserIdFromSession(String sessionId) {

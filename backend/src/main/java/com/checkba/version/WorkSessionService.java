@@ -96,6 +96,20 @@ public class WorkSessionService {
     // Compare active physical scopes, so unrelated folders can save during background version work.
     private final PathScopedRepoLock.Registry localFolderRepoLocks = new PathScopedRepoLock.Registry();
     private final Set<Long> deletedProjects = ConcurrentHashMap.newKeySet();
+    private final Set<Long> sessionChangedProjects = ConcurrentHashMap.newKeySet();
+    private final LocalDateTime sessionStartedAt = LocalDateTime.now();
+
+    public Set<Long> sessionChangedProjectIds() {
+        return Set.copyOf(sessionChangedProjects);
+    }
+
+    public void markSessionChanged(long projectId) {
+        if (!deletedProjects.contains(projectId)) sessionChangedProjects.add(projectId);
+    }
+
+    public LocalDateTime sessionStartedAt() {
+        return sessionStartedAt;
+    }
 
     /**
      * push 落库延后的项目 → 最早的基线 sha（Task 6）。内存态，服务端重启即丢失——
@@ -489,6 +503,7 @@ public class WorkSessionService {
      */
     public void onChangeSignal(long projectId, Long userId, String userName) {
         if (deletedProjects.contains(projectId)) return;
+        sessionChangedProjects.add(projectId);
         PendingActor actor = new PendingActor(userId, userName);
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -723,6 +738,9 @@ public class WorkSessionService {
     private WorkSession ensureSession(long projectId, Long userId, String userName) {
         Optional<WorkSession> existing = activeSession(projectId);
         if (existing.isPresent()) return existing.get();
+        if (repoService.resolveRef(projectId, "HEAD") == null) {
+            repoService.init(projectId, userName, email(projectId, userId, userName));
+        }
 
         String branch = "work/" + System.currentTimeMillis();
         repoService.createBranch(projectId, branch, "HEAD");
@@ -1135,6 +1153,7 @@ public class WorkSessionService {
             if (!onDraftBranch(projectId)) {
                 ensureSession(projectId, userId, AI_AUTHOR_NAME);
             }
+            sessionChangedProjects.add(projectId);
             String msg = changesKnown ? describeChanges(changes)
                     : LangText.of("修改了项目文件", "Edited project files");
             return repoService.commitAll(projectId, msg, "auto", null,

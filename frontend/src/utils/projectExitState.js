@@ -6,6 +6,18 @@
 const unsettled = new Map()
 export const pendingExitProjects = () => [...unsettled.values()].map(row => ({ ...row, state: 'uncertain', selected: false }))
 
+export function selectExitProjectRows(projects, changedIds, pending = []) {
+  const changed = new Set(changedIds.map(String))
+  const rows = projects.filter(p => changed.has(String(p.id)) && !['SCRATCH', 'LOOSE_FILES'].includes(p.projectType))
+    .map(p => ({ id: p.id, name: p.name, selected: false, count: 0, state: 'checking' }))
+  for (const pendingRow of pending) {
+    const row = rows.find(item => String(item.id) === String(pendingRow.id))
+    if (row) Object.assign(row, pendingRow)
+    else rows.push({ ...pendingRow })
+  }
+  return rows
+}
+
 function validateStatus(status) {
   if (typeof status?.enabled !== 'boolean' || typeof status?.working !== 'boolean'
     || typeof status?.canCommit !== 'boolean' || !Number.isFinite(status.changedCount) || status.changedCount < 0
@@ -24,14 +36,18 @@ export async function inspectExitProject(row, readStatus) {
     const status = validateStatus(await readStatus(row.id))
     row.count = status.changedCount
     row.receiptEpoch = status.receiptEpoch
+    row.error = ''
+    row.errorKind = ''
     row.state = !status.enabled ? 'empty' : status.conflict ? 'conflict'
       : !status.canCommit || !row.count ? 'empty' : 'ready'
-  } catch { row.state = 'failed' }
+  } catch (error) { row.state = 'failed'; row.error = error?.message || ''; row.errorKind = 'status' }
 }
 
 export async function settleExitCommit(row, commit, readStatus) {
   row.state = 'committing'
   row.selected = false
+  row.error = ''
+  row.errorKind = ''
   unsettled.set(String(row.id), { id: row.id, requestId: row.requestId, receiptEpoch: row.receiptEpoch })
   let result
   try { result = await commit(row.id, row.requestId) } catch { row.state = 'uncertain'; return false }
@@ -39,6 +55,8 @@ export async function settleExitCommit(row, commit, readStatus) {
     unsettled.delete(String(row.id))
     row.requestId = null
     await inspectExitProject(row, readStatus)
+    row.error = result.message || ''
+    row.errorKind = 'commit'
     return false
   }
   if (result?.receiptState !== 'SUCCEEDED' || typeof result.sha !== 'string' || typeof result.notice !== 'string') {
@@ -47,6 +65,7 @@ export async function settleExitCommit(row, commit, readStatus) {
   }
   unsettled.delete(String(row.id))
   row.requestId = null
+  row.error = ''
   row.state = 'committed'
   if (result.conflict || result.success === false) {
     await inspectExitProject(row, readStatus)

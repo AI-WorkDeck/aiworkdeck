@@ -719,7 +719,7 @@ public class LocalProjectService {
 
     /**
      * 把文件夹现有内容按广度优先（层序）批量登记进数据库文件树（dev-board#1427）。幂等：
-     * - 已有同名同大小同路径的行一字不动（避免 DB 行翻搅与版本记录噪声）；
+     * - 同名同大小同路径且磁盘 mtime 不晚于行更新时间的行一字不动（避免 DB 翻搅与版本噪声）；
      * - <b>回收站里的行（isDeleted）不复活</b>——软删除不动磁盘文件，重扫时把磁盘上
      *   仍存在的它当「新文件」再导入会静默撤销律师刚做的删除；
      * - 跳过噪声目录（{@link #isIgnoredDirectoryName}）与噪声文件（{@link #isIgnoredEntryName}）；
@@ -814,7 +814,10 @@ public class LocalProjectService {
                     }
                     boolean sameSize = row.getFileSize() != null && row.getFileSize() == entry.attrs().size();
                     boolean samePath = logicalPath.equals(row.getFilePath());
-                    if (sameSize && samePath) {
+                    boolean notNewerOnDisk = row.getUpdatedAt() != null
+                            && !entry.attrs().lastModifiedTime().toInstant().isAfter(
+                                    row.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant());
+                    if (sameSize && samePath && notNewerOnDisk) {
                         stats.imported++;
                         continue; // 无变化不动行
                     }

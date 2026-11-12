@@ -109,6 +109,9 @@ export default {
   redlineAuthorPlaceholder: '留空则使用昵称',
   redlineAuthorHint: '只影响之后新增的修订和批注，已有署名不变',
   // 姓名引导（Spec §6）：手机号注册的默认展示名是打码手机号，同事在案卷里看到的就是它
+  exitAutoScanGroupTitle: '退出',
+  exitAutoScanLabel: '退出时检查项目改动',
+  exitAutoScanHint: '开启后只检查本次打开后有更新的项目；关闭则保存文件后直接退出。',
   nameNudgeText: '填写你的姓名，同事在案卷里看到的就是它',
   nameNudgeTitle: '填写你的姓名',
   nameNudgeConfirm: '去填写',

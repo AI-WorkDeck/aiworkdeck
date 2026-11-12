@@ -5,6 +5,7 @@ package com.checkba.service;
 
 import com.checkba.model.entity.Project;
 import com.checkba.repository.ProjectRepository;
+import com.checkba.version.WorkSessionService;
 import io.methvin.watcher.DirectoryWatcher;
 import io.methvin.watcher.hashing.FileHasher;
 import jakarta.annotation.PreDestroy;
@@ -70,6 +71,9 @@ public class LocalRootWatchService {
     private final ProjectRepository projectRepository;
     private final LocalProjectService localProjectService;
     private final LocalProjectFileChangeService fileChanges;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private WorkSessionService workSessionService;
 
     private static final class WatchState {
         // 注册可能遍历很大的目录；只串行同一项目，stop/shutdown 不等待这把锁。
@@ -173,7 +177,10 @@ public class LocalRootWatchService {
                 }
                 watcher = createWatcher(root, () -> {
                     synchronized (state) {
-                        if (!closing && state.generation == generation) scheduleReconcile(projectId);
+                        if (!closing && state.generation == generation) {
+                            if (workSessionService != null) workSessionService.markSessionChanged(projectId);
+                            scheduleReconcile(projectId);
+                        }
                     }
                 });
                 final DirectoryWatcher registeredWatcher = watcher;

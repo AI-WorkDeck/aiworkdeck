@@ -7,9 +7,14 @@ import { pendingExitProjects } from './projectExitState.js'
 import { getSessionId } from './auth.js'
 import { isDesktopHost } from '@/services/host.js'
 import { setGlobalOverlay } from './overlayState.js'
+import { shouldScanProjectsOnExit } from './projectExitPreferences.js'
 
 export function confirmProjectExit({ isCurrent = () => true } = {}) {
-  if (!isDesktopHost() && !getSessionId() && !pendingExitProjects().length) return Promise.resolve(true)
+  const desktop = isDesktopHost()
+  const pending = pendingExitProjects()
+  if (!pending.length && ((!desktop && !getSessionId()) || (desktop && !shouldScanProjectsOnExit()))) {
+    return Promise.resolve(true)
+  }
   return new Promise(resolve => {
     const container = document.createElement('div')
     document.body.appendChild(container)

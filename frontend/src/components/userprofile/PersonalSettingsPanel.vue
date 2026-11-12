@@ -23,6 +23,13 @@
         </view>
       </SettingsSection>
 
+      <SettingsSection v-if="isDesktop" :title="$t('account.exitAutoScanGroupTitle')">
+        <SettingsRow :label="$t('account.exitAutoScanLabel')">
+          <AwdSwitch :checked="exitAutoScan" :aria-label="$t('account.exitAutoScanLabel')" @change="onExitAutoScanChange" />
+        </SettingsRow>
+        <text class="bind-tip">{{ $t('account.exitAutoScanHint') }}</text>
+      </SettingsSection>
+
       <SettingsSection :title="$t('account.basicInfoGroupTitle')">
         <!-- 姓名引导（Spec §6）：手机号注册的默认展示名是打码手机号，
              而同事在案卷参与人列表、时间线、批注作者里看到的就是这个字段 -->
@@ -218,6 +225,7 @@ import { getAppLanguage, setAppLanguage, getLocaleEntry, LOCALE_REGISTRY } from 
 import { applyI18nLocale } from '@/i18n/index.js'
 import { getInitial } from '@/utils/textInitial.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
+import { shouldScanProjectsOnExit, setScanProjectsOnExit } from '@/utils/projectExitPreferences.js'
 
 export default {
   name: 'PersonalSettingsPanel',
@@ -265,6 +273,7 @@ export default {
       // 界面语言：读写走 utils/appLanguage.js（storage 权威源 + App.vue 镜像同步）。
       // 选项标签用各自母语，刻意不随语言翻译。
       appLanguage: getAppLanguage(),
+      exitAutoScan: shouldScanProjectsOnExit(),
       appLanguageOptions: (Array.isArray(LOCALE_REGISTRY) ? LOCALE_REGISTRY : []).map((entry) => ({
         value: entry.code,
         label: entry.nativeName,
@@ -562,6 +571,10 @@ export default {
     // 与应用菜单「退出登录…」共用一份，别在这里另写一条会漂的。
     handleLogout() {
       signOut()
+    },
+    onExitAutoScanChange(next) {
+      setScanProjectsOnExit(next)
+      this.exitAutoScan = shouldScanProjectsOnExit()
     },
     onAppLanguageChange({ resolved } = {}) {
       this.appLanguage = resolved || getAppLanguage()
