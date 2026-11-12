@@ -151,7 +151,7 @@ export function formatNumber(v, code) {
     : x.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: grouped })
   // 字面量前后缀：引号文本与 [$¥-804] 货币符号
   const literal = part => (part.match(/"([^"]*)"|\[\$([^\]-]*)[^\]]*\]|\\(.)|([¥$€£])/g) || [])
-    .map(t => t.startsWith('"') ? t.slice(1, -1) : t.startsWith('[$') ? t.slice(2).split('-')[0].replace(']', '') : t.startsWith('\\') ? t.slice(1) : t).join('')
+    .map(t => t.startsWith('"') ? t.slice(1, -1) : t.startsWith('[$') ? t.slice(2).split('-')[0].replace(/]/g, '') : t.startsWith('\\') ? t.slice(1) : t).join('')
   // 引号文本、[$¥-804] 这类方括号里的字符不是数字占位符（804 里的 0 曾被当成数字起点）
   const masked = section.replace(/"[^"]*"|\[[^\]]*\]|\\./g, m => ' '.repeat(m.length))
   const firstDigit = masked.search(/[#0?]/)
