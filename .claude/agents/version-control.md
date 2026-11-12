@@ -912,7 +912,7 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 45. **`awdk-login` 的回包形状是跨端契约，Office 插件云后端也吃它**——dev-board#439 给它加了 `tokenId` 与 `displayName`（`AwdkLoginService.BridgeSession` 相应加了两个分量，桌面端拿 `tokenId` 才撤得掉远端那枚长期设备令牌）。加字段是安全的，但 **`tokenId` 缺失时必须整个键不下发**：用 `Map.of` 就得给个非 null 值，回落成 0 会让调用方存下一个不存在的令牌行 id，断开时对着 0 号令牌发撤销请求。护栏 `AuthControllerHardeningTest.awdkLoginOmitsTokenIdWhenAbsent`。
 
 
-46. **查人与加人必须共用同一个限频计数，挂一处等于没挂**（dev-board#444）——两个端点回答的是同一个问题「这个手机号在 AI WorkDeck 上注册过没有」：只给 lookup 限频的话，攻击者交替调 lookup 与 addMember 就把额度翻了倍（addMember 撞到「用户已在项目中」与「对方还没登录过」两句不同的话，一样能区分号码存不存在）。所以 `ProjectMemberController` 的两个方法都调 `checkMemberLookupRate`+`recordMemberLookup`，且 `AuthAbuseGuard` 里是**同一张表**。维度选的是发起人（项目管理员）不是 IP：这条路必须先过项目管理员权限，攻击者手上是一个具体账号，IP 可以随便换、账号不能；何况基线部署 nginx 与后端同机时 IP 维度本来就退化成全局（`AuthAbuseGuard` 类注释）。**新增任何限频维度都要顺手进 `purgeIfOversized`**，否则伪造维度能把那张 map 撑爆。护栏 `AuthAbuseGuardTest.memberLookupRateLimitPerRequester` + `ProjectMemberLookupControllerTest.addingAMemberCountsAgainstTheSameRateLimit`。
+46. **查人与加人必须共用同一个限频计数，挂一处等于没挂**（dev-board#444）——两个端点回答的是同一个问题「这个手机号在 AI WorkDeck 上注册过没有」：只给 lookup 限频的话，攻击者交替调 lookup 与 addMember 就把额度翻了倍（addMember 撞到「用户已在项目中」与「对方还没登录过」两句不同的话，一样能区分号码存不存在）。所以 `ProjectMemberController` 的两个方法都调 `checkMemberLookupRate`+`recordMemberLookup`，且 `AuthAbuseGuard` 里是**同一张表**。维度选的是发起人（项目管理员）不是 IP：这条路必须先过项目管理员权限，攻击者手上是一个具体账号，IP 可以随便换、账号不能。**新增任何限频维度都要顺手进 `purgeIfOversized`**，否则伪造维度能把那张 map 撑爆。护栏 `AuthAbuseGuardTest.memberLookupRateLimitPerRequester` + `ProjectMemberLookupControllerTest.addingAMemberCountsAgainstTheSameRateLimit`。
 
 47. **`ProjectMemberService` 的构造器被两个测试类手工 `new`，新依赖一律走字段注入**（dev-board#444）——查人卡片的头像要 `AccountBindingRepository` 与 `ai.account.base-url`，两样都用 `@Autowired(required=false)` / `@Value` **字段**注入，包内可见的 `setAccountLookupForTest` 给手工 new 出来的实例补上（`ProjectRepoService.maxTrackedFileSizeBytes` 的同款先例）。改成构造器参数就要同步改 `ProjectMemberAddByContactTest` 与 `ProjectMemberServiceAddMemberRaceTest`，是纯 churn。
 
@@ -948,9 +948,10 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 - `version/CloudSyncService.java` — `proxyInviteClient` / `proxyRemoveMember` / `proxyDd`（原字节转发，`httpRaw` seam 非 200 不抛，403 原样带回）/ `hasRemoteBinding` / `clientPortalUrl`。
 - `config/DdCloudProxyFilter.java` — local-mode 下 `/api/dd/*` 在已上云案卷上整体转发到 `{server}/api/dd/*`。
 - `service/DdCloudMigrationService.java` — 首读清单列表时把本机未迁移的清单推上去；`DdRequest.cloudRequestId` 非空 = 已迁移。
-- `controller/DdController.java` — CLIENT 白名单（`requireStaffBy*` + `ClientForbiddenException` → 真 HTTP 403）；`GET /api/dd/items/{itemId}/file`（清单项取件口，`?token=` 兜底）。
+- `controller/DdController.java` — CLIENT 白名单（`requireStaffBy*` + `ClientForbiddenException` → 真 HTTP 403）；`DdController`/`DdAiController` 的写路由由 `DdClientRouteClassificationTest` 按反射穷举：客户可调的只有其 `CLIENT_WRITE_ROUTES`（上传/提交/说明/申诉/留言/通知已读/核验自己的提交），其余客户调用必须在业务层之前 403，新增写路由不归类就红；`GET /api/dd/items/{itemId}/file`（清单项取件口，`?token=` 兜底）。
 - `service/ClientInvitationService.java` — `issueClientCode`（`Issued{code, expiresAt, clientUserId}`）、30 天有效期、同码同称呼复用、local-mode 一律不签（`IssueViaLibraryException`）。
-- `controller/AuthController.clientLogin` — 接 `AuthAbuseGuard`（维度 `::client-code`）。
+- `controller/AuthController.clientLogin` — 接 `AuthAbuseGuard`（维度 真实客户端 IP + `::client-code`，IP 取自 `util/ClientIp`：只在对端为回环时采信 nginx 写入的 `X-Real-IP`，永不看 X-Forwarded-For），同 IP 错 5 次只锁该 IP；另有全站 10 分钟 200 次失败上限（`checkClientCodeGlobalCeiling`）压分布式猜码。
+- `controller/ProjectMemberController.getMembers` — 客户（`isClient`）一律拒绝：门户与客户工作区不读成员名单，名单含用户名/官网账户 id/带账户 id 的头像地址/其他客户。
 - 前端：`pages/client-portal/client-portal.vue`、`utils/clientPortal.js`（门户构建的路由收口）、`utils/memberLookup.js` 的 `clientPortalLink`/`codeFromHash`/`expiryDate`、`InviteMemberDialog.vue`（云端轨签码 + 撤销）、`collab/CollabDialog.vue`（参与人「移出」）、`services/api.js` 的 `ddUrl`/`inviteCloudClient`/`removeCloudMember`。
 - 部署：`deploy/case/nginx-case.conf.example`（`location ^~ /client/`、`/api/auth/client-login` 限频）、`deploy/case/README.md`「六之二」。
 
@@ -1010,7 +1011,7 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 - dev-board#1216/#1218：`ProjectRepoHistoryTest` 钉查询不改索引/对象、暂存后恢复原文与 rm --cached 后的工作区语义；`ChangeSignalNonBlockingTest` 钉仓库忙时保存信号立即返回、同项目合并最新署名、提交后异步派发/回滚不派发、异常重试与关闭版本取消迟到信号、状态查询忙时快速返回。现场根因是状态查询全量 add 大文件，上传事务随后持数据库连接等同一把仓库锁；try/catch 只能降级异常，不能解除无限等待。
 
 ```bash
-cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ClientPortalRoundTripTest,DdControllerClientWhitelistTest,DdItemReviewStatusTest,DdCloudProxyFilterTest,AuthClientLoginGuardTest,ClientInvitationServiceTest'
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ClientPortalRoundTripTest,DdControllerClientWhitelistTest,DdClientRouteClassificationTest,ProjectMemberClientRosterTest,ClientIpTest,DdItemReviewStatusTest,DdCloudProxyFilterTest,AuthClientLoginGuardTest,ClientInvitationServiceTest'
 cd frontend && node --test tests/member-invite/*.test.mjs && npm run build:client-portal
 ```
 `ClientPortalRoundTripTest` 起一个 local-mode=false 的内嵌案件库，桌面栈手工 new：放进案件库 → 本机旧清单首读迁上去（含 multipart 附件）→ 代理签码 →

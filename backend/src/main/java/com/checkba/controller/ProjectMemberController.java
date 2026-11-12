@@ -38,6 +38,11 @@ public class ProjectMemberController {
         if (callerId == null || !projectMemberService.hasReadPermission(projectId, callerId)) {
             throw new IllegalArgumentException(com.checkba.service.LangText.of("无权访问该项目成员", "You do not have access to this project's members"));
         }
+        // 客户（访问码进来的 CLIENT）不读名单：门户与客户工作区都不用这张表，而它带着律师的
+        // 用户名、官网账户 id、头像地址（内含账户 id）和同项目其他客户，同级的找人/文件树端点也拒客户。
+        if (projectMemberService.isClient(projectId, callerId)) {
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("客户无权查看项目成员名单", "Clients cannot view the project member list"));
+        }
 
         // Fetch project owner (implicitly an ADMIN member)
         com.checkba.model.entity.User owner = projectMemberService.getProjectOwner(projectId);

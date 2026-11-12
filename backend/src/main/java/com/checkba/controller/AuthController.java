@@ -10,6 +10,7 @@ import com.checkba.model.entity.User;
 import com.checkba.service.ClientInvitationService;
 import com.checkba.service.LangText;
 import com.checkba.service.UserService;
+import com.checkba.util.ClientIp;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -217,13 +218,13 @@ public class AuthController {
         try {
             // 注册闸 + 按 IP 限频（server 模式；local-mode 旁路）
             authAbuseGuard.requireRegistrationOpen();
-            authAbuseGuard.checkRegistrationRate(http.getRemoteAddr());
+            authAbuseGuard.checkRegistrationRate(ClientIp.of(http));
             User user = userService.register(
                     request.getUsername(),
                     request.getPassword(),
                     request.getDisplayName()
             );
-            authAbuseGuard.recordRegistration(http.getRemoteAddr());
+            authAbuseGuard.recordRegistration(ClientIp.of(http));
 
             // 注册成功后自动登录
             String sessionId = userSessionService.issue(user.getId());
@@ -257,7 +258,7 @@ public class AuthController {
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody LoginRequest request,
                                      jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         // 同 ip+用户名串行化「检查锁定 → 校验凭据 → 记失败」，否则并发请求都在记账前通过检查，绕过 5 次上限
         synchronized (authAbuseGuard.loginLock(ip, request.getUsername())) {
             return loginLocked(request, ip);
@@ -330,7 +331,7 @@ public class AuthController {
     @PostMapping("/awdk-login")
     public Map<String, Object> awdkLogin(@RequestBody(required = false) Map<String, String> body,
                                          jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkLoginAttempt(ip, AWDK_BRIDGE_RATE_KEY);
@@ -411,7 +412,7 @@ public class AuthController {
             jakarta.servlet.http.HttpServletRequest http) {
         Map<String, Object> result = new HashMap<>();
         try {
-            authAbuseGuard.recordCaptchaChallenge(http.getRemoteAddr());
+            authAbuseGuard.recordCaptchaChallenge(ClientIp.of(http));
             result.put("data", awdkLoginService.captchaChallenge(body));
             result.put("code", 0);
         } catch (com.checkba.service.account.AccountException | IllegalArgumentException e) {
@@ -424,7 +425,7 @@ public class AuthController {
     @PostMapping("/account-login/send-code")
     public Map<String, Object> accountLoginSendCode(@RequestBody(required = false) Map<String, String> body,
                                                     jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkCodeSendRate(ip);
@@ -474,7 +475,7 @@ public class AuthController {
 
     private Map<String, Object> accountPasswordOperation(String operation, Map<String, String> body,
             jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             if ("reset/send-code".equals(operation)) {
@@ -524,7 +525,7 @@ public class AuthController {
     @PostMapping("/account-login")
     public Map<String, Object> accountLogin(@RequestBody(required = false) Map<String, String> body,
                                             jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkLoginAttempt(ip, ACCOUNT_LOGIN_RATE_KEY);
@@ -595,7 +596,7 @@ public class AuthController {
     public Map<String, Object> sendSmsCode(@RequestBody SmsSendCodeRequest request,
                                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                                            jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkCodeSendRate(ip);
@@ -762,7 +763,7 @@ public class AuthController {
     public Map<String, Object> sendMailCode(@RequestBody MailSendCodeRequest request,
                                             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                                             jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkCodeSendRate(ip);
@@ -833,7 +834,7 @@ public class AuthController {
                                                  jakarta.servlet.http.HttpServletRequest http) {
         Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getEmail());
         if (legacyRefusal != null) return legacyRefusal;
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkCodeSendRate(ip);
@@ -859,7 +860,7 @@ public class AuthController {
                                                jakarta.servlet.http.HttpServletRequest http) {
         Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getEmail());
         if (legacyRefusal != null) return legacyRefusal;
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         String lockKey = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
         try {
@@ -911,7 +912,7 @@ public class AuthController {
                                                 jakarta.servlet.http.HttpServletRequest http) {
         Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getPhone());
         if (legacyRefusal != null) return legacyRefusal;
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkCodeSendRate(ip);
@@ -937,7 +938,7 @@ public class AuthController {
                                               jakarta.servlet.http.HttpServletRequest http) {
         Map<String, Object> legacyRefusal = legacyOtpRefusal(request.getPhone());
         if (legacyRefusal != null) return legacyRefusal;
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         String lockKey = request.getPhone() == null ? "" : request.getPhone().trim();
         try {
@@ -996,7 +997,7 @@ public class AuthController {
                                             jakarta.servlet.http.HttpServletRequest http) {
         Map<String, Object> legacyRefusal = legacyOtpRefusal(null);
         if (legacyRefusal != null) return legacyRefusal;
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         try {
             authAbuseGuard.checkLoginAttempt(ip, WX_PHONE_LOGIN_RATE_KEY);
@@ -1043,15 +1044,17 @@ public class AuthController {
      * 客户登录（使用访问码）。
      *
      * <p>案件库托管客户门户（dev-board#1050）之后，这是公网上唯一一个「凭一串码就换会话」的
-     * 匿名入口：接 {@link com.checkba.service.AuthAbuseGuard} 的失败锁定（按 IP + 固定的访问码
-     * 维度，写法同 awdk-login），错码连续 5 次锁 10 分钟；nginx 另有 awd_auth 限频兜底。
+     * 匿名入口：接 {@link com.checkba.service.AuthAbuseGuard} 的失败锁定（按真实客户端 IP
+     * （{@link ClientIp}）+ 固定的访问码维度，写法同 awdk-login），同一 IP 错码连续 5 次锁 10 分钟，
+     * 只锁这个 IP；另有全站 10 分钟 200 次失败的宽上限压分布式猜码；nginx 另有 awd_auth 限频兜底。
      */
     @PostMapping("/client-login")
     public Map<String, Object> clientLogin(@RequestBody ClientLoginRequest request,
                                            jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http == null ? null : http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         try {
             authAbuseGuard.checkLoginAttempt(ip, CLIENT_CODE_RATE_KEY);
+            authAbuseGuard.checkClientCodeGlobalCeiling();
         } catch (IllegalArgumentException e) {
             Map<String, Object> result = new HashMap<>();
             result.put("code", 1);
@@ -1065,6 +1068,7 @@ public class AuthController {
             } catch (IllegalArgumentException e) {
                 // 只有「码不对 / 已作废 / 已过期」计失败；后面的业务拒绝（人数上限等）不消耗尝试次数
                 authAbuseGuard.recordLoginFailure(ip, CLIENT_CODE_RATE_KEY);
+                authAbuseGuard.recordClientCodeFailure();
                 throw e;
             }
 
@@ -1223,7 +1227,7 @@ public class AuthController {
     @PostMapping("/device-token")
     public Map<String, Object> issueDeviceToken(@RequestBody Map<String, String> body,
                                                 jakarta.servlet.http.HttpServletRequest http) {
-        String ip = http.getRemoteAddr();
+        String ip = ClientIp.of(http);
         Map<String, Object> result = new HashMap<>();
         // 这也是一次密码登录，与 /login 共用同一套失败锁定
         try {

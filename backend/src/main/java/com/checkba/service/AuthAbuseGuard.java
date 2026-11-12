@@ -36,9 +36,9 @@ import java.util.function.LongSupplier;
  * <ul>
  *   <li>进程内内存计数，无 Redis 依赖。<b>多实例部署时各实例独立计数，必须在前置
  *       nginx 配 limit_req 作为真正的限流层</b>；本类只是单实例基线。</li>
- *   <li>基线部署形态是 nginx 与后端同机反代，后端看到的 remoteAddr 恒为 127.0.0.1，
- *       此时 IP 维度退化为全局维度——登录锁定仍按用户名生效（这正是防爆破要的），
- *       注册限频则变成全服共享一个额度，公网生产姿态本就该 registration-mode=closed。</li>
+ *   <li>调用方传进来的 IP 一律取自 {@link com.checkba.util.ClientIp#of}：基线部署 nginx 与后端
+ *       同机反代，remoteAddr 恒为 127.0.0.1，只有回环来源才采信 nginx 覆盖写入的 X-Real-IP，
+ *       IP 维度因此是真实客户端维度，不会退化成全站一个桶。</li>
  *   <li>不看 X-Forwarded-For（不可信，与 LocalModeAccessFilter 同一立场）。</li>
  * </ul>
  *
@@ -59,6 +59,13 @@ public class AuthAbuseGuard {
     static final int MAX_CODE_SENDS_PER_WINDOW = 20;
     static final Duration CODE_WINDOW = Duration.ofHours(1);
 
+    /**
+     * 客户访问码的全站失败上限：按 IP 锁定之外再兜一层，压分布式猜码；额度给得宽，
+     * 单个 IP 最多贡献 {@value #MAX_LOGIN_FAILURES} 次，一个来源拖不垮全部客户。
+     */
+    static final int MAX_CLIENT_CODE_FAILURES_GLOBAL = 200;
+    static final Duration CLIENT_CODE_GLOBAL_WINDOW = Duration.ofMinutes(10);
+
     static final int MAX_MEMBER_LOOKUPS_PER_WINDOW = 30;
     static final Duration MEMBER_LOOKUP_WINDOW = Duration.ofMinutes(10);
 
@@ -75,6 +82,7 @@ public class AuthAbuseGuard {
     private final Map<String, WindowCounter> captchaChallenges = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> codeSends = new ConcurrentHashMap<>();
     private final Map<String, WindowCounter> memberLookups = new ConcurrentHashMap<>();
+    private final WindowCounter clientCodeFailures = new WindowCounter();
 
     @Autowired
     public AuthAbuseGuard(
@@ -140,6 +148,35 @@ public class AuthAbuseGuard {
     public void recordLoginSuccess(String ip, String username) {
         if (localMode) return;
         loginFailures.remove(loginKey(ip, username));
+    }
+
+    // ==================== 客户访问码全站上限 ====================
+
+    /** 全站访问码失败在窗口内达到上限时拒绝（在按 IP 锁定之后、校验访问码之前调用）。 */
+    public void checkClientCodeGlobalCeiling() {
+        if (localMode) return;
+        long now = nowMillis.getAsLong();
+        synchronized (clientCodeFailures) {
+            if (now - clientCodeFailures.windowStart <= CLIENT_CODE_GLOBAL_WINDOW.toMillis()
+                    && clientCodeFailures.count >= MAX_CLIENT_CODE_FAILURES_GLOBAL) {
+                // 文案红线（见类注释）：不含「登录」「未授权」「请先」
+                throw new IllegalArgumentException(LangText.of(
+                        "访问码尝试次数过多，请几分钟后再试",
+                        "Too many access code attempts. Please try again in a few minutes"));
+            }
+        }
+    }
+
+    public void recordClientCodeFailure() {
+        if (localMode) return;
+        long now = nowMillis.getAsLong();
+        synchronized (clientCodeFailures) {
+            if (now - clientCodeFailures.windowStart > CLIENT_CODE_GLOBAL_WINDOW.toMillis()) {
+                clientCodeFailures.windowStart = now;
+                clientCodeFailures.count = 0;
+            }
+            clientCodeFailures.count++;
+        }
     }
 
     // ==================== 注册限频 ====================
@@ -222,8 +259,7 @@ public class AuthAbuseGuard {
     // 探测面，**必须共用一个计数**——分开计等于把额度翻倍，交替调两个端点即可绕开。
     //
     // 维度是发起人（项目管理员）而不是 IP：这条路必须先过项目管理员权限，攻击者拿到的
-    // 是一个具体账号，IP 可以随便换，账号不能。基线部署 nginx 与后端同机时 IP 维度
-    // 本来也会退化成全局（见类注释）。
+    // 是一个具体账号，IP 可以随便换，账号不能。
 
     public void checkMemberLookupRate(Long requesterId) {
         if (localMode) return;
