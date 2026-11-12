@@ -469,5 +469,8 @@ export default {
   "bqtDebtWarning": "{count} addebiti di punti non sono riusciti e {amount} Credits sono in sospeso. Ricarica i punti nell'app Baoqingtian e poi contatta l'assistenza.",
   "bqtPayInApp": "Ricarica o rinnova nell'app Baoqingtian",
   "bqtPriorityNote": "L'uso di DeepSeek viene pagato prima con i tuoi punti Baoqingtian; quando finiscono si usa automaticamente il saldo del conto. Gli altri modelli e servizi usano il saldo del conto.",
+  "bqtRenewHint": "I punti Baoqingtian si possono usare solo con un abbonamento Baoqingtian attivo e l’AI Workbench abilitato. Attiva l’abbonamento nell’app avvocati Baoqingtian → Profilo per usare i tuoi {points} punti; nel frattempo l’utilizzo è addebitato sul saldo dell’account.",
+  "bqtWalletHint": "Tutto l’utilizzo è attualmente addebitato sul saldo dell’account. Se non basta, effettua una ricarica.",
+  "bqtRenewRechargeNote": "Hai ancora {points} punti Baoqingtian, ma richiedono un abbonamento Baoqingtian attivo. Attivalo nell’app avvocati Baoqingtian → Profilo per pagare con i punti, oppure ricarica qui.",
   "bqtRechargeNote": "Il tuo saldo è convertito dai punti Baoqingtian e i tuoi vantaggi seguono il tuo abbonamento Baoqingtian. Ricarica i punti o rinnova nell'app Baoqingtian; AI WorkDeck non accetta pagamenti per questo account.",
 }

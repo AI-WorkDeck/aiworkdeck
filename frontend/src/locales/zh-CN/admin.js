@@ -508,5 +508,8 @@ export default {
   "bqtDebtWarning": "有 {count} 笔扣点未成功，待结清 {amount} Credits。请在包晴天 App 充值积分，然后联系客服处理。",
   "bqtPayInApp": "请在包晴天 App 充值/续费",
   "bqtPriorityNote": "DeepSeek 模型的用量优先扣包晴天积分，积分不够时自动改用账户余额；其他模型和服务使用账户余额。",
+  "bqtRenewHint": "包晴天会员有效并开通 AI 工作台后才能使用积分。请前往包晴天律师端 App「个人中心」开通会员，即可使用你的 {points} 积分；在此之前，用量从账户余额扣。",
+  "bqtWalletHint": "目前所有用量都从账户余额扣，余额不够可直接充值。",
+  "bqtRenewRechargeNote": "你还有 {points} 包晴天积分，但需包晴天会员有效才能使用：前往包晴天律师端 App「个人中心」开通会员，即可用积分抵扣；也可以直接在这里充值。",
   "bqtRechargeNote": "你的余额由包晴天积分折算，会员权益随包晴天会员生效。请在包晴天 App 充值积分或续费会员，AI WorkDeck 内不提供充值。",
 }

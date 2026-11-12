@@ -509,5 +509,8 @@ export default {
   "bqtDebtWarning": "{count} points deduction(s) failed, {amount} Credits outstanding. Recharge points in the Baoqingtian app, then contact support.",
   "bqtPayInApp": "Recharge or renew in the Baoqingtian app",
   "bqtPriorityNote": "DeepSeek usage is paid from your Baoqingtian points first; when points run out it automatically uses your account balance. Other models and services use your account balance.",
+  "bqtRenewHint": "Baoqingtian points can only be used while your Baoqingtian membership is active with the AI Workbench enabled. Open the Baoqingtian lawyer app → Profile to activate your membership and use your {points} points; until then, usage is charged to your account balance.",
+  "bqtWalletHint": "All usage is currently charged to your account balance. If it runs low, just top up.",
+  "bqtRenewRechargeNote": "You still have {points} Baoqingtian points, but they need an active Baoqingtian membership. Activate it in the Baoqingtian lawyer app → Profile to pay with points, or top up here.",
   "bqtRechargeNote": "Your balance is converted from Baoqingtian points, and your benefits follow your Baoqingtian membership. Recharge points or renew in the Baoqingtian app; AI WorkDeck does not take payments for this account.",
 }

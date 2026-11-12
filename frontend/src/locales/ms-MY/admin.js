@@ -469,5 +469,8 @@ export default {
   "bqtDebtWarning": "{count} potongan mata gagal dan {amount} Credits belum dijelaskan. Tambah nilai mata dalam aplikasi Baoqingtian kemudian hubungi sokongan.",
   "bqtPayInApp": "Tambah nilai atau perbaharui dalam aplikasi Baoqingtian",
   "bqtPriorityNote": "Penggunaan DeepSeek dibayar dahulu dengan mata Baoqingtian anda; apabila mata habis, baki akaun digunakan secara automatik. Model dan perkhidmatan lain menggunakan baki akaun.",
+  "bqtRenewHint": "Mata Baoqingtian hanya boleh digunakan apabila keahlian Baoqingtian aktif dan AI Workbench didayakan. Aktifkan keahlian dalam aplikasi peguam Baoqingtian → Profil untuk menggunakan {points} mata anda; sehingga itu, penggunaan dicaj ke baki akaun.",
+  "bqtWalletHint": "Semua penggunaan kini dicaj ke baki akaun anda. Jika tidak cukup, tambah nilai sahaja.",
+  "bqtRenewRechargeNote": "Anda masih ada {points} mata Baoqingtian, tetapi ia memerlukan keahlian Baoqingtian yang aktif. Aktifkan dalam aplikasi peguam Baoqingtian → Profil untuk membayar dengan mata, atau tambah nilai di sini.",
   "bqtRechargeNote": "Baki anda ditukar daripada mata Baoqingtian dan faedah anda mengikut keahlian Baoqingtian anda. Tambah nilai mata atau perbaharui dalam aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akaun ini.",
 }

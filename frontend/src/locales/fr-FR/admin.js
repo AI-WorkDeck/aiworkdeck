@@ -469,5 +469,8 @@ export default {
   "bqtDebtWarning": "{count} déduction(s) de points ont échoué et {amount} Credits restent dus. Rechargez des points dans l'app Baoqingtian puis contactez le support.",
   "bqtPayInApp": "Rechargez ou renouvelez dans l'app Baoqingtian",
   "bqtPriorityNote": "L'utilisation de DeepSeek est d'abord payée avec vos points Baoqingtian ; quand ils sont épuisés, le solde de votre compte prend automatiquement le relais. Les autres modèles et services utilisent le solde de votre compte.",
+  "bqtRenewHint": "Les points Baoqingtian ne sont utilisables que si votre adhésion Baoqingtian est active avec l’atelier IA activé. Activez l’adhésion dans l’app avocat Baoqingtian → Profil pour utiliser vos {points} points ; en attendant, l’utilisation est débitée de votre solde.",
+  "bqtWalletHint": "Toute l’utilisation est actuellement débitée de votre solde. S’il est insuffisant, rechargez simplement.",
+  "bqtRenewRechargeNote": "Il vous reste {points} points Baoqingtian, mais ils nécessitent une adhésion Baoqingtian active. Activez-la dans l’app avocat Baoqingtian → Profil pour payer avec vos points, ou rechargez ici.",
   "bqtRechargeNote": "Votre solde est converti à partir des points Baoqingtian et vos avantages suivent votre abonnement Baoqingtian. Rechargez des points ou renouvelez dans l'app Baoqingtian ; AI WorkDeck n'accepte pas de paiements pour ce compte.",
 }

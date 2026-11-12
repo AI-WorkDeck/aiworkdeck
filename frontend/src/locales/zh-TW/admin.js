@@ -469,5 +469,8 @@ export default {
   "bqtDebtWarning": "有 {count} 筆扣點未成功，待結清 {amount} Credits。請在包晴天 App 儲值積分，然後聯繫客服處理。",
   "bqtPayInApp": "請在包晴天 App 儲值／續費",
   "bqtPriorityNote": "DeepSeek 模型的用量優先扣包晴天積分，積分不夠時自動改用帳戶餘額；其他模型和服務使用帳戶餘額。",
+  "bqtRenewHint": "包晴天會員有效並開通 AI 工作台後才能使用積分。請前往包晴天律師端 App「個人中心」開通會員，即可使用你的 {points} 積分；在此之前，用量從帳戶餘額扣。",
+  "bqtWalletHint": "目前所有用量都從帳戶餘額扣，餘額不夠可直接儲值。",
+  "bqtRenewRechargeNote": "你還有 {points} 包晴天積分，但需包晴天會員有效才能使用：前往包晴天律師端 App「個人中心」開通會員，即可用積分抵扣；也可以直接在這裡儲值。",
   "bqtRechargeNote": "你的餘額由包晴天積分折算，會員權益隨包晴天會員生效。請在包晴天 App 儲值積分或續費會員，AI WorkDeck 內不提供儲值。",
 }

@@ -348,9 +348,11 @@
                     </view>
                     <text v-if="walletBqtMember.expireAt" class="account-note">{{ $t('admin.bqtExpireAt', { date: formatUsageTime(walletBqtMember.expireAt) }) }}</text>
                     <text class="account-note">{{ $t('admin.bqtPointsLine', { points: walletBqtMember.points, credits: walletBqtMember.credits }) }}</text>
-                    <text v-if="walletBqtMember.active && !walletBqtMember.aiWorkbench" class="bqt-member-warn">{{ $t('agentStream.bqtAiClosed') }}</text>
                     <text v-if="walletBqtMember.hasDebt" class="bqt-member-warn">{{ $t('admin.bqtDebtWarning', { count: walletBqtMember.failedCount, amount: walletBqtMember.outstandingCredits }) }}</text>
-                    <text class="account-note">{{ isBqtBilling ? $t('admin.bqtPayInApp') : $t('admin.bqtPriorityNote') }}</text>
+                    <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                    <text v-else-if="walletBqtMember.guidance === 'renew'" class="bqt-member-warn">{{ $t('admin.bqtRenewHint', { points: walletBqtMember.points }) }}</text>
+                    <text v-else-if="walletBqtMember.guidance === 'wallet'" class="account-note">{{ $t('admin.bqtWalletHint') }}</text>
+                    <text v-else class="account-note">{{ $t('admin.bqtPriorityNote') }}</text>
                   </view>
                   <!-- 兑换码 / Circle 联盟所邀请码绑定入口（储值入口，包晴天积分通道不显示） -->
                   <view v-if="!isBqtBilling" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">
