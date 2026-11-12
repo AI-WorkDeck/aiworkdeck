@@ -454,7 +454,7 @@ CSS 在弹窗期间把 `.pane-content` 里的 `iframe`/`webview` 置 `visibility
 
 独立纯 Web 插件在 `official-plugins/project-im/`，构建脚本仅从规范 SDK 复制进 zip，不内置到宿主、不自动上架。固定 `im` 权限和桥入口由 `PluginImController` 验证，`service/im/ImService` 持久化会话/成员/消息/附件；本地通过 `ImGatewayService` 官方账户连接转云端，无密钥下发。`ImProjectFiles` 负责主动归档、附件导入和项目文件快照引用，Git只接收显式写入的普通项目文件及标识 JSON，聊天不自动进Git。
 
-文件权限由 `ProjectFileAccessService` 统一：内部成员默认可读，客户（项目或全局CLIENT）仅自己上传/明确开放文件可读。FileTree单文件“客户访问权限”调用 `/files/{id}/access`。IM快照独立 `fileAccess`；客户无权时返回固定待准备提示并剔除附件元数据。详细契约在 `docs/PLUGIN_SPEC.md §16`。客户不可调用拥有整个项目读能力的律师AI/跨文档分析工具。
+文件权限由 `ProjectFileAccessService` 统一：内部成员默认可读，客户（项目或全局CLIENT）仅自己上传/明确开放文件可读。FileTree单文件“客户访问权限”调用 `/files/{id}/access`。IM快照独立 `fileAccess`；客户无权时返回固定待准备提示并剔除附件元数据。详细契约在 `docs/PLUGIN_SPEC.md §16`。客户不可调用拥有整个项目读能力的律师AI/跨文档分析工具。客户也读不到项目成员名单（`GET /api/projects/{id}/members` 对 `isClient` 拒绝，护栏 `ProjectMemberClientRosterTest`）；尽调写路由的客户分类见 `DdClientRouteClassificationTest`（反射穷举 `DdController`/`DdAiController`，白名单 `CLIENT_WRITE_ROUTES`）。
 
 回归：`mvn test -Dtest='Im*Test,ProjectFileAccess*Test'`；`node --test official-plugins/project-im/tests/*.mjs frontend/tests/plugin-sdk/im-*.test.mjs frontend/tests/project-home/file-tree-client-access.test.mjs`；`official-plugins/project-im/build.sh`。sandbox 无 allow-modals，应使用插件内 HTML dialog；close() 必须在移除 open 属性前执行。进入 iframe 的父窗口 blur 不代表整个文档失焦，不应清除准备的拖拽票据。
 
