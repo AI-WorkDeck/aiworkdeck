@@ -157,8 +157,9 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   assert.equal(vm.passwordInput, '', '输错清空，直接重输')
   assert.equal(vm.openFailCode, DIAG_DOC_ENCRYPTED)
 
-  vm.passwordInput = 'awd-0414'
-  await vm.submitPassword()
+  // 回车时 v-model 还没跟上（只到 'awd-0'）：以输入框随 confirm 事件带来的值为准
+  vm.passwordInput = 'awd-0'
+  await vm.submitPassword({ detail: { value: 'awd-0414' } })
   for (let i = 0; i < 50 && vm.statusKey !== 'ready'; i++) await tick()
   assert.equal(vm.statusKey, 'ready')
   assert.equal(vm.docLoadFailed, false)

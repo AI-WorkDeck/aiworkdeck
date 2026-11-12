@@ -284,7 +284,10 @@ async function enterPassword(name, password) {
   const pt = await passwordBox(name)
   await page.mouse.click(pt.x, pt.y)
   await page.keyboard.type(password, { delay: 20 })
+  const before = await page.evaluate((expr, name) => { const e = (0, eval)(expr)(name); const el = [...document.querySelectorAll('.libre-password-input input')].find(i => i.getBoundingClientRect().width); return { model: (e.passwordInput || '').length, dom: el ? el.value.length : -1, focused: document.activeElement === el } }, editorExpr, name)
   await page.keyboard.press('Enter')
+  await sleep(4000)
+  log('password', JSON.stringify({ typed: password.length, before, after: await editor(name, e => ({ state: e.passwordState, code: e.openFailCode, status: e.statusKey })) }))
 }
 async function edit(name, kind) {
   const { guest } = await findGuest(name)
@@ -381,14 +384,14 @@ try {
   for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx']) fs.copyFileSync(path.join(fixtures, f), path.join(dir, 'locked-' + f))
   evidence.runtime = (await start('warmup')).versions
   await openFolder(dir)
-  for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx']) {
+  for (const f of (process.env.OFFICE_PASSWORD_ONLY || 'flexmark-table.docx,case-ledger.xlsx,case-report.pptx').split(',')) {
     try { await checkFile(path.join(fixtures, f)) } catch (error) {
       evidence.files.push({ name: f, error: error.stack })
       log(f, 'failed', error.message)
       await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})
     }
   }
-  evidence.passed = evidence.files.length === 3 && evidence.files.every(r => r.passed)
+  evidence.passed = evidence.files.length > 0 && evidence.files.every(r => r.passed)
 } catch (error) {
   evidence.error = error.stack
   if (page && browser) await page.screenshot({ path: path.join(run, 'failure.png') }).catch(() => {})

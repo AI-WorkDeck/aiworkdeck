@@ -23,11 +23,11 @@
         <view v-if="passwordPromptVisible" class="libre-password">
           <text class="libre-loading-error">{{ $t('editor.openFailed.passwordPrompt') }}</text>
           <input :key="'pw' + passwordAttempts" v-model="passwordInput" class="libre-password-input" type="password" password focus
-            :placeholder="$t('editor.openFailed.passwordPlaceholder')" :disabled="passwordState === 'checking'" @confirm="submitPassword" />
+            :placeholder="$t('editor.openFailed.passwordPlaceholder')" :disabled="passwordState === 'checking'" @confirm="submitPassword($event)" />
           <text v-if="passwordState === 'wrong' || passwordState === 'error'" class="libre-password-error">
             {{ passwordState === 'wrong' ? $t('editor.openFailed.passwordWrong') : $t('editor.openFailed.passwordError') }}
           </text>
-          <view class="libre-loading-retry libre-password-submit" :class="{ busy: passwordState === 'checking' }" @click="submitPassword">
+          <view class="libre-loading-retry libre-password-submit" :class="{ busy: passwordState === 'checking' }" @click="submitPassword()">
             <text>{{ passwordState === 'checking' ? $t('editor.openFailed.passwordChecking') : $t('editor.openFailed.passwordOpen') }}</text>
           </view>
           <text class="libre-loading-dl">{{ $t('editor.openFailed.passwordNote') }}</text>
@@ -3010,8 +3010,11 @@ export default {
       return sealed
     },
     // 加载面板上的密码框（O14）：先在宿主验证密码，对了才重新走装载；密码本身不保存。
-    async submitPassword() {
-      const password = this.passwordInput
+    async submitPassword(event) {
+      // 回车（@confirm）带着输入框此刻的值：uni 的 v-model 比按键晚一拍，快速输入后直接回车时
+      // passwordInput 还缺最后几个字（真机实测 8 位只到了 5 位），会被当成密码错
+      const typed = event && event.detail && typeof event.detail.value === 'string' ? event.detail.value : null
+      const password = typed != null ? typed : this.passwordInput
       if (!password || this.passwordState === 'checking' || !this.file?.id) return
       const fileId = this.file.id, seq = this._docLoadSeq
       this.passwordState = 'checking'
