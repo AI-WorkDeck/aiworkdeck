@@ -405,7 +405,10 @@ public class HarnessEvolutionService {
             return false;
         }
         if (HarnessDiagnosticService.ACTION_MOUNT_DOMAIN_SKILL.equals(action)) {
-            return true;
+            // 挂载的是自进化技能本身时不再沉淀：否则「挂载 user-evo-A」的提示又被升格成 user-evo-B，
+            // 一句评测指令实测链式生出 15 个内容只是互相指路的同名技能
+            String mounted = adaptation.activatedSkillId();
+            return mounted == null || !mounted.startsWith(PROMOTED_SKILL_PREFIX);
         }
         return initialUserInstruction != null && QUOTED_TERM.matcher(initialUserInstruction).find();
     }
@@ -601,7 +604,10 @@ public class HarnessEvolutionService {
         if (skillRegistry == null || record == null) {
             return false;
         }
-        return SCOPE_USER.equalsIgnoreCase(record.scope())
+        // 自愈信号的规则是 Harness 固定处方模板（如「停止盲目重试，调用 ask_user」），不是用户给的领域知识：
+        // 只留记忆记录（面板里可查、可手动升格），不自动注册成会按触发词激活的技能
+        return !SIGNAL_SELF_HEALING_RECOVERY.equals(record.signalType())
+                && SCOPE_USER.equalsIgnoreCase(record.scope())
                 && CATEGORY_DOMAIN.equalsIgnoreCase(record.category())
                 && record.suggestedSkillTriggers() != null
                 && !record.suggestedSkillTriggers().isEmpty();

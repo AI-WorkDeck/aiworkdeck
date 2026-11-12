@@ -1970,6 +1970,10 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - **零打扰自动判断自进化（`service/ai/harness/HarnessEvolutionService`）**：
   1. **过滤底层运行期噪音**：`EXPAND_TOOL_CATEGORY` 与 `ANCHOR_PROBE_RECOVERY` 属于单轮内部工具调度机制，`isEvolvableSelfHealing` 一律跳过，绝不写入 `topics/harness-evo-*.md` 污染用户记忆。
   2. **自动判定作用域（`inferOptimalScope`）与自动升格技能（`shouldAutoPromoteToSkill`）**：绑定本案具体材料（`《…》`、`这份`、`本案`、`补充协议`等）的规则自动写入 `project` 记忆；跨项目通用规范或显式「…专项规范」自动写入 `user` 全局记忆，并在属于 `DOMAIN` 领域规范时自动升格注册为 `user-evo-*` Skill（无需人工点击）。
+     **地雷（2026-11-12 office-tier1 O12）**：自动升格只认用户自己的话（回退重发、插话纠偏）。`SELF_HEALING_RECOVERY`
+     的规则是 Harness 固定处方模板（「停止盲目重试，调用 ask_user」「已挂载技能 X」），只留记忆记录、不自动注册技能；
+     挂载 `user-evo-*` 技能本身的 `MOUNT_DOMAIN_SKILL` 不算可沉淀信号。此前一句带「」的 PPT 指令链式生出 15 个只会互相指路的
+     同名技能，下次提到触发词就注入「先问用户」。测试：`HarnessEvolutionServiceTest` 末两例。
   3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
 - **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
 - **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
