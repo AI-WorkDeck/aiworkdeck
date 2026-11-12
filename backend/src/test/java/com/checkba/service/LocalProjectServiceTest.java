@@ -399,6 +399,21 @@ class LocalProjectServiceTest {
     }
 
     @Test
+    void reconcileDetectsSameSizeExternalEditThroughDiskMtime(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("a.txt");
+        Files.writeString(file, "1");
+        Long projectId = svc.openLocalFolder(folder.toString(), false, null, null, 1L).project().getId();
+        java.time.LocalDateTime before = projectFileRepository.findByProjectId(projectId).get(0).getUpdatedAt();
+
+        Files.writeString(file, "2");
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(2)));
+        LocalProjectService.ReconcileResult r = svc.reconcileProject(projectId);
+
+        assertEquals(1, r.changed());
+        assertTrue(projectFileRepository.findByProjectId(projectId).get(0).getUpdatedAt().isAfter(before));
+    }
+
+    @Test
     void reconcileAbortsWhenRootUnreachable(@TempDir Path tmp) throws Exception {
         Path folder = tmp.resolve("proj");
         Files.createDirectories(folder);

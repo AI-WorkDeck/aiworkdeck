@@ -290,17 +290,29 @@ public class ProjectRepoService {
         }
     }
 
-    /** 建仓库并落一笔「初始版本」。已存在则直接返回。 */
+    /** 建仓库并落一笔「初始版本」；初始化中断留下的无引用空仓可以续建。 */
     public void init(long projectId, String authorName, String authorEmail) {
         requireVersionRecordingSupported(projectId);
-        if (isInitialized(projectId)) return;
+        boolean initialized = isInitialized(projectId);
+        if (initialized) {
+            try (Repository repo = open(projectId)) {
+                if (repo.resolve(Constants.HEAD) != null) return;
+                if (!repo.getRefDatabase().getRefsByPrefix(Constants.R_REFS).isEmpty()) {
+                    throw VersionException.userFacing(com.checkba.service.LangText.of(
+                            "版本记录尚未完整初始化，当前文件仍保留；请联系支持人员修复后再提交",
+                            "Version history was not initialized completely. Your files are preserved; contact support before submitting"));
+                }
+            } catch (java.io.IOException e) {
+                throw new VersionException("检查版本初始化状态失败: project=" + projectId, e);
+            }
+        }
         try {
             Files.createDirectories(workTree(projectId));
             Files.createDirectories(gitDir(projectId).getParent());
             try (Repository repo = new VersionObjectRepository(new FileRepositoryBuilder()
                     .setGitDir(gitDir(projectId).toFile())
                     .setWorkTree(workTree(projectId).toFile()).setup())) {
-                repo.create(true);
+                if (!initialized) repo.create(true);
                 ensureExcludes(projectId);
                 VersionObjectFilters.install(repo, objectStore, projectId, maxTrackedFileSizeBytes);
                 try (Git git = new Git(repo)) {

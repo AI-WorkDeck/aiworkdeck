@@ -13,8 +13,8 @@
           <component :is="'input'" type="checkbox" :checked="row.selected" :disabled="busy || row.state !== 'ready'"
             @change="row.selected = $event.target.checked" />
           <span class="project-exit-name">{{ row.name || $t('version.exitUnconfirmedProject') }}</span>
-          <component :is="'button'" v-if="['failed', 'uncertain'].includes(row.state)" type="button" class="project-exit-count project-exit-retry"
-            :disabled="busy || loading" @click.prevent="retry">{{ rowText(row) }}</component>
+          <component :is="'button'" v-if="['failed', 'uncertain'].includes(row.state) || row.error" type="button" class="project-exit-count project-exit-retry"
+            :class="{ 'project-exit-error': row.error }" :disabled="busy || loading" @click.prevent="row.error ? retryCommit(row) : retry()">{{ rowText(row) }}</component>
           <span v-else class="project-exit-count">{{ rowText(row) }}</span>
         </component>
       </div>
@@ -29,8 +29,8 @@
   </div>
 </template>
 <script>
-import { getMyProjects, getVersionExitStatus, endWorkSession } from '@/services/api.js'
-import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit } from '@/utils/projectExitState.js'
+import { getMyProjects, getVersionExitProjects, getVersionExitStatus, endWorkSession } from '@/services/api.js'
+import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit, selectExitProjectRows } from '@/utils/projectExitState.js'
 export default {
   props: { isCurrent: { type: Function, required: true } },
   emits: ['close'],
@@ -58,6 +58,7 @@ export default {
   methods: {
     readStatus: async id => (await getVersionExitStatus(id))?.data,
     rowText(row) {
+      if (row.error) return `${row.error} — ${this.$t('common.retry')}`
       if (row.state === 'checking') return this.$t('version.exitProjectsChecking')
       if (row.state === 'committing') return this.$t('version.committingChanges')
       if (row.state === 'committed') return this.$t('version.exitProjectsCommitted')
@@ -69,17 +70,11 @@ export default {
     async load() {
       this.loading = true; this.listFailed = false
       try {
-        const response = await getMyProjects()
+        const [response, changedResponse] = await Promise.all([getMyProjects(), getVersionExitProjects()])
         if (this._disposed) return
         const projects = Array.isArray(response) ? response : response?.data
-        if (!Array.isArray(projects)) throw new Error('invalid projects')
-        this.rows = projects.filter(p => !['SCRATCH', 'LOOSE_FILES'].includes(p.projectType))
-          .map(p => ({ id: p.id, name: p.name, selected: false, count: 0, state: 'checking' }))
-        for (const pending of pendingExitProjects()) {
-          const row = this.rows.find(row => String(row.id) === String(pending.id))
-          if (row) Object.assign(row, pending)
-          else this.rows.push(pending)
-        }
+        if (!Array.isArray(projects) || !Array.isArray(changedResponse?.projectIds)) throw new Error('invalid projects')
+        this.rows = selectExitProjectRows(projects, changedResponse.projectIds, pendingExitProjects())
         // Bound the scan concurrency: never flood the local version locks.
         let index = 0
         await Promise.all(Array.from({ length: 3 }, async () => {
@@ -108,6 +103,20 @@ export default {
       }
       this.loading = false; this.busy = false
     },
+    async retryCommit(row) {
+      if (this.busy || this.loading) return
+      const retrySubmission = row.errorKind === 'commit'
+      if (row.state === 'failed') {
+        this.loading = true
+        await inspectExitProject(row, this.readStatus)
+        this.loading = false
+        if (this._disposed || !this.isCurrent()) return
+      }
+      if (retrySubmission && row.state === 'ready') {
+        row.selected = true
+        await this.submit()
+      }
+    },
     commit: async (id, requestId) => (await endWorkSession(id, '', requestId))?.data,
     async submit() {
       if (this.busy || this.loading || this.hasUncertain || !this.hasSelection) return
@@ -131,6 +140,7 @@ p { font-size: 13px; line-height: 1.6; }
 .project-exit-count { max-width: 40%; font-size: 12px; }
 .project-exit-retry { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 12px; text-align: end; text-decoration: underline; cursor: pointer; }
 .project-exit-retry:disabled { opacity: .5; cursor: default; }
+.project-exit-error { color: var(--awd-danger-text); overflow-wrap: anywhere; }
 footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .project-exit-button { padding: 8px 12px; border: 1px solid var(--awd-border); border-radius: 6px; background: var(--awd-surface); color: var(--awd-text); cursor: pointer; }
 .project-exit-button:disabled { opacity: .5; cursor: default; }
