@@ -5,13 +5,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const source = readFileSync(new URL('../../src/pages/project-overview/librePool.js', import.meta.url), 'utf8')
-function harness(limit = 64 * 1024 * 1024) {
+function harness(limit = 64 * 1024 * 1024, win = undefined) {
   const body = source.replace(/^\s*import[\s\S]*?from\s*'[^']*'\s*$/gm, '')
     .replace(/export const librePoolMethods = \{/, 'return {')
   const timers = new Map()
-  const methods = new Function('host', 'isDesktopHost', 'setTimeout', 'clearTimeout', body)(
+  const methods = new Function('host', 'isDesktopHost', 'setTimeout', 'clearTimeout', 'window', body)(
     { systemMemory: { totalBytes: 32 * 1024 ** 3 }, zetaoffice: { nativeDocxMaxBytes: limit } }, () => true,
-    fn => { timers.set(1, fn); return 1 }, id => timers.delete(id))
+    fn => { timers.set(1, fn); return 1 }, id => timers.delete(id), win)
   const vm = { libreSpares: [{ key: 1, file: null }], libreLruKeys: [], leftFiles: [], rightFiles: [],
     activeFileIdLeft: null, activeFileIdRight: null, splitMode: false, _libreRefs: {}, useLibreEditor: () => true }
   for (const [name, fn] of Object.entries(methods)) vm[name] = fn.bind(vm)
@@ -53,4 +53,37 @@ test('native foreground work does not start an extra WASM engine; spreadsheet wa
   assert.equal(timers.size, 1)
   timers.get(1)()
   assert.equal(vm.libreSpares.length, 1)
+})
+
+test('the spare boot waits while the user is typing in an open document, then starts once they pause (office-tier1 O8b)', () => {
+  const { vm, timers } = harness()
+  let booted = 0
+  vm.initLibreSpare = () => { booted++ }
+  vm._libreRefs = { 'left:9': { _lastInteractionAt: Date.now() } }
+  vm.initLibreSpareWhenIdle(0)
+  assert.equal(booted, 0, 'recent input defers the spare')
+  assert.equal(timers.size, 1, 'and re-checks later')
+  vm._libreRefs['left:9']._lastInteractionAt = Date.now() - 60000
+  timers.get(1)()
+  assert.equal(booted, 1, 'idle long enough: the spare boots')
+  // never starves: after the retry budget it boots even if input keeps coming
+  vm._libreRefs['left:9']._lastInteractionAt = Date.now()
+  vm.initLibreSpareWhenIdle(30)
+  assert.equal(booted, 2)
+})
+
+test('host-page input (thumbnail rail, sheet tabs) also defers the spare, not just input inside the editor', () => {
+  const listeners = {}
+  const win = { addEventListener: (ev, fn) => { listeners[ev] = fn } }
+  const { vm, timers } = harness(undefined, win)
+  let booted = 0
+  vm.initLibreSpare = () => { booted++ }
+  vm._libreRefs = { 'left:9': { _lastInteractionAt: Date.now() - 60000 } }
+  listeners.pointerdown({ isTrusted: true })
+  vm.initLibreSpareWhenIdle(0)
+  assert.equal(booted, 0, 'a click on the host page counts as activity')
+  assert.equal(timers.size, 1)
+  listeners.pointerdown({ isTrusted: false })
+  vm.initLibreSpareWhenIdle(30)
+  assert.equal(booted, 1, 'retry budget still bounds the wait')
 })

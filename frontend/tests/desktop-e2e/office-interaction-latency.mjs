@@ -18,6 +18,9 @@
 //   OFFICE_LATENCY_REOPEN  basenames whose round-1 warm run also checks that normal
 //                          autosave put the typed text on disk and that a close/reopen
 //                          shows it (default tpl-5mb.pptx,ledger-5000.xlsx).
+//   OFFICE_LATENCY_COLD_BURST settled|eager: cold-open-only mode — one natural-typing
+//                          burst ~10 s after the click or right after ready, with the
+//                          warm-spare create/ready timeline and a next-open warm check.
 //   OFFICE_LATENCY_ANALYZE path of a saved *.trace.json: print its summary and exit.
 // Timings come from compositor frames (Page.screencastFrame metadata.timestamp)
 // relative to the input event's own timestamp inside the page; "settled" is the
@@ -571,7 +574,7 @@ async function burst(sc, guest, text) {
   const tol = Math.max(8, changed * 0.03, masked * 2)
   let settled = null
   for (let i = after.length - 1; i >= 0; i--) { if (diff(sc, target, after[i], r, mask) <= tol) settled = after[i]; else break }
-  return { perKeyMs: perKey, typedOverMs: Math.round(kd[kd.length - 1] - kd[0]), lastKeyToSettledMs: settled ? Math.round(settled.ts - kd[kd.length - 1]) : null, changedPixels: changed }
+  return { firstKeyAt: kd[0], lastKeyAt: kd[kd.length - 1], perKeyMs: perKey, typedOverMs: Math.round(kd[kd.length - 1] - kd[0]), lastKeyToSettledMs: settled ? Math.round(settled.ts - kd[kd.length - 1]) : null, changedPixels: changed }
 }
 function summarizeCmds(cmds, from, to) {
   const inWindow = cmds.filter(c => c.sent >= from && c.sent < to)
@@ -592,9 +595,9 @@ function summarizeCmds(cmds, from, to) {
 }
 
 // ---- CDP trace -------------------------------------------------------------------
-async function startTrace() {
+async function startTrace(categories) {
   const cdp = await browser.target().createCDPSession()
-  await cdp.send('Tracing.start', { transferMode: 'ReturnAsStream', traceConfig: { recordMode: 'recordContinuously', includedCategories: ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8.execute', 'disabled-by-default-v8.cpu_profiler', 'blink.user_timing', 'v8', 'v8.wasm'] } })
+  await cdp.send('Tracing.start', { transferMode: 'ReturnAsStream', traceConfig: { recordMode: 'recordContinuously', includedCategories: categories || ['toplevel', 'devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8.execute', 'disabled-by-default-v8.cpu_profiler', 'blink.user_timing', 'v8', 'v8.wasm'] } })
   return cdp
 }
 async function stopTrace(cdp, file) {
@@ -840,6 +843,76 @@ async function measureDocument(name, filePath, mode, { trace = false, reopen = f
   return result
 }
 
+// ---- cold-burst mode -------------------------------------------------------------
+// OFFICE_LATENCY_COLD_BURST=settled|eager: cold open, then one natural-typing burst
+// either ~10 s after the click (reader then typist) or as soon as the editor is
+// ready (eager typist). Records when the warm spare is created/ready relative to
+// the burst, then checks that the next open adopts a warm spare.
+const coldBurstVariant = process.env.OFFICE_LATENCY_COLD_BURST || null
+const TRACE_COMPOSITOR = ['toplevel', 'benchmark', 'input', 'cc', 'viz', 'gpu', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.frame', 'devtools.timeline', 'blink.user_timing', 'v8.execute', 'disabled-by-default-v8.cpu_profiler']
+async function measureColdBurst(name, variant, { trace = false } = {}) {
+  const result = { name, kind: kindOf(name), mode: 'cold', variant, spareAtClick: await spareState() }
+  result.loginPromptDismissed = await primeTree(name)
+  await page.evaluate(() => {
+    const t = window.__olbSpare = {}
+    const iv = setInterval(() => {
+      const now = performance.timeOrigin + performance.now()
+      const sp = (window.__checkbaActiveOverviewVm?.libreSpares || []).filter(s => !s.file && !s.hidden)
+      if (sp.length) t.created ??= now
+      if (sp.some(s => s.executor)) { t.ready ??= now; clearInterval(iv) }
+    }, 50)
+  })
+  const traceCdp = trace ? await startTrace(TRACE_COMPOSITOR) : null
+  const { clickAt } = await clickOpen(name)
+  await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 50 }, editorExpr, name)
+  const readyAt = Date.now()
+  const { guest } = await findGuest(name)
+  const sc = await screencast(await guest.createCDPSession(), { format: 'png', maxWidth: 1280, maxHeight: 1100, keep: 600 })
+  try {
+    if (variant === 'settled') await until(async () => Date.now() >= clickAt + 10500, 60000, 100)
+    else await sleep(300)
+    if (await dismissLogin()) result.loginPromptDuring = true
+    result.typingTarget = await prepareTyping(name, guest, sc)
+    if (result.typingTarget.skipped) return result
+    const b = await burst(sc, guest, 'quickbrown')
+    result.burst = b
+    // What else ran on the office worker around the burst (3 s before to settle).
+    const cmds = await guest.evaluate(() => window.__olbCmds)
+    result.burstWindowCmds = summarizeCmds(cmds, b.firstKeyAt - 3000, b.lastKeyAt + Math.max(0, b.lastKeyToSettledMs || 0) + 300)
+    result.guestLongTasksInBurst = (await guest.evaluate(() => window.__olbLong)).filter(l => l.start >= b.firstKeyAt - 3000 && l.start <= b.lastKeyAt + 2000).map(l => ({ at: Math.round(l.start - b.firstKeyAt), ms: Math.round(l.dur) }))
+    result.hostLongTasksInBurst = (await page.evaluate(() => window.__olbLong)).filter(l => l.start >= b.firstKeyAt - 3000 && l.start <= b.lastKeyAt + 2000).map(l => ({ at: Math.round(l.start - b.firstKeyAt), ms: Math.round(l.dur) }))
+    log(name, 'cold', variant, 'burst-window', JSON.stringify({ cmds: result.burstWindowCmds, guestLong: result.guestLongTasksInBurst, hostLong: result.hostLongTasksInBurst }))
+    log(name, 'cold', variant, 'burst', JSON.stringify(b))
+  } finally { await sc.stop() }
+  if (traceCdp) {
+    const file = path.join(run, `${name}-cold-${variant}.trace.json`)
+    await stopTrace(traceCdp, file)
+    result.trace = { file, size: fs.statSync(file).size }
+  }
+  // The spare must still boot once typing stops.
+  await page.waitForFunction(() => window.__olbSpare.ready, { timeout: 180000, polling: 200 }).catch(() => {})
+  const sp = await page.evaluate(() => window.__olbSpare)
+  const rel = t => t == null ? null : Math.round(t - clickAt)
+  const b = result.burst || {}
+  result.timeline = { readyMs: Math.round(readyAt - clickAt), burstStartMs: rel(b.firstKeyAt), burstEndMs: rel(b.lastKeyAt), spareCreatedMs: rel(sp.created), spareReadyMs: rel(sp.ready) }
+  result.timeline.spareBootOverlapsBurst = sp.created != null && b.firstKeyAt != null && sp.created < b.lastKeyAt + (b.lastKeyToSettledMs || 0) && (sp.ready == null || sp.ready > b.firstKeyAt)
+  log(name, 'cold', variant, 'timeline', JSON.stringify(result.timeline))
+  await close(name)
+  return result
+}
+async function checkWarmNext(name) {
+  await page.waitForFunction(() => (window.__checkbaActiveOverviewVm?.libreSpares || []).some(sp => !sp.file && !sp.hidden && sp.executor), { timeout: 180000, polling: 200 }).catch(() => {})
+  await sleep(4000)
+  const spareAtClick = await spareState()
+  await primeTree(name)
+  const { clickAt } = await clickOpen(name)
+  await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' }, { timeout: 240000, polling: 50 }, editorExpr, name)
+  const out = { name, spareAtClick, warm: spareAtClick.some(s => !s.file && !s.hidden && s.ready), readyMs: Math.round(Date.now() - clickAt) }
+  log(name, 'next open', JSON.stringify(out))
+  await close(name)
+  return out
+}
+
 // ---- main ------------------------------------------------------------------------------
 try {
   await until(async () => (await fetch(base + '/api/admin/wizard')).ok, 120000, 500)
@@ -891,6 +964,12 @@ try {
           if (child) await quit().catch(() => { try { process.kill(-child.pid, 'SIGKILL') } catch { /* gone */ } child = null })
           if (attempt >= 3) throw error
         }
+      }
+      if (coldBurstVariant) {
+        session.runs.push(await measureColdBurst(names.cold, coldBurstVariant, { trace: doTrace }))
+        session.nextOpen = await checkWarmNext(names.warm)
+        write('progress.json', evidence)
+        continue
       }
       session.runs.push(await measureDocument(names.cold, path.join(dir, names.cold), 'cold'))
       write('progress.json', evidence)

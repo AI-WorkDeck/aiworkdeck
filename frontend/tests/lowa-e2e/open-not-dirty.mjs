@@ -31,7 +31,8 @@ try {
     { name: 'template.docx', bytes: read('../../../docs/template.docx'), writer: true },
     { name: 'comment-batch-revisions.docx', bytes: read('./fixtures/comment-batch-revisions.docx'), writer: true },
     { name: 'impress-smoke.pptx', bytes: read('./fixtures/impress-smoke.pptx') },
-    { name: '未提供文件.xlsx', bytes: read('../../../data/projects/9/0-尽调材料/1-收购报告书底稿/未提供文件.xlsx') },
+    // 原用 data/ 下的项目样本，data/ 已出库（泄露处置），改用入库的评测台账样本
+    { name: 'case-ledger.xlsx', bytes: read('../../../scripts/eval/fixtures/case-ledger.xlsx') },
   ]
   for (const doc of docs) {
     await ok('load_document', { name: doc.name, bytes: doc.bytes, authorName: '测试用户' })

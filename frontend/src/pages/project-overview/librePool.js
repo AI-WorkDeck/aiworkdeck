@@ -24,6 +24,16 @@ const LOW_MEMORY_INSTANCE_BUDGET = 2
 // 备胎延迟建：避开项目打开期（文件树/面板初始化）的资源竞争，同时尽早预热，
 // 让首开文档免整链冷启动。原 4s 偏长，用户常在 4s 内就点开第一份文档。
 const LIBRE_SPARE_DELAY_MS = 2000
+// 备胎只在用户停手这么久后才启动（见 initLibreSpareWhenIdle）
+const LIBRE_SPARE_IDLE_MS = 2000
+// 宿主页自己的输入（缩略图栏切页、工作表标签、面板）不经编辑器 iframe，单靠编辑器上报的
+// _lastInteractionAt 看不到：O8 实测在缩略图栏点到第 2 页时备胎照样启动。
+let lastHostInputAt = 0
+if (typeof window !== 'undefined' && window.addEventListener) {
+    for (const ev of ['pointerdown', 'keydown', 'wheel']) {
+        window.addEventListener(ev, e => { if (e.isTrusted) lastHostInputAt = Date.now() }, { capture: true, passive: true })
+    }
+}
 
 // 引擎固定基座远大于小文档本身；低内存设备不能只按压缩后的文件体积记账。
 // 用宿主真实物理内存，旧壳/网页缺失时保守处理，不依赖浏览器截断的 deviceMemory。
@@ -178,7 +188,18 @@ export const librePoolMethods = {
         clearTimeout(this._libreSpareTimer)
         if (this.hasActiveNativeDocument()) return
         if (useConservativeLibrePool() && this.hasLibreDocumentInstance()) return
-        this._libreSpareTimer = setTimeout(() => this.initLibreSpare(), LIBRE_SPARE_DELAY_MS)
+        this._libreSpareTimer = setTimeout(() => this.initLibreSpareWhenIdle(0), LIBRE_SPARE_DELAY_MS)
+    },
+    // 备胎启动会和前台文档争 CPU / 合成器：冷开大文档后马上打字时，首字要 1–1.8s 才上屏
+    // （office-tier1 O8 整机测量）。用户还在输入就往后让，停手 LIBRE_SPARE_IDLE_MS 再建，最多等 ~60s。
+    initLibreSpareWhenIdle(attempt) {
+        const refs = this._libreRefs || {}
+        const lastInput = Math.max(lastHostInputAt, ...Object.values(refs).map(r => (r && r._lastInteractionAt) || 0))
+        if (attempt < 30 && Date.now() - lastInput < LIBRE_SPARE_IDLE_MS) {
+            this._libreSpareTimer = setTimeout(() => this.initLibreSpareWhenIdle(attempt + 1), LIBRE_SPARE_IDLE_MS)
+            return
+        }
+        this.initLibreSpare()
     },
     initLibreSpare() {
         // 页面栈多实例守卫：只有活跃 overview 实例建备胎（PR#148/#151 模式）。
