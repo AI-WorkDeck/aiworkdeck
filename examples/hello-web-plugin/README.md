@@ -1,4 +1,6 @@
 # hello-web-plugin
+> English: [README.en.md](README.en.md)
+
 
 纯前端插件的最小示例：没有 Java、没有构建步骤，`web/index.html` 就是全部。
 
