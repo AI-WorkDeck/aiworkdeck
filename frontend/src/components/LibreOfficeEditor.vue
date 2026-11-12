@@ -3035,6 +3035,7 @@ export default {
       } catch (e) {
         if (fileId !== this.file?.id) return
         this.passwordState = e?.code === 'WRONG_PASSWORD' ? 'wrong' : e?.code === 'UNSUPPORTED_ENCRYPTION' ? 'unsupported' : 'error'
+        if (e?.code === 'WRONG_PASSWORD') this.passwordInput = '' // 同系统登录框：输错清空，直接重输
       }
     },
     // 文档 Generator 元数据（可溯源性设计规范附录 B4）：把导出件 docProps/app.xml 的

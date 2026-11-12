@@ -153,6 +153,7 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   vm.passwordInput = 'awd-0415'
   await vm.submitPassword()
   assert.equal(vm.passwordState, 'wrong')
+  assert.equal(vm.passwordInput, '', '输错清空，直接重输')
   assert.equal(vm.openFailCode, DIAG_DOC_ENCRYPTED)
 
   vm.passwordInput = 'awd-0414'

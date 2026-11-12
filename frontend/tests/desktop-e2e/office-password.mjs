@@ -282,8 +282,7 @@ async function passwordBox(name) {
 }
 async function enterPassword(name, password) {
   const pt = await passwordBox(name)
-  await page.mouse.click(pt.x, pt.y, { clickCount: 3 })
-  await page.keyboard.press('Backspace')
+  await page.mouse.click(pt.x, pt.y)
   await page.keyboard.type(password, { delay: 20 })
   await page.keyboard.press('Enter')
 }
@@ -333,6 +332,7 @@ async function checkFile(src) {
   await page.screenshot({ path: path.join(run, kind + '-1-prompt.png') })
   await enterPassword(name, 'wrong-password')
   await page.waitForFunction((expr, name) => (0, eval)(expr)(name)?.passwordState === 'wrong', { timeout: 60000, polling: 100 }, editorExpr, name)
+  r.wrongPasswordCleared = await editor(name, e => e.passwordInput === '')
   r.wrongPasswordShown = await page.evaluate(() => [...document.querySelectorAll('.libre-password-error')].some(e => e.getBoundingClientRect().width))
   await page.screenshot({ path: path.join(run, kind + '-2-wrong.png') })
   const t0 = Date.now()
@@ -365,7 +365,7 @@ async function checkFile(src) {
   r.slidePreviewCacheEntries = await previewCacheKeys()
   await close(name)
   log(name, JSON.stringify(r))
-  r.passed = r.engineSawCiphertext === 'DOC_ENCRYPTED' && r.wrongPasswordShown && r.editVisible && r.autosaveLanded &&
+  r.passed = r.engineSawCiphertext === 'DOC_ENCRYPTED' && r.wrongPasswordShown && r.wrongPasswordCleared && r.editVisible && r.autosaveLanded &&
     r.diskStillEncrypted && r.diskDecryptsWithPassword === true && r.diskRejectsWrongPassword && r.reopenAsksPassword && r.reopenHasEdit &&
     r.slidePreviewCacheEntries === 0
   return r
