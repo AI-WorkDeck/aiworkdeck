@@ -429,7 +429,8 @@ class LocalCoreBootstrapTest {
                 assertEquals(1, business.getCount()); assertFalse(refresh.isDone());
                 var lease = fixture.capture.ownership.acquireCoreLease();
                 allowEmf.countDown();
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                // 30s：整套测试满载并行时 bootstrap 线程 10s 内可能还没被调度到（只在全量跑偶发）
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
                 while (fixture.capture.ownership.state() == LocalCoreOwnership.State.CORE && System.nanoTime() < deadline) Thread.sleep(10);
                 assertEquals(LocalCoreOwnership.State.DRAINING, fixture.capture.ownership.state());
                 assertEquals(1, business.getCount()); assertEquals(0, fixture.capture.handedOff);
