@@ -225,7 +225,7 @@ async function exec(name, action, params = {}) {
 }
 async function openFolder(dir) {
   fs.writeFileSync(commandFile, JSON.stringify({ path: dir, nonce: Date.now() }))
-  await page.waitForFunction(() => !!window.__checkbaActiveOverviewVm, { timeout: 120000 })
+  await page.waitForFunction(() => !!window.__checkbaActiveOverviewVm && !location.hash.includes('pages/login/'), { timeout: 60000 })
 }
 async function treePoint(name) {
   return until(() => page.evaluate(name => {
@@ -870,9 +870,22 @@ try {
     const session = { source: path.basename(src), round, runs: [] }
     evidence.sessions.push(session)
     try {
-      await start(`r${round}-${stem}`)
-      await openFolder(dir)
-      await treePoint(names.cold)
+      // The app occasionally boots into the web login page (or reloads while the
+      // folder opens); that launch is not measurable, so relaunch it (max 3 tries).
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await start(`r${round}-${stem}`)
+          await openFolder(dir)
+          await treePoint(names.cold)
+          break
+        } catch (error) {
+          const url = page ? await page.evaluate(() => location.hash).catch(() => '?') : '?'
+          ;(session.relaunches ||= []).push({ attempt, url, error: error.message })
+          log('relaunch', path.basename(src), round, attempt, url, error.message)
+          if (child) await quit().catch(() => { try { process.kill(-child.pid, 'SIGKILL') } catch { /* gone */ } child = null })
+          if (attempt >= 3) throw error
+        }
+      }
       session.runs.push(await measureDocument(names.cold, path.join(dir, names.cold), 'cold'))
       write('progress.json', evidence)
       const waitSpare = async () => {
