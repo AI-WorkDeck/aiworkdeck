@@ -190,6 +190,23 @@ class BrowserProxyControllerTest {
         return controller.signTicket(1L, now, now + BrowserProxyController.TICKET_TTL.toMillis());
     }
 
+    /** Server profile: page fetches over the per-user limit are 429 with plain text, before fetching. */
+    @Test
+    void fetchesOverThePerUserLimitAreRejected() {
+        ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");
+        ReflectionTestUtils.setField(controller, "rateLimiter",
+                new com.checkba.service.UserRateLimiter(false, 30, 300, 20, 1));
+        assertEquals(HttpStatus.OK, controller.proxy(siteUrl, "tok", validTicket()).getStatusCode());
+        ResponseEntity<?> limited = controller.proxy(siteUrl, "tok", validTicket());
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, limited.getStatusCode());
+        assertNotNull(limited.getHeaders().getFirst("Retry-After"));
+
+        ReflectionTestUtils.setField(controller, "rateLimiter",
+                new com.checkba.service.UserRateLimiter(true, 30, 300, 20, 1));
+        assertEquals(HttpStatus.OK, controller.proxy(siteUrl, "tok", validTicket()).getStatusCode());
+        assertEquals(HttpStatus.OK, controller.proxy(siteUrl, "tok", validTicket()).getStatusCode());
+    }
+
     @Test
     void oversizedResponseIsRejectedInsteadOfBuffered() {
         ReflectionTestUtils.setField(controller, "e2eAllowedHosts", "127.0.0.1");

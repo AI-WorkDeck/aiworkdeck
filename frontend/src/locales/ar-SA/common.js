@@ -31,6 +31,7 @@ export default {
   "goToSettings": "الانتقال إلى الإعدادات",
   "later": "لاحقًا",
   "requestFailedWithStatus": "فشل الطلب ({status})",
+  "tooManyRequests": "طلبات كثيرة جدًا. يرجى الانتظار قليلًا ثم المحاولة مرة أخرى",
   "smsVerificationRequired": "يتطلب هذا الإجراء التحقق عبر الرسائل النصية القصيرة (SMS)",
   "freeQuotaExceeded": "لقد استخدمت جميع أرصدتك المجانية",
   "serviceErrorRetryLater": "حدث خطأ في الخدمة. يرجى المحاولة مرة أخرى لاحقًا",

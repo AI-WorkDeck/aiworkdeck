@@ -150,6 +150,7 @@ server {
         proxy_cache off;
         proxy_read_timeout 3600s;
         # 文件上传（案卷附件走 API 而非 git 的路径）
+        # 与后端 application-case.yml 的 storage.max-upload-size 2GB 同值，改一处要改两处
         client_max_body_size 2g;
     }
 

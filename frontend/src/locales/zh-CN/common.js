@@ -32,6 +32,7 @@ export default {
   goToSettings: '去设置',
   later: '稍后',
   requestFailedWithStatus: '请求失败 ({status})',
+  tooManyRequests: '操作太频繁，请稍候再试',
   smsVerificationRequired: '本次操作需要短信验证',
   freeQuotaExceeded: '免费额度已满',
   serviceErrorRetryLater: '服务异常，请稍后重试',

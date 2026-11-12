@@ -332,6 +332,7 @@ export default {
   "apiConversationIssueFailedHttp": "Ausstellung der Konversation fehlgeschlagen (HTTP {status})",
   "apiChatUnreachable": "Backend nicht erreichbar: Nachricht nicht gesendet",
   "apiChatFailedHttp": "Chat-Anfrage fehlgeschlagen (HTTP {status})",
+  "apiChatRateLimited": "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut",
   "conversationRenewedNotice": "Die vorherige Konversation war nicht mehr gültig. Eine neue wurde gestartet und diese Nachricht erneut gesendet.",
   "conversationExpiredRetryFailed": "Diese Konversation ist nicht mehr gültig, und das erneute Senden in einer neuen Konversation ist ebenfalls fehlgeschlagen. Tippen Sie unten auf „Neuer Chat“, um von vorne zu beginnen; wenn der Fehler weiterhin besteht, prüfen Sie Ihre Netzwerkverbindung oder versuchen Sie es später erneut.",
   "conversationDenied": "Diese Konversation kann nicht fortgesetzt werden: Sie gehört möglicherweise zu einem anderen Gerät oder einem anderen Konto. Tippen Sie unten auf „Neuer Chat“, um von vorne zu beginnen.",

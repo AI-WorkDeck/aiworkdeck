@@ -332,6 +332,7 @@ export default {
   "apiConversationIssueFailedHttp": "Échec de la création de la conversation (HTTP {status})",
   "apiChatUnreachable": "Backend injoignable : message non envoyé",
   "apiChatFailedHttp": "Échec de la requête de chat (HTTP {status})",
+  "apiChatRateLimited": "Trop de requêtes. Veuillez patienter un instant et réessayer",
   "conversationRenewedNotice": "La conversation précédente n'était plus valide. Une nouvelle a été créée et ce message a été renvoyé.",
   "conversationExpiredRetryFailed": "Cette conversation n'est plus valide et le renvoi dans une nouvelle conversation a également échoué. Appuyez sur « Nouveau chat » en bas pour recommencer ; si l'échec persiste, vérifiez votre connexion réseau ou réessayez plus tard.",
   "conversationDenied": "Cette conversation ne peut pas être poursuivie : elle peut appartenir à un autre appareil ou à un autre compte. Appuyez sur « Nouveau chat » en bas pour recommencer.",

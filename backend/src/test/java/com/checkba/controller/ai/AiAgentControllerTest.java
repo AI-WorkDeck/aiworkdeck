@@ -224,6 +224,34 @@ class AiAgentControllerTest {
         }
     }
 
+    /** Server profile: chat starts over the per-user limit are 429 before the inbox; local mode never is. */
+    @Test
+    void chatStartsOverThePerUserLimitAreRejectedBeforeTheInbox() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L); req.setConversationId("conv-1"); req.setMessage("hi");
+        var item = new com.checkba.model.entity.AgentInboxItem(); item.setId("item-1");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "rateLimiter",
+                    new com.checkba.service.UserRateLimiter(false, 1, 300, 20, 120));
+            assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+            var limited = org.junit.jupiter.api.Assertions.assertThrows(
+                    com.checkba.exception.RateLimitedException.class, () -> controller.startSession(req, "s", null));
+            var resp = new com.checkba.config.GlobalExceptionHandler().handleRateLimited(limited);
+            assertEquals(429, resp.getStatusCode().value());
+            assertEquals(String.valueOf(limited.getRetryAfterSeconds()), resp.getHeaders().getFirst("Retry-After"));
+            verify(inboxService, org.mockito.Mockito.times(1)).submit(req, 7L);
+
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "rateLimiter",
+                    new com.checkba.service.UserRateLimiter(true, 1, 300, 20, 120));
+            for (int i = 0; i < 3; i++) assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+        }
+    }
+
     @Test
     void unpaidChatDoesNotEnterInboxOrStartWork() {
         var req = new AiAgentController.AgentChatRequest();

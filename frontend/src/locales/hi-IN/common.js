@@ -31,6 +31,7 @@ export default {
   "goToSettings": "सेटिंग्स पर जाएँ",
   "later": "बाद में",
   "requestFailedWithStatus": "अनुरोध विफल रहा ({status})",
+  "tooManyRequests": "बहुत अधिक अनुरोध। कृपया कुछ देर प्रतीक्षा करके फिर से प्रयास करें",
   "smsVerificationRequired": "इस कार्रवाई के लिए SMS सत्यापन आवश्यक है",
   "freeQuotaExceeded": "आपने अपने सभी मुफ़्त क्रेडिट उपयोग कर लिए हैं",
   "serviceErrorRetryLater": "सेवा त्रुटि। कृपया बाद में पुनः प्रयास करें",

@@ -993,6 +993,8 @@ export function useAgentStream() {
             })
             // fetch 对 4xx/5xx 不 reject，需显式校验，否则会话过期/后端错误时加载态永久卡死
             if (!chatResp.ok) {
+                // 429 = 服务器按用户限频（server 部署），给可读的「稍候再试」而不是裸状态码
+                if (chatResp.status === 429) throw Object.assign(new Error(t('common.tooManyRequests')), { status: 429 })
                 throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
             }
             const responseBody = await chatResp.json()

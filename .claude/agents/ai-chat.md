@@ -2016,6 +2016,7 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 
 ## 并发/凭证契约补充（hidden-mines B2）
 
+- **server 模式按用户限频**：`POST /api/agent/chat`（含插话）与 `/api/agent/ppt/generate` 共用 `UserRateLimiter.Kind.CHAT`（`security.rate-limit.chat-per-minute`，默认 30/分钟，local-mode 旁路），在登录校验之后、inbox 落库之前检查；超限抛 `RateLimitedException` → HTTP 429 + `Retry-After`，前端/加载项显示「操作太频繁，请稍候再试」。仓库里并没有「每用户并发 run 上限」这类机制（个人助理 `MobileAssistantService` 另有按库计的 6 次/分钟）。完整契约见 eng-infra.md「部署与其它」。
 - 回退端点（`POST /api/agent/history/rollback`）在会话仍有活跃 run（`AgentOrchestrator.hasActiveRun`）时回 409，否则编排器会把已截断的 assistant 行重新写回；客户端不得假定运行中可回退。
 - `SseEmitterService.createConnection` 与 `send` 共用每会话发送锁（挂 emitter + 补发、序号分配 + 写出互斥），实时事件 id 不会先于补发 id 上线；`emitTo` 为包内可见仅供测试。
 - `MemoryManager` 的 saveProjectMemory/saveUserMemory/updateProjectField/consolidate 在锁内用 REQUIRES_NEW 事务提交（注入了事务管理器时），不要再给这几个方法加 `@Transactional`，否则锁又会早于提交释放。

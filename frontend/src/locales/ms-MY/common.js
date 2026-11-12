@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Pergi ke Tetapan",
   "later": "Kemudian",
   "requestFailedWithStatus": "Permintaan gagal ({status})",
+  "tooManyRequests": "Terlalu banyak permintaan. Sila tunggu sebentar dan cuba lagi",
   "smsVerificationRequired": "Tindakan ini memerlukan pengesahan SMS",
   "freeQuotaExceeded": "Anda telah menggunakan semua Credits percuma anda",
   "serviceErrorRetryLater": "Ralat perkhidmatan. Sila cuba lagi nanti",

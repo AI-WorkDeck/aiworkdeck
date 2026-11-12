@@ -4541,6 +4541,9 @@ export default {
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve()
+          } else if (xhr.status === 429) {
+            // 服务器按用户限频：该项标为失败、可重试（建好的文件行会被复用）
+            reject(Object.assign(new Error(t('common.tooManyRequests')), { status: 429 }))
           } else {
             reject(new Error(`HTTP ${xhr.status}`))
           }

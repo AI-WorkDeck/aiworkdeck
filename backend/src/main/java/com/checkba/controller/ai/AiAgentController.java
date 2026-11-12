@@ -48,6 +48,10 @@ public class AiAgentController {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ai.DocumentCheckpointService documentCheckpointService;
 
+    /** 按用户限频（server 模式）。字段注入、可缺省：手工装配的既有测试不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
@@ -205,6 +209,7 @@ public class AiAgentController {
         if (userId == null) {
             return chatError(401, LangText.of("请先登录", "Please sign in first"));
         }
+        if (rateLimiter != null) rateLimiter.check(com.checkba.service.UserRateLimiter.Kind.CHAT, userId);
         if (request.getProjectId() == null || !projectMemberService.hasReadPermission(request.getProjectId(), userId)) {
             return chatError(403, LangText.of("无权访问该项目", "You do not have access to this project"));
         }
@@ -556,6 +561,7 @@ public class AiAgentController {
             return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"" +
                     LangText.of("请先登录", "Please sign in first") + "\"}");
         }
+        if (rateLimiter != null) rateLimiter.check(com.checkba.service.UserRateLimiter.Kind.CHAT, userId);
         if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)
                 || fileAccess.isClient(request.getProjectId(), userId)) {
             return ResponseEntity.status(403).body("{\"status\":\"error\", \"message\":\"" +

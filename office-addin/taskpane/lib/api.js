@@ -751,7 +751,7 @@ export async function postChat({ serverUrl, token }, payload) {
     throw new Error(t('apiChatUnreachable'))
   }
   if (!resp.ok) {
-    const err = new Error(t('apiChatFailedHttp', { status: resp.status }))
+    const err = new Error(resp.status === 429 ? t('apiChatRateLimited') : t('apiChatFailedHttp', { status: resp.status }))
     err.status = resp.status
     let detail = null
     try { detail = await resp.json() } catch (_) { /* Non-JSON failures keep the HTTP fallback. */ }

@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Ir a Ajustes",
   "later": "Más tarde",
   "requestFailedWithStatus": "Error en la solicitud ({status})",
+  "tooManyRequests": "Demasiadas solicitudes. Espere un momento e inténtelo de nuevo",
   "smsVerificationRequired": "Esta acción requiere verificación por SMS",
   "freeQuotaExceeded": "Ha agotado todos sus créditos gratuitos",
   "serviceErrorRetryLater": "Error del servicio. Inténtelo de nuevo más tarde",

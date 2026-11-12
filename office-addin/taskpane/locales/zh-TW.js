@@ -332,6 +332,7 @@ export default {
   "apiConversationIssueFailedHttp": "會話簽發失敗（HTTP {status}）",
   "apiChatUnreachable": "後端不可達：消息未送出",
   "apiChatFailedHttp": "對話請求失敗（HTTP {status}）",
+  "apiChatRateLimited": "操作太頻繁，請稍候再試",
   "conversationRenewedNotice": "原會話已失效，已自動新建一場會話並把這條消息重新發出。",
   "conversationExpiredRetryFailed": "會話已失效：自動新建會話後重發仍未成功。請點擊底部的「新對話」重新開始；若仍然失敗，請檢查網絡連接或稍後再試。",
   "conversationDenied": "當前會話無法繼續：它可能屬於另一台設備或另一個賬戶。請點擊底部的「新對話」重新開始。",

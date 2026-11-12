@@ -67,6 +67,16 @@ class FileOcrControllerTest {
         verifyNoInteractions(service);
     }
 
+    @Test void serverProfileLimitsOcrPerUserBeforeAnyWork() throws Exception {
+        when(service.run(anyLong(), anyLong(), anyLong(), any())).thenReturn(
+                new FileOcrService.Outcome("done", "t", null, "ocr", 1, null, null));
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "rateLimiter",
+                new com.checkba.service.UserRateLimiter(false, 30, 300, 1, 120));
+        controller.recognize(1L, 2L, Map.of(), "sess");
+        assertThrows(com.checkba.exception.RateLimitedException.class, () -> controller.recognize(1L, 3L, Map.of(), "sess"));
+        verify(service, times(1)).run(anyLong(), anyLong(), anyLong(), any());
+    }
+
     @Test void cancelIsScopedToTheSignedInUser() {
         controller.cancel(1L, Map.of("jobId", "job"), "sess");
         verify(service).cancel(5L, "job");
