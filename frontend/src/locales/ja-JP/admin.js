@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "包晴天ポイント {points}、{credits} Credits 相当",
   "bqtDebtWarning": "{count} 件のポイント差引に失敗し、{amount} Credits が未精算です。包晴天アプリでポイントをチャージしてから、サポートまでお問い合わせください。",
   "bqtPayInApp": "包晴天アプリでチャージ／更新してください",
+  "bqtPriorityNote": "DeepSeek モデルの利用は包晴天ポイントから優先して差し引かれ、ポイントが不足すると自動的にアカウント残高を使います。その他のモデルとサービスはアカウント残高を使います。",
   "bqtRechargeNote": "残高は包晴天ポイントから換算され、特典は包晴天会員資格に応じて適用されます。ポイントのチャージや会員の更新は包晴天アプリで行ってください。AI WorkDeck ではこのアカウントの決済は行えません。",
 }

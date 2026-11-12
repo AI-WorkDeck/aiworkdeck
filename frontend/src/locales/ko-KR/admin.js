@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "바오칭톈 포인트 {points}, {credits} Credits 상당",
   "bqtDebtWarning": "포인트 차감 {count}건이 실패하여 {amount} Credits가 미결제 상태입니다. 바오칭톈 앱에서 포인트를 충전한 후 고객 지원에 문의해 주세요.",
   "bqtPayInApp": "바오칭톈 앱에서 충전 또는 갱신하세요",
+  "bqtPriorityNote": "DeepSeek 모델 사용량은 바오칭톈 포인트에서 먼저 차감되며, 포인트가 부족하면 자동으로 계정 잔액을 사용합니다. 다른 모델과 서비스는 계정 잔액을 사용합니다.",
   "bqtRechargeNote": "잔액은 바오칭톈 포인트에서 환산되며, 혜택은 바오칭톈 멤버십에 따릅니다. 바오칭톈 앱에서 포인트를 충전하거나 멤버십을 갱신하세요. AI WorkDeck에서는 이 계정의 결제를 받지 않습니다.",
 }

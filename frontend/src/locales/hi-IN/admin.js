@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} Baoqingtian पॉइंट्स, जो {credits} Credits के बराबर हैं",
   "bqtDebtWarning": "{count} पॉइंट कटौती विफल रही और {amount} Credits बकाया हैं। Baoqingtian ऐप में पॉइंट्स रिचार्ज करें, फिर सहायता से संपर्क करें।",
   "bqtPayInApp": "Baoqingtian ऐप में रिचार्ज या नवीनीकरण करें",
+  "bqtPriorityNote": "DeepSeek का उपयोग पहले आपके Baoqingtian पॉइंट से भुगतान होता है; पॉइंट खत्म होने पर अपने-आप आपके खाते की शेष राशि इस्तेमाल होती है। अन्य मॉडल और सेवाएँ खाते की शेष राशि इस्तेमाल करती हैं।",
   "bqtRechargeNote": "आपका बैलेंस Baoqingtian पॉइंट्स से परिवर्तित होता है और आपके लाभ आपकी Baoqingtian सदस्यता के अनुसार चलते हैं। Baoqingtian ऐप में पॉइंट्स रिचार्ज करें या नवीनीकरण करें; AI WorkDeck इस खाते के लिए भुगतान स्वीकार नहीं करता।",
 }

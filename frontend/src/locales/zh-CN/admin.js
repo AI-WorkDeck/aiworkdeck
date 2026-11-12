@@ -507,5 +507,6 @@ export default {
   "bqtPointsLine": "包晴天积分 {points}，折合 {credits} Credits",
   "bqtDebtWarning": "有 {count} 笔扣点未成功，待结清 {amount} Credits。请在包晴天 App 充值积分，然后联系客服处理。",
   "bqtPayInApp": "请在包晴天 App 充值/续费",
+  "bqtPriorityNote": "DeepSeek 模型的用量优先扣包晴天积分，积分不够时自动改用账户余额；其他模型和服务使用账户余额。",
   "bqtRechargeNote": "你的余额由包晴天积分折算，会员权益随包晴天会员生效。请在包晴天 App 充值积分或续费会员，AI WorkDeck 内不提供充值。",
 }

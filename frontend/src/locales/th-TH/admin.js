@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "คะแนน Baoqingtian {points} คะแนน เทียบเท่า {credits} Credits",
   "bqtDebtWarning": "การหักคะแนนไม่สำเร็จ {count} รายการ และมียอดค้างชำระ {amount} Credits โปรดเติมคะแนนในแอป Baoqingtian แล้วติดต่อฝ่ายสนับสนุน",
   "bqtPayInApp": "เติมคะแนนหรือต่ออายุในแอป Baoqingtian",
+  "bqtPriorityNote": "การใช้งาน DeepSeek จะหักจากแต้ม Baoqingtian ก่อน เมื่อแต้มไม่พอจะใช้ยอดเงินในบัญชีโดยอัตโนมัติ โมเดลและบริการอื่นใช้ยอดเงินในบัญชี",
   "bqtRechargeNote": "ยอดคงเหลือของคุณแปลงจากคะแนน Baoqingtian และสิทธิประโยชน์เป็นไปตามสมาชิก Baoqingtian ของคุณ โปรดเติมคะแนนหรือต่ออายุในแอป Baoqingtian; AI WorkDeck ไม่รับชำระเงินสำหรับบัญชีนี้",
 }

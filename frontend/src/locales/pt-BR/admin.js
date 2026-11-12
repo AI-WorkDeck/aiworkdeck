@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} pontos Baoqingtian, equivalentes a {credits} Credits",
   "bqtDebtWarning": "{count} dedução(ões) de pontos falhou(aram) e {amount} Credits estão pendentes. Recarregue pontos no app Baoqingtian e depois entre em contato com o suporte.",
   "bqtPayInApp": "Recarregue ou renove no app Baoqingtian",
+  "bqtPriorityNote": "O uso do DeepSeek é pago primeiro com seus pontos Baoqingtian; quando acabam, o saldo da sua conta é usado automaticamente. Outros modelos e serviços usam o saldo da conta.",
   "bqtRechargeNote": "Seu saldo é convertido de pontos Baoqingtian e seus benefícios seguem sua assinatura Baoqingtian. Recarregue pontos ou renove no app Baoqingtian; o AI WorkDeck não aceita pagamentos para esta conta.",
 }

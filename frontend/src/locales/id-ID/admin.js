@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} poin Baoqingtian, setara dengan {credits} Credits",
   "bqtDebtWarning": "{count} pemotongan poin gagal dan {amount} Credits belum lunas. Isi ulang poin di aplikasi Baoqingtian lalu hubungi dukungan.",
   "bqtPayInApp": "Isi ulang atau perpanjang di aplikasi Baoqingtian",
+  "bqtPriorityNote": "Penggunaan DeepSeek dibayar lebih dulu dengan poin Baoqingtian Anda; jika poin habis, saldo akun otomatis digunakan. Model dan layanan lain menggunakan saldo akun.",
   "bqtRechargeNote": "Saldo Anda dikonversi dari poin Baoqingtian dan manfaat Anda mengikuti keanggotaan Baoqingtian Anda. Isi ulang poin atau perpanjang di aplikasi Baoqingtian; AI WorkDeck tidak menerima pembayaran untuk akun ini.",
 }

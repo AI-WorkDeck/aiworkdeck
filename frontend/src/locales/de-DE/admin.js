@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "{points} Baoqingtian-Punkte, entspricht {credits} Credits",
   "bqtDebtWarning": "Bei {count} Punkteabzug/-abzügen ist ein Fehler aufgetreten, {amount} Credits sind offen. Laden Sie Punkte in der Baoqingtian-App auf und wenden Sie sich dann an den Support.",
   "bqtPayInApp": "In der Baoqingtian-App aufladen oder verlängern",
+  "bqtPriorityNote": "DeepSeek-Nutzung wird zuerst mit Ihren Baoqingtian-Punkten bezahlt; reichen die Punkte nicht, wird automatisch Ihr Kontoguthaben verwendet. Andere Modelle und Dienste nutzen Ihr Kontoguthaben.",
   "bqtRechargeNote": "Ihr Guthaben wird aus Baoqingtian-Punkten umgerechnet, und Ihre Vorteile richten sich nach Ihrer Baoqingtian-Mitgliedschaft. Laden Sie Punkte auf oder verlängern Sie in der Baoqingtian-App; AI WorkDeck nimmt für dieses Konto keine Zahlungen entgegen.",
 }

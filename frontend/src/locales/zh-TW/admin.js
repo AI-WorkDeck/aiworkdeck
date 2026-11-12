@@ -468,5 +468,6 @@ export default {
   "bqtPointsLine": "包晴天積分 {points}，折合 {credits} Credits",
   "bqtDebtWarning": "有 {count} 筆扣點未成功，待結清 {amount} Credits。請在包晴天 App 儲值積分，然後聯繫客服處理。",
   "bqtPayInApp": "請在包晴天 App 儲值／續費",
+  "bqtPriorityNote": "DeepSeek 模型的用量優先扣包晴天積分，積分不夠時自動改用帳戶餘額；其他模型和服務使用帳戶餘額。",
   "bqtRechargeNote": "你的餘額由包晴天積分折算，會員權益隨包晴天會員生效。請在包晴天 App 儲值積分或續費會員，AI WorkDeck 內不提供儲值。",
 }
