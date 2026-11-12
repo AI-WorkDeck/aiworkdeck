@@ -20,7 +20,7 @@
       <view v-if="!previewReady && openFailed" class="libre-loading-card libre-open-failed">
         <text class="libre-loading-name">{{ loadingTitle }}</text>
         <!-- 设了打开密码（O14）：在这里输密码，宿主解密后交给引擎；不支持的加密方式退回原说明 -->
-        <view v-if="openFailCode === 'DOC_ENCRYPTED' && passwordState !== 'unsupported'" class="libre-password">
+        <view v-if="passwordPromptVisible" class="libre-password">
           <text class="libre-loading-error">{{ $t('editor.openFailed.passwordPrompt') }}</text>
           <input v-model="passwordInput" class="libre-password-input" type="password" password focus
             :placeholder="$t('editor.openFailed.passwordPlaceholder')" :disabled="passwordState === 'checking'" @confirm="submitPassword" />
@@ -32,10 +32,8 @@
           </view>
           <text class="libre-loading-dl">{{ $t('editor.openFailed.passwordNote') }}</text>
         </view>
-        <template v-else>
-          <text class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : $t('editor.openFailed.title') }}</text>
-          <text class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
-        </template>
+        <text v-if="!passwordPromptVisible" class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : $t('editor.openFailed.title') }}</text>
+        <text v-if="!passwordPromptVisible" class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
         <view v-if="canReadOnlyPreview && openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="openReadOnlyPreview">
           <text>{{ $t('editor.openFailed.readOnlyPreview') }}</text>
         </view>
@@ -483,6 +481,10 @@ export default {
     },
     openFailed() {
       return this.statusKey === STATUS_OPEN_FAILED
+    },
+    // 设了打开密码且加密方式受支持（O14）：加载面板显示密码框，不显示「无法打开」
+    passwordPromptVisible() {
+      return this.openFailCode === DIAG_DOC_ENCRYPTED && this.passwordState !== 'unsupported'
     },
     // 「打不开时的只读预览」按钮只对 Word 生效（docx-preview）；PPT 冷启动只显示缓存的引擎渲染页
     // （见 tryDocxPreview / slidePreviewCache，没有缓存就不显示），表格冷启动只显示第一屏
