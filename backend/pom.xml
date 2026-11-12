@@ -51,7 +51,7 @@
         </dependency>
         <!-- 服务器 profile 的就绪探针与 Prometheus 指标（application-ops.yml）。
              管理端口只绑 127.0.0.1；桌面/默认 profile 关闭（management.server.port=-1）。
-             版本跟 Boot BOM（actuator 3.2.4 / micrometer 1.12.4）。 -->
+             版本跟 Boot BOM（actuator 3.5.16 / micrometer 1.15.12；micrometer <1.15.12 有 CVE-2026-40984，别单独降）。 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>

@@ -51,7 +51,8 @@ management:
   server:
     port: -1
   endpoints:
-    enabled-by-default: false
+    access:
+      default: none
     web:
       exposure:
         include: ""

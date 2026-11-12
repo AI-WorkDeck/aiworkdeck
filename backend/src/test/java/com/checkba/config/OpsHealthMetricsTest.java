@@ -16,6 +16,7 @@ import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -53,6 +54,8 @@ import static org.mockito.Mockito.reset;
 @ActiveProfiles({"desktop", "ops"})
 // Spring Boot tests swap in a no-export registry by default; we need the real Prometheus one.
 @AutoConfigureObservability(tracing = false)
+// No other test shares this configuration; close it (two Tomcats + a real registry) instead of caching it.
+@DirtiesContext
 class OpsHealthMetricsTest {
 
     @DynamicPropertySource

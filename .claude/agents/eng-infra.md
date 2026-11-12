@@ -383,9 +383,8 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
   所以「端点不存在」不能用 404 判，测试比对与未知路径同响应；② `@SpringBootTest` 默认把指标导出换成空实现，
   测 prometheus 要 `@AutoConfigureObservability`；③ actuator 的 `additional-path` 只认单段路径，不能挂 `/api/...`，
   所以公网探针是自写控制器；④ 业务 gauge（`OpsMetrics`）在抓取时才经 ObjectProvider 取 bean，别改成构造注入
-  `AgentOrchestrator`（构造器一动要同步 EvalHarness）。⑤ micrometer-core 1.12.4 在 CVE-2026-40984 受影响范围内，
-  但漏洞类 `HttpJakartaServletRequestTags` 不在 Spring MVC 路径上（spring-web 6.1.5 的
-  `DefaultServerRequestObservationConvention` 自己把非标准 method 归为 UNKNOWN），升 Boot 时一并消掉。
+  `AgentOrchestrator`（构造器一动要同步 EvalHarness）。⑤ micrometer 跟 Boot 3.5.16 BOM 为 1.15.12（CVE-2026-40984 的修复版；Boot 3.2 的 1.12.4 受影响，
+  所以本功能排在 Boot 升级之后合并），不要在 pom 里单独钉回旧版。
   回归：`mvn test -Dtest=OpsHealthMetricsTest,DesktopContextSmokeTest`；巡检脚本 `python3 -I deploy/ops/awd-health-check_test.py`。
   pom 加了依赖 → 只能随大版本（`patch-gate`）。
 - `deploy/update-mirror-sync.sh` — 官网 ECS 上每小时一跑的镜像同步（补丁产物 + 安装包 + installers/latest.json）。

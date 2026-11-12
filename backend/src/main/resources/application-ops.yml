@@ -22,7 +22,7 @@ management:
         include: health,prometheus
   endpoint:
     health:
-      enabled: true
+      access: read-only
       show-details: always
       probes:
         enabled: true
@@ -33,7 +33,7 @@ management:
           # 变成本实例「DOWN」的误报。
           include: readinessState,db,diskSpace
     prometheus:
-      enabled: true
+      access: read-only
   health:
     # spring-boot-starter-mail 会自动挂 SMTP 探测；我们不走 spring.mail.*，这项只会误报。
     mail:
