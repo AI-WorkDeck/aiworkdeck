@@ -1,4 +1,9 @@
 # 代码稳定性审计 · 清单归档（dev-board#74）
+> **Archived.** This note now lives at [`docs/dev-notes/AUDIT_2026-08-20_REMAINING.md`](dev-notes/AUDIT_2026-08-20_REMAINING.md).
+>
+> This stub is kept so existing links do not 404.
+> The text below is frozen and no longer maintained — edit the copy under `docs/dev-notes/` instead.
+> See [`docs/dev-notes/`](dev-notes/) for other archived internal notes.
 
 > **2026-08-21 收官：166 条里 156 条已修完并合并，6 条经复现被推翻，
 > 4 条留给维护者拍板（见下）。这份文件从「待处理清单」转为归档，
