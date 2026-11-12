@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "İnceleme",
   "previewReadableHint": "Şu anda okunabilir; düzenleyici hazır olduğunda düzenleme yapılabilir",
+  "slidePreviewMore": "{count} slayt daha; düzenleyici hazır olduğunda görüntülenebilir",
   "preparingEditor": "Düzenleyici hazırlanıyor",
   "dlProgress": "Belge içeriği {loaded} / {total}",
   "dlLoadedOnly": "Belge içeriğinin {size} kadarı okundu",

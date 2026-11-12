@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Überprüfung",
   "previewReadableHint": "Jetzt lesbar; Bearbeitung möglich, sobald der Editor bereit ist",
+  "slidePreviewMore": "{count} weitere Folien – verfügbar, sobald der Editor bereit ist",
   "preparingEditor": "Editor wird vorbereitet",
   "dlProgress": "Dokumentinhalt {loaded} / {total}",
   "dlLoadedOnly": "{size} Dokumentinhalt gelesen",

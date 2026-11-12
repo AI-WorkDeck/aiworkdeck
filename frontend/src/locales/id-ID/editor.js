@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Tinjauan",
   "previewReadableHint": "Sudah dapat dibaca; pengeditan tersedia setelah editor siap",
+  "slidePreviewMore": "{count} slide lainnya — tersedia setelah editor siap",
   "preparingEditor": "Menyiapkan editor",
   "dlProgress": "Konten dokumen {loaded} / {total}",
   "dlLoadedOnly": "Membaca {size} dari konten dokumen",

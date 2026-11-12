@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Semak",
   "previewReadableHint": "Boleh dibaca sekarang; penyuntingan tersedia sebaik sahaja penyunting sedia",
+  "slidePreviewMore": "{count} slaid lagi — tersedia sebaik sahaja penyunting sedia",
   "preparingEditor": "Menyediakan penyunting",
   "dlProgress": "Kandungan dokumen {loaded} / {total}",
   "dlLoadedOnly": "Membaca {size} kandungan dokumen",

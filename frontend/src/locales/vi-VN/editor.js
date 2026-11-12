@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Xem lại",
   "previewReadableHint": "Đã có thể đọc ngay; có thể chỉnh sửa trực tiếp khi trình soạn thảo sẵn sàng",
+  "slidePreviewMore": "Còn {count} trang chiếu — xem được khi trình soạn thảo sẵn sàng",
   "preparingEditor": "Đang chuẩn bị trình soạn thảo",
   "dlProgress": "Nội dung tài liệu {loaded} / {total}",
   "dlLoadedOnly": "Đã đọc {size} nội dung tài liệu",

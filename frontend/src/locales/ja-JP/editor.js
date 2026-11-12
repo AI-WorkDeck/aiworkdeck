@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "レビュー",
   "previewReadableHint": "閲覧可能です。エディタの準備が完了すると編集できます",
+  "slidePreviewMore": "残り {count} 枚のスライドはエディタの準備完了後に表示できます",
   "preparingEditor": "エディタを準備しています",
   "dlProgress": "文書データ {loaded} / {total}",
   "dlLoadedOnly": "文書データを {size} 読み込みました",

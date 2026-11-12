@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "審閱",
   "previewReadableHint": "已可閱讀，編輯器就緒後可直接編輯",
+  "slidePreviewMore": "還有 {count} 頁，編輯器就緒後可查看",
   "preparingEditor": "正在準備編輯器",
   "dlProgress": "文檔內容 {loaded} / {total}",
   "dlLoadedOnly": "已讀取文檔內容 {size}",

@@ -133,6 +133,7 @@ export default {
   },
   reviewBtn: '审阅',
   previewReadableHint: '已可阅读，编辑器就绪后可直接编辑',
+  slidePreviewMore: '还有 {count} 页，编辑器就绪后可查看',
   preparingEditor: '正在准备编辑器',
   dlProgress: '文档内容 {loaded} / {total}',
   dlLoadedOnly: '已读取文档内容 {size}',

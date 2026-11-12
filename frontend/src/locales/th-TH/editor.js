@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "ตรวจทาน",
   "previewReadableHint": "อ่านได้แล้ว และจะสามารถแก้ไขได้ทันทีเมื่อตัวแก้ไขพร้อมทำงาน",
+  "slidePreviewMore": "อีก {count} สไลด์ — ดูได้เมื่อตัวแก้ไขพร้อมทำงาน",
   "preparingEditor": "กำลังเตรียมตัวแก้ไข",
   "dlProgress": "เนื้อหาเอกสาร {loaded} / {total}",
   "dlLoadedOnly": "อ่านเนื้อหาเอกสารแล้ว {size}",

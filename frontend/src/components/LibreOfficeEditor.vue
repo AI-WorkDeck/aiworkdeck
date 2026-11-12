@@ -214,8 +214,9 @@ import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
 import { buildAiFormatPrompt, buildAiSelectionRevisePrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import { getResolvedTheme, APP_THEME_EVENT } from '@/utils/appTheme.js'
-// 冷启动 PPT 只读预览的体量上限（office-tier1）：更大的演示文稿本地解析会拖慢引擎启动，直接等可编辑视图
-const PPTX_PREVIEW_MAX_BYTES = 15 * 1024 * 1024
+// 懒建：只有 PPT 路径会用到（组件脚本在多个测试桩里求值，模块顶层不调导入）
+let slidePreviewCacheInstance = null
+const slidePreviewCache = () => slidePreviewCacheInstance || (slidePreviewCacheInstance = createSlidePreviewCache())
 import { isEnglish, getAppLanguage } from '@/utils/appLanguage.js'
 import { stampApplication } from '@/utils/docxAppProps.js'
 import { documentStampApplication } from '@/utils/documentGeneratorSetting.js'
@@ -223,6 +224,7 @@ import { createInlineReviewHost } from '@/composables/inlineReviewHost.js'
 import { requireAccount, requireRecharge } from '@/utils/requireAccount.js'
 import { createWritingAssistanceHost } from '@/composables/writingAssistanceHost.js'
 import { createSemanticWritingHost } from '@/composables/semanticWritingHost.js'
+import { createSlidePreviewCache, fingerprint as previewFingerprint } from '@/composables/slidePreviewCache.js'
 import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemanticWritingSuggestion, getSemanticWritingSuggestion, cancelSemanticWritingSuggestion, acceptSemanticWritingSuggestion } from '@/services/api.js'
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
@@ -464,10 +466,11 @@ export default {
     openFailed() {
       return this.statusKey === STATUS_OPEN_FAILED
     },
-    // 只读预览：Word 用 docx-preview，PPT 用 pptx-preview（office-tier1：冷启动时演示文稿也先给可读画面）；表格只给下载出口。
+    // 「打不开时的只读预览」按钮只对 Word 生效（docx-preview）；PPT 冷启动只显示缓存的引擎渲染页
+    // （见 tryDocxPreview / slidePreviewCache，没有缓存就不显示），表格只给下载出口。
     canReadOnlyPreview() {
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
-      return t === 'docx' || t === 'doc' || t === 'pptx'
+      return t === 'docx' || t === 'doc'
     },
     loadingOverlayVisible() {
       // Model readiness precedes native menu hiding. Keep the guest covered
@@ -600,6 +603,8 @@ export default {
     }
   },
   beforeUnmount() {
+    clearTimeout(this._slidePreviewTimer)
+    this.revokeSlidePreviewUrls()
     if (this._onIdentityUpdated) uni.$off('awd:identity-updated', this._onIdentityUpdated)
     this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
     this._nativeSurface = null
@@ -1726,6 +1731,7 @@ export default {
       // 用户点开文件时就是「第二份文档」的速度。过继时 adoptAndLoad 先等它结束。
       // 备胎此刻还没有 docKind（没装过文档）；是不是空白 Writer 由 worker 自己判定。
       if (!this.file) this.warmSpare()
+      else if (this._bytesPromise) this._bytesPromise.then(b => this.scheduleSlidePreviewCapture(b)).catch(() => {})
       // EvidenceLink 首轮：拉缓存 → 旧式链接收编书签（仅 writer）→ 核对锚点。
       // 不 await：核对是后台事，不能拖住 ready 之后的任何链路。
       this.initEvidence()
@@ -1804,6 +1810,58 @@ export default {
     },
     // 引擎 boot 期间先把预取到的 docx 渲成只读预览（docx-preview 本地解析，
     // 同 FilePreview.renderDocx 的配置）。失败静默回落进度卡片。
+    // 缓存的引擎渲染页做成卡片：画布底色上居中、圆角阴影、页码；宽度随窗格，最大 960。
+    renderCachedSlides(container, cached) {
+      this.revokeSlidePreviewUrls()
+      const urls = []
+      const wrap = document.createElement('div')
+      wrap.className = 'awd-slide-preview'
+      cached.slides.forEach((slide, i) => {
+        const url = URL.createObjectURL(new Blob([slide.bytes], { type: 'image/jpeg' }))
+        urls.push(url)
+        const card = document.createElement('figure')
+        card.className = 'awd-slide-preview-card'
+        const img = document.createElement('img')
+        img.src = url; img.alt = ''; img.decoding = 'async'
+        if (slide.width && slide.height) img.style.aspectRatio = slide.width + ' / ' + slide.height
+        const cap = document.createElement('figcaption')
+        cap.textContent = (i + 1) + ' / ' + (cached.total || cached.slides.length)
+        card.append(img, cap)
+        wrap.append(card)
+      })
+      if ((cached.total || 0) > cached.slides.length) {
+        const more = document.createElement('div')
+        more.className = 'awd-slide-preview-more'
+        more.textContent = this.$t('editor.slidePreviewMore', { count: cached.total - cached.slides.length })
+        wrap.append(more)
+      }
+      container.append(wrap)
+      this._slidePreviewUrls = urls
+    },
+    revokeSlidePreviewUrls() {
+      for (const url of this._slidePreviewUrls || []) URL.revokeObjectURL(url)
+      this._slidePreviewUrls = []
+    },
+    // 引擎就绪 / 保存成功后，空闲时把前几页渲染进缓存，供下次冷启动显示（只 PPT；后台只读命令）。
+    scheduleSlidePreviewCapture(bytes) {
+      const t = String((this.file && this.file.fileType) || '').toLowerCase()
+      if (t !== 'pptx' || !bytes || !this.executor) return
+      clearTimeout(this._slidePreviewTimer)
+      const seq = this._docLoadSeq, fileId = this.file?.id
+      const isCurrent = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
+      const attempt = async (tries) => {
+        if (!isCurrent()) return
+        if (!this.canRunNavigationWork) { if (tries < 20) this._slidePreviewTimer = setTimeout(() => attempt(tries + 1), 3000); return }
+        try {
+          const key = await previewFingerprint(bytes)
+          const nav = await this.executor.executeCommand('office_get_navigation', {}, { background: true })
+          const total = Array.isArray(nav?.items) ? nav.items.length : 0
+          await slidePreviewCache().capture((a, p, o) => this.executor.executeCommand(a, p, o),
+            { key, total, documentSeq: nav?.documentSeq, isCurrent: () => isCurrent() && this.canRunNavigationWork })
+        } catch (e) { /* 缓存失败不影响编辑 */ }
+      }
+      this._slidePreviewTimer = setTimeout(() => attempt(0), 4000)
+    },
     async tryDocxPreview(buf, force = false) {
       if (!buf || buf.byteLength === 0 || this.previewReady) return
       // 热备胎已能直接装载，不再同时用 docx-preview 解包并布局同一份文档。
@@ -1812,22 +1870,26 @@ export default {
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
       if (t !== 'docx' && t !== 'doc' && t !== 'pptx') return
-      // 大演示文稿的本地解析会和引擎启动抢主线程：只给常见体量的 PPT 做冷启动预览
-      if (t === 'pptx' && !force && buf.byteLength > PPTX_PREVIEW_MAX_BYTES) return
+      // PPT：只显示「上次打开时引擎自己渲染、按文件字节命中」的前几页（slidePreviewCache）；
+      // 没有缓存就保持进度卡片——前端解析 pptx 的画面在真实课件上错位裁切，不如不显示。
+      let cached = null
+      if (t === 'pptx') {
+        cached = await slidePreviewCache().load(await previewFingerprint(buf)).catch(() => null)
+        if (!cached) return
+      }
       const seq = this._docLoadSeq, fileId = this.file?.id
       const generation = documentCheckpointGeneration(this.projectId, fileId)
       const current = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
         && generation === documentCheckpointGeneration(this.projectId, fileId)
       try {
-        const renderer = t === 'pptx' ? await import('pptx-preview') : await import('docx-preview')
+        const renderer = t === 'pptx' ? null : await import('docx-preview')
         await this.$nextTick() // 过继路径上 overlay 可能刚重新显示，等 ref 挂上
         const ref = this.$refs.docxPreviewHost
         const container = ref && (ref.$el || ref)
         if (!container || !current() || (!force && (this._endpointUp || this.ready))) return
         container.innerHTML = ''
         if (t === 'pptx') {
-          const width = Math.max(320, (container.clientWidth || 960) - 32)
-          await renderer.init(container, { width, height: Math.round(width * 9 / 16) }).preview(buf)
+          this.renderCachedSlides(container, cached)
         } else {
         await renderer.renderAsync(buf, container, null, {
           className: 'docx',
@@ -2765,6 +2827,7 @@ export default {
         }
         safeToOverwrite = true
         this._savedOnce = true
+        this.scheduleSlidePreviewCapture(u8)
         // 保存确认后通知项目入口刷新；过期文件/重载中的回执不参与当前状态。
         if (!this._reloading && !this._saveDiscarded && !this._pendingReload && !this._checkpointInvalidated &&
             saveContext === (this._backendSaveContext || 0) && this.file?.id === fileId &&
@@ -3030,4 +3093,13 @@ export default {
 .libre-preview-host { position: absolute; inset: 0; top: 34px; overflow-y: auto; background: var(--awd-surface-2); }
 /* docx-preview 生成的页面居中呈现（deep：内容是运行时注入的非 scoped DOM） */
 .libre-preview-host :deep(.docx-wrapper) { background: transparent; padding: 16px 0; }
+/* 演示文稿冷启动预览：缓存的引擎渲染页做成卡片 */
+.libre-preview-host :deep(.awd-slide-preview) { max-width: 960px; margin: 0 auto; padding: 24px 32px 40px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 22px; }
+.libre-preview-host :deep(.awd-slide-preview-card) { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.libre-preview-host :deep(.awd-slide-preview-card img) { display: block; width: 100%; height: auto; border-radius: 6px;
+  background: #fff; box-shadow: 0 1px 2px rgba(31, 35, 40, 0.08), 0 8px 24px rgba(31, 35, 40, 0.10); }
+.libre-preview-host :deep(.awd-slide-preview-card figcaption) { text-align: center; font-size: 11px; color: var(--awd-text-3);
+  font-variant-numeric: tabular-nums; }
+.libre-preview-host :deep(.awd-slide-preview-more) { text-align: center; font-size: 12px; color: var(--awd-text-3); padding-bottom: 8px; }
 </style>

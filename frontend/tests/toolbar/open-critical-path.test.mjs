@@ -15,7 +15,6 @@ function component(name, overrides = {}) {
   })
   const body = script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
     .replace("import('docx-preview')", 'previewModule()')
-    .replace("import('pptx-preview')", "previewModule('pptx')")
     .replace('export default', 'return')
   return new Function(...names, 'previewModule', body)(...names.map(n => overrides[n] || (() => {})), overrides.previewModule)
 }
@@ -86,17 +85,23 @@ function previewVm({ endpointUp = false, module } = {}) {
   return { vm, events, options }
 }
 
-test('cold engine boot also gives PPTX a readable preview, but not for oversized decks', async () => {
-  const { vm, events } = previewVm({ module: { promise: { init: () => ({ preview: async () => { events.push('render-pptx') } }) } } })
-  vm.file = { id: 7, fileType: 'pptx' }
-  await vm.tryDocxPreview(new ArrayBuffer(16))
-  assert.deepEqual(events, ['import', 'render-pptx'])
-  assert.equal(vm.previewReady, true)
-  const big = previewVm()
-  big.vm.file = { id: 7, fileType: 'pptx' }
-  await big.vm.tryDocxPreview(new ArrayBuffer(16 * 1024 * 1024))
-  assert.deepEqual(big.events, [])
-  assert.equal(big.vm.previewReady, false)
+test('cold engine boot shows cached engine renders for PPTX, and nothing (not a wrong picture) without a cache', async () => {
+  const cached = { total: 7, slides: [{ bytes: new Uint8Array([1]), width: 960, height: 540 }] }
+  for (const hit of [true, false]) {
+    const events = []
+    const options = component('LibreOfficeEditor', { documentCheckpointGeneration: () => 0,
+      createSlidePreviewCache: () => ({ load: async (key) => { events.push('load:' + key); return hit ? cached : null } }),
+      previewFingerprint: async () => 'sha-of-bytes',
+      previewModule: async (kind) => { events.push('import:' + (kind || 'docx')); return {} } })
+    const vm = { _endpointUp: false, ready: false, previewReady: false, previewFailed: false,
+      projectId: 1, file: { id: 7, fileType: 'pptx' }, $nextTick: async () => {}, $refs: { docxPreviewHost: { innerHTML: '' } }, appendLog() {},
+      renderCachedSlides: (_c, entry) => events.push('cards:' + entry.slides.length + '/' + entry.total),
+      tryDocxPreview: options.methods.tryDocxPreview }
+    await vm.tryDocxPreview(new ArrayBuffer(16))
+    assert.deepEqual(events, hit ? ['load:sha-of-bytes', 'cards:1/7'] : ['load:sha-of-bytes'])
+    assert.equal(vm.previewReady, hit)
+    assert.ok(!events.some(e => e.startsWith('import:')), 'no front-end pptx parsing')
+  }
 })
 
 test('a warm engine opens DOCX without importing or rendering a duplicate preview', async () => {

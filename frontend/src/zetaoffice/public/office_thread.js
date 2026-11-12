@@ -10040,7 +10040,10 @@ const EXEC = {
     const number = Number(p && p.slideNumber);
     if (!Number.isInteger(number) || number < 1 || number > pages.getCount()) return slideFail('页码越界');
     const page = pages.getByIndex(number - 1);
-    const width = Math.max(80, Math.min(480, Math.round(Number(p && p.width) || 240)));
+    // preview:true（冷启动预览缓存，office-tier1）允许到 1280px；format:'jpeg' 体积约为 PNG 的 1/15
+    const maxWidth = p && p.preview === true ? 1280 : 480;
+    const width = Math.max(80, Math.min(maxWidth, Math.round(Number(p && p.width) || 240)));
+    const jpeg = !!(p && p.format === 'jpeg');
     const pageWidth = Number(page.getPropertyValue('Width'));
     const pageHeight = Number(page.getPropertyValue('Height'));
     const height = Math.max(1, Math.round(width * pageHeight / pageWidth));
@@ -10058,16 +10061,16 @@ const EXEC = {
     try {
       const exporter = context.getServiceManager().createInstanceWithContext('com.sun.star.drawing.GraphicExportFilter', context);
       exporter.setSourceDocument(page);
-      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), [
-        mkProp('PixelWidth', width), mkProp('PixelHeight', height),
-      ]);
-      if (!exporter.filter([mkProp('MediaType', 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
+      const filterProps = [mkProp('PixelWidth', width), mkProp('PixelHeight', height)];
+      if (jpeg) filterProps.push(mkProp('Quality', 82));
+      const filterData = new zetajs.Any(zetajs.type.sequence(zetajs.type.struct(css.beans.PropertyValue)), filterProps);
+      if (!exporter.filter([mkProp('MediaType', jpeg ? 'image/jpeg' : 'image/png'), mkProp('OutputStream', sink), mkProp('FilterData', filterData)]))
         return slideFail('缩略图导出失败');
       if (!total) return slideFail('缩略图为空');
       const bytes = new Uint8Array(total);
       let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-      return { success: true, slideNumber: number, width: width, height: height, bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
+      return { success: true, slideNumber: number, width: width, height: height, total: pages.getCount(), format: jpeg ? 'jpeg' : 'png', bytes: bytes, documentSeq: docSeq, revision: currentReviewRevision() };
     } catch (e) { return slideFail(errStr(e)); }
     finally {
       try { if (xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) {}

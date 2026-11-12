@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Controleren",
   "previewReadableHint": "Nu leesbaar; bewerken is beschikbaar zodra de editor gereed is",
+  "slidePreviewMore": "Nog {count} dia’s; beschikbaar zodra de editor gereed is",
   "preparingEditor": "Editor voorbereiden",
   "dlProgress": "Documentinhoud {loaded} / {total}",
   "dlLoadedOnly": "{size} aan documentinhoud gelezen",

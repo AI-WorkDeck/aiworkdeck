@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Révision",
   "previewReadableHint": "Lecture disponible dès maintenant ; l’édition sera possible dès que l’éditeur sera prêt",
+  "slidePreviewMore": "{count} diapositives de plus — disponibles dès que l’éditeur est prêt",
   "preparingEditor": "Préparation de l’éditeur",
   "dlProgress": "Contenu du document {loaded} / {total}",
   "dlLoadedOnly": "{size} du contenu du document lus",

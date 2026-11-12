@@ -129,6 +129,7 @@ export default {
   },
   reviewBtn: 'Review',
   previewReadableHint: 'Readable now; editing is available once the editor is ready',
+  slidePreviewMore: '{count} more slides — available once the editor is ready',
   preparingEditor: 'Preparing the editor',
   dlProgress: 'Document content {loaded} / {total}',
   dlLoadedOnly: 'Read {size} of document content',

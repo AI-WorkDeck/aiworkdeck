@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "समीक्षा",
   "previewReadableHint": "अभी पढ़ने योग्य है; संपादक तैयार होने पर संपादन उपलब्ध होगा",
+  "slidePreviewMore": "{count} और स्लाइड — संपादक तैयार होने पर उपलब्ध होंगी",
   "preparingEditor": "संपादक तैयार किया जा रहा है",
   "dlProgress": "दस्तावेज़ सामग्री {loaded} / {total}",
   "dlLoadedOnly": "दस्तावेज़ सामग्री का {size} पढ़ा गया",

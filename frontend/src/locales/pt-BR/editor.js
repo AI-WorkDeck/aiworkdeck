@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "Revisão",
   "previewReadableHint": "Já pode ser lido; a edição ficará disponível assim que o editor estiver pronto",
+  "slidePreviewMore": "Mais {count} slides; disponíveis assim que o editor estiver pronto",
   "preparingEditor": "Preparando o editor",
   "dlProgress": "Conteúdo do documento {loaded} / {total}",
   "dlLoadedOnly": "Foram lidos {size} do conteúdo do documento",

@@ -127,6 +127,7 @@ export default {
   },
   "reviewBtn": "مراجعة",
   "previewReadableHint": "متاح للقراءة الآن؛ وسيكون التحرير متاحاً بمجرد جاهزية المحرر",
+  "slidePreviewMore": "{count} شرائح أخرى — ستتوفر بمجرد جاهزية المحرر",
   "preparingEditor": "جارٍ تحضير المحرر",
   "dlProgress": "محتوى المستند {loaded} / {total}",
   "dlLoadedOnly": "تمت قراءة {size} من محتوى المستند",
