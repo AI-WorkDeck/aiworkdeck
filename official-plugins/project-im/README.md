@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # 项目沟通
 
-纯 Web IM 插件。0.2.0 的沟通助手需要包含 `agentScopes`、`ensureAgent`、`agentReply` 的 AI WorkDeck 0.82.0 或更新宿主及相应协作服务；仅更新插件无法增加旧服务端的能力。当前使用中国大陆站 AI WorkDeck 账号，连接 `case.aiworkdeck.com` 官方协作服务；国际站账号暂不支持。源码、宿主和云服务分别发布，实际可用状态以插件广场及正式版本为准。
+纯 Web IM 插件。0.2.5 需要 AI WorkDeck 0.82.0 或更新宿主（沟通助手所需的 `agentScopes`、`ensureAgent`、`agentReply` 自 0.69.0 起提供）及相应协作服务；仅更新插件无法增加旧服务端的能力。当前使用中国大陆站 AI WorkDeck 账号，连接 `case.aiworkdeck.com` 官方协作服务；国际站账号暂不支持。源码、宿主和云服务分别发布，实际可用状态以插件广场及正式版本为准。
 
 ## 助手与会话
 
