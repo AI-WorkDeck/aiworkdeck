@@ -15,6 +15,9 @@
 //                          run in round 1 (CDP Tracing + V8 CPU samples; excluded
 //                          from the latency statistics).
 //   AWD_ELECTRON_BINARY    optional Electron executable.
+//   OFFICE_LATENCY_REOPEN  basenames whose round-1 warm run also checks that normal
+//                          autosave put the typed text on disk and that a close/reopen
+//                          shows it (default tpl-5mb.pptx,ledger-5000.xlsx).
 //   OFFICE_LATENCY_ANALYZE path of a saved *.trace.json: print its summary and exit.
 // Timings come from compositor frames (Page.screencastFrame metadata.timestamp)
 // relative to the input event's own timestamp inside the page; "settled" is the
@@ -30,6 +33,7 @@ import { spawn, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer-core'
 import { PNG } from 'pngjs'
+import JSZip from 'jszip'
 import jpeg from 'jpeg-js'
 
 // Re-summarise a saved trace without launching anything.
@@ -72,6 +76,7 @@ for (const s of sources) assert.ok(fs.existsSync(s), `Missing document: ${s}`)
 const sourceHashes = Object.fromEntries(sources.map(s => [s, hash(s)]))
 const rounds = Number(process.env.OFFICE_LATENCY_ROUNDS || 3)
 assert.ok(Number.isInteger(rounds) && rounds > 0 && rounds <= 10)
+const reopenFor = new Set((process.env.OFFICE_LATENCY_REOPEN ?? 'tpl-5mb.pptx,ledger-5000.xlsx').split(',').filter(Boolean))
 const traced = new Set((process.env.OFFICE_LATENCY_TRACE ?? 'tpl-5mb.pptx,ledger-5000.xlsx').split(',').filter(Boolean))
 
 const [backendPort, cdpPort, ...ports] = await Promise.all(Array.from({ length: 6 }, freePort))
@@ -487,12 +492,14 @@ async function prepareTyping(name, guest, sc) {
   const kind = kindOf(name)
   if (kind === 'pptx') return enterPptText(name, guest, sc)
   const viewport = await guest.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+  let cell = null
   if (kind === 'xlsx') {
     await guest.mouse.click(viewport.width * 0.32, viewport.height * 0.45)
     await sleep(600)
+    cell = await exec(name, 'sheet_get_active_cell').then(r => ({ sheet: r.sheet, address: r.address })).catch(() => null)
   }
   await focusOverlay(name, guest)
-  return { target: kind === 'xlsx' ? 'clicked grid cell' : 'document cursor (start of body)' }
+  return { target: kind === 'xlsx' ? 'clicked grid cell' : 'document cursor (start of body)', cell }
 }
 async function navigate(name, guest, sc, kind) {
   const results = []
@@ -676,7 +683,16 @@ function analyzeTrace(file, windows) {
 }
 
 // ---- one measured open ---------------------------------------------------------------
-async function measureDocument(name, filePath, mode, { trace = false } = {}) {
+// The typed marker as it lands in the saved package (text runs may be split by
+// markup, so compare against the XML with tags removed).
+const TYPED = 'quickbrownolbtypingx'
+async function packageText(file) {
+  const zip = await JSZip.loadAsync(fs.readFileSync(file))
+  let out = ''
+  for (const n of Object.keys(zip.files).filter(n => n.endsWith('.xml'))) out += (await zip.file(n).async('string')).replace(/<[^>]+>/g, '')
+  return out
+}
+async function measureDocument(name, filePath, mode, { trace = false, reopen = false } = {}) {
   const kind = kindOf(name)
   const result = { name, kind, mode, spareAtClick: await spareState() }
   const hostCdp = await page.createCDPSession()
@@ -774,6 +790,13 @@ async function measureDocument(name, filePath, mode, { trace = false } = {}) {
       result.autosave = { savingMs: saveStart && saveEnd ? Math.round(saveEnd - saveStart) : null, lastExportMs, landedOnDisk: landed, probe }
       log(name, mode, 'autosave', JSON.stringify({ ...result.autosave, probe: probe && [probe.firstChangeMs, probe.settledMs] }))
     }
+    // Acceptance chain: the product's normal autosave (no forced save, no extra
+    // command that could reset its timer) must put the typed text on disk.
+    if (reopen && !result.typingTarget.skipped) {
+      const t = Date.now()
+      result.diskHasEdit = await until(async () => (await packageText(filePath)).includes(TYPED), 60000, 500).then(() => Date.now() - t).catch(() => false)
+      log(name, mode, 'disk has typed text after normal autosave', result.diskHasEdit)
+    }
     // Scroll and navigate after typing/autosave: typing is measured on the freshly
     // opened view (slide 1 / top of document / first sheet).
     const sc2 = await phase('scroll', () => scroll(guest, sc))
@@ -791,6 +814,23 @@ async function measureDocument(name, filePath, mode, { trace = false } = {}) {
     result.trace = { file, size: fs.statSync(file).size }
   }
   await close(name)
+  if (reopen && !result.typingTarget?.skipped) {
+    await clickOpen(name)
+    await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+    await sleep(1500)
+    if (kind === 'pptx') {
+      const info = await exec(name, 'slide_get_page', { slideNumber: result.typingTarget.slide })
+      // Runtime shape names are not stable across loads; check every shape's text.
+      const hit = info.shapes.find(s => String(s.text || '').includes(TYPED))
+      result.reopen = { slide: result.typingTarget.slide, shape: hit?.name || null, text: String(hit?.text || '').slice(-80), hasEdit: !!hit }
+    } else if (kind === 'xlsx' && result.typingTarget.cell) {
+      const r = await exec(name, 'sheet_read_range', { sheet: result.typingTarget.cell.sheet, range: result.typingTarget.cell.address })
+      const value = JSON.stringify(r.values ?? r.data ?? r).slice(0, 200)
+      result.reopen = { cell: result.typingTarget.cell, value, hasEdit: value.includes(TYPED) }
+    }
+    log(name, mode, 'reopen', JSON.stringify(result.reopen))
+    await close(name)
+  }
   return result
 }
 
@@ -842,7 +882,7 @@ try {
         return Date.now() - t
       }
       session.spareWaitMs = await waitSpare()
-      session.runs.push(await measureDocument(names.warm, path.join(dir, names.warm), 'warm'))
+      session.runs.push(await measureDocument(names.warm, path.join(dir, names.warm), 'warm', { reopen: round === 1 && reopenFor.has(path.basename(src)) }))
       write('progress.json', evidence)
       if (doTrace) {
         await waitSpare()
