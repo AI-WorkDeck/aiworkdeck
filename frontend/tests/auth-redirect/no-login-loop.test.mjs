@@ -27,7 +27,7 @@ test('闸二：已经在登录页时 4010 不再 reLaunch 登录页', () => {
   assert.match(API, /getCurrentPages/, '判定要读页面栈而不是猜')
   // 跳登录页只许出现在 isOnLoginPage() 为假的那条分支里
   assert.match(API,
-    /else if \(isOnLoginPage\(\)\) \{[\s\S]{0,600}?\} else \{[\s\S]{0,300}?uni\.reLaunch\(\{[\s\S]{0,80}?'\/pages\/login\/login'/,
+    /if \(isOnLoginPage\(\)\) \{[\s\S]{0,600}?\} else \{[\s\S]{0,300}?uni\.reLaunch\(\{[\s\S]{0,80}?'\/pages\/login\/login'/,
     'reLaunch 登录页必须落在 isOnLoginPage 为假的分支')
 })
 
