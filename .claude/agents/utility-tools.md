@@ -605,8 +605,9 @@ FilePickerDialog :298 / EasyVoicePane :537 / DesensitizePane :543 / SearchPanel 
 
 - **server 模式按用户限频（2026-11-12）**：`/api/browser/proxy` 按票据 userId 计 `browser-proxy-per-minute`（默认 120，超限回纯文本 429 给 iframe）；`/api/ocr/recognize` 与资源管理器「识别文字」`/api/projects/{p}/files/{f}/ocr` 共用 `ocr-per-minute`（默认 20，桶容量 20、之后每 3 秒一个；资源管理器批量识别 `explorerOcr.js` 遇 429 按 `retryAfterSeconds` 等待后重试同一文件，最多 5 次、取消即停；其余调用由 `request()` 显示后端 message）。local-mode 旁路。契约见 eng-infra.md「部署与其它」。
 
-- **commons-compress 1.26+ 依赖 commons-lang3 ≥3.14（ArrayFill），而 Spring Boot 3.2 BOM 钉 3.13**：
-  pom 已属性覆盖 `<commons-lang3.version>3.14.0</commons-lang3.version>`（PR#435），别删。缺了它，
+- **commons-compress 1.26+ 依赖 commons-lang3 ≥3.14（ArrayFill）**：Spring Boot 3.2 BOM 曾钉 3.13，
+  PR#435 起 pom 属性覆盖；升 Boot 3.5.16 后覆盖为 `<commons-lang3.version>3.18.0</commons-lang3.version>`
+  （BOM 的 3.17.0 有 CVE-2025-48924），别删、别降到 3.14 以下。缺了它，
   压缩包预览/解压遇到老 PKZIP imploded 条目（`BinaryTree` 解码）与 tar 写路径会
   `NoClassDefFoundError`——且是 Error，`walkArchive` 外层 `catch (Exception)` 兜不住，直接 500。
   回归用例 `extractZipWithImplodedEntryDecodesContent`（fixture `imploding-8Kdict-3trees.zip`）。
