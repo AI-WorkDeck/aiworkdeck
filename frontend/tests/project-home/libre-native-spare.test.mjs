@@ -54,3 +54,20 @@ test('native foreground work does not start an extra WASM engine; spreadsheet wa
   timers.get(1)()
   assert.equal(vm.libreSpares.length, 1)
 })
+
+test('the spare boot waits while the user is typing in an open document, then starts once they pause (office-tier1 O8b)', () => {
+  const { vm, timers } = harness()
+  let booted = 0
+  vm.initLibreSpare = () => { booted++ }
+  vm._libreRefs = { 'left:9': { _lastInteractionAt: Date.now() } }
+  vm.initLibreSpareWhenIdle(0)
+  assert.equal(booted, 0, 'recent input defers the spare')
+  assert.equal(timers.size, 1, 'and re-checks later')
+  vm._libreRefs['left:9']._lastInteractionAt = Date.now() - 60000
+  timers.get(1)()
+  assert.equal(booted, 1, 'idle long enough: the spare boots')
+  // never starves: after the retry budget it boots even if input keeps coming
+  vm._libreRefs['left:9']._lastInteractionAt = Date.now()
+  vm.initLibreSpareWhenIdle(30)
+  assert.equal(booted, 2)
+})
