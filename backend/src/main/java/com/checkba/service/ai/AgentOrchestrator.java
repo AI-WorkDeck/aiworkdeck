@@ -2910,6 +2910,15 @@ public class AgentOrchestrator {
                 return;
             }
 
+            // 原生调用一个不存在的 `final` 工具当「我答完了」（O11：DeepSeek V4 Pro 在 PPT 任务里
+            // 反复发 final()，每次收到「未知工具」再发，直到轮数耗尽、改动也没做完）。
+            // 只有本轮全是 final 且注册表里确实没有这个工具时才按收尾处理，正文照常保留。
+            boolean pseudoFinal = isPseudoFinalCall(aiMessage) && toolRegistry.resolve("final").isEmpty();
+            if (pseudoFinal) {
+                log.info("Native pseudo-tool 'final' treated as end of turn for {}", conversationId);
+                aiMessage = dev.langchain4j.data.message.AiMessage.from(aiMessage.text() == null ? "" : aiMessage.text());
+            }
+
             // 本轮真正成功完成（有内容或有工具调用）：清零瞬时错误重试预算与溢出压缩预算
             //（额度按轮计，不跨轮累积；溢出预算跨轮清零对标 dsh——长任务里
             // 「涨到溢出→压缩→继续跑→再涨到溢出」是合法路径）
@@ -2949,7 +2958,8 @@ public class AgentOrchestrator {
                 return;
             }
 
-            messages.add(aiMessage);
+            // 空正文的 final 收尾不入栈：空 assistant 轮次发回服务商会 400（同空响应处理）
+            if (!(pseudoFinal && aiMessage.text().isBlank())) messages.add(aiMessage);
 
             // 注意：本轮生成内容已由 onToken 回调逐 token 累加进本轮 RunGuard 的流式缓冲，
             // 此处不可再 append aiMessage.text()，否则取消/断线恢复的快照内容会翻倍。
@@ -4763,6 +4773,13 @@ public class AgentOrchestrator {
         if (aiMessage == null) return true;
         return !aiMessage.hasToolExecutionRequests()
                 && (aiMessage.text() == null || aiMessage.text().isBlank());
+    }
+
+    /** 本轮原生工具调用是否全是名为 final 的伪工具（大小写不敏感）。 */
+    static boolean isPseudoFinalCall(dev.langchain4j.data.message.AiMessage aiMessage) {
+        return aiMessage != null && aiMessage.hasToolExecutionRequests()
+                && aiMessage.toolExecutionRequests().stream()
+                        .allMatch(r -> r.name() != null && "final".equalsIgnoreCase(r.name().trim()));
     }
 
     /**

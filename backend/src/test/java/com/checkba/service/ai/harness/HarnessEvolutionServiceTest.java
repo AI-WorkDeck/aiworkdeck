@@ -284,4 +284,41 @@ class HarnessEvolutionServiceTest {
         assertNotNull(record.promotedSkillId());
         assertTrue(skillRegistry.getSkill(record.promotedSkillId()).isPresent());
     }
+
+    private static HarnessDiagnosticService.HarnessAdaptation domainAdaptation(String action, String skillId, String prescription) {
+        return new HarnessDiagnosticService.HarnessAdaptation(
+                "ha-" + action, HarnessDiagnosticService.TIER_DOMAIN, action, "slide_move_page",
+                "Harness 自愈", "归因 [DOMAIN]", prescription, List.of(), skillId, System.currentTimeMillis());
+    }
+
+    /** O11 评测实测：一句带「」的 PPT 指令链式生出 15 个只会互相指路的 user-evo 技能。 */
+    @Test
+    void mountingAnEvolvedSkillDoesNotBreedAnotherSkill() {
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-evo-chain", 7L, 10L,
+                        "把「风险提示」那页挪到第2页，再把它的标题改成「主要风险」",
+                        null, List.of(),
+                        List.of(domainAdaptation(HarnessDiagnosticService.ACTION_MOUNT_DOMAIN_SKILL, "user-evo-daaf5a22",
+                                "[Harness Domain Mount] Activated domain skill \"风险提示 Workflow\" (user-evo-daaf5a22).")));
+
+        assertTrue(recordOpt.isEmpty(), "挂载自进化技能本身不是新经验");
+        verify(memoryDocumentService, never()).write(anyLong(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    void selfHealingGuardrailStaysAMemoryRecordAndIsNeverAutoPromoted() {
+        Optional<HarnessEvolutionService.HarnessEvolutionRecord> recordOpt =
+                evolutionService.evaluateTurnEvolution(
+                        "conv-evo-guardrail", 7L, 10L,
+                        "以后所有项目都把「风险提示」那页挪到第2页",
+                        null, List.of(),
+                        List.of(domainAdaptation(HarnessDiagnosticService.ACTION_CLARIFY_WITH_USER, null,
+                                "[Harness Domain Guardrail] Stop blind retries and never fabricate unsupported facts.")));
+
+        assertTrue(recordOpt.isPresent(), "自愈记录照常留在记忆里供查阅");
+        HarnessEvolutionService.HarnessEvolutionRecord record = recordOpt.get();
+        assertTrue(record.promotedSkillId() == null, "Harness 固定处方不能自动注册成按触发词激活的技能");
+        assertTrue(skillRegistry.getSkills().stream().noneMatch(s -> s.getId().startsWith("user-evo-")));
+    }
 }
