@@ -259,6 +259,9 @@ public class LawFirmWorkflowService {
             entities.clear(); // Reload workflow and clearance state after waiting for the common user locks.
         }
         var w=(lock?workflows.lockById(id):workflows.findById(id)).orElseThrow(LawFirmAuthority::denied);
+        // Locking read first: these managed rows are what every later clearance query in this transaction resolves to.
+        // A plain re-read here could be answered from the result H2 remembered before the wait for the locks above.
+        if(lock) clearances.lockByWorkflowId(id);
         if(!w.getFirmId().equals(me.firmId()) || !visible(w,me)) throw LawFirmAuthority.denied();
         return w;
     }
