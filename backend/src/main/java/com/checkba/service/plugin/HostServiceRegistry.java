@@ -291,6 +291,7 @@ public class HostServiceRegistry {
     }
 
     // ---- lawfirm（只读；与 PluginLawFirmController 同一入口 LawFirmManagementService.execute。
+    //      读的是本机台账：非 local-mode（团队服务器）一律 requireLocalLedger 拒绝。
     //      全所数据（收费台账、全所看板）要 canViewFirmWide：系统管理员 / 律所管理员 / 桌面单机；conflictCheck 与 UI 收案表单同口径，登录即可）----
 
     private static final int LAWFIRM_ROW_LIMIT = 30;
@@ -312,6 +313,7 @@ public class HostServiceRegistry {
         Map<String, Object> a = call.args();
         LawFirmManagementService service = lawfirm.getIfAvailable();
         if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireLocalLedger();
         if (!service.canViewFirmWide(call.userId())) {
             // 没有全所查看资格：只给「有读权限的某项目」的事项级数据，绝不给全所看板/收费
             if (projectId == null) service.requireFirmWide(call.userId());
@@ -331,6 +333,9 @@ public class HostServiceRegistry {
     }
 
     private Object lawfirmConflictCheck(Call call) {
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireLocalLedger();
         Map<String, Object> a = call.args();
         Map<String, Object> params = new LinkedHashMap<>();
         for (String key : List.of("title", "practiceArea", "clientName", "clientCreditCode", "clientRole", "counterpartyName",
@@ -348,6 +353,7 @@ public class HostServiceRegistry {
         // 收费台账是全所数据：即便传了 projectId，也只有全所查看资格者可读
         LawFirmManagementService service = lawfirm.getIfAvailable();
         if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireLocalLedger();
         service.requireFirmWide(call.userId());
         Long projectId = optionalReadableProject(call);
         Map<String, Object> a = call.args();
