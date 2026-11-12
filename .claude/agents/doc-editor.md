@@ -7,6 +7,21 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## PPT/Excel 一流化（office-tier1，2026-11-12）
+
+2026-11-12 在真实 LOWA 引擎实测。
+- Impress 标题占位符：`slideReplaceTextRange` 写后不回读就导出，会按旧长度截断（「案件概况」→「案件基本情况」落盘成「案件基本」）；写后 `text.getString()` 回读修复。
+- Impress 部分 UNO 写入（slide_write_notes、slide_format_text 等）不置 modified、不发修改事件 → 宿主不自动保存、关掉即丢。`execCommand` 末尾 `markSlideWriteModified` 对成功的 slide_* 写命令统一标脏（读类按 `SLIDE_READ_ACTION_RE` 排除）。
+- 文字颜色与主题色：pptx/docx 文字常带主题色，只写 CharColor 导出仍是 schemeClr。统一走 `setCharColor`（同时 CharColorTheme=-1）。Calc 单元格区域没有 CharColorTheme，CharComplexColor 断不开；`setCalcFontColor` 走 `.uno:Color` 派发（实测导出 rgb），失败退回属性写入。
+- `sheet_write_cells` 字符串类型判定 `sheetTypedInput`：>15 位数字串（身份证/银行卡）保文本；千分位、¥金额、百分比、ISO/年月日日期写数值，「常规」格式时配格式；3/4、TRUE、12:30、001 不猜。回执新增 `cellsAfterWrite`（首行、末行、公式格的地址=值）。
+- `slide_move_page`：.uno:MovePage* 是界面派发，两种静默失效——刚插页/刚打开时（让出事件循环重试最多约 1.5s 可恢复）；宿主把菜单栏、状态栏、工具栏三样同时藏掉后一律失效（任两样都正常），`slideMoveRetry` 先把状态栏显示再藏回一次即恢复，此后一直正常。真机矩阵 p07 由 0/4 → 4/4。
+- `sheet_read_range`：日期/时间格式的数值回显示文本（`sheetDateText`，按格式键缓存），不再给序列号。`sheet_write_cells` 回执另有 `overwrote`（被替换的原非空值，最多 20 格），模型写错格能看出并写回。
+- Word 导出慢：`repairMoveRangeBookmarks` 每次导出逐条取 redline（本引擎每条 2–7ms），4107 条修订的定稿每次自动保存白耗 10s。改为按「模型 + redline 条数 + 纪元」缓存「无移动」结论：条数只增 0/1 且纪元（接受/拒绝/撤销/重做/重载时递增，见 `noteRedlinesMayHaveBeenRemoved`）未变则跳过。实测同稿保存 11.7s → 首次全扫后约 1s。已知取舍：新插入与既有同文删除配成移动只 +1 条时会漏补一次书签（Word 里显示为删除+插入），正文不丢。
+- 结构改动回执带新现状：slide_add_page/delete/move 返回 `slides`（页码+标题），add_page 另返回新页 `shapes`；sheet_edit_rows_cols 返回 `usedRange` 与 `headerRow`。
+- 冷启动只读预览扩到 PPT（pptx-preview，≤15MB，`PPTX_PREVIEW_MAX_BYTES`），表格仍无预览。
+- 性能实测（引擎内计时，带 CJK 字体，备胎预热后；`frontend/tests/lowa-e2e/open-format-timing.mjs` / `open-format-postload.mjs`，`OPEN_TIMING_FILES` 可传本机文件）：装载 xlsx 5000 行 1.1s、pptx 5MB 1.8s / 14MB 3.9s、docx 3.3MB 2.1s；导出 xlsx 0.26s、pptx 5MB 1.0s / 14MB 2.7s、docx 3.3MB（含 2.6MB PNG）11.5s（Word 导出偏慢，待查）。
+- 地雷：e2e 页面的 CJK 字体从页面同目录取，`dist/zetaoffice` 里没有 cjk* 时中文全走回退，xlsx 装载虚高到 16s；计时必须在页面内做，导出字节经 CDP 回传 node 要多花数秒。图片是 pptx 装载/导出的主要成本（同稿去图后导出 0.2s）；JPEG 原样写回、不重编码。
+
 ## PPT 局部格式与视觉复核（2026-10-28，dev-board#1570/#1571/#1572）
 
 `office_thread.js` 的 PPT 替换按具体页/形状和可选完整原文校验后，用文字范围游标局部写入，保留其余混合字形；插页按 LO 24.2 前驱页索引语义定位，并在后续填充失败时报告已创建页，不能让上层盲目重试。段落读取增加 runs 与背景/几何信息；段距、行距、首行/左缩进写入共用 Impress 专属处理。非零右缩进当前导出 PPTX 不保留，因此在任何其他格式写入前拒绝；不以运行时成功回包代替保存重开验证。

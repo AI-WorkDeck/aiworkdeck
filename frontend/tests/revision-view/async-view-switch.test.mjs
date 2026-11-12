@@ -13,7 +13,7 @@ function harness(initial = 'all') {
     xModel: {}, docSeq: 1, INFLIGHT: {}, CANCELLED: {}, AI_AUTHOR: 'AI WorkDeck', humanAuthor: 'Editor',
     setRedlineAuthor: value => { author = value }, log() {}, errStr: String,
     post: (kind, data) => { if (kind === 'result') results.push(data) },
-    isWriterDoc: () => true, isImpressDoc: () => false, revisionViewState: () => ({ mode }), hasAnyRedline: () => true,
+    isWriterDoc: () => true, isImpressDoc: () => false, revisionViewState: () => ({ mode }), hasAnyRedline: () => true, noteRedlinesMayHaveBeenRemoved() {},
     withViewOnlyChange: fn => fn(), applyRevisionView(next) { switches.push(next); mode = next; return { mode } },
     ctrl: { getViewCursor: () => ({}) }, paragraphTextOf: () => '',
     REVISION_VIEWS: ['all', 'balloons', 'margin', 'final'], supportsReviewGeometry: () => true,

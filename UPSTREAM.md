@@ -82,6 +82,11 @@ Full 51-patch audit and Tier A / Tier B classification are documented in [`deskt
 2. **Build & Image Slimming (`apply-source-patches.py`, `fs-image-patch.py`)**:
    - Adapted from ElyOffice `scripts/build-libreoffice.sh` (`Step 2b` and `Step 5b`): strips unused non-`zh`/`en` Hunspell dictionaries (`dict-*`) from `RepositoryModule_host.mk` / `CustomTarget_emscripten_fs_image.mk` / `soffice.data` and strips broken `Lightproof.py` grammar checker files while preserving `dict-en` and `zh-CN` UI localization resources.
 
+### Upstream check 2026-11-12
+
+- Latest upstream is v0.1.9 (`5843fb4`, Gitea). The only engine-side delta from our base: 0049 (revised: adds the missing `#include <doc.hxx>`), 0052 (Impress master-view part info; not relevant to us) and 0053 (Calc AutoFilter takes the first row as header under LOK without a dialog; a crash fix and a candidate for the next engine rebuild). The build script is unchanged, and nothing touches load/save performance.
+- ElyOffice relicensed its own code to MIT on 2026-10-19 (commit `271468d`); the LibreOffice patches remain MPL-2.0.
+
 ---
 
 ## 3. LitViz (`@ checks/litviz`)

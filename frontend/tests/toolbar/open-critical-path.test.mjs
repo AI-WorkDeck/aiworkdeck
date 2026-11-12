@@ -15,6 +15,7 @@ function component(name, overrides = {}) {
   })
   const body = script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
     .replace("import('docx-preview')", 'previewModule()')
+    .replace("import('pptx-preview')", "previewModule('pptx')")
     .replace('export default', 'return')
   return new Function(...names, 'previewModule', body)(...names.map(n => overrides[n] || (() => {})), overrides.previewModule)
 }
@@ -84,6 +85,19 @@ function previewVm({ endpointUp = false, module } = {}) {
   }
   return { vm, events, options }
 }
+
+test('cold engine boot also gives PPTX a readable preview, but not for oversized decks', async () => {
+  const { vm, events } = previewVm({ module: { promise: { init: () => ({ preview: async () => { events.push('render-pptx') } }) } } })
+  vm.file = { id: 7, fileType: 'pptx' }
+  await vm.tryDocxPreview(new ArrayBuffer(16))
+  assert.deepEqual(events, ['import', 'render-pptx'])
+  assert.equal(vm.previewReady, true)
+  const big = previewVm()
+  big.vm.file = { id: 7, fileType: 'pptx' }
+  await big.vm.tryDocxPreview(new ArrayBuffer(16 * 1024 * 1024))
+  assert.deepEqual(big.events, [])
+  assert.equal(big.vm.previewReady, false)
+})
 
 test('a warm engine opens DOCX without importing or rendering a duplicate preview', async () => {
   const { vm, events } = previewVm({ endpointUp: true })

@@ -27,6 +27,7 @@ function harness(kind = 'writer') {
     installKeyHandler() {}, installModifyListener() {}, installSelectionListener() {}, dropAiAnchors() {}, resetRevisionView() {},
     mkProp: (Name, Value) => ({ Name, Value }), CANCELLED: {}, INFLIGHT: {},
     RESOLVE_REVISION_ACTIONS: new Set(), FINAL_TEXT_ACTIONS: new Set(), setRedlineAuthor() {}, AI_AUTHOR: 'QA',
+    noteRedlinesMayHaveBeenRemoved() {}, isImpressDoc: () => kind === 'impress',
   }
   vm.createContext(state)
   vm.runInContext(boot + '\nconst EXEC = {' + load + ' get_ui_state(){return {success:true}}, set_app_theme(){return {success:true}}, set_host_context_menu(){return {success:true}}, set_style_profile(){return {success:true}}};\n' + exec, state)

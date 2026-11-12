@@ -12,7 +12,7 @@ test('every returned formula cell includes its expression, including cells after
   }
   const realm = vm.createContext({
     resolveSheet: () => ({ sheet: { getName: () => 'Budget' } }),
-    normalizeFormula: s => s, sheetRange: () => range, sheetRangeName: () => 'A1:A150', readCellOut: () => 42,
+    normalizeFormula: s => s, sheetRange: () => range, sheetRangeName: () => 'A1:A150', readCellOut: () => 42, sheetDateText: () => null,
     enumEq: (a, b) => a === b, css: { table: { CellContentType: { FORMULA: 3 } } },
     colLetterOf: () => 'A'
   })
