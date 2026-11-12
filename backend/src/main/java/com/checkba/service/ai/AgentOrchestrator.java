@@ -1283,13 +1283,17 @@ public class AgentOrchestrator {
                 || guard.protocolNudged || !guard.toolsRun.isEmpty()) {
             return null;
         }
-        // 只看正文叙述：代码块（在讲解写法）、tool_code/process 块（截断与文字调用另有纠正路径）、
-        // 标签本身（<artifact type="task_list"> 的属性值）都不算「声称」
-        String prose = CLAIM_NOISE.matcher(content).replaceAll(" ");
-        java.util.Set<String> named = new java.util.LinkedHashSet<>();
-        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(prose);
-        while (m.find()) if (isTool.test(m.group())) named.add(m.group());
-        if (named.isEmpty()) return null;
+        java.util.Set<String> named = claimedToolNames(content, isTool);
+        if (named.isEmpty()) {
+            // office-tier1：不点名工具、只说「已为第1页添加备注」「已冻结第 1 行」的口头完成（百炼 qwen 实录）
+            if (!claimsUnexecutedEdit(guard, content)) return null;
+            guard.claimNudged = true;
+            return LangText.of(
+                    "[系统提醒] 你的回答说已经改好了，但本轮没有执行任何工具，文档实际上没有变化。"
+                            + "现在通过函数调用真正执行用户要的修改；完成后再简短回答，不要先写「已完成」。",
+                    "[System reminder] Your answer says the change is done, but no tool ran in this turn, so the document did not change. "
+                            + "Make the requested change now through function calling, then answer briefly; do not claim it is done before it runs.");
+        }
         guard.claimNudged = true;
         String list = String.join(", ", named);
         return LangText.of(
@@ -1297,6 +1301,48 @@ public class AgentOrchestrator {
                         + "现在通过函数调用真正执行它；完成后再简短回答，不要先写「已完成」。",
                 "[System reminder] Your answer mentions " + list + ", but no tool ran in this turn, so the requested action did not happen. "
                         + "Call it now through function calling, then answer briefly; do not claim it is done before it runs.");
+    }
+
+    // 只看正文叙述：代码块（在讲解写法）、tool_code/process 块（截断与文字调用另有纠正路径）、
+    // 标签本身（<artifact type="task_list"> 的属性值）都不算「声称」
+    private static java.util.Set<String> claimedToolNames(String content, java.util.function.Predicate<String> isTool) {
+        String prose = CLAIM_NOISE.matcher(content).replaceAll(" ");
+        java.util.Set<String> named = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(prose);
+        while (m.find()) if (isTool.test(m.group())) named.add(m.group());
+        return named;
+    }
+
+    /** 「已（经）…添加/修改/冻结…」类完成句，及英文 "I've added / has been updated"。 */
+    private static final java.util.regex.Pattern EDIT_CLAIM = java.util.regex.Pattern.compile(
+            "(?:已|已经)[^。！？\\n]{0,24}?(?:添加|加上|加了|修改|改为|改成|删除|删掉|冻结|插入|设置|设为|调整|替换|写入|填入|排序|合并|移动|移到|挪到|新建|创建|加粗|标红|标黄|拆分|缩小|放大)"
+                    + "|\\b(?:I(?:'ve| have)|has been|have been)\\b[^.!?\\n]{0,40}?\\b(?:added|inserted|deleted|removed|froze|frozen|updated|changed|replaced|moved|set|formatted|merged|sorted|created|renamed|resized)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+    /** 用户这句话本身是不是在要求改文档（「之前加过吗？」这类回顾提问不算）。 */
+    private static final java.util.regex.Pattern EDIT_REQUEST = java.util.regex.Pattern.compile(
+            "加|改|删|冻结|插入|设置|设成|设为|调|替换|写|填|排序|合并|移|挪|建|标红|标黄|加粗|拆|缩小|放大|修好|修一下"
+                    + "|\\b(?:add|insert|delete|remove|freeze|update|change|replace|move|set|format|merge|sort|create|rename|resize|fix)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 零工具轮次里，回答用完成句宣称改了文档：仅在开着文档、用户本句确实在要求修改时成立
+     * （「之前加过吗？」「已经添加了吗」这类回顾提问的用户句不含修改请求时不触发）。
+     */
+    static boolean claimsUnexecutedEdit(RunGuard guard, String content) {
+        if (guard == null || content == null || guard.activeDocKind == null || !guard.toolsRun.isEmpty()) return false;
+        if (guard.userMessage == null || !EDIT_REQUEST.matcher(guard.userMessage).find()) return false;
+        return EDIT_CLAIM.matcher(CLAIM_NOISE.matcher(content).replaceAll(" ")).find();
+    }
+
+    /**
+     * 纠正一轮后模型仍零工具、仍宣称完成：不再追问（不打转），但必须如实告诉用户没改成——
+     * 返回追加在回答末尾的一句说明；其余 null。
+     */
+    static String falseClaimNotice(RunGuard guard, String content, java.util.function.Predicate<String> isTool) {
+        if (guard == null || content == null || !guard.claimNudged || !guard.toolsRun.isEmpty()) return null;
+        if (claimedToolNames(content, isTool).isEmpty() && !claimsUnexecutedEdit(guard, content)) return null;
+        return LangText.of("\n\n（系统说明：本轮实际上没有执行任何修改，文档未变化。请再说一次要改的内容，或换个说法让我重试。）",
+                "\n\n(System note: no change was actually made in this turn; the document is unchanged. Please repeat the request or rephrase it so I can retry.)");
     }
 
     /** 用户消息是否含明确的「记住」请求（中文子串匹配，英文按词边界）。 */
@@ -3547,6 +3593,16 @@ public class AgentOrchestrator {
                 continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                         depth + 1, executionLog, agentMode, guard);
                 return;
+            }
+
+            // 3.7 纠正后仍是口头完成（office-tier1）：如实补一句「没改成」，不再追问
+            if (!summaryOnly) {
+                String notice = falseClaimNotice(guard, content, toolRegistry::hasTool);
+                if (notice != null) {
+                    log.warn("Answer still claims an edit after the corrective round in {}, appending an honest notice", conversationId);
+                    sendTextDelta(guard, notice);
+                    content = content + notice;
+                }
             }
 
             // 4. Default: Loop Finished

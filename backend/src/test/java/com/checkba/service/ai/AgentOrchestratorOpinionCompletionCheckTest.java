@@ -486,7 +486,8 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                 AiMessage.from("已按指示完成替换。"));
 
         verify(subAgentService, never()).dispatch(any(), any(), any(), any());
-        assertEquals(1, model.calls.get());
+        // 脚本回复是零工具的「已完成替换」——口头完成纠正（office-tier1 O5）会补一轮；与本用例要证的「不付费补检」无关
+        assertEquals(2, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-narrow").status());
     }
 

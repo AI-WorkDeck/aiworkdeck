@@ -2519,18 +2519,25 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "插入删除行列", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·结构】插入或删除整行/整列。op: insert_rows/delete_rows/insert_cols/delete_cols；" +
           "start 是 1 开始的行号（如 '3'）或列标（如 'B'）；count 默认 1。插入的新行/列占据 start 的位置（原内容后移）。" +
-          "「在 C 列后面加一列」= insert_cols start='D'；「在第 5 行下面加一行」= insert_rows start='6'。插入后再用 sheet_write_cells 往新列/行填表头和内容——不要用写入覆盖相邻列来「挪」数据。")
+          "按用户说法传 position：「在案由（C 列）后面加一列」= insert_cols start='C' position='after'；「在第 5 行下面加一行」= insert_rows start='5' position='after'；不传 position 就是插在 start 前面。" +
+          "回执里的 usedRange / headerRow 是插入后的新地址。插入后再用 sheet_write_cells 往新列/行填表头和内容——不要用写入覆盖相邻列来「挪」数据。")
     public String sheet_edit_rows_cols(
             @P("操作：insert_rows/delete_rows/insert_cols/delete_cols") String op,
             @P("起始位置：行号（1 开始，如 '3'）或列标（如 'B'）") String start,
             @P(value = "行/列数，默认 1", required = false) Integer count,
-            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet,
+            @P(value = "插入位置：before（默认，插在 start 前面）/ after（插在 start 后面）；删除时不用传", required = false) String position
     ) {
-        log.info("Tool: sheet_edit_rows_cols called op={}, start={}, count={}", op, start, count);
+        log.info("Tool: sheet_edit_rows_cols called op={}, start={}, count={}, position={}", op, start, count, position);
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("op", op != null ? op : "");
-            params.put("start", start != null ? start : "");
+            String at = start != null ? start.trim() : "";
+            if ("after".equalsIgnoreCase(position) && op != null && op.toLowerCase().startsWith("insert") && !at.isEmpty()) {
+                at = nextRowOrColumn(at);
+                if (at == null) return "Error: start 无效：" + start + "（行号如 '3'，列标如 'B'）";
+            }
+            params.put("start", at);
             if (count != null) params.put("count", count);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
             return executeSheetCommand("sheet_edit_rows_cols", params);
@@ -2538,6 +2545,19 @@ public class DocumentEditTools implements AgentToolComponent {
             log.error("Failed to edit rows/cols", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    /** '5' → '6'，'C' → 'D'，'Z' → 'AA'；无效返回 null。 */
+    static String nextRowOrColumn(String start) {
+        String t = start.trim().toUpperCase(java.util.Locale.ROOT);
+        if (t.matches("[1-9]\\d*")) return String.valueOf(Long.parseLong(t) + 1);
+        if (!t.matches("[A-Z]{1,3}")) return null;
+        int n = 0;
+        for (char ch : t.toCharArray()) n = n * 26 + (ch - 'A' + 1);
+        n++;
+        StringBuilder sb = new StringBuilder();
+        for (; n > 0; n = (n - 1) / 26) sb.insert(0, (char) ('A' + (n - 1) % 26));
+        return sb.toString();
     }
 
     @ToolMeta(displayName = "合并单元格", category = "document", fileEffect = "MODIFIED")
