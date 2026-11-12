@@ -36,6 +36,14 @@ test('personal settings expose the same desktop preference', () => {
   assert.match(panel, /account\.exitAutoScanLabel/)
 })
 
+test('desktop preference uses the transform-aware storage in production builds', () => {
+  const source = readFileSync(new URL('../../src/utils/projectExitPreferences.js', import.meta.url), 'utf8')
+  assert.match(source, /import \{ uniStorage \} from '\.\/uniStorage\.js'/)
+  assert.doesNotMatch(source, /globalThis\.uni/)
+  assert.match(source, /shouldScanProjectsOnExit\(storage = uniStorage\)/)
+  assert.match(source, /setScanProjectsOnExit\(enabled, storage = uniStorage\)/)
+})
+
 test('desktop user can turn off project scanning from the rendered personal settings', async () => {
   const { JSDOM } = await import('jsdom')
   const dom = new JSDOM('<body></body>')
