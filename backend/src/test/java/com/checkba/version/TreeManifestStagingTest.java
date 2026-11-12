@@ -57,6 +57,11 @@ class TreeManifestStagingTest {
                 folder ? null : "projects/7/" + name, deleted, 1L, null, null, null, null);
     }
 
+    /** 新建行的 id 由库生成（与真实 IDENTITY 一致），不沿用清单 id，按名字找。 */
+    private ProjectFile byName(String name) {
+        return db.values().stream().filter(p -> name.equals(p.getName())).findFirst().orElseThrow();
+    }
+
     private long liveRootStagingCount() {
         return db.values().stream().filter(p -> p.getParentId() == null && Boolean.TRUE.equals(p.getIsFolder())
                 && STAGING.equals(p.getName()) && !Boolean.TRUE.equals(p.getIsDeleted())).count();
@@ -119,7 +124,7 @@ class TreeManifestStagingTest {
                 n(9L, 2L, "证据.pdf", false, false))));
 
         assertEquals(1, liveRootStagingCount(), "只能有一个活着的根级缓存区");
-        assertEquals(5L, db.get(9L).getParentId(), "旧缓存区名下的文件挂到活着的缓存区下");
+        assertEquals(5L, byName("证据.pdf").getParentId(), "旧缓存区名下的文件挂到活着的缓存区下");
         assertFalse(db.get(5L).getIsDeleted());
     }
 }
