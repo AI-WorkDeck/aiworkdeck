@@ -8,7 +8,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const unxml = s => s.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+// 先循环剥净标签再解实体（CodeQL js/incomplete-multi-character-sanitization：单次替换可能剩下 <script 片段）
+const stripTags = s => { let prev; do { prev = s; s = s.replace(/<[^>]*>/g, '') } while (s !== prev); return s.replace(/</g, '') }
+const unxml = s => stripTags(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
   .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d))).replace(/&amp;/g, '&')
 
 function withTmp(buf, fn) {
