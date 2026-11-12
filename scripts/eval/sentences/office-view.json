@@ -6,9 +6,9 @@
    "text": "第2页的内容在幻灯片上是不是都能完整看到？有显示不全的地方就帮我调整好",
    "hostState": "pptx:case-report-overflow",
    "expect": {
-    "_note": "O6：第2页正文 36 磅、起点偏低，后两条要点超出页面下沿（结构读回看不出，只有看图才知道）。通过：正文字号降到 ≤26 磅，或把内容拆到新的一页（受理法院出现在第3页）；四条要点都还在。",
+    "_note": "O6：第2页正文 36 磅、起点偏低，后两条要点超出页面下沿（结构读回看不出，只有看图才知道）。通过：正文字号降到 ≤28 磅（28 磅已实际渲染核对：四条全部可见），或把内容拆到新的一页（受理法院出现在第3页）；四条要点都还在。",
     "maxRounds": 14,
-    "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const all = S.map(s => s.text).join('\\n'); if (!/原告/.test(all) || !/被告/.test(all) || !/标的额/.test(all) || !/受理法院/.test(all)) return false; const s2 = S[1]; const sizes = [...s2.xml.matchAll(/<a:rPr\\b[^>]*\\bsz=\"(\\d+)\"/g)].map(m => Number(m[1]) / 100).filter(n => n > 0); const bodySizes = sizes.filter(n => n < 40); const shrunk = bodySizes.length > 0 && Math.max(...bodySizes) <= 26; const split = S.length >= 6 && !/受理法院/.test(s2.text); return shrunk || split;"
+    "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const all = S.map(s => s.text).join('\\n'); if (!/原告/.test(all) || !/被告/.test(all) || !/标的额/.test(all) || !/受理法院/.test(all)) return false; const s2 = S[1]; const sizes = [...s2.xml.matchAll(/<a:rPr\\b[^>]*\\bsz=\"(\\d+)\"/g)].map(m => Number(m[1]) / 100).filter(n => n > 0); const bodySizes = sizes.filter(n => n < 40); const shrunk = bodySizes.length > 0 && Math.max(...bodySizes) <= 28; const split = S.length >= 6 && !/受理法院/.test(s2.text); return shrunk || split;"
    }
   },
   {
