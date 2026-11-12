@@ -686,10 +686,16 @@ function analyzeTrace(file, windows) {
 // The typed marker as it lands in the saved package (text runs may be split by
 // markup, so compare against the XML with tags removed).
 const TYPED = 'quickbrownolbtypingx'
+function stripTags(xml) {
+  // Loop until stable so nested fragments such as `<<b>script>` cannot survive one pass (CodeQL).
+  let prev
+  do { prev = xml; xml = xml.replace(/<[^>]*>/g, '') } while (xml !== prev)
+  return xml
+}
 async function packageText(file) {
   const zip = await JSZip.loadAsync(fs.readFileSync(file))
   let out = ''
-  for (const n of Object.keys(zip.files).filter(n => n.endsWith('.xml'))) out += (await zip.file(n).async('string')).replace(/<[^>]+>/g, '')
+  for (const n of Object.keys(zip.files).filter(n => n.endsWith('.xml'))) out += stripTags(await zip.file(n).async('string'))
   return out
 }
 async function measureDocument(name, filePath, mode, { trace = false, reopen = false } = {}) {
