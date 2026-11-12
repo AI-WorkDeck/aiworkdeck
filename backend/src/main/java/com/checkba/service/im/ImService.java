@@ -7,7 +7,10 @@ import com.checkba.model.entity.*;
 import com.checkba.repository.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,6 +29,8 @@ public class ImService {
     public static final Set<String> ACTIONS = Set.of("self", "list", "create", "invite", "join",
             "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess",
             "agentScopes", "ensureAgent", "agentInfo", "agentReply", "projectGroup");
+    /** Polled every few seconds by every open panel: these never take the conversation row lock. */
+    static final Set<String> READ_ONLY_ACTIONS = Set.of("self", "list", "members", "agentInfo", "messages", "download");
     private final ImConversationRepository conversations;
     private final ImMemberRepository members;
     private final ImInvitationRepository invitations;
@@ -39,9 +44,30 @@ public class ImService {
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.service.ProjectMemberService projectPermissions;
 
-    /** The conversation row lock serializes membership, invitations, sends and quota accounting. */
-    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    private TransactionTemplate writes, reads;
+    @org.springframework.beans.factory.annotation.Autowired
+    void transactions(PlatformTransactionManager manager) {
+        writes = new TransactionTemplate(manager);
+        writes.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        reads = new TransactionTemplate(manager);
+        reads.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        reads.setReadOnly(true);
+    }
+
+    /**
+     * The conversation row lock serializes membership, invitations, sends and quota accounting. Sends must stay
+     * serialized: message ids then become visible in id order, so an {@code afterId} poll never skips a slower sender.
+     * Read-only actions take no lock and run in a read-only transaction: every open panel polls them, and queueing
+     * them on the row made members of one group wait for each other. What the lock gave a read is kept by checking
+     * membership again after the rows are read (see below). A read nested in a caller's own transaction keeps the
+     * lock: such callers (project import/export) decide writes from what they read.
+     */
     public Object execute(Long userId, String action, Map<String, Object> params) {
+        boolean unlocked = READ_ONLY_ACTIONS.contains(action) && !TransactionSynchronizationManager.isActualTransactionActive();
+        return (unlocked ? reads : writes).execute(status -> execute(userId, action, params, unlocked));
+    }
+
+    private Object execute(Long userId, String action, Map<String, Object> params, boolean unlocked) {
         if (userId == null || !users.existsById(userId)) throw bad("请先登录");
         Map<String,Object> p = params == null ? Map.of() : params;
         if (!ACTIONS.contains(action)) throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
@@ -71,10 +97,13 @@ public class ImService {
         if ("create".equals(action)) return create(userId, p);
         if ("projectGroup".equals(action)) return projectGroup(userId, p);
         if ("join".equals(action)) return join(userId, p);
-        ImConversation conversation = lock(required(p, "conversationId", 36));
+        String conversationId = required(p, "conversationId", 36);
+        // "read" only advances the caller's own cursor, atomically in SQL, so it does not queue behind the group either.
+        ImConversation conversation = unlocked || "read".equals(action)
+                ? conversations.findById(conversationId).orElseThrow(ImService::unknownConversation) : lock(conversationId);
         ImMember member = requireMember(conversation.getId(), userId);
         authorizeAgent(conversation, userId);
-        return switch (action) {
+        Object result = switch (action) {
             case "invite" -> invite(conversation, member, p);
             case "members" -> memberViews(conversation);
             case "agentInfo" -> view(conversation, member);
@@ -89,6 +118,10 @@ public class ImService {
             case "fileAccess" -> fileAccess(conversation, member, p);
             default -> throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
         };
+        // Without the lock a removal and a later send can both commit between the check above and the rows just read.
+        // Still a member now means nothing read was sent after a removal; otherwise the result is discarded.
+        if (unlocked) requireMember(conversation.getId(), userId);
+        return result;
     }
 
     private Object create(Long userId, Map<String,Object> p) {
@@ -235,8 +268,8 @@ public class ImService {
             ImMessage message = messages.findById(id).orElseThrow(() -> bad(com.checkba.service.LangText.of("消息不存在", "Message not found")));
             if (!c.getId().equals(message.getConversationId())) throw bad(com.checkba.service.LangText.of("无权访问该消息", "You do not have access to this message"));
         }
-        me.setLastReadId(Math.max(me.getLastReadId(), id)); members.save(me);
-        return Map.of("lastReadId", me.getLastReadId());
+        members.advanceLastRead(me.getId(), id);
+        return Map.of("lastReadId", Math.max(me.getLastReadId(), id));
     }
 
     private Object upload(ImConversation c, ImMember me, Map<String,Object> p) {
@@ -315,8 +348,9 @@ public class ImService {
         return Map.of("members", rows, "humanCount", humanCount);
     }
 
-    private ImConversation lock(String id) { return conversations.lockById(id).orElseThrow(() -> bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied"))); }
-    private ImMember requireMember(String id, Long userId) { return members.findByConversationIdAndUserId(id, userId).orElseThrow(() -> bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied"))); }
+    private static IllegalArgumentException unknownConversation() { return bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied")); }
+    private ImConversation lock(String id) { return conversations.lockById(id).orElseThrow(ImService::unknownConversation); }
+    private ImMember requireMember(String id, Long userId) { return members.findByConversationIdAndUserId(id, userId).orElseThrow(ImService::unknownConversation); }
     private void requireOwner(ImMember member) { if (!"OWNER".equals(member.getRole())) throw bad(com.checkba.service.LangText.of("只有会话负责人可以执行此操作", "Only the conversation owner can perform this action")); }
     private ImAttachment requireAttachment(String conversationId, String id) {
         ImAttachment file = attachments.findById(id).orElseThrow(() -> bad(com.checkba.service.LangText.of("文件不存在或无权访问", "File does not exist or access denied")));
