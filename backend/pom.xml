@@ -49,6 +49,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- 服务器 profile 的就绪探针与 Prometheus 指标（application-ops.yml）。
+             管理端口只绑 127.0.0.1；桌面/默认 profile 关闭（management.server.port=-1）。
+             版本跟 Boot BOM（actuator 3.2.4 / micrometer 1.12.4）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <!-- 仅密码哈希（BCrypt），不引入整套 security 过滤器链，避免改变现有接口鉴权行为 -->
         <dependency>
             <groupId>org.springframework.security</groupId>

@@ -9,6 +9,13 @@ server:
 spring:
   application:
     name: checkba-backend
+  # 三个服务器形态自动带上 ops（就绪探针 + 回环指标，见 application-ops.yml）。
+  # desktop / dev / 无 profile 不带：管理端口关闭、指标不采。
+  profiles:
+    group:
+      cloud: ops
+      case: ops
+      prod: ops
   task:
     scheduling:
       pool:
@@ -37,6 +44,23 @@ spring:
       max-request-size: ${storage.max-upload-size:20GB}
       # 超过这个大小的分块才落临时盘；1GB 意味着一个大分块整块压在堆里
       file-size-threshold: 8MB
+
+# Actuator 默认全关（桌面 / dev / 无 profile）：不开管理端口、不暴露任何端点、
+# 不采指标，桌面端只多几项自动装配判断。服务器形态由 application-ops.yml 打开。
+management:
+  server:
+    port: -1
+  endpoints:
+    enabled-by-default: false
+    web:
+      exposure:
+        include: ""
+  metrics:
+    enable:
+      all: false
+  observations:
+    enable:
+      all: false
 
 # 外部服务配置
 external:
