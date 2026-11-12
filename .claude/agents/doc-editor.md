@@ -138,6 +138,16 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 
 **打开编辑器的重复工作（dev-board#1474）**：`LibreOfficeEditor.tryDocxPreview` 的自动预览只在引擎尚未就绪时开始，避免热备胎过继时与 `load_document` 同时解包、布局同一 DOCX；动态加载预览模块后再次核验。冷启动预览与失败后的显式 `force` 只读预览仍保留；热备胎探活失败转冷启动时，复用已下载且曾跳过预览的字节补回预览，文件、装载世代、检查点或缓存已失效则不重放，尚在下载的原回调只执行一次。`EditorToolbar.bootstrap` 先隐藏原生外壳、应用视图偏好并回读真实状态，再拉样式/字体清单；清单尚未返回不阻止视图按钮启用。设置偏好失败仍回读一次状态，不用默认值冒充引擎真实状态。`tests/toolbar/open-critical-path.test.mjs` 覆盖三文种顺序、慢清单、视图失败、热/冷启动预览及模块加载中的就绪竞争；保存、失败诊断与保活预算不变。
 
+**表格冷启动预览（office-tier1 O10）**：`composables/xlsxQuickPreview.js` 直接从 xlsx 读「打开后的第一屏」
+（活动表、保存时的 topLeftCell、冻结窗格、前 60 行 × 26 列、值 + 粗体/填充/对齐/列宽/数字格式/合并），首次打开就有、不需缓存。
+流式解压读够就停（20 000 行 < 1.5 s，实测台账 3–17 ms）。**第一屏有图片/图表/按钮（drawing 锚点或 VML 非 Note 对象）一律返回 null**，
+保持进度卡片——宁可不显示也不显示错的画面（与 PPT 缓存渲染同一原则）。地雷：
+- 内置格式 14/22 按引擎的 zh-CN 区域显示 `2025-03-02`；
+- styles 里自闭合 `<xf/>` 与 `<xf>…</xf>` 混排，必须用同一个元素正则切（先找 `</xf>` 会吞掉前一个，样式序号整体错位）；
+- 流式循环里用过的 g 正则别再拿去 `matchAll`（沿用 lastIndex，中途停下的大表会全空）。
+
+测试 `tests/lowa-unit/xlsx-quick-preview.test.mjs`。
+
 **非空文件冷开的首个模型（dev-board#1474）**：`LibreOfficeEditor.mountEditor` 只在挂载时已知 `fileSize>0` 才向 guest 传 `initialDocument=1`，`editor-main`→`bootZetaOffice` 的 pthread bootstrap shim 转给 worker。worker 先建立 UNO desktop，首个模型直接由既有 `load_document` 装入，避免先建空白 Writer 再替换；spare、隐藏合并实例（file=null）、新空文件和大小未知的旧入口仍用空白 boot。relay ready 表示命令通道已接好，`ui_ready` 只在首个模型真正成功后发出，失败不得显示可编辑空白。模型出现前，模型命令回 `DOCUMENT_NOT_READY`；主题、右键配置和样式画像这三种引擎级配置仍可执行。缺 `bytes` 的 `load_document` 只更新署名，绝不能被异步作者解析抢先触发空白模型；显式空字节才允许必要的空白初始化。宿主空文件支路明确传空字节，无模型实例初始化失败继续落保存保护；已有空白实例的署名失败沿用容错。回归：`tests/lowa-unit/first-document-boot.test.mjs`、`tests/revision-view/boot-resize.test.mjs`、`tests/project-home/libre-redline-author.test.mjs`、`tests/toolbar/open-critical-path.test.mjs`。完整性能必须另测未预热实例的正文首帧、IME 和原文件保存，不能把跳过的 blank span 全当净收益（首次 native 公共初始化仍由真实文档承担）。
 
 **空工作台预热挂载（dev-board#1474）**：`.editors-grid` 必须常驻，空态用同级绝对定位覆盖层呈现。原 `v-else` 导致空标签时虽在 4 秒后创建 spare 条目，却没有组件/webview；首开 Word 才冷启，关闭最后一个欢迎标签还会销毁已热实例。常驻网格保留原父容器与 key，空态、过继及分屏切换都不搬 webview、不使用 `display:none`；4 秒调度、低内存预算和关闭保存链路不变。`tests/project-home/libre-spare-mount.test.mjs` 编译实际相关模板并用 Vue renderer 验证首开前挂载、过继实例恒等和欢迎/分屏切换不卸载。宿主 `ready` 只表示装载应答，完整性能验证还须单独观察实际纸张墨迹与编辑保存，不把 ready 截图点当首次可用首屏。

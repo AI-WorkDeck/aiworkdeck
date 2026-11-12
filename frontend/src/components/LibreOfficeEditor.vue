@@ -467,7 +467,8 @@ export default {
       return this.statusKey === STATUS_OPEN_FAILED
     },
     // 「打不开时的只读预览」按钮只对 Word 生效（docx-preview）；PPT 冷启动只显示缓存的引擎渲染页
-    // （见 tryDocxPreview / slidePreviewCache，没有缓存就不显示），表格只给下载出口。
+    // （见 tryDocxPreview / slidePreviewCache，没有缓存就不显示），表格冷启动只显示第一屏
+    // （xlsxQuickPreview），打不开时只给下载出口——前 60 行不能冒充整份文件。
     canReadOnlyPreview() {
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
       return t === 'docx' || t === 'doc'
@@ -1873,7 +1874,7 @@ export default {
       if (!force && this._endpointUp) { this._previewSkippedForWarmEngine = true; return }
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
-      if (t !== 'docx' && t !== 'doc' && t !== 'pptx') return
+      if (t !== 'docx' && t !== 'doc' && t !== 'pptx' && t !== 'xlsx') return
       // PPT：只显示「上次打开时引擎自己渲染、按文件字节命中」的前几页（slidePreviewCache）；
       // 没有缓存就保持进度卡片——前端解析 pptx 的画面在真实课件上错位裁切，不如不显示。
       let cached = null
@@ -1881,12 +1882,19 @@ export default {
         cached = await slidePreviewCache().load(await previewFingerprint(buf)).catch(() => null)
         if (!cached) return
       }
+      // 表格：直接从文件读打开后的第一屏（xlsxQuickPreview），首次打开就有；第一屏有图片/按钮等对象时不显示
+      let sheetScreen = null
+      if (t === 'xlsx') {
+        const { readXlsxFirstScreen } = await import('@/composables/xlsxQuickPreview.js')
+        sheetScreen = await readXlsxFirstScreen(buf).catch(() => null)
+        if (!sheetScreen) return
+      }
       const seq = this._docLoadSeq, fileId = this.file?.id
       const generation = documentCheckpointGeneration(this.projectId, fileId)
       const current = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
         && generation === documentCheckpointGeneration(this.projectId, fileId)
       try {
-        const renderer = t === 'pptx' ? null : await import('docx-preview')
+        const renderer = t === 'pptx' || t === 'xlsx' ? null : await import('docx-preview')
         await this.$nextTick() // 过继路径上 overlay 可能刚重新显示，等 ref 挂上
         const ref = this.$refs.docxPreviewHost
         const container = ref && (ref.$el || ref)
@@ -1894,6 +1902,9 @@ export default {
         container.innerHTML = ''
         if (t === 'pptx') {
           this.renderCachedSlides(container, cached)
+        } else if (t === 'xlsx') {
+          const { renderSheetPreview } = await import('@/composables/xlsxQuickPreview.js')
+          renderSheetPreview(container, sheetScreen)
         } else {
         await renderer.renderAsync(buf, container, null, {
           className: 'docx',
@@ -3106,4 +3117,20 @@ export default {
 .libre-preview-host :deep(.awd-slide-preview-card figcaption) { text-align: center; font-size: 11px; color: var(--awd-text-3);
   font-variant-numeric: tabular-nums; }
 .libre-preview-host :deep(.awd-slide-preview-more) { text-align: center; font-size: 12px; color: var(--awd-text-3); padding-bottom: 8px; }
+/* 表格冷启动预览：与 Calc 画布同一观感（白底网格、灰色行列头、底部工作表标签）。
+   单元格是文档内容，深浅主题下都保持白底黑字，与引擎画布一致。 */
+.libre-preview-host :deep(.awd-sheet-preview) { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+.libre-preview-host :deep(.awd-sheet-preview__grid) { flex: 1; overflow: hidden; }
+.libre-preview-host :deep(.awd-sheet-preview table) { border-collapse: collapse; table-layout: fixed; width: max-content;
+  font: 14.7px/1.25 -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; color: #000; }
+.libre-preview-host :deep(.awd-sheet-preview th) { background: #f3f3f3; color: #444; font-weight: 400; font-size: 12px;
+  border: 1px solid #c8c8c8; text-align: center; padding: 0 2px; height: 20px; }
+.libre-preview-host :deep(.awd-sheet-preview tr > th:first-child) { font-variant-numeric: tabular-nums; }
+.libre-preview-host :deep(.awd-sheet-preview td) { border: 1px solid #dadada; padding: 0 3px; white-space: nowrap; overflow: hidden;
+  text-overflow: clip; vertical-align: bottom; }
+.libre-preview-host :deep(.awd-sheet-preview__tabs) { flex: none; display: flex; gap: 2px; padding: 0 8px; height: 28px; align-items: flex-end;
+  background: #f3f3f3; border-top: 1px solid #c8c8c8; font-size: 12px; color: #444; overflow: hidden; }
+.libre-preview-host :deep(.awd-sheet-preview__tabs span) { padding: 4px 14px; white-space: nowrap; }
+.libre-preview-host :deep(.awd-sheet-preview__tabs .is-active) { background: #fff; color: #000; font-weight: 600;
+  border: 1px solid #c8c8c8; border-top: none; border-radius: 0 0 4px 4px; }
 </style>
