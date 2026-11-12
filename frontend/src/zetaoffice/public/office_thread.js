@@ -2800,8 +2800,9 @@ function postNativeKeys(keys) {
     keyRobot.keyRelease(ev);
   }
   scheduleNativeKeySelectionRefresh();
-  // Wake Qt's idle queue so Impress paints the posted input promptly.
-  if (isImpressDoc()) Module.resumeMainLoop();
+  // Wake Qt's idle queue so Impress and Calc paint the posted input promptly
+  // (office-tier1 O8: Calc bursts painted only after the last key, 0.9-1.8 s late).
+  if (isImpressDoc() || isCalcDoc()) Module.resumeMainLoop();
   return { success: true, native: true, keys: keys.length };
 }
 // 全屏标志在引擎处理完投递的 Esc 之后才翻（异步，时点不定），所以 1.5 秒内每

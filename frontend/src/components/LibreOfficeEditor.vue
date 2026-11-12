@@ -254,6 +254,10 @@ function authorNames() {
 function currentAuthorName() { return authorNames().current() }
 // 保存失败后的有界退避（B7）：第 n 次连续失败等 SAVE_RETRY_DELAYS_MS[n]，封顶 60 秒。
 const SAVE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000]
+// 自动保存所需的空闲时长：上次导出耗时的 2 倍，夹在 1.5–8 秒（office-tier1 O8）
+function autoSaveIdleMs(lastExportMs) {
+  return Math.max(1500, Math.min(8000, 2 * (Number(lastExportMs) || 0)))
+}
 // 脏数据存活超过该时长即不再为「命令繁忙 / 刚输入」让路，强制导出保存（崩溃丢失上限）。
 const FORCE_SAVE_DIRTY_AGE_MS = 10000
 // AI 命令在飞（修订风暴）时仍按旧的 60s 上限：每 10s 硬塞一次全文导出会把风暴中的
@@ -2422,7 +2426,11 @@ export default {
       // 大文档整篇导出本身就要十几秒（150 页基准 12–17s），期间输入冻住；上限至少取
       // 上次导出耗时的 4 倍，冻住的时间不超过编辑时间的约五分之一。
       const forceAfter = Math.max(this._cmdBusy > 0 ? FORCE_SAVE_DIRTY_AGE_BUSY_MS : FORCE_SAVE_DIRTY_AGE_MS, 4 * (this._lastExportMs || 0))
-      if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < forceAfter) {
+      // 空闲门随导出耗时伸缩（office-tier1 O8）：14MB 演示文稿一次导出冻住 2.5–4s，固定 1.5s 空闲门让
+      // 每次停笔都触发一次冻结（逐字慢打实测每键 ~3.4s 才上屏）。改为上次导出耗时的 2 倍、夹在 1.5–8s；
+      // 小文件不变。崩溃丢失上限仍由 forceAfter 兜底。
+      const idleNeeded = autoSaveIdleMs(this._lastExportMs)
+      if ((this._cmdBusy > 0 || sinceCmd < idleNeeded) && dirtyAge < forceAfter) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
         return

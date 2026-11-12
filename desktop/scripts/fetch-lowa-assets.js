@@ -126,7 +126,7 @@ const distRoot = path.join(__dirname, '../../frontend/dist/zetaoffice');
 //           the source actually sends (any ALLOWED_ENCODINGS) and record that.
 // magic: shape check applied to the DECOMPRESSED content.
 const ASSETS = [
-  { url: LOWA_BASE + 'soffice.js',               dest: 'lowa/soffice.js',               serve: 'lowa',   encoding: null, magic: 'js' },
+  { url: LOWA_BASE + 'soffice.js',               dest: 'lowa/soffice.js',               serve: 'lowa',   encoding: null, magic: 'js', transform: 'stripEmbindLeakWarning' },
   { url: LOWA_BASE + 'soffice.wasm',             dest: 'lowa/soffice.wasm',             serve: 'lowa',   encoding: 'br', magic: 'wasm' },
   { url: LOWA_BASE + 'soffice.data',             dest: 'lowa/soffice.data',             serve: 'lowa',   encoding: 'br', magic: 'blob' },
   { url: LOWA_BASE + 'soffice.data.js.metadata', dest: 'lowa/soffice.data.js.metadata', serve: 'lowa',   encoding: null, magic: 'json' },
@@ -288,6 +288,18 @@ function loadExistingEncodings() {
 }
 const existingEncodings = loadExistingEncodings();
 
+// Text transforms for JS glue (see lowa-js-patches.js). Applied to identity bytes
+// only; an encoded soffice.js (custom LOWA_BASE_URL) is decoded and stored identity.
+const { stripEmbindLeakWarning } = require('./lowa-js-patches');
+const TRANSFORMS = { stripEmbindLeakWarning };
+function applyTransform(a, bytes, enc) {
+  if (!a.transform) return { bytes, enc };
+  const text = decode(bytes, enc).toString('utf8');
+  const { text: out, changed } = TRANSFORMS[a.transform](text);
+  console.log('  ~ ' + a.dest + ': ' + a.transform + (changed ? ' applied' : ' not needed (anchor absent)'));
+  return { bytes: changed ? Buffer.from(out, 'utf8') : bytes, enc: changed ? null : enc };
+}
+
 // If an on-disk file already decodes + validates, return {enc} (the encoding it
 // was stored with, for re-recording); else null (re-download).
 function cachedOk(destPath, a) {
@@ -307,6 +319,14 @@ async function fetchAsset(a) {
   if (!usingCustomBase && fs.existsSync(destPath)) {
     const hit = cachedOk(destPath, a);
     if (hit) {
+      if (a.transform) {
+        const t = applyTransform(a, fs.readFileSync(destPath), hit.enc);
+        if (t.enc !== hit.enc || t.bytes.length !== fs.statSync(destPath).size) {
+          fs.writeFileSync(destPath + '.part', t.bytes);
+          fs.renameSync(destPath + '.part', destPath);
+          hit.enc = t.enc;
+        }
+      }
       const mb = (fs.statSync(destPath).size / 1048576).toFixed(1);
       console.log('  = ' + a.dest + ' (cached, ' + mb + ' MB on disk)');
       return { size: fs.statSync(destPath).size, enc: hit.enc };
@@ -334,13 +354,15 @@ async function fetchAsset(a) {
   }
   // Zip-packaged asset: store the extracted entry, not the archive.
   let out = body;
+  let storedEnc = a.zipEntry ? null : enc;
   if (a.zipEntry) out = unzipEntry(decode(body, enc), a.zipEntry);
-  checkMagic(decode(out, a.zipEntry ? null : enc), a.magic, a.dest);
+  if (a.transform) ({ bytes: out, enc: storedEnc } = applyTransform(a, out, storedEnc));
+  checkMagic(decode(out, storedEnc), a.magic, a.dest);
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
   fs.writeFileSync(destPath + '.part', out);
   fs.renameSync(destPath + '.part', destPath);
-  console.log(' ' + (out.length / 1048576).toFixed(1) + ' MB' + (enc ? ' (' + enc + ')' : ''));
-  return { size: out.length, enc: a.zipEntry ? null : enc };
+  console.log(' ' + (out.length / 1048576).toFixed(1) + ' MB' + (storedEnc ? ' (' + storedEnc + ')' : ''));
+  return { size: out.length, enc: storedEnc };
 }
 
 async function main() {
