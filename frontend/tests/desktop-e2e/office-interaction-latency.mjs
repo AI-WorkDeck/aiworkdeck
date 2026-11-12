@@ -178,8 +178,13 @@ async function instrumentTarget(target) {
 }
 
 // ---- process lifecycle -------------------------------------------------------
+const profileDirs = ['appData', 'userData', 'sessionData']
 async function start(phase) {
   fs.writeFileSync(commandFile, '{}')
+  if (phase !== 'warmup') for (const key of profileDirs) {
+    fs.rmSync(path.join(run, key), { recursive: true, force: true })
+    fs.cpSync(path.join(run, 'seed-' + key), path.join(run, key), { recursive: true })
+  }
   const executable = process.env.AWD_ELECTRON_BINARY || path.join(root, 'desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron')
   child = spawn(executable, [wrapper, `--remote-debugging-port=${cdpPort}`, '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'], { cwd: root, env, stdio: ['ignore', logFd, logFd], detached: true })
   const version = await until(async () => {
@@ -408,21 +413,31 @@ async function press(guest, key) {
 }
 
 async function enterPptText(name, guest, sc) {
-  const info = await exec(name, 'slide_get_page', { slideNumber: 1 })
-  const shape = info.shapes.find(s => typeof s.text === 'string' && s.text.trim().length > 3 && !s.isTable)
-  if (!shape) return { skipped: 'no text shape on slide 1' }
-  // Typing runs first after open, so the visible slide is slide 1.
+  // First slide with an ordinary text shape (image-only title slides are common).
+  const count = (await exec(name, 'office_get_navigation')).items.length
+  let info, shape, slideNumber
+  for (slideNumber = 1; slideNumber <= count; slideNumber++) {
+    info = await exec(name, 'slide_get_page', { slideNumber })
+    shape = info.shapes.find(s => typeof s.text === 'string' && s.text.trim().length > 1 && !s.isTable)
+    if (shape) break
+  }
+  if (!shape) return { skipped: 'no text shape in deck' }
+  // Typing runs first after open (slide 1 visible); go elsewhere via the slide panel.
+  if (slideNumber > 1) { await clickNavItem('pptx', slideNumber - 1); await sleep(2000) }
   // Calibrate the white slide on the real canvas before double-clicking the shape.
   // Use the latest screencast frame: Page.captureScreenshot stalls a webview's screencast.
   await sleep(300)
   const shot = sc.img(sc.latest())
   fs.writeFileSync(path.join(run, `${name}-typing-target.png`), sc.latest().bytes)
+  // The slide is whatever differs from the workspace background (sampled at a
+  // corner), so coloured/image templates calibrate as well as white slides.
+  const bg = [shot.data[(10 * shot.width + 10) * 4], shot.data[(10 * shot.width + 10) * 4 + 1], shot.data[(10 * shot.width + 10) * 4 + 2]]
   let left = shot.width, right = 0, top = shot.height, bottom = 0
-  for (let y = 0; y < shot.height; y++) {
+  for (let y = 0; y < shot.height - 24; y++) {
     let count = 0, first = shot.width, last = 0
     for (let x = 0; x < shot.width - 24; x++) {
       const i = (y * shot.width + x) * 4
-      if (shot.data[i] > 235 && shot.data[i + 1] > 235 && shot.data[i + 2] > 235) { count++; first = Math.min(first, x); last = x }
+      if (Math.abs(shot.data[i] - bg[0]) + Math.abs(shot.data[i + 1] - bg[1]) + Math.abs(shot.data[i + 2] - bg[2]) > 24) { count++; first = Math.min(first, x); last = x }
     }
     if (count > shot.width * 0.4) { left = Math.min(left, first); right = Math.max(right, last); top = Math.min(top, y); bottom = y }
   }
@@ -433,14 +448,19 @@ async function enterPptText(name, guest, sc) {
     // of a placeholder only selects the frame, and a later End jumps to the last slide.
     const bx0 = Math.round(left + shape.left / info.width * (right - left)), bx1 = Math.round(left + (shape.left + shape.width) / info.width * (right - left))
     const by0 = Math.round(top + shape.top / info.height * (bottom - top)), by1 = Math.round(top + (shape.top + shape.height) / info.height * (bottom - top))
+    // Glyphs = pixels far from the box's mean colour (dark-on-light or light-on-dark).
+    const mean = [0, 0, 0]; let n = 0
+    for (let yy = by0; yy < by1; yy++) for (let xx = bx0; xx < bx1; xx++) { const i = (yy * shot.width + xx) * 4; mean[0] += shot.data[i]; mean[1] += shot.data[i + 1]; mean[2] += shot.data[i + 2]; n++ }
+    for (let k = 0; k < 3; k++) mean[k] /= Math.max(1, n)
+    const glyph = i => Math.abs(shot.data[i] - mean[0]) + Math.abs(shot.data[i + 1] - mean[1]) + Math.abs(shot.data[i + 2] - mean[2]) > 180
     let bestRow = -1, bestCount = 0
     for (let yy = by0; yy < by1; yy++) {
       let c = 0
-      for (let xx = bx0; xx < bx1; xx++) { const i = (yy * shot.width + xx) * 4; if (shot.data[i] + shot.data[i + 1] + shot.data[i + 2] < 300) c++ }
+      for (let xx = bx0; xx < bx1; xx++) if (glyph((yy * shot.width + xx) * 4)) c++
       if (c > bestCount) { bestCount = c; bestRow = yy }
     }
     let lastDark = bx0
-    for (let xx = bx0; xx < bx1; xx++) { const i = (bestRow * shot.width + xx) * 4; if (shot.data[i] + shot.data[i + 1] + shot.data[i + 2] < 300) lastDark = xx }
+    for (let xx = bx0; xx < bx1; xx++) if (glyph((bestRow * shot.width + xx) * 4)) lastDark = xx
     const px = bestCount ? lastDark - 2 : (bx0 + bx1) / 2, py = bestCount ? bestRow : (by0 + by1) / 2
     x = px * viewport.width / shot.width
     y = py * viewport.height / shot.height
@@ -451,7 +471,7 @@ async function enterPptText(name, guest, sc) {
   await sleep(800)
   await focusOverlay(name, guest)
   await sleep(600)
-  return { shape: shape.name, slideCalibrated: right > left, click: [Math.round(x), Math.round(y)] }
+  return { slide: slideNumber, shape: shape.name, slideCalibrated: right > left, click: [Math.round(x), Math.round(y)] }
 }
 async function clickNavItem(kind, index) {
   const pt = await page.evaluate((kind, index) => {
@@ -507,6 +527,44 @@ async function scroll(guest, sc) {
   return { ...m, afterLastTickMs: m.settledMs != null ? Math.round(m.t0 + m.settledMs - lastTick) : null, frameCount: frames.length,
     maxFrameGapMs: gaps.length ? Math.round(Math.max(...gaps)) : null, p50FrameGapMs: pct(gaps, 50),
     guestLongTasks: longs.length, guestLongTaskMs: Math.round(longs.reduce((a, l) => a + l.dur, 0)), ticks: undefined }
+}
+// Natural typing: 10 keys ~130 ms apart. Per key, latency = first frame after its
+// keydown that differs from the last frame before it (outside the start caret);
+// backlog = last keydown to the settled final picture.
+async function burst(sc, guest, text) {
+  const cal = await calibrate(sc, null)
+  const { mask, r, masked } = cal
+  const before = await guest.evaluate(() => window.__olbInputs.length)
+  for (const ch of text) { await guest.keyboard.press(ch); await sleep(110) }
+  await sleep(300)
+  const kd = await guest.evaluate(n => window.__olbInputs.slice(n).filter(i => i.type === 'keydown').map(i => i.t), before)
+  if (kd.length < text.length) return { error: `only ${kd.length}/${text.length} keydowns reached the editor` }
+  const caretTol = Math.max(40, masked * 1.5)
+  // Wait until the worker has executed every typed key (insert_at_cursor results)
+  // and then the picture has been quiet for 1.2 s.
+  let lastBig = Date.now(), lastSeen = null, responded = false
+  const deadline = Date.now() + 90000
+  while (Date.now() < deadline && !(responded && Date.now() - lastBig >= 1200)) {
+    const f = sc.latest()
+    if (!responded) responded = await guest.evaluate((t0, n) => window.__olbCmds.filter(c => c.action === 'insert_at_cursor' && c.sent >= t0 - 5 && c.done).reduce((a, c) => a + (c.text || 0), 0) >= n, kd[0], text.length)
+    if (f !== lastSeen) {
+      if (lastSeen && diff(sc, lastSeen, f, r, mask) > caretTol) lastBig = Date.now()
+      lastSeen = f
+    }
+    await sleep(30)
+  }
+  const target = sc.latest()
+  const after = sc.frames.filter(f => f.ts >= kd[0] - 5)
+  const perKey = kd.map(t => {
+    const base = [...sc.frames].reverse().find(f => f.ts < t) || cal.base
+    const hit = after.find(f => f.ts >= t && diff(sc, base, f, r, mask) >= 12)
+    return hit ? Math.round(hit.ts - t) : null
+  })
+  const changed = diff(sc, cal.base, target, r, mask)
+  const tol = Math.max(8, changed * 0.03, masked * 2)
+  let settled = null
+  for (let i = after.length - 1; i >= 0; i--) { if (diff(sc, target, after[i], r, mask) <= tol) settled = after[i]; else break }
+  return { perKeyMs: perKey, typedOverMs: Math.round(kd[kd.length - 1] - kd[0]), lastKeyToSettledMs: settled ? Math.round(settled.ts - kd[kd.length - 1]) : null, changedPixels: changed }
 }
 function summarizeCmds(cmds, from, to) {
   const inWindow = cmds.filter(c => c.sent >= from && c.sent < to)
@@ -677,20 +735,28 @@ async function measureDocument(name, filePath, mode, { trace = false } = {}) {
   let sc = await screencast(await guest.createCDPSession(), { format: 'png', maxWidth: 1280, maxHeight: 1100, keep: 600 })
   const phase = async (label, fn) => {
     const from = Date.now()
-    const value = await fn()
+    // A login prompt (AI features without an account) can pop over the editor
+    // after open; dismiss it and give the canvas focus back, as a user would.
+    if (await dismissLogin()) { (result.loginPromptDuring ||= []).push(label); if (label !== 'nav') await focusOverlay(name, guest) }
+    let value
+    try { value = await fn() } catch (error) { value = { error: error.message }; log(name, mode, label, 'failed', error.message) }
     const list = await cmds()
     return { value, cmds: summarizeCmds(list, from, Date.now()) }
   }
   try {
+    if (await dismissLogin()) (result.loginPromptDuring ||= []).push('before-typing')
     result.typingTarget = await prepareTyping(name, guest, sc)
     if (!result.typingTarget.skipped) {
+      const typedBurst = await phase('burst', () => burst(sc, guest, 'quickbrown'))
+      result.burst = typedBurst.value; result.burstCmds = typedBurst.cmds
+      log(name, mode, 'burst', JSON.stringify(typedBurst.value))
       const typed = await phase('typing', async () => {
         const keys = []
         for (const ch of 'olbtypingx') keys.push(await measure(sc, null, () => press(guest, ch), { label: `key-${ch}`, quietMs: 700 }))
         return keys
       })
       result.typing = typed.value; result.typingCmds = typed.cmds
-      log(name, mode, 'keys', JSON.stringify(typed.value.map(k => [k.firstChangeMs, k.settledMs])))
+      log(name, mode, 'keys', JSON.stringify(Array.isArray(typed.value) ? typed.value.map(k => [k.firstChangeMs, k.settledMs]) : typed.value))
       // Commit like a user: Enter in a Calc cell, Escape out of an Impress text box.
       if (kind === 'xlsx') await guest.keyboard.press('Enter')
       if (kind === 'pptx') await guest.keyboard.press('Escape')
@@ -715,7 +781,7 @@ async function measureDocument(name, filePath, mode, { trace = false } = {}) {
     log(name, mode, 'scroll', JSON.stringify(sc2.value))
     const nav = await phase('nav', () => navigate(name, guest, sc, kind))
     result.navigation = nav.value; result.navigationCmds = nav.cmds
-    log(name, mode, 'nav', JSON.stringify(nav.value.map(m => m.settledMs)))
+    log(name, mode, 'nav', JSON.stringify(Array.isArray(nav.value) ? nav.value.map(m => m.settledMs) : nav.value))
   } finally {
     await sc.stop()
   }
@@ -748,6 +814,10 @@ try {
     await sleep(5000)
     await close(name)
     await quit()
+    // Every measured session starts from this same post-warm-up profile, so one
+    // session's state (e.g. an account prompt that ends the local session)
+    // cannot leak into the next and all sessions share identical caches.
+    for (const key of profileDirs) fs.cpSync(path.join(run, key), path.join(run, 'seed-' + key), { recursive: true })
     log('warm-up done')
   }
   for (let round = 1; round <= rounds; round++) for (const src of sources) {
@@ -798,11 +868,13 @@ try {
   const summary = {}
   for (const session of evidence.sessions) for (const r of session.runs) {
     if (r.mode === 'warm-trace') continue
-    const s = summary[`${session.source} ${r.mode}`] ||= { rounds: 0, open: [], near: [], ready: [], keysFirst: [], keysSettled: [], nav: [], scrollSettle: [], scrollMaxGap: [], saveMs: [], probe: [], cmds10s: [], busy10s: [] }
+    const s = summary[`${session.source} ${r.mode}`] ||= { rounds: 0, open: [], near: [], ready: [], keysFirst: [], keysSettled: [], burstKey: [], burstBacklog: [], nav: [], scrollSettle: [], scrollMaxGap: [], saveMs: [], probe: [], cmds10s: [], busy10s: [] }
     s.rounds++
     s.open.push(r.open?.paintedMs); s.near.push(r.open?.nearContentMs); s.ready.push(r.open?.readyMs)
-    for (const k of r.typing || []) { s.keysFirst.push(k.firstChangeMs); s.keysSettled.push(k.settledMs) }
-    for (const n of r.navigation || []) s.nav.push(n.settledMs)
+    for (const k of Array.isArray(r.typing) ? r.typing : []) { s.keysFirst.push(k.firstChangeMs); s.keysSettled.push(k.settledMs) }
+    for (const k of r.burst?.perKeyMs || []) s.burstKey.push(k)
+    s.burstBacklog.push(r.burst?.lastKeyToSettledMs)
+    for (const n of Array.isArray(r.navigation) ? r.navigation : []) if (!n.noVisibleChange && !n.timedOut) s.nav.push(n.settledMs)
     s.scrollSettle.push(r.scroll?.settledMs); s.scrollMaxGap.push(r.scroll?.maxFrameGapMs)
     s.saveMs.push(r.autosave?.savingMs); s.probe.push(r.autosave?.probe?.settledMs)
     s.cmds10s.push(r.first10s?.count); s.busy10s.push(r.first10s?.inFlightUnionMs)
