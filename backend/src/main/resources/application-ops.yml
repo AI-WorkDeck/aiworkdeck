@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# 服务器形态的健康与指标（cloud / case / prod 经 application.yml 的 profiles.group 自动带上，
+# 不要手工激活到桌面）。巡检与告警脚本见 deploy/ops/，运维说明见 deploy/cloud/README.md。
+#
+# 两个面，刻意分开：
+#   公网：GET /api/health/ready（OpsReadinessController，读下面的 readiness 组）——
+#         只回 {"status":"UP"} / 503 {"status":"DOWN"}，不带组件名、路径、版本。
+#         由主端口提供（nginx 既有 location /api/ 即可达），跨机拨测 site-probe 直接探它。
+#   回环：management 独立端口，只绑 127.0.0.1（主端口上根本没有 /actuator/**）：
+#         /actuator/health（带明细）与 /actuator/prometheus。
+#         端口默认 = "1" + server.port（cloud/prod 19696、case 19797），同机两实例不会撞；
+#         需要时用 AWD_MANAGEMENT_PORT 覆盖。不要把这个端口加进 nginx 或安全组。
+management:
+  server:
+    port: ${AWD_MANAGEMENT_PORT:1${server.port}}
+    address: 127.0.0.1
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      access: read-only
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          # 只看本进程自己：应用已就绪、数据库可连、存储盘有余量。
+          # 官网/网关/OSS 等外部依赖不放进来——它们各自有拨测，放进来只会让别人的故障
+          # 变成本实例「DOWN」的误报。
+          include: readinessState,db,diskSpace
+    prometheus:
+      access: read-only
+  health:
+    # spring-boot-starter-mail 会自动挂 SMTP 探测；我们不走 spring.mail.*，这项只会误报。
+    mail:
+      enabled: false
+    diskspace:
+      path: ${storage.local.root-path:.}
+      threshold: ${AWD_HEALTH_DISK_MIN:2GB}
+  # 不跑在 Cloud Foundry 上；关掉其端点面（CVE-2026-22733 的前提条件之一）。
+  cloudfoundry:
+    enabled: false
+  metrics:
+    enable:
+      all: true
+    tags:
+      application: ${spring.application.name}
+  observations:
+    enable:
+      all: true

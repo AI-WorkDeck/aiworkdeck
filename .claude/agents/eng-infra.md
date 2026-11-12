@@ -373,6 +373,20 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 - `deploy/web/` — Web 服务器版（瘦客户端 Phase A2/鸿蒙路线）：nginx.conf.example、能力探针 probe/、后端 prod 只听 127.0.0.1。
 - `deploy/cloud/` — 官方托管的插件云后端（addin.aiworkdeck.com）：nginx server 块、systemd unit、env 模板、部署实录。
+- **服务器健康与指标（`application-ops.yml` + `deploy/ops/`，说明在 deploy/cloud/README.md「运维监控」）**：
+  cloud/case/prod 经 `application.yml` 的 `spring.profiles.group` 自动带 `ops` profile；新增服务器 profile 要同样加进 group。
+  `application.yml` 默认 Actuator 全关（`management.server.port=-1`、端点全禁、`metrics/observations.enable.all=false`），
+  桌面版靠这组默认值保持零暴露、不采指标——`DesktopContextSmokeTest` 断言 `-1`。ops 开**只绑 127.0.0.1 的独立管理端口**
+  （默认 `"1"+server.port`：19696/19797，同机两实例不撞），只暴露 health + prometheus；公网只有
+  `OpsReadinessController` 的 `GET /api/health/ready`（readiness 组 = readinessState+db+diskSpace，回 UP/DOWN 不带明细；
+  无 ops 时 404）。**地雷**：① 本应用对未映射路径回 HTTP 200 `{"code":1}`（GlobalExceptionHandler，管理端口子上下文也继承），
+  所以「端点不存在」不能用 404 判，测试比对与未知路径同响应；② `@SpringBootTest` 默认把指标导出换成空实现，
+  测 prometheus 要 `@AutoConfigureObservability`；③ actuator 的 `additional-path` 只认单段路径，不能挂 `/api/...`，
+  所以公网探针是自写控制器；④ 业务 gauge（`OpsMetrics`）在抓取时才经 ObjectProvider 取 bean，别改成构造注入
+  `AgentOrchestrator`（构造器一动要同步 EvalHarness）。⑤ micrometer 跟 Boot 3.5.16 BOM 为 1.15.12（CVE-2026-40984 的修复版；Boot 3.2 的 1.12.4 受影响，
+  所以本功能排在 Boot 升级之后合并），不要在 pom 里单独钉回旧版。
+  回归：`mvn test -Dtest=OpsHealthMetricsTest,DesktopContextSmokeTest`；巡检脚本 `python3 -I deploy/ops/awd-health-check_test.py`。
+  pom 加了依赖 → 只能随大版本（`patch-gate`）。
 - `deploy/update-mirror-sync.sh` — 官网 ECS 上每小时一跑的镜像同步（补丁产物 + 安装包 + installers/latest.json）。
   **安装包留最新两版，别改回「只留最新一版」**：官网 /start 的下载按钮是服务端渲染的，
   数据源（官网仓 lib/latest-release.ts）对 latest.json 用了 `revalidate: 300`。旧包一删、

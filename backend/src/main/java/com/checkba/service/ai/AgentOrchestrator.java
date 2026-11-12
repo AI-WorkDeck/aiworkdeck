@@ -573,6 +573,11 @@ public class AgentOrchestrator {
         return guard;
     }
 
+    /** 各会话当前登记的 run 数（运维指标 awd.agent.runs.active；被取代后仍在收尾的旧轮次不计）。 */
+    public int activeRunCount() {
+        return activeRuns.size();
+    }
+
     /** 该会话当前是否有登记在册的 run（回退等破坏性操作据此拒绝并发）。 */
     public boolean hasActiveRun(String conversationId) {
         return conversationId != null && activeRuns.get(conversationId) != null;

@@ -92,6 +92,61 @@
   多出来的 600 MB 在 Linux 上一行都用不到，纯粹白传白占盘。
   产物大小可以当校验：和线上那份差不多（±1 MB）才对。
 
+## 运维监控：就绪探针、回环指标、告警
+
+三层，各管一段，不重复：
+
+| 层 | 在哪 | 发现什么 |
+|---|---|---|
+| 跨机拨测 `site-probe.timer`（已有，2026-09-08 起，脚本在服务器 `/usr/local/sbin/site-probe.py`，不在本仓） | 北京 ⇄ 新加坡互探，每 2 分钟 | 整机/nginx/证书/进程挂了 |
+| 公网就绪探针 `GET /api/health/ready` | 后端主端口，经既有 `location /api/` | 进程活着但数据库连不上、存储盘低于 2GB、正在关停 |
+| 本机巡检 `awd-health-check.timer`（`deploy/ops/`） | 每分钟读回环管理端口 + 本机磁盘 | 5xx 比例、堆、连接池排队、磁盘余量、明细健康 |
+
+两条告警都走同一个通道：阿里云通知模板 `SMS_512065498`（「站点${name}于${time}探测失败」）
++ Resend 邮件（可选）。
+
+**就绪探针**：只回 `{"status":"UP"}` 或 503 `{"status":"DOWN"}`，不带组件名、路径、版本；
+判据 = actuator `readiness` 组（readinessState、db、diskSpace@`storage.local.root-path`，
+阈值 `AWD_HEALTH_DISK_MIN` 默认 2GB）。外部依赖（官网、网关、OSS）**刻意不算**——它们有
+自己的拨测，放进来只会把别人的故障报成本实例 DOWN。
+
+**回环指标**：cloud/case/prod 三个 profile 经 `spring.profiles.group` 自动带上
+`application-ops.yml`，开一个**只绑 127.0.0.1** 的独立管理端口，默认 `"1" + server.port`
+（addin 19696、case 19797，同机不撞；`AWD_MANAGEMENT_PORT` 可覆盖）。上面只有两个端点：
+`/actuator/health`（带明细）与 `/actuator/prometheus`。主端口上不存在 `/actuator/**`。
+**不要**把管理端口加进 nginx 或安全组；看指标就 ssh 上去 `curl -s 127.0.0.1:19696/actuator/prometheus`。
+关键序列：`http_server_requests_seconds_count/sum{status,uri}`、`jvm_memory_used_bytes{area="heap"}`、
+`jvm_threads_live_threads`、`hikaricp_connections_{active,pending,max}`、
+`awd_sse_connections{stream="chat|desktop"}`、`awd_agent_runs_active`。
+桌面版不带这些：管理端口关闭、指标不采（application.yml 默认值）。
+
+**本机巡检**（零依赖 Python 3，`deploy/ops/awd-health-check.py`）：
+
+| 检查 | 默认阈值 | 连续几轮才报 |
+|---|---|---|
+| `<实例>-health` | `/actuator/health` 非 UP 或不可达 | 2 |
+| `<实例>-5xx` | 两轮之间 5xx ≥5 条且 ≥5%（不计 /actuator） | 2 |
+| `<实例>-heap` | 堆占用 ≥90% `-Xmx` | 3 |
+| `<实例>-dbpool` | Hikari 有线程在排队取连接 | 3 |
+| `<标签>-disk` | 可用 <10% 或 <5GB | 2 |
+
+报一次后保持安静直到恢复（恢复只发邮件，短信模板只有「失败」一种），持续故障每 6 小时再提醒。
+`--dry-run` 只打印不发、不写状态；`--test` 发一条测试告警。阈值见 `deploy/ops/health-check.env.example`。
+离线自测：`python3 -I deploy/ops/awd-health-check_test.py`。
+
+安装（每台跑后端的机器各一次，root）：
+```bash
+install -m 0755 deploy/ops/awd-health-check.py /usr/local/sbin/
+install -m 0644 deploy/ops/awd-health-check.{service,timer} /etc/systemd/system/
+install -m 0600 deploy/ops/health-check.env.example /etc/aiworkdeck/health-check.env  # 再填手机号/目标
+/usr/bin/python3 /usr/local/sbin/awd-health-check.py --dry-run   # 先看一眼判定
+systemctl daemon-reload && systemctl enable --now awd-health-check.timer
+systemctl start awd-health-check && journalctl -u awd-health-check -n 30
+```
+再在两台机的 `/etc/aiworkdeck/site-probe.json` 里给对方加一条就绪探针 URL
+（`https://addin.aiworkdeck.com/api/health/ready`、`https://case.aiworkdeck.com/api/health/ready`、
+`https://addin.workdeck.ai/api/health/ready`），让既有拨测在 503 时也报警——字段照该文件里已有条目抄。
+
 ## 手机影像云中转的 OSS 存储（dev-board#236）
 
 - blob 不再落 ECS 本地盘，走平台私有桶：北京 `awd-mobile-relay`（cn-beijing），
