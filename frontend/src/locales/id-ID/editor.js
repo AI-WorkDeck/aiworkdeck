@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "Pembukaan pertama menginisialisasi mesin dokumen; dokumen besar mungkin memerlukan waktu sebentar",
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: editor tidak merespons atau berkas rusak",
+    "encryptedTitle": "File ini dilindungi kata sandi pembuka yang belum dapat dibuka oleh editor. Hapus kata sandi di Excel, Word, PowerPoint, atau WPS lalu buka lagi, atau unduh file aslinya.",
     "code": "Kode diagnostik: {code}",
     "previewNotice": "Dokumen tidak dapat dibuka di editor (kode {code}); menampilkan pratinjau hanya-baca",
     "readOnlyPreview": "Buka pratinjau hanya-baca",

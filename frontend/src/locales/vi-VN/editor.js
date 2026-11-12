@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "Lần mở đầu tiên cần khởi tạo bộ máy tài liệu; tài liệu lớn có thể mất thêm chút thời gian",
   "openFailed": {
     "title": "Không thể mở tài liệu: trình soạn thảo không phản hồi hoặc tệp bị hỏng",
+    "encryptedTitle": "Tệp này được bảo vệ bằng mật khẩu mở mà trình soạn thảo chưa mở được. Hãy gỡ mật khẩu trong Excel, Word, PowerPoint hoặc WPS rồi mở lại, hoặc tải tệp gốc xuống.",
     "code": "Mã chẩn đoán: {code}",
     "previewNotice": "Không thể mở tài liệu trong trình soạn thảo (mã {code}); dưới đây là bản xem trước chỉ đọc",
     "readOnlyPreview": "Mở bản xem trước chỉ đọc",

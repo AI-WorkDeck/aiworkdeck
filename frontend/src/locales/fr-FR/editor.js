@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "La première ouverture initialise le moteur de document ; les documents volumineux peuvent prendre un moment",
   "openFailed": {
     "title": "Impossible d’ouvrir le document : l’éditeur ne répond pas ou le fichier est endommagé",
+    "encryptedTitle": "Ce fichier est protégé par un mot de passe d’ouverture que l’éditeur ne peut pas encore ouvrir. Supprimez le mot de passe dans Excel, Word, PowerPoint ou WPS puis rouvrez-le, ou téléchargez l’original.",
     "code": "Code de diagnostic : {code}",
     "previewNotice": "Le document n’a pas pu être ouvert dans l’éditeur (code {code}) ; affichage d’un aperçu en lecture seule",
     "readOnlyPreview": "Ouvrir l’aperçu en lecture seule",

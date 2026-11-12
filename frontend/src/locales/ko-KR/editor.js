@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "처음 열 때는 문서 엔진을 초기화하므로 대용량 문서는 다소 시간이 걸릴 수 있습니다",
   "openFailed": {
     "title": "문서를 열 수 없습니다: 편집기가 응답하지 않거나 파일이 손상되었습니다",
+    "encryptedTitle": "이 파일에는 열기 암호가 설정되어 있어 편집기에서 아직 열 수 없습니다. Excel, Word, PowerPoint 또는 WPS에서 암호를 해제한 뒤 다시 열거나 원본 파일을 다운로드하세요.",
     "code": "진단 코드: {code}",
     "previewNotice": "편집기에서 문서를 열 수 없습니다(코드 {code}). 읽기 전용 미리보기를 표시합니다",
     "readOnlyPreview": "읽기 전용 미리보기로 열기",

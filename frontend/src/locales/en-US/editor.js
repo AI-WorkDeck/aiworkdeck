@@ -137,6 +137,7 @@ export default {
   // "Cannot open" terminal state (dev-board#1018).
   openFailed: {
     title: 'The document cannot be opened: the editor is not responding or the file is damaged',
+    encryptedTitle: 'This file is protected with an open password, which the editor can’t open yet. Remove the password in Excel, Word, PowerPoint or WPS and open it again, or download the original.',
     code: 'Diagnostic code: {code}',
     previewNotice: 'The document could not be opened in the editor (code {code}); showing a read-only preview',
     readOnlyPreview: 'Open read-only preview',

@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "Bij het eerste openen wordt de document-engine geïnitialiseerd; grote documenten kunnen even duren",
   "openFailed": {
     "title": "Het document kan niet worden geopend: de editor reageert niet of het bestand is beschadigd",
+    "encryptedTitle": "Dit bestand is beveiligd met een openingswachtwoord dat de editor nog niet kan openen. Verwijder het wachtwoord in Excel, Word, PowerPoint of WPS en open het opnieuw, of download het origineel.",
     "code": "Diagnosecode: {code}",
     "previewNotice": "Het document kon niet in de editor worden geopend (code {code}); er wordt een alleen-lezen voorbeeld getoond",
     "readOnlyPreview": "Alleen-lezen voorbeeld openen",

@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "A primeira abertura inicializa o motor de documentos; documentos grandes podem levar um momento",
   "openFailed": {
     "title": "Não é possível abrir o documento: o editor não está respondendo ou o arquivo está danificado",
+    "encryptedTitle": "Este arquivo está protegido por senha de abertura, que o editor ainda não consegue abrir. Remova a senha no Excel, Word, PowerPoint ou WPS e abra novamente, ou baixe o original.",
     "code": "Código de diagnóstico: {code}",
     "previewNotice": "Não foi possível abrir o documento no editor (código {code}); exibindo pré-visualização somente leitura",
     "readOnlyPreview": "Abrir pré-visualização somente leitura",

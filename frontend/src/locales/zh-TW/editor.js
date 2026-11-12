@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "首次打開需初始化文檔引擎，大文檔會稍慢，請稍候",
   "openFailed": {
     "title": "文檔無法打開：引擎無響應或文件損壞",
+    "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",
     "code": "診斷碼：{code}",
     "previewNotice": "文檔無法在編輯器中打開（診斷碼：{code}），以下為只讀預覽",
     "readOnlyPreview": "用只讀預覽打開",

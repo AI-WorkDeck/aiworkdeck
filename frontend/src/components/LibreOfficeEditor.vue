@@ -19,15 +19,15 @@
            说清楚、给诊断码、给出路（只读预览 / 下载原文件 / 重启再试），不再对着 95% 干等。 -->
       <view v-if="!previewReady && openFailed" class="libre-loading-card libre-open-failed">
         <text class="libre-loading-name">{{ loadingTitle }}</text>
-        <text class="libre-loading-error">{{ $t('editor.openFailed.title') }}</text>
+        <text class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : $t('editor.openFailed.title') }}</text>
         <text class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
-        <view v-if="canReadOnlyPreview" class="libre-loading-retry" @click="openReadOnlyPreview">
+        <view v-if="canReadOnlyPreview && openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="openReadOnlyPreview">
           <text>{{ $t('editor.openFailed.readOnlyPreview') }}</text>
         </view>
         <view class="libre-loading-retry" @click="downloadOriginal">
           <text>{{ $t('editor.openFailed.download') }}</text>
         </view>
-        <view class="libre-loading-retry" @click="retryLoad">
+        <view v-if="openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="retryLoad">
           <text>{{ $t('editor.openFailed.retry') }}</text>
         </view>
       </view>
@@ -197,7 +197,7 @@
 import { beginDocumentSave, checkpointSaveBarrier, documentCheckpointGeneration, reconcileCheckpointSaveBarrier } from '@/utils/checkpointSaveBarrier.js'
 import { webviewTransport, iframeTransport } from '@/composables/useZetaOfficeWebview.js'
 import { createRelayExecutor, PROBE_ACTION, PROBE_BUDGET_MS } from '@/composables/zetaOfficeRelay.js'
-import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED } from '@/utils/editorLoadFailure.js'
+import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED, DIAG_DOC_REJECTED, DIAG_DOC_ENCRYPTED, isEncryptedOoxml } from '@/utils/editorLoadFailure.js'
 import ReviewPanel from '@/components/ReviewPanel.vue'
 import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
@@ -1707,6 +1707,10 @@ export default {
           // 下载超时/网络错 = 请检查网络、其余（含引擎装载失败与 relay 超时）
           // 沿用 loadFailed。几个 key 都以 'Failed' 结尾，既有判据不必改。
           if (open) this.openFailCode = open.code
+          if (open && open.code === DIAG_DOC_REJECTED) {
+            const raw = await (this._bytesPromise || Promise.resolve(null)).catch(() => null)
+            if (seq === this._docLoadSeq && isEncryptedOoxml(raw, this.file?.name || this.file?.fileName)) this.openFailCode = DIAG_DOC_ENCRYPTED
+          }
           this.statusKey = open ? open.statusKey : classifyLoadFailure(e)
           // 记下这次失败时的世代号——迟到的 load_document 结果（见
           // onLateLoadResult）只在世代仍相符（没有更晚的装载尝试发生过）时

@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "Beim ersten Öffnen wird die Dokument-Engine initialisiert; große Dokumente können einen Moment dauern",
   "openFailed": {
     "title": "Das Dokument kann nicht geöffnet werden: Der Editor reagiert nicht oder die Datei ist beschädigt",
+    "encryptedTitle": "Diese Datei ist mit einem Öffnungskennwort geschützt, das der Editor noch nicht öffnen kann. Entfernen Sie das Kennwort in Excel, Word, PowerPoint oder WPS und öffnen Sie sie erneut, oder laden Sie das Original herunter.",
     "code": "Diagnosecode: {code}",
     "previewNotice": "Das Dokument konnte im Editor nicht geöffnet werden (Code {code}); es wird eine schreibgeschützte Vorschau angezeigt",
     "readOnlyPreview": "Schreibgeschützte Vorschau öffnen",

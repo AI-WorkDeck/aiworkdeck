@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "Pembukaan pertama memulakan enjin dokumen; dokumen besar mungkin mengambil sedikit masa",
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: penyunting tidak memberi respons atau fail rosak",
+    "encryptedTitle": "Fail ini dilindungi kata laluan pembukaan yang belum boleh dibuka oleh penyunting. Buang kata laluan dalam Excel, Word, PowerPoint atau WPS dan buka semula, atau muat turun fail asal.",
     "code": "Kod diagnostik: {code}",
     "previewNotice": "Dokumen tidak dapat dibuka dalam penyunting (kod {code}); memaparkan pratonton baca sahaja",
     "readOnlyPreview": "Buka pratonton baca sahaja",

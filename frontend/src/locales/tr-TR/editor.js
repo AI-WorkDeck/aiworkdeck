@@ -134,6 +134,7 @@ export default {
   "firstOpenHint": "İlk açılışta belge motoru başlatılır; büyük belgeler biraz zaman alabilir",
   "openFailed": {
     "title": "Belge açılamıyor: düzenleyici yanıt vermiyor veya dosya hasar görmüş",
+    "encryptedTitle": "Bu dosya, düzenleyicinin henüz açamadığı bir açılış parolasıyla korunuyor. Parolayı Excel, Word, PowerPoint veya WPS’te kaldırıp yeniden açın ya da orijinal dosyayı indirin.",
     "code": "Tanılama kodu: {code}",
     "previewNotice": "Belge düzenleyicide açılamadı (kod {code}); salt okunur önizleme gösteriliyor",
     "readOnlyPreview": "Salt okunur önizlemeyi aç",
