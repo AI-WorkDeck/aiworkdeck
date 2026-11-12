@@ -334,6 +334,10 @@ public class AccountService {
     private Map<String, Object> fetchAiKeyWith(String key, boolean currentAccount, long requestVersion, String requestBaseUrl) {
         AccountTransport.Reply reply = transport.send("POST", requestBaseUrl + "/api/account/ai-key", key, "{}");
         if (reply.networkFailure()) {
+            // 幂等端点；官网冷启动/瞬断时重试一次，别让新用户的唯一一次登录落成「额度尚未就绪」
+            reply = transport.send("POST", requestBaseUrl + "/api/account/ai-key", key, "{}");
+        }
+        if (reply.networkFailure()) {
             throw networkError();
         }
         String bqtCode = reply.status() >= 400 ? businessErrorCode(reply.body()) : null;
