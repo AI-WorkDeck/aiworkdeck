@@ -418,8 +418,8 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
   `limit_req` 为准（与 `AuthAbuseGuard` 同一立场）。控制器里都是 `@Autowired(required=false)` 字段注入并判空，手工装配的测试不用改。
   **单次上传上限 `storage.max-upload-size`**：默认 `${storage.project-size-limit:20GB}`（桌面不变），multipart 的
   `max-file-size/max-request-size` 引用它；裸 octet-stream（浏览器/桌面/Office 的主上传路径，Spring multipart 管不到）
-  由 `FileController.uploadFile` 按 Content-Length 拦，413 `UPLOAD_TOO_LARGE`。cloud / prod = 500MB（对齐
-  `deploy/cloud/nginx-addin.conf.example`、`deploy/web/nginx.conf.example` 的 `client_max_body_size 500m`），case = 2GB
+  由 `FileController.uploadFile` 按 Content-Length 拦，413 `UPLOAD_TOO_LARGE`。cloud / prod = 200MB（对齐
+  `deploy/cloud/nginx-addin.conf.example`、`deploy/web/nginx.conf.example` 的 `client_max_body_size 200m`），case = 2GB
   （对齐 `deploy/case/nginx-case*.conf.example` 里 `/api/` 的 2g；整段案卷历史走 `/git/` 的 4g，不受此限）。
   改任一侧要两处同改；接线由 `ProjectStorageResolverTest.profilesWireTheSizeLimit` 钉住。
   回归：`UserRateLimiterTest`、`FileControllerUploadLimitsTest`、`AiAgentControllerTest`、`BrowserProxyControllerTest`、

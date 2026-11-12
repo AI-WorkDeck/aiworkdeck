@@ -746,7 +746,7 @@ storage:
   project-size-limit: 20GB
   # 单次上传请求的字节上限：multipart 与裸 octet-stream（FileController.uploadFile 按
   # Content-Length 拦，413 UPLOAD_TOO_LARGE）共用。默认跟项目总量闸走，桌面行为不变；
-  # 公网 server profile 显式收紧（cloud 500MB / case 2GB），并与 nginx client_max_body_size 对齐。
+  # 公网 server profile 显式收紧（cloud 200MB / case 2GB），并与 nginx client_max_body_size 对齐。
   max-upload-size: ${storage.project-size-limit:20GB}
   # 本机文件夹项目（打开本机文件夹的项目）是否豁免上面的总量闸；桌面 profile 打开
   exempt-local-folder-projects: false

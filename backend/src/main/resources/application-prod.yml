@@ -56,7 +56,7 @@ ai:
 storage:
   type: local
   # 单次上传请求上限（默认跟 project-size-limit 走到 20GB）；与 deploy/web/nginx.conf.example 同值
-  max-upload-size: 500MB
+  max-upload-size: 200MB
   local:
     root-path: /data/checkba/wps-files  # 生产环境建议使用绝对路径
     template-path: /data/checkba/docs/template.docx

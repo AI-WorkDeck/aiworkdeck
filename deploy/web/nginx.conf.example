@@ -45,7 +45,7 @@ server {
         proxy_read_timeout 3600s;
         # 单文件上传上限：与后端 storage.max-upload-size（cloud / prod profile 500MB）同值。
         # 超出时 nginx 先回 413；后端对裸 octet-stream 上传按 Content-Length 再拦一道
-        client_max_body_size 500m;
+        client_max_body_size 200m;
     }
 
     # ---- LOWA 运行时：brotli 预压缩文件按原编码回放 ----

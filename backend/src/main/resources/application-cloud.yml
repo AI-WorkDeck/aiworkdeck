@@ -78,8 +78,8 @@ storage:
   subscription-quota:
     enabled: true
   # 单次上传请求上限（默认会跟 project-size-limit 走到 20GB）。案卷扫描件、证据 PDF
-  # 常见几十到两三百 MB；与 deploy/cloud/nginx-addin.conf.example 的 client_max_body_size 同值
-  max-upload-size: 500MB
+  # 常见几十到一两百 MB，200MB 即现网 nginx 上限，不放宽；与 deploy/cloud/nginx-addin.conf.example 的 client_max_body_size 同值
+  max-upload-size: 200MB
   type: local
   local:
     root-path: /opt/aiworkdeck/cloud/data

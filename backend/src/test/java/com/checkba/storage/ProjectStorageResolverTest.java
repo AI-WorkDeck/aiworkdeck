@@ -185,8 +185,8 @@ class ProjectStorageResolverTest {
         assertEquals("${storage.max-upload-size:20GB}", base.get("spring.servlet.multipart.max-file-size"));
         assertEquals("${storage.max-upload-size:20GB}", base.get("spring.servlet.multipart.max-request-size"));
         assertFalse(flatYaml("application-desktop.yml").containsKey("storage.max-upload-size"));
-        assertEquals("500MB", flatYaml("application-cloud.yml").get("storage.max-upload-size"));
-        assertEquals("500MB", flatYaml("application-prod.yml").get("storage.max-upload-size"));
+        assertEquals("200MB", flatYaml("application-cloud.yml").get("storage.max-upload-size"));
+        assertEquals("200MB", flatYaml("application-prod.yml").get("storage.max-upload-size"));
         assertEquals("2GB", flatYaml("application-case.yml").get("storage.max-upload-size"));
         assertEquals("8MB", String.valueOf(base.get("spring.servlet.multipart.file-size-threshold")));
         assertEquals(true, flatYaml("application-desktop.yml").get("storage.exempt-local-folder-projects"));
