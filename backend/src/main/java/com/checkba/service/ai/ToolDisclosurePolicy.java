@@ -468,7 +468,8 @@ public class ToolDisclosurePolicy {
                 "convert to pdf", "convert it to pdf", "convert into pdf", "print to pdf"));
         // office-tier1：xlsx 会话里不在核心集的常用格式工具，按说法精确放回（上游只在 xlsx 会话放行 sheet_*）
         TOOL_KEYWORDS.put("sheet_set_borders", List.of("边框", "框线", "加框", "border", "borders", "gridlines"));
-        TOOL_KEYWORDS.put("sheet_set_row_col", List.of("列宽", "行高", "调宽", "调高", "加宽", "自适应宽", "column width", "row height", "autofit"));
+        TOOL_KEYWORDS.put("sheet_set_row_col", List.of("列宽", "行高", "调宽", "调高", "加宽", "自适应宽", "显示不全", "显示不完整", "看不全", "###",
+                "column width", "row height", "autofit", "cut off", "truncated"));
         TOOL_KEYWORDS.put("sheet_set_autofilter", List.of("筛选", "过滤", "filter", "autofilter"));
         TOOL_KEYWORDS.put("memory_search", List.of("记得", "之前说过", "上次说", "之前提过", "之前聊过",
                 "do you remember", "you remember", "did i tell you", "did i say", "did i mention", "what did i say",
