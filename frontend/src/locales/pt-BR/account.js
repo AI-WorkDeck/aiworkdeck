@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "ex.: Zhejiang Qinghe Foods Co., Ltd. Consultoria jurídica e disputa trabalhista",
   "caseFieldPracticeArea": "Área de atuação",
   "caseFieldPracticeAreaPh": "ex.: Trabalhista / Consultoria jurídica / M&A",
-  "caseFieldDepartment": "Área de atuação",
+  "caseFieldDepartment": "Grupo de atuação",
   "caseFieldDepartmentPh": "ex.: Societário e M&A",
   "caseFieldLeadLawyer": "Sócio / advogado responsável",
   "caseFieldLeadLawyerPh": "ex.: Lin Zhiyuan",

@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "vd. Công ty TNHH Zhejiang Qinghe Foods - Tổng cố vấn pháp lý & Tranh chấp lao động",
   "caseFieldPracticeArea": "Lĩnh vực hành nghề",
   "caseFieldPracticeAreaPh": "vd. Lao động / Tổng cố vấn pháp lý / M&A",
-  "caseFieldDepartment": "Lĩnh vực hành nghề",
+  "caseFieldDepartment": "Nhóm nghiệp vụ",
   "caseFieldDepartmentPh": "vd. Doanh nghiệp & M&A",
   "caseFieldLeadLawyer": "Đối tác chính / Luật sư",
   "caseFieldLeadLawyerPh": "vd. Nguyễn Văn A",

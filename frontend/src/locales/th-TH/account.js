@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "เช่น บริษัท Zhejiang Qinghe Foods Co., Ltd. ที่ปรึกษากฎหมายทั่วไปและข้อพิพาทแรงงาน",
   "caseFieldPracticeArea": "สาขากฎหมาย",
   "caseFieldPracticeAreaPh": "เช่น แรงงาน / ที่ปรึกษากฎหมายทั่วไป / การควบรวมและเข้าซื้อกิจการ",
-  "caseFieldDepartment": "สาขากฎหมาย",
+  "caseFieldDepartment": "หมวดงาน",
   "caseFieldDepartmentPh": "เช่น บริษัทและการควบรวมกิจการ (Corporate & M&A)",
   "caseFieldLeadLawyer": "หุ้นส่วนหลัก / ทนายความ",
   "caseFieldLeadLawyerPh": "เช่น สมชาย ใจดี",

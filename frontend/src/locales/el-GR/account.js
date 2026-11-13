@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "π.χ. Zhejiang Qinghe Foods Co., Ltd. Γενική Νομική Υποστήριξη & Εργατική Διαφορά",
   "caseFieldPracticeArea": "Τομέας Εξειδίκευσης",
   "caseFieldPracticeAreaPh": "π.χ. Εργατικό Δίκαιο / Γενική Νομική Υποστήριξη / Συγχωνεύσεις & Εξαγορές",
-  "caseFieldDepartment": "Τομέας εξειδίκευσης",
+  "caseFieldDepartment": "Ομάδα πρακτικής",
   "caseFieldDepartmentPh": "π.χ. Εταιρικό Δίκαιο & Συγχωνεύσεις/Εξαγορές",
   "caseFieldLeadLawyer": "Εταίρος / Δικηγόρος Υπεύθυνος",
   "caseFieldLeadLawyerPh": "π.χ. Lin Zhiyuan",

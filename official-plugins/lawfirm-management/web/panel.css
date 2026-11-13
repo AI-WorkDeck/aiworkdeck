@@ -445,10 +445,10 @@ p {
   border-top: 1px dashed var(--awd-border, var(--fallback-border));
 }
 
+/* 步骤名在英文、德文、俄文等语言里比中文长得多：换行显示，不截断 */
 .step-pill {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
   padding: 5px 6px;
   border-radius: var(--awd-radius-sm, 6px);
   border: 1px solid var(--awd-border, var(--fallback-border));
@@ -728,4 +728,14 @@ td.num {
 .client-confirm p {
   margin: 0;
   flex: 1 1 100%;
+}
+
+/* 表格里的状态胶囊（负荷/风险）在长语言下换行，不被表格边缘截断 */
+td .badge {
+  white-space: normal;
+  min-width: 8em;
+}
+/* 中文胶囊本来就短，保持一行（换行反而把「可优先派案」拆开） */
+:lang(zh) td .badge {
+  white-space: nowrap;
 }

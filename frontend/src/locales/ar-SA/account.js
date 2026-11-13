@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "مثال: Zhejiang Qinghe Foods Co., Ltd. المستشار العام ونزاع عمالي",
   "caseFieldPracticeArea": "مجال الممارسة",
   "caseFieldPracticeAreaPh": "مثال: التوظيف / المستشار العام / الاندماج والاستحواذ",
-  "caseFieldDepartment": "مجال الممارسة",
+  "caseFieldDepartment": "تصنيف الأعمال",
   "caseFieldDepartmentPh": "مثال: الشركات والاندماج والاستحواذ",
   "caseFieldLeadLawyer": "الشريك / المحامي المسؤول",
   "caseFieldLeadLawyerPh": "مثال: Lin Zhiyuan",
