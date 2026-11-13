@@ -345,7 +345,9 @@ async function checkFile(src) {
   await enterPassword(name, PASSWORD)
   await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
   r.openAfterPasswordMs = Date.now() - t0
-  await sleep(2500)
+  const openDirty = []
+  for (let i = 0; i < 6; i++) { openDirty.push(await editor(name, e => e.dirty || e.saving)); await sleep(500) }
+  r.notDirtyAfterOpen = openDirty.every(d => d === false)
   await page.screenshot({ path: path.join(run, kind + '-3-open.png') })
   await dismissLogin()
   await edit(name, kind)
@@ -372,7 +374,7 @@ async function checkFile(src) {
   r.slidePreviewCacheEntries = await previewCacheKeys()
   await close(name)
   log(name, JSON.stringify(r))
-  r.passed = r.engineSawCiphertext === 'DOC_ENCRYPTED' && r.wrongPasswordShown && r.wrongPasswordCleared && r.editVisible && r.autosaveLanded &&
+  r.passed = r.notDirtyAfterOpen && r.engineSawCiphertext === 'DOC_ENCRYPTED' && r.wrongPasswordShown && r.wrongPasswordCleared && r.editVisible && r.autosaveLanded &&
     r.diskStillEncrypted && r.diskDecryptsWithPassword === true && r.diskRejectsWrongPassword && r.reopenAsksPassword && r.reopenHasEdit &&
     r.slidePreviewCacheEntries === 0
   return r
@@ -393,7 +395,9 @@ async function checkLegacy(src, password) {
   r.promptShown = true
   await enterPassword(name, password)
   await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
-  await sleep(2500)
+  const dirtySamples = []
+  for (let i = 0; i < 6; i++) { dirtySamples.push(await editor(name, e => e.dirty)); await sleep(500) }
+  r.notDirtyAfterOpen = dirtySamples.every(d => d === false)
   r.readOnlyBar = await page.evaluate(() => [...document.querySelectorAll('.libre-legacy-copy')].some(e => e.getBoundingClientRect().width))
   await page.screenshot({ path: path.join(run, ext + '-legacy-open.png') })
   await dismissLogin()
@@ -418,9 +422,41 @@ async function checkLegacy(src, password) {
   await close(name)
   await close(copyName)
   log(name, JSON.stringify(r))
-  r.passed = r.readOnlyBar && r.editVisible && r.originalUntouched && r.dirtyKept && r.copyOpenedWithoutPrompt && r.copyHasEdit &&
+  r.passed = r.notDirtyAfterOpen && r.readOnlyBar && r.editVisible && r.originalUntouched && r.dirtyKept && r.copyOpenedWithoutPrompt && r.copyHasEdit &&
     r.copyEncrypted && r.copyDecryptsWithPassword === true && r.originalStillUntouched
   return r
+}
+
+// 诊断：明文旧格式打开后是否被标脏 / 被自动保存改写（OFFICE_PASSWORD_PLAIN=逗号分隔的文件路径）
+async function checkPlain(src) {
+  const name = 'plain-' + path.basename(src), file = path.join(home, 'docs', name)
+  const r = { name, plainCheck: true }
+  evidence.files.push(r)
+  const hash0 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  await primeTree(name)
+  await clickOpen(name)
+  await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+  await page.evaluate((expr, name) => {
+    const e = (0, eval)(expr)(name); window.__dirtyTrace = []; let d = e.dirty
+    setInterval(() => { if (e.dirty !== d) { window.__dirtyTrace.push({ t: Date.now(), dirty: e.dirty }); d = e.dirty } }, 5)
+  }, editorExpr, name)
+  const { guest } = await findGuest(name)
+  const samples = []
+  for (let i = 0; i < 6; i++) { samples.push(await editor(name, e => e.dirty)); await sleep(500) }
+  r.dirtySamples = samples
+  const trace = await page.evaluate(() => window.__dirtyTrace)
+  if (trace.length) {
+    const t = trace[0].t
+    r.dirtyAt = trace
+    r.cmdsAround = (await guest.evaluate(() => window.__olbCmds)).filter(c => c.sent > t - 3000 && c.sent < t + 300).map(c => [c.action, Math.round(c.sent - t), c.done ? Math.round(c.done - t) : null])
+    r.eventsAround = (await guest.evaluate(() => window.__olbEvents)).filter(ev => ev.t > t - 1500 && ev.t < t + 300).map(ev => [ev.type, Math.round(ev.t - t)])
+  }
+  await sleep(20000)
+  r.fileRewritten = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== hash0
+  r.log = await editor(name, e => String(e.log || '').split('\n').filter(l => /modif|save|export|load_document|set_/i.test(l)).slice(-25))
+  await close(name).catch(() => {})
+  log(name, JSON.stringify(r))
+  r.passed = !r.fileRewritten
 }
 
 try {
@@ -430,6 +466,8 @@ try {
   for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx']) fs.copyFileSync(path.join(fixtures, f), path.join(dir, 'locked-' + f))
   const LEGACY = [['rc4cryptoapi_password.xls', 'Password1234_'], ['contract.doc', 'awd-0414'], ['rc4cryptoapi_password.ppt', 'Password1234_']]
   for (const [f] of LEGACY) fs.copyFileSync(path.join(fixtures, 'legacy', f), path.join(dir, 'locked-' + f))
+  const PLAIN = process.env.OFFICE_PASSWORD_PLAIN ? process.env.OFFICE_PASSWORD_PLAIN.split(',') : []
+  for (const f of PLAIN) fs.copyFileSync(f, path.join(dir, 'plain-' + path.basename(f)))
   evidence.runtime = (await start('warmup')).versions
   await openFolder(dir)
   const only = process.env.OFFICE_PASSWORD_ONLY ? process.env.OFFICE_PASSWORD_ONLY.split(',') : null
@@ -440,6 +478,7 @@ try {
       await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})
     }
   }
+  for (const f of PLAIN) { try { await checkPlain(f) } catch (error) { evidence.files.push({ name: f, error: error.stack }); log(f, 'failed', error.message) } }
   for (const [f, pw] of LEGACY) {
     if (only && !only.includes(f)) continue
     try { await checkLegacy(path.join(fixtures, 'legacy', f), pw) } catch (error) {

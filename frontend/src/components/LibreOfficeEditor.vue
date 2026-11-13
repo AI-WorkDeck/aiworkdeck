@@ -3110,7 +3110,8 @@ export default {
         this.passwordState = ''
         this.appendLog('密码已验证，重新装载 / password accepted, loading')
         this.openFailCode = ''
-        this.docLoadFailed = false
+        // docLoadFailed 留给 finishDocLoad 在装载成功后撤：ready 还是上一轮失败时置的 true，
+        // 提前撤闸会让装载途中引擎发来的 modified 把刚打开的文档标脏（真机实测，触发一笔多余的自动保存）
         this.statusKey = 'loadingDoc'
         this.bootStageKey = 'openingDoc'
         this.bootCap = Math.max(this.bootCap, 95)

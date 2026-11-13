@@ -2983,12 +2983,16 @@ function ensureShapeNames(page) {
     if (name) used.add(name);
     else unnamed.push(shape);
   }
-  let counter = 0;
-  for (const shape of unnamed) {
-    let candidate;
-    do { candidate = '__awd_shape_' + (counter++); } while (used.has(candidate));
-    try { shape.setName(candidate); used.add(candidate); } catch (e) {}
-  }
+  // 起名只是定位用的内部记账，不是用户编辑：.ppt 的形状天生没名字，只读一次工具栏状态就给它们
+  // 起名并把文档标成 modified，宿主随即自动保存——打开一份旧演示文稿就被改写成 10 倍大（O14b 真机实测）。
+  if (unnamed.length) withViewOnlyChange(function () {
+    let counter = 0;
+    for (const shape of unnamed) {
+      let candidate;
+      do { candidate = '__awd_shape_' + (counter++); } while (used.has(candidate));
+      try { shape.setName(candidate); used.add(candidate); } catch (e) {}
+    }
+  });
   // Reuse only within this synchronous read; the next call reacquires the page
   // so edits, reordered shapes and recreated placeholders cannot leave stale refs.
   return shapes;

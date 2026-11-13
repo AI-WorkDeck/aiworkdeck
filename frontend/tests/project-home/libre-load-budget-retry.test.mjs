@@ -140,8 +140,15 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   const { decryptOoxml } = await import('../../src/utils/officeEncryption.js')
   const encrypted = new Uint8Array(readFileSync(new URL('../lowa-e2e/fixtures/encrypted/case-ledger.xlsx', import.meta.url)))
   const plain = new Uint8Array(readFileSync(new URL('../../../scripts/eval/fixtures/case-ledger.xlsx', import.meta.url)))
-  const vm = makeVm(async (action) => action === 'load_document' ? { success: true, kind: 'calc' } : { success: true })
+  // 引擎在装载途中会发 modified（真机实测）：模拟它，刚解开的文档不得被标脏
+  const vm = makeVm(async (action, params) => {
+    if (action === 'load_document' && params.bytes && !vm.__modifiedOnce) { vm.__modifiedOnce = true; vm.onDocModified() }
+    return action === 'load_document' ? { success: true, kind: 'calc' } : { success: true }
+  })
   vm.file = { id: 7, name: '案件台账.xlsx', fileType: 'xlsx', fileSize: encrypted.length }
+  vm.dirty = false
+  for (const name of ['onDocModified', 'scheduleAutoSave']) vm[name] = METHODS[name].bind(vm)
+  vm.scheduleAnchorCheck = () => {}
   vm.passwordInput = ''
   vm.passwordState = ''
   vm.passwordAttempts = 0
@@ -167,6 +174,7 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   assert.equal(vm.statusKey, 'ready')
   assert.equal(vm.docLoadFailed, false)
   assert.equal(vm.passwordInput, '', '密码提交后不留在组件里')
+  assert.equal(vm.dirty, false, '装载途中的 modified 不得把刚打开的文档标脏')
   assert.deepEqual(new Uint8Array(loads().at(-1).params.bytes), plain, '引擎拿到的是解开的明文')
 
   const sealed = await vm.sealForStorage(plain, 7)
