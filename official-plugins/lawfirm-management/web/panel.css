@@ -195,7 +195,8 @@ p {
   background: var(--awd-surface-2, var(--fallback-surface-2));
   border: 1px solid var(--awd-border-subtle, var(--fallback-border));
   border-radius: var(--awd-radius-md, 6px);
-  overflow-x: auto;
+  /* 页签已有七八个：窄窗格里换行显示，而不是横向滚动把后面的页签藏到看不见的地方 */
+  flex-wrap: wrap;
 }
 
 .tab-btn {
