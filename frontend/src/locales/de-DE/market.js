@@ -222,6 +222,7 @@ export default {
   "permTasks": "Kalender und Aufgaben",
   "permClipboard": "Zwischenablage",
   "permLawfirm": "Team-Informationen",
+  "permWorklogRead": "Zusammenfassung Ihrer eigenen Arbeitsprotokolle",
   "newlyCreatedTag": "Neu",
   "publishBtn": "Im Erweiterungsmarkt veröffentlichen",
   "publishUpdateBtn": "Im Erweiterungsmarkt aktualisieren",

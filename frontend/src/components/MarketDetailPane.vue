@@ -380,6 +380,7 @@ const PERMISSION_LABELS = {
   get tasks() { return t('market.permTasks') },
   get clipboard() { return t('market.permClipboard') },
   get lawfirm() { return t('market.permLawfirm') },
+  get worklog_read() { return t('market.permWorklogRead') },
 }
 
 /**

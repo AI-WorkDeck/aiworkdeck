@@ -32,14 +32,15 @@ test('every key the panel uses is defined, including dynamic families', () => {
     'panel.status.': ['pending', 'met', 'partial', 'missing', 'na'],
     'panel.kind.': ['qualification', 'scoring'],
     'panel.quote.kind.': ['fixed', 'hourly'],
+    'panel.share.scope.': ['private', 'team', 'firm'],
     'panel.quote.col.': ['item', 'basis', 'amount'],
     'panel.col.': ['no', 'kind', 'requirement', 'score', 'status', 'evidence', 'gap', 'note', 'source'],
     'panel.err.': ['not_signed_in', 'no_project', 'bad_params', 'bad_action', 'bad_library', 'library_too_large', 'matrix_too_large', 'quote_missing',
       'quote_rate_missing', 'quote_empty', 'bad_amount', 'template_missing', 'template_kind', 'template_too_large', 'template_invalid', 'item_missing', 'quota', 'permission', 'failed']
   }
   for (const [prefix, names] of Object.entries(dynamic)) names.forEach((n) => used.add(prefix + n))
-  const fields = { credentials: ['title', 'client', 'clientAlias', 'area', 'year', 'amount', 'role', 'lawyers', 'tags', 'summary'],
-    lawyers: ['name', 'title', 'areas', 'since', 'education', 'bio'], qualifications: ['name', 'kind', 'issuer', 'year', 'expires'],
+  const fields = { credentials: ['title', 'client', 'clientAlias', 'area', 'year', 'amount', 'role', 'lawyers', 'tags', 'summary', 'period', 'scopeOfWork', 'highlights', 'outcome', 'share'],
+    lawyers: ['name', 'title', 'areas', 'since', 'education', 'bio', 'share'], qualifications: ['name', 'kind', 'issuer', 'year', 'expires'],
     services: ['title', 'area', 'content'], quotes: ['name', 'note'] }
   for (const [s, keys] of Object.entries(fields)) keys.forEach((k) => used.add('panel.field.' + s + '.' + k))
   for (const k of used) assert.ok(k in zh, 'missing ' + k)

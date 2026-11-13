@@ -222,6 +222,7 @@ export default {
   "permTasks": "Calendario e attività",
   "permClipboard": "Appunti",
   "permLawfirm": "Informazioni sul team",
+  "permWorklogRead": "Riepilogo dei tuoi registri di lavoro",
   "newlyCreatedTag": "Nuovo",
   "publishBtn": "Pubblica nel catalogo estensioni",
   "publishUpdateBtn": "Aggiorna nel catalogo estensioni",
