@@ -477,8 +477,8 @@ export async function fetchMe({ serverUrl, token }) {
 }
 
 /**
- * 退出登录（POST /api/auth/logout，尽力而为）。设备令牌的本地清除才是真正的退出，
- * 服务端调用失败不阻塞也不报错。
+ * 退出登录（POST /api/auth/logout，尽力而为）。后端会吊销请求头里这枚 awdt_ 设备令牌；
+ * 本地清除照做，服务端调用失败不阻塞也不报错（令牌留到空转清理或在别处手动吊销）。
  */
 export async function postLogout({ serverUrl, token }) {
   const base = normalizeBaseUrl(serverUrl)

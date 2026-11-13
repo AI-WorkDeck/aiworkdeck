@@ -144,8 +144,8 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    但 `/api/site` 仍返回 `cn`。2026-11-03 已备份后修正并核新进程环境、公开 `/api/site`
    的 `current=intl` / `pinned=true` 及 `sites[].baseUrl=https://www.workdeck.ai`。后续部署
    要一起核对站点标识与账户地址；不能只凭国际域名或登录成功判断区域配置正确。
-   不再与「不存在的端点」相同（后者恒为 `{"code":1,"message":"服务器内部错误"}` + 200，
-   这也是判「接口没上」最快的探法）。表结构靠 `ddl-auto: update` 自动建，无手动迁移。
+   不再与「不存在的端点」相同（后者现为 HTTP 404 `{"code":1,"message":"接口不存在"}`，方法不对为 405，
+   路径参数类型不对为 400，均不打 ERROR；此前恒为 200 + 「服务器内部错误」。判「接口没上」看 404）。表结构靠 `ddl-auto: update` 自动建，无手动迁移。
 4.7. **独立发布件逐项查、有更新随发版一起发（2026-09-11 维护者定，dev-board#592）**：
    五个 native pack（`pptx/mineru/kokoro/asr-runtime` + `litigation-visual`）、广场官方插件
    （`due-diligence` 在私有仓 `zeweihan/aiworkdeck-dd-plugin`、`hr-template-pack`）、LOWA 引擎

@@ -80,6 +80,14 @@ HTTP 409 `{status:"error",code:"INLINE_CONTENT_CACHE_MISS",retryWithInlineConten
 更早无来源元数据的历史不能猜测归属。Office消息保存前移除tool_code/tool_output载荷，
 保留过程状态、用户消息、模型回复及思考；Office不再自动写长期摘要。用户粘贴或AI引用文字
 仍随会话保留至删除。不是备份/磁盘物理擦除承诺，完整用户口径见legal/PRIVACY.md。
+**`OfficeConversationPrivacy.forStorage` 的复制游标与搜索游标必须分开**（QO-office 真机 QA 2026-11-13）：
+早先跳过非载荷 `<` 时把复制起点一起推进，第一个载荷前的内容（`<process …>` 的 `<`、整段
+`<thinking>`、工具调用前的正文）全部丢失，回灌气泡以 `process name="…">` 开头，同一段坏文本
+还作为对话历史回喂模型；启动时 `AgentInboxService.scrubOfficeHistory` 会对存量行再跑一遍，所以
+它必须幂等。已坏的存量行内容回不来，窗格回灌经 `sse.restoreLostTagOpener` 补回开头的 `<`，
+只是不再露出残片。护栏 `OfficeConversationPrivacyTest`、`sse.test.js`。
+**`POST /api/auth/logout` 吊销请求头里的 awdt_**（只吊这一枚，同账号其他设备不受影响；本机模式下
+粘贴的桌面签发令牌同样会被吊销，重连要重新生成）。护栏 `AuthControllerLogoutTest`。
 
 Word文本改写六工具支持可选reason：replace_text、insert_text、table_set_cell、
 edit_header_footer、insert_footnote、insert_endnote；replace_batch/pass_step的editsJson支持

@@ -11,7 +11,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTagStreamParser, createSseConnection } from './sse.js'
+import { createTagStreamParser, createSseConnection, restoreLostTagOpener } from './sse.js'
 
 /** 把整段文本喂给解析器，返回三路输出（外加 tool_code 进出事件序列） */
 function parse(chunks) {
@@ -429,4 +429,18 @@ test('稳定计时器不许给已经断掉的连接上：否则退避涨到 5 �
   } finally {
     restore()
   }
+})
+
+test('history rows that lost their leading "<" do not show a dangling tag fragment', () => {
+  const OMIT = '[工具原始参数与输出不保留 / Raw tool payload not retained]'
+  const broken = `process name="列出项目文件"><tool_code>${OMIT}</tool_code></process><final>项目里有 2 个文件</final>`
+  assert.equal(parse(restoreLostTagOpener(broken)).main, '项目里有 2 个文件')
+  assert.equal(parse(restoreLostTagOpener(`/thinking><tool_code>${OMIT}</tool_code>答复`)).main, '答复')
+  // Intact rows and ordinary prose are left alone
+  const intact = '<process name="x"></process><final>好</final>'
+  assert.equal(restoreLostTagOpener(intact), intact)
+  assert.equal(restoreLostTagOpener('final answer> 不是标签'), 'final answer> 不是标签')
+  assert.equal(restoreLostTagOpener('甲方> 乙方'), '甲方> 乙方')
+  assert.equal(restoreLostTagOpener('a > b'), 'a > b')
+  assert.equal(restoreLostTagOpener(''), '')
 })

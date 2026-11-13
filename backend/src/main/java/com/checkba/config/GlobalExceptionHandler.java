@@ -189,6 +189,51 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok().body(result);
     }
 
+    /**
+     * 没有这个路径：真 HTTP 404，不走「统一 200」口径，也不打 ERROR。
+     * 此前落到下面的兜底变成 200 + 「服务器内部错误」，而各端判「旧后端没有这个端点」
+     * 认的都是 HTTP 404（office-addin api.js、MobileRelayClientService、CloudSyncService）。
+     * 主端口上没有 /actuator/**，同样走这里；管理端口的 actuator 端点不受影响。
+     */
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.servlet.NoHandlerFoundException.class})
+    public ResponseEntity<Map<String, Object>> handleNotFound(Exception e) {
+        log.debug("No handler: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", LangText.of("接口不存在", "API endpoint not found"));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
+    }
+
+    /** 路径存在但方法不对：真 HTTP 405 + Allow 头，理由同上。 */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotAllowed(
+            org.springframework.web.HttpRequestMethodNotSupportedException e) {
+        log.debug("Method not allowed: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", LangText.of("该接口不支持此请求方法", "HTTP method not allowed for this endpoint"));
+        var response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (e.getSupportedHttpMethods() != null && !e.getSupportedHttpMethods().isEmpty()) {
+            response.allow(e.getSupportedHttpMethods().toArray(org.springframework.http.HttpMethod[]::new));
+        }
+        return response.body(result);
+    }
+
+    /**
+     * 路径参数类型不对（如 GET /api/projects/list 落到 /{id} 而 id 是 Long）：HTTP 400，
+     * 是调用方的错不是服务器故障，不打 ERROR 堆栈。
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e) {
+        log.debug("Argument type mismatch: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", LangText.of("请求参数格式不正确：" + e.getName(), "Invalid request parameter: " + e.getName()));
+        return ResponseEntity.badRequest().body(result);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleException(Exception e) {
         log.error("GlobalExceptionHandler caught Exception: ", e);
