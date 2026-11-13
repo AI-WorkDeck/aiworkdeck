@@ -388,6 +388,12 @@ async function mountPanel(options = {}) {
                 result = inv || {};
                 break;
               }
+              case 'voidInvoice': {
+                const inv = state.invoices.find((i) => i.id === params.invoiceId);
+                if (inv) inv.status = params.mode;
+                result = inv || {};
+                break;
+              }
               case 'recordCollection': {
                 const col = {
                   id: state.collections.length + 901,
@@ -620,12 +626,20 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
   // Issue the newly submitted invoice
   const issueBtn = p.$('invoice-list').querySelector('.btn-issue-invoice');
   assert.ok(issueBtn, 'Expected issue invoice button');
+  // 没填发票号码不发请求（以前会写死占位号码 SD-xxxxxx）
   issueBtn.click();
+  await tick();
+  assert.equal(p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'issueInvoice'), undefined);
+  assert.match(p.$('notice').textContent, /发票号码/);
+  p.$('invoice-list').querySelector('.invoice-number-input').value = '26112000000012345678';
+  p.$('invoice-list').querySelector('.btn-issue-invoice').click();
   await tick();
 
   const issueCall = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'issueInvoice');
   assert.ok(issueCall);
   assert.equal(issueCall.params.params.invoiceId, 802);
+  assert.equal(issueCall.params.params.invoiceNumber, '26112000000012345678');
+  assert.equal(issueCall.params.params.invoiceCode, undefined, 'no made-up invoice code either');
 
   // Record manual fee collection against the issued invoice
   p.$('collection-invoice-id').value = '802';
@@ -641,6 +655,19 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
   assert.equal(colCall.params.params.bankVoucherNo, 'BK-20261015-9901');
   assert.match(p.$('collection-list').textContent, /BK-20261015-9901/);
   assert.match(p.$('invoice-list').textContent, /已全额回款/);
+
+  // 已开出的发票只能红冲：第一次点击只是确认提示，第二次才发请求
+  const redBtn = [...p.$('invoice-list').querySelectorAll('.btn-void-invoice')].find((b) => b.textContent === '红冲');
+  assert.ok(redBtn, 'issued invoices offer 红冲');
+  redBtn.click();
+  await tick();
+  assert.equal(p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'voidInvoice'), undefined, 'first click only arms');
+  assert.equal(redBtn.textContent, '再点一次确认红冲');
+  redBtn.click();
+  await tick();
+  const voidCall = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'voidInvoice');
+  assert.equal(voidCall.params.params.mode, 'RED_INVOICED');
+  assert.match(p.$('invoice-list').textContent, /已红冲/);
 
   // Sync with Kingdee / Yonyou ERP
   p.$('btn-sync-erp').click();

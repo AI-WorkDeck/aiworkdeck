@@ -347,6 +347,28 @@ class LawFirmBillingFlowTest {
         assertFalse(LawFirmBillingService.onTeam("张三", null));
     }
 
+    @Test
+    void voidedInvoiceFreesFeeCapAndDropsOutOfRealization() {
+        act(partner, "billingSaveTimekeeper", Map.of("userId", senior.getId(), "level", "SENIOR_ASSOCIATE", "standardRateYuan", "2000"));
+        act(partner, "billingSaveTerms", Map.of("intakeId", intake.getId(), "capYuan", "5000"));
+        Long a = id(act(senior, "timeSave", Map.of("target", "i:" + intake.getId(), "workDate", today.toString(), "hours", "2", "description", "a")));
+        act(senior, "timeSubmit", Map.of("ids", List.of(a)));
+        act(partner, "timeReview", Map.of("id", a, "op", "APPROVE"));
+        Map<String, Object> first = bill(act(partner, "billCreate", Map.of("intakeId", intake.getId())));
+        act(partner, "billSend", Map.of("id", first.get("id")));
+        act(partner, "billConfirm", Map.of("id", first.get("id"), "confirmedBy", "王总"));
+        Long invoiceId = ((Number) bills(first.get("id")).get("invoiceId")).longValue();
+        // 作废发票但还没撤销账单：这张单不再占封顶，也不计入实现率
+        ledger.execute(partner.getId(), null, "voidInvoice", Map.of("invoiceId", invoiceId));
+        Long b = id(act(senior, "timeSave", Map.of("target", "i:" + intake.getId(), "workDate", today.toString(), "hours", "2", "description", "b")));
+        act(senior, "timeSubmit", Map.of("ids", List.of(b)));
+        act(partner, "timeReview", Map.of("id", b, "op", "APPROVE"));
+        Map<String, Object> preview = act(partner, "billPreview", Map.of("intakeId", intake.getId()));
+        assertEquals(400_000L, preview.get("totalCents"), "cap room of the voided bill is free again (5000 - 0)");
+        Map<?, ?> total = (Map<?, ?>) act(partner, "billingMetrics", Map.of()).get("total");
+        assertEquals(0L, total.get("billedAmountCents"));
+    }
+
     // ── helpers ──
 
     private Map<String, Object> act(User u, String action, Map<String, Object> params) {
