@@ -7163,7 +7163,15 @@ const EXEC = {
     try {
       withInlineMarkupForExport(function () { if (ext === 'docx') repairMoveRangeBookmarks(); xModel.storeToURL('private:stream', props); });
     } finally {
-      try { if (!!xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) { /* 只读文档等场景可能拒绝，忽略 */ }
+      // 宿主的保存（带 saveSnapshotId）落下快照后，引擎这边就是「自上次保存以来没改过」：标志清成 false。
+      // Impress 的 modify 广播只在 false→true 那一下发，复原成 true 的话之后单条格式类命令（如 AI 把标题
+      // 改红）再也报不上来，宿主不标脏、不自动保存、关标签也不拦——改动丢失（O7 实测）。
+      // Writer/Calc 每笔都广播，不受影响；宿主 dirty 独立记账，上传失败照常重试。其余导出（另存副本、比对）照旧复原。
+      const savedSnapshot = Number.isSafeInteger(p && p.saveSnapshotId) && p.saveSnapshotId > 0;
+      try {
+        const target = savedSnapshot ? false : wasModified;
+        if (!!xModel.isModified() !== target) xModel.setModified(target);
+      } catch (e) { /* 只读文档等场景可能拒绝，忽略 */ }
       exportInFlight = false;
     }
     saveSeq++;
