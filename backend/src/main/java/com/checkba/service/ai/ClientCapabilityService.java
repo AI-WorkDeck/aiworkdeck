@@ -20,8 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * 超时空转（PptxEditTools 教训）。因此按会话记录客户端能力，
  * ToolRegistry 的三个消费点（getAllSpecifications / execute / resolve）据此过滤。
  *
- * 能力由 chat 请求的可选字段 clientCapability 声明（lowa / office / none），
- * 缺省 lowa 保持现状兼容（存量主前端不发送该字段）。
+ * 能力由 chat 请求的可选字段 clientCapability 声明（lowa / office / none / web），
+ * 缺省 lowa 保持现状兼容（存量主前端不发送该字段）；来自网页版来源的会话例外，
+ * 一律钉在 web（见 {@link #markWebClient}）。
  *
  * 生命周期与 EditorBridgeService 的 conversationId 语义一致：按会话记录、
  * 进程内存态、不落库；条目极小（枚举值），不做主动清理。
@@ -37,7 +38,12 @@ public class ClientCapabilityService {
         /** Office 任务窗格插件（Word/Excel/PowerPoint，office_* 执行器） */
         OFFICE,
         /** 无文档编辑执行器（纯对话客户端） */
-        NONE
+        NONE,
+        /**
+         * 网页版工作台（官网 /web/，W1）：浏览器里的 iframe LOWA 执行器，只开 DOCX，
+         * 没有本机文件 / 终端 / Python / git / PPT 服务。工具面是白名单，见 {@link WebClientToolSurface}。
+         */
+        WEB
     }
 
     /**
@@ -71,6 +77,68 @@ public class ClientCapabilityService {
     private final ConcurrentHashMap<String, OfficeFamily> familyByConversation = new ConcurrentHashMap<>();
 
     /**
+     * 确认来自网页版的会话（W1 设计 §4.6 / 风险 6）：能力缺省是 LOWA，网页客户端漏带
+     * {@code clientCapability}（或进程重启后登记表清空、inbox 回放时）就会拿到整套桌面工具。
+     * 所以只要从网页来源（{@link #isWebOrigin}）或 {@code web-} 前缀的连接实例见过这个会话，
+     * 它就钉死在 WEB：之后声明成别的也不放宽，未登记时也按 WEB 兜底。只收窄、不放宽。
+     */
+    private final java.util.Set<String> webConversations = ConcurrentHashMap.newKeySet();
+
+    /** 网页版的 Origin（{@code security.cors.web-origins}，与 CORS 白名单同一份配置）。 */
+    private volatile java.util.Set<String> webOrigins = java.util.Set.of();
+
+    /**
+     * 第三方插件工具在 WEB 档是否可见：只有所属插件 manifest 声明了 {@code hosts:["web"]} 的才放行，
+     * 由 {@link ToolRegistry} 在 {@code @PostConstruct} 推进来（与 {@link #declareHostRequirement} 同一个推模式）。
+     * 缺省（测试里直接 new 的状态）一个都不放。
+     */
+    private volatile java.util.function.Predicate<String> webPluginTool = name -> false;
+
+    /** 网页版连接实例 id 的前缀（{@code X-Client-Instance: web-<uuid>}）。 */
+    public static final String WEB_CLIENT_INSTANCE_PREFIX = "web-";
+
+    @org.springframework.beans.factory.annotation.Value("${security.cors.web-origins:}")
+    void setWebOrigins(String csv) {
+        java.util.Set<String> parsed = new java.util.HashSet<>();
+        if (csv != null) {
+            for (String s : csv.split(",")) {
+                String t = s.trim();
+                if (!t.isEmpty()) parsed.add(t);
+            }
+        }
+        this.webOrigins = java.util.Set.copyOf(parsed);
+    }
+
+    /** 请求的 Origin 是否是配置里的网页版来源（精确匹配，无通配）。 */
+    public boolean isWebOrigin(String origin) {
+        return origin != null && webOrigins.contains(origin);
+    }
+
+    /** 连接实例 id 是否是网页版发的。 */
+    public static boolean isWebClientInstance(String clientInstance) {
+        return clientInstance != null && clientInstance.startsWith(WEB_CLIENT_INSTANCE_PREFIX);
+    }
+
+    /** 把会话钉在 WEB（幂等）。 */
+    public void markWebClient(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return;
+        }
+        if (webConversations.add(conversationId)) {
+            Capability previous = byConversation.put(conversationId, Capability.WEB);
+            if (previous != null && previous != Capability.WEB) {
+                log.warn("Conversation {} came from the web client but was registered as {}; pinned to WEB",
+                        conversationId, previous);
+            }
+        }
+    }
+
+    /** 由 ToolRegistry 推入：插件工具名 → 所属插件是否声明支持网页版。 */
+    public void setWebPluginToolPredicate(java.util.function.Predicate<String> predicate) {
+        this.webPluginTool = predicate == null ? name -> false : predicate;
+    }
+
+    /**
      * 记录一次 chat 请求声明的客户端能力（不带宿主细分，宿主按 WORD 兜底）。
      * raw 为空或无法识别时按 LOWA 处理（现状兼容）。
      */
@@ -94,6 +162,12 @@ public class ClientCapabilityService {
             return;
         }
         Capability parsed = parse(raw);
+        if (parsed == Capability.WEB) {
+            webConversations.add(conversationId);
+        } else if (webConversations.contains(conversationId)) {
+            log.warn("Web conversation {} declared clientCapability '{}'; keeping WEB", conversationId, raw);
+            parsed = Capability.WEB;
+        }
         Capability previous = byConversation.put(conversationId, parsed);
         if (previous != null && previous != parsed) {
             log.info("Client capability changed for conversation {}: {} -> {}", conversationId, previous, parsed);
@@ -119,7 +193,11 @@ public class ClientCapabilityService {
         if (conversationId == null) {
             return Capability.LOWA;
         }
-        return byConversation.getOrDefault(conversationId, Capability.LOWA);
+        Capability recorded = byConversation.get(conversationId);
+        if (recorded != null) {
+            return recorded;
+        }
+        return webConversations.contains(conversationId) ? Capability.WEB : Capability.LOWA;
     }
 
     /** Office 会话的宿主；未登记（含 conversationId 为 null）时默认 WORD。 */
@@ -265,6 +343,10 @@ public class ClientCapabilityService {
         if (toolName == null) {
             return false;
         }
+        // WEB 是白名单：先于一切前缀与声明规则判定，名单外（含插件、用户 MCP）一律不可见
+        if (capabilityOf(conversationId) == Capability.WEB) {
+            return isWebToolVisible(toolName, activeDocKind);
+        }
         if (!satisfiesDeclaredHost(toolName, conversationId)) {
             return false;
         }
@@ -298,7 +380,30 @@ public class ClientCapabilityService {
             case OFFICE -> backendOnly
                     || (officeOnly && hostOfTool(toolName) == officeHostOf(conversationId));
             case NONE -> backendOnly;
+            case WEB -> false; // 已在方法开头按白名单返回
         };
+    }
+
+    /**
+     * WEB 档可见性（W1 设计 §4.6）：编辑器工具按白名单且仍过活跃文档类型闸；纯后端工具按白名单；
+     * 显式拒绝的一律不可见；其余名字只可能是插件 / MCP 工具，只有 manifest 声明了网页支持的才放行。
+     */
+    private boolean isWebToolVisible(String toolName, String activeDocKind) {
+        if (WebClientToolSurface.EDITOR_TOOLS.contains(toolName)) {
+            return visibleForDocKind(toolName, activeDocKind);
+        }
+        if (WebClientToolSurface.BACKEND_TOOLS.contains(toolName)) {
+            return true;
+        }
+        if (WebClientToolSurface.denies(toolName) || hostRequirementOf(toolName) != ToolMeta.Host.NONE) {
+            return false;
+        }
+        try {
+            return webPluginTool.test(toolName);
+        } catch (RuntimeException e) {
+            log.warn("Web plugin tool check failed for {}, hiding it", toolName, e);
+            return false;
+        }
     }
 
     /**

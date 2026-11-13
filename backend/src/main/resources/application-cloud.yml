@@ -50,9 +50,14 @@ security:
   # conversationId 强制服务端签发（公网多租户防空会话抢占）
   conversation-issuance-required: true
   cors:
-    # Office 插件正式托管 Origin；localhost/127.0.0.1 开发态默认放行无需列出。
+    # 网页版工作台（官网 /web/，W1）：精确列出，不用通配。这份清单同时是「网页来源」的判据——
+    # 来自这些 Origin 的 chat / connect 一律按 clientCapability=web 处理（ClientCapabilityService），
+    # 网页端漏带字段也拿不到桌面工具。staging 在环境变量 SECURITY_CORS_WEB_ORIGINS 里换成
+    # https://stg-www.aiworkdeck.com。鉴权只走 X-Session-Id 头、不带 cookie。
+    web-origins: https://www.aiworkdeck.com,https://www.workdeck.ai
+    # Office 插件正式托管 Origin + 网页版来源；localhost/127.0.0.1 开发态默认放行无需列出。
     # allow-all 绝不能开（会整体旁路 Origin 闸）。
-    allowed-origins: https://addin.aiworkdeck.com
+    allowed-origins: https://addin.aiworkdeck.com,${security.cors.web-origins:}
 
 # 官方云后端只有平台通道一条路：这台机器上没有、也不该有任何 BYOK 的 OpenRouter key
 # （env 里没有 OPENROUTER_API_KEY，DB 里没有 external.openrouter.apiKey）。

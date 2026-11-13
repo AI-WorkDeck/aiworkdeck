@@ -916,6 +916,76 @@ class AgentOrchestratorInboxTest {
         }
     }
 
+    @Test
+    void webRunsBeyondThePerUserLimitAreQueuedNotRefusedAndStartWhenASlotFrees() throws Exception {
+        orchestrator.webAdmissionExecutor = Runnable::run;
+        int limit = AgentOrchestrator.WEB_ACTIVE_RUNS_PER_USER;
+        CountDownLatch entered = new CountDownLatch(limit), release = new CountDownLatch(1);
+        Set<String> toolConversations = ConcurrentHashMap.newKeySet();
+        when(tools.execute(eq("read"), any(), any())).thenAnswer(inv -> {
+            toolConversations.add(inv.getArgument(2, com.checkba.service.ai.tools.ToolContext.class).conversationId());
+            entered.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            return new ToolRegistry.ToolResult("done", null, true);
+        });
+        // 每个会话：首轮调一次阻塞工具，拿到结果后收尾
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(new StreamingChatLanguageModel() {
+            @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                generate(messages, List.of(), handler);
+            }
+            @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> specifications,
+                                           StreamingResponseHandler<AiMessage> handler) {
+                modelRequests.add(new ArrayList<>(messages));
+                boolean toolDone = messages.stream().anyMatch(m -> m instanceof ToolExecutionResultMessage);
+                AiMessage reply = toolDone ? AiMessage.from("done") : AiMessage.from(List.of(tool("read", "r-" + messages.size())));
+                if (reply.text() != null) handler.onNext(reply.text());
+                handler.onComplete(Response.from(reply));
+            }
+        });
+        List<Thread> runs = new ArrayList<>();
+        for (int i = 0; i < limit; i++) {
+            var item = inbox.submit(webRequest("conv-web-" + i, "web-" + i), 7L);
+            Thread run = new Thread(() -> orchestrator.acceptInboxSubmission(item.getId()));
+            runs.add(run);
+            run.start();
+        }
+        assertTrue(entered.await(5, TimeUnit.SECONDS), "前 " + limit + " 个网页轮次应当都已起跑");
+
+        var extra = inbox.submit(webRequest("conv-web-extra", "web-extra"), 7L);
+        assertNull(orchestrator.acceptInboxSubmission(extra.getId()), "超出上限：排队而不是起跑");
+        assertEquals(AgentInboxService.PENDING, rows.get(extra.getId()).getState(), "排队条目留在 inbox，不报错不丢");
+        assertNull(orchestrator.activeRunId("conv-web-extra"));
+
+        // 别的用户、或桌面会话不受这个用户的网页名额影响
+        when(members.hasReadPermission(42L, 8L)).thenReturn(true);
+        var otherUser = inbox.submit(webRequest("conv-web-other-user", "web-other"), 8L);
+        Thread other = new Thread(() -> orchestrator.acceptInboxSubmission(otherUser.getId()));
+        other.start();
+        var desktop = request("desktop", "desk-1", "steer");
+        desktop.setConversationId("conv-desktop");
+        var desktopItem = inbox.submit(desktop, 7L);
+        Thread desk = new Thread(() -> orchestrator.acceptInboxSubmission(desktopItem.getId()));
+        desk.start();
+
+        release.countDown();
+        for (Thread run : runs) run.join(5000);
+        other.join(5000);
+        desk.join(5000);
+        long deadline = System.currentTimeMillis() + 5000;
+        while (!toolConversations.contains("conv-web-extra") && System.currentTimeMillis() < deadline) Thread.sleep(20);
+        assertTrue(toolConversations.contains("conv-web-extra"), "腾出名额后排队条目应自动起跑");
+        assertEquals(AgentInboxService.APPLIED, rows.get(extra.getId()).getState());
+        assertTrue(toolConversations.contains("conv-web-other-user"));
+        assertTrue(toolConversations.contains("conv-desktop"));
+    }
+
+    private static AiAgentController.AgentChatRequest webRequest(String conversationId, String key) {
+        AiAgentController.AgentChatRequest r = request("web turn " + key, key, "steer");
+        r.setConversationId(conversationId);
+        r.setClientCapability("web");
+        return r;
+    }
+
     private StreamingChatLanguageModel scripted(AiMessage... script) {
         AtomicInteger call = new AtomicInteger();
         return new StreamingChatLanguageModel() {
