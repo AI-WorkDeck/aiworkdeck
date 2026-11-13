@@ -11,6 +11,11 @@
 
   let locale = 'zh-CN';
   let entries = [];
+  let receiptEditId = null;
+  const NOTE_MAX = 200;
+
+  // 有凭证 = 登记时填了凭证说明，或事后补了凭证（receiptAddedAt）；旧数据没有该字段，按原逻辑处理。
+  const hasReceipt = (e) => Boolean(e.voucher || e.receiptAddedAt);
 
   function t(key) {
     return TABLE[locale]?.[key] ?? TABLE['en-US']?.[key] ?? TABLE['zh-CN']?.[key] ?? key;
@@ -80,6 +85,26 @@
     return persist(entries.map((e) => (e.id === id ? { ...e, settled: !e.settled } : e)), t('expense.updated'));
   }
 
+  function markReceipt(id, date, note) {
+    const receiptAddedAt = date || today();
+    const receiptNote = String(note || '').trim().slice(0, NOTE_MAX);
+    receiptEditId = null;
+    return persist(entries.map((e) => {
+      if (e.id !== id) return e;
+      const next = { ...e, receiptAddedAt };
+      if (receiptNote) next.receiptNote = receiptNote;
+      return next;
+    }), t('expense.updated'));
+  }
+
+  function undoReceipt(id) {
+    return persist(entries.map((e) => {
+      if (e.id !== id) return e;
+      const { receiptAddedAt, receiptNote, ...rest } = e;
+      return rest;
+    }), t('expense.updated'));
+  }
+
   function deleteEntry(id) {
     return persist(entries.filter((e) => e.id !== id), t('expense.deleted'));
   }
@@ -100,7 +125,7 @@
       } else {
         row.advanced += e.amountCents;
         if (!e.settled) row.pending += e.amountCents;
-        if (!e.settled && !e.voucher) row.noVoucher += e.amountCents;
+        if (!e.settled && !hasReceipt(e)) row.noVoucher += e.amountCents;
       }
       byMatter.set(e.matter, row);
     }
@@ -120,6 +145,33 @@
     }
   }
 
+  function receiptForm(id) {
+    const form = el('div', null, 'action-row');
+    form.dataset.receiptForm = id;
+    const dateLabel = el('label', t('expense.receiptDate'));
+    const date = el('input');
+    date.type = 'date';
+    date.value = today();
+    date.dataset.field = 'receipt-date';
+    dateLabel.append(' ', date);
+    const noteLabel = el('label', t('expense.receiptNote'));
+    const note = el('input');
+    note.type = 'text';
+    note.maxLength = NOTE_MAX;
+    note.dataset.field = 'receipt-note';
+    noteLabel.append(' ', note);
+    const ok = el('button', t('expense.confirm'));
+    ok.type = 'button';
+    ok.dataset.action = 'receipt-confirm';
+    ok.addEventListener('click', () => markReceipt(id, date.value, note.value));
+    const cancel = el('button', t('expense.cancel'));
+    cancel.type = 'button';
+    cancel.dataset.action = 'receipt-cancel';
+    cancel.addEventListener('click', () => { receiptEditId = null; renderList(); });
+    form.append(dateLabel, noteLabel, ok, cancel);
+    return form;
+  }
+
   function renderList() {
     const list = $('ex-list');
     list.replaceChildren();
@@ -137,10 +189,14 @@
       head.append(el('span', t(`expense.paid.${e.paidBy}`), 'badge badge-neutral'));
       if (e.paidBy !== 'CLIENT') {
         head.append(el('span', t(e.settled ? 'expense.settled' : 'expense.unsettled'), e.settled ? 'badge badge-green' : 'badge badge-yellow'));
-        if (!e.voucher) head.append(el('span', t('expense.noVoucher'), 'badge badge-red'));
+        if (e.receiptAddedAt) head.append(el('span', t('expense.receiptAdded'), 'badge badge-green'));
+        else if (!e.voucher) head.append(el('span', t('expense.noVoucher'), 'badge badge-red'));
       }
       card.append(head);
       if (e.voucher) card.append(el('p', e.voucher, 'item-meta'));
+      if (e.receiptAddedAt) {
+        card.append(el('p', `${t('expense.receiptDate')}: ${e.receiptAddedAt}${e.receiptNote ? ` · ${e.receiptNote}` : ''}`, 'item-meta'));
+      }
       const actions = el('div', null, 'action-row');
       if (e.paidBy !== 'CLIENT') {
         const settle = el('button', t(e.settled ? 'expense.markUnsettled' : 'expense.markSettled'));
@@ -149,12 +205,26 @@
         settle.addEventListener('click', () => toggleSettled(e.id));
         actions.append(settle);
       }
+      if (e.paidBy !== 'CLIENT' && e.receiptAddedAt) {
+        const undo = el('button', t('expense.undoReceipt'));
+        undo.type = 'button';
+        undo.dataset.action = 'undo-receipt';
+        undo.addEventListener('click', () => undoReceipt(e.id));
+        actions.append(undo);
+      } else if (e.paidBy !== 'CLIENT' && !e.voucher && receiptEditId !== e.id) {
+        const add = el('button', t('expense.markReceipt'));
+        add.type = 'button';
+        add.dataset.action = 'receipt';
+        add.addEventListener('click', () => { receiptEditId = e.id; renderList(); });
+        actions.append(add);
+      }
       const del = el('button', t('expense.delete'));
       del.type = 'button';
       del.dataset.action = 'delete';
       del.addEventListener('click', () => deleteEntry(e.id));
       actions.append(del);
       card.append(actions);
+      if (receiptEditId === e.id) card.append(receiptForm(e.id));
       list.append(card);
     }
   }
