@@ -42,12 +42,11 @@
       <view class="te-table">
         <view class="te-row te-head">
           <text class="tc tc-sel"></text>
-          <text class="tc tc-date">{{ $t('account.teColDate') }}</text>
+          <text class="tc tc-date">{{ $t('account.teColDate') }} / {{ $t('account.teColStatus') }}</text>
           <text class="tc tc-matter">{{ $t('account.teColMatter') }}</text>
           <text class="tc tc-hours">{{ $t('account.teColHours') }}</text>
-          <text class="tc tc-desc">{{ $t('account.teColDesc') }}</text>
           <text class="tc tc-bill">{{ $t('account.teColBillable') }}</text>
-          <text class="tc tc-status">{{ $t('account.teColStatus') }}</text>
+          <text class="tc tc-desc">{{ $t('account.teColDesc') }}</text>
           <text class="tc tc-ops"></text>
         </view>
         <view v-if="loading" class="te-empty">{{ $t('account.loadingEllipsis') }}</view>
@@ -56,7 +55,11 @@
           <view class="tc tc-sel">
             <checkbox v-if="r.editable" :checked="selected[r.id]" @tap="toggleSelect(r.id)" />
           </view>
-          <text class="tc tc-date">{{ r.workDate }}</text>
+          <!-- 状态放在日期下面：窄面板（如开着 AI 助手）里也总在第一屏看得到 -->
+          <view class="tc tc-date">
+            <text>{{ r.workDate }}</text>
+            <text class="awd-set-pill te-status-pill" :class="statusClass(r.status)">{{ statusText(r.status) }}</text>
+          </view>
           <view class="tc tc-matter">
             <AwdSelect v-if="r.editable && targets.length" class="te-row-target" :range="targetLabels" :value="targetIndex(edits[r.id].target)"
               :aria-label="$t('account.teColMatter')" @change="i => setTarget(r.id, i)" />
@@ -65,19 +68,18 @@
           </view>
           <view class="tc tc-hours">
             <input v-if="r.editable" class="awd-set-input te-cell-input" v-model="edits[r.id].hours" type="digit" />
-            <text v-else>{{ hours(r.minutes) }}</text>
+            <text v-else :class="{ 'te-written-down': r.writtenDown }" :title="r.reviewNotes.join('\n')">{{ hoursCell(r) }}</text>
             <text class="te-sub">{{ sourceText(r) }}</text>
+          </view>
+          <view class="tc tc-bill">
+            <checkbox v-if="r.editable" :checked="edits[r.id].billable" @tap="edits[r.id].billable = !edits[r.id].billable" />
+            <text v-else>{{ r.billable ? $t('account.teYes') : $t('account.teNo') }}</text>
           </view>
           <view class="tc tc-desc">
             <input v-if="r.editable" class="awd-set-input te-cell-input" v-model="edits[r.id].description" />
             <text v-else class="te-desc-text" :title="r.description">{{ r.description }}</text>
             <text v-for="(a, i) in r.reviewNotes" :key="i" class="te-sub te-review">{{ a }}</text>
           </view>
-          <view class="tc tc-bill">
-            <checkbox v-if="r.editable" :checked="edits[r.id].billable" @tap="edits[r.id].billable = !edits[r.id].billable" />
-            <text v-else>{{ r.billable ? $t('account.teYes') : $t('account.teNo') }}</text>
-          </view>
-          <view class="tc tc-status"><text class="awd-set-pill" :class="statusClass(r.status)">{{ statusText(r.status) }}</text></view>
           <view class="tc tc-ops">
             <button v-if="r.editable && isDirty(r)" class="awd-set-btn-secondary" :disabled="busy" @tap="saveRow(r)">{{ $t('account.teSave') }}</button>
             <button v-if="r.editable" class="awd-set-btn-danger-text" :disabled="busy" @tap="removeRow(r)">{{ $t('account.teDelete') }}</button>
@@ -133,6 +135,7 @@ export default {
       return this.entries.map(e => ({
         ...e,
         editable: e.status === 'DRAFT' || e.status === 'RETURNED',
+        writtenDown: e.billedMinutes != null && e.billedMinutes !== e.minutes,
         reviewNotes: this.reviewNotes(e),
       }))
     },
@@ -147,10 +150,13 @@ export default {
     },
     summaryText() {
       const sum = s => this.entries.filter(e => s.includes(e.status)).reduce((n, e) => n + (e.minutes || 0), 0)
+      // 已通过只算合伙人核定后仍可收费的时长：核减按核定数，标为不收费的不计
+      const approved = this.entries.filter(e => (e.status === 'APPROVED' || e.status === 'BILLED') && e.billable)
+        .reduce((n, e) => n + (e.billedMinutes != null ? e.billedMinutes : (e.minutes || 0)), 0)
       return this.$t('account.teSummary', {
         draft: this.hours(sum(['DRAFT', 'RETURNED'])),
         submitted: this.hours(sum(['SUBMITTED'])),
-        approved: this.hours(sum(['APPROVED', 'BILLED'])),
+        approved: this.hours(approved),
       })
     },
   },
@@ -165,6 +171,10 @@ export default {
     hours(minutes) {
       // 分钟是整数，÷60 后最多两位小数即可精确表达 6 分钟单位与手填的两位小数
       return String(Number(((minutes || 0) / 60).toFixed(2)))
+    },
+    // 核减过的显示「申报 → 核定」，理由在悬停提示与工作内容下方的审核记录里
+    hoursCell(r) {
+      return r.writtenDown ? `${this.hours(r.minutes)} → ${this.hours(r.billedMinutes)}` : this.hours(r.minutes)
     },
     sourceText(r) {
       if (r.source === 'WORK_RECORD') return this.$t('account.teSourceWorkLog', { hours: this.hours(r.capturedMinutes) })
@@ -365,11 +375,16 @@ export default {
   border: 1px solid var(--awd-border);
   border-radius: var(--awd-radius-md);
   overflow-x: auto;
+  /* macOS 默认浮动滚动条不滚就不显示，律师看不出右边还有列：常驻一条细滚动条 */
+  &::-webkit-scrollbar { height: 8px; }
+  &::-webkit-scrollbar-thumb { background: var(--awd-border); border-radius: 4px; }
 }
+.te-written-down { color: var(--awd-warning-text); }
 .te-row {
   display: flex;
   align-items: flex-start;
-  min-width: 760px;
+  /* 各列固定宽度之和，窄面板（如开着 AI 助手）里整行横向滚动，不把右侧列挤出看不见 */
+  min-width: max-content;
   padding: 6px 0;
   border-bottom: 1px solid var(--awd-border-subtle);
   font-size: var(--awd-panel-fs);
@@ -391,12 +406,13 @@ export default {
   gap: 2px;
 }
 .tc-sel { width: 36px; }
-.tc-date { width: 96px; font-variant-numeric: tabular-nums; }
+.tc-date { width: 112px; font-variant-numeric: tabular-nums; }
+.te-status-pill { align-self: flex-start; }
 .tc-matter { width: 170px; }
 .tc-hours { width: 120px; white-space: nowrap; }
-.tc-desc { flex: 1 1 200px; min-width: 180px; }
+/* 定宽作基准、宽面板里再长：各行 max-content 一样宽，表头底色与行线不会短一截 */
+.tc-desc { flex: 1 0 280px; width: 280px; }
 .tc-bill { width: 60px; }
-.tc-status { width: 80px; }
 .tc-ops { width: 110px; flex-direction: row; flex-wrap: wrap; gap: 4px; }
 .te-strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .te-sub { font-size: var(--awd-panel-fs-sec); color: var(--awd-text-3); }

@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Créer à partir du journal d'activité",
   "teAddBtn": "Ajouter du temps",
   "teSubmitBtn": "Soumettre pour validation ({count})",
-  "teSummary": "À soumettre {draft} h · En validation {submitted} h · Validé {approved} h",
+  "teSummary": "À soumettre {draft} h · En validation {submitted} h · Validé facturable {approved} h",
   "teColDate": "Date",
   "teColMatter": "Projet / dossier",
   "teColHours": "Heures",

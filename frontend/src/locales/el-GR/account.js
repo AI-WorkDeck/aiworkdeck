@@ -39,7 +39,7 @@ export default {
   teImportBtn: 'Δημιουργία από το ημερολόγιο εργασιών',
   teAddBtn: 'Προσθήκη χρόνου',
   teSubmitBtn: 'Υποβολή για έλεγχο ({count})',
-  teSummary: 'Προς υποβολή {draft} ώ. · Σε έλεγχο {submitted} ώ. · Εγκεκριμένες {approved} ώ.',
+  teSummary: 'Προς υποβολή {draft} ώ. · Σε έλεγχο {submitted} ώ. · Εγκεκριμένες χρεώσιμες {approved} ώ.',
   teColDate: 'Ημερομηνία',
   teColMatter: 'Έργο / υπόθεση',
   teColHours: 'Ώρες',

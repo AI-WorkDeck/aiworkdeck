@@ -51,7 +51,7 @@ export default {
   teImportBtn: 'Build from work log',
   teAddBtn: 'Add time',
   teSubmitBtn: 'Submit for review ({count})',
-  teSummary: 'To submit {draft} h · In review {submitted} h · Approved {approved} h',
+  teSummary: 'To submit {draft} h · In review {submitted} h · Approved billable {approved} h',
   teColDate: 'Date',
   teColMatter: 'Project / matter',
   teColHours: 'Hours',

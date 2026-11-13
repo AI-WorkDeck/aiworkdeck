@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "從工作記錄產生",
   "teAddBtn": "補錄工時",
   "teSubmitBtn": "提交審核（{count}）",
-  "teSummary": "待提交 {draft} 小時 · 審核中 {submitted} 小時 · 已通過 {approved} 小時",
+  "teSummary": "待提交 {draft} 小時 · 審核中 {submitted} 小時 · 已通過可收費 {approved} 小時",
   "teColDate": "日期",
   "teColMatter": "專案 / 事項",
   "teColHours": "小時",

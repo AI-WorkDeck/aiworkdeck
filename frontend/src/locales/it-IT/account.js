@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Genera dal registro attività",
   "teAddBtn": "Aggiungi tempo",
   "teSubmitBtn": "Invia in revisione ({count})",
-  "teSummary": "Da inviare {draft} h · In revisione {submitted} h · Approvato {approved} h",
+  "teSummary": "Da inviare {draft} h · In revisione {submitted} h · Approvato fatturabile {approved} h",
   "teColDate": "Data",
   "teColMatter": "Progetto / pratica",
   "teColHours": "Ore",

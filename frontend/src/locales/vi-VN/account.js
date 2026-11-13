@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Tạo từ nhật ký hoạt động",
   "teAddBtn": "Thêm giờ làm việc",
   "teSubmitBtn": "Gửi duyệt ({count})",
-  "teSummary": "Chờ gửi {draft} giờ · Đang duyệt {submitted} giờ · Đã duyệt {approved} giờ",
+  "teSummary": "Chờ gửi {draft} giờ · Đang duyệt {submitted} giờ · Đã duyệt tính phí {approved} giờ",
   "teColDate": "Ngày",
   "teColMatter": "Dự án / vụ việc",
   "teColHours": "Số giờ",

@@ -39,7 +39,7 @@ export default {
   teImportBtn: 'कार्य लॉग से बनाएँ',
   teAddBtn: 'समय जोड़ें',
   teSubmitBtn: 'समीक्षा के लिए जमा करें ({count})',
-  teSummary: 'जमा करना शेष {draft} घं. · समीक्षा में {submitted} घं. · स्वीकृत {approved} घं.',
+  teSummary: 'जमा करना शेष {draft} घं. · समीक्षा में {submitted} घं. · स्वीकृत बिल योग्य {approved} घं.',
   teColDate: 'तारीख',
   teColMatter: 'प्रोजेक्ट / मामला',
   teColHours: 'घंटे',

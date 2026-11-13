@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Jana daripada log aktiviti",
   "teAddBtn": "Tambah masa",
   "teSubmitBtn": "Hantar untuk semakan ({count})",
-  "teSummary": "Untuk dihantar {draft} j · Dalam semakan {submitted} j · Diluluskan {approved} j",
+  "teSummary": "Untuk dihantar {draft} j · Dalam semakan {submitted} j · Diluluskan boleh dicaj {approved} j",
   "teColDate": "Tarikh",
   "teColMatter": "Projek / kes",
   "teColHours": "Jam",

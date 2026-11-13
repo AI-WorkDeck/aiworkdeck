@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "업무 기록에서 생성",
   "teAddBtn": "시간 추가",
   "teSubmitBtn": "검토 제출({count})",
-  "teSummary": "제출 전 {draft}시간 · 검토 중 {submitted}시간 · 승인됨 {approved}시간",
+  "teSummary": "제출 전 {draft}시간 · 검토 중 {submitted}시간 · 승인된 청구 가능 {approved}시간",
   "teColDate": "날짜",
   "teColMatter": "프로젝트 / 사건",
   "teColHours": "시간",

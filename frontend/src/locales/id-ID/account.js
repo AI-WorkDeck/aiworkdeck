@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Susun dari log aktivitas",
   "teAddBtn": "Tambah waktu",
   "teSubmitBtn": "Ajukan untuk ditinjau ({count})",
-  "teSummary": "Akan diajukan {draft} jam · Dalam tinjauan {submitted} jam · Disetujui {approved} jam",
+  "teSummary": "Akan diajukan {draft} jam · Dalam tinjauan {submitted} jam · Disetujui dapat ditagih {approved} jam",
   "teColDate": "Tanggal",
   "teColMatter": "Proyek / perkara",
   "teColHours": "Jam",

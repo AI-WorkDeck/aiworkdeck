@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Сформировать из журнала активности",
   "teAddBtn": "Добавить время",
   "teSubmitBtn": "Отправить на проверку ({count})",
-  "teSummary": "К отправке: {draft} ч · На проверке: {submitted} ч · Утверждено: {approved} ч",
+  "teSummary": "К отправке: {draft} ч · На проверке: {submitted} ч · Утверждено к оплате: {approved} ч",
   "teColDate": "Дата",
   "teColMatter": "Проект / дело",
   "teColHours": "Часы",

@@ -39,7 +39,7 @@ export default {
   teImportBtn: 'Opbouwen uit activiteitenlog',
   teAddBtn: 'Uren toevoegen',
   teSubmitBtn: 'Ter controle indienen ({count})',
-  teSummary: 'In te dienen {draft} u · In controle {submitted} u · Goedgekeurd {approved} u',
+  teSummary: 'In te dienen {draft} u · In controle {submitted} u · Goedgekeurd declarabel {approved} u',
   teColDate: 'Datum',
   teColMatter: 'Project / zaak',
   teColHours: 'Uren',

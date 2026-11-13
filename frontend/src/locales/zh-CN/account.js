@@ -51,7 +51,7 @@ export default {
   teImportBtn: '从工作记录生成',
   teAddBtn: '补录工时',
   teSubmitBtn: '提交审核（{count}）',
-  teSummary: '待提交 {draft} 小时 · 审核中 {submitted} 小时 · 已通过 {approved} 小时',
+  teSummary: '待提交 {draft} 小时 · 审核中 {submitted} 小时 · 已通过可收费 {approved} 小时',
   teColDate: '日期',
   teColMatter: '项目 / 事项',
   teColHours: '小时',

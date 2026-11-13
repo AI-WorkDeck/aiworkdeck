@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "作業記録から作成",
   "teAddBtn": "時間を追加",
   "teSubmitBtn": "審査に提出（{count}）",
-  "teSummary": "未提出 {draft} 時間 · 審査中 {submitted} 時間 · 承認済み {approved} 時間",
+  "teSummary": "未提出 {draft} 時間 · 審査中 {submitted} 時間 · 承認済み・請求対象 {approved} 時間",
   "teColDate": "日付",
   "teColMatter": "プロジェクト / 案件",
   "teColHours": "時間",

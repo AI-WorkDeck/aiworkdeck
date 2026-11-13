@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "إنشاء من سجل النشاط",
   "teAddBtn": "إضافة وقت",
   "teSubmitBtn": "رفع للمراجعة ({count})",
-  "teSummary": "للرفع {draft} س · قيد المراجعة {submitted} س · معتمد {approved} س",
+  "teSummary": "للرفع {draft} س · قيد المراجعة {submitted} س · معتمد قابل للفوترة {approved} س",
   "teColDate": "التاريخ",
   "teColMatter": "المشروع / القضية",
   "teColHours": "الساعات",

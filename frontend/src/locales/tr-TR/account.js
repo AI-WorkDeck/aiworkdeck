@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Etkinlik Günlüğü'nden oluştur",
   "teAddBtn": "Süre ekle",
   "teSubmitBtn": "İncelemeye gönder ({count})",
-  "teSummary": "Gönderilecek {draft} sa · İncelemede {submitted} sa · Onaylı {approved} sa",
+  "teSummary": "Gönderilecek {draft} sa · İncelemede {submitted} sa · Onaylı faturalanabilir {approved} sa",
   "teColDate": "Tarih",
   "teColMatter": "Proje / dosya",
   "teColHours": "Saat",

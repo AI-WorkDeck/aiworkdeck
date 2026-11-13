@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "สร้างจากบันทึกกิจกรรม",
   "teAddBtn": "เพิ่มเวลา",
   "teSubmitBtn": "ส่งตรวจสอบ ({count})",
-  "teSummary": "รอส่ง {draft} ชม. · อยู่ระหว่างตรวจสอบ {submitted} ชม. · อนุมัติแล้ว {approved} ชม.",
+  "teSummary": "รอส่ง {draft} ชม. · อยู่ระหว่างตรวจสอบ {submitted} ชม. · อนุมัติแล้วที่เรียกเก็บได้ {approved} ชม.",
   "teColDate": "วันที่",
   "teColMatter": "โปรเจกต์ / คดี",
   "teColHours": "ชั่วโมง",

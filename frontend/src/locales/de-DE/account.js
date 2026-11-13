@@ -39,7 +39,7 @@ export default {
   "teImportBtn": "Aus Aktivitätsprotokoll erstellen",
   "teAddBtn": "Zeit hinzufügen",
   "teSubmitBtn": "Zur Prüfung einreichen ({count})",
-  "teSummary": "Einzureichen {draft} Std. · In Prüfung {submitted} Std. · Freigegeben {approved} Std.",
+  "teSummary": "Einzureichen {draft} Std. · In Prüfung {submitted} Std. · Freigegeben abrechenbar {approved} Std.",
   "teColDate": "Datum",
   "teColMatter": "Projekt / Mandat",
   "teColHours": "Stunden",

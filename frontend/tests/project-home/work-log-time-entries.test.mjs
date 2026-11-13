@@ -128,3 +128,29 @@ test('when the firm has the cloud channel on, the notice is shown in addition to
   assert.doesNotMatch(between, /<template v-else>/)
   assert.match(between, /<template v-if="!unavailable">/)
 })
+
+test('the approved total counts only billable time at the partner\'s approved hours; written-down rows show declared → approved', () => {
+  const vm = makeVm(async () => ({ data: {} }))
+  vm.entries = [
+    { id: 1, status: 'BILLED', minutes: 150, billedMinutes: 120, billable: true, audit: [] }, // 核减 2.5 → 2
+    { id: 2, status: 'APPROVED', minutes: 72, billedMinutes: 72, billable: false, audit: [] }, // 标为不收费
+    { id: 3, status: 'APPROVED', minutes: 180, billedMinutes: null, billable: true, audit: [] },
+    { id: 4, status: 'SUBMITTED', minutes: 60, billable: true, audit: [] },
+  ]
+  assert.match(vm.summaryText, /"approved":"5"/) // 2 + 3，不含不收费的 1.2 与申报多出的 0.5
+  assert.match(vm.summaryText, /"submitted":"1"/)
+  const rows = Object.fromEntries(vm.rows.map((r) => [r.id, r]))
+  assert.equal(vm.hoursCell(rows[1]), '2.5 → 2')
+  assert.equal(vm.hoursCell(rows[2]), '1.2')
+  assert.equal(vm.hoursCell(rows[3]), '3')
+})
+
+test('status sits under the date so a narrow pane (AI panel open) still shows it; the table scrolls instead of clipping', () => {
+  const tpl = SRC.slice(SRC.indexOf('<template>'), SRC.indexOf('<script>'))
+  const row = tpl.slice(tpl.indexOf('v-for="r in rows"'))
+  const dateCell = row.slice(row.indexOf('tc tc-date'), row.indexOf('tc tc-matter'))
+  assert.match(dateCell, /statusText\(r\.status\)/)
+  assert.doesNotMatch(tpl, /tc-status/)
+  assert.match(SRC, /\.te-row \{[^}]*min-width: max-content;/)
+  assert.match(SRC, /\.te-table \{[^}]*overflow-x: auto;/)
+})
