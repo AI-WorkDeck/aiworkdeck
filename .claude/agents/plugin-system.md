@@ -100,7 +100,7 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 `manifest.frontendEntry` 从「预留」激活。两种形态在 PluginPane 里**行为刻意不同**：
 
 - **`web/` 相对路径** = Web 插件。后端 `GET /api/plugin-web/{id}/**` 静态服务 `plugins/<id>/web/`；PluginPane 给 iframe 加 `sandbox="allow-scripts allow-forms"`，与插件只走 postMessage 桥。
-- **`http(s)://` 绝对 URL** = 旧形态。不加 sandbox、不发握手、不响应桥调用——改它只会打断存量插件。判据是 URL 里有没有 `/api/plugin-web/`（`PluginPane.isWebPlugin`）。
+- **`http(s)://` 绝对 URL** = 旧形态。不发握手、不响应桥调用。判据是 URL 里有没有 `/api/plugin-web/`（`PluginPane.isWebPlugin`）。S26 起也带 sandbox：`allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-downloads`——保留外站自己的源（登录态/存储），只收走顶层导航（不带 sandbox 的外站 iframe 能把整个工作台导航走）。外站与应用页不同源，这里的 allow-same-origin 碰不到宿主；下一条禁令针对 Web 插件。
 
 **绝不给 sandbox 加 `allow-same-origin`。** 同源的 iframe 能读 localStorage 里的 `X-Session-Id` 并打全部 `/api/*`，等于白送宿主权限。
 
