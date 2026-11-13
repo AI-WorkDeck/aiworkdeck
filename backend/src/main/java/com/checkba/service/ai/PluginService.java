@@ -665,12 +665,36 @@ public class PluginService {
     private static final Set<String> L10N_LANGS = com.checkba.util.AppLocale.supportedCodes();
     private static final long L10N_MAX_BYTES = 256 * 1024;
 
+    /** 宿主随包分发的内置插件目录；未安装的内置插件在广场列表里用它的 l10n 表显示名称与简介。 */
+    @Value("${ai.plugins.bundled-dir:}")
+    String bundledDir = "";
+
+    /** pluginId -> 内置包 l10n 表（只读、随安装包固定，不随 rescan 清空） */
+    private final Map<String, Map<String, Map<String, String>>> bundledL10n = new ConcurrentHashMap<>();
+
     private void loadL10n(String pluginId, File pluginDir) {
-        File dir = new File(pluginDir, "l10n");
-        if (!dir.isDirectory()) {
-            return;
+        Map<String, Map<String, String>> tables = readL10n(pluginId, pluginDir);
+        if (!tables.isEmpty()) {
+            pluginL10n.put(pluginId, tables);
         }
+    }
+
+    private Map<String, Map<String, String>> l10nTables(String pluginId) {
+        Map<String, Map<String, String>> tables = pluginL10n.get(pluginId);
+        if (tables != null || bundledDir == null || bundledDir.isBlank() || !PACK_ID.matcher(pluginId).matches()) {
+            return tables;
+        }
+        Map<String, Map<String, String>> bundled = bundledL10n.computeIfAbsent(pluginId,
+                id -> readL10n(id, new File(bundledDir, id)));
+        return bundled.isEmpty() ? null : bundled;
+    }
+
+    private static Map<String, Map<String, String>> readL10n(String pluginId, File pluginDir) {
+        File dir = new File(pluginDir, "l10n");
         Map<String, Map<String, String>> tables = new HashMap<>();
+        if (!dir.isDirectory()) {
+            return tables;
+        }
         for (String lang : L10N_LANGS) {
             File f = new File(dir, lang + ".json");
             if (!f.isFile() || f.length() > L10N_MAX_BYTES) {
@@ -691,9 +715,7 @@ public class PluginService {
                 log.warn("Plugin {} l10n/{}.json 解析失败，忽略: {}", pluginId, lang, e.getMessage());
             }
         }
-        if (!tables.isEmpty()) {
-            pluginL10n.put(pluginId, tables);
-        }
+        return tables;
     }
 
     private static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
@@ -818,7 +840,7 @@ public class PluginService {
             return raw;
         }
         boolean isToken = raw.length() >= 3 && raw.charAt(0) == '%' && raw.charAt(raw.length() - 1) == '%';
-        Map<String, Map<String, String>> tables = pluginId != null ? pluginL10n.get(pluginId) : null;
+        Map<String, Map<String, String>> tables = pluginId != null ? l10nTables(pluginId) : null;
         com.checkba.util.AppLocale current = com.checkba.util.AppLocale.fromCode(
                 com.checkba.service.LangText.localeCode());
         if (isToken) {
@@ -854,6 +876,12 @@ public class PluginService {
             return builtinEn != null ? builtinEn : raw;
         }
         return raw;
+    }
+
+    /** 广场/内置包列表的名称与简介：同 localize，但解析不了的 %key% 占位符绝不外露，改用 fallback。 */
+    public String localizeListing(String pluginId, String raw, String fallback) {
+        String value = localize(pluginId, raw);
+        return value != null && value.length() >= 3 && value.startsWith("%") && value.endsWith("%") ? fallback : value;
     }
 
     private static String localizeToken(Map<String, Map<String, String>> tables,

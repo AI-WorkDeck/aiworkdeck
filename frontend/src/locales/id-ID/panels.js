@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Belum dibaca",
   "pwsFilterGroup": "Grup",
   "pwsFilterDirect": "Langsung",
+  "pwsTypeGroup": "Grup",
+  "pwsTypeDirect": "Langsung",
   "pwsOrgSubNotJoined": "Bergabung dengan tim untuk melihat rekan tim dan firma hukum",
   "pwsOrgSubFirmPrefix": "Firma: ",
   "pwsOrgSubUnnamed": "Tanpa nama",

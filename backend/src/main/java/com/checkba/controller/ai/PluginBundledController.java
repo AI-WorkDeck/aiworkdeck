@@ -24,7 +24,13 @@ public class PluginBundledController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(@RequestHeader(value="X-Session-Id", required=false) String session) {
         if (AuthController.getUserIdFromSession(session) == null) return ResponseEntity.status(401).body(Map.of("code", 1, "message", "Sign in required"));
-        return ResponseEntity.ok(Map.of("code", 0, "plugins", installer.available()));
+        var rows = installer.available();
+        for (Map<String, Object> row : rows) {
+            String id = String.valueOf(row.get("id"));
+            row.put("name", plugins.localizeListing(id, (String) row.get("name"), id));
+            row.put("description", plugins.localizeListing(id, (String) row.get("description"), ""));
+        }
+        return ResponseEntity.ok(Map.of("code", 0, "plugins", rows));
     }
 
     @PostMapping("/{id}/install")

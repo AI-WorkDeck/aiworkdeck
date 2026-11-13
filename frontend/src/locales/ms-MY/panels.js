@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Belum dibaca",
   "pwsFilterGroup": "Kumpulan",
   "pwsFilterDirect": "Terus",
+  "pwsTypeGroup": "Kumpulan",
+  "pwsTypeDirect": "Terus",
   "pwsOrgSubNotJoined": "Sertai pasukan untuk melihat rakan sepasukan dan firma guaman",
   "pwsOrgSubFirmPrefix": "Firma: ",
   "pwsOrgSubUnnamed": "Tiada nama",

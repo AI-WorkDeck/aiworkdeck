@@ -89,7 +89,7 @@
             <text class="form-label">{{ $t('chat.uploadFolder') }}</text>
             <view class="awd-field clickable" @tap="triggerFolderUploadInput">
                <view v-if="isFolderUpload && uploadSelectedFiles.length > 0" class="field-content-row">
-                  <text class="field-value">{{ $t('chat.filesSelected', { count: uploadSelectedFiles.length }) }}</text>
+                  <text class="field-value">{{ $t('chat.filesSelected', { count: uploadSelectedFiles.length }, uploadSelectedFiles.length) }}</text>
                </view>
                <view v-else>
                   <text class="field-placeholder">{{ $t('chat.clickSelectFolder') }}</text>
@@ -494,7 +494,7 @@
                <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
                   <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
                   <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
-                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { n: activeSelectionChip.length }) }}</text>
                   <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
                </view>
                <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
@@ -819,7 +819,7 @@
            <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
               <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
               <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
-              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { n: activeSelectionChip.length }) }}</text>
               <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
            </view>
            <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->

@@ -892,7 +892,8 @@ export default {
           ? this.tr('panels.pwsAgentDirectLabel', '云端助手私聊 · 仅你可见')
           : this.tr('panels.pwsAgentGroupLabel', '云端助手群聊 · 群成员可见')
       }
-      return (c.type === 'DIRECT' ? this.tr('panels.pwsFilterDirect', '私聊') : this.tr('panels.pwsFilterGroup', '群聊')) + ' · ' + this.roleName(c.role)
+      // 行内类型用单数词条（筛选标签是复数「Groups」，英文 QA 2026-11-14 第 5 条）
+      return (c.type === 'DIRECT' ? this.tr('panels.pwsTypeDirect', '私聊') : this.tr('panels.pwsTypeGroup', '群聊')) + ' · ' + this.roleName(c.role)
     },
     selectConversation(c) {
       if (!c) return

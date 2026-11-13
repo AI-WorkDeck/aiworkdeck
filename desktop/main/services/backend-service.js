@@ -226,6 +226,13 @@ function buildJar(ctx) {
   })
 }
 
+function isReleaseBuild() {
+  try {
+    const v = require('../../package.json').awdReleaseBuild
+    return v === true || v === 'true'
+  } catch (e) { return false }
+}
+
 function spawnEnv(ctx) {
   const env = { ...process.env }
   // 后端再起的包内 Python 子进程（诉讼可视化等）继承它：不写 .pyc，免得破坏 .app 签名封印（问题 91）
@@ -243,6 +250,9 @@ function spawnEnv(ctx) {
   // CHECKBA_BACKEND_PORT 口子（会正确流入 ctx.ports.backend），不需要也不该再认
   // 环境里裸的 SERVER_PORT。
   env.SERVER_PORT = String(ctx.ports.backend)
+  // 官方 CI 打的发行版（package.json 经 extraMetadata 带 awdReleaseBuild）：后端据此把
+  // 「允许装未签名能力包」的默认值设为关。开发态与自己从源码打的包不带这个标记。
+  if (ctx.packaged && isReleaseBuild()) env.AWD_RELEASE_BUILD = 'true'
   if (!env.AI_PLUGINS_BUNDLED_DIR) env.AI_PLUGINS_BUNDLED_DIR = path.join(ctx.packaged ? ctx.resourcesPath : ctx.projectRoot, 'official-plugins')
   if (!env.AI_PLUGINS_OAUTH_REDIRECT_URI) env.AI_PLUGINS_OAUTH_REDIRECT_URI = `http://localhost:${ctx.ports.backend}/api/plugins/oauth/callback`
   // PDFBox 直接复用随包 LOWA 的可嵌入 TrueType 字体；用户显式配置优先。
@@ -366,6 +376,7 @@ function createBackendDescriptor() {
 }
 
 module.exports = {
+  isReleaseBuild, spawnEnv,
   createBackendDescriptor, backendLayout, javaLaunchArgs,
   // 复用版本闸的可测面（backend-reuse-gate.test.js）
   decideReuse, probeBackend, probeBackendHealth, probeBackendStartupHealth, probeExternalBackendHealth, backendBuildId,

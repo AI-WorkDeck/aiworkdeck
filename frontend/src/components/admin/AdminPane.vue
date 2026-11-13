@@ -788,14 +788,14 @@
                   <view v-if="telemetrySummary.byMatterCategory.length" class="telemetry-list">
                     <text class="telemetry-list-title">{{ $t('admin.matterCategoryTitle') }}</text>
                     <view v-for="item in telemetrySummary.byMatterCategory" :key="'m-' + item.name" class="telemetry-list-row">
-                      <text class="telemetry-list-name">{{ item.name }}</text>
+                      <text class="telemetry-list-name">{{ matterTypeLabel(item.name, $t) }}</text>
                       <text class="telemetry-list-count">{{ item.count }}</text>
                     </view>
                   </view>
                   <view v-if="telemetrySummary.byTool.length" class="telemetry-list">
                     <text class="telemetry-list-title">{{ $t('admin.topToolsTitle') }}</text>
                     <view v-for="item in telemetrySummary.byTool.slice(0, 8)" :key="'t-' + item.name" class="telemetry-list-row">
-                      <text class="telemetry-list-name">{{ item.name }}</text>
+                      <text class="telemetry-list-name" :title="item.name">{{ toolDisplayName(item.name) }}</text>
                       <text class="telemetry-list-count">{{ item.count }}</text>
                     </view>
                   </view>
@@ -974,7 +974,7 @@
               </view>
               <view v-for="slot in capabilitySlots" :key="slot.id" class="comp-row">
                 <view class="comp-main">
-                  <text class="comp-name">{{ slot.name }}</text>
+                  <text class="comp-name">{{ capabilitySlotName(slot) }}</text>
                   <text class="comp-sub">
                     {{ slot.id }} · {{ $t('admin.capabilityCurrent') }}{{ capabilityCurrentLabel(slot) }}
                     <text v-if="slot.degraded" class="comp-error"> · {{ $t('admin.capabilityDegraded') }}</text>
@@ -1126,6 +1126,9 @@ import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import DocGeneratorSetting from '@/components/settings/DocGeneratorSetting.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
+import { matterTypeLabel } from '@/config/matterTypes.js'
+import { localizeSites } from '@/utils/siteNames.js'
+import { toolDisplayName } from '@/utils/toolDisplayNames.js'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { openPermissionOnboarding, normalizePermissionItems } from '@/utils/permissionOnboarding.js'
 
@@ -1751,6 +1754,14 @@ export default {
     }
   },
   methods: {
+    // 本机用量统计：事项类别存的是后端中文类别名、工具是内部代号，按界面语言显示（英文 QA 2026-11-14 第 4 条）
+    matterTypeLabel,
+    toolDisplayName,
+    // 能力槽名：后端给的是中文配置名，已知槽按 id 换词条；新槽未收录前原样显示
+    capabilitySlotName(slot) {
+      const key = { 'litigation.diagram': 'admin.capabilitySlotLitigationDiagram' }[slot && slot.id]
+      return key ? this.$t(key) : ((slot && slot.name) || '')
+    },
     goBackToWorkbench() {
       uni.reLaunch({ url: '/pages/project-overview/project-overview' })
     },
@@ -2492,7 +2503,7 @@ export default {
     async loadSite() {
       try {
         const s = await getSiteStatus()
-        const sites = (s && s.sites) || []
+        const sites = localizeSites((s && s.sites) || [], this.$t.bind(this))
         const current = sites.find((x) => x.id === (s && s.current))
         this.site = {
           current: (s && s.current) || '',
@@ -3185,7 +3196,8 @@ $brand-accent: $brand-mint;
   font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   color: var(--awd-text-3);
-  word-break: break-all;
+  /* 英文按词换行（break-all 会把 Affero、WorkDeck 拆成两半）；只有长 URL 这类无空格串才在任意处断开 */
+  overflow-wrap: anywhere;
 }
 
 .legal-strong {

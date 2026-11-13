@@ -572,6 +572,8 @@ export default {
   "pwsFilterUnread": "Non letti",
   "pwsFilterGroup": "Gruppi",
   "pwsFilterDirect": "Diretta",
+  "pwsTypeGroup": "Gruppo",
+  "pwsTypeDirect": "Diretta",
   "pwsOrgSubNotJoined": "Unisciti a un team per vedere colleghi e studio",
   "pwsOrgSubFirmPrefix": "Studio: ",
   "pwsOrgSubUnnamed": "Senza nome",

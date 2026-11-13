@@ -572,6 +572,8 @@ export default {
   "pwsFilterUnread": "No leídos",
   "pwsFilterGroup": "Grupos",
   "pwsFilterDirect": "Directo",
+  "pwsTypeGroup": "Grupo",
+  "pwsTypeDirect": "Directo",
   "pwsOrgSubNotJoined": "Únase a un equipo para ver a sus colegas y su despacho",
   "pwsOrgSubFirmPrefix": "Despacho: ",
   "pwsOrgSubUnnamed": "Sin nombre",

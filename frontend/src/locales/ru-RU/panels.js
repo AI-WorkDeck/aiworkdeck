@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Непрочитанные",
   "pwsFilterGroup": "Группы",
   "pwsFilterDirect": "Личные",
+  "pwsTypeGroup": "Группа",
+  "pwsTypeDirect": "Личные",
   "pwsOrgSubNotJoined": "Присоединитесь к команде, чтобы видеть коллег и юридическую фирму",
   "pwsOrgSubFirmPrefix": "Фирма: ",
   "pwsOrgSubUnnamed": "Без названия",

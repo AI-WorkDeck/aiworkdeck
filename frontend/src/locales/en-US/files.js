@@ -140,7 +140,7 @@ export default {
   tagViewTags: 'Tags',
   tagViewAllTagged: 'All tagged files',
   tagViewNoFiles: 'No files match these tags',
-  tagViewFileCount: '{count} files',
+  tagViewFileCount: '{count} file | {count} files',
   tagViewRoot: 'Project root',
   tagClear: 'Clear',
   tagFilterPlaceholder: 'Filter tags…',

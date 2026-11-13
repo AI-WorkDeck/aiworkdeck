@@ -3332,11 +3332,11 @@ export default {
     versionWorkStatusLabel() {
       const s = this.versionWorkStatus
       if (s.onDraft && s.onDraft.name) return this.$t('workbench.workingOnDraft', { name: s.onDraft.name })
-      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }) : this.$t('version.changesAutoRecorded')
+      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }, s.changedCount) : this.$t('version.changesAutoRecorded')
       return ''
     },
     versionEntry() {
-      return versionEntryState((key, params) => this.$t(key, params), {
+      return versionEntryState((key, params, plural) => (plural === undefined ? this.$t(key, params) : this.$t(key, params, plural)), {
         status: this.versionWorkStatus, cloud: this.collabCloud,
         conflict: this.adoptConflictPending, unavailable: this.versionStatusError,
       })
@@ -8007,7 +8007,7 @@ export default {
             if (ok) count++
         })
         if (multi && count > 0) {
-            uni.showToast({ title: this.$t('workbench.filesAdded', { count }), icon: 'none' })
+            uni.showToast({ title: this.$t('workbench.filesAdded', { count }, count), icon: 'none' })
         }
     },
     /** 已打开的标签（两侧窗格）按 id 查一条；id 统一按字符串比较 */

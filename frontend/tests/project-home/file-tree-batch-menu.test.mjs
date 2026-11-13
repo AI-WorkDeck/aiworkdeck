@@ -337,7 +337,7 @@ test('BUG-73 复核：多选加入 AI 对话，宿主逐个挂进上下文但只
   assert.equal(toasts.length, 1, '多选时 showToast 只调一次')
   assert.equal(toasts[0].title, 'workbench.filesAdded:{"count":2}')
   assert.match(ZH_WB, /filesAdded: '已加入 \{count\} 个文件'/)
-  assert.match(EN_WB, /filesAdded: 'Added \{count\} files'/)
+  assert.match(EN_WB, /filesAdded: 'Added \{count\} file \| Added \{count\} files'/) // 单复数（英文 QA 第 5 条）
 })
 
 test('BUG-73 复核：单项加入 AI 对话保持原提示', async () => {

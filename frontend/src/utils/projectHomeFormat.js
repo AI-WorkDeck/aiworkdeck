@@ -22,9 +22,9 @@ try {
 }
 
 /** t() 可用则翻译，否则返回 zh 回落串（node --test 环境）。 */
-function tr(key, params, zhFallback) {
+function tr(key, params, zhFallback, plural) {
   if (_t) {
-    try { return params ? _t(key, params) : _t(key) } catch (e) { /* 回落 */ }
+    try { return plural !== undefined ? _t(key, params, plural) : params ? _t(key, params) : _t(key) } catch (e) { /* 回落 */ }
   }
   return zhFallback
 }
@@ -70,8 +70,8 @@ export function versionTitle(entry) {
 export function fileCountLabel(stats) {
   const n = Number((stats && stats.fileCount) || 0)
   return stats && stats.isLocalRoot
-    ? tr('common.registeredItems', { count: n }, `已登记 ${n} 项`)
-    : tr('common.filesCount', { count: n }, `${n} 个文件`)
+    ? tr('common.registeredItems', { count: n }, `已登记 ${n} 项`, n)
+    : tr('common.filesCount', { count: n }, `${n} 个文件`, n)
 }
 
 /**

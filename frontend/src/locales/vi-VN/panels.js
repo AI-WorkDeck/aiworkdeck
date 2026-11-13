@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Chưa đọc",
   "pwsFilterGroup": "Nhóm",
   "pwsFilterDirect": "Trực tiếp",
+  "pwsTypeGroup": "Nhóm",
+  "pwsTypeDirect": "Trực tiếp",
   "pwsOrgSubNotJoined": "Tham gia nhóm để xem đồng đội và công ty luật",
   "pwsOrgSubFirmPrefix": "Công ty: ",
   "pwsOrgSubUnnamed": "Chưa đặt tên",

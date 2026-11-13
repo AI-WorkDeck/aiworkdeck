@@ -159,8 +159,8 @@ public class PluginMarketService {
         list.removeIf(view -> PluginService.isRetired(view.getId()));
         for (MarketPluginView view : list) {
             if (view.getId() != null) {
-                view.setName(pluginService.localize(view.getId(), view.getName()));
-                view.setDescription(pluginService.localize(view.getId(), view.getDescription()));
+                view.setName(pluginService.localizeListing(view.getId(), view.getName(), view.getId()));
+                view.setDescription(pluginService.localizeListing(view.getId(), view.getDescription(), ""));
             }
             // 安装状态只由本机扫描决定，不能接受远端同名字段。
             view.setInstalled(false);

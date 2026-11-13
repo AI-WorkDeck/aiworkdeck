@@ -6,7 +6,7 @@ export function versionEntryState(t, { status = {}, cloud, conflict = false, una
   const count = status.enabled ? Math.max(0, Math.floor(Number(status.changedCount) || 0)) : 0
   const details = []
   if (unavailable) details.push(t('version.entryUnavailable'))
-  else if (count) details.push(t('version.pendingFileCount', { count }))
+  else if (count) details.push(t('version.pendingFileCount', { count }, count))
   else if (status.enabled && status.working && !status.onDraft) details.push(t('version.changesAutoRecorded'))
   if (conflict) details.push(t('version.pendingChoice'))
   if (cloud?.linked) {

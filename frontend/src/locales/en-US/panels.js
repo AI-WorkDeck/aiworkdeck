@@ -606,6 +606,8 @@ export default {
   pwsFilterUnread: 'Unread',
   pwsFilterGroup: 'Groups',
   pwsFilterDirect: 'Direct',
+  pwsTypeGroup: 'Group',
+  pwsTypeDirect: 'Direct',
   pwsOrgSubNotJoined: 'Join a team to see teammates and law firm',
   pwsOrgSubFirmPrefix: 'Firm: ',
   pwsOrgSubUnnamed: 'Unnamed',
