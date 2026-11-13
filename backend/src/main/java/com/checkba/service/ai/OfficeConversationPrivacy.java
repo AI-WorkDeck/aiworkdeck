@@ -16,32 +16,26 @@ public final class OfficeConversationPrivacy {
         if (content == null) return null;
         // Also cover interrupted streams whose closing payload tag has not arrived yet.
         StringBuilder out = null;
-        int pos = 0;
+        int copied = 0; // content[0, copied) is already in out (or needs no change)
+        int pos = 0;    // search cursor; may run ahead of copied over non-payload '<'
         int len = content.length();
         while (pos < len) {
             int lt = content.indexOf('<', pos);
             if (lt < 0) break;
             String matchedTag = matchTagAt(content, lt);
-            if (matchedTag == null) {
-                if (out != null) out.append(content, pos, lt + 1);
-                pos = lt + 1;
-                continue;
-            }
-            int afterName = lt + 1 + matchedTag.length();
-            int gt = content.indexOf('>', afterName);
+            int gt = matchedTag == null ? -1 : content.indexOf('>', lt + 1 + matchedTag.length());
             if (gt < 0) {
-                if (out != null) out.append(content, pos, lt + 1);
                 pos = lt + 1;
                 continue;
             }
             if (out == null) out = new StringBuilder(len);
-            out.append(content, pos, gt + 1).append(OMITTED).append("</").append(matchedTag).append('>');
+            out.append(content, copied, gt + 1).append(OMITTED).append("</").append(matchedTag).append('>');
             String closeTag = "</" + matchedTag + ">";
             int closeIdx = content.indexOf(closeTag, gt + 1);
-            pos = closeIdx >= 0 ? closeIdx + closeTag.length() : len;
+            pos = copied = closeIdx >= 0 ? closeIdx + closeTag.length() : len;
         }
         if (out == null) return content;
-        if (pos < len) out.append(content, pos, len);
+        if (copied < len) out.append(content, copied, len);
         return out.toString();
     }
 

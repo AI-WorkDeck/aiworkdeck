@@ -8,7 +8,7 @@ import {
   deleteConversation as apiDeleteConversation, renameConversation as apiRenameConversation,
   uploadRelayDocument
 } from './api.js'
-import { createSseConnection, createTagStreamParser } from './sse.js'
+import { createSseConnection, createTagStreamParser, restoreLostTagOpener } from './sse.js'
 import {
   readActiveDocument, readDocumentMeta, detectHost, hashContent,
   executeCommand, hostFamily, documentIdentity
@@ -892,7 +892,7 @@ function toLocalMessage(row) {
     onQuestion: (q) => { question = questionFromParsed(q) },
     onArtifact: (c) => { artifact = artifact ? artifact + '\n\n' + c : c }
   })
-  p.feed(content)
+  p.feed(restoreLostTagOpener(content))
   p.flush()
   text = text.replace(/\s+$/, '')
   return reactive({ role: 'assistant', text, thinking, streaming: false, error: '', tools: [], question, artifact })
