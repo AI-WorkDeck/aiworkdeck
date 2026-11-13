@@ -297,6 +297,7 @@ try {
   await until(async () => (await fetch(base + '/api/admin/wizard')).ok, 120000, 500)
   const dir = path.join(home, 'docs'); fs.mkdirSync(dir)
   for (const [src, kind] of SAMPLES) fs.copyFileSync(src, path.join(dir, 'ql-' + kind + '-' + path.basename(src)))
+  fs.copyFileSync(path.join(root, 'scripts/eval/fixtures/opinion.docx'), path.join(dir, 'b5-opinion.docx'))
   // 偶发启动到 Web 登录页（同 office-interaction-latency.mjs）：重启，最多三次
   for (let attempt = 1; ; attempt++) {
     try {
@@ -317,7 +318,47 @@ try {
       await page.screenshot({ path: path.join(run, 'failure-' + kind + '.png') }).catch(() => {})
     }
   }
-  evidence.passed = evidence.files.length === SAMPLES.length && evidence.files.every(r => r.passed)
+  // 台账 B5：预览借走预热备胎后，紧接着打开文件应仍落在热引擎上（预览清场后原样归还），
+  // 而不是冷启动。先预览演示文稿、马上打开一份 Word：打字 → 自动保存落盘 → 关闭重开核对；
+  // 再预览一次、马上打开同一份演示文稿。
+  const waitReady = n => page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 50 }, editorExpr, n)
+  const waitWarmSpare = () => page.waitForFunction(() => (window.__checkbaActiveOverviewVm?.libreSpares || []).some(sp => !sp.file && !sp.hidden && !sp.borrowed && sp.executor), { timeout: 240000, polling: 200 })
+  async function previewThenOpen(previewName, openName) {
+    await waitWarmSpare()
+    await quickLook(previewName)
+    await until(() => page.evaluate(() => { const m = document.querySelector('.quick-look-mask'); return m && !m.querySelector('.docx-loading') && m.querySelectorAll('.awd-slide-preview-card img').length > 0 }), 180000, 200)
+    await page.evaluate(() => { window.__checkbaActiveOverviewVm.quickLookFile = null })
+    await sleep(600) // 用户看完预览、关掉、点开文件的间隔
+    const spareAtClick = await spareState()
+    const t0 = Date.now()
+    await clickOpen(openName)
+    await waitReady(openName)
+    const r = { preview: previewName, open: openName, spareAtClick, warmAtClick: spareAtClick.some(sp => !sp.file && !sp.hidden && sp.ready), readyMs: Date.now() - t0 }
+    await sleep(1500)
+    await page.screenshot({ path: path.join(run, 'b5-open-' + openName + '.png') })
+    return r
+  }
+  const b5 = evidence.b5 = {}
+  try {
+    const docx = 'b5-opinion.docx', deck = 'ql-pptx-case-report.pptx'
+    const docPath = path.join(dir, docx), mtime0 = fs.statSync(docPath).mtimeMs
+    b5.docx = await previewThenOpen(deck, docx)
+    await exec(docx, 'insert_at_cursor', { text: 'B5回收验证' })
+    await until(() => fs.statSync(docPath).mtimeMs > mtime0, 60000, 300)   // 产品自身的自动保存落盘
+    await close(docx)
+    await clickOpen(docx); await waitReady(docx)
+    const text = await exec(docx, 'get_document_text', { startParagraph: 0, maxParagraphs: 20, __agent: true })
+    b5.docx.savedAndReopened = JSON.stringify(text).includes('B5回收验证')
+    await page.screenshot({ path: path.join(run, 'b5-reopened-docx.png') })
+    await close(docx)
+    b5.deck = await previewThenOpen(deck, deck)
+    const nav = await exec(deck, 'office_get_navigation', {})
+    b5.deck.slides = nav.items?.length || 0
+    await close(deck)
+    b5.passed = b5.docx.warmAtClick && b5.docx.savedAndReopened && b5.deck.warmAtClick && b5.deck.slides > 0
+  } catch (error) { b5.error = error.stack; await page.screenshot({ path: path.join(run, 'failure-b5.png') }).catch(() => {}) }
+  log('B5', JSON.stringify(b5))
+  evidence.passed = evidence.files.length === SAMPLES.length && evidence.files.every(r => r.passed) && !!b5.passed
 } catch (error) {
   evidence.error = error.stack
   if (page && browser) await page.screenshot({ path: path.join(run, 'failure.png') }).catch(() => {})
