@@ -305,7 +305,10 @@ final class Ooxml {
             if (!"tc".equals(tc.getLocalName())) continue;
             // 横向合并的后续格不占新列（gridSpan 已计入）；纵向合并的后续格没有自己的文字
             if ("1".equals(tc.getAttribute("hMerge")) || "true".equals(tc.getAttribute("hMerge"))) continue;
-            if ("1".equals(tc.getAttribute("vMerge")) || "true".equals(tc.getAttribute("vMerge"))) { col++; continue; }
+            if ("1".equals(tc.getAttribute("vMerge")) || "true".equals(tc.getAttribute("vMerge"))) {
+                col += tc.hasAttribute("gridSpan") ? (int) Math.max(1, attr(tc, "gridSpan")) : 1;
+                continue;
+            }
             int span = tc.hasAttribute("gridSpan") ? (int) Math.max(1, attr(tc, "gridSpan")) : 1;
             int rowSpan = tc.hasAttribute("rowSpan") ? (int) Math.max(1, attr(tc, "rowSpan")) : 1;
             long width = 0;
