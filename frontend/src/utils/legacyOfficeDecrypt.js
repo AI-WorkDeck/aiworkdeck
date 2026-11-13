@@ -359,7 +359,14 @@ function putStream(cfb, name, data) {
 }
 
 function writeCfb(cfb) {
-  return cfb.out || new Uint8Array(cfb.src)
+  const out = cfb.out || new Uint8Array(cfb.src)
+  // 4 版复合文档（4096 字节扇区，Mac 版 PowerPoint 会写）：引擎与桌面 LibreOffice 都打不开这种容器里的 .ppt
+  // （同样的明文换成 3 版容器即可正常打开，用户真实样本实测）。解出的明文只交给引擎、不落盘，重打包成 3 版。
+  if (u16(out, 26) === 4) {
+    const repacked = CFB.write(CFB.read(out, { type: 'array' }), { type: 'array', fileType: 'cfb' })
+    return repacked instanceof Uint8Array ? new Uint8Array(repacked.buffer, repacked.byteOffset, repacked.byteLength) : new Uint8Array(repacked)
+  }
+  return out
 }
 
 // ───────────── 检测 ─────────────
@@ -666,6 +673,9 @@ function decryptPptPictures(enc, key0) {
   if (off !== out.length) throw fail('CORRUPT', 'trailing bytes in Pictures stream')
   return out
 }
+
+// 仅供单元测试：图片记录的分段解法用合成数据核对（真实样本不入库）
+export const __test = { decryptPptPictures }
 
 // ───────────── 入口 ─────────────
 

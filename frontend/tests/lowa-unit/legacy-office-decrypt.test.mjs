@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import CFB from 'cfb'
-import { decryptLegacyOffice, detectLegacyEncryption, md5, rc4 } from '../../src/utils/legacyOfficeDecrypt.js'
+import { decryptLegacyOffice, detectLegacyEncryption, md5, rc4, __test } from '../../src/utils/legacyOfficeDecrypt.js'
 
 const FIX = new URL('../lowa-e2e/fixtures/encrypted/legacy/', import.meta.url)
 const load = (name) => new Uint8Array(fs.readFileSync(new URL(name, FIX)))
@@ -155,10 +155,43 @@ test('RC4 已知向量（常见向量：Key="Key", "Plaintext"）', () => {
   assert.equal(Buffer.from(enc).toString('hex'), 'bbf316e8d940af0ad3')
 })
 
-test('带图片的加密 .ppt 明确报 UNSUPPORTED_ENCRYPTION（Pictures 流解法未经真实样本核对，宁可不支持也不出坏图）', async () => {
-  const src = new Uint8Array(fs.readFileSync(new URL('../lowa-e2e/fixtures/encrypted/legacy/rc4cryptoapi_password.ppt', import.meta.url)))
-  const c = CFB.read(src, { type: 'array' })
-  CFB.utils.cfb_add(c, 'Pictures', new Uint8Array(64).fill(7))
-  const withPictures = new Uint8Array(CFB.write(c, { type: 'array', fileType: 'cfb' }))
-  await assert.rejects(decryptLegacyOffice(withPictures, 'deck.ppt', 'Password1234_'), (e) => e.code === 'UNSUPPORTED_ENCRYPTION')
+// Pictures 流：每条图片记录按字段分段（记录头 / rgbUid ×1 或 2 / tag 或 34 字节图元文件头 / 图片数据），
+// 每段都从块 0 重新起 RC4。用户真实样本（Mac PowerPoint，17 MB）上核对过；这里用合成记录锁住分段规则。
+function pictureRecord(recType, inst, uidCount, metaLen, payload) {
+  const body = new Uint8Array(16 * uidCount + metaLen + payload.length)
+  for (let i = 0; i < 16 * uidCount + metaLen; i++) body[i] = (i * 7 + recType) & 0xff
+  body.set(payload, 16 * uidCount + metaLen)
+  const rec = new Uint8Array(8 + body.length)
+  const dv = new DataView(rec.buffer)
+  dv.setUint16(0, inst << 4, true); dv.setUint16(2, recType, true); dv.setUint32(4, body.length, true)
+  rec.set(body, 8)
+  return { rec, segments: [8, ...Array(uidCount).fill(16), metaLen, payload.length] }
+}
+test('加密 .ppt 的图片：按 POI 的分段规则逐条解开（PNG / 双 UID 的 JPEG / EMF）', () => {
+  const key = new Uint8Array(16).map((_, i) => i * 13 + 1)
+  const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, ...Array.from({ length: 3000 }, (_, i) => i & 0xff)])
+  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, ...Array.from({ length: 1500 }, (_, i) => (i * 3) & 0xff), 0xff, 0xd9])
+  const records = [pictureRecord(0xf01e, 0x6e0, 1, 1, png), pictureRecord(0xf01d, 0x46b, 2, 1, jpeg), pictureRecord(0xf01a, 0x3d4, 1, 34, new Uint8Array(700).fill(9))]
+  const plain = new Uint8Array(records.reduce((n, r) => n + r.rec.length, 0))
+  const enc = new Uint8Array(plain.length)
+  let off = 0
+  for (const { rec, segments } of records) {
+    plain.set(rec, off)
+    let p = 0
+    for (const len of segments) { enc.set(rc4(key, rec.subarray(p, p + len)), off + p); p += len }
+    off += rec.length
+  }
+  assert.deepEqual(__test.decryptPptPictures(enc, key), plain)
+  // 整条记录一口气 RC4（不分段重置）解出来是错的——锁住「每段重置」这一点
+  const continuous = new Uint8Array(enc.length); off = 0
+  for (const { rec } of records) { continuous.set(rc4(key, rec), off); off += rec.length }
+  let wrong = null
+  try { wrong = __test.decryptPptPictures(continuous, key) } catch (e) { wrong = null }
+  assert.notDeepEqual(wrong, plain)
+})
+
+test('图片区里出现认不出的记录：明确报 UNSUPPORTED_ENCRYPTION，不猜', () => {
+  const key = new Uint8Array(16).fill(3)
+  const rec = new Uint8Array(8 + 4); new DataView(rec.buffer).setUint16(2, 0xf007, true); new DataView(rec.buffer).setUint32(4, 4, true)
+  assert.throws(() => __test.decryptPptPictures(rc4(key, rec), key), (e) => e.code === 'UNSUPPORTED_ENCRYPTION')
 })

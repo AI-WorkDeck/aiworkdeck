@@ -407,7 +407,12 @@ async function checkLegacy(src, password) {
   await passwordBox(name)
   r.promptShown = true
   await enterPassword(name, password)
-  await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+  try {
+    await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+  } catch (error) {
+    r.stuck = await editor(name, e => ({ status: e.statusKey, code: e.openFailCode, pw: e.passwordState, failed: e.docLoadFailed, log: String(e.log || '').split('\n').filter(l => !/QObject|QRect/.test(l)).slice(-15) }))
+    throw error
+  }
   const dirtySamples = []
   for (let i = 0; i < 6; i++) { dirtySamples.push(await editor(name, e => e.dirty)); await sleep(500) }
   r.notDirtyAfterOpen = dirtySamples.every(d => d === false)
