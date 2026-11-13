@@ -37,11 +37,11 @@ function createDemoState() {
       {
         id: 1,
         intakeNo: 'LF-2026-0001',
-        title: '华星半导体科创板IPO专项法律服务',
+        title: '澜曜微电子科创板IPO专项法律服务',
         practiceArea: 'CAPITAL_MARKET',
         departmentName: '资本市场与并购部',
         leadLawyerName: '韩泽伟律师',
-        clientName: '华星半导体股份有限公司',
+        clientName: '澜曜微电子股份有限公司',
         clientCreditCode: '91110108MA001111XX',
         counterpartyName: '无',
         feeMode: 'FIXED',
@@ -55,18 +55,18 @@ function createDemoState() {
       {
         id: 2,
         intakeNo: 'LF-2026-0002',
-        title: '蓝海光电诉华星半导体（集团）有限公司技术秘密侵权纠纷',
+        title: '朗绮光电诉澜曜微电子（集团）有限公司技术秘密侵权纠纷',
         practiceArea: 'IP_TECH',
         departmentName: '争议解决部',
         leadLawyerName: '林致远律师',
-        clientName: '苏州蓝海光电科技有限公司',
+        clientName: '苏州朗绮光电科技有限公司',
         clientCreditCode: '91320500MA002222YY',
-        counterpartyName: '华星半导体（集团）有限公司',
+        counterpartyName: '澜曜微电子（集团）有限公司',
         feeMode: 'CONTINGENCY',
         contractAmountCents: 120000000,
         contingencyRateBps: 2000,
         conflictRiskLevel: 'YELLOW',
-        conflictSummary: '【YELLOW · Y1_EXISTING_CLIENT_OTHER_MATTER】新案对方当事人与本所在办案件委托人「华星半导体股份有限公司」商号核心词干一致，需征询主办律师放行并建立信息隔离墙。',
+        conflictSummary: '【YELLOW · Y1_EXISTING_CLIENT_OTHER_MATTER】新案对方当事人与本所在办案件委托人「澜曜微电子股份有限公司」商号核心词干一致，需征询主办律师放行并建立信息隔离墙。',
         feeComplianceWarning: '《关于进一步规范律师服务收费的意见》分段递减上限提示：风险代理收费最高不得超过标的额的30%，且分段递减上限为：不超过100万元部分≤18%',
         status: 'PENDING_LAWYER_CLEARANCE',
         imConversationId: 'im-conv-conflict-2'
@@ -80,8 +80,8 @@ function createDemoState() {
         targetUserId: 101,
         targetUserName: '韩泽伟律师',
         matchedProjectId: 11,
-        matchedMatterTitle: '华星半导体科创板IPO专项法律服务',
-        matchedPartyName: '华星半导体股份有限公司',
+        matchedMatterTitle: '澜曜微电子科创板IPO专项法律服务',
+        matchedPartyName: '澜曜微电子股份有限公司',
         conflictRuleCitation: '全国律协《律师执业行为规范》第五十一条第（三）项、第五十二条第（一）项',
         decision: 'PENDING',
         comment: '',
@@ -94,14 +94,14 @@ function createDemoState() {
         invoiceAppNo: 'INV-2026-001',
         intakeId: 1,
         intakeNo: 'LF-2026-0001',
-        matterTitle: '华星半导体科创板IPO专项法律服务',
+        matterTitle: '澜曜微电子科创板IPO专项法律服务',
         departmentName: '资本市场与并购部',
         invoiceType: 'DIGITAL_SPECIAL',
         amountCents: 180000000,
         taxRateBps: 600,
         taxAmountCents: 10188679,
         netAmountCents: 169811321,
-        buyerName: '华星半导体股份有限公司',
+        buyerName: '澜曜微电子股份有限公司',
         buyerTaxId: '91110108MA001111XX',
         status: 'ISSUED',
         invoiceNumber: 'SD-000801',
@@ -115,10 +115,10 @@ function createDemoState() {
         collectionNo: 'COL-2026-001',
         intakeId: 1,
         intakeNo: 'LF-2026-0001',
-        matterTitle: '华星半导体科创板IPO专项法律服务',
+        matterTitle: '澜曜微电子科创板IPO专项法律服务',
         invoiceId: 801,
         invoiceAppNo: 'INV-2026-001',
-        payerName: '华星半导体股份有限公司',
+        payerName: '澜曜微电子股份有限公司',
         amountCents: 120000000,
         paymentMethod: 'BANK_TRANSFER',
         bankVoucherNo: 'BK-20261010-7712',
@@ -298,8 +298,8 @@ async function mountPanel(options = {}) {
                       riskLevel: 'YELLOW',
                       ruleTitle: '新案对方当事人系本所在办案件委托人',
                       statutoryCitation: '《律师法》第39条 / 《全国律协执业行为规范》第51条',
-                      matchedMatterTitle: '华星半导体科创板IPO专项法律服务',
-                      matchedPartyName: params.counterpartyName || '华星半导体股份有限公司',
+                      matchedMatterTitle: '澜曜微电子科创板IPO专项法律服务',
+                      matchedPartyName: params.counterpartyName || '澜曜微电子股份有限公司',
                       handlerUserName: '韩泽伟律师'
                     }
                   ],
@@ -362,7 +362,7 @@ async function mountPanel(options = {}) {
                   id: state.invoices.length + 801,
                   invoiceAppNo: `INV-2026-00${state.invoices.length + 1}`,
                   intakeId: params.intakeId,
-                  matterTitle: '华星半导体科创板IPO专项法律服务',
+                  matterTitle: '澜曜微电子科创板IPO专项法律服务',
                   departmentName: '资本市场与并购部',
                   invoiceType: params.invoiceType,
                   amountCents: params.amountCents,
@@ -394,7 +394,7 @@ async function mountPanel(options = {}) {
                   collectionNo: `COL-2026-00${state.collections.length + 1}`,
                   intakeId: params.intakeId,
                   invoiceId: params.invoiceId,
-                  matterTitle: '华星半导体科创板IPO专项法律服务',
+                  matterTitle: '澜曜微电子科创板IPO专项法律服务',
                   invoiceAppNo: params.invoiceId ? 'INV-2026-002' : null,
                   payerName: params.payerName,
                   amountCents: params.amountCents,
@@ -500,6 +500,8 @@ test('1. Handshake init, theme token injection (light & dark), SDK lawfirm helpe
   assert.match(p.$('self-badge').textContent, /韩泽伟律师.*资本市场与并购部/);
   assert.match(p.$('intake-list').textContent, /LF-2026-0001/);
   assert.match(p.$('intake-list').textContent, /LF-2026-0002/);
+  assert.doesNotMatch(p.$('intake-list').textContent, /G0_CLEAR|[A-Z]\d_[A-Z_]+/, 'rule codes stay internal');
+  assert.match(p.$('intake-list').textContent, /【无冲突】/);
 
   // Verify host event lawfirm.navigate switches tabs
   p.sendToPlugin({ awd: 1, type: 'event', event: 'lawfirm.navigate', data: { tab: 'dashboard' } });
@@ -513,11 +515,11 @@ test('2. Real-time conflict preview and submitting a case intake with statutory 
   const p = await mountPanel();
   t.after(() => p.dom.window.close());
 
-  p.$('intake-title').value = '华星高管职务侵占刑事控告与追偿专项';
+  p.$('intake-title').value = '澜曜高管职务侵占刑事控告与追偿专项';
   p.$('intake-practice-area').value = 'CRIMINAL';
   p.$('intake-fee-mode').value = 'CONTINGENCY';
   p.$('intake-client-name').value = '蓝海控股集团有限公司';
-  p.$('intake-counterparty-name').value = '华星半导体股份有限公司';
+  p.$('intake-counterparty-name').value = '澜曜微电子股份有限公司';
   p.$('intake-contract-amount').value = '150';
   p.$('intake-contingency-rate').value = '25';
 
@@ -535,11 +537,11 @@ test('2. Real-time conflict preview and submitting a case intake with statutory 
 
   const submitCalls = p.calls.filter((c) => c.method === 'lawfirm.request' && c.params.action === 'submitIntake');
   assert.equal(submitCalls.length, 1);
-  assert.equal(submitCalls[0].params.params.title, '华星高管职务侵占刑事控告与追偿专项');
+  assert.equal(submitCalls[0].params.params.title, '澜曜高管职务侵占刑事控告与追偿专项');
   assert.equal(submitCalls[0].params.params.contractAmountCents, 150000000);
 
   // Verify 5-step progress tracker rendered for the newly submitted intake
-  assert.match(p.$('intake-list').textContent, /LF-2026-0003.*华星高管职务侵占刑事控告与追偿专项/);
+  assert.match(p.$('intake-list').textContent, /LF-2026-0003.*澜曜高管职务侵占刑事控告与追偿专项/);
   const steps = p.$('intake-list').querySelectorAll('.item-card:first-child .step-pill');
   assert.equal(steps.length, 5);
   assert.equal(steps[0].dataset.state, 'done');
@@ -604,7 +606,7 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
 
   // Submit a new digital invoice
   p.$('invoice-amount-yuan').value = '500000';
-  p.$('invoice-buyer-name').value = '华星半导体股份有限公司';
+  p.$('invoice-buyer-name').value = '澜曜微电子股份有限公司';
   p.$('invoice-buyer-tax-id').value = '91110108MA001111XX';
   p.$('btn-submit-invoice').click();
   await tick();
@@ -627,7 +629,7 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
 
   // Record manual fee collection against the issued invoice
   p.$('collection-invoice-id').value = '802';
-  p.$('collection-payer-name').value = '华星半导体股份有限公司';
+  p.$('collection-payer-name').value = '澜曜微电子股份有限公司';
   p.$('collection-amount-yuan').value = '500000';
   p.$('collection-voucher-no').value = 'BK-20261015-9901';
   p.$('btn-record-collection').click();

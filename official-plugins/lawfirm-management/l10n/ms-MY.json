@@ -6,7 +6,7 @@
   "expense.formHint": "Fi mahkamah, fi pakar, kos perjalanan dan kos yang serupa bukan yuran guaman. Klien membayarnya secara berasingan, jadi ia direkodkan berasingan daripada yuran guaman di bawah «Pengebilan & Kutipan Yuran». Menurut Langkah Pentadbiran Yuran Perkhidmatan Peguam China, penyelesaian mesti menyertakan senarai kos yang dibayar bagi pihak klien beserta baucar yang sah; klien boleh menolak mana-mana bahagian yang tiada baucar sah. Lejar ini disimpan pada peranti ini.",
   "expense.date": "Tarikh",
   "expense.matter": "Kes",
-  "expense.matterPlaceholder": "cth. Lanhai Optoelectronics lwn. Huaxing Semiconductor",
+  "expense.matterPlaceholder": "cth. Langqi Optoelectronics lwn. Lanyao Microelectronics",
   "expense.category": "Kategori",
   "expense.amount": "Jumlah (CNY)",
   "expense.paidBy": "Dibayar oleh",
@@ -58,6 +58,7 @@
   "access.colleague": "Rakan sekerja di firma anda",
   "access.risk.line": "Amaran risiko: {0}",
   "access.risk.GREEN": "Hijau (tiada konflik)",
+  "access.rule.G0_CLEAR": "Tiada konflik",
   "access.risk.YELLOW": "Kuning (potensi konflik)",
   "access.risk.RED": "Merah (konflik langsung)"
 }
