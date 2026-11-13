@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Intake & Konflik",
   "pwsLfJumpFinance": "Penagihan & Keuangan",
   "pwsLfJumpDashboard": "Dasbor 3D Firm",
+  "pwsLfJumpDashboardLocal": "Dasbor 3D (perangkat ini)",
+  "pwsLfJumpDashboardMine": "Dasbor 3D saya",
   "pwsLfJumpOa": "Sinkronisasi OA & IM",
   "pwsDdStagesTitle": "Tahap Due Diligence",
   "pwsDdStagesSub": "Alur Kerja Standar 6 Langkah",

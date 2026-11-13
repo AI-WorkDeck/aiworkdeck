@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "受任と利益相反チェック",
   "pwsLfJumpFinance": "請求と財務",
   "pwsLfJumpDashboard": "事務所3Dダッシュボード",
+  "pwsLfJumpDashboardLocal": "3Dダッシュボード（この端末）",
+  "pwsLfJumpDashboardMine": "自分の3Dダッシュボード",
   "pwsLfJumpOa": "OA & IM同期",
   "pwsDdStagesTitle": "デューデリジェンスの段階",
   "pwsDdStagesSub": "6ステップ標準ワークフロー",

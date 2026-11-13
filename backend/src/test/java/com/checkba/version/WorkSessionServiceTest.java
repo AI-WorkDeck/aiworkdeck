@@ -190,6 +190,23 @@ class WorkSessionServiceTest {
     }
 
     @Test
+    void diskScanAfterEndSessionDoesNotStartAPhantomSession() throws Exception {
+        // QA D10: ending a session checks out main and merges; the folder scan then reports the rewritten
+        // file (same content, newer mtime). That must not open a new session.
+        svc.onChangeSignal(7L, 1L, "韩泽伟");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "二稿");
+        svc.commitNow(7L, 1L, "韩泽伟", "改了");
+        svc.endSession(7L, 1L, "韩泽伟", "第一轮");
+        svc.onDiskScanSignal(7L, 1L, "韩泽伟");
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(repoSvc.mainBranch(), repoSvc.currentBranch(7L));
+
+        Files.writeString(root.resolve("projects/7/合同.txt"), "三稿");
+        svc.onDiskScanSignal(7L, 1L, "韩泽伟");
+        assertTrue(svc.activeSession(7L).isPresent(), "a real edit found by the scan still starts a session");
+    }
+
+    @Test
     void secondSignalReusesTheSameSession() {
         svc.onChangeSignal(7L, 1L, "韩泽伟");
         String branch = svc.activeSession(7L).orElseThrow().getBranchName();

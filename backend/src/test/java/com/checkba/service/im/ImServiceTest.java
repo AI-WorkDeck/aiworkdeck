@@ -110,6 +110,13 @@ class ImServiceTest {
   row.setExpiresAt(Instant.now().minusSeconds(1)); invitations.saveAndFlush(row);
   assertThrows(IllegalArgumentException.class,()->call(client,"join",Map.of("code",expired)));
  }
+ @Test void replacedCodeStopsWorkingButStaysRecognisableForThePortal() {
+  // QA D4: a replaced code was deleted, so the client portal could only answer "invalid access code".
+  String group=create("GROUP"), first=invite(group,"CLIENT"), second=invite(group,"CLIENT");
+  assertTrue(invitations.existsById(ImService.sha(first.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+  assertThrows(IllegalArgumentException.class,()->call(client,"join",Map.of("code",first)));
+  call(client,"join",Map.of("code",second));
+ }
  @Test void concurrentInvitationRedemptionHasExactlyOneWinner() throws Exception {
   String id=create("GROUP"), code=invite(id,"MEMBER"); CountDownLatch start=new CountDownLatch(1);
   ExecutorService workers=Executors.newFixedThreadPool(2);

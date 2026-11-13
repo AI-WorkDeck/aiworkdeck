@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Intake & conflicten",
   "pwsLfJumpFinance": "Facturering & financiën",
   "pwsLfJumpDashboard": "3D-dashboard kantoor",
+  "pwsLfJumpDashboardLocal": "3D-dashboard (dit apparaat)",
+  "pwsLfJumpDashboardMine": "Mijn 3D-dashboard",
   "pwsLfJumpOa": "OA & IM-synchronisatie",
   "pwsDdStagesTitle": "Due diligence-fases",
   "pwsDdStagesSub": "Standaardworkflow in 6 stappen",

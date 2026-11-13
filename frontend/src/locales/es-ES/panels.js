@@ -615,6 +615,8 @@ export default {
   "pwsLfJumpIntake": "Admisión de clientes y conflictos de interés",
   "pwsLfJumpFinance": "Facturación y finanzas",
   "pwsLfJumpDashboard": "Panel 3D del despacho",
+  "pwsLfJumpDashboardLocal": "Panel 3D (este dispositivo)",
+  "pwsLfJumpDashboardMine": "Mi panel 3D",
   "pwsLfJumpOa": "Sincronización de OA y MI",
   "pwsDdStagesTitle": "Etapas de due diligence",
   "pwsDdStagesSub": "Flujo de trabajo estándar de 6 pasos",

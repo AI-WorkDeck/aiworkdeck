@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "수임 및 이해충돌",
   "pwsLfJumpFinance": "청구 및 재무",
   "pwsLfJumpDashboard": "로펌 3D 대시보드",
+  "pwsLfJumpDashboardLocal": "3D 대시보드(이 기기)",
+  "pwsLfJumpDashboardMine": "내 3D 대시보드",
   "pwsLfJumpOa": "OA & IM 동기화",
   "pwsDdStagesTitle": "실사(Due Diligence) 단계",
   "pwsDdStagesSub": "6단계 표준 워크플로우",

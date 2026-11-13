@@ -43,6 +43,11 @@ public class LawFirmAccessPolicy {
         }
     }
 
+    /** Desktop single-user ledger: viewable in full, but it is this device's data, not the firm's. */
+    public boolean localLedger() {
+        return localMode;
+    }
+
     public void requireFirmWide(Long userId) {
         if (!canViewFirmWide(userId)) {
             throw new IllegalArgumentException(LangText.of("无权查看：全所收费台账与看板仅限律所管理员", "Not permitted: firm-wide fee ledger and dashboards are limited to law firm administrators"));

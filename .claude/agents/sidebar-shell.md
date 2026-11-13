@@ -312,6 +312,13 @@ type/priority/notes/assigneeId/remindBefore 与多文件关联表 `project_task_
   在块容器里撑满整行。按钮类一律写 `margin: 0`（`.comp-btn` / `.btn-save` 已补）。
 - **`<form>` → `<uni-form><span>…</span></uni-form>`**：写在 form 上的 flex/grid/gap 只作用到中间那层 span，
   子元素全挤在一起。`App.vue` 已全局 `uni-form > span { display: contents }`，不要删。
+- **`<form @submit>` 在应用里不会提交（QA D1 第二轮）**：uni-button 只有 `form-type="submit"` 才触发表单提交
+  （`type="submit"` 被忽略），uni-input 回车只发 `@confirm`，uni-form 的 submit 事件对象没有 `preventDefault`。
+  表单里的按钮一律 `type="button"` + `@click` 直接调处理函数（输入框回车用 `@confirm`）。同理模板里的
+  `<textarea>`/`<input>` 是 uni 组件，input 事件的值在 `detail.value`，读 `$event.target.value` 会丢字
+  （消息中心输入框曾因此永远点不亮「发送」）；要原生元素就写 `<component :is="'textarea'">`。jsdom/Chrome
+  单测里挂的是原生元素，派发 submit 照样全绿——守卫 `frontend/tests/design-system/uni-form-buttons.test.mjs`
+  （CI 首个 job）静态拦这两类；真页面回归 `npm run test:message-center-e2e`（uni 编译产物 + 真实鼠标点击）。
 - **模板里用了类名却没写样式不会报错**（团队看板 `scope-tab` 曾渲染成三行裸大字），
   `<text>` 不设字号会继承 16px。新组件交付前按 `sdk/plugin-sdk/UI-GUIDELINES.md` 第 8 条截图自检。
 - `var(--awd-xxx)` 名字写错同样静默失效；`scripts/check-design-system.mjs` 只查 MIGRATED_FILES 里的文件。
