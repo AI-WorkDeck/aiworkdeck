@@ -824,8 +824,30 @@ public class ToolRegistry {
             disclosurePolicy.setPluginToolKeywords(this::declaredToolKeywords);
             disclosurePolicy.setPluginToolSearchTerms(this::declaredToolSearchTerms);
         }
+        if (clientCapabilityService != null) {
+            clientCapabilityService.setWebPluginToolPredicate(this::pluginToolSupportsWeb);
+        }
         log.info("ToolRegistry initialized: {} built-in tools from {} components",
                 builtinTools.size(), toolComponents.size());
+    }
+
+    /**
+     * 插件工具（JAR / 声明式 / 插件 MCP）在网页版会话里是否可见：所属插件 manifest 声明了
+     * {@code hosts} 含 {@code "web"} 才放行（W1 设计 §4.6）。内置工具与用户自配 MCP 一律 false——
+     * 内置工具在 {@link WebClientToolSurface} 里静态归类，用户 MCP 多是本机进程，网页上不可达。
+     */
+    boolean pluginToolSupportsWeb(String name) {
+        if (name == null || builtinTools.containsKey(name)) return false;
+        String pluginId = pluginService.getPluginIdForTool(name);
+        if (pluginId == null) {
+            DeclaredToolBinding declared = declaredBinding(name);
+            if (declared != null) pluginId = declared.pluginId();
+        }
+        if (pluginId == null && pluginMcpService != null) {
+            var binding = pluginMcpService.find(name);
+            if (binding != null) pluginId = binding.pluginId();
+        }
+        return pluginId != null && pluginService.supportsWebClient(pluginId);
     }
 
     /**
