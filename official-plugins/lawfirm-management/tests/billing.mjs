@@ -80,7 +80,10 @@ test('review groups by client and matter, approves, writes down with reason and 
   const card2 = h.doc.querySelector('[data-entry-id="2"]');
   assert.match(card2.textContent, /1 → 0\.5 小时/);
   await h.click(card2.querySelector('[data-action="audit"]'));
-  assert.match(h.doc.querySelector('[data-entry-id="2"] .hb-audit').textContent, /林合伙人 核减 1 → 0\.5 小时（理由：行政性工作）/);
+  const trail = h.doc.querySelector('[data-entry-id="2"] .hb-audit').textContent;
+  assert.match(trail, /林合伙人 核减 1 → 0\.5 小时（理由：行政性工作）/);
+  const d = new Date('2026-11-01T10:00:00Z');
+  assert.ok(trail.startsWith(`2026-11-0${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:00`), 'audit time is shown in local time');
 
   await h.click(h.doc.querySelector('[data-entry-id="1"] [data-action="approve"]'));
   assert.deepEqual(h.calls.find((c) => c.action === 'timeReview').params, { id: 1, op: 'APPROVE' });

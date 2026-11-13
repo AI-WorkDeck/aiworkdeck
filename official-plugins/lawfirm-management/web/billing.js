@@ -119,7 +119,10 @@
   }
 
   function auditLine(a) {
-    const at = String(a.at || '').replace('T', ' ').slice(0, 16);
+    // 后端给的是 UTC 时刻（Instant），按本机时区显示
+    const d0 = new Date(a.at);
+    const pad = (n) => String(n).padStart(2, '0');
+    const at = Number.isNaN(d0.getTime()) ? '' : `${d0.getFullYear()}-${pad(d0.getMonth() + 1)}-${pad(d0.getDate())} ${pad(d0.getHours())}:${pad(d0.getMinutes())}`;
     let what = t(`billing.audit.${a.action}`);
     const d = a.detail || {};
     if (d.billedMinutes) what += ' ' + t('billing.audit.hoursChange', { from: hours(d.billedMinutes.from), to: hours(d.billedMinutes.to) });
@@ -393,7 +396,7 @@
         status(t('billing.cancelled') + (resend.length ? ' ' + t('billing.recalculated', { nos: resend.join('、') }) : ''));
       }));
     }
-    if (b.status === 'CONFIRMED' && b.invoiceId) actions.append(button(t('billing.goInvoice'), 'go-invoice', async () => { $('tab-finance')?.click(); }));
+    if (b.status === 'CONFIRMED' && b.invoiceId) actions.append(button(t('billing.goInvoice'), 'go-invoice', async () => { $('refresh-data')?.click(); $('tab-finance')?.click(); }));
     card.append(actions);
     if (state.openBill.has(b.id)) {
       card.append(linesTable(b.lines), totalsBlock(b));

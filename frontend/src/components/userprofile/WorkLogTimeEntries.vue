@@ -299,6 +299,11 @@ export default {
   gap: var(--awd-space-2);
   margin-bottom: var(--awd-space-2);
 }
+.te-toolbar button,
+.te-add button,
+.tc-ops button {
+  margin: 0;
+}
 .te-summary {
   margin-inline-start: auto;
   font-size: var(--awd-panel-fs-sec);
@@ -333,7 +338,7 @@ export default {
 .te-row {
   display: flex;
   align-items: flex-start;
-  min-width: 900px;
+  min-width: 760px;
   padding: 6px 0;
   border-bottom: 1px solid var(--awd-border-subtle);
   font-size: var(--awd-panel-fs);
@@ -356,12 +361,12 @@ export default {
 }
 .tc-sel { width: 36px; }
 .tc-date { width: 96px; font-variant-numeric: tabular-nums; }
-.tc-matter { width: 180px; }
-.tc-hours { width: 110px; }
-.tc-desc { flex: 1 1 220px; min-width: 220px; }
-.tc-bill { width: 70px; }
-.tc-status { width: 90px; }
-.tc-ops { width: 120px; flex-direction: row; gap: 4px; }
+.tc-matter { width: 170px; }
+.tc-hours { width: 120px; white-space: nowrap; }
+.tc-desc { flex: 1 1 200px; min-width: 180px; }
+.tc-bill { width: 60px; }
+.tc-status { width: 80px; }
+.tc-ops { width: 110px; flex-direction: row; flex-wrap: wrap; gap: 4px; }
 .te-strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .te-sub { font-size: var(--awd-panel-fs-sec); color: var(--awd-text-3); }
 .te-review { color: var(--awd-warning-text); }
