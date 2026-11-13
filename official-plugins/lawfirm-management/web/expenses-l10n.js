@@ -45,7 +45,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "تم تحديث المصروف.",
     "expense.deleted": "تم حذف المصروف.",
     "expense.quota": "مساحة التخزين المحلية للإضافة ممتلئة (64 KB). احذف أولًا السجلات القديمة التي تمت تسويتها.",
-    "access.restricted": "ليس لديك صلاحية عرض بيانات المكتب بالكامل. تُعرض فقط العناصر المتعلقة بك. سجل الأتعاب ولوحات المكتب الشاملة متاحة لمسؤولي المكتب فقط."
+    "access.restricted": "ليس لديك صلاحية عرض بيانات المكتب بالكامل. تُعرض فقط العناصر المتعلقة بك. سجل الأتعاب ولوحات المكتب الشاملة متاحة لمسؤولي المكتب فقط.",
+    "access.role.committee": "عضو لجنة تعارض المصالح",
+    "access.queue.emptyLocal": "قائمة مراجعة تعارض المصالح المحلية فارغة.",
+    "access.kpi.activeSubLocal": "تُحتسب فقط القضايا في السجل المحلي التي تخصك",
+    "access.kpi.contractedLocal": "إجمالي عقودي",
+    "access.kpi.billingRateLocal": "نسبة الفوترة الخاصة بي",
+    "access.colleague": "زميل في مكتبك",
+    "access.risk.line": "تنبيه المخاطر: {0}",
+    "access.risk.GREEN": "أخضر (لا تعارض)",
+    "access.risk.YELLOW": "أصفر (تعارض محتمل)",
+    "access.risk.RED": "أحمر (تعارض مباشر)"
   },
   "de-DE": {
     "expense.tab": "Mandatsauslagen",
@@ -90,7 +100,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Auslage aktualisiert.",
     "expense.deleted": "Auslage gelöscht.",
     "expense.quota": "Der lokale Plugin-Speicher ist voll (64 KB). Bitte zuerst ältere abgerechnete Einträge löschen.",
-    "access.restricted": "Keine Berechtigung für kanzleiweite Daten. Es werden nur Vorgänge angezeigt, die Sie betreffen. Das kanzleiweite Honorarbuch und die Dashboards sind Kanzleiadministratoren vorbehalten."
+    "access.restricted": "Keine Berechtigung für kanzleiweite Daten. Es werden nur Vorgänge angezeigt, die Sie betreffen. Das kanzleiweite Honorarbuch und die Dashboards sind Kanzleiadministratoren vorbehalten.",
+    "access.role.committee": "Mitglied des Interessenkonflikt-Ausschusses",
+    "access.queue.emptyLocal": "Die lokale Prüfwarteschlange für Interessenkonflikte ist leer.",
+    "access.kpi.activeSubLocal": "Nur Mandate aus dem lokalen Hauptbuch, die Sie betreffen",
+    "access.kpi.contractedLocal": "Mein vertraglich vereinbarter Gesamtbetrag",
+    "access.kpi.billingRateLocal": "Meine Rechnungsquote",
+    "access.colleague": "Kollegin/Kollege Ihrer Kanzlei",
+    "access.risk.line": "Risikohinweis: {0}",
+    "access.risk.GREEN": "Grün (kein Konflikt)",
+    "access.risk.YELLOW": "Gelb (möglicher Konflikt)",
+    "access.risk.RED": "Rot (direkter Konflikt)"
   },
   "el-GR": {
     "expense.tab": "Έξοδα υπόθεσης",
@@ -135,7 +155,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Το έξοδο ενημερώθηκε.",
     "expense.deleted": "Το έξοδο διαγράφηκε.",
     "expense.quota": "Ο τοπικός χώρος αποθήκευσης του πρόσθετου είναι πλήρης (64 KB). Διαγράψτε πρώτα παλαιότερες διακανονισμένες εγγραφές.",
-    "access.restricted": "Δεν έχετε δικαίωμα προβολής δεδομένων όλου του γραφείου. Εμφανίζονται μόνο στοιχεία που σας αφορούν. Το βιβλίο αμοιβών και οι πίνακες ελέγχου όλου του γραφείου προορίζονται για διαχειριστές."
+    "access.restricted": "Δεν έχετε δικαίωμα προβολής δεδομένων όλου του γραφείου. Εμφανίζονται μόνο στοιχεία που σας αφορούν. Το βιβλίο αμοιβών και οι πίνακες ελέγχου όλου του γραφείου προορίζονται για διαχειριστές.",
+    "access.role.committee": "Μέλος της επιτροπής συγκρούσεων συμφερόντων",
+    "access.queue.emptyLocal": "Η τοπική ουρά ελέγχου συγκρούσεων συμφερόντων είναι κενή.",
+    "access.kpi.activeSubLocal": "Μόνο οι υποθέσεις του τοπικού καθολικού που σας αφορούν",
+    "access.kpi.contractedLocal": "Το συνολικό συμβατικό ποσό μου",
+    "access.kpi.billingRateLocal": "Το ποσοστό τιμολόγησής μου",
+    "access.colleague": "Συνάδελφος από το γραφείο σας",
+    "access.risk.line": "Ένδειξη κινδύνου: {0}",
+    "access.risk.GREEN": "Πράσινο (καμία σύγκρουση)",
+    "access.risk.YELLOW": "Κίτρινο (πιθανή σύγκρουση)",
+    "access.risk.RED": "Κόκκινο (άμεση σύγκρουση)"
   },
   "en-US": {
     "expense.tab": "Matter expenses",
@@ -180,7 +210,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Expense updated.",
     "expense.deleted": "Expense deleted.",
     "expense.quota": "Local plugin storage is full (64 KB). Delete older settled entries first.",
-    "access.restricted": "You don't have permission to view firm-wide data. Only items related to you are shown. The firm-wide fee ledger and dashboards are limited to law firm administrators."
+    "access.restricted": "You don't have permission to view firm-wide data. Only items related to you are shown. The firm-wide fee ledger and dashboards are limited to law firm administrators.",
+    "access.role.committee": "Conflict committee member",
+    "access.queue.emptyLocal": "The local conflict review queue is empty.",
+    "access.kpi.activeSubLocal": "Only intakes in the local ledger that involve you",
+    "access.kpi.contractedLocal": "My total contracted amount",
+    "access.kpi.billingRateLocal": "My invoicing rate",
+    "access.colleague": "Colleague at your firm",
+    "access.risk.line": "Risk level: {0}",
+    "access.risk.GREEN": "Green (no conflict)",
+    "access.risk.YELLOW": "Yellow (potential conflict)",
+    "access.risk.RED": "Red (direct conflict)"
   },
   "es-ES": {
     "expense.tab": "Gastos del asunto",
@@ -225,7 +265,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Gasto actualizado.",
     "expense.deleted": "Gasto eliminado.",
     "expense.quota": "El almacenamiento local del plugin está lleno (64 KB). Elimine primero las entradas liquidadas más antiguas.",
-    "access.restricted": "No tienes permiso para ver los datos de todo el despacho. Solo se muestran los elementos que te conciernen. El libro de honorarios y los paneles de todo el despacho son solo para administradores."
+    "access.restricted": "No tienes permiso para ver los datos de todo el despacho. Solo se muestran los elementos que te conciernen. El libro de honorarios y los paneles de todo el despacho son solo para administradores.",
+    "access.role.committee": "Miembro del comité de conflictos de intereses",
+    "access.queue.emptyLocal": "La cola local de revisión de conflictos de intereses está vacía.",
+    "access.kpi.activeSubLocal": "Solo los asuntos del libro local que le conciernen",
+    "access.kpi.contractedLocal": "Mi total contratado",
+    "access.kpi.billingRateLocal": "Mi tasa de facturación",
+    "access.colleague": "Colega de su despacho",
+    "access.risk.line": "Aviso de riesgo: {0}",
+    "access.risk.GREEN": "Verde (sin conflicto)",
+    "access.risk.YELLOW": "Amarillo (conflicto potencial)",
+    "access.risk.RED": "Rojo (conflicto directo)"
   },
   "fr-FR": {
     "expense.tab": "Frais de dossier",
@@ -270,7 +320,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Frais mis à jour.",
     "expense.deleted": "Frais supprimé.",
     "expense.quota": "Le stockage local du plugin est plein (64 KB). Supprimez d'abord les anciennes entrées réglées.",
-    "access.restricted": "Vous n'avez pas l'autorisation de consulter les données de l'ensemble du cabinet. Seuls les éléments vous concernant sont affichés. Le registre des honoraires et les tableaux de bord du cabinet sont réservés aux administrateurs."
+    "access.restricted": "Vous n'avez pas l'autorisation de consulter les données de l'ensemble du cabinet. Seuls les éléments vous concernant sont affichés. Le registre des honoraires et les tableaux de bord du cabinet sont réservés aux administrateurs.",
+    "access.role.committee": "Membre du comité des conflits d’intérêts",
+    "access.queue.emptyLocal": "La file locale d’examen des conflits d’intérêts est vide.",
+    "access.kpi.activeSubLocal": "Uniquement les dossiers du registre local qui vous concernent",
+    "access.kpi.contractedLocal": "Mon total contractuel",
+    "access.kpi.billingRateLocal": "Mon taux de facturation",
+    "access.colleague": "Collègue de votre cabinet",
+    "access.risk.line": "Niveau de risque : {0}",
+    "access.risk.GREEN": "Vert (aucun conflit)",
+    "access.risk.YELLOW": "Jaune (conflit potentiel)",
+    "access.risk.RED": "Rouge (conflit direct)"
   },
   "hi-IN": {
     "expense.tab": "मामले के खर्च",
@@ -315,7 +375,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "खर्च अपडेट किया गया।",
     "expense.deleted": "खर्च हटाया गया।",
     "expense.quota": "प्लगइन का स्थानीय स्टोरेज भर गया है (64 KB)। पहले निपटाई गई पुरानी प्रविष्टियाँ हटाएँ।",
-    "access.restricted": "आपको पूरे firm का डेटा देखने की अनुमति नहीं है। केवल आपसे संबंधित intake, मंज़ूरी, इनवॉइस और वसूली दिखाई जाती हैं। पूरे firm की फ़ीस बही और डैशबोर्ड केवल firm प्रशासकों के लिए हैं।"
+    "access.restricted": "आपको पूरे firm का डेटा देखने की अनुमति नहीं है। केवल आपसे संबंधित intake, मंज़ूरी, इनवॉइस और वसूली दिखाई जाती हैं। पूरे firm की फ़ीस बही और डैशबोर्ड केवल firm प्रशासकों के लिए हैं।",
+    "access.role.committee": "हितों के टकराव समिति सदस्य",
+    "access.queue.emptyLocal": "स्थानीय हितों के टकराव समीक्षा कतार खाली है।",
+    "access.kpi.activeSubLocal": "केवल स्थानीय बही में आपसे संबंधित मामले गिने गए हैं",
+    "access.kpi.contractedLocal": "मेरी कुल अनुबंधित राशि",
+    "access.kpi.billingRateLocal": "मेरी बिलिंग दर",
+    "access.colleague": "आपकी फर्म के सहकर्मी",
+    "access.risk.line": "जोखिम सूचना: {0}",
+    "access.risk.GREEN": "हरा (कोई टकराव नहीं)",
+    "access.risk.YELLOW": "पीला (संभावित टकराव)",
+    "access.risk.RED": "लाल (सीधा टकराव)"
   },
   "id-ID": {
     "expense.tab": "Biaya Perkara",
@@ -360,7 +430,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Biaya diperbarui.",
     "expense.deleted": "Biaya dihapus.",
     "expense.quota": "Penyimpanan lokal plugin penuh (64 KB). Hapus dulu catatan lama yang sudah diselesaikan.",
-    "access.restricted": "Anda tidak memiliki izin melihat data seluruh firma. Hanya item yang terkait dengan Anda yang ditampilkan. Buku besar biaya dan dasbor seluruh firma hanya untuk administrator firma."
+    "access.restricted": "Anda tidak memiliki izin melihat data seluruh firma. Hanya item yang terkait dengan Anda yang ditampilkan. Buku besar biaya dan dasbor seluruh firma hanya untuk administrator firma.",
+    "access.role.committee": "Anggota komite benturan kepentingan",
+    "access.queue.emptyLocal": "Antrean pemeriksaan benturan kepentingan lokal kosong.",
+    "access.kpi.activeSubLocal": "Hanya perkara di buku besar lokal yang menyangkut Anda",
+    "access.kpi.contractedLocal": "Total kontrak saya",
+    "access.kpi.billingRateLocal": "Rasio penagihan saya",
+    "access.colleague": "Rekan di firma Anda",
+    "access.risk.line": "Peringatan risiko: {0}",
+    "access.risk.GREEN": "Hijau (tidak ada benturan)",
+    "access.risk.YELLOW": "Kuning (potensi benturan)",
+    "access.risk.RED": "Merah (benturan langsung)"
   },
   "it-IT": {
     "expense.tab": "Spese di pratica",
@@ -405,7 +485,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Spesa aggiornata.",
     "expense.deleted": "Spesa eliminata.",
     "expense.quota": "L'archivio locale del plugin è pieno (64 KB). Elimina prima le voci regolate più vecchie.",
-    "access.restricted": "Non hai l'autorizzazione a visualizzare i dati dell'intero studio. Vengono mostrati solo gli elementi che ti riguardano. Il registro degli onorari e le dashboard dello studio sono riservati agli amministratori."
+    "access.restricted": "Non hai l'autorizzazione a visualizzare i dati dell'intero studio. Vengono mostrati solo gli elementi che ti riguardano. Il registro degli onorari e le dashboard dello studio sono riservati agli amministratori.",
+    "access.role.committee": "Membro del comitato per i conflitti di interessi",
+    "access.queue.emptyLocal": "La coda locale di verifica dei conflitti di interessi è vuota.",
+    "access.kpi.activeSubLocal": "Solo le pratiche del registro locale che la riguardano",
+    "access.kpi.contractedLocal": "Il mio totale contrattuale",
+    "access.kpi.billingRateLocal": "Il mio tasso di fatturazione",
+    "access.colleague": "Collega del suo studio",
+    "access.risk.line": "Avviso di rischio: {0}",
+    "access.risk.GREEN": "Verde (nessun conflitto)",
+    "access.risk.YELLOW": "Giallo (conflitto potenziale)",
+    "access.risk.RED": "Rosso (conflitto diretto)"
   },
   "ja-JP": {
     "expense.tab": "案件費用",
@@ -450,7 +540,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "費用を更新しました。",
     "expense.deleted": "費用を削除しました。",
     "expense.quota": "プラグインのローカルストレージがいっぱいです（64 KB）。まず精算済みの古い記録を削除してください。",
-    "access.restricted": "事務所全体のデータを閲覧する権限がありません。自分に関係する受任・承認・請求書・入金のみ表示されます。事務所全体の報酬台帳とダッシュボードは事務所管理者のみ閲覧できます。"
+    "access.restricted": "事務所全体のデータを閲覧する権限がありません。自分に関係する受任・承認・請求書・入金のみ表示されます。事務所全体の報酬台帳とダッシュボードは事務所管理者のみ閲覧できます。",
+    "access.role.committee": "利益相反委員",
+    "access.queue.emptyLocal": "ローカルの利益相反審査キューは空です。",
+    "access.kpi.activeSubLocal": "ローカル台帳のうちあなたに関係する受任のみ集計",
+    "access.kpi.contractedLocal": "自分の契約総額",
+    "access.kpi.billingRateLocal": "自分の請求率",
+    "access.colleague": "同じ事務所の同僚",
+    "access.risk.line": "リスク表示：{0}",
+    "access.risk.GREEN": "緑（相反なし）",
+    "access.risk.YELLOW": "黄（相反の可能性）",
+    "access.risk.RED": "赤（直接の相反）"
   },
   "ko-KR": {
     "expense.tab": "사건 비용",
@@ -495,7 +595,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "비용이 업데이트되었습니다.",
     "expense.deleted": "비용이 삭제되었습니다.",
     "expense.quota": "플러그인 로컬 저장 공간이 가득 찼습니다(64 KB). 먼저 정산 완료된 오래된 기록을 삭제하세요.",
-    "access.restricted": "전체 사무소 데이터를 볼 권한이 없습니다. 본인과 관련된 수임, 승인, 청구서, 수금만 표시됩니다. 전체 수임료 장부와 대시보드는 사무소 관리자만 볼 수 있습니다."
+    "access.restricted": "전체 사무소 데이터를 볼 권한이 없습니다. 본인과 관련된 수임, 승인, 청구서, 수금만 표시됩니다. 전체 수임료 장부와 대시보드는 사무소 관리자만 볼 수 있습니다.",
+    "access.role.committee": "이해충돌 위원",
+    "access.queue.emptyLocal": "로컬 이해충돌 심사 대기열이 비어 있습니다.",
+    "access.kpi.activeSubLocal": "로컬 장부 중 본인과 관련된 수임만 집계",
+    "access.kpi.contractedLocal": "내 계약 총액",
+    "access.kpi.billingRateLocal": "내 청구율",
+    "access.colleague": "같은 사무소 동료",
+    "access.risk.line": "위험 표시: {0}",
+    "access.risk.GREEN": "녹색(충돌 없음)",
+    "access.risk.YELLOW": "노랑(잠재적 충돌)",
+    "access.risk.RED": "빨강(직접 충돌)"
   },
   "ms-MY": {
     "expense.tab": "Perbelanjaan Kes",
@@ -540,7 +650,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Perbelanjaan dikemas kini.",
     "expense.deleted": "Perbelanjaan dipadam.",
     "expense.quota": "Storan setempat plugin penuh (64 KB). Padam dahulu rekod lama yang telah diselesaikan.",
-    "access.restricted": "Anda tiada kebenaran melihat data seluruh firma. Hanya item berkaitan anda dipaparkan. Lejar yuran dan papan pemuka seluruh firma terhad kepada pentadbir firma."
+    "access.restricted": "Anda tiada kebenaran melihat data seluruh firma. Hanya item berkaitan anda dipaparkan. Lejar yuran dan papan pemuka seluruh firma terhad kepada pentadbir firma.",
+    "access.role.committee": "Ahli jawatankuasa konflik kepentingan",
+    "access.queue.emptyLocal": "Baris gilir semakan konflik kepentingan setempat kosong.",
+    "access.kpi.activeSubLocal": "Hanya kes dalam lejar setempat yang melibatkan anda",
+    "access.kpi.contractedLocal": "Jumlah kontrak saya",
+    "access.kpi.billingRateLocal": "Kadar pengebilan saya",
+    "access.colleague": "Rakan sekerja di firma anda",
+    "access.risk.line": "Amaran risiko: {0}",
+    "access.risk.GREEN": "Hijau (tiada konflik)",
+    "access.risk.YELLOW": "Kuning (potensi konflik)",
+    "access.risk.RED": "Merah (konflik langsung)"
   },
   "nl-NL": {
     "expense.tab": "Dossierkosten",
@@ -585,7 +705,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Kosten bijgewerkt.",
     "expense.deleted": "Kosten verwijderd.",
     "expense.quota": "De lokale pluginopslag is vol (64 KB). Verwijder eerst oudere afgerekende posten.",
-    "access.restricted": "U heeft geen toestemming om kantoorbrede gegevens te bekijken. Alleen items die u betreffen worden getoond. Het kantoorbrede declaratiegrootboek en de dashboards zijn voorbehouden aan kantoorbeheerders."
+    "access.restricted": "U heeft geen toestemming om kantoorbrede gegevens te bekijken. Alleen items die u betreffen worden getoond. Het kantoorbrede declaratiegrootboek en de dashboards zijn voorbehouden aan kantoorbeheerders.",
+    "access.role.committee": "Lid van de commissie belangenconflicten",
+    "access.queue.emptyLocal": "De lokale wachtrij voor conflictcontrole is leeg.",
+    "access.kpi.activeSubLocal": "Alleen zaken uit het lokale register die u betreffen",
+    "access.kpi.contractedLocal": "Mijn totaal overeengekomen bedrag",
+    "access.kpi.billingRateLocal": "Mijn factuurpercentage",
+    "access.colleague": "Collega van uw kantoor",
+    "access.risk.line": "Risicomelding: {0}",
+    "access.risk.GREEN": "Groen (geen conflict)",
+    "access.risk.YELLOW": "Geel (mogelijk conflict)",
+    "access.risk.RED": "Rood (direct conflict)"
   },
   "pt-BR": {
     "expense.tab": "Despesas do caso",
@@ -630,7 +760,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Despesa atualizada.",
     "expense.deleted": "Despesa excluída.",
     "expense.quota": "O armazenamento local do plugin está cheio (64 KB). Exclua primeiro os lançamentos acertados mais antigos.",
-    "access.restricted": "Você não tem permissão para ver os dados de todo o escritório. Somente itens relacionados a você são exibidos. O livro de honorários e os painéis do escritório são restritos a administradores."
+    "access.restricted": "Você não tem permissão para ver os dados de todo o escritório. Somente itens relacionados a você são exibidos. O livro de honorários e os painéis do escritório são restritos a administradores.",
+    "access.role.committee": "Membro do comitê de conflitos de interesses",
+    "access.queue.emptyLocal": "A fila local de revisão de conflitos de interesses está vazia.",
+    "access.kpi.activeSubLocal": "Apenas os casos do registro local que dizem respeito a você",
+    "access.kpi.contractedLocal": "Meu total contratado",
+    "access.kpi.billingRateLocal": "Minha taxa de faturamento",
+    "access.colleague": "Colega do seu escritório",
+    "access.risk.line": "Aviso de risco: {0}",
+    "access.risk.GREEN": "Verde (sem conflito)",
+    "access.risk.YELLOW": "Amarelo (conflito potencial)",
+    "access.risk.RED": "Vermelho (conflito direto)"
   },
   "ru-RU": {
     "expense.tab": "Расходы по делу",
@@ -675,7 +815,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Расход обновлён.",
     "expense.deleted": "Расход удалён.",
     "expense.quota": "Локальное хранилище плагина заполнено (64 KB). Сначала удалите старые рассчитанные записи.",
-    "access.restricted": "Нет прав на просмотр данных всей фирмы. Показаны только материалы, связанные с вами. Книга гонораров и дашборды всей фирмы доступны только администраторам фирмы."
+    "access.restricted": "Нет прав на просмотр данных всей фирмы. Показаны только материалы, связанные с вами. Книга гонораров и дашборды всей фирмы доступны только администраторам фирмы.",
+    "access.role.committee": "Член комитета по конфликтам интересов",
+    "access.queue.emptyLocal": "Локальная очередь проверки конфликтов интересов пуста.",
+    "access.kpi.activeSubLocal": "Учитываются только дела из локальной книги, имеющие к вам отношение",
+    "access.kpi.contractedLocal": "Моя сумма по договорам",
+    "access.kpi.billingRateLocal": "Моя доля выставленных счетов",
+    "access.colleague": "Коллега из вашей фирмы",
+    "access.risk.line": "Уровень риска: {0}",
+    "access.risk.GREEN": "Зелёный (конфликта нет)",
+    "access.risk.YELLOW": "Жёлтый (возможный конфликт)",
+    "access.risk.RED": "Красный (прямой конфликт)"
   },
   "th-TH": {
     "expense.tab": "ค่าใช้จ่ายคดี",
@@ -720,7 +870,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "อัปเดตค่าใช้จ่ายแล้ว",
     "expense.deleted": "ลบค่าใช้จ่ายแล้ว",
     "expense.quota": "พื้นที่จัดเก็บของปลั๊กอินในเครื่องเต็มแล้ว (64 KB) กรุณาลบรายการเก่าที่สรุปบัญชีแล้วก่อน",
-    "access.restricted": "คุณไม่มีสิทธิ์ดูข้อมูลทั้งสำนักงาน แสดงเฉพาะรายการที่เกี่ยวข้องกับคุณ บัญชีค่าบริการและแดชบอร์ดทั้งสำนักงานจำกัดเฉพาะผู้ดูแลสำนักงาน"
+    "access.restricted": "คุณไม่มีสิทธิ์ดูข้อมูลทั้งสำนักงาน แสดงเฉพาะรายการที่เกี่ยวข้องกับคุณ บัญชีค่าบริการและแดชบอร์ดทั้งสำนักงานจำกัดเฉพาะผู้ดูแลสำนักงาน",
+    "access.role.committee": "กรรมการตรวจสอบผลประโยชน์ทับซ้อน",
+    "access.queue.emptyLocal": "คิวตรวจสอบผลประโยชน์ทับซ้อนในเครื่องว่างเปล่า",
+    "access.kpi.activeSubLocal": "นับเฉพาะงานรับเรื่องในสมุดบัญชีในเครื่องที่เกี่ยวข้องกับคุณ",
+    "access.kpi.contractedLocal": "ยอดสัญญารวมของฉัน",
+    "access.kpi.billingRateLocal": "อัตราการออกใบแจ้งหนี้ของฉัน",
+    "access.colleague": "เพื่อนร่วมงานในสำนักงานของคุณ",
+    "access.risk.line": "ข้อความเตือนความเสี่ยง: {0}",
+    "access.risk.GREEN": "เขียว (ไม่มีความขัดแย้ง)",
+    "access.risk.YELLOW": "เหลือง (อาจขัดแย้ง)",
+    "access.risk.RED": "แดง (ขัดแย้งโดยตรง)"
   },
   "tr-TR": {
     "expense.tab": "Dosya Masrafları",
@@ -765,7 +925,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Masraf güncellendi.",
     "expense.deleted": "Masraf silindi.",
     "expense.quota": "Yerel eklenti depolama alanı dolu (64 KB). Önce eski hesaplaşılmış kayıtları silin.",
-    "access.restricted": "Büro genelindeki verileri görüntüleme izniniz yok. Yalnızca sizinle ilgili öğeler gösterilir. Büro genelindeki ücret defteri ve panolar yalnızca büro yöneticilerine açıktır."
+    "access.restricted": "Büro genelindeki verileri görüntüleme izniniz yok. Yalnızca sizinle ilgili öğeler gösterilir. Büro genelindeki ücret defteri ve panolar yalnızca büro yöneticilerine açıktır.",
+    "access.role.committee": "Çıkar çatışması komitesi üyesi",
+    "access.queue.emptyLocal": "Yerel çıkar çatışması inceleme kuyruğu boş.",
+    "access.kpi.activeSubLocal": "Yalnızca yerel defterdeki sizi ilgilendiren dosyalar",
+    "access.kpi.contractedLocal": "Sözleşme toplamım",
+    "access.kpi.billingRateLocal": "Faturalama oranım",
+    "access.colleague": "Büronuzdan bir meslektaş",
+    "access.risk.line": "Risk uyarısı: {0}",
+    "access.risk.GREEN": "Yeşil (çatışma yok)",
+    "access.risk.YELLOW": "Sarı (olası çatışma)",
+    "access.risk.RED": "Kırmızı (doğrudan çatışma)"
   },
   "vi-VN": {
     "expense.tab": "Chi phí vụ việc",
@@ -810,7 +980,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "Đã cập nhật chi phí.",
     "expense.deleted": "Đã xóa chi phí.",
     "expense.quota": "Bộ nhớ cục bộ của plugin đã đầy (64 KB). Vui lòng xóa các bản ghi cũ đã quyết toán trước.",
-    "access.restricted": "Bạn không có quyền xem dữ liệu toàn văn phòng. Chỉ hiển thị các mục liên quan đến bạn. Sổ phí và bảng điều khiển toàn văn phòng chỉ dành cho quản trị viên văn phòng."
+    "access.restricted": "Bạn không có quyền xem dữ liệu toàn văn phòng. Chỉ hiển thị các mục liên quan đến bạn. Sổ phí và bảng điều khiển toàn văn phòng chỉ dành cho quản trị viên văn phòng.",
+    "access.role.committee": "Thành viên ủy ban xung đột lợi ích",
+    "access.queue.emptyLocal": "Hàng đợi rà soát xung đột lợi ích cục bộ đang trống.",
+    "access.kpi.activeSubLocal": "Chỉ tính các vụ việc trong sổ cục bộ có liên quan đến bạn",
+    "access.kpi.contractedLocal": "Tổng giá trị hợp đồng của tôi",
+    "access.kpi.billingRateLocal": "Tỷ lệ xuất hóa đơn của tôi",
+    "access.colleague": "Đồng nghiệp trong văn phòng của bạn",
+    "access.risk.line": "Cảnh báo rủi ro: {0}",
+    "access.risk.GREEN": "Xanh (không xung đột)",
+    "access.risk.YELLOW": "Vàng (có thể xung đột)",
+    "access.risk.RED": "Đỏ (xung đột trực tiếp)"
   },
   "zh-CN": {
     "expense.tab": "办案费用",
@@ -855,7 +1035,17 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "费用已更新。",
     "expense.deleted": "费用已删除。",
     "expense.quota": "本机插件存储已满（64 KB），请先删除已结算的旧记录。",
-    "access.restricted": "无权查看全所数据：仅显示与你相关的收案、放行、发票与回款。全所收费台账与看板仅限律所管理员。"
+    "access.restricted": "无权查看全所数据：仅显示与你相关的收案、放行、发票与回款。全所收费台账与看板仅限律所管理员。",
+    "access.role.committee": "利冲委员",
+    "access.queue.emptyLocal": "本机利冲审查队列为空。",
+    "access.kpi.activeSubLocal": "仅统计本机台账中与你相关的收案",
+    "access.kpi.contractedLocal": "我的签约合同总额",
+    "access.kpi.billingRateLocal": "我的开票率",
+    "access.colleague": "同所同事",
+    "access.risk.line": "风险提示 {0}",
+    "access.risk.GREEN": "绿色（无利冲）",
+    "access.risk.YELLOW": "黄色（潜在利冲）",
+    "access.risk.RED": "红色（直接利冲）"
   },
   "zh-TW": {
     "expense.tab": "辦案費用",
@@ -900,6 +1090,16 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "expense.updated": "費用已更新。",
     "expense.deleted": "費用已刪除。",
     "expense.quota": "本機外掛程式儲存空間已滿（64 KB），請先刪除已結算的舊記錄。",
-    "access.restricted": "無權檢視全所資料：僅顯示與你相關的收案、放行、發票與回款。全所收費台帳與看板僅限律所管理員。"
+    "access.restricted": "無權檢視全所資料：僅顯示與你相關的收案、放行、發票與回款。全所收費台帳與看板僅限律所管理員。",
+    "access.role.committee": "利衝委員",
+    "access.queue.emptyLocal": "本機利衝審查佇列為空。",
+    "access.kpi.activeSubLocal": "僅統計本機帳冊中與你相關的收案",
+    "access.kpi.contractedLocal": "我的簽約合約總額",
+    "access.kpi.billingRateLocal": "我的開票率",
+    "access.colleague": "同所同事",
+    "access.risk.line": "風險提示 {0}",
+    "access.risk.GREEN": "綠色（無利衝）",
+    "access.risk.YELLOW": "黃色（潛在利衝）",
+    "access.risk.RED": "紅色（直接利衝）"
   }
 };

@@ -78,6 +78,8 @@ class LawFirmWorkflowTest {
         call(committee,"workflowAppointmentDecision",Map.of("recordId",aid,"expectedVersion",a.get("version"),"decision","ACCEPTED"));
         var record=call(applicant,"workflowSubmit",draft());String id=(String)record.get("id");
         assertEquals("PENDING_LAWYER_CLEARANCE",record.get("status"));assertEquals(1,inbox(lawyer).size());
+        assertEquals("合成律师 account-"+lawyer,clearances(record).get(0).get("targetName"),"clearance rows carry the colleague name, so the panel never shows a raw account id");
+        assertTrue(inbox(lawyer).get(0).get("title").toString().startsWith("待你确认"));
         assertThrows(IllegalArgumentException.class,()->call(admin,"workflowClearance",Map.of("recordId",id,"decision","APPROVED","comment","冒名")));
         assertThrows(IllegalStateException.class,()->call(committee,"workflowReview",Map.of("recordId",id,"decision","APPROVED","comment","过早")));
         var lawyerView=call(lawyer,"workflowDetail",Map.of("recordId",id));assertFalse(lawyerView.containsKey("clientName"));assertEquals(1,clearances(lawyerView).size());
@@ -86,6 +88,8 @@ class LawFirmWorkflowTest {
         assertThrows(IllegalArgumentException.class,()->call(admin,"workflowDetail",Map.of("recordId",id)));
         var response=call(lawyer,"workflowClearance",Map.of("recordId",id,"decision","APPROVED_WITH_WALL","comment","合成核查条件"));
         assertEquals("PENDING_COMMITTEE_REVIEW",response.get("status"));
+        assertTrue(inbox(lawyer).get(0).get("title").toString().startsWith("已确认"),"a finished item must not keep the pending title");
+        assertEquals("done",inbox(lawyer).get(0).get("actionState"));
         var done=call(committee,"workflowReview",Map.of("recordId",id,"decision","APPROVED","comment","已人工核查条件"));assertEquals("APPROVED",done.get("status"));
         assertEquals("APPROVED",call(committee,"workflowReview",Map.of("recordId",id,"decision","APPROVED","comment","已人工核查条件")).get("status"));
         assertEquals(2,inbox(applicant).size());assertTrue(inbox(applicant).stream().allMatch(n->"done".equals(n.get("actionState"))));

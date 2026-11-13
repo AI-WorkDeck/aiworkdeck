@@ -54,7 +54,7 @@
         <text class="wcol wcol-member">{{ $t('team.weekColMember') }}</text>
         <text class="wcol wcol-days">{{ $t('team.weekColDays') }}</text>
         <text class="wcol wcol-current">{{ $t('team.weekColCurrent') }}</text>
-        <text class="wcol wcol-hours">{{ $t('team.weekColHours') }}</text>
+        <text class="wcol wcol-hours">{{ $t(week.lastWeek ? 'team.weekColHoursLastWeek' : 'team.weekColHours') }}</text>
         <text class="wcol wcol-load">{{ $t('team.weekColLoad') }}</text>
       </view>
       <view v-for="r in rows" :key="r.accountId" class="week-row">
@@ -208,7 +208,7 @@ export default {
 .week-title { font-size: 15px; font-weight: 600; color: var(--awd-text); }
 .week-range { font-size: 12px; color: var(--awd-text-2); }
 .week-sub { font-size: 12px; color: var(--awd-text-3); }
-.week-legend { display: flex; gap: 12px; align-items: center; }
+.week-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
 .week-legend-item { display: flex; align-items: center; gap: 4px; }
 .week-legend-text { font-size: 12px; color: var(--awd-text-2); }
 .week-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -218,7 +218,8 @@ export default {
 
 .week-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Whole tiles wrap to the next row when the pane is narrow (side panes open), instead of squeezing text */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 .week-kpi {
@@ -230,7 +231,7 @@ export default {
   border-inline-start: 3px solid var(--awd-mint);
   border-radius: 4px;
 }
-.week-kpi-value { font-size: 20px; font-weight: 600; color: var(--awd-accent-text); }
+.week-kpi-value { font-size: 20px; font-weight: 600; color: var(--awd-accent-text); white-space: nowrap; }
 .week-kpi-label { font-size: 12px; color: var(--awd-text-2); }
 .week-kpi-sub { font-size: 11px; color: var(--awd-text-3); }
 .week-empty { font-size: 12px; color: var(--awd-text-3); text-align: start; }
@@ -247,17 +248,18 @@ export default {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  min-width: 640px;
+  /* The table scrolls sideways as a whole; every column keeps a readable minimum */
+  min-width: 620px;
 }
 .week-row + .week-row { border-top: 1px solid var(--awd-border-subtle); }
 .week-row-head { background: var(--awd-surface-2); }
 .wcol { font-size: 12px; color: var(--awd-text); text-align: start; min-width: 0; }
 .week-row-head .wcol { color: var(--awd-text-2); }
-.wcol-member { flex: 2.2 1 0; }
-.wcol-days { flex: 1.6 1 0; }
-.wcol-current { flex: 1.6 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wcol-hours { flex: 0.8 1 0; }
-.wcol-load { flex: 1.6 1 0; }
+.wcol-member { flex: 2.2 1 150px; }
+.wcol-days { flex: 0 0 132px; }
+.wcol-current { flex: 1.6 1 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcol-hours { flex: 0 0 68px; white-space: nowrap; }
+.wcol-load { flex: 1.6 1 120px; }
 
 .week-member { display: flex; align-items: center; gap: 8px; }
 .week-avatar {
@@ -279,6 +281,7 @@ export default {
 
 .week-cells { display: flex; gap: 4px; }
 .week-cell {
+  flex: none;
   width: 22px;
   height: 22px;
   border-radius: 4px;
@@ -300,8 +303,4 @@ export default {
 }
 .week-bar-fill { height: 100%; border-radius: 3px; }
 .week-load-text { flex: none; font-size: 12px; color: var(--awd-text-2); }
-
-@media (max-width: 720px) {
-  .week-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 </style>

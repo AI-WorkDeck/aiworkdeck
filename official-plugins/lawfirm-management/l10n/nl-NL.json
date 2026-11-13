@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Kantooroverzicht (alleen lezen): status van intakes en zaken, kengetallen en openstaande belangenconflict-vrijgaves; optioneel filter op project of trefwoord. Gebruiken wanneer de gebruiker vraagt naar intakes, zaken, de voortgang van belangenconflict-vrijgaves of het maandelijkse bedrijfsoverzicht van het kantoor.",
   "tool.lawfirm_management_conflict_check.desc": "Belangenconflictcontrole (alleen lezen, er wordt niets opgeslagen): vergelijkt cliënt en wederpartij met bestaande zaken. Gebruiken wanneer de gebruiker vraagt of een cliënt of wederpartij een belangenconflict heeft.",
   "tool.lawfirm_management_fee_ledger.desc": "Declaratiegrootboek raadplegen (alleen lezen): facturen, ontvangsten, debiteuren en incassopercentage; filter op project of trefwoord. Gebruiken wanneer de gebruiker vraagt naar kantoorbrede honoraria, ontvangsten, declaraties, facturen of debiteuren (alleen kantoorbeheerders).",
-  "access.restricted": "U heeft geen toestemming om kantoorbrede gegevens te bekijken. Alleen items die u betreffen worden getoond. Het kantoorbrede declaratiegrootboek en de dashboards zijn voorbehouden aan kantoorbeheerders."
+  "access.restricted": "U heeft geen toestemming om kantoorbrede gegevens te bekijken. Alleen items die u betreffen worden getoond. Het kantoorbrede declaratiegrootboek en de dashboards zijn voorbehouden aan kantoorbeheerders.",
+  "access.role.committee": "Lid van de commissie belangenconflicten",
+  "access.queue.emptyLocal": "De lokale wachtrij voor conflictcontrole is leeg.",
+  "access.kpi.activeSubLocal": "Alleen zaken uit het lokale register die u betreffen",
+  "access.kpi.contractedLocal": "Mijn totaal overeengekomen bedrag",
+  "access.kpi.billingRateLocal": "Mijn factuurpercentage",
+  "access.colleague": "Collega van uw kantoor",
+  "access.risk.line": "Risicomelding: {0}",
+  "access.risk.GREEN": "Groen (geen conflict)",
+  "access.risk.YELLOW": "Geel (mogelijk conflict)",
+  "access.risk.RED": "Rood (direct conflict)"
 }

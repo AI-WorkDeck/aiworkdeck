@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Aperçu du cabinet (lecture seule) : état des dossiers et prises en charge, indicateurs et autorisations de conflit d'intérêts en attente ; filtre facultatif par projet ou mot-clé. À utiliser quand l'utilisateur interroge sur les prises en charge, les dossiers, l'avancement des autorisations de conflit d'intérêts ou la synthèse mensuelle d'activité du cabinet.",
   "tool.lawfirm_management_conflict_check.desc": "Vérification de conflit d'intérêts (lecture seule, rien n'est enregistré) : compare un client et une partie adverse aux dossiers existants. À utiliser quand l'utilisateur demande si un client ou une partie adverse présente un conflit d'intérêts.",
   "tool.lawfirm_management_fee_ledger.desc": "Consulter le registre des honoraires (lecture seule) : factures, encaissements, créances et taux de recouvrement ; filtre par projet ou mot-clé. À utiliser quand l'utilisateur interroge sur les honoraires, encaissements, notes, factures ou créances de l'ensemble du cabinet (administrateurs du cabinet uniquement).",
-  "access.restricted": "Vous n'avez pas l'autorisation de consulter les données de l'ensemble du cabinet. Seuls les éléments vous concernant sont affichés. Le registre des honoraires et les tableaux de bord du cabinet sont réservés aux administrateurs."
+  "access.restricted": "Vous n'avez pas l'autorisation de consulter les données de l'ensemble du cabinet. Seuls les éléments vous concernant sont affichés. Le registre des honoraires et les tableaux de bord du cabinet sont réservés aux administrateurs.",
+  "access.role.committee": "Membre du comité des conflits d’intérêts",
+  "access.queue.emptyLocal": "La file locale d’examen des conflits d’intérêts est vide.",
+  "access.kpi.activeSubLocal": "Uniquement les dossiers du registre local qui vous concernent",
+  "access.kpi.contractedLocal": "Mon total contractuel",
+  "access.kpi.billingRateLocal": "Mon taux de facturation",
+  "access.colleague": "Collègue de votre cabinet",
+  "access.risk.line": "Niveau de risque : {0}",
+  "access.risk.GREEN": "Vert (aucun conflit)",
+  "access.risk.YELLOW": "Jaune (conflit potentiel)",
+  "access.risk.RED": "Rouge (conflit direct)"
 }

@@ -90,8 +90,19 @@
     committeeQueue: [],
     invoices: [],
     collections: [],
-    dashboard: {}
+    dashboard: {},
+    restricted: false
   };
+
+  // Plugin l10n lookup with the Chinese source text as the fallback ({0}, {1} placeholders).
+  function L(key, fallback, ...args) {
+    let text = window.AWD_LAWFIRM_T?.(key);
+    if (!text || text === key) text = fallback;
+    return text.replace(/\{(\d+)\}/g, (m, i) => (args[i] ?? m));
+  }
+  // Non-admins only see their own local-ledger rows, so a "whole firm" label would overstate the data.
+  const scoped = (firmText, key, mineText) => (state.restricted ? L(key, mineText) : firmText);
+  const NO_VALUE = '—';
 
   // 后端摘要里带内部规则码（「【RED · R2_RETAINER_ADVERSARY】」「Y1_… - 依据」），
   // 风险等级已由卡片徽标表达，律师不需要看到机器码。只改显示，不改存储。
@@ -197,6 +208,7 @@
     const normalized = TAB_ALIASES[raw] || raw;
     const valid = ['intake', 'conflict', 'finance', 'dashboard', 'expense'];
     const target = valid.includes(normalized) ? normalized : 'intake';
+    if (state.activeTab !== target) notice('');
     state.activeTab = target;
     for (const key of valid) {
       const btn = $(`tab-${key}`);
@@ -265,7 +277,7 @@
       id: data.currentUserId || 1,
       displayName: data.currentUserName || '当前律师',
       departmentName: data.currentDepartment || '争议解决',
-      role: '主办律师 / 利冲委员'
+      role: '执业律师'
     };
 
     const intakes = data.intakes || data.allIntakes || data.myIntakes || data.matters || [];
@@ -294,7 +306,8 @@
     const name = self.displayName || self.name || '当前律师';
     const dept = self.departmentName || self.department || '综合业务';
     const role = self.role || self.title || '执业律师';
-    $('self-badge').textContent = `${name} · ${dept} · ${role}`;
+    const committee = $('self-badge').dataset.committee === '1' ? ` · ${L('access.role.committee', '利冲委员')}` : '';
+    $('self-badge').textContent = `${name} · ${dept} · ${role}${committee}`;
 
     const leadInput = $('intake-lead-lawyer');
     if (leadInput && !leadInput.value) leadInput.value = name;
@@ -474,7 +487,7 @@
     queueContainer.replaceChildren();
 
     if (state.committeeQueue.length === 0) {
-      queueContainer.append(node('p', '全所利冲审查队列为空。', 'hint'));
+      queueContainer.append(node('p', scoped('全所利冲审查队列为空。', 'access.queue.emptyLocal', '本机利冲审查队列为空。'), 'hint'));
       return;
     }
 
@@ -718,7 +731,7 @@
     const activeMatters = kpis.activeMatterCount ?? kpis.activeCases ?? kpis.activeMatters ?? state.intakes.filter((i) => i.status === 'APPROVED_FILED').length;
     const totalIntakes = kpis.totalIntakeCount ?? kpis.totalCases ?? state.intakes.length;
     const unitCount = kpis.activeUnitCount ?? kpis.activeUnits ?? kpis.unitCount ?? (d.units ? d.units.length : 0);
-    const avgWi = kpis.avgWorkloadIndex ?? kpis.averageWorkloadIndex ?? 68;
+    const avgWi = kpis.avgWorkloadIndex ?? kpis.averageWorkloadIndex ?? NO_VALUE;
     const totalContracted = kpis.totalContractedCents ?? kpis.contractedCents ?? 0;
     const totalBilled = kpis.totalBilledCents ?? kpis.billedCents ?? 0;
     const totalCollected = kpis.totalCollectedCents ?? kpis.collectedCents ?? 0;
@@ -732,10 +745,10 @@
     const bucketOver90 = aging.over90DaysCents ?? aging.bucketOver90Cents ?? 0;
 
     kpiContainer.append(
-      makeKpi('在办正式案件 / 累计收案', `${activeMatters} 件 / ${totalIntakes} 件`, '工作台与立项中心全所实时汇总'),
+      makeKpi('在办正式案件 / 累计收案', `${activeMatters} 件 / ${totalIntakes} 件`, scoped('工作台与立项中心全所实时汇总', 'access.kpi.activeSubLocal', '仅统计本机台账中与你相关的收案')),
       makeKpi('活跃律师与平均负荷', `${unitCount} 名 · 负荷 ${avgWi}`, '综合主办、协办、待办与近30日工时'),
-      makeKpi('全所签约合同总额', formatYuanFromCents(totalContracted), `折合 ${formatWanFromCents(totalContracted)}`),
-      makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `全所开票率 ${formatPercent(billingRate)}`),
+      makeKpi(scoped('全所签约合同总额', 'access.kpi.contractedLocal', '我的签约合同总额'), formatYuanFromCents(totalContracted), `折合 ${formatWanFromCents(totalContracted)}`),
+      makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `${scoped('全所开票率', 'access.kpi.billingRateLocal', '我的开票率')} ${formatPercent(billingRate)}`),
       makeKpi('已到账实收与回收率', formatYuanFromCents(totalCollected), `账单回收率 ${formatPercent(billedColRate)} · 合同回款率 ${formatPercent(contractColRate)}`),
       makeKpi('待收账款（AR）与账龄结构', formatYuanFromCents(totalAr), `<30天 ${formatYuanFromCents(bucket0To30)} | 30-90天 ${formatYuanFromCents(bucket30To90)} | >90天 ${formatYuanFromCents(bucketOver90)}`)
     );
@@ -797,21 +810,21 @@
         const billed = lead.billedCents ?? lead.totalBilledCents ?? 0;
         const collected = lead.collectedCents ?? lead.totalCollectedCents ?? 0;
         const colRate = lead.billedCollectionRatePercent ?? lead.collectionRatePercent ?? (billed > 0 ? (collected * 100) / billed : 0);
-        const passRate = lead.conflictPassRatePercent ?? lead.firstPassConflictRatePercent ?? lead.firstPassRatePercent ?? 100;
-        const cycleHours = lead.avgFilingHours ?? lead.avgCycleHours ?? 3.5;
+        const passRate = lead.conflictPassRatePercent ?? lead.firstPassConflictRatePercent ?? lead.firstPassRatePercent;
+        const cycleHours = lead.avgFilingHours ?? lead.avgCycleHours;
 
         tr.append(
           node('td', lead.leadLawyerName || lead.leadName || lead.name || '-'),
           node('td', lead.departmentName || lead.department || '-'),
           node('td', `${lead.teamSize ?? lead.unitCount ?? 1} 人`),
           node('td', `${lead.leadMatterCount ?? lead.leadCaseCount ?? lead.caseCount ?? lead.activeMatterCount ?? 0} 件`),
-          node('td', `负荷 ${lead.teamAvgWorkloadIndex ?? lead.avgWorkloadIndex ?? 65}`),
+          node('td', `负荷 ${lead.teamAvgWorkloadIndex ?? lead.avgWorkloadIndex ?? NO_VALUE}`),
           node('td', formatYuanFromCents(contracted)),
           node('td', formatYuanFromCents(billed)),
           node('td', formatYuanFromCents(collected)),
           node('td', formatPercent(colRate)),
-          node('td', formatPercent(passRate)),
-          node('td', `${Number(cycleHours).toFixed(1)} 小时`)
+          node('td', passRate == null ? NO_VALUE : formatPercent(passRate)),
+          node('td', cycleHours == null ? NO_VALUE : `${Number(cycleHours).toFixed(1)} 小时`)
         );
         leadTbody.append(tr);
       }
@@ -911,6 +924,7 @@
     const data = await request('overview', {});
     if (epoch !== state.epoch) return;
     normalizeOverview(data || {});
+    state.restricted = Boolean(data?.restricted);
     renderAll();
     const banner = $('restrictedBanner');
     if (banner) {
@@ -1304,6 +1318,7 @@
     if (previewData) {
       renderConflictPreview(previewData);
     }
+    $('intake-form').reset();
     await loadOverview(epoch);
     notice(`已提交收案申请「${payload.title}」，利益冲突审查流已启动。`);
   }));
@@ -1340,6 +1355,7 @@
       recipientEmail
     });
     if (epoch !== state.epoch) return;
+    $('invoice-form').reset();
     await loadOverview(epoch);
     notice(`已提交发票申请：${buyerName}（¥${amountYuan.toLocaleString('zh-CN')}）。`);
   }));
@@ -1368,6 +1384,7 @@
       receivedDate
     });
     if (epoch !== state.epoch) return;
+    $('collection-form').reset();
     await loadOverview(epoch);
     notice(`已登记收费到账：${payerName}（¥${amountYuan.toLocaleString('zh-CN')}）。`);
   }));

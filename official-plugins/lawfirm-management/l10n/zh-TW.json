@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "律所管理概覽（唯讀）：收案／事項狀態、KPI、待處理的利衝放行；可依專案或關鍵字篩選。使用者詢問「律所／全所的收案、案件、利衝進展、本月業務概況」時使用。",
   "tool.lawfirm_management_conflict_check.desc": "利益衝突檢索（唯讀，不儲存任何內容）：依委託人與對方當事人比對既有事項。使用者詢問「某客戶／對方有沒有利益衝突、利衝檢索」時使用。",
   "tool.lawfirm_management_fee_ledger.desc": "查詢收費台帳（唯讀）：發票、回款、應收與回款率；可依專案或關鍵字篩選。僅律所管理員可用。使用者詢問「全所／本月收費情況、回款、帳單、發票、應收」時使用。",
-  "access.restricted": "無權檢視全所資料：僅顯示與你相關的收案、放行、發票與回款。全所收費台帳與看板僅限律所管理員。"
+  "access.restricted": "無權檢視全所資料：僅顯示與你相關的收案、放行、發票與回款。全所收費台帳與看板僅限律所管理員。",
+  "access.role.committee": "利衝委員",
+  "access.queue.emptyLocal": "本機利衝審查佇列為空。",
+  "access.kpi.activeSubLocal": "僅統計本機帳冊中與你相關的收案",
+  "access.kpi.contractedLocal": "我的簽約合約總額",
+  "access.kpi.billingRateLocal": "我的開票率",
+  "access.colleague": "同所同事",
+  "access.risk.line": "風險提示 {0}",
+  "access.risk.GREEN": "綠色（無利衝）",
+  "access.risk.YELLOW": "黃色（潛在利衝）",
+  "access.risk.RED": "紅色（直接利衝）"
 }

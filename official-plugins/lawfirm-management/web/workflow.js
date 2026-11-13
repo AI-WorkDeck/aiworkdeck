@@ -12,10 +12,18 @@
   $('workflow-practice').replaceChildren(...[...$('intake-practice-area').options].map(option => option.cloneNode(true)));
   const element = (tag, text, cls) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (cls) el.className = cls; return el; };
   const status = text => { $('workflow-status').textContent = text || ''; };
-  function name(id) { return members.get(Number(id))?.name || `账户 ${id}`; }
+  const L = (key, fallback, ...args) => {
+    let text = window.AWD_LAWFIRM_T?.(key);
+    if (!text || text === key) text = fallback;
+    return text.replace(/\{(\d+)\}/g, (m, i) => (args[i] ?? m));
+  };
+  // Never show a raw account id: use the name the server resolved, then the verified-member list, then a neutral label.
+  function name(id, resolved) { return resolved || members.get(Number(id))?.name || L('access.colleague', '同所同事'); }
+  const riskLabel = risk => L(`access.risk.${risk}`, risk);
   async function action(button, fn) {
     if (button.disabled) return;
     button.disabled = true;
+    const top = document.getElementById('notice'); if (top) top.textContent = '';
     const started = epoch;
     try { await fn(started); } catch (e) { if (started === epoch) status(e?.message || '操作未完成，请重试'); }
     finally { if (button.isConnected) button.disabled = false; }
@@ -45,6 +53,10 @@
     $('workflow-content').hidden = false;
     $('workflow-admin').hidden = !data.self.firmAdmin;
     members.set(data.self.userId, data.self);
+    const isCommittee = (data.committee || []).some(a => a.member.userId === data.self.userId && a.state === 'ACCEPTED');
+    const badge = $('self-badge'), mark = ` · ${L('access.role.committee', '利冲委员')}`;
+    badge.dataset.committee = isCommittee ? '1' : '';
+    badge.textContent = badge.textContent.replace(mark, '') + (isCommittee ? mark : '');
     for (const a of data.committee || []) members.set(a.member.userId, a.member);
     choices();
     const appointments = $('workflow-appointments'); appointments.replaceChildren();
@@ -64,7 +76,7 @@
     if (!data.records?.length) records.append(element('p', '暂无与你有关的云端利冲申请。', 'hint'));
     for (const record of data.records || []) {
       const card = element('article', null, 'card'); card.dataset.recordId = record.id; card.tabIndex = -1;
-      card.append(element('h3', record.title), element('p', `${labels[record.status] || record.status} · 风险提示 ${record.risk}`));
+      card.append(element('h3', record.title), element('p', `${labels[record.status] || record.status} · ${L('access.risk.line', '风险提示 {0}', riskLabel(record.risk))}`));
       if (record.consultationContext) {
         const context = record.consultationContext;
         const details = element('section'); details.setAttribute('aria-label', '本次申请核查信息');
@@ -73,7 +85,7 @@
       } else if (record.clientName != null) card.append(element('p', `委托人：${record.clientName}；对方：${record.counterpartyName || '未填写'}`));
       for (const c of record.clearances || []) {
         const section = element('section');
-        section.append(element('strong', `${name(c.targetId)} · ${labels[c.decision] || c.decision}`), element('p', c.summary));
+        section.append(element('strong', `${name(c.targetId, c.targetName)} · ${labels[c.decision] || c.decision}`), element('p', c.summary));
         if (c.comment) section.append(element('p', `本人意见：${c.comment}`));
         if (c.targetId === data.self.userId && c.decision === 'PENDING' && record.status === 'PENDING_LAWYER_CLEARANCE') {
           const comment = element('textarea'); comment.maxLength = 2000; comment.setAttribute('aria-label', '本人利冲核查意见'); section.append(comment);
@@ -133,7 +145,7 @@
     if (started !== epoch) return;
     pending = null; draftId = null; selectedId = result.id; $('workflow-revise').hidden = true;
     for (const input of $('workflow-form').querySelectorAll('input,textarea,select')) input.disabled = false;
-    $('workflow-submit').textContent = '发送利冲协作申请'; $('workflow-consent').checked = false;
+    $('workflow-form').reset(); $('workflow-submit').textContent = '发送利冲协作申请';
     await refresh(started);
   }); });
   $('workflow-revise').addEventListener('click', () => {

@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Gambaran keseluruhan firma guaman (baca sahaja): status pengambilan/kes, KPI dan kelulusan percanggahan kepentingan yang belum selesai; tapis pilihan mengikut projek atau kata kunci. Guna apabila pengguna bertanya tentang pengambilan kes, kes, kemajuan kelulusan percanggahan kepentingan atau ringkasan perniagaan bulanan firma.",
   "tool.lawfirm_management_conflict_check.desc": "Semakan percanggahan kepentingan (baca sahaja, tiada apa disimpan): membandingkan klien dan pihak lawan dengan kes sedia ada. Guna apabila pengguna bertanya sama ada klien atau pihak lawan mempunyai percanggahan kepentingan.",
   "tool.lawfirm_management_fee_ledger.desc": "Lihat lejar yuran (baca sahaja): invois, kutipan, akaun belum terima dan kadar kutipan; tapis mengikut projek atau kata kunci. Guna apabila pengguna bertanya tentang yuran, kutipan, bil, invois atau akaun belum terima seluruh firma (pentadbir firma sahaja).",
-  "access.restricted": "Anda tiada kebenaran melihat data seluruh firma. Hanya item berkaitan anda dipaparkan. Lejar yuran dan papan pemuka seluruh firma terhad kepada pentadbir firma."
+  "access.restricted": "Anda tiada kebenaran melihat data seluruh firma. Hanya item berkaitan anda dipaparkan. Lejar yuran dan papan pemuka seluruh firma terhad kepada pentadbir firma.",
+  "access.role.committee": "Ahli jawatankuasa konflik kepentingan",
+  "access.queue.emptyLocal": "Baris gilir semakan konflik kepentingan setempat kosong.",
+  "access.kpi.activeSubLocal": "Hanya kes dalam lejar setempat yang melibatkan anda",
+  "access.kpi.contractedLocal": "Jumlah kontrak saya",
+  "access.kpi.billingRateLocal": "Kadar pengebilan saya",
+  "access.colleague": "Rakan sekerja di firma anda",
+  "access.risk.line": "Amaran risiko: {0}",
+  "access.risk.GREEN": "Hijau (tiada konflik)",
+  "access.risk.YELLOW": "Kuning (potensi konflik)",
+  "access.risk.RED": "Merah (konflik langsung)"
 }
