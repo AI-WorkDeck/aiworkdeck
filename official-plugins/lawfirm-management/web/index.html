@@ -12,6 +12,7 @@
   <script src="workflow.js" defer></script>
   <script src="expenses-l10n.js" defer></script>
   <script src="expenses.js" defer></script>
+  <script src="clients.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -36,6 +37,10 @@
       <button type="button" id="tab-intake" role="tab" data-tab="intake" aria-selected="true" aria-controls="panel-intake" class="tab-btn">
         <span>收案与立项</span>
         <span id="badge-intake-count" class="tab-count">0</span>
+      </button>
+      <button type="button" id="tab-clients" role="tab" data-tab="clients" aria-selected="false" aria-controls="panel-clients" class="tab-btn">
+        <span data-c="client.tab"></span>
+        <span id="badge-clients-count" class="tab-count">0</span>
       </button>
       <button type="button" id="tab-conflict" role="tab" data-tab="conflict" aria-selected="false" aria-controls="panel-conflict" class="tab-btn">
         <span>利冲审查中心</span>
@@ -165,6 +170,11 @@
     </section>
 
     <!-- Tab 2: 利冲审查中心 -->
+    <!-- 客户管理（web/clients.js） -->
+    <section id="panel-clients" role="tabpanel" aria-labelledby="tab-clients" class="tab-panel" hidden>
+      <div id="clients-root"></div>
+    </section>
+
     <section id="panel-conflict" role="tabpanel" aria-labelledby="tab-conflict" class="tab-panel" hidden>
       <article class="card" id="cloud-workflow">
         <header class="card-header"><div><h2>律所云端利冲协作</h2><p class="hint">管理员指定委员，由本人接受；关联律师与指定委员分别确认。仅发送你明确提交的信息，本机旧台账不会自动上传。</p></div><button type="button" id="workflow-refresh">连接并刷新</button></header>
