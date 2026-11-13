@@ -10968,9 +10968,18 @@ const EXEC = {
     if (r0.error) return tableFail(r0.error);
     if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
-    const range = sheetRange(sheet, String((p && p.range) || ''));
-    if (!range) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
-    const addr = range.getRangeAddress();
+    // 'A1:A7,D1:D7'：逗号分开的多块区域，第一块是分类标签、其余是数据（只画某一列时用，O7 实测）。
+    // 单块区域时首列当分类标签——只有一列就没有可画的数据（导出的图表没有系列），所以单列不当标签。
+    const parts = String((p && p.range) || '').split(',').map(x => x.trim()).filter(Boolean);
+    const addrs = [];
+    for (const part of parts) {
+      const rg = sheetRange(sheet, part);
+      if (!rg) return tableFail('无效的数据区域: ' + part);
+      addrs.push(rg.getRangeAddress());
+    }
+    if (!addrs.length) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
+    const addr = addrs[0];
+    const rowHeaders = addrs.length > 1 || addr.EndColumn > addr.StartColumn;
     const TYPE_MAP = { column: { cls: 'Bar', vertical: false }, bar: { cls: 'Bar', vertical: true }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
     const chartTypeRaw = (p && (p.chartType != null ? p.chartType : p.type)) || 'column';
     const typeInfo = TYPE_MAP[String(chartTypeRaw).toLowerCase()];
@@ -10981,13 +10990,13 @@ const EXEC = {
     if (charts.hasByName(name)) return tableFail('图表已存在: ' + name);
     let rect;
     try {
-      const anchorCol = Math.min(addr.EndColumn + 2, 1023);
+      const anchorCol = Math.min(Math.max(...addrs.map(a => a.EndColumn)) + 2, 1023);
       const anchorCell = sheet.getCellByPosition(anchorCol, addr.StartRow);
       const pos = anchorCell.getPropertyValue('Position');
       rect = new css.awt.Rectangle({ X: pos.X, Y: pos.Y, Width: ptToMm100(400), Height: ptToMm100(250) });
     } catch (e) { return tableFail('计算图表放置位置失败: ' + errStr(e)); }
     try {
-      charts.addNewByName(name, rect, [addr], true, true);
+      charts.addNewByName(name, rect, addrs, true, rowHeaders);
     } catch (e) { return tableFail('创建图表失败: ' + errStr(e)); }
     const note = [];
     try {
@@ -11006,7 +11015,7 @@ const EXEC = {
     } catch (e) { note.push('图表类型/标题设置失败: ' + errStr(e)); }
     const res = {
       success: true, name: name, chartType: String(chartTypeRaw).toLowerCase(),
-      range: sheetRangeName(addr), sheet: sheet.getName(),
+      range: addrs.map(sheetRangeName).join(','), sheet: sheet.getName(),
     };
     if (p && p.title) res.title = String(p.title);
     if (note.length) return { ...res, ...tableFail('SHEET_CHART_PARTIAL'), created: true, retryable: false };
