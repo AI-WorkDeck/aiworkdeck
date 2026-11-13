@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Hiermee wordt de hele bibliotheek, inclusief de echte cliëntnamen, geëxporteerd naar de map \"Export aanbestedingsbibliotheek\" van het huidige project, waar alle projectleden de bestanden kunnen zien. Toch exporteren?",
   "panel.lib.someClient": "een cliënt",
   "panel.err.cancelled": "Gestopt.",
-  "panel.err.panel_only": "Deze actie is alleen beschikbaar in het paneel \"Aanbestedingen en offertes\"."
+  "panel.err.panel_only": "Deze actie is alleen beschikbaar in het paneel \"Aanbestedingen en offertes\".",
+  "panel.err.libraryNotLoaded": "De bibliotheek met referenties en team kon nog niet worden gelezen, dus er is niets opgeslagen om bestaande inhoud niet te overschrijven. Probeer het over enkele ogenblikken opnieuw.",
+  "panel.err.libraryReloaded": "De bibliotheek met referenties en team is zojuist opnieuw geladen, dus er is niets opgeslagen om bestaande inhoud niet te overschrijven. Controleer de bibliotheek en sla opnieuw op."
 }
