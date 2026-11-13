@@ -210,13 +210,16 @@
     kpi: 'dashboard',
     team: 'dashboard',
     expense: 'expense',
-    expenses: 'expense'
+    expenses: 'expense',
+    clients: 'clients',
+    client: 'clients',
+    customers: 'clients'
   };
 
   function switchTab(tabId) {
     const raw = String(tabId || '').replace(/^tab-/, '').replace(/^panel-/, '').trim().toLowerCase();
     const normalized = TAB_ALIASES[raw] || raw;
-    const valid = ['intake', 'conflict', 'finance', 'dashboard', 'expense'];
+    const valid = ['intake', 'clients', 'conflict', 'finance', 'dashboard', 'expense'];
     const target = valid.includes(normalized) ? normalized : 'intake';
     if (state.activeTab !== target) notice('');
     state.activeTab = target;
@@ -358,7 +361,8 @@
         const matchedParty = hit.matchedPartyName ? ` · 冲突主体：${hit.matchedPartyName}` : '';
         const handler = hit.handlerUserName ? ` · 承办人：${hit.handlerUserName}` : '';
         const citation = hit.statutoryCitation || hit.conflictRuleCitation || '';
-        li.textContent = `${ruleTitle}${matchedMatter}${matchedParty}${handler}${citation ? ' — 依据：' + citation : ''}`;
+        const relationPath = hit.relationPath ? ` · ${L('client.conflict.pathLabel', '关系链：')}${hit.relationPath}` : '';
+        li.textContent = `${ruleTitle}${matchedMatter}${matchedParty}${relationPath}${handler}${citation ? ' — 依据：' + citation : ''}`;
         ul.append(li);
       }
       box.append(ul);
@@ -909,6 +913,7 @@
       : [];
 
     return {
+      clientId: Number($('intake-client-id')?.value) || undefined,
       title,
       practiceArea,
       departmentName,
@@ -1282,7 +1287,7 @@
   }
 
   // Bind navigation tabs
-  for (const tabKey of ['intake', 'conflict', 'finance', 'dashboard', 'expense']) {
+  for (const tabKey of ['intake', 'clients', 'conflict', 'finance', 'dashboard', 'expense']) {
     const btn = $(`tab-${tabKey}`);
     if (btn) {
       btn.addEventListener('click', () => switchTab(tabKey));

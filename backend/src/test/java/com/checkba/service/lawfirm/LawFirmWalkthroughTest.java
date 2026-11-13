@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({LawFirmManagementService.class, LawFirmConflictEngine.class, ImService.class, ObjectMapper.class})
+@Import({LawFirmManagementService.class, LawFirmClientService.class, LawFirmConflictEngine.class, ImService.class, ObjectMapper.class})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:lawfirm-walkthrough-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver",

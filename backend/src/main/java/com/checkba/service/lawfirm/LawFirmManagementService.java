@@ -87,6 +87,7 @@ public class LawFirmManagementService {
     private final PluginService pluginService;
     private final ObjectMapper objectMapper;
     private final LawFirmAccessPolicy access;
+    private final LawFirmClientService clientService;
 
     /**
      * 桌面单机（local-mode）只有一个真人：他同时是申请人、被征询律师与利冲委员（单人所/演示）。
@@ -132,6 +133,13 @@ public class LawFirmManagementService {
         Map<String, Object> params = rawParams == null ? Map.of() : rawParams;
         Long effectiveUserId = userId;
         String act = action == null || action.isBlank() ? "overview" : action.trim();
+
+        // 客户档案（LawFirmClientService）：与收案、利冲共用一份主体数据
+        if (LawFirmClientService.ACTIONS.contains(act)) return clientService.execute(effectiveUserId, act, params);
+        if (Set.of("overview", "list", "dashboard").contains(act)) clientService.linkUnassignedIntakes();
+        if (Set.of("submitIntake", "createIntake", "precheckConflict", "conflictCheck", "scanConflict", "conflictPreview").contains(act)) {
+            params = clientService.applyClientToIntakeParams(effectiveUserId, params);
+        }
 
         return switch (act) {
             case "overview", "list", "dashboard" -> buildOverview(effectiveUserId, projectId, params);
@@ -353,7 +361,8 @@ public class LawFirmManagementService {
                 draft,
                 intakeRepository.findAllByOrderByCreatedAtDescIdDesc(),
                 projectRepository.findAll(),
-                userNames
+                userNames,
+                clientService.graph()
         );
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("riskLevel", result.getRiskLevel());
@@ -383,7 +392,7 @@ public class LawFirmManagementService {
         List<Project> existingProjects = projectRepository.findAll();
 
         LawFirmConflictEngine.ConflictCheckResult conflictResult = conflictEngine.evaluateConflict(
-                intake, existingIntakes, existingProjects, userNames);
+                intake, existingIntakes, existingProjects, userNames, clientService.graph());
 
         Instant now = Instant.now();
         intake.setIntakeNo(generateIntakeNo());
@@ -404,6 +413,7 @@ public class LawFirmManagementService {
         }
 
         intake = intakeRepository.save(intake);
+        clientService.linkIntake(intake);
 
         List<LawFirmConflictClearance> createdClearances = new ArrayList<>();
         if (hasHits) {
@@ -2195,6 +2205,7 @@ public class LawFirmManagementService {
 
         return LawFirmMatterIntake.builder()
                 .projectId(resolvedProjectId)
+                .clientId(longVal(params.get("clientId")))
                 .title(string(params, "title", ""))
                 .practiceArea(string(params, "practiceArea", "CORPORATE_MA"))
                 .applicantUserId(userId)
@@ -2388,6 +2399,7 @@ public class LawFirmManagementService {
         map.put("leadLawyerName", i.getLeadLawyerName());
         map.put("departmentName", i.getDepartmentName());
         map.put("teamMemberNames", i.getTeamMemberNames());
+        map.put("clientId", i.getClientId());
         map.put("clientName", i.getClientName());
         map.put("clientCreditCode", i.getClientCreditCode());
         map.put("clientRole", i.getClientRole());
