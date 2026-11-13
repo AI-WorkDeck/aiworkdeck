@@ -874,8 +874,12 @@
       await refreshList(epoch); if (epoch !== state.epoch) return; notice();
       try {
         await loadAgentScopes(epoch); if (epoch !== state.epoch) return;
+        // Opening the panel must not write into the project (QA D15): creating the assistant chat writes
+        // 项目沟通/项目标识.json, so that waits for a click. An existing private assistant chat is resumed.
         const projectAgent = state.agents.find((agent) => agent.scope === 'project');
-        if (projectAgent) await openAgent(projectAgent);
+        const resumable = projectAgent && state.conversations.find((c) => c.agent && privateAgent(c) && c.agent.scope === 'project'
+          && (c.agent.scopeKey === projectAgent.scopeKey || c.agent.scopeKey === projectAgent.legacyScopeKey));
+        if (resumable && !state.active) await select(resumable);
       } catch (error) { if (epoch === state.epoch) notice('助手暂不可用：' + failure(error), true); }
     } catch (error) { if (epoch === state.epoch) notice(failure(error), true); }
     finally {

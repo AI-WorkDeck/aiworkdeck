@@ -649,6 +649,8 @@ export default {
   pwsLfJumpIntake: 'Intake & Conflicts',
   pwsLfJumpFinance: 'Billing & Finance',
   pwsLfJumpDashboard: 'Firm 3D Dashboard',
+  pwsLfJumpDashboardLocal: '3D Dashboard (this device)',
+  pwsLfJumpDashboardMine: 'My 3D Dashboard',
   pwsLfJumpOa: 'OA & IM Sync',
   pwsDdStagesTitle: 'Due Diligence Stages',
   pwsDdStagesSub: '6-Step Standard Workflow',

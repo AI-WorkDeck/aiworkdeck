@@ -915,7 +915,7 @@ public class LocalProjectService {
         }
 
         if (stats.changed > 0) {
-            projectFileService.signalChange(projectId, userId);
+            projectFileService.signalChange(projectId, userId, true);
         }
         return stats;
     }

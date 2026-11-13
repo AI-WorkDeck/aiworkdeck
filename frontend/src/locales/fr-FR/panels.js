@@ -615,6 +615,8 @@ export default {
   "pwsLfJumpIntake": "Intake et conflits d'intérêts",
   "pwsLfJumpFinance": "Facturation et finance",
   "pwsLfJumpDashboard": "Tableau de bord 3D du cabinet",
+  "pwsLfJumpDashboardLocal": "Tableau de bord 3D (cet appareil)",
+  "pwsLfJumpDashboardMine": "Mon tableau de bord 3D",
   "pwsLfJumpOa": "Synchronisation OA et messagerie instantanée",
   "pwsDdStagesTitle": "Étapes de due diligence",
   "pwsDdStagesSub": "Flux de travail standard en 6 étapes",

@@ -651,6 +651,8 @@ export default {
   pwsLfJumpIntake: '立案与利冲',
   pwsLfJumpFinance: '开票与财务',
   pwsLfJumpDashboard: '全所三维看板',
+  pwsLfJumpDashboardLocal: '本机三维看板',
+  pwsLfJumpDashboardMine: '我的三维看板',
   pwsLfJumpOa: 'OA与IM联动',
   pwsDdStagesTitle: '尽调作业阶段',
   pwsDdStagesSub: '6 步标准流程',

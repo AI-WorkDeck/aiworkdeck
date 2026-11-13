@@ -413,7 +413,7 @@
           <view class="lawfirm-quick-jumps">
             <button class="lawfirm-jump-btn" @tap="openLawFirmTab('intake')">{{ tr('panels.pwsLfJumpIntake', '立案与利冲') }}</button>
             <button class="lawfirm-jump-btn" @tap="openLawFirmTab('finance')">{{ tr('panels.pwsLfJumpFinance', '开票与财务') }}</button>
-            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('dashboard')">{{ tr('panels.pwsLfJumpDashboard', '全所三维看板') }}</button>
+            <button class="lawfirm-jump-btn" @tap="openLawFirmTab('dashboard')">{{ lawfirmOverview?.localLedger ? tr('panels.pwsLfJumpDashboardLocal', '本机三维看板') : lawfirmOverview?.restricted ? tr('panels.pwsLfJumpDashboardMine', '我的三维看板') : tr('panels.pwsLfJumpDashboard', '全所三维看板') }}</button>
             <button class="lawfirm-jump-btn" @tap="openLawFirmTab('oa')">{{ tr('panels.pwsLfJumpOa', 'OA与IM联动') }}</button>
           </view>
         </view>

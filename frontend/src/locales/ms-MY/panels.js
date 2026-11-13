@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Penerimaan & Konflik",
   "pwsLfJumpFinance": "Pengebilan & Kewangan",
   "pwsLfJumpDashboard": "Papan Pemuka 3D Firma",
+  "pwsLfJumpDashboardLocal": "Papan Pemuka 3D (peranti ini)",
+  "pwsLfJumpDashboardMine": "Papan Pemuka 3D saya",
   "pwsLfJumpOa": "Segerak OA & IM",
   "pwsDdStagesTitle": "Peringkat Due Diligence",
   "pwsDdStagesSub": "Aliran Kerja Standard 6 Langkah",

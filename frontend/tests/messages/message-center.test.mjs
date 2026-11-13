@@ -64,7 +64,7 @@ test('ordinary text send uses actual acknowledgement, Enter works and IME Enter 
  area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));await tick();assert.equal(f.state.messages[0].text,'第一条');assert.equal(f.host.querySelector('.message-row').textContent.includes('第一条'),true)
 })
 test('failed text send stays visible and retries with its original idempotency key',async t=>{
- let rejectSend=true;const f=await mount(t,{override:(a,p)=>{if(p.action==='send'&&rejectSend){rejectSend=false;return Promise.reject(new Error('离线'))}}});await selectChat(f);type(f,'保留原文');f.host.querySelector('.message-composer').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick()
+ let rejectSend=true;const f=await mount(t,{override:(a,p)=>{if(p.action==='send'&&rejectSend){rejectSend=false;return Promise.reject(new Error('离线'))}}});await selectChat(f);type(f,'保留原文');await tick();f.host.querySelector('.message-composer button.primary').click();await tick()
  assert.match(f.host.textContent,/发送未确认/);const first=f.calls.find(c=>c.params.action==='send');[...f.host.querySelectorAll('button')].find(b=>b.textContent==='重试发送').click();await tick()
  const second=f.calls.filter(c=>c.params.action==='send')[1];assert.equal(first.params.params.clientMessageId,second.params.params.clientMessageId);assert.equal(f.vm.current.pending.length,0)
 })
@@ -111,7 +111,9 @@ test('partial source failure is visible rather than a falsely empty inbox', asyn
 })
 
 test('new conversation offers direct and group creation without the optional plugin', async t => {
- const f=await mount(t);f.vm.form='create';f.vm.formValue='与客户私聊';await f.vm.createConversation();assert.equal(f.calls.find(c=>c.params.action==='create').params.params.type,'DIRECT')
+ const f=await mount(t);[...f.host.querySelectorAll('.list-actions button')].find(b=>b.textContent===zh.newChat).click();await tick()
+ const title=f.host.querySelector('.create-form input');title.value='与客户私聊';title.dispatchEvent(new dom.window.Event('input',{bubbles:true}));await tick()
+ ;[...f.host.querySelectorAll('.create-form button')].find(b=>b.textContent===zh.create).click();await tick();assert.equal(f.calls.find(c=>c.params.action==='create').params.params.type,'DIRECT')
  f.vm.form='create';f.vm.formType='GROUP';f.vm.formValue='跨所协作';await f.vm.createConversation();assert.equal(f.calls.filter(c=>c.params.action==='create').at(-1).params.params.type,'GROUP')
 })
 
@@ -186,7 +188,8 @@ test('QA D1: message-center invite never issues a code in one click; the lawyer 
  const invites=()=>f.calls.filter(c=>c.params.action==='invite')
  const form=()=>f.host.querySelector('form.invite-result')
  const pick=(select,value)=>{select.value=value;select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))}
- const submit=async()=>{form().dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick()}
+ // In the app uni-form never sees a submit from a plain button, so press the button the lawyer presses (QA D1 round 2).
+ const submit=async()=>{const b=form().querySelector('button.primary');if(!b.disabled)b.click();await tick()}
  inviteButton().click();await tick()
  assert.equal(invites().length,0,'opening the invite form must not create a code')
  const role=form().querySelector('select');assert.equal(role.value,'');assert.equal(form().querySelector('button.primary').disabled,true)

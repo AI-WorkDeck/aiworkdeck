@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Müvekkil Kabulü ve Çatışma Kontrolleri",
   "pwsLfJumpFinance": "Faturalandırma ve Finans",
   "pwsLfJumpDashboard": "Büro 3B Panosu",
+  "pwsLfJumpDashboardLocal": "3B Pano (bu cihaz)",
+  "pwsLfJumpDashboardMine": "3B Panom",
   "pwsLfJumpOa": "OA ve IM Senkronizasyonu",
   "pwsDdStagesTitle": "Due Diligence Aşamaları",
   "pwsDdStagesSub": "6 Adımlı Standart İş Akışı",

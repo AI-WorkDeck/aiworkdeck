@@ -340,6 +340,8 @@ public class LawFirmManagementService {
         out.put("summary", summary);
         out.put("users", userOptions);
         out.put("restricted", !firmWide);
+        // Desktop ledger holds this device's data only; the panel labels it 本机, never 全所 (QA D11).
+        out.put("localLedger", access.localLedger());
         return out;
     }
 

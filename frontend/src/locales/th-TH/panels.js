@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "การรับงานและความขัดแย้ง",
   "pwsLfJumpFinance": "การเรียกเก็บเงินและการเงิน",
   "pwsLfJumpDashboard": "แดชบอร์ด 3D ของสำนักงาน",
+  "pwsLfJumpDashboardLocal": "แดชบอร์ด 3D (อุปกรณ์นี้)",
+  "pwsLfJumpDashboardMine": "แดชบอร์ด 3D ของฉัน",
   "pwsLfJumpOa": "การซิงค์ OA และ IM",
   "pwsDdStagesTitle": "ขั้นตอนการตรวจสอบก่อนธุรกรรม",
   "pwsDdStagesSub": "ขั้นตอนการทำงานมาตรฐาน 6 ขั้น",

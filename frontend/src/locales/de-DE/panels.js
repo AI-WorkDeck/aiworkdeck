@@ -615,6 +615,8 @@ export default {
   "pwsLfJumpIntake": "Mandatsannahme und Interessenkonflikte",
   "pwsLfJumpFinance": "Abrechnung und Finanzen",
   "pwsLfJumpDashboard": "3D-Dashboard der Kanzlei",
+  "pwsLfJumpDashboardLocal": "3D-Dashboard (dieses Gerät)",
+  "pwsLfJumpDashboardMine": "Mein 3D-Dashboard",
   "pwsLfJumpOa": "OA- und IM-Synchronisierung",
   "pwsDdStagesTitle": "Due-Diligence-Phasen",
   "pwsDdStagesSub": "Standardworkflow in 6 Schritten",
