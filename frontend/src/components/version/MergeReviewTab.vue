@@ -70,6 +70,7 @@ import ReviewPanel from '@/components/ReviewPanel.vue'
 import { createWebviewEditorExecutor, createIframeEditorExecutor } from '@/composables/useZetaOfficeWebview.js'
 import { fetchVersionFileBytes, postMergeResolveFile, getFileBytesUrl } from '@/services/api.js'
 import { fetchMergeInputs, buildMergeDraft } from '@/services/mergeDraft.js'
+import { assertNotPasswordProtected, isPasswordProtectedError } from '@/utils/officeCompareGuard.js'
 import { collectDecisions } from '@/utils/mergeReviewDecisions.js'
 import { resolveMergeSideNames } from '@/utils/mergeSideNames.js'
 import { getAuthHeaders } from '@/utils/auth.js'
@@ -169,7 +170,7 @@ export default {
       this.ready = true
     } catch (e) {
       console.warn('[MergeReview] 失败', e)
-      this.statusText = (e && e.message) || this.$t('version.mergeBuildFailed')
+      this.statusText = isPasswordProtectedError(e) ? this.$t('version.officePasswordProtected') : ((e && e.message) || this.$t('version.mergeBuildFailed'))
     }
   },
   beforeUnmount() {
@@ -227,6 +228,7 @@ export default {
       this.statusText = this.$t('version.mergeFetchingVersions')
       const baseBytes = await fetchVersionFileBytes(spec.projectId, spec.mergeBase, spec.path)
       const mergedBytes = await this.fetchMergedBytes()
+      assertNotPasswordProtected(spec.path, baseBytes, mergedBytes)
       const loaded = await this.run('load_document', {
         bytes: mergedBytes, name: spec.name, authorName: this.$t('version.compareAuthorName'),
       })

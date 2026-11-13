@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "文書を開けません：エディタが応答しないか、ファイルが破損しています",
     "encryptedTitle": "このファイルには読み取りパスワードが設定されているため、エディタではまだ開けません。Excel・Word・PowerPoint または WPS でパスワードを解除してから開き直すか、元のファイルをダウンロードしてください。",
+    "legacyTitle": "古い形式の Office ファイルのため、エディターでは直接開けません。Word / Excel / PowerPoint または WPS で開き、.docx / .xlsx / .pptx として保存してから開き直してください。",
     "passwordPrompt": "このファイルには読み取りパスワードが設定されています。パスワードを入力してください。",
     "passwordPlaceholder": "パスワード",
     "passwordOpen": "開く",

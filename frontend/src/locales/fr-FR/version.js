@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Échec du chargement de la version plus récente",
   "compareGenerateFailed": "Échec de la génération de la comparaison",
   "compareEmptyContent": "Cette version ne contient aucun contenu pour ce fichier",
+  "officePasswordProtected": "Ce fichier est protégé par un mot de passe d'ouverture ; la comparaison et la fusion ne sont pas encore prises en charge. Enregistrez d'abord une copie sans mot de passe.",
   "compareFailedRetry": "Échec de la génération de la comparaison. Veuillez réessayer plus tard.",
   "compareTimeout": "Délai de préparation de la comparaison dépassé. Veuillez fermer et réessayer.",
   "compareIframeLoadFailed": "Échec du chargement de la page de l'éditeur",

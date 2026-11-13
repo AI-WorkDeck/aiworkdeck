@@ -311,7 +311,7 @@ public class PitchTools implements HostAware {
         requireProject(call);
         String kind = text(args, "kind");
         if (!kind.equals("docx") && !kind.equals("pptx")) throw new Failure("bad_params", "kind");
-        ObjectNode lib = loadLibrary(call);
+        ObjectNode lib = withExternal(loadLibrary(call), args);
         JsonNode matrix = args.path("includeMatrix").asBoolean(true) ? loadMatrix(call) : JSON.nullNode();
         Build build = new Build(lib, args, matrix, zh);
         Ooxml.Data data = build.data();
@@ -339,6 +339,34 @@ public class PitchTools implements HostAware {
         out.put("missingAliases", build.missingAliases);
         out.put("quote", build.quoteView);
         return out;
+    }
+
+    /**
+     * 同事共享给我的业绩/简历（面板从律所云端检索到，随 generate 传入）：只接受 id 以「x:」开头的条目，
+     * 字段按白名单取，标上作者（owner），与本人库合并后统一走对外称谓替换与泄露检查。
+     */
+    static ObjectNode withExternal(ObjectNode lib, JsonNode args) {
+        ObjectNode out = lib.deepCopy();
+        mergeExternal((ArrayNode) out.withArray("credentials"), args.path("externalCredentials"),
+                List.of("title", "client", "clientAlias", "area", "year", "amount", "role", "summary", "scopeOfWork", "highlights", "outcome", "period", "owner"),
+                List.of("lawyers", "tags"));
+        mergeExternal((ArrayNode) out.withArray("lawyers"), args.path("externalLawyers"),
+                List.of("name", "title", "since", "education", "bio", "owner"), List.of("areas"));
+        return out;
+    }
+
+    private static void mergeExternal(ArrayNode into, JsonNode items, List<String> fields, List<String> lists) {
+        if (!items.isArray()) return;
+        int n = 0;
+        for (JsonNode it : items) {
+            String id = text(it, "id");
+            if (!id.startsWith("x:") || id.length() > 64 || ++n > 100) continue;
+            ObjectNode o = JSON.createObjectNode();
+            o.put("id", id);
+            for (String f : fields) if (!text(it, f).isEmpty()) o.put(f, text(it, f).length() > 2000 ? text(it, f).substring(0, 2000) : text(it, f));
+            for (String f : lists) if (it.path(f).isArray()) o.set(f, it.path(f).deepCopy());
+            into.add(o);
+        }
     }
 
     /** 对外材料复查：库里真实客户名（与对外称谓不同的）不得出现在生成文件里。 */
@@ -428,6 +456,7 @@ public class PitchTools implements HostAware {
             out.add(n);
             n = n.replaceAll("[（(][^）)]*[）)]", "").trim();
             out.add(n);
+            out.add(n.replaceAll("(股份有限公司|有限责任公司|有限公司)$", "")); // 保留「集团」的写法
             for (int i = 0; i < 3 && FORM.matcher(n).find(); i++) { n = FORM.matcher(n).replaceAll(""); out.add(n); }
             String noRegion = REGION.matcher(n).replaceAll("");
             out.add(noRegion);
@@ -485,6 +514,11 @@ public class PitchTools implements HostAware {
                 m.put("角色", text(c, "role"));
                 m.put("简介", mask(text(c, "summary")));
                 m.put("律师", join(c.path("lawyers")));
+                m.put("服务内容", mask(text(c, "scopeOfWork")));
+                m.put("亮点", mask(text(c, "highlights")));
+                m.put("结果", mask(text(c, "outcome")));
+                m.put("期间", text(c, "period"));
+                m.put("来源", text(c, "owner"));
                 creds.add(m);
             }
             lists.put("业绩", creds);

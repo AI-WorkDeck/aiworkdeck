@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "加載新版失敗",
   "compareGenerateFailed": "對比生成失敗",
   "compareEmptyContent": "這一版里沒有這份文件的內容",
+  "officePasswordProtected": "該檔案設有開啟密碼，暫不支援比對/合併，請先另存為無密碼副本",
   "compareFailedRetry": "對比生成失敗，請稍後重試",
   "compareTimeout": "對比準備超時，請關閉後重試",
   "compareIframeLoadFailed": "編輯器頁面加載失敗",

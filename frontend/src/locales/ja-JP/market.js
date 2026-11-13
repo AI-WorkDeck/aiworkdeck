@@ -222,6 +222,7 @@ export default {
   "permTasks": "カレンダーとタスク",
   "permClipboard": "クリップボード",
   "permLawfirm": "チーム情報",
+  "permWorklogRead": "自分の作業記録の集計",
   "newlyCreatedTag": "新規",
   "publishBtn": "マーケットプレイスに公開",
   "publishUpdateBtn": "マーケットプレイスを更新",

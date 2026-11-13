@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Falha ao carregar a versão mais recente",
   "compareGenerateFailed": "Falha ao gerar a comparação",
   "compareEmptyContent": "Esta versão não possui conteúdo para este arquivo",
+  "officePasswordProtected": "Este arquivo tem senha de abertura; a comparação e a mesclagem ainda não são suportadas. Salve primeiro uma cópia sem senha.",
   "compareFailedRetry": "Falha ao gerar a comparação. Tente novamente mais tarde.",
   "compareTimeout": "Tempo limite da comparação esgotado. Feche e tente novamente.",
   "compareIframeLoadFailed": "Falha ao carregar a página do editor",

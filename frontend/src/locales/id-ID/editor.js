@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: editor tidak merespons atau berkas rusak",
     "encryptedTitle": "File ini dilindungi kata sandi pembuka yang belum dapat dibuka oleh editor. Hapus kata sandi di Excel, Word, PowerPoint, atau WPS lalu buka lagi, atau unduh file aslinya.",
+    "legacyTitle": "Ini format Office lama yang tidak dapat dibuka langsung oleh editor. Buka di Word, Excel, PowerPoint, atau WPS, simpan sebagai .docx / .xlsx / .pptx, lalu buka kembali.",
     "passwordPrompt": "File ini dilindungi kata sandi pembuka. Masukkan kata sandi untuk membukanya.",
     "passwordPlaceholder": "Kata sandi",
     "passwordOpen": "Buka",

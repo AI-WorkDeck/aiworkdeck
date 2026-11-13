@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Daha yeni sürüm yüklenemedi",
   "compareGenerateFailed": "Karşılaştırma oluşturulamadı",
   "compareEmptyContent": "Bu sürümde bu dosya için içerik yok",
+  "officePasswordProtected": "Bu dosya açma parolasıyla korunuyor; karşılaştırma ve birleştirme henüz desteklenmiyor. Önce parolasız bir kopya kaydedin.",
   "compareFailedRetry": "Karşılaştırma oluşturulamadı. Lütfen daha sonra tekrar deneyin.",
   "compareTimeout": "Karşılaştırma zaman aşımına uğradı. Lütfen kapatıp tekrar deneyin.",
   "compareIframeLoadFailed": "Düzenleyici sayfası yüklenemedi",

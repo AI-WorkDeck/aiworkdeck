@@ -22,4 +22,10 @@ public interface LawFirmTimeEntryRepository extends JpaRepository<LawFirmTimeEnt
     List<LawFirmTimeEntry> findByBillIdIn(Collection<Long> billIds);
 
     Optional<LawFirmTimeEntry> findByUserIdAndSourceKey(Long userId, String sourceKey);
+
+    Optional<LawFirmTimeEntry> findBySourceKey(String sourceKey);
+
+    List<LawFirmTimeEntry> findByCloudSyncPendingTrue();
+
+    List<LawFirmTimeEntry> findByUserIdAndCloudEntryIdIsNotNull(Long userId);
 }

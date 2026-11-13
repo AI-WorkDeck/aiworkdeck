@@ -255,6 +255,7 @@ export default {
   permTasks: "Calendar and tasks",
   permClipboard: "Clipboard",
   permLawfirm: "Team information",
+  permWorklogRead: "Summary of your own work records",
   newlyCreatedTag: 'New',
   publishBtn: 'Publish to Marketplace',
   publishUpdateBtn: 'Update on Marketplace',

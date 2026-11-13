@@ -222,6 +222,7 @@ export default {
   "permTasks": "कैलेंडर और कार्य",
   "permClipboard": "क्लिपबोर्ड",
   "permLawfirm": "टीम जानकारी",
+  "permWorklogRead": "आपके अपने कार्य रिकॉर्ड का सारांश",
   "newlyCreatedTag": "नया",
   "publishBtn": "मार्केटप्लेस पर प्रकाशित करें",
   "publishUpdateBtn": "मार्केटप्लेस पर अपडेट करें",

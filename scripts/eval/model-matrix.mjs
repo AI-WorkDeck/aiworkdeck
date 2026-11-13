@@ -15,6 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readXlsx, readPptx, zipPart } from './office-xml.mjs'
+import { waitSavedAfterWrite, isDocWriteTool } from './save-wait.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const REPO = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: HERE, encoding: 'utf8' }).trim()
@@ -395,6 +396,15 @@ class Instance {
     try { return JSON.parse(text) } catch { return { _status: res.status, _text: text.slice(0, 300) } }
   }
   sql(q) { return this.pg.psql(this.db, q) }
+  // 项目里某个文件（按名）当前服务器内容的 sha256；找不到或下载失败 = null
+  async hostSha(pid, name) {
+    try {
+      const f = (await this.rows(`select id, name, is_folder, is_deleted from project_file where project_id=${pid} order by id`)).find(x => !x.is_deleted && !x.is_folder && x.name === name)
+      if (!f) return null
+      const r = await fetch(`${this.base}/api/files/${f.id}/download`, { headers: { 'X-Session-Id': this.sid } })
+      return r.ok ? crypto.createHash('sha256').update(Buffer.from(await r.arrayBuffer())).digest('hex') : null
+    } catch { return null }
+  }
   async rows(q) { const t = await this.sql(`select coalesce(json_agg(t),'[]'::json) from (${q}) t`); return JSON.parse(t) }
   async stop() {
     if (this.proc && !this.exited) { this.proc.kill('SIGTERM'); for (let i = 0; i < 20 && !this.exited; i++) await sleep(250); if (!this.exited) this.proc.kill('SIGKILL') }
@@ -509,6 +519,7 @@ class Instance {
       }
       rec.editorReadyMs = Date.now() - t0
       const t1 = Date.now()
+      const shaBefore = await this.hostSha(pid, hostFile) // 本轮开始前服务器上这份文件的内容摘要，用来确认「写命令之后确有一次上传」
       const box = page.locator('.chat-input-rich').last()
       await box.click()
       await page.keyboard.insertText(sentence.text)
@@ -537,6 +548,16 @@ class Instance {
         const body = await page.locator('body').innerText().catch(() => '')
         clean = /更改待保存|保存中|Changes pending save|Saving/.test(body) ? 0 : clean + 1
         if (clean < 2) await sleep(500)
+      }
+      // 状态栏干净只说明编辑器没标脏——宿主若根本没标脏（#1545 修复前的 PPT 就是）会立刻读到旧稿。
+      // 本轮有写命令时，再核对服务器上的内容确实变了（相对本轮开始前），并连续两次一致（没有更晚的上传在途）；
+      // 等不到就如实记 staleRead，不假装读到的是终稿。
+      const logNow = (() => { const fd = fs.openSync(this.logFile, 'r'); try { const sz = fs.fstatSync(fd).size; const b = Buffer.alloc(sz - rec.logOffset); fs.readSync(fd, b, 0, b.length, rec.logOffset); return b.toString('utf8') } finally { fs.closeSync(fd) } })()
+      const wroteDoc = parseLogSlice(logNow, rec.conversationId).tools.some(isDocWriteTool)
+      if (wroteDoc && shaBefore) {
+        const saved = await waitSavedAfterWrite(() => this.hostSha(pid, hostFile), shaBefore)
+        rec.savedAfterWrite = saved
+        if (!saved) rec.staleRead = true
       }
       rec.text =(await this.rows(`select content from project_ai_message where conversation_id='${rec.conversationId}' and role='ASSISTANT' order by id desc limit 1`))[0]?.content || ''
     } catch (e) {

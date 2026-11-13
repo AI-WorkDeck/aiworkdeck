@@ -381,6 +381,7 @@ const PERMISSION_LABELS = {
   get tasks() { return t('market.permTasks') },
   get clipboard() { return t('market.permClipboard') },
   get lawfirm() { return t('market.permLawfirm') },
+  get worklog_read() { return t('market.permWorklogRead') },
 }
 
 // 分类沿用官网 SKILL_CATEGORIES（aiworkdeckweb lib/skill-categories）；registry 未返回 category 时归入"其他"

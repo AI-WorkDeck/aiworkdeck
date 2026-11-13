@@ -1160,9 +1160,25 @@ public class VersionController {
             String text = tika.parseToString(in);
             return ok(Map.of("text", text == null ? "" : text));
         } catch (Exception e) {
+            // 设了打开密码的 Office 文件：抽不出文本是预期，不是故障——给明确原因，
+            // 别让律师对着「版本记录操作失败，请重试」反复重试（前端按 kind 换成界面语言）
+            if (isEncryptedDocument(e)) {
+                throw VersionException.passwordProtected(LangText.of(
+                        "该文件设有打开密码，暂不支持比对/合并，请先另存为无密码副本",
+                        "This file is protected with an open password, so comparing and merging are not supported yet. Save a copy without a password first."));
+            }
             log.warn("版本文本抽取失败: project={}, ref={}", projectId, ref, e);
             throw new VersionException("文本抽取失败", e);
         }
+    }
+
+    private static boolean isEncryptedDocument(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof org.apache.tika.exception.EncryptedDocumentException
+                    || t instanceof org.apache.poi.EncryptedDocumentException) return true;
+            if (t.getCause() == t) break;
+        }
+        return false;
     }
 
     @PostMapping("/versions/{sha}/milestone")

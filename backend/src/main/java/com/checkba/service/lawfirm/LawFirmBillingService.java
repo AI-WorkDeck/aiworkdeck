@@ -75,7 +75,8 @@ public class LawFirmBillingService {
             "timeReviewList", "timeReview", "timeApproveAll",
             "billingRates", "billingSaveTimekeeper", "billingSaveTerms",
             "billPreview", "billCreate", "billList", "billSend", "billCancel", "billConfirm",
-            "billingMetrics", "billingSeedDemo");
+            "billingMetrics", "billingSeedDemo",
+            "cloudBillingStatus", "cloudBillingPublish", "cloudBillingPull");
 
     static final Set<String> LEVELS = Set.of("PARTNER", "COUNSEL", "SENIOR_ASSOCIATE", "ASSOCIATE", "PARALEGAL");
     /** 活动记录里不算律师工时的类型：AI 工具耗时与律师打开文件的时间重叠，登录是瞬时事件。 */
@@ -97,6 +98,14 @@ public class LawFirmBillingService {
     private final LawFirmManagementService ledger;
     private final LawFirmAccessPolicy access;
     private final ObjectMapper objectMapper;
+
+    /** 律所云端工时汇总（经 LawFirmWorkflowGateway）。缺席时（如单元测试）云端功能显示为不可用，本机流程照常。 */
+    private LawFirmBillingCloudClient cloud;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setCloud(LawFirmBillingCloudClient cloud) {
+        this.cloud = cloud;
+    }
 
     @Transactional
     public Map<String, Object> execute(Long userId, Long projectId, String action, Map<String, Object> rawParams) {
@@ -123,6 +132,9 @@ public class LawFirmBillingService {
             case "billConfirm" -> billConfirm(userId, p);
             case "billingMetrics" -> billingMetrics(userId, p);
             case "billingSeedDemo" -> seedDemo(userId);
+            case "cloudBillingStatus" -> cloudStatus(userId);
+            case "cloudBillingPublish" -> cloudPublish(userId, p);
+            case "cloudBillingPull" -> cloudPull(userId);
             default -> throw new IllegalArgumentException(LangText.of("不支持的计时收费操作：", "Unsupported time billing action: ") + action);
         };
     }
@@ -145,6 +157,9 @@ public class LawFirmBillingService {
     Map<String, Object> timeMine(Long userId, Map<String, Object> p) {
         LocalDate[] range = range(p);
         Ctx ctx = new Ctx();
+        Map<String, Object> cloudState = cloud == null ? Map.of("available", false) : cloud.statusOrUnavailable(userId);
+        ctx.cloudMatters = cloudMatters(cloudState);
+        if (Boolean.TRUE.equals(cloudState.get("available"))) syncMine(userId);
         List<LawFirmTimeEntry> mine = entries.findByUserIdAndWorkDateBetweenOrderByWorkDateDescIdDesc(userId, range[0], range[1])
                 .stream().filter(e -> !"DISMISSED".equals(e.getStatus())).toList();
         // 审核结论（退回理由、核减、不收费）回给律师本人看
@@ -152,7 +167,9 @@ public class LawFirmBillingService {
                 .stream().collect(Collectors.groupingBy(LawFirmTimeEntryAudit::getEntryId));
         List<Map<String, Object>> rows = mine.stream().map(e -> {
             Map<String, Object> v = entryView(e, ctx, false);
-            v.put("audit", trail.getOrDefault(e.getId(), List.of()).stream().map(this::auditView).toList());
+            List<Map<String, Object>> trailView = new ArrayList<>(trail.getOrDefault(e.getId(), List.of()).stream().map(this::auditView).toList());
+            trailView.addAll(cloudNotes(e));
+            v.put("audit", trailView);
             return v;
         }).toList();
         List<Map<String, Object>> targets = new ArrayList<>();
@@ -169,7 +186,23 @@ public class LawFirmBillingService {
             if (in.getProjectId() != null && projects.existsById(in.getProjectId())) continue;
             targets.add(target("i:" + in.getId(), in.getTitle(), in));
         }
+        for (Map<String, Object> m : ctx.cloudMatters.values()) {
+            if (!Boolean.TRUE.equals(m.get("active"))) continue;
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("key", "c:" + m.get("id"));
+            t.put("label", m.get("title"));
+            t.put("intakeId", null);
+            t.put("matterTitle", m.get("title"));
+            t.put("clientName", m.get("clientName"));
+            t.put("cloud", true);
+            targets.add(t);
+        }
         Map<String, Object> out = new LinkedHashMap<>();
+        Map<String, Object> cloudView = new LinkedHashMap<>();
+        cloudView.put("available", cloudState.get("available"));
+        cloudView.put("enabled", cloudState.get("enabled"));
+        cloudView.put("reason", cloudState.get("reason"));
+        out.put("cloud", cloudView);
         out.put("from", range[0].toString());
         out.put("to", range[1].toString());
         out.put("entries", rows);
@@ -308,6 +341,12 @@ public class LawFirmBillingService {
     }
 
     private void applyTarget(LawFirmTimeEntry e, String target) {
+        if (target != null && target.matches("c:[0-9a-f-]{36}")) {
+            // 律所云端事项：本机只记事项编号；是否存在、是否仍接收工时由云端在提交时核验
+            e.setCloudMatterId(target.substring(2));
+            e.setIntakeId(null);
+            return;
+        }
         if (target == null || !target.matches("[pi]:[1-9][0-9]{0,18}")) {
             throw new IllegalArgumentException(LangText.of("请选择项目或事项", "Please choose a project or matter"));
         }
@@ -319,12 +358,14 @@ public class LawFirmBillingService {
             }
             e.setProjectId(pr.getId());
             e.setIntakeId(null);
+            e.setCloudMatterId(null);
         } else {
             LawFirmMatterIntake in = intakes.findById(tid)
                     .filter(x -> !"REJECTED_CONFLICT".equals(x.getStatus()) && canRecordOn(e.getUserId(), x))
                     .orElseThrow(() -> new IllegalArgumentException(LangText.of("事项不存在", "Matter not found")));
             e.setIntakeId(in.getId());
             e.setProjectId(in.getProjectId());
+            e.setCloudMatterId(null);
         }
     }
 
@@ -351,11 +392,16 @@ public class LawFirmBillingService {
         Instant now = Instant.now();
         int submitted = 0;
         List<String> skipped = new ArrayList<>();
+        List<LawFirmTimeEntry> toCloud = new ArrayList<>();
         for (Long id : ids) {
             LawFirmTimeEntry e = ownEntry(userId, id);
             if (!Set.of("DRAFT", "RETURNED").contains(e.getStatus())) continue;
-            if (e.getProjectId() == null && e.getIntakeId() == null) {
+            if (e.getProjectId() == null && e.getIntakeId() == null && e.getCloudMatterId() == null) {
                 skipped.add(e.getWorkDate() + " " + LangText.of("未选项目", "no project"));
+                continue;
+            }
+            if (e.getCloudMatterId() != null) {
+                toCloud.add(e);
                 continue;
             }
             e.setStatus("SUBMITTED");
@@ -365,8 +411,10 @@ public class LawFirmBillingService {
             audit(e, userId, actor, "SUBMIT", Map.of("minutes", change(null, e.getMinutes())), null);
             submitted++;
         }
+        int cloudSubmitted = submitToCloud(userId, toCloud, actor, now);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("submitted", submitted);
+        out.put("submitted", submitted + cloudSubmitted);
+        out.put("cloudSubmitted", cloudSubmitted);
         out.put("skipped", skipped);
         return out;
     }
@@ -378,6 +426,7 @@ public class LawFirmBillingService {
         String status = string(p.get("status"));
         Ctx ctx = new Ctx();
         List<LawFirmTimeEntry> rows = entries.findByWorkDateBetweenOrderByWorkDateAscIdAsc(range[0], range[1]).stream()
+                .filter(LawFirmBillingService::inLedger)
                 .filter(e -> Set.of("SUBMITTED", "APPROVED", "BILLED").contains(e.getStatus()))
                 .filter(e -> status == null || status.isBlank() || status.equals(e.getStatus()))
                 .filter(e -> canReview(userId, ctx.intakeFor(e)))
@@ -402,7 +451,7 @@ public class LawFirmBillingService {
         Long id = longVal(p.get("id"));
         String op = string(p.get("op"));
         Ctx ctx = new Ctx();
-        LawFirmTimeEntry e = entries.findById(id == null ? -1L : id)
+        LawFirmTimeEntry e = entries.findById(id == null ? -1L : id).filter(LawFirmBillingService::inLedger)
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("工时不存在", "Time entry not found")));
         LawFirmMatterIntake intake = ctx.intakeFor(e);
         requireReviewer(userId, intake);
@@ -494,7 +543,9 @@ public class LawFirmBillingService {
         e.setUpdatedAt(now);
         e = entries.save(e);
         audit(e, userId, actor, action, detail, reason);
+        boolean synced = pushCloud(userId, List.of(e));
         Map<String, Object> v = entryView(e, ctx, true);
+        v.put("cloudSynced", synced);
         v.put("audit", audits.findByEntryIdInOrderByIdAsc(List.of(e.getId())).stream().map(this::auditView).toList());
         return Map.of("entry", v);
     }
@@ -536,7 +587,7 @@ public class LawFirmBillingService {
         }
         Map<Long, Long> billedByIntake = new HashMap<>();
         for (LawFirmBill b : bills.findAll()) {
-            if (!"CANCELLED".equals(b.getStatus())) billedByIntake.merge(b.getIntakeId(), nz(b.getTotalCents()), Long::sum);
+            if (countsTowardFees(b)) billedByIntake.merge(b.getIntakeId(), nz(b.getTotalCents()), Long::sum);
         }
         Map<Long, LawFirmBillingTerms> terms = termsRepository.findAll().stream()
                 .collect(Collectors.toMap(LawFirmBillingTerms::getIntakeId, Function.identity(), (a, b) -> a));
@@ -631,6 +682,7 @@ public class LawFirmBillingService {
         LocalDate[] range = range(p);
         Ctx ctx = new Ctx();
         List<LawFirmTimeEntry> all = entries.findByWorkDateBetweenOrderByWorkDateAscIdAsc(range[0], range[1]).stream()
+                .filter(LawFirmBillingService::inLedger)
                 .filter(e -> { LawFirmMatterIntake x = ctx.intakeFor(e); return x != null && x.getId().equals(in.getId()); })
                 .toList();
         List<LawFirmTimeEntry> rows = all.stream()
@@ -670,7 +722,7 @@ public class LawFirmBillingService {
                 ? LawFirmBillingMath.bpsFromPercent(p.get("discountPercent"))
                 : terms == null ? 0 : nzi(terms.getDiscountBps());
         long prior = bills.findByIntakeId(in.getId()).stream()
-                .filter(b -> !"CANCELLED".equals(b.getStatus()))
+                .filter(this::countsTowardFees)
                 .mapToLong(b -> nz(b.getTotalCents())).sum();
         LawFirmBillingMath.Totals totals = LawFirmBillingMath.totals(subtotal, discountBps, terms == null ? null : terms.getCapCents(), prior);
         return new Draft(in, range[0], range[1], rows, lines, minutes, standard, totals, noCharge, pending);
@@ -692,6 +744,7 @@ public class LawFirmBillingService {
     }
 
     Map<String, Object> billCreate(Long userId, Map<String, Object> p) {
+        lockMatter(longVal(p.get("intakeId")));
         Draft d = draft(userId, p);
         if (d.rows().isEmpty()) {
             throw new IllegalStateException(LangText.of("这段期间没有已审核通过、可收费且未出账单的工时", "No approved, billable, unbilled entries in this period"));
@@ -725,6 +778,7 @@ public class LawFirmBillingService {
             entries.save(e);
             audit(e, userId, actor, "BILL", Map.of("billNo", change(null, bill.getBillNo())), null);
         }
+        pushCloud(userId, d.rows());
         return Map.of("bill", billView(bill, true));
     }
 
@@ -763,13 +817,16 @@ public class LawFirmBillingService {
         Instant now = Instant.now();
         String actor = displayName(userId);
         String reason = trimTo(string(p.get("reason")), 500);
-        for (LawFirmTimeEntry e : entries.findByBillId(b.getId())) {
+        lockMatter(b.getIntakeId());
+        List<LawFirmTimeEntry> released = entries.findByBillId(b.getId());
+        for (LawFirmTimeEntry e : released) {
             e.setStatus("APPROVED");
             e.setBillId(null);
             e.setUpdatedAt(now);
             entries.save(e);
             audit(e, userId, actor, "UNBILL", Map.of("billNo", change(b.getBillNo(), null)), reason);
         }
+        pushCloud(userId, released);
         b.setStatus("CANCELLED");
         b.setCancelledAt(now);
         b.setUpdatedAt(now);
@@ -788,7 +845,7 @@ public class LawFirmBillingService {
     private List<String> recomputeCaps(Long intakeId) {
         LawFirmBillingTerms terms = termsRepository.findByIntakeId(intakeId).orElse(null);
         List<LawFirmBill> siblings = new ArrayList<>(bills.findByIntakeId(intakeId).stream()
-                .filter(x -> !"CANCELLED".equals(x.getStatus())).toList());
+                .filter(this::countsTowardFees).toList());
         siblings.sort(Comparator.comparing(LawFirmBill::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
                 .thenComparing(LawFirmBill::getId));
         List<String> changedSent = new ArrayList<>();
@@ -928,11 +985,12 @@ public class LawFirmBillingService {
         LocalDate[] range = range(p);
         Ctx ctx = new Ctx();
         List<LawFirmTimeEntry> rows = entries.findByWorkDateBetweenOrderByWorkDateAscIdAsc(range[0], range[1]).stream()
+                .filter(LawFirmBillingService::inLedger)
                 .filter(e -> Set.of("SUBMITTED", "APPROVED", "BILLED").contains(e.getStatus())).toList();
         Map<Long, LawFirmBill> billById = bills.findAll().stream().collect(Collectors.toMap(LawFirmBill::getId, Function.identity()));
         Map<Long, long[]> allocByEntry = new HashMap<>(); // entryId -> {billed, collected}
         for (LawFirmBill b : billById.values()) {
-            if (!"CONFIRMED".equals(b.getStatus())) continue;
+            if (!"CONFIRMED".equals(b.getStatus()) || !countsTowardFees(b)) continue;
             List<Map<String, Object>> ls = lines(b);
             long[] weights = ls.stream().mapToLong(l -> nz(longVal(l.get("amountCents")))).toArray();
             long[] billed = LawFirmBillingMath.allocate(nz(b.getTotalCents()), weights);
@@ -969,7 +1027,7 @@ public class LawFirmBillingService {
             if ("APPROVED".equals(e.getStatus()) && billable) add(m, "wipMinutes", billedMin, firm, 3);
             LawFirmBill bill = e.getBillId() == null ? null : billById.get(e.getBillId());
             if (bill != null) add(m, "billedMinutes", billedMin, firm, 4);
-            boolean confirmed = bill != null && "CONFIRMED".equals(bill.getStatus());
+            boolean confirmed = bill != null && "CONFIRMED".equals(bill.getStatus()) && countsTowardFees(bill);
             boolean writtenOff = "APPROVED".equals(e.getStatus()) && !billable && claimed;
             if (confirmed || writtenOff) {
                 add(m, "standardValueCents", LawFirmBillingMath.amountCents(claimedMin, nz(e.getStandardRateCents())), firm, 5);
@@ -1097,12 +1155,342 @@ public class LawFirmBillingService {
                 .level(level).standardRateCents(rateCents).updatedAt(Instant.now()).build());
     }
 
+
+    // ───────────────────────────── 律所云端工时汇总（本机一侧） ─────────────────────────────
+
+    /**
+     * 本机台账里参与审核、出账单与统计的工时。律师交到律所云端的工时在本机只是镜像（cloudMatterId 非空），
+     * 由发布该事项的合伙人取回后另成一条 source=CLOUD 的工时；镜像不参与，避免合伙人自己交的工时被算两遍。
+     */
+    static boolean inLedger(LawFirmTimeEntry e) {
+        return e.getCloudMatterId() == null;
+    }
+
+    /** 计入封顶与实现率的账单：未作废；客户已确认的还要求对应发票没有被作废或红冲。 */
+    private boolean countsTowardFees(LawFirmBill b) {
+        if ("CANCELLED".equals(b.getStatus())) return false;
+        if (!"CONFIRMED".equals(b.getStatus()) || b.getInvoiceId() == null) return true;
+        String st = invoices.findById(b.getInvoiceId()).map(LawFirmInvoice::getStatus).orElse("VOIDED");
+        return !Set.of("VOIDED", "RED_INVOICED").contains(st);
+    }
+
+    /** 同一事项的出账单与撤销串行执行：先确保约定行存在，再对它加行锁。 */
+    private void lockMatter(Long intakeId) {
+        if (intakeId == null) return;
+        if (termsRepository.findByIntakeId(intakeId).isEmpty()) {
+            termsRepository.saveAndFlush(LawFirmBillingTerms.builder().intakeId(intakeId).discountBps(0).updatedAt(Instant.now()).build());
+        }
+        termsRepository.lockByIntakeId(intakeId);
+    }
+
+    private Map<String, Object> requireCloud() {
+        if (cloud == null) {
+            throw new IllegalStateException(LangText.of("当前版本不支持律所云端工时汇总", "This version does not support cloud time collection"));
+        }
+        return Map.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Map<String, Object>> cloudMatters(Map<String, Object> status) {
+        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+        if (status.get("matters") instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m && m.get("id") != null) out.put(String.valueOf(m.get("id")), (Map<String, Object>) m);
+            }
+        }
+        return out;
+    }
+
+    /** 律师交到律所云端的工时：首次提交生成幂等键；云端核验事项与身份后返回云端编号。 */
+    private int submitToCloud(Long userId, List<LawFirmTimeEntry> rows, String actor, Instant now) {
+        if (rows.isEmpty()) return 0;
+        requireCloud();
+        int done = 0;
+        for (int i = 0; i < rows.size(); i += LawFirmCloudBillingService.MAX_BATCH) {
+            List<LawFirmTimeEntry> batch = rows.subList(i, Math.min(rows.size(), i + LawFirmCloudBillingService.MAX_BATCH));
+            List<Map<String, Object>> payload = new ArrayList<>();
+            for (LawFirmTimeEntry e : batch) {
+                if (e.getCloudClientKey() == null) e.setCloudClientKey(java.util.UUID.randomUUID().toString());
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("clientKey", e.getCloudClientKey());
+                r.put("matterId", e.getCloudMatterId());
+                r.put("workDate", e.getWorkDate().toString());
+                r.put("minutes", e.getMinutes());
+                r.put("description", e.getDescription());
+                r.put("billable", Boolean.TRUE.equals(e.getBillable()));
+                payload.add(r);
+            }
+            Map<String, Object> res = cloud.call(userId, "time.submit", Map.of("entries", payload));
+            Map<String, String> idByKey = new HashMap<>();
+            for (Map<String, Object> r : listOfMaps(res.get("entries"))) idByKey.put(String.valueOf(r.get("clientKey")), String.valueOf(r.get("id")));
+            for (LawFirmTimeEntry e : batch) {
+                String cloudId = idByKey.get(e.getCloudClientKey());
+                if (cloudId == null) continue;
+                e.setCloudEntryId(cloudId);
+                e.setStatus("SUBMITTED");
+                e.setBilledMinutes(null);
+                e.setSubmittedAt(now);
+                e.setUpdatedAt(now);
+                entries.save(e);
+                audit(e, userId, actor, "SUBMIT", Map.of("minutes", change(null, e.getMinutes()), "cloud", change(null, true)), null);
+                done++;
+            }
+        }
+        return done;
+    }
+
+    /** 律师端：把云端的审核结论同步回本机镜像（状态、核定时长、是否收费、审核记录）。 */
+    private void syncMine(Long userId) {
+        List<LawFirmTimeEntry> mine = entries.findByUserIdAndCloudEntryIdIsNotNull(userId);
+        if (mine.isEmpty()) return;
+        Map<String, Object> res;
+        try {
+            res = cloud.call(userId, "time.mine", Map.of());
+        } catch (RuntimeException e) {
+            return; // 云端暂不可用时显示上次同步的结果
+        }
+        Map<String, Map<String, Object>> byId = new HashMap<>();
+        for (Map<String, Object> r : listOfMaps(res.get("entries"))) byId.put(String.valueOf(r.get("id")), r);
+        for (LawFirmTimeEntry e : mine) {
+            Map<String, Object> r = byId.get(e.getCloudEntryId());
+            if (r == null || Set.of("DRAFT", "DISMISSED").contains(e.getStatus())) continue;
+            String st = String.valueOf(r.get("status"));
+            String local = switch (st) {
+                case "APPROVED" -> "APPROVED";
+                case "RETURNED" -> "RETURNED";
+                case "BILLED" -> "BILLED";
+                default -> "SUBMITTED";
+            };
+            // 律师已在本机改过退回的工时、还没重新提交：保留本机草稿
+            if ("RETURNED".equals(e.getStatus()) && Boolean.TRUE.equals(e.getEdited()) && "RETURNED".equals(local)) continue;
+            Integer billed = r.get("billedMinutes") instanceof Number n ? n.intValue() : null;
+            e.setStatus(local);
+            e.setBilledMinutes("RETURNED".equals(local) ? null : billed);
+            if (r.get("reviewedBillable") instanceof Boolean b) e.setBillable(b);
+            e.setCloudNotesJson(toJson(r.get("notes") == null ? List.of() : r.get("notes")));
+            entries.save(e);
+        }
+    }
+
+    /** 合伙人端：取回自己发布事项下同事交来的工时，落成本机待审工时（计时人为对应同事），并重试未回写成功的结论。 */
+    Map<String, Object> cloudPull(Long userId) {
+        access.requireFirmWide(userId);
+        requireCloud();
+        Map<String, Object> res = cloud.call(userId, "time.pull", Map.of());
+        int created = 0, refreshed = 0, unmapped = 0;
+        Instant now = Instant.now();
+        for (Map<String, Object> r : listOfMaps(res.get("entries"))) {
+            String cloudId = String.valueOf(r.get("id"));
+            LawFirmBillingTerms terms = termsRepository.findByCloudMatterId(String.valueOf(r.get("matterId"))).orElse(null);
+            if (terms == null) {
+                unmapped++;
+                continue;
+            }
+            User lawyer = cloudLawyer(String.valueOf(r.get("lawyerAccountId")), String.valueOf(r.get("lawyerName")));
+            int minutes = ((Number) r.get("minutes")).intValue();
+            boolean billable = !Boolean.FALSE.equals(r.get("billable"));
+            LawFirmTimeEntry e = entries.findBySourceKey("CLOUD:" + cloudId).orElse(null);
+            boolean fresh = e == null;
+            if (fresh) {
+                e = LawFirmTimeEntry.builder().userId(lawyer.getId()).source("CLOUD").sourceKey("CLOUD:" + cloudId)
+                        .cloudEntryId(cloudId).edited(true).createdAt(now).build();
+            } else if (!Set.of("SUBMITTED", "RETURNED").contains(e.getStatus())) {
+                continue;
+            } else if ("SUBMITTED".equals(e.getStatus()) && e.getReviewedAt() != null) {
+                continue; // 已开始审核的不被重复取回覆盖
+            }
+            boolean resubmitted = !fresh && "RETURNED".equals(e.getStatus());
+            e.setTimekeeperName(lawyer.getDisplayName());
+            e.setIntakeId(terms.getIntakeId());
+            e.setWorkDate(LocalDate.parse(String.valueOf(r.get("workDate"))));
+            e.setMinutes(minutes);
+            e.setBilledMinutes(null);
+            e.setDescription(trimTo(string(r.get("description")), 1000));
+            e.setBillableClaimed(billable);
+            e.setBillable(billable);
+            e.setStatus("SUBMITTED");
+            e.setRateCents(null);
+            e.setStandardRateCents(null);
+            e.setSubmittedAt(now);
+            e.setUpdatedAt(now);
+            e = entries.save(e);
+            if (fresh || resubmitted) {
+                audit(e, lawyer.getId(), lawyer.getDisplayName(), "SUBMIT", Map.of("minutes", change(null, minutes), "cloud", change(null, true)), null);
+            }
+            if (fresh) created++; else refreshed++;
+        }
+        List<LawFirmTimeEntry> pending = entries.findByCloudSyncPendingTrue();
+        boolean retried = pending.isEmpty() || pushCloud(userId, pending);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("created", created);
+        out.put("refreshed", refreshed);
+        out.put("unmapped", unmapped);
+        out.put("pendingSync", retried ? 0 : pending.size());
+        return out;
+    }
+
+    /** 同事在本机台账里的计时人：按云端账户编号建一个仅用于台账的本机用户（不能登录），费率在「费率与约定」里设置。 */
+    private User cloudLawyer(String accountRef, String name) {
+        String username = "cloud-lawyer-" + accountRef.replaceAll("[^A-Za-z0-9_-]", "");
+        User u = users.findByUsername(username).orElse(null);
+        if (u == null) {
+            u = new User();
+            u.setUsername(username);
+            u.setPassword("{noop}" + java.util.UUID.randomUUID() + java.util.UUID.randomUUID());
+            u.setRole("USER");
+            u.setSubscriptionType("FREE");
+            u.setCreatedAt(java.time.LocalDateTime.now());
+        }
+        String display = name == null || name.isBlank() || "null".equals(name) ? username : name;
+        if (!display.equals(u.getDisplayName())) {
+            u.setDisplayName(display);
+            u.setUpdatedAt(java.time.LocalDateTime.now());
+            u = users.save(u);
+        }
+        return u;
+    }
+
+    /**
+     * 把本机审核结论回写到云端（只对从云端取回的工时）。失败不影响本机操作：记为待同步，下次取回时重试。
+     * 返回是否全部同步成功。
+     */
+    private boolean pushCloud(Long userId, Collection<LawFirmTimeEntry> rows) {
+        List<LawFirmTimeEntry> cloudRows = rows.stream().filter(e -> "CLOUD".equals(e.getSource()) && e.getCloudEntryId() != null).toList();
+        if (cloudRows.isEmpty()) return true;
+        if (cloud == null) {
+            cloudRows.forEach(e -> { e.setCloudSyncPending(true); entries.save(e); });
+            return false;
+        }
+        Map<Long, List<LawFirmTimeEntryAudit>> trail = audits.findByEntryIdInOrderByIdAsc(cloudRows.stream().map(LawFirmTimeEntry::getId).toList())
+                .stream().collect(Collectors.groupingBy(LawFirmTimeEntryAudit::getEntryId));
+        boolean ok = true;
+        for (int i = 0; i < cloudRows.size(); i += LawFirmCloudBillingService.MAX_BATCH) {
+            List<LawFirmTimeEntry> batch = cloudRows.subList(i, Math.min(cloudRows.size(), i + LawFirmCloudBillingService.MAX_BATCH));
+            List<Map<String, Object>> payload = new ArrayList<>();
+            for (LawFirmTimeEntry e : batch) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("id", e.getCloudEntryId());
+                r.put("status", switch (e.getStatus()) {
+                    case "APPROVED" -> "APPROVED";
+                    case "RETURNED" -> "RETURNED";
+                    case "BILLED" -> "BILLED";
+                    default -> "RECEIVED";
+                });
+                if (!"RETURNED".equals(e.getStatus())) r.put("billedMinutes", e.effectiveBilledMinutes());
+                r.put("description", e.getDescription());
+                r.put("billable", Boolean.TRUE.equals(e.getBillable()));
+                if (e.getBillId() != null) bills.findById(e.getBillId()).ifPresent(b -> r.put("billNo", b.getBillNo()));
+                List<Map<String, Object>> notes = new ArrayList<>();
+                for (LawFirmTimeEntryAudit a : trail.getOrDefault(e.getId(), List.of())) {
+                    if ("SUBMIT".equals(a.getAction())) continue;
+                    Map<String, Object> n = new LinkedHashMap<>();
+                    n.put("action", a.getAction());
+                    n.put("actorName", a.getActorName());
+                    n.put("reason", a.getReason());
+                    n.put("at", str(a.getCreatedAt()));
+                    notes.add(n);
+                }
+                r.put("notes", notes);
+                payload.add(r);
+            }
+            boolean batchOk;
+            try {
+                cloud.call(userId, "time.outcome", Map.of("entries", payload));
+                batchOk = true;
+            } catch (RuntimeException ex) {
+                batchOk = false;
+            }
+            for (LawFirmTimeEntry e : batch) {
+                e.setCloudSyncPending(!batchOk);
+                entries.save(e);
+            }
+            ok &= batchOk;
+        }
+        return ok;
+    }
+
+    Map<String, Object> cloudStatus(Long userId) {
+        access.requireFirmWide(userId);
+        Map<String, Object> st = cloud == null ? Map.of("available", false) : cloud.statusOrUnavailable(userId);
+        Map<String, Object> out = new LinkedHashMap<>(st);
+        // 只认云端此刻还在的事项：「关闭并删除」后本机仍留着旧编号，不能再显示成「已发布」
+        Set<String> live = cloudMatters(st).keySet();
+        Map<String, Long> published = new LinkedHashMap<>();
+        for (LawFirmBillingTerms t : termsRepository.findAll()) {
+            if (t.getCloudMatterId() != null && live.contains(t.getCloudMatterId())) published.put(t.getCloudMatterId(), t.getIntakeId());
+        }
+        out.put("published", published);
+        out.put("pendingSync", entries.findByCloudSyncPendingTrue().size());
+        return out;
+    }
+
+    /** 把本机收案发布为律所云端事项（只上传事项名称与委托人名称），同事据此提交工时。 */
+    Map<String, Object> cloudPublish(Long userId, Map<String, Object> p) {
+        LawFirmMatterIntake in = intake(longVal(p.get("intakeId")));
+        access.requireFirmWide(userId);
+        requireCloud();
+        LawFirmBillingTerms t = termsRepository.findByIntakeId(in.getId())
+                .orElseGet(() -> LawFirmBillingTerms.builder().intakeId(in.getId()).discountBps(0).build());
+        Map<String, Object> req = new LinkedHashMap<>();
+        req.put("title", in.getTitle());
+        req.put("clientName", in.getClientName());
+        Map<String, Object> matter = null;
+        if (t.getCloudMatterId() != null) {
+            req.put("matterId", t.getCloudMatterId());
+            try {
+                matter = castMap(cloud.call(userId, "time.publishMatter", req).get("matter"));
+            } catch (IllegalStateException gone) {
+                // 云端事项已随「关闭并删除」清除，或不是本人发布：重新发布一条新的
+                req.remove("matterId");
+            }
+        }
+        if (matter == null) matter = castMap(cloud.call(userId, "time.publishMatter", req).get("matter"));
+        t.setCloudMatterId(String.valueOf(matter.get("id")));
+        t.setUpdatedAt(Instant.now());
+        termsRepository.save(t);
+        return cloudStatus(userId);
+    }
+
+    /** 云端回来的审核记录，转成与本机审核记录同样的形状（核减附上核定时长）。 */
+    private List<Map<String, Object>> cloudNotes(LawFirmTimeEntry e) {
+        if (e.getCloudNotesJson() == null || e.getCloudNotesJson().isBlank()) return List.of();
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            for (Map<String, Object> n : objectMapper.readValue(e.getCloudNotesJson(), new TypeReference<List<Map<String, Object>>>() {})) {
+                Map<String, Object> v = new LinkedHashMap<>(n);
+                String action = String.valueOf(n.get("action"));
+                v.put("detail", action.startsWith("WRITE_DOWN") && e.getBilledMinutes() != null
+                        ? Map.of("billedMinutes", change(e.getMinutes(), e.getBilledMinutes())) : Map.of());
+                out.add(v);
+            }
+        } catch (Exception ex) {
+            return List.of();
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Object raw) {
+        if (!(raw instanceof Map<?, ?> m)) throw new IllegalStateException(LangText.of("云端返回格式不正确", "Unexpected cloud response"));
+        return (Map<String, Object>) m;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> listOfMaps(Object raw) {
+        if (!(raw instanceof Collection<?> c)) return List.of();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : c) if (o instanceof Map<?, ?> m) out.add((Map<String, Object>) m);
+        return out;
+    }
+
     // ───────────────────────────── 共用 ─────────────────────────────
 
     /** 一次请求内缓存事项，按 projectId 推导事项（取最近一条未被利冲驳回的收案）。 */
     private final class Ctx {
         private List<LawFirmMatterIntake> all;
         private final Map<Long, String> projectNames = new HashMap<>();
+        /** 律所云端事项（编号 → {id,title,clientName,active}），律师端显示用。 */
+        Map<String, Map<String, Object>> cloudMatters = Map.of();
 
         List<LawFirmMatterIntake> allIntakes() {
             if (all == null) all = intakes.findAllByOrderByCreatedAtDescIdDesc();
@@ -1139,8 +1527,13 @@ public class LawFirmBillingService {
         v.put("projectName", ctx.projectName(e.getProjectId()));
         v.put("intakeId", in == null ? null : in.getId());
         v.put("intakeNo", in == null ? null : in.getIntakeNo());
-        v.put("matterTitle", in == null ? null : in.getTitle());
-        v.put("clientName", in == null ? null : in.getClientName());
+        Map<String, Object> cm = e.getCloudMatterId() == null ? null : ctx.cloudMatters.get(e.getCloudMatterId());
+        v.put("matterTitle", in != null ? in.getTitle() : cm != null ? cm.get("title")
+                : e.getCloudMatterId() != null ? LangText.of("律所云端事项", "Firm cloud matter") : null);
+        v.put("clientName", in != null ? in.getClientName() : cm != null ? cm.get("clientName") : null);
+        v.put("cloud", e.getCloudMatterId() != null || "CLOUD".equals(e.getSource()));
+        v.put("cloudTarget", e.getCloudMatterId() == null ? null : "c:" + e.getCloudMatterId());
+        v.put("cloudSyncPending", Boolean.TRUE.equals(e.getCloudSyncPending()));
         v.put("feeMode", in == null ? null : in.getFeeMode());
         v.put("workDate", e.getWorkDate().toString());
         v.put("capturedMinutes", e.getCapturedMinutes());

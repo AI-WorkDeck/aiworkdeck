@@ -114,6 +114,7 @@ export default {
   compareLoadNewFailed: 'Failed to load the newer version',
   compareGenerateFailed: 'Failed to generate the comparison',
   compareEmptyContent: 'This version has no content for this file',
+  officePasswordProtected: 'This file is protected with an open password, so comparing and merging are not supported yet. Save a copy without a password first.',
   compareFailedRetry: 'Failed to generate the comparison. Please try again later.',
   compareTimeout: 'Comparison timed out. Please close and try again.',
   compareIframeLoadFailed: 'Failed to load the editor page',

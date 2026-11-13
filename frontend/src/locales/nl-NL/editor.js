@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Het document kan niet worden geopend: de editor reageert niet of het bestand is beschadigd",
     "encryptedTitle": "Dit bestand is beveiligd met een openingswachtwoord dat de editor nog niet kan openen. Verwijder het wachtwoord in Excel, Word, PowerPoint of WPS en open het opnieuw, of download het origineel.",
+    "legacyTitle": "Dit is een ouder Office-formaat dat de editor niet rechtstreeks kan openen. Open het in Word, Excel, PowerPoint of WPS, sla het op als .docx / .xlsx / .pptx en open het opnieuw.",
     "passwordPrompt": "Dit bestand is beveiligd met een openingswachtwoord. Voer het wachtwoord in om het te openen.",
     "passwordPlaceholder": "Wachtwoord",
     "passwordOpen": "Openen",

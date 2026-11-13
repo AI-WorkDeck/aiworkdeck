@@ -433,6 +433,24 @@ export function detectLegacyEncryption(bytes, name) {
   }
 }
 
+/**
+ * 这是不是一份结构完整的老 Office 二进制文件（OLE 复合文档头 + 对应的主数据流）。
+ * 用于引擎拒收（DOC_REJECTED）后区分「格式太旧/不受支持」与「文件已损坏」：
+ * 复合文档读得开且主流在 = 格式没坏，只是引擎不收；读不开/缺主流 = 按损坏处理。永不抛错。
+ * @returns {null | 'doc'|'xls'|'ppt'}
+ */
+export function detectLegacyFormat(bytes, name) {
+  try {
+    const ext = extOf(name)
+    const streams = { doc: ['WordDocument'], xls: ['Workbook', 'Book'], ppt: ['PowerPoint Document'] }[ext]
+    if (!streams) return null
+    const cfb = readCfb(bytes)
+    return streams.some((s) => findStream(cfb, s)) ? ext : null
+  } catch {
+    return null
+  }
+}
+
 // ───────────── doc ─────────────
 
 async function decryptDoc(cfb, password, det) {

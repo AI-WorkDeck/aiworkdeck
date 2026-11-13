@@ -222,6 +222,7 @@ export default {
   "permTasks": "Kalendar dan tugasan",
   "permClipboard": "Papan keratan",
   "permLawfirm": "Maklumat pasukan",
+  "permWorklogRead": "Ringkasan rekod kerja anda sendiri",
   "newlyCreatedTag": "Baharu",
   "publishBtn": "Terbitkan ke Pasaran",
   "publishUpdateBtn": "Kemas kini di Pasaran",

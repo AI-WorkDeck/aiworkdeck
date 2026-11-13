@@ -35,6 +35,7 @@
 import { createWebviewEditorExecutor, createIframeEditorExecutor } from '@/composables/useZetaOfficeWebview.js'
 import { fetchVersionFileBytes } from '@/services/api.js'
 import { host } from '@/services/host.js'
+import { assertNotPasswordProtected, isPasswordProtectedError } from '@/utils/officeCompareGuard.js'
 
 let seq = 0
 
@@ -82,6 +83,7 @@ export default {
       // 空的新版字节进 load_document 只会得到一个空白文档，再 compare 出满篇「删除」
       // 修订——那是假的对比结果，比报错更糟。直接失败。
       if (!newBytes || !newBytes.length) throw new Error(this.$t('version.compareEmptyContent'))
+      assertNotPasswordProtected(spec.path, newBytes, oldBytes)
       this.statusText = this.$t('version.compareTabGenerating')
       const name = spec.path.split('/').pop() || 'compare.docx'
       const loaded = await this.executor.executeCommand('load_document', {
@@ -95,7 +97,7 @@ export default {
       this.ready = true
     } catch (e) {
       console.warn('[VersionCompare] 失败', e)
-      this.statusText = (e && e.message) || this.$t('version.compareFailedRetry')
+      this.statusText = isPasswordProtectedError(e) ? this.$t('version.officePasswordProtected') : ((e && e.message) || this.$t('version.compareFailedRetry'))
     }
   },
   beforeUnmount() {

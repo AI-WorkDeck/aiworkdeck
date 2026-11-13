@@ -257,6 +257,7 @@ export default {
   permTasks: "日程与事项",
   permClipboard: "剪贴板",
   permLawfirm: "团队信息",
+  permWorklogRead: "本人工作记录汇总",
   newlyCreatedTag: '新建',
   publishBtn: '发布到 Marketplace',
   publishUpdateBtn: '更新到 Marketplace',

@@ -222,6 +222,7 @@ export default {
   "permTasks": "Календарь и задачи",
   "permClipboard": "Буфер обмена",
   "permLawfirm": "Информация о команде",
+  "permWorklogRead": "Сводка ваших собственных записей о работе",
   "newlyCreatedTag": "Новый",
   "publishBtn": "Опубликовать в каталоге расширений",
   "publishUpdateBtn": "Обновить в каталоге расширений",

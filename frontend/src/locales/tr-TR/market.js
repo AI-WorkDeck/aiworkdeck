@@ -222,6 +222,7 @@ export default {
   "permTasks": "Takvim ve görevler",
   "permClipboard": "Pano",
   "permLawfirm": "Ekip bilgileri",
+  "permWorklogRead": "Kendi çalışma kayıtlarınızın özeti",
   "newlyCreatedTag": "Yeni",
   "publishBtn": "Eklenti Mağazası'nda yayınla",
   "publishUpdateBtn": "Eklenti Mağazası'nda güncelle",

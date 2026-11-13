@@ -3,7 +3,7 @@
 id: pitch-materials-workflow
 name: 投标与提案材料
 name_en: Bids and proposals
-version: 0.1.0
+version: 0.2.1
 author: AI WorkDeck
 license: AGPL-3.0-or-later
 description: 从所里的业绩与团队库挑材料，对照招标文件的资格要求和评分项，按所里模板生成投标书或提案，报价由插件计算。
