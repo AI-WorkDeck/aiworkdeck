@@ -26,9 +26,9 @@
       "text": "在「费用」表加一列「合计」（律师费加差旅费），最下面加一行「总计」把各列加起来，再用「合计」列做一个折线图",
       "hostState": "xlsx:case-ledger",
       "expect": {
-        "_note": "D1「合计」，D2–D7 公式且值正确；有「总计」行含 282000/22900/304900；有折线图",
+        "_note": "D1「合计」，D2–D7 值正确（题面没要求公式，写值或公式都算）；有「总计」行含 282000/22900/304900；有折线图",
         "maxRounds": 24,
-        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const F = wb.sheet('费用'); if (!F) return false; const c = r => F.cells[r]?.v; if (c('D1') !== '合计') return false; const fee = [[42000,3800],[38000,2100],[51000,4600],[47000,3900],[55000,5200],[49000,3300]]; for (let i = 0; i < 6; i++) { const r = i + 2; if (c('D' + r) !== fee[i][0] + fee[i][1] || !F.cells['D' + r].f) return false; } const totalRow = F.rows.findIndex(row => row.includes('总计')); if (totalRow < 0) return false; const row = F.rows[totalRow]; if (!(row.includes(282000) && row.includes(22900) && row.includes(304900))) return false; const parts = wb.parts().filter(p => /^xl\\/charts\\/chart\\d*\\.xml$/.test(p)); return parts.some(p => /<c:lineChart>|<c:line3DChart>/.test(ctx.zipPart(buf, p)));"
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const F = wb.sheet('费用'); if (!F) return false; const c = r => F.cells[r]?.v; if (c('D1') !== '合计') return false; const fee = [[42000,3800],[38000,2100],[51000,4600],[47000,3900],[55000,5200],[49000,3300]]; for (let i = 0; i < 6; i++) { const r = i + 2; if (Number(c('D' + r)) !== fee[i][0] + fee[i][1]) return false; } const totalRow = F.rows.findIndex(row => row.includes('总计')); if (totalRow < 0) return false; const row = F.rows[totalRow]; if (!(row.includes(282000) && row.includes(22900) && row.includes(304900))) return false; const parts = wb.parts().filter(p => /^xl\\/charts\\/chart\\d*\\.xml$/.test(p)); return parts.some(p => /<c:lineChart>|<c:line3DChart>/.test(ctx.zipPart(buf, p)));"
       }
     },
     {
