@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Apri file…",
   "looseFilesOpenFolder": "Apri cartella…",
   "mobileBackup": {
+    "undecided": "Scelta in sospeso",
     "cleanupDeadline": "Salda il dovuto entro {time} per evitare la cancellazione dei contenuti cloud. I file locali restano invariati.",
     "billingSummary": "Importo dovuto: {debt}; credito disponibile: {available}.",
     "manageBilling": "Account e fatturazione",

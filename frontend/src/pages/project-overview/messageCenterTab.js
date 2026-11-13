@@ -110,7 +110,9 @@ export const messageCenterTabMethods = {
       if (!stillCurrent()) return false
       const pluginId = target.kind === 'calendar' ? 'calendar' : target.pluginId
       const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
-      if (!plugin || (!this.hasProject && !isGlobalPlugin(plugin))) throw new Error(this.$t('messageCenter.pluginUnavailable'))
+      if (!plugin) throw new Error(this.$t('messageCenter.pluginUnavailable'))
+      // Installed but project-scoped: the user only needs to open a project, not to check the plugin center.
+      if (!this.hasProject && !isGlobalPlugin(plugin)) throw Object.assign(new Error(this.$t('messageCenter.projectRequired')), { projectRequired: true })
       if (target.kind === 'calendar') this.openCalendarTab({ focus: target.recordId })
       else if (pluginId === 'lawfirm-management') await this.handleOpenLawFirmPlugin({ tab: target.view, recordId: target.recordId })
       else {

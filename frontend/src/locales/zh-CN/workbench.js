@@ -37,6 +37,7 @@ export default {
   looseFilesOpenFile: '打开文件…',
   looseFilesOpenFolder: '打开文件夹…',
   mobileBackup: {
+    "undecided": "待选择",
     "accessRequired": "云功能无需订阅。请到账户页查看按量价格、确认后付费规则或处理欠款；本机文件不受影响。",
     "manageBilling": "账户与计费",
     "billingSummary": "欠款：{debt}；可用授信：{available}。",

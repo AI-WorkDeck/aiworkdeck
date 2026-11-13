@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "ファイルを開く…",
   "looseFilesOpenFolder": "フォルダーを開く…",
   "mobileBackup": {
+    "undecided": "選択待ち",
     "cleanupDeadline": "クラウドの内容が削除されないよう、{time} までに全額お支払いください。ローカルファイルには影響しません。",
     "billingSummary": "未払い額：{debt}、利用可能な与信：{available}。",
     "manageBilling": "アカウントと請求",

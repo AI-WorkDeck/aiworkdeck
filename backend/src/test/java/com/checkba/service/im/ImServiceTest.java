@@ -308,6 +308,19 @@ class ImServiceTest {
   join(client,id,"MEMBER"); assertEquals(List.of(),texts(client,Map.of("conversationId",id)));
   join(colleague,id,"MEMBER"); assertEquals(List.of("入群前的讨论"),texts(colleague,Map.of("conversationId",id)));
  }
+ @Test void memberCodeNeverOpensEarlierMessagesToAClientEvenWhenAskedTo() {
+  String id=create("GROUP"); send(owner,id,"before","入群前的内部讨论");
+  // The history choice belongs to client invitations; a member code that asks for it records and echoes false.
+  var invite=call(owner,"invite",Map.of("conversationId",id,"role","MEMBER","shareHistory",true)); assertEquals(false,invite.get("shareHistory"));
+  User global=users.findById(client).orElseThrow();global.setRole("CLIENT");users.saveAndFlush(global);
+  call(client,"join",Map.of("code",invite.get("code"))); assertEquals(List.of(),texts(client,Map.of("conversationId",id)));
+  // A stored row from before this rule (member role + shared history) is still floored when a client redeems it.
+  String second=create("GROUP"); send(owner,second,"before","另一群的早期讨论");
+  var legacy=call(owner,"invite",Map.of("conversationId",second,"role","MEMBER"));
+  var row=invitations.findById(ImService.sha(legacy.get("code").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8))).orElseThrow();
+  row.setShareHistory(true); invitations.saveAndFlush(row);
+  call(client,"join",Map.of("code",legacy.get("code"))); assertEquals(List.of(),texts(client,Map.of("conversationId",second)));
+ }
  @Test void projectClientEnteringProjectGroupLaterSeesOnlyLaterMessages() {
   var project=new com.checkba.model.entity.Project(); project.setName("合成项目群历史"); project.setProjectType("TEST"); project.setListedCompanyName("合成公司"); project.setTargetCompanyName("合成标的"); project.setUserId(owner);
   long projectId=projects.saveAndFlush(project).getId();

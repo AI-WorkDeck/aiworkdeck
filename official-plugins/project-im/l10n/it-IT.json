@@ -7,5 +7,6 @@
   "panel.historyAfterJoin": "Solo i messaggi successivi all’ingresso",
   "panel.historyWithEarlier": "Anche i messaggi precedenti",
   "panel.inviteHintAfterJoin": "Il cliente che entra con questo codice vede solo i messaggi e i file inviati dopo il suo ingresso. Condividilo solo con la persona prevista. Valido fino al {time}",
-  "panel.inviteHintWithHistory": "Il cliente che entra con questo codice può leggere anche i messaggi precedenti; i file restano aperti uno per uno in base ai permessi di accesso. Condividilo solo con la persona prevista. Valido fino al {time}"
+  "panel.inviteHintWithHistory": "Il cliente che entra con questo codice può leggere anche i messaggi precedenti; i file restano aperti uno per uno in base ai permessi di accesso. Condividilo solo con la persona prevista. Valido fino al {time}",
+  "panel.inviteJoinHow": "La persona accede all’app AI WorkDeck con il proprio account e inserisce il codice in «Centro messaggi → Conversazioni → Partecipa con codice» o in «Chat del progetto → Partecipa con codice». Il portale clienti non accetta questo codice."
 }

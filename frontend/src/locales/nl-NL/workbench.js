@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Bestand openen…",
   "looseFilesOpenFolder": "Map openen…",
   "mobileBackup": {
+    "undecided": "Keuze nodig",
     "cleanupDeadline": "Betaal het volledige bedrag vóór {time} om verwijdering van cloudinhoud te voorkomen. Lokale bestanden blijven intact.",
     "billingSummary": "Openstaand bedrag: {debt}; beschikbaar krediet: {available}.",
     "manageBilling": "Account en facturering",

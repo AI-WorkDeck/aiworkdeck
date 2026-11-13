@@ -51,7 +51,7 @@
               <div class="notice-meta"><time>{{ displayDate(selectedNotice.createdAt) }}</time><span v-if="selectedNotice.projectName">{{ selectedNotice.projectName }}</span></div>
             </header>
             <p v-if="selectedNotice.body" class="notice-body">{{ selectedNotice.body }}</p>
-            <p v-if="noticeError" class="center-error" role="alert">{{ noticeError }}</p>
+            <p v-if="noticeError" class="center-error" role="alert"><span>{{ noticeError }}</span><button v-if="noticeNeedsProject && openProjects" @click="openProjects()">{{ $t('messageCenter.openProjects') }}</button></p>
             <footer v-if="selectedNotice.actionState === 'pending' || !isNoticeRead(selectedNotice) || selectedNotice.target?.kind" class="notice-footer">
               <p v-if="selectedNotice.actionState === 'pending'" class="center-hint">{{ $t('messageCenter.readNotDone') }}</p>
               <div class="notice-actions"><button v-if="!isNoticeRead(selectedNotice)" @click="markNoticeRead(selectedNotice)">{{ $t('messageCenter.markRead') }}</button><button v-if="selectedNotice.target?.kind" class="primary" :disabled="opening" @click="openNotice"><span>{{ $t(opening ? 'messageCenter.opening' : selectedNotice.actionState === 'pending' ? 'messageCenter.goHandle' : 'messageCenter.openBusiness') }}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button></div>
@@ -59,7 +59,20 @@
           </div>
         </article>
         <div v-else class="center-placeholder"><div class="placeholder-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 6l8 6 8-6" /></svg></div><h3>{{ $t('messageCenter.choose') }}</h3></div>
-        <div v-if="inviteCode && selectedConversation" class="invite-result" role="status"><strong>{{ $t('messageCenter.inviteLabel') }}</strong><code>{{ inviteCode }}</code><button @click="inviteCode = ''">{{ $t('messageCenter.cancel') }}</button></div>
+        <form v-if="invite && selectedConversation && invite.key === selection" class="invite-result" :aria-label="$t('messageCenter.inviteTitle')" @submit.prevent="confirmInvite">
+          <strong>{{ $t('messageCenter.inviteTitle') }}</strong>
+          <template v-if="!invite.result">
+            <label class="invite-field"><span>{{ $t('messageCenter.inviteRole') }}</span><select v-model="invite.role" required><option value="" disabled>{{ $t('messageCenter.inviteRolePlaceholder') }}</option><option value="MEMBER">{{ $t('messageCenter.inviteRoleMember') }}</option><option value="CLIENT">{{ $t('messageCenter.inviteRoleClient') }}</option></select></label>
+            <label v-if="invite.role === 'CLIENT'" class="invite-field"><span>{{ $t('messageCenter.historyScope') }}</span><select v-model="invite.history"><option value="after">{{ $t('messageCenter.historyAfterJoin') }}</option><option value="all">{{ $t('messageCenter.historyWithEarlier') }}</option></select></label>
+            <p v-if="invite.role" class="invite-note"><template v-if="invite.role === 'MEMBER'">{{ $t('messageCenter.inviteNoteMember') }} </template>{{ $t('messageCenter.inviteValidity') }}</p>
+            <div class="invite-actions"><button class="primary" :disabled="!invite.role || invite.busy">{{ $t('messageCenter.inviteGenerate') }}</button><button type="button" @click="invite = null">{{ $t('messageCenter.cancel') }}</button></div>
+          </template>
+          <template v-else>
+            <code>{{ invite.result.code }}</code>
+            <p class="invite-note">{{ invite.result.hint }} {{ $t('messageCenter.inviteJoinHow', { center: $t('messageCenter.title'), chats: $t('messageCenter.conversations'), join: $t('messageCenter.joinChat'), plugin: $t('workbench.pluginLabels.projectIm') }) }}</p>
+            <div class="invite-actions"><button type="button" @click="copyInvite">{{ $t(invite.result.copied ? 'messageCenter.inviteCopied' : 'messageCenter.inviteCopy') }}</button><button type="button" @click="invite = null">{{ $t('messageCenter.inviteDone') }}</button></div>
+          </template>
+        </form>
       </div>
     </div>
   </section>
@@ -74,8 +87,8 @@ const conversationKey = row => `${row.sourceId === 'dd-client' ? `dd:${row.conne
 const historyState = () => ({ messages: [], pending: [], draft: '', failures: {}, status: null, admitting: false, loading: false, hasMore: false, error: '', humanCount: null, selfId: null })
 export default {
   components: { MessageConversationPane },
-  props: { activeFileIds: { type: Array, default: () => [] }, currentProjectId: { type: [String, Number], default: null }, initialConversationId: { type: String, default: '' }, openTarget: { type: Function, required: true }, inviteProject: { type: Function, default: null } },
-  data: () => ({ category: 'conversations', selection: '', search: '', projectKey: '', projects: [], conversations: [], notifications: [], counts: {}, agents: [], projectReason: '', unavailableSources: [], histories: {}, selfId: null, loading: false, error: '', accountRequired: false, hasMore: false, identityLoaded: false, form: '', formType: 'DIRECT', formValue: '', creating: false, noticeError: '', opening: false, inviteCode: '', epoch: 0, listSerial: 0 }),
+  props: { activeFileIds: { type: Array, default: () => [] }, currentProjectId: { type: [String, Number], default: null }, initialConversationId: { type: String, default: '' }, openTarget: { type: Function, required: true }, inviteProject: { type: Function, default: null }, openProjects: { type: Function, default: null } },
+  data: () => ({ category: 'conversations', selection: '', search: '', projectKey: '', projects: [], conversations: [], notifications: [], counts: {}, agents: [], projectReason: '', unavailableSources: [], histories: {}, selfId: null, loading: false, error: '', accountRequired: false, hasMore: false, identityLoaded: false, form: '', formType: 'DIRECT', formValue: '', creating: false, noticeError: '', noticeNeedsProject: false, opening: false, invite: null, epoch: 0, listSerial: 0 }),
   computed: {
     availableAgents() { return this.agents.filter(agent => !this.conversations.some(row => row.agent && (row.agent.scopeKey === agent.scopeKey || (agent.scope === 'project' && row.agent.scopeKey === agent.legacyScopeKey)) && row.agent.scope === agent.scope && !!(row.agent.private || row.type === 'AGENT_DIRECT') === (agent.scope === 'project'))) },
     categories() { return [{ key: 'conversations', count: this.counts.unreadMessages }, { key: 'notifications', count: this.counts.unreadNotifications }, { key: 'pending', count: this.counts.pending }] },
@@ -115,7 +128,7 @@ export default {
     },
     itemKey(item) { return this.category === 'conversations' ? conversationKey(item) : item.id },
     state(conversation) { const key = conversationKey(conversation); if (!this.histories[key]) this.histories[key] = historyState(); return this.histories[key] },
-    resetAccount() { this.epoch++; this.listSerial++; this.selection = ''; this.conversations = []; this.notifications = []; this.projects = []; this.counts = {}; this.agents = []; this.histories = {}; this.selfId = null; this.projectKey = ''; this.projectReason = ''; this.unavailableSources = []; this.inviteCode = ''; this.form = ''; this.formType = 'DIRECT'; this.formValue = ''; this.error = ''; this.noticeError = ''; this.identityLoaded = false; this.loading = false; this.creating = false; this.opening = false; this.refresh(true) },
+    resetAccount() { this.epoch++; this.listSerial++; this.selection = ''; this.conversations = []; this.notifications = []; this.projects = []; this.counts = {}; this.agents = []; this.histories = {}; this.selfId = null; this.projectKey = ''; this.projectReason = ''; this.unavailableSources = []; this.invite = null; this.form = ''; this.formType = 'DIRECT'; this.formValue = ''; this.error = ''; this.noticeError = ''; this.identityLoaded = false; this.loading = false; this.creating = false; this.opening = false; this.refresh(true) },
     async connectAccount() { if (await requireAccount()) this.resetAccount() },
     async refresh(initial = false) {
       const ticket = this.ticket(), serial = ++this.listSerial
@@ -140,10 +153,10 @@ export default {
       if (scopes.status === 'fulfilled') { this.agents = scopes.value.agents || []; this.projectReason = scopes.value.projectReason || ''; this.conversations = this.conversations.map(row => this.withProjectContext(row)) }
       else this.projectReason = scopes.reason?.message || this.$t('messageCenter.serviceFailed')
     },
-    changeProject() { this.selection = ''; this.inviteCode = ''; this.refresh() },
-    changeCategory(category) { this.category = category; this.selection = ''; this.inviteCode = ''; this.noticeError = '' },
+    changeProject() { this.selection = ''; this.invite = null; this.refresh() },
+    changeCategory(category) { this.category = category; this.selection = ''; this.invite = null; this.noticeError = ''; this.noticeNeedsProject = false },
     async selectItem(item) {
-      this.selection = this.itemKey(item); this.inviteCode = ''; this.noticeError = ''
+      this.selection = this.itemKey(item); this.invite = null; this.noticeError = ''; this.noticeNeedsProject = false
       if (this.category !== 'conversations') { await this.markNoticeRead(item); return }
       const ticket = this.ticket(), state = this.state(item)
       this.loadMessages(item)
@@ -231,13 +244,29 @@ export default {
       catch (error) { if (this.valid(ticket)) this.error = error.message }
       finally { if (this.valid(ticket)) this.creating = false }
     },
-    async createInvite() { const conversation = this.selectedConversation, ticket = this.ticket(); try { if (conversation.projectId) { if (!this.inviteProject) throw new Error(this.$t('messageCenter.targetUnavailable')); await this.inviteProject(conversation); return } const result = await this.im('invite', { conversationId: conversation.id, role: 'MEMBER' }, conversation); if (this.valid(ticket) && this.selection === conversationKey(conversation)) this.inviteCode = result.code } catch (error) { if (this.valid(ticket)) this.state(conversation).error = error.message } },
+    // The lawyer chooses member or client every time; for a client, earlier messages stay closed unless explicitly opened (#1524).
+    async createInvite() { const conversation = this.selectedConversation, ticket = this.ticket(); try { if (conversation.projectId) { if (!this.inviteProject) throw new Error(this.$t('messageCenter.targetUnavailable')); await this.inviteProject(conversation); return } this.invite = { key: conversationKey(conversation), role: '', history: 'after', busy: false, result: null } } catch (error) { if (this.valid(ticket)) this.state(conversation).error = error.message } },
+    async confirmInvite() {
+      const conversation = this.selectedConversation, draft = this.invite
+      if (!conversation || !draft || draft.busy || draft.result || !['MEMBER', 'CLIENT'].includes(draft.role) || draft.key !== conversationKey(conversation)) return
+      const ticket = this.ticket(), client = draft.role === 'CLIENT'
+      draft.busy = true
+      try {
+        const result = await this.im('invite', { conversationId: conversation.id, role: draft.role, ...(client ? { shareHistory: draft.history === 'all' } : {}) }, conversation)
+        if (!this.valid(ticket) || this.invite !== draft || this.selection !== draft.key) return
+        // An older server that does not echo shareHistory also does not limit history: say so instead of promising it.
+        const key = client && typeof result.shareHistory === 'boolean' ? (result.shareHistory ? 'inviteHintWithHistory' : 'inviteHintAfterJoin') : 'inviteHintMember'
+        draft.result = { code: result.code, hint: this.$t('messageCenter.' + key, { time: this.displayDate(result.expiresAt) }), copied: false }
+      } catch (error) { if (this.valid(ticket)) this.state(conversation).error = error.message }
+      finally { draft.busy = false }
+    },
+    async copyInvite() { const result = this.invite?.result; if (!result) return; try { await navigator.clipboard.writeText(result.code); result.copied = true } catch (_) { /* The code stays selectable for manual copying. */ } },
     isNoticeRead(notice) { return typeof notice.read === 'boolean' ? notice.read : !!notice.readAt },
     async markNoticeRead(notice) { if (this.isNoticeRead(notice)) return; const ticket = this.ticket(); try { await messageCenterRequest('read', { id: notice.id }); if (this.valid(ticket)) { notice.read = true; this.counts.unreadNotifications = Math.max(0, (this.counts.unreadNotifications || 0) - 1); uni.$emit('awd:message-center-changed') } } catch (error) { if (this.valid(ticket)) this.noticeError = error.message } },
     async openNotice() {
-      const notice = this.selectedNotice, ticket = this.ticket(); if (!notice || this.opening) return; this.opening = true; this.noticeError = ''
+      const notice = this.selectedNotice, ticket = this.ticket(); if (!notice || this.opening) return; this.opening = true; this.noticeError = ''; this.noticeNeedsProject = false
       try { const resolved = await messageCenterRequest('target', { id: notice.id }); if (!this.valid(ticket) || this.selection !== notice.id) return; const target = normalizeMessageTarget(resolved.target || resolved); if (!target) throw new Error(this.$t('messageCenter.targetUnavailable')); const opened = await this.openTarget(target, notice.id); if (opened === false) throw new Error(this.$t('messageCenter.openFailed')) }
-      catch (error) { if (this.valid(ticket)) this.noticeError = error.message || this.$t('messageCenter.openFailed') }
+      catch (error) { if (this.valid(ticket)) { this.noticeError = error.message || this.$t('messageCenter.openFailed'); this.noticeNeedsProject = !!error.projectRequired } }
       finally { if (this.valid(ticket)) this.opening = false }
     },
     async downloadAttachment(attachment) {
@@ -328,6 +357,10 @@ export default {
 .notice-back { display: none; }
 .invite-result { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px; background: var(--awd-surface); border: 1px solid var(--awd-border); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .invite-result code { user-select: all; overflow-wrap: anywhere; }
+.invite-result strong, .invite-note { flex-basis: 100%; }
+.invite-note { margin: 0; color: var(--awd-text-2); font-size: 12px; line-height: 1.6; }
+.invite-field { display: flex; align-items: center; gap: 8px; }
+.invite-actions { display: flex; gap: 8px; }
 button, input, select { font: inherit; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-md, 6px); padding: 7px 10px; box-sizing: border-box; min-height: 32px; min-width: 0; max-width: 100%; line-height: 1.5; }
 button { cursor: pointer; margin: 0; }
 button::after { border: 0; }

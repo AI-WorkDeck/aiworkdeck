@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Ouvrir un fichier…",
   "looseFilesOpenFolder": "Ouvrir un dossier…",
   "mobileBackup": {
+    "undecided": "Choix en attente",
     "cleanupDeadline": "Réglez la totalité avant le {time} pour éviter la suppression du contenu cloud. Les fichiers locaux restent intacts.",
     "billingSummary": "Montant dû : {debt} ; crédit disponible : {available}.",
     "manageBilling": "Compte et facturation",

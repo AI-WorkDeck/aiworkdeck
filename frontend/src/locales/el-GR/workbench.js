@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Άνοιγμα αρχείου…",
   "looseFilesOpenFolder": "Άνοιγμα φακέλου…",
   "mobileBackup": {
+    "undecided": "Εκκρεμεί επιλογή",
     "cleanupDeadline": "Εξοφλήστε έως {time} για να αποφύγετε τη διαγραφή περιεχομένου cloud. Τα τοπικά αρχεία δεν επηρεάζονται.",
     "billingSummary": "Οφειλή: {debt}· διαθέσιμη πίστωση: {available}.",
     "manageBilling": "Λογαριασμός και χρέωση",

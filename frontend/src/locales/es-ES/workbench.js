@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Abrir archivo…",
   "looseFilesOpenFolder": "Abrir carpeta…",
   "mobileBackup": {
+    "undecided": "Pendiente de decidir",
     "cleanupDeadline": "Pague el total antes de {time} para evitar que se borre el contenido en la nube. Los archivos locales no se verán afectados.",
     "billingSummary": "Importe pendiente: {debt}; crédito disponible: {available}.",
     "manageBilling": "Cuenta y facturación",

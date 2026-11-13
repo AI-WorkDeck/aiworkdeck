@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Открыть файл…",
   "looseFilesOpenFolder": "Открыть папку…",
   "mobileBackup": {
+    "undecided": "Нужно решение",
     "cleanupDeadline": "Погасите задолженность полностью до {time}, чтобы избежать удаления облачных данных. Локальные файлы не затрагиваются.",
     "billingSummary": "Задолженность: {debt}; доступный кредит: {available}.",
     "manageBilling": "Аккаунт и оплата",

@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Dosya aç…",
   "looseFilesOpenFolder": "Klasör Aç…",
   "mobileBackup": {
+    "undecided": "Seçim bekliyor",
     "cleanupDeadline": "Bulut içeriğinin silinmesini önlemek için borcunuzu {time} tarihine kadar tamamen ödeyin. Yerel dosyalar etkilenmez.",
     "billingSummary": "Borç: {debt}; kullanılabilir kredi: {available}.",
     "manageBilling": "Hesap ve faturalandırma",

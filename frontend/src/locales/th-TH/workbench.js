@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "เปิดไฟล์…",
   "looseFilesOpenFolder": "เปิดโฟลเดอร์…",
   "mobileBackup": {
+    "undecided": "รอการเลือก",
     "cleanupDeadline": "ชำระยอดค้างทั้งหมดภายใน {time} เพื่อป้องกันการลบเนื้อหาบนคลาวด์ ไฟล์ในเครื่องจะไม่ได้รับผลกระทบ",
     "billingSummary": "ยอดค้างชำระ: {debt}; วงเงินคงเหลือ: {available}",
     "manageBilling": "บัญชีและการเรียกเก็บเงิน",

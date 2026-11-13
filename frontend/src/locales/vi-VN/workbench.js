@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Mở tệp…",
   "looseFilesOpenFolder": "Mở thư mục…",
   "mobileBackup": {
+    "undecided": "Chờ lựa chọn",
     "cleanupDeadline": "Thanh toán hết trước {time} để tránh bị xóa nội dung đám mây. Tệp trên máy không bị ảnh hưởng.",
     "billingSummary": "Số tiền còn nợ: {debt}; hạn mức còn lại: {available}.",
     "manageBilling": "Tài khoản và thanh toán",

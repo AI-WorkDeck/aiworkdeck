@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "فتح ملف…",
   "looseFilesOpenFolder": "فتح مجلد…",
   "mobileBackup": {
+    "undecided": "بانتظار القرار",
     "cleanupDeadline": "سدّد المبلغ بالكامل قبل {time} لتجنب حذف المحتوى السحابي. لن تتأثر الملفات المحلية.",
     "billingSummary": "المبلغ المستحق: {debt}؛ الائتمان المتاح: {available}.",
     "manageBilling": "الحساب والفوترة",

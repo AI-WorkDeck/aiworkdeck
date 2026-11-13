@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Abrir arquivo…",
   "looseFilesOpenFolder": "Abrir pasta…",
   "mobileBackup": {
+    "undecided": "Aguardando escolha",
     "cleanupDeadline": "Quite o saldo até {time} para evitar a exclusão do conteúdo na nuvem. Os arquivos locais não são afetados.",
     "billingSummary": "Valor devido: {debt}; crédito disponível: {available}.",
     "manageBilling": "Conta e cobrança",

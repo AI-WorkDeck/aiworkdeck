@@ -48,7 +48,7 @@ public class ImScopedAgentHost implements ImProjectActionHandler {
                     // Existing marker histories remain accessible; they are not merged into the wider project audience.
                     try { entry.put("legacyScopeKey",projectFiles.readIdentity(userId,projectId,accountScope)); }
                     catch (IllegalArgumentException absent) { /* Shared project access does not require a local marker file. */ }
-                } else entry.put("scopeKey",projectFiles.ensureIdentity(userId,projectId,accountScope));
+                } else entry.put("scopeKey",projectFiles.previewIdentity(userId,projectId,accountScope));
                 agents.add(entry);
             } catch (IllegalArgumentException unavailable) {
                 result.put("projectReason", com.checkba.service.LangText.of("当前项目助手尚未就绪，请由项目内部成员打开项目沟通完成关联", "Project Assistant is not ready yet; please ask an internal project member to open Project IM to complete binding"));

@@ -185,7 +185,7 @@ filelink 点击定位、多 target 弹窗、method 小条；契约见 ai-doc-bri
 
 消息中心入口在顶栏右上角 `AccountEntry.vue`：已登录头像显示未读数字（超过 99 显示 `99+`），下拉首个动作是「消息中心」。消息来自现有 `messageCenterTab.js` 轮询；来源暂不可用时不能把未读归零，未知且部分失败显示 `·`，并保留不可用说明。余额/宽限提醒小点与消息角标共存。未连接统一账户时，登录按钮旁仍提供消息图标，因为受邀 DD 连接可独立于统一账户使用；旧 CLIENT 视角仍不开放消息入口。
 
-头像动作直接调用 `openMessageCenterTab`，沿用跨左右窗格的单例标签，不切换或展开左栏。`messages` 不再属于 rail / 无项目左栏白名单；旧有项目 `leftPaneKey=messages` 迁移成 `files`，无项目恢复默认空面板并收栏（#1582）。`MessageCenterPane.vue` 保留对话、通知、待处理分类及原业务跳转；阅读不替代业务确认，项目切换仍走落盘出口，账号切换仍清除旧内容和迟到响应。
+头像动作直接调用 `openMessageCenterTab`，沿用跨左右窗格的单例标签，不切换或展开左栏。`messages` 不再属于 rail / 无项目左栏白名单；旧有项目 `leftPaneKey=messages` 迁移成 `files`，无项目恢复默认空面板并收栏（#1582）。`MessageCenterPane.vue` 保留对话、通知、待处理分类及原业务跳转；阅读不替代业务确认，项目切换仍走落盘出口，账号切换仍清除旧内容和迟到响应。「去处理」指向已安装但限项目使用的插件、而当前没开项目时，`openMessageTarget` 抛带 `projectRequired` 的错误，面板显示「请先打开一个项目」并给「打开项目…」按钮（`openProjects` prop = `openProjectsPane`）；只有插件确实不在可用列表里才说「尚未安装或启用」（QA D3，`tests/messages/message-navigation.test.mjs`）。对话里的「邀请码」不再一键签发成员码，见 plugin-system.md 的 QA D1 段。
 
 验证：`node --test tests/messages/*.test.mjs tests/account/account-entry-account-changed.test.mjs`（`frontend/`），`npm run check:nav:full`。头像浏览器测试使用实际组件与单例方法、合成账户状态，隔离夹具把 uni `tap` 映射为 H5 点击；不代表正式 Electron 客户端、真实账户或跨设备已验。
 

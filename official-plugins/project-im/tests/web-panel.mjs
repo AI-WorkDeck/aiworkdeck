@@ -109,6 +109,8 @@ test('client invite defaults to after-join history and sharing earlier messages 
   assert.deepEqual([...history.options].map((o) => o.textContent), ['只看入群之后的消息', '同时可看此前的消息']); assert.equal(history.value, 'after');
   await p.named('生成邀请码'); assert.equal(sent().shareHistory, false); assert.equal(sent().role, 'CLIENT');
   assert.match(p.$('invite-result').textContent, /只能看到入群之后的消息和文件/); assert.doesNotMatch(p.$('invite-result').textContent, /\{time\}|查看历史消息/);
+  // QA D4: the lawyer is told the client needs an AI WorkDeck account, where to type the code, and that the portal will not take it.
+  assert.match(p.$('invite-result').textContent, /AI WorkDeck 账号登录应用.*邀请码加入.*客户门户不能使用此码/);
   change(history, 'all'); await p.named('生成邀请码'); assert.equal(sent().shareHistory, true); assert.match(p.$('invite-result').textContent, /可同时查看此前的消息/);
   change(role, 'MEMBER'); assert.equal(history.parentElement.hidden, true); await p.named('生成邀请码'); assert.equal('shareHistory' in sent(), false);
 });
@@ -124,7 +126,8 @@ test('history choice copy is tokenized for every locale and the generated panel 
   for (const file of locales) {
     const panelKeys = Object.fromEntries(Object.entries(JSON.parse(readFileSync(new URL(file, dir), 'utf8'))).filter(([k]) => k.startsWith('panel.')));
     assert.deepEqual(JSON.parse(JSON.stringify(p.dom.window.AWD_IM_L10N[file.slice(0, -5)])), panelKeys, file);
-    for (const key of ['historyScope', 'historyAfterJoin', 'historyWithEarlier']) assert.ok(panelKeys['panel.' + key], file + key);
+    for (const key of ['historyScope', 'historyAfterJoin', 'historyWithEarlier', 'inviteJoinHow']) assert.ok(panelKeys['panel.' + key], file + key);
+    assert.match(panelKeys['panel.inviteJoinHow'], /AI WorkDeck/, file);
     for (const key of ['inviteHintAfterJoin', 'inviteHintWithHistory']) assert.match(panelKeys['panel.' + key], /\{time\}/, file + key);
   }
 });

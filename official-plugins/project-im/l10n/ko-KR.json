@@ -7,5 +7,6 @@
   "panel.historyAfterJoin": "참여 이후의 메시지만",
   "panel.historyWithEarlier": "이전 메시지도 함께 보기",
   "panel.inviteHintAfterJoin": "이 코드로 참여한 의뢰인은 참여 이후의 메시지와 파일만 볼 수 있습니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}",
-  "panel.inviteHintWithHistory": "이 코드로 참여한 의뢰인은 이전 메시지도 볼 수 있습니다. 파일은 여전히 접근 권한에 따라 개별적으로 공개됩니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}"
+  "panel.inviteHintWithHistory": "이 코드로 참여한 의뢰인은 이전 메시지도 볼 수 있습니다. 파일은 여전히 접근 권한에 따라 개별적으로 공개됩니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}",
+  "panel.inviteJoinHow": "상대방은 자신의 AI WorkDeck 계정으로 앱에 로그인한 뒤 «메시지 센터 → 대화 → 초대 코드로 참여» 또는 «프로젝트 채팅 → 초대 코드로 참여»에서 이 코드를 입력합니다. 의뢰인 포털에서는 이 코드를 사용할 수 없습니다."
 }
