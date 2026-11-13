@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Bu işlem, gerçek müvekkil adları dahil tüm kütüphaneyi geçerli projenin \"İhale kütüphanesi dışa aktarımları\" klasörüne aktarır; klasörü tüm proje üyeleri görebilir. Yine de dışa aktarılsın mı?",
   "panel.lib.someClient": "bir müvekkil",
   "panel.err.cancelled": "Durduruldu.",
-  "panel.err.panel_only": "Bu işlem yalnızca \"İhaleler ve Teklifler\" panelinde kullanılabilir."
+  "panel.err.panel_only": "Bu işlem yalnızca \"İhaleler ve Teklifler\" panelinde kullanılabilir.",
+  "panel.err.libraryNotLoaded": "Referanslar ve ekip kitaplığı henüz okunamadı; mevcut içeriğin üzerine yazılmaması için bu sefer kaydedilmedi. Lütfen biraz sonra tekrar deneyin.",
+  "panel.err.libraryReloaded": "Referanslar ve ekip kitaplığı az önce yeniden yüklendi; mevcut içeriğin üzerine yazılmaması için bu sefer kaydedilmedi. Lütfen kontrol edip yeniden kaydedin."
 }

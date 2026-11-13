@@ -211,7 +211,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "سيصدّر هذا المكتبة كاملة، بما في ذلك أسماء العملاء الحقيقية، إلى مجلد \"صادرات مكتبة المناقصات\" في المشروع الحالي، وسيراه جميع أعضاء المشروع. هل تريد التصدير؟",
     "panel.lib.someClient": "أحد العملاء",
     "panel.err.cancelled": "تم الإيقاف.",
-    "panel.err.panel_only": "هذا الإجراء متاح فقط في لوحة «المناقصات والعروض»."
+    "panel.err.panel_only": "هذا الإجراء متاح فقط في لوحة «المناقصات والعروض».",
+    "panel.err.libraryNotLoaded": "تعذّرت قراءة مكتبة الأعمال والفريق بعد، ولذلك لم يتم الحفظ تجنبًا للكتابة فوق المحتوى الحالي. يُرجى المحاولة مرة أخرى بعد قليل.",
+    "panel.err.libraryReloaded": "أُعيدت قراءة مكتبة الأعمال والفريق للتو، ولذلك لم يتم الحفظ تجنبًا للكتابة فوق المحتوى الحالي. يُرجى المراجعة ثم الحفظ مرة أخرى."
   },
   "de-DE": {
     "panel.title": "Ausschreibungen und Angebote",
@@ -422,7 +424,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Dies exportiert die gesamte Bibliothek einschließlich der echten Mandantennamen in den Ordner „Export Angebotsbibliothek“ des aktuellen Projekts, wo ihn alle Projektmitglieder sehen können. Trotzdem exportieren?",
     "panel.lib.someClient": "ein Mandant",
     "panel.err.cancelled": "Angehalten.",
-    "panel.err.panel_only": "Diese Aktion ist nur im Bereich „Ausschreibungen und Angebote“ verfügbar."
+    "panel.err.panel_only": "Diese Aktion ist nur im Bereich „Ausschreibungen und Angebote“ verfügbar.",
+    "panel.err.libraryNotLoaded": "Die Bibliothek mit Referenzen und Team konnte noch nicht gelesen werden. Um vorhandene Inhalte nicht zu überschreiben, wurde nichts gespeichert. Bitte versuchen Sie es in Kürze erneut.",
+    "panel.err.libraryReloaded": "Die Bibliothek mit Referenzen und Team wurde soeben neu geladen. Um vorhandene Inhalte nicht zu überschreiben, wurde nichts gespeichert. Bitte prüfen Sie den Stand und speichern Sie erneut."
   },
   "el-GR": {
     "panel.title": "Διαγωνισμοί και προσφορές",
@@ -633,7 +637,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Θα εξαχθεί ολόκληρη η βιβλιοθήκη, συμπεριλαμβανομένων των πραγματικών ονομάτων πελατών, στον φάκελο «Εξαγωγές βιβλιοθήκης διαγωνισμών» του τρέχοντος έργου, όπου θα είναι ορατή σε όλα τα μέλη του έργου. Να γίνει εξαγωγή;",
     "panel.lib.someClient": "ένας πελάτης",
     "panel.err.cancelled": "Διακόπηκε.",
-    "panel.err.panel_only": "Αυτή η ενέργεια είναι διαθέσιμη μόνο στον πίνακα «Διαγωνισμοί και προσφορές»."
+    "panel.err.panel_only": "Αυτή η ενέργεια είναι διαθέσιμη μόνο στον πίνακα «Διαγωνισμοί και προσφορές».",
+    "panel.err.libraryNotLoaded": "Η βιβλιοθήκη αναφορών και ομάδας δεν μπόρεσε να διαβαστεί ακόμη, γι' αυτό δεν αποθηκεύτηκε τίποτα, ώστε να μην αντικατασταθεί το υπάρχον περιεχόμενο. Δοκιμάστε ξανά σε λίγο.",
+    "panel.err.libraryReloaded": "Η βιβλιοθήκη αναφορών και ομάδας μόλις φορτώθηκε ξανά, γι' αυτό δεν αποθηκεύτηκε τίποτα, ώστε να μην αντικατασταθεί το υπάρχον περιεχόμενο. Ελέγξτε την και αποθηκεύστε ξανά."
   },
   "en-US": {
     "panel.title": "Bids and Proposals",
@@ -844,7 +850,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "This exports the whole library, including real client names, into the project's \"Pitch library exports\" folder, where every project member can see it. Export anyway?",
     "panel.lib.someClient": "a client",
     "panel.err.cancelled": "Stopped.",
-    "panel.err.panel_only": "This action is only available in the Bids and Proposals panel."
+    "panel.err.panel_only": "This action is only available in the Bids and Proposals panel.",
+    "panel.err.libraryNotLoaded": "The credentials and team library could not be read yet, so nothing was saved to avoid overwriting it. Please try again shortly.",
+    "panel.err.libraryReloaded": "The credentials and team library was just reloaded, so nothing was saved to avoid overwriting it. Check it and save again."
   },
   "es-ES": {
     "panel.title": "Licitaciones y propuestas",
@@ -1055,7 +1063,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Se exportará toda la biblioteca, incluidos los nombres reales de los clientes, a la carpeta «Exportaciones de la biblioteca de licitaciones» del proyecto actual, donde la verán todos los miembros del proyecto. ¿Exportar de todos modos?",
     "panel.lib.someClient": "un cliente",
     "panel.err.cancelled": "Detenido.",
-    "panel.err.panel_only": "Esta acción solo está disponible en el panel «Licitaciones y propuestas»."
+    "panel.err.panel_only": "Esta acción solo está disponible en el panel «Licitaciones y propuestas».",
+    "panel.err.libraryNotLoaded": "Todavía no se ha podido leer la biblioteca de referencias y equipo, por lo que no se ha guardado nada para no sobrescribir su contenido. Inténtelo de nuevo en unos momentos.",
+    "panel.err.libraryReloaded": "La biblioteca de referencias y equipo se acaba de volver a cargar, por lo que no se ha guardado nada para no sobrescribir su contenido. Revísela y guarde de nuevo."
   },
   "fr-FR": {
     "panel.title": "Appels d'offres et propositions",
@@ -1266,7 +1276,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Cela exporte toute la bibliothèque, y compris les noms réels des clients, dans le dossier « Exports de la bibliothèque d'appels d'offres » du projet actuel, visible par tous les membres du projet. Exporter quand même ?",
     "panel.lib.someClient": "un client",
     "panel.err.cancelled": "Arrêté.",
-    "panel.err.panel_only": "Cette action n'est disponible que dans le panneau « Appels d'offres et propositions »."
+    "panel.err.panel_only": "Cette action n'est disponible que dans le panneau « Appels d'offres et propositions ».",
+    "panel.err.libraryNotLoaded": "La bibliothèque des références et de l'équipe n'a pas encore pu être lue ; rien n'a été enregistré afin de ne pas écraser son contenu. Veuillez réessayer dans un instant.",
+    "panel.err.libraryReloaded": "La bibliothèque des références et de l'équipe vient d'être rechargée ; rien n'a été enregistré afin de ne pas écraser son contenu. Vérifiez-la, puis enregistrez à nouveau."
   },
   "hi-IN": {
     "panel.title": "निविदा और प्रस्ताव",
@@ -1477,7 +1489,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "यह पूरी लाइब्रेरी को, असली मुवक्किल नामों सहित, वर्तमान प्रोजेक्ट के \"निविदा लाइब्रेरी निर्यात\" फ़ोल्डर में निर्यात करेगा, जहाँ प्रोजेक्ट के सभी सदस्य इसे देख सकते हैं। फिर भी निर्यात करें?",
     "panel.lib.someClient": "एक मुवक्किल",
     "panel.err.cancelled": "रोक दिया गया।",
-    "panel.err.panel_only": "यह कार्रवाई केवल \"निविदा और प्रस्ताव\" पैनल में उपलब्ध है।"
+    "panel.err.panel_only": "यह कार्रवाई केवल \"निविदा और प्रस्ताव\" पैनल में उपलब्ध है।",
+    "panel.err.libraryNotLoaded": "उपलब्धियाँ और टीम लाइब्रेरी अभी पढ़ी नहीं जा सकी, इसलिए मौजूदा सामग्री को अधिलेखित होने से बचाने के लिए कुछ भी सहेजा नहीं गया। कृपया थोड़ी देर बाद फिर प्रयास करें।",
+    "panel.err.libraryReloaded": "उपलब्धियाँ और टीम लाइब्रेरी अभी दोबारा लोड की गई है, इसलिए मौजूदा सामग्री को अधिलेखित होने से बचाने के लिए कुछ भी सहेजा नहीं गया। कृपया जाँच लें और फिर से सहेजें।"
   },
   "id-ID": {
     "panel.title": "Tender dan Proposal",
@@ -1688,7 +1702,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Tindakan ini mengekspor seluruh pustaka, termasuk nama klien yang sebenarnya, ke folder \"Ekspor pustaka tender\" pada proyek saat ini, yang dapat dilihat oleh semua anggota proyek. Tetap ekspor?",
     "panel.lib.someClient": "seorang klien",
     "panel.err.cancelled": "Dihentikan.",
-    "panel.err.panel_only": "Tindakan ini hanya tersedia di panel \"Tender dan Proposal\"."
+    "panel.err.panel_only": "Tindakan ini hanya tersedia di panel \"Tender dan Proposal\".",
+    "panel.err.libraryNotLoaded": "Pustaka rekam jejak dan tim belum dapat dibaca, sehingga tidak ada yang disimpan agar isinya tidak tertimpa. Silakan coba lagi sebentar lagi.",
+    "panel.err.libraryReloaded": "Pustaka rekam jejak dan tim baru saja dimuat ulang, sehingga tidak ada yang disimpan agar isinya tidak tertimpa. Periksa terlebih dahulu, lalu simpan lagi."
   },
   "it-IT": {
     "panel.title": "Gare d'appalto e proposte",
@@ -1899,7 +1915,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Verrà esportata l'intera libreria, compresi i nomi reali dei clienti, nella cartella \"Esportazioni libreria gare\" del progetto corrente, visibile a tutti i membri del progetto. Esportare comunque?",
     "panel.lib.someClient": "un cliente",
     "panel.err.cancelled": "Interrotto.",
-    "panel.err.panel_only": "Questa azione è disponibile solo nel pannello \"Gare d'appalto e proposte\"."
+    "panel.err.panel_only": "Questa azione è disponibile solo nel pannello \"Gare d'appalto e proposte\".",
+    "panel.err.libraryNotLoaded": "Non è stato ancora possibile leggere la libreria di referenze e team, quindi non è stato salvato nulla per non sovrascriverne il contenuto. Riprova tra poco.",
+    "panel.err.libraryReloaded": "La libreria di referenze e team è stata appena ricaricata, quindi non è stato salvato nulla per non sovrascriverne il contenuto. Controllala e salva di nuovo."
   },
   "ja-JP": {
     "panel.title": "入札・提案",
@@ -2110,7 +2128,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "ライブラリ全体が、実在のクライアント名を含めて、現在のプロジェクトの「入札ライブラリのエクスポート」フォルダーに書き出され、プロジェクトのメンバー全員が閲覧できます。エクスポートしますか？",
     "panel.lib.someClient": "あるクライアント",
     "panel.err.cancelled": "停止しました。",
-    "panel.err.panel_only": "この操作は「入札・提案」パネルでのみ実行できます。"
+    "panel.err.panel_only": "この操作は「入札・提案」パネルでのみ実行できます。",
+    "panel.err.libraryNotLoaded": "実績とチームのライブラリをまだ読み込めていないため、既存の内容を上書きしないよう、今回は保存しませんでした。しばらくしてからもう一度お試しください。",
+    "panel.err.libraryReloaded": "実績とチームのライブラリを再読み込みしたばかりのため、既存の内容を上書きしないよう、今回は保存しませんでした。内容を確認してから、もう一度保存してください。"
   },
   "ko-KR": {
     "panel.title": "입찰 및 제안",
@@ -2321,7 +2341,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "라이브러리 전체가 실제 의뢰인 이름을 포함하여 현재 프로젝트의 \"입찰 라이브러리 내보내기\" 폴더에 저장되며, 프로젝트 구성원 모두가 볼 수 있습니다. 내보내시겠습니까?",
     "panel.lib.someClient": "어느 의뢰인",
     "panel.err.cancelled": "중지했습니다.",
-    "panel.err.panel_only": "이 작업은 \"입찰 및 제안\" 패널에서만 사용할 수 있습니다."
+    "panel.err.panel_only": "이 작업은 \"입찰 및 제안\" 패널에서만 사용할 수 있습니다.",
+    "panel.err.libraryNotLoaded": "실적 및 팀 라이브러리를 아직 읽지 못해 기존 내용을 덮어쓰지 않도록 이번에는 저장하지 않았습니다. 잠시 후 다시 시도해 주세요.",
+    "panel.err.libraryReloaded": "실적 및 팀 라이브러리를 방금 다시 불러와 기존 내용을 덮어쓰지 않도록 이번에는 저장하지 않았습니다. 내용을 확인한 뒤 다시 저장해 주세요."
   },
   "ms-MY": {
     "panel.title": "Tender dan Cadangan",
@@ -2532,7 +2554,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Ini mengeksport seluruh perpustakaan, termasuk nama klien sebenar, ke folder \"Eksport perpustakaan tender\" dalam projek semasa, yang boleh dilihat oleh semua ahli projek. Tetap eksport?",
     "panel.lib.someClient": "seorang klien",
     "panel.err.cancelled": "Dihentikan.",
-    "panel.err.panel_only": "Tindakan ini hanya tersedia dalam panel \"Tender dan Cadangan\"."
+    "panel.err.panel_only": "Tindakan ini hanya tersedia dalam panel \"Tender dan Cadangan\".",
+    "panel.err.libraryNotLoaded": "Pustaka kelayakan dan pasukan belum dapat dibaca, jadi tiada apa yang disimpan bagi mengelakkan kandungan sedia ada tertimpa. Sila cuba lagi sebentar nanti.",
+    "panel.err.libraryReloaded": "Pustaka kelayakan dan pasukan baru sahaja dimuat semula, jadi tiada apa yang disimpan bagi mengelakkan kandungan sedia ada tertimpa. Sila semak, kemudian simpan semula."
   },
   "nl-NL": {
     "panel.title": "Aanbestedingen en offertes",
@@ -2743,7 +2767,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Hiermee wordt de hele bibliotheek, inclusief de echte cliëntnamen, geëxporteerd naar de map \"Export aanbestedingsbibliotheek\" van het huidige project, waar alle projectleden de bestanden kunnen zien. Toch exporteren?",
     "panel.lib.someClient": "een cliënt",
     "panel.err.cancelled": "Gestopt.",
-    "panel.err.panel_only": "Deze actie is alleen beschikbaar in het paneel \"Aanbestedingen en offertes\"."
+    "panel.err.panel_only": "Deze actie is alleen beschikbaar in het paneel \"Aanbestedingen en offertes\".",
+    "panel.err.libraryNotLoaded": "De bibliotheek met referenties en team kon nog niet worden gelezen, dus er is niets opgeslagen om bestaande inhoud niet te overschrijven. Probeer het over enkele ogenblikken opnieuw.",
+    "panel.err.libraryReloaded": "De bibliotheek met referenties en team is zojuist opnieuw geladen, dus er is niets opgeslagen om bestaande inhoud niet te overschrijven. Controleer de bibliotheek en sla opnieuw op."
   },
   "pt-BR": {
     "panel.title": "Licitações e propostas",
@@ -2954,7 +2980,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Isto exporta a biblioteca inteira, incluindo os nomes reais dos clientes, para a pasta \"Exportações da biblioteca de licitações\" do projeto atual, onde todos os membros do projeto poderão vê-la. Exportar mesmo assim?",
     "panel.lib.someClient": "um cliente",
     "panel.err.cancelled": "Interrompido.",
-    "panel.err.panel_only": "Esta ação só está disponível no painel \"Licitações e propostas\"."
+    "panel.err.panel_only": "Esta ação só está disponível no painel \"Licitações e propostas\".",
+    "panel.err.libraryNotLoaded": "A biblioteca de credenciais e equipe ainda não pôde ser lida, então nada foi salvo para não sobrescrever o conteúdo existente. Tente novamente em instantes.",
+    "panel.err.libraryReloaded": "A biblioteca de credenciais e equipe acabou de ser recarregada, então nada foi salvo para não sobrescrever o conteúdo existente. Confira e salve novamente."
   },
   "ru-RU": {
     "panel.title": "Тендеры и предложения",
@@ -3165,7 +3193,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Будет экспортирована вся библиотека, включая настоящие имена клиентов, в папку «Экспорт тендерной библиотеки» текущего проекта, где её увидят все участники проекта. Всё равно экспортировать?",
     "panel.lib.someClient": "клиент",
     "panel.err.cancelled": "Остановлено.",
-    "panel.err.panel_only": "Это действие доступно только на панели «Тендеры и предложения»."
+    "panel.err.panel_only": "Это действие доступно только на панели «Тендеры и предложения».",
+    "panel.err.libraryNotLoaded": "Библиотека кейсов и команды ещё не прочитана, поэтому ничего не сохранено, чтобы не перезаписать имеющееся содержимое. Повторите попытку чуть позже.",
+    "panel.err.libraryReloaded": "Библиотека кейсов и команды только что была перечитана, поэтому ничего не сохранено, чтобы не перезаписать имеющееся содержимое. Проверьте её и сохраните ещё раз."
   },
   "th-TH": {
     "panel.title": "การประมูลและข้อเสนอ",
@@ -3376,7 +3406,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "การดำเนินการนี้จะส่งออกคลังทั้งหมด รวมถึงชื่อลูกความจริง ไปยังโฟลเดอร์ \"การส่งออกคลังการประมูล\" ของโครงการปัจจุบัน ซึ่งสมาชิกทุกคนในโครงการมองเห็นได้ ต้องการส่งออกหรือไม่",
     "panel.lib.someClient": "ลูกความรายหนึ่ง",
     "panel.err.cancelled": "หยุดแล้ว",
-    "panel.err.panel_only": "การดำเนินการนี้ใช้ได้เฉพาะในแผง \"การประมูลและข้อเสนอ\""
+    "panel.err.panel_only": "การดำเนินการนี้ใช้ได้เฉพาะในแผง \"การประมูลและข้อเสนอ\"",
+    "panel.err.libraryNotLoaded": "ยังอ่านคลังผลงานและทีมไม่ได้ จึงไม่ได้บันทึกเพื่อป้องกันการเขียนทับเนื้อหาเดิม โปรดลองอีกครั้งในอีกสักครู่",
+    "panel.err.libraryReloaded": "คลังผลงานและทีมเพิ่งถูกโหลดใหม่ จึงไม่ได้บันทึกเพื่อป้องกันการเขียนทับเนื้อหาเดิม โปรดตรวจสอบแล้วบันทึกอีกครั้ง"
   },
   "tr-TR": {
     "panel.title": "İhaleler ve Teklifler",
@@ -3587,7 +3619,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Bu işlem, gerçek müvekkil adları dahil tüm kütüphaneyi geçerli projenin \"İhale kütüphanesi dışa aktarımları\" klasörüne aktarır; klasörü tüm proje üyeleri görebilir. Yine de dışa aktarılsın mı?",
     "panel.lib.someClient": "bir müvekkil",
     "panel.err.cancelled": "Durduruldu.",
-    "panel.err.panel_only": "Bu işlem yalnızca \"İhaleler ve Teklifler\" panelinde kullanılabilir."
+    "panel.err.panel_only": "Bu işlem yalnızca \"İhaleler ve Teklifler\" panelinde kullanılabilir.",
+    "panel.err.libraryNotLoaded": "Referanslar ve ekip kitaplığı henüz okunamadı; mevcut içeriğin üzerine yazılmaması için bu sefer kaydedilmedi. Lütfen biraz sonra tekrar deneyin.",
+    "panel.err.libraryReloaded": "Referanslar ve ekip kitaplığı az önce yeniden yüklendi; mevcut içeriğin üzerine yazılmaması için bu sefer kaydedilmedi. Lütfen kontrol edip yeniden kaydedin."
   },
   "vi-VN": {
     "panel.title": "Đấu thầu và đề xuất",
@@ -3798,7 +3832,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "Thao tác này xuất toàn bộ thư viện, bao gồm tên khách hàng thật, vào thư mục \"Xuất thư viện đấu thầu\" của dự án hiện tại, nơi mọi thành viên dự án đều xem được. Vẫn xuất?",
     "panel.lib.someClient": "một khách hàng",
     "panel.err.cancelled": "Đã dừng.",
-    "panel.err.panel_only": "Thao tác này chỉ dùng được trong bảng \"Đấu thầu và đề xuất\"."
+    "panel.err.panel_only": "Thao tác này chỉ dùng được trong bảng \"Đấu thầu và đề xuất\".",
+    "panel.err.libraryNotLoaded": "Thư viện kinh nghiệm và đội ngũ chưa đọc được, nên chưa lưu gì để tránh ghi đè nội dung hiện có. Vui lòng thử lại sau ít phút.",
+    "panel.err.libraryReloaded": "Thư viện kinh nghiệm và đội ngũ vừa được tải lại, nên chưa lưu gì để tránh ghi đè nội dung hiện có. Vui lòng kiểm tra rồi lưu lại."
   },
   "zh-CN": {
     "panel.title": "投标与提案",
@@ -4009,7 +4045,9 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "导出的是整个库，包括真实客户名，会写进当前项目的「投标库导出」文件夹，项目成员都能看到。确定导出？",
     "panel.lib.someClient": "某客户",
     "panel.err.cancelled": "已停止。",
-    "panel.err.panel_only": "这个操作只能在「投标与提案」面板里进行。"
+    "panel.err.panel_only": "这个操作只能在「投标与提案」面板里进行。",
+    "panel.err.libraryNotLoaded": "业绩与团队库还没有读出来，为避免覆盖已有内容，这次没有保存。请稍后重试。",
+    "panel.err.libraryReloaded": "业绩与团队库刚刚重新读取，为避免覆盖已有内容，这次没有保存。请核对后再保存一次。"
   },
   "zh-TW": {
     "panel.title": "投標與提案",
@@ -4220,6 +4258,8 @@ window.AWD_PITCH_L10N = {
     "panel.lib.confirmExport": "匯出的是整個庫，包括真實客戶名，會寫進目前專案的「投標庫匯出」資料夾，專案成員都看得到。確定匯出？",
     "panel.lib.someClient": "某客戶",
     "panel.err.cancelled": "已停止。",
-    "panel.err.panel_only": "這個操作只能在「投標與提案」面板裡進行。"
+    "panel.err.panel_only": "這個操作只能在「投標與提案」面板裡進行。",
+    "panel.err.libraryNotLoaded": "業績與團隊庫還沒有讀取出來，為避免覆蓋既有內容，這次沒有儲存。請稍後重試。",
+    "panel.err.libraryReloaded": "業績與團隊庫剛剛重新讀取，為避免覆蓋既有內容，這次沒有儲存。請核對後再儲存一次。"
   }
 };

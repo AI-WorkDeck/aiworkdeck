@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Se exportará toda la biblioteca, incluidos los nombres reales de los clientes, a la carpeta «Exportaciones de la biblioteca de licitaciones» del proyecto actual, donde la verán todos los miembros del proyecto. ¿Exportar de todos modos?",
   "panel.lib.someClient": "un cliente",
   "panel.err.cancelled": "Detenido.",
-  "panel.err.panel_only": "Esta acción solo está disponible en el panel «Licitaciones y propuestas»."
+  "panel.err.panel_only": "Esta acción solo está disponible en el panel «Licitaciones y propuestas».",
+  "panel.err.libraryNotLoaded": "Todavía no se ha podido leer la biblioteca de referencias y equipo, por lo que no se ha guardado nada para no sobrescribir su contenido. Inténtelo de nuevo en unos momentos.",
+  "panel.err.libraryReloaded": "La biblioteca de referencias y equipo se acaba de volver a cargar, por lo que no se ha guardado nada para no sobrescribir su contenido. Revísela y guarde de nuevo."
 }

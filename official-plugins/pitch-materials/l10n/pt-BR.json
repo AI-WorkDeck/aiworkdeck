@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Isto exporta a biblioteca inteira, incluindo os nomes reais dos clientes, para a pasta \"Exportações da biblioteca de licitações\" do projeto atual, onde todos os membros do projeto poderão vê-la. Exportar mesmo assim?",
   "panel.lib.someClient": "um cliente",
   "panel.err.cancelled": "Interrompido.",
-  "panel.err.panel_only": "Esta ação só está disponível no painel \"Licitações e propostas\"."
+  "panel.err.panel_only": "Esta ação só está disponível no painel \"Licitações e propostas\".",
+  "panel.err.libraryNotLoaded": "A biblioteca de credenciais e equipe ainda não pôde ser lida, então nada foi salvo para não sobrescrever o conteúdo existente. Tente novamente em instantes.",
+  "panel.err.libraryReloaded": "A biblioteca de credenciais e equipe acabou de ser recarregada, então nada foi salvo para não sobrescrever o conteúdo existente. Confira e salve novamente."
 }

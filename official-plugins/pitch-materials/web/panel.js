@@ -122,7 +122,12 @@
     try {
       const data = await tool('library.get');
       state.library = core.normalizeLibrary(data.library);
-    } catch (e) { notice(errText(e), 'error'); }
+      state.libraryLoaded = true;
+    } catch (e) {
+      // 读库失败时界面上是空库：此时任何保存都会覆盖已有的库，所以在读成功之前一律不许保存
+      state.libraryLoaded = false;
+      notice(errText(e), 'error');
+    }
     if (state.projectId) {
       try {
         const data = await tool('matrix.get');
@@ -151,6 +156,11 @@
   }
 
   async function saveLibrary(lib) {
+    if (!state.libraryLoaded) {
+      await loadAll();
+      if (!state.libraryLoaded) throw new Error(t('panel.err.libraryNotLoaded'));
+      throw new Error(t('panel.err.libraryReloaded'));
+    }
     await tool('library.save', { library: lib });
     quoteCache.clear();
     state.library = core.normalizeLibrary(lib);
