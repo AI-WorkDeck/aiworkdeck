@@ -64,13 +64,40 @@ else
   echo "跳过（无引擎）" >> "$REPORT"
 fi
 
-# ---- 2) 全应用真人模拟（需 9696）----
+# ---- 2) 全应用真人模拟 ----
+# 不再依赖常驻的 9696：用打包版内置的 JRE + 后端，起一台隔离的 desktop 后端（隔离 user.home、
+# 空库、未连账户——正是 app-e2e 设计的冷启动起点）；内置技能 / 插件取专用克隆里的最新源码。
+# 缺打包版时才退回「9696 在跑就用它，否则跳过」。
 section "app-e2e（全应用真人模拟）"
-if nc -z 127.0.0.1 9696 2>/dev/null; then
-  (npx uni --port $PORT > "$QA_HOME/dev.log" 2>&1 &)
-  DEV_PID=$!
-  sleep 25
-  if APP_E2E_BASE="http://127.0.0.1:$PORT" npm run test:app-e2e > "$QA_HOME/app-e2e.log" 2>&1; then
+APP_BACKEND_PORT=19685
+APP_BE="/Applications/AI WorkDeck.app/Contents/Resources/backend"
+APP_JAVA="/Applications/AI WorkDeck.app/Contents/Resources/jre/bin/java"
+E2E_BACKEND_PORT=""
+E2E_BACKEND_PID=""
+if [[ -x "$APP_JAVA" && -f "$APP_BE/app.jar" ]]; then
+  E2E_HOME="$QA_HOME/e2e-home"
+  rm -rf "$E2E_HOME"; mkdir -p "$E2E_HOME"
+  SPRING_PROFILES_ACTIVE=desktop \
+  AI_SKILLS_BUILTIN_DIR="$REPO/backend/skills" \
+  AI_PLUGINS_BUNDLED_DIR="$REPO/official-plugins" \
+  AWD_APP_VERSION=$(node -p "require('$REPO/desktop/package.json').version") \
+  "$APP_JAVA" -Duser.home="$E2E_HOME" -Dserver.port=$APP_BACKEND_PORT \
+    -cp "$APP_BE/app.jar:$APP_BE/lib/*" com.checkba.CheckbaApplication > "$QA_HOME/e2e-backend.log" 2>&1 &
+  E2E_BACKEND_PID=$!
+  for i in {1..60}; do
+    curl -s "http://127.0.0.1:$APP_BACKEND_PORT/api/account/status" 2>/dev/null | grep -q '"code":0' && { E2E_BACKEND_PORT=$APP_BACKEND_PORT; break }
+    sleep 3
+  done
+elif nc -z 127.0.0.1 9696 2>/dev/null; then
+  E2E_BACKEND_PORT=9696
+fi
+if [[ -n "$E2E_BACKEND_PORT" ]]; then
+  (VITE_API_BASE_URL="http://127.0.0.1:$E2E_BACKEND_PORT" npx uni --port $PORT > "$QA_HOME/dev.log" 2>&1 &)
+  for i in {1..40}; do curl -s -o /dev/null "http://127.0.0.1:$PORT" && break; sleep 3; done
+  CHROME_FT=$(ls -d /Users/Shared/claude-work/browsers/chrome/*/chrome-mac-arm64/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing" 2>/dev/null | tail -1)
+  [[ -n "$CHROME_FT" ]] && export PUPPETEER_EXECUTABLE_PATH="$CHROME_FT"
+  if APP_E2E_BASE="http://127.0.0.1:$PORT" APP_E2E_BACKEND="http://127.0.0.1:$E2E_BACKEND_PORT" \
+     npm run test:app-e2e > "$QA_HOME/app-e2e.log" 2>&1; then
     tail -3 "$QA_HOME/app-e2e.log" >> "$REPORT"
   else
     FAILED=1
@@ -78,8 +105,10 @@ if nc -z 127.0.0.1 9696 2>/dev/null; then
   fi
   pkill -f "uni --port $PORT" 2>/dev/null
 else
-  echo "跳过：桌面后端 9696 未运行（打开 AI WorkDeck 后自动恢复覆盖）" >> "$REPORT"
+  FAILED=1
+  echo "app-e2e 未能运行：打包版后端起不来且 9696 无后端（见 $QA_HOME/e2e-backend.log）" >> "$REPORT"
 fi
+[[ -n "$E2E_BACKEND_PID" ]] && kill "$E2E_BACKEND_PID" 2>/dev/null
 
 # ---- 汇报 ----
 if [[ $FAILED -ne 0 ]]; then

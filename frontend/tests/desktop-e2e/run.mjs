@@ -276,7 +276,7 @@ try {
     const acct = await api('/api/account/status').catch(() => null)
     if (acct && acct.data && acct.data.connected === false) {
       if (await page.$('.left-rail .account-entry-btn')) throw new Error('rail 底部不该再有账户入口（dev-board#1062 改回顶栏）')
-      const label = await page.$eval('.project-header .header-account .account-entry-btn', (e) => ({
+      const label = await page.$eval('.project-header .header-account .account-entry-btn.is-signed-out', (e) => ({
         signedOut: e.classList.contains('is-signed-out'),
         text: ((e.querySelector('.account-entry-label') || {}).textContent || '').trim(),
       }))
