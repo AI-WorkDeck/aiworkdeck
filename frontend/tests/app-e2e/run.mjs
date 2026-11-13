@@ -621,8 +621,8 @@ try {
     })
 
     await step('顶栏右上角账户入口：未连账户显示「登录」态，rail 底部无账户入口与设置齿轮', async () => {
-      await j1Page.waitForSelector('.project-header .header-account .account-entry-btn:not(.signed-out-messages)', { timeout: 15000 })
-      const st = await j1Page.$eval('.project-header .header-account .account-entry-btn:not(.signed-out-messages)', (e) => ({
+      await j1Page.waitForSelector('.project-header .header-account .account-entry-btn:not(.signed-out-messages):not(.signed-out-settings)', { timeout: 15000 })
+      const st = await j1Page.$eval('.project-header .header-account .account-entry-btn:not(.signed-out-messages):not(.signed-out-settings)', (e) => ({
         signedOut: e.classList.contains('is-signed-out'),
         label: ((e.querySelector('.account-entry-label') || {}).textContent || '').trim(),
         avatar: !!e.querySelector('.account-avatar'),
@@ -727,7 +727,7 @@ try {
     // 只看侧栏导航本身（.nav-list .nav-text），不看整页 innerText
     const labels = await page.evaluate(
       () => [...document.querySelectorAll('.nav-list .nav-text')].map((e) => e.innerText.trim()))
-    for (const want of ['工作记录', '全部收藏', '我的待办', '账户与安全']) {
+    for (const want of ['工作记录', '全部收藏', '我的待办', '个人资料与登录']) {
       if (!labels.includes(want)) {
         throw new Error('「个人」组缺栏目「' + want + '」: ' + JSON.stringify(labels))
       }
@@ -749,7 +749,7 @@ try {
     ['工作记录', '.panel-work-log'],
     ['全部收藏', '.panel-favorites'],
     ['我的待办', '.panel-todos'],
-    ['账户与安全', '.panel-settings'],
+    ['个人资料与登录', '.panel-settings'],
   ]) {
     await step('个人组栏目 ' + tab, async () => {
       await mouseClickText(tab)
@@ -1181,7 +1181,7 @@ try {
   console.log('== J6.3 账户入口与设置标签 ==')
   if (accountConnected0) {
     await step('点顶栏头像开三项下拉，点「设置」开中栏标签、不跳页', async () => {
-      await mouseClickSel('.project-header .header-account .account-entry-btn:not(.signed-out-messages)')
+      await mouseClickSel('.project-header .header-account .account-entry-btn:not(.signed-out-messages):not(.signed-out-settings)')
       await page.waitForSelector('.account-entry-menu', { timeout: 8000 })
       const items = await page.$$eval('.account-entry-menu .avatar-menu-item', (els) => els.map((e) => e.textContent.trim()))
       if (items.length !== 3) throw new Error('账户下拉应当恰好三项（我的日程/设置/退出登录），实际: ' + JSON.stringify(items))
@@ -1231,7 +1231,7 @@ try {
     if (h.includes('pages/admin/admin')) throw new Error('设置又变回整页跳转了')
     // 个人组与系统组都要在同一页里够得着
     await waitText('工作记录', 10000)
-    await waitText('账户与安全', 10000)
+    await waitText('个人资料与登录', 10000)
   })
   await step('鼠标中键单击标签关闭它（dev-board#97）', async () => {
     // 关掉设置标签，别把后面的旅程都压在设置页上——顺便覆盖中键关闭：
@@ -1563,9 +1563,9 @@ try {
     ['插件广场', '/pages/plugin-market/plugin-market', '插件广场'],
     ['变量库', '/pages/variable-library/variable-library', '新增变量'],
     // 侧栏标题 2026-08-20 从「系统管理」改成「设置」（个人中心并入这一页）；
-    // 「设置」两个字满页都是，所以断言「账户与安全」——个人组那一栏的名字，
+    // 「设置」两个字满页都是，所以断言「个人资料与登录」——个人组那一栏的名字，
     // 不随分区增减变化（此前断言的是导航卡标题，同一个道理）
-    ['管理页(只读)', '/pages/admin/admin', '账户与安全'],
+    ['管理页(只读)', '/pages/admin/admin', '个人资料与登录'],
     // 新建项目页 2026-08 起不再是主入口（两个新建动作已内嵌在项目列表页下方），
     // 保留给浏览器降级与应用菜单的 ?auto=create-folder，所以仍然要能打开
     ['新建项目页', '/pages/newproject/index', '新建或打开项目'],
