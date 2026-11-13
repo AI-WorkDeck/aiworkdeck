@@ -339,6 +339,14 @@ class LawFirmBillingFlowTest {
                 .filter(b -> id.equals(b.get("id"))).findFirst().orElseThrow();
     }
 
+    @Test
+    void teamMembershipMatchesWholeNamesOnly() {
+        assertTrue(LawFirmBillingService.onTeam("周铭泽（主办律师）", "周铭泽, 沈括"));
+        assertTrue(LawFirmBillingService.onTeam("张三", "李四、张三"));
+        assertFalse(LawFirmBillingService.onTeam("张三", "张三丰、李四"));
+        assertFalse(LawFirmBillingService.onTeam("张三", null));
+    }
+
     // ── helpers ──
 
     private Map<String, Object> act(User u, String action, Map<String, Object> params) {

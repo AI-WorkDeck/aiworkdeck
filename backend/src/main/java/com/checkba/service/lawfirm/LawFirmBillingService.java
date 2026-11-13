@@ -134,8 +134,7 @@ public class LawFirmBillingService {
     public static Map<String, Object> concurrencySafe(java.util.function.Supplier<Map<String, Object>> body) {
         try {
             return body.get();
-        } catch (org.springframework.dao.OptimisticLockingFailureException
-                 | org.springframework.dao.DataIntegrityViolationException e) {
+        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
             throw new IllegalStateException(LangText.of("这条记录刚被另一次操作改过，请刷新后重试",
                     "This record was just changed by another action; refresh and try again"));
         }
@@ -793,8 +792,10 @@ public class LawFirmBillingService {
         siblings.sort(Comparator.comparing(LawFirmBill::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
                 .thenComparing(LawFirmBill::getId));
         List<String> changedSent = new ArrayList<>();
-        long prior = 0;
+        // 客户已确认的账单先占额度（它们的金额不会再变），未确认的按生成先后依次分剩余额度
+        long prior = siblings.stream().filter(x -> "CONFIRMED".equals(x.getStatus())).mapToLong(x -> nz(x.getTotalCents())).sum();
         for (LawFirmBill x : siblings) {
+            if ("CONFIRMED".equals(x.getStatus())) continue;
             if (Set.of("DRAFT", "SENT").contains(x.getStatus()) && x.getCapCents() != null) {
                 Long cap = terms == null ? x.getCapCents() : terms.getCapCents();
                 LawFirmBillingMath.Totals t = LawFirmBillingMath.totals(nz(x.getSubtotalCents()), nzi(x.getDiscountBps()), cap, prior);
@@ -1220,8 +1221,18 @@ public class LawFirmBillingService {
     private boolean canRecordOn(Long userId, LawFirmMatterIntake in) {
         if (access.canViewFirmWide(userId)) return true;
         if (userId.equals(in.getLeadLawyerUserId()) || userId.equals(in.getApplicantUserId())) return true;
-        String name = displayName(userId);
-        return in.getTeamMemberNames() != null && name != null && in.getTeamMemberNames().contains(name);
+        return onTeam(displayName(userId), in.getTeamMemberNames());
+    }
+
+    /** 团队成员名单按「、，, 空白」拆开逐个精确比对；显示名带「（主办律师）」这类后缀时也按去掉后缀的姓名比。 */
+    static boolean onTeam(String displayName, String teamMemberNames) {
+        if (displayName == null || teamMemberNames == null) return false;
+        String bare = displayName.replaceAll("[（(].*$", "").trim();
+        for (String member : teamMemberNames.split("[、,，;；\\s]+")) {
+            String m = member.replaceAll("[（(].*$", "").trim();
+            if (!m.isEmpty() && (m.equals(displayName.trim()) || m.equals(bare))) return true;
+        }
+        return false;
     }
 
     private boolean canReview(Long userId, LawFirmMatterIntake intake) {
