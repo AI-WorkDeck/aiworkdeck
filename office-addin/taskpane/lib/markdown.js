@@ -1,5 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { stripEmoji } from './stripEmoji.js'
+
 /**
  * 助手气泡的轻量 Markdown 渲染（dev-board#197）。
  *
@@ -108,7 +110,7 @@ function renderBlocks(segment) {
  */
 export function renderMarkdown(text) {
   if (!text) return ''
-  const normalized = String(text).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n')
+  const normalized = stripEmoji(String(text)).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n')
   const escaped = escapeHtml(normalized)
   // 围栏代码块：```lang\n…\n```；流式期间未闭合的围栏把余下内容都当代码
   const parts = escaped.split(/^```[^\n]*$/m)
