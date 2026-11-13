@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "새 버전을 불러오지 못했습니다",
   "compareGenerateFailed": "비교 결과를 생성하지 못했습니다",
   "compareEmptyContent": "이 버전에는 해당 파일의 내용이 없습니다",
+  "officePasswordProtected": "이 파일에는 열기 암호가 설정되어 있어 비교/병합을 아직 지원하지 않습니다. 먼저 암호 없는 사본으로 저장해 주세요.",
   "compareFailedRetry": "비교 결과를 생성하지 못했습니다. 나중에 다시 시도해 주세요.",
   "compareTimeout": "비교 시간이 초과되었습니다. 탭을 닫고 다시 시도해 주세요.",
   "compareIframeLoadFailed": "편집기 페이지를 불러오지 못했습니다",

@@ -142,6 +142,7 @@ export default {
   openFailed: {
     title: '文档无法打开：引擎无响应或文件损坏',
     encryptedTitle: '这个文件设置了打开密码，编辑器暂不能直接打开。请在 Excel / Word / PowerPoint 或 WPS 中去掉打开密码后再打开，或下载原文件。',
+    legacyTitle: '这是较旧的 Office 格式，当前编辑器不支持直接打开。请用 Word / Excel / PowerPoint 或 WPS 打开后另存为 .docx / .xlsx / .pptx，再重新打开。',
     passwordPrompt: '这个文件设置了打开密码，请输入密码。',
     passwordPlaceholder: '打开密码',
     passwordOpen: '打开',

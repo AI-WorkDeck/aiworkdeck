@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Impossible d’ouvrir le document : l’éditeur ne répond pas ou le fichier est endommagé",
     "encryptedTitle": "Ce fichier est protégé par un mot de passe d’ouverture que l’éditeur ne peut pas encore ouvrir. Supprimez le mot de passe dans Excel, Word, PowerPoint ou WPS puis rouvrez-le, ou téléchargez l’original.",
+    "legacyTitle": "Il s'agit d'un ancien format Office que l'éditeur ne peut pas ouvrir directement. Ouvrez-le dans Word, Excel, PowerPoint ou WPS, enregistrez-le en .docx / .xlsx / .pptx, puis rouvrez-le.",
     "passwordPrompt": "Ce fichier est protégé par un mot de passe d’ouverture. Saisissez le mot de passe pour l’ouvrir.",
     "passwordPlaceholder": "Mot de passe",
     "passwordOpen": "Ouvrir",

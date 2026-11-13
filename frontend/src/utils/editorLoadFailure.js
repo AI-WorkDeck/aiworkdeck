@@ -135,3 +135,21 @@ export function openFailureOf(err, alreadyHealed) {
   if (alreadyHealed && isRelayTimeout(err)) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_LOAD_TIMEOUT }
   return null
 }
+
+/**
+ * 宿主在装载前先看一眼：这份字节是不是带打开密码的 Office 文件（新式 OOXML 或旧式二进制）。
+ * 版本比对 / 三方合并走隐藏引擎，直接拿后端字节，引擎对加密文件只会安全拒收（用户只看到
+ * 笼统的「生成失败」）。入口先判，给出明确的原因。永不抛错。
+ * @param {Uint8Array|ArrayBuffer} bytes
+ * @param {string} name 带扩展名的文件名/路径
+ * @param {(bytes, name) => any} [detectLegacy] 旧格式判定（legacyOfficeDecrypt.detectLegacyEncryption，按需注入以免本模块依赖 cfb）
+ * @returns {boolean}
+ */
+export function isPasswordProtectedOffice(bytes, name, detectLegacy) {
+  try {
+    if (isEncryptedOoxml(bytes, name)) return true
+    return !!(detectLegacy && detectLegacy(bytes, name))
+  } catch {
+    return false
+  }
+}

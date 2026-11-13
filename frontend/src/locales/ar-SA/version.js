@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "فشل تحميل الإصدار الأحدث",
   "compareGenerateFailed": "فشل إنشاء المقارنة",
   "compareEmptyContent": "لا يحتوي هذا الإصدار على محتوى لهذا الملف",
+  "officePasswordProtected": "هذا الملف محمي بكلمة مرور للفتح، لذا لا تُدعم المقارنة والدمج حاليًا. احفظ أولًا نسخة بلا كلمة مرور.",
   "compareFailedRetry": "فشل إنشاء المقارنة. يرجى المحاولة مرة أخرى لاحقًا.",
   "compareTimeout": "انتهت مهلة المقارنة. يرجى الإغلاق والمحاولة مرة أخرى.",
   "compareIframeLoadFailed": "فشل تحميل صفحة المحرر",

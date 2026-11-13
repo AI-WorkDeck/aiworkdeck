@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Die neuere Version konnte nicht geladen werden",
   "compareGenerateFailed": "Vergleich konnte nicht erstellt werden",
   "compareEmptyContent": "Diese Version enthält keinen Inhalt für diese Datei",
+  "officePasswordProtected": "Diese Datei ist mit einem Öffnungskennwort geschützt; Vergleichen und Zusammenführen werden noch nicht unterstützt. Speichern Sie zuerst eine Kopie ohne Kennwort.",
   "compareFailedRetry": "Vergleich konnte nicht erstellt werden. Bitte versuchen Sie es später erneut.",
   "compareTimeout": "Zeitüberschreitung beim Vergleich. Bitte schließen und erneut versuchen.",
   "compareIframeLoadFailed": "Editor-Seite konnte nicht geladen werden",

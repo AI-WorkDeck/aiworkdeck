@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Không thể tải phiên bản mới hơn",
   "compareGenerateFailed": "Không thể tạo bản so sánh",
   "compareEmptyContent": "Phiên bản này không có nội dung cho tệp này",
+  "officePasswordProtected": "Tệp này có mật khẩu mở nên chưa hỗ trợ so sánh và hợp nhất. Hãy lưu trước một bản sao không có mật khẩu.",
   "compareFailedRetry": "Không thể tạo bản so sánh. Vui lòng thử lại sau.",
   "compareTimeout": "Quá thời gian chuẩn bị so sánh. Vui lòng đóng và thử lại.",
   "compareIframeLoadFailed": "Không thể tải trang trình soạn thảo",

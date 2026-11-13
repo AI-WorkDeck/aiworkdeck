@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "新しいバージョンの読み込みに失敗しました",
   "compareGenerateFailed": "比較結果の生成に失敗しました",
   "compareEmptyContent": "このバージョンにはこのファイルの内容がありません",
+  "officePasswordProtected": "このファイルには開くためのパスワードが設定されているため、比較・マージはまだ利用できません。先にパスワードなしのコピーとして保存してください。",
   "compareFailedRetry": "比較結果の生成に失敗しました。しばらくしてからもう一度お試しください。",
   "compareTimeout": "比較がタイムアウトしました。タブを閉じてからもう一度お試しください。",
   "compareIframeLoadFailed": "エディターページの読み込みに失敗しました",

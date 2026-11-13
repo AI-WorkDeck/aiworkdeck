@@ -113,6 +113,7 @@ export default {
   compareLoadNewFailed: '加载新版失败',
   compareGenerateFailed: '对比生成失败',
   compareEmptyContent: '这一版里没有这份文件的内容',
+  officePasswordProtected: '该文件设有打开密码，暂不支持比对/合并，请先另存为无密码副本',
   compareFailedRetry: '对比生成失败，请稍后重试',
   compareTimeout: '对比准备超时，请关闭后重试',
   compareIframeLoadFailed: '编辑器页面加载失败',

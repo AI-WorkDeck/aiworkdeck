@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Belge açılamıyor: düzenleyici yanıt vermiyor veya dosya hasar görmüş",
     "encryptedTitle": "Bu dosya, düzenleyicinin henüz açamadığı bir açılış parolasıyla korunuyor. Parolayı Excel, Word, PowerPoint veya WPS’te kaldırıp yeniden açın ya da orijinal dosyayı indirin.",
+    "legacyTitle": "Bu, düzenleyicinin doğrudan açamadığı eski bir Office biçimidir. Word, Excel, PowerPoint veya WPS ile açıp .docx / .xlsx / .pptx olarak kaydedin, ardından yeniden açın.",
     "passwordPrompt": "Bu dosya bir açılış parolasıyla korunuyor. Açmak için parolayı girin.",
     "passwordPlaceholder": "Parola",
     "passwordOpen": "Aç",
