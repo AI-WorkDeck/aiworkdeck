@@ -15,10 +15,11 @@
 set -u
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
-QA_HOME="$HOME/aiworkdeck-qa"
+QA_HOME="${QA_HOME:-$HOME/aiworkdeck-qa}"
+APP="${QA_APP:-/Applications/AI WorkDeck.app}"
 REPO="$QA_HOME/repo"
 REPORTS="$QA_HOME/reports"
-APP_RES="/Applications/AI WorkDeck.app/Contents/Resources/frontend/dist/zetaoffice"
+APP_RES="$APP/Contents/Resources/frontend/dist/zetaoffice"
 DAY=$(date +%F)
 REPORT="$REPORTS/$DAY.md"
 PORT=5199
@@ -29,6 +30,14 @@ log() { echo "$(date +%T) $*" }
 section() { echo "\n## $*" >> "$REPORT" }
 
 echo "# AI WorkDeck 每日 QA — $DAY" > "$REPORT"
+
+# 可选：机器级重活锁（QA_SLOT_CMD 指向 heavy-slot.sh）；无空位就跳过今晚，不和录屏/其他重活抢机器
+if [[ -n "${QA_SLOT_CMD:-}" ]]; then
+  if ! SLOT_DIR=$("$QA_SLOT_CMD" acquire "qa-nightly" "nightly QA" 90 2>&1); then
+    echo "跳过：无空闲重活槽位（$SLOT_DIR）" >> "$REPORT"; exit 0
+  fi
+  trap '"$QA_SLOT_CMD" release qa-nightly >/dev/null 2>&1' EXIT
+fi
 
 # ---- 更新专用克隆 ----
 if [[ ! -d "$REPO/.git" ]]; then
@@ -70,8 +79,8 @@ fi
 # 缺打包版时才退回「9696 在跑就用它，否则跳过」。
 section "app-e2e（全应用真人模拟）"
 APP_BACKEND_PORT=19685
-APP_BE="/Applications/AI WorkDeck.app/Contents/Resources/backend"
-APP_JAVA="/Applications/AI WorkDeck.app/Contents/Resources/jre/bin/java"
+APP_BE="$APP/Contents/Resources/backend"
+APP_JAVA="$APP/Contents/Resources/jre/bin/java"
 E2E_BACKEND_PORT=""
 E2E_BACKEND_PID=""
 if [[ -x "$APP_JAVA" && -f "$APP_BE/app.jar" ]]; then
