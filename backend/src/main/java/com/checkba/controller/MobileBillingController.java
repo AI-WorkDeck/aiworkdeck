@@ -83,6 +83,7 @@ public class MobileBillingController {
          * 支付通道（dev-board#427/#426）。缺省 = 站点默认通道（第一期行为）；
          * {@code "wxvp"} = 小程序虚拟支付，此时 productId / wxCode 必填；
          * {@code "appstore"} = iOS 内购，此时只要 productId；
+         * {@code "googleplay"} = Android Google Play 内购，此时只要 productId；
          * {@code "wxpay-app"} = 安卓微信支付 APP 支付，只要金额（productId/wxCode 不用）。
          */
         private String channel;
@@ -155,6 +156,34 @@ public class MobileBillingController {
         MobileBillingClient.RechargeStatus s = service.confirmAppstore(requireUser(sessionId),
                 request == null ? null : request.getOutTradeNo(),
                 request == null ? null : request.getSignedTransaction());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", s.status());
+        out.put("paid", s.paid());
+        out.put("amountCents", s.amountCents());
+        return out;
+    }
+
+    @Data
+    public static class GooglePlayConfirmRequest {
+        /** 可缺省：App 被杀或重装后重放未消耗购买时本地可能没存下单号。 */
+        private String outTradeNo;
+        /** 必填：Google Play 商品 ID，如 {@code credits.usd.10}。 */
+        private String productId;
+        /** 必填：Google Play Billing {@code Purchase.purchaseToken}。 */
+        private String purchaseToken;
+    }
+
+    /**
+     * POST /recharge/confirm-googleplay → {status, paid, amountCents}（形状同 /recharge/status）。
+     */
+    @PostMapping("/recharge/confirm-googleplay")
+    public Map<String, Object> rechargeConfirmGooglePlay(
+            @RequestBody(required = false) GooglePlayConfirmRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        MobileBillingClient.RechargeStatus s = service.confirmGooglePlay(requireUser(sessionId),
+                request == null ? null : request.getOutTradeNo(),
+                request == null ? null : request.getProductId(),
+                request == null ? null : request.getPurchaseToken());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("status", s.status());
         out.put("paid", s.paid());

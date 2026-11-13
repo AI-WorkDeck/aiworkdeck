@@ -174,14 +174,17 @@ public class ImService {
         // Earlier messages open only through an explicit client invitation; a member code never carries
         // that choice, so a client account redeeming it stays limited to messages after joining.
         boolean shareHistory = "CLIENT".equals(role) && Boolean.TRUE.equals(p.get("shareHistory"));
-        // A fresh invitation replaces outstanding codes, limiting stale invitations and storage growth.
-        invitations.deleteByConversationIdAndIssuedBy(c.getId(), me.getUserId());
+        // A fresh invitation ends outstanding codes. Their rows stay for 30 days, so a replaced code typed into the
+        // client portal is still explained as a chat code (QA D4) instead of "invalid access code".
+        Instant now = Instant.now();
+        invitations.expireOutstanding(c.getId(), me.getUserId(), now);
+        invitations.deleteByExpiresAtBefore(now.minus(30, ChronoUnit.DAYS));
         byte[] entropy = new byte[24]; new SecureRandom().nextBytes(entropy);
         String code = Base64.getUrlEncoder().withoutPadding().encodeToString(entropy);
         ImInvitation invite = new ImInvitation(); invite.setTokenHash(sha(code.getBytes(StandardCharsets.UTF_8)));
         invite.setConversationId(c.getId()); invite.setRole(role); invite.setIssuedBy(me.getUserId());
         invite.setShareHistory(shareHistory);
-        invite.setExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS)); invitations.save(invite);
+        invite.setExpiresAt(now.plus(24, ChronoUnit.HOURS)); invitations.save(invite);
         // Echoed so a panel can tell a server that enforces the choice from an older one that ignores it.
         return Map.of("code", code, "expiresAt", invite.getExpiresAt(), "shareHistory", shareHistory);
     }

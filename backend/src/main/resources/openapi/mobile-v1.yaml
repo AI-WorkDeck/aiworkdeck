@@ -2446,11 +2446,12 @@ paths:
                     官网 orders 表有 UNIQUE(userId, idempotencyKey) 兜底。
                 channel:
                   type: string
-                  enum: [wxvp, appstore, wxpay-app]
+                  enum: [wxvp, appstore, googleplay, wxpay-app]
                   description: |
-                    支付通道（dev-board#427/#426）。**缺省 = 站点默认通道**（第一期行为，扫码/跳转）；
+                    支付通道（dev-board#427/#426/#665）。**缺省 = 站点默认通道**（第一期行为，扫码/跳转）；
                     wxvp = 微信小程序虚拟支付，**channel=wxvp 时 channel/productId/wxCode 三者必填**，
                     响应为 present=virtual；appstore = iOS 内购，**productId 必填、wxCode 不传**，
+                    响应为 present=native；googleplay = Google Play 内购，**productId 必填、wxCode 不传**，
                     响应为 present=native；wxpay-app = 安卓微信支付 APP 支付，**只传金额，productId/wxCode 不传**
                     （传了也被忽略），响应为 present=app + 七个 PayReq 字段。别的取值一律 code 1（通用 handler，无 kind）。
                 productId:
@@ -2459,7 +2460,9 @@ paths:
                   description: |
                     channel=wxvp 时必填：微信道具 id（credits_cny_10 / credits_cny_50 / credits_cny_100）；
                     channel=appstore 时必填：App Store 商品 id，**带点号**
-                    （credits.cny.50 / credits.cny.100 / credits.cny.300）。
+                    （credits.cny.50 / credits.cny.100 / credits.cny.300）；
+                    channel=googleplay 时必填：Google Play 商品 id，**带点号**
+                    （credits.usd.10 / credits.usd.20 / credits.usd.50）。
                     服务端按通道分别校形态：wxvp 是 `^[a-z0-9_]{1,64}$`，appstore 是 `^[a-z0-9_.]{1,64}$`。
                     **价格权威在官网**，云后端只校形态；档位与金额不符时官网回 400 product_mismatch
                     → 信封 kind=REJECTED。message 目前逐字是「充值档位与金额不符，请更新小程序后重试」
@@ -2512,6 +2515,47 @@ paths:
                   description: |
                     StoreKit 2 的 Transaction.jwsRepresentation 原文。云后端**不验签**、不解析，
                     原样转给官网；超过 16KB 即 code 1。
+      responses:
+        "200":
+          description: 裸对象（形状同 /recharge/status）；未登录 Envelope(4010)；业务错误 Envelope(code 1)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RechargeStatus'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/billing/recharge/confirm-googleplay:
+    post:
+      summary: 上报 Google Play 购买凭证完成内购确认（dev-board#665）
+      description: |
+        客户端 Play Billing 拿到 PURCHASED 的 purchaseToken 后调此接口，云后端转发官网用 Android Publisher API
+        校验并入账（若尚未入账）。只有 paid=true 时安卓才可调用 consumeAsync 消耗商品。
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, purchaseToken]
+              properties:
+                outTradeNo:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{1,64}$'
+                  description: |
+                    **可缺省**：重启恢复未消耗订单时本地可能没有下单号，
+                    此时可不传 outTradeNo，官网凭 obfuscatedExternalAccountId + productId/purchaseToken 对账。
+                productId:
+                  type: string
+                  pattern: '^[a-z0-9_.]{1,64}$'
+                  description: Google Play 商品 id（credits.usd.10 / credits.usd.20 / credits.usd.50）。
+                purchaseToken:
+                  type: string
+                  maxLength: 4096
+                  description: |
+                    Google Play Billing Library 返回的 Purchase.purchaseToken 原文。云后端不自行验签，
+                    原样转给官网；超过 4KB 即 code 1。
       responses:
         "200":
           description: 裸对象（形状同 /recharge/status）；未登录 Envelope(4010)；业务错误 Envelope(code 1)

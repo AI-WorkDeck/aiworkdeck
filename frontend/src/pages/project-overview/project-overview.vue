@@ -2544,7 +2544,7 @@ import {
 } from '@/services/api.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
-import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { requireAccount, requireSubscription, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
@@ -2807,7 +2807,7 @@ export default {
       graceDays: 0,
       // Credits 余额 chip（dev-board#187）。loaded=false 或 connected=false 时不渲染，
       // 绝不显示 0 冒充余额；available=false（官网不可达）时余额位显示「—」。
-      wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null },
+      wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 },
 
       // 布局状态
       viewMode: 'ide',
@@ -3195,12 +3195,13 @@ export default {
     railScheduleCount() {
       return this.railScheduleSummary.overdue + this.railScheduleSummary.today
     },
-    // 余额不足：低于 20 元（2000 分）视为要提醒。官网不可达（余额未知）不算——
-    // 那是连接问题不是钱的问题，用「—」表达就够了，不该冒充告急。
+    // 余额不足：低于 1 Credit（100 分）且当前无有效个人 Pro 订阅额度时才提醒。
+    // 官网不可达（余额未知）不算；新户 $9.90 / Pro 订阅期内置余额也不应误报红点。
     walletLow() {
       if (this.wallet.available === false) return false
+      if (Number(this.wallet.subscriptionAvailableCents) > 0) return false
       const cents = Number(this.wallet.balanceCents)
-      return Number.isFinite(cents) && cents < 2000
+      return Number.isFinite(cents) && cents < 100
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -3484,6 +3485,7 @@ export default {
           return this.loadHistoryChat(conversation)
         },
         openAccount: () => this.openSettingsTab({ nav: 'account' }),
+        subscribePro: () => requireSubscription(),
         importVoiceText: signal => new Promise(resolve => {
           this.handleFilePickerCancel()
           const finish = (text, fileId) => {
@@ -4876,13 +4878,16 @@ export default {
             available: data.available !== false,
             balanceCents: data.balanceCents,
             membership: data.membership || null,
+            subscriptionAvailableCents: data.subscription && data.subscription.active
+              ? Number(data.subscription.availableCents || 0)
+              : 0,
           }
         } else {
-          this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
+          this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 }
         }
       } catch (e) {
         // 旧后端没有该端点 / 请求失败：chip 不渲染
-        this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
+        this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 }
       }
     },
     /** 宽限弹窗的主按钮：联网复验那条去账户设置，其余去官网。 */

@@ -115,6 +115,7 @@ export default {
     cancel: '取消',
     switchFailed: '切换站点失败，稍后重试',
     rescueFailed: '切换站点后仍未解锁，检查后重试',
+    "proIntroBanner": "注册即享免费体验额度 · 个人 Pro 前 3 个月特惠 ¥9.9/月",
   },
   hint: {
     learnMore: '了解详情',
@@ -127,6 +128,8 @@ export default {
     purchaseSuccess: '已解锁',
     purchaseFailed: '购买失败',
     goRecharge: '去充值',
+    "subscribeProBtn": "个人 Pro ¥9.9",
+    "clipboardProBtn": "开通个人 Pro",
   },
   identity: {
     title: '选择本机工作区',

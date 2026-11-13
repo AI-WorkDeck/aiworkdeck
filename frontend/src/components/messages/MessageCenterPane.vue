@@ -21,7 +21,7 @@
           <div class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input v-model="search" class="center-search" type="search" :placeholder="$t('messageCenter.search')" :aria-label="$t('messageCenter.search')" /></div>
         </div>
         <div v-if="category === 'conversations'" class="list-actions"><button v-if="currentProjectId" :disabled="creating" @click="openProjectGroup">{{ $t('messageCenter.projectGroup') }}</button><button @click="form = 'create'">{{ $t('messageCenter.newChat') }}</button><button @click="form = 'join'">{{ $t('messageCenter.joinChat') }}</button></div>
-        <form v-if="form" class="create-form" @submit.prevent="createConversation"><select v-if="form === 'create'" v-model="formType" :aria-label="$t('messageCenter.chatType')"><option value="DIRECT">{{ $t('messageCenter.direct') }}</option><option value="GROUP">{{ $t('messageCenter.group') }}</option></select><input v-model="formValue" :aria-label="$t(form === 'create' ? 'messageCenter.titleLabel' : 'messageCenter.inviteLabel')" :placeholder="$t(form === 'create' ? 'messageCenter.titleLabel' : 'messageCenter.inviteLabel')" maxlength="120" required /><button :disabled="creating">{{ $t(form === 'create' ? 'messageCenter.create' : 'messageCenter.join') }}</button><button type="button" @click="form = ''">{{ $t('messageCenter.cancel') }}</button></form>
+        <form v-if="form" class="create-form"><select v-if="form === 'create'" v-model="formType" :aria-label="$t('messageCenter.chatType')"><option value="DIRECT">{{ $t('messageCenter.direct') }}</option><option value="GROUP">{{ $t('messageCenter.group') }}</option></select><input v-model="formValue" :aria-label="$t(form === 'create' ? 'messageCenter.titleLabel' : 'messageCenter.inviteLabel')" :placeholder="$t(form === 'create' ? 'messageCenter.titleLabel' : 'messageCenter.inviteLabel')" maxlength="120" required @confirm="createConversation" /><button type="button" :disabled="creating || !formValue.trim()" @click="createConversation">{{ $t(form === 'create' ? 'messageCenter.create' : 'messageCenter.join') }}</button><button type="button" @click="form = ''">{{ $t('messageCenter.cancel') }}</button></form>
         <p v-if="loading && !items.length" class="list-loading" role="status">{{ $t('messageCenter.loading') }}</p>
         <div class="list-scroll">
           <template v-if="category === 'conversations'">
@@ -59,13 +59,13 @@
           </div>
         </article>
         <div v-else class="center-placeholder"><div class="placeholder-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 6l8 6 8-6" /></svg></div><h3>{{ $t('messageCenter.choose') }}</h3></div>
-        <form v-if="invite && selectedConversation && invite.key === selection" class="invite-result" :aria-label="$t('messageCenter.inviteTitle')" @submit.prevent="confirmInvite">
+        <form v-if="invite && selectedConversation && invite.key === selection" class="invite-result" :aria-label="$t('messageCenter.inviteTitle')">
           <strong>{{ $t('messageCenter.inviteTitle') }}</strong>
           <template v-if="!invite.result">
             <label class="invite-field"><span>{{ $t('messageCenter.inviteRole') }}</span><select v-model="invite.role" required><option value="" disabled>{{ $t('messageCenter.inviteRolePlaceholder') }}</option><option value="MEMBER">{{ $t('messageCenter.inviteRoleMember') }}</option><option value="CLIENT">{{ $t('messageCenter.inviteRoleClient') }}</option></select></label>
             <label v-if="invite.role === 'CLIENT'" class="invite-field"><span>{{ $t('messageCenter.historyScope') }}</span><select v-model="invite.history"><option value="after">{{ $t('messageCenter.historyAfterJoin') }}</option><option value="all">{{ $t('messageCenter.historyWithEarlier') }}</option></select></label>
             <p v-if="invite.role" class="invite-note"><template v-if="invite.role === 'MEMBER'">{{ $t('messageCenter.inviteNoteMember') }} </template>{{ $t('messageCenter.inviteValidity') }}</p>
-            <div class="invite-actions"><button class="primary" :disabled="!invite.role || invite.busy">{{ $t('messageCenter.inviteGenerate') }}</button><button type="button" @click="invite = null">{{ $t('messageCenter.cancel') }}</button></div>
+            <div class="invite-actions"><button type="button" class="primary" :disabled="!invite.role || invite.busy" @click="confirmInvite">{{ $t('messageCenter.inviteGenerate') }}</button><button type="button" @click="invite = null">{{ $t('messageCenter.cancel') }}</button></div>
           </template>
           <template v-else>
             <code>{{ invite.result.code }}</code>

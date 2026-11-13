@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "استلام القضايا وتعارضات المصالح",
   "pwsLfJumpFinance": "الفوترة والمالية",
   "pwsLfJumpDashboard": "لوحة تحكم الشركة ثلاثية الأبعاد",
+  "pwsLfJumpDashboardLocal": "لوحة التحكم ثلاثية الأبعاد (هذا الجهاز)",
+  "pwsLfJumpDashboardMine": "لوحة التحكم ثلاثية الأبعاد الخاصة بي",
   "pwsLfJumpOa": "مزامنة OA والمراسلة الفورية",
   "pwsDdStagesTitle": "مراحل العناية الواجبة",
   "pwsDdStagesSub": "سير العمل القياسي من 6 خطوات",

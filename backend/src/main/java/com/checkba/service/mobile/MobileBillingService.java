@@ -109,6 +109,9 @@ public class MobileBillingService {
     /** iOS App Store 内购通道（dev-board#426）。 */
     private static final String CHANNEL_APPSTORE = "appstore";
 
+    /** Android Google Play 内购通道（dev-board#665）。 */
+    private static final String CHANNEL_GOOGLEPLAY = "googleplay";
+
     /** 安卓微信支付 APP 支付通道（dev-board#428）：只要金额，不要档位 / wxCode。 */
     private static final String CHANNEL_WXPAY_APP = "wxpay-app";
 
@@ -128,6 +131,9 @@ public class MobileBillingService {
      * 挂在一个只要有 session 就能打的端点上。
      */
     private static final int MAX_SIGNED_TRANSACTION_LENGTH = 16 * 1024;
+
+    /** Google Play purchaseToken 上限（通常百余字符，与官网侧 4096 校验一致）。 */
+    private static final int MAX_PURCHASE_TOKEN_LENGTH = 4096;
 
     private final MobileBillingClient billing;
     private final AccountBindingRepository accountBindingRepository;
@@ -252,8 +258,8 @@ public class MobileBillingService {
                         "缺少微信登录凭证，请重新进入充值页",
                         "Missing WeChat login code; please reopen the top-up page"));
             }
-        } else if (CHANNEL_APPSTORE.equals(ch)) {
-            // iOS 内购只要档位：wxCode 是微信那条路的一次性凭证，这里即便客户端传了也不上行
+        } else if (CHANNEL_APPSTORE.equals(ch) || CHANNEL_GOOGLEPLAY.equals(ch)) {
+            // 原生应用商店内购（iOS App Store / Android Google Play）只要档位：wxCode 不上行
             product = trimToNull(productId);
             if (product == null || !APPSTORE_PRODUCT_ID.matcher(product).matches()) {
                 throw new IllegalArgumentException(LangText.of(
@@ -331,6 +337,39 @@ public class MobileBillingService {
         }
         MobileBillingClient.RechargeStatus status = callWithAccount(userId, false, false,
                 accountId -> billing.confirmAppstore(accountId, no, jws));
+        if (status.paid()) {
+            balanceCache.remove(userId);
+        }
+        return status;
+    }
+
+    /**
+     * 确认一笔 Google Play 内购交易（dev-board#665）。
+     *
+     * <p>客户端拿到 BillingClient {@code Purchase}（非 Pending）后调用本入口，收到 {@code paid=true}
+     * 后方可执行客户端 consume；官网会在服务端先按 Play Developer API 核验状态、入账后最佳努力 consume。
+     */
+    public MobileBillingClient.RechargeStatus confirmGooglePlay(Long userId, String outTradeNo,
+                                                                String productId, String purchaseToken) {
+        requireRechargeEnabled();
+        String product = trimToNull(productId);
+        if (product == null || !APPSTORE_PRODUCT_ID.matcher(product).matches()) {
+            throw new IllegalArgumentException(LangText.of(
+                    "缺少或非法的充值档位，请更新 App 后重试",
+                    "Missing or invalid top-up product; please update the app and try again"));
+        }
+        String token = purchaseToken == null ? "" : purchaseToken.trim();
+        if (token.isEmpty() || token.length() > MAX_PURCHASE_TOKEN_LENGTH) {
+            throw new IllegalArgumentException(LangText.of(
+                    "缺少或非法的交易凭证", "Missing or invalid transaction receipt"));
+        }
+        String no = trimToNull(outTradeNo);
+        if (no != null && !OUT_TRADE_NO.matcher(no).matches()) {
+            throw new IllegalArgumentException(LangText.of(
+                    "非法的 outTradeNo", "Invalid outTradeNo"));
+        }
+        MobileBillingClient.RechargeStatus status = callWithAccount(userId, false, false,
+                accountId -> billing.confirmGooglePlay(accountId, no, product, token));
         if (status.paid()) {
             balanceCache.remove(userId);
         }

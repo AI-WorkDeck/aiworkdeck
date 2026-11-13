@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "立案與利衝",
   "pwsLfJumpFinance": "開票與財務",
   "pwsLfJumpDashboard": "全所三維看板",
+  "pwsLfJumpDashboardLocal": "本機三維看板",
+  "pwsLfJumpDashboardMine": "我的三維看板",
   "pwsLfJumpOa": "OA 與 IM 聯動",
   "pwsDdStagesTitle": "盡職調查作業階段",
   "pwsDdStagesSub": "6 步標準流程",

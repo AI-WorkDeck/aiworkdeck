@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "केस प्रवेश और टकराव जाँच",
   "pwsLfJumpFinance": "बिलिंग और वित्त",
   "pwsLfJumpDashboard": "फर्म 3D डैशबोर्ड",
+  "pwsLfJumpDashboardLocal": "3D डैशबोर्ड (यह डिवाइस)",
+  "pwsLfJumpDashboardMine": "मेरा 3D डैशबोर्ड",
   "pwsLfJumpOa": "OA और IM सिंक",
   "pwsDdStagesTitle": "ड्यू डिलिजेंस चरण",
   "pwsDdStagesSub": "6-चरणीय मानक वर्कफ़्लो",

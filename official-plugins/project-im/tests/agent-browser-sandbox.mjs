@@ -67,6 +67,10 @@ test('assistant group, retry and private chat work through native browser input 
   const page = await browser.newPage(), errors = []; page.setDefaultTimeout(8000); page.on('pageerror', error => errors.push(error.message));
   await page.setViewport({ width: 1120, height: 760 }); await page.goto(`http://127.0.0.1:${server.address().port}/`);
   const frame = await (await page.$('iframe')).contentFrame();
+  // Opening the panel creates nothing (QA D15); the private assistant chat starts on an explicit click.
+  await frame.waitForSelector('#agents .agent-entry');
+  assert.equal(await page.evaluate(() => calls.some(c => c.action === 'ensureAgent')), false);
+  await frame.click('#agents .agent-entry');
   await frame.waitForFunction(() => !document.getElementById('active-chat').hidden);
   assert.match(await frame.$eval('#chat-subtitle', el => el.textContent), /仅你可见/);
   assert.equal(await page.evaluate(() => calls.find(c => c.action === 'ensureAgent').params.private), true);

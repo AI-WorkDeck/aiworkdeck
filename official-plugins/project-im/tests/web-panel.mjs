@@ -323,7 +323,7 @@ async function agentPanel(options = {}) {
     if (action === 'send') { const message = { id: nextId++, senderId: 9, actorType: 'HUMAN', text: params.text, clientMessageId: params.clientMessageId }; messages.push(message); return message; }
     if (action === 'agentReply') { status = { status: 'queued', messageId: params.messageId }; return { accepted: true, ...status }; }
   } });
-  if (!options.keepDefault && !p.$('active-chat').hidden) await p.select(0);
+  if (!options.keepDefault) await p.select(0);
   return { ...p, group, privateChat, messages, setStatus: (next) => { status = next; } };
 }
 test('selecting an existing shared conversation preserves its group behavior and single-human replies', async (t) => {
@@ -331,8 +331,8 @@ test('selecting an existing shared conversation preserves its group behavior and
   assert.equal(p.$('active-chat').hidden, false);
   assert.equal(p.$('chat-title').textContent, '合成项目助手群');
   assert.match(p.$('chat-subtitle').textContent, /群成员可见/);
-  assert.equal(p.$('agents').children.length, 0, 'existing assistant group is not duplicated as a shortcut');
-  assert.equal(p.calls.find((c) => c.action === 'ensureAgent').params.private, true);
+  assert.equal(p.$('agents').querySelectorAll('button').length, 1, 'only the private assistant shortcut is offered; the existing group is not duplicated');
+  assert.equal(p.calls.some((c) => c.action === 'ensureAgent'), false, 'opening the panel creates nothing (QA D15)');
   await p.click('members-button');
   assert.match(p.$('dialog-body').textContent, /合成项目助手 · AI 助手/);
   assert.equal([...p.$('dialog-body').querySelectorAll('.member-row button')].some((b) => b.textContent === '移除'), false);
@@ -404,7 +404,8 @@ test('project scope reason remains visible while a permitted team assistant can 
 });
 test('assistant scope and enrollment failures preserve ordinary messaging; disconnected account never looks ready', async (t) => {
   for (const action of ['agentScopes', 'ensureAgent', 'self']) {
-    const p = await agentPanel({ call: (c) => { if (c.action === action) throw Error(action === 'ensureAgent' ? '请使用邀请码加入该项目助手群' : '服务连接失败'); } }); close(t, p);
+    const p = await agentPanel({ keepDefault: true, call: (c) => { if (c.action === action) throw Error(action === 'ensureAgent' ? '请使用邀请码加入该项目助手群' : '服务连接失败'); } }); close(t, p);
+    if (action === 'ensureAgent') { p.$('agents').querySelector('button').click(); await tick(); await tick(); }
     assert.match(p.$('notice').textContent, action === 'ensureAgent' ? /邀请码/ : /服务连接失败/);
     assert.equal(p.$('active-chat').hidden, true);
     if (action === 'self') {
@@ -419,7 +420,8 @@ test('assistant scope and enrollment failures preserve ordinary messaging; disco
 });
 test('late default assistant enrollment cannot replace a conversation chosen by the user', async (t) => {
   let release;
-  const p = await agentPanel({ call: ({ action }) => action === 'ensureAgent' ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
+  const p = await agentPanel({ keepDefault: true, call: ({ action }) => action === 'ensureAgent' ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
+  p.$('agents').querySelector('button').click(); await tick();
   await p.select(1); assert.equal(p.$('chat-title').textContent, c1.title);
   release(p.group); await tick(); await tick();
   assert.equal(p.$('chat-title').textContent, c1.title);
@@ -507,9 +509,21 @@ test('assistant and member avatars render safely without verbose empty-chat inst
 
 test('project assistant defaults to private context while an explicit shared command stays shared', async t => {
  const p=await agentPanel({keepDefault:true});close(t,p)
+ assert.equal(p.$('active-chat').hidden,true,'nothing is created or opened just by opening the panel (QA D15)')
+ assert.equal(p.calls.some(c=>c.action==='ensureAgent'),false)
+ p.$('agents').querySelector('button').click();await tick();await tick()
  assert.match(p.$('chat-subtitle').textContent,/仅你可见/)
  assert.equal(p.calls.find(c=>c.action==='ensureAgent').params.private,true)
  await p.events['sidebar.command']({command:'open-agent',scope:'project',scopeKey:'project-uuid',private:false});await tick()
  assert.match(p.$('chat-subtitle').textContent,/群成员可见/)
  assert.equal(p.calls.filter(c=>c.action==='ensureAgent').at(-1).params.private,false)
+})
+
+test('QA D15: an existing private assistant chat is resumed on open without enrolling again', async t => {
+ const agent={scope:'project',scopeKey:'project-uuid',name:'合成项目助手',title:'合成项目助手群'}
+ const privateChat={id:'agent-private',title:agent.name,type:'AGENT_DIRECT',role:'OWNER',agent:{...agent,private:true}}
+ const p=await panel({call:async({method,action})=>{if(method!=='im.request')return;if(action==='agentScopes')return{agents:[agent]};if(action==='list')return{conversations:[privateChat,c1]};if(action==='messages')return{messages:[],hasMore:false}}})
+ close(t,p)
+ assert.equal(p.$('chat-title').textContent,agent.name)
+ assert.equal(p.calls.some(c=>c.action==='ensureAgent'),false)
 })

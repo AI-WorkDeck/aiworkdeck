@@ -297,9 +297,7 @@ six==1.17.0
     #   volcengine-python-sdk
 sniffio==1.3.1
     # via openai
-soupsieve==2.10 ; python_full_version < '3.11.5'
-    # via beautifulsoup4
-soupsieve==3.0.4 ; python_full_version >= '3.11.5'
+soupsieve==4.1
     # via beautifulsoup4
 speechrecognition==3.14.4
     # via markitdown

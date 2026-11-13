@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Tiếp nhận & xung đột",
   "pwsLfJumpFinance": "Thanh toán & tài chính",
   "pwsLfJumpDashboard": "Bảng điều khiển 3D của công ty",
+  "pwsLfJumpDashboardLocal": "Bảng điều khiển 3D (thiết bị này)",
+  "pwsLfJumpDashboardMine": "Bảng điều khiển 3D của tôi",
   "pwsLfJumpOa": "Đồng bộ OA & IM",
   "pwsDdStagesTitle": "Các giai đoạn thẩm định",
   "pwsDdStagesSub": "Quy trình chuẩn 6 bước",

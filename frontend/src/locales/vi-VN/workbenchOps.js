@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Bạn có thể dùng nhận dạng trên đám mây cho các tệp trong lô này chưa hoàn tất khi nhận dạng cục bộ. Nếu không, các tệp này sẽ không được tải lên.",
   "ocrLocalFailedConfirm": "Dùng nhận dạng trên đám mây",
   "ocrAlreadySearchable": "\"{name}\" đã có lớp văn bản và có thể tìm kiếm; không tạo tệp mới",
-  "ocrStopped": "Đã dừng; {count} tệp chưa xử lý"
+  "ocrStopped": "Đã dừng; {count} tệp chưa xử lý",
+  "subscribeProBtn": "Pro ¥9.9",
 }

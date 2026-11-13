@@ -102,4 +102,5 @@ export default {
   ocrLocalFailedConfirm: '改用云端识别',
   ocrAlreadySearchable: '「{name}」本身带文字层，已经可以搜索，未生成新文件',
   ocrStopped: '已停止，{count} 份未处理',
+  "subscribeProBtn": "个人 Pro ¥9.9",
 }

@@ -87,6 +87,7 @@
     "test:lowa-sheet-format": "node tests/lowa-e2e/sheet-format-inherit.mjs",
     "test:lowa-big": "LOWA_E2E_BIG=1 node tests/lowa-e2e/big-doc.mjs",
     "test:app-e2e": "node tests/app-e2e/run.mjs",
+    "test:message-center-e2e": "node tests/app-e2e/message-center-forms.mjs",
     "test:marketing-shots": "node tests/marketing-screenshots/run.mjs",
     "test:desktop-e2e": "node tests/desktop-e2e/run.mjs",
     "test:feedback-widget": "node --test tests/feedback-widget/*.test.mjs",

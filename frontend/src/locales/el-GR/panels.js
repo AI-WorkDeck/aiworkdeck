@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Εισαγωγή υποθέσεων & συγκρούσεις συμφερόντων",
   "pwsLfJumpFinance": "Τιμολόγηση & οικονομικά",
   "pwsLfJumpDashboard": "3D ταμπλό δικηγορικής εταιρείας",
+  "pwsLfJumpDashboardLocal": "3D ταμπλό (αυτή η συσκευή)",
+  "pwsLfJumpDashboardMine": "Το 3D ταμπλό μου",
   "pwsLfJumpOa": "Συγχρονισμός OA & IM",
   "pwsDdStagesTitle": "Στάδια λόγω επιμέλειας (Due Diligence)",
   "pwsDdStagesSub": "Τυπική ροή εργασίας 6 βημάτων",

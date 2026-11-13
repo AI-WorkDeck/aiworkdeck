@@ -143,6 +143,9 @@ class MobileBillingRechargeDisabledTest {
         assertEquals(MobileBillingKind.DISABLED,
                 assertThrows(MobileBillingFailureException.class,
                         () -> service.confirmAppstore(u.getId(), null, null)).getKind());
+        assertEquals(MobileBillingKind.DISABLED,
+                assertThrows(MobileBillingFailureException.class,
+                        () -> service.confirmGooglePlay(u.getId(), null, null, null)).getKind());
         verifyNoInteractions(billing);
     }
 

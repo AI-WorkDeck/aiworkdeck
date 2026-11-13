@@ -107,7 +107,8 @@ export default {
     "switch": "Chuyển",
     "cancel": "Hủy",
     "switchFailed": "Chuyển trang web thất bại. Vui lòng thử lại sau.",
-    "rescueFailed": "Sau khi chuyển trang web vẫn chưa được mở khóa. Vui lòng kiểm tra mã và thử lại."
+    "rescueFailed": "Sau khi chuyển trang web vẫn chưa được mở khóa. Vui lòng kiểm tra mã và thử lại.",
+    "proIntroBanner": "Tặng Credits trải nghiệm khi đăng ký · Personal Pro ¥9.9/tháng (3 tháng đầu)",
   },
   "hint": {
     "learnMore": "Tìm hiểu thêm",
@@ -118,7 +119,9 @@ export default {
     "purchaseConfirmOk": "Xác nhận",
     "purchaseSuccess": "Đã mở khóa",
     "purchaseFailed": "Mua thất bại",
-    "goRecharge": "Nạp thêm"
+    "goRecharge": "Nạp thêm",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Mở Personal Pro",
   },
   "identity": {
     "title": "Chọn Workspace cục bộ",

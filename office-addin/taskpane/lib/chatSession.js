@@ -1283,12 +1283,20 @@ function handleEvent(evt, dataStr) {
     if (lower === 'awaiting_input') notice.value = t('awaitingAnswer')
   } else if (evt === 'error') {
     let msg = t('executionError')
-    try { msg = JSON.parse(dataStr).message || msg } catch (e) { /* ignore */ }
+    let reason = ''
+    try {
+      const parsed = JSON.parse(dataStr)
+      if (parsed && parsed.message) msg = parsed.message
+      if (parsed && parsed.reason) reason = String(parsed.reason)
+    } catch (e) { /* ignore */ }
     if (currentAssistant) {
-      // 配额耗尽（后端 LlmErrorClassifier.QUOTA_EXHAUSTED_MARKER）：载荷是上游英文原文，
-      // 原样拼给用户等于没有信息。换成引导文案并打标记，界面据此追加充值入口（dev-board#198）
+      // 配额耗尽（后端 LlmErrorClassifier.QUOTA_EXHAUSTED_MARKER 或网关 no_credits）：
+      // 载荷若是上游英文原文则换成引导文案，并打 quota 标记让界面展示充值 / Pro 升级入口。
       if (msg.includes('AI_QUOTA_EXHAUSTED')) {
         currentAssistant.error = t('quotaExhaustedNotice')
+        currentAssistant.errorKind = 'quota'
+      } else if (reason === 'no_credits' || reason === 'insufficient_credits') {
+        currentAssistant.error = msg || t('quotaExhaustedNotice')
         currentAssistant.errorKind = 'quota'
       } else {
         currentAssistant.error = msg

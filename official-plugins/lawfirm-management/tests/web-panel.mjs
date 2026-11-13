@@ -283,7 +283,8 @@ async function mountPanel(options = {}) {
                   invoices: state.invoices,
                   collections: state.collections,
                   dashboard: state.dashboard,
-                  restricted: state.restricted === true
+                  restricted: state.restricted === true,
+                  localLedger: state.localLedger === true
                 };
                 break;
               case 'conflictPreview':
@@ -738,6 +739,15 @@ test('8. Non-admin dashboard labels follow the real scope; missing metrics show 
   const admin = await mountPanel();
   t.after(() => admin.dom.window.close());
   assert.match(admin.$('dashboard-kpis').textContent, /全所签约合同总额/);
+
+  // QA D11: the desktop ledger is this device's data even when the user may view all of it.
+  const device = await mountPanel({ onCall: (msg, state) => { if (msg.method === 'lawfirm.request') state.localLedger = true; } });
+  t.after(() => device.dom.window.close());
+  device.$('tab-dashboard').click();
+  await tick();
+  assert.doesNotMatch(device.$('dashboard-kpis').textContent, /全所/);
+  assert.match(device.$('dashboard-kpis').textContent, /本机签约合同总额/);
+  assert.match(device.$('dashboard-kpis').textContent, /本机开票率/);
 });
 
 test('9. A successful intake submit clears the form so it cannot be submitted twice; switching tabs clears the stale notice', async (t) => {

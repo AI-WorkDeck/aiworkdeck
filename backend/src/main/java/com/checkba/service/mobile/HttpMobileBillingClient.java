@@ -226,6 +226,29 @@ public class HttpMobileBillingClient implements MobileBillingClient {
     }
 
     @Override
+    public RechargeStatus confirmGooglePlay(String accountId, String outTradeNo,
+                                            String productId, String purchaseToken) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("action", "confirm-googleplay");
+        body.put("accountId", accountId);
+        if (outTradeNo != null && !outTradeNo.isBlank()) {
+            body.put("outTradeNo", outTradeNo);
+        }
+        body.put("productId", productId);
+        body.put("purchaseToken", purchaseToken);
+        JsonNode json;
+        try {
+            json = call(body);
+        } catch (MobileBillingException e) {
+            throw remapConfirmFailure(e);
+        }
+        return new RechargeStatus(
+                json.path("status").asText(null),
+                json.path("paid").asBoolean(false),
+                json.path("amountCents").asLong(0));
+    }
+
+    @Override
     public SubscriptionCapability appstoreSubscriptionCapability(String accountId) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("action", "appstore-subscription-capability");

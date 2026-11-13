@@ -194,6 +194,15 @@ public interface MobileBillingClient {
      */
     RechargeStatus confirmAppstore(String accountId, String outTradeNo, String signedTransaction);
 
+    /**
+     * 确认一笔 Google Play 内购交易（action=confirm-googleplay，dev-board#665）。
+     *
+     * <p>云后端不持有 Google Play 服务账号凭据，只把 {@code productId} 与 {@code purchaseToken}
+     * 透传官网；官网调 Play Developer API 核验、按目录面值入账并 consume。
+     * 客户端在收到 {@code paid=true} 之前不 consume 购买，可由应用重放或 RTDN 兜底。
+     */
+    RechargeStatus confirmGooglePlay(String accountId, String outTradeNo, String productId, String purchaseToken);
+
     record SubscriptionCapability(boolean available, String productId) {}
 
     default SubscriptionCapability appstoreSubscriptionCapability(String accountId) { return new SubscriptionCapability(false, "pro.monthly.cny.149"); }

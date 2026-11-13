@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "剩餘 {remaining} / 共 {limit}",
   "quotaUsed": "已用 {used}",
   "recharge": "儲值",
-  "rechargeTitle": "在官網賬戶頁充值（瀏覽器打開，與插件同一賬戶）",
+  "rechargeTitle": "在官網賬戶頁儲值或開通個人 Pro（瀏覽器打開，與外掛同一賬戶）",
   "quotaExhaustedNotice": "賬戶額度不足，本輪已中止。充值到賬後重發這條消息即可繼續。",
   "addinDefaultProjectName": "插件臨時項目",
   "newProjectOption": "+ 新建項目",

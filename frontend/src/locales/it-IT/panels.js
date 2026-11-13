@@ -615,6 +615,8 @@ export default {
   "pwsLfJumpIntake": "Acquisizione clienti e conflitti d'interesse",
   "pwsLfJumpFinance": "Fatturazione e finanza",
   "pwsLfJumpDashboard": "Dashboard 3D dello studio",
+  "pwsLfJumpDashboardLocal": "Dashboard 3D (questo dispositivo)",
+  "pwsLfJumpDashboardMine": "La mia dashboard 3D",
   "pwsLfJumpOa": "Sincronizzazione OA e IM",
   "pwsDdStagesTitle": "Fasi della due diligence",
   "pwsDdStagesSub": "Flusso di lavoro standard in 6 fasi",

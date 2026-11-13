@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{limit} में से {remaining} शेष",
   "quotaUsed": "{used} उपयोग किए गए",
   "recharge": "रिचार्ज करें",
-  "rechargeTitle": "वेबसाइट के अकाउंट पेज से रिचार्ज करें (ब्राउज़र में खुलता है, इस ऐड-इन वाला वही अकाउंट)",
+  "rechargeTitle": "वेबसाइट के अकाउंट पेज से रिचार्ज करें या Personal Pro लें (ब्राउज़र में खुलता है)",
   "quotaExhaustedNotice": "आपके अकाउंट में Credits समाप्त हो गए हैं; यह टर्न रोक दिया गया। जारी रखने के लिए रिचार्ज करें और यह संदेश दोबारा भेजें।",
   "addinDefaultProjectName": "प्लगइन अस्थायी प्रोजेक्ट",
   "newProjectOption": "+ नया प्रोजेक्ट",

@@ -618,6 +618,8 @@ export default {
   "pwsLfJumpIntake": "Приём клиентов и конфликты интересов",
   "pwsLfJumpFinance": "Выставление счетов и финансы",
   "pwsLfJumpDashboard": "3D-панель фирмы",
+  "pwsLfJumpDashboardLocal": "3D-панель (это устройство)",
+  "pwsLfJumpDashboardMine": "Моя 3D-панель",
   "pwsLfJumpOa": "Синхронизация OA и IM",
   "pwsDdStagesTitle": "Этапы комплексной проверки",
   "pwsDdStagesSub": "Стандартный 6-этапный рабочий процесс",

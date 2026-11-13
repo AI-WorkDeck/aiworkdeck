@@ -48,9 +48,9 @@
       <p v-if="agentBusy">{{ $t(agentStatus?.status === 'running' ? 'messageCenter.running' : 'messageCenter.waiting') }}</p>
       <div v-for="failed in (canRequestAssistant ? failures : [])" :key="failed.messageId" class="message-retry"><span>{{ failed.text || $t('messageCenter.message') }}：{{ failed.error || $t('messageCenter.replyFailed') }}</span><button :disabled="agentBusy" @click="$emit('retry-reply', failed.messageId)">{{ $t('messageCenter.retryReply') }}</button></div>
     </div>
-    <form class="message-composer" @submit.prevent="$emit('send')">
-      <textarea :value="draft" maxlength="8000" rows="3" :aria-label="$t('messageCenter.composer')" :placeholder="$t('messageCenter.composer')" @input="$emit('draft', $event.target.value)" @keydown="onKeydown"></textarea>
-      <div class="message-send-row"><button v-if="canRequestAssistant" type="button" :disabled="agentBusy || !canReply" @click="$emit('reply')">{{ $t('messageCenter.askAssistant') }}</button><small>{{ $t('messageCenter.enterHint') }}</small><button type="submit" class="primary" :disabled="!draft.trim()">{{ $t('messageCenter.send') }}</button></div>
+    <form class="message-composer">
+      <component :is="'textarea'" :value="draft" maxlength="8000" rows="3" :aria-label="$t('messageCenter.composer')" :placeholder="$t('messageCenter.composer')" @input="$emit('draft', $event.target.value)" @keydown="onKeydown"></component>
+      <div class="message-send-row"><button v-if="canRequestAssistant" type="button" :disabled="agentBusy || !canReply" @click="$emit('reply')">{{ $t('messageCenter.askAssistant') }}</button><small>{{ $t('messageCenter.enterHint') }}</small><button type="button" class="primary" :disabled="!draft.trim()" @click="$emit('send')">{{ $t('messageCenter.send') }}</button></div>
     </form>
     </div>
   </section>

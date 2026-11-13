@@ -91,7 +91,8 @@
     invoices: [],
     collections: [],
     dashboard: {},
-    restricted: false
+    restricted: false,
+    localLedger: false
   };
 
   // Plugin l10n lookup with the Chinese source text as the fallback ({0}, {1} placeholders).
@@ -100,8 +101,11 @@
     if (!text || text === key) text = fallback;
     return text.replace(/\{(\d+)\}/g, (m, i) => (args[i] ?? m));
   }
-  // Non-admins only see their own local-ledger rows, so a "whole firm" label would overstate the data.
-  const scoped = (firmText, key, mineText) => (state.restricted ? L(key, mineText) : firmText);
+  // Non-admins only see their own rows, and the desktop ledger only holds this device's data:
+  // 「全所」 is reserved for genuinely firm-wide server data (QA D11).
+  const scoped = (firmText, key, mineText, deviceKey, deviceText) => (state.restricted
+    ? L(key, mineText)
+    : state.localLedger ? L(deviceKey || key, deviceText || mineText) : firmText);
   const NO_VALUE = '—';
 
   // 后端摘要里带内部规则码（「【RED · R2_RETAINER_ADVERSARY】」「Y1_… - 依据」），
@@ -748,10 +752,10 @@
     const bucketOver90 = aging.over90DaysCents ?? aging.bucketOver90Cents ?? 0;
 
     kpiContainer.append(
-      makeKpi('在办正式案件 / 累计收案', `${activeMatters} 件 / ${totalIntakes} 件`, scoped('工作台与立项中心全所实时汇总', 'access.kpi.activeSubLocal', '仅统计本机台账中与你相关的收案')),
+      makeKpi('在办正式案件 / 累计收案', `${activeMatters} 件 / ${totalIntakes} 件`, scoped('工作台与立项中心全所实时汇总', 'access.kpi.activeSubLocal', '仅统计本机台账中与你相关的收案', 'access.kpi.activeSubDevice', '本机台账实时汇总')),
       makeKpi('活跃律师与平均负荷', `${unitCount} 名 · 负荷 ${avgWi}`, '综合主办、协办、待办与近30日工时'),
-      makeKpi(scoped('全所签约合同总额', 'access.kpi.contractedLocal', '我的签约合同总额'), formatYuanFromCents(totalContracted), `折合 ${formatWanFromCents(totalContracted)}`),
-      makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `${scoped('全所开票率', 'access.kpi.billingRateLocal', '我的开票率')} ${formatPercent(billingRate)}`),
+      makeKpi(scoped('全所签约合同总额', 'access.kpi.contractedLocal', '我的签约合同总额', 'access.kpi.contractedDevice', '本机签约合同总额'), formatYuanFromCents(totalContracted), `折合 ${formatWanFromCents(totalContracted)}`),
+      makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `${scoped('全所开票率', 'access.kpi.billingRateLocal', '我的开票率', 'access.kpi.billingRateDevice', '本机开票率')} ${formatPercent(billingRate)}`),
       makeKpi('已到账实收与回收率', formatYuanFromCents(totalCollected), `账单回收率 ${formatPercent(billedColRate)} · 合同回款率 ${formatPercent(contractColRate)}`),
       makeKpi('待收账款（AR）与账龄结构', formatYuanFromCents(totalAr), `<30天 ${formatYuanFromCents(bucket0To30)} | 30-90天 ${formatYuanFromCents(bucket30To90)} | >90天 ${formatYuanFromCents(bucketOver90)}`)
     );
@@ -928,6 +932,7 @@
     if (epoch !== state.epoch) return;
     normalizeOverview(data || {});
     state.restricted = Boolean(data?.restricted);
+    state.localLedger = Boolean(data?.localLedger);
     renderAll();
     const banner = $('restrictedBanner');
     if (banner) {
@@ -952,7 +957,7 @@
     '正在连接律所管理引擎…': 'Connecting to Law Firm Management engine…',
     '收案、财务和样板数据属于本机台账。本机征询记录不表示同事已收到消息。需要本人确认时，请使用「利冲审查中心」中的律所云端协作。': 'Intake, finance, and demo data are stored in your local ledger. Local clearance entries do not notify colleagues automatically; use Firm Cloud Collaboration in the Conflict Check Center for cross-account confirmation.',
     '新建本机收案记录': 'New Local Case Intake',
-    '依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索全所在办、历史及关联主体冲突': 'Automatically screens active, historical, and affiliate conflicts across the firm.',
+    '依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索本机台账中的在办、历史及关联主体冲突': 'Automatically screens active, historical, and affiliate conflicts in this device\'s ledger.',
     '案件 / 专项名称': 'Matter / Project Title',
     '例如：华星半导体与蓝海光电专利侵权及商业秘密纠纷案': 'e.g., Huaxing Semiconductor v. Blue Ocean Optoelectronics Patent & Trade Secret Dispute',
     '业务领域': 'Practice Area',

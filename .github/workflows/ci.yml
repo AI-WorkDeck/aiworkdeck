@@ -323,6 +323,21 @@ jobs:
         working-directory: frontend
         run: npm run build:h5
 
+  pptx-service:
+    # 随包的 PPT 服务（上游 banana-slides 的 vendored 代码）单元测试；此前 CI 完全没跑过，
+    # image options 测试因此红了一阵才被发现。只跑 unit（不含集成），几十秒。
+    # 不做路径过滤：ci.yml 其它 job 都无路径过滤，且被过滤跳过的 job 若被设为 required 会一直 pending。
+    name: PPT service unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11.12'
+      - name: Unit tests
+        working-directory: pptx-service
+        run: uv run --frozen --with pytest python -m pytest -q backend/tests/unit
+
   desktop:
     name: Desktop (install deps)
     runs-on: ubuntu-latest
