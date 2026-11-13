@@ -5,6 +5,9 @@
     <section class="card">
       <h2>{{ mode === 'setup' ? t('savePassword') : resetMode ? t('resetPassword') : t('connectionTitle') }}</h2>
 
+      <!-- 登录失效被踢回来时的原因（App 传入）；不随表单状态清掉，重新登录成功后整页切走 -->
+      <p v-if="notice" class="status error">{{ notice }}</p>
+
       <p v-if="token.trim()" class="summary">
         {{ t('connectedTo', { url: displayServerUrl }) }}
       </p>
@@ -231,7 +234,8 @@ import { legalUrl, openExternal, signUpUrl } from '../lib/site.js'
 
 const props = defineProps({
   initialServerUrl: { type: String, default: '' },
-  initialToken: { type: String, default: '' }
+  initialToken: { type: String, default: '' },
+  notice: { type: String, default: '' }
 })
 const emit = defineEmits(['saved'])
 

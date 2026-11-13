@@ -307,6 +307,11 @@ public class AccountService {
         return getCurrentJson("/api/account/ai-usage");
     }
 
+    /** 同 {@link #fetchAiUsage()}，但用调用方给定的 awdk_（server 模式 per-user 通道取汇率口径用）。 */
+    public Map<String, Object> fetchAiUsageWith(String awdkKey) {
+        return getJson("/api/account/ai-usage", awdkKey);
+    }
+
     /**
      * POST /api/account/ai-key —— 取该账户的 provisioned OpenRouter runtime key。
      * 幂等：已有未禁用的 key 直接返回同一把。
