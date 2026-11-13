@@ -539,11 +539,17 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
      这个名字被十来个工具描述与多份提示片段引用、还写在老会话执行日志里，改名要么留别名（别名表应当一直是空表）、
      要么让那些引用同一刻全部失效。其余 doc_* 在 Office/none 会话里照旧不可见（`ClientCapabilityServiceTest` 钉着）；
      **WEB 档（网页版工作台，W1，设计 readiness/w1/W1-design.md）是白名单，先于前缀链与声明层判定**：
-     只放 `WebClientToolSurface.EDITOR_TOOLS`（网页 iframe LOWA 执行器能跑的 Writer doc_*，仍过活跃文档类型闸）
-     与 `BACKEND_TOOLS`（纯后端），`DENIED_TOOLS` + `DENIED_PREFIXES`（office_/ref_/sheet_/slide_/pptx_/litigation_/version_/
+     只放 `WebClientToolSurface.EDITOR_TOOLS`（= `EDITOR_EXECUTED_TOOLS` 网页 iframe LOWA 执行的 Writer doc_* ∪
+     `HOST_HANDLED_TOOLS` 桌面由宿主页处理的 `doc_open_file`/`doc_start_stream`/`doc_restore_checkpoint`，网页客户端 P5 自建宿主处理器；
+     两者都过活跃文档类型闸）与 `BACKEND_TOOLS`（纯后端，含 `doc_list_project_files`/`doc_list_evidence`），`DENIED_TOOLS` + `DENIED_PREFIXES`（office_/ref_/sheet_/slide_/pptx_/litigation_/version_/
      plugin_dev_/capability_）一律不可见；名单外的名字只可能是插件/MCP 工具，仅当所属插件 manifest `hosts` 含 `"web"`
      （`PluginService.supportsWebClient`，由 `ToolRegistry.init` 推入 `setWebPluginToolPredicate`）才放行，用户自配 MCP 永不。
      **新增内置工具必须在 `WebClientToolSurface` 归类**，`ClientCapabilityWebSurfaceTest` 枚举真实注册表、没归类就红。
+     **编辑器执行工具 ⊆ 网页执行器能力**：`ClientCapabilityWebEditorActionsTest` 把每个 `EDITOR_EXECUTED_TOOLS` 映射到它发出的编辑器 action
+     （`EMITTED_ACTIONS`，与源码扫描对拍），对拍 `backend/src/test/resources/web-client/editor-capabilities.json`——官网仓
+     `web-workbench/src/editor-capabilities.json` 的副本，钉在测试里的 `PINNED_WEBSITE_COMMIT`/`PINNED_CORE_COMMIT`/`PINNED_ENGINE`。
+     官网 vendor 追版后按测试类注释里的 `gh api … -H 'Accept: application/vnd.github.raw'` 命令刷新副本并改这三个常量；
+     改了工具发出的 action 要同步 `EMITTED_ACTIONS`，新 action 不在清单里就追平官网 vendor 或把工具移出 WEB 白名单。
      **网页会话不许回落到 LOWA**：Origin ∈ `security.cors.web-origins`（chat/connect）或 `X-Client-Instance` 以 `web-` 开头（connect）
      → `markWebClient` 把会话钉在 WEB（之后声明 lowa/未知/漏带都不放宽，未登记时也按 WEB 兜底），chat 把 `clientCapability:"web"`
      写回请求体，inbox 重启回放同样是 web。片段 `prompts/tools-web(.en).md`（只教白名单工具 + 网页边界）。

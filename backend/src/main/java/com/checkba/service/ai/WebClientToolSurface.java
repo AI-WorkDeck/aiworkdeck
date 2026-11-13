@@ -26,14 +26,14 @@ public final class WebClientToolSurface {
     }
 
     /**
-     * 网页执行器能执行的 Writer 编辑器工具（经 {@code client_action editor_command} 下发到浏览器里的
-     * iframe LOWA），外加带 doc_ 前缀的纯后端 / 打开类工具。仍受活跃文档类型闸约束
-     *（{@link ClientCapabilityService#visibleForDocKind}）。
+     * 由网页里的编辑器执行的 Writer 工具：经 {@code client_action editor_command} 下发到浏览器 iframe LOWA，
+     * 发出的每个编辑器 action 都必须在网页 vendor 版本导出的执行器能力清单里
+     *（{@code ClientCapabilityWebEditorActionsTest} 逐工具映射到 action，对拍
+     * {@code src/test/resources/web-client/editor-capabilities.json}）。仍受活跃文档类型闸约束。
      *
      * <p>W1 只开 DOCX：{@code sheet_* / slide_*} 等 W2。不在这里的 doc_* 见 {@link #DENIED_TOOLS}。
-     * 最终要与官网 vendor 版本导出的执行器能力清单对拍（设计 §4.3，P1 交付后补那条测试）。
      */
-    public static final Set<String> EDITOR_TOOLS = Set.of(
+    public static final Set<String> EDITOR_EXECUTED_TOOLS = Set.of(
             // 看
             "doc_get_document_text", "doc_get_clauses", "doc_get_paragraph", "doc_get_outline",
             "doc_get_cursor_context", "doc_get_formatting", "doc_get_comments", "doc_audit_structure",
@@ -53,13 +53,27 @@ public final class WebClientToolSurface {
             "doc_table_insert", "doc_table_set_cell", "doc_table_delete",
             // 批注与修订
             "doc_add_comment", "doc_update_comment", "doc_delete_comment", "doc_revisions",
-            // 证据链接
-            "doc_link_evidence", "doc_list_evidence",
-            // 文件：清单（纯后端）/ 打开 / 流式新建 / 回到检查点
-            "doc_list_project_files", "doc_open_file", "doc_start_stream", "doc_restore_checkpoint");
+            // 证据链接（经 EvidenceAnchorService 在编辑器里套书签与超链接）
+            "doc_link_evidence");
+
+    /**
+     * 桌面端由<b>宿主页面</b>而不是编辑器处理的 doc_* 工具：它们发的不是编辑器 action，网页客户端
+     *（W1 P5）要自己实现对应的宿主处理器——
+     * {@code doc_open_file} → {@code client_action doc_open_file}；
+     * {@code doc_start_stream} → {@code editor_command doc_open_file_sync}（宿主拦截）+ {@code doc_stream_*}；
+     * {@code doc_restore_checkpoint} → {@code client_action doc_checkpoint_restore}。
+     * 它们仍过活跃文档类型闸（三个都在 kind 无关表里）。
+     */
+    public static final Set<String> HOST_HANDLED_TOOLS = Set.of(
+            "doc_open_file", "doc_start_stream", "doc_restore_checkpoint");
+
+    /** 编辑器路由的工具（编辑器执行 ∪ 宿主处理）：可见性按白名单且过活跃文档类型闸。 */
+    public static final Set<String> EDITOR_TOOLS = union(EDITOR_EXECUTED_TOOLS, HOST_HANDLED_TOOLS);
 
     /** 纯后端工具（在云后端执行，不依赖任何客户端执行器或本机环境）。 */
     public static final Set<String> BACKEND_TOOLS = Set.of(
+            // 带 doc_ 前缀但纯后端：项目文件权威清单、证据链接清单（只查库，不经编辑器桥）
+            "doc_list_project_files", "doc_list_evidence",
             // 编排
             "ask_user", "list_tools", "use_skill", "dispatch_subtask", "todo_write", "list_attached_files",
             // 项目文件
@@ -105,6 +119,12 @@ public final class WebClientToolSurface {
     public static final List<String> DENIED_PREFIXES = List.of(
             "office_", "ref_", "sheet_", "slide_", "pptx_", "litigation_", "version_", "plugin_dev_",
             "capability_");
+
+    private static Set<String> union(Set<String> a, Set<String> b) {
+        java.util.Set<String> all = new java.util.HashSet<>(a);
+        all.addAll(b);
+        return Set.copyOf(all);
+    }
 
     /** 内置工具在 WEB 档是否可见（插件工具另走 manifest 声明，见 {@link ClientCapabilityService}）。 */
     static boolean allowsBuiltin(String toolName) {
