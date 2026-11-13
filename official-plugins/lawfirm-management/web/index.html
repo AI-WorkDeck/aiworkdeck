@@ -12,6 +12,7 @@
   <script src="workflow.js" defer></script>
   <script src="expenses-l10n.js" defer></script>
   <script src="expenses.js" defer></script>
+  <script src="billing.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -50,6 +51,9 @@
       </button>
       <button type="button" id="tab-expense" role="tab" data-tab="expense" aria-selected="false" aria-controls="panel-expense" class="tab-btn">
         <span data-ex="expense.tab"></span>
+      </button>
+      <button type="button" id="tab-hourly" role="tab" data-tab="hourly" aria-selected="false" aria-controls="panel-hourly" class="tab-btn">
+        <span data-hb="billing.tab"></span>
       </button>
     </nav>
   </header>
@@ -522,6 +526,89 @@
         <header class="card-header"><div><h2 data-ex="expense.listTitle"></h2></div></header>
         <div id="ex-list" class="stack-list"></div>
       </article>
+    </section>
+
+    <section id="panel-hourly" role="tabpanel" aria-labelledby="tab-hourly" class="tab-panel" hidden>
+      <article class="card">
+        <header class="card-header">
+          <div><h2 data-hb="billing.title"></h2><p class="hint" data-hb="billing.intro"></p></div>
+          <button type="button" id="hb-seed" data-hb="billing.seed"></button>
+        </header>
+        <div class="hb-bar">
+          <label class="hb-month"><span data-hb="billing.month"></span><input id="hb-month" type="month"></label>
+          <nav class="hb-subnav" role="tablist">
+            <button type="button" id="hb-nav-review" role="tab" data-hb="billing.nav.review"></button>
+            <button type="button" id="hb-nav-bills" role="tab" data-hb="billing.nav.bills"></button>
+            <button type="button" id="hb-nav-rates" role="tab" data-hb="billing.nav.rates"></button>
+            <button type="button" id="hb-nav-metrics" role="tab" data-hb="billing.nav.metrics"></button>
+          </nav>
+        </div>
+        <p id="hb-status" class="hint" role="status" aria-live="polite"></p>
+      </article>
+
+      <div id="hb-view-review">
+        <div class="hb-bar">
+          <label><span data-hb="billing.statusFilter"></span>
+            <select id="hb-review-status">
+              <option value="SUBMITTED" data-hb="billing.status.SUBMITTED"></option>
+              <option value="APPROVED" data-hb="billing.status.APPROVED"></option>
+              <option value="BILLED" data-hb="billing.status.BILLED"></option>
+              <option value="ALL" data-hb="billing.status.ALL"></option>
+            </select>
+          </label>
+          <p class="hint" data-hb="billing.reviewHint"></p>
+        </div>
+        <div id="hb-review-list" class="stack-list"></div>
+      </div>
+
+      <div id="hb-view-bills" hidden>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.newBill"></h2><p class="hint" data-hb="billing.newBillHint"></p></div></header>
+          <div class="form-grid">
+            <label class="field-span-2"><span data-hb="billing.matter"></span><select id="hb-bill-matter"></select></label>
+            <label><span data-hb="billing.discountOverride"></span><input id="hb-bill-discount" type="text" inputmode="decimal" data-hb-placeholder="billing.discountOverridePlaceholder"></label>
+            <div class="form-actions"><button type="button" id="hb-preview-btn" data-hb="billing.preview"></button></div>
+          </div>
+          <div id="hb-preview"></div>
+        </article>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.billList"></h2></div></header>
+          <div id="hb-bill-list" class="stack-list"></div>
+        </article>
+      </div>
+
+      <div id="hb-view-rates" hidden>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.timekeepers"></h2><p class="hint" data-hb="billing.timekeepersHint"></p></div></header>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th data-hb="billing.col.lawyer"></th><th data-hb="billing.col.level"></th><th data-hb="billing.col.standardRate"></th><th></th></tr></thead>
+              <tbody id="hb-timekeepers"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.terms"></h2><p class="hint" data-hb="billing.termsHint"></p></div></header>
+          <div id="hb-terms" class="stack-list"></div>
+        </article>
+      </div>
+
+      <div id="hb-view-metrics" hidden>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.metrics"></h2><p class="hint" data-hb="billing.metricsHint"></p></div></header>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th data-hb="billing.col.lawyer"></th><th data-hb="billing.col.level"></th><th data-hb="billing.col.recorded"></th>
+                <th data-hb="billing.col.billable"></th><th data-hb="billing.col.writtenDown"></th><th data-hb="billing.col.wip"></th>
+                <th data-hb="billing.col.standardValue"></th><th data-hb="billing.col.billedAmount"></th><th data-hb="billing.col.collected"></th>
+                <th data-hb="billing.col.realization"></th>
+              </tr></thead>
+              <tbody id="hb-metrics"></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
     </section>
   </main>
 </body>
