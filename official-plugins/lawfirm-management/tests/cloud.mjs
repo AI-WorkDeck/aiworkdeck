@@ -77,10 +77,12 @@ test('stale version shows the server message and reloads; non-admins get a read-
   const h = harness({ settings: base(), onSet: () => new Error('该记录已被同事修改，请刷新后再改') });
   t.after(() => h.dom.window.close());
   await h.click(h.$('tab-cloud'));
+  const gets = () => h.calls.filter((c) => c.action === 'cloud.settings.get').length;
+  const before = gets();
   await h.click(h.doc.querySelector('[data-feature="pitch"] [data-action="turn-on"]'));
   assert.equal(h.$('cl-status').dataset.error, 'true');
   assert.match(h.$('cl-status').textContent, /已被同事修改/);
-  assert.equal(h.calls.filter((c) => c.action === 'cloud.settings.get').length, 2, 'reloaded after the conflict');
+  assert.equal(gets(), before + 1, 'reloaded after the conflict');
 
   const r = harness({ settings: base({ firmAdmin: false }), onSet: () => assert.fail('no set for non-admin') });
   t.after(() => r.dom.window.close());
@@ -103,4 +105,14 @@ test('unreachable or old service shows the reason; unknown features get a generi
   assert.equal(e.$('tab-cloud').textContent.trim(), 'Firm cloud');
   assert.match(e.doc.querySelector('[data-feature="archive"]').textContent, /Firm cloud feature \(archive\)/);
   assert.match(e.doc.querySelector('[data-feature="pitch"]').textContent, /Pitch library.*Shared experience entries\./, 'feature-supplied labels win over plugin strings');
+});
+
+test('on an older host without Firm cloud actions the 律所云端 tab hides itself; other tabs stay', async (t) => {
+  const h = harness({ settings: new Error('不支持的律所管理操作：cloud.settings.get') });
+  t.after(() => h.dom.window.close());
+  await tick();
+  assert.equal(h.$('tab-cloud').hidden, true);
+  assert.equal(h.$('panel-cloud').hidden, true);
+  assert.equal(h.$('tab-finance').hidden, false);
+  assert.equal(h.$('tab-expense').hidden, false);
 });
