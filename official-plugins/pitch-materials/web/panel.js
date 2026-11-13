@@ -119,7 +119,9 @@
   async function probeCloud() {
     try {
       const ctx = await cloud('pitch.context');
-      state.cloud = Object.assign(state.cloud, { available: true, teams: (ctx && ctx.teams) || [], me: (ctx && ctx.name) || '', error: '' });
+      // 团队可能是 id 字符串，也可能是 {id, name}（名录给出显示名时）；统一成 {id, name}，没有名称就显示 id
+      const teams = ((ctx && ctx.teams) || []).map((tm) => (tm && typeof tm === 'object') ? { id: String(tm.id), name: String(tm.name || tm.id) } : { id: String(tm), name: String(tm) });
+      state.cloud = Object.assign(state.cloud, { available: true, teams, me: (ctx && ctx.name) || '', error: '' });
       const mine = await cloud('pitch.mine');
       state.cloud.mine = Object.fromEntries(((mine && mine.entries) || []).map((e) => [e.id, e]));
     } catch (e) {
@@ -345,6 +347,7 @@
       list.appendChild(el('label', { className: 'pm-check pm-pick-item' }, [c, el('span', { className: 'pm-path', text: f.path })]));
     });
     card.appendChild(list);
+    card.appendChild(el('p', { className: 'hint', text: t('panel.exp.aiNotice') }));
     card.appendChild(el('div', { className: 'pm-actions' }, [btn(t('panel.exp.draft'), draftExperience, 'awd-btn-primary'),
       btn(t('panel.action.cancel'), () => { state.draftSource = null; render(); })]));
     return card;
@@ -498,11 +501,11 @@
       if (d.share.scope !== 'team') return;
       const teams = state.cloud.teams || [];
       if (!teams.length) { teamsBox.appendChild(el('span', { className: 'pm-warn', text: t('panel.share.noTeam') })); return; }
-      if (teams.length === 1) { d.share.teams = teams.slice(); teamsBox.appendChild(el('span', { className: 'hint', text: t('panel.share.oneTeam', { team: teams[0] }) })); return; }
+      if (teams.length === 1) { d.share.teams = [teams[0].id]; teamsBox.appendChild(el('span', { className: 'hint', text: t('panel.share.oneTeam', { team: teams[0].name }) })); return; }
       teams.forEach((tm) => {
-        const c = el('input', { type: 'checkbox', checked: d.share.teams.includes(tm) });
-        c.addEventListener('change', () => { d.share.teams = c.checked ? d.share.teams.concat([tm]) : d.share.teams.filter((x) => x !== tm); });
-        teamsBox.appendChild(el('label', { className: 'pm-check' }, [c, el('span', { text: tm })]));
+        const c = el('input', { type: 'checkbox', checked: d.share.teams.includes(tm.id) });
+        c.addEventListener('change', () => { d.share.teams = c.checked ? d.share.teams.concat([tm.id]) : d.share.teams.filter((x) => x !== tm.id); });
+        teamsBox.appendChild(el('label', { className: 'pm-check' }, [c, el('span', { text: tm.name })]));
       });
     };
     scope.addEventListener('change', () => { d.share.scope = scope.value; drawTeams(); client.disabled = off || scope.value === 'private'; });

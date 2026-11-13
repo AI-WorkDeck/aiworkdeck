@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Drafting…",
   "panel.exp.drafted": "Draft ready. Review, edit and save it.",
   "panel.exp.draftFailed": "No usable draft came back. Try other files or try again later.",
-  "panel.exp.fromProject": "From project"
+  "panel.exp.fromProject": "From project",
+  "panel.exp.aiNotice": "To draft, the matter facts for this project (including the client name), your work-record summary and the selected files are sent to the AI. The tender check still sends only public descriptions."
 }

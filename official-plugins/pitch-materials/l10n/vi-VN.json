@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Đang soạn thảo…",
   "panel.exp.drafted": "Đã có bản nháp. Hãy kiểm tra, chỉnh sửa rồi lưu.",
   "panel.exp.draftFailed": "Không nhận được bản nháp dùng được. Hãy thử các tệp khác hoặc thử lại sau.",
-  "panel.exp.fromProject": "Từ dự án"
+  "panel.exp.fromProject": "Từ dự án",
+  "panel.exp.aiNotice": "Để soạn thảo, thông tin vụ việc của dự án này (gồm tên khách hàng), bản tóm tắt nhật ký công việc của bạn và các tệp đã chọn sẽ được gửi tới AI. Phần đối chiếu hồ sơ mời thầu vẫn chỉ gửi tên gọi đối ngoại."
 }

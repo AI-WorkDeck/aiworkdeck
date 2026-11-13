@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Sedang menyediakan draf…",
   "panel.exp.drafted": "Draf siap. Semak, sunting, kemudian simpan.",
   "panel.exp.draftFailed": "Draf yang boleh digunakan tidak diperoleh. Cuba fail lain atau cuba lagi kemudian.",
-  "panel.exp.fromProject": "Daripada projek"
+  "panel.exp.fromProject": "Daripada projek",
+  "panel.exp.aiNotice": "Untuk merangka, fakta perkara projek ini (termasuk nama klien), ringkasan rekod kerja anda dan fail yang dipilih dihantar kepada AI. Semakan dokumen tender masih hanya menghantar keterangan luaran."
 }

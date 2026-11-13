@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Taslak hazırlanıyor…",
   "panel.exp.drafted": "Taslak hazır. Kontrol edip düzenledikten sonra kaydedin.",
   "panel.exp.draftFailed": "Kullanılabilir bir taslak alınamadı. Başka dosyalar seçin veya daha sonra tekrar deneyin.",
-  "panel.exp.fromProject": "Projeden"
+  "panel.exp.fromProject": "Projeden",
+  "panel.exp.aiNotice": "Taslak için bu projenin dosya bilgileri (müvekkil adı dahil), çalışma kayıtlarınızın özeti ve seçilen dosyalar yapay zekâya gönderilir. İhale karşılaştırması yine yalnızca dış tanımları gönderir."
 }

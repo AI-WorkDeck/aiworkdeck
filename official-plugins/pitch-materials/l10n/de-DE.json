@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Entwurf wird erstellt …",
   "panel.exp.drafted": "Entwurf erstellt. Bitte prüfen, anpassen und speichern.",
   "panel.exp.draftFailed": "Es wurde kein brauchbarer Entwurf erzeugt. Wählen Sie andere Dateien oder versuchen Sie es später erneut.",
-  "panel.exp.fromProject": "Aus Projekt"
+  "panel.exp.fromProject": "Aus Projekt",
+  "panel.exp.aiNotice": "Für den Entwurf werden die Mandatsdaten dieses Projekts (einschließlich des Mandantennamens), Ihre Arbeitsprotokoll-Zusammenfassung und die ausgewählten Dateien an die KI gesendet. Beim Ausschreibungsabgleich werden weiterhin nur die externen Bezeichnungen gesendet."
 }

@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Redactando…",
   "panel.exp.drafted": "Borrador listo. Revíselo, edítelo y guárdelo.",
   "panel.exp.draftFailed": "No se obtuvo un borrador utilizable. Pruebe con otros archivos o inténtelo más tarde.",
-  "panel.exp.fromProject": "Desde proyecto"
+  "panel.exp.fromProject": "Desde proyecto",
+  "panel.exp.aiNotice": "Para redactar se envían a la IA los datos del asunto (incluido el nombre del cliente), el resumen de tus registros de trabajo y los archivos seleccionados. La comparación con la licitación sigue enviando solo las descripciones externas."
 }

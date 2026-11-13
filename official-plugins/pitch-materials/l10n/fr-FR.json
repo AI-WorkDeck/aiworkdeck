@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Rédaction en cours…",
   "panel.exp.drafted": "Brouillon prêt. Relisez-le, modifiez-le puis enregistrez-le.",
   "panel.exp.draftFailed": "Aucun brouillon exploitable n'a été obtenu. Essayez d'autres fichiers ou réessayez plus tard.",
-  "panel.exp.fromProject": "Depuis un projet"
+  "panel.exp.fromProject": "Depuis un projet",
+  "panel.exp.aiNotice": "Pour la rédaction, les éléments du dossier (y compris le nom du client), la synthèse de vos relevés de travail et les fichiers choisis sont envoyés à l'IA. La comparaison avec l'appel d'offres n'envoie toujours que les désignations externes."
 }

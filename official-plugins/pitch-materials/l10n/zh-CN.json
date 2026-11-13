@@ -257,5 +257,6 @@
   "panel.exp.drafting": "正在起草…",
   "panel.exp.drafted": "已起草，请核对、修改后保存。",
   "panel.exp.draftFailed": "没有得到可用的草稿，请换几份文件或稍后重试。",
-  "panel.exp.fromProject": "项目整理"
+  "panel.exp.fromProject": "项目整理",
+  "panel.exp.aiNotice": "起草时会把本项目的收案事实（含客户名称）、你的工作记录汇总和所选文件的内容发给 AI；对照招标文件时仍只发送对外称谓。"
 }

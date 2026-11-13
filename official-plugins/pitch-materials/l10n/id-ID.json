@@ -257,5 +257,6 @@
   "panel.exp.drafting": "Sedang menyusun…",
   "panel.exp.drafted": "Draf siap. Periksa, ubah, lalu simpan.",
   "panel.exp.draftFailed": "Draf yang dapat dipakai tidak diperoleh. Coba berkas lain atau ulangi nanti.",
-  "panel.exp.fromProject": "Dari proyek"
+  "panel.exp.fromProject": "Dari proyek",
+  "panel.exp.aiNotice": "Untuk menyusun draf, fakta perkara proyek ini (termasuk nama klien), ringkasan catatan kerja Anda, dan berkas yang dipilih dikirim ke AI. Pencocokan dokumen tender tetap hanya mengirim deskripsi eksternal."
 }

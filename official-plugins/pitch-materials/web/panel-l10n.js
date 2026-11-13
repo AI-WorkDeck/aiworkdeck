@@ -257,7 +257,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "جارٍ إعداد المسودة…",
     "panel.exp.drafted": "المسودة جاهزة. راجعها وعدّلها ثم احفظها.",
     "panel.exp.draftFailed": "لم يتم الحصول على مسودة صالحة للاستخدام. جرّب ملفات أخرى أو أعد المحاولة لاحقًا.",
-    "panel.exp.fromProject": "من مشروع"
+    "panel.exp.fromProject": "من مشروع",
+    "panel.exp.aiNotice": "لإعداد المسودة تُرسل إلى الذكاء الاصطناعي وقائع القضية (بما فيها اسم العميل) وملخص سجلات عملك والملفات المختارة. أما مقارنة وثائق المناقصة فلا تُرسل إلا الأوصاف الخارجية."
   },
   "de-DE": {
     "panel.title": "Ausschreibungen und Angebote",
@@ -514,7 +515,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Entwurf wird erstellt …",
     "panel.exp.drafted": "Entwurf erstellt. Bitte prüfen, anpassen und speichern.",
     "panel.exp.draftFailed": "Es wurde kein brauchbarer Entwurf erzeugt. Wählen Sie andere Dateien oder versuchen Sie es später erneut.",
-    "panel.exp.fromProject": "Aus Projekt"
+    "panel.exp.fromProject": "Aus Projekt",
+    "panel.exp.aiNotice": "Für den Entwurf werden die Mandatsdaten dieses Projekts (einschließlich des Mandantennamens), Ihre Arbeitsprotokoll-Zusammenfassung und die ausgewählten Dateien an die KI gesendet. Beim Ausschreibungsabgleich werden weiterhin nur die externen Bezeichnungen gesendet."
   },
   "el-GR": {
     "panel.title": "Διαγωνισμοί και προσφορές",
@@ -771,7 +773,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Σύνταξη σε εξέλιξη…",
     "panel.exp.drafted": "Το προσχέδιο είναι έτοιμο. Ελέγξτε το, επεξεργαστείτε το και αποθηκεύστε το.",
     "panel.exp.draftFailed": "Δεν προέκυψε αξιοποιήσιμο προσχέδιο. Δοκιμάστε άλλα αρχεία ή ξαναδοκιμάστε αργότερα.",
-    "panel.exp.fromProject": "Από έργο"
+    "panel.exp.fromProject": "Από έργο",
+    "panel.exp.aiNotice": "Για το σχέδιο αποστέλλονται στην ΤΝ τα στοιχεία της υπόθεσης (συμπεριλαμβανομένου του ονόματος του πελάτη), η σύνοψη των καταγραφών εργασίας σας και τα επιλεγμένα αρχεία. Η αντιπαραβολή με τον διαγωνισμό εξακολουθεί να στέλνει μόνο τις εξωτερικές περιγραφές."
   },
   "en-US": {
     "panel.title": "Bids and Proposals",
@@ -1028,7 +1031,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Drafting…",
     "panel.exp.drafted": "Draft ready. Review, edit and save it.",
     "panel.exp.draftFailed": "No usable draft came back. Try other files or try again later.",
-    "panel.exp.fromProject": "From project"
+    "panel.exp.fromProject": "From project",
+    "panel.exp.aiNotice": "To draft, the matter facts for this project (including the client name), your work-record summary and the selected files are sent to the AI. The tender check still sends only public descriptions."
   },
   "es-ES": {
     "panel.title": "Licitaciones y propuestas",
@@ -1285,7 +1289,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Redactando…",
     "panel.exp.drafted": "Borrador listo. Revíselo, edítelo y guárdelo.",
     "panel.exp.draftFailed": "No se obtuvo un borrador utilizable. Pruebe con otros archivos o inténtelo más tarde.",
-    "panel.exp.fromProject": "Desde proyecto"
+    "panel.exp.fromProject": "Desde proyecto",
+    "panel.exp.aiNotice": "Para redactar se envían a la IA los datos del asunto (incluido el nombre del cliente), el resumen de tus registros de trabajo y los archivos seleccionados. La comparación con la licitación sigue enviando solo las descripciones externas."
   },
   "fr-FR": {
     "panel.title": "Appels d'offres et propositions",
@@ -1542,7 +1547,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Rédaction en cours…",
     "panel.exp.drafted": "Brouillon prêt. Relisez-le, modifiez-le puis enregistrez-le.",
     "panel.exp.draftFailed": "Aucun brouillon exploitable n'a été obtenu. Essayez d'autres fichiers ou réessayez plus tard.",
-    "panel.exp.fromProject": "Depuis un projet"
+    "panel.exp.fromProject": "Depuis un projet",
+    "panel.exp.aiNotice": "Pour la rédaction, les éléments du dossier (y compris le nom du client), la synthèse de vos relevés de travail et les fichiers choisis sont envoyés à l'IA. La comparaison avec l'appel d'offres n'envoie toujours que les désignations externes."
   },
   "hi-IN": {
     "panel.title": "निविदा और प्रस्ताव",
@@ -1799,7 +1805,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "मसौदा तैयार हो रहा है…",
     "panel.exp.drafted": "मसौदा तैयार है। जाँचें, संपादित करें और सहेजें।",
     "panel.exp.draftFailed": "उपयोगी मसौदा नहीं मिला। अन्य फ़ाइलें चुनें या बाद में पुनः प्रयास करें।",
-    "panel.exp.fromProject": "प्रोजेक्ट से"
+    "panel.exp.fromProject": "प्रोजेक्ट से",
+    "panel.exp.aiNotice": "मसौदा बनाने के लिए इस परियोजना के मामले के तथ्य (ग्राहक के नाम सहित), आपके कार्य रिकॉर्ड का सारांश और चुनी गई फ़ाइलें AI को भेजी जाती हैं। निविदा मिलान में अब भी केवल बाहरी विवरण भेजे जाते हैं।"
   },
   "id-ID": {
     "panel.title": "Tender dan Proposal",
@@ -2056,7 +2063,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Sedang menyusun…",
     "panel.exp.drafted": "Draf siap. Periksa, ubah, lalu simpan.",
     "panel.exp.draftFailed": "Draf yang dapat dipakai tidak diperoleh. Coba berkas lain atau ulangi nanti.",
-    "panel.exp.fromProject": "Dari proyek"
+    "panel.exp.fromProject": "Dari proyek",
+    "panel.exp.aiNotice": "Untuk menyusun draf, fakta perkara proyek ini (termasuk nama klien), ringkasan catatan kerja Anda, dan berkas yang dipilih dikirim ke AI. Pencocokan dokumen tender tetap hanya mengirim deskripsi eksternal."
   },
   "it-IT": {
     "panel.title": "Gare d'appalto e proposte",
@@ -2313,7 +2321,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Redazione in corso…",
     "panel.exp.drafted": "Bozza pronta. Verificala, modificala e salvala.",
     "panel.exp.draftFailed": "Non è stata ottenuta una bozza utilizzabile. Prova con altri file o riprova più tardi.",
-    "panel.exp.fromProject": "Da progetto"
+    "panel.exp.fromProject": "Da progetto",
+    "panel.exp.aiNotice": "Per la bozza vengono inviati all'IA i dati della pratica (compreso il nome del cliente), il riepilogo dei tuoi registri di lavoro e i file selezionati. Il confronto con il bando continua a inviare solo le descrizioni esterne."
   },
   "ja-JP": {
     "panel.title": "入札・提案",
@@ -2570,7 +2579,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "草案を作成しています…",
     "panel.exp.drafted": "草案ができました。確認・修正のうえ保存してください。",
     "panel.exp.draftFailed": "利用可能な草案が得られませんでした。別のファイルを選ぶか、後でもう一度お試しください。",
-    "panel.exp.fromProject": "プロジェクトから"
+    "panel.exp.fromProject": "プロジェクトから",
+    "panel.exp.aiNotice": "下書きのため、本案件の受任情報（依頼者名を含む）、あなたの作業記録の集計、選択したファイルの内容が AI に送信されます。入札書類との照合では、引き続き対外向けの名称のみを送信します。"
   },
   "ko-KR": {
     "panel.title": "입찰 및 제안",
@@ -2827,7 +2837,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "초안을 작성하는 중…",
     "panel.exp.drafted": "초안이 준비되었습니다. 검토하고 수정한 뒤 저장하세요.",
     "panel.exp.draftFailed": "사용할 수 있는 초안을 얻지 못했습니다. 다른 파일을 선택하거나 나중에 다시 시도하세요.",
-    "panel.exp.fromProject": "프로젝트에서"
+    "panel.exp.fromProject": "프로젝트에서",
+    "panel.exp.aiNotice": "초안을 작성하기 위해 이 프로젝트의 수임 정보(의뢰인 이름 포함), 본인 작업 기록 요약, 선택한 파일 내용이 AI에 전송됩니다. 입찰 문서 대조에서는 여전히 대외 명칭만 전송됩니다."
   },
   "ms-MY": {
     "panel.title": "Tender dan Cadangan",
@@ -3084,7 +3095,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Sedang menyediakan draf…",
     "panel.exp.drafted": "Draf siap. Semak, sunting, kemudian simpan.",
     "panel.exp.draftFailed": "Draf yang boleh digunakan tidak diperoleh. Cuba fail lain atau cuba lagi kemudian.",
-    "panel.exp.fromProject": "Daripada projek"
+    "panel.exp.fromProject": "Daripada projek",
+    "panel.exp.aiNotice": "Untuk merangka, fakta perkara projek ini (termasuk nama klien), ringkasan rekod kerja anda dan fail yang dipilih dihantar kepada AI. Semakan dokumen tender masih hanya menghantar keterangan luaran."
   },
   "nl-NL": {
     "panel.title": "Aanbestedingen en offertes",
@@ -3341,7 +3353,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Bezig met opstellen…",
     "panel.exp.drafted": "Concept gereed. Controleer, pas aan en sla op.",
     "panel.exp.draftFailed": "Er is geen bruikbaar concept verkregen. Kies andere bestanden of probeer het later opnieuw.",
-    "panel.exp.fromProject": "Uit project"
+    "panel.exp.fromProject": "Uit project",
+    "panel.exp.aiNotice": "Voor het concept worden de dossiergegevens van dit project (inclusief de cliëntnaam), je werkoverzicht en de gekozen bestanden naar de AI gestuurd. De aanbestedingsvergelijking stuurt nog steeds alleen externe omschrijvingen."
   },
   "pt-BR": {
     "panel.title": "Licitações e propostas",
@@ -3598,7 +3611,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Redigindo…",
     "panel.exp.drafted": "Rascunho pronto. Revise, edite e salve.",
     "panel.exp.draftFailed": "Não foi obtido um rascunho utilizável. Tente outros arquivos ou tente novamente mais tarde.",
-    "panel.exp.fromProject": "De projeto"
+    "panel.exp.fromProject": "De projeto",
+    "panel.exp.aiNotice": "Para redigir, os dados do assunto (incluindo o nome do cliente), o resumo dos seus registros de trabalho e os arquivos selecionados são enviados à IA. A comparação com o edital continua enviando apenas as descrições externas."
   },
   "ru-RU": {
     "panel.title": "Тендеры и предложения",
@@ -3855,7 +3869,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Составляется черновик…",
     "panel.exp.drafted": "Черновик готов. Проверьте, отредактируйте и сохраните.",
     "panel.exp.draftFailed": "Пригодный черновик получить не удалось. Выберите другие файлы или повторите попытку позже.",
-    "panel.exp.fromProject": "Из проекта"
+    "panel.exp.fromProject": "Из проекта",
+    "panel.exp.aiNotice": "Для черновика ИИ получает сведения о деле (включая название клиента), сводку ваших записей о работе и выбранные файлы. При сверке с тендерной документацией по-прежнему передаются только внешние описания."
   },
   "th-TH": {
     "panel.title": "การประมูลและข้อเสนอ",
@@ -4112,7 +4127,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "กำลังร่าง…",
     "panel.exp.drafted": "ร่างเสร็จแล้ว โปรดตรวจสอบ แก้ไข แล้วบันทึก",
     "panel.exp.draftFailed": "ไม่ได้ร่างที่ใช้งานได้ ลองเลือกไฟล์อื่นหรือลองใหม่ภายหลัง",
-    "panel.exp.fromProject": "จากโครงการ"
+    "panel.exp.fromProject": "จากโครงการ",
+    "panel.exp.aiNotice": "เพื่อร่าง ระบบจะส่งข้อเท็จจริงของคดีในโครงการนี้ (รวมชื่อลูกความ) สรุปบันทึกการทำงานของคุณ และไฟล์ที่เลือกไปยัง AI ส่วนการเทียบเอกสารประกวดราคายังคงส่งเฉพาะชื่อเรียกภายนอกเท่านั้น"
   },
   "tr-TR": {
     "panel.title": "İhaleler ve Teklifler",
@@ -4369,7 +4385,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Taslak hazırlanıyor…",
     "panel.exp.drafted": "Taslak hazır. Kontrol edip düzenledikten sonra kaydedin.",
     "panel.exp.draftFailed": "Kullanılabilir bir taslak alınamadı. Başka dosyalar seçin veya daha sonra tekrar deneyin.",
-    "panel.exp.fromProject": "Projeden"
+    "panel.exp.fromProject": "Projeden",
+    "panel.exp.aiNotice": "Taslak için bu projenin dosya bilgileri (müvekkil adı dahil), çalışma kayıtlarınızın özeti ve seçilen dosyalar yapay zekâya gönderilir. İhale karşılaştırması yine yalnızca dış tanımları gönderir."
   },
   "vi-VN": {
     "panel.title": "Đấu thầu và đề xuất",
@@ -4626,7 +4643,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "Đang soạn thảo…",
     "panel.exp.drafted": "Đã có bản nháp. Hãy kiểm tra, chỉnh sửa rồi lưu.",
     "panel.exp.draftFailed": "Không nhận được bản nháp dùng được. Hãy thử các tệp khác hoặc thử lại sau.",
-    "panel.exp.fromProject": "Từ dự án"
+    "panel.exp.fromProject": "Từ dự án",
+    "panel.exp.aiNotice": "Để soạn thảo, thông tin vụ việc của dự án này (gồm tên khách hàng), bản tóm tắt nhật ký công việc của bạn và các tệp đã chọn sẽ được gửi tới AI. Phần đối chiếu hồ sơ mời thầu vẫn chỉ gửi tên gọi đối ngoại."
   },
   "zh-CN": {
     "panel.title": "投标与提案",
@@ -4883,7 +4901,8 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "正在起草…",
     "panel.exp.drafted": "已起草，请核对、修改后保存。",
     "panel.exp.draftFailed": "没有得到可用的草稿，请换几份文件或稍后重试。",
-    "panel.exp.fromProject": "项目整理"
+    "panel.exp.fromProject": "项目整理",
+    "panel.exp.aiNotice": "起草时会把本项目的收案事实（含客户名称）、你的工作记录汇总和所选文件的内容发给 AI；对照招标文件时仍只发送对外称谓。"
   },
   "zh-TW": {
     "panel.title": "投標與提案",
@@ -5140,6 +5159,7 @@ window.AWD_PITCH_L10N = {
     "panel.exp.drafting": "正在起草…",
     "panel.exp.drafted": "已起草，請核對、修改後儲存。",
     "panel.exp.draftFailed": "沒有得到可用的草稿，請換幾份檔案或稍後重試。",
-    "panel.exp.fromProject": "專案整理"
+    "panel.exp.fromProject": "專案整理",
+    "panel.exp.aiNotice": "起草時會把本案件的收案事實（含客戶名稱）、你的工作紀錄彙總和所選檔案的內容傳送給 AI；比對招標文件時仍只傳送對外稱謂。"
   }
 };
