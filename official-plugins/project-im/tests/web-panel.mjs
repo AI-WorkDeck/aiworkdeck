@@ -182,6 +182,30 @@ test('recent-page polling replaces permission DTOs even when message IDs and cou
   await p.select(); await p.named('存入项目'); assert.ok([...p.$('messages').querySelectorAll('button')].some((b) => b.textContent === '添加到 AI'));
   allowed = false; await p.poll(); assert.match(p.$('messages').textContent, /文件待准备/); assert.doesNotMatch(p.$('messages').textContent, /添加到 AI|合同/);
 });
+test('an unchanged server revision skips the recent page; a changed one or every tenth poll re-reads it', async (t) => {
+  let revision = '0:OWNER:staff', allowed = true;
+  const p = await panel({ call: ({ action, params }) => action === 'messages' ? {
+    messages: params.afterId ? [] : [{ ...msg, attachment: allowed ? { ...msg.attachment, available: true } : { id: msg.attachment.id, available: false } }], revision
+  } : undefined }); close(t, p); Object.defineProperty(p.dom.window.document, 'visibilityState', { value: 'visible' });
+  const recentReads = () => p.calls.filter((c) => c.action === 'messages' && !c.params.afterId && !c.params.beforeId).length;
+  await p.select(); const initial = recentReads();
+  await p.poll(); await p.poll();
+  assert.equal(recentReads(), initial, 'nothing changed: only the afterId delta was polled');
+  assert.ok(p.calls.filter((c) => c.action === 'messages' && c.params.afterId === 3).length >= 2);
+  allowed = false; revision = '1:OWNER:staff'; await p.poll();
+  assert.equal(recentReads(), initial + 1); assert.match(p.$('messages').textContent, /文件待准备/);
+  for (let i = 0; i < 9; i++) await p.poll();
+  assert.equal(recentReads(), initial + 1);
+  await p.poll(); assert.equal(recentReads(), initial + 2, 'names and avatars still refresh periodically');
+});
+test('an acknowledged read is not sent again on every poll', async (t) => {
+  let lastReadId = 0;
+  const p = await panel({ call: ({ action }) => action === 'list' ? { conversations: [{ ...c1, unreadCount: 0, lastReadId }] }
+    : action === 'read' ? (lastReadId = 3, { lastReadId: 3 }) : undefined }); close(t, p);
+  p.dom.window.document.hasFocus = () => true; await p.select();
+  const reads = () => p.calls.filter((c) => c.action === 'read').length;
+  assert.equal(reads(), 1); await p.poll(); await p.poll(); assert.equal(reads(), 1);
+});
 test('local upload and message share one idempotency key; a fresh identical file has a new key', async (t) => {
   const p = await panel({ call: ({ action }) => action === 'upload' ? { id: 'uploaded-file' } : undefined }); close(t, p); await p.select();
   p.dom.window.FileReader = class { readAsDataURL() { this.result = 'data:application/octet-stream;base64,YWJj'; queueMicrotask(() => this.onload()); } };

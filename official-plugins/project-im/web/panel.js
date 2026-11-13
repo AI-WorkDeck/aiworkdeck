@@ -6,7 +6,10 @@
   const state = { epoch: 0, selection: 0, context: null, self: null, conversations: [], active: null,
     agents: [], projectAgentReason: '', agentOpenSequence: 0, agentStatus: null, agentRequesting: false, agentFailures: new Map(),
     directory: null, expandedGroups: { project: true, org: false, firm: false, friends: false },
-    messages: [], drafts: new Map(), pending: new Map(), imports: new Map(), timer: null, loading: false };
+    messages: [], drafts: new Map(), pending: new Map(), imports: new Map(), timer: null, loading: false,
+    recentRevision: undefined, quietPolls: 0 };
+  // Polls between full re-reads of the recent page while the server reports no revision change (names, avatars).
+  const RECENT_EVERY = 10;
   const scopeLabels = { project: '项目', team: '团队', firm: '律所' };
   const privateAgent = (c = state.active) => !!c?.agent && (c.agent.private || c.type === 'AGENT_DIRECT');
   const conversationLabel = (c) => c.agent ? (privateAgent(c) ? '云端助手私聊 · 仅你可见' : '云端助手群聊 · 群成员可见') : `${c.type === 'DIRECT' ? '私聊' : '群聊'} · ${roles[c.role] || '成员'}`;
@@ -355,6 +358,7 @@
   }
   async function select(c) {
     state.selection++; state.active = c; state.messages = []; state.loading = false; state.agentStatus = null; state.agentRequesting = false;
+    state.recentRevision = undefined; state.quietPolls = 0;
     $('workspace').classList.add('chat-open'); $('welcome').hidden = true; $('active-chat').hidden = false;
     $('chat-title').textContent = c.title; $('chat-subtitle').textContent = conversationLabel(c);
     renderAgentInfo(c);
@@ -386,17 +390,28 @@
       if (!state.agentRequesting && Object.prototype.hasOwnProperty.call(result, 'agentStatus')) applyAgentStatus(result.agentStatus);
       renderAgentStatus();
       if (mode === 'initial' || mode === 'older') $('older').hidden = !result.hasMore;
+      if (mode === 'initial' || mode === 'recent') { state.recentRevision = result.revision; state.quietPolls = 0; }
       // Reconcile an uncertain send response against server acknowledgements.
       const pending = state.pending.get(s.id) || [];
       state.pending.set(s.id, pending.filter((p) => !state.messages.some((m) => m.clientMessageId === p.clientMessageId && String(m.senderId) === String(state.self.id))));
       if (JSON.stringify(state.messages) !== previousMessages || pending.length !== state.pending.get(s.id).length || mode === 'initial') renderMessages();
       if (mode === 'older') $('message-scroll').scrollTop = oldTop + $('message-scroll').scrollHeight - oldHeight;
       else if (mode === 'initial' || nearBottom) $('message-scroll').scrollTop = $('message-scroll').scrollHeight;
-      if (document.visibilityState !== 'hidden' && document.hasFocus() && state.messages.length) {
-        await request('read', { conversationId: s.id, lastReadId: state.messages.at(-1).id });
-        if (current(s)) { state.active.unreadCount = 0; renderList(); }
+      // The server cursor only moves forward, so a read it has already acknowledged is not sent again.
+      const lastId = state.messages.at(-1)?.id;
+      if (document.visibilityState !== 'hidden' && document.hasFocus() && state.messages.length
+          && !(Number(state.active.lastReadId) >= lastId && !state.active.unreadCount)) {
+        const read = await request('read', { conversationId: s.id, lastReadId: lastId });
+        if (current(s)) { state.active.unreadCount = 0; state.active.lastReadId = Math.max(Number(read?.lastReadId) || 0, lastId); renderList(); }
       }
+      return result;
     } finally { if (current(s)) state.loading = false; }
+  }
+  // The recent page is re-read to refresh what already-shown messages say (attachment access). A server that reports a
+  // revision changes it whenever that can differ, so an unchanged revision skips the re-read; older servers send none.
+  function recentDue(delta) {
+    if (!delta || typeof delta.revision !== 'string' || delta.revision !== state.recentRevision) return true;
+    return ++state.quietPolls >= RECENT_EVERY;
   }
   function time(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
   function renderMessages() {
@@ -876,8 +891,8 @@
         const self = await request('self'); if (epoch !== state.epoch) return;
         if (!state.self || String(self.id) !== String(state.self.id)) { await reload(); return; }
         await refreshList(epoch); if (epoch !== state.epoch) return;
-        await loadMessages();
-        if (epoch === state.epoch && document.visibilityState !== 'hidden') await loadMessages('recent');
+        const delta = await loadMessages();
+        if (epoch === state.epoch && document.visibilityState !== 'hidden' && recentDue(delta)) await loadMessages('recent');
       } catch (error) { if (epoch === state.epoch) notice(failure(error), true); }
       finally { if (epoch === state.epoch) schedule(epoch); }
     }, 3000);

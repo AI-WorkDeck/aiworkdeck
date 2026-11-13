@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ImAttachmentRepository extends JpaRepository<ImAttachment, String> {
  @org.springframework.data.jpa.repository.Query("select a.id,a.name,a.size,a.sha256,a.uploadedBy,a.clientVisible,a.sourceProjectUid,a.sourceFileUid from ImAttachment a where a.id=:id and a.conversationId=:conversationId")
  java.util.List<Object[]> metadata(String id, String conversationId);
+ /** Same columns as {@link #metadata}, for every attachment on one message page in a single statement. */
+ @org.springframework.data.jpa.repository.Query("select a.id,a.name,a.size,a.sha256,a.uploadedBy,a.clientVisible,a.sourceProjectUid,a.sourceFileUid from ImAttachment a where a.conversationId=:conversationId and a.id in :ids")
+ java.util.List<Object[]> metadataIn(String conversationId, java.util.Collection<String> ids);
  java.util.Optional<ImAttachment> findByConversationIdAndUploadedByAndClientMessageId(
          String conversationId, Long uploadedBy, String clientMessageId);
  @org.springframework.data.jpa.repository.Query("select coalesce(sum(a.size),0) from ImAttachment a where a.conversationId=:conversationId")

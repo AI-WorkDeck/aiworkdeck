@@ -6,12 +6,15 @@ package com.checkba.repository;
 import com.checkba.model.entity.AccountBinding;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface AccountBindingRepository extends JpaRepository<AccountBinding, Long> {
     Optional<AccountBinding> findByExternalAccountId(String externalAccountId);
 
     Optional<AccountBinding> findByUserId(Long userId);
+    List<AccountBinding> findByUserIdIn(Collection<Long> userIds);
 
     long deleteByUserId(Long userId);
 }
