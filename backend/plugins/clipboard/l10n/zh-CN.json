@@ -1,0 +1,5 @@
+{
+  "plugin.name": "剪贴板",
+  "plugin.description": "查找剪贴记录、复制和插入内容。",
+  "view.main.name": "剪贴板"
+}

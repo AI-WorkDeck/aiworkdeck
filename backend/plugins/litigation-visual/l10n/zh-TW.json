@@ -1,0 +1,5 @@
+{
+  "plugin.name": "訴訟視覺化",
+  "plugin.description": "選擇案卷材料，生成並管理可編輯的訴訟圖表。",
+  "view.main.name": "訴訟視覺化"
+}

@@ -290,6 +290,7 @@ export default {
 <style lang="scss" scoped>
 @import '@/components/settings/settings.scss';
 
+.te { display: block; }
 .te-hint { margin-bottom: var(--awd-space-2); }
 .te-toolbar {
   display: flex;

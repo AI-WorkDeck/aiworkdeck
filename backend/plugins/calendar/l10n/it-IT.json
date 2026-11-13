@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Calendario",
+  "plugin.description": "Calendario multiprogetto, attività, promemoria e collegamenti ai file.",
+  "view.sidebar.name": "Calendario",
+  "view.main.name": "Calendario"
+}

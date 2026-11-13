@@ -1,0 +1,119 @@
+{
+  "id": "aurora-glass",
+  "name": "深海极光 · 冰刃琉璃",
+  "previewSwatches": ["#EFF5FA", "#026AA7", "#8B5CF6", "#0B131E"],
+  "effects": {
+    "aiPulseStyle": "aurora-pulse",
+    "surfaceTexture": "frosted-glass"
+  },
+  "roles": {
+    "light": {
+      "bg": "#EFF5FA",
+      "surface": "#F9FCFF",
+      "surface-2": "#E3EEF7",
+      "surface-3": "#D4E4F2",
+      "surface-elevated": "#FFFFFF",
+      "canvas": "#DCEAF5",
+
+      "text": "#0F1E2E",
+      "text-2": "#465A70",
+      "text-3": "#677D94",
+      "text-on-accent": "#FFFFFF",
+      "text-on-mint": "#0B2938",
+
+      "border-subtle": "#DFECF5",
+      "border": "#C9DCEB",
+      "border-strong": "#6F8CA3",
+
+      "accent": "#026AA7",
+      "accent-hover": "#01568A",
+      "accent-text": "#026199",
+      "accent-soft": "#E0F1FC",
+      "accent-wash": "rgba(2, 106, 167, 0.06)",
+
+      "mint": "#4BA3C7",
+      "bamboo": "#4BA3C7",
+
+      "gold": "#8B5CF6",
+      "gold-line": "#7C3AED",
+      "gold-text": "#6D28D9",
+      "gold-soft": "#F1EBFE",
+
+      "danger": "#C24141",
+      "danger-text": "#992E2E",
+      "danger-soft": "#FCEEEE",
+      "warning": "#B87A1E",
+      "warning-text": "#875711",
+      "warning-soft": "#FAF1E1",
+      "info": "#026AA7",
+      "info-text": "#014F7D",
+      "info-soft": "#E3F2FC",
+
+      "overlay": "rgba(11, 19, 30, 0.45)",
+      "glass": "rgba(249, 252, 255, 0.82)",
+      "glass-border": "rgba(255, 255, 255, 0.65)",
+
+      "halo-1": "#E0F1FC",
+      "halo-2": "rgba(139, 92, 246, 0.05)",
+      "halo-page": "#E0F1FC",
+
+      "shadow-sm": "0 1px 2px rgba(15, 30, 46, 0.06)",
+      "shadow-md": "0 4px 16px rgba(15, 30, 46, 0.09)",
+      "shadow-lg": "0 12px 32px rgba(15, 30, 46, 0.16)"
+    },
+    "dark": {
+      "bg": "#0B131E",
+      "surface": "#111D2E",
+      "surface-2": "#18283E",
+      "surface-3": "#213550",
+      "surface-elevated": "#16263B",
+      "canvas": "#070D15",
+
+      "text": "#E6F1FA",
+      "text-2": "#9EB4C9",
+      "text-3": "#738CA6",
+      "text-on-accent": "#FFFFFF",
+      "text-on-mint": "#081C29",
+
+      "border-subtle": "#192940",
+      "border": "#263D5C",
+      "border-strong": "#5A7899",
+
+      "accent": "#0284C7",
+      "accent-hover": "#0EA5E9",
+      "accent-text": "#58C4F6",
+      "accent-soft": "rgba(56, 189, 248, 0.16)",
+      "accent-wash": "rgba(56, 189, 248, 0.07)",
+
+      "mint": "#58C4F6",
+      "bamboo": "#58C4F6",
+
+      "gold": "#A855F7",
+      "gold-line": "#7E22CE",
+      "gold-text": "#C084FC",
+      "gold-soft": "rgba(168, 85, 247, 0.16)",
+
+      "danger": "#E06363",
+      "danger-text": "#F29494",
+      "danger-soft": "rgba(194, 65, 65, 0.18)",
+      "warning": "#DEA043",
+      "warning-text": "#F0BD6E",
+      "warning-soft": "rgba(184, 122, 30, 0.16)",
+      "info": "#38BDF8",
+      "info-text": "#7DD3FC",
+      "info-soft": "rgba(2, 132, 199, 0.22)",
+
+      "overlay": "rgba(5, 10, 18, 0.68)",
+      "glass": "rgba(17, 29, 46, 0.78)",
+      "glass-border": "rgba(56, 189, 248, 0.18)",
+
+      "halo-1": "rgba(56, 189, 248, 0.09)",
+      "halo-2": "rgba(168, 85, 247, 0.05)",
+      "halo-page": "#0E1826",
+
+      "shadow-sm": "0 1px 2px rgba(2, 6, 12, 0.48)",
+      "shadow-md": "0 4px 16px rgba(2, 6, 12, 0.55)",
+      "shadow-lg": "0 12px 32px rgba(2, 6, 12, 0.68)"
+    }
+  }
+}

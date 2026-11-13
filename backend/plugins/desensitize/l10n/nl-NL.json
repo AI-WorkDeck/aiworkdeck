@@ -1,0 +1,7 @@
+{
+  "plugin.name": "Bestandsredactie",
+  "plugin.description": "Inspecteer gevoelige informatie, genereer geanonimiseerde kopieën en herstel met herstelpakketten.",
+  "view.main.name": "Bestandsredactie",
+  "tool.desensitize_preview.desc": "Voorbeeld van gevoelige gegevens die in een projectbestand zouden worden afgeschermd (alleen lezen, maakt geen bestand aan). Gebruiken wanneer de gebruiker vooraf wil zien welke gevoelige gegevens in een bestand zouden worden afgeschermd.",
+  "tool.desensitize_redact.desc": "Schermt gevoelige gegevens in een projectbestand af en slaat een NIEUWE afgeschermde kopie op; het origineel wordt nooit overschreven. Gebruiken wanneer de gebruiker een bestand wil afschermen, anonimiseren of maskeren (maskermodus, niet herstelbaar)."
+}

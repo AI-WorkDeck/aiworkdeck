@@ -1,0 +1,5 @@
+{
+  "plugin.name": "項目搜索",
+  "plugin.description": "按正文、標籤搜索項目文件，並定位到文檔。",
+  "view.main.name": "項目搜索"
+}

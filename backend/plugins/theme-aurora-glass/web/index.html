@@ -1,0 +1,114 @@
+<!doctype html>
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="en-US">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title data-i18n="plugin.name"></title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --skin-bg: #EFF5FA;
+      --skin-surface: #F9FCFF;
+      --skin-text: #0F1E2E;
+      --skin-text-2: #465A70;
+      --skin-border: #C9DCEB;
+      --skin-accent-soft: #E0F1FC;
+      --skin-accent-text: #026199;
+    }
+    html[data-theme='dark'] {
+      --skin-bg: #0B131E;
+      --skin-surface: #121E2F;
+      --skin-text: #EAF2FA;
+      --skin-text-2: #9AB0C7;
+      --skin-border: #263B54;
+      --skin-accent-soft: rgba(56, 189, 248, 0.16);
+      --skin-accent-text: #7DD3FC;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--awd-font-sans, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif);
+      background: transparent;
+      color: var(--skin-text);
+      padding: 2px;
+      line-height: 1.5;
+      overflow: hidden;
+    }
+    .card {
+      background: var(--skin-surface);
+      border: 1px solid var(--skin-border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .subtitle {
+      color: var(--skin-text-2);
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .swatch {
+      background: var(--skin-bg);
+      border: 1px solid var(--skin-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .swatch-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      margin-bottom: 6px;
+      border: 1px solid rgba(128,128,128,0.28);
+    }
+    .swatch-hex {
+      color: var(--skin-text-2);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--skin-accent-soft);
+      color: var(--skin-accent-text);
+      font-size: 11px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="head-row">
+      <h1 class="title" data-i18n="plugin.name"></h1>
+      <span class="badge" data-i18n="gallery.badge"></span>
+    </div>
+    <p class="subtitle" data-i18n="plugin.desc"></p>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-dot" style="background:#EFF5FA"></div><strong data-i18n="gallery.swatch1"></strong><div class="swatch-hex">#EFF5FA</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#026AA7"></div><strong data-i18n="gallery.swatch2"></strong><div class="swatch-hex">#026AA7</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#8B5CF6"></div><strong data-i18n="gallery.swatch3"></strong><div class="swatch-hex">#8B5CF6</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#38BDF8"></div><strong data-i18n="gallery.swatch4"></strong><div class="swatch-hex">#38BDF8</div></div>
+      <div class="swatch"><div class="swatch-dot" style="background:#0B131E"></div><strong data-i18n="gallery.swatch5"></strong><div class="swatch-hex">#0B131E</div></div>
+    </div>
+  </div>
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="gallery-l10n.js"></script>
+  <script src="gallery.js"></script>
+</body>
+</html>

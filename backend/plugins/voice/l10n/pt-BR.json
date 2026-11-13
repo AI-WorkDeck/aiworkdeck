@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Voz e fala",
+  "plugin.description": "Leitura em voz alta instantânea, controle de velocidade em tempo real, destaque de legendas e gravação de reuniões.",
+  "view.main.name": "Voz e fala"
+}

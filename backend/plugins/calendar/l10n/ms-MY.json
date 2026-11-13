@@ -1,0 +1,6 @@
+{
+  "plugin.name": "Kalendar",
+  "plugin.description": "Kalendar merentas projek, tugasan, peringatan dan pautan fail.",
+  "view.sidebar.name": "Kalendar",
+  "view.main.name": "Kalendar"
+}

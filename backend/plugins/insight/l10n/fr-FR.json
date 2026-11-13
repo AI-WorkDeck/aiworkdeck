@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Preuves et Insights",
+  "plugin.description": "Récupération des preuves documentaires, vérification de cohérence et revue de contrat.",
+  "view.main.name": "Preuves et Insights"
+}

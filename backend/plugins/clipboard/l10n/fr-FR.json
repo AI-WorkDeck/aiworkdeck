@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Presse-papiers",
+  "plugin.description": "Recherchez dans l'historique du presse-papiers, copiez et insérez du contenu.",
+  "view.main.name": "Presse-papiers"
+}

@@ -1,0 +1,7 @@
+{
+  "plugin.name": "File Redaction",
+  "plugin.description": "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.",
+  "view.main.name": "File Redaction",
+  "tool.desensitize_preview.desc": "Preview which sensitive items in a project file would be redacted (read-only, creates no file). Use when the user wants to preview what sensitive information in a file would be redacted.",
+  "tool.desensitize_redact.desc": "Redact sensitive information in a project file and save it as a NEW redacted copy; the original is never overwritten. Use when the user asks to redact, anonymize or mask a file (mask mode, not restorable)."
+}

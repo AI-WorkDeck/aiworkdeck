@@ -1,0 +1,5 @@
+{
+  "plugin.name": "Project zoeken",
+  "plugin.description": "Zoek projectbestanden op volledige tekst of tags en spring direct naar documenten.",
+  "view.main.name": "Project zoeken"
+}
