@@ -131,3 +131,46 @@ test('merge keeps ids unique and updates same-source entries', () => {
   assert.equal(new Set(m.library.credentials.map((c) => c.id)).size, m.library.credentials.length)
   assert.equal(m.library.credentials.find((c) => c.id === 'c2').summary, '更新')
 })
+
+test('share payload carries only chosen fields and the real client only when ticked', () => {
+  const c = Object.assign({}, lib.credentials[0], { secret: 'x', share: { scope: 'team' } })
+  const p = core.sharePayload('credentials', c, false)
+  assert.equal(p.client, undefined)
+  assert.equal(p.secret, undefined)
+  assert.equal(p.clientAlias, lib.credentials[0].clientAlias)
+  assert.equal(core.sharePayload('credentials', c, true).client, lib.credentials[0].client)
+  const l = core.sharePayload('lawyers', lib.lawyers[0], true)
+  assert.equal(l.name, lib.lawyers[0].name)
+  assert.equal(l.client, undefined)
+})
+
+test('shared entries join the working library with author and x: ids, and are masked like own entries', () => {
+  const merged = core.withShared(lib, [
+    { id: 'u1', kind: 'credential', owner: '律师乙', payload: { title: '瀚海港务集团常年法律顾问', client: '瀚海港务集团有限公司', clientAlias: '某省属港口国有企业', year: '2025' } },
+    { id: 'u2', kind: 'lawyer', owner: '律师乙', payload: { name: '苏明远', title: '合伙人' } },
+    { id: 'u3', kind: 'credential', owner: '律师丙', payload: {} }
+  ])
+  assert.equal(merged.credentials.length, lib.credentials.length + 1)
+  const x = merged.credentials.at(-1)
+  assert.equal(x.id, 'x:u1')
+  assert.equal(x.owner, '律师乙')
+  assert.equal(merged.lawyers.at(-1).id, 'x:u2')
+  assert.ok(!core.libraryDigest(merged, '港口', 20000).text.includes('瀚海港务集团有限公司'))
+  assert.equal(core.maskClients(merged, x.title), '某省属港口国有企业常年法律顾问')
+  assert.equal(core.normalizeLibrary(lib).credentials.length, lib.credentials.length) // 不改动本人库
+})
+
+test('experience draft prompt stays within limits and the draft is private, attributed and sourced', () => {
+  const facts = { projectId: 42, lawyer: '沈知远', intake: { title: '某仲裁案', clientName: '甲公司', practiceAreaLabel: '争议解决', status: 'CLOSED' },
+    worklog: { totalHours: 12.5, from: '2026-01-02', to: '2026-03-01', byMonth: [{ month: '2026-01', hours: 10 }], byCategory: [], topFiles: [{ name: '仲裁申请书.docx', hours: 6 }] },
+    docs: [{ name: '仲裁申请书.docx', text: '申请人'.repeat(5000) }, { name: '裁决书.pdf', text: '裁决'.repeat(5000) }] }
+  const req = core.draftRequest(facts, 'zh-CN')
+  assert.ok(req.system.length + req.prompt.length <= 16000)
+  assert.ok(req.prompt.includes('12.5 hours'))
+  const draft = core.parseDraft(JSON.stringify({ title: '某仲裁案代理', role: '主办律师', clientAlias: '某制造企业', summary: '代理某制造企业仲裁' }), facts)
+  assert.equal(draft.source, 'project:42')
+  assert.deepEqual(draft.lawyers, ['沈知远'])
+  assert.equal(draft.share.scope, 'private')
+  assert.equal(draft.client, '甲公司')
+  assert.equal(core.parseDraft('{"role":"x"}', facts), null)
+})

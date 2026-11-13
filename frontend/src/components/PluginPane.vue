@@ -58,7 +58,7 @@ import {
   getPlugins, getProjectFiles, getFileText, getAiConversations, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm, requestPluginNotifications,
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
-  getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
+  getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags, getProjectWorklogSummary,
   getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile, getSensitiveRecovery,
   getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall
 } from '@/services/api.js'
@@ -450,7 +450,15 @@ export default {
         const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
         const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles() })
         this._businessServices = createPluginBusinessServices({
-          delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal) },
+          delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal),
+            // 工作记录汇总：只读、只含本人、只给聚合数；须声明 worklog_read（安装时向用户展示）
+            worklog: async (operation) => {
+              if (operation !== 'summary') throw Object.assign(new Error('Unknown service operation'), { code: 'unknown_operation' })
+              if (!this.hasPermission('worklog_read')) throw Object.assign(new Error('worklog_read is required'), { code: 'permission_denied' })
+              if (!this.projectId) throw Object.assign(new Error('A project is required'), { code: 'no_project' })
+              const res = await getProjectWorklogSummary(this.projectId)
+              return res && res.data !== undefined ? res.data : res
+            } },
           api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile, getSensitiveRecovery,
             getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall },
           projectId: () => this.projectId,

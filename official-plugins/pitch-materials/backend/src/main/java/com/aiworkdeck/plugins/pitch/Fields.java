@@ -17,13 +17,13 @@ final class Fields {
             {"date", "日期"}, {"team.lead", "团队负责人"}, {"service.text", "服务方案"}, {"quote.mode", "报价方式"},
             {"quote.total", "报价合计"}, {"quote.totalUpper", "报价大写"}, {"quote.note", "报价说明"}};
     static final Map<String, List<String>> LISTS = Map.of(
-            "业绩", List.of("序号", "名称", "客户", "领域", "年份", "金额", "角色", "简介", "律师"),
+            "业绩", List.of("序号", "名称", "客户", "领域", "年份", "金额", "角色", "简介", "律师", "服务内容", "亮点", "结果", "期间", "来源"),
             "律师", List.of("序号", "姓名", "职务", "领域", "执业年份", "教育", "简介"),
             "资质", List.of("序号", "名称", "类型", "颁发机构", "年份"),
             "报价", List.of("序号", "项目", "计算", "金额"),
             "对照", List.of("序号", "类型", "要求", "分值", "结论", "依据", "缺口"));
     private static final String[][] LIST_EN = {
-            {"credentials", "业绩", "no:序号,title:名称,client:客户,area:领域,year:年份,amount:金额,role:角色,summary:简介,lawyers:律师"},
+            {"credentials", "业绩", "no:序号,title:名称,client:客户,area:领域,year:年份,amount:金额,role:角色,summary:简介,lawyers:律师,scope:服务内容,highlights:亮点,outcome:结果,period:期间,source:来源"},
             {"lawyers", "律师", "no:序号,name:姓名,title:职务,area:领域,since:执业年份,education:教育,bio:简介"},
             {"quals", "资质", "no:序号,name:名称,kind:类型,issuer:颁发机构,year:年份"},
             {"quote", "报价", "no:序号,item:项目,basis:计算,amount:金额"},

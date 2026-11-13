@@ -331,6 +331,20 @@ class HostServiceRegistryTest {
         assertEquals("无权访问该会话", e.getMessage());
     }
 
+    @Test
+    void worklogSummaryIsOwnRecordsOnlyAndNeedsProjectReadAccess() {
+        var worklog = mock(com.checkba.service.activity.WorklogSummaryService.class);
+        registry.setWorklog(worklog);
+        when(members.hasReadPermission(9L, 7L)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("worklog", "summary", 7L, 9L, Map.of("userId", 99)));
+        verify(worklog, never()).summarize(any(), any());
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        when(worklog.summarize(7L, 5L)).thenReturn(Map.of("totalHours", 3.5));
+        // 模型传的 userId 不影响：只按服务端身份汇总
+        assertTrue(registry.invoke("worklog", "summary", 7L, 5L, Map.of("userId", 99)).contains("3.5"));
+        verify(worklog).summarize(7L, 5L);
+    }
+
     private static Long eq5() { return org.mockito.ArgumentMatchers.eq(5L); }
     private static Long eq7() { return org.mockito.ArgumentMatchers.eq(7L); }
 }

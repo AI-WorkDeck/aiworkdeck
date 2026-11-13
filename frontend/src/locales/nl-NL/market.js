@@ -222,6 +222,7 @@ export default {
   "permTasks": "Agenda en taken",
   "permClipboard": "Klembord",
   "permLawfirm": "Teaminformatie",
+  "permWorklogRead": "Overzicht van je eigen werkregistraties",
   "newlyCreatedTag": "Nieuw",
   "publishBtn": "Publiceren op Marktplaats",
   "publishUpdateBtn": "Bijwerken op Marktplaats",

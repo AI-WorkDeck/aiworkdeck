@@ -222,6 +222,7 @@ export default {
   "permTasks": "캘린더 및 작업",
   "permClipboard": "클립보드",
   "permLawfirm": "팀 정보",
+  "permWorklogRead": "본인 작업 기록 요약",
   "newlyCreatedTag": "신규",
   "publishBtn": "마켓플레이스에 게시",
   "publishUpdateBtn": "마켓플레이스 업데이트",
