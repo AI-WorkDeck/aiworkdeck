@@ -863,6 +863,8 @@ async function measureColdBurst(name, variant, { trace = false } = {}) {
     }, 50)
   })
   const traceCdp = trace ? await startTrace(TRACE_COMPOSITOR) : null
+  // 与 measureDocument 同一枚时钟标记：trace 按 olb:click 的墙钟对齐，不必退回用首个 keydown 对齐
+  await page.evaluate(() => console.timeStamp('olb:click:' + Date.now()))
   const { clickAt } = await clickOpen(name)
   await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 50 }, editorExpr, name)
   const readyAt = Date.now()

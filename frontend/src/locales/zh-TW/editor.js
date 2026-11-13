@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "文檔無法打開：引擎無響應或文件損壞",
     "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",
+    "legacyTitle": "這是較舊的 Office 格式，目前的編輯器無法直接開啟。請用 Word / Excel / PowerPoint 或 WPS 開啟後另存為 .docx / .xlsx / .pptx，再重新開啟。",
     "passwordPrompt": "這個檔案設定了開啟密碼，請輸入密碼。",
     "passwordPlaceholder": "開啟密碼",
     "passwordOpen": "開啟",

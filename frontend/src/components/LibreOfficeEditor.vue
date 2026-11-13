@@ -32,7 +32,7 @@
           </view>
           <text class="libre-loading-dl">{{ $t('editor.openFailed.passwordNote') }}</text>
         </view>
-        <text v-if="!passwordPromptVisible" class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : $t('editor.openFailed.title') }}</text>
+        <text v-if="!passwordPromptVisible" class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : (openFailLegacy && openFailCode === 'DOC_REJECTED' ? $t('editor.openFailed.legacyTitle') : $t('editor.openFailed.title')) }}</text>
         <text v-if="!passwordPromptVisible" class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
         <view v-if="canReadOnlyPreview && openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="openReadOnlyPreview">
           <text>{{ $t('editor.openFailed.readOnlyPreview') }}</text>
@@ -390,6 +390,8 @@ export default {
       stuck: false,
       // 「文档无法打开」终态的诊断码（DOC_REJECTED / EDITOR_LOAD_TIMEOUT，见 editorLoadFailure.js）
       openFailCode: '',
+      // 引擎拒收的是一份结构完整的老 Office 文件（.doc/.xls/.ppt）：说「格式过旧」而不是「损坏」
+      openFailLegacy: false,
       // 打开密码框（O14）：输入值只在提交前存在；state '' | checking | wrong | error | unsupported
       passwordInput: '',
       passwordState: '',
@@ -1734,6 +1736,14 @@ export default {
           // 下载超时/网络错 = 请检查网络、其余（含引擎装载失败与 relay 超时）
           // 沿用 loadFailed。几个 key 都以 'Failed' 结尾，既有判据不必改。
           if (open) this.openFailCode = open.code
+          this.openFailLegacy = false
+          if (open && open.code === DIAG_DOC_REJECTED && this._legacyProbe) {
+            try {
+              const { detectLegacyFormat } = await import('@/utils/legacyOfficeDecrypt.js')
+              this.openFailLegacy = !!detectLegacyFormat(this._legacyProbe.bytes, this._legacyProbe.name)
+            } catch (err) { /* 判不出就按原来的泛化文案 */ }
+          }
+          this._legacyProbe = null
           this.statusKey = open ? open.statusKey : classifyLoadFailure(e)
           // 记下这次失败时的世代号——迟到的 load_document 结果（见
           // onLateLoadResult）只在世代仍相符（没有更晚的装载尝试发生过）时
@@ -2087,6 +2097,8 @@ export default {
           bytes = plain
         }
       }
+      // 引擎拒收时用来区分「格式过旧」与「损坏」：只留旧格式文件的字节引用，失败分支用完即清
+      this._legacyProbe = /\.(doc|xls|ppt)$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf ? { bytes, name } : null
       // office 是单线程消息循环，两条 load_document 会按到达顺序依次执行，后到的
       // 那条把先装好的文档整个换掉——被取代的这次到此为止，不再发命令。
       if (seq !== (this._docLoadSeq || 0)) throw new Error('装载已被更晚的一次尝试取代 / load superseded')

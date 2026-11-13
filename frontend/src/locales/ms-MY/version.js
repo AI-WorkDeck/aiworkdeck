@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Gagal memuatkan versi baharu",
   "compareGenerateFailed": "Gagal menjana perbandingan",
   "compareEmptyContent": "Versi ini tiada kandungan untuk fail ini",
+  "officePasswordProtected": "Fail ini dilindungi kata laluan pembukaan, jadi perbandingan dan penggabungan belum disokong. Simpan dahulu salinan tanpa kata laluan.",
   "compareFailedRetry": "Gagal menjana perbandingan. Sila cuba lagi nanti.",
   "compareTimeout": "Penyediaan perbandingan tamat masa. Sila tutup dan cuba lagi.",
   "compareIframeLoadFailed": "Gagal memuatkan halaman penyunting",

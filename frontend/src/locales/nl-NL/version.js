@@ -103,6 +103,7 @@ export default {
   "compareLoadNewFailed": "Kan de nieuwere versie niet laden",
   "compareGenerateFailed": "Kan de vergelijking niet genereren",
   "compareEmptyContent": "Deze versie heeft geen inhoud voor dit bestand",
+  "officePasswordProtected": "Dit bestand is beveiligd met een openingswachtwoord; vergelijken en samenvoegen worden nog niet ondersteund. Sla eerst een kopie zonder wachtwoord op.",
   "compareFailedRetry": "Kan de vergelijking niet genereren. Probeer het later opnieuw.",
   "compareTimeout": "Time-out bij vergelijken. Sluit af en probeer het opnieuw.",
   "compareIframeLoadFailed": "Kan de editorpagina niet laden",

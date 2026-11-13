@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "문서를 열 수 없습니다: 편집기가 응답하지 않거나 파일이 손상되었습니다",
     "encryptedTitle": "이 파일에는 열기 암호가 설정되어 있어 편집기에서 아직 열 수 없습니다. Excel, Word, PowerPoint 또는 WPS에서 암호를 해제한 뒤 다시 열거나 원본 파일을 다운로드하세요.",
+    "legacyTitle": "오래된 Office 형식이라 편집기에서 바로 열 수 없습니다. Word / Excel / PowerPoint 또는 WPS에서 연 뒤 .docx / .xlsx / .pptx로 저장하고 다시 열어 주세요.",
     "passwordPrompt": "이 파일에는 열기 암호가 설정되어 있습니다. 암호를 입력하세요.",
     "passwordPlaceholder": "암호",
     "passwordOpen": "열기",

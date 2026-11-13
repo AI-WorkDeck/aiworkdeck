@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: penyunting tidak memberi respons atau fail rosak",
     "encryptedTitle": "Fail ini dilindungi kata laluan pembukaan yang belum boleh dibuka oleh penyunting. Buang kata laluan dalam Excel, Word, PowerPoint atau WPS dan buka semula, atau muat turun fail asal.",
+    "legacyTitle": "Ini format Office lama yang tidak boleh dibuka terus oleh editor. Buka dalam Word, Excel, PowerPoint atau WPS, simpan sebagai .docx / .xlsx / .pptx, kemudian buka semula.",
     "passwordPrompt": "Fail ini dilindungi kata laluan pembukaan. Masukkan kata laluan untuk membukanya.",
     "passwordPlaceholder": "Kata laluan",
     "passwordOpen": "Buka",

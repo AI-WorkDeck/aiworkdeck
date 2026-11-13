@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "لا يمكن فتح المستند: المحرر لا يستجيب أو الملف تالف",
     "encryptedTitle": "هذا الملف محمي بكلمة مرور للفتح، ولا يمكن للمحرر فتحه بعد. أزل كلمة المرور في Excel أو Word أو PowerPoint أو WPS ثم افتحه مجدداً، أو نزّل الملف الأصلي.",
+    "legacyTitle": "هذه صيغة Office قديمة لا يستطيع المحرر فتحها مباشرة. افتحها في Word أو Excel أو PowerPoint أو WPS واحفظها بصيغة .docx / .xlsx / .pptx ثم افتحها مجددًا.",
     "passwordPrompt": "هذا الملف محمي بكلمة مرور للفتح. أدخل كلمة المرور لفتحه.",
     "passwordPlaceholder": "كلمة المرور",
     "passwordOpen": "فتح",

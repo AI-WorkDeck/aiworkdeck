@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Não é possível abrir o documento: o editor não está respondendo ou o arquivo está danificado",
     "encryptedTitle": "Este arquivo está protegido por senha de abertura, que o editor ainda não consegue abrir. Remova a senha no Excel, Word, PowerPoint ou WPS e abra novamente, ou baixe o original.",
+    "legacyTitle": "Este é um formato antigo do Office que o editor não consegue abrir diretamente. Abra-o no Word, Excel, PowerPoint ou WPS, salve como .docx / .xlsx / .pptx e abra novamente.",
     "passwordPrompt": "Este arquivo está protegido por senha de abertura. Digite a senha para abri-lo.",
     "passwordPlaceholder": "Senha",
     "passwordOpen": "Abrir",

@@ -135,6 +135,7 @@ export default {
   "openFailed": {
     "title": "Không thể mở tài liệu: trình soạn thảo không phản hồi hoặc tệp bị hỏng",
     "encryptedTitle": "Tệp này được bảo vệ bằng mật khẩu mở mà trình soạn thảo chưa mở được. Hãy gỡ mật khẩu trong Excel, Word, PowerPoint hoặc WPS rồi mở lại, hoặc tải tệp gốc xuống.",
+    "legacyTitle": "Đây là định dạng Office cũ mà trình soạn thảo không thể mở trực tiếp. Hãy mở bằng Word, Excel, PowerPoint hoặc WPS, lưu thành .docx / .xlsx / .pptx rồi mở lại.",
     "passwordPrompt": "Tệp này được bảo vệ bằng mật khẩu mở. Nhập mật khẩu để mở tệp.",
     "passwordPlaceholder": "Mật khẩu",
     "passwordOpen": "Mở",
