@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Teklif ve deneyim kayıtları",
   "cloud.feature.pitch.desc": "Açıldığında avukatlar deneyim kayıtlarını ekipleriyle veya tüm büroyla paylaşarak ihalelerde ve müvekkil tekliflerinde kullanabilir.",
   "cloud.feature.other.name": "Büro bulutu özelliği ({key})",
-  "cloud.feature.other.desc": "Bu özelliğin hangi verileri sakladığı için gizlilik notuna bakın."
+  "cloud.feature.other.desc": "Bu özelliğin hangi verileri sakladığı için gizlilik notuna bakın.",
+  "cloud.turnOffPurge": "Kapat ve bulut verilerini sil"
 }

@@ -64,7 +64,10 @@ test('admin sees every registered feature and toggles with the version they saw'
   assert.deepEqual(h.calls.at(-1), { action: 'cloud.settings.set', params: { feature: 'clients', enabled: true, purge: false, expectedVersion: 2 } });
   assert.match(h.$('cl-status').textContent, /已开启：客户与主体资料/);
   const time = h.doc.querySelector('[data-feature="time"]');
-  time.querySelector('[data-field="purge"]').checked = true;
+  const purgeBox = time.querySelector('[data-field="purge"]');
+  purgeBox.checked = true;
+  purgeBox.dispatchEvent(new h.dom.window.Event('change'));
+  assert.equal(time.querySelector('[data-action="turn-off"]').textContent, '关闭并删除云端数据', 'deleting is spelled out on the button');
   await h.click(time.querySelector('[data-action="turn-off"]'));
   assert.deepEqual(h.calls.at(-1).params, { feature: 'time', enabled: false, purge: true, expectedVersion: 3 });
   assert.match(h.$('cl-status').textContent, /已删除云端保存的该项数据/);

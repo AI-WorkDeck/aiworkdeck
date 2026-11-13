@@ -155,6 +155,9 @@ class LawFirmCloudServiceTest {
         assertThrows(IllegalStateException.class, () -> cloud.execute(otherAdmin, "time.mine", Map.of()));
         assertEquals(false, switches(cloud.execute(otherAdmin, LawFirmCloudService.SETTINGS_GET, Map.of())).get("time"));
         assertFalse(cloud.isEnabled("other-" + firm, "time"));
+        LawFirmCloudSwitches switches = cloud;
+        assertTrue(switches.enabled(firm, "time"), "features (e.g. cloud conflict using shared parties) can re-check a switch");
+        assertFalse(switches.enabled(firm, "pitch"));
         assertTrue(cloud.isEnabled(firm, "time"));
     }
 

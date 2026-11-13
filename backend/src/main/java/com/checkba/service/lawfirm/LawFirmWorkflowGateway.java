@@ -15,7 +15,7 @@ import java.util.*;
 
 /** No user-supplied endpoint and no fallback to the legacy local ledger. */
 @Service
-public class LawFirmWorkflowGateway {
+public class LawFirmWorkflowGateway implements LawFirmCloudCaller {
     private final boolean local;
     private final OfficialCloudService cloud;
     private final AccountService account;
@@ -44,6 +44,9 @@ public class LawFirmWorkflowGateway {
      * 只认服务端登记过的动作（{@link LawFirmCloudService#featureOf}），大小上限按功能定。云端不可用或账户已变化时直接报错，
      * 不回落到本机台账。
      */
+    @Override
+    public Map<String,Object> call(Long userId,String action,Map<String,Object> params){return executeCloud(userId,action,params);}
+
     public boolean isCloudAction(String action){return firmCloud!=null&&firmCloud.featureOf(action)!=null;}
 
     /** 插件桥入口：只放行该插件被登记允许的云端动作（最小权限），其余一律拒绝，不落到本机台账。 */

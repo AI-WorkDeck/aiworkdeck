@@ -74,6 +74,8 @@ class LawFirmWorkflowGatewayTest {
             assertEquals(true,gateway.executeCloud(1L,"time.mine",Map.of()).get("ok"));
             assertEquals("/api/lawfirm/cloud",path.get());assertEquals("synthetic-token",token.get());
             assertEquals(true,gateway.executeCloud(1L,"cloud.settings.get",Map.of()).get("ok"));
+            LawFirmCloudCaller caller=gateway;
+            assertEquals(true,caller.call(1L,"time.mine",Map.of()).get("ok"),"host services call the cloud through the same gateway");
             path.set(null);
             assertThrows(IllegalArgumentException.class,()->gateway.executeCloud(1L,"time.mine",Map.of("blob","x".repeat(2000))));
             assertThrows(IllegalArgumentException.class,()->gateway.executeCloud(1L,"workflowOverview",Map.of()),"conflict actions do not ride the cloud path");

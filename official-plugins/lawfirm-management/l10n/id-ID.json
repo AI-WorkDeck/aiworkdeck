@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Pitch dan entri pengalaman",
   "cloud.feature.pitch.desc": "Jika diaktifkan, advokat dapat membagikan entri pengalamannya kepada tim atau seluruh kantor untuk digunakan dalam tender dan proposal klien.",
   "cloud.feature.other.name": "Fitur cloud kantor ({key})",
-  "cloud.feature.other.desc": "Lihat catatan privasi untuk mengetahui data yang disimpan oleh fitur ini."
+  "cloud.feature.other.desc": "Lihat catatan privasi untuk mengetahui data yang disimpan oleh fitur ini.",
+  "cloud.turnOffPurge": "Matikan dan hapus data cloud"
 }

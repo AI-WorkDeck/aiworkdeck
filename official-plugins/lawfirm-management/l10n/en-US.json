@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Pitch and experience entries",
   "cloud.feature.pitch.desc": "When on, lawyers can share their experience entries with their team or the whole firm for use in tenders and client proposals.",
   "cloud.feature.other.name": "Firm cloud feature ({key})",
-  "cloud.feature.other.desc": "See the privacy note for what this feature stores."
+  "cloud.feature.other.desc": "See the privacy note for what this feature stores.",
+  "cloud.turnOffPurge": "Turn off and delete cloud data"
 }

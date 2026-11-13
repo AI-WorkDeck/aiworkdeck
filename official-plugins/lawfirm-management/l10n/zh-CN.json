@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "投标与业绩经历",
   "cloud.feature.pitch.desc": "开启后，律师可以把个人业绩经历条目共享到本团队或全所，供投标与客户提案材料引用。",
   "cloud.feature.other.name": "律所云端功能（{key}）",
-  "cloud.feature.other.desc": "该功能的数据说明请见隐私说明。"
+  "cloud.feature.other.desc": "该功能的数据说明请见隐私说明。",
+  "cloud.turnOffPurge": "关闭并删除云端数据"
 }

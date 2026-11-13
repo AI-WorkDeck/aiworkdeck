@@ -93,8 +93,13 @@
       const off = el('button', t('cloud.turnOff'));
       off.type = 'button';
       off.dataset.action = 'turn-off';
+      // 勾选删除后按钮文案随之变为「关闭并删除云端数据」，删除需要这次明确勾选加点击
+      purge.addEventListener('change', () => {
+        off.textContent = t(purge.checked ? 'cloud.turnOffPurge' : 'cloud.turnOff');
+        off.classList.toggle('danger', purge.checked);
+      });
       off.addEventListener('click', () => toggle(key, false, purge.checked, off));
-      row.append(off, purgeLabel);
+      row.append(purgeLabel, off);
     } else {
       const onBtn = el('button', t('cloud.turnOn'), 'primary');
       onBtn.type = 'button';

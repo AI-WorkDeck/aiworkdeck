@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Pitch und Referenzen",
   "cloud.feature.pitch.desc": "Wenn aktiviert, können Anwälte ihre Referenzeinträge mit ihrem Team oder der gesamten Kanzlei teilen, damit sie in Ausschreibungen und Mandantenangeboten verwendet werden können.",
   "cloud.feature.other.name": "Funktion der Kanzlei-Cloud ({key})",
-  "cloud.feature.other.desc": "Welche Daten diese Funktion speichert, finden Sie im Datenschutzhinweis."
+  "cloud.feature.other.desc": "Welche Daten diese Funktion speichert, finden Sie im Datenschutzhinweis.",
+  "cloud.turnOffPurge": "Ausschalten und Cloud-Daten löschen"
 }

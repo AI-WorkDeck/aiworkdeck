@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Propuestas y experiencia",
   "cloud.feature.pitch.desc": "Si se activa, los abogados pueden compartir sus entradas de experiencia con su equipo o con todo el despacho para usarlas en concursos y propuestas a clientes.",
   "cloud.feature.other.name": "Función de la nube del despacho ({key})",
-  "cloud.feature.other.desc": "Consulte la nota de privacidad para saber qué datos almacena esta función."
+  "cloud.feature.other.desc": "Consulte la nota de privacidad para saber qué datos almacena esta función.",
+  "cloud.turnOffPurge": "Desactivar y eliminar los datos en la nube"
 }

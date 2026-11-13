@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Pitches en ervaringsvermeldingen",
   "cloud.feature.pitch.desc": "Indien ingeschakeld kunnen advocaten hun ervaringsvermeldingen delen met hun team of het hele kantoor voor gebruik in aanbestedingen en voorstellen aan cliënten.",
   "cloud.feature.other.name": "Functie van de kantoorcloud ({key})",
-  "cloud.feature.other.desc": "Zie de privacyverklaring voor welke gegevens deze functie opslaat."
+  "cloud.feature.other.desc": "Zie de privacyverklaring voor welke gegevens deze functie opslaat.",
+  "cloud.turnOffPurge": "Uitschakelen en cloudgegevens verwijderen"
 }

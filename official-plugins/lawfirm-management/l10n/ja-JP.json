@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "提案書・実績経歴",
   "cloud.feature.pitch.desc": "オンにすると、弁護士は自身の実績経歴の項目をチームまたは事務所全体で共有でき、入札やクライアント向け提案資料で利用できます。",
   "cloud.feature.other.name": "事務所クラウド機能（{key}）",
-  "cloud.feature.other.desc": "この機能が保存するデータについては、プライバシーに関する説明をご覧ください。"
+  "cloud.feature.other.desc": "この機能が保存するデータについては、プライバシーに関する説明をご覧ください。",
+  "cloud.turnOffPurge": "オフにしてクラウドのデータを削除"
 }

@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "投標與業績經歷",
   "cloud.feature.pitch.desc": "開啟後，律師可以將個人業績經歷條目共享至本團隊或全所，供投標與客戶提案資料引用。",
   "cloud.feature.other.name": "律所雲端功能（{key}）",
-  "cloud.feature.other.desc": "該功能的資料說明請見隱私說明。"
+  "cloud.feature.other.desc": "該功能的資料說明請見隱私說明。",
+  "cloud.turnOffPurge": "關閉並刪除雲端資料"
 }

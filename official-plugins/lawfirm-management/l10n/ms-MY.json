@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Pitch dan entri pengalaman",
   "cloud.feature.pitch.desc": "Apabila dihidupkan, peguam boleh berkongsi entri pengalaman mereka dengan pasukan atau seluruh firma untuk digunakan dalam tender dan cadangan kepada klien.",
   "cloud.feature.other.name": "Ciri awan firma ({key})",
-  "cloud.feature.other.desc": "Lihat nota privasi untuk maklumat tentang data yang disimpan oleh ciri ini."
+  "cloud.feature.other.desc": "Lihat nota privasi untuk maklumat tentang data yang disimpan oleh ciri ini.",
+  "cloud.turnOffPurge": "Matikan dan padam data awan"
 }

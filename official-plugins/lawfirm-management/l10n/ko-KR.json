@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "입찰 및 수행 실적",
   "cloud.feature.pitch.desc": "켜면 변호사가 자신의 수행 실적 항목을 팀 또는 로펌 전체와 공유하여 입찰 및 의뢰인 제안서에 활용할 수 있습니다.",
   "cloud.feature.other.name": "로펌 클라우드 기능({key})",
-  "cloud.feature.other.desc": "이 기능이 저장하는 데이터는 개인정보 처리 안내를 참조하세요."
+  "cloud.feature.other.desc": "이 기능이 저장하는 데이터는 개인정보 처리 안내를 참조하세요.",
+  "cloud.turnOffPurge": "끄고 클라우드 데이터 삭제"
 }

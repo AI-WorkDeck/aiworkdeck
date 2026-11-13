@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Offerte ed esperienze",
   "cloud.feature.pitch.desc": "Se attiva, gli avvocati possono condividere le proprie voci di esperienza con il team o con l’intero studio per l’uso in gare e proposte ai clienti.",
   "cloud.feature.other.name": "Funzionalità del cloud dello studio ({key})",
-  "cloud.feature.other.desc": "Consulti l’informativa sulla privacy per sapere quali dati memorizza questa funzionalità."
+  "cloud.feature.other.desc": "Consulti l’informativa sulla privacy per sapere quali dati memorizza questa funzionalità.",
+  "cloud.turnOffPurge": "Disattiva ed elimina i dati nel cloud"
 }

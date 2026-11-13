@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Hồ sơ dự thầu và kinh nghiệm",
   "cloud.feature.pitch.desc": "Khi bật, luật sư có thể chia sẻ các mục kinh nghiệm của mình với nhóm hoặc toàn công ty để dùng trong hồ sơ dự thầu và đề xuất cho khách hàng.",
   "cloud.feature.other.name": "Tính năng đám mây công ty luật ({key})",
-  "cloud.feature.other.desc": "Xem ghi chú về quyền riêng tư để biết tính năng này lưu những dữ liệu gì."
+  "cloud.feature.other.desc": "Xem ghi chú về quyền riêng tư để biết tính năng này lưu những dữ liệu gì.",
+  "cloud.turnOffPurge": "Tắt và xóa dữ liệu trên đám mây"
 }

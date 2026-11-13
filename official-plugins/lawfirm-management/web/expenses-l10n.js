@@ -84,7 +84,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "العروض والخبرات",
     "cloud.feature.pitch.desc": "عند التفعيل، يمكن للمحامين مشاركة بنود خبراتهم مع فريقهم أو مع المكتب بأكمله لاستخدامها في المناقصات والعروض المقدمة للعملاء.",
     "cloud.feature.other.name": "ميزة سحابة المكتب ({key})",
-    "cloud.feature.other.desc": "راجع ملاحظة الخصوصية لمعرفة البيانات التي تحفظها هذه الميزة."
+    "cloud.feature.other.desc": "راجع ملاحظة الخصوصية لمعرفة البيانات التي تحفظها هذه الميزة.",
+    "cloud.turnOffPurge": "إيقاف وحذف البيانات السحابية"
   },
   "de-DE": {
     "expense.tab": "Mandatsauslagen",
@@ -168,7 +169,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Pitch und Referenzen",
     "cloud.feature.pitch.desc": "Wenn aktiviert, können Anwälte ihre Referenzeinträge mit ihrem Team oder der gesamten Kanzlei teilen, damit sie in Ausschreibungen und Mandantenangeboten verwendet werden können.",
     "cloud.feature.other.name": "Funktion der Kanzlei-Cloud ({key})",
-    "cloud.feature.other.desc": "Welche Daten diese Funktion speichert, finden Sie im Datenschutzhinweis."
+    "cloud.feature.other.desc": "Welche Daten diese Funktion speichert, finden Sie im Datenschutzhinweis.",
+    "cloud.turnOffPurge": "Ausschalten und Cloud-Daten löschen"
   },
   "el-GR": {
     "expense.tab": "Έξοδα υπόθεσης",
@@ -252,7 +254,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Προσφορές και καταχωρίσεις εμπειρίας",
     "cloud.feature.pitch.desc": "Όταν είναι ενεργή, οι δικηγόροι μπορούν να μοιράζονται τις καταχωρίσεις εμπειρίας τους με την ομάδα τους ή με όλο το γραφείο, για χρήση σε διαγωνισμούς και προτάσεις προς πελάτες.",
     "cloud.feature.other.name": "Λειτουργία cloud γραφείου ({key})",
-    "cloud.feature.other.desc": "Δείτε τη σημείωση απορρήτου για τα δεδομένα που αποθηκεύει αυτή η λειτουργία."
+    "cloud.feature.other.desc": "Δείτε τη σημείωση απορρήτου για τα δεδομένα που αποθηκεύει αυτή η λειτουργία.",
+    "cloud.turnOffPurge": "Απενεργοποίηση και διαγραφή δεδομένων cloud"
   },
   "en-US": {
     "expense.tab": "Matter expenses",
@@ -336,7 +339,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Pitch and experience entries",
     "cloud.feature.pitch.desc": "When on, lawyers can share their experience entries with their team or the whole firm for use in tenders and client proposals.",
     "cloud.feature.other.name": "Firm cloud feature ({key})",
-    "cloud.feature.other.desc": "See the privacy note for what this feature stores."
+    "cloud.feature.other.desc": "See the privacy note for what this feature stores.",
+    "cloud.turnOffPurge": "Turn off and delete cloud data"
   },
   "es-ES": {
     "expense.tab": "Gastos del asunto",
@@ -420,7 +424,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Propuestas y experiencia",
     "cloud.feature.pitch.desc": "Si se activa, los abogados pueden compartir sus entradas de experiencia con su equipo o con todo el despacho para usarlas en concursos y propuestas a clientes.",
     "cloud.feature.other.name": "Función de la nube del despacho ({key})",
-    "cloud.feature.other.desc": "Consulte la nota de privacidad para saber qué datos almacena esta función."
+    "cloud.feature.other.desc": "Consulte la nota de privacidad para saber qué datos almacena esta función.",
+    "cloud.turnOffPurge": "Desactivar y eliminar los datos en la nube"
   },
   "fr-FR": {
     "expense.tab": "Frais de dossier",
@@ -504,7 +509,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Appels d’offres et références",
     "cloud.feature.pitch.desc": "Lorsque cette option est activée, les avocats peuvent partager leurs références avec leur équipe ou l’ensemble du cabinet pour les appels d’offres et les propositions aux clients.",
     "cloud.feature.other.name": "Fonctionnalité du cloud du cabinet ({key})",
-    "cloud.feature.other.desc": "Consultez la note de confidentialité pour connaître les données stockées par cette fonctionnalité."
+    "cloud.feature.other.desc": "Consultez la note de confidentialité pour connaître les données stockées par cette fonctionnalité.",
+    "cloud.turnOffPurge": "Désactiver et supprimer les données cloud"
   },
   "hi-IN": {
     "expense.tab": "मामले के खर्च",
@@ -588,7 +594,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "निविदा और अनुभव प्रविष्टियाँ",
     "cloud.feature.pitch.desc": "चालू होने पर वकील अपनी अनुभव प्रविष्टियाँ अपनी टीम या पूरी फर्म के साथ साझा कर सकते हैं, ताकि उनका उपयोग निविदाओं और मुवक्किल प्रस्तावों में हो सके।",
     "cloud.feature.other.name": "फर्म क्लाउड सुविधा ({key})",
-    "cloud.feature.other.desc": "यह सुविधा क्या संग्रहीत करती है, इसके लिए गोपनीयता नोट देखें।"
+    "cloud.feature.other.desc": "यह सुविधा क्या संग्रहीत करती है, इसके लिए गोपनीयता नोट देखें।",
+    "cloud.turnOffPurge": "बंद करें और क्लाउड डेटा हटाएँ"
   },
   "id-ID": {
     "expense.tab": "Biaya Perkara",
@@ -672,7 +679,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Pitch dan entri pengalaman",
     "cloud.feature.pitch.desc": "Jika diaktifkan, advokat dapat membagikan entri pengalamannya kepada tim atau seluruh kantor untuk digunakan dalam tender dan proposal klien.",
     "cloud.feature.other.name": "Fitur cloud kantor ({key})",
-    "cloud.feature.other.desc": "Lihat catatan privasi untuk mengetahui data yang disimpan oleh fitur ini."
+    "cloud.feature.other.desc": "Lihat catatan privasi untuk mengetahui data yang disimpan oleh fitur ini.",
+    "cloud.turnOffPurge": "Matikan dan hapus data cloud"
   },
   "it-IT": {
     "expense.tab": "Spese di pratica",
@@ -756,7 +764,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Offerte ed esperienze",
     "cloud.feature.pitch.desc": "Se attiva, gli avvocati possono condividere le proprie voci di esperienza con il team o con l’intero studio per l’uso in gare e proposte ai clienti.",
     "cloud.feature.other.name": "Funzionalità del cloud dello studio ({key})",
-    "cloud.feature.other.desc": "Consulti l’informativa sulla privacy per sapere quali dati memorizza questa funzionalità."
+    "cloud.feature.other.desc": "Consulti l’informativa sulla privacy per sapere quali dati memorizza questa funzionalità.",
+    "cloud.turnOffPurge": "Disattiva ed elimina i dati nel cloud"
   },
   "ja-JP": {
     "expense.tab": "案件費用",
@@ -840,7 +849,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "提案書・実績経歴",
     "cloud.feature.pitch.desc": "オンにすると、弁護士は自身の実績経歴の項目をチームまたは事務所全体で共有でき、入札やクライアント向け提案資料で利用できます。",
     "cloud.feature.other.name": "事務所クラウド機能（{key}）",
-    "cloud.feature.other.desc": "この機能が保存するデータについては、プライバシーに関する説明をご覧ください。"
+    "cloud.feature.other.desc": "この機能が保存するデータについては、プライバシーに関する説明をご覧ください。",
+    "cloud.turnOffPurge": "オフにしてクラウドのデータを削除"
   },
   "ko-KR": {
     "expense.tab": "사건 비용",
@@ -924,7 +934,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "입찰 및 수행 실적",
     "cloud.feature.pitch.desc": "켜면 변호사가 자신의 수행 실적 항목을 팀 또는 로펌 전체와 공유하여 입찰 및 의뢰인 제안서에 활용할 수 있습니다.",
     "cloud.feature.other.name": "로펌 클라우드 기능({key})",
-    "cloud.feature.other.desc": "이 기능이 저장하는 데이터는 개인정보 처리 안내를 참조하세요."
+    "cloud.feature.other.desc": "이 기능이 저장하는 데이터는 개인정보 처리 안내를 참조하세요.",
+    "cloud.turnOffPurge": "끄고 클라우드 데이터 삭제"
   },
   "ms-MY": {
     "expense.tab": "Perbelanjaan Kes",
@@ -1008,7 +1019,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Pitch dan entri pengalaman",
     "cloud.feature.pitch.desc": "Apabila dihidupkan, peguam boleh berkongsi entri pengalaman mereka dengan pasukan atau seluruh firma untuk digunakan dalam tender dan cadangan kepada klien.",
     "cloud.feature.other.name": "Ciri awan firma ({key})",
-    "cloud.feature.other.desc": "Lihat nota privasi untuk maklumat tentang data yang disimpan oleh ciri ini."
+    "cloud.feature.other.desc": "Lihat nota privasi untuk maklumat tentang data yang disimpan oleh ciri ini.",
+    "cloud.turnOffPurge": "Matikan dan padam data awan"
   },
   "nl-NL": {
     "expense.tab": "Dossierkosten",
@@ -1092,7 +1104,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Pitches en ervaringsvermeldingen",
     "cloud.feature.pitch.desc": "Indien ingeschakeld kunnen advocaten hun ervaringsvermeldingen delen met hun team of het hele kantoor voor gebruik in aanbestedingen en voorstellen aan cliënten.",
     "cloud.feature.other.name": "Functie van de kantoorcloud ({key})",
-    "cloud.feature.other.desc": "Zie de privacyverklaring voor welke gegevens deze functie opslaat."
+    "cloud.feature.other.desc": "Zie de privacyverklaring voor welke gegevens deze functie opslaat.",
+    "cloud.turnOffPurge": "Uitschakelen en cloudgegevens verwijderen"
   },
   "pt-BR": {
     "expense.tab": "Despesas do caso",
@@ -1176,7 +1189,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Propostas e experiência",
     "cloud.feature.pitch.desc": "Quando ativado, os advogados podem compartilhar suas entradas de experiência com sua equipe ou com todo o escritório para uso em licitações e propostas a clientes.",
     "cloud.feature.other.name": "Recurso da nuvem do escritório ({key})",
-    "cloud.feature.other.desc": "Consulte a nota de privacidade para saber o que este recurso armazena."
+    "cloud.feature.other.desc": "Consulte a nota de privacidade para saber o que este recurso armazena.",
+    "cloud.turnOffPurge": "Desativar e excluir os dados na nuvem"
   },
   "ru-RU": {
     "expense.tab": "Расходы по делу",
@@ -1260,7 +1274,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Тендерные заявки и опыт",
     "cloud.feature.pitch.desc": "Если функция включена, юристы могут делиться записями о своём опыте со своей командой или со всей фирмой для использования в тендерах и предложениях клиентам.",
     "cloud.feature.other.name": "Функция облака фирмы ({key})",
-    "cloud.feature.other.desc": "О том, какие данные хранит эта функция, см. в уведомлении о конфиденциальности."
+    "cloud.feature.other.desc": "О том, какие данные хранит эта функция, см. в уведомлении о конфиденциальности.",
+    "cloud.turnOffPurge": "Отключить и удалить данные в облаке"
   },
   "th-TH": {
     "expense.tab": "ค่าใช้จ่ายคดี",
@@ -1344,7 +1359,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "ข้อเสนอและประสบการณ์ผลงาน",
     "cloud.feature.pitch.desc": "เมื่อเปิด ทนายความสามารถแชร์รายการประสบการณ์ผลงานของตนกับทีมหรือทั้งสำนักงาน เพื่อใช้ในการประมูลและข้อเสนอต่อลูกความ",
     "cloud.feature.other.name": "ฟีเจอร์คลาวด์สำนักงาน ({key})",
-    "cloud.feature.other.desc": "โปรดดูหมายเหตุความเป็นส่วนตัวสำหรับข้อมูลที่ฟีเจอร์นี้จัดเก็บ"
+    "cloud.feature.other.desc": "โปรดดูหมายเหตุความเป็นส่วนตัวสำหรับข้อมูลที่ฟีเจอร์นี้จัดเก็บ",
+    "cloud.turnOffPurge": "ปิดและลบข้อมูลบนคลาวด์"
   },
   "tr-TR": {
     "expense.tab": "Dosya Masrafları",
@@ -1428,7 +1444,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Teklif ve deneyim kayıtları",
     "cloud.feature.pitch.desc": "Açıldığında avukatlar deneyim kayıtlarını ekipleriyle veya tüm büroyla paylaşarak ihalelerde ve müvekkil tekliflerinde kullanabilir.",
     "cloud.feature.other.name": "Büro bulutu özelliği ({key})",
-    "cloud.feature.other.desc": "Bu özelliğin hangi verileri sakladığı için gizlilik notuna bakın."
+    "cloud.feature.other.desc": "Bu özelliğin hangi verileri sakladığı için gizlilik notuna bakın.",
+    "cloud.turnOffPurge": "Kapat ve bulut verilerini sil"
   },
   "vi-VN": {
     "expense.tab": "Chi phí vụ việc",
@@ -1512,7 +1529,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "Hồ sơ dự thầu và kinh nghiệm",
     "cloud.feature.pitch.desc": "Khi bật, luật sư có thể chia sẻ các mục kinh nghiệm của mình với nhóm hoặc toàn công ty để dùng trong hồ sơ dự thầu và đề xuất cho khách hàng.",
     "cloud.feature.other.name": "Tính năng đám mây công ty luật ({key})",
-    "cloud.feature.other.desc": "Xem ghi chú về quyền riêng tư để biết tính năng này lưu những dữ liệu gì."
+    "cloud.feature.other.desc": "Xem ghi chú về quyền riêng tư để biết tính năng này lưu những dữ liệu gì.",
+    "cloud.turnOffPurge": "Tắt và xóa dữ liệu trên đám mây"
   },
   "zh-CN": {
     "expense.tab": "办案费用",
@@ -1596,7 +1614,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "投标与业绩经历",
     "cloud.feature.pitch.desc": "开启后，律师可以把个人业绩经历条目共享到本团队或全所，供投标与客户提案材料引用。",
     "cloud.feature.other.name": "律所云端功能（{key}）",
-    "cloud.feature.other.desc": "该功能的数据说明请见隐私说明。"
+    "cloud.feature.other.desc": "该功能的数据说明请见隐私说明。",
+    "cloud.turnOffPurge": "关闭并删除云端数据"
   },
   "zh-TW": {
     "expense.tab": "辦案費用",
@@ -1680,6 +1699,7 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "cloud.feature.pitch.name": "投標與業績經歷",
     "cloud.feature.pitch.desc": "開啟後，律師可以將個人業績經歷條目共享至本團隊或全所，供投標與客戶提案資料引用。",
     "cloud.feature.other.name": "律所雲端功能（{key}）",
-    "cloud.feature.other.desc": "該功能的資料說明請見隱私說明。"
+    "cloud.feature.other.desc": "該功能的資料說明請見隱私說明。",
+    "cloud.turnOffPurge": "關閉並刪除雲端資料"
   }
 };

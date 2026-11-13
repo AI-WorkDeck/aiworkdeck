@@ -85,5 +85,6 @@
   "cloud.feature.pitch.name": "Appels d’offres et références",
   "cloud.feature.pitch.desc": "Lorsque cette option est activée, les avocats peuvent partager leurs références avec leur équipe ou l’ensemble du cabinet pour les appels d’offres et les propositions aux clients.",
   "cloud.feature.other.name": "Fonctionnalité du cloud du cabinet ({key})",
-  "cloud.feature.other.desc": "Consultez la note de confidentialité pour connaître les données stockées par cette fonctionnalité."
+  "cloud.feature.other.desc": "Consultez la note de confidentialité pour connaître les données stockées par cette fonctionnalité.",
+  "cloud.turnOffPurge": "Désactiver et supprimer les données cloud"
 }

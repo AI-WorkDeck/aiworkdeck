@@ -25,7 +25,7 @@ import java.util.*;
  * </ul>
  */
 @Service
-public class LawFirmCloudService {
+public class LawFirmCloudService implements LawFirmCloudSwitches {
 
     public static final String SETTINGS_GET = "cloud.settings.get";
     public static final String SETTINGS_SET = "cloud.settings.set";
@@ -92,7 +92,12 @@ public class LawFirmCloudService {
 
     /** 本律所是否开启了某功能（供各功能在自己的服务里复核）。 */
     public boolean isEnabled(String firmId, String feature) {
-        return enabled(row(firmId), feature);
+        return firmId != null && feature != null && enabled(row(firmId), feature);
+    }
+
+    @Override
+    public boolean enabled(String firmId, String feature) {
+        return isEnabled(firmId, feature);
     }
 
     private LawFirmCloudSettings row(String firmId) {
