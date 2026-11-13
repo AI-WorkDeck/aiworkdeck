@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{remaining} over van {limit}",
   "quotaUsed": "{used} gebruikt",
   "recharge": "Opwaarderen",
-  "rechargeTitle": "Opwaarderen via de accountpagina op de website (opent in browser, zelfde account als deze add-in)",
+  "rechargeTitle": "Waardeer op of neem Personal Pro op de website (opent in browser)",
   "quotaExhaustedNotice": "Uw account is zonder Credits; deze beurt is gestopt. Waard aan en stuur dit bericht opnieuw om door te gaan.",
   "addinDefaultProjectName": "Tijdelijke plug-inproject",
   "newProjectOption": "+ Nieuw project",

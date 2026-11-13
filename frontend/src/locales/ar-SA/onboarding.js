@@ -106,7 +106,8 @@ export default {
     "switch": "تبديل",
     "cancel": "إلغاء",
     "switchFailed": "فشل تبديل الموقع. حاول مرة أخرى لاحقًا.",
-    "rescueFailed": "لم يتم إلغاء القفل بعد تبديل الموقع. تحقق من الرمز وحاول مرة أخرى."
+    "rescueFailed": "لم يتم إلغاء القفل بعد تبديل الموقع. تحقق من الرمز وحاول مرة أخرى.",
+    "proIntroBanner": "رصيد تجريبي مجاني عند التسجيل · عرض Personal Pro بـ ¥9.9/شهر لأول 3 أشهر",
   },
   "hint": {
     "learnMore": "اعرف المزيد",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "تأكيد",
     "purchaseSuccess": "تم إلغاء القفل",
     "purchaseFailed": "فشل الشراء",
-    "goRecharge": "إعادة التعبئة"
+    "goRecharge": "إعادة التعبئة",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "احصل على Personal Pro",
   },
   "identity": {
     "title": "اختيار مساحة عمل محلية",

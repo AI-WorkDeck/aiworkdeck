@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{limit} üzerinden {remaining} kaldı",
   "quotaUsed": "{used} kullanıldı",
   "recharge": "Bakiye yükle",
-  "rechargeTitle": "Web sitesindeki hesap sayfasından yükleme yapın (tarayıcıda açılır, bu eklentiyle aynı hesap)",
+  "rechargeTitle": "Web sitesinden bakiye yükleyin veya Personal Pro’ya katılın (tarayıcıda açılır)",
   "quotaExhaustedNotice": "Hesabınızda Credits kalmadı; bu tur durduruldu. Devam etmek için yükleme yapın ve bu mesajı yeniden gönderin.",
   "addinDefaultProjectName": "Eklenti Geçici Projesi",
   "newProjectOption": "+ Yeni proje",

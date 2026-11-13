@@ -106,7 +106,8 @@ export default {
     "switch": "Cambiar",
     "cancel": "Cancelar",
     "switchFailed": "No se pudo cambiar de sitio. Inténtelo de nuevo más tarde.",
-    "rescueFailed": "Sigue sin desbloquearse después de cambiar de sitio. Compruebe el código e inténtelo de nuevo."
+    "rescueFailed": "Sigue sin desbloquearse después de cambiar de sitio. Compruebe el código e inténtelo de nuevo.",
+    "proIntroBanner": "Créditos de bienvenida al registrarte · Personal Pro ¥9.9/mes (3 primeros meses)",
   },
   "hint": {
     "learnMore": "Más información",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Confirmar",
     "purchaseSuccess": "Desbloqueado",
     "purchaseFailed": "Error en la compra",
-    "goRecharge": "Recargar"
+    "goRecharge": "Recargar",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Obtener Personal Pro",
   },
   "identity": {
     "title": "Elegir un Workspace local",

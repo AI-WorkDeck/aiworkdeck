@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Puedes usar el reconocimiento en la nube para los archivos de este lote que fallaron en local. Si no lo haces, esos archivos no se subirán.",
   "ocrLocalFailedConfirm": "Usar reconocimiento en la nube",
   "ocrAlreadySearchable": "«{name}» ya tiene capa de texto y permite búsquedas; no se creó ningún archivo nuevo",
-  "ocrStopped": "Detenido; {count} archivo(s) sin procesar"
+  "ocrStopped": "Detenido; {count} archivo(s) sin procesar",
+  "subscribeProBtn": "Pro ¥9.9",
 }

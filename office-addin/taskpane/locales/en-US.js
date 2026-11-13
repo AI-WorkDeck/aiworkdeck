@@ -91,7 +91,7 @@ export const EN = {
   quotaRemaining: '{remaining} left of {limit}',
   quotaUsed: '{used} used',
   recharge: 'Top up',
-  rechargeTitle: 'Top up on the website account page (opens in browser, same account as this add-in)',
+  rechargeTitle: "Top up or subscribe to Personal Pro on the website (opens in browser, same account as this add-in)",
   quotaExhaustedNotice: 'Your account is out of credit; this turn was stopped. Top up and resend this message to continue.',
 
   // ---- App.vue：新建项目（dev-board#196）----

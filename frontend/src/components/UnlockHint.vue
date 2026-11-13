@@ -5,6 +5,13 @@
     <text class="unlock-hint-text">{{ text }}</text>
     <text class="unlock-hint-link" @tap.stop="onLearnMore">{{ linkText }}</text>
     <view
+      v-if="isCnSite"
+      class="unlock-hint-pro"
+      @tap.stop="onSubscribePro"
+    >
+      <text class="unlock-hint-pro-text">{{ t('onboarding.hint.subscribeProBtn') }}</text>
+    </view>
+    <view
       v-if="skuId"
       class="unlock-hint-buy"
       :class="{ 'is-busy': purchasing }"
@@ -28,6 +35,8 @@
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { purchaseFeatureSku } from '@/services/api.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
+import { requireRecharge, requireSubscription } from '@/utils/requireAccount.js'
+import { siteLinks } from '@/utils/siteLinks.js'
 import { t } from '@/i18n'
 
 export default {
@@ -58,8 +67,16 @@ export default {
   data() {
     return { purchasing: false }
   },
+  computed: {
+    isCnSite() {
+      return siteLinks().current === 'cn'
+    },
+  },
   methods: {
     t,
+    onSubscribePro() {
+      void requireSubscription()
+    },
     onLearnMore() {
       if (this.linkUrl) {
         openExternalUrl(this.linkUrl)
@@ -90,13 +107,13 @@ export default {
         uni.showToast({ title: t('onboarding.hint.purchaseSuccess'), icon: 'success' })
       } catch (e) {
         if (e && e.reason === 'insufficient_credits') {
-          // 余额不足：指路去充值（设置「账户与用量」里有充值按钮）
+          // 余额不足：直接打开应用内充值弹层
           uni.showModal({
             title: t('onboarding.hint.purchaseFailed'),
             content: (e && e.message) || '',
             confirmText: t('onboarding.hint.goRecharge'),
             success: (res) => {
-              if (res.confirm) uni.$emit('awd:open-settings', { nav: 'account' })
+              if (res.confirm) void requireRecharge()
             },
           })
         } else if (e && e.reason === 'already_owned') {
@@ -169,5 +186,24 @@ export default {
   line-height: 18px;
   font-weight: 500;
   color: var(--awd-text-on-accent);
+}
+
+.unlock-hint-pro {
+  background: var(--awd-accent-soft);
+  border: 1px solid var(--awd-accent);
+  border-radius: 4px;
+  padding: 1px 9px;
+  cursor: pointer;
+}
+
+.unlock-hint-pro:hover {
+  background: var(--awd-surface-2);
+}
+
+.unlock-hint-pro-text {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--awd-accent-text);
 }
 </style>

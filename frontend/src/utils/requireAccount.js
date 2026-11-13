@@ -20,6 +20,7 @@
 import { createApp, ref } from 'vue'
 import AccountLoginDialog from '@/components/account/AccountLoginDialog.vue'
 import RechargeDialog from '@/components/RechargeDialog.vue'
+import ProSubscribeDialog from '@/components/ProSubscribeDialog.vue'
 import { i18n } from '@/i18n/index.js'
 import { getAccountStatus, getCloudAccountGeneration } from '@/services/api.js'
 import { isDesktopHost } from '@/services/host.js'
@@ -188,6 +189,44 @@ export function invalidateAccountCache() {
 /** 已知连接状态（如设置页刚读过 status）时顺手喂给缓存，省一次查询。 */
 export function noteAccountConnected(connected) {
   gate.noteConnected(connected)
+}
+
+// Keep above the recharge state block below (tests slice from the recharge declaration to EOF).
+let subscribePending = null
+export async function requireSubscription({ auto = false } = {}) {
+  const ok = await requireAccount({ reason: 'account', auto })
+  if (!ok) return false
+  if (subscribePending) return subscribePending
+  if (typeof document === 'undefined' || !document.body) return false
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  let app
+  let resolveClosed
+  let subscribed = false
+  subscribePending = new Promise(resolve => { resolveClosed = resolve })
+  const pending = subscribePending
+  const finish = () => {
+    if (!subscribePending) return
+    app?.unmount()
+    el.remove()
+    setGlobalOverlay(false, 'awd-account-subscribe')
+    subscribePending = null
+    resolveClosed(subscribed)
+  }
+  try {
+    app = createApp(ProSubscribeDialog, {
+      visible: true,
+      onSubscribed: () => { subscribed = true },
+      'onUpdate:visible': visible => { if (!visible) finish() },
+    })
+    app.use(i18n)
+    setGlobalOverlay(true, 'awd-account-subscribe')
+    app.mount(el)
+  } catch (error) {
+    finish()
+    console.warn('[requireSubscription] 订阅弹层挂载失败:', error)
+  }
+  return pending
 }
 
 // One in-place wallet dialog for all paid-service entry points. Closing an automatic

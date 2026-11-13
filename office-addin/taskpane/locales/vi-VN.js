@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{remaining} left of {limit}",
   "quotaUsed": "{used} used",
   "recharge": "Nạp tiền",
-  "rechargeTitle": "Top up on the website account page (opens in browser, same account as this add-in)",
+  "rechargeTitle": "Nạp tiền hoặc đăng ký Personal Pro trên trang web (mở trong trình duyệt)",
   "quotaExhaustedNotice": "Your account is out of credit; this turn was stopped. Top up and resend this message to continue.",
   "addinDefaultProjectName": "Plugin Temporary Project",
   "newProjectOption": "+ New project",
