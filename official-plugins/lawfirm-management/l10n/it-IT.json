@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Recuperati: {created} nuovi, {refreshed} aggiornati.",
   "billing.cloudUnmapped": "{n} voci appartengono a pratiche senza apertura locale e non sono state recuperate.",
   "billing.invoiceNumberPlaceholder": "Numero di fattura del sistema di fatturazione",
-  "billing.invoiceNumberRequired": "Inserisca il numero di fattura restituito dal sistema di fatturazione (20 cifre per le fatture digitali)"
+  "billing.invoiceNumberRequired": "Inserisca il numero di fattura restituito dal sistema di fatturazione (20 cifre per le fatture digitali)",
+  "billing.voidInvoice": "Annulla",
+  "billing.redInvoice": "Nota di credito",
+  "billing.confirmVoid": "Clicca ancora per annullare",
+  "billing.confirmRed": "Clicca ancora per emettere la nota di credito",
+  "billing.voided": "Richiesta di fattura aggiornata: {0}"
 }

@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Abgerufen: {created} neu, {refreshed} aktualisiert.",
   "billing.cloudUnmapped": "{n} Einträge gehören zu Mandaten ohne lokale Mandatsaufnahme und wurden nicht abgerufen.",
   "billing.invoiceNumberPlaceholder": "Rechnungsnummer aus dem Rechnungssystem",
-  "billing.invoiceNumberRequired": "Geben Sie die vom Rechnungssystem zurückgegebene Rechnungsnummer ein (bei digitalen Rechnungen 20 Ziffern)"
+  "billing.invoiceNumberRequired": "Geben Sie die vom Rechnungssystem zurückgegebene Rechnungsnummer ein (bei digitalen Rechnungen 20 Ziffern)",
+  "billing.voidInvoice": "Stornieren",
+  "billing.redInvoice": "Stornorechnung",
+  "billing.confirmVoid": "Zum Stornieren erneut klicken",
+  "billing.confirmRed": "Für Stornorechnung erneut klicken",
+  "billing.voided": "Rechnungsantrag aktualisiert: {0}"
 }

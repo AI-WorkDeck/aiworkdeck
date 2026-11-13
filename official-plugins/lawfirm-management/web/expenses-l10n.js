@@ -257,7 +257,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "تم الجلب: {created} جديدة، {refreshed} محدّثة.",
     "billing.cloudUnmapped": "هناك {n} من الإدخالات تتبع قضايا ليس لها قبول قضية محلي، ولم يتم جلبها.",
     "billing.invoiceNumberPlaceholder": "رقم الفاتورة من نظام الفوترة",
-    "billing.invoiceNumberRequired": "أدخل رقم الفاتورة الذي أعاده نظام الفوترة (20 رقمًا للفواتير الرقمية)"
+    "billing.invoiceNumberRequired": "أدخل رقم الفاتورة الذي أعاده نظام الفوترة (20 رقمًا للفواتير الرقمية)",
+    "billing.voidInvoice": "إلغاء",
+    "billing.redInvoice": "إشعار دائن",
+    "billing.confirmVoid": "انقر مرة أخرى لتأكيد الإلغاء",
+    "billing.confirmRed": "انقر مرة أخرى لإصدار إشعار الدائن",
+    "billing.voided": "تم تحديث طلب الفاتورة: {0}"
   },
   "de-DE": {
     "expense.tab": "Mandatsauslagen",
@@ -514,7 +519,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Abgerufen: {created} neu, {refreshed} aktualisiert.",
     "billing.cloudUnmapped": "{n} Einträge gehören zu Mandaten ohne lokale Mandatsaufnahme und wurden nicht abgerufen.",
     "billing.invoiceNumberPlaceholder": "Rechnungsnummer aus dem Rechnungssystem",
-    "billing.invoiceNumberRequired": "Geben Sie die vom Rechnungssystem zurückgegebene Rechnungsnummer ein (bei digitalen Rechnungen 20 Ziffern)"
+    "billing.invoiceNumberRequired": "Geben Sie die vom Rechnungssystem zurückgegebene Rechnungsnummer ein (bei digitalen Rechnungen 20 Ziffern)",
+    "billing.voidInvoice": "Stornieren",
+    "billing.redInvoice": "Stornorechnung",
+    "billing.confirmVoid": "Zum Stornieren erneut klicken",
+    "billing.confirmRed": "Für Stornorechnung erneut klicken",
+    "billing.voided": "Rechnungsantrag aktualisiert: {0}"
   },
   "el-GR": {
     "expense.tab": "Έξοδα υπόθεσης",
@@ -771,7 +781,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Λήφθηκαν: {created} νέες, {refreshed} ενημερωμένες.",
     "billing.cloudUnmapped": "{n} εγγραφές ανήκουν σε υποθέσεις χωρίς τοπική καταχώριση και δεν λήφθηκαν.",
     "billing.invoiceNumberPlaceholder": "Αριθμός τιμολογίου από το σύστημα τιμολόγησης",
-    "billing.invoiceNumberRequired": "Συμπληρώστε τον αριθμό τιμολογίου που επέστρεψε το σύστημα τιμολόγησης (20 ψηφία για ψηφιακά τιμολόγια)"
+    "billing.invoiceNumberRequired": "Συμπληρώστε τον αριθμό τιμολογίου που επέστρεψε το σύστημα τιμολόγησης (20 ψηφία για ψηφιακά τιμολόγια)",
+    "billing.voidInvoice": "Ακύρωση",
+    "billing.redInvoice": "Πιστωτικό",
+    "billing.confirmVoid": "Πατήστε ξανά για ακύρωση",
+    "billing.confirmRed": "Πατήστε ξανά για έκδοση πιστωτικού",
+    "billing.voided": "Η αίτηση τιμολογίου ενημερώθηκε: {0}"
   },
   "en-US": {
     "expense.tab": "Matter expenses",
@@ -1027,8 +1042,13 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPull": "Pull time from the firm cloud",
     "billing.cloudPulled": "Pulled: {created} new, {refreshed} updated.",
     "billing.cloudUnmapped": "{n} entries belong to matters with no local intake and were not pulled.",
-    "billing.invoiceNumberPlaceholder": "Invoice number from the invoicing system",
-    "billing.invoiceNumberRequired": "Enter the invoice number returned by the invoicing system (20 digits for digital invoices)"
+    "billing.invoiceNumberPlaceholder": "Invoice no.",
+    "billing.invoiceNumberRequired": "Enter the invoice number returned by the invoicing system (20 digits for digital invoices)",
+    "billing.voidInvoice": "Void",
+    "billing.redInvoice": "Red-invoice",
+    "billing.confirmVoid": "Click again to void",
+    "billing.confirmRed": "Click again to red-invoice",
+    "billing.voided": "Invoice application updated: {0}"
   },
   "es-ES": {
     "expense.tab": "Gastos del asunto",
@@ -1285,7 +1305,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Descargado: {created} nuevos, {refreshed} actualizados.",
     "billing.cloudUnmapped": "{n} entradas pertenecen a asuntos sin alta local y no se han descargado.",
     "billing.invoiceNumberPlaceholder": "Número de factura del sistema de facturación",
-    "billing.invoiceNumberRequired": "Introduzca el número de factura devuelto por el sistema de facturación (20 dígitos en las facturas digitales)"
+    "billing.invoiceNumberRequired": "Introduzca el número de factura devuelto por el sistema de facturación (20 dígitos en las facturas digitales)",
+    "billing.voidInvoice": "Anular",
+    "billing.redInvoice": "Factura rectificativa",
+    "billing.confirmVoid": "Haga clic de nuevo para anular",
+    "billing.confirmRed": "Haga clic de nuevo para emitir la rectificativa",
+    "billing.voided": "Solicitud de factura actualizada: {0}"
   },
   "fr-FR": {
     "expense.tab": "Frais de dossier",
@@ -1542,7 +1567,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Récupéré : {created} nouveaux, {refreshed} mis à jour.",
     "billing.cloudUnmapped": "{n} entrées appartiennent à des dossiers sans ouverture de dossier locale et n'ont pas été récupérées.",
     "billing.invoiceNumberPlaceholder": "Numéro de facture du système de facturation",
-    "billing.invoiceNumberRequired": "Saisissez le numéro de facture renvoyé par le système de facturation (20 chiffres pour les factures numériques)"
+    "billing.invoiceNumberRequired": "Saisissez le numéro de facture renvoyé par le système de facturation (20 chiffres pour les factures numériques)",
+    "billing.voidInvoice": "Annuler",
+    "billing.redInvoice": "Facture rectificative",
+    "billing.confirmVoid": "Cliquez encore pour annuler",
+    "billing.confirmRed": "Cliquez encore pour émettre la facture rectificative",
+    "billing.voided": "Demande de facture mise à jour : {0}"
   },
   "hi-IN": {
     "expense.tab": "मामले के खर्च",
@@ -1799,7 +1829,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "प्राप्त हुआ: {created} नए, {refreshed} अपडेट।",
     "billing.cloudUnmapped": "{n} प्रविष्टियाँ ऐसे मामलों की हैं जिनका इस कंप्यूटर पर कोई स्थानीय इनटेक नहीं है, इसलिए प्राप्त नहीं की गईं।",
     "billing.invoiceNumberPlaceholder": "इनवॉइस सिस्टम से मिला इनवॉइस नंबर",
-    "billing.invoiceNumberRequired": "इनवॉइस सिस्टम से मिला इनवॉइस नंबर दर्ज करें (डिजिटल इनवॉइस के लिए 20 अंक)"
+    "billing.invoiceNumberRequired": "इनवॉइस सिस्टम से मिला इनवॉइस नंबर दर्ज करें (डिजिटल इनवॉइस के लिए 20 अंक)",
+    "billing.voidInvoice": "रद्द करें",
+    "billing.redInvoice": "क्रेडिट नोट",
+    "billing.confirmVoid": "रद्द करने के लिए फिर क्लिक करें",
+    "billing.confirmRed": "क्रेडिट नोट के लिए फिर क्लिक करें",
+    "billing.voided": "इनवॉइस अनुरोध अपडेट हुआ: {0}"
   },
   "id-ID": {
     "expense.tab": "Biaya Perkara",
@@ -2056,7 +2091,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Diambil: {created} baru, {refreshed} diperbarui.",
     "billing.cloudUnmapped": "{n} entri milik perkara yang tidak memiliki penerimaan perkara lokal sehingga tidak diambil.",
     "billing.invoiceNumberPlaceholder": "Nomor faktur dari sistem faktur",
-    "billing.invoiceNumberRequired": "Masukkan nomor faktur yang dikembalikan oleh sistem faktur (20 digit untuk faktur digital)"
+    "billing.invoiceNumberRequired": "Masukkan nomor faktur yang dikembalikan oleh sistem faktur (20 digit untuk faktur digital)",
+    "billing.voidInvoice": "Batalkan",
+    "billing.redInvoice": "Faktur koreksi",
+    "billing.confirmVoid": "Klik lagi untuk membatalkan",
+    "billing.confirmRed": "Klik lagi untuk menerbitkan faktur koreksi",
+    "billing.voided": "Pengajuan faktur diperbarui: {0}"
   },
   "it-IT": {
     "expense.tab": "Spese di pratica",
@@ -2313,7 +2353,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Recuperati: {created} nuovi, {refreshed} aggiornati.",
     "billing.cloudUnmapped": "{n} voci appartengono a pratiche senza apertura locale e non sono state recuperate.",
     "billing.invoiceNumberPlaceholder": "Numero di fattura del sistema di fatturazione",
-    "billing.invoiceNumberRequired": "Inserisca il numero di fattura restituito dal sistema di fatturazione (20 cifre per le fatture digitali)"
+    "billing.invoiceNumberRequired": "Inserisca il numero di fattura restituito dal sistema di fatturazione (20 cifre per le fatture digitali)",
+    "billing.voidInvoice": "Annulla",
+    "billing.redInvoice": "Nota di credito",
+    "billing.confirmVoid": "Clicca ancora per annullare",
+    "billing.confirmRed": "Clicca ancora per emettere la nota di credito",
+    "billing.voided": "Richiesta di fattura aggiornata: {0}"
   },
   "ja-JP": {
     "expense.tab": "案件費用",
@@ -2570,7 +2615,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "取得しました：新規 {created} 件、更新 {refreshed} 件。",
     "billing.cloudUnmapped": "{n} 件は、このパソコンに対応する受任案件がないため取得されませんでした。",
     "billing.invoiceNumberPlaceholder": "請求書発行システムから返された請求書番号",
-    "billing.invoiceNumberRequired": "請求書発行システムから返された請求書番号を入力してください（デジタル請求書は 20 桁の数字）"
+    "billing.invoiceNumberRequired": "請求書発行システムから返された請求書番号を入力してください（デジタル請求書は 20 桁の数字）",
+    "billing.voidInvoice": "無効化",
+    "billing.redInvoice": "赤伝発行",
+    "billing.confirmVoid": "もう一度クリックで無効化",
+    "billing.confirmRed": "もう一度クリックで赤伝発行",
+    "billing.voided": "請求書申請を更新しました: {0}"
   },
   "ko-KR": {
     "expense.tab": "사건 비용",
@@ -2827,7 +2877,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "가져왔습니다: 신규 {created}건, 업데이트 {refreshed}건.",
     "billing.cloudUnmapped": "{n}건은 이 컴퓨터에 해당하는 수임 사건이 없어 가져오지 않았습니다.",
     "billing.invoiceNumberPlaceholder": "청구서 발행 시스템에서 반환된 청구서 번호",
-    "billing.invoiceNumberRequired": "청구서 발행 시스템에서 반환된 청구서 번호를 입력하세요(전자 청구서는 숫자 20자리)"
+    "billing.invoiceNumberRequired": "청구서 발행 시스템에서 반환된 청구서 번호를 입력하세요(전자 청구서는 숫자 20자리)",
+    "billing.voidInvoice": "무효 처리",
+    "billing.redInvoice": "적색 발행",
+    "billing.confirmVoid": "한 번 더 클릭하면 무효 처리",
+    "billing.confirmRed": "한 번 더 클릭하면 적색 발행",
+    "billing.voided": "청구서 신청이 처리되었습니다: {0}"
   },
   "ms-MY": {
     "expense.tab": "Perbelanjaan Kes",
@@ -3084,7 +3139,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Ditarik: {created} baharu, {refreshed} dikemas kini.",
     "billing.cloudUnmapped": "{n} entri milik kes yang tiada penerimaan kes setempat dan tidak ditarik.",
     "billing.invoiceNumberPlaceholder": "Nombor invois daripada sistem invois",
-    "billing.invoiceNumberRequired": "Sila masukkan nombor invois yang dikembalikan oleh sistem invois (20 digit untuk invois digital)"
+    "billing.invoiceNumberRequired": "Sila masukkan nombor invois yang dikembalikan oleh sistem invois (20 digit untuk invois digital)",
+    "billing.voidInvoice": "Batalkan",
+    "billing.redInvoice": "Nota kredit",
+    "billing.confirmVoid": "Klik sekali lagi untuk batalkan",
+    "billing.confirmRed": "Klik sekali lagi untuk keluarkan nota kredit",
+    "billing.voided": "Permohonan invois dikemas kini: {0}"
   },
   "nl-NL": {
     "expense.tab": "Dossierkosten",
@@ -3341,7 +3401,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Opgehaald: {created} nieuw, {refreshed} bijgewerkt.",
     "billing.cloudUnmapped": "{n} regels horen bij zaken zonder lokale zaakopening en zijn niet opgehaald.",
     "billing.invoiceNumberPlaceholder": "Factuurnummer uit het factureringssysteem",
-    "billing.invoiceNumberRequired": "Vul het factuurnummer in dat het factureringssysteem heeft teruggegeven (20 cijfers bij digitale facturen)"
+    "billing.invoiceNumberRequired": "Vul het factuurnummer in dat het factureringssysteem heeft teruggegeven (20 cijfers bij digitale facturen)",
+    "billing.voidInvoice": "Annuleren",
+    "billing.redInvoice": "Creditfactuur",
+    "billing.confirmVoid": "Klik nogmaals om te annuleren",
+    "billing.confirmRed": "Klik nogmaals voor creditfactuur",
+    "billing.voided": "Factuuraanvraag bijgewerkt: {0}"
   },
   "pt-BR": {
     "expense.tab": "Despesas do caso",
@@ -3598,7 +3663,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Buscadas: {created} novas, {refreshed} atualizadas.",
     "billing.cloudUnmapped": "{n} lançamentos pertencem a casos sem cadastro local e não foram buscados.",
     "billing.invoiceNumberPlaceholder": "Número da nota fiscal do sistema de emissão",
-    "billing.invoiceNumberRequired": "Informe o número da nota fiscal retornado pelo sistema de emissão (20 dígitos para nota fiscal digital)"
+    "billing.invoiceNumberRequired": "Informe o número da nota fiscal retornado pelo sistema de emissão (20 dígitos para nota fiscal digital)",
+    "billing.voidInvoice": "Anular",
+    "billing.redInvoice": "Fatura de estorno",
+    "billing.confirmVoid": "Clique novamente para anular",
+    "billing.confirmRed": "Clique novamente para emitir o estorno",
+    "billing.voided": "Solicitação de fatura atualizada: {0}"
   },
   "ru-RU": {
     "expense.tab": "Расходы по делу",
@@ -3855,7 +3925,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Получено: новых {created}, обновлено {refreshed}.",
     "billing.cloudUnmapped": "Записей, относящихся к делам без локального приёма дела: {n}. Они не получены.",
     "billing.invoiceNumberPlaceholder": "Номер счёта-фактуры из системы выставления счетов",
-    "billing.invoiceNumberRequired": "Введите номер счёта-фактуры, возвращённый системой выставления счетов (для цифровых счетов-фактур 20 цифр)"
+    "billing.invoiceNumberRequired": "Введите номер счёта-фактуры, возвращённый системой выставления счетов (для цифровых счетов-фактур 20 цифр)",
+    "billing.voidInvoice": "Аннулировать",
+    "billing.redInvoice": "Сторно-счёт",
+    "billing.confirmVoid": "Нажмите ещё раз для аннулирования",
+    "billing.confirmRed": "Нажмите ещё раз для сторнирования",
+    "billing.voided": "Заявка на счёт обновлена: {0}"
   },
   "th-TH": {
     "expense.tab": "ค่าใช้จ่ายคดี",
@@ -4112,7 +4187,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "ดึงข้อมูลแล้ว: ใหม่ {created} รายการ อัปเดต {refreshed} รายการ",
     "billing.cloudUnmapped": "{n} รายการอยู่ในคดีที่ไม่มีการรับคดีที่ตรงกันในเครื่องนี้ จึงไม่ได้ดึงมา",
     "billing.invoiceNumberPlaceholder": "เลขที่ใบแจ้งหนี้ที่ระบบออกใบแจ้งหนี้ส่งกลับมา",
-    "billing.invoiceNumberRequired": "กรุณากรอกเลขที่ใบแจ้งหนี้ที่ระบบออกใบแจ้งหนี้ส่งกลับมา (ใบแจ้งหนี้อิเล็กทรอนิกส์มี 20 หลัก)"
+    "billing.invoiceNumberRequired": "กรุณากรอกเลขที่ใบแจ้งหนี้ที่ระบบออกใบแจ้งหนี้ส่งกลับมา (ใบแจ้งหนี้อิเล็กทรอนิกส์มี 20 หลัก)",
+    "billing.voidInvoice": "ยกเลิก",
+    "billing.redInvoice": "ออกใบลดหนี้",
+    "billing.confirmVoid": "คลิกอีกครั้งเพื่อยืนยันการยกเลิก",
+    "billing.confirmRed": "คลิกอีกครั้งเพื่อยืนยันการออกใบลดหนี้",
+    "billing.voided": "อัปเดตคำขอใบแจ้งหนี้แล้ว: {0}"
   },
   "tr-TR": {
     "expense.tab": "Dosya Masrafları",
@@ -4369,7 +4449,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Çekildi: {created} yeni, {refreshed} güncellendi.",
     "billing.cloudUnmapped": "{n} kayıt, bu bilgisayarda yerel dosya açılışı bulunmayan dosyalara ait olduğu için çekilmedi.",
     "billing.invoiceNumberPlaceholder": "Faturalama sisteminden gelen fatura numarası",
-    "billing.invoiceNumberRequired": "Faturalama sisteminin döndürdüğü fatura numarasını girin (dijital faturalarda 20 haneli)"
+    "billing.invoiceNumberRequired": "Faturalama sisteminin döndürdüğü fatura numarasını girin (dijital faturalarda 20 haneli)",
+    "billing.voidInvoice": "İptal et",
+    "billing.redInvoice": "Ters fatura",
+    "billing.confirmVoid": "İptal için tekrar tıklayın",
+    "billing.confirmRed": "Ters fatura için tekrar tıklayın",
+    "billing.voided": "Fatura talebi güncellendi: {0}"
   },
   "vi-VN": {
     "expense.tab": "Chi phí vụ việc",
@@ -4626,7 +4711,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPulled": "Đã lấy về: mới {created}, cập nhật {refreshed}.",
     "billing.cloudUnmapped": "{n} mục thuộc vụ việc không có hồ sơ tiếp nhận tương ứng trên máy này nên chưa được lấy về.",
     "billing.invoiceNumberPlaceholder": "Số hóa đơn do hệ thống xuất hóa đơn trả về",
-    "billing.invoiceNumberRequired": "Vui lòng nhập số hóa đơn do hệ thống xuất hóa đơn trả về (hóa đơn điện tử gồm 20 chữ số)"
+    "billing.invoiceNumberRequired": "Vui lòng nhập số hóa đơn do hệ thống xuất hóa đơn trả về (hóa đơn điện tử gồm 20 chữ số)",
+    "billing.voidInvoice": "Hủy",
+    "billing.redInvoice": "Hóa đơn điều chỉnh",
+    "billing.confirmVoid": "Nhấp lần nữa để hủy",
+    "billing.confirmRed": "Nhấp lần nữa để lập hóa đơn điều chỉnh",
+    "billing.voided": "Đã cập nhật yêu cầu hóa đơn: {0}"
   },
   "zh-CN": {
     "expense.tab": "办案费用",
@@ -4882,8 +4972,13 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPull": "从律所云端取回工时",
     "billing.cloudPulled": "已取回：新增 {created} 条，更新 {refreshed} 条。",
     "billing.cloudUnmapped": "{n} 条所属事项在本机找不到对应收案，未取回。",
-    "billing.invoiceNumberPlaceholder": "开票系统返回的发票号码",
-    "billing.invoiceNumberRequired": "请填写开票系统返回的发票号码（数电票为 20 位数字）"
+    "billing.invoiceNumberPlaceholder": "发票号码",
+    "billing.invoiceNumberRequired": "请填写开票系统返回的发票号码（数电票为 20 位数字）",
+    "billing.voidInvoice": "作废",
+    "billing.redInvoice": "红冲",
+    "billing.confirmVoid": "再点一次确认作废",
+    "billing.confirmRed": "再点一次确认红冲",
+    "billing.voided": "已处理发票申请：{0}"
   },
   "zh-TW": {
     "expense.tab": "辦案費用",
@@ -5139,7 +5234,12 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.cloudPull": "從律所雲端取回工時",
     "billing.cloudPulled": "已取回：新增 {created} 筆，更新 {refreshed} 筆。",
     "billing.cloudUnmapped": "{n} 筆所屬事項在本機找不到對應的收案，未取回。",
-    "billing.invoiceNumberPlaceholder": "開票系統回傳的發票號碼",
-    "billing.invoiceNumberRequired": "請填寫開票系統回傳的發票號碼（數電票為 20 位數字）"
+    "billing.invoiceNumberPlaceholder": "發票號碼",
+    "billing.invoiceNumberRequired": "請填寫開票系統回傳的發票號碼（數電票為 20 位數字）",
+    "billing.voidInvoice": "作廢",
+    "billing.redInvoice": "紅沖",
+    "billing.confirmVoid": "再點一次確認作廢",
+    "billing.confirmRed": "再點一次確認紅沖",
+    "billing.voided": "已處理發票申請：{0}"
   }
 };

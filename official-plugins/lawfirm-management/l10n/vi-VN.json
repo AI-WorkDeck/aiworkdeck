@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Đã lấy về: mới {created}, cập nhật {refreshed}.",
   "billing.cloudUnmapped": "{n} mục thuộc vụ việc không có hồ sơ tiếp nhận tương ứng trên máy này nên chưa được lấy về.",
   "billing.invoiceNumberPlaceholder": "Số hóa đơn do hệ thống xuất hóa đơn trả về",
-  "billing.invoiceNumberRequired": "Vui lòng nhập số hóa đơn do hệ thống xuất hóa đơn trả về (hóa đơn điện tử gồm 20 chữ số)"
+  "billing.invoiceNumberRequired": "Vui lòng nhập số hóa đơn do hệ thống xuất hóa đơn trả về (hóa đơn điện tử gồm 20 chữ số)",
+  "billing.voidInvoice": "Hủy",
+  "billing.redInvoice": "Hóa đơn điều chỉnh",
+  "billing.confirmVoid": "Nhấp lần nữa để hủy",
+  "billing.confirmRed": "Nhấp lần nữa để lập hóa đơn điều chỉnh",
+  "billing.voided": "Đã cập nhật yêu cầu hóa đơn: {0}"
 }

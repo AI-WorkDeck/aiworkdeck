@@ -257,6 +257,11 @@
   "billing.cloudPull": "Pull time from the firm cloud",
   "billing.cloudPulled": "Pulled: {created} new, {refreshed} updated.",
   "billing.cloudUnmapped": "{n} entries belong to matters with no local intake and were not pulled.",
-  "billing.invoiceNumberPlaceholder": "Invoice number from the invoicing system",
-  "billing.invoiceNumberRequired": "Enter the invoice number returned by the invoicing system (20 digits for digital invoices)"
+  "billing.invoiceNumberPlaceholder": "Invoice no.",
+  "billing.invoiceNumberRequired": "Enter the invoice number returned by the invoicing system (20 digits for digital invoices)",
+  "billing.voidInvoice": "Void",
+  "billing.redInvoice": "Red-invoice",
+  "billing.confirmVoid": "Click again to void",
+  "billing.confirmRed": "Click again to red-invoice",
+  "billing.voided": "Invoice application updated: {0}"
 }

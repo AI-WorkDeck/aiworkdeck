@@ -647,9 +647,11 @@
     } else {
       for (const inv of state.invoices) {
         const tr = node('tr');
-        const noText = inv.invoiceNumber ? `${inv.invoiceAppNo || ''} / ${inv.invoiceNumber}` : (inv.invoiceAppNo || `INV-${inv.id}`);
+        // 申请单号与发票号分两行（数电票号码 20 位，并排会把操作列挤出可视区）
+        const noTd = node('td', inv.invoiceAppNo || `INV-${inv.id}`);
+        if (inv.invoiceNumber) noTd.append(node('div', inv.invoiceNumber, 'invoice-number'));
         tr.append(
-          node('td', noText),
+          noTd,
           node('td', `${inv.matterTitle || '-'}（${inv.departmentName || '-'}）`, 'cell-text'),
           node('td', INVOICE_TYPE_LABELS[inv.invoiceType] || inv.invoiceType || '数电专票'),
           node('td', `${inv.buyerName || '-'} ${inv.buyerTaxId ? '· ' + inv.buyerTaxId : ''}`, 'cell-text'),
@@ -680,8 +682,8 @@
           const numberInput = document.createElement('input');
           numberInput.type = 'text';
           numberInput.className = 'invoice-number-input';
-          numberInput.setAttribute('placeholder', L('billing.invoiceNumberPlaceholder', '开票系统返回的发票号码'));
-          numberInput.setAttribute('aria-label', L('billing.invoiceNumberPlaceholder', '开票系统返回的发票号码'));
+          numberInput.setAttribute('placeholder', L('billing.invoiceNumberPlaceholder', '发票号码'));
+          numberInput.setAttribute('aria-label', L('billing.invoiceNumberPlaceholder', '发票号码'));
           const issueBtn = node('button', '确认开票', 'btn-issue-invoice');
           issueBtn.type = 'button';
           issueBtn.addEventListener('click', () => runAction(issueBtn, async (epoch) => {
@@ -696,9 +698,33 @@
             await loadOverview(epoch);
             notice(`已确认开具数电发票：${inv.invoiceAppNo || inv.id}`);
           }));
-          actionTd.append(numberInput, issueBtn);
-        } else {
+          // 号码框放在「申请单号 / 发票号」这一格（开出后号码就显示在这里），操作列只留按钮，表格不被撑宽
+          noTd.append(numberInput);
+          actionTd.append(issueBtn);
+        } else if (!['VOIDED', 'RED_INVOICED'].includes(inv.status)) {
           actionTd.append(node('span', '已开具', 'hint'));
+        }
+        // 作废（未开出）/ 红冲（已开出）：不可撤销，点两次才执行。计时账单撤销前须先作废或红冲对应发票。
+        if (!['VOIDED', 'RED_INVOICED'].includes(inv.status)) {
+          const red = !needsIssue;
+          const voidBtn = node('button', red ? L('billing.redInvoice', '红冲') : L('billing.voidInvoice', '作废'), 'btn-void-invoice');
+          voidBtn.type = 'button';
+          let armed = false;
+          voidBtn.addEventListener('click', () => {
+            if (!armed) {
+              armed = true;
+              voidBtn.textContent = red ? L('billing.confirmRed', '再点一次确认红冲') : L('billing.confirmVoid', '再点一次确认作废');
+              voidBtn.classList.add('danger');
+              return;
+            }
+            runAction(voidBtn, async (epoch) => {
+              await request('voidInvoice', { invoiceId: inv.id, mode: red ? 'RED_INVOICED' : 'VOIDED' });
+              if (epoch !== state.epoch) return;
+              await loadOverview(epoch);
+              notice(L('billing.voided', '已处理发票申请：{0}', inv.invoiceAppNo || inv.id));
+            });
+          });
+          actionTd.append(voidBtn);
         }
         tr.append(actionTd);
         invTbody.append(tr);

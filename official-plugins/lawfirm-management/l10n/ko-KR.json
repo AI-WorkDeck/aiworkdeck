@@ -258,5 +258,10 @@
   "billing.cloudPulled": "가져왔습니다: 신규 {created}건, 업데이트 {refreshed}건.",
   "billing.cloudUnmapped": "{n}건은 이 컴퓨터에 해당하는 수임 사건이 없어 가져오지 않았습니다.",
   "billing.invoiceNumberPlaceholder": "청구서 발행 시스템에서 반환된 청구서 번호",
-  "billing.invoiceNumberRequired": "청구서 발행 시스템에서 반환된 청구서 번호를 입력하세요(전자 청구서는 숫자 20자리)"
+  "billing.invoiceNumberRequired": "청구서 발행 시스템에서 반환된 청구서 번호를 입력하세요(전자 청구서는 숫자 20자리)",
+  "billing.voidInvoice": "무효 처리",
+  "billing.redInvoice": "적색 발행",
+  "billing.confirmVoid": "한 번 더 클릭하면 무효 처리",
+  "billing.confirmRed": "한 번 더 클릭하면 적색 발행",
+  "billing.voided": "청구서 신청이 처리되었습니다: {0}"
 }

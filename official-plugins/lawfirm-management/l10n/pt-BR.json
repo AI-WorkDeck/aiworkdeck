@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Buscadas: {created} novas, {refreshed} atualizadas.",
   "billing.cloudUnmapped": "{n} lançamentos pertencem a casos sem cadastro local e não foram buscados.",
   "billing.invoiceNumberPlaceholder": "Número da nota fiscal do sistema de emissão",
-  "billing.invoiceNumberRequired": "Informe o número da nota fiscal retornado pelo sistema de emissão (20 dígitos para nota fiscal digital)"
+  "billing.invoiceNumberRequired": "Informe o número da nota fiscal retornado pelo sistema de emissão (20 dígitos para nota fiscal digital)",
+  "billing.voidInvoice": "Anular",
+  "billing.redInvoice": "Fatura de estorno",
+  "billing.confirmVoid": "Clique novamente para anular",
+  "billing.confirmRed": "Clique novamente para emitir o estorno",
+  "billing.voided": "Solicitação de fatura atualizada: {0}"
 }

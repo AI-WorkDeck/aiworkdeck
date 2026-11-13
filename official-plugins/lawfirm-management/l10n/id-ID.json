@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Diambil: {created} baru, {refreshed} diperbarui.",
   "billing.cloudUnmapped": "{n} entri milik perkara yang tidak memiliki penerimaan perkara lokal sehingga tidak diambil.",
   "billing.invoiceNumberPlaceholder": "Nomor faktur dari sistem faktur",
-  "billing.invoiceNumberRequired": "Masukkan nomor faktur yang dikembalikan oleh sistem faktur (20 digit untuk faktur digital)"
+  "billing.invoiceNumberRequired": "Masukkan nomor faktur yang dikembalikan oleh sistem faktur (20 digit untuk faktur digital)",
+  "billing.voidInvoice": "Batalkan",
+  "billing.redInvoice": "Faktur koreksi",
+  "billing.confirmVoid": "Klik lagi untuk membatalkan",
+  "billing.confirmRed": "Klik lagi untuk menerbitkan faktur koreksi",
+  "billing.voided": "Pengajuan faktur diperbarui: {0}"
 }

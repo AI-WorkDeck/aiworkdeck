@@ -258,5 +258,10 @@
   "billing.cloudPulled": "تم الجلب: {created} جديدة، {refreshed} محدّثة.",
   "billing.cloudUnmapped": "هناك {n} من الإدخالات تتبع قضايا ليس لها قبول قضية محلي، ولم يتم جلبها.",
   "billing.invoiceNumberPlaceholder": "رقم الفاتورة من نظام الفوترة",
-  "billing.invoiceNumberRequired": "أدخل رقم الفاتورة الذي أعاده نظام الفوترة (20 رقمًا للفواتير الرقمية)"
+  "billing.invoiceNumberRequired": "أدخل رقم الفاتورة الذي أعاده نظام الفوترة (20 رقمًا للفواتير الرقمية)",
+  "billing.voidInvoice": "إلغاء",
+  "billing.redInvoice": "إشعار دائن",
+  "billing.confirmVoid": "انقر مرة أخرى لتأكيد الإلغاء",
+  "billing.confirmRed": "انقر مرة أخرى لإصدار إشعار الدائن",
+  "billing.voided": "تم تحديث طلب الفاتورة: {0}"
 }

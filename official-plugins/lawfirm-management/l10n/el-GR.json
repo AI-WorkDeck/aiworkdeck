@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Λήφθηκαν: {created} νέες, {refreshed} ενημερωμένες.",
   "billing.cloudUnmapped": "{n} εγγραφές ανήκουν σε υποθέσεις χωρίς τοπική καταχώριση και δεν λήφθηκαν.",
   "billing.invoiceNumberPlaceholder": "Αριθμός τιμολογίου από το σύστημα τιμολόγησης",
-  "billing.invoiceNumberRequired": "Συμπληρώστε τον αριθμό τιμολογίου που επέστρεψε το σύστημα τιμολόγησης (20 ψηφία για ψηφιακά τιμολόγια)"
+  "billing.invoiceNumberRequired": "Συμπληρώστε τον αριθμό τιμολογίου που επέστρεψε το σύστημα τιμολόγησης (20 ψηφία για ψηφιακά τιμολόγια)",
+  "billing.voidInvoice": "Ακύρωση",
+  "billing.redInvoice": "Πιστωτικό",
+  "billing.confirmVoid": "Πατήστε ξανά για ακύρωση",
+  "billing.confirmRed": "Πατήστε ξανά για έκδοση πιστωτικού",
+  "billing.voided": "Η αίτηση τιμολογίου ενημερώθηκε: {0}"
 }

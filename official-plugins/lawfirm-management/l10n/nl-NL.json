@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Opgehaald: {created} nieuw, {refreshed} bijgewerkt.",
   "billing.cloudUnmapped": "{n} regels horen bij zaken zonder lokale zaakopening en zijn niet opgehaald.",
   "billing.invoiceNumberPlaceholder": "Factuurnummer uit het factureringssysteem",
-  "billing.invoiceNumberRequired": "Vul het factuurnummer in dat het factureringssysteem heeft teruggegeven (20 cijfers bij digitale facturen)"
+  "billing.invoiceNumberRequired": "Vul het factuurnummer in dat het factureringssysteem heeft teruggegeven (20 cijfers bij digitale facturen)",
+  "billing.voidInvoice": "Annuleren",
+  "billing.redInvoice": "Creditfactuur",
+  "billing.confirmVoid": "Klik nogmaals om te annuleren",
+  "billing.confirmRed": "Klik nogmaals voor creditfactuur",
+  "billing.voided": "Factuuraanvraag bijgewerkt: {0}"
 }

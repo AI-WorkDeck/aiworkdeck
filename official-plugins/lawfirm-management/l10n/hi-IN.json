@@ -258,5 +258,10 @@
   "billing.cloudPulled": "प्राप्त हुआ: {created} नए, {refreshed} अपडेट।",
   "billing.cloudUnmapped": "{n} प्रविष्टियाँ ऐसे मामलों की हैं जिनका इस कंप्यूटर पर कोई स्थानीय इनटेक नहीं है, इसलिए प्राप्त नहीं की गईं।",
   "billing.invoiceNumberPlaceholder": "इनवॉइस सिस्टम से मिला इनवॉइस नंबर",
-  "billing.invoiceNumberRequired": "इनवॉइस सिस्टम से मिला इनवॉइस नंबर दर्ज करें (डिजिटल इनवॉइस के लिए 20 अंक)"
+  "billing.invoiceNumberRequired": "इनवॉइस सिस्टम से मिला इनवॉइस नंबर दर्ज करें (डिजिटल इनवॉइस के लिए 20 अंक)",
+  "billing.voidInvoice": "रद्द करें",
+  "billing.redInvoice": "क्रेडिट नोट",
+  "billing.confirmVoid": "रद्द करने के लिए फिर क्लिक करें",
+  "billing.confirmRed": "क्रेडिट नोट के लिए फिर क्लिक करें",
+  "billing.voided": "इनवॉइस अनुरोध अपडेट हुआ: {0}"
 }

@@ -388,6 +388,12 @@ async function mountPanel(options = {}) {
                 result = inv || {};
                 break;
               }
+              case 'voidInvoice': {
+                const inv = state.invoices.find((i) => i.id === params.invoiceId);
+                if (inv) inv.status = params.mode;
+                result = inv || {};
+                break;
+              }
               case 'recordCollection': {
                 const col = {
                   id: state.collections.length + 901,
@@ -649,6 +655,19 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
   assert.equal(colCall.params.params.bankVoucherNo, 'BK-20261015-9901');
   assert.match(p.$('collection-list').textContent, /BK-20261015-9901/);
   assert.match(p.$('invoice-list').textContent, /已全额回款/);
+
+  // 已开出的发票只能红冲：第一次点击只是确认提示，第二次才发请求
+  const redBtn = [...p.$('invoice-list').querySelectorAll('.btn-void-invoice')].find((b) => b.textContent === '红冲');
+  assert.ok(redBtn, 'issued invoices offer 红冲');
+  redBtn.click();
+  await tick();
+  assert.equal(p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'voidInvoice'), undefined, 'first click only arms');
+  assert.equal(redBtn.textContent, '再点一次确认红冲');
+  redBtn.click();
+  await tick();
+  const voidCall = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'voidInvoice');
+  assert.equal(voidCall.params.params.mode, 'RED_INVOICED');
+  assert.match(p.$('invoice-list').textContent, /已红冲/);
 
   // Sync with Kingdee / Yonyou ERP
   p.$('btn-sync-erp').click();

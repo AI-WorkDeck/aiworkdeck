@@ -258,5 +258,10 @@
   "billing.cloudPulled": "取得しました：新規 {created} 件、更新 {refreshed} 件。",
   "billing.cloudUnmapped": "{n} 件は、このパソコンに対応する受任案件がないため取得されませんでした。",
   "billing.invoiceNumberPlaceholder": "請求書発行システムから返された請求書番号",
-  "billing.invoiceNumberRequired": "請求書発行システムから返された請求書番号を入力してください（デジタル請求書は 20 桁の数字）"
+  "billing.invoiceNumberRequired": "請求書発行システムから返された請求書番号を入力してください（デジタル請求書は 20 桁の数字）",
+  "billing.voidInvoice": "無効化",
+  "billing.redInvoice": "赤伝発行",
+  "billing.confirmVoid": "もう一度クリックで無効化",
+  "billing.confirmRed": "もう一度クリックで赤伝発行",
+  "billing.voided": "請求書申請を更新しました: {0}"
 }

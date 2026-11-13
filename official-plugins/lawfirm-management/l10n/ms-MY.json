@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Ditarik: {created} baharu, {refreshed} dikemas kini.",
   "billing.cloudUnmapped": "{n} entri milik kes yang tiada penerimaan kes setempat dan tidak ditarik.",
   "billing.invoiceNumberPlaceholder": "Nombor invois daripada sistem invois",
-  "billing.invoiceNumberRequired": "Sila masukkan nombor invois yang dikembalikan oleh sistem invois (20 digit untuk invois digital)"
+  "billing.invoiceNumberRequired": "Sila masukkan nombor invois yang dikembalikan oleh sistem invois (20 digit untuk invois digital)",
+  "billing.voidInvoice": "Batalkan",
+  "billing.redInvoice": "Nota kredit",
+  "billing.confirmVoid": "Klik sekali lagi untuk batalkan",
+  "billing.confirmRed": "Klik sekali lagi untuk keluarkan nota kredit",
+  "billing.voided": "Permohonan invois dikemas kini: {0}"
 }

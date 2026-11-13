@@ -257,6 +257,11 @@
   "billing.cloudPull": "從律所雲端取回工時",
   "billing.cloudPulled": "已取回：新增 {created} 筆，更新 {refreshed} 筆。",
   "billing.cloudUnmapped": "{n} 筆所屬事項在本機找不到對應的收案，未取回。",
-  "billing.invoiceNumberPlaceholder": "開票系統回傳的發票號碼",
-  "billing.invoiceNumberRequired": "請填寫開票系統回傳的發票號碼（數電票為 20 位數字）"
+  "billing.invoiceNumberPlaceholder": "發票號碼",
+  "billing.invoiceNumberRequired": "請填寫開票系統回傳的發票號碼（數電票為 20 位數字）",
+  "billing.voidInvoice": "作廢",
+  "billing.redInvoice": "紅沖",
+  "billing.confirmVoid": "再點一次確認作廢",
+  "billing.confirmRed": "再點一次確認紅沖",
+  "billing.voided": "已處理發票申請：{0}"
 }

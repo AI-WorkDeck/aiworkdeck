@@ -257,6 +257,11 @@
   "billing.cloudPull": "从律所云端取回工时",
   "billing.cloudPulled": "已取回：新增 {created} 条，更新 {refreshed} 条。",
   "billing.cloudUnmapped": "{n} 条所属事项在本机找不到对应收案，未取回。",
-  "billing.invoiceNumberPlaceholder": "开票系统返回的发票号码",
-  "billing.invoiceNumberRequired": "请填写开票系统返回的发票号码（数电票为 20 位数字）"
+  "billing.invoiceNumberPlaceholder": "发票号码",
+  "billing.invoiceNumberRequired": "请填写开票系统返回的发票号码（数电票为 20 位数字）",
+  "billing.voidInvoice": "作废",
+  "billing.redInvoice": "红冲",
+  "billing.confirmVoid": "再点一次确认作废",
+  "billing.confirmRed": "再点一次确认红冲",
+  "billing.voided": "已处理发票申请：{0}"
 }

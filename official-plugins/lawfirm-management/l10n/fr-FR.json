@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Récupéré : {created} nouveaux, {refreshed} mis à jour.",
   "billing.cloudUnmapped": "{n} entrées appartiennent à des dossiers sans ouverture de dossier locale et n'ont pas été récupérées.",
   "billing.invoiceNumberPlaceholder": "Numéro de facture du système de facturation",
-  "billing.invoiceNumberRequired": "Saisissez le numéro de facture renvoyé par le système de facturation (20 chiffres pour les factures numériques)"
+  "billing.invoiceNumberRequired": "Saisissez le numéro de facture renvoyé par le système de facturation (20 chiffres pour les factures numériques)",
+  "billing.voidInvoice": "Annuler",
+  "billing.redInvoice": "Facture rectificative",
+  "billing.confirmVoid": "Cliquez encore pour annuler",
+  "billing.confirmRed": "Cliquez encore pour émettre la facture rectificative",
+  "billing.voided": "Demande de facture mise à jour : {0}"
 }

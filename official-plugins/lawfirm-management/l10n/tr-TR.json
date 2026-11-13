@@ -258,5 +258,10 @@
   "billing.cloudPulled": "Çekildi: {created} yeni, {refreshed} güncellendi.",
   "billing.cloudUnmapped": "{n} kayıt, bu bilgisayarda yerel dosya açılışı bulunmayan dosyalara ait olduğu için çekilmedi.",
   "billing.invoiceNumberPlaceholder": "Faturalama sisteminden gelen fatura numarası",
-  "billing.invoiceNumberRequired": "Faturalama sisteminin döndürdüğü fatura numarasını girin (dijital faturalarda 20 haneli)"
+  "billing.invoiceNumberRequired": "Faturalama sisteminin döndürdüğü fatura numarasını girin (dijital faturalarda 20 haneli)",
+  "billing.voidInvoice": "İptal et",
+  "billing.redInvoice": "Ters fatura",
+  "billing.confirmVoid": "İptal için tekrar tıklayın",
+  "billing.confirmRed": "Ters fatura için tekrar tıklayın",
+  "billing.voided": "Fatura talebi güncellendi: {0}"
 }
