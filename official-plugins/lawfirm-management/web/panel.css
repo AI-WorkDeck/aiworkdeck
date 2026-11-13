@@ -723,7 +723,7 @@ td.num {
   padding: 10px 12px;
   margin-block-end: 12px;
   border-radius: var(--awd-radius-sm, 6px);
-  background: var(--awd-danger-wash, var(--fallback-danger-wash));
+  background: var(--awd-danger-soft, var(--fallback-danger-wash));
 }
 .client-confirm p {
   margin: 0;
