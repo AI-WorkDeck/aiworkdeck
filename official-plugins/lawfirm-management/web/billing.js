@@ -568,8 +568,25 @@
   $('tab-hourly')?.addEventListener('click', () => run(null, refresh));
   applyStaticText();
   switchView('review');
+  // 旧宿主（0.85 及以前）后端没有计时收费动作：探测一次，不支持就隐藏整个页签，其余页签照常
+  const UNSUPPORTED = /不支持的律所管理操作|Unsupported law firm management action/;
+  async function probeHost() {
+    try {
+      await call('billingMetrics', monthRange());
+    } catch (err) {
+      if (!UNSUPPORTED.test(String(err?.message || ''))) return;
+      const tab = $('tab-hourly');
+      if (tab) {
+        if (tab.getAttribute('aria-selected') === 'true') $('tab-intake')?.click();
+        tab.hidden = true;
+      }
+      $('panel-hourly').hidden = true;
+    }
+  }
+
   awd.ready().then((ctx) => {
     locale = pickLocale(ctx?.language);
     applyStaticText();
+    return probeHost();
   }).catch(() => {});
 }());

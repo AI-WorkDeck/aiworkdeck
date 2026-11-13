@@ -185,3 +185,18 @@ test('English UI uses tokenized strings', async (t) => {
   assert.equal(h.$('hb-nav-metrics').textContent, 'Billable hours & realization');
   assert.equal(h.$('hb-review-status').options[0].textContent, 'To review');
 });
+
+test('on an older host without hourly-billing actions the 计时收费 tab hides itself; other errors keep it', async (t) => {
+  const old = harness({ responses: { billingMetrics: new Error('不支持的律所管理操作：billingMetrics') } });
+  t.after(() => old.dom.window.close());
+  await tick();
+  assert.equal(old.$('tab-hourly').hidden, true, 'tab hidden on a 0.85 host');
+  assert.equal(old.$('panel-hourly').hidden, true);
+  assert.equal(old.$('tab-finance').hidden, false, 'invoicing and the other tabs stay');
+  assert.equal(old.$('tab-expense').hidden, false);
+
+  const denied = harness({ responses: { billingMetrics: new Error('无权查看：全所收费台账与看板仅限律所管理员') } });
+  t.after(() => denied.dom.window.close());
+  await tick();
+  assert.equal(denied.$('tab-hourly').hidden, false, 'a permission error is not an old host');
+});
