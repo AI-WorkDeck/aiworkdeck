@@ -40,6 +40,8 @@ public class PluginLawFirmController {
         Map<String, Object> body = ImController.readBody(request, mapper);
         Map<String, Object> params = ImController.params(body);
         String action = body.get("action") == null ? "" : String.valueOf(body.get("action")).trim();
+        if (workflow.isCloudAction(action))
+            return LawFirmManagementController.run(() -> workflow.executeCloudForPlugin(pluginId, userId, action, params));
         if (com.checkba.service.lawfirm.LawFirmWorkflowService.ACTIONS.contains(action))
             return LawFirmManagementController.run(() -> workflow.execute(userId, action, params));
         Long projectId = LawFirmManagementController.parseProjectId(body.get("projectId"));

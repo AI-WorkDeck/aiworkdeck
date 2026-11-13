@@ -700,3 +700,6 @@ td.num {
   color: var(--awd-text-2, #555);
 }
 .hb-edit, .hb-confirm { margin-top: 8px; }
+/* 律所云端（cloud.js） */
+#cl-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
+.cl-purge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }

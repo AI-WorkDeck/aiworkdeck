@@ -46,7 +46,7 @@ test('generated l10n table matches l10n/*.json and every used key exists in zh-C
   const table = window.AWD_LAWFIRM_EXPENSE_L10N;
   for (const locale of ['zh-CN', 'en-US']) {
     const all = JSON.parse(read(`../l10n/${locale}.json`));
-    const expected = Object.fromEntries(Object.entries(all).filter(([k]) => k.startsWith('expense.') || k.startsWith('access.') || k.startsWith('client.') || k.startsWith('billing.')));
+    const expected = Object.fromEntries(Object.entries(all).filter(([k]) => k.startsWith('expense.') || k.startsWith('access.') || k.startsWith('client.') || k.startsWith('billing.') || k.startsWith('cloud.')));
     assert.deepEqual(table[locale], expected, `${locale} is out of sync; run build.sh`);
   }
   assert.deepEqual(Object.keys(table['zh-CN']).sort(), Object.keys(table['en-US']).sort());
