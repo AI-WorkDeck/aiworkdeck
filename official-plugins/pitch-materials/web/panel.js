@@ -118,7 +118,7 @@
 
   // ---------- 加载与保存 ----------
 
-  async function loadAll() {
+  async function loadLibrary() {
     try {
       const data = await tool('library.get');
       state.library = core.normalizeLibrary(data.library);
@@ -128,6 +128,10 @@
       state.libraryLoaded = false;
       notice(errText(e), 'error');
     }
+  }
+
+  async function loadAll() {
+    await loadLibrary();
     if (state.projectId) {
       try {
         const data = await tool('matrix.get');
@@ -157,7 +161,7 @@
 
   async function saveLibrary(lib) {
     if (!state.libraryLoaded) {
-      await loadAll();
+      await loadLibrary(); // 只重读库，不动对照表和生成表单
       if (!state.libraryLoaded) throw new Error(t('panel.err.libraryNotLoaded'));
       throw new Error(t('panel.err.libraryReloaded'));
     }
