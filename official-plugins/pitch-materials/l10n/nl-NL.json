@@ -258,5 +258,7 @@
   "panel.exp.drafted": "Concept gereed. Controleer, pas aan en sla op.",
   "panel.exp.draftFailed": "Er is geen bruikbaar concept verkregen. Kies andere bestanden of probeer het later opnieuw.",
   "panel.exp.fromProject": "Uit project",
-  "panel.exp.aiNotice": "Voor het concept worden de dossiergegevens van dit project (inclusief de cliëntnaam), je werkoverzicht en de gekozen bestanden naar de AI gestuurd. De aanbestedingsvergelijking stuurt nog steeds alleen externe omschrijvingen."
+  "panel.exp.aiNotice": "Voor het concept worden de dossiergegevens van dit project (inclusief de cliëntnaam), je werkoverzicht en de gekozen bestanden naar de AI gestuurd. De aanbestedingsvergelijking stuurt nog steeds alleen externe omschrijvingen.",
+  "panel.share.oneTeamUnnamed": "Wordt gedeeld met je team.",
+  "panel.share.teamN": "Team {n}"
 }

@@ -258,5 +258,7 @@
   "panel.exp.drafted": "Bozza pronta. Verificala, modificala e salvala.",
   "panel.exp.draftFailed": "Non è stata ottenuta una bozza utilizzabile. Prova con altri file o riprova più tardi.",
   "panel.exp.fromProject": "Da progetto",
-  "panel.exp.aiNotice": "Per la bozza vengono inviati all'IA i dati della pratica (compreso il nome del cliente), il riepilogo dei tuoi registri di lavoro e i file selezionati. Il confronto con il bando continua a inviare solo le descrizioni esterne."
+  "panel.exp.aiNotice": "Per la bozza vengono inviati all'IA i dati della pratica (compreso il nome del cliente), il riepilogo dei tuoi registri di lavoro e i file selezionati. Il confronto con il bando continua a inviare solo le descrizioni esterne.",
+  "panel.share.oneTeamUnnamed": "Verrà condiviso con il tuo team.",
+  "panel.share.teamN": "Team {n}"
 }

@@ -258,5 +258,7 @@
   "panel.exp.drafted": "已起草，請核對、修改後儲存。",
   "panel.exp.draftFailed": "沒有得到可用的草稿，請換幾份檔案或稍後重試。",
   "panel.exp.fromProject": "專案整理",
-  "panel.exp.aiNotice": "起草時會把本案件的收案事實（含客戶名稱）、你的工作紀錄彙總和所選檔案的內容傳送給 AI；比對招標文件時仍只傳送對外稱謂。"
+  "panel.exp.aiNotice": "起草時會把本案件的收案事實（含客戶名稱）、你的工作紀錄彙總和所選檔案的內容傳送給 AI；比對招標文件時仍只傳送對外稱謂。",
+  "panel.share.oneTeamUnnamed": "將分享給你所在的團隊。",
+  "panel.share.teamN": "團隊 {n}"
 }

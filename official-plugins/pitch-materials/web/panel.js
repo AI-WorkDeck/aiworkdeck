@@ -120,7 +120,12 @@
     try {
       const ctx = await cloud('pitch.context');
       // 团队可能是 id 字符串，也可能是 {id, name}（名录给出显示名时）；统一成 {id, name}，没有名称就显示 id
-      const teams = ((ctx && ctx.teams) || []).map((tm) => (tm && typeof tm === 'object') ? { id: String(tm.id), name: String(tm.name || tm.id) } : { id: String(tm), name: String(tm) });
+      // 永远不显示团队的原始 id：名录没给名称时，一个团队说「你所在的团队」，多个团队编成「团队 1 / 团队 2」（id 只放在悬停提示里）
+      const teams = ((ctx && ctx.teams) || []).map((tm, i) => {
+        const id = String(tm && typeof tm === 'object' ? tm.id : tm);
+        const name = tm && typeof tm === 'object' && tm.name ? String(tm.name) : '';
+        return { id, name, label: name || t('panel.share.teamN', { n: i + 1 }) };
+      });
       state.cloud = Object.assign(state.cloud, { available: true, teams, me: (ctx && ctx.name) || '', error: '' });
       const mine = await cloud('pitch.mine');
       state.cloud.mine = Object.fromEntries(((mine && mine.entries) || []).map((e) => [e.id, e]));
@@ -501,11 +506,15 @@
       if (d.share.scope !== 'team') return;
       const teams = state.cloud.teams || [];
       if (!teams.length) { teamsBox.appendChild(el('span', { className: 'pm-warn', text: t('panel.share.noTeam') })); return; }
-      if (teams.length === 1) { d.share.teams = [teams[0].id]; teamsBox.appendChild(el('span', { className: 'hint', text: t('panel.share.oneTeam', { team: teams[0].name }) })); return; }
+      if (teams.length === 1) {
+        d.share.teams = [teams[0].id];
+        teamsBox.appendChild(el('span', { className: 'hint', text: teams[0].name ? t('panel.share.oneTeam', { team: teams[0].name }) : t('panel.share.oneTeamUnnamed') }));
+        return;
+      }
       teams.forEach((tm) => {
         const c = el('input', { type: 'checkbox', checked: d.share.teams.includes(tm.id) });
         c.addEventListener('change', () => { d.share.teams = c.checked ? d.share.teams.concat([tm.id]) : d.share.teams.filter((x) => x !== tm.id); });
-        teamsBox.appendChild(el('label', { className: 'pm-check' }, [c, el('span', { text: tm.name })]));
+        teamsBox.appendChild(el('label', { className: 'pm-check', title: tm.name ? null : tm.id }, [c, el('span', { text: tm.label })]));
       });
     };
     scope.addEventListener('change', () => { d.share.scope = scope.value; drawTeams(); client.disabled = off || scope.value === 'private'; });

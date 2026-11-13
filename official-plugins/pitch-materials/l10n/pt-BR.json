@@ -258,5 +258,7 @@
   "panel.exp.drafted": "Rascunho pronto. Revise, edite e salve.",
   "panel.exp.draftFailed": "Não foi obtido um rascunho utilizável. Tente outros arquivos ou tente novamente mais tarde.",
   "panel.exp.fromProject": "De projeto",
-  "panel.exp.aiNotice": "Para redigir, os dados do assunto (incluindo o nome do cliente), o resumo dos seus registros de trabalho e os arquivos selecionados são enviados à IA. A comparação com o edital continua enviando apenas as descrições externas."
+  "panel.exp.aiNotice": "Para redigir, os dados do assunto (incluindo o nome do cliente), o resumo dos seus registros de trabalho e os arquivos selecionados são enviados à IA. A comparação com o edital continua enviando apenas as descrições externas.",
+  "panel.share.oneTeamUnnamed": "Será compartilhado com sua equipe.",
+  "panel.share.teamN": "Equipe {n}"
 }
