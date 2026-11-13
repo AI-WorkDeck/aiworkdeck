@@ -538,6 +538,18 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
      它本来就在 `KIND_AGNOSTIC_LOWA_TOOLS` 里；声明层 `requiresHost` 仍叠在前面）。**开例外而不是改名**：
      这个名字被十来个工具描述与多份提示片段引用、还写在老会话执行日志里，改名要么留别名（别名表应当一直是空表）、
      要么让那些引用同一刻全部失效。其余 doc_* 在 Office/none 会话里照旧不可见（`ClientCapabilityServiceTest` 钉着）；
+     **WEB 档（网页版工作台，W1，设计 readiness/w1/W1-design.md）是白名单，先于前缀链与声明层判定**：
+     只放 `WebClientToolSurface.EDITOR_TOOLS`（网页 iframe LOWA 执行器能跑的 Writer doc_*，仍过活跃文档类型闸）
+     与 `BACKEND_TOOLS`（纯后端），`DENIED_TOOLS` + `DENIED_PREFIXES`（office_/ref_/sheet_/slide_/pptx_/litigation_/version_/
+     plugin_dev_/capability_）一律不可见；名单外的名字只可能是插件/MCP 工具，仅当所属插件 manifest `hosts` 含 `"web"`
+     （`PluginService.supportsWebClient`，由 `ToolRegistry.init` 推入 `setWebPluginToolPredicate`）才放行，用户自配 MCP 永不。
+     **新增内置工具必须在 `WebClientToolSurface` 归类**，`ClientCapabilityWebSurfaceTest` 枚举真实注册表、没归类就红。
+     **网页会话不许回落到 LOWA**：Origin ∈ `security.cors.web-origins`（chat/connect）或 `X-Client-Instance` 以 `web-` 开头（connect）
+     → `markWebClient` 把会话钉在 WEB（之后声明 lowa/未知/漏带都不放宽，未登记时也按 WEB 兜底），chat 把 `clientCapability:"web"`
+     写回请求体，inbox 重启回放同样是 web。片段 `prompts/tools-web(.en).md`（只教白名单工具 + 网页边界）。
+     网页会话每用户最多 `AgentOrchestrator.WEB_ACTIVE_RUNS_PER_USER`=3 个活跃轮次，超出的留在 inbox pending（回执 runId=null，不报错），
+     任一网页轮次收尾（`endRun`/`endRunAndDrain`）后在 `web-run-admission` 线程按序接纳（异步：不在本会话锁里拿别的会话锁）。
+     回归 `ClientCapabilityWebSurfaceTest`、`ClientCapabilityServiceTest`、`AiAgentControllerTest`、`AgentOrchestratorInboxTest#webRuns*`、`CorsPreflightHeadersTest`；
   ①b **工具自报的宿主依赖**（dev-board#799，`@ToolMeta.requiresHost = NONE|LOWA|OFFICE`）：
      叠在前缀链**之上**的声明层，**只收窄、绝不放宽**（两层都通过才可见）。前缀链是既有公开契约、
      一行没动；无前缀的工具从此自己声明，不再往 `ClientCapabilityService` 里塞名字清单。

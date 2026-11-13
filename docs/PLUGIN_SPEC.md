@@ -86,6 +86,7 @@ plugins/
 | `tools` | object[] | 否 | 工具清单（`name` + 中文 `description` + 可选 `permissions`），用于插件广场展示、人工审查与 v2 权限校验。`name` 应与 JAR 中 `@Tool` 方法名一致；`permissions` 声明**该工具运行所需**的能力（v2 新增，见 §3）。 |
 | `frontendEntry` | string | 否 | **v2.3 起激活**：`web/index.html` 这样的相对路径 = Web 插件（见 §8）；`http(s)://` 绝对 URL = 旧形态，宿主直接 iframe 打开外部页面。 |
 | `minHostVersion` | string | 否 | **v2.7 新增**：本插件需要的最低宿主版本（semver）。宿主低于它时插件登记但**不生效**（不加载 JAR、不注册工具、不服务 web/），管理页提示「需要宿主 ≥ X，请升级客户端」，enable 明确拒绝；广场安装与 dev 直装在装前就拦。非法格式视为缺省并 WARN。dev 态宿主（版本 `dev`）跳过校验。注意它保护不了 0.27.3 及更老的宿主（它们不认识这个字段）——用了 v2.7 能力的插件应声明 `"0.27.4"`，缺口随存量宿主升级自然收敛。 |
+| `hosts` | string[] | 否 | **W1 新增**：除桌面端与 Office/WPS 任务窗格（缺省就支持）之外还支持的宿主，目前只认 `"web"`。声明了 `["web"]`，本插件的 Agent 工具（JAR `@Tool`、声明式 `tools[]`、`contributes.mcpServers` 投影的工具）才会出现在**网页版**（官网 `/web/` 工作台，`clientCapability:"web"`）会话里；**缺省不出现**——插件工具多数假设桌面环境（本机文件、桌面前端、编辑器桥），判不准时放行在网页上会变成死路径。只声明你的工具在纯云端（无本机文件、无终端、编辑器只开 DOCX）也能跑通的插件。不影响桌面端与任务窗格的可见性。宿主实现见 `ClientCapabilityService` / `WebClientToolSurface`。 |
 | `backendJars` | string[] | 否 | 相对插件目录的 JAR 文件名列表，启动/重扫时加载其中带 `@Tool` 注解的类。 |
 | `skills` | string[] | 否 | **v2.1 新增**：插件携带的 Skill 子目录名列表（相对插件目录），见 §7。 |
 | `packs` | string[] | 否 | **v2.3 新增**：依赖的原生资源包 id 列表，见 §9 与 [NATIVE_PACK_DISTRIBUTION.md](NATIVE_PACK_DISTRIBUTION.md)。 |

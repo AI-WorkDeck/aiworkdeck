@@ -431,6 +431,8 @@ public class AgentOrchestrator {
          * 打开 / 新建文档成功后清零（只放宽，与 activeDocKind 的中途放宽同一契约）。
          */
         volatile boolean noFileEntrySet;
+        /** 网页版会话的轮次：占一个每用户活跃名额（{@link #WEB_ACTIVE_RUNS_PER_USER}），收尾时释放。 */
+        volatile boolean webClient;
         /**
          * 起跑时（关键词 / skill 预放回之后）的展开集快照。展开集之后再增长 = 模型经 list_tools / 点名 / 决策辅助
          * 明确要了某个类目，此时没开文件态的编辑原语过滤不再适用（明确要的就给全）。null = 没有快照，按不过滤处理。
@@ -513,6 +515,26 @@ public class AgentOrchestrator {
      * {@code cancel(conversationId)} 与断线重连的恢复快照都靠这张表解析 runId。
      */
     private final Map<String, RunGuard> activeRuns = new ConcurrentHashMap<>();
+
+    /**
+     * 网页版每个用户同时活跃的轮次上限（W1 设计 §4.8 / §8-5）：防一个账户开多个标签页刷后端。
+     * 超出的输入<b>不报错</b>：留在 inbox 里 pending（回执 runId=null，与重启期间排队同形），
+     * 有名额腾出时按提交顺序自动起跑。这是防滥用的并发闸，不是打断用户的自动暂停。
+     */
+    static final int WEB_ACTIVE_RUNS_PER_USER = 3;
+
+    /** 因上限而排队的网页版 inbox 条目（按用户、按提交顺序）。只在 {@link #restartAdmission} 下读写。 */
+    private final Map<Long, java.util.LinkedHashSet<String>> webAdmissionQueue = new java.util.HashMap<>();
+
+    /**
+     * 腾出名额后起跑排队条目的线程。异步是为了不在收尾路径持有的会话锁里再去拿另一个会话的锁
+     *（两个会话互相接续对方的排队条目会死锁）。包级可见：测试换成同步执行。
+     */
+    java.util.concurrent.Executor webAdmissionExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "web-run-admission");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final ChatModelFactory chatModelFactory;
     private final ProjectAiMessageService messageService;
@@ -610,6 +632,55 @@ public class AgentOrchestrator {
             editorBridgeService.cleanupAfterRun(guard.conversationId);
         }
         skillRouter.clearRun(guard.runId);
+        if (wasCurrent) scheduleWebAdmission(guard);
+    }
+
+    /** 本用户此刻登记在册的网页版轮次数。调用方持有 {@link #restartAdmission}。 */
+    private int activeWebRuns(Long userId) {
+        int count = 0;
+        for (RunGuard guard : activeRuns.values()) {
+            if (guard.webClient && java.util.Objects.equals(userId, guard.userId)) count++;
+        }
+        return count;
+    }
+
+    private boolean isWebRequest(AiAgentController.AgentChatRequest request) {
+        return "web".equalsIgnoreCase(request.getClientCapability())
+                || (clientCapabilities != null && clientCapabilities.capabilityOf(request.getConversationId())
+                        == ClientCapabilityService.Capability.WEB);
+    }
+
+    /** 网页版轮次腾出名额：有排队条目就异步接着起跑。 */
+    private void scheduleWebAdmission(RunGuard guard) {
+        if (!guard.webClient || guard.userId == null) return;
+        synchronized (restartAdmission) {
+            if (!webAdmissionQueue.containsKey(guard.userId)) return;
+        }
+        Long userId = guard.userId;
+        webAdmissionExecutor.execute(() -> admitQueuedWebRuns(userId));
+    }
+
+    private void admitQueuedWebRuns(Long userId) {
+        while (true) {
+            String next;
+            synchronized (restartAdmission) {
+                java.util.LinkedHashSet<String> queue = webAdmissionQueue.get(userId);
+                if (queue == null || queue.isEmpty()) {
+                    webAdmissionQueue.remove(userId);
+                    return;
+                }
+                if (activeWebRuns(userId) >= WEB_ACTIVE_RUNS_PER_USER) return;
+                next = queue.iterator().next();
+                queue.remove(next);
+                if (queue.isEmpty()) webAdmissionQueue.remove(userId);
+            }
+            try {
+                acceptInboxSubmission(next);
+            } catch (RuntimeException e) {
+                // 条目留在 inbox 里 pending，用户可以重发或删除；不影响后面的排队条目
+                log.warn("Queued web run {} for user {} could not start: {}", next, userId, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -647,6 +718,8 @@ public class AgentOrchestrator {
                     sseEmitterService.close(guard.conversationId, guard.connectionEpoch);
                 }
             }
+            // 名额让给同一用户排队中的其它网页版会话；本会话的接续若已占回名额，接纳循环会按上限停下
+            if (wasCurrent) scheduleWebAdmission(guard);
         }
     }
 
@@ -1373,10 +1446,15 @@ public class AgentOrchestrator {
         return editorBridgeService.executeEditorCommand(action, params, PostWriteCheck.READ_TIMEOUT_SECONDS);
     }
 
-    /** 嵌入式编辑器会话（Office/WPS 任务窗格没有 get_document_text，写后核对不适用）。 */
+    /**
+     * 嵌入式编辑器会话（Office/WPS 任务窗格没有 get_document_text，写后核对不适用）。
+     * 网页版跑的是同一个 LOWA 执行器，同样算（W1）。
+     */
     private boolean isLowaSession(String conversationId) {
-        return clientCapabilities == null
-                || clientCapabilities.capabilityOf(conversationId) == ClientCapabilityService.Capability.LOWA;
+        if (clientCapabilities == null) return true;
+        ClientCapabilityService.Capability capability = clientCapabilities.capabilityOf(conversationId);
+        return capability == ClientCapabilityService.Capability.LOWA
+                || capability == ClientCapabilityService.Capability.WEB;
     }
 
     /**
@@ -2358,9 +2436,18 @@ public class AgentOrchestrator {
                         + "\"retryWithInlineContent\":true,\"message\":\"文档正文缓存已失效，请重新发送文档正文。 / Resend the document text.\"}");
                 throw e;
             }
+            boolean web = isWebRequest(request);
             synchronized (restartAdmission) {
                 if (restartAttempts.containsKey(item.getUserId())) return null;
+                if (web && activeWebRuns(item.getUserId()) >= WEB_ACTIVE_RUNS_PER_USER) {
+                    // 不拒绝：条目留在 inbox 里 pending，腾出名额后按序起跑（W1 设计 §4.8）
+                    webAdmissionQueue.computeIfAbsent(item.getUserId(), k -> new java.util.LinkedHashSet<>()).add(itemId);
+                    log.info("Web run limit reached for user {}: queued inbox item {} (conversation {})",
+                            item.getUserId(), itemId, conversationId);
+                    return null;
+                }
                 guard = beginRun(item.getConversationId());
+                guard.webClient = web;
                 guard.userId = item.getUserId();
                 guard.originalRequest = request;
                 guard.inboxItemId = itemId;
@@ -2689,8 +2776,7 @@ public class AgentOrchestrator {
             guard.activeDocKind = initialDocKind(request.getActiveContext());
             guard.noFileEntrySet = (request.getActiveContext() == null || request.getActiveContext().getId() == null
                     || request.getActiveContext().getId().isEmpty())
-                    && (clientCapabilities == null
-                    || clientCapabilities.capabilityOf(conversationId) == ClientCapabilityService.Capability.LOWA);
+                    && isLowaSession(conversationId);
             if (guard.activeDocKind != null) {
                 log.info("[ToolVisibility] conv={} 活跃文档类型={}，本轮按该类型裁剪 doc_/sheet_/slide_ 工具集",
                         conversationId, guard.activeDocKind);
