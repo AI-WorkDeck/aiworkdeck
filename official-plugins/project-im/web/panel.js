@@ -646,8 +646,8 @@
   }
   const controlIds = ['new-chat', 'join-chat', 'refresh', 'add-friend', 'directory-home'];
   const EN_EXACT = {
-    '项目沟通 · AI WorkDeck': 'Project Messaging · AI WorkDeck',
-    '正在连接项目沟通…': 'Connecting to Project Messaging…',
+    '项目沟通 · AI WorkDeck': 'Project Chat · AI WorkDeck',
+    '正在连接项目沟通…': 'Connecting to Project Chat…',
     '会话与通讯录': 'Conversations & Directory',
     '新建会话': 'New Chat',
     '邀请码加入': 'Join with Code',
@@ -663,7 +663,7 @@
     '当前团队与律所': 'Current Team & Firm',
     '添加联系人': 'Add Contact',
     '当前会话': 'Active Chat',
-    '项目沟通': 'Project Messaging',
+    '项目沟通': 'Project Chat',
     '从左侧选择会话，继续讨论。': 'Select a conversation on the left to continue.',
     '同事与客户可通过邀请码加入。需要联系项目成员时，展开通讯录。': 'Colleagues and clients can join via invite code. Expand the directory to reach project members.',
     '返回会话列表': 'Back to conversations',
@@ -694,9 +694,9 @@
     '确认操作': 'Confirm Action',
     '取消': 'Cancel',
     '继续': 'Continue',
-    '请先选择一个项目，再使用项目沟通。': 'Please select a project first to use Project Messaging.',
+    '请先选择一个项目，再使用项目沟通。': 'Please select a project first to use Project Chat.',
     '没有操作权限，或已不在此会话中。请刷新会话。': 'Permission denied or you are no longer in this conversation. Please refresh.',
-    '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。': 'Your client does not support Project Messaging. Please upgrade to 0.61.0 or newer.',
+    '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。': 'Your client does not support Project Chat. Please upgrade to 0.61.0 or newer.',
     '操作未完成，请检查连接后重试。草稿仍保留在当前会话。': 'Operation incomplete. Please check your connection and try again. Your draft is preserved.',
     '未命名团队': 'Unnamed Team',
     '尚未加入团队': 'Not in a Team Yet',
