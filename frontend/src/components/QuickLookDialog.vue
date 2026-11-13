@@ -8,7 +8,7 @@
         <button type="button" @click="$emit('open')">{{ $t('files.quickLookOpen') }}</button>
         <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="$emit('close')">×</button>
       </header>
-      <FilePreview :key="file.id" :file="file" :project-id="projectId" :show-edit-btn="false" @extracted="$emit('extracted', $event)" />
+      <FilePreview :key="file.id" :file="file" :project-id="projectId" :render-slides="renderSlides" :show-edit-btn="false" @extracted="$emit('extracted', $event)" />
     </section>
   </div>
 </template>
@@ -20,7 +20,7 @@ export default {
   name: 'QuickLookDialog',
   components: { FilePreview },
   emits: ['close', 'navigate', 'open', 'extracted'],
-  props: { file: { type: Object, required: true }, projectId: { type: [String, Number], default: null } },
+  props: { file: { type: Object, required: true }, projectId: { type: [String, Number], default: null }, renderSlides: { type: Function, default: null } },
   mounted() {
     this._overlayHolder = `quick-look-${++holderSequence}`
     setGlobalOverlay(true, this._overlayHolder)

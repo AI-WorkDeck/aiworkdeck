@@ -238,7 +238,7 @@ import { createInlineReviewHost } from '@/composables/inlineReviewHost.js'
 import { requireAccount, requireRecharge } from '@/utils/requireAccount.js'
 import { createWritingAssistanceHost } from '@/composables/writingAssistanceHost.js'
 import { createSemanticWritingHost } from '@/composables/semanticWritingHost.js'
-import { createSlidePreviewCache, fingerprint as previewFingerprint } from '@/composables/slidePreviewCache.js'
+import { createSlidePreviewCache, fingerprint as previewFingerprint, renderSlideCards } from '@/composables/slidePreviewCache.js'
 import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemanticWritingSuggestion, getSemanticWritingSuggestion, cancelSemanticWritingSuggestion, acceptSemanticWritingSuggestion } from '@/services/api.js'
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
@@ -1840,30 +1840,8 @@ export default {
     // 缓存的引擎渲染页做成卡片：画布底色上居中、圆角阴影、页码；宽度随窗格，最大 960。
     renderCachedSlides(container, cached) {
       this.revokeSlidePreviewUrls()
-      const urls = []
-      const wrap = document.createElement('div')
-      wrap.className = 'awd-slide-preview'
-      cached.slides.forEach((slide, i) => {
-        const url = URL.createObjectURL(new Blob([slide.bytes], { type: 'image/jpeg' }))
-        urls.push(url)
-        const card = document.createElement('figure')
-        card.className = 'awd-slide-preview-card'
-        const img = document.createElement('img')
-        img.src = url; img.alt = ''; img.decoding = 'async'
-        if (slide.width && slide.height) img.style.aspectRatio = slide.width + ' / ' + slide.height
-        const cap = document.createElement('figcaption')
-        cap.textContent = (i + 1) + ' / ' + (cached.total || cached.slides.length)
-        card.append(img, cap)
-        wrap.append(card)
-      })
-      if ((cached.total || 0) > cached.slides.length) {
-        const more = document.createElement('div')
-        more.className = 'awd-slide-preview-more'
-        more.textContent = this.$t('editor.slidePreviewMore', { count: cached.total - cached.slides.length })
-        wrap.append(more)
-      }
-      container.append(wrap)
-      this._slidePreviewUrls = urls
+      const more = (cached.total || 0) > cached.slides.length ? this.$t('editor.slidePreviewMore', { count: cached.total - cached.slides.length }) : ''
+      this._slidePreviewUrls = renderSlideCards(container, cached, more)
     },
     revokeSlidePreviewUrls() {
       for (const url of this._slidePreviewUrls || []) URL.revokeObjectURL(url)

@@ -2030,6 +2030,7 @@
         v-if="quickLookFile"
         :file="quickLookFile"
         :project-id="projectId"
+        :render-slides="libreOfficePreferred ? renderSlidesForPreview : null"
         @close="closeQuickLook"
         @navigate="navigateQuickLook"
         @open="handleFileTreeOpen(quickLookFile)"

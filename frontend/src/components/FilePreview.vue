@@ -34,8 +34,8 @@
           <view ref="docxContainer" class="docx-host"></view>
         </view>
 
-        <!-- PPTX 零配置只读渲染：pptx-preview 本地解析（自建 LOWA 引擎无 Impress
-             模块，演示文稿由前端渲染承接） -->
+        <!-- 演示文稿只读预览（O13）：有引擎时借隐藏引擎逐页渲染成图片（renderSlides，.ppt 也能看），
+             先显示上次缓存的渲染页；没有引擎（未部署 /zetaoffice/ 的 Web 版）才退回前端 pptx-preview -->
         <view v-else-if="isPptx && usePptxPreview && !pptxRenderFailed" class="preview-pptx">
           <view v-if="pptxLoading" class="docx-loading"><text>{{ $t('files.renderingSlides') }}</text></view>
           <view ref="pptxContainer" class="pptx-host"></view>
@@ -187,6 +187,8 @@
 
 <script>
 import { getFileBytesUrl, getArchiveEntries, extractArchive } from '@/services/api.js'
+import { createSlidePreviewCache, fingerprint, renderSlideCards } from '@/composables/slidePreviewCache.js'
+import { isEncryptedOoxml } from '@/utils/editorLoadFailure.js'
 import { getAuthHeaders, getSessionId } from '@/utils/auth.js'
 import { buildStreamUrl } from '@/utils/media/mediaSource.js'
 import { getFileLocalPath } from '@/services/api.js'
@@ -240,6 +242,11 @@ export default {
     showEditBtn: {
       type: Boolean,
       default: true
+    },
+    // 引擎渲染演示文稿（工作台的 renderSlidesForPreview）：(bytes, name, opts) => { slides, total } | null
+    renderSlides: {
+      type: Function,
+      default: null
     },
     // 播放器登记转写（生成字幕）要项目 id；file 上带 projectId 时以 file 为准，这里是兜底
     projectId: {
@@ -328,9 +335,10 @@ export default {
       return ['doc', 'docx'].includes(this.file.fileType.toLowerCase())
     },
     isPptx() {
-      // 仅 pptx（OOXML）；ppt 97 二进制前端渲染库不支持，落占位下载分支
+      // pptx；ppt 97 二进制只有引擎能渲染（renderSlides 在时），前端渲染库不支持，否则落占位下载分支
       if (!this.file || !this.file.fileType) return false
-      return this.file.fileType.toLowerCase() === 'pptx'
+      const type = this.file.fileType.toLowerCase()
+      return type === 'pptx' || (type === 'ppt' && !!this.renderSlides)
     },
     isImage() {
       if (!this.file || !this.file.fileType) return false
@@ -446,6 +454,8 @@ export default {
     if (this.blobUrl) {
       URL.revokeObjectURL(this.blobUrl)
     }
+    this._slideJob = (this._slideJob || 0) + 1
+    this.revokeSlideUrls()
     this.unbindImageViewportListeners()
     // 组件卸载时若正处于拖拽平移中，window 上的监听不会自己消失
     window.removeEventListener('mousemove', this.handleImagePanMove)
@@ -501,6 +511,7 @@ export default {
 
       this.docxRenderFailed = false
       this.pptxRenderFailed = false
+      this.revokeSlideUrls()
       this.resetImageViewState()
 
       if (!newFile) return false
@@ -681,28 +692,57 @@ export default {
         this.docxLoading = false
       }
     },
-    // PPTX 零配置只读渲染：pptx-preview 在本地（Chromium）解析 .pptx
+    // 演示文稿只读预览（O13）：缓存的引擎渲染页 → 引擎逐页渲染 → 没有引擎才用前端 pptx-preview
     async renderPptx() {
+      const job = this._slideJob = (this._slideJob || 0) + 1
+      const fileId = this.file && this.file.id
+      const current = () => job === this._slideJob && this.file && this.file.id === fileId
       this.pptxLoading = true
       this.pptxRenderFailed = false
       try {
         const blob = await this.fetchAuthedBlob()
         const buf = await blob.arrayBuffer()
+        if (!current()) return
         await this.$nextTick()
         const ref = this.$refs.pptxContainer
         const container = ref && (ref.$el || ref)
         if (!container) throw new Error(this.$t('files.renderContainerNotReadyError'))
+        // 设了打开密码：预览里不问密码，落占位（打开后在编辑器里输入）
+        if (isEncryptedOoxml(buf, this.file.name || '.' + this.file.fileType)) throw new Error('password protected')
+        const show = (deck) => {
+          if (!current()) return
+          this.revokeSlideUrls()
+          container.innerHTML = ''
+          const more = (deck.total || 0) > deck.slides.length ? this.$t('files.slidesNotShown', { count: deck.total - deck.slides.length }) : ''
+          this._slideUrls = renderSlideCards(container, deck, more)
+          this.pptxLoading = false
+        }
+        if (this.renderSlides) {
+          // 上次编辑器缓存过同一份字节的渲染页就先显示（瞬时），引擎渲染完整份后替换
+          const cached = await createSlidePreviewCache().load(await fingerprint(buf)).catch(() => null)
+          if (cached) show(cached)
+          const deck = await this.renderSlides(buf, this.file.name, { isCancelled: () => !current() }).catch(() => null)
+          if (!current()) return
+          if (deck) { show(deck); return }
+          if (cached) return
+        }
+        if (this.file.fileType.toLowerCase() !== 'pptx') throw new Error('no engine for .ppt')
         container.innerHTML = ''
         const { init } = await import('pptx-preview')
         const width = Math.max(320, (container.clientWidth || 960) - 32)
         const previewer = init(container, { width, height: Math.round(width * 9 / 16) })
         await previewer.preview(buf)
       } catch (error) {
-        console.error('pptx 本地渲染失败，落 Office 占位分支:', error)
+        if (!current()) return
+        console.error('演示文稿预览失败，落 Office 占位分支:', error)
         this.pptxRenderFailed = true
       } finally {
-        this.pptxLoading = false
+        if (current()) this.pptxLoading = false
       }
+    },
+    revokeSlideUrls() {
+      for (const url of this._slideUrls || []) URL.revokeObjectURL(url)
+      this._slideUrls = []
     },
     getMimeType(fileType) {
         if (!fileType) return ''
@@ -1213,6 +1253,15 @@ export default {
   background-color: var(--awd-surface-2);
 }
 
+/* 演示文稿预览：引擎渲染页做成卡片（与编辑器冷启动预览同款），无引擎时容器给 pptx-preview */
+.pptx-host :deep(.awd-slide-preview) { max-width: 960px; margin: 0 auto; padding: 16px 24px 32px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 22px; }
+.pptx-host :deep(.awd-slide-preview-card) { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.pptx-host :deep(.awd-slide-preview-card img) { display: block; width: 100%; height: auto; border-radius: 6px;
+  background: #fff; box-shadow: 0 1px 2px rgba(31, 35, 40, 0.08), 0 8px 24px rgba(31, 35, 40, 0.10); }
+.pptx-host :deep(.awd-slide-preview-card figcaption) { text-align: center; font-size: 11px; color: var(--awd-text-3);
+  font-variant-numeric: tabular-nums; }
+.pptx-host :deep(.awd-slide-preview-more) { text-align: center; font-size: 12px; color: var(--awd-text-3); padding-bottom: 8px; }
 /* PPTX 零配置只读渲染容器（pptx-preview） */
 .preview-pptx {
   width: 100%;
@@ -1223,6 +1272,7 @@ export default {
 
 .pptx-host {
   display: block;
+  box-sizing: border-box;
   width: 100%;
   padding: 16rpx;
 }

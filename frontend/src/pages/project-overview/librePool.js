@@ -335,6 +335,35 @@ export const librePoolMethods = {
             _spare: sp,
         }
     },
+    // 文件预览/QuickLook 的演示文稿（O13）：借隐藏引擎把每页渲染成图片——与编辑器同一个引擎，
+    // 不再用前端 pptx-preview 解析（真实课件上背景图错位裁切）。一次只跑一份：新请求作废上一份，
+    // 作废的那份在下一页前停下并归还引擎。返回 { slides, total }；拿不到引擎或装载失败回 null（调用方退回旧渲染）。
+    async renderSlidesForPreview(bytes, name, { maxSlides = 40, width = 1280, isCancelled = null } = {}) {
+        const job = this._slidePreviewJob = (this._slidePreviewJob || 0) + 1
+        const cancelled = () => job !== this._slidePreviewJob || (typeof isCancelled === 'function' && isCancelled())
+        const handle = await this.acquireLibreHiddenInstance({ timeoutMs: 120000, isCancelled: cancelled })
+        if (!handle) return null
+        try {
+            if (cancelled()) return null
+            const loaded = await handle.run('load_document', { bytes: new Uint8Array(bytes), name: String(name || 'preview.pptx') })
+            if (!loaded || !loaded.success || cancelled()) return null
+            const nav = await handle.run('office_get_navigation', {}, { background: true })
+            const total = Array.isArray(nav && nav.items) ? nav.items.length : 0
+            const slides = []
+            for (let n = 1; n <= Math.min(total, maxSlides); n++) {
+                if (cancelled()) return null
+                const r = await handle.run('slide_get_thumbnail', { slideNumber: n, width, format: 'jpeg', preview: true, documentSeq: nav.documentSeq }, { background: true })
+                if (!r || !r.success || !r.bytes) break
+                slides.push({ bytes: r.bytes instanceof Uint8Array ? r.bytes : new Uint8Array(r.bytes), width: r.width, height: r.height })
+            }
+            return slides.length ? { slides, total } : null
+        } catch (e) {
+            console.warn('[ProjectOverview] slide preview render failed', e)
+            return null
+        } finally {
+            this.releaseLibreHiddenInstance(handle)
+        }
+    },
     releaseLibreHiddenInstance(handle) {
         const sp = handle && (handle._spare || handle)
         // #1122: array entries are Vue proxies; acquired handles retain the raw object.
