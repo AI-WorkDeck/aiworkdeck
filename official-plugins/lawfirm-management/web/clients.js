@@ -462,28 +462,46 @@
     return fill;
   }
 
+  // 宿主还不认识客户管理动作（0.85.x 及更早）：律所管理后端回「不支持的律所管理操作」
+  function unsupportedHost(err) {
+    const msg = String(err?.message || '');
+    return msg.includes('不支持的律所管理操作') || msg.includes('Unsupported law firm management action');
+  }
+
+  // 旧宿主上整个客户管理不出现：标签与面板隐藏，收案表单不加客户下拉，收案与利冲照旧
+  function hideForOldHost() {
+    const tab = $('tab-clients');
+    const panel = $('panel-clients');
+    if (tab) tab.hidden = true;
+    if (panel) panel.hidden = true;
+    if (tab && tab.getAttribute('aria-selected') === 'true') $('tab-intake')?.click();
+  }
+
   async function init(ctx) {
     locale = pickLocale(ctx?.language || ctx?.locale);
     for (const n of document.querySelectorAll('[data-c]')) n.textContent = t(n.dataset.c);
-    const fillPicker = setupIntakePicker();
     const tab = $('tab-clients');
+    try {
+      // 首次加载只发一次 listClients（旧收案归集在这一次里完成），收案表单的客户下拉直接复用结果
+      await loadList();
+    } catch (err) {
+      if (unsupportedHost(err)) { hideForOldHost(); return; }
+      const root = $('clients-root');
+      if (root) root.replaceChildren(el('p', { class: 'hint' }, errorText(err)));
+      return;
+    }
     if (tab) {
       tab.addEventListener('click', () => {
         if (state.profile || state.editing) return;
         run(null, async () => { await loadList(); renderList(); });
       });
     }
-    try {
-      // 首次加载只发一次 listClients（旧收案归集在这一次里完成），收案表单的客户下拉直接复用结果
-      await loadList();
-      renderList();
-      state.pickOptions = [...(state.list?.clients || [])].sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'));
-      if (fillPicker) fillPicker();
-    } catch (err) {
-      const root = $('clients-root');
-      if (root) root.replaceChildren(el('p', { class: 'hint' }, errorText(err)));
-    }
+    const fillPicker = setupIntakePicker();
+    renderList();
+    state.pickOptions = [...(state.list?.clients || [])].sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'));
+    if (fillPicker) fillPicker();
   }
+
 
   window.AWD_LAWFIRM_CLIENTS = { t, openProfile };
   if (typeof awd !== 'undefined' && awd.ready) awd.ready().then(init).catch(() => {});

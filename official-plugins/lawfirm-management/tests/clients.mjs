@@ -38,7 +38,7 @@ const PROFILE = {
   signals: [{ date: '2026-10-31', source: 'WORK_LOG', projectName: '远航仓储' }]
 };
 
-async function mount({ language = 'zh-CN' } = {}) {
+async function mount({ language = 'zh-CN', oldHost = false } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://plugin.invalid/' });
   const calls = [];
   const send = (data) => dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data, source: dom.window.parent }));
@@ -50,6 +50,12 @@ async function mount({ language = 'zh-CN' } = {}) {
       if (msg.method === 'context.get') result = { pluginId: 'lawfirm-management', language };
       if (msg.method === 'lawfirm.request') {
         const { action, params } = msg.params;
+        // 0.85.x 宿主：后端不认识客户管理动作
+        if (oldHost && ['listClients', 'getClient', 'saveClient', 'saveRelation', 'searchParties'].includes(action)) {
+          send({ awd: 1, type: 'result', seq: msg.seq, ok: false, error: { code: 'invoke_failed', message: '不支持的律所管理操作：' + action } });
+          return;
+        }
+        if (action === 'conflictPreview') result = { riskLevel: 'GREEN', summary: '未发现利益冲突', hits: [] };
         if (action === 'overview') result = { self: { id: 1, displayName: '陈思远' }, intakes: [], restricted: false };
         if (action === 'listClients') result = LIST;
         if (action === 'getClient') result = { client: PROFILE };
@@ -152,4 +158,24 @@ test('English locale renders client UI from l10n keys', async () => {
   assert.match(p.$('tab-clients').textContent, /Clients/);
   assert.match(p.$('clients-root').textContent, /Collected in 2026/);
   assert.match(p.dom.window.document.querySelector('tr.client-row').textContent, /12 days ago · Work record/);
+});
+
+test('host without client actions (0.85.x): Clients tab and intake picker are hidden, intake and conflict check work as before', async () => {
+  const p = await mount({ oldHost: true });
+  assert.equal(p.$('tab-clients').hidden, true);
+  assert.equal(p.$('panel-clients').hidden, true);
+  assert.equal(p.$('intake-client-pick'), null, 'no client picker on a host that cannot resolve clients');
+  assert.equal(p.$('client-error'), null);
+  p.$('intake-title').value = '旧宿主上的收案';
+  p.$('intake-client-name').value = '某委托人有限公司';
+  p.$('intake-counterparty-name').value = '某对方有限公司';
+  p.$('btn-preview-conflict').click();
+  await tick();
+  assert.equal(p.actions('conflictPreview').length, 1);
+  assert.match(p.$('conflict-preview-card').textContent, /未发现利益冲突/);
+  p.$('btn-submit-intake').click();
+  await tick();
+  const sent = p.actions('submitIntake').at(-1);
+  assert.equal(sent.clientName, '某委托人有限公司');
+  assert.equal('clientId' in sent && sent.clientId !== undefined, false, 'old host receives the same intake payload as before');
 });
