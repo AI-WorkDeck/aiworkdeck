@@ -752,6 +752,26 @@ public class ToolRegistry {
         return words;
     }
 
+    /**
+     * 启用插件的工具检索词（工具名 → manifest keywords + 插件名 + 插件 id），喂 {@code list_tools(query)}：
+     * 用户说「律所管理插件」「应收账款」时模型去搜，命中的应是插件工具而不是空结果。含 handler=jar 的带 keywords 条目。
+     */
+    public Map<String, List<String>> declaredToolSearchTerms() {
+        Map<String, List<String>> terms = new java.util.LinkedHashMap<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            String pluginId = declared.pluginId();
+            if (!pluginService.isEnabled(pluginId)) continue;
+            List<String> words = new ArrayList<>();
+            if (declared.tool().getKeywords() != null) words.addAll(declared.tool().getKeywords());
+            words.add(pluginId);
+            var meta = pluginService.getPlugin(pluginId);
+            if (meta != null && meta.getName() != null && !meta.getName().startsWith("%")) words.add(meta.getName());
+            if (meta != null && meta.getName() != null) words.add(pluginService.localize(pluginId, meta.getName()));
+            terms.put(declared.tool().getName(), words);
+        }
+        return terms;
+    }
+
     private final List<AgentToolComponent> toolComponents;
     private final PluginService pluginService;
     private final ClientCapabilityService clientCapabilityService;
@@ -802,6 +822,7 @@ public class ToolRegistry {
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
             disclosurePolicy.setPluginToolKeywords(this::declaredToolKeywords);
+            disclosurePolicy.setPluginToolSearchTerms(this::declaredToolSearchTerms);
         }
         log.info("ToolRegistry initialized: {} built-in tools from {} components",
                 builtinTools.size(), toolComponents.size());

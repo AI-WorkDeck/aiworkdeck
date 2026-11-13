@@ -2218,6 +2218,9 @@ export default {
         if (agentMode) selectMode(agentMode)
       }
       inputPrompt.value = bw.prompt
+      // 卡片点名的工作流随这条消息显式带上（skillIds），不靠后端按触发词猜：
+      // 卡片措辞一改、或命中门槛漏了某个动词，技能就静默不生效（tutorial #146）
+      pendingWorkflowSkillId.value = bw.id
       if (richInput.value) {
         const existingTags = Array.from(richInput.value.querySelectorAll('[data-file-id]'))
           .map(el => el.outerHTML)
@@ -2229,7 +2232,17 @@ export default {
 
     // 每个 sendMessage 出口都要带上它。「继续」「按此推进」「点选项」都是同一件任务的后续轮次，
     // 漏带的话用户选的技能会在这些路径上静默掉线（旧的 pinnedSkillId 就只有主发送路径带）。
-    const currentSkillIds = () => (skillDisabledByMode.value ? [] : [...selectedSkillIds.value])
+    // 点内置工作流卡片后待发的那个工作流 id：同一份草稿发出（或清空）前一直带着，发完随草稿清掉
+    const pendingWorkflowSkillId = ref(null)
+    watch(inputPrompt, (value) => {
+      if (!String(value || '').trim()) pendingWorkflowSkillId.value = null
+    })
+    const currentSkillIds = () => {
+      if (skillDisabledByMode.value) return []
+      const ids = [...selectedSkillIds.value]
+      if (pendingWorkflowSkillId.value && !ids.includes(pendingWorkflowSkillId.value)) ids.push(pendingWorkflowSkillId.value)
+      return ids
+    }
 
     const toggleSkillSelection = (skillId) => {
       if (!skillId) return
