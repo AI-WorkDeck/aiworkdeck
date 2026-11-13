@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Sie können für die Dateien dieses Stapels, bei denen die lokale Erkennung fehlgeschlagen ist, die Cloud-Erkennung verwenden. Andernfalls werden diese Dateien nicht hochgeladen.",
   "ocrLocalFailedConfirm": "Cloud-Erkennung verwenden",
   "ocrAlreadySearchable": "„{name}“ hat bereits eine Textebene und ist durchsuchbar; es wurde keine neue Datei erstellt",
-  "ocrStopped": "Angehalten; {count} Datei(en) nicht verarbeitet"
+  "ocrStopped": "Angehalten; {count} Datei(en) nicht verarbeitet",
+  "subscribeProBtn": "Pro ¥9.9",
 }

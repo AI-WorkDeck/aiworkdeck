@@ -123,16 +123,45 @@ class OpsHealthMetricsTest {
 
     @Test
     void actuatorIsNotServedOnThePublicPort() throws Exception {
-        // GlobalExceptionHandler answers every unmapped path the same way (pre-existing behaviour,
-        // HTTP 200 + code=1), so "not served" means: indistinguishable from a path that never existed.
+        // "Not served" means: a plain 404, indistinguishable from a path that never existed.
         HttpResponse<String> unknown = get(port, "/no-such-path-" + System.nanoTime());
+        assertEquals(404, unknown.statusCode());
         for (String path : new String[]{"/actuator/prometheus", "/actuator/health", "/actuator", "/actuator/env"}) {
             HttpResponse<String> r = get(port, path);
-            assertEquals(unknown.statusCode(), r.statusCode(), path);
+            assertEquals(404, r.statusCode(), path);
             assertEquals(unknown.body(), r.body(), path);
             assertFalse(r.body().contains("jvm_"), path);
         }
         assertNotEquals(port, managementPort);
+    }
+
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void unmappedApiPathsGetRealStatusCodesWithoutErrorLogs(
+            org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        // QA QO-office bug 10: these used to be HTTP 200 {"code":1,"message":"服务器内部错误"} plus an ERROR stack.
+        HttpResponse<String> missing = get(port, "/api/no-such-endpoint-" + System.nanoTime());
+        assertEquals(404, missing.statusCode());
+        assertTrue(missing.body().contains("\"code\":1"), missing.body());
+        assertTrue(missing.body().contains("API endpoint not found") || missing.body().contains("接口不存在"),
+                missing.body());
+
+        HttpResponse<String> wrongMethod = get(port, "/api/projects"); // only POST is mapped
+        assertEquals(405, wrongMethod.statusCode());
+        assertTrue(wrongMethod.headers().firstValue("Allow").orElse("").contains("POST"));
+
+        HttpResponse<String> badId = get(port, "/api/projects/list"); // falls on /{id} with a Long id
+        assertEquals(400, badId.statusCode());
+
+        HttpResponse<String> english = http.send(HttpRequest.newBuilder(
+                URI.create("http://127.0.0.1:" + port + "/api/no-such-endpoint"))
+                .header("X-App-Language", "en").build(), HttpResponse.BodyHandlers.ofString());
+        assertTrue(english.body().contains("API endpoint not found"), english.body());
+
+        for (HttpResponse<String> r : java.util.List.of(missing, wrongMethod, badId)) {
+            assertFalse(r.body().contains("服务器内部错误"), r.body());
+        }
+        assertFalse(output.getAll().contains("GlobalExceptionHandler caught Exception"), "no ERROR log for unmapped paths");
     }
 
     @Test

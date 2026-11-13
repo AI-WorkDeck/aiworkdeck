@@ -8,7 +8,7 @@ import {
   deleteConversation as apiDeleteConversation, renameConversation as apiRenameConversation,
   uploadRelayDocument
 } from './api.js'
-import { createSseConnection, createTagStreamParser } from './sse.js'
+import { createSseConnection, createTagStreamParser, restoreLostTagOpener } from './sse.js'
 import {
   readActiveDocument, readDocumentMeta, detectHost, hashContent,
   executeCommand, hostFamily, documentIdentity
@@ -168,6 +168,8 @@ export const toolPrep = ref(false)
 export const passProgress = ref(null)
 /** 错误类提示（红） */
 export const banner = ref('')
+/** 上一次发送失败（消息已放回输入框）：界面据此在横幅旁给「重试」按钮，下一次发送开始时清零 */
+export const sendFailed = ref(false)
 /** 中性提示（灰），如「上一次的任务仍在进行中」 */
 export const notice = ref('')
 export const includeDocument = ref(true)
@@ -892,7 +894,7 @@ function toLocalMessage(row) {
     onQuestion: (q) => { question = questionFromParsed(q) },
     onArtifact: (c) => { artifact = artifact ? artifact + '\n\n' + c : c }
   })
-  p.feed(content)
+  p.feed(restoreLostTagOpener(content))
   p.flush()
   text = text.replace(/\s+$/, '')
   return reactive({ role: 'assistant', text, thinking, streaming: false, error: '', tools: [], question, artifact })
@@ -1281,12 +1283,20 @@ function handleEvent(evt, dataStr) {
     if (lower === 'awaiting_input') notice.value = t('awaitingAnswer')
   } else if (evt === 'error') {
     let msg = t('executionError')
-    try { msg = JSON.parse(dataStr).message || msg } catch (e) { /* ignore */ }
+    let reason = ''
+    try {
+      const parsed = JSON.parse(dataStr)
+      if (parsed && parsed.message) msg = parsed.message
+      if (parsed && parsed.reason) reason = String(parsed.reason)
+    } catch (e) { /* ignore */ }
     if (currentAssistant) {
-      // 配额耗尽（后端 LlmErrorClassifier.QUOTA_EXHAUSTED_MARKER）：载荷是上游英文原文，
-      // 原样拼给用户等于没有信息。换成引导文案并打标记，界面据此追加充值入口（dev-board#198）
+      // 配额耗尽（后端 LlmErrorClassifier.QUOTA_EXHAUSTED_MARKER 或网关 no_credits）：
+      // 载荷若是上游英文原文则换成引导文案，并打 quota 标记让界面展示充值 / Pro 升级入口。
       if (msg.includes('AI_QUOTA_EXHAUSTED')) {
         currentAssistant.error = t('quotaExhaustedNotice')
+        currentAssistant.errorKind = 'quota'
+      } else if (reason === 'no_credits' || reason === 'insufficient_credits') {
+        currentAssistant.error = msg || t('quotaExhaustedNotice')
         currentAssistant.errorKind = 'quota'
       } else {
         currentAssistant.error = msg
@@ -1852,6 +1862,7 @@ export async function send(overrideText, sendOpts) {
   }
   const prompt = (override === null ? input.value : override).trim()
   if (!prompt || stopping.value) return { needSettings: false }
+  sendFailed.value = false
   // 运行中发送 = 插话：不新开一轮、不新建助手气泡，也不等在途的文档命令（插话本来就在它们之间读入）
   if (streaming.value) return steerRunningTurn(prompt, override === null)
   if (pendingOfficeResults) return { needSettings: false }
@@ -1865,7 +1876,8 @@ export async function send(overrideText, sendOpts) {
   if (override === null) input.value = ''
   // 用户已经作答（不管是点选项还是自己打字）：所有反问的按钮就此封掉
   sealStaleQuestions(true)
-  messages.value.push({ role: 'user', text: displayText || prompt })
+  const userBubble = { role: 'user', text: displayText || prompt }
+  messages.value.push(userBubble)
   if (typeof opts.onAccepted === 'function') opts.onAccepted()
 
   currentAssistant = null
@@ -1934,11 +1946,33 @@ export async function send(overrideText, sendOpts) {
     conversationPersisted = true
     if (perfRound) perfRound.chatAcceptedMs = perfSince()
   } catch (e) {
-    assistant.error = sendErrorText(e)
-    disableDocDedup()
-    finishStreaming()
+    failSend(e, assistant, userBubble, prompt, displayText)
   }
   return { needSettings: false }
+}
+
+/**
+ * 发送失败的收尾：这条消息没有送达，所以不留空白助手气泡，也不留一条「看似已发出」的用户气泡，
+ * 原文放回输入框（用户正打着别的内容时不覆盖）并给「重试」；错误说明走横幅。
+ * 带 displayText 的（问题卡作答）发出的是结构化文本，放回输入框没有意义，保留气泡、只在错误行说明。
+ */
+function failSend(e, assistant, userBubble, prompt, displayText) {
+  const text = sendErrorText(e)
+  disableDocDedup()
+  finishStreaming()
+  if (displayText) {
+    assistant.error = text
+    return
+  }
+  const list = messages.value
+  for (const m of [assistant, userBubble]) {
+    const at = list.indexOf(m)
+    if (at >= 0) list.splice(at, 1)
+  }
+  if (currentAssistant === assistant) currentAssistant = null
+  if (!input.value.trim()) input.value = prompt
+  banner.value = text
+  sendFailed.value = true
 }
 
 /**
@@ -1947,6 +1981,7 @@ export async function send(overrideText, sendOpts) {
  */
 function sendErrorText(e) {
   const status = e && e.status
+  if (e && e.authExpired) return t('sessionExpired')
   if (status === 403 || status === 404) {
     return conversationPersisted ? t('conversationDenied') : t('conversationExpiredRetryFailed')
   }

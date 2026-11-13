@@ -45,6 +45,18 @@ public class PlatformAiKey {
     /** 官网返回的额度上限（美元），展示用；官网未给时为 null。 */
     private Double limitUsd;
 
+    /**
+     * 站点计价币种（CNY/USD）与 provision 当时的官网汇率、毛利乘数（官网 ai-usage 给的）。
+     * limitUsd/用量是美元，用户钱包是站点币种：实付 = 美元 × 汇率 × 毛利乘数。
+     * 官网没给或取不到时为 null，展示端退回美元并标明，不自己猜汇率。
+     */
+    @Column(length = 8)
+    private String currency;
+
+    private Double exchangeRate;
+
+    private Double marginMultiplier;
+
     @Column(length = 20)
     private String provider;
 

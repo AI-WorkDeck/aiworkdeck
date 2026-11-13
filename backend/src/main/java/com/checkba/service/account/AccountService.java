@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 桌面与官网账户的连接（商业化改造 PR-B）。
@@ -307,6 +308,11 @@ public class AccountService {
         return getCurrentJson("/api/account/ai-usage");
     }
 
+    /** 同 {@link #fetchAiUsage()}，但用调用方给定的 awdk_（server 模式 per-user 通道取汇率口径用）。 */
+    public Map<String, Object> fetchAiUsageWith(String awdkKey) {
+        return getJson("/api/account/ai-usage", awdkKey);
+    }
+
     /**
      * POST /api/account/ai-key —— 取该账户的 provisioned OpenRouter runtime key。
      * 幂等：已有未禁用的 key 直接返回同一把。
@@ -564,23 +570,105 @@ public class AccountService {
      * <p>微信站响应 {@code present:'qrcode'}（+codeUrl/qrCode），Stripe 站
      * {@code present:'redirect'}（+redirectUrl）；两种形状原样透传，不在桌面端分叉。
      */
+    private static final String SUBSCRIPTION_SKU_INTRO = "pro_monthly_intro";
+    private static final long SUBSCRIPTION_AMOUNT_INTRO_FEN = 990L;
+    private static final String SUBSCRIPTION_SKU_STANDARD = "pro_monthly";
+    private static final long SUBSCRIPTION_AMOUNT_STANDARD_FEN = 14900L;
+
     public Map<String, Object> createRecharge(long amountCents, String idempotencyKey) {
         ConnectionSnapshot connection = requireConnectionSnapshot();
         long requestVersion = connection.generation();
         String key = connection.key();
+        AccountTransport.Reply reply = sendPaymentCreate(connection, key, amountCents, "recharge", null, idempotencyKey);
+        return handleCurrent(reply, "", key, requestVersion);
+    }
+
+    /**
+     * POST /api/payment/create —— 发起个人 Pro 月付订阅订单。
+     * 优先请求首 3 月体验价（pro_monthly_intro / 990 分）；若官网返回 409 intro_quota_exhausted，
+     * 自动改用正价（pro_monthly / 14900 分）重试一次，并返回实际生效的 skuId 与 amount。
+     */
+    public Map<String, Object> createSubscriptionOrder(String idempotencyKey) {
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
+        String safeKey = idempotencyKey == null || idempotencyKey.isBlank() ? UUID.randomUUID().toString() : idempotencyKey;
+
+        String skuId = SUBSCRIPTION_SKU_INTRO;
+        long amountCents = SUBSCRIPTION_AMOUNT_INTRO_FEN;
+        AccountTransport.Reply reply = sendPaymentCreate(connection, key, amountCents, "subscription", skuId, safeKey);
+        if (reply.status() == 409 && isPaymentErrorCode(reply.body(), "intro_quota_exhausted")) {
+            skuId = SUBSCRIPTION_SKU_STANDARD;
+            amountCents = SUBSCRIPTION_AMOUNT_STANDARD_FEN;
+            reply = sendPaymentCreate(connection, key, amountCents, "subscription", skuId, safeKey + ":std");
+        }
+        Map<String, Object> result = new LinkedHashMap<>(handlePaymentCreateReply(reply, key, requestVersion));
+        result.putIfAbsent("skuId", skuId);
+        result.putIfAbsent("amount", amountCents);
+        return result;
+    }
+
+    private AccountTransport.Reply sendPaymentCreate(
+            ConnectionSnapshot connection,
+            String key,
+            long amountCents,
+            String kind,
+            String skuId,
+            String idempotencyKey) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("amount", amountCents);
-        body.put("kind", "recharge");
+        body.put("kind", kind);
+        if (skuId != null) {
+            body.put("skuId", skuId);
+        }
         body.put("idempotencyKey", idempotencyKey);
         String json;
         try {
             json = objectMapper.writeValueAsString(body);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new IllegalStateException(e); // 入参都是基本类型/String，序列化不会失败
+            throw new IllegalStateException(e);
         }
         AccountTransport.Reply reply = transport.send("POST", connection.baseUrl() + "/api/payment/create", key, json);
         if (reply.networkFailure()) {
             throw networkError();
+        }
+        return reply;
+    }
+
+    private static boolean isPaymentErrorCode(String body, String expected) {
+        if (body == null || body.isBlank()) return false;
+        try {
+            Map<String, Object> m = CODE_MAPPER.readValue(body, new TypeReference<Map<String, Object>>() {});
+            return expected.equals(m.get("code")) || expected.equals(m.get("error"));
+        } catch (Exception ignore) {
+            return false;
+        }
+    }
+
+    private Map<String, Object> handlePaymentCreateReply(AccountTransport.Reply reply, String key, long requestVersion) {
+        int status = reply.status();
+        if (status == 400 || status == 403 || status == 409) {
+            try {
+                Map<String, Object> err = CODE_MAPPER.readValue(reply.body(), new TypeReference<Map<String, Object>>() {});
+                Object codeObj = err.get("code");
+                if (codeObj instanceof String code && !code.isBlank() && !AUTH_ERROR_CODES.contains(code)) {
+                    synchronized (this) {
+                        if (requestVersion != connectionVersion || !java.util.Objects.equals(key, currentKeyOrNull())) {
+                            throw new AccountException(AccountException.Kind.REJECTED,
+                                    LangText.of("账户已变化，请重试", "Account changed; please try again"));
+                        }
+                    }
+                    String msg = str(err.get("error"));
+                    if (msg == null || msg.isBlank()) {
+                        msg = rejectedMessage(code);
+                    }
+                    throw new AccountException(AccountException.Kind.REJECTED, msg, code);
+                }
+            } catch (AccountException ae) {
+                throw ae;
+            } catch (Exception ignore) {
+                // fall through to standard handleCurrent
+            }
         }
         return handleCurrent(reply, "", key, requestVersion);
     }

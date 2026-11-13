@@ -107,7 +107,8 @@ export default {
     "switch": "สลับ",
     "cancel": "ยกเลิก",
     "switchFailed": "สลับไซต์ไม่สำเร็จ โปรดลองอีกครั้งภายหลัง",
-    "rescueFailed": "ยังไม่ปลดล็อกหลังจากสลับไซต์ โปรดตรวจสอบรหัสและลองอีกครั้ง"
+    "rescueFailed": "ยังไม่ปลดล็อกหลังจากสลับไซต์ โปรดตรวจสอบรหัสและลองอีกครั้ง",
+    "proIntroBanner": "รับเครดิตทดลองใช้ฟรีเมื่อสมัคร · Personal Pro ¥9.9/เดือน (3 เดือนแรก)",
   },
   "hint": {
     "learnMore": "เรียนรู้เพิ่มเติม",
@@ -118,7 +119,9 @@ export default {
     "purchaseConfirmOk": "ยืนยัน",
     "purchaseSuccess": "ปลดล็อกแล้ว",
     "purchaseFailed": "การซื้อไม่สำเร็จ",
-    "goRecharge": "เติมเงิน"
+    "goRecharge": "เติมเงิน",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "สมัคร Personal Pro",
   },
   "identity": {
     "title": "เลือกพื้นที่ทำงานในเครื่อง",

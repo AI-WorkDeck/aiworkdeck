@@ -1164,6 +1164,13 @@ public class AuthController {
         if (sessionId != null && userSessionService != null) {
             userSessionService.revoke(sessionId);
         }
+        // 设备令牌（Office/WPS 加载项登录签发的 awdt_）不在会话表里，上面那步撤不掉它：
+        // 不单独删，退出后同一枚令牌照样能用。只撤请求头里这一枚，同账号其他设备不受影响。
+        if (sessionId != null && sessionId.startsWith(com.checkba.service.DeviceTokenService.TOKEN_PREFIX)
+                && deviceTokenService != null) {
+            var device = deviceTokenService.resolve(sessionId);
+            if (device != null) deviceTokenService.revoke(device.userId(), device.tokenId());
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("code", 0);
         result.put("message", LangText.of("登出成功", "Signed out successfully"));

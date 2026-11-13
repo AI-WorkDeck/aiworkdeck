@@ -92,7 +92,7 @@ export const ZH = {
   quotaRemaining: '剩余 {remaining} / 共 {limit}',
   quotaUsed: '已用 {used}',
   recharge: '充值',
-  rechargeTitle: '在官网账户页充值（浏览器打开，与插件同一账户）',
+  rechargeTitle: "在官网账户页充值或开通个人 Pro（浏览器打开，与插件同一账户）",
   quotaExhaustedNotice: '账户额度不足，本轮已中止。充值到账后重发这条消息即可继续。',
 
   // ---- App.vue：新建项目（dev-board#196）----
@@ -124,10 +124,13 @@ export const ZH = {
   noProjectSelected: '尚未选择项目：在顶部下拉中选一个项目。',
   welcomeTitle: '不离开 Office，用 AI 起草、修订、审阅',
   welcomeBenefit1: '用日常语言说出要改什么，改动以修订形式写进文档，由你逐条接受或拒绝。',
+  welcomeBenefit1Sheet: '用日常语言说出要改什么，AI 直接在表格或演示文稿里完成。',
+  sessionExpired: '登录已失效，请重新登录',
+  retrySend: '重试',
   welcomeBenefit2: '逐条处理文档批注，长文档按章节分段校对。',
   welcomeBenefit3: '回答以你自己项目中的文件为依据，Word、Excel、PowerPoint 均可使用。',
   createFreeAccount: '免费注册账户',
-  welcomeFootnote: '插件免费安装。AI 用量从你的 AI WorkDeck 账户扣除 Credits，与桌面版是同一个账户。',
+  welcomeFootnote: '插件免费安装。AI 用量从你的 AI WorkDeck 账户余额中扣费，与桌面版是同一个账户。',
 
   // ---- ChatView.vue：快捷入口 ----
   quickSummarizeLabel: '总结当前文档',

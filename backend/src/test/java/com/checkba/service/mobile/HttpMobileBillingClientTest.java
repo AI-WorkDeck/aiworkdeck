@@ -341,6 +341,65 @@ class HttpMobileBillingClientTest {
     }
 
     @Test
+    @DisplayName("channel=wxpay-app：只上行 channel（无 productId/wxCode），七个 SDK 字段解回 appPay")
+    void wxpayAppFieldsComeBack() {
+        HttpMobileBillingClient c = stubbed(200,
+                "{\"present\":\"app\",\"outTradeNo\":\"OT-app-1\",\"amountCents\":5000,"
+                        + "\"appId\":\"wxapp1\",\"partnerId\":\"1900000001\",\"prepayId\":\"wx123\","
+                        + "\"packageValue\":\"Sign=WXPay\",\"nonceStr\":\"n0nce\",\"timeStamp\":\"1760000000\","
+                        + "\"sign\":\"c2lnbg==\"}");
+
+        MobileBillingClient.RechargeOrder order = c.createRecharge("acct-x", 5000, "idem-app-0001",
+                "wxpay-app", null, null);
+
+        assertEquals("app", order.present());
+        assertEquals("OT-app-1", order.outTradeNo());
+        assertEquals("wxapp1", order.appPay().get("appId"));
+        assertEquals("1900000001", order.appPay().get("partnerId"));
+        assertEquals("wx123", order.appPay().get("prepayId"));
+        assertEquals("Sign=WXPay", order.appPay().get("packageValue"));
+        assertEquals("n0nce", order.appPay().get("nonceStr"));
+        assertEquals("1760000000", order.appPay().get("timeStamp"));
+        assertEquals("c2lnbg==", order.appPay().get("sign"));
+        assertNull(order.codeUrl());
+        String sent = lastRequest.get();
+        assertTrue(sent.contains("\"channel\":\"wxpay-app\""), sent);
+        assertFalse(sent.contains("productId"), sent);
+        assertFalse(sent.contains("wxCode"), sent);
+    }
+
+    @Test
+    @DisplayName("channel=wxpay-app 网络失败重试一次：幂等键兜底，没有一次性凭证")
+    void wxpayAppRetries() {
+        HttpMobileBillingClient c = stubbed(200, "{}");
+        stubDrop.set(true);
+
+        assertEquals(MobileBillingKind.UNAVAILABLE,
+                assertThrows(MobileBillingException.class,
+                        () -> c.createRecharge("acct-x", 5000, "idem-app-0002",
+                                "wxpay-app", null, null)).getKind());
+        assertEquals(2, hits.get());
+    }
+
+    @Test
+    @DisplayName("channel=wxpay-app：官网 503 channel_unavailable 是「没开通」，翻成 DISABLED 而不是 UNAVAILABLE")
+    void wxpayAppChannelOffIsDisabled() {
+        MobileBillingException off = assertThrows(MobileBillingException.class,
+                () -> stubbed(503, "{\"error\":\"channel_unavailable\"}").createRecharge("acct-x", 5000, "idem-app-0003",
+                        "wxpay-app", null, null));
+        assertEquals(MobileBillingKind.DISABLED, off.getKind());
+        assertEquals("channel_unavailable", off.getMachineError());
+    }
+
+    @Test
+    @DisplayName("非 APP 通道：appPay 为 null")
+    void otherChannelsHaveNoAppPay() {
+        HttpMobileBillingClient c = stubbed(200,
+                "{\"present\":\"qrcode\",\"outTradeNo\":\"OT-q\",\"amountCents\":5000,\"codeUrl\":\"weixin://x\"}");
+        assertNull(c.createRecharge("acct-x", 5000, "idem-q-00001", null, null, null).appPay());
+    }
+
+    @Test
     @DisplayName("channel=appstore 网络失败仍重试一次：没有一次性凭证，建单是幂等的")
     void appstoreRetriesLikeDefaultChannel() {
         HttpMobileBillingClient c = stubbed(200, "{}");

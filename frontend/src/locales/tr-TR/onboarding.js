@@ -106,7 +106,8 @@ export default {
     "switch": "Değiştir",
     "cancel": "İptal",
     "switchFailed": "Site değiştirilemedi. Daha sonra tekrar deneyin.",
-    "rescueFailed": "Site değiştirildikten sonra kilit yine de açılamadı. Kodu kontrol edip tekrar deneyin."
+    "rescueFailed": "Site değiştirildikten sonra kilit yine de açılamadı. Kodu kontrol edip tekrar deneyin.",
+    "proIntroBanner": "Kayıtta ücretsiz başlangıç kredisi · Personal Pro ilk 3 ay ¥9.9/ay",
   },
   "hint": {
     "learnMore": "Daha Fazla Bilgi",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Onayla",
     "purchaseSuccess": "Kilit açıldı",
     "purchaseFailed": "Satın alma başarısız",
-    "goRecharge": "Bakiye Yükle"
+    "goRecharge": "Bakiye Yükle",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro Al",
   },
   "identity": {
     "title": "Yerel Çalışma Alanı Seçin",

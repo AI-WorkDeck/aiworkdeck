@@ -82,7 +82,8 @@ public class MobileBillingController {
         /**
          * 支付通道（dev-board#427/#426）。缺省 = 站点默认通道（第一期行为）；
          * {@code "wxvp"} = 小程序虚拟支付，此时 productId / wxCode 必填；
-         * {@code "appstore"} = iOS 内购，此时只要 productId。
+         * {@code "appstore"} = iOS 内购，此时只要 productId；
+         * {@code "wxpay-app"} = 安卓微信支付 APP 支付，只要金额（productId/wxCode 不用）。
          */
         private String channel;
         /**
@@ -123,6 +124,10 @@ public class MobileBillingController {
         putIfPresent(out, "paySig", order.paySig());
         putIfPresent(out, "signature", order.signature());
         putIfPresent(out, "appAccountToken", order.appAccountToken());
+        // present=app（安卓微信支付 APP 支付）：七个 PayReq 字段平铺，其它通道不出现
+        if (order.appPay() != null) {
+            order.appPay().forEach((k, v) -> putIfPresent(out, k, v));
+        }
         return out;
     }
 

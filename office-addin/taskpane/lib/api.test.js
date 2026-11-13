@@ -436,3 +436,28 @@ test('postOfficeResult aborts a stalled POST after the timeout', async (t) => {
     else globalThis.fetch = original
   }
 })
+
+// ==================== 登录失效（401 / code 4010）统一通知 ====================
+
+test('任一 API 调用撞上 401 或 code=4010 都通知登录失效处理器（带发出请求的令牌）', async () => {
+  const { setAuthExpiredHandler, fetchMe } = await import('./api.js')
+  const seen = []
+  setAuthExpiredHandler((tok) => seen.push(tok))
+  const mk = (status, body) => ({
+    ok: status < 400, status, headers: { get: () => 'application/json' },
+    json: async () => body, clone() { return this }
+  })
+  try {
+    for (const reply of [mk(401, {}), mk(200, { code: 4010, message: 'expired' })]) {
+      const f = stubFetch(() => reply)
+      try { assert.equal(await fetchMe({ serverUrl: 'https://cloud.example', token: 'awdt_old' }), null) } finally { f.restore() }
+    }
+    assert.deepEqual(seen, ['awdt_old', 'awdt_old'])
+    // 正常响应不触发
+    const f = stubFetch(() => mk(200, { code: 0, data: { id: 1 } }))
+    try { await fetchMe({ serverUrl: 'https://cloud.example', token: 'awdt_old' }) } finally { f.restore() }
+    assert.equal(seen.length, 2)
+  } finally {
+    setAuthExpiredHandler(null)
+  }
+})

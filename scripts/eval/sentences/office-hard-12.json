@@ -1,0 +1,133 @@
+{
+  "_comment": "office-hard-12（O7）：PPT 与 Excel 的多步任务，只按保存后的文件判分（ctx.pptx / ctx.xlsx）。夹具同 office-18（fixtures/make_office_fixtures.py）；hp02 另放入台账让模型跨文件取数。",
+  "sentences": [
+    {
+      "id": "hx01-ratio",
+      "text": "在「标的额(元)」后面插入一列「占比」，用公式算出每个案件标的额占全部案件标的额的比例，并设置成百分比格式",
+      "hostState": "xlsx:case-ledger",
+      "expect": {
+        "_note": "E 列「占比」：E2–E9 为引用 D 列的公式、值=标的额/12582000、百分比格式（内置 9/10 或含 % 的自定义格式）；原数据右移不丢",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const L = wb.sheet('台账'); if (!L) return false; const c = r => L.cells[r]?.v; if (c('E1') !== '占比' || c('D1') !== '标的额(元)') return false; const total = 12582000; const st = wb.styles(); const xfs = [...(/<cellXfs\\b[^>]*>([\\s\\S]*?)<\\/cellXfs>/.exec(st)?.[1] || '').matchAll(/<xf\\b[^>]*>/g)].map(m => +(/numFmtId=\"(\\d+)\"/.exec(m[0])?.[1] || 0)); const fmts = Object.fromEntries([...st.matchAll(/<numFmt\\b[^>]*numFmtId=\"(\\d+)\"[^>]*formatCode=\"([^\"]*)\"/g)].map(m => [m[1], m[2]])); const isPct = r => { const id = xfs[Number(L.cells[r]?.s ?? 0)]; return id === 9 || id === 10 || /%/.test(fmts[id] || ''); }; const amts = [1280000, 356000, 2150000, 86000, 640000, 3200000, 4750000, 120000]; for (let i = 0; i < 8; i++) { const r = i + 2; const cell = L.cells['E' + r]; if (!cell || !cell.f || !/D/.test(cell.f)) return false; if (Math.abs(Number(cell.v) - amts[i] / total) > 1e-4) return false; if (!isPct('E' + r)) return false; if (c('D' + r) !== amts[i]) return false; } return c('G1') === '状态' || c('F1') === '立案日期';"
+      }
+    },
+    {
+      "id": "hx02-big-cases",
+      "text": "把标的额超过 100 万的案件整行标成浅黄色底色，再新建一个工作表「重大案件」，列出这些案件的案号和标的额",
+      "hostState": "xlsx:case-ledger",
+      "expect": {
+        "_note": "第 2/4/7/8 行（>100 万）A、D、F 有底色，其余行无；「重大案件」表含这 4 个案号与标的额，不含其余案号",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const L = wb.sheet('台账'); if (!L) return false; const c = r => L.cells[r]?.v; const amts = [1280000, 356000, 2150000, 86000, 640000, 3200000, 4750000, 120000]; const cases = [\"(2025)\\u793a0105\\u6c11\\u521d1001\\u53f7\", \"(2025)\\u793a0105\\u6c11\\u521d1187\\u53f7\", \"(2025)\\u793a0108\\u6c11\\u521d2210\\u53f7\", \"(2025)\\u793a0102\\u6c11\\u521d0456\\u53f7\", \"(2026)\\u793a0105\\u6c11\\u521d0033\\u53f7\", \"(2026)\\u793a0101\\u6c11\\u521d0219\\u53f7\", \"(2026)\\u793a0108\\u6c11\\u521d0577\\u53f7\", \"(2026)\\u793a0102\\u6c11\\u521d0811\\u53f7\"]; for (let i = 0; i < 8; i++) { const r = i + 2; if (c('A' + r) !== cases[i]) return false; const big = amts[i] > 1000000; for (const col of ['A', 'D', 'F']) { const f = wb.style('台账', col + r).fill; if (big !== !!f) return false; } } const B = wb.sheet('重大案件'); if (!B) return false; const flat = B.rows.flat(); const want = cases.filter((_, i) => amts[i] > 1000000); return want.every(k => flat.includes(k)) && cases.filter((_, i) => amts[i] <= 1000000).every(k => !flat.includes(k)) && amts.filter(a => a > 1000000).every(a => flat.includes(a));"
+      }
+    },
+    {
+      "id": "hx03-fees-total",
+      "text": "在「费用」表加一列「合计」（律师费加差旅费），最下面加一行「总计」把各列加起来，再用「合计」列做一个折线图",
+      "hostState": "xlsx:case-ledger",
+      "expect": {
+        "_note": "D1「合计」，D2–D7 值正确（题面没要求公式，写值或公式都算）；有「总计」行含 282000/22900/304900；有折线图",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const F = wb.sheet('费用'); if (!F) return false; const c = r => F.cells[r]?.v; if (c('D1') !== '合计') return false; const fee = [[42000,3800],[38000,2100],[51000,4600],[47000,3900],[55000,5200],[49000,3300]]; for (let i = 0; i < 6; i++) { const r = i + 2; if (Number(c('D' + r)) !== fee[i][0] + fee[i][1]) return false; } const totalRow = F.rows.findIndex(row => row.includes('总计')); if (totalRow < 0) return false; const row = F.rows[totalRow]; if (!(row.includes(282000) && row.includes(22900) && row.includes(304900))) return false; const parts = wb.parts().filter(p => /^xl\\/charts\\/chart\\d*\\.xml$/.test(p)); return parts.some(p => /<c:lineChart>|<c:line3DChart>/.test(ctx.zipPart(buf, p)));"
+      }
+    },
+    {
+      "id": "hx04-status-dropdown",
+      "text": "给「状态」这一列加一个下拉选项，只能选审理中、已结案、待开庭、已归档，然后把第5行的状态改成「已归档」",
+      "hostState": "xlsx:case-ledger",
+      "expect": {
+        "_note": "F 列有 list 型数据验证含四个选项；F5=已归档，其余行状态不变",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const L = wb.sheet('台账'); if (!L) return false; const c = r => L.cells[r]?.v; const dv = (L.xml.match(/<dataValidation\\b[\\s\\S]*?<\\/dataValidation>/g) || []).concat(L.xml.match(/<x14:dataValidation\\b[\\s\\S]*?<\\/x14:dataValidation>/g) || []); const ok = dv.some(d => /type=\"list\"/.test(d) && ['审理中', '已结案', '待开庭', '已归档'].every(k => d.includes(k)) && /F\\d|F:F/.test(d)); return ok && c('F5') === '已归档' && c('F2') === '审理中' && c('F3') === '已结案' && c('A5') === '(2025)示0102民初0456号';"
+      }
+    },
+    {
+      "id": "hx05-date-sort",
+      "text": "把「立案日期」显示成「2025年3月2日」这样的格式，然后按立案日期从新到旧排序（整行一起动）",
+      "hostState": "xlsx:case-ledger",
+      "expect": {
+        "_note": "按立案日期倒序，整行一致（案号与标的额对应）；E 列日期仍是数值，格式含 年/月/日",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const L = wb.sheet('台账'); if (!L) return false; const c = r => L.cells[r]?.v; const cases = [\"(2025)\\u793a0105\\u6c11\\u521d1001\\u53f7\", \"(2025)\\u793a0105\\u6c11\\u521d1187\\u53f7\", \"(2025)\\u793a0108\\u6c11\\u521d2210\\u53f7\", \"(2025)\\u793a0102\\u6c11\\u521d0456\\u53f7\", \"(2026)\\u793a0105\\u6c11\\u521d0033\\u53f7\", \"(2026)\\u793a0101\\u6c11\\u521d0219\\u53f7\", \"(2026)\\u793a0108\\u6c11\\u521d0577\\u53f7\", \"(2026)\\u793a0102\\u6c11\\u521d0811\\u53f7\"]; const amts = [1280000, 356000, 2150000, 86000, 640000, 3200000, 4750000, 120000]; const want = [7, 6, 5, 4, 3, 2, 1, 0]; for (let i = 0; i < 8; i++) { const r = i + 2; if (c('A' + r) !== cases[want[i]] || c('D' + r) !== amts[want[i]]) return false; } const st = wb.styles(); const xfs = [...(/<cellXfs\\b[^>]*>([\\s\\S]*?)<\\/cellXfs>/.exec(st)?.[1] || '').matchAll(/<xf\\b[^>]*>/g)].map(m => /numFmtId=\"(\\d+)\"/.exec(m[0])?.[1] || '0'); const fmts = Object.fromEntries([...st.matchAll(/<numFmt\\b[^>]*numFmtId=\"(\\d+)\"[^>]*formatCode=\"([^\"]*)\"/g)].map(m => [m[1], m[2].replace(/&quot;/g, '\"')])); const code = fmts[xfs[Number(L.cells.E2?.s ?? 0)]] || ''; return /年/.test(code) && /月/.test(code) && /日/.test(code) && typeof c('E2') === 'number';"
+      }
+    },
+    {
+      "id": "hx06-summary-formulas",
+      "text": "新建一个工作表「汇总」：A列写各个状态，B列用公式统计每种状态的案件数，C列用公式统计每种状态的标的额合计",
+      "hostState": "xlsx:case-ledger",
+      "expect": {
+        "_note": "「汇总」表：三种状态各一行，B 列 COUNTIF 公式值 3/3/2，C 列 SUMIF 公式值 8180000/562000/3840000",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const wb = ctx.xlsx(buf); const L = wb.sheet('台账'); if (!L) return false; const c = r => L.cells[r]?.v; const H = wb.sheet('汇总'); if (!H) return false; const want = { '审理中': [3, 8180000], '已结案': [3, 562000], '待开庭': [2, 3840000] }; for (const [k, [n, sum]] of Object.entries(want)) { const r = Object.entries(H.cells).find(([ref, x]) => /^A\\d+$/.test(ref) && x.v === k); if (!r) return false; const row = r[0].slice(1); const b = H.cells['B' + row], cc = H.cells['C' + row]; if (!b || !cc || Number(b.v) !== n || Number(cc.v) !== sum || !/COUNTIF/i.test(b.f || '') || !/SUMIF/i.test(cc.f || '')) return false; } return c('F2') === '审理中';"
+      }
+    },
+    {
+      "id": "hp01-risk-table",
+      "text": "把「风险提示」那页的两条要点改成一张两列的表格（风险、应对措施），应对措施你来拟，然后把这一页挪到「诉讼策略」前面",
+      "hostState": "pptx:case-report",
+      "expect": {
+        "_note": "共 5 页；「风险提示」紧挨在「诉讼策略」前，含表格、两条风险与「应对」列；前两页不动",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const T = i => (S[i]?.paragraphs[0] || '').trim(); if (S.length !== 5) return false; const r = S.findIndex(s => (s.paragraphs[0] || '').trim() === '风险提示'); const k = S.findIndex(s => (s.paragraphs[0] || '').trim() === '诉讼策略'); if (r < 0 || k < 0 || r !== k - 1) return false; const R = S[r]; return R.hasTable && /质检报告/.test(R.text) && /违约金/.test(R.text) && /应对/.test(R.text) && T(1) === '案件概况' && T(2) === '争议焦点';"
+      }
+    },
+    {
+      "id": "hp02-ledger-slide",
+      "text": "根据项目里的「案件台账.xlsx」，在演示文稿最后加一页「在办案件一览」，用表格列出状态不是「已结案」的案件的案号、当事人和状态",
+      "hostState": "pptx:case-report",
+      "expect": {
+        "_note": "共 6 页；最后一页「在办案件一览」含表格，列出 5 个未结案件（含当事人、状态），不含 3 个已结案",
+        "maxRounds": 28,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const T = i => (S[i]?.paragraphs[0] || '').trim(); if (S.length !== 6) return false; const L = S[5]; if (T(5) !== '在办案件一览' || !L.hasTable) return false; const open = ['(2025)示0105民初1001号', '(2025)示0108民初2210号', '(2026)示0105民初0033号', '(2026)示0101民初0219号', '(2026)示0108民初0577号']; const closed = ['(2025)示0105民初1187号', '(2025)示0102民初0456号', '(2026)示0102民初0811号']; return open.every(k => L.text.includes(k)) && closed.every(k => !L.text.includes(k)) && /演示建工/.test(L.text) && /待开庭/.test(L.text) && T(4) === '风险提示';"
+      },
+      "seed": {
+        "files": [
+          {
+            "name": "案件台账.xlsx",
+            "fixture": "case-ledger.xlsx"
+          }
+        ]
+      }
+    },
+    {
+      "id": "hp03-split-slide",
+      "text": "把「案件概况」这一页拆成两页：第一页标题「当事人」，放原告和被告；第二页标题「案件信息」，放标的额和受理法院",
+      "hostState": "pptx:case-report",
+      "expect": {
+        "_note": "共 6 页；第 2 页「当事人」只含原告/被告，第 3 页「案件信息」只含标的额/受理法院；其后顺序不变",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const T = i => (S[i]?.paragraphs[0] || '').trim(); if (S.length !== 6) return false; return T(1) === '当事人' && /原告/.test(S[1].text) && /被告/.test(S[1].text) && !/标的额|受理法院/.test(S[1].text) && T(2) === '案件信息' && /1,280,000|1280000/.test(S[2].text) && /受理法院/.test(S[2].text) && !/原告|被告/.test(S[2].text) && T(3) === '争议焦点' && T(5) === '风险提示';"
+      }
+    },
+    {
+      "id": "hp04-agenda",
+      "text": "在第1页后面加一页「目录」，按顺序列出后面各页的标题",
+      "hostState": "pptx:case-report",
+      "expect": {
+        "_note": "共 6 页；第 2 页「目录」按顺序含后续四页标题",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const T = i => (S[i]?.paragraphs[0] || '').trim(); if (S.length !== 6 || T(1) !== '目录') return false; const t = S[1].text; const order = ['案件概况', '争议焦点', '诉讼策略', '风险提示'].map(k => t.indexOf(k)); return order.every(i => i >= 0) && order.every((v, i) => i === 0 || v > order[i - 1]) && T(2) === '案件概况';"
+      }
+    },
+    {
+      "id": "hp05-notes-all",
+      "text": "给每一页都加上演讲者备注，用一两句话概括这一页要讲什么",
+      "hostState": "pptx:case-report",
+      "expect": {
+        "_note": "5 页都有不少于 6 个字的备注；页面本身不变",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const T = i => (S[i]?.paragraphs[0] || '').trim(); return S.length === 5 && S.every(s => (s.notes || '').replace(/\\s/g, '').length >= 6) && T(0) === '示范科技诉样例公司买卖合同纠纷案' && T(4) === '风险提示';"
+      }
+    },
+    {
+      "id": "hp06-strategy-rewrite",
+      "text": "把「诉讼策略」那页的标题改成「下一步诉讼策略」并设为红色，正文换成三条：先申请财产保全、再提起诉讼、争取调解结案",
+      "hostState": "pptx:case-report",
+      "expect": {
+        "_note": "第 4 页标题「下一步诉讼策略」且标题形状里有红色（R≥180,G,B≤80）；正文为三条新要点，旧要点不在",
+        "maxRounds": 24,
+        "outcomeCheck": "const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const T = i => (S[i]?.paragraphs[0] || '').trim(); if (S.length !== 5) return false; const k = S.findIndex(s => (s.paragraphs[0] || '').trim() === '下一步诉讼策略'); if (k !== 3) return false; const s = S[k]; if (!(/财产保全/.test(s.text) && /提起诉讼/.test(s.text) && /调解结案/.test(s.text)) || /诉前调解|全额主张/.test(s.text)) return false; const sp = (s.xml.match(/<p:sp>[\\s\\S]*?<\\/p:sp>/g) || []).find(x => x.includes('下一步诉讼策略')) || ''; const reds = [...sp.matchAll(/<a:srgbClr val=\"([0-9A-Fa-f]{6})\"/g)].map(m => m[1]).map(h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]); return reds.some(([r, g, b]) => r >= 180 && g <= 80 && b <= 80);"
+      }
+    }
+  ]
+}
