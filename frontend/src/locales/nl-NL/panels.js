@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Ongelezen",
   "pwsFilterGroup": "Groepen",
   "pwsFilterDirect": "Privéchat",
+  "pwsTypeGroup": "Groep",
+  "pwsTypeDirect": "Privéchat",
   "pwsOrgSubNotJoined": "Word lid van een team om teamleden en het kantoor te zien",
   "pwsOrgSubFirmPrefix": "Kantoor: ",
   "pwsOrgSubUnnamed": "Naamloos",

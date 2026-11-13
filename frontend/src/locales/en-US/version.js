@@ -38,7 +38,7 @@ export default {
   exitCheckFailed: "Could not check or commit project changes. Retry or exit without committing.",
   controlEntry: 'Source Control',
   entryUnavailable: 'Status unavailable. Click to retry',
-  pendingFileCount: '{count} files awaiting commit',
+  pendingFileCount: '{count} file awaiting commit | {count} files awaiting commit',
   changesAutoRecorded: 'Changes recorded automatically; ready to organize a commit',
   pendingCloudUpload: 'Local history awaiting upload to the Team Case Library',
   pendingCloudUpdate: 'New team changes available to download',

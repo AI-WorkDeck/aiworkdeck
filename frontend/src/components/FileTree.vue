@@ -407,7 +407,7 @@
       <component :is="'button'" type="button" class="tag-view-back" @click.stop="setTagView(false)">
         <text aria-hidden="true">‹</text> {{ $t('files.tagViewFolders') }}
       </component>
-      <text>{{ $t('files.tagViewFileCount', { count: displayFiles.length }) }}</text>
+      <text>{{ $t('files.tagViewFileCount', { count: displayFiles.length }, displayFiles.length) }}</text>
     </view>
 
     <view

@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "अपठित",
   "pwsFilterGroup": "समूह",
   "pwsFilterDirect": "सीधे",
+  "pwsTypeGroup": "समूह",
+  "pwsTypeDirect": "सीधे",
   "pwsOrgSubNotJoined": "सहकर्मियों और लॉ फर्म देखने के लिए किसी टीम से जुड़ें",
   "pwsOrgSubFirmPrefix": "फर्म: ",
   "pwsOrgSubUnnamed": "नामहीन",

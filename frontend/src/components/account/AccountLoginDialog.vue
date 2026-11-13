@@ -318,6 +318,7 @@
 </template>
 
 <script>
+import { localizeSites } from '@/utils/siteNames.js'
 import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, createBqtScanSession, pollBqtScanStatus, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
@@ -637,7 +638,7 @@ export default {
           current: (s && s.current) || '',
           pinned: !!(s && s.pinned),
           multiSite: !!(s && s.multiSite),
-          sites: (s && s.sites) || [],
+          sites: localizeSites((s && s.sites) || [], this.$t.bind(this)),
         }
         // 解锁页的品牌展示区按站点换文案，跟着这里走
         this.$emit('site-changed', this.siteStatus.current)

@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Okunmamış",
   "pwsFilterGroup": "Gruplar",
   "pwsFilterDirect": "Doğrudan",
+  "pwsTypeGroup": "Grup",
+  "pwsTypeDirect": "Doğrudan",
   "pwsOrgSubNotJoined": "Ekip arkadaşlarınızı ve hukuk büronuzu görmek için bir takıma katılın",
   "pwsOrgSubFirmPrefix": "Büro: ",
   "pwsOrgSubUnnamed": "İsimsiz",

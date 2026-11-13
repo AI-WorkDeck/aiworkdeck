@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "읽지 않음",
   "pwsFilterGroup": "그룹",
   "pwsFilterDirect": "다이렉트",
+  "pwsTypeGroup": "그룹",
+  "pwsTypeDirect": "다이렉트",
   "pwsOrgSubNotJoined": "팀에 참여하면 팀원과 로펌을 볼 수 있습니다",
   "pwsOrgSubFirmPrefix": "로펌: ",
   "pwsOrgSubUnnamed": "이름 없음",

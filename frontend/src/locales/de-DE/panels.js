@@ -572,6 +572,8 @@ export default {
   "pwsFilterUnread": "Ungelesen",
   "pwsFilterGroup": "Gruppen",
   "pwsFilterDirect": "Direkt",
+  "pwsTypeGroup": "Gruppe",
+  "pwsTypeDirect": "Direkt",
   "pwsOrgSubNotJoined": "Treten Sie einem Team bei, um Kollegen und Kanzlei zu sehen",
   "pwsOrgSubFirmPrefix": "Kanzlei: ",
   "pwsOrgSubUnnamed": "Unbenannt",

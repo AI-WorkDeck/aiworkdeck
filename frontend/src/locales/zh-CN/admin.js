@@ -133,6 +133,8 @@ export default {
 
   // 当前站点
   siteSectionTitle: '当前站点',
+  siteNameCn: 'AI WorkDeck 国内站',
+  siteNameIntl: 'AI WorkDeck International',
   siteSectionSubtitle: '账户 Key、余额与已购权益都属于所选站点。两站账户体系相互独立，余额与已购不互通',
   siteLabel: '站点',
   sitePinnedNote: '由部署配置指定，本机不提供切换。',
@@ -402,6 +404,7 @@ export default {
   capabilityPromptCopied: '已复制到剪贴板，回到工作台粘给 AI 即可',
   capabilitySlotsTitle: '能力实现',
   capabilitySlotsSubtitle: '每项能力都可以换实现，切换即生效，不满意可以回滚',
+  capabilitySlotLitigationDiagram: '诉讼可视化出图引擎',
   capabilityCurrent: '当前实现：',
   capabilityRollback: '回滚',
   capabilityDegraded: '已降级到内置（选中的实现当前不可用）',
@@ -414,7 +417,7 @@ export default {
   capabilitySwitchFailed: '切换失败',
   capabilityRollbackFailed: '回滚失败',
   capabilityDevModeTitle: '开发者模式',
-  capabilityDevModeSubtitle: '已默认开启：允许安装未签名的能力包，代码会在这台电脑上运行；不需要时可关闭',
+  capabilityDevModeSubtitle: '允许安装未签名的能力包，其代码会在这台电脑上运行；不需要时请保持关闭',
   capabilityDevModeSwitch: '允许安装未签名的本机执行实现',
   capabilityDevModeDesc: '打开后，从 GitHub 拉来的 Python 等引擎可以直接装到本机并由本软件启动运行。',
   capabilityDevModeConfirmTitle: '打开开发者模式？',

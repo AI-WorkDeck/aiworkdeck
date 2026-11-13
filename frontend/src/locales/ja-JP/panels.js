@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "未読",
   "pwsFilterGroup": "グループ",
   "pwsFilterDirect": "ダイレクト",
+  "pwsTypeGroup": "グループ",
+  "pwsTypeDirect": "ダイレクト",
   "pwsOrgSubNotJoined": "チームに参加すると、チームメンバーや法律事務所を表示できます",
   "pwsOrgSubFirmPrefix": "事務所: ",
   "pwsOrgSubUnnamed": "名前なし",

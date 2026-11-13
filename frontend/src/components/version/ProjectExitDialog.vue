@@ -65,7 +65,7 @@ export default {
       if (row.state === 'uncertain') return this.$t('version.entryUnavailable')
       if (row.state === 'failed') return this.$t('version.entryUnavailable')
       if (row.state === 'conflict') return this.$t('version.exitConflict')
-      return this.$t('version.pendingFileCount', { count: row.count })
+      return this.$t('version.pendingFileCount', { count: row.count }, row.count)
     },
     async load() {
       this.loading = true; this.listFailed = false

@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "Μη αναγνωσμένα",
   "pwsFilterGroup": "Ομάδες",
   "pwsFilterDirect": "Ατομικά",
+  "pwsTypeGroup": "Ομάδα",
+  "pwsTypeDirect": "Ατομικά",
   "pwsOrgSubNotJoined": "Εγγραφείτε σε μια ομάδα για να βλέπετε τους συναδέλφους και το δικηγορικό γραφείο",
   "pwsOrgSubFirmPrefix": "Γραφείο: ",
   "pwsOrgSubUnnamed": "Χωρίς όνομα",

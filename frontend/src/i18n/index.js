@@ -69,8 +69,9 @@ registerReactiveLocaleTracker(() => (
 /**
  * 供纯 JS 模块（services/api.js、utils/*、config/*）在组件树外取词。
  */
-export function t(key, params) {
-  return i18n.global.t(key, params)
+export function t(key, params, plural) {
+  // plural：英文等有单复数的词条写成 'x file | x files'，调用方传数量选形（单数形只在 1 时用）
+  return plural === undefined ? i18n.global.t(key, params) : i18n.global.t(key, params || {}, plural)
 }
 
 /**

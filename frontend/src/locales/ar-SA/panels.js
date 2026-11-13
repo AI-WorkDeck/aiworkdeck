@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "غير مقروء",
   "pwsFilterGroup": "مجموعات",
   "pwsFilterDirect": "مباشر",
+  "pwsTypeGroup": "مجموعة",
+  "pwsTypeDirect": "مباشر",
   "pwsOrgSubNotJoined": "انضم إلى فريق لرؤية الزملاء والمكتب القانوني",
   "pwsOrgSubFirmPrefix": "المكتب: ",
   "pwsOrgSubUnnamed": "بدون اسم",

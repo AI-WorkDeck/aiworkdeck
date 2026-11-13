@@ -427,7 +427,7 @@ jobs:
           sudo launchctl limit maxfiles 524288 524288 || true
           ulimit -n 524288 || ulimit -n "$(ulimit -Hn)" || true
           echo "fd soft=$(ulimit -n) hard=$(ulimit -Hn)"
-          npx electron-builder --publish never
+          npx electron-builder --publish never -c.extraMetadata.awdReleaseBuild=true
       - name: Compress macOS disk image
         if: runner.os == 'macOS'
         working-directory: desktop
@@ -554,7 +554,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         shell: pwsh
         run: |
-          npx electron-builder --dir --arm64
+          npx electron-builder --dir --arm64 -c.extraMetadata.awdReleaseBuild=true
           if (-not (Test-Path 'release\win-arm64-unpacked\AI WorkDeck.exe')) { throw 'arm64 unpacked dir missing' }
           Remove-Item -Recurse -Force 'release\win-arm64-unpacked\resources'
           New-Item -ItemType Directory -Force 'build\win\arm64-shell' | Out-Null
@@ -577,7 +577,7 @@ jobs:
           # dev-board#1011）：应用 exe、卸载器、安装器逐个签 + RFC3161 时间戳；
           # 未设 AZURE_SIGNING_*（普通 PR / fork PR）时钩子跳过，产物未签名。
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx electron-builder --publish never
+        run: npx electron-builder --publish never -c.extraMetadata.awdReleaseBuild=true
       - name: Regress NSIS known-folder path copy
         if: runner.os == 'Windows'
         shell: pwsh

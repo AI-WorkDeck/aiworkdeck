@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "ยังไม่ได้อ่าน",
   "pwsFilterGroup": "กลุ่ม",
   "pwsFilterDirect": "ส่วนตัว",
+  "pwsTypeGroup": "กลุ่ม",
+  "pwsTypeDirect": "ส่วนตัว",
   "pwsOrgSubNotJoined": "เข้าร่วมทีมเพื่อดูเพื่อนร่วมทีมและสำนักงานกฎหมาย",
   "pwsOrgSubFirmPrefix": "สำนักงาน: ",
   "pwsOrgSubUnnamed": "ไม่มีชื่อ",

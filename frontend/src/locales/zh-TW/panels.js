@@ -575,6 +575,8 @@ export default {
   "pwsFilterUnread": "未讀",
   "pwsFilterGroup": "群聊",
   "pwsFilterDirect": "私聊",
+  "pwsTypeGroup": "群聊",
+  "pwsTypeDirect": "私聊",
   "pwsOrgSubNotJoined": "加入團隊後可看到同事與律所",
   "pwsOrgSubFirmPrefix": "律所：",
   "pwsOrgSubUnnamed": "未命名",

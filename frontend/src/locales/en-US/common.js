@@ -57,8 +57,8 @@ export default {
   cannotResolveParentFolder: 'Cannot determine the folder containing this file',
   // ---- utils/projectHomeFormat.js ----
   dateTimeMdHm: '{year}-{month}-{day} {time}',
-  registeredItems: '{count} items registered',
-  filesCount: '{count} files',
+  registeredItems: '{count} item registered | {count} items registered',
+  filesCount: '{count} file | {count} files',
   statusRunning: 'Running',
   statusPaused: 'Paused',
   statusInterrupted: 'Interrupted',

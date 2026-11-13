@@ -133,6 +133,8 @@ export default {
 
   // Current site
   siteSectionTitle: 'Current Site',
+  siteNameCn: 'AI WorkDeck Mainland China',
+  siteNameIntl: 'AI WorkDeck International',
   siteSectionSubtitle: 'Your account Key, balance, and purchased entitlements belong to the selected site. The two sites have independent account systems; balances and purchases do not transfer',
   siteLabel: 'Site',
   sitePinnedNote: 'Set by deployment configuration; switching is not available on this machine.',
@@ -403,6 +405,7 @@ export default {
   capabilityPromptCopied: 'Copied. Paste it to the AI panel in the workbench.',
   capabilitySlotsTitle: 'Capability implementations',
   capabilitySlotsSubtitle: 'Every capability can be swapped; switching takes effect immediately and can be rolled back',
+  capabilitySlotLitigationDiagram: 'Litigation diagram engine',
   capabilityCurrent: 'Current: ',
   capabilityRollback: 'Roll back',
   capabilityDegraded: 'Fell back to built-in (the selected implementation is unavailable)',
@@ -415,7 +418,7 @@ export default {
   capabilitySwitchFailed: 'Switch failed',
   capabilityRollbackFailed: 'Roll back failed',
   capabilityDevModeTitle: 'Developer mode',
-  capabilityDevModeSubtitle: 'On by default: allows installing unsigned capability packages, whose code runs on this computer; turn it off if you do not need it',
+  capabilityDevModeSubtitle: 'Allows installing unsigned capability packages, whose code runs on this computer. Keep it off unless you need it',
   capabilityDevModeSwitch: 'Allow installing unsigned implementations that run locally',
   capabilityDevModeDesc: 'Once on, engines pulled from GitHub (Python and the like) can be installed on this machine and started by this app.',
   capabilityDevModeConfirmTitle: 'Turn on developer mode?',

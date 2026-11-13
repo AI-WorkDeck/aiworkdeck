@@ -369,7 +369,7 @@ export default {
   selectionReplaced: 'Selection replaced',
   replaceFailed: 'Replace failed',
   fileAdded: 'Added: {name}',
-  filesAdded: 'Added {count} files',
+  filesAdded: 'Added {count} file | Added {count} files',
   // Dropping into the AI chat area (dev-board#779 K6 (5))
   dragUnsupported: 'This content cannot be dropped here; drop a file, an editor tab, or a file from your computer',
   dragFolderUnsupported: 'The chat area accepts files only; drop a whole folder onto the file explorer on the left',
