@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "Khi bật, luật sư có thể chia sẻ các mục kinh nghiệm của mình với nhóm hoặc toàn công ty để dùng trong hồ sơ dự thầu và đề xuất cho khách hàng.",
   "cloud.feature.other.name": "Tính năng đám mây công ty luật ({key})",
   "cloud.feature.other.desc": "Xem ghi chú về quyền riêng tư để biết tính năng này lưu những dữ liệu gì.",
-  "cloud.turnOffPurge": "Tắt và xóa dữ liệu trên đám mây"
+  "cloud.turnOffPurge": "Tắt và xóa dữ liệu trên đám mây",
+  "client.cloud.mode.local": "Sổ theo dõi trên máy",
+  "client.cloud.mode.cloud": "Đám mây văn phòng luật",
+  "client.cloud.off": "Đám mây văn phòng luật chưa được bật. Khi quản trị viên văn phòng bật trong phần cài đặt đám mây văn phòng luật, hồ sơ khách hàng có thể được chia sẻ với các luật sư cùng văn phòng.",
+  "client.cloud.on": "Văn phòng của bạn đang chia sẻ hồ sơ khách hàng trên đám mây văn phòng luật.",
+  "client.cloud.openSettings": "Mở cài đặt đám mây văn phòng luật",
+  "client.cloud.upload": "Tải khách hàng của tôi lên đám mây văn phòng luật",
+  "client.cloud.uploadHint": "Chỉ tải lên những khách hàng do bạn phụ trách, chủ trì hoặc lập hồ sơ, cùng các mối quan hệ của họ. Không tải lên thông tin tiếp nhận vụ việc, phí và nhật ký trao đổi.",
+  "client.cloud.uploaded": "Đã tải lên {clients} khách hàng ({created} mới, {matched} khớp với hồ sơ đã có trên đám mây).",
+  "client.cloud.listHint": "Hồ sơ khách hàng trên đám mây văn phòng luật. Người phụ trách, luật sư đối tác chịu trách nhiệm và quản trị viên văn phòng xem được toàn bộ hồ sơ; các luật sư khác chỉ thấy tên và người phụ trách.",
+  "client.cloud.col.scope": "Phạm vi xem",
+  "client.cloud.scope.full": "Toàn bộ hồ sơ",
+  "client.cloud.scope.limited": "Chỉ tên và người phụ trách",
+  "client.cloud.restricted": "Bạn không phải người phụ trách hay luật sư đối tác chịu trách nhiệm của khách hàng này nên chỉ hiển thị tên và người phụ trách. Cần biết chi tiết, vui lòng liên hệ người phụ trách.",
+  "client.cloud.conflictTitle": "Tra cứu các bên trên đám mây văn phòng luật",
+  "client.cloud.conflictClear": "Không phát hiện liên quan nào trong số khách hàng và các bên liên quan trên đám mây văn phòng luật.",
+  "client.cloud.conflictHit": "{client} ({no}) · người phụ trách: {owner}"
 }

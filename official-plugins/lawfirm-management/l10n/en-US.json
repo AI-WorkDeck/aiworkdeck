@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "When on, lawyers can share their experience entries with their team or the whole firm for use in tenders and client proposals.",
   "cloud.feature.other.name": "Firm cloud feature ({key})",
   "cloud.feature.other.desc": "See the privacy note for what this feature stores.",
-  "cloud.turnOffPurge": "Turn off and delete cloud data"
+  "cloud.turnOffPurge": "Turn off and delete cloud data",
+  "client.cloud.mode.local": "Local ledger",
+  "client.cloud.mode.cloud": "Firm cloud",
+  "client.cloud.off": "Firm cloud is off. Once a firm administrator turns it on in the firm cloud settings, client records can be shared with colleagues.",
+  "client.cloud.on": "Your firm shares client records in the firm cloud.",
+  "client.cloud.openSettings": "Open firm cloud settings",
+  "client.cloud.upload": "Upload my clients to the firm cloud",
+  "client.cloud.uploadHint": "Only clients you own, lead or created, with their relationships, are uploaded. Intakes, fees and interaction logs are not.",
+  "client.cloud.uploaded": "Uploaded {clients} clients ({created} new, {matched} matched existing cloud records).",
+  "client.cloud.listHint": "Client records in the firm cloud. Owners, responsible partners and firm administrators see the full record; other lawyers see only the name and owner.",
+  "client.cloud.col.scope": "Visibility",
+  "client.cloud.scope.full": "Full record",
+  "client.cloud.scope.limited": "Name and owner only",
+  "client.cloud.restricted": "You are not this client's owner or responsible partner, so only the name and owner are shown. Contact the owner for details.",
+  "client.cloud.conflictTitle": "Firm cloud party search",
+  "client.cloud.conflictClear": "No connection found among the firm cloud's clients and related parties.",
+  "client.cloud.conflictHit": "{client} ({no}) · owner: {owner}"
 }

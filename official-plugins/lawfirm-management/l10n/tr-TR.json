@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "Açıldığında avukatlar deneyim kayıtlarını ekipleriyle veya tüm büroyla paylaşarak ihalelerde ve müvekkil tekliflerinde kullanabilir.",
   "cloud.feature.other.name": "Büro bulutu özelliği ({key})",
   "cloud.feature.other.desc": "Bu özelliğin hangi verileri sakladığı için gizlilik notuna bakın.",
-  "cloud.turnOffPurge": "Kapat ve bulut verilerini sil"
+  "cloud.turnOffPurge": "Kapat ve bulut verilerini sil",
+  "client.cloud.mode.local": "Yerel kayıt defteri",
+  "client.cloud.mode.cloud": "Büro bulutu",
+  "client.cloud.off": "Büro bulutu kapalı. Büro yöneticisi büro bulutu ayarlarından açtığında, müvekkil dosyaları meslektaşlarla paylaşılabilir.",
+  "client.cloud.on": "Büronuz müvekkil dosyalarını büro bulutunda paylaşıyor.",
+  "client.cloud.openSettings": "Büro bulutu ayarlarını aç",
+  "client.cloud.upload": "Müvekkillerimi büro bulutuna yükle",
+  "client.cloud.uploadHint": "Yalnızca sizin yürüttüğünüz, sorumlu olduğunuz veya oluşturduğunuz müvekkiller ilişkileriyle birlikte yüklenir. Dosya kabulleri, ücretler ve görüşme kayıtları yüklenmez.",
+  "client.cloud.uploaded": "{clients} müvekkil yüklendi ({created} yeni, {matched} buluttaki mevcut dosyalarla eşleşti).",
+  "client.cloud.listHint": "Büro bulutundaki müvekkil dosyaları. Müvekkil sorumlusu, sorumlu ortak ve büro yöneticileri dosyanın tamamını görür; diğer avukatlar yalnızca adı ve sorumluyu görür.",
+  "client.cloud.col.scope": "Görünürlük",
+  "client.cloud.scope.full": "Dosyanın tamamı",
+  "client.cloud.scope.limited": "Yalnızca ad ve sorumlu",
+  "client.cloud.restricted": "Bu müvekkilin sorumlusu veya sorumlu ortağı olmadığınız için yalnızca ad ve sorumlu gösterilir. Ayrıntı için sorumluyla iletişime geçin.",
+  "client.cloud.conflictTitle": "Büro bulutunda taraf araması",
+  "client.cloud.conflictClear": "Büro bulutundaki müvekkiller ve ilişkili taraflar arasında bağlantı bulunamadı.",
+  "client.cloud.conflictHit": "{client} ({no}) · sorumlu: {owner}"
 }

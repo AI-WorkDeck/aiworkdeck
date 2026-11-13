@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "開啟後，律師可以將個人業績經歷條目共享至本團隊或全所，供投標與客戶提案資料引用。",
   "cloud.feature.other.name": "律所雲端功能（{key}）",
   "cloud.feature.other.desc": "該功能的資料說明請見隱私說明。",
-  "cloud.turnOffPurge": "關閉並刪除雲端資料"
+  "cloud.turnOffPurge": "關閉並刪除雲端資料",
+  "client.cloud.mode.local": "本機台帳",
+  "client.cloud.mode.cloud": "律所雲端",
+  "client.cloud.off": "律所雲端尚未開啟：律所管理員在「律所雲端」設定中開啟後，即可與同所律師共享客戶檔案。",
+  "client.cloud.on": "律所已開啟客戶檔案雲端共享。",
+  "client.cloud.openSettings": "開啟「律所雲端」設定",
+  "client.cloud.upload": "上傳我的客戶至律所雲端",
+  "client.cloud.uploadHint": "僅上傳由你維護、主辦或建檔的客戶及其關係，不上傳收案、收費與往來紀錄。",
+  "client.cloud.uploaded": "已上傳 {clients} 位客戶（新增 {created}，與雲端既有檔案比對相符 {matched}）。",
+  "client.cloud.listHint": "律所雲端的客戶檔案。維護人、主辦合夥律師與律所管理員可檢視完整檔案；其他律師僅能看到名稱與維護人。",
+  "client.cloud.col.scope": "可見範圍",
+  "client.cloud.scope.full": "完整檔案",
+  "client.cloud.scope.limited": "僅名稱與維護人",
+  "client.cloud.restricted": "你不是此客戶的維護人或主辦合夥律師，僅顯示名稱與維護人。如需了解詳情，請聯繫維護人。",
+  "client.cloud.conflictTitle": "律所雲端當事人檢索",
+  "client.cloud.conflictClear": "在律所雲端的客戶與關聯當事人中未發現關聯。",
+  "client.cloud.conflictHit": "{client}（{no}）· 維護人：{owner}"
 }

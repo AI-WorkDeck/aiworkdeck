@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "Lorsque cette option est activée, les avocats peuvent partager leurs références avec leur équipe ou l’ensemble du cabinet pour les appels d’offres et les propositions aux clients.",
   "cloud.feature.other.name": "Fonctionnalité du cloud du cabinet ({key})",
   "cloud.feature.other.desc": "Consultez la note de confidentialité pour connaître les données stockées par cette fonctionnalité.",
-  "cloud.turnOffPurge": "Désactiver et supprimer les données cloud"
+  "cloud.turnOffPurge": "Désactiver et supprimer les données cloud",
+  "client.cloud.mode.local": "Registre local",
+  "client.cloud.mode.cloud": "Cloud du cabinet",
+  "client.cloud.off": "Le cloud du cabinet est désactivé. Dès qu'un administrateur du cabinet l'active dans les paramètres du cloud du cabinet, les dossiers clients peuvent être partagés avec vos confrères.",
+  "client.cloud.on": "Votre cabinet partage les dossiers clients dans le cloud du cabinet.",
+  "client.cloud.openSettings": "Ouvrir les paramètres du cloud du cabinet",
+  "client.cloud.upload": "Téléverser mes clients vers le cloud du cabinet",
+  "client.cloud.uploadHint": "Seuls les clients dont vous êtes le référent, le responsable ou le créateur sont téléversés, avec leurs relations. Les prises de dossier, honoraires et journaux d'échanges ne le sont pas.",
+  "client.cloud.uploaded": "{clients} clients téléversés ({created} nouveaux, {matched} rapprochés de dossiers existants du cloud).",
+  "client.cloud.listHint": "Dossiers clients du cloud du cabinet. Les référents, associés responsables et administrateurs du cabinet voient le dossier complet ; les autres avocats voient uniquement le nom et le référent.",
+  "client.cloud.col.scope": "Visibilité",
+  "client.cloud.scope.full": "Dossier complet",
+  "client.cloud.scope.limited": "Nom et référent uniquement",
+  "client.cloud.restricted": "Vous n'êtes ni le référent ni l'associé responsable de ce client ; seuls le nom et le référent s'affichent. Contactez le référent pour plus de détails.",
+  "client.cloud.conflictTitle": "Recherche de parties dans le cloud du cabinet",
+  "client.cloud.conflictClear": "Aucun lien trouvé parmi les clients et parties liées du cloud du cabinet.",
+  "client.cloud.conflictHit": "{client} ({no}) · référent : {owner}"
 }

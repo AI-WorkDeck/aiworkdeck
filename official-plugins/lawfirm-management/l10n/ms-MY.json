@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "Apabila dihidupkan, peguam boleh berkongsi entri pengalaman mereka dengan pasukan atau seluruh firma untuk digunakan dalam tender dan cadangan kepada klien.",
   "cloud.feature.other.name": "Ciri awan firma ({key})",
   "cloud.feature.other.desc": "Lihat nota privasi untuk maklumat tentang data yang disimpan oleh ciri ini.",
-  "cloud.turnOffPurge": "Matikan dan padam data awan"
+  "cloud.turnOffPurge": "Matikan dan padam data awan",
+  "client.cloud.mode.local": "Lejar tempatan",
+  "client.cloud.mode.cloud": "Awan firma",
+  "client.cloud.off": "Awan firma belum diaktifkan. Setelah pentadbir firma mengaktifkannya dalam tetapan awan firma, fail klien boleh dikongsi dengan rakan sejawat.",
+  "client.cloud.on": "Firma anda berkongsi fail klien dalam awan firma.",
+  "client.cloud.openSettings": "Buka tetapan awan firma",
+  "client.cloud.upload": "Muat naik klien saya ke awan firma",
+  "client.cloud.uploadHint": "Hanya klien yang anda urus, pimpin atau wujudkan failnya dimuat naik, bersama hubungan mereka. Penerimaan kes, yuran dan log interaksi tidak dimuat naik.",
+  "client.cloud.uploaded": "{clients} klien dimuat naik ({created} baharu, {matched} sepadan dengan fail sedia ada dalam awan).",
+  "client.cloud.listHint": "Fail klien dalam awan firma. Pengurus klien, rakan kongsi bertanggungjawab dan pentadbir firma boleh melihat fail penuh; peguam lain hanya melihat nama dan pengurus klien.",
+  "client.cloud.col.scope": "Skop paparan",
+  "client.cloud.scope.full": "Fail penuh",
+  "client.cloud.scope.limited": "Nama dan pengurus klien sahaja",
+  "client.cloud.restricted": "Anda bukan pengurus klien atau rakan kongsi bertanggungjawab bagi klien ini, jadi hanya nama dan pengurus klien dipaparkan. Hubungi pengurus klien untuk maklumat lanjut.",
+  "client.cloud.conflictTitle": "Carian pihak dalam awan firma",
+  "client.cloud.conflictClear": "Tiada kaitan ditemui dalam kalangan klien dan pihak berkaitan di awan firma.",
+  "client.cloud.conflictHit": "{client} ({no}) · pengurus klien: {owner}"
 }

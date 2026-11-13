@@ -433,5 +433,21 @@
   "cloud.feature.pitch.desc": "Jika diaktifkan, advokat dapat membagikan entri pengalamannya kepada tim atau seluruh kantor untuk digunakan dalam tender dan proposal klien.",
   "cloud.feature.other.name": "Fitur cloud kantor ({key})",
   "cloud.feature.other.desc": "Lihat catatan privasi untuk mengetahui data yang disimpan oleh fitur ini.",
-  "cloud.turnOffPurge": "Matikan dan hapus data cloud"
+  "cloud.turnOffPurge": "Matikan dan hapus data cloud",
+  "client.cloud.mode.local": "Buku klien lokal",
+  "client.cloud.mode.cloud": "Cloud firma",
+  "client.cloud.off": "Cloud firma belum aktif. Setelah administrator firma mengaktifkannya di pengaturan cloud firma, berkas klien dapat dibagikan kepada rekan sejawat.",
+  "client.cloud.on": "Firma Anda membagikan berkas klien di cloud firma.",
+  "client.cloud.openSettings": "Buka pengaturan cloud firma",
+  "client.cloud.upload": "Unggah klien saya ke cloud firma",
+  "client.cloud.uploadHint": "Hanya klien yang Anda kelola, pimpin, atau buat berkasnya yang diunggah, beserta hubungannya. Penerimaan perkara, biaya, dan catatan interaksi tidak diunggah.",
+  "client.cloud.uploaded": "{clients} klien diunggah ({created} baru, {matched} cocok dengan berkas yang sudah ada di cloud).",
+  "client.cloud.listHint": "Berkas klien di cloud firma. Penanggung jawab klien, partner penanggung jawab, dan administrator firma dapat melihat berkas lengkap; advokat lain hanya melihat nama dan penanggung jawab klien.",
+  "client.cloud.col.scope": "Cakupan akses",
+  "client.cloud.scope.full": "Berkas lengkap",
+  "client.cloud.scope.limited": "Hanya nama dan penanggung jawab",
+  "client.cloud.restricted": "Anda bukan penanggung jawab klien maupun partner penanggung jawab klien ini, sehingga hanya nama dan penanggung jawab yang ditampilkan. Hubungi penanggung jawab untuk keterangan lebih lanjut.",
+  "client.cloud.conflictTitle": "Pencarian pihak di cloud firma",
+  "client.cloud.conflictClear": "Tidak ditemukan keterkaitan pada klien maupun pihak terkait di cloud firma.",
+  "client.cloud.conflictHit": "{client} ({no}) · penanggung jawab: {owner}"
 }

@@ -38,7 +38,14 @@ const PROFILE = {
   signals: [{ date: '2026-10-31', source: 'WORK_LOG', projectName: '远航仓储' }]
 };
 
-async function mount({ language = 'zh-CN', oldHost = false } = {}) {
+const CLOUD_LIST = {
+  clients: [
+    { id: 41, clientNo: 'KH-2026-0001', name: '星河医疗器械有限公司', ownerName: '许嘉宁', partnerName: '陈思远', restricted: false, canEdit: true, version: 3 },
+    { id: 42, clientNo: 'KH-2026-0002', name: '东方航运有限公司', ownerName: '周铭泽', restricted: true, canEdit: false, version: 1 }
+  ]
+};
+
+async function mount({ language = 'zh-CN', oldHost = false, cloud = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://plugin.invalid/' });
   const calls = [];
   const send = (data) => dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data, source: dom.window.parent }));
@@ -62,6 +69,18 @@ async function mount({ language = 'zh-CN', oldHost = false } = {}) {
         if (action === 'searchParties') result = { parties: [{ id: 41, name: '林海', client: false }] };
         if (action === 'saveRelation') result = { client: { ...PROFILE, relations: [...PROFILE.relations, { id: 32, relationType: 'SHAREHOLDER', direction: 'IN', partyId: 41, partyName: '林海', description: '林海持有远航物流有限公司 30% 股权' }] } };
         if (action === 'submitIntake') result = { intake: { id: 2, clientId: params.clientId } };
+        if (action === 'cloud.settings.get') {
+          if (!cloud) { send({ awd: 1, type: 'result', seq: msg.seq, ok: false, error: { code: 'invoke_failed', message: 'not connected' } }); return; }
+          result = cloud;
+        }
+        if (action === 'clients.list') result = CLOUD_LIST;
+        if (action === 'clients.get') result = { client: CLOUD_LIST.clients.find((c) => c.id === params.partyId) };
+        if (action === 'clients.save') {
+          if (params.expectedVersion !== 3) { send({ awd: 1, type: 'result', seq: msg.seq, ok: false, error: { code: 'invoke_failed', message: '该记录已被同事修改，请刷新后再改' } }); return; }
+          result = { client: { ...CLOUD_LIST.clients[0], version: 4 } };
+        }
+        if (action === 'clients.conflictSearch') result = { riskLevel: 'YELLOW', hits: [{ ruleTitle: '新案对方当事人与本所客户存在关联关系（含间接股权）', clientName: '星河医疗器械有限公司', clientNo: 'KH-2026-0001', ownerName: '许嘉宁', relationPath: '林海持有星河控股 80% 股权' }] };
+        if (action === 'uploadClientsToCloud') result = { uploadedClients: 2, created: 1, matched: 1 };
       }
       send({ awd: 1, type: 'result', seq: msg.seq, ok: true, result });
     });
@@ -178,4 +197,61 @@ test('host without client actions (0.85.x): Clients tab and intake picker are hi
   const sent = p.actions('submitIntake').at(-1);
   assert.equal(sent.clientName, '某委托人有限公司');
   assert.equal('clientId' in sent && sent.clientId !== undefined, false, 'old host receives the same intake payload as before');
+test('firm cloud off or unavailable: local ledger only, with a pointer to the shared settings', async () => {
+  const p = await mount({ cloud: { clientsEnabled: false, timeEnabled: false, version: 0 } });
+  assert.match(p.$('client-cloud-bar').textContent, /律所云端未开启/);
+  assert.equal(p.$('client-mode-cloud'), null);
+  const q = await mount();
+  assert.equal(q.$('client-cloud-bar'), null, 'no cloud bar when the cloud status cannot be read');
+});
+
+test('firm cloud on: cloud list shows visibility, restricted profile hides details, stale edit shows the server message', async () => {
+  const p = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2 } });
+  p.$('client-mode-cloud').click();
+  await tick();
+  const rows = p.dom.window.document.querySelectorAll('tr.client-row');
+  assert.equal(rows.length, 2);
+  assert.match(rows[1].textContent, /仅名称与维护人/);
+  rows[1].click();
+  await tick();
+  assert.equal(p.actions('clients.get').at(-1).partyId, 42);
+  assert.match(p.$('client-restricted').textContent, /只显示名称与维护人/);
+  assert.equal(p.$('client-edit'), null);
+
+  p.$('client-back').click();
+  await tick();
+  p.dom.window.document.querySelector('tr.client-row').click();
+  await tick();
+  p.$('client-edit').click();
+  await tick();
+  assert.equal(p.$('client-f-owner'), null, 'cloud owner is a cloud account, not picked from local users');
+  p.$('client-save').click();
+  await tick();
+  assert.equal(p.actions('clients.save').at(-1).expectedVersion, 3);
+  // 同事已改过：再次保存带上的是旧版本，服务器拒绝，界面原样提示
+  p.$('client-edit').click();
+  await tick();
+  p.$('client-save').click();
+  await tick();
+  assert.equal(p.actions('clients.save').at(-1).expectedVersion, 4);
+  assert.match(p.$('clients-status').textContent, /该记录已被同事修改，请刷新后再改/);
+
+  p.$('client-cancel').click();
+  await tick();
+  p.$('client-back').click();
+  await tick();
+  p.$('client-upload').click();
+  await tick();
+  assert.match(p.$('clients-status').textContent, /已上传 2 位客户（新建 1，与云端已有档案对上 1）/);
+});
+
+test('intake precheck also searches firm cloud parties when the firm cloud is on', async () => {
+  const p = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2 } });
+  p.$('intake-client-name').value = '另一委托人有限公司';
+  p.$('intake-counterparty-name').value = '林海';
+  p.$('btn-preview-conflict').click();
+  await tick();
+  assert.equal(p.actions('clients.conflictSearch').at(-1).counterpartyName, '林海');
+  assert.match(p.$('cloud-conflict-card').textContent, /星河医疗器械有限公司（KH-2026-0001）· 维护人：许嘉宁/);
+  assert.match(p.$('cloud-conflict-card').textContent, /林海持有星河控股 80% 股权/);
 });

@@ -703,3 +703,15 @@ td.num {
 /* 律所云端（cloud.js） */
 #cl-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
 .cl-purge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.client-cloud-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block-end: 12px;
+}
+.client-restricted {
+  padding: 10px 12px;
+  border-radius: var(--awd-radius-sm, 6px);
+  background: var(--awd-surface-2, var(--fallback-surface-2));
+}
