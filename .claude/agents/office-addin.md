@@ -576,3 +576,16 @@ body 为 `{phone|email,purpose:'login'|'reset'}`，返回 `{id,image,expiresAt}`
 ### Mac 安装器瞬态失败（dev-board#1639）
 
 `installer/build-installers.mjs` 使用独立临时构建目录；已有同名挂载点时拒绝，不强制卸载。仅 hdiutil create/detach 的 Resource busy 和 stapler staple 的 NSURLError -1001/-1005 最多重试3次（2/5/10秒），保留每次输出及最终失败；公证拒绝、其它错误不重试，装订后仍必须validate。原run41005659222三次失败分别为detach忙、已Accepted后CloudKit断连、create忙；未确认具体占用进程。验证：`node --test office-addin/scripts/installer-transient.test.mjs`；真实签名/公证和双地区安装包另以固定SHA CI产物验收。
+
+## Mac 真机测试（Real-host testing on Mac）
+
+来自 2026-11 真机 QA（`readiness/qa/QO-office`）。Mac 上往往同时装着正式版，测错窗格会直接动用户真实账号。
+
+- **暂存清单要有独立身份。** 给 staging manifest 单独的 `<Id>` 和 DisplayName（含 STG），否则它和 AppSource 版、侧载的正式清单在功能区都叫「打开 AI WorkDeck」，窗格标题也一样。
+- **测试期间把正式清单挪出 `wef/`。** Office 会加载 `wef/` 里的每个文件，不看扩展名，`*.bak-*` 备份同样生效（曾有与正式站同 Id 的 cn 备份在线）。备份一律放到 `wef/` 之外。
+- **从「加载项 → 开发人员加载项」打开**暂存窗格（该弹层要真实鼠标点击一次；原生 `<select>` 菜单同理）。
+- **打字之前先确认窗格标题带 STG**，不是 STG 就关掉，什么都不要发。
+- **`AXValue` 不触发 Vue 的 `input` 事件。** 辅助功能赋值能让输入框显示文字，但 `v-model` 收不到；要真实粘贴或按键。
+- **不要在用户可能正在用 Mac 时往前台应用打字。** 曾有 "T"/"fa" 漏进文档标题、一次登录被误提交。要么确认用户不在用，要么改用不抢前台的 AXPress 点按钮。
+- 副屏在主屏左侧时 `cliclick` 的负坐标要写 `=-802` 形式。
+- 合成测试文件（python-docx/pptx 默认模板）带日文主题字体，会产生逐字「字体属性」修订和 `lang="zh-CN"` 的字体差异，不是插件缺陷。

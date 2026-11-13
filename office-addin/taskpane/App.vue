@@ -211,6 +211,7 @@
         v-if="view === 'settings'"
         :initial-server-url="settings.serverUrl"
         :initial-token="settings.token"
+        :notice="authNotice"
         @saved="onSettingsSaved"
       />
       <ChatView
@@ -270,7 +271,7 @@ import {
 } from './lib/settings.js'
 import {
   fetchMyProjects, fetchProjectCatalog, ensureAddinDefaultProject, fetchMe, postLogout,
-  createProject, fetchPlatformAiStatus, fetchMobileDevices,
+  createProject, fetchPlatformAiStatus, setAuthExpiredHandler, fetchMobileDevices,
   ensureAddinLink, fetchAddinLinks, postPaneHeartbeat, sendPaneBye
 } from './lib/api.js'
 import {
@@ -285,6 +286,7 @@ import {
 } from './lib/i18n.js'
 import { displayProjectName } from './lib/projectName.js'
 import { rechargeUrl, openExternal } from './lib/site.js'
+import { isQuotaLow, quotaParts } from './lib/quota.js'
 import { hostFamily, hidePanel, detectHost, readDocumentMeta, documentKey } from './lib/hostBridge.js'
 import { popIn } from './lib/motion.js'
 import { transferOpen, closeTransfer } from './lib/transfer.js'
@@ -486,27 +488,18 @@ const accountContact = computed(() => {
 /** 官网充值页（仅官方云后端有；私有部署/桌面本机为空串，入口隐藏） */
 const siteRecharge = computed(() => rechargeUrl(settings.serverUrl))
 
-/** 低额度警示：剩余不足 $1 时数字转警示色 */
-const quotaLow = computed(() => {
-  const q = aiQuota.value
-  return Boolean(q && q.hasKey && q.remainingUsd != null && q.remainingUsd <= 1)
-})
+/** 低额度警示：剩余不足约 1 美元（人民币站 7 元）时数字转警示色 */
+const quotaLow = computed(() => isQuotaLow(aiQuota.value, settings.serverUrl))
 
 function openRecharge() {
   accountOpen.value = false
   openExternal(siteRecharge.value)
 }
 
-/** 额度文案：有上限就给「剩余 / 共」，只有用量就给「已用」，什么都没有则隐藏 */
+/** 额度文案：币种跟随站点（大陆站 ¥、国际站 $） */
 const quotaText = computed(() => {
-  const q = aiQuota.value
-  if (!q || !q.hasKey) return ''
-  const fmt = (v) => '$' + Number(v).toFixed(2)
-  if (q.remainingUsd != null && q.limitUsd != null) {
-    return t('quotaRemaining', { remaining: fmt(q.remainingUsd), limit: fmt(q.limitUsd) })
-  }
-  if (q.usageUsd != null) return t('quotaUsed', { used: fmt(q.usageUsd) })
-  return ''
+  const p = quotaParts(aiQuota.value, settings.serverUrl)
+  return p ? t(p.key, p.params) : ''
 })
 
 /**
@@ -649,9 +642,26 @@ async function logout() {
   view.value = 'settings'
 }
 
+/**
+ * 登录失效（HTTP 401 / code 4010，令牌过期或被吊销）：清令牌、回登录页并说明原因。
+ * 用户在输入框里打的字留在 chatSession 的 input 里（发送失败时还会被放回），重新登录后仍在。
+ * 只认「当前令牌」发出的请求——重登之后才返回的旧请求不能把新会话踢掉。
+ */
+const authNotice = ref('')
+setAuthExpiredHandler((usedToken) => {
+  if (!settings.token || (usedToken && usedToken !== settings.token)) return
+  clearToken()
+  settings.token = ''
+  me.value = null
+  aiQuota.value = null
+  authNotice.value = t('sessionExpired')
+  view.value = 'settings'
+})
+
 function onSettingsSaved({ serverUrl, token }) {
   settings.serverUrl = serverUrl
   settings.token = token
+  authNotice.value = ''
   view.value = 'chat'
   refreshProjects()
   loadMe()
