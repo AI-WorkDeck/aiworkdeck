@@ -106,6 +106,7 @@
         <text class="libre-save-label" :title="saveStateText">{{ saveStateText }}</text>
         <text v-if="(statusKey === 'saveFailed' || statusKey === 'movedSaveFailed') && !saving" class="libre-save-retry" @tap="retrySave">{{ $t('editor.retrySave') }}</text>
         <text v-if="statusKey === 'movedSaveFailed' && !saving" class="libre-save-retry" @tap="saveCopyAs">{{ $t('editor.saveCopyAs') }}</text>
+        <text v-if="legacyProtected" class="libre-save-retry libre-legacy-copy" :class="{ busy: legacyCopyBusy }" @tap="saveProtectedCopy">{{ legacyCopyBusy ? $t('editor.legacyProtected.copying') : $t('editor.legacyProtected.saveCopy', { ext: legacyProtected }) }}</text>
       </view>
     </view>
     <!-- 外部 Agent（MCP propose_revision）的待审修订：仅激活的已打开文件显示，接受后以修订痕迹落入文档 -->
@@ -215,7 +216,7 @@ import ReviewPanel from '@/components/ReviewPanel.vue'
 import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
-import { getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
+import { createFile, getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
 import { createAuthorNameResolver, REDLINE_AUTHOR_KEY } from '@/utils/editorAuthor.js'
 import { host } from '@/services/host.js'
@@ -393,6 +394,9 @@ export default {
       passwordInput: '',
       passwordState: '',
       passwordAttempts: 0,
+      // 带密码的旧格式已打开（只读）：另存副本的目标扩展名 docx/xlsx/pptx，否则 ''
+      legacyProtected: '',
+      legacyCopyBusy: false,
       // 客体页 boot 失败时的原因串（lo-relay 'boot-failed'），显示在加载面板上。
       bootFailReason: '',
       // 改字 stale 提示条当前展示的条目 [{linkKey, text, link}]（合并规则见 StaleQueue）
@@ -451,6 +455,7 @@ export default {
     // 不用浮动胶囊提示保存，固定细栏在防抖等待期间也明确显示未落盘状态。
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
+      if (this.legacyProtected) return this.$t(this.dirty ? 'editor.legacyProtected.edited' : 'editor.legacyProtected.readOnly', { ext: this.legacyProtected })
       if (this.saving) return this.$t('editor.status.saving')
       if (this.localContentSaveText) return this.localContentSaveText
       if (this.statusKey === 'saveFailed' && this.saveRetryDelaySec > 0) return this.$t('editor.status.saveRetryScheduled', { seconds: this.saveRetryDelaySec })
@@ -2069,6 +2074,7 @@ export default {
         }
         assertCurrentGeneration()
         this._docCrypto = null
+        this.legacyProtected = ''
         this._localContentMetadata = this._contentSnapshots?.get(buf) || null
         this._checkpointGeneration = generation
         this._checkpointInvalidated = false
@@ -2079,13 +2085,29 @@ export default {
       // 没有就落 DOC_ENCRYPTED，加载面板请用户输入密码（submitPassword）。
       let crypt = null
       if (isEncryptedOoxml(bytes, name)) {
-        const held = [this._pendingCrypto, this._docCrypto].find(c => c && c.fileId === fileId) || null
-        const { decryptWithSession } = await import('@/utils/officeEncryption.js')
+        const { decryptWithSession, takeHandedOffSession } = await import('@/utils/officeEncryption.js')
+        // 「另存为加密副本」刚建出来的文件：会话由原编辑器交过来，不再问一次密码
+        const handed = takeHandedOffSession(fileId)
+        if (handed) this._pendingCrypto = { fileId, session: handed }
+        const held = [this._pendingCrypto, this._docCrypto].find(c => c && c.fileId === fileId && c.session) || null
         const plain = held ? await decryptWithSession(bytes, held.session) : null
         assertCurrentGeneration()
         if (!plain) throw Object.assign(new Error('document is password protected'), { code: DIAG_DOC_ENCRYPTED })
         crypt = held
         bytes = plain
+      } else if (/\.(doc|xls|ppt)$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf) {
+        // 带密码的旧格式（.doc/.xls/.ppt，O14b）：引擎打不开（.xls/.ppt 带密码也不行），宿主解成明文旧格式交给引擎，
+        // 只读——旧格式写不回加密，修改要另存为同密码的 .docx/.xlsx/.pptx 副本（saveProtectedCopy）。
+        const { detectLegacyEncryption, decryptLegacyOffice } = await import('@/utils/legacyOfficeDecrypt.js')
+        if (detectLegacyEncryption(bytes, name)) {
+          const held = [this._pendingCrypto, this._docCrypto].find(c => c && c.fileId === fileId && c.legacy) || null
+          let plain = null
+          if (held) { try { plain = await decryptLegacyOffice(bytes, name, held.password) } catch (e) { plain = null } }
+          assertCurrentGeneration()
+          if (!plain) throw Object.assign(new Error('document is password protected'), { code: DIAG_DOC_ENCRYPTED })
+          crypt = held
+          bytes = plain
+        }
       }
       // office 是单线程消息循环，两条 load_document 会按到达顺序依次执行，后到的
       // 那条把先装好的文档整个换掉——被取代的这次到此为止，不再发命令。
@@ -2118,9 +2140,10 @@ export default {
       this._checkpointGeneration = generation
       this._checkpointInvalidated = false
       if (res.kind) this.docKind = res.kind
-      // 之后每一笔保存都按它重新加密（sealForStorage）；明文文件清空
+      // 之后每一笔保存都按它重新加密（sealForStorage）；明文文件清空。旧格式进只读（legacyProtected）
       this._docCrypto = crypt
       this._pendingCrypto = null
+      this.legacyProtected = crypt && crypt.legacy ? ({ doc: 'docx', xls: 'xlsx', ppt: 'pptx' })[String(name).split('.').pop().toLowerCase()] || '' : ''
       // 换文档后工具栏必须重读一次激活态：worker 的 retarget 会把修订显示方式
       // 复位到默认（上一份文档设过「最终稿」就在这一步被打回来），工具栏若还
       // 端着上一份的读数，显示的态就跟画布对不上。
@@ -2522,6 +2545,7 @@ export default {
     },
     scheduleAutoSave() {
       clearTimeout(this._saveTimer)
+      if (this._docCrypto?.legacy) return
       if (this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       const elapsed = Date.now() - this._dirtySince
       const delay = Math.max(200, Math.min(2500, 15000 - elapsed))
@@ -2746,6 +2770,8 @@ export default {
     async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
       if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
+      // 带密码的旧格式只读（O14b）：不写回原文件，修改走「另存为加密副本」
+      if (this._docCrypto?.legacy) return false
       // 一笔保存开始，之前排的退避重试与「N 秒后重试」文案都作废；只有 catch 里认定的安全失败类别才再排。
       this._saveRetryKind = null
       clearTimeout(this._saveRetryTimer)
@@ -3003,11 +3029,55 @@ export default {
     async sealForStorage(u8, fileId) {
       const c = this._docCrypto
       if (!c) return u8
+      if (c.legacy) throw new Error('password-protected legacy document is read-only')
       if (c.fileId !== fileId) throw new Error('encrypted document session does not match file ' + fileId)
       const { encryptOoxml } = await import('@/utils/officeEncryption.js')
       const sealed = await encryptOoxml(u8, c.session)
       this.appendLog('  ← re-encrypted ' + u8.length + ' → ' + sealed.length + ' bytes')
       return sealed
+    },
+    // 带密码的旧格式 → 同目录下同密码的 .docx/.xlsx/.pptx 副本（O14b），包含此刻画布上的修改；原文件不动。
+    // 建好后把会话交给副本的编辑器（不再问密码）并打开它。
+    async saveProtectedCopy() {
+      const c = this._docCrypto, f = this.file
+      if (!c?.legacy || !f?.id || !this.executor || this.legacyCopyBusy || !this.legacyProtected) return false
+      const ext = this.legacyProtected, projectId = this.projectId
+      const stem = String(f.name || f.fileName || 'document').replace(/\.[^.]+$/, '')
+      this.legacyCopyBusy = true
+      try {
+        const res = await this.executor.executeCommand('export_document', { name: stem + '.' + ext })
+        const raw = res && res.success ? res.bytes : null
+        let u8 = raw instanceof Uint8Array ? raw : raw instanceof ArrayBuffer ? new Uint8Array(raw)
+          : raw && raw.buffer instanceof ArrayBuffer ? new Uint8Array(raw.buffer, raw.byteOffset || 0, raw.byteLength)
+            : Array.isArray(raw) ? new Uint8Array(raw) : null
+        if (!u8 || !u8.length) throw new Error((res && (res.message || res.error)) || 'export failed')
+        u8 = await this.stampGeneratorMetadata(u8)
+        const { createEncryptionSession, encryptOoxml, handOffSession } = await import('@/utils/officeEncryption.js')
+        const session = await createEncryptionSession(c.password)
+        const sealed = await encryptOoxml(u8, session)
+        let created = null, lastError = null
+        for (let i = 0; i < 6 && !created; i++) {
+          const name = stem + (i ? ' (' + i + ')' : '') + '.' + ext
+          try { created = await createFile(projectId, f.parentId ?? null, name, ext, sealed.length, null) }
+          catch (e) { lastError = e }
+        }
+        if (!created || created.id == null) throw lastError || new Error('create file failed')
+        await this.uploadBytes(getFileWriteUrl(created.id), sealed, created.name)
+        handOffSession(created.id, session)
+        // 修改已经带进副本：原标签不再算有未保存修改（原文件本来就不写）
+        this.dirty = false
+        this._dirtySince = 0
+        this.appendLog('另存为加密副本 / protected copy saved: ' + created.name)
+        uni.showToast({ title: this.$t('editor.legacyProtected.copySaved', { name: created.name }), icon: 'none' })
+        uni.$emit('awd:open-evidence-target', { fileId: created.id })
+        return true
+      } catch (e) {
+        this.appendLog('protected copy failed: ' + (e && e.message ? e.message : e))
+        uni.showToast({ title: this.$t('editor.legacyProtected.copyFailed', { reason: (e && e.message) || '' }), icon: 'none' })
+        return false
+      } finally {
+        this.legacyCopyBusy = false
+      }
     },
     // 加载面板上的密码框（O14）：先在宿主验证密码，对了才重新走装载；密码本身不保存。
     async submitPassword(event) {
@@ -3022,15 +3092,26 @@ export default {
         if (!this._bytesPromise) this.prefetchBytes()
         const buf = await this._bytesPromise
         if (!buf) throw new Error('download failed')
-        const { decryptOoxml } = await import('@/utils/officeEncryption.js')
-        const { session } = await decryptOoxml(new Uint8Array(buf), password)
+        const bytes = new Uint8Array(buf)
+        const name = this.file.name || this.file.fileName || ''
+        let pending
+        if (isEncryptedOoxml(bytes, name)) {
+          const { decryptOoxml } = await import('@/utils/officeEncryption.js')
+          pending = { fileId, session: (await decryptOoxml(bytes, password)).session }
+        } else {
+          // 旧格式没有可复用的文件密钥：密码只留在这个编辑器的内存里，供重载与「另存为加密副本」
+          const { decryptLegacyOffice } = await import('@/utils/legacyOfficeDecrypt.js')
+          await decryptLegacyOffice(bytes, name, password)
+          pending = { fileId, legacy: true, password }
+        }
         if (fileId !== this.file?.id || seq !== this._docLoadSeq) return
-        this._pendingCrypto = { fileId, session }
+        this._pendingCrypto = pending
         this.passwordInput = ''
         this.passwordState = ''
         this.appendLog('密码已验证，重新装载 / password accepted, loading')
         this.openFailCode = ''
-        this.docLoadFailed = false
+        // docLoadFailed 留给 finishDocLoad 在装载成功后撤：ready 还是上一轮失败时置的 true，
+        // 提前撤闸会让装载途中引擎发来的 modified 把刚打开的文档标脏（真机实测，触发一笔多余的自动保存）
         this.statusKey = 'loadingDoc'
         this.bootStageKey = 'openingDoc'
         this.bootCap = Math.max(this.bootCap, 95)

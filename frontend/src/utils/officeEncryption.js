@@ -205,3 +205,58 @@ export async function encryptOoxml(plain, session) {
   const out = CFB.write(cfb, { type: 'array', fileType: 'cfb' })
   return out instanceof Uint8Array ? new Uint8Array(out.buffer, out.byteOffset, out.byteLength) : new Uint8Array(out)
 }
+
+// ---- 新建加密包（O14b：带密码的 .doc/.xls/.ppt 另存为同密码的 .docx/.xlsx/.pptx 副本）----
+// DataSpaces 四条流是 MS-OFFCRYPTO 2.3.4.x 规定的固定内容（与 Office / msoffcrypto 写出的逐字节相同）
+const DATASPACES = [
+  ['\u0006DataSpaces/Version', 'PAAAAE0AaQBjAHIAbwBzAG8AZgB0AC4AQwBvAG4AdABhAGkAbgBlAHIALgBEAGEAdABhAFMAcABhAGMAZQBzAAEAAAABAAAAAQAAAA=='],
+  ['\u0006DataSpaces/DataSpaceMap', 'CAAAAAEAAABoAAAAAQAAAAAAAAAgAAAARQBuAGMAcgB5AHAAdABlAGQAUABhAGMAawBhAGcAZQAyAAAAUwB0AHIAbwBuAGcARQBuAGMAcgB5AHAAdABpAG8AbgBEAGEAdABhAFMAcABhAGMAZQAAAA=='],
+  ['\u0006DataSpaces/DataSpaceInfo/StrongEncryptionDataSpace', 'CAAAAAEAAAAyAAAAUwB0AHIAbwBuAGcARQBuAGMAcgB5AHAAdABpAG8AbgBUAHIAYQBuAHMAZgBvAHIAbQAAAA=='],
+  ['\u0006DataSpaces/TransformInfo/StrongEncryptionTransform/\u0006Primary', 'WAAAAAEAAABMAAAAewBGAEYAOQBBADMARgAwADMALQA1ADYARQBGAC0ANAA2ADEAMwAtAEIARABEADUALQA1AEEANAAxAEMAMQBEADAANwAyADQANgB9AE4AAABNAGkAYwByAG8AcwBvAGYAdAAuAEMAbwBuAHQAYQBpAG4AZQByAC4ARQBuAGMAcgB5AHAAdABpAG8AbgBUAHIAYQBuAHMAZgBvAHIAbQAAAAEAAAABAAAAAQAAAAAAAAAAAAAAAAAAAAQAAAA='],
+]
+const SPIN_COUNT = 100000
+
+/**
+ * 用密码新建一把 Agile 加密（AES-256 / SHA-512 / spinCount 100000，同 Office 默认）。
+ * 返回的 session 与 decryptOoxml 得到的同形，直接交给 encryptOoxml。
+ */
+export async function createEncryptionSession(password) {
+  const rand = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))
+  const keyData = { keyBytes: 32, blockSize: 16, hashSize: 64, hash: 'SHA-512', salt: rand(16) }
+  const enc = { ...keyData, salt: rand(16), spinCount: SPIN_COUNT }
+  const keyFor = await deriveKey(enc, password)
+  const iv = fit(enc.salt, enc.blockSize)
+  const encWith = async (block, data) => aesEncryptRaw(await aesKey(await keyFor(block)), iv, padBlock(data, enc.blockSize))
+  const verifierInput = rand(16)
+  const secretRaw = rand(32)
+  const encryptedVerifierHashInput = await encWith(BLOCK_VERIFIER_INPUT, verifierInput)
+  const encryptedVerifierHashValue = await encWith(BLOCK_VERIFIER_HASH, await digest('SHA-512', verifierInput))
+  const encryptedKeyValue = await encWith(BLOCK_KEY_VALUE, secretRaw)
+  const common = 'blockSize="16" keyBits="256" hashSize="64" cipherAlgorithm="AES" cipherChaining="ChainingModeCBC" hashAlgorithm="SHA512"'
+  const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n' +
+    '<encryption xmlns="http://schemas.microsoft.com/office/2006/encryption" xmlns:p="http://schemas.microsoft.com/office/2006/keyEncryptor/password" xmlns:c="http://schemas.microsoft.com/office/2006/keyEncryptor/certificate">' +
+    '<keyData saltSize="16" ' + common + ' saltValue="' + tob64(keyData.salt) + '"/>' +
+    '<dataIntegrity encryptedHmacKey="" encryptedHmacValue=""/>' +
+    '<keyEncryptors><keyEncryptor uri="http://schemas.microsoft.com/office/2006/keyEncryptor/password">' +
+    '<p:encryptedKey spinCount="' + SPIN_COUNT + '" saltSize="16" ' + common + ' saltValue="' + tob64(enc.salt) + '"' +
+    ' encryptedVerifierHashInput="' + tob64(encryptedVerifierHashInput) + '" encryptedVerifierHashValue="' + tob64(encryptedVerifierHashValue) + '"' +
+    ' encryptedKeyValue="' + tob64(encryptedKeyValue) + '"/></keyEncryptor></keyEncryptors></encryption>'
+  return {
+    secret: await aesKey(secretRaw), secretRaw,
+    parsed: { header: new Uint8Array([4, 0, 4, 0, 0x40, 0, 0, 0]), xml, keyData, enc },
+    others: DATASPACES.map(([p, v]) => [p, b64(v)]),
+  }
+}
+
+// 「另存为加密副本」后新标签打开副本：用户刚输过密码，把会话交给那个文件的编辑器，免得再问一次。
+// 只在内存、只用一次、60 秒内有效；不落盘、不进存储。
+const handoff = new Map()
+export function handOffSession(fileId, session) {
+  handoff.set(String(fileId), { session, at: Date.now() })
+}
+export function takeHandedOffSession(fileId) {
+  const key = String(fileId)
+  const hit = handoff.get(key)
+  handoff.delete(key)
+  return hit && Date.now() - hit.at < 60000 ? hit.session : null
+}

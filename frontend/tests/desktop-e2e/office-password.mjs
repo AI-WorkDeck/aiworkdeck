@@ -270,6 +270,19 @@ async function decryptedText(file, password) {
   for (const n of Object.keys(zip.files).filter(n => n.endsWith('.xml'))) text += stripTags(await zip.file(n).async('string'))
   return text
 }
+// 副本里的图片：解开后列出 media/ 下的文件与大小、并核对图片魔数
+async function mediaOf(file, password) {
+  const out = path.join(run, 'media-' + Date.now() + path.extname(file))
+  execFileSync(decryptTool, ['-p', password, file, out])
+  const zip = await JSZip.loadAsync(fs.readFileSync(out))
+  const list = []
+  for (const n of Object.keys(zip.files).filter(n => /\/media\//.test(n))) {
+    const b = await zip.file(n).async('uint8array')
+    const magic = b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'png' : (b[0] === 0x4d && b[1] === 0x4d) || (b[0] === 0x49 && b[1] === 0x49) ? 'tiff' : 'other'
+    list.push([n, b.length, magic])
+  }
+  return list
+}
 const editor = (name, fn, ...args) => page.evaluate((expr, name, fn, args) => { const e = (0, eval)(expr)(name); return e ? (0, eval)(fn)(e, ...args) : null }, editorExpr, name, fn.toString(), args)
 async function passwordBox(name) {
   await page.waitForFunction((expr, name) => (0, eval)(expr)(name)?.openFailCode === 'DOC_ENCRYPTED', { timeout: 240000, polling: 100 }, editorExpr, name)
@@ -345,7 +358,9 @@ async function checkFile(src) {
   await enterPassword(name, PASSWORD)
   await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
   r.openAfterPasswordMs = Date.now() - t0
-  await sleep(2500)
+  const openDirty = []
+  for (let i = 0; i < 6; i++) { openDirty.push(await editor(name, e => e.dirty || e.saving)); await sleep(500) }
+  r.notDirtyAfterOpen = openDirty.every(d => d === false)
   await page.screenshot({ path: path.join(run, kind + '-3-open.png') })
   await dismissLogin()
   await edit(name, kind)
@@ -372,10 +387,95 @@ async function checkFile(src) {
   r.slidePreviewCacheEntries = await previewCacheKeys()
   await close(name)
   log(name, JSON.stringify(r))
-  r.passed = r.engineSawCiphertext === 'DOC_ENCRYPTED' && r.wrongPasswordShown && r.wrongPasswordCleared && r.editVisible && r.autosaveLanded &&
+  r.passed = r.notDirtyAfterOpen && r.engineSawCiphertext === 'DOC_ENCRYPTED' && r.wrongPasswordShown && r.wrongPasswordCleared && r.editVisible && r.autosaveLanded &&
     r.diskStillEncrypted && r.diskDecryptsWithPassword === true && r.diskRejectsWrongPassword && r.reopenAsksPassword && r.reopenHasEdit &&
     r.slidePreviewCacheEntries === 0
   return r
+}
+
+// O14b：带密码的 .doc/.xls/.ppt —— 只读打开，修改另存为同密码的 .docx/.xlsx/.pptx 副本，原文件不动
+async function checkLegacy(src, password) {
+  const ext = path.extname(src).slice(1), target = { doc: 'docx', xls: 'xlsx', ppt: 'pptx' }[ext]
+  const name = 'locked-' + path.basename(src)
+  const file = path.join(home, 'docs', name)
+  const copyName = name.replace(/\.[^.]+$/, '.' + target)
+  const r = { name, kind: ext }
+  evidence.files.push(r)
+  const hash0 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  await primeTree(name)
+  await clickOpen(name)
+  await passwordBox(name)
+  r.promptShown = true
+  await enterPassword(name, password)
+  try {
+    await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+  } catch (error) {
+    r.stuck = await editor(name, e => ({ status: e.statusKey, code: e.openFailCode, pw: e.passwordState, failed: e.docLoadFailed, log: String(e.log || '').split('\n').filter(l => !/QObject|QRect/.test(l)).slice(-15) }))
+    throw error
+  }
+  const dirtySamples = []
+  for (let i = 0; i < 6; i++) { dirtySamples.push(await editor(name, e => e.dirty)); await sleep(500) }
+  r.notDirtyAfterOpen = dirtySamples.every(d => d === false)
+  r.readOnlyBar = await page.evaluate(() => [...document.querySelectorAll('.libre-legacy-copy')].some(e => e.getBoundingClientRect().width))
+  await page.screenshot({ path: path.join(run, ext + '-legacy-open.png') })
+  await dismissLogin()
+  await edit(name, target)
+  r.editVisible = await until(() => contentHasEdit(name, target), 20000, 500).then(() => true).catch(() => false)
+  await sleep(20000) // 足够触发一次自动保存——旧格式必须一笔都不写
+  r.originalUntouched = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') === hash0
+  r.dirtyKept = await editor(name, e => e.dirty === true)
+  const pt = await page.evaluate(() => { const el = [...document.querySelectorAll('.libre-legacy-copy')].find(e => e.getBoundingClientRect().width); if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 } })
+  await page.mouse.click(pt.x, pt.y)
+  // 副本在新标签打开、不再要密码
+  await page.waitForFunction((expr, n) => { const e = (0, eval)(expr)(n); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 200 }, editorExpr, copyName)
+  r.copyOpenedWithoutPrompt = await editor(copyName, e => !e.openFailCode)
+  await sleep(2000)
+  await page.screenshot({ path: path.join(run, ext + '-legacy-copy.png') })
+  r.copyHasEdit = await until(() => contentHasEdit(copyName, target), 20000, 500).then(() => true).catch(() => false)
+  const copyFile = path.join(home, 'docs', copyName)
+  r.copyEncrypted = isCfb(copyFile)
+  r.copyDecryptsWithPassword = await decryptedText(copyFile, password).then(t => t.includes(TYPED)).catch(e => 'error: ' + e.message)
+  r.copyMedia = await mediaOf(copyFile, password).catch(e => 'error: ' + e.message)
+  r.originalStillUntouched = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') === hash0
+  // 原标签的修改已带进副本：关闭不应再拦
+  await close(name)
+  await close(copyName)
+  log(name, JSON.stringify(r))
+  r.passed = r.notDirtyAfterOpen && r.readOnlyBar && r.editVisible && r.originalUntouched && r.dirtyKept && r.copyOpenedWithoutPrompt && r.copyHasEdit &&
+    r.copyEncrypted && r.copyDecryptsWithPassword === true && r.originalStillUntouched
+  return r
+}
+
+// 诊断：明文旧格式打开后是否被标脏 / 被自动保存改写（OFFICE_PASSWORD_PLAIN=逗号分隔的文件路径）
+async function checkPlain(src) {
+  const name = 'plain-' + path.basename(src), file = path.join(home, 'docs', name)
+  const r = { name, plainCheck: true }
+  evidence.files.push(r)
+  const hash0 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  await primeTree(name)
+  await clickOpen(name)
+  await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+  await page.evaluate((expr, name) => {
+    const e = (0, eval)(expr)(name); window.__dirtyTrace = []; let d = e.dirty
+    setInterval(() => { if (e.dirty !== d) { window.__dirtyTrace.push({ t: Date.now(), dirty: e.dirty }); d = e.dirty } }, 5)
+  }, editorExpr, name)
+  const { guest } = await findGuest(name)
+  const samples = []
+  for (let i = 0; i < 6; i++) { samples.push(await editor(name, e => e.dirty)); await sleep(500) }
+  r.dirtySamples = samples
+  const trace = await page.evaluate(() => window.__dirtyTrace)
+  if (trace.length) {
+    const t = trace[0].t
+    r.dirtyAt = trace
+    r.cmdsAround = (await guest.evaluate(() => window.__olbCmds)).filter(c => c.sent > t - 3000 && c.sent < t + 300).map(c => [c.action, Math.round(c.sent - t), c.done ? Math.round(c.done - t) : null])
+    r.eventsAround = (await guest.evaluate(() => window.__olbEvents)).filter(ev => ev.t > t - 1500 && ev.t < t + 300).map(ev => [ev.type, Math.round(ev.t - t)])
+  }
+  await sleep(20000)
+  r.fileRewritten = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== hash0
+  r.log = await editor(name, e => String(e.log || '').split('\n').filter(l => /modif|save|export|load_document|set_/i.test(l)).slice(-25))
+  await close(name).catch(() => {})
+  log(name, JSON.stringify(r))
+  r.passed = !r.fileRewritten
 }
 
 try {
@@ -383,10 +483,27 @@ try {
   const dir = path.join(home, 'docs'); fs.mkdirSync(dir)
   for (const key of profileDirs) fs.mkdirSync(path.join(run, 'seed-' + key), { recursive: true })
   for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx']) fs.copyFileSync(path.join(fixtures, f), path.join(dir, 'locked-' + f))
+  const LEGACY = [['rc4cryptoapi_password.xls', 'Password1234_'], ['contract.doc', 'awd-0414'], ['rc4cryptoapi_password.ppt', 'Password1234_']]
+  // OFFICE_PASSWORD_EXTRA=路径|密码,…：额外的本机样本（不入库，例如用户提供的真实加密演示文稿）
+  const EXTRA = (process.env.OFFICE_PASSWORD_EXTRA || '').split(',').filter(Boolean).map(x => x.split('|'))
+  for (const [f] of LEGACY) fs.copyFileSync(path.join(fixtures, 'legacy', f), path.join(dir, 'locked-' + f))
+  for (const [f] of EXTRA) fs.copyFileSync(f, path.join(dir, 'locked-' + path.basename(f)))
+  const PLAIN = process.env.OFFICE_PASSWORD_PLAIN ? process.env.OFFICE_PASSWORD_PLAIN.split(',') : []
+  for (const f of PLAIN) fs.copyFileSync(f, path.join(dir, 'plain-' + path.basename(f)))
   evidence.runtime = (await start('warmup')).versions
   await openFolder(dir)
-  for (const f of (process.env.OFFICE_PASSWORD_ONLY || 'flexmark-table.docx,case-ledger.xlsx,case-report.pptx').split(',')) {
+  const only = process.env.OFFICE_PASSWORD_ONLY ? process.env.OFFICE_PASSWORD_ONLY.split(',') : null
+  for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx'].filter(f => !only || only.includes(f))) {
     try { await checkFile(path.join(fixtures, f)) } catch (error) {
+      evidence.files.push({ name: f, error: error.stack })
+      log(f, 'failed', error.message)
+      await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})
+    }
+  }
+  for (const f of PLAIN) { try { await checkPlain(f) } catch (error) { evidence.files.push({ name: f, error: error.stack }); log(f, 'failed', error.message) } }
+  for (const [f, pw] of [...LEGACY.map(([f, pw]) => [path.join(fixtures, 'legacy', f), pw]), ...EXTRA]) {
+    if (only && !only.includes(path.basename(f))) continue
+    try { await checkLegacy(f, pw) } catch (error) {
       evidence.files.push({ name: f, error: error.stack })
       log(f, 'failed', error.message)
       await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})

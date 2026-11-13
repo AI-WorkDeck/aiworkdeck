@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Pratinjau hanya-baca juga tidak dapat merender berkas ini: {reason}",
     "downloadFailedToast": "Gagal mengunduh berkas asli: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "File format lama berkata sandi — hanya baca",
+    "edited": "Perubahan tidak disimpan ke file format lama",
+    "saveCopy": "Simpan sebagai .{ext} terlindungi dan buka",
+    "copying": "Menyimpan salinan…",
+    "copySaved": "Disimpan sebagai {name} (kata sandi sama)",
+    "copyFailed": "Gagal menyimpan salinan: {reason}",
+  },
   "retryLoad": "Mengalami kendala? Ketuk untuk mencoba lagi",
   "bootFailedHint": "Mesin dokumen gagal dimulai: {reason}. Jaringan atau firewall perusahaan mungkin memblokir berkas mesin; periksa koneksi dan coba lagi.",
   "review": {

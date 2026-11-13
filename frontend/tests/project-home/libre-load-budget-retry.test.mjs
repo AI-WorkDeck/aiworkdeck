@@ -28,18 +28,21 @@ function loadOptions() {
     .replace(/^import OfficeNavigation .*$/m, 'const OfficeNavigation = {}')
     .replace(/^import .*$/gm, '')
     .replace(/import\('@\/utils\/officeEncryption\.js'\)/g, '__officeEncryption()')
+    .replace(/import\('@\/utils\/legacyOfficeDecrypt\.js'\)/g, '__legacyDecrypt()')
     .replace(/export default \{/, 'return {')
-  const factory = new Function('__officeEncryption', ...Object.keys(barriers),
+  const factory = new Function('__officeEncryption', '__legacyDecrypt', 'createFile', 'getFileWriteUrl', ...Object.keys(barriers),
     'getFileBytesUrl', 'getCurrentUser', 'createRelayExecutor',
     'webviewTransport', 'iframeTransport', 'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar',
     'getAuthHeaders', 'host', 'classifyLoadFailure', 'shouldSelfHealLoadFailure',
     'createAuthorNameResolver', 'loadBudgetMs', 'openFailureOf', 'STATUS_OPEN_FAILED', 'DIAG_DOC_REJECTED', 'DIAG_DOC_ENCRYPTED', 'isEncryptedOoxml', body)
-  return factory(() => import('../../src/utils/officeEncryption.js'), ...Object.values(barriers), (id) => '/download/' + id, () => ({ name: '测试用户' }),
+  return factory(() => import('../../src/utils/officeEncryption.js'), () => import('../../src/utils/legacyOfficeDecrypt.js'),
+    (...args) => HARNESS.createFile(...args), (id) => '/upload/' + id, ...Object.values(barriers), (id) => '/download/' + id, () => ({ name: '测试用户' }),
     null, null, null, null, null, null, null,
     { zetaoffice: { getEditor: async () => ({ kind: 'iframe', url: 'about:blank' }) } },
     classifyLoadFailure, shouldSelfHealLoadFailure, createAuthorNameResolver,
     loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED, DIAG_DOC_REJECTED, DIAG_DOC_ENCRYPTED, isEncryptedOoxml)
 }
+const HARNESS = { createFile: async () => { throw new Error('createFile not stubbed') } }
 const OPTIONS = loadOptions()
 const METHODS = OPTIONS.methods
 const tick = () => new Promise((r) => setTimeout(r, 0))
@@ -137,8 +140,15 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   const { decryptOoxml } = await import('../../src/utils/officeEncryption.js')
   const encrypted = new Uint8Array(readFileSync(new URL('../lowa-e2e/fixtures/encrypted/case-ledger.xlsx', import.meta.url)))
   const plain = new Uint8Array(readFileSync(new URL('../../../scripts/eval/fixtures/case-ledger.xlsx', import.meta.url)))
-  const vm = makeVm(async (action) => action === 'load_document' ? { success: true, kind: 'calc' } : { success: true })
+  // 引擎在装载途中会发 modified（真机实测）：模拟它，刚解开的文档不得被标脏
+  const vm = makeVm(async (action, params) => {
+    if (action === 'load_document' && params.bytes && !vm.__modifiedOnce) { vm.__modifiedOnce = true; vm.onDocModified() }
+    return action === 'load_document' ? { success: true, kind: 'calc' } : { success: true }
+  })
   vm.file = { id: 7, name: '案件台账.xlsx', fileType: 'xlsx', fileSize: encrypted.length }
+  vm.dirty = false
+  for (const name of ['onDocModified', 'scheduleAutoSave']) vm[name] = METHODS[name].bind(vm)
+  vm.scheduleAnchorCheck = () => {}
   vm.passwordInput = ''
   vm.passwordState = ''
   vm.passwordAttempts = 0
@@ -164,6 +174,7 @@ test('设了打开密码（O14）：输对密码后引擎拿到明文；保存�
   assert.equal(vm.statusKey, 'ready')
   assert.equal(vm.docLoadFailed, false)
   assert.equal(vm.passwordInput, '', '密码提交后不留在组件里')
+  assert.equal(vm.dirty, false, '装载途中的 modified 不得把刚打开的文档标脏')
   assert.deepEqual(new Uint8Array(loads().at(-1).params.bytes), plain, '引擎拿到的是解开的明文')
 
   const sealed = await vm.sealForStorage(plain, 7)
@@ -264,4 +275,60 @@ test('宿主等待预算：引擎未就绪多算一段冷启动', () => {
   assert.equal(vm.loadWaitBudgetMs(), 30000)
   vm._endpointUp = false
   assert.equal(vm.loadWaitBudgetMs(), 120000)
+})
+
+test('带密码的旧格式（O14b）：输对密码后引擎拿到解开的 .xls，只读不保存；另存为同密码的 .xlsx 副本并交接会话', async () => {
+  const { decryptLegacyOffice } = await import('../../src/utils/legacyOfficeDecrypt.js')
+  const { decryptOoxml, takeHandedOffSession } = await import('../../src/utils/officeEncryption.js')
+  const encrypted = new Uint8Array(readFileSync(new URL('../lowa-e2e/fixtures/encrypted/legacy/rc4cryptoapi_password.xls', import.meta.url)))
+  const plainXls = await decryptLegacyOffice(encrypted, 'a.xls', 'Password1234_')
+  const exportedXlsx = new Uint8Array(readFileSync(new URL('../../../scripts/eval/fixtures/case-ledger.xlsx', import.meta.url)))
+  const vm = makeVm(async (action, params) => action === 'load_document' ? { success: true, kind: 'calc' }
+    : action === 'export_document' ? { success: true, bytes: exportedXlsx, name: params.name } : { success: true })
+  vm.file = { id: 21, parentId: 5, name: '旧台账.xls', fileType: 'xls', fileSize: encrypted.length }
+  Object.assign(vm, { passwordInput: '', passwordState: '', passwordAttempts: 0, legacyProtected: '', legacyCopyBusy: false, projectId: 3, dirty: false,
+    $t: (k, p) => k + (p ? JSON.stringify(p) : ''), stampGeneratorMetadata: async (u8) => u8 })
+  for (const name of ['submitPassword', 'sealForStorage', 'scheduleAutoSave', 'saveDocument', 'saveProtectedCopy']) vm[name] = METHODS[name].bind(vm)
+  vm._bytesPromise = Promise.resolve(encrypted.slice().buffer)
+  const loads = () => vm.calls.filter(c => c.action === 'load_document' && c.params.bytes)
+
+  await vm.finishDocLoad()
+  assert.equal(vm.openFailCode, DIAG_DOC_ENCRYPTED)
+  assert.equal(loads().length, 0, '密文不交给引擎')
+  await vm.submitPassword({ detail: { value: 'wrong' } })
+  assert.equal(vm.passwordState, 'wrong')
+  await vm.submitPassword({ detail: { value: 'Password1234_' } })
+  for (let i = 0; i < 50 && vm.statusKey !== 'ready'; i++) await tick()
+  assert.equal(vm.statusKey, 'ready')
+  assert.deepEqual(new Uint8Array(loads().at(-1).params.bytes), plainXls, '引擎拿到解开的旧格式')
+  assert.equal(vm.legacyProtected, 'xlsx')
+
+  // 只读：不排自动保存、saveDocument 直接拒绝、sealForStorage 绝不放行
+  vm._dirtySince = Date.now()
+  vm.scheduleAutoSave()
+  assert.equal(vm._saveTimer, undefined)
+  assert.equal(await vm.saveDocument(), false)
+  assert.equal(vm.calls.some(c => c.action === 'export_document'), false, '原 .xls 一个字节都不写')
+  await assert.rejects(vm.sealForStorage(exportedXlsx, 21))
+
+  // 另存副本：同目录、.xlsx、内容是同密码的加密包；会话交给副本，原标签不再算未保存
+  const uploads = [], created = []
+  HARNESS.createFile = async (projectId, parentId, name, fileType) => {
+    created.push({ projectId, parentId, name, fileType })
+    if (created.length === 1) throw new Error('A file with this name already exists')
+    return { id: 99, name }
+  }
+  vm.uploadBytes = async (url, bytes, name) => { uploads.push({ url, bytes, name }) }
+  globalThis.uni = { showToast() {}, $emit: (ev, p) => { (globalThis.__emits ||= []).push([ev, p]) } }
+  vm.dirty = true
+  assert.equal(await vm.saveProtectedCopy(), true)
+  assert.deepEqual(created.map(c => c.name), ['旧台账.xlsx', '旧台账 (1).xlsx'], '同名已存在就换名，不覆盖')
+  assert.equal(created[0].parentId, 5)
+  assert.equal(uploads.length, 1)
+  assert.equal(uploads[0].url, '/upload/99')
+  assert.deepEqual((await decryptOoxml(uploads[0].bytes, 'Password1234_')).plain, exportedXlsx, '副本用原密码能打开')
+  assert.equal(vm.dirty, false)
+  assert.ok(takeHandedOffSession(99), '副本的编辑器拿到会话，不再问密码')
+  assert.equal(takeHandedOffSession(99), null, '会话只交一次')
+  assert.deepEqual(globalThis.__emits.at(-1), ['awd:open-evidence-target', { fileId: 99 }])
 })

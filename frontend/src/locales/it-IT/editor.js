@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Anche l'anteprima di sola lettura non è riuscita a eseguire il rendering del file: {reason}",
     "downloadFailedToast": "Impossibile scaricare il file originale: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "File in formato precedente protetto da password — sola lettura",
+    "edited": "Le modifiche non vengono salvate nel file precedente",
+    "saveCopy": "Salva come .{ext} protetto e apri",
+    "copying": "Salvataggio della copia…",
+    "copySaved": "Salvato come {name} (stessa password)",
+    "copyFailed": "Impossibile salvare la copia: {reason}",
+  },
   "retryLoad": "Bloccato? Tocca per riprovare",
   "bootFailedHint": "Impossibile avviare il motore dei documenti: {reason}. La rete o un firewall aziendale potrebbe bloccare i file del motore; controlla la connessione e riprova.",
   "review": {

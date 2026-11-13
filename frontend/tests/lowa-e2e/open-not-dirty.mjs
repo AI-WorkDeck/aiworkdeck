@@ -33,6 +33,8 @@ try {
     { name: 'impress-smoke.pptx', bytes: read('./fixtures/impress-smoke.pptx') },
     // 原用 data/ 下的项目样本，data/ 已出库（泄露处置），改用入库的评测台账样本
     { name: 'case-ledger.xlsx', bytes: read('../../../scripts/eval/fixtures/case-ledger.xlsx') },
+    // 旧 .ppt 的形状天生没名字：get_ui_state 给它们起内部名曾把文档标成 modified，打开即被自动保存改写（O14b）
+    { name: 'plain.ppt', bytes: read('./fixtures/encrypted/legacy/plain.ppt'), impress: true },
   ]
   for (const doc of docs) {
     await ok('load_document', { name: doc.name, bytes: doc.bytes, authorName: '测试用户' })
@@ -51,6 +53,14 @@ try {
     const settled = await ok('debug_open_dirty')
     assert.equal(settled.posts, loaded.posts, doc.name + ': 只打开不得向宿主报 modified ' + JSON.stringify({ loaded, settled }))
     assert.equal(settled.modified, false, doc.name)
+    if (doc.impress) {
+      const shapes = (await ok('slide_get_page', { slideNumber: 1 })).shapes
+      assert.ok(shapes.length && shapes.every(sh => sh.name), doc.name + ': 形状仍拿到可定位的名字')
+      const shape = shapes.find(sh => typeof sh.text === 'string')
+      await ok('slide_set_shape_text', { slideNumber: 1, shapeName: shape.name, text: '真编辑' })
+      const edited = await ok('debug_open_dirty')
+      assert.ok(edited.posts > settled.posts && edited.modified, doc.name + ': 真编辑仍报 modified')
+    }
     if (doc.writer) {
       await ok('insert_at_cursor', { text: '真编辑' })
       const edited = await ok('debug_open_dirty')

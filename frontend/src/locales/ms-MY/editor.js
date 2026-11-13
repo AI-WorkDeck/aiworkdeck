@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Pratonton baca sahaja juga tidak dapat memaparkan fail ini: {reason}",
     "downloadFailedToast": "Gagal memuat turun fail asal: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Fail format lama berkata laluan — baca sahaja",
+    "edited": "Perubahan tidak disimpan ke fail format lama",
+    "saveCopy": "Simpan sebagai .{ext} dilindungi dan buka",
+    "copying": "Menyimpan salinan…",
+    "copySaved": "Disimpan sebagai {name} (kata laluan sama)",
+    "copyFailed": "Gagal menyimpan salinan: {reason}",
+  },
   "retryLoad": "Tersangkut? Ketik untuk cuba semula",
   "bootFailedHint": "Enjin dokumen gagal dimulakan: {reason}. Rangkaian atau tembok api korporat mungkin menyekat fail enjin; semak sambungan dan cuba lagi.",
   "review": {

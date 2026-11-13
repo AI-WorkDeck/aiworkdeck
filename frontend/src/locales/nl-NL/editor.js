@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Het alleen-lezen voorbeeld kon dit bestand ook niet weergeven: {reason}",
     "downloadFailedToast": "Downloaden van het originele bestand is mislukt: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Met wachtwoord beveiligd oud bestandsformaat — alleen-lezen",
+    "edited": "Wijzigingen worden niet in het oude bestand opgeslagen",
+    "saveCopy": "Opslaan als beveiligde .{ext} en openen",
+    "copying": "Kopie opslaan…",
+    "copySaved": "Opgeslagen als {name} (zelfde wachtwoord)",
+    "copyFailed": "Kopie kon niet worden opgeslagen: {reason}",
+  },
   "retryLoad": "Loopt het vast? Tik om opnieuw te proberen",
   "bootFailedHint": "De document-engine kon niet worden gestart: {reason}. Mogelijk blokkeert het netwerk of een bedrijfsfirewall de enginebestanden; controleer de verbinding en probeer het opnieuw.",
   "review": {

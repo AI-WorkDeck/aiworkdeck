@@ -150,6 +150,14 @@ export default {
     "previewFailed": "L’aperçu en lecture seule n’a pas non plus pu afficher ce fichier : {reason}",
     "downloadFailedToast": "Échec du téléchargement du fichier d’origine : {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Ancien format protégé par mot de passe — lecture seule",
+    "edited": "Les modifications ne sont pas enregistrées dans l’ancien fichier",
+    "saveCopy": "Enregistrer en .{ext} protégé et ouvrir",
+    "copying": "Enregistrement de la copie…",
+    "copySaved": "Enregistré sous {name} (même mot de passe)",
+    "copyFailed": "Impossible d’enregistrer la copie : {reason}",
+  },
   "retryLoad": "Bloqué ? Touchez pour réessayer",
   "bootFailedHint": "Le moteur de document n’a pas pu démarrer : {reason}. Le réseau ou un pare-feu d’entreprise bloque peut-être les fichiers du moteur ; vérifiez la connexion et réessayez.",
   "review": {

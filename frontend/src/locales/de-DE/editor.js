@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Auch die schreibgeschützte Vorschau konnte diese Datei nicht darstellen: {reason}",
     "downloadFailedToast": "Herunterladen der Originaldatei fehlgeschlagen: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Kennwortgeschützte Datei im alten Format – schreibgeschützt",
+    "edited": "Änderungen werden nicht in der alten Datei gespeichert",
+    "saveCopy": "Als geschützte .{ext} speichern und öffnen",
+    "copying": "Kopie wird gespeichert…",
+    "copySaved": "Gespeichert als {name} (gleiches Kennwort)",
+    "copyFailed": "Kopie konnte nicht gespeichert werden: {reason}",
+  },
   "retryLoad": "Hängt es? Zum Wiederholen tippen",
   "bootFailedHint": "Die Dokument-Engine konnte nicht gestartet werden: {reason}. Möglicherweise blockieren das Netzwerk oder eine Unternehmens-Firewall die Engine-Dateien; prüfen Sie die Verbindung und versuchen Sie es erneut.",
   "review": {

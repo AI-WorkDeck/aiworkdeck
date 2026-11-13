@@ -10,7 +10,10 @@ function source(start, end) {
   assert.ok(from >= 0 && to > from, `worker source boundaries: ${start}`)
   return worker.slice(from, to)
 }
-const namesSource = source('function ensureShapeNames(', '// 形状文字：')
+// 起名包在 withViewOnlyChange 里（O14b：起内部名不算用户编辑）；这里记录调用，真实现见 office_thread.js
+const viewOnlyCalls = []
+const namesSource = 'function withViewOnlyChange(fn) { globalThis.__viewOnlyCalls.push(1); return fn() }\n' + source('function ensureShapeNames(', '// 形状文字：')
+globalThis.__viewOnlyCalls = viewOnlyCalls
 const impressSource = source('function activeImpressContext(', 'function impressShapeDetail(')
 const calcSource = source('function activeCalcSelection(', 'function activeCalcRangeName(')
 const ensureNames = new Function(namesSource + '\nreturn ensureShapeNames;')()
@@ -322,3 +325,13 @@ for (const action of ['get_ui_state', 'get_formatting']) {
     assert.equal(result.character.color, '#123456')
   })
 }
+
+test('起内部名包在 withViewOnlyChange 里，全都有名字时不进（O14b：打开旧 .ppt 不得被标 modified）', () => {
+  viewOnlyCalls.length = 0
+  ensureNames(drawPage([shape('a'), shape('b')]))
+  assert.equal(viewOnlyCalls.length, 0)
+  const items = [shape('a'), shape('')]
+  ensureNames(drawPage(items))
+  assert.equal(viewOnlyCalls.length, 1)
+  assert.equal(items[1].name, '__awd_shape_0')
+})
