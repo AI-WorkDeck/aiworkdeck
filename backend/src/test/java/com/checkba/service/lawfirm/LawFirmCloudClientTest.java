@@ -287,6 +287,44 @@ class LawFirmCloudClientTest {
         assertEquals("他所客户有限公司", client(call(outsider, "clients.get", Map.of("partyId", id(outsiderClient)))).get("name"), "只删本所");
     }
 
+    @Test
+    void withdrawAlsoRemovesChainPartiesNoLongerLinkedToAnyClient() {
+        // 律师甲：华昌科技 ← 60% 华昌控股 ← 70% 林某（两层股权链）；华昌控股同时 30% 持股律师乙的客户
+        Map<String, Object> mine = createClient(lawyerA, "华昌科技有限公司");
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine), "relationType", "SHAREHOLDER", "direction", "IN",
+                "partyName", "华昌控股集团有限公司", "sharePercent", "60"));
+        long holdco = ((Number) ((List<Map<String, Object>>) client(call(lawyerA, "clients.get", Map.of("partyId", id(mine)))).get("network")).get(0).get("id")).longValue();
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine), "subjectPartyId", holdco, "relationType", "SHAREHOLDER",
+                "direction", "IN", "partyName", "林某", "partyType", "INDIVIDUAL", "sharePercent", "70"));
+        Map<String, Object> mine2 = createClient(lawyerA, "远航物流有限公司");
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine2), "relationType", "SHAREHOLDER", "direction", "IN",
+                "partyName", "远航实控人", "partyType", "INDIVIDUAL", "sharePercent", "90"));
+
+        // 只有律师甲的客户时，撤回后整条链都不留在云端
+        call(lawyerA, "clients.withdraw", Map.of("partyIds", List.of(id(mine2))));
+        Map<String, Object> w = call(lawyerA, "clients.withdraw", Map.of());
+        assertEquals(1, w.get("withdrawnClients"));
+        assertEquals(3, ((List<?>) w.get("removedIds")).size(), "客户、控股公司、自然人股东一起删除");
+        assertTrue(((List<?>) call(admin, "clients.searchParties", Map.of("query", "华昌")).get("parties")).isEmpty());
+        assertTrue(((List<?>) call(admin, "clients.searchParties", Map.of("query", "林某")).get("parties")).isEmpty());
+        assertTrue(((List<?>) call(admin, "clients.searchParties", Map.of("query", "远航")).get("parties")).isEmpty());
+
+        // 链上主体还连着别人的客户时保留（连同其上游）
+        mine = createClient(lawyerA, "华昌科技有限公司");
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine), "relationType", "SHAREHOLDER", "direction", "IN",
+                "partyName", "华昌控股集团有限公司", "sharePercent", "60"));
+        holdco = ((Number) ((List<Map<String, Object>>) client(call(lawyerA, "clients.get", Map.of("partyId", id(mine)))).get("network")).get(0).get("id")).longValue();
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine), "subjectPartyId", holdco, "relationType", "SHAREHOLDER",
+                "direction", "IN", "partyName", "林某", "partyType", "INDIVIDUAL", "sharePercent", "70"));
+        Map<String, Object> others = createClient(lawyerB, "乙律师的客户有限公司");
+        call(lawyerB, "clients.saveRelation", Map.of("clientId", id(others), "relationType", "SHAREHOLDER", "direction", "IN",
+                "partyName", "华昌控股集团有限公司", "sharePercent", "30"));
+        Map<String, Object> w2 = call(lawyerA, "clients.withdraw", Map.of());
+        assertEquals(List.of(id(mine)), ((List<?>) w2.get("removedIds")).stream().map(o -> ((Number) o).longValue()).toList());
+        assertEquals(2, ((List<?>) call(admin, "clients.searchParties", Map.of("query", "华昌控股")).get("parties")).size()
+                + ((List<?>) call(admin, "clients.searchParties", Map.of("query", "林某")).get("parties")).size());
+    }
+
     Map<String, Object> submission(String title) {
         return new HashMap<>(Map.of("requestId", UUID.randomUUID().toString(), "title", title, "clientName", "另一委托人有限公司",
                 "counterpartyName", "林海", "leadId", lawyerB, "committeeId", committee));

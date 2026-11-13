@@ -144,24 +144,44 @@ public class LawFirmCloudClientService implements LawFirmCloudFeature {
         Set<Long> removed = new LinkedHashSet<>();
         for (LawFirmCloudParty c : mine) removed.add(c.getId());
         List<LawFirmCloudRelation> rels = relations.findByFirmIdOrderByIdAsc(ctx.me.firmId());
+        Map<Long, LawFirmCloudParty> byId = new java.util.HashMap<>();
+        for (LawFirmCloudParty x : ctx.all()) byId.put(x.getId(), x);
+        // 撤回客户的关系网（经非客户主体延伸，到其他客户为止）；撤回后连不到任何剩余客户的非客户主体一并删除，
+        // 否则股东链上的自然人、控股公司会留在全所云端
+        Set<Long> network = reach(removed, rels, Set.of(), byId);
+        Set<Long> remainingClients = new java.util.HashSet<>();
+        for (LawFirmCloudParty x : ctx.all()) if (x.isClient() && !removed.contains(x.getId())) remainingClients.add(x.getId());
+        Set<Long> anchored = reach(remainingClients, rels, removed, byId);
+        List<LawFirmCloudParty> orphans = network.stream().map(byId::get)
+                .filter(x -> x != null && !x.isClient() && !anchored.contains(x.getId())).toList();
+        for (LawFirmCloudParty o : orphans) removed.add(o.getId());
         List<LawFirmCloudRelation> drop = rels.stream()
                 .filter(r -> removed.contains(r.getFromPartyId()) || removed.contains(r.getToPartyId())).toList();
-        Set<Long> stillLinked = new java.util.HashSet<>();
-        for (LawFirmCloudRelation r : rels) {
-            if (drop.contains(r)) continue;
-            stillLinked.add(r.getFromPartyId());
-            stillLinked.add(r.getToPartyId());
-        }
-        Set<Long> touched = new java.util.HashSet<>();
-        for (LawFirmCloudRelation r : drop) { touched.add(r.getFromPartyId()); touched.add(r.getToPartyId()); }
-        List<LawFirmCloudParty> orphans = ctx.all().stream()
-                .filter(x -> !x.isClient() && touched.contains(x.getId()) && !stillLinked.contains(x.getId())).toList();
-        for (LawFirmCloudParty o : orphans) removed.add(o.getId());
         relations.deleteAllInBatch(drop);
         parties.deleteAllInBatch(mine);
         parties.deleteAllInBatch(orphans);
         ctx.invalidate();
         return Map.of("withdrawnClients", mine.size(), "removedIds", List.copyOf(removed));
+    }
+
+    /** 从 start 出发沿关系（不分方向）可达的主体：只经过非客户主体延伸，跳过 excluded。 */
+    private static Set<Long> reach(Set<Long> start, List<LawFirmCloudRelation> rels, Set<Long> excluded, Map<Long, LawFirmCloudParty> byId) {
+        Map<Long, List<Long>> adj = new java.util.HashMap<>();
+        for (LawFirmCloudRelation r : rels) {
+            if (excluded.contains(r.getFromPartyId()) || excluded.contains(r.getToPartyId())) continue;
+            adj.computeIfAbsent(r.getFromPartyId(), k -> new ArrayList<>()).add(r.getToPartyId());
+            adj.computeIfAbsent(r.getToPartyId(), k -> new ArrayList<>()).add(r.getFromPartyId());
+        }
+        Set<Long> seen = new LinkedHashSet<>(start);
+        java.util.ArrayDeque<Long> queue = new java.util.ArrayDeque<>(start);
+        while (!queue.isEmpty()) {
+            for (Long n : adj.getOrDefault(queue.poll(), List.of())) {
+                if (!seen.add(n)) continue;
+                LawFirmCloudParty x = byId.get(n);
+                if (x != null && !x.isClient()) queue.add(n);
+            }
+        }
+        return seen;
     }
 
     /** 全所主体关系图（云端利冲用，不按查看人裁剪）；征询对象为客户维护人，没有则主办合伙人。 */
