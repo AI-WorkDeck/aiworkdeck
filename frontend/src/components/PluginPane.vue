@@ -695,6 +695,8 @@ export default {
             if (!res || res.code !== 0) {
               return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('律所管理服务请求失败', 'Law firm management service request failed') } }
             }
+            // 插件每次写入、加载样板或「刷新数据」后都会重读 overview：通知左栏摘要卡同步数字
+            if (action === 'overview' || action === 'seedDemo' || action === 'seedDemoData') uni.$emit('awd:lawfirm-data-changed')
             return { ok: true, result: res.data }
           } catch (e) {
             return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('律所管理服务请求失败', 'Law firm management service request failed') } }

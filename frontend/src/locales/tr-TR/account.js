@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "örn. Zhejiang Qinghe Foods Co., Ltd. Hukuk Müşavirliği ve İş Uyuşmazlığı",
   "caseFieldPracticeArea": "Uzmanlık Alanı",
   "caseFieldPracticeAreaPh": "örn. İstihdam / Hukuk Müşavirliği / Birleşme ve Devralma",
-  "caseFieldDepartment": "Uzmanlık alanı",
+  "caseFieldDepartment": "Uygulama grubu",
   "caseFieldDepartmentPh": "örn. Kurumsal ve Birleşme/Devralma",
   "caseFieldLeadLawyer": "Sorumlu Ortak / Avukat",
   "caseFieldLeadLawyerPh": "örn. Lin Zhiyuan",
