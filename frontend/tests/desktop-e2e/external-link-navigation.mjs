@@ -173,7 +173,7 @@ try {
   })
   const box = await link.boundingBox()
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
-  try { await until(() => readOpened().includes(LINK), 'openExternal called with the AI link', 10000) } finally { evidence.clickDiag = await page.evaluate(() => window.__s26.clicks).catch(e => String(e)) }
+  try { await until(() => readOpened().some(u => u === LINK), 'openExternal called with the AI link', 10000) } finally { evidence.clickDiag = await page.evaluate(() => window.__s26.clicks).catch(e => String(e)) }
   await sleep(1000)
   assert.equal(page.url(), appUrl, 'main window must stay on the app page')
   assert.equal(await page.evaluate(() => typeof window.checkbaDesktop), 'object')
@@ -189,7 +189,7 @@ try {
   }, BARE)
   const bare = await (await page.$('#s26-bare')).boundingBox()
   await page.mouse.click(bare.x + bare.width / 2, bare.y + bare.height / 2)
-  await until(() => readOpened().includes(BARE), 'main-process guard opened the bare link externally', 10000)
+  await until(() => readOpened().some(u => u === BARE), 'main-process guard opened the bare link externally', 10000)
   await sleep(1000)
   assert.equal(page.url(), appUrl)
   evidence.checks.push('Bare anchor (no renderer delegate): will-navigate blocked, opened externally')
