@@ -18,7 +18,9 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "account_binding",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"external_account_id"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"external_account_id"}),
+        // Avatar/account lookups by user (every IM message page) must not scan the table.
+        indexes = @Index(columnList = "user_id"))
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class AccountBinding {

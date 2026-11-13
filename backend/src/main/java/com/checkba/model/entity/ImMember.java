@@ -5,7 +5,7 @@ package com.checkba.model.entity;
 
 import jakarta.persistence.*;
 
-@Entity @Table(name="im_member", uniqueConstraints=@UniqueConstraint(columnNames={"conversation_id","user_id"})) @lombok.Data
+@Entity @Table(name="im_member", uniqueConstraints=@UniqueConstraint(columnNames={"conversation_id","user_id"}),indexes=@Index(columnList="user_id")) @lombok.Data
 public class ImMember {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @Column(name="conversation_id",nullable=false,length=36) private String conversationId;

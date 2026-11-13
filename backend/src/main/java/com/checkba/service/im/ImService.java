@@ -68,7 +68,8 @@ public class ImService {
     }
 
     private Object execute(Long userId, String action, Map<String, Object> params, boolean unlocked) {
-        if (userId == null || !users.existsById(userId)) throw bad("请先登录");
+        // Loaded, not just counted: the caller's row is read again later (name, client status) and then comes from the session.
+        if (userId == null || users.findById(userId).isEmpty()) throw bad("请先登录");
         Map<String,Object> p = params == null ? Map.of() : params;
         if (!ACTIONS.contains(action)) throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
         if ("self".equals(action)) return Map.of("id", userId, "displayName", displayName(userId));
@@ -229,10 +230,12 @@ public class ImService {
         List<ImMessage> rows = new ArrayList<>(page.getContent());
         rows.sort(Comparator.comparing(ImMessage::getId));
         Map<String,Object> result = new LinkedHashMap<>();
-        result.put("messages", rows.stream().map(m -> messageView(m, me)).toList()); result.put("hasMore", page.hasNext());
+        boolean client = client(me);
+        result.put("messages", messageViews(rows, me, client)); result.put("hasMore", page.hasNext());
         Map<String,Object> agentStatus = c.getAgentScope() == null ? null : agentService().status(c.getId());
         if (agentStatus != null && agentStatus.get("messageId") instanceof Number source && source.longValue() <= floor) agentStatus = null;
         result.put("agentStatus", agentStatus);
+        result.put("revision", revision(c, me, client));
         return result;
     }
 
@@ -326,6 +329,7 @@ public class ImService {
         ImAttachment file = requireAttachment(c.getId(), required(p, "attachmentId", 36));
         if (!canManage(me, file.getUploadedBy())) throw bad(fileUnavailable());
         file.setClientVisible(visible); attachments.save(file);
+        c.setAccessRevision(c.getAccessRevision() == null ? 1 : c.getAccessRevision() + 1); conversations.save(c);
         return attachmentView(file, me);
     }
 
@@ -383,35 +387,58 @@ public class ImService {
         }
         return result;
     }
+    /**
+     * What lets a poller skip re-reading a page it already has: it changes whenever a message already shown could render
+     * differently for this viewer (an attachment's client access was toggled, or the viewer's role or client status
+     * changed). New messages are what {@code afterId} finds. Sender names and avatars are not covered.
+     */
+    private static String revision(ImConversation c, ImMember me, boolean client) {
+        return (c.getAccessRevision() == null ? 0 : c.getAccessRevision()) + ":" + me.getRole() + ":" + (client ? "client" : "staff");
+    }
     private Map<String,Object> messageView(ImMessage m, ImMember me) {
-        Map<String,Object> result = new LinkedHashMap<>(); result.put("id", m.getId()); result.put("uid", m.getUid());
-        result.put("clientMessageId", m.getClientMessageId()); result.put("senderId", m.getSenderId());
-        boolean agent = "AGENT".equals(m.getActorType()); result.put("actorType", agent ? "AGENT" : "HUMAN");
-        result.put("senderName", agent ? m.getAgentName() : displayName(m.getSenderId()));
-        if (agent) result.put("agentName", m.getAgentName());
-        else users.findById(m.getSenderId()).map(user -> projectPermissions == null ? user.getAvatarUrl() : projectPermissions.avatarUrlFor(user)).filter(url -> !url.isBlank()).ifPresent(url -> result.put("senderAvatarUrl", url));
-        result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
-        if (m.getAttachmentId() != null) {
-            // Fetch only metadata: a page of 100 messages must not hydrate 100 attachment blobs.
-            var metadata = attachments.metadata(m.getAttachmentId(), m.getConversationId());
-            if (!metadata.isEmpty()) {
-                Object[] a = metadata.get(0);
-                result.put("attachment", attachmentView((String)a[0], (String)a[1], ((Number)a[2]).longValue(),
-                        (String)a[3], (Long)a[4], Boolean.TRUE.equals(a[5]), (String)a[6], (String)a[7], me));
-            }
+        return messageViews(List.of(m), me, m.getAttachmentId() != null && client(me)).get(0);
+    }
+    /** One statement each for the senders, their avatars and the attachment metadata, however long the page. */
+    private List<Map<String,Object>> messageViews(List<ImMessage> rows, ImMember me, boolean client) {
+        Set<Long> senderIds = new HashSet<>(); Set<String> attachmentIds = new HashSet<>();
+        for (ImMessage m : rows) {
+            if (!"AGENT".equals(m.getActorType())) senderIds.add(m.getSenderId());
+            if (m.getAttachmentId() != null) attachmentIds.add(m.getAttachmentId());
         }
-        return result;
+        Map<Long,User> senders = new HashMap<>();
+        if (!senderIds.isEmpty()) for (User user : users.findAllById(senderIds)) senders.put(user.getId(), user);
+        Map<Long,String> avatars = new HashMap<>();
+        if (projectPermissions != null) avatars.putAll(projectPermissions.avatarUrlsFor(senders.values()));
+        else for (User user : senders.values()) if (user.getAvatarUrl() != null) avatars.put(user.getId(), user.getAvatarUrl());
+        // Fetch only metadata: a page of 100 messages must not hydrate 100 attachment blobs.
+        Map<String,Object[]> files = new HashMap<>();
+        if (!attachmentIds.isEmpty()) for (Object[] a : attachments.metadataIn(me.getConversationId(), attachmentIds)) files.put((String)a[0], a);
+        List<Map<String,Object>> views = new ArrayList<>(rows.size());
+        for (ImMessage m : rows) {
+            Map<String,Object> result = new LinkedHashMap<>(); result.put("id", m.getId()); result.put("uid", m.getUid());
+            result.put("clientMessageId", m.getClientMessageId()); result.put("senderId", m.getSenderId());
+            boolean agent = "AGENT".equals(m.getActorType()); result.put("actorType", agent ? "AGENT" : "HUMAN");
+            result.put("senderName", agent ? m.getAgentName() : displayName(senders.get(m.getSenderId())));
+            if (agent) result.put("agentName", m.getAgentName());
+            else Optional.ofNullable(avatars.get(m.getSenderId())).filter(url -> !url.isBlank()).ifPresent(url -> result.put("senderAvatarUrl", url));
+            result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
+            Object[] a = m.getAttachmentId() == null || !m.getConversationId().equals(me.getConversationId()) ? null : files.get(m.getAttachmentId());
+            if (a != null) result.put("attachment", attachmentView((String)a[0], (String)a[1], ((Number)a[2]).longValue(),
+                    (String)a[3], (Long)a[4], Boolean.TRUE.equals(a[5]), (String)a[6], (String)a[7], me, client));
+            views.add(result);
+        }
+        return views;
     }
     private Map<String,Object> attachmentView(ImAttachment a, ImMember me) {
         return attachmentView(a.getId(), a.getName(), a.getSize(), a.getSha256(), a.getUploadedBy(), a.isClientVisible(),
-                a.getSourceProjectUid(), a.getSourceFileUid(), me);
+                a.getSourceProjectUid(), a.getSourceFileUid(), me, client(me));
     }
     private Map<String,Object> attachmentView(String id, String name, long size, String sha256, Long uploadedBy,
-                                               boolean clientVisible, String projectUid, String fileUid, ImMember me) {
-        if (!canRead(me, uploadedBy, clientVisible)) return Map.of("id", id, "available", false, "message", fileUnavailable());
+                                               boolean clientVisible, String projectUid, String fileUid, ImMember me, boolean client) {
+        if (!canRead(me, client, uploadedBy, clientVisible)) return Map.of("id", id, "available", false, "message", fileUnavailable());
         Map<String,Object> result = new LinkedHashMap<>(); result.put("id", id); result.put("name", name);
         result.put("size", size); result.put("sha256", sha256); result.put("available", true);
-        result.put("clientVisible", clientVisible); result.put("canManageAccess", canManage(me, uploadedBy));
+        result.put("clientVisible", clientVisible); result.put("canManageAccess", canManage(me, client, uploadedBy));
         if (projectUid != null && fileUid != null) result.put("source", Map.of("projectUid", projectUid, "fileUid", fileUid));
         return result;
     }
@@ -423,18 +450,21 @@ public class ImService {
                 || conversations.findById(me.getConversationId()).map(c -> c.getProjectId() != null ? c.getProjectId() : c.getAgentProjectId())
                     .map(projectId -> projectPermissions == null || projectPermissions.isClient(projectId, me.getUserId())).orElse(false);
     }
-    private boolean canRead(ImMember me, Long uploadedBy, boolean clientVisible) {
-        return !client(me) || me.getUserId().equals(uploadedBy) || clientVisible;
+    private boolean canRead(ImMember me, Long uploadedBy, boolean clientVisible) { return canRead(me, client(me), uploadedBy, clientVisible); }
+    private static boolean canRead(ImMember me, boolean client, Long uploadedBy, boolean clientVisible) {
+        return !client || me.getUserId().equals(uploadedBy) || clientVisible;
     }
-    private boolean canManage(ImMember me, Long uploadedBy) {
-        return !client(me) && ("OWNER".equals(me.getRole()) || me.getUserId().equals(uploadedBy));
+    private boolean canManage(ImMember me, Long uploadedBy) { return canManage(me, client(me), uploadedBy); }
+    private static boolean canManage(ImMember me, boolean client, Long uploadedBy) {
+        return !client && ("OWNER".equals(me.getRole()) || me.getUserId().equals(uploadedBy));
     }
     private static String sourceUid(Object value) {
         if (!(value instanceof String raw) || !raw.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
             throw bad(com.checkba.service.LangText.of("文件来源编号无效", "Invalid file source ID"));
         return UUID.fromString(raw).toString();
     }
-    private String displayName(Long userId) { return users.findById(userId).map(User::getDisplayName).filter(s -> !s.isBlank()).orElse(com.checkba.service.LangText.of("用户", "User")); }
+    private String displayName(Long userId) { return displayName(users.findById(userId).orElse(null)); }
+    private static String displayName(User user) { return Optional.ofNullable(user).map(User::getDisplayName).filter(s -> !s.isBlank()).orElse(com.checkba.service.LangText.of("用户", "User")); }
     static String safeName(String name) {
         String clean = name.replace('\\', '/'); clean = clean.substring(clean.lastIndexOf('/') + 1);
         clean = clean.replaceAll("[\\p{Cntrl}<>:\"|?*]", "_");

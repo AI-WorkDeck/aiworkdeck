@@ -165,7 +165,7 @@ class ImAgentServiceTest {
         when(model.generate(any(ChatMessage[].class))).thenAnswer(call -> {projectAccess.remove(projectId+":"+owner);return Response.from(AiMessage.from("不得送达"));});
         long source=send(owner,id,"私聊问题"); reply(owner,id,source); jobs.remove().run();
         assertEquals("failed",turns.findById(source).orElseThrow().getStatus());
-        assertEquals(1,messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(id,0,org.springframework.data.domain.PageRequest.of(0,100)).getTotalElements());
+        assertEquals(1,messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(id,0,org.springframework.data.domain.PageRequest.of(0,100)).getNumberOfElements());
     }
 
     @Test void boundPrivateDowngradeWhileQueuedNeverCallsModel() {
@@ -300,7 +300,7 @@ class ImAgentServiceTest {
         when(model.generate(any(ChatMessage[].class))).thenAnswer(call -> {prompt.set(Arrays.toString(call.getArguments()));allowed.remove(owner);return Response.from(AiMessage.from("不应送达"));});
         long source=send(owner,id,"本团队怎么协作");reply(owner,id,source);jobs.remove().run();
         assertEquals("failed",turns.findById(source).orElseThrow().getStatus());assertTrue(prompt.get().contains("本团队共享约定"));
-        assertEquals(1,messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(id,0,org.springframework.data.domain.PageRequest.of(0,100)).getTotalElements());
+        assertEquals(1,messages.findByConversationIdAndIdGreaterThanOrderByIdAsc(id,0,org.springframework.data.domain.PageRequest.of(0,100)).getNumberOfElements());
         verify(memory).read(owner,team,MemoryDocumentService.INDEX_PATH);
     }
 

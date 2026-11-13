@@ -22,4 +22,6 @@ public class ImConversation {
  @Column(unique=true) private Long projectId;
  /** Verified cloud project association for a private assistant; never a desktop-local ID. */
  private Long agentProjectId;
+ /** Bumped (under the row lock) whenever an existing message's attachment access changes. Null = never changed. */
+ @Column(name="access_revision") private Long accessRevision;
 }

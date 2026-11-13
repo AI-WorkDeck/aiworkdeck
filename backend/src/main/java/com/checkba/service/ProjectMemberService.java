@@ -3,6 +3,7 @@
 
 package com.checkba.service;
 
+import com.checkba.model.entity.AccountBinding;
 import com.checkba.model.entity.Project;
 import com.checkba.model.entity.ProjectMember;
 import com.checkba.model.entity.User;
@@ -23,8 +24,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -370,6 +375,26 @@ public class ProjectMemberService {
         return accountBindingRepository.findByUserId(user.getId())
                 .map(b -> trimTrailingSlash(accountBaseUrl) + "/api/avatar/" + b.getExternalAccountId())
                 .orElse(null);
+    }
+
+    /**
+     * {@link #avatarUrlFor} 的批量版：一页消息的发送者一次查完绑定表（每 3 秒轮询一次，逐人查是 N+1）。
+     * 没有头像的人不出现在结果里。
+     */
+    public Map<Long, String> avatarUrlsFor(Collection<User> users) {
+        Map<Long, String> result = new HashMap<>();
+        List<Long> unbound = new ArrayList<>();
+        for (User user : users) {
+            if (user.getAvatarUrl() != null && !user.getAvatarUrl().isBlank()) result.put(user.getId(), user.getAvatarUrl());
+            else unbound.add(user.getId());
+        }
+        if (unbound.isEmpty() || accountBindingRepository == null || accountBaseUrl == null || accountBaseUrl.isBlank()) {
+            return result;
+        }
+        for (AccountBinding binding : accountBindingRepository.findByUserIdIn(unbound)) {
+            result.putIfAbsent(binding.getUserId(), trimTrailingSlash(accountBaseUrl) + "/api/avatar/" + binding.getExternalAccountId());
+        }
+        return result;
     }
 
     /**
