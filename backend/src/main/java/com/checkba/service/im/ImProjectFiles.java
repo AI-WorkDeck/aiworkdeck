@@ -69,11 +69,34 @@ public class ImProjectFiles implements ImProjectActionHandler {
         return uid;
     }
 
+    /**
+     * Listing assistants runs whenever the message center or the chat panel opens, so it must not write
+     * into the user's project. It reports the identity that {@link #ensureIdentity} would record; the
+     * marker file is written only once the user actually opens the project assistant or links a chat.
+     */
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public String previewIdentity(Long userId, Long projectId, String accountScope) {
+        if (userId == null || projectId == null || !access.hasReadPermission(projectId, userId))
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("没有当前项目的访问权限", "You do not have access to the current project"));
+        gateway.assertAccountScope(accountScope);
+        var identityFile = files.findByRelativePath(projectId, "项目沟通/项目标识.json");
+        if (identityFile.isPresent()) return uuid(parse(read(identityFile.get(), 64 * 1024)).get("projectUid"));
+        requireIdentityWriter(userId, projectId);
+        var project = projects.findById(projectId).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("项目不存在", "Project not found")));
+        String uid = catalog.ensureProjectUid(project);
+        gateway.assertAccountScope(accountScope);
+        return uid;
+    }
+
+    private void requireIdentityWriter(Long userId, Long projectId) {
+        if (!access.hasWritePermission(projectId, userId) || fileAccess.isClient(projectId, userId))
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("请先由项目内部成员打开项目沟通，建立项目标识", "Please ask an internal project member to open Project IM first to initialize the project identity"));
+    }
+
     private String identity(Long userId, Long projectId, String accountScope) {
         var identityFile = files.findByRelativePath(projectId, "项目沟通/项目标识.json");
         if (identityFile.isPresent()) return uuid(parse(read(identityFile.get(), 64 * 1024)).get("projectUid"));
-        if (!access.hasWritePermission(projectId, userId) || fileAccess.isClient(projectId, userId))
-            throw new IllegalArgumentException(com.checkba.service.LangText.of("请先由项目内部成员打开项目沟通，建立项目标识", "Please ask an internal project member to open Project IM first to initialize the project identity"));
+        requireIdentityWriter(userId, projectId);
         var project = projects.findById(projectId).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("项目不存在", "Project not found")));
         String uid = catalog.ensureProjectUid(project);
         writeJson(accountScope, projectId, userId, "项目沟通", "项目标识.json", Map.of("schemaVersion", 1, "projectUid", uid));

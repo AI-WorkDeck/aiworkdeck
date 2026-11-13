@@ -37,6 +37,7 @@ export default {
   looseFilesOpenFile: 'Open File…',
   looseFilesOpenFolder: 'Open Folder…',
   mobileBackup: {
+    "undecided": "Decision needed",
     "cleanupDeadline": "Pay the outstanding balance by {time} to avoid cloud content deletion. Local files are unaffected.",
     "billingSummary": "Amount due: {debt}; available credit: {available}.",
     "manageBilling": "Account and billing",

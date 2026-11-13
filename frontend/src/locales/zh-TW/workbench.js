@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "打開文件…",
   "looseFilesOpenFolder": "打開文件夾…",
   "mobileBackup": {
+    "undecided": "待選擇",
     "cleanupDeadline": "請於 {time} 前付清欠款，否則將清理雲端內容，本機檔案不受影響。",
     "billingSummary": "欠款：{debt}；可用授信：{available}。",
     "manageBilling": "帳戶與計費",

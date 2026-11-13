@@ -171,7 +171,9 @@ public class ImService {
         String role = required(p, "role", 16);
         if (!Set.of("MEMBER", "CLIENT").contains(role)) throw bad(com.checkba.service.LangText.of("邀请角色无效", "Invalid invitation role"));
         if (p.containsKey("shareHistory") && !(p.get("shareHistory") instanceof Boolean)) throw bad(com.checkba.service.LangText.of("shareHistory必须为布尔值", "shareHistory must be a boolean"));
-        boolean shareHistory = Boolean.TRUE.equals(p.get("shareHistory"));
+        // Earlier messages open only through an explicit client invitation; a member code never carries
+        // that choice, so a client account redeeming it stays limited to messages after joining.
+        boolean shareHistory = "CLIENT".equals(role) && Boolean.TRUE.equals(p.get("shareHistory"));
         // A fresh invitation replaces outstanding codes, limiting stale invitations and storage growth.
         invitations.deleteByConversationIdAndIssuedBy(c.getId(), me.getUserId());
         byte[] entropy = new byte[24]; new SecureRandom().nextBytes(entropy);
@@ -198,7 +200,8 @@ public class ImService {
         if (size >= ("DIRECT".equals(c.getType()) ? 2 : 100)) throw bad(com.checkba.service.LangText.of("会话人数已满", "Conversation has reached its member limit"));
         invite.setUsedAt(Instant.now()); invitations.save(invite);
         ImMember member = addMember(c.getId(), userId, invite.getRole());
-        return view(c, Boolean.TRUE.equals(invite.getShareHistory()) ? member : limitClientHistory(member));
+        boolean shareHistory = "CLIENT".equals(invite.getRole()) && Boolean.TRUE.equals(invite.getShareHistory());
+        return view(c, shareHistory ? member : limitClientHistory(member));
     }
 
     private Object remove(ImConversation c, ImMember me, long targetId) {

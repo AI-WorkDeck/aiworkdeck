@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "फ़ाइल खोलें…",
   "looseFilesOpenFolder": "फ़ोल्डर खोलें…",
   "mobileBackup": {
+    "undecided": "निर्णय बाकी",
     "cleanupDeadline": "क्लाउड सामग्री हटने से बचाने के लिए {time} तक पूरा बकाया चुकाएँ। स्थानीय फ़ाइलें प्रभावित नहीं होंगी।",
     "billingSummary": "बकाया: {debt}; उपलब्ध क्रेडिट: {available}।",
     "manageBilling": "खाता और बिलिंग",

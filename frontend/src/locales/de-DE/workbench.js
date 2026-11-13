@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Datei öffnen…",
   "looseFilesOpenFolder": "Ordner öffnen…",
   "mobileBackup": {
+    "undecided": "Entscheidung offen",
     "cleanupDeadline": "Begleichen Sie den offenen Betrag bis {time}, um die Löschung der Cloud-Inhalte zu vermeiden. Lokale Dateien bleiben unverändert.",
     "billingSummary": "Offener Betrag: {debt}; verfügbarer Kredit: {available}.",
     "manageBilling": "Konto und Abrechnung",

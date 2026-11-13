@@ -30,6 +30,7 @@ class ImScopedAgentHostTest {
         when(projects.findById(2L)).thenReturn(Optional.of(project));
         when(projectFiles.ensureIdentity(7L, 2L, "qa-account")).thenReturn(uid);
         when(projectFiles.readIdentity(7L, 2L, "qa-account")).thenReturn(uid);
+        when(projectFiles.previewIdentity(7L, 2L, "qa-account")).thenReturn(uid);
         when(gateway.captureAccountScope()).thenReturn("qa-account");
         when(gateway.executeWithinScope(eq(7L),eq("qa-account"),eq("ensureAgent"),anyMap())).thenReturn(Map.of("id","private-chat"));
     }
@@ -126,11 +127,13 @@ class ImScopedAgentHostTest {
         assertEquals(2, agents.size());
         assertEquals(uid, ((Map<?, ?>) agents.get(0)).get("scopeKey"));
         assertEquals(team, agents.get(1));
+        // Opening the message center or the chat panel lists assistants; that must not write into the project.
+        verify(projectFiles, never()).ensureIdentity(any(), any(), any());
     }
     @Test void unavailableProjectIdentityDoesNotHideAuthorizedTeamAssistant() {
         var team = Map.of("scope", "team", "scopeKey", "team:qa", "name", "团队助手");
         when(gateway.executeWithinScope(7L, "qa-account", "agentScopes", Map.of())).thenReturn(Map.of("agents", List.of(team)));
-        when(projectFiles.ensureIdentity(7L, 2L, "qa-account")).thenThrow(new IllegalArgumentException("readonly"));
+        when(projectFiles.previewIdentity(7L, 2L, "qa-account")).thenThrow(new IllegalArgumentException("readonly"));
         var result = (Map<?, ?>) host.execute(7L, 2L, "agentScopes", Map.of());
         assertEquals(List.of(team), result.get("agents"));
         assertNotNull(result.get("projectReason"));

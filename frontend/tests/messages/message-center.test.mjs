@@ -18,7 +18,7 @@ const script = source.script.content.replace(/^import .*$/gm, '').replace('expor
 const tick = async () => { await new Promise(resolve => setImmediate(resolve)); await Vue.nextTick() }
 const deferred = () => { let resolve, reject; const promise = new Promise((yes,no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const conv = (extra = {}) => ({id:'c1',title:'测试项目群',type:'GROUP',role:'OWNER',unreadCount:2,...extra})
-async function mount(t, { conversations = [conv()], notices = [], override, selfId = 7, projectId = null, inviteProject = null, activeFileIds = [] } = {}) {
+async function mount(t, { conversations = [conv()], notices = [], override, selfId = 7, projectId = null, inviteProject = null, activeFileIds = [], openProjects = null, openTarget = null } = {}) {
   let identity = 'account-one'; const calls = [], targets = [], events = new Map(), state = { messages: [], status: null, conversations, notices }
   const request = async (action, params, project) => {
     calls.push({action,params:structuredClone(params),project})
@@ -40,7 +40,7 @@ async function mount(t, { conversations = [conv()], notices = [], override, self
   const uni = { $on(name,callback){events.set(name,callback)},$off(name){events.delete(name)},$emit(){} }
   const options = new Function('MessageConversationPane','messageCenterRequest','messageCenterIdentity','normalizeMessageTarget','requireAccount','ACCOUNT_CHANGED_EVENT','uni',script)(Child,request,()=>identity,normalizeMessageTarget,async()=>false,'account-changed',uni)
   let vm; const host=document.createElement('div');document.body.append(host)
-  const app=Vue.createApp({render:()=>Vue.h({...options,template:source.template.content},{currentProjectId:projectId,activeFileIds,inviteProject,openTarget:async(...args)=>targets.push(args),ref:value=>vm=value})})
+  const app=Vue.createApp({render:()=>Vue.h({...options,template:source.template.content},{currentProjectId:projectId,activeFileIds,inviteProject,openProjects,openTarget:openTarget||(async(...args)=>targets.push(args)),ref:value=>vm=value})})
   app.config.globalProperties.$t=(key,args)=>{let result=zh[key.split('.').at(-1)]||key; for(const[k,v]of Object.entries(args||{}))result=result.replace(`{${k}}`,v);return result}
   app.mount(host);t.after(()=>{app.unmount();host.remove()});await tick();clearInterval(vm._poll)
   return {host,vm,calls,targets,state,accountChanged(){identity='account-two';events.get('account-changed')()},request}
@@ -177,4 +177,41 @@ test('private project replies pass current file ids and question only for the ma
  assert.deepEqual(reply.preferredFileIds,[71]);assert.equal(reply.question,'他是原告还是被告？')
  f.vm.selectedConversation.localProjectId=2;await f.vm.requestReply(f.vm.selectedConversation,10)
  assert.deepEqual(f.calls.filter(c=>c.params.action==='agentReply').at(-1).params.params.preferredFileIds,[])
+})
+test('QA D1: message-center invite never issues a code in one click; the lawyer picks member or client and the client history scope', async t => {
+ let echo=true
+ const f=await mount(t,{override:(action,p)=>p.action==='invite'?{code:'SYNTHETIC-CODE',expiresAt:'2026-11-13T08:00:00Z',...(echo?{shareHistory:p.params.shareHistory===true}:{})}:undefined})
+ await selectChat(f)
+ const inviteButton=()=>[...f.host.querySelectorAll('button')].find(b=>b.textContent==='邀请码')
+ const invites=()=>f.calls.filter(c=>c.params.action==='invite')
+ const form=()=>f.host.querySelector('form.invite-result')
+ const pick=(select,value)=>{select.value=value;select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))}
+ const submit=async()=>{form().dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await tick()}
+ inviteButton().click();await tick()
+ assert.equal(invites().length,0,'opening the invite form must not create a code')
+ const role=form().querySelector('select');assert.equal(role.value,'');assert.equal(form().querySelector('button.primary').disabled,true)
+ await submit();assert.equal(invites().length,0,'no role chosen, no code')
+ pick(role,'CLIENT');await tick()
+ const history=form().querySelectorAll('select')[1];assert.equal(history.value,'after');assert.match(form().textContent,/客户可看的消息范围/);assert.match(form().textContent,/24 小时内有效/)
+ await submit()
+ assert.deepEqual(invites().at(-1).params.params,{conversationId:'c1',role:'CLIENT',shareHistory:false})
+ assert.match(form().textContent,/SYNTHETIC-CODE/);assert.match(form().textContent,/只能看到入群之后的消息和文件/);assert.match(form().textContent,/AI WorkDeck 账号登录应用/);assert.doesNotMatch(form().textContent,/\{time\}|\{center\}/)
+ ;[...form().querySelectorAll('button')].find(b=>b.textContent==='完成').click();await tick();assert.equal(form(),null)
+ inviteButton().click();await tick();pick(form().querySelector('select'),'CLIENT');await tick();pick(form().querySelectorAll('select')[1],'all');await submit()
+ assert.equal(invites().at(-1).params.params.shareHistory,true);assert.match(form().textContent,/可同时查看此前的消息/)
+ ;[...form().querySelectorAll('button')].find(b=>b.textContent==='完成').click();await tick()
+ inviteButton().click();await tick();pick(form().querySelector('select'),'MEMBER');await tick();assert.equal(form().querySelectorAll('select').length,1);assert.match(form().textContent,/邀请客户请选择「客户」/);await submit()
+ assert.deepEqual(invites().at(-1).params.params,{conversationId:'c1',role:'MEMBER'});assert.match(form().textContent,/持码人可加入会话并查看此前的消息/)
+ // A service that ignores the history choice must not be described as limiting it.
+ echo=false;[...form().querySelectorAll('button')].find(b=>b.textContent==='完成').click();await tick()
+ inviteButton().click();await tick();pick(form().querySelector('select'),'CLIENT');await tick();await submit()
+ assert.match(form().textContent,/持码人可加入会话并查看此前的消息/);assert.doesNotMatch(form().textContent,/只能看到入群之后/)
+})
+test('QA D3: an installed project-scoped plugin without an open project offers to open a project instead of blaming the plugin', async t => {
+ const notice={id:'n1',title:'利冲待复核',sourceName:'律所管理',actionState:'pending',target:{kind:'plugin',pluginId:'lawfirm-management',view:'conflicts',recordId:'00000000-0000-4000-8000-000000000001'}}
+ const opened=[];const f=await mount(t,{notices:[notice],openProjects:()=>opened.push(1),openTarget:async()=>{throw Object.assign(new Error(zh.projectRequired),{projectRequired:true})}})
+ f.host.querySelectorAll('[role=tab]')[2].click();await tick();f.host.querySelector('.inbox-row').click();await tick()
+ f.host.querySelector('.notice-actions .primary').click();await tick()
+ assert.match(f.host.textContent,/请先打开一个项目/);assert.doesNotMatch(f.host.textContent,/尚未安装或启用/)
+ ;[...f.host.querySelectorAll('button')].find(b=>b.textContent===zh.openProjects).click();await tick();assert.equal(opened.length,1)
 })

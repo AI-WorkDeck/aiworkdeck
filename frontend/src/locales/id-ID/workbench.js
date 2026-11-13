@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Buka File…",
   "looseFilesOpenFolder": "Buka Folder…",
   "mobileBackup": {
+    "undecided": "Perlu keputusan",
     "cleanupDeadline": "Lunasi tagihan sebelum {time} agar konten cloud tidak dihapus. File lokal tidak terpengaruh.",
     "billingSummary": "Tagihan: {debt}; kredit tersedia: {available}.",
     "manageBilling": "Akun dan tagihan",

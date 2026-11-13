@@ -7,5 +7,6 @@
   "panel.historyAfterJoin": "Chỉ tin nhắn sau khi tham gia",
   "panel.historyWithEarlier": "Cả tin nhắn trước đó",
   "panel.inviteHintAfterJoin": "Khách hàng tham gia bằng mã này chỉ thấy tin nhắn và tệp được gửi sau khi tham gia. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}",
-  "panel.inviteHintWithHistory": "Khách hàng tham gia bằng mã này cũng đọc được các tin nhắn trước đó; tệp vẫn được mở từng tệp theo quyền truy cập. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}"
+  "panel.inviteHintWithHistory": "Khách hàng tham gia bằng mã này cũng đọc được các tin nhắn trước đó; tệp vẫn được mở từng tệp theo quyền truy cập. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}",
+  "panel.inviteJoinHow": "Người nhận đăng nhập ứng dụng AI WorkDeck bằng tài khoản của chính mình và nhập mã tại “Trung tâm tin nhắn → Hội thoại → Tham gia bằng mã mời” hoặc trong “Trò chuyện dự án → Tham gia bằng mã mời”. Cổng khách hàng không chấp nhận mã này."
 }

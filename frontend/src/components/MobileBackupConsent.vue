@@ -45,13 +45,14 @@ import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { accountPageUrl } from '@/utils/siteLinks.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 export default {
-  data: () => ({ state: null, open: false, saving: false, error: '', dismissedScope: '', epoch: 0, requestId: 0, stopped: false, timer: null }),
+  data: () => ({ state: null, open: false, saving: false, error: '', dismissedScope: '', epoch: 0, requestId: 0, stopped: false, timer: null, lastInputAt: 0 }),
   computed: {
     canWrite() {
       if (this.state?.cloudAccess != null) return this.state.cloudAccess.canWrite === true
       return this.state?.subscriptionActive === true
     },
     backupLabel() {
+      if (!this.state?.decided) return 'undecided'
       if (!this.state?.enabled) return 'disabled'
       if (this.state.objectBackup?.state === 'pending') return 'awaitingSync'
       if (this.state.objectBackup?.state === 'syncing') return 'syncing'
@@ -59,8 +60,19 @@ export default {
     },
   },
   watch: { open(value) { if (value) this.$nextTick(() => this.$refs.dialog?.focus()) } },
-  mounted() { window.addEventListener(ACCOUNT_CHANGED_EVENT, this.accountChanged); this.refresh() },
-  beforeUnmount() { this.stopped = true; this.epoch++; clearTimeout(this.timer); window.removeEventListener(ACCOUNT_CHANGED_EVENT, this.accountChanged) },
+  mounted() {
+    // Account changes are broadcast on the uni event bus (requireAccount.broadcastAccountChanged), not on window.
+    uni.$on(ACCOUNT_CHANGED_EVENT, this.accountChanged)
+    document.addEventListener('pointerdown', this.noteInput, true)
+    document.addEventListener('keydown', this.noteInput, true)
+    this.refresh({ prompt: true })
+  },
+  beforeUnmount() {
+    this.stopped = true; this.epoch++; clearTimeout(this.timer)
+    uni.$off(ACCOUNT_CHANGED_EVENT, this.accountChanged)
+    document.removeEventListener('pointerdown', this.noteInput, true)
+    document.removeEventListener('keydown', this.noteInput, true)
+  },
   methods: {
     money(value) {
       if (!Number.isFinite(value)) return '—'
@@ -79,10 +91,17 @@ export default {
       if (event.shiftKey && index <= 0) { event.preventDefault(); buttons.at(-1).focus() }
       else if (!event.shiftKey && (index < 0 || index === buttons.length - 1)) { event.preventDefault(); buttons[0].focus() }
     },
-    accountChanged() { this.epoch++; this.state = null; this.open = false; this.error = ''; this.saving = false; this.refresh() },
-    async refresh() {
+    noteInput(event) { if (!this.$refs.dialog?.contains(event.target)) this.lastInputAt = Date.now() },
+    accountChanged() { this.epoch++; this.state = null; this.open = false; this.error = ''; this.saving = false; this.refresh({ prompt: true }) },
+    /**
+     * Only the check that follows opening the workbench or signing in may ask on its own, and only
+     * if the user has not started doing something meanwhile. Background re-checks never pop the
+     * dialog over work in progress; an open decision stays visible as 「待选择」 in the status bar.
+     */
+    async refresh({ prompt = false } = {}) {
       clearTimeout(this.timer)
       if (this.saving) return
+      const startedAt = Date.now()
       const requestId = ++this.requestId
       const epoch = this.epoch
       try {
@@ -90,7 +109,7 @@ export default {
         if (this.stopped || epoch !== this.epoch || requestId !== this.requestId) return
         if (this.state?.accountScope && this.state.accountScope !== state.accountScope) { this.open = false; this.error = '' }
         this.state = state
-        if (state.available && !state.decided && this.dismissedScope !== state.accountScope) this.open = true
+        if (prompt && state.available && !state.decided && this.dismissedScope !== state.accountScope && this.lastInputAt < startedAt) this.open = true
         if (!state.available) this.open = false
       } catch (_) { /* Unavailable cloud must never block local work or imply consent. */ }
       finally { if (!this.stopped && epoch === this.epoch) this.timer = setTimeout(() => this.refresh(), 60000) }

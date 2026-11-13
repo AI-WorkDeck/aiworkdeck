@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "Buka Fail…",
   "looseFilesOpenFolder": "Buka Folder…",
   "mobileBackup": {
+    "undecided": "Perlu keputusan",
     "cleanupDeadline": "Jelaskan semua tunggakan sebelum {time} untuk mengelakkan kandungan awan dipadam. Fail setempat tidak terjejas.",
     "billingSummary": "Jumlah tertunggak: {debt}; kredit tersedia: {available}.",
     "manageBilling": "Akaun dan bil",

@@ -111,6 +111,7 @@ dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
 - `GET/PUT /api/mobile/backup-consent` 保存账户决定；PUT 必须显式传 enabled 和当前
   `consentVersion:2026-10-11`。旧行 nullable 字段默认关闭/未决定，不替用户同意。
   返回 `enabled/decided/subscriptionActive/consentVersion/cleanupPending`。
+  桌面 `MobileBackupConsent.vue` 只在工作台挂载与账户变化（uni 总线 `awd:account-changed`，不是 window 事件）后的那一次查询里、且用户此后没有点击/按键时自动弹出未决定的说明；60 秒后台复查从不自己弹窗，未决定时状态栏显示「文件云端备份 · 待选择」（QA D9，`frontend/tests/mobile-backup/prompt-timing.test.mjs`）。
 - 桌面 worker 定期查账户决定和订阅；同意后推 `/backup/manifest` 元数据（含空文件夹），
   仅为支持格式计算 SHA256、读取字节；`GET /backup/files?deviceId=&projectKey=` 对账，
   省略 projectKey 返回此设备全部备份，便于清理已删除项目。`PUT /backup/files` 是 query

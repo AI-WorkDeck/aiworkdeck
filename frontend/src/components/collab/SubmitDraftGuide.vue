@@ -200,7 +200,16 @@ export default {
     async refresh({ online = false } = {}) {
       let conflicted = false
       try {
-        const res = await getVersionStatus(this.projectId)
+        // Right after a commit the repository lock may still be held (ingest, idle merge, cloud fetch);
+        // /status then answers VERSION_BUSY. Retry that read only — a failed read must never repaint
+        // the checklist from the stale page snapshot (QA D10: step 1 came back after a commit).
+        let res
+        for (let attempt = 0; ; attempt++) {
+          try { res = await getVersionStatus(this.projectId); break } catch (e) {
+            if (e?.kind !== 'VERSION_BUSY' || attempt >= 9 || !this.visible) throw e
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          }
+        }
         const d = (res && res.data) || {}
         this.localWorking = !!d.working
         conflicted = !!(d.sessionEndConflict || d.cloudConflict || d.adoptConflict)
@@ -229,6 +238,9 @@ export default {
         const notice = (res && res.data && res.data.notice) || ''
         if (notice) uni.showToast({ title: notice, icon: 'none' })
         this.sessionName = ''
+        // The session has ended (a notice only means it produced no version). Keep that fact even if the
+        // status re-read below is refused, instead of showing 「结束本次工作」 as still to do.
+        this.localWorking = false
         await this.refresh()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || this.$t('version.endFailed'), icon: 'none' })

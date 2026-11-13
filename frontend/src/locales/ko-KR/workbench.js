@@ -36,6 +36,7 @@ export default {
   "looseFilesOpenFile": "파일 열기…",
   "looseFilesOpenFolder": "폴더 열기…",
   "mobileBackup": {
+    "undecided": "선택 필요",
     "cleanupDeadline": "클라우드 콘텐츠가 삭제되지 않도록 {time}까지 미납금을 전액 납부하세요. 로컬 파일은 영향을 받지 않습니다.",
     "billingSummary": "미납금: {debt}, 사용 가능한 신용 한도: {available}.",
     "manageBilling": "계정 및 결제",

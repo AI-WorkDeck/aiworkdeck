@@ -618,6 +618,8 @@
         box.append(node('p', client && typeof invite.shareHistory === 'boolean'
           ? t(invite.shareHistory ? 'inviteHintWithHistory' : 'inviteHintAfterJoin', { time: time(invite.expiresAt) })
           : '持码人可加入会话并查看历史消息。文件按访问权限开放，请仅交给预期成员。有效期至 ' + time(invite.expiresAt), 'hint'));
+        // 告诉律师对方在哪儿用这串码：要 AI WorkDeck 账号、在应用里输入，客户门户不收（QA D4）。
+        box.append(node('p', t('inviteJoinHow'), 'hint'));
         box.append(button('复制邀请码', async () => {
           input.focus(); input.select();
           try { await navigator.clipboard.writeText(invite.code); notice('邀请码已复制。'); }

@@ -28,6 +28,9 @@ public class ClientInvitationService {
     private final ProjectMemberService projectMemberService;
     private final LocalIdentityService localIdentityService;
     private final ProjectRemoteRepository remoteRepository;
+    /** Only consulted to explain a project-chat invitation code typed into the portal. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.repository.ImInvitationRepository chatInvitations;
 
     /**
      * 本机（local-mode）案卷还没放进案件库时拒绝签发访问码（dev-board#1039）。
@@ -313,9 +316,18 @@ public class ClientInvitationService {
         return code;
     }
 
+    private boolean isChatInvitationCode(String code) {
+        if (chatInvitations == null || code == null || code.isBlank() || code.length() > 64) return false;
+        return chatInvitations.existsById(com.checkba.service.im.ImService.sha(code.trim().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
     public ProjectInvitation validateCode(String code) {
         ProjectInvitation invitation = invitationRepository.findByAccessCode(code)
-                .orElseThrow(() -> new IllegalArgumentException(LangText.of("访问码无效", "Invalid access code")));
+                .orElseThrow(() -> isChatInvitationCode(code)
+                        ? new IllegalArgumentException(LangText.of(
+                                "这是项目沟通的群聊邀请码，不能在客户门户使用。请登录 AI WorkDeck 应用，在「消息中心 → 对话 → 邀请码加入」中输入。",
+                                "This is a project chat invitation code, not a client portal access code. Sign in to the AI WorkDeck app and enter it under Message Center → Conversations → Join with invite code."))
+                        : new IllegalArgumentException(LangText.of("访问码无效", "Invalid access code")));
         // 已作废的码必须在这里挡住：过了这一关 createClientUser 会无条件把持码人
         // 重新加成 CLIENT 成员，被移出的客户就自己回到项目里了。
         if (invitation.getRevokedAt() != null) {
