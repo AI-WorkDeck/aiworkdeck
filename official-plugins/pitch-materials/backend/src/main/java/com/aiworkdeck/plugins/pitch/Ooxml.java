@@ -217,7 +217,8 @@ final class Ooxml {
 
     /**
      * PPT 表格行数变了：表格框随之变高，原来在表格下方的形状一起下移（或上移），不压在表格上；
-     * 表格超出页面底部时先按比例压低行高（每行不低于 0.25 英寸），仍放不下就记一条提示交给律师处理。
+     * 页脚区（页面底部 12%）的形状不动。表格或被下推的形状会超出页面时，先按比例压低行高
+     * （每行不低于按文字估算的所需高度），仍放不下的由 checkFit 记提示交给律师处理。
      */
     private void reflow(Element tbl, long delta) {
         if (delta == 0) return;
@@ -229,25 +230,113 @@ final class Ooxml {
         long top = attr(off, "y");
         long oldCy = attr(ext, "cy");
         long bottom = top + oldCy;
-        long newCy = Math.max(0, oldCy + delta);
         long limit = slideCy > 0 ? slideCy * 94 / 100 : Long.MAX_VALUE;
-        if (top + newCy > limit) {
-            List<Element> rows = list(tbl, A, "tr");
-            long sum = rowHeights(tbl);
-            long target = Math.max(limit - top, rows.size() * MIN_ROW);
-            if (sum > target && sum > 0) {
-                for (Element tr : rows) tr.setAttribute("h", String.valueOf(Math.max(MIN_ROW, attr(tr, "h") * target / sum)));
-                newCy = rowHeights(tbl);
-            }
-            if (top + newCy > limit) overflow.add(slideNo);
-        }
-        ext.setAttribute("cy", String.valueOf(newCy));
-        long shift = newCy - oldCy;
+        long footer = slideCy > 0 ? slideCy * 88 / 100 : Long.MAX_VALUE;
+        List<Element> below = new ArrayList<>();
+        long belowBottom = bottom;
         for (Element shape : childElements(tree)) {
             if (shape == frame || !P.equals(shape.getNamespaceURI())) continue;
             Element o = first(shape, A, "off");
-            if (o == null) continue;
-            if (attr(o, "y") >= bottom - 12700) o.setAttribute("y", String.valueOf(Math.max(0, attr(o, "y") + shift)));
+            Element e = first(shape, A, "ext");
+            if (o == null || attr(o, "y") < bottom - 12700 || attr(o, "y") >= footer) continue;
+            below.add(o);
+            belowBottom = Math.max(belowBottom, attr(o, "y") + (e == null ? 0 : attr(e, "cy")));
+        }
+        long newCy = Math.max(0, oldCy + delta);
+        // 表格自身和被下推的形状都要留在页面里：算出表格最多能长到多高
+        long maxCy = Math.min(limit - top, oldCy + (limit - belowBottom));
+        if (newCy > maxCy) {
+            List<Element> rows = list(tbl, A, "tr");
+            long sum = rowHeights(tbl);
+            long target = Math.max(maxCy, rows.size() * MIN_ROW);
+            if (sum > target && sum > 0) {
+                for (Element tr : rows) tr.setAttribute("h", String.valueOf(Math.max(Math.max(MIN_ROW, rowNeed(tbl, tr)), attr(tr, "h") * target / sum)));
+                newCy = rowHeights(tbl);
+            }
+        }
+        ext.setAttribute("cy", String.valueOf(newCy));
+        long shift = newCy - oldCy;
+        for (Element o : below) o.setAttribute("y", String.valueOf(Math.max(0, attr(o, "y") + shift)));
+    }
+
+    // ------------------------------------------------------------------ 版面估算（PPT）
+    // JAR 里没有排版引擎，按字数、字号、框宽保守估算文字实际占用的高度：中日韩字符按一个字宽、其余按 0.6 个字宽，
+    // 行高取字号的 1.2 倍乘行距。只用于判断「会不会超出页面」，宁可多报，不可漏报。
+
+    private static final long EMU_PER_PT = 12700;
+    private static final int DEFAULT_SZ = 1800;
+
+    /** 一段文字在给定宽度里需要的高度（EMU）。 */
+    private static long paragraphHeight(Element p, long width) {
+        int sz = 0;
+        StringBuilder text = new StringBuilder();
+        for (Element t : texts(p, A)) text.append(t.getTextContent());
+        for (Element r : list(p, A, "rPr")) sz = Math.max(sz, (int) attr(r, "sz"));
+        Element end = first(p, A, "endParaRPr");
+        if (sz == 0 && end != null) sz = (int) attr(end, "sz");
+        if (sz == 0) {
+            Element def = first(p, A, "defRPr");
+            sz = def != null && attr(def, "sz") > 0 ? (int) attr(def, "sz") : DEFAULT_SZ;
+        }
+        double ptSize = sz / 100.0;
+        double units = 0;
+        for (int i = 0; i < text.length(); ) {
+            int cp = text.codePointAt(i);
+            units += Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN || (cp >= 0x3000 && cp <= 0x30FF) || (cp >= 0xFF00 && cp <= 0xFFEF) ? 1.0 : 0.6;
+            i += Character.charCount(cp);
+        }
+        double perLine = Math.max(1, width / (ptSize * EMU_PER_PT));
+        long lines = Math.max(1, (long) Math.ceil(units / perLine));
+        double spacing = 1.2;
+        Element spc = first(p, A, "spcPct");
+        if (spc != null && attr(spc, "val") > 0 && ancestor(spc, A, "lnSpc") != null) spacing = 1.2 * attr(spc, "val") / 100000.0;
+        return (long) Math.ceil(lines * ptSize * spacing * EMU_PER_PT);
+    }
+
+    /** 表格行按各单元格文字估算的最低所需高度。 */
+    private static long rowNeed(Element tbl, Element tr) {
+        List<Long> cols = new ArrayList<>();
+        for (Element g : list(tbl, A, "gridCol")) cols.add(attr(g, "w"));
+        long need = 0;
+        int col = 0;
+        for (Element tc : childElements(tr)) {
+            if (!"tc".equals(tc.getLocalName())) continue;
+            int span = tc.hasAttribute("gridSpan") ? (int) Math.max(1, attr(tc, "gridSpan")) : 1;
+            long width = 0;
+            for (int k = col; k < Math.min(cols.size(), col + span); k++) width += cols.get(k);
+            col += span;
+            Element pr = first(tc, A, "tcPr");
+            long insetX = (pr != null && pr.hasAttribute("marL") ? attr(pr, "marL") : 91440) + (pr != null && pr.hasAttribute("marR") ? attr(pr, "marR") : 91440);
+            long insetY = (pr != null && pr.hasAttribute("marT") ? attr(pr, "marT") : 45720) + (pr != null && pr.hasAttribute("marB") ? attr(pr, "marB") : 45720);
+            long h = insetY;
+            for (Element p : list(tc, A, "p")) h += paragraphHeight(p, Math.max(EMU_PER_PT, width - insetX));
+            need = Math.max(need, h);
+        }
+        return need;
+    }
+
+    /** 填完的幻灯片：表格或文本框按估算会伸出页面底部的，记一条提示。 */
+    private void checkFit(Element root) {
+        if (slideCy <= 0) return;
+        long limit = slideCy * 97 / 100;
+        for (Element tbl : list(root, A, "tbl")) {
+            Element frame = ancestor(tbl, P, "graphicFrame");
+            Element off = frame == null ? null : first(frame, A, "off");
+            if (off == null) continue;
+            long total = 0;
+            for (Element tr : list(tbl, A, "tr")) total += Math.max(attr(tr, "h"), rowNeed(tbl, tr));
+            if (attr(off, "y") + total > limit) overflow.add(slideNo);
+        }
+        for (Element sp : list(root, P, "sp")) {
+            Element body = first(sp, P, "txBody");
+            Element off = first(sp, A, "off");
+            Element ext = first(sp, A, "ext");
+            if (body == null || off == null || ext == null) continue;
+            Element bodyPr = first(body, A, "bodyPr");
+            long insetX = (bodyPr != null && bodyPr.hasAttribute("lIns") ? attr(bodyPr, "lIns") : 91440) + (bodyPr != null && bodyPr.hasAttribute("rIns") ? attr(bodyPr, "rIns") : 91440);
+            long h = (bodyPr != null && bodyPr.hasAttribute("tIns") ? attr(bodyPr, "tIns") : 45720) + (bodyPr != null && bodyPr.hasAttribute("bIns") ? attr(bodyPr, "bIns") : 45720);
+            for (Element p : list(body, A, "p")) h += paragraphHeight(p, Math.max(EMU_PER_PT, attr(ext, "cx") - insetX));
+            if (attr(off, "y") + h > limit) overflow.add(slideNo);
         }
     }
 
@@ -299,6 +388,7 @@ final class Ooxml {
             String relsName = part.replace("ppt/slides/", "ppt/slides/_rels/") + ".rels";
             if (coll == null) {
                 replaceScalars(root);
+                checkFit(root);
                 parts.put(part, serialize(slide));
                 continue;
             }
@@ -310,6 +400,10 @@ final class Ooxml {
                 Document copy = parse(base);
                 fillItem(copy.getDocumentElement(), coll, items.get(k));
                 replaceScalars(copy.getDocumentElement());
+                int keep = slideNo;
+                slideNo = keep + k;
+                checkFit(copy.getDocumentElement());
+                slideNo = keep;
                 if (k == 0) {
                     parts.put(part, serialize(copy));
                     continue;
