@@ -3,7 +3,7 @@ name = "banana-slides"
 version = "0.3.0"
 description = "Banana Slides – AI native PPT generator"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 dependencies = [
     "flask>=3.0.0",
     "flask-cors>=4.0.0",
