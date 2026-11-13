@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "напр. Zhejiang Qinghe Foods Co., Ltd. — внешний юрсоветник и трудовой спор",
   "caseFieldPracticeArea": "Область практики",
   "caseFieldPracticeAreaPh": "напр. Трудовое право / Внешний юрсоветник / M&A",
-  "caseFieldDepartment": "Область практики",
+  "caseFieldDepartment": "Практическая группа",
   "caseFieldDepartmentPh": "напр. Корпоративное право и M&A",
   "caseFieldLeadLawyer": "Ведущий партнёр / юрист",
   "caseFieldLeadLawyerPh": "напр. Линь Чжиюань",

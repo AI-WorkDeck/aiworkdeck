@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "z. B. Zhejiang Qinghe Foods Co., Ltd. General Counsel & Arbeitsrechtsstreit",
   "caseFieldPracticeArea": "Rechtsgebiet",
   "caseFieldPracticeAreaPh": "z. B. Arbeitsrecht / General Counsel / M&A",
-  "caseFieldDepartment": "Rechtsgebiet",
+  "caseFieldDepartment": "Praxisgruppe",
   "caseFieldDepartmentPh": "z. B. Gesellschaftsrecht & M&A",
   "caseFieldLeadLawyer": "Lead-Partner / Anwalt",
   "caseFieldLeadLawyerPh": "z. B. Lin Zhiyuan",

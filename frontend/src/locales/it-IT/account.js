@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "es. Zhejiang Qinghe Foods Co., Ltd. Direzione legale e controversia del lavoro",
   "caseFieldPracticeArea": "Area di pratica",
   "caseFieldPracticeAreaPh": "es. Lavoro / Direzione legale / M&A",
-  "caseFieldDepartment": "Area di pratica",
+  "caseFieldDepartment": "Gruppo di pratica",
   "caseFieldDepartmentPh": "es. Societario e M&A",
   "caseFieldLeadLawyer": "Partner / avvocato responsabile",
   "caseFieldLeadLawyerPh": "es. Lin Zhiyuan",

@@ -3178,6 +3178,15 @@ export function getUserActivityHistory(range = {}) {
   })
 }
 
+// 本人在某项目上的工作记录汇总（按月/类别小时数与用时最多的文件）；插件 worklog.summary 服务用
+export function getProjectWorklogSummary(projectId) {
+  return request({
+    url: '/api/activity/project-summary',
+    method: 'GET',
+    data: { projectId }
+  })
+}
+
 // ===================== 产品埋点（匿名使用统计，与活动日志无关） =====================
 export function logTelemetryEvent(eventName, attrs) {
   return request({

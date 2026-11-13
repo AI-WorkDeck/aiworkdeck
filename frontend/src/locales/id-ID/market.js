@@ -222,6 +222,7 @@ export default {
   "permTasks": "Kalender dan tugas",
   "permClipboard": "Papan Klip",
   "permLawfirm": "Informasi tim",
+  "permWorklogRead": "Ringkasan catatan kerja Anda sendiri",
   "newlyCreatedTag": "Baru",
   "publishBtn": "Terbitkan ke Pasar Ekstensi",
   "publishUpdateBtn": "Perbarui di Pasar Ekstensi",

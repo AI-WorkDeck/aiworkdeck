@@ -79,6 +79,9 @@
     OVERLOADED: { label: '超负荷 · 预警分流', cls: 'badge-red' }
   };
 
+  // 面板语言（applyLocale 设定）；金额与提示按它格式化
+  let uiLocale = 'zh-CN';
+
   const state = {
     epoch: 0,
     activeTab: 'intake',
@@ -160,9 +163,13 @@
     return '¥' + num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // 中文按「万元」显示；其他语言从真实金额按当地习惯缩写（例如 CN¥10.3M），不拼接单位
   function formatWanFromCents(cents) {
-    const num = Number(cents || 0) / 1000000;
-    return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 万元';
+    const yuan = Number(cents || 0) / 100;
+    if (uiLocale === 'zh-CN') {
+      return (yuan / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 万元';
+    }
+    return new Intl.NumberFormat(uiLocale, { style: 'currency', currency: 'CNY', notation: 'compact', maximumSignificantDigits: 3 }).format(yuan);
   }
 
   function formatPercent(val) {
@@ -187,7 +194,7 @@
       else key = 'IDLE';
     }
     const meta = WORKLOAD_BAND_META[key];
-    return node('span', `${idx} · ${meta.label}`, `badge ${meta.cls}`);
+    return node('span', `${idx} · ${tx(meta.label)}`, `badge ${meta.cls}`);
   }
 
   const TAB_ALIASES = {
@@ -255,7 +262,7 @@
         const mappedState = rawState === 'error' ? 'rejected' : rawState;
         return {
           step: st.step || idx + 1,
-          label: st.label || st.title || `步骤 ${idx + 1}`,
+          label: st.label || st.title || L('panel.t.step', '步骤 {0}', idx + 1),
           state: mappedState
         };
       });
@@ -324,7 +331,7 @@
     const dept = self.departmentName || self.department || '综合业务';
     const role = self.role || self.title || '执业律师';
     const committee = $('self-badge').dataset.committee === '1' ? ` · ${L('access.role.committee', '利冲委员')}` : '';
-    $('self-badge').textContent = `${name} · ${dept} · ${role}${committee}`;
+    $('self-badge').textContent = `${tx(name)} · ${tx(dept)} · ${tx(role)}${committee}`;
 
     const leadInput = $('intake-lead-lawyer');
     if (leadInput && !leadInput.value) leadInput.value = name;
@@ -361,19 +368,19 @@
       for (const hit of hits) {
         const li = node('li');
                 const ruleTitle = hit.ruleTitle || '命中冲突规则';
-        const matchedMatter = hit.matchedMatterTitle ? ` · 关联案件：${hit.matchedMatterTitle}` : '';
-        const matchedParty = hit.matchedPartyName ? ` · 冲突主体：${hit.matchedPartyName}` : '';
-        const handler = hit.handlerUserName ? ` · 承办人：${hit.handlerUserName}` : '';
+        const matchedMatter = hit.matchedMatterTitle ? L('panel.t.hitMatter', ' · 关联案件：{0}', hit.matchedMatterTitle) : '';
+        const matchedParty = hit.matchedPartyName ? L('panel.t.hitParty', ' · 冲突主体：{0}', hit.matchedPartyName) : '';
+        const handler = hit.handlerUserName ? L('panel.t.hitHandler', ' · 承办人：{0}', hit.handlerUserName) : '';
         const citation = hit.statutoryCitation || hit.conflictRuleCitation || '';
         const relationPath = hit.relationPath ? ` · ${L('client.conflict.pathLabel', '关系链：')}${hit.relationPath}` : '';
-        li.textContent = `${ruleTitle}${matchedMatter}${matchedParty}${relationPath}${handler}${citation ? ' — 依据：' + citation : ''}`;
+        li.textContent = `${tx(ruleTitle)}${matchedMatter}${matchedParty}${relationPath}${handler}${citation ? L('panel.t.hitBasis', ' — 依据：{0}', citation) : ''}`;
         ul.append(li);
       }
       box.append(ul);
     }
 
     if (result.feeComplianceWarning) {
-      box.append(node('div', `收费合规预警：${result.feeComplianceWarning}`, 'compliance-warning'));
+      box.append(node('div', L('panel.t.feeWarning', '收费合规预警：{0}', result.feeComplianceWarning), 'compliance-warning'));
     }
   }
 
@@ -391,20 +398,20 @@
       const head = node('div', null, 'item-head');
       const left = node('div');
       left.append(
-        node('strong', `${item.intakeNo || 'LF-NEW'} · ${item.title || '未命名案件'}`),
-        node('span', ` （${STATUS_LABELS[item.status] || item.statusLabel || item.status || '审查中'}）`, 'hint')
+        node('strong', `${item.intakeNo || 'LF-NEW'} · ${item.title || tx('未命名案件')}`),
+        node('span', L('panel.t.statusParen', ' （{0}）', tx(STATUS_LABELS[item.status] || item.statusLabel || item.status || '审查中')), 'hint')
       );
       head.append(left, riskBadge(item.conflictRiskLevel));
       card.append(head);
 
       const meta = node('div', null, 'item-meta');
       meta.append(
-        node('span', `业务领域：${PRACTICE_LABELS[item.practiceArea] || item.practiceAreaLabel || item.practiceArea || '综合业务'}`),
-        node('span', `业务分类：${item.departmentName || '未填写'}`),
-        node('span', `主办：${item.leadLawyerName || item.applicantName || '未指定'}`),
-        node('span', `委托人：${item.clientName || '-'}`),
-        node('span', `对方当事人：${item.counterpartyName || '无'}`),
-        node('span', `收费：${FEE_MODE_LABELS[item.feeMode] || item.feeModeLabel || item.feeMode || '固定收费'} · ${formatWanFromCents(item.contractAmountCents)}`)
+        node('span', L('panel.t.practiceArea', '业务领域：{0}', tx(PRACTICE_LABELS[item.practiceArea] || item.practiceAreaLabel || item.practiceArea || '综合业务'))),
+        node('span', L('panel.t.practiceGroup', '业务分类：{0}', tx(item.departmentName || '未填写'))),
+        node('span', L('panel.t.lead', '主办：{0}', item.leadLawyerName || item.applicantName || tx('未指定'))),
+        node('span', L('panel.t.client', '委托人：{0}', item.clientName || '-')),
+        node('span', L('panel.t.counterparty', '对方当事人：{0}', item.counterpartyName || tx('无'))),
+        node('span', L('panel.t.fee', '收费：{0} · {1}', tx(FEE_MODE_LABELS[item.feeMode] || item.feeModeLabel || item.feeMode || '固定收费'), formatWanFromCents(item.contractAmountCents)))
       );
       card.append(meta);
 
@@ -413,11 +420,11 @@
       }
 
       if (item.feeComplianceWarning) {
-        card.append(node('div', `收费合规提示：${item.feeComplianceWarning}`, 'compliance-warning'));
+        card.append(node('div', L('panel.t.feeNote', '收费合规提示：{0}', item.feeComplianceWarning), 'compliance-warning'));
       }
 
       if (item.imConversationId) {
-        card.append(node('p', `本机征询会话 ID：${item.imConversationId}（不表示已向其他设备送达）`, 'hint'));
+        card.append(node('p', L('panel.t.localConv', '本机征询会话 ID：{0}（不表示已向其他设备送达）', item.imConversationId), 'hint'));
       }
 
       const stepsWrap = node('div', null, 'progress-steps');
@@ -443,7 +450,7 @@
         const card = node('div', null, 'item-card');
         const head = node('div', null, 'item-head');
         head.append(
-          node('strong', `征询单 #${clr.id} · 申请案号 ${clr.intakeNo || '-'}`),
+          node('strong', L('panel.t.clrTitle', '征询单 #{0} · 申请案号 {1}', clr.id, clr.intakeNo || '-')),
           node('span', CLEARANCE_DECISION_LABELS[clr.decision] || clr.decision || '待放行',
             clr.decision === 'REJECTED' ? 'badge badge-red' : (clr.decision && clr.decision !== 'PENDING' ? 'badge badge-green' : 'badge badge-yellow'))
         );
@@ -451,20 +458,20 @@
 
         const meta = node('div', null, 'item-meta');
         meta.append(
-          node('span', `命中在办/历史案件：${clr.matchedMatterTitle || '-'}`),
-          node('span', `冲突关联主体：${clr.matchedPartyName || '-'}`),
-          node('span', `被征询承办律师：${clr.targetUserName || '-'}`)
+          node('span', L('panel.t.clrMatter', '命中在办/历史案件：{0}', clr.matchedMatterTitle || '-')),
+          node('span', L('panel.t.clrParty', '冲突关联主体：{0}', clr.matchedPartyName || '-')),
+          node('span', L('panel.t.clrTarget', '被征询承办律师：{0}', clr.targetUserName || '-'))
         );
         card.append(meta);
 
         if (clr.conflictRuleCitation) {
-          card.append(node('p', `法规依据：${plainRuleText(clr.conflictRuleCitation)}`, 'hint'));
+          card.append(node('p', L('panel.t.clrBasis', '法规依据：{0}', plainRuleText(clr.conflictRuleCitation)), 'hint'));
         }
         if (clr.imConversationId) {
-          card.append(node('p', `本机征询会话：${clr.imConversationId}（仅本机记录）`, 'hint'));
+          card.append(node('p', L('panel.t.clrConv', '本机征询会话：{0}（仅本机记录）', clr.imConversationId), 'hint'));
         }
         if (clr.comment) {
-          card.append(node('p', `放行备注：${clr.comment}`));
+          card.append(node('p', L('panel.t.clrComment', '放行备注：{0}', clr.comment)));
         }
 
         const commentInput = node('input', null, 'clearance-comment-input');
@@ -486,7 +493,7 @@
             });
             if (epoch !== state.epoch) return;
             await loadOverview(epoch);
-            notice(`已保存本机核查记录：${label}`);
+            notice(L('panel.t.savedReview', '已保存本机核查记录：{0}', tx(label)));
           }));
           return btn;
         };
@@ -520,10 +527,10 @@
 
       const meta = node('div', null, 'item-meta');
       meta.append(
-        node('span', `状态：${STATUS_LABELS[intake.status] || intake.statusLabel || intake.status}`),
-        node('span', `委托人：${intake.clientName || '-'}`),
-        node('span', `对方当事人：${intake.counterpartyName || '-'}`),
-        node('span', `主办：${intake.leadLawyerName || '-'}`)
+        node('span', L('panel.t.status', '状态：{0}', tx(STATUS_LABELS[intake.status] || intake.statusLabel || intake.status))),
+        node('span', L('panel.t.client', '委托人：{0}', intake.clientName || '-')),
+        node('span', L('panel.t.counterparty', '对方当事人：{0}', intake.counterpartyName || '-')),
+        node('span', L('panel.t.lead', '主办：{0}', intake.leadLawyerName || '-'))
       );
       card.append(meta);
 
@@ -535,7 +542,7 @@
       if (relatedClearances.length > 0) {
         const ul = node('ul', null, 'hit-list');
         for (const rc of relatedClearances) {
-          ul.append(node('li', `关联律师 [${rc.targetUserName || '承办律师'}]（关联案：${rc.matchedMatterTitle || '-'}）→ ${CLEARANCE_DECISION_LABELS[rc.decision] || rc.decision}`));
+          ul.append(node('li', L('panel.t.relatedLawyer', '关联律师 [{0}]（关联案：{1}）→ {2}', rc.targetUserName || tx('承办律师'), rc.matchedMatterTitle || '-', tx(CLEARANCE_DECISION_LABELS[rc.decision] || rc.decision))));
         }
         card.append(ul);
       }
@@ -575,7 +582,7 @@
         });
         if (epoch !== state.epoch) return;
         await loadOverview(epoch);
-        notice(`案件「${intake.title}」已在本机登记通过并建项；云端终审状态另行查看。`);
+        notice(L('panel.t.approvedLocal', '案件「{0}」已在本机登记通过并建项；云端终审状态另行查看。', intake.title));
       }));
 
       const rejectBtn = node('button', '本机登记驳回', 'danger');
@@ -590,7 +597,7 @@
         });
         if (epoch !== state.epoch) return;
         await loadOverview(epoch);
-        notice(`已驳回案件「${intake.title}」的立项申请。`);
+        notice(L('panel.t.rejectedLocal', '已驳回案件「{0}」的立项申请。', intake.title));
       }));
 
       actions.append(approveBtn, rejectBtn);
@@ -659,7 +666,7 @@
           node('td', `${inv.matterTitle || '-'}（${inv.departmentName || '-'}）`, 'cell-text'),
           node('td', INVOICE_TYPE_LABELS[inv.invoiceType] || inv.invoiceType || '数电专票'),
           node('td', `${inv.buyerName || '-'} ${inv.buyerTaxId ? '· ' + inv.buyerTaxId : ''}`, 'cell-text'),
-          node('td', `${formatYuanFromCents(inv.amountCents)}（税额 ${formatYuanFromCents(inv.taxAmountCents)}）`),
+          node('td', L('panel.t.amountTax', '{0}（税额 {1}）', formatYuanFromCents(inv.amountCents), formatYuanFromCents(inv.taxAmountCents))),
           node('td', formatYuanFromCents(inv.collectedAmountCents))
         );
 
@@ -677,7 +684,7 @@
         statusTd.append(node('span', stLabel, `badge ${stCls}`));
         tr.append(statusTd);
 
-        tr.append(node('td', inv.externalErpRef ? `已同步 (${inv.externalErpRef})` : (inv.externalSyncStatus || '待同步')));
+        tr.append(node('td', inv.externalErpRef ? L('panel.t.synced', '已同步 ({0})', inv.externalErpRef) : (inv.externalSyncStatus || '待同步')));
 
         const actionTd = node('td');
         const needsIssue = inv.status === 'PENDING' || inv.status === 'PENDING_APPROVAL' || (!inv.invoiceNumber && inv.status !== 'PAID' && inv.status !== 'VOIDED');
@@ -700,7 +707,7 @@
             await request('issueInvoice', { invoiceId: inv.id, invoiceNumber });
             if (epoch !== state.epoch) return;
             await loadOverview(epoch);
-            notice(`已确认开具数电发票：${inv.invoiceAppNo || inv.id}`);
+            notice(L('panel.t.issued', '已确认开具数电发票：{0}', inv.invoiceAppNo || inv.id));
           }));
           // 号码框放在「申请单号 / 发票号」这一格（开出后号码就显示在这里），操作列只留按钮，表格不被撑宽
           noTd.append(numberInput);
@@ -797,12 +804,12 @@
     const bucketOver90 = aging.over90DaysCents ?? aging.bucketOver90Cents ?? 0;
 
     kpiContainer.append(
-      makeKpi('在办正式案件 / 累计收案', `${activeMatters} 件 / ${totalIntakes} 件`, scoped('工作台与立项中心全所实时汇总', 'access.kpi.activeSubLocal', '仅统计本机台账中与你相关的收案', 'access.kpi.activeSubDevice', '本机台账实时汇总')),
-      makeKpi('活跃律师与平均负荷', `${unitCount} 名 · 负荷 ${avgWi}`, '综合主办、协办、待办与近30日工时'),
-      makeKpi(scoped('全所签约合同总额', 'access.kpi.contractedLocal', '我的签约合同总额', 'access.kpi.contractedDevice', '本机签约合同总额'), formatYuanFromCents(totalContracted), `折合 ${formatWanFromCents(totalContracted)}`),
-      makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `${scoped('全所开票率', 'access.kpi.billingRateLocal', '我的开票率', 'access.kpi.billingRateDevice', '本机开票率')} ${formatPercent(billingRate)}`),
-      makeKpi('已到账实收与回收率', formatYuanFromCents(totalCollected), `账单回收率 ${formatPercent(billedColRate)} · 合同回款率 ${formatPercent(contractColRate)}`),
-      makeKpi('待收账款（AR）与账龄结构', formatYuanFromCents(totalAr), `<30天 ${formatYuanFromCents(bucket0To30)} | 30-90天 ${formatYuanFromCents(bucket30To90)} | >90天 ${formatYuanFromCents(bucketOver90)}`)
+      makeKpi('在办正式案件 / 累计收案', L('panel.t.mattersOfTotal', '{0} 件 / {1} 件', activeMatters, totalIntakes), scoped('工作台与立项中心全所实时汇总', 'access.kpi.activeSubLocal', '仅统计本机台账中与你相关的收案', 'access.kpi.activeSubDevice', '本机台账实时汇总')),
+      makeKpi('活跃律师与平均负荷', L('panel.t.lawyersLoad', '{0} 名 · 负荷 {1}', unitCount, avgWi), '综合主办、协办、待办与近30日工时'),
+      makeKpi(scoped('全所签约合同总额', 'access.kpi.contractedLocal', '我的签约合同总额', 'access.kpi.contractedDevice', '本机签约合同总额'), formatYuanFromCents(totalContracted), L('panel.t.approx', '折合 {0}', formatWanFromCents(totalContracted))),
+      makeKpi('已开票总额与开票率', formatYuanFromCents(totalBilled), `${tx(scoped('全所开票率', 'access.kpi.billingRateLocal', '我的开票率', 'access.kpi.billingRateDevice', '本机开票率'))} ${formatPercent(billingRate)}`),
+      makeKpi('已到账实收与回收率', formatYuanFromCents(totalCollected), L('panel.t.collectionRates', '账单回收率 {0} · 合同回款率 {1}', formatPercent(billedColRate), formatPercent(contractColRate))),
+      makeKpi('待收账款（AR）与账龄结构', formatYuanFromCents(totalAr), L('panel.t.aging', '<30天 {0} | 30-90天 {1} | >90天 {2}', formatYuanFromCents(bucket0To30), formatYuanFromCents(bucket30To90), formatYuanFromCents(bucketOver90)))
     );
 
     // 1. 业务分类统计（沿用 departmentName 台账字段，不代表团队层级）
@@ -832,8 +839,8 @@
         tr.append(
           node('td', dept.departmentName || dept.name || '-'),
           node('td', dept.headLawyerName || dept.leadName || '主办律师'),
-          node('td', `${dept.unitCount ?? dept.lawyerCount ?? 0} 人`),
-          node('td', `${dept.activeMatterCount ?? dept.activeCaseCount ?? dept.caseCount ?? dept.matterCount ?? 0} 件`),
+          node('td', L('panel.t.people', '{0} 人', dept.unitCount ?? dept.lawyerCount ?? 0)),
+          node('td', L('panel.t.matters', '{0} 件', dept.activeMatterCount ?? dept.activeCaseCount ?? dept.caseCount ?? dept.matterCount ?? 0)),
           wiTd,
           node('td', formatYuanFromCents(contracted)),
           node('td', formatYuanFromCents(billed)),
@@ -868,15 +875,15 @@
         tr.append(
           node('td', lead.leadLawyerName || lead.leadName || lead.name || '-'),
           node('td', lead.departmentName || lead.department || '-'),
-          node('td', `${lead.teamSize ?? lead.unitCount ?? 1} 人`),
-          node('td', `${lead.leadMatterCount ?? lead.leadCaseCount ?? lead.caseCount ?? lead.activeMatterCount ?? 0} 件`),
-          node('td', `负荷 ${lead.teamAvgWorkloadIndex ?? lead.avgWorkloadIndex ?? NO_VALUE}`),
+          node('td', L('panel.t.people', '{0} 人', lead.teamSize ?? lead.unitCount ?? 1)),
+          node('td', L('panel.t.matters', '{0} 件', lead.leadMatterCount ?? lead.leadCaseCount ?? lead.caseCount ?? lead.activeMatterCount ?? 0)),
+          node('td', L('panel.t.load', '负荷 {0}', lead.teamAvgWorkloadIndex ?? lead.avgWorkloadIndex ?? NO_VALUE)),
           node('td', formatYuanFromCents(contracted)),
           node('td', formatYuanFromCents(billed)),
           node('td', formatYuanFromCents(collected)),
           node('td', formatPercent(colRate)),
           node('td', passRate == null ? NO_VALUE : formatPercent(passRate)),
-          node('td', cycleHours == null ? NO_VALUE : `${Number(cycleHours).toFixed(1)} 小时`)
+          node('td', cycleHours == null ? NO_VALUE : L('panel.t.hours', '{0} 小时', Number(cycleHours).toFixed(1)))
         );
         leadTbody.append(tr);
       }
@@ -908,10 +915,10 @@
           node('td', u.userName || u.lawyerName || u.displayName || u.name || '-'),
           node('td', u.role || u.title || '主办律师'),
           node('td', u.departmentName || u.department || '-'),
-          node('td', `${u.leadMatterCount ?? u.leadCaseCount ?? u.leadMatters ?? 0} 件`),
-          node('td', `${u.coMatterCount ?? u.coCaseCount ?? u.coMatters ?? 0} 件`),
-          node('td', `待办 ${u.openTaskCount ?? 0} / 逾期 ${u.overdueTaskCount ?? 0}`),
-          node('td', `${Number(u.activeHours30d ?? u.activeHours ?? 0).toFixed(1)} 小时`),
+          node('td', L('panel.t.matters', '{0} 件', u.leadMatterCount ?? u.leadCaseCount ?? u.leadMatters ?? 0)),
+          node('td', L('panel.t.matters', '{0} 件', u.coMatterCount ?? u.coCaseCount ?? u.coMatters ?? 0)),
+          node('td', L('panel.t.tasks', '待办 {0} / 逾期 {1}', u.openTaskCount ?? 0, u.overdueTaskCount ?? 0)),
+          node('td', L('panel.t.hours', '{0} 小时', Number(u.activeHours30d ?? u.activeHours ?? 0).toFixed(1))),
           wiTd,
           node('td', `${formatYuanFromCents(contracted)} / ${formatYuanFromCents(collected)}`),
           node('td', formatPercent(colRate))
@@ -932,7 +939,7 @@
   function collectIntakePayload() {
     const title = $('intake-title').value.trim();
     const practiceArea = $('intake-practice-area').value;
-    const departmentName = $('intake-department').value.trim() || '争议解决';
+    const departmentName = $('intake-department').value.trim() || tx('争议解决');
     const leadLawyerName = $('intake-lead-lawyer').value.trim() || (state.self?.displayName || '主办律师');
     const feeMode = $('intake-fee-mode').value;
     const clientName = $('intake-client-name').value.trim();
@@ -989,275 +996,21 @@
     }
   }
 
-  const EN_EXACT = {
-    '律所管理 · AI WorkDeck': 'Law Firm Management · AI WorkDeck',
-    '律所业务与决策管理中心': 'Law Firm Practice & Executive Center',
-    '正在加载身份与业务分类…': 'Loading identity & practice areas…',
-    '加载典型律所样板数据': 'Load Demo Law Firm Data',
-    '刷新数据': 'Refresh Data',
-    '律所管理主导航': 'Law Firm Management Navigation',
-    '收案与立项': 'Case Intake & Filing',
-    '利冲审查中心': 'Conflict Check Center',
-    '发票与财务收费': 'Invoicing & Billing',
-    '决策与业务看板': 'Executive Dashboard',
-    '正在连接律所管理引擎…': 'Connecting to Law Firm Management engine…',
-    '收案、财务和样板数据属于本机台账。本机征询记录不表示同事已收到消息。需要本人确认时，请使用「利冲审查中心」中的律所云端协作。': 'Intake, finance, and demo data are stored in your local ledger. Local clearance entries do not notify colleagues automatically; use Firm Cloud Collaboration in the Conflict Check Center for cross-account confirmation.',
-    '新建本机收案记录': 'New Local Case Intake',
-    '依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索本机台账中的在办、历史及关联主体冲突': 'Automatically screens active, historical, and affiliate conflicts in this device\'s ledger.',
-    '案件 / 专项名称': 'Matter / Project Title',
-    '例如：澜曜微电子与朗绮光电专利侵权及商业秘密纠纷案': 'e.g., Lanyao Microelectronics v. Langqi Optoelectronics Patent & Trade Secret Dispute',
-    '业务领域': 'Practice Area',
-    '民商事诉讼与仲裁': 'Commercial Litigation & Arbitration',
-    '资本市场与证券': 'Capital Markets & Securities',
-    '资本市场/IPO': 'Capital Markets / IPO',
-    '公司并购与投融资': 'Corporate M&A & Investment',
-    '知识产权与数据合规': 'IP & Data Compliance',
-    '刑事辩护与代理': 'Criminal Defense & Representation',
-    '行政复议与诉讼': 'Administrative Reconsideration & Litigation',
-    '婚姻家事与财富传承': 'Family Law & Wealth Succession',
-    '常年法律顾问': 'Retainer Legal Counsel',
-    '破产重整与清收': 'Bankruptcy Reorganization & Recovery',
-    '劳动人事合规': 'Labor & Employment Compliance',
-    '业务分类': 'Practice Group',
-    '争议解决': 'Dispute Resolution',
-    '例如：争议解决 / 资本市场': 'e.g., Dispute Resolution / Capital Markets',
-    '拟任主办负责人': 'Proposed Lead Counsel',
-    '主办合伙人/律师姓名': 'Lead partner / lawyer name',
-    '收费方式': 'Billing Mode',
-    '固定收费': 'Fixed Fee',
-    '按标的额比例收费': 'Proportional Fee',
-    '风险代理收费': 'Contingency Fee',
-    '计时收费': 'Hourly Billing',
-    '常年法律顾问': 'Retainer Fee',
-    '按标的额比例': 'Proportional Fee',
-    '风险代理': 'Contingency Fee',
-    '常年顾问': 'Retainer',
-    '委托人 / 客户名称': 'Client Name',
-    '客户法定全称或自然人姓名': 'Full legal name of entity or individual client',
-    '客户统一社会信用代码': 'Client Unified Social Credit Code',
-    '选填，18位信用代码': 'Optional, 18-digit credit code',
-    '对方当事人名称': 'Counterparty Name',
-    '对方当事人全称，无对抗方填无': 'Full name of counterparty (enter None if N/A)',
-    '对方统一社会信用代码': 'Counterparty Unified Social Credit Code',
-    '关联方 / 控股股东 / 一致行动人': 'Related Party / Controlling Shareholder / Concerted Actor',
-    '选填，集团母公司、实控人或担保方名称': 'Optional, parent company, controller, or guarantor',
-    '关联方身份关系': 'Related Party Role',
-    '控股股东 / 实际控制人': 'Controlling Shareholder / Actual Controller',
-    '集团关联公司 / 母子公司': 'Affiliate / Parent-Subsidiary',
-    '一致行动人': 'Concerted Actor',
-    '担保人 / 连带债务人': 'Guarantor / Joint Debtor',
-    '签约合同额（万元）': 'Contract Amount (10k CNY)',
-    '风险代理提成比例（%）': 'Contingency Rate (%)',
-    '实时利冲与合规预检': 'Run Conflict & Compliance Pre-check',
-    '保存本机收案与核查记录': 'Save Local Intake & Check Record',
-    '我的收案申请与利冲五步进展': 'My Case Intakes & 5-Step Conflict Progress',
-    '与个人中心「收案与利冲」共享本机台账。以下进展为本机登记，跨账户征询及本人终审请使用云端协作。': 'Shares the local ledger with Personal Center. Use Cloud Collaboration for cross-account clearance and final review.',
-    '律所云端利冲协作': 'Firm Cloud Conflict Collaboration',
-    '管理员指定委员，由本人接受；关联律师与指定委员分别确认。仅发送你明确提交的信息，本机旧台账不会自动上传。': 'Admins appoint committee members who accept personally; related counsel and committee members confirm separately. Only explicitly submitted data is sent.',
-    '连接并刷新': 'Connect & Refresh',
-    '连接后可查看本人待办和已提交申请。': 'Connect to view your pending tasks and submitted requests.',
-    '核验同所账户': 'Verify Firm Account',
-    '同事账户手机号或邮箱': 'Colleague phone number or email',
-    '核验并加入选择列表': 'Verify & Add to List',
-    '指定利冲委员': 'Appoint Conflict Committee Member',
-    '委员候选账户': 'Committee candidate account',
-    '发送委员指派': 'Send Appointment',
-    '发起新的利冲协作申请': 'Submit New Conflict Collaboration Request',
-    '案件名称': 'Matter Title',
-    '委托人名称': 'Client Name',
-    '主办律师账户': 'Lead Counsel Account',
-    '已接受指派的终审委员': 'Accepted Final Review Committee Member',
-    '需要人工征询的关联律师（可选）': 'Related Counsel for Manual Clearance (Optional)',
-    '不另行指定': 'None specified',
-    '仅向该律师发送的关联案件摘要': 'Related Matter Summary (Sent Only to This Lawyer)',
-    '如涉及本机案件，只填写对方核查所必需的信息；请勿粘贴无关客户材料。': 'Enter only the information necessary for conflict verification; do not paste unrelated client materials.',
-    '将以上申请信息发送至本所云端协作，向关联律师及所选委员发出通知。系统仅检索本所已经主动提交的云端申请。': 'Send the above request to Firm Cloud Collaboration and notify related counsel and the selected committee member.',
-    '发送利冲协作申请': 'Submit Conflict Request',
-    '重新编辑同一申请': 'Edit Same Request',
-    '重试同一申请': 'Retry Same Request',
-    '重新发送同一申请': 'Resend Same Request',
-    '本机历史征询记录': 'Local Clearance History',
-    '以下仅为本机台账与演示记录，不表示已向其他设备送达。跨账户确认请使用上方云端协作。': 'Local ledger and demo records only. Use Cloud Collaboration above for cross-account confirmation.',
-    '本机收案核查台账': 'Local Intake Review Ledger',
-    '保留本机核查结论与建项功能。此处登记不代表云端指定委员已作出终审决定。': 'Retains local review conclusions and project creation. Does not represent cloud committee final approval.',
-    '提交发票申请（数电专票 / 普票）': 'Submit Invoice Application (Digital VAT Special / Normal)',
-    '自动核算不含税金额与增值税税额，支持关联已立案项目或收案台账': 'Automatically calculates tax-exclusive amount and VAT, linked to filed matters.',
-    '关联案件立项': 'Linked Matter Intake',
-    '发票类型': 'Invoice Type',
-    '数电增值税专用发票': 'Digital VAT Special Invoice',
-    '数电普通发票': 'Digital VAT Normal Invoice',
-    '增值税专用发票': 'VAT Special Invoice',
-    '增值税普通发票': 'VAT Normal Invoice',
-    '税率 / 征收率': 'Tax / Levy Rate',
-    '6%（现代服务 · 法律鉴证咨询）': '6% (Modern Services · Legal Advisory)',
-    '3%（小规模纳税人征收率）': '3% (Small-Scale Taxpayer Levy Rate)',
-    '1%（阶段性减按征收率）': '1% (Reduced Levy Rate)',
-    '申请开票含税金额（元）': 'Invoice Tax-Inclusive Amount (CNY)',
-    '购买方名称（客户抬头）': 'Buyer Name (Client Title)',
-    '购买方法定全称': 'Full legal name of buyer',
-    '购买方纳税人识别号': 'Buyer Taxpayer ID',
-    '18位统一社会信用代码': '18-digit Unified Social Credit Code',
-    '购买方开户行及账号': 'Buyer Bank & Account No.',
-    '选填，专票备查开户行及账号': 'Optional, bank name and account number',
-    '数电票交付邮箱': 'Digital Invoice Delivery Email',
-    '提交发票申请': 'Submit Invoice Request',
-    '手动登记收费 / 到账核销': 'Record Payment / Reconciliation',
-    '在未直连外部财务软件前，支持手动录入银行到账流水并与发票及案件合同额自动核销': 'Manually record bank receipts and reconcile with invoices and contract amounts.',
-    '核销关联发票（可选）': 'Reconcile with Invoice (Optional)',
-    '不绑定特定发票（先款后票/预收款）': 'Unbound (Advance Payment / Unbilled)',
-    '不绑定特定发票（先款后票 / 预收款）': 'Unbound (Advance Payment / Unbilled)',
-    '付款方名称': 'Payer Name',
-    '实际打款主体名称': 'Actual paying entity name',
-    '本次到账实收金额（元）': 'Received Amount (CNY)',
-    '收款方式': 'Payment Method',
-    '对公银行转账': 'Corporate Bank Transfer',
-    '提存 / 监管账户划转': 'Escrow Account Transfer',
-    '提存/监管账户划转': 'Escrow Account Transfer',
-    '银行本票 / 支票': 'Bank Cashier Order / Check',
-    '银行本票/支票': 'Bank Cashier Order / Check',
-    '其他合规收款': 'Other Compliant Payment',
-    '银行流水号 / 凭证号': 'Bank Reference / Voucher No.',
-    '例如：BK-20261015-8801': 'e.g., BK-20261015-8801',
-    '到账日期': 'Received Date',
-    '登记收费并核销': 'Record Payment & Reconcile',
-    '发票与财务收费台账（支持金蝶 / 用友对接）': 'Invoice & Billing Ledger (Kingdee / Yonyou Ready)',
-    '实时计算每案开票率、账单回收率与合同回款率；支持一键同步用友/金蝶财务凭证或导出标准台账': 'Tracks billing and collection rates per matter; syncs vouchers with Kingdee/Yonyou or exports standard CSV ledgers.',
-    '与财务系统同步核销（金蝶/用友）': 'Sync with ERP (Kingdee / Yonyou)',
-    '导出标准财务台账': 'Export Standard Finance CSV',
-    '发票申请与开票核销明细': 'Invoice Applications & Reconciliation Details',
-    '申请单号 / 发票号': 'App No. / Invoice No.',
-    '关联案件与业务分类': 'Linked Matter & Practice Group',
-    '购买方与税号': 'Buyer & Tax ID',
-    '含税金额 / 税额': 'Tax-Inclusive / Tax',
-    '已核销回款': 'Reconciled Collection',
-    '开票与回款状态': 'Billing & Collection Status',
-    '财务ERP同步': 'ERP Sync',
-    '操作': 'Actions',
-    '到账实收与核销流水明细': 'Payment Receipts & Reconciliation Ledger',
-    '收款单号': 'Receipt No.',
-    '关联案件': 'Linked Matter',
-    '核销发票号': 'Reconciled Invoice',
-    '实收金额': 'Received Amount',
-    '银行流水凭证号': 'Bank Voucher No.',
-    '核销状态': 'Reconciliation Status',
-    '各业务分类表现对比（忙闲负荷 · 创收 · 开票 · 回收率）': 'Practice Group Performance (Workload · Revenue · Billing · Collection)',
-    '汇总工作台在办项目与财务台账，按业务分类对比案件饱和度、签约创收、已开票、实收回款与回收率': 'Compares case saturation, contracted revenue, billed amounts, collections, and recovery rates across practice groups.',
-    '主办律师': 'Lead Counsel',
-    '活跃律师': 'Active Lawyers',
-    '在办案件数': 'Active Matters',
-    '平均负荷与忙闲状态': 'Avg Workload & Status',
-    '签约合同总额': 'Total Contracted',
-    '已开票金额': 'Billed Amount',
-    '已到账实收': 'Collected Amount',
-    '账单回收率 / 合同回款率': 'Billed / Contract Recovery',
-    '待收账款（AR）': 'Accounts Receivable (AR)',
-    '主办律师业务统计': 'Lead Counsel Statistics',
-    '按主办律师汇总案件规模、工作负荷、实收创收、回收率、利冲一次通过率与立案效率': 'Summarizes matter volume, workload, collections, recovery rate, conflict pass rate, and filing cycle by lead counsel.',
-    '项目协作人数': 'Team Size',
-    '主办案件数': 'Lead Matters',
-    '主办律师负荷': 'Lead Workload',
-    '实收回款额': 'Collected Amount',
-    '账单回收率': 'Recovery Rate',
-    '利冲通过率': 'Conflict Pass Rate',
-    '平均立案周期': 'Avg Filing Cycle',
-    '律师工作负荷与创收明细': 'Lawyer Workload & Revenue Details',
-    '按主办案件、协办案件、待办/逾期任务与近30日工作台活跃时长综合计算个体负荷指数（空闲 / 适中 / 饱和 / 超负荷）': 'Computes individual workload index (Idle / Optimal / Saturated / Overloaded) from lead/co-counsel matters, open/overdue tasks, and 30-day activity.',
-    '律师姓名': 'Lawyer Name',
-    '执业角色': 'Role',
-    '主办案件': 'Lead Matters',
-    '协办案件': 'Co-Counsel Matters',
-    '待办 / 临期逾期事项': 'Open / Overdue Tasks',
-    '近30日工作台活跃': '30d Active Hours',
-    'Workload 负荷指数与忙闲状态': 'Workload Index & Status',
-    '个人签约 / 实收': 'Contracted / Collected',
-    '个人回收率': 'Recovery Rate',
-    '直接利冲 · 禁止代理': 'Direct Conflict · Representation Prohibited',
-    '潜在利冲 · 需征询放行': 'Potential Conflict · Clearance Required',
-    '无利冲 · 审查通过': 'No Conflict · Cleared',
-    '1. 提交收案申请': '1. Intake Submitted',
-    '2. 自动利冲检索': '2. Auto Conflict Check',
-    '3. 关联律师站内信放行': '3. Related Counsel Clearance',
-    '4. 利冲委员终审': '4. Committee Final Review',
-    '5. 正式立案并建项': '5. Approved & Filed',
-    '实时利益冲突与收费合规审查结论': 'Real-Time Conflict & Fee Compliance Conclusion',
-    '已完成全所利益冲突扫描。': 'Completed firm-wide conflict of interest scan.',
-    '暂无收案立项记录。可在左侧填写新案信息并预检利冲，或点击顶部「加载典型律所样板数据」。': 'No intake records yet. Fill out the form on the left or click "Load Demo Law Firm Data" above.',
-    '当前没有待处理的利益冲突放行征询单。': 'No pending conflict clearance requests.',
-    '本机登记放行': 'Record Local Approval',
-    '本机登记附条件放行': 'Record Conditional Approval (Wall)',
-    '本机登记拒绝放行': 'Record Local Rejection',
-    '全所利冲审查队列为空。': 'Firm conflict review queue is empty.',
-    '启用信息隔离墙承诺（Ethical Wall）': 'Apply Ethical Wall Undertaking',
-    '已核验当事人书面豁免函': 'Verified Written Client Waiver',
-    '本机登记通过并建项': 'Approve & Create Project Locally',
-    '本机登记驳回': 'Reject Locally',
-    '暂无发票记录。': 'No invoice records.',
-    '待开票': 'Pending Issue',
-    '已开票 · 待回款': 'Issued · Awaiting Payment',
-    '已开票 · 部分回款': 'Issued · Partially Paid',
-    '已全额回款': 'Paid in Full',
-    '已作废': 'Voided',
-    '已红冲': 'Red-Invoiced',
-    '待同步': 'Pending Sync',
-    '确认开票': 'Confirm Issue',
-    '已开具': 'Issued',
-    '暂无收费到账流水记录。': 'No payment collection records.',
-    '未绑定发票': 'Unbound',
-    '已核销': 'Reconciled',
-    '已入账': 'Recorded',
-    '在办正式案件 / 累计收案': 'Active Filed Matters / Total Intakes',
-    '工作台与立项中心全所实时汇总': 'Real-time firm-wide summary across workbench and intake center',
-    '活跃律师与平均负荷': 'Active Lawyers & Avg Workload',
-    '综合主办、协办、待办与近30日工时': 'Combined lead, co-counsel, open tasks, and 30d active hours',
-    '全所签约合同总额': 'Firm Total Contracted Amount',
-    '已开票总额与开票率': 'Total Billed & Billing Rate',
-    '已到账实收与回收率': 'Total Collected & Recovery Rate',
-    '待收账款（AR）与账龄结构': 'Accounts Receivable (AR) & Aging',
-    '暂无业务分类统计数据。': 'No practice group statistics available.',
-    '暂无主办律师统计数据。': 'No lead counsel statistics available.',
-    '暂无律师工作负荷数据。': 'No lawyer workload data available.',
-    '数据已刷新。': 'Data refreshed.',
-    '已完成全所利益冲突与收费合规预检。': 'Completed firm-wide conflict and fee compliance pre-check.',
-    '已与财务系统（金蝶/用友）完成凭证同步与核销。': 'Completed voucher sync and reconciliation with ERP (Kingdee/Yonyou).',
-    '已生成金蝶/用友标准财务台账。': 'Generated standard Kingdee/Yonyou finance ledger CSV.',
-    '接受委员指派': 'Accept Appointment',
-    '拒绝委员指派': 'Decline Appointment',
-    '撤销委员指派': 'Revoke Appointment',
-    '暂无与你有关的云端利冲申请。': 'No cloud conflict requests involving you.',
-    '本人确认放行': 'Confirm Clearance',
-    '附条件放行': 'Conditional Clearance',
-    '本人拒绝放行': 'Decline Clearance',
-    '本人终审通过': 'Approve Final Review',
-    '本人终审拒绝': 'Reject Final Review',
-    '云端协作已更新。仅显示本人有权查看的记录。': 'Cloud collaboration updated. Showing only records you are authorized to view.',
-    '账户或项目已切换，请重新连接云端协作。': 'Account or project switched. Please reconnect to cloud collaboration.'
-  };
-  let enObserverReady = false;
-  function trEn(s) {
-    if (!s || typeof s !== 'string') return s;
+  // 面板文案多语言（dev-board QA post-0.85）：中文原文对照 l10n/*.json 的 panel.s.* 词条，翻成当前语言；
+  // 带数字的句子在代码里用 L('panel.t.*')。词条表由 build.sh 生成到 expenses-l10n.js。zh-CN 原样显示。
+  let zhToKey = null;
+  function tx(s) {
+    if (!s || typeof s !== 'string' || uiLocale === 'zh-CN') return s;
+    const table = window.AWD_LAWFIRM_EXPENSE_L10N || {};
+    if (!zhToKey) {
+      zhToKey = new Map();
+      for (const [k, v] of Object.entries(table['zh-CN'] || {})) if (k.startsWith('panel.s.')) zhToKey.set(v, k);
+    }
     const trimmed = s.trim();
-    if (!trimmed) return s;
-    if (EN_EXACT[trimmed]) return s.replace(trimmed, EN_EXACT[trimmed]);
-    return s
-      .replace(/空闲 · 可优先派案/g, 'Idle · Ready for Assignment')
-      .replace(/适中 · 良性饱和/g, 'Optimal · Balanced')
-      .replace(/饱和 · 高负荷/g, 'Saturated · High Load')
-      .replace(/超负荷 · 预警分流/g, 'Overloaded · Rebalance Needed')
-      .replace(/（草稿）/g, ' (Draft)')
-      .replace(/（自动利冲检索中）/g, ' (Auto Conflict Checking)')
-      .replace(/（待关联律师放行）/g, ' (Pending Counsel Clearance)')
-      .replace(/（待利冲委员终审）/g, ' (Pending Committee Review)')
-      .replace(/（正式立案并建项）/g, ' (Approved & Filed)')
-      .replace(/（利冲驳回）/g, ' (Rejected for Conflict)')
-      .replace(/（已结案归档）/g, ' (Closed & Archived)')
-      .replace(/^业务领域：/, 'Practice Area: ')
-      .replace(/^业务分类：/, 'Practice Group: ')
-      .replace(/^主办：/, 'Lead: ')
-      .replace(/^委托人：/, 'Client: ')
-      .replace(/^对方当事人：/, 'Counterparty: ')
-      .replace(/^收费：/, 'Fee: ')
-      .replace(/^状态：/, 'Status: ')
-      .replace(/ 万元/g, '0k CNY');
+    const key = trimmed && zhToKey.get(trimmed);
+    if (!key) return s;
+    const out = table[uiLocale]?.[key] ?? table['en-US']?.[key];
+    return out ? s.replace(trimmed, out) : s;
   }
   function translateSubtree(root) {
     if (!root) return;
@@ -1265,13 +1018,13 @@
     let curr = walk.currentNode;
     while (curr) {
       if (curr.nodeType === Node.TEXT_NODE) {
-        const next = trEn(curr.nodeValue);
+        const next = tx(curr.nodeValue);
         if (next !== curr.nodeValue) curr.nodeValue = next;
       } else if (curr.nodeType === Node.ELEMENT_NODE) {
         for (const attr of ['placeholder', 'aria-label', 'title']) {
           const val = curr.getAttribute?.(attr);
           if (val) {
-            const next = trEn(val);
+            const next = tx(val);
             if (next !== val) curr.setAttribute(attr, next);
           }
         }
@@ -1279,26 +1032,32 @@
       curr = walk.nextNode();
     }
   }
-  function maybeEnableEnglish(ctx) {
+  let localeObserverReady = false;
+  function applyLocale(ctx) {
     let lang = ctx?.language || ctx?.locale || '';
     if (!lang) {
       try { lang = localStorage.getItem('checkba_locale') || localStorage.getItem('awd_locale') || ''; } catch {}
     }
-    if (!String(lang).toLowerCase().startsWith('en')) return;
-    document.documentElement.lang = 'en-US';
-    document.title = trEn(document.title);
+    const table = window.AWD_LAWFIRM_EXPENSE_L10N || {};
+    uiLocale = !lang ? 'zh-CN' : table[lang] ? lang : String(lang).toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
+    if (uiLocale === 'zh-CN') return;
+    document.documentElement.lang = uiLocale;
+    document.title = tx(document.title);
+    // 「业务分类」默认值是可编辑的输入值，不在文本节点里，单独换成当前语言
+    const group = $('intake-department');
+    if (group && group.value === '争议解决') group.value = tx('争议解决');
     translateSubtree(document.body);
-    if (!enObserverReady && typeof MutationObserver !== 'undefined') {
-      enObserverReady = true;
+    if (!localeObserverReady && typeof MutationObserver !== 'undefined') {
+      localeObserverReady = true;
       const obs = new MutationObserver((mutations) => {
         for (const m of mutations) {
           if (m.type === 'characterData') {
-            const next = trEn(m.target.nodeValue);
+            const next = tx(m.target.nodeValue);
             if (next !== m.target.nodeValue) m.target.nodeValue = next;
           } else if (m.type === 'attributes') {
             const val = m.target.getAttribute?.(m.attributeName);
             if (val) {
-              const next = trEn(val);
+              const next = tx(val);
               if (next !== val) m.target.setAttribute(m.attributeName, next);
             }
           } else {
@@ -1316,7 +1075,7 @@
       const ctx = await awd.call('context.get', {});
       if (epoch !== state.epoch) return;
       state.context = ctx || {};
-      maybeEnableEnglish(state.context);
+      applyLocale(state.context);
       await loadOverview(epoch);
       if (epoch === state.epoch) notice('');
     } catch (err) {
@@ -1374,7 +1133,7 @@
     }
     $('intake-form').reset();
     await loadOverview(epoch);
-    notice(`已提交收案申请「${payload.title}」，利益冲突审查流已启动。`);
+    notice(L('panel.t.intakeSubmitted', '已提交收案申请「{0}」，利益冲突审查流已启动。', payload.title));
   }));
 
   $('intake-form').addEventListener('submit', (e) => {
@@ -1411,7 +1170,7 @@
     if (epoch !== state.epoch) return;
     $('invoice-form').reset();
     await loadOverview(epoch);
-    notice(`已提交发票申请：${buyerName}（¥${amountYuan.toLocaleString('zh-CN')}）。`);
+    notice(L('panel.t.invoiceSubmitted', '已提交发票申请：{0}（¥{1}）。', buyerName, amountYuan.toLocaleString(uiLocale)));
   }));
 
   $('btn-record-collection').addEventListener('click', () => runAction($('btn-record-collection'), async (epoch) => {
@@ -1440,7 +1199,7 @@
     if (epoch !== state.epoch) return;
     $('collection-form').reset();
     await loadOverview(epoch);
-    notice(`已登记收费到账：${payerName}（¥${amountYuan.toLocaleString('zh-CN')}）。`);
+    notice(L('panel.t.collectionRecorded', '已登记收费到账：{0}（¥{1}）。', payerName, amountYuan.toLocaleString(uiLocale)));
   }));
 
   $('btn-sync-erp').addEventListener('click', () => runAction($('btn-sync-erp'), async (epoch) => {
@@ -1452,8 +1211,8 @@
     const syncedCount = res?.syncedInvoiceCount ?? res?.syncedCount ?? state.invoices.length;
     const voucherRef = res?.batchRef || res?.externalErpRef || res?.erpSystem || 'ERP-KD-YY-20261015';
     banner.append(
-      node('strong', `财务系统对账完成（批次号：${voucherRef}）`),
-      node('p', res?.summary || `已同步 ${syncedCount} 笔发票与收款核销台账至金蝶/用友标准凭证接口。`, 'hint')
+      node('strong', L('panel.t.erpDone', '财务系统对账完成（批次号：{0}）', voucherRef)),
+      node('p', res?.summary || L('panel.t.erpSynced', '已同步 {0} 笔发票与收款核销台账至金蝶/用友标准凭证接口。', syncedCount), 'hint')
     );
     await loadOverview(epoch);
     notice('已与财务系统（金蝶/用友）完成凭证同步与核销。');
@@ -1467,7 +1226,7 @@
     banner.hidden = false;
     const csvSample = typeof res?.csv === 'string' ? res.csv.split('\n').slice(0, 3).join(' | ') : null;
     banner.append(
-      node('strong', `标准财务台账 CSV 已生成（${res?.filename || 'lawfirm-finance-ledger.csv'}）`),
+      node('strong', L('panel.t.csvReady', '标准财务台账 CSV 已生成（{0}）', res?.filename || 'lawfirm-finance-ledger.csv')),
       node('p', csvSample || res?.csvPreview || res?.summary || '包含单据编号、案件案号、客户税号、含税额、不含税额、税额、实收核销额与账龄分段。', 'hint')
     );
     notice('已生成金蝶/用友标准财务台账。');

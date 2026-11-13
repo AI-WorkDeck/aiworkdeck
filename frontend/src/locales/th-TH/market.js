@@ -222,6 +222,7 @@ export default {
   "permTasks": "ปฏิทินและงาน",
   "permClipboard": "คลิปบอร์ด",
   "permLawfirm": "ข้อมูลทีม",
+  "permWorklogRead": "สรุปบันทึกการทำงานของคุณเอง",
   "newlyCreatedTag": "ใหม่",
   "publishBtn": "เผยแพร่ไปยังตลาดส่วนขยาย",
   "publishUpdateBtn": "อัปเดตบนตลาดส่วนขยาย",

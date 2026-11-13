@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "bijv. Zhejiang Qinghe Foods Co., Ltd. Juridische afdeling & arbeidsgeschil",
   "caseFieldPracticeArea": "Praktijkgebied",
   "caseFieldPracticeAreaPh": "bijv. Arbeidsrecht / Juridische dienst / M&A",
-  "caseFieldDepartment": "Praktijkgebied",
+  "caseFieldDepartment": "Praktijkgroep",
   "caseFieldDepartmentPh": "bijv. Ondernemingsrecht & M&A",
   "caseFieldLeadLawyer": "Verantwoordelijke partner / advocaat",
   "caseFieldLeadLawyerPh": "bijv. Lin Zhiyuan",

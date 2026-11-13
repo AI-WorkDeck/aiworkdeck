@@ -493,7 +493,9 @@ public class LawFirmConflictEngine {
             return ConflictCheckResult.builder()
                     .riskLevel("GREEN")
                     .primaryRuleCode("G0_CLEAR")
-                    .summary("【G0_CLEAR】全国律协《律师执业行为规范》第五十条：经检索全所在办案件、常年法律顾问、历史客户及关联方库，未发现利益冲突。")
+                    .summary(com.checkba.service.LangText.of(
+                            "【G0_CLEAR】全国律协《律师执业行为规范》第五十条：经检索全所在办案件、常年法律顾问、历史客户及关联方库，未发现利益冲突。",
+                            "【G0_CLEAR】ACLA Code of Conduct for Lawyers art. 50: no conflict found across the firm's active matters, retainer clients, former clients and related parties."))
                     .hits(List.of())
                     .feeComplianceWarning(feeWarning)
                     .build();
@@ -507,7 +509,9 @@ public class LawFirmConflictEngine {
                 .orElse(hits.get(0));
 
         String summary = String.format(
-                "【%s · %s】共命中 %d 项利益冲突记录（首要规则：%s；涉及主体：%s；关联主办：%s）。法规依据：%s",
+                com.checkba.service.LangText.of(
+                        "【%s · %s】共命中 %d 项利益冲突记录（首要规则：%s；涉及主体：%s；关联主办：%s）。法规依据：%s",
+                        "【%s · %s】%d conflict record(s) found (primary rule: %s; party: %s; related lead: %s). Legal basis: %s"),
                 overallRisk,
                 primary.getRuleCode(),
                 hits.size(),

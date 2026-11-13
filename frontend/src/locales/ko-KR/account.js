@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "예: Zhejiang Qinghe Foods Co., Ltd. 총괄 법무 및 노동 분쟁",
   "caseFieldPracticeArea": "전문 분야",
   "caseFieldPracticeAreaPh": "예: 노동 / 총괄 법무 / M&A",
-  "caseFieldDepartment": "전문 분야",
+  "caseFieldDepartment": "업무 분류",
   "caseFieldDepartmentPh": "예: 기업 및 M&A",
   "caseFieldLeadLawyer": "수석 파트너 / 변호사",
   "caseFieldLeadLawyerPh": "예: 홍길동",

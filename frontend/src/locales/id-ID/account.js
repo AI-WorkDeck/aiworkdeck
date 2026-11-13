@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "mis. PT Zhejiang Qinghe Foods - Konsultan Hukum Umum & Sengketa Kettenagakerjaan",
   "caseFieldPracticeArea": "Bidang Praktik",
   "caseFieldPracticeAreaPh": "mis. Ketenagakerjaan / Konsultan Hukum Umum / Merger & Akuisisi",
-  "caseFieldDepartment": "Bidang praktik",
+  "caseFieldDepartment": "Kelompok praktik",
   "caseFieldDepartmentPh": "mis. Korporat & Merger/Akuisisi",
   "caseFieldLeadLawyer": "Mitra Utama / Pengacara",
   "caseFieldLeadLawyerPh": "mis. Budi Santoso",

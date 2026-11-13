@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "cth. Zhejiang Qinghe Foods Co., Ltd. Peguam Umum & Pertikaian Buruh",
   "caseFieldPracticeArea": "Bidang Amalan",
   "caseFieldPracticeAreaPh": "cth. Pekerjaan / Peguam Umum / M&A",
-  "caseFieldDepartment": "Bidang amalan",
+  "caseFieldDepartment": "Kumpulan amalan",
   "caseFieldDepartmentPh": "cth. Korporat & M&A",
   "caseFieldLeadLawyer": "Rakan Kanan / Peguam",
   "caseFieldLeadLawyerPh": "cth. Lin Zhiyuan",

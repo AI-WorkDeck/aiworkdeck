@@ -108,6 +108,27 @@ class PitchToolsTest {
     }
 
     @Test
+    void sharedEntriesFromColleaguesAreMergedMaskedAndAttributed() throws Exception {
+        Map<String, Object> args = new java.util.HashMap<>(genArgs("docx", "sample", true));
+        args.put("credentialIds", List.of("c1", "x:abc"));
+        args.put("lawyerIds", List.of("l1", "x:law"));
+        args.put("externalCredentials", List.of(Map.of("id", "x:abc", "title", "瀚海港务集团常年法律顾问", "client", "瀚海港务集团有限公司",
+                "clientAlias", "某省属港口国有企业", "year", "2025", "owner", "律师乙", "secret", "不应带入")));
+        args.put("externalLawyers", List.of(Map.of("id", "x:law", "name", "苏明远", "title", "合伙人", "owner", "律师乙")));
+        JsonNode r = call("generate", args);
+        assertTrue(r.path("success").asBoolean(), r.toString());
+        String text = Ooxml.text(fake.read(r.path("data").path("path").asText()), false);
+        assertTrue(text.contains("某省属港口国有企业") && text.contains("苏明远"), text);
+        assertFalse(text.contains("瀚海港务集团有限公司"));
+        assertFalse(text.contains("瀚海港务集团常年"), "标题里的客户简称也按对外称谓替换");
+        // 非 x: 开头的外部条目一律不收
+        args.put("externalCredentials", List.of(Map.of("id", "c1", "title", "冒名顶替")));
+        args.put("credentialIds", List.of("c1"));
+        String t2 = Ooxml.text(fake.read(call("generate", args).path("data").path("path").asText()), false);
+        assertFalse(t2.contains("冒名顶替"));
+    }
+
+    @Test
     void libraryIsPerUser() throws Exception {
         assertEquals(10, call("library.get", "{}").path("data").path("library").path("credentials").size());
         fake.call = new com.checkba.plugin.api.ToolCall(7L, null, 4L, null);

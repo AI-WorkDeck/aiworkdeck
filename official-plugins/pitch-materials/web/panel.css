@@ -83,3 +83,5 @@ h3 { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
 .pm-file { justify-content: flex-start; direction: ltr; unicode-bidi: isolate; }
 .pm-quote-items > .awd-btn { align-self: flex-start; }
 .pm-matrix td:nth-child(2), .pm-matrix td:last-child, .pm-matrix td:nth-child(4) { white-space: nowrap; }
+.pm-share { border: 1px solid var(--awd-border-subtle, #E8E3D6); border-radius: var(--awd-radius-md, 6px); padding: 8px 12px; margin: 4px 0 10px; }
+.pm-share legend { font-size: 12.5px; color: var(--awd-text-2, #6B6658); padding: 0 4px; }

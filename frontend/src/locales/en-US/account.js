@@ -388,7 +388,7 @@ export default {
   caseFieldTitlePh: 'e.g. Zhejiang Qinghe Foods Co., Ltd. General Counsel & Labor Dispute',
   caseFieldPracticeArea: 'Practice Area',
   caseFieldPracticeAreaPh: 'e.g. Employment / General Counsel / M&A',
-  caseFieldDepartment: 'Practice area',
+  caseFieldDepartment: 'Practice Group',
   caseFieldDepartmentPh: 'e.g. Corporate & M&A',
   caseFieldLeadLawyer: 'Lead Partner / Lawyer',
   caseFieldLeadLawyerPh: 'e.g. Lin Zhiyuan',

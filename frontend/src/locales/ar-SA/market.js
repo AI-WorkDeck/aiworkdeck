@@ -222,6 +222,7 @@ export default {
   "permTasks": "التقويم والمهام",
   "permClipboard": "الحافظة",
   "permLawfirm": "معلومات الفريق",
+  "permWorklogRead": "ملخص سجلات عملك الخاصة",
   "newlyCreatedTag": "جديد",
   "publishBtn": "النشر في السوق",
   "publishUpdateBtn": "التحديث في السوق",

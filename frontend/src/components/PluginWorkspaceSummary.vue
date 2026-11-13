@@ -472,6 +472,7 @@
 </template>
 
 <script>
+import { formatCnyCompact } from '@/utils/cnyAmount'
 import { ICONS } from '@/config/icons.js'
 import { getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { getTeam, getProjectMembers, getCurrentUser, requestPluginIm, getLawFirmOverview } from '@/services/api.js'
@@ -572,8 +573,8 @@ export default {
       return {
         activeMatters,
         pendingClearances,
-        contractedText: this.tr('panels.pwsLfWanSuffix', `${contractedWan} 万`, { amount: contractedWan }),
-        collectedText: this.tr('panels.pwsLfWanSuffix', `${collectedWan} 万`, { amount: collectedWan }),
+        contractedText: formatCnyCompact(Number(contractedWan) * 10000, 'panels.pwsLfWanSuffix'),
+        collectedText: formatCnyCompact(Number(collectedWan) * 10000, 'panels.pwsLfWanSuffix'),
       }
     },
     ICONS() {
@@ -701,6 +702,13 @@ export default {
     },
   },
   mounted() {
+    // 律所管理插件加载样板、刷新或写入后重读了数据：左栏数字跟着更新（只在显示律所摘要时）
+    this._onLawFirmDataChanged = () => {
+      if (!this.plugin || this.plugin.pluginId !== 'lawfirm-management') return
+      clearTimeout(this._lawfirmRefreshTimer)
+      this._lawfirmRefreshTimer = setTimeout(() => this.loadLawFirmSummary(), 300)
+    }
+    uni.$on('awd:lawfirm-data-changed', this._onLawFirmDataChanged)
     this._onImDirectoryChanged = () => {
       if (this.plugin && this.plugin.pluginId === 'project-im') {
         this.loadDirectoryOnly()
@@ -740,6 +748,8 @@ export default {
     if (this.plugin.pluginId === 'project-im') this.notifyImSidebar(true)
   },
   beforeUnmount() {
+    if (this._onLawFirmDataChanged) uni.$off('awd:lawfirm-data-changed', this._onLawFirmDataChanged)
+    clearTimeout(this._lawfirmRefreshTimer)
     if (this.plugin.pluginId === 'project-im') this.notifyImSidebar(false)
     if (this._onImDirectoryChanged) uni.$off('awd:im-directory-changed', this._onImDirectoryChanged)
     if (this._onPluginStateSynced) uni.$off('awd:plugin-state-synced', this._onPluginStateSynced)
@@ -955,12 +965,13 @@ export default {
 .lawfirm-summary-card { display: flex; flex-direction: column; gap: 10px; margin: 10px 8px 6px; padding: 10px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2); border: 1px solid var(--awd-border-subtle); }
 .lawfirm-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .lawfirm-stat-item { padding: 8px; border-radius: var(--awd-radius-sm); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); }
-.lawfirm-stat-label { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+/* 德文、俄文等长词在窄栏里按音节断行，不溢出卡片 */
+.lawfirm-stat-label { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); overflow-wrap: anywhere; hyphens: auto; }
 .lawfirm-stat-val { display: block; margin-top: 2px; font-size: var(--awd-font-size-reading); font-weight: 600; color: var(--awd-text); font-variant-numeric: tabular-nums; }
 .lawfirm-stat-val.warn { color: var(--awd-warning); }
 .lawfirm-stat-val.accent { color: var(--awd-accent); }
 .lawfirm-quick-jumps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.lawfirm-jump-btn { min-height: 30px; line-height: 28px; padding: 0 8px; margin: 0; font-size: var(--awd-panel-fs); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); }
+.lawfirm-jump-btn { min-height: 30px; line-height: 1.35; padding: 6px 8px; margin: 0; font-size: var(--awd-panel-fs); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); white-space: normal; overflow-wrap: anywhere; hyphens: auto; }
 
 .pws-root {
   display: flex;
@@ -1763,8 +1774,9 @@ export default {
 .pws-workspace-link.active { background: var(--awd-panel-accent-wash); }
 .pws-workspace-link:focus-visible, .pws-about-toggle:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
 .pws-workspace-glyph { width: 16px; height: 16px; flex-shrink: 0; color: var(--awd-panel-text-2); }
-.pws-workspace-label { flex: 1; min-width: 0; }
-.pws-workspace-state { flex-shrink: 0; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); }
+/* 俄文、德文等长词：两侧都允许按音节断行，不互相压住 */
+.pws-workspace-label { flex: 1; min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
+.pws-workspace-state { flex: 0 1 auto; max-width: 50%; text-align: end; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); overflow-wrap: anywhere; hyphens: auto; }
 .pws-workspace-summary .pws-section { border: 0; padding-top: var(--awd-panel-gap); }
 .pws-workspace-summary .pws-nav-item { border: 0; background: transparent; }
 .pws-workspace-summary .pws-nav-item.active { background: var(--awd-panel-accent-wash); }

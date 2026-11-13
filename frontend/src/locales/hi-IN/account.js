@@ -346,7 +346,7 @@ export default {
   "caseFieldTitlePh": "उदा. Zhejiang Qinghe Foods Co., Ltd. महाधिवक्ता और श्रम विवाद",
   "caseFieldPracticeArea": "अभ्यास क्षेत्र",
   "caseFieldPracticeAreaPh": "उदा. रोजगार / महाधिवक्ता / M&A",
-  "caseFieldDepartment": "अभ्यास क्षेत्र",
+  "caseFieldDepartment": "प्रैक्टिस समूह",
   "caseFieldDepartmentPh": "उदा. कॉर्पोरेट और M&A",
   "caseFieldLeadLawyer": "प्रमुख पार्टनर / अधिवक्ता",
   "caseFieldLeadLawyerPh": "उदा. Lin Zhiyuan",
