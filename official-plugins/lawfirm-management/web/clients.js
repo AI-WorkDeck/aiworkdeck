@@ -19,7 +19,7 @@
     cloud: { list: 'clients.list', get: 'clients.get', save: 'clients.save', saveRelation: 'clients.saveRelation', deleteRelation: 'clients.deleteRelation', searchParties: 'clients.searchParties', idKey: 'partyId' }
   };
   const act = () => ACT[state.mode];
-  const cloudOn = () => Boolean(state.cloud && state.cloud.clientsEnabled);
+  const cloudOn = () => Boolean(state.cloud && state.cloud.switches && state.cloud.switches.clients);
 
   function t(key, vars) {
     let s = TABLE[locale]?.[key] ?? TABLE['en-US']?.[key] ?? TABLE['zh-CN']?.[key] ?? key;
@@ -156,7 +156,7 @@
     };
     const withdraw = el('button', { type: 'button', id: 'client-withdraw', onclick: () => askThen(t('client.cloud.withdrawConfirm'),
       () => request('withdrawClientsFromCloud', {}), (r) => t('client.cloud.withdrawn', { clients: r.withdrawnClients ?? 0 })) }, t('client.cloud.withdraw'));
-    const purge = state.cloud.canChange ? el('button', { type: 'button', id: 'client-purge', class: 'danger', onclick: () => askThen(t('client.cloud.purgeConfirm'),
+    const purge = state.cloud.firmAdmin ? el('button', { type: 'button', id: 'client-purge', class: 'danger', onclick: () => askThen(t('client.cloud.purgeConfirm'),
       () => request('clients.purge', { confirm: true }), (r) => t('client.cloud.purged', { clients: r.deletedClients ?? 0 })) }, t('client.cloud.purge')) : null;
     return el('div', {},
       el('div', { class: 'client-cloud-bar', id: 'client-cloud-bar' },

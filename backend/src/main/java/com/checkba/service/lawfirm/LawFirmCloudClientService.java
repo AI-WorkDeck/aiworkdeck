@@ -43,12 +43,10 @@ import java.util.Set;
  */
 @Service
 @RequiredArgsConstructor
-public class LawFirmCloudClientService {
-    public static final String FEATURE = "clients";
+public class LawFirmCloudClientService implements LawFirmCloudFeature {
     public static final Set<String> ACTIONS = Set.of(
             "clients.list", "clients.get", "clients.save", "clients.saveRelation", "clients.deleteRelation",
             "clients.searchParties", "clients.import", "clients.conflictSearch", "clients.withdraw", "clients.purge");
-    static final String STALE = "该记录已被同事修改，请刷新后再改";
     private static final int MAX_IMPORT = 2000;
 
     private final LawFirmAuthority authority;
@@ -56,14 +54,43 @@ public class LawFirmCloudClientService {
     private final LawFirmCloudRelationRepository relations;
     private final LawFirmConflictEngine engine;
     private final ObjectMapper mapper;
-    private final org.springframework.beans.factory.ObjectProvider<LawFirmCloudClientsSwitch> clientsSwitch;
+    private final LawFirmCloudSwitches switches;
 
-    /** 本所是否已开启「客户管理」云端功能；开关实现缺席时视为未开启。 */
-    public boolean enabledFor(String firmId) {
-        LawFirmCloudClientsSwitch s = clientsSwitch.getIfAvailable();
-        return firmId != null && s != null && s.enabled(firmId);
+    @Override
+    public String key() {
+        return "clients";
     }
 
+    @Override
+    public Set<String> pluginIds() {
+        return Set.of("lawfirm-management");
+    }
+
+    @Override
+    public Map<String, String> names() {
+        return Map.of("zh-CN", "客户与主体", "en-US", "Clients and parties");
+    }
+
+    @Override
+    public Map<String, String> descriptions() {
+        return Map.of(
+                "zh-CN", "同所律师共享客户档案、联系人与主体关系；云端利冲检索全所客户与关联主体。维护人、主办合伙人和管理员看完整档案，其他律师只看名称与维护人。",
+                "en-US", "Share client records, contacts and party relationships within the firm; cloud conflict checks search all firm clients and related parties. Owners, responsible partners and administrators see full records; other lawyers see only the name and owner.");
+    }
+
+    /** 律所管理员关闭开关并选择删除时由律所云端通道调用；返回删除的行数（客户与主体 + 关系）。 */
+    @Override
+    public long purge(String firmId) {
+        Map<String, Object> r = purgeFirm(firmId);
+        return ((Number) r.get("deletedParties")).longValue() + ((Number) r.get("deletedRelations")).longValue();
+    }
+
+    /** 本所是否已开启「客户管理」云端功能（云端利冲是否使用全所主体数据）。 */
+    public boolean enabledFor(String firmId) {
+        return firmId != null && switches.enabled(firmId, key());
+    }
+
+    @Override
     public Map<String, Object> execute(LawFirmAuthority.Member me, String action, Map<String, Object> raw) {
         Map<String, Object> p = raw == null ? Map.of() : raw;
         Ctx ctx = new Ctx(me);
@@ -531,10 +558,10 @@ public class LawFirmCloudClientService {
         return userId;
     }
 
+    /** 界面上的修改必须带所见版本（缺版本同样按过期处理）；比对交给律所云端通道的统一校验。 */
     static void requireVersion(Map<String, Object> p, long current) {
-        if (!(p.get("expectedVersion") instanceof Number v) || v.longValue() != current) {
-            throw new IllegalStateException(LangText.of(STALE, "This record was changed by a colleague; please refresh and try again"));
-        }
+        if (p.get("expectedVersion") == null) throw new IllegalStateException(LawFirmCloudVersions.staleMessage());
+        LawFirmCloudVersions.check(p, current);
     }
 
     private LawFirmCloudParty findOrCreate(Ctx ctx, String name, String code, String type) {

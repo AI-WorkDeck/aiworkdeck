@@ -200,7 +200,7 @@ test('host without client actions (0.85.x): Clients tab and intake picker are hi
   assert.equal(sent.clientName, '某委托人有限公司');
   assert.equal('clientId' in sent && sent.clientId !== undefined, false, 'old host receives the same intake payload as before');
 test('firm cloud off or unavailable: local ledger only, with a pointer to the shared settings', async () => {
-  const p = await mount({ cloud: { clientsEnabled: false, timeEnabled: false, version: 0 } });
+  const p = await mount({ cloud: { switches: { clients: false, time: false }, version: 0 } });
   assert.match(p.$('client-cloud-bar').textContent, /律所云端未开启/);
   assert.equal(p.$('client-mode-cloud'), null);
   const q = await mount();
@@ -208,7 +208,7 @@ test('firm cloud off or unavailable: local ledger only, with a pointer to the sh
 });
 
 test('firm cloud on: cloud list shows visibility, restricted profile hides details, stale edit shows the server message', async () => {
-  const p = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2 } });
+  const p = await mount({ cloud: { switches: { clients: true, time: false }, version: 2 } });
   p.$('client-mode-cloud').click();
   await tick();
   const rows = p.dom.window.document.querySelectorAll('tr.client-row');
@@ -248,7 +248,7 @@ test('firm cloud on: cloud list shows visibility, restricted profile hides detai
 });
 
 test('intake precheck also searches firm cloud parties when the firm cloud is on', async () => {
-  const p = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2 } });
+  const p = await mount({ cloud: { switches: { clients: true, time: false }, version: 2 } });
   p.$('intake-client-name').value = '另一委托人有限公司';
   p.$('intake-counterparty-name').value = '林海';
   p.$('btn-preview-conflict').click();
@@ -259,7 +259,7 @@ test('intake precheck also searches firm cloud parties when the firm cloud is on
 });
 
 test('withdraw and admin purge require an on-page confirmation before anything is deleted', async () => {
-  const lawyer = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2, canChange: false } });
+  const lawyer = await mount({ cloud: { switches: { clients: true, time: false }, version: 2, firmAdmin: false } });
   assert.equal(lawyer.$('client-purge'), null, 'only firm administrators see the purge action');
   lawyer.$('client-withdraw').click();
   await tick();
@@ -274,7 +274,7 @@ test('withdraw and admin purge require an on-page confirmation before anything i
   assert.equal(lawyer.actions('withdrawClientsFromCloud').length, 1);
   assert.match(lawyer.$('clients-status').textContent, /已从律所云端撤回 1 位客户/);
 
-  const admin = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2, canChange: true } });
+  const admin = await mount({ cloud: { switches: { clients: true, time: false }, version: 2, firmAdmin: true } });
   admin.$('client-purge').click();
   await tick();
   assert.match(admin.$('client-cloud-confirm').textContent, /删除后无法恢复/);

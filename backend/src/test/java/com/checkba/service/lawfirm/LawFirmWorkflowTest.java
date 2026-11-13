@@ -41,6 +41,7 @@ class LawFirmWorkflowTest {
     @Autowired UserRepository users;
     @MockBean AccountDirectoryClient directory;
     @MockBean ProjectMemberService projectPermissions;
+    @MockBean LawFirmCloudSwitches cloudSwitches;
     final Map<String,OrgMembership> membership=new ConcurrentHashMap<>();
     Long admin,applicant,lawyer,committee,outsider;
     String firm;

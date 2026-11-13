@@ -47,8 +47,8 @@ class LawFirmCloudClientTest {
     @TestConfiguration
     static class Switch {
         @Bean
-        LawFirmCloudClientsSwitch clientsSwitch() {
-            return ENABLED::contains;
+        LawFirmCloudSwitches cloudSwitches() {
+            return (firmId, feature) -> "clients".equals(feature) && ENABLED.contains(firmId);
         }
     }
 
@@ -170,7 +170,7 @@ class LawFirmCloudClientTest {
         assertEquals(readByA + 1, version(byPartner));
         IllegalStateException stale = assertThrows(IllegalStateException.class, () -> call(lawyerA, "clients.save",
                 new HashMap<>(Map.of("partyId", id(c), "name", "东方航运有限公司", "industry", "物流", "expectedVersion", readByA))));
-        assertEquals(LawFirmCloudClientService.STALE, stale.getMessage());
+        assertEquals(LawFirmCloudVersions.staleMessage(), stale.getMessage());
         assertThrows(IllegalStateException.class, () -> call(lawyerA, "clients.save",
                 new HashMap<>(Map.of("partyId", id(c), "name", "东方航运有限公司"))), "不带版本号的修改同样拒绝");
         assertEquals("航运", client(call(lawyerA, "clients.get", Map.of("partyId", id(c)))).get("industry"), "被拒的修改没有写进去");
