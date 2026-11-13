@@ -12,6 +12,10 @@
       <text>{{ $t('account.teHint') }}</text>
     </view>
     <view v-if="unavailable" class="awd-set-note">{{ unavailable }}</view>
+    <view v-else-if="cloud.enabled" class="awd-set-note te-cloud-note">
+      <text class="awd-set-note-title">{{ $t('account.teCloudTitle') }}</text>
+      <text>{{ $t('account.teCloudNote') }}</text>
+    </view>
     <template v-else>
       <view class="te-toolbar">
         <button class="awd-set-btn-primary" :disabled="busy" @tap="importFromWorkLog">{{ $t('account.teImportBtn') }}</button>
@@ -54,8 +58,10 @@
           </view>
           <text class="tc tc-date">{{ r.workDate }}</text>
           <view class="tc tc-matter">
-            <text class="te-strong">{{ r.matterTitle || r.projectName || '-' }}</text>
-            <text class="te-sub">{{ r.clientName || (r.intakeId ? '' : $t('account.teNoMatter')) }}</text>
+            <AwdSelect v-if="r.editable && targets.length" class="te-row-target" :range="targetLabels" :value="targetIndex(edits[r.id].target)"
+              :aria-label="$t('account.teColMatter')" @change="i => setTarget(r.id, i)" />
+            <text v-else class="te-strong">{{ r.matterTitle || r.projectName || '-' }}</text>
+            <text class="te-sub">{{ r.cloud ? $t('account.teCloudBadge') : (r.clientName || (r.intakeId ? '' : $t('account.teNoMatter'))) }}</text>
           </view>
           <view class="tc tc-hours">
             <input v-if="r.editable" class="awd-set-input te-cell-input" v-model="edits[r.id].hours" type="digit" />
@@ -115,6 +121,7 @@ export default {
       status: '',
       entries: [],
       targets: [],
+      cloud: { enabled: false },
       edits: {},
       selected: {},
       adding: false,
@@ -133,7 +140,10 @@ export default {
       return this.rows.filter(r => r.editable && this.selected[r.id]).map(r => r.id)
     },
     targetLabels() {
-      return this.targets.map(t => (t.clientName ? `${t.label}（${t.clientName}）` : t.label))
+      return this.targets.map(t => {
+        if (t.cloud) return this.$t('account.teCloudTarget', { title: t.label, client: t.clientName || '' })
+        return t.clientName ? `${t.label}（${t.clientName}）` : t.label
+      })
     },
     summaryText() {
       const sum = s => this.entries.filter(e => s.includes(e.status)).reduce((n, e) => n + (e.minutes || 0), 0)
@@ -182,16 +192,32 @@ export default {
       }
       return notes
     },
+    // 本条当前挂在哪个目标上（与 targets[].key 同一编码：p:项目 / i:事项 / c:律所云端事项）
+    rowTarget(e) {
+      if (e.cloudTarget) return e.cloudTarget
+      if (e.projectId && this.targets.some(t => t.key === 'p:' + e.projectId)) return 'p:' + e.projectId
+      if (e.intakeId) return 'i:' + e.intakeId
+      return e.projectId ? 'p:' + e.projectId : ''
+    },
+    targetIndex(key) {
+      const i = this.targets.findIndex(t => t.key === key)
+      return i >= 0 ? i : 0
+    },
+    setTarget(id, index) {
+      const t = this.targets[index]
+      if (t && this.edits[id]) this.edits[id] = { ...this.edits[id], target: t.key }
+    },
     resetEdits() {
       const edits = {}
       for (const e of this.entries) {
-        edits[e.id] = { hours: this.hours(e.minutes), description: e.description || '', billable: e.billable !== false }
+        edits[e.id] = { hours: this.hours(e.minutes), description: e.description || '', billable: e.billable !== false, target: this.rowTarget(e) }
       }
       this.edits = edits
     },
     isDirty(r) {
       const ed = this.edits[r.id]
-      return !!ed && (ed.hours !== this.hours(r.minutes) || ed.description !== (r.description || '') || ed.billable !== (r.billable !== false))
+      return !!ed && (ed.hours !== this.hours(r.minutes) || ed.description !== (r.description || '') || ed.billable !== (r.billable !== false)
+        || ed.target !== this.rowTarget(r))
     },
     unwrap(res) {
       return res && res.data && typeof res.data === 'object' ? res.data : res
@@ -199,6 +225,7 @@ export default {
     apply(data) {
       this.entries = data.entries || []
       this.targets = data.targets || this.targets
+      this.cloud = data.cloud || this.cloud
       this.resetEdits()
       const alive = new Set(this.entries.map(e => e.id))
       for (const id of Object.keys(this.selected)) if (!alive.has(Number(id))) delete this.selected[id]
@@ -258,7 +285,9 @@ export default {
     saveRow(r) {
       return this.run(async () => {
         const ed = this.edits[r.id]
-        await this.call('timeSave', { id: r.id, hours: ed.hours, description: ed.description, billable: ed.billable })
+        const params = { id: r.id, hours: ed.hours, description: ed.description, billable: ed.billable }
+        if (ed.target && ed.target !== this.rowTarget(r)) params.target = ed.target
+        await this.call('timeSave', params)
         await this.load()
         this.status = this.$t('account.teSaved')
       })
@@ -280,7 +309,9 @@ export default {
         const data = await this.call('timeSubmit', { ids: this.selectedIds })
         this.selected = {}
         await this.load()
-        this.status = this.$t('account.teSubmitted', { count: data.submitted || 0 })
+        this.status = data.cloudSubmitted
+          ? this.$t('account.teSubmittedCloud', { count: data.submitted || 0, cloud: data.cloudSubmitted })
+          : this.$t('account.teSubmitted', { count: data.submitted || 0 })
       })
     },
   },
@@ -372,6 +403,8 @@ export default {
 .te-review { color: var(--awd-warning-text); }
 .te-desc-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .te-cell-input { width: 100%; box-sizing: border-box; }
+.te-row-target { width: 100%; }
+.te-cloud-note { margin-bottom: var(--awd-space-2); }
 .te-empty {
   padding: 32px;
   text-align: center;

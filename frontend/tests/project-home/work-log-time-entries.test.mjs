@@ -94,3 +94,26 @@ test('ledger unavailable (team server) shows the backend reason instead of an em
   await vm.load()
   assert.equal(vm.unavailable, '本机收费台账仅在桌面端可用。')
 })
+
+test('a draft can be pointed at a firm cloud matter; the change is saved as a target and cloud submissions are reported', async () => {
+  const calls = []
+  const entries = [{ id: 7, status: 'DRAFT', minutes: 60, description: 'x', billable: true, source: 'WORK_RECORD', capturedMinutes: 60, projectId: 5 }]
+  const targets = [{ key: 'p:5', label: '甲项目' }, { key: 'c:11111111-2222-3333-4444-555555555555', label: '数据合规专项', clientName: '甲公司', cloud: true }]
+  const vm = makeVm(async (action, params) => {
+    calls.push({ action, params })
+    if (action === 'timeSubmit') return { data: { submitted: 1, cloudSubmitted: 1 } }
+    return { data: { entries, targets, cloud: { available: true, enabled: true } } }
+  })
+  await vm.load()
+  assert.equal(vm.cloud.enabled, true)
+  assert.equal(vm.targetLabels[1], 'account.teCloudTarget:{"title":"数据合规专项","client":"甲公司"}')
+  assert.equal(vm.edits[7].target, 'p:5')
+  vm.setTarget(7, 1)
+  assert.equal(vm.isDirty(vm.rows[0]), true)
+  await vm.saveRow(vm.rows[0])
+  assert.deepEqual(calls.find((c) => c.action === 'timeSave').params,
+    { id: 7, hours: '1', description: 'x', billable: true, target: 'c:11111111-2222-3333-4444-555555555555' })
+  vm.selected = { 7: true }
+  await vm.submitSelected()
+  assert.match(vm.status, /teSubmittedCloud/)
+})

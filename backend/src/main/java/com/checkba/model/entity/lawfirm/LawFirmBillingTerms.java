@@ -43,5 +43,9 @@ public class LawFirmBillingTerms {
     /** 事项累计封顶金额（分）；为空表示不封顶。 */
     private Long capCents;
 
+    /** 发布到律所云端后的云端事项编号；同事交的工时按它对应回本事项。 */
+    @Column(length = 36)
+    private String cloudMatterId;
+
     private Instant updatedAt;
 }

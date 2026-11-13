@@ -200,3 +200,34 @@ test('on an older host without hourly-billing actions the 计时收费 tab hides
   await tick();
   assert.equal(denied.$('tab-hourly').hidden, false, 'a permission error is not an old host');
 });
+
+test('firm cloud: off links to the shared switch page; on pulls colleagues\' time and publishes matters', async (t) => {
+  let published = {};
+  const h = harness({ responses: {
+    timeReviewList: { entries: [entry({ source: 'CLOUD', timekeeperName: '陈律师（另一台电脑）', cloudSyncPending: true })] },
+    cloudBillingStatus: () => ({ available: true, enabled: true, firmAdmin: true, published, pendingSync: 0 }),
+    cloudBillingPull: { created: 2, refreshed: 1, unmapped: 1, pendingSync: 0 },
+    cloudBillingPublish: () => { published = { 'm-1': 3 }; return { available: true, enabled: true, firmAdmin: true, published, pendingSync: 0 }; },
+    billingRates: { matters: [{ intakeId: 3, title: '数据合规专项', clientName: '甲公司', feeMode: 'HOURLY', levelRates: {} }], timekeepers: [], levels: [] }
+  } });
+  t.after(() => h.dom.window.close());
+  await h.click(h.$('tab-hourly'));
+  assert.match(h.$('hb-cloud').textContent, /已开启，已发布 0 个事项/);
+  const card = h.doc.querySelector('[data-entry-id="1"]');
+  assert.match(card.textContent, /同事经律所云端提交/);
+  assert.match(card.textContent, /尚未同步到云端/);
+  await h.click(h.$('hb-cloud').querySelector('[data-action="cloud-pull"]'));
+  assert.ok(h.calls.some((c) => c.action === 'cloudBillingPull'));
+  assert.match(h.$('hb-status').textContent, /新增 2 条，更新 1 条.*1 条所属事项在本机找不到/);
+  await h.click(h.$('hb-nav-rates'));
+  await h.click(h.doc.querySelector('#hb-terms [data-action="cloud-publish"]'));
+  assert.deepEqual(h.calls.find((c) => c.action === 'cloudBillingPublish').params, { intakeId: 3 });
+  assert.match(h.doc.querySelector('#hb-terms').textContent, /已发布到律所云端/);
+
+  const off = harness({ responses: { timeReviewList: { entries: [] }, cloudBillingStatus: { available: true, enabled: false } } });
+  t.after(() => off.dom.window.close());
+  await off.click(off.$('tab-hourly'));
+  assert.match(off.$('hb-cloud').textContent, /尚未开启「计时工时汇总」/);
+  assert.ok(off.$('hb-cloud').querySelector('[data-action="cloud-settings"]'), 'links to the shared Firm cloud page');
+  assert.equal(off.$('hb-cloud').querySelector('[data-action="cloud-pull"]'), null);
+});

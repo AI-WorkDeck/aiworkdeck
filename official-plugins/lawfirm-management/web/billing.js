@@ -12,7 +12,7 @@
   const call = (action, params = {}) => awd.call('lawfirm.request', { action, params });
 
   let locale = 'zh-CN';
-  const state = { view: 'review', month: '', review: [], rates: null, bills: [], preview: null, metrics: null, openAudit: new Set(), openEdit: new Set(), openBill: new Set() };
+  const state = { cloud: null, view: 'review', month: '', review: [], rates: null, bills: [], preview: null, metrics: null, openAudit: new Set(), openEdit: new Set(), openBill: new Set() };
 
   function t(key, vars) {
     const raw = TABLE[locale]?.[key] ?? TABLE['en-US']?.[key] ?? TABLE['zh-CN']?.[key] ?? key;
@@ -154,7 +154,9 @@
     if (e.billable && e.rateCents == null) head.append(el('span', t('billing.noRate'), 'badge badge-red'));
     card.append(head);
     card.append(el('p', e.description || '', 'item-meta cell-text'));
-    const src = e.source === 'WORK_RECORD' ? t('billing.sourceWorkLog', { h: hours(e.capturedMinutes) }) : t('billing.sourceManual');
+    const src = e.source === 'WORK_RECORD' ? t('billing.sourceWorkLog', { h: hours(e.capturedMinutes) })
+      : e.source === 'CLOUD' ? t('billing.sourceCloud') : t('billing.sourceManual');
+    if (e.cloudSyncPending) head.append(el('span', t('billing.cloudSyncPending'), 'badge badge-yellow'));
     card.append(el('p', src, 'hint'));
 
     const actions = el('div', null, 'action-row');
@@ -460,6 +462,16 @@
       head.append(el('strong', `${m.clientName || '—'} · ${m.title}`));
       if (m.feeMode === 'HOURLY') head.append(el('span', t('billing.hourlyBadge'), 'badge badge-green'));
       head.append(el('span', t('billing.billedToDate', { amount: yuan(m.billedToDateCents) }), 'badge badge-neutral'));
+      const published = Object.values(state.cloud?.published || {}).map(String).includes(String(m.intakeId));
+      if (published) head.append(el('span', t('billing.cloudPublished'), 'badge badge-green'));
+      if (state.cloud?.enabled && state.cloud?.firmAdmin) {
+        head.append(button(t(published ? 'billing.cloudRepublish' : 'billing.cloudPublish'), 'cloud-publish', async () => {
+          state.cloud = await call('cloudBillingPublish', { intakeId: m.intakeId });
+          renderCloud();
+          renderRates();
+          status(t('billing.cloudPublishedDone', { title: m.title }));
+        }));
+      }
       card.append(head);
       const form = el('div', null, 'form-grid');
       const discount = input(pct(m.discountBps), { inputmode: 'decimal', 'data-field': 'discount' });
@@ -531,8 +543,50 @@
     }
   }
 
+  // 律所云端工时汇总：开关在共用的「律所云端」页；这里只显示状态、取回同事交来的工时、发布事项
+  async function loadCloud() {
+    try {
+      state.cloud = await call('cloudBillingStatus', {});
+    } catch (err) {
+      state.cloud = { available: false, reason: err?.message || '' };
+    }
+    renderCloud();
+  }
+
+  function renderCloud() {
+    const box = $('hb-cloud');
+    box.replaceChildren();
+    const c = state.cloud;
+    if (!c) return;
+    const line = el('p', null, 'hint');
+    if (!c.available) {
+      line.textContent = t('billing.cloudUnavailable', { reason: c.reason || '' });
+      box.append(line);
+      return;
+    }
+    if (!c.enabled) {
+      line.textContent = t('billing.cloudOff');
+      box.append(line, button(t('billing.cloudOpenSettings'), 'cloud-settings', async () => { $('tab-cloud')?.click(); }));
+      return;
+    }
+    const n = Object.keys(c.published || {}).length;
+    line.textContent = t('billing.cloudOn', { n }) + (c.pendingSync ? ' ' + t('billing.cloudPending', { n: c.pendingSync }) : '');
+    box.append(line);
+    if (c.firmAdmin) {
+      box.append(button(t('billing.cloudPull'), 'cloud-pull', async () => {
+        const res = await call('cloudBillingPull', {});
+        await loadCloud();
+        if (state.view === 'review') await loadReview();
+        status(t('billing.cloudPulled', { created: res?.created || 0, refreshed: res?.refreshed || 0 })
+          + (res?.unmapped ? ' ' + t('billing.cloudUnmapped', { n: res.unmapped }) : '')
+          + (res?.pendingSync ? ' ' + t('billing.cloudPending', { n: res.pendingSync }) : ''), Boolean(res?.pendingSync));
+      }, 'primary'), button(t('billing.cloudOpenSettings'), 'cloud-settings', async () => { $('tab-cloud')?.click(); }));
+    }
+  }
+
   async function refresh() {
     status('');
+    if (!state.cloud) await loadCloud();
     if (state.view === 'review') await loadReview();
     if (state.view === 'bills') { await ensureRates(); await loadBills(); }
     if (state.view === 'rates') await loadRates();
