@@ -2,6 +2,34 @@
 
 
 
+## r10 candidate (2026-11-13) — Emscripten proxying deadlock fix (O9)
+
+r8 recipe plus `patches/apply-emscripten-patches.py`, which backports emscripten-core/emscripten#28186
+("[Proxying] Do not allocate while holding mutex") into the allotropia fork `fixed-3.1.65`. Core/Qt/toolchain
+pins unchanged. Built 2026-11-13 11:08–~12:15 UTC on Hong Kong `ecs.c9i.16xlarge` (shared ops config, direct
+download, no relay); all temporary resources deleted and re-checked (only `awd-staging` remains).
+
+Why: r8 (and a plain r8-recipe rebuild) occasionally deadlocked right after boot. Native samples of the hung
+renderer (`sample` + V8 `--perf-basic-prof`, names from a `--profiling-funcs` build) showed the main thread in
+`do_proxy` holding the system proxying-queue mutex while `get_or_add_tasks_for_thread` reallocated; malloc
+waited, the main-thread wait loop ran `emscripten_proxy_execute_queue` and re-locked the same mutex. Other
+threads (Qt `devicePixelRatio` during repaint, configmgr `mkdir`) queued behind it. Upstream fixed exactly this on
+2026-11-11.
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| soffice.js | 858359 | `5a8b4cc2218c40dfe1d41b9f26df85496b9e1ad7e862b32d8daa9c9212f8dd06` |
+| soffice.wasm | 161691688 | `c2885dfedf47cd4325ae2b6c47ee64ab2f7f8daaaa14a2dae6010f9093aa5f69` |
+| soffice.data | 56494002 | `862d0a428d830c0bcdb951d1d2c5a4f214f592f4705384a920b1b2b1d4ddc698` |
+| soffice.data.js.metadata | 207339 | `871e91a4ef63866b518b559f4e3fdbedb59dcca418c56b5d60fb74d0d2b62945` |
+
+Validation (headless, heavy slot): startup smoke 80/80 (boot + first command; r8 1/55 hung, a plain rebuild
+6/55); `run.mjs` 609 passed / 0 failed; dark-page 12/12, calc-header-chrome 114, native-font-popup,
+edit-after-save, open-not-dirty, sheet-chart-ranges, ppt-precision, ppt-advanced-design, ppt-image-layout,
+impress-playback, load-rejected, sheet-precision all pass. Desktop cold-open typing A/B vs r8 (2026-11-13, tpl-5mb.pptx, eager burst, alternating): r10 6/6 clean (no late typing, no hang); r8 5/5 valid rounds clean this time (1 round void: harness stuck at login before any open). The intermittent r8 lag did not reproduce under this load, so no lag claim for r10; r10 shows no regression.
+Builds of this recipe are not byte-reproducible (code layout differs between runs); any new binary needs the
+≥40-boot startup smoke before publishing (`awd-worktrees/o9-lowa/tools/bootsmoke.mjs`).
+
 ## r8 (2026-11-06) — dark page: explicit dark text, ruler, scrollbars (tutorial ep 18)
 
 r7 (= the r7b tooltip-input candidate) plus four source patches in `apply-source-patches.py`:
