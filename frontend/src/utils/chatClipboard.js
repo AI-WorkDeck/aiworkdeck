@@ -8,6 +8,7 @@
 
 import { t } from '@/i18n'
 import { markdownToPlainText } from './markdownPlain.js'
+import { stripEmoji } from './stripEmoji.js'
 import { PROTOCOL_TAGS } from '@/composables/agentTagProtocol.mjs'
 
 /**
@@ -32,7 +33,7 @@ const PROTOCOL_TAG_RE = new RegExp(`<\\/?(?:${PROTOCOL_TAGS.join('|')})(?:\\s[^>
 export function answerPlainText(content) {
   const raw = String(content == null ? '' : content)
   if (!raw.trim()) return ''
-  return markdownToPlainText(raw.replace(PROTOCOL_TAG_RE, ''))
+  return markdownToPlainText(stripEmoji(raw.replace(PROTOCOL_TAG_RE, '')))
 }
 
 /**

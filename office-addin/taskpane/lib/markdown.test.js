@@ -60,3 +60,9 @@ test('段内单换行渲染为 br，保住模型的软换行排版', () => {
   const html = renderMarkdown('第一行\n第二行')
   assert.equal(html, '<p>第一行<br>第二行</p>')
 })
+
+test('renderMarkdown drops emoji the model writes (2026-11-12)', () => {
+  const html = renderMarkdown('### ✅ 引用正确\n\n**⚠️ 注意**：甲方 ↔ 乙方 © 2026')
+  assert.ok(!/✅|⚠/.test(html), html)
+  assert.ok(html.includes('引用正确') && html.includes('↔') && html.includes('©'), html)
+})

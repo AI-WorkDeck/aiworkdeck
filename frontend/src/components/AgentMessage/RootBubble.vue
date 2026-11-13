@@ -61,7 +61,7 @@
             <div v-else-if="entry.type === 'text'" class="main-content" data-chat-answer>
               <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming)" :key="pi">
                 <LegalReferenceCard v-if="part.type === 'reference'" :reference="corroborateReference(part.reference, liveLawOutputs)" @open="openReference" />
-                <MarkdownPreview v-else :content="part.text" />
+                <MarkdownPreview v-else :content="stripEmoji(part.text)" />
               </template>
             </div>
           </template>
@@ -192,6 +192,7 @@ import CrossBorderConsentCard from '../account/CrossBorderConsentCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
 import { legalMessageParts, referencesFromTools, legalReadableText, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
+import { stripEmoji } from '@/utils/stripEmoji.js'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'
 import { APPROVAL_PLAN_TYPES } from './chatTurns.mjs'
