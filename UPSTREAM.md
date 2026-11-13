@@ -107,8 +107,9 @@ See [`litviz/UPSTREAM.md`](litviz/UPSTREAM.md) for upstream provenance of the Li
 `rc4_cryptoapi.py`, `xor_obfuscation.py`. The full MIT notice is kept in the file
 header (`SPDX-License-Identifier: AGPL-3.0-or-later AND MIT`). Local changes: browser
 WebCrypto SHA-1 plus in-file MD5/RC4, the `cfb` package for the compound file, the
-decrypted streams patched into the original sectors, and encrypted presentations
-with a `Pictures` stream rejected as unsupported (upstream leaves that stream
-encrypted; no real sample was available to verify a decryption). Encryption of the
+decrypted streams patched into the original sectors (version-4 containers are
+repacked as version 3, which the engine requires), and decryption of the `Pictures`
+stream, which upstream leaves encrypted (segment-wise RC4 reset as in Apache POI's
+`HSLFSlideShowEncrypted`, verified on a real Mac PowerPoint deck). Encryption of the
 new Agile `.docx/.xlsx/.pptx` copies is our own code (`officeEncryption.js`) and was
 checked against msoffcrypto-tool as an independent implementation.

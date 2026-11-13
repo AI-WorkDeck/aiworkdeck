@@ -169,7 +169,8 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 旧格式写不回加密，所以**只读**：`saveDocument`/`scheduleAutoSave`/`sealForStorage` 对 `_docCrypto.legacy` 一律拒绝，
 保存栏给「另存为加密 .docx/.xlsx/.pptx 并打开」（`saveProtectedCopy`：导出画布当前内容 → `createEncryptionSession(密码)`
 新建 Agile 加密 → 同目录建文件（重名加 ` (1)`）→ `handOffSession` 把会话交给副本的编辑器，副本不再问密码）。
-旧格式没有可复用的文件密钥，密码只留在该编辑器实例内存里。带 Pictures 流的加密 .ppt 报不支持（无真实样本可核对图片解法）。
+旧格式没有可复用的文件密钥，密码只留在该编辑器实例内存里。加密 .ppt 的 Pictures 流按 POI 规则逐字段、每段从块 0 重起 RC4（用户真实 17 MB 样本核对；msoffcrypto 未实现这一段）；认不出的图片记录（如 FBSE）报不支持。
+- 4 版复合文档（4096 字节扇区，Mac PowerPoint 会写）里的 .ppt 引擎与桌面 LibreOffice 都打不开，解密后重打包成 3 版（`writeCfb`）。
 地雷：
 - `submitPassword` 不能提前撤 `docLoadFailed`——失败那轮已把 `ready` 置 true，提前撤闸会让装载途中的 modified 把文档标脏；
 - 旧 .ppt 形状没名字，`ensureShapeNames` 起内部名曾把文档标 modified，打开即被自动保存改写成 10 倍大（已包进 `withViewOnlyChange`，
