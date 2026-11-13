@@ -108,6 +108,24 @@ public class LawFirmTimeEntry {
     @Column(length = 128)
     private String reviewedByName;
 
+    /** 律所云端工时汇总：律师端为所选云端事项 / 本条在云端的编号 / 首次提交时生成的幂等键；合伙人端取回的工时 source=CLOUD。 */
+    @Column(length = 36)
+    private String cloudMatterId;
+
+    @Column(length = 36)
+    private String cloudEntryId;
+
+    @Column(length = 64)
+    private String cloudClientKey;
+
+    /** 合伙人端：审核结论尚未成功回写到云端，下次「从云端取回」时重试。 */
+    @Builder.Default
+    private Boolean cloudSyncPending = false;
+
+    /** 律师端：云端回来的审核记录副本（JSON）。 */
+    @Column(columnDefinition = "TEXT")
+    private String cloudNotesJson;
+
     private Instant submittedAt;
     private Instant reviewedAt;
     private Instant createdAt;
