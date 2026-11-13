@@ -15,7 +15,7 @@ globalThis.Office = { context: { document: { url: 'file:///test/inline-retry.doc
 globalThis.Word = {
   run: async cb => cb({ document: { body: { load() {}, text: BODY } }, sync: async () => {} })
 }
-const { activateSession, send, messages, stop, streaming } = await import('./chatSession.js')
+const { activateSession, send, messages, stop, streaming, banner, input } = await import('./chatSession.js')
 const { postChat } = await import('./api.js')
 const SETTINGS = { serverUrl: 'https://cloud.example', token: 'test-token' }
 const json = (body, status = 200) => ({ ok: status === 200, status, json: async () => body })
@@ -76,9 +76,10 @@ for (const retrySucceeds of [true, false]) {
       assert.ok(requests[1].clientRequestId)
       assert.equal(requests[2].clientRequestId, requests[1].clientRequestId)
       assert.notEqual(requests[0].clientRequestId, requests[1].clientRequestId)
-      assert.equal(messages.value.filter(m => m.role === 'user' && m.text === '第二轮').length, 1)
-      const last = messages.value.at(-1)
-      assert.equal(Boolean(last.error), !retrySucceeds)
+      // 成功：用户气泡在会话里；失败：消息没送达，气泡撤掉、原文回到输入框、错误进横幅
+      assert.equal(messages.value.filter(m => m.role === 'user' && m.text === '第二轮').length, retrySucceeds ? 1 : 0)
+      assert.equal(Boolean(banner.value), !retrySucceeds)
+      assert.equal(input.value, retrySucceeds ? '' : '第二轮')
     } finally {
       await stop()
       globalThis.fetch = originalFetch

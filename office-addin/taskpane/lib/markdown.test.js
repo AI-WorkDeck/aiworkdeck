@@ -66,3 +66,37 @@ test('renderMarkdown drops emoji the model writes (2026-11-12)', () => {
   assert.ok(!/✅|⚠/.test(html), html)
   assert.ok(html.includes('引用正确') && html.includes('↔') && html.includes('©'), html)
 })
+
+// ==================== GFM 表格 ====================
+
+test('GFM 表格渲染为可横向滚动的 table，含对齐与行内样式', () => {
+  const html = renderMarkdown('| 条款 | 金额 |\n|:--|--:|\n| **违约金** | `10万` |\n| 管辖 | 北京 |')
+  assert.ok(html.includes('<div class="md-table-wrap"><table>'))
+  assert.ok(html.includes('<th style="text-align:left">条款</th>'))
+  assert.ok(html.includes('<th style="text-align:right">金额</th>'))
+  assert.ok(html.includes('<td style="text-align:left"><strong>违约金</strong></td>'))
+  assert.ok(html.includes('<code>10万</code>'))
+  assert.equal((html.match(/<tr>/g) || []).length, 3)
+  assert.ok(!html.includes('|'), '竖线不许外漏')
+})
+
+test('表格单元格内容被转义，不能注入 HTML', () => {
+  const html = renderMarkdown('| a | b |\n|---|---|\n| <script>alert(1)</script> | <img src=x onerror=alert(1)> |')
+  assert.ok(!html.includes('<script'))
+  assert.ok(!html.includes('<img'))
+  assert.ok(html.includes('&lt;script&gt;'))
+})
+
+test('表格前后的段落与列表不受影响；无分隔行的竖线文本不成表', () => {
+  const html = renderMarkdown('前文\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n后文')
+  assert.ok(html.includes('<p>前文</p>'))
+  assert.ok(html.includes('<p>后文</p>'))
+  const plain = renderMarkdown('甲 | 乙\n丙 | 丁')
+  assert.ok(!plain.includes('<table'))
+})
+
+test('表体行缺格补空、多格截断；\\| 转义保留字面量竖线', () => {
+  const html = renderMarkdown('| a | b |\n|---|---|\n| 1 |\n| x \\| y | 2 | 3 |')
+  assert.equal((html.match(/<td/g) || []).length, 4)
+  assert.ok(html.includes('x | y'))
+})

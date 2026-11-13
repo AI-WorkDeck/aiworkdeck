@@ -37,7 +37,40 @@ const cloudEpochGate = createCloudEpochGate(async (origin, auth) => {
   return state?.data || state
 })
 
+/**
+ * 登录失效（HTTP 401 或信封 code=4010）：任何一次 API 调用撞上都通知同一个处理器，
+ * 由 App 清令牌、回登录页。处理器拿到发出请求时用的令牌，过期的旧请求不会误踢刚重登的新会话。
+ */
+let authExpiredHandler = null
+export function setAuthExpiredHandler(fn) {
+  authExpiredHandler = typeof fn === 'function' ? fn : null
+}
+
+function notifyAuthExpired(token) {
+  try { if (authExpiredHandler) authExpiredHandler(token || '') } catch (_) { /* 处理器出错不影响调用方 */ }
+}
+
+/** 响应是否为登录失效：401，或 JSON 信封里的 code=4010（读 clone，不消耗原响应） */
+async function isAuthExpiredResponse(resp) {
+  if (!resp) return false
+  if (resp.status === 401) return true
+  try {
+    const type = resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get('content-type') : ''
+    if (!type || !type.includes('json') || typeof resp.clone !== 'function') return false
+    const body = await resp.clone().json()
+    return Boolean(body) && Number(body.code) === 4010
+  } catch (_) {
+    return false
+  }
+}
+
 async function cloudFetch(url, options = {}) {
+  const resp = await cloudFetchRaw(url, options)
+  if (await isAuthExpiredResponse(resp)) notifyAuthExpired((options.headers || {})['X-Session-Id'])
+  return resp
+}
+
+async function cloudFetchRaw(url, options = {}) {
   const auth = options.headers || {}
   if (!needsCloudEpoch(url, options.method, auth)) return fetch(url, options)
   const storedToken = globalThis.localStorage?.getItem('awd_addin_token')
@@ -755,6 +788,10 @@ export async function postChat({ serverUrl, token }, payload) {
     err.status = resp.status
     let detail = null
     try { detail = await resp.json() } catch (_) { /* Non-JSON failures keep the HTTP fallback. */ }
+    if (resp.status === 401 || (detail && Number(detail.code) === 4010)) {
+      err.authExpired = true
+      err.message = t('sessionExpired')
+    }
     if (detail && detail.code === 'INLINE_CONTENT_CACHE_MISS') {
       err.code = detail.code
       err.retryWithInlineContent = detail.retryWithInlineContent === true
@@ -763,12 +800,15 @@ export async function postChat({ serverUrl, token }, payload) {
   }
   // 受理回执（AgentInboxService.Receipt：messageId/state/submissionMode）。插话靠它挂「尚未读取/已送达」；
   // 旧后端或非 JSON 响应回 null，调用方按「已受理、状态未知」处理
-  try {
-    const body = await resp.json()
-    return body && body.data ? body.data : body
-  } catch (_) {
-    return null
+  let body = null
+  try { body = await resp.json() } catch (_) { return null }
+  if (body && Number(body.code) === 4010) {
+    const err = new Error(t('sessionExpired'))
+    err.status = 401
+    err.authExpired = true
+    throw err
   }
+  return body && body.data ? body.data : body
 }
 
 /**
