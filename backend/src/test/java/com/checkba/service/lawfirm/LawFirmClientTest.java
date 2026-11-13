@@ -128,7 +128,7 @@ class LawFirmClientTest {
         LawFirmMatterIntake c = legacyIntake("LF-T-3", "蓝海光电科技有限公司", "91320500MA002222YY", "丙公司", "APPROVED_FILED", partner.getId());
         LawFirmMatterIntake d = legacyIntake("LF-T-4", "蓝海光电（苏州）科技有限公司", "91320500ma002222yy", "丁公司", "APPROVED_FILED", partner.getId());
 
-        run(partner.getId(), "overview", Map.of());
+        run(partner.getId(), "listClients", Map.of());
         assertEquals(2, parties.countByClientTrue(), "同名（括号/空白不同）与同信用代码各归一个客户");
         Long huaxing = intakes.findById(a.getId()).orElseThrow().getClientId();
         assertNotNull(huaxing);
@@ -215,7 +215,7 @@ class LawFirmClientTest {
                 .relatedPartiesJson("[{\"role\":\"CONTROLLING_SHAREHOLDER\",\"name\":\"星河控股集团有限公司\"}]")
                 .status("APPROVED_FILED").applicantUserId(partner.getId()).leadLawyerUserId(partner.getId())
                 .createdAt(Instant.now()).submittedAt(Instant.now()).build());
-        run(partner.getId(), "overview", Map.of());
+        run(partner.getId(), "listClients", Map.of());
         Long clientId = intakes.findById(ex.getId()).orElseThrow().getClientId();
         assertEquals(1, relations.count(), "收案上的控股股东转成主体关系");
         Map<String, Object> profile = (Map<String, Object>) run(partner.getId(), "getClient", Map.of("clientId", clientId)).get("client");
@@ -399,5 +399,35 @@ class LawFirmClientTest {
         assertThrows(IllegalStateException.class, () -> run(associate.getId(), "saveClient", Map.of("clientId", other, "name", "改名")));
         assertThrows(IllegalArgumentException.class, () -> run(associate.getId(), "submitIntake", Map.of(
                 "clientId", other, "title", "借别人客户收案", "counterpartyName", "某方")));
+    }
+
+    @Test
+    @DisplayName("复核修正：同名自然人不合并；被驳回的潜在客户不算本所客户；按名称关联到看不到的客户被拒；升为客户时建档人改为升级者")
+    void reviewFixes() {
+        Long a = ((Number) ((Map<String, Object>) run(partner.getId(), "saveClient", Map.of("name", "甲客户有限公司")).get("client")).get("id")).longValue();
+        run(partner.getId(), "saveRelation", Map.of("clientId", a, "relationType", "SPOUSE", "partyName", "张伟", "partyType", "INDIVIDUAL"));
+        Long b = ((Number) ((Map<String, Object>) run(partner.getId(), "saveClient", Map.of("name", "乙客户有限公司")).get("client")).get("id")).longValue();
+        run(partner.getId(), "saveRelation", Map.of("clientId", b, "relationType", "FAMILY", "partyName", "张伟", "partyType", "INDIVIDUAL"));
+        assertEquals(2, parties.findAllByOrderByIdAsc().stream().filter(p -> "张伟".equals(p.getName())).count(), "同名自然人各自成档");
+
+        LawFirmMatterIntake declined = legacyIntake("LF-D-1", "被拒潜在客户有限公司", "", "某方", "REJECTED_CONFLICT", partner.getId());
+        run(partner.getId(), "listClients", Map.of());
+        assertNotNull(intakes.findById(declined.getId()).orElseThrow().getClientId());
+        Map<String, Object> pre = run(partner.getId(), "precheckConflict", Map.of("clientName", "新委托人有限公司", "counterpartyName", "被拒潜在客户有限公司"));
+        assertEquals("GREEN", pre.get("riskLevel"), "名下收案全部被驳回的潜在客户不触发 Y5");
+
+        when(accessPolicy.canViewFirmWide(eq(associate.getId()))).thenReturn(false);
+        Long mine = ((Number) ((Map<String, Object>) run(associate.getId(), "saveClient", Map.of("name", "许律师的客户有限公司", "ownerUserId", associate.getId())).get("client")).get("id")).longValue();
+        IllegalArgumentException hidden = assertThrows(IllegalArgumentException.class, () -> run(associate.getId(), "saveRelation",
+                Map.of("clientId", mine, "relationType", "AFFILIATE", "partyName", "甲客户有限公司")));
+        assertFalse(hidden.getMessage().contains("KH-"));
+        IllegalArgumentException dup = assertThrows(IllegalArgumentException.class, () -> run(associate.getId(), "saveClient", Map.of("name", "乙客户有限公司")));
+        assertFalse(dup.getMessage().contains("乙客户"), "看不到的客户不在重名提示里露出");
+
+        // 许律师把「丙公司」登记为自己客户的关联方；之后由陈律师建为客户，许律师不因此取得该客户
+        run(associate.getId(), "saveRelation", Map.of("clientId", mine, "relationType", "AFFILIATE", "partyName", "丙公司有限公司"));
+        Long c = ((Number) ((Map<String, Object>) run(partner.getId(), "saveClient", Map.of("name", "丙公司有限公司", "ownerUserId", partner.getId())).get("client")).get("id")).longValue();
+        assertEquals(partner.getId(), parties.findById(c).orElseThrow().getCreatedByUserId());
+        assertThrows(IllegalStateException.class, () -> run(associate.getId(), "saveClient", Map.of("clientId", c, "name", "丙公司有限公司")));
     }
 }

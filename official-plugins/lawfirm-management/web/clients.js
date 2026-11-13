@@ -459,13 +459,13 @@
       hint.textContent = hit ? t('client.intake.matched', { name: hit.name, no: hit.clientNo || '' }) : '';
     });
     form.addEventListener('reset', () => setTimeout(() => { select.value = ''; apply(); }, 0));
-    refresh();
+    return fill;
   }
 
   async function init(ctx) {
     locale = pickLocale(ctx?.language || ctx?.locale);
     for (const n of document.querySelectorAll('[data-c]')) n.textContent = t(n.dataset.c);
-    setupIntakePicker();
+    const fillPicker = setupIntakePicker();
     const tab = $('tab-clients');
     if (tab) {
       tab.addEventListener('click', () => {
@@ -474,8 +474,11 @@
       });
     }
     try {
+      // 首次加载只发一次 listClients（旧收案归集在这一次里完成），收案表单的客户下拉直接复用结果
       await loadList();
       renderList();
+      state.pickOptions = [...(state.list?.clients || [])].sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'));
+      if (fillPicker) fillPicker();
     } catch (err) {
       const root = $('clients-root');
       if (root) root.replaceChildren(el('p', { class: 'hint' }, errorText(err)));

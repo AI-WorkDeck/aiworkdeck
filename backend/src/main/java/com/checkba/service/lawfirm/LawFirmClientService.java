@@ -159,12 +159,28 @@ public class LawFirmClientService {
         return client;
     }
 
-    /** 利冲引擎用的主体关系图（全所范围，不按查看人裁剪——利冲检索本来就扫全所）。 */
+    /**
+     * 利冲引擎用的主体关系图（全所范围，不按查看人裁剪——利冲检索本来就扫全所）。
+     * 收案时自动建档、但名下收案全部被利冲驳回的客户不算「本所客户」（只是未接的潜在客户）。
+     * 征询对象：客户维护人，没有则主办合伙人。
+     */
     public LawFirmPartyGraph graph() {
         Map<Long, String> names = userNames();
+        Map<Long, Boolean> hasLiveIntake = new HashMap<>();
+        for (LawFirmMatterIntake i : intakeRepository.findAllByOrderByCreatedAtDescIdDesc()) {
+            if (i.getClientId() == null) continue;
+            hasLiveIntake.merge(i.getClientId(), !"REJECTED_CONFLICT".equals(i.getStatus()), Boolean::logicalOr);
+        }
         List<LawFirmPartyGraph.Node> nodes = partyRepository.findAllByOrderByIdAsc().stream()
-                .map(p -> new LawFirmPartyGraph.Node(p.getId(), p.getName(), p.getCreditCode(), p.isClientParty(), p.getClientNo(),
-                        p.getOwnerUserId(), firstNonBlank(p.getOwnerName(), p.getOwnerUserId() == null ? null : names.get(p.getOwnerUserId()))))
+                .map(p -> {
+                    boolean declinedProspect = "INTAKE".equals(p.getSource()) && Boolean.FALSE.equals(hasLiveIntake.get(p.getId()));
+                    Long handler = p.getOwnerUserId() != null ? p.getOwnerUserId() : p.getPartnerUserId();
+                    String handlerName = p.getOwnerUserId() != null || p.getOwnerName() != null
+                            ? firstNonBlank(p.getOwnerName(), p.getOwnerUserId() == null ? null : names.get(p.getOwnerUserId()))
+                            : firstNonBlank(p.getPartnerName(), p.getPartnerUserId() == null ? null : names.get(p.getPartnerUserId()));
+                    return new LawFirmPartyGraph.Node(p.getId(), p.getName(), p.getCreditCode(),
+                            p.isClientParty() && !declinedProspect, p.getClientNo(), handler, handlerName);
+                })
                 .toList();
         List<LawFirmPartyGraph.Edge> edges = relationRepository.findAllByOrderByIdAsc().stream()
                 .map(r -> new LawFirmPartyGraph.Edge(r.getId(), r.getFromPartyId(), r.getToPartyId(), r.getRelationType(), r.getShareBps(), r.getNote()))
@@ -364,8 +380,9 @@ public class LawFirmClientService {
             requireEditable(userId, client);
         }
         if (dup != null) {
-            throw new IllegalArgumentException(LangText.of("已有同名或同一信用代码的主体：", "A party with the same name or credit code already exists: ")
-                    + dup.getName() + (dup.getClientNo() == null ? "" : "（" + dup.getClientNo() + "）"));
+            boolean show = access.canViewFirmWide(userId) || !dup.isClientParty() || isVisibleClient(userId, dup);
+            throw new IllegalArgumentException(LangText.of("已有同名或同一信用代码的主体", "A party with the same name or credit code already exists")
+                    + (show ? "：" + dup.getName() + (dup.getClientNo() == null ? "" : "（" + dup.getClientNo() + "）") : ""));
         }
         Map<Long, String> names = userNames();
         client.setName(name);
@@ -376,12 +393,17 @@ public class LawFirmClientService {
         client.setAddress(trimTo(string(params, "address"), 512));
         client.setNotes(trimTo(string(params, "notes"), 4000));
         client.setContactsJson(toJson(cleanContacts(params.get("contacts"))));
+        // 只填过姓名（非本机账号）的维护人/主办合伙人：编辑时没改就保留
+        String keptOwnerName = client.getOwnerUserId() == null ? client.getOwnerName() : null;
+        String keptPartnerName = client.getPartnerUserId() == null ? client.getPartnerName() : null;
         Long ownerId = longVal(params.get("ownerUserId"));
         client.setOwnerUserId(ownerId != null && names.containsKey(ownerId) ? ownerId : null);
-        client.setOwnerName(firstNonBlank(trimTo(string(params, "ownerName"), 128), client.getOwnerUserId() == null ? null : names.get(client.getOwnerUserId())));
+        client.setOwnerName(firstNonBlank(trimTo(string(params, "ownerName"), 128),
+                client.getOwnerUserId() == null ? keptOwnerName : names.get(client.getOwnerUserId())));
         Long partnerId = longVal(params.get("partnerUserId"));
         client.setPartnerUserId(partnerId != null && names.containsKey(partnerId) ? partnerId : null);
-        client.setPartnerName(firstNonBlank(trimTo(string(params, "partnerName"), 128), client.getPartnerUserId() == null ? null : names.get(client.getPartnerUserId())));
+        client.setPartnerName(firstNonBlank(trimTo(string(params, "partnerName"), 128),
+                client.getPartnerUserId() == null ? keptPartnerName : names.get(client.getPartnerUserId())));
         client.setUpdatedAt(now);
         client = partyRepository.save(client);
         return getClient(userId, Map.of("clientId", client.getId()));
@@ -421,11 +443,18 @@ public class LawFirmClientService {
     Map<String, Object> searchParties(Long userId, Map<String, Object> params) {
         String q = LawFirmConflictEngine.normalizeExact(string(params, "query"));
         boolean firmWide = access.canViewFirmWide(userId);
-        Set<Long> visible = firmWide ? Set.of() : loadLedger(userId).visibleClients.stream().map(LawFirmParty::getId).collect(Collectors.toSet());
+        Set<Long> visible = new java.util.HashSet<>();
+        if (!firmWide) {
+            LawFirmPartyGraph g = graph();
+            for (LawFirmParty c : loadLedger(userId).visibleClients) {
+                visible.add(c.getId());
+                visible.addAll(networkOf(g, c.getId()));
+            }
+        }
         List<Map<String, Object>> out = new ArrayList<>();
         for (LawFirmParty p : partyRepository.findAllByOrderByIdAsc()) {
             if (out.size() >= 20) break;
-            if (p.isClientParty() && !firmWide && !visible.contains(p.getId())) continue;
+            if (!firmWide && !visible.contains(p.getId())) continue;
             if (!q.isEmpty() && !LawFirmConflictEngine.normalizeExact(p.getName()).contains(q)
                     && !LawFirmConflictEngine.normalizeExact(p.getCreditCode()).contains(q)
                     && !LawFirmConflictEngine.normalizeExact(p.getClientNo()).contains(q)) continue;
@@ -473,6 +502,10 @@ public class LawFirmClientService {
             String ptype = string(params, "partyType").toUpperCase();
             other = findOrCreateParty(new ArrayList<>(partyRepository.findAllByOrderByIdAsc()), name, code,
                     Set.of("ORGANIZATION", "INDIVIDUAL").contains(ptype) ? ptype : null, "RELATION", userId);
+            if (other.isClientParty() && !access.canViewFirmWide(userId) && !isVisibleClient(userId, other)) {
+                throw new IllegalArgumentException(LangText.of("该主体已在本所登记，请联系律所管理员登记这条关系",
+                        "This party is already registered by the firm; please ask a firm administrator to record this relationship"));
+            }
         }
         if (other.getId().equals(subject.getId())) {
             throw new IllegalArgumentException(LangText.of("不能与自身建立关系", "A party cannot be related to itself"));
@@ -627,7 +660,8 @@ public class LawFirmClientService {
         List<LawFirmParty> clients = partyRepository.findAllByOrderByIdAsc().stream().filter(LawFirmParty::isClientParty).toList();
         Set<Long> mineClientIds = new LinkedHashSet<>();
         for (LawFirmMatterIntake i : intakes) {
-            if (i.getClientId() != null && (Objects.equals(i.getApplicantUserId(), userId) || Objects.equals(i.getLeadLawyerUserId(), userId))) {
+            if (i.getClientId() != null && !"REJECTED_CONFLICT".equals(i.getStatus())
+                    && (Objects.equals(i.getApplicantUserId(), userId) || Objects.equals(i.getLeadLawyerUserId(), userId))) {
                 mineClientIds.add(i.getClientId());
             }
         }
@@ -653,7 +687,8 @@ public class LawFirmClientService {
             if (p.isLooseFileWorkspace() || p.isScratchWorkspace()) continue;
             l.projectNames.put(p.getId(), Objects.requireNonNullElse(firstNonBlank(p.getName()), "#" + p.getId()));
             String key = LawFirmConflictEngine.normalizeExact(p.getListedCompanyName());
-            if (!key.isEmpty()) l.projectsByClientName.computeIfAbsent(key, k -> new ArrayList<>()).add(p);
+            // 按名称匹配工作台项目只给全所资格者：其他人可能看不到这些项目
+            if (l.firmWide && !key.isEmpty()) l.projectsByClientName.computeIfAbsent(key, k -> new ArrayList<>()).add(p);
         }
         Set<Long> projectIds = new LinkedHashSet<>();
         for (LawFirmParty c : l.visibleClients) projectIds.addAll(l.projectIdsOf(c));
@@ -773,7 +808,7 @@ public class LawFirmClientService {
                     .client(true)
                     .clientNo(nextClientNo())
                     .name(trimTo(intake.getClientName(), 256))
-                    .creditCode(blank(intake.getClientCreditCode()) ? null : intake.getClientCreditCode().trim())
+                    .creditCode(blank(intake.getClientCreditCode()) ? null : trimTo(intake.getClientCreditCode(), 128))
                     .partyType("ORGANIZATION")
                     .ownerUserId(intake.getLeadLawyerUserId())
                     .ownerName(intake.getLeadLawyerName())
@@ -794,7 +829,7 @@ public class LawFirmClientService {
             changed = true;
         }
         if (blank(p.getCreditCode()) && !blank(intake.getClientCreditCode())) {
-            p.setCreditCode(intake.getClientCreditCode().trim());
+            p.setCreditCode(trimTo(intake.getClientCreditCode(), 128));
             changed = true;
         }
         if (changed) {
@@ -807,7 +842,8 @@ public class LawFirmClientService {
     private void promote(LawFirmParty p, Long userId) {
         p.setClient(true);
         if (p.getClientNo() == null) p.setClientNo(nextClientNo());
-        if (p.getCreatedByUserId() == null) p.setCreatedByUserId(userId);
+        // 建档人按升为客户的人算：先前把它登记为别人关联方的律师不因此取得这位客户的查看/编辑权
+        p.setCreatedByUserId(userId);
     }
 
     /** 收案上登记的关联方（控股股东、一致行动人等）转成主体关系，旧数据不丢。 */
@@ -834,13 +870,13 @@ public class LawFirmClientService {
     }
 
     private LawFirmParty findOrCreateParty(List<LawFirmParty> parties, String name, String code, String partyType, String source, Long userId) {
-        LawFirmParty p = findMatch(parties, name, code, null);
+        LawFirmParty p = findMatch(parties, name, code, partyType, null);
         if (p != null) return p;
         Instant now = Instant.now();
         p = partyRepository.save(LawFirmParty.builder()
                 .client(false)
                 .name(trimTo(name, 256))
-                .creditCode(blank(code) ? null : code.trim())
+                .creditCode(blank(code) ? null : trimTo(code, 128))
                 .partyType(partyType)
                 .source(source)
                 .createdByUserId(userId)
@@ -866,7 +902,7 @@ public class LawFirmClientService {
     private boolean isVisibleClient(Long userId, LawFirmParty client) {
         if (canEdit(userId, client, false)) return true;
         return intakeRepository.findByApplicantUserIdOrLeadLawyerUserIdOrderByCreatedAtDescIdDesc(userId, userId).stream()
-                .anyMatch(i -> client.getId().equals(i.getClientId()));
+                .anyMatch(i -> client.getId().equals(i.getClientId()) && !"REJECTED_CONFLICT".equals(i.getStatus()));
     }
 
     private LawFirmParty requireVisibleClient(Long userId, Long clientId) {
@@ -893,6 +929,12 @@ public class LawFirmClientService {
 
     /** 同一主体：信用代码一致；或规范化全称一致且两边信用代码不冲突。 */
     static LawFirmParty findMatch(List<LawFirmParty> parties, String name, String code, Long excludeId) {
+        return findMatch(parties, name, code, null, excludeId);
+    }
+
+    /** 同上；任何一边是自然人时不按姓名合并（同名不同人），只认证件号/信用代码。 */
+    static LawFirmParty findMatch(List<LawFirmParty> parties, String name, String code, String partyType, Long excludeId) {
+        boolean queryIndividual = "INDIVIDUAL".equals(partyType);
         String n = LawFirmConflictEngine.normalizeExact(name);
         String k = LawFirmConflictEngine.normalizeExact(code);
         LawFirmParty byName = null;
@@ -900,7 +942,8 @@ public class LawFirmClientService {
             if (excludeId != null && excludeId.equals(p.getId())) continue;
             String pk = LawFirmConflictEngine.normalizeExact(p.getCreditCode());
             if (!k.isEmpty() && k.equals(pk)) return p;
-            if (byName == null && !n.isEmpty() && n.equals(LawFirmConflictEngine.normalizeExact(p.getName()))
+            if (byName == null && !queryIndividual && !"INDIVIDUAL".equals(p.getPartyType())
+                    && !n.isEmpty() && n.equals(LawFirmConflictEngine.normalizeExact(p.getName()))
                     && (k.isEmpty() || pk.isEmpty())) {
                 byName = p;
             }

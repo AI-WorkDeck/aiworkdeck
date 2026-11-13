@@ -136,7 +136,6 @@ public class LawFirmManagementService {
 
         // 客户档案（LawFirmClientService）：与收案、利冲共用一份主体数据
         if (LawFirmClientService.ACTIONS.contains(act)) return clientService.execute(effectiveUserId, act, params);
-        if (Set.of("overview", "list", "dashboard").contains(act)) clientService.linkUnassignedIntakes();
         if (Set.of("submitIntake", "createIntake", "precheckConflict", "conflictCheck", "scanConflict", "conflictPreview").contains(act)) {
             params = clientService.applyClientToIntakeParams(effectiveUserId, params);
         }
