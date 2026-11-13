@@ -64,11 +64,14 @@ class PitchToolsTest {
         String dump = lib.toString();
         assertFalse(dump.contains("江岭市城市发展投资集团有限公司"), dump);
         assertFalse(lib.path("credentials").get(0).has("client"));
+        assertFalse(dump.contains("鼎盛连锁零售"), dump); // 简称也换掉（标题、标签等所有文字字段）
         assertEquals("panel_only", call("library.save", "{\"library\":{}}").path("code").asText());
         assertEquals("panel_only", call("library.export", "{}").path("code").asText());
         JsonNode g = call("generate", genArgs("docx", "sample", true)).path("data");
         assertFalse(g.has("leaks"));
         assertEquals(0, g.path("leakCount").asInt());
+        JsonNode q = call("quote.compute", "{\"quoteId\":\"p1\"}").path("data");
+        assertTrue(q.path("rows").isArray());
         fake.call = new com.checkba.plugin.api.ToolCall(7L, null, 3L, null);
         assertEquals(10, call("library.get", "{}").path("data").path("library").path("credentials").size());
     }
@@ -81,9 +84,13 @@ class PitchToolsTest {
         ObjectNode args = PitchTools.JSON.createObjectNode();
         args.set("library", lib);
         assertTrue(call("library.save", args).path("success").asBoolean());
-        assertTrue(fake.settings.get("library.u3").startsWith("#"));
+        assertTrue(fake.settings.get("library.u3").matches("#g2:\\d+")); // setUp 已存过第 1 代
         assertTrue(fake.settings.entrySet().stream().filter(e -> e.getKey().startsWith("library.u3."))
                 .allMatch(e -> e.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= PitchTools.CHUNK_BYTES));
+        // 第二次保存写新一代，旧代各段清空
+        assertTrue(call("library.save", args).path("success").asBoolean());
+        assertTrue(fake.settings.get("library.u3").startsWith("#g3:"));
+        assertEquals("", fake.settings.get("library.u3.g2.0"));
         assertEquals(310, call("library.get", "{}").path("data").path("library").path("credentials").size());
     }
 

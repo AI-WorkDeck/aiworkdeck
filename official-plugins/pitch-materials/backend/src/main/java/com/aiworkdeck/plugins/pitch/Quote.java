@@ -57,6 +57,7 @@ final class Quote {
             if (cap > 0 && after > cap) { capCut = after - cap; after = cap; }
         }
         BigDecimal rate = optionalDecimal(PitchTools.text(q, "taxRatePct"), "taxRatePct");
+        if (rate.compareTo(BigDecimal.valueOf(100)) > 0) throw new PitchTools.Failure("bad_amount", "taxRatePct");
         boolean included = !q.has("taxIncluded") || q.path("taxIncluded").asBoolean(true);
         long tax;
         long total;
@@ -68,6 +69,7 @@ final class Quote {
             tax = BigDecimal.valueOf(after).multiply(rate).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP).longValueExact();
             total = after + tax;
         }
+        if (total >= MAX_CENTS) throw new PitchTools.Failure("bad_amount", "total");
         List<String> note = new ArrayList<>();
         String pctText = pct.stripTrailingZeros().toPlainString();
         String rateText = rate.stripTrailingZeros().toPlainString();

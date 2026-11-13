@@ -151,15 +151,19 @@
   }
 
   async function saveLibrary(lib) {
-    quoteCache.clear();
     await tool('library.save', { library: lib });
+    quoteCache.clear();
     state.library = core.normalizeLibrary(lib);
   }
 
+  // 项目切换代次：长任务（抽取/对照）和延迟保存只在启动时的那个项目里写对照表
+  let projectGen = 0;
   let matrixTimer = null;
-  function saveMatrixSoon() {
+  function saveMatrixSoon(gen = projectGen) {
+    if (gen !== projectGen) return;
     clearTimeout(matrixTimer);
     matrixTimer = setTimeout(() => {
+      if (gen !== projectGen) return;
       state.matrix.updatedAt = new Date().toISOString();
       tool('matrix.save', { matrix: state.matrix }).catch((e) => notice(errText(e), 'error'));
     }, 600);
@@ -515,6 +519,7 @@
   function extractRequirements() {
     const path = state.tenderPath;
     const go = () => run(async () => {
+      const gen = projectGen;
       state.cancellable = true;
       state.progress = t('panel.progress.reading');
       render();
@@ -532,6 +537,7 @@
         parts.push({ chunk: chunks[i], data: core.parseJson(await ask(req)) });
       }
       const got = core.collectItems(path, parts);
+      if (gen !== projectGen) return;
       if (!got.items.length) throw new Error(t('panel.err.noRequirements'));
       state.matrix = Object.assign(emptyMatrix(), { tenderPath: path, tenderer: got.tenderer, project: got.project, items: got.items });
       if (got.tenderer) state.gen.client = got.tenderer;
@@ -548,6 +554,7 @@
 
   function matchAll() {
     run(async () => {
+      const gen = projectGen;
       state.cancellable = true;
       const items = state.matrix.items;
       const today = new Date().toISOString().slice(0, 10);
@@ -565,8 +572,10 @@
         }
       } finally {
         // 中途停止或出错时，已对照完的批次也要保存
-        state.selection = null;
-        saveMatrixSoon();
+        if (gen === projectGen) {
+          state.selection = null;
+          saveMatrixSoon(gen);
+        }
       }
       const sum = core.summary(items);
       notice(t('panel.tender.matched', { met: sum.met, partial: sum.partial, missing: sum.missing })
@@ -796,6 +805,8 @@
       awd.events.on('project.switched', async (data) => {
         // 待保存的对照表属于上一个项目：宿主此时已切到新项目，不能再存，直接丢弃；生成表单也清空
         clearTimeout(matrixTimer);
+        projectGen++;
+        state.cancelled = true;
         state.projectId = (data && data.projectId) || '';
         state.results = [];
         state.sensitive = {};

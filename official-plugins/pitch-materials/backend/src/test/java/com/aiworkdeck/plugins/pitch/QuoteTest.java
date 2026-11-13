@@ -69,6 +69,9 @@ class QuoteTest {
         f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree(
                 "{\"items\":[{\"label\":\"x\",\"kind\":\"fixed\",\"amount\":\"1000000000000\"}]}"), true));
         assertEquals("bad_amount", f.code);
+        f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree(
+                "{\"items\":[{\"label\":\"x\",\"kind\":\"fixed\",\"amount\":\"900000000000\"}],\"taxRatePct\":\"50\",\"taxIncluded\":false}"), true));
+        assertEquals("total", f.detail);
         f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree("{\"items\":[]}"), true));
         assertEquals("quote_empty", f.code);
     }

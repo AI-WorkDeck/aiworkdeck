@@ -23,7 +23,6 @@ import java.util.*;
  */
 public class PitchTools implements HostAware {
     static final ObjectMapper JSON = new ObjectMapper();
-    static final int MAX_STORE_CHARS = 2_000_000;
     static final int MAX_ITEMS = 1000;
     static final long MAX_TEMPLATE = 30L * 1024 * 1024;
     static final List<String> SECTIONS = List.of("credentials", "lawyers", "qualifications", "services", "quotes");
@@ -59,7 +58,13 @@ public class PitchTools implements HostAware {
                 case "library.export" -> { panelOnly(call); yield exportLibrary(call, zh); }
                 case "matrix.get" -> { requireProject(call); yield Map.of("matrix", loadMatrix(call)); }
                 case "matrix.save" -> { requireProject(call); saveMatrix(call, args.path("matrix")); yield Map.of("saved", true); }
-                case "quote.compute" -> quoteView(Quote.compute(findQuote(call, args), zh), zh);
+                case "quote.compute" -> {
+                    Map<String, Object> view = quoteView(Quote.compute(findQuote(call, args), zh), zh);
+                    if (!fromAgent(call)) yield view;
+                    JsonNode tree = JSON.valueToTree(view);
+                    maskTree(tree, new Build(loadLibrary(call), JSON.createObjectNode(), null, zh));
+                    yield tree;
+                }
                 case "templates.sample" -> writeSamples(call, zh);
                 case "generate" -> generate(call, args, zh);
                 default -> throw new Failure("bad_action", action);
@@ -97,20 +102,32 @@ public class PitchTools implements HostAware {
         if (fromAgent(call)) throw new Failure("panel_only");
     }
 
-    /** 给模型看的库：去掉真实客户名，所有文本字段里的客户名换成对外称谓。 */
+    /** 给模型看的库：去掉真实客户名，其余所有文字字段里的客户名（含简称）换成对外称谓。 */
     static ObjectNode maskedLibrary(ObjectNode lib, boolean zh) {
         Build b = new Build(lib, JSON.createObjectNode(), null, zh);
         ObjectNode out = lib.deepCopy();
-        ObjectNode firm = (ObjectNode) out.path("firm");
-        firm.put("intro", b.mask(text(firm, "intro")));
-        for (String s : SECTIONS) {
-            for (JsonNode it : out.path(s)) {
-                ObjectNode o = (ObjectNode) it;
-                o.remove("client");
-                for (String f : List.of("title", "summary", "amount", "bio", "content", "note")) if (o.has(f)) o.put(f, b.mask(text(o, f)));
+        for (JsonNode c : out.path("credentials")) ((ObjectNode) c).remove("client");
+        maskTree(out, b);
+        return out;
+    }
+
+    private static final Set<String> KEEP = Set.of("id", "clientAlias", "source", "kind");
+
+    static void maskTree(JsonNode node, Build b) {
+        if (node instanceof ObjectNode o) {
+            List<String> names = new ArrayList<>();
+            o.fieldNames().forEachRemaining(names::add);
+            for (String f : names) {
+                JsonNode v = o.get(f);
+                if (v.isTextual() && !KEEP.contains(f)) o.put(f, b.mask(v.asText()));
+                else maskTree(v, b);
+            }
+        } else if (node instanceof ArrayNode a) {
+            for (int i = 0; i < a.size(); i++) {
+                if (a.get(i).isTextual()) a.set(i, JSON.getNodeFactory().textNode(b.mask(a.get(i).asText())));
+                else maskTree(a.get(i), b);
             }
         }
-        return out;
     }
 
     private String libraryKey(ToolCall call) { return "library.u" + call.userId(); }
@@ -148,24 +165,26 @@ public class PitchTools implements HostAware {
 
     private void saveLibrary(ToolCall call, JsonNode lib) throws Exception {
         String raw = JSON.writeValueAsString(normalize(lib));
-        if (raw.length() > MAX_STORE_CHARS) throw new Failure("library_too_large");
         writeChunked(libraryKey(call), raw);
     }
 
     /**
-     * 设置值在服务器的 MySQL 上是 TEXT（64 KB）：按 UTF-8 字节切成 ≤ 60 KB 的段分键保存，
-     * 主键存段数（"#n"）；旧的单键值照常读取。
+     * 设置值在服务器的 MySQL 上是 TEXT（64 KB）：按 UTF-8 字节切成 ≤ 60 KB 的段保存。
+     * 每次保存写一代新键 {@code <key>.g<代>.<i>}，最后才把主键改成 {@code #g<代>:<段数>}；
+     * 中途失败（如宿主每分钟配额用完）时主键仍指向上一代完整内容。旧代的段随后清空。
      */
     static final int CHUNK_BYTES = 60_000;
+    static final int MAX_STORE_BYTES = 1_000_000;
+    private static final java.util.regex.Pattern HEAD = java.util.regex.Pattern.compile("#g(\\d+):(\\d+)");
 
     private String readChunked(String key) {
         String head = host.settings().get(key);
         if (head == null || !head.startsWith("#")) return head;
-        int n;
-        try { n = Integer.parseInt(head.substring(1)); } catch (NumberFormatException e) { throw new Failure("bad_library"); }
+        java.util.regex.Matcher m = HEAD.matcher(head);
+        if (!m.matches()) throw new Failure("bad_library");
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < n; i++) {
-            String part = host.settings().get(key + "." + i);
+        for (int i = 0; i < Integer.parseInt(m.group(2)); i++) {
+            String part = host.settings().get(key + ".g" + m.group(1) + "." + i);
             if (part == null) throw new Failure("bad_library");
             sb.append(part);
         }
@@ -173,6 +192,7 @@ public class PitchTools implements HostAware {
     }
 
     private void writeChunked(String key, String value) {
+        if (value.getBytes(StandardCharsets.UTF_8).length > MAX_STORE_BYTES) throw new Failure("library_too_large");
         List<String> parts = new ArrayList<>();
         int start = 0;
         int bytes = 0;
@@ -184,9 +204,18 @@ public class PitchTools implements HostAware {
             i += Character.charCount(cp);
         }
         parts.add(value.substring(start));
-        // 先写各段再写段数：中途失败时主键仍指向旧的完整内容（旧段数 ≤ 新段数的部分会被覆盖，读到的是新旧混合，所以段数最后写）
-        for (int i = 0; i < parts.size(); i++) host.settings().set(key + "." + i, parts.get(i));
-        host.settings().set(key, "#" + parts.size());
+        String head = host.settings().get(key);
+        java.util.regex.Matcher old = head == null ? null : HEAD.matcher(head);
+        boolean hadOld = old != null && old.matches();
+        long gen = hadOld ? Long.parseLong(old.group(1)) + 1 : 1;
+        for (int i = 0; i < parts.size(); i++) host.settings().set(key + ".g" + gen + "." + i, parts.get(i));
+        host.settings().set(key, "#g" + gen + ":" + parts.size());
+        if (hadOld) {
+            // 宿主 SPI 没有删除接口：旧代各段清成空串（失败不影响新内容）
+            try {
+                for (int i = 0; i < Integer.parseInt(old.group(2)); i++) host.settings().set(key + ".g" + old.group(1) + "." + i, "");
+            } catch (RuntimeException ignored) { /* 配额用完时留到下次 */ }
+        }
     }
 
     private JsonNode loadMatrix(ToolCall call) throws Exception {
@@ -198,7 +227,7 @@ public class PitchTools implements HostAware {
         if (!matrix.isObject() || !matrix.path("items").isArray()) throw new Failure("bad_params", "matrix");
         if (matrix.path("items").size() > 300) throw new Failure("matrix_too_large");
         String raw = JSON.writeValueAsString(matrix);
-        if (raw.length() > MAX_STORE_CHARS) throw new Failure("matrix_too_large");
+        if (raw.getBytes(StandardCharsets.UTF_8).length > MAX_STORE_BYTES) throw new Failure("matrix_too_large");
         writeChunked(matrixKey(call), raw);
     }
 
