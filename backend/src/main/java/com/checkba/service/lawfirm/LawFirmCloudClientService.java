@@ -449,7 +449,8 @@ public class LawFirmCloudClientService implements LawFirmCloudFeature {
             m.put("clientId", h.getMatchedClientId());
             m.put("clientName", c == null ? h.getMatchedPartyName() : c.getName());
             m.put("clientNo", c == null ? null : c.getClientNo());
-            m.put("relationPath", h.getRelationPath());
+            // 关系链只给能看完整档案的人（维护人、主办合伙人、管理员）；其他律师只知道撞了哪个客户、找谁
+            m.put("relationPath", c != null && canView(ctx.me, c) ? h.getRelationPath() : null);
             m.put("ownerName", c == null ? null : ctx.name(c.getOwnerUserId() != null ? c.getOwnerUserId() : c.getPartnerUserId()));
             m.put("statutoryCitation", h.getStatutoryCitation());
             hits.add(m);

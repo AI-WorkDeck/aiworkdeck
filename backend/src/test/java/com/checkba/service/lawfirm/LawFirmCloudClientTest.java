@@ -233,7 +233,10 @@ class LawFirmCloudClientTest {
         assertEquals("Y6_RELATED_TO_FIRM_CLIENT", hit.get("ruleCode"));
         assertEquals("星河医疗器械有限公司", hit.get("clientName"));
         assertEquals("合成律师 account-" + lawyerA, hit.get("ownerName"));
-        assertEquals("林海持有星河控股集团有限公司 80% 股权；星河控股集团有限公司持有星河医疗器械有限公司 55% 股权", hit.get("relationPath"));
+        assertNull(hit.get("relationPath"), "看不到档案的律师拿不到关系链");
+        Map<String, Object> own = ((List<Map<String, Object>>) call(lawyerA, "clients.conflictSearch",
+                Map.of("clientName", "另一委托人有限公司", "counterpartyName", "林海")).get("hits")).get(0);
+        assertEquals("林海持有星河控股集团有限公司 80% 股权；星河控股集团有限公司持有星河医疗器械有限公司 55% 股权", own.get("relationPath"));
 
         // 正式云端提交：开关开着 → 征询发给客户维护人，关系链只在其本人私密摘要里
         var a = workflow.execute(admin, "workflowAppoint", Map.of("userId", committee));
