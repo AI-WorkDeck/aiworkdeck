@@ -244,7 +244,7 @@ final class Ooxml {
         }
         long newCy = Math.max(0, oldCy + delta);
         // 表格自身和被下推的形状都要留在页面里：算出表格最多能长到多高
-        long maxCy = Math.min(limit - top, oldCy + (limit - belowBottom));
+        long maxCy = Math.min(limit - top, oldCy + Math.max(0, limit - belowBottom));
         if (newCy > maxCy) {
             List<Element> rows = list(tbl, A, "tr");
             long sum = rowHeights(tbl);
@@ -271,6 +271,7 @@ final class Ooxml {
         int sz = 0;
         StringBuilder text = new StringBuilder();
         for (Element t : texts(p, A)) text.append(t.getTextContent());
+        if (text.toString().isBlank()) return 0; // 空段（装饰形状、页脚色带里的占位段）不占高度
         for (Element r : list(p, A, "rPr")) sz = Math.max(sz, (int) attr(r, "sz"));
         Element end = first(p, A, "endParaRPr");
         if (sz == 0 && end != null) sz = (int) attr(end, "sz");
@@ -286,22 +287,27 @@ final class Ooxml {
             i += Character.charCount(cp);
         }
         double perLine = Math.max(1, width / (ptSize * EMU_PER_PT));
-        long lines = Math.max(1, (long) Math.ceil(units / perLine));
+        long lines = Math.max(1, (long) Math.ceil(units / perLine)) + list(p, A, "br").size();
         double spacing = 1.2;
-        Element spc = first(p, A, "spcPct");
-        if (spc != null && attr(spc, "val") > 0 && ancestor(spc, A, "lnSpc") != null) spacing = 1.2 * attr(spc, "val") / 100000.0;
+        Element ln = first(p, A, "lnSpc");
+        Element spc = ln == null ? null : first(ln, A, "spcPct");
+        if (spc != null && attr(spc, "val") > 0) spacing = 1.2 * attr(spc, "val") / 100000.0;
         return (long) Math.ceil(lines * ptSize * spacing * EMU_PER_PT);
     }
 
     /** 表格行按各单元格文字估算的最低所需高度。 */
-    private static long rowNeed(Element tbl, Element tr) {
+    static long rowNeed(Element tbl, Element tr) {
         List<Long> cols = new ArrayList<>();
         for (Element g : list(tbl, A, "gridCol")) cols.add(attr(g, "w"));
         long need = 0;
         int col = 0;
         for (Element tc : childElements(tr)) {
             if (!"tc".equals(tc.getLocalName())) continue;
+            // 横向合并的后续格不占新列（gridSpan 已计入）；纵向合并的后续格没有自己的文字
+            if ("1".equals(tc.getAttribute("hMerge")) || "true".equals(tc.getAttribute("hMerge"))) continue;
+            if ("1".equals(tc.getAttribute("vMerge")) || "true".equals(tc.getAttribute("vMerge"))) { col++; continue; }
             int span = tc.hasAttribute("gridSpan") ? (int) Math.max(1, attr(tc, "gridSpan")) : 1;
+            int rowSpan = tc.hasAttribute("rowSpan") ? (int) Math.max(1, attr(tc, "rowSpan")) : 1;
             long width = 0;
             for (int k = col; k < Math.min(cols.size(), col + span); k++) width += cols.get(k);
             col += span;
@@ -310,7 +316,7 @@ final class Ooxml {
             long insetY = (pr != null && pr.hasAttribute("marT") ? attr(pr, "marT") : 45720) + (pr != null && pr.hasAttribute("marB") ? attr(pr, "marB") : 45720);
             long h = insetY;
             for (Element p : list(tc, A, "p")) h += paragraphHeight(p, Math.max(EMU_PER_PT, width - insetX));
-            need = Math.max(need, h);
+            need = Math.max(need, h / rowSpan); // 跨行格的文字由所跨各行分摊
         }
         return need;
     }
@@ -319,24 +325,29 @@ final class Ooxml {
     private void checkFit(Element root) {
         if (slideCy <= 0) return;
         long limit = slideCy * 97 / 100;
+        // 组合形状里的坐标是组内坐标，不按页面判断；没有自身位置的占位符（继承版式）也不估算
         for (Element tbl : list(root, A, "tbl")) {
             Element frame = ancestor(tbl, P, "graphicFrame");
-            Element off = frame == null ? null : first(frame, A, "off");
+            Element off = frame == null || ancestor(frame, P, "grpSp") != null ? null : first(frame, A, "off");
             if (off == null) continue;
             long total = 0;
             for (Element tr : list(tbl, A, "tr")) total += Math.max(attr(tr, "h"), rowNeed(tbl, tr));
             if (attr(off, "y") + total > limit) overflow.add(slideNo);
         }
         for (Element sp : list(root, P, "sp")) {
+            if (ancestor(sp, P, "grpSp") != null) continue;
             Element body = first(sp, P, "txBody");
             Element off = first(sp, A, "off");
             Element ext = first(sp, A, "ext");
             if (body == null || off == null || ext == null) continue;
             Element bodyPr = first(body, A, "bodyPr");
+            // 自动缩字或不换行的文本框由 PowerPoint 自己处理，不估算
+            if (bodyPr != null && ("none".equals(bodyPr.getAttribute("wrap")) || first(bodyPr, A, "normAutofit") != null)) continue;
             long insetX = (bodyPr != null && bodyPr.hasAttribute("lIns") ? attr(bodyPr, "lIns") : 91440) + (bodyPr != null && bodyPr.hasAttribute("rIns") ? attr(bodyPr, "rIns") : 91440);
             long h = (bodyPr != null && bodyPr.hasAttribute("tIns") ? attr(bodyPr, "tIns") : 45720) + (bodyPr != null && bodyPr.hasAttribute("bIns") ? attr(bodyPr, "bIns") : 45720);
             for (Element p : list(body, A, "p")) h += paragraphHeight(p, Math.max(EMU_PER_PT, attr(ext, "cx") - insetX));
-            if (attr(off, "y") + h > limit) overflow.add(slideNo);
+            // 只在文字比框高、并且伸出页面底部时提示（框本身在页内、文字也装得下的不算）
+            if (h > attr(ext, "cy") && attr(off, "y") + h > limit) overflow.add(slideNo);
         }
     }
 
