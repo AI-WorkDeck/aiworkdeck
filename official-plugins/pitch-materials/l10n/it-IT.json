@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Verrà esportata l'intera libreria, compresi i nomi reali dei clienti, nella cartella \"Esportazioni libreria gare\" del progetto corrente, visibile a tutti i membri del progetto. Esportare comunque?",
   "panel.lib.someClient": "un cliente",
   "panel.err.cancelled": "Interrotto.",
-  "panel.err.panel_only": "Questa azione è disponibile solo nel pannello \"Gare d'appalto e proposte\"."
+  "panel.err.panel_only": "Questa azione è disponibile solo nel pannello \"Gare d'appalto e proposte\".",
+  "panel.err.libraryNotLoaded": "Non è stato ancora possibile leggere la libreria di referenze e team, quindi non è stato salvato nulla per non sovrascriverne il contenuto. Riprova tra poco.",
+  "panel.err.libraryReloaded": "La libreria di referenze e team è stata appena ricaricata, quindi non è stato salvato nulla per non sovrascriverne il contenuto. Controllala e salva di nuovo."
 }

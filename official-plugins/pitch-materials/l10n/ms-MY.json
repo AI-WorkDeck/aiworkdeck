@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Ini mengeksport seluruh perpustakaan, termasuk nama klien sebenar, ke folder \"Eksport perpustakaan tender\" dalam projek semasa, yang boleh dilihat oleh semua ahli projek. Tetap eksport?",
   "panel.lib.someClient": "seorang klien",
   "panel.err.cancelled": "Dihentikan.",
-  "panel.err.panel_only": "Tindakan ini hanya tersedia dalam panel \"Tender dan Cadangan\"."
+  "panel.err.panel_only": "Tindakan ini hanya tersedia dalam panel \"Tender dan Cadangan\".",
+  "panel.err.libraryNotLoaded": "Pustaka kelayakan dan pasukan belum dapat dibaca, jadi tiada apa yang disimpan bagi mengelakkan kandungan sedia ada tertimpa. Sila cuba lagi sebentar nanti.",
+  "panel.err.libraryReloaded": "Pustaka kelayakan dan pasukan baru sahaja dimuat semula, jadi tiada apa yang disimpan bagi mengelakkan kandungan sedia ada tertimpa. Sila semak, kemudian simpan semula."
 }

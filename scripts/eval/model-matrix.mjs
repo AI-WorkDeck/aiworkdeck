@@ -328,8 +328,8 @@ async function loadPlaywright() {
 
 // ---------- 后端实例 ----------
 class Instance {
-  constructor({ label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl }) {
-    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl })
+  constructor({ label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl, plugins = [] }) {
+    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl, plugins })
     this.db = 'awd_' + sanitize(label)
     this.dir = path.join(tmp, 'inst-' + sanitize(label))
     this.logFile = path.join(outDir, 'backend-' + sanitize(label) + '.log')
@@ -339,6 +339,16 @@ class Instance {
     await this.pg.psql('postgres', `create database ${this.db}`)
     this.port = await freePort()
     for (const d of ['home', 'storage', 'plugins', 'skills']) fs.mkdirSync(path.join(this.dir, d), { recursive: true })
+    // 句子 installPlugins 点名的官方插件（不随包内置安装的，如 lawfirm-management）：按广场安装的落盘形态拷进实例 plugins/
+    for (const id of this.plugins) {
+      const src = path.join(this.build.wt, 'official-plugins', id)
+      const dst = path.join(this.dir, 'plugins', id)
+      if (fs.existsSync(path.join(src, 'manifest.json')) && !fs.existsSync(dst)) {
+        fs.mkdirSync(dst, { recursive: true })
+        for (const f of ['manifest.json', 'README.md']) if (fs.existsSync(path.join(src, f))) fs.copyFileSync(path.join(src, f), path.join(dst, f))
+        for (const d of ['web', 'l10n', 'skills']) if (fs.existsSync(path.join(src, d))) fs.cpSync(path.join(src, d), path.join(dst, d), { recursive: true })
+      }
+    }
     const env = {
       ...process.env, // OPENROUTER_API_KEY 随环境继承给子进程，不经过任何日志
       JAVA_HOME: this.java,
@@ -1059,7 +1069,7 @@ async function main() {
     const byRef = Object.fromEntries(built.map(b => [b.ref, b]))
     const sides = []
     for (const side of ['before', 'after']) for (const model of o.models) sides.push({ side, model, build: byRef[o[side]] })
-    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile], llmBaseUrl: proxy?.baseUrl }), { side: s.side }))
+    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile], llmBaseUrl: proxy?.baseUrl, plugins: [...new Set(sentences.flatMap(x => x.installPlugins || []))] }), { side: s.side }))
 
     // 以并发 K 启动实例
     const queue = (items, k, fn) => { let i = 0; return Promise.all(Array.from({ length: Math.min(k, items.length) }, async () => { while (i < items.length) await fn(items[i++]) })) }

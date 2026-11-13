@@ -218,7 +218,7 @@ system prompt 的事实分级保留来源事实截止日，不凭系统当天或
 
 ## 法律意见书技能路由（dev-board#1092，2026-09-30）
 
-`legal-opinion-review` 独立于合同六遍清单：相关事实依据/缺口清单 → 正文与结论限定 → 来源时点 → 最终按清单回读。只审查不直接编辑，编辑范围与审查范围分开。`SkillRouter` 用本地规则在意见书主体命中后区分实质任务与纯机械编辑；并列错字/格式不排除实质审查，后置“仅限错字”限制修订，否定动作不当正向请求。不调用付费预选。当前自动匹配只读用户消息，未将 active filename 加入路由；通用“修订这个文档”仍需模型 `use_skill` 或手选。回归：`LegalOpinionSkillRoutingTest` 中英范围/否定/混合意图；`BuiltinSkillsTest` 校验真实工具名及 LOWA/Office 激活后的读取、编辑、澄清与计划工具。路由通过不等于事实核验质量通过，仍须真实模型验收。
+`legal-opinion-review` 独立于合同六遍清单：相关事实依据/缺口清单 → 正文与结论限定 → 来源时点 → 最终按清单回读。只审查不直接编辑，编辑范围与审查范围分开。`SkillRouter` 用本地规则在意见书主体命中后区分实质任务与纯机械编辑；并列错字/格式不排除实质审查，后置“仅限错字”限制修订，否定动作不当正向请求。不调用付费预选。当前自动匹配只读用户消息，未将 active filename 加入路由；通用“修订这个文档”仍需模型 `use_skill` 或手选。实质动词含 核查/核验/核对/排查/verify/cross-check（工作流卡片「法律意见书核查 · 底稿交叉核验与披露排查」自己的说法，漏了就点卡片也不激活，tutorial #146）；点内置工作流卡片时前端另把卡片的 skill id 随消息显式放进 `skillIds`（`ChatInterface.vue` 的 `pendingWorkflowSkillId`，草稿清空即作废；`useAgentStream` 把内置工作流的 manual 回执按 auto 展示），触发词只是兜底。`LegalOpinionSkillRoutingTest.everyBuiltinWorkflowCardPromptActivatesItsOwnSkill` 钉住中英四张卡片的默认句都命中自己的 skill。回归：`LegalOpinionSkillRoutingTest` 中英范围/否定/混合意图；`BuiltinSkillsTest` 校验真实工具名及 LOWA/Office 激活后的读取、编辑、澄清与计划工具。路由通过不等于事实核验质量通过，仍须真实模型验收。
 
 ## 意见书收尾补检（dev-board#1097，2026-09-30）
 
@@ -866,6 +866,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
         `ToolDisclosurePolicy.setPluginToolKeywords(registry::declaredToolKeywords)` 动态命中 plugin-tools 预放回；ASK 模式放行
         `ASK_READ_TOOLS ∪ ToolRegistry.declaredReadToolNames()`（`AgentOrchestrator.askAllows`）；`CapabilityCatalog.accessOfDeclared` 以声明为准、不推断。
         回归 `PluginDeclaredToolsTest`、`HostServiceRegistryTest`。
+        **发现（fix/plugin-tools-discovery）**：① `categoriesPutBackFor` 给 plugin-tools 计分时把 manifest keywords 算进去（原先只算静态表，恒 1 分，「插件」一词就能把它挤出前三）；② `ToolRegistry.declaredToolSearchTerms()`（工具名 → keywords + 插件名 + id，启用中）经 `ToolDisclosurePolicy.setPluginToolSearchTerms` 喂 `list_tools(query)`：haystack 并入这些词，且「查询词里含某个检索词（≥2 字）」也算命中（中文整句当一个词搜，如「应收账款」含「应收」）；skill 的 query 同理并入 triggers；③ `list_tools` 描述注明 `plugin（插件开发）`/`plugin-tools（已装插件的工具）`，展开 `plugin` 而没要 `plugin-tools` 时回执末尾点名已装插件的工具（tutorial 实测模型照「律所管理插件」字面展开 plugin、只见 capability_install 就劝用户去装）。回归 `OfficialPluginDeclaredToolsTest`（开发安装 .awd-dev / 广场安装两种落盘形态 × 律师问法）；真实模型句集 `scripts/eval/sentences/v8-plugin-tools.json`（`installPlugins` 让矩阵实例装上 lawfirm-management）。
       - **开关关着时连 `list_tools` 自己都不下发**（`ToolDiscoveryTools.isAvailable()`）：
         模型手上已是全集，再挂个目录只会每轮白付约一千字符。**例外是 ②b 活跃文档类目裁剪**（dev-board#1064，
         默认开）：它开着时目录工具进程级可用，由编排器按「本轮藏没藏东西」决定下不下发（`dropIdleCatalog`）。

@@ -114,4 +114,43 @@ class LegalOpinionSkillRoutingTest {
     void narrowEditsAndNonReviewRequestsDoNotActivateSubstantiveWorkflow(boolean english, String request) {
         assertTrue(router(english).match(request).isEmpty());
     }
+    /**
+     * 内置工作流卡片发出的那句话必须激活它自己的 skill（tutorial #146：「法律意见书核查」卡片的
+     * 「请按内置法律意见书核查流程…核验与…排查」没有命中，因为意见书门槛只认审查/修订类动词）。
+     * 前端点卡片已显式带 skillIds，这里守住按触发词这条兜底：卡片措辞与门槛不许再错开。
+     */
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void everyBuiltinWorkflowCardPromptActivatesItsOwnSkill(boolean english) {
+        SkillProperties properties = new SkillProperties();
+        properties.setDir("skills");
+        AppLanguageService language = mock(AppLanguageService.class);
+        when(language.isEnglish()).thenReturn(english);
+        when(language.language()).thenReturn(english ? AppLanguageService.EN_US : AppLanguageService.ZH_CN);
+        SkillRegistry registry = new SkillRegistry(properties, null, new PluginService(), language);
+        registry.init();
+        SkillRouter router = new SkillRouter(registry, properties, mock(TelemetryService.class), language);
+        BuiltinWorkflowVersionService cards = new BuiltinWorkflowVersionService(registry, null, language);
+        for (String id : BuiltinWorkflowVersionService.ORDERED_WORKFLOW_IDS) {
+            SkillDefinition skill = registry.getSkill(id).orElseThrow();
+            if (!registry.isAvailable(skill)) continue;
+            String prompt = cards.buildSystemDefaultVersion(skill).getQuickPrompt();
+            router.activateForTurn("card", "card-" + id, prompt, null);
+            assertEquals(id, router.activeSkill("card-" + id).map(SkillDefinition::getId).orElse(null), prompt);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "false,核查一下这份法律意见书的事实",
+        "false,对照底稿核验法律意见书",
+        "false,排查法律意见书的披露遗漏",
+        "true,Verify the facts in this legal opinion against the workpapers"
+    })
+    void verificationVerbsCountAsSubstantiveOpinionWork(boolean english, String request) {
+        assertTrue(SkillRouter.requestsOpinionReview(request), request);
+        SkillRouter router = router(english);
+        router.activateForTurn("opinion", "verify-run", request, null);
+        assertEquals("legal-opinion-review", router.activeSkill("verify-run").map(SkillDefinition::getId).orElse(null));
+    }
 }

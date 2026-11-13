@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Thao tác này xuất toàn bộ thư viện, bao gồm tên khách hàng thật, vào thư mục \"Xuất thư viện đấu thầu\" của dự án hiện tại, nơi mọi thành viên dự án đều xem được. Vẫn xuất?",
   "panel.lib.someClient": "một khách hàng",
   "panel.err.cancelled": "Đã dừng.",
-  "panel.err.panel_only": "Thao tác này chỉ dùng được trong bảng \"Đấu thầu và đề xuất\"."
+  "panel.err.panel_only": "Thao tác này chỉ dùng được trong bảng \"Đấu thầu và đề xuất\".",
+  "panel.err.libraryNotLoaded": "Thư viện kinh nghiệm và đội ngũ chưa đọc được, nên chưa lưu gì để tránh ghi đè nội dung hiện có. Vui lòng thử lại sau ít phút.",
+  "panel.err.libraryReloaded": "Thư viện kinh nghiệm và đội ngũ vừa được tải lại, nên chưa lưu gì để tránh ghi đè nội dung hiện có. Vui lòng kiểm tra rồi lưu lại."
 }

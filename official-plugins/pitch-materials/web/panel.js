@@ -118,11 +118,20 @@
 
   // ---------- 加载与保存 ----------
 
-  async function loadAll() {
+  async function loadLibrary() {
     try {
       const data = await tool('library.get');
       state.library = core.normalizeLibrary(data.library);
-    } catch (e) { notice(errText(e), 'error'); }
+      state.libraryLoaded = true;
+    } catch (e) {
+      // 读库失败时界面上是空库：此时任何保存都会覆盖已有的库，所以在读成功之前一律不许保存
+      state.libraryLoaded = false;
+      notice(errText(e), 'error');
+    }
+  }
+
+  async function loadAll() {
+    await loadLibrary();
     if (state.projectId) {
       try {
         const data = await tool('matrix.get');
@@ -151,6 +160,11 @@
   }
 
   async function saveLibrary(lib) {
+    if (!state.libraryLoaded) {
+      await loadLibrary(); // 只重读库，不动对照表和生成表单
+      if (!state.libraryLoaded) throw new Error(t('panel.err.libraryNotLoaded'));
+      throw new Error(t('panel.err.libraryReloaded'));
+    }
     await tool('library.save', { library: lib });
     quoteCache.clear();
     state.library = core.normalizeLibrary(lib);

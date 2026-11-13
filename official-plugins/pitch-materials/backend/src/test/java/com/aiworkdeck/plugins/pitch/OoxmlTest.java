@@ -61,4 +61,18 @@ class OoxmlTest {
         PitchTools.Failure f = assertThrows(PitchTools.Failure.class, () -> Ooxml.fill("not a zip".getBytes(), false, data()));
         assertEquals("template_invalid", f.code);
     }
+
+    @Test
+    void mergedCellsDoNotSkewColumnWidths() throws Exception {
+        String a = "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"";
+        String cell = "<a:tc><a:txBody><a:p><a:r><a:rPr sz=\"1000\"/><a:t>二十个字二十个字二十个字二十个字二十个字</a:t></a:r></a:p></a:txBody></a:tc>";
+        String xml = "<a:tbl " + a + "><a:tblGrid><a:gridCol w=\"2000000\"/><a:gridCol w=\"2000000\"/><a:gridCol w=\"2000000\"/></a:tblGrid>"
+                + "<a:tr h=\"300000\"><a:tc gridSpan=\"2\"><a:txBody><a:p><a:r><a:rPr sz=\"1000\"/><a:t>合并格</a:t></a:r></a:p></a:txBody></a:tc>"
+                + "<a:tc hMerge=\"1\"><a:txBody><a:p/></a:txBody></a:tc>" + cell + "</a:tr></a:tbl>";
+        org.w3c.dom.Element tbl = Ooxml.parse(xml.getBytes(StandardCharsets.UTF_8)).getDocumentElement();
+        org.w3c.dom.Element tr = Ooxml.list(tbl, Ooxml.A, "tr").get(0);
+        // 三格各一行字：所需高度约等于一行 10pt（加上下边距），不会因为错列被算成几百磅
+        long need = Ooxml.rowNeed(tbl, tr);
+        assertTrue(need < 400000, String.valueOf(need));
+    }
 }

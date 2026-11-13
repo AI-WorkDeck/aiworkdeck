@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "导出的是整个库，包括真实客户名，会写进当前项目的「投标库导出」文件夹，项目成员都能看到。确定导出？",
   "panel.lib.someClient": "某客户",
   "panel.err.cancelled": "已停止。",
-  "panel.err.panel_only": "这个操作只能在「投标与提案」面板里进行。"
+  "panel.err.panel_only": "这个操作只能在「投标与提案」面板里进行。",
+  "panel.err.libraryNotLoaded": "业绩与团队库还没有读出来，为避免覆盖已有内容，这次没有保存。请稍后重试。",
+  "panel.err.libraryReloaded": "业绩与团队库刚刚重新读取，为避免覆盖已有内容，这次没有保存。请核对后再保存一次。"
 }

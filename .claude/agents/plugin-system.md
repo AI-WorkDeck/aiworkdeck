@@ -100,7 +100,7 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 `manifest.frontendEntry` 从「预留」激活。两种形态在 PluginPane 里**行为刻意不同**：
 
 - **`web/` 相对路径** = Web 插件。后端 `GET /api/plugin-web/{id}/**` 静态服务 `plugins/<id>/web/`；PluginPane 给 iframe 加 `sandbox="allow-scripts allow-forms"`，与插件只走 postMessage 桥。
-- **`http(s)://` 绝对 URL** = 旧形态。不加 sandbox、不发握手、不响应桥调用——改它只会打断存量插件。判据是 URL 里有没有 `/api/plugin-web/`（`PluginPane.isWebPlugin`）。
+- **`http(s)://` 绝对 URL** = 旧形态。不发握手、不响应桥调用。判据是 URL 里有没有 `/api/plugin-web/`（`PluginPane.isWebPlugin`）。S26 起也带 sandbox：`allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-downloads`——保留外站自己的源（登录态/存储），只收走顶层导航（不带 sandbox 的外站 iframe 能把整个工作台导航走）。外站与应用页不同源，这里的 allow-same-origin 碰不到宿主；下一条禁令针对 Web 插件。
 
 **绝不给 sandbox 加 `allow-same-origin`。** 同源的 iframe 能读 localStorage 里的 `X-Session-Id` 并打全部 `/api/*`，等于白送宿主权限。
 
@@ -525,4 +525,4 @@ Web协议仍为awd:1。新增contributes.views/connections/mcpServers和settings
 DesensitizePane 与诉讼可视化「安装 / 重试」控件补 role/tabindex/aria-disabled 与 Enter/Space。回归 `Sensitive*Test`、`frontend/tests/desensitize/*`、`tests/litigation-visual/packUpdate.test.mjs`。
 
 语音/脱敏根背景用侧栏 `--awd-bg`，表单保留 surface；脱敏按钮清除 Uni 默认伪元素描边、引用公共控件令牌，窄栏模式按钮纵排。长编号说明在预览阶段显示，不移除不可逆/PDF/恢复密码等必要操作提示。语音/脱敏编译资源与manifest版本应随源码一并准备，源码验证不等于用户已安装新版。
-- **官方插件声明的工具（P2-3）**：lawfirm-management（`lawfirm_management_matter_overview/conflict_check/fee_ledger`，read）、project-im（`project_im_list_conversations/read_messages`，read）、desensitize（`desensitize_preview` read、`desensitize_redact` write；redact 走 `SensitiveController.executeAs`，输出恒为**新文件**（`rename` 去重 + `CREATE_NEW` 写恢复包），不覆盖原文件）。三个插件版本已升（0.1.5 / 0.2.4 / 1.0.8）；描述用 `%tool.<name>.desc%`，20 个 l10n 文件都有。测试 `HostServiceRegistryTest`（每个新操作含拒绝）、`OfficialPluginDeclaredToolsTest`（装真实 manifest，启用出现/禁用消失）。**地雷**：① 工具名必须以 `<id 连字符转下划线>_` 开头，所以不是 `lawfirm_overview`/`im_*`；② `ToolRegistry.executeDeclared` 会剥掉模型传的 `userId` 和 `conversationId`（后者是 Agent 会话 id），工具参数不能叫这两个名，IM 的会话参数因此叫 `imConversationId`；③ 核心已有 `search_project_content`/`task_*`，故 search/calendar 不声明（见上）。
+- **官方插件声明的工具（P2-3）**：lawfirm-management（`lawfirm_management_matter_overview/conflict_check/fee_ledger`，read）、project-im（`project_im_list_conversations/read_messages`，read）、desensitize（`desensitize_preview` read、`desensitize_redact` write；redact 走 `SensitiveController.executeAs`，输出恒为**新文件**（`rename` 去重 + `CREATE_NEW` 写恢复包），不覆盖原文件）。三个插件版本已升（0.1.5 / 0.2.4 / 1.0.8）；描述用 `%tool.<name>.desc%`，20 个 l10n 文件都有。测试 `HostServiceRegistryTest`（每个新操作含拒绝）、`OfficialPluginDeclaredToolsTest`（装真实 manifest，启用出现/禁用消失）。**地雷**：① 工具名必须以 `<id 连字符转下划线>_` 开头，所以不是 `lawfirm_overview`/`im_*`；② `ToolRegistry.executeDeclared` 会剥掉模型传的 `userId` 和 `conversationId`（后者是 Agent 会话 id），工具参数不能叫这两个名，IM 的会话参数因此叫 `imConversationId`；③ 核心已有 `search_project_content`/`task_*`，故 search/calendar 不声明（见上）。④ `keywords` 是首轮预放回与 `list_tools(query)` 的唯一线索，要写律师的**自然说法**（lawfirm-management 0.1.10 补了 应收/应收账款/没收回/开票/律师费/所里/案件台账/律所管理…；刻意不收 欠款/尾款/收款，它们在案件与合同里太常见）。

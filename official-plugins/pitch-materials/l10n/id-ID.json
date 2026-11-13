@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Tindakan ini mengekspor seluruh pustaka, termasuk nama klien yang sebenarnya, ke folder \"Ekspor pustaka tender\" pada proyek saat ini, yang dapat dilihat oleh semua anggota proyek. Tetap ekspor?",
   "panel.lib.someClient": "seorang klien",
   "panel.err.cancelled": "Dihentikan.",
-  "panel.err.panel_only": "Tindakan ini hanya tersedia di panel \"Tender dan Proposal\"."
+  "panel.err.panel_only": "Tindakan ini hanya tersedia di panel \"Tender dan Proposal\".",
+  "panel.err.libraryNotLoaded": "Pustaka rekam jejak dan tim belum dapat dibaca, sehingga tidak ada yang disimpan agar isinya tidak tertimpa. Silakan coba lagi sebentar lagi.",
+  "panel.err.libraryReloaded": "Pustaka rekam jejak dan tim baru saja dimuat ulang, sehingga tidak ada yang disimpan agar isinya tidak tertimpa. Periksa terlebih dahulu, lalu simpan lagi."
 }

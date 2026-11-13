@@ -189,7 +189,19 @@ class PitchToolsTest {
         assertTrue(fm.find());
         long bottom = Long.parseLong(fm.group(1)) + Long.parseLong(fm.group(2));
         assertTrue(bottom <= slideCy * 94 / 100, "table bottom " + bottom + " of " + slideCy);
-        assertEquals(0, r.path("data").path("overflowSlides").size());
+        assertEquals(0, r.path("data").path("overflowSlides").size(), r.path("data").path("overflowSlides").toString());
+    }
+
+    @Test
+    void overflowIsReportedForLongTablesAndServicePlans() throws Exception {
+        // 真机复测：10 项业绩 + 3 份服务方案时第 9 页溢出却没有提示（行高估算偏乐观）
+        Map<String, Object> args = new java.util.HashMap<>(genArgs("pptx", "模板/启衡提案模板.pptx", true));
+        args.put("credentialIds", List.of("c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10"));
+        args.put("serviceIds", List.of("s1", "s2", "s3"));
+        JsonNode r = call("generate", args);
+        dump(r, "overflow-proposal.pptx");
+        JsonNode slides = r.path("data").path("overflowSlides");
+        assertTrue(slides.toString().contains("5") && slides.toString().contains("6"), slides.toString()); // 业绩表页、服务方案页
     }
 
     @Test
