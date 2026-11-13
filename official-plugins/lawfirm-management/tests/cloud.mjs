@@ -116,3 +116,12 @@ test('on an older host without Firm cloud actions the 律所云端 tab hides its
   assert.equal(h.$('tab-finance').hidden, false);
   assert.equal(h.$('tab-expense').hidden, false);
 });
+
+test('每个标签页面板都是并列的顶层区块，律所云端不能嵌在隐藏的计时收费面板里', () => {
+  const doc = new JSDOM(html).window.document;
+  const panels = [...doc.querySelectorAll('.tab-panel')];
+  assert.ok(panels.some((p) => p.id === 'panel-cloud'));
+  for (const p of panels) {
+    assert.equal(p.parentElement.closest('.tab-panel'), null, `${p.id} 嵌套在 ${p.parentElement.closest('.tab-panel')?.id} 里`);
+  }
+});
