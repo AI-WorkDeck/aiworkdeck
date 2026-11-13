@@ -39,11 +39,11 @@ public class PitchTools implements HostAware {
 
     @Override public void setHost(PluginHost host) { this.host = host; }
 
-    @Tool("投标与提案插件：业绩与团队库、招标对照表、报价计算、按 Word/PPT 模板生成投标书或提案。action 为 "
-            + "library.get / library.save / library.export / matrix.get / matrix.save / quote.compute / templates.sample / generate；"
-            + "json 是 JSON 对象参数。generate 参数：kind(docx|pptx)、template(项目内模板路径，或 sample 用内置示例)、client、project、"
-            + "credentialIds、lawyerIds、qualificationIds、serviceIds、quoteId、outward(对外材料，默认 true，客户名换成对外称谓)、includeMatrix。"
-            + "业绩库是所内保密资料，对外材料必须保持 outward=true。")
+    @Tool("生成投标书或提案（按所里的 Word/PPT 模板），读写业绩与团队库和招标对照表，计算报价。"
+            + "用户要做投标书、服务方案、提案 PPT 或对照招标文件时用。action 为 library.get / matrix.get / matrix.save / quote.compute / "
+            + "templates.sample / generate（library.save、library.export 只能在面板里做）；json 是 JSON 对象参数。generate 参数：kind(docx|pptx)、"
+            + "template(项目内模板路径，或 sample 用内置示例)、client、project、credentialIds、lawyerIds、qualificationIds、serviceIds、quoteId、"
+            + "outward(对外材料，默认 true，客户名换成对外称谓)、includeMatrix。业绩库是所内保密资料，对外材料必须保持 outward=true。")
     public String pitch_materials_action(@P("操作名") String action, @P("JSON 参数对象，默认 {}") String json) {
         try {
             ToolCall call = identity();

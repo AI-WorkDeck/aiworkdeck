@@ -1,7 +1,7 @@
 {
   "plugin.name": "投标与提案",
   "plugin.description": "从所里的业绩、律师简历、资质荣誉、服务说明和报价模板中挑出相关材料，对照招标文件的资格要求和评分项标出满足与缺口，按所里的 Word / PPT 模板生成投标书或提案初稿，报价自动计算，对外材料默认脱敏。",
-  "tool.pitch_materials_action.description": "投标与提案：读取或维护业绩与团队库、招标对照表，计算报价，按 Word/PPT 模板生成投标书或提案（对外材料自动换成对外称谓）。",
+  "tool.pitch_materials_action.description": "生成投标书或提案（按所里的 Word/PPT 模板），读写业绩与团队库和招标对照表，计算报价。",
   "view.main.name": "投标与提案",
   "panel.title": "投标与提案",
   "panel.subtitle": "从所里的积累拼出投标书和提案：维护业绩与团队库，逐条对照招标要求，按模板生成初稿后在编辑器里修改。",

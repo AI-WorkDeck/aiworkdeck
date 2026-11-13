@@ -6,20 +6,58 @@
   "description": "从所里的业绩、律师简历、资质荣誉、服务说明和报价模板中挑出相关材料，对照招标文件的资格要求和评分项标出满足与缺口，按所里的 Word / PPT 模板生成投标书或提案初稿，报价自动计算，对外材料默认脱敏。",
   "author": "AI WorkDeck",
   "homepage": "https://www.aiworkdeck.com/zh/marketplace/plugins",
-  "permissions": ["file_read", "file_write", "ai", "lawfirm"],
+  "permissions": [
+    "file_read",
+    "file_write",
+    "ai",
+    "lawfirm"
+  ],
   "frontendEntry": "web/index.html",
-  "backendJars": ["pitch-materials-0.1.0.jar"],
-  "skills": ["skill"],
-  "tools": [{
-    "name": "pitch_materials_action",
-    "description": "投标与提案：读取或维护业绩与团队库、招标对照表，计算报价，按 Word/PPT 模板生成投标书或提案（对外材料自动换成对外称谓）。",
-    "permissions": ["file_read", "file_write"],
-    "access": "write",
-    "keywords": ["投标", "投标书", "标书", "招标", "招标文件", "提案", "服务方案", "业绩库", "业绩", "律师简历", "报价", "pitch", "bid", "tender", "proposal", "credentials", "RFP"]
-  }],
+  "backendJars": [
+    "pitch-materials-0.1.0.jar"
+  ],
+  "skills": [
+    "skill"
+  ],
+  "tools": [
+    {
+      "name": "pitch_materials_action",
+      "description": "生成投标书或提案（按所里的 Word/PPT 模板），读写业绩与团队库和招标对照表，计算报价。",
+      "permissions": [
+        "file_read",
+        "file_write"
+      ],
+      "access": "write",
+      "keywords": [
+        "投标",
+        "投标书",
+        "标书",
+        "招标",
+        "招标文件",
+        "提案",
+        "服务方案",
+        "业绩库",
+        "业绩",
+        "律师简历",
+        "报价",
+        "pitch",
+        "bid",
+        "tender",
+        "proposal",
+        "credentials",
+        "RFP"
+      ]
+    }
+  ],
   "contributes": {
     "views": [
-      { "id": "main", "name": "投标与提案", "entry": "web/index.html", "placement": "workspace", "scope": "project" }
+      {
+        "id": "main",
+        "name": "投标与提案",
+        "entry": "web/index.html",
+        "placement": "workspace",
+        "scope": "project"
+      }
     ]
   }
 }
