@@ -449,5 +449,13 @@
   "client.cloud.restricted": "Bạn không phải người phụ trách hay luật sư đối tác chịu trách nhiệm của khách hàng này nên chỉ hiển thị tên và người phụ trách. Cần biết chi tiết, vui lòng liên hệ người phụ trách.",
   "client.cloud.conflictTitle": "Tra cứu các bên trên đám mây văn phòng luật",
   "client.cloud.conflictClear": "Không phát hiện liên quan nào trong số khách hàng và các bên liên quan trên đám mây văn phòng luật.",
-  "client.cloud.conflictHit": "{client} ({no}) · người phụ trách: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · người phụ trách: {owner}",
+  "client.cloud.withdraw": "Rút khách hàng tôi phụ trách khỏi đám mây văn phòng luật",
+  "client.cloud.withdrawConfirm": "Các khách hàng do bạn phụ trách và quan hệ của họ sẽ bị xóa khỏi đám mây văn phòng luật. Hồ sơ cục bộ của bạn không bị ảnh hưởng. Bạn có muốn rút không?",
+  "client.cloud.withdrawn": "Đã rút {clients} khách hàng khỏi đám mây văn phòng luật.",
+  "client.cloud.purge": "Xóa toàn bộ dữ liệu khách hàng trên đám mây văn phòng luật",
+  "client.cloud.purgeConfirm": "Toàn bộ khách hàng, bên liên quan và quan hệ của văn phòng trên đám mây văn phòng luật sẽ bị xóa. Không thể hoàn tác. Hồ sơ cục bộ của từng luật sư không bị ảnh hưởng. Bạn có muốn xóa không?",
+  "client.cloud.purged": "Đã xóa {clients} khách hàng và các quan hệ của họ khỏi đám mây văn phòng luật.",
+  "client.cloud.confirm": "Xác nhận",
+  "client.cloud.cancel": "Hủy"
 }

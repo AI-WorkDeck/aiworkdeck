@@ -449,5 +449,13 @@
   "client.cloud.restricted": "No es el responsable de la relación ni el socio responsable de este cliente, por lo que solo se muestran el nombre y el responsable. Para más detalles, contacte con el responsable.",
   "client.cloud.conflictTitle": "Búsqueda de partes en la nube del despacho",
   "client.cloud.conflictClear": "No se ha encontrado ninguna vinculación entre los clientes y partes relacionadas de la nube del despacho.",
-  "client.cloud.conflictHit": "{client} ({no}) · responsable: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · responsable: {owner}",
+  "client.cloud.withdraw": "Retirar mis clientes de la nube del despacho",
+  "client.cloud.withdrawConfirm": "Los clientes que usted gestiona y sus relaciones se eliminarán de la nube del despacho. Sus expedientes locales no se ven afectados. ¿Desea retirarlos?",
+  "client.cloud.withdrawn": "Se retiraron {clients} clientes de la nube del despacho.",
+  "client.cloud.purge": "Eliminar todos los datos de clientes de la nube del despacho",
+  "client.cloud.purgeConfirm": "Se eliminarán todos los clientes, partes vinculadas y relaciones del despacho en la nube del despacho. Esta acción no se puede deshacer. Los expedientes locales de cada abogado no se ven afectados. ¿Desea eliminarlos?",
+  "client.cloud.purged": "Se eliminaron {clients} clientes y sus relaciones de la nube del despacho.",
+  "client.cloud.confirm": "Confirmar",
+  "client.cloud.cancel": "Cancelar"
 }

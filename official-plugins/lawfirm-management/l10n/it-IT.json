@@ -449,5 +449,13 @@
   "client.cloud.restricted": "Non sei il referente né il socio responsabile di questo cliente, quindi vengono mostrati solo il nome e il referente. Per i dettagli contatta il referente.",
   "client.cloud.conflictTitle": "Ricerca parti nel cloud dello studio",
   "client.cloud.conflictClear": "Nessun collegamento trovato tra i clienti e le parti correlate del cloud dello studio.",
-  "client.cloud.conflictHit": "{client} ({no}) · referente: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · referente: {owner}",
+  "client.cloud.withdraw": "Ritira i miei clienti dal cloud dello studio",
+  "client.cloud.withdrawConfirm": "I clienti da te gestiti e le loro relazioni saranno eliminati dal cloud dello studio. Le tue schede locali non sono interessate. Vuoi ritirarli?",
+  "client.cloud.withdrawn": "{clients} clienti ritirati dal cloud dello studio.",
+  "client.cloud.purge": "Elimina tutti i dati dei clienti nel cloud dello studio",
+  "client.cloud.purgeConfirm": "Tutti i clienti, le parti collegate e le relazioni dello studio nel cloud dello studio saranno eliminati. L'operazione non può essere annullata. Le schede locali dei singoli avvocati non sono interessate. Vuoi eliminarli?",
+  "client.cloud.purged": "{clients} clienti e le relative relazioni eliminati dal cloud dello studio.",
+  "client.cloud.confirm": "Conferma",
+  "client.cloud.cancel": "Annulla"
 }

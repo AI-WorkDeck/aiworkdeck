@@ -47,7 +47,7 @@ public class LawFirmCloudClientService {
     public static final String FEATURE = "clients";
     public static final Set<String> ACTIONS = Set.of(
             "clients.list", "clients.get", "clients.save", "clients.saveRelation", "clients.deleteRelation",
-            "clients.searchParties", "clients.import", "clients.conflictSearch");
+            "clients.searchParties", "clients.import", "clients.conflictSearch", "clients.withdraw", "clients.purge");
     static final String STALE = "该记录已被同事修改，请刷新后再改";
     private static final int MAX_IMPORT = 2000;
 
@@ -76,8 +76,65 @@ public class LawFirmCloudClientService {
             case "clients.searchParties" -> searchParties(ctx, p);
             case "clients.import" -> importLedger(ctx, p);
             case "clients.conflictSearch" -> conflictSearch(ctx, p);
+            case "clients.withdraw" -> withdraw(ctx, p);
+            case "clients.purge" -> {
+                if (!me.firmAdmin()) throw LawFirmAuthority.denied();
+                if (!Boolean.TRUE.equals(p.get("confirm"))) {
+                    throw new IllegalArgumentException(LangText.of("删除律所云端全部客户数据须明确确认", "Deleting all firm cloud client data requires explicit confirmation"));
+                }
+                yield purgeFirm(me.firmId());
+            }
             default -> throw new IllegalArgumentException(LangText.of("不支持的客户云端操作", "Unsupported client cloud action"));
         };
+    }
+
+    /**
+     * 删除本所在云端的全部客户、关联主体与关系（不可恢复）。律所管理员在页面上确认后调用，
+     * 也供律所云端通道在管理员关闭「客户管理」并勾选「同时删除云端客户数据」时调用。
+     */
+    public Map<String, Object> purgeFirm(String firmId) {
+        List<LawFirmCloudRelation> rels = relations.findByFirmIdOrderByIdAsc(firmId);
+        List<LawFirmCloudParty> all = parties.findByFirmIdOrderByIdAsc(firmId);
+        long clientCount = all.stream().filter(LawFirmCloudParty::isClient).count();
+        relations.deleteAllInBatch(rels);
+        parties.deleteAllInBatch(all);
+        return Map.of("deletedClients", clientCount, "deletedParties", all.size(), "deletedRelations", rels.size());
+    }
+
+    /**
+     * 律师从云端撤回自己维护的客户（可指定 partyIds，缺省为本人维护的全部）：删除客户、与之相连的关系，
+     * 以及因此不再与任何主体相连的非客户主体。主办合伙人或他人维护的客户不受影响。
+     */
+    private Map<String, Object> withdraw(Ctx ctx, Map<String, Object> p) {
+        Set<Long> only = new LinkedHashSet<>();
+        if (p.get("partyIds") instanceof List<?> ids) for (Object o : ids) { Long v = longVal(o); if (v != null) only.add(v); }
+        List<LawFirmCloudParty> mine = ctx.all().stream()
+                .filter(c -> c.isClient() && Objects.equals(c.getOwnerUserId(), ctx.me.userId()) && (only.isEmpty() || only.contains(c.getId())))
+                .toList();
+        if (mine.isEmpty()) {
+            return Map.of("withdrawnClients", 0, "removedIds", List.of());
+        }
+        Set<Long> removed = new LinkedHashSet<>();
+        for (LawFirmCloudParty c : mine) removed.add(c.getId());
+        List<LawFirmCloudRelation> rels = relations.findByFirmIdOrderByIdAsc(ctx.me.firmId());
+        List<LawFirmCloudRelation> drop = rels.stream()
+                .filter(r -> removed.contains(r.getFromPartyId()) || removed.contains(r.getToPartyId())).toList();
+        Set<Long> stillLinked = new java.util.HashSet<>();
+        for (LawFirmCloudRelation r : rels) {
+            if (drop.contains(r)) continue;
+            stillLinked.add(r.getFromPartyId());
+            stillLinked.add(r.getToPartyId());
+        }
+        Set<Long> touched = new java.util.HashSet<>();
+        for (LawFirmCloudRelation r : drop) { touched.add(r.getFromPartyId()); touched.add(r.getToPartyId()); }
+        List<LawFirmCloudParty> orphans = ctx.all().stream()
+                .filter(x -> !x.isClient() && touched.contains(x.getId()) && !stillLinked.contains(x.getId())).toList();
+        for (LawFirmCloudParty o : orphans) removed.add(o.getId());
+        relations.deleteAllInBatch(drop);
+        parties.deleteAllInBatch(mine);
+        parties.deleteAllInBatch(orphans);
+        ctx.invalidate();
+        return Map.of("withdrawnClients", mine.size(), "removedIds", List.copyOf(removed));
     }
 
     /** 全所主体关系图（云端利冲用，不按查看人裁剪）；征询对象为客户维护人，没有则主办合伙人。 */

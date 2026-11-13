@@ -449,5 +449,13 @@
   "client.cloud.restricted": "Vous n'êtes ni le référent ni l'associé responsable de ce client ; seuls le nom et le référent s'affichent. Contactez le référent pour plus de détails.",
   "client.cloud.conflictTitle": "Recherche de parties dans le cloud du cabinet",
   "client.cloud.conflictClear": "Aucun lien trouvé parmi les clients et parties liées du cloud du cabinet.",
-  "client.cloud.conflictHit": "{client} ({no}) · référent : {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · référent : {owner}",
+  "client.cloud.withdraw": "Retirer mes clients du cloud du cabinet",
+  "client.cloud.withdrawConfirm": "Les clients dont vous avez la charge et leurs relations seront supprimés du cloud du cabinet. Vos dossiers locaux ne sont pas affectés. Confirmer le retrait ?",
+  "client.cloud.withdrawn": "{clients} clients ont été retirés du cloud du cabinet.",
+  "client.cloud.purge": "Supprimer toutes les données clients du cloud du cabinet",
+  "client.cloud.purgeConfirm": "Tous les clients, parties liées et relations du cabinet seront supprimés du cloud du cabinet. Cette action est irréversible. Les dossiers locaux de chaque avocat ne sont pas affectés. Confirmer la suppression ?",
+  "client.cloud.purged": "{clients} clients et leurs relations ont été supprimés du cloud du cabinet.",
+  "client.cloud.confirm": "Confirmer",
+  "client.cloud.cancel": "Annuler"
 }

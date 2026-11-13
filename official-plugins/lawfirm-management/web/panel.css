@@ -715,3 +715,17 @@ td.num {
   border-radius: var(--awd-radius-sm, 6px);
   background: var(--awd-surface-2, var(--fallback-surface-2));
 }
+.client-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-block-end: 12px;
+  border-radius: var(--awd-radius-sm, 6px);
+  background: var(--awd-danger-wash, var(--fallback-danger-wash));
+}
+.client-confirm p {
+  margin: 0;
+  flex: 1 1 100%;
+}

@@ -253,6 +253,37 @@ class LawFirmCloudClientTest {
         assertEquals("PENDING_COMMITTEE_REVIEW", off.get("status"));
     }
 
+    @Test
+    void lawyerWithdrawsOwnClientsAndAdminPurgesAllWithExplicitConfirm() {
+        Map<String, Object> mine = createClient(lawyerA, "甲律师的客户有限公司");
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine), "relationType", "SPOUSE", "partyName", "甲客户实控人配偶", "partyType", "INDIVIDUAL"));
+        Map<String, Object> shared = createClient(lawyerA, "共同股东客户有限公司");
+        call(lawyerA, "clients.saveRelation", Map.of("clientId", id(mine), "relationType", "AFFILIATE", "partyId", id(shared)));
+        Map<String, Object> others = createClient(lawyerB, "乙律师的客户有限公司");
+
+        Map<String, Object> w = call(lawyerA, "clients.withdraw", Map.of("partyIds", List.of(id(mine))));
+        assertEquals(1, w.get("withdrawnClients"));
+        List<?> removed = (List<?>) w.get("removedIds");
+        assertTrue(removed.contains(id(mine)));
+        assertEquals(2, removed.size(), "只剩这一条关系的非客户主体（配偶）一并删掉");
+        assertThrows(IllegalArgumentException.class, () -> call(lawyerA, "clients.get", Map.of("partyId", id(mine))));
+        assertTrue(((List<?>) client(call(lawyerA, "clients.get", Map.of("partyId", id(shared)))).get("relations")).isEmpty(),
+                "与被撤回客户之间的关系也删除，另一位客户保留");
+        assertEquals(0, call(lawyerB, "clients.withdraw", Map.of("partyIds", List.of(id(shared)))).get("withdrawnClients"),
+                "不能撤回别人维护的客户");
+
+        assertThrows(IllegalArgumentException.class, () -> call(lawyerA, "clients.purge", Map.of("confirm", true)), "只有律所管理员能清空");
+        assertThrows(IllegalArgumentException.class, () -> call(admin, "clients.purge", Map.of()), "须明确确认");
+        Map<String, Object> purged = call(admin, "clients.purge", Map.of("confirm", true));
+        assertEquals(2L, purged.get("deletedClients"));
+        assertTrue(((List<?>) call(admin, "clients.list", Map.of()).get("clients")).isEmpty());
+        assertTrue(((List<?>) call(lawyerB, "clients.list", Map.of()).get("clients")).isEmpty());
+        assertNotNull(others);
+        Map<String, Object> outsiderClient = client(call(outsider, "clients.save", Map.of("name", "他所客户有限公司")));
+        call(admin, "clients.purge", Map.of("confirm", true));
+        assertEquals("他所客户有限公司", client(call(outsider, "clients.get", Map.of("partyId", id(outsiderClient)))).get("name"), "只删本所");
+    }
+
     Map<String, Object> submission(String title) {
         return new HashMap<>(Map.of("requestId", UUID.randomUUID().toString(), "title", title, "clientName", "另一委托人有限公司",
                 "counterpartyName", "林海", "leadId", lawyerB, "committeeId", committee));

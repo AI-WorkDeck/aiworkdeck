@@ -64,7 +64,7 @@ public class LawFirmClientService {
 
     public static final Set<String> ACTIONS = Set.of(
             "listClients", "getClient", "saveClient", "logClientContact", "searchParties", "saveRelation", "deleteRelation",
-            "uploadClientsToCloud");
+            "uploadClientsToCloud", "withdrawClientsFromCloud");
 
     static final Set<String> ACTIVE_STATUSES = Set.of(
             "CONFLICT_CHECKING", "PENDING_LAWYER_CLEARANCE", "PENDING_COMMITTEE_REVIEW", "APPROVED_FILED");
@@ -100,6 +100,7 @@ public class LawFirmClientService {
             case "saveRelation" -> saveRelation(userId, params);
             case "deleteRelation" -> deleteRelation(userId, params);
             case "uploadClientsToCloud" -> uploadToCloud(userId, params);
+            case "withdrawClientsFromCloud" -> withdrawFromCloud(userId);
             default -> throw new IllegalArgumentException(LangText.of("不支持的客户操作：", "Unsupported client action: ") + action);
         };
     }
@@ -627,6 +628,26 @@ public class LawFirmClientService {
         out.put("matched", result.get("matched"));
         out.put("linked", linked);
         return out;
+    }
+
+    /** 从律所云端撤回本人维护的客户，并清掉本机对应的 cloudPartyId（本机档案不受影响）。 */
+    Map<String, Object> withdrawFromCloud(Long userId) {
+        LawFirmCloudCaller caller = cloudCaller.getIfAvailable();
+        if (caller == null) {
+            throw new IllegalArgumentException(LangText.of("律所云端通道尚未就绪", "The law firm cloud channel is not available yet"));
+        }
+        Map<String, Object> result = caller.call(userId, "clients.withdraw", Map.of());
+        Set<Long> removed = new java.util.HashSet<>();
+        if (result.get("removedIds") instanceof List<?> ids) for (Object o : ids) { Long v = longVal(o); if (v != null) removed.add(v); }
+        int unlinked = 0;
+        for (LawFirmParty x : partyRepository.findAllByOrderByIdAsc()) {
+            if (x.getCloudPartyId() != null && removed.contains(x.getCloudPartyId())) {
+                x.setCloudPartyId(null);
+                partyRepository.save(x);
+                unlinked++;
+            }
+        }
+        return Map.of("withdrawnClients", result.getOrDefault("withdrawnClients", 0), "unlinked", unlinked);
     }
 
     // ---- 视图 ----

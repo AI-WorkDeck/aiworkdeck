@@ -140,9 +140,29 @@
       status(t('client.cloud.uploaded', { clients: r.uploadedClients ?? 0, created: r.created ?? 0, matched: r.matched ?? 0 }));
       if (state.mode === 'cloud') { await loadList(); renderList(); status(t('client.cloud.uploaded', { clients: r.uploadedClients ?? 0, created: r.created ?? 0, matched: r.matched ?? 0 })); }
     }));
-    return el('div', { class: 'client-cloud-bar', id: 'client-cloud-bar' },
-      el('span', { class: 'hint' }, t('client.cloud.on')), modeBtn('local'), modeBtn('cloud'), upload,
-      el('span', { class: 'hint' }, t('client.cloud.uploadHint')));
+    const confirmRow = el('div', { class: 'client-confirm', id: 'client-cloud-confirm', hidden: true });
+    // 删除类操作先在页面上展示后果，再点「确认」才执行（插件沙箱里不依赖系统弹窗）
+    const askThen = (warning, action, done) => {
+      const ok = el('button', { type: 'button', id: 'client-cloud-confirm-ok', class: 'danger' }, t('client.cloud.confirm'));
+      const cancel = el('button', { type: 'button', id: 'client-cloud-confirm-cancel', onclick: () => { confirmRow.hidden = true; } }, t('client.cloud.cancel'));
+      ok.addEventListener('click', () => run(ok, async () => {
+        const r = await action();
+        confirmRow.hidden = true;
+        if (state.mode === 'cloud') { await loadList(); renderList(); }
+        status(done(r));
+      }));
+      confirmRow.replaceChildren(el('p', {}, warning), ok, cancel);
+      confirmRow.hidden = false;
+    };
+    const withdraw = el('button', { type: 'button', id: 'client-withdraw', onclick: () => askThen(t('client.cloud.withdrawConfirm'),
+      () => request('withdrawClientsFromCloud', {}), (r) => t('client.cloud.withdrawn', { clients: r.withdrawnClients ?? 0 })) }, t('client.cloud.withdraw'));
+    const purge = state.cloud.canChange ? el('button', { type: 'button', id: 'client-purge', class: 'danger', onclick: () => askThen(t('client.cloud.purgeConfirm'),
+      () => request('clients.purge', { confirm: true }), (r) => t('client.cloud.purged', { clients: r.deletedClients ?? 0 })) }, t('client.cloud.purge')) : null;
+    return el('div', {},
+      el('div', { class: 'client-cloud-bar', id: 'client-cloud-bar' },
+        el('span', { class: 'hint' }, t('client.cloud.on')), modeBtn('local'), modeBtn('cloud'), upload, withdraw, purge,
+        el('span', { class: 'hint' }, t('client.cloud.uploadHint'))),
+      confirmRow);
   }
 
   function renderCloudList(root) {

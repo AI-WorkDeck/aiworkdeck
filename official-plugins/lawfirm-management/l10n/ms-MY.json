@@ -449,5 +449,13 @@
   "client.cloud.restricted": "Anda bukan pengurus klien atau rakan kongsi bertanggungjawab bagi klien ini, jadi hanya nama dan pengurus klien dipaparkan. Hubungi pengurus klien untuk maklumat lanjut.",
   "client.cloud.conflictTitle": "Carian pihak dalam awan firma",
   "client.cloud.conflictClear": "Tiada kaitan ditemui dalam kalangan klien dan pihak berkaitan di awan firma.",
-  "client.cloud.conflictHit": "{client} ({no}) · pengurus klien: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · pengurus klien: {owner}",
+  "client.cloud.withdraw": "Tarik balik klien saya daripada awan firma",
+  "client.cloud.withdrawConfirm": "Klien yang anda uruskan beserta hubungan mereka akan dipadam daripada awan firma. Rekod setempat anda tidak terjejas. Tarik balik?",
+  "client.cloud.withdrawn": "{clients} klien telah ditarik balik daripada awan firma.",
+  "client.cloud.purge": "Padam semua data klien dalam awan firma",
+  "client.cloud.purgeConfirm": "Semua klien, pihak berkaitan dan hubungan firma dalam awan firma akan dipadam. Tindakan ini tidak boleh dibatalkan. Rekod setempat setiap peguam tidak terjejas. Padam?",
+  "client.cloud.purged": "{clients} klien beserta hubungan mereka telah dipadam daripada awan firma.",
+  "client.cloud.confirm": "Sahkan",
+  "client.cloud.cancel": "Batal"
 }

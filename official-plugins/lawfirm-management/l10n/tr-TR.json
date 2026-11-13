@@ -449,5 +449,13 @@
   "client.cloud.restricted": "Bu müvekkilin sorumlusu veya sorumlu ortağı olmadığınız için yalnızca ad ve sorumlu gösterilir. Ayrıntı için sorumluyla iletişime geçin.",
   "client.cloud.conflictTitle": "Büro bulutunda taraf araması",
   "client.cloud.conflictClear": "Büro bulutundaki müvekkiller ve ilişkili taraflar arasında bağlantı bulunamadı.",
-  "client.cloud.conflictHit": "{client} ({no}) · sorumlu: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · sorumlu: {owner}",
+  "client.cloud.withdraw": "Müvekkillerimi büro bulutundan çek",
+  "client.cloud.withdrawConfirm": "Yönettiğiniz müvekkiller ve ilişkileri büro bulutundan silinecek. Yerel kayıtlarınız etkilenmez. Geri çekilsin mi?",
+  "client.cloud.withdrawn": "{clients} müvekkil büro bulutundan geri çekildi.",
+  "client.cloud.purge": "Büro bulutundaki tüm müvekkil verilerini sil",
+  "client.cloud.purgeConfirm": "Büronun büro bulutundaki tüm müvekkilleri, ilişkili tarafları ve ilişkileri silinecek. Bu işlem geri alınamaz. Avukatların yerel kayıtları etkilenmez. Silinsin mi?",
+  "client.cloud.purged": "{clients} müvekkil ve ilişkileri büro bulutundan silindi.",
+  "client.cloud.confirm": "Onayla",
+  "client.cloud.cancel": "İptal"
 }

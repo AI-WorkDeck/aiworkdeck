@@ -449,5 +449,13 @@
   "client.cloud.restricted": "أنت لست المسؤول عن هذا العميل ولا الشريك المسؤول عنه، لذا يظهر الاسم والمسؤول فقط. للاطلاع على التفاصيل، تواصل مع المسؤول.",
   "client.cloud.conflictTitle": "البحث عن الأطراف في سحابة المكتب",
   "client.cloud.conflictClear": "لم يُعثر على أي صلة بين العملاء والأطراف ذات الصلة في سحابة المكتب.",
-  "client.cloud.conflictHit": "{client} ({no}) · المسؤول: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · المسؤول: {owner}",
+  "client.cloud.withdraw": "سحب عملائي من سحابة المكتب",
+  "client.cloud.withdrawConfirm": "سيتم حذف العملاء الذين تديرهم وعلاقاتهم من سحابة المكتب. ملفاتك المحلية لا تتأثر. هل تريد سحبهم؟",
+  "client.cloud.withdrawn": "تم سحب {clients} عميل من سحابة المكتب.",
+  "client.cloud.purge": "حذف جميع بيانات العملاء في سحابة المكتب",
+  "client.cloud.purgeConfirm": "سيتم حذف جميع عملاء المكتب والأطراف المرتبطة والعلاقات في سحابة المكتب. لا يمكن التراجع عن ذلك. ملفات المحامين المحلية لا تتأثر. هل تريد الحذف؟",
+  "client.cloud.purged": "تم حذف {clients} عميل وعلاقاتهم من سحابة المكتب.",
+  "client.cloud.confirm": "تأكيد",
+  "client.cloud.cancel": "إلغاء"
 }

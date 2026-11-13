@@ -449,5 +449,13 @@
   "client.cloud.restricted": "You are not this client's owner or responsible partner, so only the name and owner are shown. Contact the owner for details.",
   "client.cloud.conflictTitle": "Firm cloud party search",
   "client.cloud.conflictClear": "No connection found among the firm cloud's clients and related parties.",
-  "client.cloud.conflictHit": "{client} ({no}) · owner: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · owner: {owner}",
+  "client.cloud.withdraw": "Withdraw my clients from the firm cloud",
+  "client.cloud.withdrawConfirm": "Clients you own and their relationships will be deleted from the firm cloud. Your local records are not affected. Withdraw them?",
+  "client.cloud.withdrawn": "Withdrew {clients} clients from the firm cloud.",
+  "client.cloud.purge": "Delete all client data in the firm cloud",
+  "client.cloud.purgeConfirm": "All of the firm's clients, related parties and relationships in the firm cloud will be deleted. This cannot be undone. Lawyers' local records are not affected. Delete them?",
+  "client.cloud.purged": "Deleted {clients} clients and their relationships from the firm cloud.",
+  "client.cloud.confirm": "Confirm",
+  "client.cloud.cancel": "Cancel"
 }

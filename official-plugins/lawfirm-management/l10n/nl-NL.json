@@ -449,5 +449,13 @@
   "client.cloud.restricted": "U bent niet de beheerder of verantwoordelijk partner van deze cliënt, dus alleen de naam en de beheerder worden getoond. Neem voor details contact op met de beheerder.",
   "client.cloud.conflictTitle": "Partijenzoeker in de kantoorcloud",
   "client.cloud.conflictClear": "Geen verband gevonden tussen de cliënten en gerelateerde partijen in de kantoorcloud.",
-  "client.cloud.conflictHit": "{client} ({no}) · beheerder: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · beheerder: {owner}",
+  "client.cloud.withdraw": "Mijn cliënten uit de kantoorcloud terugtrekken",
+  "client.cloud.withdrawConfirm": "De cliënten die u beheert en hun relaties worden uit de kantoorcloud verwijderd. Uw lokale dossiers worden niet geraakt. Terugtrekken?",
+  "client.cloud.withdrawn": "{clients} cliënten zijn uit de kantoorcloud teruggetrokken.",
+  "client.cloud.purge": "Alle cliëntgegevens in de kantoorcloud verwijderen",
+  "client.cloud.purgeConfirm": "Alle cliënten, gekoppelde partijen en relaties van het kantoor worden uit de kantoorcloud verwijderd. Dit kan niet ongedaan worden gemaakt. De lokale dossiers van de afzonderlijke advocaten worden niet geraakt. Verwijderen?",
+  "client.cloud.purged": "{clients} cliënten en hun relaties zijn uit de kantoorcloud verwijderd.",
+  "client.cloud.confirm": "Bevestigen",
+  "client.cloud.cancel": "Annuleren"
 }

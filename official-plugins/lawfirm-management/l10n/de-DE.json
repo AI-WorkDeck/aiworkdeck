@@ -449,5 +449,13 @@
   "client.cloud.restricted": "Sie sind weder Betreuer noch verantwortlicher Partner dieses Mandanten, daher werden nur Name und Betreuer angezeigt. Wenden Sie sich für Details an den Betreuer.",
   "client.cloud.conflictTitle": "Beteiligtensuche in der Kanzlei-Cloud",
   "client.cloud.conflictClear": "Keine Verbindung zu den Mandanten und verbundenen Beteiligten der Kanzlei-Cloud gefunden.",
-  "client.cloud.conflictHit": "{client} ({no}) · Betreuer: {owner}"
+  "client.cloud.conflictHit": "{client} ({no}) · Betreuer: {owner}",
+  "client.cloud.withdraw": "Meine Mandanten aus der Kanzlei-Cloud zurückziehen",
+  "client.cloud.withdrawConfirm": "Die von Ihnen betreuten Mandanten und ihre Beziehungen werden aus der Kanzlei-Cloud gelöscht. Ihre lokalen Akten sind nicht betroffen. Jetzt zurückziehen?",
+  "client.cloud.withdrawn": "{clients} Mandanten wurden aus der Kanzlei-Cloud zurückgezogen.",
+  "client.cloud.purge": "Alle Mandantendaten in der Kanzlei-Cloud löschen",
+  "client.cloud.purgeConfirm": "Alle Mandanten, verbundenen Beteiligten und Beziehungen der Kanzlei werden aus der Kanzlei-Cloud gelöscht. Dies kann nicht rückgängig gemacht werden. Die lokalen Akten der einzelnen Anwälte sind nicht betroffen. Jetzt löschen?",
+  "client.cloud.purged": "{clients} Mandanten und ihre Beziehungen wurden aus der Kanzlei-Cloud gelöscht.",
+  "client.cloud.confirm": "Bestätigen",
+  "client.cloud.cancel": "Abbrechen"
 }

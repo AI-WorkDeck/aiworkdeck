@@ -449,5 +449,13 @@
   "client.cloud.restricted": "あなたはこの顧客の担当者でも責任パートナーでもないため、名称と担当者のみ表示されます。詳細は担当者にお問い合わせください。",
   "client.cloud.conflictTitle": "事務所クラウド当事者検索",
   "client.cloud.conflictClear": "事務所クラウド上の顧客および関係当事者に関連は見つかりませんでした。",
-  "client.cloud.conflictHit": "{client}（{no}）· 担当者：{owner}"
+  "client.cloud.conflictHit": "{client}（{no}）· 担当者：{owner}",
+  "client.cloud.withdraw": "自分が管理する顧客を事務所クラウドから取り下げる",
+  "client.cloud.withdrawConfirm": "あなたが管理する顧客とその関係が事務所クラウドから削除されます。お使いの端末のローカル記録には影響しません。取り下げますか？",
+  "client.cloud.withdrawn": "{clients} 件の顧客を事務所クラウドから取り下げました。",
+  "client.cloud.purge": "事務所クラウド上の全顧客データを削除",
+  "client.cloud.purgeConfirm": "事務所クラウド上の当事務所の全顧客、関連当事者、関係が削除されます。削除後は元に戻せません。各弁護士のローカル記録には影響しません。削除しますか？",
+  "client.cloud.purged": "事務所クラウドから {clients} 件の顧客とその関係を削除しました。",
+  "client.cloud.confirm": "確認",
+  "client.cloud.cancel": "キャンセル"
 }

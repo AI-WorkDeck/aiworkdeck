@@ -81,6 +81,8 @@ async function mount({ language = 'zh-CN', oldHost = false, cloud = null } = {})
         }
         if (action === 'clients.conflictSearch') result = { riskLevel: 'YELLOW', hits: [{ ruleTitle: '新案对方当事人与本所客户存在关联关系（含间接股权）', clientName: '星河医疗器械有限公司', clientNo: 'KH-2026-0001', ownerName: '许嘉宁', relationPath: '林海持有星河控股 80% 股权' }] };
         if (action === 'uploadClientsToCloud') result = { uploadedClients: 2, created: 1, matched: 1 };
+        if (action === 'withdrawClientsFromCloud') result = { withdrawnClients: 1, unlinked: 1 };
+        if (action === 'clients.purge') result = { deletedClients: 2, deletedParties: 4, deletedRelations: 3 };
       }
       send({ awd: 1, type: 'result', seq: msg.seq, ok: true, result });
     });
@@ -254,4 +256,30 @@ test('intake precheck also searches firm cloud parties when the firm cloud is on
   assert.equal(p.actions('clients.conflictSearch').at(-1).counterpartyName, '林海');
   assert.match(p.$('cloud-conflict-card').textContent, /星河医疗器械有限公司（KH-2026-0001）· 维护人：许嘉宁/);
   assert.match(p.$('cloud-conflict-card').textContent, /林海持有星河控股 80% 股权/);
+});
+
+test('withdraw and admin purge require an on-page confirmation before anything is deleted', async () => {
+  const lawyer = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2, canChange: false } });
+  assert.equal(lawyer.$('client-purge'), null, 'only firm administrators see the purge action');
+  lawyer.$('client-withdraw').click();
+  await tick();
+  assert.equal(lawyer.actions('withdrawClientsFromCloud').length, 0, 'first click only shows the consequence');
+  assert.match(lawyer.$('client-cloud-confirm').textContent, /本机档案不受影响/);
+  lawyer.$('client-cloud-confirm-cancel').click();
+  assert.equal(lawyer.$('client-cloud-confirm').hidden, true);
+  lawyer.$('client-withdraw').click();
+  await tick();
+  lawyer.$('client-cloud-confirm-ok').click();
+  await tick();
+  assert.equal(lawyer.actions('withdrawClientsFromCloud').length, 1);
+  assert.match(lawyer.$('clients-status').textContent, /已从律所云端撤回 1 位客户/);
+
+  const admin = await mount({ cloud: { clientsEnabled: true, timeEnabled: false, version: 2, canChange: true } });
+  admin.$('client-purge').click();
+  await tick();
+  assert.match(admin.$('client-cloud-confirm').textContent, /删除后无法恢复/);
+  admin.$('client-cloud-confirm-ok').click();
+  await tick();
+  assert.equal(admin.actions('clients.purge').at(-1).confirm, true);
+  assert.match(admin.$('clients-status').textContent, /已删除律所云端的 2 位客户/);
 });

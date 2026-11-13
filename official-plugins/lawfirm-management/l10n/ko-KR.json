@@ -449,5 +449,13 @@
   "client.cloud.restricted": "이 고객의 담당자 또는 책임 파트너가 아니므로 이름과 담당자만 표시됩니다. 자세한 내용은 담당자에게 문의하세요.",
   "client.cloud.conflictTitle": "로펌 클라우드 당사자 검색",
   "client.cloud.conflictClear": "로펌 클라우드의 고객 및 관련 당사자에서 연관성이 발견되지 않았습니다.",
-  "client.cloud.conflictHit": "{client}({no}) · 담당자: {owner}"
+  "client.cloud.conflictHit": "{client}({no}) · 담당자: {owner}",
+  "client.cloud.withdraw": "내가 관리하는 고객을 로펌 클라우드에서 회수",
+  "client.cloud.withdrawConfirm": "내가 관리하는 고객과 그 관계가 로펌 클라우드에서 삭제됩니다. 내 기기의 로컬 기록은 영향을 받지 않습니다. 회수하시겠습니까?",
+  "client.cloud.withdrawn": "로펌 클라우드에서 고객 {clients}명을 회수했습니다.",
+  "client.cloud.purge": "로펌 클라우드의 모든 고객 데이터 삭제",
+  "client.cloud.purgeConfirm": "로펌 클라우드에 있는 우리 로펌의 모든 고객, 관련 당사자 및 관계가 삭제됩니다. 삭제 후에는 복구할 수 없습니다. 각 변호사의 로컬 기록은 영향을 받지 않습니다. 삭제하시겠습니까?",
+  "client.cloud.purged": "로펌 클라우드에서 고객 {clients}명과 그 관계를 삭제했습니다.",
+  "client.cloud.confirm": "확인",
+  "client.cloud.cancel": "취소"
 }

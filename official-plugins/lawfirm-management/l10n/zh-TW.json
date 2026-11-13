@@ -449,5 +449,13 @@
   "client.cloud.restricted": "你不是此客戶的維護人或主辦合夥律師，僅顯示名稱與維護人。如需了解詳情，請聯繫維護人。",
   "client.cloud.conflictTitle": "律所雲端當事人檢索",
   "client.cloud.conflictClear": "在律所雲端的客戶與關聯當事人中未發現關聯。",
-  "client.cloud.conflictHit": "{client}（{no}）· 維護人：{owner}"
+  "client.cloud.conflictHit": "{client}（{no}）· 維護人：{owner}",
+  "client.cloud.withdraw": "從雲端撤回我維護的客戶",
+  "client.cloud.withdrawConfirm": "將從律所雲端刪除由你維護的客戶及其關係，本機檔案不受影響。確定撤回？",
+  "client.cloud.withdrawn": "已從律所雲端撤回 {clients} 位客戶。",
+  "client.cloud.purge": "刪除律所雲端全部客戶資料",
+  "client.cloud.purgeConfirm": "將刪除本所在律所雲端的全部客戶、關聯主體與關係，刪除後無法復原。各律師本機檔案不受影響。確定刪除？",
+  "client.cloud.purged": "已刪除律所雲端的 {clients} 位客戶及其關係。",
+  "client.cloud.confirm": "確認",
+  "client.cloud.cancel": "取消"
 }
