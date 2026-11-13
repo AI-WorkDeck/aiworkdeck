@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Bản xem trước chỉ đọc cũng không thể hiển thị tệp này: {reason}",
     "downloadFailedToast": "Tải xuống tệp gốc thất bại: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Tệp định dạng cũ có mật khẩu — chỉ đọc",
+    "edited": "Thay đổi không được lưu vào tệp định dạng cũ",
+    "saveCopy": "Lưu thành .{ext} được bảo vệ và mở",
+    "copying": "Đang lưu bản sao…",
+    "copySaved": "Đã lưu thành {name} (cùng mật khẩu)",
+    "copyFailed": "Không lưu được bản sao: {reason}",
+  },
   "retryLoad": "Bị treo? Nhấn vào đây để thử lại",
   "bootFailedHint": "Bộ máy tài liệu khởi động thất bại: {reason}. Có thể mạng hoặc tường lửa công ty đã chặn tài nguyên bộ máy; vui lòng kiểm tra kết nối mạng và thử lại.",
   "review": {

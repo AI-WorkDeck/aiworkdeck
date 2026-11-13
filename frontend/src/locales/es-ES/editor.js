@@ -150,6 +150,14 @@ export default {
     "previewFailed": "La vista previa de solo lectura tampoco pudo procesar este archivo: {reason}",
     "downloadFailedToast": "Error al descargar el archivo original: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Archivo antiguo protegido con contraseña: solo lectura",
+    "edited": "Los cambios no se guardan en el archivo antiguo",
+    "saveCopy": "Guardar como .{ext} protegido y abrir",
+    "copying": "Guardando copia…",
+    "copySaved": "Guardado como {name} (misma contraseña)",
+    "copyFailed": "No se pudo guardar la copia: {reason}",
+  },
   "retryLoad": "¿Se quedó bloqueado? Pulsa para reintentar",
   "bootFailedHint": "El motor de documentos no pudo iniciarse: {reason}. Es posible que la red o un cortafuegos corporativo esté bloqueando los archivos del motor; comprueba la conexión e inténtalo de nuevo.",
   "review": {

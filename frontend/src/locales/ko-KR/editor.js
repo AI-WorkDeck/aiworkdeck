@@ -150,6 +150,14 @@ export default {
     "previewFailed": "읽기 전용 미리보기에서도 이 파일을 렌더링할 수 없습니다: {reason}",
     "downloadFailedToast": "원본 파일 다운로드 실패: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "암호가 설정된 이전 형식 파일 — 읽기 전용",
+    "edited": "변경 내용은 이전 형식 파일에 저장되지 않습니다",
+    "saveCopy": "암호화된 .{ext}(으)로 저장하고 열기",
+    "copying": "사본 저장 중…",
+    "copySaved": "{name}(으)로 저장했습니다(같은 암호)",
+    "copyFailed": "사본을 저장하지 못했습니다: {reason}",
+  },
   "retryLoad": "멈춰 있나요? 탭하여 다시 시도",
   "bootFailedHint": "문서 엔진 시작 실패: {reason}. 네트워크나 사내 방화벽이 엔진 파일을 차단했을 수 있으니 연결을 확인한 후 다시 시도해 주세요.",
   "review": {

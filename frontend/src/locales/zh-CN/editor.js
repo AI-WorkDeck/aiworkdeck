@@ -157,6 +157,14 @@ export default {
     previewFailed: '只读预览也无法渲染该文件：{reason}',
     downloadFailedToast: '下载原文件失败：{reason}',
   },
+  legacyProtected: {
+    readOnly: '带密码的旧格式文件，只读',
+    edited: '修改不会存回旧格式文件',
+    saveCopy: '另存为加密 .{ext} 并打开',
+    copying: '正在另存…',
+    copySaved: '已另存为 {name}（同一密码）',
+    copyFailed: '另存失败：{reason}',
+  },
   retryLoad: '一直卡着？点此重试',
   bootFailedHint: '文档引擎启动失败：{reason}。可能是网络或公司防火墙拦截了引擎资源，请检查网络后重试。',
   review: {

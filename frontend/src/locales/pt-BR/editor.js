@@ -150,6 +150,14 @@ export default {
     "previewFailed": "A pré-visualização somente leitura também não conseguiu renderizar este arquivo: {reason}",
     "downloadFailedToast": "Falha ao baixar o arquivo original: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Arquivo antigo protegido por senha — somente leitura",
+    "edited": "As alterações não são salvas no arquivo antigo",
+    "saveCopy": "Salvar como .{ext} protegido e abrir",
+    "copying": "Salvando cópia…",
+    "copySaved": "Salvo como {name} (mesma senha)",
+    "copyFailed": "Não foi possível salvar a cópia: {reason}",
+  },
   "retryLoad": "Travou? Toque para tentar novamente",
   "bootFailedHint": "Falha ao iniciar o motor de documentos: {reason}. A rede ou um firewall corporativo pode estar bloqueando os arquivos do motor; verifique a conexão e tente novamente.",
   "review": {

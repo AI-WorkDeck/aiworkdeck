@@ -153,6 +153,14 @@ export default {
     previewFailed: 'The read-only preview could not render this file either: {reason}',
     downloadFailedToast: 'Failed to download the original file: {reason}',
   },
+  legacyProtected: {
+    readOnly: 'Password-protected legacy file — read-only',
+    edited: 'Changes are not saved to the legacy file',
+    saveCopy: 'Save as protected .{ext} and open',
+    copying: 'Saving copy…',
+    copySaved: 'Saved as {name} (same password)',
+    copyFailed: 'Couldn’t save the copy: {reason}',
+  },
   retryLoad: 'Stuck? Tap to retry',
   bootFailedHint: 'The document engine failed to start: {reason}. The network or a corporate firewall may be blocking the engine files; check the connection and retry.',
   review: {

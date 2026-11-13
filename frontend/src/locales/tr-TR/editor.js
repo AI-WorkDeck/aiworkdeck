@@ -150,6 +150,14 @@ export default {
     "previewFailed": "Salt okunur önizleme de bu dosyayı işleyemedi: {reason}",
     "downloadFailedToast": "Orijinal dosya indirilemedi: {reason}"
   },
+  "legacyProtected": {
+    "readOnly": "Parola korumalı eski biçim dosya — salt okunur",
+    "edited": "Değişiklikler eski biçim dosyaya kaydedilmez",
+    "saveCopy": "Korumalı .{ext} olarak kaydet ve aç",
+    "copying": "Kopya kaydediliyor…",
+    "copySaved": "{name} olarak kaydedildi (aynı parola)",
+    "copyFailed": "Kopya kaydedilemedi: {reason}",
+  },
   "retryLoad": "Takıldı mı? Tekrar denemek için dokunun",
   "bootFailedHint": "Belge motoru başlatılamadı: {reason}. Ağ veya kurumsal güvenlik duvarı motor dosyalarını engelliyor olabilir; bağlantıyı kontrol edip tekrar deneyin.",
   "review": {

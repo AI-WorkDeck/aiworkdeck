@@ -378,15 +378,71 @@ async function checkFile(src) {
   return r
 }
 
+// O14b：带密码的 .doc/.xls/.ppt —— 只读打开，修改另存为同密码的 .docx/.xlsx/.pptx 副本，原文件不动
+async function checkLegacy(src, password) {
+  const ext = path.extname(src).slice(1), target = { doc: 'docx', xls: 'xlsx', ppt: 'pptx' }[ext]
+  const name = 'locked-' + path.basename(src)
+  const file = path.join(home, 'docs', name)
+  const copyName = name.replace(/\.[^.]+$/, '.' + target)
+  const r = { name, kind: ext }
+  evidence.files.push(r)
+  const hash0 = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  await primeTree(name)
+  await clickOpen(name)
+  await passwordBox(name)
+  r.promptShown = true
+  await enterPassword(name, password)
+  await page.waitForFunction((expr, name) => { const e = (0, eval)(expr)(name); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 100 }, editorExpr, name)
+  await sleep(2500)
+  r.readOnlyBar = await page.evaluate(() => [...document.querySelectorAll('.libre-legacy-copy')].some(e => e.getBoundingClientRect().width))
+  await page.screenshot({ path: path.join(run, ext + '-legacy-open.png') })
+  await dismissLogin()
+  await edit(name, target)
+  r.editVisible = await until(() => contentHasEdit(name, target), 20000, 500).then(() => true).catch(() => false)
+  await sleep(20000) // 足够触发一次自动保存——旧格式必须一笔都不写
+  r.originalUntouched = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') === hash0
+  r.dirtyKept = await editor(name, e => e.dirty === true)
+  const pt = await page.evaluate(() => { const el = [...document.querySelectorAll('.libre-legacy-copy')].find(e => e.getBoundingClientRect().width); if (!el) return null; const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 } })
+  await page.mouse.click(pt.x, pt.y)
+  // 副本在新标签打开、不再要密码
+  await page.waitForFunction((expr, n) => { const e = (0, eval)(expr)(n); return e && e.ready && e.statusKey === 'ready' && !e.docLoadFailed }, { timeout: 240000, polling: 200 }, editorExpr, copyName)
+  r.copyOpenedWithoutPrompt = await editor(copyName, e => !e.openFailCode)
+  await sleep(2000)
+  await page.screenshot({ path: path.join(run, ext + '-legacy-copy.png') })
+  r.copyHasEdit = await until(() => contentHasEdit(copyName, target), 20000, 500).then(() => true).catch(() => false)
+  const copyFile = path.join(home, 'docs', copyName)
+  r.copyEncrypted = isCfb(copyFile)
+  r.copyDecryptsWithPassword = await decryptedText(copyFile, password).then(t => t.includes(TYPED)).catch(e => 'error: ' + e.message)
+  r.originalStillUntouched = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') === hash0
+  // 原标签的修改已带进副本：关闭不应再拦
+  await close(name)
+  await close(copyName)
+  log(name, JSON.stringify(r))
+  r.passed = r.readOnlyBar && r.editVisible && r.originalUntouched && r.dirtyKept && r.copyOpenedWithoutPrompt && r.copyHasEdit &&
+    r.copyEncrypted && r.copyDecryptsWithPassword === true && r.originalStillUntouched
+  return r
+}
+
 try {
   await until(async () => (await fetch(base + '/api/admin/wizard')).ok, 120000, 500)
   const dir = path.join(home, 'docs'); fs.mkdirSync(dir)
   for (const key of profileDirs) fs.mkdirSync(path.join(run, 'seed-' + key), { recursive: true })
   for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx']) fs.copyFileSync(path.join(fixtures, f), path.join(dir, 'locked-' + f))
+  const LEGACY = [['rc4cryptoapi_password.xls', 'Password1234_'], ['contract.doc', 'awd-0414'], ['rc4cryptoapi_password.ppt', 'Password1234_']]
+  for (const [f] of LEGACY) fs.copyFileSync(path.join(fixtures, 'legacy', f), path.join(dir, 'locked-' + f))
   evidence.runtime = (await start('warmup')).versions
   await openFolder(dir)
-  for (const f of (process.env.OFFICE_PASSWORD_ONLY || 'flexmark-table.docx,case-ledger.xlsx,case-report.pptx').split(',')) {
+  const only = process.env.OFFICE_PASSWORD_ONLY ? process.env.OFFICE_PASSWORD_ONLY.split(',') : null
+  for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx'].filter(f => !only || only.includes(f))) {
     try { await checkFile(path.join(fixtures, f)) } catch (error) {
+      evidence.files.push({ name: f, error: error.stack })
+      log(f, 'failed', error.message)
+      await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})
+    }
+  }
+  for (const [f, pw] of LEGACY) {
+    if (only && !only.includes(f)) continue
+    try { await checkLegacy(path.join(fixtures, 'legacy', f), pw) } catch (error) {
       evidence.files.push({ name: f, error: error.stack })
       log(f, 'failed', error.message)
       await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})

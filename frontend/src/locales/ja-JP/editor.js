@@ -150,6 +150,14 @@ export default {
     "previewFailed": "読み取り専用プレビューでもこのファイルを描画できませんでした：{reason}",
     "downloadFailedToast": "元のファイルのダウンロードに失敗しました：{reason}"
   },
+  "legacyProtected": {
+    "readOnly": "パスワード付きの旧形式ファイル（読み取り専用）",
+    "edited": "変更は旧形式のファイルには保存されません",
+    "saveCopy": "暗号化した .{ext} として保存して開く",
+    "copying": "コピーを保存しています…",
+    "copySaved": "{name} として保存しました（同じパスワード）",
+    "copyFailed": "コピーを保存できませんでした：{reason}",
+  },
   "retryLoad": "進まない場合はここをタップして再試行",
   "bootFailedHint": "文書エンジンの起動に失敗しました：{reason}。ネットワークまたは社内ファイアウォールがエンジンリソースをブロックしている可能性があります。接続を確認して再試行してください。",
   "review": {

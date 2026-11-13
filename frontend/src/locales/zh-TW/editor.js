@@ -150,6 +150,14 @@ export default {
     "previewFailed": "只讀預覽也無法渲染該文件：{reason}",
     "downloadFailedToast": "下載原文件失敗：{reason}"
   },
+  "legacyProtected": {
+    "readOnly": "帶密碼的舊格式檔案，唯讀",
+    "edited": "修改不會存回舊格式檔案",
+    "saveCopy": "另存為加密 .{ext} 並開啟",
+    "copying": "正在另存…",
+    "copySaved": "已另存為 {name}（同一密碼）",
+    "copyFailed": "另存失敗：{reason}",
+  },
   "retryLoad": "一直卡著？點此重試",
   "bootFailedHint": "文檔引擎啟動失敗：{reason}。可能是網絡或公司防火牆攔截了引擎資源，請檢查網絡後重試。",
   "review": {
