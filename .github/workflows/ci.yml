@@ -67,6 +67,8 @@ jobs:
         run: ./official-plugins/tencent-meeting/build.sh
       - name: Build and test Baoqingtian marketplace plugin
         run: ./official-plugins/baoqingtian/build.sh
+      - name: Build and test bids and proposals plugin
+        run: ./official-plugins/pitch-materials/build.sh
       - name: Test
         working-directory: backend
         # backend/pom.xml configures the real TCP ForkNodeFactory. A JVM -D...factory
