@@ -90,3 +90,35 @@ export function createSlidePreviewCache({ store = indexedDbStore(), now = () => 
   }
   return { load, save, capture }
 }
+
+/**
+ * 把幻灯片图片排成卡片（编辑器冷启动预览与文件预览/QuickLook 共用）。
+ * deck: { slides: [{ bytes, width, height }], total }；moreText：还有未渲染的页时的提示（可空）。
+ * 返回创建的 object URL，调用方负责 revoke。
+ */
+export function renderSlideCards(container, deck, moreText = '', doc = globalThis.document) {
+  const urls = []
+  const wrap = doc.createElement('div')
+  wrap.className = 'awd-slide-preview'
+  deck.slides.forEach((slide, i) => {
+    const url = URL.createObjectURL(new Blob([slide.bytes], { type: 'image/jpeg' }))
+    urls.push(url)
+    const card = doc.createElement('figure')
+    card.className = 'awd-slide-preview-card'
+    const img = doc.createElement('img')
+    img.src = url; img.alt = ''; img.decoding = 'async'
+    if (slide.width && slide.height) img.style.aspectRatio = slide.width + ' / ' + slide.height
+    const cap = doc.createElement('figcaption')
+    cap.textContent = (i + 1) + ' / ' + (deck.total || deck.slides.length)
+    card.append(img, cap)
+    wrap.append(card)
+  })
+  if (moreText) {
+    const more = doc.createElement('div')
+    more.className = 'awd-slide-preview-more'
+    more.textContent = moreText
+    wrap.append(more)
+  }
+  container.append(wrap)
+  return urls
+}

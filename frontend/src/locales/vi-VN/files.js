@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Kích thước: {size}",
   "renderingDoc": "Đang hiển thị tài liệu…",
   "renderingSlides": "Đang hiển thị bài thuyết trình…",
+  "slidesNotShown": "Còn {count} trang chiếu chưa hiển thị. Mở tệp để xem tất cả.",
   "officePreviewUnsupported": "Không thể xem trực tuyến tệp này",
   "fileTypeHintOpenLocal": "Loại tệp: {type}. Tìm nó trong Finder hoặc File Explorer và mở bằng ứng dụng cục bộ.",
   "unknown": "Không xác định",

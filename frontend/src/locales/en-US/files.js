@@ -24,6 +24,7 @@ export default {
   sizeLabel: 'Size: {size}',
   renderingDoc: 'Rendering document…',
   renderingSlides: 'Rendering presentation…',
+  slidesNotShown: '{count} more slides not shown. Open the file to see them all.',
   officePreviewUnsupported: 'Online preview is not available for this file',
   fileTypeHintOpenLocal: 'File type: {type}. Find it in Finder or File Explorer and open it with a local app.',
   unknown: 'Unknown',

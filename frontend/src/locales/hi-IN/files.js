@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "आकार: {size}",
   "renderingDoc": "दस्तावेज़ रेंडर हो रहा है…",
   "renderingSlides": "प्रेजेंटेशन रेंडर हो रहा है…",
+  "slidesNotShown": "{count} और स्लाइड नहीं दिखाई गईं। सभी देखने के लिए फ़ाइल खोलें।",
   "officePreviewUnsupported": "इस फ़ाइल के लिए ऑनलाइन पूर्वावलोकन उपलब्ध नहीं है",
   "fileTypeHintOpenLocal": "फ़ाइल प्रकार: {type}। इसे Finder या File Explorer में खोजें और किसी लोकल ऐप से खोलें।",
   "unknown": "अज्ञात",

@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "ขนาด: {size}",
   "renderingDoc": "กำลังเรนเดอร์เอกสาร…",
   "renderingSlides": "กำลังเรนเดอร์งานนำเสนอ…",
+  "slidesNotShown": "ยังมีอีก {count} สไลด์ที่ไม่ได้แสดง เปิดไฟล์เพื่อดูทั้งหมด",
   "officePreviewUnsupported": "ไม่มีตัวอย่างออนไลน์สำหรับไฟล์นี้",
   "fileTypeHintOpenLocal": "ประเภทไฟล์: {type} ค้นหาใน Finder หรือ File Explorer แล้วเปิดด้วยแอปภายในเครื่อง",
   "unknown": "ไม่ทราบ",

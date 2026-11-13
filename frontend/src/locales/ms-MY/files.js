@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Saiz: {size}",
   "renderingDoc": "Memaparkan dokumen…",
   "renderingSlides": "Memaparkan pembentangan…",
+  "slidesNotShown": "{count} lagi slaid tidak dipaparkan. Buka fail untuk melihat semuanya.",
   "officePreviewUnsupported": "Pratonton dalam talian tidak tersedia untuk fail ini",
   "fileTypeHintOpenLocal": "Jenis fail: {type}. Cari dalam Finder atau File Explorer dan buka dengan aplikasi setempat.",
   "unknown": "Tidak diketahui",

@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "サイズ:{size}",
   "renderingDoc": "ドキュメントをレンダリング中…",
   "renderingSlides": "プレゼンテーションをレンダリング中…",
+  "slidesNotShown": "ほかに {count} 枚のスライドがあります。ファイルを開くとすべて表示されます。",
   "officePreviewUnsupported": "このファイルはオンラインプレビューに対応していません",
   "fileTypeHintOpenLocal": "ファイルの種類:{type}。Finderまたはファイルエクスプローラーで見つけて、ローカルアプリで開いてください。",
   "unknown": "不明",
