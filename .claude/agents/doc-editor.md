@@ -164,6 +164,17 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 测试：`tests/lowa-unit/office-encryption.test.mjs`（夹具由独立实现 msoffcrypto-tool 加密，含 node:crypto 独立核 HMAC）、
 `tests/project-home/libre-load-budget-retry.test.mjs`、`external-rename-save.test.mjs`；真机 `tests/desktop-e2e/office-password.mjs`。
 
+**带密码的旧格式 .doc/.xls/.ppt（O14b）**：引擎带密码只开得了 .doc，.xls/.ppt 一律不行（真机探针，含 Office 原生样本），
+统一由宿主解：`utils/legacyOfficeDecrypt.js`（msoffcrypto-tool 6.1.0 移植，MIT，见根 `UPSTREAM.md` §4），引擎拿明文旧格式。
+旧格式写不回加密，所以**只读**：`saveDocument`/`scheduleAutoSave`/`sealForStorage` 对 `_docCrypto.legacy` 一律拒绝，
+保存栏给「另存为加密 .docx/.xlsx/.pptx 并打开」（`saveProtectedCopy`：导出画布当前内容 → `createEncryptionSession(密码)`
+新建 Agile 加密 → 同目录建文件（重名加 ` (1)`）→ `handOffSession` 把会话交给副本的编辑器，副本不再问密码）。
+旧格式没有可复用的文件密钥，密码只留在该编辑器实例内存里。带 Pictures 流的加密 .ppt 报不支持（无真实样本可核对图片解法）。
+地雷：
+- `submitPassword` 不能提前撤 `docLoadFailed`——失败那轮已把 `ready` 置 true，提前撤闸会让装载途中的 modified 把文档标脏；
+- 旧 .ppt 形状没名字，`ensureShapeNames` 起内部名曾把文档标 modified，打开即被自动保存改写成 10 倍大（已包进 `withViewOnlyChange`，
+  `lowa-e2e/open-not-dirty.mjs` 守着）。
+
 **非空文件冷开的首个模型（dev-board#1474）**：`LibreOfficeEditor.mountEditor` 只在挂载时已知 `fileSize>0` 才向 guest 传 `initialDocument=1`，`editor-main`→`bootZetaOffice` 的 pthread bootstrap shim 转给 worker。worker 先建立 UNO desktop，首个模型直接由既有 `load_document` 装入，避免先建空白 Writer 再替换；spare、隐藏合并实例（file=null）、新空文件和大小未知的旧入口仍用空白 boot。relay ready 表示命令通道已接好，`ui_ready` 只在首个模型真正成功后发出，失败不得显示可编辑空白。模型出现前，模型命令回 `DOCUMENT_NOT_READY`；主题、右键配置和样式画像这三种引擎级配置仍可执行。缺 `bytes` 的 `load_document` 只更新署名，绝不能被异步作者解析抢先触发空白模型；显式空字节才允许必要的空白初始化。宿主空文件支路明确传空字节，无模型实例初始化失败继续落保存保护；已有空白实例的署名失败沿用容错。回归：`tests/lowa-unit/first-document-boot.test.mjs`、`tests/revision-view/boot-resize.test.mjs`、`tests/project-home/libre-redline-author.test.mjs`、`tests/toolbar/open-critical-path.test.mjs`。完整性能必须另测未预热实例的正文首帧、IME 和原文件保存，不能把跳过的 blank span 全当净收益（首次 native 公共初始化仍由真实文档承担）。
 
 **空工作台预热挂载（dev-board#1474）**：`.editors-grid` 必须常驻，空态用同级绝对定位覆盖层呈现。原 `v-else` 导致空标签时虽在 4 秒后创建 spare 条目，却没有组件/webview；首开 Word 才冷启，关闭最后一个欢迎标签还会销毁已热实例。常驻网格保留原父容器与 key，空态、过继及分屏切换都不搬 webview、不使用 `display:none`；4 秒调度、低内存预算和关闭保存链路不变。`tests/project-home/libre-spare-mount.test.mjs` 编译实际相关模板并用 Vue renderer 验证首开前挂载、过继实例恒等和欢迎/分屏切换不卸载。宿主 `ready` 只表示装载应答，完整性能验证还须单独观察实际纸张墨迹与编辑保存，不把 ready 截图点当首次可用首屏。

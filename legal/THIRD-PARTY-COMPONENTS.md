@@ -61,6 +61,14 @@ Packaging: `desktop/scripts/prepare-python-service.js` installs each service's `
 | Source availability | The corresponding source is the upstream branch above plus the patches in `desktop/lowa-build/`. Together they reproduce the shipped artifacts. |
 | Related | zeta.js marshalling layer by [allotropia](https://github.com/allotropia/zetajs), MIT, vendored under `frontend/src/zetaoffice/public/` (see `UPSTREAM.md` there). CJK and multilingual fonts (Noto Sans/Serif SC, Noto Sans/Serif KR, LXGW WenKai, Zhuque Fangsong, Noto Sans/Serif Thai, Noto Sans Khmer/Lao/Myanmar/Arabic/Devanagari) under the SIL Open Font License 1.1, downloaded at build time by `desktop/scripts/fetch-lowa-assets.js`. |
 
+### Password-protected legacy Office files (msoffcrypto-tool port)
+
+| Item | Detail |
+|---|---|
+| Upstream | [msoffcrypto-tool](https://github.com/nolze/msoffcrypto-tool) 6.1.0 by nolze |
+| License | MIT. The full notice is kept in the ported file's header. |
+| Where | `frontend/src/utils/legacyOfficeDecrypt.js` — a JavaScript port of the decryption code for .doc/.xls/.ppt (RC4, RC4 CryptoAPI, Excel XOR obfuscation). Test inputs under `frontend/tests/lowa-e2e/fixtures/encrypted/legacy/` come from the upstream test suite. Provenance in `UPSTREAM.md` §4. |
+
 ## Diagram layout (native pack, downloaded on first use)
 
 ### Graphviz
