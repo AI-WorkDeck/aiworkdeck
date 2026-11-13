@@ -752,6 +752,26 @@ public class ToolRegistry {
         return words;
     }
 
+    /**
+     * 启用插件的工具检索词（工具名 → manifest keywords + 插件名 + 插件 id），喂 {@code list_tools(query)}：
+     * 用户说「律所管理插件」「应收账款」时模型去搜，命中的应是插件工具而不是空结果。含 handler=jar 的带 keywords 条目。
+     */
+    public Map<String, List<String>> declaredToolSearchTerms() {
+        Map<String, List<String>> terms = new java.util.LinkedHashMap<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            String pluginId = declared.pluginId();
+            if (!pluginService.isEnabled(pluginId)) continue;
+            List<String> words = new ArrayList<>();
+            if (declared.tool().getKeywords() != null) words.addAll(declared.tool().getKeywords());
+            words.add(pluginId);
+            var meta = pluginService.getPlugin(pluginId);
+            if (meta != null && meta.getName() != null && !meta.getName().startsWith("%")) words.add(meta.getName());
+            if (meta != null && meta.getName() != null) words.add(pluginService.localize(pluginId, meta.getName()));
+            terms.put(declared.tool().getName(), words);
+        }
+        return terms;
+    }
+
     private final List<AgentToolComponent> toolComponents;
     private final PluginService pluginService;
     private final ClientCapabilityService clientCapabilityService;
@@ -802,9 +822,32 @@ public class ToolRegistry {
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
             disclosurePolicy.setPluginToolKeywords(this::declaredToolKeywords);
+            disclosurePolicy.setPluginToolSearchTerms(this::declaredToolSearchTerms);
+        }
+        if (clientCapabilityService != null) {
+            clientCapabilityService.setWebPluginToolPredicate(this::pluginToolSupportsWeb);
         }
         log.info("ToolRegistry initialized: {} built-in tools from {} components",
                 builtinTools.size(), toolComponents.size());
+    }
+
+    /**
+     * 插件工具（JAR / 声明式 / 插件 MCP）在网页版会话里是否可见：所属插件 manifest 声明了
+     * {@code hosts} 含 {@code "web"} 才放行（W1 设计 §4.6）。内置工具与用户自配 MCP 一律 false——
+     * 内置工具在 {@link WebClientToolSurface} 里静态归类，用户 MCP 多是本机进程，网页上不可达。
+     */
+    boolean pluginToolSupportsWeb(String name) {
+        if (name == null || builtinTools.containsKey(name)) return false;
+        String pluginId = pluginService.getPluginIdForTool(name);
+        if (pluginId == null) {
+            DeclaredToolBinding declared = declaredBinding(name);
+            if (declared != null) pluginId = declared.pluginId();
+        }
+        if (pluginId == null && pluginMcpService != null) {
+            var binding = pluginMcpService.find(name);
+            if (binding != null) pluginId = binding.pluginId();
+        }
+        return pluginId != null && pluginService.supportsWebClient(pluginId);
     }
 
     /**

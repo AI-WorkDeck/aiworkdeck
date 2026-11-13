@@ -122,6 +122,14 @@ jobs:
           # Epic #43: build the embedded LibreOffice editor bundle (dist/zetaoffice),
           # shipped via extraResources for the experimental "LibreOffice 验证" window.
           npm run build:zetaoffice
+      - name: Cache baked OFL fonts (avoid jsDelivr in steady state)
+        # Fonts are sha256-pinned in fetch-lowa-assets.js (FONT_PINS), so the key
+        # tracks that file; the script re-validates cached bytes and re-downloads
+        # anything stale. Restored after the frontend build, which writes dist/.
+        uses: actions/cache@v4
+        with:
+          path: frontend/dist/zetaoffice/cjk*
+          key: ofl-fonts-${{ hashFiles('desktop/scripts/fetch-lowa-assets.js') }}
       - name: Bake LOWA runtime + OFL CJK font into the editor bundle (offline)
         shell: bash
         env:
@@ -129,7 +137,7 @@ jobs:
           # tooltips + FS/callMain exports. Hosted on the project site (versioned,
           # immutable; wasm/data served brotli so the installer stays small).
           # Unset -> upstream CDN (English UI). Build recipe: desktop/lowa-build/.
-          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r8/
+          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r10/
         run: |
           # Track A (Epic #43): download the LibreOffice WASM runtime (soffice.*)
           # into dist/zetaoffice/lowa and an OFL-licensed CJK font (Noto Sans SC)

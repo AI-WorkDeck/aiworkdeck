@@ -28,8 +28,11 @@
 <script>
 // 插件面板：承载 manifest.frontendEntry 指向的页面。两种形态，行为刻意不同。
 //
-// 1) 绝对 http(s) URL（旧形态）：iframe 直接打开，不加 sandbox、不发握手、不响应桥调用。
-//    这类插件从来就是"内嵌一个外部网页"，改动它只会打断存量插件。
+// 1) 绝对 http(s) URL（旧形态）：iframe 直接打开，不发握手、不响应桥调用。
+//    这类插件从来就是"内嵌一个外部网页"，所以保留它自己的源（allow-same-origin，登录态/存储照常）
+//    与脚本、表单、弹窗、下载；sandbox 只收走顶层导航（S26：不带 sandbox 的外站 iframe 能把整个
+//    工作台导航到别的页面）。它与应用页（file:// / dev server）不同源，allow-same-origin 不会让它
+//    碰到宿主；下面那条「绝不能加」说的是走 /api/plugin-web/ 的 Web 插件。
 // 2) web/ 相对路径（规范 v2.3 的 Web 插件）：后端 /api/plugin-web/ 静态服务，
 //    iframe 带 sandbox="allow-scripts allow-forms"，与宿主只通过 postMessage 桥通信。
 //
@@ -249,13 +252,14 @@ export default {
       const [major, minor, patch] = this.installedPluginVersion.split('.').map(Number)
       return major === 0 && (minor === 0 || (minor === 1 && patch < 2))
     },
-    // 只有走 /api/plugin-web/ 的 Web 插件才 sandbox + 握手。
-    // 绑定 null 会让 Vue 移除该属性，绝对 URL 形态因此与改造前逐字节一致。
+    // 只有走 /api/plugin-web/ 的 Web 插件才握手；两种形态都带 sandbox，取值不同（见文件头）。
     isWebPlugin() {
       return String(this.url || '').indexOf('/api/plugin-web/') >= 0
     },
     sandboxAttr() {
-      return this.isWebPlugin ? 'allow-scripts allow-forms' : null
+      return this.isWebPlugin
+        ? 'allow-scripts allow-forms'
+        : 'allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-downloads'
     }
   },
   created() {

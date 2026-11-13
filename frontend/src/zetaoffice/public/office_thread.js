@@ -6994,18 +6994,12 @@ const EXEC = {
     // bytes for it). That is NOT an error: keep the blank boot doc as-is. The
     // host also guards this, but defend here too.
     // An author-only update must not create a model while real bytes are in flight.
-    if (!u8) return { success: true, empty: true, name: name, kind: docKindOf() };
-    if (u8.length === 0) {
+    const blank = !!(p && p.blank === true);
+    if (!u8 && !blank) return { success: true, empty: true, name: name, kind: docKindOf() };
+    if (u8 && u8.length === 0) {
       if (!xModel) bootDoc();
       return { success: true, empty: true, name: name, kind: docKindOf() };
     }
-    // zeta.js marshals JS→UNO sequences ONLY from plain Arrays (translateToEmbind
-    // gates on Array.isArray), and sequence<byte> elements are SIGNED — so go
-    // through an Int8Array view, then Array.from. Passing the typed array itself
-    // reaches embind unconverted: 'Cannot pass "80,75,…" as …'. (Int8Array is
-    // the shape of RESULTS only, and only in some zetajs builds.)
-    const bytes = Array.from(new Int8Array(u8.buffer, u8.byteOffset, u8.byteLength));
-
     if(slideShowViewState) {
       try{if(isImpressDoc() && xModel.getPresentation().isRunning())xModel.getPresentation().end();}catch(_){}
       try{restoreSlideShowView();}catch(_){}
@@ -7052,6 +7046,22 @@ const EXEC = {
         catch (e) { log('load_document: previous model close failed: ' + errStr(e)); }
       }
     };
+
+    // blank：换回一份全新的空白 Writer 文档（台账 B5）。QuickLook 借预热备胎渲染幻灯片后
+    // 用它清场，备胎原样归还池子，紧接着打开文件仍是热引擎；上一份文档照常经 retarget 关闭。
+    if (blank) {
+      const loaded = desktop.loadComponentFromURL('private:factory/swriter', '_default', 0, []);
+      if (!loaded) return { success: false, message: 'load_document: blank document could not be created' };
+      retarget(loaded);
+      return { success: true, blank: true, name: name, kind: docKindOf() };
+    }
+
+    // zeta.js marshals JS→UNO sequences ONLY from plain Arrays (translateToEmbind
+    // gates on Array.isArray), and sequence<byte> elements are SIGNED — so go
+    // through an Int8Array view, then Array.from. Passing the typed array itself
+    // reaches embind unconverted: 'Cannot pass "80,75,…" as …'. (Int8Array is
+    // the shape of RESULTS only, and only in some zetajs builds.)
+    const bytes = Array.from(new Int8Array(u8.buffer, u8.byteOffset, u8.byteLength));
 
     const errs = [];
 

@@ -672,9 +672,16 @@ public class ToolDisclosurePolicy {
         String normalized = withoutToolKeywords(normalize(userMessage));
         Map<String, Integer> score = new LinkedHashMap<>();
         for (String category : hinted) {
+            List<String> keywords = new ArrayList<>(CATEGORY_KEYWORDS.getOrDefault(category, List.of()));
+            // 插件 manifest 声明的 keywords 同样计分：只按静态表算，plugin-tools 恒为 1 分，
+            // 「插件」一词就能把它挤出前三（律所管理那句实测如此）
+            if (PLUGIN_TOOLS_CATEGORY.equals(category)) {
+                keywords.addAll(safePluginToolKeywords());
+            }
             int total = 0;
-            for (String keyword : CATEGORY_KEYWORDS.getOrDefault(category, List.of())) {
-                if (SkillRouter.containsTrigger(normalized, keyword.toLowerCase(Locale.ROOT))) {
+            for (String keyword : new LinkedHashSet<>(keywords)) {
+                if (keyword != null && !keyword.isBlank()
+                        && SkillRouter.containsTrigger(normalized, keyword.toLowerCase(Locale.ROOT))) {
                     total += keyword.length();
                 }
             }
@@ -756,6 +763,40 @@ public class ToolDisclosurePolicy {
     /** 由 {@code ToolRegistry} 在初始化时调一次。 */
     public void setPluginToolKeywords(Supplier<List<String>> source) {
         this.pluginToolKeywords = source == null ? List::of : source;
+    }
+
+    private List<String> safePluginToolKeywords() {
+        try {
+            List<String> words = pluginToolKeywords.get();
+            return words == null ? List.of() : words;
+        } catch (RuntimeException e) {
+            return List.of();
+        }
+    }
+
+    /**
+     * 插件工具的检索词（工具名 → manifest keywords + 插件名/id），供 {@code list_tools(query)} 搜索。
+     * 声明的 keywords 原先只喂首轮预放回，模型自己按「应收账款」「律所管理」去搜时却搜不到。活视图。
+     */
+    private volatile Supplier<Map<String, List<String>>> pluginToolSearchTerms = Map::of;
+
+    /** 由 {@code ToolRegistry} 在初始化时调一次。null 视为没有。 */
+    public void setPluginToolSearchTerms(Supplier<Map<String, List<String>>> source) {
+        this.pluginToolSearchTerms = source == null ? Map::of : source;
+    }
+
+    /** 某个插件工具的检索词；内置工具或来源出错时返回空表。 */
+    public List<String> searchTermsOf(String toolName) {
+        if (toolName == null) {
+            return List.of();
+        }
+        try {
+            Map<String, List<String>> all = pluginToolSearchTerms.get();
+            List<String> terms = all == null ? null : all.get(toolName);
+            return terms == null ? List.of() : terms;
+        } catch (RuntimeException e) {
+            return List.of();
+        }
     }
 
     /** 由 {@code ToolRegistry} 在初始化时调一次（见 {@link #pluginToolNames}）。null 视为没有插件工具。 */

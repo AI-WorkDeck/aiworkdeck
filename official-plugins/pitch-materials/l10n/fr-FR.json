@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Cela exporte toute la bibliothèque, y compris les noms réels des clients, dans le dossier « Exports de la bibliothèque d'appels d'offres » du projet actuel, visible par tous les membres du projet. Exporter quand même ?",
   "panel.lib.someClient": "un client",
   "panel.err.cancelled": "Arrêté.",
-  "panel.err.panel_only": "Cette action n'est disponible que dans le panneau « Appels d'offres et propositions »."
+  "panel.err.panel_only": "Cette action n'est disponible que dans le panneau « Appels d'offres et propositions ».",
+  "panel.err.libraryNotLoaded": "La bibliothèque des références et de l'équipe n'a pas encore pu être lue ; rien n'a été enregistré afin de ne pas écraser son contenu. Veuillez réessayer dans un instant.",
+  "panel.err.libraryReloaded": "La bibliothèque des références et de l'équipe vient d'être rechargée ; rien n'a été enregistré afin de ne pas écraser son contenu. Vérifiez-la, puis enregistrez à nouveau."
 }

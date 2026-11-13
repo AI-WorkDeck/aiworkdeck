@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "Dies exportiert die gesamte Bibliothek einschließlich der echten Mandantennamen in den Ordner „Export Angebotsbibliothek“ des aktuellen Projekts, wo ihn alle Projektmitglieder sehen können. Trotzdem exportieren?",
   "panel.lib.someClient": "ein Mandant",
   "panel.err.cancelled": "Angehalten.",
-  "panel.err.panel_only": "Diese Aktion ist nur im Bereich „Ausschreibungen und Angebote“ verfügbar."
+  "panel.err.panel_only": "Diese Aktion ist nur im Bereich „Ausschreibungen und Angebote“ verfügbar.",
+  "panel.err.libraryNotLoaded": "Die Bibliothek mit Referenzen und Team konnte noch nicht gelesen werden. Um vorhandene Inhalte nicht zu überschreiben, wurde nichts gespeichert. Bitte versuchen Sie es in Kürze erneut.",
+  "panel.err.libraryReloaded": "Die Bibliothek mit Referenzen und Team wurde soeben neu geladen. Um vorhandene Inhalte nicht zu überschreiben, wurde nichts gespeichert. Bitte prüfen Sie den Stand und speichern Sie erneut."
 }

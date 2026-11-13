@@ -195,7 +195,8 @@ p {
   background: var(--awd-surface-2, var(--fallback-surface-2));
   border: 1px solid var(--awd-border-subtle, var(--fallback-border));
   border-radius: var(--awd-radius-md, 6px);
-  overflow-x: auto;
+  /* 页签已有七八个：窄窗格里换行显示，而不是横向滚动把后面的页签藏到看不见的地方 */
+  flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -596,6 +597,73 @@ td.cell-text {
   }
 }
 
+/* 客户管理（clients.js） */
+.client-toolbar,
+.client-rel-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block-end: 10px;
+}
+.client-toolbar > *,
+.client-rel-form > *,
+.client-toolbar input,
+.client-toolbar select,
+.client-rel-form input,
+.client-rel-form select {
+  width: auto;
+  flex: 0 1 auto;
+}
+.client-rel-form #rel-party,
+.client-rel-form #contact-note {
+  flex: 1 1 220px;
+}
+.client-toolbar input[type="search"] {
+  min-width: 220px;
+  flex: 1 1 260px;
+}
+.client-rel-form input[type="text"] {
+  min-width: 160px;
+}
+.client-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.client-title {
+  flex: 1;
+}
+.client-title h2 {
+  margin: 0;
+}
+.client-contact-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 6px;
+}
+.client-row {
+  cursor: pointer;
+}
+.client-row:hover,
+.client-row:focus {
+  background: var(--awd-accent-wash, var(--fallback-wash));
+}
+td.num {
+  text-align: end;
+  white-space: nowrap;
+}
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+#panel-clients h3 {
+  font-size: 13px;
+  margin: 14px 0 6px;
+}
+#clients-status[data-error="true"] {
+  color: var(--awd-danger-text, var(--fallback-danger));
+}
 /* 计时收费（billing.js） */
 .hb-bar {
   display: flex;

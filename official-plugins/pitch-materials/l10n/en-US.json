@@ -211,5 +211,7 @@
   "panel.lib.confirmExport": "This exports the whole library, including real client names, into the project's \"Pitch library exports\" folder, where every project member can see it. Export anyway?",
   "panel.lib.someClient": "a client",
   "panel.err.cancelled": "Stopped.",
-  "panel.err.panel_only": "This action is only available in the Bids and Proposals panel."
+  "panel.err.panel_only": "This action is only available in the Bids and Proposals panel.",
+  "panel.err.libraryNotLoaded": "The credentials and team library could not be read yet, so nothing was saved to avoid overwriting it. Please try again shortly.",
+  "panel.err.libraryReloaded": "The credentials and team library was just reloaded, so nothing was saved to avoid overwriting it. Check it and save again."
 }

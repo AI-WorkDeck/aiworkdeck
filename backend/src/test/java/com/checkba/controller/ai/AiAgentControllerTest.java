@@ -107,6 +107,51 @@ class AiAgentControllerTest {
     }
 
     @Test
+    @DisplayName("网页来源的 chat 一律按 web 登记并写回请求体；web- 连接实例把会话钉在 WEB（W1）")
+    void webOriginAndWebClientInstancePinTheConversationToWeb() {
+        ClientCapabilityService capabilities = new ClientCapabilityService();
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(capabilities, "setWebOrigins",
+                "https://www.aiworkdeck.com,https://www.workdeck.ai");
+        AiAgentController web = new AiAgentController(sse, agentOrchestrator, messageService, backgroundTaskService,
+                pptxTools, mock(TodoListService.class), mock(AgentRunStateService.class), projectMemberService,
+                capabilities, subAgentService, inboxService, chatModelFactory, fileAccess);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            for (String conv : new String[] {"conv-web-chat", "conv-desktop-chat", "conv-web-connect"}) {
+                when(messageService.canUseConversation(conv, 7L)).thenReturn(true);
+            }
+            var item = new com.checkba.model.entity.AgentInboxItem(); item.setId("web-item");
+            when(inboxService.submit(any(), eq(7L))).thenReturn(item);
+
+            // 网页来源漏带 clientCapability：不回落到 LOWA
+            var req = new AiAgentController.AgentChatRequest();
+            req.setProjectId(42L); req.setConversationId("conv-web-chat"); req.setMessage("hi");
+            assertEquals(200, web.startSession(req, "s", null, "https://www.aiworkdeck.com").getStatusCode().value());
+            assertEquals("web", req.getClientCapability(), "inbox 落库的请求也要是 web，重启回放才不会回落");
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-chat"));
+            assertFalse(capabilities.isToolVisible("version_commit", "conv-web-chat"));
+
+            // 其它来源（Office 插件域名）照旧按声明登记
+            var desk = new AiAgentController.AgentChatRequest();
+            desk.setProjectId(42L); desk.setConversationId("conv-desktop-chat"); desk.setMessage("hi");
+            assertEquals(200, web.startSession(desk, "s", null, "https://addin.aiworkdeck.com").getStatusCode().value());
+            assertEquals(ClientCapabilityService.Capability.LOWA, capabilities.capabilityOf("conv-desktop-chat"));
+
+            // SSE 连接：web- 实例 id 钉住会话，之后 chat 声明 lowa 也不放宽
+            assertEquals(200, web.connect("conv-web-connect", "s", "web-7f3a", null,
+                    new org.springframework.mock.web.MockHttpServletResponse(), null, null).getStatusCode().value());
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-connect"));
+            var later = new AiAgentController.AgentChatRequest();
+            later.setProjectId(42L); later.setConversationId("conv-web-connect"); later.setMessage("hi");
+            later.setClientCapability("lowa");
+            assertEquals(200, web.startSession(later, "s", null, null).getStatusCode().value());
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-connect"));
+            assertEquals("web", later.getClientCapability());
+        }
+    }
+
+    @Test
     void cacheMissRejectsBeforeInboxOrModelAndFullRetryIsAcceptedOnce() {
         var cache = new com.checkba.service.ai.InlineContentCache();
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "inlineContentCache", cache);

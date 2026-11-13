@@ -87,6 +87,7 @@ qwen3.7-flash 240 次运行有 171 次（71%）记为基础设施故障、deepse
   "text": "把合同.docx移到归档文件夹",
   "hostState": "nofile",            // nofile | docx:<夹具>（xlsx/pptx/attachments 暂不支持，SKIPPED）
   "requiresPlugin": "desensitize",  // 可选：实例 plugins/ 里没有该插件时整句 SKIPPED（报告里写明原因）
+  "installPlugins": ["lawfirm-management"], // 可选：启动实例前把 official-plugins/<id> 按广场安装的落盘形态（manifest/web/l10n/skills）拷进实例 plugins/
   "task": true,                     // 可选：多步任务（只按结果判分），报告里单列「多步任务」表
   "followUps": [{ "whenStatus": "awaiting_input", "text": "执行" }], // 可选，仅 API 句：本轮以 whenStatus 结束时在同一会话里再发一条（按顺序、每条最多一次）；上一轮停在 ask_user 卡（确认卡/反问卡）时按卡片回答「Selected: - 执行」，否则作为普通消息
   "seed": {

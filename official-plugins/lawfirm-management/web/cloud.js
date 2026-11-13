@@ -48,6 +48,17 @@
     n.dataset.error = String(Boolean(isError));
   }
 
+  // 旧宿主（0.85 及以前）后端不认识律所云端动作：隐藏本页签，其余页签照常
+  const UNSUPPORTED = /不支持的律所管理操作|Unsupported law firm management action/;
+  function hideForOldHost() {
+    const tab = $('tab-cloud');
+    if (tab) {
+      if (tab.getAttribute('aria-selected') === 'true') $('tab-intake')?.click();
+      tab.hidden = true;
+    }
+    $('panel-cloud').hidden = true;
+  }
+
   async function load() {
     try {
       view = await call('cloud.settings.get', {});
@@ -55,6 +66,10 @@
     } catch (err) {
       view = null;
       loadError = err?.message || t('cloud.loadFailed');
+      if (UNSUPPORTED.test(String(err?.message || ''))) {
+        hideForOldHost();
+        return;
+      }
     }
     render();
   }
@@ -137,6 +152,6 @@
   awd.ready().then((ctx) => {
     locale = pickLocale(ctx?.language);
     applyStaticText();
-    render();
+    return load();
   }).catch(() => {});
 }());

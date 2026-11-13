@@ -14,30 +14,31 @@
 # 2026-11-11 P7（case_search 进核心集；基础提示不再点名未下发工具）合并 P3 后重测
 # 2026-11-11 write_docx 加 append 参数（同轮重写/分段写）合并 P7 后重测
 # 2026-11-12 office-tier1：doc_view_pages 进核心集（各宿主 +1 工具）；xlsx/pptx 会话常用 sheet_*/slide_* 进核心集
-lowa-docx,neutral,33,7557
-lowa-docx,typical,42,10377
-lowa-docx,worst,35,7894
-lowa-xlsx,neutral,34,8216
-lowa-xlsx,typical,53,13005
-lowa-xlsx,worst,36,8553
-lowa-pptx,neutral,35,8605
-lowa-pptx,typical,40,10337
-lowa-pptx,worst,37,8942
-lowa-nofile,neutral,23,5328
-lowa-nofile,typical,27,6857
-lowa-nofile,worst,25,5665
-office-word,neutral,28,6293
-office-word,typical,32,7822
-office-word,worst,30,6630
-office-excel,neutral,26,6128
-office-excel,typical,30,7657
-office-excel,worst,28,6465
-office-ppt,neutral,25,5885
-office-ppt,typical,29,7414
-office-ppt,worst,27,6222
-none,neutral,19,4460
-none,typical,23,5989
-none,worst,21,4797
+# 2026-11-12 fix/plugin-tools-discovery：list_tools 描述注明 plugin（插件开发）/ plugin-tools（已装插件的工具）后重测（xlsx 三行此前已漂到 2% 边缘，一并对齐实测）
+lowa-docx,neutral,33,7566
+lowa-docx,typical,42,10386
+lowa-docx,worst,35,7903
+lowa-xlsx,neutral,34,8381
+lowa-xlsx,typical,53,13170
+lowa-xlsx,worst,36,8718
+lowa-pptx,neutral,35,8647
+lowa-pptx,typical,40,10379
+lowa-pptx,worst,37,8984
+lowa-nofile,neutral,23,5291
+lowa-nofile,typical,27,6820
+lowa-nofile,worst,25,5628
+office-word,neutral,28,6256
+office-word,typical,32,7785
+office-word,worst,30,6593
+office-excel,neutral,26,6091
+office-excel,typical,30,7620
+office-excel,worst,28,6428
+office-ppt,neutral,25,5848
+office-ppt,typical,29,7377
+office-ppt,worst,27,6185
+none,neutral,19,4423
+none,typical,23,5952
+none,worst,21,4760
 ask,neutral,8,1253
 ask,typical,8,1253
 ask,worst,8,1253

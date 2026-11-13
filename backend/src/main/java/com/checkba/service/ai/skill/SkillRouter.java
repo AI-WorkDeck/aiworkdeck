@@ -260,8 +260,13 @@ public class SkillRouter {
         if (input.isEmpty()) {
             return false;
         }
-        List<String> actions = List.of("审查", "审阅", "审核", "修订", "修改", "评估",
-                "審查", "審閱", "審核", "修訂", "評估", "review", "revise", "redline", "assess");
+        // 核查/核验/核对/排查是工作流卡片自己的说法（「法律意见书核查 · 底稿交叉核验与披露排查」），
+        // 漏了它们，点卡片发出的那句话反而激活不了这个 skill（tutorial #146）
+        List<String> verify = List.of("核查", "核验", "核对", "排查", "核实", "核驗", "核對", "核實",
+                "verify", "verification", "cross-check", "cross check");
+        List<String> actions = new java.util.ArrayList<>(List.of("审查", "审阅", "审核", "修订", "修改", "评估",
+                "審查", "審閱", "審核", "修訂", "評估", "review", "revise", "redline", "assess"));
+        actions.addAll(verify);
         List<String> mechanical = List.of("错别字", "错字", "錯別字", "錯字", "字体", "字體",
                 "字号", "字號", "标点", "標點", "排版", "格式", "替换", "替換",
                 "typo", "typos", "format", "formatting", "font", "punctuation", "replace");
@@ -280,8 +285,8 @@ public class SkillRouter {
                     + quotedText + "\\s*(?:改成|改为|改為)\\s*" + quotedText + ".*");
             boolean local = limitedReplacement || mechanical.stream().anyMatch(t -> containsTrigger(clause, t));
             substantive |= review && !local;
-            reviewOnly |= !local && List.of("审查", "审阅", "审核", "评估", "審查", "審閱", "審核",
-                    "評估", "review", "assess").stream().anyMatch(t -> containsTrigger(clause, t));
+            reviewOnly |= !local && java.util.stream.Stream.concat(List.of("审查", "审阅", "审核", "评估", "審查", "審閱", "審核",
+                    "評估", "review", "assess").stream(), verify.stream()).anyMatch(t -> containsTrigger(clause, t));
             localLimit |= local && (clause.contains("只") || clause.contains("仅") || clause.contains("僅")
                     || containsTrigger(clause, "only"));
         }

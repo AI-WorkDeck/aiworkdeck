@@ -46,7 +46,7 @@ export interface DeclarativeToolDeclaration {
 }
 export interface PluginManifest {
   $schema?: string; id: string; name: string; version: string; description?: string; author?: string; homepage?: string; icon?: string;
-  minHostVersion?: string; frontendEntry?: string; permissions?: Permission[]; backendJars?: string[]; skills?: string[]; packs?: string[];
+  minHostVersion?: string; /** Extra hosts beyond desktop and Office/WPS panes; "web" = agent tools also offered on the web workbench. */ hosts?: "web"[]; frontendEntry?: string; permissions?: Permission[]; backendJars?: string[]; skills?: string[]; packs?: string[];
   tools?: (LegacyToolDeclaration | DeclarativeToolDeclaration)[];
   settings?: SettingDeclaration[]; guide?: Record<string, unknown>;
   contributes?: {

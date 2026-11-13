@@ -121,13 +121,19 @@ public class AiAgentController {
         return connect(conversationId, sessionId, clientInstance, lastEventId, response, null);
     }
 
+    public ResponseEntity<SseEmitter> connect(String conversationId, String sessionId, String clientInstance,
+            String lastEventId, HttpServletResponse response, String conversationScope) {
+        return connect(conversationId, sessionId, clientInstance, lastEventId, response, conversationScope, null);
+    }
+
     @GetMapping(value = "/connect/{conversationId}", produces = "text/event-stream")
     public ResponseEntity<SseEmitter> connect(@PathVariable String conversationId,
                               @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                               @RequestHeader(value = "X-Client-Instance", required = false) String clientInstance,
                               @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
                               HttpServletResponse response,
-                              @RequestParam(required = false) String conversationScope) {
+                              @RequestParam(required = false) String conversationScope,
+                              @RequestHeader(value = "Origin", required = false) String origin) {
         // 归属校验：emitter 表只按 conversationId 索引且新连接直接覆盖旧连接，
         // 此前 userId 仅用于打日志，任何人猜到会话 ID 即可劫持他人的整条输出流
         Long userId = AuthController.getUserIdFromSession(sessionId);
@@ -143,6 +149,12 @@ public class AiAgentController {
         }
         if (!java.util.Objects.equals(scope, messageService.conversationScopeOf(conversationId))) {
             return ResponseEntity.status(409).build();
+        }
+        // 网页版连接（web- 实例 id 或网页来源）把会话钉在 WEB：进程重启后登记表清空、
+        // 或网页端漏带 clientCapability 时，也不会回落到桌面工具面（W1 设计 §4.6）
+        if (com.checkba.service.ai.ClientCapabilityService.isWebClientInstance(clientInstance)
+                || clientCapabilityService.isWebOrigin(origin)) {
+            clientCapabilityService.markWebClient(conversationId);
         }
 
         // 添加响应头禁用缓冲，确保流式响应实时到达客户端
@@ -192,11 +204,16 @@ public class AiAgentController {
      * 发送用户消息 (触发 Agent 思考)。
      * 这是一个异步接口，立刻返回 200 OK，后续通过 SSE 推送结果。
      */
+    public ResponseEntity<?> startSession(AgentChatRequest request, String sessionId, String appLanguageHeader) {
+        return startSession(request, sessionId, appLanguageHeader, null);
+    }
+
     @PostMapping("/chat")
     public ResponseEntity<?> startSession(@RequestBody AgentChatRequest request,
                                           @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                                           @RequestHeader(value = com.checkba.config.AppLanguageRequestFilter.HEADER,
-                                                  required = false) String appLanguageHeader) {
+                                                  required = false) String appLanguageHeader,
+                                          @RequestHeader(value = "Origin", required = false) String origin) {
         // 界面语言：请求体优先，缺省时补上请求头里的那个。补这一手是因为编排循环跑在池线程上，
         // 过滤器建的 ThreadLocal 作用域不跟着走——只有随请求体带过去的值才能活到那一轮。
         if (com.checkba.service.AppLanguageScope.normalize(request.getAppLanguage()) == null) {
@@ -263,8 +280,17 @@ public class AiAgentController {
 
         // 会话级客户端能力登记（Phase C）：lowa（默认，主前端）/ office（Office 插件）/ none（纯对话）；
         // office 会话再按宿主细分（word / excel / powerpoint，缺省 word），工具可见性按宿主过滤
+        // 网页来源一律按 web 登记（W1 设计 §4.6）；已钉在 WEB 的会话（含 web- 连接见过的）
+        // 把 web 写回请求体，inbox 落库的那份请求重启回放时也不会回落到桌面工具面
+        if (clientCapabilityService.isWebOrigin(origin)) {
+            clientCapabilityService.markWebClient(request.getConversationId());
+        }
         clientCapabilityService.record(request.getConversationId(), request.getClientCapability(),
                 request.getOfficeHost(), request.getOfficeFamily());
+        if (clientCapabilityService.capabilityOf(request.getConversationId())
+                == com.checkba.service.ai.ClientCapabilityService.Capability.WEB) {
+            request.setClientCapability("web");
+        }
 
         try {
             com.checkba.model.entity.AgentInboxItem item = agentInboxService.submit(request, userId);
@@ -736,8 +762,8 @@ public class AiAgentController {
         @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = DecisionOptInDeserializer.class)
         private boolean decisionAssistEnabled;
         /**
-         * 可选：客户端文档编辑能力（lowa / office / none，Phase C）。
-         * 缺省按 lowa 处理，兼容不发送该字段的存量主前端。
+         * 可选：客户端文档编辑能力（lowa / office / none / web，Phase C；web 见 W1）。
+         * 缺省按 lowa 处理，兼容不发送该字段的存量主前端；网页来源的请求一律按 web。
          */
         private String clientCapability;
         /**

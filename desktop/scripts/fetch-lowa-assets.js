@@ -70,6 +70,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const zlib = require('zlib');
+const crypto = require('crypto');
 const { fileURLToPath } = require('url');
 
 const LOWA_CDN = 'https://cdn.zetaoffice.net/zetaoffice_latest/';
@@ -114,6 +115,37 @@ const FONT_LAO_URL = 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffe
 const FONT_MYANMAR_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansMyanmar/NotoSansMyanmar-Regular.ttf';
 const FONT_ARABIC_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf';
 const FONT_DEVANAGARI_URL = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf';
+
+// Integrity pins for every baked font (sha256 of the file as stored in dist) plus,
+// where the primary is jsDelivr, a mirror of the SAME pinned file on
+// raw.githubusercontent.com. jsDelivr intermittently answers 403/5xx, which used
+// to fail unrelated desktop builds; on such a failure we fall back to the mirror.
+// The sha256 is verified whatever the source, so a mirror (or a moved `@main`)
+// can never silently change the shipped bytes.
+const FONT_PINS = {
+  'cjk.ttc':             { sha256: 'faa6c9df652116dde789d351359f3d7e5d2285a2b2a1f04a2d7244df706d5ea9',
+                           mirror: 'https://raw.githubusercontent.com/googlefonts/noto-cjk/Sans2.004/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf' },
+  'cjk-serif.otf':       { sha256: 'b634f451523f7e1cdacf4afd2143cf5913dbab8979f753921de759e0243989bd',
+                           mirror: 'https://raw.githubusercontent.com/googlefonts/noto-cjk/Serif2.002/Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf' },
+  'cjk-kai.ttf':         { sha256: '8d6ba638ac9553413354cfaab97637c1cd778444e259441ea1e5f8fb2c697fba' },
+  'cjk-fangsong.ttf':    { sha256: '558c62730844fe54ba220146ed62f859d4e2880188d92d985f8921c6e3743bc4' },
+  'cjk-kr.otf':          { sha256: '69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68',
+                           mirror: 'https://raw.githubusercontent.com/googlefonts/noto-cjk/Sans2.004/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf' },
+  'cjk-kr-serif.otf':    { sha256: '03b36b1927525d93f35227a8816c8bf82d751b89ac4122b40f74949004ccfa69',
+                           mirror: 'https://raw.githubusercontent.com/googlefonts/noto-cjk/Serif2.002/Serif/SubsetOTF/KR/NotoSerifKR-Regular.otf' },
+  'cjk-thai.ttf':        { sha256: '404ddfb5ed0aaa6b6ec8a85700d682978992062d67da93903967b56cbd9a4acc',
+                           mirror: 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf' },
+  'cjk-thai-serif.ttf':  { sha256: '36718303c18459aa1a6010c71566b1487b4385e923cb13e367ff7e7fba218ae0',
+                           mirror: 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSerifThai/NotoSerifThai-Regular.ttf' },
+  'cjk-khmer.ttf':       { sha256: '5c1ec068352f1e1fe8e7a3218230360d054e104d377ef40c0423b17c34c3c259' },
+  'cjk-lao.ttf':         { sha256: '4a64d40850990992913d4be44b2e87a93d52f76882c1f0c0755edcb12ec57aa2' },
+  'cjk-myanmar.ttf':     { sha256: '9dd2bc76a822a974efce803a4b07302d14d01d5c1fa9e33a258d15a9cb513a7d',
+                           mirror: 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansMyanmar/NotoSansMyanmar-Regular.ttf' },
+  'cjk-arabic.ttf':      { sha256: 'ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b',
+                           mirror: 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf' },
+  'cjk-devanagari.ttf':  { sha256: '385e78e6359a9d88a0f243d53b1209d7548361ba2194e2b9ec779bcaa7e8949d',
+                           mirror: 'https://raw.githubusercontent.com/notofonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf' },
+};
 
 const distRoot = path.join(__dirname, '../../frontend/dist/zetaoffice');
 
@@ -206,6 +238,29 @@ async function fetchUrlWithRetry(url, headers, attempts = 3) {
       await sleep(delay);
     }
   }
+}
+
+// Font download: primary first (one attempt when a mirror exists, so a 403 falls
+// through immediately), then the pinned mirror. FONT_URL_REWRITE="from=to" rewrites
+// a prefix of the PRIMARY url only (test hook: point it at a local server that
+// answers 403 to exercise the fallback).
+async function fetchAssetBody(a, headers) {
+  const pin = FONT_PINS[a.dest];
+  if (!pin || !pin.mirror) return fetchUrlWithRetry(a.url, headers);
+  const [from, to] = (process.env.FONT_URL_REWRITE || '=').split('=');
+  const primary = from && a.url.startsWith(from) ? to + a.url.slice(from.length) : a.url;
+  try { return await fetchUrlWithRetry(primary, headers, 1); }
+  catch (e) {
+    console.warn('\n  ! ' + a.dest + ': ' + (e.message || e) + '; falling back to ' + pin.mirror);
+    return fetchUrlWithRetry(pin.mirror, headers);
+  }
+}
+
+function checkSha(bytes, a) {
+  const pin = FONT_PINS[a.dest];
+  if (!pin) return;
+  const got = crypto.createHash('sha256').update(bytes).digest('hex');
+  if (got !== pin.sha256) throw new Error('validation failed for ' + a.dest + ': sha256 ' + got + ' != pinned ' + pin.sha256);
 }
 
 // GET with up to 5 redirects; resolves {encoding, body:Buffer}.
@@ -305,7 +360,9 @@ function applyTransform(a, bytes, enc) {
 function cachedOk(destPath, a) {
   const enc = existingEncodings[path.basename(a.dest)] || null;
   try {
-    checkMagic(decode(fs.readFileSync(destPath), enc), a.magic, destPath);
+    const raw = fs.readFileSync(destPath);
+    checkMagic(decode(raw, enc), a.magic, destPath);
+    checkSha(raw, a);
     return { enc };
   } catch (e) { return null; }
 }
@@ -315,8 +372,10 @@ function cachedOk(destPath, a) {
 async function fetchAsset(a) {
   const destPath = path.join(distRoot, a.dest);
   // Cache only on the default path; a custom LOWA_BASE_URL may point at a
-  // different engine than whatever is already on disk, so always re-fetch.
-  if (!usingCustomBase && fs.existsSync(destPath)) {
+  // different engine than whatever is already on disk, so always re-fetch. Fonts
+  // are independent of LOWA_BASE_URL and sha256-pinned, so they may be reused
+  // (CI restores them from actions/cache) on either path.
+  if ((!usingCustomBase || FONT_PINS[a.dest]) && fs.existsSync(destPath)) {
     const hit = cachedOk(destPath, a);
     if (hit) {
       if (a.transform) {
@@ -335,7 +394,7 @@ async function fetchAsset(a) {
   process.stdout.write('  ↓ ' + a.dest + ' …');
   // 'static' assets are served without encoding replay, so insist on identity.
   const reqHeaders = a.serve === 'static' ? { 'Accept-Encoding': 'identity' } : {};
-  const { encoding, body } = await fetchUrlWithRetry(a.url, reqHeaders);
+  const { encoding, body } = await fetchAssetBody(a, reqHeaders);
   const enc = encoding || null;
   // Default CDN: assert the encoding we expect, so a CDN change trips the build.
   // Custom LOWA_BASE_URL: the encoding is unknown, so accept whatever the source
@@ -358,6 +417,7 @@ async function fetchAsset(a) {
   if (a.zipEntry) out = unzipEntry(decode(body, enc), a.zipEntry);
   if (a.transform) ({ bytes: out, enc: storedEnc } = applyTransform(a, out, storedEnc));
   checkMagic(decode(out, storedEnc), a.magic, a.dest);
+  checkSha(out, a);
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
   fs.writeFileSync(destPath + '.part', out);
   fs.renameSync(destPath + '.part', destPath);
@@ -369,9 +429,9 @@ async function main() {
   console.log('Fetching LOWA runtime + CJK font into ' + distRoot);
   if (usingCustomBase) console.log('  LOWA source: ' + LOWA_BASE + ' (LOWA_BASE_URL)');
   // 未设 LOWA_BASE_URL 时拿的是上游通用 zetaoffice_latest，不是发版用的自建 zh-CN 引擎
-  // （desktop-build.yml / model-matrix.yml 固定 24.2.8-zhcn-r8）。本地测性能或对拍时会量错引擎（office-tier1 O8 实踩）。
+  // （desktop-build.yml / model-matrix.yml 固定 24.2.8-zhcn-r10）。本地测性能或对拍时会量错引擎（office-tier1 O8 实踩）。
   else console.warn('  ⚠ LOWA_BASE_URL is unset: fetching the generic upstream engine (' + LOWA_CDN + '), NOT the production build.\n' +
-    '    For production parity use LOWA_BASE_URL=https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r8/ (the pin in .github/workflows/desktop-build.yml).');
+    '    For production parity use LOWA_BASE_URL=https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r10/ (the pin in .github/workflows/desktop-build.yml).');
 
   // Build the sidecar from the encoding ACTUALLY stored per file, so a
   // self-hosted identity engine records nothing (served raw) while the CDN's

@@ -46,7 +46,7 @@ import static org.mockito.Mockito.*;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({LawFirmManagementService.class, LawFirmBillingService.class, LawFirmCloudBillingService.class, LawFirmCloudService.class, LawFirmAuthority.class,
+@Import({LawFirmManagementService.class, LawFirmClientService.class, LawFirmBillingService.class, LawFirmCloudBillingService.class, LawFirmCloudService.class, LawFirmAuthority.class,
         LawFirmConflictEngine.class, ImService.class, ObjectMapper.class})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:lawfirm-cloud-billing;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1",
