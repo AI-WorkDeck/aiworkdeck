@@ -6,7 +6,7 @@
   "expense.formHint": "अदालती शुल्क, विशेषज्ञ शुल्क, यात्रा व्यय और इसी तरह के खर्च वकालत शुल्क नहीं हैं। मुवक्किल इन्हें अलग से चुकाता है, इसलिए इन्हें «इनवॉइसिंग और शुल्क संग्रह» के अंतर्गत वकालत शुल्क से अलग रखा जाता है। चीन के वकील सेवा शुल्क प्रबंधन उपायों के अनुसार, निपटान में मुवक्किल की ओर से किए गए भुगतानों की सूची वैध वाउचरों के साथ शामिल होनी चाहिए; वैध वाउचर के बिना किसी भी हिस्से को मुवक्किल अस्वीकार कर सकता है। यह खाता-बही इसी डिवाइस पर सहेजी जाती है।",
   "expense.date": "तारीख",
   "expense.matter": "मामला",
-  "expense.matterPlaceholder": "उदा. Lanhai Optoelectronics बनाम Huaxing Semiconductor",
+  "expense.matterPlaceholder": "उदा. Langqi Optoelectronics बनाम Lanyao Microelectronics",
   "expense.category": "श्रेणी",
   "expense.amount": "राशि (CNY)",
   "expense.paidBy": "भुगतानकर्ता",
@@ -58,6 +58,7 @@
   "access.colleague": "आपकी फर्म के सहकर्मी",
   "access.risk.line": "जोखिम सूचना: {0}",
   "access.risk.GREEN": "हरा (कोई टकराव नहीं)",
+  "access.rule.G0_CLEAR": "कोई टकराव नहीं",
   "access.risk.YELLOW": "पीला (संभावित टकराव)",
   "access.risk.RED": "लाल (सीधा टकराव)"
 }

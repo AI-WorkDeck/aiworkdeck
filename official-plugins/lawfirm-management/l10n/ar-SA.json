@@ -58,6 +58,7 @@
   "access.colleague": "زميل في مكتبك",
   "access.risk.line": "تنبيه المخاطر: {0}",
   "access.risk.GREEN": "أخضر (لا تعارض)",
+  "access.rule.G0_CLEAR": "لا تعارض",
   "access.risk.YELLOW": "أصفر (تعارض محتمل)",
   "access.risk.RED": "أحمر (تعارض مباشر)"
 }

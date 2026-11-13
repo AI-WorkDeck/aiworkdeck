@@ -6,7 +6,7 @@
   "expense.formHint": "Biaya pengadilan, biaya ahli, biaya perjalanan, dan biaya serupa bukan merupakan honorarium advokat. Klien membayarnya secara terpisah, sehingga dicatat terpisah dari honorarium di bagian «Penagihan & Pembayaran Honorarium». Berdasarkan Tindakan Administrasi Biaya Layanan Advokat Tiongkok, penyelesaian harus menyertakan daftar biaya yang dibayarkan atas nama klien beserta bukti yang sah; klien dapat menolak bagian mana pun yang tidak disertai bukti yang sah. Buku besar ini disimpan di perangkat ini.",
   "expense.date": "Tanggal",
   "expense.matter": "Perkara",
-  "expense.matterPlaceholder": "mis. Lanhai Optoelectronics vs. Huaxing Semiconductor",
+  "expense.matterPlaceholder": "mis. Langqi Optoelectronics vs. Lanyao Microelectronics",
   "expense.category": "Kategori",
   "expense.amount": "Jumlah (CNY)",
   "expense.paidBy": "Dibayar oleh",
@@ -58,6 +58,7 @@
   "access.colleague": "Rekan di firma Anda",
   "access.risk.line": "Peringatan risiko: {0}",
   "access.risk.GREEN": "Hijau (tidak ada benturan)",
+  "access.rule.G0_CLEAR": "Tidak ada benturan",
   "access.risk.YELLOW": "Kuning (potensi benturan)",
   "access.risk.RED": "Merah (benturan langsung)"
 }

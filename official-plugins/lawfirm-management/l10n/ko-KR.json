@@ -58,6 +58,7 @@
   "access.colleague": "같은 사무소 동료",
   "access.risk.line": "위험 표시: {0}",
   "access.risk.GREEN": "녹색(충돌 없음)",
+  "access.rule.G0_CLEAR": "충돌 없음",
   "access.risk.YELLOW": "노랑(잠재적 충돌)",
   "access.risk.RED": "빨강(직접 충돌)"
 }

@@ -6,7 +6,7 @@
   "expense.formHint": "Custas judiciais, honorários de perito, despesas de viagem e similares não são honorários advocatícios. São pagos separadamente pelo cliente e, por isso, ficam separados dos honorários em «Faturamento e cobrança». Conforme as Medidas da China para a Administração dos Honorários de Serviços Advocatícios, o acerto de contas deve incluir a lista das despesas pagas em nome do cliente com comprovantes válidos; o cliente pode recusar qualquer parte sem comprovante válido. Este livro de registros fica armazenado neste dispositivo.",
   "expense.date": "Data",
   "expense.matter": "Caso",
-  "expense.matterPlaceholder": "ex.: Lanhai Optoelectronics x Huaxing Semiconductor",
+  "expense.matterPlaceholder": "ex.: Langqi Optoelectronics x Lanyao Microelectronics",
   "expense.category": "Categoria",
   "expense.amount": "Valor (CNY)",
   "expense.paidBy": "Pago por",
@@ -58,6 +58,7 @@
   "access.colleague": "Colega do seu escritório",
   "access.risk.line": "Aviso de risco: {0}",
   "access.risk.GREEN": "Verde (sem conflito)",
+  "access.rule.G0_CLEAR": "Sem conflito",
   "access.risk.YELLOW": "Amarelo (conflito potencial)",
   "access.risk.RED": "Vermelho (conflito direto)"
 }

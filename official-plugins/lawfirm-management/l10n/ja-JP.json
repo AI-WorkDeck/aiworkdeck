@@ -58,6 +58,7 @@
   "access.colleague": "同じ事務所の同僚",
   "access.risk.line": "リスク表示：{0}",
   "access.risk.GREEN": "緑（相反なし）",
+  "access.rule.G0_CLEAR": "相反なし",
   "access.risk.YELLOW": "黄（相反の可能性）",
   "access.risk.RED": "赤（直接の相反）"
 }
