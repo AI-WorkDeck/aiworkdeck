@@ -1,0 +1,13 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+# Bids and proposals
+
+`pitch_materials_action(action, json)` is the only entry point of the Bids and Proposals plugin. The library and matrix are stored per user; generated files go to the current project's "Pitch materials" folder (Chinese UI: 投标材料). The same functions are available in the Bids and Proposals workspace view.
+
+1. Call `library.get` first (in chat you get a desensitized view without real client names; only the lawyer can change or export the library in the panel, so library.save / library.export are refused in chat). Use only entry ids that exist in the library; never invent credentials, lawyers, qualifications or certificates. If something is missing, tell the user what is missing.
+2. With a tender document, read it in full and list each eligibility requirement (kind=qualification) and scoring criterion (kind=scoring, with points), each with a short verbatim excerpt. Check each against the library: status is met / partial / missing / na, evidence lists library ids, gap says what material is missing. Count year and quantity thresholds from the library data. Save with `matrix.save` `{"tenderPath":"…","tenderer":"…","project":"…","items":[{"id":"r1","kind":"…","text":"…","score":"…","status":"…","evidence":["c1"],"note":"…","gap":"…"}]}`; generated material appends it.
+3. Fee amounts come only from `quote.compute` (quoteId) or the quoteId of generate. Never compute amounts yourself.
+4. Generate with `generate`: kind (docx bid / pptx proposal), template (project template path, or sample when the firm has none), client, project, credentialIds, lawyerIds, qualificationIds, serviceIds, quoteId, includeMatrix. Put the lead lawyer first.
+5. Credentials are confidential. Keep outward=true for anything that leaves the firm (client names become their public description). Set it to false only when the user explicitly asks for an internal version, and warn them not to send it out. If leakCount is above 0, tell the user that real client names from the library remain in the file and to check the result in the panel; if missingAliases is not empty, ask them to add public descriptions. A leakCount of 0 only means the client names recorded in the library do not appear; it does not mean the file is ready to send, so ask the lawyer to read it through first. Do not repeat real client names in your replies.
+6. If a generated PPT needs layout work, follow the presentation workflow: check each rendered page, fix, keep the template style and all facts unchanged.
+7. When success=false, explain the code (template_missing, quote_rate_missing, no_project, ...) instead of retrying blindly.

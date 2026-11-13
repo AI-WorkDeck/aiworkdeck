@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.lawfirm;
 
-import com.checkba.model.entity.lawfirm.LawFirmCloudBillingSetting;
 import com.checkba.model.entity.lawfirm.LawFirmCloudMatter;
 import com.checkba.model.entity.lawfirm.LawFirmCloudTimeEntry;
-import com.checkba.repository.lawfirm.LawFirmCloudBillingSettingRepository;
 import com.checkba.repository.lawfirm.LawFirmCloudMatterRepository;
 import com.checkba.repository.lawfirm.LawFirmCloudTimeEntryRepository;
 import com.checkba.service.LangText;
@@ -27,96 +25,76 @@ import java.util.*;
  * 在自己的桌面端取回、在本机台账里审核和出账单，再把审核结论回写到这里，律师在自己的工作记录里看到结论。
  * 费率、金额、账单与发票不上云：本机「发票与财务收费」台账仍是唯一的财务账。
  *
- * <p>身份全部来自账户名录（{@link LawFirmAuthority}）：律所、显示名、是否律所管理员；不信任客户端传来的任何身份字段。
- * 每个律所默认关闭，由律所管理员明确开启；关闭时可一并删除云端工时与事项。
+ * <p>挂在律所云端统一入口（{@link LawFirmCloudService}，{@code /api/lawfirm/cloud}）上的「time」功能：身份由统一入口从账户名录解析后传入，
+ * 律所开关（默认关闭、律所管理员在「律所云端」页开启）也由统一入口把关；关闭并选择删除时调 {@link #purge}。
  */
 @Service
 @RequiredArgsConstructor
-public class LawFirmCloudBillingService {
+public class LawFirmCloudBillingService implements LawFirmCloudFeature {
 
-    public static final Set<String> ACTIONS = Set.of("billingCloudStatus", "billingCloudEnable", "billingCloudPublishMatter",
-            "billingCloudArchiveMatter", "billingCloudSubmit", "billingCloudMine", "billingCloudPull", "billingCloudOutcome");
+    public static final Set<String> ACTIONS = Set.of("time.status", "time.publishMatter",
+            "time.archiveMatter", "time.submit", "time.mine", "time.pull", "time.outcome");
 
     static final int MAX_BATCH = 100;
     static final int MAX_PULL = 300;
     static final Set<String> OUTCOMES = Set.of("RECEIVED", "APPROVED", "RETURNED", "BILLED");
 
     private final LawFirmAuthority authority;
-    private final LawFirmCloudBillingSettingRepository settings;
     private final LawFirmCloudMatterRepository matters;
     private final LawFirmCloudTimeEntryRepository entries;
     private final ObjectMapper mapper;
 
+    @Override
+    public String key() {
+        return "time";
+    }
+
+    @Override
+    public Set<String> pluginIds() {
+        return Set.of(LawFirmCloudService.SETTINGS_PLUGIN);
+    }
+
+    @Override
     @Transactional
-    public Map<String, Object> execute(Long userId, String action, Map<String, Object> raw) {
-        LawFirmAuthority.Member me = authority.current(userId);
+    public Map<String, Object> execute(LawFirmAuthority.Member me, String action, Map<String, Object> raw) {
         Map<String, Object> p = raw == null ? Map.of() : raw;
         return switch (action) {
-            case "billingCloudStatus" -> status(me);
-            case "billingCloudEnable" -> enable(me, p);
-            case "billingCloudPublishMatter" -> publish(me, p);
-            case "billingCloudArchiveMatter" -> archive(me, p);
-            case "billingCloudSubmit" -> submit(me, p);
-            case "billingCloudMine" -> mine(me);
-            case "billingCloudPull" -> pull(me);
-            case "billingCloudOutcome" -> outcome(me, p);
+            case "time.status" -> status(me);
+            case "time.publishMatter" -> publish(me, p);
+            case "time.archiveMatter" -> archive(me, p);
+            case "time.submit" -> submit(me, p);
+            case "time.mine" -> mine(me);
+            case "time.pull" -> pull(me);
+            case "time.outcome" -> outcome(me, p);
             default -> throw new IllegalArgumentException(LangText.of("不支持的云端工时操作", "Unsupported cloud time action"));
         };
     }
 
-    private boolean enabled(String firmId) {
-        return settings.findById(firmId).map(LawFirmCloudBillingSetting::isEnabled).orElse(false);
-    }
-
-    private void requireEnabled(LawFirmAuthority.Member me) {
-        if (!enabled(me.firmId())) {
-            throw new IllegalStateException(LangText.of("本所尚未开启云端工时汇总，请律所管理员在律所管理「计时收费」中开启",
-                    "Cloud time collection is not enabled for this firm; a firm administrator can enable it under Hourly billing"));
-        }
+    /** 律所管理员关闭「计时工时汇总」并选择删除：清除本所全部云端工时与事项。 */
+    @Override
+    @Transactional
+    public long purge(String firmId) {
+        long n = entries.deleteByFirmId(firmId);
+        matters.deleteByFirmId(firmId);
+        return n;
     }
 
     private Map<String, Object> status(LawFirmAuthority.Member me) {
         Map<String, Object> out = new LinkedHashMap<>();
-        boolean on = enabled(me.firmId());
-        out.put("enabled", on);
+        out.put("enabled", true);
         out.put("firmAdmin", me.firmAdmin());
         out.put("name", me.name());
         List<Map<String, Object>> list = new ArrayList<>();
-        if (on) {
-            for (LawFirmCloudMatter m : matters.findByFirmIdOrderByCreatedAtDesc(me.firmId())) {
-                if (!m.isActive() && !Objects.equals(m.getOwnerId(), me.userId())) continue;
-                list.add(matterView(m, me));
-            }
+        for (LawFirmCloudMatter m : matters.findByFirmIdOrderByCreatedAtDesc(me.firmId())) {
+            if (!m.isActive() && !Objects.equals(m.getOwnerId(), me.userId())) continue;
+            list.add(matterView(m, me));
         }
         out.put("matters", list);
         return out;
     }
 
-    private Map<String, Object> enable(LawFirmAuthority.Member me, Map<String, Object> p) {
-        if (!me.firmAdmin()) throw LawFirmAuthority.denied();
-        boolean on = Boolean.TRUE.equals(p.get("enabled"));
-        LawFirmCloudBillingSetting s = settings.findById(me.firmId()).orElseGet(() -> {
-            LawFirmCloudBillingSetting x = new LawFirmCloudBillingSetting();
-            x.setFirmId(me.firmId());
-            return x;
-        });
-        s.setEnabled(on);
-        s.setUpdatedBy(me.userId());
-        s.setUpdatedAt(Instant.now());
-        settings.saveAndFlush(s);
-        long purged = 0;
-        if (!on && Boolean.TRUE.equals(p.get("purge"))) {
-            purged = entries.deleteByFirmId(me.firmId());
-            matters.deleteByFirmId(me.firmId());
-        }
-        Map<String, Object> out = new LinkedHashMap<>(status(me));
-        out.put("purgedEntries", purged);
-        return out;
-    }
-
     private Map<String, Object> publish(LawFirmAuthority.Member me, Map<String, Object> p) {
         if (!me.firmAdmin()) throw LawFirmAuthority.denied();
-        requireEnabled(me);
         String id = text(p, "matterId", 36, false);
         LawFirmCloudMatter m;
         if (id != null) {
@@ -153,7 +131,6 @@ public class LawFirmCloudBillingService {
 
     /** 律师交工时。同一本机工时（clientKey）重复提交：仍在待审或已退回时更新内容，已被合伙人取回后不再改动。 */
     private Map<String, Object> submit(LawFirmAuthority.Member me, Map<String, Object> p) {
-        requireEnabled(me);
         List<Map<String, Object>> rows = list(p.get("entries"));
         if (rows.isEmpty() || rows.size() > MAX_BATCH) {
             throw new IllegalArgumentException(LangText.of("每次提交 1–100 条工时", "Submit between 1 and 100 entries at a time"));
@@ -212,7 +189,6 @@ public class LawFirmCloudBillingService {
     /** 合伙人取回自己发布事项下的待审工时（取回即标为 RECEIVED；重复取回会再次返回，本机按编号去重）。 */
     private Map<String, Object> pull(LawFirmAuthority.Member me) {
         if (!me.firmAdmin()) throw LawFirmAuthority.denied();
-        requireEnabled(me);
         List<String> mine = matters.findByFirmIdOrderByCreatedAtDesc(me.firmId()).stream()
                 .filter(m -> Objects.equals(m.getOwnerId(), me.userId())).map(LawFirmCloudMatter::getId).toList();
         List<Map<String, Object>> out = new ArrayList<>();

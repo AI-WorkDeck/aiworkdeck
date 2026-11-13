@@ -46,7 +46,7 @@ import static org.mockito.Mockito.*;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({LawFirmManagementService.class, LawFirmBillingService.class, LawFirmCloudBillingService.class, LawFirmAuthority.class,
+@Import({LawFirmManagementService.class, LawFirmBillingService.class, LawFirmCloudBillingService.class, LawFirmCloudService.class, LawFirmAuthority.class,
         LawFirmConflictEngine.class, ImService.class, ObjectMapper.class})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:lawfirm-cloud-billing;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1",
@@ -58,7 +58,7 @@ class LawFirmCloudBillingTest {
 
     @Autowired LawFirmBillingService billing;
     @Autowired LawFirmManagementService ledger;
-    @Autowired LawFirmCloudBillingService cloudService;
+    @Autowired LawFirmCloudService cloudService;
     @Autowired UserRepository users;
     @Autowired AccountBindingRepository bindings;
     @Autowired LawFirmMatterIntakeRepository intakes;
@@ -101,7 +101,7 @@ class LawFirmCloudBillingTest {
         }).when(access).requireFirmWide(ArgumentMatchers.any());
         when(cloudClient.call(ArgumentMatchers.any(), anyString(), ArgumentMatchers.any())).thenAnswer(c -> {
             String action = c.getArgument(1);
-            if (cloudDown.get() && "billingCloudOutcome".equals(action)) throw new IllegalStateException("cloud down");
+            if (cloudDown.get() && "time.outcome".equals(action)) throw new IllegalStateException("cloud down");
             try {
                 return cloudService.execute(c.getArgument(0), action, c.getArgument(2));
             } catch (IllegalArgumentException e) {
@@ -109,8 +109,12 @@ class LawFirmCloudBillingTest {
             }
         });
         when(cloudClient.statusOrUnavailable(ArgumentMatchers.any())).thenAnswer(c -> {
-            Map<String, Object> s = new LinkedHashMap<>(cloudService.execute(c.getArgument(0), "billingCloudStatus", Map.of()));
+            Long u = c.getArgument(0);
+            Map<?, ?> sw = (Map<?, ?>) cloudService.execute(u, LawFirmCloudService.SETTINGS_GET, Map.of()).get("switches");
+            boolean on = Boolean.TRUE.equals(sw.get("time"));
+            Map<String, Object> s = new LinkedHashMap<>(on ? cloudService.execute(u, "time.status", Map.of()) : Map.of("matters", List.of()));
             s.put("available", true);
+            s.put("enabled", on);
             return s;
         });
         intake = intakes.save(LawFirmMatterIntake.builder().intakeNo("C-" + System.nanoTime()).title("甲公司数据合规专项")
@@ -137,6 +141,12 @@ class LawFirmCloudBillingTest {
         return id;
     }
 
+    /** 律所管理员在共用的「律所云端」页开关（带所见版本）。 */
+    Map<String, Object> setSwitch(Long admin, boolean on, boolean purge) {
+        Object v = cloudService.execute(admin, LawFirmCloudService.SETTINGS_GET, Map.of()).get("version");
+        return cloudService.execute(admin, LawFirmCloudService.SETTINGS_SET, Map.of("feature", "time", "enabled", on, "purge", purge, "expectedVersion", v));
+    }
+
     Map<String, Object> act(Long u, String action, Map<String, Object> p) {
         return billing.execute(u, null, action, p);
     }
@@ -159,9 +169,9 @@ class LawFirmCloudBillingTest {
     void lawyersSubmitAcrossDesktopsPartnerReviewsAndBillsLocallyOutcomesFlowBack() {
         // 默认关闭；只有律所管理员能开启
         assertEquals(false, list(act(lawyerA, "timeMine", Map.of()), "entries").isEmpty() ? act(lawyerA, "timeMine", Map.of()).get("cloud") instanceof Map<?, ?> c ? c.get("enabled") : null : null);
-        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(lawyerA, "billingCloudEnable", Map.of("enabled", true)));
+        assertThrows(IllegalArgumentException.class, () -> setSwitch(lawyerA, true, false), "only a firm admin can turn it on");
         assertThrows(IllegalStateException.class, () -> act(partner, "cloudBillingPublish", Map.of("intakeId", intake.getId())), "publish requires opt-in");
-        act(partner, "cloudBillingEnable", Map.of("enabled", true));
+        setSwitch(partner, true, false);
         Map<String, Object> st = act(partner, "cloudBillingPublish", Map.of("intakeId", intake.getId()));
         String matterId = terms.findByIntakeId(intake.getId()).orElseThrow().getCloudMatterId();
         assertNotNull(matterId);
@@ -176,19 +186,19 @@ class LawFirmCloudBillingTest {
         assertEquals(1, act(lawyerB, "timeSubmit", Map.of("ids", List.of(b))).get("cloudSubmitted"));
         assertEquals("SUBMITTED", entries.findById(a).orElseThrow().getStatus());
         // 重复提交同一条（如网络重试）不会在云端多出一条
-        cloudService.execute(lawyerA, "billingCloudSubmit", Map.of("entries", List.of(Map.of("clientKey",
+        cloudService.execute(lawyerA, "time.submit", Map.of("entries", List.of(Map.of("clientKey",
                 entries.findById(a).orElseThrow().getCloudClientKey(), "matterId", matterId, "workDate", LocalDate.now().toString(),
                 "minutes", 120, "description", "审阅数据处理协议", "billable", true))));
         assertEquals(2, cloudEntries.count());
 
         // 律师只看到自己的；外所账户不能往本所事项交工时
-        assertEquals(1, list(cloudService.execute(lawyerA, "billingCloudMine", Map.of()), "entries").size());
-        cloudService.execute(outsider, "billingCloudEnable", Map.of("enabled", true));
-        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(outsider, "billingCloudSubmit", Map.of("entries", List.of(Map.of(
+        assertEquals(1, list(cloudService.execute(lawyerA, "time.mine", Map.of()), "entries").size());
+        setSwitch(outsider, true, false);
+        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(outsider, "time.submit", Map.of("entries", List.of(Map.of(
                 "clientKey", "x", "matterId", matterId, "workDate", LocalDate.now().toString(), "minutes", 60, "description", "x")))));
         // 非律所管理员、以及不是发布人的另一位合伙人，都取不到这些工时
-        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(lawyerA, "billingCloudPull", Map.of()));
-        assertTrue(list(cloudService.execute(partner2, "billingCloudPull", Map.of()), "entries").isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(lawyerA, "time.pull", Map.of()));
+        assertTrue(list(cloudService.execute(partner2, "time.pull", Map.of()), "entries").isEmpty());
 
         // 取回之前，本机审核列表里没有律师端的镜像（同库的测试里也不会被算两遍）
         assertTrue(list(act(partner, "timeReviewList", Map.of()), "entries").isEmpty());
@@ -243,13 +253,17 @@ class LawFirmCloudBillingTest {
 
         // 另一位合伙人不能改写不属于他发布事项的结论
         String cloudId = entries.findById(ra).orElseThrow().getCloudEntryId();
-        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(partner2, "billingCloudOutcome",
+        assertThrows(IllegalArgumentException.class, () -> cloudService.execute(partner2, "time.outcome",
                 Map.of("entries", List.of(Map.of("id", cloudId, "status", "APPROVED")))));
 
         // 律所关闭并删除云端数据
-        act(partner, "cloudBillingEnable", Map.of("enabled", false, "purge", true));
+        setSwitch(partner, false, true);
         assertEquals(0, cloudEntries.count());
-        assertNull(terms.findByIntakeId(intake.getId()).orElseThrow().getCloudMatterId());
-        assertThrows(IllegalStateException.class, () -> act(lawyerA, "timeSubmit", Map.of("ids", List.of(save(lawyerA, "c:" + matterId, "1", "x")))));
+        assertThrows(IllegalStateException.class, () -> act(lawyerA, "timeSubmit", Map.of("ids", List.of(save(lawyerA, "c:" + matterId, "1", "x")))),
+                "switched off: the cloud refuses new time");
+        // 重新开启后再发布：旧的云端事项已删除，本机自动改为发布一条新的
+        setSwitch(partner, true, false);
+        act(partner, "cloudBillingPublish", Map.of("intakeId", intake.getId()));
+        assertNotEquals(matterId, terms.findByIntakeId(intake.getId()).orElseThrow().getCloudMatterId());
     }
 }

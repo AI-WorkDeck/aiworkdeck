@@ -46,7 +46,7 @@ test('generated l10n table matches l10n/*.json and every used key exists in zh-C
   const table = window.AWD_LAWFIRM_EXPENSE_L10N;
   for (const locale of ['zh-CN', 'en-US']) {
     const all = JSON.parse(read(`../l10n/${locale}.json`));
-    const expected = Object.fromEntries(Object.entries(all).filter(([k]) => k.startsWith('expense.') || k.startsWith('access.') || k.startsWith('billing.')));
+    const expected = Object.fromEntries(Object.entries(all).filter(([k]) => k.startsWith('expense.') || k.startsWith('access.') || k.startsWith('billing.') || k.startsWith('cloud.')));
     assert.deepEqual(table[locale], expected, `${locale} is out of sync; run build.sh`);
   }
   assert.deepEqual(Object.keys(table['zh-CN']).sort(), Object.keys(table['en-US']).sort());
@@ -77,10 +77,10 @@ test('summary separates firm advances, pending settlement, missing vouchers and 
   await h.add({ 'ex-matter': '蓝海案', 'ex-amount': '0.1', 'ex-category': 'COURT_FEE', 'ex-paid-by': 'FIRM', 'ex-voucher': '收据 1' });
   await h.add({ 'ex-matter': '蓝海案', 'ex-amount': '0.2', 'ex-category': 'TRAVEL', 'ex-paid-by': 'FIRM', 'ex-voucher': '' });
   await h.add({ 'ex-matter': '蓝海案', 'ex-amount': '500', 'ex-category': 'APPRAISAL', 'ex-paid-by': 'CLIENT', 'ex-voucher': '' });
-  await h.add({ 'ex-matter': '华星案', 'ex-amount': '80', 'ex-category': 'POSTAGE', 'ex-paid-by': 'FIRM', 'ex-voucher': '快递单' });
+  await h.add({ 'ex-matter': '澜曜案', 'ex-amount': '80', 'ex-category': 'POSTAGE', 'ex-paid-by': 'FIRM', 'ex-voucher': '快递单' });
   const rows = Object.fromEntries(h.summary().map(([m, ...rest]) => [m, rest]));
   assert.deepEqual(rows['蓝海案'], ['¥0.30', '¥0.30', '¥0.20 缺凭证', '¥500.00'], 'cent arithmetic has no float drift');
-  assert.deepEqual(rows['华星案'], ['¥80.00', '¥80.00', '¥0.00', '¥0.00']);
+  assert.deepEqual(rows['澜曜案'], ['¥80.00', '¥80.00', '¥0.00', '¥0.00']);
   const travel = h.store.expenses.entries.find((e) => e.category === 'TRAVEL');
   await h.button(travel.id, 'settle');
   assert.equal(h.store.expenses.entries.find((e) => e.id === travel.id).settled, true);

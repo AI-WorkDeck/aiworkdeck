@@ -76,7 +76,7 @@ public class LawFirmBillingService {
             "billingRates", "billingSaveTimekeeper", "billingSaveTerms",
             "billPreview", "billCreate", "billList", "billSend", "billCancel", "billConfirm",
             "billingMetrics", "billingSeedDemo",
-            "cloudBillingStatus", "cloudBillingEnable", "cloudBillingPublish", "cloudBillingPull");
+            "cloudBillingStatus", "cloudBillingPublish", "cloudBillingPull");
 
     static final Set<String> LEVELS = Set.of("PARTNER", "COUNSEL", "SENIOR_ASSOCIATE", "ASSOCIATE", "PARALEGAL");
     /** 活动记录里不算律师工时的类型：AI 工具耗时与律师打开文件的时间重叠，登录是瞬时事件。 */
@@ -133,7 +133,6 @@ public class LawFirmBillingService {
             case "billingMetrics" -> billingMetrics(userId, p);
             case "billingSeedDemo" -> seedDemo(userId);
             case "cloudBillingStatus" -> cloudStatus(userId);
-            case "cloudBillingEnable" -> cloudEnable(userId, p);
             case "cloudBillingPublish" -> cloudPublish(userId, p);
             case "cloudBillingPull" -> cloudPull(userId);
             default -> throw new IllegalArgumentException(LangText.of("不支持的计时收费操作：", "Unsupported time billing action: ") + action);
@@ -1221,7 +1220,7 @@ public class LawFirmBillingService {
                 r.put("billable", Boolean.TRUE.equals(e.getBillable()));
                 payload.add(r);
             }
-            Map<String, Object> res = cloud.call(userId, "billingCloudSubmit", Map.of("entries", payload));
+            Map<String, Object> res = cloud.call(userId, "time.submit", Map.of("entries", payload));
             Map<String, String> idByKey = new HashMap<>();
             for (Map<String, Object> r : listOfMaps(res.get("entries"))) idByKey.put(String.valueOf(r.get("clientKey")), String.valueOf(r.get("id")));
             for (LawFirmTimeEntry e : batch) {
@@ -1246,7 +1245,7 @@ public class LawFirmBillingService {
         if (mine.isEmpty()) return;
         Map<String, Object> res;
         try {
-            res = cloud.call(userId, "billingCloudMine", Map.of());
+            res = cloud.call(userId, "time.mine", Map.of());
         } catch (RuntimeException e) {
             return; // 云端暂不可用时显示上次同步的结果
         }
@@ -1277,7 +1276,7 @@ public class LawFirmBillingService {
     Map<String, Object> cloudPull(Long userId) {
         access.requireFirmWide(userId);
         requireCloud();
-        Map<String, Object> res = cloud.call(userId, "billingCloudPull", Map.of());
+        Map<String, Object> res = cloud.call(userId, "time.pull", Map.of());
         int created = 0, refreshed = 0, unmapped = 0;
         Instant now = Instant.now();
         for (Map<String, Object> r : listOfMaps(res.get("entries"))) {
@@ -1396,7 +1395,7 @@ public class LawFirmBillingService {
             }
             boolean batchOk;
             try {
-                cloud.call(userId, "billingCloudOutcome", Map.of("entries", payload));
+                cloud.call(userId, "time.outcome", Map.of("entries", payload));
                 batchOk = true;
             } catch (RuntimeException ex) {
                 batchOk = false;
@@ -1423,23 +1422,6 @@ public class LawFirmBillingService {
         return out;
     }
 
-    Map<String, Object> cloudEnable(Long userId, Map<String, Object> p) {
-        access.requireFirmWide(userId);
-        requireCloud();
-        boolean on = Boolean.TRUE.equals(boolVal(p.get("enabled")));
-        boolean purge = Boolean.TRUE.equals(boolVal(p.get("purge")));
-        cloud.call(userId, "billingCloudEnable", Map.of("enabled", on, "purge", purge));
-        if (purge) {
-            for (LawFirmBillingTerms t : termsRepository.findAll()) {
-                if (t.getCloudMatterId() != null) {
-                    t.setCloudMatterId(null);
-                    termsRepository.save(t);
-                }
-            }
-        }
-        return cloudStatus(userId);
-    }
-
     /** 把本机收案发布为律所云端事项（只上传事项名称与委托人名称），同事据此提交工时。 */
     Map<String, Object> cloudPublish(Long userId, Map<String, Object> p) {
         LawFirmMatterIntake in = intake(longVal(p.get("intakeId")));
@@ -1450,9 +1432,17 @@ public class LawFirmBillingService {
         Map<String, Object> req = new LinkedHashMap<>();
         req.put("title", in.getTitle());
         req.put("clientName", in.getClientName());
-        if (t.getCloudMatterId() != null) req.put("matterId", t.getCloudMatterId());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> matter = (Map<String, Object>) cloud.call(userId, "billingCloudPublishMatter", req).get("matter");
+        Map<String, Object> matter = null;
+        if (t.getCloudMatterId() != null) {
+            req.put("matterId", t.getCloudMatterId());
+            try {
+                matter = castMap(cloud.call(userId, "time.publishMatter", req).get("matter"));
+            } catch (IllegalStateException gone) {
+                // 云端事项已随「关闭并删除」清除，或不是本人发布：重新发布一条新的
+                req.remove("matterId");
+            }
+        }
+        if (matter == null) matter = castMap(cloud.call(userId, "time.publishMatter", req).get("matter"));
         t.setCloudMatterId(String.valueOf(matter.get("id")));
         t.setUpdatedAt(Instant.now());
         termsRepository.save(t);
@@ -1475,6 +1465,12 @@ public class LawFirmBillingService {
             return List.of();
         }
         return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Object raw) {
+        if (!(raw instanceof Map<?, ?> m)) throw new IllegalStateException(LangText.of("云端返回格式不正确", "Unexpected cloud response"));
+        return (Map<String, Object>) m;
     }
 
     @SuppressWarnings("unchecked")

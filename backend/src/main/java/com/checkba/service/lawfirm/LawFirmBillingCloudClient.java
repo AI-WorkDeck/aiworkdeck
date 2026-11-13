@@ -2,48 +2,47 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.lawfirm;
 
-import com.checkba.service.LangText;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 桌面端调用律所云端工时汇总的薄封装：全部经 {@link LawFirmWorkflowGateway}（与云端利冲协作同一入口、同一账户凭据），
- * 不另开通道。只在本机台账（local-mode）里使用。
+ * 本机台账调用律所云端「time」功能的薄封装：经律所云端统一入口（{@link LawFirmCloudCaller}，与利冲协作同一连接与账户凭据），
+ * 不另开通道。开关本身在律所管理插件的「律所云端」页（cloud.settings.*），这里只读。
  */
 @Component
 @RequiredArgsConstructor
 public class LawFirmBillingCloudClient {
 
-    private final LawFirmWorkflowGateway gateway;
+    private final LawFirmCloudCaller caller;
 
     public Map<String, Object> call(Long userId, String action, Map<String, Object> params) {
         try {
-            return gateway.execute(userId, action, params);
+            return caller.call(userId, action, params);
         } catch (IllegalArgumentException e) {
-            // 旧版云端不认识 billingCloud* 动作时回的是利冲协作的「不支持的操作」，换成律师看得懂的说法
-            String msg = e.getMessage() == null ? "" : e.getMessage();
-            if (msg.contains("不支持的利冲协作操作") || msg.contains("Unsupported conflict collaboration action")
-                    || msg.contains("不支持的云端利冲操作")) {
-                throw new IllegalStateException(LangText.of("所连接的协作服务尚未升级到支持云端工时汇总的版本",
-                        "The connected collaboration service does not support cloud time collection yet"));
-            }
-            if (msg.contains("请连接官方账户")) {
-                throw new IllegalStateException(LangText.of("请先登录并连接官方账户，才能使用律所云端工时汇总",
-                        "Sign in and connect your official account to use cloud time collection"));
-            }
-            throw new IllegalStateException(msg);
+            // 云端的业务拒绝（权限、事项已停止接收等）在本机统一按「操作未完成」返回给界面
+            throw new IllegalStateException(e.getMessage());
         }
     }
 
-    /** 不抛异常的状态查询：没连账户、云端不可用时返回 available=false 与原因，界面照常显示本机工时。 */
+    /**
+     * 不抛异常的状态：available=false 时带原因（没连账户、协作服务太旧、网络不通）；
+     * enabled=false 时律所还没开启「计时工时汇总」，界面引导到「律所云端」页。
+     */
     public Map<String, Object> statusOrUnavailable(Long userId) {
         try {
-            Map<String, Object> s = new java.util.LinkedHashMap<>(call(userId, "billingCloudStatus", Map.of()));
-            s.put("available", true);
-            return s;
+            Map<String, Object> settings = call(userId, LawFirmCloudService.SETTINGS_GET, Map.of());
+            boolean on = settings.get("switches") instanceof Map<?, ?> sw && Boolean.TRUE.equals(sw.get("time"));
+            Map<String, Object> out = new LinkedHashMap<>();
+            if (on) out.putAll(call(userId, "time.status", Map.of()));
+            out.put("available", true);
+            out.put("enabled", on);
+            out.put("firmAdmin", settings.get("firmAdmin"));
+            out.putIfAbsent("matters", List.of());
+            return out;
         } catch (RuntimeException e) {
             return Map.of("available", false, "reason", e.getMessage() == null ? "" : e.getMessage(),
                     "enabled", false, "matters", List.of());

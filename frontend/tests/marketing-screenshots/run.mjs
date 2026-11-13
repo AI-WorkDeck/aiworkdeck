@@ -301,7 +301,7 @@ const SHOTS = [
     async prepare(page, { base, projectId }) {
       await openSettings(page, base, projectId, '团队')
       await waitText(page, '按主办律师')
-      await waitText(page, '资本市场与证券部')
+      await waitText(page, '示例资本市场部')
     },
   },
   {
@@ -360,7 +360,7 @@ const SHOTS = [
       await clickTitle(page, '律所管理')
       await waitFrameText(page, 'LF-2026-0004')
       await clickFrameText(page, '决策与业务看板')
-      await waitFrameText(page, '资本市场与证券部')
+      await waitFrameText(page, '示例资本市场部')
     },
   },
   {

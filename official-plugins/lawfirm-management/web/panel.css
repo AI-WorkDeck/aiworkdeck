@@ -543,7 +543,7 @@ table {
   font-size: 12px;
 }
 
-/* 中文可在任意字间断行：表格被压窄时「苏婉清（合伙人）」会被拆成三行。
+/* 中文可在任意字间断行：表格被压窄时「蔺若曦（合伙人）」会被拆成三行。
    短值一律不折行、由 .table-wrap 横向滚动；长文本列显式标 .cell-text 才允许折行。 */
 th,
 td {
@@ -632,3 +632,6 @@ td.cell-text {
   color: var(--awd-text-2, #555);
 }
 .hb-edit, .hb-confirm { margin-top: 8px; }
+/* 律所云端（cloud.js） */
+#cl-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
+.cl-purge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }

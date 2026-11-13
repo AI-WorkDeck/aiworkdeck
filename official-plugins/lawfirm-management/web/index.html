@@ -13,6 +13,7 @@
   <script src="expenses-l10n.js" defer></script>
   <script src="expenses.js" defer></script>
   <script src="billing.js" defer></script>
+  <script src="cloud.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -54,6 +55,8 @@
       </button>
       <button type="button" id="tab-hourly" role="tab" data-tab="hourly" aria-selected="false" aria-controls="panel-hourly" class="tab-btn">
         <span data-hb="billing.tab"></span>
+      <button type="button" id="tab-cloud" role="tab" data-tab="cloud" aria-selected="false" aria-controls="panel-cloud" class="tab-btn">
+        <span data-cl="cloud.tab"></span>
       </button>
     </nav>
   </header>
@@ -76,7 +79,7 @@
           <form id="intake-form" class="form-grid" novalidate>
             <label class="field-span-2">
               <span>案件 / 专项名称</span>
-              <input id="intake-title" name="title" type="text" placeholder="例如：华星半导体与蓝海光电专利侵权及商业秘密纠纷案" required>
+              <input id="intake-title" name="title" type="text" placeholder="例如：澜曜微电子与朗绮光电专利侵权及商业秘密纠纷案" required>
             </label>
             <label>
               <span>业务领域</span>
@@ -609,6 +612,16 @@
           </div>
         </article>
       </div>
+    <section id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" class="tab-panel" hidden>
+      <article class="card">
+        <header class="card-header">
+          <div><h2 data-cl="cloud.title"></h2><p class="hint" data-cl="cloud.intro"></p></div>
+          <button type="button" id="cl-refresh" data-cl="cloud.refresh"></button>
+        </header>
+        <p id="cl-who" class="hint"></p>
+        <p id="cl-status" class="hint" role="status" aria-live="polite"></p>
+        <div id="cl-features" class="stack-list"></div>
+      </article>
     </section>
   </main>
 </body>
