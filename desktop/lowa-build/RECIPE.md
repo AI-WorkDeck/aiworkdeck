@@ -26,7 +26,7 @@ threads (Qt `devicePixelRatio` during repaint, configmgr `mkdir`) queued behind 
 Validation (headless, heavy slot): startup smoke 80/80 (boot + first command; r8 1/55 hung, a plain rebuild
 6/55); `run.mjs` 609 passed / 0 failed; dark-page 12/12, calc-header-chrome 114, native-font-popup,
 edit-after-save, open-not-dirty, sheet-chart-ranges, ppt-precision, ppt-advanced-design, ppt-image-layout,
-impress-playback, load-rejected, sheet-precision all pass. Desktop cold-open typing A/B vs r8: pending.
+impress-playback, load-rejected, sheet-precision all pass. Desktop cold-open typing A/B vs r8 (2026-11-13, tpl-5mb.pptx, eager burst, alternating): r10 6/6 clean (no late typing, no hang); r8 5/5 valid rounds clean this time (1 round void: harness stuck at login before any open). The intermittent r8 lag did not reproduce under this load, so no lag claim for r10; r10 shows no regression.
 Builds of this recipe are not byte-reproducible (code layout differs between runs); any new binary needs the
 ≥40-boot startup smoke before publishing (`awd-worktrees/o9-lowa/tools/bootsmoke.mjs`).
 
