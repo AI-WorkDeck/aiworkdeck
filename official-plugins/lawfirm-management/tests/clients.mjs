@@ -199,6 +199,8 @@ test('host without client actions (0.85.x): Clients tab and intake picker are hi
   const sent = p.actions('submitIntake').at(-1);
   assert.equal(sent.clientName, '某委托人有限公司');
   assert.equal('clientId' in sent && sent.clientId !== undefined, false, 'old host receives the same intake payload as before');
+});
+
 test('firm cloud off or unavailable: local ledger only, with a pointer to the shared settings', async () => {
   const p = await mount({ cloud: { switches: { clients: false, time: false }, version: 0 } });
   assert.match(p.$('client-cloud-bar').textContent, /律所云端未开启/);
