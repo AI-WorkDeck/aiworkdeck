@@ -472,6 +472,7 @@
 </template>
 
 <script>
+import { formatCnyCompact } from '@/utils/cnyAmount'
 import { ICONS } from '@/config/icons.js'
 import { getPluginGlyphPaths } from '@/config/pluginIcons.js'
 import { getTeam, getProjectMembers, getCurrentUser, requestPluginIm, getLawFirmOverview } from '@/services/api.js'
@@ -572,8 +573,8 @@ export default {
       return {
         activeMatters,
         pendingClearances,
-        contractedText: this.tr('panels.pwsLfWanSuffix', `${contractedWan} 万`, { amount: contractedWan }),
-        collectedText: this.tr('panels.pwsLfWanSuffix', `${collectedWan} 万`, { amount: collectedWan }),
+        contractedText: formatCnyCompact(Number(contractedWan) * 10000, 'panels.pwsLfWanSuffix'),
+        collectedText: formatCnyCompact(Number(collectedWan) * 10000, 'panels.pwsLfWanSuffix'),
       }
     },
     ICONS() {
@@ -701,6 +702,13 @@ export default {
     },
   },
   mounted() {
+    // 律所管理插件加载样板、刷新或写入后重读了数据：左栏数字跟着更新（只在显示律所摘要时）
+    this._onLawFirmDataChanged = () => {
+      if (!this.plugin || this.plugin.pluginId !== 'lawfirm-management') return
+      clearTimeout(this._lawfirmRefreshTimer)
+      this._lawfirmRefreshTimer = setTimeout(() => this.loadLawFirmSummary(), 300)
+    }
+    uni.$on('awd:lawfirm-data-changed', this._onLawFirmDataChanged)
     this._onImDirectoryChanged = () => {
       if (this.plugin && this.plugin.pluginId === 'project-im') {
         this.loadDirectoryOnly()
@@ -740,6 +748,8 @@ export default {
     if (this.plugin.pluginId === 'project-im') this.notifyImSidebar(true)
   },
   beforeUnmount() {
+    if (this._onLawFirmDataChanged) uni.$off('awd:lawfirm-data-changed', this._onLawFirmDataChanged)
+    clearTimeout(this._lawfirmRefreshTimer)
     if (this.plugin.pluginId === 'project-im') this.notifyImSidebar(false)
     if (this._onImDirectoryChanged) uni.$off('awd:im-directory-changed', this._onImDirectoryChanged)
     if (this._onPluginStateSynced) uni.$off('awd:plugin-state-synced', this._onPluginStateSynced)

@@ -629,6 +629,7 @@
 </template>
 
 <script>
+import { formatCnyCompact } from '@/utils/cnyAmount'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
@@ -734,9 +735,9 @@ export default {
       return {
         activeMatters,
         pendingClearances,
-        totalContractedText: this.$t('team.lawfirmWanSuffix', { amount: totalContractedWan }),
-        totalBilledText: this.$t('team.lawfirmWanSuffix', { amount: totalBilledWan }),
-        totalCollectedText: this.$t('team.lawfirmWanSuffix', { amount: totalCollectedWan }),
+        totalContractedText: formatCnyCompact(Number(totalContractedWan) * 10000, 'team.lawfirmWanSuffix'),
+        totalBilledText: formatCnyCompact(Number(totalBilledWan) * 10000, 'team.lawfirmWanSuffix'),
+        totalCollectedText: formatCnyCompact(Number(totalCollectedWan) * 10000, 'team.lawfirmWanSuffix'),
         collectionRate,
       }
     },
@@ -861,9 +862,9 @@ export default {
       return res
     },
     formatLawFirmWan(cents, wan) {
-      if (wan != null && wan !== '') return this.$t('team.lawfirmWanSuffix', { amount: Number(wan).toFixed(2) })
+      if (wan != null && wan !== '') return formatCnyCompact(Number(wan) * 10000, 'team.lawfirmWanSuffix')
       const c = Number(cents || 0)
-      return this.$t('team.lawfirmWanSuffix', { amount: (c / 1000000).toFixed(2) })
+      return formatCnyCompact(c / 100, 'team.lawfirmWanSuffix')
     },
     formatLawFirmRate(rate) {
       if (rate == null || rate === '') return '-'
