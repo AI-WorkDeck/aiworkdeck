@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Penerimaan honorarium dicatat: {0} (¥{1}).",
   "panel.t.erpDone": "Rekonsiliasi sistem keuangan selesai (nomor batch: {0})",
   "panel.t.erpSynced": "{0} faktur dan catatan rekonsiliasi penerimaan disinkronkan ke antarmuka bukti pembukuan standar Kingdee/Yonyou.",
-  "panel.t.csvReady": "CSV buku besar keuangan standar telah dibuat ({0})"
+  "panel.t.csvReady": "CSV buku besar keuangan standar telah dibuat ({0})",
+  "panel.s.293": "Tingkat penagihan firma",
+  "panel.s.294": "Penerimaan diajukan",
+  "panel.s.295": "Pemeriksaan konflik dan kepatuhan otomatis",
+  "panel.s.296": "Persetujuan pengacara terkait via pesan",
+  "panel.s.297": "Tinjauan akhir komite",
+  "panel.s.298": "Benturan kepentingan langsung antara para pihak dalam sengketa yang sama atau terkait",
+  "panel.s.299": "Berhadapan dengan klien retainer firma yang masih aktif",
+  "panel.s.300": "Pihak lawan adalah mantan klien firma (perkara telah ditutup)",
+  "panel.s.301": "Tumpang tindih kepentingan yang berlawanan dengan penerimaan perkara yang masih ditinjau",
+  "panel.s.302": "Pihak lawan adalah klien (atau afiliasi grup) dalam perkara firma yang sedang berjalan",
+  "panel.s.303": "Potensi benturan kepentingan melalui afiliasi, pemegang saham pengendali, atau pihak yang bertindak bersama",
+  "panel.s.304": "Benturan langsung dua arah dengan proyek workbench yang sedang berjalan",
+  "panel.s.305": "Salah satu pihak cocok dengan klien atau target proyek workbench yang sedang berjalan"
 }

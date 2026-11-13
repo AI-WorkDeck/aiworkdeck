@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Payment recorded: {0} (¥{1}).",
   "panel.t.erpDone": "Finance system reconciliation complete (batch {0})",
   "panel.t.erpSynced": "Synced {0} invoice and collection records to the Kingdee/Yonyou voucher interface.",
-  "panel.t.csvReady": "Standard finance ledger CSV generated ({0})"
+  "panel.t.csvReady": "Standard finance ledger CSV generated ({0})",
+  "panel.s.293": "Firm billing rate",
+  "panel.s.294": "Intake submitted",
+  "panel.s.295": "Automatic conflict and compliance check",
+  "panel.s.296": "Related-lawyer clearance by message",
+  "panel.s.297": "Committee final review",
+  "panel.s.298": "Direct conflict between parties to the same or a related dispute",
+  "panel.s.299": "Adverse to a current retainer client of the firm",
+  "panel.s.300": "Counterparty is a former client of the firm (closed matter)",
+  "panel.s.301": "Adverse overlap with an intake still under review",
+  "panel.s.302": "Counterparty is a client (or group affiliate) in an active firm matter",
+  "panel.s.303": "Potential conflict through an affiliate, controlling shareholder or person acting in concert",
+  "panel.s.304": "Direct two-way conflict with an active workbench project",
+  "panel.s.305": "A party matches the client or target of an active workbench project"
 }

@@ -18,8 +18,8 @@ export function formatCnyCompact(yuan, zhKey) {
   const locale = currentLocale()
   if (!locale || locale === 'zh-CN') return t(zhKey, { amount: (amount / 10000).toFixed(2) })
   try {
-    return new Intl.NumberFormat(locale, { style: 'currency', currency: 'CNY', notation: 'compact', maximumFractionDigits: 2 }).format(amount)
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: 'CNY', notation: 'compact', maximumSignificantDigits: 3 }).format(amount)
   } catch (e) {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'CNY', notation: 'compact', maximumFractionDigits: 2 }).format(amount)
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'CNY', notation: 'compact', maximumSignificantDigits: 3 }).format(amount)
   }
 }

@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "p. ej. Zhejiang Qinghe Foods Co., Ltd. Dirección jurídica y conflicto laboral",
   "caseFieldPracticeArea": "Área de práctica",
   "caseFieldPracticeAreaPh": "p. ej. Laboral / Dirección jurídica / M&A",
-  "caseFieldDepartment": "Área de práctica",
+  "caseFieldDepartment": "Grupo de práctica",
   "caseFieldDepartmentPh": "p. ej. Societario y M&A",
   "caseFieldLeadLawyer": "Socio / abogado responsable",
   "caseFieldLeadLawyerPh": "p. ej. Lin Zhiyuan",

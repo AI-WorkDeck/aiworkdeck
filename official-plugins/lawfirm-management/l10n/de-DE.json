@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Zahlungseingang erfasst: {0} (¥{1}).",
   "panel.t.erpDone": "Abstimmung mit dem Finanzsystem abgeschlossen (Charge {0})",
   "panel.t.erpSynced": "{0} Rechnungs- und Zahlungseingangsdaten mit der Beleg-Schnittstelle von Kingdee/Yonyou synchronisiert.",
-  "panel.t.csvReady": "Standard-Finanzbuch-CSV erzeugt ({0})"
+  "panel.t.csvReady": "Standard-Finanzbuch-CSV erzeugt ({0})",
+  "panel.s.293": "Fakturierungsquote der Kanzlei",
+  "panel.s.294": "Mandatsannahme eingereicht",
+  "panel.s.295": "Automatische Kollisions- und Compliance-Prüfung",
+  "panel.s.296": "Freigabe durch betroffene Anwälte (Nachricht)",
+  "panel.s.297": "Abschließende Prüfung durch den Ausschuss",
+  "panel.s.298": "Direkter Interessenkonflikt zwischen den Parteien derselben oder einer verbundenen Streitigkeit",
+  "panel.s.299": "Gegnerschaft zu einem laufenden Dauermandanten (Retainer-Mandant) der Kanzlei",
+  "panel.s.300": "Gegenpartei ist ein ehemaliger Mandant der Kanzlei (abgeschlossenes Mandat)",
+  "panel.s.301": "Gegnerische Überschneidung mit einer noch in Prüfung befindlichen Mandatsannahme",
+  "panel.s.302": "Gegenpartei ist Mandant (oder Konzerngesellschaft) in einem laufenden Mandat der Kanzlei",
+  "panel.s.303": "Möglicher Interessenkonflikt über verbundene Unternehmen, beherrschenden Gesellschafter oder abgestimmt handelnde Personen",
+  "panel.s.304": "Direkter beidseitiger Konflikt mit einem laufenden Projekt im Workbench",
+  "panel.s.305": "Eine Partei entspricht dem Mandanten oder Zielunternehmen eines laufenden Workbench-Projekts"
 }

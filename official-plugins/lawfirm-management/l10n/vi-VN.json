@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Đã ghi nhận khoản thu phí: {0} (¥{1}).",
   "panel.t.erpDone": "Đã hoàn tất đối chiếu hệ thống tài chính (số lô: {0})",
   "panel.t.erpSynced": "Đã đồng bộ {0} bản ghi hóa đơn và đối trừ khoản thu lên giao diện chứng từ chuẩn Kingdee/Yonyou.",
-  "panel.t.csvReady": "Đã tạo CSV sổ cái tài chính chuẩn ({0})"
+  "panel.t.csvReady": "Đã tạo CSV sổ cái tài chính chuẩn ({0})",
+  "panel.s.293": "Tỷ lệ xuất hóa đơn toàn công ty",
+  "panel.s.294": "Đã nộp đề nghị tiếp nhận",
+  "panel.s.295": "Tự động kiểm tra xung đột và tuân thủ",
+  "panel.s.296": "Luật sư liên quan chấp thuận qua tin nhắn",
+  "panel.s.297": "Ủy ban duyệt lần cuối",
+  "panel.s.298": "Xung đột lợi ích trực tiếp giữa các bên trong cùng một tranh chấp hoặc tranh chấp liên quan",
+  "panel.s.299": "Đối nghịch với khách hàng tư vấn thường xuyên hiện hữu của văn phòng",
+  "panel.s.300": "Bên đối phương là khách hàng cũ của văn phòng (vụ việc đã đóng)",
+  "panel.s.301": "Chồng lấn đối nghịch với hồ sơ tiếp nhận vụ việc đang được xem xét",
+  "panel.s.302": "Bên đối phương là khách hàng (hoặc công ty liên kết cùng tập đoàn) trong vụ việc đang thực hiện của văn phòng",
+  "panel.s.303": "Xung đột lợi ích tiềm ẩn qua bên liên quan, cổ đông kiểm soát hoặc người hành động phối hợp",
+  "panel.s.304": "Xung đột trực tiếp hai chiều với dự án đang thực hiện trên bàn làm việc",
+  "panel.s.305": "Một bên trùng với khách hàng hoặc đối tượng của dự án đang thực hiện trên bàn làm việc"
 }

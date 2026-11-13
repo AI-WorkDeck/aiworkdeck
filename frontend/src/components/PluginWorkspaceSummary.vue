@@ -965,12 +965,13 @@ export default {
 .lawfirm-summary-card { display: flex; flex-direction: column; gap: 10px; margin: 10px 8px 6px; padding: 10px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2); border: 1px solid var(--awd-border-subtle); }
 .lawfirm-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .lawfirm-stat-item { padding: 8px; border-radius: var(--awd-radius-sm); background: var(--awd-surface); border: 1px solid var(--awd-border-subtle); }
-.lawfirm-stat-label { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
+/* 德文、俄文等长词在窄栏里按音节断行，不溢出卡片 */
+.lawfirm-stat-label { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); overflow-wrap: anywhere; hyphens: auto; }
 .lawfirm-stat-val { display: block; margin-top: 2px; font-size: var(--awd-font-size-reading); font-weight: 600; color: var(--awd-text); font-variant-numeric: tabular-nums; }
 .lawfirm-stat-val.warn { color: var(--awd-warning); }
 .lawfirm-stat-val.accent { color: var(--awd-accent); }
 .lawfirm-quick-jumps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.lawfirm-jump-btn { min-height: 30px; line-height: 28px; padding: 0 8px; margin: 0; font-size: var(--awd-panel-fs); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); }
+.lawfirm-jump-btn { min-height: 30px; line-height: 1.35; padding: 6px 8px; margin: 0; font-size: var(--awd-panel-fs); color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: var(--awd-radius-sm); white-space: normal; overflow-wrap: anywhere; hyphens: auto; }
 
 .pws-root {
   display: flex;
@@ -1773,8 +1774,9 @@ export default {
 .pws-workspace-link.active { background: var(--awd-panel-accent-wash); }
 .pws-workspace-link:focus-visible, .pws-about-toggle:focus-visible { outline: var(--awd-focus-width) solid var(--awd-accent-text); outline-offset: var(--awd-focus-offset); }
 .pws-workspace-glyph { width: 16px; height: 16px; flex-shrink: 0; color: var(--awd-panel-text-2); }
-.pws-workspace-label { flex: 1; min-width: 0; }
-.pws-workspace-state { flex-shrink: 0; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); }
+/* 俄文、德文等长词：两侧都允许按音节断行，不互相压住 */
+.pws-workspace-label { flex: 1; min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
+.pws-workspace-state { flex: 0 1 auto; max-width: 50%; text-align: end; color: var(--awd-panel-text-2); font-size: var(--awd-panel-fs-meta); overflow-wrap: anywhere; hyphens: auto; }
 .pws-workspace-summary .pws-section { border: 0; padding-top: var(--awd-panel-gap); }
 .pws-workspace-summary .pws-nav-item { border: 0; background: transparent; }
 .pws-workspace-summary .pws-nav-item.active { background: var(--awd-panel-accent-wash); }

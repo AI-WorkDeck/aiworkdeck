@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Incasso registrato: {0} (¥{1}).",
   "panel.t.erpDone": "Riconciliazione con il sistema finanziario completata (lotto {0})",
   "panel.t.erpSynced": "{0} fatture e incassi sincronizzati con l'interfaccia scritture Kingdee/Yonyou.",
-  "panel.t.csvReady": "CSV contabile standard generato ({0})"
+  "panel.t.csvReady": "CSV contabile standard generato ({0})",
+  "panel.s.293": "Tasso di fatturazione dello studio",
+  "panel.s.294": "Richiesta di apertura inviata",
+  "panel.s.295": "Verifica automatica di conflitti e conformità",
+  "panel.s.296": "Nulla osta degli avvocati collegati via messaggio",
+  "panel.s.297": "Revisione finale del comitato",
+  "panel.s.298": "Conflitto di interessi diretto tra le parti della stessa controversia o di una controversia connessa",
+  "panel.s.299": "Posizione contraria a un cliente con incarico di consulenza continuativa dello studio",
+  "panel.s.300": "La controparte è un ex cliente dello studio (pratica chiusa)",
+  "panel.s.301": "Sovrapposizione di interessi contrapposti con una nuova pratica ancora in fase di verifica",
+  "panel.s.302": "La controparte è cliente (o società del gruppo) in una pratica in corso dello studio",
+  "panel.s.303": "Potenziale conflitto di interessi tramite una società collegata, un socio di controllo o una persona che agisce di concerto",
+  "panel.s.304": "Conflitto diretto e reciproco con un progetto in corso del workbench",
+  "panel.s.305": "Una parte coincide con il cliente o la società target di un progetto in corso del workbench"
 }

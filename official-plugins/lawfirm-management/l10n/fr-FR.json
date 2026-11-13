@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Paiement enregistré : {0} (¥{1}).",
   "panel.t.erpDone": "Rapprochement avec le système financier terminé (lot {0})",
   "panel.t.erpSynced": "{0} factures et encaissements synchronisés avec l'interface d'écritures Kingdee/Yonyou.",
-  "panel.t.csvReady": "CSV comptable standard généré ({0})"
+  "panel.t.csvReady": "CSV comptable standard généré ({0})",
+  "panel.s.293": "Taux de facturation du cabinet",
+  "panel.s.294": "Ouverture soumise",
+  "panel.s.295": "Vérification automatique des conflits et de la conformité",
+  "panel.s.296": "Levée par les avocats concernés (message)",
+  "panel.s.297": "Examen final du comité",
+  "panel.s.298": "Conflit d'intérêts direct entre les parties à un même litige ou à un litige connexe",
+  "panel.s.299": "Action contre un client sous convention d'honoraires récurrente du cabinet",
+  "panel.s.300": "La partie adverse est un ancien client du cabinet (dossier clôturé)",
+  "panel.s.301": "Chevauchement d'intérêts adverses avec une prise de dossier en cours d'examen",
+  "panel.s.302": "La partie adverse est cliente (ou société du groupe) dans un dossier en cours du cabinet",
+  "panel.s.303": "Conflit d'intérêts potentiel via une société liée, un actionnaire de contrôle ou une personne agissant de concert",
+  "panel.s.304": "Conflit direct et réciproque avec un projet en cours de l'espace de travail",
+  "panel.s.305": "Une partie correspond au client ou à la cible d'un projet en cours de l'espace de travail"
 }

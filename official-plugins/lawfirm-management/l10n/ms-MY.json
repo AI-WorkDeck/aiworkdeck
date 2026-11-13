@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Terimaan yuran direkodkan: {0} (¥{1}).",
   "panel.t.erpDone": "Penyelarasan sistem kewangan selesai (nombor kelompok: {0})",
   "panel.t.erpSynced": "{0} rekod invois dan penyelarasan terimaan telah disegerakkan ke antara muka baucar standard Kingdee/Yonyou.",
-  "panel.t.csvReady": "CSV lejar kewangan standard telah dijana ({0})"
+  "panel.t.csvReady": "CSV lejar kewangan standard telah dijana ({0})",
+  "panel.s.293": "Kadar pengebilan firma",
+  "panel.s.294": "Pengambilan dihantar",
+  "panel.s.295": "Semakan konflik dan pematuhan automatik",
+  "panel.s.296": "Kelulusan peguam berkaitan melalui mesej",
+  "panel.s.297": "Semakan akhir jawatankuasa",
+  "panel.s.298": "Konflik kepentingan langsung antara pihak-pihak dalam pertikaian yang sama atau berkaitan",
+  "panel.s.299": "Bertentangan dengan klien retainer firma yang masih aktif",
+  "panel.s.300": "Pihak lawan ialah bekas klien firma (kes ditutup)",
+  "panel.s.301": "Pertindihan kepentingan bertentangan dengan penerimaan kes yang masih disemak",
+  "panel.s.302": "Pihak lawan ialah klien (atau afiliasi kumpulan) dalam kes firma yang sedang berjalan",
+  "panel.s.303": "Potensi konflik kepentingan melalui afiliasi, pemegang saham pengawal atau pihak yang bertindak secara bersama",
+  "panel.s.304": "Konflik langsung dua hala dengan projek workbench yang sedang berjalan",
+  "panel.s.305": "Satu pihak sepadan dengan klien atau sasaran projek workbench yang sedang berjalan"
 }

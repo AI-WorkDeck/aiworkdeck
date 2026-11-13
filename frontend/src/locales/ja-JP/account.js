@@ -341,7 +341,7 @@ export default {
   "caseFieldTitlePh": "例：浙江青禾食品株式会社 総合法務・労務紛争",
   "caseFieldPracticeArea": "取扱分野",
   "caseFieldPracticeAreaPh": "例：労務 / 総合法務 / M&A",
-  "caseFieldDepartment": "取扱分野",
+  "caseFieldDepartment": "業務区分",
   "caseFieldDepartmentPh": "例：コーポレート・M&A",
   "caseFieldLeadLawyer": "チーフパートナー / 弁護士",
   "caseFieldLeadLawyerPh": "例：山田太郎",

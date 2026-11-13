@@ -445,10 +445,10 @@ p {
   border-top: 1px dashed var(--awd-border, var(--fallback-border));
 }
 
+/* 步骤名在英文、德文、俄文等语言里比中文长得多：换行显示，不截断 */
 .step-pill {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
   padding: 5px 6px;
   border-radius: var(--awd-radius-sm, 6px);
   border: 1px solid var(--awd-border, var(--fallback-border));
@@ -703,3 +703,9 @@ td.num {
 /* 律所云端（cloud.js） */
 #cl-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
 .cl-purge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+
+/* 表格里的状态胶囊（负荷/风险）在长语言下换行，不被表格边缘截断 */
+td .badge {
+  white-space: normal;
+  min-width: 8em;
+}

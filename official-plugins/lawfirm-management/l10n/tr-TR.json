@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Ödeme kaydedildi: {0} (¥{1}).",
   "panel.t.erpDone": "Mali sistem mutabakatı tamamlandı (parti {0})",
   "panel.t.erpSynced": "{0} fatura ve tahsilat kaydı Kingdee/Yonyou kayıt arayüzüne senkronize edildi.",
-  "panel.t.csvReady": "Standart mali defter CSV'si oluşturuldu ({0})"
+  "panel.t.csvReady": "Standart mali defter CSV'si oluşturuldu ({0})",
+  "panel.s.293": "Büro faturalama oranı",
+  "panel.s.294": "Kabul başvurusu gönderildi",
+  "panel.s.295": "Otomatik çatışma ve uyum kontrolü",
+  "panel.s.296": "İlgili avukatların mesajla onayı",
+  "panel.s.297": "Komite nihai incelemesi",
+  "panel.s.298": "Aynı veya ilişkili uyuşmazlığın tarafları arasında doğrudan çıkar çatışması",
+  "panel.s.299": "Büronun mevcut sürekli danışmanlık müvekkiline karşı olma durumu",
+  "panel.s.300": "Karşı taraf, büronun eski müvekkilidir (kapanmış dosya)",
+  "panel.s.301": "İncelemedeki bir dosya kabulüyle karşıt çıkar örtüşmesi",
+  "panel.s.302": "Karşı taraf, büronun yürüttüğü bir dosyada müvekkil (veya grup şirketi)",
+  "panel.s.303": "İştirak, hâkim ortak veya birlikte hareket eden kişi aracılığıyla olası çıkar çatışması",
+  "panel.s.304": "Çalışma alanındaki yürüyen bir proje ile doğrudan iki yönlü çatışma",
+  "panel.s.305": "Bir taraf, çalışma alanındaki yürüyen bir projenin müvekkili veya hedefiyle eşleşiyor"
 }

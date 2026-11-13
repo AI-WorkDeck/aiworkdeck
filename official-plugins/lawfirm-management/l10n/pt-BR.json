@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Recebimento registrado: {0} (¥{1}).",
   "panel.t.erpDone": "Conciliação com o sistema financeiro concluída (lote {0})",
   "panel.t.erpSynced": "{0} notas e recebimentos sincronizados com a interface de lançamentos Kingdee/Yonyou.",
-  "panel.t.csvReady": "CSV financeiro padrão gerado ({0})"
+  "panel.t.csvReady": "CSV financeiro padrão gerado ({0})",
+  "panel.s.293": "Taxa de faturamento do escritório",
+  "panel.s.294": "Admissão enviada",
+  "panel.s.295": "Verificação automática de conflitos e conformidade",
+  "panel.s.296": "Liberação dos advogados relacionados por mensagem",
+  "panel.s.297": "Revisão final do comitê",
+  "panel.s.298": "Conflito de interesses direto entre as partes de uma mesma disputa ou de disputa relacionada",
+  "panel.s.299": "Adversidade em relação a cliente com contrato de assessoria jurídica continuada do escritório",
+  "panel.s.300": "A parte contrária é ex-cliente do escritório (caso encerrado)",
+  "panel.s.301": "Sobreposição adversa com uma admissão de caso ainda em análise",
+  "panel.s.302": "A parte contrária é cliente (ou afiliada do grupo) em caso em andamento do escritório",
+  "panel.s.303": "Potencial conflito de interesses por meio de afiliada, acionista controlador ou pessoa que age em conjunto",
+  "panel.s.304": "Conflito direto e bilateral com projeto em andamento na bancada de trabalho",
+  "panel.s.305": "Uma parte corresponde ao cliente ou alvo de projeto em andamento na bancada de trabalho"
 }

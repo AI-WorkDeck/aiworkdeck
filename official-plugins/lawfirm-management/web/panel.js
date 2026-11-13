@@ -169,7 +169,7 @@
     if (uiLocale === 'zh-CN') {
       return (yuan / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 万元';
     }
-    return new Intl.NumberFormat(uiLocale, { style: 'currency', currency: 'CNY', notation: 'compact', maximumFractionDigits: 2 }).format(yuan);
+    return new Intl.NumberFormat(uiLocale, { style: 'currency', currency: 'CNY', notation: 'compact', maximumSignificantDigits: 3 }).format(yuan);
   }
 
   function formatPercent(val) {

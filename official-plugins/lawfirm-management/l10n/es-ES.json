@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Cobro registrado: {0} (¥{1}).",
   "panel.t.erpDone": "Conciliación con el sistema financiero completada (lote {0})",
   "panel.t.erpSynced": "{0} facturas y cobros sincronizados con la interfaz de asientos de Kingdee/Yonyou.",
-  "panel.t.csvReady": "CSV financiero estándar generado ({0})"
+  "panel.t.csvReady": "CSV financiero estándar generado ({0})",
+  "panel.s.293": "Tasa de facturación del despacho",
+  "panel.s.294": "Solicitud de admisión enviada",
+  "panel.s.295": "Verificación automática de conflictos y cumplimiento",
+  "panel.s.296": "Autorización de abogados relacionados por mensaje",
+  "panel.s.297": "Revisión final del comité",
+  "panel.s.298": "Conflicto de intereses directo entre las partes de una misma controversia o de una controversia conexa",
+  "panel.s.299": "Actuación contra un cliente con iguala vigente del despacho",
+  "panel.s.300": "La contraparte es un antiguo cliente del despacho (asunto cerrado)",
+  "panel.s.301": "Solapamiento adverso con una solicitud de aceptación de asunto aún en revisión",
+  "panel.s.302": "La contraparte es cliente (o sociedad del grupo) en un asunto en curso del despacho",
+  "panel.s.303": "Posible conflicto de intereses por una vinculada, un accionista de control o una persona que actúa de concierto",
+  "panel.s.304": "Conflicto directo bilateral con un proyecto en curso del espacio de trabajo",
+  "panel.s.305": "Una parte coincide con el cliente o la sociedad objetivo de un proyecto en curso del espacio de trabajo"
 }

@@ -771,5 +771,18 @@
   "panel.t.collectionRecorded": "Betaling vastgelegd: {0} (¥{1}).",
   "panel.t.erpDone": "Afstemming met het financiële systeem voltooid (batch {0})",
   "panel.t.erpSynced": "{0} facturen en incasso's gesynchroniseerd met de boekingsinterface van Kingdee/Yonyou.",
-  "panel.t.csvReady": "Standaard financieel CSV-grootboek gegenereerd ({0})"
+  "panel.t.csvReady": "Standaard financieel CSV-grootboek gegenereerd ({0})",
+  "panel.s.293": "Factureringsgraad van het kantoor",
+  "panel.s.294": "Intake ingediend",
+  "panel.s.295": "Automatische conflict- en compliancecontrole",
+  "panel.s.296": "Vrijgave door betrokken advocaten (bericht)",
+  "panel.s.297": "Eindbeoordeling door de commissie",
+  "panel.s.298": "Direct belangenconflict tussen partijen in hetzelfde of een samenhangend geschil",
+  "panel.s.299": "Tegengesteld belang aan een lopende retainer-cliënt van het kantoor",
+  "panel.s.300": "Wederpartij is een voormalige cliënt van het kantoor (afgesloten zaak)",
+  "panel.s.301": "Tegengestelde overlap met een zaak die nog in intakebeoordeling is",
+  "panel.s.302": "Wederpartij is cliënt (of groepsmaatschappij) in een lopende zaak van het kantoor",
+  "panel.s.303": "Mogelijk belangenconflict via een gelieerde partij, controlerend aandeelhouder of in onderling overleg handelende persoon",
+  "panel.s.304": "Direct wederzijds conflict met een lopend project in de werkbank",
+  "panel.s.305": "Een partij komt overeen met de cliënt of het doelwit van een lopend project in de werkbank"
 }
