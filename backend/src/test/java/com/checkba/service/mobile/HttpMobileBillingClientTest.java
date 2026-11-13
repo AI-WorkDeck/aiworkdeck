@@ -382,6 +382,16 @@ class HttpMobileBillingClientTest {
     }
 
     @Test
+    @DisplayName("channel=wxpay-app：官网 503 channel_unavailable 是「没开通」，翻成 DISABLED 而不是 UNAVAILABLE")
+    void wxpayAppChannelOffIsDisabled() {
+        MobileBillingException off = assertThrows(MobileBillingException.class,
+                () -> stubbed(503, "{\"error\":\"channel_unavailable\"}").createRecharge("acct-x", 5000, "idem-app-0003",
+                        "wxpay-app", null, null));
+        assertEquals(MobileBillingKind.DISABLED, off.getKind());
+        assertEquals("channel_unavailable", off.getMachineError());
+    }
+
+    @Test
     @DisplayName("非 APP 通道：appPay 为 null")
     void otherChannelsHaveNoAppPay() {
         HttpMobileBillingClient c = stubbed(200,

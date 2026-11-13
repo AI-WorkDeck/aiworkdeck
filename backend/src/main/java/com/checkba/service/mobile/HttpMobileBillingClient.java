@@ -145,7 +145,19 @@ public class HttpMobileBillingClient implements MobileBillingClient {
         // appstore 没有一次性凭证，且建单只是「拿一个 appAccountToken」，与默认通道一样可以重试。
         boolean wxvp = "wxvp".equals(channel);
         // wxpay-app 同理可重试：同一 idempotencyKey 命中的 pending 单官网原样重发 prepay 参数。
-        JsonNode json = wxvp ? call(body) : callWithRetry(body);
+        JsonNode json;
+        try {
+            json = wxvp ? call(body) : callWithRetry(body);
+        } catch (MobileBillingException e) {
+            // 官网没配 WXPAY_APP_APPID 时回 503 channel_unavailable：这是「这条通道没开」，
+            // 不是暂时故障。翻成 DISABLED，手机端据此退回「去哪里充值」的说明，而不是「稍后再试」。
+            if ("wxpay-app".equals(channel) && "channel_unavailable".equals(e.getMachineError())) {
+                throw new MobileBillingException(MobileBillingKind.DISABLED,
+                        LangText.of("App 内微信支付暂未开通", "WeChat Pay in the app is not available yet"),
+                        e.getMachineError());
+            }
+            throw e;
+        }
         Map<String, String> appPay = null;
         if ("app".equals(json.path("present").asText(null))) {
             appPay = new LinkedHashMap<>();
