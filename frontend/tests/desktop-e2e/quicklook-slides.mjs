@@ -269,7 +269,7 @@ async function quickLook(name) {
   await page.waitForFunction(() => !!document.querySelector('.quick-look-mask'), { timeout: 10000 })
 }
 async function checkSample(src, kind) {
-  const name = 'ql-' + path.basename(src)
+  const name = 'ql-' + kind + '-' + path.basename(src)
   const r = { name, kind }
   evidence.files.push(r)
   const t0 = Date.now()
@@ -300,9 +300,19 @@ async function checkSample(src, kind) {
 try {
   await until(async () => (await fetch(base + '/api/admin/wizard')).ok, 120000, 500)
   const dir = path.join(home, 'docs'); fs.mkdirSync(dir)
-  for (const [src] of SAMPLES) fs.copyFileSync(src, path.join(dir, 'ql-' + path.basename(src)))
-  evidence.runtime = (await start('warmup')).versions
-  await openFolder(dir)
+  for (const [src, kind] of SAMPLES) fs.copyFileSync(src, path.join(dir, 'ql-' + kind + '-' + path.basename(src)))
+  // 偶发启动到 Web 登录页（同 office-interaction-latency.mjs）：重启，最多三次
+  for (let attempt = 1; ; attempt++) {
+    try {
+      evidence.runtime = (await start('warmup')).versions
+      await openFolder(dir)
+      break
+    } catch (error) {
+      log('relaunch', attempt, error.message)
+      if (child) await quit().catch(() => { try { process.kill(-child.pid, 'SIGKILL') } catch { /* gone */ } child = null })
+      if (attempt >= 3) throw error
+    }
+  }
   // 先等预热备胎就绪（与真实使用一致：打开工作台一会儿之后再按空格预览）
   await page.waitForFunction(() => (window.__checkbaActiveOverviewVm?.libreSpares || []).some(sp => !sp.file && !sp.hidden && sp.executor), { timeout: 240000, polling: 500 }).catch(() => {})
   for (const [src, kind] of SAMPLES) {

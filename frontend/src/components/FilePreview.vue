@@ -1272,6 +1272,7 @@ export default {
 
 .pptx-host {
   display: block;
+  box-sizing: border-box;
   width: 100%;
   padding: 16rpx;
 }
