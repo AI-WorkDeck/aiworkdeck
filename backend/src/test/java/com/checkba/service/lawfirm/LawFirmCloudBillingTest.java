@@ -263,6 +263,8 @@ class LawFirmCloudBillingTest {
                 "switched off: the cloud refuses new time");
         // 重新开启后再发布：旧的云端事项已删除，本机自动改为发布一条新的
         setSwitch(partner, true, false);
+        // 本机仍记着旧编号，但云端已没有这个事项：不能再显示「已发布」，否则合伙人以为同事看得到
+        assertTrue(((Map<?, ?>) act(partner, "cloudBillingStatus", Map.of()).get("published")).isEmpty());
         act(partner, "cloudBillingPublish", Map.of("intakeId", intake.getId()));
         assertNotEquals(matterId, terms.findByIntakeId(intake.getId()).orElseThrow().getCloudMatterId());
     }

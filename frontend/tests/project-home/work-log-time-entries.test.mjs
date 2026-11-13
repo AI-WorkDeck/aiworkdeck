@@ -117,3 +117,14 @@ test('a draft can be pointed at a firm cloud matter; the change is saved as a ta
   await vm.submitSelected()
   assert.match(vm.status, /teSubmittedCloud/)
 })
+
+test('when the firm has the cloud channel on, the notice is shown in addition to the toolbar and table, not instead of them', () => {
+  const tpl = SRC.slice(SRC.indexOf('<template>'), SRC.indexOf('<script>'))
+  const note = tpl.indexOf('te-cloud-note')
+  const toolbar = tpl.indexOf('te-toolbar')
+  assert.ok(note > 0 && toolbar > note)
+  // 工具栏所在块不能挂在云端提示的 v-else 分支上（staging 实测：开启云端后补录、提交按钮整块消失）
+  const between = tpl.slice(note, toolbar)
+  assert.doesNotMatch(between, /<template v-else>/)
+  assert.match(between, /<template v-if="!unavailable">/)
+})

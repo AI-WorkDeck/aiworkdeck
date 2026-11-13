@@ -1413,9 +1413,11 @@ public class LawFirmBillingService {
         access.requireFirmWide(userId);
         Map<String, Object> st = cloud == null ? Map.of("available", false) : cloud.statusOrUnavailable(userId);
         Map<String, Object> out = new LinkedHashMap<>(st);
+        // 只认云端此刻还在的事项：「关闭并删除」后本机仍留着旧编号，不能再显示成「已发布」
+        Set<String> live = cloudMatters(st).keySet();
         Map<String, Long> published = new LinkedHashMap<>();
         for (LawFirmBillingTerms t : termsRepository.findAll()) {
-            if (t.getCloudMatterId() != null) published.put(t.getCloudMatterId(), t.getIntakeId());
+            if (t.getCloudMatterId() != null && live.contains(t.getCloudMatterId())) published.put(t.getCloudMatterId(), t.getIntakeId());
         }
         out.put("published", published);
         out.put("pendingSync", entries.findByCloudSyncPendingTrue().size());

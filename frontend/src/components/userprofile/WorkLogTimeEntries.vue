@@ -16,7 +16,7 @@
       <text class="awd-set-note-title">{{ $t('account.teCloudTitle') }}</text>
       <text>{{ $t('account.teCloudNote') }}</text>
     </view>
-    <template v-else>
+    <template v-if="!unavailable">
       <view class="te-toolbar">
         <button class="awd-set-btn-primary" :disabled="busy" @tap="importFromWorkLog">{{ $t('account.teImportBtn') }}</button>
         <button class="awd-set-btn-secondary" :disabled="busy" @tap="toggleAdd">{{ $t('account.teAddBtn') }}</button>
