@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Lưu ý: tệp vẫn còn tên thật của khách hàng trong thư viện: {list}. Hãy xóa trong trình soạn thảo trước khi gửi.",
   "panel.gen.noLeaks": "Đã kiểm tra: không có tên thật của khách hàng trong thư viện xuất hiện trong tệp.",
   "panel.gen.internal": "Bản nội bộ chứa tên thật của khách hàng. Không gửi ra ngoài.",
-  "panel.gen.unknown": "Các trường giữ chỗ không nhận dạng được đã được giữ nguyên: {list}",
+  "panel.gen.unknown": "Một số ký hiệu giữ chỗ trong mẫu không thể điền (tên không xác định hoặc nằm ở vị trí không thể lặp lại) và được giữ nguyên: {list}",
   "panel.sens.heading": "Kiểm tra ẩn thông tin nhạy cảm",
   "panel.sens.hint": "Dùng công cụ Ẩn thông tin nhạy cảm trong tệp để tìm số điện thoại, số giấy tờ tùy thân, số thẻ ngân hàng và tên thật của khách hàng trong thư viện; tên luật sư và tên công ty không bị xử lý.",
   "panel.sens.preview": "Kiểm tra dữ liệu nhạy cảm",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "Hồ sơ mời thầu không có văn bản đọc được. Với tệp quét, hãy chạy OCR trước.",
   "panel.err.noRequirements": "Không tìm thấy yêu cầu về điều kiện tham dự hay tiêu chí chấm điểm nào. Hãy kiểm tra xem đây có đúng là hồ sơ mời thầu không.",
   "panel.gen.overflow": "Các bảng trên slide {list} có nhiều dòng và dù đã giảm chiều cao dòng vẫn có thể tràn ra ngoài slide. Hãy kiểm tra trong trình soạn thảo hoặc chọn ít mục hơn.",
-  "panel.hint.credentials.title": "Tài liệu gửi bên ngoài dùng nguyên tên vụ việc; nếu tên có chứa tên viết tắt của khách hàng, hãy viết lại để không thể nhận ra khách hàng."
+  "panel.hint.credentials.title": "Tài liệu gửi bên ngoài dùng nguyên tên vụ việc; nếu tên có chứa tên viết tắt của khách hàng, hãy viết lại để không thể nhận ra khách hàng.",
+  "panel.lib.confirmExport": "Thao tác này xuất toàn bộ thư viện, bao gồm tên khách hàng thật, vào thư mục \"Xuất thư viện đấu thầu\" của dự án hiện tại, nơi mọi thành viên dự án đều xem được. Vẫn xuất?",
+  "panel.lib.someClient": "một khách hàng",
+  "panel.err.cancelled": "Đã dừng.",
+  "panel.err.panel_only": "Thao tác này chỉ dùng được trong bảng \"Đấu thầu và đề xuất\"."
 }

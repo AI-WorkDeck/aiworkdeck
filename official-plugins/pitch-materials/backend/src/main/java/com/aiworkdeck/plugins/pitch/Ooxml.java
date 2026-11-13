@@ -40,7 +40,8 @@ final class Ooxml {
     static final String NOTES_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
     static final String R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     static final Pattern TOKEN = Pattern.compile("\\{\\{([^{}]{1,60})\\}\\}");
-    static final long MAX_ENTRY = 50L * 1024 * 1024;
+    static final long MAX_ENTRY = 10L * 1024 * 1024;
+    static final int MAX_ENTRIES = 5000;
     static final long MAX_TOTAL = 200L * 1024 * 1024;
 
     /** 填充用的数据：单值字段 + 列表（键都是规范中文名）。 */
@@ -67,8 +68,30 @@ final class Ooxml {
         this.tName = "t";
     }
 
+    // 数据里的花括号先换成私用区字符，填完再换回：库或招标文件里的「{{…}}」文字不会被当成占位符
+    private static final char OPEN = '\uE000';
+    private static final char CLOSE = '\uE001';
+
+    private static String escape(String v) { return v == null ? "" : v.replace('{', OPEN).replace('}', CLOSE); }
+
+    private static Data escaped(Data d) {
+        Map<String, String> sc = new LinkedHashMap<>();
+        d.scalars().forEach((k, v) -> sc.put(k, escape(v)));
+        Map<String, List<Map<String, String>>> lists = new LinkedHashMap<>();
+        d.lists().forEach((k, items) -> {
+            List<Map<String, String>> out = new ArrayList<>();
+            for (Map<String, String> it : items) {
+                Map<String, String> m = new LinkedHashMap<>();
+                it.forEach((f, v) -> m.put(f, escape(v)));
+                out.add(m);
+            }
+            lists.put(k, out);
+        });
+        return new Data(sc, lists);
+    }
+
     static Result fill(byte[] template, boolean pptx, Data data) throws Exception {
-        Ooxml engine = new Ooxml(pptx, data);
+        Ooxml engine = new Ooxml(pptx, escaped(data));
         Map<String, byte[]> parts = readZip(template);
         if (pptx ? !parts.containsKey("ppt/presentation.xml") : !parts.containsKey("word/document.xml")) {
             throw new PitchTools.Failure("template_invalid");
@@ -81,6 +104,13 @@ final class Ooxml {
                     engine.fillWordPart(doc);
                     parts.put(name, serialize(doc));
                 }
+            }
+        }
+        for (Map.Entry<String, byte[]> e : parts.entrySet()) {
+            if (!e.getKey().endsWith(".xml")) continue;
+            String xml = new String(e.getValue(), StandardCharsets.UTF_8);
+            if (xml.indexOf(OPEN) >= 0 || xml.indexOf(CLOSE) >= 0) {
+                e.setValue(xml.replace(OPEN, '{').replace(CLOSE, '}').getBytes(StandardCharsets.UTF_8));
             }
         }
         return new Result(writeZip(parts), engine.unknown, engine.overflow);
@@ -112,6 +142,8 @@ final class Ooxml {
         expandRows(root, W);
         Element body = first(root, W, "body");
         expandParagraphGroups(body != null ? body : root);
+        // 内容控件（w:sdt）里的段落组同样展开
+        for (Element sdt : list(root, W, "sdtContent")) expandParagraphGroups(sdt);
         replaceScalars(root);
     }
 
@@ -406,6 +438,14 @@ final class Ooxml {
             if (k.list() != null) return null;
             return data.scalars().getOrDefault(k.field(), "");
         });
+        // 还留着的列表占位符（放在无法复制的位置，如嵌套表格）也报给律师，不静默保留
+        for (Element t : allTexts(root)) {
+            Matcher m = TOKEN.matcher(t.getTextContent());
+            while (m.find()) {
+                Fields.Key k = Fields.resolve(m.group(1));
+                if (k != null && k.list() != null) unknown.add(m.group());
+            }
+        }
     }
 
     private interface Lookup { String get(String key); }
@@ -592,7 +632,9 @@ final class Ooxml {
                 if (e.isDirectory()) continue;
                 String name = e.getName();
                 if (name.contains("..") || name.startsWith("/")) throw new PitchTools.Failure("template_invalid");
-                byte[] bytes = readLimited(in, MAX_ENTRY);
+                if (parts.size() >= MAX_ENTRIES) throw new PitchTools.Failure("template_too_large");
+                // 媒体文件可以大，XML 部件会整份载入 DOM：单个部件不超过 10 MB
+                byte[] bytes = readLimited(in, name.endsWith(".xml") || name.endsWith(".rels") ? MAX_ENTRY : MAX_TOTAL);
                 total += bytes.length;
                 if (total > MAX_TOTAL) throw new PitchTools.Failure("template_too_large");
                 parts.put(name, bytes);

@@ -53,9 +53,10 @@ public class PitchTools implements HostAware {
             boolean zh = !text(args, "lang").toLowerCase(Locale.ROOT).startsWith("en")
                     && (text(args, "lang").isEmpty() || text(args, "lang").toLowerCase(Locale.ROOT).startsWith("zh"));
             Object data = switch (action == null ? "" : action.trim()) {
-                case "library.get" -> Map.of("library", loadLibrary(call));
-                case "library.save" -> { saveLibrary(call, args.path("library")); yield Map.of("saved", true); }
-                case "library.export" -> exportLibrary(call, zh);
+                // 对话里的调用（有 conversationId）结果会进模型：只给脱敏视图，且不许改写/导出整库（防招标文件里的注入指令）
+                case "library.get" -> Map.of("library", fromAgent(call) ? maskedLibrary(loadLibrary(call), zh) : loadLibrary(call));
+                case "library.save" -> { panelOnly(call); saveLibrary(call, args.path("library")); yield Map.of("saved", true); }
+                case "library.export" -> { panelOnly(call); yield exportLibrary(call, zh); }
                 case "matrix.get" -> { requireProject(call); yield Map.of("matrix", loadMatrix(call)); }
                 case "matrix.save" -> { requireProject(call); saveMatrix(call, args.path("matrix")); yield Map.of("saved", true); }
                 case "quote.compute" -> quoteView(Quote.compute(findQuote(call, args), zh), zh);
@@ -90,12 +91,34 @@ public class PitchTools implements HostAware {
         host.files().list(call.projectId(), null, false); // 宿主在这里核项目成员权限
     }
 
+    static boolean fromAgent(ToolCall call) { return call.conversationId() != null && !call.conversationId().isBlank(); }
+
+    private static void panelOnly(ToolCall call) {
+        if (fromAgent(call)) throw new Failure("panel_only");
+    }
+
+    /** 给模型看的库：去掉真实客户名，所有文本字段里的客户名换成对外称谓。 */
+    static ObjectNode maskedLibrary(ObjectNode lib, boolean zh) {
+        Build b = new Build(lib, JSON.createObjectNode(), null, zh);
+        ObjectNode out = lib.deepCopy();
+        ObjectNode firm = (ObjectNode) out.path("firm");
+        firm.put("intro", b.mask(text(firm, "intro")));
+        for (String s : SECTIONS) {
+            for (JsonNode it : out.path(s)) {
+                ObjectNode o = (ObjectNode) it;
+                o.remove("client");
+                for (String f : List.of("title", "summary", "amount", "bio", "content", "note")) if (o.has(f)) o.put(f, b.mask(text(o, f)));
+            }
+        }
+        return out;
+    }
+
     private String libraryKey(ToolCall call) { return "library.u" + call.userId(); }
 
     private String matrixKey(ToolCall call) { return "matrix.u" + call.userId() + ".p" + call.projectId(); }
 
     ObjectNode loadLibrary(ToolCall call) throws Exception {
-        String raw = host.settings().get(libraryKey(call));
+        String raw = readChunked(libraryKey(call));
         ObjectNode lib = raw == null || raw.isBlank() ? JSON.createObjectNode() : (ObjectNode) JSON.readTree(raw);
         return normalize(lib);
     }
@@ -126,11 +149,48 @@ public class PitchTools implements HostAware {
     private void saveLibrary(ToolCall call, JsonNode lib) throws Exception {
         String raw = JSON.writeValueAsString(normalize(lib));
         if (raw.length() > MAX_STORE_CHARS) throw new Failure("library_too_large");
-        host.settings().set(libraryKey(call), raw);
+        writeChunked(libraryKey(call), raw);
+    }
+
+    /**
+     * 设置值在服务器的 MySQL 上是 TEXT（64 KB）：按 UTF-8 字节切成 ≤ 60 KB 的段分键保存，
+     * 主键存段数（"#n"）；旧的单键值照常读取。
+     */
+    static final int CHUNK_BYTES = 60_000;
+
+    private String readChunked(String key) {
+        String head = host.settings().get(key);
+        if (head == null || !head.startsWith("#")) return head;
+        int n;
+        try { n = Integer.parseInt(head.substring(1)); } catch (NumberFormatException e) { throw new Failure("bad_library"); }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            String part = host.settings().get(key + "." + i);
+            if (part == null) throw new Failure("bad_library");
+            sb.append(part);
+        }
+        return sb.toString();
+    }
+
+    private void writeChunked(String key, String value) {
+        List<String> parts = new ArrayList<>();
+        int start = 0;
+        int bytes = 0;
+        for (int i = 0; i < value.length(); ) {
+            int cp = value.codePointAt(i);
+            int len = cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+            if (bytes + len > CHUNK_BYTES) { parts.add(value.substring(start, i)); start = i; bytes = 0; }
+            bytes += len;
+            i += Character.charCount(cp);
+        }
+        parts.add(value.substring(start));
+        // 先写各段再写段数：中途失败时主键仍指向旧的完整内容（旧段数 ≤ 新段数的部分会被覆盖，读到的是新旧混合，所以段数最后写）
+        for (int i = 0; i < parts.size(); i++) host.settings().set(key + "." + i, parts.get(i));
+        host.settings().set(key, "#" + parts.size());
     }
 
     private JsonNode loadMatrix(ToolCall call) throws Exception {
-        String raw = host.settings().get(matrixKey(call));
+        String raw = readChunked(matrixKey(call));
         return raw == null || raw.isBlank() ? JSON.nullNode() : JSON.readTree(raw);
     }
 
@@ -139,7 +199,7 @@ public class PitchTools implements HostAware {
         if (matrix.path("items").size() > 300) throw new Failure("matrix_too_large");
         String raw = JSON.writeValueAsString(matrix);
         if (raw.length() > MAX_STORE_CHARS) throw new Failure("matrix_too_large");
-        host.settings().set(matrixKey(call), raw);
+        writeChunked(matrixKey(call), raw);
     }
 
     // ------------------------------------------------------------------ 报价
@@ -245,7 +305,8 @@ public class PitchTools implements HostAware {
         out.put("fileId", info.id());
         out.put("unknownPlaceholders", filled.unknown());
         out.put("overflowSlides", filled.overflowSlides());
-        out.put("leaks", leaks);
+        // 对话里只回泄露条数，不把真实客户名交给模型
+        if (fromAgent(call)) out.put("leakCount", leaks.size()); else out.put("leaks", leaks);
         out.put("missingAliases", build.missingAliases);
         out.put("quote", build.quoteView);
         return out;

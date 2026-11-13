@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Attenzione: nel file compaiono ancora nomi reali di clienti presenti nella libreria: {list}. Li rimuova nell'editor prima dell'invio.",
   "panel.gen.noLeaks": "Verificato: nessun nome reale di cliente presente nella libreria compare nel file.",
   "panel.gen.internal": "Versione interna con i nomi reali dei clienti. Non inviare all'esterno.",
-  "panel.gen.unknown": "I segnaposto non riconosciuti sono stati lasciati invariati: {list}",
+  "panel.gen.unknown": "Alcuni segnaposto del modello non sono stati compilati (nome sconosciuto o posizione non ripetibile) e sono stati lasciati invariati: {list}",
   "panel.sens.heading": "Verifica di anonimizzazione",
   "panel.sens.hint": "Usa il motore di Anonimizzazione file per individuare numeri di telefono, di documento d'identità e di carta bancaria e i nomi reali dei clienti presenti nella libreria; i nomi di avvocati e società non vengono toccati.",
   "panel.sens.preview": "Verifica dati sensibili",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "Il bando non contiene testo leggibile. Esegua prima l'OCR sui file scansionati.",
   "panel.err.noRequirements": "Non sono stati trovati requisiti di partecipazione né criteri di valutazione. Verifichi che sia la documentazione di gara.",
   "panel.gen.overflow": "Le tabelle della slide {list} hanno molte righe e, anche riducendone l'altezza, potrebbero uscire dalla slide. Controllale nell'editor oppure seleziona meno voci.",
-  "panel.hint.credentials.title": "I materiali esterni usano il nome della pratica così com'è; se contiene una forma abbreviata del nome del cliente, riformulalo in modo che il cliente non sia identificabile."
+  "panel.hint.credentials.title": "I materiali esterni usano il nome della pratica così com'è; se contiene una forma abbreviata del nome del cliente, riformulalo in modo che il cliente non sia identificabile.",
+  "panel.lib.confirmExport": "Verrà esportata l'intera libreria, compresi i nomi reali dei clienti, nella cartella \"Esportazioni libreria gare\" del progetto corrente, visibile a tutti i membri del progetto. Esportare comunque?",
+  "panel.lib.someClient": "un cliente",
+  "panel.err.cancelled": "Interrotto.",
+  "panel.err.panel_only": "Questa azione è disponibile solo nel pannello \"Gare d'appalto e proposte\"."
 }

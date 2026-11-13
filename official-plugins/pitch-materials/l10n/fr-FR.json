@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Attention : des noms de clients réels issus de la bibliothèque figurent encore dans le fichier : {list}. Supprimez-les dans l'éditeur avant l'envoi.",
   "panel.gen.noLeaks": "Vérifié : aucun nom de client réel issu de la bibliothèque n'apparaît dans le fichier.",
   "panel.gen.internal": "Version interne contenant les vrais noms de clients. Ne pas envoyer à l'extérieur.",
-  "panel.gen.unknown": "Les champs non reconnus ont été laissés tels quels : {list}",
+  "panel.gen.unknown": "Certains champs réservés du modèle n'ont pas pu être renseignés (nom inconnu ou emplacement non répétable) et ont été laissés tels quels : {list}",
   "panel.sens.heading": "Contrôle d'anonymisation",
   "panel.sens.hint": "Utilise le moteur d'Anonymisation de fichiers pour repérer les numéros de téléphone, de pièce d'identité et de carte bancaire ainsi que les vrais noms de clients de la bibliothèque ; les noms d'avocats et de sociétés ne sont pas modifiés.",
   "panel.sens.preview": "Rechercher les données sensibles",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "L'appel d'offres ne contient aucun texte lisible. Lancez d'abord la reconnaissance de texte (OCR) sur les fichiers numérisés.",
   "panel.err.noRequirements": "Aucune condition de participation ni aucun critère de notation n'a été trouvé. Vérifiez qu'il s'agit bien du dossier d'appel d'offres.",
   "panel.gen.overflow": "Les tableaux de la diapositive {list} comportent beaucoup de lignes et peuvent encore dépasser de la diapositive malgré la réduction de la hauteur des lignes. Vérifiez-les dans l'éditeur ou sélectionnez moins d'entrées.",
-  "panel.hint.credentials.title": "Les documents destinés à l'extérieur reprennent tel quel l'intitulé du dossier ; s'il contient une forme abrégée du nom du client, reformulez-le afin que le client ne soit pas identifiable."
+  "panel.hint.credentials.title": "Les documents destinés à l'extérieur reprennent tel quel l'intitulé du dossier ; s'il contient une forme abrégée du nom du client, reformulez-le afin que le client ne soit pas identifiable.",
+  "panel.lib.confirmExport": "Cela exporte toute la bibliothèque, y compris les noms réels des clients, dans le dossier « Exports de la bibliothèque d'appels d'offres » du projet actuel, visible par tous les membres du projet. Exporter quand même ?",
+  "panel.lib.someClient": "un client",
+  "panel.err.cancelled": "Arrêté.",
+  "panel.err.panel_only": "Cette action n'est disponible que dans le panneau « Appels d'offres et propositions »."
 }

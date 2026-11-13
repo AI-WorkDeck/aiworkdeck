@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Warning: real client names from the library still appear in the file: {list}. Remove them in the editor before sending.",
   "panel.gen.noLeaks": "Checked: no real client name from the library appears in the file.",
   "panel.gen.internal": "Internal version with real client names. Do not send out.",
-  "panel.gen.unknown": "Unrecognised placeholders were left as they are: {list}",
+  "panel.gen.unknown": "Some template placeholders could not be filled (unknown name or in a position that cannot repeat) and were left as they are: {list}",
   "panel.sens.heading": "Desensitization check",
   "panel.sens.hint": "Uses the File Desensitization engine to find phone numbers, ID and bank card numbers and the library's real client names; lawyer and company names are left alone.",
   "panel.sens.preview": "Check sensitive data",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "The tender has no readable text. Run OCR on scanned files first.",
   "panel.err.noRequirements": "No eligibility requirements or scoring criteria were found. Check that this is the tender document.",
   "panel.gen.overflow": "The tables on slide {list} have many rows and may still run off the slide after the rows were shortened. Check them in the editor or select fewer entries.",
-  "panel.hint.credentials.title": "Outward materials use the matter name as is; if it contains a short form of the client name, rewrite it so the client is not identifiable."
+  "panel.hint.credentials.title": "Outward materials use the matter name as is; if it contains a short form of the client name, rewrite it so the client is not identifiable.",
+  "panel.lib.confirmExport": "This exports the whole library, including real client names, into the project's \"Pitch library exports\" folder, where every project member can see it. Export anyway?",
+  "panel.lib.someClient": "a client",
+  "panel.err.cancelled": "Stopped.",
+  "panel.err.panel_only": "This action is only available in the Bids and Proposals panel."
 }

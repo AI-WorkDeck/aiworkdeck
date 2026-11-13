@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Warnung: Klarnamen von Mandanten aus der Bibliothek erscheinen noch in der Datei: {list}. Entfernen Sie diese im Editor, bevor Sie die Datei versenden.",
   "panel.gen.noLeaks": "Geprüft: Kein Klarname eines Mandanten aus der Bibliothek erscheint in der Datei.",
   "panel.gen.internal": "Interne Fassung mit Klarnamen von Mandanten. Nicht versenden.",
-  "panel.gen.unknown": "Nicht erkannte Platzhalter wurden unverändert belassen: {list}",
+  "panel.gen.unknown": "Einige Platzhalter in der Vorlage konnten nicht befüllt werden (unbekannter Name oder an einer Stelle, die sich nicht wiederholen lässt) und blieben unverändert: {list}",
   "panel.sens.heading": "Anonymisierungsprüfung",
   "panel.sens.hint": "Verwendet die Engine der Dateianonymisierung, um Telefonnummern, Ausweis- und Bankkartennummern sowie die Klarnamen von Mandanten aus der Bibliothek zu finden; Namen von Anwälten und Unternehmen bleiben unberührt.",
   "panel.sens.preview": "Auf sensible Daten prüfen",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "Die Ausschreibung enthält keinen lesbaren Text. Führen Sie bei gescannten Dateien zuerst OCR aus.",
   "panel.err.noRequirements": "Es wurden keine Eignungsanforderungen oder Zuschlagskriterien gefunden. Prüfen Sie, ob es sich um die Ausschreibungsunterlagen handelt.",
   "panel.gen.overflow": "Die Tabellen auf Folie {list} haben viele Zeilen und können trotz verringerter Zeilenhöhe über die Folie hinausragen. Prüfen Sie sie im Editor oder wählen Sie weniger Einträge aus.",
-  "panel.hint.credentials.title": "Externe Unterlagen verwenden die Bezeichnung der Angelegenheit unverändert; enthält sie eine Kurzform des Mandantennamens, formulieren Sie sie so um, dass der Mandant nicht erkennbar ist."
+  "panel.hint.credentials.title": "Externe Unterlagen verwenden die Bezeichnung der Angelegenheit unverändert; enthält sie eine Kurzform des Mandantennamens, formulieren Sie sie so um, dass der Mandant nicht erkennbar ist.",
+  "panel.lib.confirmExport": "Dies exportiert die gesamte Bibliothek einschließlich der echten Mandantennamen in den Ordner „Export Angebotsbibliothek“ des aktuellen Projekts, wo ihn alle Projektmitglieder sehen können. Trotzdem exportieren?",
+  "panel.lib.someClient": "ein Mandant",
+  "panel.err.cancelled": "Angehalten.",
+  "panel.err.panel_only": "Diese Aktion ist nur im Bereich „Ausschreibungen und Angebote“ verfügbar."
 }

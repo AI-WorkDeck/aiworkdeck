@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Waarschuwing: echte cliëntnamen uit de bibliotheek komen nog in het bestand voor: {list}. Verwijder ze in de editor voordat u het verstuurt.",
   "panel.gen.noLeaks": "Gecontroleerd: er komt geen echte cliëntnaam uit de bibliotheek in het bestand voor.",
   "panel.gen.internal": "Interne versie met echte cliëntnamen. Niet naar buiten sturen.",
-  "panel.gen.unknown": "Niet-herkende plaatshouders zijn ongewijzigd gelaten: {list}",
+  "panel.gen.unknown": "Sommige plaatshouders in de sjabloon konden niet worden ingevuld (onbekende naam of op een plek die zich niet kan herhalen) en zijn ongewijzigd gelaten: {list}",
   "panel.sens.heading": "Anonimiseringscontrole",
   "panel.sens.hint": "Gebruikt de engine van Bestandsanonimisering om telefoonnummers, identiteitsbewijs- en bankpasnummers en de echte cliëntnamen uit de bibliotheek te vinden; namen van advocaten en bedrijven blijven ongemoeid.",
   "panel.sens.preview": "Gevoelige gegevens controleren",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "De aanbesteding bevat geen leesbare tekst. Voer eerst OCR uit op gescande bestanden.",
   "panel.err.noRequirements": "Er zijn geen geschiktheidseisen of gunningscriteria gevonden. Controleer of dit het aanbestedingsdocument is.",
   "panel.gen.overflow": "De tabellen op dia {list} hebben veel rijen en kunnen ondanks de verkleinde rijhoogte nog buiten de dia vallen. Controleer ze in de editor of selecteer minder items.",
-  "panel.hint.credentials.title": "Extern materiaal gebruikt de naam van de zaak ongewijzigd; als die een afkorting van de naam van de cliënt bevat, herschrijf deze dan zodat de cliënt niet herkenbaar is."
+  "panel.hint.credentials.title": "Extern materiaal gebruikt de naam van de zaak ongewijzigd; als die een afkorting van de naam van de cliënt bevat, herschrijf deze dan zodat de cliënt niet herkenbaar is.",
+  "panel.lib.confirmExport": "Hiermee wordt de hele bibliotheek, inclusief de echte cliëntnamen, geëxporteerd naar de map \"Export aanbestedingsbibliotheek\" van het huidige project, waar alle projectleden de bestanden kunnen zien. Toch exporteren?",
+  "panel.lib.someClient": "een cliënt",
+  "panel.err.cancelled": "Gestopt.",
+  "panel.err.panel_only": "Deze actie is alleen beschikbaar in het paneel \"Aanbestedingen en offertes\"."
 }

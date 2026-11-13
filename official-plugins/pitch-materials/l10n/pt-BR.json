@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Atenção: nomes reais de clientes da biblioteca ainda aparecem no arquivo: {list}. Remova-os no editor antes de enviar.",
   "panel.gen.noLeaks": "Verificado: nenhum nome real de cliente da biblioteca aparece no arquivo.",
   "panel.gen.internal": "Versão interna com nomes reais de clientes. Não enviar para fora.",
-  "panel.gen.unknown": "Campos não reconhecidos foram mantidos como estão: {list}",
+  "panel.gen.unknown": "Alguns marcadores do modelo não puderam ser preenchidos (nome desconhecido ou em posição que não pode se repetir) e foram mantidos como estão: {list}",
   "panel.sens.heading": "Verificação de anonimização",
   "panel.sens.hint": "Usa o mecanismo de Anonimização de arquivos para encontrar números de telefone, de documento de identidade e de cartão bancário e os nomes reais de clientes da biblioteca; nomes de advogados e de empresas não são alterados.",
   "panel.sens.preview": "Verificar dados sensíveis",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "O edital não tem texto legível. Execute primeiro o OCR nos arquivos digitalizados.",
   "panel.err.noRequirements": "Não foram encontrados requisitos de habilitação nem critérios de pontuação. Verifique se este é o edital.",
   "panel.gen.overflow": "As tabelas do slide {list} têm muitas linhas e, mesmo com a altura reduzida, ainda podem ultrapassar o slide. Verifique-as no editor ou selecione menos itens.",
-  "panel.hint.credentials.title": "Os materiais externos usam o nome do caso exatamente como está; se ele contiver uma forma abreviada do nome do cliente, reescreva-o para que o cliente não seja identificável."
+  "panel.hint.credentials.title": "Os materiais externos usam o nome do caso exatamente como está; se ele contiver uma forma abreviada do nome do cliente, reescreva-o para que o cliente não seja identificável.",
+  "panel.lib.confirmExport": "Isto exporta a biblioteca inteira, incluindo os nomes reais dos clientes, para a pasta \"Exportações da biblioteca de licitações\" do projeto atual, onde todos os membros do projeto poderão vê-la. Exportar mesmo assim?",
+  "panel.lib.someClient": "um cliente",
+  "panel.err.cancelled": "Interrompido.",
+  "panel.err.panel_only": "Esta ação só está disponível no painel \"Licitações e propostas\"."
 }

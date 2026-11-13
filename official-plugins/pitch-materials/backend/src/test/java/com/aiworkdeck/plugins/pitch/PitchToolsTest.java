@@ -58,6 +58,49 @@ class PitchToolsTest {
     }
 
     @Test
+    void agentCallsGetMaskedLibraryAndCannotRewriteIt() throws Exception {
+        fake.call = new com.checkba.plugin.api.ToolCall(7L, "conv-1", 3L, null);
+        JsonNode lib = call("library.get", "{}").path("data").path("library");
+        String dump = lib.toString();
+        assertFalse(dump.contains("江岭市城市发展投资集团有限公司"), dump);
+        assertFalse(lib.path("credentials").get(0).has("client"));
+        assertEquals("panel_only", call("library.save", "{\"library\":{}}").path("code").asText());
+        assertEquals("panel_only", call("library.export", "{}").path("code").asText());
+        JsonNode g = call("generate", genArgs("docx", "sample", true)).path("data");
+        assertFalse(g.has("leaks"));
+        assertEquals(0, g.path("leakCount").asInt());
+        fake.call = new com.checkba.plugin.api.ToolCall(7L, null, 3L, null);
+        assertEquals(10, call("library.get", "{}").path("data").path("library").path("credentials").size());
+    }
+
+    @Test
+    void largeLibrariesAreStoredInChunks() throws Exception {
+        JsonNode lib = PitchTools.JSON.readTree(Files.readString(FIX.resolve("library-qiheng.json")));
+        com.fasterxml.jackson.databind.node.ArrayNode creds = (com.fasterxml.jackson.databind.node.ArrayNode) lib.path("credentials");
+        for (int i = 0; i < 300; i++) creds.add(((ObjectNode) creds.get(i % 10).deepCopy()).put("id", "x" + i));
+        ObjectNode args = PitchTools.JSON.createObjectNode();
+        args.set("library", lib);
+        assertTrue(call("library.save", args).path("success").asBoolean());
+        assertTrue(fake.settings.get("library.u3").startsWith("#"));
+        assertTrue(fake.settings.entrySet().stream().filter(e -> e.getKey().startsWith("library.u3."))
+                .allMatch(e -> e.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= PitchTools.CHUNK_BYTES));
+        assertEquals(310, call("library.get", "{}").path("data").path("library").path("credentials").size());
+    }
+
+    @Test
+    void dataBracesAreNotTreatedAsPlaceholders() throws Exception {
+        JsonNode lib = call("library.get", "{}").path("data").path("library");
+        ((ObjectNode) lib.path("credentials").get(0)).put("summary", "见{{律所名称}}与{{foo}}");
+        ObjectNode args = PitchTools.JSON.createObjectNode();
+        args.set("library", lib);
+        call("library.save", args);
+        JsonNode r = call("generate", genArgs("docx", "sample", true));
+        assertEquals(0, r.path("data").path("unknownPlaceholders").size(), r.toString());
+        String text = Ooxml.text(fake.read(r.path("data").path("path").asText()), false);
+        assertTrue(text.contains("见{{律所名称}}与{{foo}}"));
+    }
+
+    @Test
     void libraryIsPerUser() throws Exception {
         assertEquals(10, call("library.get", "{}").path("data").path("library").path("credentials").size());
         fake.call = new com.checkba.plugin.api.ToolCall(7L, null, 4L, null);

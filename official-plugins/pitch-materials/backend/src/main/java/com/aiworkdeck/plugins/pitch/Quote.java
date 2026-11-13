@@ -45,6 +45,7 @@ final class Quote {
             lines.add(new Line(String.valueOf(++n), label, basis, amount));
         }
         if (lines.isEmpty()) throw new PitchTools.Failure("quote_empty");
+        if (subtotal >= MAX_CENTS) throw new PitchTools.Failure("bad_amount", "subtotal");
         BigDecimal pct = optionalDecimal(PitchTools.text(q, "discountPct"), "discountPct");
         if (pct.signum() < 0 || pct.compareTo(BigDecimal.valueOf(100)) >= 0) throw new PitchTools.Failure("bad_amount", "discountPct");
         long discount = BigDecimal.valueOf(subtotal).multiply(pct).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP).longValueExact();
@@ -117,9 +118,12 @@ final class Quote {
     }
 
     static String money(long cents, boolean symbol) {
-        String s = String.format("%,d.%02d", cents / 100, cents % 100);
+        String s = String.format(java.util.Locale.ROOT, "%,d.%02d", cents / 100, cents % 100);
         return symbol ? "¥" + s : s;
     }
+
+    /** 大写金额只写到千亿位：合计须小于 1 万亿元。 */
+    static final long MAX_CENTS = 1_000_000_000_000L * 100;
 
     private static final String DIGITS = "零壹贰叁肆伍陆柒捌玖";
     private static final String[] SMALL = {"", "拾", "佰", "仟"};

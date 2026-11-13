@@ -50,6 +50,15 @@ class QuoteTest {
     }
 
     @Test
+    void moneyIgnoresJvmLocale() {
+        java.util.Locale old = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(java.util.Locale.GERMANY);
+            assertEquals("¥36,000,000.05", Quote.money(3600000005L, true));
+        } finally { java.util.Locale.setDefault(old); }
+    }
+
+    @Test
     void rejectsBadInput() throws Exception {
         PitchTools.Failure f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree(
                 "{\"items\":[{\"label\":\"x\",\"kind\":\"fixed\",\"amount\":\"30万\"}]}"), true));
@@ -57,6 +66,9 @@ class QuoteTest {
         f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree(
                 "{\"items\":[{\"label\":\"x\",\"kind\":\"hourly\",\"title\":\"顾问\",\"hours\":\"3\"}]}"), true));
         assertEquals("quote_rate_missing", f.code);
+        f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree(
+                "{\"items\":[{\"label\":\"x\",\"kind\":\"fixed\",\"amount\":\"1000000000000\"}]}"), true));
+        assertEquals("bad_amount", f.code);
         f = assertThrows(PitchTools.Failure.class, () -> Quote.compute(PitchTools.JSON.readTree("{\"items\":[]}"), true));
         assertEquals("quote_empty", f.code);
     }

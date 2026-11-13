@@ -171,7 +171,7 @@
   "panel.gen.leaks": "注意：文件里仍出现库中的真实客户名：{list}。请在编辑器里改掉后再外发。",
   "panel.gen.noLeaks": "已检查：库里的真实客户名未出现在文件中。",
   "panel.gen.internal": "所内版本：含真实客户名，不要外发。",
-  "panel.gen.unknown": "模板里有未识别的占位符，已原样保留：{list}",
+  "panel.gen.unknown": "模板里有未能填充的占位符（写法不对或放在无法复制的位置），已原样保留：{list}",
   "panel.sens.heading": "文件脱敏复查",
   "panel.sens.hint": "调用「文件脱敏」引擎，检查手机号、证件号、银行卡等敏感信息和库里的真实客户名；律师姓名与公司名不作处理。",
   "panel.sens.preview": "检查敏感信息",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "招标文件没有可读取的文字。扫描件请先做 OCR。",
   "panel.err.noRequirements": "没有从文件里抽取到资格要求或评分项，请确认选的是招标文件。",
   "panel.gen.overflow": "第 {list} 页的表格条目较多，已压低行高仍可能超出页面，请在编辑器里检查或减少所选条目。",
-  "panel.hint.credentials.title": "对外材料会直接使用项目名称；名称里如含客户简称，请改成不暴露客户的写法。"
+  "panel.hint.credentials.title": "对外材料会直接使用项目名称；名称里如含客户简称，请改成不暴露客户的写法。",
+  "panel.lib.confirmExport": "导出的是整个库，包括真实客户名，会写进当前项目的「投标库导出」文件夹，项目成员都能看到。确定导出？",
+  "panel.lib.someClient": "某客户",
+  "panel.err.cancelled": "已停止。",
+  "panel.err.panel_only": "这个操作只能在「投标与提案」面板里进行。"
 }

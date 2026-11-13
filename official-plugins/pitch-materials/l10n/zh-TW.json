@@ -171,7 +171,7 @@
   "panel.gen.leaks": "注意：檔案裡仍出現庫中的真實客戶名：{list}。請在編輯器裡改掉後再對外寄送。",
   "panel.gen.noLeaks": "已檢查：庫裡的真實客戶名未出現在檔案中。",
   "panel.gen.internal": "所內版本：含真實客戶名，不要對外寄送。",
-  "panel.gen.unknown": "範本裡有無法辨識的預留位置，已原樣保留：{list}",
+  "panel.gen.unknown": "範本裡有未能填入的預留位置（寫法不對或放在無法複製的位置），已原樣保留：{list}",
   "panel.sens.heading": "檔案去識別化複查",
   "panel.sens.hint": "呼叫「檔案去識別化」引擎，檢查手機號碼、證件號碼、銀行卡號等敏感資訊和庫裡的真實客戶名；律師姓名與公司名稱不作處理。",
   "panel.sens.preview": "檢查敏感資訊",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "招標文件沒有可讀取的文字。掃描檔請先做 OCR。",
   "panel.err.noRequirements": "沒有從檔案裡擷取到資格要求或評分項，請確認選的是招標文件。",
   "panel.gen.overflow": "第 {list} 頁的表格項目較多，已壓低列高仍可能超出頁面，請在編輯器中檢查或減少所選項目。",
-  "panel.hint.credentials.title": "對外資料會直接使用專案名稱；名稱中如含客戶簡稱，請改成不會洩露客戶的寫法。"
+  "panel.hint.credentials.title": "對外資料會直接使用專案名稱；名稱中如含客戶簡稱，請改成不會洩露客戶的寫法。",
+  "panel.lib.confirmExport": "匯出的是整個庫，包括真實客戶名，會寫進目前專案的「投標庫匯出」資料夾，專案成員都看得到。確定匯出？",
+  "panel.lib.someClient": "某客戶",
+  "panel.err.cancelled": "已停止。",
+  "panel.err.panel_only": "這個操作只能在「投標與提案」面板裡進行。"
 }

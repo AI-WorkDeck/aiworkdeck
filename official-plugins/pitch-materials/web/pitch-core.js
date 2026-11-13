@@ -230,21 +230,21 @@
   }
 
   // 简称若出现在任何对外称谓里（如「城市发展」之于「某市属城市发展平台公司」）就不用，免得把称谓本身改坏
-  function aliasPairs(lib) {
+  function aliasPairs(lib, fallback) {
     const pairs = [];
     const aliases = lib.credentials.map((c) => str(c.clientAlias)).filter(Boolean);
     lib.credentials.forEach((c) => {
       const name = str(c.client);
       if (name.length < 2 || name === str(c.clientAlias)) return;
       nameVariants(name).filter((v) => v === name || !aliases.some((a) => a.includes(v)))
-        .forEach((v) => pairs.push([v, str(c.clientAlias) || '某客户']));
+        .forEach((v) => pairs.push([v, str(c.clientAlias) || fallback || '某客户']));
     });
     return pairs.sort((a, b) => b[0].length - a[0].length);
   }
 
-  function maskClients(lib, text) {
+  function maskClients(lib, text, fallback) {
     let s = str(text);
-    aliasPairs(lib).forEach(([name, alias]) => { s = s.split(name).join(alias); });
+    aliasPairs(lib, fallback).forEach(([name, alias]) => { s = s.split(name).join(alias); });
     return s;
   }
 
@@ -366,17 +366,18 @@
 
   // ---------- 导出 Excel ----------
 
-  function exportSheets(matrix, library, t) {
+  function exportSheets(matrix, library, t, locale) {
     const lib = normalizeLibrary(library);
     const names = new Map([['firm', lib.firm.name]]);
-    lib.credentials.forEach((c) => names.set(c.id, maskClients(lib, c.title)));
+    lib.credentials.forEach((c) => names.set(c.id, maskClients(lib, c.title, t('panel.lib.someClient'))));
     lib.lawyers.forEach((l) => names.set(l.id, l.name));
     lib.qualifications.forEach((q) => names.set(q.id, q.name));
     lib.services.forEach((s) => names.set(s.id, s.title));
+    const sep = /^(zh|ja)/.test(String(locale || 'zh-CN')) ? '；' : '; ';
     const rows = [[t('panel.col.no'), t('panel.col.kind'), t('panel.col.requirement'), t('panel.col.score'), t('panel.col.status'),
       t('panel.col.evidence'), t('panel.col.note'), t('panel.col.gap'), t('panel.col.source')]];
     ((matrix && matrix.items) || []).forEach((it, i) => rows.push([String(i + 1), t('panel.kind.' + it.kind), it.text, it.score || '',
-      t('panel.status.' + it.status), (it.evidence || []).map((id) => names.get(id) || id).join('；'), it.note || '', it.gap || '',
+      t('panel.status.' + it.status), (it.evidence || []).map((id) => names.get(id) || id).join(sep), it.note || '', it.gap || '',
       it.source ? it.source.excerpt : t('panel.matrix.unverified')]));
     return [{ name: t('panel.export.sheet'), rows }];
   }

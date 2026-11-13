@@ -171,7 +171,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "تنبيه: ما زالت الأسماء الحقيقية للعملاء من المكتبة تظهر في الملف: {list}. احذفها في المحرر قبل الإرسال.",
     "panel.gen.noLeaks": "تم الفحص: لا يظهر في الملف أي اسم حقيقي لعميل من المكتبة.",
     "panel.gen.internal": "نسخة داخلية تتضمن الأسماء الحقيقية للعملاء. لا ترسلها إلى الخارج.",
-    "panel.gen.unknown": "تُركت العناصر النائبة غير المعروفة كما هي: {list}",
+    "panel.gen.unknown": "تعذّر ملء بعض العناصر النائبة في النموذج (اسم غير معروف أو في موضع لا يمكن تكراره) وتُركت كما هي: {list}",
     "panel.sens.heading": "فحص إخفاء البيانات الحساسة",
     "panel.sens.hint": "يستخدم محرك إخفاء البيانات الحساسة في الملفات لاكتشاف أرقام الهواتف وأرقام الهوية والبطاقات المصرفية والأسماء الحقيقية للعملاء في المكتبة؛ ولا تُعالج أسماء المحامين والشركات.",
     "panel.sens.preview": "فحص البيانات الحساسة",
@@ -207,7 +207,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "لا يحتوي ملف المناقصة على نص قابل للقراءة. شغّل التعرف الضوئي على الحروف (OCR) أولاً على الملفات الممسوحة ضوئياً.",
     "panel.err.noRequirements": "لم يُعثر على شروط أهلية أو معايير تقييم. تأكد من أن هذا هو ملف المناقصة.",
     "panel.gen.overflow": "الجداول في الشريحة {list} تحتوي على صفوف كثيرة وقد تتجاوز حدود الشريحة حتى بعد تقليص ارتفاع الصفوف. يرجى مراجعتها في المحرر أو تحديد عدد أقل من البنود.",
-    "panel.hint.credentials.title": "تستخدم المواد الموجهة إلى الخارج اسم القضية كما هو؛ وإذا تضمن الاسم اختصاراً لاسم العميل، فأعد صياغته بحيث لا يمكن التعرف على العميل."
+    "panel.hint.credentials.title": "تستخدم المواد الموجهة إلى الخارج اسم القضية كما هو؛ وإذا تضمن الاسم اختصاراً لاسم العميل، فأعد صياغته بحيث لا يمكن التعرف على العميل.",
+    "panel.lib.confirmExport": "سيصدّر هذا المكتبة كاملة، بما في ذلك أسماء العملاء الحقيقية، إلى مجلد \"صادرات مكتبة المناقصات\" في المشروع الحالي، وسيراه جميع أعضاء المشروع. هل تريد التصدير؟",
+    "panel.lib.someClient": "أحد العملاء",
+    "panel.err.cancelled": "تم الإيقاف.",
+    "panel.err.panel_only": "هذا الإجراء متاح فقط في لوحة «المناقصات والعروض»."
   },
   "de-DE": {
     "panel.title": "Ausschreibungen und Angebote",
@@ -378,7 +382,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Warnung: Klarnamen von Mandanten aus der Bibliothek erscheinen noch in der Datei: {list}. Entfernen Sie diese im Editor, bevor Sie die Datei versenden.",
     "panel.gen.noLeaks": "Geprüft: Kein Klarname eines Mandanten aus der Bibliothek erscheint in der Datei.",
     "panel.gen.internal": "Interne Fassung mit Klarnamen von Mandanten. Nicht versenden.",
-    "panel.gen.unknown": "Nicht erkannte Platzhalter wurden unverändert belassen: {list}",
+    "panel.gen.unknown": "Einige Platzhalter in der Vorlage konnten nicht befüllt werden (unbekannter Name oder an einer Stelle, die sich nicht wiederholen lässt) und blieben unverändert: {list}",
     "panel.sens.heading": "Anonymisierungsprüfung",
     "panel.sens.hint": "Verwendet die Engine der Dateianonymisierung, um Telefonnummern, Ausweis- und Bankkartennummern sowie die Klarnamen von Mandanten aus der Bibliothek zu finden; Namen von Anwälten und Unternehmen bleiben unberührt.",
     "panel.sens.preview": "Auf sensible Daten prüfen",
@@ -414,7 +418,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "Die Ausschreibung enthält keinen lesbaren Text. Führen Sie bei gescannten Dateien zuerst OCR aus.",
     "panel.err.noRequirements": "Es wurden keine Eignungsanforderungen oder Zuschlagskriterien gefunden. Prüfen Sie, ob es sich um die Ausschreibungsunterlagen handelt.",
     "panel.gen.overflow": "Die Tabellen auf Folie {list} haben viele Zeilen und können trotz verringerter Zeilenhöhe über die Folie hinausragen. Prüfen Sie sie im Editor oder wählen Sie weniger Einträge aus.",
-    "panel.hint.credentials.title": "Externe Unterlagen verwenden die Bezeichnung der Angelegenheit unverändert; enthält sie eine Kurzform des Mandantennamens, formulieren Sie sie so um, dass der Mandant nicht erkennbar ist."
+    "panel.hint.credentials.title": "Externe Unterlagen verwenden die Bezeichnung der Angelegenheit unverändert; enthält sie eine Kurzform des Mandantennamens, formulieren Sie sie so um, dass der Mandant nicht erkennbar ist.",
+    "panel.lib.confirmExport": "Dies exportiert die gesamte Bibliothek einschließlich der echten Mandantennamen in den Ordner „Export Angebotsbibliothek“ des aktuellen Projekts, wo ihn alle Projektmitglieder sehen können. Trotzdem exportieren?",
+    "panel.lib.someClient": "ein Mandant",
+    "panel.err.cancelled": "Angehalten.",
+    "panel.err.panel_only": "Diese Aktion ist nur im Bereich „Ausschreibungen und Angebote“ verfügbar."
   },
   "el-GR": {
     "panel.title": "Διαγωνισμοί και προσφορές",
@@ -585,7 +593,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Προσοχή: στο αρχείο εξακολουθούν να εμφανίζονται πραγματικά ονόματα πελατών της βιβλιοθήκης: {list}. Αφαιρέστε τα στον επεξεργαστή πριν από την αποστολή.",
     "panel.gen.noLeaks": "Ελέγχθηκε: κανένα πραγματικό όνομα πελάτη της βιβλιοθήκης δεν εμφανίζεται στο αρχείο.",
     "panel.gen.internal": "Εσωτερική έκδοση με πραγματικά ονόματα πελατών. Να μην αποσταλεί εκτός γραφείου.",
-    "panel.gen.unknown": "Τα μη αναγνωρισμένα πεδία παρέμειναν ως έχουν: {list}",
+    "panel.gen.unknown": "Ορισμένα σύμβολα κράτησης θέσης του προτύπου δεν συμπληρώθηκαν (άγνωστο όνομα ή θέση που δεν μπορεί να επαναληφθεί) και παρέμειναν ως έχουν: {list}",
     "panel.sens.heading": "Έλεγχος ανωνυμοποίησης",
     "panel.sens.hint": "Χρησιμοποιεί τη μηχανή Ανωνυμοποίησης αρχείων για τον εντοπισμό αριθμών τηλεφώνου, ταυτότητας και τραπεζικών καρτών, καθώς και των πραγματικών ονομάτων πελατών της βιβλιοθήκης· τα ονόματα δικηγόρων και εταιρειών δεν τροποποιούνται.",
     "panel.sens.preview": "Έλεγχος για ευαίσθητα δεδομένα",
@@ -621,7 +629,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "Ο διαγωνισμός δεν περιέχει αναγνώσιμο κείμενο. Εκτελέστε πρώτα OCR στα σαρωμένα αρχεία.",
     "panel.err.noRequirements": "Δεν βρέθηκαν απαιτήσεις επιλεξιμότητας ή κριτήρια βαθμολόγησης. Ελέγξτε ότι πρόκειται για τα έγγραφα του διαγωνισμού.",
     "panel.gen.overflow": "Οι πίνακες στη διαφάνεια {list} έχουν πολλές γραμμές και μπορεί να εξακολουθούν να ξεπερνούν τη διαφάνεια ακόμη και μετά τη μείωση του ύψους των γραμμών. Ελέγξτε τους στον επεξεργαστή ή επιλέξτε λιγότερες καταχωρίσεις.",
-    "panel.hint.credentials.title": "Το υλικό για τρίτους χρησιμοποιεί αυτούσια την ονομασία της υπόθεσης· αν περιέχει συντομογραφία του ονόματος του πελάτη, αναδιατυπώστε την ώστε ο πελάτης να μην αναγνωρίζεται."
+    "panel.hint.credentials.title": "Το υλικό για τρίτους χρησιμοποιεί αυτούσια την ονομασία της υπόθεσης· αν περιέχει συντομογραφία του ονόματος του πελάτη, αναδιατυπώστε την ώστε ο πελάτης να μην αναγνωρίζεται.",
+    "panel.lib.confirmExport": "Θα εξαχθεί ολόκληρη η βιβλιοθήκη, συμπεριλαμβανομένων των πραγματικών ονομάτων πελατών, στον φάκελο «Εξαγωγές βιβλιοθήκης διαγωνισμών» του τρέχοντος έργου, όπου θα είναι ορατή σε όλα τα μέλη του έργου. Να γίνει εξαγωγή;",
+    "panel.lib.someClient": "ένας πελάτης",
+    "panel.err.cancelled": "Διακόπηκε.",
+    "panel.err.panel_only": "Αυτή η ενέργεια είναι διαθέσιμη μόνο στον πίνακα «Διαγωνισμοί και προσφορές»."
   },
   "en-US": {
     "panel.title": "Bids and Proposals",
@@ -792,7 +804,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Warning: real client names from the library still appear in the file: {list}. Remove them in the editor before sending.",
     "panel.gen.noLeaks": "Checked: no real client name from the library appears in the file.",
     "panel.gen.internal": "Internal version with real client names. Do not send out.",
-    "panel.gen.unknown": "Unrecognised placeholders were left as they are: {list}",
+    "panel.gen.unknown": "Some template placeholders could not be filled (unknown name or in a position that cannot repeat) and were left as they are: {list}",
     "panel.sens.heading": "Desensitization check",
     "panel.sens.hint": "Uses the File Desensitization engine to find phone numbers, ID and bank card numbers and the library's real client names; lawyer and company names are left alone.",
     "panel.sens.preview": "Check sensitive data",
@@ -828,7 +840,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "The tender has no readable text. Run OCR on scanned files first.",
     "panel.err.noRequirements": "No eligibility requirements or scoring criteria were found. Check that this is the tender document.",
     "panel.gen.overflow": "The tables on slide {list} have many rows and may still run off the slide after the rows were shortened. Check them in the editor or select fewer entries.",
-    "panel.hint.credentials.title": "Outward materials use the matter name as is; if it contains a short form of the client name, rewrite it so the client is not identifiable."
+    "panel.hint.credentials.title": "Outward materials use the matter name as is; if it contains a short form of the client name, rewrite it so the client is not identifiable.",
+    "panel.lib.confirmExport": "This exports the whole library, including real client names, into the project's \"Pitch library exports\" folder, where every project member can see it. Export anyway?",
+    "panel.lib.someClient": "a client",
+    "panel.err.cancelled": "Stopped.",
+    "panel.err.panel_only": "This action is only available in the Bids and Proposals panel."
   },
   "es-ES": {
     "panel.title": "Licitaciones y propuestas",
@@ -999,7 +1015,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Aviso: en el archivo siguen apareciendo nombres reales de clientes de la biblioteca: {list}. Elimínelos en el editor antes de enviarlo.",
     "panel.gen.noLeaks": "Comprobado: ningún nombre real de cliente de la biblioteca aparece en el archivo.",
     "panel.gen.internal": "Versión interna con nombres reales de clientes. No enviar al exterior.",
-    "panel.gen.unknown": "Los marcadores no reconocidos se dejaron tal cual: {list}",
+    "panel.gen.unknown": "Algunos marcadores de posición de la plantilla no se pudieron rellenar (nombre desconocido o en una posición que no admite repetición) y se dejaron tal cual: {list}",
     "panel.sens.heading": "Revisión de anonimización",
     "panel.sens.hint": "Usa el motor de Anonimización de archivos para detectar números de teléfono, de documento de identidad y de tarjeta bancaria, así como los nombres reales de clientes de la biblioteca; los nombres de abogados y empresas no se modifican.",
     "panel.sens.preview": "Comprobar datos sensibles",
@@ -1035,7 +1051,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "El pliego no tiene texto legible. Ejecute primero OCR en los archivos escaneados.",
     "panel.err.noRequirements": "No se encontraron requisitos de solvencia ni criterios de valoración. Compruebe que se trata del pliego de licitación.",
     "panel.gen.overflow": "Las tablas de la diapositiva {list} tienen muchas filas y, aun reduciendo su altura, pueden salirse de la diapositiva. Revíselas en el editor o seleccione menos entradas.",
-    "panel.hint.credentials.title": "Los materiales externos usan el título del asunto tal cual; si contiene una forma abreviada del nombre del cliente, reescríbalo para que no se pueda identificar al cliente."
+    "panel.hint.credentials.title": "Los materiales externos usan el título del asunto tal cual; si contiene una forma abreviada del nombre del cliente, reescríbalo para que no se pueda identificar al cliente.",
+    "panel.lib.confirmExport": "Se exportará toda la biblioteca, incluidos los nombres reales de los clientes, a la carpeta «Exportaciones de la biblioteca de licitaciones» del proyecto actual, donde la verán todos los miembros del proyecto. ¿Exportar de todos modos?",
+    "panel.lib.someClient": "un cliente",
+    "panel.err.cancelled": "Detenido.",
+    "panel.err.panel_only": "Esta acción solo está disponible en el panel «Licitaciones y propuestas»."
   },
   "fr-FR": {
     "panel.title": "Appels d'offres et propositions",
@@ -1206,7 +1226,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Attention : des noms de clients réels issus de la bibliothèque figurent encore dans le fichier : {list}. Supprimez-les dans l'éditeur avant l'envoi.",
     "panel.gen.noLeaks": "Vérifié : aucun nom de client réel issu de la bibliothèque n'apparaît dans le fichier.",
     "panel.gen.internal": "Version interne contenant les vrais noms de clients. Ne pas envoyer à l'extérieur.",
-    "panel.gen.unknown": "Les champs non reconnus ont été laissés tels quels : {list}",
+    "panel.gen.unknown": "Certains champs réservés du modèle n'ont pas pu être renseignés (nom inconnu ou emplacement non répétable) et ont été laissés tels quels : {list}",
     "panel.sens.heading": "Contrôle d'anonymisation",
     "panel.sens.hint": "Utilise le moteur d'Anonymisation de fichiers pour repérer les numéros de téléphone, de pièce d'identité et de carte bancaire ainsi que les vrais noms de clients de la bibliothèque ; les noms d'avocats et de sociétés ne sont pas modifiés.",
     "panel.sens.preview": "Rechercher les données sensibles",
@@ -1242,7 +1262,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "L'appel d'offres ne contient aucun texte lisible. Lancez d'abord la reconnaissance de texte (OCR) sur les fichiers numérisés.",
     "panel.err.noRequirements": "Aucune condition de participation ni aucun critère de notation n'a été trouvé. Vérifiez qu'il s'agit bien du dossier d'appel d'offres.",
     "panel.gen.overflow": "Les tableaux de la diapositive {list} comportent beaucoup de lignes et peuvent encore dépasser de la diapositive malgré la réduction de la hauteur des lignes. Vérifiez-les dans l'éditeur ou sélectionnez moins d'entrées.",
-    "panel.hint.credentials.title": "Les documents destinés à l'extérieur reprennent tel quel l'intitulé du dossier ; s'il contient une forme abrégée du nom du client, reformulez-le afin que le client ne soit pas identifiable."
+    "panel.hint.credentials.title": "Les documents destinés à l'extérieur reprennent tel quel l'intitulé du dossier ; s'il contient une forme abrégée du nom du client, reformulez-le afin que le client ne soit pas identifiable.",
+    "panel.lib.confirmExport": "Cela exporte toute la bibliothèque, y compris les noms réels des clients, dans le dossier « Exports de la bibliothèque d'appels d'offres » du projet actuel, visible par tous les membres du projet. Exporter quand même ?",
+    "panel.lib.someClient": "un client",
+    "panel.err.cancelled": "Arrêté.",
+    "panel.err.panel_only": "Cette action n'est disponible que dans le panneau « Appels d'offres et propositions »."
   },
   "hi-IN": {
     "panel.title": "निविदा और प्रस्ताव",
@@ -1413,7 +1437,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "चेतावनी: लाइब्रेरी के वास्तविक मुवक्किल नाम अब भी फ़ाइल में दिख रहे हैं: {list}। भेजने से पहले उन्हें संपादक में हटाएँ।",
     "panel.gen.noLeaks": "जाँच पूरी: लाइब्रेरी का कोई वास्तविक मुवक्किल नाम फ़ाइल में नहीं है।",
     "panel.gen.internal": "वास्तविक मुवक्किल नामों वाला आंतरिक संस्करण। बाहर न भेजें।",
-    "panel.gen.unknown": "अपरिचित प्लेसहोल्डर जैसे थे वैसे छोड़ दिए गए: {list}",
+    "panel.gen.unknown": "टेम्पलेट के कुछ प्लेसहोल्डर भरे नहीं जा सके (अज्ञात नाम या ऐसी जगह जहाँ दोहराव संभव नहीं) और उन्हें जस का तस छोड़ दिया गया: {list}",
     "panel.sens.heading": "संवेदनशील जानकारी छिपाने की जाँच",
     "panel.sens.hint": "फ़ोन नंबर, पहचान और बैंक कार्ड नंबर तथा लाइब्रेरी के वास्तविक मुवक्किल नाम खोजने के लिए फ़ाइल संवेदनशील जानकारी छिपाना इंजन का उपयोग करता है; अधिवक्ताओं और कंपनियों के नामों को नहीं छुआ जाता।",
     "panel.sens.preview": "संवेदनशील डेटा जाँचें",
@@ -1449,7 +1473,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "निविदा में पढ़ने योग्य पाठ नहीं है। स्कैन की गई फ़ाइलों पर पहले OCR चलाएँ।",
     "panel.err.noRequirements": "कोई पात्रता आवश्यकता या स्कोरिंग मानदंड नहीं मिला। जाँचें कि यह निविदा दस्तावेज़ ही है।",
     "panel.gen.overflow": "स्लाइड {list} की तालिकाओं में बहुत अधिक पंक्तियाँ हैं और पंक्तियों की ऊँचाई घटाने के बाद भी वे स्लाइड से बाहर जा सकती हैं। कृपया एडिटर में जाँच करें या कम प्रविष्टियाँ चुनें।",
-    "panel.hint.credentials.title": "बाहरी सामग्री में मामले का नाम जैसा है वैसा ही उपयोग होता है; यदि उसमें मुवक्किल के नाम का संक्षिप्त रूप है, तो उसे इस तरह बदलें कि मुवक्किल की पहचान न हो सके।"
+    "panel.hint.credentials.title": "बाहरी सामग्री में मामले का नाम जैसा है वैसा ही उपयोग होता है; यदि उसमें मुवक्किल के नाम का संक्षिप्त रूप है, तो उसे इस तरह बदलें कि मुवक्किल की पहचान न हो सके।",
+    "panel.lib.confirmExport": "यह पूरी लाइब्रेरी को, असली मुवक्किल नामों सहित, वर्तमान प्रोजेक्ट के \"निविदा लाइब्रेरी निर्यात\" फ़ोल्डर में निर्यात करेगा, जहाँ प्रोजेक्ट के सभी सदस्य इसे देख सकते हैं। फिर भी निर्यात करें?",
+    "panel.lib.someClient": "एक मुवक्किल",
+    "panel.err.cancelled": "रोक दिया गया।",
+    "panel.err.panel_only": "यह कार्रवाई केवल \"निविदा और प्रस्ताव\" पैनल में उपलब्ध है।"
   },
   "id-ID": {
     "panel.title": "Tender dan Proposal",
@@ -1620,7 +1648,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Peringatan: nama asli klien dari pustaka masih muncul di berkas: {list}. Hapus di editor sebelum dikirim.",
     "panel.gen.noLeaks": "Sudah diperiksa: tidak ada nama asli klien dari pustaka yang muncul di berkas.",
     "panel.gen.internal": "Versi internal dengan nama asli klien. Jangan dikirim ke luar.",
-    "panel.gen.unknown": "Penampung yang tidak dikenali dibiarkan apa adanya: {list}",
+    "panel.gen.unknown": "Beberapa placeholder pada templat tidak dapat diisi (nama tidak dikenal atau berada di posisi yang tidak dapat diulang) dan dibiarkan apa adanya: {list}",
     "panel.sens.heading": "Pemeriksaan penyamaran",
     "panel.sens.hint": "Menggunakan mesin Penyamaran Berkas untuk menemukan nomor telepon, nomor identitas dan kartu bank, serta nama asli klien dari pustaka; nama advokat dan perusahaan tidak diubah.",
     "panel.sens.preview": "Periksa data sensitif",
@@ -1656,7 +1684,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "Dokumen tender tidak memiliki teks yang dapat dibaca. Jalankan OCR terlebih dahulu pada berkas hasil pindai.",
     "panel.err.noRequirements": "Tidak ditemukan persyaratan kualifikasi atau kriteria penilaian. Pastikan ini adalah dokumen tender.",
     "panel.gen.overflow": "Tabel pada slide {list} memiliki banyak baris dan mungkin masih melewati batas slide meskipun tinggi baris sudah dikurangi. Periksa di editor atau pilih lebih sedikit entri.",
-    "panel.hint.credentials.title": "Materi untuk pihak luar memakai nama perkara apa adanya; jika memuat singkatan nama klien, tulis ulang agar klien tidak dapat dikenali."
+    "panel.hint.credentials.title": "Materi untuk pihak luar memakai nama perkara apa adanya; jika memuat singkatan nama klien, tulis ulang agar klien tidak dapat dikenali.",
+    "panel.lib.confirmExport": "Tindakan ini mengekspor seluruh pustaka, termasuk nama klien yang sebenarnya, ke folder \"Ekspor pustaka tender\" pada proyek saat ini, yang dapat dilihat oleh semua anggota proyek. Tetap ekspor?",
+    "panel.lib.someClient": "seorang klien",
+    "panel.err.cancelled": "Dihentikan.",
+    "panel.err.panel_only": "Tindakan ini hanya tersedia di panel \"Tender dan Proposal\"."
   },
   "it-IT": {
     "panel.title": "Gare d'appalto e proposte",
@@ -1827,7 +1859,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Attenzione: nel file compaiono ancora nomi reali di clienti presenti nella libreria: {list}. Li rimuova nell'editor prima dell'invio.",
     "panel.gen.noLeaks": "Verificato: nessun nome reale di cliente presente nella libreria compare nel file.",
     "panel.gen.internal": "Versione interna con i nomi reali dei clienti. Non inviare all'esterno.",
-    "panel.gen.unknown": "I segnaposto non riconosciuti sono stati lasciati invariati: {list}",
+    "panel.gen.unknown": "Alcuni segnaposto del modello non sono stati compilati (nome sconosciuto o posizione non ripetibile) e sono stati lasciati invariati: {list}",
     "panel.sens.heading": "Verifica di anonimizzazione",
     "panel.sens.hint": "Usa il motore di Anonimizzazione file per individuare numeri di telefono, di documento d'identità e di carta bancaria e i nomi reali dei clienti presenti nella libreria; i nomi di avvocati e società non vengono toccati.",
     "panel.sens.preview": "Verifica dati sensibili",
@@ -1863,7 +1895,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "Il bando non contiene testo leggibile. Esegua prima l'OCR sui file scansionati.",
     "panel.err.noRequirements": "Non sono stati trovati requisiti di partecipazione né criteri di valutazione. Verifichi che sia la documentazione di gara.",
     "panel.gen.overflow": "Le tabelle della slide {list} hanno molte righe e, anche riducendone l'altezza, potrebbero uscire dalla slide. Controllale nell'editor oppure seleziona meno voci.",
-    "panel.hint.credentials.title": "I materiali esterni usano il nome della pratica così com'è; se contiene una forma abbreviata del nome del cliente, riformulalo in modo che il cliente non sia identificabile."
+    "panel.hint.credentials.title": "I materiali esterni usano il nome della pratica così com'è; se contiene una forma abbreviata del nome del cliente, riformulalo in modo che il cliente non sia identificabile.",
+    "panel.lib.confirmExport": "Verrà esportata l'intera libreria, compresi i nomi reali dei clienti, nella cartella \"Esportazioni libreria gare\" del progetto corrente, visibile a tutti i membri del progetto. Esportare comunque?",
+    "panel.lib.someClient": "un cliente",
+    "panel.err.cancelled": "Interrotto.",
+    "panel.err.panel_only": "Questa azione è disponibile solo nel pannello \"Gare d'appalto e proposte\"."
   },
   "ja-JP": {
     "panel.title": "入札・提案",
@@ -2034,7 +2070,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "注意：ライブラリ内のクライアント実名がファイルに残っています：{list}。送付前にエディターで修正してください。",
     "panel.gen.noLeaks": "確認済み：ライブラリ内のクライアント実名はファイルに含まれていません。",
     "panel.gen.internal": "クライアント実名を含む事務所内向けの版です。社外には送付しないでください。",
-    "panel.gen.unknown": "認識できない差し込み欄はそのまま残しました：{list}",
+    "panel.gen.unknown": "テンプレート内の一部のプレースホルダーを埋められず（名前が不明、または繰り返せない位置にあるため）、そのまま残しています：{list}",
     "panel.sens.heading": "マスキング確認",
     "panel.sens.hint": "ファイルマスキングのエンジンを使って、電話番号、身分証明書番号、銀行カード番号、およびライブラリ内のクライアント実名を検出します。弁護士名と会社名は処理対象外です。",
     "panel.sens.preview": "機微情報を確認",
@@ -2070,7 +2106,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "入札書類に読み取れるテキストがありません。スキャンしたファイルは、先に OCR を実行してください。",
     "panel.err.noRequirements": "参加資格要件や評価項目が見つかりませんでした。入札書類であることを確認してください。",
     "panel.gen.overflow": "スライド {list} の表は行数が多く、行の高さを詰めてもスライドからはみ出す可能性があります。エディターで確認するか、選択する項目を減らしてください。",
-    "panel.hint.credentials.title": "対外向け資料では案件名がそのまま使用されます。案件名にクライアント名の略称が含まれる場合は、クライアントが特定されない表現に書き換えてください。"
+    "panel.hint.credentials.title": "対外向け資料では案件名がそのまま使用されます。案件名にクライアント名の略称が含まれる場合は、クライアントが特定されない表現に書き換えてください。",
+    "panel.lib.confirmExport": "ライブラリ全体が、実在のクライアント名を含めて、現在のプロジェクトの「入札ライブラリのエクスポート」フォルダーに書き出され、プロジェクトのメンバー全員が閲覧できます。エクスポートしますか？",
+    "panel.lib.someClient": "あるクライアント",
+    "panel.err.cancelled": "停止しました。",
+    "panel.err.panel_only": "この操作は「入札・提案」パネルでのみ実行できます。"
   },
   "ko-KR": {
     "panel.title": "입찰 및 제안",
@@ -2241,7 +2281,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "주의: 라이브러리의 의뢰인 실명이 파일에 남아 있습니다: {list}. 발송 전에 편집기에서 수정하세요.",
     "panel.gen.noLeaks": "확인 완료: 라이브러리의 의뢰인 실명이 파일에 나타나지 않습니다.",
     "panel.gen.internal": "의뢰인 실명이 포함된 내부용 버전입니다. 외부로 발송하지 마세요.",
-    "panel.gen.unknown": "인식되지 않은 자리표시자는 그대로 두었습니다: {list}",
+    "panel.gen.unknown": "템플릿의 일부 자리 표시자를 채우지 못해(알 수 없는 이름이거나 반복할 수 없는 위치) 그대로 두었습니다: {list}",
     "panel.sens.heading": "비식별화 점검",
     "panel.sens.hint": "파일 비식별화 엔진을 사용하여 전화번호, 신분증 번호, 은행 카드 번호와 라이브러리의 의뢰인 실명을 찾습니다. 변호사 이름과 회사 이름은 처리하지 않습니다.",
     "panel.sens.preview": "민감 정보 점검",
@@ -2277,7 +2317,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "입찰 문서에 읽을 수 있는 텍스트가 없습니다. 스캔 파일은 먼저 OCR을 실행하세요.",
     "panel.err.noRequirements": "참가자격 요건이나 평가 기준을 찾지 못했습니다. 입찰 문서가 맞는지 확인하세요.",
     "panel.gen.overflow": "슬라이드 {list}의 표는 행이 많아 행 높이를 줄여도 슬라이드를 벗어날 수 있습니다. 편집기에서 확인하거나 선택 항목 수를 줄여 주세요.",
-    "panel.hint.credentials.title": "외부용 자료에는 사건명이 그대로 사용됩니다. 사건명에 의뢰인 이름의 약칭이 포함되어 있다면 의뢰인을 알아볼 수 없도록 고쳐 쓰세요."
+    "panel.hint.credentials.title": "외부용 자료에는 사건명이 그대로 사용됩니다. 사건명에 의뢰인 이름의 약칭이 포함되어 있다면 의뢰인을 알아볼 수 없도록 고쳐 쓰세요.",
+    "panel.lib.confirmExport": "라이브러리 전체가 실제 의뢰인 이름을 포함하여 현재 프로젝트의 \"입찰 라이브러리 내보내기\" 폴더에 저장되며, 프로젝트 구성원 모두가 볼 수 있습니다. 내보내시겠습니까?",
+    "panel.lib.someClient": "어느 의뢰인",
+    "panel.err.cancelled": "중지했습니다.",
+    "panel.err.panel_only": "이 작업은 \"입찰 및 제안\" 패널에서만 사용할 수 있습니다."
   },
   "ms-MY": {
     "panel.title": "Tender dan Cadangan",
@@ -2448,7 +2492,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Amaran: nama sebenar klien daripada perpustakaan masih terdapat dalam fail: {list}. Buangkannya dalam editor sebelum menghantar.",
     "panel.gen.noLeaks": "Disemak: tiada nama sebenar klien daripada perpustakaan terdapat dalam fail.",
     "panel.gen.internal": "Versi dalaman dengan nama sebenar klien. Jangan hantar ke luar.",
-    "panel.gen.unknown": "Pemegang tempat yang tidak dikenali dibiarkan seperti asal: {list}",
+    "panel.gen.unknown": "Sesetengah pemegang tempat dalam templat tidak dapat diisi (nama tidak dikenali atau berada di kedudukan yang tidak boleh diulang) dan dibiarkan seperti asal: {list}",
     "panel.sens.heading": "Semakan penyamaran",
     "panel.sens.hint": "Menggunakan enjin Penyamaran Fail untuk mencari nombor telefon, nombor kad pengenalan dan kad bank, serta nama sebenar klien daripada perpustakaan; nama peguam dan syarikat tidak diubah.",
     "panel.sens.preview": "Semak data sensitif",
@@ -2484,7 +2528,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "Dokumen tender tiada teks yang boleh dibaca. Jalankan OCR dahulu pada fail imbasan.",
     "panel.err.noRequirements": "Tiada syarat kelayakan atau kriteria pemarkahan ditemui. Pastikan ini ialah dokumen tender.",
     "panel.gen.overflow": "Jadual pada slaid {list} mempunyai banyak baris dan mungkin masih melebihi slaid walaupun ketinggian baris telah dikurangkan. Sila semak dalam editor atau pilih lebih sedikit entri.",
-    "panel.hint.credentials.title": "Bahan untuk pihak luar menggunakan nama perkara seperti sedia ada; jika ia mengandungi singkatan nama klien, tulis semula supaya klien tidak dapat dikenal pasti."
+    "panel.hint.credentials.title": "Bahan untuk pihak luar menggunakan nama perkara seperti sedia ada; jika ia mengandungi singkatan nama klien, tulis semula supaya klien tidak dapat dikenal pasti.",
+    "panel.lib.confirmExport": "Ini mengeksport seluruh perpustakaan, termasuk nama klien sebenar, ke folder \"Eksport perpustakaan tender\" dalam projek semasa, yang boleh dilihat oleh semua ahli projek. Tetap eksport?",
+    "panel.lib.someClient": "seorang klien",
+    "panel.err.cancelled": "Dihentikan.",
+    "panel.err.panel_only": "Tindakan ini hanya tersedia dalam panel \"Tender dan Cadangan\"."
   },
   "nl-NL": {
     "panel.title": "Aanbestedingen en offertes",
@@ -2655,7 +2703,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Waarschuwing: echte cliëntnamen uit de bibliotheek komen nog in het bestand voor: {list}. Verwijder ze in de editor voordat u het verstuurt.",
     "panel.gen.noLeaks": "Gecontroleerd: er komt geen echte cliëntnaam uit de bibliotheek in het bestand voor.",
     "panel.gen.internal": "Interne versie met echte cliëntnamen. Niet naar buiten sturen.",
-    "panel.gen.unknown": "Niet-herkende plaatshouders zijn ongewijzigd gelaten: {list}",
+    "panel.gen.unknown": "Sommige plaatshouders in de sjabloon konden niet worden ingevuld (onbekende naam of op een plek die zich niet kan herhalen) en zijn ongewijzigd gelaten: {list}",
     "panel.sens.heading": "Anonimiseringscontrole",
     "panel.sens.hint": "Gebruikt de engine van Bestandsanonimisering om telefoonnummers, identiteitsbewijs- en bankpasnummers en de echte cliëntnamen uit de bibliotheek te vinden; namen van advocaten en bedrijven blijven ongemoeid.",
     "panel.sens.preview": "Gevoelige gegevens controleren",
@@ -2691,7 +2739,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "De aanbesteding bevat geen leesbare tekst. Voer eerst OCR uit op gescande bestanden.",
     "panel.err.noRequirements": "Er zijn geen geschiktheidseisen of gunningscriteria gevonden. Controleer of dit het aanbestedingsdocument is.",
     "panel.gen.overflow": "De tabellen op dia {list} hebben veel rijen en kunnen ondanks de verkleinde rijhoogte nog buiten de dia vallen. Controleer ze in de editor of selecteer minder items.",
-    "panel.hint.credentials.title": "Extern materiaal gebruikt de naam van de zaak ongewijzigd; als die een afkorting van de naam van de cliënt bevat, herschrijf deze dan zodat de cliënt niet herkenbaar is."
+    "panel.hint.credentials.title": "Extern materiaal gebruikt de naam van de zaak ongewijzigd; als die een afkorting van de naam van de cliënt bevat, herschrijf deze dan zodat de cliënt niet herkenbaar is.",
+    "panel.lib.confirmExport": "Hiermee wordt de hele bibliotheek, inclusief de echte cliëntnamen, geëxporteerd naar de map \"Export aanbestedingsbibliotheek\" van het huidige project, waar alle projectleden de bestanden kunnen zien. Toch exporteren?",
+    "panel.lib.someClient": "een cliënt",
+    "panel.err.cancelled": "Gestopt.",
+    "panel.err.panel_only": "Deze actie is alleen beschikbaar in het paneel \"Aanbestedingen en offertes\"."
   },
   "pt-BR": {
     "panel.title": "Licitações e propostas",
@@ -2862,7 +2914,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Atenção: nomes reais de clientes da biblioteca ainda aparecem no arquivo: {list}. Remova-os no editor antes de enviar.",
     "panel.gen.noLeaks": "Verificado: nenhum nome real de cliente da biblioteca aparece no arquivo.",
     "panel.gen.internal": "Versão interna com nomes reais de clientes. Não enviar para fora.",
-    "panel.gen.unknown": "Campos não reconhecidos foram mantidos como estão: {list}",
+    "panel.gen.unknown": "Alguns marcadores do modelo não puderam ser preenchidos (nome desconhecido ou em posição que não pode se repetir) e foram mantidos como estão: {list}",
     "panel.sens.heading": "Verificação de anonimização",
     "panel.sens.hint": "Usa o mecanismo de Anonimização de arquivos para encontrar números de telefone, de documento de identidade e de cartão bancário e os nomes reais de clientes da biblioteca; nomes de advogados e de empresas não são alterados.",
     "panel.sens.preview": "Verificar dados sensíveis",
@@ -2898,7 +2950,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "O edital não tem texto legível. Execute primeiro o OCR nos arquivos digitalizados.",
     "panel.err.noRequirements": "Não foram encontrados requisitos de habilitação nem critérios de pontuação. Verifique se este é o edital.",
     "panel.gen.overflow": "As tabelas do slide {list} têm muitas linhas e, mesmo com a altura reduzida, ainda podem ultrapassar o slide. Verifique-as no editor ou selecione menos itens.",
-    "panel.hint.credentials.title": "Os materiais externos usam o nome do caso exatamente como está; se ele contiver uma forma abreviada do nome do cliente, reescreva-o para que o cliente não seja identificável."
+    "panel.hint.credentials.title": "Os materiais externos usam o nome do caso exatamente como está; se ele contiver uma forma abreviada do nome do cliente, reescreva-o para que o cliente não seja identificável.",
+    "panel.lib.confirmExport": "Isto exporta a biblioteca inteira, incluindo os nomes reais dos clientes, para a pasta \"Exportações da biblioteca de licitações\" do projeto atual, onde todos os membros do projeto poderão vê-la. Exportar mesmo assim?",
+    "panel.lib.someClient": "um cliente",
+    "panel.err.cancelled": "Interrompido.",
+    "panel.err.panel_only": "Esta ação só está disponível no painel \"Licitações e propostas\"."
   },
   "ru-RU": {
     "panel.title": "Тендеры и предложения",
@@ -3069,7 +3125,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Внимание: в файле всё ещё есть настоящие имена клиентов из библиотеки: {list}. Удалите их в редакторе перед отправкой.",
     "panel.gen.noLeaks": "Проверено: настоящих имён клиентов из библиотеки в файле нет.",
     "panel.gen.internal": "Внутренняя версия с настоящими именами клиентов. Не отправлять наружу.",
-    "panel.gen.unknown": "Нераспознанные поля оставлены без изменений: {list}",
+    "panel.gen.unknown": "Некоторые заполнители в шаблоне не удалось заполнить (неизвестное имя или позиция, где повтор невозможен), они оставлены без изменений: {list}",
     "panel.sens.heading": "Проверка обезличивания",
     "panel.sens.hint": "Использует механизм «Обезличивания файлов» для поиска номеров телефонов, документов, удостоверяющих личность, и банковских карт, а также настоящих имён клиентов из библиотеки; имена юристов и названия компаний не затрагиваются.",
     "panel.sens.preview": "Проверить конфиденциальные данные",
@@ -3105,7 +3161,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "В тендерной документации нет читаемого текста. Для отсканированных файлов сначала выполните OCR.",
     "panel.err.noRequirements": "Квалификационные требования и критерии оценки не найдены. Убедитесь, что это тендерная документация.",
     "panel.gen.overflow": "Таблицы на слайде {list} содержат много строк и после уменьшения высоты строк всё равно могут выходить за пределы слайда. Проверьте их в редакторе или выберите меньше записей.",
-    "panel.hint.credentials.title": "В материалах для внешнего использования название дела указывается без изменений; если оно содержит сокращённое имя клиента, перепишите его так, чтобы клиента нельзя было определить."
+    "panel.hint.credentials.title": "В материалах для внешнего использования название дела указывается без изменений; если оно содержит сокращённое имя клиента, перепишите его так, чтобы клиента нельзя было определить.",
+    "panel.lib.confirmExport": "Будет экспортирована вся библиотека, включая настоящие имена клиентов, в папку «Экспорт тендерной библиотеки» текущего проекта, где её увидят все участники проекта. Всё равно экспортировать?",
+    "panel.lib.someClient": "клиент",
+    "panel.err.cancelled": "Остановлено.",
+    "panel.err.panel_only": "Это действие доступно только на панели «Тендеры и предложения»."
   },
   "th-TH": {
     "panel.title": "การประมูลและข้อเสนอ",
@@ -3276,7 +3336,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "คำเตือน: ในไฟล์ยังมีชื่อจริงของลูกความจากคลังปรากฏอยู่: {list} โปรดลบออกในตัวแก้ไขก่อนส่ง",
     "panel.gen.noLeaks": "ตรวจแล้ว: ไม่มีชื่อจริงของลูกความจากคลังปรากฏในไฟล์",
     "panel.gen.internal": "เวอร์ชันภายในที่มีชื่อจริงของลูกความ อย่าส่งออกภายนอก",
-    "panel.gen.unknown": "ตัวแทนช่องข้อมูลที่ไม่รู้จักถูกเก็บไว้ตามเดิม: {list}",
+    "panel.gen.unknown": "ตัวแทนตำแหน่งบางรายการในแม่แบบไม่สามารถเติมข้อมูลได้ (ชื่อไม่รู้จักหรืออยู่ในตำแหน่งที่ทำซ้ำไม่ได้) จึงคงไว้ตามเดิม: {list}",
     "panel.sens.heading": "ตรวจสอบการปกปิดข้อมูล",
     "panel.sens.hint": "ใช้เอนจินปกปิดข้อมูลสำคัญในไฟล์เพื่อค้นหาหมายเลขโทรศัพท์ เลขบัตรประจำตัวและบัตรธนาคาร รวมถึงชื่อจริงของลูกความในคลัง ชื่อทนายความและชื่อบริษัทจะไม่ถูกแก้ไข",
     "panel.sens.preview": "ตรวจหาข้อมูลอ่อนไหว",
@@ -3312,7 +3372,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "เอกสารประกวดราคาไม่มีข้อความที่อ่านได้ โปรดทำ OCR กับไฟล์สแกนก่อน",
     "panel.err.noRequirements": "ไม่พบข้อกำหนดคุณสมบัติหรือเกณฑ์การให้คะแนน โปรดตรวจสอบว่าเป็นเอกสารประกวดราคา",
     "panel.gen.overflow": "ตารางในสไลด์ {list} มีหลายแถว และแม้จะลดความสูงของแถวแล้วก็อาจยังล้นออกนอกสไลด์ โปรดตรวจสอบในตัวแก้ไข หรือเลือกรายการให้น้อยลง",
-    "panel.hint.credentials.title": "เอกสารที่ส่งออกภายนอกจะใช้ชื่อเรื่องตามที่ระบุไว้โดยตรง หากชื่อมีตัวย่อของชื่อลูกความ โปรดแก้ไขถ้อยคำเพื่อไม่ให้ระบุตัวลูกความได้"
+    "panel.hint.credentials.title": "เอกสารที่ส่งออกภายนอกจะใช้ชื่อเรื่องตามที่ระบุไว้โดยตรง หากชื่อมีตัวย่อของชื่อลูกความ โปรดแก้ไขถ้อยคำเพื่อไม่ให้ระบุตัวลูกความได้",
+    "panel.lib.confirmExport": "การดำเนินการนี้จะส่งออกคลังทั้งหมด รวมถึงชื่อลูกความจริง ไปยังโฟลเดอร์ \"การส่งออกคลังการประมูล\" ของโครงการปัจจุบัน ซึ่งสมาชิกทุกคนในโครงการมองเห็นได้ ต้องการส่งออกหรือไม่",
+    "panel.lib.someClient": "ลูกความรายหนึ่ง",
+    "panel.err.cancelled": "หยุดแล้ว",
+    "panel.err.panel_only": "การดำเนินการนี้ใช้ได้เฉพาะในแผง \"การประมูลและข้อเสนอ\""
   },
   "tr-TR": {
     "panel.title": "İhaleler ve Teklifler",
@@ -3483,7 +3547,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Uyarı: Dosyada kütüphanedeki gerçek müvekkil adları hâlâ yer alıyor: {list}. Göndermeden önce düzenleyicide kaldırın.",
     "panel.gen.noLeaks": "Kontrol edildi: Kütüphanedeki gerçek müvekkil adlarından hiçbiri dosyada yer almıyor.",
     "panel.gen.internal": "Gerçek müvekkil adlarını içeren iç sürüm. Dışarıya göndermeyin.",
-    "panel.gen.unknown": "Tanınmayan yer tutucular olduğu gibi bırakıldı: {list}",
+    "panel.gen.unknown": "Şablondaki bazı yer tutucular doldurulamadı (bilinmeyen ad veya tekrarlanamayan bir konum) ve olduğu gibi bırakıldı: {list}",
     "panel.sens.heading": "Maskeleme kontrolü",
     "panel.sens.hint": "Telefon numaralarını, kimlik ve banka kartı numaralarını ve kütüphanedeki gerçek müvekkil adlarını bulmak için Dosya Maskeleme altyapısını kullanır; avukat ve şirket adlarına dokunulmaz.",
     "panel.sens.preview": "Hassas verileri kontrol et",
@@ -3519,7 +3583,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "İhalede okunabilir metin yok. Taranmış dosyalarda önce OCR çalıştırın.",
     "panel.err.noRequirements": "Yeterlik şartı veya puanlama kriteri bulunamadı. Bunun ihale dokümanı olduğunu kontrol edin.",
     "panel.gen.overflow": "{list} numaralı slayttaki tablolarda çok sayıda satır var ve satır yüksekliği azaltıldıktan sonra bile slayttan taşabilir. Düzenleyicide kontrol edin veya daha az kayıt seçin.",
-    "panel.hint.credentials.title": "Dışarıya yönelik belgelerde dosya adı olduğu gibi kullanılır; ad müvekkilin kısaltmasını içeriyorsa, müvekkil anlaşılmayacak şekilde yeniden yazın."
+    "panel.hint.credentials.title": "Dışarıya yönelik belgelerde dosya adı olduğu gibi kullanılır; ad müvekkilin kısaltmasını içeriyorsa, müvekkil anlaşılmayacak şekilde yeniden yazın.",
+    "panel.lib.confirmExport": "Bu işlem, gerçek müvekkil adları dahil tüm kütüphaneyi geçerli projenin \"İhale kütüphanesi dışa aktarımları\" klasörüne aktarır; klasörü tüm proje üyeleri görebilir. Yine de dışa aktarılsın mı?",
+    "panel.lib.someClient": "bir müvekkil",
+    "panel.err.cancelled": "Durduruldu.",
+    "panel.err.panel_only": "Bu işlem yalnızca \"İhaleler ve Teklifler\" panelinde kullanılabilir."
   },
   "vi-VN": {
     "panel.title": "Đấu thầu và đề xuất",
@@ -3690,7 +3758,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "Lưu ý: tệp vẫn còn tên thật của khách hàng trong thư viện: {list}. Hãy xóa trong trình soạn thảo trước khi gửi.",
     "panel.gen.noLeaks": "Đã kiểm tra: không có tên thật của khách hàng trong thư viện xuất hiện trong tệp.",
     "panel.gen.internal": "Bản nội bộ chứa tên thật của khách hàng. Không gửi ra ngoài.",
-    "panel.gen.unknown": "Các trường giữ chỗ không nhận dạng được đã được giữ nguyên: {list}",
+    "panel.gen.unknown": "Một số ký hiệu giữ chỗ trong mẫu không thể điền (tên không xác định hoặc nằm ở vị trí không thể lặp lại) và được giữ nguyên: {list}",
     "panel.sens.heading": "Kiểm tra ẩn thông tin nhạy cảm",
     "panel.sens.hint": "Dùng công cụ Ẩn thông tin nhạy cảm trong tệp để tìm số điện thoại, số giấy tờ tùy thân, số thẻ ngân hàng và tên thật của khách hàng trong thư viện; tên luật sư và tên công ty không bị xử lý.",
     "panel.sens.preview": "Kiểm tra dữ liệu nhạy cảm",
@@ -3726,7 +3794,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "Hồ sơ mời thầu không có văn bản đọc được. Với tệp quét, hãy chạy OCR trước.",
     "panel.err.noRequirements": "Không tìm thấy yêu cầu về điều kiện tham dự hay tiêu chí chấm điểm nào. Hãy kiểm tra xem đây có đúng là hồ sơ mời thầu không.",
     "panel.gen.overflow": "Các bảng trên slide {list} có nhiều dòng và dù đã giảm chiều cao dòng vẫn có thể tràn ra ngoài slide. Hãy kiểm tra trong trình soạn thảo hoặc chọn ít mục hơn.",
-    "panel.hint.credentials.title": "Tài liệu gửi bên ngoài dùng nguyên tên vụ việc; nếu tên có chứa tên viết tắt của khách hàng, hãy viết lại để không thể nhận ra khách hàng."
+    "panel.hint.credentials.title": "Tài liệu gửi bên ngoài dùng nguyên tên vụ việc; nếu tên có chứa tên viết tắt của khách hàng, hãy viết lại để không thể nhận ra khách hàng.",
+    "panel.lib.confirmExport": "Thao tác này xuất toàn bộ thư viện, bao gồm tên khách hàng thật, vào thư mục \"Xuất thư viện đấu thầu\" của dự án hiện tại, nơi mọi thành viên dự án đều xem được. Vẫn xuất?",
+    "panel.lib.someClient": "một khách hàng",
+    "panel.err.cancelled": "Đã dừng.",
+    "panel.err.panel_only": "Thao tác này chỉ dùng được trong bảng \"Đấu thầu và đề xuất\"."
   },
   "zh-CN": {
     "panel.title": "投标与提案",
@@ -3897,7 +3969,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "注意：文件里仍出现库中的真实客户名：{list}。请在编辑器里改掉后再外发。",
     "panel.gen.noLeaks": "已检查：库里的真实客户名未出现在文件中。",
     "panel.gen.internal": "所内版本：含真实客户名，不要外发。",
-    "panel.gen.unknown": "模板里有未识别的占位符，已原样保留：{list}",
+    "panel.gen.unknown": "模板里有未能填充的占位符（写法不对或放在无法复制的位置），已原样保留：{list}",
     "panel.sens.heading": "文件脱敏复查",
     "panel.sens.hint": "调用「文件脱敏」引擎，检查手机号、证件号、银行卡等敏感信息和库里的真实客户名；律师姓名与公司名不作处理。",
     "panel.sens.preview": "检查敏感信息",
@@ -3933,7 +4005,11 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "招标文件没有可读取的文字。扫描件请先做 OCR。",
     "panel.err.noRequirements": "没有从文件里抽取到资格要求或评分项，请确认选的是招标文件。",
     "panel.gen.overflow": "第 {list} 页的表格条目较多，已压低行高仍可能超出页面，请在编辑器里检查或减少所选条目。",
-    "panel.hint.credentials.title": "对外材料会直接使用项目名称；名称里如含客户简称，请改成不暴露客户的写法。"
+    "panel.hint.credentials.title": "对外材料会直接使用项目名称；名称里如含客户简称，请改成不暴露客户的写法。",
+    "panel.lib.confirmExport": "导出的是整个库，包括真实客户名，会写进当前项目的「投标库导出」文件夹，项目成员都能看到。确定导出？",
+    "panel.lib.someClient": "某客户",
+    "panel.err.cancelled": "已停止。",
+    "panel.err.panel_only": "这个操作只能在「投标与提案」面板里进行。"
   },
   "zh-TW": {
     "panel.title": "投標與提案",
@@ -4104,7 +4180,7 @@ window.AWD_PITCH_L10N = {
     "panel.gen.leaks": "注意：檔案裡仍出現庫中的真實客戶名：{list}。請在編輯器裡改掉後再對外寄送。",
     "panel.gen.noLeaks": "已檢查：庫裡的真實客戶名未出現在檔案中。",
     "panel.gen.internal": "所內版本：含真實客戶名，不要對外寄送。",
-    "panel.gen.unknown": "範本裡有無法辨識的預留位置，已原樣保留：{list}",
+    "panel.gen.unknown": "範本裡有未能填入的預留位置（寫法不對或放在無法複製的位置），已原樣保留：{list}",
     "panel.sens.heading": "檔案去識別化複查",
     "panel.sens.hint": "呼叫「檔案去識別化」引擎，檢查手機號碼、證件號碼、銀行卡號等敏感資訊和庫裡的真實客戶名；律師姓名與公司名稱不作處理。",
     "panel.sens.preview": "檢查敏感資訊",
@@ -4140,6 +4216,10 @@ window.AWD_PITCH_L10N = {
     "panel.err.emptyTender": "招標文件沒有可讀取的文字。掃描檔請先做 OCR。",
     "panel.err.noRequirements": "沒有從檔案裡擷取到資格要求或評分項，請確認選的是招標文件。",
     "panel.gen.overflow": "第 {list} 頁的表格項目較多，已壓低列高仍可能超出頁面，請在編輯器中檢查或減少所選項目。",
-    "panel.hint.credentials.title": "對外資料會直接使用專案名稱；名稱中如含客戶簡稱，請改成不會洩露客戶的寫法。"
+    "panel.hint.credentials.title": "對外資料會直接使用專案名稱；名稱中如含客戶簡稱，請改成不會洩露客戶的寫法。",
+    "panel.lib.confirmExport": "匯出的是整個庫，包括真實客戶名，會寫進目前專案的「投標庫匯出」資料夾，專案成員都看得到。確定匯出？",
+    "panel.lib.someClient": "某客戶",
+    "panel.err.cancelled": "已停止。",
+    "panel.err.panel_only": "這個操作只能在「投標與提案」面板裡進行。"
   }
 };

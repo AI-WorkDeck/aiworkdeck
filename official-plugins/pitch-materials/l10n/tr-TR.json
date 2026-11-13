@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Uyarı: Dosyada kütüphanedeki gerçek müvekkil adları hâlâ yer alıyor: {list}. Göndermeden önce düzenleyicide kaldırın.",
   "panel.gen.noLeaks": "Kontrol edildi: Kütüphanedeki gerçek müvekkil adlarından hiçbiri dosyada yer almıyor.",
   "panel.gen.internal": "Gerçek müvekkil adlarını içeren iç sürüm. Dışarıya göndermeyin.",
-  "panel.gen.unknown": "Tanınmayan yer tutucular olduğu gibi bırakıldı: {list}",
+  "panel.gen.unknown": "Şablondaki bazı yer tutucular doldurulamadı (bilinmeyen ad veya tekrarlanamayan bir konum) ve olduğu gibi bırakıldı: {list}",
   "panel.sens.heading": "Maskeleme kontrolü",
   "panel.sens.hint": "Telefon numaralarını, kimlik ve banka kartı numaralarını ve kütüphanedeki gerçek müvekkil adlarını bulmak için Dosya Maskeleme altyapısını kullanır; avukat ve şirket adlarına dokunulmaz.",
   "panel.sens.preview": "Hassas verileri kontrol et",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "İhalede okunabilir metin yok. Taranmış dosyalarda önce OCR çalıştırın.",
   "panel.err.noRequirements": "Yeterlik şartı veya puanlama kriteri bulunamadı. Bunun ihale dokümanı olduğunu kontrol edin.",
   "panel.gen.overflow": "{list} numaralı slayttaki tablolarda çok sayıda satır var ve satır yüksekliği azaltıldıktan sonra bile slayttan taşabilir. Düzenleyicide kontrol edin veya daha az kayıt seçin.",
-  "panel.hint.credentials.title": "Dışarıya yönelik belgelerde dosya adı olduğu gibi kullanılır; ad müvekkilin kısaltmasını içeriyorsa, müvekkil anlaşılmayacak şekilde yeniden yazın."
+  "panel.hint.credentials.title": "Dışarıya yönelik belgelerde dosya adı olduğu gibi kullanılır; ad müvekkilin kısaltmasını içeriyorsa, müvekkil anlaşılmayacak şekilde yeniden yazın.",
+  "panel.lib.confirmExport": "Bu işlem, gerçek müvekkil adları dahil tüm kütüphaneyi geçerli projenin \"İhale kütüphanesi dışa aktarımları\" klasörüne aktarır; klasörü tüm proje üyeleri görebilir. Yine de dışa aktarılsın mı?",
+  "panel.lib.someClient": "bir müvekkil",
+  "panel.err.cancelled": "Durduruldu.",
+  "panel.err.panel_only": "Bu işlem yalnızca \"İhaleler ve Teklifler\" panelinde kullanılabilir."
 }

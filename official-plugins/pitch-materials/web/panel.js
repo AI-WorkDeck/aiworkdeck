@@ -34,6 +34,10 @@
     quotes: ['name']
   };
 
+  const sep = () => (/^(zh|ja)/.test(locale) ? '、' : ', ');
+  const sep2 = () => (/^(zh|ja)/.test(locale) ? '；' : '; ');
+  const mask = (text) => core.maskClients(state.library, text, t('panel.lib.someClient'));
+
   const state = {
     projectId: '', tab: 'library', section: 'credentials', filter: '',
     library: core.emptyLibrary(), editing: null, draft: null,
@@ -83,6 +87,7 @@
   function errText(e) {
     if (e && e.code === 'unknown_method') return t('panel.err.upgrade');
     if (e && e.code === 'permission_denied') return t('panel.err.permission');
+    if (e && e.code === 'cancelled') return t('panel.err.cancelled');
     if (e && e.pitchCode) {
       const key = 'panel.err.' + e.pitchCode;
       const msg = t(key, { detail: e.detail || '' });
@@ -138,7 +143,15 @@
     } catch (e) { state.files = []; }
   }
 
+  // 报价按模板 id 缓存，避免每次重绘都调一次插件工具（占每分钟配额）；库一改就清空
+  const quoteCache = new Map();
+  function computeQuote(quoteId) {
+    if (!quoteCache.has(quoteId)) quoteCache.set(quoteId, tool('quote.compute', { quoteId }).catch((e) => { quoteCache.delete(quoteId); throw e; }));
+    return quoteCache.get(quoteId);
+  }
+
   async function saveLibrary(lib) {
+    quoteCache.clear();
     await tool('library.save', { library: lib });
     state.library = core.normalizeLibrary(lib);
   }
@@ -222,7 +235,7 @@
 
   function cellValue(item, key) {
     const v = item[key];
-    return Array.isArray(v) ? v.join(locale.startsWith('zh') ? '、' : ', ') : String(v == null ? '' : v);
+    return Array.isArray(v) ? v.join(sep()) : String(v == null ? '' : v);
   }
 
   function renderList() {
@@ -276,7 +289,7 @@
     box.appendChild(el('h2', { text: state.editing.id ? t('panel.lib.editTitle') : t('panel.lib.addTitle') }));
     FIELDS[section].forEach(([key, type]) => {
       const label = t('panel.field.' + section + '.' + key);
-      const value = Array.isArray(d[key]) ? d[key].join(locale.startsWith('zh') ? '、' : ', ') : (d[key] == null ? '' : String(d[key]));
+      const value = Array.isArray(d[key]) ? d[key].join(sep()) : (d[key] == null ? '' : String(d[key]));
       const input = type && type.startsWith('textarea')
         ? el('textarea', { className: 'awd-textarea', rows: type === 'textarea-lg' ? '10' : '3', value })
         : el('input', { className: 'awd-input', value });
@@ -400,11 +413,12 @@
       }), 'pm-file'))), btn(t('panel.action.cancel'), () => { state.importChoices = null; render(); })]);
   }
 
+  // 导出的是整库（含真实客户名），写进当前项目后项目成员都能看到：先确认
   function exportLibrary() {
-    run(async () => {
+    confirmBar(t('panel.lib.confirmExport'), [[t('panel.lib.export'), () => run(async () => {
       const res = await tool('library.export');
       notice(t('panel.lib.exported', { path: res.path }), 'info');
-    });
+    }), 'awd-btn-primary'], [t('panel.action.cancel'), () => {}]]);
   }
 
   // ---------- 2. 招标对照 ----------
@@ -478,7 +492,7 @@
   function evidenceNames() {
     const lib = state.library;
     const map = new Map([['firm', lib.firm.name]]);
-    lib.credentials.forEach((c) => map.set(c.id, core.maskClients(lib, c.title)));
+    lib.credentials.forEach((c) => map.set(c.id, mask(c.title)));
     lib.lawyers.forEach((l) => map.set(l.id, l.name + (l.title ? ' · ' + l.title : '')));
     lib.qualifications.forEach((q) => map.set(q.id, q.name));
     lib.services.forEach((s) => map.set(s.id, s.title));
@@ -541,15 +555,19 @@
       const ask = makeAsk();
       let failed = 0;
       let omitted = 0;
-      for (let i = 0; i < reqs.length; i++) {
-        if (state.cancelled) break;
-        state.progress = t('panel.progress.match', { i: i + 1, n: reqs.length });
-        render();
-        omitted = Math.max(omitted, reqs[i].omitted);
-        if (!core.applyMatch(items, await ask(reqs[i]), state.library, reqs[i].ids)) failed++;
+      try {
+        for (let i = 0; i < reqs.length; i++) {
+          if (state.cancelled) break;
+          state.progress = t('panel.progress.match', { i: i + 1, n: reqs.length });
+          render();
+          omitted = Math.max(omitted, reqs[i].omitted);
+          if (!core.applyMatch(items, await ask(reqs[i]), state.library, reqs[i].ids)) failed++;
+        }
+      } finally {
+        // 中途停止或出错时，已对照完的批次也要保存
+        state.selection = null;
+        saveMatrixSoon();
       }
-      state.selection = null;
-      saveMatrixSoon();
       const sum = core.summary(items);
       notice(t('panel.tender.matched', { met: sum.met, partial: sum.partial, missing: sum.missing })
         + (failed ? ' ' + t('panel.tender.matchFailed', { n: failed }) : '') + (omitted ? ' ' + t('panel.tender.digestTrimmed', { n: omitted }) : ''), failed ? 'warn' : 'info');
@@ -559,7 +577,7 @@
 
   function exportMatrix() {
     run(async () => {
-      const bytes = xlsx.buildXlsx(core.exportSheets(state.matrix, state.library, t));
+      const bytes = xlsx.buildXlsx(core.exportSheets(state.matrix, state.library, t, locale));
       const base = (state.matrix.tenderPath.split('/').pop() || 'tender').replace(/\.[^.]+$/, '');
       await awd.call('files.download', { name: t('panel.export.fileName', { name: base }) + '.xlsx', data: bytes });
     });
@@ -625,7 +643,7 @@
     const sel = state.selection[section];
     const rec = new Set((state.recommended && state.recommended[section]) || []);
     const lib = state.library;
-    const label = (it) => section === 'credentials' ? [core.maskClients(lib, it.title), it.year].filter(Boolean).join(' · ')
+    const label = (it) => section === 'credentials' ? [mask(it.title), it.year].filter(Boolean).join(' · ')
       : section === 'lawyers' ? [it.name, it.title].filter(Boolean).join(' · ') : (it.name || it.title || it.id);
     const items = lib[section].map((it) => {
       const box = el('input', { type: 'checkbox', checked: sel.has(it.id) });
@@ -646,7 +664,7 @@
     const draw = async () => {
       preview.textContent = '';
       if (!state.quoteId) return;
-      try { preview.appendChild(quoteTable(await tool('quote.compute', { quoteId: state.quoteId }))); } catch (e) { preview.appendChild(el('p', { className: 'pm-error', text: errText(e) })); }
+      try { preview.appendChild(quoteTable(await computeQuote(state.quoteId))); } catch (e) { preview.appendChild(el('p', { className: 'pm-error', text: errText(e) })); }
     };
     s.addEventListener('change', () => { state.quoteId = s.value; draw(); });
     draw();
@@ -659,7 +677,7 @@
       await loadFiles();
       state.gen.word = res.paths[0];
       state.gen.ppt = res.paths[1];
-      notice(t('panel.gen.samplesWritten', { paths: res.paths.join('、') }), 'info');
+      notice(t('panel.gen.samplesWritten', { paths: res.paths.join(sep()) }), 'info');
     });
   }
 
@@ -685,7 +703,7 @@
     });
     const missing = g.outward ? core.missingAliases(state.library, params.credentialIds) : [];
     if (missing.length) {
-      confirmBar(t('panel.gen.missingAlias', { list: missing.map((c) => c.title).join('；') }), [
+      confirmBar(t('panel.gen.missingAlias', { list: missing.map((c) => c.title).join(sep2()) }), [
         [t('panel.gen.continue'), go, 'awd-btn-primary'], [t('panel.gen.fixAlias'), () => { state.tab = 'library'; state.section = 'credentials'; render(); }]]);
     } else go();
   }
@@ -704,9 +722,9 @@
       el('p', { className: 'pm-path', text: r.path }),
       r.quote && r.quote.total ? el('p', { text: t('panel.quote.total', { total: r.quote.total, upper: r.quote.upper }) }) : null
     ]);
-    if (r.outward) card.appendChild(el('p', { className: r.leaks.length ? 'pm-error' : 'pm-ok', text: r.leaks.length ? t('panel.gen.leaks', { list: r.leaks.join('；') }) : t('panel.gen.noLeaks') }));
+    if (r.outward) card.appendChild(el('p', { className: r.leaks.length ? 'pm-error' : 'pm-ok', text: r.leaks.length ? t('panel.gen.leaks', { list: r.leaks.join(sep2()) }) : t('panel.gen.noLeaks') }));
     else card.appendChild(el('p', { className: 'pm-warn', text: t('panel.gen.internal') }));
-    if (r.overflowSlides && r.overflowSlides.length) card.appendChild(el('p', { className: 'pm-warn', text: t('panel.gen.overflow', { list: r.overflowSlides.join('、') }) }));
+    if (r.overflowSlides && r.overflowSlides.length) card.appendChild(el('p', { className: 'pm-warn', text: t('panel.gen.overflow', { list: r.overflowSlides.join(sep()) }) }));
     if (r.unknownPlaceholders.length) card.appendChild(el('p', { className: 'pm-warn', text: t('panel.gen.unknown', { list: r.unknownPlaceholders.join(' ') }) }));
     if (r.kind === 'docx') card.appendChild(renderSensitive(r));
     return card;
@@ -726,7 +744,7 @@
     }))]));
     if (st.counts) {
       const entries = Object.entries(st.counts);
-      box.appendChild(el('p', { text: entries.length ? t('panel.sens.counts', { list: entries.map(([k, v]) => k + ' ' + v).join('，') }) : t('panel.sens.none') }));
+      box.appendChild(el('p', { text: entries.length ? t('panel.sens.counts', { list: entries.map(([k, v]) => k + ' ' + v).join(sep()) }) : t('panel.sens.none') }));
       const pwd = el('input', { className: 'awd-input', type: 'password', autocomplete: 'new-password', placeholder: t('panel.sens.password') });
       box.appendChild(el('div', { className: 'pm-toolbar' }, [pwd, btn(t('panel.sens.redact'), () => {
         if (!pwd.value) { notice(t('panel.sens.passwordRequired'), 'warn'); return; }
@@ -773,8 +791,12 @@
     try { awd.events.on('files.changed', () => { if (!state.busy) loadFiles().then(render); }); } catch (e) { /* 旧宿主无事件通道 */ }
     try {
       awd.events.on('project.switched', async (data) => {
+        // 待保存的对照表属于上一个项目：宿主此时已切到新项目，不能再存，直接丢弃；生成表单也清空
+        clearTimeout(matrixTimer);
         state.projectId = (data && data.projectId) || '';
         state.results = [];
+        state.sensitive = {};
+        state.gen = { client: '', project: '', word: 'sample', ppt: 'sample', outward: true, hideAmounts: false, includeMatrix: true };
         await loadAll();
         render();
       });

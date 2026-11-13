@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Aviso: en el archivo siguen apareciendo nombres reales de clientes de la biblioteca: {list}. Elimínelos en el editor antes de enviarlo.",
   "panel.gen.noLeaks": "Comprobado: ningún nombre real de cliente de la biblioteca aparece en el archivo.",
   "panel.gen.internal": "Versión interna con nombres reales de clientes. No enviar al exterior.",
-  "panel.gen.unknown": "Los marcadores no reconocidos se dejaron tal cual: {list}",
+  "panel.gen.unknown": "Algunos marcadores de posición de la plantilla no se pudieron rellenar (nombre desconocido o en una posición que no admite repetición) y se dejaron tal cual: {list}",
   "panel.sens.heading": "Revisión de anonimización",
   "panel.sens.hint": "Usa el motor de Anonimización de archivos para detectar números de teléfono, de documento de identidad y de tarjeta bancaria, así como los nombres reales de clientes de la biblioteca; los nombres de abogados y empresas no se modifican.",
   "panel.sens.preview": "Comprobar datos sensibles",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "El pliego no tiene texto legible. Ejecute primero OCR en los archivos escaneados.",
   "panel.err.noRequirements": "No se encontraron requisitos de solvencia ni criterios de valoración. Compruebe que se trata del pliego de licitación.",
   "panel.gen.overflow": "Las tablas de la diapositiva {list} tienen muchas filas y, aun reduciendo su altura, pueden salirse de la diapositiva. Revíselas en el editor o seleccione menos entradas.",
-  "panel.hint.credentials.title": "Los materiales externos usan el título del asunto tal cual; si contiene una forma abreviada del nombre del cliente, reescríbalo para que no se pueda identificar al cliente."
+  "panel.hint.credentials.title": "Los materiales externos usan el título del asunto tal cual; si contiene una forma abreviada del nombre del cliente, reescríbalo para que no se pueda identificar al cliente.",
+  "panel.lib.confirmExport": "Se exportará toda la biblioteca, incluidos los nombres reales de los clientes, a la carpeta «Exportaciones de la biblioteca de licitaciones» del proyecto actual, donde la verán todos los miembros del proyecto. ¿Exportar de todos modos?",
+  "panel.lib.someClient": "un cliente",
+  "panel.err.cancelled": "Detenido.",
+  "panel.err.panel_only": "Esta acción solo está disponible en el panel «Licitaciones y propuestas»."
 }

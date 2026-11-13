@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Peringatan: nama asli klien dari pustaka masih muncul di berkas: {list}. Hapus di editor sebelum dikirim.",
   "panel.gen.noLeaks": "Sudah diperiksa: tidak ada nama asli klien dari pustaka yang muncul di berkas.",
   "panel.gen.internal": "Versi internal dengan nama asli klien. Jangan dikirim ke luar.",
-  "panel.gen.unknown": "Penampung yang tidak dikenali dibiarkan apa adanya: {list}",
+  "panel.gen.unknown": "Beberapa placeholder pada templat tidak dapat diisi (nama tidak dikenal atau berada di posisi yang tidak dapat diulang) dan dibiarkan apa adanya: {list}",
   "panel.sens.heading": "Pemeriksaan penyamaran",
   "panel.sens.hint": "Menggunakan mesin Penyamaran Berkas untuk menemukan nomor telepon, nomor identitas dan kartu bank, serta nama asli klien dari pustaka; nama advokat dan perusahaan tidak diubah.",
   "panel.sens.preview": "Periksa data sensitif",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "Dokumen tender tidak memiliki teks yang dapat dibaca. Jalankan OCR terlebih dahulu pada berkas hasil pindai.",
   "panel.err.noRequirements": "Tidak ditemukan persyaratan kualifikasi atau kriteria penilaian. Pastikan ini adalah dokumen tender.",
   "panel.gen.overflow": "Tabel pada slide {list} memiliki banyak baris dan mungkin masih melewati batas slide meskipun tinggi baris sudah dikurangi. Periksa di editor atau pilih lebih sedikit entri.",
-  "panel.hint.credentials.title": "Materi untuk pihak luar memakai nama perkara apa adanya; jika memuat singkatan nama klien, tulis ulang agar klien tidak dapat dikenali."
+  "panel.hint.credentials.title": "Materi untuk pihak luar memakai nama perkara apa adanya; jika memuat singkatan nama klien, tulis ulang agar klien tidak dapat dikenali.",
+  "panel.lib.confirmExport": "Tindakan ini mengekspor seluruh pustaka, termasuk nama klien yang sebenarnya, ke folder \"Ekspor pustaka tender\" pada proyek saat ini, yang dapat dilihat oleh semua anggota proyek. Tetap ekspor?",
+  "panel.lib.someClient": "seorang klien",
+  "panel.err.cancelled": "Dihentikan.",
+  "panel.err.panel_only": "Tindakan ini hanya tersedia di panel \"Tender dan Proposal\"."
 }

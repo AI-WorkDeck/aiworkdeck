@@ -171,7 +171,7 @@
   "panel.gen.leaks": "Amaran: nama sebenar klien daripada perpustakaan masih terdapat dalam fail: {list}. Buangkannya dalam editor sebelum menghantar.",
   "panel.gen.noLeaks": "Disemak: tiada nama sebenar klien daripada perpustakaan terdapat dalam fail.",
   "panel.gen.internal": "Versi dalaman dengan nama sebenar klien. Jangan hantar ke luar.",
-  "panel.gen.unknown": "Pemegang tempat yang tidak dikenali dibiarkan seperti asal: {list}",
+  "panel.gen.unknown": "Sesetengah pemegang tempat dalam templat tidak dapat diisi (nama tidak dikenali atau berada di kedudukan yang tidak boleh diulang) dan dibiarkan seperti asal: {list}",
   "panel.sens.heading": "Semakan penyamaran",
   "panel.sens.hint": "Menggunakan enjin Penyamaran Fail untuk mencari nombor telefon, nombor kad pengenalan dan kad bank, serta nama sebenar klien daripada perpustakaan; nama peguam dan syarikat tidak diubah.",
   "panel.sens.preview": "Semak data sensitif",
@@ -207,5 +207,9 @@
   "panel.err.emptyTender": "Dokumen tender tiada teks yang boleh dibaca. Jalankan OCR dahulu pada fail imbasan.",
   "panel.err.noRequirements": "Tiada syarat kelayakan atau kriteria pemarkahan ditemui. Pastikan ini ialah dokumen tender.",
   "panel.gen.overflow": "Jadual pada slaid {list} mempunyai banyak baris dan mungkin masih melebihi slaid walaupun ketinggian baris telah dikurangkan. Sila semak dalam editor atau pilih lebih sedikit entri.",
-  "panel.hint.credentials.title": "Bahan untuk pihak luar menggunakan nama perkara seperti sedia ada; jika ia mengandungi singkatan nama klien, tulis semula supaya klien tidak dapat dikenal pasti."
+  "panel.hint.credentials.title": "Bahan untuk pihak luar menggunakan nama perkara seperti sedia ada; jika ia mengandungi singkatan nama klien, tulis semula supaya klien tidak dapat dikenal pasti.",
+  "panel.lib.confirmExport": "Ini mengeksport seluruh perpustakaan, termasuk nama klien sebenar, ke folder \"Eksport perpustakaan tender\" dalam projek semasa, yang boleh dilihat oleh semua ahli projek. Tetap eksport?",
+  "panel.lib.someClient": "seorang klien",
+  "panel.err.cancelled": "Dihentikan.",
+  "panel.err.panel_only": "Tindakan ini hanya tersedia dalam panel \"Tender dan Cadangan\"."
 }
