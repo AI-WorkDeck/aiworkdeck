@@ -13,6 +13,10 @@
   <SettingsSection class="panel-work-log" :title="$t('account.tabWorkLog')" :description="$t('account.workLogSubtitle')">
       <template #actions>
         <view class="log-filter-bar header-actions">
+          <view class="log-view-switch" role="tablist">
+            <text class="log-view-tab" :class="{ active: view === 'activity' }" role="tab" :aria-selected="view === 'activity'" @tap="view = 'activity'">{{ $t('account.workLogViewActivity') }}</text>
+            <text class="log-view-tab" :class="{ active: view === 'time' }" role="tab" :aria-selected="view === 'time'" @tap="view = 'time'">{{ $t('account.workLogViewTime') }}</text>
+          </view>
           <picker class="filter-input filter-date" mode="date" :value="activityFilter.from" :end="activityFilter.to" @change="onRangeChange('from', $event)">
             <text class="filter-date-text">{{ activityFilter.from }}</text>
           </picker>
@@ -21,18 +25,20 @@
             <text class="filter-date-text">{{ activityFilter.to }}</text>
           </picker>
           <AwdSelect
+            v-if="view === 'activity'"
             class="filter-project-select"
             :range="projectFilterLabels"
             :value="projectFilterIndex"
             @change="onProjectFilterChange"
           />
-          <input class="filter-input" v-model="activityFilter.content" :placeholder="$t('account.filterContentPlaceholder')" />
-          <button class="btn-export" @tap="exportLogsToExcel">{{ $t('account.exportExcelBtn') }}</button>
+          <input v-if="view === 'activity'" class="filter-input" v-model="activityFilter.content" :placeholder="$t('account.filterContentPlaceholder')" />
+          <button v-if="view === 'activity'" class="btn-export" @tap="exportLogsToExcel">{{ $t('account.exportExcelBtn') }}</button>
         </view>
       </template>
 
-      <view v-if="activityTruncated" class="log-truncated-hint">{{ $t('account.workLogTruncatedHint') }}</view>
-      <view class="log-table-container">
+      <WorkLogTimeEntries v-if="view === 'time'" :from="activityFilter.from" :to="activityFilter.to" />
+      <view v-if="view === 'activity' && activityTruncated" class="log-truncated-hint">{{ $t('account.workLogTruncatedHint') }}</view>
+      <view v-if="view === 'activity'" class="log-table-container">
         <view class="log-table-header">
           <text class="th th-project">{{ $t('account.thProject') }}</text>
           <text class="th th-action">{{ $t('account.thAction') }}</text>
@@ -63,6 +69,7 @@
 import { getUserActivityHistory } from '@/services/api.js'
 import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import WorkLogTimeEntries from '@/components/userprofile/WorkLogTimeEntries.vue'
 import { toolDisplayName } from '@/utils/toolDisplayNames.js'
 
 // dev-board BUG-45：actionType → i18n key。取值范围见 backend
@@ -86,9 +93,11 @@ const ACTION_TYPE_I18N_KEYS = {
 
 export default {
   name: 'PersonalWorkLogPanel',
-  components: { AwdSelect, SettingsSection },
+  components: { AwdSelect, SettingsSection, WorkLogTimeEntries },
   data() {
     return {
+      // 'activity' = 活动明细（原表）；'time' = 计费工时（由工作记录汇总，提交合伙人审核出账单）
+      view: 'activity',
       activityLogs: [],
       activityLoading: false,
       activityTruncated: false,
@@ -387,6 +396,29 @@ export default {
   line-height: calc(var(--awd-control-height) - 2px);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.log-view-switch {
+  display: inline-flex;
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.log-view-tab {
+  padding: 0 10px;
+  line-height: calc(var(--awd-control-height) - 2px);
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text-2);
+  cursor: pointer;
+  white-space: nowrap;
+
+  &.active {
+    background: var(--awd-accent-soft);
+    color: var(--awd-accent-text);
+    font-weight: 500;
+  }
 }
 
 .filter-range-sep {

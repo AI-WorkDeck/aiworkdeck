@@ -34,7 +34,7 @@ import static org.mockito.Mockito.*;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({LawFirmManagementService.class, LawFirmConflictEngine.class, ImService.class, ObjectMapper.class,
+@Import({LawFirmManagementService.class, LawFirmClientService.class, LawFirmConflictEngine.class, ImService.class, ObjectMapper.class,
         LawFirmAccessPolicy.class, AdminAccessService.class})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:lawfirm-firmwide-access-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1",

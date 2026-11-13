@@ -291,6 +291,12 @@ public class PluginService {
          * 写入只经宿主表单——配置权在用户手里。
          */
         private List<PluginSettingDecl> settings;
+        /**
+         * 除桌面端与 Office/WPS 任务窗格（缺省就支持）之外还声明支持的宿主（规范 §2，W1）。
+         * 目前只认 {@code "web"}：声明了它，本插件的 Agent 工具才会出现在网页版会话里；
+         * 缺省不出现（插件工具多数假设桌面环境，判不准时放行在网页上会变成死路径）。
+         */
+        private List<String> hosts;
     }
 
     /** manifest.contributes：插件向宿主贡献的声明式内容（规范 v2.8 P3 起，只加不改） */
@@ -1052,6 +1058,13 @@ public class PluginService {
     /** 工具所属的插件 id（内置工具不在此映射中，返回 null） */
     public String getPluginIdForTool(String toolName) {
         return toolToPluginId.get(toolName);
+    }
+
+    /** 插件 manifest 的 {@code hosts} 是否声明了网页版（{@code "web"}，大小写不敏感）。未知插件为 false。 */
+    public boolean supportsWebClient(String pluginId) {
+        PluginMetadata meta = pluginId == null ? null : getPlugin(pluginId);
+        if (meta == null || meta.getHosts() == null) return false;
+        return meta.getHosts().stream().anyMatch(h -> h != null && "web".equalsIgnoreCase(h.trim()));
     }
 
     /** manifest 以 {@code agent:false} 标为仅供 UI 直调的工具名（不下发给模型、不投影 MCP）。 */

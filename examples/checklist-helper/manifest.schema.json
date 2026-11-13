@@ -36,6 +36,15 @@
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
+    "hosts": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "web"
+        ]
+      },
+      "uniqueItems": true
+    },
     "frontendEntry": {
       "type": "string",
       "pattern": "^(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[\\\\%?#:])web/.+\\.html?$"

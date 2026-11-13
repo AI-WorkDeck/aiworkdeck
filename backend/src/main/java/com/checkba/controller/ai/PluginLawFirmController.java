@@ -26,6 +26,7 @@ public class PluginLawFirmController {
     private final LawFirmManagementService service;
     private final ObjectMapper mapper;
     private final com.checkba.service.lawfirm.LawFirmWorkflowGateway workflow;
+    private final com.checkba.service.lawfirm.LawFirmBillingService billing;
 
     @PostMapping
     public Map<String, Object> action(@PathVariable("id") String pluginId, HttpServletRequest request,
@@ -44,6 +45,8 @@ public class PluginLawFirmController {
         if (com.checkba.service.lawfirm.LawFirmWorkflowService.ACTIONS.contains(action))
             return LawFirmManagementController.run(() -> workflow.execute(userId, action, params));
         Long projectId = LawFirmManagementController.parseProjectId(body.get("projectId"));
+        if (com.checkba.service.lawfirm.LawFirmBillingService.ACTIONS.contains(action))
+            return LawFirmManagementController.run(() -> com.checkba.service.lawfirm.LawFirmBillingService.concurrencySafe(() -> billing.execute(userId, projectId, action, params)));
         return LawFirmManagementController.run(() -> service.execute(userId, projectId, action, params));
     }
 }

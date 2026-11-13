@@ -91,12 +91,12 @@ test('渲染途中换了文件：迟到的结果不显示到新文件上', async
 
 // ---- 工作台：借隐藏引擎渲染 ----
 function poolHarness(run) {
-  const body = between(POOL, '    async renderSlidesForPreview(', '    releaseLibreHiddenInstance(handle) {')
+  const body = between(POOL, '    async renderSlidesForPreview(', '    releaseLibreHiddenInstance(handle, { recycle')
   const methods = new Function('console', `return ({${body}})`)({ warn() {} })
   const released = []
   const vm = {
     acquireLibreHiddenInstance: async ({ isCancelled }) => (isCancelled() ? null : { run, _spare: { key: 1 } }),
-    releaseLibreHiddenInstance: (h) => released.push(h),
+    releaseLibreHiddenInstance: (h, opts) => { assert.deepEqual(opts, { recycle: true }, '预览归还要走回收（B5）'); released.push(h) },
   }
   vm.renderSlidesForPreview = methods.renderSlidesForPreview.bind(vm)
   return { vm, released }

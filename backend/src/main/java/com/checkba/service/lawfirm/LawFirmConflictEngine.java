@@ -76,6 +76,10 @@ public class LawFirmConflictEngine {
         private String handlerUserName;
         private String departmentName;
         private String actionRequired;
+        /** 命中的客户（{@link com.checkba.model.entity.lawfirm.LawFirmParty} 客户行）；无客户档案的命中为空。 */
+        private Long matchedClientId;
+        /** 经主体关系图命中时的关系链说明（例如「甲持有乙 60% 股权；乙是丙的实际控制人」）。 */
+        private String relationPath;
 
         public String getRuleCitation() {
             return statutoryCitation;
@@ -224,6 +228,27 @@ public class LawFirmConflictEngine {
             List<LawFirmMatterIntake> existingIntakes,
             List<Project> existingProjects,
             Map<Long, String> userDisplayNames) {
+        return evaluateConflict(candidate, existingIntakes, existingProjects, userDisplayNames, LawFirmPartyGraph.empty());
+    }
+
+    /**
+     * 同上，另沿主体关系图（客户档案与其股东、子公司、实际控制人、配偶等）检索：
+     * <ul>
+     *   <li>Y5：对方当事人就是本所登记客户（该客户尚无收案命中，例如只建了档）；</li>
+     *   <li>Y6：对方当事人经关系链（含多层股权）关联到本所客户；</li>
+     *   <li>Y7：新委托人经关系链关联到本所在办案件的对方当事人。</li>
+     * </ul>
+     * 命中带 relationPath 说明关系链。
+     */
+    public ConflictCheckResult evaluateConflict(
+            LawFirmMatterIntake candidate,
+            List<LawFirmMatterIntake> existingIntakes,
+            List<Project> existingProjects,
+            Map<Long, String> userDisplayNames,
+            LawFirmPartyGraph graph) {
+
+        if (graph == null) graph = LawFirmPartyGraph.empty();
+        Map<Long, Long> clientIdByIntakeId = new java.util.HashMap<>();
 
         List<ConflictHit> hits = new ArrayList<>();
         String candClient = candidate.getClientName();
@@ -246,6 +271,9 @@ public class LawFirmConflictEngine {
                 }
                 if (ex.getProjectId() != null) {
                     coveredProjectIds.add(ex.getProjectId());
+                }
+                if (ex.getId() != null && ex.getClientId() != null) {
+                    clientIdByIntakeId.put(ex.getId(), ex.getClientId());
                 }
 
                 Long handlerId = ex.getLeadLawyerUserId() != null ? ex.getLeadLawyerUserId() : ex.getApplicantUserId();
@@ -446,6 +474,15 @@ public class LawFirmConflictEngine {
             }
         }
 
+        // 收案命中带上所属客户，便于客户档案汇总「利冲记录」，也用于下面 Y5 去重
+        for (ConflictHit hit : hits) {
+            if (hit.getMatchedClientId() == null && hit.getMatchedIntakeId() != null) {
+                hit.setMatchedClientId(clientIdByIntakeId.get(hit.getMatchedIntakeId()));
+            }
+        }
+
+        appendGraphHits(hits, candidate, existingIntakes, graph, userDisplayNames);
+
         String feeWarning = evaluateFeeCompliance(
                 candidate.getPracticeArea(),
                 candidate.getFeeMode(),
@@ -515,6 +552,105 @@ public class LawFirmConflictEngine {
             }
         }
         return null;
+    }
+
+    private static final Set<String> GRAPH_ACTIVE_STATUSES = Set.of(
+            "CONFLICT_CHECKING", "PENDING_LAWYER_CLEARANCE", "PENDING_COMMITTEE_REVIEW", "APPROVED_FILED");
+
+    private void appendGraphHits(List<ConflictHit> hits, LawFirmMatterIntake candidate,
+                                 List<LawFirmMatterIntake> existingIntakes, LawFirmPartyGraph graph,
+                                 Map<Long, String> userDisplayNames) {
+        Set<Long> hitClientIds = new java.util.HashSet<>();
+        Set<Long> hitIntakeIds = new java.util.HashSet<>();
+        for (ConflictHit hit : hits) {
+            if (hit.getMatchedClientId() != null) hitClientIds.add(hit.getMatchedClientId());
+            if (hit.getMatchedIntakeId() != null) hitIntakeIds.add(hit.getMatchedIntakeId());
+        }
+        Long ownClient = candidate.getClientId();
+        String counter = candidate.getCounterpartyName();
+        String counterCode = candidate.getCounterpartyCreditCode();
+
+        // 对方当事人一侧：对方本身是客户（Y5），或经关系链连到客户（Y6）
+        for (LawFirmPartyGraph.Node start : graph.match(counter, counterCode)) {
+            if (start.client() && !Objects.equals(start.id(), ownClient) && hitClientIds.add(start.id())) {
+                hits.add(graphHit("Y5_REGISTERED_CLIENT_ADVERSE",
+                        com.checkba.service.LangText.of("新案对方当事人系本所登记客户", "Opposing party is a registered firm client"),
+                        start, null, userDisplayNames));
+            }
+            for (LawFirmPartyGraph.Reach r : graph.reach(start.id(), LawFirmPartyGraph.CONFLICT_DEPTH)) {
+                LawFirmPartyGraph.Node n = r.node();
+                if (!n.client() || Objects.equals(n.id(), ownClient) || !hitClientIds.add(n.id())) continue;
+                hits.add(graphHit("Y6_RELATED_TO_FIRM_CLIENT",
+                        com.checkba.service.LangText.of("新案对方当事人与本所客户存在关联关系（含间接股权）",
+                                "Opposing party is related to a firm client (including indirect shareholding)"),
+                        n, graph.describe(r.steps()), userDisplayNames));
+            }
+        }
+
+        // 委托人一侧：委托人的关联主体是本所在办案件的对方当事人（Y7）
+        List<LawFirmPartyGraph.Node> clientStarts = ownClient != null && graph.node(ownClient) != null
+                ? List.of(graph.node(ownClient)) : graph.match(candidate.getClientName(), candidate.getClientCreditCode());
+        if (existingIntakes == null) return;
+        for (LawFirmPartyGraph.Node start : clientStarts) {
+            for (LawFirmPartyGraph.Reach r : graph.reach(start.id(), LawFirmPartyGraph.CONFLICT_DEPTH)) {
+                for (LawFirmMatterIntake ex : existingIntakes) {
+                    if (ex == null || ex.getId() == null || hitIntakeIds.contains(ex.getId())) continue;
+                    if (candidate.getId() != null && candidate.getId().equals(ex.getId())) continue;
+                    if (!GRAPH_ACTIVE_STATUSES.contains(String.valueOf(ex.getStatus()))) continue;
+                    if (!matchesParty(r.node().name(), r.node().creditCode(), ex.getCounterpartyName(), ex.getCounterpartyCreditCode())) continue;
+                    hitIntakeIds.add(ex.getId());
+                    Long handlerId = ex.getLeadLawyerUserId() != null ? ex.getLeadLawyerUserId() : ex.getApplicantUserId();
+                    hits.add(ConflictHit.builder()
+                            .ruleCode("Y7_CLIENT_RELATED_TO_ADVERSE_PARTY")
+                            .riskLevel("YELLOW")
+                            .ruleTitle(com.checkba.service.LangText.of("新委托人的关联主体系本所在办案件对方当事人",
+                                    "A party related to the new client is the opposing party in an active firm matter"))
+                            .statutoryCitation(GRAPH_CITATION.get())
+                            .matchedIntakeId(ex.getId())
+                            .matchedIntakeNo(ex.getIntakeNo())
+                            .matchedProjectId(ex.getProjectId())
+                            .matchedMatterTitle(ex.getTitle())
+                            .matchedClientId(ex.getClientId())
+                            .matchedPartyName(r.node().name())
+                            .matchedPartyRole(com.checkba.service.LangText.of("在办案件对方当事人", "Opposing party in an active matter"))
+                            .relationPath(graph.describe(r.steps()))
+                            .handlerUserId(handlerId)
+                            .handlerUserName(firstNonBlank(ex.getLeadLawyerName(), ex.getApplicantName(),
+                                    handlerId != null && userDisplayNames != null ? userDisplayNames.get(handlerId) : null,
+                                    com.checkba.service.LangText.of("关联案件主办律师", "Lead lawyer of the related matter")))
+                            .departmentName(firstNonBlank(ex.getDepartmentName(), com.checkba.service.LangText.of("本所业务部", "Firm practice group")))
+                            .actionRequired(com.checkba.service.LangText.of("向在办案件主办律师发送站内信征询放行，确认关联关系后交利冲委员终审",
+                                    "Ask the lead lawyer of the active matter to clear it, then send it to the committee"))
+                            .build());
+                }
+            }
+        }
+    }
+
+    private static final java.util.function.Supplier<String> GRAPH_CITATION = () -> com.checkba.service.LangText.of(
+            "全国律协《律师执业行为规范》第五十条、第五十一条第（三）项、第五十三条：对抗本所客户或其关联主体，需客户维护人确认并征询放行",
+            "ACLA Code of Conduct for Lawyers arts. 50, 51(3) and 53: acting against a firm client or its related parties requires clearance");
+
+    private ConflictHit graphHit(String code, String title, LawFirmPartyGraph.Node client, String path, Map<Long, String> userDisplayNames) {
+        return ConflictHit.builder()
+                .ruleCode(code)
+                .riskLevel("YELLOW")
+                .ruleTitle(title)
+                .statutoryCitation(GRAPH_CITATION.get())
+                .matchedClientId(client.id())
+                .matchedMatterTitle(com.checkba.service.LangText.of("客户档案 ", "Client record ") + firstNonBlank(client.clientNo(), client.name()))
+                .matchedPartyName(client.name())
+                .matchedPartyRole(com.checkba.service.LangText.of("本所客户", "Firm client"))
+                .relationPath(path)
+                .handlerUserId(client.ownerUserId())
+                .handlerUserName(firstNonBlank(client.ownerName(),
+                        client.ownerUserId() != null && userDisplayNames != null ? userDisplayNames.get(client.ownerUserId()) : null,
+                        com.checkba.service.LangText.of("客户维护人", "Relationship owner")))
+                .departmentName(com.checkba.service.LangText.of("客户档案", "Client records"))
+                .actionRequired(com.checkba.service.LangText.of(
+                        "向客户维护人发送站内信征询，确认客户关系现状并放行后交利冲委员终审",
+                        "Ask the relationship owner to confirm the client relationship and clear it before committee review"))
+                .build();
     }
 
     private static String firstNonBlank(String... values) {

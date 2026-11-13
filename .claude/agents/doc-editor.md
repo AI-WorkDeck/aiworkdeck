@@ -17,6 +17,13 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 - **后台写作调用**（设置/词表/学习/自动补全）`accountPrompt:false`：会话失效时静默失败，不在打字途中弹登录框；改写/采用等主动操作照常提示。
 - 待办：三个写作辅助宿主各自分页通读全文（大文档 Word 主因），宜按 revision 共享一次读取；PPT 缩略图与备胎启动在打开后 10s 内与交互争 worker。
 
+## QuickLook 借预热备胎后原样归还（台账 B5，2026-11-13）
+
+- 空格预览演示文稿借用预热备胎渲染（`renderSlidesForPreview`）。过去用完即弃，紧接着打开文件就要冷启动（真机 3.1s）；现在 `releaseLibreHiddenInstance(handle, { recycle: true })` 先发 `load_document{blank:true}`（worker 新建空白 Writer 文档、经 retarget 关掉预览的那份），成功才把 `borrowed` 清掉归还池子，紧接着打开落在热引擎上（真机 0.43–0.47s）。清场期间保持 borrowed，不会被过继；清场失败/拒收才按老规矩丢掉重排预热。
+- 三方合并等其他借用方**不走**回收（它们端着别人的文档跑重活，仍用完即弃）。
+- `load_document{blank}` 不是「空字节」：空字节保持当前文档不变（新建空文件的语义），清场必须用 blank。
+- 回归：`tests/project-home/libre-hidden-release-reactive.test.mjs`（回收/失败回退/冷实例不回收）、`node tests/lowa-e2e/blank-reset.mjs`（真引擎：预览→清场无残留→再装三种格式可编辑）、`node tests/desktop-e2e/quicklook-slides.mjs` 末段 B5（预览后马上打开 Word：热引擎、打字自动保存落盘、关闭重开核对；再开同一份演示文稿）。
+
 ## PPT/Excel 一流化（office-tier1，2026-11-12）
 
 2026-11-12 在真实 LOWA 引擎实测。
@@ -68,7 +75,7 @@ PPT 内容修改立即失效缩略图，但全篇导航清单等宿主允许后�
 
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
-当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
+当前正式基线是 **24.2.8-zhcn-r10**（2026-11-13 发布，0.86 起打包；= r8 配方 + Emscripten #28186 代理死锁回移补丁 `desktop/lowa-build/patches/apply-emscripten-patches.py`，修启动偶发挂住；四个产物 SHA 与验证见 `desktop/lowa-build/RECIPE.md`；r8 留在架上作回退，切回只改 desktop-build.yml / model-matrix.yml 的 LOWA_BASE_URL）。任何重编引擎发布前必须跑启动冒烟 ≥40 次（不能只看 run.mjs）。下文历史段落的 r5/r6 描述不能当作当前未完成清单。
 
 Calc 行列标题由原生 `ScHeaderControl` 绘制，字体在构造时缓存，CSS 与事后 UNO `ApplicationFont` 设置不能可靠替换。构建补丁将标题字体设为包内 Liberation Sans 9pt，经 VCL 设备DPI换算；在 Paint 中用独立 StyleSettings 副本映射产品深浅令牌，以现有 `AppBackground` 判主题，不修改正文格式或全局Qt调色板。高对比保留原生路径；这不等于滚动条/菜单等全部Qt chrome已深色化。`Color(sal_uInt32)` 在该基准可为 consteval，动态主题须写成 `dark ? Color(常量) : Color(常量)`。
 

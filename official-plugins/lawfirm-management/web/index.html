@@ -12,6 +12,8 @@
   <script src="workflow.js" defer></script>
   <script src="expenses-l10n.js" defer></script>
   <script src="expenses.js" defer></script>
+  <script src="clients.js" defer></script>
+  <script src="billing.js" defer></script>
   <script src="cloud.js" defer></script>
 </head>
 <body>
@@ -38,6 +40,10 @@
         <span>收案与立项</span>
         <span id="badge-intake-count" class="tab-count">0</span>
       </button>
+      <button type="button" id="tab-clients" role="tab" data-tab="clients" aria-selected="false" aria-controls="panel-clients" class="tab-btn">
+        <span data-c="client.tab"></span>
+        <span id="badge-clients-count" class="tab-count">0</span>
+      </button>
       <button type="button" id="tab-conflict" role="tab" data-tab="conflict" aria-selected="false" aria-controls="panel-conflict" class="tab-btn">
         <span>利冲审查中心</span>
         <span id="badge-conflict-count" class="tab-count">0</span>
@@ -52,6 +58,8 @@
       <button type="button" id="tab-expense" role="tab" data-tab="expense" aria-selected="false" aria-controls="panel-expense" class="tab-btn">
         <span data-ex="expense.tab"></span>
       </button>
+      <button type="button" id="tab-hourly" role="tab" data-tab="hourly" aria-selected="false" aria-controls="panel-hourly" class="tab-btn">
+        <span data-hb="billing.tab"></span>
       <button type="button" id="tab-cloud" role="tab" data-tab="cloud" aria-selected="false" aria-controls="panel-cloud" class="tab-btn">
         <span data-cl="cloud.tab"></span>
       </button>
@@ -169,6 +177,11 @@
     </section>
 
     <!-- Tab 2: 利冲审查中心 -->
+    <!-- 客户管理（web/clients.js） -->
+    <section id="panel-clients" role="tabpanel" aria-labelledby="tab-clients" class="tab-panel" hidden>
+      <div id="clients-root"></div>
+    </section>
+
     <section id="panel-conflict" role="tabpanel" aria-labelledby="tab-conflict" class="tab-panel" hidden>
       <article class="card" id="cloud-workflow">
         <header class="card-header"><div><h2>律所云端利冲协作</h2><p class="hint">管理员指定委员，由本人接受；关联律师与指定委员分别确认。仅发送你明确提交的信息，本机旧台账不会自动上传。</p></div><button type="button" id="workflow-refresh">连接并刷新</button></header>
@@ -528,6 +541,87 @@
       </article>
     </section>
 
+    <section id="panel-hourly" role="tabpanel" aria-labelledby="tab-hourly" class="tab-panel" hidden>
+      <article class="card">
+        <header class="card-header">
+          <div><h2 data-hb="billing.title"></h2><p class="hint" data-hb="billing.intro"></p></div>
+          <button type="button" id="hb-seed" data-hb="billing.seed"></button>
+        </header>
+        <div class="hb-bar">
+          <label class="hb-month"><span data-hb="billing.month"></span><input id="hb-month" type="month"></label>
+          <nav class="hb-subnav" role="tablist">
+            <button type="button" id="hb-nav-review" role="tab" data-hb="billing.nav.review"></button>
+            <button type="button" id="hb-nav-bills" role="tab" data-hb="billing.nav.bills"></button>
+            <button type="button" id="hb-nav-rates" role="tab" data-hb="billing.nav.rates"></button>
+            <button type="button" id="hb-nav-metrics" role="tab" data-hb="billing.nav.metrics"></button>
+          </nav>
+        </div>
+        <p id="hb-status" class="hint" role="status" aria-live="polite"></p>
+      </article>
+
+      <div id="hb-view-review">
+        <div class="hb-bar">
+          <label><span data-hb="billing.statusFilter"></span>
+            <select id="hb-review-status">
+              <option value="SUBMITTED" data-hb="billing.status.SUBMITTED"></option>
+              <option value="APPROVED" data-hb="billing.status.APPROVED"></option>
+              <option value="BILLED" data-hb="billing.status.BILLED"></option>
+              <option value="ALL" data-hb="billing.status.ALL"></option>
+            </select>
+          </label>
+          <p class="hint" data-hb="billing.reviewHint"></p>
+        </div>
+        <div id="hb-review-list" class="stack-list"></div>
+      </div>
+
+      <div id="hb-view-bills" hidden>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.newBill"></h2><p class="hint" data-hb="billing.newBillHint"></p></div></header>
+          <div class="form-grid">
+            <label class="field-span-2"><span data-hb="billing.matter"></span><select id="hb-bill-matter"></select></label>
+            <label><span data-hb="billing.discountOverride"></span><input id="hb-bill-discount" type="text" inputmode="decimal" data-hb-placeholder="billing.discountOverridePlaceholder"></label>
+            <div class="form-actions"><button type="button" id="hb-preview-btn" data-hb="billing.preview"></button></div>
+          </div>
+          <div id="hb-preview"></div>
+        </article>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.billList"></h2></div></header>
+          <div id="hb-bill-list" class="stack-list"></div>
+        </article>
+      </div>
+
+      <div id="hb-view-rates" hidden>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.timekeepers"></h2><p class="hint" data-hb="billing.timekeepersHint"></p></div></header>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th data-hb="billing.col.lawyer"></th><th data-hb="billing.col.level"></th><th data-hb="billing.col.standardRate"></th><th></th></tr></thead>
+              <tbody id="hb-timekeepers"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.terms"></h2><p class="hint" data-hb="billing.termsHint"></p></div></header>
+          <div id="hb-terms" class="stack-list"></div>
+        </article>
+      </div>
+
+      <div id="hb-view-metrics" hidden>
+        <article class="card">
+          <header class="card-header"><div><h2 data-hb="billing.metrics"></h2><p class="hint" data-hb="billing.metricsHint"></p></div></header>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th data-hb="billing.col.lawyer"></th><th data-hb="billing.col.level"></th><th data-hb="billing.col.recorded"></th>
+                <th data-hb="billing.col.billable"></th><th data-hb="billing.col.writtenDown"></th><th data-hb="billing.col.wip"></th>
+                <th data-hb="billing.col.standardValue"></th><th data-hb="billing.col.billedAmount"></th><th data-hb="billing.col.collected"></th>
+                <th data-hb="billing.col.realization"></th>
+              </tr></thead>
+              <tbody id="hb-metrics"></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
     <section id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" class="tab-panel" hidden>
       <article class="card">
         <header class="card-header">
