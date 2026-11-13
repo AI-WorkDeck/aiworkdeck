@@ -58,6 +58,7 @@
   "access.colleague": "同所同事",
   "access.risk.line": "風險提示 {0}",
   "access.risk.GREEN": "綠色（無利衝）",
+  "access.rule.G0_CLEAR": "無衝突",
   "access.risk.YELLOW": "黃色（潛在利衝）",
   "access.risk.RED": "紅色（直接利衝）"
 }

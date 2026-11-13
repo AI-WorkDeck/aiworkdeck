@@ -6,7 +6,7 @@
   "expense.formHint": "Les frais de justice, honoraires d'expert, frais de déplacement et dépenses similaires ne sont pas des honoraires d'avocat. Le client les règle séparément ; ils sont donc distincts des honoraires suivis dans « Facturation et recouvrement ». Selon les Mesures chinoises de gestion des honoraires des avocats, le décompte final doit comporter la liste des frais avancés pour le compte du client avec des justificatifs valables ; le client peut refuser toute somme sans justificatif valable. Ce registre est conservé sur cet appareil.",
   "expense.date": "Date",
   "expense.matter": "Dossier",
-  "expense.matterPlaceholder": "p. ex. Lanhai Optoelectronics c. Huaxing Semiconductor",
+  "expense.matterPlaceholder": "p. ex. Langqi Optoelectronics c. Lanyao Microelectronics",
   "expense.category": "Catégorie",
   "expense.amount": "Montant (CNY)",
   "expense.paidBy": "Payé par",
@@ -58,6 +58,7 @@
   "access.colleague": "Collègue de votre cabinet",
   "access.risk.line": "Niveau de risque : {0}",
   "access.risk.GREEN": "Vert (aucun conflit)",
+  "access.rule.G0_CLEAR": "Aucun conflit",
   "access.risk.YELLOW": "Jaune (conflit potentiel)",
   "access.risk.RED": "Rouge (conflit direct)"
 }

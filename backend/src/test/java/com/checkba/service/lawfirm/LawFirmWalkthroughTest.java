@@ -98,9 +98,9 @@ class LawFirmWalkthroughTest {
         // 走查测多账户业务链路：服务器上台账本已拒绝（见 LawFirmFirmWideAccessTest），这里在被代理实例上打开台账
         org.springframework.test.util.AopTestUtils.<LawFirmManagementService>getUltimateTargetObject(lawFirmService).ledgerAvailable = true;
         org.mockito.Mockito.when(accessPolicy.canViewFirmWide(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-        userA = createUser("lawyer_a", "苏婉清（合伙人）");
-        userB = createUser("lawyer_b", "周铭泽（主办律师）");
-        userCommittee = createUser("lawyer_committee", "林正源（利冲主任委员）");
+        userA = createUser("lawyer_a", "蔺若曦（合伙人）");
+        userB = createUser("lawyer_b", "郁承泽（主办律师）");
+        userCommittee = createUser("lawyer_committee", "岑方远（利冲主任委员）");
     }
 
     private User createUser(String username, String displayName) {
@@ -144,7 +144,14 @@ class LawFirmWalkthroughTest {
             Map<String, Object> dashboard = (Map<String, Object>) overview.get("dashboard");
             List<Map<String, Object>> departments = (List<Map<String, Object>>) dashboard.get("departments");
             Set<Object> names = departments.stream().map(d -> d.get("departmentName")).collect(java.util.stream.Collectors.toSet());
-            assertEquals(Set.of("资本市场与证券部", "公司并购与投融资部", "民商事争议解决部", "知识产权与合规部"), names);
+            assertEquals(Set.of("示例资本市场部", "示例并购投融资部", "示例争议解决部", "示例知产合规部"), names);
+            // 样板数据不得改动当前用户自己的资料与部门，也不得出现真实品牌名和内部规则码
+            Map<String, Object> self = (Map<String, Object>) overview.get("self");
+            assertNull(self.get("departmentName"), "样板数据不该给当前用户安上部门: " + self);
+            String all = String.valueOf(overview);
+            for (String banned : List.of("华星", "中航", "光启", "科创板审核中心")) {
+                assertFalse(all.contains(banned), "样板数据含真实品牌/机构名: " + banned);
+            }
         } finally {
             target.localMode = false;
         }
@@ -215,13 +222,13 @@ class LawFirmWalkthroughTest {
     @DisplayName("Walkthrough 2: 黄色潜在冲突 -> 自动建站内信会话与征询单 -> 承办律师隔离墙放行 -> 委员会终审立案")
     @SuppressWarnings("unchecked")
     void walkthrough2_yellowConflictToImStationMessageLawyerClearanceAndCommitteeFiling() {
-        // 1. 律师 A 先有一宗在办已立案案件，委托人为「华星半导体股份有限公司」
+        // 1. 律师 A 先有一宗在办已立案案件，委托人为「澜曜微电子股份有限公司」
         Map<String, Object> caseARes = lawFirmService.execute(userA.getId(), null, "submitIntake", Map.of(
-                "title", "华星半导体科创板上市常年及专项辅导",
+                "title", "澜曜微电子科创板上市常年及专项辅导",
                 "practiceArea", "IPO_CAPITAL",
                 "departmentName", "资本市场与证券部",
-                "clientName", "华星半导体股份有限公司",
-                "counterpartyName", "上海证券交易所科创板审核中心",
+                "clientName", "澜曜微电子股份有限公司",
+                "counterpartyName", "无",
                 "contractAmountCents", 380_000_000L
         ));
         Long caseAId = ((Number) ((Map<String, Object>) caseARes.get("intake")).get("id")).longValue();
@@ -230,21 +237,21 @@ class LawFirmWalkthroughTest {
                 "decision", "APPROVE_AND_FILE"
         ));
 
-        // 2. 律师 B 预检并提交新商事诉讼：对方当事人为「华星半导体（集团）有限公司」（商号核心词干归一化为「华星半导体」）
+        // 2. 律师 B 预检并提交新商事诉讼：对方当事人为「澜曜微电子（集团）有限公司」（商号核心词干归一化为「澜曜微电子」）
         Map<String, Object> precheck = lawFirmService.execute(userB.getId(), null, "precheckConflict", Map.of(
                 "practiceArea", "LITIGATION",
-                "clientName", "苏州东海精密装备股份有限公司",
-                "counterpartyName", "华星半导体（集团）有限公司"
+                "clientName", "苏州霁岚精密装备股份有限公司",
+                "counterpartyName", "澜曜微电子（集团）有限公司"
         ));
         assertEquals("YELLOW", precheck.get("conflictRiskLevel"));
         assertEquals("Y1_EXISTING_CLIENT_OTHER_MATTER", precheck.get("primaryRuleCode"));
 
         Map<String, Object> submitBRes = lawFirmService.execute(userB.getId(), null, "submitIntake", Map.of(
-                "title", "东海精密诉华星半导体（集团）晶圆设备采购合同纠纷案",
+                "title", "霁岚精密诉澜曜微电子（集团）晶圆设备采购合同纠纷案",
                 "practiceArea", "LITIGATION",
                 "departmentName", "民商事争议解决部",
-                "clientName", "苏州东海精密装备股份有限公司",
-                "counterpartyName", "华星半导体（集团）有限公司",
+                "clientName", "苏州霁岚精密装备股份有限公司",
+                "counterpartyName", "澜曜微电子（集团）有限公司",
                 "feeMode", "PROPORTIONAL",
                 "contractAmountCents", 150_000_000L
         ));
@@ -319,12 +326,12 @@ class LawFirmWalkthroughTest {
     @DisplayName("Walkthrough 3: 红色常顾/直接对抗冲突阻断校验 + 风险代理法定禁区与30%上限合规预警")
     @SuppressWarnings("unchecked")
     void walkthrough3_redRetainerConflictBlockAndStatutoryFeeCompliance() {
-        // 1. 律师 A 有一宗在办常年法律顾问项目（RETAINER），客户为「北京云杉数智科技有限公司」
+        // 1. 律师 A 有一宗在办常年法律顾问项目（RETAINER），客户为「北京衡砚数智科技有限公司」
         Map<String, Object> retainerRes = lawFirmService.execute(userA.getId(), null, "submitIntake", Map.of(
-                "title", "北京云杉数智科技有限公司2026年度常年法律顾问",
+                "title", "北京衡砚数智科技有限公司2026年度常年法律顾问",
                 "practiceArea", "RETAINER",
                 "departmentName", "公司并购与投融资部",
-                "clientName", "北京云杉数智科技有限公司",
+                "clientName", "北京衡砚数智科技有限公司",
                 "counterpartyName", "无",
                 "feeMode", "RETAINER",
                 "contractAmountCents", 80_000_000L
@@ -335,13 +342,13 @@ class LawFirmWalkthroughTest {
                 "decision", "APPROVE_AND_FILE"
         ));
 
-        // 2. 律师 B 提交以「北京云杉数智科技有限公司」为对方当事人的诉讼案件
+        // 2. 律师 B 提交以「北京衡砚数智科技有限公司」为对方当事人的诉讼案件
         Map<String, Object> redSubmitRes = lawFirmService.execute(userB.getId(), null, "submitIntake", Map.of(
-                "title", "远洋软件诉北京云杉数智科技有限公司技术开发合同纠纷",
+                "title", "墨隅软件诉北京衡砚数智科技有限公司技术开发合同纠纷",
                 "practiceArea", "LITIGATION",
                 "departmentName", "知识产权与合规部",
-                "clientName", "深圳远洋云创软件有限公司",
-                "counterpartyName", "北京云杉数智科技有限公司",
+                "clientName", "深圳墨隅云创软件有限公司",
+                "counterpartyName", "北京衡砚数智科技有限公司",
                 "feeMode", "FIXED",
                 "contractAmountCents", 60_000_000L
         ));

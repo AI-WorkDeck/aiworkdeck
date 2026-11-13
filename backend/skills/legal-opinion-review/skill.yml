@@ -30,6 +30,7 @@ allowed_tools:
   - doc_insert_at_cursor
   - doc_insert_under_heading
   - doc_add_comment
+  - doc_link_evidence
   - doc_update_comment
   - doc_select
   - doc_format_selection

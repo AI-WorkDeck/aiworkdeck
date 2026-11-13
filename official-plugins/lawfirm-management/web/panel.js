@@ -110,9 +110,15 @@
 
   // 后端摘要里带内部规则码（「【RED · R2_RETAINER_ADVERSARY】」「Y1_… - 依据」），
   // 风险等级已由卡片徽标表达，律师不需要看到机器码。只改显示，不改存储。
+  // 只带规则码的摘要（「【G0_CLEAR】…」）没有风险等级可省，换成本地化的中文标签；码本身不外露。
+  const RULE_LABELS = { G0_CLEAR: '无冲突' };
   function plainRuleText(text) {
     return String(text || '')
       .replace(/^【[A-Z]+ · [A-Z0-9_]+】\s*/, '')
+      .replace(/^【([A-Z][A-Z0-9]*_[A-Z0-9_]+)】\s*/, (m, code) => {
+        const label = L('access.rule.' + code, RULE_LABELS[code] || '');
+        return label ? `【${label}】` : '';
+      })
       .replace(/^[A-Z][A-Z0-9]*_[A-Z0-9_]+ - /, '');
   }
 
@@ -956,7 +962,7 @@
     '新建本机收案记录': 'New Local Case Intake',
     '依据《律师法》第39、50条及《全国律协执业行为规范》第50–56条自动检索本机台账中的在办、历史及关联主体冲突': 'Automatically screens active, historical, and affiliate conflicts in this device\'s ledger.',
     '案件 / 专项名称': 'Matter / Project Title',
-    '例如：华星半导体与蓝海光电专利侵权及商业秘密纠纷案': 'e.g., Huaxing Semiconductor v. Blue Ocean Optoelectronics Patent & Trade Secret Dispute',
+    '例如：澜曜微电子与朗绮光电专利侵权及商业秘密纠纷案': 'e.g., Lanyao Microelectronics v. Langqi Optoelectronics Patent & Trade Secret Dispute',
     '业务领域': 'Practice Area',
     '民商事诉讼与仲裁': 'Commercial Litigation & Arbitration',
     '资本市场与证券': 'Capital Markets & Securities',
