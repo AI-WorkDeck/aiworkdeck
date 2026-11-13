@@ -627,3 +627,7 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 ## 包晴天律师（2026-11-06，aiworkdeck_website#380 / aiworkdeck#1403）
 
 `GET /api/mobile/billing/balance` 透传官网 `billingLine`（standard|circle|bqt）与 `bqtMember`（schema `BqtMember`，mobile-v1.yaml），经 `MobileBillingClient.BalanceResult.billing` → `BqtBilling.copyBillingFields`，旧官网缺字段按 standard/null。billingLine=bqt 时四端只显示包晴天积分折算额度（balanceCents 已是折算值），隐藏本站充值/Pro/兑换码，提示去包晴天 App 充值续费。网关拒绝码 `bqt_*` 不是登录失效。手机端登录建议：建扫码会话后打开 `bqtlawyer:///pages/scan/result?qrid=&timestamp=&source=`（包晴天 App 现有 scheme 与确认页），回前台继续轮询 status；未装包晴天则显示二维码或手机号登录。回归：`MobileApiContractTest`（bqt 分支覆盖 BqtMember 每个键）。
+
+## Google Play 消耗型内购桥接（2026-11-13，dev-board#665）
+
+`POST /api/mobile/billing/recharge` 放行 `channel=googleplay`（必传 `productId=credits.usd.10|20|50`，响应 `present=native`）；新增 `POST /api/mobile/billing/recharge/confirm-googleplay`（`outTradeNo` 可缺省、`productId` 必传、`purchaseToken` ≤4KB），原样转发官网 `action=confirm-googleplay`，仅在 `paid=true` 时作废余额缓存并由客户端 `consumeAsync` 消耗商品。回归：`MobileBillingServiceTest`、`HttpMobileBillingClientTest`、`MobileBillingRechargeDisabledTest` 与 `MobileApiContractTest`。

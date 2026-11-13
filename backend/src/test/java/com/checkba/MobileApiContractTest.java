@@ -853,6 +853,49 @@ class MobileApiContractTest {
                 .andExpect(jsonPath("$.code").value(4010))
                 .andExpect(openApi().isValid(validator));
 
+        // Google Play 下单（channel=googleplay）与确认端点（/recharge/confirm-googleplay）
+        when(billing.createRecharge(anyString(), eq(1000L), eq("idem-contract-gp01"),
+                eq("googleplay"), eq("credits.usd.10"), isNull()))
+                .thenReturn(new MobileBillingClient.RechargeOrder("native", "OT-contract-gp", 1000L,
+                        null, null, null, null, null, null, "00000000-0000-4000-8000-000000000001"));
+        mvc.perform(post("/api/mobile/billing/recharge").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"amountCents":1000,"idempotencyKey":"idem-contract-gp01",\
+                                "channel":"googleplay","productId":"credits.usd.10"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outTradeNo").value("OT-contract-gp"))
+                .andExpect(jsonPath("$.present").value("native"))
+                .andExpect(openApi().isValid(validator));
+
+        when(billing.confirmGooglePlay(anyString(), any(), eq("credits.usd.10"), eq("tok.contract.ok")))
+                .thenReturn(new MobileBillingClient.RechargeStatus("paid", true, 7200L));
+        mvc.perform(post("/api/mobile/billing/recharge/confirm-googleplay").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"outTradeNo":"OT-contract-gp","productId":"credits.usd.10",\
+                                "purchaseToken":"tok.contract.ok"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("paid"))
+                .andExpect(jsonPath("$.paid").value(true))
+                .andExpect(jsonPath("$.amountCents").value(7200))
+                .andExpect(openApi().isValid(validator));
+
+        mvc.perform(post("/api/mobile/billing/recharge/confirm-googleplay").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"productId":"credits.usd.10","purchaseToken":"tok.contract.ok"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paid").value(true))
+                .andExpect(openApi().isValid(validator));
+
+        mvc.perform(post("/api/mobile/billing/recharge/confirm-googleplay").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON).content("{\"productId\":\"credits.usd.10\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.kind").doesNotExist())
+                .andExpect(openApi().isValid(validator));
+
         // 新请求字段的校验也走通用信封：不认识的通道 → code 1（无 kind，通用 handler）
         mvc.perform(post("/api/mobile/billing/recharge").header("X-Session-Id", sid)
                         .contentType(APPLICATION_JSON)
