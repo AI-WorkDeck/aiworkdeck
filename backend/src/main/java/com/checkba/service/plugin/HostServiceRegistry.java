@@ -70,7 +70,9 @@ public class HostServiceRegistry {
                     "feeLedger", new Spec("read", List.of("lawfirm"))),
             "im", Map.of(
                     "listConversations", new Spec("read", List.of("im")),
-                    "readMessages", new Spec("read", List.of("im"))));
+                    "readMessages", new Spec("read", List.of("im"))),
+            "worklog", Map.of(
+                    "summary", new Spec("read", List.of("worklog_read"))));
 
     /** 单次返回给模型的字符上限，超出截断并注明。 */
     static final int MAX_RESULT_CHARS = 30_000;
@@ -108,6 +110,22 @@ public class HostServiceRegistry {
         register("lawfirm", "feeLedger", this::lawfirmFeeLedger);
         register("im", "listConversations", this::imListConversations);
         register("im", "readMessages", this::imReadMessages);
+        register("worklog", "summary", this::worklogSummary);
+    }
+
+    /** 工作记录汇总服务（setter 注入：旧测试直接 new 本类时可缺席，调用时报不可用）。 */
+    private com.checkba.service.activity.WorklogSummaryService worklog;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWorklog(com.checkba.service.activity.WorklogSummaryService worklog) {
+        this.worklog = worklog;
+    }
+
+    /** 本人在当前项目上的工作记录汇总（只读、只含本人、只给聚合数）；项目须有读权限。 */
+    private Object worklogSummary(Call call) {
+        Long projectId = requireProject(call, false);
+        if (worklog == null) throw new IllegalArgumentException("Worklog service unavailable");
+        return worklog.summarize(call.userId(), projectId);
     }
 
     private void register(String service, String operation, Handler handler) {

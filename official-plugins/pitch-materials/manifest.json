@@ -1,7 +1,7 @@
 {
   "id": "pitch-materials",
   "name": "投标与提案",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minHostVersion": "0.81.0",
   "description": "从所里的业绩、律师简历、资质荣誉、服务说明和报价模板中挑出相关材料，对照招标文件的资格要求和评分项标出满足与缺口，按所里的 Word / PPT 模板生成投标书或提案初稿，报价自动计算，对外材料默认脱敏。",
   "author": "AI WorkDeck",
@@ -10,11 +10,12 @@
     "file_read",
     "file_write",
     "ai",
-    "lawfirm"
+    "lawfirm",
+    "worklog_read"
   ],
   "frontendEntry": "web/index.html",
   "backendJars": [
-    "pitch-materials-0.1.0.jar"
+    "pitch-materials-0.2.0.jar"
   ],
   "skills": [
     "skill"

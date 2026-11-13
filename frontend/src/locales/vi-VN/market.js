@@ -222,6 +222,7 @@ export default {
   "permTasks": "Lịch và công việc",
   "permClipboard": "Bộ nhớ tạm (Clipboard)",
   "permLawfirm": "Thông tin nhóm",
+  "permWorklogRead": "Tóm tắt nhật ký công việc của chính bạn",
   "newlyCreatedTag": "Mới",
   "publishBtn": "Xuất bản lên Chợ tiện ích",
   "publishUpdateBtn": "Cập nhật trên Chợ tiện ích",

@@ -28,4 +28,7 @@ public interface UserActivityLogRepository extends JpaRepository<UserActivityLog
     /** 律所客户档案「最近往来」：每个项目最后一条工作记录的时间，行为 [projectId, max(timestamp)]。 */
     @Query("select a.projectId, max(a.timestamp) from UserActivityLog a where a.projectId in :projectIds group by a.projectId")
     List<Object[]> latestTimestampByProjectIds(@Param("projectIds") java.util.Collection<Long> projectIds);
+
+    /** 本人在某项目上的工作记录（工作记录汇总 worklog.summary 用；保留期 180 天，上限 20000 条）。 */
+    List<UserActivityLog> findTop20000ByUserIdAndProjectIdOrderByTimestampAsc(Long userId, Long projectId);
 }

@@ -222,6 +222,7 @@ export default {
   "permTasks": "日程與事項",
   "permClipboard": "剪貼板",
   "permLawfirm": "團隊信息",
+  "permWorklogRead": "本人工作紀錄彙總",
   "newlyCreatedTag": "新建",
   "publishBtn": "發布到外掛市集",
   "publishUpdateBtn": "更新到外掛市集",

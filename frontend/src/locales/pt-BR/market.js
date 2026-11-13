@@ -222,6 +222,7 @@ export default {
   "permTasks": "Calendário e tarefas",
   "permClipboard": "Área de transferência",
   "permLawfirm": "Informações da equipe",
+  "permWorklogRead": "Resumo dos seus próprios registros de trabalho",
   "newlyCreatedTag": "Novo",
   "publishBtn": "Publicar na loja de extensões",
   "publishUpdateBtn": "Atualizar na loja de extensões",

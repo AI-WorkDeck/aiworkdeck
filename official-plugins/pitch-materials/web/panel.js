@@ -20,15 +20,16 @@
   }
 
   const FIELDS = {
-    credentials: [['title'], ['client'], ['clientAlias'], ['area'], ['year'], ['amount'], ['role'], ['lawyers', 'list'], ['tags', 'list'], ['summary', 'textarea']],
+    credentials: [['title'], ['client'], ['clientAlias'], ['area'], ['year'], ['period'], ['amount'], ['role'], ['lawyers', 'list'], ['tags', 'list'], ['summary', 'textarea'],
+      ['scopeOfWork', 'textarea'], ['highlights', 'textarea'], ['outcome', 'textarea']],
     lawyers: [['name'], ['title'], ['areas', 'list'], ['since'], ['education'], ['bio', 'textarea']],
     qualifications: [['name'], ['kind'], ['issuer'], ['year'], ['expires']],
     services: [['title'], ['area'], ['content', 'textarea-lg']],
     quotes: [['name'], ['note', 'textarea']]
   };
   const COLUMNS = {
-    credentials: ['title', 'clientAlias', 'area', 'year', 'role'],
-    lawyers: ['name', 'title', 'areas', 'since'],
+    credentials: ['title', 'clientAlias', 'area', 'year', 'role', 'share'],
+    lawyers: ['name', 'title', 'areas', 'since', 'share'],
     qualifications: ['name', 'kind', 'issuer', 'year'],
     services: ['title', 'area'],
     quotes: ['name']
@@ -44,8 +45,15 @@
     files: [], matrix: emptyMatrix(), tenderPath: '', busy: false, progress: '', cancelled: false,
     selection: null, quoteId: '', quotePreview: null,
     gen: { client: '', project: '', word: 'sample', ppt: 'sample', outward: true, hideAmounts: false, includeMatrix: true },
-    results: [], sensitive: {}
+    results: [], sensitive: {},
+    // 律所云端共享：available=null 未探测，false 不可用（未开启/未连接/宿主太旧）
+    cloud: { available: null, teams: [], me: '', error: '', mine: {} },
+    shared: { loaded: false, entries: [], query: '' },
+    draftSource: null
   };
+
+  // 本人库 + 同事共享来的条目（匹配、推荐、选材都用它；保存只存本人库）
+  const combined = () => core.withShared(state.library, state.shared.entries);
 
   function emptyMatrix() { return { version: 1, tenderPath: '', tenderer: '', project: '', items: [], updatedAt: '' }; }
 
@@ -102,6 +110,41 @@
     try { res = JSON.parse(output); } catch (e) { throw Object.assign(new Error('bad'), { pitchCode: 'failed' }); }
     if (!res || res.success !== true) throw Object.assign(new Error(res && res.code), { pitchCode: (res && res.code) || 'failed', detail: res && res.detail });
     return res.data;
+  }
+
+  async function cloud(action, params) {
+    return awd.lawfirm.request(action, params || {});
+  }
+
+  async function probeCloud() {
+    try {
+      const ctx = await cloud('pitch.context');
+      // 团队可能是 id 字符串，也可能是 {id, name}（名录给出显示名时）；统一成 {id, name}，没有名称就显示 id
+      const teams = ((ctx && ctx.teams) || []).map((tm) => (tm && typeof tm === 'object') ? { id: String(tm.id), name: String(tm.name || tm.id) } : { id: String(tm), name: String(tm) });
+      state.cloud = Object.assign(state.cloud, { available: true, teams, me: (ctx && ctx.name) || '', error: '' });
+      const mine = await cloud('pitch.mine');
+      state.cloud.mine = Object.fromEntries(((mine && mine.entries) || []).map((e) => [e.id, e]));
+    } catch (e) {
+      state.cloud = Object.assign(state.cloud, { available: false, error: errText(e) });
+    }
+  }
+
+  // 本地保存之后同步分享状态：选了团队/全所就上传（更新），改回仅自己就撤回。失败时把分享设置还原。
+  async function syncShare(section, item, before) {
+    const now = core.shareOf(item);
+    const prev = core.shareOf(before);
+    if (now.scope === 'private') {
+      if (!prev.cloudId) return item;
+      await cloud('pitch.withdraw', { id: prev.cloudId });
+      return Object.assign({}, item, { share: { scope: 'private' } });
+    }
+    if (state.cloud.available !== true) throw new Error(t('panel.share.unavailable'));
+    const params = { localId: item.id, kind: section === 'credentials' ? 'credential' : 'lawyer', scope: now.scope,
+      teams: now.scope === 'team' ? now.teams : [], includeClient: section === 'credentials' && now.includeClient,
+      payload: core.sharePayload(section, item, now.includeClient) };
+    if (prev.cloudId && prev.version != null) params.expectedVersion = prev.version;
+    const res = await cloud('pitch.share', params);
+    return Object.assign({}, item, { share: Object.assign({}, now, { cloudId: res.id, version: res.version }) });
   }
 
   async function run(work) {
@@ -231,6 +274,7 @@
       el('p', { className: 'hint', text: t('panel.lib.privacy') })
     ]);
     view.appendChild(firm);
+    if (state.projectId) view.appendChild(renderExperienceCard());
     if (state.importChoices) view.appendChild(renderImportChoices());
 
     const tabs = el('div', { className: 'pm-sections', role: 'tablist' }, core.SECTIONS.map((s) => el('button', {
@@ -251,6 +295,102 @@
     if (!state.editing) renderList();
   }
 
+  // ---------- 从当前项目整理业绩（个人经验积累）----------
+
+  // 律所管理里本项目的收案（桌面端才有）；读不到就当没有
+  async function projectIntake() {
+    try {
+      const ov = await awd.lawfirm.request('overview', {});
+      const rows = (ov && (ov.allIntakes || ov.intakes)) || [];
+      return rows.find((m) => String(m.projectId) === String(state.projectId)) || null;
+    } catch (e) { return null; }
+  }
+
+  async function projectWorklog() {
+    try { return await awd.services.request('worklog', 'summary', {}); } catch (e) { return null; }
+  }
+
+  function checkNudge() {
+    if (!state.projectId || state.nudgeFor === state.projectId) return;
+    state.nudgeFor = state.projectId;
+    projectIntake().then((m) => {
+      const done = state.library.credentials.some((c) => c.source === 'project:' + state.projectId);
+      state.nudge = m && m.status === 'CLOSED' && !done ? m.title : '';
+      if (state.nudge && state.tab === 'library') render();
+    });
+  }
+
+  function renderExperienceCard() {
+    checkNudge();
+    const ds = state.draftSource;
+    const card = el('div', { className: 'awd-card' }, [el('div', { className: 'awd-card-header' }, [
+      el('h2', { className: 'awd-card-title', text: t('panel.exp.heading') }),
+      el('div', { className: 'pm-actions' }, [btn(t('panel.exp.start'), startExperience, ds ? '' : 'awd-btn-primary')])])]);
+    if (state.nudge) card.appendChild(el('p', { className: 'pm-warn', text: t('panel.exp.closedNudge', { title: state.nudge }) }));
+    card.appendChild(el('p', { className: 'hint', text: t('panel.exp.hint') }));
+    if (!ds) return card;
+    const facts = ds.facts;
+    const lines = [];
+    if (facts.intake) lines.push(t('panel.exp.factIntake', { title: facts.intake.title || '', area: facts.intake.practiceAreaLabel || '' }));
+    else lines.push(t('panel.exp.noIntake'));
+    if (facts.worklog && facts.worklog.totalHours) lines.push(t('panel.exp.factWorklog', { hours: facts.worklog.totalHours, from: facts.worklog.from || '', to: facts.worklog.to || '' }));
+    else lines.push(t('panel.exp.noWorklog'));
+    lines.forEach((l) => card.appendChild(el('p', { text: l })));
+    card.appendChild(el('span', { className: 'pm-label', text: t('panel.exp.pickDocs') }));
+    const list = el('div', { className: 'pm-pick-list' });
+    ds.files.forEach((f) => {
+      const c = el('input', { type: 'checkbox', checked: ds.picked.has(f.path) });
+      c.addEventListener('change', () => {
+        if (c.checked && ds.picked.size >= 3) { c.checked = false; notice(t('panel.exp.maxDocs'), 'warn'); return; }
+        if (c.checked) ds.picked.add(f.path); else ds.picked.delete(f.path);
+      });
+      list.appendChild(el('label', { className: 'pm-check pm-pick-item' }, [c, el('span', { className: 'pm-path', text: f.path })]));
+    });
+    card.appendChild(list);
+    card.appendChild(el('p', { className: 'hint', text: t('panel.exp.aiNotice') }));
+    card.appendChild(el('div', { className: 'pm-actions' }, [btn(t('panel.exp.draft'), draftExperience, 'awd-btn-primary'),
+      btn(t('panel.action.cancel'), () => { state.draftSource = null; render(); })]));
+    return card;
+  }
+
+  function startExperience() {
+    run(async () => {
+      state.progress = t('panel.exp.collecting');
+      render();
+      const [intake, worklog] = await Promise.all([projectIntake(), projectWorklog()]);
+      await loadFiles();
+      const docs = state.files.filter((f) => /\.(docx?|pdf|md|txt)$/i.test(f.path) && !/^(投标材料|投标模板|Pitch )/.test(f.path));
+      // 用时最多的文件排在前面并预先勾上（最多 3 份）
+      const top = ((worklog && worklog.topFiles) || []).map((x) => x.name);
+      docs.sort((a, b) => (top.indexOf(a.name) < 0 ? 99 : top.indexOf(a.name)) - (top.indexOf(b.name) < 0 ? 99 : top.indexOf(b.name)));
+      const picked = new Set(docs.filter((d) => top.includes(d.name)).slice(0, 3).map((d) => d.path));
+      state.draftSource = { facts: { projectId: state.projectId, intake, worklog, lawyer: state.cloud.me || '' }, files: docs.slice(0, 40), picked };
+    });
+  }
+
+  function draftExperience() {
+    const ds = state.draftSource;
+    run(async () => {
+      state.progress = t('panel.exp.drafting');
+      render();
+      const docs = [];
+      for (const path of ds.picked) {
+        try { const r = await awd.files.read(path); docs.push({ name: path.split('/').pop(), text: r.content || '' }); } catch (e) { /* 读不到的跳过 */ }
+      }
+      const facts = Object.assign({}, ds.facts, { docs, project: (ds.facts.intake && ds.facts.intake.title) || '' });
+      const req = core.draftRequest(facts, locale);
+      const text = await makeAsk()(req);
+      const draft = core.parseDraft(text, facts);
+      if (!draft) throw new Error(t('panel.exp.draftFailed'));
+      // 起草结果只进编辑框：律师核对、修改并保存后才进库；默认仅自己可见
+      state.draftSource = null;
+      state.section = 'credentials';
+      state.editing = { section: 'credentials', id: null };
+      state.draft = draft;
+      notice(t('panel.exp.drafted'), 'info');
+    });
+  }
+
   function cellValue(item, key) {
     const v = item[key];
     return Array.isArray(v) ? v.join(sep()) : String(v == null ? '' : v);
@@ -268,15 +408,21 @@
     const body = el('tbody');
     rows.forEach((it) => {
       const tr = el('tr', {}, COLUMNS[s].map((c, i) => {
+        if (c === 'share') return el('td', {}, [shareBadge(it)]);
         const td = el('td', { text: s === 'credentials' && c === 'clientAlias' && !it.clientAlias && it.client ? '' : cellValue(it, c) });
         if (s === 'credentials' && c === 'clientAlias' && !it.clientAlias && it.client) td.appendChild(el('span', { className: 'awd-badge awd-badge-warning', text: t('panel.lib.noAlias') }));
         if (i === 0 && it.source && it.source.startsWith('lawfirm')) td.appendChild(el('span', { className: 'awd-badge awd-badge-info', text: t('panel.lib.fromLawfirm') }));
+        if (i === 0 && it.source && it.source.startsWith('project:')) td.appendChild(el('span', { className: 'awd-badge awd-badge-info', text: t('panel.exp.fromProject') }));
         return td;
       }));
+      const cloudId = core.shareOf(it).cloudId;
       tr.appendChild(el('td', { className: 'pm-row-actions' }, [
+        cloudId ? btn(t('panel.share.usage'), () => showUsage(it), 'awd-btn-xs') : null,
         btn(t('panel.action.edit'), () => startEdit(it.id), 'awd-btn-xs'),
         btn(t('panel.action.delete'), () => confirmBar(t('panel.lib.confirmDelete', { name: cellValue(it, COLUMNS[s][0]) }), [
           [t('panel.action.delete'), () => run(async () => {
+            // 已分享的先撤回，再从本人库删除
+            if (cloudId) await cloud('pitch.withdraw', { id: cloudId });
             const next = Object.assign({}, state.library, { [s]: state.library[s].filter((x) => x.id !== it.id) });
             await saveLibrary(next);
           }), 'awd-btn-danger'], [t('panel.action.cancel'), () => {}]]), 'awd-btn-xs')
@@ -285,6 +431,23 @@
     });
     table.appendChild(body);
     host.appendChild(el('div', { className: 'pm-table-wrap' }, [table]));
+  }
+
+  function shareBadge(it) {
+    const sh = core.shareOf(it);
+    if (sh.scope === 'private') return el('span', { className: 'awd-badge', text: t('panel.share.scope.private') });
+    const mine = state.cloud.mine[sh.cloudId];
+    const uses = mine && mine.uses ? ' · ' + t('panel.share.uses', { n: mine.uses }) : '';
+    return el('span', { className: 'awd-badge awd-badge-accent', text: t('panel.share.scope.' + sh.scope) + uses });
+  }
+
+  function showUsage(it) {
+    run(async () => {
+      const res = await cloud('pitch.usage', { id: core.shareOf(it).cloudId });
+      const uses = (res && res.uses) || [];
+      notice(uses.length ? t('panel.share.usedBy', { list: uses.slice(0, 10).map((u) => u.by + '（' + u.label + '，' + String(u.at).slice(0, 10) + '）').join(sep2()) })
+        : t('panel.share.notUsed'), 'info');
+    });
   }
 
   function startEdit(id) {
@@ -317,11 +480,43 @@
         hint === 'panel.hint.' + section + '.' + key ? null : el('small', { className: 'hint', text: hint })]));
     });
     if (section === 'quotes') box.appendChild(renderQuoteEditor(d));
+    if (section === 'credentials' || section === 'lawyers') box.appendChild(renderShareControls(section, d));
     box.appendChild(el('div', { className: 'pm-actions' }, [
       el('button', { type: 'submit', className: 'awd-btn awd-btn-sm awd-btn-primary', text: t('panel.action.save'), disabled: state.busy }),
       btn(t('panel.action.cancel'), () => { state.editing = null; render(); })
     ]));
     return box;
+  }
+
+  function renderShareControls(section, d) {
+    const sh = core.shareOf(d);
+    d.share = Object.assign({}, d.share || {}, { scope: sh.scope, teams: sh.teams, includeClient: sh.includeClient });
+    const wrap = el('fieldset', { className: 'pm-share' }, [el('legend', { text: t('panel.share.heading') })]);
+    const off = state.cloud.available === false;
+    const scope = el('select', { className: 'awd-select', disabled: off }, core.SHARE_SCOPES.map((v) =>
+      el('option', { value: v, text: t('panel.share.scope.' + v), selected: sh.scope === v })));
+    const teamsBox = el('div', { className: 'pm-inline' });
+    const drawTeams = () => {
+      teamsBox.textContent = '';
+      if (d.share.scope !== 'team') return;
+      const teams = state.cloud.teams || [];
+      if (!teams.length) { teamsBox.appendChild(el('span', { className: 'pm-warn', text: t('panel.share.noTeam') })); return; }
+      if (teams.length === 1) { d.share.teams = [teams[0].id]; teamsBox.appendChild(el('span', { className: 'hint', text: t('panel.share.oneTeam', { team: teams[0].name }) })); return; }
+      teams.forEach((tm) => {
+        const c = el('input', { type: 'checkbox', checked: d.share.teams.includes(tm.id) });
+        c.addEventListener('change', () => { d.share.teams = c.checked ? d.share.teams.concat([tm.id]) : d.share.teams.filter((x) => x !== tm.id); });
+        teamsBox.appendChild(el('label', { className: 'pm-check' }, [c, el('span', { text: tm.name })]));
+      });
+    };
+    scope.addEventListener('change', () => { d.share.scope = scope.value; drawTeams(); client.disabled = off || scope.value === 'private'; });
+    const client = el('input', { type: 'checkbox', checked: sh.includeClient, disabled: off || sh.scope === 'private' });
+    client.addEventListener('change', () => { d.share.includeClient = client.checked; });
+    wrap.appendChild(el('label', { className: 'pm-field pm-field-sm' }, [el('span', { text: t('panel.share.scope') }), scope]));
+    wrap.appendChild(teamsBox);
+    if (section === 'credentials') wrap.appendChild(el('label', { className: 'pm-check' }, [client, el('span', { text: t('panel.share.includeClient') })]));
+    wrap.appendChild(el('p', { className: 'hint', text: off ? t('panel.share.unavailable') + (state.cloud.error ? ' ' + state.cloud.error : '') : t('panel.share.hint') }));
+    drawTeams();
+    return wrap;
   }
 
   function renderQuoteEditor(d) {
@@ -389,10 +584,30 @@
     run(async () => {
       if (section === 'quotes') await tool('quote.compute', { quote: d }); // 存之前先算一遍，金额写错当场提示
       const list = state.library[section].slice();
-      if (id) list[list.findIndex((x) => x.id === id)] = Object.assign(d, { id });
-      else list.push(Object.assign(d, { id: core.newId(section, list) }));
+      const before = id ? list.find((x) => x.id === id) : null;
+      if (!before) d.share = Object.assign({}, d.share || {}, { cloudId: '', version: null });
+      else d.share = Object.assign({}, d.share || {}, { cloudId: core.shareOf(before).cloudId, version: core.shareOf(before).version });
+      const item = Object.assign(d, { id: id || core.newId(section, list) });
+      const at = id ? list.findIndex((x) => x.id === id) : list.length;
+      list[at] = item;
       await saveLibrary(Object.assign({}, state.library, { [section]: list }));
       state.editing = null;
+      if (section === 'credentials' || section === 'lawyers') {
+        try {
+          const synced = await syncShare(section, item, before);
+          const again = state.library[section].slice();
+          again[again.findIndex((x) => x.id === item.id)] = synced;
+          await saveLibrary(Object.assign({}, state.library, { [section]: again }));
+          await probeCloud();
+        } catch (e) {
+          // 云端没成功：本地内容已存，分享设置还原成原来的
+          const again = state.library[section].slice();
+          again[again.findIndex((x) => x.id === item.id)] = Object.assign({}, item, { share: before ? before.share : { scope: 'private' } });
+          await saveLibrary(Object.assign({}, state.library, { [section]: again }));
+          notice(t('panel.share.failed', { reason: errText(e) }), 'warn');
+          return;
+        }
+      }
       notice(t('panel.lib.saved'), 'info');
     });
   }
@@ -508,7 +723,7 @@
   }
 
   function evidenceNames() {
-    const lib = state.library;
+    const lib = combined();
     const map = new Map([['firm', lib.firm.name]]);
     lib.credentials.forEach((c) => map.set(c.id, mask(c.title)));
     lib.lawyers.forEach((l) => map.set(l.id, l.name + (l.title ? ' · ' + l.title : '')));
@@ -572,7 +787,7 @@
       state.cancellable = true;
       const items = state.matrix.items;
       const today = new Date().toISOString().slice(0, 10);
-      const reqs = core.matchRequests(state.library, items.filter((it) => !it.edited), locale, today);
+      const reqs = core.matchRequests(combined(), items.filter((it) => !it.edited), locale, today);
       const ask = makeAsk();
       let failed = 0;
       let omitted = 0;
@@ -582,7 +797,7 @@
           state.progress = t('panel.progress.match', { i: i + 1, n: reqs.length });
           render();
           omitted = Math.max(omitted, reqs[i].omitted);
-          if (!core.applyMatch(items, await ask(reqs[i]), state.library, reqs[i].ids)) failed++;
+          if (!core.applyMatch(items, await ask(reqs[i]), combined(), reqs[i].ids)) failed++;
         }
       } finally {
         // 中途停止或出错时，已对照完的批次也要保存
@@ -610,7 +825,7 @@
 
   function ensureSelection() {
     if (state.selection) return;
-    const rec = core.recommend(state.library, state.matrix, state.gen.project);
+    const rec = core.recommend(combined(), state.matrix, state.gen.project);
     state.recommended = rec;
     state.selection = {
       credentials: new Set(rec.credentials), lawyers: new Set(rec.lawyers),
@@ -651,6 +866,7 @@
         toggle('includeMatrix', t('panel.gen.includeMatrix'))]),
       el('p', { className: 'hint', text: t('panel.gen.outwardHint') })
     ]));
+    view.appendChild(renderSharedSearch());
     const picks = el('div', { className: 'pm-picks' });
     ['credentials', 'lawyers', 'qualifications', 'services'].forEach((s) => picks.appendChild(renderPick(s)));
     picks.appendChild(renderQuotePick());
@@ -662,12 +878,34 @@
     state.results.forEach((r) => view.appendChild(renderResult(r)));
   }
 
+  // 同事分享给我（团队或全所）的业绩和简历：检索后并入可选材料，标明是谁的
+  function renderSharedSearch() {
+    const card = el('div', { className: 'awd-card' }, [el('div', { className: 'awd-card-header' }, [
+      el('h2', { className: 'awd-card-title', text: t('panel.shared.heading') })])]);
+    if (state.cloud.available !== true) {
+      card.appendChild(el('p', { className: 'hint', text: t('panel.share.unavailable') + (state.cloud.error ? ' ' + state.cloud.error : '') }));
+      return card;
+    }
+    const q = el('input', { className: 'awd-input', type: 'search', placeholder: t('panel.shared.query'), value: state.shared.query });
+    q.addEventListener('input', () => { state.shared.query = q.value; });
+    card.appendChild(el('div', { className: 'pm-toolbar' }, [q, btn(t('panel.shared.search'), () => run(async () => {
+      const res = await cloud('pitch.search', { query: state.shared.query.trim() });
+      state.shared.entries = (res && res.entries) || [];
+      state.shared.loaded = true;
+      state.selection = null;
+      notice(t('panel.shared.found', { n: state.shared.entries.length }), 'info');
+    }), 'awd-btn-primary')]));
+    card.appendChild(el('p', { className: 'hint', text: state.shared.loaded ? t('panel.shared.loadedHint', { n: state.shared.entries.length }) : t('panel.shared.hint') }));
+    return card;
+  }
+
   function renderPick(section) {
     const sel = state.selection[section];
     const rec = new Set((state.recommended && state.recommended[section]) || []);
-    const lib = state.library;
-    const label = (it) => section === 'credentials' ? [mask(it.title), it.year].filter(Boolean).join(' · ')
-      : section === 'lawyers' ? [it.name, it.title].filter(Boolean).join(' · ') : (it.name || it.title || it.id);
+    const lib = combined();
+    const owner = (it) => it.shared ? t('panel.shared.from', { owner: it.owner }) : '';
+    const label = (it) => section === 'credentials' ? [core.maskClients(lib, it.title, t('panel.lib.someClient')), it.year, owner(it)].filter(Boolean).join(' · ')
+      : section === 'lawyers' ? [it.name, it.title, owner(it)].filter(Boolean).join(' · ') : (it.name || it.title || it.id);
     const items = lib[section].map((it) => {
       const box = el('input', { type: 'checkbox', checked: sel.has(it.id) });
       box.addEventListener('change', () => { if (box.checked) sel.add(it.id); else sel.delete(it.id); count.textContent = String(sel.size); });
@@ -714,17 +952,25 @@
       qualificationIds: Array.from(sel.qualifications), serviceIds: Array.from(sel.services),
       quoteId: state.quoteId, outward: g.outward, hideAmounts: g.hideAmounts, includeMatrix: g.includeMatrix
     };
+    // 选中的同事共享条目随请求带上（JAR 只收 x: 开头的），生成成功后在云端记一笔使用
+    const lib = combined();
+    params.externalCredentials = lib.credentials.filter((c) => c.shared && sel.credentials.has(c.id));
+    params.externalLawyers = lib.lawyers.filter((l) => l.shared && sel.lawyers.has(l.id));
+    const usedCloudIds = params.externalCredentials.concat(params.externalLawyers).map((x) => x.cloudId);
     const go = () => run(async () => {
       state.progress = t('panel.progress.generate');
       render();
       const res = await tool('generate', params);
+      if (usedCloudIds.length) {
+        try { await cloud('pitch.recordUse', { ids: usedCloudIds, label: (g.project || g.client).slice(0, 200) }); } catch (e) { /* 记录失败不影响已生成的文件 */ }
+      }
       state.results.unshift(Object.assign({ kind, outward: g.outward }, res));
       state.results = state.results.slice(0, 4);
       await loadFiles();
       try { await awd.ui.openFile(res.path); } catch (e) { /* 打开失败不影响生成结果，卡片上可再点打开 */ }
       notice(t('panel.gen.done', { path: res.path }), res.leaks.length || res.unknownPlaceholders.length ? 'warn' : 'info');
     });
-    const missing = g.outward ? core.missingAliases(state.library, params.credentialIds) : [];
+    const missing = g.outward ? core.missingAliases(lib, params.credentialIds) : [];
     if (missing.length) {
       confirmBar(t('panel.gen.missingAlias', { list: missing.map((c) => c.title).join(sep2()) }), [
         [t('panel.gen.continue'), go, 'awd-btn-primary'], [t('panel.gen.fixAlias'), () => { state.tab = 'library'; state.section = 'credentials'; render(); }]]);
@@ -811,6 +1057,7 @@
       render();
     }));
     await loadAll();
+    await probeCloud();
     // 已有对照表时默认打开招标对照；加载期间律师已经点了别的标签就不改
     if (state.matrix.items.length && !userPickedTab) state.tab = 'tender';
     render();
@@ -824,6 +1071,9 @@
         state.projectId = (data && data.projectId) || '';
         state.results = [];
         state.sensitive = {};
+        state.draftSource = null;
+        state.nudge = '';
+        state.nudgeFor = '';
         state.gen = { client: '', project: '', word: 'sample', ppt: 'sample', outward: true, hideAmounts: false, includeMatrix: true };
         await loadAll();
         render();

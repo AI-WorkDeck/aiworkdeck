@@ -222,6 +222,7 @@ export default {
   "permTasks": "Ημερολόγιο και εργασίες",
   "permClipboard": "Πρόχειρο",
   "permLawfirm": "Πληροφορίες ομάδας",
+  "permWorklogRead": "Σύνοψη των δικών σας καταγραφών εργασίας",
   "newlyCreatedTag": "Νέο",
   "publishBtn": "Δημοσίευση στην Αγορά προσθέτων",
   "publishUpdateBtn": "Ενημέρωση στην Αγορά προσθέτων",
