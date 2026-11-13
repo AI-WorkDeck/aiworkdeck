@@ -89,6 +89,11 @@ export default {
   teDeleted: '已删除',
   teSaveFirst: '选中的工时有未保存的修改，请先保存',
   teSubmitted: '已提交 {count} 条，等待合伙人审核',
+  teCloudTitle: '本所已开启律所云端工时汇总',
+  teCloudNote: '选择「律所云端」事项的工时，提交后会把工作日期、时长、工作内容描述和是否收费保存到 AI WorkDeck 协作服务，交给发布该事项的合伙人审核；审核结论会回到这里。工作内容描述请只写必要内容，避免写入不必要的客户敏感信息。',
+  teCloudBadge: '律所云端事项',
+  teCloudTarget: '律所云端 · {title}（{client}）',
+  teSubmittedCloud: '已提交 {count} 条，其中 {cloud} 条已交到律所云端',
   allProjectsOption: '全部项目',
   unassociatedProjectOption: '未关联项目',
   // dev-board BUG-45：「操作」列/CSV 导出原来直接显示后端枚举值，改成中文文案

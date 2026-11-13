@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Wenn aktiviert, können Anwälte ihre Referenzeinträge mit ihrem Team oder der gesamten Kanzlei teilen, damit sie in Ausschreibungen und Mandantenangeboten verwendet werden können.",
   "cloud.feature.other.name": "Funktion der Kanzlei-Cloud ({key})",
   "cloud.feature.other.desc": "Welche Daten diese Funktion speichert, finden Sie im Datenschutzhinweis.",
-  "cloud.turnOffPurge": "Ausschalten und Cloud-Daten löschen"
+  "cloud.turnOffPurge": "Ausschalten und Cloud-Daten löschen",
+  "billing.sourceCloud": "Von einer Kollegin bzw. einem Kollegen über die Kanzlei-Cloud eingereicht",
+  "billing.cloudSyncPending": "Prüfergebnis noch nicht mit der Cloud synchronisiert",
+  "billing.cloudPublished": "In der Kanzlei-Cloud veröffentlicht",
+  "billing.cloudPublish": "In der Kanzlei-Cloud veröffentlichen",
+  "billing.cloudRepublish": "Mandatsnamen in der Cloud aktualisieren",
+  "billing.cloudPublishedDone": "„{title}“ wurde veröffentlicht. Kolleginnen und Kollegen können es nun in ihrer Zeitabrechnung auswählen.",
+  "billing.cloudUnavailable": "Die Zeiterfassung über die Kanzlei-Cloud ist nicht verfügbar: {reason}",
+  "billing.cloudOff": "Die Zeiterfassung ist für diese Kanzlei nicht aktiviert. Sobald sie aktiviert ist, können Anwälte auf anderen Computern Ihnen Zeiten zur Prüfung einreichen.",
+  "billing.cloudOpenSettings": "Einstellungen der Kanzlei-Cloud öffnen",
+  "billing.cloudOn": "Die Zeiterfassung über die Kanzlei-Cloud ist aktiv; {n} Mandate veröffentlicht.",
+  "billing.cloudPending": "{n} Prüfergebnisse sind noch nicht mit der Cloud synchronisiert und werden beim nächsten Abruf erneut gesendet.",
+  "billing.cloudPull": "Zeiten aus der Kanzlei-Cloud abrufen",
+  "billing.cloudPulled": "Abgerufen: {created} neu, {refreshed} aktualisiert.",
+  "billing.cloudUnmapped": "{n} Einträge gehören zu Mandaten ohne lokale Mandatsaufnahme und wurden nicht abgerufen.",
+  "billing.invoiceNumberPlaceholder": "Rechnungsnummer aus dem Rechnungssystem",
+  "billing.invoiceNumberRequired": "Geben Sie die vom Rechnungssystem zurückgegebene Rechnungsnummer ein (bei digitalen Rechnungen 20 Ziffern)"
 }

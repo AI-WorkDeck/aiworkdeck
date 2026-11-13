@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "开启后，律师可以把个人业绩经历条目共享到本团队或全所，供投标与客户提案材料引用。",
   "cloud.feature.other.name": "律所云端功能（{key}）",
   "cloud.feature.other.desc": "该功能的数据说明请见隐私说明。",
-  "cloud.turnOffPurge": "关闭并删除云端数据"
+  "cloud.turnOffPurge": "关闭并删除云端数据",
+  "billing.sourceCloud": "同事经律所云端提交",
+  "billing.cloudSyncPending": "审核结论尚未同步到云端",
+  "billing.cloudPublished": "已发布到律所云端",
+  "billing.cloudPublish": "发布到律所云端",
+  "billing.cloudRepublish": "更新云端事项名称",
+  "billing.cloudPublishedDone": "已发布「{title}」，同事可以在自己的计费工时里选它提交工时。",
+  "billing.cloudUnavailable": "律所云端工时汇总暂不可用：{reason}",
+  "billing.cloudOff": "本所尚未开启「计时工时汇总」。开启后，其他电脑上的律师可以把工时交给你审核。",
+  "billing.cloudOpenSettings": "去「律所云端」设置",
+  "billing.cloudOn": "律所云端工时汇总已开启，已发布 {n} 个事项。",
+  "billing.cloudPending": "{n} 条审核结论尚未同步到云端，取回时会重试。",
+  "billing.cloudPull": "从律所云端取回工时",
+  "billing.cloudPulled": "已取回：新增 {created} 条，更新 {refreshed} 条。",
+  "billing.cloudUnmapped": "{n} 条所属事项在本机找不到对应收案，未取回。",
+  "billing.invoiceNumberPlaceholder": "开票系统返回的发票号码",
+  "billing.invoiceNumberRequired": "请填写开票系统返回的发票号码（数电票为 20 位数字）"
 }

@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Indien ingeschakeld kunnen advocaten hun ervaringsvermeldingen delen met hun team of het hele kantoor voor gebruik in aanbestedingen en voorstellen aan cliënten.",
   "cloud.feature.other.name": "Functie van de kantoorcloud ({key})",
   "cloud.feature.other.desc": "Zie de privacyverklaring voor welke gegevens deze functie opslaat.",
-  "cloud.turnOffPurge": "Uitschakelen en cloudgegevens verwijderen"
+  "cloud.turnOffPurge": "Uitschakelen en cloudgegevens verwijderen",
+  "billing.sourceCloud": "Door een collega ingediend via de kantoorcloud",
+  "billing.cloudSyncPending": "Beoordelingsresultaat nog niet gesynchroniseerd met de cloud",
+  "billing.cloudPublished": "Gepubliceerd in de kantoorcloud",
+  "billing.cloudPublish": "Publiceren in de kantoorcloud",
+  "billing.cloudRepublish": "Zaaknaam in de cloud bijwerken",
+  "billing.cloudPublishedDone": "\"{title}\" is gepubliceerd. Collega's kunnen deze nu kiezen bij het factureren van hun uren.",
+  "billing.cloudUnavailable": "Urenverzameling via de kantoorcloud is niet beschikbaar: {reason}",
+  "billing.cloudOff": "Urenverzameling staat niet aan voor dit kantoor. Zodra die aanstaat, kunnen advocaten op andere computers hun uren ter controle bij u indienen.",
+  "billing.cloudOpenSettings": "Instellingen van de Kantoorcloud openen",
+  "billing.cloudOn": "Urenverzameling via de kantoorcloud staat aan; {n} zaken gepubliceerd.",
+  "billing.cloudPending": "{n} beoordelingsresultaten zijn nog niet gesynchroniseerd met de cloud en worden bij de volgende ophaalronde opnieuw geprobeerd.",
+  "billing.cloudPull": "Uren ophalen uit de kantoorcloud",
+  "billing.cloudPulled": "Opgehaald: {created} nieuw, {refreshed} bijgewerkt.",
+  "billing.cloudUnmapped": "{n} regels horen bij zaken zonder lokale zaakopening en zijn niet opgehaald.",
+  "billing.invoiceNumberPlaceholder": "Factuurnummer uit het factureringssysteem",
+  "billing.invoiceNumberRequired": "Vul het factuurnummer in dat het factureringssysteem heeft teruggegeven (20 cijfers bij digitale facturen)"
 }

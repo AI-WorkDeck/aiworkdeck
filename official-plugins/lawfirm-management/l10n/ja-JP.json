@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "オンにすると、弁護士は自身の実績経歴の項目をチームまたは事務所全体で共有でき、入札やクライアント向け提案資料で利用できます。",
   "cloud.feature.other.name": "事務所クラウド機能（{key}）",
   "cloud.feature.other.desc": "この機能が保存するデータについては、プライバシーに関する説明をご覧ください。",
-  "cloud.turnOffPurge": "オフにしてクラウドのデータを削除"
+  "cloud.turnOffPurge": "オフにしてクラウドのデータを削除",
+  "billing.sourceCloud": "同僚が事務所クラウド経由で提出",
+  "billing.cloudSyncPending": "審査結果はまだクラウドに同期されていません",
+  "billing.cloudPublished": "事務所クラウドに公開済み",
+  "billing.cloudPublish": "事務所クラウドに公開",
+  "billing.cloudRepublish": "クラウド上の案件名を更新",
+  "billing.cloudPublishedDone": "「{title}」を公開しました。同僚は自分のタイムチャージで選択して作業時間を提出できます。",
+  "billing.cloudUnavailable": "事務所クラウドの作業時間集約は現在利用できません：{reason}",
+  "billing.cloudOff": "この事務所では「作業時間の集約」がまだオンになっていません。オンにすると、他のパソコンの弁護士があなたに作業時間を提出して審査を受けられます。",
+  "billing.cloudOpenSettings": "「事務所クラウド」の設定を開く",
+  "billing.cloudOn": "事務所クラウドの作業時間集約はオンです。公開済みの案件は {n} 件です。",
+  "billing.cloudPending": "審査結果 {n} 件がまだクラウドに同期されていません。次回の取得時に再試行します。",
+  "billing.cloudPull": "事務所クラウドから作業時間を取得",
+  "billing.cloudPulled": "取得しました：新規 {created} 件、更新 {refreshed} 件。",
+  "billing.cloudUnmapped": "{n} 件は、このパソコンに対応する受任案件がないため取得されませんでした。",
+  "billing.invoiceNumberPlaceholder": "請求書発行システムから返された請求書番号",
+  "billing.invoiceNumberRequired": "請求書発行システムから返された請求書番号を入力してください（デジタル請求書は 20 桁の数字）"
 }

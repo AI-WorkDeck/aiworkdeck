@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Açıldığında avukatlar deneyim kayıtlarını ekipleriyle veya tüm büroyla paylaşarak ihalelerde ve müvekkil tekliflerinde kullanabilir.",
   "cloud.feature.other.name": "Büro bulutu özelliği ({key})",
   "cloud.feature.other.desc": "Bu özelliğin hangi verileri sakladığı için gizlilik notuna bakın.",
-  "cloud.turnOffPurge": "Kapat ve bulut verilerini sil"
+  "cloud.turnOffPurge": "Kapat ve bulut verilerini sil",
+  "billing.sourceCloud": "Bir meslektaş büro bulutu üzerinden gönderdi",
+  "billing.cloudSyncPending": "İnceleme sonucu henüz buluta eşitlenmedi",
+  "billing.cloudPublished": "Büro bulutunda yayımlandı",
+  "billing.cloudPublish": "Büro bulutunda yayımla",
+  "billing.cloudRepublish": "Buluttaki dosya adını güncelle",
+  "billing.cloudPublishedDone": "\"{title}\" yayımlandı. Meslektaşlar artık bunu kendi saatlik faturalamalarında seçebilir.",
+  "billing.cloudUnavailable": "Büro bulutu üzerinden süre toplama kullanılamıyor: {reason}",
+  "billing.cloudOff": "Bu büroda süre toplama açık değil. Açıldığında diğer bilgisayarlardaki avukatlar sürelerini incelemeniz için size gönderebilir.",
+  "billing.cloudOpenSettings": "Büro bulutu ayarlarını aç",
+  "billing.cloudOn": "Büro bulutu üzerinden süre toplama açık; {n} dosya yayımlandı.",
+  "billing.cloudPending": "{n} inceleme sonucu henüz buluta eşitlenmedi ve bir sonraki çekmede yeniden denenecek.",
+  "billing.cloudPull": "Büro bulutundan süreleri çek",
+  "billing.cloudPulled": "Çekildi: {created} yeni, {refreshed} güncellendi.",
+  "billing.cloudUnmapped": "{n} kayıt, bu bilgisayarda yerel dosya açılışı bulunmayan dosyalara ait olduğu için çekilmedi.",
+  "billing.invoiceNumberPlaceholder": "Faturalama sisteminden gelen fatura numarası",
+  "billing.invoiceNumberRequired": "Faturalama sisteminin döndürdüğü fatura numarasını girin (dijital faturalarda 20 haneli)"
 }

@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "عند التفعيل، يمكن للمحامين مشاركة بنود خبراتهم مع فريقهم أو مع المكتب بأكمله لاستخدامها في المناقصات والعروض المقدمة للعملاء.",
   "cloud.feature.other.name": "ميزة سحابة المكتب ({key})",
   "cloud.feature.other.desc": "راجع ملاحظة الخصوصية لمعرفة البيانات التي تحفظها هذه الميزة.",
-  "cloud.turnOffPurge": "إيقاف وحذف البيانات السحابية"
+  "cloud.turnOffPurge": "إيقاف وحذف البيانات السحابية",
+  "billing.sourceCloud": "أرسله زميل عبر سحابة المكتب",
+  "billing.cloudSyncPending": "لم تتم مزامنة نتيجة المراجعة مع السحابة بعد",
+  "billing.cloudPublished": "نُشر في سحابة المكتب",
+  "billing.cloudPublish": "النشر في سحابة المكتب",
+  "billing.cloudRepublish": "تحديث اسم القضية في السحابة",
+  "billing.cloudPublishedDone": "تم نشر \"{title}\". يمكن للزملاء الآن اختيارها في الفوترة بالساعة الخاصة بهم.",
+  "billing.cloudUnavailable": "تجميع الوقت عبر سحابة المكتب غير متاح: {reason}",
+  "billing.cloudOff": "لم يُفعَّل تجميع الوقت في هذا المكتب. بعد تفعيله، يستطيع المحامون على الأجهزة الأخرى إرسال أوقاتهم إليك للمراجعة.",
+  "billing.cloudOpenSettings": "فتح إعدادات سحابة المكتب",
+  "billing.cloudOn": "تجميع الوقت عبر سحابة المكتب مفعّل؛ عدد القضايا المنشورة: {n}.",
+  "billing.cloudPending": "هناك {n} من نتائج المراجعة لم تتم مزامنتها مع السحابة بعد، وستُعاد المحاولة عند الجلب التالي.",
+  "billing.cloudPull": "جلب الوقت من سحابة المكتب",
+  "billing.cloudPulled": "تم الجلب: {created} جديدة، {refreshed} محدّثة.",
+  "billing.cloudUnmapped": "هناك {n} من الإدخالات تتبع قضايا ليس لها قبول قضية محلي، ولم يتم جلبها.",
+  "billing.invoiceNumberPlaceholder": "رقم الفاتورة من نظام الفوترة",
+  "billing.invoiceNumberRequired": "أدخل رقم الفاتورة الذي أعاده نظام الفوترة (20 رقمًا للفواتير الرقمية)"
 }

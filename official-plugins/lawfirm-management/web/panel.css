@@ -635,3 +635,6 @@ td.cell-text {
 /* 律所云端（cloud.js） */
 #cl-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
 .cl-purge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.invoice-number-input { width: 13em; margin-inline-end: 6px; }
+.hb-cloud { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.hb-cloud .hint { margin: 0; }

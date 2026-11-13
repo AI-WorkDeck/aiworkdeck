@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Si se activa, los abogados pueden compartir sus entradas de experiencia con su equipo o con todo el despacho para usarlas en concursos y propuestas a clientes.",
   "cloud.feature.other.name": "Función de la nube del despacho ({key})",
   "cloud.feature.other.desc": "Consulte la nota de privacidad para saber qué datos almacena esta función.",
-  "cloud.turnOffPurge": "Desactivar y eliminar los datos en la nube"
+  "cloud.turnOffPurge": "Desactivar y eliminar los datos en la nube",
+  "billing.sourceCloud": "Enviado por un compañero a través de la nube del despacho",
+  "billing.cloudSyncPending": "El resultado de la revisión aún no se ha sincronizado con la nube",
+  "billing.cloudPublished": "Publicado en la nube del despacho",
+  "billing.cloudPublish": "Publicar en la nube del despacho",
+  "billing.cloudRepublish": "Actualizar el nombre del asunto en la nube",
+  "billing.cloudPublishedDone": "Se ha publicado «{title}». Los compañeros ya pueden elegirlo en su facturación por horas.",
+  "billing.cloudUnavailable": "La recopilación de tiempos en la nube del despacho no está disponible: {reason}",
+  "billing.cloudOff": "La recopilación de tiempos no está activada en este despacho. Una vez activada, los abogados de otros ordenadores podrán enviarle sus tiempos para su revisión.",
+  "billing.cloudOpenSettings": "Abrir los ajustes de la Nube del despacho",
+  "billing.cloudOn": "La recopilación de tiempos en la nube del despacho está activada; {n} asuntos publicados.",
+  "billing.cloudPending": "{n} resultados de revisión aún no se han sincronizado con la nube y se reintentarán en la próxima descarga.",
+  "billing.cloudPull": "Descargar tiempos de la nube del despacho",
+  "billing.cloudPulled": "Descargado: {created} nuevos, {refreshed} actualizados.",
+  "billing.cloudUnmapped": "{n} entradas pertenecen a asuntos sin alta local y no se han descargado.",
+  "billing.invoiceNumberPlaceholder": "Número de factura del sistema de facturación",
+  "billing.invoiceNumberRequired": "Introduzca el número de factura devuelto por el sistema de facturación (20 dígitos en las facturas digitales)"
 }

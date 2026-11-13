@@ -676,19 +676,27 @@
         const actionTd = node('td');
         const needsIssue = inv.status === 'PENDING' || inv.status === 'PENDING_APPROVAL' || (!inv.invoiceNumber && inv.status !== 'PAID' && inv.status !== 'VOIDED');
         if (needsIssue) {
+          // 发票号码由开票系统/税务平台返回，必须如实填写；以前这里写死了占位号码 SD-xxxxxx
+          const numberInput = document.createElement('input');
+          numberInput.type = 'text';
+          numberInput.className = 'invoice-number-input';
+          numberInput.setAttribute('placeholder', L('billing.invoiceNumberPlaceholder', '开票系统返回的发票号码'));
+          numberInput.setAttribute('aria-label', L('billing.invoiceNumberPlaceholder', '开票系统返回的发票号码'));
           const issueBtn = node('button', '确认开票', 'btn-issue-invoice');
           issueBtn.type = 'button';
           issueBtn.addEventListener('click', () => runAction(issueBtn, async (epoch) => {
-            await request('issueInvoice', {
-              invoiceId: inv.id,
-              invoiceCode: '011002600111',
-              invoiceNumber: `SD-${String(inv.id).padStart(6, '0')}`
-            });
+            const invoiceNumber = numberInput.value.trim();
+            if (!/^[0-9A-Za-z-]{8,32}$/.test(invoiceNumber)) {
+              notice(L('billing.invoiceNumberRequired', '请填写开票系统返回的发票号码（数电票为 20 位数字）'), true);
+              numberInput.focus();
+              return;
+            }
+            await request('issueInvoice', { invoiceId: inv.id, invoiceNumber });
             if (epoch !== state.epoch) return;
             await loadOverview(epoch);
             notice(`已确认开具数电发票：${inv.invoiceAppNo || inv.id}`);
           }));
-          actionTd.append(issueBtn);
+          actionTd.append(numberInput, issueBtn);
         } else {
           actionTd.append(node('span', '已开具', 'hint'));
         }

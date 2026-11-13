@@ -620,12 +620,20 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
   // Issue the newly submitted invoice
   const issueBtn = p.$('invoice-list').querySelector('.btn-issue-invoice');
   assert.ok(issueBtn, 'Expected issue invoice button');
+  // 没填发票号码不发请求（以前会写死占位号码 SD-xxxxxx）
   issueBtn.click();
+  await tick();
+  assert.equal(p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'issueInvoice'), undefined);
+  assert.match(p.$('notice').textContent, /发票号码/);
+  p.$('invoice-list').querySelector('.invoice-number-input').value = '26112000000012345678';
+  p.$('invoice-list').querySelector('.btn-issue-invoice').click();
   await tick();
 
   const issueCall = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'issueInvoice');
   assert.ok(issueCall);
   assert.equal(issueCall.params.params.invoiceId, 802);
+  assert.equal(issueCall.params.params.invoiceNumber, '26112000000012345678');
+  assert.equal(issueCall.params.params.invoiceCode, undefined, 'no made-up invoice code either');
 
   // Record manual fee collection against the issued invoice
   p.$('collection-invoice-id').value = '802';

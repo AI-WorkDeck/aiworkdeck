@@ -89,6 +89,11 @@ export default {
   teDeleted: 'Deleted',
   teSaveFirst: 'Some selected entries have unsaved changes. Save them first.',
   teSubmitted: '{count} submitted for partner review',
+  teCloudTitle: 'Your firm has turned on cloud time collection',
+  teCloudNote: 'Time on a firm cloud matter is saved to the AI WorkDeck collaboration service when you submit it (work date, duration, work description and billable flag) and goes to the partner who published that matter for review; the outcome comes back here. Keep descriptions to what is necessary and avoid unnecessary sensitive client details.',
+  teCloudBadge: 'Firm cloud matter',
+  teCloudTarget: 'Firm cloud · {title} ({client})',
+  teSubmittedCloud: '{count} submitted, {cloud} of them to the firm cloud',
   allProjectsOption: 'All Projects',
   unassociatedProjectOption: 'No Project',
   // dev-board BUG-45: the Action column / CSV export used to show the raw

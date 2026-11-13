@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Jika diaktifkan, advokat dapat membagikan entri pengalamannya kepada tim atau seluruh kantor untuk digunakan dalam tender dan proposal klien.",
   "cloud.feature.other.name": "Fitur cloud kantor ({key})",
   "cloud.feature.other.desc": "Lihat catatan privasi untuk mengetahui data yang disimpan oleh fitur ini.",
-  "cloud.turnOffPurge": "Matikan dan hapus data cloud"
+  "cloud.turnOffPurge": "Matikan dan hapus data cloud",
+  "billing.sourceCloud": "Diajukan rekan kerja melalui cloud kantor",
+  "billing.cloudSyncPending": "Hasil peninjauan belum disinkronkan ke cloud",
+  "billing.cloudPublished": "Dipublikasikan ke cloud kantor",
+  "billing.cloudPublish": "Publikasikan ke cloud kantor",
+  "billing.cloudRepublish": "Perbarui nama perkara di cloud",
+  "billing.cloudPublishedDone": "\"{title}\" telah dipublikasikan. Rekan kerja kini dapat memilihnya di penagihan per jam mereka.",
+  "billing.cloudUnavailable": "Pengumpulan waktu cloud kantor tidak tersedia: {reason}",
+  "billing.cloudOff": "Pengumpulan waktu belum diaktifkan untuk kantor ini. Setelah aktif, pengacara di komputer lain dapat mengajukan waktu kepada Anda untuk ditinjau.",
+  "billing.cloudOpenSettings": "Buka pengaturan Cloud kantor",
+  "billing.cloudOn": "Pengumpulan waktu cloud kantor aktif; {n} perkara dipublikasikan.",
+  "billing.cloudPending": "{n} hasil peninjauan belum disinkronkan ke cloud dan akan dicoba lagi saat pengambilan berikutnya.",
+  "billing.cloudPull": "Ambil waktu dari cloud kantor",
+  "billing.cloudPulled": "Diambil: {created} baru, {refreshed} diperbarui.",
+  "billing.cloudUnmapped": "{n} entri milik perkara yang tidak memiliki penerimaan perkara lokal sehingga tidak diambil.",
+  "billing.invoiceNumberPlaceholder": "Nomor faktur dari sistem faktur",
+  "billing.invoiceNumberRequired": "Masukkan nomor faktur yang dikembalikan oleh sistem faktur (20 digit untuk faktur digital)"
 }

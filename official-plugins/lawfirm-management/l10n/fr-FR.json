@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Lorsque cette option est activée, les avocats peuvent partager leurs références avec leur équipe ou l’ensemble du cabinet pour les appels d’offres et les propositions aux clients.",
   "cloud.feature.other.name": "Fonctionnalité du cloud du cabinet ({key})",
   "cloud.feature.other.desc": "Consultez la note de confidentialité pour connaître les données stockées par cette fonctionnalité.",
-  "cloud.turnOffPurge": "Désactiver et supprimer les données cloud"
+  "cloud.turnOffPurge": "Désactiver et supprimer les données cloud",
+  "billing.sourceCloud": "Soumis par un collègue via le cloud du cabinet",
+  "billing.cloudSyncPending": "Le résultat de la validation n'est pas encore synchronisé avec le cloud",
+  "billing.cloudPublished": "Publié sur le cloud du cabinet",
+  "billing.cloudPublish": "Publier sur le cloud du cabinet",
+  "billing.cloudRepublish": "Mettre à jour le nom du dossier dans le cloud",
+  "billing.cloudPublishedDone": "« {title} » est publié. Vos collègues peuvent désormais le choisir dans leur facturation au temps passé.",
+  "billing.cloudUnavailable": "La collecte des temps via le cloud du cabinet est indisponible : {reason}",
+  "billing.cloudOff": "La collecte des temps n'est pas activée pour ce cabinet. Une fois activée, les avocats des autres ordinateurs pourront vous soumettre leurs temps pour validation.",
+  "billing.cloudOpenSettings": "Ouvrir les paramètres du Cloud du cabinet",
+  "billing.cloudOn": "La collecte des temps via le cloud du cabinet est activée ; {n} dossiers publiés.",
+  "billing.cloudPending": "{n} résultats de validation ne sont pas encore synchronisés avec le cloud et seront renvoyés lors de la prochaine récupération.",
+  "billing.cloudPull": "Récupérer les temps depuis le cloud du cabinet",
+  "billing.cloudPulled": "Récupéré : {created} nouveaux, {refreshed} mis à jour.",
+  "billing.cloudUnmapped": "{n} entrées appartiennent à des dossiers sans ouverture de dossier locale et n'ont pas été récupérées.",
+  "billing.invoiceNumberPlaceholder": "Numéro de facture du système de facturation",
+  "billing.invoiceNumberRequired": "Saisissez le numéro de facture renvoyé par le système de facturation (20 chiffres pour les factures numériques)"
 }

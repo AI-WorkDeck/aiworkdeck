@@ -242,5 +242,21 @@
   "cloud.feature.pitch.desc": "Quando ativado, os advogados podem compartilhar suas entradas de experiência com sua equipe ou com todo o escritório para uso em licitações e propostas a clientes.",
   "cloud.feature.other.name": "Recurso da nuvem do escritório ({key})",
   "cloud.feature.other.desc": "Consulte a nota de privacidade para saber o que este recurso armazena.",
-  "cloud.turnOffPurge": "Desativar e excluir os dados na nuvem"
+  "cloud.turnOffPurge": "Desativar e excluir os dados na nuvem",
+  "billing.sourceCloud": "Enviado por um colega pela nuvem do escritório",
+  "billing.cloudSyncPending": "O resultado da revisão ainda não foi sincronizado com a nuvem",
+  "billing.cloudPublished": "Publicado na nuvem do escritório",
+  "billing.cloudPublish": "Publicar na nuvem do escritório",
+  "billing.cloudRepublish": "Atualizar o nome do caso na nuvem",
+  "billing.cloudPublishedDone": "\"{title}\" foi publicado. Os colegas já podem escolhê-lo na cobrança por hora deles.",
+  "billing.cloudUnavailable": "A coleta de horas pela nuvem do escritório está indisponível: {reason}",
+  "billing.cloudOff": "A coleta de horas não está ativada neste escritório. Depois de ativada, advogados em outros computadores poderão enviar horas a você para revisão.",
+  "billing.cloudOpenSettings": "Abrir as configurações da Nuvem do escritório",
+  "billing.cloudOn": "A coleta de horas pela nuvem do escritório está ativada; {n} casos publicados.",
+  "billing.cloudPending": "{n} resultados de revisão ainda não foram sincronizados com a nuvem e serão reenviados na próxima busca.",
+  "billing.cloudPull": "Buscar horas da nuvem do escritório",
+  "billing.cloudPulled": "Buscadas: {created} novas, {refreshed} atualizadas.",
+  "billing.cloudUnmapped": "{n} lançamentos pertencem a casos sem cadastro local e não foram buscados.",
+  "billing.invoiceNumberPlaceholder": "Número da nota fiscal do sistema de emissão",
+  "billing.invoiceNumberRequired": "Informe o número da nota fiscal retornado pelo sistema de emissão (20 dígitos para nota fiscal digital)"
 }
