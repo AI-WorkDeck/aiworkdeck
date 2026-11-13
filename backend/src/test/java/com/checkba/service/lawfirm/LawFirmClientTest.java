@@ -38,7 +38,6 @@ import org.springframework.test.context.TestPropertySource;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -110,6 +109,11 @@ class LawFirmClientTest {
                 .applicantUserId(lead).leadLawyerUserId(lead).leadLawyerName("陈思远")
                 .contractAmountCents(1_000_000L).practiceArea("COMMERCIAL_LITIGATION").feeMode("FIXED")
                 .submittedAt(now).createdAt(now).updatedAt(now).build());
+    }
+
+    /** 本地日期 N 天前的中午：按 24 小时倒推会在夏令时切换时差一天。 */
+    private static Instant daysAgo(int days) {
+        return LocalDate.now().minusDays(days).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant();
     }
 
     private Map<String, Object> run(Long userId, String action, Map<String, Object> params) {
@@ -313,7 +317,7 @@ class LawFirmClientTest {
         p = projects.saveAndFlush(p);
         LawFirmMatterIntake m = legacyIntake("LF-S-1", "南湖地产有限公司", "", "Z", "APPROVED_FILED", partner.getId());
         m.setProjectId(p.getId());
-        m.setSubmittedAt(Instant.now().minus(200, ChronoUnit.DAYS));
+        m.setSubmittedAt(daysAgo(200));
         intakes.saveAndFlush(m);
 
         Map<String, Object> row = listRows(partner.getId()).get(0);
@@ -325,7 +329,7 @@ class LawFirmClientTest {
         log.setActionType("OPEN_FILE");
         log.setProjectId(p.getId());
         activity.saveAndFlush(log);
-        log.setTimestamp(LocalDateTime.now().minusDays(40));
+        log.setTimestamp(LocalDate.now().minusDays(40).atTime(12, 0));
         activity.saveAndFlush(log);
         row = listRows(partner.getId()).get(0);
         assertEquals("WORK_LOG", row.get("lastInteractionSource"));
@@ -336,8 +340,8 @@ class LawFirmClientTest {
         conv.setTitle("项目群");
         conv.setType("PROJECT");
         conv.setOwnerId(partner.getId());
-        conv.setCreatedAt(Instant.now().minus(60, ChronoUnit.DAYS));
-        conv.setLastMessageAt(Instant.now().minus(20, ChronoUnit.DAYS));
+        conv.setCreatedAt(daysAgo(60));
+        conv.setLastMessageAt(daysAgo(20));
         conv.setProjectId(p.getId());
         conversations.saveAndFlush(conv);
 
