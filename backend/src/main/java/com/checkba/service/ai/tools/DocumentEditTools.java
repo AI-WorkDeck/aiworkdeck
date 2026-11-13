@@ -2802,7 +2802,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·结构】以区域数据建一个图表。chartType: column（柱状）/ bar（条状）/ line（折线）/ pie（饼图）。" +
           "只做「建图表 + 选类型 + 标题」三件事，位置固定在数据区域右侧、默认尺寸，不支持自定义位置/尺寸/多系列等复杂配置。")
     public String sheet_add_chart(
-            @P("数据区域，如 'A1:B10'（含表头）") String range,
+            @P("数据区域，如 'A1:B10'（含表头；多列时首列作分类标签）。只画某一列且标签列不相邻时用逗号分开：标签列在前、数据列在后，如 'A1:A7,D1:D7'") String range,
             @P("图表类型：column/bar/line/pie") String chartType,
             @P(value = "图表标题，不设则不传", required = false) String title,
             @P(value = "图表名称，不传自动生成", required = false) String name,

@@ -7163,7 +7163,15 @@ const EXEC = {
     try {
       withInlineMarkupForExport(function () { if (ext === 'docx') repairMoveRangeBookmarks(); xModel.storeToURL('private:stream', props); });
     } finally {
-      try { if (!!xModel.isModified() !== wasModified) xModel.setModified(wasModified); } catch (e) { /* 只读文档等场景可能拒绝，忽略 */ }
+      // 宿主的保存（带 saveSnapshotId）落下快照后，引擎这边就是「自上次保存以来没改过」：标志清成 false。
+      // Impress 的 modify 广播只在 false→true 那一下发，复原成 true 的话之后单条格式类命令（如 AI 把标题
+      // 改红）再也报不上来，宿主不标脏、不自动保存、关标签也不拦——改动丢失（O7 实测）。
+      // Writer/Calc 每笔都广播，不受影响；宿主 dirty 独立记账，上传失败照常重试。其余导出（另存副本、比对）照旧复原。
+      const savedSnapshot = Number.isSafeInteger(p && p.saveSnapshotId) && p.saveSnapshotId > 0;
+      try {
+        const target = savedSnapshot ? false : wasModified;
+        if (!!xModel.isModified() !== target) xModel.setModified(target);
+      } catch (e) { /* 只读文档等场景可能拒绝，忽略 */ }
       exportInFlight = false;
     }
     saveSeq++;
@@ -10968,9 +10976,18 @@ const EXEC = {
     if (r0.error) return tableFail(r0.error);
     if (r0.sheet.isProtected()) return tableFail('SHEET_PROTECTED_CELL');
     const sheet = r0.sheet;
-    const range = sheetRange(sheet, String((p && p.range) || ''));
-    if (!range) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
-    const addr = range.getRangeAddress();
+    // 'A1:A7,D1:D7'：逗号分开的多块区域，第一块是分类标签、其余是数据（只画某一列时用，O7 实测）。
+    // 单块区域时首列当分类标签——只有一列就没有可画的数据（导出的图表没有系列），所以单列不当标签。
+    const parts = String((p && p.range) || '').split(',').map(x => x.trim()).filter(Boolean);
+    const addrs = [];
+    for (const part of parts) {
+      const rg = sheetRange(sheet, part);
+      if (!rg) return tableFail('无效的数据区域: ' + part);
+      addrs.push(rg.getRangeAddress());
+    }
+    if (!addrs.length) return tableFail('无效的数据区域: ' + ((p && p.range) || '(空)'));
+    const addr = addrs[0];
+    const rowHeaders = addrs.length > 1 || addr.EndColumn > addr.StartColumn;
     const TYPE_MAP = { column: { cls: 'Bar', vertical: false }, bar: { cls: 'Bar', vertical: true }, line: { cls: 'Line' }, pie: { cls: 'Pie' } };
     const chartTypeRaw = (p && (p.chartType != null ? p.chartType : p.type)) || 'column';
     const typeInfo = TYPE_MAP[String(chartTypeRaw).toLowerCase()];
@@ -10981,13 +10998,13 @@ const EXEC = {
     if (charts.hasByName(name)) return tableFail('图表已存在: ' + name);
     let rect;
     try {
-      const anchorCol = Math.min(addr.EndColumn + 2, 1023);
+      const anchorCol = Math.min(Math.max(...addrs.map(a => a.EndColumn)) + 2, 1023);
       const anchorCell = sheet.getCellByPosition(anchorCol, addr.StartRow);
       const pos = anchorCell.getPropertyValue('Position');
       rect = new css.awt.Rectangle({ X: pos.X, Y: pos.Y, Width: ptToMm100(400), Height: ptToMm100(250) });
     } catch (e) { return tableFail('计算图表放置位置失败: ' + errStr(e)); }
     try {
-      charts.addNewByName(name, rect, [addr], true, true);
+      charts.addNewByName(name, rect, addrs, true, rowHeaders);
     } catch (e) { return tableFail('创建图表失败: ' + errStr(e)); }
     const note = [];
     try {
@@ -11006,7 +11023,7 @@ const EXEC = {
     } catch (e) { note.push('图表类型/标题设置失败: ' + errStr(e)); }
     const res = {
       success: true, name: name, chartType: String(chartTypeRaw).toLowerCase(),
-      range: sheetRangeName(addr), sheet: sheet.getName(),
+      range: addrs.map(sheetRangeName).join(','), sheet: sheet.getName(),
     };
     if (p && p.title) res.title = String(p.title);
     if (note.length) return { ...res, ...tableFail('SHEET_CHART_PARTIAL'), created: true, retryable: false };

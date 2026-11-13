@@ -1,10 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // O13 真机验收（由 office-password.mjs 的宿主隔离骨架改出）：QuickLook 预览演示文稿用引擎逐页渲染，不再用前端 pptx-preview。
-// 原 O14 说明：设了打开密码的 docx / xlsx / pptx 在真实桌面宿主（Electron + webview LOWA + 正常自动保存）里
-//   打开 → 加载面板出现密码框 → 输错密码提示 → 输对密码进入编辑 → 编辑 → 产品正常自动保存落盘
-//   → 磁盘上的文件仍是加密复合文档、用原密码（msoffcrypto-tool 独立实现）能解开且含编辑
-//   → 关闭重开再次要密码 → 重开后内容含编辑 → 演示文稿的冷启动预览缓存里没有这份文件的渲染页。
 // 不碰用户的生产实例：Electron/后端的 home、userData、端口全部在临时目录（同 office-interaction-latency.mjs）。
 // 先构建本树的 H5、zetaoffice（含 LOWA 资源与 cjk* 字体）与后端 JAR；JAVA_HOME 指向 JDK 21。
 import fs from 'node:fs'
