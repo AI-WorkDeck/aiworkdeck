@@ -401,6 +401,39 @@ class MobileBillingServiceTest {
     }
 
     @Test
+    @DisplayName("channel=wxpay-app：无 productId 放行，productId/wxCode 不上行，appPay 原样带回")
+    void wxpayAppChannelNeedsNoProduct() {
+        User u = phoneUser();
+        String accountId = "acct-app-" + u.getId();
+        bind(u.getId(), accountId);
+        java.util.Map<String, String> pay = java.util.Map.of("appId", "wxapp1", "sign", "s");
+        when(billing.createRecharge(accountId, 5000L, "idem-app-0001", "wxpay-app", null, null))
+                .thenReturn(new RechargeOrder("app", "OT-app", 5000L, null, null, null,
+                        null, null, null, null, pay));
+
+        RechargeOrder order = service.createRecharge(u.getId(), 5000L, "idem-app-0001",
+                "wxpay-app", "credits.cny.50", "0a1b2c3d4e");
+
+        assertEquals("app", order.present());
+        assertEquals(pay, order.appPay());
+        verify(billing).createRecharge(accountId, 5000L, "idem-app-0001", "wxpay-app", null, null);
+    }
+
+    @Test
+    @DisplayName("channel=wxpay-app 金额与幂等键仍按通用规则校验：不合格不发上游")
+    void wxpayAppStillValidatesAmountAndKey() {
+        User u = phoneUser();
+        bind(u.getId(), "acct-app-bad-" + u.getId());
+        for (Long bad : new Long[]{null, 0L, -1L}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> service.createRecharge(u.getId(), bad, "idem-app-0003", "wxpay-app", null, null));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createRecharge(u.getId(), 5000L, "bad key", "wxpay-app", null, null));
+        verify(billing, never()).createRecharge(anyString(), anyLong(), anyString(), eq("wxpay-app"), any(), any());
+    }
+
+    @Test
     @DisplayName("channel=appstore 带了 wxCode：那是微信那条路的凭证，不上行也不报错")
     void appstoreIgnoresWxCode() {
         User u = phoneUser();
