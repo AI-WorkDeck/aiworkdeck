@@ -12,6 +12,7 @@
   <script src="workflow.js" defer></script>
   <script src="expenses-l10n.js" defer></script>
   <script src="expenses.js" defer></script>
+  <script src="cloud.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -50,6 +51,9 @@
       </button>
       <button type="button" id="tab-expense" role="tab" data-tab="expense" aria-selected="false" aria-controls="panel-expense" class="tab-btn">
         <span data-ex="expense.tab"></span>
+      </button>
+      <button type="button" id="tab-cloud" role="tab" data-tab="cloud" aria-selected="false" aria-controls="panel-cloud" class="tab-btn">
+        <span data-cl="cloud.tab"></span>
       </button>
     </nav>
   </header>
@@ -521,6 +525,18 @@
       <article class="card">
         <header class="card-header"><div><h2 data-ex="expense.listTitle"></h2></div></header>
         <div id="ex-list" class="stack-list"></div>
+      </article>
+    </section>
+
+    <section id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" class="tab-panel" hidden>
+      <article class="card">
+        <header class="card-header">
+          <div><h2 data-cl="cloud.title"></h2><p class="hint" data-cl="cloud.intro"></p></div>
+          <button type="button" id="cl-refresh" data-cl="cloud.refresh"></button>
+        </header>
+        <p id="cl-who" class="hint"></p>
+        <p id="cl-status" class="hint" role="status" aria-live="polite"></p>
+        <div id="cl-features" class="stack-list"></div>
       </article>
     </section>
   </main>
