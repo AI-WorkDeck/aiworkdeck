@@ -778,7 +778,9 @@
     locale = (ctx && ctx.language) || 'zh-CN';
     state.projectId = (ctx && ctx.projectId) || '';
     applyStatic();
+    let userPickedTab = false;
     document.querySelectorAll('.pm-tabs [role=tab]').forEach((b) => b.addEventListener('click', () => {
+      userPickedTab = true;
       state.tab = b.dataset.tab;
       state.editing = null;
       confirmBar('');
@@ -786,7 +788,8 @@
       render();
     }));
     await loadAll();
-    if (state.matrix.items.length) state.tab = 'tender';
+    // 已有对照表时默认打开招标对照；加载期间律师已经点了别的标签就不改
+    if (state.matrix.items.length && !userPickedTab) state.tab = 'tender';
     render();
     try { awd.events.on('files.changed', () => { if (!state.busy) loadFiles().then(render); }); } catch (e) { /* 旧宿主无事件通道 */ }
     try {
