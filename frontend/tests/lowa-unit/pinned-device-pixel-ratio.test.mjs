@@ -21,7 +21,9 @@ test('editor.html pins devicePixelRatio in an inline script before the engine mo
 })
 
 test('after a screen change the page still reports the boot ratio', () => {
-  const inline = html.match(/<script>([\s\S]*?)<\/script>/)[1]
+  // 取第一段内联脚本（editor.html 自己的文件，按固定标记切片即可）
+  const open = html.indexOf('<script>') + '<script>'.length
+  const inline = html.slice(open, html.indexOf('</script>', open))
   // 模拟浏览器：devicePixelRatio 是随所在屏幕变化的访问器
   let screenDpr = 2
   class Win {}
