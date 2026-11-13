@@ -270,6 +270,19 @@ async function decryptedText(file, password) {
   for (const n of Object.keys(zip.files).filter(n => n.endsWith('.xml'))) text += stripTags(await zip.file(n).async('string'))
   return text
 }
+// 副本里的图片：解开后列出 media/ 下的文件与大小、并核对图片魔数
+async function mediaOf(file, password) {
+  const out = path.join(run, 'media-' + Date.now() + path.extname(file))
+  execFileSync(decryptTool, ['-p', password, file, out])
+  const zip = await JSZip.loadAsync(fs.readFileSync(out))
+  const list = []
+  for (const n of Object.keys(zip.files).filter(n => /\/media\//.test(n))) {
+    const b = await zip.file(n).async('uint8array')
+    const magic = b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'png' : (b[0] === 0x4d && b[1] === 0x4d) || (b[0] === 0x49 && b[1] === 0x49) ? 'tiff' : 'other'
+    list.push([n, b.length, magic])
+  }
+  return list
+}
 const editor = (name, fn, ...args) => page.evaluate((expr, name, fn, args) => { const e = (0, eval)(expr)(name); return e ? (0, eval)(fn)(e, ...args) : null }, editorExpr, name, fn.toString(), args)
 async function passwordBox(name) {
   await page.waitForFunction((expr, name) => (0, eval)(expr)(name)?.openFailCode === 'DOC_ENCRYPTED', { timeout: 240000, polling: 100 }, editorExpr, name)
@@ -417,6 +430,7 @@ async function checkLegacy(src, password) {
   const copyFile = path.join(home, 'docs', copyName)
   r.copyEncrypted = isCfb(copyFile)
   r.copyDecryptsWithPassword = await decryptedText(copyFile, password).then(t => t.includes(TYPED)).catch(e => 'error: ' + e.message)
+  r.copyMedia = await mediaOf(copyFile, password).catch(e => 'error: ' + e.message)
   r.originalStillUntouched = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') === hash0
   // 原标签的修改已带进副本：关闭不应再拦
   await close(name)
@@ -465,7 +479,10 @@ try {
   for (const key of profileDirs) fs.mkdirSync(path.join(run, 'seed-' + key), { recursive: true })
   for (const f of ['flexmark-table.docx', 'case-ledger.xlsx', 'case-report.pptx']) fs.copyFileSync(path.join(fixtures, f), path.join(dir, 'locked-' + f))
   const LEGACY = [['rc4cryptoapi_password.xls', 'Password1234_'], ['contract.doc', 'awd-0414'], ['rc4cryptoapi_password.ppt', 'Password1234_']]
+  // OFFICE_PASSWORD_EXTRA=路径|密码,…：额外的本机样本（不入库，例如用户提供的真实加密演示文稿）
+  const EXTRA = (process.env.OFFICE_PASSWORD_EXTRA || '').split(',').filter(Boolean).map(x => x.split('|'))
   for (const [f] of LEGACY) fs.copyFileSync(path.join(fixtures, 'legacy', f), path.join(dir, 'locked-' + f))
+  for (const [f] of EXTRA) fs.copyFileSync(f, path.join(dir, 'locked-' + path.basename(f)))
   const PLAIN = process.env.OFFICE_PASSWORD_PLAIN ? process.env.OFFICE_PASSWORD_PLAIN.split(',') : []
   for (const f of PLAIN) fs.copyFileSync(f, path.join(dir, 'plain-' + path.basename(f)))
   evidence.runtime = (await start('warmup')).versions
@@ -479,9 +496,9 @@ try {
     }
   }
   for (const f of PLAIN) { try { await checkPlain(f) } catch (error) { evidence.files.push({ name: f, error: error.stack }); log(f, 'failed', error.message) } }
-  for (const [f, pw] of LEGACY) {
-    if (only && !only.includes(f)) continue
-    try { await checkLegacy(path.join(fixtures, 'legacy', f), pw) } catch (error) {
+  for (const [f, pw] of [...LEGACY.map(([f, pw]) => [path.join(fixtures, 'legacy', f), pw]), ...EXTRA]) {
+    if (only && !only.includes(path.basename(f))) continue
+    try { await checkLegacy(f, pw) } catch (error) {
       evidence.files.push({ name: f, error: error.stack })
       log(f, 'failed', error.message)
       await page.screenshot({ path: path.join(run, 'failure-' + f + '.png') }).catch(() => {})

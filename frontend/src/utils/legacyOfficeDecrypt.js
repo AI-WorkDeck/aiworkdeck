@@ -630,10 +630,41 @@ async function decryptPpt(cfb, password) {
   }
   pd.fill(0, cryptOff, cryptOff + 8 + cryptLen) // 去掉加密容器，补零保持流长度
 
+  // Pictures 流（图片）：每条图片记录按字段分段、每段都从块 0 重新起 RC4（同 Apache POI
+  // HSLFSlideShowEncrypted.decryptPicture）。用户真实样本（17 MB TIFF）实测：这样解出的图片完整可读，
+  // 按 512 字节换块的解法从第二块起即错乱。
+  const pic0 = findStream(cfb, 'Pictures')
+  if (pic0 && pic0.size > 0) putStream(cfb, 'Pictures', decryptPptPictures(new Uint8Array(pic0.content), await session.keyFor(0)))
+
   const cu = cu0.slice()
   setU32(cu, 12, PPT_TOKEN_PLAIN)
   putStream(cfb, 'Current User', cu)
   putStream(cfb, 'PowerPoint Document', pd)
+}
+
+// 有两份 rgbUid 的图片实例（EMF/WMF/PICT/JPEG/PNG/DIB/TIFF 带第二 UID 的变体），见 MS-ODRAW OfficeArtBlip*
+const PIC_TWO_UIDS = new Set([0x217, 0x3d5, 0x46b, 0x543, 0x6e1, 0x6e3, 0x6e5, 0x7a9])
+function decryptPptPictures(enc, key0) {
+  const out = enc.slice()
+  const seg = (off, len) => { out.set(rc4(key0, enc.subarray(off, off + len)), off) }
+  let off = 0
+  while (off + 8 <= out.length) {
+    seg(off, 8)
+    const inst = u16(out, off) >>> 4
+    const recType = u16(out, off + 2)
+    const end = off + 8 + u32(out, off + 4)
+    // 只认图片记录（OfficeArtBlip 0xF018–0xF117）；FBSE（0xF007）等 POI 也未用真实样本核对过，不猜
+    if (recType < 0xf018 || recType > 0xf117 || end > out.length) throw fail('UNSUPPORTED_ENCRYPTION', 'unrecognised picture record 0x' + recType.toString(16))
+    let p = off + 8
+    for (let i = PIC_TWO_UIDS.has(inst) ? 2 : 1; i > 0; i--) { seg(p, 16); p += 16 }
+    const meta = recType === 0xf01a || recType === 0xf01b || recType === 0xf01c ? 34 : 1 // 图元文件头 / tag
+    seg(p, meta); p += meta
+    if (p > end) throw fail('CORRUPT', 'picture record too short')
+    seg(p, end - p)
+    off = end
+  }
+  if (off !== out.length) throw fail('CORRUPT', 'trailing bytes in Pictures stream')
+  return out
 }
 
 // ───────────── 入口 ─────────────
@@ -654,10 +685,6 @@ export async function decryptLegacyOffice(bytes, name, password) {
     if (ext === 'doc') await decryptDoc(cfb, pw, det)
     else if (ext === 'xls') await decryptXls(cfb, pw)
     else {
-      // 带图片的演示文稿：Pictures 流的加密方式 msoffcrypto 没实现、手上也没有真实样本可核对（O14b）。
-      // 解不对就是坏图——宁可明确说不支持，也不显示/另存出缺图的文件。
-      const pictures = findStream(cfb, 'Pictures')
-      if (pictures && pictures.size > 0) throw fail('UNSUPPORTED_ENCRYPTION', 'encrypted presentation with pictures is not supported yet')
       await decryptPpt(cfb, pw)
     }
     return writeCfb(cfb)
