@@ -770,7 +770,9 @@ public class LawFirmClientService {
             }
             LocalDate today = LocalDate.now();
             out.removeIf(s -> s.date.isAfter(today));
-            out.sort(Comparator.comparing((Signal s) -> s.date).reversed());
+            // 同一天里收案登记排最后：它只是建档时间，其他来源才说明真有往来
+            out.sort(Comparator.comparing((Signal s) -> s.date).reversed()
+                    .thenComparing((Signal s) -> "INTAKE".equals(s.source)));
             return out;
         }
 
