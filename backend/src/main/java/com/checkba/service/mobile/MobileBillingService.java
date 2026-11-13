@@ -109,6 +109,9 @@ public class MobileBillingService {
     /** iOS App Store 内购通道（dev-board#426）。 */
     private static final String CHANNEL_APPSTORE = "appstore";
 
+    /** 安卓微信支付 APP 支付通道（dev-board#428）：只要金额，不要档位 / wxCode。 */
+    private static final String CHANNEL_WXPAY_APP = "wxpay-app";
+
     /** 微信道具 id 围栏。只做形态把关，<b>价格权威在官网</b>（不符时官网回 product_mismatch）。 */
     private static final Pattern PRODUCT_ID = Pattern.compile("^[a-z0-9_]{1,64}$");
 
@@ -257,6 +260,8 @@ public class MobileBillingService {
                         "缺少或非法的充值档位，请更新 App 后重试",
                         "Missing or invalid top-up product; please update the app and try again"));
             }
+        } else if (CHANNEL_WXPAY_APP.equals(ch)) {
+            // 微信支付 APP 支付：金额口径同默认通道（上面已校 >0），productId / wxCode 即便传了也不上行
         } else if (ch != null) {
             throw new IllegalArgumentException(LangText.of(
                     "不支持的支付通道，请升级客户端后重试",

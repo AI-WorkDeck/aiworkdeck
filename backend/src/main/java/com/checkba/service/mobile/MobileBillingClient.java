@@ -67,6 +67,10 @@ public interface MobileBillingClient {
      * （小程序虚拟支付，signData/paySig/signature 三者都有值）或 {@code "native"}
      * （iOS 内购，appAccountToken 有值）；不适用的字段为 null。
      *
+     * <p>{@code appPay} 是 present=app（安卓微信支付 APP 支付，{@code channel="wxpay-app"}）时官网给的
+     * 七个 OpenSDK PayReq 字段（appId/partnerId/prepayId/packageValue/nonceStr/timeStamp/sign），
+     * 云后端原样透传；其它通道为 null。
+     *
      * <p>三个 virtual 字段是 {@code wx.requestVirtualPayment} 的入参，由官网算出来后原样透传：
      * 云后端<b>不持有</b>虚拟支付 AppKey，也不碰小程序 session_key，全程只当管道
      * （dev-board#427，spec {@code 2026-09-09-miniprogram-virtual-payment-plan.md} §1）。
@@ -79,7 +83,16 @@ public interface MobileBillingClient {
     record RechargeOrder(String present, String outTradeNo, long amountCents,
                          String codeUrl, String qrCode, String redirectUrl,
                          String signData, String paySig, String signature,
-                         String appAccountToken) {}
+                         String appAccountToken, Map<String, String> appPay) {
+        /** 非 APP 支付通道：appPay 为 null。 */
+        public RechargeOrder(String present, String outTradeNo, long amountCents,
+                             String codeUrl, String qrCode, String redirectUrl,
+                             String signData, String paySig, String signature,
+                             String appAccountToken) {
+            this(present, outTradeNo, amountCents, codeUrl, qrCode, redirectUrl,
+                    signData, paySig, signature, appAccountToken, null);
+        }
+    }
 
     /** 充值单状态：status ∈ {pending, paid, closed, expired}。 */
     record RechargeStatus(String status, boolean paid, long amountCents) {}

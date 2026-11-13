@@ -708,6 +708,14 @@ class MobileApiContractTest {
                 .thenReturn(new MobileBillingClient.RechargeOrder(
                         "native", "OT-contract-ios", 5000L, null, null, null,
                         null, null, null, "3f2504e0-4f89-11d3-9a0c-0305e82c3301"));
+        // 安卓微信支付 APP 支付（dev-board#428）：present=app 多出七个 PayReq 键，同样必须先进 YAML
+        when(billing.createRecharge(anyString(), anyLong(), anyString(),
+                eq("wxpay-app"), isNull(), isNull()))
+                .thenReturn(new MobileBillingClient.RechargeOrder(
+                        "app", "OT-contract-app", 5000L, null, null, null, null, null, null, null,
+                        Map.of("appId", "wx0123456789abcdef", "partnerId", "1900000001",
+                                "prepayId", "wx1234567890", "packageValue", "Sign=WXPay",
+                                "nonceStr", "abc123", "timeStamp", "1760000000", "sign", "c2ln")));
         when(billing.queryRecharge(anyString(), anyString()))
                 .thenReturn(new MobileBillingClient.RechargeStatus("pending", false, 5000L));
         when(billing.confirmAppstore(anyString(), any(), eq("jws.contract.ok")))
@@ -761,6 +769,25 @@ class MobileApiContractTest {
                 .andExpect(jsonPath("$.appAccountToken").value("3f2504e0-4f89-11d3-9a0c-0305e82c3301"))
                 .andExpect(jsonPath("$.codeUrl").doesNotExist())
                 .andExpect(jsonPath("$.signData").doesNotExist())
+                .andExpect(openApi().isValid(validator));
+
+        // present=app 的成功形状（dev-board#428）：七个 PayReq 字段平铺，别的通道字段不出现
+        mvc.perform(post("/api/mobile/billing/recharge").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"amountCents":5000,"idempotencyKey":"idem-contract-app01","channel":"wxpay-app"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.present").value("app"))
+                .andExpect(jsonPath("$.outTradeNo").value("OT-contract-app"))
+                .andExpect(jsonPath("$.appId").value("wx0123456789abcdef"))
+                .andExpect(jsonPath("$.partnerId").value("1900000001"))
+                .andExpect(jsonPath("$.prepayId").value("wx1234567890"))
+                .andExpect(jsonPath("$.packageValue").value("Sign=WXPay"))
+                .andExpect(jsonPath("$.nonceStr").value("abc123"))
+                .andExpect(jsonPath("$.timeStamp").value("1760000000"))
+                .andExpect(jsonPath("$.sign").value("c2ln"))
+                .andExpect(jsonPath("$.codeUrl").doesNotExist())
+                .andExpect(jsonPath("$.appAccountToken").doesNotExist())
                 .andExpect(openApi().isValid(validator));
 
         // 内购确认端点：成功回 RechargeStatus 形状（与 /recharge/status 逐字段同形）

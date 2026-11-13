@@ -132,7 +132,9 @@ public class HttpMobileBillingClient implements MobileBillingClient {
         // channel=appstore 时它本来就是 null，别硬塞一个 null 键上去。
         if (channel != null && !channel.isBlank()) {
             body.put("channel", channel);
-            body.put("productId", productId);
+            if (productId != null) { // wxpay-app 没有档位，不上送 null 键
+                body.put("productId", productId);
+            }
             if (wxCode != null && !wxCode.isBlank()) {
                 body.put("wxCode", wxCode);
             }
@@ -142,7 +144,16 @@ public class HttpMobileBillingClient implements MobileBillingClient {
         // wx.login 拿新 code、带同一 idempotencyKey 再来（官网对命中幂等键的 pending 单用新 code 重签）。
         // appstore 没有一次性凭证，且建单只是「拿一个 appAccountToken」，与默认通道一样可以重试。
         boolean wxvp = "wxvp".equals(channel);
+        // wxpay-app 同理可重试：同一 idempotencyKey 命中的 pending 单官网原样重发 prepay 参数。
         JsonNode json = wxvp ? call(body) : callWithRetry(body);
+        Map<String, String> appPay = null;
+        if ("app".equals(json.path("present").asText(null))) {
+            appPay = new LinkedHashMap<>();
+            for (String f : new String[]{"appId", "partnerId", "prepayId", "packageValue",
+                    "nonceStr", "timeStamp", "sign"}) {
+                appPay.put(f, textOrNull(json, f));
+            }
+        }
         return new RechargeOrder(
                 json.path("present").asText(null),
                 json.path("outTradeNo").asText(null),
@@ -153,7 +164,8 @@ public class HttpMobileBillingClient implements MobileBillingClient {
                 textOrNull(json, "signData"),
                 textOrNull(json, "paySig"),
                 textOrNull(json, "signature"),
-                textOrNull(json, "appAccountToken"));
+                textOrNull(json, "appAccountToken"),
+                appPay);
     }
 
     @Override

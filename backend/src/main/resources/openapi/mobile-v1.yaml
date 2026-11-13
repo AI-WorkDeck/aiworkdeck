@@ -511,9 +511,14 @@ components:
         product.purchase(options:[.appAccountToken(UUID)])，成功后把 Transaction.jwsRepresentation
         交给 POST /api/mobile/billing/recharge/confirm；**收到 paid 之前绝不 tx.finish()**。
         验签在官网（苹果根证书 / bundleId / appAppleId 都在那边），云后端同样只当管道。
+
+        present=app 是安卓微信支付 APP 支付（dev-board#428，channel=wxpay-app）：appId/partnerId/prepayId/
+        packageValue/nonceStr/timeStamp/sign 七个字段平铺且都有值，原样填进微信 OpenSDK 的 PayReq
+        （packageValue 对应 PayReq.packageValue，值为 "Sign=WXPay"）。**SDK 回调的 errCode 不作数**，
+        端上必须再调 GET /recharge/status 确认 paid。官网未配 WXPAY_APP_APPID 时本通道不可用（信封 code 1）。
       required: [present, outTradeNo, amountCents]
       properties:
-        present: { type: string, enum: [qrcode, redirect, virtual, native] }
+        present: { type: string, enum: [qrcode, redirect, virtual, native, app] }
         outTradeNo: { type: string, description: 商户订单号，查状态用 }
         amountCents: { type: integer, format: int64, description: 下单金额，整数分 }
         codeUrl: { type: string, description: present=qrcode：支付链接原文 }
@@ -522,6 +527,13 @@ components:
         signData: { type: string, description: 'present=virtual 必有：待签名 JSON 串（offerId/buyQuantity/env/currencyType/productId/goodsPrice/outTradeNo/attach）' }
         paySig: { type: string, description: 'present=virtual 必有：hex(hmac_sha256(appKey, "requestVirtualPayment&" + signData))' }
         signature: { type: string, description: 'present=virtual 必有：hex(hmac_sha256(session_key, signData))' }
+        appId: { type: string, description: 'present=app 必有：微信开放平台「移动应用」AppID' }
+        partnerId: { type: string, description: 'present=app 必有：商户号' }
+        prepayId: { type: string, description: 'present=app 必有：预支付交易会话 ID' }
+        packageValue: { type: string, description: 'present=app 必有：扩展字段，固定 Sign=WXPay' }
+        nonceStr: { type: string, description: 'present=app 必有：随机串' }
+        timeStamp: { type: string, description: 'present=app 必有：秒级时间戳（字符串）' }
+        sign: { type: string, description: 'present=app 必有：官网算好的签名' }
         appAccountToken:
           type: string
           description: |
@@ -2434,12 +2446,13 @@ paths:
                     官网 orders 表有 UNIQUE(userId, idempotencyKey) 兜底。
                 channel:
                   type: string
-                  enum: [wxvp, appstore]
+                  enum: [wxvp, appstore, wxpay-app]
                   description: |
                     支付通道（dev-board#427/#426）。**缺省 = 站点默认通道**（第一期行为，扫码/跳转）；
                     wxvp = 微信小程序虚拟支付，**channel=wxvp 时 channel/productId/wxCode 三者必填**，
                     响应为 present=virtual；appstore = iOS 内购，**productId 必填、wxCode 不传**，
-                    响应为 present=native。别的取值一律 code 1（通用 handler，无 kind）。
+                    响应为 present=native；wxpay-app = 安卓微信支付 APP 支付，**只传金额，productId/wxCode 不传**
+                    （传了也被忽略），响应为 present=app + 七个 PayReq 字段。别的取值一律 code 1（通用 handler，无 kind）。
                 productId:
                   type: string
                   pattern: '^[a-z0-9_.]{1,64}$'
