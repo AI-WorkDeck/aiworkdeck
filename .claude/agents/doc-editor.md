@@ -68,7 +68,7 @@ PPT 内容修改立即失效缩略图，但全篇导航清单等宿主允许后�
 
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
-当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
+当前正式基线是 **24.2.8-zhcn-r10**（2026-11-13 发布，0.86 起打包；= r8 配方 + Emscripten #28186 代理死锁回移补丁 `desktop/lowa-build/patches/apply-emscripten-patches.py`，修启动偶发挂住；四个产物 SHA 与验证见 `desktop/lowa-build/RECIPE.md`；r8 留在架上作回退，切回只改 desktop-build.yml / model-matrix.yml 的 LOWA_BASE_URL）。任何重编引擎发布前必须跑启动冒烟 ≥40 次（不能只看 run.mjs）。下文历史段落的 r5/r6 描述不能当作当前未完成清单。
 
 Calc 行列标题由原生 `ScHeaderControl` 绘制，字体在构造时缓存，CSS 与事后 UNO `ApplicationFont` 设置不能可靠替换。构建补丁将标题字体设为包内 Liberation Sans 9pt，经 VCL 设备DPI换算；在 Paint 中用独立 StyleSettings 副本映射产品深浅令牌，以现有 `AppBackground` 判主题，不修改正文格式或全局Qt调色板。高对比保留原生路径；这不等于滚动条/菜单等全部Qt chrome已深色化。`Color(sal_uInt32)` 在该基准可为 consteval，动态主题须写成 `dark ? Color(常量) : Color(常量)`。
 
