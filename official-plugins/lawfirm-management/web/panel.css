@@ -709,3 +709,7 @@ td .badge {
   white-space: normal;
   min-width: 8em;
 }
+/* 中文胶囊本来就短，保持一行（换行反而把「可优先派案」拆开） */
+:lang(zh) td .badge {
+  white-space: nowrap;
+}
