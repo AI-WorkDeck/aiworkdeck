@@ -127,6 +127,20 @@ public class LawFirmBillingService {
         };
     }
 
+    /**
+     * 同一条工时/账单被两次操作同时改动（如双击「生成账单」）时，@Version 在提交时报乐观锁冲突，
+     * 发生在事务代理之外；控制器用这层把它换成「请刷新重试」，而不是一条 500。
+     */
+    public static Map<String, Object> concurrencySafe(java.util.function.Supplier<Map<String, Object>> body) {
+        try {
+            return body.get();
+        } catch (org.springframework.dao.OptimisticLockingFailureException
+                 | org.springframework.dao.DataIntegrityViolationException e) {
+            throw new IllegalStateException(LangText.of("这条记录刚被另一次操作改过，请刷新后重试",
+                    "This record was just changed by another action; refresh and try again"));
+        }
+    }
+
     // ───────────────────────────── 律师：我的计费工时 ─────────────────────────────
 
     Map<String, Object> timeMine(Long userId, Map<String, Object> p) {
@@ -152,6 +166,7 @@ public class LawFirmBillingService {
         }
         for (LawFirmMatterIntake in : ctx.allIntakes()) {
             if (linkedIntakes.contains(in.getId()) || "REJECTED_CONFLICT".equals(in.getStatus())) continue;
+            if (!canRecordOn(userId, in)) continue;
             if (in.getProjectId() != null && projects.existsById(in.getProjectId())) continue;
             targets.add(target("i:" + in.getId(), in.getTitle(), in));
         }
@@ -179,7 +194,12 @@ public class LawFirmBillingService {
         LocalDate[] range = range(p);
         LocalDate to = range[1].isAfter(LocalDate.now()) ? LocalDate.now() : range[1];
         List<UserActivityLog> logs = activityLogs.findByUserIdAndTimestampGreaterThanEqualAndTimestampLessThanOrderByTimestampDesc(
-                userId, range[0].atStartOfDay(), to.plusDays(1).atStartOfDay(), PageRequest.of(0, MAX_ACTIVITY_ROWS));
+                userId, range[0].atStartOfDay(), to.plusDays(1).atStartOfDay(), PageRequest.of(0, MAX_ACTIVITY_ROWS + 1));
+        if (logs.size() > MAX_ACTIVITY_ROWS) {
+            // 记录按时间倒序取，超出上限时最早几天会被截掉一半——宁可拒绝，也不生成看似完整的残缺工时
+            throw new IllegalStateException(LangText.of("这段日期的工作记录太多，请缩小日期范围（例如按周）再生成",
+                    "Too many work-log records in this range; narrow the dates (for example one week) and try again"));
+        }
         record Key(Long projectId, LocalDate date) {}
         Map<Key, Long> millis = new LinkedHashMap<>();
         Map<Key, Set<String>> objects = new HashMap<>();
@@ -271,7 +291,12 @@ public class LawFirmBillingService {
             if (d.isAfter(LocalDate.now())) throw new IllegalArgumentException(LangText.of("工作日期不能晚于今天", "Work date cannot be in the future"));
             e.setWorkDate(d);
         }
-        if (p.containsKey("hours") || id == null) e.setMinutes(LawFirmBillingMath.minutesFromHours(p.get("hours")));
+        if (p.containsKey("hours") || id == null) {
+            int minutes = LawFirmBillingMath.minutesFromHours(p.get("hours"));
+            // 律师改了申报时长，上一轮审核的核定时长作废，重新审核时以新申报为准
+            if (!Objects.equals(minutes, e.getMinutes())) e.setBilledMinutes(null);
+            e.setMinutes(minutes);
+        }
         if (p.containsKey("description") || id == null) e.setDescription(description(p.get("description"), true));
         if (p.containsKey("billable")) {
             boolean billable = !Boolean.FALSE.equals(boolVal(p.get("billable")));
@@ -296,7 +321,9 @@ public class LawFirmBillingService {
             e.setProjectId(pr.getId());
             e.setIntakeId(null);
         } else {
-            LawFirmMatterIntake in = intakes.findById(tid).orElseThrow(() -> new IllegalArgumentException(LangText.of("事项不存在", "Matter not found")));
+            LawFirmMatterIntake in = intakes.findById(tid)
+                    .filter(x -> !"REJECTED_CONFLICT".equals(x.getStatus()) && canRecordOn(e.getUserId(), x))
+                    .orElseThrow(() -> new IllegalArgumentException(LangText.of("事项不存在", "Matter not found")));
             e.setIntakeId(in.getId());
             e.setProjectId(in.getProjectId());
         }
@@ -380,6 +407,10 @@ public class LawFirmBillingService {
                 .orElseThrow(() -> new IllegalArgumentException(LangText.of("工时不存在", "Time entry not found")));
         LawFirmMatterIntake intake = ctx.intakeFor(e);
         requireReviewer(userId, intake);
+        if (userId.equals(e.getUserId()) && !access.canViewFirmWide(userId)) {
+            throw new IllegalArgumentException(LangText.of("不能审核自己的工时，请由其他合伙人或律所管理员审核",
+                    "You cannot review your own time; ask another partner or a firm administrator"));
+        }
         if (!Set.of("SUBMITTED", "APPROVED").contains(e.getStatus())) {
             throw new IllegalStateException(LangText.of("只有待审核或已通过、尚未进账单的工时可以审核", "Only submitted or approved entries that are not on a bill can be reviewed"));
         }
@@ -438,7 +469,7 @@ public class LawFirmBillingService {
                 e.setIntakeId(intake.getId());
                 e.setRateCents(rate.rateCents());
                 e.setStandardRateCents(rate.standardRateCents());
-                if (e.getBilledMinutes() == null) e.setBilledMinutes(e.getMinutes());
+                if (e.getBilledMinutes() == null || e.getBilledMinutes() > e.getMinutes()) e.setBilledMinutes(e.getMinutes());
                 e.setStatus("APPROVED");
                 detail.put("status", change("SUBMITTED", "APPROVED"));
                 detail.put("rateCents", change(null, rate.rateCents()));
@@ -450,6 +481,7 @@ public class LawFirmBillingService {
                 }
                 detail.put("status", change(e.getStatus(), "RETURNED"));
                 e.setStatus("RETURNED");
+                e.setBilledMinutes(null);
                 e.setRateCents(null);
                 e.setStandardRateCents(null);
                 action = "RETURN";
@@ -665,6 +697,14 @@ public class LawFirmBillingService {
         if (d.rows().isEmpty()) {
             throw new IllegalStateException(LangText.of("这段期间没有已审核通过、可收费且未出账单的工时", "No approved, billable, unbilled entries in this period"));
         }
+        // 界面带上预览时看到的合计与条数：预览之后工时或约定变了，就不按旧画面出单
+        Long expectedTotal = longVal(p.get("expectedTotalCents"));
+        Long expectedCount = longVal(p.get("expectedEntryCount"));
+        if ((expectedTotal != null && expectedTotal != d.totals().totalCents())
+                || (expectedCount != null && expectedCount != d.rows().size())) {
+            throw new IllegalStateException(LangText.of("预览之后工时或收费约定有变化，请重新预览后再生成账单",
+                    "Time entries or fee terms changed since the preview; preview again before creating the bill"));
+        }
         Instant now = Instant.now();
         String actor = displayName(userId);
         LawFirmBillingMath.Totals t = d.totals();
@@ -710,8 +750,16 @@ public class LawFirmBillingService {
 
     Map<String, Object> billCancel(Long userId, Map<String, Object> p) {
         LawFirmBill b = billFor(userId, p);
-        if (!Set.of("DRAFT", "SENT").contains(b.getStatus())) {
-            throw new IllegalStateException(LangText.of("客户已确认的账单不能作废；如需冲销请在「发票与财务收费」作废或红冲发票", "Confirmed bills cannot be cancelled; void or red-invoice the invoice under Invoicing instead"));
+        if ("CONFIRMED".equals(b.getStatus())) {
+            // 客户已确认的账单只有在对应发票已作废/红冲（或本单为 0 元、没有发票）后才能撤销，工时随之退回重出
+            String invStatus = b.getInvoiceId() == null ? null
+                    : invoices.findById(b.getInvoiceId()).map(LawFirmInvoice::getStatus).orElse("VOIDED");
+            if (b.getInvoiceId() != null && !Set.of("VOIDED", "RED_INVOICED").contains(invStatus)) {
+                throw new IllegalStateException(LangText.of("客户已确认的账单要先在「发票与财务收费」作废或红冲对应发票，再撤销账单",
+                        "Void or red-invoice this bill's invoice under Invoicing & Fees before cancelling a confirmed bill"));
+            }
+        } else if (!Set.of("DRAFT", "SENT").contains(b.getStatus())) {
+            throw new IllegalStateException(LangText.of("该账单已作废", "This bill is already cancelled"));
         }
         Instant now = Instant.now();
         String actor = displayName(userId);
@@ -726,7 +774,42 @@ public class LawFirmBillingService {
         b.setStatus("CANCELLED");
         b.setCancelledAt(now);
         b.setUpdatedAt(now);
-        return Map.of("bill", billView(bills.save(b), true));
+        b = bills.save(b);
+        List<String> resent = recomputeCaps(b.getIntakeId());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("bill", billView(b, true));
+        out.put("recalculated", resent);
+        return out;
+    }
+
+    /**
+     * 作废一张账单后，同一事项尚未经客户确认的账单按封顶重算（按生成先后依次占用额度）。
+     * 返回金额发生变化、且已发给客户的账单号——这些要重新发给客户。
+     */
+    private List<String> recomputeCaps(Long intakeId) {
+        LawFirmBillingTerms terms = termsRepository.findByIntakeId(intakeId).orElse(null);
+        List<LawFirmBill> siblings = new ArrayList<>(bills.findByIntakeId(intakeId).stream()
+                .filter(x -> !"CANCELLED".equals(x.getStatus())).toList());
+        siblings.sort(Comparator.comparing(LawFirmBill::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(LawFirmBill::getId));
+        List<String> changedSent = new ArrayList<>();
+        long prior = 0;
+        for (LawFirmBill x : siblings) {
+            if (Set.of("DRAFT", "SENT").contains(x.getStatus()) && x.getCapCents() != null) {
+                Long cap = terms == null ? x.getCapCents() : terms.getCapCents();
+                LawFirmBillingMath.Totals t = LawFirmBillingMath.totals(nz(x.getSubtotalCents()), nzi(x.getDiscountBps()), cap, prior);
+                if (t.totalCents() != nz(x.getTotalCents())) {
+                    x.setCapCents(t.capCents());
+                    x.setCapReductionCents(t.capReductionCents());
+                    x.setTotalCents(t.totalCents());
+                    x.setUpdatedAt(Instant.now());
+                    bills.save(x);
+                    if ("SENT".equals(x.getStatus())) changedSent.add(x.getBillNo());
+                }
+            }
+            prior += nz(x.getTotalCents());
+        }
+        return changedSent;
     }
 
     /** 客户确认：生成一张普通发票申请进入原收费台账（之后开票、核销回款都在原台账做）。 */
@@ -1131,6 +1214,14 @@ public class LawFirmBillingService {
         out.put("capRemainingCents", t.capCents() == null ? null : t.capRemainingCents());
         out.put("capReductionCents", t.capReductionCents());
         out.put("totalCents", t.totalCents());
+    }
+
+    /** 律师可以把工时记到哪些事项：全所资格者全部；其余只能是自己申请、主办或列为团队成员的事项。 */
+    private boolean canRecordOn(Long userId, LawFirmMatterIntake in) {
+        if (access.canViewFirmWide(userId)) return true;
+        if (userId.equals(in.getLeadLawyerUserId()) || userId.equals(in.getApplicantUserId())) return true;
+        String name = displayName(userId);
+        return in.getTeamMemberNames() != null && name != null && in.getTeamMemberNames().contains(name);
     }
 
     private boolean canReview(Long userId, LawFirmMatterIntake intake) {

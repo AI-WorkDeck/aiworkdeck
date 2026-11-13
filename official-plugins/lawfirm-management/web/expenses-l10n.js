@@ -210,7 +210,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "تُحتسب القيود بحسب تاريخ العمل في الشهر المحدد. نسبة التحصيل = المحصَّل ÷ القيمة وفق الأسعار القياسية، ولا تُحتسب إلا القيود التي استقرت نتيجتها: ضمن مطالبة أكّدها الموكّل، أو وُسمت «بلا أتعاب» عند المراجعة. المحصَّل هو المدفوعات المطابَقة مع فاتورة تلك المطالبة ضمن «الفوترة وتحصيل الأتعاب»، وتُوزَّع على المحامين بنسبة مبالغ بنودهم.",
     "billing.metricsEmpty": "لا يوجد وقت مرفوع هذا الشهر.",
     "billing.firmTotal": "إجمالي المكتب",
-    "billing.failed": "تعذّر إكمال الإجراء. يُرجى المحاولة لاحقًا."
+    "billing.failed": "تعذّر إكمال الإجراء. يُرجى المحاولة لاحقًا.",
+    "billing.recalculated": "أُعيد حساب الفواتير التالية المرسلة إلى العميل بعد تحرير جزء من سقف الأتعاب؛ يُرجى إرسالها مجددًا: {nos}"
   },
   "de-DE": {
     "expense.tab": "Mandatsauslagen",
@@ -420,7 +421,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Zählt Einträge nach Arbeitsdatum im gewählten Monat. Realisierung = eingegangener Betrag ÷ Wert zu Standardsätzen; berücksichtigt werden nur Einträge mit einem Ergebnis: in einer vom Mandanten bestätigten Honorarnote oder bei der Prüfung als nicht berechnet markiert. Der eingegangene Betrag sind die Zahlungen, die unter „Rechnungsstellung & Gebühreneinzug“ mit der Rechnung dieser Honorarnote abgeglichen wurden, aufgeteilt auf die Anwälte im Verhältnis ihrer Zeilenbeträge.",
     "billing.metricsEmpty": "In diesem Monat wurden keine Zeiten eingereicht.",
     "billing.firmTotal": "Kanzlei gesamt",
-    "billing.failed": "Die Aktion wurde nicht abgeschlossen. Bitte versuchen Sie es später erneut."
+    "billing.failed": "Die Aktion wurde nicht abgeschlossen. Bitte versuchen Sie es später erneut.",
+    "billing.recalculated": "Diese bereits an den Mandanten gesendeten Rechnungen wurden neu berechnet, weil Spielraum unter der Honorarobergrenze frei wurde; bitte erneut senden: {nos}"
   },
   "el-GR": {
     "expense.tab": "Έξοδα υπόθεσης",
@@ -630,7 +632,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Οι εγγραφές μετρώνται με βάση την ημερομηνία εργασίας στον επιλεγμένο μήνα. Ποσοστό είσπραξης = εισπραχθέντα ÷ αξία με τυπικές τιμές, με μέτρηση μόνο των εγγραφών που έχουν αποτέλεσμα: σε λογαριασμό που επιβεβαιώθηκε από τον εντολέα ή σημάνθηκαν ως άχρεωτες κατά τον έλεγχο. Τα εισπραχθέντα είναι οι πληρωμές που συμφιλιώθηκαν με το τιμολόγιο του λογαριασμού στην ενότητα Τιμολόγηση & Εισπράξεις, κατανεμημένες στους δικηγόρους ανάλογα με τα ποσά των γραμμών τους.",
     "billing.metricsEmpty": "Δεν έχει υποβληθεί χρόνος αυτόν τον μήνα.",
     "billing.firmTotal": "Σύνολο γραφείου",
-    "billing.failed": "Η ενέργεια δεν ολοκληρώθηκε. Δοκιμάστε ξανά αργότερα."
+    "billing.failed": "Η ενέργεια δεν ολοκληρώθηκε. Δοκιμάστε ξανά αργότερα.",
+    "billing.recalculated": "Τα παρακάτω τιμολόγια που έχουν ήδη σταλεί στον πελάτη επανυπολογίστηκαν επειδή απελευθερώθηκε περιθώριο κάτω από το ανώτατο όριο αμοιβής· στείλτε τα ξανά: {nos}"
   },
   "en-US": {
     "expense.tab": "Matter expenses",
@@ -840,7 +843,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Counts entries by work date in the selected month. Realization = collected ÷ value at standard rates, counting only entries with an outcome: on a client-confirmed bill, or marked no charge at review. Collected is the payments reconciled against that bill's invoice under Invoicing & Fees, split across lawyers in proportion to their line amounts.",
     "billing.metricsEmpty": "No submitted time this month.",
     "billing.firmTotal": "Firm total",
-    "billing.failed": "The action did not complete. Please try again later."
+    "billing.failed": "The action did not complete. Please try again later.",
+    "billing.recalculated": "These bills already sent to the client were recalculated because fee-cap room was freed; send them again: {nos}"
   },
   "es-ES": {
     "expense.tab": "Gastos del asunto",
@@ -1050,7 +1054,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Cuenta las entradas por fecha de trabajo en el mes seleccionado. Realización = cobrado ÷ valor a tarifas estándar, contando solo las entradas con resultado: en una minuta confirmada por el cliente o marcadas sin cargo en la revisión. Lo cobrado son los pagos conciliados con la factura de esa minuta en «Facturación y cobro de honorarios», repartidos entre los abogados en proporción al importe de sus líneas.",
     "billing.metricsEmpty": "No hay tiempo enviado este mes.",
     "billing.firmTotal": "Total del despacho",
-    "billing.failed": "No se pudo completar la acción. Inténtelo de nuevo más tarde."
+    "billing.failed": "No se pudo completar la acción. Inténtelo de nuevo más tarde.",
+    "billing.recalculated": "Estas facturas ya enviadas al cliente se recalcularon porque se liberó margen bajo el tope de honorarios; vuelva a enviarlas: {nos}"
   },
   "fr-FR": {
     "expense.tab": "Frais de dossier",
@@ -1260,7 +1265,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Les entrées sont comptées selon leur date de travail dans le mois sélectionné. Taux de réalisation = encaissé ÷ valeur aux taux standard, en ne comptant que les entrées ayant un résultat : sur une note confirmée par le client, ou marquées non facturables lors de la validation. Le montant encaissé correspond aux paiements rapprochés de la facture de cette note dans « Facturation et recouvrement », répartis entre les avocats au prorata du montant de leurs lignes.",
     "billing.metricsEmpty": "Aucun temps soumis ce mois-ci.",
     "billing.firmTotal": "Total du cabinet",
-    "billing.failed": "L'action n'a pas abouti. Veuillez réessayer plus tard."
+    "billing.failed": "L'action n'a pas abouti. Veuillez réessayer plus tard.",
+    "billing.recalculated": "Ces factures déjà envoyées au client ont été recalculées car une marge sous le plafond a été libérée ; renvoyez-les : {nos}"
   },
   "hi-IN": {
     "expense.tab": "मामले के खर्च",
@@ -1470,7 +1476,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "चुने गए महीने की कार्य-तिथि के आधार पर प्रविष्टियाँ गिनी जाती हैं। वसूली दर = वसूल राशि ÷ मानक दरों पर मूल्य, और केवल उन्हीं प्रविष्टियों को गिना जाता है जिनका परिणाम तय है: मुवक्किल द्वारा पुष्टि किए गए बिल में, या समीक्षा में बिना शुल्क चिह्नित। वसूल राशि वह भुगतान है जो इनवॉइसिंग और संग्रह के अंतर्गत उस बिल के इनवॉइस से मिलान किया गया है, और वकीलों में उनकी पंक्ति-राशियों के अनुपात में बाँटा जाता है।",
     "billing.metricsEmpty": "इस महीने कोई समय जमा नहीं किया गया।",
     "billing.firmTotal": "फर्म का कुल",
-    "billing.failed": "कार्रवाई पूरी नहीं हुई। कृपया बाद में पुनः प्रयास करें।"
+    "billing.failed": "कार्रवाई पूरी नहीं हुई। कृपया बाद में पुनः प्रयास करें।",
+    "billing.recalculated": "शुल्क सीमा में जगह खाली होने से ग्राहक को पहले भेजे गए ये बिल फिर से गणना किए गए हैं; कृपया इन्हें दोबारा भेजें: {nos}"
   },
   "id-ID": {
     "expense.tab": "Biaya Perkara",
@@ -1680,7 +1687,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Menghitung entri menurut tanggal pekerjaan pada bulan yang dipilih. Realisasi = tertagih ÷ nilai pada tarif standar, hanya menghitung entri yang sudah ada hasilnya: pada tagihan yang dikonfirmasi klien, atau ditandai tanpa biaya saat peninjauan. Tertagih adalah pembayaran yang direkonsiliasi dengan faktur tagihan tersebut di Faktur & Biaya, dibagi antar pengacara sesuai proporsi jumlah baris mereka.",
     "billing.metricsEmpty": "Tidak ada waktu yang diajukan bulan ini.",
     "billing.firmTotal": "Total firma",
-    "billing.failed": "Tindakan tidak selesai. Silakan coba lagi nanti."
+    "billing.failed": "Tindakan tidak selesai. Silakan coba lagi nanti.",
+    "billing.recalculated": "Tagihan berikut yang sudah dikirim ke klien dihitung ulang karena ruang batas biaya terbuka kembali; kirim ulang: {nos}"
   },
   "it-IT": {
     "expense.tab": "Spese di pratica",
@@ -1890,7 +1898,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Conta le voci per data di lavoro nel mese selezionato. Realizzo = incassato ÷ valore alle tariffe standard, considerando solo le voci con un esito: in una parcella confermata dal cliente o segnate come non addebitate in sede di revisione. L'incassato è costituito dai pagamenti riconciliati con la fattura di quella parcella in «Fatturazione e riscossione», ripartiti tra gli avvocati in proporzione all'importo delle rispettive righe.",
     "billing.metricsEmpty": "Nessun tempo inviato in questo mese.",
     "billing.firmTotal": "Totale dello studio",
-    "billing.failed": "Impossibile completare l'azione. Riprova più tardi."
+    "billing.failed": "Impossibile completare l'azione. Riprova più tardi.",
+    "billing.recalculated": "Queste parcelle già inviate al cliente sono state ricalcolate perché si è liberato margine sotto il tetto; inviale di nuovo: {nos}"
   },
   "ja-JP": {
     "expense.tab": "案件費用",
@@ -2100,7 +2109,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "選択した月の作業日で集計します。実現率 = 回収額 ÷ 標準料率での評価額で、結果が確定した時間のみ対象とします。すなわち、依頼者が確認した請求明細の時間、または審査で請求対象外とした時間です。回収額は「請求・報酬回収」で当該請求明細の請求書に消し込まれた入金で、各明細行の金額に応じて弁護士ごとに按分します。",
     "billing.metricsEmpty": "今月は提出された時間がありません。",
     "billing.firmTotal": "事務所合計",
-    "billing.failed": "操作を完了できませんでした。しばらくしてからもう一度お試しください。"
+    "billing.failed": "操作を完了できませんでした。しばらくしてからもう一度お試しください。",
+    "billing.recalculated": "上限枠が戻ったため、送付済みの次の請求書の金額を再計算しました。クライアントに再送してください：{nos}"
   },
   "ko-KR": {
     "expense.tab": "사건 비용",
@@ -2310,7 +2320,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "선택한 달의 업무 일자를 기준으로 집계합니다. 실현율 = 수금액 ÷ 표준 요율 기준 금액이며, 결과가 확정된 시간만 포함합니다. 즉 의뢰인이 확인한 청구 명세서에 포함된 시간이거나 검토 시 비청구로 표시된 시간입니다. 수금액은 «청구 및 보수 수금»에서 해당 명세서의 청구서에 대사된 입금액이며, 각 항목 금액에 비례하여 변호사별로 배분합니다.",
     "billing.metricsEmpty": "이번 달에 제출된 시간이 없습니다.",
     "billing.firmTotal": "사무소 합계",
-    "billing.failed": "작업을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    "billing.failed": "작업을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    "billing.recalculated": "상한 한도가 다시 확보되어 이미 고객에게 보낸 다음 청구서의 금액을 다시 계산했습니다. 고객에게 다시 보내 주십시오: {nos}"
   },
   "ms-MY": {
     "expense.tab": "Perbelanjaan Kes",
@@ -2520,7 +2531,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Mengira catatan mengikut tarikh kerja dalam bulan yang dipilih. Realisasi = dikutip ÷ nilai pada kadar piawai, hanya mengira catatan yang ada hasil: pada bil yang disahkan klien, atau ditandakan tanpa caj semasa semakan. Jumlah dikutip ialah bayaran yang dipadankan dengan invois bil itu di bawah Invois & Yuran, dibahagikan antara peguam mengikut nisbah jumlah baris mereka.",
     "billing.metricsEmpty": "Tiada masa dihantar bulan ini.",
     "billing.firmTotal": "Jumlah firma",
-    "billing.failed": "Tindakan tidak selesai. Sila cuba lagi kemudian."
+    "billing.failed": "Tindakan tidak selesai. Sila cuba lagi kemudian.",
+    "billing.recalculated": "Bil berikut yang telah dihantar kepada klien dikira semula kerana ruang had yuran dibebaskan; sila hantar semula: {nos}"
   },
   "nl-NL": {
     "expense.tab": "Dossierkosten",
@@ -2730,7 +2742,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Telt regels naar werkdatum in de gekozen maand. Realisatie = geïncasseerd ÷ waarde tegen standaardtarieven, waarbij alleen regels met een uitkomst meetellen: op een declaratie waarmee de cliënt akkoord ging, of bij controle als kosteloos gemarkeerd. Geïncasseerd zijn de betalingen die onder Facturering en incasso zijn afgeletterd met de factuur van die declaratie, verdeeld over de advocaten naar verhouding van hun regelbedragen.",
     "billing.metricsEmpty": "Deze maand zijn geen uren ingediend.",
     "billing.firmTotal": "Totaal kantoor",
-    "billing.failed": "De handeling is niet voltooid. Probeer het later opnieuw."
+    "billing.failed": "De handeling is niet voltooid. Probeer het later opnieuw.",
+    "billing.recalculated": "Deze al naar de cliënt verzonden facturen zijn herberekend omdat er ruimte onder het honorariumplafond vrijkwam; stuur ze opnieuw: {nos}"
   },
   "pt-BR": {
     "expense.tab": "Despesas do caso",
@@ -2940,7 +2953,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Conta os lançamentos pela data do trabalho no mês selecionado. Realização = recebido ÷ valor em tarifas padrão, considerando apenas lançamentos com desfecho: em cobrança confirmada pelo cliente ou marcados sem cobrança na revisão. O recebido corresponde aos pagamentos conciliados com a nota fiscal dessa cobrança em «Faturamento e cobrança», divididos entre os advogados na proporção do valor de suas linhas.",
     "billing.metricsEmpty": "Nenhum tempo enviado neste mês.",
     "billing.firmTotal": "Total do escritório",
-    "billing.failed": "Não foi possível concluir a ação. Tente novamente mais tarde."
+    "billing.failed": "Não foi possível concluir a ação. Tente novamente mais tarde.",
+    "billing.recalculated": "Estas faturas já enviadas ao cliente foram recalculadas porque foi liberado espaço sob o teto de honorários; envie-as novamente: {nos}"
   },
   "ru-RU": {
     "expense.tab": "Расходы по делу",
@@ -3150,7 +3164,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Записи учитываются по дате работы в выбранном месяце. Реализация = полученные суммы ÷ стоимость по стандартным ставкам; учитываются только записи с определившимся результатом: включённые в подтверждённый клиентом счёт или отмеченные при проверке как без оплаты. Полученные суммы — это платежи, сверенные со счётом-фактурой этого счёта в разделе «Счета и взыскание вознаграждения»; они распределяются между юристами пропорционально суммам их строк.",
     "billing.metricsEmpty": "В этом месяце нет поданного времени.",
     "billing.firmTotal": "Итого по фирме",
-    "billing.failed": "Не удалось выполнить действие. Повторите попытку позже."
+    "billing.failed": "Не удалось выполнить действие. Повторите попытку позже.",
+    "billing.recalculated": "Эти счета, уже отправленные клиенту, пересчитаны, так как освободился лимит по потолку гонорара; отправьте их повторно: {nos}"
   },
   "th-TH": {
     "expense.tab": "ค่าใช้จ่ายคดี",
@@ -3360,7 +3375,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "นับรายการตามวันที่ทำงานในเดือนที่เลือก อัตราเก็บเงินได้จริง = ยอดที่เก็บได้ ÷ มูลค่าตามอัตรามาตรฐาน โดยนับเฉพาะรายการที่มีผลชัดเจน คือรายการในใบเรียกเก็บเงินที่ลูกค้ายืนยันแล้ว หรือที่ทำเครื่องหมายไม่คิดค่าบริการตอนตรวจสอบ ยอดที่เก็บได้คือเงินที่กระทบยอดกับใบแจ้งหนี้ของใบเรียกเก็บเงินนั้นใน ใบแจ้งหนี้และค่าธรรมเนียม โดยแบ่งให้ทนายความตามสัดส่วนของยอดในแต่ละรายการ",
     "billing.metricsEmpty": "เดือนนี้ไม่มีเวลาที่ส่งเข้ามา",
     "billing.firmTotal": "รวมทั้งสำนักงาน",
-    "billing.failed": "การดำเนินการไม่สำเร็จ กรุณาลองใหม่ภายหลัง"
+    "billing.failed": "การดำเนินการไม่สำเร็จ กรุณาลองใหม่ภายหลัง",
+    "billing.recalculated": "ใบแจ้งหนี้ต่อไปนี้ที่ส่งให้ลูกค้าแล้วถูกคำนวณยอดใหม่เนื่องจากมีวงเงินเพดานคืนมา โปรดส่งให้ลูกค้าอีกครั้ง: {nos}"
   },
   "tr-TR": {
     "expense.tab": "Dosya Masrafları",
@@ -3570,7 +3586,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Kayıtlar, seçilen aydaki iş tarihine göre sayılır. Tahsil oranı = tahsil edilen ÷ standart ücretlerle değer; yalnızca sonucu belli olan kayıtlar dikkate alınır: müvekkilin onayladığı bir hesap özetindekiler veya incelemede ücretsiz işaretlenenler. Tahsil edilen tutar, o hesap özetinin faturasıyla «Faturalama ve Ücret Tahsilatı» altında eşleştirilen ödemelerdir ve avukatlara satır tutarları oranında dağıtılır.",
     "billing.metricsEmpty": "Bu ay gönderilmiş süre yok.",
     "billing.firmTotal": "Büro toplamı",
-    "billing.failed": "İşlem tamamlanamadı. Lütfen daha sonra tekrar deneyin."
+    "billing.failed": "İşlem tamamlanamadı. Lütfen daha sonra tekrar deneyin.",
+    "billing.recalculated": "Ücret tavanında yer açıldığı için müşteriye gönderilmiş şu faturalar yeniden hesaplandı; lütfen yeniden gönderin: {nos}"
   },
   "vi-VN": {
     "expense.tab": "Chi phí vụ việc",
@@ -3780,7 +3797,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "Tính các mục theo ngày làm việc trong tháng đã chọn. Tỷ lệ thu thực tế = số đã thu ÷ giá trị theo đơn giá chuẩn, chỉ tính các mục đã có kết quả: nằm trong phiếu đã được khách hàng xác nhận, hoặc được đánh dấu không thu phí khi duyệt. Số đã thu là các khoản thanh toán đã đối chiếu với hóa đơn của phiếu đó trong mục «Hóa đơn & Thu phí», phân bổ cho các luật sư theo tỷ lệ số tiền từng dòng.",
     "billing.metricsEmpty": "Tháng này chưa có giờ làm việc nào được gửi duyệt.",
     "billing.firmTotal": "Tổng của văn phòng",
-    "billing.failed": "Thao tác chưa hoàn tất. Vui lòng thử lại sau."
+    "billing.failed": "Thao tác chưa hoàn tất. Vui lòng thử lại sau.",
+    "billing.recalculated": "Các hóa đơn sau đã gửi khách hàng được tính lại do hạn mức trần được giải phóng; vui lòng gửi lại: {nos}"
   },
   "zh-CN": {
     "expense.tab": "办案费用",
@@ -3990,7 +4008,8 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "按工作日期统计所选月份。实现率 = 实际收到 ÷ 按标准费率应收，只计已有结论的工时：账单客户已确认，或审核时标为不收费。实际收到取「发票与财务收费」里核销到该账单发票的回款，按各条金额比例分摊到律师。",
     "billing.metricsEmpty": "这个月还没有提交的工时。",
     "billing.firmTotal": "全所合计",
-    "billing.failed": "操作未完成，请稍后重试。"
+    "billing.failed": "操作未完成，请稍后重试。",
+    "billing.recalculated": "以下已发给客户的账单因封顶额度释放而重新计算了金额，请重新发给客户：{nos}"
   },
   "zh-TW": {
     "expense.tab": "辦案費用",
@@ -4200,6 +4219,7 @@ window.AWD_LAWFIRM_EXPENSE_L10N = {
     "billing.metricsHint": "按工作日期統計所選月份。實現率 = 實際收到 ÷ 按標準費率應收，只計已有結論的工時：帳單客戶已確認，或審核時標為不收費。實際收到取「發票與財務收費」裡核銷到該帳單發票的回款，按各條金額比例分攤到律師。",
     "billing.metricsEmpty": "這個月還沒有提交的工時。",
     "billing.firmTotal": "全所合計",
-    "billing.failed": "操作未完成，請稍後重試。"
+    "billing.failed": "操作未完成，請稍後重試。",
+    "billing.recalculated": "以下已寄給客戶的帳單因封頂額度釋出而重新計算了金額，請重新寄給客戶：{nos}"
   }
 };

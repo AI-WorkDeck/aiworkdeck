@@ -1,5 +1,0 @@
-{
-  "plugin.name": "Clipboard",
-  "plugin.description": "Search clipboard history, copy, and insert content.",
-  "view.main.name": "Clipboard"
-}

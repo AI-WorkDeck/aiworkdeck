@@ -87,7 +87,7 @@ class LawFirmBillingFlowTest {
         otherProject = project("未立案项目", associate.getId());
         intake = intakes.save(LawFirmMatterIntake.builder().intakeNo("T-" + System.nanoTime()).title("甲公司数据合规专项")
                 .projectId(matterProject.getId()).clientName("甲公司（虚构）").clientCreditCode("91110000MA00TEST01")
-                .leadLawyerUserId(partner.getId()).leadLawyerName("林合伙人").feeMode("HOURLY").status("APPROVED_FILED")
+                .leadLawyerUserId(partner.getId()).leadLawyerName("林合伙人").teamMemberNames("陈律师、周律师").feeMode("HOURLY").status("APPROVED_FILED")
                 .createdAt(Instant.now()).updatedAt(Instant.now()).build());
     }
 
@@ -274,6 +274,69 @@ class LawFirmBillingFlowTest {
         act(associate, "timeSave", Map.of("id", m, "description", "审阅并修改股权转让协议第 3–7 条"));
         act(associate, "timeSubmit", Map.of("ids", List.of(m)));
         assertEquals("SUBMITTED", entries.findById(m).orElseThrow().getStatus());
+    }
+
+    @Test
+    void reviewFixesFromCodeReview() {
+        act(partner, "billingSaveTimekeeper", Map.of("userId", senior.getId(), "level", "SENIOR_ASSOCIATE", "standardRateYuan", "2000"));
+
+        // 核减后退回、律师改申报再提交：按新申报计，不沿用上一轮核定时长
+        Long e = id(act(senior, "timeSave", Map.of("target", "i:" + intake.getId(), "workDate", today.toString(), "hours", "5", "description", "a")));
+        act(senior, "timeSubmit", Map.of("ids", List.of(e)));
+        act(partner, "timeReview", Map.of("id", e, "op", "ADJUST", "billedHours", "4", "reason", "部分重复"));
+        act(partner, "timeReview", Map.of("id", e, "op", "RETURN", "reason", "请拆分"));
+        assertNull(entries.findById(e).orElseThrow().getBilledMinutes());
+        act(senior, "timeSave", Map.of("id", e, "hours", "3"));
+        act(senior, "timeSubmit", Map.of("ids", List.of(e)));
+        act(partner, "timeReview", Map.of("id", e, "op", "APPROVE"));
+        assertEquals(180, entries.findById(e).orElseThrow().getBilledMinutes());
+
+        // 预览之后内容变了：按旧预览出单被拒
+        assertThrows(IllegalStateException.class, () -> act(partner, "billCreate",
+                Map.of("intakeId", intake.getId(), "expectedTotalCents", 1L, "expectedEntryCount", 1L)));
+
+        // 客户已确认的账单：发票未作废不能撤销；作废后可撤销，工时退回、封顶额度释放
+        act(partner, "billingSaveTerms", Map.of("intakeId", intake.getId(), "capYuan", "8000"));
+        Map<String, Object> first = bill(act(partner, "billCreate", Map.of("intakeId", intake.getId(), "expectedTotalCents", 600_000L, "expectedEntryCount", 1L)));
+        Long f = id(act(senior, "timeSave", Map.of("target", "i:" + intake.getId(), "workDate", today.toString(), "hours", "2", "description", "b")));
+        act(senior, "timeSubmit", Map.of("ids", List.of(f)));
+        act(partner, "timeReview", Map.of("id", f, "op", "APPROVE"));
+        Map<String, Object> second = bill(act(partner, "billCreate", Map.of("intakeId", intake.getId())));
+        assertEquals(200_000L, second.get("totalCents"), "cap 8000 - 6000 already billed");
+        act(partner, "billSend", Map.of("id", first.get("id")));
+        act(partner, "billConfirm", Map.of("id", first.get("id"), "confirmedBy", "王总"));
+        assertThrows(IllegalStateException.class, () -> act(partner, "billCancel", Map.of("id", first.get("id"))));
+        Long invoiceId = ((Number) bills(first.get("id")).get("invoiceId")).longValue();
+        ledger.execute(partner.getId(), null, "voidInvoice", Map.of("invoiceId", invoiceId));
+        Map<String, Object> cancelled = act(partner, "billCancel", Map.of("id", first.get("id"), "reason", "发票开错，重新出单"));
+        assertEquals("CANCELLED", bill(cancelled).get("status"));
+        assertEquals("APPROVED", entries.findById(e).orElseThrow().getStatus());
+        // 草稿账单按释放后的额度重算：2h × 2000 = 4000，不再被封顶压到 2000
+        assertEquals(400_000L, ((Number) bills(second.get("id")).get("totalCents")).longValue());
+        assertEquals(List.of(), cancelled.get("recalculated"), "draft bills are not reported as needing a resend");
+    }
+
+    @Test
+    void leadLawyerWithoutFirmWideRightsCannotReviewOwnTimeOrUseOthersMatters() {
+        LawFirmMatterIntake own = intakes.save(LawFirmMatterIntake.builder().intakeNo("T2-" + System.nanoTime()).title("周律师主办事项")
+                .leadLawyerUserId(senior.getId()).clientName("乙公司（虚构）").feeMode("HOURLY").status("APPROVED_FILED")
+                .createdAt(Instant.now()).updatedAt(Instant.now()).build());
+        act(partner, "billingSaveTimekeeper", Map.of("userId", senior.getId(), "level", "SENIOR_ASSOCIATE", "standardRateYuan", "2000"));
+        Long e = id(act(senior, "timeSave", Map.of("target", "i:" + own.getId(), "workDate", today.toString(), "hours", "1", "description", "x")));
+        act(senior, "timeSubmit", Map.of("ids", List.of(e)));
+        assertThrows(IllegalArgumentException.class, () -> act(senior, "timeReview", Map.of("id", e, "op", "APPROVE")));
+        // 陈律师与乙公司事项无关：看不到也记不上
+        assertThrows(IllegalArgumentException.class, () -> act(associate, "timeSave", Map.of("target", "i:" + own.getId(),
+                "workDate", today.toString(), "hours", "1", "description", "x")));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> targets = (List<Map<String, Object>>) act(associate, "timeMine", Map.of()).get("targets");
+        assertTrue(targets.stream().noneMatch(t -> own.getId().equals(t.get("intakeId"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> bills(Object id) {
+        return ((List<Map<String, Object>>) act(partner, "billList", Map.of()).get("bills")).stream()
+                .filter(b -> id.equals(b.get("id"))).findFirst().orElseThrow();
     }
 
     // ── helpers ──

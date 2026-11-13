@@ -211,5 +211,6 @@
   "billing.metricsHint": "Conta le voci per data di lavoro nel mese selezionato. Realizzo = incassato ÷ valore alle tariffe standard, considerando solo le voci con un esito: in una parcella confermata dal cliente o segnate come non addebitate in sede di revisione. L'incassato è costituito dai pagamenti riconciliati con la fattura di quella parcella in «Fatturazione e riscossione», ripartiti tra gli avvocati in proporzione all'importo delle rispettive righe.",
   "billing.metricsEmpty": "Nessun tempo inviato in questo mese.",
   "billing.firmTotal": "Totale dello studio",
-  "billing.failed": "Impossibile completare l'azione. Riprova più tardi."
+  "billing.failed": "Impossibile completare l'azione. Riprova più tardi.",
+  "billing.recalculated": "Queste parcelle già inviate al cliente sono state ricalcolate perché si è liberato margine sotto il tetto; inviale di nuovo: {nos}"
 }

@@ -211,5 +211,6 @@
   "billing.metricsHint": "Les entrées sont comptées selon leur date de travail dans le mois sélectionné. Taux de réalisation = encaissé ÷ valeur aux taux standard, en ne comptant que les entrées ayant un résultat : sur une note confirmée par le client, ou marquées non facturables lors de la validation. Le montant encaissé correspond aux paiements rapprochés de la facture de cette note dans « Facturation et recouvrement », répartis entre les avocats au prorata du montant de leurs lignes.",
   "billing.metricsEmpty": "Aucun temps soumis ce mois-ci.",
   "billing.firmTotal": "Total du cabinet",
-  "billing.failed": "L'action n'a pas abouti. Veuillez réessayer plus tard."
+  "billing.failed": "L'action n'a pas abouti. Veuillez réessayer plus tard.",
+  "billing.recalculated": "Ces factures déjà envoyées au client ont été recalculées car une marge sous le plafond a été libérée ; renvoyez-les : {nos}"
 }

@@ -1,7 +1,0 @@
-{
-  "plugin.name": "Dateischwärzung",
-  "plugin.description": "Sensible Informationen prüfen, desensibilisierte Kopien erstellen und mit Wiederherstellungspaketen wiederherstellen.",
-  "view.main.name": "Dateischwärzung",
-  "tool.desensitize_preview.desc": "Vorschau, welche sensiblen Angaben in einer Projektdatei geschwärzt würden (nur lesen, erzeugt keine Datei). Verwenden, wenn der Nutzer vorab sehen will, welche sensiblen Angaben in einer Datei geschwärzt würden.",
-  "tool.desensitize_redact.desc": "Schwärzt sensible Angaben in einer Projektdatei und speichert eine NEUE geschwärzte Kopie; das Original wird nie überschrieben. Verwenden, wenn der Nutzer eine Datei schwärzen, anonymisieren oder maskieren lassen will (Maskenmodus, nicht wiederherstellbar)."
-}

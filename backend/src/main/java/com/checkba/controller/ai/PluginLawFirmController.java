@@ -44,7 +44,7 @@ public class PluginLawFirmController {
             return LawFirmManagementController.run(() -> workflow.execute(userId, action, params));
         Long projectId = LawFirmManagementController.parseProjectId(body.get("projectId"));
         if (com.checkba.service.lawfirm.LawFirmBillingService.ACTIONS.contains(action))
-            return LawFirmManagementController.run(() -> billing.execute(userId, projectId, action, params));
+            return LawFirmManagementController.run(() -> com.checkba.service.lawfirm.LawFirmBillingService.concurrencySafe(() -> billing.execute(userId, projectId, action, params)));
         return LawFirmManagementController.run(() -> service.execute(userId, projectId, action, params));
     }
 }

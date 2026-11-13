@@ -211,5 +211,6 @@
   "billing.metricsHint": "按工作日期统计所选月份。实现率 = 实际收到 ÷ 按标准费率应收，只计已有结论的工时：账单客户已确认，或审核时标为不收费。实际收到取「发票与财务收费」里核销到该账单发票的回款，按各条金额比例分摊到律师。",
   "billing.metricsEmpty": "这个月还没有提交的工时。",
   "billing.firmTotal": "全所合计",
-  "billing.failed": "操作未完成，请稍后重试。"
+  "billing.failed": "操作未完成，请稍后重试。",
+  "billing.recalculated": "以下已发给客户的账单因封顶额度释放而重新计算了金额，请重新发给客户：{nos}"
 }

@@ -1,5 +1,0 @@
-{
-  "plugin.name": "Favorites",
-  "plugin.description": "Search project favorites, copy, insert, or open sources.",
-  "view.main.name": "Favorites"
-}

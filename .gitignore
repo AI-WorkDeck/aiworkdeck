@@ -82,3 +82,6 @@ scripts/eval/out/
 
 # 运行期由 harness 进化生成的用户 skill（本地产物，不入库）
 /skills/user-evo-*/
+
+# 裸 jar 在 backend/ 下起时 ai.plugins.dir=plugins 会把内置插件解到这里（运行期产物，不入库）
+/backend/plugins/

@@ -1,6 +1,0 @@
-{
-  "plugin.name": "캘린더",
-  "plugin.description": "프로젝트 전반의 캘린더, 작업, 알림 및 파일 링크입니다.",
-  "view.sidebar.name": "캘린더",
-  "view.main.name": "캘린더"
-}

@@ -211,5 +211,6 @@
   "billing.metricsHint": "Telt regels naar werkdatum in de gekozen maand. Realisatie = geïncasseerd ÷ waarde tegen standaardtarieven, waarbij alleen regels met een uitkomst meetellen: op een declaratie waarmee de cliënt akkoord ging, of bij controle als kosteloos gemarkeerd. Geïncasseerd zijn de betalingen die onder Facturering en incasso zijn afgeletterd met de factuur van die declaratie, verdeeld over de advocaten naar verhouding van hun regelbedragen.",
   "billing.metricsEmpty": "Deze maand zijn geen uren ingediend.",
   "billing.firmTotal": "Totaal kantoor",
-  "billing.failed": "De handeling is niet voltooid. Probeer het later opnieuw."
+  "billing.failed": "De handeling is niet voltooid. Probeer het later opnieuw.",
+  "billing.recalculated": "Deze al naar de cliënt verzonden facturen zijn herberekend omdat er ruimte onder het honorariumplafond vrijkwam; stuur ze opnieuw: {nos}"
 }

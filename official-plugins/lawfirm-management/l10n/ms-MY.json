@@ -211,5 +211,6 @@
   "billing.metricsHint": "Mengira catatan mengikut tarikh kerja dalam bulan yang dipilih. Realisasi = dikutip ÷ nilai pada kadar piawai, hanya mengira catatan yang ada hasil: pada bil yang disahkan klien, atau ditandakan tanpa caj semasa semakan. Jumlah dikutip ialah bayaran yang dipadankan dengan invois bil itu di bawah Invois & Yuran, dibahagikan antara peguam mengikut nisbah jumlah baris mereka.",
   "billing.metricsEmpty": "Tiada masa dihantar bulan ini.",
   "billing.firmTotal": "Jumlah firma",
-  "billing.failed": "Tindakan tidak selesai. Sila cuba lagi kemudian."
+  "billing.failed": "Tindakan tidak selesai. Sila cuba lagi kemudian.",
+  "billing.recalculated": "Bil berikut yang telah dihantar kepada klien dikira semula kerana ruang had yuran dibebaskan; sila hantar semula: {nos}"
 }

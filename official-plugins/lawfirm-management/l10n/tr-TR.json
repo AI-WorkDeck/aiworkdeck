@@ -211,5 +211,6 @@
   "billing.metricsHint": "Kayıtlar, seçilen aydaki iş tarihine göre sayılır. Tahsil oranı = tahsil edilen ÷ standart ücretlerle değer; yalnızca sonucu belli olan kayıtlar dikkate alınır: müvekkilin onayladığı bir hesap özetindekiler veya incelemede ücretsiz işaretlenenler. Tahsil edilen tutar, o hesap özetinin faturasıyla «Faturalama ve Ücret Tahsilatı» altında eşleştirilen ödemelerdir ve avukatlara satır tutarları oranında dağıtılır.",
   "billing.metricsEmpty": "Bu ay gönderilmiş süre yok.",
   "billing.firmTotal": "Büro toplamı",
-  "billing.failed": "İşlem tamamlanamadı. Lütfen daha sonra tekrar deneyin."
+  "billing.failed": "İşlem tamamlanamadı. Lütfen daha sonra tekrar deneyin.",
+  "billing.recalculated": "Ücret tavanında yer açıldığı için müşteriye gönderilmiş şu faturalar yeniden hesaplandı; lütfen yeniden gönderin: {nos}"
 }

@@ -1,6 +1,0 @@
-{
-  "plugin.name": "カレンダー",
-  "plugin.description": "プロジェクト横断のカレンダー、タスク、リマインダー、ファイルリンク。",
-  "view.sidebar.name": "カレンダー",
-  "view.main.name": "カレンダー"
-}

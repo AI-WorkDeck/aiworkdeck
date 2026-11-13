@@ -227,6 +227,8 @@
           await ensureRates();
           switchView('bills');
           $('hb-bill-matter').value = String(g.intakeId);
+          dropPreview();
+          await loadBills();
         }));
       }
       section.append(header);
@@ -295,7 +297,16 @@
   }
 
   async function previewBill() {
-    state.preview = await call('billPreview', billParams());
+    const params = billParams();
+    state.preview = await call('billPreview', params);
+    state.previewParams = params;
+    renderPreview();
+  }
+
+  // 预览之后改了事项、折扣或月份，旧预览作废，免得照着旧画面出单
+  function dropPreview() {
+    state.preview = null;
+    state.previewParams = null;
     renderPreview();
   }
 
@@ -313,9 +324,8 @@
     box.append(linesTable(p.lines), totalsBlock(p));
     if (p.capCents != null) box.append(el('p', t('billing.capRemaining', { left: yuan(p.capRemainingCents) }), 'hint'));
     box.append(button(t('billing.create'), 'create-bill', async () => {
-      const res = await call('billCreate', billParams());
-      state.preview = null;
-      renderPreview();
+      const res = await call('billCreate', { ...state.previewParams, expectedTotalCents: p.totalCents, expectedEntryCount: p.lines.length });
+      dropPreview();
       state.openBill.add(res?.bill?.id);
       await loadBills();
       status(t('billing.created', { no: res?.bill?.billNo || '' }));
@@ -331,7 +341,9 @@
   function confirmForm(b) {
     const form = el('div', null, 'form-grid hb-confirm');
     const who = input('', { 'data-field': 'confirmedBy', placeholder: t('billing.confirmedByPlaceholder') });
-    const date = input(new Date().toISOString().slice(0, 10), { type: 'date', 'data-field': 'confirmedDate' });
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const date = input(today, { type: 'date', 'data-field': 'confirmedDate' });
     const type = el('select');
     type.dataset.field = 'invoiceType';
     for (const v of ['DIGITAL_NORMAL', 'DIGITAL_SPECIAL', 'VAT_NORMAL', 'VAT_SPECIAL']) {
@@ -372,7 +384,15 @@
     const actions = el('div', null, 'action-row');
     actions.append(button(t(state.openBill.has(b.id) ? 'billing.hideDetail' : 'billing.showDetail'), 'detail', async () => { toggle(state.openBill, b.id); renderBills(); }));
     if (b.status === 'DRAFT') actions.append(button(t('billing.send'), 'send-bill', async () => { await call('billSend', { id: b.id }); state.openBill.add(b.id); await loadBills(); status(t('billing.sent')); }, 'primary'));
-    if (b.status === 'DRAFT' || b.status === 'SENT') actions.append(button(t('billing.cancel'), 'cancel-bill', async () => { await call('billCancel', { id: b.id }); await loadBills(); status(t('billing.cancelled')); }));
+    const voided = ['VOIDED', 'RED_INVOICED'].includes(b.invoiceStatus) || (b.status === 'CONFIRMED' && !b.invoiceId);
+    if (b.status === 'DRAFT' || b.status === 'SENT' || (b.status === 'CONFIRMED' && voided)) {
+      actions.append(button(t('billing.cancel'), 'cancel-bill', async () => {
+        const res = await call('billCancel', { id: b.id });
+        await loadBills();
+        const resend = res?.recalculated || [];
+        status(t('billing.cancelled') + (resend.length ? ' ' + t('billing.recalculated', { nos: resend.join('、') }) : ''));
+      }));
+    }
     if (b.status === 'CONFIRMED' && b.invoiceId) actions.append(button(t('billing.goInvoice'), 'go-invoice', async () => { $('tab-finance')?.click(); }));
     card.append(actions);
     if (state.openBill.has(b.id)) {
@@ -525,10 +545,11 @@
   $('hb-month').value = state.month;
   $('hb-month').addEventListener('change', () => run(null, async () => {
     if (/^\d{4}-\d{2}$/.test($('hb-month').value)) state.month = $('hb-month').value;
-    state.preview = null;
-    renderPreview();
+    dropPreview();
     await refresh();
   }));
+  $('hb-bill-matter').addEventListener('change', dropPreview);
+  $('hb-bill-discount').addEventListener('input', dropPreview);
   for (const v of VIEWS) $(`hb-nav-${v}`).addEventListener('click', () => run(null, async () => { switchView(v); await refresh(); }));
   $('hb-review-status').addEventListener('change', () => run(null, loadReview));
   $('hb-preview-btn').addEventListener('click', () => run($('hb-preview-btn'), previewBill));

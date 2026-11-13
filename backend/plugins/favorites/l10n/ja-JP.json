@@ -1,5 +1,0 @@
-{
-  "plugin.name": "お気に入り",
-  "plugin.description": "プロジェクトのお気に入りを検索し、コピー、挿入、またはソースを開きます。",
-  "view.main.name": "お気に入り"
-}

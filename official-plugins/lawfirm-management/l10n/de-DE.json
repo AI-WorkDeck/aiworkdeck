@@ -211,5 +211,6 @@
   "billing.metricsHint": "Zählt Einträge nach Arbeitsdatum im gewählten Monat. Realisierung = eingegangener Betrag ÷ Wert zu Standardsätzen; berücksichtigt werden nur Einträge mit einem Ergebnis: in einer vom Mandanten bestätigten Honorarnote oder bei der Prüfung als nicht berechnet markiert. Der eingegangene Betrag sind die Zahlungen, die unter „Rechnungsstellung & Gebühreneinzug“ mit der Rechnung dieser Honorarnote abgeglichen wurden, aufgeteilt auf die Anwälte im Verhältnis ihrer Zeilenbeträge.",
   "billing.metricsEmpty": "In diesem Monat wurden keine Zeiten eingereicht.",
   "billing.firmTotal": "Kanzlei gesamt",
-  "billing.failed": "Die Aktion wurde nicht abgeschlossen. Bitte versuchen Sie es später erneut."
+  "billing.failed": "Die Aktion wurde nicht abgeschlossen. Bitte versuchen Sie es später erneut.",
+  "billing.recalculated": "Diese bereits an den Mandanten gesendeten Rechnungen wurden neu berechnet, weil Spielraum unter der Honorarobergrenze frei wurde; bitte erneut senden: {nos}"
 }

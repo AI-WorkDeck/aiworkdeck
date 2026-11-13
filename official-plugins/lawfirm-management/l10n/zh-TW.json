@@ -211,5 +211,6 @@
   "billing.metricsHint": "按工作日期統計所選月份。實現率 = 實際收到 ÷ 按標準費率應收，只計已有結論的工時：帳單客戶已確認，或審核時標為不收費。實際收到取「發票與財務收費」裡核銷到該帳單發票的回款，按各條金額比例分攤到律師。",
   "billing.metricsEmpty": "這個月還沒有提交的工時。",
   "billing.firmTotal": "全所合計",
-  "billing.failed": "操作未完成，請稍後重試。"
+  "billing.failed": "操作未完成，請稍後重試。",
+  "billing.recalculated": "以下已寄給客戶的帳單因封頂額度釋出而重新計算了金額，請重新寄給客戶：{nos}"
 }

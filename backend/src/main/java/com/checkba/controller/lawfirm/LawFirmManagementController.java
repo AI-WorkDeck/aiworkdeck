@@ -53,7 +53,7 @@ public class LawFirmManagementController {
         @SuppressWarnings("unchecked")
         Map<String, Object> params = b.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
         if (com.checkba.service.lawfirm.LawFirmBillingService.ACTIONS.contains(action))
-            return run(() -> billing.execute(userId, projectId, action, params));
+            return run(() -> com.checkba.service.lawfirm.LawFirmBillingService.concurrencySafe(() -> billing.execute(userId, projectId, action, params)));
         return run(() -> service.execute(userId, projectId, action, params));
     }
 

@@ -211,5 +211,6 @@
   "billing.metricsHint": "Conta os lançamentos pela data do trabalho no mês selecionado. Realização = recebido ÷ valor em tarifas padrão, considerando apenas lançamentos com desfecho: em cobrança confirmada pelo cliente ou marcados sem cobrança na revisão. O recebido corresponde aos pagamentos conciliados com a nota fiscal dessa cobrança em «Faturamento e cobrança», divididos entre os advogados na proporção do valor de suas linhas.",
   "billing.metricsEmpty": "Nenhum tempo enviado neste mês.",
   "billing.firmTotal": "Total do escritório",
-  "billing.failed": "Não foi possível concluir a ação. Tente novamente mais tarde."
+  "billing.failed": "Não foi possível concluir a ação. Tente novamente mais tarde.",
+  "billing.recalculated": "Estas faturas já enviadas ao cliente foram recalculadas porque foi liberado espaço sob o teto de honorários; envie-as novamente: {nos}"
 }

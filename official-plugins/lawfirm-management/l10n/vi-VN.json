@@ -211,5 +211,6 @@
   "billing.metricsHint": "Tính các mục theo ngày làm việc trong tháng đã chọn. Tỷ lệ thu thực tế = số đã thu ÷ giá trị theo đơn giá chuẩn, chỉ tính các mục đã có kết quả: nằm trong phiếu đã được khách hàng xác nhận, hoặc được đánh dấu không thu phí khi duyệt. Số đã thu là các khoản thanh toán đã đối chiếu với hóa đơn của phiếu đó trong mục «Hóa đơn & Thu phí», phân bổ cho các luật sư theo tỷ lệ số tiền từng dòng.",
   "billing.metricsEmpty": "Tháng này chưa có giờ làm việc nào được gửi duyệt.",
   "billing.firmTotal": "Tổng của văn phòng",
-  "billing.failed": "Thao tác chưa hoàn tất. Vui lòng thử lại sau."
+  "billing.failed": "Thao tác chưa hoàn tất. Vui lòng thử lại sau.",
+  "billing.recalculated": "Các hóa đơn sau đã gửi khách hàng được tính lại do hạn mức trần được giải phóng; vui lòng gửi lại: {nos}"
 }

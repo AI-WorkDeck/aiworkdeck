@@ -1,6 +1,0 @@
-{
-  "plugin.name": "Kalender",
-  "plugin.description": "Projektübergreifender Kalender, Aufgaben, Erinnerungen und Dateilinks.",
-  "view.sidebar.name": "Kalender",
-  "view.main.name": "Kalender"
-}

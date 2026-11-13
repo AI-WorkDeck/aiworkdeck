@@ -211,5 +211,6 @@
   "billing.metricsHint": "Counts entries by work date in the selected month. Realization = collected ÷ value at standard rates, counting only entries with an outcome: on a client-confirmed bill, or marked no charge at review. Collected is the payments reconciled against that bill's invoice under Invoicing & Fees, split across lawyers in proportion to their line amounts.",
   "billing.metricsEmpty": "No submitted time this month.",
   "billing.firmTotal": "Firm total",
-  "billing.failed": "The action did not complete. Please try again later."
+  "billing.failed": "The action did not complete. Please try again later.",
+  "billing.recalculated": "These bills already sent to the client were recalculated because fee-cap room was freed; send them again: {nos}"
 }

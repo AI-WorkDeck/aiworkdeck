@@ -211,5 +211,6 @@
   "billing.metricsHint": "Menghitung entri menurut tanggal pekerjaan pada bulan yang dipilih. Realisasi = tertagih ÷ nilai pada tarif standar, hanya menghitung entri yang sudah ada hasilnya: pada tagihan yang dikonfirmasi klien, atau ditandai tanpa biaya saat peninjauan. Tertagih adalah pembayaran yang direkonsiliasi dengan faktur tagihan tersebut di Faktur & Biaya, dibagi antar pengacara sesuai proporsi jumlah baris mereka.",
   "billing.metricsEmpty": "Tidak ada waktu yang diajukan bulan ini.",
   "billing.firmTotal": "Total firma",
-  "billing.failed": "Tindakan tidak selesai. Silakan coba lagi nanti."
+  "billing.failed": "Tindakan tidak selesai. Silakan coba lagi nanti.",
+  "billing.recalculated": "Tagihan berikut yang sudah dikirim ke klien dihitung ulang karena ruang batas biaya terbuka kembali; kirim ulang: {nos}"
 }

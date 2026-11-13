@@ -211,5 +211,6 @@
   "billing.metricsHint": "Cuenta las entradas por fecha de trabajo en el mes seleccionado. Realización = cobrado ÷ valor a tarifas estándar, contando solo las entradas con resultado: en una minuta confirmada por el cliente o marcadas sin cargo en la revisión. Lo cobrado son los pagos conciliados con la factura de esa minuta en «Facturación y cobro de honorarios», repartidos entre los abogados en proporción al importe de sus líneas.",
   "billing.metricsEmpty": "No hay tiempo enviado este mes.",
   "billing.firmTotal": "Total del despacho",
-  "billing.failed": "No se pudo completar la acción. Inténtelo de nuevo más tarde."
+  "billing.failed": "No se pudo completar la acción. Inténtelo de nuevo más tarde.",
+  "billing.recalculated": "Estas facturas ya enviadas al cliente se recalcularon porque se liberó margen bajo el tope de honorarios; vuelva a enviarlas: {nos}"
 }

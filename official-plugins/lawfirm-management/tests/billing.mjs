@@ -129,7 +129,15 @@ test('bill preview shows exact totals, creates, sends and records client confirm
   assert.match(preview, /工时小计¥5,900\.00/);
   assert.match(preview, /折扣（10%）-¥590\.00/);
   assert.match(preview, /本单应收¥5,310\.00/);
+  // 预览后改了折扣：旧预览作废，不能照旧画面出单
+  h.$('hb-bill-discount').value = '20';
+  h.$('hb-bill-discount').dispatchEvent(new h.dom.window.Event('input'));
+  assert.equal(h.$('hb-preview').textContent, '');
+  h.$('hb-bill-discount').value = '10';
+  await h.click(h.$('hb-preview-btn'));
   await h.click(h.$('hb-preview').querySelector('[data-action="create-bill"]'));
+  assert.deepEqual(h.calls.find((c) => c.action === 'billCreate').params,
+    { intakeId: '3', from: '2026-10-01', to: '2026-10-31', discountPercent: '10', expectedTotalCents: 531000, expectedEntryCount: 1 });
   assert.match(h.$('hb-status').textContent, /TB202611-0001/);
   const card = () => h.doc.querySelector('[data-bill-id="9"]');
   assert.match(card().textContent, /草稿/);
