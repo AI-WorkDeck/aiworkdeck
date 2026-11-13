@@ -488,17 +488,17 @@ const accountContact = computed(() => {
 /** 官网充值页（仅官方云后端有；私有部署/桌面本机为空串，入口隐藏） */
 const siteRecharge = computed(() => rechargeUrl(settings.serverUrl))
 
-/** 低额度警示：剩余不足约 1 美元（人民币站 7 元）时数字转警示色 */
-const quotaLow = computed(() => isQuotaLow(aiQuota.value, settings.serverUrl))
+/** 低额度警示：剩余不足约 1 美元的等值（人民币 7 元）时数字转警示色 */
+const quotaLow = computed(() => isQuotaLow(aiQuota.value))
 
 function openRecharge() {
   accountOpen.value = false
   openExternal(siteRecharge.value)
 }
 
-/** 额度文案：币种跟随站点（大陆站 ¥、国际站 $） */
+/** 额度文案：币种与金额由后端按官网汇率折算（缺折算字段时标 US$ 美元原值） */
 const quotaText = computed(() => {
-  const p = quotaParts(aiQuota.value, settings.serverUrl)
+  const p = quotaParts(aiQuota.value)
   return p ? t(p.key, p.params) : ''
 })
 

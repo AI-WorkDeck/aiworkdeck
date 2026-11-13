@@ -19,25 +19,6 @@ const OFFICIAL_SITES = {
   'addin.workdeck.ai': 'https://workdeck.ai'
 }
 
-/**
- * 站点计价币种：后端额度接口（/api/platform-ai/key/status）的字段名叫 *Usd，但没有币种字段，
- * 数值是该站点的记账币种——大陆站人民币、国际站美元。接口若将来返回 currency 以接口为准；
- * 否则按官方站点域名判断，私有部署（域名不在白名单）保持历史口径 USD。
- */
-const SITE_CURRENCY = {
-  'addin.aiworkdeck.com': 'CNY',
-  'addin.workdeck.ai': 'USD'
-}
-
-export function siteCurrency(serverUrl) {
-  const base = normalizeBaseUrl(serverUrl)
-  try {
-    return SITE_CURRENCY[new URL(base).hostname] || 'USD'
-  } catch (e) {
-    return 'USD'
-  }
-}
-
 /** 官网账户页（钱包+充值在这一页；/account 自动按 locale 跳转）。非官方后端回空串。 */
 export function rechargeUrl(serverUrl) {
   const base = normalizeBaseUrl(serverUrl)

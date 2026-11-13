@@ -186,6 +186,7 @@ public class PlatformAiKeyService {
         entity.setKeyEnc(cipher.encrypt(plaintext));
         entity.setKeyFingerprint(PlatformAiKeyCipher.fingerprint(plaintext));
         entity.setLimitUsd(connection.limitUsd());
+        applyChargedRate(entity, awdkKey);
         entity.setProvider(connection.provider());
         entity.setBaseUrl(connection.baseUrl());
         entity.setDefaultModel(connection.defaultModel());
@@ -194,6 +195,28 @@ public class PlatformAiKeyService {
         entity.setLastVerifiedAt(now);
         keyRepository.save(entity);
         log.info("已为用户 {} 取得平台 AI 通道密钥（指纹 {}）", userId, entity.getKeyFingerprint());
+    }
+
+    /**
+     * 记下官网当前的计价口径（币种/汇率/毛利乘数），供额度面板把美元折成用户真正看到的本币。
+     * 取不到（旧官网、网络抖动）不影响取 key：清空这三列，展示端退回美元，绝不沿用旧汇率去算新额度。
+     */
+    private void applyChargedRate(PlatformAiKey entity, String awdkKey) {
+        ModelPriceDisplayService.ChargedRate rate = null;
+        try {
+            rate = ModelPriceDisplayService.parse(accountService.fetchAiUsageWith(awdkKey));
+        } catch (Exception e) {
+            log.debug("读取官网计价口径失败，额度按美元显示: {}", e.getMessage());
+        }
+        entity.setCurrency(rate == null ? null : rate.currency());
+        entity.setExchangeRate(rate == null ? null : rate.exchangeRate());
+        entity.setMarginMultiplier(rate == null ? null : rate.marginMultiplier());
+    }
+
+    /** 美元 → 站点币种实付额（美元 × 汇率 × 毛利乘数），保留两位。 */
+    static Double toSiteCurrency(Double usd, Double exchangeRate, Double marginMultiplier) {
+        if (usd == null || exchangeRate == null || marginMultiplier == null) return null;
+        return Math.round(usd * exchangeRate * marginMultiplier * 100d) / 100d;
     }
 
     /**
@@ -269,6 +292,18 @@ public class PlatformAiKeyService {
         result.put("remainingUsd", usage == null || limit == null ? null : Math.max(0d, limit - usage));
         // 用量拿不到时前端显示「—」，绝不把 0 当成剩余额度（licensing 领域既有口径）
         result.put("usageAvailable", usage != null);
+
+        // 本币口径：有官网汇率就给折算后的实付额（与用户在官网账户页看到的钱包同一单位）；
+        // 没有就明说是美元（currency=USD、amount=美元原值），不做任何自拟换算。
+        Double rate = row.map(PlatformAiKey::getExchangeRate).orElse(null);
+        Double margin = row.map(PlatformAiKey::getMarginMultiplier).orElse(null);
+        String currency = row.map(PlatformAiKey::getCurrency).orElse(null);
+        boolean converted = currency != null && rate != null && margin != null;
+        result.put("currency", converted ? currency : "USD");
+        Double remaining = usage == null || limit == null ? null : Math.max(0d, limit - usage);
+        result.put("limitAmount", converted ? toSiteCurrency(limit, rate, margin) : limit);
+        result.put("usageAmount", converted ? toSiteCurrency(usage, rate, margin) : usage);
+        result.put("remainingAmount", converted ? toSiteCurrency(remaining, rate, margin) : remaining);
         return result;
     }
 

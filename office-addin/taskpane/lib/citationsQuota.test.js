@@ -7,8 +7,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { cleanQuote, extractCitations } from './citations.js'
-import { quotaParts, isQuotaLow, quotaCurrency } from './quota.js'
-import { siteCurrency } from './site.js'
+import { quotaParts, isQuotaLow } from './quota.js'
 
 test('引文剥掉 ** 与反引号，不带 Markdown 标记', () => {
   assert.equal(cleanQuote('**乙方应于三十日内付款**'), '乙方应于三十日内付款')
@@ -25,23 +24,25 @@ test('去重、过短丢弃、最多 4 条，已确认找不到的不再出 chip
   assert.deepEqual(extractCitations('「条款一的全文内容」「条款二的全文内容」', new Set(['条款一的全文内容'])), ['条款二的全文内容'])
 })
 
-test('额度币种：大陆站 ¥、国际站 $，接口给 currency 时以接口为准', () => {
-  const q = { hasKey: true, limitUsd: 100, remainingUsd: 80, usageUsd: 20 }
-  assert.equal(siteCurrency('https://addin.aiworkdeck.com'), 'CNY')
-  assert.equal(siteCurrency('https://addin.workdeck.ai'), 'USD')
-  assert.equal(siteCurrency('https://addin.yourfirm.com'), 'USD')
-  assert.deepEqual(quotaParts(q, 'https://addin.aiworkdeck.com').params, { remaining: '¥80.00', limit: '¥100.00' })
-  assert.deepEqual(quotaParts(q, 'https://addin.workdeck.ai').params, { remaining: '$80.00', limit: '$100.00' })
-  assert.equal(quotaCurrency({ ...q, currency: 'cny' }, 'https://addin.workdeck.ai'), 'CNY')
-  assert.deepEqual(quotaParts({ hasKey: true, usageUsd: 3 }, 'https://addin.aiworkdeck.com'), { key: 'quotaUsed', params: { used: '¥3.00' } })
-  assert.equal(quotaParts({ hasKey: false }, 'https://addin.aiworkdeck.com'), null)
+test('额度：后端折算出的本币额原样显示（美元 2.39 × 汇率 7.2 × 毛利 1.16 = ¥19.96，不是 ¥2.39）', () => {
+  // 后端 PlatformAiKeyService.status 按官网汇率折算后给的字段
+  const cny = { hasKey: true, limitUsd: 2.39, usageUsd: 0.39, remainingUsd: 2.0,
+    currency: 'CNY', limitAmount: 19.96, usageAmount: 3.26, remainingAmount: 16.7 }
+  assert.deepEqual(quotaParts(cny).params, { remaining: '¥16.70', limit: '¥19.96' })
+  const usd = { hasKey: true, limitUsd: 10, remainingUsd: 8, currency: 'USD', limitAmount: 10, remainingAmount: 8 }
+  assert.deepEqual(quotaParts(usd).params, { remaining: '$8.00', limit: '$10.00' })
 })
 
-test('低额度阈值本地化：美元站 $1，人民币站 ¥7', () => {
-  const cn = 'https://addin.aiworkdeck.com'
-  const intl = 'https://addin.workdeck.ai'
-  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: 5 }, cn), true)
-  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: 5 }, intl), false)
-  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: 0.5 }, intl), true)
-  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: null }, cn), false)
+test('没有折算字段（旧后端 / 官网没给汇率）：显示美元原值并标 US$，不冒充 ¥，也不自己换算', () => {
+  const q = { hasKey: true, limitUsd: 2.39, remainingUsd: 2.0, usageUsd: 0.39 }
+  assert.deepEqual(quotaParts(q).params, { remaining: 'US$2.00', limit: 'US$2.39' })
+  assert.deepEqual(quotaParts({ hasKey: true, usageUsd: 3 }), { key: 'quotaUsed', params: { used: 'US$3.00' } })
+  assert.equal(quotaParts({ hasKey: false }), null)
+})
+
+test('低额度阈值按本币口径：美元 $1，人民币 ¥7；用折算后的额判断', () => {
+  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: 0.8, currency: 'CNY', remainingAmount: 5.5, limitAmount: 20 }), true)
+  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: 0.8, currency: 'CNY', remainingAmount: 16.7, limitAmount: 20 }), false)
+  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: 0.5 }), true)
+  assert.equal(isQuotaLow({ hasKey: true, remainingUsd: null }), false)
 })
