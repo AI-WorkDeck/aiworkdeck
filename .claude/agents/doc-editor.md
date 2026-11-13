@@ -160,7 +160,7 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 - `CFB.find` 是模糊匹配，会把 `EncryptedPackage` 找成 `EncryptionInfo`，按完整路径精确取；
 - 演示文稿冷启动预览缓存（IndexedDB 明文）对加密文件一律不写不读；
 - 只支持 Agile（Office 2010+ / WPS 默认）；Standard 等报 `UNSUPPORTED_ENCRYPTION`，面板回到「请先去掉密码」的说明；
-- 版本合并、比对等隐藏引擎路径直接拿后端字节，加密文件在那里仍会被引擎拒收（安全失败，不写明文）；入口（`VersionCompareTab`、`MergeReviewTab`、`services/mergeDraft.js` 的 `fetchMergeInputs`）先经 `utils/officeCompareGuard.js` 的 `assertNotPasswordProtected` 判定（`isEncryptedOoxml` + `detectLegacyEncryption`，只读字节头、不解密不落盘），抛 `DOC_ENCRYPTED`，界面显示 `version.officePasswordProtected`（请先另存为无密码副本）。不复用编辑器内存里的会话密钥：隐藏引擎实例与编辑器是不同实例，复用要跨实例传密钥且比对稿会带出明文，得不偿失。
+- 版本合并、比对等隐藏引擎路径直接拿后端字节，加密文件在那里仍会被引擎拒收（安全失败，不写明文）；入口（`VersionCompareTab`、`MergeReviewTab`、`services/mergeDraft.js` 的 `fetchMergeInputs`）先经 `utils/officeCompareGuard.js` 的 `assertNotPasswordProtected` 判定（`isEncryptedOoxml` + `detectLegacyEncryption`，只读字节头、不解密不落盘），抛 `DOC_ENCRYPTED`，界面显示 `version.officePasswordProtected`（请先另存为无密码副本）。xlsx/pptx 等走文本对比（`DocDiffViewer` + 后端 `file-text`）：后端 Tika 遇加密抛 `EncryptedDocumentException` 时回 `kind=DOC_ENCRYPTED`，前端同样显示 `version.officePasswordProtected`。不复用编辑器内存里的会话密钥：隐藏引擎实例与编辑器是不同实例，复用要跨实例传密钥且比对稿会带出明文，得不偿失。
 - 未加密但引擎拒收（`DOC_REJECTED`）的 .doc/.xls/.ppt：`legacyOfficeDecrypt.detectLegacyFormat` 确认是结构完整的复合文档（含对应主数据流）时，加载面板显示 `editor.openFailed.legacyTitle`（格式过旧，请另存为 .docx/.xlsx/.pptx），否则仍是「引擎无响应或文件损坏」。测试 `tests/lowa-unit/office-compare-guard.test.mjs`。
 测试：`tests/lowa-unit/office-encryption.test.mjs`（夹具由独立实现 msoffcrypto-tool 加密，含 node:crypto 独立核 HMAC）、
 `tests/project-home/libre-load-budget-retry.test.mjs`、`external-rename-save.test.mjs`；真机 `tests/desktop-e2e/office-password.mjs`。

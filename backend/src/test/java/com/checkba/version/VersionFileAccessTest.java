@@ -212,6 +212,44 @@ class VersionFileAccessTest {
         }
     }
     @Test
+    void fileTextAtRefReportsPasswordProtectedOfficeFileWithKind() throws Exception {
+        VersionController controller = newController();
+        byte[] encrypted = encryptedXlsx("awd-0414");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            stubMember(auth);
+            when(repoService.readBlobAtCommit(PROJECT_ID, REF, "台账.xlsx")).thenReturn(encrypted);
+
+            VersionException e = assertThrows(VersionException.class,
+                    () -> controller.fileTextAtRef(PROJECT_ID, REF, "台账.xlsx", "sess"));
+            assertTrue(e.isUserFacing());
+            assertEquals(VersionException.DOC_ENCRYPTED, e.getKind());
+            assertTrue(e.getMessage().contains("打开密码"), e.getMessage());
+
+            var body = controller.onVersionError(e).getBody();
+            assertEquals(1, body.get("code"));
+            assertEquals(VersionException.DOC_ENCRYPTED, body.get("kind"));
+        }
+    }
+
+    /** 用 POI 的 Agile 加密现做一份带打开密码的 xlsx（与 Office/WPS 默认加密同一种）。 */
+    private static byte[] encryptedXlsx(String password) throws Exception {
+        var plain = new java.io.ByteArrayOutputStream();
+        try (var wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
+            wb.createSheet("台账").createRow(0).createCell(0).setCellValue("案件一");
+            wb.write(plain);
+        }
+        try (var fs = new org.apache.poi.poifs.filesystem.POIFSFileSystem()) {
+            var info = new org.apache.poi.poifs.crypt.EncryptionInfo(org.apache.poi.poifs.crypt.EncryptionMode.agile);
+            var enc = info.getEncryptor();
+            enc.confirmPassword(password);
+            try (var out = enc.getDataStream(fs)) { out.write(plain.toByteArray()); }
+            var bytes = new java.io.ByteArrayOutputStream();
+            fs.writeFilesystem(bytes);
+            return bytes.toByteArray();
+        }
+    }
+
+    @Test
     void streamingDownloadPinsCommitAndPreflightsOnlyTheRequestedFile() throws Exception {
         VersionController controller = newController();
         byte[] content = "original commit".getBytes(StandardCharsets.UTF_8);

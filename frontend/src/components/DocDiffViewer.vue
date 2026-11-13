@@ -195,7 +195,10 @@ export default {
         
       } catch (e) {
         console.error('加载文档失败:', e)
-        this.error = e.message || this.$t('editor.diff.loadFailed')
+        // 带打开密码的 Office 文件抽不出文本：后端回 kind=DOC_ENCRYPTED，按界面语言给明确原因
+        this.error = e && e.kind === 'DOC_ENCRYPTED'
+          ? this.$t('version.officePasswordProtected')
+          : (e.message || this.$t('editor.diff.loadFailed'))
       } finally {
         this.loading = false
       }
