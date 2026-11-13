@@ -106,7 +106,8 @@ export default {
     "switch": "Changer",
     "cancel": "Annuler",
     "switchFailed": "Échec du changement de site. Veuillez réessayer plus tard.",
-    "rescueFailed": "Toujours pas débloqué après le changement de site. Vérifiez le code et réessayez."
+    "rescueFailed": "Toujours pas débloqué après le changement de site. Vérifiez le code et réessayez.",
+    "proIntroBanner": "Crédits offerts à l’inscription · Personal Pro ¥9.9/mois les 3 premiers mois",
   },
   "hint": {
     "learnMore": "En savoir plus",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Confirmer",
     "purchaseSuccess": "Débloqué",
     "purchaseFailed": "Échec de l'achat",
-    "goRecharge": "Recharger"
+    "goRecharge": "Recharger",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Passer à Personal Pro",
   },
   "identity": {
     "title": "Choisir un espace de travail local",

@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{remaining} von {limit} übrig",
   "quotaUsed": "{used} verbraucht",
   "recharge": "Aufladen",
-  "rechargeTitle": "Auf der Kontoseite der Website aufladen (öffnet sich im Browser, dasselbe Konto wie dieses Add-in)",
+  "rechargeTitle": "Auf der Website aufladen oder Personal Pro abonnieren (öffnet im Browser)",
   "quotaExhaustedNotice": "Ihr Konto hat keine Credits mehr; dieser Durchlauf wurde gestoppt. Laden Sie auf und senden Sie diese Nachricht erneut, um fortzufahren.",
   "addinDefaultProjectName": "Plugin-Temporärprojekt",
   "newProjectOption": "+ Neues Projekt",

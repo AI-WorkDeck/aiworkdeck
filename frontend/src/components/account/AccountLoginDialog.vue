@@ -82,6 +82,7 @@
         <div class="unlock-title">{{ $t('onboarding.unlock.title') }}</div>
         <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : 'accountPassword.intro') }}</div>
         <div v-if="promoActive" class="unlock-promo">{{ $t('onboarding.unlock.promoLine', { amount: promoAmount }) }}</div>
+        <div v-else-if="isPhoneSite && mode === 'login' && (authFlow === 'register' || authFlow === 'password')" class="unlock-promo">{{ $t('onboarding.unlock.proIntroBanner') }}</div>
 
         <div class="unlock-form">
           <!-- 标识符按站点取：cn 是手机号，intl 是邮箱。两个字段各自保留输入。 -->

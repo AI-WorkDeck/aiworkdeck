@@ -408,12 +408,15 @@
                 <text class="account-note">{{ $t('admin.subscriptionEnds', { date: formatUsageTime(subscription.periodEnd) }) }}</text>
                 <text class="account-note">{{ $t(subscription.walletFallbackEnabled ? 'admin.subscriptionFallbackOn' : 'admin.subscriptionFallbackOff') }}</text>
                 <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
-                <button v-else class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                <view v-else class="comp-actions">
+                  <button v-if="isCnSite" class="comp-btn" @tap="onSubscribePro">{{ $t('admin.subscriptionRenewBtn') }}</button>
+                  <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                </view>
               </view>
               <view v-else class="provider-card">
-                <text class="account-note">{{ $t('admin.subscriptionInactiveNote') }}</text>
+                <text class="account-note">{{ $t(isCnSite ? 'admin.subscriptionInactiveNoteCn' : 'admin.subscriptionInactiveNote') }}</text>
                 <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
-                <button v-else class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionSubscribeBtn') }}</button>
+                <button v-else class="comp-btn" @tap="isCnSite ? onSubscribePro() : openSubscriptionAccount()">{{ $t(isCnSite ? 'admin.subscriptionSubscribeBtnCn' : 'admin.subscriptionSubscribeBtn') }}</button>
               </view>
             </SettingsSection>
 
@@ -1096,7 +1099,7 @@ import { openExternalUrl } from '@/utils/externalLink.js'
 import { accountPageUrl, siteBaseUrl, siteLinks, loadSiteLinks, resetSiteLinks } from '@/utils/siteLinks.js'
 import { host } from '@/services/host.js'
 import { signOut } from '@/utils/signOut.js'
-import { requireAccount, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { requireAccount, requireSubscription, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { refreshEntitlements, isEnabled, FEATURES } from '@/composables/useEntitlement.js'
 import { loadIdentityProfile, readNudgeRecords, markNudgeShown, PROFILE_SOURCE } from '@/services/accountProfile.js'
@@ -1545,9 +1548,11 @@ export default {
     },
     // ---------- 会员钱包卡（dev-board#183） ----------
     // 货币符号按站点：cn 人民币，其余美元。site 还没拉到时用 siteLinks 的缓存/兜底
+    isCnSite() {
+      return (this.site.current || siteLinks().current) === 'cn'
+    },
     walletCurrencySymbol() {
-      const current = this.site.current || siteLinks().current
-      return current === 'cn' ? '¥' : '$'
+      return this.isCnSite ? '¥' : '$'
     },
     // 余额大字：分→元两位小数；官网不可达 / 还没拉到时「—」，绝不拿 0 冒充
     walletBalanceText() {
@@ -2604,6 +2609,13 @@ export default {
     },
     openSubscriptionAccount() {
       openExternalUrl(accountPageUrl())
+    },
+    async onSubscribePro() {
+      const ok = await requireSubscription()
+      if (ok) {
+        await this.loadWallet()
+        await this.loadAccountUsage()
+      }
     },
     async loadWallet() {
       try {

@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Bu gruptaki yerel olarak tamamlanamayan dosyalar için bulut tanıma kullanabilirsiniz. Kullanmazsanız bu dosyalar yüklenmez.",
   "ocrLocalFailedConfirm": "Bulut tanımayı kullan",
   "ocrAlreadySearchable": "\"{name}\" zaten metin katmanına sahip ve aranabilir; yeni dosya oluşturulmadı",
-  "ocrStopped": "Durduruldu; {count} dosya işlenmedi"
+  "ocrStopped": "Durduruldu; {count} dosya işlenmedi",
+  "subscribeProBtn": "Pro ¥9.9",
 }

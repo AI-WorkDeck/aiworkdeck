@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "تبقى {remaining} من أصل {limit}",
   "quotaUsed": "تم استخدام {used}",
   "recharge": "إعادة الشحن",
-  "rechargeTitle": "أعد الشحن من صفحة الحساب على الموقع (تُفتح في المتصفح، نفس الحساب المستخدم في هذه الإضافة)",
+  "rechargeTitle": "أعد الشحن أو اشترك في Personal Pro عبر الموقع (يُفتح في المتصفح)",
   "quotaExhaustedNotice": "نفدت أرصدة حسابك؛ تم إيقاف هذا الطلب. أعد الشحن وأعد إرسال هذه الرسالة للمتابعة.",
   "addinDefaultProjectName": "مشروع الإضافة المؤقت",
   "newProjectOption": "+ مشروع جديد",

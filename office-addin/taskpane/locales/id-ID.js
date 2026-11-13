@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{remaining} left of {limit}",
   "quotaUsed": "{used} used",
   "recharge": "Isi saldo",
-  "rechargeTitle": "Top up on the website account page (opens in browser, same account as this add-in)",
+  "rechargeTitle": "Isi ulang atau berlangganan Personal Pro di situs web (terbuka di browser)",
   "quotaExhaustedNotice": "Your account is out of credit; this turn was stopped. Top up and resend this message to continue.",
   "addinDefaultProjectName": "Plugin Temporary Project",
   "newProjectOption": "+ New project",

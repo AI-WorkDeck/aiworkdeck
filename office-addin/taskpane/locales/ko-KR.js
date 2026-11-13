@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{remaining} left of {limit}",
   "quotaUsed": "{used} used",
   "recharge": "충전",
-  "rechargeTitle": "Top up on the website account page (opens in browser, same account as this add-in)",
+  "rechargeTitle": "웹사이트 계정 페이지에서 충전 또는 Personal Pro 구독 (브라우저에서 열림)",
   "quotaExhaustedNotice": "Your account is out of credit; this turn was stopped. Top up and resend this message to continue.",
   "addinDefaultProjectName": "Plugin Temporary Project",
   "newProjectOption": "+ New project",

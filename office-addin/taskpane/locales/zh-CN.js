@@ -92,7 +92,7 @@ export const ZH = {
   quotaRemaining: '剩余 {remaining} / 共 {limit}',
   quotaUsed: '已用 {used}',
   recharge: '充值',
-  rechargeTitle: '在官网账户页充值（浏览器打开，与插件同一账户）',
+  rechargeTitle: "在官网账户页充值或开通个人 Pro（浏览器打开，与插件同一账户）",
   quotaExhaustedNotice: '账户额度不足，本轮已中止。充值到账后重发这条消息即可继续。',
 
   // ---- App.vue：新建项目（dev-board#196）----

@@ -103,4 +103,5 @@ export default {
   ocrLocalFailedConfirm: 'Use cloud recognition',
   ocrAlreadySearchable: '"{name}" already has a text layer and is searchable; no new file was created',
   ocrStopped: 'Stopped; {count} file(s) not processed',
+  "subscribeProBtn": "Pro ¥9.9",
 }

@@ -1815,6 +1815,20 @@ export function createAccountRecharge(amountCents) {
   }).then(unwrapEnvelope);
 }
 
+// 发起个人 Pro 订阅开通（仅国内站微信扫码；首次前 3 个月走体验价 pro_monthly_intro ¥9.90，
+// 第 4 个周期起自动回落 ¥149.00，不自动扣款）。响应形状同 createAccountRecharge，
+// 多出 skuId（pro_monthly_intro | pro_monthly）。
+export function createAccountSubscriptionOrder() {
+  return request({
+    url: '/api/account/subscription/create',
+    method: 'POST',
+    data: {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  }).then(unwrapEnvelope);
+}
+
 // 查询充值订单状态（轮询用）。已支付形如 { success: true, order: { ..., status: 'paid' } }，
 // 未付 order.status 为 pending 等，字段以官网为准。
 export function getRechargeStatus(outTradeNo) {

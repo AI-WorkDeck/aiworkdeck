@@ -107,7 +107,8 @@ export default {
     "switch": "切換",
     "cancel": "取消",
     "switchFailed": "切換站點失敗，稍後重試",
-    "rescueFailed": "切換站點後仍未解鎖，檢查後重試"
+    "rescueFailed": "切換站點後仍未解鎖，檢查後重試",
+    "proIntroBanner": "註冊即享免費體驗額度 · 個人 Pro 前 3 個月特惠 ¥9.9/月",
   },
   "hint": {
     "learnMore": "瞭解詳情",
@@ -118,7 +119,9 @@ export default {
     "purchaseConfirmOk": "確認購買",
     "purchaseSuccess": "已解鎖",
     "purchaseFailed": "購買失敗",
-    "goRecharge": "去充值"
+    "goRecharge": "去充值",
+    "subscribeProBtn": "個人 Pro ¥9.9",
+    "clipboardProBtn": "開通個人 Pro",
   },
   "identity": {
     "title": "選擇本機工作區",

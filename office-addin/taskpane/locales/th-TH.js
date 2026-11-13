@@ -88,7 +88,7 @@ export default {
   "quotaRemaining": "{remaining} left of {limit}",
   "quotaUsed": "{used} used",
   "recharge": "เติมเงิน",
-  "rechargeTitle": "Top up on the website account page (opens in browser, same account as this add-in)",
+  "rechargeTitle": "เติมเงินหรือสมัคร Personal Pro บนหน้าบัญชีเว็บไซต์ (เปิดในเบราว์เซอร์)",
   "quotaExhaustedNotice": "Your account is out of credit; this turn was stopped. Top up and resend this message to continue.",
   "addinDefaultProjectName": "Plugin Temporary Project",
   "newProjectOption": "+ New project",

@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Vous pouvez utiliser la reconnaissance dans le cloud pour les fichiers de ce lot qui ont échoué en local. Sinon, ces fichiers ne seront pas envoyés.",
   "ocrLocalFailedConfirm": "Utiliser la reconnaissance dans le cloud",
   "ocrAlreadySearchable": "« {name} » contient déjà une couche de texte et est interrogeable ; aucun nouveau fichier n'a été créé",
-  "ocrStopped": "Arrêté ; {count} fichier(s) non traité(s)"
+  "ocrStopped": "Arrêté ; {count} fichier(s) non traité(s)",
+  "subscribeProBtn": "Pro ¥9.9",
 }

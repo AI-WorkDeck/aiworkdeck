@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "可以改用雲端識別本批中本機未完成的檔案。不改用的話，這些檔案不會上傳。",
   "ocrLocalFailedConfirm": "改用雲端識別",
   "ocrAlreadySearchable": "「{name}」本身帶文字層，已經可以搜尋，未產生新檔案",
-  "ocrStopped": "已停止，{count} 份未處理"
+  "ocrStopped": "已停止，{count} 份未處理",
+  "subscribeProBtn": "個人 Pro ¥9.9",
 }

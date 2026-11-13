@@ -107,7 +107,8 @@ export default {
     "switch": "切り替え",
     "cancel": "キャンセル",
     "switchFailed": "サイトの切り替えに失敗しました。後ほど再試行してください。",
-    "rescueFailed": "サイト切り替え後もロックを解除できませんでした。コードを確認して再試行してください。"
+    "rescueFailed": "サイト切り替え後もロックを解除できませんでした。コードを確認して再試行してください。",
+    "proIntroBanner": "登録で無料体験クレジット進呈 · Personal Pro 初回 3 か月 ¥9.9/月",
   },
   "hint": {
     "learnMore": "詳細を見る",
@@ -118,7 +119,9 @@ export default {
     "purchaseConfirmOk": "確認",
     "purchaseSuccess": "ロック解除済み",
     "purchaseFailed": "購入に失敗しました",
-    "goRecharge": "チャージへ"
+    "goRecharge": "チャージへ",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro へ",
   },
   "identity": {
     "title": "ローカルワークスペースを選択",
