@@ -53,6 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -311,7 +312,7 @@ public class LawFirmManagementService {
                 .map(LawFirmMatterIntake::getDepartmentName)
                 .filter(d -> d != null && !d.isBlank())
                 .findFirst().orElse(null));
-        selfInfo.put("role", "主办律师 / 利冲委员");
+        // No fixed role label: committee membership comes from the cloud workflow, not from the local ledger.
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("self", selfInfo);
@@ -1301,9 +1302,6 @@ public class LawFirmManagementService {
                     .mapToLong(l -> l.getDuration() != null && l.getDuration() > 0 ? l.getDuration() : 0L)
                     .sum();
             double activeHours30d = loggedMs / 3_600_000.0;
-            if (activeHours30d < 1.0 && (leadCases > 0 || coCases > 0 || openTasks > 0)) {
-                activeHours30d = Math.min(165.0, leadCases * 26.0 + coCases * 14.0 + openTasks * 4.5);
-            }
             activeHours30d = Math.round(activeHours30d * 10.0) / 10.0;
 
             int workloadIndex = (int) Math.min(120, Math.round(
@@ -1466,7 +1464,12 @@ public class LawFirmManagementService {
             leadMap.put("contractCollectionRatePercent", ratePercent(collected, contracted));
             leadMap.put("firstPassConflictRatePercent", passRate);
             leadMap.put("conflictPassRatePercent", passRate);
-            leadMap.put("avgFilingHours", 3.5);
+            // Real submit-to-filed average only; no data means no value (the panel shows an empty state).
+            OptionalDouble avgFiling = leadIntakes.stream()
+                    .filter(li -> li.getSubmittedAt() != null && li.getFiledAt() != null && !li.getFiledAt().isBefore(li.getSubmittedAt()))
+                    .mapToDouble(li -> java.time.Duration.between(li.getSubmittedAt(), li.getFiledAt()).toMinutes() / 60.0)
+                    .average();
+            if (avgFiling.isPresent()) leadMap.put("avgFilingHours", Math.round(avgFiling.getAsDouble() * 10.0) / 10.0);
             teamLeadList.add(leadMap);
         }
         teamLeadList.sort(Comparator.comparing((Map<String, Object> m) -> (Long) m.get("contractedCents")).reversed());

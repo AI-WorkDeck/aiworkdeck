@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Visão geral do escritório (somente leitura): status de admissões e casos, indicadores e liberações de conflito de interesses pendentes; filtro opcional por projeto ou palavra-chave. Use quando o usuário perguntar sobre admissões, casos, andamento das liberações de conflito de interesses ou o panorama mensal do escritório.",
   "tool.lawfirm_management_conflict_check.desc": "Verificação de conflito de interesses (somente leitura, nada é salvo): compara cliente e parte contrária com os casos existentes. Use quando o usuário perguntar se um cliente ou parte contrária tem conflito de interesses.",
   "tool.lawfirm_management_fee_ledger.desc": "Consultar o livro de honorários (somente leitura): faturas, recebimentos, valores a receber e taxa de recebimento; filtro por projeto ou palavra-chave. Use quando o usuário perguntar sobre honorários, recebimentos, cobranças, faturas ou valores a receber de todo o escritório (somente administradores do escritório).",
-  "access.restricted": "Você não tem permissão para ver os dados de todo o escritório. Somente itens relacionados a você são exibidos. O livro de honorários e os painéis do escritório são restritos a administradores."
+  "access.restricted": "Você não tem permissão para ver os dados de todo o escritório. Somente itens relacionados a você são exibidos. O livro de honorários e os painéis do escritório são restritos a administradores.",
+  "access.role.committee": "Membro do comitê de conflitos de interesses",
+  "access.queue.emptyLocal": "A fila local de revisão de conflitos de interesses está vazia.",
+  "access.kpi.activeSubLocal": "Apenas os casos do registro local que dizem respeito a você",
+  "access.kpi.contractedLocal": "Meu total contratado",
+  "access.kpi.billingRateLocal": "Minha taxa de faturamento",
+  "access.colleague": "Colega do seu escritório",
+  "access.risk.line": "Aviso de risco: {0}",
+  "access.risk.GREEN": "Verde (sem conflito)",
+  "access.risk.YELLOW": "Amarelo (conflito potencial)",
+  "access.risk.RED": "Vermelho (conflito direto)"
 }

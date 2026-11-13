@@ -314,7 +314,9 @@ public class SkillMarketService {
             }
             resp = req.execute();
         } catch (Exception e) {
-            throw new IllegalStateException(LangText.of("注册表不可达: ", "Registry unreachable: ") + e.getMessage());
+            // The technical cause (proxy, DNS, timeout...) stays in the log; the UI gets a plain sentence.
+            log.warn("Plugin/skill registry unreachable: {}: {}", e.getClass().getSimpleName(), e.getMessage());
+            throw new IllegalStateException(LangText.of("暂时连不上插件广场，请检查网络或代理设置后重试。", "Can't reach the plugin marketplace right now. Check your network or proxy settings and try again."));
         }
         return new RegistryReply(resp.getStatus(), resp.bodyBytes());
     }

@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Kanzleiübersicht (nur lesen): Mandats-/Aufnahmestatus, Kennzahlen und offene Interessenkollisions-Freigaben; optional nach Projekt oder Stichwort filtern. Verwenden, wenn der Nutzer nach Mandatsaufnahmen, Mandaten, dem Stand der Kollisionsfreigaben oder der monatlichen Geschäftsübersicht der Kanzlei fragt.",
   "tool.lawfirm_management_conflict_check.desc": "Interessenkollisionsprüfung (nur lesen, es wird nichts gespeichert): gleicht Mandant und Gegenpartei mit bestehenden Mandaten ab. Verwenden, wenn der Nutzer fragt, ob bei einem Mandanten oder einer Gegenpartei ein Interessenkonflikt besteht.",
   "tool.lawfirm_management_fee_ledger.desc": "Honorarbuch lesen (nur lesen): Rechnungen, Zahlungseingänge, Forderungen und Einzugsquote; nach Projekt oder Stichwort filterbar. Verwenden, wenn der Nutzer nach kanzleiweiten Honoraren, Zahlungseingängen, Abrechnungen, Rechnungen oder Forderungen fragt (nur Kanzleiadministratoren).",
-  "access.restricted": "Keine Berechtigung für kanzleiweite Daten. Es werden nur Vorgänge angezeigt, die Sie betreffen. Das kanzleiweite Honorarbuch und die Dashboards sind Kanzleiadministratoren vorbehalten."
+  "access.restricted": "Keine Berechtigung für kanzleiweite Daten. Es werden nur Vorgänge angezeigt, die Sie betreffen. Das kanzleiweite Honorarbuch und die Dashboards sind Kanzleiadministratoren vorbehalten.",
+  "access.role.committee": "Mitglied des Interessenkonflikt-Ausschusses",
+  "access.queue.emptyLocal": "Die lokale Prüfwarteschlange für Interessenkonflikte ist leer.",
+  "access.kpi.activeSubLocal": "Nur Mandate aus dem lokalen Hauptbuch, die Sie betreffen",
+  "access.kpi.contractedLocal": "Mein vertraglich vereinbarter Gesamtbetrag",
+  "access.kpi.billingRateLocal": "Meine Rechnungsquote",
+  "access.colleague": "Kollegin/Kollege Ihrer Kanzlei",
+  "access.risk.line": "Risikohinweis: {0}",
+  "access.risk.GREEN": "Grün (kein Konflikt)",
+  "access.risk.YELLOW": "Gelb (möglicher Konflikt)",
+  "access.risk.RED": "Rot (direkter Konflikt)"
 }

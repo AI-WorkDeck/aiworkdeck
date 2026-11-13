@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Panoramica dello studio (sola lettura): stato di incarichi e pratiche, indicatori e autorizzazioni per conflitto di interessi in sospeso; filtro facoltativo per progetto o parola chiave. Da usare quando l'utente chiede di incarichi, pratiche, avanzamento delle autorizzazioni per conflitto di interessi o del quadro mensile dell'attività dello studio.",
   "tool.lawfirm_management_conflict_check.desc": "Verifica del conflitto di interessi (sola lettura, nulla viene salvato): confronta cliente e controparte con le pratiche esistenti. Da usare quando l'utente chiede se un cliente o una controparte ha un conflitto di interessi.",
   "tool.lawfirm_management_fee_ledger.desc": "Consulta il registro degli onorari (sola lettura): fatture, incassi, crediti e tasso di incasso; filtro per progetto o parola chiave. Da usare quando l'utente chiede di onorari, incassi, parcelle, fatture o crediti dell'intero studio (solo amministratori dello studio).",
-  "access.restricted": "Non hai l'autorizzazione a visualizzare i dati dell'intero studio. Vengono mostrati solo gli elementi che ti riguardano. Il registro degli onorari e le dashboard dello studio sono riservati agli amministratori."
+  "access.restricted": "Non hai l'autorizzazione a visualizzare i dati dell'intero studio. Vengono mostrati solo gli elementi che ti riguardano. Il registro degli onorari e le dashboard dello studio sono riservati agli amministratori.",
+  "access.role.committee": "Membro del comitato per i conflitti di interessi",
+  "access.queue.emptyLocal": "La coda locale di verifica dei conflitti di interessi è vuota.",
+  "access.kpi.activeSubLocal": "Solo le pratiche del registro locale che la riguardano",
+  "access.kpi.contractedLocal": "Il mio totale contrattuale",
+  "access.kpi.billingRateLocal": "Il mio tasso di fatturazione",
+  "access.colleague": "Collega del suo studio",
+  "access.risk.line": "Avviso di rischio: {0}",
+  "access.risk.GREEN": "Verde (nessun conflitto)",
+  "access.risk.YELLOW": "Giallo (conflitto potenziale)",
+  "access.risk.RED": "Rosso (conflitto diretto)"
 }

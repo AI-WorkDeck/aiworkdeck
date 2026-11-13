@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Ringkasan firma hukum (hanya baca): status penerimaan/perkara, KPI, dan persetujuan benturan kepentingan yang tertunda; filter opsional berdasarkan proyek atau kata kunci. Gunakan saat pengguna menanyakan penerimaan perkara, perkara, kemajuan persetujuan benturan kepentingan, atau ringkasan bisnis bulanan firma.",
   "tool.lawfirm_management_conflict_check.desc": "Pemeriksaan benturan kepentingan (hanya baca, tidak ada yang disimpan): membandingkan klien dan pihak lawan dengan perkara yang ada. Gunakan saat pengguna menanyakan apakah klien atau pihak lawan memiliki benturan kepentingan.",
   "tool.lawfirm_management_fee_ledger.desc": "Lihat buku besar biaya (hanya baca): faktur, penagihan, piutang, dan tingkat penagihan; filter berdasarkan proyek atau kata kunci. Gunakan saat pengguna menanyakan biaya, penagihan, tagihan, faktur, atau piutang seluruh firma (hanya administrator firma).",
-  "access.restricted": "Anda tidak memiliki izin melihat data seluruh firma. Hanya item yang terkait dengan Anda yang ditampilkan. Buku besar biaya dan dasbor seluruh firma hanya untuk administrator firma."
+  "access.restricted": "Anda tidak memiliki izin melihat data seluruh firma. Hanya item yang terkait dengan Anda yang ditampilkan. Buku besar biaya dan dasbor seluruh firma hanya untuk administrator firma.",
+  "access.role.committee": "Anggota komite benturan kepentingan",
+  "access.queue.emptyLocal": "Antrean pemeriksaan benturan kepentingan lokal kosong.",
+  "access.kpi.activeSubLocal": "Hanya perkara di buku besar lokal yang menyangkut Anda",
+  "access.kpi.contractedLocal": "Total kontrak saya",
+  "access.kpi.billingRateLocal": "Rasio penagihan saya",
+  "access.colleague": "Rekan di firma Anda",
+  "access.risk.line": "Peringatan risiko: {0}",
+  "access.risk.GREEN": "Hijau (tidak ada benturan)",
+  "access.risk.YELLOW": "Kuning (potensi benturan)",
+  "access.risk.RED": "Merah (benturan langsung)"
 }

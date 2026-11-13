@@ -46,5 +46,15 @@
   "tool.lawfirm_management_matter_overview.desc": "Law firm overview (read-only): intake/matter status, KPIs and pending conflict clearances; optional project or keyword filter. Use when the user asks about the firm's intake, matters, conflict-clearance progress or monthly business overview.",
   "tool.lawfirm_management_conflict_check.desc": "Conflict-of-interest check (read-only, nothing is saved): compares a client and counterparty against existing matters. Use when the user asks whether a client or counterparty has a conflict of interest.",
   "tool.lawfirm_management_fee_ledger.desc": "Read the fee ledger (read-only): invoices, collections, receivables and collection rate; filter by project or keyword. Law firm administrators only. Use when the user asks about firm-wide fees, collections, bills, invoices or receivables.",
-  "access.restricted": "You don't have permission to view firm-wide data. Only items related to you are shown. The firm-wide fee ledger and dashboards are limited to law firm administrators."
+  "access.restricted": "You don't have permission to view firm-wide data. Only items related to you are shown. The firm-wide fee ledger and dashboards are limited to law firm administrators.",
+  "access.role.committee": "Conflict committee member",
+  "access.queue.emptyLocal": "The local conflict review queue is empty.",
+  "access.kpi.activeSubLocal": "Only intakes in the local ledger that involve you",
+  "access.kpi.contractedLocal": "My total contracted amount",
+  "access.kpi.billingRateLocal": "My invoicing rate",
+  "access.colleague": "Colleague at your firm",
+  "access.risk.line": "Risk level: {0}",
+  "access.risk.GREEN": "Green (no conflict)",
+  "access.risk.YELLOW": "Yellow (potential conflict)",
+  "access.risk.RED": "Red (direct conflict)"
 }

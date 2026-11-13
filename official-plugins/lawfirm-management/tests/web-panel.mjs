@@ -718,3 +718,39 @@ test('7. On a team server the local ledger is refused: panel shows the message a
   await tick(8);
   assert.equal(p.$('notice').textContent, refusal, 'refresh shows the refusal again instead of crashing');
 });
+
+test('8. Non-admin dashboard labels follow the real scope; missing metrics show an empty state, not invented numbers', async (t) => {
+  const mine = await mountPanel({ onCall: (msg, state) => {
+    if (msg.method === 'lawfirm.request') {
+      state.restricted = true;
+      for (const lead of state.dashboard.teamLeads || []) { delete lead.avgFilingHours; delete lead.avgCycleHours; delete lead.conflictPassRatePercent; delete lead.firstPassConflictRatePercent; }
+    }
+  } });
+  t.after(() => mine.dom.window.close());
+  mine.$('tab-dashboard').click();
+  await tick();
+  assert.doesNotMatch(mine.$('dashboard-kpis').textContent, /全所/);
+  assert.match(mine.$('dashboard-kpis').textContent, /我的签约合同总额/);
+  assert.doesNotMatch(mine.$("self-badge").textContent, / · 利冲委员$/);
+  const row = mine.$('lead-table').textContent;
+  assert.doesNotMatch(row, /3\.5/); assert.match(row, /—/);
+
+  const admin = await mountPanel();
+  t.after(() => admin.dom.window.close());
+  assert.match(admin.$('dashboard-kpis').textContent, /全所签约合同总额/);
+});
+
+test('9. A successful intake submit clears the form so it cannot be submitted twice; switching tabs clears the stale notice', async (t) => {
+  const p = await mountPanel();
+  t.after(() => p.dom.window.close());
+  p.$('intake-title').value = '重复提交测试案件';
+  p.$('intake-client-name').value = '测试委托人';
+  p.$('btn-submit-intake').click();
+  await tick(8);
+  assert.ok(p.calls.some((c) => c.method === 'lawfirm.request' && c.params.action === 'submitIntake'));
+  assert.equal(p.$('intake-title').value, '');
+  assert.equal(p.$('intake-client-name').value, '');
+  assert.match(p.$('notice').textContent, /已提交收案申请/);
+  p.$('tab-finance').click();
+  assert.equal(p.$('notice').textContent, '');
+});
