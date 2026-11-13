@@ -361,15 +361,27 @@ export const librePoolMethods = {
             console.warn('[ProjectOverview] slide preview render failed', e)
             return null
         } finally {
-            this.releaseLibreHiddenInstance(handle)
+            this.releaseLibreHiddenInstance(handle, { recycle: true })
         }
     },
-    releaseLibreHiddenInstance(handle) {
+    // recycle（台账 B5，QuickLook 用）：借的是预热备胎时，先让它换回空白文档再原样归还，
+    // 而不是丢掉重建——空格预览后马上打开文件是常见动作，丢掉就得冷启动 4–6 秒。清场
+    // 期间仍是 borrowed，不会被过继；清场失败才按老规矩丢掉、重排预热。
+    releaseLibreHiddenInstance(handle, { recycle = false } = {}) {
         const sp = handle && (handle._spare || handle)
         // #1122: array entries are Vue proxies; acquired handles retain the raw object.
         const key = sp && sp.key
         if (!Number.isSafeInteger(key) || key < 1) return
         const reused = this.libreSpares.some((x) => x.key === key && x.borrowed)
+        if (recycle && reused && handle.run) {
+            const discard = () => this.releaseLibreHiddenInstance(handle)
+            Promise.resolve(handle.run('load_document', { blank: true, name: 'blank.docx' })).then((r) => {
+                const entry = this.libreSpares.find((x) => x.key === key)
+                if (r && r.success && r.blank && entry) entry.borrowed = false
+                else if (entry) discard()
+            }, discard)
+            return
+        }
         this.libreSpares = this.libreSpares.filter((x) => x.key !== key)
         // 借走的是预热备胎：还掉后补一个，下一次打开文档/比对仍有热引擎可用
         if (reused && typeof this.scheduleLibreSpare === 'function') this.scheduleLibreSpare()
