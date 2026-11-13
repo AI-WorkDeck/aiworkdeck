@@ -23,6 +23,12 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 - 三方合并等其他借用方**不走**回收（它们端着别人的文档跑重活，仍用完即弃）。
 - `load_document{blank}` 不是「空字节」：空字节保持当前文档不变（新建空文件的语义），清场必须用 blank。
 - 回归：`tests/project-home/libre-hidden-release-reactive.test.mjs`（回收/失败回退/冷实例不回收）、`node tests/lowa-e2e/blank-reset.mjs`（真引擎：预览→清场无残留→再装三种格式可编辑）、`node tests/desktop-e2e/quicklook-slides.mjs` 末段 B5（预览后马上打开 Word：热引擎、打字自动保存落盘、关闭重开核对；再开同一份演示文稿）。
+## 换屏后页面偏右被裁（台账 B1，2026-11-13）
+
+- 现象：窗口拖到/最大化到像素比不同的屏幕（Retina 2x ⇄ 外接 1x）后，Word 页面放大、偏右、右半截被裁、标尺对不上；PPT 缩放跳变、Excel 单元格放大。之后怎么拉窗口都不恢复。单纯改窗口宽度（前台/后台标签、加载中、动画式最大化、备胎过继）都**不会**出问题——别再往 resize 上找。
+- 根因：Qt 每次布局都重读 `devicePixelRatio`（引擎唯一读取点是 `emscripten_get_device_pixel_ratio`），LibreOffice 的排版比例在启动时定死，两边一错开就是上面的样子。
+- 修法：`editor.html` 头部内联脚本把 `window.devicePixelRatio` 钉在启动值（必须在 `editor-main.js` 之前）。代价：换到更高像素比的屏后画布略发虚，重新打开文件即按新屏启动。**别删这段，也别在客体页别处读 `devicePixelRatio` 当真实像素比用**（读到的是启动值）。
+- 回归：`node --test tests/lowa-unit/pinned-device-pixel-ratio.test.mjs`；真机 `node tests/desktop-e2e/resize-recenter.mjs`（默认 `RESIZE_MODE=dpr`，用 CDP 把客体像素比 2→1 仿真换屏，三种格式各一，去掉钉值即转红）。PDF 走 pdf.js iframe，不经 LOWA，不受影响。
 
 ## PPT/Excel 一流化（office-tier1，2026-11-12）
 
