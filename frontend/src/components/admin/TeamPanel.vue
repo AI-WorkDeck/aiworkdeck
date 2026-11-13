@@ -1964,7 +1964,7 @@ export default {
   margin-top: 4px;
 }
 
-/* 设置页右侧有 AI 栏时面板只剩六七百像素：等分的六列会把「苏婉清（合伙人）」逐字折行。
+/* 设置页右侧有 AI 栏时面板只剩六七百像素：等分的六列会把「蔺若曦（合伙人）」逐字折行。
    给行一个最小宽度（表格本身可横向滚动），单元格不折行。 */
 .lf-dim-table .team-table-head,
 .lf-dim-table .team-table-row {

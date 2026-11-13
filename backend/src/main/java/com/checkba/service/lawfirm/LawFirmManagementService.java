@@ -1692,25 +1692,25 @@ public class LawFirmManagementService {
             return buildOverview(userId, null, Map.of("scope", "all"));
         }
 
-        User partnerLin = ensureDemoUser("partner_lin", "林正源（高级合伙人）");
-        User partnerSu = ensureDemoUser("partner_su", "苏婉清（合伙人）");
-        User lawyerZhou = ensureDemoUser("lawyer_zhou", "周铭泽（主办律师）");
-        User lawyerChen = ensureDemoUser("lawyer_chen", "陈思远（主办律师）");
+        User partnerLin = ensureDemoUser("partner_lin", "岑方远（高级合伙人）");
+        User partnerSu = ensureDemoUser("partner_su", "蔺若曦（合伙人）");
+        User lawyerZhou = ensureDemoUser("lawyer_zhou", "郁承泽（主办律师）");
+        User lawyerChen = ensureDemoUser("lawyer_chen", "戚明远（主办律师）");
 
         Instant now = Instant.now();
 
         // 案件 1：常年法律顾问（在办已立项，供 R2 红色常顾冲突检索对照）
         LawFirmMatterIntake case1 = saveOrUpdateDemoIntake(LawFirmMatterIntake.builder()
                 .intakeNo("LF-2026-0001")
-                .title("云杉数智2026年度常年法律顾问项目")
+                .title("衡砚数智2026年度常年法律顾问项目")
                 .practiceArea("RETAINER")
                 .applicantUserId(partnerLin.getId())
                 .applicantName(partnerLin.getDisplayName())
                 .leadLawyerUserId(partnerLin.getId())
                 .leadLawyerName(partnerLin.getDisplayName())
-                .departmentName("公司并购与投融资部")
-                .teamMemberNames("林正源, 周铭泽, 林晓婷")
-                .clientName("北京云杉数智科技有限公司（示例）")
+                .departmentName("示例并购投融资部")
+                .teamMemberNames("岑方远, 郁承泽, 厉晓婷")
+                .clientName("北京衡砚数智科技有限公司（示例）")
                 .clientCreditCode(null)
                 .clientRole("常年法律顾问委托人")
                 .counterpartyName("无（常年法律顾问）")
@@ -1733,19 +1733,19 @@ public class LawFirmManagementService {
         // 案件 2：科创板 IPO 专项（绿色无冲突，已立案）
         LawFirmMatterIntake case2 = saveOrUpdateDemoIntake(LawFirmMatterIntake.builder()
                 .intakeNo("LF-2026-0002")
-                .title("华星半导体股份有限公司科创板首次公开发行股票并上市（IPO）专项")
+                .title("澜曜微电子股份有限公司科创板首次公开发行股票并上市（IPO）专项")
                 .practiceArea("IPO_CAPITAL")
                 .applicantUserId(partnerSu.getId())
                 .applicantName(partnerSu.getDisplayName())
                 .leadLawyerUserId(partnerSu.getId())
                 .leadLawyerName(partnerSu.getDisplayName())
-                .departmentName("资本市场与证券部")
-                .teamMemberNames("苏婉清, 陆景行, 许知夏")
-                .clientName("华星半导体股份有限公司")
+                .departmentName("示例资本市场部")
+                .teamMemberNames("蔺若曦, 邝景行, 宓知夏")
+                .clientName("澜曜微电子股份有限公司")
                 .clientCreditCode(null)
                 .clientRole("发行人/上市申请人")
-                .counterpartyName("上海证券交易所科创板审核中心")
-                .relatedPartiesJson("[{\"role\":\"AFFILIATE\",\"name\":\"华星微电子控股集团\",\"creditCode\":\"91310000MA1FL8HX00\"}]")
+                .counterpartyName("无")
+                .relatedPartiesJson("[{\"role\":\"AFFILIATE\",\"name\":\"澜曜微电子控股集团\",\"creditCode\":\"91310000MA1FL8HX00\"}]")
                 .feeMode("FIXED")
                 .contractAmountCents(380_000_000L) // 380万元
                 .conflictRiskLevel("GREEN")
@@ -1762,28 +1762,28 @@ public class LawFirmManagementService {
                 .updatedAt(now.minus(34, ChronoUnit.DAYS))
                 .build());
 
-        // 案件 3：黄色间接利冲（新案对方当事人「华星半导体（集团）有限公司」命中在办客户「华星半导体股份有限公司」商号词干，站内信放行中）
+        // 案件 3：黄色间接利冲（新案对方当事人「澜曜微电子（集团）有限公司」命中在办客户「澜曜微电子股份有限公司」商号词干，站内信放行中）
         LawFirmMatterIntake case3 = saveOrUpdateDemoIntake(LawFirmMatterIntake.builder()
                 .intakeNo("LF-2026-0003")
-                .title("东海精密装备诉华星半导体（集团）有限公司晶圆设备采购合同纠纷案")
+                .title("霁岚精密装备诉澜曜微电子（集团）有限公司晶圆设备采购合同纠纷案")
                 .practiceArea("LITIGATION")
-                .applicantUserId(userId)
-                .applicantName(userRepository.findById(userId).map(User::getDisplayName).orElse(lawyerZhou.getDisplayName()))
+                .applicantUserId(lawyerZhou.getId())
+                .applicantName(lawyerZhou.getDisplayName())
                 .leadLawyerUserId(lawyerZhou.getId())
                 .leadLawyerName(lawyerZhou.getDisplayName())
-                .departmentName("民商事争议解决部")
-                .teamMemberNames("周铭泽, 沈括")
-                .clientName("苏州东海精密装备股份有限公司")
+                .departmentName("示例争议解决部")
+                .teamMemberNames("郁承泽, 贲括")
+                .clientName("苏州霁岚精密装备股份有限公司")
                 .clientCreditCode(null)
                 .clientRole("原告/申请人")
-                .counterpartyName("华星半导体（集团）有限公司")
+                .counterpartyName("澜曜微电子（集团）有限公司")
                 .counterpartyCreditCode(null)
                 .feeMode("PROPORTIONAL")
                 .contractAmountCents(150_000_000L) // 150万元
                 .disputeTargetCents(4500_000_000L) // 4500万元
                 .conflictRiskLevel("YELLOW")
-                .conflictSummary("【YELLOW · Y1_EXISTING_CLIENT_OTHER_MATTER】共命中 1 项利益冲突记录（首要规则：新案对方当事人系本所在办案件委托人（或集团关联主体）；涉及主体：华星半导体股份有限公司；关联主办：苏婉清（合伙人））。法规依据：全国律协《律师执业行为规范》第五十一条第（三）项、第五十二条第（一）项：需征询该客户承办律师放行、取得客户书面豁免并建立信息隔离墙")
-                .conflictHitsJson("[{\"ruleCode\":\"Y1_EXISTING_CLIENT_OTHER_MATTER\",\"riskLevel\":\"YELLOW\",\"ruleTitle\":\"新案对方当事人系本所在办案件委托人（或集团关联主体）\",\"statutoryCitation\":\"全国律协《律师执业行为规范》第五十一条第（三）项、第五十二条第（一）项\",\"matchedIntakeNo\":\"LF-2026-0002\",\"matchedMatterTitle\":\"华星半导体股份有限公司科创板首次公开发行股票并上市（IPO）专项\",\"matchedPartyName\":\"华星半导体股份有限公司\",\"handlerUserId\":" + partnerSu.getId() + ",\"handlerUserName\":\"" + partnerSu.getDisplayName() + "\"}]")
+                .conflictSummary("【YELLOW · Y1_EXISTING_CLIENT_OTHER_MATTER】共命中 1 项利益冲突记录（首要规则：新案对方当事人系本所在办案件委托人（或集团关联主体）；涉及主体：澜曜微电子股份有限公司；关联主办：蔺若曦（合伙人））。法规依据：全国律协《律师执业行为规范》第五十一条第（三）项、第五十二条第（一）项：需征询该客户承办律师放行、取得客户书面豁免并建立信息隔离墙")
+                .conflictHitsJson("[{\"ruleCode\":\"Y1_EXISTING_CLIENT_OTHER_MATTER\",\"riskLevel\":\"YELLOW\",\"ruleTitle\":\"新案对方当事人系本所在办案件委托人（或集团关联主体）\",\"statutoryCitation\":\"全国律协《律师执业行为规范》第五十一条第（三）项、第五十二条第（一）项\",\"matchedIntakeNo\":\"LF-2026-0002\",\"matchedMatterTitle\":\"澜曜微电子股份有限公司科创板首次公开发行股票并上市（IPO）专项\",\"matchedPartyName\":\"澜曜微电子股份有限公司\",\"handlerUserId\":" + partnerSu.getId() + ",\"handlerUserName\":\"" + partnerSu.getDisplayName() + "\"}]")
                 .status("PENDING_LAWYER_CLEARANCE")
                 .submittedAt(now.minus(2, ChronoUnit.DAYS))
                 .createdAt(now.minus(2, ChronoUnit.DAYS))
@@ -1795,7 +1795,7 @@ public class LawFirmManagementService {
                     userId,
                     List.of(partnerSu.getId(), lawyerZhou.getId()),
                     "【利冲征询】" + case3.getIntakeNo() + " " + case3.getTitle(),
-                    "【系统利冲预警通知】收案号 " + case3.getIntakeNo() + " 对方当事人「华星半导体（集团）有限公司」与本所在办项目「" + case2.getTitle() + "」委托人「华星半导体股份有限公司」构成集团商号关联冲突（Y1_EXISTING_CLIENT_OTHER_MATTER）。请主办合伙人 " + partnerSu.getDisplayName() + " 在个人中心或律所管理插件中确认是否同意放行并启用信息隔离墙。"
+                    "【系统利冲预警通知】收案号 " + case3.getIntakeNo() + " 对方当事人「澜曜微电子（集团）有限公司」与本所在办项目「" + case2.getTitle() + "」委托人「澜曜微电子股份有限公司」构成集团商号关联冲突（Y1_EXISTING_CLIENT_OTHER_MATTER）。请主办合伙人 " + partnerSu.getDisplayName() + " 在个人中心或律所管理插件中确认是否同意放行并启用信息隔离墙。"
             );
             case3.setImConversationId(convId);
             intakeRepository.save(case3);
@@ -1815,27 +1815,27 @@ public class LawFirmManagementService {
                     .build());
         }
 
-        // 案件 4：红色常年顾问对抗冲突（对方当事人为本所在期常年法律顾问客户「北京云杉数智科技有限公司（示例）」）
+        // 案件 4：红色常年顾问对抗冲突（对方当事人为本所在期常年法律顾问客户「北京衡砚数智科技有限公司（示例）」）
         saveOrUpdateDemoIntake(LawFirmMatterIntake.builder()
                 .intakeNo("LF-2026-0004")
-                .title("远洋云创软件诉北京云杉数智科技有限公司（示例）技术委托开发合同争议案")
+                .title("墨隅云创软件诉北京衡砚数智科技有限公司（示例）技术委托开发合同争议案")
                 .practiceArea("LITIGATION")
                 .applicantUserId(lawyerChen.getId())
                 .applicantName(lawyerChen.getDisplayName())
                 .leadLawyerUserId(lawyerChen.getId())
                 .leadLawyerName(lawyerChen.getDisplayName())
-                .departmentName("知识产权与合规部")
-                .teamMemberNames("陈思远, 赵明")
-                .clientName("深圳远洋云创软件有限公司")
+                .departmentName("示例知产合规部")
+                .teamMemberNames("戚明远, 逄明")
+                .clientName("深圳墨隅云创软件有限公司")
                 .clientCreditCode(null)
                 .clientRole("原告")
-                .counterpartyName("北京云杉数智科技有限公司（示例）")
+                .counterpartyName("北京衡砚数智科技有限公司（示例）")
                 .counterpartyCreditCode(null)
                 .feeMode("FIXED")
                 .contractAmountCents(60_000_000L)
                 .conflictRiskLevel("RED")
-                .conflictSummary("【RED · R2_RETAINER_ADVERSARY】共命中 1 项利益冲突记录（首要规则：对抗本所在期常年法律顾问客户；涉及主体：北京云杉数智科技有限公司（示例）；关联主办：林正源（高级合伙人））。法规依据：全国律协《律师执业行为规范》第五十一条第（四）项：在委托人处于常年法律顾问关系期间，不得代理他人与该委托人之间的诉讼或仲裁")
-                .conflictHitsJson("[{\"ruleCode\":\"R2_RETAINER_ADVERSARY\",\"riskLevel\":\"RED\",\"ruleTitle\":\"对抗本所在期常年法律顾问客户\",\"statutoryCitation\":\"全国律协《律师执业行为规范》第五十一条第（四）项\",\"matchedIntakeNo\":\"LF-2026-0001\",\"matchedMatterTitle\":\"云杉数智2026年度常年法律顾问项目\",\"matchedPartyName\":\"北京云杉数智科技有限公司（示例）\",\"handlerUserId\":" + partnerLin.getId() + ",\"handlerUserName\":\"" + partnerLin.getDisplayName() + "\"}]")
+                .conflictSummary("【RED · R2_RETAINER_ADVERSARY】共命中 1 项利益冲突记录（首要规则：对抗本所在期常年法律顾问客户；涉及主体：北京衡砚数智科技有限公司（示例）；关联主办：岑方远（高级合伙人））。法规依据：全国律协《律师执业行为规范》第五十一条第（四）项：在委托人处于常年法律顾问关系期间，不得代理他人与该委托人之间的诉讼或仲裁")
+                .conflictHitsJson("[{\"ruleCode\":\"R2_RETAINER_ADVERSARY\",\"riskLevel\":\"RED\",\"ruleTitle\":\"对抗本所在期常年法律顾问客户\",\"statutoryCitation\":\"全国律协《律师执业行为规范》第五十一条第（四）项\",\"matchedIntakeNo\":\"LF-2026-0001\",\"matchedMatterTitle\":\"衡砚数智2026年度常年法律顾问项目\",\"matchedPartyName\":\"北京衡砚数智科技有限公司（示例）\",\"handlerUserId\":" + partnerLin.getId() + ",\"handlerUserName\":\"" + partnerLin.getDisplayName() + "\"}]")
                 .status("PENDING_COMMITTEE_REVIEW")
                 .submittedAt(now.minus(1, ChronoUnit.DAYS))
                 .createdAt(now.minus(1, ChronoUnit.DAYS))
@@ -1845,18 +1845,18 @@ public class LawFirmManagementService {
         // 案件 5：跨境并购专项（绿色无冲突，已立案）
         LawFirmMatterIntake case5 = saveOrUpdateDemoIntake(LawFirmMatterIntake.builder()
                 .intakeNo("LF-2026-0005")
-                .title("中航新材收购德国莱茵精密复合材料股权跨境并购专项")
+                .title("岫恒新材收购德国诺德海姆精密复合材料股权跨境并购专项")
                 .practiceArea("CORPORATE_MA")
                 .applicantUserId(partnerLin.getId())
                 .applicantName(partnerLin.getDisplayName())
                 .leadLawyerUserId(partnerLin.getId())
                 .leadLawyerName(partnerLin.getDisplayName())
-                .departmentName("公司并购与投融资部")
-                .teamMemberNames("林正源, 周铭泽")
-                .clientName("中航先进新材料股份有限公司")
+                .departmentName("示例并购投融资部")
+                .teamMemberNames("岑方远, 郁承泽")
+                .clientName("岫恒先进新材料股份有限公司")
                 .clientCreditCode(null)
                 .clientRole("收购方")
-                .counterpartyName("Rhein Composite GmbH")
+                .counterpartyName("Nordhalm Verbund GmbH")
                 .feeMode("FIXED")
                 .contractAmountCents(240_000_000L) // 240万元
                 .conflictRiskLevel("GREEN")
@@ -1876,18 +1876,18 @@ public class LawFirmManagementService {
         // 案件 6：知识产权商业秘密诉讼（已立案，带合规风险代理）
         LawFirmMatterIntake case6 = saveOrUpdateDemoIntake(LawFirmMatterIntake.builder()
                 .intakeNo("LF-2026-0006")
-                .title("光启智算科技大模型训练算子商业秘密侵权及不正当竞争诉讼")
+                .title("珩渊智算科技大模型训练算子商业秘密侵权及不正当竞争诉讼")
                 .practiceArea("IP")
                 .applicantUserId(lawyerChen.getId())
                 .applicantName(lawyerChen.getDisplayName())
                 .leadLawyerUserId(lawyerChen.getId())
                 .leadLawyerName(lawyerChen.getDisplayName())
-                .departmentName("知识产权与合规部")
-                .teamMemberNames("陈思远, 许知夏")
-                .clientName("北京光启智算科技有限公司")
+                .departmentName("示例知产合规部")
+                .teamMemberNames("戚明远, 宓知夏")
+                .clientName("北京珩渊智算科技有限公司")
                 .clientCreditCode(null)
                 .clientRole("原告")
-                .counterpartyName("杭州星云矩阵科技有限公司")
+                .counterpartyName("杭州霜序矩阵科技有限公司")
                 .feeMode("CONTINGENCY")
                 .contractAmountCents(120_000_000L) // 120万元
                 .disputeTargetCents(1000_000_000L)
@@ -1916,7 +1916,7 @@ public class LawFirmManagementService {
                 .applicantName(partnerLin.getDisplayName())
                 .leadLawyerUserId(partnerLin.getId())
                 .leadLawyerName(partnerLin.getDisplayName())
-                .departmentName("公司并购与投融资部")
+                .departmentName("示例并购投融资部")
                 .invoiceType("DIGITAL_SPECIAL")
                 .taxItemName("*鉴证咨询服务*常年法律顾问费")
                 .amountCents(80_000_000L)
@@ -1945,7 +1945,7 @@ public class LawFirmManagementService {
                 .applicantName(partnerSu.getDisplayName())
                 .leadLawyerUserId(partnerSu.getId())
                 .leadLawyerName(partnerSu.getDisplayName())
-                .departmentName("资本市场与证券部")
+                .departmentName("示例资本市场部")
                 .invoiceType("DIGITAL_SPECIAL")
                 .taxItemName("*鉴证咨询服务*IPO专项法律服务费（首期及申报期）")
                 .amountCents(280_000_000L)
@@ -1974,7 +1974,7 @@ public class LawFirmManagementService {
                 .applicantName(partnerLin.getDisplayName())
                 .leadLawyerUserId(partnerLin.getId())
                 .leadLawyerName(partnerLin.getDisplayName())
-                .departmentName("公司并购与投融资部")
+                .departmentName("示例并购投融资部")
                 .invoiceType("DIGITAL_SPECIAL")
                 .taxItemName("*鉴证咨询服务*跨境并购法律尽调与交割服务费")
                 .amountCents(200_000_000L)
@@ -2002,7 +2002,7 @@ public class LawFirmManagementService {
                 .applicantName(lawyerChen.getDisplayName())
                 .leadLawyerUserId(lawyerChen.getId())
                 .leadLawyerName(lawyerChen.getDisplayName())
-                .departmentName("知识产权与合规部")
+                .departmentName("示例知产合规部")
                 .invoiceType("DIGITAL_NORMAL")
                 .taxItemName("*法律鉴证*知识产权诉讼代理费")
                 .amountCents(120_000_000L)
@@ -2030,7 +2030,7 @@ public class LawFirmManagementService {
                 .applicantName(lawyerZhou.getDisplayName())
                 .leadLawyerUserId(lawyerZhou.getId())
                 .leadLawyerName(lawyerZhou.getDisplayName())
-                .departmentName("民商事争议解决部")
+                .departmentName("示例争议解决部")
                 .invoiceType("DIGITAL_SPECIAL")
                 .taxItemName("*鉴证咨询服务*诉讼代理首期基础律师费")
                 .amountCents(60_000_000L)
@@ -2056,7 +2056,7 @@ public class LawFirmManagementService {
                 .recordedByUserId(partnerLin.getId())
                 .recordedByName(partnerLin.getDisplayName())
                 .leadLawyerUserId(partnerLin.getId())
-                .departmentName("公司并购与投融资部")
+                .departmentName("示例并购投融资部")
                 .payerName(case1.getClientName())
                 .amountCents(80_000_000L)
                 .paymentMethod("BANK_TRANSFER")
@@ -2078,7 +2078,7 @@ public class LawFirmManagementService {
                 .recordedByUserId(partnerSu.getId())
                 .recordedByName(partnerSu.getDisplayName())
                 .leadLawyerUserId(partnerSu.getId())
-                .departmentName("资本市场与证券部")
+                .departmentName("示例资本市场部")
                 .payerName(case2.getClientName())
                 .amountCents(200_000_000L)
                 .paymentMethod("BANK_TRANSFER")
@@ -2100,7 +2100,7 @@ public class LawFirmManagementService {
                 .recordedByUserId(partnerLin.getId())
                 .recordedByName(partnerLin.getDisplayName())
                 .leadLawyerUserId(partnerLin.getId())
-                .departmentName("公司并购与投融资部")
+                .departmentName("示例并购投融资部")
                 .payerName(case5.getClientName())
                 .amountCents(140_000_000L)
                 .paymentMethod("BANK_TRANSFER")
@@ -2121,7 +2121,7 @@ public class LawFirmManagementService {
                 .recordedByUserId(lawyerChen.getId())
                 .recordedByName(lawyerChen.getDisplayName())
                 .leadLawyerUserId(lawyerChen.getId())
-                .departmentName("知识产权与合规部")
+                .departmentName("示例知产合规部")
                 .payerName(case6.getClientName())
                 .amountCents(70_000_000L)
                 .paymentMethod("BANK_TRANSFER")

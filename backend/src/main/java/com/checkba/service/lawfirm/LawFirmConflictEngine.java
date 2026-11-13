@@ -120,7 +120,7 @@ public class LawFirmConflictEngine {
 
     /**
      * 提取商号核心词干（去除括号附加词及常见公司/集团/行业尾缀）。
-     * 例如：「华星半导体股份有限公司」与「华星半导体（集团）有限公司」均归一化为「华星半导体」。
+     * 例如：「澜曜微电子股份有限公司」与「澜曜微电子（集团）有限公司」均归一化为「澜曜微电子」。
      */
     public static String extractCoreStem(String raw) {
         String normalized = normalizeExact(raw);

@@ -47,7 +47,7 @@
              而不销毁——切回编辑要保留光标/滚动/撤销栈 -->
         <div v-show="!previewMode" ref="cmHost" class="ptx-cm-host"></div>
         <view v-if="previewMode" class="ptx-preview">
-          <view class="markdown-body" v-html="previewHtml"></view>
+          <div class="markdown-body" v-html="previewHtml" @click="onPreviewClick"></div>
         </view>
         <!-- 批注只在编辑态有意义（预览态不画标记），右栏跟着编辑态走 -->
         <PlanReviewComments
@@ -84,6 +84,8 @@ import { json } from '@codemirror/lang-json'
 import { html } from '@codemirror/lang-html'
 import { css } from '@codemirror/lang-css'
 import MarkdownIt from 'markdown-it'
+import { withExternalLinkAttrs } from '@/utils/markdownRenderer.js'
+import { handleRenderedLinkClick } from '@/utils/externalLink.js'
 import { getFileBytesUrl, getFileWriteUrl, getCloudWriteHeaders } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 import { toRaw } from 'vue'
@@ -761,9 +763,13 @@ export default {
     renderPreview() {
       if (!this._md) {
         // html:false —— 渲染结果直接进 v-html，放行原始 HTML 等于存储型 XSS（同 MarkdownPreview）
-        this._md = new MarkdownIt({ html: false, linkify: true, typographer: true })
+        this._md = withExternalLinkAttrs(new MarkdownIt({ html: false, linkify: true, typographer: true }))
       }
       this.previewHtml = this._md.render(this.getText())
+    },
+
+    onPreviewClick(event) {
+      handleRenderedLinkClick(event)
     }
   }
 }

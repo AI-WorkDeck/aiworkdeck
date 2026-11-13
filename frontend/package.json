@@ -90,6 +90,7 @@
     "test:message-center-e2e": "node tests/app-e2e/message-center-forms.mjs",
     "test:marketing-shots": "node tests/marketing-screenshots/run.mjs",
     "test:desktop-e2e": "node tests/desktop-e2e/run.mjs",
+    "test:external-link-e2e": "node tests/desktop-e2e/external-link-navigation.mjs",
     "test:feedback-widget": "node --test tests/feedback-widget/*.test.mjs",
     "test:dialog": "node --test tests/dialog/*.test.mjs",
     "test:toast": "node --test tests/toast/*.test.mjs",

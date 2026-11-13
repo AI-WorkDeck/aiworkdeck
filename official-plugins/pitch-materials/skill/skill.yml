@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+id: pitch-materials-workflow
+name: 投标与提案材料
+name_en: Bids and proposals
+version: 0.1.0
+author: AI WorkDeck
+license: AGPL-3.0-or-later
+description: 从所里的业绩与团队库挑材料，对照招标文件的资格要求和评分项，按所里模板生成投标书或提案，报价由插件计算。
+description_en: Pick material from the firm's credentials and team library, check tender eligibility and scoring items, and generate a bid or proposal from the firm's templates with the fee quote calculated by the plugin.
+enabled_by_default: true
+languages: [zh-CN, en-US]
+category: 其他法律事务
+triggers:
+  - 投标书
+  - 标书
+  - 招标文件
+  - 投标文件
+  - 服务方案
+  - 客户提案
+  - 提案PPT
+  - 业绩库
+  - 律师业绩
+triggers_en:
+  - bid proposal
+  - tender document
+  - pitch deck
+  - client pitch
+  - credentials library
+  - RFP response
+prompt: prompt.md
+tool_policy: passthrough
+allowed_tools: []
+output: 汇报生成的文件路径、选用的业绩与律师、报价合计、对照表中缺材料的条目和脱敏复查结果；未完成或未核实的部分明确说明。
+output_en: Report the generated file paths, the credentials and lawyers used, the fee total, the matrix items still missing material and the desensitization check; state clearly what is unfinished or unverified.
