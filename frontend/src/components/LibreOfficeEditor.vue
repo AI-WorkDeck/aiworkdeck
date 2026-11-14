@@ -112,6 +112,10 @@
     <!-- 外部 Agent（MCP propose_revision）的待审修订：仅激活的已打开文件显示，接受后以修订痕迹落入文档 -->
     <!-- PendingRevisionBar 在 main.js 全局注册：不进本组件的 script，免得抽取源码构建组件的测试夹具逐个补桩 -->
     <PendingRevisionBar v-if="file && file.id && active" :project-id="projectId" :file-id="file.id" :executor="pendingRevisionExecutor" />
+    <view v-if="engineNotice" class="libre-input-error libre-engine-notice" role="alert">
+      <text>{{ engineNotice }}</text>
+      <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="engineNotice = ''">×</button>
+    </view>
     <view v-if="inputError" class="libre-input-error" role="alert">
       <text>{{ inputError }}</text>
       <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
@@ -332,6 +336,8 @@ export default {
       // AI 审校（dev-board#723/#724/#749）：宿主这边只存一份 host publish 出来的快照，
       // 下传给审阅面板的「AI 审校」标签。null = 这份文档没有审校（非 Writer/没项目/没就绪）。
       inlineReviewState: null,
+      // 引擎意外停止后已自动恢复：告诉用户恢复到了哪一刻、哪些改动没保存上（R-086）
+      engineNotice: '',
       // 有据续写（dev-board#748）：面板长在客体页里，宿主只持有它上报的两个位——
       // 这份文档有没有这项能力（非 Writer / 只读 / 未就绪时为假）、面板此刻开着没有。
       // 不在本地乐观翻：客体里的「关闭」与 Esc 也走同一条回报，两边才不会漂。
@@ -643,6 +649,8 @@ export default {
     this.invalidateBackendSaveHint()
     clearTimeout(this._provReloadTimer)
     clearTimeout(this._provRetryTimer)
+    clearTimeout(this._renewTimer)
+    clearTimeout(this._heapTimer)
     this._provSeq = (this._provSeq || 0) + 1
     if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
     if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
@@ -1484,8 +1492,14 @@ export default {
           this.$emit('cursor-context', ctx)
         } else if (msg.type === 'boot-log') {
           this.onBootLog(String(msg.msg || ''))
+        } else if (msg.type === 'ime-composing') {
+          this._imeComposing = !!msg.composing
+          this._lastInteractionAt = Date.now()
         } else if (msg.type === 'engine-failed') {
           this.$emit('engine-failed')
+          // 已装着文档的实例：引擎中止后画布还停在最后一帧，看着能编辑其实已经死了（R-086）。
+          // 立刻换引擎重装，别留一个假的可编辑标签。备胎（无文件）由工作台回收。
+          if (this.file && this._endpointUp) this.onGuestProcessGone('engine aborted')
         } else if (msg.type === 'boot-failed') {
           this.$emit('engine-failed')
           this.onBootFailed(String(msg.message || ''))
@@ -1634,6 +1648,86 @@ export default {
         return false
       }
     },
+    // ---- 引擎换新（R-086 浸泡）---------------------------------------------
+    // 引擎堆固定 1 GB，LibreOffice 原生侧有收不回的小泄漏（长文档逐段读约 0.9 KB/段、每次装载约
+    // 22 MB），只有换一台新引擎才收得回。保存成功后量一下堆的高水位（不分配内存的扫描），过阈值就在
+    // 安静、已全部保存、不在输入法组字中的时刻换新引擎、重装刚保存的内容、恢复阅读位置。
+    // 阈值与量的间隔可以不发版调整：localStorage「awd.engineHeap」= {"recycleAt":0.7,"checkEveryMs":60000}。
+    engineHeapPolicy() {
+      let o = null
+      try { o = JSON.parse(globalThis.localStorage?.getItem('awd.engineHeap') || 'null') } catch (e) { o = null }
+      const at = Number(o && o.recycleAt), every = Number(o && o.checkEveryMs)
+      return { recycleAt: at > 0 && at <= 1 ? at : 0.7, checkEveryMs: Number.isFinite(every) && every >= 0 ? every : 60000 }
+    },
+    // 保存流程之外再量：留出 2 s，期间又改了或又在存就不量（量只在干净、空闲时有意义）。
+    scheduleEngineHeapCheck() {
+      clearTimeout(this._heapTimer)
+      this._heapTimer = setTimeout(() => {
+        this._heapTimer = null
+        if (!this.dirty && !this.saving && !this._backendHealthDisposed) this.checkEngineHeap()
+      }, 2000)
+    },
+    async checkEngineHeap() {
+      const policy = this.engineHeapPolicy()
+      const executor = this.executor
+      if (!executor || !this.file || this._engineRenewDue || Date.now() - (this._heapCheckedAt || 0) < policy.checkEveryMs) return
+      this._heapCheckedAt = Date.now()
+      let r = null
+      try { r = await executor.executeCommand('get_engine_heap', {}, { background: true }) } catch (e) { return }
+      if (executor !== this.executor || !r || !r.success || !(r.limitBytes > 0)) return
+      this.appendLog('[heap] engine ' + Math.round(r.usedBytes / 1048576) + ' / ' + Math.round(r.limitBytes / 1048576) + ' MB')
+      if (r.usedBytes / r.limitBytes < policy.recycleAt) return
+      this._engineRenewDue = true
+      this.tryRenewEngine()
+    },
+    engineRenewBlocked() {
+      return !this.ready || !this.executor || !this.file || this.docLoadFailed || this.dirty || this.saving ||
+        this._imeComposing || this._cmdBusy > 0 || this._reloading || this._pendingReload || this._saveDiscarded ||
+        this._checkpointInvalidated || this.statusKey !== 'ready' ||
+        Date.now() - Math.max(this._lastInteractionAt || 0, this._lastCmdAt || 0) < 8000
+    },
+    tryRenewEngine() {
+      clearTimeout(this._renewTimer)
+      this._renewTimer = null
+      if (!this._engineRenewDue || this._backendHealthDisposed) return
+      if (this.engineRenewBlocked()) { this._renewTimer = setTimeout(() => this.tryRenewEngine(), 3000); return }
+      this.renewEngine()
+    },
+    async renewEngine() {
+      const executor = this.executor
+      let position = null
+      try { position = await executor.executeCommand('get_view_position', {}, { background: true }) } catch (e) { position = null }
+      // 取位置的这一下里用户可能又动了：重新排队，绝不在有未保存改动时换。
+      if (executor !== this.executor || this.engineRenewBlocked()) { this._renewTimer = setTimeout(() => this.tryRenewEngine(), 3000); return }
+      this._engineRenewDue = false
+      this._engineRenewal = { kind: 'renew', position: position && position.success ? position : null }
+      this.appendLog('engine renew: heap over threshold → fresh engine with the saved document')
+      this._bytesPromise = null // 重装刚保存到后端的内容，不是打开时预取的字节
+      this.dlLoaded = 0
+      this.dlTotal = 0
+      this._loadSelfHealed = false
+      await this.remountEditor()
+    },
+    async afterEngineRenewed() {
+      const renewal = this._engineRenewal
+      this._engineRenewal = null
+      this.appendLog('engine renewed (' + renewal.kind + ')')
+      if (renewal.kind === 'renew') {
+        if (renewal.position) {
+          let r = null
+          try { r = await this.executor.executeCommand('restore_view_position', renewal.position, { background: true }) } catch (e) { /* 位置恢复失败不影响编辑 */ }
+          this.appendLog('  view position restored: ' + JSON.stringify(r))
+        }
+        uni.showToast({ title: this.$t('editor.engineRenewed'), icon: 'none', duration: 4000 })
+        return
+      }
+      const parts = [renewal.lastSavedAt
+        ? this.$t('editor.engineRecoveredAt', { time: new Date(renewal.lastSavedAt).toLocaleTimeString() })
+        : this.$t('editor.engineRecoveredDisk')]
+      if (renewal.unsaved) parts.push(this.$t('editor.engineUnsavedLost'))
+      // 中日文句号后不加空格
+      this.engineNotice = parts.join(/[。！？]$/.test(parts[0]) ? '' : ' ')
+    },
     // webview 的渲染进程没了（被系统回收 / OOM / 崩溃）。引擎连同文档一起消失，
     // 界面上却什么都看不出来——不重启的话下一条命令要等到 relay 超时才报错。
     // 重启引擎并重装当前文件（未保存的编辑随进程一起没了，重装拿到的是后端
@@ -1647,6 +1741,8 @@ export default {
         return
       }
       this._guestGoneAt = Date.now()
+      // 重装后告诉用户恢复到了哪一刻、有没有没保存上的改动（不能静默丢改动）。
+      this._engineRenewal = { kind: 'crashed', unsaved: !!this.dirty || !!this.saving, lastSavedAt: this._lastSavedAt || 0 }
       this.appendLog('render-process-gone（' + reason + '）→ 重启引擎并重装当前文档')
       // 进程里的文档已经没了：脏标记与预取字节都作废，保存闸等重装结果说话。
       this.dirty = false
@@ -1756,6 +1852,7 @@ export default {
         this._perfOpenAt = 0
       }
       this.$emit('ready', this.executor)
+      if (this._engineRenewal && this.file && !this.docLoadFailed) this.afterEngineRenewed()
       // 备胎（还没有文件）空闲时预热引擎：付掉首份文档的一次性初始化（约 1.3s），
       // 用户点开文件时就是「第二份文档」的速度。过继时 adoptAndLoad 先等它结束。
       // 备胎此刻还没有 docKind（没装过文档）；是不是空白 Writer 由 worker 自己判定。
@@ -2903,6 +3000,8 @@ export default {
           try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
         }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
+        this._lastSavedAt = Date.now()
+        this.scheduleEngineHeapCheck()
         this.appendLog('[perf] save bytes=' + (u8 ? u8.length : 0) + ' export=' + (tUpload - tExp) + 'ms upload=' + (Date.now() - tUpload) + 'ms total=' + (Date.now() - tExp) + 'ms')
         this._savePaused = false
         this._saveRetryAttempt = 0
@@ -2912,6 +3011,12 @@ export default {
         this.scheduleProvenanceReload()
         return true
       } catch (e) {
+        // 引擎已经停了（R-086 OOM 中止）：换引擎恢复接管全部状态，这笔不落 saveFailed、也不排重试，
+        // 否则恢复期间状态栏会闪「保存失败」、重试还会去导一台新引擎里的旧内容。
+        if (e?.code === 'EDITOR_ENGINE_FAILED' || (e?.code === 'EDITOR_DISPOSED' && this._engineRenewal)) {
+          this.appendLog('save aborted: document engine stopped')
+          return false
+        }
         // Only the server's explicit pre-publication busy response proves this upload
         // cannot arrive later. Network failures and other statuses retain the write guard.
         const notPublished = uploadRecoverySeq !== null && e?.saveNotPublished === true
