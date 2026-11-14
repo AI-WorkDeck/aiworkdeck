@@ -4,7 +4,7 @@
 export default {
   "nav": "監査ログ",
   "title": "事務所監査ログ",
-  "subtitle": "サインイン、デバイスとアカウントキー、事務所への参加と退所およびロールの変更、プロジェクトの共有とメンバー変更、クライアント招待、ファイルのダウンロード、事務所設定の変更、拒否されたアクセスを記録します。公式サイトでの操作も含まれます。事務所の管理者のみ閲覧できます。文書の内容、ファイルの内容、会話は含まれません。",
+  "subtitle": "事務所メンバーのサインイン、デバイス接続、プロジェクトの共有とメンバー変更、クライアント招待、ファイルのダウンロード、事務所設定の変更を記録します。事務所の管理者のみ閲覧できます。文書の内容、ファイルの内容、会話は含まれません。",
   "retention": "記録は {days} 日間保持され、その後自動的に削除されます",
   "from": "開始日",
   "to": "終了日",
@@ -41,8 +41,6 @@ export default {
   "colEventId": "記録 ID",
   "outcomeFailure": "失敗",
   "catAll": "すべてのカテゴリ",
-  "sourceWebsite": "公式サイト",
-  "colSource": "ソース",
   "cat": {
     "AUTH": "サインイン",
     "DEVICES": "デバイス",
@@ -50,8 +48,7 @@ export default {
     "SHARING": "プロジェクト共有",
     "CLIENT": "クライアントとコミュニケーション",
     "DATA": "データアクセス",
-    "SETTINGS": "事務所設定",
-    "ACCESS": "アクセス拒否"
+    "SETTINGS": "事務所設定"
   },
   "action": {
     "LOGIN": "サインイン",
@@ -73,19 +70,6 @@ export default {
     "CHAT_FILE_DOWNLOADED": "会話の添付ファイルのダウンロード",
     "FIRM_CLOUD_SWITCH_CHANGED": "事務所クラウドスイッチの変更",
     "FIRM_COMMITTEE_APPOINTED": "利益相反委員の任命",
-    "FIRM_COMMITTEE_REVOKED": "利益相反委員の解任",
-    "PERMISSION_DENIED": "権限の拒否",
-    "FIRM_MEMBER_JOINED": "メンバーが事務所に参加",
-    "FIRM_MEMBER_LEFT": "メンバーが事務所を退所",
-    "FIRM_MEMBER_REMOVED": "メンバーを事務所から削除",
-    "FIRM_ROLE_CHANGED": "事務所のロール変更",
-    "FIRM_TEAM_JOINED": "チームが事務所に参加",
-    "FIRM_TEAM_LEFT": "チームが事務所を退所",
-    "FIRM_TEAM_REMOVED": "チームを事務所から削除",
-    "FIRM_CREATED": "事務所の作成",
-    "FIRM_JOIN_CODE_REGENERATED": "事務所の参加コードをリセット",
-    "WEBSITE_LOGIN_FAILED": "公式サイトへのサインイン",
-    "ACCOUNT_API_KEY_CREATED": "アカウントキーの発行",
-    "ACCOUNT_API_KEY_REVOKED": "アカウントキーの失効"
+    "FIRM_COMMITTEE_REVOKED": "利益相反委員の解任"
   }
 }

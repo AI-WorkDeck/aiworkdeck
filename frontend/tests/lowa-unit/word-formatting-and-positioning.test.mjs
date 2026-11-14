@@ -239,8 +239,6 @@ function buildTestHarness(paragraphs) {
       return id;
     },
     anchorRange: (id) => anchors.get(id) || null,
-    // 段落索引按修订视图存放（R-086）：视图键读这两个属性
-    readShowChanges: () => true, readShowChangesInMargin: () => false, balloonModel: null,
     contextAround: () => ({ before: '', after: '' }),
     paragraphTextOf: (r) => {
       const p = r?.para || r;

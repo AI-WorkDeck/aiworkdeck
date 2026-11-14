@@ -98,8 +98,6 @@ export const EDITOR_ACTIONS = [
   // [#79 click-to-open] LO WASM 不触发 window.open（v0.7.1 真机证实）：编辑器页
   // 监听 canvas 点击后经此原语读取光标处链接再转发宿主。
   'get_hyperlink_at_cursor',
-  // [R-086 引擎换新] 宿主保存后量引擎堆高水位；换引擎前后记录/恢复阅读位置。
-  'get_engine_heap', 'get_view_position', 'restore_view_position',
   // [EvidenceLink dev-board#103] 书签名 = linkKey 的证据锚点五原语。Host-initiated
   //（EvidenceLink 服务 / 拖拽关联 / 底稿面板），不是 AI 管线；失败双字段 error+message。
   'bookmark_selection', 'get_bookmark_context', 'check_link_anchors', 'adopt_legacy_links', 'goto_bookmark',

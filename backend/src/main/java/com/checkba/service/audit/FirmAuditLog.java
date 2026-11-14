@@ -113,13 +113,6 @@ public class FirmAuditLog {
         Long firmUserId;
         final Map<String, Object> detail = new LinkedHashMap<>();
         Instant occurredAt;
-        /** 跨服务上报（官网）用：幂等键、来源、直接给定的律所与显示名。本服务内的调用点不用。 */
-        String eventId;
-        String source;
-        String explicitFirmId;
-        String actorNameOverride;
-        /** 来源地址已由上报方给定（可能为空）：不得再从当前请求取——那是上报方自己的回环连接。 */
-        boolean sourceGiven;
         String sourceIp;
         String userAgent;
         int attempts;
@@ -135,20 +128,6 @@ public class FirmAuditLog {
 
         /** 显式指定按谁的律所归档（如外部客户的动作归邀请人所在律所）；优先于项目所有人与操作人。 */
         public Event firmOf(Long userId) { this.firmUserId = userId; return this; }
-
-        /** 官网等外部来源已知律所，直接给定（不再按名录解析）。 */
-        public Event firm(String firmId) { this.explicitFirmId = firmId; return this; }
-
-        public Event actorName(String name) { this.actorNameOverride = name; return this; }
-
-        /** 幂等键：同一 eventId 只落一行（上报方重试安全）。 */
-        public Event eventId(String id) { this.eventId = id; return this; }
-
-        public Event source(String source) { this.source = source; return this; }
-
-        public Event at(Instant when) { this.occurredAt = when == null ? null : when.truncatedTo(ChronoUnit.MILLIS); return this; }
-
-        public Event from(String ip, String userAgent) { this.sourceIp = clip(ip, 64); this.userAgent = clip(userAgent, 256); this.sourceGiven = true; return this; }
 
         public Event target(String type, Object id, String label) {
             this.targetType = type;
@@ -191,9 +170,9 @@ public class FirmAuditLog {
             return;
         }
         try {
-            if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null && e.explicitFirmId == null)) return;
-            if (e.occurredAt == null) e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-            if (!e.sourceGiven) captureRequest(e);
+            if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null)) return;
+            e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+            captureRequest(e);
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
@@ -213,9 +192,9 @@ public class FirmAuditLog {
      */
     public void recordNow(Event e) {
         try {
-            if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null && e.explicitFirmId == null)) return;
-            if (e.occurredAt == null) e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-            if (!e.sourceGiven) captureRequest(e);
+            if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null)) return;
+            e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+            captureRequest(e);
             enqueue(e);
         } catch (Exception ex) {
             log.warn("Firm audit record failed for {}: {}", e == null ? null : e.action, ex.toString());
@@ -248,45 +227,6 @@ public class FirmAuditLog {
         }
     }
 
-    // ==================== 权限拒绝（防刷：同人同资源 10 分钟一条，全局每分钟上限） ====================
-
-    static final long DENIED_WINDOW_MS = 10 * 60_000L;
-    static final int DENIED_PER_MINUTE = 120;
-    private static final int DENIED_KEYS_MAX = 50_000;
-    private record DeniedSeen(long at, int suppressed) {}
-    private final Map<String, DeniedSeen> deniedSeen = new ConcurrentHashMap<>();
-    private final AtomicLong deniedMinute = new AtomicLong();
-    private final java.util.concurrent.atomic.AtomicInteger deniedInMinute = new java.util.concurrent.atomic.AtomicInteger();
-
-    /**
-     * 记一次「权限拒绝」（非管理员读审计日志、跨所访问等）。同一人对同一资源 10 分钟内只落一条，
-     * 其间被压下的次数记在下一条的 {@code suppressedRepeats}；全局每分钟最多 {@value #DENIED_PER_MINUTE} 条。
-     * 探测者刷不爆日志，管理员仍能看到「有人在试」。永不抛。
-     */
-    public void recordDenied(Long userId, String resource, String reason) {
-        try {
-            if (userId == null || !enabled()) return;
-            long now = System.currentTimeMillis();
-            String key = userId + "|" + resource;
-            DeniedSeen prev = deniedSeen.get(key);
-            if (prev != null && now - prev.at() < DENIED_WINDOW_MS) {
-                deniedSeen.put(key, new DeniedSeen(prev.at(), prev.suppressed() + 1));
-                return;
-            }
-            long minute = now / 60_000L;
-            if (deniedMinute.getAndSet(minute) != minute) deniedInMinute.set(0);
-            if (deniedInMinute.incrementAndGet() > DENIED_PER_MINUTE) return;
-            if (deniedSeen.size() > DENIED_KEYS_MAX) deniedSeen.clear();
-            deniedSeen.put(key, new DeniedSeen(now, 0));
-            Event e = event("ACCESS", "PERMISSION_DENIED").failed().actor(userId)
-                    .target("RESOURCE", resource, resource).detail("reason", reason);
-            if (prev != null && prev.suppressed() > 0) e.detail("suppressedRepeats", prev.suppressed());
-            recordNow(e);
-        } catch (Exception ex) {
-            log.warn("Firm audit denied record failed: {}", ex.toString());
-        }
-    }
-
     public long droppedCount() {
         return dropped.get();
     }
@@ -308,9 +248,8 @@ public class FirmAuditLog {
             Project project = e.projectId == null ? null : projects.findById(e.projectId).orElse(null);
             Long subject = e.firmUserId != null ? e.firmUserId
                     : project != null && project.getUserId() != null ? project.getUserId() : e.actorUserId;
-            String firmId = e.explicitFirmId != null ? clip(e.explicitFirmId, 64) : firmOf(subject);
+            String firmId = firmOf(subject);
             if (firmId == null) return;
-            if (e.eventId != null && repository.existsByEventId(e.eventId)) return; // 上报方重试：已落过
 
             FirmAuditEvent row = new FirmAuditEvent();
             row.setFirmId(firmId);
@@ -319,9 +258,7 @@ public class FirmAuditLog {
             row.setAction(clip(e.action, 48));
             row.setOutcome(e.outcome);
             row.setActorUserId(e.actorUserId);
-            row.setActorName(clip(e.actorNameOverride != null ? e.actorNameOverride : displayName(e.actorUserId), 128));
-            row.setEventId(e.eventId);
-            row.setSource(e.source);
+            row.setActorName(clip(displayName(e.actorUserId), 128));
             row.setTargetType(clip(e.targetType, 32));
             row.setTargetId(clip(e.targetId, 64));
             row.setTargetLabel(clip(e.targetLabel != null ? e.targetLabel : displayName(e.targetUserId), 256));
@@ -390,11 +327,6 @@ public class FirmAuditLog {
                 r.getDetail()}) {
             sb.append(part == null ? "" : part).append('\u001f');
         }
-        // 后加的两列只在有值时入链：此前写下的行（两列为空）哈希不变
-        if (r.getEventId() != null || r.getSource() != null) {
-            sb.append(r.getEventId() == null ? "" : r.getEventId()).append('\u001f')
-              .append(r.getSource() == null ? "" : r.getSource()).append('\u001f');
-        }
         try {
             byte[] d = MessageDigest.getInstance("SHA-256").digest(sb.toString().getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(d);
@@ -451,7 +383,6 @@ public class FirmAuditLog {
         m.put("sourceIp", r.getSourceIp());
         m.put("userAgent", r.getUserAgent());
         m.put("detail", parse(r.getDetail()));
-        m.put("source", r.getSource());
         return m;
     }
 

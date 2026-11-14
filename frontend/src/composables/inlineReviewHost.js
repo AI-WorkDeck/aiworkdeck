@@ -32,9 +32,7 @@ const AUTO_AI_BLOCKING = new Set(['DEEP_QUOTA', 'DEEP_RATE_LIMITED', 'DEEP_MODEL
  *   - AI 审校在停笔 20 秒后自动跑一次，扣 Credits，用户可以关。
  */
 export function createInlineReviewHost({ projectId, fileId, userId, execute, send, review, storage, openPanel, onState,
-  // delay：停笔多久才整篇重读一次。2.5 s → 5 s（R-086）：长文档上每次整篇读都要重建段落索引，
-  // 引擎原生侧每段漏约 0.9 KB、150 页一次读还要占住 office 线程十几秒，连续打字时少读一次是一次。
-  writable = true, active = true, delay = 5000, now = () => Date.now(),
+  writable = true, active = true, delay = 2500, now = () => Date.now(),
   timers = { set: (fn, ms) => setTimeout(fn, ms), clear: id => clearTimeout(id) } }) {
   const session = `review:${projectId}:${fileId}:${Date.now()}:${Math.random().toString(36).slice(2)}`
   const key = `awd_ai_review_${userId}`

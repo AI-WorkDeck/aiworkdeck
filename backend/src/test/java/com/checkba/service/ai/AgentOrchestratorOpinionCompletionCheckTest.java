@@ -108,6 +108,8 @@ class AgentOrchestratorOpinionCompletionCheckTest {
 
     private ProjectFileService projectFiles;
 
+    private EditorBridgeService editorBridge;
+
     @BeforeEach
     void setUp() {
         chatModelFactory = mock(ChatModelFactory.class);
@@ -143,6 +145,12 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         XmlToolCallParser parser = mock(XmlToolCallParser.class);
         when(parser.containsToolCall(any())).thenReturn(false);
 
+        // 编辑器桥上的当前稿（W6：系统在派发核验前读好附进任务）
+        editorBridge = mock(EditorBridgeService.class);
+        when(editorBridge.executeEditorCommand(eq("get_document_text"), any())).thenReturn(
+                "{\"success\":true,\"truncated\":false,\"paragraphs\":["
+                        + "{\"index\":0,\"text\":\"本所接受岚屿精密科技股份有限公司的委托\"},"
+                        + "{\"index\":1,\"text\":\"发行人不存在尚未了结的重大诉讼\",\"numbering\":{\"label\":\"（一）\"}}]}");
         subAgentService = mock(SubAgentService.class);
         projectFiles = mock(ProjectFileService.class);
         when(subAgentService.dispatch(any(), any(), any(), any(), any()))
@@ -157,7 +165,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         orchestrator = new AgentOrchestrator(
                 chatModelFactory, messageService, sse, mock(TokenUsageService.class), assembler,
                 toolRegistry, skillRouter, parser, mock(MemoryPipelineService.class),
-                projectFiles, mock(EditorBridgeService.class),
+                projectFiles, editorBridge,
                 mock(ConversationFileChangeService.class), mock(TodoListService.class),
                 mock(DocumentCheckpointService.class), runState,
                 mock(com.checkba.version.WorkSessionService.class), new AiFailoverProperties(),
@@ -388,6 +396,57 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         } finally {
             com.checkba.service.LangText.reset();
         }
+    }
+
+    @Test
+    @DisplayName("W6：当前稿由系统从编辑器读出附进核验任务——命题只能取自实际正文")
+    void verifierTaskCarriesTheLiveDraft() {
+        skillActive();
+        run("conv-draft", AiMessage.from("已按您的要求完成修订。"), AiMessage.from("交付说明如下。"));
+        ArgumentCaptor<String> task = ArgumentCaptor.forClass(String.class);
+        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), any());
+        assertTrue(task.getValue().contains("【0】本所接受岚屿精密科技股份有限公司的委托"), task.getValue());
+        assertTrue(task.getValue().contains("【1】（一） 发行人不存在尚未了结的重大诉讼"), "编号前缀与段号都要带上：" + task.getValue());
+        assertTrue(task.getValue().contains("不得自拟、不得套用模板"), task.getValue());
+    }
+
+    @Test
+    @DisplayName("W6 回归：核验员一次工具都没调、满屏「待核实」——按核验失败处理，卡片不得显示「有据 0 / 待核 24」")
+    void verifierThatConsultedNothingFailsInsteadOfReportingGaps() {
+        skillActive();
+        String guessed = "命题：委托人为[委托人名称]。整句判定：待核实\n".repeat(24);
+        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+                .thenReturn(SubAgentResult.success("sub-check", guessed, List.of(), 1));
+        ScriptModel model = run("conv-check-noread",
+                AiMessage.from("已按您的要求完成修订。"),
+                AiMessage.from("核验未进行，我已自行回读并核对。"));
+
+        String handoff = lastMessageText(model, 1);
+        assertTrue(handoff.contains("没有查阅任何底稿"), "接回主助手时必须说明核验无效：" + handoff);
+        assertFalse(handoff.contains("[委托人名称]"), "编出来的命题不能当发现接回：" + handoff);
+        String report = verificationReportData();
+        assertTrue(report.contains("\"status\":\"UNVERIFIED\""), report);
+        assertFalse(report.contains("GAPS_FOUND"), "没读材料的输出不能算成 24 项待核实：" + report);
+        assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-check-noread").status());
+    }
+
+    @Test
+    @DisplayName("W6：编辑器读不出当前稿——不派付费核验，如实接回")
+    void unreadableDraftSkipsThePaidCheck() {
+        skillActive();
+        when(editorBridge.executeEditorCommand(eq("get_document_text"), any())).thenReturn("Error: editor not ready");
+        ScriptModel model = run("conv-check-unread",
+                AiMessage.from("已按您的要求完成修订。"),
+                AiMessage.from("我自行回读了当前稿并核对。"));
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        assertTrue(lastMessageText(model, 1).contains("无法从编辑器读出目标文档的当前稿"), lastMessageText(model, 1));
+    }
+
+    private String verificationReportData() {
+        for (int i = 0; i < sseEvents.size(); i++) {
+            if ("verification_report".equals(sseEvents.get(i))) return sseData.get(i);
+        }
+        return "";
     }
 
     @Test

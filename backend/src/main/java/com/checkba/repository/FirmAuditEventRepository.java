@@ -26,8 +26,6 @@ public interface FirmAuditEventRepository extends Repository<FirmAuditEvent, Lon
 
     Optional<FirmAuditEvent> findTopByFirmIdOrderByIdDesc(String firmId);
 
-    boolean existsByEventId(String eventId);
-
     @Query("select e from FirmAuditEvent e where e.firmId = :firm and e.id < :beforeId"
             + " and e.occurredAt >= :from and e.occurredAt < :to"
             + " and (:category = '' or e.category = :category)"

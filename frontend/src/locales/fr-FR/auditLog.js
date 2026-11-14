@@ -4,7 +4,7 @@
 export default {
   "nav": "Journal d’audit",
   "title": "Journal d’audit du cabinet",
-  "subtitle": "Enregistre les connexions, les appareils et les clés de compte, l'arrivée ou le départ du cabinet et les changements de rôle, le partage et les membres des projets, les invitations de clients, les téléchargements de fichiers, les modifications des paramètres du cabinet et les accès refusés, y compris les actions effectuées sur le site web. Visible uniquement par les administrateurs du cabinet ; ne contient jamais le contenu des documents, des fichiers ni des conversations.",
+  "subtitle": "Enregistre les connexions, les connexions d’appareils, le partage de projets et les changements de membres, les invitations de clients, les téléchargements de fichiers et les modifications des paramètres de votre cabinet. Visible uniquement par les administrateurs du cabinet ; ne contient jamais de contenu de documents, de fichiers ni de conversations.",
   "retention": "Les enregistrements sont conservés {days} jours, puis supprimés automatiquement",
   "from": "Du",
   "to": "Au",
@@ -41,8 +41,6 @@ export default {
   "colEventId": "ID de l’enregistrement",
   "outcomeFailure": "échec",
   "catAll": "Toutes les catégories",
-  "sourceWebsite": "site web",
-  "colSource": "Source",
   "cat": {
     "AUTH": "Connexion",
     "DEVICES": "Appareils",
@@ -50,8 +48,7 @@ export default {
     "SHARING": "Partage de projets",
     "CLIENT": "Clients et messagerie",
     "DATA": "Accès aux données",
-    "SETTINGS": "Paramètres du cabinet",
-    "ACCESS": "Accès refusé"
+    "SETTINGS": "Paramètres du cabinet"
   },
   "action": {
     "LOGIN": "Connexion",
@@ -73,19 +70,6 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Pièce jointe de conversation téléchargée",
     "FIRM_CLOUD_SWITCH_CHANGED": "Interrupteur cloud du cabinet modifié",
     "FIRM_COMMITTEE_APPOINTED": "Membre du comité des conflits nommé",
-    "FIRM_COMMITTEE_REVOKED": "Membre du comité des conflits révoqué",
-    "PERMISSION_DENIED": "Autorisation refusée",
-    "FIRM_MEMBER_JOINED": "Membre ayant rejoint le cabinet",
-    "FIRM_MEMBER_LEFT": "Membre ayant quitté le cabinet",
-    "FIRM_MEMBER_REMOVED": "Membre retiré du cabinet",
-    "FIRM_ROLE_CHANGED": "Rôle dans le cabinet modifié",
-    "FIRM_TEAM_JOINED": "Équipe ayant rejoint le cabinet",
-    "FIRM_TEAM_LEFT": "Équipe ayant quitté le cabinet",
-    "FIRM_TEAM_REMOVED": "Équipe retirée du cabinet",
-    "FIRM_CREATED": "Cabinet créé",
-    "FIRM_JOIN_CODE_REGENERATED": "Code d'adhésion au cabinet réinitialisé",
-    "WEBSITE_LOGIN_FAILED": "Connexion au site web",
-    "ACCOUNT_API_KEY_CREATED": "Clé de compte émise",
-    "ACCOUNT_API_KEY_REVOKED": "Clé de compte révoquée"
+    "FIRM_COMMITTEE_REVOKED": "Membre du comité des conflits révoqué"
   }
 }

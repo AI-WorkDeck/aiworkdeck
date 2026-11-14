@@ -146,6 +146,118 @@ final class OpinionCompletionCheck {
         return verificationTaskBody(targetFileId, targetName, userInstructions) + manifestSection(manifest);
     }
 
+    /**
+     * 派发前系统从编辑器读到的当前稿（与 doc_get_document_text 同源：桥上的 get_document_text，最终文本视图）。
+     *
+     * <p>W6 实测（staging 与本地复现）：核验员拿到读正文的工具却一轮就交卷、一次工具都没调，自己编了几条
+     * 「待核实」命题，卡片显示有据 0 / 待核 24。只靠提示词要求它先读不可靠，所以由系统读好附在任务里。
+     */
+    record DraftText(String text, boolean truncated, Integer nextStartParagraph) {}
+
+    static String verificationTask(Long targetFileId, String targetName, List<String> userInstructions,
+                                   List<ManifestEntry> manifest, DraftText draft) {
+        return verificationTaskBody(targetFileId, targetName, userInstructions) + draftSection(draft)
+                + manifestSection(manifest);
+    }
+
+    static String draftSection(DraftText draft) {
+        if (draft == null || draft.text() == null || draft.text().isBlank()) {
+            return "";
+        }
+        String tail = draft.truncated() && draft.nextStartParagraph() != null
+                ? LangText.of("\n……正文较长，以上是前一部分；其余段落用 doc_get_document_text(startParagraph="
+                                + draft.nextStartParagraph() + ") 续读。\n",
+                        "\n… The draft is long; the text above is the first part. Read the rest with "
+                                + "doc_get_document_text(startParagraph=" + draft.nextStartParagraph() + ").\n")
+                : LangText.of("\n【当前稿正文完】\n", "\n[End of current draft]\n");
+        return LangText.of(
+                "\n【当前稿正文】系统在派发前已从编辑器读出目标文档的当前稿（与 doc_get_document_text 同源，"
+                        + "每段以【段号】开头）。待核命题必须逐条取自这份正文并注明段号——不得自拟、不得套用模板或示例；"
+                        + "然后用只读工具到底稿里逐槽取证。\n",
+                "\n[Current draft] The system read the target's current draft from the editor before dispatch "
+                        + "(same source as doc_get_document_text; each paragraph starts with its [index]). Take every "
+                        + "proposition from this text and cite its paragraph index — never invent propositions or use a "
+                        + "template or example; then gather evidence slot by slot from the source materials with the "
+                        + "read-only tools.\n")
+                + draft.text() + tail;
+    }
+
+    /**
+     * 核验员一次工具都没调就交卷 = 没查过任何底稿，不可能给出有据结论；它的「待核实」只是没读的结果。
+     * 按核验失败处理（卡片显示未完成、接回主助手时如实说明），不把这种输出当成 N 项待核实的发现。
+     */
+    // 整句判定为「有依据」的那一行（与 VerificationHarness 计数口径一致：只认整句判定，不认槽判定）
+    private static final java.util.regex.Pattern SENTENCE_SUPPORTED = java.util.regex.Pattern.compile(
+            "((?:整句判定|sentence\\s+verdict)[：:\\s]*[「\"'【]?\\s*)(有依据|supported\\b)",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+    private static final java.util.regex.Pattern CITED_ID = java.util.regex.Pattern.compile(
+            "(?:fileId|file\\s*id|文件\\s*ID|\\bID)\\s*[=:：]?\\s*(\\d+)|[（(](\\d{1,9})[）)]",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 收尾核验结果的服务端校验（W6）：
+     * <ul>
+     *   <li>一次工具都没调 → 核验失败（见 {@link #requireConsultation}）；</li>
+     *   <li>每条整句判定「有依据」的命题，必须引用至少一份核验员<b>经读文件工具实际读过</b>的底稿
+     *       （按文件 ID，或按清单里的文件名对上 ID）；只引当前稿段号、引没读过的文件、什么都不引的，
+     *       一律改判「待核实」并注明原因——随手调一次工具再编结论过不了这一关。</li>
+     * </ul>
+     */
+    static com.checkba.service.ai.subagent.SubAgentResult validateVerifierResult(
+            com.checkba.service.ai.subagent.SubAgentResult result, List<ManifestEntry> manifest) {
+        result = requireConsultation(result);
+        if (result == null || !result.success() || result.result() == null) {
+            return result;
+        }
+        java.util.Set<Long> read = new java.util.HashSet<>(result.filesRead() == null ? List.of() : result.filesRead());
+        String[] blocks = result.result().split("\n(?=\\s*(?:\\d+[.、)|]|【命题|命题\\s*\\d+|Item\\s+\\d+))");
+        StringBuilder out = new StringBuilder();
+        int downgraded = 0;
+        for (int b = 0; b < blocks.length; b++) {
+            String block = blocks[b];
+            if (SENTENCE_SUPPORTED.matcher(block).find() && !citesReadSource(block, read, manifest)) {
+                block = SENTENCE_SUPPORTED.matcher(block).replaceAll("$1" + LangText.of("待核实（服务端校验：所引来源未经核验员实际读取）",
+                        "unverified (server check: the cited source was not actually read by the verifier)"));
+                downgraded++;
+            }
+            if (b > 0) out.append('\n');
+            out.append(block);
+        }
+        if (downgraded == 0) {
+            return result;
+        }
+        return new com.checkba.service.ai.subagent.SubAgentResult(result.subtaskId(), true, out.toString(), null,
+                result.toolsUsed(), result.rounds(), result.fileChanges(), result.filesRead());
+    }
+
+    private static boolean citesReadSource(String block, java.util.Set<Long> read, List<ManifestEntry> manifest) {
+        if (read.isEmpty()) return false;
+        java.util.regex.Matcher m = CITED_ID.matcher(block);
+        while (m.find()) {
+            String id = m.group(1) != null ? m.group(1) : m.group(2);
+            try { if (read.contains(Long.parseLong(id))) return true; } catch (NumberFormatException ignored) { }
+        }
+        if (manifest != null) {
+            for (ManifestEntry entry : manifest) {
+                String name = entry.name();
+                if (read.contains(entry.id()) && name != null && name.length() >= 2 && block.contains(name)) return true;
+            }
+        }
+        return false;
+    }
+
+    static com.checkba.service.ai.subagent.SubAgentResult requireConsultation(
+            com.checkba.service.ai.subagent.SubAgentResult result) {
+        if (result == null || !result.success() || (result.toolsUsed() != null && !result.toolsUsed().isEmpty())) {
+            return result;
+        }
+        return com.checkba.service.ai.subagent.SubAgentResult.failure(result.subtaskId(),
+                LangText.of("核验员没有查阅任何底稿就给出了结论，本次核验无效；请自行回读正文并对照底稿核实。",
+                        "The verifier returned a conclusion without consulting any source material, so this check is "
+                                + "invalid; re-read the draft and check it against the source materials yourself."),
+                List.of(), result.rounds());
+    }
+
     private static String verificationTaskBody(Long targetFileId, String targetName, List<String> userInstructions) {
         String target = targetFileId != null
                 ? (targetName == null || targetName.isBlank() ? "" : "《" + targetName + "》")

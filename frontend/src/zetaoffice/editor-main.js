@@ -503,9 +503,6 @@ loadSystemFonts().then((systemFonts) => startEditorEndpoint({
       onError: message => hostTransport.send({ __lo: 'lo-relay', type: 'input-error', message }),
       onLog: (m) => { console.log('[zeta-editor]', m); if (VERIFY) vlog(m) },
     })
-    // 宿主只在输入法组字之外给引擎换新（R-086）：组字开合报给宿主，别把候选窗里的字连引擎一起丢了。
-    overlay.element.addEventListener('compositionstart', () => hostTransport.send({ __lo: 'lo-relay', type: 'ime-composing', composing: true }))
-    overlay.element.addEventListener('compositionend', () => hostTransport.send({ __lo: 'lo-relay', type: 'ime-composing', composing: false }))
     writingAssistance = attachWritingAssistance({
       canvas: document.getElementById('qtcanvas'), input: overlay.element,
       execute: (action, params) => endpoint.executor.executeCommand(action, params),

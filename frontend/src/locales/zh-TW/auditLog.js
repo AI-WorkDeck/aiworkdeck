@@ -4,7 +4,7 @@
 export default {
   "nav": "稽核日誌",
   "title": "律所稽核日誌",
-  "subtitle": "記錄本所成員的登入、裝置與帳號金鑰、入所與退所及角色變更、專案共享與成員異動、客戶邀請、檔案下載、律所設定變更以及遭拒絕的存取，包含在官網上發生的操作。僅律所管理員可見；不包含文件內容、檔案內容與對話。",
+  "subtitle": "記錄本所成員的登入、裝置連線、專案共享與成員變更、客戶邀請、檔案下載及律所設定變更。僅律所管理員可見；不含文件內容、檔案內容與對話。",
   "retention": "記錄保留 {days} 天，之後自動清除",
   "from": "開始日期",
   "to": "結束日期",
@@ -41,8 +41,6 @@ export default {
   "colEventId": "記錄編號",
   "outcomeFailure": "失敗",
   "catAll": "全部類別",
-  "sourceWebsite": "官網",
-  "colSource": "來源",
   "cat": {
     "AUTH": "登入",
     "DEVICES": "裝置",
@@ -50,8 +48,7 @@ export default {
     "SHARING": "專案共享",
     "CLIENT": "客戶與溝通",
     "DATA": "資料存取",
-    "SETTINGS": "律所設定",
-    "ACCESS": "存取遭拒"
+    "SETTINGS": "律所設定"
   },
   "action": {
     "LOGIN": "登入",
@@ -73,19 +70,6 @@ export default {
     "CHAT_FILE_DOWNLOADED": "溝通附件下載",
     "FIRM_CLOUD_SWITCH_CHANGED": "律所雲端開關變更",
     "FIRM_COMMITTEE_APPOINTED": "指派利益衝突委員",
-    "FIRM_COMMITTEE_REVOKED": "撤銷利益衝突委員",
-    "PERMISSION_DENIED": "權限遭拒",
-    "FIRM_MEMBER_JOINED": "成員加入律所",
-    "FIRM_MEMBER_LEFT": "成員退出律所",
-    "FIRM_MEMBER_REMOVED": "成員被移出律所",
-    "FIRM_ROLE_CHANGED": "律所角色變更",
-    "FIRM_TEAM_JOINED": "團隊加入律所",
-    "FIRM_TEAM_LEFT": "團隊退出律所",
-    "FIRM_TEAM_REMOVED": "團隊被移出律所",
-    "FIRM_CREATED": "律所已建立",
-    "FIRM_JOIN_CODE_REGENERATED": "律所加入碼已重設",
-    "WEBSITE_LOGIN_FAILED": "官網登入",
-    "ACCOUNT_API_KEY_CREATED": "帳號金鑰已核發",
-    "ACCOUNT_API_KEY_REVOKED": "帳號金鑰已撤銷"
+    "FIRM_COMMITTEE_REVOKED": "撤銷利益衝突委員"
   }
 }
