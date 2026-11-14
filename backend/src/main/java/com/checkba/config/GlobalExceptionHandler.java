@@ -188,6 +188,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok().body(result);
     }
 
+    /** A client's chat upload over a configured limit: the usual shape plus reason and the limit in bytes (B4). */
+    @ExceptionHandler(com.checkba.service.im.ImLimitException.class)
+    public ResponseEntity<Map<String, Object>> handleImLimit(com.checkba.service.im.ImLimitException e) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("reason", e.getReason());
+        result.put("limitBytes", e.getLimitBytes());
+        result.put("message", e.getMessage());
+        return ResponseEntity.ok().body(result);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("GlobalExceptionHandler caught IllegalArgumentException: {}", e.getMessage());

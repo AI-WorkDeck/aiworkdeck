@@ -9,5 +9,7 @@
   "panel.inviteHintAfterJoin": "Ein Mandant, der mit diesem Code beitritt, sieht nur Nachrichten und Dateien, die nach seinem Beitritt gesendet werden. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}",
   "panel.inviteHintWithHistory": "Ein Mandant, der mit diesem Code beitritt, kann auch frühere Nachrichten lesen; Dateien werden weiterhin einzeln gemäß ihren Zugriffsrechten freigegeben. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}",
   "panel.inviteJoinHow": "Die Person meldet sich mit ihrem eigenen AI WorkDeck-Konto in der App an und gibt den Code unter „Nachrichtenzentrale → Unterhaltungen → Mit Code beitreten“ oder in „Projekt-Chat → Mit Code beitreten“ ein. Das Mandantenportal akzeptiert diesen Code nicht.",
-  "panel.fromClient": "Mandant"
+  "panel.fromClient": "Mandant",
+  "panel.revokeCode": "Zugangscode widerrufen",
+  "panel.revokeCodeConfirm": "Der Zugangscode des Mandanten ist sofort ungültig; er kann weder den Projektchat noch die Checkliste mehr öffnen. Widerrufen?"
 }

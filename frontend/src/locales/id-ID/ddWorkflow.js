@@ -163,7 +163,8 @@ export default {
       "attach": "Kirim berkas",
       "send": "Kirim",
       "sending": "Mengirim…",
-      "fileTooLarge": "Berkas tidak boleh lebih besar dari 8 MB",
+      "fileTooLarge": "Satu berkas tidak boleh lebih dari {size} MB",
+      "quotaFull": "Anda telah mencapai batas total unggahan {size} MB untuk proyek ini. Silakan hubungi pengacara Anda.",
       "unavailable": "Obrolan proyek sedang tidak tersedia. Silakan coba lagi nanti."
     },
     "messageUnavailable": "Proyek undangan atau daftar periksa ini tidak lagi tersedia. Segarkan dan coba lagi.",

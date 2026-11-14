@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Link für den Mandanten:",
   "clientCodeExpires": "Gültig bis {date}. Zum Verlängern erneut erstellen.",
   "clientChatNeedsName": "Ohne Mandantennamen ist dies ein gemeinsamer Code: Er öffnet die Checkliste, gilt aber nicht für den Projektchat.",
+  "clientNameRequired": "Geben Sie den Namen des Mandanten ein: Der Code gilt nur für diesen Mandanten, und der Projektchat erfordert einen namentlichen Code.",
+  "clientGenericOption": "Gemeinsamen Code ohne Namen ausstellen (nur Checkliste, kein Projektchat)",
   "clientChatHistoryLabel": "Nachrichten im Projektchat, die der Mandant sehen kann",
   "clientChatHistoryAfter": "Nur Nachrichten nach dem Beitritt (empfohlen)",
   "clientChatHistoryAll": "Auch Nachrichten von vor dem Beitritt",

@@ -163,7 +163,8 @@ export default {
       "attach": "Dosya gönder",
       "send": "Gönder",
       "sending": "Gönderiliyor…",
-      "fileTooLarge": "Dosyalar 8 MB'tan büyük olamaz",
+      "fileTooLarge": "Tek bir dosya {size} MB'ı geçemez",
+      "quotaFull": "Bu proje için {size} MB toplam yükleme sınırına ulaştınız. Lütfen avukatınızla iletişime geçin.",
       "unavailable": "Proje sohbeti şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
     },
     "messageUnavailable": "Bu davet edilen proje veya kontrol listesi artık kullanılamıyor. Yenileyip tekrar deneyin.",

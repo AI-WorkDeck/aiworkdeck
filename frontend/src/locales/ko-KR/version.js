@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "고객용 링크:",
   "clientCodeExpires": "{date}까지 유효합니다. 연장하려면 다시 생성하세요.",
   "clientChatNeedsName": "의뢰인 이름 없이 발급하면 공용 코드가 되어 체크리스트는 열 수 있지만 프로젝트 채팅에는 사용할 수 없습니다.",
+  "clientNameRequired": "의뢰인 이름을 입력하세요. 코드는 이 의뢰인 본인 전용이며, 프로젝트 채팅에는 이름이 지정된 코드가 필요합니다.",
+  "clientGenericOption": "이름 없이 공용 코드 발급(체크리스트만, 프로젝트 채팅 불가)",
   "clientChatHistoryLabel": "프로젝트 채팅에서 의뢰인이 볼 수 있는 메시지",
   "clientChatHistoryAfter": "참여 이후의 메시지만 (권장)",
   "clientChatHistoryAll": "참여 이전의 메시지도 포함",

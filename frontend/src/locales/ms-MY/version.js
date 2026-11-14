@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Pautan untuk klien:",
   "clientCodeExpires": "Sah sehingga {date}. Jana semula untuk melanjutkan tempoh.",
   "clientChatNeedsName": "Tanpa nama anak guam, ini kod kongsi: ia membuka senarai semak tetapi tidak boleh digunakan untuk sembang projek.",
+  "clientNameRequired": "Masukkan nama anak guam: kod ini untuk anak guam ini sahaja, dan sembang projek memerlukan kod bernama.",
+  "clientGenericOption": "Keluarkan kod kongsi tanpa nama (senarai semak sahaja, tiada sembang projek)",
   "clientChatHistoryLabel": "Mesej yang boleh dilihat anak guam dalam sembang projek",
   "clientChatHistoryAfter": "Hanya mesej selepas menyertai (disyorkan)",
   "clientChatHistoryAll": "Termasuk mesej sebelum menyertai",

@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Link para o cliente:",
   "clientCodeExpires": "Válido até {date}. Gere novamente para prorrogar.",
   "clientChatNeedsName": "Sem o nome do cliente, este é um código compartilhado: abre a lista de verificação, mas não serve para o chat do projeto.",
+  "clientNameRequired": "Informe o nome do cliente: o código é só para este cliente, e o chat do projeto exige um código nominal.",
+  "clientGenericOption": "Emitir um código compartilhado sem nome (apenas lista de verificação, sem chat do projeto)",
   "clientChatHistoryLabel": "Mensagens que o cliente pode ver no chat do projeto",
   "clientChatHistoryAfter": "Somente mensagens após a entrada (recomendado)",
   "clientChatHistoryAll": "Também mensagens anteriores à entrada",

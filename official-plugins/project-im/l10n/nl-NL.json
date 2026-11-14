@@ -9,5 +9,7 @@
   "panel.inviteHintAfterJoin": "Een cliënt die met deze code deelneemt, ziet alleen berichten en bestanden die na deelname zijn verzonden. Deel de code alleen met de beoogde persoon. Geldig tot {time}",
   "panel.inviteHintWithHistory": "Een cliënt die met deze code deelneemt, kan ook eerdere berichten lezen; bestanden worden nog steeds per stuk opengesteld volgens hun toegangsrechten. Deel de code alleen met de beoogde persoon. Geldig tot {time}",
   "panel.inviteJoinHow": "De persoon meldt zich met een eigen AI WorkDeck-account aan in de app en voert de code in bij “Berichtencentrum → Gesprekken → Deelnemen met code” of in “Projectchat → Deelnemen met code”. Het cliëntenportaal accepteert deze code niet.",
-  "panel.fromClient": "Cliënt"
+  "panel.fromClient": "Cliënt",
+  "panel.revokeCode": "Toegangscode intrekken",
+  "panel.revokeCodeConfirm": "De toegangscode van de cliënt werkt meteen niet meer; de cliënt kan de projectchat en de checklist niet meer openen. Intrekken?"
 }

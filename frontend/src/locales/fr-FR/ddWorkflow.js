@@ -163,7 +163,8 @@ export default {
       "attach": "Envoyer un fichier",
       "send": "Envoyer",
       "sending": "Envoi en cours…",
-      "fileTooLarge": "Les fichiers ne peuvent pas dépasser 8 Mo",
+      "fileTooLarge": "Un fichier ne peut pas dépasser {size} Mo",
+      "quotaFull": "Vous avez atteint la limite totale d’envoi de {size} Mo pour ce projet. Veuillez contacter votre avocat.",
       "unavailable": "La discussion du projet n’est pas disponible pour le moment. Veuillez réessayer plus tard."
     },
     "messageUnavailable": "Ce projet invité ou cette liste de contrôle n'est plus disponible. Actualisez et réessayez.",

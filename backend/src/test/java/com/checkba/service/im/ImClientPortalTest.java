@@ -231,13 +231,26 @@ class ImClientPortalTest {
     }
 
     @Test
-    void lawyersEndAClientsChatByRevokingTheCodeNotByRemovingTheMember() {
-        Long client = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
+    void removingAnAccessCodeClientMeansRevokingTheCodeAfterConfirmation() {
+        var issued = codes.issueClientCode(projectId, lawyer, "合成客户", false);
+        Long client = issued.clientUserId();
         String group = id(call(client, "projectGroup", Map.of("projectId", projectId)));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> roster = (List<Map<String, Object>>) call(lawyer, "members", Map.of("conversationId", group)).get("members");
+        assertEquals(Boolean.TRUE, roster.stream().filter(m -> client.equals(m.get("id"))).findFirst().orElseThrow().get("accessCode"));
+        assertNull(roster.stream().filter(m -> lawyer.equals(m.get("id"))).findFirst().orElseThrow().get("accessCode"));
+
+        // A plain remove would bounce back on the next poll, so it is refused with what to do instead.
         IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
                 () -> call(lawyer, "removeMember", Map.of("conversationId", group, "userId", client)));
         assertTrue(refused.getMessage().contains("撤销"), refused.getMessage());
         assertTrue(memberRows.findByConversationIdAndUserId(group, client).isPresent());
+
+        // Confirmed: the code is revoked and the client is out of the project and its chat at once.
+        assertEquals(true, call(lawyer, "removeMember", Map.of("conversationId", group, "userId", client, "revokeCode", true)).get("codeRevoked"));
+        assertNotNull(invitationRows.findByAccessCode(issued.code()).orElseThrow().getRevokedAt());
+        assertTrue(memberRows.findByConversationIdAndUserId(group, client).isEmpty());
+        assertCodeInactive(() -> call(client, "projectGroup", Map.of("projectId", projectId)));
     }
 
     @Test
@@ -276,18 +289,43 @@ class ImClientPortalTest {
     }
 
     @Test
-    void clientUploadsHaveTheirOwnQuotaAndCannotPoseAsProjectFiles() {
-        Long client = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
-        String group = id(call(client, "projectGroup", Map.of("projectId", projectId)));
-        Map<String, Object> cited = call(client, "upload", kv("conversationId", group, "name", "x.txt", "base64", b64("x"),
-                "source", Map.of("projectUid", "00000000-0000-0000-0000-000000000001", "fileUid", "00000000-0000-0000-0000-000000000002")));
-        assertNull(cited.get("source"), "a client upload never cites a project file");
-        String eight = Base64.getEncoder().encodeToString(new byte[ImService.MAX_FILE_BYTES]);
-        for (int i = 0; i < 3; i++) call(client, "upload", Map.of("conversationId", group, "name", "big" + i + ".bin", "base64", eight));
-        IllegalArgumentException full = assertThrows(IllegalArgumentException.class,
-                () -> call(client, "upload", Map.of("conversationId", group, "name", "big3.bin", "base64", eight)));
-        assertTrue(full.getMessage().contains("32MiB"), full.getMessage());
-        call(lawyer, "upload", Map.of("conversationId", group, "name", "lawyer.bin", "base64", eight));
+    void clientUploadsHaveConfigurableLimitsOfTheirOwnAndCannotPoseAsProjectFiles() {
+        ReflectionTestUtils.setField(service, "clientMaxFileMb", 1L);
+        ReflectionTestUtils.setField(service, "clientMaxTotalMb", 2L);
+        try {
+            Long client = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
+            Map<String, Object> group = call(client, "projectGroup", Map.of("projectId", projectId));
+            String id = id(group);
+            assertEquals(Map.of("maxFileBytes", 1048576L, "maxTotalBytes", 2097152L), group.get("uploadLimits"));
+            Map<String, Object> cited = call(client, "upload", kv("conversationId", id, "name", "x.txt", "base64", b64("x"),
+                    "source", Map.of("projectUid", "00000000-0000-0000-0000-000000000001", "fileUid", "00000000-0000-0000-0000-000000000002")));
+            assertNull(cited.get("source"), "a client upload never cites a project file");
+
+            String oneMiB = Base64.getEncoder().encodeToString(new byte[1024 * 1024]);
+            String overOne = Base64.getEncoder().encodeToString(new byte[1024 * 1024 + 1]);
+            ImLimitException tooBig = assertThrows(ImLimitException.class, () -> call(client, "upload", Map.of("conversationId", id, "name", "big.pdf", "base64", overOne)));
+            assertEquals(ImLimitException.FILE_TOO_LARGE, tooBig.getReason());
+            assertEquals(1048576L, tooBig.getLimitBytes());
+            call(client, "upload", Map.of("conversationId", id, "name", "scan1.pdf", "base64", oneMiB));
+            ImLimitException full = assertThrows(ImLimitException.class, () -> call(client, "upload", Map.of("conversationId", id, "name", "scan2.pdf", "base64", oneMiB)));
+            assertEquals(ImLimitException.QUOTA_FULL, full.getReason());
+            assertEquals(2097152L, full.getLimitBytes());
+
+            // Staff keep the 8 MiB file limit, and client files do not use up the group's staff storage.
+            String eight = Base64.getEncoder().encodeToString(new byte[ImService.MAX_FILE_BYTES]);
+            assertThrows(IllegalArgumentException.class, () -> call(lawyer, "upload", Map.of("conversationId", id, "name", "over.bin",
+                    "base64", Base64.getEncoder().encodeToString(new byte[ImService.MAX_FILE_BYTES + 1]))));
+            call(lawyer, "upload", Map.of("conversationId", id, "name", "lawyer.bin", "base64", eight));
+            assertNull(call(lawyer, "projectGroup", Map.of("projectId", projectId)).get("uploadLimits"), "limits are the client's");
+        } finally {
+            ReflectionTestUtils.setField(service, "clientMaxFileMb", 50L);
+            ReflectionTestUtils.setField(service, "clientMaxTotalMb", 512L);
+        }
+    }
+
+    @Test
+    void theRequestCapFollowsTheClientFileLimit() {
+        assertTrue(service.maxRequestBytes() >= (50L * 1024 * 1024) * 4 / 3, "a 50 MiB scan as base64 fits in one request");
     }
 
     @Test

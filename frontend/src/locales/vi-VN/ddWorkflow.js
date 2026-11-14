@@ -164,7 +164,8 @@ export default {
       "attach": "Gửi tệp",
       "send": "Gửi",
       "sending": "Đang gửi…",
-      "fileTooLarge": "Tệp không được lớn hơn 8 MB",
+      "fileTooLarge": "Một tệp không được vượt quá {size} MB",
+      "quotaFull": "Bạn đã đạt giới hạn tải lên tổng cộng {size} MB cho dự án này. Vui lòng liên hệ luật sư của bạn.",
       "unavailable": "Trò chuyện dự án hiện không khả dụng. Vui lòng thử lại sau."
     },
     "messageUnavailable": "Dự án hoặc danh mục được mời này không còn khả dụng. Vui lòng làm mới và thử lại.",

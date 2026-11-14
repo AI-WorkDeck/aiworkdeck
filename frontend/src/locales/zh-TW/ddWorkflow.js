@@ -164,7 +164,8 @@ export default {
       "attach": "傳送檔案",
       "send": "傳送",
       "sending": "正在傳送…",
-      "fileTooLarge": "檔案不能超過 8 MB",
+      "fileTooLarge": "單一檔案不能超過 {size} MB",
+      "quotaFull": "你在本專案上傳的檔案總量已達 {size} MB 上限，請聯絡律師。",
       "unavailable": "專案溝通暫時無法使用，請稍後再試"
     },
     "messageUnavailable": "該消息對應的受邀項目或清單已不可訪問，請刷新後重試。",

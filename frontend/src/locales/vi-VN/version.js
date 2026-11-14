@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Liên kết gửi cho khách hàng:",
   "clientCodeExpires": "Có hiệu lực đến {date}. Tạo lại để gia hạn.",
   "clientChatNeedsName": "Nếu không nhập tên khách hàng, đây là mã dùng chung: mở được danh mục kiểm tra nhưng không dùng được cho trò chuyện dự án.",
+  "clientNameRequired": "Nhập tên khách hàng: mã chỉ dành cho khách hàng này, và trò chuyện dự án cần mã đứng tên.",
+  "clientGenericOption": "Cấp mã dùng chung không có tên (chỉ danh mục kiểm tra, không trò chuyện dự án)",
   "clientChatHistoryLabel": "Tin nhắn khách hàng có thể xem trong trò chuyện dự án",
   "clientChatHistoryAfter": "Chỉ tin nhắn sau khi tham gia (khuyến nghị)",
   "clientChatHistoryAll": "Cả tin nhắn trước khi tham gia",

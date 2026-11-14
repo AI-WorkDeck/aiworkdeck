@@ -20,6 +20,11 @@ import java.util.Map;
 @Service
 public class ImGatewayService {
     public static final int MAX_JSON_BYTES = 12 * 1024 * 1024;
+    /**
+     * Replies may carry a client's scanned evidence (default limit 50 MiB, sent as base64). Requests from this desktop
+     * stay at {@link #MAX_JSON_BYTES}: staff files are 8 MiB.
+     */
+    public static final int MAX_REPLY_BYTES = 96 * 1024 * 1024;
     private final boolean localMode;
     private final OfficialCloudService cloud;
     private final AccountService account;
@@ -69,13 +74,13 @@ public class ImGatewayService {
             HttpResponse<java.io.InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
             byte[] bytes;
             try (var body = new com.checkba.util.DeadlineInputStream(response.body(), bodyDeadline())) {
-                bytes = body.readNBytes(MAX_JSON_BYTES + 1);
+                bytes = body.readNBytes(MAX_REPLY_BYTES + 1);
             }
             assertAccountScope(fingerprint);
             if (response.statusCode() == 404) throw new IllegalArgumentException(com.checkba.service.LangText.of("云端尚未开通沟通服务，请稍后再试", "Cloud IM service is not enabled yet; please try again later"));
             if (response.statusCode() == 429) throw rateLimited(response, bytes);
             if (response.statusCode() == 401) throw new IllegalArgumentException(com.checkba.service.LangText.of("云端账户凭据已失效，请重新连接账户", "Cloud account credentials have expired; please reconnect your account"));
-            if (response.statusCode() != 200 || bytes.length > MAX_JSON_BYTES)
+            if (response.statusCode() != 200 || bytes.length > MAX_REPLY_BYTES)
                 throw new IllegalArgumentException(com.checkba.service.LangText.of("云端沟通服务暂不可用", "Cloud IM service is temporarily unavailable"));
             Map<String,Object> result = mapper.readValue(bytes, new TypeReference<>() {});
             if (!(result.get("code") instanceof Number code) || code.intValue() != 0)

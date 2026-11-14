@@ -16,8 +16,8 @@ test('the history choice defaults to "only after joining" and is reset with the 
 })
 
 test('both invite endpoints carry the choice as a strict boolean', () => {
-  assert.match(dialog, /inviteCloudClient\(this\.projectId, this\.clientName, this\.clientShareHistory\)/)
-  assert.match(dialog, /inviteClient\(this\.projectId, this\.clientName, this\.clientShareHistory\)/)
+  assert.match(dialog, /inviteCloudClient\(this\.projectId, this\.clientGeneric \? '' : this\.clientName, this\.clientShareHistory\)/)
+  assert.match(dialog, /inviteClient\(this\.projectId, this\.clientGeneric \? '' : this\.clientName, this\.clientShareHistory\)/)
   for (const name of ['inviteCloudClient', 'inviteClient']) {
     const fn = api.slice(api.indexOf(`export function ${name}(`), api.indexOf('}', api.indexOf(`export function ${name}(`) + 200) + 1)
     assert.match(fn, /shareHistory = false/, name)
@@ -33,4 +33,17 @@ test('the result line follows the server echo, and an old server that does not e
   assert.equal(result(false, true), 'version.clientChatHistoryResultAfter')
   assert.equal(result(null, false), 'version.clientChatHistoryResultAfter')
   assert.equal(result(null, true), 'version.clientChatHistoryNotApplied')
+})
+
+test('a named code is the default: no name means no code unless a shared code is explicitly chosen', () => {
+  assert.match(dialog, /clientGeneric: false,/)
+  assert.match(dialog, /this\.clientGeneric = false/)
+  const start = dialog.indexOf('canGenerateClientCode() {')
+  const body = dialog.slice(dialog.indexOf('{', start) + 1, dialog.indexOf('},', start))
+  const can = (name, generic) => new Function(body).call({ clientName: name, clientGeneric: generic })
+  assert.equal(can('', false), false)
+  assert.equal(can('   ', false), false)
+  assert.equal(can('张三', false), true)
+  assert.equal(can('', true), true)
+  assert.match(dialog, /if \(this\.loading \|\| !this\.canGenerateClientCode\) return/)
 })

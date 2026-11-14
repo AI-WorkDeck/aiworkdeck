@@ -80,16 +80,39 @@ test('a refusal on open leaves the composer disabled with the reason', async () 
   assert.match(vm.error, /访问码已失效/)
 })
 
-test('files over 8 MB are refused before any upload', async () => {
+test('the per-file limit comes from the server and is checked before any upload', async () => {
+  const s = server({ projectGroup: () => ({ id: 'group-1', uploadLimits: { maxFileBytes: 50 * 1024 * 1024, maxTotalBytes: 512 * 1024 * 1024 } }) })
+  const vm = fixture(s.chat)
+  await vm.mount(); vm.unmount()
+  assert.equal(vm.maxFileBytes, 50 * 1024 * 1024)
+  await vm.upload({ size: 50 * 1024 * 1024 + 1, name: 'big.pdf' })
+  assert.equal(vm.error, t('ddWorkflow.client.chat.fileTooLarge', { size: 50 }))
+  assert.equal(s.calls.some(c => c.action === 'upload'), false)
+})
+
+test('an older case server without limits keeps the 8 MB check', async () => {
   const s = server(); const vm = fixture(s.chat)
   await vm.mount(); vm.unmount()
   await vm.upload({ size: 8 * 1024 * 1024 + 1, name: 'big.pdf' })
-  assert.equal(vm.error, t('ddWorkflow.client.chat.fileTooLarge'))
-  assert.equal(s.calls.some(c => c.action === 'upload'), false)
+  assert.equal(vm.error, t('ddWorkflow.client.chat.fileTooLarge', { size: 8 }))
+})
+
+test('server limit refusals say which limit, localized, and keep chat open', () => {
+  const vm = fixture(server().chat)
+  vm.stop(Object.assign(new Error('x'), { status: 200, code: 1, reason: 'FILE_TOO_LARGE', limitBytes: 50 * 1024 * 1024 }))
+  assert.equal(vm.error, t('ddWorkflow.client.chat.fileTooLarge', { size: 50 })); assert.equal(vm.stopped, false)
+  vm.stop(Object.assign(new Error('x'), { status: 200, code: 1, reason: 'UPLOAD_QUOTA_FULL', limitBytes: 512 * 1024 * 1024 }))
+  assert.equal(vm.error, t('ddWorkflow.client.chat.quotaFull', { size: 512 })); assert.equal(vm.stopped, false)
 })
 
 test('a shared code, an out-of-scope answer or a signed-out session also stop chat', () => {
   for (const e of [refusal('通用码', 'GENERIC_CODE'), refusal('越界', 'OUT_OF_SCOPE'), Object.assign(new Error('请先登录'), { status: 200, code: 4010 })]) {
     const vm = fixture(server().chat); vm.stop(e); assert.equal(vm.stopped, true, e.message)
   }
+})
+
+test('the send button is an explicit click, not a form submit (uni-button never submits)', () => {
+  const tpl = source.slice(source.indexOf('<template>'), source.indexOf('</template>'))
+  assert.doesNotMatch(tpl, /type="submit"/)
+  assert.match(tpl, /type="button" class="primary"[^>]*@click="send"/)
 })

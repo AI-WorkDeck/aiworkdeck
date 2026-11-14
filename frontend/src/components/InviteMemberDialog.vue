@@ -208,7 +208,13 @@
                    :placeholder="$t('version.clientNamePlaceholder')"
                  />
                </view>
-               <text v-if="!clientName.trim()" class="code-tip">{{ $t('version.clientChatNeedsName') }}</text>
+               <!-- 默认签具名码：项目沟通只认具名码（通用码是持码人共用的一个身份）。要通用码须明确勾选（B4） -->
+               <text v-if="!clientGeneric && !clientName.trim()" class="code-tip">{{ $t('version.clientNameRequired') }}</text>
+               <view class="history-option" :class="{ selected: clientGeneric }" role="checkbox" :aria-checked="clientGeneric" @tap="clientGeneric = !clientGeneric">
+                 <text class="history-dot" aria-hidden="true">{{ clientGeneric ? '☑' : '☐' }}</text>
+                 <text>{{ $t('version.clientGenericOption') }}</text>
+               </view>
+               <text v-if="clientGeneric" class="code-tip">{{ $t('version.clientChatNeedsName') }}</text>
                <!-- 项目沟通里客户能看到的消息范围（B4）：默认只看加入之后，开放此前消息须明确选择 -->
                <view class="form-group" role="radiogroup" :aria-label="$t('version.clientChatHistoryLabel')">
                  <text class="form-label">{{ $t('version.clientChatHistoryLabel') }}</text>
@@ -262,7 +268,7 @@
             </view>
         </block>
         <block v-else>
-            <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
+            <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading || !canGenerateClientCode }" :aria-disabled="loading || !canGenerateClientCode">
                 {{ loading ? $t('version.generatingEllipsis') : $t('version.generateAccessCode') }}
             </view>
             <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('common.done') }}</view>
@@ -332,6 +338,7 @@ export default {
       role: 'PARTICIPANT',
       clientName: '',
       clientShareHistory: false,
+      clientGeneric: false,
       clientHistoryEcho: null,
       clientInviteCode: '',
       // 云端轨签码回执（dev-board#1050）：门户地址、有效期、案件库那一侧的客户用户 id（撤销用）
@@ -404,6 +411,8 @@ export default {
     clientPortalLinkText() {
       return clientPortalLink(this.clientPortalUrl, this.clientInviteCode)
     },
+    // A named code unless the lawyer explicitly asked for a shared one (which cannot be used for project chat).
+    canGenerateClientCode() { return this.clientGeneric || !!this.clientName.trim() },
     clientHistoryResult() {
         if (this.clientHistoryEcho === true) return this.$t('version.clientChatHistoryResultAll')
         if (this.clientHistoryEcho === false || !this.clientShareHistory) return this.$t('version.clientChatHistoryResultAfter')
@@ -437,6 +446,7 @@ export default {
         this.role = 'PARTICIPANT'
         this.clientName = ''
         this.clientShareHistory = false
+        this.clientGeneric = false
         this.clientHistoryEcho = null
         this.clientInviteCode = ''
         this.clientPortalUrl = ''
@@ -671,13 +681,14 @@ export default {
       })
     },
     async generateClientCode() {
+        if (this.loading || !this.canGenerateClientCode) return
         this.loading = true
         try {
             // 云端轨：案卷在团队案件库里，码必须由案件库签（客户登录的是案件库的门户，
             // 本机签的码案件库上不存在）；本机轨（自建服务器）照旧打本机接口
             const res = this.isCloudTrack
-              ? await inviteCloudClient(this.projectId, this.clientName, this.clientShareHistory)
-              : await inviteClient(this.projectId, this.clientName, this.clientShareHistory)
+              ? await inviteCloudClient(this.projectId, this.clientGeneric ? '' : this.clientName, this.clientShareHistory)
+              : await inviteClient(this.projectId, this.clientGeneric ? '' : this.clientName, this.clientShareHistory)
             if (res.code === 0 && res.data && res.data.accessCode) {
                 this.clientInviteCode = res.data.accessCode
                 this.clientPortalUrl = res.data.clientUrl || ''

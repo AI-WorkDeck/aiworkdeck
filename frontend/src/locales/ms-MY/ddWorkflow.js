@@ -163,7 +163,8 @@ export default {
       "attach": "Hantar fail",
       "send": "Hantar",
       "sending": "Sedang menghantar…",
-      "fileTooLarge": "Fail tidak boleh melebihi 8 MB",
+      "fileTooLarge": "Satu fail tidak boleh melebihi {size} MB",
+      "quotaFull": "Anda telah mencapai had jumlah muat naik {size} MB untuk projek ini. Sila hubungi peguam anda.",
       "unavailable": "Sembang projek tidak tersedia buat masa ini. Sila cuba lagi kemudian."
     },
     "messageUnavailable": "Projek jemputan atau senarai semak ini tidak lagi tersedia. Segar semula dan cuba lagi.",

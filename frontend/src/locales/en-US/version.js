@@ -357,6 +357,8 @@ export default {
   clientPortalLinkLabel: 'Link for the client:',
   clientCodeExpires: 'Valid until {date}. Generate it again to extend.',
   clientChatNeedsName: 'Without a client name this is a shared code: it opens the checklist but can\'t be used for project chat.',
+  clientNameRequired: 'Enter the client\'s name: the code is for this client only, and project chat needs a named code.',
+  clientGenericOption: 'Issue a shared code without a name (checklist only, no project chat)',
   clientChatHistoryLabel: 'Messages the client can see in project chat',
   clientChatHistoryAfter: 'Only messages after they join (recommended)',
   clientChatHistoryAll: 'Also messages from before they join',

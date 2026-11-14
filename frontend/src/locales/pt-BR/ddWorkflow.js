@@ -163,7 +163,8 @@ export default {
       "attach": "Enviar um arquivo",
       "send": "Enviar",
       "sending": "Enviando…",
-      "fileTooLarge": "Os arquivos não podem ser maiores que 8 MB",
+      "fileTooLarge": "Um único arquivo não pode ter mais de {size} MB",
+      "quotaFull": "Você atingiu o limite total de envio de {size} MB neste projeto. Entre em contato com seu advogado.",
       "unavailable": "O chat do projeto não está disponível no momento. Tente novamente mais tarde."
     },
     "messageUnavailable": "Este projeto convidado ou checklist não está mais disponível. Atualize e tente novamente.",

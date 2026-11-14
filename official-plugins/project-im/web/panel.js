@@ -601,7 +601,12 @@
     dialog('会话成员', '', null);
     for (const m of result.members || []) {
       const row = node('div', null, 'member-row'); row.append(node('span', `${m.displayName || m.name || m.id || '助手'} · ${m.actorType === 'AGENT' ? 'AI 助手' : (roles[m.role] || '成员')}`));
-      if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER') row.append(button('移除', async () => {
+      // A client who came in by access code is removed by revoking that code (B4); a plain remove would bounce back.
+      if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER' && m.accessCode) row.append(button(t('revokeCode'), async () => {
+        if (!await confirmAction(t('revokeCodeConfirm'))) return;
+        await request('removeMember', { conversationId: s.id, userId: m.id, revokeCode: true }); if (current(s)) await membersDialog();
+      }, 'danger'));
+      else if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER') row.append(button('移除', async () => {
         if (!await confirmAction('将该成员移出当前会话？')) return;
         await request('removeMember', { conversationId: s.id, userId: m.id }); if (current(s)) await membersDialog();
       })); $('dialog-body').append(row);

@@ -26,8 +26,18 @@ public class ImService {
     public static final int MAX_FILE_BYTES = 8 * 1024 * 1024;
     public static final String FILE_UNAVAILABLE = "抱歉文件还在准备中，请联系您的律师。";
     static final long MAX_CONVERSATION_BYTES = 100L * 1024 * 1024;
-    /** What one client may upload into a group, so a client cannot fill the group's shared 100 MiB. */
-    static final long MAX_CLIENT_BYTES = 32L * 1024 * 1024;
+    /**
+     * Client uploads (scanned evidence) have their own limits, set by ops: per file and per client in a project's group.
+     * They are not counted against the group's 100 MiB, which stays for staff files.
+     */
+    @org.springframework.beans.factory.annotation.Value("${im.client-upload.max-file-mb:50}")
+    private long clientMaxFileMb = 50;
+    @org.springframework.beans.factory.annotation.Value("${im.client-upload.max-total-mb:512}")
+    private long clientMaxTotalMb = 512;
+    public long clientMaxFileBytes() { return clientMaxFileMb * 1024 * 1024; }
+    public long clientMaxTotalBytes() { return clientMaxTotalMb * 1024 * 1024; }
+    /** Largest JSON body an upload may need: a client file as base64, plus room for the envelope. */
+    public long maxRequestBytes() { return Math.max(ImGatewayService.MAX_JSON_BYTES, (Math.max(MAX_FILE_BYTES, clientMaxFileBytes()) + 2) / 3 * 4 + 1024 * 1024); }
     public static final Set<String> ACTIONS = Set.of("self", "list", "create", "invite", "join",
             "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess",
             "agentScopes", "ensureAgent", "agentInfo", "agentReply", "projectGroup");
@@ -178,7 +188,7 @@ public class ImService {
                     : memberViews(conversation);
             case "agentInfo" -> view(conversation, member);
             case "agentReply" -> agentService().reply(conversation, userId, p);
-            case "removeMember" -> remove(conversation, member, number(p, "userId", -1));
+            case "removeMember" -> remove(conversation, member, number(p, "userId", -1), Boolean.TRUE.equals(p.get("revokeCode")));
             case "leave" -> leave(conversation, member);
             case "messages" -> listMessages(conversation, member, p);
             case "send" -> send(conversation, member, p);
@@ -288,14 +298,24 @@ public class ImService {
         return view(c, shareHistory ? member : limitClientHistory(member));
     }
 
-    private Object remove(ImConversation c, ImMember me, long targetId) {
+    /**
+     * {@code revokeCode}: the lawyer confirmed that removing an access-code client revokes their code (B4). Their chat
+     * membership is the code, so without revoking it they would simply be re-added on their next poll.
+     */
+    private Object remove(ImConversation c, ImMember me, long targetId, boolean revokeCode) {
         requireOwner(me);
         ImMember target = requireMember(c.getId(), targetId);
         if ("OWNER".equals(target.getRole())) throw bad(com.checkba.service.LangText.of("不能移除会话负责人", "Cannot remove the conversation owner"));
         // An access-code client would come straight back on their next poll: their access is the code, so end it there.
-        if (users.findById(targetId).map(User::getRole).filter("CLIENT"::equals).isPresent())
-            throw bad(com.checkba.service.LangText.of("这位客户凭访问码进入项目沟通；要让他离开，请在项目成员里撤销他的访问码。",
-                    "This client is in project chat by access code; to remove them, revoke their access code under project members."));
+        if (users.findById(targetId).map(User::getRole).filter("CLIENT"::equals).isPresent()) {
+            if (!revokeCode || c.getProjectId() == null || projectPermissions == null)
+                throw bad(com.checkba.service.LangText.of("这位客户凭访问码进入项目沟通；要让他离开，请撤销他的访问码。",
+                        "This client is in project chat by access code; to remove them, revoke their access code."));
+            // Same path as removing the client from the project: permission checks, member row deleted, code revoked.
+            projectPermissions.removeMember(c.getProjectId(), targetId, me.getUserId());
+            members.delete(target);
+            return Map.of("removed", true, "codeRevoked", true);
+        }
         members.delete(target);
         return Map.of("removed", true);
     }
@@ -368,14 +388,16 @@ public class ImService {
 
     private Object upload(ImConversation c, ImMember me, Map<String,Object> p) {
         String encoded = string(p, "base64");
-        if (encoded.length() > ((MAX_FILE_BYTES + 2L) / 3) * 4) throw bad(com.checkba.service.LangText.of("文件不能超过8MiB", "File cannot exceed 8 MiB"));
+        boolean fromClient = client(me);
+        long maxFile = fromClient ? clientMaxFileBytes() : MAX_FILE_BYTES;
+        if (encoded.length() > ((maxFile + 2L) / 3) * 4) throw fileTooLarge(fromClient, maxFile);
         byte[] bytes;
         try { bytes = Base64.getDecoder().decode(encoded); }
         catch (IllegalArgumentException e) { throw bad(com.checkba.service.LangText.of("文件编码无效", "Invalid file encoding")); }
-        if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES) throw bad(com.checkba.service.LangText.of("文件不能为空且不能超过8MiB", "File cannot be empty and cannot exceed 8 MiB"));
+        if (bytes.length == 0) throw bad(com.checkba.service.LangText.of("文件不能为空", "File cannot be empty"));
+        if (bytes.length > maxFile) throw fileTooLarge(fromClient, maxFile);
         String name = safeName(required(p, "name", 500)), digest = sha(bytes);
         String projectUid = null, fileUid = null;
-        boolean fromClient = client(me);
         // A client's upload is never a project-file reference; only staff can cite project files.
         if (p.get("source") != null && !fromClient) {
             if (!(p.get("source") instanceof Map<?,?> source)) throw bad(com.checkba.service.LangText.of("文件来源格式无效", "Invalid file source format"));
@@ -392,9 +414,11 @@ public class ImService {
                 return attachmentView(old, me);
             }
         }
-        if (fromClient && attachments.totalSizeBy(c.getId(), me.getUserId()) + bytes.length > MAX_CLIENT_BYTES)
-            throw bad(com.checkba.service.LangText.of("你在本群上传的文件已达 32MiB 上限，请联系律师", "You have reached the 32 MiB upload limit in this group; please contact your lawyer"));
-        if (attachments.totalSize(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad(com.checkba.service.LangText.of("本会话文件空间已满（100MiB）", "Conversation file storage is full (100 MiB)"));
+        if (fromClient && attachments.totalSizeBy(c.getId(), me.getUserId()) + bytes.length > clientMaxTotalBytes())
+            throw new ImLimitException(ImLimitException.QUOTA_FULL, clientMaxTotalBytes(), com.checkba.service.LangText.of(
+                    "你在本项目上传的文件总量已达 " + mib(clientMaxTotalBytes()) + "MiB 上限，请联系律师",
+                    "You have reached the " + mib(clientMaxTotalBytes()) + " MiB total upload limit for this project; please contact your lawyer"));
+        if (!fromClient && attachments.totalSize(c.getId()) - attachments.totalSizeByClients(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad(com.checkba.service.LangText.of("本会话文件空间已满（100MiB）", "Conversation file storage is full (100 MiB)"));
         ImAttachment file = new ImAttachment(); file.setId(UUID.randomUUID().toString());
         file.setConversationId(c.getId()); file.setUploadedBy(me.getUserId()); file.setClientMessageId(clientId);
         file.setName(name); file.setSize(bytes.length);
@@ -439,8 +463,15 @@ public class ImService {
     }
     private Map<String,Object> memberViews(ImConversation conversation) {
         List<Map<String,Object>> rows = new ArrayList<>();
-        for (ImMember member : members.findByConversationId(conversation.getId())) {
-            rows.add(Map.of("id", member.getUserId(), "displayName", displayName(member.getUserId()), "role", member.getRole(), "actorType", "HUMAN"));
+        List<ImMember> all = members.findByConversationId(conversation.getId());
+        Set<Long> accessCodeClients = new HashSet<>();
+        for (User user : users.findAllById(all.stream().map(ImMember::getUserId).toList()))
+            if ("CLIENT".equals(user.getRole())) accessCodeClients.add(user.getId());
+        for (ImMember member : all) {
+            Map<String,Object> row = new LinkedHashMap<>(Map.of("id", member.getUserId(), "displayName", displayName(member.getUserId()), "role", member.getRole(), "actorType", "HUMAN"));
+            // Removing them means revoking their access code; the panels offer that instead of a plain remove.
+            if (accessCodeClients.contains(member.getUserId())) row.put("accessCode", true);
+            rows.add(row);
         }
         int humanCount = rows.size();
         if (conversation.getAgentScope() != null) rows.add(Map.of("id", "agent:" + conversation.getId(), "displayName", conversation.getAgentName(), "role", "AGENT", "actorType", "AGENT"));
@@ -489,6 +520,12 @@ public class ImService {
         if (!client(member)) return member;
         member.setHistoryAfterId(messages.maxId(member.getConversationId())); return members.save(member);
     }
+    private static long mib(long bytes) { return bytes / (1024 * 1024); }
+    private static IllegalArgumentException fileTooLarge(boolean client, long maxFile) {
+        String zh = "单个文件不能超过 " + mib(maxFile) + "MiB", en = "A single file cannot exceed " + mib(maxFile) + " MiB";
+        return client ? new ImLimitException(ImLimitException.FILE_TOO_LARGE, maxFile, com.checkba.service.LangText.of(zh, en))
+                : bad(com.checkba.service.LangText.of(zh, en));
+    }
     private static long historyFloor(ImMember member) { return member.getHistoryAfterId() == null ? 0 : member.getHistoryAfterId(); }
     private Map<String,Object> view(ImConversation c, ImMember member) {
         Map<String,Object> result = new LinkedHashMap<>(Map.of("id", c.getId(), "title", c.getTitle(), "type", c.getType(), "role", member.getRole(),
@@ -498,6 +535,9 @@ public class ImService {
             result.put("agent", ImAgentService.agentView(c));
             result.put("canRequestAgent", (c.getProjectId() == null && c.getAgentProjectId() == null) || !client(member));
         }
+        // Clients read their upload limits from here, so the portal checks a file before sending it.
+        if (c.getProjectId() != null && "CLIENT".equals(member.getRole()))
+            result.put("uploadLimits", Map.of("maxFileBytes", clientMaxFileBytes(), "maxTotalBytes", clientMaxTotalBytes()));
         Long projectId = c.getProjectId() != null ? c.getProjectId() : c.getAgentProjectId();
         if (projectId != null) {
             result.put("projectId", projectId);

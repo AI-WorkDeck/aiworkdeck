@@ -163,7 +163,8 @@ export default {
       "attach": "Bestand verzenden",
       "send": "Verzenden",
       "sending": "Verzenden…",
-      "fileTooLarge": "Bestanden mogen niet groter zijn dan 8 MB",
+      "fileTooLarge": "Eén bestand mag niet groter zijn dan {size} MB",
+      "quotaFull": "U hebt de totale uploadlimiet van {size} MB voor dit project bereikt. Neem contact op met uw advocaat.",
       "unavailable": "De projectchat is momenteel niet beschikbaar. Probeer het later opnieuw."
     },
     "messageUnavailable": "Dit uitgenodigde project of deze checklist is niet langer beschikbaar. Vernieuw en probeer het opnieuw.",

@@ -32,6 +32,7 @@
       </article>
     </div>
 
+    <!-- uni-app compiles <button> to uni-button, which never submits a form: send is an explicit click (QA D1, B4) -->
     <form v-if="conversationId" class="chat-compose" @submit.prevent="send">
       <textarea
         v-model="draft"
@@ -45,7 +46,7 @@
       ></textarea>
       <div class="chat-actions">
         <button type="button" class="secondary" :disabled="sending || stopped" @click="pickFile">{{ $t('ddWorkflow.client.chat.attach') }}</button>
-        <button type="submit" class="primary" :disabled="sending || stopped || !draft.trim()">{{ sending ? $t('ddWorkflow.client.chat.sending') : $t('ddWorkflow.client.chat.send') }}</button>
+        <button type="button" class="primary" :disabled="sending || stopped || !draft.trim()" @click="send">{{ sending ? $t('ddWorkflow.client.chat.sending') : $t('ddWorkflow.client.chat.send') }}</button>
       </div>
     </form>
   </section>
@@ -55,7 +56,9 @@
 import { portalChat } from '@/services/ddClient.js'
 
 const POLL_MS = 3000
-const MAX_FILE_BYTES = 8 * 1024 * 1024
+// Until the server says otherwise (older case servers do not send uploadLimits): the long-standing 8 MiB.
+const DEFAULT_MAX_FILE_BYTES = 8 * 1024 * 1024
+const mb = bytes => Math.floor(bytes / (1024 * 1024))
 const REFUSALS = new Set(['CODE_INACTIVE', 'GENERIC_CODE', 'OUT_OF_SCOPE', 'ACTION_NOT_ALLOWED'])
 
 export default {
@@ -65,13 +68,14 @@ export default {
     projectId: { type: Number, required: true },
   },
   data: () => ({ conversationId: '', title: '', selfId: null, messages: [], hasMore: false, loading: true, loadingOlder: false,
-    draft: '', sending: false, downloading: '', error: '', stopped: false, timer: null, lastReadId: 0 }),
+    draft: '', maxFileBytes: DEFAULT_MAX_FILE_BYTES, sending: false, downloading: '', error: '', stopped: false, timer: null, lastReadId: 0 }),
   async mounted() {
     try {
       const [self, group] = [await portalChat(this.connectionId, 'self'), await portalChat(this.connectionId, 'projectGroup', { projectId: this.projectId })]
       this.selfId = self?.id ?? null
       this.conversationId = group.id
       this.title = group.title || ''
+      if (Number.isSafeInteger(group.uploadLimits?.maxFileBytes)) this.maxFileBytes = group.uploadLimits.maxFileBytes
       const page = await portalChat(this.connectionId, 'messages', { conversationId: this.conversationId, limit: 50 })
       this.messages = page.messages || []
       this.hasMore = !!page.hasMore
@@ -89,7 +93,7 @@ export default {
     lastId() { return this.messages.length ? this.messages[this.messages.length - 1].id : 0 },
     // A code that expired or was revoked stops chat on the server; stop polling and say why instead of retrying forever.
     stop(e) {
-      this.error = e?.message || this.$t('ddWorkflow.client.chat.unavailable')
+      this.error = this.describe(e)
       // Only an explicit refusal ends chat: the server's access reasons (code expired or revoked, shared code, out of
       // scope), a signed-out session (4010) or 401/403. 429 (「发送太快」), ordinary business errors (an empty file,
       // the upload quota), 5xx and network failures are shown and polling goes on.
@@ -139,7 +143,7 @@ export default {
       input.click()
     },
     async upload(file) {
-      if (file.size > MAX_FILE_BYTES) { this.error = this.$t('ddWorkflow.client.chat.fileTooLarge'); return }
+      if (file.size > this.maxFileBytes) { this.error = this.$t('ddWorkflow.client.chat.fileTooLarge', { size: mb(this.maxFileBytes) }); return }
       this.sending = true; this.error = ''
       try {
         const base64 = await new Promise((resolve, reject) => {
@@ -166,6 +170,12 @@ export default {
         link.click()
         setTimeout(() => URL.revokeObjectURL(url), 1000)
       } catch (e) { this.error = e?.message || this.$t('ddWorkflow.client.chat.filePending') } finally { this.downloading = '' }
+    },
+    // Upload limits are said in the reader's language: one file too large, or the client's total used up.
+    describe(e) {
+      if (e?.reason === 'FILE_TOO_LARGE') return this.$t('ddWorkflow.client.chat.fileTooLarge', { size: mb(e.limitBytes || this.maxFileBytes) })
+      if (e?.reason === 'UPLOAD_QUOTA_FULL') return this.$t('ddWorkflow.client.chat.quotaFull', { size: mb(e.limitBytes || 0) })
+      return e?.message || this.$t('ddWorkflow.client.chat.unavailable')
     },
     scrollToEnd() { this.$nextTick(() => { const el = this.$refs.list; if (el) el.scrollTop = el.scrollHeight }) },
     formatTime(value) {

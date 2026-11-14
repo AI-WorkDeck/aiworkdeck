@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Link voor de cliënt:",
   "clientCodeExpires": "Geldig tot {date}. Genereer opnieuw om te verlengen.",
   "clientChatNeedsName": "Zonder naam van de cliënt is dit een gedeelde code: hij opent de checklist maar werkt niet voor de projectchat.",
+  "clientNameRequired": "Vul de naam van de cliënt in: de code is alleen voor deze cliënt en de projectchat vereist een code op naam.",
+  "clientGenericOption": "Gedeelde code zonder naam uitgeven (alleen checklist, geen projectchat)",
   "clientChatHistoryLabel": "Berichten die de cliënt kan zien in de projectchat",
   "clientChatHistoryAfter": "Alleen berichten na deelname (aanbevolen)",
   "clientChatHistoryAll": "Ook berichten van vóór deelname",

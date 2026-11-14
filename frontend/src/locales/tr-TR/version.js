@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Müvekkil için bağlantı:",
   "clientCodeExpires": "{date} tarihine kadar geçerli. Süreyi uzatmak için yeniden oluşturun.",
   "clientChatNeedsName": "Müvekkil adı girilmezse bu ortak bir koddur: kontrol listesini açar ancak proje sohbeti için kullanılamaz.",
+  "clientNameRequired": "Müvekkilin adını girin: kod yalnızca bu müvekkil içindir ve proje sohbeti adlı bir kod gerektirir.",
+  "clientGenericOption": "Adsız ortak kod oluştur (yalnızca kontrol listesi, proje sohbeti yok)",
   "clientChatHistoryLabel": "Müvekkilin proje sohbetinde görebileceği mesajlar",
   "clientChatHistoryAfter": "Yalnızca katıldıktan sonraki mesajlar (önerilir)",
   "clientChatHistoryAll": "Katılmadan önceki mesajlar da",

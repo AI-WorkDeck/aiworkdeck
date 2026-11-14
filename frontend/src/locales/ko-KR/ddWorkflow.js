@@ -164,7 +164,8 @@ export default {
       "attach": "파일 보내기",
       "send": "보내기",
       "sending": "보내는 중…",
-      "fileTooLarge": "파일은 8 MB를 초과할 수 없습니다",
+      "fileTooLarge": "파일 하나는 {size}MB를 넘을 수 없습니다",
+      "quotaFull": "이 프로젝트의 총 업로드 한도 {size}MB에 도달했습니다. 변호사에게 문의하세요.",
       "unavailable": "프로젝트 채팅을 지금은 사용할 수 없습니다. 잠시 후 다시 시도하세요."
     },
     "messageUnavailable": "이 초대받은 프로젝트 또는 체크리스트에 더 이상 접근할 수 없습니다. 새로고침 후 다시 시도하세요.",

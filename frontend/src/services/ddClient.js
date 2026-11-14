@@ -38,6 +38,7 @@ function check(data, status) {
     error.status = status
     if (data?.reason) error.reason = data.reason
     if (data?.code !== undefined) error.code = data.code
+    if (typeof data?.limitBytes === 'number') error.limitBytes = data.limitBytes
     throw error
   }
   return unpack(data)

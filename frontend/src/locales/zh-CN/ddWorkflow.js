@@ -163,7 +163,8 @@ export default {
       "attach": "发送文件",
       "send": "发送",
       "sending": "正在发送…",
-      "fileTooLarge": "文件不能超过 8 MB",
+      "fileTooLarge": "单个文件不能超过 {size} MB",
+      "quotaFull": "你在本项目上传的文件总量已达 {size} MB 上限，请联系律师。",
       "unavailable": "项目沟通暂不可用，请稍后再试"
     },
     "messageUnavailable": "该消息对应的受邀项目或清单已不可访问，请刷新后重试。",

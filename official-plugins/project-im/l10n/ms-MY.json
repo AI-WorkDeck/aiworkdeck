@@ -9,5 +9,7 @@
   "panel.inviteHintAfterJoin": "Anak guam yang menyertai dengan kod ini hanya melihat mesej dan fail yang dihantar selepas dia menyertai. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}",
   "panel.inviteHintWithHistory": "Anak guam yang menyertai dengan kod ini juga boleh membaca mesej terdahulu; fail masih dibuka satu demi satu mengikut kebenaran akses. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}",
   "panel.inviteJoinHow": "Orang tersebut log masuk ke aplikasi AI WorkDeck dengan akaunnya sendiri dan memasukkan kod di “Pusat mesej → Sembang → Sertai dengan kod” atau di “Sembang Projek → Sertai dengan kod”. Portal anak guam tidak menerima kod ini.",
-  "panel.fromClient": "Anak guam"
+  "panel.fromClient": "Anak guam",
+  "panel.revokeCode": "Batalkan kod akses",
+  "panel.revokeCodeConfirm": "Kod akses anak guam akan serta-merta tidak sah; mereka tidak lagi boleh membuka sembang projek atau senarai semak. Batalkan?"
 }

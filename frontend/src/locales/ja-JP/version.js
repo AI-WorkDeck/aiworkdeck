@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "クライアント用リンク：",
   "clientCodeExpires": "{date} まで有効。延長するには再生成してください。",
   "clientChatNeedsName": "クライアント名を入れずに発行すると共通コードになり、チェックリストは開けますがプロジェクトチャットには使えません。",
+  "clientNameRequired": "クライアント名を入力してください。コードはこのクライアント本人専用で、プロジェクトチャットには名前付きのコードが必要です。",
+  "clientGenericOption": "名前なしで共通コードを発行（チェックリストのみ、プロジェクトチャットは不可）",
   "clientChatHistoryLabel": "プロジェクトチャットでクライアントが閲覧できるメッセージ",
   "clientChatHistoryAfter": "参加後のメッセージのみ（推奨）",
   "clientChatHistoryAll": "参加前のメッセージも閲覧可",

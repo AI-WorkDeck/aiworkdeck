@@ -9,7 +9,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "الموكل الذي ينضم بهذا الرمز يرى فقط الرسائل والملفات المرسلة بعد انضمامه. شاركه مع الشخص المقصود فقط. صالح حتى {time}",
     "panel.inviteHintWithHistory": "الموكل الذي ينضم بهذا الرمز يمكنه أيضًا قراءة الرسائل السابقة؛ وتبقى الملفات متاحة كلٌّ على حدة وفق صلاحيات الوصول. شاركه مع الشخص المقصود فقط. صالح حتى {time}",
     "panel.inviteJoinHow": "يسجّل الطرف الآخر الدخول إلى تطبيق AI WorkDeck بحسابه الخاص ويُدخل الرمز في «مركز الرسائل ← المحادثات ← الانضمام برمز» أو في «دردشة المشروع ← الانضمام برمز». لا تقبل بوابة الموكلين هذا الرمز.",
-    "panel.fromClient": "الموكل"
+    "panel.fromClient": "الموكل",
+    "panel.revokeCode": "إلغاء رمز الوصول",
+    "panel.revokeCodeConfirm": "سيتوقف رمز وصول الموكل فورًا، ولن يتمكن بعد ذلك من فتح دردشة المشروع أو قائمة التحقق. هل تريد الإلغاء؟"
   },
   "de-DE": {
     "panel.historyScope": "Für den Mandanten sichtbare Nachrichten",
@@ -18,7 +20,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Ein Mandant, der mit diesem Code beitritt, sieht nur Nachrichten und Dateien, die nach seinem Beitritt gesendet werden. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}",
     "panel.inviteHintWithHistory": "Ein Mandant, der mit diesem Code beitritt, kann auch frühere Nachrichten lesen; Dateien werden weiterhin einzeln gemäß ihren Zugriffsrechten freigegeben. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}",
     "panel.inviteJoinHow": "Die Person meldet sich mit ihrem eigenen AI WorkDeck-Konto in der App an und gibt den Code unter „Nachrichtenzentrale → Unterhaltungen → Mit Code beitreten“ oder in „Projekt-Chat → Mit Code beitreten“ ein. Das Mandantenportal akzeptiert diesen Code nicht.",
-    "panel.fromClient": "Mandant"
+    "panel.fromClient": "Mandant",
+    "panel.revokeCode": "Zugangscode widerrufen",
+    "panel.revokeCodeConfirm": "Der Zugangscode des Mandanten ist sofort ungültig; er kann weder den Projektchat noch die Checkliste mehr öffnen. Widerrufen?"
   },
   "el-GR": {
     "panel.historyScope": "Μηνύματα που μπορεί να δει ο εντολέας",
@@ -27,7 +31,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Ο εντολέας που εισέρχεται με αυτόν τον κωδικό βλέπει μόνο τα μηνύματα και τα αρχεία που αποστέλλονται μετά την είσοδό του. Δώστε τον μόνο στο προβλεπόμενο πρόσωπο. Ισχύει έως {time}",
     "panel.inviteHintWithHistory": "Ο εντολέας που εισέρχεται με αυτόν τον κωδικό μπορεί να διαβάσει και τα προηγούμενα μηνύματα· τα αρχεία εξακολουθούν να ανοίγουν ένα προς ένα σύμφωνα με τα δικαιώματα πρόσβασης. Δώστε τον μόνο στο προβλεπόμενο πρόσωπο. Ισχύει έως {time}",
     "panel.inviteJoinHow": "Το πρόσωπο συνδέεται στην εφαρμογή AI WorkDeck με τον δικό του λογαριασμό και εισάγει τον κωδικό στο «Κέντρο μηνυμάτων → Συνομιλίες → Συμμετοχή με κωδικό» ή στο «Συνομιλία έργου → Συμμετοχή με κωδικό». Η πύλη εντολέων δεν δέχεται αυτόν τον κωδικό.",
-    "panel.fromClient": "Εντολέας"
+    "panel.fromClient": "Εντολέας",
+    "panel.revokeCode": "Ανάκληση κωδικού πρόσβασης",
+    "panel.revokeCodeConfirm": "Ο κωδικός πρόσβασης του εντολέα παύει αμέσως να ισχύει· δεν θα μπορεί πλέον να ανοίξει τη συνομιλία του έργου ή τη λίστα ελέγχου. Ανάκληση;"
   },
   "en-US": {
     "panel.historyScope": "Messages the client can see",
@@ -36,7 +42,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "A client who joins with this code sees only messages and files sent after they join. Share it only with the intended person. Valid until {time}",
     "panel.inviteHintWithHistory": "A client who joins with this code can also read earlier messages; files are still opened one by one under their access settings. Share it only with the intended person. Valid until {time}",
     "panel.inviteJoinHow": "They sign in to the AI WorkDeck app with their own account and enter the code under “Message center → Chats → Join with code” or in “Project Chat → Join with code”. The client portal does not accept this code.",
-    "panel.fromClient": "Client"
+    "panel.fromClient": "Client",
+    "panel.revokeCode": "Revoke access code",
+    "panel.revokeCodeConfirm": "The client's access code stops working at once; they will no longer be able to open the project chat or the checklist. Revoke it?"
   },
   "es-ES": {
     "panel.historyScope": "Mensajes que puede ver el cliente",
@@ -45,7 +53,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "El cliente que se una con este código solo verá los mensajes y archivos enviados después de su incorporación. Compártalo únicamente con la persona prevista. Válido hasta {time}",
     "panel.inviteHintWithHistory": "El cliente que se una con este código también podrá leer los mensajes anteriores; los archivos siguen abriéndose uno a uno según sus permisos de acceso. Compártalo únicamente con la persona prevista. Válido hasta {time}",
     "panel.inviteJoinHow": "La otra persona inicia sesión en la aplicación AI WorkDeck con su propia cuenta e introduce el código en «Centro de mensajes → Conversaciones → Unirse con código» o en «Chat del proyecto → Unirse con código». El portal de clientes no acepta este código.",
-    "panel.fromClient": "Cliente"
+    "panel.fromClient": "Cliente",
+    "panel.revokeCode": "Revocar el código de acceso",
+    "panel.revokeCodeConfirm": "El código de acceso del cliente deja de funcionar de inmediato; ya no podrá abrir el chat del proyecto ni la lista de verificación. ¿Revocarlo?"
   },
   "fr-FR": {
     "panel.historyScope": "Messages visibles par le client",
@@ -54,7 +64,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Un client qui rejoint la conversation avec ce code ne voit que les messages et fichiers envoyés après son arrivée. Ne le transmettez qu’à la personne prévue. Valable jusqu’au {time}",
     "panel.inviteHintWithHistory": "Un client qui rejoint la conversation avec ce code peut aussi lire les messages antérieurs ; les fichiers restent ouverts un par un selon leurs droits d’accès. Ne le transmettez qu’à la personne prévue. Valable jusqu’au {time}",
     "panel.inviteJoinHow": "La personne se connecte à l’application AI WorkDeck avec son propre compte et saisit le code dans « Centre de messages → Discussions → Rejoindre avec un code » ou dans « Chat du projet → Rejoindre avec un code ». Le portail client n’accepte pas ce code.",
-    "panel.fromClient": "Client"
+    "panel.fromClient": "Client",
+    "panel.revokeCode": "Révoquer le code d’accès",
+    "panel.revokeCodeConfirm": "Le code d’accès du client cesse immédiatement de fonctionner ; il ne pourra plus ouvrir le chat du projet ni la liste de contrôle. Révoquer ?"
   },
   "hi-IN": {
     "panel.historyScope": "मुवक्किल को दिखने वाले संदेश",
@@ -63,7 +75,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "इस कोड से शामिल होने वाला मुवक्किल केवल शामिल होने के बाद भेजे गए संदेश और फ़ाइलें देख सकता है। इसे केवल इच्छित व्यक्ति को दें। {time} तक मान्य",
     "panel.inviteHintWithHistory": "इस कोड से शामिल होने वाला मुवक्किल पहले के संदेश भी पढ़ सकता है; फ़ाइलें अब भी एक्सेस अनुमतियों के अनुसार एक-एक करके खोली जाती हैं। इसे केवल इच्छित व्यक्ति को दें। {time} तक मान्य",
     "panel.inviteJoinHow": "सामने वाला व्यक्ति अपने AI WorkDeck खाते से ऐप में साइन इन करके «संदेश केंद्र → चैट → कोड से जुड़ें» या «प्रोजेक्ट चैट → कोड से जुड़ें» में यह कोड दर्ज करता है। मुवक्किल पोर्टल यह कोड स्वीकार नहीं करता।",
-    "panel.fromClient": "मुवक्किल"
+    "panel.fromClient": "मुवक्किल",
+    "panel.revokeCode": "एक्सेस कोड रद्द करें",
+    "panel.revokeCodeConfirm": "मुवक्किल का एक्सेस कोड तुरंत काम करना बंद कर देगा; वे परियोजना चैट या चेकलिस्ट नहीं खोल पाएँगे। रद्द करें?"
   },
   "id-ID": {
     "panel.historyScope": "Pesan yang dapat dilihat klien",
@@ -72,7 +86,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Klien yang bergabung dengan kode ini hanya melihat pesan dan berkas yang dikirim setelah ia bergabung. Bagikan hanya kepada orang yang dituju. Berlaku hingga {time}",
     "panel.inviteHintWithHistory": "Klien yang bergabung dengan kode ini juga dapat membaca pesan sebelumnya; berkas tetap dibuka satu per satu sesuai izin aksesnya. Bagikan hanya kepada orang yang dituju. Berlaku hingga {time}",
     "panel.inviteJoinHow": "Orang tersebut masuk ke aplikasi AI WorkDeck dengan akunnya sendiri lalu memasukkan kode di “Pusat pesan → Obrolan → Gabung dengan kode” atau di “Obrolan Proyek → Gabung dengan kode”. Portal klien tidak menerima kode ini.",
-    "panel.fromClient": "Klien"
+    "panel.fromClient": "Klien",
+    "panel.revokeCode": "Cabut kode akses",
+    "panel.revokeCodeConfirm": "Kode akses klien langsung tidak berlaku; klien tidak dapat lagi membuka obrolan proyek atau daftar periksa. Cabut?"
   },
   "it-IT": {
     "panel.historyScope": "Messaggi visibili al cliente",
@@ -81,7 +97,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Il cliente che entra con questo codice vede solo i messaggi e i file inviati dopo il suo ingresso. Condividilo solo con la persona prevista. Valido fino al {time}",
     "panel.inviteHintWithHistory": "Il cliente che entra con questo codice può leggere anche i messaggi precedenti; i file restano aperti uno per uno in base ai permessi di accesso. Condividilo solo con la persona prevista. Valido fino al {time}",
     "panel.inviteJoinHow": "La persona accede all’app AI WorkDeck con il proprio account e inserisce il codice in «Centro messaggi → Conversazioni → Partecipa con codice» o in «Chat del progetto → Partecipa con codice». Il portale clienti non accetta questo codice.",
-    "panel.fromClient": "Cliente"
+    "panel.fromClient": "Cliente",
+    "panel.revokeCode": "Revoca codice di accesso",
+    "panel.revokeCodeConfirm": "Il codice di accesso del cliente smette subito di funzionare; non potrà più aprire la chat del progetto né la checklist. Revocare?"
   },
   "ja-JP": {
     "panel.historyScope": "クライアントが閲覧できるメッセージの範囲",
@@ -90,7 +108,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "このコードで参加したクライアントは、参加後のメッセージとファイルのみ閲覧できます。予定している相手にのみ渡してください。有効期限：{time}",
     "panel.inviteHintWithHistory": "このコードで参加したクライアントは、参加前のメッセージも閲覧できます。ファイルは引き続きアクセス権限に従って個別に公開されます。予定している相手にのみ渡してください。有効期限：{time}",
     "panel.inviteJoinHow": "相手は自分の AI WorkDeck アカウントでアプリにサインインし、「メッセージセンター → チャット → 招待コードで参加」または「プロジェクトチャット → 招待コードで参加」でこのコードを入力します。クライアントポータルではこのコードは使えません。",
-    "panel.fromClient": "クライアント"
+    "panel.fromClient": "クライアント",
+    "panel.revokeCode": "アクセスコードを取り消す",
+    "panel.revokeCodeConfirm": "クライアントのアクセスコードは直ちに無効になり、プロジェクトチャットとチェックリストを開けなくなります。取り消しますか？"
   },
   "ko-KR": {
     "panel.historyScope": "의뢰인이 볼 수 있는 메시지 범위",
@@ -99,7 +119,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "이 코드로 참여한 의뢰인은 참여 이후의 메시지와 파일만 볼 수 있습니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}",
     "panel.inviteHintWithHistory": "이 코드로 참여한 의뢰인은 이전 메시지도 볼 수 있습니다. 파일은 여전히 접근 권한에 따라 개별적으로 공개됩니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}",
     "panel.inviteJoinHow": "상대방은 자신의 AI WorkDeck 계정으로 앱에 로그인한 뒤 «메시지 센터 → 대화 → 초대 코드로 참여» 또는 «프로젝트 채팅 → 초대 코드로 참여»에서 이 코드를 입력합니다. 의뢰인 포털에서는 이 코드를 사용할 수 없습니다.",
-    "panel.fromClient": "의뢰인"
+    "panel.fromClient": "의뢰인",
+    "panel.revokeCode": "액세스 코드 취소",
+    "panel.revokeCodeConfirm": "의뢰인의 액세스 코드가 즉시 무효화되어 프로젝트 채팅과 체크리스트를 더 이상 열 수 없습니다. 취소하시겠습니까?"
   },
   "ms-MY": {
     "panel.historyScope": "Mesej yang boleh dilihat anak guam",
@@ -108,7 +130,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Anak guam yang menyertai dengan kod ini hanya melihat mesej dan fail yang dihantar selepas dia menyertai. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}",
     "panel.inviteHintWithHistory": "Anak guam yang menyertai dengan kod ini juga boleh membaca mesej terdahulu; fail masih dibuka satu demi satu mengikut kebenaran akses. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}",
     "panel.inviteJoinHow": "Orang tersebut log masuk ke aplikasi AI WorkDeck dengan akaunnya sendiri dan memasukkan kod di “Pusat mesej → Sembang → Sertai dengan kod” atau di “Sembang Projek → Sertai dengan kod”. Portal anak guam tidak menerima kod ini.",
-    "panel.fromClient": "Anak guam"
+    "panel.fromClient": "Anak guam",
+    "panel.revokeCode": "Batalkan kod akses",
+    "panel.revokeCodeConfirm": "Kod akses anak guam akan serta-merta tidak sah; mereka tidak lagi boleh membuka sembang projek atau senarai semak. Batalkan?"
   },
   "nl-NL": {
     "panel.historyScope": "Berichten die de cliënt kan zien",
@@ -117,7 +141,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Een cliënt die met deze code deelneemt, ziet alleen berichten en bestanden die na deelname zijn verzonden. Deel de code alleen met de beoogde persoon. Geldig tot {time}",
     "panel.inviteHintWithHistory": "Een cliënt die met deze code deelneemt, kan ook eerdere berichten lezen; bestanden worden nog steeds per stuk opengesteld volgens hun toegangsrechten. Deel de code alleen met de beoogde persoon. Geldig tot {time}",
     "panel.inviteJoinHow": "De persoon meldt zich met een eigen AI WorkDeck-account aan in de app en voert de code in bij “Berichtencentrum → Gesprekken → Deelnemen met code” of in “Projectchat → Deelnemen met code”. Het cliëntenportaal accepteert deze code niet.",
-    "panel.fromClient": "Cliënt"
+    "panel.fromClient": "Cliënt",
+    "panel.revokeCode": "Toegangscode intrekken",
+    "panel.revokeCodeConfirm": "De toegangscode van de cliënt werkt meteen niet meer; de cliënt kan de projectchat en de checklist niet meer openen. Intrekken?"
   },
   "pt-BR": {
     "panel.historyScope": "Mensagens que o cliente pode ver",
@@ -126,7 +152,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "O cliente que entrar com este código verá apenas as mensagens e os arquivos enviados após a entrada. Compartilhe somente com a pessoa prevista. Válido até {time}",
     "panel.inviteHintWithHistory": "O cliente que entrar com este código também poderá ler as mensagens anteriores; os arquivos continuam sendo liberados um a um conforme as permissões de acesso. Compartilhe somente com a pessoa prevista. Válido até {time}",
     "panel.inviteJoinHow": "A pessoa entra no aplicativo AI WorkDeck com a própria conta e digita o código em “Central de mensagens → Conversas → Entrar com código” ou em “Chat do projeto → Entrar com código”. O portal do cliente não aceita este código.",
-    "panel.fromClient": "Cliente"
+    "panel.fromClient": "Cliente",
+    "panel.revokeCode": "Revogar código de acesso",
+    "panel.revokeCodeConfirm": "O código de acesso do cliente deixa de funcionar imediatamente; ele não poderá mais abrir o chat do projeto nem a lista de verificação. Revogar?"
   },
   "ru-RU": {
     "panel.historyScope": "Сообщения, доступные клиенту",
@@ -135,7 +163,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Клиент, присоединившийся по этому коду, видит только сообщения и файлы, отправленные после его присоединения. Передавайте код только предполагаемому участнику. Действует до {time}",
     "panel.inviteHintWithHistory": "Клиент, присоединившийся по этому коду, сможет читать и более ранние сообщения; файлы по-прежнему открываются по отдельности согласно правам доступа. Передавайте код только предполагаемому участнику. Действует до {time}",
     "panel.inviteJoinHow": "Получатель входит в приложение AI WorkDeck под своей учётной записью и вводит код в разделе «Центр сообщений → Беседы → Войти по коду» или в «Чат проекта → Войти по коду». Клиентский портал этот код не принимает.",
-    "panel.fromClient": "Клиент"
+    "panel.fromClient": "Клиент",
+    "panel.revokeCode": "Отозвать код доступа",
+    "panel.revokeCodeConfirm": "Код доступа клиента сразу перестанет действовать; он больше не сможет открыть чат проекта и чек-лист. Отозвать?"
   },
   "th-TH": {
     "panel.historyScope": "ข้อความที่ลูกความมองเห็นได้",
@@ -144,7 +174,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "ลูกความที่เข้าร่วมด้วยรหัสนี้จะเห็นเฉพาะข้อความและไฟล์ที่ส่งหลังจากเข้าร่วมเท่านั้น โปรดมอบให้เฉพาะบุคคลที่ตั้งใจไว้ ใช้ได้ถึง {time}",
     "panel.inviteHintWithHistory": "ลูกความที่เข้าร่วมด้วยรหัสนี้จะอ่านข้อความก่อนหน้าได้ด้วย ส่วนไฟล์ยังคงเปิดให้ทีละไฟล์ตามสิทธิ์การเข้าถึง โปรดมอบให้เฉพาะบุคคลที่ตั้งใจไว้ ใช้ได้ถึง {time}",
     "panel.inviteJoinHow": "อีกฝ่ายต้องลงชื่อเข้าใช้แอป AI WorkDeck ด้วยบัญชีของตนเอง แล้วป้อนรหัสที่ «ศูนย์ข้อความ → แชท → เข้าร่วมด้วยรหัสเชิญ» หรือใน «แชทของโปรเจกต์ → เข้าร่วมด้วยรหัสเชิญ» พอร์ทัลลูกความไม่รับรหัสนี้",
-    "panel.fromClient": "ลูกความ"
+    "panel.fromClient": "ลูกความ",
+    "panel.revokeCode": "เพิกถอนรหัสเข้าถึง",
+    "panel.revokeCodeConfirm": "รหัสเข้าถึงของลูกความจะใช้ไม่ได้ทันที และจะเปิดแชตโครงการหรือรายการตรวจสอบไม่ได้อีก ยืนยันการเพิกถอนหรือไม่"
   },
   "tr-TR": {
     "panel.historyScope": "Müvekkilin görebileceği mesajlar",
@@ -153,7 +185,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Bu kodla katılan müvekkil yalnızca katıldıktan sonra gönderilen mesajları ve dosyaları görür. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir",
     "panel.inviteHintWithHistory": "Bu kodla katılan müvekkil önceki mesajları da okuyabilir; dosyalar yine erişim izinlerine göre tek tek açılır. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir",
     "panel.inviteJoinHow": "Karşı taraf kendi AI WorkDeck hesabıyla uygulamada oturum açar ve kodu “Mesaj merkezi → Sohbetler → Kodla katıl” bölümüne ya da “Proje Sohbeti → Kodla katıl” içine girer. Müvekkil portalı bu kodu kabul etmez.",
-    "panel.fromClient": "Müvekkil"
+    "panel.fromClient": "Müvekkil",
+    "panel.revokeCode": "Erişim kodunu iptal et",
+    "panel.revokeCodeConfirm": "Müvekkilin erişim kodu hemen geçersiz olur; artık proje sohbetini veya kontrol listesini açamaz. İptal edilsin mi?"
   },
   "vi-VN": {
     "panel.historyScope": "Tin nhắn khách hàng có thể xem",
@@ -162,7 +196,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "Khách hàng tham gia bằng mã này chỉ thấy tin nhắn và tệp được gửi sau khi tham gia. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}",
     "panel.inviteHintWithHistory": "Khách hàng tham gia bằng mã này cũng đọc được các tin nhắn trước đó; tệp vẫn được mở từng tệp theo quyền truy cập. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}",
     "panel.inviteJoinHow": "Người nhận đăng nhập ứng dụng AI WorkDeck bằng tài khoản của chính mình và nhập mã tại “Trung tâm tin nhắn → Hội thoại → Tham gia bằng mã mời” hoặc trong “Trò chuyện dự án → Tham gia bằng mã mời”. Cổng khách hàng không chấp nhận mã này.",
-    "panel.fromClient": "Khách hàng"
+    "panel.fromClient": "Khách hàng",
+    "panel.revokeCode": "Thu hồi mã truy cập",
+    "panel.revokeCodeConfirm": "Mã truy cập của khách hàng sẽ mất hiệu lực ngay; họ sẽ không thể mở trò chuyện dự án hay danh mục kiểm tra nữa. Thu hồi?"
   },
   "zh-CN": {
     "panel.historyScope": "客户可看的消息范围",
@@ -171,7 +207,9 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "客户凭码加入后，只能看到入群之后的消息和文件。请仅交给预期成员。有效期至 {time}",
     "panel.inviteHintWithHistory": "客户凭码加入后，可同时查看此前的消息；文件仍按访问权限逐个开放。请仅交给预期成员。有效期至 {time}",
     "panel.inviteJoinHow": "对方需用自己的 AI WorkDeck 账号登录应用，在「消息中心 → 对话 → 邀请码加入」或「项目沟通 → 邀请码加入」中输入此码；客户门户不能使用此码。",
-    "panel.fromClient": "客户"
+    "panel.fromClient": "客户",
+    "panel.revokeCode": "撤销访问码",
+    "panel.revokeCodeConfirm": "撤销后，这位客户的访问码立即失效，他将无法再进入项目沟通和尽调清单。确定撤销？"
   },
   "zh-TW": {
     "panel.historyScope": "客戶可看的訊息範圍",
@@ -180,6 +218,8 @@ window.AWD_IM_L10N = {
     "panel.inviteHintAfterJoin": "客戶憑碼加入後，只能看到入群之後的訊息和檔案。請僅交給預期成員。有效期至 {time}",
     "panel.inviteHintWithHistory": "客戶憑碼加入後，可同時查看此前的訊息；檔案仍按存取權限逐一開放。請僅交給預期成員。有效期至 {time}",
     "panel.inviteJoinHow": "對方需用自己的 AI WorkDeck 帳號登入應用程式，在「訊息中心 → 對話 → 邀請碼加入」或「專案溝通 → 邀請碼加入」中輸入此碼；客戶入口網站不能使用此碼。",
-    "panel.fromClient": "客戶"
+    "panel.fromClient": "客戶",
+    "panel.revokeCode": "撤銷存取碼",
+    "panel.revokeCodeConfirm": "撤銷後，這位客戶的存取碼立即失效，將無法再進入專案溝通與盡調清單。確定撤銷？"
   }
 };

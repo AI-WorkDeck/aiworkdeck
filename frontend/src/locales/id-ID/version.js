@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "Tautan untuk klien:",
   "clientCodeExpires": "Berlaku hingga {date}. Buat ulang untuk memperpanjang.",
   "clientChatNeedsName": "Tanpa nama klien, ini adalah kode bersama: membuka daftar periksa, tetapi tidak dapat dipakai untuk obrolan proyek.",
+  "clientNameRequired": "Masukkan nama klien: kode hanya untuk klien ini, dan obrolan proyek memerlukan kode atas nama.",
+  "clientGenericOption": "Terbitkan kode bersama tanpa nama (hanya daftar periksa, tanpa obrolan proyek)",
   "clientChatHistoryLabel": "Pesan yang dapat dilihat klien di obrolan proyek",
   "clientChatHistoryAfter": "Hanya pesan setelah bergabung (disarankan)",
   "clientChatHistoryAll": "Juga pesan sebelum bergabung",

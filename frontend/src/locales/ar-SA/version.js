@@ -318,6 +318,8 @@ export default {
   "clientPortalLinkLabel": "الرابط للعميل:",
   "clientCodeExpires": "صالح حتى {date}. أعد إنشاءه للتمديد.",
   "clientChatNeedsName": "بدون اسم الموكل يكون هذا رمزًا مشتركًا: يفتح قائمة التحقق لكنه لا يصلح لدردشة المشروع.",
+  "clientNameRequired": "أدخل اسم الموكل: الرمز لهذا الموكل وحده، ودردشة المشروع تتطلب رمزًا باسمه.",
+  "clientGenericOption": "إصدار رمز مشترك بدون اسم (قائمة التحقق فقط، بدون دردشة المشروع)",
   "clientChatHistoryLabel": "الرسائل التي يراها الموكل في دردشة المشروع",
   "clientChatHistoryAfter": "الرسائل بعد الانضمام فقط (موصى به)",
   "clientChatHistoryAll": "الرسائل السابقة للانضمام أيضًا",
