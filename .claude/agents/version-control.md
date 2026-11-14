@@ -1119,3 +1119,9 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Inte
 - 桌面 local-mode 可无 session 创建和提交本机项目。全局退出清单必须以 `isDesktopHost()` 纳入匿名桌面，不能用缺少 session 跳过；只有未登录 Web 且无待确认提交回执才可略过（#1695）。
 
 - 退出清单通过动态 `component :is` 渲染原生 `label/input/button`，样式必须使用专用 class。Uni H5 会将 CSS 标签选择器 `label/button` 改写为 `uni-label/uni-button`，原生元素因此无法命中；脱离 Uni 的 SFC/esbuild 预览不能发现这一差异。#1695 在真实 H5 编译 CSS 中复现失配，已安装 QA 的 `checkExitList` 同时核对行 `display:flex`、行矩形不重叠和按钮 padding/radius，截图仍需人工复核。
+
+## 比对时新版自身已带修订（台账 B12，2026-11-14）
+- `VersionCompareTab` 走 `compare_document`（不是 `build_comparison_document`）：以前直接拿新版原样比，新版里原有的修订（如 AI 的 5→2）与比对修订叠在一起，律师看到「52050%」、共 5 处。
+- 现在默认 `compare_document{acceptExisting:true}`：先在对比专用实例里接受新版原有修订再比（旧版一侧原生比较本就按最终文本读），返回 `acceptedExisting`；横幅说明「已按接受后的正文比对」，并可「显示原有修订」切回原样（每台实例只能比一次，切换即整台重建）。
+- 回归：`frontend/tests/lowa-e2e/compare-accepted.mjs`（接受模式 2 处、只有「版本对比」署名；原样模式 5 处、含原 AI 修订）。
+
