@@ -320,14 +320,23 @@ class OpenRouterStreamingChatModelTest {
     }
 
     @org.junit.jupiter.api.Test
-    @org.junit.jupiter.api.DisplayName("W6：tool_choice 具名函数注入请求体，其余字段不动")
-    void forcedToolIsInjectedAsNamedFunctionChoice() throws Exception {
+    @org.junit.jupiter.api.DisplayName("W6：核验员一轮——并行工具调用总是打开；具名强制 / none / auto，其余字段不动")
+    void consultRoundSetsParallelCallsAndToolChoice() throws Exception {
         String body = "{\"model\":\"q\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"search_project_content\"}}]}";
-        com.fasterxml.jackson.databind.JsonNode out = new com.fasterxml.jackson.databind.ObjectMapper()
-                .readTree(OpenRouterStreamingChatModel.withForcedTool(body, "search_project_content"));
-        org.junit.jupiter.api.Assertions.assertEquals("function", out.path("tool_choice").path("type").asText());
-        org.junit.jupiter.api.Assertions.assertEquals("search_project_content", out.path("tool_choice").path("function").path("name").asText());
-        org.junit.jupiter.api.Assertions.assertEquals("q", out.path("model").asText());
-        org.junit.jupiter.api.Assertions.assertEquals(1, out.path("tools").size());
+        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.JsonNode forced = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "search_project_content", true));
+        org.junit.jupiter.api.Assertions.assertEquals("function", forced.path("tool_choice").path("type").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("search_project_content", forced.path("tool_choice").path("function").path("name").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(forced.path("parallel_tool_calls").asBoolean());
+        org.junit.jupiter.api.Assertions.assertEquals("q", forced.path("model").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(1, forced.path("tools").size());
+        com.fasterxml.jackson.databind.JsonNode none = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "none", false));
+        org.junit.jupiter.api.Assertions.assertEquals("none", none.path("tool_choice").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(1, none.path("tools").size(), "tools stay declared so earlier tool calls remain valid");
+        com.fasterxml.jackson.databind.JsonNode auto = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "auto", false));
+        org.junit.jupiter.api.Assertions.assertTrue(auto.path("tool_choice").isMissingNode());
+        org.junit.jupiter.api.Assertions.assertTrue(auto.path("parallel_tool_calls").asBoolean());
+        com.fasterxml.jackson.databind.JsonNode undeclared = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "read_document", false));
+        org.junit.jupiter.api.Assertions.assertTrue(undeclared.path("tool_choice").isMissingNode());
     }
 }

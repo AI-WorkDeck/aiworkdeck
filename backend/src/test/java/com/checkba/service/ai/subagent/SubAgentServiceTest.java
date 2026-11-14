@@ -260,6 +260,65 @@ class SubAgentServiceTest {
     }
 
     @Test
+    @DisplayName("W6 费用：核验员每轮都带并行工具调用；第一轮强制检索，查满 4 轮后 tool_choice=none 只许作答")
+    void verifierReadRoundsAreCapped() {
+        when(registry.getAllSpecifications(any())).thenReturn(List.of(
+                ToolSpecification.builder().name("search_project_content").description("search").build(),
+                ToolSpecification.builder().name("read_document").description("read file").build()));
+        com.checkba.service.ai.OpenRouterStreamingChatModel streaming =
+                org.mockito.Mockito.mock(com.checkba.service.ai.OpenRouterStreamingChatModel.class);
+        when(modelFactory.getStreamingChatModel(any())).thenReturn(streaming);
+        List<String> choices = new java.util.ArrayList<>();
+        // 模型一直想一轮读一个文件；只有 tool_choice=none 那轮给结论
+        org.mockito.Mockito.doAnswer(inv -> {
+            String choice = inv.getArgument(2);
+            choices.add(choice);
+            com.checkba.service.ai.ReasoningStreamingHandler h = inv.getArgument(3);
+            h.onComplete("none".equals(choice) ? textTurn("命题 1：有依据（fileId=55 引文「…」）")
+                    : toolCallTurn("read_document", "{\"fileId\":55}"));
+            return null;
+        }).when(streaming).generateConsultRound(anyList(), anyList(), any(),
+                org.mockito.ArgumentMatchers.<dev.langchain4j.model.StreamingResponseHandler<AiMessage>>any());
+
+        SubAgentResult result = newService().dispatch("核验", "清单",
+                List.of("search_project_content", "read_document"), PARENT_CTX, null, true);
+
+        assertTrue(result.success(), result.toJson());
+        assertEquals(List.of("search_project_content", "auto", "auto", "auto", "none"), choices);
+        assertEquals(5, result.rounds());
+        assertEquals(4, result.toolsUsed().size());
+    }
+
+    @Test
+    @DisplayName("W6 费用：读取轮次用完后模型仍调工具——不执行；再犯一次判失败，不会无限转")
+    void verifierIgnoringToolChoiceNoneStops() {
+        com.checkba.service.ai.OpenRouterStreamingChatModel streaming =
+                org.mockito.Mockito.mock(com.checkba.service.ai.OpenRouterStreamingChatModel.class);
+        when(modelFactory.getStreamingChatModel(any())).thenReturn(streaming);
+        org.mockito.Mockito.doAnswer(inv -> {
+            com.checkba.service.ai.ReasoningStreamingHandler h = inv.getArgument(3);
+            h.onComplete(toolCallTurn("read_document", "{\"fileId\":55}"));
+            return null;
+        }).when(streaming).generateConsultRound(anyList(), anyList(), any(),
+                org.mockito.ArgumentMatchers.<dev.langchain4j.model.StreamingResponseHandler<AiMessage>>any());
+
+        SubAgentResult result = newService().dispatch("核验", "清单", List.of("read_document"), PARENT_CTX, null, true);
+
+        assertFalse(result.success());
+        assertEquals(4, result.toolsUsed().size(), "nothing executed after the read budget");
+    }
+
+    @Test
+    @DisplayName("W6 费用：tool_choice 轮次表")
+    void consultToolChoiceSchedule() {
+        List<ToolSpecification> specs = List.of(ToolSpecification.builder().name("search_project_content").description("s").build());
+        assertEquals("search_project_content", SubAgentService.consultToolChoice(1, true, specs));
+        assertEquals("auto", SubAgentService.consultToolChoice(1, false, specs));
+        assertEquals("auto", SubAgentService.consultToolChoice(SubAgentService.MAX_CONSULT_ROUNDS, false, specs));
+        assertEquals("none", SubAgentService.consultToolChoice(SubAgentService.MAX_CONSULT_ROUNDS + 1, false, specs));
+    }
+
+    @Test
     @DisplayName("W6：mustConsult 只顶一次；不带 mustConsult 的子任务行为不变")
     void mustConsultPushesBackOnlyOnce() {
         when(model.generate(anyList(), anyList())).thenReturn(textTurn("不查也行。"), textTurn("还是不查。"));
