@@ -428,6 +428,8 @@ public class SubAgentService {
 
             // 协议 1：原生 function calling
             if (aiMessage.hasToolExecutionRequests()) {
+                log.info("[SubAgent] {} round {} tool requests: {}", subtaskId, round,
+                        aiMessage.toolExecutionRequests().stream().map(ToolExecutionRequest::name).toList());
                 for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
                     String output = executeScoped(req.name(), req.arguments(), allowed, subCtx, toolsUsed, progress);
                     messages.add(ToolExecutionResultMessage.from(req, output));
@@ -454,6 +456,9 @@ public class SubAgentService {
 
             // 无工具调用 = 最终答案
             if (progress.isCancelled(parentCtx)) throw new CancellationException();
+            // W6：核验员一次工具都没调就交卷（没读过正文）以前只能靠推断，记下来
+            log.info("[SubAgent] {} finished after {} round(s); tools offered={} used={}",
+                    subtaskId, round, specs.size(), toolsUsed);
             return SubAgentResult.success(subtaskId, text.trim(), toolsUsed, round);
         }
     }
@@ -537,6 +542,7 @@ public class SubAgentService {
                     + "state the open question in your result; the main agent will ask the user.";
         }
         if (!allowed.contains(resolved)) {
+            log.info("[SubAgent] refused out-of-scope tool '{}' (scope {})", resolved, allowed);
             return "Error: tool '" + resolved + "' is outside this sub-agent's tool scope.";
         }
         toolsUsed.add(resolved);

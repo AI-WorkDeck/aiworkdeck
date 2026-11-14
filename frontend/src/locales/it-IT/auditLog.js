@@ -4,7 +4,7 @@
 export default {
   "nav": "Registro di audit",
   "title": "Registro di audit dello studio",
-  "subtitle": "Registra gli accessi, i dispositivi e le chiavi dell'account, l'ingresso o l'uscita dallo studio e i cambi di ruolo, la condivisione e i membri dei progetti, gli inviti ai clienti, i download di file, le modifiche alle impostazioni dello studio e gli accessi negati, comprese le azioni eseguite sul sito web. Visibile solo agli amministratori dello studio; non contiene mai il contenuto di documenti, file o conversazioni.",
+  "subtitle": "Registra accessi, connessioni di dispositivi, condivisione di progetti e modifiche dei membri, inviti ai clienti, download di file e modifiche alle impostazioni dello studio. Visibile solo agli amministratori dello studio; non contiene mai il contenuto di documenti, file o conversazioni.",
   "retention": "I record vengono conservati per {days} giorni e poi rimossi automaticamente",
   "from": "Da",
   "to": "A",
@@ -41,8 +41,6 @@ export default {
   "colEventId": "ID record",
   "outcomeFailure": "non riuscito",
   "catAll": "Tutte le categorie",
-  "sourceWebsite": "sito web",
-  "colSource": "Origine",
   "cat": {
     "AUTH": "Accesso",
     "DEVICES": "Dispositivi",
@@ -50,8 +48,7 @@ export default {
     "SHARING": "Condivisione progetti",
     "CLIENT": "Clienti e messaggistica",
     "DATA": "Accesso ai dati",
-    "SETTINGS": "Impostazioni dello studio",
-    "ACCESS": "Accesso negato"
+    "SETTINGS": "Impostazioni dello studio"
   },
   "action": {
     "LOGIN": "Accesso",
@@ -73,19 +70,6 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Allegato della conversazione scaricato",
     "FIRM_CLOUD_SWITCH_CHANGED": "Interruttore cloud dello studio modificato",
     "FIRM_COMMITTEE_APPOINTED": "Membro del comitato conflitti nominato",
-    "FIRM_COMMITTEE_REVOKED": "Membro del comitato conflitti revocato",
-    "PERMISSION_DENIED": "Autorizzazione negata",
-    "FIRM_MEMBER_JOINED": "Membro entrato nello studio",
-    "FIRM_MEMBER_LEFT": "Membro uscito dallo studio",
-    "FIRM_MEMBER_REMOVED": "Membro rimosso dallo studio",
-    "FIRM_ROLE_CHANGED": "Ruolo nello studio modificato",
-    "FIRM_TEAM_JOINED": "Team entrato nello studio",
-    "FIRM_TEAM_LEFT": "Team uscito dallo studio",
-    "FIRM_TEAM_REMOVED": "Team rimosso dallo studio",
-    "FIRM_CREATED": "Studio creato",
-    "FIRM_JOIN_CODE_REGENERATED": "Codice di adesione allo studio reimpostato",
-    "WEBSITE_LOGIN_FAILED": "Accesso al sito web",
-    "ACCOUNT_API_KEY_CREATED": "Chiave dell'account emessa",
-    "ACCOUNT_API_KEY_REVOKED": "Chiave dell'account revocata"
+    "FIRM_COMMITTEE_REVOKED": "Membro del comitato conflitti revocato"
   }
 }

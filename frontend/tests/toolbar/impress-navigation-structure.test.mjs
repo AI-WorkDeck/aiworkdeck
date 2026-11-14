@@ -29,7 +29,7 @@ function harness(kind = 'impress', operation = () => ({ success: true })) {
     xModel: {}, docSeq: 7, CANCELLED: {}, INFLIGHT: {},
     EXEC: Object.fromEntries([...actions, 'insert_at_cursor', 'ui_command', 'get_ui_state'].map(action => [action, operation])),
     RESOLVE_REVISION_ACTIONS: new Set(), FINAL_TEXT_ACTIONS: new Set(),
-    humanAuthor: 'Test', AI_AUTHOR: 'Test AI', setRedlineAuthor() {}, errStr: String, log() {}, noteRedlinesMayHaveBeenRemoved() {}, releaseRetiredParaRanges() {},
+    humanAuthor: 'Test', AI_AUTHOR: 'Test AI', setRedlineAuthor() {}, errStr: String, log() {}, noteRedlinesMayHaveBeenRemoved() {},
     runAgentCommandInMarginView: (_action, run) => run(),
     isImpressDoc: () => editor.docKind === 'impress',
     post(cmd, payload) { const event = { cmd, ...payload }; messages.push(event); relayEvent(event) },

@@ -4462,6 +4462,49 @@ public class AgentOrchestrator {
      *
      * @return true = 本方法已接管收尾（补检续轮或取消），调用方直接 return；false = 走默认收尾
      */
+    /** 收尾核验附带的当前稿上限：约 2 万汉字，长稿其余段落由核验员按段号续读。 */
+    static final int OPINION_DRAFT_CHAR_LIMIT = 40_000;
+
+    /**
+     * 经编辑器桥读出目标文档当前稿（与 doc_get_document_text 同源；宿主给桥命令带 __agent，读到的是最终文本）。
+     * 分页读到上限为止；读不到或正文为空返回 null。
+     */
+    OpinionCompletionCheck.DraftText readOpinionDraftText() {
+        StringBuilder text = new StringBuilder();
+        int start = 0;
+        try {
+            for (int page = 0; page < 40; page++) {
+                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                params.put("startParagraph", start);
+                params.put("maxParagraphs", 500);
+                String raw = editorBridgeService.executeEditorCommand("get_document_text", params);
+                com.fasterxml.jackson.databind.JsonNode root = SKILL_UPDATE_MAPPER.readTree(raw);
+                if (root == null || !root.path("success").asBoolean(true) || !root.path("paragraphs").isArray()) {
+                    return null;
+                }
+                for (com.fasterxml.jackson.databind.JsonNode para : root.path("paragraphs")) {
+                    String body = para.path("text").asText("");
+                    String label = para.path("numbering").path("label").asText("");
+                    if (body.isBlank() && label.isBlank()) continue;
+                    String line = "【" + para.path("index").asInt() + "】" + (label.isBlank() ? "" : label + " ") + body + "\n";
+                    if (text.length() + line.length() > OPINION_DRAFT_CHAR_LIMIT) {
+                        return text.length() == 0 ? null
+                                : new OpinionCompletionCheck.DraftText(text.toString(), true, para.path("index").asInt());
+                    }
+                    text.append(line);
+                }
+                boolean truncated = root.path("truncated").asBoolean(false);
+                int next = root.path("nextStartParagraph").asInt(-1);
+                if (!truncated || next <= start) break;
+                start = next;
+            }
+        } catch (Exception e) {
+            log.warn("[OpinionCheck] 读取当前稿失败", e);
+            return null;
+        }
+        return text.length() == 0 ? null : new OpinionCompletionCheck.DraftText(text.toString(), false, null);
+    }
+
     private boolean runOpinionCompletionCheckOnce(StreamingChatLanguageModel model,
                                                   java.util.List<dev.langchain4j.data.message.ChatMessage> messages,
                                                   String conversationId, String projectId, Long userId,
@@ -4506,14 +4549,26 @@ public class AgentOrchestrator {
                         LangText.of("无法确认当前编辑器仍为本轮目标文档，请先定位目标并自行回读核对。",
                                 "The active editor cannot be confirmed as this run's target. Locate and re-read the target yourself."),
                         List.of(), 0);
-            } else outcome = subAgentService.dispatch(
-                    OpinionCompletionCheck.verificationTask(guard.opinionTargetFileId,
-                            guard.opinionTargetFileName, guard.opinionInstructions, manifest),
-                    OpinionCompletionCheck.expectedOutput(),
-                    OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
-                    // 核验员模型（W6）：默认本轮主模型——flash 档辅助模型在收尾核验里编造过不存在的来源文件；
-                    // ai.verifierModel 可改成 subagent（子 Agent 模型）或显式中档模型
-                    auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId);
+            } else {
+                // 当前稿由系统读好附进任务（W6）：核验员不读正文就交卷时，命题只能是它自己编的
+                OpinionCompletionCheck.DraftText draft = readOpinionDraftText();
+                if (draft == null) {
+                    outcome = com.checkba.service.ai.subagent.SubAgentResult.failure("opinion-completion-check",
+                            LangText.of("无法从编辑器读出目标文档的当前稿，独立核验未进行；请自行回读正文并对照底稿核实。",
+                                    "Could not read the target's current draft from the editor, so the independent check did not run; "
+                                            + "re-read the draft and check it against the source materials yourself."),
+                            List.of(), 0);
+                } else {
+                    outcome = OpinionCompletionCheck.requireConsultation(subAgentService.dispatch(
+                            OpinionCompletionCheck.verificationTask(guard.opinionTargetFileId,
+                                    guard.opinionTargetFileName, guard.opinionInstructions, manifest, draft),
+                            OpinionCompletionCheck.expectedOutput(),
+                            OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
+                            // 核验员模型（W6）：默认本轮主模型——flash 档辅助模型在收尾核验里编造过不存在的来源文件；
+                            // ai.verifierModel 可改成 subagent（子 Agent 模型）或显式中档模型
+                            auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId));
+                }
+            }
         } catch (Exception e) {
             // 派发异常与核验失败同一条出路：如实接回「未验证」，不阻断收尾
             log.warn("[OpinionCheck] conv={} 补检派发异常，按失败接回", conversationId, e);

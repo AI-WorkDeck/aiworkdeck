@@ -4,7 +4,7 @@
 export default {
   "nav": "Auditlogboek",
   "title": "Auditlogboek van het kantoor",
-  "subtitle": "Registreert aanmeldingen, apparaten en accountsleutels, toetreding tot of vertrek uit het kantoor en rolwijzigingen, projectdeling en -lidmaatschap, uitnodigingen aan cliënten, bestandsdownloads, wijzigingen in kantoorinstellingen en geweigerde toegang, inclusief acties op de website. Alleen zichtbaar voor kantoorbeheerders; bevat nooit documentinhoud, bestandsinhoud of gesprekken.",
+  "subtitle": "Legt aanmeldingen, apparaatverbindingen, projectdeling en ledenwijzigingen, cliëntuitnodigingen, bestandsdownloads en wijzigingen in de kantoorinstellingen vast. Alleen zichtbaar voor kantoorbeheerders; bevat nooit documentinhoud, bestandsinhoud of gesprekken.",
   "retention": "Records worden {days} dagen bewaard en daarna automatisch verwijderd",
   "from": "Van",
   "to": "Tot",
@@ -41,8 +41,6 @@ export default {
   "colEventId": "Record-ID",
   "outcomeFailure": "mislukt",
   "catAll": "Alle categorieën",
-  "sourceWebsite": "website",
-  "colSource": "Bron",
   "cat": {
     "AUTH": "Aanmelden",
     "DEVICES": "Apparaten",
@@ -50,8 +48,7 @@ export default {
     "SHARING": "Projectdeling",
     "CLIENT": "Cliënten en berichten",
     "DATA": "Gegevenstoegang",
-    "SETTINGS": "Kantoorinstellingen",
-    "ACCESS": "Toegang geweigerd"
+    "SETTINGS": "Kantoorinstellingen"
   },
   "action": {
     "LOGIN": "Aanmelden",
@@ -73,19 +70,6 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Gespreksbijlage gedownload",
     "FIRM_CLOUD_SWITCH_CHANGED": "Cloudschakelaar van het kantoor gewijzigd",
     "FIRM_COMMITTEE_APPOINTED": "Lid van de conflictencommissie benoemd",
-    "FIRM_COMMITTEE_REVOKED": "Lid van de conflictencommissie ontheven",
-    "PERMISSION_DENIED": "Toestemming geweigerd",
-    "FIRM_MEMBER_JOINED": "Lid is toegetreden tot het kantoor",
-    "FIRM_MEMBER_LEFT": "Lid heeft het kantoor verlaten",
-    "FIRM_MEMBER_REMOVED": "Lid verwijderd uit het kantoor",
-    "FIRM_ROLE_CHANGED": "Kantoorrol gewijzigd",
-    "FIRM_TEAM_JOINED": "Team is toegetreden tot het kantoor",
-    "FIRM_TEAM_LEFT": "Team heeft het kantoor verlaten",
-    "FIRM_TEAM_REMOVED": "Team verwijderd uit het kantoor",
-    "FIRM_CREATED": "Kantoor aangemaakt",
-    "FIRM_JOIN_CODE_REGENERATED": "Toetredingscode van het kantoor opnieuw ingesteld",
-    "WEBSITE_LOGIN_FAILED": "Website-aanmelding",
-    "ACCOUNT_API_KEY_CREATED": "Accountsleutel uitgegeven",
-    "ACCOUNT_API_KEY_REVOKED": "Accountsleutel ingetrokken"
+    "FIRM_COMMITTEE_REVOKED": "Lid van de conflictencommissie ontheven"
   }
 }

@@ -10,11 +10,7 @@ Module.zetajs = new Promise(function (resolve, reject) {
     // warnings for them); it is tied to Module so it doesn't itself get GC'ed early:
     Module.uno$zetajs_deleteRegistry = new FinalizationRegistry(function(value) {
       value.forEach((val) => val.delete());
-      // AI WorkDeck local change: count of live interface proxies (diagnostics, heap tests).
-      if (value.zetajsProxy) Module.uno$zetajs_live--;
     });
-    const releaseSymbol = Symbol('release');
-    Module.uno$zetajs_live = 0;
     const getProxyTarget = Symbol('getProxyTarget');
     const keepAlive = Symbol('keepAlive');
     function gcWrap(obj) {
@@ -354,12 +350,7 @@ Module.zetajs = new Promise(function (resolve, reject) {
       }
       const prox = {};
       const toDelete = [unoObject];
-      toDelete.zetajsProxy = true;
-      // AI WorkDeck local change: register with an unregister token so release() below can free
-      // the native objects now instead of waiting for a V8 GC that may never come (see UPSTREAM.md).
-      Module.uno$zetajs_deleteRegistry.register(prox, toDelete, prox);
-      Module.uno$zetajs_live++;
-      prox[releaseSymbol] = toDelete;
+      Module.uno$zetajs_deleteRegistry.register(prox, toDelete);
       prox[getProxyTarget] = unoObject;
       prox.$precise = {[getProxyTarget]: unoObject, [keepAlive]: prox};
       // css.script.XInvocation2::getInfo invents additional members (e.g., an attribute "Foo"
@@ -1126,20 +1117,7 @@ Module.zetajs = new Promise(function (resolve, reject) {
         tdm.delete();
         return proxy(Module.unoObject(interfaceNames, wrapper));
       },
-      mainPort: Module.uno_mainPort,
-      // AI WorkDeck local change: free an interface proxy's native objects now. The caller must
-      // own it — any later use of that proxy (or of the same object held elsewhere) throws.
-      // Returns false for values that are not live zetajs proxies, so it is safe on anything.
-      release: function(prox) {
-        const toDelete = prox && typeof prox === 'object' && prox[releaseSymbol];
-        if (!toDelete) return false;
-        delete prox[releaseSymbol];
-        Module.uno$zetajs_deleteRegistry.unregister(prox);
-        toDelete.forEach((val) => val.delete());
-        Module.uno$zetajs_live--;
-        return true;
-      },
-      liveProxies: function() { return Module.uno$zetajs_live; }
+      mainPort: Module.uno_mainPort
     };
     resolve(zetajs);
   };

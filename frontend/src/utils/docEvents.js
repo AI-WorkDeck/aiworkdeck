@@ -36,8 +36,6 @@ export const DOC_READONLY_ACTIONS = new Set([
   // 显示 / 外观 / 宿主自发的存取，都不改内容
   'export_document', 'load_document', 'warm_engine', 'set_zoom', 'set_app_theme', 'set_chrome',
   'set_track_changes', 'set_revision_view', 'set_view_options',
-  // 引擎换新（R-086）：量堆、记录/恢复阅读位置
-  'get_engine_heap', 'get_view_position', 'restore_view_position',
 ])
 
 export function isDocMutatingAction(action) {

@@ -84,16 +84,6 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
 
     @Transactional
     public Map<String, Object> execute(Long userId, String action, Map<String, Object> raw) {
-        try {
-            return executeChecked(userId, action, raw);
-        } catch (LawFirmAuthority.AccessDenied denied) {
-            // 跨所 / 非本所成员 / 非管理员改开关：记「权限拒绝」（同人同资源 10 分钟一条）
-            if (audit != null) audit.recordDenied(userId, "firm-cloud:" + action, "not_permitted");
-            throw denied;
-        }
-    }
-
-    private Map<String, Object> executeChecked(Long userId, String action, Map<String, Object> raw) {
         String feature = featureOf(action);
         if (feature == null) throw new IllegalArgumentException(LangText.of("不支持的律所云端操作", "Unsupported law firm cloud action"));
         LawFirmAuthority.Member me = authority.current(userId);
@@ -196,10 +186,7 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
     }
 
     private Map<String, Object> auditRead(LawFirmAuthority.Member me, String action, Map<String, Object> p) {
-        if (!me.firmAdmin()) {
-            if (audit != null) audit.recordDenied(me.userId(), "firm-cloud:" + action, "not_firm_admin");
-            throw new IllegalArgumentException(LangText.of("无权查看：审计日志仅限律所管理员", "Not permitted: the audit log is limited to firm administrators"));
-        }
+        if (!me.firmAdmin()) throw new IllegalArgumentException(LangText.of("无权查看：审计日志仅限律所管理员", "Not permitted: the audit log is limited to firm administrators"));
         if (audit == null || !audit.enabled()) throw new IllegalStateException(LangText.of("本服务器未开启审计日志", "The audit log is not enabled on this server"));
         return AUDIT_LIST.equals(action) ? audit.list(me.firmId(), p) : audit.verify(me.firmId());
     }

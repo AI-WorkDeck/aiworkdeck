@@ -205,24 +205,6 @@ class FirmAuditLogTest {
     }
 
     @Test
-    void permissionDenialsAreRecordedOncePerPersonAndResourceWindow() {
-        // 非管理员连试 5 次读审计日志 + 1 次改开关：两种资源各一条，重复的被压下
-        for (int i = 0; i < 5; i++) {
-            assertThrows(IllegalArgumentException.class, () -> cloud.execute(lawyer, LawFirmCloudService.AUDIT_LIST, Map.of()));
-        }
-        assertThrows(IllegalArgumentException.class, () -> cloud.execute(lawyer, LawFirmCloudService.SETTINGS_SET,
-                Map.of("feature", "x", "enabled", true)));
-        List<Map<String, Object>> rows = events(admin, Map.of("category", "ACCESS"));
-        assertEquals(2, rows.size(), rows.toString());
-        assertTrue(rows.stream().allMatch(r -> "PERMISSION_DENIED".equals(r.get("action")) && "FAILURE".equals(r.get("outcome"))
-                && "律师甲".equals(r.get("actorName"))));
-        assertEquals(Set.of("firm-cloud:cloud.audit.list", "firm-cloud:cloud.settings.set"),
-                rows.stream().map(r -> r.get("targetId")).collect(java.util.stream.Collectors.toSet()));
-        // 别所管理员看不到
-        assertTrue(events(otherAdmin, Map.of("category", "ACCESS")).isEmpty());
-    }
-
-    @Test
     void switchChangesAreAuditedAndFiltersApply() {
         sessions.issue(lawyer);
         // 合成一个功能开关不需要：开关读写本身就是 cloud 动作，未登记功能会被拒；这里直接记一次开关事件
