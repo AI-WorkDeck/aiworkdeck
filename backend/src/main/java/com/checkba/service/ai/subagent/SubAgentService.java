@@ -199,6 +199,15 @@ public class SubAgentService {
      */
     public SubAgentResult dispatch(String taskDescription, String expectedOutput,
                                    List<String> toolScope, ToolContext parentCtx) {
+        return dispatch(taskDescription, expectedOutput, toolScope, parentCtx, null);
+    }
+
+    /**
+     * modelOverride 非空时用它代替配置的子 Agent 模型（仍走同一道可用清单校验）。
+     * 收尾核验用主轮次的模型（W6：flash 档核验员会编造不存在的来源文件）。
+     */
+    public SubAgentResult dispatch(String taskDescription, String expectedOutput,
+                                   List<String> toolScope, ToolContext parentCtx, String modelOverride) {
         String subtaskId = "subtask-" + UUID.randomUUID().toString().substring(0, 8);
         // started/结束事件必须成对发出（前端的子任务卡按 taskId 配对渲染），
         // 所以模型校验失败那条路径也走"先 started 再 failed"，不能只发一个 failed
@@ -208,7 +217,8 @@ public class SubAgentService {
         // 模型在提交线程解析，非白名单在起跑前就拒绝：ChatModelFactory 对非白名单的处置是
         // 静默回落默认模型——failover 链踩过的同一个坑（看着「配了便宜模型」，实际跑的是主模型，
         // 账单要到月底才看得出来）。这里给出可读提示，让模型与面板都能看到原因。
-        String configuredModel = auxModelResolver.subAgentModelId(props.getModel());
+        String configuredModel = modelOverride != null && !modelOverride.isBlank()
+                ? modelOverride : auxModelResolver.subAgentModelId(props.getModel());
         String modelId = chatModelFactory.usesProviderCatalog()
                 ? chatModelFactory.resolveEffectiveModelId(configuredModel) : configuredModel;
         if (!(chatModelFactory.usesProviderCatalog() ? chatModelFactory.isAvailableModel(modelId) : AllowedModels.isAllowed(modelId))) {
@@ -393,16 +403,25 @@ public class SubAgentService {
             }
 
             Response<AiMessage> response;
+            Integer[] cacheUsage = new Integer[2];
             try {
                 // Recheck account/balance and key ownership before every paid round.
-                ChatLanguageModel model = chatModelFactory.getChatModel(modelId);
-                response = specs.isEmpty() ? model.generate(messages) : model.generate(messages, specs);
+                // 优先走与主循环同一个流式通道（W6）：它给 system 打提示缓存断点、并回报 cached_tokens；
+                // 非流式 OpenAiChatModel 两样都没有——核验员 10 轮调用全部按全价算、cached 一栏全是空。
+                dev.langchain4j.model.chat.StreamingChatLanguageModel streaming = chatModelFactory.getStreamingChatModel(modelId);
+                // 只有平台/OpenRouter 的流式实现支持带工具的三参 generate 并回报缓存；Ollama 等走原路
+                if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel) {
+                    response = generateBlocking(streaming, messages, specs, cacheUsage);
+                } else {
+                    ChatLanguageModel model = chatModelFactory.getChatModel(modelId);
+                    response = specs.isEmpty() ? model.generate(messages) : model.generate(messages, specs);
+                }
             } catch (Exception e) {
                 log.warn("Sub-agent {} LLM call failed at round {}", subtaskId, round, e);
                 return SubAgentResult.failure(subtaskId,
                         "sub-agent LLM call failed: " + e.getMessage(), toolsUsed, round - 1);
             }
-            recordUsage(response, modelId, parentCtx);
+            recordUsage(response, modelId, parentCtx, cacheUsage[0], cacheUsage[1]);
             if (progress.isCancelled(parentCtx)) throw new CancellationException();
             AiMessage aiMessage = response.content();
             messages.add(aiMessage);
@@ -449,7 +468,41 @@ public class SubAgentService {
      * <p>归属取主会话上下文（不变式 3：projectId/conversationId/userId 一律继承，模型可独立），
      * 记账失败绝不影响子任务结果。
      */
+    /**
+     * 流式通道的阻塞包装：等 onComplete/onError，把提示缓存读写数写进 cacheUsage[0..1]。
+     * 被 dispatch 的超时/取消打断时 get() 抛 InterruptedException，与非流式一样按失败返回。
+     */
+    static Response<AiMessage> generateBlocking(dev.langchain4j.model.chat.StreamingChatLanguageModel model,
+                                                List<ChatMessage> messages,
+                                                List<dev.langchain4j.agent.tool.ToolSpecification> specs,
+                                                Integer[] cacheUsage) throws Exception {
+        java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
+        com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
+            @Override public void onNext(String token) { }
+            @Override public void onComplete(Response<AiMessage> response) { done.complete(response); }
+            @Override public void onError(Throwable error) { done.completeExceptionally(error); }
+            @Override public void onCacheUsage(int promptTokens, int cachedTokens, int cacheWriteTokens) {
+                cacheUsage[0] = cachedTokens;
+                cacheUsage[1] = cacheWriteTokens;
+            }
+        };
+        if (specs == null || specs.isEmpty()) model.generate(messages, handler);
+        else model.generate(messages, specs, handler);
+        try {
+            return done.get();
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception ex) throw ex;
+            throw e;
+        }
+    }
+
     private void recordUsage(Response<AiMessage> response, String modelId, ToolContext parentCtx) {
+        recordUsage(response, modelId, parentCtx, null, null);
+    }
+
+    private void recordUsage(Response<AiMessage> response, String modelId, ToolContext parentCtx,
+                             Integer cachedTokens, Integer cacheWriteTokens) {
         if (response == null || response.tokenUsage() == null) {
             return;
         }
@@ -459,7 +512,12 @@ public class SubAgentService {
                     ? parentCtx.userId()
                     : PlatformAiUserScope.current();
             String conversationId = parentCtx != null ? parentCtx.conversationId() : null;
-            tokenUsageService.recordUsage(projectId, userId, modelId, response.tokenUsage(), conversationId);
+            if (cachedTokens == null && cacheWriteTokens == null) {
+                tokenUsageService.recordUsage(projectId, userId, modelId, response.tokenUsage(), conversationId);
+            } else {
+                tokenUsageService.recordUsage(projectId, userId, modelId, response.tokenUsage(), conversationId,
+                        cachedTokens, cacheWriteTokens);
+            }
         } catch (Exception e) {
             log.warn("子 Agent token 记账失败（不影响子任务结果）: {}", e.getMessage());
         }

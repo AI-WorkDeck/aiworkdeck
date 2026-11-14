@@ -93,10 +93,30 @@ public class ClientInvitationService {
 
     /**
      * {@code shareHistory}：客户进项目群后能否看此前的消息（B4）。默认 false = 只看入群之后；
-     * 通用码重新签发时以这一次的选择为准，只影响之后才进群的客户。
+     * 通用码重新签发时只能收窄不能放宽（同一张码已发给别人）。
      */
     @Transactional
     public Issued issueClientCode(Long projectId, Long requesterId, String clientName, boolean shareHistory) {
+        Issued issued = issueClientCodeInternal(projectId, requesterId, clientName, shareHistory);
+        if (firmAudit != null) {
+            boolean named = clientName != null && !clientName.trim().isEmpty();
+            var e = com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CLIENT_INVITE_ISSUED").actor(requesterId).project(projectId)
+                    .detail("kind", named ? "named" : "shared")
+                    .detail("expiresAt", issued.expiresAt() == null ? null : issued.expiresAt().toString())
+                    .detail("shareHistory", issued.shareHistory());
+            if (issued.clientUserId() != null) e.targetUser(issued.clientUserId());
+            firmAudit.record(e);
+        }
+        return issued;
+    }
+
+    /** 律所审计日志（S20）：只记谁给哪个项目签了客户访问码、具名与否、到期时间与消息范围；不记码本身。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
+    private Issued issueClientCodeInternal(Long projectId, Long requesterId, String clientName, boolean shareHistory) {
         projectMemberService.lockCloudMembership(projectId);
         // 1. Check permissions (Allow Admin and Participant)
         if (!projectMemberService.hasWritePermission(projectId, requesterId)) {
@@ -347,7 +367,22 @@ public class ClientInvitationService {
      */
     @Transactional(readOnly = true)
     public Optional<ProjectInvitation> activeInvitationFor(User user) {
-        if (user == null || user.getId() == null) return Optional.empty();
+        LocalDateTime now = LocalDateTime.now();
+        return invitationsOf(user).stream()
+                .filter(i -> i.getRevokedAt() == null)
+                .filter(i -> { LocalDateTime expiry = effectiveExpiry(i); return expiry == null || !expiry.isBefore(now); })
+                .filter(i -> projectMemberRepository.findByProjectIdAndUserId(i.getProjectId(), user.getId()).isPresent())
+                .min(java.util.Comparator.comparing(ProjectInvitation::getId));
+    }
+
+    /** The project this client's code was for, live or not: where a refusal is filed in the firm's audit log. */
+    @Transactional(readOnly = true)
+    public Optional<Long> invitedProjectOf(User user) {
+        return invitationsOf(user).stream().min(java.util.Comparator.comparing(ProjectInvitation::getId)).map(ProjectInvitation::getProjectId);
+    }
+
+    private List<ProjectInvitation> invitationsOf(User user) {
+        if (user == null || user.getId() == null) return List.of();
         List<ProjectInvitation> candidates = new java.util.ArrayList<>(invitationRepository.findByRelatedUserId(user.getId()));
         String username = user.getUsername();
         if (candidates.isEmpty() && username != null && username.startsWith("client_inv")) {
@@ -360,12 +395,7 @@ public class ClientInvitationService {
                 }
             }
         }
-        LocalDateTime now = LocalDateTime.now();
-        return candidates.stream()
-                .filter(i -> i.getRevokedAt() == null)
-                .filter(i -> { LocalDateTime expiry = effectiveExpiry(i); return expiry == null || !expiry.isBefore(now); })
-                .filter(i -> projectMemberRepository.findByProjectIdAndUserId(i.getProjectId(), user.getId()).isPresent())
-                .min(java.util.Comparator.comparing(ProjectInvitation::getId));
+        return candidates;
     }
 
     /** A project-chat invitation code typed where an access code belongs; the portal explains instead of "invalid" (B4). */

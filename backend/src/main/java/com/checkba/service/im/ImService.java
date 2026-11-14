@@ -131,7 +131,7 @@ public class ImService {
         com.checkba.model.entity.ProjectInvitation portalCode = null;
         if ("CLIENT".equals(caller.getRole())) {
             portalCode = clientInvitations == null ? null : clientInvitations.activeInvitationFor(caller).orElse(null);
-            if (portalCode == null) throw portalDenied(userId, null, DENIED_CODE_INACTIVE);
+            if (portalCode == null) throw portalDenied(userId, clientInvitations == null ? null : clientInvitations.invitedProjectOf(caller).orElse(null), DENIED_CODE_INACTIVE);
             portalProjectId = portalCode.getProjectId();
             // A generic code is one identity shared by everyone holding it (and a typed name picks anyone's login):
             // chat needs a code issued to one named client.
@@ -276,6 +276,8 @@ public class ImService {
         invite.setConversationId(c.getId()); invite.setRole(role); invite.setIssuedBy(me.getUserId());
         invite.setShareHistory(shareHistory);
         invite.setExpiresAt(now.plus(24, ChronoUnit.HOURS)); invitations.save(invite);
+        audit(com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CHAT_INVITE_ISSUED").actor(me.getUserId())
+                .target("CONVERSATION", c.getId(), c.getTitle()).detail("role", role).detail("shareHistory", shareHistory));
         // Echoed so a panel can tell a server that enforces the choice from an older one that ignores it.
         return Map.of("code", code, "expiresAt", invite.getExpiresAt(), "shareHistory", shareHistory);
     }
@@ -295,6 +297,10 @@ public class ImService {
         invite.setUsedAt(Instant.now()); invitations.save(invite);
         ImMember member = addMember(c.getId(), userId, invite.getRole());
         boolean shareHistory = "CLIENT".equals(invite.getRole()) && Boolean.TRUE.equals(invite.getShareHistory());
+        // Filed under the issuer's firm: the redeemer is often an outside client with no firm of their own.
+        audit(com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CHAT_INVITE_REDEEMED").actor(userId).firmOf(invite.getIssuedBy())
+                .target("CONVERSATION", c.getId(), c.getTitle()).detail("issuedBy", invite.getIssuedBy())
+                .detail("role", invite.getRole()).detail("shareHistory", shareHistory));
         return view(c, shareHistory ? member : limitClientHistory(member));
     }
 
@@ -317,6 +323,8 @@ public class ImService {
             return Map.of("removed", true, "codeRevoked", true);
         }
         members.delete(target);
+        audit(com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CHAT_MEMBER_REMOVED").actor(me.getUserId())
+                .target("CONVERSATION", c.getId(), c.getTitle()).detail("removedUserId", targetId).detail("role", target.getRole()));
         return Map.of("removed", true);
     }
 
@@ -438,6 +446,8 @@ public class ImService {
                 && !messages.existsByConversationIdAndAttachmentIdAndIdGreaterThan(c.getId(), attachmentId, floor))
             throw bad(fileUnavailable());
         ImAttachment file = requireAttachment(c.getId(), attachmentId);
+        audit(com.checkba.service.audit.FirmAuditLog.event("DATA", "CHAT_FILE_DOWNLOADED").actor(me.getUserId()).firmOf(c.getOwnerId())
+                .project(c.getProjectId()).target("CHAT_FILE", attachmentId, file.getName()).detail("conversationId", c.getId()));
         Map<String,Object> result = new LinkedHashMap<>(attachmentView(file, me));
         result.put("base64", Base64.getEncoder().encodeToString(file.getContent()));
         return result;
@@ -641,6 +651,16 @@ public class ImService {
         if (clean.isBlank()) throw bad(com.checkba.service.LangText.of("文件名无效", "Invalid file name"));
         return clean.substring(0, Math.min(180, clean.length()));
     }
+    /** Firm audit log (S20): invitations with their history choice, redemptions and removals; never message text. */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
+    private void audit(com.checkba.service.audit.FirmAuditLog.Event e) {
+        if (firmAudit != null) firmAudit.record(e);
+    }
+
     public static String sha(byte[] content) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }

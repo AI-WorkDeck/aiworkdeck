@@ -40,6 +40,31 @@ public class CollabEventService {
         this.repository = repository;
     }
 
+    /** 律所审计日志（S20）：共享、签出与成员变更同时转给律所日志；推送/取回量大、合规价值低，不转。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
+    private void forwardToFirmAudit(CollabEvent.Kind kind, long projectId, Long actorUserId, Long tokenId,
+                                    Long targetUserId, Map<String, Object> detail) {
+        if (firmAudit == null) return;
+        var e = switch (kind) {
+            case SHARED -> com.checkba.service.audit.FirmAuditLog.event("SHARING", "PROJECT_SHARED");
+            case CHECKOUT -> com.checkba.service.audit.FirmAuditLog.event("DATA", "PROJECT_CHECKOUT");
+            case MEMBER_ADDED -> com.checkba.service.audit.FirmAuditLog.event("MEMBERSHIP", "PROJECT_MEMBER_ADDED");
+            case MEMBER_REMOVED -> com.checkba.service.audit.FirmAuditLog.event("MEMBERSHIP", "PROJECT_MEMBER_REMOVED");
+            case MEMBER_ROLE_CHANGED -> com.checkba.service.audit.FirmAuditLog.event("MEMBERSHIP", "PROJECT_MEMBER_ROLE_CHANGED");
+            default -> null;
+        };
+        if (e == null) return;
+        e.actor(actorUserId).project(projectId);
+        if (targetUserId != null) e.targetUser(targetUserId);
+        if (tokenId != null) e.detail("deviceTokenId", tokenId);
+        if (detail != null) e.detail("role", detail.get("role"));
+        firmAudit.record(e);
+    }
+
     /** 记一条。失败只 log，绝不外抛。 */
     public void record(CollabEvent.Kind kind, long projectId, Long actorUserId, Long tokenId,
                        String fromSha, String toSha, Integer commitCount, Long targetUserId,
@@ -60,6 +85,11 @@ public class CollabEventService {
             repository.save(e);
         } catch (Exception ex) {
             log.warn("协作事件记录失败（已吞）: kind={}, project={}", kind, projectId, ex);
+        }
+        try {
+            if (kind != null && actorUserId != null) forwardToFirmAudit(kind, projectId, actorUserId, tokenId, targetUserId, detail);
+        } catch (Exception ex) {
+            log.warn("律所审计转发失败（已吞）: kind={}, project={}", kind, projectId, ex);
         }
     }
 

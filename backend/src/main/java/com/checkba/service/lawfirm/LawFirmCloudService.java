@@ -29,6 +29,9 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
 
     public static final String SETTINGS_GET = "cloud.settings.get";
     public static final String SETTINGS_SET = "cloud.settings.set";
+    /** 律所管理员审计日志（S20）：只给本所律所管理员，读本所的行；不受功能开关约束（审计一直开着）。 */
+    public static final String AUDIT_LIST = "cloud.audit.list";
+    public static final String AUDIT_VERIFY = "cloud.audit.verify";
     /** 开关读写只给律所管理插件（唯一的开关界面）。 */
     public static final String SETTINGS_PLUGIN = "lawfirm-management";
     /** 功能键：小写字母开头，2–24 位小写字母、数字或连字符；"cloud" 保留给开关读写本身。 */
@@ -43,6 +46,11 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
         this.settings = settings;
         this.features = features;
     }
+
+    private com.checkba.service.audit.FirmAuditLog audit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAudit(com.checkba.service.audit.FirmAuditLog audit) { this.audit = audit; }
 
     /** 已登记的功能（按功能键）。 */
     public Map<String, LawFirmCloudFeature> registry() {
@@ -59,7 +67,7 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
     /** 动作名属于哪个功能；开关读写返回 "cloud"；不认识返回 null。供服务端分发与桌面端网关白名单共用。 */
     public String featureOf(String action) {
         if (action == null) return null;
-        if (SETTINGS_GET.equals(action) || SETTINGS_SET.equals(action)) return "cloud";
+        if (SETTINGS_GET.equals(action) || SETTINGS_SET.equals(action) || AUDIT_LIST.equals(action) || AUDIT_VERIFY.equals(action)) return "cloud";
         int dot = action.indexOf('.');
         if (dot <= 0 || dot == action.length() - 1) return null;
         String key = action.substring(0, dot);
@@ -81,6 +89,7 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
         LawFirmAuthority.Member me = authority.current(userId);
         Map<String, Object> p = raw == null ? Map.of() : raw;
         if ("cloud".equals(feature)) {
+            if (AUDIT_LIST.equals(action) || AUDIT_VERIFY.equals(action)) return auditRead(me, action, p);
             return SETTINGS_GET.equals(action) ? view(me) : set(me, p);
         }
         if (!enabled(row(me.firmId()), feature)) {
@@ -167,8 +176,18 @@ public class LawFirmCloudService implements LawFirmCloudSwitches {
         if (!on && Boolean.TRUE.equals(p.get("purge"))) {
             purged = registry().get(feature).purge(me.firmId());
         }
+        if (audit != null) {
+            audit.record(com.checkba.service.audit.FirmAuditLog.event("SETTINGS", "FIRM_CLOUD_SWITCH_CHANGED").actor(me.userId())
+                    .target("FIRM_CLOUD_FEATURE", feature, feature).detail("enabled", on).detail("purgedRows", purged));
+        }
         Map<String, Object> out = new LinkedHashMap<>(view(me));
         out.put("purged", purged);
         return out;
+    }
+
+    private Map<String, Object> auditRead(LawFirmAuthority.Member me, String action, Map<String, Object> p) {
+        if (!me.firmAdmin()) throw new IllegalArgumentException(LangText.of("无权查看：审计日志仅限律所管理员", "Not permitted: the audit log is limited to firm administrators"));
+        if (audit == null || !audit.enabled()) throw new IllegalStateException(LangText.of("本服务器未开启审计日志", "The audit log is not enabled on this server"));
+        return AUDIT_LIST.equals(action) ? audit.list(me.firmId(), p) : audit.verify(me.firmId());
     }
 }

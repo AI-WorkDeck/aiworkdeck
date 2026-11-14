@@ -384,6 +384,55 @@ class ImClientPortalTest {
         }
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void firmAuditRecordsJoinsAndRefusalsWithFixedKeysAndNoTextCodesOrTokens() {
+        com.checkba.service.audit.FirmAuditLog firm = mock(com.checkba.service.audit.FirmAuditLog.class);
+        List<com.checkba.service.audit.FirmAuditLog.Event> events = new ArrayList<>();
+        org.mockito.Mockito.doAnswer(i -> { events.add(i.getArgument(0)); return null; }).when(firm).record(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doAnswer(i -> { events.add(i.getArgument(0)); return null; }).when(firm).recordNow(org.mockito.ArgumentMatchers.any());
+        org.springframework.beans.factory.support.StaticListableBeanFactory beans = new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        beans.addBean("firmAuditLog", firm);
+        ReflectionTestUtils.setField(service, "portalAudit", new FirmClientPortalChatAudit(beans.getBeanProvider(com.checkba.service.audit.FirmAuditLog.class)));
+        ReflectionTestUtils.setField(service, "deniedAudited", new java.util.concurrent.ConcurrentHashMap<String, Long>());
+
+        var issued = codes.issueClientCode(projectId, lawyer, "合成客户", true);
+        Long client = issued.clientUserId();
+        String session = "session_synthetic-token-for-audit-test";
+        String group = id(call(client, "projectGroup", Map.of("projectId", projectId)));
+        send(client, group, "secret", "合成机密正文-不得入审计");
+        assertDenied(() -> call(client, "list", Map.of()));
+        assertDenied(() -> call(client, "projectGroup", Map.of("projectId", otherProjectId)));
+        ProjectInvitation code = invitationRows.findByAccessCode(issued.code()).orElseThrow();
+        code.setRevokedAt(LocalDateTime.now()); invitationRows.saveAndFlush(code);
+        assertDenied(() -> call(client, "messages", Map.of("conversationId", group)));
+
+        assertEquals(4, events.size(), "one join and three refusals (action, scope, inactive code)");
+        for (var e : events) {
+            assertEquals("CLIENT", ReflectionTestUtils.getField(e, "category"));
+            assertEquals("CLIENT_PORTAL_CHAT_JOINED", ReflectionTestUtils.getField(e, "action"));
+            Map<String, Object> detail = (Map<String, Object>) ReflectionTestUtils.getField(e, "detail");
+            assertTrue(Set.of("shareHistory", "reason").containsAll(detail.keySet()), detail.toString());
+            assertEquals(client, ReflectionTestUtils.getField(e, "actorUserId"));
+            assertEquals(projectId, ReflectionTestUtils.getField(e, "projectId"), "every record is filed under the project, even for a dead code");
+            StringBuilder all = new StringBuilder();
+            for (var f : e.getClass().getDeclaredFields()) { f.setAccessible(true); try { all.append(f.get(e)).append('|'); } catch (IllegalAccessException x) { throw new AssertionError(x); } }
+            assertFalse(all.toString().contains("合成机密正文"), all.toString());
+            assertFalse(all.toString().contains(issued.code()), all.toString());
+            assertFalse(all.toString().contains(session) || all.toString().contains("session_"), all.toString());
+        }
+        assertEquals(Boolean.TRUE, ((Map<String, Object>) ReflectionTestUtils.getField(events.get(0), "detail")).get("shareHistory"));
+        assertEquals("SUCCESS", ReflectionTestUtils.getField(events.get(0), "outcome"));
+        assertEquals(List.of(ImService.DENIED_ACTION, ImService.DENIED_OUT_OF_SCOPE, ImService.DENIED_CODE_INACTIVE),
+                events.subList(1, 4).stream().map(e -> ((Map<String, Object>) ReflectionTestUtils.getField(e, "detail")).get("reason")).toList());
+        for (var e : events.subList(1, 4)) assertEquals("FAILURE", ReflectionTestUtils.getField(e, "outcome"));
+        org.mockito.Mockito.verify(firm, org.mockito.Mockito.times(1)).record(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(firm, org.mockito.Mockito.times(3)).recordNow(org.mockito.ArgumentMatchers.any());
+        // Polling after a refusal does not flood the log: one record per client and reason per window.
+        assertDenied(() -> call(client, "messages", Map.of("conversationId", group)));
+        assertEquals(4, events.size());
+    }
+
     // ---- helpers ----
 
     @SuppressWarnings("unchecked")
