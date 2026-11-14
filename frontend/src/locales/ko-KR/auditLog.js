@@ -4,7 +4,7 @@
 export default {
   "nav": "감사 로그",
   "title": "로펌 감사 로그",
-  "subtitle": "로펌 구성원의 로그인, 기기 연결, 프로젝트 공유 및 구성원 변경, 고객 초대, 파일 다운로드, 로펌 설정 변경을 기록합니다. 로펌 관리자만 볼 수 있으며 문서 내용, 파일 내용, 대화는 포함되지 않습니다.",
+  "subtitle": "로그인, 기기와 계정 키, 로펌 가입과 탈퇴 및 역할 변경, 프로젝트 공유와 구성원 변경, 고객 초대, 파일 다운로드, 로펌 설정 변경, 거부된 접근을 기록하며 웹사이트에서 이루어진 작업도 포함합니다. 로펌 관리자만 볼 수 있으며, 문서 내용, 파일 내용, 대화는 포함되지 않습니다.",
   "retention": "기록은 {days}일간 보관된 후 자동으로 삭제됩니다",
   "from": "시작일",
   "to": "종료일",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "기록 ID",
   "outcomeFailure": "실패",
   "catAll": "모든 범주",
+  "sourceWebsite": "웹사이트",
+  "colSource": "출처",
   "cat": {
     "AUTH": "로그인",
     "DEVICES": "기기",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "프로젝트 공유",
     "CLIENT": "고객 및 소통",
     "DATA": "데이터 접근",
-    "SETTINGS": "로펌 설정"
+    "SETTINGS": "로펌 설정",
+    "ACCESS": "접근 거부"
   },
   "action": {
     "LOGIN": "로그인",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "대화 첨부 파일 다운로드",
     "FIRM_CLOUD_SWITCH_CHANGED": "로펌 클라우드 스위치 변경",
     "FIRM_COMMITTEE_APPOINTED": "이해충돌 위원 임명",
-    "FIRM_COMMITTEE_REVOKED": "이해충돌 위원 해임"
+    "FIRM_COMMITTEE_REVOKED": "이해충돌 위원 해임",
+    "PERMISSION_DENIED": "권한 거부",
+    "FIRM_MEMBER_JOINED": "구성원이 로펌에 가입",
+    "FIRM_MEMBER_LEFT": "구성원이 로펌에서 탈퇴",
+    "FIRM_MEMBER_REMOVED": "구성원이 로펌에서 제외됨",
+    "FIRM_ROLE_CHANGED": "로펌 역할 변경",
+    "FIRM_TEAM_JOINED": "팀이 로펌에 가입",
+    "FIRM_TEAM_LEFT": "팀이 로펌에서 탈퇴",
+    "FIRM_TEAM_REMOVED": "팀이 로펌에서 제외됨",
+    "FIRM_CREATED": "로펌 생성",
+    "FIRM_JOIN_CODE_REGENERATED": "로펌 가입 코드 재설정",
+    "WEBSITE_LOGIN_FAILED": "웹사이트 로그인",
+    "ACCOUNT_API_KEY_CREATED": "계정 키 발급",
+    "ACCOUNT_API_KEY_REVOKED": "계정 키 폐기"
   }
 }

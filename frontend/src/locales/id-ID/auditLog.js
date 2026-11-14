@@ -4,7 +4,7 @@
 export default {
   "nav": "Log Audit",
   "title": "Log Audit Firma",
-  "subtitle": "Mencatat login, koneksi perangkat, pembagian proyek dan perubahan anggota, undangan klien, unduhan berkas, serta perubahan pengaturan firma Anda. Hanya dapat dilihat oleh administrator firma; tidak pernah memuat isi dokumen, isi berkas, atau percakapan.",
+  "subtitle": "Mencatat login, perangkat dan kunci akun, bergabung atau keluarnya anggota dari firma serta perubahan peran, berbagi dan keanggotaan proyek, undangan klien, pengunduhan file, perubahan pengaturan firma, dan akses yang ditolak, termasuk tindakan di situs web. Hanya terlihat oleh administrator firma; tidak pernah memuat isi dokumen, isi file, atau percakapan.",
   "retention": "Catatan disimpan selama {days} hari, lalu dihapus otomatis",
   "from": "Dari",
   "to": "Sampai",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "ID Catatan",
   "outcomeFailure": "gagal",
   "catAll": "Semua Kategori",
+  "sourceWebsite": "situs web",
+  "colSource": "Sumber",
   "cat": {
     "AUTH": "Login",
     "DEVICES": "Perangkat",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Pembagian Proyek",
     "CLIENT": "Klien dan Pesan",
     "DATA": "Akses Data",
-    "SETTINGS": "Pengaturan Firma"
+    "SETTINGS": "Pengaturan Firma",
+    "ACCESS": "Akses Ditolak"
   },
   "action": {
     "LOGIN": "Login",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Lampiran percakapan diunduh",
     "FIRM_CLOUD_SWITCH_CHANGED": "Sakelar cloud firma diubah",
     "FIRM_COMMITTEE_APPOINTED": "Anggota komite konflik ditunjuk",
-    "FIRM_COMMITTEE_REVOKED": "Anggota komite konflik dicabut"
+    "FIRM_COMMITTEE_REVOKED": "Anggota komite konflik dicabut",
+    "PERMISSION_DENIED": "Izin ditolak",
+    "FIRM_MEMBER_JOINED": "Anggota bergabung dengan firma",
+    "FIRM_MEMBER_LEFT": "Anggota keluar dari firma",
+    "FIRM_MEMBER_REMOVED": "Anggota dikeluarkan dari firma",
+    "FIRM_ROLE_CHANGED": "Peran di firma diubah",
+    "FIRM_TEAM_JOINED": "Tim bergabung dengan firma",
+    "FIRM_TEAM_LEFT": "Tim keluar dari firma",
+    "FIRM_TEAM_REMOVED": "Tim dikeluarkan dari firma",
+    "FIRM_CREATED": "Firma dibuat",
+    "FIRM_JOIN_CODE_REGENERATED": "Kode bergabung firma direset",
+    "WEBSITE_LOGIN_FAILED": "Login situs web",
+    "ACCOUNT_API_KEY_CREATED": "Kunci akun diterbitkan",
+    "ACCOUNT_API_KEY_REVOKED": "Kunci akun dicabut"
   }
 }
