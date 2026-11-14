@@ -192,6 +192,19 @@ class FirmAuditLogTest {
     }
 
     @Test
+    void anyFailedEventSurvivesItsRollingBackTransactionEvenThroughRecord() {
+        // record() 默认等提交；失败/拒绝事件不能依赖提交——被拒的请求往往正是要回滚的那一个
+        new TransactionTemplate(tx).executeWithoutResult(status -> {
+            audit.record(FirmAuditLog.event("AUTH", "LOGIN_FAILED").failed().actor(lawyer).detail("via", "password"));
+            audit.record(FirmAuditLog.event("AUTH", "LOGIN").actor(lawyer));
+            status.setRollbackOnly();
+        });
+        List<Map<String, Object>> rows = events(admin, Map.of());
+        assertEquals(List.of("LOGIN_FAILED"), rows.stream().map(r -> r.get("action")).toList(),
+                "the refusal is kept, the rolled-back success is not");
+    }
+
+    @Test
     void switchChangesAreAuditedAndFiltersApply() {
         sessions.issue(lawyer);
         // 合成一个功能开关不需要：开关读写本身就是 cloud 动作，未登记功能会被拒；这里直接记一次开关事件

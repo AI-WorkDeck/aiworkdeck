@@ -123,7 +123,8 @@ public class AuthController {
     private void recordFailedLogin(String username, String via) {
         if (firmAudit == null || !firmAudit.enabled() || username == null || username.isBlank() || userService == null) return;
         try {
-            userService.getUserByUsername(username.trim()).ifPresent(u -> firmAudit.record(
+            // recordNow, not record: a refusal must not depend on some surrounding transaction committing.
+            userService.getUserByUsername(username.trim()).ifPresent(u -> firmAudit.recordNow(
                     com.checkba.service.audit.FirmAuditLog.event("AUTH", "LOGIN_FAILED").failed().actor(u.getId()).detail("via", via)));
         } catch (Exception e) {
             log.debug("Failed-login audit lookup skipped: {}", e.toString());
