@@ -198,7 +198,7 @@ public class ProjectMemberController {
             data.put("expiresAt", issued.expiresAt() == null ? null : issued.expiresAt().toString());
             data.put("clientUserId", issued.clientUserId());
             // 回显：桌面端据此判断案件库是否已执行这次的消息范围选择（老案件库不回这个字段）
-            data.put("shareHistory", shareHistory);
+            data.put("shareHistory", issued.shareHistory());
             result.put("data", data);
             return ResponseEntity.ok(result);
         } catch (ClientInvitationService.LibraryRequiredException e) {

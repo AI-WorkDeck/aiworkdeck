@@ -357,6 +357,7 @@ export default {
   // ---- 客户门户（dev-board#1050）：案卷在团队案件库里时，访问码由案件库签发 ----
   clientPortalLinkLabel: '客户打开的网址：',
   clientCodeExpires: '有效期至 {date}，过期后重新生成即可续期。',
+  clientChatNeedsName: '不填客户称呼签出的是通用码：可以看尽调清单，但不能用于项目沟通。',
   clientChatHistoryLabel: '项目沟通里客户能看到的消息',
   clientChatHistoryAfter: '只看加入之后的消息（推荐）',
   clientChatHistoryAll: '也可以看加入之前的消息',

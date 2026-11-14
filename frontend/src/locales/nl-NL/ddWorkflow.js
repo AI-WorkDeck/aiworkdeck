@@ -148,6 +148,9 @@ export default {
   },
   "client": {
     "chat": {
+      "chatInviteCode": "Deze uitnodiging is bedoeld voor AI WorkDeck-accounts. U kunt hier in de projectchat met uw advocaten praten.",
+      "openChat": "Projectchat openen",
+      "joinFirst": "Open eerst het project met de toegangscode die uw advocaat u stuurde en gebruik daarna de projectchat.",
       "title": "Projectchat",
       "hint": "Bespreek dit project met uw juridische team. Uw advocaten bepalen welke eerdere berichten en bestanden u kunt zien.",
       "tabChecklist": "Checklist",

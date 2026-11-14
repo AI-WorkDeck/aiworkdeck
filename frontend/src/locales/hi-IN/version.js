@@ -317,6 +317,7 @@ export default {
   "generateFailed": "जनरेट करने में विफल",
   "clientPortalLinkLabel": "क्लाइंट के लिए लिंक:",
   "clientCodeExpires": "{date} तक वैध। बढ़ाने के लिए इसे फिर से जनरेट करें।",
+  "clientChatNeedsName": "मुवक्किल का नाम न देने पर यह साझा कोड होता है: इससे चेकलिस्ट खुलती है, पर परियोजना चैट के लिए इसका उपयोग नहीं हो सकता।",
   "clientChatHistoryLabel": "प्रोजेक्ट चैट में मुवक्किल को दिखने वाले संदेश",
   "clientChatHistoryAfter": "केवल शामिल होने के बाद के संदेश (अनुशंसित)",
   "clientChatHistoryAll": "शामिल होने से पहले के संदेश भी",

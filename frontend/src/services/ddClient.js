@@ -36,6 +36,8 @@ function check(data, status) {
   if (status < 200 || status >= 300 || (data && data.code !== undefined && ![0, 200].includes(data.code))) {
     const error = new Error(ddClientErrorMessage(data?.message))
     error.status = status
+    if (data?.reason) error.reason = data.reason
+    if (data?.code !== undefined) error.code = data.code
     throw error
   }
   return unpack(data)

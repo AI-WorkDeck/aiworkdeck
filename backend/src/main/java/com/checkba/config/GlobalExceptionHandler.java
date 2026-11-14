@@ -178,6 +178,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok().body(result);
     }
 
+    /** Project-chat refusal for an access-code client: the usual shape plus a machine reason (B4). */
+    @ExceptionHandler(com.checkba.service.im.ImAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleImAccessDenied(com.checkba.service.im.ImAccessDeniedException e) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("reason", e.getReason());
+        result.put("message", e.getMessage());
+        return ResponseEntity.ok().body(result);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("GlobalExceptionHandler caught IllegalArgumentException: {}", e.getMessage());

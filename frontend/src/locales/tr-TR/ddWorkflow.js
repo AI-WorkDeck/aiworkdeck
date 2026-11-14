@@ -148,6 +148,9 @@ export default {
   },
   "client": {
     "chat": {
+      "chatInviteCode": "Bu davet AI WorkDeck hesapları içindir. Burada proje sohbetinde avukatlarınızla konuşabilirsiniz.",
+      "openChat": "Proje sohbetini aç",
+      "joinFirst": "Önce avukatınızın gönderdiği erişim koduyla projeye girin, ardından proje sohbetini kullanın.",
       "title": "Proje sohbeti",
       "hint": "Bu proje hakkında hukuk ekibinizle görüşün. Hangi önceki mesaj ve dosyaları görebileceğinize avukatlarınız karar verir.",
       "tabChecklist": "Kontrol listesi",

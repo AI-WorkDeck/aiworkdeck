@@ -317,6 +317,7 @@ export default {
   "generateFailed": "فشل الإنشاء",
   "clientPortalLinkLabel": "الرابط للعميل:",
   "clientCodeExpires": "صالح حتى {date}. أعد إنشاءه للتمديد.",
+  "clientChatNeedsName": "بدون اسم الموكل يكون هذا رمزًا مشتركًا: يفتح قائمة التحقق لكنه لا يصلح لدردشة المشروع.",
   "clientChatHistoryLabel": "الرسائل التي يراها الموكل في دردشة المشروع",
   "clientChatHistoryAfter": "الرسائل بعد الانضمام فقط (موصى به)",
   "clientChatHistoryAll": "الرسائل السابقة للانضمام أيضًا",

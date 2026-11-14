@@ -76,7 +76,10 @@ public class ClientInvitationService {
     static final int MAX_USERS_PER_INVITATION = 20;
 
     /** 签发结果：码、有效期截止、它登录成的那个客户用户（撤销时按这个 id 移出）。 */
-    public record Issued(String code, LocalDateTime expiresAt, Long clientUserId) {}
+    /** {@code shareHistory}: what the code now says about earlier project-chat messages (echoed to the lawyer). */
+    public record Issued(String code, LocalDateTime expiresAt, Long clientUserId, boolean shareHistory) {
+        public Issued(String code, LocalDateTime expiresAt, Long clientUserId) { this(code, expiresAt, clientUserId, false); }
+    }
 
     @Transactional
     public String inviteClient(Long projectId, Long requesterId, String clientName) {
@@ -141,7 +144,7 @@ public class ClientInvitationService {
              invitation.setImShareHistory(shareHistory);
              invitationRepository.save(invitation);
              
-             return new Issued(code, invitation.getExpiresAt(), user.getId());
+             return new Issued(code, invitation.getExpiresAt(), user.getId(), shareHistory);
         }
 
         // 3. Standard Shared Code Logic (Generic)
@@ -187,16 +190,18 @@ public class ClientInvitationService {
         // 之后每个文件接口都回 403——「登录成功」与「什么都打不开」并存。
         ensureClientMember(projectId, templateUser.getId());
 
-        return new Issued(code, invitation.getExpiresAt(), templateUser.getId());
+        return new Issued(code, invitation.getExpiresAt(), templateUser.getId(), shareHistory);
     }
 
     /** 重新签发同一行通用码：续期并取（必要时升级成长码）的码。 */
     private Issued reissue(ProjectInvitation invitation, boolean shareHistory) {
         invitation.setExpiresAt(freshExpiry());
-        invitation.setImShareHistory(shareHistory);
+        // The same code goes back out to people who may not have opened chat yet: a reissue may narrow, never widen.
+        boolean effective = Boolean.TRUE.equals(invitation.getImShareHistory()) && shareHistory;
+        invitation.setImShareHistory(effective);
         String code = ensureLongCode(invitation);
         invitationRepository.save(invitation);
-        return new Issued(code, invitation.getExpiresAt(), invitation.getRelatedUserId());
+        return new Issued(code, invitation.getExpiresAt(), invitation.getRelatedUserId(), effective);
     }
 
     private static LocalDateTime freshExpiry() {
@@ -363,10 +368,16 @@ public class ClientInvitationService {
                 .min(java.util.Comparator.comparing(ProjectInvitation::getId));
     }
 
+    /** A project-chat invitation code typed where an access code belongs; the portal explains instead of "invalid" (B4). */
+    public static class ChatInvitationCodeException extends IllegalArgumentException {
+        public static final String REASON = "CHAT_INVITE_CODE";
+        public ChatInvitationCodeException(String message) { super(message); }
+    }
+
     public ProjectInvitation validateCode(String code) {
         ProjectInvitation invitation = invitationRepository.findByAccessCode(code)
                 .orElseThrow(() -> isChatInvitationCode(code)
-                        ? new IllegalArgumentException(LangText.of(
+                        ? new ChatInvitationCodeException(LangText.of(
                                 "这是项目沟通的群聊邀请码，不能在客户门户使用。请登录 AI WorkDeck 应用，在「消息中心 → 对话 → 邀请码加入」中输入。",
                                 "This is a project chat invitation code, not a client portal access code. Sign in to the AI WorkDeck app and enter it under Message Center → Conversations → Join with invite code."))
                         : new IllegalArgumentException(LangText.of("访问码无效", "Invalid access code")));

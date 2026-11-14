@@ -88,9 +88,9 @@ class ImClientPortalTest {
 
         // Another project's group, by project id and by a conversation id the client should never have.
         String otherGroup = id(call(lawyer, "projectGroup", Map.of("projectId", otherProjectId)));
-        assertDenied(() -> call(client, "projectGroup", Map.of("projectId", otherProjectId)));
-        assertDenied(() -> call(client, "messages", Map.of("conversationId", otherGroup)));
-        assertDenied(() -> send(client, otherGroup, "c2", "越界"));
+        assertReason(ImService.DENIED_OUT_OF_SCOPE, () -> call(client, "projectGroup", Map.of("projectId", otherProjectId)));
+        assertReason(ImService.DENIED_OUT_OF_SCOPE, () -> call(client, "messages", Map.of("conversationId", otherGroup)));
+        assertReason(ImService.DENIED_OUT_OF_SCOPE, () -> send(client, otherGroup, "c2", "越界"));
 
         // Internal spaces: a DM and a non-project group, even with a member row planted for the client.
         String direct = id(call(lawyer, "create", Map.of("type", "DIRECT", "title", "内部私聊")));
@@ -100,14 +100,14 @@ class ImClientPortalTest {
             row.setConversationId(conversation); row.setUserId(client); row.setRole("CLIENT"); row.setJoinedAt(java.time.Instant.now());
             memberRows.saveAndFlush(row);
             for (String action : List.of("messages", "send", "read", "download", "upload", "members"))
-                assertDenied(() -> call(client, action, Map.of("conversationId", conversation, "clientMessageId", "x", "text", "x",
+                assertReason(ImService.DENIED_OUT_OF_SCOPE, () -> call(client, action, Map.of("conversationId", conversation, "clientMessageId", "x", "text", "x",
                         "attachmentId", "00000000-0000-0000-0000-000000000000", "name", "a.txt", "base64", "YQ==", "lastReadId", 1)));
         }
 
         // Actions that are never a client's, on their own group too.
         for (String action : List.of("list", "create", "join", "invite", "removeMember", "leave", "fileAccess",
                 "agentScopes", "ensureAgent", "agentInfo", "agentReply"))
-            assertDenied(() -> call(client, action, kv("conversationId", group, "type", "GROUP", "title", "x", "code", "x",
+            assertReason(ImService.DENIED_ACTION, () -> call(client, action, kv("conversationId", group, "type", "GROUP", "title", "x", "code", "x",
                     "role", "CLIENT", "userId", lawyer, "attachmentId", "x", "clientVisible", true, "scope", "project",
                     "scopeKey", "project:" + projectId, "private", true)));
 
@@ -117,6 +117,31 @@ class ImClientPortalTest {
         assertEquals(2, roster.get("humanCount"));
         assertTrue(audit.stream().anyMatch(a -> a.endsWith(":" + ImService.DENIED_OUT_OF_SCOPE)));
         assertTrue(audit.stream().anyMatch(a -> a.endsWith(":" + ImService.DENIED_ACTION)));
+    }
+
+    @Test
+    void clientsWithARealAccountKeepAdHocChatInvites() {
+        // A client who uses their own AI WorkDeck account (not an access code) joins an ad-hoc group by chat invite as before.
+        Long accountClient = user("账户客户", "USER");
+        String adHoc = id(call(lawyer, "create", Map.of("type", "GROUP", "title", "外部沟通组")));
+        send(lawyer, adHoc, "early", "早先合成讨论");
+        Object code = call(lawyer, "invite", Map.of("conversationId", adHoc, "role", "CLIENT")).get("code");
+        assertEquals("CLIENT", call(accountClient, "join", Map.of("code", code)).get("role"));
+        send(accountClient, adHoc, "hi", "账户客户合成留言");
+        assertEquals(List.of("账户客户合成留言"), texts(messages(accountClient, adHoc)), "joined with the usual after-joining floor");
+        assertTrue(((List<?>) call(accountClient, "list", Map.of()).get("conversations")).size() >= 1);
+    }
+
+    @Test
+    void accessCodeClientsAreToldWhatAChatInviteIsFor() {
+        Long portal = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
+        String adHoc = id(call(lawyer, "create", Map.of("type", "GROUP", "title", "外部沟通组")));
+        Object code = call(lawyer, "invite", Map.of("conversationId", adHoc, "role", "CLIENT")).get("code");
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> call(portal, "join", Map.of("code", code)));
+        assertEquals(ImService.CHAT_INVITE_FOR_ACCOUNTS, refused.getMessage());
+        assertTrue(memberRows.findByConversationIdAndUserId(adHoc, portal).isEmpty());
+        // Typed into the portal's access-code box, the same code is recognised rather than called invalid.
+        assertThrows(ClientInvitationService.ChatInvitationCodeException.class, () -> codes.validateCode(String.valueOf(code)));
     }
 
     @Test
@@ -147,15 +172,14 @@ class ImClientPortalTest {
     }
 
     @Test
-    void namedLoginOnAGenericCodeFollowsThatCode() {
+    void sharedGenericCodesCannotChat() {
+        // A generic code is one identity for everyone holding it, and a typed name selects anyone's login: no chat.
         var issued = codes.issueClientCode(projectId, lawyer, null, false);
+        assertReason(ImService.DENIED_GENERIC_CODE, () -> call(issued.clientUserId(), "projectGroup", Map.of("projectId", projectId)));
         ProjectInvitation code = invitationRows.findByAccessCode(issued.code()).orElseThrow();
         User person = codes.createClientUser(code, "合成联系人");
-        String group = id(call(person.getId(), "projectGroup", Map.of("projectId", projectId)));
-        send(person.getId(), group, "p1", "合成联系人问题");
-        code.setExpiresAt(LocalDateTime.now().minusSeconds(1));
-        invitationRows.saveAndFlush(code);
-        assertCodeInactive(() -> messages(person.getId(), group));
+        assertReason(ImService.DENIED_GENERIC_CODE, () -> call(person.getId(), "projectGroup", Map.of("projectId", projectId)));
+        assertReason(ImService.DENIED_GENERIC_CODE, () -> call(person.getId(), "self", Map.of()));
     }
 
     @Test
@@ -181,13 +205,39 @@ class ImClientPortalTest {
     }
 
     @Test
-    void reissuingAGenericCodeNeverWidensAFloorAlreadySet() {
+    void reissuingTheSameCodeNeverWidensHistory() {
+        // The reissued code goes back to everyone who already has it; turning history on would reach them too.
+        var first = codes.issueClientCode(projectId, lawyer, null, false);
+        var again = codes.issueClientCode(projectId, lawyer, null, true);
+        assertEquals(first.code(), again.code());
+        assertFalse(again.shareHistory(), "the echo says what the code now does");
+        assertEquals(Boolean.FALSE, invitationRows.findByAccessCode(first.code()).orElseThrow().getImShareHistory());
+        // A named code is issued per client, so the lawyer's choice is taken as asked.
+        assertTrue(codes.issueClientCode(projectId, lawyer, "开放历史客户", true).shareHistory());
+    }
+
+    @Test
+    void floorHoldsForFirstPagePollingFromZeroAndUnreadCounts() {
         String group = id(call(lawyer, "projectGroup", Map.of("projectId", projectId)));
-        send(lawyer, group, "before", "入群前合成消息");
-        Long client = codes.issueClientCode(projectId, lawyer, null, false).clientUserId();
-        call(client, "projectGroup", Map.of("projectId", projectId));
-        codes.issueClientCode(projectId, lawyer, null, true);
-        assertEquals(List.of(), texts(messages(client, group)));
+        for (int i = 0; i < 3; i++) send(lawyer, group, "pre-" + i, "入群前" + i);
+        Long client = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
+        Map<String, Object> view = call(client, "projectGroup", Map.of("projectId", projectId));
+        assertEquals(0L, ((Number) view.get("unreadCount")).longValue());
+        send(lawyer, group, "post", "入群后");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> fromZero = (List<Map<String, Object>>) call(client, "messages", Map.of("conversationId", group, "afterId", 0)).get("messages");
+        assertEquals(List.of("入群后"), texts(fromZero));
+        assertEquals(1L, ((Number) call(client, "projectGroup", Map.of("projectId", projectId)).get("unreadCount")).longValue());
+    }
+
+    @Test
+    void lawyersEndAClientsChatByRevokingTheCodeNotByRemovingTheMember() {
+        Long client = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
+        String group = id(call(client, "projectGroup", Map.of("projectId", projectId)));
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                () -> call(lawyer, "removeMember", Map.of("conversationId", group, "userId", client)));
+        assertTrue(refused.getMessage().contains("撤销"), refused.getMessage());
+        assertTrue(memberRows.findByConversationIdAndUserId(group, client).isPresent());
     }
 
     @Test
@@ -226,6 +276,21 @@ class ImClientPortalTest {
     }
 
     @Test
+    void clientUploadsHaveTheirOwnQuotaAndCannotPoseAsProjectFiles() {
+        Long client = codes.issueClientCode(projectId, lawyer, "合成客户", false).clientUserId();
+        String group = id(call(client, "projectGroup", Map.of("projectId", projectId)));
+        Map<String, Object> cited = call(client, "upload", kv("conversationId", group, "name", "x.txt", "base64", b64("x"),
+                "source", Map.of("projectUid", "00000000-0000-0000-0000-000000000001", "fileUid", "00000000-0000-0000-0000-000000000002")));
+        assertNull(cited.get("source"), "a client upload never cites a project file");
+        String eight = Base64.getEncoder().encodeToString(new byte[ImService.MAX_FILE_BYTES]);
+        for (int i = 0; i < 3; i++) call(client, "upload", Map.of("conversationId", group, "name", "big" + i + ".bin", "base64", eight));
+        IllegalArgumentException full = assertThrows(IllegalArgumentException.class,
+                () -> call(client, "upload", Map.of("conversationId", group, "name", "big3.bin", "base64", eight)));
+        assertTrue(full.getMessage().contains("32MiB"), full.getMessage());
+        call(lawyer, "upload", Map.of("conversationId", group, "name", "lawyer.bin", "base64", eight));
+    }
+
+    @Test
     void sendsAreLimitedPerSenderAndServerPostersAreNotCounted() {
         UserRateLimiter limiter = new UserRateLimiter(false, 30, 300, 20, 120, 30, 120);
         @SuppressWarnings("unchecked")
@@ -251,6 +316,8 @@ class ImClientPortalTest {
         for (int i = 0; i < 3; i++) request(client, "messages", Map.of("conversationId", group));
         assertThrows(RateLimitedException.class, () -> request(client, "messages", Map.of("conversationId", group)));
         for (int i = 0; i < 10; i++) request(lawyer, "messages", Map.of("conversationId", group));
+        // A file is one message: staff uploads take nothing from the send bucket.
+        for (int i = 0; i < 3; i++) request(lawyer, "upload", Map.of("conversationId", group, "name", "f" + i + ".txt", "base64", b64("f")));
     }
 
     @Test
@@ -308,6 +375,11 @@ class ImClientPortalTest {
     static String b64(String s) { return Base64.getEncoder().encodeToString(s.getBytes(StandardCharsets.UTF_8)); }
 
     static void assertDenied(org.junit.jupiter.api.function.Executable call) { assertThrows(IllegalArgumentException.class, call); }
+
+    static void assertReason(String reason, org.junit.jupiter.api.function.Executable call) {
+        ImAccessDeniedException e = assertThrows(ImAccessDeniedException.class, call);
+        assertEquals(reason, e.getReason(), e.getMessage());
+    }
 
     static void assertCodeInactive(org.junit.jupiter.api.function.Executable call) {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, call);

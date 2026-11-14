@@ -149,6 +149,9 @@ export default {
   },
   "client": {
     "chat": {
+      "chatInviteCode": "Lời mời này dành cho tài khoản AI WorkDeck. Bạn có thể trao đổi với luật sư trong cuộc trò chuyện dự án tại đây.",
+      "openChat": "Mở trò chuyện dự án",
+      "joinFirst": "Trước tiên hãy vào dự án bằng mã truy cập luật sư đã gửi cho bạn, sau đó dùng trò chuyện dự án.",
       "title": "Trò chuyện dự án",
       "hint": "Trao đổi với đội ngũ pháp lý của bạn về dự án này. Luật sư của bạn quyết định bạn được xem những tin nhắn và tệp trước đó nào.",
       "tabChecklist": "Danh mục kiểm tra",

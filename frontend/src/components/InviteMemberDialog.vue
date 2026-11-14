@@ -208,6 +208,7 @@
                    :placeholder="$t('version.clientNamePlaceholder')"
                  />
                </view>
+               <text v-if="!clientName.trim()" class="code-tip">{{ $t('version.clientChatNeedsName') }}</text>
                <!-- 项目沟通里客户能看到的消息范围（B4）：默认只看加入之后，开放此前消息须明确选择 -->
                <view class="form-group" role="radiogroup" :aria-label="$t('version.clientChatHistoryLabel')">
                  <text class="form-label">{{ $t('version.clientChatHistoryLabel') }}</text>

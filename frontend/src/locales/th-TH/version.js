@@ -317,6 +317,7 @@ export default {
   "generateFailed": "สร้างไม่สำเร็จ",
   "clientPortalLinkLabel": "ลิงก์สำหรับลูกความ:",
   "clientCodeExpires": "ใช้ได้ถึง {date} สร้างใหม่เพื่อขยายเวลา",
+  "clientChatNeedsName": "หากไม่ระบุชื่อลูกความ จะเป็นรหัสใช้ร่วมกัน: เปิดรายการตรวจสอบได้ แต่ใช้กับแชตโครงการไม่ได้",
   "clientChatHistoryLabel": "ข้อความที่ลูกความมองเห็นได้ในแชตโครงการ",
   "clientChatHistoryAfter": "เฉพาะข้อความหลังเข้าร่วม (แนะนำ)",
   "clientChatHistoryAll": "รวมข้อความก่อนเข้าร่วมด้วย",

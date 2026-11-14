@@ -317,6 +317,7 @@ export default {
   "generateFailed": "Oluşturma başarısız oldu",
   "clientPortalLinkLabel": "Müvekkil için bağlantı:",
   "clientCodeExpires": "{date} tarihine kadar geçerli. Süreyi uzatmak için yeniden oluşturun.",
+  "clientChatNeedsName": "Müvekkil adı girilmezse bu ortak bir koddur: kontrol listesini açar ancak proje sohbeti için kullanılamaz.",
   "clientChatHistoryLabel": "Müvekkilin proje sohbetinde görebileceği mesajlar",
   "clientChatHistoryAfter": "Yalnızca katıldıktan sonraki mesajlar (önerilir)",
   "clientChatHistoryAll": "Katılmadan önceki mesajlar da",

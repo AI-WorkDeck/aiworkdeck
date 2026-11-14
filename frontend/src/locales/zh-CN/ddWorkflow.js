@@ -148,6 +148,9 @@ export default {
   },
   "client": {
     "chat": {
+      "chatInviteCode": "此邀请码用于 AI WorkDeck 账户；你可以在这里的项目沟通里与律师交流。",
+      "openChat": "打开项目沟通",
+      "joinFirst": "请先用律师发给你的访问码进入项目，再在项目沟通里交流。",
       "title": "项目沟通",
       "hint": "与律师团队沟通本项目。能看到哪些此前的消息和文件，由律师决定。",
       "tabChecklist": "尽调清单",

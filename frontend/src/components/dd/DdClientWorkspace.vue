@@ -41,6 +41,12 @@
       <button type="button" class="text-button" @click="load">{{ $t('ddWorkflow.retry') }}</button>
     </p>
 
+    <p v-if="chatInviteNotice" class="chat-invite-notice" role="status">
+      <span>{{ $t('ddWorkflow.client.chat.chatInviteCode') }}</span>
+      <button v-if="portalChatEnabled" type="button" class="text-button" @click="openChatFromNotice">{{ $t('ddWorkflow.client.chat.openChat') }}</button>
+      <span v-else>{{ $t('ddWorkflow.client.chat.joinFirst') }}</span>
+    </p>
+
     <div v-if="adding || !connections.length" class="join-stage" :class="{ 'is-empty-stage': !connections.length }">
       <div class="join-container">
         <form class="join-panel" @submit.prevent="join">
@@ -180,7 +186,7 @@ export default {
   name: 'DdClientWorkspace', components: { DdClientChecklist, ClientPortalChat },
   props: { navigationTarget: { type: Object, default: null } },
   watch: { navigationTarget() { this.applyNavigationTarget() } },
-  data: () => ({ view: 'checklist', submissionBusy: false, pendingNavigation: false, code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
+  data: () => ({ view: 'checklist', chatInviteNotice: false, submissionBusy: false, pendingNavigation: false, code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
   computed: {
     selected() { return this.connections.find(c => c.id === this.selectedId) },
     // Project chat lives in the browser portal; desktop client connections use the message center instead.
@@ -227,10 +233,15 @@ export default {
     },
     async join() {
       if (this.submissionBusy || this.joining || !this.code.trim()) return
-      this.joining = true; this.error = ''
+      this.joining = true; this.error = ''; this.chatInviteNotice = false
       try { const row = await connectDdClient(this.code.trim(), this.cloudConnectionId || null); this.code = ''; this.selectedId = row.id; this.adding = false; await this.load() }
-      catch (e) { this.error = e.message } finally { this.joining = false }
+      catch (e) {
+        // A project-chat invitation code is for AI WorkDeck accounts; point the client at their own project chat instead.
+        if (e.reason === 'CHAT_INVITE_CODE') { this.chatInviteNotice = true; this.error = '' }
+        else this.error = e.message
+      } finally { this.joining = false }
     },
+    openChatFromNotice() { this.chatInviteNotice = false; this.adding = false; this.code = ''; this.view = 'chat' },
     selectConnection(id) { if (this.submissionBusy) return; this.focusItemId = null; this.selectedId = id; this.requestId = null; this.requests = []; this.loadRequests() },
     async loadRequests() {
       if (this.submissionBusy) return
@@ -684,6 +695,7 @@ p {
   grid-template-columns: 268px minmax(0, 1fr);
 }
 
+.chat-invite-notice { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 var(--awd-space-4) var(--awd-space-3); padding: 8px 12px; border-radius: var(--awd-radius-sm); background: var(--awd-info-soft); color: var(--awd-info-text); }
 .workspace-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .main-tabs { display: flex; gap: 4px; padding: var(--awd-space-3, 12px) var(--awd-space-4, 16px) 0; border-bottom: 1px solid var(--awd-border); }
 .main-tab { border: 0; border-bottom: 2px solid transparent; background: none; padding: 8px 12px; cursor: pointer; color: var(--awd-text-2); font: inherit; }

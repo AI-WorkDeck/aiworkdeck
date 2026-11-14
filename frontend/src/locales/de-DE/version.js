@@ -317,6 +317,7 @@ export default {
   "generateFailed": "Erstellen fehlgeschlagen",
   "clientPortalLinkLabel": "Link für den Mandanten:",
   "clientCodeExpires": "Gültig bis {date}. Zum Verlängern erneut erstellen.",
+  "clientChatNeedsName": "Ohne Mandantennamen ist dies ein gemeinsamer Code: Er öffnet die Checkliste, gilt aber nicht für den Projektchat.",
   "clientChatHistoryLabel": "Nachrichten im Projektchat, die der Mandant sehen kann",
   "clientChatHistoryAfter": "Nur Nachrichten nach dem Beitritt (empfohlen)",
   "clientChatHistoryAll": "Auch Nachrichten von vor dem Beitritt",

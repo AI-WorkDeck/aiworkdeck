@@ -317,6 +317,7 @@ export default {
   "generateFailed": "生成失敗",
   "clientPortalLinkLabel": "客戶打開的網址：",
   "clientCodeExpires": "有效期至 {date}，過期後重新生成即可續期。",
+  "clientChatNeedsName": "未填客戶稱呼產生的是通用碼：可查看盡調清單，但不能用於專案溝通。",
   "clientChatHistoryLabel": "專案溝通中客戶能看到的訊息",
   "clientChatHistoryAfter": "只看加入之後的訊息（建議）",
   "clientChatHistoryAll": "也可以看加入之前的訊息",

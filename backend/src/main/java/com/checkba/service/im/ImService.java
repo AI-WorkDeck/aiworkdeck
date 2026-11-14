@@ -26,6 +26,8 @@ public class ImService {
     public static final int MAX_FILE_BYTES = 8 * 1024 * 1024;
     public static final String FILE_UNAVAILABLE = "抱歉文件还在准备中，请联系您的律师。";
     static final long MAX_CONVERSATION_BYTES = 100L * 1024 * 1024;
+    /** What one client may upload into a group, so a client cannot fill the group's shared 100 MiB. */
+    static final long MAX_CLIENT_BYTES = 32L * 1024 * 1024;
     public static final Set<String> ACTIONS = Set.of("self", "list", "create", "invite", "join",
             "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess",
             "agentScopes", "ensureAgent", "agentInfo", "agentReply", "projectGroup");
@@ -37,6 +39,8 @@ public class ImService {
      * theirs. Checked here, before any action, so the portal, the desktop client proxy and direct calls share one rule.
      */
     public static final Set<String> CLIENT_PORTAL_ACTIONS = Set.of("self", "projectGroup", "members", "messages", "send", "read", "upload", "download");
+    public static final String CHAT_INVITE_FOR_ACCOUNTS = "此邀请码用于 AI WorkDeck 账户；你可以在这里的项目沟通里与律师交流。";
+    public static final String DENIED_GENERIC_CODE = "GENERIC_CODE";
     public static final String DENIED_CODE_INACTIVE = "CODE_INACTIVE", DENIED_OUT_OF_SCOPE = "OUT_OF_SCOPE", DENIED_ACTION = "ACTION_NOT_ALLOWED";
     /** One denial record per client per window: a cut-off portal keeps polling every few seconds. */
     private static final long DENIAL_AUDIT_WINDOW_MS = 10 * 60 * 1000L;
@@ -86,12 +90,14 @@ public class ImService {
      */
     public Object executeRequest(Long userId, String action, Map<String, Object> params) {
         if (rateLimiter != null && userId != null) {
-            boolean sending = "send".equals(action) || "upload".equals(action);
-            long retry = sending ? rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.IM_SEND, userId) : 0;
-            if (sending && retry > 0) throw new com.checkba.exception.RateLimitedException(retry, com.checkba.service.LangText.of(
-                    "发送太快，请 " + retry + " 秒后再发", "You're sending too fast; please wait " + retry + " seconds"));
-            if (!sending && users.findById(userId).map(User::getRole).filter("CLIENT"::equals).isPresent()) {
-                retry = rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.IM_READ, userId);
+            // A message is one send whether or not it carries a file, so a lawyer sharing files is not throttled twice.
+            if ("send".equals(action)) {
+                long retry = rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.IM_SEND, userId);
+                if (retry > 0) throw new com.checkba.exception.RateLimitedException(retry, com.checkba.service.LangText.of(
+                        "发送太快，请 " + retry + " 秒后再发", "You're sending too fast; please wait " + retry + " seconds"));
+            } else if (users.findById(userId).map(User::getRole).filter("CLIENT"::equals).isPresent()) {
+                long retry = rateLimiter.acquire("upload".equals(action)
+                        ? com.checkba.service.UserRateLimiter.Kind.UPLOAD : com.checkba.service.UserRateLimiter.Kind.IM_READ, userId);
                 if (retry > 0) throw new com.checkba.exception.RateLimitedException(retry);
             }
         }
@@ -117,6 +123,15 @@ public class ImService {
             portalCode = clientInvitations == null ? null : clientInvitations.activeInvitationFor(caller).orElse(null);
             if (portalCode == null) throw portalDenied(userId, null, DENIED_CODE_INACTIVE);
             portalProjectId = portalCode.getProjectId();
+            // A generic code is one identity shared by everyone holding it (and a typed name picks anyone's login):
+            // chat needs a code issued to one named client.
+            if (!"CLIENT_NAMED".equals(portalCode.getType())) throw portalDenied(userId, portalProjectId, DENIED_GENERIC_CODE);
+            if ("join".equals(action)) {
+                // A chat invitation code is for AI WorkDeck accounts; say so instead of a generic refusal.
+                portalDenied(userId, portalProjectId, DENIED_ACTION);
+                throw new ImAccessDeniedException(DENIED_ACTION, com.checkba.service.LangText.of(CHAT_INVITE_FOR_ACCOUNTS,
+                        "This invitation is for AI WorkDeck accounts. You can talk to your lawyers in this project's chat here."));
+            }
             if (!CLIENT_PORTAL_ACTIONS.contains(action)) throw portalDenied(userId, portalProjectId, DENIED_ACTION);
             if ("projectGroup".equals(action) && number(p, "projectId", -1) != portalProjectId)
                 throw portalDenied(userId, portalProjectId, DENIED_OUT_OF_SCOPE);
@@ -277,6 +292,10 @@ public class ImService {
         requireOwner(me);
         ImMember target = requireMember(c.getId(), targetId);
         if ("OWNER".equals(target.getRole())) throw bad(com.checkba.service.LangText.of("不能移除会话负责人", "Cannot remove the conversation owner"));
+        // An access-code client would come straight back on their next poll: their access is the code, so end it there.
+        if (users.findById(targetId).map(User::getRole).filter("CLIENT"::equals).isPresent())
+            throw bad(com.checkba.service.LangText.of("这位客户凭访问码进入项目沟通；要让他离开，请在项目成员里撤销他的访问码。",
+                    "This client is in project chat by access code; to remove them, revoke their access code under project members."));
         members.delete(target);
         return Map.of("removed", true);
     }
@@ -356,7 +375,9 @@ public class ImService {
         if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES) throw bad(com.checkba.service.LangText.of("文件不能为空且不能超过8MiB", "File cannot be empty and cannot exceed 8 MiB"));
         String name = safeName(required(p, "name", 500)), digest = sha(bytes);
         String projectUid = null, fileUid = null;
-        if (p.get("source") != null) {
+        boolean fromClient = client(me);
+        // A client's upload is never a project-file reference; only staff can cite project files.
+        if (p.get("source") != null && !fromClient) {
             if (!(p.get("source") instanceof Map<?,?> source)) throw bad(com.checkba.service.LangText.of("文件来源格式无效", "Invalid file source format"));
             projectUid = sourceUid(source.get("projectUid")); fileUid = sourceUid(source.get("fileUid"));
         }
@@ -371,6 +392,8 @@ public class ImService {
                 return attachmentView(old, me);
             }
         }
+        if (fromClient && attachments.totalSizeBy(c.getId(), me.getUserId()) + bytes.length > MAX_CLIENT_BYTES)
+            throw bad(com.checkba.service.LangText.of("你在本群上传的文件已达 32MiB 上限，请联系律师", "You have reached the 32 MiB upload limit in this group; please contact your lawyer"));
         if (attachments.totalSize(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad(com.checkba.service.LangText.of("本会话文件空间已满（100MiB）", "Conversation file storage is full (100 MiB)"));
         ImAttachment file = new ImAttachment(); file.setId(UUID.randomUUID().toString());
         file.setConversationId(c.getId()); file.setUploadedBy(me.getUserId()); file.setClientMessageId(clientId);
@@ -430,6 +453,7 @@ public class ImService {
      */
     private IllegalArgumentException portalDenied(Long userId, Long projectId, String reason) {
         if (portalAudit != null) {
+            if (deniedAudited.size() > 10_000) deniedAudited.clear();
             String key = userId + ":" + reason;
             long now = System.currentTimeMillis();
             Long last = deniedAudited.get(key);
@@ -440,8 +464,11 @@ public class ImService {
             }
         }
         if (DENIED_CODE_INACTIVE.equals(reason))
-            return bad(com.checkba.service.LangText.of("访问码已失效或已过期，请联系律师", "Your access code is no longer valid or has expired; please contact your lawyer"));
-        return unknownConversation();
+            return new ImAccessDeniedException(reason, com.checkba.service.LangText.of("访问码已失效或已过期，请联系律师", "Your access code is no longer valid or has expired; please contact your lawyer"));
+        if (DENIED_GENERIC_CODE.equals(reason))
+            return new ImAccessDeniedException(reason, com.checkba.service.LangText.of("这个访问码是通用码，不能用于项目沟通。请让律师为你单独生成一个访问码。",
+                    "This is a shared access code and can't be used for project chat. Please ask your lawyer for an access code of your own."));
+        return new ImAccessDeniedException(reason, com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied"));
     }
 
     private static IllegalArgumentException unknownConversation() { return bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied")); }

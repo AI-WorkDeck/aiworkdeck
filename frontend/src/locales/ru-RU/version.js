@@ -317,6 +317,7 @@ export default {
   "generateFailed": "Не удалось создать",
   "clientPortalLinkLabel": "Ссылка для клиента:",
   "clientCodeExpires": "Действителен до {date}. Создайте заново, чтобы продлить.",
+  "clientChatNeedsName": "Без имени клиента это общий код: он открывает чек-лист, но не подходит для чата проекта.",
   "clientChatHistoryLabel": "Сообщения в чате проекта, которые видит клиент",
   "clientChatHistoryAfter": "Только сообщения после присоединения (рекомендуется)",
   "clientChatHistoryAll": "Также сообщения до присоединения",

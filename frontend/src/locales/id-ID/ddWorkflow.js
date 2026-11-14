@@ -148,6 +148,9 @@ export default {
   },
   "client": {
     "chat": {
+      "chatInviteCode": "Undangan ini untuk akun AI WorkDeck. Anda dapat berbicara dengan pengacara Anda di obrolan proyek di sini.",
+      "openChat": "Buka obrolan proyek",
+      "joinFirst": "Masuk dulu ke proyek dengan kode akses yang dikirim pengacara Anda, lalu gunakan obrolan proyek.",
       "title": "Obrolan Proyek",
       "hint": "Berdiskusi dengan tim hukum Anda tentang proyek ini. Pengacara Anda yang menentukan pesan dan berkas sebelumnya yang dapat Anda lihat.",
       "tabChecklist": "Daftar periksa",

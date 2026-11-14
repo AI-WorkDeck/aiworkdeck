@@ -356,6 +356,7 @@ export default {
   // ---- Client portal (dev-board#1050): case files in the Team Case Library get codes issued by the library ----
   clientPortalLinkLabel: 'Link for the client:',
   clientCodeExpires: 'Valid until {date}. Generate it again to extend.',
+  clientChatNeedsName: 'Without a client name this is a shared code: it opens the checklist but can\'t be used for project chat.',
   clientChatHistoryLabel: 'Messages the client can see in project chat',
   clientChatHistoryAfter: 'Only messages after they join (recommended)',
   clientChatHistoryAll: 'Also messages from before they join',

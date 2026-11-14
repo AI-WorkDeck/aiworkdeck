@@ -317,6 +317,7 @@ export default {
   "generateFailed": "Generazione non riuscita",
   "clientPortalLinkLabel": "Link per il cliente:",
   "clientCodeExpires": "Valido fino al {date}. Rigeneralo per prorogarlo.",
+  "clientChatNeedsName": "Senza nome del cliente è un codice condiviso: apre la checklist ma non vale per la chat del progetto.",
   "clientChatHistoryLabel": "Messaggi che il cliente può vedere nella chat di progetto",
   "clientChatHistoryAfter": "Solo i messaggi successivi all’ingresso (consigliato)",
   "clientChatHistoryAll": "Anche i messaggi precedenti all’ingresso",

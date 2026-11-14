@@ -18,7 +18,8 @@ function fixture(chat) {
   vm.unmount = () => options.beforeUnmount.call(vm)
   return vm
 }
-const refusal = (message, status = 200) => Object.assign(new Error(message), { status })
+const refusal = (message, reason = 'CODE_INACTIVE', status = 200) => Object.assign(new Error(message), { status, code: 1, reason })
+const businessError = message => Object.assign(new Error(message), { status: 200, code: 1 })
 
 function server(overrides = {}) {
   const calls = []
@@ -59,10 +60,11 @@ test('sends with a fresh clientMessageId and shows the message once', async () =
 test('an expired or revoked code stops chat; 429, 5xx and network failures keep polling', async () => {
   const s = server(); const vm = fixture(s.chat)
   await vm.mount(); vm.unmount()
-  vm.stop(refusal('发送太快，请 5 秒后再发', 429))
+  vm.stop(Object.assign(new Error('发送太快，请 5 秒后再发'), { status: 429, code: 4290 }))
   assert.equal(vm.stopped, false); assert.match(vm.error, /发送太快/)
-  vm.stop(refusal('网关错误', 502)); assert.equal(vm.stopped, false)
+  vm.stop(Object.assign(new Error('网关错误'), { status: 502 })); assert.equal(vm.stopped, false)
   vm.stop(new Error('Failed to fetch')); assert.equal(vm.stopped, false)
+  vm.stop(businessError('文件不能为空且不能超过8MiB')); assert.equal(vm.stopped, false, 'an ordinary business error is not a refusal')
   vm.stop(refusal('访问码已失效或已过期，请联系律师'))
   assert.equal(vm.stopped, true); assert.match(vm.error, /访问码已失效/)
   const before = s.calls.length
@@ -84,4 +86,10 @@ test('files over 8 MB are refused before any upload', async () => {
   await vm.upload({ size: 8 * 1024 * 1024 + 1, name: 'big.pdf' })
   assert.equal(vm.error, t('ddWorkflow.client.chat.fileTooLarge'))
   assert.equal(s.calls.some(c => c.action === 'upload'), false)
+})
+
+test('a shared code, an out-of-scope answer or a signed-out session also stop chat', () => {
+  for (const e of [refusal('通用码', 'GENERIC_CODE'), refusal('越界', 'OUT_OF_SCOPE'), Object.assign(new Error('请先登录'), { status: 200, code: 4010 })]) {
+    const vm = fixture(server().chat); vm.stop(e); assert.equal(vm.stopped, true, e.message)
+  }
 })

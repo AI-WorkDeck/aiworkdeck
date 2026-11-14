@@ -56,6 +56,7 @@ import { portalChat } from '@/services/ddClient.js'
 
 const POLL_MS = 3000
 const MAX_FILE_BYTES = 8 * 1024 * 1024
+const REFUSALS = new Set(['CODE_INACTIVE', 'GENERIC_CODE', 'OUT_OF_SCOPE', 'ACTION_NOT_ALLOWED'])
 
 export default {
   name: 'ClientPortalChat',
@@ -89,9 +90,10 @@ export default {
     // A code that expired or was revoked stops chat on the server; stop polling and say why instead of retrying forever.
     stop(e) {
       this.error = e?.message || this.$t('ddWorkflow.client.chat.unavailable')
-      // Only an explicit refusal (code expired or revoked, out of scope: a 200 with an error code, or 401/403) ends chat.
-      // 429 (「发送太快」), 5xx and network failures are shown and polling goes on.
-      const refused = (e?.status >= 200 && e?.status < 300) || e?.status === 401 || e?.status === 403
+      // Only an explicit refusal ends chat: the server's access reasons (code expired or revoked, shared code, out of
+      // scope), a signed-out session (4010) or 401/403. 429 (「发送太快」), ordinary business errors (an empty file,
+      // the upload quota), 5xx and network failures are shown and polling goes on.
+      const refused = REFUSALS.has(e?.reason) || e?.code === 4010 || e?.status === 401 || e?.status === 403
       if (refused) { this.stopped = true; clearInterval(this.timer) }
     },
     async poll() {

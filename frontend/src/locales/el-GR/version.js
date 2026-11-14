@@ -317,6 +317,7 @@ export default {
   "generateFailed": "Αποτυχία δημιουργίας",
   "clientPortalLinkLabel": "Σύνδεσμος για τον πελάτη:",
   "clientCodeExpires": "Ισχύει έως {date}. Δημιουργήστε τον ξανά για παράταση.",
+  "clientChatNeedsName": "Χωρίς όνομα εντολέα αυτός είναι κοινός κωδικός: ανοίγει τη λίστα ελέγχου αλλά δεν ισχύει για τη συνομιλία του έργου.",
   "clientChatHistoryLabel": "Μηνύματα που βλέπει ο εντολέας στη συνομιλία έργου",
   "clientChatHistoryAfter": "Μόνο μηνύματα μετά την είσοδο (προτείνεται)",
   "clientChatHistoryAll": "Και μηνύματα πριν από την είσοδο",

@@ -317,6 +317,7 @@ export default {
   "generateFailed": "Genereren mislukt",
   "clientPortalLinkLabel": "Link voor de cliënt:",
   "clientCodeExpires": "Geldig tot {date}. Genereer opnieuw om te verlengen.",
+  "clientChatNeedsName": "Zonder naam van de cliënt is dit een gedeelde code: hij opent de checklist maar werkt niet voor de projectchat.",
   "clientChatHistoryLabel": "Berichten die de cliënt kan zien in de projectchat",
   "clientChatHistoryAfter": "Alleen berichten na deelname (aanbevolen)",
   "clientChatHistoryAll": "Ook berichten van vóór deelname",

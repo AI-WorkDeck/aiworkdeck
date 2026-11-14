@@ -148,6 +148,9 @@ export default {
   },
   "client": {
     "chat": {
+      "chatInviteCode": "Jemputan ini untuk akaun AI WorkDeck. Anda boleh berbincang dengan peguam anda dalam sembang projek di sini.",
+      "openChat": "Buka sembang projek",
+      "joinFirst": "Masuk ke projek dahulu dengan kod akses yang dihantar oleh peguam anda, kemudian gunakan sembang projek.",
       "title": "Sembang Projek",
       "hint": "Berbincang dengan pasukan guaman anda tentang projek ini. Peguam anda menentukan mesej dan fail terdahulu yang boleh anda lihat.",
       "tabChecklist": "Senarai semak",
