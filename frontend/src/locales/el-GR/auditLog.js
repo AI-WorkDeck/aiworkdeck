@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Άλλαξε ο ρόλος μέλους έργου",
     "CLIENT_INVITE_ISSUED": "Εκδόθηκε κωδικός πρόσβασης πελάτη",
     "CLIENT_PORTAL_LOGIN": "Σύνδεση στην πύλη πελατών",
+    "CLIENT_PORTAL_CHAT_JOINED": "Ο εντολέας μπήκε στη συνομιλία του έργου στην πύλη",
     "CHAT_INVITE_ISSUED": "Στάλθηκε πρόσκληση συνομιλίας",
     "CHAT_INVITE_REDEEMED": "Η πρόσκληση συνομιλίας έγινε δεκτή",
     "CHAT_MEMBER_REMOVED": "Αφαιρέθηκε μέλος συνομιλίας",

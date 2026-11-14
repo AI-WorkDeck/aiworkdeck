@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "이전 메시지도 함께 보기",
   "inviteHintAfterJoin": "이 코드로 참여한 의뢰인은 참여 이후의 메시지와 파일만 볼 수 있습니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}.",
   "inviteHintWithHistory": "이 코드로 참여한 의뢰인은 이전 메시지도 볼 수 있습니다. 파일은 여전히 접근 권한에 따라 개별적으로 공개됩니다. 예정된 상대에게만 전달하세요. 유효 기한: {time}.",
+  "fromClient": "의뢰인",
 }

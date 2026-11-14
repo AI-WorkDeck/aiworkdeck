@@ -46,16 +46,20 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(com.checkba.exception.RateLimitedException.class)
     public ResponseEntity<Map<String, Object>> handleRateLimited(com.checkba.exception.RateLimitedException e) {
-        return rateLimitedResponse(e.getRetryAfterSeconds());
+        return rateLimitedResponse(e.getRetryAfterSeconds(), e.getMessage());
     }
 
     /** 同一份 429 响应，供自带 catch-all 的控制器（如上传）直接返回。 */
     public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds) {
+        return rateLimitedResponse(retryAfterSeconds, com.checkba.exception.RateLimitedException.message(retryAfterSeconds));
+    }
+
+    public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds, String message) {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 4290);
         result.put("status", "error");
         result.put("reason", "RATE_LIMITED");
-        result.put("message", com.checkba.exception.RateLimitedException.message(retryAfterSeconds));
+        result.put("message", message);
         result.put("retryAfterSeconds", retryAfterSeconds);
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", String.valueOf(retryAfterSeconds))
@@ -170,6 +174,27 @@ public class GlobalExceptionHandler {
         if (e.getOutTradeNo() != null && !e.getOutTradeNo().isEmpty()) {
             result.put("outTradeNo", e.getOutTradeNo());
         }
+        result.put("message", e.getMessage());
+        return ResponseEntity.ok().body(result);
+    }
+
+    /** Project-chat refusal for an access-code client: the usual shape plus a machine reason (B4). */
+    @ExceptionHandler(com.checkba.service.im.ImAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleImAccessDenied(com.checkba.service.im.ImAccessDeniedException e) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("reason", e.getReason());
+        result.put("message", e.getMessage());
+        return ResponseEntity.ok().body(result);
+    }
+
+    /** A client's chat upload over a configured limit: the usual shape plus reason and the limit in bytes (B4). */
+    @ExceptionHandler(com.checkba.service.im.ImLimitException.class)
+    public ResponseEntity<Map<String, Object>> handleImLimit(com.checkba.service.im.ImLimitException e) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("reason", e.getReason());
+        result.put("limitBytes", e.getLimitBytes());
         result.put("message", e.getMessage());
         return ResponseEntity.ok().body(result);
     }

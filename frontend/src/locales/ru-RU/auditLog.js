@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Роль участника проекта изменена",
     "CLIENT_INVITE_ISSUED": "Выдан код доступа клиента",
     "CLIENT_PORTAL_LOGIN": "Вход в клиентский портал",
+    "CLIENT_PORTAL_CHAT_JOINED": "Клиент вошёл в чат проекта на портале",
     "CHAT_INVITE_ISSUED": "Отправлено приглашение в беседу",
     "CHAT_INVITE_REDEEMED": "Приглашение в беседу принято",
     "CHAT_MEMBER_REMOVED": "Участник удалён из беседы",

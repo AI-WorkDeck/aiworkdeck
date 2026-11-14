@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "प्रोजेक्ट सदस्य की भूमिका बदली गई",
     "CLIENT_INVITE_ISSUED": "क्लाइंट एक्सेस कोड जारी किया गया",
     "CLIENT_PORTAL_LOGIN": "क्लाइंट पोर्टल में साइन-इन",
+    "CLIENT_PORTAL_CHAT_JOINED": "मुवक्किल पोर्टल में परियोजना चैट से जुड़ा",
     "CHAT_INVITE_ISSUED": "बातचीत का आमंत्रण भेजा गया",
     "CHAT_INVITE_REDEEMED": "बातचीत का आमंत्रण स्वीकार किया गया",
     "CHAT_MEMBER_REMOVED": "बातचीत से सदस्य हटाया गया",

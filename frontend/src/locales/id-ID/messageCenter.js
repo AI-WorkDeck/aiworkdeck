@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "Termasuk pesan sebelumnya",
   "inviteHintAfterJoin": "Klien yang bergabung dengan kode ini hanya melihat pesan dan berkas yang dikirim setelah ia bergabung. Bagikan hanya kepada orang yang dituju. Berlaku hingga {time}.",
   "inviteHintWithHistory": "Klien yang bergabung dengan kode ini juga dapat membaca pesan sebelumnya; berkas tetap dibuka satu per satu sesuai izin aksesnya. Bagikan hanya kepada orang yang dituju. Berlaku hingga {time}.",
+  "fromClient": "Klien",
 }

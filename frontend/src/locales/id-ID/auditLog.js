@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Peran anggota proyek diubah",
     "CLIENT_INVITE_ISSUED": "Kode akses klien diterbitkan",
     "CLIENT_PORTAL_LOGIN": "Login portal klien",
+    "CLIENT_PORTAL_CHAT_JOINED": "Klien bergabung ke obrolan proyek di portal",
     "CHAT_INVITE_ISSUED": "Undangan percakapan dikirim",
     "CHAT_INVITE_REDEEMED": "Undangan percakapan diterima",
     "CHAT_MEMBER_REMOVED": "Anggota percakapan dihapus",

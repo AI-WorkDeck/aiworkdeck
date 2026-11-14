@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "تم تغيير دور عضو في المشروع",
     "CLIENT_INVITE_ISSUED": "تم إصدار رمز وصول للعميل",
     "CLIENT_PORTAL_LOGIN": "تسجيل دخول إلى بوابة العميل",
+    "CLIENT_PORTAL_CHAT_JOINED": "انضم الموكل إلى دردشة المشروع في البوابة",
     "CHAT_INVITE_ISSUED": "تم إرسال دعوة إلى محادثة",
     "CHAT_INVITE_REDEEMED": "تم قبول دعوة محادثة",
     "CHAT_MEMBER_REMOVED": "تمت إزالة عضو من المحادثة",

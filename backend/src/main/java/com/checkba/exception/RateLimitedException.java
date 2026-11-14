@@ -21,6 +21,12 @@ public class RateLimitedException extends RuntimeException {
         this.retryAfterSeconds = retryAfterSeconds;
     }
 
+    /** Same 429 shape with a more specific, already localized message (e.g. project chat「发送太快」). */
+    public RateLimitedException(long retryAfterSeconds, String message) {
+        super(message);
+        this.retryAfterSeconds = retryAfterSeconds;
+    }
+
     public long getRetryAfterSeconds() {
         return retryAfterSeconds;
     }

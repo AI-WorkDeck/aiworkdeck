@@ -8,5 +8,8 @@
   "panel.historyWithEarlier": "Earlier messages as well",
   "panel.inviteHintAfterJoin": "A client who joins with this code sees only messages and files sent after they join. Share it only with the intended person. Valid until {time}",
   "panel.inviteHintWithHistory": "A client who joins with this code can also read earlier messages; files are still opened one by one under their access settings. Share it only with the intended person. Valid until {time}",
-  "panel.inviteJoinHow": "They sign in to the AI WorkDeck app with their own account and enter the code under “Message center → Chats → Join with code” or in “Project Chat → Join with code”. The client portal does not accept this code."
+  "panel.inviteJoinHow": "They sign in to the AI WorkDeck app with their own account and enter the code under “Message center → Chats → Join with code” or in “Project Chat → Join with code”. The client portal does not accept this code.",
+  "panel.fromClient": "Client",
+  "panel.revokeCode": "Revoke access code",
+  "panel.revokeCodeConfirm": "The client's access code stops working at once; they will no longer be able to open the project chat or the checklist. Revoke it?"
 }

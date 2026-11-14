@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "プロジェクトメンバーの役割変更",
     "CLIENT_INVITE_ISSUED": "クライアントアクセスコードの発行",
     "CLIENT_PORTAL_LOGIN": "クライアントポータルへのサインイン",
+    "CLIENT_PORTAL_CHAT_JOINED": "クライアントがポータルのプロジェクトチャットに参加",
     "CHAT_INVITE_ISSUED": "会話への招待を送信",
     "CHAT_INVITE_REDEEMED": "会話への招待が承諾された",
     "CHAT_MEMBER_REMOVED": "会話メンバーの削除",

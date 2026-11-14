@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "Termasuk mesej terdahulu",
   "inviteHintAfterJoin": "Anak guam yang menyertai dengan kod ini hanya melihat mesej dan fail yang dihantar selepas dia menyertai. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}.",
   "inviteHintWithHistory": "Anak guam yang menyertai dengan kod ini juga boleh membaca mesej terdahulu; fail masih dibuka satu demi satu mengikut kebenaran akses. Kongsikan hanya kepada orang yang dimaksudkan. Sah hingga {time}.",
+  "fromClient": "Anak guam",
 }

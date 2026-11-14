@@ -177,6 +177,21 @@ class FirmAuditLogTest {
     }
 
     @Test
+    void aRefusalIsRecordedEvenThoughItsRequestRollsBack() {
+        Long p = project(lawyer, "门户客户案卷");
+        new TransactionTemplate(tx).executeWithoutResult(status -> {
+            audit.recordNow(FirmAuditLog.event("CLIENT", "CLIENT_PORTAL_CHAT_JOINED").failed().actor(personal).project(p)
+                    .detail("reason", "CODE_INACTIVE"));
+            status.setRollbackOnly();
+        });
+        List<Map<String, Object>> rows = events(admin, Map.of());
+        assertEquals(1, rows.size());
+        assertEquals("CLIENT_PORTAL_CHAT_JOINED", rows.get(0).get("action"));
+        assertEquals("FAILURE", rows.get(0).get("outcome"));
+        assertEquals(Map.of("reason", "CODE_INACTIVE"), rows.get(0).get("detail"));
+    }
+
+    @Test
     void switchChangesAreAuditedAndFiltersApply() {
         sessions.issue(lawyer);
         // 合成一个功能开关不需要：开关读写本身就是 cloud 动作，未登记功能会被拒；这里直接记一次开关事件

@@ -995,6 +995,8 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
   `utils/clientPortal.js` 在 `main.js` 里把其余硬编码跳转（4010 回登录页、退出登录回启动页、日程……）改写回门户；门户不埋点。
   这只是入口收口，真闸在后端。
 
+- **门户项目沟通（B4）**：门户工作区（只在门户构建、`portal-` 连接上）多一个「项目沟通」视图 `components/dd/ClientPortalChat.vue`，用门户会话直接调 `/api/im/action`（`ddClient.js` 的 `portalChat`），3 秒 `afterId` 轮询；服务端明确拒绝（200+错误码、401/403，如访问码失效）就停轮询、禁用输入，429/5xx/断网只提示不停。权限全在 `ImService`（见 plugin-system.md「客户门户项目沟通」），前端不做闸。签码时律师选客户在项目沟通里能否看加入之前的消息（`InviteMemberDialog` 的单选，默认只看加入之后），存在 `project_invitation.im_share_history`。
+
 ### 已知地雷
 
 - `DdCloudProxyFilter` **绝不能调 `request.getParameter`**：Tomcat 会顺手把 multipart 请求体解析掉，原字节转发就断了；查询串自己拆（`parseQuery`）。

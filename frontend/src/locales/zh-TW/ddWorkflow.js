@@ -148,6 +148,26 @@ export default {
     "titles": "請填寫每個清單項的名稱。"
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "此邀請碼用於 AI WorkDeck 帳戶；你可以在這裡的專案溝通中與律師交流。",
+      "openChat": "開啟專案溝通",
+      "joinFirst": "請先使用律師提供的存取碼進入專案，再於專案溝通中交流。",
+      "title": "專案溝通",
+      "hint": "與律師團隊溝通本專案。能看到哪些先前的訊息和檔案，由律師決定。",
+      "tabChecklist": "盡調清單",
+      "loading": "正在載入訊息…",
+      "empty": "還沒有訊息。有問題可以直接在這裡留言。",
+      "older": "載入更早的訊息",
+      "you": "我",
+      "filePending": "檔案還在準備中，請聯絡您的律師。",
+      "placeholder": "輸入訊息，Enter 傳送，Shift+Enter 換行",
+      "attach": "傳送檔案",
+      "send": "傳送",
+      "sending": "正在傳送…",
+      "fileTooLarge": "單一檔案不能超過 {size} MB",
+      "quotaFull": "你在本專案上傳的檔案總量已達 {size} MB 上限，請聯絡律師。",
+      "unavailable": "專案溝通暫時無法使用，請稍後再試"
+    },
     "messageUnavailable": "該消息對應的受邀項目或清單已不可訪問，請刷新後重試。",
     "workspaceTitle": "受邀盡調",
     "workspaceHint": "按律師清單準備材料，逐項提交並查看反饋。",

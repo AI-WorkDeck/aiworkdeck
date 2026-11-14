@@ -62,6 +62,7 @@ export default {
     PROJECT_MEMBER_ROLE_CHANGED: '项目成员角色变更',
     CLIENT_INVITE_ISSUED: '签发客户访问码',
     CLIENT_PORTAL_LOGIN: '客户门户登录',
+    CLIENT_PORTAL_CHAT_JOINED: '客户进入门户项目沟通',
     CHAT_INVITE_ISSUED: '发出沟通邀请',
     CHAT_INVITE_REDEEMED: '沟通邀请被接受',
     CHAT_MEMBER_REMOVED: '移出沟通成员',

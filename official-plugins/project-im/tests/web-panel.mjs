@@ -527,3 +527,21 @@ test('QA D15: an existing private assistant chat is resumed on open without enro
  assert.equal(p.$('chat-title').textContent,agent.name)
  assert.equal(p.calls.some(c=>c.action==='ensureAgent'),false)
 })
+
+test('messages from the client carry a visible client badge; staff messages do not (B4)', async t => {
+ const p=await panel({call:({action})=> action==='list'?{conversations:[c1]}:action==='messages'?{messages:[{...msg,id:1,attachment:null,text:'律师消息'},{...msg,id:2,senderId:12,senderName:'合成客户',attachment:null,text:'客户消息',fromClient:true}],hasMore:false}:undefined})
+ close(t,p);await p.select()
+ const metas=[...p.$('messages').querySelectorAll('.message-meta')]
+ assert.equal(metas[0].querySelector('.client-badge'),null)
+ assert.equal(metas[1].querySelector('.client-badge').textContent,'客户')
+})
+
+test('an access-code client is removed by revoking the code, after a confirmation that says so (B4)', async t => {
+ const calls=[]
+ const p=await panel({call:({action,params})=>{calls.push({action,params});return action==='list'?{conversations:[{...c1,role:'OWNER'}]}:action==='messages'?{messages:[],hasMore:false}:action==='members'?{members:[{id:9,displayName:'律师',role:'OWNER',actorType:'HUMAN'},{id:12,displayName:'合成客户',role:'CLIENT',actorType:'HUMAN',accessCode:true},{id:13,displayName:'同事',role:'MEMBER',actorType:'HUMAN'}],humanCount:3}:action==='removeMember'?{removed:true,codeRevoked:true}:undefined}})
+ close(t,p);await p.select();await p.click('members-button')
+ const rows=[...p.$('dialog-body').querySelectorAll('.member-row')]
+ assert.equal(rows.length,3)
+ const texts=rows.map(r=>[...r.querySelectorAll('button')].map(b=>b.textContent))
+ assert.deepEqual(texts[0],[]); assert.deepEqual(texts[1],['撤销访问码']); assert.deepEqual(texts[2],['移除'])
+})

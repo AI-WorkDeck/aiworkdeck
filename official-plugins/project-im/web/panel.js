@@ -420,7 +420,10 @@
       const row = node('article', null, 'message' + (String(message.senderId) === String(state.self?.id) ? ' mine' : ''));
       const content = node('div', null, 'message-content');
       row.append(avatar(message.senderName || message.agentName, message.senderAvatarUrl, message.actorType === 'AGENT'), content);
-      content.append(node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta'));
+      const meta = node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta');
+      // 客户（门户访问码客户或项目客户）发的消息明确标出，律师一眼分清对内对外
+      if (message.fromClient) meta.append(node('span', t('fromClient'), 'client-badge'));
+      content.append(meta);
       const bubble = node('div', null, 'bubble'); if (message.text) bubble.append(node('div', message.text));
       if (message.attachment) bubble.append(fileCard(message.attachment));
       content.append(bubble); $('messages').append(row);
@@ -598,7 +601,12 @@
     dialog('会话成员', '', null);
     for (const m of result.members || []) {
       const row = node('div', null, 'member-row'); row.append(node('span', `${m.displayName || m.name || m.id || '助手'} · ${m.actorType === 'AGENT' ? 'AI 助手' : (roles[m.role] || '成员')}`));
-      if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER') row.append(button('移除', async () => {
+      // A client who came in by access code is removed by revoking that code (B4); a plain remove would bounce back.
+      if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER' && m.accessCode) row.append(button(t('revokeCode'), async () => {
+        if (!await confirmAction(t('revokeCodeConfirm'))) return;
+        await request('removeMember', { conversationId: s.id, userId: m.id, revokeCode: true }); if (current(s)) await membersDialog();
+      }, 'danger'));
+      else if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER') row.append(button('移除', async () => {
         if (!await confirmAction('将该成员移出当前会话？')) return;
         await request('removeMember', { conversationId: s.id, userId: m.id }); if (current(s)) await membersDialog();
       })); $('dialog-body').append(row);

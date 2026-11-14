@@ -147,6 +147,26 @@ export default {
     "titles": "Voer voor elk onderdeel een titel in."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Deze uitnodiging is bedoeld voor AI WorkDeck-accounts. U kunt hier in de projectchat met uw advocaten praten.",
+      "openChat": "Projectchat openen",
+      "joinFirst": "Open eerst het project met de toegangscode die uw advocaat u stuurde en gebruik daarna de projectchat.",
+      "title": "Projectchat",
+      "hint": "Bespreek dit project met uw juridische team. Uw advocaten bepalen welke eerdere berichten en bestanden u kunt zien.",
+      "tabChecklist": "Checklist",
+      "loading": "Berichten laden…",
+      "empty": "Nog geen berichten. U kunt hier vragen stellen aan uw advocaten.",
+      "older": "Eerdere berichten laden",
+      "you": "U",
+      "filePending": "Het bestand wordt nog voorbereid. Neem contact op met uw advocaat.",
+      "placeholder": "Typ een bericht. Enter om te verzenden, Shift+Enter voor een nieuwe regel",
+      "attach": "Bestand verzenden",
+      "send": "Verzenden",
+      "sending": "Verzenden…",
+      "fileTooLarge": "Eén bestand mag niet groter zijn dan {size} MB",
+      "quotaFull": "U hebt de totale uploadlimiet van {size} MB voor dit project bereikt. Neem contact op met uw advocaat.",
+      "unavailable": "De projectchat is momenteel niet beschikbaar. Probeer het later opnieuw."
+    },
     "messageUnavailable": "Dit uitgenodigde project of deze checklist is niet langer beschikbaar. Vernieuw en probeer het opnieuw.",
     "workspaceTitle": "Cliëntsamenwerking",
     "workspaceHint": "Bereid documenten voor aan de hand van de checklist van uw advocaat, dien elk onderdeel in en volg de feedback.",

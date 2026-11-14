@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "También los mensajes anteriores",
   "inviteHintAfterJoin": "El cliente que se una con este código solo verá los mensajes y archivos enviados después de su incorporación. Compártalo únicamente con la persona prevista. Válido hasta {time}.",
   "inviteHintWithHistory": "El cliente que se una con este código también podrá leer los mensajes anteriores; los archivos siguen abriéndose uno a uno según sus permisos de acceso. Compártalo únicamente con la persona prevista. Válido hasta {time}.",
+  "fromClient": "Cliente",
 }

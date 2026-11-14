@@ -46,7 +46,7 @@ test('a message opens its exact item once and polling does not override the next
 function navigationFixture(read) {
   const workspace = readFileSync(new URL('../../src/components/dd/DdClientWorkspace.vue', import.meta.url), 'utf8')
   const body = workspace.slice(workspace.indexOf('<script>') + 8, workspace.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
-  const options = new Function('DdClientChecklist', 'ddNotificationPermission', 'ddClientRead', body)(null, () => 'unavailable', read)
+  const options = new Function('DdClientChecklist', 'ClientPortalChat', 'ddNotificationPermission', 'ddClientRead', body)(null, null, () => 'unavailable', read)
   const vm = { ...options.data(), $t: translate(), navigationTarget: null }
   for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
   for (const [key, fn] of Object.entries(options.computed)) Object.defineProperty(vm, key, { get: fn.bind(vm) })
@@ -99,7 +99,7 @@ test('the workspace reads registered case servers from the real API envelope', a
   const workspace = readFileSync(new URL('../../src/components/dd/DdClientWorkspace.vue', import.meta.url), 'utf8')
   const body = workspace.slice(workspace.indexOf('<script>') + 8, workspace.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
   const rows = [{ id: 1, name: 'Case server' }]
-  const options = new Function('DdClientChecklist', 'listCloudConnections', 'isClientPortalBuild', 'ddNotificationPermission', 'ddClientIdentity', body)(null, async () => ({ code: 0, data: { connections: rows } }), () => false, () => 'unavailable', () => 'local')
+  const options = new Function('DdClientChecklist', 'ClientPortalChat', 'listCloudConnections', 'isClientPortalBuild', 'ddNotificationPermission', 'ddClientIdentity', body)(null, null, async () => ({ code: 0, data: { connections: rows } }), () => false, () => 'unavailable', () => 'local')
   const vm = { ...options.data(), load: () => {}, refreshNotifications: () => {} }
   const timer = globalThis.setInterval; globalThis.setInterval = () => 0
   try { options.mounted.call(vm); await Promise.resolve(); assert.deepEqual(vm.cloudConnections, rows) }

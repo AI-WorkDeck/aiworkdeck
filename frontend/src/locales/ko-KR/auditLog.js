@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "프로젝트 구성원 역할 변경",
     "CLIENT_INVITE_ISSUED": "고객 접근 코드 발급",
     "CLIENT_PORTAL_LOGIN": "고객 포털 로그인",
+    "CLIENT_PORTAL_CHAT_JOINED": "의뢰인이 포털의 프로젝트 채팅에 참여함",
     "CHAT_INVITE_ISSUED": "대화 초대 발송",
     "CHAT_INVITE_REDEEMED": "대화 초대 수락됨",
     "CHAT_MEMBER_REMOVED": "대화 구성원 제거",

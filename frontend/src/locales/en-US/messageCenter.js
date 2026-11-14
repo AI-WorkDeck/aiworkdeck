@@ -50,4 +50,5 @@ export default {
   "historyWithEarlier": "Earlier messages as well",
   "inviteHintAfterJoin": "A client who joins with this code sees only messages and files sent after they join. Share it only with the intended person. Valid until {time}.",
   "inviteHintWithHistory": "A client who joins with this code can also read earlier messages; files are still opened one by one under their access settings. Share it only with the intended person. Valid until {time}.",
+  "fromClient": "Client",
 }

@@ -16,4 +16,9 @@ public interface ImAttachmentRepository extends JpaRepository<ImAttachment, Stri
          String conversationId, Long uploadedBy, String clientMessageId);
  @org.springframework.data.jpa.repository.Query("select coalesce(sum(a.size),0) from ImAttachment a where a.conversationId=:conversationId")
  long totalSize(String conversationId);
+ @org.springframework.data.jpa.repository.Query("select coalesce(sum(a.size),0) from ImAttachment a where a.conversationId=:conversationId and a.uploadedBy=:uploadedBy")
+ long totalSizeBy(String conversationId, Long uploadedBy);
+ /** Bytes uploaded by access-code clients, who have their own limits and do not use up the group's staff storage. */
+ @org.springframework.data.jpa.repository.Query("select coalesce(sum(a.size),0) from ImAttachment a, com.checkba.model.entity.User u where u.id=a.uploadedBy and a.conversationId=:conversationId and u.role='CLIENT'")
+ long totalSizeByClients(String conversationId);
 }

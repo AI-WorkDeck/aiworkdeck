@@ -8,5 +8,8 @@
   "panel.historyWithEarlier": "También los mensajes anteriores",
   "panel.inviteHintAfterJoin": "El cliente que se una con este código solo verá los mensajes y archivos enviados después de su incorporación. Compártalo únicamente con la persona prevista. Válido hasta {time}",
   "panel.inviteHintWithHistory": "El cliente que se una con este código también podrá leer los mensajes anteriores; los archivos siguen abriéndose uno a uno según sus permisos de acceso. Compártalo únicamente con la persona prevista. Válido hasta {time}",
-  "panel.inviteJoinHow": "La otra persona inicia sesión en la aplicación AI WorkDeck con su propia cuenta e introduce el código en «Centro de mensajes → Conversaciones → Unirse con código» o en «Chat del proyecto → Unirse con código». El portal de clientes no acepta este código."
+  "panel.inviteJoinHow": "La otra persona inicia sesión en la aplicación AI WorkDeck con su propia cuenta e introduce el código en «Centro de mensajes → Conversaciones → Unirse con código» o en «Chat del proyecto → Unirse con código». El portal de clientes no acepta este código.",
+  "panel.fromClient": "Cliente",
+  "panel.revokeCode": "Revocar el código de acceso",
+  "panel.revokeCodeConfirm": "El código de acceso del cliente deja de funcionar de inmediato; ya no podrá abrir el chat del proyecto ni la lista de verificación. ¿Revocarlo?"
 }

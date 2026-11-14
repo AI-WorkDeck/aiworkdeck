@@ -26,11 +26,35 @@ public class ImService {
     public static final int MAX_FILE_BYTES = 8 * 1024 * 1024;
     public static final String FILE_UNAVAILABLE = "抱歉文件还在准备中，请联系您的律师。";
     static final long MAX_CONVERSATION_BYTES = 100L * 1024 * 1024;
+    /**
+     * Client uploads (scanned evidence) have their own limits, set by ops: per file and per client in a project's group.
+     * They are not counted against the group's 100 MiB, which stays for staff files.
+     */
+    @org.springframework.beans.factory.annotation.Value("${im.client-upload.max-file-mb:50}")
+    private long clientMaxFileMb = 50;
+    @org.springframework.beans.factory.annotation.Value("${im.client-upload.max-total-mb:512}")
+    private long clientMaxTotalMb = 512;
+    public long clientMaxFileBytes() { return clientMaxFileMb * 1024 * 1024; }
+    public long clientMaxTotalBytes() { return clientMaxTotalMb * 1024 * 1024; }
+    /** Largest JSON body an upload may need: a client file as base64, plus room for the envelope. */
+    public long maxRequestBytes() { return Math.max(ImGatewayService.MAX_JSON_BYTES, (Math.max(MAX_FILE_BYTES, clientMaxFileBytes()) + 2) / 3 * 4 + 1024 * 1024); }
     public static final Set<String> ACTIONS = Set.of("self", "list", "create", "invite", "join",
             "members", "removeMember", "leave", "messages", "send", "read", "upload", "download", "fileAccess",
             "agentScopes", "ensureAgent", "agentInfo", "agentReply", "projectGroup");
     /** Polled every few seconds by every open panel: these never take the conversation row lock. */
     static final Set<String> READ_ONLY_ACTIONS = Set.of("self", "list", "members", "agentInfo", "messages", "download");
+    /**
+     * Everything a client holding an access code (global role CLIENT) may call (B4). They reach only the project group
+     * of the project their code is for; DMs, other groups, private assistants, membership and access management are not
+     * theirs. Checked here, before any action, so the portal, the desktop client proxy and direct calls share one rule.
+     */
+    public static final Set<String> CLIENT_PORTAL_ACTIONS = Set.of("self", "projectGroup", "members", "messages", "send", "read", "upload", "download");
+    public static final String CHAT_INVITE_FOR_ACCOUNTS = "此邀请码用于 AI WorkDeck 账户；你可以在这里的项目沟通里与律师交流。";
+    public static final String DENIED_GENERIC_CODE = "GENERIC_CODE";
+    public static final String DENIED_CODE_INACTIVE = "CODE_INACTIVE", DENIED_OUT_OF_SCOPE = "OUT_OF_SCOPE", DENIED_ACTION = "ACTION_NOT_ALLOWED";
+    /** One denial record per client per window: a cut-off portal keeps polling every few seconds. */
+    private static final long DENIAL_AUDIT_WINDOW_MS = 10 * 60 * 1000L;
+    private final Map<String, Long> deniedAudited = new java.util.concurrent.ConcurrentHashMap<>();
     private final ImConversationRepository conversations;
     private final ImMemberRepository members;
     private final ImInvitationRepository invitations;
@@ -43,6 +67,12 @@ public class ImService {
     private ProjectRepository projects;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.service.ProjectMemberService projectPermissions;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.ClientInvitationService clientInvitations;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private ClientPortalChatAudit portalAudit;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
 
     private TransactionTemplate writes, reads;
     @org.springframework.beans.factory.annotation.Autowired
@@ -62,6 +92,28 @@ public class ImService {
      * membership again after the rows are read (see below). A read nested in a caller's own transaction keeps the
      * lock: such callers (project import/export) decide writes from what they read.
      */
+    /**
+     * Entry for requests that arrive over the network ({@code /api/im/action}, and the server-mode gateway). Counts the
+     * request against the caller's own buckets before running it: sends and uploads per sender; every other action too
+     * when the caller is an access-code client. Server-side posters (law-firm notices, assistant replies) call
+     * {@link #execute} directly and are not counted.
+     */
+    public Object executeRequest(Long userId, String action, Map<String, Object> params) {
+        if (rateLimiter != null && userId != null) {
+            // A message is one send whether or not it carries a file, so a lawyer sharing files is not throttled twice.
+            if ("send".equals(action)) {
+                long retry = rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.IM_SEND, userId);
+                if (retry > 0) throw new com.checkba.exception.RateLimitedException(retry, com.checkba.service.LangText.of(
+                        "发送太快，请 " + retry + " 秒后再发", "You're sending too fast; please wait " + retry + " seconds"));
+            } else if (users.findById(userId).map(User::getRole).filter("CLIENT"::equals).isPresent()) {
+                long retry = rateLimiter.acquire("upload".equals(action)
+                        ? com.checkba.service.UserRateLimiter.Kind.UPLOAD : com.checkba.service.UserRateLimiter.Kind.IM_READ, userId);
+                if (retry > 0) throw new com.checkba.exception.RateLimitedException(retry);
+            }
+        }
+        return execute(userId, action, params);
+    }
+
     public Object execute(Long userId, String action, Map<String, Object> params) {
         boolean unlocked = READ_ONLY_ACTIONS.contains(action) && !TransactionSynchronizationManager.isActualTransactionActive();
         return (unlocked ? reads : writes).execute(status -> execute(userId, action, params, unlocked));
@@ -69,9 +121,31 @@ public class ImService {
 
     private Object execute(Long userId, String action, Map<String, Object> params, boolean unlocked) {
         // Loaded, not just counted: the caller's row is read again later (name, client status) and then comes from the session.
-        if (userId == null || users.findById(userId).isEmpty()) throw bad("请先登录");
+        User caller = userId == null ? null : users.findById(userId).orElse(null);
+        if (caller == null) throw bad("请先登录");
         Map<String,Object> p = params == null ? Map.of() : params;
         if (!ACTIONS.contains(action)) throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
+        // Access-code clients: the code is checked on every request, not only at login, so expiry and revocation end
+        // chat on the next poll. portalProjectId is then the only project whose group they may touch.
+        Long portalProjectId = null;
+        com.checkba.model.entity.ProjectInvitation portalCode = null;
+        if ("CLIENT".equals(caller.getRole())) {
+            portalCode = clientInvitations == null ? null : clientInvitations.activeInvitationFor(caller).orElse(null);
+            if (portalCode == null) throw portalDenied(userId, clientInvitations == null ? null : clientInvitations.invitedProjectOf(caller).orElse(null), DENIED_CODE_INACTIVE);
+            portalProjectId = portalCode.getProjectId();
+            // A generic code is one identity shared by everyone holding it (and a typed name picks anyone's login):
+            // chat needs a code issued to one named client.
+            if (!"CLIENT_NAMED".equals(portalCode.getType())) throw portalDenied(userId, portalProjectId, DENIED_GENERIC_CODE);
+            if ("join".equals(action)) {
+                // A chat invitation code is for AI WorkDeck accounts; say so instead of a generic refusal.
+                portalDenied(userId, portalProjectId, DENIED_ACTION);
+                throw new ImAccessDeniedException(DENIED_ACTION, com.checkba.service.LangText.of(CHAT_INVITE_FOR_ACCOUNTS,
+                        "This invitation is for AI WorkDeck accounts. You can talk to your lawyers in this project's chat here."));
+            }
+            if (!CLIENT_PORTAL_ACTIONS.contains(action)) throw portalDenied(userId, portalProjectId, DENIED_ACTION);
+            if ("projectGroup".equals(action) && number(p, "projectId", -1) != portalProjectId)
+                throw portalDenied(userId, portalProjectId, DENIED_OUT_OF_SCOPE);
+        }
         if ("self".equals(action)) return Map.of("id", userId, "displayName", displayName(userId));
         if ("agentScopes".equals(action)) return agentService().scopes(userId);
         if ("ensureAgent".equals(action)) {
@@ -96,20 +170,25 @@ public class ImService {
             return Map.of("conversations", rows);
         }
         if ("create".equals(action)) return create(userId, p);
-        if ("projectGroup".equals(action)) return projectGroup(userId, p);
+        if ("projectGroup".equals(action)) return projectGroup(userId, p, portalCode);
         if ("join".equals(action)) return join(userId, p);
         String conversationId = required(p, "conversationId", 36);
         // "read" only advances the caller's own cursor, atomically in SQL, so it does not queue behind the group either.
         ImConversation conversation = unlocked || "read".equals(action)
                 ? conversations.findById(conversationId).orElseThrow(ImService::unknownConversation) : lock(conversationId);
+        if (portalProjectId != null && !portalProjectId.equals(conversation.getProjectId()))
+            throw portalDenied(userId, portalProjectId, DENIED_OUT_OF_SCOPE);
         ImMember member = requireMember(conversation.getId(), userId);
         authorizeAgent(conversation, userId);
         Object result = switch (action) {
             case "invite" -> invite(conversation, member, p);
-            case "members" -> memberViews(conversation);
+            // The roster (names, account ids, other clients) is not a client's to read anywhere; the count is enough.
+            case "members" -> portalProjectId != null
+                    ? Map.of("members", List.of(), "humanCount", members.findByConversationId(conversation.getId()).size())
+                    : memberViews(conversation);
             case "agentInfo" -> view(conversation, member);
             case "agentReply" -> agentService().reply(conversation, userId, p);
-            case "removeMember" -> remove(conversation, member, number(p, "userId", -1));
+            case "removeMember" -> remove(conversation, member, number(p, "userId", -1), Boolean.TRUE.equals(p.get("revokeCode")));
             case "leave" -> leave(conversation, member);
             case "messages" -> listMessages(conversation, member, p);
             case "send" -> send(conversation, member, p);
@@ -136,7 +215,10 @@ public class ImService {
     }
 
     /** Entering a project group grants no project rights. Every subsequent action rechecks its ACL. */
-    private Object projectGroup(Long userId, Map<String,Object> p) {
+    private Object projectGroup(Long userId, Map<String,Object> p) { return projectGroup(userId, p, null); }
+
+    /** {@code portalCode}: the caller's active access code when they are an access-code client, else null. */
+    private Object projectGroup(Long userId, Map<String,Object> p, com.checkba.model.entity.ProjectInvitation portalCode) {
         long projectId = number(p, "projectId", -1);
         if (projectPermissions == null || projectId <= 0 || !projectPermissions.hasReadPermission(projectId, userId))
             throw bad(com.checkba.service.LangText.of("项目不存在或无权访问", "Project does not exist or access denied"));
@@ -158,8 +240,17 @@ public class ImService {
             conversations.saveAndFlush(c);
         }
         ImMember member = members.findByConversationIdAndUserId(c.getId(), userId).orElse(null);
-        if (member == null) member = limitClientHistory(addMember(c.getId(), userId,
-                Objects.equals(c.getOwnerId(), userId) ? "OWNER" : projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER"));
+        if (member == null) {
+            member = addMember(c.getId(), userId,
+                    Objects.equals(c.getOwnerId(), userId) ? "OWNER" : portalCode != null || projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER");
+            // Earlier messages only when the lawyer chose so on this client's access code; floors set once, never widened.
+            boolean shareHistory = portalCode != null && Boolean.TRUE.equals(portalCode.getImShareHistory());
+            if (!shareHistory) member = limitClientHistory(member);
+            if (portalCode != null && portalAudit != null) {
+                try { portalAudit.joined(userId, projectId, c.getId(), c.getTitle(), shareHistory); }
+                catch (RuntimeException ignored) { /* Audit never blocks chat. */ }
+            }
+        }
         return view(c, member);
     }
 
@@ -213,10 +304,24 @@ public class ImService {
         return view(c, shareHistory ? member : limitClientHistory(member));
     }
 
-    private Object remove(ImConversation c, ImMember me, long targetId) {
+    /**
+     * {@code revokeCode}: the lawyer confirmed that removing an access-code client revokes their code (B4). Their chat
+     * membership is the code, so without revoking it they would simply be re-added on their next poll.
+     */
+    private Object remove(ImConversation c, ImMember me, long targetId, boolean revokeCode) {
         requireOwner(me);
         ImMember target = requireMember(c.getId(), targetId);
         if ("OWNER".equals(target.getRole())) throw bad(com.checkba.service.LangText.of("不能移除会话负责人", "Cannot remove the conversation owner"));
+        // An access-code client would come straight back on their next poll: their access is the code, so end it there.
+        if (users.findById(targetId).map(User::getRole).filter("CLIENT"::equals).isPresent()) {
+            if (!revokeCode || c.getProjectId() == null || projectPermissions == null)
+                throw bad(com.checkba.service.LangText.of("这位客户凭访问码进入项目沟通；要让他离开，请撤销他的访问码。",
+                        "This client is in project chat by access code; to remove them, revoke their access code."));
+            // Same path as removing the client from the project: permission checks, member row deleted, code revoked.
+            projectPermissions.removeMember(c.getProjectId(), targetId, me.getUserId());
+            members.delete(target);
+            return Map.of("removed", true, "codeRevoked", true);
+        }
         members.delete(target);
         audit(com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CHAT_MEMBER_REMOVED").actor(me.getUserId())
                 .target("CONVERSATION", c.getId(), c.getTitle()).detail("removedUserId", targetId).detail("role", target.getRole()));
@@ -291,14 +396,18 @@ public class ImService {
 
     private Object upload(ImConversation c, ImMember me, Map<String,Object> p) {
         String encoded = string(p, "base64");
-        if (encoded.length() > ((MAX_FILE_BYTES + 2L) / 3) * 4) throw bad(com.checkba.service.LangText.of("文件不能超过8MiB", "File cannot exceed 8 MiB"));
+        boolean fromClient = client(me);
+        long maxFile = fromClient ? clientMaxFileBytes() : MAX_FILE_BYTES;
+        if (encoded.length() > ((maxFile + 2L) / 3) * 4) throw fileTooLarge(fromClient, maxFile);
         byte[] bytes;
         try { bytes = Base64.getDecoder().decode(encoded); }
         catch (IllegalArgumentException e) { throw bad(com.checkba.service.LangText.of("文件编码无效", "Invalid file encoding")); }
-        if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES) throw bad(com.checkba.service.LangText.of("文件不能为空且不能超过8MiB", "File cannot be empty and cannot exceed 8 MiB"));
+        if (bytes.length == 0) throw bad(com.checkba.service.LangText.of("文件不能为空", "File cannot be empty"));
+        if (bytes.length > maxFile) throw fileTooLarge(fromClient, maxFile);
         String name = safeName(required(p, "name", 500)), digest = sha(bytes);
         String projectUid = null, fileUid = null;
-        if (p.get("source") != null) {
+        // A client's upload is never a project-file reference; only staff can cite project files.
+        if (p.get("source") != null && !fromClient) {
             if (!(p.get("source") instanceof Map<?,?> source)) throw bad(com.checkba.service.LangText.of("文件来源格式无效", "Invalid file source format"));
             projectUid = sourceUid(source.get("projectUid")); fileUid = sourceUid(source.get("fileUid"));
         }
@@ -313,7 +422,11 @@ public class ImService {
                 return attachmentView(old, me);
             }
         }
-        if (attachments.totalSize(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad(com.checkba.service.LangText.of("本会话文件空间已满（100MiB）", "Conversation file storage is full (100 MiB)"));
+        if (fromClient && attachments.totalSizeBy(c.getId(), me.getUserId()) + bytes.length > clientMaxTotalBytes())
+            throw new ImLimitException(ImLimitException.QUOTA_FULL, clientMaxTotalBytes(), com.checkba.service.LangText.of(
+                    "你在本项目上传的文件总量已达 " + mib(clientMaxTotalBytes()) + "MiB 上限，请联系律师",
+                    "You have reached the " + mib(clientMaxTotalBytes()) + " MiB total upload limit for this project; please contact your lawyer"));
+        if (!fromClient && attachments.totalSize(c.getId()) - attachments.totalSizeByClients(c.getId()) + bytes.length > MAX_CONVERSATION_BYTES) throw bad(com.checkba.service.LangText.of("本会话文件空间已满（100MiB）", "Conversation file storage is full (100 MiB)"));
         ImAttachment file = new ImAttachment(); file.setId(UUID.randomUUID().toString());
         file.setConversationId(c.getId()); file.setUploadedBy(me.getUserId()); file.setClientMessageId(clientId);
         file.setName(name); file.setSize(bytes.length);
@@ -360,12 +473,43 @@ public class ImService {
     }
     private Map<String,Object> memberViews(ImConversation conversation) {
         List<Map<String,Object>> rows = new ArrayList<>();
-        for (ImMember member : members.findByConversationId(conversation.getId())) {
-            rows.add(Map.of("id", member.getUserId(), "displayName", displayName(member.getUserId()), "role", member.getRole(), "actorType", "HUMAN"));
+        List<ImMember> all = members.findByConversationId(conversation.getId());
+        Set<Long> accessCodeClients = new HashSet<>();
+        for (User user : users.findAllById(all.stream().map(ImMember::getUserId).toList()))
+            if ("CLIENT".equals(user.getRole())) accessCodeClients.add(user.getId());
+        for (ImMember member : all) {
+            Map<String,Object> row = new LinkedHashMap<>(Map.of("id", member.getUserId(), "displayName", displayName(member.getUserId()), "role", member.getRole(), "actorType", "HUMAN"));
+            // Removing them means revoking their access code; the panels offer that instead of a plain remove.
+            if (accessCodeClients.contains(member.getUserId())) row.put("accessCode", true);
+            rows.add(row);
         }
         int humanCount = rows.size();
         if (conversation.getAgentScope() != null) rows.add(Map.of("id", "agent:" + conversation.getId(), "displayName", conversation.getAgentName(), "role", "AGENT", "actorType", "AGENT"));
         return Map.of("members", rows, "humanCount", humanCount);
+    }
+
+    /**
+     * The same answer whatever the reason, so a client learns nothing about other conversations; the audit keeps the
+     * reason. A code that stopped working gets the portal's own wording so the client knows to ask the lawyer.
+     */
+    private IllegalArgumentException portalDenied(Long userId, Long projectId, String reason) {
+        if (portalAudit != null) {
+            if (deniedAudited.size() > 10_000) deniedAudited.clear();
+            String key = userId + ":" + reason;
+            long now = System.currentTimeMillis();
+            Long last = deniedAudited.get(key);
+            if (last == null || now - last > DENIAL_AUDIT_WINDOW_MS) {
+                deniedAudited.put(key, now);
+                try { portalAudit.denied(userId, projectId, reason); }
+                catch (RuntimeException ignored) { /* Audit never blocks the answer. */ }
+            }
+        }
+        if (DENIED_CODE_INACTIVE.equals(reason))
+            return new ImAccessDeniedException(reason, com.checkba.service.LangText.of("访问码已失效或已过期，请联系律师", "Your access code is no longer valid or has expired; please contact your lawyer"));
+        if (DENIED_GENERIC_CODE.equals(reason))
+            return new ImAccessDeniedException(reason, com.checkba.service.LangText.of("这个访问码是通用码，不能用于项目沟通。请让律师为你单独生成一个访问码。",
+                    "This is a shared access code and can't be used for project chat. Please ask your lawyer for an access code of your own."));
+        return new ImAccessDeniedException(reason, com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied"));
     }
 
     private static IllegalArgumentException unknownConversation() { return bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied")); }
@@ -386,6 +530,12 @@ public class ImService {
         if (!client(member)) return member;
         member.setHistoryAfterId(messages.maxId(member.getConversationId())); return members.save(member);
     }
+    private static long mib(long bytes) { return bytes / (1024 * 1024); }
+    private static IllegalArgumentException fileTooLarge(boolean client, long maxFile) {
+        String zh = "单个文件不能超过 " + mib(maxFile) + "MiB", en = "A single file cannot exceed " + mib(maxFile) + " MiB";
+        return client ? new ImLimitException(ImLimitException.FILE_TOO_LARGE, maxFile, com.checkba.service.LangText.of(zh, en))
+                : bad(com.checkba.service.LangText.of(zh, en));
+    }
     private static long historyFloor(ImMember member) { return member.getHistoryAfterId() == null ? 0 : member.getHistoryAfterId(); }
     private Map<String,Object> view(ImConversation c, ImMember member) {
         Map<String,Object> result = new LinkedHashMap<>(Map.of("id", c.getId(), "title", c.getTitle(), "type", c.getType(), "role", member.getRole(),
@@ -395,6 +545,9 @@ public class ImService {
             result.put("agent", ImAgentService.agentView(c));
             result.put("canRequestAgent", (c.getProjectId() == null && c.getAgentProjectId() == null) || !client(member));
         }
+        // Clients read their upload limits from here, so the portal checks a file before sending it.
+        if (c.getProjectId() != null && "CLIENT".equals(member.getRole()))
+            result.put("uploadLimits", Map.of("maxFileBytes", clientMaxFileBytes(), "maxTotalBytes", clientMaxTotalBytes()));
         Long projectId = c.getProjectId() != null ? c.getProjectId() : c.getAgentProjectId();
         if (projectId != null) {
             result.put("projectId", projectId);
@@ -429,6 +582,12 @@ public class ImService {
         // Fetch only metadata: a page of 100 messages must not hydrate 100 attachment blobs.
         Map<String,Object[]> files = new HashMap<>();
         if (!attachmentIds.isEmpty()) for (Object[] a : attachments.metadataIn(me.getConversationId(), attachmentIds)) files.put((String)a[0], a);
+        // Lawyers must see which messages came from the client: client member of this group, or an access-code client.
+        Set<Long> clientSenders = new HashSet<>();
+        for (User user : senders.values()) if ("CLIENT".equals(user.getRole())) clientSenders.add(user.getId());
+        if (!senderIds.isEmpty() && clientSenders.size() < senders.size())
+            for (ImMember member : members.findByConversationId(me.getConversationId()))
+                if ("CLIENT".equals(member.getRole()) && senderIds.contains(member.getUserId())) clientSenders.add(member.getUserId());
         List<Map<String,Object>> views = new ArrayList<>(rows.size());
         for (ImMessage m : rows) {
             Map<String,Object> result = new LinkedHashMap<>(); result.put("id", m.getId()); result.put("uid", m.getUid());
@@ -437,6 +596,7 @@ public class ImService {
             result.put("senderName", agent ? m.getAgentName() : displayName(senders.get(m.getSenderId())));
             if (agent) result.put("agentName", m.getAgentName());
             else Optional.ofNullable(avatars.get(m.getSenderId())).filter(url -> !url.isBlank()).ifPresent(url -> result.put("senderAvatarUrl", url));
+            if (!agent && clientSenders.contains(m.getSenderId())) result.put("fromClient", true);
             result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
             Object[] a = m.getAttachmentId() == null || !m.getConversationId().equals(me.getConversationId()) ? null : files.get(m.getAttachmentId());
             if (a != null) result.put("attachment", attachmentView((String)a[0], (String)a[1], ((Number)a[2]).longValue(),

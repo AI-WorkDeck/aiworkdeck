@@ -1087,6 +1087,14 @@ public class AuthController {
                 // 只有「码不对 / 已作废 / 已过期」计失败；后面的业务拒绝（人数上限等）不消耗尝试次数
                 authAbuseGuard.recordLoginFailure(ip, CLIENT_CODE_RATE_KEY);
                 authAbuseGuard.recordClientCodeFailure();
+                if (e instanceof ClientInvitationService.ChatInvitationCodeException) {
+                    // The portal shows its own localized explanation and a way into its project chat (B4).
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("code", 1);
+                    result.put("reason", ClientInvitationService.ChatInvitationCodeException.REASON);
+                    result.put("message", e.getMessage());
+                    return result;
+                }
                 throw e;
             }
 

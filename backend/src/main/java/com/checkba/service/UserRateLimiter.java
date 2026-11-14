@@ -32,7 +32,8 @@ import java.util.function.LongSupplier;
 @Service
 public class UserRateLimiter {
 
-    public enum Kind { CHAT, UPLOAD, OCR, BROWSER_PROXY }
+    /** IM_SEND: project chat send/upload per sender; IM_READ: every other chat action by an access-code client. */
+    public enum Kind { CHAT, UPLOAD, OCR, BROWSER_PROXY, IM_SEND, IM_READ }
 
     private static final int PURGE_THRESHOLD = 10_000;
 
@@ -47,8 +48,17 @@ public class UserRateLimiter {
             @Value("${security.rate-limit.chat-per-minute:30}") int chat,
             @Value("${security.rate-limit.upload-per-minute:300}") int upload,
             @Value("${security.rate-limit.ocr-per-minute:20}") int ocr,
-            @Value("${security.rate-limit.browser-proxy-per-minute:120}") int browserProxy) {
+            @Value("${security.rate-limit.browser-proxy-per-minute:120}") int browserProxy,
+            @Value("${security.rate-limit.im-send-per-minute:30}") int imSend,
+            @Value("${security.rate-limit.im-client-read-per-minute:120}") int imRead) {
         this(localMode, chat, upload, ocr, browserProxy, System::currentTimeMillis);
+        perMinute.put(Kind.IM_SEND, imSend);
+        perMinute.put(Kind.IM_READ, imRead);
+    }
+
+    /** Without the project-chat limits set explicitly: the defaults above. */
+    public UserRateLimiter(boolean localMode, int chat, int upload, int ocr, int browserProxy) {
+        this(localMode, chat, upload, ocr, browserProxy, 30, 120);
     }
 
     /** Test constructor with a controllable clock. */

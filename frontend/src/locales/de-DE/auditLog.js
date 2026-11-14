@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Rolle eines Projektmitglieds geändert",
     "CLIENT_INVITE_ISSUED": "Zugangscode für Mandanten ausgestellt",
     "CLIENT_PORTAL_LOGIN": "Anmeldung im Mandantenportal",
+    "CLIENT_PORTAL_CHAT_JOINED": "Mandant ist dem Projektchat im Portal beigetreten",
     "CHAT_INVITE_ISSUED": "Einladung zur Unterhaltung gesendet",
     "CHAT_INVITE_REDEEMED": "Einladung zur Unterhaltung angenommen",
     "CHAT_MEMBER_REMOVED": "Mitglied aus Unterhaltung entfernt",

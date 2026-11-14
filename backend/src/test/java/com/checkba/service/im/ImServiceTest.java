@@ -213,13 +213,13 @@ class ImServiceTest {
   assertEquals(ImService.FILE_UNAVAILABLE,assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",aid))).getMessage());
  }
  @Test void globalClientCannotGainInternalAccessByAcceptingMemberInvitation() {
+  // Access-code clients (the only global CLIENT accounts) reach their project group only (B4): no code joins them elsewhere.
   User global=users.findById(client).orElseThrow();global.setRole("CLIENT");users.saveAndFlush(global);
-  String id=create("GROUP");join(client,id,"MEMBER");
-  var file=call(owner,"upload",Map.of("conversationId",id,"name","内部.txt","base64","YQ=="));
-  call(owner,"send",Map.of("conversationId",id,"clientMessageId","internal","attachmentId",file.get("id")));
-  assertEquals(false,attachmentFor(client,id).get("available"));
-  assertThrows(IllegalArgumentException.class,()->call(client,"fileAccess",Map.of("conversationId",id,"attachmentId",file.get("id"),"clientVisible",true)));
-  assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",file.get("id"))));
+  String id=create("GROUP");
+  var invite=call(owner,"invite",Map.of("conversationId",id,"role","MEMBER"));
+  assertThrows(IllegalArgumentException.class,()->call(client,"join",Map.of("code",invite.get("code"))));
+  assertTrue(memberRows.findByConversationIdAndUserId(id,client).isEmpty());
+  assertThrows(IllegalArgumentException.class,()->call(client,"messages",Map.of("conversationId",id)));
  }
  @Test void clientOwnUploadIsReadableOnlyToSelfAndInternalMembersByDefault() {
   String id=create("GROUP");join(client,id,"CLIENT");join(stranger,id,"CLIENT");join(colleague,id,"MEMBER");
@@ -311,22 +311,23 @@ class ImServiceTest {
   String id=create("GROUP"); send(owner,id,"before","入群前的讨论");
   assertEquals(false,call(owner,"invite",Map.of("conversationId",id,"role","CLIENT")).get("shareHistory"));
   assertThrows(IllegalArgumentException.class,()->call(owner,"invite",Map.of("conversationId",id,"role","CLIENT","shareHistory","true")));
-  User global=users.findById(client).orElseThrow();global.setRole("CLIENT");users.saveAndFlush(global);
-  join(client,id,"MEMBER"); assertEquals(List.of(),texts(client,Map.of("conversationId",id)));
   join(colleague,id,"MEMBER"); assertEquals(List.of("入群前的讨论"),texts(colleague,Map.of("conversationId",id)));
  }
  @Test void memberCodeNeverOpensEarlierMessagesToAClientEvenWhenAskedTo() {
   String id=create("GROUP"); send(owner,id,"before","入群前的内部讨论");
   // The history choice belongs to client invitations; a member code that asks for it records and echoes false.
   var invite=call(owner,"invite",Map.of("conversationId",id,"role","MEMBER","shareHistory",true)); assertEquals(false,invite.get("shareHistory"));
-  User global=users.findById(client).orElseThrow();global.setRole("CLIENT");users.saveAndFlush(global);
-  call(client,"join",Map.of("code",invite.get("code"))); assertEquals(List.of(),texts(client,Map.of("conversationId",id)));
+  join(colleague,id,"MEMBER"); assertEquals(List.of("入群前的内部讨论"),texts(colleague,Map.of("conversationId",id)));
+  // A client account holding an invitation code (role CLIENT member, not an access-code client) keeps the floor.
+  var clientInvite=call(owner,"invite",Map.of("conversationId",id,"role","CLIENT"));
+  call(client,"join",Map.of("code",clientInvite.get("code"))); assertEquals(List.of(),texts(client,Map.of("conversationId",id)));
   // A stored row from before this rule (member role + shared history) is still floored when a client redeems it.
   String second=create("GROUP"); send(owner,second,"before","另一群的早期讨论");
   var legacy=call(owner,"invite",Map.of("conversationId",second,"role","MEMBER"));
   var row=invitations.findById(ImService.sha(legacy.get("code").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8))).orElseThrow();
   row.setShareHistory(true); invitations.saveAndFlush(row);
-  call(client,"join",Map.of("code",legacy.get("code"))); assertEquals(List.of(),texts(client,Map.of("conversationId",second)));
+  call(stranger,"join",Map.of("code",legacy.get("code"))); assertEquals(List.of("另一群的早期讨论"),texts(stranger,Map.of("conversationId",second)),
+    "a MEMBER code is for internal members; the stored true is ignored and members see history as always");
  }
  @Test void projectClientEnteringProjectGroupLaterSeesOnlyLaterMessages() {
   var project=new com.checkba.model.entity.Project(); project.setName("合成项目群历史"); project.setProjectType("TEST"); project.setListedCompanyName("合成公司"); project.setTargetCompanyName("合成标的"); project.setUserId(owner);

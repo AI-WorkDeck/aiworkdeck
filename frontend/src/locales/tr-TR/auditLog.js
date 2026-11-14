@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Proje üyesinin rolü değiştirildi",
     "CLIENT_INVITE_ISSUED": "Müvekkil erişim kodu verildi",
     "CLIENT_PORTAL_LOGIN": "Müvekkil portalında oturum açıldı",
+    "CLIENT_PORTAL_CHAT_JOINED": "Müvekkil portaldaki proje sohbetine katıldı",
     "CHAT_INVITE_ISSUED": "Sohbet daveti gönderildi",
     "CHAT_INVITE_REDEEMED": "Sohbet daveti kabul edildi",
     "CHAT_MEMBER_REMOVED": "Sohbet üyesi çıkarıldı",

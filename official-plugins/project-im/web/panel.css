@@ -168,3 +168,5 @@ dialog label input,dialog label select{margin-top:5px}
 #agent-info{padding-block:4px 0}
 
 .message.mine:not(:has(.message-content)){flex-direction:column;align-items:flex-end}
+.client-badge{display:inline-block;margin-inline-start:6px;padding:0 6px;border-radius:999px;font-size:10px;line-height:15px;background:var(--awd-warning-soft,var(--fallback-wash));color:var(--awd-warning-text,var(--fallback-text))}
+.member-row button.danger{color:var(--awd-danger-text,var(--fallback-danger))}

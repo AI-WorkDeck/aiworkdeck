@@ -175,7 +175,7 @@ public class ProjectMemberController {
     @PostMapping("/{projectId}/invite/client")
     public ResponseEntity<Map<String, Object>> inviteClient(
             @PathVariable Long projectId,
-            @RequestBody(required = false) Map<String, String> body,
+            @RequestBody(required = false) Map<String, Object> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         
         Long userId = AuthController.getUserIdFromSession(sessionId);
@@ -183,10 +183,12 @@ public class ProjectMemberController {
             throw new IllegalArgumentException("未登录");
         }
 
-        String clientName = (body != null) ? body.get("clientName") : null;
+        String clientName = (body != null && body.get("clientName") instanceof String name) ? name : null;
+        // 项目沟通里客户能否看入群之前的消息（B4）：只认明确的 true，缺省 = 只看入群之后
+        boolean shareHistory = body != null && (Boolean.TRUE.equals(body.get("shareHistory")) || "true".equals(body.get("shareHistory")));
 
         try {
-            ClientInvitationService.Issued issued = clientInvitationService.issueClientCode(projectId, userId, clientName);
+            ClientInvitationService.Issued issued = clientInvitationService.issueClientCode(projectId, userId, clientName, shareHistory);
             Map<String, Object> result = new HashMap<>();
             result.put("code", 0);
             result.put("message", com.checkba.service.LangText.of("邀请码生成成功", "Invitation code generated successfully"));
@@ -195,6 +197,8 @@ public class ProjectMemberController {
             data.put("accessCode", issued.code());
             data.put("expiresAt", issued.expiresAt() == null ? null : issued.expiresAt().toString());
             data.put("clientUserId", issued.clientUserId());
+            // 回显：桌面端据此判断案件库是否已执行这次的消息范围选择（老案件库不回这个字段）
+            data.put("shareHistory", issued.shareHistory());
             result.put("data", data);
             return ResponseEntity.ok(result);
         } catch (ClientInvitationService.LibraryRequiredException e) {

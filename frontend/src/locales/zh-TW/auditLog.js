@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "專案成員角色變更",
     "CLIENT_INVITE_ISSUED": "核發客戶存取碼",
     "CLIENT_PORTAL_LOGIN": "客戶入口登入",
+    "CLIENT_PORTAL_CHAT_JOINED": "客戶進入入口網站專案溝通",
     "CHAT_INVITE_ISSUED": "發出溝通邀請",
     "CHAT_INVITE_REDEEMED": "溝通邀請已被接受",
     "CHAT_MEMBER_REMOVED": "移除溝通成員",

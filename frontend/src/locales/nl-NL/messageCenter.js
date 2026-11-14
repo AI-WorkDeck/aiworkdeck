@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "Ook eerdere berichten",
   "inviteHintAfterJoin": "Een cliënt die met deze code deelneemt, ziet alleen berichten en bestanden die na deelname zijn verzonden. Deel de code alleen met de beoogde persoon. Geldig tot {time}.",
   "inviteHintWithHistory": "Een cliënt die met deze code deelneemt, kan ook eerdere berichten lezen; bestanden worden nog steeds per stuk opengesteld volgens hun toegangsrechten. Deel de code alleen met de beoogde persoon. Geldig tot {time}.",
+  "fromClient": "Cliënt",
 }

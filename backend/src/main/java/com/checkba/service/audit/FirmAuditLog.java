@@ -179,6 +179,21 @@ public class FirmAuditLog {
         }
     }
 
+    /**
+     * For a refusal: the request being refused rolls back its transaction, so an after-commit record would never be
+     * written. Enqueues at once instead. Never throws; same checks as {@link #record}.
+     */
+    public void recordNow(Event e) {
+        try {
+            if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null)) return;
+            e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+            captureRequest(e);
+            enqueue(e);
+        } catch (Exception ex) {
+            log.warn("Firm audit record failed for {}: {}", e == null ? null : e.action, ex.toString());
+        }
+    }
+
     private static void captureRequest(Event e) {
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)) return;
         var request = attrs.getRequest();

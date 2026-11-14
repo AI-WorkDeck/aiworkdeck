@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Đã đổi vai trò thành viên dự án",
     "CLIENT_INVITE_ISSUED": "Đã cấp mã truy cập cho khách hàng",
     "CLIENT_PORTAL_LOGIN": "Đăng nhập cổng khách hàng",
+    "CLIENT_PORTAL_CHAT_JOINED": "Khách hàng đã tham gia trò chuyện dự án trên cổng",
     "CHAT_INVITE_ISSUED": "Đã gửi lời mời trò chuyện",
     "CHAT_INVITE_REDEEMED": "Lời mời trò chuyện đã được chấp nhận",
     "CHAT_MEMBER_REMOVED": "Đã xóa thành viên trò chuyện",

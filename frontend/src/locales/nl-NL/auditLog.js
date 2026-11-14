@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Rol van projectlid gewijzigd",
     "CLIENT_INVITE_ISSUED": "Toegangscode voor cliënt uitgegeven",
     "CLIENT_PORTAL_LOGIN": "Aanmelding bij cliëntenportaal",
+    "CLIENT_PORTAL_CHAT_JOINED": "Cliënt nam deel aan de projectchat in het portaal",
     "CHAT_INVITE_ISSUED": "Gespreksuitnodiging verzonden",
     "CHAT_INVITE_REDEEMED": "Gespreksuitnodiging geaccepteerd",
     "CHAT_MEMBER_REMOVED": "Gespreksdeelnemer verwijderd",

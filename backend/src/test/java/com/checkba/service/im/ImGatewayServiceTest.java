@@ -56,7 +56,7 @@ class ImGatewayServiceTest {
  }
  @Test void serverModeUsesServerIdentityWithoutMachineAccount() {
   ImGatewayService serverGateway=new ImGatewayService(false,cloud,account,service,mapper);
-  when(service.execute(8L,"self",Map.of())).thenReturn(Map.of("id",8));
+  when(service.executeRequest(8L,"self",Map.of())).thenReturn(Map.of("id",8));
   assertEquals(Map.of("id",8),serverGateway.execute(8L,"self",Map.of()));
   verifyNoInteractions(cloud,account);
  }

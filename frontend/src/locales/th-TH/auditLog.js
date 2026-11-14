@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "เปลี่ยนบทบาทสมาชิกโปรเจกต์",
     "CLIENT_INVITE_ISSUED": "ออกรหัสเข้าถึงสำหรับลูกความ",
     "CLIENT_PORTAL_LOGIN": "ลูกความเข้าสู่ระบบพอร์ทัล",
+    "CLIENT_PORTAL_CHAT_JOINED": "ลูกความเข้าร่วมแชตโครงการในพอร์ทัล",
     "CHAT_INVITE_ISSUED": "ส่งคำเชิญเข้าร่วมการสนทนา",
     "CHAT_INVITE_REDEEMED": "คำเชิญเข้าร่วมการสนทนาได้รับการยอมรับ",
     "CHAT_MEMBER_REMOVED": "ลบสมาชิกการสนทนา",

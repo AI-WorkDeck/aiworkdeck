@@ -62,6 +62,7 @@ export default {
     "PROJECT_MEMBER_ROLE_CHANGED": "Função de membro do projeto alterada",
     "CLIENT_INVITE_ISSUED": "Código de acesso do cliente emitido",
     "CLIENT_PORTAL_LOGIN": "Login no portal do cliente",
+    "CLIENT_PORTAL_CHAT_JOINED": "Cliente entrou no chat do projeto no portal",
     "CHAT_INVITE_ISSUED": "Convite para conversa enviado",
     "CHAT_INVITE_REDEEMED": "Convite para conversa aceito",
     "CHAT_MEMBER_REMOVED": "Membro removido da conversa",
