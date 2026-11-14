@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -153,7 +154,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                         + "{\"index\":1,\"text\":\"发行人不存在尚未了结的重大诉讼\",\"numbering\":{\"label\":\"（一）\"}}]}");
         subAgentService = mock(SubAgentService.class);
         projectFiles = mock(ProjectFileService.class);
-        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(SubAgentResult.success("sub-check",
                         "逐项核对：未发现冲突（已核对 3 项，读过 2 份材料）",
                         List.of("doc_get_document_text", "ref_read"), 2));
@@ -247,7 +248,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         // 恰好一次，scope 就是写死的只读清单，身份沿本轮 ToolContext（项目/会话/用户）
         ArgumentCaptor<List<String>> scopeCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<ToolContext> ctxCaptor = ArgumentCaptor.forClass(ToolContext.class);
-        verify(subAgentService, times(1)).dispatch(any(), any(), scopeCaptor.capture(), ctxCaptor.capture(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), scopeCaptor.capture(), ctxCaptor.capture(), any(), eq(true));
         assertEquals(OpinionCompletionCheck.VERIFICATION_SCOPE, scopeCaptor.getValue(),
                 "补检 scope 必须使用服务端固定只读清单，不能空（空=全工具）也不能含写工具");
         assertEquals(1L, ctxCaptor.getValue().projectId());
@@ -277,7 +278,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     @DisplayName("接回消息（生产注入原文，zh）：仅加批注不算修正、批注不替代正文限定、缺证不得反向否定")
     void handoffMessageDemandsBodyQualificationNotJustComments() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(SubAgentResult.success("sub-check",
                         "判定：待核实——“已获股东会批准”无决议材料支撑",
                         List.of("doc_get_document_text"), 1));
@@ -334,7 +335,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         run("conv-expected", AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("已核对收尾核验发现，交付说明如下。"));
 
-        verify(subAgentService, times(1)).dispatch(taskCaptor.capture(), expectedCaptor.capture(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(taskCaptor.capture(), expectedCaptor.capture(), any(), any(), any(), eq(true));
         assertTrue(taskCaptor.getValue().contains("必要事实槽"), taskCaptor.getValue());
         String expected = expectedCaptor.getValue();
         assertTrue(expected.contains("必要事实槽"), expected);
@@ -404,7 +405,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         skillActive();
         run("conv-draft", AiMessage.from("已按您的要求完成修订。"), AiMessage.from("交付说明如下。"));
         ArgumentCaptor<String> task = ArgumentCaptor.forClass(String.class);
-        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), any(), anyBoolean());
         assertTrue(task.getValue().contains("【0】本所接受岚屿精密科技股份有限公司的委托"), task.getValue());
         assertTrue(task.getValue().contains("【1】（一） 发行人不存在尚未了结的重大诉讼"), "编号前缀与段号都要带上：" + task.getValue());
         assertTrue(task.getValue().contains("不得自拟、不得套用模板"), task.getValue());
@@ -415,7 +416,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     void verifierThatConsultedNothingFailsInsteadOfReportingGaps() {
         skillActive();
         String guessed = "命题：委托人为[委托人名称]。整句判定：待核实\n".repeat(24);
-        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(SubAgentResult.success("sub-check", guessed, List.of(), 1));
         ScriptModel model = run("conv-check-noread",
                 AiMessage.from("已按您的要求完成修订。"),
@@ -438,7 +439,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         ScriptModel model = run("conv-check-unread",
                 AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("我自行回读了当前稿并核对。"));
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertTrue(lastMessageText(model, 1).contains("无法从编辑器读出目标文档的当前稿"), lastMessageText(model, 1));
     }
 
@@ -453,13 +454,13 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     @DisplayName("补检子任务失败：如实接回「未能完成」，绝不重复派发，仍 FINISHED")
     void failedCompletionCheckHandsBackUnverifiedAndNeverRepeats() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(SubAgentResult.failure("sub-check", "子 Agent 模型不可用", List.of(), 0));
         ScriptModel model = run("conv-check-fail",
                 AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("我自行回读了当前稿并逐项核对，交付说明如下（核验子任务未能完成）。"));
 
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(2, model.calls.get());
         String handoff = lastMessageText(model, 1);
         assertTrue(handoff.contains("未能完成"), handoff);
@@ -471,14 +472,14 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     @DisplayName("补检期间用户点停止：按取消收尾，发现不再接回，不再续轮")
     void cancelDuringCompletionCheckFinishesAsCancelled() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any(), any())).thenAnswer(inv -> {
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean())).thenAnswer(inv -> {
             orchestrator.setCancelled("conv-check-cancel");
             return SubAgentResult.success("sub-check", "未发现冲突", List.of("doc_get_document_text"), 1);
         });
         ScriptModel model = run("conv-check-cancel", AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("不应该被用到：取消后不能续轮"));
 
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(1, model.calls.get(), "取消后不能再发起新一轮 LLM 调用");
         assertEquals(AgentRunStateService.RunStatus.CANCELLED, runState.get("conv-check-cancel").status());
         assertTrue(sseEvents.contains("cancelled"), "要给前端明确的取消事件：" + sseEvents);
@@ -491,7 +492,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     void noCheckWhenSkillNotActive() {
         ScriptModel model = run("conv-no-skill", AiMessage.from("已改好那个错字。"));
 
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(1, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-no-skill").status());
     }
@@ -502,7 +503,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         skillActive();
         ScriptModel model = run("conv-ask", "ASK", AiMessage.from("这份意见书的结论部分依据如下……"));
 
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(1, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-ask").status());
     }
@@ -521,7 +522,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
 
         ScriptModel model = run("conv-self-check", dispatch, AiMessage.from("摘录完成，交付说明如下。"));
 
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(3, model.calls.get(), "工具轮 → 收尾补检 → 接回续轮，共三轮");
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-self-check").status());
     }
@@ -548,7 +549,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                 "只把第三段中的“ seperate ”改成 separate",
                 AiMessage.from("已按指示完成替换。"));
 
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         // 脚本回复是零工具的「已完成替换」——口头完成纠正（office-tier1 O5）会补一轮；与本用例要证的「不付费补检」无关
         assertEquals(2, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-narrow").status());
@@ -582,18 +583,18 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         model.beforeFirstCompletion = () -> startReplacementRun("conv-supersede");
         startOpinionRun("conv-supersede");
         assertEquals(2, model.calls.get(), "旧轮确实生成过，新轮在其收尾前完成");
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
     void supersededDuringCheckDoesNotContinueOldRun() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any(), any())).thenAnswer(inv -> {
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean())).thenAnswer(inv -> {
             startReplacementRun("conv-during");
             return SubAgentResult.success("sub", "待核对发现", List.of("doc_get_document_text"), 1);
         });
         ScriptModel model = run("conv-during", AiMessage.from("修订完成"));
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(2, model.calls.get(), "只有旧轮和新轮各一次，不接回旧轮自动续改");
     }
 
@@ -603,7 +604,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         AiMessage open = AiMessage.from(List.of(ToolExecutionRequest.builder().id("open")
                 .name("doc_open_file").arguments("{\"fileId\":9}").build()));
         ScriptModel model = run("conv-other", open, AiMessage.from("完成"));
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(3, model.calls.get());
         assertTrue(lastMessageText(model, 2).contains("无法确认当前编辑器"));
     }
@@ -612,7 +613,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     void questionWaitsForUserWithoutCompletionCheck() {
         skillActive();
         ScriptModel model = run("conv-question", AiMessage.from("<question>请确认审查范围</question>"));
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertEquals(1, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.AWAITING_INPUT, runState.get("conv-question").status());
     }
@@ -633,7 +634,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                 .name("doc_get_document_text").arguments("{}").build()));
         ScriptModel model = run("conv-edit-check", edit, AiMessage.from("初次修订完成"),
                 edit, read, AiMessage.from("已根据发现修正并回读"));
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         verify(toolRegistry, times(2)).execute(eq("doc_replace_text"), any(), any());
         verify(toolRegistry).execute(eq("doc_get_document_text"), any(), any());
         assertEquals(5, model.calls.get());
@@ -678,7 +679,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         AiMessage question = AiMessage.from(List.of(ToolExecutionRequest.builder().id("ask")
                 .name("ask_user").arguments("{\"question\":\"修订范围？\",\"options\":[\"核对事实与依据后修订\",\"只改错字\"]}").build()));
         run("conv-answer", question);
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         String questionId = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(sseData.get(sseEvents.indexOf("ask_user"))).path("id").asText();
         AgentInboxService.Clarification original = new AgentInboxService.Clarification(
@@ -688,7 +689,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                         + "\">Selected:\n- 核对事实与依据后修订</ask_user_answer>",
                 AiMessage.from("已修订"), AiMessage.from("已核验"));
         ArgumentCaptor<String> task = ArgumentCaptor.forClass(String.class);
-        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), any(), anyBoolean());
         verify(inbox).rememberClarification(any(), eq(questionId), eq(original));
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-answer").status());
         assertTrue(task.getValue().contains("帮我修订一下这个法律意见书"));
@@ -709,7 +710,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
             runWithMessage("conv-limit-" + limit, "<ask_user_answer id=\"ask-limit\">Selected:\n- "
                     + limit + "</ask_user_answer>", AiMessage.from("已按指定范围处理"));
         }
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -721,7 +722,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         ScriptModel model = runWithMessage("conv-switched", "<ask_user_answer id=\"ask-old\">Selected:\n- 继续</ask_user_answer>",
                 AiMessage.from("不应运行"));
         assertEquals(0, model.calls.get(), "切到另一文件时不得让主助手编辑当前文件");
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any(), anyBoolean());
         assertTrue(lastPersistedAssistant().contains("原任务文档"));
     }
 
@@ -750,7 +751,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         ArgumentCaptor<String> task = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> model = ArgumentCaptor.forClass(String.class);
         run("conv-w6-manifest", AiMessage.from("已按您的要求完成修订。"), AiMessage.from("已核对。"));
-        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), model.capture());
+        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), model.capture(), eq(true));
         assertTrue(task.getValue().contains("项目文件清单"), task.getValue());
         assertTrue(task.getValue().contains("ID 11 · 01-公司基本情况/股权结构及历史沿革说明.docx"), task.getValue());
         assertTrue(task.getValue().contains("清单外的文件在本项目中不存在"), task.getValue());
@@ -762,7 +763,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     void phantomSourcesInFindingsAreFlaggedToTheMainAgent() {
         skillActive();
         ipoProject();
-        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any(), anyBoolean()))
                 .thenReturn(SubAgentResult.success("sub-check",
                         "1. 正文「发行人股权清晰」——来源：股权关系说明.docx 第 2 段；另见 验资报告摘要.pdf（fileId=99）。\n"
                                 + "2. 正文「营业期限长期」——来源：《营业执照信息摘要.docx》，ID 12。",

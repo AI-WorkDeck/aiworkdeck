@@ -4566,7 +4566,8 @@ public class AgentOrchestrator {
                             OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
                             // 核验员模型（W6）：默认本轮主模型——flash 档辅助模型在收尾核验里编造过不存在的来源文件；
                             // ai.verifierModel 可改成 subagent（子 Agent 模型）或显式中档模型
-                            auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId), manifest);
+                            auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId,
+                            true), manifest);
                 }
             }
         } catch (Exception e) {

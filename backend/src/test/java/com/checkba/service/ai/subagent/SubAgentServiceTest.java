@@ -236,6 +236,44 @@ class SubAgentServiceTest {
     }
 
     @Test
+    @DisplayName("W6：mustConsult——一次工具都没调就想交卷，顶回一次；之后读了材料再交卷")
+    void mustConsultPushesBackOnceWhenNothingWasRead() {
+        when(model.generate(anyList(), anyList())).thenReturn(
+                textTurn("凭当前稿直接判断：全部有依据。"),
+                toolCallTurn("read_document", "{\"fileId\":55}"),
+                textTurn("命题 1 整句判定：有依据（验资报告.docx fileId=55 引文「…」）"));
+        SubAgentResult result = newService().dispatch("核验", "清单", List.of("read_document"), PARENT_CTX, null, true);
+        assertTrue(result.success(), result.toJson());
+        assertEquals(List.of("read_document"), result.toolsUsed());
+        assertEquals(List.of(55L), result.filesRead());
+        assertEquals(3, result.rounds());
+        assertTrue(result.result().contains("fileId=55"));
+    }
+
+    @Test
+    @DisplayName("W6：mustConsult 第一轮强制的工具——优先全文检索，没有就读文件，都没有就不强制")
+    void forcedConsultToolPrefersSearchThenRead() {
+        java.util.function.Function<String, ToolSpecification> spec = n -> ToolSpecification.builder().name(n).description(n).build();
+        assertEquals("search_project_content", SubAgentService.forcedConsultTool(List.of(spec.apply("extract_file_text"), spec.apply("search_project_content"))));
+        assertEquals("extract_file_text", SubAgentService.forcedConsultTool(List.of(spec.apply("doc_get_document_text"), spec.apply("extract_file_text"))));
+        assertEquals(null, SubAgentService.forcedConsultTool(List.of(spec.apply("search_web"))));
+    }
+
+    @Test
+    @DisplayName("W6：mustConsult 只顶一次；不带 mustConsult 的子任务行为不变")
+    void mustConsultPushesBackOnlyOnce() {
+        when(model.generate(anyList(), anyList())).thenReturn(textTurn("不查也行。"), textTurn("还是不查。"));
+        SubAgentResult pushed = newService().dispatch("核验", "清单", List.of("read_document"), PARENT_CTX, null, true);
+        assertTrue(pushed.success());
+        assertEquals(2, pushed.rounds(), "顶回一次后照常交卷，由调用方判未查阅");
+        assertTrue(pushed.toolsUsed().isEmpty());
+
+        when(model.generate(anyList(), anyList())).thenReturn(textTurn("直接回答。"));
+        SubAgentResult plain = newService().dispatch("调研", "要点", List.of("read_document"), PARENT_CTX);
+        assertEquals(1, plain.rounds(), "普通子任务不受影响");
+    }
+
+    @Test
     @DisplayName("W6：读文件工具成功读过的 fileId 记入 filesRead（去重）；检索类工具不算读过底稿")
     void filesReadRecordsSuccessfulFileReads() {
         when(model.generate(anyList(), anyList())).thenReturn(

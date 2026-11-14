@@ -299,6 +299,20 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
     private Inflight send(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
                           Integer maxOutputTokens, StreamingResponseHandler<AiMessage> handler) {
+        return send(messages, toolSpecifications, maxOutputTokens, handler, null);
+    }
+
+    /**
+     * 本轮强制先调指定工具（OpenAI 兼容 tool_choice 的具名函数形态，百炼/Qwen 兼容端点有文档）。
+     * 只给收尾核验员第一轮用：qwen3.8-max 拿着可用的读工具却直接写结论（W6，staging 实测两次）。
+     */
+    public Call generateWithForcedTool(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
+                                       String toolName, StreamingResponseHandler<AiMessage> handler) {
+        return send(messages, toolSpecifications, null, handler, toolName).firstCall;
+    }
+
+    private Inflight send(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
+                          Integer maxOutputTokens, StreamingResponseHandler<AiMessage> handler, String forcedTool) {
         // 分界标记绝不能漏进报文，三条路各自处理（都在序列化之前做）：
         //   显式缓存（Anthropic/Qwen）→ 留着标记，markSystemForCaching 按它拆 content block；
         //   自动缓存且形态已验证 → 按标记拆成两条 system 消息（dev-board#750，见 splitVolatileSystem）；
@@ -330,6 +344,10 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         }
         if (reasoningEffort != null) {
             body = withReasoningEffort(body, reasoningEffort);
+        }
+        if (forcedTool != null && toolSpecifications != null
+                && toolSpecifications.stream().anyMatch(t -> forcedTool.equals(t.name()))) {
+            body = withForcedTool(body, forcedTool);
         }
         // Explicit routing also applies to bounded writing; local provider requeue remains disabled below.
         if (providerRouting != null) {
@@ -429,6 +447,19 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
      * 往请求体里加 {@code "reasoning":{"effort":...}}（dev-board#1061）。
      * 只由构造时给定的档位触发，名单外的模型请求体一个字节都不变。
      */
+    static String withForcedTool(String body, String toolName) {
+        try {
+            ObjectNode root = (ObjectNode) LENIENT.readTree(body);
+            ObjectNode choice = LENIENT.createObjectNode().put("type", "function");
+            choice.set("function", LENIENT.createObjectNode().put("name", toolName));
+            root.set("tool_choice", choice);
+            return LENIENT.writeValueAsString(root);
+        } catch (IOException | ClassCastException e) {
+            log.warn("Could not add tool_choice to request body: {}", e.getClass().getSimpleName());
+            return body;
+        }
+    }
+
     static String withReasoningEffort(String body, String effort) {
         try {
             ObjectNode root = (ObjectNode) LENIENT.readTree(body);
