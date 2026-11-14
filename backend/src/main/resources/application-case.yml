@@ -139,3 +139,12 @@ collab:
 ref:
   internal:
     serve: true
+
+# 律所审计日志的内部上报口（readiness S20）：同机官网经 127.0.0.1 POST /api/internal/firm-audit，
+# 把入所/退所、角色变更、官网登录失败、账户 Key 签发与吊销写进同一份审计日志。
+# 开关只在本 profile 打开；密钥为空 = 不收（裸 404）。与名录、参考口是三把不同的密钥，
+# 官网侧 AWD_FIRM_AUDIT_SECRET 配同一个值。公网 nginx 的 ^~ /api/internal/ 恒 404 兜底。
+audit:
+  ingest:
+    serve: true
+    secret: ${AWD_AUDIT_INGEST_SECRET:}

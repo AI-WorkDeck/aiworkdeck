@@ -4,7 +4,7 @@
 export default {
   "nav": "Denetim Günlüğü",
   "title": "Büro Denetim Günlüğü",
-  "subtitle": "Bürenizdeki oturum açmaları, cihaz bağlantılarını, proje paylaşımı ve üye değişikliklerini, müvekkil davetlerini, dosya indirmelerini ve büro ayarı değişikliklerini kaydeder. Yalnızca büro yöneticileri görebilir; belge içeriğini, dosya içeriğini veya sohbetleri asla içermez.",
+  "subtitle": "Oturum açmaları, cihazları ve hesap anahtarlarını, büroya katılma veya ayrılmayı ve rol değişikliklerini, proje paylaşımını ve üyeliğini, müvekkil davetlerini, dosya indirmelerini, büro ayarı değişikliklerini ve reddedilen erişimleri, web sitesindeki işlemler dahil, kaydeder. Yalnızca büro yöneticileri görebilir; belge içeriğini, dosya içeriğini veya görüşmeleri asla içermez.",
   "retention": "Kayıtlar {days} gün saklanır, ardından otomatik olarak silinir",
   "from": "Başlangıç",
   "to": "Bitiş",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "Kayıt ID",
   "outcomeFailure": "başarısız",
   "catAll": "Tüm Kategoriler",
+  "sourceWebsite": "web sitesi",
+  "colSource": "Kaynak",
   "cat": {
     "AUTH": "Oturum açma",
     "DEVICES": "Cihazlar",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Proje Paylaşımı",
     "CLIENT": "Müvekkiller ve Mesajlaşma",
     "DATA": "Veri Erişimi",
-    "SETTINGS": "Büro Ayarları"
+    "SETTINGS": "Büro Ayarları",
+    "ACCESS": "Erişim Reddedildi"
   },
   "action": {
     "LOGIN": "Oturum açma",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Sohbet eki indirildi",
     "FIRM_CLOUD_SWITCH_CHANGED": "Büro bulut anahtarı değiştirildi",
     "FIRM_COMMITTEE_APPOINTED": "Çıkar çatışması komitesi üyesi atandı",
-    "FIRM_COMMITTEE_REVOKED": "Çıkar çatışması komitesi üyeliği geri alındı"
+    "FIRM_COMMITTEE_REVOKED": "Çıkar çatışması komitesi üyeliği geri alındı",
+    "PERMISSION_DENIED": "İzin reddedildi",
+    "FIRM_MEMBER_JOINED": "Üye büroya katıldı",
+    "FIRM_MEMBER_LEFT": "Üye bürodan ayrıldı",
+    "FIRM_MEMBER_REMOVED": "Üye bürodan çıkarıldı",
+    "FIRM_ROLE_CHANGED": "Büro rolü değiştirildi",
+    "FIRM_TEAM_JOINED": "Ekip büroya katıldı",
+    "FIRM_TEAM_LEFT": "Ekip bürodan ayrıldı",
+    "FIRM_TEAM_REMOVED": "Ekip bürodan çıkarıldı",
+    "FIRM_CREATED": "Büro oluşturuldu",
+    "FIRM_JOIN_CODE_REGENERATED": "Büro katılım kodu sıfırlandı",
+    "WEBSITE_LOGIN_FAILED": "Web sitesi oturum açma",
+    "ACCOUNT_API_KEY_CREATED": "Hesap anahtarı verildi",
+    "ACCOUNT_API_KEY_REVOKED": "Hesap anahtarı iptal edildi"
   }
 }

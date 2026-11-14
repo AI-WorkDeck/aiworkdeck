@@ -35,6 +35,15 @@ public class LawFirmWorkflowService {
             "workflowSubmit","workflowDetail","workflowClearance","workflowReview");
 
     public Map<String,Object> execute(Long userId,String action,Map<String,Object> raw) {
+        try { return executeChecked(userId,action,raw); }
+        catch(LawFirmAuthority.AccessDenied denied) {
+            // 跨所或无权的利冲操作：记「权限拒绝」（同人同资源 10 分钟一条）
+            if(firmAudit!=null) firmAudit.recordDenied(userId,"conflict-workflow:"+action,"not_permitted");
+            throw denied;
+        }
+    }
+
+    private Map<String,Object> executeChecked(Long userId,String action,Map<String,Object> raw) {
         boolean submission="workflowSubmit".equals(action);
         LawFirmAuthority.Member me=authority.current(userId);
         TransactionTemplate transaction=new TransactionTemplate(transactionManager);
