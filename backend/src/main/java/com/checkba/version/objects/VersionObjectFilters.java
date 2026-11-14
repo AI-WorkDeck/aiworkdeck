@@ -49,10 +49,11 @@ public final class VersionObjectFilters {
                 previous == null ? new ConcurrentHashMap<>() : previous.legacyHashes()));
         var config = repo.getConfig();
         // Commands are registered in-process, never executed by a shell.
-        config.setString("filter", "awd-content", "clean", CLEAN);
-        config.setBoolean("filter", "awd-content", "required", true);
-        config.setString("filter", "awd-media", "clean", MEDIA);
-        config.setBoolean("filter", "awd-media", "required", true);
+        // 过滤器配置一次性以文本装入（fromText）：逐条 setString 每次都整表扫描，
+        // 2000 个文件 × 3 条 = O(n²)，单次 open 要 1 秒多，而 /version/status 每 15 秒就要 open 一次。
+        StringBuilder filters = new StringBuilder();
+        appendFilter(filters, "awd-content", CLEAN, null);
+        appendFilter(filters, "awd-media", MEDIA, null);
         var rules = new java.util.ArrayList<org.eclipse.jgit.attributes.AttributesRule>();
         rules.add(new org.eclipse.jgit.attributes.AttributesRule("*", "filter=awd-content -text"));
         for (String extension : MEDIA_EXTENSIONS.stream().sorted().toList()) {
@@ -73,16 +74,38 @@ public final class VersionObjectFilters {
             String smudge = "jgit://awd/" + name + "/smudge";
             FilterCommandRegistry.register(clean, (r, in, out) -> clean(r, in, out, isMedia(path), path));
             FilterCommandRegistry.register(smudge, (r, in, out) -> smudge(r, in, out, path));
-            config.setString("filter", name, "clean", clean);
-            config.setString("filter", name, "smudge", smudge);
-            config.setBoolean("filter", name, "required", true);
+            appendFilter(filters, name, clean, smudge);
             rules.add(new org.eclipse.jgit.attributes.AttributesRule(quotePattern(path), "filter=" + name + " -text"));
+        }
+        try {
+            config.fromText(withoutAwdFilters(config.toText()) + filters);
+        } catch (org.eclipse.jgit.errors.ConfigInvalidException e) {
+            throw new IOException("Version filter configuration is invalid", e);
         }
         rules.add(new org.eclipse.jgit.attributes.AttributesRule(".awd/**", "-filter"));
         if (!(repo instanceof VersionObjectRepository versionRepo)) {
             throw new IOException("Version repository adapter is required");
         }
         versionRepo.setVersionRules(rules);
+    }
+
+    /** 一个 filter 段的配置文本（名称与命令都由本类生成：十六进制名 + jgit:// 地址，无需转义）。 */
+    static void appendFilter(StringBuilder out, String name, String clean, String smudge) {
+        out.append("[filter \"").append(name).append("\"]\n\tclean = ").append(clean).append('\n');
+        if (smudge != null) out.append("\tsmudge = ").append(smudge).append('\n');
+        out.append("\trequired = true\n");
+    }
+
+    /** 去掉上一次 install 留在内存配置里的 awd 过滤器段（同一 Repository 可能 install 多次），其余配置原样保留。 */
+    static String withoutAwdFilters(String text) {
+        StringBuilder kept = new StringBuilder();
+        boolean skip = false;
+        for (String line : text.split("\n", -1)) {
+            String t = line.trim();
+            if (t.startsWith("[")) skip = t.startsWith("[filter \"awd-");
+            if (!skip) kept.append(line).append('\n');
+        }
+        return kept.toString();
     }
 
     private static byte[] sha1(byte[] input) {
