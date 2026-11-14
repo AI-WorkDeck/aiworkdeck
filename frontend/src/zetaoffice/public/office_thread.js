@@ -4623,13 +4623,31 @@ let exportInFlight = false;
 // out the broadcast a later setModified(false) would emit.
 // 批量命令期间摘下/装回的把手（见 suspendModifyListener）。
 let modifyListener = null;
+// 当前（内联视图的）段落索引是否仍与正文逐字一致：各段文字以换行拼接 == 正文整体文字。
+// 一次取正文 + 每段一次 getString（150 页 ~100 ms，远小于重建索引的 ~550 ms）；表格等非段落内容会对不上，按「不一致」处理。
+function indexStillMatchesBody() {
+  if (!paraIndex.ranges || paraIndex.model !== xModel || paraIndex.viewMode !== 'all') return false;
+  const body = String(xModel.getText().getString() || '');
+  let joined = '';
+  for (let i = 0; i < paraIndex.ranges.length; i++) { if (i) joined += '\n'; joined += String(paraIndex.ranges[i].getString() || ''); }
+  return joined === body;
+}
 function installModifyListener(model) {
   const listener = zetajs.unoObject([css.util.XModifyListener], {
     // exportInFlight：storeToURL 自己会把文档标成 modified（见 export_document）。
     // 不挡掉的话每次自动保存都会引出一次 modified，宿主据此再排一次保存——
     // 实测形成每 3 秒一轮的「保存→modified→保存」死循环，整份 docx 反复上传，
     // 且 export 是全文档同步序列化，会周期性冻住 Qt 事件循环。
-    modified() { invalidateParaIndex(); try { if (exportInFlight || viewChangeInFlight) return; if (model.isModified()) post('modified'); } catch (e) { /* ignore */ } },
+    // 台账 B11：窗口/侧栏改尺寸时引擎重排版面，也会广播一次 modified——正文一个字都没变。这种事件
+    // 不该丢段落索引（150 页重建 ~550 ms，正好压在律师接着打的字上）。判据看正文本身而不是 modified
+    // 标志：没有命令在途时，只有「索引里各段的字拼起来与正文逐字相同」才保留索引；分段、合并、粘贴多段、
+    // 拖放移动等任何结构或文字变化都对不上，照常作废。读不准一律作废。
+    modified() {
+      let keep = false;
+      try { keep = !exportInFlight && !viewChangeInFlight && !Object.keys(INFLIGHT).length && indexStillMatchesBody(); } catch (e) { keep = false; }
+      if (!keep) invalidateParaIndex();
+      try { if (exportInFlight || viewChangeInFlight) return; if (model.isModified()) post('modified'); } catch (e) { /* ignore */ }
+    },
     disposing() {},
   });
   model.addModifyListener(listener);
