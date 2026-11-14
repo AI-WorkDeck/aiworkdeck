@@ -213,6 +213,17 @@ public class SubAgentService {
      */
     public SubAgentResult dispatch(String taskDescription, String expectedOutput,
                                    List<String> toolScope, ToolContext parentCtx, String modelOverride) {
+        return dispatch(taskDescription, expectedOutput, toolScope, parentCtx, modelOverride, false);
+    }
+
+    /**
+     * @param mustConsult 子 Agent 第一次想交卷时一次工具都没调过，就在同一对话里顶回一次、要求先查材料
+     *                    （收尾核验用：staging 实测 qwen3.8-max 拿着可用的读文件工具、一轮就写了 1.3 万字结论，
+     *                    一份底稿都没读）。只顶一次；还是不查就照常交卷，由调用方按「未查阅」处理。
+     */
+    public SubAgentResult dispatch(String taskDescription, String expectedOutput,
+                                   List<String> toolScope, ToolContext parentCtx, String modelOverride,
+                                   boolean mustConsult) {
         String subtaskId = "subtask-" + UUID.randomUUID().toString().substring(0, 8);
         // started/结束事件必须成对发出（前端的子任务卡按 taskId 配对渲染），
         // 所以模型校验失败那条路径也走"先 started 再 failed"，不能只发一个 failed
@@ -262,7 +273,7 @@ public class SubAgentService {
                 if (editorBridgeService != null) {
                     editorBridgeService.setCurrentConversationId(parentCtx == null ? null : parentCtx.conversationId());
                 }
-                return runLoop(subtaskId, taskDescription, expectedOutput, toolScope, parentCtx, modelId, progress);
+                return runLoop(subtaskId, taskDescription, expectedOutput, toolScope, parentCtx, modelId, progress, mustConsult);
             } finally {
                 if (editorBridgeService != null) {
                     if (previousConversation == null) editorBridgeService.clearCurrentConversationId();
@@ -367,6 +378,13 @@ public class SubAgentService {
      */
     SubAgentResult runLoop(String subtaskId, String taskDescription, String expectedOutput,
                            List<String> toolScope, ToolContext parentCtx, String modelId, Progress progress) {
+        return runLoop(subtaskId, taskDescription, expectedOutput, toolScope, parentCtx, modelId, progress, false);
+    }
+
+    SubAgentResult runLoop(String subtaskId, String taskDescription, String expectedOutput,
+                           List<String> toolScope, ToolContext parentCtx, String modelId, Progress progress,
+                           boolean mustConsult) {
+        boolean consultNudged = false;
         // 子 Agent 继承主会话的客户端能力（不变式 3 同款思路）：
         // office 会话派生的子 Agent 同样不该看到 doc_*/sheet_* 死路径工具
         String parentConversationId = parentCtx != null ? parentCtx.conversationId() : null;
@@ -415,7 +433,12 @@ public class SubAgentService {
                 // 非流式 OpenAiChatModel 两样都没有——核验员 10 轮调用全部按全价算、cached 一栏全是空。
                 dev.langchain4j.model.chat.StreamingChatLanguageModel streaming = chatModelFactory.getStreamingChatModel(modelId);
                 // 只有平台/OpenRouter 的流式实现支持带工具的三参 generate 并回报缓存；Ollama 等走原路
-                if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel) {
+                // mustConsult 第一轮：强制先调一次检索/读取工具（tool_choice 具名函数），之后回到 auto
+                String forced = mustConsult && round == 1 && toolsUsed.isEmpty() ? forcedConsultTool(specs) : null;
+                if (forced != null) log.info("[SubAgent] {} round 1 forces tool {}", subtaskId, forced);
+                if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel orm && forced != null) {
+                    response = generateBlocking(orm, messages, specs, forced, cacheUsage);
+                } else if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel) {
                     response = generateBlocking(streaming, messages, specs, cacheUsage);
                 } else {
                     ChatLanguageModel model = chatModelFactory.getChatModel(modelId);
@@ -461,10 +484,25 @@ public class SubAgentService {
 
             // 无工具调用 = 最终答案
             if (progress.isCancelled(parentCtx)) throw new CancellationException();
+            if (mustConsult && toolsUsed.isEmpty() && !consultNudged && !specs.isEmpty()) {
+                consultNudged = true;
+                log.info("[SubAgent] {} tried to finish at round {} without consulting any tool; asking once to read the materials first",
+                        subtaskId, round);
+                messages.add(UserMessage.from(com.checkba.service.LangText.of(
+                        "你还没有查阅任何材料就给出了结论。没有读过来源材料的结论会被系统判为无效。"
+                                + "请先用可用的读取/检索工具（extract_file_text、search_project_content 等）读取与各命题相关的材料，"
+                                + "再按要求逐槽给出引文与判定。",
+                        "You gave conclusions without consulting any material. Conclusions not based on sources you "
+                                + "actually read will be ruled invalid by the system. First read the materials relevant to each "
+                                + "proposition with the available read/search tools (extract_file_text, search_project_content, ...), "
+                                + "then give the per-slot quotes and verdicts as required.")));
+                continue;
+            }
             // W6：核验员一次工具都没调就交卷（没读过正文）以前只能靠推断，记下来
             // 只记形状不记正文：长度，以及正文里是否夹着本循环不解析的工具调用标记（如 Qwen 的 <tool_call>）
-            log.info("[SubAgent] {} finished after {} round(s); tools offered={} used={}; answer chars={} toolMarkup={}",
-                    subtaskId, round, specs.size(), toolsUsed, text.length(),
+            // pushedBack：mustConsult 顶回过一次——日志里数它占收尾核验的比例，看模型多常需要被提醒
+            log.info("[SubAgent] {} finished after {} round(s); tools offered={} used={}; pushedBack={}; answer chars={} toolMarkup={}",
+                    subtaskId, round, specs.size(), toolsUsed, consultNudged, text.length(),
                     text.contains("<tool_call") || text.contains("<function") || text.contains("\"name\":") );
             return SubAgentResult.success(subtaskId, text.trim(), toolsUsed, round);
         }
@@ -484,6 +522,37 @@ public class SubAgentService {
      * 流式通道的阻塞包装：等 onComplete/onError，把提示缓存读写数写进 cacheUsage[0..1]。
      * 被 dispatch 的超时/取消打断时 get() 抛 InterruptedException，与非流式一样按失败返回。
      */
+    /** 收尾核验第一轮强制调用的工具：优先全文检索（模型自己定查什么），没有就读文件。 */
+    static String forcedConsultTool(List<ToolSpecification> specs) {
+        for (String name : List.of("search_project_content", "extract_file_text", "read_document")) {
+            if (specs.stream().anyMatch(s -> name.equals(s.name()))) return name;
+        }
+        return null;
+    }
+
+    static Response<AiMessage> generateBlocking(com.checkba.service.ai.OpenRouterStreamingChatModel model,
+                                                List<ChatMessage> messages, List<ToolSpecification> specs,
+                                                String forcedTool, Integer[] cacheUsage) throws Exception {
+        java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
+        com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
+            @Override public void onNext(String token) { }
+            @Override public void onComplete(Response<AiMessage> response) { done.complete(response); }
+            @Override public void onError(Throwable error) { done.completeExceptionally(error); }
+            @Override public void onCacheUsage(int promptTokens, int cachedTokens, int cacheWriteTokens) {
+                cacheUsage[0] = cachedTokens;
+                cacheUsage[1] = cacheWriteTokens;
+            }
+        };
+        model.generateWithForcedTool(messages, specs, forcedTool, handler);
+        try {
+            return done.get();
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception ex) throw ex;
+            throw e;
+        }
+    }
+
     static Response<AiMessage> generateBlocking(dev.langchain4j.model.chat.StreamingChatLanguageModel model,
                                                 List<ChatMessage> messages,
                                                 List<dev.langchain4j.agent.tool.ToolSpecification> specs,

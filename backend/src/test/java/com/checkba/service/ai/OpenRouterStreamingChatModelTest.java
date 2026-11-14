@@ -318,4 +318,16 @@ class OpenRouterStreamingChatModelTest {
                 m2.httpClient().dispatcher(),
                 "不同模型实例应复用同一个 OkHttp Dispatcher");
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("W6：tool_choice 具名函数注入请求体，其余字段不动")
+    void forcedToolIsInjectedAsNamedFunctionChoice() throws Exception {
+        String body = "{\"model\":\"q\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"search_project_content\"}}]}";
+        com.fasterxml.jackson.databind.JsonNode out = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(OpenRouterStreamingChatModel.withForcedTool(body, "search_project_content"));
+        org.junit.jupiter.api.Assertions.assertEquals("function", out.path("tool_choice").path("type").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("search_project_content", out.path("tool_choice").path("function").path("name").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("q", out.path("model").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(1, out.path("tools").size());
+    }
 }
