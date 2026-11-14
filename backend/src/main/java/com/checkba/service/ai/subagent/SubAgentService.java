@@ -457,8 +457,10 @@ public class SubAgentService {
             // 无工具调用 = 最终答案
             if (progress.isCancelled(parentCtx)) throw new CancellationException();
             // W6：核验员一次工具都没调就交卷（没读过正文）以前只能靠推断，记下来
-            log.info("[SubAgent] {} finished after {} round(s); tools offered={} used={}",
-                    subtaskId, round, specs.size(), toolsUsed);
+            // 只记形状不记正文：长度，以及正文里是否夹着本循环不解析的工具调用标记（如 Qwen 的 <tool_call>）
+            log.info("[SubAgent] {} finished after {} round(s); tools offered={} used={}; answer chars={} toolMarkup={}",
+                    subtaskId, round, specs.size(), toolsUsed, text.length(),
+                    text.contains("<tool_call") || text.contains("<function") || text.contains("\"name\":") );
             return SubAgentResult.success(subtaskId, text.trim(), toolsUsed, round);
         }
     }
