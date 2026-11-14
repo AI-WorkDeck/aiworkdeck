@@ -210,7 +210,7 @@ jobs:
         run: npm run test:account
       - name: Test unified account project catalog
         working-directory: frontend
-        run: node --test tests/project-catalog.test.mjs
+        run: node --test tests/project-catalog.test.mjs tests/firm-audit/*.test.mjs
       - name: Test project-home page
         working-directory: frontend
         run: npm run test:project-home

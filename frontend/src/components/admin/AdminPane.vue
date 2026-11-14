@@ -1062,14 +1062,14 @@
             </view>
           </SettingsSection>
         </scroll-view>
+        <!-- 律所审计日志（S20）：只有服务端确认是律所管理员时这一栏才出现（firmAuditAvailable） -->
+        <scroll-view v-else-if="activeNav === 'audit_log'" scroll-y class="config-scroll">
+          <FirmAuditLogPanel />
+        </scroll-view>
         <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
              activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
         <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
           <TeamPanel @go-account="onNavTap({ key: 'account' })" />
-        </scroll-view>
-        <!-- 律所审计日志（S20）：只有服务端确认是律所管理员时这一栏才出现（firmAuditAvailable） -->
-        <scroll-view v-else-if="activeNav === 'audit_log'" scroll-y class="config-scroll">
-          <FirmAuditLogPanel />
         </scroll-view>
       </view>
     </view>
