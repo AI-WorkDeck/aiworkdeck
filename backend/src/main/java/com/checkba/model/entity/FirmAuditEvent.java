@@ -18,7 +18,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "firm_audit_event", indexes = {
         @Index(name = "idx_firm_audit_firm_id", columnList = "firm_id, id"),
-        @Index(name = "idx_firm_audit_firm_time", columnList = "firm_id, occurred_at")
+        @Index(name = "idx_firm_audit_firm_time", columnList = "firm_id, occurred_at"),
+        @Index(name = "uk_firm_audit_event_id", columnList = "event_id", unique = true)
 })
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -76,6 +77,14 @@ public class FirmAuditEvent {
     /** 调用点按固定键组装的小 JSON；从不来自请求体原文。 */
     @Column(name = "detail", columnDefinition = "TEXT")
     private String detail;
+
+    /** 跨服务上报的幂等键（官网事件）；本服务内产生的事件为空。 */
+    @Column(name = "event_id", length = 64)
+    private String eventId;
+
+    /** 来源：空 = 本服务；"website" = 官网上报。 */
+    @Column(name = "source", length = 16)
+    private String source;
 
     @Column(name = "prev_hash", length = 64)
     private String prevHash;

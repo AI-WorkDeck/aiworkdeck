@@ -4,7 +4,7 @@
 export default {
   "nav": "Nhật ký kiểm toán",
   "title": "Nhật ký kiểm toán của văn phòng luật",
-  "subtitle": "Ghi lại việc đăng nhập, kết nối thiết bị, chia sẻ dự án và thay đổi thành viên, lời mời khách hàng, tải xuống tệp và thay đổi cài đặt của văn phòng luật. Chỉ quản trị viên văn phòng luật mới xem được; không bao giờ chứa nội dung tài liệu, nội dung tệp hay cuộc trò chuyện.",
+  "subtitle": "Ghi lại đăng nhập, thiết bị và khóa tài khoản, việc tham gia hoặc rời văn phòng luật và thay đổi vai trò, chia sẻ và thành viên dự án, lời mời khách hàng, tải xuống tệp, thay đổi cài đặt văn phòng luật và các truy cập bị từ chối, bao gồm cả thao tác trên trang web. Chỉ quản trị viên văn phòng luật mới xem được; không bao giờ chứa nội dung tài liệu, nội dung tệp hay cuộc trò chuyện.",
   "retention": "Bản ghi được giữ {days} ngày, sau đó tự động xóa",
   "from": "Từ ngày",
   "to": "Đến ngày",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "ID bản ghi",
   "outcomeFailure": "thất bại",
   "catAll": "Tất cả danh mục",
+  "sourceWebsite": "trang web",
+  "colSource": "Nguồn",
   "cat": {
     "AUTH": "Đăng nhập",
     "DEVICES": "Thiết bị",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Chia sẻ dự án",
     "CLIENT": "Khách hàng và trao đổi",
     "DATA": "Truy cập dữ liệu",
-    "SETTINGS": "Cài đặt văn phòng luật"
+    "SETTINGS": "Cài đặt văn phòng luật",
+    "ACCESS": "Truy cập bị từ chối"
   },
   "action": {
     "LOGIN": "Đăng nhập",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Đã tải xuống tệp đính kèm cuộc trò chuyện",
     "FIRM_CLOUD_SWITCH_CHANGED": "Đã đổi công tắc đám mây của văn phòng luật",
     "FIRM_COMMITTEE_APPOINTED": "Đã bổ nhiệm thành viên ủy ban xung đột lợi ích",
-    "FIRM_COMMITTEE_REVOKED": "Đã miễn nhiệm thành viên ủy ban xung đột lợi ích"
+    "FIRM_COMMITTEE_REVOKED": "Đã miễn nhiệm thành viên ủy ban xung đột lợi ích",
+    "PERMISSION_DENIED": "Quyền bị từ chối",
+    "FIRM_MEMBER_JOINED": "Thành viên tham gia văn phòng luật",
+    "FIRM_MEMBER_LEFT": "Thành viên rời văn phòng luật",
+    "FIRM_MEMBER_REMOVED": "Thành viên bị xóa khỏi văn phòng luật",
+    "FIRM_ROLE_CHANGED": "Vai trò trong văn phòng luật thay đổi",
+    "FIRM_TEAM_JOINED": "Nhóm tham gia văn phòng luật",
+    "FIRM_TEAM_LEFT": "Nhóm rời văn phòng luật",
+    "FIRM_TEAM_REMOVED": "Nhóm bị xóa khỏi văn phòng luật",
+    "FIRM_CREATED": "Văn phòng luật được tạo",
+    "FIRM_JOIN_CODE_REGENERATED": "Mã tham gia văn phòng luật được đặt lại",
+    "WEBSITE_LOGIN_FAILED": "Đăng nhập trang web",
+    "ACCOUNT_API_KEY_CREATED": "Khóa tài khoản được cấp",
+    "ACCOUNT_API_KEY_REVOKED": "Khóa tài khoản bị thu hồi"
   }
 }

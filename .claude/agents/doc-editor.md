@@ -30,6 +30,13 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 - 修法：`editor.html` 头部内联脚本把 `window.devicePixelRatio` 钉在启动值（必须在 `editor-main.js` 之前）。代价：换到更高像素比的屏后画布略发虚，重新打开文件即按新屏启动。**别删这段，也别在客体页别处读 `devicePixelRatio` 当真实像素比用**（读到的是启动值）。
 - 回归：`node --test tests/lowa-unit/pinned-device-pixel-ratio.test.mjs`；真机 `node tests/desktop-e2e/resize-recenter.mjs`（默认 `RESIZE_MODE=dpr`，用 CDP 把客体像素比 2→1 仿真换屏，三种格式各一，去掉钉值即转红）。PDF 走 pdf.js iframe，不经 LOWA，不受影响。
 
+## 引擎堆 1 GB 与换引擎（R-086 浸泡，2026-11-14）
+- 现象：150 页合同（修订开启）在可见标签上每轮自动保存漏约 10 MB，约 30 轮引擎 OOM 中止；中止后画布停在最后一帧像能编辑，保存永远失败。
+- 根因三层：① zetajs 代理只在 V8 GC 时释放（FinalizationRegistry），worker JS 堆小到几乎不 GC → 加 `zetajs.release()`，段落索引换下的旧数组在无命令在途时显式释放；② 宿主 `__agent` 读切修订视图再切回，每次切都清索引 → 索引按视图存放（`parkedParaIndexes`），正文没变（`reviewRevision`）就原样取回；③ **LibreOffice 原生侧**逐段 `nextElement` 约 0.9 KB/段、每次 `load_document` 约 22 MB 收不回（释放代理、重装文档都收不回）→ 宿主兜底：保存后 `get_engine_heap`（不分配内存的高水位扫描，**绝不用 malloc 探**），过阈值在安静、已全部保存、不在输入法组字时换新引擎并恢复光标位置（`get_view_position`/`restore_view_position`）。
+- 地雷：控制器 `restoreViewData` 运行期调用不生效，位置一律按光标恢复。阈值/间隔可不发版调：localStorage `awd.engineHeap` = `{"recycleAt":0.7,"checkEveryMs":60000}`。
+- 引擎中止（`engine-failed`）与渲染进程没了走同一条恢复：换引擎重装最后一次保存的内容，`engineNotice` 写明恢复到哪一刻、之后的改动没保存上；进行中的保存不落 saveFailed。
+- 回归：`npm run test:lowa-heap-cycles`（每轮至多一次整篇枚举、活代理不增长、高水位与探针一致）；真机 `tests/desktop-e2e/engine-renew.mjs`（三种格式换新 + Word 中止恢复）。即时审校停笔重读 2.5 s → 5 s。
+
 ## 只打开不许写盘（台账 B10，2026-11-14）
 
 - 现象：Word 2 的 .doc、Excel 5/95 的 .xls 打开几秒后被自动保存按 Word 97/BIFF8 改写原件（标题样式与间距还丢了），用户什么都没做。
