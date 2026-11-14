@@ -46,16 +46,20 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(com.checkba.exception.RateLimitedException.class)
     public ResponseEntity<Map<String, Object>> handleRateLimited(com.checkba.exception.RateLimitedException e) {
-        return rateLimitedResponse(e.getRetryAfterSeconds());
+        return rateLimitedResponse(e.getRetryAfterSeconds(), e.getMessage());
     }
 
     /** 同一份 429 响应，供自带 catch-all 的控制器（如上传）直接返回。 */
     public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds) {
+        return rateLimitedResponse(retryAfterSeconds, com.checkba.exception.RateLimitedException.message(retryAfterSeconds));
+    }
+
+    public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds, String message) {
         Map<String, Object> result = new HashMap<>();
         result.put("code", 4290);
         result.put("status", "error");
         result.put("reason", "RATE_LIMITED");
-        result.put("message", com.checkba.exception.RateLimitedException.message(retryAfterSeconds));
+        result.put("message", message);
         result.put("retryAfterSeconds", retryAfterSeconds);
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", String.valueOf(retryAfterSeconds))

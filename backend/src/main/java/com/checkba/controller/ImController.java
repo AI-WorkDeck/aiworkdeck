@@ -28,7 +28,7 @@ public class ImController {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("请先登录");
         Map<String,Object> body = readBody(request, mapper);
-        return Map.of("code", 0, "data", service.execute(userId, ImService.string(body, "action"), params(body)));
+        return Map.of("code", 0, "data", service.executeRequest(userId, ImService.string(body, "action"), params(body)));
     }
 
     /** Bound raw JSON before parsing, including requests using chunked transfer encoding. */

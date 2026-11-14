@@ -31,6 +31,16 @@ public class ImService {
             "agentScopes", "ensureAgent", "agentInfo", "agentReply", "projectGroup");
     /** Polled every few seconds by every open panel: these never take the conversation row lock. */
     static final Set<String> READ_ONLY_ACTIONS = Set.of("self", "list", "members", "agentInfo", "messages", "download");
+    /**
+     * Everything a client holding an access code (global role CLIENT) may call (B4). They reach only the project group
+     * of the project their code is for; DMs, other groups, private assistants, membership and access management are not
+     * theirs. Checked here, before any action, so the portal, the desktop client proxy and direct calls share one rule.
+     */
+    public static final Set<String> CLIENT_PORTAL_ACTIONS = Set.of("self", "projectGroup", "members", "messages", "send", "read", "upload", "download");
+    public static final String DENIED_CODE_INACTIVE = "CODE_INACTIVE", DENIED_OUT_OF_SCOPE = "OUT_OF_SCOPE", DENIED_ACTION = "ACTION_NOT_ALLOWED";
+    /** One denial record per client per window: a cut-off portal keeps polling every few seconds. */
+    private static final long DENIAL_AUDIT_WINDOW_MS = 10 * 60 * 1000L;
+    private final Map<String, Long> deniedAudited = new java.util.concurrent.ConcurrentHashMap<>();
     private final ImConversationRepository conversations;
     private final ImMemberRepository members;
     private final ImInvitationRepository invitations;
@@ -43,6 +53,12 @@ public class ImService {
     private ProjectRepository projects;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.checkba.service.ProjectMemberService projectPermissions;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.ClientInvitationService clientInvitations;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private ClientPortalChatAudit portalAudit;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
 
     private TransactionTemplate writes, reads;
     @org.springframework.beans.factory.annotation.Autowired
@@ -62,6 +78,26 @@ public class ImService {
      * membership again after the rows are read (see below). A read nested in a caller's own transaction keeps the
      * lock: such callers (project import/export) decide writes from what they read.
      */
+    /**
+     * Entry for requests that arrive over the network ({@code /api/im/action}, and the server-mode gateway). Counts the
+     * request against the caller's own buckets before running it: sends and uploads per sender; every other action too
+     * when the caller is an access-code client. Server-side posters (law-firm notices, assistant replies) call
+     * {@link #execute} directly and are not counted.
+     */
+    public Object executeRequest(Long userId, String action, Map<String, Object> params) {
+        if (rateLimiter != null && userId != null) {
+            boolean sending = "send".equals(action) || "upload".equals(action);
+            long retry = sending ? rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.IM_SEND, userId) : 0;
+            if (sending && retry > 0) throw new com.checkba.exception.RateLimitedException(retry, com.checkba.service.LangText.of(
+                    "发送太快，请 " + retry + " 秒后再发", "You're sending too fast; please wait " + retry + " seconds"));
+            if (!sending && users.findById(userId).map(User::getRole).filter("CLIENT"::equals).isPresent()) {
+                retry = rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.IM_READ, userId);
+                if (retry > 0) throw new com.checkba.exception.RateLimitedException(retry);
+            }
+        }
+        return execute(userId, action, params);
+    }
+
     public Object execute(Long userId, String action, Map<String, Object> params) {
         boolean unlocked = READ_ONLY_ACTIONS.contains(action) && !TransactionSynchronizationManager.isActualTransactionActive();
         return (unlocked ? reads : writes).execute(status -> execute(userId, action, params, unlocked));
@@ -69,9 +105,22 @@ public class ImService {
 
     private Object execute(Long userId, String action, Map<String, Object> params, boolean unlocked) {
         // Loaded, not just counted: the caller's row is read again later (name, client status) and then comes from the session.
-        if (userId == null || users.findById(userId).isEmpty()) throw bad("请先登录");
+        User caller = userId == null ? null : users.findById(userId).orElse(null);
+        if (caller == null) throw bad("请先登录");
         Map<String,Object> p = params == null ? Map.of() : params;
         if (!ACTIONS.contains(action)) throw bad(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
+        // Access-code clients: the code is checked on every request, not only at login, so expiry and revocation end
+        // chat on the next poll. portalProjectId is then the only project whose group they may touch.
+        Long portalProjectId = null;
+        com.checkba.model.entity.ProjectInvitation portalCode = null;
+        if ("CLIENT".equals(caller.getRole())) {
+            portalCode = clientInvitations == null ? null : clientInvitations.activeInvitationFor(caller).orElse(null);
+            if (portalCode == null) throw portalDenied(userId, null, DENIED_CODE_INACTIVE);
+            portalProjectId = portalCode.getProjectId();
+            if (!CLIENT_PORTAL_ACTIONS.contains(action)) throw portalDenied(userId, portalProjectId, DENIED_ACTION);
+            if ("projectGroup".equals(action) && number(p, "projectId", -1) != portalProjectId)
+                throw portalDenied(userId, portalProjectId, DENIED_OUT_OF_SCOPE);
+        }
         if ("self".equals(action)) return Map.of("id", userId, "displayName", displayName(userId));
         if ("agentScopes".equals(action)) return agentService().scopes(userId);
         if ("ensureAgent".equals(action)) {
@@ -96,17 +145,22 @@ public class ImService {
             return Map.of("conversations", rows);
         }
         if ("create".equals(action)) return create(userId, p);
-        if ("projectGroup".equals(action)) return projectGroup(userId, p);
+        if ("projectGroup".equals(action)) return projectGroup(userId, p, portalCode);
         if ("join".equals(action)) return join(userId, p);
         String conversationId = required(p, "conversationId", 36);
         // "read" only advances the caller's own cursor, atomically in SQL, so it does not queue behind the group either.
         ImConversation conversation = unlocked || "read".equals(action)
                 ? conversations.findById(conversationId).orElseThrow(ImService::unknownConversation) : lock(conversationId);
+        if (portalProjectId != null && !portalProjectId.equals(conversation.getProjectId()))
+            throw portalDenied(userId, portalProjectId, DENIED_OUT_OF_SCOPE);
         ImMember member = requireMember(conversation.getId(), userId);
         authorizeAgent(conversation, userId);
         Object result = switch (action) {
             case "invite" -> invite(conversation, member, p);
-            case "members" -> memberViews(conversation);
+            // The roster (names, account ids, other clients) is not a client's to read anywhere; the count is enough.
+            case "members" -> portalProjectId != null
+                    ? Map.of("members", List.of(), "humanCount", members.findByConversationId(conversation.getId()).size())
+                    : memberViews(conversation);
             case "agentInfo" -> view(conversation, member);
             case "agentReply" -> agentService().reply(conversation, userId, p);
             case "removeMember" -> remove(conversation, member, number(p, "userId", -1));
@@ -136,7 +190,10 @@ public class ImService {
     }
 
     /** Entering a project group grants no project rights. Every subsequent action rechecks its ACL. */
-    private Object projectGroup(Long userId, Map<String,Object> p) {
+    private Object projectGroup(Long userId, Map<String,Object> p) { return projectGroup(userId, p, null); }
+
+    /** {@code portalCode}: the caller's active access code when they are an access-code client, else null. */
+    private Object projectGroup(Long userId, Map<String,Object> p, com.checkba.model.entity.ProjectInvitation portalCode) {
         long projectId = number(p, "projectId", -1);
         if (projectPermissions == null || projectId <= 0 || !projectPermissions.hasReadPermission(projectId, userId))
             throw bad(com.checkba.service.LangText.of("项目不存在或无权访问", "Project does not exist or access denied"));
@@ -158,8 +215,17 @@ public class ImService {
             conversations.saveAndFlush(c);
         }
         ImMember member = members.findByConversationIdAndUserId(c.getId(), userId).orElse(null);
-        if (member == null) member = limitClientHistory(addMember(c.getId(), userId,
-                Objects.equals(c.getOwnerId(), userId) ? "OWNER" : projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER"));
+        if (member == null) {
+            member = addMember(c.getId(), userId,
+                    Objects.equals(c.getOwnerId(), userId) ? "OWNER" : portalCode != null || projectPermissions.isClient(projectId, userId) ? "CLIENT" : "MEMBER");
+            // Earlier messages only when the lawyer chose so on this client's access code; floors set once, never widened.
+            boolean shareHistory = portalCode != null && Boolean.TRUE.equals(portalCode.getImShareHistory());
+            if (!shareHistory) member = limitClientHistory(member);
+            if (portalCode != null && portalAudit != null) {
+                try { portalAudit.joined(userId, projectId, c.getId(), c.getTitle(), shareHistory); }
+                catch (RuntimeException ignored) { /* Audit never blocks chat. */ }
+            }
+        }
         return view(c, member);
     }
 
@@ -358,6 +424,26 @@ public class ImService {
         return Map.of("members", rows, "humanCount", humanCount);
     }
 
+    /**
+     * The same answer whatever the reason, so a client learns nothing about other conversations; the audit keeps the
+     * reason. A code that stopped working gets the portal's own wording so the client knows to ask the lawyer.
+     */
+    private IllegalArgumentException portalDenied(Long userId, Long projectId, String reason) {
+        if (portalAudit != null) {
+            String key = userId + ":" + reason;
+            long now = System.currentTimeMillis();
+            Long last = deniedAudited.get(key);
+            if (last == null || now - last > DENIAL_AUDIT_WINDOW_MS) {
+                deniedAudited.put(key, now);
+                try { portalAudit.denied(userId, projectId, reason); }
+                catch (RuntimeException ignored) { /* Audit never blocks the answer. */ }
+            }
+        }
+        if (DENIED_CODE_INACTIVE.equals(reason))
+            return bad(com.checkba.service.LangText.of("访问码已失效或已过期，请联系律师", "Your access code is no longer valid or has expired; please contact your lawyer"));
+        return unknownConversation();
+    }
+
     private static IllegalArgumentException unknownConversation() { return bad(com.checkba.service.LangText.of("会话不存在或无权访问", "Conversation does not exist or access denied")); }
     private ImConversation lock(String id) { return conversations.lockById(id).orElseThrow(ImService::unknownConversation); }
     private ImMember requireMember(String id, Long userId) { return members.findByConversationIdAndUserId(id, userId).orElseThrow(ImService::unknownConversation); }
@@ -419,6 +505,12 @@ public class ImService {
         // Fetch only metadata: a page of 100 messages must not hydrate 100 attachment blobs.
         Map<String,Object[]> files = new HashMap<>();
         if (!attachmentIds.isEmpty()) for (Object[] a : attachments.metadataIn(me.getConversationId(), attachmentIds)) files.put((String)a[0], a);
+        // Lawyers must see which messages came from the client: client member of this group, or an access-code client.
+        Set<Long> clientSenders = new HashSet<>();
+        for (User user : senders.values()) if ("CLIENT".equals(user.getRole())) clientSenders.add(user.getId());
+        if (!senderIds.isEmpty() && clientSenders.size() < senders.size())
+            for (ImMember member : members.findByConversationId(me.getConversationId()))
+                if ("CLIENT".equals(member.getRole()) && senderIds.contains(member.getUserId())) clientSenders.add(member.getUserId());
         List<Map<String,Object>> views = new ArrayList<>(rows.size());
         for (ImMessage m : rows) {
             Map<String,Object> result = new LinkedHashMap<>(); result.put("id", m.getId()); result.put("uid", m.getUid());
@@ -427,6 +519,7 @@ public class ImService {
             result.put("senderName", agent ? m.getAgentName() : displayName(senders.get(m.getSenderId())));
             if (agent) result.put("agentName", m.getAgentName());
             else Optional.ofNullable(avatars.get(m.getSenderId())).filter(url -> !url.isBlank()).ifPresent(url -> result.put("senderAvatarUrl", url));
+            if (!agent && clientSenders.contains(m.getSenderId())) result.put("fromClient", true);
             result.put("text", m.getText()); result.put("createdAt", m.getCreatedAt());
             Object[] a = m.getAttachmentId() == null || !m.getConversationId().equals(me.getConversationId()) ? null : files.get(m.getAttachmentId());
             if (a != null) result.put("attachment", attachmentView((String)a[0], (String)a[1], ((Number)a[2]).longValue(),

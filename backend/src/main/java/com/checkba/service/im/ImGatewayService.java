@@ -55,7 +55,7 @@ public class ImGatewayService {
     public Object executeWithinScope(Long userId, String expectedScope, String action, Map<String,Object> params) {
         if (!ImService.ACTIONS.contains(action)) throw new IllegalArgumentException(com.checkba.service.LangText.of("不支持的沟通操作", "Unsupported IM action"));
         assertAccountScope(expectedScope);
-        if (!localMode) return service.execute(userId, action, params);
+        if (!localMode) return service.executeRequest(userId, action, params);
         CloudConnection connection = cloud.connectOfficial(userId);
         String fingerprint = connection.getAccountFingerprint();
         if (fingerprint == null || !fingerprint.equals(expectedScope) || !fingerprint.equals(account.accountFingerprintOrNull()))
@@ -73,6 +73,7 @@ public class ImGatewayService {
             }
             assertAccountScope(fingerprint);
             if (response.statusCode() == 404) throw new IllegalArgumentException(com.checkba.service.LangText.of("云端尚未开通沟通服务，请稍后再试", "Cloud IM service is not enabled yet; please try again later"));
+            if (response.statusCode() == 429) throw rateLimited(response, bytes);
             if (response.statusCode() == 401) throw new IllegalArgumentException(com.checkba.service.LangText.of("云端账户凭据已失效，请重新连接账户", "Cloud account credentials have expired; please reconnect your account"));
             if (response.statusCode() != 200 || bytes.length > MAX_JSON_BYTES)
                 throw new IllegalArgumentException(com.checkba.service.LangText.of("云端沟通服务暂不可用", "Cloud IM service is temporarily unavailable"));
@@ -85,5 +86,16 @@ public class ImGatewayService {
         } catch (java.io.IOException e) {
             throw new IllegalArgumentException(com.checkba.service.LangText.of("云端沟通服务暂时无法连接，请稍后重试", "Cloud IM service is temporarily unreachable; please try again later"));
         }
+    }
+
+    /** The case server's 429 carries a localized message (「发送太快」) and Retry-After; pass both on to the desktop UI. */
+    private com.checkba.exception.RateLimitedException rateLimited(HttpResponse<?> response, byte[] bytes) {
+        long retry = response.headers().firstValueAsLong("Retry-After").orElse(30);
+        String message = null;
+        try {
+            Map<String,Object> body = mapper.readValue(bytes, new TypeReference<>() {});
+            if (body.get("message") instanceof String text && !text.isBlank()) message = text;
+        } catch (java.io.IOException | RuntimeException unreadable) { /* fall back to the standard wording */ }
+        return message == null ? new com.checkba.exception.RateLimitedException(retry) : new com.checkba.exception.RateLimitedException(retry, message);
     }
 }

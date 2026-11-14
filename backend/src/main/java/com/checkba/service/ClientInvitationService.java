@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -84,6 +85,15 @@ public class ClientInvitationService {
 
     @Transactional
     public Issued issueClientCode(Long projectId, Long requesterId, String clientName) {
+        return issueClientCode(projectId, requesterId, clientName, false);
+    }
+
+    /**
+     * {@code shareHistory}：客户进项目群后能否看此前的消息（B4）。默认 false = 只看入群之后；
+     * 通用码重新签发时以这一次的选择为准，只影响之后才进群的客户。
+     */
+    @Transactional
+    public Issued issueClientCode(Long projectId, Long requesterId, String clientName, boolean shareHistory) {
         projectMemberService.lockCloudMembership(projectId);
         // 1. Check permissions (Allow Admin and Participant)
         if (!projectMemberService.hasWritePermission(projectId, requesterId)) {
@@ -128,6 +138,7 @@ public class ClientInvitationService {
              invitation.setRelatedUserId(user.getId());
              invitation.setCreatedBy(requesterId);
              invitation.setExpiresAt(freshExpiry());
+             invitation.setImShareHistory(shareHistory);
              invitationRepository.save(invitation);
              
              return new Issued(code, invitation.getExpiresAt(), user.getId());
@@ -137,13 +148,13 @@ public class ClientInvitationService {
         // Check for new "CLIENT_GENERIC" type
         Optional<ProjectInvitation> existingGeneric = earliest(projectId, "CLIENT_GENERIC");
         if (existingGeneric.isPresent()) {
-            return reissue(existingGeneric.get());
+            return reissue(existingGeneric.get(), shareHistory);
         }
         
         // Check for legacy "CLIENT" type
         Optional<ProjectInvitation> existingLegacy = earliest(projectId, "CLIENT");
         if (existingLegacy.isPresent()) {
-             return reissue(existingLegacy.get());
+             return reissue(existingLegacy.get(), shareHistory);
         }
 
         // Create new Generic Invitation
@@ -166,6 +177,7 @@ public class ClientInvitationService {
         invitation.setRelatedUserId(templateUser.getId());
         invitation.setCreatedBy(requesterId);
         invitation.setExpiresAt(freshExpiry());
+        invitation.setImShareHistory(shareHistory);
         invitationRepository.save(invitation);
 
         // 通用码此前只建影子用户与 invitation 行，从不建成员行；而客户登录恒走
@@ -179,8 +191,9 @@ public class ClientInvitationService {
     }
 
     /** 重新签发同一行通用码：续期并取（必要时升级成长码）的码。 */
-    private Issued reissue(ProjectInvitation invitation) {
+    private Issued reissue(ProjectInvitation invitation, boolean shareHistory) {
         invitation.setExpiresAt(freshExpiry());
+        invitation.setImShareHistory(shareHistory);
         String code = ensureLongCode(invitation);
         invitationRepository.save(invitation);
         return new Issued(code, invitation.getExpiresAt(), invitation.getRelatedUserId());
@@ -319,6 +332,35 @@ public class ClientInvitationService {
     private boolean isChatInvitationCode(String code) {
         if (chatInvitations == null || code == null || code.isBlank() || code.length() > 64) return false;
         return chatInvitations.existsById(com.checkba.service.im.ImService.sha(code.trim().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    /**
+     * 持访问码的客户（全局 CLIENT 用户）此刻凭哪张码、在哪个项目里（B4）。每次项目沟通请求都调：
+     * 码作废、过期或客户已被移出项目，立即返回空——会话令牌还有效也不行（登录时只验一次码）。
+     * 找码：具名码与通用码的影子用户是 relatedUserId；通用码带称呼登录建出的用户名是
+     * {@code client_inv{invitationId}_…}。
+     */
+    @Transactional(readOnly = true)
+    public Optional<ProjectInvitation> activeInvitationFor(User user) {
+        if (user == null || user.getId() == null) return Optional.empty();
+        List<ProjectInvitation> candidates = new java.util.ArrayList<>(invitationRepository.findByRelatedUserId(user.getId()));
+        String username = user.getUsername();
+        if (candidates.isEmpty() && username != null && username.startsWith("client_inv")) {
+            int end = username.indexOf('_', "client_inv".length());
+            if (end > "client_inv".length()) {
+                try {
+                    invitationRepository.findById(Long.parseLong(username.substring("client_inv".length(), end))).ifPresent(candidates::add);
+                } catch (NumberFormatException ignored) {
+                    // 不是本服务签出的用户名：没有对应的码
+                }
+            }
+        }
+        LocalDateTime now = LocalDateTime.now();
+        return candidates.stream()
+                .filter(i -> i.getRevokedAt() == null)
+                .filter(i -> { LocalDateTime expiry = effectiveExpiry(i); return expiry == null || !expiry.isBefore(now); })
+                .filter(i -> projectMemberRepository.findByProjectIdAndUserId(i.getProjectId(), user.getId()).isPresent())
+                .min(java.util.Comparator.comparing(ProjectInvitation::getId));
     }
 
     public ProjectInvitation validateCode(String code) {

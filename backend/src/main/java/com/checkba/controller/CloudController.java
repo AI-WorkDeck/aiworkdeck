@@ -332,11 +332,12 @@ public class CloudController {
     @PostMapping("/projects/{projectId}/invite/client")
     public ResponseEntity<Map<String, Object>> inviteClient(
             @PathVariable Long projectId,
-            @RequestBody(required = false) Map<String, String> body,
+            @RequestBody(required = false) Map<String, Object> body,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireWriteMember(projectId, sessionId);
-        String clientName = body == null ? null : body.get("clientName");
-        return ok(cloudSyncService.proxyInviteClient(projectId, clientName));
+        String clientName = body != null && body.get("clientName") instanceof String name ? name : null;
+        boolean shareHistory = body != null && Boolean.TRUE.equals(body.get("shareHistory"));
+        return ok(cloudSyncService.proxyInviteClient(projectId, clientName, shareHistory));
     }
 
     /** update/resolve 共用的响应形状：UpdateResult 平铺。 */
