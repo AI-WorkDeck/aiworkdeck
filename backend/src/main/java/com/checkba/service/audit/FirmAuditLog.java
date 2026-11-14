@@ -118,6 +118,8 @@ public class FirmAuditLog {
         String source;
         String explicitFirmId;
         String actorNameOverride;
+        /** 来源地址已由上报方给定（可能为空）：不得再从当前请求取——那是上报方自己的回环连接。 */
+        boolean sourceGiven;
         String sourceIp;
         String userAgent;
         int attempts;
@@ -146,7 +148,7 @@ public class FirmAuditLog {
 
         public Event at(Instant when) { this.occurredAt = when == null ? null : when.truncatedTo(ChronoUnit.MILLIS); return this; }
 
-        public Event from(String ip, String userAgent) { this.sourceIp = clip(ip, 64); this.userAgent = clip(userAgent, 256); return this; }
+        public Event from(String ip, String userAgent) { this.sourceIp = clip(ip, 64); this.userAgent = clip(userAgent, 256); this.sourceGiven = true; return this; }
 
         public Event target(String type, Object id, String label) {
             this.targetType = type;
@@ -191,7 +193,7 @@ public class FirmAuditLog {
         try {
             if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null && e.explicitFirmId == null)) return;
             if (e.occurredAt == null) e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-            if (e.sourceIp == null && e.userAgent == null) captureRequest(e);
+            if (!e.sourceGiven) captureRequest(e);
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
@@ -213,7 +215,7 @@ public class FirmAuditLog {
         try {
             if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null && e.explicitFirmId == null)) return;
             if (e.occurredAt == null) e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-            if (e.sourceIp == null && e.userAgent == null) captureRequest(e);
+            if (!e.sourceGiven) captureRequest(e);
             enqueue(e);
         } catch (Exception ex) {
             log.warn("Firm audit record failed for {}: {}", e == null ? null : e.action, ex.toString());

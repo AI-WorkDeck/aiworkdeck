@@ -153,6 +153,25 @@ class InternalFirmAuditControllerTest {
     }
 
     @Test
+    void anEventWithoutASourceAddressDoesNotTakeTheWebsitesLoopbackAddress() {
+        Map<String, Object> b = body(UUID.randomUUID().toString(), "FIRM_MEMBER_JOINED");
+        b.remove("sourceIp");
+        b.remove("userAgent");
+        MockHttpServletRequest loopback = from("127.0.0.1");
+        loopback.addHeader("User-Agent", "node");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(loopback));
+        try {
+            controller.ingest(b, SECRET, loopback);
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+        Map<String, Object> r = rows().get(0);
+        assertNull(r.get("sourceIp"), "staging showed 127.0.0.1 here: the ingest request's own address");
+        assertNull(r.get("userAgent"));
+    }
+
+    @Test
     void loginFailuresAreFailuresAndUnknownActionsOrBadIdsAreRejected() {
         controller.ingest(body(UUID.randomUUID().toString(), "WEBSITE_LOGIN_FAILED"), SECRET, from("127.0.0.1"));
         assertEquals("FAILURE", rows().get(0).get("outcome"));
