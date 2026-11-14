@@ -65,7 +65,7 @@
           <text class="col">{{ e.actorName || '—' }}</text>
           <text class="col">{{ e.targetLabel || e.targetId || '—' }}</text>
           <text class="col">{{ e.projectName || '—' }}</text>
-          <text class="col col-detail">{{ detailText(e.detail) || '—' }}</text>
+          <text class="col col-detail">{{ shortDetail(e.detail) || '—' }}</text>
           <text class="col col-ip">{{ e.sourceIp || '—' }}</text>
         </view>
         <text v-if="!loading && !events.length && !error" class="empty-line">{{ $t('auditLog.empty') }}</text>
@@ -118,6 +118,13 @@ export default {
   },
   methods: {
     detailText,
+    // 表格里省掉只有导出才用得上的内部 id（CSV 仍是全量）
+    shortDetail(detail) {
+      if (!detail || typeof detail !== 'object') return ''
+      const rest = { ...detail }
+      for (const k of ['actorAccountId', 'teamId', 'conversationId', 'deviceTokenId']) delete rest[k]
+      return detailText(rest)
+    },
     query(extra = {}) {
       const p = { ...extra }
       for (const k of ['from', 'to', 'category', 'actor']) {
