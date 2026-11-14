@@ -190,7 +190,7 @@ export default {
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "律所管理",
   "railLabelTmeet": "騰訊會議",
-  "railLabelProjectIm": "項目溝通",
+  "railLabelProjectIm": "專案溝通",
   "railLabelDesensitize": "檔案脫敏",
   "railLabelTabular": "表格審閱",
   "railEditDoneBtn": "完成",
@@ -354,7 +354,7 @@ export default {
     "baoqingtian": "包晴天 · 案源與筆記",
     "dpiaWorkbench": "DPIA 數據合規工作台",
     "lawfirmManagement": "律所管理",
-    "projectIm": "項目溝通"
+    "projectIm": "專案溝通"
   },
   "sensitiveEditorNotReadyError": "編輯器尚未就緒，無法保存當前修改，請稍後重試",
   "sensitiveSavePendingError": "當前修改尚未保存成功，請先保存文件後重試",

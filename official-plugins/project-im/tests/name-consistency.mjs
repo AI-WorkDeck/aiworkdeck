@@ -51,3 +51,10 @@ test('workbench rail label and in-plugin references use the same Chinese name', 
     assert.ok(!/项目群聊|項目群聊|專案群聊/.test(text), f)
   }
 })
+
+test('zh-TW uses 專案溝通 (the zh-TW app says 專案 for project)', () => {
+  assert.equal(JSON.parse(readFileSync(new URL('l10n/zh-TW.json', root), 'utf8'))['plugin.name'], '專案溝通')
+  const tw = readFileSync(new URL('frontend/src/locales/zh-TW/workbench.js', repo), 'utf8')
+  assert.ok(tw.includes('"projectIm": "專案溝通"') && tw.includes('"railLabelProjectIm": "專案溝通"'))
+  for (const f of ['l10n/zh-TW.json', 'web/panel-l10n.js']) assert.ok(!readFileSync(new URL(f, root), 'utf8').includes('項目溝通'), f)
+})

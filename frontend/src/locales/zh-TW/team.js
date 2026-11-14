@@ -171,7 +171,7 @@ export default {
   "switchTeamDesc": "當前團隊：{team}。一個賬戶同一時間只屬於一個團隊，切換會先退出當前團隊，再用邀請碼加入新團隊。",
   "switchTeamButton": "退出並加入新團隊",
   "switchTeamOwnerBlocked": "你是本團隊負責人，負責人不能退出團隊，因此暫不能切換到其他團隊。",
-  "confirmSwitchTeam": "將先退出「{team}」，再用邀請碼加入新團隊。退出後看不到原團隊統計與通訊錄；項目溝通中的已有會話按會話成員身份保留。若加入失敗，需要原團隊重新邀請。繼續？",
+  "confirmSwitchTeam": "將先退出「{team}」，再用邀請碼加入新團隊。退出後看不到原團隊統計與通訊錄；專案溝通中的已有會話按會話成員身份保留。若加入失敗，需要原團隊重新邀請。繼續？",
   "switchTeamHalfDone": "已退出「{team}」，但加入新團隊未完成：{reason}。可核對邀請碼後重新加入，或請原團隊負責人重新邀請。",
   "switchTeamDone": "已切換到新團隊",
   "switchFirmTitle": "切換律所",
