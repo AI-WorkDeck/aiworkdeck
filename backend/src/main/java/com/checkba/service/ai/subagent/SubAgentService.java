@@ -127,10 +127,15 @@ public class SubAgentService {
      * 循环开头调用，记录"这一刻已经完整跑完的轮数"，与 runLoop 自己失败分支里 {@code round - 1}
      * 的口径保持一致。
      */
+    /** 记为「实际读过某份材料」的工具：按 fileId 读全文。检索摘要与读当前稿都不算读过底稿。 */
+    static final java.util.Set<String> READ_FILE_TOOLS = java.util.Set.of("extract_file_text", "read_document");
+
     static final class Progress {
         Long activeFileId;
         private final List<String> toolsUsed = new java.util.concurrent.CopyOnWriteArrayList<>();
         private final List<SubAgentResult.FileChange> fileChanges = new java.util.concurrent.CopyOnWriteArrayList<>();
+        /** 读文件工具成功读过的文件 ID（去重、按首次读取顺序）。 */
+        private final List<Long> filesRead = new java.util.concurrent.CopyOnWriteArrayList<>();
         private final AtomicInteger completedRounds = new AtomicInteger(0);
         private final AtomicBoolean cancelled = new AtomicBoolean();
 
@@ -316,7 +321,7 @@ public class SubAgentService {
                 result.success() ? com.checkba.service.LangText.of("子任务完成", "Subtask completed")
                         : cancelledByUser ? com.checkba.service.LangText.of("子任务已停止", "Subtask stopped")
                         : com.checkba.service.LangText.of("子任务失败：", "Subtask failed: ") + brief(result.error()));
-        return result.withFileChanges(progress.fileChanges);
+        return result.withFileChanges(progress.fileChanges).withFilesRead(progress.filesRead);
     }
 
     /**
@@ -549,6 +554,13 @@ public class SubAgentService {
         }
         toolsUsed.add(resolved);
         ToolRegistry.ToolResult result = toolRegistry.execute(rawName, argsJson, subCtx);
+        if (result.success() && READ_FILE_TOOLS.contains(resolved)) {
+            try {
+                var id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(argsJson).path("fileId");
+                long value = id.isIntegralNumber() || (id.isTextual() && id.asText().matches("\\d+")) ? Long.parseLong(id.asText()) : 0;
+                if (value > 0 && !progress.filesRead.contains(value)) progress.filesRead.add(value);
+            } catch (Exception ignored) { /* 读不出 fileId 就不算读过 */ }
+        }
         if (result.success() && result.fileChanged()) {
             if ("doc_open_file".equals(resolved) || "doc_start_stream".equals(resolved)) {
                 try { progress.activeFileId = Long.parseLong(new com.fasterxml.jackson.databind.ObjectMapper()

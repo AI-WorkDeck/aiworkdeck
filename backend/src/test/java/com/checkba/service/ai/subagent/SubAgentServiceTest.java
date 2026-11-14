@@ -236,6 +236,23 @@ class SubAgentServiceTest {
     }
 
     @Test
+    @DisplayName("W6：读文件工具成功读过的 fileId 记入 filesRead（去重）；检索类工具不算读过底稿")
+    void filesReadRecordsSuccessfulFileReads() {
+        when(model.generate(anyList(), anyList())).thenReturn(
+                toolCallTurn("read_document", "{\"fileId\":55}"),
+                toolCallTurn("search_web", "{\"query\":\"贷款\"}"),
+                toolCallTurn("read_document", "{\"fileId\":\"58\"}"),
+                toolCallTurn("read_document", "{\"fileId\":55}"),
+                textTurn("逐项核对完成"));
+
+        SubAgentResult result = newService().dispatch("核验", "清单",
+                List.of("read_document", "search_web"), PARENT_CTX);
+
+        assertTrue(result.success(), result.toJson());
+        assertEquals(List.of(55L, 58L), result.filesRead());
+    }
+
+    @Test
     @DisplayName("身份继承（不变式 3）：子 Agent 工具调用的 ToolContext 与主会话一致 + 进度事件成对发送")
     void identityInheritedFromParentContext() {
         when(model.generate(anyList(), anyList())).thenReturn(

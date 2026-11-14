@@ -23,18 +23,24 @@ public record SubAgentResult(
         String error,
         List<String> toolsUsed,
         int rounds,
-        List<FileChange> fileChanges
+        List<FileChange> fileChanges,
+        List<Long> filesRead
 ) {
 
     public record FileChange(Long fileId, String changeType) {}
 
     public SubAgentResult(String subtaskId, boolean success, String result, String error,
                           List<String> toolsUsed, int rounds) {
-        this(subtaskId, success, result, error, toolsUsed, rounds, List.of());
+        this(subtaskId, success, result, error, toolsUsed, rounds, List.of(), List.of());
     }
 
     public SubAgentResult withFileChanges(List<FileChange> changes) {
-        return new SubAgentResult(subtaskId, success, result, error, toolsUsed, rounds, List.copyOf(changes));
+        return new SubAgentResult(subtaskId, success, result, error, toolsUsed, rounds, List.copyOf(changes), filesRead);
+    }
+
+    /** 子 Agent 用读文件工具（extract_file_text / read_document）实际读过的文件 ID——收尾核验据此校验「有依据」的来源。 */
+    public SubAgentResult withFilesRead(List<Long> ids) {
+        return new SubAgentResult(subtaskId, success, result, error, toolsUsed, rounds, fileChanges, List.copyOf(ids));
     }
 
     public static SubAgentResult success(String subtaskId, String result, List<String> toolsUsed, int rounds) {

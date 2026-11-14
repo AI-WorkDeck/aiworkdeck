@@ -186,6 +186,66 @@ final class OpinionCompletionCheck {
      * 核验员一次工具都没调就交卷 = 没查过任何底稿，不可能给出有据结论；它的「待核实」只是没读的结果。
      * 按核验失败处理（卡片显示未完成、接回主助手时如实说明），不把这种输出当成 N 项待核实的发现。
      */
+    // 整句判定为「有依据」的那一行（与 VerificationHarness 计数口径一致：只认整句判定，不认槽判定）
+    private static final java.util.regex.Pattern SENTENCE_SUPPORTED = java.util.regex.Pattern.compile(
+            "((?:整句判定|sentence\\s+verdict)[：:\\s]*[「\"'【]?\\s*)(有依据|supported\\b)",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+    private static final java.util.regex.Pattern CITED_ID = java.util.regex.Pattern.compile(
+            "(?:fileId|file\\s*id|文件\\s*ID|\\bID)\\s*[=:：]?\\s*(\\d+)|[（(](\\d{1,9})[）)]",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 收尾核验结果的服务端校验（W6）：
+     * <ul>
+     *   <li>一次工具都没调 → 核验失败（见 {@link #requireConsultation}）；</li>
+     *   <li>每条整句判定「有依据」的命题，必须引用至少一份核验员<b>经读文件工具实际读过</b>的底稿
+     *       （按文件 ID，或按清单里的文件名对上 ID）；只引当前稿段号、引没读过的文件、什么都不引的，
+     *       一律改判「待核实」并注明原因——随手调一次工具再编结论过不了这一关。</li>
+     * </ul>
+     */
+    static com.checkba.service.ai.subagent.SubAgentResult validateVerifierResult(
+            com.checkba.service.ai.subagent.SubAgentResult result, List<ManifestEntry> manifest) {
+        result = requireConsultation(result);
+        if (result == null || !result.success() || result.result() == null) {
+            return result;
+        }
+        java.util.Set<Long> read = new java.util.HashSet<>(result.filesRead() == null ? List.of() : result.filesRead());
+        String[] blocks = result.result().split("\n(?=\\s*(?:\\d+[.、)|]|【命题|命题\\s*\\d+|Item\\s+\\d+))");
+        StringBuilder out = new StringBuilder();
+        int downgraded = 0;
+        for (int b = 0; b < blocks.length; b++) {
+            String block = blocks[b];
+            if (SENTENCE_SUPPORTED.matcher(block).find() && !citesReadSource(block, read, manifest)) {
+                block = SENTENCE_SUPPORTED.matcher(block).replaceAll("$1" + LangText.of("待核实（服务端校验：所引来源未经核验员实际读取）",
+                        "unverified (server check: the cited source was not actually read by the verifier)"));
+                downgraded++;
+            }
+            if (b > 0) out.append('\n');
+            out.append(block);
+        }
+        if (downgraded == 0) {
+            return result;
+        }
+        return new com.checkba.service.ai.subagent.SubAgentResult(result.subtaskId(), true, out.toString(), null,
+                result.toolsUsed(), result.rounds(), result.fileChanges(), result.filesRead());
+    }
+
+    private static boolean citesReadSource(String block, java.util.Set<Long> read, List<ManifestEntry> manifest) {
+        if (read.isEmpty()) return false;
+        java.util.regex.Matcher m = CITED_ID.matcher(block);
+        while (m.find()) {
+            String id = m.group(1) != null ? m.group(1) : m.group(2);
+            try { if (read.contains(Long.parseLong(id))) return true; } catch (NumberFormatException ignored) { }
+        }
+        if (manifest != null) {
+            for (ManifestEntry entry : manifest) {
+                String name = entry.name();
+                if (read.contains(entry.id()) && name != null && name.length() >= 2 && block.contains(name)) return true;
+            }
+        }
+        return false;
+    }
+
     static com.checkba.service.ai.subagent.SubAgentResult requireConsultation(
             com.checkba.service.ai.subagent.SubAgentResult result) {
         if (result == null || !result.success() || (result.toolsUsed() != null && !result.toolsUsed().isEmpty())) {

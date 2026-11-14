@@ -4559,14 +4559,14 @@ public class AgentOrchestrator {
                                             + "re-read the draft and check it against the source materials yourself."),
                             List.of(), 0);
                 } else {
-                    outcome = OpinionCompletionCheck.requireConsultation(subAgentService.dispatch(
+                    outcome = OpinionCompletionCheck.validateVerifierResult(subAgentService.dispatch(
                             OpinionCompletionCheck.verificationTask(guard.opinionTargetFileId,
                                     guard.opinionTargetFileName, guard.opinionInstructions, manifest, draft),
                             OpinionCompletionCheck.expectedOutput(),
                             OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
                             // 核验员模型（W6）：默认本轮主模型——flash 档辅助模型在收尾核验里编造过不存在的来源文件；
                             // ai.verifierModel 可改成 subagent（子 Agent 模型）或显式中档模型
-                            auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId));
+                            auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId), manifest);
                 }
             }
         } catch (Exception e) {

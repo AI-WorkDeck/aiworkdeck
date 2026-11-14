@@ -233,6 +233,7 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
 ## 澄清回答续轮（dev-board#1116）
 
 W6（2026-11-14）：核验员曾编造不存在的来源文件（「股权关系说明.docx」「验资报告摘要.pdf」）。现在 ①任务附项目真实文件清单（`ProjectFileService.listRelativePaths`，ID + 相对路径，清单外即不存在）；②核验输出里的文件名/ID 按清单校验（`OpinionCompletionCheck.unknownSources`，后缀匹配防误报），不存在的在接回消息与过程卡前置「[系统校验]」，要求主助手视依赖发现为无效、不得据此修改/寻找/新建；③核验员改用本轮主模型（`SubAgentService.dispatch` 第 5 参 modelOverride，其余调用方不变）；④删掉无从满足的「LOWA 回执 sourceFileId 等于目标」要求——没有任何工具回该字段，核验员永远确认不了目标；编排器派发前已校验目标即活跃文档。回归同在 `AgentOrchestratorOpinionCompletionCheckTest`。
+W6 后续（2026-11-14，#1595）：staging 卡片「有据 0 / 待核 24」——核验员一轮就交卷、**一次工具都没调**（本地复现：`[SubAgent] … tools offered=6 used=[]`，doc_get_document_text 明明在），编的命题被正则计成 24 项待核。现在 ①派发前服务端经编辑器桥读当前稿（与 doc_get_document_text 同源、最终文本、分页 ≤4 万字、带【段号】），附进核验任务，读不出就不派付费核验、如实接回；②`OpinionCompletionCheck.validateVerifierResult`：一次工具都没调 → 核验失败（卡片 UNVERIFIED）；每条整句判定「有依据」须引用核验员**经读文件工具实际读过**的底稿（`SubAgentResult.filesRead`，来自 extract_file_text/read_document 的 fileId；按 ID 或清单文件名对上），否则改判「待核实」并注明——只引当前稿段号或随手调一次工具再编结论都过不了；③`SubAgentService` 记每轮工具请求、越权拒绝、收尾时轮数/可用/实用工具与答案形状。地雷：qwen3.8-max 在子 Agent 里会不调工具直接作答（原因待下次 staging 日志定位）。回归：`OpinionVerifierGroundingTest`、`AgentOrchestratorOpinionCompletionCheckTest`（+3）、`SubAgentServiceTest.filesReadRecordsSuccessfulFileReads`。
 
 `ask_user` 停机时，原请求范围（含依序插话）、自动技能与原目标身份写入既有 inbox 的 `requestJson` 服务端元数据；回答凭 questionId、会话、项目、用户匹配原快照，不接受客户端自报原授权。成功匹配原文档才消费快照，跨后端重启可恢复，同问题重复回答不再继承旧范围，新无关任务使旧问题失效。回答仍是新 run，步数与收尾补检次数按新 run 有界；核验目标保持原文件，回答文字按序加入范围。
 
