@@ -30,6 +30,7 @@ public class LawFirmWorkflowService {
     private final MessageCenterService notices;
     private final EntityManager entities;
     private final PlatformTransactionManager transactionManager;
+    private final LawFirmCloudClientService cloudClients;
     public static final Set<String> ACTIONS=Set.of("workflowOverview","workflowLookup","workflowAppoint","workflowAppointmentDecision",
             "workflowSubmit","workflowDetail","workflowClearance","workflowReview");
 
@@ -157,12 +158,18 @@ public class LawFirmWorkflowService {
         List<LawFirmWorkflow> previous=workflows.findByFirmIdOrderByCreatedAtDesc(me.firmId());
         var draft=projection(null,title,client,counter,practice,lead,me.userId());
         List<LawFirmMatterIntake> corpus=previous.stream().map(w -> projection(w,w.getTitle(),w.getClientName(),w.getCounterpartyName(),w.getPracticeArea(),w.getLeadId(),w.getApplicantId())).toList();
-        var check=engine.evaluateConflict(draft,corpus,List.of(),Map.of());
+        // 律所开启了「客户管理」云端功能：一并检索全所客户与关联主体（含多层股权、实控人、配偶等关系）。
+        // 命中只把关系链写进被征询律师本人的私密摘要，申请人看到的仍只是核查事项。
+        if(cloudClients.enabledFor(me.firmId()) && p.get("clientPartyId") instanceof Number partyId) draft.setClientId(partyId.longValue());
+        var check=cloudClients.enabledFor(me.firmId())
+                ?engine.evaluateConflict(draft,corpus,List.of(),Map.of(),cloudClients.graphForFirm(me.firmId()))
+                :engine.evaluateConflict(draft,corpus,List.of(),Map.of());
         for(var hit:check.getHits()) if(hit.getHandlerUserId()!=null) {
             Long target=hit.getHandlerUserId();authority.requireMember(me.userId(),target);
             String rule=Objects.toString(hit.getRuleTitle(),"");
             requested.merge(target,"系统发现该律师承办案件存在关联；核查事项："+rule,(a,b)->clip(a+"\n"+b,4000));
-            String detail="本人关联案件："+Objects.toString(hit.getMatchedMatterTitle(),"")+"；命中主体："+Objects.toString(hit.getMatchedPartyName(),"")+"；核查事项："+rule;
+            String detail="本人关联案件："+Objects.toString(hit.getMatchedMatterTitle(),"")+"；命中主体："+Objects.toString(hit.getMatchedPartyName(),"")+"；核查事项："+rule
+                    +(hit.getRelationPath()==null?"":"；关系链："+hit.getRelationPath());
             privateDetails.merge(target,clip(detail,4000),(a,b)->clip(a+"\n"+b,4000));
         }
         if(requested.size()>20) throw new IllegalArgumentException(LangText.of("关联律师超过20位，请先由律所管理员分批核查", "More than 20 related lawyers found; please have the firm administrator review in batches"));

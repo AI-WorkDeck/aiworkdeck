@@ -63,7 +63,8 @@ import java.util.stream.Collectors;
 public class LawFirmClientService {
 
     public static final Set<String> ACTIONS = Set.of(
-            "listClients", "getClient", "saveClient", "logClientContact", "searchParties", "saveRelation", "deleteRelation");
+            "listClients", "getClient", "saveClient", "logClientContact", "searchParties", "saveRelation", "deleteRelation",
+            "uploadClientsToCloud", "withdrawClientsFromCloud");
 
     static final Set<String> ACTIVE_STATUSES = Set.of(
             "CONFLICT_CHECKING", "PENDING_LAWYER_CLEARANCE", "PENDING_COMMITTEE_REVIEW", "APPROVED_FILED");
@@ -85,6 +86,7 @@ public class LawFirmClientService {
     private final LawFirmAccessPolicy access;
     private final LawFirmConflictEngine conflictEngine;
     private final ObjectMapper objectMapper;
+    private final org.springframework.beans.factory.ObjectProvider<LawFirmCloudCaller> cloudCaller;
 
     /** 调用方已在事务内并已核本机台账。 */
     public Map<String, Object> execute(Long userId, String action, Map<String, Object> params) {
@@ -97,6 +99,8 @@ public class LawFirmClientService {
             case "searchParties" -> searchParties(userId, params);
             case "saveRelation" -> saveRelation(userId, params);
             case "deleteRelation" -> deleteRelation(userId, params);
+            case "uploadClientsToCloud" -> uploadToCloud(userId, params);
+            case "withdrawClientsFromCloud" -> withdrawFromCloud(userId);
             default -> throw new IllegalArgumentException(LangText.of("不支持的客户操作：", "Unsupported client action: ") + action);
         };
     }
@@ -547,6 +551,103 @@ public class LawFirmClientService {
         requireEditable(userId, client);
         relationRepository.delete(rel);
         return getClient(userId, Map.of("clientId", clientId));
+    }
+
+    /**
+     * 把本人可编辑的客户（或全所资格者指定的全部客户）连同其关系网中的主体与关系上传到律所云端。
+     * 只在律所管理员开启「客户管理」云端功能后可用（云端会拒绝）；只传客户档案，不传收案、收费、回款与往来记录。
+     * 云端按信用代码/全称对上已有主体，返回的对应写回本机 cloudPartyId，可重复上传。
+     */
+    Map<String, Object> uploadToCloud(Long userId, Map<String, Object> params) {
+        LawFirmCloudCaller caller = cloudCaller.getIfAvailable();
+        if (caller == null) {
+            throw new IllegalArgumentException(LangText.of("律所云端通道尚未就绪", "The law firm cloud channel is not available yet"));
+        }
+        boolean firmWide = access.canViewFirmWide(userId);
+        Set<Long> only = new LinkedHashSet<>();
+        if (params.get("clientIds") instanceof List<?> ids) for (Object o : ids) { Long v = longVal(o); if (v != null) only.add(v); }
+        List<LawFirmParty> all = partyRepository.findAllByOrderByIdAsc();
+        LawFirmPartyGraph g = graph();
+        Set<Long> include = new LinkedHashSet<>();
+        Set<Long> clientIds = new LinkedHashSet<>();
+        for (LawFirmParty c : all) {
+            if (!c.isClientParty() || (!only.isEmpty() && !only.contains(c.getId()))) continue;
+            if (!canEdit(userId, c, firmWide)) continue;
+            clientIds.add(c.getId());
+            include.add(c.getId());
+            include.addAll(networkOf(g, c.getId()));
+        }
+        if (clientIds.isEmpty()) {
+            throw new IllegalArgumentException(LangText.of("没有可上传的客户：只能上传由你维护、主办或建档的客户", "No clients to upload: you can only upload clients you own, lead or created"));
+        }
+        List<Map<String, Object>> partyRows = new ArrayList<>();
+        for (LawFirmParty x : all) {
+            if (!include.contains(x.getId())) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("localId", String.valueOf(x.getId()));
+            m.put("client", clientIds.contains(x.getId()));
+            m.put("name", x.getName());
+            m.put("creditCode", x.getCreditCode());
+            m.put("partyType", x.getPartyType());
+            if (clientIds.contains(x.getId())) {
+                m.put("industry", x.getIndustry());
+                m.put("address", x.getAddress());
+                m.put("notes", x.getNotes());
+                m.put("contacts", parseList(x.getContactsJson()));
+            }
+            partyRows.add(m);
+        }
+        List<Map<String, Object>> relRows = new ArrayList<>();
+        for (LawFirmPartyRelation r : relationRepository.findAllByOrderByIdAsc()) {
+            if (!include.contains(r.getFromPartyId()) || !include.contains(r.getToPartyId())) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("fromLocalId", String.valueOf(r.getFromPartyId()));
+            m.put("toLocalId", String.valueOf(r.getToPartyId()));
+            m.put("relationType", r.getRelationType());
+            if (r.getShareBps() != null) m.put("shareBps", r.getShareBps());
+            m.put("note", r.getNote());
+            relRows.add(m);
+        }
+        Map<String, Object> result = caller.call(userId, "clients.import", Map.of("parties", partyRows, "relations", relRows));
+        int linked = 0;
+        if (result.get("mapping") instanceof Map<?, ?> mapping) {
+            for (LawFirmParty x : all) {
+                Long cloudId = longVal(mapping.get(String.valueOf(x.getId())));
+                if (cloudId != null && !cloudId.equals(x.getCloudPartyId())) {
+                    x.setCloudPartyId(cloudId);
+                    partyRepository.save(x);
+                    linked++;
+                }
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("uploadedClients", clientIds.size());
+        out.put("uploadedParties", partyRows.size());
+        out.put("uploadedRelations", relRows.size());
+        out.put("created", result.get("created"));
+        out.put("matched", result.get("matched"));
+        out.put("linked", linked);
+        return out;
+    }
+
+    /** 从律所云端撤回本人维护的客户，并清掉本机对应的 cloudPartyId（本机档案不受影响）。 */
+    Map<String, Object> withdrawFromCloud(Long userId) {
+        LawFirmCloudCaller caller = cloudCaller.getIfAvailable();
+        if (caller == null) {
+            throw new IllegalArgumentException(LangText.of("律所云端通道尚未就绪", "The law firm cloud channel is not available yet"));
+        }
+        Map<String, Object> result = caller.call(userId, "clients.withdraw", Map.of());
+        Set<Long> removed = new java.util.HashSet<>();
+        if (result.get("removedIds") instanceof List<?> ids) for (Object o : ids) { Long v = longVal(o); if (v != null) removed.add(v); }
+        int unlinked = 0;
+        for (LawFirmParty x : partyRepository.findAllByOrderByIdAsc()) {
+            if (x.getCloudPartyId() != null && removed.contains(x.getCloudPartyId())) {
+                x.setCloudPartyId(null);
+                partyRepository.save(x);
+                unlinked++;
+            }
+        }
+        return Map.of("withdrawnClients", result.getOrDefault("withdrawnClients", 0), "unlinked", unlinked);
     }
 
     // ---- 视图 ----

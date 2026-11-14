@@ -86,6 +86,9 @@ public class LawFirmParty {
     @Column(length = 32)
     private String source;
 
+    /** 上传到律所云端后对应的云端主体 id（{@code LawFirmCloudParty}）；未上传为空。 */
+    private Long cloudPartyId;
+
     private Long createdByUserId;
     private Instant createdAt;
     private Instant updatedAt;

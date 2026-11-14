@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 @TestPropertySource(properties={"spring.datasource.url=jdbc:h2:mem:lawfirm-workflow;MODE=PostgreSQL;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
         "spring.datasource.driver-class-name=org.h2.Driver","spring.datasource.username=sa","spring.datasource.password=",
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect","spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({LawFirmWorkflowService.class,LawFirmAuthority.class,LawFirmConflictEngine.class,MessageCenterService.class,LawFirmMessageAccessPolicy.class,ObjectMapper.class})
+@Import({LawFirmWorkflowService.class,LawFirmCloudClientService.class,LawFirmAuthority.class,LawFirmConflictEngine.class,MessageCenterService.class,LawFirmMessageAccessPolicy.class,ObjectMapper.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class LawFirmWorkflowTest {
     @Autowired LawFirmWorkflowService workflow;
@@ -41,6 +41,7 @@ class LawFirmWorkflowTest {
     @Autowired UserRepository users;
     @MockBean AccountDirectoryClient directory;
     @MockBean ProjectMemberService projectPermissions;
+    @MockBean LawFirmCloudSwitches cloudSwitches;
     final Map<String,OrgMembership> membership=new ConcurrentHashMap<>();
     Long admin,applicant,lawyer,committee,outsider;
     String firm;

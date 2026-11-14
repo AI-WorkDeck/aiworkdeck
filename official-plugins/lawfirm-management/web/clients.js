@@ -11,7 +11,15 @@
   const request = (action, params = {}) => awd.call('lawfirm.request', { action, params });
 
   let locale = 'zh-CN';
-  const state = { list: null, filters: { query: '', ownerUserId: '', staleDays: '', sort: 'revenue' }, profile: null, editing: null, pickOptions: [] };
+  const state = { list: null, filters: { query: '', ownerUserId: '', staleDays: '', sort: 'revenue' }, profile: null, editing: null, pickOptions: [], mode: 'local', cloud: null };
+
+  // 本机台账与律所云端用同一套界面，只是动作名与 id 参数不同（云端改动须带读取时的版本号）
+  const ACT = {
+    local: { list: 'listClients', get: 'getClient', save: 'saveClient', saveRelation: 'saveRelation', deleteRelation: 'deleteRelation', searchParties: 'searchParties', idKey: 'clientId' },
+    cloud: { list: 'clients.list', get: 'clients.get', save: 'clients.save', saveRelation: 'clients.saveRelation', deleteRelation: 'clients.deleteRelation', searchParties: 'clients.searchParties', idKey: 'partyId' }
+  };
+  const act = () => ACT[state.mode];
+  const cloudOn = () => Boolean(state.cloud && state.cloud.switches && state.cloud.switches.clients);
 
   function t(key, vars) {
     let s = TABLE[locale]?.[key] ?? TABLE['en-US']?.[key] ?? TABLE['zh-CN']?.[key] ?? key;
@@ -99,8 +107,18 @@
 
   // ---- 列表（管理视图） ----
 
+  async function loadCloudStatus() {
+    // 律所云端开关由共享的「律所云端」设置管理；拿不到（未连接账户、旧宿主）就当未开启，不打扰本机使用
+    try { state.cloud = await request('cloud.settings.get', {}); } catch { state.cloud = null; }
+    if (!cloudOn()) state.mode = 'local';
+  }
+
   async function loadList() {
     const f = state.filters;
+    if (state.mode === 'cloud') {
+      state.list = await request(act().list, { query: f.query });
+      return;
+    }
     state.list = await request('listClients', {
       query: f.query, ownerUserId: f.ownerUserId || undefined, staleDays: f.staleDays || undefined, sort: f.sort
     });
@@ -108,9 +126,68 @@
     if (badge) badge.textContent = String(state.list?.totals?.clientCount ?? 0);
   }
 
+  function cloudBar() {
+    if (!state.cloud) return null;
+    if (!cloudOn()) {
+      const open = $('tab-cloud') ? el('button', { type: 'button', onclick: () => $('tab-cloud').click() }, t('client.cloud.openSettings')) : null;
+      return el('div', { class: 'client-cloud-bar', id: 'client-cloud-bar' }, el('span', { class: 'hint' }, t('client.cloud.off')), open);
+    }
+    const modeBtn = (m) => el('button', { type: 'button', id: 'client-mode-' + m, class: state.mode === m ? 'primary' : '',
+      onclick: () => { if (state.mode === m) return; state.mode = m; state.profile = null; run(null, async () => { await loadList(); renderList(); }); } }, t('client.cloud.mode.' + m));
+    const upload = el('button', { type: 'button', id: 'client-upload' }, t('client.cloud.upload'));
+    upload.addEventListener('click', () => run(upload, async () => {
+      const r = await request('uploadClientsToCloud', {});
+      status(t('client.cloud.uploaded', { clients: r.uploadedClients ?? 0, created: r.created ?? 0, matched: r.matched ?? 0 }));
+      if (state.mode === 'cloud') { await loadList(); renderList(); status(t('client.cloud.uploaded', { clients: r.uploadedClients ?? 0, created: r.created ?? 0, matched: r.matched ?? 0 })); }
+    }));
+    const confirmRow = el('div', { class: 'client-confirm', id: 'client-cloud-confirm', hidden: true });
+    // 删除类操作先在页面上展示后果，再点「确认」才执行（插件沙箱里不依赖系统弹窗）
+    const askThen = (warning, action, done) => {
+      const ok = el('button', { type: 'button', id: 'client-cloud-confirm-ok', class: 'danger' }, t('client.cloud.confirm'));
+      const cancel = el('button', { type: 'button', id: 'client-cloud-confirm-cancel', onclick: () => { confirmRow.hidden = true; } }, t('client.cloud.cancel'));
+      ok.addEventListener('click', () => run(ok, async () => {
+        const r = await action();
+        confirmRow.hidden = true;
+        if (state.mode === 'cloud') { await loadList(); renderList(); }
+        status(done(r));
+      }));
+      confirmRow.replaceChildren(el('p', {}, warning), ok, cancel);
+      confirmRow.hidden = false;
+    };
+    const withdraw = el('button', { type: 'button', id: 'client-withdraw', onclick: () => askThen(t('client.cloud.withdrawConfirm'),
+      () => request('withdrawClientsFromCloud', {}), (r) => t('client.cloud.withdrawn', { clients: r.withdrawnClients ?? 0 })) }, t('client.cloud.withdraw'));
+    const purge = state.cloud.firmAdmin ? el('button', { type: 'button', id: 'client-purge', class: 'danger', onclick: () => askThen(t('client.cloud.purgeConfirm'),
+      () => request('clients.purge', { confirm: true }), (r) => t('client.cloud.purged', { clients: r.deletedClients ?? 0 })) }, t('client.cloud.purge')) : null;
+    return el('div', {},
+      el('div', { class: 'client-cloud-bar', id: 'client-cloud-bar' },
+        el('span', { class: 'hint' }, t('client.cloud.on')), modeBtn('local'), modeBtn('cloud'), upload, withdraw, purge,
+        el('span', { class: 'hint' }, t('client.cloud.uploadHint'))),
+      confirmRow);
+  }
+
+  function renderCloudList(root) {
+    const f = state.filters;
+    const search = el('input', { type: 'search', id: 'clients-search', value: f.query, placeholder: t('client.list.search'), 'aria-label': t('client.list.search') });
+    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(null, async () => { state.filters.query = search.value.trim(); await loadList(); renderList(); }); });
+    const rows = (state.list?.clients || []).map((c) => el('tr', { class: 'client-row', 'data-client-id': c.id, tabindex: '0', onclick: () => openProfile(c.id), onkeydown: (e) => { if (e.key === 'Enter') openProfile(c.id); } },
+      el('td', {}, el('strong', {}, c.name), el('div', { class: 'hint' }, c.clientNo || '')),
+      el('td', {}, c.ownerName || t('client.none')),
+      el('td', {}, c.partnerName || t('client.none')),
+      el('td', {}, el('span', { class: c.restricted ? 'badge badge-neutral' : 'badge badge-green' }, t(c.restricted ? 'client.cloud.scope.limited' : 'client.cloud.scope.full')))));
+    root.replaceChildren(
+      cloudBar(),
+      card(t('client.list.title'), t('client.cloud.listHint'),
+        el('div', { class: 'client-toolbar' }, search,
+          el('button', { type: 'button', id: 'client-new', class: 'primary', onclick: () => openEditor(null) }, t('client.list.new'))),
+        rows.length ? table([t('client.col.client'), t('client.field.owner'), t('client.field.partner'), t('client.cloud.col.scope')], rows)
+          : el('p', { class: 'hint' }, t('client.list.empty'))),
+      el('div', { id: 'clients-status', role: 'status', 'aria-live': 'polite' }));
+  }
+
   function renderList() {
     const root = $('clients-root');
     if (!root) return;
+    if (state.mode === 'cloud') { renderCloudList(root); return; }
     const data = state.list || { clients: [], totals: {}, users: [] };
     const tot = data.totals || {};
     const f = state.filters;
@@ -140,6 +217,7 @@
       el('td', {}, el('span', { class: staleClass(c.lastInteractionDays) }, lastInteraction(c)))));
 
     root.replaceChildren(
+      cloudBar(),
       el('div', { class: 'kpi-grid' },
         kpi(t('client.kpi.clients'), String(tot.clientCount ?? 0), data.restricted ? t('client.kpi.restricted') : t('client.kpi.firm')),
         kpi(t('client.kpi.activeMatters'), String(tot.activeMatterCount ?? 0)),
@@ -158,7 +236,7 @@
 
   async function openProfile(clientId) {
     await run(null, async () => {
-      const res = await request('getClient', { clientId });
+      const res = await request(act().get, { [act().idKey]: clientId });
       state.profile = res.client;
       state.editing = null;
       renderProfile();
@@ -186,6 +264,19 @@
       c.address ? `${t('client.field.address')}：${c.address}` : null
     ].filter(Boolean).join(' · ');
 
+    const head = el('div', { class: 'client-head' },
+        el('button', { type: 'button', id: 'client-back', onclick: back }, t('client.back')),
+        el('div', { class: 'client-title' }, el('h2', {}, c.name), el('span', { class: 'hint' }, c.clientNo || '')),
+        c.canEdit ? el('button', { type: 'button', id: 'client-edit', onclick: () => openEditor(c) }, t('client.edit')) : null);
+    if (state.mode === 'cloud') {
+      // 律所云端只放客户档案：没有收案、收费与往来；非维护人只看到名称与维护人
+      root.replaceChildren(head,
+        el('p', {}, `${t('client.field.owner')}：${c.ownerName || t('client.none')}　${t('client.field.partner')}：${c.partnerName || t('client.none')}`),
+        el('div', { id: 'clients-status', role: 'status', 'aria-live': 'polite' }),
+        ...(c.restricted ? [el('p', { class: 'client-restricted', id: 'client-restricted' }, t('client.cloud.restricted'))]
+          : [el('p', { class: 'hint' }, facts), contactsSection(c), relationsSection(c)]));
+      return;
+    }
     root.replaceChildren(
       el('div', { class: 'client-head' },
         el('button', { type: 'button', id: 'client-back', onclick: back }, t('client.back')),
@@ -231,7 +322,7 @@
       el('td', {}, el('strong', {}, r.partyName), r.partyIsClient ? el('span', { class: 'badge badge-neutral' }, t('client.rel.isClient')) : null),
       el('td', {}, r.description),
       el('td', {}, c.canEdit ? el('button', { type: 'button', class: 'danger', onclick: (e) => run(e.currentTarget, async () => {
-        const res = await request('deleteRelation', { clientId: c.id, relationId: r.id });
+        const res = await request(act().deleteRelation, { clientId: c.id, relationId: r.id, expectedVersion: r.version });
         state.profile = res.client;
         renderProfile();
         status(t('client.rel.deleted'));
@@ -277,7 +368,7 @@
     party.addEventListener('input', () => {
       const q = party.value.trim();
       if (q.length < 1) return;
-      request('searchParties', { query: q }).then((res) => {
+      request(act().searchParties, { query: q }).then((res) => {
         options = (res?.parties || []).filter((p) => String(p.id) !== subject.value);
         datalist.replaceChildren(...options.map((p) => el('option', { value: p.name }, p.client ? `${p.clientNo || ''} ${t('client.rel.isClient')}` : (p.creditCode || ''))));
       }).catch(() => {});
@@ -288,7 +379,7 @@
       const name = party.value.trim();
       if (!name) throw new Error(t('client.rel.needParty'));
       const picked = options.find((p) => p.name === name);
-      const res = await request('saveRelation', {
+      const res = await request(act().saveRelation, {
         clientId: c.id, subjectPartyId: Number(subject.value), relationType, direction: direction === 'BOTH' ? 'OUT' : direction,
         partyId: picked ? picked.id : undefined, partyName: picked ? undefined : name,
         partyCreditCode: picked ? undefined : code.value.trim(), partyType: ptype.value,
@@ -385,11 +476,14 @@
       if (!name) throw new Error(t('client.err.needName'));
       const contacts = [...contactRows.querySelectorAll('.client-contact-row')].map((row) => Object.fromEntries(
         [...row.querySelectorAll('input')].map((i) => [i.dataset.f, i.value.trim()]))).filter((p) => p.name);
-      const res = await request('saveClient', {
-        clientId: v.id, name, creditCode: $('client-f-code').value.trim(), partyType: $('client-f-type').value,
-        industry: $('client-f-industry').value.trim(), address: $('client-f-address').value.trim(), notes: $('client-f-notes').value.trim(),
-        ownerUserId: $('client-f-owner').value || undefined, partnerUserId: $('client-f-partner').value || undefined, contacts
-      });
+      const fields = {
+        name, creditCode: $('client-f-code').value.trim(), partyType: $('client-f-type').value,
+        industry: $('client-f-industry').value.trim(), address: $('client-f-address').value.trim(), notes: $('client-f-notes').value.trim(), contacts
+      };
+      // 云端：带读取时的版本号；维护人与主办合伙人是云端账户，这里不改
+      const res = state.mode === 'cloud'
+        ? await request(act().save, { ...fields, partyId: v.id, expectedVersion: v.id ? v.version : undefined })
+        : await request('saveClient', { ...fields, clientId: v.id, ownerUserId: $('client-f-owner').value || undefined, partnerUserId: $('client-f-partner').value || undefined });
       state.profile = res.client;
       state.editing = null;
       renderProfile();
@@ -403,8 +497,8 @@
         el('label', {}, el('span', {}, t('client.field.type')), el('select', { id: 'client-f-type' },
           ['ORGANIZATION', 'INDIVIDUAL'].map((ty) => el('option', { value: ty, selected: ty === (v.partyType || 'ORGANIZATION') }, t('client.type.' + ty))))),
         input('client-f-industry', t('client.field.industry'), v.industry, { maxlength: 128 }),
-        userSelect('client-f-owner', t('client.field.owner'), v.ownerUserId),
-        userSelect('client-f-partner', t('client.field.partner'), v.partnerUserId),
+        state.mode === 'cloud' ? null : userSelect('client-f-owner', t('client.field.owner'), v.ownerUserId),
+        state.mode === 'cloud' ? null : userSelect('client-f-partner', t('client.field.partner'), v.partnerUserId),
         el('label', { class: 'field-span-2' }, el('span', {}, t('client.field.address')), el('input', { id: 'client-f-address', type: 'text', value: v.address || '', maxlength: 512 })),
         el('label', { class: 'field-span-2' }, el('span', {}, t('client.field.notes')), el('textarea', { id: 'client-f-notes', rows: 3, maxlength: 4000 }, v.notes || ''))),
       el('h3', {}, t('client.contacts.title')),
@@ -477,6 +571,31 @@
     if (tab && tab.getAttribute('aria-selected') === 'true') $('tab-intake')?.click();
   }
 
+  // 律所云端开着时，收案「实时利冲预检」顺带检索全所客户与关联主体（只指向客户档案，不涉及他人案件名称）
+  function setupCloudPrecheck() {
+    const btn = $('btn-preview-conflict');
+    const anchor = $('conflict-preview-card');
+    if (!btn || !anchor || $('cloud-conflict-card')) return;
+    const box = el('div', { id: 'cloud-conflict-card', class: 'preview-box', hidden: true });
+    anchor.after(box);
+    btn.addEventListener('click', () => {
+      if (!cloudOn()) { box.hidden = true; return; }
+      const v = (id) => ($(id)?.value || '').trim();
+      request('clients.conflictSearch', {
+        clientName: v('intake-client-name'), clientCreditCode: v('intake-client-code'),
+        counterpartyName: v('intake-counterparty-name'), counterpartyCreditCode: v('intake-counterparty-code')
+      }).then((res) => {
+        const hits = res?.hits || [];
+        box.replaceChildren(el('strong', {}, t('client.cloud.conflictTitle')),
+          hits.length ? el('ul', { class: 'hit-list' }, hits.map((h) => el('li', {},
+            `${h.ruleTitle} · ${t('client.cloud.conflictHit', { client: h.clientName || '', no: h.clientNo || '', owner: h.ownerName || t('client.none') })}`
+            + (h.relationPath ? ` · ${t('client.conflict.pathLabel')}${h.relationPath}` : ''))))
+            : el('p', { class: 'hint' }, t('client.cloud.conflictClear')));
+        box.hidden = false;
+      }).catch((err) => { box.replaceChildren(el('p', { class: 'hint' }, errorText(err))); box.hidden = false; });
+    });
+  }
+
   async function init(ctx) {
     locale = pickLocale(ctx?.language || ctx?.locale);
     for (const n of document.querySelectorAll('[data-c]')) n.textContent = t(n.dataset.c);
@@ -496,6 +615,8 @@
         run(null, async () => { await loadList(); renderList(); });
       });
     }
+    await loadCloudStatus();
+    setupCloudPrecheck();
     const fillPicker = setupIntakePicker();
     renderList();
     state.pickOptions = [...(state.list?.clients || [])].sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-CN'));
