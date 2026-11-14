@@ -43,6 +43,30 @@ jobs:
         working-directory: frontend
         run: npm run check:locales
 
+  revert-guard:
+    name: Revert guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 200
+      - name: Fetch base branch history
+        run: git fetch --no-tags --depth=200 origin "$BASE_REF"
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+      # A PR must not silently undo recent master commits (stale-base squash, #1595).
+      # Intentional reverts: put "revert-guard: allow <sha>" in the PR description.
+      - name: Fail if the PR reverts recent base commits
+        run: scripts/ci/revert-guard.sh "origin/$BASE_REF" "$HEAD_SHA"
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+      - name: Test revert guard
+        run: node --test scripts/tests/revert-guard.test.mjs
+
   backend:
     # Keep the required check identity; verify also exercises the packaged contract.
     name: Backend (mvn test)
