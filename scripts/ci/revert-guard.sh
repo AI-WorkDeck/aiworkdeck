@@ -8,6 +8,8 @@
 # of the last N first-parent base commits touching it, and differs from base tip.
 # This also covers deleting a file that such a commit added.
 # Intentional reverts: put "revert-guard: allow <sha>" in the PR body.
+# Hashed plugin build output (official-plugins/*/web/assets) is skipped: a rebuild
+# legitimately deletes the previous hashed file.
 set -euo pipefail
 
 BASE=${1:?base rev}
@@ -36,7 +38,7 @@ while IFS= read -r f; do
     flagged+=("${commits[$i]}")
     reports+=("${commits[$i]} $f$note")
   done
-done < <(git diff --no-renames --name-only "$BASE...$HEAD")
+done < <(git diff --no-renames --name-only "$BASE...$HEAD" -- . ':(exclude,glob)official-plugins/*/web/assets/**')
 
 [ ${#flagged[@]} -eq 0 ] && { echo "revert-guard: ok"; exit 0; }
 
