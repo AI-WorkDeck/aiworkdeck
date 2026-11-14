@@ -327,7 +327,7 @@ function paragraphNumberingOf(paragraph) {
 // (2) 索引绑定 xModel 引用，换文档（load_document / 测试探针直接换 xModel）自然
 // 重建；(3) 写原语末尾的 verifySnapshot 再补一刀。段落被删后旧对象会抛异常，
 // withParaIndex 捕到就重建一次再读，仍失败才冒泡。
-const paraIndex = { model: null, ranges: null, total: 0 };
+const paraIndex = { model: null, ranges: null, total: 0, revision: -1, viewKey: '' };
 // 补全只保留一个内存快照；不把临时候选变成存进 docx 的书签。
 let completionSnapshot = null;
 let completionSeq = 0;
@@ -341,20 +341,73 @@ function currentReviewRevision() {
   if (reviewModel !== xModel) { reviewModel = xModel; reviewRevision++; }
   return reviewRevision;
 }
+// ---- 段落索引的内存（R-086 浸泡）------------------------------------------------
+// 引擎堆固定 1 GB、不能扩，而每次重建索引都要逐段 nextElement 造新代理：LibreOffice 侧每段
+// 约 0.9 KB 收不回来（释放代理也收不回，重装文档也收不回，只有换引擎），zetajs 侧的代理又
+// 只在 V8 GC 时才释放，这个 worker 的 JS 堆小到几乎不触发 GC。150 页合同在可见标签上每轮
+// 自动保存重建两次（宿主的 __agent 读会切修订视图再切回，每次切都清索引），约 30 轮就 OOM，
+// 之后每次保存都失败。所以：
+//   1. 只有正文真改了（reviewRevision 前进）才重建；纯视图切换把当前索引按视图存起来，
+//      切回同一视图、正文没变就原样拿回，不再枚举；
+//   2. 换下来的旧索引在没有命令在途时显式释放（命令可能还拿着自己改之前取到的段落对象，
+//      所以不能在失效那一刻就放）。
+let retiredParaRanges = [];
+const parkedParaIndexes = new Map(); // viewKey -> { model, revision, ranges }
+function paraViewKey() {
+  return String(readShowChanges()) + '|' + String(readShowChangesInMargin()) + '|' + (balloonModel === xModel);
+}
+function retireRanges(ranges) { if (ranges) retiredParaRanges.push(ranges); }
+function retireParkedParaIndexes() {
+  for (const parked of parkedParaIndexes.values()) retireRanges(parked.ranges);
+  parkedParaIndexes.clear();
+}
+function releaseRetiredParaRanges() {
+  if (!retiredParaRanges.length || !zetajs || typeof zetajs.release !== 'function') return;
+  const lists = retiredParaRanges;
+  retiredParaRanges = [];
+  for (const list of lists) for (const el of list) { try { zetajs.release(el); } catch (e) { /* already gone */ } }
+}
 function invalidateParaIndex() {
+  const viewOnly = exportInFlight || viewChangeInFlight;
+  if (viewOnly && paraIndex.ranges && paraIndex.model === xModel && paraIndex.revision === reviewRevision) {
+    const key = paraIndex.viewKey;
+    retireRanges(parkedParaIndexes.has(key) ? parkedParaIndexes.get(key).ranges : null);
+    parkedParaIndexes.set(key, { model: xModel, revision: reviewRevision, ranges: paraIndex.ranges });
+  } else {
+    retireRanges(paraIndex.ranges);
+  }
   paraIndex.ranges = null; paraIndex.total = 0; paraIndex.model = null;
   // 导出同步切换修订显示并恢复 modified 标志，会触发只读的缓存失效；
   // 此窗口不可能插入人工编辑，补全令牌保留，接受时仍完整核对模型/位置/原文。
-  if (!exportInFlight && !viewChangeInFlight) { completionSnapshot = null; reviewRevision++; }
+  if (!viewOnly) { completionSnapshot = null; reviewRevision++; retireParkedParaIndexes(); }
 }
 function buildParaIndex() {
-  const ranges = [];
-  const en = xModel.getText().createEnumeration();
+  retireRanges(paraIndex.ranges); // a different model's index is replaced without invalidateParaIndex
+  paraIndex.ranges = null;
+  const key = paraViewKey();
+  const parked = parkedParaIndexes.get(key);
+  if (parked) {
+    parkedParaIndexes.delete(key);
+    if (parked.model === xModel && parked.revision === reviewRevision) {
+      paraIndex.ranges = parked.ranges; paraIndex.total = parked.ranges.length; paraIndex.model = xModel;
+      paraIndex.revision = reviewRevision; paraIndex.viewKey = key;
+      return paraIndex;
+    }
+    retireRanges(parked.ranges);
+  }
+  for (const [k, p] of parkedParaIndexes) if (p.model !== xModel) { retireRanges(p.ranges); parkedParaIndexes.delete(k); }
+  const ranges = [], owned = [];
+  const text = xModel.getText();
+  const en = text.createEnumeration();
+  owned.push(text, en);
   while (en.hasMoreElements()) {
     const el = en.nextElement();
     if (el.supportsService && el.supportsService('com.sun.star.text.Paragraph')) ranges.push(el);
+    else owned.push(el); // tables etc. are not indexed
   }
+  retiredParaRanges.push(owned);
   paraIndex.ranges = ranges; paraIndex.total = ranges.length; paraIndex.model = xModel;
+  paraIndex.revision = reviewRevision; paraIndex.viewKey = key;
   return paraIndex;
 }
 function getParaIndex() { return (paraIndex.ranges && paraIndex.model === xModel) ? paraIndex : buildParaIndex(); }
@@ -10136,6 +10189,69 @@ const EXEC = {
     return { success: true, sheet: sheet, address: colLetterOf(col) + (row + 1) };
   },
   // [溯源光标条] 演示文稿里的「当前这一页」（1 基，与 slide_goto 同口径）。
+  // ---- 引擎换新（R-086）：堆高水位与视图位置 ----------------------------------
+  // 引擎堆固定 1 GB，LibreOffice 原生侧有收不回的小泄漏（逐段枚举约 0.9 KB/段、每次装载约 22 MB），
+  // 只有换一台新引擎才能收回。宿主在保存后量一下，过阈值就在安静、已全部保存的时刻换引擎。
+  // 量法不分配内存：wasm 内存初始全零、dlmalloc 只往上长，从顶往下找最后一个非零页就是高水位。
+  // 绝不能用 malloc 探——堆快满时探针本身就会让引擎 OOM 中止。
+  get_engine_heap() {
+    const heap = Module.HEAPU8;
+    if (!heap || !heap.buffer) return { success: false, message: 'engine heap unavailable' };
+    const u = new Uint32Array(heap.buffer);
+    const PAGE = 16384; // 64 KB in 32-bit words
+    let used = 0;
+    for (let pg = Math.floor(u.length / PAGE) - 1; pg >= 0 && !used; pg--) {
+      const base = pg * PAGE;
+      for (let i = base + PAGE - 1; i >= base; i--) if (u[i] !== 0) { used = (i + 1) * 4; break; }
+    }
+    return { success: true, usedBytes: used, limitBytes: u.length * 4 };
+  },
+  // 换引擎前后保持阅读位置。控制器的 restoreViewData 在本引擎上运行期调用不生效（实测读回仍在文首），
+  // 所以记光标：Writer 记正文段号 + 段内偏移，Calc 记活动表与单元格，Impress 记当前页；
+  // 恢复时把光标放回去，视图随光标滚到那里。
+  get_view_position() {
+    const out = { success: true };
+    try {
+      if (isWriterDoc()) {
+        const vc = ctrl.getViewCursor();
+        const loc = rangeLocator(vc.getStart(), vc.getStart());
+        if (loc) { out.paragraph = loc.paraKey; out.offset = loc.start; }
+      } else if (isCalcDoc()) {
+        const cell = EXEC.sheet_get_active_cell();
+        if (cell.success) { out.sheet = cell.sheet; out.cell = cell.address; }
+      } else if (isImpressDoc()) {
+        out.slide = Number(ctrl.getCurrentPage().getPropertyValue('Number')) || 0;
+      }
+    } catch (e) {}
+    return out;
+  },
+  restore_view_position(p) {
+    let restored = false;
+    try {
+      if (isWriterDoc() && Number.isInteger(p && p.paragraph) && p.paragraph >= 0) {
+        const el = paraAt(p.paragraph);
+        if (el) {
+          const vc = ctrl.getViewCursor();
+          vc.gotoRange(el.getStart(), false);
+          const offset = Math.max(0, Math.min(Number(p.offset) || 0, String(el.getString() || '').length));
+          if (offset) vc.goRight(offset, false);
+          restored = true;
+        }
+      } else if (isCalcDoc() && p && typeof p.sheet === 'string' && typeof p.cell === 'string') {
+        const sheets = xModel.getSheets();
+        if (sheets.hasByName(p.sheet)) {
+          const sheet = sheets.getByName(p.sheet);
+          ctrl.setActiveSheet(sheet);
+          ctrl.select(sheet.getCellRangeByName(p.cell));
+          restored = true;
+        }
+      } else if (isImpressDoc() && p && p.slide >= 1) {
+        const pages = xModel.getDrawPages();
+        if (p.slide <= pages.getCount()) { ctrl.setCurrentPage(pages.getByIndex(p.slide - 1)); restored = true; }
+      }
+    } catch (e) {}
+    return { success: true, restored: restored };
+  },
   slide_get_current() {
     if (!isImpressDoc()) return slideFail(NOT_PRESENTATION_MSG);
     try {
@@ -12839,6 +12955,7 @@ function execCommand(reqId, action, params) {
     if (result && result.success && ['slide_add_page', 'slide_delete_page', 'slide_move_page', 'undo', 'redo'].includes(action)
         && commandDocSeq === docSeq && isImpressDoc()) post('structure_changed', { documentSeq: docSeq });
     post('result', { reqId: reqId, result: result });
+    if (!Object.keys(INFLIGHT).length) releaseRetiredParaRanges();
   };
   // Early cursor/zoom queries must not touch UNO model/controller before the
   // first import. A rejected import stays retryable and never exposes a blank.

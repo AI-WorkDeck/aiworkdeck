@@ -4,7 +4,7 @@
 export default {
   "nav": "Prüfprotokoll",
   "title": "Kanzlei-Prüfprotokoll",
-  "subtitle": "Protokolliert Anmeldungen, Geräteverbindungen, Projektfreigaben und Mitgliedsänderungen, Mandanteneinladungen, Dateidownloads und Änderungen der Kanzleieinstellungen. Nur für Kanzleiadministratoren sichtbar; enthält nie Dokumentinhalte, Dateiinhalte oder Unterhaltungen.",
+  "subtitle": "Protokolliert Anmeldungen, Geräte und Konto-Schlüssel, Beitritt zur und Austritt aus der Kanzlei sowie Rollenänderungen, Projektfreigaben und -mitgliedschaften, Mandanteneinladungen, Datei-Downloads, Änderungen der Kanzleieinstellungen und verweigerte Zugriffe, einschließlich Aktionen auf der Website. Nur für Kanzleiadministratoren sichtbar; enthält niemals Dokumentinhalte, Dateiinhalte oder Unterhaltungen.",
   "retention": "Einträge werden {days} Tage aufbewahrt und dann automatisch gelöscht",
   "from": "Von",
   "to": "Bis",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "Eintrags-ID",
   "outcomeFailure": "fehlgeschlagen",
   "catAll": "Alle Kategorien",
+  "sourceWebsite": "Website",
+  "colSource": "Quelle",
   "cat": {
     "AUTH": "Anmeldung",
     "DEVICES": "Geräte",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Projektfreigabe",
     "CLIENT": "Mandanten und Nachrichten",
     "DATA": "Datenzugriff",
-    "SETTINGS": "Kanzleieinstellungen"
+    "SETTINGS": "Kanzleieinstellungen",
+    "ACCESS": "Zugriff verweigert"
   },
   "action": {
     "LOGIN": "Anmeldung",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Gesprächsanhang heruntergeladen",
     "FIRM_CLOUD_SWITCH_CHANGED": "Cloud-Schalter der Kanzlei geändert",
     "FIRM_COMMITTEE_APPOINTED": "Mitglied des Konfliktausschusses berufen",
-    "FIRM_COMMITTEE_REVOKED": "Mitglied des Konfliktausschusses abberufen"
+    "FIRM_COMMITTEE_REVOKED": "Mitglied des Konfliktausschusses abberufen",
+    "PERMISSION_DENIED": "Berechtigung verweigert",
+    "FIRM_MEMBER_JOINED": "Mitglied der Kanzlei beigetreten",
+    "FIRM_MEMBER_LEFT": "Mitglied hat die Kanzlei verlassen",
+    "FIRM_MEMBER_REMOVED": "Mitglied aus der Kanzlei entfernt",
+    "FIRM_ROLE_CHANGED": "Kanzleirolle geändert",
+    "FIRM_TEAM_JOINED": "Team der Kanzlei beigetreten",
+    "FIRM_TEAM_LEFT": "Team hat die Kanzlei verlassen",
+    "FIRM_TEAM_REMOVED": "Team aus der Kanzlei entfernt",
+    "FIRM_CREATED": "Kanzlei erstellt",
+    "FIRM_JOIN_CODE_REGENERATED": "Beitrittscode der Kanzlei zurückgesetzt",
+    "WEBSITE_LOGIN_FAILED": "Website-Anmeldung",
+    "ACCOUNT_API_KEY_CREATED": "Konto-Schlüssel ausgestellt",
+    "ACCOUNT_API_KEY_REVOKED": "Konto-Schlüssel widerrufen"
   }
 }

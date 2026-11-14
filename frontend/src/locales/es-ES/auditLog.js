@@ -4,7 +4,7 @@
 export default {
   "nav": "Registro de auditoría",
   "title": "Registro de auditoría del despacho",
-  "subtitle": "Registra inicios de sesión, conexiones de dispositivos, uso compartido de proyectos y cambios de miembros, invitaciones a clientes, descargas de archivos y cambios en los ajustes del despacho. Visible solo para los administradores del despacho; nunca contiene el contenido de documentos, archivos ni conversaciones.",
+  "subtitle": "Registra los inicios de sesión, los dispositivos y las claves de cuenta, la incorporación o salida del despacho y los cambios de rol, el uso compartido y los miembros de proyectos, las invitaciones a clientes, las descargas de archivos, los cambios en los ajustes del despacho y los accesos denegados, incluidas las acciones realizadas en el sitio web. Solo visible para los administradores del despacho; nunca contiene el contenido de documentos, archivos ni conversaciones.",
   "retention": "Los registros se conservan {days} días y después se eliminan automáticamente",
   "from": "Desde",
   "to": "Hasta",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "ID del registro",
   "outcomeFailure": "fallido",
   "catAll": "Todas las categorías",
+  "sourceWebsite": "sitio web",
+  "colSource": "Origen",
   "cat": {
     "AUTH": "Inicio de sesión",
     "DEVICES": "Dispositivos",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Uso compartido de proyectos",
     "CLIENT": "Clientes y mensajería",
     "DATA": "Acceso a datos",
-    "SETTINGS": "Ajustes del despacho"
+    "SETTINGS": "Ajustes del despacho",
+    "ACCESS": "Acceso denegado"
   },
   "action": {
     "LOGIN": "Inicio de sesión",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Adjunto de conversación descargado",
     "FIRM_CLOUD_SWITCH_CHANGED": "Interruptor de nube del despacho modificado",
     "FIRM_COMMITTEE_APPOINTED": "Miembro del comité de conflictos nombrado",
-    "FIRM_COMMITTEE_REVOKED": "Miembro del comité de conflictos revocado"
+    "FIRM_COMMITTEE_REVOKED": "Miembro del comité de conflictos revocado",
+    "PERMISSION_DENIED": "Permiso denegado",
+    "FIRM_MEMBER_JOINED": "Miembro incorporado al despacho",
+    "FIRM_MEMBER_LEFT": "Miembro ha salido del despacho",
+    "FIRM_MEMBER_REMOVED": "Miembro eliminado del despacho",
+    "FIRM_ROLE_CHANGED": "Rol en el despacho modificado",
+    "FIRM_TEAM_JOINED": "Equipo incorporado al despacho",
+    "FIRM_TEAM_LEFT": "Equipo ha salido del despacho",
+    "FIRM_TEAM_REMOVED": "Equipo eliminado del despacho",
+    "FIRM_CREATED": "Despacho creado",
+    "FIRM_JOIN_CODE_REGENERATED": "Código de incorporación al despacho restablecido",
+    "WEBSITE_LOGIN_FAILED": "Inicio de sesión en el sitio web",
+    "ACCOUNT_API_KEY_CREATED": "Clave de cuenta emitida",
+    "ACCOUNT_API_KEY_REVOKED": "Clave de cuenta revocada"
   }
 }
