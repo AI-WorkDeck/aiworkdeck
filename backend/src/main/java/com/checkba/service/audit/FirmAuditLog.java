@@ -160,8 +160,15 @@ public class FirmAuditLog {
         return !localMode && directory.configured();
     }
 
-    /** 入队一条事件；永不抛。 */
+    /**
+     * 入队一条事件；永不抛。成功事件等事务提交后才入队（回滚的动作不留痕）；
+     * {@link Event#failed()} 的拒绝/失败事件一律立即入队（同 {@link #recordNow}）——被拒的请求往往正是要回滚的那一个。
+     */
     public void record(Event e) {
+        if (e != null && FAILURE.equals(e.outcome)) {
+            recordNow(e);
+            return;
+        }
         try {
             if (e == null || !enabled() || (e.actorUserId == null && e.projectId == null && e.firmUserId == null)) return;
             e.occurredAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
