@@ -132,7 +132,7 @@ public class SubAgentService {
      * 收尾核验员（mustConsult）最多查材料的轮数；之后一轮 tool_choice=none，只许依据已读材料作答。
      * W6 staging：不设上限时 qwen3.8-max 一轮读一个文件，12 个文件 14 轮，每轮重发整段上下文。
      */
-    static final int MAX_CONSULT_ROUNDS = 4;
+    public static final int MAX_CONSULT_ROUNDS = 4;
     static final java.util.Set<String> READ_FILE_TOOLS = java.util.Set.of("extract_file_text", "read_document");
 
     static final class Progress {
