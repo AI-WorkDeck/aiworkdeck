@@ -61,7 +61,7 @@ public class LawFirmWorkflowGateway implements LawFirmCloudCaller {
         if(feature==null)throw new IllegalArgumentException(LangText.of("不支持的律所云端操作", "Unsupported law firm cloud action"));
         if(!local)return firmCloud.execute(userId,action,params);
         LawFirmCloudFeature f="cloud".equals(feature)?null:firmCloud.registry().get(feature);
-        int maxRequest=f==null?64*1024:f.maxRequestBytes(),maxResponse=f==null?256*1024:f.maxResponseBytes();
+        int maxRequest=f==null?64*1024:f.maxRequestBytes(),maxResponse=f==null?(action.startsWith("cloud.audit.")?4*1024*1024:256*1024):f.maxResponseBytes();
         return forward(userId,"/api/lawfirm/cloud",action,params,maxRequest,maxResponse,
                 LangText.of("一次提交的内容过多，请分批提交", "Too much data in one request; submit in smaller batches"),
                 LangText.of("所连接的协作服务尚未升级到支持律所云端的版本", "The connected collaboration service does not support Firm cloud yet"),

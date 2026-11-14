@@ -113,6 +113,23 @@ public class AuthController {
         staticLocalIdentityService = svc;
     }
 
+    /** 律所审计日志（S20）。只在服务端 profile 且配了账户名录时生效。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
+    /** 口令错误只在账号确实存在时记（归到该账号的律所）；不存在的用户名没有律所可归，交给防爆破计数。 */
+    private void recordFailedLogin(String username, String via) {
+        if (firmAudit == null || !firmAudit.enabled() || username == null || username.isBlank() || userService == null) return;
+        try {
+            userService.getUserByUsername(username.trim()).ifPresent(u -> firmAudit.record(
+                    com.checkba.service.audit.FirmAuditLog.event("AUTH", "LOGIN_FAILED").failed().actor(u.getId()).detail("via", via)));
+        } catch (Exception e) {
+            log.debug("Failed-login audit lookup skipped: {}", e.toString());
+        }
+    }
+
     public AuthController(UserService userService, ClientInvitationService clientInvitationService,
                           com.checkba.service.AdminAccessService adminAccessService,
                           com.checkba.service.DeviceTokenService deviceTokenService,
@@ -316,6 +333,7 @@ public class AuthController {
             return result;
         } catch (IllegalArgumentException e) {
             authAbuseGuard.recordLoginFailure(ip, request.getUsername());
+            recordFailedLogin(request.getUsername(), "password");
             Map<String, Object> result = new HashMap<>();
             result.put("code", 1);
             result.put("message", e.getMessage());
@@ -1083,6 +1101,10 @@ public class AuthController {
             authAbuseGuard.recordLoginSuccess(ip, CLIENT_CODE_RATE_KEY);
 
             String sessionId = userSessionService.issue(user.getId());
+            if (firmAudit != null) {
+                firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CLIENT_PORTAL_LOGIN")
+                        .actor(user.getId()).project(invitation.getProjectId()).detail("invitationType", invitation.getType()));
+            }
 
             Map<String, Object> result = new HashMap<>();
             result.put("code", 0);
@@ -1270,6 +1292,7 @@ public class AuthController {
                     "displayName", user.getDisplayName() == null ? user.getUsername() : user.getDisplayName()));
         } catch (Exception e) {
             authAbuseGuard.recordLoginFailure(ip, body.get("username"));
+            recordFailedLogin(body.get("username"), "device-token");
             result.put("code", 1);
             result.put("message", e.getMessage());
         }

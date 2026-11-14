@@ -1067,6 +1067,10 @@
         <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
           <TeamPanel @go-account="onNavTap({ key: 'account' })" />
         </scroll-view>
+        <!-- 律所审计日志（S20）：只有服务端确认是律所管理员时这一栏才出现（firmAuditAvailable） -->
+        <scroll-view v-else-if="activeNav === 'audit_log'" scroll-y class="config-scroll">
+          <FirmAuditLogPanel />
+        </scroll-view>
       </view>
     </view>
 
@@ -1092,6 +1096,7 @@ import {
   getSiteStatus, selectSite,
   getPlatformServices, getPlatformServiceRemote, savePlatformBudget,
   packUninstall,
+  firmCloudAction,
 } from '@/services/api.js'
 import { getCurrentUser, getSessionId, setSessionUser } from '@/utils/auth.js'
 import { getInitial } from '@/utils/textInitial.js'
@@ -1116,6 +1121,7 @@ import PersonalFavoritesPanel from '@/components/userprofile/PersonalFavoritesPa
 import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
 import TeamPanel from '@/components/admin/TeamPanel.vue'
+import FirmAuditLogPanel from '@/components/admin/FirmAuditLogPanel.vue'
 import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
@@ -1140,6 +1146,7 @@ const NAV_LABEL_KEYS = {
   todos: 'account.tabTodos',
   personal_settings: 'admin.navPersonalSettings',
   team: 'team.navTeam',
+  audit_log: 'auditLog.nav',
   memory: 'chat.memoryButton',
   workflows: 'chat.builtinWorkflowsFoldEntry',
   mcp: 'mcp.title',
@@ -1189,7 +1196,7 @@ export default {
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    McpConnectionsPanel, TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
+    McpConnectionsPanel, TeamPanel, FirmAuditLogPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
     LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
@@ -1226,6 +1233,8 @@ export default {
       // 「系统」组是否可见。原来这条规则长在个人中心的 checkAdminTab（只有管理员
       // 才多出一个「系统设置」tab），两页合并后它就是这一处。
       isAdminUser: cachedIsAdmin(),
+      // 律所审计日志一栏是否出现：服务端确认当前账户是律所管理员后才置 true（见 probeFirmAudit）
+      firmAuditAvailable: false,
       // 非管理员进来时默认落「个人资料与登录」——落在一个自己看不见的面板上等于空白页
       activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings',
       /** 服务端记录的同意时间戳；空 = 未同意或告知文本已改版需重新征求 */
@@ -1246,6 +1255,9 @@ export default {
         // 团队（dev-board#496）：挂「个人」组而不是「系统」组——团队是每个人自己的归属，
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
+        // 律所审计日志（S20）：律所管理员才有。是否显示由服务端说了算（cloud.settings.get 的 firmAdmin），
+        // 不是闸门——读日志的接口自己按账户名录拒绝非管理员。
+        { key: 'audit_log', label: this.$t('auditLog.nav'), group: 'personal', firmAdminOnly: true },
         { key: 'mcp', label: this.$t('mcp.title'), group: 'personal' },
         { key: 'memory', label: this.$t('chat.memoryButton'), group: 'personal' },
         { key: 'workflows', label: this.$t('chat.builtinWorkflowsFoldEntry'), group: 'personal' },
@@ -1468,6 +1480,7 @@ export default {
           if (n.desktopOnly && !this.isDesktop) return false
           if (n.macOnly && !this.permissionsSupported) return false
           if (n.group === 'system' && !this.isAdminUser) return false
+          if (n.firmAdminOnly && !this.firmAuditAvailable) return false
           return true
         })
         .map((n) => ({
@@ -1665,6 +1678,7 @@ export default {
   },
   mounted() {
     this.loadUserInfo()
+    this.probeFirmAudit()
     // 深链定位面板（顶栏「已连接账户」chip → ?nav=account）；只认当前可见的本页面板
     const nav = resolveAdminNavKey(this.initialNav)
     if (nav && this.visibleNavItems.some((n) => n.key === nav)) {
@@ -1754,6 +1768,13 @@ export default {
     }
   },
   methods: {
+    // 律所审计日志（S20）：问一次服务端「我是不是律所管理员」。未连接账户、不在律所、
+    // 服务器没开名录都只是不显示这一栏，不提示、不弹登录层。
+    probeFirmAudit() {
+      firmCloudAction('cloud.settings.get')
+        .then((d) => { this.firmAuditAvailable = !!(d && d.firmAdmin) })
+        .catch(() => { this.firmAuditAvailable = false })
+    },
     // 本机用量统计：事项类别存的是后端中文类别名、工具是内部代号，按界面语言显示（英文 QA 2026-11-14 第 4 条）
     matterTypeLabel,
     toolDisplayName,

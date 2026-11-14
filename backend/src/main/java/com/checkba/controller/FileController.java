@@ -145,6 +145,12 @@ public class FileController {
      * 浏览器 &lt;a&gt; 下载无法设请求头，只能用 ?token=&lt;sessionId&gt;；fetch/XHR 走 X-Session-Id 头。
      * 两者取其一解析出 userId 后校验项目成员资格。此前这些接口完全无鉴权，可按数字 id 遍历下载他人文件。
      */
+    /** 律所审计日志（S20）；桌面单机与未配名录的服务器上是空操作。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
     private boolean isAuthorizedForFile(String token, String sessionHeader, ProjectFile file) {
         if (file == null) {
             return false;
@@ -296,7 +302,8 @@ public class FileController {
             @PathVariable("fileId") String fileId,
             @RequestParam(value = "token", required = false) String token,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader,
-            @RequestParam(value = "inline", defaultValue = "false") boolean inline) {
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline,
+            @RequestHeader(value = "Range", required = false) String range) {
         log.info("[FileDownload] ===== 开始处理下载请求 =====");
         log.info("[FileDownload] 收到下载请求: fileId={}", fileId);
         
@@ -383,6 +390,13 @@ public class FileController {
             // 并写 Accept-Ranges——前提是返回类型声明为 Resource（改成 ResponseEntity<?> 会让
             // ResourceRegionHttpMessageConverter 拒写）。它依赖 contentLength()；取不到长度的资源
             // （对象存储等）包成 InputStreamResource，Spring 对它跳过 Range 处理，退回 200 全量。
+            // 律所审计日志（S20）：只记谁取了哪份文件（id + 文件名），不记内容。音视频分段请求只记起始那一段，免得一次播放刷出几十行。
+            if (firmAudit != null && projectFileOpt.isPresent() && (range == null || range.startsWith("bytes=0-"))) {
+                ProjectFile pf = projectFileOpt.get();
+                firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("DATA", "FILE_DOWNLOADED")
+                        .actor(AuthController.getUserIdFromSession(StringUtils.hasText(sessionHeader) ? sessionHeader : token))
+                        .project(pf.getProjectId()).target("FILE", pf.getId(), downloadFilename).detail("inline", inline));
+            }
             if (contentLengthOrNegative(resource) < 0) {
                 return ResponseEntity.ok()
                         .contentType(mediaType)
