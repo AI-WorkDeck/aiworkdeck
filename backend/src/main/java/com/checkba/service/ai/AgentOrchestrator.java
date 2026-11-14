@@ -4489,6 +4489,8 @@ public class AgentOrchestrator {
         com.checkba.service.ai.tools.ToolContext ctx = new com.checkba.service.ai.tools.ToolContext(
                 Long.parseLong(projectId), conversationId, userId, modelId,
                 guard.roundCandidates, guard.roundOffered, guard.runId, null, guard::isCancelled);
+        // 项目真实文件清单（W6）：写进核验任务，并用来校验核验输出引用的来源
+        List<OpinionCompletionCheck.ManifestEntry> manifest = projectFileManifest(projectId);
         com.checkba.service.ai.subagent.SubAgentResult outcome;
         try {
             if (guard.opinionTargetFileId == null || !guard.opinionTargetFileId.equals(guard.activeFileId)) {
@@ -4498,9 +4500,11 @@ public class AgentOrchestrator {
                         List.of(), 0);
             } else outcome = subAgentService.dispatch(
                     OpinionCompletionCheck.verificationTask(guard.opinionTargetFileId,
-                            guard.opinionTargetFileName, guard.opinionInstructions),
+                            guard.opinionTargetFileName, guard.opinionInstructions, manifest),
                     OpinionCompletionCheck.expectedOutput(),
-                    OpinionCompletionCheck.VERIFICATION_SCOPE, ctx);
+                    OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
+                    // 核验员与主轮次同一模型（W6）：flash 档辅助模型在收尾核验里编造过不存在的来源文件
+                    modelId);
         } catch (Exception e) {
             // 派发异常与核验失败同一条出路：如实接回「未验证」，不阻断收尾
             log.warn("[OpinionCheck] conv={} 补检派发异常，按失败接回", conversationId, e);
@@ -4532,7 +4536,14 @@ public class AgentOrchestrator {
         int displayLimit = toolOutputDisplayLimit(
                 com.checkba.service.ai.subagent.SubAgentService.DISPATCH_TOOL_NAME);
         String status = outcome.success() ? "SUCCESS" : "FAILURE";
-        String outcomeText = outcome.success() ? outcome.result() : "Error: " + String.valueOf(outcome.error());
+        List<String> unknownSources = outcome.success()
+                ? OpinionCompletionCheck.unknownSources(outcome.result(), manifest) : List.of();
+        if (!unknownSources.isEmpty()) {
+            log.warn("[OpinionCheck] conv={} run={} 核验输出引用了项目中不存在的来源 {}", conversationId, guard.runId, unknownSources);
+        }
+        String outcomeText = outcome.success()
+                ? OpinionCompletionCheck.unknownSourcesWarning(unknownSources) + outcome.result()
+                : "Error: " + String.valueOf(outcome.error());
         String processCard = String.format(
                 "<process name=\"%s\"><tool_code>%s(%s)</tool_code><tool_output status=\"%s\">%s</tool_output></process>\n",
                 LangText.of("收尾核验", "Completion check"),
@@ -4544,10 +4555,22 @@ public class AgentOrchestrator {
         emitVerificationReportQuietly(guard, challengerSkill.orElse(null), outcome);
 
         messages.add(dev.langchain4j.data.message.UserMessage.from(
-                OpinionCompletionCheck.handoffMessage(outcome)));
+                OpinionCompletionCheck.handoffMessage(outcome, unknownSources)));
         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                 depth + 1, executionLog, agentMode, guard);
         return true;
+    }
+
+    /** 收尾核验用的项目文件清单；列不出时返回空（核验照常，只是不做来源校验）。 */
+    private List<OpinionCompletionCheck.ManifestEntry> projectFileManifest(String projectId) {
+        try {
+            return projectFileService.listRelativePaths(Long.parseLong(projectId), null, 2000).stream()
+                    .map(e -> new OpinionCompletionCheck.ManifestEntry(e.getValue().getId(), e.getKey()))
+                    .toList();
+        } catch (Exception e) {
+            log.warn("[OpinionCheck] 列项目文件清单失败，跳过来源校验: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private String applyHarnessAdaptationIfDiagnosed(

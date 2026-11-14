@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -105,6 +106,8 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         }
     }
 
+    private ProjectFileService projectFiles;
+
     @BeforeEach
     void setUp() {
         chatModelFactory = mock(ChatModelFactory.class);
@@ -141,7 +144,8 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         when(parser.containsToolCall(any())).thenReturn(false);
 
         subAgentService = mock(SubAgentService.class);
-        when(subAgentService.dispatch(any(), any(), any(), any()))
+        projectFiles = mock(ProjectFileService.class);
+        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
                 .thenReturn(SubAgentResult.success("sub-check",
                         "逐项核对：未发现冲突（已核对 3 项，读过 2 份材料）",
                         List.of("doc_get_document_text", "ref_read"), 2));
@@ -153,7 +157,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         orchestrator = new AgentOrchestrator(
                 chatModelFactory, messageService, sse, mock(TokenUsageService.class), assembler,
                 toolRegistry, skillRouter, parser, mock(MemoryPipelineService.class),
-                mock(ProjectFileService.class), mock(EditorBridgeService.class),
+                projectFiles, mock(EditorBridgeService.class),
                 mock(ConversationFileChangeService.class), mock(TodoListService.class),
                 mock(DocumentCheckpointService.class), runState,
                 mock(com.checkba.version.WorkSessionService.class), new AiFailoverProperties(),
@@ -235,7 +239,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         // 恰好一次，scope 就是写死的只读清单，身份沿本轮 ToolContext（项目/会话/用户）
         ArgumentCaptor<List<String>> scopeCaptor = ArgumentCaptor.forClass(List.class);
         ArgumentCaptor<ToolContext> ctxCaptor = ArgumentCaptor.forClass(ToolContext.class);
-        verify(subAgentService, times(1)).dispatch(any(), any(), scopeCaptor.capture(), ctxCaptor.capture());
+        verify(subAgentService, times(1)).dispatch(any(), any(), scopeCaptor.capture(), ctxCaptor.capture(), any());
         assertEquals(OpinionCompletionCheck.VERIFICATION_SCOPE, scopeCaptor.getValue(),
                 "补检 scope 必须使用服务端固定只读清单，不能空（空=全工具）也不能含写工具");
         assertEquals(1L, ctxCaptor.getValue().projectId());
@@ -265,7 +269,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     @DisplayName("接回消息（生产注入原文，zh）：仅加批注不算修正、批注不替代正文限定、缺证不得反向否定")
     void handoffMessageDemandsBodyQualificationNotJustComments() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
                 .thenReturn(SubAgentResult.success("sub-check",
                         "判定：待核实——“已获股东会批准”无决议材料支撑",
                         List.of("doc_get_document_text"), 1));
@@ -322,7 +326,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         run("conv-expected", AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("已核对收尾核验发现，交付说明如下。"));
 
-        verify(subAgentService, times(1)).dispatch(taskCaptor.capture(), expectedCaptor.capture(), any(), any());
+        verify(subAgentService, times(1)).dispatch(taskCaptor.capture(), expectedCaptor.capture(), any(), any(), any());
         assertTrue(taskCaptor.getValue().contains("必要事实槽"), taskCaptor.getValue());
         String expected = expectedCaptor.getValue();
         assertTrue(expected.contains("必要事实槽"), expected);
@@ -390,13 +394,13 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     @DisplayName("补检子任务失败：如实接回「未能完成」，绝不重复派发，仍 FINISHED")
     void failedCompletionCheckHandsBackUnverifiedAndNeverRepeats() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any()))
+        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
                 .thenReturn(SubAgentResult.failure("sub-check", "子 Agent 模型不可用", List.of(), 0));
         ScriptModel model = run("conv-check-fail",
                 AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("我自行回读了当前稿并逐项核对，交付说明如下（核验子任务未能完成）。"));
 
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
         assertEquals(2, model.calls.get());
         String handoff = lastMessageText(model, 1);
         assertTrue(handoff.contains("未能完成"), handoff);
@@ -408,14 +412,14 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     @DisplayName("补检期间用户点停止：按取消收尾，发现不再接回，不再续轮")
     void cancelDuringCompletionCheckFinishesAsCancelled() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(subAgentService.dispatch(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             orchestrator.setCancelled("conv-check-cancel");
             return SubAgentResult.success("sub-check", "未发现冲突", List.of("doc_get_document_text"), 1);
         });
         ScriptModel model = run("conv-check-cancel", AiMessage.from("已按您的要求完成修订。"),
                 AiMessage.from("不应该被用到：取消后不能续轮"));
 
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
         assertEquals(1, model.calls.get(), "取消后不能再发起新一轮 LLM 调用");
         assertEquals(AgentRunStateService.RunStatus.CANCELLED, runState.get("conv-check-cancel").status());
         assertTrue(sseEvents.contains("cancelled"), "要给前端明确的取消事件：" + sseEvents);
@@ -428,7 +432,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     void noCheckWhenSkillNotActive() {
         ScriptModel model = run("conv-no-skill", AiMessage.from("已改好那个错字。"));
 
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         assertEquals(1, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-no-skill").status());
     }
@@ -439,7 +443,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         skillActive();
         ScriptModel model = run("conv-ask", "ASK", AiMessage.from("这份意见书的结论部分依据如下……"));
 
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         assertEquals(1, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-ask").status());
     }
@@ -458,7 +462,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
 
         ScriptModel model = run("conv-self-check", dispatch, AiMessage.from("摘录完成，交付说明如下。"));
 
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
         assertEquals(3, model.calls.get(), "工具轮 → 收尾补检 → 接回续轮，共三轮");
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-self-check").status());
     }
@@ -485,7 +489,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                 "只把第三段中的“ seperate ”改成 separate",
                 AiMessage.from("已按指示完成替换。"));
 
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         // 脚本回复是零工具的「已完成替换」——口头完成纠正（office-tier1 O5）会补一轮；与本用例要证的「不付费补检」无关
         assertEquals(2, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-narrow").status());
@@ -519,18 +523,18 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         model.beforeFirstCompletion = () -> startReplacementRun("conv-supersede");
         startOpinionRun("conv-supersede");
         assertEquals(2, model.calls.get(), "旧轮确实生成过，新轮在其收尾前完成");
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
     }
 
     @Test
     void supersededDuringCheckDoesNotContinueOldRun() {
         skillActive();
-        when(subAgentService.dispatch(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(subAgentService.dispatch(any(), any(), any(), any(), any())).thenAnswer(inv -> {
             startReplacementRun("conv-during");
             return SubAgentResult.success("sub", "待核对发现", List.of("doc_get_document_text"), 1);
         });
         ScriptModel model = run("conv-during", AiMessage.from("修订完成"));
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
         assertEquals(2, model.calls.get(), "只有旧轮和新轮各一次，不接回旧轮自动续改");
     }
 
@@ -540,7 +544,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         AiMessage open = AiMessage.from(List.of(ToolExecutionRequest.builder().id("open")
                 .name("doc_open_file").arguments("{\"fileId\":9}").build()));
         ScriptModel model = run("conv-other", open, AiMessage.from("完成"));
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         assertEquals(3, model.calls.get());
         assertTrue(lastMessageText(model, 2).contains("无法确认当前编辑器"));
     }
@@ -549,7 +553,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
     void questionWaitsForUserWithoutCompletionCheck() {
         skillActive();
         ScriptModel model = run("conv-question", AiMessage.from("<question>请确认审查范围</question>"));
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         assertEquals(1, model.calls.get());
         assertEquals(AgentRunStateService.RunStatus.AWAITING_INPUT, runState.get("conv-question").status());
     }
@@ -570,7 +574,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                 .name("doc_get_document_text").arguments("{}").build()));
         ScriptModel model = run("conv-edit-check", edit, AiMessage.from("初次修订完成"),
                 edit, read, AiMessage.from("已根据发现修正并回读"));
-        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(any(), any(), any(), any(), any());
         verify(toolRegistry, times(2)).execute(eq("doc_replace_text"), any(), any());
         verify(toolRegistry).execute(eq("doc_get_document_text"), any(), any());
         assertEquals(5, model.calls.get());
@@ -615,7 +619,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         AiMessage question = AiMessage.from(List.of(ToolExecutionRequest.builder().id("ask")
                 .name("ask_user").arguments("{\"question\":\"修订范围？\",\"options\":[\"核对事实与依据后修订\",\"只改错字\"]}").build()));
         run("conv-answer", question);
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         String questionId = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(sseData.get(sseEvents.indexOf("ask_user"))).path("id").asText();
         AgentInboxService.Clarification original = new AgentInboxService.Clarification(
@@ -625,7 +629,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
                         + "\">Selected:\n- 核对事实与依据后修订</ask_user_answer>",
                 AiMessage.from("已修订"), AiMessage.from("已核验"));
         ArgumentCaptor<String> task = ArgumentCaptor.forClass(String.class);
-        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any());
+        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), any());
         verify(inbox).rememberClarification(any(), eq(questionId), eq(original));
         assertEquals(AgentRunStateService.RunStatus.FINISHED, runState.get("conv-answer").status());
         assertTrue(task.getValue().contains("帮我修订一下这个法律意见书"));
@@ -646,7 +650,7 @@ class AgentOrchestratorOpinionCompletionCheckTest {
             runWithMessage("conv-limit-" + limit, "<ask_user_answer id=\"ask-limit\">Selected:\n- "
                     + limit + "</ask_user_answer>", AiMessage.from("已按指定范围处理"));
         }
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -658,8 +662,90 @@ class AgentOrchestratorOpinionCompletionCheckTest {
         ScriptModel model = runWithMessage("conv-switched", "<ask_user_answer id=\"ask-old\">Selected:\n- 继续</ask_user_answer>",
                 AiMessage.from("不应运行"));
         assertEquals(0, model.calls.get(), "切到另一文件时不得让主助手编辑当前文件");
-        verify(subAgentService, never()).dispatch(any(), any(), any(), any());
+        verify(subAgentService, never()).dispatch(any(), any(), any(), any(), any());
         assertTrue(lastPersistedAssistant().contains("原任务文档"));
     }
 
+
+    // ───── W6：核验员编造不存在的文件（「股权关系说明.docx」「验资报告摘要.pdf」）─────
+
+    private static java.util.Map.Entry<String, com.checkba.model.entity.ProjectFile> pf(long id, String path) {
+        com.checkba.model.entity.ProjectFile f = new com.checkba.model.entity.ProjectFile();
+        f.setId(id);
+        f.setName(path.substring(path.lastIndexOf('/') + 1));
+        return java.util.Map.entry(path, f);
+    }
+
+    private void ipoProject() {
+        when(projectFiles.listRelativePaths(eq(1L), any(), anyInt())).thenReturn(List.of(
+                pf(11, "01-公司基本情况/股权结构及历史沿革说明.docx"),
+                pf(12, "01-公司基本情况/营业执照信息摘要.docx"),
+                pf(13, "06-法律意见书/法律意见书（初稿）.docx")));
+    }
+
+    @Test
+    @DisplayName("W6：核验任务带项目真实文件清单，并用主轮次模型派发（不落到 flash 档子 Agent 模型）")
+    void verificationGetsManifestAndRunsOnTheMainModel() {
+        skillActive();
+        ipoProject();
+        ArgumentCaptor<String> task = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> model = ArgumentCaptor.forClass(String.class);
+        run("conv-w6-manifest", AiMessage.from("已按您的要求完成修订。"), AiMessage.from("已核对。"));
+        verify(subAgentService, times(1)).dispatch(task.capture(), any(), any(), any(), model.capture());
+        assertTrue(task.getValue().contains("项目文件清单"), task.getValue());
+        assertTrue(task.getValue().contains("ID 11 · 01-公司基本情况/股权结构及历史沿革说明.docx"), task.getValue());
+        assertTrue(task.getValue().contains("清单外的文件在本项目中不存在"), task.getValue());
+        assertEquals(MODEL, model.getValue(), "核验员用本轮主模型");
+    }
+
+    @Test
+    @DisplayName("W6：核验发现引用不存在的文件 → 接回主助手时前置系统校验，指明这些来源无效、不得据此修改")
+    void phantomSourcesInFindingsAreFlaggedToTheMainAgent() {
+        skillActive();
+        ipoProject();
+        when(subAgentService.dispatch(any(), any(), any(), any(), any()))
+                .thenReturn(SubAgentResult.success("sub-check",
+                        "1. 正文「发行人股权清晰」——来源：股权关系说明.docx 第 2 段；另见 验资报告摘要.pdf（fileId=99）。\n"
+                                + "2. 正文「营业期限长期」——来源：《营业执照信息摘要.docx》，ID 12。",
+                        List.of("ref_read"), 2));
+        ScriptModel model = run("conv-w6-phantom", AiMessage.from("已按您的要求完成修订。"), AiMessage.from("已核对。"));
+        String handoff = lastMessageText(model, 1);
+        assertTrue(handoff.startsWith("[系统校验]"), handoff);
+        assertTrue(handoff.contains("股权关系说明.docx"), handoff);
+        assertTrue(handoff.contains("验资报告摘要.pdf"), handoff);
+        assertTrue(handoff.contains("ID 99"), handoff);
+        String warning = handoff.substring(0, handoff.indexOf('\n'));
+        assertFalse(warning.contains("营业执照信息摘要"), "真实存在的文件不能被误判：" + warning);
+        assertFalse(warning.contains("ID 12"), warning);
+        assertTrue(handoff.contains("不要据此修改文档"), handoff);
+        // 过程卡（用户看得到的）同样带上校验结果
+        assertTrue(lastPersistedAssistant().contains("股权关系说明.docx"), lastPersistedAssistant());
+    }
+
+    @Test
+    @DisplayName("W6：unknownSources 按后缀匹配真实文件（路径前缀、书名号、括号都不误报），清单为空时不判")
+    void unknownSourcesMatchesRealFilesLeniently() {
+        List<OpinionCompletionCheck.ManifestEntry> m = List.of(
+                new OpinionCompletionCheck.ManifestEntry(11, "01-公司基本情况/股权结构及历史沿革说明.docx"),
+                new OpinionCompletionCheck.ManifestEntry(13, "06-法律意见书/法律意见书（初稿）.docx"));
+        assertEquals(List.of(), OpinionCompletionCheck.unknownSources(
+                "来源 01-公司基本情况/股权结构及历史沿革说明.docx；目标《法律意见书（初稿）.docx》fileId=13", m));
+        assertEquals(List.of("股权关系说明.docx", "验资报告摘要.pdf"), OpinionCompletionCheck.unknownSources(
+                "见 股权关系说明.docx 与「验资报告摘要.pdf」", m));
+        assertEquals(List.of(), OpinionCompletionCheck.unknownSources("见 股权关系说明.docx", List.of()));
+        assertEquals("", OpinionCompletionCheck.unknownSourcesWarning(List.of()));
+    }
+
+    @Test
+    @DisplayName("W6：核验任务不再要求无从满足的 sourceFileId 回执（编排器派发前已确认目标即活跃文档）")
+    void verificationTaskDoesNotDemandAnUnavailableReceiptField() {
+        for (String lang : List.of("zh", "en")) {
+            String task = lang.equals("zh")
+                    ? OpinionCompletionCheck.verificationTask(5L, "意见书", List.of("核查并修订这份法律意见书"))
+                    : com.checkba.service.AppLanguageScope.call("en-US", () ->
+                            OpinionCompletionCheck.verificationTask(5L, "opinion", List.of("review and revise this opinion")));
+            assertFalse(task.contains("sourceFileId"), task);
+        }
+    }
 }
+

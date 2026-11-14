@@ -199,6 +199,15 @@ public class SubAgentService {
      */
     public SubAgentResult dispatch(String taskDescription, String expectedOutput,
                                    List<String> toolScope, ToolContext parentCtx) {
+        return dispatch(taskDescription, expectedOutput, toolScope, parentCtx, null);
+    }
+
+    /**
+     * modelOverride 非空时用它代替配置的子 Agent 模型（仍走同一道可用清单校验）。
+     * 收尾核验用主轮次的模型（W6：flash 档核验员会编造不存在的来源文件）。
+     */
+    public SubAgentResult dispatch(String taskDescription, String expectedOutput,
+                                   List<String> toolScope, ToolContext parentCtx, String modelOverride) {
         String subtaskId = "subtask-" + UUID.randomUUID().toString().substring(0, 8);
         // started/结束事件必须成对发出（前端的子任务卡按 taskId 配对渲染），
         // 所以模型校验失败那条路径也走"先 started 再 failed"，不能只发一个 failed
@@ -208,7 +217,8 @@ public class SubAgentService {
         // 模型在提交线程解析，非白名单在起跑前就拒绝：ChatModelFactory 对非白名单的处置是
         // 静默回落默认模型——failover 链踩过的同一个坑（看着「配了便宜模型」，实际跑的是主模型，
         // 账单要到月底才看得出来）。这里给出可读提示，让模型与面板都能看到原因。
-        String configuredModel = auxModelResolver.subAgentModelId(props.getModel());
+        String configuredModel = modelOverride != null && !modelOverride.isBlank()
+                ? modelOverride : auxModelResolver.subAgentModelId(props.getModel());
         String modelId = chatModelFactory.usesProviderCatalog()
                 ? chatModelFactory.resolveEffectiveModelId(configuredModel) : configuredModel;
         if (!(chatModelFactory.usesProviderCatalog() ? chatModelFactory.isAvailableModel(modelId) : AllowedModels.isAllowed(modelId))) {
