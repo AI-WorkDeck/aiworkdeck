@@ -628,4 +628,18 @@ class LocalCoreBootstrapTest {
             assertTrue(afterClose.waitFor(5, TimeUnit.SECONDS)); assertEquals(0, afterClose.exitValue());
         } finally { release(afterClose); }
     }
+
+    /**
+     * S22：桌面库 URL 带 OPTIMIZE_REUSE_RESULTS=FALSE。h2File 只认白名单里的选项——漏了它就返回 null，
+     * 本地核心启动整段被跳过，挂着待恢复本地内容的用户还会直接启动失败。
+     */
+    @Test void desktopProfileJdbcUrlIsAcceptedIncludingResultReuseOff(@TempDir java.nio.file.Path home) throws Exception {
+        String yml = new String(getClass().getResourceAsStream("/application-desktop.yml").readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("url:\\s*(jdbc:h2:file:\\S+)").matcher(yml);
+        org.junit.jupiter.api.Assertions.assertTrue(m.find(), "desktop datasource url");
+        String url = m.group(1).replace("${user.home}", home.toString());
+        org.junit.jupiter.api.Assertions.assertTrue(url.contains(";OPTIMIZE_REUSE_RESULTS=FALSE"), url);
+        org.junit.jupiter.api.Assertions.assertEquals(home.resolve(".aiworkdeck/local.mv.db").normalize(), LocalCoreBootstrap.h2File(url));
+    }
 }
+
