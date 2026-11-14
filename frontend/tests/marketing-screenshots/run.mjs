@@ -367,7 +367,7 @@ const SHOTS = [
     id: 'ui-project-im', dir: 'ui', viewport: UI_WIDE,
     async prepare(page, { base, projectId }) {
       await openWorkbench(page, base, projectId)
-      await clickTitle(page, '项目群聊')
+      await clickTitle(page, '项目沟通')
       await waitFrameText(page, '请先连接')
     },
   },
