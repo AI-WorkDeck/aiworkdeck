@@ -5,6 +5,10 @@ import { isCreditsRequired } from '../utils/requireAccountCore.js'
 import { completionDetails } from '../utils/completionDetails.js'
 import { referencesFromEntity } from '../utils/legalReferences.js'
 import { retrievalSourceLabel } from '../utils/insightDetail.js'
+// 台账 B11：整篇读按页取，每页一条命令——律师打的字（每个字也是一条命令）能插在页与页之间上屏，
+// 而不是排在一次读完上千段的大命令后面。页与页之间正文变了，版本围栏会丢弃这次快照、停笔后重读。
+const READ_PAGE_PARAGRAPHS = 300
+
 
 // 客体页（写作辅助卡片）的全部文案键。客体不 import 语言包：宿主用 translate 生成
 // 标签表随 writing-config 下发，客体收到后整表替换自带的英文兜底（教程反馈 48）。
@@ -137,7 +141,7 @@ export function createWritingAssistanceHost({ projectId, fileId, userId, execute
     const paragraphs = []
     let revision, start = 0, chars = 0, stop = false
     for (let page = 0; page < 1000 && !stop; page++) {
-      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: 10000, bulk: true, __agent: true }).catch(() => null)
+      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: READ_PAGE_PARAGRAPHS, bulk: true, __agent: true }).catch(() => null)
       if (!current() || !result?.success || result.revision == null || !Array.isArray(result.paragraphs)) return
       if (revision == null) revision = result.revision
       if (result.revision !== revision) return

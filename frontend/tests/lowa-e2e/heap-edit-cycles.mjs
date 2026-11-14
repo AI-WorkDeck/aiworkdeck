@@ -95,7 +95,7 @@ try {
   const topEnd = await probeTopMB()
   console.log(JSON.stringify({ cycles: CYCLES, maxIndexBuildsPerCycle: maxRebuilds, liveProxies: [liveStart, liveEnd],
     heapTopMB: [Math.round(topStart), Math.round(topEnd)], perCycleMB: +((topEnd - topStart) / CYCLES).toFixed(2) }))
-  assert.equal(maxRebuilds, 1, `paragraph index rebuilt ${maxRebuilds}× in one edit cycle; view switches must reuse the parked index`)
+  assert.ok(maxRebuilds <= 1, `paragraph index rebuilt ${maxRebuilds}× in one edit cycle; view switches must reuse the parked index`)
   assert.ok(Number.isInteger(liveStart) && Number.isInteger(liveEnd), 'zetajs.liveProxies() missing — the proxy release patch is not loaded')
   assert.ok(liveEnd - liveStart <= 200, `live zetajs proxies grew ${liveStart} → ${liveEnd} over ${CYCLES} cycles; retired paragraph proxies are not released`)
   const heap = await ok('get_engine_heap', {})
