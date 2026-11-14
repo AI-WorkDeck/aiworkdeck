@@ -2049,6 +2049,14 @@ public class AgentOrchestrator {
         this.harnessDiagnosticService = harnessDiagnosticService;
     }
 
+    /** 收尾核验员的模型解析（W6）；手工装配的测试里为 null，按主模型走。 */
+    private AuxModelResolver auxModelResolver;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAuxModelResolver(AuxModelResolver auxModelResolver) {
+        this.auxModelResolver = auxModelResolver;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setVerificationHarness(com.checkba.service.ai.harness.VerificationHarness verificationHarness) {
         if (verificationHarness != null) {
@@ -4503,8 +4511,9 @@ public class AgentOrchestrator {
                             guard.opinionTargetFileName, guard.opinionInstructions, manifest),
                     OpinionCompletionCheck.expectedOutput(),
                     OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
-                    // 核验员与主轮次同一模型（W6）：flash 档辅助模型在收尾核验里编造过不存在的来源文件
-                    modelId);
+                    // 核验员模型（W6）：默认本轮主模型——flash 档辅助模型在收尾核验里编造过不存在的来源文件；
+                    // ai.verifierModel 可改成 subagent（子 Agent 模型）或显式中档模型
+                    auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId);
         } catch (Exception e) {
             // 派发异常与核验失败同一条出路：如实接回「未验证」，不阻断收尾
             log.warn("[OpinionCheck] conv={} 补检派发异常，按失败接回", conversationId, e);
