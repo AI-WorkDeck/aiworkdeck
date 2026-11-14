@@ -384,7 +384,7 @@ export default {
     baoqingtian: '包晴天 · 案源与笔记',
     dpiaWorkbench: 'DPIA 数据合规工作台',
     lawfirmManagement: '律所管理',
-    projectIm: '项目群聊',
+    projectIm: '项目沟通',
   },
   sensitiveEditorNotReadyError: '编辑器尚未就绪，无法保存当前修改，请稍后重试',
   sensitiveSavePendingError: '当前修改尚未保存成功，请先保存文件后重试',

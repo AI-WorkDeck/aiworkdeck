@@ -718,7 +718,7 @@ public class PluginService {
         return tables;
     }
 
-    private static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
+    static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
             Map.entry("baoqingtian", Map.ofEntries(
                     Map.entry("plugin.name", "Baoqingtian · Leads & Notes"),
                     Map.entry("包晴天 · 案源与笔记", "Baoqingtian · Leads & Notes"),
@@ -805,8 +805,8 @@ public class PluginService {
                     Map.entry("选择案卷材料，生成并管理可编辑的诉讼图表。", "Select case materials to generate and manage editable litigation charts.")
             )),
             Map.entry("project-im", Map.ofEntries(
-                    Map.entry("plugin.name", "Project Messaging"),
-                    Map.entry("项目沟通", "Project Messaging"),
+                    Map.entry("plugin.name", "Project Chat"),
+                    Map.entry("项目沟通", "Project Chat"),
                     Map.entry("plugin.description", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only."),
                     Map.entry("律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.")
             )),
