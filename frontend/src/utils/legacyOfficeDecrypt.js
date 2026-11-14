@@ -451,6 +451,35 @@ export function detectLegacyFormat(bytes, name) {
   }
 }
 
+/**
+ * 早于 Office 97 的二进制格式（台账 B10）：Word 2/6/95 的 .doc（FIB nFib < 0x00C1）、
+ * Excel 5/95 的 .xls（主流叫 Book，或首个 BOF 的版本是 BIFF5 0x0500）。引擎读得进，但写不回原格式——
+ * 存盘会变成 Word 97 / BIFF8，标题样式与间距还会丢。这类文件按只读打开，修改另存为 .docx/.xlsx 副本，
+ * 原件一个字节都不动。读不开或不认识时返回 null（按普通文件处理）。永不抛错。
+ * @returns {null | 'doc'|'xls'}
+ */
+export function detectPre97Format(bytes, name) {
+  try {
+    const ext = extOf(name)
+    if (ext !== 'doc' && ext !== 'xls') return null
+    const cfb = readCfb(bytes)
+    if (ext === 'doc') {
+      const wd = readStream(cfb, 'WordDocument')
+      if (!wd || wd.length < 4) return null
+      const nFib = wd[2] | (wd[3] << 8)
+      return nFib > 0 && nFib < 0x00c1 ? 'doc' : null
+    }
+    const book = readStream(cfb, 'Workbook')
+    if (!book) return readStream(cfb, 'Book') ? 'xls' : null
+    // 首条记录应是 BOF（0x0809），数据区第 0–1 字节是 BIFF 版本：0x0600 = BIFF8（Excel 97+）
+    if (book.length < 6 || (book[0] | (book[1] << 8)) !== 0x0809) return null
+    const version = book[4] | (book[5] << 8)
+    return version < 0x0600 ? 'xls' : null
+  } catch {
+    return null
+  }
+}
+
 // ───────────── doc ─────────────
 
 async function decryptDoc(cfb, password, det) {

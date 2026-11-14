@@ -79,7 +79,8 @@
         <path v-for="(d, gi) in ICONS.warning" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
       <text class="error-text">{{ error }}</text>
-      <button class="retry-btn" @tap="loadDocuments">{{ $t('editor.diff.retry') }}</button>
+      <!-- 加密文件重试也不会成功（台账 B10 附注 a），只留原因 -->
+      <button v-if="errorKind !== 'DOC_ENCRYPTED'" class="retry-btn" @tap="loadDocuments">{{ $t('editor.diff.retry') }}</button>
     </view>
   </view>
 </template>
@@ -133,6 +134,7 @@ export default {
     return {
       loading: false,
       error: null,
+      errorKind: '',
       sourceText: '',
       targetText: '',
       viewMode: 'side', // 'side' | 'inline'
@@ -158,6 +160,7 @@ export default {
     async loadDocuments() {
       this.loading = true
       this.error = null
+      this.errorKind = ''
       
       try {
         if (this.versionSpec) {
@@ -196,6 +199,7 @@ export default {
       } catch (e) {
         console.error('加载文档失败:', e)
         // 带打开密码的 Office 文件抽不出文本：后端回 kind=DOC_ENCRYPTED，按界面语言给明确原因
+        this.errorKind = (e && e.kind) || ''
         this.error = e && e.kind === 'DOC_ENCRYPTED'
           ? this.$t('version.officePasswordProtected')
           : (e.message || this.$t('editor.diff.loadFailed'))
