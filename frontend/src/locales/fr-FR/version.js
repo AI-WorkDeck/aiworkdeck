@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Ceci ajoute un participant pour ce dossier uniquement sur cet appareil. Si le dossier a déjà été ajouté à la bibliothèque de dossiers d'équipe, vous devez également l'ajouter sous « Participants au dossier » dans le panneau Collaborer, sinon il ne pourra pas récupérer le dossier.",
   "clientInviteDesc": "Donnez un code d'accès au client. Il pourra le saisir sur la page web pour accéder à ce dossier et téléverser les documents dont vous avez besoin — il ne verra que ce dossier précis, et non vos échanges, brouillons ou notes internes avec vos collègues.",
   "clientNameLabel": "Nom du client",
-  "clientNamePlaceholder": "ex. « M. Martin de la société XYZ » (facultatif)",
+  "clientNamePlaceholder": "ex. « M. Martin de la société XYZ »",
   "accessCodeLabel": "Code d'accès :",
   "copy": "Copier",
   "accessCodeTip": "Envoyez ce code au client et demandez-lui de sélectionner « Client » sur la page de connexion puis de le saisir. Ce code est comme une clé pour ce dossier — ne le partagez qu'avec la personne concernée.",

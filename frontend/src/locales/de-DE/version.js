@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Hiermit wird ein Beteiligter für diese Akte nur auf diesem Gerät hinzugefügt. Wenn die Akte bereits zur Team-Aktenbibliothek hinzugefügt wurde, müssen Sie die Person zusätzlich unter „Akte-Mitglieder“ im Bereich „Zusammenarbeiten“ hinzufügen, da sie die Akte sonst nicht abrufen kann.",
   "clientInviteDesc": "Geben Sie dem Mandanten einen Zugangscode. Er kann ihn auf der Webseite eingeben, um auf diese Akte zuzugreifen und die benötigten Unterlagen hochzuladen — er sieht nur diese eine Akte, nicht Ihre Korrespondenz, Entwürfe oder internen Notizen mit Kollegen.",
   "clientNameLabel": "Name des Mandanten",
-  "clientNamePlaceholder": "z. B. „Herr Müller, XYZ GmbH“ (optional)",
+  "clientNamePlaceholder": "z. B. „Herr Müller, XYZ GmbH“",
   "accessCodeLabel": "Zugangscode:",
   "copy": "Kopieren",
   "accessCodeTip": "Senden Sie diesen Code an den Mandanten und bitten Sie ihn, auf der Anmeldeseite „Mandant“ auszuwählen und den Code einzugeben. Dieser Code ist wie ein Schlüssel zu dieser Akte — teilen Sie ihn nur mit der vorgesehenen Person.",

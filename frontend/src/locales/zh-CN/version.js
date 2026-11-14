@@ -345,7 +345,7 @@ export default {
   localMemberDualTrackHint: '这里加的是这份案卷在本机的参与人。案卷已经放进团队案件库的话，还要在顶栏「协作」 的「案件参与人」里再加一次，同事才取得到这份案卷。',
   clientInviteDesc: '给客户一串访问码。客户在网页上输入它就能进这份案卷，把你要的材料传上来； 他只看得到这一份案卷，你和同事的往来记录、底稿、内部意见他都看不到。',
   clientNameLabel: '客户称呼',
-  clientNamePlaceholder: '例如「某某公司 张总」（可不填）',
+  clientNamePlaceholder: '例如「某某公司 张总」',
   accessCodeLabel: '访问码：',
   copy: '复制',
   accessCodeTip: '把这串码发给客户，请他在登录页选「客户」输入即可。 这串码等同于进这份案卷的钥匙，只发给本人。',

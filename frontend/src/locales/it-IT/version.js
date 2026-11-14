@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Questo aggiunge un partecipante per questo fascicolo solo su questo dispositivo. Se il fascicolo è già stato aggiunto alla Raccolta fascicoli del team, devi aggiungerlo nuovamente anche in Membri del fascicolo nel pannello Collabora, altrimenti non potrà scaricare il fascicolo.",
   "clientInviteDesc": "Fornisci al cliente un codice di accesso. Potrà inserirlo nella pagina web per accedere a questo fascicolo e caricare i materiali necessari — potrà vedere solo questo fascicolo, non la tua corrispondenza, le bozze o le note interne con i colleghi.",
   "clientNameLabel": "Nome del cliente",
-  "clientNamePlaceholder": "es. “Sig. Rossi presso XYZ S.r.l.” (facoltativo)",
+  "clientNamePlaceholder": "es. “Sig. Rossi presso XYZ S.r.l.”",
   "accessCodeLabel": "Codice di accesso:",
   "copy": "Copia",
   "accessCodeTip": "Invia questo codice al cliente e chiedigli di selezionare “Cliente” nella pagina di accesso e di inserirlo. Questo codice è come una chiave per questo fascicolo — condividilo solo con il destinatario previsto.",

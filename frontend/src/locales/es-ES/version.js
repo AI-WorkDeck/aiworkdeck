@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Esto añade a un participante para este expediente solo en este dispositivo. Si el expediente ya se ha añadido a la Biblioteca de expedientes del equipo, también deberá añadirlo en «Participantes del expediente» dentro del panel «Colaborar», o no podrá descargar el expediente.",
   "clientInviteDesc": "Entregue al cliente un código de acceso. Podrá introducirlo en la página web para acceder a este expediente y subir los materiales que usted necesite; solo verá este expediente, no su correspondencia, borradores ni notas internas con sus colegas.",
   "clientNameLabel": "Nombre del cliente",
-  "clientNamePlaceholder": "p. ej., «Sr. García de Empresa XYZ» (opcional)",
+  "clientNamePlaceholder": "p. ej., «Sr. García de Empresa XYZ»",
   "accessCodeLabel": "Código de acceso:",
   "copy": "Copiar",
   "accessCodeTip": "Envíe este código al cliente y pídale que seleccione «Cliente» en la página de inicio de sesión y lo introduzca. Este código equivale a una llave para este expediente; compártalo únicamente con el interesado.",

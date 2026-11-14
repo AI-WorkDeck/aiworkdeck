@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Isso adiciona um participante a este arquivo de caso apenas neste dispositivo. Se o arquivo de caso já tiver sido adicionado à Biblioteca de Casos da Equipe, você também precisará adicioná-lo novamente em Membros do Caso no painel Colaborar, ou ele não conseguirá baixar o arquivo de caso.",
   "clientInviteDesc": "Forneça um código de acesso ao cliente. Ele poderá digitá-lo na página web para acessar este arquivo de caso e enviar os materiais necessários — ele verá apenas este arquivo de caso, sem acesso às suas conversas, rascunhos ou notas internas com colegas.",
   "clientNameLabel": "Nome do Cliente",
-  "clientNamePlaceholder": "ex.: “Sr. Silva da Empresa XYZ” (opcional)",
+  "clientNamePlaceholder": "ex.: “Sr. Silva da Empresa XYZ”",
   "accessCodeLabel": "Código de Acesso:",
   "copy": "Copiar",
   "accessCodeTip": "Envie este código ao cliente e peça que ele selecione “Cliente” na página de login e o informe. Este código funciona como uma chave para este arquivo de caso — compartilhe apenas com o destinatário pretendido.",

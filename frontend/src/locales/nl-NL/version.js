@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Hiermee voegt u alleen op dit apparaat een deelnemer toe voor dit dossier. Als het dossier al is toegevoegd aan de Teamdossierbibliotheek, moet u deze persoon ook opnieuw toevoegen onder Dossierleden in het paneel Samenwerken, anders kan diegene het dossier niet ophalen.",
   "clientInviteDesc": "Geef de cliënt een toegangscode. Zij kunnen deze op de webpagina invoeren om toegang te krijgen tot dit dossier en de benodigde stukken te uploaden — zij zien alleen dit ene dossier, niet uw correspondentie, concepten of interne notities met collega's.",
   "clientNameLabel": "Naam cliënt",
-  "clientNamePlaceholder": "bijv. “Dhr. De Vries bij XYZ B.V.” (optioneel)",
+  "clientNamePlaceholder": "bijv. “Dhr. De Vries bij XYZ B.V.”",
   "accessCodeLabel": "Toegangscode:",
   "copy": "Kopiëren",
   "accessCodeTip": "Stuur deze code naar de cliënt en vraag om op de inlogpagina “Cliënt” te kiezen en de code in te voeren. Deze code is als een sleutel tot dit dossier — deel hem alleen met de beoogde persoon.",

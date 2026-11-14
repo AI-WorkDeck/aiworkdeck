@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Bu işlem, bu dava dosyası için katılımcıyı yalnızca bu cihaza ekler. Dava dosyası zaten Ekip Dava Dosyası Kitaplığına eklendiyse, onu İşbirliği panelindeki Dava Üyeleri altından da yeniden eklemeniz gerekir; aksi halde dava dosyasını çekemez.",
   "clientInviteDesc": "Müvekkile bir erişim kodu verin. Müvekkil web sayfasına girerek bu dava dosyasına erişebilir ve ihtiyacınız olan materyalleri yükleyebilir — yalnızca bu dava dosyasını görebilir, yazışmalarınızı, taslaklarınızı veya çalışma arkadaşlarınızla yaptığınız iç notları göremez.",
   "clientNameLabel": "Müvekkil Adı",
-  "clientNamePlaceholder": "örn. “XYZ Şirketi'ndeki Sayın Zhang” (isteğe bağlı)",
+  "clientNamePlaceholder": "örn. “XYZ Şirketi'ndeki Sayın Zhang”",
   "accessCodeLabel": "Erişim Kodu:",
   "copy": "Kopyala",
   "accessCodeTip": "Bu kodu müvekkile gönderin ve giriş sayfasında “Müvekkil” seçeneğini seçip kodu girmesini isteyin. Bu kod bu dava dosyasının anahtarı gibidir — yalnızca ilgili kişiyle paylaşın.",

@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Ini hanya menambahkan peserta untuk berkas kasus ini di perangkat ini saja. Jika berkas kasus sudah ditambahkan ke Perpustakaan Berkas Kasus Tim, Anda juga perlu menambahkannya lagi di bawah Anggota Kasus di panel Kolaborasi, jika tidak mereka tidak akan bisa menarik berkas kasus tersebut.",
   "clientInviteDesc": "Beri klien kode akses. Mereka dapat memasukkannya di halaman web untuk mengakses berkas kasus ini dan mengunggah materi yang Anda perlukan — mereka hanya dapat melihat berkas kasus ini saja, bukan korespondensi, draf, atau catatan internal Anda dengan rekan kerja.",
   "clientNameLabel": "Nama Klien",
-  "clientNamePlaceholder": "mis. “Bpk. Zhang dari XYZ Corp” (opsional)",
+  "clientNamePlaceholder": "mis. “Bpk. Zhang dari XYZ Corp”",
   "accessCodeLabel": "Kode Akses:",
   "copy": "Salin",
   "accessCodeTip": "Kirim kode ini kepada klien dan minta mereka memilih “Klien” di halaman masuk lalu memasukkannya. Kode ini bagaikan kunci menuju berkas perkara ini — bagikan hanya kepada orang yang dituju.",

@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Thao tác này chỉ thêm người tham gia cho hồ sơ vụ việc này trên thiết bị này. Nếu hồ sơ vụ việc đã được thêm vào Thư viện hồ sơ vụ việc của nhóm, bạn cũng cần thêm họ lại trong phần Thành viên vụ việc ở bảng Hợp tác, nếu không họ sẽ không thể tải hồ sơ vụ việc về.",
   "clientInviteDesc": "Cung cấp mã truy cập cho khách hàng. Họ có thể nhập mã trên trang web để truy cập hồ sơ vụ việc này và tải lên các tài liệu bạn cần — họ chỉ có thể xem hồ sơ vụ việc này, không thể xem thư từ trả lời, bản nháp hoặc ghi chú nội bộ của bạn với đồng nghiệp.",
   "clientNameLabel": "Tên khách hàng",
-  "clientNamePlaceholder": "ví dụ: “Ông Zhang tại XYZ Corp” (không bắt buộc)",
+  "clientNamePlaceholder": "ví dụ: “Ông Zhang tại XYZ Corp”",
   "accessCodeLabel": "Mã truy cập:",
   "copy": "Sao chép",
   "accessCodeTip": "Gửi mã này cho khách hàng và nhờ họ chọn “Khách hàng” trên trang đăng nhập rồi nhập mã. Mã này giống như chìa khóa mở hồ sơ vụ việc này — chỉ chia sẻ cho đúng người nhận.",

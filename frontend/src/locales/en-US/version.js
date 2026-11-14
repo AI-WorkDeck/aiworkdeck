@@ -344,7 +344,7 @@ export default {
   localMemberDualTrackHint: 'This adds a participant for this case file on this device only. If the case file has already been added to the Team Case Library, you also need to add them again under Case Members in the Collaborate panel, or they won’t be able to pull the case file.',
   clientInviteDesc: 'Give the client an access code. They can enter it on the web page to access this case file and upload the materials you need — they can only see this one case file, not your correspondence, drafts, or internal notes with colleagues.',
   clientNameLabel: 'Client Name',
-  clientNamePlaceholder: 'e.g. “Mr. Zhang at XYZ Corp” (optional)',
+  clientNamePlaceholder: 'e.g. “Mr. Zhang at XYZ Corp”',
   accessCodeLabel: 'Access Code:',
   copy: 'Copy',
   accessCodeTip: 'Send this code to the client and ask them to select “Client” on the sign-in page and enter it. This code is like a key to this case file — only share it with the intended person.',

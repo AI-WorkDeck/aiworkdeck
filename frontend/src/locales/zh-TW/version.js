@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "這裡加的是這份案卷在本機的參與人。案卷已經放進團隊案件庫的話，還要在頂欄「協作」 的「案件參與人」里再加一次，同事才取得到這份案卷。",
   "clientInviteDesc": "給客戶一串訪問碼。客戶在網頁上輸入它就能進這份案卷，把你要的材料傳上來； 他只看得到這一份案卷，你和同事的往來記錄、底稿、內部意見他都看不到。",
   "clientNameLabel": "客戶稱呼",
-  "clientNamePlaceholder": "例如「某某公司 張總」（可不填）",
+  "clientNamePlaceholder": "例如「某某公司 張總」",
   "accessCodeLabel": "訪問碼：",
   "copy": "複製",
   "accessCodeTip": "把這串碼發給客戶，請他在登錄頁選「客戶」輸入即可。 這串碼等同於進這份案卷的鑰匙，只發給本人。",

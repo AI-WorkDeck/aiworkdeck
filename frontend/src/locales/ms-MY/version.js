@@ -306,7 +306,7 @@ export default {
   "localMemberDualTrackHint": "Ini hanya menambah peserta untuk fail kes ini pada peranti ini sahaja. Jika fail kes telah ditambahkan ke Perpustakaan Fail Kes Pasukan, anda juga perlu menambah mereka semula di bawah Ahli Kes dalam panel Kolaborasi, jika tidak mereka tidak dapat menarik fail kes tersebut.",
   "clientInviteDesc": "Beri klien kod akses. Mereka boleh memasukkannya di halaman web untuk mengakses fail kes ini dan memuat naik bahan yang anda perlukan — mereka hanya boleh melihat fail kes ini sahaja, bukan surat-menyurat, draf atau nota dalaman anda dengan rakan sekerja.",
   "clientNameLabel": "Nama Klien",
-  "clientNamePlaceholder": "cth. “Encik Zhang dari XYZ Corp” (pilihan)",
+  "clientNamePlaceholder": "cth. “Encik Zhang dari XYZ Corp”",
   "accessCodeLabel": "Kod Akses:",
   "copy": "Salin",
   "accessCodeTip": "Hantar kod ini kepada klien dan minta mereka memilih “Klien” pada halaman log masuk lalu memasukkannya. Kod ini umpama kunci kepada fail kes ini — hanya kongsikan dengan individu yang dimaksudkan.",
