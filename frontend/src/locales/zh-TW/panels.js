@@ -365,7 +365,7 @@ export default {
   "pgWorkspaceRetry": "重新加載",
   "pgDefaultIntro": "{name} 已安裝。在右側 AI 對話里描述你的需求即可使用。",
   "ppVerifying": "正在核驗插件狀態…",
-  "ppCommunicationUpdate": "當前項目溝通插件仍是 {version}。請在插件中心更新後使用律所、團隊、項目通訊錄；統一聊天和通知也可從「消息中心」打開。",
+  "ppCommunicationUpdate": "當前專案溝通插件仍是 {version}。請在插件中心更新後使用律所、團隊、項目通訊錄；統一聊天和通知也可從「消息中心」打開。",
   "ppLawfirmWorkflowUpdate": "當前律所管理插件為 {version}，尚不支持本人確認和跨設備利衝協作。請在插件中心更新到 0.1.2 或更高版本後處理此消息。",
   "ppOpenPluginUpdate": "打開插件更新",
   "ppAuthorizationChanged": "插件狀態已改變或無法核驗。請先切換到其他側欄面板，再重新打開；若仍無法加載，請在插件中心確認插件已啓用。",
