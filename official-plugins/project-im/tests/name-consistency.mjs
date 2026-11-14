@@ -39,3 +39,15 @@ test('the host English fallback uses the same English name', () => {
   assert.equal(m[1], en)
   assert.ok(!block.slice(0, 600).includes('Project Messaging'))
 })
+
+test('workbench rail label and in-plugin references use the same Chinese name', () => {
+  const cn = readFileSync(new URL('frontend/src/locales/zh-CN/workbench.js', repo), 'utf8')
+  const tw = readFileSync(new URL('frontend/src/locales/zh-TW/workbench.js', repo), 'utf8')
+  const twName = JSON.parse(readFileSync(new URL('l10n/zh-TW.json', root), 'utf8'))['plugin.name']
+  assert.match(cn, /railLabelProjectIm:\s*'项目沟通'/)
+  assert.ok(tw.includes('"railLabelProjectIm": "' + twName + '"'))
+  for (const f of ['l10n/zh-CN.json', 'l10n/zh-TW.json', 'README.md', 'web/panel-l10n.js']) {
+    const text = readFileSync(new URL(f, root), 'utf8')
+    assert.ok(!/项目群聊|項目群聊|專案群聊/.test(text), f)
+  }
+})

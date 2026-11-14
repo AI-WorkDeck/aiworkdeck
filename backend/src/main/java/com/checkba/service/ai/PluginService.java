@@ -743,9 +743,10 @@ public class PluginService {
                     Map.entry("查找剪贴记录、复制和插入内容。", "Search clipboard history, copy, and insert content.")
             )),
             Map.entry("desensitize", Map.ofEntries(
-                    Map.entry("plugin.name", "Desensitize"),
-                    Map.entry("view.main.name", "Desensitize"),
-                    Map.entry("脱敏", "Desensitize"),
+                    Map.entry("plugin.name", "File Redaction"),
+                    Map.entry("view.main.name", "File Redaction"),
+                    Map.entry("脱敏", "File Redaction"),
+                    Map.entry("文件脱敏", "File Redaction"),
                     Map.entry("plugin.description", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages."),
                     Map.entry("核查敏感信息并生成脱敏副本，可用恢复包复敏。", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.")
             )),

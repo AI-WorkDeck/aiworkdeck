@@ -190,7 +190,7 @@ export default {
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "律所管理",
   "railLabelTmeet": "騰訊會議",
-  "railLabelProjectIm": "專案群聊",
+  "railLabelProjectIm": "項目溝通",
   "railLabelDesensitize": "檔案脫敏",
   "railLabelTabular": "表格審閱",
   "railEditDoneBtn": "完成",
