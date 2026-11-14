@@ -24,7 +24,7 @@ node scripts/eval/model-matrix.mjs \
 | `--models` | 逗号分隔的 OpenRouter 模型 id，随请求的 `model` 字段下发 |
 | `--sentences` | 句子集 JSON（见下） |
 | `--runs N` | 每句重复次数（默认 1） |
-| `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题 |
+| `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题。所有实例（2 个分支 × 模型数）会同时在跑，每个实例连同编辑器引擎约占 2–3 GB 内存：先估算总量，别和 Android 模拟器、桌面实例等重活同时跑（曾整机崩溃） |
 | `--profile cn\|intl` | 站点/语言档位（默认 `cn`）。`cn`：界面语言 zh-CN（`system_prompt.md` + 中文 LangText），账户站点保持默认 aiworkdeck.com；`intl`：界面语言 en-US（`system_prompt.en.md` + 英文 LangText），实例设 `AI_ACCOUNT_BASE_URL=https://www.workdeck.ai`（`OfficialCloudEndpoint.isInternationalSite` 按主机判定的就是它）。语言经请求体 `appLanguage` + `X-App-Language` 头下发，编辑器句子经浏览器 `checkba_app_language` |
 | `--route openrouter\|bailian` | 模型走哪条线（默认 `openrouter`，行为不变）。`bailian` 直连阿里云百炼（国内用户的生产路径），见下节「百炼路由」 |
 | `--tier cheap\|release` | 默认模型档（默认 `cheap`）。cn cheap = `deepseek/deepseek-v4-flash` + `qwen/qwen3.7-flash`；intl cheap = `google/gemini-3.6-flash` + `anthropic/claude-haiku-4.5`；`release` 在 cheap 之上再加 cn：`qwen/qwen3.8-max-0902`、`deepseek/deepseek-v4-pro`，intl：`anthropic/claude-sonnet-5`、`openai/gpt-5.6-terra`。`--models` 显式给出时覆盖 |
