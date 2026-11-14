@@ -201,7 +201,7 @@ export default {
   railLabelDpia: 'DPIA',
   railLabelLawfirm: '律所管理',
   railLabelTmeet: '腾讯会议',
-  railLabelProjectIm: '项目群聊',
+  railLabelProjectIm: '项目沟通',
   railLabelDesensitize: '文件脱敏',
   railLabelTabular: '表格审阅',
   railEditDoneBtn: '完成',

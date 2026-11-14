@@ -152,7 +152,7 @@ window.AWD_IM_L10N = {
     "panel.historyWithEarlier": "同时可看此前的消息",
     "panel.inviteHintAfterJoin": "客户凭码加入后，只能看到入群之后的消息和文件。请仅交给预期成员。有效期至 {time}",
     "panel.inviteHintWithHistory": "客户凭码加入后，可同时查看此前的消息；文件仍按访问权限逐个开放。请仅交给预期成员。有效期至 {time}",
-    "panel.inviteJoinHow": "对方需用自己的 AI WorkDeck 账号登录应用，在「消息中心 → 对话 → 邀请码加入」或「项目群聊 → 邀请码加入」中输入此码；客户门户不能使用此码。"
+    "panel.inviteJoinHow": "对方需用自己的 AI WorkDeck 账号登录应用，在「消息中心 → 对话 → 邀请码加入」或「项目沟通 → 邀请码加入」中输入此码；客户门户不能使用此码。"
   },
   "zh-TW": {
     "panel.historyScope": "客戶可看的訊息範圍",
@@ -160,6 +160,6 @@ window.AWD_IM_L10N = {
     "panel.historyWithEarlier": "同時可看此前的訊息",
     "panel.inviteHintAfterJoin": "客戶憑碼加入後，只能看到入群之後的訊息和檔案。請僅交給預期成員。有效期至 {time}",
     "panel.inviteHintWithHistory": "客戶憑碼加入後，可同時查看此前的訊息；檔案仍按存取權限逐一開放。請僅交給預期成員。有效期至 {time}",
-    "panel.inviteJoinHow": "對方需用自己的 AI WorkDeck 帳號登入應用程式，在「訊息中心 → 對話 → 邀請碼加入」或「項目群聊 → 邀請碼加入」中輸入此碼；客戶入口網站不能使用此碼。"
+    "panel.inviteJoinHow": "對方需用自己的 AI WorkDeck 帳號登入應用程式，在「訊息中心 → 對話 → 邀請碼加入」或「項目溝通 → 邀請碼加入」中輸入此碼；客戶入口網站不能使用此碼。"
   }
 };
