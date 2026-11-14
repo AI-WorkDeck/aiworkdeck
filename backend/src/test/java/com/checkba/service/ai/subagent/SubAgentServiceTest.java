@@ -544,4 +544,32 @@ class SubAgentServiceTest {
         assertTrue(com.checkba.service.ai.tools.SubAgentTools.parseToolScope("  ").isEmpty());
         assertTrue(com.checkba.service.ai.tools.SubAgentTools.parseToolScope(null).isEmpty());
     }
+
+    @Test
+    @DisplayName("W6：平台/OpenRouter 流式通道可用时子任务走它（system 提示缓存断点），并把 cached_tokens 记进 token_usage")
+    void usesCachedStreamingChannelAndRecordsCachedTokens() {
+        com.checkba.service.ai.OpenRouterStreamingChatModel streaming =
+                org.mockito.Mockito.mock(com.checkba.service.ai.OpenRouterStreamingChatModel.class);
+        when(modelFactory.getStreamingChatModel(any())).thenReturn(streaming);
+        org.mockito.stubbing.Answer<Object> reply = inv -> {
+            com.checkba.service.ai.ReasoningStreamingHandler h = inv.getArgument(inv.getArguments().length - 1);
+            h.onCacheUsage(5000, 4096, 0);
+            h.onComplete(Response.from(AiMessage.from("最终结论"), new TokenUsage(5000, 50)));
+            return null;
+        };
+        org.mockito.Mockito.doAnswer(reply).when(streaming).generate(anyList(),
+                org.mockito.ArgumentMatchers.<dev.langchain4j.model.StreamingResponseHandler<AiMessage>>any());
+        org.mockito.Mockito.doAnswer(reply).when(streaming).generate(anyList(), anyList(),
+                org.mockito.ArgumentMatchers.<dev.langchain4j.model.StreamingResponseHandler<AiMessage>>any());
+
+        SubAgentResult result = newService().dispatch("任务", null, List.of(), PARENT_CTX);
+
+        assertTrue(result.success(), String.valueOf(result.error()));
+        assertEquals("最终结论", result.result());
+        verify(model, never()).generate(anyList());
+        verify(model, never()).generate(anyList(), anyList());
+        verify(tokenUsageService).recordUsage(eq(42L), eq(7L), eq(AUX_MODEL),
+                eq(new TokenUsage(5000, 50)), eq("conv-main"), eq(4096), eq(0));
+    }
 }
+
