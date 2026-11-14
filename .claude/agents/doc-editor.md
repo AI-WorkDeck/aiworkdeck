@@ -17,6 +17,13 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 - **后台写作调用**（设置/词表/学习/自动补全）`accountPrompt:false`：会话失效时静默失败，不在打字途中弹登录框；改写/采用等主动操作照常提示。
 - 待办：三个写作辅助宿主各自分页通读全文（大文档 Word 主因），宜按 revision 共享一次读取；PPT 缩略图与备胎启动在打开后 10s 内与交互争 worker。
 
+## 只打开不许写盘（台账 B10，2026-11-14）
+
+- 现象：Word 2 的 .doc、Excel 5/95 的 .xls 打开几秒后被自动保存按 Word 97/BIFF8 改写原件（标题样式与间距还丢了），用户什么都没做。
+- 根因两处，都在 worker：①`retarget` 先装 XModifyListener 再做装载期规范化（修订开关、显示模式、锚点清场），这些改动先向宿主报一声 modified、随后才清标志——**每一份文档装载都会发这声**（旧 open-not-dirty 只数装载之后的，漏了），宿主若此时已 ready 就标脏自动保存，是否写盘全看时序；②`set_chrome{sheetTabs:false}` 改 Calc 的 `HasSheetTabs`，Calc 记成文档改动（连普通 .xlsx 都中）。修法：监听器挪到清标志之后装；`HasSheetTabs` 包进 `withViewOnlyChange`。
+- 产品规则：Office 97 之前的格式（`detectPre97Format`：.doc 的 FIB nFib < 0x00C1，.xls 主流叫 Book 或首个 BOF 是 BIFF5）引擎读得进、写不回原格式，按只读打开（`legacyImport`，与带密码旧格式共用 `legacyProtected` 横幅），修改走「另存为 .docx/.xlsx 副本」，原件一个字节不动。Word 97+/BIFF8 的 .doc/.xls 照常可编辑保存。
+- 回归：`node tests/lowa-e2e/open-not-dirty.mjs`（装载期间与之后都不许报 modified，含 `fixtures/legacy-import/` 三份旧版格式与表格 sheetTabs）；真机 `node tests/desktop-e2e/legacy-open-no-write.mjs`（打开不写盘、mtime 不变；旧版格式真改一笔仍不写原件，另存副本是合法 zip）。
+
 ## PPT/Excel 一流化（office-tier1，2026-11-12）
 
 2026-11-12 在真实 LOWA 引擎实测。

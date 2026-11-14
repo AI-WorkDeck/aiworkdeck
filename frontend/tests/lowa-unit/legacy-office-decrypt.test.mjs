@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import CFB from 'cfb'
-import { decryptLegacyOffice, detectLegacyEncryption, md5, rc4, __test } from '../../src/utils/legacyOfficeDecrypt.js'
+import { decryptLegacyOffice, detectLegacyEncryption, detectPre97Format, md5, rc4, __test } from '../../src/utils/legacyOfficeDecrypt.js'
 
 const FIX = new URL('../lowa-e2e/fixtures/encrypted/legacy/', import.meta.url)
 const load = (name) => new Uint8Array(fs.readFileSync(new URL(name, FIX)))
@@ -194,4 +194,18 @@ test('图片区里出现认不出的记录：明确报 UNSUPPORTED_ENCRYPTION，
   const key = new Uint8Array(16).fill(3)
   const rec = new Uint8Array(8 + 4); new DataView(rec.buffer).setUint16(2, 0xf007, true); new DataView(rec.buffer).setUint32(4, 4, true)
   assert.throws(() => __test.decryptPptPictures(rc4(key, rec), key), (e) => e.code === 'UNSUPPORTED_ENCRYPTION')
+})
+
+// ───── 台账 B10：Office 97 之前的格式按只读打开（写不回原格式）─────
+test('detectPre97Format flags Word 2/6/95 .doc and Excel 5/95 .xls, not Word 97 / BIFF8', () => {
+  const fx = (n) => fs.readFileSync(new URL('../lowa-e2e/fixtures/legacy-import/' + n, import.meta.url))
+  assert.equal(detectPre97Format(fx('word2-nfib.doc'), 'a.doc'), 'doc')
+  assert.equal(detectPre97Format(fx('excel95.xls'), 'a.xls'), 'xls')      // stream named "Book"
+  assert.equal(detectPre97Format(fx('excel5-book.xls'), 'a.xls'), 'xls')  // BIFF5 BOF in "Workbook"
+  assert.equal(detectPre97Format(fx('word97-control.doc'), 'a.doc'), null)
+  assert.equal(detectPre97Format(fx('biff8-control.xls'), 'a.xls'), null)
+  // 扩展名决定判读；非复合文档、空字节都不认
+  assert.equal(detectPre97Format(fx('word2-nfib.doc'), 'a.ppt'), null)
+  assert.equal(detectPre97Format(new Uint8Array(10), 'a.doc'), null)
+  assert.equal(detectPre97Format(fx('excel95.xls'), 'a.xlsx'), null)
 })

@@ -6641,7 +6641,8 @@ const EXEC = {
     }
     if (req.sheetTabs != null && isCalcDoc()) {
       try {
-        ctrl.setPropertyValue('HasSheetTabs', !!req.sheetTabs);
+        // 纯视图开关，但 Calc 把它记成文档改动（台账 B10：Excel 5/95 打开后就被自动保存改写）
+        withViewOnlyChange(() => ctrl.setPropertyValue('HasSheetTabs', !!req.sheetTabs));
         out.applied.sheetTabs = !!ctrl.getPropertyValue('HasSheetTabs');
       } catch (e) { out.sheetTabsErr = errStr(e); }
     }
@@ -7019,8 +7020,6 @@ const EXEC = {
       installContextMenuInterceptor(ctrl);
       ensureFullScreen();
       try { installKeyHandler(); } catch (e) {}
-      // The listener is per-model — the freshly-loaded component needs its own.
-      try { installModifyListener(xModel); } catch (e) { log('XModifyListener 安装失败 / install failed: ' + errStr(e)); }
       // 选区监听是 per-controller 的，换文档同样要重装（漏了工具栏就再也不刷新）
       try { installSelectionListener(ctrl); } catch (e) { log('XSelectionChangeListener 安装失败 / install failed: ' + errStr(e)); }
       // RecordChanges/ShowChangesInMargin 是 Writer 专属（Calc/Impress 没有该属性）——
@@ -7044,6 +7043,11 @@ const EXEC = {
       // 传回去成了「待提交」（教程反馈 15，lowa-e2e open-not-dirty 实证）。
       // 装载结果就是磁盘上的文件：清掉这个标志，真编辑照常置位。
       try { if (xModel.isModified()) xModel.setModified(false); } catch (e) {}
+      // 监听器放到规范化与清标志之后再装（台账 B10）：装早了，上面这些装载期改动（修订开关、
+      // 显示模式、锚点清场；旧版 Word 2/6、Excel 5/95 导入时尤其多）会先向宿主报一声 modified，
+      // 宿主若恰好已就绪就标脏、自动保存，把只是打开的原件按新格式写回磁盘。
+      // The listener is per-model — the freshly-loaded component needs its own.
+      try { installModifyListener(xModel); } catch (e) { log('XModifyListener 安装失败 / install failed: ' + errStr(e)); }
       // _default keeps modified components alive. Close only after successful
       // replacement: 33 retained models exhausted LOWA's 1 GiB heap (#1121).
       if (!previous) post('ui_ready');
