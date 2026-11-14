@@ -9629,6 +9629,18 @@ const EXEC = {
   // 宿主（VersionCompareTab）没有任何保存路径，只读是第二道保险。
   compare_document(p) {
     if (!toUnoByteSeq(p && p.baseBytes)) return { success: false, stage: 'input', message: 'baseBytes empty' };
+    // acceptExisting（台账 B12）：新版自身带的修订先接受、再比对——否则比对出来的修订与原有修订叠在一起
+    // （律师看到「52050%」）。旧版一侧原生比较本来就按最终文本读。只改这台对比专用实例里的内存模型。
+    let acceptedExisting = 0;
+    if (p && p.acceptExisting === true) {
+      const existing = countRedlines();
+      if (existing > 0) {
+        try { xModel.setPropertyValue('RecordChanges', false); } catch (e) {}
+        const resolved = EXEC.resolve_all_revisions({ action: 'accept' });
+        if (!resolved.success || resolved.remaining !== 0) return { success: false, stage: 'normalize', message: 'could not accept existing revisions' };
+        acceptedExisting = existing;
+      }
+    }
     try { setRedlineAuthor('版本对比'); } catch (e) {}
     const r = compareWithBytes(p && p.baseBytes, 'file:///tmp/awd_base_cmp.docx');
     if (!r.success) return r;
@@ -9637,7 +9649,7 @@ const EXEC = {
         ctrl.getFrame(), '.uno:EditDoc', '', 0, []);
     } catch (e) {}
     comparisonModel = xModel; // The comparison tab is a read-only review surface.
-    return { success: true, redlineCount: r.redlineCount };
+    return { success: true, redlineCount: r.redlineCount, acceptedExisting: acceptedExisting };
   },
   // Standalone comparison copies: compare both final projections in temporary
   // models. Source files are never written by this action.
