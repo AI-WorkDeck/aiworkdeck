@@ -4,7 +4,7 @@
 export default {
   "nav": "Log Audit",
   "title": "Log Audit Firma",
-  "subtitle": "Merekodkan log masuk, sambungan peranti, perkongsian projek dan perubahan ahli, jemputan klien, muat turun fail serta perubahan tetapan firma anda. Hanya boleh dilihat oleh pentadbir firma; tidak pernah mengandungi kandungan dokumen, kandungan fail atau perbualan.",
+  "subtitle": "Merekodkan log masuk, peranti dan kunci akaun, penyertaan atau peninggalan firma serta perubahan peranan, perkongsian dan keahlian projek, jemputan klien, muat turun fail, perubahan tetapan firma dan akses yang ditolak, termasuk tindakan di laman web. Hanya boleh dilihat oleh pentadbir firma; tidak pernah mengandungi kandungan dokumen, kandungan fail atau perbualan.",
   "retention": "Rekod disimpan selama {days} hari, kemudian dipadam secara automatik",
   "from": "Dari",
   "to": "Hingga",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "ID Rekod",
   "outcomeFailure": "gagal",
   "catAll": "Semua Kategori",
+  "sourceWebsite": "laman web",
+  "colSource": "Sumber",
   "cat": {
     "AUTH": "Log masuk",
     "DEVICES": "Peranti",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Perkongsian Projek",
     "CLIENT": "Klien dan Pemesejan",
     "DATA": "Akses Data",
-    "SETTINGS": "Tetapan Firma"
+    "SETTINGS": "Tetapan Firma",
+    "ACCESS": "Akses Ditolak"
   },
   "action": {
     "LOGIN": "Log masuk",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Lampiran perbualan dimuat turun",
     "FIRM_CLOUD_SWITCH_CHANGED": "Suis awan firma diubah",
     "FIRM_COMMITTEE_APPOINTED": "Ahli jawatankuasa konflik dilantik",
-    "FIRM_COMMITTEE_REVOKED": "Ahli jawatankuasa konflik ditamatkan"
+    "FIRM_COMMITTEE_REVOKED": "Ahli jawatankuasa konflik ditamatkan",
+    "PERMISSION_DENIED": "Kebenaran ditolak",
+    "FIRM_MEMBER_JOINED": "Ahli menyertai firma",
+    "FIRM_MEMBER_LEFT": "Ahli meninggalkan firma",
+    "FIRM_MEMBER_REMOVED": "Ahli dikeluarkan daripada firma",
+    "FIRM_ROLE_CHANGED": "Peranan firma diubah",
+    "FIRM_TEAM_JOINED": "Pasukan menyertai firma",
+    "FIRM_TEAM_LEFT": "Pasukan meninggalkan firma",
+    "FIRM_TEAM_REMOVED": "Pasukan dikeluarkan daripada firma",
+    "FIRM_CREATED": "Firma dicipta",
+    "FIRM_JOIN_CODE_REGENERATED": "Kod penyertaan firma ditetapkan semula",
+    "WEBSITE_LOGIN_FAILED": "Log masuk laman web",
+    "ACCOUNT_API_KEY_CREATED": "Kunci akaun dikeluarkan",
+    "ACCOUNT_API_KEY_REVOKED": "Kunci akaun dibatalkan"
   }
 }

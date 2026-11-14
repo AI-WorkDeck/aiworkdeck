@@ -81,7 +81,7 @@
 import { firmCloudAction } from '@/services/api'
 import { buildAuditCsv, detailText } from '@/utils/firmAuditCsv.js'
 
-const CATEGORIES = ['AUTH', 'DEVICES', 'MEMBERSHIP', 'SHARING', 'CLIENT', 'DATA', 'SETTINGS']
+const CATEGORIES = ['AUTH', 'DEVICES', 'MEMBERSHIP', 'SHARING', 'CLIENT', 'DATA', 'SETTINGS', 'ACCESS']
 const PAGE = 100
 const EXPORT_PAGE = 500
 const EXPORT_MAX = 20000
@@ -167,7 +167,9 @@ export default {
     actionLabel(e) {
       const key = `auditLog.action.${e.action}`
       const label = this.$te && this.$te(key) ? this.$t(key) : e.action
-      return e.outcome === 'FAILURE' ? `${label} (${this.$t('auditLog.outcomeFailure')})` : label
+      const shown = e.outcome === 'FAILURE' ? `${label} (${this.$t('auditLog.outcomeFailure')})` : label
+      // 官网上报的事件标一下来源（入所退所、官网登录、账户 Key）
+      return e.source === 'website' ? `${shown} · ${this.$t('auditLog.sourceWebsite')}` : shown
     },
     formatTime(iso) {
       if (!iso) return ''
@@ -200,6 +202,7 @@ export default {
           { label: this.$t('auditLog.colAction'), value: (e) => this.actionLabel(e) },
           { label: this.$t('auditLog.colActionCode'), value: (e) => e.action },
           { label: this.$t('auditLog.colOutcome'), value: (e) => e.outcome },
+          { label: this.$t('auditLog.colSource'), value: (e) => e.source || '' },
           { label: this.$t('auditLog.colActor'), value: (e) => e.actorName },
           { label: this.$t('auditLog.colActorId'), value: (e) => e.actorUserId },
           { label: this.$t('auditLog.colTarget'), value: (e) => e.targetLabel },

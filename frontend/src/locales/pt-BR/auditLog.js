@@ -4,7 +4,7 @@
 export default {
   "nav": "Registro de auditoria",
   "title": "Registro de auditoria do escritório",
-  "subtitle": "Registra logins, conexões de dispositivos, compartilhamento de projetos e alterações de membros, convites a clientes, downloads de arquivos e alterações nas configurações do escritório. Visível apenas para administradores do escritório; nunca contém conteúdo de documentos, de arquivos ou conversas.",
+  "subtitle": "Registra logins, dispositivos e chaves de conta, entrada ou saída do escritório e mudanças de função, compartilhamento e membros de projetos, convites a clientes, downloads de arquivos, alterações nas configurações do escritório e acessos negados, incluindo ações no site. Visível apenas para administradores do escritório; nunca contém o conteúdo de documentos, arquivos ou conversas.",
   "retention": "Os registros são mantidos por {days} dias e depois removidos automaticamente",
   "from": "De",
   "to": "Até",
@@ -41,6 +41,8 @@ export default {
   "colEventId": "ID do registro",
   "outcomeFailure": "falhou",
   "catAll": "Todas as categorias",
+  "sourceWebsite": "site",
+  "colSource": "Origem",
   "cat": {
     "AUTH": "Login",
     "DEVICES": "Dispositivos",
@@ -48,7 +50,8 @@ export default {
     "SHARING": "Compartilhamento de projetos",
     "CLIENT": "Clientes e mensagens",
     "DATA": "Acesso a dados",
-    "SETTINGS": "Configurações do escritório"
+    "SETTINGS": "Configurações do escritório",
+    "ACCESS": "Acesso negado"
   },
   "action": {
     "LOGIN": "Login",
@@ -70,6 +73,19 @@ export default {
     "CHAT_FILE_DOWNLOADED": "Anexo da conversa baixado",
     "FIRM_CLOUD_SWITCH_CHANGED": "Chave de nuvem do escritório alterada",
     "FIRM_COMMITTEE_APPOINTED": "Membro do comitê de conflitos nomeado",
-    "FIRM_COMMITTEE_REVOKED": "Membro do comitê de conflitos destituído"
+    "FIRM_COMMITTEE_REVOKED": "Membro do comitê de conflitos destituído",
+    "PERMISSION_DENIED": "Permissão negada",
+    "FIRM_MEMBER_JOINED": "Membro entrou no escritório",
+    "FIRM_MEMBER_LEFT": "Membro saiu do escritório",
+    "FIRM_MEMBER_REMOVED": "Membro removido do escritório",
+    "FIRM_ROLE_CHANGED": "Função no escritório alterada",
+    "FIRM_TEAM_JOINED": "Equipe entrou no escritório",
+    "FIRM_TEAM_LEFT": "Equipe saiu do escritório",
+    "FIRM_TEAM_REMOVED": "Equipe removida do escritório",
+    "FIRM_CREATED": "Escritório criado",
+    "FIRM_JOIN_CODE_REGENERATED": "Código de entrada do escritório redefinido",
+    "WEBSITE_LOGIN_FAILED": "Login no site",
+    "ACCOUNT_API_KEY_CREATED": "Chave de conta emitida",
+    "ACCOUNT_API_KEY_REVOKED": "Chave de conta revogada"
   }
 }
