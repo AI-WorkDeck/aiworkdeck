@@ -395,8 +395,95 @@ function hasParagraphSpanningDeletion() {
   spanningDeletionCache = { model: xModel, revision: reviewRevision, value: value };
   return value;
 }
+// 台账 B11：在一段之内打字（光标塌陷、不含换行/Markdown 标记）不改段落结构——缓存的段落对象是活的、
+// 跟着内容走，索引照样可用。只前进正文版本号（补全令牌、宿主的版本围栏照常失效），不重建索引：
+// 重建 1800 段要半秒，期间 office 线程被占住，律师打的字排在后面上屏。
+let textOnlyEditDepth = 0;
+// ---- 宿主整篇读的「最终文本」不切视图（台账 B11）-------------------------------
+// 即时审校/写作辅助要读「改后的样子」。原做法是读前把修订显示切到「隐藏删除」、读完切回：
+// 改过稿子之后这一切换要整篇重排（150 页实测 ~600 ms），期间 office 线程占住，律师打的字排在后面。
+// 现在在内联视图里直接读，再把删除型修订覆盖的字从各段正文里剪掉——结果与切视图读到的逐字相同
+// （等价测试 tests/lowa-e2e/bulk-final-text.mjs）。拿不准的文档（删除里含域/批注锚点/脚注锚点、
+// 一端在正文一端不在、认不出的修订类型）整份退回切视图，并记日志。按（模型, 正文版本）缓存，两个读者共用。
+const FINAL_TEXT_SAFE_TYPES = new Set(['Insert', 'Format', 'ParagraphFormat', 'Attributes']);
+const DELETION_UNSAFE_PORTIONS = new Set(['TextField', 'Annotation', 'AnnotationEnd', 'Footnote', 'Endnote', 'Frame', 'InContentMetadata', 'ReferenceMark', 'DocumentIndexMark', 'Ruby', 'ContentControl']);
+let finalTextCuts = { model: null, revision: -1, cuts: null, fallback: null };
+function deletionHasUnsafePortion(rs, re) {
+  const c = rs.getText().createTextCursorByRange(rs);
+  c.gotoRange(re, true);
+  const paras = c.createEnumeration();
+  while (paras.hasMoreElements()) {
+    const para = paras.nextElement();
+    if (!para.supportsService('com.sun.star.text.Paragraph')) return 'non-paragraph content';
+    const portions = para.createEnumeration();
+    while (portions.hasMoreElements()) {
+      let type = '';
+      try { type = String(portions.nextElement().getPropertyValue('TextPortionType') || ''); } catch (e) { return 'unreadable portion'; }
+      if (DELETION_UNSAFE_PORTIONS.has(type)) return type;
+    }
+  }
+  return null;
+}
+function bodyFinalTextCuts() {
+  const rev = currentReviewRevision();
+  if (finalTextCuts.model === xModel && finalTextCuts.revision === rev) return finalTextCuts;
+  const cuts = new Map();
+  let fallback = null;
+  const add = (key, from, to) => { if (!cuts.has(key)) cuts.set(key, []); cuts.get(key).push([from, to]); };
+  try {
+    const en = xModel.getRedlines().createEnumeration();
+    const cache = {};
+    while (!fallback && en.hasMoreElements()) {
+      const r = en.nextElement();
+      let type = '';
+      try { type = String(r.getPropertyValue('RedlineType') || ''); } catch (e) { fallback = 'unreadable redline type'; break; }
+      if (FINAL_TEXT_SAFE_TYPES.has(type)) continue;
+      const rs = r.getPropertyValue('RedlineStart'), re = r.getPropertyValue('RedlineEnd');
+      const a = rs ? rangeLocator(rs, rs, cache) : null, b = re ? rangeLocator(re, re, cache) : null;
+      if (!a && !b) continue; // 整条在正文段落之外（表格、脚注、页眉页脚）：正文段落的字不受影响
+      if (type !== 'Delete') { fallback = 'redline type ' + type + ' in body'; break; }
+      if (!a || !b) { fallback = 'deletion crosses the body boundary'; break; }
+      const unsafe = deletionHasUnsafePortion(rs, re);
+      if (unsafe) { fallback = 'deletion contains ' + unsafe; break; }
+      // RedlineStart/End 不保证先后（实测删除型会倒过来报）：按（段号, 偏移）排好再剪
+      const [lo, hi] = (a.paraKey < b.paraKey || (a.paraKey === b.paraKey && a.start <= b.start)) ? [a, b] : [b, a];
+      // 跨段删除（删到段落标记）在最终稿视图里会合并/去掉段落、后面的段号整体前移，编号归属也随之变——
+      // 不能逐字保证一致，整份退回切视图。
+      if (lo.paraKey !== hi.paraKey) { fallback = 'deletion spans a paragraph mark'; break; }
+      add(lo.paraKey, lo.start, hi.start);
+    }
+  } catch (e) { fallback = 'error: ' + errStr(e); }
+  if (fallback) log('bulk final text: falls back to the view switch for this document (' + fallback + ')');
+  finalTextCuts = { model: xModel, revision: rev, cuts: cuts, fallback: fallback };
+  return finalTextCuts;
+}
+function cutText(text, ranges) {
+  if (!ranges || !ranges.length) return text;
+  const sorted = ranges.slice().sort((x, y) => x[0] - y[0]);
+  let out = '', pos = 0;
+  for (const [from, to] of sorted) {
+    const f = Math.max(pos, Math.min(from, text.length)), t = Math.min(to, text.length);
+    if (f > pos) out += text.slice(pos, f);
+    pos = Math.max(pos, t);
+  }
+  return out + text.slice(pos);
+}
+// 宿主整篇读（bulk + __agent）能否不切视图、直接在内联视图里按剪切表读出最终文本。
+function bulkFinalTextPlan(action, p) {
+  if (action !== 'get_document_text' || !p || p.bulk !== true || p.__agent !== true || !isWriterDoc()) return null;
+  if (revisionViewState().mode !== 'all' || !hasAnyRedline()) return null; // 原路径本来就不切
+  const plan = bodyFinalTextCuts();
+  return plan.fallback ? null : plan;
+}
+
 function invalidateParaIndex() {
   const viewOnly = exportInFlight || viewChangeInFlight;
+  if (textOnlyEditDepth > 0 && !viewOnly) {
+    completionSnapshot = null; reviewRevision++;
+    if (paraIndex.ranges && paraIndex.model === xModel) paraIndex.revision = reviewRevision;
+    for (const parked of parkedParaIndexes.values()) if (parked.model === xModel) parked.revision = reviewRevision;
+    return;
+  }
   // 最终稿/页边视图里，删到段落标记的修订会让引擎把段落合并显示；在那种视图里枚举出的段落对象，
   // 视图来回切过之后再读会变成空串、按段号写会失败（0.85.3）。所以：内联视图（all）的索引照存；
   // 其他视图的索引只有在稿子里没有跨段删除（不会合并）时才存，否则用完即弃、下次重建。
@@ -5513,6 +5600,11 @@ const EXEC = {
     }
     const vc = ctrl.getViewCursor();
     const text = String(p.text || '');
+    let collapsed = false;
+    try { collapsed = vc.isCollapsed(); } catch (e) {}
+    const textOnly = collapsed && text.length > 0 && !/[\r\n\u2028\u2029]/.test(text) && !MD_MARKER_RE.test(text);
+    if (textOnly) textOnlyEditDepth++;
+    try {
     return typeOverSelection(vc, !!p.replaceSelection, '输入', function () {
       vc.collapseToEnd();
       // 只管用户手打（replaceSelection）的单段纯文本；AI / 插件管线照旧。
@@ -5527,6 +5619,7 @@ const EXEC = {
       vc.collapseToEnd();
       return Object.assign({ success: true, inserted: text }, verifySnapshot());
     });
+    } finally { if (textOnly) textOnlyEditDepth--; }
   },
   // [verified] replace selection if any, else insert at cursor. '\n' in the new
   // text becomes a paragraph break (insertTextAtCursor).
@@ -7361,13 +7454,15 @@ const EXEC = {
     const maxParas = bulk ? Math.max(1, Math.min(Number(p && p.maxParagraphs) || 10000, 10000))
       : Math.max(1, Math.min(Number(p && p.maxParagraphs) || 200, 500));
     const charBudget = bulk ? 200000 : 15000;
+    const finalCuts = p && p.__finalCuts instanceof Map ? p.__finalCuts : null;
     return withParaIndex(function (ix) {
       const total = ix.total;
       const paragraphs = [];
       let chars = 0;
       for (let i = start; i < total && paragraphs.length < maxParas && chars < charBudget; i++) {
         const el = ix.ranges[i];
-        const item = { index: i, text: el.getString(), numbering: paragraphNumberingOf(el) };
+        const raw = el.getString();
+        const item = { index: i, text: finalCuts ? cutText(raw, finalCuts.get(i)) : raw, numbering: paragraphNumberingOf(el) };
         try {
           const lvl = el.getPropertyValue('OutlineLevel') || 0;
           if (lvl > 0) { item.headingLevel = lvl; item.style = el.getPropertyValue('ParaStyleName') || ''; }
@@ -13013,8 +13108,10 @@ function execCommand(reqId, action, params) {
       catch (e) { log('修订作者设置失败 / redline author failed: ' + errStr(e)); }
       return fn(p);
     };
+    const finalPlan = fn ? bulkFinalTextPlan(action, p) : null;
+    if (finalPlan) p.__finalCuts = finalPlan.cuts;
     result = fn
-      ? (RESOLVE_REVISION_ACTIONS.has(action) ? runRevisionResolution(run, p, action) : (p.__agent || FINAL_TEXT_ACTIONS.has(action)) ? runAgentCommandInMarginView(action, run) : run())
+      ? (RESOLVE_REVISION_ACTIONS.has(action) ? runRevisionResolution(run, p, action) : finalPlan ? run() : (p.__agent || FINAL_TEXT_ACTIONS.has(action)) ? runAgentCommandInMarginView(action, run) : run())
       : { success: false, message: 'not implemented in LibreOffice worker yet: ' + action };
   } catch (e) {
     result = { success: false, message: errStr(e) };

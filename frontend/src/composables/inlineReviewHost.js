@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+// 台账 B11：整篇读按页取，每页一条命令——律师打的字（每个字也是一条命令）能插在页与页之间上屏，
+// 而不是排在一次读完上千段的大命令后面。页与页之间正文变了，版本围栏会丢弃这次快照、停笔后重读。
+const READ_PAGE_PARAGRAPHS = 300
+
 const preferenceListeners = new Map()
 const unwrap = (value) => value && typeof value === 'object' && 'code' in value && 'data' in value ? value.data : value
 const hashKey = value => {
@@ -127,7 +131,7 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
     let revision, start = 0, chars = 0, truncated = false, exhausted = false
     // Pagination has a revision fence: never splice paragraphs from different edits.
     for (let page = 0; page < 60; page++) {
-      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: 10000, bulk: true, __agent: true })
+      const result = await execute('get_document_text', { startParagraph: start, maxParagraphs: READ_PAGE_PARAGRAPHS, bulk: true, __agent: true })
       if (!current(gen)) return null
       if (!result?.success || result.revision == null || !Array.isArray(result.paragraphs)) throw new Error('REVIEW_SNAPSHOT_FAILED')
       if (revision == null) revision = result.revision
