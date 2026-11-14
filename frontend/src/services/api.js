@@ -5025,3 +5025,16 @@ export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions
 export const recordPendingRevisionProgress = (id, appliedCount) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/progress`, method: 'POST', data: { appliedCount } })
 export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
 export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })
+
+// ---- 律所审计日志（readiness S20）----
+// 走律所云端统一入口 POST /api/lawfirm/cloud：服务端直接分发，桌面端经网关转发到官方协作服务。
+// 身份与「是否律所管理员」一律由服务端按账户名录判定；这里只传动作与筛选条件。
+export function firmCloudAction(action, params = {}) {
+  return request({
+    url: '/api/lawfirm/cloud',
+    method: 'POST',
+    data: { action, params },
+    header: { 'Content-Type': 'application/json' },
+    accountPrompt: false,
+  }).then(unwrapEnvelope)
+}

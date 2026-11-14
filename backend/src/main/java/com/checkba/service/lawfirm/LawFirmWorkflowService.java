@@ -89,6 +89,11 @@ public class LawFirmWorkflowService {
         return Map.of("self",me,"committee",committee,"records",records);
     }
 
+    /** 律所审计日志（S20）：利冲委员指派与撤销是律所内的角色变更。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit=firmAudit; }
+
     private Map<String,Object> appoint(LawFirmAuthority.Member me,Map<String,Object> p) {
         if(!me.firmAdmin()) throw LawFirmAuthority.denied();
         Long target=number(p,"userId");
@@ -103,6 +108,8 @@ public class LawFirmWorkflowService {
         if(a==null) { a=new LawFirmCommitteeAppointment();a.setId(UUID.randomUUID().toString());a.setFirmId(me.firmId());a.setUserId(target); }
         a.setAppointedBy(me.userId());a.setState(revoke?"REVOKED":"PENDING");a.setUpdatedAt(Instant.now());
         appointments.saveAndFlush(a);
+        if(firmAudit!=null) firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("MEMBERSHIP",revoke?"FIRM_COMMITTEE_REVOKED":"FIRM_COMMITTEE_APPOINTED")
+                .actor(me.userId()).targetUser(target));
         String event="appointment/"+a.getId()+"/"+a.getVersion();
         notify(me.userId(),List.of(target),event,"COMMITTEE_APPOINTMENT",revoke?LangText.of("利冲委员指派已撤销","Conflict committee appointment revoked"):LangText.of("请确认利冲委员指派","Please confirm conflict committee appointment"),
                 revoke?LangText.of("你已不再具备该律所的利冲终审权限。","You no longer hold final conflict review authority for this law firm."):LangText.of("律所管理员邀请你担任利冲委员，请在律所管理中接受或拒绝。","The law firm administrator has invited you to serve on the conflict committee. Please accept or decline in Law Firm Management."),revoke?"CANCELLED":"PENDING",a.getId());

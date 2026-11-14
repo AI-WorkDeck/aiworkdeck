@@ -84,6 +84,25 @@ public class ClientInvitationService {
 
     @Transactional
     public Issued issueClientCode(Long projectId, Long requesterId, String clientName) {
+        Issued issued = issueClientCodeInternal(projectId, requesterId, clientName);
+        if (firmAudit != null) {
+            boolean named = clientName != null && !clientName.trim().isEmpty();
+            var e = com.checkba.service.audit.FirmAuditLog.event("CLIENT", "CLIENT_INVITE_ISSUED").actor(requesterId).project(projectId)
+                    .detail("kind", named ? "named" : "shared")
+                    .detail("expiresAt", issued.expiresAt() == null ? null : issued.expiresAt().toString());
+            if (issued.clientUserId() != null) e.targetUser(issued.clientUserId());
+            firmAudit.record(e);
+        }
+        return issued;
+    }
+
+    /** 律所审计日志（S20）：只记谁给哪个项目签了客户访问码、具名与否、到期时间；不记码本身。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
+    private Issued issueClientCodeInternal(Long projectId, Long requesterId, String clientName) {
         projectMemberService.lockCloudMembership(projectId);
         // 1. Check permissions (Allow Admin and Participant)
         if (!projectMemberService.hasWritePermission(projectId, requesterId)) {

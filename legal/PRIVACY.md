@@ -134,6 +134,14 @@
 
 这些是财务记录，与账户共存续，在「系统管理 → 账户与用量」可自行查看。
 
+## 三之二、会留下的记录：律所审计日志（律所账户）
+
+你的账户属于某家律所（官网账户名录里有律所归属）时，官方协作服务（或你所在律所的团队服务器）会为该律所记一份审计日志，供律所管理员核查：
+
+- 记录：登录与口令错误、设备连接与撤销、项目放入案件库与首次取到设备、项目成员增减、客户访问码签发与客户门户登录、项目沟通邀请（含「可看此前消息」选择）与移出、经服务器的文件下载、律所云端开关与利冲委员指派；每条带时间、操作人、对象（如文件名、项目名、设备名）、来源 IP 与客户端标识；
+- **不含**文档内容、文件内容、对话或提示词、口令、验证码、访问码与令牌；
+- 只有本所律所管理员能在「设置 → 审计日志」查看与导出；记录只增不改、按律所做哈希链防篡改，默认保留 3 年后自动清除。没有律所归属的个人账户、桌面单机不记。
+
 ## 四、怎么让它不经过我们
 
 「系统管理 → 平台服务」里每一项都可以改档，改完立即生效：
@@ -311,6 +319,8 @@ The personal assistant additionally requires file backup consent and explicit cl
 Apart from the case library, explicitly enabled cloud file backups, mobile calendar snapshots and personal assistant data, files in the relay area are deleted on delivery: the cloud only stages them and is not a long-term archive.
 
 **What is kept: billing entries.** Each platform-sourced call leaves one ledger entry under your account recording the service name, operation, quantity (minutes / pages / calls / thousand characters), amount charged, timestamp, and idempotency key. It contains no request content, no result content, and no file names. These are financial records, kept for the life of the account, and visible to you under Settings → Account and Usage.
+
+**What is kept: firm audit log (firm accounts).** When your account belongs to a law firm in the account directory, the official collaboration service (or your firm's team server) keeps an audit log for that firm: sign-ins and wrong passwords, device connections and revocations, projects added to the Case Library and first downloaded to a device, project member changes, client access codes and client portal sign-ins, conversation invitations (including the "can see earlier messages" choice) and removals, file downloads through the server, firm cloud switches and conflict committee appointments. Each record has the time, actor, target (such as a file, project or device name), source IP and client identifier. It contains no document content, file content, conversations or prompts, passwords, codes or tokens. Only the firm's administrators can view and export it under Settings → Audit Log. Records are append-only, hash-chained per firm, and removed automatically after 3 years by default. Personal accounts without a firm and the stand-alone desktop record nothing.
 
 **How to keep it off our servers.** Under Settings → Platform Services each item can be switched to your own key (the desktop app then connects to that vendor directly), to an on-device tier where one exists (on-device meeting transcription ships in a later version), or disabled entirely. Existing installs that already have a vendor key configured stay on their own key and are not moved. Team-hosted server deployments and the Office add-in are always own-key; the platform-sourced tier is not offered to them.
 
