@@ -148,6 +148,22 @@ export default {
     "titles": "Vui lòng nhập tiêu đề cho tất cả các mục."
   },
   "client": {
+    "chat": {
+      "title": "Trò chuyện dự án",
+      "hint": "Trao đổi với đội ngũ pháp lý của bạn về dự án này. Luật sư của bạn quyết định bạn được xem những tin nhắn và tệp trước đó nào.",
+      "tabChecklist": "Danh mục kiểm tra",
+      "loading": "Đang tải tin nhắn…",
+      "empty": "Chưa có tin nhắn. Bạn có thể hỏi luật sư của mình tại đây.",
+      "older": "Tải tin nhắn cũ hơn",
+      "you": "Bạn",
+      "filePending": "Tệp vẫn đang được chuẩn bị. Vui lòng liên hệ luật sư của bạn.",
+      "placeholder": "Nhập tin nhắn. Nhấn Enter để gửi, Shift+Enter để xuống dòng",
+      "attach": "Gửi tệp",
+      "send": "Gửi",
+      "sending": "Đang gửi…",
+      "fileTooLarge": "Tệp không được lớn hơn 8 MB",
+      "unavailable": "Trò chuyện dự án hiện không khả dụng. Vui lòng thử lại sau."
+    },
     "messageUnavailable": "Dự án hoặc danh mục được mời này không còn khả dụng. Vui lòng làm mới và thử lại.",
     "workspaceTitle": "Cộng tác khách hàng",
     "workspaceHint": "Chuẩn bị tài liệu theo danh mục của luật sư, nộp từng mục và theo dõi phản hồi.",

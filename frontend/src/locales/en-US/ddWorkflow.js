@@ -147,6 +147,22 @@ export default {
     "titles": "Enter a title for every item."
   },
   "client": {
+    "chat": {
+      "title": "Project chat",
+      "hint": "Talk to your legal team about this project. Your lawyers decide which earlier messages and files you can see.",
+      "tabChecklist": "Checklist",
+      "loading": "Loading messages…",
+      "empty": "No messages yet. You can ask your lawyers here.",
+      "older": "Load earlier messages",
+      "you": "You",
+      "filePending": "This file is still being prepared. Please contact your lawyer.",
+      "placeholder": "Type a message. Enter to send, Shift+Enter for a new line",
+      "attach": "Send a file",
+      "send": "Send",
+      "sending": "Sending…",
+      "fileTooLarge": "Files can't be larger than 8 MB",
+      "unavailable": "Project chat isn't available right now. Please try again later."
+    },
     "messageUnavailable": "This invited project or checklist is no longer available. Refresh and try again.",
     "workspaceTitle": "Client collaboration",
     "workspaceHint": "Prepare documents from your lawyer’s checklist, submit each item and follow the feedback.",

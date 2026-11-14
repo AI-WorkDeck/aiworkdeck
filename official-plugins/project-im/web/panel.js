@@ -420,7 +420,10 @@
       const row = node('article', null, 'message' + (String(message.senderId) === String(state.self?.id) ? ' mine' : ''));
       const content = node('div', null, 'message-content');
       row.append(avatar(message.senderName || message.agentName, message.senderAvatarUrl, message.actorType === 'AGENT'), content);
-      content.append(node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta'));
+      const meta = node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta');
+      // 客户（门户访问码客户或项目客户）发的消息明确标出，律师一眼分清对内对外
+      if (message.fromClient) meta.append(node('span', t('fromClient'), 'client-badge'));
+      content.append(meta);
       const bubble = node('div', null, 'bubble'); if (message.text) bubble.append(node('div', message.text));
       if (message.attachment) bubble.append(fileCard(message.attachment));
       content.append(bubble); $('messages').append(row);

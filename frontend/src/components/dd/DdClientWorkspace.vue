@@ -150,30 +150,42 @@
         </div>
       </aside>
 
-      <DdClientChecklist
-        v-if="requestId && selected"
-        :key="`${selected.id}:${requestId}`"
-        :request-id="requestId"
-        :project-id="selected.projectId"
-        :connection-id="selected.id"
-        :focus-item-id="focusItemId"
-        @busy-change="setSubmissionBusy"
-      />
-      <div v-else class="empty detail-empty">{{ $t('ddWorkflow.client.chooseChecklist') }}</div>
+      <div class="workspace-main">
+        <div v-if="portalChatEnabled" class="main-tabs" role="tablist">
+          <button type="button" role="tab" class="main-tab" :class="{ active: view === 'checklist' }" :aria-selected="view === 'checklist'" @click="view = 'checklist'">{{ $t('ddWorkflow.client.chat.tabChecklist') }}</button>
+          <button type="button" role="tab" class="main-tab" :class="{ active: view === 'chat' }" :aria-selected="view === 'chat'" :disabled="submissionBusy" @click="view = 'chat'">{{ $t('ddWorkflow.client.chat.title') }}</button>
+        </div>
+        <ClientPortalChat v-if="portalChatEnabled && view === 'chat'" :key="selected.id" :connection-id="selected.id" :project-id="selected.projectId" />
+        <DdClientChecklist
+          v-else-if="requestId && selected"
+          :key="`${selected.id}:${requestId}`"
+          :request-id="requestId"
+          :project-id="selected.projectId"
+          :connection-id="selected.id"
+          :focus-item-id="focusItemId"
+          @busy-change="setSubmissionBusy"
+        />
+        <div v-else class="empty detail-empty">{{ $t('ddWorkflow.client.chooseChecklist') }}</div>
+      </div>
     </div>
   </section>
 </template>
 <script>
 import DdClientChecklist from './DdClientChecklist.vue'
+import ClientPortalChat from './ClientPortalChat.vue'
 import { listCloudConnections } from '@/services/api.js'
 import { isClientPortalBuild } from '@/utils/clientPortal.js'
 import { connectDdClient, listDdClientConnections, removeDdClientConnection, ddClientRead, ddClientWrite, ddClientIdentity, pollDdClientNotifications, ddNotificationPermission, enableDdNotifications } from '@/services/ddClient.js'
 export default {
-  name: 'DdClientWorkspace', components: { DdClientChecklist },
+  name: 'DdClientWorkspace', components: { DdClientChecklist, ClientPortalChat },
   props: { navigationTarget: { type: Object, default: null } },
   watch: { navigationTarget() { this.applyNavigationTarget() } },
-  data: () => ({ submissionBusy: false, pendingNavigation: false, code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
-  computed: { selected() { return this.connections.find(c => c.id === this.selectedId) } },
+  data: () => ({ view: 'checklist', submissionBusy: false, pendingNavigation: false, code: '', connections: [], selectedId: '', requestId: null, focusItemId: null, requests: [], adding: false, joining: false, loading: false, requestsLoading: false, error: '', cloudConnections: [], cloudConnectionId: '', generation: 0, identity: '', identityTimer: null, notificationTimer: null, notifications: [], notificationPermission: ddNotificationPermission() }),
+  computed: {
+    selected() { return this.connections.find(c => c.id === this.selectedId) },
+    // Project chat lives in the browser portal; desktop client connections use the message center instead.
+    portalChatEnabled() { return isClientPortalBuild() && !!this.selected && String(this.selected.id).startsWith('portal-') },
+  },
   mounted() {
     this.identity = ddClientIdentity(); this.load(); this.refreshNotifications(); this.notificationTimer = setInterval(() => this.refreshNotifications(), 15000)
     if (typeof window !== 'undefined' && window.__AWD_PORTAL_CODE__) { this.code = window.__AWD_PORTAL_CODE__; window.__AWD_PORTAL_CODE__ = ''; this.adding = true }
@@ -671,6 +683,11 @@ p {
   display: grid;
   grid-template-columns: 268px minmax(0, 1fr);
 }
+
+.workspace-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.main-tabs { display: flex; gap: 4px; padding: var(--awd-space-3, 12px) var(--awd-space-4, 16px) 0; border-bottom: 1px solid var(--awd-border); }
+.main-tab { border: 0; border-bottom: 2px solid transparent; background: none; padding: 8px 12px; cursor: pointer; color: var(--awd-text-2); font: inherit; }
+.main-tab.active { color: var(--awd-text); border-bottom-color: var(--awd-accent); }
 
 .project-list {
   padding: var(--awd-space-5);

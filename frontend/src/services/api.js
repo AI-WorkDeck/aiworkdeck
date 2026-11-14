@@ -2090,11 +2090,11 @@ export function clientLogin(accessCode, displayName) {
   })
 }
 
-export function inviteClient(projectId, clientName) {
+export function inviteClient(projectId, clientName, shareHistory = false) {
   return request({
     url: `/api/projects/${projectId}/invite/client`,
     method: 'POST',
-    data: { clientName },
+    data: { clientName, shareHistory: shareHistory === true },
     header: { 'Content-Type': 'application/json' }
   })
 }
@@ -4620,9 +4620,10 @@ export function removeCloudMember(projectId, remoteUserId) {
 
 // 经案件库签发客户访问码（dev-board#1050）。回 {accessCode, expiresAt, clientUserId, clientUrl}；
 // 发给客户的链接是 `${clientUrl}#code=<码>`（utils/memberLookup.js clientPortalLink）。
-export function inviteCloudClient(projectId, clientName) {
+// shareHistory：客户在项目沟通里能否看加入之前的消息（B4），默认 false
+export function inviteCloudClient(projectId, clientName, shareHistory = false) {
   return request({ url: `/api/cloud/projects/${projectId}/invite/client`, method: 'POST',
-    data: { clientName }, header: { 'Content-Type': 'application/json' } })
+    data: { clientName, shareHistory: shareHistory === true }, header: { 'Content-Type': 'application/json' } })
 }
 
 // ==================== 记忆同步 ====================

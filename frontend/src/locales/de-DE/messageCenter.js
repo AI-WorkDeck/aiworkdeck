@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "Auch frühere Nachrichten",
   "inviteHintAfterJoin": "Ein Mandant, der mit diesem Code beitritt, sieht nur Nachrichten und Dateien, die nach seinem Beitritt gesendet werden. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}.",
   "inviteHintWithHistory": "Ein Mandant, der mit diesem Code beitritt, kann auch frühere Nachrichten lesen; Dateien werden weiterhin einzeln gemäß ihren Zugriffsrechten freigegeben. Geben Sie den Code nur an die vorgesehene Person weiter. Gültig bis {time}.",
+  "fromClient": "Mandant",
 }

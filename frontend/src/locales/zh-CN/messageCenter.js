@@ -50,4 +50,5 @@ export default {
   "historyWithEarlier": "同时可看此前的消息",
   "inviteHintAfterJoin": "客户凭码加入后，只能看到入群之后的消息和文件。请仅交给预期成员。有效期至 {time}。",
   "inviteHintWithHistory": "客户凭码加入后，可同时查看此前的消息；文件仍按访问权限逐个开放。请仅交给预期成员。有效期至 {time}。",
+  "fromClient": "客户",
 }

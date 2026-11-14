@@ -357,6 +357,12 @@ export default {
   // ---- 客户门户（dev-board#1050）：案卷在团队案件库里时，访问码由案件库签发 ----
   clientPortalLinkLabel: '客户打开的网址：',
   clientCodeExpires: '有效期至 {date}，过期后重新生成即可续期。',
+  clientChatHistoryLabel: '项目沟通里客户能看到的消息',
+  clientChatHistoryAfter: '只看加入之后的消息（推荐）',
+  clientChatHistoryAll: '也可以看加入之前的消息',
+  clientChatHistoryResultAfter: '项目沟通：客户只看加入之后的消息。',
+  clientChatHistoryResultAll: '项目沟通：客户可以看加入之前的消息。',
+  clientChatHistoryNotApplied: '案件库还不支持这一选择，客户按只看加入之后的消息处理。',
   clientCopyInvite: '复制发给客户的话',
   clientInviteShareText: '请用浏览器打开下面的链接进入案卷，上传我们需要的材料：\n{link}\n\n如果页面要求输入访问码，请输入：{code}\n访问码有效期至 {date}，只发给你本人，请勿转发。',
   clientInviteShareTextNoDate: '请用浏览器打开下面的链接进入案卷，上传我们需要的材料：\n{link}\n\n如果页面要求输入访问码，请输入：{code}\n访问码只发给你本人，请勿转发。',

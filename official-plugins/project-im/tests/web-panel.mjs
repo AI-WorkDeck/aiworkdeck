@@ -527,3 +527,11 @@ test('QA D15: an existing private assistant chat is resumed on open without enro
  assert.equal(p.$('chat-title').textContent,agent.name)
  assert.equal(p.calls.some(c=>c.action==='ensureAgent'),false)
 })
+
+test('messages from the client carry a visible client badge; staff messages do not (B4)', async t => {
+ const p=await panel({call:({action})=> action==='list'?{conversations:[c1]}:action==='messages'?{messages:[{...msg,id:1,attachment:null,text:'律师消息'},{...msg,id:2,senderId:12,senderName:'合成客户',attachment:null,text:'客户消息',fromClient:true}],hasMore:false}:undefined})
+ close(t,p);await p.select()
+ const metas=[...p.$('messages').querySelectorAll('.message-meta')]
+ assert.equal(metas[0].querySelector('.client-badge'),null)
+ assert.equal(metas[1].querySelector('.client-badge').textContent,'客户')
+})

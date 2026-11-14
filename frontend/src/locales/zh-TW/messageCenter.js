@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "同時可看此前的訊息",
   "inviteHintAfterJoin": "客戶憑碼加入後，只能看到入群之後的訊息和檔案。請僅交給預期成員。有效期至 {time}。",
   "inviteHintWithHistory": "客戶憑碼加入後，可同時查看此前的訊息；檔案仍按存取權限逐一開放。請僅交給預期成員。有效期至 {time}。",
+  "fromClient": "客戶",
 }

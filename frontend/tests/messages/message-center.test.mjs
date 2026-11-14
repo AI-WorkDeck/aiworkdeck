@@ -218,3 +218,10 @@ test('QA D3: an installed project-scoped plugin without an open project offers t
  assert.match(f.host.textContent,/请先打开一个项目/);assert.doesNotMatch(f.host.textContent,/尚未安装或启用/)
  ;[...f.host.querySelectorAll('button')].find(b=>b.textContent===zh.openProjects).click();await tick();assert.equal(opened.length,1)
 })
+test('messages from the client carry the client badge; staff messages do not (B4)',async t=>{
+ const f=await mount(t);f.state.messages=[{id:1,senderId:7,actorType:'HUMAN',senderName:'测试用户',text:'律师消息'},{id:2,senderId:12,actorType:'HUMAN',senderName:'合成客户',text:'客户消息',fromClient:true}]
+ await selectChat(f)
+ const rows=[...f.host.querySelectorAll('.message-row')]
+ assert.equal(rows[0].querySelector('.client-badge'),null)
+ assert.equal(rows[1].querySelector('.client-badge').textContent,'客户')
+})

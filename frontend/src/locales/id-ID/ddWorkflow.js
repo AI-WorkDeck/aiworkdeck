@@ -147,6 +147,22 @@ export default {
     "titles": "Masukkan judul untuk setiap item."
   },
   "client": {
+    "chat": {
+      "title": "Obrolan Proyek",
+      "hint": "Berdiskusi dengan tim hukum Anda tentang proyek ini. Pengacara Anda yang menentukan pesan dan berkas sebelumnya yang dapat Anda lihat.",
+      "tabChecklist": "Daftar periksa",
+      "loading": "Memuat pesan…",
+      "empty": "Belum ada pesan. Anda dapat bertanya kepada pengacara Anda di sini.",
+      "older": "Muat pesan sebelumnya",
+      "you": "Anda",
+      "filePending": "Berkas masih disiapkan. Silakan hubungi pengacara Anda.",
+      "placeholder": "Ketik pesan. Enter untuk mengirim, Shift+Enter untuk baris baru",
+      "attach": "Kirim berkas",
+      "send": "Kirim",
+      "sending": "Mengirim…",
+      "fileTooLarge": "Berkas tidak boleh lebih besar dari 8 MB",
+      "unavailable": "Obrolan proyek sedang tidak tersedia. Silakan coba lagi nanti."
+    },
     "messageUnavailable": "Proyek undangan atau daftar periksa ini tidak lagi tersedia. Segarkan dan coba lagi.",
     "workspaceTitle": "Kolaborasi klien",
     "workspaceHint": "Siapkan dokumen dari daftar periksa pengacara Anda, kirimkan setiap item, dan ikuti umpan baliknya.",

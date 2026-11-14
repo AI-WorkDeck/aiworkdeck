@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "Cả tin nhắn trước đó",
   "inviteHintAfterJoin": "Khách hàng tham gia bằng mã này chỉ thấy tin nhắn và tệp được gửi sau khi tham gia. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}.",
   "inviteHintWithHistory": "Khách hàng tham gia bằng mã này cũng đọc được các tin nhắn trước đó; tệp vẫn được mở từng tệp theo quyền truy cập. Chỉ chia sẻ cho đúng người dự định. Có hiệu lực đến {time}.",
+  "fromClient": "Khách hàng",
 }

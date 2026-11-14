@@ -8,5 +8,6 @@
   "panel.historyWithEarlier": "Önceki mesajlar da",
   "panel.inviteHintAfterJoin": "Bu kodla katılan müvekkil yalnızca katıldıktan sonra gönderilen mesajları ve dosyaları görür. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir",
   "panel.inviteHintWithHistory": "Bu kodla katılan müvekkil önceki mesajları da okuyabilir; dosyalar yine erişim izinlerine göre tek tek açılır. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir",
-  "panel.inviteJoinHow": "Karşı taraf kendi AI WorkDeck hesabıyla uygulamada oturum açar ve kodu “Mesaj merkezi → Sohbetler → Kodla katıl” bölümüne ya da “Proje Sohbeti → Kodla katıl” içine girer. Müvekkil portalı bu kodu kabul etmez."
+  "panel.inviteJoinHow": "Karşı taraf kendi AI WorkDeck hesabıyla uygulamada oturum açar ve kodu “Mesaj merkezi → Sohbetler → Kodla katıl” bölümüne ya da “Proje Sohbeti → Kodla katıl” içine girer. Müvekkil portalı bu kodu kabul etmez.",
+  "panel.fromClient": "Müvekkil"
 }

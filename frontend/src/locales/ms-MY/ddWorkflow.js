@@ -147,6 +147,22 @@ export default {
     "titles": "Masukkan tajuk bagi setiap item."
   },
   "client": {
+    "chat": {
+      "title": "Sembang Projek",
+      "hint": "Berbincang dengan pasukan guaman anda tentang projek ini. Peguam anda menentukan mesej dan fail terdahulu yang boleh anda lihat.",
+      "tabChecklist": "Senarai semak",
+      "loading": "Sedang memuatkan mesej…",
+      "empty": "Belum ada mesej. Anda boleh bertanya kepada peguam anda di sini.",
+      "older": "Muatkan mesej terdahulu",
+      "you": "Anda",
+      "filePending": "Fail masih disediakan. Sila hubungi peguam anda.",
+      "placeholder": "Taip mesej. Enter untuk hantar, Shift+Enter untuk baris baharu",
+      "attach": "Hantar fail",
+      "send": "Hantar",
+      "sending": "Sedang menghantar…",
+      "fileTooLarge": "Fail tidak boleh melebihi 8 MB",
+      "unavailable": "Sembang projek tidak tersedia buat masa ini. Sila cuba lagi kemudian."
+    },
     "messageUnavailable": "Projek jemputan atau senarai semak ini tidak lagi tersedia. Segar semula dan cuba lagi.",
     "workspaceTitle": "Kerjasama pelanggan",
     "workspaceHint": "Sediakan dokumen daripada senarai semak peguam anda, serahkan setiap item dan ikuti maklum balas.",

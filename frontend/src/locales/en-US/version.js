@@ -356,6 +356,12 @@ export default {
   // ---- Client portal (dev-board#1050): case files in the Team Case Library get codes issued by the library ----
   clientPortalLinkLabel: 'Link for the client:',
   clientCodeExpires: 'Valid until {date}. Generate it again to extend.',
+  clientChatHistoryLabel: 'Messages the client can see in project chat',
+  clientChatHistoryAfter: 'Only messages after they join (recommended)',
+  clientChatHistoryAll: 'Also messages from before they join',
+  clientChatHistoryResultAfter: 'Project chat: the client sees only messages after joining.',
+  clientChatHistoryResultAll: 'Project chat: the client can also see earlier messages.',
+  clientChatHistoryNotApplied: 'The case library doesn\'t support this choice yet; the client will see only messages after joining.',
   clientCopyInvite: 'Copy message for the client',
   clientInviteShareText: 'Please open the link below in your browser to access the case file and upload the materials we need:\n{link}\n\nIf the page asks for an access code, enter: {code}\nThe code is valid until {date}. It is for you only — please do not forward it.',
   clientInviteShareTextNoDate: 'Please open the link below in your browser to access the case file and upload the materials we need:\n{link}\n\nIf the page asks for an access code, enter: {code}\nThe code is for you only — please do not forward it.',

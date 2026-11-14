@@ -147,6 +147,22 @@ export default {
     "titles": "Her madde için bir başlık girin."
   },
   "client": {
+    "chat": {
+      "title": "Proje sohbeti",
+      "hint": "Bu proje hakkında hukuk ekibinizle görüşün. Hangi önceki mesaj ve dosyaları görebileceğinize avukatlarınız karar verir.",
+      "tabChecklist": "Kontrol listesi",
+      "loading": "Mesajlar yükleniyor…",
+      "empty": "Henüz mesaj yok. Avukatlarınıza buradan soru sorabilirsiniz.",
+      "older": "Önceki mesajları yükle",
+      "you": "Siz",
+      "filePending": "Dosya hâlâ hazırlanıyor. Lütfen avukatınızla iletişime geçin.",
+      "placeholder": "Bir mesaj yazın. Göndermek için Enter, yeni satır için Shift+Enter",
+      "attach": "Dosya gönder",
+      "send": "Gönder",
+      "sending": "Gönderiliyor…",
+      "fileTooLarge": "Dosyalar 8 MB'tan büyük olamaz",
+      "unavailable": "Proje sohbeti şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+    },
     "messageUnavailable": "Bu davet edilen proje veya kontrol listesi artık kullanılamıyor. Yenileyip tekrar deneyin.",
     "workspaceTitle": "Müvekkil iş birliği",
     "workspaceHint": "Avukatınızın kontrol listesindeki belgeleri hazırlayın, her maddeyi gönderin ve geri bildirimleri takip edin.",

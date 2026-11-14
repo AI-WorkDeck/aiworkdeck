@@ -8,5 +8,6 @@
   "panel.historyWithEarlier": "Termasuk pesan sebelumnya",
   "panel.inviteHintAfterJoin": "Klien yang bergabung dengan kode ini hanya melihat pesan dan berkas yang dikirim setelah ia bergabung. Bagikan hanya kepada orang yang dituju. Berlaku hingga {time}",
   "panel.inviteHintWithHistory": "Klien yang bergabung dengan kode ini juga dapat membaca pesan sebelumnya; berkas tetap dibuka satu per satu sesuai izin aksesnya. Bagikan hanya kepada orang yang dituju. Berlaku hingga {time}",
-  "panel.inviteJoinHow": "Orang tersebut masuk ke aplikasi AI WorkDeck dengan akunnya sendiri lalu memasukkan kode di “Pusat pesan → Obrolan → Gabung dengan kode” atau di “Obrolan Proyek → Gabung dengan kode”. Portal klien tidak menerima kode ini."
+  "panel.inviteJoinHow": "Orang tersebut masuk ke aplikasi AI WorkDeck dengan akunnya sendiri lalu memasukkan kode di “Pusat pesan → Obrolan → Gabung dengan kode” atau di “Obrolan Proyek → Gabung dengan kode”. Portal klien tidak menerima kode ini.",
+  "panel.fromClient": "Klien"
 }

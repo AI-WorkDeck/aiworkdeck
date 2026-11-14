@@ -112,4 +112,5 @@ export default {
   "historyWithEarlier": "Önceki mesajlar da",
   "inviteHintAfterJoin": "Bu kodla katılan müvekkil yalnızca katıldıktan sonra gönderilen mesajları ve dosyaları görür. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir.",
   "inviteHintWithHistory": "Bu kodla katılan müvekkil önceki mesajları da okuyabilir; dosyalar yine erişim izinlerine göre tek tek açılır. Kodu yalnızca hedeflenen kişiyle paylaşın. {time} tarihine kadar geçerlidir.",
+  "fromClient": "Müvekkil",
 }

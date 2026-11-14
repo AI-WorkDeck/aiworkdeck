@@ -147,6 +147,22 @@ export default {
     "titles": "Geben Sie für jedes Element einen Titel ein."
   },
   "client": {
+    "chat": {
+      "title": "Projektchat",
+      "hint": "Besprechen Sie dieses Projekt mit Ihrem Anwaltsteam. Ihre Anwälte entscheiden, welche früheren Nachrichten und Dateien Sie sehen können.",
+      "tabChecklist": "Checkliste",
+      "loading": "Nachrichten werden geladen…",
+      "empty": "Noch keine Nachrichten. Sie können Ihren Anwälten hier Fragen stellen.",
+      "older": "Frühere Nachrichten laden",
+      "you": "Sie",
+      "filePending": "Die Datei wird noch vorbereitet. Bitte wenden Sie sich an Ihren Anwalt.",
+      "placeholder": "Nachricht eingeben. Enter zum Senden, Shift+Enter für eine neue Zeile",
+      "attach": "Datei senden",
+      "send": "Senden",
+      "sending": "Wird gesendet…",
+      "fileTooLarge": "Dateien dürfen höchstens 8 MB groß sein",
+      "unavailable": "Der Projektchat ist derzeit nicht verfügbar. Bitte versuchen Sie es später erneut."
+    },
     "messageUnavailable": "Dieses eingeladene Projekt oder diese Checkliste ist nicht mehr verfügbar. Aktualisieren Sie die Ansicht und versuchen Sie es erneut.",
     "workspaceTitle": "Mandanten-Kollaboration",
     "workspaceHint": "Bereiten Sie Dokumente anhand der Checkliste Ihres Anwalts vor, reichen Sie jedes Element ein und verfolgen Sie die Rückmeldungen.",

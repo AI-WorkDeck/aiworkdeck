@@ -8,5 +8,6 @@
   "panel.historyWithEarlier": "Également les messages antérieurs",
   "panel.inviteHintAfterJoin": "Un client qui rejoint la conversation avec ce code ne voit que les messages et fichiers envoyés après son arrivée. Ne le transmettez qu’à la personne prévue. Valable jusqu’au {time}",
   "panel.inviteHintWithHistory": "Un client qui rejoint la conversation avec ce code peut aussi lire les messages antérieurs ; les fichiers restent ouverts un par un selon leurs droits d’accès. Ne le transmettez qu’à la personne prévue. Valable jusqu’au {time}",
-  "panel.inviteJoinHow": "La personne se connecte à l’application AI WorkDeck avec son propre compte et saisit le code dans « Centre de messages → Discussions → Rejoindre avec un code » ou dans « Chat du projet → Rejoindre avec un code ». Le portail client n’accepte pas ce code."
+  "panel.inviteJoinHow": "La personne se connecte à l’application AI WorkDeck avec son propre compte et saisit le code dans « Centre de messages → Discussions → Rejoindre avec un code » ou dans « Chat du projet → Rejoindre avec un code ». Le portail client n’accepte pas ce code.",
+  "panel.fromClient": "Client"
 }
