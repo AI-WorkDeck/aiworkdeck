@@ -327,7 +327,7 @@ function paragraphNumberingOf(paragraph) {
 // (2) 索引绑定 xModel 引用，换文档（load_document / 测试探针直接换 xModel）自然
 // 重建；(3) 写原语末尾的 verifySnapshot 再补一刀。段落被删后旧对象会抛异常，
 // withParaIndex 捕到就重建一次再读，仍失败才冒泡。
-const paraIndex = { model: null, ranges: null, total: 0, revision: -1, viewKey: '' };
+const paraIndex = { model: null, ranges: null, total: 0, revision: -1, viewKey: '', viewMode: '' };
 // 补全只保留一个内存快照；不把临时候选变成存进 docx 的书签。
 let completionSnapshot = null;
 let completionSeq = 0;
@@ -367,9 +367,41 @@ function releaseRetiredParaRanges() {
   retiredParaRanges = [];
   for (const list of lists) for (const el of list) { try { zetajs.release(el); } catch (e) { /* already gone */ } }
 }
+// 有没有删到段落标记的删除型修订（最终稿视图会因此合并段落）。按模型位置比较，与当前显示视图无关；
+// 按（模型, 正文版本）缓存。读不准时按「有」处理——宁可多重建一次索引，也不复用可能失效的段落对象。
+let spanningDeletionCache = { model: null, revision: -1, value: false };
+function hasParagraphSpanningDeletion() {
+  if (spanningDeletionCache.model === xModel && spanningDeletionCache.revision === reviewRevision) return spanningDeletionCache.value;
+  let value = false;
+  try {
+    const body = xModel.getText();
+    const spans = function (from, to) {
+      const c = body.createTextCursorByRange(from);
+      c.gotoEndOfParagraph(false);
+      return body.compareRegionStarts(c, to) === 1; // 本段段尾在另一端之前 = 跨过了段落标记
+    };
+    const en = xModel.getRedlines().createEnumeration();
+    while (!value && en.hasMoreElements()) {
+      const r = en.nextElement();
+      let type = '';
+      try { type = String(r.getPropertyValue('RedlineType') || ''); } catch (e) { value = true; break; }
+      if (type !== 'Delete') continue;
+      const rs = r.getPropertyValue('RedlineStart'), re = r.getPropertyValue('RedlineEnd');
+      if (!rs || !re) continue;
+      try { value = spans(rs, re) || spans(re, rs); }
+      catch (e) { /* 不在正文（表格、脚注、页眉页脚）：不影响正文段落索引 */ }
+    }
+  } catch (e) { value = true; }
+  spanningDeletionCache = { model: xModel, revision: reviewRevision, value: value };
+  return value;
+}
 function invalidateParaIndex() {
   const viewOnly = exportInFlight || viewChangeInFlight;
-  if (viewOnly && paraIndex.ranges && paraIndex.model === xModel && paraIndex.revision === reviewRevision) {
+  // 最终稿/页边视图里，删到段落标记的修订会让引擎把段落合并显示；在那种视图里枚举出的段落对象，
+  // 视图来回切过之后再读会变成空串、按段号写会失败（0.85.3）。所以：内联视图（all）的索引照存；
+  // 其他视图的索引只有在稿子里没有跨段删除（不会合并）时才存，否则用完即弃、下次重建。
+  const mergedView = paraIndex.viewMode !== 'all' && hasParagraphSpanningDeletion();
+  if (viewOnly && paraIndex.ranges && paraIndex.model === xModel && paraIndex.revision === reviewRevision && !mergedView) {
     const key = paraIndex.viewKey;
     retireRanges(parkedParaIndexes.has(key) ? parkedParaIndexes.get(key).ranges : null);
     parkedParaIndexes.set(key, { model: xModel, revision: reviewRevision, ranges: paraIndex.ranges });
@@ -390,7 +422,7 @@ function buildParaIndex() {
     parkedParaIndexes.delete(key);
     if (parked.model === xModel && parked.revision === reviewRevision) {
       paraIndex.ranges = parked.ranges; paraIndex.total = parked.ranges.length; paraIndex.model = xModel;
-      paraIndex.revision = reviewRevision; paraIndex.viewKey = key;
+      paraIndex.revision = reviewRevision; paraIndex.viewKey = key; paraIndex.viewMode = 'all';
       return paraIndex;
     }
     retireRanges(parked.ranges);
@@ -408,6 +440,7 @@ function buildParaIndex() {
   retiredParaRanges.push(owned);
   paraIndex.ranges = ranges; paraIndex.total = ranges.length; paraIndex.model = xModel;
   paraIndex.revision = reviewRevision; paraIndex.viewKey = key;
+  try { paraIndex.viewMode = revisionViewState().mode; } catch (e) { paraIndex.viewMode = ''; }
   return paraIndex;
 }
 function getParaIndex() { return (paraIndex.ranges && paraIndex.model === xModel) ? paraIndex : buildParaIndex(); }
