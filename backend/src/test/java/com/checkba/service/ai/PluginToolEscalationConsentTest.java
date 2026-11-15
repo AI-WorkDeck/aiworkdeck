@@ -106,8 +106,11 @@ class PluginToolEscalationConsentTest {
         write(mutate(toolName, change), false);
     }
 
+    /** 真正可用（非待批准占位）的已下发工具名 */
     private List<String> offered() {
-        return registry.getAllSpecifications().stream().map(ToolSpecification::name).toList();
+        return registry.getAllSpecifications().stream()
+                .filter(s -> s.description() == null || !(s.description().contains("Plugin Center") || s.description().contains("插件中心")))
+                .map(ToolSpecification::name).toList();
     }
 
     private List<String> reasons(String tool) {
@@ -118,7 +121,12 @@ class PluginToolEscalationConsentTest {
     /** 升级后：不下发、不投影、执行被拒且后端服务从未被调用 */
     private void assertBlocked(String tool, String reason) {
         assertTrue(reasons(tool).contains(reason), "应记录升级原因 " + reason + "，实际 " + reasons(tool));
-        assertFalse(offered().contains(tool), "批准前不应下发给模型");
+        // 批准前只下发无参占位规格（不带新定义的入参），调用拿到点名工具的待批准说明
+        var stub = registry.getAllSpecifications().stream().filter(s -> s.name().equals(tool)).findFirst();
+        stub.ifPresent(s -> {
+            assertTrue(s.parameters() == null || s.parameters().properties() == null || s.parameters().properties().isEmpty(), "占位规格不得带入参");
+            assertTrue(s.description().contains("Plugin Center") || s.description().contains("插件中心"), s.description());
+        });
         assertTrue(registry.mcpCandidates().stream().noneMatch(c -> c.spec().name().equals(tool)), "批准前不应投影到 MCP");
         assertFalse(registry.requiresConfirmation(tool) && registry.resolve(tool).isPresent());
         var r = registry.execute(tool, WRITE_ARGS, ctx);

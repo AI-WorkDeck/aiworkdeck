@@ -617,6 +617,31 @@ public class ToolRegistry {
         }
     }
 
+    /**
+     * 权限升级待用户批准的插件工具：只下发一个无参占位规格（不带新定义的入参与说明），
+     * 模型若按用户要求去调，{@link #doExecute} 回「请用户到插件中心批准」的说明而不执行——
+     * 否则模型只会看到工具消失，对用户说「没装这个插件」。不进 MCP 投影、不过确认闸。
+     */
+    private List<ToolSpecification> pendingApprovalStubs() {
+        List<ToolSpecification> out = new ArrayList<>();
+        for (var entry : pluginService.allPendingToolChanges().entrySet()) {
+            String pluginId = entry.getKey();
+            if (!pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) continue;
+            for (PluginToolApprovals.Change c : entry.getValue()) {
+                String name = c.name();
+                if (name == null || !name.matches("[A-Za-z][A-Za-z0-9_]{1,63}") || builtinTools.containsKey(name)
+                        || pluginService.isAgentHidden(name)) continue;
+                out.add(ToolSpecification.builder().name(name)
+                        .description(LangText.of(
+                                "【待用户批准】该插件工具的权限刚升高，用户在插件中心批准前不可用；调用只会返回待批准说明。",
+                                "[Awaiting user approval] This plugin tool's privileges just increased; it is unavailable until the user approves it in Plugin Center. Calling it only returns that notice."))
+                        .parameters(dev.langchain4j.model.chat.request.json.JsonObjectSchema.builder().build())
+                        .build());
+            }
+        }
+        return out;
+    }
+
     /** userId/conversationId 由服务端注入，不向模型暴露；projectId 在 schema 里声明了才是「目标项目」参数。 */
     @SuppressWarnings("unchecked")
     private static dev.langchain4j.model.chat.request.json.JsonObjectSchema declaredParameters(PluginService.PluginToolInfo tool) {
@@ -861,6 +886,7 @@ public class ToolRegistry {
         Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         declaredBindings().forEach(b -> names.add(b.specification().name()));
+        pendingApprovalStubs().forEach(s -> names.add(s.name()));
         names.removeIf(pluginService::isAgentHidden);
         return java.util.Collections.unmodifiableSet(names);
     }
@@ -1034,6 +1060,9 @@ public class ToolRegistry {
                 all.add(offerable(spec));
             }
         }
+        Set<String> present = new java.util.HashSet<>();
+        all.forEach(s -> present.add(s.name()));
+        for (ToolSpecification stub : pendingApprovalStubs()) if (present.add(stub.name())) all.add(stub);
         // 顺序只由规范序决定（见 ToolDisclosurePolicy#canonicalOrder），不取决于 bean 扫描 / 反射方法 / 插件加载顺序
         if (disclosurePolicy != null) return disclosurePolicy.canonicalOrder(all);
         all.sort(Comparator.comparing(ToolSpecification::name));

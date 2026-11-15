@@ -720,6 +720,11 @@ public class PluginService {
                 .map(this::isToolDefinitionApproved).orElse(true);
     }
 
+    /** pluginId → 待批准的升级（全部插件，含已停用的；调用方按需过滤） */
+    public Map<String, List<PluginToolApprovals.Change>> allPendingToolChanges() {
+        return Map.copyOf(pendingToolChanges);
+    }
+
     public List<PluginToolApprovals.Change> pendingToolChanges(String pluginId) {
         return pendingToolChanges.getOrDefault(pluginId, List.of());
     }
