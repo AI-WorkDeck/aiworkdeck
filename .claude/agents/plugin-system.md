@@ -339,6 +339,7 @@ skill 是有代价的（注入无关指引 + 裁工具）。
 - `RealToolBeans.instantiateAll()`（评测用的工具 bean 清单）与生产的 `AgentToolComponent` 实现集**不是自动同步的**：`TodoTools` 就不在里面，所以 `todo_write` 在回放评测里根本没注册，评测断言不到它的可见性。新增工具组件时要顺手补进去。
 - 插件启停语义只影响可见性，不拦截历史工具调用回放。
 - **Web 插件的 `frontendEntry` 校验失败是静默降级**：指到 `web/` 之外或文件不存在时 `PluginService` 把它置空并记 WARN，前端表现为「未配置入口地址」的空面板——面板空白先查后端日志的这条 WARN，别去前端找。
+- **PluginPane 每次桥调用都重读 `/api/plugins/list` 比对授权（`verifyAuthorization`），比的是 `authorizationFingerprint`，不是整条记录**：列表里工具说明、视图/主题/模板/样式/依据来源的 name/description 按界面语言返回，整条比较会让「切换语言」被当成授权变化——下一次桥调用就作废实例、按 `:key=sessionGeneration` 重建 iframe，所有插件回到入口地址、丢掉当前页签与路由（0.86.0 律所管理 B5）。新增按语言本地化的字段时，同步加进 `LOCALIZED_CONTRIBUTION_TEXT` 或工具的剔除表；安全相关字段（权限、版本、入口、工具名与工具权限、各贡献项 id/文件/入口/服务）不能剔。回归：`frontend/tests/plugin-sdk/live-authorization.test.mjs`。
 - **`/api/plugin-web` 不要加登录闸**：iframe 是 opaque origin，带不出凭据，加了只会让面板白屏；那里也没有用户数据。禁用/未安装/被封禁一律 404（不是 403，不泄露 id 存在性）。
 - 改 AgentOrchestrator 构造器（如注入新服务）必须同步 EvalHarness（踩过两次）。
 - **「先落中间态再 `executor.submit`」的服务（会议转写就是），测试里断中间态必须先卡住后台线程**：`save` mock 成原样返回入参时，方法返回的对象与测试持有的是同一个可变实例，后台那个瞬间返回的 mock 会抢先把它改成终态，断言成败取决于 runner 调度（#394 修的就是这个间歇红）。用 `CountDownLatch` 卡住后台调用的那个 mock，断完中间态再 `countDown` 放行。
