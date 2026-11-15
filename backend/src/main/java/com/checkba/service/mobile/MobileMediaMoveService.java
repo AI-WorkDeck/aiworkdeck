@@ -249,9 +249,13 @@ public class MobileMediaMoveService {
 
     @Scheduled(initialDelay=60000,fixedDelay=30000)
     public void advanceCloudMoves() {
-        for(MobileMediaMove m:moves.findByStatusIn(Set.of("WAITING_TARGET","WAITING_SOURCE"))) {
-            try {advanceCloud(m.getUserId(),m.getRequestId());} catch(RuntimeException failure) { org.slf4j.LoggerFactory.getLogger(MobileMediaMoveService.class)
-                    .warn("Capture move {} deferred: {}",m.getRequestId(),failure.getClass().getSimpleName()); }
+        // PostgreSQL @Lob (oid) columns can only be read inside a transaction; keep it short and release it before the slow per-move work.
+        var pending=tx.execute(ignored->moves.findByStatusIn(Set.of("WAITING_TARGET","WAITING_SOURCE")).stream()
+                .map(m->new String[]{String.valueOf(m.getUserId()),m.getRequestId()}).toList());
+        if(pending==null) return;
+        for(String[] m:pending) {
+            try {advanceCloud(Long.valueOf(m[0]),m[1]);} catch(RuntimeException failure) { org.slf4j.LoggerFactory.getLogger(MobileMediaMoveService.class)
+                    .warn("Capture move {} deferred: {}",m[1],failure.getClass().getSimpleName()); }
         }
     }
     private void advanceCloud(Long user,String id) {
