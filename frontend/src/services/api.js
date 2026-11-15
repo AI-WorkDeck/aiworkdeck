@@ -824,6 +824,17 @@ export function setPluginEnabled(pluginId, enabled) {
   });
 }
 
+// 批准插件当前的工具定义（权限升级的工具批准前对 Agent 不可用；仅管理员）。
+// token 取自 /api/plugins/list 的 toolApprovalToken；查看期间插件又变了会被拒绝（409）。
+export function approvePluginToolChanges(pluginId, token) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/tool-approval`,
+    method: 'POST',
+    data: { token },
+    header: { 'Content-Type': 'application/json' },
+  });
+}
+
 // 在线插件广场：拉取官网注册表列表（仅含已审核签名的插件）
 export function getPluginMarket({ accountPrompt = true } = {}) {
   return request({

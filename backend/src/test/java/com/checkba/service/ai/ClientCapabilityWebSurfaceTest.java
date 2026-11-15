@@ -189,6 +189,7 @@ class ClientCapabilityWebSurfaceTest {
         when(plugins.getPluginTools()).thenReturn(Map.of("webprobe_lookup", new WebPluginFakeTools()));
         when(plugins.getPluginIdForTool("webprobe_lookup")).thenReturn("webprobe");
         when(plugins.isEnabled("webprobe")).thenReturn(true);
+        when(plugins.isPluginToolApproved("webprobe_lookup")).thenReturn(true);
         when(plugins.supportsWebClient("webprobe")).thenReturn(hosts != null && hosts.contains("web"));
         ToolRegistry reg = new ToolRegistry(List.of(), plugins, caps);
         reg.init();

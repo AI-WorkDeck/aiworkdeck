@@ -53,6 +53,8 @@ function harness(kind = 'detail', { local = localPlugin(), remote = remotePlugin
       state.local.enabled = enabled
     },
     isAccountLoginRetry: () => false,
+    pendingToolChanges: plugin => Array.isArray(plugin?.pendingToolChanges) ? plugin.pendingToolChanges : [],
+    promptToolApproval: async plugin => { calls.push(['approve-tools', plugin.id, plugin.toolApprovalToken]); state.local.pendingToolChanges = []; return true },
   }
   const vm = {
     $t: translate, spec: { kind: 'plugin', id: 'project-im' },
@@ -66,11 +68,11 @@ function harness(kind = 'detail', { local = localPlugin(), remote = remotePlugin
   }
   const source = kind === 'detail' ? detail : pane
   const names = kind === 'detail'
-    ? ['reload', 'notifyChanged', 'doInstallPlugin', 'onPluginToggle', 'onPurchasedRefresh', 'loginThenContinue']
+    ? ['reload', 'notifyChanged', 'doInstallPlugin', 'onPluginToggle', 'onPurchasedRefresh', 'loginThenContinue', 'reviewToolChanges']
     : ['reloadAll', 'loadPlugins', 'loadPluginMarket', 'installPlugin', 'notifyMarketChanged', 'installedPluginVersion', 'pluginUpdateAvailable', 'onToggle', 'permissionLabel', 'marketAction', 'refreshPluginPurchase', 'loginThenInstall']
   for (const name of names) vm[name] = method(source, name, deps).bind(vm)
   if (kind === 'detail') {
-    for (const name of ['display', 'pluginUpdateAvailable', 'isBuiltinRedaction', 'paidStateValue', 'needsPurchase', 'pluginPermissionText']) {
+    for (const name of ['display', 'pendingToolChangeCount', 'pluginUpdateAvailable', 'isBuiltinRedaction', 'paidStateValue', 'needsPurchase', 'pluginPermissionText']) {
       Object.defineProperty(vm, name, { get: method(source, name, deps).bind(vm) })
     }
   }
@@ -308,4 +310,17 @@ test('update controls render native keyboard-accessible buttons with disabled st
   assert.match(detail, /<component\s+:is="'button'"\s+v-else-if="pluginUpdateAvailable && !needsPurchase"[\s\S]*?:disabled="busy"[\s\S]*?@click="doInstallPlugin"/)
   assert.match(pane, /<component\s+:is="'button'"[\s\S]*?:disabled="!!pluginBusyId"[\s\S]*?@click="installPlugin\(m\)"/)
   assert.match(detail, /marketInfo && \(!installedInfo \|\| pluginUpdateAvailable\) && needsPurchase/)
+})
+
+// 插件工具权限升级（0.86.1）：更新确认框只列插件级权限；新版若有权限升高的工具，更新完成后逐个工具征得同意
+for (const kind of ['detail', 'pane']) test(`${kind}: an update with escalated tools asks for tool approval with the shown token`, async () => {
+  const h = harness(kind)
+  h.state.actualInstalled = { pendingToolChanges: [{ name: 'project_im_delete', reasons: ['new'], after: { access: 'destructive' } }], toolApprovalToken: 'tok-9' }
+  await h.install()
+  assert.deepEqual(h.calls.filter(c => c[0] === 'approve-tools'), [['approve-tools', 'project-im', 'tok-9']])
+})
+for (const kind of ['detail', 'pane']) test(`${kind}: an update without tool escalation does not ask again`, async () => {
+  const h = harness(kind)
+  await h.install()
+  assert.equal(h.calls.filter(c => c[0] === 'approve-tools').length, 0)
 })

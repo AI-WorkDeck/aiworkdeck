@@ -184,7 +184,10 @@ function authorizationFingerprint(record) {
       if (Array.isArray(contributes[list])) contributes[list] = contributes[list].map(item => omitKeys(item, keys))
     }
   }
-  return JSON.stringify({ ...record, tools, contributes })
+  // 待批准的工具变更与批准凭据只是「用户还没点批准」的状态，不是面板实例的授权：
+  // 工具定义本身（access/confirm/mcp/handler/inputSchema）已在 tools 里逐项比较，升级时实例照样作废；
+  // 批准动作不该再把面板重建一次。闸在后端（未批准的工具调用一律被拒）。
+  return JSON.stringify({ ...omitKeys(record, ['pendingToolChanges', 'toolApprovalToken']), tools, contributes })
 }
 
 export default {

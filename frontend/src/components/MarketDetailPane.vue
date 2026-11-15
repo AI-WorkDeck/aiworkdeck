@@ -179,6 +179,10 @@
 
           <text v-if="pluginActionError" class="mdp-purchase-hint" role="alert">{{ pluginActionError }}</text>
           <text v-if="pluginActionHint" class="mdp-purchase-hint" role="status">{{ pluginActionHint }}</text>
+          <view v-if="spec.kind === 'plugin' && pendingToolChangeCount" class="mdp-tool-approval" role="alert">
+            <text class="mdp-purchase-hint">{{ $t('market.toolApprovalBanner', { count: pendingToolChangeCount }) }}</text>
+            <view class="mdp-btn" :class="{ busy }" @tap="reviewToolChanges"><text>{{ $t('market.toolApprovalReview') }}</text></view>
+          </view>
           <text v-if="spec.kind === 'plugin' && installedInfo && (installedInfo.revokedReason || installedInfo.incompatibleReason)" class="mdp-purchase-hint">{{ installedInfo.revokedReason || installedInfo.incompatibleReason }}</text>
           <text v-if="purchaseHint" class="mdp-purchase-hint">{{ purchaseHint }}</text>
         </view>
@@ -339,6 +343,7 @@ import { buildVoiceGroupSkill } from '@/config/leftSidebarPlugins.js'
 import { isAiWorkflowSkill } from '@/utils/chatSelectableSkills.mjs'
 import { formatPrice, isPaid, paidState, priceCentsOf, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { mergePluginCatalog, isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
+import { pendingToolChanges, promptToolApproval } from '@/utils/pluginToolApproval.js'
 import PluginConnectionSettings from '@/components/PluginConnectionSettings.vue'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { refreshEntitlements } from '@/composables/useEntitlement.js'
@@ -510,6 +515,9 @@ export default {
     isBuiltinRedaction() {
       return this.spec.kind === 'skill' && this.spec.id === 'desensitize'
         && !!this.installedInfo && !this.installedInfo.sourcePluginId
+    },
+    pendingToolChangeCount() {
+      return this.spec.kind === 'plugin' ? pendingToolChanges(this.installedInfo).length : 0
     },
     pluginUpdateAvailable() {
       return this.spec.kind === 'plugin' && isPluginUpdateAvailable(this.marketInfo, this.installedInfo)
@@ -778,6 +786,23 @@ export default {
     },
     notifyChanged() {
       uni.$emit('awd:market-changed')
+    },
+    // 工具权限升级的重新授权：批准前后端对 Agent 屏蔽这些工具，这里只展示变更并提交批准
+    async reviewToolChanges() {
+      if (this.busy || !this.installedInfo) return
+      this.busy = true
+      try {
+        if (await promptToolApproval(this.installedInfo, this.display && this.display.name)) {
+          uni.showToast({ title: this.$t('market.toolApprovalDone'), icon: 'none' })
+          this.notifyChanged()
+        }
+      } catch (e) {
+        this.pluginActionError = e?.message || this.$t('market.toolApprovalFailed')
+        uni.showToast({ title: this.pluginActionError, icon: 'none' })
+      } finally {
+        this.busy = false
+      }
+      await this.reload(false)
     },
 
     // ---- 声明式贡献点（规范 v2.9 P4）：设置表单 + 样式画像 ----
@@ -1145,6 +1170,11 @@ export default {
         await this.reload()
         this.notifyChanged()
         uni.showToast({ title: this.pluginActionHint || this.$t(isUpdate ? 'market.updatedToast' : 'market.installedUsableHint'), icon: 'none' })
+        // 新版里有权限升高的工具：更新确认框只列了插件级权限，这里再逐个工具征得同意
+        if (this.pendingToolChangeCount) {
+          this.busy = false
+          await this.reviewToolChanges()
+        }
       } catch (e) {
         console.error('安装插件失败:', e)
         if (isAccountLoginRetry(e)) await this.reload()
@@ -1337,6 +1367,14 @@ export default {
     color: var(--awd-warning-text);
     background: var(--awd-bg);
   }
+}
+
+.mdp-tool-approval {
+  margin-top: 8px;
+}
+
+.mdp-tool-approval .mdp-btn {
+  margin-top: 6px;
 }
 
 .mdp-purchase-hint {

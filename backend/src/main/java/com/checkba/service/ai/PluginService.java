@@ -3,6 +3,7 @@
 
 package com.checkba.service.ai;
 
+import com.checkba.service.LangText;
 import com.checkba.service.SystemSettingService;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
@@ -116,6 +117,21 @@ public class PluginService {
     private final Set<String> devInstalledPluginIds = ConcurrentHashMap.newKeySet();
 
     private volatile long disabledStateRefreshedAt = 0L;
+
+    /**
+     * 当前这一代清单里已获批准的工具定义对象（PluginToolInfo / McpToolDecl，按引用比）。
+     * 只有在这里的对象才会交给 Agent、面板直调与对外 MCP（见 {@link PluginToolApprovals}）。
+     * 按引用而不是按名字：rescan 换上新对象前它们天然不在集合里，判定与执行用的是同一个对象，
+     * 不会出现「按旧定义放行、按新定义执行」的竞态。
+     */
+    private final Set<Object> approvedToolDefinitions =
+            Collections.newSetFromMap(Collections.synchronizedMap(new IdentityHashMap<>()));
+
+    /** pluginId -> 待用户批准的工具升级（rescan 时重算，批准后清掉） */
+    private final Map<String, List<PluginToolApprovals.Change>> pendingToolChanges = new ConcurrentHashMap<>();
+
+    /** systemSettingService 为 null（直接 new 的测试）时的基线存放处 */
+    private final Map<String, String> memoryToolApprovals = new ConcurrentHashMap<>();
 
     private final SystemSettingService systemSettingService;
 
@@ -566,6 +582,8 @@ public class PluginService {
         pluginDirById.clear();
         incompatiblePluginIds.clear();
         devInstalledPluginIds.clear();
+        approvedToolDefinitions.clear();
+        pendingToolChanges.clear();
         pluginL10n.clear();
         // 插件证据来源整批清空重建（规范 v2.8 P3）；内置来源不动
         if (evidenceRetrieverRegistry != null) {
@@ -619,6 +637,132 @@ public class PluginService {
     /** 该插件是否为本机 dev 免签直装（目录带 .awd-dev 标记）；实验 API 只对它们开放 */
     public boolean isDevInstalled(String pluginId) {
         return devInstalledPluginIds.contains(pluginId);
+    }
+
+    // ==================== 工具升级重新授权 ====================
+
+    /**
+     * 对比本插件工具的当前定义与已批准基线（规则见 {@link PluginToolApprovals}）：
+     * 不升级的定义直接获批并把基线跟过去，升级的留在待批准表里、基线保留旧值。
+     *
+     * <p>没有基线时：广场/内置插件按当前定义建基线（装机与启用本身经过验签和用户确认；也覆盖升级到本版之前已装的插件）；
+     * dev 免签直装的插件从空基线算起，非 read 工具都要先批准——它们装完即启用，且 Agent 自己就能经 plugin_dev_install 重装。
+     * 卸载不清基线：dev 卸载后重装照样和上次批准的定义比。
+     */
+    private void reconcileToolApprovals(PluginMetadata meta, boolean devInstalled) {
+        String id = meta.getId();
+        PluginToolApprovals.Snapshot current = PluginToolApprovals.snapshot(meta);
+        String raw = readToolApprovals(id);
+        Map<String, PluginToolApprovals.Definition> approved;
+        if (raw.isBlank()) {
+            approved = devInstalled ? Map.of() : current.definitions();
+        } else {
+            try {
+                approved = PluginToolApprovals.fromJson(raw);
+            } catch (RuntimeException corrupt) {
+                log.warn("Plugin {} tool approval record unreadable, treating as empty: {}", id, corrupt.getMessage());
+                approved = Map.of();
+            }
+        }
+        Map<String, PluginToolApprovals.Definition> next = new LinkedHashMap<>();
+        List<PluginToolApprovals.Change> pending = new ArrayList<>();
+        for (var e : current.definitions().entrySet()) {
+            String key = e.getKey();
+            PluginToolApprovals.Definition before = approved.get(key);
+            List<String> reasons = PluginToolApprovals.escalation(before, e.getValue());
+            if (reasons.isEmpty()) {
+                next.put(key, e.getValue());
+                approvedToolDefinitions.add(current.objects().get(key));
+            } else {
+                String[] names = current.names().get(key);
+                pending.add(new PluginToolApprovals.Change(key, names[0], names[1], reasons, before, e.getValue()));
+                if (before != null) next.put(key, before);
+            }
+        }
+        if (!pending.isEmpty()) {
+            pendingToolChanges.put(id, List.copyOf(pending));
+            log.warn("Plugin {} has tool changes awaiting user approval: {}", id,
+                    pending.stream().map(c -> c.label() + c.reasons()).toList());
+        }
+        if (raw.isBlank() || !next.equals(approved)) writeToolApprovals(id, PluginToolApprovals.toJson(next));
+    }
+
+    private String readToolApprovals(String pluginId) {
+        String key = PluginToolApprovals.KEY_PREFIX + pluginId;
+        if (systemSettingService == null) return memoryToolApprovals.getOrDefault(key, "");
+        String value = systemSettingService.get(key, "");
+        return value == null ? "" : value;
+    }
+
+    private void writeToolApprovals(String pluginId, String json) {
+        String key = PluginToolApprovals.KEY_PREFIX + pluginId;
+        if (systemSettingService == null) memoryToolApprovals.put(key, json);
+        else systemSettingService.set(key, json);
+    }
+
+    /** 这个清单对象（PluginToolInfo / McpToolDecl）的定义是否已获用户批准；执行与下发前按引用判定。 */
+    public boolean isToolDefinitionApproved(Object definition) {
+        return definition != null && approvedToolDefinitions.contains(definition);
+    }
+
+    /** JAR @Tool 工具：按名字找到所属插件 manifest 里的同名条目再判；manifest 没有这条（没有可比的定义）放行。 */
+    public boolean isPluginToolApproved(String toolName) {
+        String pluginId = toolToPluginId.get(toolName);
+        PluginMetadata meta = pluginId == null ? null : getPlugin(pluginId);
+        if (meta == null || meta.getTools() == null) return true;
+        return meta.getTools().stream().filter(t -> t != null && toolName.equals(t.getName())).findFirst()
+                .map(this::isToolDefinitionApproved).orElse(true);
+    }
+
+    public List<PluginToolApprovals.Change> pendingToolChanges(String pluginId) {
+        return pendingToolChanges.getOrDefault(pluginId, List.of());
+    }
+
+    /** 当前定义的摘要，批准请求要原样带回（见 {@link #approveToolChanges}）。 */
+    public String toolApprovalToken(String pluginId) {
+        PluginMetadata meta = getPlugin(pluginId);
+        return meta == null ? null : PluginToolApprovals.token(PluginToolApprovals.snapshot(meta).definitions());
+    }
+
+    /**
+     * 该名字的工具此刻因升级待批准而不可用时，给模型/调用方的说明；否则 null。
+     * 只用于给出可读的拒绝原因，真正的闸是 {@link #isToolDefinitionApproved}。
+     */
+    public String pendingToolNotice(String toolName) {
+        if (toolName == null) return null;
+        for (var e : pendingToolChanges.entrySet()) {
+            for (PluginToolApprovals.Change c : e.getValue()) {
+                if (toolName.equals(c.name())) {
+                    PluginMetadata meta = getPlugin(e.getKey());
+                    String plugin = meta == null ? e.getKey() : localize(e.getKey(), meta.getName());
+                    return LangText.of(
+                            "插件「" + plugin + "」的工具 " + c.label() + " 定义有变（权限升高），用户批准前不能使用。"
+                                    + "请告诉用户到「插件中心 → " + plugin + "」查看并批准这项变更，不要改用其他工具绕过。",
+                            "Tool " + c.label() + " of plugin \"" + plugin + "\" changed to a higher-privilege definition and cannot be used "
+                                    + "until the user approves it. Ask the user to review and approve the change in Plugin Center → " + plugin
+                                    + "; do not work around it with other tools.");
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 用户（管理员）批准插件当前的全部工具定义。{@code token} 必须等于 {@link #toolApprovalToken}：
+     * 用户看提示期间插件又被重装/改动过，就拒绝，让用户看新的变更（null = 宿主自己发的内置包，不核对）。
+     */
+    public synchronized void approveToolChanges(String pluginId, String token) {
+        PluginMetadata meta = getPlugin(pluginId);
+        if (meta == null) throw new IllegalArgumentException("Plugin not found: " + pluginId);
+        PluginToolApprovals.Snapshot current = PluginToolApprovals.snapshot(meta);
+        if (token != null && !token.equals(PluginToolApprovals.token(current.definitions()))) {
+            throw new IllegalStateException(LangText.of("插件在你查看期间又有变动，请重新查看变更后再批准。",
+                    "The plugin changed while you were reviewing it. Review the new changes before approving."));
+        }
+        writeToolApprovals(pluginId, PluginToolApprovals.toJson(current.definitions()));
+        approvedToolDefinitions.addAll(current.objects().values());
+        pendingToolChanges.remove(pluginId);
+        log.info("Plugin {} tool definitions approved", pluginId);
     }
 
     /** 相对路径守卫（模板/画像文件声明）：非空、不以 / 开头、不含 ..、不含反斜杠 */
@@ -1259,6 +1403,8 @@ public class PluginService {
                 validateFrontendEntry(pluginDir, meta);
                 PluginManifestContractValidator.validateViews(meta, pluginDir);
                 applyDeclaredTools(meta);
+                // 必须在 plugins.add 之前：登记进列表的那一刻，工具是否获批已经确定（缺省不批）
+                reconcileToolApprovals(meta, new File(pluginDir, ".awd-dev").exists());
                 plugins.add(meta);
                 pluginDirById.put(meta.getId(), pluginDir);
 

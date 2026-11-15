@@ -604,6 +604,8 @@ public class ToolRegistry {
         String pluginId = declared.pluginId();
         if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
                 || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
+        // 权限升级待用户批准的定义：不下发、不投影、不执行（按对象判，执行用的就是这里返回的同一个对象）
+        if (!pluginService.isToolDefinitionApproved(tool)) return null;
         try {
             return new DeclaredToolBinding(pluginId, tool, ToolSpecification.builder()
                     .name(tool.getName())
@@ -1026,7 +1028,8 @@ public class ToolRegistry {
         declaredBindings().forEach(b -> { if (!pluginService.isAgentHidden(b.specification().name())) all.add(b.specification()); });
         if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
-            if (pluginToolEnabled(spec.name()) && !pluginService.isAgentHidden(spec.name())) {
+            if (pluginToolEnabled(spec.name()) && !pluginService.isAgentHidden(spec.name())
+                    && pluginService.isPluginToolApproved(spec.name())) {
                 all.add(offerable(spec));
             }
         }
@@ -1302,6 +1305,11 @@ public class ToolRegistry {
                     ? new ToolResult(com.checkba.service.ai.tools.ToolShims.hint(r.output(), resolvedName), r.tool(), true)
                     : r;
         }
+        // 插件工具升级待批准：给出可读原因（闸本身在 bind / PluginMcpService / 下面的 JAR 分支）
+        String pendingApproval = pluginService.pendingToolNotice(resolvedName);
+        if (pendingApproval != null) {
+            return new ToolResult("Error: " + pendingApproval, null, true);
+        }
         if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
             var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());
             if (binding == null || !clientCapabilityService.isToolVisible(resolvedName, ctx == null ? null : ctx.conversationId()))
@@ -1337,6 +1345,9 @@ public class ToolRegistry {
 
         // 插件工具权限校验（规范 v2）：所需权限未在 manifest permissions 中声明即拒绝
         if (tool.fromPlugin()) {
+            if (!pluginService.isPluginToolApproved(resolvedName)) {
+                return new ToolResult(unknownToolMessage(resolvedName), null, false);
+            }
             List<String> missing = pluginService.missingPermissionsForTool(resolvedName);
             if (!missing.isEmpty()) {
                 log.warn("Tool '{}' rejected: requires undeclared permission(s) {}", resolvedName, missing);

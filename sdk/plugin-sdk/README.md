@@ -139,6 +139,8 @@ node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugi
 
 `manifest.json` 的 `tools[]` 除老形态（JAR 工具：`name`/`description`/`permissions`）外，新增声明式形态：`name`（非 JAR 工具须以 `<插件id 连字符转下划线>_` 开头）、`description`（可用 `%key%`）、`access`（`read|write|destructive`）、`inputSchema`（与 `contributes.mcpServers` 相同的受限子集）、`handler`（`jar` | `service` | `connection` | `view`）、`permissions`（⊆ manifest.permissions）、`mcp`、`confirm`、`keywords`、`agent`（`false` = 登记但不下发给模型、不投影 MCP，仅供插件界面直调；老形态 JAR 条目也可带）。`validate` 另按 A5 描述门禁检查声明式工具的 `description`（`%key%` 取 `l10n/zh-CN.json`）：首行 ≤80 字符、单一语言（中文）、动词开头，「何时用」写第二行起；并拒绝 destructive / `confirm:always` / `agent:false` 工具写 `mcp:true`。`handler.type=service` 的服务与操作名取自 [services.json](services.json)（宿主服务表的发布副本，与 `awd.services.request` 同名）；`view` 属第四期，`awd.tools.handle` 目前只有类型占位，`awd.tools.list()` 待宿主桥方法。`init` 生成的模板带一个 read 样例工具，`validate` 离线检查全部规则。详见 docs/PLUGIN_SPEC.md §20。
 
+**工具权限升级需用户重新批准**：已安装插件的工具若 access 升档（read→write/destructive、write→destructive）、confirm 放松、打开 `mcp` 投影、非 read 工具改 `handler`/`inputSchema`，或新增非 read 工具（改名同此），宿主在用户于插件中心批准前不让 Agent、面板直调与对外 MCP 使用该工具；降档与只改说明不受影响。dev 直装的插件首次安装时，其 write/destructive 工具也要先批准一次。
+
 ## 消息中心通知（SDK 1.7）
 
 声明 `notifications` 后，使用 `awd.notifications.publish({eventKey,title,body?,actionState?,target?})` 向当前账号发布持久通知；业务真正完成后调用 `awd.notifications.resolve(eventKey, 'done')`。已读不代表业务确认。通知目标只能打开本插件，禁止任意 URL、执行代码或指定其他收件人。
