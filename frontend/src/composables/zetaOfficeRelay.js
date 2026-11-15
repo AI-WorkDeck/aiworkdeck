@@ -79,6 +79,7 @@ const ACTION_BUDGET_MS = {
   replace_selection: 120000, modify_paragraph: 120000,
   // 三方合并（合并比对稿）：与 libreofficeExecutorClient 同表。
   build_merge_draft: 180000,
+  resolve_merge_mechanics: 180000,
   build_comparison_document: 180000,
   compare_docx_files: 240000,
   // 读取类（dev-board#729 ③）：此前全部吃 30s 默认值。doc_open_file 是 fire-and-forget，

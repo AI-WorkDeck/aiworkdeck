@@ -213,7 +213,7 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
 - `CloudAcceptDialog.vue`（`frontend/src/components/`，注意不在 `version/` 目录下）—— v2 新增，入口在 `userprofile.vue`，PR-E 后按钮文案是「从团队案件库取一份案卷」。列出当前连接下可见的案卷（`.cloud-project-row`/`.cloud-project-name`），逐个「取到本机」（`acceptCloudProject`）；没有连接时**只说一句** `version.noLibraryAvailableShort`——dev-board#440 撤掉了「去连一个」跳 `admin.vue` 那条路（目的地已经没有连库表单了），也撤掉了 `connections.length > 1` 的连接选择器（PR-E 为地雷 #31 加的那个），恒用 `conns[0]`。#439 起没有连接但官方可用时会先 `connectOfficialCloud()` 当场连上，连接失败须显示实际不可用原因，两站都可派生官方连接。这个入口也是 `CollabDialog.inviteText` 邀请话术第 1 步指向的地方，改文案要同步改邀请话术。
 - `VersionTimeline.vue` —— 拉 `getVersionTimeline`，按 `kind==='session'` 分组（`grouped` computed），自动存档折进对应工作段节点下可展开；节点标题有 milestone 时前置「重要版本」flag 并用 milestone 名字整个替换掉原标题（`titleOf()` 只在无 milestone 时才退回 `note || message`）。采纳产生的合并提交 `kind` 也是 `session`（见下方「MERGING 态即冲突态」附近对 `adoptMessage` 的说明），作为独立的顶层节点渲染，标题就是 `"采纳：" + 稿名`。**连线已经画了**（曾经的「有意降级」已作废）：合并节点在左侧轨道上带一段 `.merge-curve`（`isMerge(group.head)` 判真时渲染），进行中的稿另有 Phase B 的分叉线（`.draft-fork-curve`，数据来自 `loadDraftBranches` 逐稿拉 `/drafts/{id}/timeline` 找分叉点）——**分叉点落在当前拉到的主线历史窗口之外、端点出错或 404 时一律优雅降级为不画**，不弹错误弹窗。完整的 `git log --graph --all` 那一份在「提交历史」标签页（`CommitHistoryTab.vue` + `utils/historyGraph.js`），不在这个面板里。
 - `VersionNodeDetail.vue` —— 点某个节点弹出的详情弹窗：拉该 sha 的变更列表、「退回到这一版」二次确认、「标为重要版本」、第 3 期新增「从这一版另起一稿」（`openDraftNaming`，独立嵌套 `.awd-dialog`，同款 `.uni-input-input` 陷阱；`createDraft(projectId, version.sha, name)`，任意节点都能开，包括采纳产生的双亲合并节点）、对 `MODIFY` 类型且非根提交的改动行渲染「和上一版对比」按钮，`@tap` 上抛 `{path, sha}` 交给宿主页面决定走桌面修订稿分支还是文本降级分支。
-- `MergeReviewTab.vue` —— 三方合并新增（dev-board#630），**可编辑**的合并比对稿宿主：主线侧改动是一批带作者的修订，另一侧不重叠的改动被逐段重放成另一位作者的修订，同一段两边都改了的那几处刻意没重放、交给右栏 `ReviewPanel`（`mode="merge"`）三选一。与 `VersionCompareTab` 一样**没有 upload 路径**（导出字节只走 `POST /version/merge/resolve-file`，绝不写回 `ProjectFile`）、不进保活池、不派发 `.uno:EditDoc`（spike A5 实测 r5 上不生效，只读靠的是「没有保存路径」）。标签管道见 `sidebar-shell.md` 的 `merge-review` 一条。
+- `MergeReviewTab.vue` —— 三方合并新增（dev-board#630），**可编辑**的合并比对稿宿主：主线那份文件原样载入（台账 B13 起不再与共同的上一版做原生比较），另一侧不重叠的改动被逐段重放成合并自己的修订（署名带 U+2060 标记），同一段两边都改了的那几处刻意没重放、交给右栏 `ReviewPanel`（`mode="merge"`）三选一。与 `VersionCompareTab` 一样**没有 upload 路径**（导出字节只走 `POST /version/merge/resolve-file`，绝不写回 `ProjectFile`）、不进保活池、不派发 `.uno:EditDoc`（spike A5 实测 r5 上不生效，只读靠的是「没有保存路径」）。标签管道见 `sidebar-shell.md` 的 `merge-review` 一条。
 - `VersionCompareTab.vue` —— 第 2 期新增，「和上一版对比」的桌面 docx 展示宿主，**只读、绝无保存路径**：不订阅 `lo-relay` 的 `modified` 信号、不进保活池（`_libreRefs`/LRU 一概不注册）、`beforeUnmount` 只 `dispose executor` + 移除 `<webview>`。流程：并行下载新旧字节 + 启动引擎 → `load_document` 新版 → `compare_document` 一次性生成修订并自动切只读。
 - **三方合并的前端纯函数与编排**：`composables/useDocumentMerge.js`（自动合并编排，纯工厂）、`services/mergeDraft.js`（`fetchMergeInputs` + `buildMergeDraft`，自动合并与比对稿标签页共用）、`utils/mergeRows.js`（裁决总览行态与文案）、`utils/mergeReviewDecisions.js`（`collectDecisions`）、`utils/historyMerges.js`（把两条新尾注翻成人话）、`utils/provenanceAlign.js`（溯源 LCS 对齐 + 自带同步 sha256）、`utils/mergeSideNames.js`（两侧的称呼与喂给引擎的署名 = 修订分桶键，见下方「两侧的称呼与分桶键」）。后五个是纯函数，`node --test` 直接跑（`mergeSideNames` 只 import `historyMerges`，其余零依赖）。
 
@@ -561,6 +561,16 @@ userId，本机 userId 与它毫无关系，所以 `proxyCollabEvents` 外层补
 
 ## 三方合并与逐段溯源（2026-09-14，dev-board#630/#631/#632，spec `docs/superpowers/specs/2026-09-14-docx-three-way-merge-design.md`）
 
+**待处理修订（台账 B13，0.86.1）——合并绝不许把三份稿里原有的待处理修订静默接受掉**。AI 改稿默认带修订、律师多开着修订改，三份稿里都有待处理修订是常态，交付物就是修订稿。契约：
+- 合并稿 = 主线那份文件原样载入 + 另一侧的改动；**不再对主线侧做 `.uno:CompareDocuments`**（真机实测：比较修订会套在律师原有的插入上、把共同的上一版已删的字再删一遍；共同的上一版或两侧有待处理插入段时多出段落，「段数对不上：当前 6，按计划应为 5」）。主线与共同的上一版里原有的修订因此一条不动。比对稿里看不到「主线改了哪几处」的修订，这是有意的取舍。
+- 合并自己产生的修订署名 = 该侧名 + `\u2060`（`office_thread.js` 的 `MERGE_MECH_MARK`，前端 `utils/mergeRevisionView.js`）。收尾一律 `resolve_merge_mechanics`（只处置带标记的，处置完核对其余修订一条没变），**不许再用 `resolve_all_revisions` 收尾**。`ReviewPanel.mergeSideOf` 只认带标记的修订，`list_revisions` 回 `mergeMechanics:true`。
+- 另一侧的段落按它真实的修订结构重建（`rebuildParagraphFromSide`）：先清掉合并稿这段原有的段内修订（普通删除逐条拒绝，插入的字关掉修订记录直接删——拒绝一条「叠在 AI 插入上的删除」会把插入翻出来另起一条、还会和段落标记上的插入并在一起），以合并署名写入对方定稿的文字，再按原作者逐条做回待处理的插入 / 删除 / 「删掉别人的插入」（LO 把它表示成一条 Delete，`RedlineSuccessorData` 里是底下那条 Insert）。新增一整段待处理插入的，以原作者插在下一段开头（文字 + 段落标记），不插在锚点段末尾。
+- 引擎里修订日期只读：`build_merge_draft` / `merge_take_other` 回 `recreated[]`（原作者、原日期）与 `freshSince`，宿主导出后用 `services/mergeRedlineDates.js` 把这次新建的修订改回原日期，并核对存出的文件里**一条带标记的修订都没有**，有就按失败处理、不落盘。
+- 认不出的（格式类修订、修订套修订、段里有域/脚注又带修订、表格单元格里的待处理修订——台账 B13b）停在 `stage:'pending-redlines'`，裁决总览给整份二选一并说明原因，绝不猜。
+- 对齐核对与后端同口径：POI `XWPFParagraph.getText()` **不含 `w:delText`**（接受了修订之后的字），引擎侧按段的修订结构算出同一口径（`acceptedText`）再比；不要用 `para.getString()`（模型里删掉的字也在）。
+- 后端 `Unit.rev`（`DocxUnitReader.revisionSignature`）：段落/单元格里待处理修订的签名，同类型同作者同日期相邻的几条并成一条（引擎导出会把一条修订拆成几个 `w:ins`）。没有修订时为空串，`ThreeWayAnalyzer.hashLines` 与以前逐字节相同——普通文档的比对结果不变。
+- 测试：`frontend/tests/lowa-e2e/merge-pending-redlines.mjs`（真引擎；A 自动合并走真宿主 `useDocumentMerge`，B 同段两边都带修订的两种选法，C 发版前回归的原样三份稿 `fixtures/merge/b13-rc086/`）、`DocxPendingRevisionTest`。
+
 裁决界面此前只有「整份三选一」：同事改了第 3 段、我改了第 200 段，律师也只能二选一整份丢掉一边的工。
 这一节把裁决从「整份」降到「一段 / 一格 / 一页」，再加一条反向的问句——「这一段是谁写的」。
 零 Git 术语与「历史永不重写」两条纪律一字未松：合并只往前写新提交，溯源只读历史。
@@ -704,7 +714,7 @@ xlsx 是无序集合，按单元格键比交集（`analyzeCells` :228），公�
 否则退到线的称呼，直接借 `historyMerges.mergeSideLabels`（提交历史那几句用的就是它，两处说法必须一致），
 采纳语境另有稿名 `version.mergeSideDraftNamed`（「稿《对方第三版回稿》」）。
 ② **`mainKey`/`otherKey` 是喂给引擎的署名，也就是修订的分桶键，出参保证互不相同**——
-引擎 `build_merge_draft` 按修订作者分桶（`office_thread.js` :6135），ReviewPanel 的 `mergeSideOf` 也按它分，
+引擎 `build_merge_draft` 按修订作者分桶，ReviewPanel 的 `mergeSideOf` 也按它分（B13 起只认带 `\u2060` 标记的合并修订），
 两侧署名一样就把两边的修订全算进一桶，块 2 的分组与 `X-AWD-Merges` 尾注里的 M/T 一起错（进用户产物）。
 `byPerson` 时 key 仍是两位的**真名**（引擎署名不变）；分不开时 key 就是线的称呼。
 稿名只有 `AdoptConflictDialog` 知道，所以它经 `openMergeReviewTab` 的 `mergeSpec.draftName` 传给标签页。

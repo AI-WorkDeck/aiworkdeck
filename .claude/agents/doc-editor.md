@@ -581,8 +581,9 @@ HOUSE 不再是常量：`buildHouse(profile)` 从画像 JSON 派生写端常量�
 
 | 原语 | 入参 | 成功出参 | 失败 |
 |---|---|---|---|
-| `build_merge_draft`（:5869） | `{baseBytes, mainBytes, otherBytes, mainAuthor, otherAuthor, plan:{mainChunks, otherChunks}, baseUnits, name}` | `{success:true, name, revisions, count, mainCount, otherCount, replayed, conflicts:[单元键], formatOnly:[{paraKey, preview}], elapsedMs:{loadOther, loadBase, compareMain, replay, total}}` | `{success:false, stage, message, elapsedMs}`，`stage ∈ load-other｜load-base｜load-main｜compare-main｜align｜replay`（另有 `compareWithBytes` 自己那三档经 `compare-main` 透出 message） |
-| `merge_take_other`（:6125） | `{paraKey, text, author}` | `{success, paraKey, revisionCount, remainingInParagraph, text}`；`success` 的判据是**该段一条未处理修订都不剩**（`left.length === 0`） | 走 `tableFail`（非 Writer / 段落序非法 / 拒旧修订失败 / 写入失败） |
+| `build_merge_draft` | `{baseBytes, mainBytes, otherBytes, mainAuthor, otherAuthor, plan:{mainChunks, otherChunks}, baseUnits, name}` | `{success:true, name, revisions, count, mainCount:0, otherCount, keptPending, replayed, conflicts:[单元键], conflictSides:[{key, paraKey, side:{segs, markRev, unsupported}, mainSide}], formatOnly:[{paraKey, preview}], recreated:[{type, author, text, date}], freshSince, elapsedMs}` | `{success:false, stage, message, elapsedMs}`，`stage ∈ load-other｜load-base｜load-main｜align｜align-other｜replay｜pending-redlines` |
+| `merge_take_other` | `{paraKey, side, author}`（`side` = `conflictSides[].side`；没有就拒做，免得把另一侧已删的字写回正文） | `{success, paraKey, recreated, freshSince, revisionCount, text}` | 走 `tableFail`；带着搬不过来的修订时附 `stage:'pending-redlines'` |
+| `resolve_merge_mechanics` | `{action:'accept'｜'reject'}` | `{success, resolved, kept}`——只处置署名带 `\u2060` 的合并修订，处置完核对其余修订一条没变 | `tableFail(message)` |
 | `sheet_get_active_cell`（:6165） | 无 | `{success:true, sheet, address}`（`address` 是 `B7` 这种 A1 写法） | `{success:false, error, message}`；非 Calc 文档明确拒绝 |
 | `slide_get_current`（:6184） | 无 | `{success:true, slideNumber}`（**1 基**，与 `slide_goto` 同口径） | `slideFail(...)`；非 Impress 文档明确拒绝 |
 
@@ -590,25 +591,24 @@ HOUSE 不再是常量：`buildHouse(profile)` 从画像 JSON 派生写端常量�
 表格与演示文稿这两条是它的对应物。**编辑器顶上那条小条自 dev-board#672 复测（2026-09-16）起是文件级的，不再用它们**
 （见 version-control.md 的「版本身份小条」）；两条原语本身是引擎公开 API，`lowa-e2e` 组 34 有用例，不要当死代码清掉。
 
-**`build_merge_draft` 的五步链路**（顺序是硬的）：
-① 载入另一侧 → `paragraphScan()`；② 载入共同的上一版 → `paragraphScan()`，两张快照按 `otherChunks` 推出的
-段序位移对齐后逐段比，文字相同而指纹不同的落进 `formatOnly`（:5952-5959）——**文字已被重放的段不再单列**，
-对不上的段**不猜**；③ 载入主线侧 → 以主线署名 `compareWithBytes(baseBytes)`，主线的改动成为带作者的字符级修订
-（含表格/批注/格式）；④ **对齐核对**：按 `mainChunks` 建「基线段序 → 当前段序」映射，先比段数总量（:6001）
-再对每一个未被主线改过的段逐段比归一文字（:6004-6009），任何一处对不上**整份退回 `stage:'align'`**；
-⑤ 切成对方署名，按 `otherChunks` 里 `conflict=false` 的块**从后往前**重放（:6051-6052，前面的段序才不会漂），
-最后恢复 `humanAuthor`。同一段两边都改了的块不重放——正文里只留主线侧那一版，另一侧的文字进 `conflicts`，
-交给面板的三选一（`merge_take_other`）。
-重放的三种块型各有写法：`INSERT` 走 `insertParasAfter`（找基线里前一个段落单元当锚点）、
-`DELETE` 走 `deleteUnit`（段落要**连段末换行一起选中**才是整段消失，:6029）、`MODIFY` 先清多余单元再追加新段、
-其余一一 `writeTrackedText`（字符级最小颗粒度，退化时整段替换）。表格单元走 `parseCellUnitKey` + `tableCellRange`（:3008/:3014）。
+**`build_merge_draft` 的链路**（顺序是硬的；台账 B13 起，详见 version-control.md「待处理修订」）：
+① 载入另一侧 → `paragraphScan()` + `docRevisionSegments()`（每段的修订结构：P/I/D/ID 片段 + 段落标记修订）；
+② 载入共同的上一版 → `paragraphScan()`，文字相同而指纹不同的落进 `formatOnly`，对不上的段**不猜**；
+③ 载入主线侧，**原样，不做原生比较**（比较会和原有的待处理修订叠在一起、还会多出段落）；
+④ **对齐核对**：按 `mainChunks` 推段序位移，先比段数总量，再对未被主线改过的段比「接受了修订之后」的文字
+（`acceptedText`，与 POI 取字同口径——不用 `para.getString()`，模型里删掉的字也在），对不上整份退回 `stage:'align'`；
+⑤ 以「对方 + `\u2060`」署名按 `otherChunks` 里 `conflict=false` 的块**从后往前**重放：正文段落走
+`rebuildParagraphFromSide`（清掉这段原有的段内修订 → 写入对方定稿的文字 → 按原作者做回对方的待处理修订），
+新增段走 `insertParasAfter`（文字 + 段落标记插在下一段开头），整段是一条待处理插入的以原作者插入；
+表格单元仍是 `writeTrackedText`，但任一侧表格里有待处理修订时停在 `pending-redlines`（台账 B13b）。
+最后恢复 `humanAuthor`。同一段两边都改了的块不重放，另一侧这一段的结构进 `conflictSides` 交给面板。
 
 **三条地雷**：
 
 - **修订作者只在同一条 worker 命令内设得住**（spike A2 实证）——`execCommand` 每条命令开头都会把署名重置回
   `humanAuthor` / `AI WorkDeck`（见 `setRedlineAuthor` 的说明），跨命令切作者必然失效。
   spike 第一轮两侧修订全签成「本地用户」就是这么来的，而合并稿的全部价值就在于「哪一处是谁改的」。
-  所以 `build_merge_draft` 是一条巨长的命令、`merge_take_other`（拒旧修订 → 切作者 → 写入 → 接受）同理，
+  所以 `build_merge_draft` 是一条巨长的命令、`merge_take_other`（清这段原有修订 → 写入 → 按原作者做回 → 只接受合并修订）同理，
   **不要为了「可读性」把它们拆成几条原语**，也不要在宿主侧用两次 `run()` 去「先设作者再写入」。
   两条命令都在每个出口（含失败出口）恢复 `humanAuthor`（`restoreAuthor` :5872 / :6150、:6153）——漏一条，
   律师接着手打的字就会签成同事的名字。
