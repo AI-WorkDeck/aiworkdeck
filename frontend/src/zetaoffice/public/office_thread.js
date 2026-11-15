@@ -5389,6 +5389,29 @@ function tableCellRange(ref) {
     return cur;
   } catch (e) { return null; }
 }
+// 表格单元格里的段落（台账 B13b：单元格里的待处理修订按段重建）。拿不到回 null。
+function tableCellParagraphs(ref) {
+  try {
+    const tables = xModel.getTextTables();
+    if (!(ref.table >= 0) || ref.table >= tables.getCount()) return null;
+    const cell = tables.getByIndex(ref.table).getCellByName(ref.name);
+    if (!cell) return null;
+    const out = [];
+    const en = cell.createEnumeration();
+    while (en.hasMoreElements()) { const el = en.nextElement(); if (el.supportsService('com.sun.star.text.Paragraph')) out.push(el); }
+    return out;
+  } catch (e) { return null; }
+}
+// 单元格的修订结构：只有一段时就是那一段的结构；多段且带待处理修订的标 unsupported（不猜）。
+function tableCellRevisionRecord(ref) {
+  const paras = tableCellParagraphs(ref);
+  if (!paras || !paras.length) return null;
+  if (paras.length === 1) return paragraphRevisionRecord(paras[0], null);
+  const recs = paras.map(function (p) { return paragraphRevisionRecord(p, null); });
+  const pending = recs.some(function (r) { return r.pending; });
+  return { segs: [{ kind: 'P', text: recs.map(function (r) { return acceptedText(r); }).join('\n'), id: '', author: '', date: '' }],
+    markRev: null, unsupported: pending ? 'multi-paragraph-cell' : '', pending: pending, multi: true };
+}
 // 把 newText 作为修订写进 range（字符级最小颗粒度，退化时整段替换）。
 function writeTrackedText(range, newText) {
   const txt = String(newText == null ? '' : newText);
@@ -5407,16 +5430,16 @@ function writeTrackedText(range, newText) {
 // 存盘前宿主再核一遍：存出的文件里不许留下任何带标记的修订（见 mergeRedlineDates.js）。
 const MERGE_MECH_MARK = '\u2060';
 function mechAuthor(name) { return String(name || '') + MERGE_MECH_MARK; }
+// 按原作者重建的待处理修订，署名先带另一个不可见标记 U+2061：导出后宿主凭它认出「这次合并重建的」，
+// 去掉标记、把日期改回原日期（mergeRedlineDates.js）——不靠「日期晚于合并开始」来认，同事在别的时区
+// 时原有修订的日期可能比本机还晚（真机实测：东八区的稿在西八区的引擎里看是「将来」）。也让重建的修订
+// 永远不会和同名律师原有的修订并成一条。
+const MERGE_RECREATED_MARK = '\u2061';
+function recreatedAuthor(name) { return String(name || '') + MERGE_RECREATED_MARK; }
 function isMechAuthor(a) { a = String(a == null ? '' : a); return a.length > 0 && a.charAt(a.length - 1) === MERGE_MECH_MARK; }
 function redlineDateIso(d) {
   if (!d || !d.Year) return '';
   return d.Year + '-' + pad2(d.Month) + '-' + pad2(d.Day) + 'T' + pad2(d.Hours) + ':' + pad2(d.Minutes) + ':' + pad2(d.Seconds) + 'Z';
-}
-// 「现在」按引擎修订日期的写法（本机墙上时间，导出成 w:date 时带 Z——LO 的老习惯）。
-// 合并新建的修订日期都不早于它；宿主据此只改这次合并新建的修订（mergeRedlineDates.js）。
-function redlineNowIso() {
-  const d = new Date();
-  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()) + 'Z';
 }
 function propOf(list, name) {
   for (let i = 0; i < (list ? list.length : 0); i++) if (list[i] && list[i].Name === name) return list[i].Value;
@@ -5535,7 +5558,8 @@ function modelOffsetOfVisible(para, visibleOffset, length) {
 function sameMarkRev(a, b) {
   if (!a && !b) return true;
   if (!a || !b) return false;
-  return a.kind === b.kind && a.author === b.author && a.date === b.date;
+  const bare = function (x) { x = String(x || ''); return x.charAt(x.length - 1) === MERGE_RECREATED_MARK ? x.slice(0, -1) : x; };
+  return a.kind === b.kind && bare(a.author) === bare(b.author) && a.date === b.date;
 }
 // 把合并稿里第 k 段改成另一侧那一段的样子，连同它的待处理修订：
 // ① 拒掉这段里原有的段内修订（段落标记上的修订不碰）——这段的文字整份以另一侧为准；
@@ -5545,11 +5569,15 @@ function sameMarkRev(a, b) {
 // 返回 { ok, recreated[], reason }。recreated 记原作者与原日期，导出后宿主把日期改回去
 // （引擎里修订日期只读，spike A2）。
 function rebuildParagraphFromSide(k, rec, mechName) {
+  return rebuildParagraphWith(function () { return paraAt(k); }, rec, mechName);
+}
+// 同上，段落由调用方给（正文段落按段序取；表格单元格取格里那一段，台账 B13b）。
+function rebuildParagraphWith(getPara, rec, mechName) {
   if (rec.unsupported) return { ok: false, reason: rec.unsupported };
   const recreated = [];
-  const cleared = clearParagraphPending(k);
+  const cleared = clearPendingWith(getPara);
   if (!cleared.ok) return { ok: false, reason: 'clear:' + cleared.reason };
-  const para = paraAt(k);
+  const para = getPara();
   if (!para) return { ok: false, reason: 'paragraph' };
   try { setRedlineAuthor(mechName); } catch (e) {}
   try { xModel.setPropertyValue('RecordChanges', true); } catch (e) {}
@@ -5570,7 +5598,7 @@ function rebuildParagraphFromSide(k, rec, mechName) {
     const cur = body.createTextCursorByRange(para.getStart());
     if (at) cur.goRight(at, false);
     if (op.kind === 'D') {
-      try { setRedlineAuthor(sg.author); } catch (e) {}
+      try { setRedlineAuthor(recreatedAuthor(sg.author)); } catch (e) {}
       cur.goRight(sg.text.length, true);
       if (String(cur.getString()) !== sg.text) return { ok: false, reason: 'delete-mismatch' };
       cur.setString('');
@@ -5578,11 +5606,11 @@ function rebuildParagraphFromSide(k, rec, mechName) {
       continue;
     }
     const insAuthor = op.kind === 'ID' ? sg.under.author : sg.author;
-    try { setRedlineAuthor(insAuthor); } catch (e) {}
+    try { setRedlineAuthor(recreatedAuthor(insAuthor)); } catch (e) {}
     body.insertString(cur, sg.text, false);
     recreated.push({ type: 'ins', author: insAuthor, text: sg.text, date: op.kind === 'ID' ? sg.under.date : sg.date });
     if (op.kind === 'ID') {
-      try { setRedlineAuthor(sg.author); } catch (e) {}
+      try { setRedlineAuthor(recreatedAuthor(sg.author)); } catch (e) {}
       const sel = body.createTextCursorByRange(para.getStart());
       if (at) sel.goRight(at, false);
       sel.goRight(sg.text.length, true);
@@ -5594,7 +5622,7 @@ function rebuildParagraphFromSide(k, rec, mechName) {
   const current = paragraphRevisionRecord(para, null).markRev;
   if (!sameMarkRev(current, rec.markRev)) {
     if (current || !rec.markRev || rec.markRev.kind !== 'D') return { ok: false, reason: 'mark:' + (rec.markRev ? rec.markRev.kind : 'none') };
-    try { setRedlineAuthor(rec.markRev.author); } catch (e) {}
+    try { setRedlineAuthor(recreatedAuthor(rec.markRev.author)); } catch (e) {}
     const body = para.getText();
     const cur = body.createTextCursorByRange(para.getEnd());
     cur.goRight(1, true);
@@ -5612,7 +5640,10 @@ function rebuildParagraphFromSide(k, rec, mechName) {
 // 段落标记上同作者的插入并在一起（真机实测，发版前回归那份稿）。清完核对：段内只剩普通字，
 // 段落标记的修订与清之前一样。
 function clearParagraphPending(k) {
-  let para = paraAt(k);
+  return clearPendingWith(function () { return paraAt(k); });
+}
+function clearPendingWith(getPara) {
+  let para = getPara();
   if (!para) return { ok: false, reason: 'paragraph' };
   let rec = paragraphRevisionRecord(para, null);
   if (rec.unsupported) return { ok: false, reason: rec.unsupported };
@@ -5622,7 +5653,7 @@ function clearParagraphPending(k) {
   if (Object.keys(delIds).length) {
     const rej = resolveRedlinesWhere(function (x) { return !!delIds[x.id]; }, 'reject');
     if (!rej.success) return { ok: false, reason: rej.message };
-    para = paraAt(k);
+    para = getPara();
     rec = paragraphRevisionRecord(para, null);
   }
   let recording = false;
@@ -5646,7 +5677,7 @@ function clearParagraphPending(k) {
     }
   } finally { try { xModel.setPropertyValue('RecordChanges', recording); } catch (e) {} }
   invalidateParaIndex();
-  const after = paragraphRevisionRecord(paraAt(k), null);
+  const after = paragraphRevisionRecord(getPara(), null);
   if (after.segs.some(function (sg) { return sg.kind !== 'P'; })) return { ok: false, reason: 'left' };
   if (!sameMarkRev(after.markRev, markBefore)) return { ok: false, reason: 'mark-changed' };
   return { ok: true };
@@ -10228,7 +10259,6 @@ const EXEC = {
   // 不生效，版本对比标签页的只读靠的是「没有保存路径」）。
   build_merge_draft(p) {
     const t0 = Date.now();
-    const freshSince = redlineNowIso();
     const elapsedMs = {};
     const restoreAuthor = function () { try { setRedlineAuthor(humanAuthor); } catch (e) {} };
     const fail = function (stage, message) {
@@ -10278,7 +10308,16 @@ const EXEC = {
     if (!ld || ld.success !== true || ld.empty) return fail('load-other', (ld && ld.message) || '另一侧的稿是空的');
     const otherScan = paragraphScan();
     const otherRecs = docRevisionSegments();
-    const otherTablePending = (((EXEC.list_revisions({ limit: 500, locate: false }) || {}).revisions) || []).some(function (r) { return r.inTable; });
+    // 另一侧改过的表格单元格的修订结构（台账 B13b）：键与基线相同（逐格 1:1 的块才重放）
+    const otherCellRecs = Object.create(null);
+    otherChunks.forEach(function (c) {
+      if (c.conflict) return;
+      unitsIn(c).forEach(function (u) {
+        if (u.paraOrd >= 0) return;
+        const ref = parseCellUnitKey(u.key);
+        if (ref) otherCellRecs[u.key] = tableCellRevisionRecord(ref);
+      });
+    });
     elapsedMs.loadOther = Date.now() - t;
     t = Date.now();
     ld = EXEC.load_document({ bytes: p && p.baseBytes, name: name });
@@ -10303,8 +10342,10 @@ const EXEC = {
           if (texts.length) otherShifts.push({ from: anchor, delta: texts.length });
         } else if (type === 'DELETE') {
           if (ords.length) otherShifts.push({ from: ords[ords.length - 1] + 1, delta: -ords.length });
-        } else if (ords.length && texts.length !== ords.length) {
-          otherShifts.push({ from: ords[ords.length - 1] + 1, delta: texts.length - ords.length });
+        } else if (ords.length && texts.length !== unitsIn(c).length) {
+          // 块里段落与表格单元混在一起时按单元数比（台账 B13b 真机：主线改第一条 + 紧挨着的表格首格
+          // 并成一块 [p1, t0.0.0]，按段落数比会误判多出一段、段数对不上）
+          otherShifts.push({ from: ords[ords.length - 1] + 1, delta: texts.length - unitsIn(c).length });
         }
       });
     const otherParaIndexOf = function (ord) {
@@ -10331,7 +10372,6 @@ const EXEC = {
     ld = EXEC.load_document({ bytes: p && p.mainBytes, name: name });
     if (!ld || ld.success !== true || ld.empty) return fail('load-main', (ld && ld.message) || '主稿那一版是空的');
     elapsedMs.loadMain = Date.now() - t;
-    const mainTablePending = (((EXEC.list_revisions({ limit: 500, locate: false }) || {}).revisions) || []).some(function (r) { return r.inTable; });
 
     // ③ 基线段序 → 主线段序（与另一侧同一套：插入的段让后面的段往后挪，删掉的段不在了）。
     // 未被主线改过的段逐一核对归一文字，对不上即退回。
@@ -10350,8 +10390,9 @@ const EXEC = {
         if (texts.length) shifts.push({ from: anchor, delta: texts.length });
       } else if (type === 'DELETE') {
         if (ords.length) shifts.push({ from: ords[ords.length - 1] + 1, delta: -ords.length });
-      } else if (ords.length && texts.length !== ords.length) {
-        shifts.push({ from: ords[ords.length - 1] + 1, delta: texts.length - ords.length });
+      } else if (ords.length && texts.length !== unitsIn(c).length) {
+        // 同上：按单元数（段落 + 表格单元）比，不按段落数
+        shifts.push({ from: ords[ords.length - 1] + 1, delta: texts.length - unitsIn(c).length });
       }
     });
     const curParaIndexOf = function (ord) {
@@ -10388,7 +10429,7 @@ const EXEC = {
       const units = unitsIn(c);
       const texts = Array.isArray(c.texts) ? c.texts : [];
       units.forEach(function (u, i) {
-        conflictRefs.push({ key: u.key, para: u.paraOrd >= 0 ? paraAt(curParaIndexOf(u.paraOrd)) : null,
+        conflictRefs.push({ key: u.key, order: u.index, para: u.paraOrd >= 0 ? paraAt(curParaIndexOf(u.paraOrd)) : null,
           rec: (u.paraOrd >= 0 && String(c.type || 'MODIFY') === 'MODIFY' && units.length === texts.length)
             ? otherRecAt(otherParaIndexOf(units[0].paraOrd) + i, texts[i]) : null });
       });
@@ -10430,16 +10471,16 @@ const EXEC = {
     };
     // 在基线段 prevOrd 之后插入另一侧新增的一段：没有待处理修订的以合并署名写入；整段是一条
     // 待处理插入（律师开着修订加了一条）的，以原作者插入；其余情形停下。
-    const insertOtherParaAfter = function (prevOrd, text, rec) {
+    const insertOtherParaAfter = function (prevOrd, text, rec, insertOrder) {
       if (!rec) { stop('align-other', '另一侧新增的段对不上'); return false; }
       if (rec.pending) {
         const whole = rec.segs.length === 1 && rec.segs[0].kind === 'I' && rec.markRev && rec.markRev.kind === 'I' && rec.markRev.id === rec.segs[0].id;
         if (!whole || rec.unsupported) { stop('pending-redlines', rec.unsupported || 'inserted-paragraph'); return false; }
-        try { setRedlineAuthor(rec.segs[0].author); } catch (e) {}
+        try { setRedlineAuthor(recreatedAuthor(rec.segs[0].author)); } catch (e) {}
         const ok = insertParasAfter(prevOrd, [rec.segs[0].text]);
         try { setRedlineAuthor(mechName); } catch (e) {}
         if (ok) recreated.push({ type: 'ins', author: rec.segs[0].author, text: rec.segs[0].text, paragraph: true, date: rec.segs[0].date,
-          _para: paraAt(prevOrd < 0 ? 0 : curParaIndexOf(prevOrd) + 1) });
+          order: insertOrder });
         return ok;
       }
       return insertParasAfter(prevOrd, [text]);
@@ -10475,7 +10516,6 @@ const EXEC = {
       const type = String(c.type || 'MODIFY');
       const texts = Array.isArray(c.texts) ? c.texts : [];
       const units = unitsIn(c);
-      if ((otherTablePending || mainTablePending) && units.some(function (u) { return u.paraOrd < 0; })) { stop('pending-redlines', 'table'); break; }
       try {
         if (type === 'INSERT') {
           let prevOrd = -1;
@@ -10486,7 +10526,7 @@ const EXEC = {
           for (let i = Number(c.baseStart); i < baseUnits.length; i++) { if (paraOrdOfUnit[i] >= 0) { anchorOrd = paraOrdOfUnit[i]; break; } }
           const oStart = otherParaIndexOf(anchorOrd) - texts.length;
           for (let j = texts.length - 1; j >= 0 && !replayErr; j--) {
-            if (!insertOtherParaAfter(prevOrd, texts[j], otherRecAt(oStart + j, texts[j]))) { if (!replayErr) stop('replay', '插入新段失败（锚点段 ' + prevOrd + '）'); break; }
+            if (!insertOtherParaAfter(prevOrd, texts[j], otherRecAt(oStart + j, texts[j]), Number(c.baseStart) - 0.5 + j * 0.001)) { if (!replayErr) stop('replay', '插入新段失败（锚点段 ' + prevOrd + '）'); break; }
             replayed++;
           }
         } else if (type === 'DELETE') {
@@ -10506,7 +10546,7 @@ const EXEC = {
             const last = units[units.length - 1];
             if (last.paraOrd < 0) stop('replay', '追加新段失败: ' + last.key);
             for (let j = texts.length - 1; j >= units.length && !replayErr; j--) {
-              if (!insertOtherParaAfter(last.paraOrd, texts[j], oStart >= 0 ? otherRecAt(oStart + j, texts[j]) : null)) { if (!replayErr) stop('replay', '追加新段失败: ' + last.key); break; }
+              if (!insertOtherParaAfter(last.paraOrd, texts[j], oStart >= 0 ? otherRecAt(oStart + j, texts[j]) : null, last.index + 0.5 + j * 0.001)) { if (!replayErr) stop('replay', '追加新段失败: ' + last.key); break; }
               replayed++;
             }
           }
@@ -10514,9 +10554,25 @@ const EXEC = {
           for (let i = pairs - 1; i >= 0 && !replayErr; i--) {
             const u = units[i];
             if (u.paraOrd < 0) {
-              const range = rangeOfUnit(u);
-              if (!range) { stop('replay', '找不到要改写的单元: ' + u.key); break; }
-              if (!writeTrackedText(range, texts[i])) { stop('replay', '改写单元失败: ' + u.key); break; }
+              // 表格单元格（台账 B13b）：两边格里都没有待处理修订的照旧写字；有的按修订结构重建，
+              // 只有单段的格做得了，多段且带待处理修订的停下（不猜）
+              const ref = parseCellUnitKey(u.key);
+              const cellRec = otherCellRecs[u.key];
+              const curParas = ref ? tableCellParagraphs(ref) : null;
+              const curPending = !!curParas && curParas.some(function (cp) { return paragraphRevisionRecord(cp, null).pending; });
+              if (!cellRec || mergeNormalize(acceptedText(cellRec)) !== mergeNormalize(texts[i])) { stop('align-other', '另一侧的表格单元对不上: ' + u.key); break; }
+              if (!cellRec.pending && !curPending) {
+                const range = rangeOfUnit(u);
+                if (!range) { stop('replay', '找不到要改写的单元: ' + u.key); break; }
+                if (!writeTrackedText(range, texts[i])) { stop('replay', '改写单元失败: ' + u.key); break; }
+                replayed++;
+                continue;
+              }
+              if (cellRec.multi || !curParas || curParas.length !== 1) { stop('pending-redlines', 'multi-paragraph-cell'); break; }
+              const builtCell = rebuildParagraphWith(function () { return (tableCellParagraphs(ref) || [])[0]; }, cellRec, mechName);
+              if (!builtCell.ok) { stop(/^(clear|write|paragraph)/.test(builtCell.reason) ? 'replay' : 'pending-redlines', builtCell.reason); break; }
+              builtCell.recreated.forEach(function (x) { x.order = u.index; recreated.push(x); });
+              try { setRedlineAuthor(mechName); } catch (e) {}
               replayed++;
               continue;
             }
@@ -10524,7 +10580,7 @@ const EXEC = {
             if (!rec) { stop('align-other', '另一侧第 ' + (u.paraOrd + 1) + ' 段对不上'); break; }
             const built = rebuildParagraphFromSide(curParaIndexOf(u.paraOrd), rec, mechName);
             if (!built.ok) { stop(/^(clear|write|paragraph)/.test(built.reason) ? 'replay' : 'pending-redlines', built.reason); break; }
-            built.recreated.forEach(function (x) { recreated.push(x); });
+            built.recreated.forEach(function (x) { x.order = u.index; recreated.push(x); });
             try { setRedlineAuthor(mechName); } catch (e) {}
             replayed++;
           }
@@ -10549,22 +10605,23 @@ const EXEC = {
     conflictRefs.forEach(function (c) {
       if (!c.rec || !c.para) return;
       const mainRec = paragraphRevisionRecord(c.para, null);
-      conflictSides.push({ key: c.key, paraKey: keyNow(c.para, -1), side: { segs: c.rec.segs, markRev: c.rec.markRev, unsupported: c.rec.unsupported },
+      conflictSides.push({ key: c.key, order: c.order, paraKey: keyNow(c.para, -1), side: { segs: c.rec.segs, markRev: c.rec.markRev, unsupported: c.rec.unsupported },
         mainSide: { segs: mainRec.segs } });
     });
     // 原生比较以前顺手把 LO 自己那套 chrome 藏掉（见 hideNativeChrome 的说明）；不比较了就在最后一次
     // load_document 之后显式藏一次，合并比对稿上不许露出原生菜单栏 / 工具栏 / 标尺。
     hideNativeChrome();
-    // 重建的修订按最终文档顺序排（段序；同段保持段内顺序），宿主据此按顺序把原日期对回去
-    const recreatedOrdered = recreated.map(function (x, i) { return { x: x, k: keyNow(x._para, 1e9), i: i }; })
+    // 重建的修订按文档顺序排：基线单元序（正文段落与表格单元格混在同一序列里，就是文档顺序），
+    // 同一单元里保持原顺序；宿主据此逐条把原日期对回去（mergeRedlineDates.js 按 para 排序）
+    const recreatedOrdered = recreated.map(function (x, i) { return { x: x, k: x.order != null ? x.order : 1e9, i: i }; })
       .sort(function (a, b) { return a.k - b.k || a.i - b.i; })
-      .map(function (o) { const y = Object.assign({}, o.x); delete y._para; y.para = o.k; return y; });
+      .map(function (o) { const y = Object.assign({}, o.x); delete y._para; delete y.order; y.para = o.k; return y; });
     elapsedMs.total = Date.now() - t0;
     return {
       success: true, name: name, revisions: revisions, count: revisions.length,
       mainCount: 0, otherCount: otherCount, keptPending: keptPending, replayed: replayed,
       conflicts: conflicts, conflictSides: conflictSides, formatOnly: formatOnly,
-      recreated: recreatedOrdered, freshSince: freshSince, elapsedMs: elapsedMs,
+      recreated: recreatedOrdered, elapsedMs: elapsedMs,
     };
   },
   // 同一段两边都改了时的「用对方的」（台账 B13）：这一段整段以另一侧为准——拒掉合并稿里这段原有
@@ -10580,7 +10637,6 @@ const EXEC = {
     const side = p && p.side;
     if (!side || !Array.isArray(side.segs)) return tableFail('缺少另一侧这一段的结构，无法原样采用（第 ' + (paraKey + 1) + ' 段）');
     const author = String((p && p.author) || '');
-    const freshSince = redlineNowIso();
     const rec = { segs: side.segs, markRev: side.markRev || null, unsupported: String(side.unsupported || '') };
     let built;
     try { built = rebuildParagraphFromSide(paraKey, rec, mechAuthor(author)); }
@@ -10591,8 +10647,10 @@ const EXEC = {
     if (!acc.success) return tableFail('接受这一段的合并改动失败：' + acc.message);
     invalidateParaIndex();
     const para2 = paraAt(paraKey);
-    const recreated = built.recreated.map(function (x) { const y = Object.assign({}, x); delete y._para; y.para = paraKey; return y; });
-    return { success: true, paraKey: paraKey, recreated: recreated, freshSince: freshSince, revisionCount: acc.resolved,
+    // 宿主排日期用的文档顺序：调用方给的单元序（conflictSides[].order），没有就退回段序
+    const order = p && p.order != null ? Number(p.order) : paraKey;
+    const recreated = built.recreated.map(function (x) { const y = Object.assign({}, x); delete y._para; y.para = order; return y; });
+    return { success: true, paraKey: paraKey, recreated: recreated, revisionCount: acc.resolved,
       text: para2 ? String(para2.getString() || '') : '' };
   },
   // 收尾（自动合并、「完成裁决」）：只接受 / 拒绝合并自己产生的修订，三份文件里原有的待处理修订

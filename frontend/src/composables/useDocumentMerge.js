@@ -158,7 +158,7 @@ export function useDocumentMerge(deps) {
         return { failed: true, failReason: 'export' }
       }
       // 按原作者重建的修订改回原日期；存出的文件里还带合并署名的修订就是没收干净，按失败处理
-      bytes = (await restoreRecreatedRedlineDates(bytes, { recreated: draft.recreated, freshSince: draft.freshSince })).bytes
+      bytes = (await restoreRecreatedRedlineDates(bytes, { recreated: draft.recreated })).bytes
       if ((await mergeMarkedAuthors(bytes)).length) return { failed: true, failReason: 'mechanics' }
       await requireCurrentOperation()
       await writeMutation(() => operationApi.postMergeResolveFile(deps.projectId, {

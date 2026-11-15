@@ -545,9 +545,10 @@ export default {
           const res = await this.run('merge_take_other', {
             // 结构化克隆过中继：Vue 的响应式代理传不过去（真机实测 "An object could not be cloned"），给一份纯数据
             paraKey: row.paraKey, side: row.side ? JSON.parse(JSON.stringify(row.side)) : null, author: this.otherAuthor,
+            order: row.order != null ? row.order : null,
           })
           if (!res) return // run() 已经把失败写进红条；这一处仍算未处理，别记账
-          this.$emit('merge-recreated', { recreated: res.recreated || [], freshSince: res.freshSince || '' })
+          this.$emit('merge-recreated', { recreated: res.recreated || [] })
         } else if (choice === 'self') {
           this.gotoParagraph(row.paraKey)
         } else {
