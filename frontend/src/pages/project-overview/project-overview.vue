@@ -734,6 +734,8 @@
             @ocr-files="onExplorerOcr"
             @create-recording="onCreateRecording"
           />
+          <!-- 已自动合入的相邻段落，请过目（版本面板上方；点开一次才消失，与版本入口小角标同源） -->
+          <MergeNeighborNotices v-if="leftPaneKey === 'version' && hasNamedProject" :project-id="projectId" />
           <view v-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
             <component :is="'button'" type="button" class="dd-client-nav" :class="{ active: workspaceTabState('dd-client') === 'active' }" :aria-current="workspaceTabState('dd-client') === 'active' ? 'page' : undefined" @click.stop="openDdClientTab">
               <text class="dd-client-nav-label">{{ $t('ddWorkflow.client.invitedProjects') }}</text>
@@ -2411,6 +2413,7 @@
 </template>
 
 <script>
+import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
 import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
 import { defineAsyncComponent } from 'vue'
@@ -2463,6 +2466,7 @@ import InsightHoverCard from '@/components/InsightHoverCard.vue'
 import LegalReferencePane from '@/components/legal/LegalReferencePane.vue'
 import InsightEntityDetailPane from '@/components/InsightEntityDetailPane.vue'
 import VersionPanel from '@/components/version/VersionPanel.vue'
+import MergeNeighborNotices from '@/components/version/MergeNeighborNotices.vue'
 import CommitHistoryTab from '@/components/version/CommitHistoryTab.vue'
 // 异步组件：历史上是为了不把 FullCalendar 拖进工作台主 chunk；dev-board#899 重做后面板
 // 已不依赖 FullCalendar，懒加载保留（只有点开「日程」面板的会话才付这份代码的成本）。
@@ -2689,6 +2693,7 @@ export default {
     }
   },
   components: {
+    MergeNeighborNotices,
     CrossBorderConsentCard,
     ScratchTransferDialog,
     BackendHealthStatus,
@@ -2749,6 +2754,8 @@ export default {
   },
   data() {
     return {
+      // 已自动合入的相邻段落还没过目的条数（mergeNeighborNotices.js），版本入口的小角标用
+      mergeNeighborUnseen: 0,
       pdfRecovery: null,
       restartPendingTasks: [],
       restartRestoring: false,
@@ -3339,6 +3346,7 @@ export default {
       return versionEntryState((key, params, plural) => (plural === undefined ? this.$t(key, params) : this.$t(key, params, plural)), {
         status: this.versionWorkStatus, cloud: this.collabCloud,
         conflict: this.adoptConflictPending, unavailable: this.versionStatusError,
+        review: this.mergeNeighborUnseen,
       })
     },
     isClientView() {
@@ -3847,6 +3855,7 @@ export default {
     }
   },
   beforeUnmount() {
+    if (this._onMergeNeighbors) uni.$off(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
     clearTimeout(this._selectionRefreshTimer)
     this.resetPdfPreviewPool()
     this._pdfPreviewRefs = {}
@@ -4294,6 +4303,9 @@ export default {
     }
   },
   mounted() {
+    this._onMergeNeighbors = () => this.refreshMergeNeighborUnseen()
+    uni.$on(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
+    this.refreshMergeNeighborUnseen()
     this._stopPluginUpdateChecks = startPluginUpdateChecks()
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
@@ -4690,7 +4702,7 @@ export default {
       this._historyEscHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.showHistoryDrawer = false } }
       window.addEventListener('keydown', this._historyEscHandler, true)
     },
-    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
+    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
     pdfPermissionIdentity() { this.resetPdfPreviewPool() },
@@ -4790,6 +4802,9 @@ export default {
     'rightFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
   },
   methods: {
+    refreshMergeNeighborUnseen() {
+      this.mergeNeighborUnseen = this.projectId ? unseenMergeNeighborNotices(this.projectId).length : 0
+    },
     // 批量命令（find_replace 逐命中路径 / apply_house_style）的「第 x/y 处」进度
     // （dev-board#108）。AI 过程卡没有工具内进度位，先用 toast 降级显示；一批一帧
     // （30 命中 / 500 元素），不会刷屏。total=0 表示命令不预知总数。

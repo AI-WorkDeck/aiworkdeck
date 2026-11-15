@@ -50,6 +50,7 @@
         :executor="executor"
         :refresh-key="refreshKey"
         :merge-conflicts="conflicts"
+        :merge-neighbors="neighbors"
         :merge-format-only="formatOnly"
         :main-author="mainAuthor"
         :other-author="otherAuthor"
@@ -112,6 +113,7 @@ export default {
       mergeState: { conflictChoices: [], revisionOutcomes: [] },
       finished: false,
       recreated: [],
+      neighbors: [],
       freshSince: '',
       finishing: false,
     }
@@ -235,6 +237,7 @@ export default {
         })
       })
       this.recreated = (res.recreated || []).slice()
+      this.neighbors = (inputs.analysis && inputs.analysis.neighbors) || []
       this.freshSince = res.freshSince || ''
       // 修订视图默认「全部」：律师要同时看见两边改了什么。
       await this.run('set_revision_view', { mode: 'all' }).catch(() => {})

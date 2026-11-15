@@ -993,9 +993,12 @@ public class VersionController {
         } catch (Exception e) {
             throw new VersionException("写入合并结果失败: " + target, e);
         }
+        // 相邻、已自动合入的单元（action N，取自分析结果，不信客户端）也记进这一笔，版本记录里看得到
+        List<com.checkba.version.merge.Decision> neighbors = com.checkba.version.merge.ThreeWayAnalyzer.neighborDecisions(analysis);
+        List<com.checkba.version.merge.Decision> recorded = new java.util.ArrayList<>("auto".equals(normalized) ? List.of() : decisions);
+        recorded.addAll(neighbors);
         pendingMergeStore.put(projectId, new com.checkba.version.merge.MergeRecord(
-                rel, normalized, "auto".equals(normalized) ? List.of() : decisions,
-                mainCount, otherCount));
+                rel, normalized, List.copyOf(recorded), mainCount, otherCount));
 
         Map<String, Object> data = new HashMap<>();
         data.put("path", rel);
