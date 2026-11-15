@@ -581,8 +581,8 @@ HOUSE 不再是常量：`buildHouse(profile)` 从画像 JSON 派生写端常量�
 
 | 原语 | 入参 | 成功出参 | 失败 |
 |---|---|---|---|
-| `build_merge_draft` | `{baseBytes, mainBytes, otherBytes, mainAuthor, otherAuthor, plan:{mainChunks, otherChunks}, baseUnits, name}` | `{success:true, name, revisions, count, mainCount:0, otherCount, keptPending, replayed, conflicts:[单元键], conflictSides:[{key, paraKey, side:{segs, markRev, unsupported}, mainSide}], formatOnly:[{paraKey, preview}], recreated:[{type, author, text, date}], freshSince, elapsedMs}` | `{success:false, stage, message, elapsedMs}`，`stage ∈ load-other｜load-base｜load-main｜align｜align-other｜replay｜pending-redlines` |
-| `merge_take_other` | `{paraKey, side, author}`（`side` = `conflictSides[].side`；没有就拒做，免得把另一侧已删的字写回正文） | `{success, paraKey, recreated, freshSince, revisionCount, text}` | 走 `tableFail`；带着搬不过来的修订时附 `stage:'pending-redlines'` |
+| `build_merge_draft` | `{baseBytes, mainBytes, otherBytes, mainAuthor, otherAuthor, plan:{mainChunks, otherChunks}, baseUnits, name}` | `{success:true, name, revisions, count, mainCount:0, otherCount, keptPending, replayed, conflicts:[单元键], conflictSides:[{key, paraKey, side:{segs, markRev, unsupported}, mainSide}], formatOnly:[{paraKey, preview}], recreated:[{type, author, text, date, para}], elapsedMs}` | `{success:false, stage, message, elapsedMs}`，`stage ∈ load-other｜load-base｜load-main｜align｜align-other｜replay｜pending-redlines` |
+| `merge_take_other` | `{paraKey, side, author, order}`（`side` = `conflictSides[].side`；没有就拒做，免得把另一侧已删的字写回正文） | `{success, paraKey, recreated, revisionCount, text}` | 走 `tableFail`；带着搬不过来的修订时附 `stage:'pending-redlines'` |
 | `resolve_merge_mechanics` | `{action:'accept'｜'reject'}` | `{success, resolved, kept}`——只处置署名带 `\u2060` 的合并修订，处置完核对其余修订一条没变 | `tableFail(message)` |
 | `sheet_get_active_cell`（:6165） | 无 | `{success:true, sheet, address}`（`address` 是 `B7` 这种 A1 写法） | `{success:false, error, message}`；非 Calc 文档明确拒绝 |
 | `slide_get_current`（:6184） | 无 | `{success:true, slideNumber}`（**1 基**，与 `slide_goto` 同口径） | `slideFail(...)`；非 Impress 文档明确拒绝 |
@@ -600,7 +600,7 @@ HOUSE 不再是常量：`buildHouse(profile)` 从画像 JSON 派生写端常量�
 ⑤ 以「对方 + `\u2060`」署名按 `otherChunks` 里 `conflict=false` 的块**从后往前**重放：正文段落走
 `rebuildParagraphFromSide`（清掉这段原有的段内修订 → 写入对方定稿的文字 → 按原作者做回对方的待处理修订），
 新增段走 `insertParasAfter`（文字 + 段落标记插在下一段开头），整段是一条待处理插入的以原作者插入；
-表格单元仍是 `writeTrackedText`，但任一侧表格里有待处理修订时停在 `pending-redlines`（台账 B13b）。
+表格单元：两边格里都没有待处理修订的照旧 `writeTrackedText`；有的，单段格走 `rebuildParagraphWith`（台账 B13b），多段格停在 `pending-redlines`。重建的修订署名带 `\u2061`，宿主导出后还原。
 最后恢复 `humanAuthor`。同一段两边都改了的块不重放，另一侧这一段的结构进 `conflictSides` 交给面板。
 
 **三条地雷**：

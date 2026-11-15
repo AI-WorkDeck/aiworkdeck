@@ -42,3 +42,17 @@ write(d + '/main-conflict.docx', m3)
 o3 = base_paras()
 o3[3] = P(R('第三条 付款安排：乙方应于协议生效后 ') + DEL(41, *YI, '10') + INS(42, *YI, '5') + R(' 个工作日内付清。'))
 write(d + '/other-conflict.docx', o3)
+# D/E (ledger B13b): pending tracked changes inside table cells
+def tc(inner): return '<w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/></w:tcPr>' + inner + '</w:tc>'
+def tbl(rows): return '<w:tbl><w:tblPr><w:tblW w:w="6000" w:type="dxa"/></w:tblPr><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid>' + ''.join('<w:tr>' + ''.join(tc(c) for c in r) + '</w:tr>' for r in rows) + '</w:tbl>'
+TP = ['付款计划（虚构示范）', '第一条 价款分两期支付。', '第二条 逾期付款按日万分之五计息。']
+def table_doc(cells, p1=None):
+    return [P(R(TP[0])), p1 or P(R(TP[1])), tbl(cells), P(R(TP[2]))]
+base_cells = [[P(R('付款节点')), P(R('金额'))], [P(R('签约后 10 日')), P(R('300 万元'))]]
+write(d + '/table-base.docx', table_doc(base_cells))
+main_cells = [[P(R('付款节点')), P(R('金额'))], [P(R('签约后 10 日')), P(DEL(61, *JIA, '300') + INS(62, *JIA, '350') + R(' 万元'))]]
+write(d + '/table-main.docx', table_doc(main_cells, P(R('第一条 价款分') + DEL(63, *JIA, '两') + INS(64, *JIA, '三') + R('期支付。'))))
+other_cells = [[P(R('付款节点')), P(R('金额'))], [P(R('签约后 ') + DEL(71, *YI, '10') + INS(72, *YI, '15') + R(' 日')), P(R('300 万元'))]]
+write(d + '/table-other.docx', table_doc(other_cells))
+multi_cells = [[P(R('付款节点')), P(R('金额'))], [P(R('签约后 ') + DEL(81, *YI, '10') + INS(82, *YI, '15') + R(' 日')) + P(R('（以书面通知为准）')), P(R('300 万元'))]]
+write(d + '/table-other-multi.docx', table_doc(multi_cells))

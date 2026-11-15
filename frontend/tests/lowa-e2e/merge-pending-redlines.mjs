@@ -204,7 +204,7 @@ try {
     assert.equal(built && built.success, true, 'combined draft must open: ' + JSON.stringify(built && { stage: built.stage, message: built.message }))
     const side = (built.conflictSides || []).find((s) => s.key === conflictKey)
     assert.ok(side, 'the engine reports the other side of the conflict')
-    let recreated = built.recreated || [], freshSince = built.freshSince
+    let recreated = built.recreated || []
     if (choose === 'other') {
       const took = await run('merge_take_other', { paraKey: side.paraKey, side: side.side, author: '李律师' })
       assert.equal(took && took.success, true, 'keep the other side: ' + JSON.stringify(took))
@@ -213,7 +213,7 @@ try {
     const acc = await run('resolve_merge_mechanics', { action: 'accept' })
     assert.equal(acc && acc.success, true, 'accept merge revisions only: ' + JSON.stringify(acc))
     const exported = await run('export_document', { name: 'm.docx' })
-    const bytes = (await restoreRecreatedRedlineDates(exported.bytes, { recreated, freshSince })).bytes
+    const bytes = (await restoreRecreatedRedlineDates(exported.bytes, { recreated })).bytes
     assert.deepEqual(await mergeMarkedAuthors(bytes), [], 'no merge-marked revision may be saved')
     const xml = await docXml(bytes)
     return { revs: revisionsOf(xml), views: views(xml), bU }
@@ -242,6 +242,71 @@ try {
     assert.ok(!r.revs.some((x) => x.text.includes('主稿')), 'the main side\'s wording of the chosen paragraph is gone')
     assert.equal(norm(r.views.accepted[0]), norm('表后总结（稿B：客户要求按季度付款）。'))
   }
+  // ---------------- D：表格单元格里的待处理修订（台账 B13b） ----------------
+  {
+    const bU = await unitsOf(read('table-base.docx')), mU = await unitsOf(read('table-main.docx')), oU = await unitsOf(read('table-other.docx'))
+    const at = (k) => bU.findIndex((u) => u.key === k)
+    const plan = {
+      mainChunks: [modify(bU, 'p1', mU[at('p1')].text), modify(bU, 't0.1.1', mU[at('t0.1.1')].text)],
+      otherChunks: [modify(bU, 't0.1.0', oU[at('t0.1.0')].text)],
+    }
+    const built = await run('build_merge_draft', { baseBytes: read('table-base.docx'), mainBytes: read('table-main.docx'), otherBytes: read('table-other.docx'),
+      mainAuthor: '张律师', otherAuthor: '李律师', plan, baseUnits: bU, name: 't.docx' })
+    assert.equal(built && built.success, true, 'merge with pending changes in table cells: ' + JSON.stringify(built && { stage: built.stage, message: built.message }))
+    assert.equal((await run('resolve_merge_mechanics', { action: 'accept' })).success, true)
+    const exported = await run('export_document', { name: 't.docx' })
+    const bytes = (await restoreRecreatedRedlineDates(exported.bytes, { recreated: built.recreated })).bytes
+    assert.deepEqual(await mergeMarkedAuthors(bytes), [])
+    const xml = await docXml(bytes)
+    const revs = revisionsOf(xml)
+    results.push({ case: 'D', revisions: revs.map((x) => [x.type, x.author, x.date, x.text].join('|')) })
+    const has = (type, author, date, text) => revs.filter((x) => !x.mark && x.type === type && x.author === author && x.date === date).map((x) => x.text).join('').includes(text)
+    assert.ok(has('del', '乙律师', '2026-11-02T10:00:00Z', '10') && has('ins', '乙律师', '2026-11-02T10:00:00Z', '15'), 'the draft\'s pending change in a table cell is recreated with its author and date')
+    assert.ok(has('del', '甲律师', '2026-11-01T09:00:00Z', '300') && has('ins', '甲律师', '2026-11-01T09:00:00Z', '350'), 'the main side\'s pending change in the neighbouring cell is kept')
+    assert.ok(has('del', '甲律师', '2026-11-01T09:00:00Z', '两') && has('ins', '甲律师', '2026-11-01T09:00:00Z', '三'), 'the main side\'s pending paragraph change is kept')
+    const cell = (re) => { const m = xml.match(re); return m ? m[0] : '' }
+    const tblXml = cell(/<w:tbl>[\s\S]*<\/w:tbl>/)
+    const cells = [...tblXml.matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)].map((m) => m[0])
+    const acc = (frag) => [...frag.replace(/<w:del\b[\s\S]*?<\/w:del>/g, '').matchAll(/<w:t\b[^>]*>([^<]*)<\/w:t>/g)].map((x) => decode(x[1])).join('')
+    assert.equal(acc(cells[2]), '签约后 15 日')
+    assert.equal(acc(cells[3]), '350 万元')
+  }
+
+  // ---------------- E：多段的单元格带待处理修订：停下，交给整份二选一，不猜 ----------------
+  {
+    const bU = await unitsOf(read('table-base.docx')), oU = await unitsOf(read('table-other-multi.docx'))
+    const at = (k) => bU.findIndex((u) => u.key === k)
+    const built = await run('build_merge_draft', { baseBytes: read('table-base.docx'), mainBytes: read('table-base.docx'), otherBytes: read('table-other-multi.docx'),
+      mainAuthor: '张律师', otherAuthor: '李律师', plan: { mainChunks: [], otherChunks: [modify(bU, 't0.1.0', oU[at('t0.1.0')].text)] }, baseUnits: bU, name: 't.docx' })
+    results.push({ case: 'E', stage: built && built.stage, message: built && built.message })
+    assert.equal(built && built.success, false)
+    assert.equal(built.stage, 'pending-redlines')
+  }
+
+  // ---------------- F：真机原样三份稿（主线改第一条 + 紧挨着的表格首格，后端并成一块） ----------------
+  {
+    const F = (f) => path.join(here, 'fixtures/merge/b13b-real', f)
+    const bU = await unitsOf(read(F('base.docx'))), mU = await unitsOf(read(F('main.docx'))), oU = await unitsOf(read(F('other.docx')))
+    const at = (k) => bU.findIndex((u) => u.key === k)
+    // 与后端 ThreeWayAnalyzer 对这三份稿给出的计划逐字相同（段落与表格单元混在一块里）
+    const plan = {
+      mainChunks: [{ type: 'MODIFY', baseStart: at('p1'), baseEnd: at('t0.0.0') + 1, texts: [mU[at('p1')].text, mU[at('t0.0.0')].text], ids: [], conflict: false }],
+      otherChunks: [modify(bU, 't0.1.0', oU[at('t0.1.0')].text)],
+    }
+    const built = await run('build_merge_draft', { baseBytes: read(F('base.docx')), mainBytes: read(F('main.docx')), otherBytes: read(F('other.docx')),
+      mainAuthor: '张律师', otherAuthor: '李律师', plan, baseUnits: bU, name: 't.docx' })
+    results.push({ case: 'F', success: built && built.success, stage: built && built.stage, message: built && built.message })
+    assert.equal(built && built.success, true, 'a chunk mixing a paragraph and a table cell must align: ' + JSON.stringify(built && { stage: built.stage, message: built.message }))
+    assert.equal((await run('resolve_merge_mechanics', { action: 'accept' })).success, true)
+    const exported = await run('export_document', { name: 't.docx' })
+    const bytes = (await restoreRecreatedRedlineDates(exported.bytes, { recreated: built.recreated })).bytes
+    const revs = revisionsOf(await docXml(bytes))
+    const has = (type, date, text) => revs.filter((x) => !x.mark && x.type === type && x.author === '测试甲-律师1' && x.date === date).map((x) => x.text).join('').includes(text)
+    assert.ok(has('ins', '2026-11-15T10:45:23Z', '5') && has('del', '2026-11-15T10:45:23Z', '0'), 'the draft\'s cell change is recreated with its date: ' + JSON.stringify(revs))
+    assert.ok(has('ins', '2026-11-15T10:45:40Z', '（已核）') && has('ins', '2026-11-15T10:45:44Z', '三'), 'the main side\'s cell and paragraph changes are kept')
+    assert.deepEqual(await mergeMarkedAuthors(bytes), [])
+  }
+
   console.log(JSON.stringify(results, null, 1))
   console.log(JSON.stringify({ pass: 1, fail: 0 }))
 } catch (e) {
