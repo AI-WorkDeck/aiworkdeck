@@ -1402,20 +1402,22 @@ try {
       await clickTabAt((await webTabIndices())[0])
 
       // 地址栏真人输入：uni 的 <input> 外面套了一层 uni-input，要点里面那个；
-      // 里面本来就有默认地址，先三连击全选再打字，否则是接在后面续写。
+      // 合成三连击在 headless Chrome 里可能不建立选区（原生 input 亦如此），
+      // 显式建立并核对全选；后续仍走真实键盘输入与导航，不直接改 value。
       await mouseClickSel('.browser-toolbar .url-input input')
-      const addr = await page.evaluate(() => {
-        const el = document.querySelector('.browser-toolbar .url-input input')
-        const r = el.getBoundingClientRect()
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
-      })
       // 打字要带 delay 并当场回读：uni 的 <input> 去抖会吃掉快速连打的字符
       // （issue #200 登录密码被截断是同一个坑）。不回读的话下面只会报「A 页没渲染
       // 出来」，分不清是没输进去、没点开、还是代理链路坏了——实测被截成过 "h"，
       // 于是打开的是 https://h。
       let typed = null
       for (let attempt = 0; attempt < 3; attempt++) {
-        await page.mouse.click(addr.x, addr.y, { clickCount: 3 })
+        await page.$eval('.browser-toolbar .url-input input', el => {
+          el.focus()
+          el.select()
+          if (el.selectionStart !== 0 || el.selectionEnd !== el.value.length) {
+            throw new Error('地址栏未完整选中')
+          }
+        })
         await page.keyboard.type(SITE + '/a', { delay: 25 })
         await sleep(300)
         typed = await page.evaluate(() => {
