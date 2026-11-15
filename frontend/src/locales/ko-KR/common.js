@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "언어 선택",
   "languageFollowSystem": "시스템 설정 따르기",
   "languageSearchPlaceholder": "언어 검색…",
-  "languageNoMatch": "일치하는 언어 없음"
+  "languageNoMatch": "일치하는 언어 없음",
+  "serverLabelAccountBridge": "계정 브리지",
+  "serverLabelGenericClient": "클라이언트(일반)",
+  "serverLabelPersonalMemory": "개인 메모리",
+  "serverLabelProjectMemory": "프로젝트 메모리"
 }

@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Выбрать язык",
   "languageFollowSystem": "Как в системе",
   "languageSearchPlaceholder": "Поиск языков…",
-  "languageNoMatch": "Подходящих языков не найдено"
+  "languageNoMatch": "Подходящих языков не найдено",
+  "serverLabelAccountBridge": "Мост аккаунта",
+  "serverLabelGenericClient": "Клиент (общий)",
+  "serverLabelPersonalMemory": "Личная память",
+  "serverLabelProjectMemory": "Память проекта"
 }

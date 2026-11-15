@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Selecionar idioma",
   "languageFollowSystem": "Seguir o sistema",
   "languageSearchPlaceholder": "Pesquisar idiomas…",
-  "languageNoMatch": "Nenhum idioma correspondente"
+  "languageNoMatch": "Nenhum idioma correspondente",
+  "serverLabelAccountBridge": "Ponte de conta",
+  "serverLabelGenericClient": "Cliente (geral)",
+  "serverLabelPersonalMemory": "Memória pessoal",
+  "serverLabelProjectMemory": "Memória do projeto"
 }
