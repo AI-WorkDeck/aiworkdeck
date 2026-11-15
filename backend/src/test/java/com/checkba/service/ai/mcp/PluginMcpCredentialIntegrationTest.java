@@ -42,6 +42,7 @@ class PluginMcpCredentialIntegrationTest {
         credentials = new PluginCredentialStore(settings, directory.resolve("credential.key").toString());
         account = mock(AccountService.class);
         plugins = mock(PluginService.class);
+        when(plugins.isToolDefinitionApproved(any())).thenReturn(true);
         var metadata = new PluginService.PluginMetadata(); metadata.setId("qa-plugin"); metadata.setPermissions(List.of("network"));
         var contributes = new PluginService.Contributes(); metadata.setContributes(contributes);
         declaration = new LinkedHashMap<>(Map.of("id", "primary", "label", "Synthetic service", "baseUrl", "https://service.example.invalid",

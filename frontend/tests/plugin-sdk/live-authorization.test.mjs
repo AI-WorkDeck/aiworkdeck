@@ -121,3 +121,30 @@ for (const [label, mutate] of [
   await h.call()
   assert.equal(h.calls, 0); assert.equal(h.vm.authorizationReady, false)
 })
+
+// 插件工具权限升级重新授权：列表现在带工具的 access/confirm/mcp/handler/inputSchema，任一变化都作废旧实例；
+// pendingToolChanges / toolApprovalToken 只是「还没批准」的状态，批准时不该再重建面板（闸在后端）。
+const toolRecord = (tool = {}) => ({ ...record(), tools: [{ name: 'demo_add', description: 'x', permissions: [], access: 'write',
+  handler: { type: 'service', service: 'calendar', operation: 'create' }, inputSchema: { type: 'object' }, ...tool }] })
+for (const [label, change] of [
+  ['access widened', { access: 'destructive' }],
+  ['confirm turned off', { confirm: 'never' }],
+  ['MCP projection turned on', { mcp: true }],
+  ['handler rebound', { handler: { type: 'service', service: 'calendar', operation: 'delete' } }],
+  ['input schema changed', { inputSchema: { type: 'object', properties: { taskId: { type: 'integer' } } } }]
+]) test(`tool ${label} invalidates the live instance`, async () => {
+  const h = harness(); h.rows = [toolRecord()]
+  await h.vm.initializeAuthorization()
+  h.rows = [toolRecord(change)]
+  await h.call()
+  assert.equal(h.calls, 0); assert.equal(h.vm.authorizationReady, false)
+})
+test('approving pending tool changes does not rebuild the panel', async () => {
+  const pending = { ...toolRecord(), pendingToolChanges: [{ name: 'demo_add', reasons: ['access'] }], toolApprovalToken: 'abc' }
+  const h = harness(); h.rows = [pending]
+  await h.vm.initializeAuthorization()
+  const generation = h.vm.sessionGeneration
+  h.rows = [toolRecord()]
+  await h.call()
+  assert.equal(h.calls, 1); assert.equal(h.vm.sessionGeneration, generation)
+})

@@ -5,6 +5,7 @@ package com.checkba.service.ai.subagent;
 
 import cn.hutool.json.JSONUtil;
 import com.checkba.dto.ai.TaskProgressEvent;
+import com.checkba.service.LangText;
 import com.checkba.service.ai.AllowedModels;
 import com.checkba.service.ai.AuxModelResolver;
 import com.checkba.service.ai.ChatModelFactory;
@@ -645,6 +646,13 @@ public class SubAgentService {
         if (com.checkba.service.ai.AskUserQuestion.TOOL_NAME.equals(resolved)) {
             return "Error: ask_user is not available inside a sub-agent. Finish with what you have and "
                     + "state the open question in your result; the main agent will ask the user.";
+        }
+        // 需要用户确认的工具（destructive / confirm:always）：子 Agent 没有确认卡可出，交回主 Agent 走确认闸
+        if (toolRegistry.requiresConfirmation(resolved)) {
+            return "Error: " + LangText.of(
+                    "工具 '" + resolved + "' 需要用户确认，不能在子 Agent 中使用。请说明需要执行的操作，由主 Agent 征得用户确认后执行。",
+                    "tool '" + resolved + "' needs the user's confirmation and is not available inside a sub-agent. "
+                            + "Report what should be done; the main agent will ask the user and run it.");
         }
         if (!allowed.contains(resolved)) {
             log.info("[SubAgent] refused out-of-scope tool '{}' (scope {})", resolved, allowed);

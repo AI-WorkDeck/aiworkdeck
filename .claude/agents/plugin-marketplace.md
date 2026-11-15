@@ -160,6 +160,7 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 
 ### 插件更新提示（dev-board#1442）
 
+- **工具级权限升级另行征得同意（0.86.1）**：更新确认框只列插件级权限，新版若有权限升高的工具（`/api/plugins/list` 的 `pendingToolChanges` 非空），更新完成后 MarketDetailPane / MarketPane 立即弹 `utils/pluginToolApproval.js` 的提示逐条点名；用户暂不批准时插件照常启用，只有这些工具对 Agent 不可用，详情页留横幅「查看并批准」。规则与闸见 plugin-system.md「插件工具权限升级必须重新征得同意」。
 - `utils/marketUpdates.js` 区分已安装版本与市场版本、严格比较 SemVer，并合并远端与随应用提供的目录。在线同 ID 以远端为准，不能让旧 bundled 条目遮住新版本；确定未安装且随包更新时可选随包，已有独立安装不走 bundled 覆盖。离线时保留已知更新，未安装项可退回随包安装源。
 - `composables/usePluginUpdates.js` 是插件更新计数的共享状态：工作台挂载即检查，之后每 30 分钟及窗口恢复焦点时检查（焦点检查间隔至少 5 分钟），不依赖市场面板挂载。检查只读取目录；更新仍由用户点击。入口和 Marketplace 分组显示数字角标，手动检查失败持续提示，不把离线当成全部最新。
 - 后台/手动检查完成广播 `awd:market-update-checked`，仅刷新已打开详情的版本元数据，不卸载正文或覆盖未保存设置；初次加载/更新期间不打断当前操作。安装、卸载、启停沿用原有两个 market-changed 事件刷新本地版本、角标与工作台入口。在途检查遇到安装变更会补一次读取，避免旧结果复活角标。工作台 PluginPane 的 key 包含版本，升级后已打开插件重新装载。
