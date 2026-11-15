@@ -40,9 +40,13 @@ public class PluginService {
         return "hr-template-pack".equals(pluginId);
     }
 
-    /** manifest 已定义的权限值（v1 四项 + v2.7 的 ai），未知值仅告警不拒绝（向前兼容） */
-    private static final Set<String> KNOWN_PERMISSIONS =
-            Set.of("file_read", "file_write", "network", "editor", "ai", "im", "lawfirm", "notifications", "tasks", "worklog_read");
+    /**
+     * manifest 已定义的权限值，未知值仅告警不拒绝（向前兼容）。唯一宿主清单：PluginDevService 直接复用；
+     * SDK schema、官网上传校验（aiworkdeck-website lib/plugin-manifest-platform.ts）与市场页标签
+     * 由 PluginPermissionParityTest 钉住，改这里要同批改那几处。
+     */
+    static final Set<String> KNOWN_PERMISSIONS = Set.of("file_read", "file_write", "network", "editor", "ai", "im",
+            "notifications", "lawfirm", "speech", "tasks", "clipboard", "worklog_read");
 
     /** manifest.packs 里的 pack id 规则，与 NativePackService / PluginMarketService 同一套 */
     private static final java.util.regex.Pattern PACK_ID =

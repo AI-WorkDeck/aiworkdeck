@@ -104,6 +104,15 @@ plugins/
 | `network` | 访问外部网络（HTTP 等出站请求） |
 | `editor` | 操作文档编辑器（LOWA/LibreOffice 相关原语） |
 | `ai` | **v2.7 新增**：经宿主平台通道调用 AI 模型（桥 `ai.request`，消耗**用户的** Credits）。广场受理时的人工审查重点项 |
+| `im` | 项目沟通固定动作（桥 `im.request`、宿主服务 `im`） |
+| `notifications` | 向当前用户发宿主通知 |
+| `lawfirm` | 律所管理固定动作（桥 `lawfirm.request`、宿主服务 `lawfirm`） |
+| `speech` | 本机语音组件进度事件（`speech.progress` / `speech.stopped`） |
+| `tasks` | 日程与任务（宿主服务 `calendar`、事件 `calendar.changed`） |
+| `clipboard` | 宿主剪贴板历史（服务 `clipboard`、事件 `clipboard.changed`） |
+| `worklog_read` | 只读本人工作记录汇总（宿主服务 `worklog.summary`，宿主 0.86.0+） |
+
+权限全集以 `PluginService.KNOWN_PERMISSIONS` 为准，SDK schema、官网上传校验与市场页标签由 `PluginPermissionParityTest` 对拍（官网仓有同名守卫测试）。
 
 > **先读这一段，否则会高估它的作用。**
 >
