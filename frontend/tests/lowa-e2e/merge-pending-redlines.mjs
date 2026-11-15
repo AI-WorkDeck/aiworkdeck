@@ -56,7 +56,7 @@ function revisionsOf(xml) {
     let text = ''
     if (!m[3]) {
       const close = xml.indexOf('</w:' + m[1] + '>', m.index)
-      text = xml.slice(m.index, close).replace(/<w:(t|delText)\b[^>]*>([^<]*)<\/w:\1>|<[^>]+>/g, (all, t, txt) => (t ? decode(txt) : ''))
+      text = [...xml.slice(m.index, close).matchAll(/<w:(t|delText)\b[^>]*>([^<]*)<\/w:\1>/g)].map((x) => decode(x[2])).join('')
     }
     // 段落标记上的修订写在 w:pPr/w:rPr 里（引擎导出时不一定自闭合）
     const inPPr = xml.lastIndexOf('<w:pPr', m.index) > xml.lastIndexOf('</w:pPr>', m.index)
@@ -90,7 +90,7 @@ function views(xml) {
   return { accepted: acc, rejected: rej }
 }
 const norm = (s) => String(s).replace(/\s+/g, ' ').trim().normalize('NFC')
-async function bodyTexts(bytes) { return bodyParagraphs(await docXml(bytes)).map((p) => (p.match(/<w:t\b[^>]*>[^<]*<\/w:t>/g) || []).map((t) => decode(t.replace(/<[^>]+>/g, ''))).join('')) }
+async function bodyTexts(bytes) { return bodyParagraphs(await docXml(bytes)).map((p) => [...p.matchAll(/<w:t\b[^>]*>([^<]*)<\/w:t>/g)].map((x) => decode(x[1])).join('')) }
 
 // 与后端 DocxUnitReader 同口径的单元（正文段落按 POI getText；表格单元格跟在表的位置）
 async function unitsOf(bytes) {
@@ -99,7 +99,7 @@ async function unitsOf(bytes) {
   const units = []
   let pi = 0, ti = 0
   // XWPFParagraph.getText 只取 w:t（删掉的字 w:delText 不算）——接受了待处理修订之后的文字
-  const textOf = (frag) => (frag.match(/<w:t\b[^>]*>[^<]*<\/w:t>/g) || []).map((t) => decode(t.replace(/<[^>]+>/g, ''))).join('')
+  const textOf = (frag) => [...frag.matchAll(/<w:t\b[^>]*>([^<]*)<\/w:t>/g)].map((x) => decode(x[1])).join('')
   const re = /<w:tbl[ >][\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>|<w:p\/>/g
   let m
   while ((m = re.exec(body))) {

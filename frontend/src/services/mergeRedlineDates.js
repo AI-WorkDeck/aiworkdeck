@@ -12,6 +12,8 @@ import { MERGE_MECH_MARK } from '../utils/mergeRevisionView.js'
 export { MERGE_MECH_MARK }
 
 const decode = (s) => String(s).replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+// 一段 XML 里 w:t / w:delText 的字（只取元素里的文字，不靠剥标签）
+const runText = (xml) => [...String(xml).matchAll(/<w:(t|delText)\b[^>]*>([^<]*)<\/w:\1>/g)].map((m) => decode(m[2])).join('')
 const attr = (tag, name) => { const m = tag.match(new RegExp('\\s' + name + '="([^"]*)"')); return m ? decode(m[1]) : null }
 
 /** 存出的字节里还有没有合并自己的修订：返回带标记的作者名清单（空 = 干净）。 */
@@ -71,7 +73,7 @@ export async function restoreRecreatedRedlineDates(bytes, { recreated = [], fres
       if (head.mark) queue.shift()
     } else {
       const close = xml.indexOf('</w:' + kind + '>', offset)
-      const inner = close > 0 ? xml.slice(offset, close).replace(/<w:(t|delText)\b[^>]*>([^<]*)<\/w:\1>|<[^>]+>/g, (m, t, txt) => (t ? decode(txt) : '')) : ''
+      const inner = close > 0 ? runText(xml.slice(offset, close)) : ''
       // 先认排在最前的那一条；对不上（引擎把字拆合得不一样）再在同组里找，都不行就仍给最前那条的日期
       let k = queue[0].rest.startsWith(inner) ? 0 : queue.findIndex((r) => r.rest.startsWith(inner))
       if (k < 0) k = 0
