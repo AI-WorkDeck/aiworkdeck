@@ -182,7 +182,7 @@ try {
     assert.deepEqual(await mergeMarkedAuthors(bytes), [], 'no merge-marked revision may be saved')
     const has = (type, author, date, text) => revs.some((r) => r.type === type && r.author === author && r.date === date && r.text === text)
     assert.ok(has('del', '甲律师', '2026-11-01T09:00:00Z', '2') && has('ins', '甲律师', '2026-11-01T09:00:00Z', '5'), 'main side pending change kept with author and date')
-    assert.ok(has('del', '乙律师', '2026-11-02T10:00:00Z', '目标公司 '), 'other side pending deletion-only change kept')
+    assert.ok(has('del', '乙律师', '2026-11-02T11:30:00Z', '目标公司 '), 'other side pending deletion-only change kept, with its own date (same author, another time)')
     assert.ok(has('del', '乙律师', '2026-11-02T10:00:00Z', '交割日') && has('ins', '乙律师', '2026-11-02T10:00:00Z', '付款完成日'), 'other side pending change kept with author and original date')
     assert.ok(has('ins', '乙律师', '2026-11-02T10:00:00Z', '第四条之一 陈述与保证：双方保证所提供信息真实。'), 'other side pending new clause kept as a pending insertion')
     assert.ok(has('del', 'AI WorkDeck', '2026-11-03T08:00:00Z', '分两期'), 'the AI pending deletion inherited from the base is untouched')

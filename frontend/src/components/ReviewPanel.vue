@@ -87,11 +87,11 @@
             </view>
             <view class="rp-three-col">
               <text class="rp-three-h">{{ mainSideLabel }}</text>
-              <text class="rp-three-t">{{ c.mainText || $t('editor.review.emptyText') }}</text>
+              <text class="rp-three-t"><text v-for="(seg, si) in c.mainDiff" :key="si" :class="'rp-d-' + seg.type">{{ seg.text }}</text><text v-if="!c.mainText">{{ $t('editor.review.emptyText') }}</text></text>
             </view>
             <view class="rp-three-col">
               <text class="rp-three-h">{{ otherSideLabel }}</text>
-              <text class="rp-three-t">{{ c.otherText || $t('editor.review.emptyText') }}</text>
+              <text class="rp-three-t"><text v-for="(seg, si) in c.otherDiff" :key="si" :class="'rp-d-' + seg.type">{{ seg.text }}</text><text v-if="!c.otherText">{{ $t('editor.review.emptyText') }}</text></text>
             </view>
           </view>
           <view class="rp-acts">
@@ -257,6 +257,7 @@
 //   类型  引擎 RedlineType 如实映射成 插入/删除/格式/段落格式，认不出的原样显示；
 //   理由  位置上与修订重叠/相接的批注挂进卡片，处置后顺手标记为已解决。
 import { MERGE_MECH_MARK } from '@/utils/mergeRevisionView.js'
+import { charDiff } from '@/utils/textDiff.js'
 import EvidencePanel from '@/components/EvidencePanel.vue'
 import InlineReviewPanel from '@/components/InlineReviewPanel.vue'
 import {
@@ -364,6 +365,9 @@ export default {
           choiceLabel: this.conflictChoiceLabel(choice),
           where: this.unitLabel(c.key),
           paraKey: c.paraKey != null ? c.paraKey : this.paraIndexOf(c.key),
+          // 每一侧相对共同的上一版改了哪几个字，轻量标出来（合并稿里不再有主线侧的比较修订，律师在这里决定）
+          mainDiff: charDiff(c.baseText || '', c.mainText || ''),
+          otherDiff: charDiff(c.baseText || '', c.otherText || ''),
         })
       })
     },
@@ -529,7 +533,8 @@ export default {
           // 合并稿里这一段本来就是主线那一版（连同它原有的待处理修订，台账 B13），不用动文档
         } else if (choice === 'other') {
           const res = await this.run('merge_take_other', {
-            paraKey: row.paraKey, side: row.side || null, author: this.otherAuthor,
+            // 结构化克隆过中继：Vue 的响应式代理传不过去（真机实测 "An object could not be cloned"），给一份纯数据
+            paraKey: row.paraKey, side: row.side ? JSON.parse(JSON.stringify(row.side)) : null, author: this.otherAuthor,
           })
           if (!res) return // run() 已经把失败写进红条；这一处仍算未处理，别记账
           this.$emit('merge-recreated', { recreated: res.recreated || [], freshSince: res.freshSince || '' })
@@ -901,6 +906,8 @@ export default {
 /* 合并比对稿模式的三块（dev-board#630） */
 .rp-merge-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); }
 .rp-sec { margin-bottom: 14px; }
+.rp-d-ins { background: var(--awd-accent-soft); color: var(--awd-accent-text); text-decoration: underline; }
+.rp-d-del { color: var(--awd-danger-text); text-decoration: line-through; }
 .rp-merge-kept { display: block; font-size: var(--awd-panel-fs); color: var(--awd-text-3); line-height: 1.5; margin: 2px 0 6px; }
 .rp-sec-h { display: block; font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); margin: 4px 0 6px; }
 .rp-sec-s { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.5; margin-bottom: 6px; }

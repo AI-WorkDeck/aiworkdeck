@@ -37,9 +37,15 @@ export async function mergeMarkedAuthors(bytes) {
  * @returns {Promise<{bytes: Uint8Array, restored: number}>}
  */
 export async function restoreRecreatedRedlineDates(bytes, { recreated = [], freshSince = '' } = {}) {
+  // 按文档顺序（段序 para，同段保持原顺序）逐条对：同一位律师在不同段、不同时间改的同样几个字
+  // （比如两段都把某个数改成「5」）只能靠位置分清，不能靠文字找第一条
+  const ordered = recreated
+    .map((r, i) => ({ r, i }))
+    .filter((o) => o.r && o.r.date && o.r.author)
+    .sort((a, b) => (a.r.para ?? Infinity) - (b.r.para ?? Infinity) || a.i - b.i)
+    .map((o) => ({ ...o.r, rest: String(o.r.text || '') }))
   const groups = new Map()
-  for (const r of recreated) {
-    if (!r || !r.date || !r.author) continue
+  for (const r of ordered) {
     const key = r.type + '\u0000' + r.author
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(r)
@@ -48,27 +54,63 @@ export async function restoreRecreatedRedlineDates(bytes, { recreated = [], fres
   const zip = await JSZip.loadAsync(bytes)
   const file = zip.file('word/document.xml')
   if (!file) return { bytes, restored: 0 }
-  const xml = await file.async('string')
+  const xml = splitCombined(await file.async('string'), groups, freshSince)
   let restored = 0
   const out = xml.replace(/<w:(ins|del)\b([^>]*?)(\/?)>/g, (whole, kind, attrs, selfClose, offset) => {
     const author = attr(attrs, 'w:author')
     const date = attr(attrs, 'w:date')
     if (author == null || !date || date < freshSince) return whole
-    const list = groups.get(kind + '\u0000' + author)
-    if (!list) return whole
-    const dates = [...new Set(list.map((r) => r.date))]
-    let pick = dates.length === 1 ? dates[0] : null
-    if (!pick && !selfClose) {
+    const queue = groups.get(kind + '\u0000' + author)
+    if (!queue || !queue.length) return whole
+    const inPPr = xml.lastIndexOf('<w:pPr', offset) > xml.lastIndexOf('</w:pPr>', offset)
+    let pick
+    if (selfClose || inPPr) {
+      // 段落标记上的修订（没有字）：标记删除各算一条；新增整段的标记排在它那段文字前面，日期跟那一条走
+      const head = queue[0]
+      pick = head.date
+      if (head.mark) queue.shift()
+    } else {
       const close = xml.indexOf('</w:' + kind + '>', offset)
       const inner = close > 0 ? xml.slice(offset, close).replace(/<w:(t|delText)\b[^>]*>([^<]*)<\/w:\1>|<[^>]+>/g, (m, t, txt) => (t ? decode(txt) : '')) : ''
-      const hit = inner && list.find((r) => r.text && (r.text === inner || r.text.includes(inner)))
-      if (hit) pick = hit.date
+      // 先认排在最前的那一条；对不上（引擎把字拆合得不一样）再在同组里找，都不行就仍给最前那条的日期
+      let k = queue[0].rest.startsWith(inner) ? 0 : queue.findIndex((r) => r.rest.startsWith(inner))
+      if (k < 0) k = 0
+      const hit = queue[k]
+      pick = hit.date
+      hit.rest = hit.rest.startsWith(inner) ? hit.rest.slice(inner.length) : ''
+      if (!hit.rest) queue.splice(k, 1)
     }
-    if (!pick) pick = dates.slice().sort()[0]
     restored++
     return '<w:' + kind + attrs.replace(/\sw:date="[^"]*"/, ' w:date="' + pick + '"') + selfClose + '>'
   })
   if (!restored) return { bytes, restored: 0 }
   zip.file('word/document.xml', out)
   return { bytes: await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }), restored }
+}
+
+// 引擎把同一位律师「首尾相接、几秒内新建」的几条修订并成一条（LO 的 CanCombine）：重建时原本日期
+// 不同的两条（如先删的「0」与后删的「3」）就成了一条「30」。只有一个文字片段的这种修订，若它的字
+// 恰好是同组里连续几条重建修订的字拼起来、且日期不止一个，就按原来的几条拆回去，再逐条对日期。
+function splitCombined(xml, groups, freshSince) {
+  const used = new Set()
+  // 拆出来的每一段要有自己的 w:id（修订 id 在文档里须唯一）
+  let nextId = Math.max(0, ...[...xml.matchAll(/\sw:id="(\d+)"/g)].map((m) => Number(m[1]))) + 1
+  return xml.replace(/<w:(ins|del)\b([^>]*?)>(<w:r>(<w:rPr>(?:(?!<\/w:rPr>)[\s\S])*<\/w:rPr>)?<w:(t|delText)\b([^>]*)>([^<]*)<\/w:\5><\/w:r>)<\/w:\1>/g,
+    (whole, kind, attrs, run, rPr, tag, tAttrs, raw) => {
+      const author = attr(attrs, 'w:author'), date = attr(attrs, 'w:date')
+      if (author == null || !date || date < freshSince) return whole
+      const list = groups.get(kind + '\u0000' + author) || []
+      const text = decode(raw)
+      for (let i = 0; i < list.length; i++) {
+        if (used.has(list[i])) continue
+        let acc = '', j = i
+        while (j < list.length && acc.length < text.length) { acc += list[j].text || ''; j++ }
+        const seq = list.slice(i, j)
+        if (acc !== text || seq.length < 2 || new Set(seq.map((r) => r.date)).size < 2) continue
+        seq.forEach((r) => used.add(r))
+        const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        return seq.map((r, n) => '<w:' + kind + (n ? attrs.replace(/\sw:id="\d+"/, ' w:id="' + (nextId++) + '"') : attrs) + '><w:r>' + (rPr || '') + '<w:' + tag + tAttrs + '>' + esc(r.text) + '</w:' + tag + '></w:r></w:' + kind + '>').join('')
+      }
+      return whole
+    })
 }

@@ -5602,6 +5602,8 @@ function rebuildParagraphFromSide(k, rec, mechName) {
     recreated.push({ type: 'del', author: rec.markRev.author, text: '', mark: true, date: rec.markRev.date });
   }
   invalidateParaIndex();
+  // 从后往前做的，翻回文档顺序；带上段落对象，调用方按最终段序排好（宿主按文档顺序对日期）
+  recreated.reverse().forEach(function (x) { x._para = para; });
   return { ok: true, recreated: recreated };
 }
 // 把第 k 段的段内待处理修订清掉、回到「拒绝修订后」的文字，段落标记上的修订不动：
@@ -10436,7 +10438,8 @@ const EXEC = {
         try { setRedlineAuthor(rec.segs[0].author); } catch (e) {}
         const ok = insertParasAfter(prevOrd, [rec.segs[0].text]);
         try { setRedlineAuthor(mechName); } catch (e) {}
-        if (ok) recreated.push({ type: 'ins', author: rec.segs[0].author, text: rec.segs[0].text, paragraph: true, date: rec.segs[0].date });
+        if (ok) recreated.push({ type: 'ins', author: rec.segs[0].author, text: rec.segs[0].text, paragraph: true, date: rec.segs[0].date,
+          _para: paraAt(prevOrd < 0 ? 0 : curParaIndexOf(prevOrd) + 1) });
         return ok;
       }
       return insertParasAfter(prevOrd, [text]);
@@ -10552,12 +10555,16 @@ const EXEC = {
     // 原生比较以前顺手把 LO 自己那套 chrome 藏掉（见 hideNativeChrome 的说明）；不比较了就在最后一次
     // load_document 之后显式藏一次，合并比对稿上不许露出原生菜单栏 / 工具栏 / 标尺。
     hideNativeChrome();
+    // 重建的修订按最终文档顺序排（段序；同段保持段内顺序），宿主据此按顺序把原日期对回去
+    const recreatedOrdered = recreated.map(function (x, i) { return { x: x, k: keyNow(x._para, 1e9), i: i }; })
+      .sort(function (a, b) { return a.k - b.k || a.i - b.i; })
+      .map(function (o) { const y = Object.assign({}, o.x); delete y._para; y.para = o.k; return y; });
     elapsedMs.total = Date.now() - t0;
     return {
       success: true, name: name, revisions: revisions, count: revisions.length,
       mainCount: 0, otherCount: otherCount, keptPending: keptPending, replayed: replayed,
       conflicts: conflicts, conflictSides: conflictSides, formatOnly: formatOnly,
-      recreated: recreated, freshSince: freshSince, elapsedMs: elapsedMs,
+      recreated: recreatedOrdered, freshSince: freshSince, elapsedMs: elapsedMs,
     };
   },
   // 同一段两边都改了时的「用对方的」（台账 B13）：这一段整段以另一侧为准——拒掉合并稿里这段原有
@@ -10584,7 +10591,8 @@ const EXEC = {
     if (!acc.success) return tableFail('接受这一段的合并改动失败：' + acc.message);
     invalidateParaIndex();
     const para2 = paraAt(paraKey);
-    return { success: true, paraKey: paraKey, recreated: built.recreated, freshSince: freshSince, revisionCount: acc.resolved,
+    const recreated = built.recreated.map(function (x) { const y = Object.assign({}, x); delete y._para; y.para = paraKey; return y; });
+    return { success: true, paraKey: paraKey, recreated: recreated, freshSince: freshSince, revisionCount: acc.resolved,
       text: para2 ? String(para2.getString() || '') : '' };
   },
   // 收尾（自动合并、「完成裁决」）：只接受 / 拒绝合并自己产生的修订，三份文件里原有的待处理修订
