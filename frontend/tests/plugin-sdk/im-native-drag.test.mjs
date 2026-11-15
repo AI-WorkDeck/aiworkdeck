@@ -45,11 +45,14 @@ test('bounded host handle produces a real one-use native drop while opaque ifram
   t.diagnostic('Opaque iframe baseline: ' + JSON.stringify(await page.evaluate(() => ({ hostDragover: events.includes('host-dragover'), dropReceived: !!result }))))
   await page.mouse.move(300, 300); await page.evaluate(() => { reset(); useHostHandle = true })
   await page.mouse.move(100, 118); await page.waitForSelector('[data-awd-plugin-drag-handle]')
+  // 子框架每次 pointerenter 都会 postMessage 一次 prepare；满载时一条迟到的 prepare 会在落下之后
+  // 再装一个新句柄（以前偶发「句柄数 1」）。这一次要拖的句柄已经装好，后面的 prepare 不再接。
+  await page.evaluate(() => { acceptPrepare = false })
   const bounded = await page.evaluate(() => { const h=document.querySelector('[data-awd-plugin-drag-handle]').getBoundingClientRect(),f=document.querySelector('iframe').getBoundingClientRect();return h.left>=f.left&&h.right<=f.right&&h.top>=f.top&&h.bottom<=f.bottom })
   assert.equal(bounded, true)
   await drag(); await page.waitForFunction(() => events.includes('host-drop'))
-  // 落下后句柄是异步摘掉的：满载并行跑全套测试时立即计数会偶发读到 1
-  await page.waitForFunction(() => document.querySelectorAll('[data-awd-plugin-drag-handle]').length === 0, { timeout: 5000 }).catch(() => {})
+  // 句柄在它自己的 dragend 上摘掉（异步）：等到真的摘掉为止，等不到就带着原因失败，不吞超时
+  await page.waitForFunction(() => document.querySelectorAll('[data-awd-plugin-drag-handle]').length === 0, { timeout: 15000 })
   const result = await page.evaluate(() => ({ result, second, events, handles: document.querySelectorAll('[data-awd-plugin-drag-handle]').length }))
   assert.deepEqual(result.result.file, { id: 42, name: 'synthetic.pdf', fileType: 'pdf', isDir: false })
   assert.equal(result.result.handled, true); assert.equal(result.second.file, null); assert.equal(result.handles, 0)
@@ -57,7 +60,7 @@ test('bounded host handle produces a real one-use native drop while opaque ifram
   assert.equal(result.events.includes('child-dragstart'), false)
   assert.equal(await page.$eval('iframe', (el) => el.getAttribute('sandbox')), 'allow-scripts allow-forms')
   // Stop asynchronous iframe preparation before testing rectangle validation in isolation.
-  await page.evaluate(() => { acceptPrepare = false; reset() })
+  await page.evaluate(() => { reset() })
   // Malformed, oversized and entirely out-of-frame rectangles never create a hit target.
   for (const rect of [{ left: 0, top: 0, width: 10000, height: 40 }, { left: 500, top: 0, width: 60, height: 32 }, { left: -500, top: 0, width: 60, height: 32 }, { left: 0, top: 0, width: 60, height: -1 }]) {
     await page.evaluate((r) => prepareAt(r), rect)
@@ -66,6 +69,6 @@ test('bounded host handle produces a real one-use native drop while opaque ifram
   await page.evaluate(() => prepareAt({ left: -10, top: -4, width: 80, height: 36 }))
   assert.equal(await page.$$eval('[data-awd-plugin-drag-handle]', (els) => els.length), 1)
   await page.keyboard.press('Escape')
-  await page.waitForFunction(() => document.querySelectorAll('[data-awd-plugin-drag-handle]').length === 0, { timeout: 5000 }).catch(() => {})
+  await page.waitForFunction(() => document.querySelectorAll('[data-awd-plugin-drag-handle]').length === 0, { timeout: 15000 })
   assert.equal(await page.$$eval('[data-awd-plugin-drag-handle]', (els) => els.length), 0)
 })
