@@ -41,6 +41,10 @@ public class EvalCase {
     public String mode = "AGENT";
     /** 用户输入 */
     public String userInput;
+    /** Optional synthetic assembled history; null preserves legacy replay setup. Never loads real history. */
+    public List<dev.langchain4j.data.message.ChatMessage> contextHistory;
+    /** Optional stored row count for testing truncated/compacted history. Includes the current user row. */
+    public Integer persistedMessageCount;
     /**
      * 可选：本轮的活跃文档（编辑器里打开着的那一份）。
      * 决定编排器下发哪一套编辑原语（dev-board#729 ①：docx 不下发 sheet_* / slide_*）。
@@ -112,6 +116,8 @@ public class EvalCase {
     public static class NativeCall {
         public String name;
         public Map<String, Object> arguments = new HashMap<>();
+        /** Deliberately malformed arguments for protocol/validation regression tests. */
+        public String rawArguments;
     }
 
     /** 真实 LLM 冒烟断言：首个工具调用应属于集合（空集合 = 期望不调用任何工具） */

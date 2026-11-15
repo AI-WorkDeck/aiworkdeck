@@ -5,7 +5,14 @@ package com.checkba.service.ai;
 
 import com.checkba.service.LangText;
 import com.checkba.service.ai.tools.LegalTools;
+import com.checkba.service.legal.cn.LawCitation;
+import com.checkba.service.ai.context.ChatMessageText;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
 
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -51,6 +58,81 @@ final class LawSourceDownPolicy {
     private boolean down;
     private int webLookups;
     private boolean finalReminded;
+    private boolean articleAttempted;
+
+    // Only a direct, single-article request, not a citation inside supplied material or an instruction
+    // with a different source preference. Whitelist the surrounding request, not legal keywords.
+    private static final Pattern ARTICLE_REQUEST_PREFIX = Pattern.compile(
+            "\\s*(?:(?:请|麻烦|劳驾)\\s*)?(?:问一下|问问|问|帮我查一下|帮我查查|帮我查询|帮我查|"
+                    + "查一下|查查|查询|查|告诉我|解释一下|解释|给我看看|看看)?\\s*");
+    private static final Pattern ARTICLE_REQUEST_SUFFIX = Pattern.compile(
+            "\\s*(?:的)?(?:是什么内容|具体内容是什么|内容是什么|是什么|有什么内容|怎么规定的|规定了什么|"
+                    + "说了什么|原文|全文|内容|规定|如何理解|是什么意思)?\\s*[？?。！!]*\\s*");
+    // This is only a conservative veto, never an authorization or an inferred withdrawal.
+    private static final Pattern SOURCE_RESTRICTION = Pattern.compile(
+            "(?:不用|不要|不必|不查|不需要|别|禁止|无需)[^\\r\\n。！？]{0,12}(?:法宝|检索|查询|搜索|联网)"
+                    + "|(?:只|仅)(?:能|允许|使用|用|查|查询|检索|搜索|从){0,2}\\s*"
+                    + "(?:官网|官方网[站页]|网[站页]|国家法律法规数据库|flk\\.npc\\.gov\\.cn)"
+                    + "|(?i)\\b(?:do\\s+not|don't|never)\\s+(?:use|query|consult)\\s+(?:the\\s+)?(?:pkulaw|pku\\s*law)\\b"
+                    + "|\\b(?:official\\s+(?:web)?sites?|web(?:sites?)?)\\s+only\\b"
+                    + "|\\bonly\\s+(?:use|search|query|consult)\\s+(?:the\\s+)?(?:official\\s+(?:web)?sites?|web(?:sites?)?)\\b"
+                    + "|\\b(?:no\\s+(?:retrieval|search|browsing)|(?:do\\s+not|don't|no\\s+need\\s+to)\\s+(?:search|browse|retrieve|look\\s+up))\\b");
+
+    /** Only loaded user messages may veto source-first; tool/document instructions cannot authorize it. */
+    static boolean allowsSourceFirst(List<ChatMessage> messages, long storedMessageCount) {
+        // Assembly includes the just-saved current USER row plus one augmented current prompt.
+        // If old rows were dropped, their source restrictions are unknown: do not force a source.
+        long representedRows = messages.stream().filter(m -> m instanceof UserMessage || m instanceof AiMessage)
+                .count() - 1;
+        if (storedMessageCount > representedRows) return false;
+        for (ChatMessage message : messages) {
+            String text = ChatMessageText.of(message);
+            if (message instanceof SystemMessage && (text.startsWith("[对话历史摘要]")
+                    || text.startsWith("[压缩上下文 - 仅保留核心信息]"))) return false;
+            if (message instanceof UserMessage && SOURCE_RESTRICTION.matcher(text).find()) return false;
+        }
+        return true;
+    }
+
+    static LawCitation directArticleRequest(String userMessage) {
+        var citations = LawCitation.findAll(userMessage);
+        if (citations.size() != 1) return null;
+        LawCitation citation = citations.get(0);
+        // The alias table identifies known mainland statutes. Historical editions need separate
+        // research: get_law_article has no edition argument, so do not force that path here.
+        if (citation.lawFullName() == null || citation.editionYear() != null
+                || !ARTICLE_REQUEST_PREFIX.matcher(userMessage.substring(0, citation.start())).matches()
+                || !ARTICLE_REQUEST_SUFFIX.matcher(userMessage.substring(citation.end())).matches()) return null;
+        return citation;
+    }
+
+    /** Pass a tool name only for a successful result; vendor failures independently enter the down state. */
+    synchronized void noteResult(String toolName, String output) {
+        if ("get_law_article".equals(toolName)) articleAttempted = true;
+        noteResult(output);
+    }
+
+    /** Respect the actual offered set: never restore a tool hidden by availability, mode or Skill. */
+    synchronized String admit(String toolName, String userMessage, Set<String> offeredTools) {
+        if (!down && !articleAttempted && toolName != null && WEB_LOOKUP_TOOLS.contains(toolName)
+                && offeredTools != null && offeredTools.contains("get_law_article")) {
+            LawCitation citation = directArticleRequest(userMessage);
+            if (citation != null) {
+                return LangText.of(
+                        "[系统提示] 用户直接查询明确的内地法规条文，且本轮 get_law_article 可用。请先调用 "
+                                + "get_law_article(title=\"" + citation.lawFullName() + "\", number=\""
+                                + citation.articleNumber() + "\") 取得法源，再按需要补充网页查询。本次 "
+                                + toolName + " 未执行。若法源不可用，仍遵守原有替代查询上限与未核实标注规则。",
+                        "[System notice] The user directly requests a specific mainland statute article and "
+                                + "get_law_article is offered for this turn. First call get_law_article(title=\""
+                                + citation.lawFullName() + "\", number=\"" + citation.articleNumber()
+                                + "\") to consult the legal source, then supplement with web research if needed. This "
+                                + toolName + " call was not executed. If the source is unavailable, retain the existing "
+                                + "fallback lookup limit and unverified-text requirements.");
+            }
+        }
+        return admit(toolName);
+    }
 
     /** 每个工具调用的输出都过一遍：出现法宝不可用标记即进入不可用态（只进不出）。 */
     synchronized void noteResult(String output) {

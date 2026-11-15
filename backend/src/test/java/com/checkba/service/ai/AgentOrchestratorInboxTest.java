@@ -351,6 +351,47 @@ class AgentOrchestratorInboxTest {
         verify(messageService).saveMessage(any(), any(), eq(CONV), eq("USER"), eq("change direction"), any(), eq("steer-key"));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void legalSourceSteeringDropsOldRequestGateButKeepsVendorFailureBudget(boolean sourceDown) {
+        when(tools.getAllSpecifications(any(), any())).thenReturn(
+                List.of("get_law_article", "search_web", "browse_url", "memory_list").stream()
+                        .map(name -> ToolSpecification.builder().name(name).description(name).build()).toList());
+        doAnswer(inv -> {
+            String prompt = inv.getArgument(2);
+            return new ArrayList<ChatMessage>(List.of(SystemMessage.from("system"),
+                    UserMessage.from("民法典第1082条是什么"), UserMessage.from(prompt), UserMessage.from(prompt)));
+        }).when(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        when(tools.execute(eq("get_law_article"), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "Error: " + com.checkba.service.ai.tools.LegalTools.VENDOR_UNAVAILABLE_MARKER, null, true));
+        when(tools.execute(eq("memory_list"), any(), any())).thenAnswer(inv -> {
+            inbox.submit(request("改为只查官网，不用法宝", "legal-source-steer", "steer"), 7L);
+            return new ToolRegistry.ToolResult("no saved notes", null, true);
+        });
+        when(tools.execute(eq("search_web"), any(), any())).thenReturn(new ToolRegistry.ToolResult("web result", null, true));
+        when(tools.execute(eq("browse_url"), any(), any())).thenReturn(new ToolRegistry.ToolResult("page text", null, true));
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                AiMessage.from(tool(sourceDown ? "get_law_article" : "search_web", "first")),
+                AiMessage.from(tool("memory_list", "steering-boundary")),
+                AiMessage.from(tool("search_web", "web-1")),
+                AiMessage.from(tool("browse_url", "web-2")),
+                AiMessage.from(tool("search_web", "web-3")),
+                AiMessage.from("资料待核对。")));
+
+        AgentInboxItem first = inbox.submit(request("民法典第938条是什么", "legal-source-first", "steer"), 7L);
+        orchestrator.acceptInboxSubmission(first.getId(), false);
+
+        assertTrue(modelToolNames.get(0).contains("get_law_article"), "法条工具必须确实下发");
+        assertTrue(rows.values().stream().anyMatch(r -> "legal-source-steer".equals(r.getClientRequestId())
+                && AgentInboxService.APPLIED.equals(r.getState())));
+        assertTrue(modelRequests.stream().anyMatch(ms -> ms.stream().anyMatch(m -> m instanceof UserMessage
+                && text(m).contains("改为只查官网，不用法宝"))));
+        if (!sourceDown) assertTrue(modelRequests.stream().anyMatch(ms -> ms.stream().anyMatch(m ->
+                m instanceof ToolExecutionResultMessage && text(m).contains("未执行"))), "插话前确实先拦网页");
+        verify(tools, times(sourceDown ? 1 : 2)).execute(eq("search_web"), any(), any());
+        verify(tools, times(1)).execute(eq("browse_url"), any(), any());
+    }
+
     @Test
     void steeringAttachmentIsAugmentedIntoTheNextModelRequest() throws Exception {
         CountDownLatch toolEntered = new CountDownLatch(1);

@@ -381,6 +381,7 @@ public class AgentOrchestrator {
         final RunBudget budget = new RunBudget();
         // 法源不可用收口（gap P8）：法宝回不可用标记后，网页替代查询封顶 + 收尾一次「未核实」提醒
         final LawSourceDownPolicy lawSource = new LawSourceDownPolicy();
+        boolean lawSourceFirstAllowed;
         // 多处修改收尾时系统代做的写后核对（gap P5），每轮最多一次，干净时对用户不可见
         final PostWriteCheck writeCheck = new PostWriteCheck();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
@@ -1145,6 +1146,7 @@ public class AgentOrchestrator {
         // A new submission has its own consent. Do not classify or narrow it using the old input.
         guard.abandonDecision();
         guard.documentSummaryOnly = false;
+        guard.lawSourceFirstAllowed = false; // New input supersedes the old request; retain the source-down budget.
 
         String streamed = guard.takeStreamSnapshot();
         String segment = executionLog.toString() + streamed;
@@ -1508,11 +1510,13 @@ public class AgentOrchestrator {
             }
         }
 
-        // 法源不可用后的网页替代查询封顶（gap P8）：超额的不执行，回一句「按已有资料作答并标未核实」。
+        // 明确条文请求先用实际可用的法源；法源不可用后的网页替代查询封顶（gap P8）。
         // 放在分发层而不是提示词里：deepseek 在法源不可用后连续 8–10 轮 search_web/browse_url 实测过。
-        String lawSourceBlocked = guard == null ? null : guard.lawSource.admit(toolName);
+        String lawSourceBlocked = guard == null ? null
+                : guard.lawSource.admit(toolName, guard.lawSourceFirstAllowed ? guard.userMessage : null,
+                        guard.roundOffered);
         if (lawSourceBlocked != null) {
-            log.info("[LawSourceDown] 替代查询已用满，未执行 {}（conv={}）", toolName, conversationId);
+            log.info("[LawSource] 法源查询策略阻止执行 {}（conv={}）", toolName, conversationId);
             ToolRegistry.ToolResult blocked = new ToolRegistry.ToolResult(
                     lawSourceBlocked, toolRegistry.resolve(toolName).orElse(null), true);
             // 本方法有三个出口，三个都要记
@@ -1588,7 +1592,7 @@ public class AgentOrchestrator {
 
         // 法源不可用态（gap P8）：任何工具输出带法宝不可用标记即进入；放行的替代查询附「第几次 / 须标未核实」
         if (guard != null) {
-            guard.lawSource.noteResult(result.output());
+            guard.lawSource.noteResult(result.success() ? toolName : null, result.output());
             String lookupNotice = guard.lawSource.lookupNotice(toolName);
             if (lookupNotice != null) {
                 result = new ToolRegistry.ToolResult(result.output() + "\n\n" + lookupNotice,
@@ -2607,7 +2611,8 @@ public class AgentOrchestrator {
             // 只为了 size()<=1 这个判断；紧接着 ContextAssemblerService 还要再全量读一次。
             // 两次都卡在用户等待首 token 的关键路径上。
             timings.mark("saveUserMsg");
-            boolean firstTurn = messageService.countByConversationId(conversationId) <= 1;
+            long conversationMessageCount = messageService.countByConversationId(conversationId);
+            boolean firstTurn = conversationMessageCount <= 1;
             if (firstTurn) { // Only the user message we just saved
                 final String convId = conversationId;
                 final String userMsg = request.getMessage();
@@ -2792,6 +2797,7 @@ public class AgentOrchestrator {
             // 活跃文档类目裁剪与渐进披露（dev-board#1064）：起跑时一次算定要不要按类目裁，并把本轮
             // 用户输入的关键词与生效 skill 的白名单涉及的类目预先放回（写进同一份展开集，只增不减）。
             guard.userMessage = request.getMessage();
+            guard.lawSourceFirstAllowed = LawSourceDownPolicy.allowsSourceFirst(messages, conversationMessageCount);
             guard.hasAttachments = request.getContextItems() != null
                     ? !request.getContextItems().isEmpty()
                     : request.getFileIds() != null && !request.getFileIds().isEmpty();
