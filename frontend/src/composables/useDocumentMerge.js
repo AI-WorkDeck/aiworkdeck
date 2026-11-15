@@ -22,6 +22,7 @@
 
 // 两侧的人分不开时（同一个账号两边都是自己——律师用「稿」管对方回稿）喂给引擎的署名
 // 要退到线上，否则引擎按作者分桶会把两边的修订全算进一桶（真机 A3：11 / 0）。
+import { restoreRecreatedRedlineDates, mergeMarkedAuthors } from '../services/mergeRedlineDates.js'
 import { resolveMergeSideNames } from '../utils/mergeSideNames.js'
 
 // 三语境里「另一侧」（MERGE_HEAD 那一侧）的 tip 字段名不同：
@@ -146,12 +147,18 @@ export function useDocumentMerge(deps) {
       if ((draft.formatOnly || []).length > 0) {
         return { downgrade: true, formatOnlyCount: draft.formatOnly.length }
       }
-      await run('resolve_all_revisions', { action: 'accept' })
+      // 只接受合并自己产生的修订（台账 B13）：三份文件里原有的待处理修订——律师开着修订改的、
+      // AI 默认带修订改的——原样留着，交付物是修订稿。
+      const accepted = await run('resolve_merge_mechanics', { action: 'accept' })
+      if (!accepted || accepted.success === false) return { failed: true, failReason: 'mechanics' }
       const exported = await run('export_document', { name })
-      const bytes = exported && (exported.bytes || exported.data)
+      let bytes = exported && (exported.bytes || exported.data)
       if (!exported || exported.success === false || !bytes || !bytes.length) {
         return { failed: true, failReason: 'export' }
       }
+      // 按原作者重建的修订改回原日期；存出的文件里还带合并署名的修订就是没收干净，按失败处理
+      bytes = (await restoreRecreatedRedlineDates(bytes, { recreated: draft.recreated, freshSince: draft.freshSince })).bytes
+      if ((await mergeMarkedAuthors(bytes)).length) return { failed: true, failReason: 'mechanics' }
       await requireCurrentOperation()
       await writeMutation(() => operationApi.postMergeResolveFile(deps.projectId, {
         path: row.path, mode: 'auto', decisions: [], bytes, name, ctx: state.ctx,

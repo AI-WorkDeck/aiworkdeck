@@ -218,7 +218,9 @@ public final class ThreeWayAnalyzer {
     private static RawText hashLines(List<Unit> units) {
         StringBuilder sb = new StringBuilder();
         for (Unit unit : units) {
-            sb.append(sha256Hex(unit.norm())).append('\n');
+            // 没有待处理修订的单元与以前逐字节相同（只按文字）；有的连修订签名一起算（台账 B13）
+            String rev = unit.rev() == null ? "" : unit.rev();
+            sb.append(sha256Hex(rev.isEmpty() ? unit.norm() : unit.norm() + "\u0000" + rev)).append('\n');
         }
         return new RawText(sb.toString().getBytes(StandardCharsets.UTF_8));
     }

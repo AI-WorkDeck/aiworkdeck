@@ -69,7 +69,10 @@ const WHOLE_REASON_KEYS = {
 // 其余统一说一句"没能合上"，不要把 stage 原文抖给律师看。
 const FAIL_REASON_KEYS = {
   align: 'version.mergeFailReasonAlign',
+  'align-other': 'version.mergeFailReasonAlign',
   engine: 'version.mergeFailReasonEngine',
+  // 台账 B13：有原样搬不过来的待处理修订（格式修订、表格里的修订等）时停下，不静默接受
+  'pending-redlines': 'version.mergeFailReasonPendingRedlines',
 }
 
 export function mergeRowText(t, row, sides = {}, opts = {}) {

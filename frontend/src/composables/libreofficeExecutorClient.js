@@ -114,7 +114,7 @@ export const EDITOR_ACTIONS = [
   // 冲突「用律师乙的」。sheet_get_active_cell / slide_get_current 是逐段溯源里
   // 「当前这一格 / 当前这一页」的取数原语（顶上那条版本身份小条 #672 起是文件级的，
   // 不再用它们；两条原语本身是引擎公开 API，lowa-e2e 组 34 有用例）。
-  'build_merge_draft', 'merge_take_other', 'sheet_get_active_cell', 'slide_get_current',
+  'build_merge_draft', 'merge_take_other', 'resolve_merge_mechanics', 'sheet_get_active_cell', 'slide_get_current',
   'office_get_navigation', 'office_activate_item', 'slide_get_thumbnail',
   // [格式增强] 富格式原语：编号/表格/格式读取/全文标准格式化；insert_under_heading
   // 是后端一直在派发但从未接通的原语（本次补齐 worker 实现）。
@@ -211,6 +211,7 @@ export const ACTION_BUDGET_MS = {
   // 三方合并：三次 load（另一侧/上一版/主线）+ 两遍格式扫描 + 一次原生比较 + 逐段重放
   // 全在一条命令里；420 段 32 页的夹具实测约 22 秒，按 load_document 同量级给预算。
   build_merge_draft: 180000,
+  resolve_merge_mechanics: 180000,
   build_comparison_document: 180000,
   compare_docx_files: 240000,
   // 读取类（dev-board#729 ③）：此前全部吃 30s 默认值。doc_open_file 是 fire-and-forget，
