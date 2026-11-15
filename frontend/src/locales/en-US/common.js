@@ -80,4 +80,8 @@ export default {
   languageFollowSystem: 'Follow system',
   languageSearchPlaceholder: 'Search languages…',
   languageNoMatch: 'No matching languages',
+  serverLabelAccountBridge: 'Account bridge',
+  serverLabelGenericClient: 'Client (general)',
+  serverLabelPersonalMemory: 'Personal memory',
+  serverLabelProjectMemory: 'Project memory',
 }

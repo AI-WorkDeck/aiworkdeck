@@ -13,19 +13,21 @@ import { readFileSync } from 'node:fs'
 const SRC = readFileSync(
   new URL('../../src/components/MemoryBrowser.vue', import.meta.url), 'utf8')
 const enChat = (await import('../../src/locales/en-US/chat.js')).default
+const { displayServerLabel } = await import('../../src/utils/serverLabels.js')
 
 function loadOptions() {
   const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
     .replace(/import\s*\{[\s\S]*?\}\s*from\s*'@\/services\/api\.js'\s*/, '')
     .replace(/import\s*\{\s*markdownFileLinks\s*\}\s*from\s*'@\/composables\/memoryBrowserState\.mjs'\s*/, '')
     .replace(/import\s*\{\s*setGlobalOverlay\s*\}\s*from\s*'@\/utils\/overlayState\.js'\s*/, '')
+    .replace(/import\s*\{\s*displayServerLabel\s*\}\s*from\s*'@\/utils\/serverLabels\.js'\s*/, '')
     .replace(/export\s+default/, 'return')
   return new Function(
     'deleteMemoryFile', 'downloadMemoryFile', 'getMemoryFile', 'getMemoryFiles',
-    'getMemorySpaces', 'saveMemoryFile', 'markdownFileLinks', 'setGlobalOverlay', 'uni', script,
+    'getMemorySpaces', 'saveMemoryFile', 'markdownFileLinks', 'setGlobalOverlay', 'uni', 'displayServerLabel', script,
   )(
     async () => {}, async () => {}, async () => {}, async () => [],
-    async () => [], async () => ({}), () => [], () => {}, {},
+    async () => [], async () => ({}), () => [], () => {}, {}, displayServerLabel,
   )
 }
 

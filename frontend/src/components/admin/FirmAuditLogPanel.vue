@@ -62,8 +62,8 @@
         <view v-for="e in events" :key="e.id" class="audit-tr" :class="{ failed: e.outcome === 'FAILURE' }">
           <text class="col col-time">{{ formatTime(e.occurredAt) }}</text>
           <text class="col col-action">{{ actionLabel(e) }}</text>
-          <text class="col">{{ e.actorName || '—' }}</text>
-          <text class="col">{{ e.targetLabel || e.targetId || '—' }}</text>
+          <text class="col">{{ serverLabel(e.actorName) || '—' }}</text>
+          <text class="col">{{ serverLabel(e.targetLabel) || e.targetId || '—' }}</text>
           <text class="col">{{ e.projectName || '—' }}</text>
           <text class="col col-detail">{{ shortDetail(e.detail) || '—' }}</text>
           <text class="col col-ip">{{ e.sourceIp || '—' }}</text>
@@ -78,6 +78,7 @@
 </template>
 
 <script>
+import { displayServerLabel } from '@/utils/serverLabels.js'
 import { firmCloudAction } from '@/services/api'
 import { buildAuditCsv, detailText } from '@/utils/firmAuditCsv.js'
 
@@ -117,6 +118,8 @@ export default {
     this.search()
   },
   methods: {
+    // 服务端写入的固定中文标签（账户桥接、客户(通用)）按界面语言显示；导出的 CSV 保持原样
+    serverLabel(text) { return displayServerLabel(this.$t.bind(this), text) },
     detailText,
     // 表格里省掉只有导出才用得上的内部 id（CSV 仍是全量）
     shortDetail(detail) {

@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "भाषा चुनें",
   "languageFollowSystem": "सिस्टम के अनुसार",
   "languageSearchPlaceholder": "भाषाएँ खोजें…",
-  "languageNoMatch": "कोई मेल खाती भाषा नहीं"
+  "languageNoMatch": "कोई मेल खाती भाषा नहीं",
+  "serverLabelAccountBridge": "खाता ब्रिज",
+  "serverLabelGenericClient": "क्लाइंट (सामान्य)",
+  "serverLabelPersonalMemory": "व्यक्तिगत मेमोरी",
+  "serverLabelProjectMemory": "प्रोजेक्ट मेमोरी"
 }

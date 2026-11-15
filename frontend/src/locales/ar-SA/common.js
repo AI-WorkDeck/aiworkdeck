@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "اختيار اللغة",
   "languageFollowSystem": "اتباع النظام",
   "languageSearchPlaceholder": "البحث في اللغات…",
-  "languageNoMatch": "لا توجد لغات مطابقة"
+  "languageNoMatch": "لا توجد لغات مطابقة",
+  "serverLabelAccountBridge": "جسر الحساب",
+  "serverLabelGenericClient": "عميل (عام)",
+  "serverLabelPersonalMemory": "الذاكرة الشخصية",
+  "serverLabelProjectMemory": "ذاكرة المشروع"
 }

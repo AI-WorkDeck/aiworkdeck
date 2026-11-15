@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Taal selecteren",
   "languageFollowSystem": "Systeem volgen",
   "languageSearchPlaceholder": "Talen zoeken…",
-  "languageNoMatch": "Geen overeenkomende talen"
+  "languageNoMatch": "Geen overeenkomende talen",
+  "serverLabelAccountBridge": "Accountbrug",
+  "serverLabelGenericClient": "Klant (algemeen)",
+  "serverLabelPersonalMemory": "Persoonlijk geheugen",
+  "serverLabelProjectMemory": "Projectgeheugen"
 }

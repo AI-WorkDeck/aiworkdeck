@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "เลือกภาษา",
   "languageFollowSystem": "ตามระบบ",
   "languageSearchPlaceholder": "ค้นหาภาษา…",
-  "languageNoMatch": "ไม่พบภาษาที่ตรงกัน"
+  "languageNoMatch": "ไม่พบภาษาที่ตรงกัน",
+  "serverLabelAccountBridge": "สะพานบัญชี",
+  "serverLabelGenericClient": "ลูกค้า (ทั่วไป)",
+  "serverLabelPersonalMemory": "หน่วยความจำส่วนตัว",
+  "serverLabelProjectMemory": "หน่วยความจำโครงการ"
 }
