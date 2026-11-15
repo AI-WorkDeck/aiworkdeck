@@ -173,12 +173,15 @@ final class OpinionCompletionCheck {
         return LangText.of(
                 "\n【当前稿正文】系统在派发前已从编辑器读出目标文档的当前稿（与 doc_get_document_text 同源，"
                         + "每段以【段号】开头）。待核命题必须逐条取自这份正文并注明段号——不得自拟、不得套用模板或示例；"
-                        + "然后用只读工具到底稿里逐槽取证。\n",
+                        + "然后用只读工具到底稿里逐槽取证：先检索定位，再把所有要读的底稿在同一轮里一次性请求（多个并行工具调用），"
+                        + "不要一轮只读一个——查材料最多 " + com.checkba.service.ai.subagent.SubAgentService.MAX_CONSULT_ROUNDS + " 轮。\n",
                 "\n[Current draft] The system read the target's current draft from the editor before dispatch "
                         + "(same source as doc_get_document_text; each paragraph starts with its [index]). Take every "
                         + "proposition from this text and cite its paragraph index — never invent propositions or use a "
                         + "template or example; then gather evidence slot by slot from the source materials with the "
-                        + "read-only tools.\n")
+                        + "read-only tools: search first, then request ALL the source files you need in ONE round (several "
+                        + "parallel tool calls), not one file per round — at most "
+                        + com.checkba.service.ai.subagent.SubAgentService.MAX_CONSULT_ROUNDS + " rounds of consulting.\n")
                 + draft.text() + tail;
     }
 

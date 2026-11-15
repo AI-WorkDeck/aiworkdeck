@@ -128,6 +128,11 @@ public class SubAgentService {
      * 的口径保持一致。
      */
     /** 记为「实际读过某份材料」的工具：按 fileId 读全文。检索摘要与读当前稿都不算读过底稿。 */
+    /**
+     * 收尾核验员（mustConsult）最多查材料的轮数；之后一轮 tool_choice=none，只许依据已读材料作答。
+     * W6 staging：不设上限时 qwen3.8-max 一轮读一个文件，12 个文件 14 轮，每轮重发整段上下文。
+     */
+    public static final int MAX_CONSULT_ROUNDS = 4;
     static final java.util.Set<String> READ_FILE_TOOLS = java.util.Set.of("extract_file_text", "read_document");
 
     static final class Progress {
@@ -402,7 +407,7 @@ public class SubAgentService {
                         specs, allowed, null, null, () -> progress.isCancelled(parentCtx), parentCtx.defaultOutputFolderId(), parentCtx.activeFileId(), parentCtx.fileChangeListener());
 
         List<ChatMessage> messages = new ArrayList<>();
-        messages.add(SystemMessage.from(buildSystemPrompt(expectedOutput, allowed)));
+        messages.add(SystemMessage.from(buildSystemPrompt(expectedOutput, allowed, mustConsult)));
         messages.add(UserMessage.from(taskDescription));
 
         // 与 progress 共用同一个列表引用：executeScoped 往这里 add，dispatch() 的超时/中断/
@@ -434,10 +439,10 @@ public class SubAgentService {
                 dev.langchain4j.model.chat.StreamingChatLanguageModel streaming = chatModelFactory.getStreamingChatModel(modelId);
                 // 只有平台/OpenRouter 的流式实现支持带工具的三参 generate 并回报缓存；Ollama 等走原路
                 // mustConsult 第一轮：强制先调一次检索/读取工具（tool_choice 具名函数），之后回到 auto
-                String forced = mustConsult && round == 1 && toolsUsed.isEmpty() ? forcedConsultTool(specs) : null;
-                if (forced != null) log.info("[SubAgent] {} round 1 forces tool {}", subtaskId, forced);
-                if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel orm && forced != null) {
-                    response = generateBlocking(orm, messages, specs, forced, cacheUsage);
+                String choice = mustConsult && !specs.isEmpty() ? consultToolChoice(round, toolsUsed.isEmpty(), specs) : null;
+                if (choice != null && !"auto".equals(choice)) log.info("[SubAgent] {} round {} tool_choice {}", subtaskId, round, choice);
+                if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel orm && choice != null) {
+                    response = generateBlocking(orm, messages, specs, choice, cacheUsage);
                 } else if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel) {
                     response = generateBlocking(streaming, messages, specs, cacheUsage);
                 } else {
@@ -454,6 +459,18 @@ public class SubAgentService {
             AiMessage aiMessage = response.content();
             messages.add(aiMessage);
 
+            // 读取轮次用完后仍要调工具（tool_choice=none 被忽略）：不再执行，按已读材料收尾；再犯一次判失败
+            if (mustConsult && round > MAX_CONSULT_ROUNDS && aiMessage.hasToolExecutionRequests()) {
+                if (round > MAX_CONSULT_ROUNDS + 1) {
+                    return SubAgentResult.failure(subtaskId, "verifier kept requesting tools after its read budget", toolsUsed, round);
+                }
+                for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
+                    messages.add(ToolExecutionResultMessage.from(req, com.checkba.service.LangText.of(
+                            "读取轮次已用完，本次未执行。请依据已读材料作答，没读到来源的命题标为未核实。",
+                            "Read budget used up; not executed. Answer from what you have read and mark unsourced propositions unverified.")));
+                }
+                continue;
+            }
             // 协议 1：原生 function calling
             if (aiMessage.hasToolExecutionRequests()) {
                 log.info("[SubAgent] {} round {} tool requests: {}", subtaskId, round,
@@ -522,6 +539,18 @@ public class SubAgentService {
      * 流式通道的阻塞包装：等 onComplete/onError，把提示缓存读写数写进 cacheUsage[0..1]。
      * 被 dispatch 的超时/取消打断时 get() 抛 InterruptedException，与非流式一样按失败返回。
      */
+    /**
+     * 收尾核验员这一轮的 tool_choice：第一轮还没查过材料→强制检索/读取；查满 {@link #MAX_CONSULT_ROUNDS} 轮→none；其余 auto。
+     */
+    static String consultToolChoice(int round, boolean nothingConsulted, List<ToolSpecification> specs) {
+        if (round > MAX_CONSULT_ROUNDS) return "none";
+        if (round == 1 && nothingConsulted) {
+            String forced = forcedConsultTool(specs);
+            if (forced != null) return forced;
+        }
+        return "auto";
+    }
+
     /** 收尾核验第一轮强制调用的工具：优先全文检索（模型自己定查什么），没有就读文件。 */
     static String forcedConsultTool(List<ToolSpecification> specs) {
         for (String name : List.of("search_project_content", "extract_file_text", "read_document")) {
@@ -532,7 +561,7 @@ public class SubAgentService {
 
     static Response<AiMessage> generateBlocking(com.checkba.service.ai.OpenRouterStreamingChatModel model,
                                                 List<ChatMessage> messages, List<ToolSpecification> specs,
-                                                String forcedTool, Integer[] cacheUsage) throws Exception {
+                                                String toolChoice, Integer[] cacheUsage) throws Exception {
         java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
         com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
             @Override public void onNext(String token) { }
@@ -543,7 +572,7 @@ public class SubAgentService {
                 cacheUsage[1] = cacheWriteTokens;
             }
         };
-        model.generateWithForcedTool(messages, specs, forcedTool, handler);
+        model.generateConsultRound(messages, specs, toolChoice, handler);
         try {
             return done.get();
         } catch (java.util.concurrent.ExecutionException e) {
@@ -690,7 +719,7 @@ public class SubAgentService {
         return allowed;
     }
 
-    private String buildSystemPrompt(String expectedOutput, Set<String> allowed) {
+    private String buildSystemPrompt(String expectedOutput, Set<String> allowed, boolean mustConsult) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个专注的子任务执行 Agent，只负责完成下面这一个子任务。\n");
         sb.append("规则：\n");
@@ -702,6 +731,14 @@ public class SubAgentService {
         }
         if (!allowed.isEmpty()) {
             sb.append("可用工具：").append(String.join(", ", allowed)).append("\n");
+        }
+        if (mustConsult) {
+            sb.append(com.checkba.service.LangText.of(
+                    "4. 查材料最多 " + MAX_CONSULT_ROUNDS + " 轮：先检索，再把要读的文件在同一轮里一次性全部请求（多个并行工具调用），"
+                            + "不要一轮只读一个；之后依据已读材料作答，没读到来源的命题标为未核实。\n",
+                    "4. At most " + MAX_CONSULT_ROUNDS + " rounds of consulting: search first, then request every file you need "
+                            + "in ONE round (several parallel tool calls), not one file per round; then answer from what you read "
+                            + "and mark any proposition without a source you read as unverified.\n"));
         }
         return sb.toString();
     }
