@@ -58,6 +58,14 @@ export default {
 </script>
 
 <style scoped>
+.mnn { display: block; }
+.awd-header { padding: 18px 24px; border-bottom: 1px solid var(--awd-border-subtle); }
+.awd-title { font-size: 16px; font-weight: 600; color: var(--awd-text); }
+.awd-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.awd-footer {
+  display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap;
+  padding: 14px 24px; border-top: 1px solid var(--awd-border-subtle); background: var(--awd-bg);
+}
 .mnn-row { display: flex; align-items: baseline; gap: 8px; margin: 6px 12px; padding: 7px 9px; border-radius: var(--awd-radius-md); background: var(--awd-surface-2); border: 1px solid var(--awd-border); }
 .mnn-text { flex: 1; font-size: var(--awd-panel-fs); color: var(--awd-text); line-height: 1.45; }
 .mnn-link { flex: none; font-size: var(--awd-panel-fs); color: var(--awd-accent-text); text-decoration: underline; cursor: pointer; }
