@@ -194,7 +194,10 @@ public final class EvalHarness {
         ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);
         // dev-board#729 ⑤：编排器改用 countByConversationId 判首轮；mock 默认回 0 会误判首轮、起异步标题线程
         // 与下一次 when(...) 打架（CI 上 Mockito WrongTypeOfReturnValue）。计数跟随 list 桩，保持各用例原语义。
-        when(messageService.countByConversationId(any())).thenAnswer(inv -> (long) messageService.listByConversationId(inv.getArgument(0)).size());
+        when(messageService.countByConversationId(any())).thenAnswer(inv -> c.persistedMessageCount != null
+                ? c.persistedMessageCount.longValue() : c.contextHistory != null ? (long) c.contextHistory.size() + 1
+                : (long) messageService.listByConversationId(inv.getArgument(0)).size());
+        when(messageService.generateConversationTitle(any(), any())).thenReturn("Eval conversation");
         // USER 消息落库走六参重载（契约 D：末位是 displayContent，缺省 null）。
         // 编排器只调六参那一个，五参重载在这里不桩也无妨；但**两个都桩着**是刻意的——
         // 哪天有人把调用点改回五参，评测不会因为「一条 USER 消息都没记录」而给出误导性的失败。
@@ -225,10 +228,18 @@ public final class EvalHarness {
         TokenUsageService tokenUsage = mock(TokenUsageService.class);
 
         ContextAssemblerService assembler = mock(ContextAssemblerService.class);
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenAnswer(inv -> new ArrayList<>(List.of(
-                        SystemMessage.from("[eval] system prompt placeholder"),
-                        UserMessage.from(c.userInput))));
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    var assembled = new ArrayList<dev.langchain4j.data.message.ChatMessage>();
+                    assembled.add(SystemMessage.from("[eval] system prompt placeholder"));
+                    if (c.contextHistory != null) {
+                        assembled.addAll(c.contextHistory);
+                        // Production assembly includes the just-persisted user row, then the current prompt.
+                        assembled.add(UserMessage.from(c.userInput));
+                    }
+                    assembled.add(UserMessage.from(c.userInput));
+                    return assembled;
+                });
 
         MemoryPipelineService memoryPipeline = mock(MemoryPipelineService.class);
 

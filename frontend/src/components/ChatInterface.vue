@@ -427,6 +427,7 @@
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
              <RootBubble
                :bubble="msg"
+               :user-message="turn.user?.bubble.content || ''"
                :is-latest="index === bubbles.length - 1"
                :review-states="reviewStates"
                :file-changes="filesForBubble(msg)"
