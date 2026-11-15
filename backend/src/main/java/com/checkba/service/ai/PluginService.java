@@ -729,6 +729,14 @@ public class PluginService {
         return pendingToolChanges.getOrDefault(pluginId, List.of());
     }
 
+    public record ToolApprovalView(List<PluginToolApprovals.Change> changes, String token) {}
+
+    /** 提示内容与批准凭据必须来自同一代定义；与 rescan / approve 共用锁，不能分别读取。 */
+    public synchronized ToolApprovalView toolApprovalView(String pluginId) {
+        List<PluginToolApprovals.Change> changes = pendingToolChanges.getOrDefault(pluginId, List.of());
+        return new ToolApprovalView(changes, changes.isEmpty() ? null : toolApprovalToken(pluginId));
+    }
+
     /** 当前定义的摘要，批准请求要原样带回（见 {@link #approveToolChanges}）。 */
     public String toolApprovalToken(String pluginId) {
         PluginMetadata meta = getPlugin(pluginId);

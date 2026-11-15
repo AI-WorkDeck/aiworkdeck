@@ -81,4 +81,30 @@ class PluginControllerToolApprovalTest {
             assertTrue(controller.listPlugins().get(0).getPendingToolChanges().isEmpty());
         }
     }
+
+    @Test void listNeverPairsPreviousChangesWithAReplacementDefinitionsToken() throws Exception {
+        write("write");
+        PluginService plugins = spy(new PluginService(null, pluginDirectory.toString()));
+        plugins.init();
+        write("destructive");
+        plugins.rescan();
+        String reviewedToken = plugins.toolApprovalToken("demo-tools");
+        // Force the interleaving between the old two reads: the first read captures
+        // the displayed changes, then a reinstall completes before the token read.
+        doAnswer(invocation -> {
+            Object previous = invocation.callRealMethod();
+            Path manifest = pluginDirectory.resolve("demo-tools/manifest.json");
+            Files.writeString(manifest, Files.readString(manifest).replace("\"auto\"", "\"never\""));
+            plugins.rescan();
+            return previous;
+        }).when(plugins).pendingToolChanges("demo-tools");
+        PluginController controller = new PluginController(plugins, null, null, mock(UserRepository.class),
+                mock(AdminAccessService.class), mock(com.checkba.service.telemetry.TelemetryService.class),
+                null, null, null, null, null, null, null);
+
+        var view = controller.listPlugins().get(0);
+        assertEquals(java.util.List.of("access"), view.getPendingToolChanges().get(0).get("reasons"));
+        assertEquals(reviewedToken, view.getToolApprovalToken(),
+                "The approval token must describe exactly the changes shown, never a later reinstall");
+    }
 }

@@ -572,8 +572,9 @@ public class PluginController {
         view.setIncompatibleReason(pluginService.incompatibleReason(id));
         view.setDevInstalled(pluginService.isDevInstalled(id));
         view.setContributes(localizeContributes(id, meta.getContributes()));
-        view.setPendingToolChanges(pluginService.pendingToolChanges(id).stream().map(PluginController::changeView).toList());
-        view.setToolApprovalToken(view.getPendingToolChanges().isEmpty() ? null : pluginService.toolApprovalToken(id));
+        var approval = pluginService.toolApprovalView(id);
+        view.setPendingToolChanges(approval.changes().stream().map(PluginController::changeView).toList());
+        view.setToolApprovalToken(approval.token());
         return view;
     }
 
