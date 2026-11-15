@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "選擇界面語言",
   "languageFollowSystem": "跟隨系統",
   "languageSearchPlaceholder": "搜索語言…",
-  "languageNoMatch": "無匹配語言"
+  "languageNoMatch": "無匹配語言",
+  "serverLabelAccountBridge": "帳戶橋接",
+  "serverLabelGenericClient": "客戶(通用)",
+  "serverLabelPersonalMemory": "個人記憶",
+  "serverLabelProjectMemory": "專案記憶"
 }

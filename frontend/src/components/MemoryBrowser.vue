@@ -46,7 +46,8 @@
             :class="{ active: current && current.path === file.path }"
             @tap="openFile(file.path)"
           >
-            <text class="memory-file-title">{{ file.title || file.path }}</text>
+            <!-- 标题取自文件的一级标题：在中文界面建的个人记忆是「个人记忆」，英文界面按界面语言显示（文件内容不改） -->
+            <text class="memory-file-title">{{ serverLabel(file.title) || file.path }}</text>
             <text class="memory-file-path">{{ file.path }}</text>
           </view>
         </view>
@@ -91,6 +92,7 @@
 </template>
 
 <script>
+import { displayServerLabel } from '@/utils/serverLabels.js'
 import {
   deleteMemoryFile,
   downloadMemoryFile,
@@ -168,6 +170,7 @@ export default {
     this.syncOverlay(false)
   },
   methods: {
+    serverLabel(text) { return displayServerLabel(this.$t.bind(this), text) },
     // 内嵌态从不接触全局 overlay；弹窗态只在目标值与当前持有状态不同时才调用
     // setGlobalOverlay，天然幂等——重复的 open→open 或 close→close 不会
     // 误多算/误多减一次引用计数（见 utils/overlayState.js）。
@@ -188,7 +191,8 @@ export default {
     // label），跟随界面语言切换；project 空间的 label 是真实项目名，原样展示。
     spaceLabel(space) {
       if (!space) return ''
-      return space.scope === 'project' ? (space.label || this.scopeLabel(space.scope)) : this.scopeLabel(space.scope)
+      // 项目空间没有项目名时服务端写的是「项目记忆」，同样按界面语言显示
+      return space.scope === 'project' ? (displayServerLabel(this.$t.bind(this), space.label) || this.scopeLabel(space.scope)) : this.scopeLabel(space.scope)
     },
     formatUpdated(value) {
       if (!value) return this.$t('chat.memoryUnknownTime')

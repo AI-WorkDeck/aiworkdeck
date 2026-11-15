@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Dil seçin",
   "languageFollowSystem": "Sistemi takip et",
   "languageSearchPlaceholder": "Dil arayın…",
-  "languageNoMatch": "Eşleşen dil yok"
+  "languageNoMatch": "Eşleşen dil yok",
+  "serverLabelAccountBridge": "Hesap köprüsü",
+  "serverLabelGenericClient": "Müşteri (genel)",
+  "serverLabelPersonalMemory": "Kişisel bellek",
+  "serverLabelProjectMemory": "Proje belleği"
 }

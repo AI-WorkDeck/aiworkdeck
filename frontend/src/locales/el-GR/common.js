@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Επιλογή γλώσσας",
   "languageFollowSystem": "Ως στο σύστημα",
   "languageSearchPlaceholder": "Αναζήτηση γλωσσών…",
-  "languageNoMatch": "Δεν βρέθηκαν γλώσσες"
+  "languageNoMatch": "Δεν βρέθηκαν γλώσσες",
+  "serverLabelAccountBridge": "Γέφυρα λογαριασμού",
+  "serverLabelGenericClient": "Πελάτης (γενικός)",
+  "serverLabelPersonalMemory": "Προσωπική μνήμη",
+  "serverLabelProjectMemory": "Μνήμη έργου"
 }

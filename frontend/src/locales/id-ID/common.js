@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Pilih bahasa",
   "languageFollowSystem": "Ikuti sistem",
   "languageSearchPlaceholder": "Cari bahasa…",
-  "languageNoMatch": "Tidak ada bahasa yang cocok"
+  "languageNoMatch": "Tidak ada bahasa yang cocok",
+  "serverLabelAccountBridge": "Jembatan akun",
+  "serverLabelGenericClient": "Klien (umum)",
+  "serverLabelPersonalMemory": "Memori pribadi",
+  "serverLabelProjectMemory": "Memori proyek"
 }

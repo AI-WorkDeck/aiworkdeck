@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "言語を選択",
   "languageFollowSystem": "システムに従う",
   "languageSearchPlaceholder": "言語を検索…",
-  "languageNoMatch": "一致する言語がありません"
+  "languageNoMatch": "一致する言語がありません",
+  "serverLabelAccountBridge": "アカウントブリッジ",
+  "serverLabelGenericClient": "クライアント(汎用)",
+  "serverLabelPersonalMemory": "個人メモリ",
+  "serverLabelProjectMemory": "プロジェクトメモリ"
 }

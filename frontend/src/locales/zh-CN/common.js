@@ -80,4 +80,8 @@ export default {
   languageFollowSystem: '跟随系统',
   languageSearchPlaceholder: '搜索语言…',
   languageNoMatch: '无匹配语言',
+  serverLabelAccountBridge: '账户桥接',
+  serverLabelGenericClient: '客户(通用)',
+  serverLabelPersonalMemory: '个人记忆',
+  serverLabelProjectMemory: '项目记忆',
 }

@@ -74,5 +74,9 @@ export default {
   "languagePickerLabel": "Chọn ngôn ngữ",
   "languageFollowSystem": "Theo hệ thống",
   "languageSearchPlaceholder": "Tìm kiếm ngôn ngữ…",
-  "languageNoMatch": "Không có ngôn ngữ phù hợp"
+  "languageNoMatch": "Không có ngôn ngữ phù hợp",
+  "serverLabelAccountBridge": "Cầu nối tài khoản",
+  "serverLabelGenericClient": "Khách hàng (chung)",
+  "serverLabelPersonalMemory": "Bộ nhớ cá nhân",
+  "serverLabelProjectMemory": "Bộ nhớ dự án"
 }

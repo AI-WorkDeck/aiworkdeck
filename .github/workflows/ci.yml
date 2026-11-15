@@ -357,12 +357,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # CI-PYPI1：依赖下载老在镜像超时上挂（uv.lock 把每个包的地址钉在清华镜像上）。
+      # ① uv 缓存按两份锁文件做键，命中就不下载；② 主镜像装不上（超时/挂了）就换官方 PyPI，
+      #    按 requirements.lock（uv export 出的同一组精确版本）重建环境；测试一步只管跑测试，
+      #    下载失败不再被当成测试失败。
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.11.12'
+          enable-cache: true
+          cache-dependency-glob: |
+            pptx-service/uv.lock
+            pptx-service/requirements.lock
+      - name: Install dependencies (locked mirror)
+        id: deps
+        continue-on-error: true
+        working-directory: pptx-service
+        env:
+          UV_HTTP_TIMEOUT: '60'
+        run: uv sync --frozen && uv pip install pytest
+      - name: Install dependencies (fallback index pypi.org)
+        if: steps.deps.outcome == 'failure'
+        working-directory: pptx-service
+        env:
+          UV_HTTP_TIMEOUT: '60'
+        run: |
+          echo "::warning::locked mirror install failed; reinstalling the same pinned versions from pypi.org"
+          rm -rf .venv
+          uv venv --python 3.11.12 .venv
+          uv pip install --python .venv/bin/python --index-url https://pypi.org/simple -r requirements.lock pytest
       - name: Unit tests
         working-directory: pptx-service
-        run: uv run --frozen --with pytest python -m pytest -q backend/tests/unit
+        run: .venv/bin/python -m pytest -q backend/tests/unit
 
   desktop:
     name: Desktop (install deps)
