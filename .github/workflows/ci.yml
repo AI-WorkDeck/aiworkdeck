@@ -374,8 +374,7 @@ jobs:
         working-directory: pptx-service
         env:
           UV_HTTP_TIMEOUT: '60'
-        # DRILL (temporary, reverted before merge): force the locked-mirror install to fail
-        run: export UV_OFFLINE=1 UV_NO_CACHE=1; uv sync --frozen && uv pip install pytest
+        run: uv sync --frozen && uv pip install pytest
       - name: Install dependencies (fallback index pypi.org)
         if: steps.deps.outcome == 'failure'
         working-directory: pptx-service
