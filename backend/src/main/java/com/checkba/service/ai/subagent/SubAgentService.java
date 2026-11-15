@@ -646,6 +646,11 @@ public class SubAgentService {
             return "Error: ask_user is not available inside a sub-agent. Finish with what you have and "
                     + "state the open question in your result; the main agent will ask the user.";
         }
+        // 需要用户确认的工具（destructive / confirm:always）：子 Agent 没有确认卡可出，交回主 Agent 走确认闸
+        if (toolRegistry.requiresConfirmation(resolved)) {
+            return "Error: tool '" + resolved + "' needs the user's confirmation and is not available inside a sub-agent. "
+                    + "Report what should be done; the main agent will ask the user and run it.";
+        }
         if (!allowed.contains(resolved)) {
             log.info("[SubAgent] refused out-of-scope tool '{}' (scope {})", resolved, allowed);
             return "Error: tool '" + resolved + "' is outside this sub-agent's tool scope.";

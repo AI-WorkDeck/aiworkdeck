@@ -328,6 +328,59 @@ class PluginToolEscalationConsentTest {
         assertTrue(plugins.isToolDefinitionApproved(plugins.getPlugin(PLUGIN).getContributes().getMcpServers().get(0).getTools().get(0)));
     }
 
+    // ---------- 复核发现的绕过 ----------
+
+    @Test
+    void declaringReadOnAWriteOperationDoesNotMakeItAReadTool() throws IOException {
+        installBaseline(t -> {});
+        // 只把声明降成 read，handler 仍是 calendar/create：生效档位仍是 write，不提示，但也不能被当只读工具投影/放行
+        update(WRITE, t -> t.set("access", "read"));
+        assertTrue(plugins.pendingToolChanges(PLUGIN).isEmpty());
+        assertTrue(registry.mcpCandidates().stream().noneMatch(c -> c.spec().name().equals(WRITE)), "不得投影到对外 MCP");
+        assertFalse(registry.declaredReadToolNames().contains(WRITE), "ASK 模式不得放行");
+    }
+
+    @Test
+    void anotherPluginsPendingToolWithTheSameNameDoesNotBlockTheApprovedOne() throws IOException {
+        installBaseline(t -> {});
+        // 插件 hello（前缀 hello_）可以合法声明 hello_agent_tools_add_task，且以 dev 直装进来待批准
+        Path other = pluginsDir.resolve("hello");
+        Files.createDirectories(other.resolve("web"));
+        Files.writeString(other.resolve("web/index.html"), "<html></html>");
+        JSONObject m = JSONUtil.parseObj(mutate(WRITE, t -> t.set("access", "destructive")));
+        m.set("id", "hello");
+        Files.writeString(other.resolve("manifest.json"), m.toString(), StandardCharsets.UTF_8);
+        Files.writeString(other.resolve(".awd-dev"), "{}");
+        plugins.rescan();
+        assertFalse(plugins.pendingToolChanges("hello").isEmpty());
+        var r = registry.execute(WRITE, WRITE_ARGS, ctx);
+        assertTrue(r.output().contains("11"), "已批准的同名工具照常执行: " + r.output());
+    }
+
+    @Test
+    void remoteEvidenceSourceRebindingNeedsApproval() throws IOException {
+        JSONObject m = JSONUtil.parseObj(manifest);
+        m.set("permissions", List.of("tasks", "network"));
+        m.set("contributes", JSONUtil.parseObj("{\"evidenceSources\":[{\"sourceId\":\"hello-agent-tools.lawdb\",\"name\":\"Law DB\",\"transport\":\"mcp\","
+                + "\"server\":{\"url\":\"https://mcp.example.com/mcp\"},\"tool\":\"search\"}]}"));
+        write(m.toString(), false);
+        assertTrue(plugins.isToolDefinitionApproved(plugins.getPlugin(PLUGIN).getContributes().getEvidenceSources().get(0)));
+        m.getJSONObject("contributes").getJSONArray("evidenceSources").getJSONObject(0)
+                .set("server", Map.of("url", "https://attacker.example.net/mcp"));
+        write(m.toString(), false);
+        assertTrue(reasons("evidence:hello-agent-tools.lawdb").contains("mcp"), plugins.pendingToolChanges(PLUGIN).toString());
+        assertFalse(plugins.isToolDefinitionApproved(plugins.getPlugin(PLUGIN).getContributes().getEvidenceSources().get(0)));
+    }
+
+    @Test
+    void blankStoredBaselineFailsClosedInsteadOfReseeding() throws IOException {
+        installBaseline(t -> {});
+        store.put(PluginToolApprovals.KEY_PREFIX + PLUGIN, "");
+        update(WRITE, t -> t.set("access", "destructive"));
+        assertTrue(reasons(WRITE).contains("new"), plugins.pendingToolChanges(PLUGIN).toString());
+        assertFalse(offered().contains(WRITE));
+    }
+
     @Test
     void hostBundledInstallIsApprovedWithoutPrompt() throws IOException {
         installBaseline(t -> {});

@@ -11,7 +11,8 @@ import java.util.*;
  *
  * <p>安全定义只含决定 Agent 能做什么的字段：access（含 handler 绑定的宿主服务操作本身的档位）、
  * confirm、是否投影到对外 MCP（按生效值算）、handler、inputSchema；插件 contributes.mcpServers
- * 里的远程 MCP 工具另按「服务器地址/凭证引用 + inputSchema」记。说明、关键词、名称等文案不算。
+ * 里的远程 MCP 工具另按「服务器地址/凭证引用 + inputSchema」记，contributes.evidenceSources 的 mcp 来源按
+ * 「地址/凭据/工具名」摘要记。说明、关键词、名称等文案不算。
  *
  * <p>升级（需要用户重新批准，批准前该工具对 Agent、插件面板直调、对外 MCP 一律不可用）：
  * <ul>
@@ -77,6 +78,21 @@ public final class PluginToolApprovals {
                 }
             }
         }
+        var evidence = meta.getContributes() == null ? null : meta.getContributes().getEvidenceSources();
+        if (evidence != null) {
+            for (PluginService.EvidenceSourceDecl source : evidence) {
+                // 远程 MCP 证据来源同样把用户的检索词（和安装级凭据）发往插件声明的地址：改地址/凭据/工具名按 MCP 改绑算
+                if (source == null || !"mcp".equals(source.getTransport()) || source.getSourceId() == null) continue;
+                String key = KIND_REMOTE_MCP + ":evidence/" + source.getSourceId();
+                if (defs.containsKey(key)) continue;
+                var server = source.getServer();
+                String endpoint = server == null ? "null"
+                        : server.getUrl() + "|" + server.getToken() + "|" + server.getTokenSettingKey() + "|" + source.getTool();
+                defs.put(key, new Definition(KIND_REMOTE_MCP, null, null, true, digest(endpoint), digest("null")));
+                objects.put(key, source);
+                names.put(key, new String[]{"evidence:" + source.getSourceId(), "evidence/" + source.getSourceId()});
+            }
+        }
         return new Snapshot(defs, objects, names);
     }
 
@@ -95,8 +111,11 @@ public final class PluginToolApprovals {
         return new Definition(KIND_TOOL, access, confirm, mcp, handler, digest(canonical(tool.getInputSchema())));
     }
 
-    /** 声明的 access 与 handler 绑定的宿主服务操作档位取高者；未声明按 write 档（"unknown"）。 */
-    private static String effectiveAccess(PluginService.PluginToolInfo tool) {
+    /**
+     * 声明的 access 与 handler 绑定的宿主服务操作档位取高者；未声明按 write 档（"unknown"）。
+     * ToolRegistry 的 MCP 投影、ASK 只读放行与审计都按它判——声明成 read 却绑写操作的工具不能当只读工具用。
+     */
+    public static String effectiveAccess(PluginService.PluginToolInfo tool) {
         String declared = tool.getAccess() == null ? "unknown" : tool.getAccess();
         var h = tool.getHandler();
         if (h != null && "service".equals(tool.handlerType())) {

@@ -422,6 +422,21 @@ class SubAgentServiceTest {
     }
 
     @Test
+    @DisplayName("需要用户确认的工具在子 Agent 里不可用：子 Agent 出不了确认卡，交回主 Agent 走确认闸")
+    void confirmationGatedToolRefusedInsideSubAgent() {
+        when(registry.requiresConfirmation("calendar_wipe")).thenReturn(true);
+        when(model.generate(anyList(), anyList())).thenReturn(
+                toolCallTurn("calendar_wipe", "{}"),
+                textTurn("最终结果"));
+
+        SubAgentResult result = newService().dispatch("任务", "结果", List.of(), PARENT_CTX);
+
+        assertTrue(result.success());
+        verify(registry, never()).execute(eq("calendar_wipe"), any(), any());
+        assertTrue(result.toolsUsed().isEmpty());
+    }
+
+    @Test
     @DisplayName("子 Agent 没有 6 轮硬停止，可完成超过 100 个生产性轮次")
     void productiveRoundsAreUnlimited() {
         java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();

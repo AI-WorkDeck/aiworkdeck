@@ -654,8 +654,11 @@ public class PluginService {
         PluginToolApprovals.Snapshot current = PluginToolApprovals.snapshot(meta);
         String raw = readToolApprovals(id);
         Map<String, PluginToolApprovals.Definition> approved;
-        if (raw.isBlank()) {
+        if (raw == null) {
+            // 真正没有记录才按来源建基线；存了空串/坏值一律按空基线（失败方向是拦）
             approved = devInstalled ? Map.of() : current.definitions();
+        } else if (raw.isBlank()) {
+            approved = Map.of();
         } else {
             try {
                 approved = PluginToolApprovals.fromJson(raw);
@@ -684,15 +687,18 @@ public class PluginService {
             log.warn("Plugin {} has tool changes awaiting user approval: {}", id,
                     pending.stream().map(c -> c.label() + c.reasons()).toList());
         }
-        if (raw.isBlank() || !next.equals(approved)) writeToolApprovals(id, PluginToolApprovals.toJson(next));
+        if (raw == null || raw.isBlank() || !next.equals(approved)) writeToolApprovals(id, PluginToolApprovals.toJson(next));
     }
 
+    /** 没有记录返回 null（区分于存了空串）。 */
     private String readToolApprovals(String pluginId) {
         String key = PluginToolApprovals.KEY_PREFIX + pluginId;
-        if (systemSettingService == null) return memoryToolApprovals.getOrDefault(key, "");
-        String value = systemSettingService.get(key, "");
-        return value == null ? "" : value;
+        if (systemSettingService == null) return memoryToolApprovals.get(key);
+        String value = systemSettingService.get(key, ABSENT);
+        return ABSENT.equals(value) ? null : value == null ? "" : value;
     }
+
+    private static final String ABSENT = "\u0000absent";
 
     private void writeToolApprovals(String pluginId, String json) {
         String key = PluginToolApprovals.KEY_PREFIX + pluginId;
@@ -745,6 +751,23 @@ public class PluginService {
             }
         }
         return null;
+    }
+
+    /**
+     * 宿主内置安装路径用：只有当前加载的定义恰好就是随宿主发的那份清单时才批准
+     * （安装与批准之间若被别的来源换掉，按普通变更等用户批准）。
+     */
+    public synchronized boolean approveBundledToolDefinitions(String pluginId, String bundledManifestJson) {
+        PluginMetadata bundled = parseManifest(bundledManifestJson);
+        if (bundled == null || !pluginId.equals(bundled.getId())) return false;
+        applyDeclaredTools(bundled);
+        try {
+            approveToolChanges(pluginId, PluginToolApprovals.token(PluginToolApprovals.snapshot(bundled).definitions()));
+            return true;
+        } catch (IllegalStateException | IllegalArgumentException changed) {
+            log.warn("Plugin {} loaded definitions differ from the bundled manifest; left for user approval", pluginId);
+            return false;
+        }
     }
 
     /**
@@ -1818,7 +1841,8 @@ public class PluginService {
                 @Override
                 public java.util.List<com.checkba.service.ai.evidence.EvidenceItem> retrieve(
                         com.checkba.service.ai.evidence.EvidenceQuery query) {
-                    return isEnabled(pluginId) ? inner.retrieve(query) : java.util.List.of();
+                    // 远程证据来源改了地址/凭据/工具名而用户还没批准：不发出检索
+                    return isEnabled(pluginId) && isToolDefinitionApproved(d) ? inner.retrieve(query) : java.util.List.of();
                 }
             });
         }
