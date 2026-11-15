@@ -123,7 +123,7 @@
       purge.addEventListener('change', () => {
         off.textContent = t(purge.checked ? 'cloud.turnOffPurge' : 'cloud.turnOff');
         off.classList.toggle('danger', purge.checked);
-        if (!purge.checked) confirmBox.hidden = true;
+        if (!purge.checked) { confirmBox.hidden = true; off.disabled = false; }
       });
       off.addEventListener('click', () => {
         if (!purge.checked) { toggle(key, false, false, off); return; }

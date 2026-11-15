@@ -102,6 +102,7 @@ test('turning off with delete never deletes without the explicit confirm; cancel
   box.checked = false;
   box.dispatchEvent(new h.dom.window.Event('change'));
   assert.equal(ask.hidden, true, 'unticking closes the question');
+  assert.equal(time.querySelector('[data-action="turn-off"]').disabled, false, 'and gives the off button back');
   const clients = h.doc.querySelector('[data-feature="clients"]');
   await h.click(clients.querySelector('[data-action="turn-off"]'));
   assert.deepEqual(sets().at(-1).params, { feature: 'clients', enabled: false, purge: false, expectedVersion: 2 });

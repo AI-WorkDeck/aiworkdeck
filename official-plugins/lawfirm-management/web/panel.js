@@ -839,7 +839,7 @@
         wiTd.append(workloadBadge(dept.workloadBand || dept.workloadStatus, wi));
 
         tr.append(
-          node('td', dept.departmentName || dept.name || '-'),
+          node('td', tx(dept.departmentName || dept.name) || '-'),
           node('td', dept.headLawyerName || dept.leadName || '主办律师'),
           node('td', L('panel.t.people', '{0} 人', dept.unitCount ?? dept.lawyerCount ?? 0)),
           node('td', L('panel.t.matters', '{0} 件', dept.activeMatterCount ?? dept.activeCaseCount ?? dept.caseCount ?? dept.matterCount ?? 0)),
@@ -876,7 +876,7 @@
 
         tr.append(
           node('td', lead.leadLawyerName || lead.leadName || lead.name || '-'),
-          node('td', lead.departmentName || lead.department || '-'),
+          node('td', tx(lead.departmentName || lead.department) || '-'),
           node('td', L('panel.t.people', '{0} 人', lead.teamSize ?? lead.unitCount ?? 1)),
           node('td', L('panel.t.matters', '{0} 件', lead.leadMatterCount ?? lead.leadCaseCount ?? lead.caseCount ?? lead.activeMatterCount ?? 0)),
           node('td', L('panel.t.load', '负荷 {0}', lead.teamAvgWorkloadIndex ?? lead.avgWorkloadIndex ?? NO_VALUE)),
@@ -916,7 +916,7 @@
         tr.append(
           node('td', u.userName || u.lawyerName || u.displayName || u.name || '-'),
           node('td', u.role || u.title || '主办律师'),
-          node('td', u.departmentName || u.department || '-'),
+          node('td', tx(u.departmentName || u.department) || '-'),
           node('td', L('panel.t.matters', '{0} 件', u.leadMatterCount ?? u.leadCaseCount ?? u.leadMatters ?? 0)),
           node('td', L('panel.t.matters', '{0} 件', u.coMatterCount ?? u.coCaseCount ?? u.coMatters ?? 0)),
           node('td', L('panel.t.tasks', '待办 {0} / 逾期 {1}', u.openTaskCount ?? 0, u.overdueTaskCount ?? 0)),
