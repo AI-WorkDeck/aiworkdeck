@@ -54,7 +54,8 @@
           "lawfirm",
           "speech",
           "tasks",
-          "clipboard"
+          "clipboard",
+          "worklog_read"
         ]
       },
       "uniqueItems": true
@@ -727,7 +728,8 @@
               "lawfirm",
               "speech",
               "tasks",
-              "clipboard"
+              "clipboard",
+              "worklog_read"
             ]
           },
           "uniqueItems": true
@@ -816,7 +818,8 @@
               "lawfirm",
               "speech",
               "tasks",
-              "clipboard"
+              "clipboard",
+              "worklog_read"
             ]
           },
           "uniqueItems": true
