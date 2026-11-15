@@ -569,6 +569,7 @@ userId，本机 userId 与它毫无关系，所以 `proxyCollabEvents` 外层补
 - 认不出的（格式类修订、修订套修订、段里有域/脚注又带修订、表格单元格里的待处理修订——台账 B13b）停在 `stage:'pending-redlines'`，裁决总览给整份二选一并说明原因，绝不猜。
 - 对齐核对与后端同口径：POI `XWPFParagraph.getText()` **不含 `w:delText`**（接受了修订之后的字），引擎侧按段的修订结构算出同一口径（`acceptedText`）再比；不要用 `para.getString()`（模型里删掉的字也在）。
 - 后端 `Unit.rev`（`DocxUnitReader.revisionSignature`）：段落/单元格里待处理修订的签名，同类型同作者同日期相邻的几条并成一条（引擎导出会把一条修订拆成几个 `w:ins`）。没有修订时为空串，`ThreeWayAnalyzer.hashLines` 与以前逐字节相同——普通文档的比对结果不变。
+- **相邻段落：只裁决两侧都改了的，只一侧改的自动合入但列出请过目**（2026-11-15）：`ThreeWayAnalyzer.analyzeSequence` 在 JGit 冲突区里三侧段数相同时逐单元判（与 `hashLines` 同一身份 `identity()`）。两侧改得不一样的进 overlaps（要裁决）；只一侧改的出成非冲突块并记进 `Analysis.neighbors`——不静默：比对稿右栏折叠块（`MergeNeighborList`）、自动合并时总览行 `neighborCount` + 本机提示 `utils/mergeNeighborNotices.js`（`MergeNeighborNotices.vue` 挂在左栏版本面板上方，版本入口 `versionEntryState({review})` 小角标，点开「过目」一次才消失）、尾注 `X-AWD-Merges` 的 action `N`（自动那一笔追加 `Np3T`，`ThreeWayAnalyzer.neighborDecisions` 把段序换成合并结果里的）。注意：`VersionPanel.vue` / `ReviewPanel.vue` 各有单测用「剥 import + new Function 喂依赖」的方式编译（`tests/_lib/review-panel-vm.mjs` 等），给它们加 import 要同步改这些桩。
 - 测试：`frontend/tests/lowa-e2e/merge-pending-redlines.mjs`（真引擎；A 自动合并走真宿主 `useDocumentMerge`，B 同段两边都带修订的两种选法，C 发版前回归的原样三份稿 `fixtures/merge/b13-rc086/`）、`DocxPendingRevisionTest`。
 
 裁决界面此前只有「整份三选一」：同事改了第 3 段、我改了第 200 段，律师也只能二选一整份丢掉一边的工。

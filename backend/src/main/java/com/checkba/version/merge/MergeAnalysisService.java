@@ -141,6 +141,8 @@ public class MergeAnalysisService {
             row.put("mainChanges", a.mainChanges());
             row.put("otherChanges", a.otherChanges());
             row.put("overlapCount", a.overlaps() == null ? 0 : a.overlaps().size());
+            // 挨着另一侧改动、只一侧改过、已自动合入的单元数（请律师过目，不要裁决）
+            row.put("neighborCount", a.neighbors() == null ? 0 : a.neighbors().size());
             var pending = pendingStore.get(projectId, e.getKey());
             row.put("state", pending.isPresent() ? "MERGED" : "PENDING");
             // 「这一侧合了几处」只有自动合并这一档才算得出（逐处裁决那一笔账在 decisions

@@ -84,12 +84,15 @@ export function mergeRowText(t, row, sides = {}, opts = {}) {
     case 'merged': {
       const mainCount = Number(row.mainCount != null ? row.mainCount : row.mainChanges) || 0
       const otherCount = Number(row.otherCount != null ? row.otherCount : row.otherChanges) || 0
-      return t('version.mergeRowMerged', {
+      const merged = t('version.mergeRowMerged', {
         main: sideName(t, sides && sides.main, given.main),
         mainCount,
         other: sideName(t, sides && sides.other, given.other),
         otherCount,
       })
+      // 挨着另一侧改动、只一侧改过、已自动合入的段（不要裁决，请过目）
+      const neighbors = Number(row.neighborCount) || 0
+      return neighbors ? merged + t('version.mergeRowNeighbors', { count: neighbors }) : merged
     }
     case 'manual-docx': {
       // 降级成 MANUAL 有两条不同的路：后端判「同一段两边都改了」（overlapCount>0），

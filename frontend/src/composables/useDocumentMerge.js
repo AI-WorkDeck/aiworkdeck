@@ -23,6 +23,7 @@
 // 两侧的人分不开时（同一个账号两边都是自己——律师用「稿」管对方回稿）喂给引擎的署名
 // 要退到线上，否则引擎按作者分桶会把两边的修订全算进一桶（真机 A3：11 / 0）。
 import { restoreRecreatedRedlineDates, mergeMarkedAuthors } from '../services/mergeRedlineDates.js'
+import { addMergeNeighborNotice } from '../utils/mergeNeighborNotices.js'
 import { resolveMergeSideNames } from '../utils/mergeSideNames.js'
 
 // 三语境里「另一侧」（MERGE_HEAD 那一侧）的 tip 字段名不同：
@@ -164,6 +165,12 @@ export function useDocumentMerge(deps) {
         path: row.path, mode: 'auto', decisions: [], bytes, name, ctx: state.ctx,
         mainRef: refs.mainRef, otherRef: refs.otherRef,
       }))
+      // 挨着另一侧改动、只一侧改过、已自动合入的段：自动合并不挡采纳，但记一条本机提示请律师过目
+      const neighbors = (inputs.analysis && Array.isArray(inputs.analysis.neighbors)) ? inputs.analysis.neighbors : []
+      if (neighbors.length) {
+        addMergeNeighborNotice(deps.projectId, { path: row.path, neighbors,
+          sides: { main: state.sideNames.main || '', other: state.sideNames.other || '' } })
+      }
       // 刻意不把 draft.mainCount/otherCount 带出去：那是「这个作者名下有几条修订」，
       // 不是「这一侧改了几处」——两侧同名时它就是 11/0。行上的「处数」一律用后端
       // 三方比对给的 mainChanges/otherChanges（按单元数，与署名无关）。

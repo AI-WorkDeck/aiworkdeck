@@ -102,6 +102,13 @@
         </view>
       </view>
 
+      <!-- ①b 已自动合入的相邻段落：只一侧改过、挨着另一侧的改动，不要裁决，折叠着请过目 -->
+      <view v-if="(mergeNeighbors || []).length" class="rp-sec">
+        <view class="rp-sec-h rp-fold" @tap="neighborsOpen = !neighborsOpen">
+          <text>{{ (neighborsOpen ? '▾ ' : '▸ ') + $t('version.mergeNeighborsSection', { count: mergeNeighbors.length }) }}</text>
+        </view>
+        <MergeNeighborList v-if="neighborsOpen" :neighbors="mergeNeighbors" :main-label="mainSideLabel" :other-label="otherSideLabel" />
+      </view>
       <!-- ② 修订按两侧作者分组 -->
       <view class="rp-sec">
         <text class="rp-sec-h">{{ $t('version.mergeBlockRevisions', { count: mergeSideGroupCount }) }}</text>
@@ -258,6 +265,7 @@
 //   理由  位置上与修订重叠/相接的批注挂进卡片，处置后顺手标记为已解决。
 import { MERGE_MECH_MARK } from '@/utils/mergeRevisionView.js'
 import { charDiff } from '@/utils/textDiff.js'
+import MergeNeighborList from '@/components/version/MergeNeighborList.vue'
 import EvidencePanel from '@/components/EvidencePanel.vue'
 import InlineReviewPanel from '@/components/InlineReviewPanel.vue'
 import {
@@ -293,7 +301,7 @@ function fenceSnapshot(src, fields) {
 
 export default {
   name: 'ReviewPanel',
-  components: { EvidencePanel, InlineReviewPanel },
+  components: { EvidencePanel, InlineReviewPanel, MergeNeighborList },
   emits: ['merge-recreated', 'close', 'changed', 'locate', 'merge-state', 'open-other-version', 'open-history', 'inline-review'],
   props: {
     documentLocation: { type: Object, default: () => ({}) },
@@ -312,6 +320,8 @@ export default {
     mode: { type: String, default: 'review' },
     // 同一段两边都改了：后端 analysis.overlaps 原样传下来 [{key, baseText, mainText, otherText}]
     mergeConflicts: { type: Array, default: () => [] },
+    // 挨着另一侧改动、只一侧改过、已自动合入的段（后端 analysis.neighbors），只列不裁决
+    mergeNeighbors: { type: Array, default: () => [] },
     // 另一侧只改了格式、没被自动带过来的段：引擎 build_merge_draft 的 formatOnly [{paraKey, preview}]
     mergeFormatOnly: { type: Array, default: () => [] },
     // 两侧修订的作者名（引擎在比较时署上的），用来把每条修订归到哪一边
@@ -345,7 +355,7 @@ export default {
       authorFilter: 'all',
       // 合并模式的两笔账：块 1 每处选了哪一边，块 2 每条修订怎么处置的。
       // 「完成裁决」时由宿主用 collectDecisions 合成尾注清单。
-      mergeChoices: {}, mergeOutcomes: [],
+      mergeChoices: {}, mergeOutcomes: [], neighborsOpen: false,
     }
   },
   computed: {
@@ -908,6 +918,7 @@ export default {
 .rp-sec { margin-bottom: 14px; }
 .rp-d-ins { background: var(--awd-accent-soft); color: var(--awd-accent-text); text-decoration: underline; }
 .rp-d-del { color: var(--awd-danger-text); text-decoration: line-through; }
+.rp-fold { cursor: pointer; }
 .rp-merge-kept { display: block; font-size: var(--awd-panel-fs); color: var(--awd-text-3); line-height: 1.5; margin: 2px 0 6px; }
 .rp-sec-h { display: block; font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); margin: 4px 0 6px; }
 .rp-sec-s { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.5; margin-bottom: 6px; }

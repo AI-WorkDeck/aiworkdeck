@@ -100,6 +100,7 @@ public final class ThreeWayAnalyzer {
         List<Chunk> mainChunks = new ArrayList<>();
         List<Chunk> otherChunks = new ArrayList<>();
         List<Overlap> overlaps = new ArrayList<>();
+        List<Neighbor> neighbors = new ArrayList<>();
 
         int basePos = 0;
         int i = 0;
@@ -139,6 +140,37 @@ public final class ThreeWayAnalyzer {
             int baseEnd = basePart != null ? basePart.getEnd() : nextBaseBegin(chunks, groupEnd, base.size());
             List<String> mainTexts = mainPart == null ? List.of() : textsOf(main, mainPart);
             List<String> otherTexts = otherPart == null ? List.of() : textsOf(other, otherPart);
+            // JGit 把挨着的改动并成一个冲突区（主线改第 3、4 段、另一侧改第 2、3 段 → 2–4 段整块冲突），
+            // 律师被要求裁决其实只有一侧改过的段（2026-11-15 真机，协调会话定：逐段判）。三侧在这个区里
+            // 段数相同时逐段判：只一侧改的照常自动合，两侧改得一样的不用动，只有两侧改得不一样的才算冲突。
+            // 段数不同（区里有增删段）对不齐，仍整块交给律师。只一侧改的那几段记进 neighbors：
+            // 相邻条款常相互牵连，合出来的组合两边都没看过，列出来请律师过目（不要裁决、不挡采纳）。
+            int n = baseEnd - baseStart;
+            if (mainPart != null && otherPart != null && basePart != null && n > 0
+                    && mainPart.getEnd() - mainPart.getBegin() == n && otherPart.getEnd() - otherPart.getBegin() == n) {
+                for (int k = 0; k < n; k++) {
+                    Unit b = base.get(baseStart + k);
+                    Unit m = main.get(mainPart.getBegin() + k);
+                    Unit o = other.get(otherPart.getBegin() + k);
+                    boolean mainChanged = !identity(m).equals(identity(b));
+                    boolean otherChanged = !identity(o).equals(identity(b));
+                    int at = baseStart + k;
+                    if (mainChanged && otherChanged && !identity(m).equals(identity(o))) {
+                        mainChunks.add(toChunk(at, at + 1, List.of(m.text()), true));
+                        otherChunks.add(toChunk(at, at + 1, List.of(o.text()), true));
+                        overlaps.add(new Overlap(b.key(), b.text(), m.text(), o.text()));
+                    } else if (mainChanged) {
+                        mainChunks.add(toChunk(at, at + 1, List.of(m.text()), false));
+                        if (!otherChanged) neighbors.add(new Neighbor(b.key(), "M", b.text(), m.text(), o.text()));
+                    } else if (otherChanged) {
+                        otherChunks.add(toChunk(at, at + 1, List.of(o.text()), false));
+                        neighbors.add(new Neighbor(b.key(), "T", b.text(), m.text(), o.text()));
+                    }
+                }
+                basePos = baseEnd;
+                i = groupEnd;
+                continue;
+            }
             if (mainPart != null) {
                 mainChunks.add(toChunk(baseStart, baseEnd, mainTexts, true));
             }
@@ -157,7 +189,48 @@ public final class ThreeWayAnalyzer {
                 countChanges(mainChunks), countChanges(otherChunks),
                 List.copyOf(overlaps), List.of(), List.of(),
                 new MergePlan(List.copyOf(mainChunks), List.copyOf(otherChunks)),
-                List.copyOf(base));
+                List.copyOf(base), List.copyOf(neighbors));
+    }
+
+    /**
+     * 「相邻、已自动合入」单元记进版本记录（{@code X-AWD-Merges}，action {@code N}）用的条目。
+     * docx 段落键换成合并结果里的段序（{@link Decision} 的约定）：按两侧不冲突的块在它前面增删了
+     * 几段平移；表格单元键原样。
+     */
+    public static List<Decision> neighborDecisions(Analysis a) {
+        if (a == null || a.neighbors() == null || a.neighbors().isEmpty() || a.plan() == null) {
+            return List.of();
+        }
+        List<Unit> base = a.baseUnits() == null ? List.of() : a.baseUnits();
+        List<Chunk> chunks = new ArrayList<>();
+        chunks.addAll(a.plan().mainChunks());
+        chunks.addAll(a.plan().otherChunks());
+        List<Decision> out = new ArrayList<>();
+        for (Neighbor n : a.neighbors()) {
+            String key = n.key();
+            int at = -1;
+            for (int i = 0; i < base.size(); i++) {
+                if (base.get(i).key().equals(key)) { at = i; break; }
+            }
+            if (at >= 0 && key.startsWith("p")) {
+                int ord = 0;
+                for (int i = 0; i < at; i++) {
+                    if (base.get(i).key().startsWith("p")) ord++;
+                }
+                int shift = 0;
+                for (Chunk c : chunks) {
+                    if (c.conflict() || c.baseEnd() > at) continue;
+                    boolean paragraphsOnly = true;
+                    for (int i = c.baseStart(); i < c.baseEnd() && i < base.size(); i++) {
+                        if (!base.get(i).key().startsWith("p")) { paragraphsOnly = false; break; }
+                    }
+                    if (paragraphsOnly) shift += c.texts().size() - (c.baseEnd() - c.baseStart());
+                }
+                key = "p" + Math.max(0, ord + shift);
+            }
+            out.add(new Decision(key, n.side(), "N"));
+        }
+        return List.copyOf(out);
     }
 
     private static int nextBaseBegin(List<MergeChunk> chunks, int from, int baseSize) {
@@ -215,12 +288,17 @@ public final class ThreeWayAnalyzer {
         return total;
     }
 
+    /** 单元的比对身份：文字，有待处理修订时连修订签名（台账 B13）。hashLines 与逐段判冲突共用。 */
+    private static String identity(Unit unit) {
+        String rev = unit.rev() == null ? "" : unit.rev();
+        return rev.isEmpty() ? unit.norm() : unit.norm() + "\u0000" + rev;
+    }
+
     private static RawText hashLines(List<Unit> units) {
         StringBuilder sb = new StringBuilder();
         for (Unit unit : units) {
             // 没有待处理修订的单元与以前逐字节相同（只按文字）；有的连修订签名一起算（台账 B13）
-            String rev = unit.rev() == null ? "" : unit.rev();
-            sb.append(sha256Hex(rev.isEmpty() ? unit.norm() : unit.norm() + "\u0000" + rev)).append('\n');
+            sb.append(sha256Hex(identity(unit))).append('\n');
         }
         return new RawText(sb.toString().getBytes(StandardCharsets.UTF_8));
     }
