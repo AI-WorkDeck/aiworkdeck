@@ -45,7 +45,7 @@ const CLOUD_LIST = {
   ]
 };
 
-async function mount({ language = 'zh-CN', oldHost = false, cloud = null } = {}) {
+async function mount({ language = 'zh-CN', oldHost = false, cloud = null, saved = [] } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://plugin.invalid/' });
   const calls = [];
   const send = (data) => dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data, source: dom.window.parent }));
@@ -64,7 +64,12 @@ async function mount({ language = 'zh-CN', oldHost = false, cloud = null } = {})
         }
         if (action === 'conflictPreview') result = { riskLevel: 'GREEN', summary: '未发现利益冲突', hits: [] };
         if (action === 'overview') result = { self: { id: 1, displayName: '陈思远' }, intakes: [], restricted: false };
-        if (action === 'listClients') result = LIST;
+        if (action === 'listClients') result = { ...LIST, clients: [...LIST.clients, ...saved] };
+        if (action === 'saveClient') {
+          const c = { id: 90 + saved.length, clientNo: 'KH-2026-0090', name: params.name, creditCode: params.creditCode || '', ownerUserId: params.ownerUserId ? Number(params.ownerUserId) : null };
+          saved.push(c);
+          result = { client: { ...PROFILE, ...c, relations: [], indirectShareholders: [], conflicts: [], matters: [], signals: [] } };
+        }
         if (action === 'getClient') result = { client: PROFILE };
         if (action === 'searchParties') result = { parties: [{ id: 41, name: '林海', client: false }] };
         if (action === 'saveRelation') result = { client: { ...PROFILE, relations: [...PROFILE.relations, { id: 32, relationType: 'SHAREHOLDER', direction: 'IN', partyId: 41, partyName: '林海', description: '林海持有远航物流有限公司 30% 股权' }] } };
@@ -80,7 +85,7 @@ async function mount({ language = 'zh-CN', oldHost = false, cloud = null } = {})
           result = { client: { ...CLOUD_LIST.clients[0], version: 4 } };
         }
         if (action === 'clients.conflictSearch') result = { riskLevel: 'YELLOW', hits: [{ ruleTitle: '新案对方当事人与本所客户存在关联关系（含间接股权）', clientName: '星河医疗器械有限公司', clientNo: 'KH-2026-0001', ownerName: '许嘉宁', relationPath: '林海持有星河控股 80% 股权' }] };
-        if (action === 'uploadClientsToCloud') result = { uploadedClients: 2, created: 1, matched: 1 };
+        if (action === 'uploadClientsToCloud') result = { uploadedClients: 2, uploadedParties: 5, uploadedRelations: 3, created: 4, matched: 1 };
         if (action === 'withdrawClientsFromCloud') result = { withdrawnClients: 1, unlinked: 1 };
         if (action === 'clients.purge') result = { deletedClients: 2, deletedParties: 4, deletedRelations: 3 };
       }
@@ -246,7 +251,8 @@ test('firm cloud on: cloud list shows visibility, restricted profile hides detai
   await tick();
   p.$('client-upload').click();
   await tick();
-  assert.match(p.$('clients-status').textContent, /已上传 2 位客户（新建 1，与云端已有档案对上 1）/);
+  // 客户与关联主体分开数：5 个主体里 2 位客户、3 个关联主体；新建/对上按主体计，不写成「客户」
+  assert.match(p.$('clients-status').textContent, /已上传 2 位客户及 3 个关联主体、3 条关系（云端新建 4 个主体，与云端已有档案对上 1 个）/);
 });
 
 test('intake precheck also searches firm cloud parties when the firm cloud is on', async () => {
@@ -284,4 +290,21 @@ test('withdraw and admin purge require an on-page confirmation before anything i
   await tick();
   assert.equal(admin.actions('clients.purge').at(-1).confirm, true);
   assert.match(admin.$('clients-status').textContent, /已删除律所云端的 2 位客户/);
+});
+
+test('a client created in 客户管理 shows in the intake picker without reopening the panel, owned by its creator', async () => {
+  const p = await mount();
+  p.$('tab-clients').click();
+  await tick();
+  p.$('client-new').click();
+  await tick();
+  assert.equal(p.$('client-f-owner').value, '1', 'new client defaults to the lawyer creating it (overview self)');
+  p.$('client-f-name').value = '青禾科技有限公司（虚构）';
+  p.$('client-save').click();
+  await tick();
+  assert.equal(p.actions('saveClient').at(-1).ownerUserId, '1');
+  p.$('tab-intake').click();
+  await tick();
+  const options = [...p.$('intake-client-pick').options].map((o) => o.textContent);
+  assert.ok(options.some((o) => o.startsWith('青禾科技有限公司（虚构）')), 'no reload needed: ' + options.join(' / '));
 });

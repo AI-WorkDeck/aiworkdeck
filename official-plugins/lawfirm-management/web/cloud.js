@@ -42,6 +42,13 @@
     return v === k ? t(`cloud.feature.other.${part}`, { key }) : v;
   }
 
+  // 关闭并删除时写明删掉的是哪些云端数据；已知功能用本插件词条，其他功能用通用说明
+  function purgeWhat(key) {
+    const k = `cloud.purgeWhat.${key}`;
+    const v = t(k);
+    return v === k ? t('cloud.purgeWhat.other') : v;
+  }
+
   function status(text, isError) {
     const n = $('cl-status');
     n.textContent = text || '';
@@ -108,13 +115,34 @@
       const off = el('button', t('cloud.turnOff'));
       off.type = 'button';
       off.dataset.action = 'turn-off';
-      // 勾选删除后按钮文案随之变为「关闭并删除云端数据」，删除需要这次明确勾选加点击
+      // 勾选删除后按钮文案随之变为「关闭并删除云端数据」；点了也不立即删，先在卡片里写明删什么、不可恢复，
+      // 再点「确认删除」才发请求（插件沙箱里不依赖系统弹窗）。不勾删除的普通关闭照旧一步完成。
+      const confirmBox = el('div', null, 'client-confirm cl-confirm');
+      confirmBox.dataset.role = 'purge-confirm';
+      confirmBox.hidden = true;
       purge.addEventListener('change', () => {
         off.textContent = t(purge.checked ? 'cloud.turnOffPurge' : 'cloud.turnOff');
         off.classList.toggle('danger', purge.checked);
+        if (!purge.checked) confirmBox.hidden = true;
       });
-      off.addEventListener('click', () => toggle(key, false, purge.checked, off));
+      off.addEventListener('click', () => {
+        if (!purge.checked) { toggle(key, false, false, off); return; }
+        const ok = el('button', t('cloud.purgeConfirmOk'), 'danger');
+        ok.type = 'button';
+        ok.dataset.action = 'purge-confirm';
+        const cancel = el('button', t('cloud.purgeCancel'));
+        cancel.type = 'button';
+        cancel.dataset.action = 'purge-cancel';
+        cancel.addEventListener('click', () => { confirmBox.hidden = true; off.disabled = false; off.focus(); });
+        ok.addEventListener('click', () => { cancel.disabled = true; toggle(key, false, true, ok); });
+        confirmBox.replaceChildren(el('p', t('cloud.purgeConfirm', { name: featureText(key, 'name'), what: purgeWhat(key) })), ok, cancel);
+        confirmBox.hidden = false;
+        off.disabled = true;
+        ok.focus();
+      });
       row.append(purgeLabel, off);
+      card.append(row, confirmBox);
+      return card;
     } else {
       const onBtn = el('button', t('cloud.turnOn'), 'primary');
       onBtn.type = 'button';

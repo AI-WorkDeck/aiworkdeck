@@ -18,6 +18,7 @@ const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8')
 const sdkSource = readFileSync(new URL('../../../sdk/plugin-sdk/awd-plugin-sdk.js', import.meta.url), 'utf8');
 const panelSource = readFileSync(new URL('../web/panel.js', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../web/panel.css', import.meta.url), 'utf8');
+const l10nSource = readFileSync(new URL('../web/expenses-l10n.js', import.meta.url), 'utf8');
 
 const tick = async (rounds = 4) => {
   for (let i = 0; i < rounds; i++) {
@@ -266,7 +267,7 @@ async function mountPanel(options = {}) {
         }
         if (result === undefined) {
           if (msg.method === 'context.get') {
-            result = { pluginId: 'lawfirm-management', projectId: 1, language: 'zh-CN', theme: 'light' };
+            result = { pluginId: 'lawfirm-management', projectId: 1, language: options.language || 'zh-CN', theme: 'light' };
           } else if (msg.method === 'events.subscribe' || msg.method === 'events.unsubscribe') {
             result = { subscribed: msg.params?.events || [] };
           } else if (msg.method === 'lawfirm.request') {
@@ -452,6 +453,8 @@ async function mountPanel(options = {}) {
     });
   };
 
+  if (options.reload) dom.window.AWD_LAWFIRM_RELOAD = options.reload;
+  if (options.language) dom.window.eval(l10nSource);
   dom.window.eval(sdkSource);
   dom.window.eval(panelSource);
 
@@ -461,7 +464,7 @@ async function mountPanel(options = {}) {
     context: {
       pluginId: 'lawfirm-management',
       projectId: 1,
-      language: 'zh-CN',
+      language: options.language || 'zh-CN',
       theme: 'light',
       themeTokens: {
         '--awd-surface': '#ffffff',
@@ -792,4 +795,42 @@ test('9. A successful intake submit clears the form so it cannot be submitted tw
   assert.match(p.$('notice').textContent, /已提交收案申请/);
   p.$('tab-finance').click();
   assert.equal(p.$('notice').textContent, '');
+});
+
+test('10. When another tab changes the invoice ledger (hourly bill confirmed), the panel reloads it without 刷新数据', async (t) => {
+  const p = await mountPanel();
+  t.after(() => p.dom.window.close());
+  const overviews = () => p.calls.filter((c) => c.method === 'lawfirm.request' && c.params?.action === 'overview').length;
+  const before = overviews();
+  p.state.invoices.push({ ...p.state.invoices[0], id: 990, invoiceAppNo: 'INV-2026-0990', status: 'PENDING_APPROVAL', invoiceNumber: null });
+  p.dom.window.dispatchEvent(new p.dom.window.CustomEvent('lawfirm:ledger-changed'));
+  await tick(8);
+  assert.equal(overviews(), before + 1);
+  assert.match(p.$('panel-finance').textContent, /INV-2026-0990/);
+});
+
+test('11. Switching the host language reloads the open panel on the same tab; a theme push without a language change does not', async (t) => {
+  const reloads = [];
+  const p = await mountPanel({ reload: (url) => reloads.push(url) });
+  t.after(() => p.dom.window.close());
+  p.$('tab-finance').click();
+  await tick();
+  p.sendToPlugin({ awd: 1, type: 'theme', theme: 'dark', tokens: {}, language: 'zh-CN' });
+  await tick();
+  assert.equal(reloads.length, 0, 'same language: only the theme changes');
+  p.sendToPlugin({ awd: 1, type: 'theme', theme: 'dark', tokens: {}, language: 'en-US' });
+  await tick();
+  assert.equal(reloads.length, 1);
+  assert.equal(new URL(reloads[0]).searchParams.get('tab'), 'finance');
+});
+
+test('12. English ledger rows translate the practice group recorded at intake', async (t) => {
+  const p = await mountPanel({ language: 'en-US' });
+  t.after(() => p.dom.window.close());
+  p.state.invoices[0].departmentName = '知识产权与数据合规';
+  p.dom.window.dispatchEvent(new p.dom.window.CustomEvent('lawfirm:ledger-changed'));
+  await tick(8);
+  const row = [...p.dom.window.document.querySelectorAll('#panel-finance tr')].find((r) => r.textContent.includes('INV-2026-001'));
+  assert.match(row.textContent, /\(IP & Data Compliance\)/);
+  assert.doesNotMatch(row.textContent, /知识产权与数据合规/);
 });

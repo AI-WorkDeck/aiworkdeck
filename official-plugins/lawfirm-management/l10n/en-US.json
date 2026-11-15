@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Open firm cloud settings",
   "client.cloud.upload": "Upload my clients to the firm cloud",
   "client.cloud.uploadHint": "Only clients you own, lead or created, with their relationships, are uploaded. Intakes, fees and interaction logs are not.",
-  "client.cloud.uploaded": "Uploaded {clients} clients ({created} new, {matched} matched existing cloud records).",
+  "client.cloud.uploaded": "Uploaded {clients} clients with {related} related parties and {relations} relationships ({created} parties new in the cloud, {matched} matched to existing profiles).",
   "client.cloud.listHint": "Client records in the firm cloud. Owners, responsible partners and firm administrators see the full record; other lawyers see only the name and owner.",
   "client.cloud.col.scope": "Visibility",
   "client.cloud.scope.full": "Full record",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Red-invoice",
   "billing.confirmVoid": "Click again to void",
   "billing.confirmRed": "Click again to red-invoice",
-  "billing.voided": "Invoice application updated: {0}"
+  "billing.voided": "Invoice application updated: {0}",
+  "cloud.purgeConfirm": "This deletes all of your firm's \"{name}\" data in the firm cloud: {what}. This cannot be undone; local data on each lawyer's computer is not affected. Turn off and delete?",
+  "cloud.purgeWhat.time": "all time entries lawyers submitted, review outcomes and published matters",
+  "cloud.purgeWhat.clients": "all client profiles, related parties and relationships",
+  "cloud.purgeWhat.pitch": "all shared credentials, profiles and usage records",
+  "cloud.purgeWhat.other": "everything this feature stores in the cloud",
+  "cloud.purgeConfirmOk": "Turn off and delete",
+  "cloud.purgeCancel": "Cancel",
+  "billing.groupNoRate": " ({n} entries have no rate and are not counted)",
+  "billing.groupSummaryNoRate": "{n} entries, {pending} to review; {h} billable hours, no rate set"
 }

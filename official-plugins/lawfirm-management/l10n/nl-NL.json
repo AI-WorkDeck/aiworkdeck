@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Instellingen van de kantoorcloud openen",
   "client.cloud.upload": "Mijn cliënten uploaden naar de kantoorcloud",
   "client.cloud.uploadHint": "Alleen cliënten die u beheert, leidt of hebt aangemaakt worden geüpload, met hun relaties. Intakes, honoraria en contactlogboeken worden niet geüpload.",
-  "client.cloud.uploaded": "{clients} cliënten geüpload ({created} nieuw, {matched} gekoppeld aan bestaande dossiers in de cloud).",
+  "client.cloud.uploaded": "{clients} cliënten geüpload met {related} verbonden partijen en {relations} relaties ({created} partijen nieuw in de cloud, {matched} gekoppeld aan bestaande profielen).",
   "client.cloud.listHint": "Cliëntdossiers in de kantoorcloud. Beheerders van de relatie, verantwoordelijke partners en kantoorbeheerders zien het volledige dossier; andere advocaten zien alleen de naam en de beheerder.",
   "client.cloud.col.scope": "Zichtbaarheid",
   "client.cloud.scope.full": "Volledig dossier",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Creditfactuur",
   "billing.confirmVoid": "Klik nogmaals om te annuleren",
   "billing.confirmRed": "Klik nogmaals voor creditfactuur",
-  "billing.voided": "Factuuraanvraag bijgewerkt: {0}"
+  "billing.voided": "Factuuraanvraag bijgewerkt: {0}",
+  "cloud.purgeConfirm": "Alle „{name}”-gegevens van uw kantoor in de kantoorcloud worden verwijderd: {what}. Dit kan niet ongedaan worden gemaakt; lokale gegevens op de computers van de advocaten blijven ongemoeid. Uitzetten en verwijderen?",
+  "cloud.purgeWhat.time": "alle ingediende tijdregistraties, beoordelingsuitkomsten en gepubliceerde zaken",
+  "cloud.purgeWhat.clients": "alle cliëntprofielen, verbonden partijen en relaties",
+  "cloud.purgeWhat.pitch": "alle gedeelde referenties, profielen en gebruiksgegevens",
+  "cloud.purgeWhat.other": "alles wat deze functie in de cloud bewaart",
+  "cloud.purgeConfirmOk": "Uitzetten en verwijderen",
+  "cloud.purgeCancel": "Annuleren",
+  "billing.groupNoRate": " ({n} regels zonder tarief, niet meegeteld)",
+  "billing.groupSummaryNoRate": "{n} regels, {pending} ter controle; {h} declarabele uren, geen tarief ingesteld"
 }

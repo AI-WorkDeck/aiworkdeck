@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "開啟「律所雲端」設定",
   "client.cloud.upload": "上傳我的客戶至律所雲端",
   "client.cloud.uploadHint": "僅上傳由你維護、主辦或建檔的客戶及其關係，不上傳收案、收費與往來紀錄。",
-  "client.cloud.uploaded": "已上傳 {clients} 位客戶（新增 {created}，與雲端既有檔案比對相符 {matched}）。",
+  "client.cloud.uploaded": "已上傳 {clients} 位客戶及 {related} 個關聯主體、{relations} 條關係（雲端新建 {created} 個主體，與雲端既有檔案對上 {matched} 個）。",
   "client.cloud.listHint": "律所雲端的客戶檔案。維護人、主辦合夥律師與律所管理員可檢視完整檔案；其他律師僅能看到名稱與維護人。",
   "client.cloud.col.scope": "可見範圍",
   "client.cloud.scope.full": "完整檔案",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "紅沖",
   "billing.confirmVoid": "再點一次確認作廢",
   "billing.confirmRed": "再點一次確認紅沖",
-  "billing.voided": "已處理發票申請：{0}"
+  "billing.voided": "已處理發票申請：{0}",
+  "cloud.purgeConfirm": "將刪除本所在律所雲端保存的全部「{name}」資料：{what}。刪除後無法復原；各律師電腦上的本機資料不受影響。確定關閉並刪除？",
+  "cloud.purgeWhat.time": "所有律師提交的工時、審核結論和已發布的事項",
+  "cloud.purgeWhat.clients": "全部客戶檔案、關聯主體與關係",
+  "cloud.purgeWhat.pitch": "全部共享的業績、簡歷及使用紀錄",
+  "cloud.purgeWhat.other": "該功能在雲端保存的全部資料",
+  "cloud.purgeConfirmOk": "確認關閉並刪除",
+  "cloud.purgeCancel": "取消",
+  "billing.groupNoRate": "（其中 {n} 筆未設費率，未計入金額）",
+  "billing.groupSummaryNoRate": "共 {n} 條，待審核 {pending} 條；可收費 {h} 小時，未設費率"
 }

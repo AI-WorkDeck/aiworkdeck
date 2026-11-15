@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "「事務所クラウド」設定を開く",
   "client.cloud.upload": "自分の顧客を事務所クラウドにアップロード",
   "client.cloud.uploadHint": "自分が担当者・主任・登録者である顧客とその関係のみをアップロードします。受任、報酬、やり取りの記録はアップロードしません。",
-  "client.cloud.uploaded": "顧客 {clients} 件をアップロードしました（新規 {created} 件、クラウド上の既存ファイルと一致 {matched} 件）。",
+  "client.cloud.uploaded": "顧客 {clients} 件、関係者 {related} 件、関係 {relations} 件をアップロードしました（クラウドで新規作成 {created} 件、既存プロファイルと照合 {matched} 件）。",
   "client.cloud.listHint": "事務所クラウド上の顧客ファイルです。担当者、責任パートナー、事務所管理者はファイル全体を閲覧でき、その他の弁護士には名称と担当者のみ表示されます。",
   "client.cloud.col.scope": "閲覧範囲",
   "client.cloud.scope.full": "ファイル全体",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "赤伝発行",
   "billing.confirmVoid": "もう一度クリックで無効化",
   "billing.confirmRed": "もう一度クリックで赤伝発行",
-  "billing.voided": "請求書申請を更新しました: {0}"
+  "billing.voided": "請求書申請を更新しました: {0}",
+  "cloud.purgeConfirm": "事務所クラウドに保存されている当事務所の「{name}」のデータをすべて削除します：{what}。元に戻せません。各弁護士のパソコン上のローカルデータには影響しません。オフにして削除しますか？",
+  "cloud.purgeWhat.time": "弁護士が提出したすべての工数、審査結果、公開した案件",
+  "cloud.purgeWhat.clients": "すべての顧客プロファイル、関係者、関係",
+  "cloud.purgeWhat.pitch": "共有したすべての実績、経歴、利用記録",
+  "cloud.purgeWhat.other": "この機能がクラウドに保存しているすべてのデータ",
+  "cloud.purgeConfirmOk": "オフにして削除",
+  "cloud.purgeCancel": "キャンセル",
+  "billing.groupNoRate": "（うち {n} 件は単価未設定のため金額に含まれません）",
+  "billing.groupSummaryNoRate": "{n} 件、うち審査待ち {pending} 件。請求対象 {h} 時間、単価未設定"
 }

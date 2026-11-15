@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "打开「律所云端」设置",
   "client.cloud.upload": "上传我的客户到律所云端",
   "client.cloud.uploadHint": "只上传由你维护、主办或建档的客户及其关系，不上传收案、收费与往来记录。",
-  "client.cloud.uploaded": "已上传 {clients} 位客户（新建 {created}，与云端已有档案对上 {matched}）。",
+  "client.cloud.uploaded": "已上传 {clients} 位客户及 {related} 个关联主体、{relations} 条关系（云端新建 {created} 个主体，与云端已有档案对上 {matched} 个）。",
   "client.cloud.listHint": "律所云端的客户档案。维护人、主办合伙人和律所管理员可看完整档案；其他律师只看到名称与维护人。",
   "client.cloud.col.scope": "可见范围",
   "client.cloud.scope.full": "完整档案",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "红冲",
   "billing.confirmVoid": "再点一次确认作废",
   "billing.confirmRed": "再点一次确认红冲",
-  "billing.voided": "已处理发票申请：{0}"
+  "billing.voided": "已处理发票申请：{0}",
+  "cloud.purgeConfirm": "将删除本所在律所云端保存的全部「{name}」数据：{what}。删除后无法恢复；各律师电脑上的本机数据不受影响。确定关闭并删除？",
+  "cloud.purgeWhat.time": "所有律师提交的工时、审核结论和已发布的事项",
+  "cloud.purgeWhat.clients": "全部客户档案、关联主体与关系",
+  "cloud.purgeWhat.pitch": "全部共享的业绩、简历及使用记录",
+  "cloud.purgeWhat.other": "该功能在云端保存的全部数据",
+  "cloud.purgeConfirmOk": "确认关闭并删除",
+  "cloud.purgeCancel": "取消",
+  "billing.groupNoRate": "（其中 {n} 条未设费率，未计入金额）",
+  "billing.groupSummaryNoRate": "共 {n} 条，待审核 {pending} 条；可收费 {h} 小时，未设费率"
 }

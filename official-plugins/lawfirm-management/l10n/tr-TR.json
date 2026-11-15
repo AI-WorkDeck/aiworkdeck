@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Büro bulutu ayarlarını aç",
   "client.cloud.upload": "Müvekkillerimi büro bulutuna yükle",
   "client.cloud.uploadHint": "Yalnızca sizin yürüttüğünüz, sorumlu olduğunuz veya oluşturduğunuz müvekkiller ilişkileriyle birlikte yüklenir. Dosya kabulleri, ücretler ve görüşme kayıtları yüklenmez.",
-  "client.cloud.uploaded": "{clients} müvekkil yüklendi ({created} yeni, {matched} buluttaki mevcut dosyalarla eşleşti).",
+  "client.cloud.uploaded": "{clients} müvekkil, {related} ilişkili taraf ve {relations} ilişki yüklendi (bulutta yeni {created} taraf, mevcut profillerle eşleşen {matched}).",
   "client.cloud.listHint": "Büro bulutundaki müvekkil dosyaları. Müvekkil sorumlusu, sorumlu ortak ve büro yöneticileri dosyanın tamamını görür; diğer avukatlar yalnızca adı ve sorumluyu görür.",
   "client.cloud.col.scope": "Görünürlük",
   "client.cloud.scope.full": "Dosyanın tamamı",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Ters fatura",
   "billing.confirmVoid": "İptal için tekrar tıklayın",
   "billing.confirmRed": "Ters fatura için tekrar tıklayın",
-  "billing.voided": "Fatura talebi güncellendi: {0}"
+  "billing.voided": "Fatura talebi güncellendi: {0}",
+  "cloud.purgeConfirm": "Büronuzun büro bulutundaki tüm «{name}» verileri silinecek: {what}. Bu işlem geri alınamaz; avukatların bilgisayarlarındaki yerel veriler etkilenmez. Kapatıp silinsin mi?",
+  "cloud.purgeWhat.time": "avukatların gönderdiği tüm süre kayıtları, inceleme sonuçları ve yayımlanan dosyalar",
+  "cloud.purgeWhat.clients": "tüm müvekkil profilleri, ilişkili taraflar ve ilişkiler",
+  "cloud.purgeWhat.pitch": "tüm paylaşılan referanslar, profiller ve kullanım kayıtları",
+  "cloud.purgeWhat.other": "bu özelliğin bulutta sakladığı her şey",
+  "cloud.purgeConfirmOk": "Kapat ve sil",
+  "cloud.purgeCancel": "İptal",
+  "billing.groupNoRate": " ({n} kayıtta ücret yok, sayılmadı)",
+  "billing.groupSummaryNoRate": "{n} kayıt, {pending} tanesi incelenecek; {h} faturalanabilir saat, ücret belirlenmedi"
 }

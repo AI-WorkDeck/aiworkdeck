@@ -303,6 +303,8 @@
       departmentName: data.currentDepartment || '争议解决',
       role: '执业律师'
     };
+    // 客户档案页新建客户时用作默认维护人
+    window.AWD_LAWFIRM_SELF = state.self;
 
     const intakes = data.intakes || data.allIntakes || data.myIntakes || data.matters || [];
     state.intakes = Array.isArray(intakes) ? intakes : [];
@@ -663,7 +665,7 @@
         if (inv.invoiceNumber) noTd.append(node('div', inv.invoiceNumber, 'invoice-number'));
         tr.append(
           noTd,
-          node('td', `${inv.matterTitle || '-'}（${inv.departmentName || '-'}）`, 'cell-text'),
+          node('td', withGroup(inv.matterTitle, inv.departmentName), 'cell-text'),
           node('td', INVOICE_TYPE_LABELS[inv.invoiceType] || inv.invoiceType || '数电专票'),
           node('td', `${inv.buyerName || '-'} ${inv.buyerTaxId ? '· ' + inv.buyerTaxId : ''}`, 'cell-text'),
           node('td', L('panel.t.amountTax', '{0}（税额 {1}）', formatYuanFromCents(inv.amountCents), formatYuanFromCents(inv.taxAmountCents))),
@@ -999,6 +1001,12 @@
   // 面板文案多语言（dev-board QA post-0.85）：中文原文对照 l10n/*.json 的 panel.s.* 词条，翻成当前语言；
   // 带数字的句子在代码里用 L('panel.t.*')。词条表由 build.sh 生成到 expenses-l10n.js。zh-CN 原样显示。
   let zhToKey = null;
+  // 台账行「案件（业务分类）」：业务分类是收案时的词条值，按界面语言翻译；括号随语言用全角或半角
+  function withGroup(title, group) {
+    const g = tx(group) || '-';
+    return String(uiLocale).startsWith('zh') ? `${title || '-'}（${g}）` : `${title || '-'} (${g})`;
+  }
+
   function tx(s) {
     if (!s || typeof s !== 'string' || uiLocale === 'zh-CN') return s;
     const table = window.AWD_LAWFIRM_EXPENSE_L10N || {};
@@ -1103,6 +1111,9 @@
     }
     notice('已加载典型律所全流程样板数据（含红黄绿利冲案例、站内信放行单、数电票与业务看板）。');
   }));
+
+  // 其他页签（如计时收费的客户确认）改动了发票台账：静默重读，失败不打扰当前页面
+  window.addEventListener('lawfirm:ledger-changed', () => { loadOverview(state.epoch).catch(() => {}); });
 
   $('refresh-data').addEventListener('click', () => runAction($('refresh-data'), async (epoch) => {
     await loadOverview(epoch);
@@ -1250,7 +1261,24 @@
     if (initialTab) switchTab(initialTab);
   } catch { /* ignore */ }
 
+  // 宿主切换界面语言时会向面板推一条 { type: 'theme', language }。各页签的文案在启动时按语言取好，
+  // 所以语言变了就整页重载（停在当前页签），各模块从握手里拿到新语言重新渲染。
+  let shownLanguage = null;
+  window.addEventListener('message', (event) => {
+    if (event.source !== window.parent) return;
+    const msg = event.data;
+    if (!msg || msg.awd !== 1 || msg.type !== 'theme' || !msg.language) return;
+    if (shownLanguage && msg.language !== shownLanguage) {
+      shownLanguage = msg.language;
+      const current = document.querySelector('[role="tab"][aria-selected="true"]')?.id?.replace(/^tab-/, '');
+      const url = new URL(window.location.href);
+      if (current) url.searchParams.set('tab', current);
+      (window.AWD_LAWFIRM_RELOAD || ((u) => window.location.replace(u)))(url.toString());
+    }
+  });
+
   awd.ready().then((ctx) => {
+    shownLanguage = ctx?.language || null;
     if (ctx?.initialTab) switchTab(ctx.initialTab);
     for (const evt of ['project.switched', 'account.changed']) {
       awd.events.on(evt, reload);

@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Buka pengaturan cloud firma",
   "client.cloud.upload": "Unggah klien saya ke cloud firma",
   "client.cloud.uploadHint": "Hanya klien yang Anda kelola, pimpin, atau buat berkasnya yang diunggah, beserta hubungannya. Penerimaan perkara, biaya, dan catatan interaksi tidak diunggah.",
-  "client.cloud.uploaded": "{clients} klien diunggah ({created} baru, {matched} cocok dengan berkas yang sudah ada di cloud).",
+  "client.cloud.uploaded": "Mengunggah {clients} klien beserta {related} pihak terkait dan {relations} hubungan ({created} pihak baru di cloud, {matched} cocok dengan profil yang ada).",
   "client.cloud.listHint": "Berkas klien di cloud firma. Penanggung jawab klien, partner penanggung jawab, dan administrator firma dapat melihat berkas lengkap; advokat lain hanya melihat nama dan penanggung jawab klien.",
   "client.cloud.col.scope": "Cakupan akses",
   "client.cloud.scope.full": "Berkas lengkap",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Faktur koreksi",
   "billing.confirmVoid": "Klik lagi untuk membatalkan",
   "billing.confirmRed": "Klik lagi untuk menerbitkan faktur koreksi",
-  "billing.voided": "Pengajuan faktur diperbarui: {0}"
+  "billing.voided": "Pengajuan faktur diperbarui: {0}",
+  "cloud.purgeConfirm": "Semua data «{name}» firma Anda di cloud firma akan dihapus: {what}. Tindakan ini tidak dapat dibatalkan; data lokal di komputer para advokat tidak terpengaruh. Matikan dan hapus?",
+  "cloud.purgeWhat.time": "semua jam kerja yang dikirim advokat, hasil peninjauan, dan perkara yang dipublikasikan",
+  "cloud.purgeWhat.clients": "semua profil klien, pihak terkait, dan hubungan",
+  "cloud.purgeWhat.pitch": "semua pengalaman, profil bersama, dan catatan penggunaan",
+  "cloud.purgeWhat.other": "semua yang disimpan fitur ini di cloud",
+  "cloud.purgeConfirmOk": "Matikan dan hapus",
+  "cloud.purgeCancel": "Batal",
+  "billing.groupNoRate": " ({n} entri tanpa tarif, tidak dihitung)",
+  "billing.groupSummaryNoRate": "{n} entri, {pending} perlu ditinjau; {h} jam dapat ditagih, tarif belum diatur"
 }
