@@ -156,6 +156,37 @@ function pluginDownloadTarget(raw) {
   return type && name.length > extOf(name).length + 1 ? { name, type } : null
 }
 
+// 授权指纹：判断「插件元数据变了、旧实例必须作废」时只比与权限和能力有关的字段。
+// /api/plugins/list 按当前界面语言返回工具说明、视图/主题/模板/样式/依据来源的名称与说明；
+// 切换语言后这些文案变了，若一并比较，下一次桥调用就会把面板当成「授权已变」重建 iframe，
+// 插件回到入口地址、丢掉当前页签与路由（0.86.0 律所管理 B5）。标识、版本、入口、权限、
+// 开发者安装标记、工具名与工具权限、各贡献项的 id/文件/入口等仍逐项比较。
+const LOCALIZED_CONTRIBUTION_TEXT = {
+  views: ['name'],
+  themes: ['name', 'description'],
+  templates: ['name', 'description'],
+  styleProfiles: ['name'],
+  evidenceSources: ['name', 'description']
+}
+function omitKeys(item, keys) {
+  if (!item || typeof item !== 'object') return item
+  const copy = { ...item }
+  for (const key of keys) delete copy[key]
+  return copy
+}
+function authorizationFingerprint(record) {
+  if (!record) return 'null'
+  const tools = Array.isArray(record.tools) ? record.tools.map(tool => omitKeys(tool, ['description'])) : record.tools
+  let contributes = record.contributes
+  if (contributes && typeof contributes === 'object') {
+    contributes = { ...contributes }
+    for (const [list, keys] of Object.entries(LOCALIZED_CONTRIBUTION_TEXT)) {
+      if (Array.isArray(contributes[list])) contributes[list] = contributes[list].map(item => omitKeys(item, keys))
+    }
+  }
+  return JSON.stringify({ ...record, tools, contributes })
+}
+
 export default {
   name: 'PluginPane',
   // chat.send 与 PluginGuidePane 的快捷按钮走同一条 kickoff 路：
@@ -423,7 +454,7 @@ export default {
       try {
         const record = await this.readAuthorization()
         if (generation !== this.sessionGeneration || this._authorizationDestroyed) return false
-        if (!record || JSON.stringify(record) !== JSON.stringify(this._authorizationSnapshot)) {
+        if (!record || authorizationFingerprint(record) !== authorizationFingerprint(this._authorizationSnapshot)) {
           this.invalidateAuthorization(record)
           return false
         }
