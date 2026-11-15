@@ -69,8 +69,70 @@ test('admin sees every registered feature and toggles with the version they saw'
   purgeBox.dispatchEvent(new h.dom.window.Event('change'));
   assert.equal(time.querySelector('[data-action="turn-off"]').textContent, '关闭并删除云端数据', 'deleting is spelled out on the button');
   await h.click(time.querySelector('[data-action="turn-off"]'));
+  await h.click(time.querySelector('[data-action="purge-confirm"]'));
   assert.deepEqual(h.calls.at(-1).params, { feature: 'time', enabled: false, purge: true, expectedVersion: 3 });
   assert.match(h.$('cl-status').textContent, /已删除云端保存的该项数据/);
+});
+
+test('turning off with delete never deletes without the explicit confirm; cancel sends nothing; plain off stays one click', async (t) => {
+  const h = harness({ settings: base({ switches: { clients: true, time: true, pitch: false } }), onSet: (p, cur) => ({ ...cur, version: cur.version + 1, switches: { ...cur.switches, [p.feature]: p.enabled } }) });
+  t.after(() => h.dom.window.close());
+  await h.click(h.$('tab-cloud'));
+  const sets = () => h.calls.filter((c) => c.action === 'cloud.settings.set');
+  const time = h.doc.querySelector('[data-feature="time"]');
+  const box = time.querySelector('[data-field="purge"]');
+  box.checked = true;
+  box.dispatchEvent(new h.dom.window.Event('change'));
+  await h.click(time.querySelector('[data-action="turn-off"]'));
+  assert.equal(sets().length, 0, 'the first click only asks');
+  const ask = time.querySelector('[data-role="purge-confirm"]');
+  assert.equal(ask.hidden, false);
+  // 写明功能、本所范围、删什么、不可恢复
+  assert.match(ask.textContent, /本所/);
+  assert.match(ask.textContent, /「计时工时汇总」/);
+  assert.match(ask.textContent, /所有律师提交的工时、审核结论和已发布的事项/);
+  assert.match(ask.textContent, /无法恢复/);
+  assert.ok(time.querySelector('[data-action="turn-off"]').disabled, 'the off button waits for the answer');
+  await h.click(ask.querySelector('[data-action="purge-cancel"]'));
+  assert.equal(ask.hidden, true);
+  assert.equal(sets().length, 0, 'cancel sends nothing');
+  // 勾掉删除后再关：普通关闭，一步完成、不删除
+  await h.click(time.querySelector('[data-action="turn-off"]'));
+  assert.equal(sets().length, 0, 'still checked: asks again instead of deleting');
+  box.checked = false;
+  box.dispatchEvent(new h.dom.window.Event('change'));
+  assert.equal(ask.hidden, true, 'unticking closes the question');
+  assert.equal(time.querySelector('[data-action="turn-off"]').disabled, false, 'and gives the off button back');
+  const clients = h.doc.querySelector('[data-feature="clients"]');
+  await h.click(clients.querySelector('[data-action="turn-off"]'));
+  assert.deepEqual(sets().at(-1).params, { feature: 'clients', enabled: false, purge: false, expectedVersion: 2 });
+  assert.equal(sets().length, 1);
+  // 只有点「确认关闭并删除」才带 purge: true
+  const time2 = h.doc.querySelector('[data-feature="time"]');
+  const box2 = time2.querySelector('[data-field="purge"]');
+  box2.checked = true;
+  box2.dispatchEvent(new h.dom.window.Event('change'));
+  await h.click(time2.querySelector('[data-action="turn-off"]'));
+  assert.equal(sets().length, 1);
+  await h.click(time2.querySelector('[data-action="purge-confirm"]'));
+  assert.deepEqual(sets().at(-1).params, { feature: 'time', enabled: false, purge: true, expectedVersion: 3 });
+  assert.equal(sets().filter((c) => c.params.purge).length, 1, 'exactly one delete, and only after confirm');
+});
+
+test('the delete question is tokenized: English names the feature and what goes', async (t) => {
+  const h = harness({ language: 'en-US', settings: base(), onSet: (p, cur) => ({ ...cur, switches: { ...cur.switches, [p.feature]: p.enabled } }) });
+  t.after(() => h.dom.window.close());
+  await h.click(h.$('tab-cloud'));
+  const time = h.doc.querySelector('[data-feature="time"]');
+  const box = time.querySelector('[data-field="purge"]');
+  box.checked = true;
+  box.dispatchEvent(new h.dom.window.Event('change'));
+  await h.click(time.querySelector('[data-action="turn-off"]'));
+  const ask = time.querySelector('[data-role="purge-confirm"]').textContent;
+  assert.match(ask, /your firm's/);
+  assert.match(ask, /cannot be undone/);
+  assert.match(ask, /time entries lawyers submitted/);
+  assert.doesNotMatch(ask, /[\u4e00-\u9fff]/);
 });
 
 test('stale version shows the server message and reloads; non-admins get a read-only view', async (t) => {

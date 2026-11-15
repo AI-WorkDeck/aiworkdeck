@@ -216,8 +216,13 @@
       const pending = g.rows.filter((r) => r.status === 'SUBMITTED');
       const amount = g.rows.reduce((s, r) => s + (r.billable && r.amountCents ? r.amountCents : 0), 0);
       const mins = g.rows.reduce((s, r) => s + (r.billable ? r.billedMinutes : 0), 0);
+      // 有可收费工时还没费率（多见于同事经律所云端提交、费率卡尚未设置）：不能把 ¥0.00 当成金额显示
+      const billableRows = g.rows.filter((r) => r.billable).length;
+      const unrated = g.rows.filter((r) => r.billable && r.rateCents == null).length;
+      const noAmount = billableRows > 0 && unrated === billableRows;
       titleBox.append(el('p', g.intakeId
-        ? t('billing.groupSummary', { n: g.rows.length, pending: pending.length, h: hours(mins), amount: yuan(amount) })
+        ? t(noAmount ? 'billing.groupSummaryNoRate' : 'billing.groupSummary', { n: g.rows.length, pending: pending.length, h: hours(mins), amount: yuan(amount) })
+          + (unrated && unrated < billableRows ? t('billing.groupNoRate', { n: unrated }) : '')
         : t('billing.noMatterHint'), 'hint'));
       header.append(titleBox);
       if (g.intakeId && pending.length) {
@@ -363,10 +368,16 @@
     row.append(button(t('billing.confirm'), 'confirm-bill', async () => {
       const res = await call('billConfirm', { id: b.id, confirmedBy: who.value, confirmedDate: date.value, invoiceType: type.value, buyerTaxId: tax.value });
       await loadBills();
+      ledgerChanged();
       status(res?.bill?.invoiceAppNo ? t('billing.confirmedWithInvoice', { no: res.bill.invoiceAppNo }) : t('billing.confirmedNoInvoice'));
     }, 'primary'));
     form.append(row);
     return form;
+  }
+
+  // 客户确认生成了发票申请、或撤销账单作废了申请：通知面板重读「发票与财务收费」台账与左栏计数，不用手动刷新
+  function ledgerChanged() {
+    window.dispatchEvent(new CustomEvent('lawfirm:ledger-changed'));
   }
 
   function billCard(b) {
@@ -393,6 +404,7 @@
     if (b.status === 'DRAFT' || b.status === 'SENT' || (b.status === 'CONFIRMED' && voided)) {
       actions.append(button(t('billing.cancel'), 'cancel-bill', async () => {
         const res = await call('billCancel', { id: b.id });
+        ledgerChanged();
         await loadBills();
         const resend = res?.recalculated || [];
         status(t('billing.cancelled') + (resend.length ? ' ' + t('billing.recalculated', { nos: resend.join('、') }) : ''));

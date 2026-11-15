@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Abrir configurações da nuvem do escritório",
   "client.cloud.upload": "Enviar meus clientes para a nuvem do escritório",
   "client.cloud.uploadHint": "Somente são enviados os clientes que você mantém, conduz ou cadastrou, com seus relacionamentos. Não são enviados contratações, honorários nem registros de interações.",
-  "client.cloud.uploaded": "{clients} clientes enviados ({created} novos, {matched} correspondentes a cadastros já existentes na nuvem).",
+  "client.cloud.uploaded": "Enviados {clients} clientes com {related} partes relacionadas e {relations} relações ({created} partes novas na nuvem, {matched} vinculadas a cadastros existentes).",
   "client.cloud.listHint": "Cadastros de clientes na nuvem do escritório. Responsáveis pelo relacionamento, sócios responsáveis e administradores do escritório veem o cadastro completo; os demais advogados veem apenas o nome e o responsável.",
   "client.cloud.col.scope": "Visibilidade",
   "client.cloud.scope.full": "Cadastro completo",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Fatura de estorno",
   "billing.confirmVoid": "Clique novamente para anular",
   "billing.confirmRed": "Clique novamente para emitir o estorno",
-  "billing.voided": "Solicitação de fatura atualizada: {0}"
+  "billing.voided": "Solicitação de fatura atualizada: {0}",
+  "cloud.purgeConfirm": "Todos os dados de «{name}» do seu escritório na nuvem do escritório serão excluídos: {what}. Não é possível desfazer; os dados locais nos computadores dos advogados não são afetados. Desativar e excluir?",
+  "cloud.purgeWhat.time": "todas as horas enviadas pelos advogados, resultados de revisão e casos publicados",
+  "cloud.purgeWhat.clients": "todos os cadastros de clientes, partes relacionadas e relações",
+  "cloud.purgeWhat.pitch": "todas as credenciais, perfis compartilhados e registros de uso",
+  "cloud.purgeWhat.other": "tudo o que este recurso guarda na nuvem",
+  "cloud.purgeConfirmOk": "Desativar e excluir",
+  "cloud.purgeCancel": "Cancelar",
+  "billing.groupNoRate": " ({n} lançamentos sem tarifa, não contabilizados)",
+  "billing.groupSummaryNoRate": "{n} lançamentos, {pending} a revisar; {h} horas faturáveis, sem tarifa definida"
 }

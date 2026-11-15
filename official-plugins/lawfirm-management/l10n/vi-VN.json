@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Mở cài đặt đám mây văn phòng luật",
   "client.cloud.upload": "Tải khách hàng của tôi lên đám mây văn phòng luật",
   "client.cloud.uploadHint": "Chỉ tải lên những khách hàng do bạn phụ trách, chủ trì hoặc lập hồ sơ, cùng các mối quan hệ của họ. Không tải lên thông tin tiếp nhận vụ việc, phí và nhật ký trao đổi.",
-  "client.cloud.uploaded": "Đã tải lên {clients} khách hàng ({created} mới, {matched} khớp với hồ sơ đã có trên đám mây).",
+  "client.cloud.uploaded": "Đã tải lên {clients} khách hàng cùng {related} bên liên quan và {relations} mối quan hệ ({created} bên mới trên đám mây, {matched} khớp với hồ sơ có sẵn).",
   "client.cloud.listHint": "Hồ sơ khách hàng trên đám mây văn phòng luật. Người phụ trách, luật sư đối tác chịu trách nhiệm và quản trị viên văn phòng xem được toàn bộ hồ sơ; các luật sư khác chỉ thấy tên và người phụ trách.",
   "client.cloud.col.scope": "Phạm vi xem",
   "client.cloud.scope.full": "Toàn bộ hồ sơ",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Hóa đơn điều chỉnh",
   "billing.confirmVoid": "Nhấp lần nữa để hủy",
   "billing.confirmRed": "Nhấp lần nữa để lập hóa đơn điều chỉnh",
-  "billing.voided": "Đã cập nhật yêu cầu hóa đơn: {0}"
+  "billing.voided": "Đã cập nhật yêu cầu hóa đơn: {0}",
+  "cloud.purgeConfirm": "Toàn bộ dữ liệu «{name}» của công ty bạn trên đám mây công ty sẽ bị xóa: {what}. Không thể hoàn tác; dữ liệu cục bộ trên máy của các luật sư không bị ảnh hưởng. Tắt và xóa?",
+  "cloud.purgeWhat.time": "mọi giờ làm việc luật sư đã gửi, kết quả duyệt và vụ việc đã công bố",
+  "cloud.purgeWhat.clients": "mọi hồ sơ khách hàng, bên liên quan và mối quan hệ",
+  "cloud.purgeWhat.pitch": "mọi kinh nghiệm, hồ sơ đã chia sẻ và nhật ký sử dụng",
+  "cloud.purgeWhat.other": "mọi thứ tính năng này lưu trên đám mây",
+  "cloud.purgeConfirmOk": "Tắt và xóa",
+  "cloud.purgeCancel": "Hủy",
+  "billing.groupNoRate": " ({n} mục chưa có mức phí, không được tính)",
+  "billing.groupSummaryNoRate": "{n} mục, {pending} chờ duyệt; {h} giờ tính phí, chưa đặt mức phí"
 }

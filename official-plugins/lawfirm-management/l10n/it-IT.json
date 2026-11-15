@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Apri le impostazioni del cloud dello studio",
   "client.cloud.upload": "Carica i miei clienti nel cloud dello studio",
   "client.cloud.uploadHint": "Vengono caricati solo i clienti che segui, che dirigi o che hai creato, con le relative relazioni. Non vengono caricati conferimenti di incarico, compensi e registri delle interazioni.",
-  "client.cloud.uploaded": "Caricati {clients} clienti ({created} nuovi, {matched} corrispondenti a schede già presenti nel cloud).",
+  "client.cloud.uploaded": "Caricati {clients} clienti con {related} parti collegate e {relations} relazioni ({created} parti nuove nel cloud, {matched} abbinate a schede esistenti).",
   "client.cloud.listHint": "Schede clienti nel cloud dello studio. Referenti, soci responsabili e amministratori dello studio vedono la scheda completa; gli altri avvocati vedono solo il nome e il referente.",
   "client.cloud.col.scope": "Visibilità",
   "client.cloud.scope.full": "Scheda completa",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Nota di credito",
   "billing.confirmVoid": "Clicca ancora per annullare",
   "billing.confirmRed": "Clicca ancora per emettere la nota di credito",
-  "billing.voided": "Richiesta di fattura aggiornata: {0}"
+  "billing.voided": "Richiesta di fattura aggiornata: {0}",
+  "cloud.purgeConfirm": "Verranno eliminati tutti i dati «{name}» del tuo studio nel cloud dello studio: {what}. L'operazione è irreversibile; i dati locali sui computer degli avvocati non sono toccati. Disattivare ed eliminare?",
+  "cloud.purgeWhat.time": "tutte le ore inviate dagli avvocati, gli esiti della revisione e le pratiche pubblicate",
+  "cloud.purgeWhat.clients": "tutte le schede clienti, le parti collegate e le relazioni",
+  "cloud.purgeWhat.pitch": "tutte le referenze, i profili condivisi e i registri di utilizzo",
+  "cloud.purgeWhat.other": "tutto ciò che questa funzione salva nel cloud",
+  "cloud.purgeConfirmOk": "Disattiva ed elimina",
+  "cloud.purgeCancel": "Annulla",
+  "billing.groupNoRate": " ({n} voci senza tariffa, non conteggiate)",
+  "billing.groupSummaryNoRate": "{n} voci, {pending} da rivedere; {h} ore fatturabili, tariffa non impostata"
 }

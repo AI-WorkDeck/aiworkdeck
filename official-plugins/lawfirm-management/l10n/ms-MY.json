@@ -441,7 +441,7 @@
   "client.cloud.openSettings": "Buka tetapan awan firma",
   "client.cloud.upload": "Muat naik klien saya ke awan firma",
   "client.cloud.uploadHint": "Hanya klien yang anda urus, pimpin atau wujudkan failnya dimuat naik, bersama hubungan mereka. Penerimaan kes, yuran dan log interaksi tidak dimuat naik.",
-  "client.cloud.uploaded": "{clients} klien dimuat naik ({created} baharu, {matched} sepadan dengan fail sedia ada dalam awan).",
+  "client.cloud.uploaded": "Memuat naik {clients} pelanggan dengan {related} pihak berkaitan dan {relations} hubungan ({created} pihak baharu dalam awan, {matched} sepadan dengan profil sedia ada).",
   "client.cloud.listHint": "Fail klien dalam awan firma. Pengurus klien, rakan kongsi bertanggungjawab dan pentadbir firma boleh melihat fail penuh; peguam lain hanya melihat nama dan pengurus klien.",
   "client.cloud.col.scope": "Skop paparan",
   "client.cloud.scope.full": "Fail penuh",
@@ -829,5 +829,14 @@
   "billing.redInvoice": "Nota kredit",
   "billing.confirmVoid": "Klik sekali lagi untuk batalkan",
   "billing.confirmRed": "Klik sekali lagi untuk keluarkan nota kredit",
-  "billing.voided": "Permohonan invois dikemas kini: {0}"
+  "billing.voided": "Permohonan invois dikemas kini: {0}",
+  "cloud.purgeConfirm": "Semua data «{name}» firma anda dalam awan firma akan dipadam: {what}. Tindakan ini tidak boleh dibatalkan; data setempat pada komputer peguam tidak terjejas. Matikan dan padam?",
+  "cloud.purgeWhat.time": "semua masa kerja yang dihantar peguam, keputusan semakan dan perkara yang diterbitkan",
+  "cloud.purgeWhat.clients": "semua profil pelanggan, pihak berkaitan dan hubungan",
+  "cloud.purgeWhat.pitch": "semua pengalaman, profil kongsi dan rekod penggunaan",
+  "cloud.purgeWhat.other": "semua yang disimpan ciri ini dalam awan",
+  "cloud.purgeConfirmOk": "Matikan dan padam",
+  "cloud.purgeCancel": "Batal",
+  "billing.groupNoRate": " ({n} entri tanpa kadar, tidak dikira)",
+  "billing.groupSummaryNoRate": "{n} catatan, {pending} untuk disemak; {h} jam boleh bil, kadar belum ditetapkan"
 }

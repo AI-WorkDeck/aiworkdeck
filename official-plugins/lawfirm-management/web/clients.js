@@ -137,8 +137,8 @@
     const upload = el('button', { type: 'button', id: 'client-upload' }, t('client.cloud.upload'));
     upload.addEventListener('click', () => run(upload, async () => {
       const r = await request('uploadClientsToCloud', {});
-      status(t('client.cloud.uploaded', { clients: r.uploadedClients ?? 0, created: r.created ?? 0, matched: r.matched ?? 0 }));
-      if (state.mode === 'cloud') { await loadList(); renderList(); status(t('client.cloud.uploaded', { clients: r.uploadedClients ?? 0, created: r.created ?? 0, matched: r.matched ?? 0 })); }
+      status(uploadedText(r));
+      if (state.mode === 'cloud') { await loadList(); renderList(); status(uploadedText(r)); }
     }));
     const confirmRow = el('div', { class: 'client-confirm', id: 'client-cloud-confirm', hidden: true });
     // 删除类操作先在页面上展示后果，再点「确认」才执行（插件沙箱里不依赖系统弹窗）
@@ -488,6 +488,7 @@
       state.editing = null;
       renderProfile();
       status(t('client.saved'));
+      if (state.refreshPicker) state.refreshPicker();
     }));
 
     root.replaceChildren(card(v.id ? t('client.editTitle') : t('client.newTitle'), t('client.editHint'),
@@ -497,7 +498,8 @@
         el('label', {}, el('span', {}, t('client.field.type')), el('select', { id: 'client-f-type' },
           ['ORGANIZATION', 'INDIVIDUAL'].map((ty) => el('option', { value: ty, selected: ty === (v.partyType || 'ORGANIZATION') }, t('client.type.' + ty))))),
         input('client-f-industry', t('client.field.industry'), v.industry, { maxlength: 128 }),
-        state.mode === 'cloud' ? null : userSelect('client-f-owner', t('client.field.owner'), v.ownerUserId),
+        // 新建客户时维护人默认是建档的律师本人（面板总览里的 self），仍可改成别人或「未指定」
+        state.mode === 'cloud' ? null : userSelect('client-f-owner', t('client.field.owner'), v.id ? v.ownerUserId : (v.ownerUserId ?? window.AWD_LAWFIRM_SELF?.id)),
         state.mode === 'cloud' ? null : userSelect('client-f-partner', t('client.field.partner'), v.partnerUserId),
         el('label', { class: 'field-span-2' }, el('span', {}, t('client.field.address')), el('input', { id: 'client-f-address', type: 'text', value: v.address || '', maxlength: 512 })),
         el('label', { class: 'field-span-2' }, el('span', {}, t('client.field.notes')), el('textarea', { id: 'client-f-notes', rows: 3, maxlength: 4000 }, v.notes || ''))),
@@ -507,6 +509,13 @@
       el('div', { class: 'form-actions' }, save,
         el('button', { type: 'button', id: 'client-cancel', onclick: () => (v.id ? openProfile(v.id) : back()) }, t('client.cancel'))),
       el('div', { id: 'clients-status', role: 'status', 'aria-live': 'polite' })));
+  }
+
+  // 上传结果：客户与关联主体分开数（后端的 created/matched 按主体计，含关联主体，不能写成「客户」）
+  function uploadedText(r) {
+    const clients = r?.uploadedClients ?? 0;
+    const related = Math.max(0, (r?.uploadedParties ?? clients) - clients);
+    return t('client.cloud.uploaded', { clients, related, relations: r?.uploadedRelations ?? 0, created: r?.created ?? 0, matched: r?.matched ?? 0 });
   }
 
   // ---- 收案表单：选择已有客户 ----
@@ -544,7 +553,10 @@
       state.pickOptions = res?.clients || [];
       fill();
     }).catch(() => {});
+    // 下拉一打开就要是最新的：除了获得焦点时刷新，客户档案一保存、切回收案页也刷新（否则新建的客户要重开面板才出现）
+    state.refreshPicker = refresh;
     select.addEventListener('focus', refresh);
+    $('tab-intake')?.addEventListener('click', refresh);
     select.addEventListener('change', apply);
     nameInput.addEventListener('input', () => {
       if (hidden.value) return;

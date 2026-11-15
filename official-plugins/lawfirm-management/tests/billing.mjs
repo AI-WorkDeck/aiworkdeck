@@ -144,6 +144,8 @@ test('bill preview shows exact totals, creates, sends and records client confirm
   assert.match(h.$('hb-status').textContent, /TB202611-0001/);
   const card = () => h.doc.querySelector('[data-bill-id="9"]');
   assert.match(card().textContent, /草稿/);
+  let ledgerEvents = 0;
+  h.dom.window.addEventListener('lawfirm:ledger-changed', () => { ledgerEvents++; });
   await h.click(card().querySelector('[data-action="send-bill"]'));
   assert.match(card().textContent, /待客户确认/);
   const form = card().querySelector('.hb-confirm');
@@ -155,6 +157,26 @@ test('bill preview shows exact totals, creates, sends and records client confirm
   assert.equal(confirm.confirmedBy, '王总');
   assert.equal(confirm.invoiceType, 'DIGITAL_SPECIAL');
   assert.match(h.$('hb-status').textContent, /INV-1/);
+  assert.equal(ledgerEvents, 1, 'confirming created an invoice request: the 发票与财务收费 ledger is told to reload');
+});
+
+test('a matter whose billable time has no rate yet says 未设费率 instead of a ¥0.00 total; partly rated groups say how many are left out', async (t) => {
+  let list = [
+    entry({ id: 1, timekeeperName: '测试甲-律师1', source: 'CLOUD', rateCents: null, amountCents: null }),
+    entry({ id: 2, timekeeperName: '测试甲-律师2', source: 'CLOUD', rateCents: null, amountCents: null }),
+    entry({ id: 3, intakeId: 4, matterTitle: '并购专项', clientName: '乙公司', rateCents: 100000, amountCents: 150000 }),
+    entry({ id: 4, intakeId: 4, matterTitle: '并购专项', clientName: '乙公司', rateCents: null, amountCents: null }),
+    entry({ id: 5, intakeId: 4, matterTitle: '并购专项', clientName: '乙公司', billable: false, rateCents: null, amountCents: null })
+  ];
+  const h = harness({ responses: { timeReviewList: () => ({ entries: list }) } });
+  t.after(() => h.dom.window.close());
+  await h.click(h.$('tab-hourly'));
+  const groups = [...h.$('hb-review-list').querySelectorAll('article.card')];
+  const unrated = groups.find((g) => /甲公司/.test(g.textContent)).querySelector('.card-header .hint').textContent;
+  assert.match(unrated, /可收费 3 小时，未设费率/);
+  assert.doesNotMatch(unrated, /¥0\.00/);
+  const partly = groups.find((g) => /乙公司/.test(g.textContent)).querySelector('.card-header .hint').textContent;
+  assert.match(partly, /按适用费率 ¥1,500\.00（其中 1 条未设费率，未计入金额）/, 'the no-charge entry without a rate is not counted as missing');
 });
 
 test('metrics table formats hours, money and realization; errors surface in the status line', async (t) => {
