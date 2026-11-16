@@ -31,6 +31,7 @@ export default {
   "goToSettings": "設定へ移動",
   "later": "後で",
   "requestFailedWithStatus": "リクエストに失敗しました({status})",
+  "tooManyRequests": "操作が多すぎます。しばらくしてから再度お試しください",
   "smsVerificationRequired": "この操作にはSMS認証が必要です",
   "freeQuotaExceeded": "無料クレジットをすべて使い切りました",
   "serviceErrorRetryLater": "サービスエラーです。後ほどもう一度お試しください",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "言語を選択",
   "languageFollowSystem": "システムに従う",
   "languageSearchPlaceholder": "言語を検索…",
-  "languageNoMatch": "一致する言語がありません"
+  "languageNoMatch": "一致する言語がありません",
+  "serverLabelAccountBridge": "アカウントブリッジ",
+  "serverLabelGenericClient": "クライアント(汎用)",
+  "serverLabelPersonalMemory": "個人メモリ",
+  "serverLabelProjectMemory": "プロジェクトメモリ"
 }

@@ -82,6 +82,7 @@
         <div class="unlock-title">{{ $t('onboarding.unlock.title') }}</div>
         <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : 'accountPassword.intro') }}</div>
         <div v-if="promoActive" class="unlock-promo">{{ $t('onboarding.unlock.promoLine', { amount: promoAmount }) }}</div>
+        <div v-else-if="isPhoneSite && mode === 'login' && (authFlow === 'register' || authFlow === 'password')" class="unlock-promo">{{ $t('onboarding.unlock.proIntroBanner') }}</div>
 
         <div class="unlock-form">
           <!-- 标识符按站点取：cn 是手机号，intl 是邮箱。两个字段各自保留输入。 -->
@@ -317,6 +318,7 @@
 </template>
 
 <script>
+import { localizeSites } from '@/utils/siteNames.js'
 import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, createBqtScanSession, pollBqtScanStatus, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
@@ -636,7 +638,7 @@ export default {
           current: (s && s.current) || '',
           pinned: !!(s && s.pinned),
           multiSite: !!(s && s.multiSite),
-          sites: (s && s.sites) || [],
+          sites: localizeSites((s && s.sites) || [], this.$t.bind(this)),
         }
         // 解锁页的品牌展示区按站点换文案，跟着这里走
         this.$emit('site-changed', this.siteStatus.current)

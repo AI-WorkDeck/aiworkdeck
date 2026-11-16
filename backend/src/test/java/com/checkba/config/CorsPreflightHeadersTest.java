@@ -72,4 +72,57 @@ class CorsPreflightHeadersTest {
         assertNull(response.getHeader("Access-Control-Allow-Origin"));
         assertNull(response.getHeader("Access-Control-Allow-Credentials"));
     }
+
+    // ---------------------------------------------------------------- 网页版来源（W1）
+
+    private static org.springframework.core.env.StandardEnvironment cloudProfile() throws Exception {
+        var env = new org.springframework.core.env.StandardEnvironment();
+        for (var source : new org.springframework.boot.env.YamlPropertySourceLoader().load("cloud",
+                new org.springframework.core.io.ClassPathResource("application-cloud.yml"))) {
+            env.getPropertySources().addFirst(source);
+        }
+        return env;
+    }
+
+    @Test
+    @DisplayName("云后端 CORS 精确列出网页版来源，Office 插件来源保留，绝不开 allow-all、不用通配")
+    void cloudProfileListsWebOriginsExplicitly() throws Exception {
+        var env = cloudProfile();
+        Set<String> web = CorsConfig.parseOrigins(env.getProperty("security.cors.web-origins"));
+        Set<String> allowed = CorsConfig.parseOrigins(env.getProperty("security.cors.allowed-origins"));
+        assertEquals(Set.of("https://www.aiworkdeck.com", "https://www.workdeck.ai"), web);
+        assertEquals(Set.of("https://addin.aiworkdeck.com", "https://www.aiworkdeck.com", "https://www.workdeck.ai"),
+                allowed);
+        assertNotEquals("true", env.getProperty("security.cors.allow-all"));
+        for (String origin : allowed) {
+            assertFalse(origin.contains("*"), origin);
+            assertTrue(origin.startsWith("https://"), origin);
+        }
+    }
+
+    @Test
+    @DisplayName("网页版来源拿到 CORS 回显与 SSE 所需的预检头，未列出的来源拿不到")
+    void webOriginGetsCorsAndUnlistedOriginsDoNot() throws Exception {
+        Set<String> allowed = CorsConfig.parseOrigins(cloudProfile().getProperty("security.cors.allowed-origins"));
+        CorsConfig.CorsPreflightFilter filter = new CorsConfig.CorsPreflightFilter(allowed, false);
+        for (String origin : List.of("https://www.aiworkdeck.com", "https://www.workdeck.ai")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/agent/chat");
+            request.addHeader("Origin", origin);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, mock(FilterChain.class));
+            assertEquals(origin, response.getHeader("Access-Control-Allow-Origin"));
+            String headers = response.getHeader("Access-Control-Allow-Headers").toLowerCase(Locale.ROOT);
+            for (String h : List.of("x-session-id", "x-cloud-epoch", "x-file-offset", "x-client-instance", "last-event-id")) {
+                assertTrue(headers.contains(h), h);
+            }
+        }
+        for (String origin : List.of("https://evil.example", "https://www.aiworkdeck.com.evil.example",
+                "http://www.aiworkdeck.com", "https://aiworkdeck.com", "null")) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/agent/chat");
+            request.addHeader("Origin", origin);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            filter.doFilter(request, response, mock(FilterChain.class));
+            assertNull(response.getHeader("Access-Control-Allow-Origin"), origin);
+        }
+    }
 }

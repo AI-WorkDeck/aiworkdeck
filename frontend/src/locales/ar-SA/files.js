@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "الحجم: {size}",
   "renderingDoc": "جارٍ عرض المستند…",
   "renderingSlides": "جارٍ عرض العرض التقديمي…",
+  "slidesNotShown": "هناك {count} شرائح أخرى غير معروضة. افتح الملف لعرضها كلها.",
   "officePreviewUnsupported": "المعاينة عبر الإنترنت غير متاحة لهذا الملف",
   "fileTypeHintOpenLocal": "نوع الملف: {type}. ابحث عنه في Finder أو File Explorer وافتحه باستخدام تطبيق محلي.",
   "unknown": "غير معروف",

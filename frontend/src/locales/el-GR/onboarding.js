@@ -106,7 +106,8 @@ export default {
     "switch": "Αλλαγή",
     "cancel": "Ακύρωση",
     "switchFailed": "Αποτυχία αλλαγής ιστότοπου. Δοκιμάστε ξανά αργότερα.",
-    "rescueFailed": "Εξακολουθεί να μην έχει ξεκλειδωθεί μετά την αλλαγή ιστότοπου. Ελέγξτε τον κωδικό και δοκιμάστε ξανά."
+    "rescueFailed": "Εξακολουθεί να μην έχει ξεκλειδωθεί μετά την αλλαγή ιστότοπου. Ελέγξτε τον κωδικό και δοκιμάστε ξανά.",
+    "proIntroBanner": "Δωρεάν Credits εκκίνησης στην εγγραφή · Personal Pro ¥9.9/μήνα (3 μήνες)",
   },
   "hint": {
     "learnMore": "Μάθετε περισσότερα",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Επιβεβαίωση",
     "purchaseSuccess": "Ξεκλειδώθηκε",
     "purchaseFailed": "Η αγορά απέτυχε",
-    "goRecharge": "Ανανέωση υπολοίπου"
+    "goRecharge": "Ανανέωση υπολοίπου",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Απόκτηση Personal Pro",
   },
   "identity": {
     "title": "Επιλέξτε τοπικό χώρο εργασίας",

@@ -167,7 +167,7 @@
 </template>
 
 <script>
-import { getApiBaseUrl, createProjectFavorite, getProjectFavorites, getMyFavorites } from '@/services/api.js'
+import { getApiBaseUrl, createProjectFavorite, getProjectFavorites, getMyFavorites, createBrowserProxyTicket } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
 import { host } from '@/services/host.js'
 import { shouldShowLoadError, loadErrorMessageKey } from '@/utils/browserLoadError.js'
@@ -202,6 +202,12 @@ export default {
       // 页面状态、滚动位置、填了一半的表单全没，正是这次要修的病。
       currentUrl: 'about:blank',
       iframeUrl: 'about:blank',
+      // 与 iframeUrl 同一拍写入的代理票据（后端 BrowserProxyController#ticket）。
+      // 只在发起 iframe 加载时更新：src 依赖它，单独换票会把当前页整个重载一遍
+      iframeTicket: '',
+      _proxyTicketCache: null,
+      _proxyTicketPending: null,
+      _iframeLoadSeq: 0,
       // 这一次加载是我们自己发起的（地址栏/前进后退），用来区分「站点自己重定向」
       // 和「用户点了链接」：前者该替换历史栈顶，后者该新增一条
       _pendingNav: false,
@@ -272,7 +278,7 @@ export default {
       if (!raw || raw.startsWith('about:')) return 'about:blank'
       if (raw.startsWith('http://') || raw.startsWith('https://')) {
         const base = getApiBaseUrl().replace(/\/$/, '')
-        return `${base}/api/browser/proxy?url=${encodeURIComponent(raw)}&token=${encodeURIComponent(this.iframeToken)}`
+        return `${base}/api/browser/proxy?url=${encodeURIComponent(raw)}&token=${encodeURIComponent(this.iframeToken)}&ticket=${encodeURIComponent(this.iframeTicket)}`
       }
       return 'about:blank'
     },
@@ -652,7 +658,7 @@ export default {
       }
 
       // H5：这一条才是真正让 iframe 去加载
-      this.iframeUrl = next
+      this.loadInIframe(next)
       this._pendingNav = true
 
       if (replace && this.index >= 0) {
@@ -699,9 +705,9 @@ export default {
       // H5：重新设置 src 触发刷新。刷的是 currentUrl（用户此刻看的这一页），
       // 不是 iframe 当初被要求加载的那一页——页内跳转之后两者已经不是一回事了
       const u = this.currentUrl
-      this.iframeUrl = 'about:blank'
+      this.loadInIframe('about:blank')
       this.$nextTick(() => {
-        this.iframeUrl = u
+        this.loadInIframe(u)
         this._pendingNav = true
       })
     },
@@ -727,9 +733,43 @@ export default {
     goToHistoryEntry() {
       this.currentUrl = this.history[this.index]
       this.inputUrl = this.currentUrl
-      this.iframeUrl = this.currentUrl
+      this.loadInIframe(this.currentUrl)
       this._pendingNav = true
       this.$emit('url-change', this.currentUrl)
+    },
+    // 换一张代理票据；手里那张还剩一分钟以上就复用，并发的换票请求合并成一个
+    async ensureProxyTicket() {
+      const cached = this._proxyTicketCache
+      if (cached && cached.expiresAt - Date.now() > 60 * 1000) return cached.ticket
+      if (!this._proxyTicketPending) {
+        this._proxyTicketPending = Promise.resolve(createBrowserProxyTicket())
+          .then((res) => {
+            const d = (res && res.data) || {}
+            if (!d.ticket) return ''
+            this._proxyTicketCache = { ticket: d.ticket, expiresAt: Number(d.expiresAt) || 0 }
+            return d.ticket
+          })
+          .finally(() => { this._proxyTicketPending = null })
+      }
+      return this._proxyTicketPending
+    },
+    // H5：让 iframe 加载 url。先拿票再把票据与地址同一拍写进去；
+    // 换票期间又发起了新导航，旧的那次作废，免得慢回来的旧地址盖掉新地址
+    async loadInIframe(url) {
+      const seq = ++this._iframeLoadSeq
+      if (!/^https?:\/\//.test(String(url || ''))) {
+        this.iframeUrl = url
+        return
+      }
+      let ticket = ''
+      try {
+        ticket = await this.ensureProxyTicket()
+      } catch (e) {
+        // 拿不到票照样发出去：后端回 401 与提示文案，比面板一片空白好认
+      }
+      if (seq !== this._iframeLoadSeq) return
+      this.iframeTicket = ticket || ''
+      this.iframeUrl = url
     },
     openInAppNewTab() {
       // 这里 emit 原始 url（不是 iframeSrc）

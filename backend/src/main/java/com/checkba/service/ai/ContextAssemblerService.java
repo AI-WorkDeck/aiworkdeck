@@ -89,6 +89,8 @@ public class ContextAssemblerService {
                                    ClientCapabilityService.OfficeHost officeHost) {
         return switch (capability) {
             case NONE -> "tools-none";
+            // 网页版（W1）：同一个编辑器执行器但只有 Writer + 云端项目，片段只教白名单里的工具
+            case WEB -> "tools-web";
             case OFFICE -> switch (officeHost) {
                 case EXCEL -> "tools-office-excel";
                 case POWERPOINT -> "tools-office-ppt";

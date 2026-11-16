@@ -51,6 +51,11 @@ public class DesktopStreamService {
         this.clock = clock;
     }
 
+    /** 当前在册的桌面门铃流数（运维指标 awd.sse.connections{stream=desktop}）。 */
+    public int activeConnectionCount() {
+        return emitters.size();
+    }
+
     /** 建一条门铃流（不超时，靠 ping 探活）。先连的同键连接收到 superseded 后关闭。 */
     public SseEmitter connect(Long userId, String deviceId) {
         String key = key(userId, deviceId);

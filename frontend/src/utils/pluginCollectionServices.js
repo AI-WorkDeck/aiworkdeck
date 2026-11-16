@@ -186,6 +186,13 @@ export function createPluginCollectionServices({ projectId, permissions, isCurre
         return isFavorite ? safe : { items: safe, limited: !!result?.limited, hiddenCount: Number(result?.hiddenCount) || 0 }
       }
       if (!isFavorite && operation === 'account') return await action('openAccount')
+      if (!isFavorite && operation === 'subscribe') {
+        if (typeof actions.subscribePro === 'function') {
+          const subscribed = await wait(actions.subscribePro())
+          return { subscribed: !!subscribed }
+        }
+        return await action('openAccount')
+      }
       if (!isFavorite && operation === 'clear') {
         await wait(clearClipboard())
         cache.clear()

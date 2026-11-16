@@ -27,6 +27,7 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 - `LegalTools.case_search(query)` 通过既有 `PkulawChannel` 调用 `pkulaw-case-semantic/search_case`（参数 `text`），平台与自备渠道继续由原通道分流，未接入处罚专用接口。`case_search` 属 `legal` 类目，案例/判例/判决书及英文 case law/judgment 触发披露；法宝不可用时与法规工具共同隐藏。
 - 中英基底提示约定聊天正文的 `legal-reference` JSON 围栏（单个对象或数组）：`kind: LAW|CASE|PENALTY`、`title`，可选 `documentNumber/authority/date/effectiveDate/validity/source/url/summary/excerpt`。`summary` 是 AI 整理、`excerpt` 是读取到的原文节选；模型卡固定待核对，忽略自报 verified，不因卡片展示额外要求付费查询，也不能把协议写进文档。`ContextAssemblerService.spliceToolGuidance` 按 OFFICE 能力删除卡片提示段（插件暂未支持此渲染），保留正常检索与案例工具说明。处罚与其他法域沿 `search_web/browse_url` 查公开来源。
+- dev-board#1735：中英提示给出完整的 `legal-reference` 围栏字面示例，并明确不能用普通 `json` 标签；示例同样只表达待核对，不增加检索、来源或核验承诺。
 - 五个法宝工具的 UI/历史显示上限采用现有结果型 16,000 字符，模型上下文仍保留原始结果。不解析截断 JSON 来伪造资料卡，不把检索成功或来源字段当作真实性、现行效力或适用性认证。前端原始工具输出继续展示截断提示。
 - 回归：`LegalToolsValidationTest`、`ExternalServiceDualTierRoutingTest`、`ToolDisclosurePolicyTest`、`ContextAssemblerServiceTest`、`SystemPromptToolVisibilityContractTest`、`AgentOrchestratorQuestionStopTest`、`ToolDisplayNameCoverageTest`、`ToolChoiceSurfaceTest`。合成通道测试不代表供应商实查、模型遵循率或正式客户端验收。
 
@@ -39,7 +40,7 @@ description: AI 对话编排领域。任务涉及编排器 AgentOrchestrator、T
 
 ## 破坏性确认闸（agent-app-control C5，P2-1）
 
-`ToolRegistry.requiresConfirmation(name)`：内置工具 `access=DESTRUCTIVE`（含按名推断），声明式插件工具 `destructive`/服务操作本身 destructive/`confirm:always`；`confirm:never` 对 destructive 无效。插件 JAR `@Tool` 与用户 MCP 不过闸。`AgentOrchestrator` 的原生与 XML 两条分发路径在 `dispatchTool` 之前调 `confirmationGate`：不分发，用 `DestructiveConfirmation.question` 生成 ask_user 卡（「确认执行「<展示名>」：<参数摘要>？」，选项 执行/取消，中英 LangText），走既有 `stopForAskUser`（AWAITING_INPUT，不新增状态），同批后续调用跳过。挂起的调用（工具名+原参数）经 `AgentInboxService.rememberPendingCall` 写进本轮请求快照（`_pendingCall*`，重启后仍在；未装配 inbox 的测试走内存兜底）。用户的回答是下一轮 `<ask_user_answer id>` 消息：`takePendingCall` 一次性取走，仅「单选执行/Run」时 `replayPendingCall` 以原参数直连 `dispatchTool` 执行一次（不再过闸，ASK 模式不重放），结果作末位 `[系统提醒]` 交给模型；其余答复（取消、其他自由输入、空）注入「用户取消了「X」」。每次都问，没有「本轮不再询问」。参数摘要 `summarizeArgs` 只给标识/数量并截断，`content/text/body…` 或超长字符串只报字数。声明式 destructive 工具因此恢复注册（此前被 bind 跳过）。MCP 投影仍永不含 destructive；凡 `requiresConfirmation` 为真的工具（destructive / `confirm:always`）一律不投影 MCP，哪怕声明 `mcp:true`（外部 Agent 答不了确认卡，`McpToolProjectionTest` 钉着）。回归 `AgentOrchestratorDestructiveConfirmTest`、`PluginDeclaredToolsTest`。
+`ToolRegistry.requiresConfirmation(name)`：内置工具 `access=DESTRUCTIVE`（含按名推断），声明式插件工具 `destructive`/服务操作本身 destructive/`confirm:always`；`confirm:never` 对 destructive 无效。插件 JAR `@Tool` 与用户 MCP 不过闸。`AgentOrchestrator` 的原生与 XML 两条分发路径在 `dispatchTool` 之前调 `confirmationGate`：不分发，用 `DestructiveConfirmation.question` 生成 ask_user 卡（「确认执行「<展示名>」：<参数摘要>？」，选项 执行/取消，中英 LangText），走既有 `stopForAskUser`（AWAITING_INPUT，不新增状态），同批后续调用跳过。挂起的调用（工具名+原参数）经 `AgentInboxService.rememberPendingCall` 写进本轮请求快照（`_pendingCall*`，重启后仍在；未装配 inbox 的测试走内存兜底）。用户的回答是下一轮 `<ask_user_answer id>` 消息：`takePendingCall` 一次性取走，仅「单选执行/Run」时 `replayPendingCall` 以原参数直连 `dispatchTool` 执行一次（不再过闸，ASK 模式不重放），结果作末位 `[系统提醒]` 交给模型；其余答复（取消、其他自由输入、空）注入「用户取消了「X」」。每次都问，没有「本轮不再询问」。参数摘要 `summarizeArgs` 只给标识/数量并截断，`content/text/body…` 或超长字符串只报字数。声明式 destructive 工具因此恢复注册（此前被 bind 跳过）。MCP 投影仍永不含 destructive；凡 `requiresConfirmation` 为真的工具（destructive / `confirm:always`）一律不投影 MCP，哪怕声明 `mcp:true`（外部 Agent 答不了确认卡，`McpToolProjectionTest` 钉着）。回归 `AgentOrchestratorDestructiveConfirmTest`、`PluginDeclaredToolsTest`。插件工具定义升级（access 升档、confirm 放松、MCP 投影打开、非 read 改 handler/schema、新增非 read 工具）未经用户批准前 `bind` 返回 null，于是不下发、不投影、不过确认闸也执行不了；判定按清单对象引用，`requiresConfirmation` 与分发之间插件被重装成更高权限也只会被拒（见 plugin-system.md，`PluginToolEscalationConsentTest`）。子 Agent（`SubAgentService.executeScoped`）没有确认卡可出：`requiresConfirmation` 为真的工具在子 Agent 里一律拒绝、交回主 Agent（`SubAgentServiceTest.confirmationGatedToolRefusedInsideSubAgent`）——此前它们在子 Agent 里不经确认直接执行。
 
 ## 期限计算工具（tool-system-v2 V7 D2）
 
@@ -218,7 +219,7 @@ system prompt 的事实分级保留来源事实截止日，不凭系统当天或
 
 ## 法律意见书技能路由（dev-board#1092，2026-09-30）
 
-`legal-opinion-review` 独立于合同六遍清单：相关事实依据/缺口清单 → 正文与结论限定 → 来源时点 → 最终按清单回读。只审查不直接编辑，编辑范围与审查范围分开。`SkillRouter` 用本地规则在意见书主体命中后区分实质任务与纯机械编辑；并列错字/格式不排除实质审查，后置“仅限错字”限制修订，否定动作不当正向请求。不调用付费预选。当前自动匹配只读用户消息，未将 active filename 加入路由；通用“修订这个文档”仍需模型 `use_skill` 或手选。回归：`LegalOpinionSkillRoutingTest` 中英范围/否定/混合意图；`BuiltinSkillsTest` 校验真实工具名及 LOWA/Office 激活后的读取、编辑、澄清与计划工具。路由通过不等于事实核验质量通过，仍须真实模型验收。
+`legal-opinion-review` 独立于合同六遍清单：相关事实依据/缺口清单 → 正文与结论限定 → 来源时点 → 最终按清单回读。只审查不直接编辑，编辑范围与审查范围分开。`SkillRouter` 用本地规则在意见书主体命中后区分实质任务与纯机械编辑；并列错字/格式不排除实质审查，后置“仅限错字”限制修订，否定动作不当正向请求。不调用付费预选。当前自动匹配只读用户消息，未将 active filename 加入路由；通用“修订这个文档”仍需模型 `use_skill` 或手选。实质动词含 核查/核验/核对/排查/verify/cross-check（工作流卡片「法律意见书核查 · 底稿交叉核验与披露排查」自己的说法，漏了就点卡片也不激活，tutorial #146）；点内置工作流卡片时前端另把卡片的 skill id 随消息显式放进 `skillIds`（`ChatInterface.vue` 的 `pendingWorkflowSkillId`，草稿清空即作废；`useAgentStream` 把内置工作流的 manual 回执按 auto 展示），触发词只是兜底。`LegalOpinionSkillRoutingTest.everyBuiltinWorkflowCardPromptActivatesItsOwnSkill` 钉住中英四张卡片的默认句都命中自己的 skill。回归：`LegalOpinionSkillRoutingTest` 中英范围/否定/混合意图；`BuiltinSkillsTest` 校验真实工具名及 LOWA/Office 激活后的读取、编辑、澄清与计划工具。路由通过不等于事实核验质量通过，仍须真实模型验收。
 
 ## 意见书收尾补检（dev-board#1097，2026-09-30）
 
@@ -231,6 +232,9 @@ dev-board#1107 后续完整来源探针发现：仅删“全部”仍保留无�
 #1107 收尾（2026-10-01）：核验单位从“整句对一份文件”收紧为逐槽取证——复合命题拆成必要事实槽（主体角色/法律关系/标的/条件/时点各自独立），每槽须给出来源文件 ID 或名称 + 定位 + 原文引文及其能证明的最小事实；任一必要槽无直接证据即标「未找到」，不得用其他槽的有据合成整句有据；当前稿与对话自述只是待核命题、不填证据槽。`expectedOutput` 固定为逐槽短表契约；接回要求主助手对待核/冲突命题逐条明确处置（限定正文或保留待核），缺逐槽引文的发现按未验证自行回读。仍是一次有界只读核验，预算与 scope 不变。
 
 ## 澄清回答续轮（dev-board#1116）
+
+W6（2026-11-14）：核验员曾编造不存在的来源文件（「股权关系说明.docx」「验资报告摘要.pdf」）。现在 ①任务附项目真实文件清单（`ProjectFileService.listRelativePaths`，ID + 相对路径，清单外即不存在）；②核验输出里的文件名/ID 按清单校验（`OpinionCompletionCheck.unknownSources`，后缀匹配防误报），不存在的在接回消息与过程卡前置「[系统校验]」，要求主助手视依赖发现为无效、不得据此修改/寻找/新建；③核验员改用本轮主模型（`SubAgentService.dispatch` 第 5 参 modelOverride，其余调用方不变）；④删掉无从满足的「LOWA 回执 sourceFileId 等于目标」要求——没有任何工具回该字段，核验员永远确认不了目标；编排器派发前已校验目标即活跃文档。回归同在 `AgentOrchestratorOpinionCompletionCheckTest`。
+W6 后续（2026-11-14，#1595）：staging 卡片「有据 0 / 待核 24」——核验员一轮就交卷、**一次工具都没调**（本地复现：`[SubAgent] … tools offered=6 used=[]`，doc_get_document_text 明明在），编的命题被正则计成 24 项待核。现在 ①派发前服务端经编辑器桥读当前稿（与 doc_get_document_text 同源、最终文本、分页 ≤4 万字、带【段号】），附进核验任务，读不出就不派付费核验、如实接回；②`OpinionCompletionCheck.validateVerifierResult`：一次工具都没调 → 核验失败（卡片 UNVERIFIED）；每条整句判定「有依据」须引用核验员**经读文件工具实际读过**的底稿（`SubAgentResult.filesRead`，来自 extract_file_text/read_document 的 fileId；按 ID 或清单文件名对上），否则改判「待核实」并注明——只引当前稿段号或随手调一次工具再编结论都过不了；③`SubAgentService` 记每轮工具请求、越权拒绝、收尾时轮数/可用/实用工具与答案形状。地雷：qwen3.8-max 在子 Agent 里会不调工具直接作答（原因待下次 staging 日志定位）。回归：`OpinionVerifierGroundingTest`、`AgentOrchestratorOpinionCompletionCheckTest`（+3）、`SubAgentServiceTest.filesReadRecordsSuccessfulFileReads`。
 
 `ask_user` 停机时，原请求范围（含依序插话）、自动技能与原目标身份写入既有 inbox 的 `requestJson` 服务端元数据；回答凭 questionId、会话、项目、用户匹配原快照，不接受客户端自报原授权。成功匹配原文档才消费快照，跨后端重启可恢复，同问题重复回答不再继承旧范围，新无关任务使旧问题失效。回答仍是新 run，步数与收尾补检次数按新 run 有界；核验目标保持原文件，回答文字按序加入范围。
 
@@ -538,6 +542,24 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
      它本来就在 `KIND_AGNOSTIC_LOWA_TOOLS` 里；声明层 `requiresHost` 仍叠在前面）。**开例外而不是改名**：
      这个名字被十来个工具描述与多份提示片段引用、还写在老会话执行日志里，改名要么留别名（别名表应当一直是空表）、
      要么让那些引用同一刻全部失效。其余 doc_* 在 Office/none 会话里照旧不可见（`ClientCapabilityServiceTest` 钉着）；
+     **WEB 档（网页版工作台，W1，设计 readiness/w1/W1-design.md）是白名单，先于前缀链与声明层判定**：
+     只放 `WebClientToolSurface.EDITOR_TOOLS`（= `EDITOR_EXECUTED_TOOLS` 网页 iframe LOWA 执行的 Writer doc_* ∪
+     `HOST_HANDLED_TOOLS` 桌面由宿主页处理的 `doc_open_file`/`doc_start_stream`/`doc_restore_checkpoint`，网页客户端 P5 自建宿主处理器；
+     两者都过活跃文档类型闸）与 `BACKEND_TOOLS`（纯后端，含 `doc_list_project_files`/`doc_list_evidence`），`DENIED_TOOLS` + `DENIED_PREFIXES`（office_/ref_/sheet_/slide_/pptx_/litigation_/version_/
+     plugin_dev_/capability_）一律不可见；名单外的名字只可能是插件/MCP 工具，仅当所属插件 manifest `hosts` 含 `"web"`
+     （`PluginService.supportsWebClient`，由 `ToolRegistry.init` 推入 `setWebPluginToolPredicate`）才放行，用户自配 MCP 永不。
+     **新增内置工具必须在 `WebClientToolSurface` 归类**，`ClientCapabilityWebSurfaceTest` 枚举真实注册表、没归类就红。
+     **编辑器执行工具 ⊆ 网页执行器能力**：`ClientCapabilityWebEditorActionsTest` 把每个 `EDITOR_EXECUTED_TOOLS` 映射到它发出的编辑器 action
+     （`EMITTED_ACTIONS`，与源码扫描对拍），对拍 `backend/src/test/resources/web-client/editor-capabilities.json`——官网仓
+     `web-workbench/src/editor-capabilities.json` 的副本，钉在测试里的 `PINNED_WEBSITE_COMMIT`/`PINNED_CORE_COMMIT`/`PINNED_ENGINE`。
+     官网 vendor 追版后按测试类注释里的 `gh api … -H 'Accept: application/vnd.github.raw'` 命令刷新副本并改这三个常量；
+     改了工具发出的 action 要同步 `EMITTED_ACTIONS`，新 action 不在清单里就追平官网 vendor 或把工具移出 WEB 白名单。
+     **网页会话不许回落到 LOWA**：Origin ∈ `security.cors.web-origins`（chat/connect）或 `X-Client-Instance` 以 `web-` 开头（connect）
+     → `markWebClient` 把会话钉在 WEB（之后声明 lowa/未知/漏带都不放宽，未登记时也按 WEB 兜底），chat 把 `clientCapability:"web"`
+     写回请求体，inbox 重启回放同样是 web。片段 `prompts/tools-web(.en).md`（只教白名单工具 + 网页边界）。
+     网页会话每用户最多 `AgentOrchestrator.WEB_ACTIVE_RUNS_PER_USER`=3 个活跃轮次，超出的留在 inbox pending（回执 runId=null，不报错），
+     任一网页轮次收尾（`endRun`/`endRunAndDrain`）后在 `web-run-admission` 线程按序接纳（异步：不在本会话锁里拿别的会话锁）。
+     回归 `ClientCapabilityWebSurfaceTest`、`ClientCapabilityServiceTest`、`AiAgentControllerTest`、`AgentOrchestratorInboxTest#webRuns*`、`CorsPreflightHeadersTest`；
   ①b **工具自报的宿主依赖**（dev-board#799，`@ToolMeta.requiresHost = NONE|LOWA|OFFICE`）：
      叠在前缀链**之上**的声明层，**只收窄、绝不放宽**（两层都通过才可见）。前缀链是既有公开契约、
      一行没动；无前缀的工具从此自己声明，不再往 `ClientCapabilityService` 里塞名字清单。
@@ -866,6 +888,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
         `ToolDisclosurePolicy.setPluginToolKeywords(registry::declaredToolKeywords)` 动态命中 plugin-tools 预放回；ASK 模式放行
         `ASK_READ_TOOLS ∪ ToolRegistry.declaredReadToolNames()`（`AgentOrchestrator.askAllows`）；`CapabilityCatalog.accessOfDeclared` 以声明为准、不推断。
         回归 `PluginDeclaredToolsTest`、`HostServiceRegistryTest`。
+        **发现（fix/plugin-tools-discovery）**：① `categoriesPutBackFor` 给 plugin-tools 计分时把 manifest keywords 算进去（原先只算静态表，恒 1 分，「插件」一词就能把它挤出前三）；② `ToolRegistry.declaredToolSearchTerms()`（工具名 → keywords + 插件名 + id，启用中）经 `ToolDisclosurePolicy.setPluginToolSearchTerms` 喂 `list_tools(query)`：haystack 并入这些词，且「查询词里含某个检索词（≥2 字）」也算命中（中文整句当一个词搜，如「应收账款」含「应收」）；skill 的 query 同理并入 triggers；③ `list_tools` 描述注明 `plugin（插件开发）`/`plugin-tools（已装插件的工具）`，展开 `plugin` 而没要 `plugin-tools` 时回执末尾点名已装插件的工具（tutorial 实测模型照「律所管理插件」字面展开 plugin、只见 capability_install 就劝用户去装）。回归 `OfficialPluginDeclaredToolsTest`（开发安装 .awd-dev / 广场安装两种落盘形态 × 律师问法）；真实模型句集 `scripts/eval/sentences/v8-plugin-tools.json`（`installPlugins` 让矩阵实例装上 lawfirm-management）。
       - **开关关着时连 `list_tools` 自己都不下发**（`ToolDiscoveryTools.isAvailable()`）：
         模型手上已是全集，再挂个目录只会每轮白付约一千字符。**例外是 ②b 活跃文档类目裁剪**（dev-board#1064，
         默认开）：它开着时目录工具进程级可用，由编排器按「本轮藏没藏东西」决定下不下发（`dropIdleCatalog`）。
@@ -1079,6 +1102,7 @@ FileTree 沿既有移动 API 处理落点；dragend 清理本来源 fallback，�
   - 依据：r083 cn 矩阵 345 个有效运行轮数中位 2、P95 8、P99 14，通过的最多 14 轮；超过 14 轮的只有 g02 的 16/29/42 轮且全部失败。通过的运行 `doc_undo` 最多 3 次，失败的打转运行 7、12 次。
   - 系统提示 `Step Budget & Anti-Flailing` 段**不许承诺暂停或写轮数上限**（旧文「约 30 步预算，超出会被系统暂停」代码里早已不存在），只说「轮数拖长 / 反复撤销时系统会提醒」；`RunBudgetTest.systemPromptDoesNotPromiseAPause` 守着中英两份。护栏：`RunBudgetTest`、`AgentOrchestratorRunBudgetTest`、回放 `cases-run-budget.json`（XML + 原生撤销循环，断言第 3、6 次提醒且 finished）。
 - **法源不可用收口（gap P8，2026-11-11）**：`LawSourceDownPolicy`（挂 `RunGuard.lawSource`）。起因：法宝回 `[pkulaw_unavailable]` 后 deepseek 连续 8–10 轮 search_web/browse_url，一次编造民法典第1082条原文并声称「已全部核实」。
+  - **明确条文首源（dev-board#1734）**：原生/XML 共用 `dispatchTool` 准入。当前用户消息完整匹配单个已知内地法规及条号的直接查询（复用 `LawCitation`/`LawAliases`，窄的询问前后缀）且 `get_law_article` 在本轮实际 `roundOffered` 内时，法条工具成功返回之前的 `search_web`/`browse_url` 不执行、不消耗替代查询额度，只回纠正提示；非法 JSON、缺参及权限错误不能解除准入。明确 `[pkulaw_unavailable]` 仍进入既有两次网页回退。工具未下发时保留原有行为；不恢复 ASK/Skill/账户限制的工具。准入还检查已装配的 USER 消息：历史明确「不用法宝 / 只查官网 / 无需检索」等来源限制保守否决硬首源，不猜测撤回；助手、工具与文档系统上下文不能提供授权。已有普通问答不取消首源要求。历史摘要或会话行数表明旧消息已缺失时不强制，避免把丢失约束当作允许；复用原有 count 与已载入消息，不额外读取历史全文。正式接纳插话后取消基于旧 `guard.userMessage` 的首源硬门槛，既有法源失败态及两次网页预算不重置。明确网页/不检索指令、引文/文档、境外法域、历史版本、多条或复杂任务不匹配，继续由模型及已有权限控制处理。新护栏不保证模型必定采纳提示，也不自动发起付费请求。回归：`LegalArticleFirstReplayEvalTest`（原生/XML、真实参数校验、历史来源限制/普通多轮/摘要与截断、不可用、ASK、失败后的两次回退）与 `LawSourceDownPolicyTest`。
   - **进入条件**：`dispatchTool` 里任何工具输出含 `LegalTools.VENDOR_UNAVAILABLE_MARKER`（只进不出；不依赖 Harness 诊断是否接线）。起跑时法宝就没下发（未连账户）不算——那时没有标记，也不封网页，免得误伤非法规查询。
   - **替代查询封顶**：之后 `search_web` + `browse_url` 合计最多执行 `MAX_WEB_LOOKUPS_AFTER_DOWN=2` 次（一次搜索定位 + 一次打开原文；t09 要求整轮 ≤6 轮）。在 `dispatchTool` 入口拦（原生/XML 共用，第三个出口，同样 `noteToolResult`），超额的不执行，回一条**非 Error** 说明（按已有资料作答、未核实标注），不触发失败纠正与 Harness；放行的两次结果尾部附「替代查询 n/2，网页非权威，须标未核实」；用满那次起把 `search_web`/`browse_url` 并进 `RunGuard.unusableTools`（与法宝整体下线同一机制，下一轮生效）——t09 实测只回拒绝说明时 deepseek 仍会再要 1–2 次、超出 6 轮。封顶对本轮全部网页查询生效，不区分是否查法条。
   - **收尾提醒**：3.5 无工具收尾点（原生/XML 共用，在「记住」硬保险之后），不可用态下回答提到 `第N条` / `Article N` 却没有未核实类标注、或自称「已核实/均已核实/verified」→ 已流出的正文并进执行日志，末位追加一次隐形提醒，模型只补一段简短 `<final>` 说明；每轮最多一次。判据是正则，不读语义：未提条文号的回答不管，提醒后模型仍不标也照收。
@@ -1970,6 +1994,10 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Refe
 - **零打扰自动判断自进化（`service/ai/harness/HarnessEvolutionService`）**：
   1. **过滤底层运行期噪音**：`EXPAND_TOOL_CATEGORY` 与 `ANCHOR_PROBE_RECOVERY` 属于单轮内部工具调度机制，`isEvolvableSelfHealing` 一律跳过，绝不写入 `topics/harness-evo-*.md` 污染用户记忆。
   2. **自动判定作用域（`inferOptimalScope`）与自动升格技能（`shouldAutoPromoteToSkill`）**：绑定本案具体材料（`《…》`、`这份`、`本案`、`补充协议`等）的规则自动写入 `project` 记忆；跨项目通用规范或显式「…专项规范」自动写入 `user` 全局记忆，并在属于 `DOMAIN` 领域规范时自动升格注册为 `user-evo-*` Skill（无需人工点击）。
+     **地雷（2026-11-12 office-tier1 O12）**：自动升格只认用户自己的话（回退重发、插话纠偏）。`SELF_HEALING_RECOVERY`
+     的规则是 Harness 固定处方模板（「停止盲目重试，调用 ask_user」「已挂载技能 X」），只留记忆记录、不自动注册技能；
+     挂载 `user-evo-*` 技能本身的 `MOUNT_DOMAIN_SKILL` 不算可沉淀信号。此前一句带「」的 PPT 指令链式生出 15 个只会互相指路的
+     同名技能，下次提到触发词就注入「先问用户」。测试：`HarnessEvolutionServiceTest` 末两例。
   3. **对话流零打扰**：`RootBubble.vue` 不挂载 `HarnessEvolutionCard`，不在对话流弹出让用户三选一的卡片；用户可随时在「我的记忆 / 项目记忆」面板或 `/api/agent/harness/evolutions` 查看与回滚。
 - **收尾 Challenger 独立核验（`service/ai/harness/VerificationHarness`）**：仅对声明 `verification_policy: slot_evidence_challenger` 的高风险技能（如 `legal-opinion`）在 `<final>` 前执行独立证据核对，未核实主张自动触发 1 次自我修正闭环。
 - **回归**：`HarnessDiagnosticServiceTest`、`VerificationHarnessTest`、`HarnessEvolutionServiceTest`、`HarnessEvolutionPersistenceTest`、`frontend/tests/project-home/harness-evolution-ui.test.mjs`、`frontend/tests/ai-alignment-e2e/harness-self-evolving-e2e.mjs`。
@@ -2016,6 +2044,7 @@ SSE query 都显式携带范围；不匹配的普通面板连接在替换 emitte
 
 ## 并发/凭证契约补充（hidden-mines B2）
 
+- **server 模式按用户限频**：`POST /api/agent/chat`（含插话）与 `/api/agent/ppt/generate` 共用 `UserRateLimiter.Kind.CHAT`（`security.rate-limit.chat-per-minute`，默认 30/分钟，local-mode 旁路），在登录校验之后、inbox 落库之前检查；超限抛 `RateLimitedException` → HTTP 429 + `Retry-After`，前端/加载项显示「操作太频繁，请稍候再试」。仓库里并没有「每用户并发 run 上限」这类机制（个人助理 `MobileAssistantService` 另有按库计的 6 次/分钟）。完整契约见 eng-infra.md「部署与其它」。
 - 回退端点（`POST /api/agent/history/rollback`）在会话仍有活跃 run（`AgentOrchestrator.hasActiveRun`）时回 409，否则编排器会把已截断的 assistant 行重新写回；客户端不得假定运行中可回退。
 - `SseEmitterService.createConnection` 与 `send` 共用每会话发送锁（挂 emitter + 补发、序号分配 + 写出互斥），实时事件 id 不会先于补发 id 上线；`emitTo` 为包内可见仅供测试。
 - `MemoryManager` 的 saveProjectMemory/saveUserMemory/updateProjectField/consolidate 在锁内用 REQUIRES_NEW 事务提交（注入了事务管理器时），不要再给这几个方法加 `@Transactional`，否则锁又会早于提交释放。

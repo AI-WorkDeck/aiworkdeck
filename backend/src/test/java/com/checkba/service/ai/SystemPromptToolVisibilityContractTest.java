@@ -154,7 +154,8 @@ class SystemPromptToolVisibilityContractTest {
             new Fragment("tools-office-word", Capability.OFFICE, OfficeHost.WORD),
             new Fragment("tools-office-excel", Capability.OFFICE, OfficeHost.EXCEL),
             new Fragment("tools-office-ppt", Capability.OFFICE, OfficeHost.POWERPOINT),
-            new Fragment("tools-none", Capability.NONE, OfficeHost.WORD));
+            new Fragment("tools-none", Capability.NONE, OfficeHost.WORD),
+            new Fragment("tools-web", Capability.WEB, OfficeHost.WORD));
 
     // ---------------------------------------------------------------- 源码扫描
 
@@ -538,6 +539,7 @@ class SystemPromptToolVisibilityContractTest {
                 "LOWA 会话不该因为 officeHost 而拿到不同片段");
         assertEquals(resolved.get("NONE/WORD"), resolved.get("NONE/POWERPOINT"),
                 "NONE 会话不该因为 officeHost 而拿到不同片段");
+        assertEquals("tools-web", resolved.get("WEB/EXCEL"), "WEB 会话不看 officeHost，一律拿网页片段");
     }
 
     @Test
@@ -572,7 +574,9 @@ class SystemPromptToolVisibilityContractTest {
             new RoundOneHost("office-word", "office", "word", null),
             new RoundOneHost("office-excel", "office", "excel", null),
             new RoundOneHost("office-ppt", "office", "powerpoint", null),
-            new RoundOneHost("none", "none", null, null));
+            new RoundOneHost("none", "none", null, null),
+            new RoundOneHost("web-docx", "web", null, "docx"),
+            new RoundOneHost("web-nofile", "web", null, null));
 
     /** 不命中任何类目 / 精确放回关键词的中性提示（同 ToolSurfaceBudgetTest.NEUTRAL）：量的是「不靠关键词」的首轮。 */
     private static final String NEUTRAL_PROMPT = "这份合同有什么风险？";

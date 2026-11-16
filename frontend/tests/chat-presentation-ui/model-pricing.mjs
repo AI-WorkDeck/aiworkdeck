@@ -230,7 +230,7 @@ try {
     badge: el.querySelector('.model-auto-badge')?.textContent.trim(),
     desc: el.querySelector('.model-auto-desc')?.textContent.trim(),
   }))
-  assert.equal(autoOpt.name, 'Smart Mode (Auto)')
+  assert.equal(autoOpt.name, 'Auto-select model (recommended)')
   assert.equal(autoOpt.badge, 'Recommended')
   assert.ok(autoOpt.desc.length > 10)
 
@@ -251,7 +251,7 @@ try {
   })
   await page.waitForFunction(() => window.chatState.currentModelId === 'auto' && !document.querySelector('.model-dropdown'))
   assert.equal(await page.evaluate(() => window.fixtureStorage.ai_selected_model), 'auto')
-  assert.equal(await page.evaluate(() => window.chatState.currentModelName), 'Smart Mode (Auto)')
+  assert.equal(await page.evaluate(() => window.chatState.currentModelName), 'Auto-select model (recommended)')
 
   // A provider-renamed model retains the user's selection through backend-supplied aliases.
   await page.evaluate(() => {

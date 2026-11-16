@@ -106,7 +106,8 @@ export default {
     "switch": "Wisselen",
     "cancel": "Annuleren",
     "switchFailed": "Kan niet van site wisselen. Probeer het later opnieuw.",
-    "rescueFailed": "Na het wisselen van site nog steeds niet ontgrendeld. Controleer de code en probeer het opnieuw."
+    "rescueFailed": "Na het wisselen van site nog steeds niet ontgrendeld. Controleer de code en probeer het opnieuw.",
+    "proIntroBanner": "Gratis starttegoed bij registratie · Personal Pro ¥9.9/mnd eerste 3 maanden",
   },
   "hint": {
     "learnMore": "Meer informatie",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Bevestigen",
     "purchaseSuccess": "Ontgrendeld",
     "purchaseFailed": "Aankoop mislukt",
-    "goRecharge": "Opwaarderen"
+    "goRecharge": "Opwaarderen",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro",
   },
   "identity": {
     "title": "Kies een lokale werkruimte",

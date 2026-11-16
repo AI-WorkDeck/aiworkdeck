@@ -3,19 +3,20 @@
 import test from 'node:test';
 import { randomFillSync } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(new URL('../../../frontend/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
 const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
 const source = readFileSync(new URL('../web/panel.js', import.meta.url), 'utf8');
+const l10n = readFileSync(new URL('../web/panel-l10n.js', import.meta.url), 'utf8');
 const tick = () => new Promise((r) => setImmediate(r));
 const c1 = { id: 'conversation-a', title: '合成客户沟通', type: 'GROUP', role: 'OWNER', unreadCount: 2 };
 const c2 = { id: 'conversation-b', title: '另一会话', type: 'DIRECT', role: 'CLIENT', unreadCount: 0 };
 const msg = { id: 3, uid: 'm-3', senderId: 9, senderName: '合成用户', text: '<img src=x onerror=alert(1)>', createdAt: '2026-10-13T09:00:00Z', attachment: { id: 'file-1', name: '<script>合同.docx</script>', size: 1200 } };
 async function panel(options = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://plugin.invalid/' });
-  const calls = [], events = {}, timers = []; let context = { projectId: 1 }, nextId = 10;
+  const calls = [], events = {}, timers = []; let context = { projectId: 1, ...options.context }, nextId = 10;
   dom.window.crypto = { getRandomValues: (bytes) => randomFillSync(bytes) };
   const confirmIfNeeded = async () => { await tick(); if (dom.window.document.getElementById('confirmation').hasAttribute('open')) { dom.window.document.getElementById(options.confirm === false ? 'confirmation-cancel' : 'confirmation-ok').click(); await tick(); } };
   dom.window.setTimeout = (cb, ms) => { const timer = { cb, ms }; timers.push(timer); return timer; };
@@ -44,7 +45,7 @@ async function panel(options = {}) {
       }
     }
   };
-  dom.window.eval(source); await tick();
+  dom.window.eval(l10n); dom.window.eval(source); await tick();
   const $ = (id) => dom.window.document.getElementById(id);
   return { dom, $, calls, events, timers,
     click: async (id) => { $(id).click(); await confirmIfNeeded(); },
@@ -96,6 +97,39 @@ test('project switch rejects late message content and clears all in-memory draft
 test('late export never opens a file in a different project', async (t) => {
   let release; const p = await panel({ call: ({ action }) => action === 'export' ? new Promise((r) => { release = r; }) : undefined }); close(t, p);
   await p.select(); await p.click('export'); await p.switch(); release({ path: '旧项目/聊天.md' }); await tick(); assert.equal(p.calls.filter((c) => c.method === 'ui.openFile').length, 0);
+});
+test('client invite defaults to after-join history and sharing earlier messages is an explicit choice', async (t) => {
+  const p = await panel({ call: ({ action, params }) => action === 'invite' ? { code: 'SYNTHETIC-CODE', expiresAt: '2026-10-14T09:00:00Z', shareHistory: params.shareHistory === true } : undefined }); close(t, p);
+  await p.select(); await p.click('members-button');
+  const [role, history] = p.$('dialog-body').querySelectorAll('select'); const change = (el, value) => { el.value = value; el.dispatchEvent(new p.dom.window.Event('change')); };
+  const sent = () => p.calls.filter((c) => c.action === 'invite').at(-1).params;
+  assert.equal(history.parentElement.hidden, true); await p.named('生成邀请码');
+  assert.equal('shareHistory' in sent(), false); assert.match(p.$('invite-result').textContent, /持码人可加入会话并查看历史消息/);
+  change(role, 'CLIENT'); assert.equal(history.parentElement.hidden, false); assert.equal(history.parentElement.firstChild.textContent, '客户可看的消息范围');
+  assert.deepEqual([...history.options].map((o) => o.textContent), ['只看入群之后的消息', '同时可看此前的消息']); assert.equal(history.value, 'after');
+  await p.named('生成邀请码'); assert.equal(sent().shareHistory, false); assert.equal(sent().role, 'CLIENT');
+  assert.match(p.$('invite-result').textContent, /只能看到入群之后的消息和文件/); assert.doesNotMatch(p.$('invite-result').textContent, /\{time\}|查看历史消息/);
+  // QA D4: the lawyer is told the client needs an AI WorkDeck account, where to type the code, and that the portal will not take it.
+  assert.match(p.$('invite-result').textContent, /AI WorkDeck 账号登录应用.*邀请码加入.*客户门户不能使用此码/);
+  change(history, 'all'); await p.named('生成邀请码'); assert.equal(sent().shareHistory, true); assert.match(p.$('invite-result').textContent, /可同时查看此前的消息/);
+  change(role, 'MEMBER'); assert.equal(history.parentElement.hidden, true); await p.named('生成邀请码'); assert.equal('shareHistory' in sent(), false);
+});
+test('client invite against a collaboration service that predates the history choice keeps the truthful legacy warning', async (t) => {
+  const p = await panel(); close(t, p); await p.select(); await p.click('members-button');
+  const role = p.$('dialog-body').querySelector('select'); role.value = 'CLIENT'; role.dispatchEvent(new p.dom.window.Event('change')); await p.named('生成邀请码');
+  assert.match(p.$('invite-result').textContent, /持码人可加入会话并查看历史消息/);
+});
+test('history choice copy is tokenized for every locale and the generated panel dictionary matches l10n', async (t) => {
+  const p = await panel({ context: { language: 'en-US' } }); close(t, p); await p.select(); await p.click('members-button');
+  assert.deepEqual([...p.$('dialog-body').querySelectorAll('select')[1].options].map((o) => o.textContent), ['Only messages sent after they join', 'Earlier messages as well']);
+  const dir = new URL('../l10n/', import.meta.url), locales = readdirSync(dir).filter((f) => f.endsWith('.json')); assert.equal(locales.length, 20);
+  for (const file of locales) {
+    const panelKeys = Object.fromEntries(Object.entries(JSON.parse(readFileSync(new URL(file, dir), 'utf8'))).filter(([k]) => k.startsWith('panel.')));
+    assert.deepEqual(JSON.parse(JSON.stringify(p.dom.window.AWD_IM_L10N[file.slice(0, -5)])), panelKeys, file);
+    for (const key of ['historyScope', 'historyAfterJoin', 'historyWithEarlier', 'inviteJoinHow']) assert.ok(panelKeys['panel.' + key], file + key);
+    assert.match(panelKeys['panel.inviteJoinHow'], /AI WorkDeck/, file);
+    for (const key of ['inviteHintAfterJoin', 'inviteHintWithHistory']) assert.match(panelKeys['panel.' + key], /\{time\}/, file + key);
+  }
 });
 test('member and client cannot see invite/removal controls, owner can', async (t) => {
   const p = await panel(); close(t, p); await p.select(); await p.click('members-button'); assert.match(p.$('dialog-body').textContent, /生成邀请码/); await p.named('生成邀请码'); assert.equal(p.$('invite-result').querySelector('input').value, 'SYNTHETIC-CODE');
@@ -150,6 +184,30 @@ test('recent-page polling replaces permission DTOs even when message IDs and cou
   } : undefined }); close(t, p); Object.defineProperty(p.dom.window.document, 'visibilityState', { value: 'visible' });
   await p.select(); await p.named('存入项目'); assert.ok([...p.$('messages').querySelectorAll('button')].some((b) => b.textContent === '添加到 AI'));
   allowed = false; await p.poll(); assert.match(p.$('messages').textContent, /文件待准备/); assert.doesNotMatch(p.$('messages').textContent, /添加到 AI|合同/);
+});
+test('an unchanged server revision skips the recent page; a changed one or every tenth poll re-reads it', async (t) => {
+  let revision = '0:OWNER:staff', allowed = true;
+  const p = await panel({ call: ({ action, params }) => action === 'messages' ? {
+    messages: params.afterId ? [] : [{ ...msg, attachment: allowed ? { ...msg.attachment, available: true } : { id: msg.attachment.id, available: false } }], revision
+  } : undefined }); close(t, p); Object.defineProperty(p.dom.window.document, 'visibilityState', { value: 'visible' });
+  const recentReads = () => p.calls.filter((c) => c.action === 'messages' && !c.params.afterId && !c.params.beforeId).length;
+  await p.select(); const initial = recentReads();
+  await p.poll(); await p.poll();
+  assert.equal(recentReads(), initial, 'nothing changed: only the afterId delta was polled');
+  assert.ok(p.calls.filter((c) => c.action === 'messages' && c.params.afterId === 3).length >= 2);
+  allowed = false; revision = '1:OWNER:staff'; await p.poll();
+  assert.equal(recentReads(), initial + 1); assert.match(p.$('messages').textContent, /文件待准备/);
+  for (let i = 0; i < 9; i++) await p.poll();
+  assert.equal(recentReads(), initial + 1);
+  await p.poll(); assert.equal(recentReads(), initial + 2, 'names and avatars still refresh periodically');
+});
+test('an acknowledged read is not sent again on every poll', async (t) => {
+  let lastReadId = 0;
+  const p = await panel({ call: ({ action }) => action === 'list' ? { conversations: [{ ...c1, unreadCount: 0, lastReadId }] }
+    : action === 'read' ? (lastReadId = 3, { lastReadId: 3 }) : undefined }); close(t, p);
+  p.dom.window.document.hasFocus = () => true; await p.select();
+  const reads = () => p.calls.filter((c) => c.action === 'read').length;
+  assert.equal(reads(), 1); await p.poll(); await p.poll(); assert.equal(reads(), 1);
 });
 test('local upload and message share one idempotency key; a fresh identical file has a new key', async (t) => {
   const p = await panel({ call: ({ action }) => action === 'upload' ? { id: 'uploaded-file' } : undefined }); close(t, p); await p.select();
@@ -265,7 +323,7 @@ async function agentPanel(options = {}) {
     if (action === 'send') { const message = { id: nextId++, senderId: 9, actorType: 'HUMAN', text: params.text, clientMessageId: params.clientMessageId }; messages.push(message); return message; }
     if (action === 'agentReply') { status = { status: 'queued', messageId: params.messageId }; return { accepted: true, ...status }; }
   } });
-  if (!options.keepDefault && !p.$('active-chat').hidden) await p.select(0);
+  if (!options.keepDefault) await p.select(0);
   return { ...p, group, privateChat, messages, setStatus: (next) => { status = next; } };
 }
 test('selecting an existing shared conversation preserves its group behavior and single-human replies', async (t) => {
@@ -273,8 +331,8 @@ test('selecting an existing shared conversation preserves its group behavior and
   assert.equal(p.$('active-chat').hidden, false);
   assert.equal(p.$('chat-title').textContent, '合成项目助手群');
   assert.match(p.$('chat-subtitle').textContent, /群成员可见/);
-  assert.equal(p.$('agents').children.length, 0, 'existing assistant group is not duplicated as a shortcut');
-  assert.equal(p.calls.find((c) => c.action === 'ensureAgent').params.private, true);
+  assert.equal(p.$('agents').querySelectorAll('button').length, 1, 'only the private assistant shortcut is offered; the existing group is not duplicated');
+  assert.equal(p.calls.some((c) => c.action === 'ensureAgent'), false, 'opening the panel creates nothing (QA D15)');
   await p.click('members-button');
   assert.match(p.$('dialog-body').textContent, /合成项目助手 · AI 助手/);
   assert.equal([...p.$('dialog-body').querySelectorAll('.member-row button')].some((b) => b.textContent === '移除'), false);
@@ -346,7 +404,8 @@ test('project scope reason remains visible while a permitted team assistant can 
 });
 test('assistant scope and enrollment failures preserve ordinary messaging; disconnected account never looks ready', async (t) => {
   for (const action of ['agentScopes', 'ensureAgent', 'self']) {
-    const p = await agentPanel({ call: (c) => { if (c.action === action) throw Error(action === 'ensureAgent' ? '请使用邀请码加入该项目助手群' : '服务连接失败'); } }); close(t, p);
+    const p = await agentPanel({ keepDefault: true, call: (c) => { if (c.action === action) throw Error(action === 'ensureAgent' ? '请使用邀请码加入该项目助手群' : '服务连接失败'); } }); close(t, p);
+    if (action === 'ensureAgent') { p.$('agents').querySelector('button').click(); await tick(); await tick(); }
     assert.match(p.$('notice').textContent, action === 'ensureAgent' ? /邀请码/ : /服务连接失败/);
     assert.equal(p.$('active-chat').hidden, true);
     if (action === 'self') {
@@ -361,7 +420,8 @@ test('assistant scope and enrollment failures preserve ordinary messaging; disco
 });
 test('late default assistant enrollment cannot replace a conversation chosen by the user', async (t) => {
   let release;
-  const p = await agentPanel({ call: ({ action }) => action === 'ensureAgent' ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
+  const p = await agentPanel({ keepDefault: true, call: ({ action }) => action === 'ensureAgent' ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
+  p.$('agents').querySelector('button').click(); await tick();
   await p.select(1); assert.equal(p.$('chat-title').textContent, c1.title);
   release(p.group); await tick(); await tick();
   assert.equal(p.$('chat-title').textContent, c1.title);
@@ -449,9 +509,39 @@ test('assistant and member avatars render safely without verbose empty-chat inst
 
 test('project assistant defaults to private context while an explicit shared command stays shared', async t => {
  const p=await agentPanel({keepDefault:true});close(t,p)
+ assert.equal(p.$('active-chat').hidden,true,'nothing is created or opened just by opening the panel (QA D15)')
+ assert.equal(p.calls.some(c=>c.action==='ensureAgent'),false)
+ p.$('agents').querySelector('button').click();await tick();await tick()
  assert.match(p.$('chat-subtitle').textContent,/仅你可见/)
  assert.equal(p.calls.find(c=>c.action==='ensureAgent').params.private,true)
  await p.events['sidebar.command']({command:'open-agent',scope:'project',scopeKey:'project-uuid',private:false});await tick()
  assert.match(p.$('chat-subtitle').textContent,/群成员可见/)
  assert.equal(p.calls.filter(c=>c.action==='ensureAgent').at(-1).params.private,false)
+})
+
+test('QA D15: an existing private assistant chat is resumed on open without enrolling again', async t => {
+ const agent={scope:'project',scopeKey:'project-uuid',name:'合成项目助手',title:'合成项目助手群'}
+ const privateChat={id:'agent-private',title:agent.name,type:'AGENT_DIRECT',role:'OWNER',agent:{...agent,private:true}}
+ const p=await panel({call:async({method,action})=>{if(method!=='im.request')return;if(action==='agentScopes')return{agents:[agent]};if(action==='list')return{conversations:[privateChat,c1]};if(action==='messages')return{messages:[],hasMore:false}}})
+ close(t,p)
+ assert.equal(p.$('chat-title').textContent,agent.name)
+ assert.equal(p.calls.some(c=>c.action==='ensureAgent'),false)
+})
+
+test('messages from the client carry a visible client badge; staff messages do not (B4)', async t => {
+ const p=await panel({call:({action})=> action==='list'?{conversations:[c1]}:action==='messages'?{messages:[{...msg,id:1,attachment:null,text:'律师消息'},{...msg,id:2,senderId:12,senderName:'合成客户',attachment:null,text:'客户消息',fromClient:true}],hasMore:false}:undefined})
+ close(t,p);await p.select()
+ const metas=[...p.$('messages').querySelectorAll('.message-meta')]
+ assert.equal(metas[0].querySelector('.client-badge'),null)
+ assert.equal(metas[1].querySelector('.client-badge').textContent,'客户')
+})
+
+test('an access-code client is removed by revoking the code, after a confirmation that says so (B4)', async t => {
+ const calls=[]
+ const p=await panel({call:({action,params})=>{calls.push({action,params});return action==='list'?{conversations:[{...c1,role:'OWNER'}]}:action==='messages'?{messages:[],hasMore:false}:action==='members'?{members:[{id:9,displayName:'律师',role:'OWNER',actorType:'HUMAN'},{id:12,displayName:'合成客户',role:'CLIENT',actorType:'HUMAN',accessCode:true},{id:13,displayName:'同事',role:'MEMBER',actorType:'HUMAN'}],humanCount:3}:action==='removeMember'?{removed:true,codeRevoked:true}:undefined}})
+ close(t,p);await p.select();await p.click('members-button')
+ const rows=[...p.$('dialog-body').querySelectorAll('.member-row')]
+ assert.equal(rows.length,3)
+ const texts=rows.map(r=>[...r.querySelectorAll('button')].map(b=>b.textContent))
+ assert.deepEqual(texts[0],[]); assert.deepEqual(texts[1],['撤销访问码']); assert.deepEqual(texts[2],['移除'])
 })

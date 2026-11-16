@@ -73,6 +73,9 @@ class DesktopContextSmokeTest {
         assertEquals(1000, hikari.getValidationTimeout());
         assertEquals("graceful", environment.getProperty("server.shutdown"));
         assertEquals("30s", environment.getProperty("spring.lifecycle.timeout-per-shutdown-phase"));
+        // Desktop keeps Actuator off: no management port, nothing exposed, metrics not recorded.
+        assertEquals("-1", environment.getProperty("management.server.port"));
+        assertEquals("false", environment.getProperty("management.metrics.enable.all"));
     }
 
     @Test

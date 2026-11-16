@@ -70,7 +70,9 @@ public class HostServiceRegistry {
                     "feeLedger", new Spec("read", List.of("lawfirm"))),
             "im", Map.of(
                     "listConversations", new Spec("read", List.of("im")),
-                    "readMessages", new Spec("read", List.of("im"))));
+                    "readMessages", new Spec("read", List.of("im"))),
+            "worklog", Map.of(
+                    "summary", new Spec("read", List.of("worklog_read"))));
 
     /** 单次返回给模型的字符上限，超出截断并注明。 */
     static final int MAX_RESULT_CHARS = 30_000;
@@ -108,6 +110,22 @@ public class HostServiceRegistry {
         register("lawfirm", "feeLedger", this::lawfirmFeeLedger);
         register("im", "listConversations", this::imListConversations);
         register("im", "readMessages", this::imReadMessages);
+        register("worklog", "summary", this::worklogSummary);
+    }
+
+    /** 工作记录汇总服务（setter 注入：旧测试直接 new 本类时可缺席，调用时报不可用）。 */
+    private com.checkba.service.activity.WorklogSummaryService worklog;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWorklog(com.checkba.service.activity.WorklogSummaryService worklog) {
+        this.worklog = worklog;
+    }
+
+    /** 本人在当前项目上的工作记录汇总（只读、只含本人、只给聚合数）；项目须有读权限。 */
+    private Object worklogSummary(Call call) {
+        Long projectId = requireProject(call, false);
+        if (worklog == null) throw new IllegalArgumentException("Worklog service unavailable");
+        return worklog.summarize(call.userId(), projectId);
     }
 
     private void register(String service, String operation, Handler handler) {
@@ -291,6 +309,7 @@ public class HostServiceRegistry {
     }
 
     // ---- lawfirm（只读；与 PluginLawFirmController 同一入口 LawFirmManagementService.execute。
+    //      读的是本机台账：非 local-mode（团队服务器）一律 requireLocalLedger 拒绝。
     //      全所数据（收费台账、全所看板）要 canViewFirmWide：系统管理员 / 律所管理员 / 桌面单机；conflictCheck 与 UI 收案表单同口径，登录即可）----
 
     private static final int LAWFIRM_ROW_LIMIT = 30;
@@ -312,6 +331,7 @@ public class HostServiceRegistry {
         Map<String, Object> a = call.args();
         LawFirmManagementService service = lawfirm.getIfAvailable();
         if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireLocalLedger();
         if (!service.canViewFirmWide(call.userId())) {
             // 没有全所查看资格：只给「有读权限的某项目」的事项级数据，绝不给全所看板/收费
             if (projectId == null) service.requireFirmWide(call.userId());
@@ -331,6 +351,9 @@ public class HostServiceRegistry {
     }
 
     private Object lawfirmConflictCheck(Call call) {
+        LawFirmManagementService service = lawfirm.getIfAvailable();
+        if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireLocalLedger();
         Map<String, Object> a = call.args();
         Map<String, Object> params = new LinkedHashMap<>();
         for (String key : List.of("title", "practiceArea", "clientName", "clientCreditCode", "clientRole", "counterpartyName",
@@ -348,6 +371,7 @@ public class HostServiceRegistry {
         // 收费台账是全所数据：即便传了 projectId，也只有全所查看资格者可读
         LawFirmManagementService service = lawfirm.getIfAvailable();
         if (service == null) throw new IllegalArgumentException("Law firm service unavailable");
+        service.requireLocalLedger();
         service.requireFirmWide(call.userId());
         Long projectId = optionalReadableProject(call);
         Map<String, Object> a = call.args();

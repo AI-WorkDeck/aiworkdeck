@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "복사할 내용 선택",
+  scratchCopySelected: "{count}개 선택됨",
+  scratchCopyFiles: "파일",
+  scratchCopyConversations: "대화",
+  scratchCopyNoProjects: "복사할 프로젝트가 없습니다. 먼저 프로젝트를 만드세요.",
   scratchCopyTitle: "프로젝트로 복사",
   scratchCopyHint: "선택한 대화와 파일을 복사하고 원본을 유지합니다. 대상 프로젝트 구성원은 복사본을 볼 수 있습니다.",
   "restartPending": "{count}개의 작업을 재개할 수 있습니다",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "파일 열기…",
   "looseFilesOpenFolder": "폴더 열기…",
   "mobileBackup": {
+    "undecided": "선택 필요",
     "cleanupDeadline": "클라우드 콘텐츠가 삭제되지 않도록 {time}까지 미납금을 전액 납부하세요. 로컬 파일은 영향을 받지 않습니다.",
     "billingSummary": "미납금: {debt}, 사용 가능한 신용 한도: {available}.",
     "manageBilling": "계정 및 결제",

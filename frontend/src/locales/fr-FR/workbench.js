@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Choisir le contenu à copier",
+  scratchCopySelected: "{count} éléments sélectionnés",
+  scratchCopyFiles: "Fichiers",
+  scratchCopyConversations: "Conversations",
+  scratchCopyNoProjects: "Aucun projet disponible. Créez d’abord un projet.",
   scratchCopyTitle: "Copier vers un projet",
   scratchCopyHint: "Copiez les conversations et fichiers sélectionnés en conservant les originaux. Les membres du projet cible peuvent consulter les copies.",
   "restartPending": "{count} tâches peuvent être reprises",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "Ouvrir un fichier…",
   "looseFilesOpenFolder": "Ouvrir un dossier…",
   "mobileBackup": {
+    "undecided": "Choix en attente",
     "cleanupDeadline": "Réglez la totalité avant le {time} pour éviter la suppression du contenu cloud. Les fichiers locaux restent intacts.",
     "billingSummary": "Montant dû : {debt} ; crédit disponible : {available}.",
     "manageBilling": "Compte et facturation",

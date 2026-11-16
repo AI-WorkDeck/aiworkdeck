@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# /etc/systemd/system/awd-health-check.service —— 由 awd-health-check.timer 每分钟拉起一次。
+# 说明见 deploy/cloud/README.md「运维监控」。
+[Unit]
+Description=AI WorkDeck health & threshold check (loopback actuator + disk)
+After=network-online.target
+
+[Service]
+Type=oneshot
+# 短信 AK 复用实例 env（北京：/opt/aiworkdeck/cloud/env 里的 SMS_ACCESS_KEY_*，与 site-probe 同源）；
+# 本脚本自己的配置（目标、手机号、阈值）放 health-check.env（0600）。systemd 以 root 读这两份，
+# 进程本身以无特权动态用户运行。
+EnvironmentFile=-/opt/aiworkdeck/cloud/env
+EnvironmentFile=/etc/aiworkdeck/health-check.env
+ExecStart=/usr/bin/python3 /usr/local/sbin/awd-health-check.py
+DynamicUser=yes
+StateDirectory=awd-health-check
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+TimeoutStartSec=50

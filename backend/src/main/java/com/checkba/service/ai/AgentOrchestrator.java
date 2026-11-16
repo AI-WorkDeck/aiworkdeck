@@ -381,6 +381,7 @@ public class AgentOrchestrator {
         final RunBudget budget = new RunBudget();
         // 法源不可用收口（gap P8）：法宝回不可用标记后，网页替代查询封顶 + 收尾一次「未核实」提醒
         final LawSourceDownPolicy lawSource = new LawSourceDownPolicy();
+        boolean lawSourceFirstAllowed;
         // 多处修改收尾时系统代做的写后核对（gap P5），每轮最多一次，干净时对用户不可见
         final PostWriteCheck writeCheck = new PostWriteCheck();
         // 已经试过并失败的模型（含当前模型），故障转移时跳过
@@ -431,6 +432,8 @@ public class AgentOrchestrator {
          * 打开 / 新建文档成功后清零（只放宽，与 activeDocKind 的中途放宽同一契约）。
          */
         volatile boolean noFileEntrySet;
+        /** 网页版会话的轮次：占一个每用户活跃名额（{@link #WEB_ACTIVE_RUNS_PER_USER}），收尾时释放。 */
+        volatile boolean webClient;
         /**
          * 起跑时（关键词 / skill 预放回之后）的展开集快照。展开集之后再增长 = 模型经 list_tools / 点名 / 决策辅助
          * 明确要了某个类目，此时没开文件态的编辑原语过滤不再适用（明确要的就给全）。null = 没有快照，按不过滤处理。
@@ -514,6 +517,26 @@ public class AgentOrchestrator {
      */
     private final Map<String, RunGuard> activeRuns = new ConcurrentHashMap<>();
 
+    /**
+     * 网页版每个用户同时活跃的轮次上限（W1 设计 §4.8 / §8-5）：防一个账户开多个标签页刷后端。
+     * 超出的输入<b>不报错</b>：留在 inbox 里 pending（回执 runId=null，与重启期间排队同形），
+     * 有名额腾出时按提交顺序自动起跑。这是防滥用的并发闸，不是打断用户的自动暂停。
+     */
+    static final int WEB_ACTIVE_RUNS_PER_USER = 3;
+
+    /** 因上限而排队的网页版 inbox 条目（按用户、按提交顺序）。只在 {@link #restartAdmission} 下读写。 */
+    private final Map<Long, java.util.LinkedHashSet<String>> webAdmissionQueue = new java.util.HashMap<>();
+
+    /**
+     * 腾出名额后起跑排队条目的线程。异步是为了不在收尾路径持有的会话锁里再去拿另一个会话的锁
+     *（两个会话互相接续对方的排队条目会死锁）。包级可见：测试换成同步执行。
+     */
+    java.util.concurrent.Executor webAdmissionExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "web-run-admission");
+        t.setDaemon(true);
+        return t;
+    });
+
     private final ChatModelFactory chatModelFactory;
     private final ProjectAiMessageService messageService;
     private final SseEmitterService sseEmitterService;
@@ -573,6 +596,11 @@ public class AgentOrchestrator {
         return guard;
     }
 
+    /** 各会话当前登记的 run 数（运维指标 awd.agent.runs.active；被取代后仍在收尾的旧轮次不计）。 */
+    public int activeRunCount() {
+        return activeRuns.size();
+    }
+
     /** 该会话当前是否有登记在册的 run（回退等破坏性操作据此拒绝并发）。 */
     public boolean hasActiveRun(String conversationId) {
         return conversationId != null && activeRuns.get(conversationId) != null;
@@ -605,6 +633,55 @@ public class AgentOrchestrator {
             editorBridgeService.cleanupAfterRun(guard.conversationId);
         }
         skillRouter.clearRun(guard.runId);
+        if (wasCurrent) scheduleWebAdmission(guard);
+    }
+
+    /** 本用户此刻登记在册的网页版轮次数。调用方持有 {@link #restartAdmission}。 */
+    private int activeWebRuns(Long userId) {
+        int count = 0;
+        for (RunGuard guard : activeRuns.values()) {
+            if (guard.webClient && java.util.Objects.equals(userId, guard.userId)) count++;
+        }
+        return count;
+    }
+
+    private boolean isWebRequest(AiAgentController.AgentChatRequest request) {
+        return "web".equalsIgnoreCase(request.getClientCapability())
+                || (clientCapabilities != null && clientCapabilities.capabilityOf(request.getConversationId())
+                        == ClientCapabilityService.Capability.WEB);
+    }
+
+    /** 网页版轮次腾出名额：有排队条目就异步接着起跑。 */
+    private void scheduleWebAdmission(RunGuard guard) {
+        if (!guard.webClient || guard.userId == null) return;
+        synchronized (restartAdmission) {
+            if (!webAdmissionQueue.containsKey(guard.userId)) return;
+        }
+        Long userId = guard.userId;
+        webAdmissionExecutor.execute(() -> admitQueuedWebRuns(userId));
+    }
+
+    private void admitQueuedWebRuns(Long userId) {
+        while (true) {
+            String next;
+            synchronized (restartAdmission) {
+                java.util.LinkedHashSet<String> queue = webAdmissionQueue.get(userId);
+                if (queue == null || queue.isEmpty()) {
+                    webAdmissionQueue.remove(userId);
+                    return;
+                }
+                if (activeWebRuns(userId) >= WEB_ACTIVE_RUNS_PER_USER) return;
+                next = queue.iterator().next();
+                queue.remove(next);
+                if (queue.isEmpty()) webAdmissionQueue.remove(userId);
+            }
+            try {
+                acceptInboxSubmission(next);
+            } catch (RuntimeException e) {
+                // 条目留在 inbox 里 pending，用户可以重发或删除；不影响后面的排队条目
+                log.warn("Queued web run {} for user {} could not start: {}", next, userId, e.getMessage());
+            }
+        }
     }
 
     /**
@@ -642,6 +719,8 @@ public class AgentOrchestrator {
                     sseEmitterService.close(guard.conversationId, guard.connectionEpoch);
                 }
             }
+            // 名额让给同一用户排队中的其它网页版会话；本会话的接续若已占回名额，接纳循环会按上限停下
+            if (wasCurrent) scheduleWebAdmission(guard);
         }
     }
 
@@ -1067,6 +1146,7 @@ public class AgentOrchestrator {
         // A new submission has its own consent. Do not classify or narrow it using the old input.
         guard.abandonDecision();
         guard.documentSummaryOnly = false;
+        guard.lawSourceFirstAllowed = false; // New input supersedes the old request; retain the source-down budget.
 
         String streamed = guard.takeStreamSnapshot();
         String segment = executionLog.toString() + streamed;
@@ -1283,13 +1363,17 @@ public class AgentOrchestrator {
                 || guard.protocolNudged || !guard.toolsRun.isEmpty()) {
             return null;
         }
-        // 只看正文叙述：代码块（在讲解写法）、tool_code/process 块（截断与文字调用另有纠正路径）、
-        // 标签本身（<artifact type="task_list"> 的属性值）都不算「声称」
-        String prose = CLAIM_NOISE.matcher(content).replaceAll(" ");
-        java.util.Set<String> named = new java.util.LinkedHashSet<>();
-        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(prose);
-        while (m.find()) if (isTool.test(m.group())) named.add(m.group());
-        if (named.isEmpty()) return null;
+        java.util.Set<String> named = claimedToolNames(content, isTool);
+        if (named.isEmpty()) {
+            // office-tier1：不点名工具、只说「已为第1页添加备注」「已冻结第 1 行」的口头完成（百炼 qwen 实录）
+            if (!claimsUnexecutedEdit(guard, content)) return null;
+            guard.claimNudged = true;
+            return LangText.of(
+                    "[系统提醒] 你的回答说已经改好了，但本轮没有执行任何工具，文档实际上没有变化。"
+                            + "现在通过函数调用真正执行用户要的修改；完成后再简短回答，不要先写「已完成」。",
+                    "[System reminder] Your answer says the change is done, but no tool ran in this turn, so the document did not change. "
+                            + "Make the requested change now through function calling, then answer briefly; do not claim it is done before it runs.");
+        }
         guard.claimNudged = true;
         String list = String.join(", ", named);
         return LangText.of(
@@ -1297,6 +1381,48 @@ public class AgentOrchestrator {
                         + "现在通过函数调用真正执行它；完成后再简短回答，不要先写「已完成」。",
                 "[System reminder] Your answer mentions " + list + ", but no tool ran in this turn, so the requested action did not happen. "
                         + "Call it now through function calling, then answer briefly; do not claim it is done before it runs.");
+    }
+
+    // 只看正文叙述：代码块（在讲解写法）、tool_code/process 块（截断与文字调用另有纠正路径）、
+    // 标签本身（<artifact type="task_list"> 的属性值）都不算「声称」
+    private static java.util.Set<String> claimedToolNames(String content, java.util.function.Predicate<String> isTool) {
+        String prose = CLAIM_NOISE.matcher(content).replaceAll(" ");
+        java.util.Set<String> named = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = SNAKE_TOOL_TOKEN.matcher(prose);
+        while (m.find()) if (isTool.test(m.group())) named.add(m.group());
+        return named;
+    }
+
+    /** 「已（经）…添加/修改/冻结…」类完成句，及英文 "I've added / has been updated"。 */
+    private static final java.util.regex.Pattern EDIT_CLAIM = java.util.regex.Pattern.compile(
+            "(?:已|已经)[^。！？\\n]{0,24}?(?:添加|加上|加了|修改|改为|改成|删除|删掉|冻结|插入|设置|设为|调整|替换|写入|填入|排序|合并|移动|移到|挪到|新建|创建|加粗|标红|标黄|拆分|缩小|放大)"
+                    + "|\\b(?:I(?:'ve| have)|has been|have been)\\b[^.!?\\n]{0,40}?\\b(?:added|inserted|deleted|removed|froze|frozen|updated|changed|replaced|moved|set|formatted|merged|sorted|created|renamed|resized)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+    /** 用户这句话本身是不是在要求改文档（「之前加过吗？」这类回顾提问不算）。 */
+    private static final java.util.regex.Pattern EDIT_REQUEST = java.util.regex.Pattern.compile(
+            "加|改|删|冻结|插入|设置|设成|设为|调|替换|写|填|排序|合并|移|挪|建|标红|标黄|加粗|拆|缩小|放大|修好|修一下"
+                    + "|\\b(?:add|insert|delete|remove|freeze|update|change|replace|move|set|format|merge|sort|create|rename|resize|fix)\\b",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 零工具轮次里，回答用完成句宣称改了文档：仅在开着文档、用户本句确实在要求修改时成立
+     * （「之前加过吗？」「已经添加了吗」这类回顾提问的用户句不含修改请求时不触发）。
+     */
+    static boolean claimsUnexecutedEdit(RunGuard guard, String content) {
+        if (guard == null || content == null || guard.activeDocKind == null || !guard.toolsRun.isEmpty()) return false;
+        if (guard.userMessage == null || !EDIT_REQUEST.matcher(guard.userMessage).find()) return false;
+        return EDIT_CLAIM.matcher(CLAIM_NOISE.matcher(content).replaceAll(" ")).find();
+    }
+
+    /**
+     * 纠正一轮后模型仍零工具、仍宣称完成：不再追问（不打转），但必须如实告诉用户没改成——
+     * 返回追加在回答末尾的一句说明；其余 null。
+     */
+    static String falseClaimNotice(RunGuard guard, String content, java.util.function.Predicate<String> isTool) {
+        if (guard == null || content == null || !guard.claimNudged || !guard.toolsRun.isEmpty()) return null;
+        if (claimedToolNames(content, isTool).isEmpty() && !claimsUnexecutedEdit(guard, content)) return null;
+        return LangText.of("\n\n（系统说明：本轮实际上没有执行任何修改，文档未变化。请再说一次要改的内容，或换个说法让我重试。）",
+                "\n\n(System note: no change was actually made in this turn; the document is unchanged. Please repeat the request or rephrase it so I can retry.)");
     }
 
     /** 用户消息是否含明确的「记住」请求（中文子串匹配，英文按词边界）。 */
@@ -1322,10 +1448,15 @@ public class AgentOrchestrator {
         return editorBridgeService.executeEditorCommand(action, params, PostWriteCheck.READ_TIMEOUT_SECONDS);
     }
 
-    /** 嵌入式编辑器会话（Office/WPS 任务窗格没有 get_document_text，写后核对不适用）。 */
+    /**
+     * 嵌入式编辑器会话（Office/WPS 任务窗格没有 get_document_text，写后核对不适用）。
+     * 网页版跑的是同一个 LOWA 执行器，同样算（W1）。
+     */
     private boolean isLowaSession(String conversationId) {
-        return clientCapabilities == null
-                || clientCapabilities.capabilityOf(conversationId) == ClientCapabilityService.Capability.LOWA;
+        if (clientCapabilities == null) return true;
+        ClientCapabilityService.Capability capability = clientCapabilities.capabilityOf(conversationId);
+        return capability == ClientCapabilityService.Capability.LOWA
+                || capability == ClientCapabilityService.Capability.WEB;
     }
 
     /**
@@ -1379,11 +1510,13 @@ public class AgentOrchestrator {
             }
         }
 
-        // 法源不可用后的网页替代查询封顶（gap P8）：超额的不执行，回一句「按已有资料作答并标未核实」。
+        // 明确条文请求先用实际可用的法源；法源不可用后的网页替代查询封顶（gap P8）。
         // 放在分发层而不是提示词里：deepseek 在法源不可用后连续 8–10 轮 search_web/browse_url 实测过。
-        String lawSourceBlocked = guard == null ? null : guard.lawSource.admit(toolName);
+        String lawSourceBlocked = guard == null ? null
+                : guard.lawSource.admit(toolName, guard.lawSourceFirstAllowed ? guard.userMessage : null,
+                        guard.roundOffered);
         if (lawSourceBlocked != null) {
-            log.info("[LawSourceDown] 替代查询已用满，未执行 {}（conv={}）", toolName, conversationId);
+            log.info("[LawSource] 法源查询策略阻止执行 {}（conv={}）", toolName, conversationId);
             ToolRegistry.ToolResult blocked = new ToolRegistry.ToolResult(
                     lawSourceBlocked, toolRegistry.resolve(toolName).orElse(null), true);
             // 本方法有三个出口，三个都要记
@@ -1459,7 +1592,7 @@ public class AgentOrchestrator {
 
         // 法源不可用态（gap P8）：任何工具输出带法宝不可用标记即进入；放行的替代查询附「第几次 / 须标未核实」
         if (guard != null) {
-            guard.lawSource.noteResult(result.output());
+            guard.lawSource.noteResult(result.success() ? toolName : null, result.output());
             String lookupNotice = guard.lawSource.lookupNotice(toolName);
             if (lookupNotice != null) {
                 result = new ToolRegistry.ToolResult(result.output() + "\n\n" + lookupNotice,
@@ -1920,6 +2053,14 @@ public class AgentOrchestrator {
         this.harnessDiagnosticService = harnessDiagnosticService;
     }
 
+    /** 收尾核验员的模型解析（W6）；手工装配的测试里为 null，按主模型走。 */
+    private AuxModelResolver auxModelResolver;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAuxModelResolver(AuxModelResolver auxModelResolver) {
+        this.auxModelResolver = auxModelResolver;
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setVerificationHarness(com.checkba.service.ai.harness.VerificationHarness verificationHarness) {
         if (verificationHarness != null) {
@@ -2307,9 +2448,18 @@ public class AgentOrchestrator {
                         + "\"retryWithInlineContent\":true,\"message\":\"文档正文缓存已失效，请重新发送文档正文。 / Resend the document text.\"}");
                 throw e;
             }
+            boolean web = isWebRequest(request);
             synchronized (restartAdmission) {
                 if (restartAttempts.containsKey(item.getUserId())) return null;
+                if (web && activeWebRuns(item.getUserId()) >= WEB_ACTIVE_RUNS_PER_USER) {
+                    // 不拒绝：条目留在 inbox 里 pending，腾出名额后按序起跑（W1 设计 §4.8）
+                    webAdmissionQueue.computeIfAbsent(item.getUserId(), k -> new java.util.LinkedHashSet<>()).add(itemId);
+                    log.info("Web run limit reached for user {}: queued inbox item {} (conversation {})",
+                            item.getUserId(), itemId, conversationId);
+                    return null;
+                }
                 guard = beginRun(item.getConversationId());
+                guard.webClient = web;
                 guard.userId = item.getUserId();
                 guard.originalRequest = request;
                 guard.inboxItemId = itemId;
@@ -2461,7 +2611,8 @@ public class AgentOrchestrator {
             // 只为了 size()<=1 这个判断；紧接着 ContextAssemblerService 还要再全量读一次。
             // 两次都卡在用户等待首 token 的关键路径上。
             timings.mark("saveUserMsg");
-            boolean firstTurn = messageService.countByConversationId(conversationId) <= 1;
+            long conversationMessageCount = messageService.countByConversationId(conversationId);
+            boolean firstTurn = conversationMessageCount <= 1;
             if (firstTurn) { // Only the user message we just saved
                 final String convId = conversationId;
                 final String userMsg = request.getMessage();
@@ -2638,8 +2789,7 @@ public class AgentOrchestrator {
             guard.activeDocKind = initialDocKind(request.getActiveContext());
             guard.noFileEntrySet = (request.getActiveContext() == null || request.getActiveContext().getId() == null
                     || request.getActiveContext().getId().isEmpty())
-                    && (clientCapabilities == null
-                    || clientCapabilities.capabilityOf(conversationId) == ClientCapabilityService.Capability.LOWA);
+                    && isLowaSession(conversationId);
             if (guard.activeDocKind != null) {
                 log.info("[ToolVisibility] conv={} 活跃文档类型={}，本轮按该类型裁剪 doc_/sheet_/slide_ 工具集",
                         conversationId, guard.activeDocKind);
@@ -2647,6 +2797,7 @@ public class AgentOrchestrator {
             // 活跃文档类目裁剪与渐进披露（dev-board#1064）：起跑时一次算定要不要按类目裁，并把本轮
             // 用户输入的关键词与生效 skill 的白名单涉及的类目预先放回（写进同一份展开集，只增不减）。
             guard.userMessage = request.getMessage();
+            guard.lawSourceFirstAllowed = LawSourceDownPolicy.allowsSourceFirst(messages, conversationMessageCount);
             guard.hasAttachments = request.getContextItems() != null
                     ? !request.getContextItems().isEmpty()
                     : request.getFileIds() != null && !request.getFileIds().isEmpty();
@@ -2864,6 +3015,15 @@ public class AgentOrchestrator {
                 return;
             }
 
+            // 原生调用一个不存在的 `final` 工具当「我答完了」（O11：DeepSeek V4 Pro 在 PPT 任务里
+            // 反复发 final()，每次收到「未知工具」再发，直到轮数耗尽、改动也没做完）。
+            // 只有本轮全是 final 且注册表里确实没有这个工具时才按收尾处理，正文照常保留。
+            boolean pseudoFinal = isPseudoFinalCall(aiMessage) && toolRegistry.resolve("final").isEmpty();
+            if (pseudoFinal) {
+                log.info("Native pseudo-tool 'final' treated as end of turn for {}", conversationId);
+                aiMessage = dev.langchain4j.data.message.AiMessage.from(aiMessage.text() == null ? "" : aiMessage.text());
+            }
+
             // 本轮真正成功完成（有内容或有工具调用）：清零瞬时错误重试预算与溢出压缩预算
             //（额度按轮计，不跨轮累积；溢出预算跨轮清零对标 dsh——长任务里
             // 「涨到溢出→压缩→继续跑→再涨到溢出」是合法路径）
@@ -2903,7 +3063,8 @@ public class AgentOrchestrator {
                 return;
             }
 
-            messages.add(aiMessage);
+            // 空正文的 final 收尾不入栈：空 assistant 轮次发回服务商会 400（同空响应处理）
+            if (!(pseudoFinal && aiMessage.text().isBlank())) messages.add(aiMessage);
 
             // 注意：本轮生成内容已由 onToken 回调逐 token 累加进本轮 RunGuard 的流式缓冲，
             // 此处不可再 append aiMessage.text()，否则取消/断线恢复的快照内容会翻倍。
@@ -3547,6 +3708,16 @@ public class AgentOrchestrator {
                 continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                         depth + 1, executionLog, agentMode, guard);
                 return;
+            }
+
+            // 3.7 纠正后仍是口头完成（office-tier1）：如实补一句「没改成」，不再追问
+            if (!summaryOnly) {
+                String notice = falseClaimNotice(guard, content, toolRegistry::hasTool);
+                if (notice != null) {
+                    log.warn("Answer still claims an edit after the corrective round in {}, appending an honest notice", conversationId);
+                    sendTextDelta(guard, notice);
+                    content = content + notice;
+                }
             }
 
             // 4. Default: Loop Finished
@@ -4297,6 +4468,49 @@ public class AgentOrchestrator {
      *
      * @return true = 本方法已接管收尾（补检续轮或取消），调用方直接 return；false = 走默认收尾
      */
+    /** 收尾核验附带的当前稿上限：约 2 万汉字，长稿其余段落由核验员按段号续读。 */
+    static final int OPINION_DRAFT_CHAR_LIMIT = 40_000;
+
+    /**
+     * 经编辑器桥读出目标文档当前稿（与 doc_get_document_text 同源；宿主给桥命令带 __agent，读到的是最终文本）。
+     * 分页读到上限为止；读不到或正文为空返回 null。
+     */
+    OpinionCompletionCheck.DraftText readOpinionDraftText() {
+        StringBuilder text = new StringBuilder();
+        int start = 0;
+        try {
+            for (int page = 0; page < 40; page++) {
+                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                params.put("startParagraph", start);
+                params.put("maxParagraphs", 500);
+                String raw = editorBridgeService.executeEditorCommand("get_document_text", params);
+                com.fasterxml.jackson.databind.JsonNode root = SKILL_UPDATE_MAPPER.readTree(raw);
+                if (root == null || !root.path("success").asBoolean(true) || !root.path("paragraphs").isArray()) {
+                    return null;
+                }
+                for (com.fasterxml.jackson.databind.JsonNode para : root.path("paragraphs")) {
+                    String body = para.path("text").asText("");
+                    String label = para.path("numbering").path("label").asText("");
+                    if (body.isBlank() && label.isBlank()) continue;
+                    String line = "【" + para.path("index").asInt() + "】" + (label.isBlank() ? "" : label + " ") + body + "\n";
+                    if (text.length() + line.length() > OPINION_DRAFT_CHAR_LIMIT) {
+                        return text.length() == 0 ? null
+                                : new OpinionCompletionCheck.DraftText(text.toString(), true, para.path("index").asInt());
+                    }
+                    text.append(line);
+                }
+                boolean truncated = root.path("truncated").asBoolean(false);
+                int next = root.path("nextStartParagraph").asInt(-1);
+                if (!truncated || next <= start) break;
+                start = next;
+            }
+        } catch (Exception e) {
+            log.warn("[OpinionCheck] 读取当前稿失败", e);
+            return null;
+        }
+        return text.length() == 0 ? null : new OpinionCompletionCheck.DraftText(text.toString(), false, null);
+    }
+
     private boolean runOpinionCompletionCheckOnce(StreamingChatLanguageModel model,
                                                   java.util.List<dev.langchain4j.data.message.ChatMessage> messages,
                                                   String conversationId, String projectId, Long userId,
@@ -4332,6 +4546,8 @@ public class AgentOrchestrator {
         com.checkba.service.ai.tools.ToolContext ctx = new com.checkba.service.ai.tools.ToolContext(
                 Long.parseLong(projectId), conversationId, userId, modelId,
                 guard.roundCandidates, guard.roundOffered, guard.runId, null, guard::isCancelled);
+        // 项目真实文件清单（W6）：写进核验任务，并用来校验核验输出引用的来源
+        List<OpinionCompletionCheck.ManifestEntry> manifest = projectFileManifest(projectId);
         com.checkba.service.ai.subagent.SubAgentResult outcome;
         try {
             if (guard.opinionTargetFileId == null || !guard.opinionTargetFileId.equals(guard.activeFileId)) {
@@ -4339,11 +4555,27 @@ public class AgentOrchestrator {
                         LangText.of("无法确认当前编辑器仍为本轮目标文档，请先定位目标并自行回读核对。",
                                 "The active editor cannot be confirmed as this run's target. Locate and re-read the target yourself."),
                         List.of(), 0);
-            } else outcome = subAgentService.dispatch(
-                    OpinionCompletionCheck.verificationTask(guard.opinionTargetFileId,
-                            guard.opinionTargetFileName, guard.opinionInstructions),
-                    OpinionCompletionCheck.expectedOutput(),
-                    OpinionCompletionCheck.VERIFICATION_SCOPE, ctx);
+            } else {
+                // 当前稿由系统读好附进任务（W6）：核验员不读正文就交卷时，命题只能是它自己编的
+                OpinionCompletionCheck.DraftText draft = readOpinionDraftText();
+                if (draft == null) {
+                    outcome = com.checkba.service.ai.subagent.SubAgentResult.failure("opinion-completion-check",
+                            LangText.of("无法从编辑器读出目标文档的当前稿，独立核验未进行；请自行回读正文并对照底稿核实。",
+                                    "Could not read the target's current draft from the editor, so the independent check did not run; "
+                                            + "re-read the draft and check it against the source materials yourself."),
+                            List.of(), 0);
+                } else {
+                    outcome = OpinionCompletionCheck.validateVerifierResult(subAgentService.dispatch(
+                            OpinionCompletionCheck.verificationTask(guard.opinionTargetFileId,
+                                    guard.opinionTargetFileName, guard.opinionInstructions, manifest, draft),
+                            OpinionCompletionCheck.expectedOutput(),
+                            OpinionCompletionCheck.VERIFICATION_SCOPE, ctx,
+                            // 核验员模型（W6）：默认本轮主模型——flash 档辅助模型在收尾核验里编造过不存在的来源文件；
+                            // ai.verifierModel 可改成 subagent（子 Agent 模型）或显式中档模型
+                            auxModelResolver != null ? auxModelResolver.verifierModelId(modelId) : modelId,
+                            true), manifest);
+                }
+            }
         } catch (Exception e) {
             // 派发异常与核验失败同一条出路：如实接回「未验证」，不阻断收尾
             log.warn("[OpinionCheck] conv={} 补检派发异常，按失败接回", conversationId, e);
@@ -4375,7 +4607,14 @@ public class AgentOrchestrator {
         int displayLimit = toolOutputDisplayLimit(
                 com.checkba.service.ai.subagent.SubAgentService.DISPATCH_TOOL_NAME);
         String status = outcome.success() ? "SUCCESS" : "FAILURE";
-        String outcomeText = outcome.success() ? outcome.result() : "Error: " + String.valueOf(outcome.error());
+        List<String> unknownSources = outcome.success()
+                ? OpinionCompletionCheck.unknownSources(outcome.result(), manifest) : List.of();
+        if (!unknownSources.isEmpty()) {
+            log.warn("[OpinionCheck] conv={} run={} 核验输出引用了项目中不存在的来源 {}", conversationId, guard.runId, unknownSources);
+        }
+        String outcomeText = outcome.success()
+                ? OpinionCompletionCheck.unknownSourcesWarning(unknownSources) + outcome.result()
+                : "Error: " + String.valueOf(outcome.error());
         String processCard = String.format(
                 "<process name=\"%s\"><tool_code>%s(%s)</tool_code><tool_output status=\"%s\">%s</tool_output></process>\n",
                 LangText.of("收尾核验", "Completion check"),
@@ -4387,10 +4626,22 @@ public class AgentOrchestrator {
         emitVerificationReportQuietly(guard, challengerSkill.orElse(null), outcome);
 
         messages.add(dev.langchain4j.data.message.UserMessage.from(
-                OpinionCompletionCheck.handoffMessage(outcome)));
+                OpinionCompletionCheck.handoffMessage(outcome, unknownSources)));
         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                 depth + 1, executionLog, agentMode, guard);
         return true;
+    }
+
+    /** 收尾核验用的项目文件清单；列不出时返回空（核验照常，只是不做来源校验）。 */
+    private List<OpinionCompletionCheck.ManifestEntry> projectFileManifest(String projectId) {
+        try {
+            return projectFileService.listRelativePaths(Long.parseLong(projectId), null, 2000).stream()
+                    .map(e -> new OpinionCompletionCheck.ManifestEntry(e.getValue().getId(), e.getKey()))
+                    .toList();
+        } catch (Exception e) {
+            log.warn("[OpinionCheck] 列项目文件清单失败，跳过来源校验: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private String applyHarnessAdaptationIfDiagnosed(
@@ -4707,6 +4958,13 @@ public class AgentOrchestrator {
         if (aiMessage == null) return true;
         return !aiMessage.hasToolExecutionRequests()
                 && (aiMessage.text() == null || aiMessage.text().isBlank());
+    }
+
+    /** 本轮原生工具调用是否全是名为 final 的伪工具（大小写不敏感）。 */
+    static boolean isPseudoFinalCall(dev.langchain4j.data.message.AiMessage aiMessage) {
+        return aiMessage != null && aiMessage.hasToolExecutionRequests()
+                && aiMessage.toolExecutionRequests().stream()
+                        .allMatch(r -> r.name() != null && "final".equalsIgnoreCase(r.name().trim()));
     }
 
     /**

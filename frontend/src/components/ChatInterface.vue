@@ -89,7 +89,7 @@
             <text class="form-label">{{ $t('chat.uploadFolder') }}</text>
             <view class="awd-field clickable" @tap="triggerFolderUploadInput">
                <view v-if="isFolderUpload && uploadSelectedFiles.length > 0" class="field-content-row">
-                  <text class="field-value">{{ $t('chat.filesSelected', { count: uploadSelectedFiles.length }) }}</text>
+                  <text class="field-value">{{ $t('chat.filesSelected', { count: uploadSelectedFiles.length }, uploadSelectedFiles.length) }}</text>
                </view>
                <view v-else>
                   <text class="field-placeholder">{{ $t('chat.clickSelectFolder') }}</text>
@@ -427,6 +427,7 @@
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
              <RootBubble
                :bubble="msg"
+               :user-message="turn.user?.bubble.content || ''"
                :is-latest="index === bubbles.length - 1"
                :review-states="reviewStates"
                :file-changes="filesForBubble(msg)"
@@ -494,7 +495,7 @@
                <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
                   <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
                   <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
-                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { n: activeSelectionChip.length }) }}</text>
                   <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
                </view>
                <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
@@ -819,7 +820,7 @@
            <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
               <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
               <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
-              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
+              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { n: activeSelectionChip.length }) }}</text>
               <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
            </view>
            <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
@@ -2218,6 +2219,9 @@ export default {
         if (agentMode) selectMode(agentMode)
       }
       inputPrompt.value = bw.prompt
+      // 卡片点名的工作流随这条消息显式带上（skillIds），不靠后端按触发词猜：
+      // 卡片措辞一改、或命中门槛漏了某个动词，技能就静默不生效（tutorial #146）
+      pendingWorkflowSkillId.value = bw.id
       if (richInput.value) {
         const existingTags = Array.from(richInput.value.querySelectorAll('[data-file-id]'))
           .map(el => el.outerHTML)
@@ -2229,7 +2233,17 @@ export default {
 
     // 每个 sendMessage 出口都要带上它。「继续」「按此推进」「点选项」都是同一件任务的后续轮次，
     // 漏带的话用户选的技能会在这些路径上静默掉线（旧的 pinnedSkillId 就只有主发送路径带）。
-    const currentSkillIds = () => (skillDisabledByMode.value ? [] : [...selectedSkillIds.value])
+    // 点内置工作流卡片后待发的那个工作流 id：同一份草稿发出（或清空）前一直带着，发完随草稿清掉
+    const pendingWorkflowSkillId = ref(null)
+    watch(inputPrompt, (value) => {
+      if (!String(value || '').trim()) pendingWorkflowSkillId.value = null
+    })
+    const currentSkillIds = () => {
+      if (skillDisabledByMode.value) return []
+      const ids = [...selectedSkillIds.value]
+      if (pendingWorkflowSkillId.value && !ids.includes(pendingWorkflowSkillId.value)) ids.push(pendingWorkflowSkillId.value)
+      return ids
+    }
 
     const toggleSkillSelection = (skillId) => {
       if (!skillId) return
@@ -4541,6 +4555,9 @@ export default {
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve()
+          } else if (xhr.status === 429) {
+            // 服务器按用户限频：该项标为失败、可重试（建好的文件行会被复用）
+            reject(Object.assign(new Error(t('common.tooManyRequests')), { status: 429 }))
           } else {
             reject(new Error(`HTTP ${xhr.status}`))
           }

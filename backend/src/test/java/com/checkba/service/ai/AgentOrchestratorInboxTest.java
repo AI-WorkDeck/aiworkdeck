@@ -351,6 +351,47 @@ class AgentOrchestratorInboxTest {
         verify(messageService).saveMessage(any(), any(), eq(CONV), eq("USER"), eq("change direction"), any(), eq("steer-key"));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void legalSourceSteeringDropsOldRequestGateButKeepsVendorFailureBudget(boolean sourceDown) {
+        when(tools.getAllSpecifications(any(), any())).thenReturn(
+                List.of("get_law_article", "search_web", "browse_url", "memory_list").stream()
+                        .map(name -> ToolSpecification.builder().name(name).description(name).build()).toList());
+        doAnswer(inv -> {
+            String prompt = inv.getArgument(2);
+            return new ArrayList<ChatMessage>(List.of(SystemMessage.from("system"),
+                    UserMessage.from("民法典第1082条是什么"), UserMessage.from(prompt), UserMessage.from(prompt)));
+        }).when(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        when(tools.execute(eq("get_law_article"), any(), any())).thenReturn(new ToolRegistry.ToolResult(
+                "Error: " + com.checkba.service.ai.tools.LegalTools.VENDOR_UNAVAILABLE_MARKER, null, true));
+        when(tools.execute(eq("memory_list"), any(), any())).thenAnswer(inv -> {
+            inbox.submit(request("改为只查官网，不用法宝", "legal-source-steer", "steer"), 7L);
+            return new ToolRegistry.ToolResult("no saved notes", null, true);
+        });
+        when(tools.execute(eq("search_web"), any(), any())).thenReturn(new ToolRegistry.ToolResult("web result", null, true));
+        when(tools.execute(eq("browse_url"), any(), any())).thenReturn(new ToolRegistry.ToolResult("page text", null, true));
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(scripted(
+                AiMessage.from(tool(sourceDown ? "get_law_article" : "search_web", "first")),
+                AiMessage.from(tool("memory_list", "steering-boundary")),
+                AiMessage.from(tool("search_web", "web-1")),
+                AiMessage.from(tool("browse_url", "web-2")),
+                AiMessage.from(tool("search_web", "web-3")),
+                AiMessage.from("资料待核对。")));
+
+        AgentInboxItem first = inbox.submit(request("民法典第938条是什么", "legal-source-first", "steer"), 7L);
+        orchestrator.acceptInboxSubmission(first.getId(), false);
+
+        assertTrue(modelToolNames.get(0).contains("get_law_article"), "法条工具必须确实下发");
+        assertTrue(rows.values().stream().anyMatch(r -> "legal-source-steer".equals(r.getClientRequestId())
+                && AgentInboxService.APPLIED.equals(r.getState())));
+        assertTrue(modelRequests.stream().anyMatch(ms -> ms.stream().anyMatch(m -> m instanceof UserMessage
+                && text(m).contains("改为只查官网，不用法宝"))));
+        if (!sourceDown) assertTrue(modelRequests.stream().anyMatch(ms -> ms.stream().anyMatch(m ->
+                m instanceof ToolExecutionResultMessage && text(m).contains("未执行"))), "插话前确实先拦网页");
+        verify(tools, times(sourceDown ? 1 : 2)).execute(eq("search_web"), any(), any());
+        verify(tools, times(1)).execute(eq("browse_url"), any(), any());
+    }
+
     @Test
     void steeringAttachmentIsAugmentedIntoTheNextModelRequest() throws Exception {
         CountDownLatch toolEntered = new CountDownLatch(1);
@@ -914,6 +955,76 @@ class AgentOrchestratorInboxTest {
             assertTrue(readDone.await(3, TimeUnit.SECONDS));
             run.join(3_000);
         }
+    }
+
+    @Test
+    void webRunsBeyondThePerUserLimitAreQueuedNotRefusedAndStartWhenASlotFrees() throws Exception {
+        orchestrator.webAdmissionExecutor = Runnable::run;
+        int limit = AgentOrchestrator.WEB_ACTIVE_RUNS_PER_USER;
+        CountDownLatch entered = new CountDownLatch(limit), release = new CountDownLatch(1);
+        Set<String> toolConversations = ConcurrentHashMap.newKeySet();
+        when(tools.execute(eq("read"), any(), any())).thenAnswer(inv -> {
+            toolConversations.add(inv.getArgument(2, com.checkba.service.ai.tools.ToolContext.class).conversationId());
+            entered.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            return new ToolRegistry.ToolResult("done", null, true);
+        });
+        // 每个会话：首轮调一次阻塞工具，拿到结果后收尾
+        when(modelFactory.getStreamingChatModel(MODEL)).thenReturn(new StreamingChatLanguageModel() {
+            @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                generate(messages, List.of(), handler);
+            }
+            @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> specifications,
+                                           StreamingResponseHandler<AiMessage> handler) {
+                modelRequests.add(new ArrayList<>(messages));
+                boolean toolDone = messages.stream().anyMatch(m -> m instanceof ToolExecutionResultMessage);
+                AiMessage reply = toolDone ? AiMessage.from("done") : AiMessage.from(List.of(tool("read", "r-" + messages.size())));
+                if (reply.text() != null) handler.onNext(reply.text());
+                handler.onComplete(Response.from(reply));
+            }
+        });
+        List<Thread> runs = new ArrayList<>();
+        for (int i = 0; i < limit; i++) {
+            var item = inbox.submit(webRequest("conv-web-" + i, "web-" + i), 7L);
+            Thread run = new Thread(() -> orchestrator.acceptInboxSubmission(item.getId()));
+            runs.add(run);
+            run.start();
+        }
+        assertTrue(entered.await(5, TimeUnit.SECONDS), "前 " + limit + " 个网页轮次应当都已起跑");
+
+        var extra = inbox.submit(webRequest("conv-web-extra", "web-extra"), 7L);
+        assertNull(orchestrator.acceptInboxSubmission(extra.getId()), "超出上限：排队而不是起跑");
+        assertEquals(AgentInboxService.PENDING, rows.get(extra.getId()).getState(), "排队条目留在 inbox，不报错不丢");
+        assertNull(orchestrator.activeRunId("conv-web-extra"));
+
+        // 别的用户、或桌面会话不受这个用户的网页名额影响
+        when(members.hasReadPermission(42L, 8L)).thenReturn(true);
+        var otherUser = inbox.submit(webRequest("conv-web-other-user", "web-other"), 8L);
+        Thread other = new Thread(() -> orchestrator.acceptInboxSubmission(otherUser.getId()));
+        other.start();
+        var desktop = request("desktop", "desk-1", "steer");
+        desktop.setConversationId("conv-desktop");
+        var desktopItem = inbox.submit(desktop, 7L);
+        Thread desk = new Thread(() -> orchestrator.acceptInboxSubmission(desktopItem.getId()));
+        desk.start();
+
+        release.countDown();
+        for (Thread run : runs) run.join(5000);
+        other.join(5000);
+        desk.join(5000);
+        long deadline = System.currentTimeMillis() + 5000;
+        while (!toolConversations.contains("conv-web-extra") && System.currentTimeMillis() < deadline) Thread.sleep(20);
+        assertTrue(toolConversations.contains("conv-web-extra"), "腾出名额后排队条目应自动起跑");
+        assertEquals(AgentInboxService.APPLIED, rows.get(extra.getId()).getState());
+        assertTrue(toolConversations.contains("conv-web-other-user"));
+        assertTrue(toolConversations.contains("conv-desktop"));
+    }
+
+    private static AiAgentController.AgentChatRequest webRequest(String conversationId, String key) {
+        AiAgentController.AgentChatRequest r = request("web turn " + key, key, "steer");
+        r.setConversationId(conversationId);
+        r.setClientCapability("web");
+        return r;
     }
 
     private StreamingChatLanguageModel scripted(AiMessage... script) {

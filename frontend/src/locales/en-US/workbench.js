@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  scratchCopyChoose: "Choose content to copy",
+  scratchCopySelected: "{count} selected",
+  scratchCopyFiles: "Files",
+  scratchCopyConversations: "Conversations",
+  scratchCopyNoProjects: "No eligible projects. Create a project first.",
   scratchCopyTitle: "Copy to a project",
   scratchCopyHint: "Copy selected conversations and files, keeping the originals. Members of the destination project can access the copies.",
   restartPending: '{count} tasks can be resumed',
@@ -37,6 +42,7 @@ export default {
   looseFilesOpenFile: 'Open File…',
   looseFilesOpenFolder: 'Open Folder…',
   mobileBackup: {
+    "undecided": "Decision needed",
     "cleanupDeadline": "Pay the outstanding balance by {time} to avoid cloud content deletion. Local files are unaffected.",
     "billingSummary": "Amount due: {debt}; available credit: {available}.",
     "manageBilling": "Account and billing",
@@ -368,7 +374,7 @@ export default {
   selectionReplaced: 'Selection replaced',
   replaceFailed: 'Replace failed',
   fileAdded: 'Added: {name}',
-  filesAdded: 'Added {count} files',
+  filesAdded: 'Added {count} file | Added {count} files',
   // Dropping into the AI chat area (dev-board#779 K6 (5))
   dragUnsupported: 'This content cannot be dropped here; drop a file, an editor tab, or a file from your computer',
   dragFolderUnsupported: 'The chat area accepts files only; drop a whole folder onto the file explorer on the left',

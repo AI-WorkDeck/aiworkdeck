@@ -27,7 +27,11 @@ spring:
     # MODE=PostgreSQL：兼容实体里的 PG 风格列定义（如 jsonb）
     # NON_KEYWORDS=VALUE：system_setting.value 列与 H2 保留字冲突的豁免
     # AUTO_SERVER=TRUE：进程重复启动时附着到已有实例而非文件锁报错
-    url: jdbc:h2:file:${user.home}/.aiworkdeck/local;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;AUTO_SERVER=TRUE
+    # OPTIMIZE_REUSE_RESULTS=FALSE（S22）：H2 默认会在同一连接上复用同 SQL 同参数的上次结果，
+    #   而表的修改序号要到对方提交可见之后才推进——「读 → 等锁 → 再读同一查询」会读到等锁前的旧行
+    #   （云端 LawFirmWorkflowService 在 H2 测试库上踩过；桌面端暂存区配额与助手抄送导入也有同形代码）。
+    #   PostgreSQL 无此行为。实测（2000 文件项目）关掉后冷打开 +1–2%、文件树 +0.5–1ms、轮询无差异。
+    url: jdbc:h2:file:${user.home}/.aiworkdeck/local;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;AUTO_SERVER=TRUE;OPTIMIZE_REUSE_RESULTS=FALSE
     username: sa
     password:
     hikari:

@@ -132,7 +132,8 @@
 </template>
 
 <script>
-import { createProject } from '@/services/api.js'
+import { createProject, getCurrentUser as fetchCurrentUser } from '@/services/api.js'
+import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { getCurrentUser } from '@/utils/auth.js'
 import { openFolderFlow, createFolderFlow } from '@/utils/ideOpen.js'
 import { host } from '@/services/host.js'
@@ -151,15 +152,20 @@ export default {
     }
   },
   onLoad(query) {
-    const user = getCurrentUser()
-    if (user) {
-      this.userDisplayName = user.displayName || this.$t('account.defaultUserName')
-      this.userAvatarUrl = user.avatarUrl
-    }
+    this.refreshUser()
+    // 登录/退出/改昵称之后跟着变（英文 QA 2026-11-14 第 7 条：已登录仍显示「User」——
+    // 只在 onLoad 读一次本地缓存，而桌面本地会话里缓存的用户没有昵称）
+    this._onUserChanged = () => this.refreshUser()
+    uni.$on(ACCOUNT_CHANGED_EVENT, this._onUserChanged)
+    uni.$on('awd:identity-updated', this._onUserChanged)
     // 应用菜单「新建项目文件夹…」跳入时自动拉起流程
     if (query && query.auto === 'create-folder') {
       setTimeout(() => { if (this.isDesktop) this.onCreateFolder() }, 300)
     }
+  },
+  onUnload() {
+    uni.$off(ACCOUNT_CHANGED_EVENT, this._onUserChanged)
+    uni.$off('awd:identity-updated', this._onUserChanged)
   },
   computed: {
     isDesktop() {
@@ -172,6 +178,19 @@ export default {
     },
   },
   methods: {
+    // 与设置页侧栏用户卡同一来源：先用缓存渲染，再拉 /api/auth/me 校正
+    async refreshUser() {
+      const apply = (u) => {
+        if (!u) return
+        if (u.displayName) this.userDisplayName = u.displayName
+        if (u.avatarUrl) this.userAvatarUrl = u.avatarUrl
+      }
+      apply(getCurrentUser())
+      try {
+        const res = await fetchCurrentUser()
+        if (res && res.code === 0) apply(res.data)
+      } catch (e) { /* 拉不到就保留缓存值 */ }
+    },
     // 两端都不是工作台（工作台参与的跳转才 reLaunch）；与 project-home.vue 的 goProjectList 同一分流
     goToProjectList() {
       // 从项目列表页 navigateTo 进本页时，双向 navigateTo 会在页面栈里堆出

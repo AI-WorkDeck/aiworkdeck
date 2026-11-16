@@ -17,14 +17,14 @@
     <p v-if="busy" role="status">{{ $t(busy === 'test' ? 'mcp.testing' : 'common.loading') }}</p>
     <p v-if="error" role="alert" class="mcp-error">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
-    <form v-if="importOpen" class="mcp-editor mcp-import" @submit.prevent="previewImport">
+    <form v-if="importOpen" class="mcp-editor mcp-import">
       <h3>{{ $t('mcp.import') }}</h3>
       <p class="mcp-note">{{ $t('mcp.importHint') }}</p>
       <p class="mcp-note">{{ $t('mcp.commandHint') }}</p>
       <label>{{ $t('mcp.importFile') }}<input ref="importFile" type="file" accept=".json,application/json" :disabled="!!busy" @change="readImportFile" /></label>
       <label>{{ $t('mcp.importJson') }}<textarea v-model="importJson" :disabled="!!busy" rows="7" spellcheck="false" autocomplete="off" dir="ltr" @input="invalidatePreview" /></label>
       <div class="mcp-actions">
-        <button type="submit" :disabled="!!busy || !importJson.trim()">{{ $t('mcp.preview') }}</button>
+        <button type="button" :disabled="!!busy || !importJson.trim()" @click="previewImport">{{ $t('mcp.preview') }}</button>
         <button type="button" :disabled="!!busy" @click="closeImport">{{ $t('common.cancel') }}</button>
       </div>
       <div v-if="importPreview" class="mcp-preview">
@@ -42,7 +42,7 @@
         <button type="button" :disabled="!!busy || !selectedIndices.length" @click="importSelected">{{ $t('mcp.importSelected', { count: selectedIndices.length }) }}</button>
       </div>
     </form>
-    <form v-if="draft" class="mcp-editor" @submit.prevent="save">
+    <form v-if="draft" class="mcp-editor">
       <label>{{ $t('mcp.name') }}<input v-model="draft.name" name="mcp-name" required maxlength="100" autocomplete="off" /></label>
       <label>{{ $t('mcp.transportLabel') }}
         <select v-model="draft.transport" name="mcp-transport" :disabled="!!draft.presetId" @change="draft.pairs = []">
@@ -85,7 +85,7 @@
       </details>
       <p class="mcp-note">{{ $t('mcp.dataNotice') }}</p>
       <div class="mcp-actions">
-        <button type="submit" :disabled="!!busy || !draft.name.trim() || !(draft.transport === 'stdio' ? draft.command.trim() : draft.url.trim())">{{ $t('common.save') }}</button>
+        <button type="button" :disabled="!!busy || !draft.name.trim() || !(draft.transport === 'stdio' ? draft.command.trim() : draft.url.trim())" @click="save">{{ $t('common.save') }}</button>
         <button type="button" :disabled="!!busy" @click="draft = null">{{ $t('common.cancel') }}</button>
       </div>
     </form>

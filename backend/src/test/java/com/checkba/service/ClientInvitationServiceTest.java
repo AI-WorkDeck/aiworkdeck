@@ -163,6 +163,19 @@ class ClientInvitationServiceTest {
     }
 
     @Test
+    @DisplayName("门户里填了项目沟通的邀请码：说明这是群聊码、去哪儿用，而不是「访问码无效」")
+    void chatInvitationCodeIsExplainedInsteadOfInvalid() {
+        var chat = mock(com.checkba.repository.ImInvitationRepository.class);
+        String code = "Gq0B3kq7n0Vh2b6sXfJm4pQe9tZcWy1a";
+        when(chat.existsById(com.checkba.service.im.ImService.sha(code.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "chatInvitations", chat);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service.validateCode(code));
+        assertTrue(e.getMessage().contains("消息中心") || e.getMessage().contains("Message Center"), e.getMessage());
+        IllegalArgumentException unknown = assertThrows(IllegalArgumentException.class, () -> service.validateCode("NOT-A-CODE"));
+        assertTrue(unknown.getMessage().contains("访问码无效") || unknown.getMessage().contains("Invalid access code"), unknown.getMessage());
+    }
+
+    @Test
     @DisplayName("没有 expiresAt 的老码按签发时间 + 30 天推算")
     void legacyCodeExpiresFromCreatedAt() {
         ProjectInvitation old = invitation(5L, 1L);

@@ -147,6 +147,26 @@ export default {
     "titles": "Masukkan judul untuk setiap item."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Undangan ini untuk akun AI WorkDeck. Anda dapat berbicara dengan pengacara Anda di obrolan proyek di sini.",
+      "openChat": "Buka obrolan proyek",
+      "joinFirst": "Masuk dulu ke proyek dengan kode akses yang dikirim pengacara Anda, lalu gunakan obrolan proyek.",
+      "title": "Obrolan Proyek",
+      "hint": "Berdiskusi dengan tim hukum Anda tentang proyek ini. Pengacara Anda yang menentukan pesan dan berkas sebelumnya yang dapat Anda lihat.",
+      "tabChecklist": "Daftar periksa",
+      "loading": "Memuat pesan…",
+      "empty": "Belum ada pesan. Anda dapat bertanya kepada pengacara Anda di sini.",
+      "older": "Muat pesan sebelumnya",
+      "you": "Anda",
+      "filePending": "Berkas masih disiapkan. Silakan hubungi pengacara Anda.",
+      "placeholder": "Ketik pesan. Enter untuk mengirim, Shift+Enter untuk baris baru",
+      "attach": "Kirim berkas",
+      "send": "Kirim",
+      "sending": "Mengirim…",
+      "fileTooLarge": "Satu berkas tidak boleh lebih dari {size} MB",
+      "quotaFull": "Anda telah mencapai batas total unggahan {size} MB untuk proyek ini. Silakan hubungi pengacara Anda.",
+      "unavailable": "Obrolan proyek sedang tidak tersedia. Silakan coba lagi nanti."
+    },
     "messageUnavailable": "Proyek undangan atau daftar periksa ini tidak lagi tersedia. Segarkan dan coba lagi.",
     "workspaceTitle": "Kolaborasi klien",
     "workspaceHint": "Siapkan dokumen dari daftar periksa pengacara Anda, kirimkan setiap item, dan ikuti umpan baliknya.",

@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Ukuran: {size}",
   "renderingDoc": "Merender dokumen…",
   "renderingSlides": "Merender presentasi…",
+  "slidesNotShown": "{count} slide lainnya tidak ditampilkan. Buka file untuk melihat semuanya.",
   "officePreviewUnsupported": "Pratinjau daring tidak tersedia untuk berkas ini",
   "fileTypeHintOpenLocal": "Tipe berkas: {type}. Cari di Finder atau File Explorer dan buka dengan aplikasi lokal.",
   "unknown": "Tidak diketahui",

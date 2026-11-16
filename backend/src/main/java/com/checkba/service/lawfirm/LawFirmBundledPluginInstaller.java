@@ -115,6 +115,8 @@ public class LawFirmBundledPluginInstaller {
         if (pluginService.getPlugin(PLUGIN_ID) == null) {
             throw new IllegalStateException(LangText.of("律所管理插件登记失败，请查看日志", "Failed to register Law Firm Management plugin; please check the logs"));
         }
+        // 随宿主发的包与宿主同一信任级：刚写入的内置版本的工具定义直接批准，不打扰用户
+        if (installed) pluginService.approveBundledToolDefinitions(PLUGIN_ID, bundledManifest);
         String incompatible = pluginService.incompatibleReason(PLUGIN_ID);
         if (incompatible != null) throw new IllegalStateException(incompatible);
         if (!pluginService.isEnabled(PLUGIN_ID)) {

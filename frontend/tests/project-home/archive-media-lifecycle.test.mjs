@@ -46,7 +46,7 @@ function mediaHarness() {
     file: { name: '照片.jpg', fileType: 'jpg' }, fileUrl: 'blob:archive-entry', blobUrl: '', pdfStreamUrl: '',
     sourceUrl: 'blob:archive-entry', loading: false,
     getMimeType: () => 'image/jpeg', $t: key => key,
-    clearEvidenceRectTimers() {}, unbindImageViewportListeners() {}, resetImageViewState() {},
+    clearEvidenceRectTimers() {}, unbindImageViewportListeners() {}, resetImageViewState() {}, revokeSlideUrls() {},
     loadTextContent() { calls.textLoads++ },
   }
   for (const [name, fn] of Object.entries(methods)) vm[name] = fn.bind(vm)

@@ -734,6 +734,8 @@
             @ocr-files="onExplorerOcr"
             @create-recording="onCreateRecording"
           />
+          <!-- 已自动合入的相邻段落，请过目（版本面板上方；点开一次才消失，与版本入口小角标同源） -->
+          <MergeNeighborNotices v-if="leftPaneKey === 'version' && hasNamedProject" :project-id="projectId" />
           <view v-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
             <component :is="'button'" type="button" class="dd-client-nav" :class="{ active: workspaceTabState('dd-client') === 'active' }" :aria-current="workspaceTabState('dd-client') === 'active' ? 'page' : undefined" @click.stop="openDdClientTab">
               <text class="dd-client-nav-label">{{ $t('ddWorkflow.client.invitedProjects') }}</text>
@@ -1264,7 +1266,7 @@
                       :key="activeFileLeft.id"
                       :version-spec="activeFileLeft.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" :open-projects="openProjectsPane" />
                     <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" :navigation-target="activeFileLeft.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
@@ -1548,7 +1550,7 @@
                       :key="activeFileRight.id"
                       :version-spec="activeFileRight.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" :open-projects="openProjectsPane" />
                     <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" :navigation-target="activeFileRight.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
@@ -2030,6 +2032,7 @@
         v-if="quickLookFile"
         :file="quickLookFile"
         :project-id="projectId"
+        :render-slides="libreOfficePreferred ? renderSlidesForPreview : null"
         @close="closeQuickLook"
         @navigate="navigateQuickLook"
         @open="handleFileTreeOpen(quickLookFile)"
@@ -2410,6 +2413,7 @@
 </template>
 
 <script>
+import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
 import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
 import { defineAsyncComponent } from 'vue'
@@ -2462,6 +2466,7 @@ import InsightHoverCard from '@/components/InsightHoverCard.vue'
 import LegalReferencePane from '@/components/legal/LegalReferencePane.vue'
 import InsightEntityDetailPane from '@/components/InsightEntityDetailPane.vue'
 import VersionPanel from '@/components/version/VersionPanel.vue'
+import MergeNeighborNotices from '@/components/version/MergeNeighborNotices.vue'
 import CommitHistoryTab from '@/components/version/CommitHistoryTab.vue'
 // 异步组件：历史上是为了不把 FullCalendar 拖进工作台主 chunk；dev-board#899 重做后面板
 // 已不依赖 FullCalendar，懒加载保留（只有点开「日程」面板的会话才付这份代码的成本）。
@@ -2543,7 +2548,7 @@ import {
 } from '@/services/api.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
-import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { requireAccount, requireSubscription, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
@@ -2688,6 +2693,7 @@ export default {
     }
   },
   components: {
+    MergeNeighborNotices,
     CrossBorderConsentCard,
     ScratchTransferDialog,
     BackendHealthStatus,
@@ -2748,6 +2754,8 @@ export default {
   },
   data() {
     return {
+      // 已自动合入的相邻段落还没过目的条数（mergeNeighborNotices.js），版本入口的小角标用
+      mergeNeighborUnseen: 0,
       pdfRecovery: null,
       restartPendingTasks: [],
       restartRestoring: false,
@@ -2806,7 +2814,7 @@ export default {
       graceDays: 0,
       // Credits 余额 chip（dev-board#187）。loaded=false 或 connected=false 时不渲染，
       // 绝不显示 0 冒充余额；available=false（官网不可达）时余额位显示「—」。
-      wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null },
+      wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 },
 
       // 布局状态
       viewMode: 'ide',
@@ -3194,12 +3202,13 @@ export default {
     railScheduleCount() {
       return this.railScheduleSummary.overdue + this.railScheduleSummary.today
     },
-    // 余额不足：低于 20 元（2000 分）视为要提醒。官网不可达（余额未知）不算——
-    // 那是连接问题不是钱的问题，用「—」表达就够了，不该冒充告急。
+    // 余额不足：低于 1 Credit（100 分）且当前无有效个人 Pro 订阅额度时才提醒。
+    // 官网不可达（余额未知）不算；新户 $9.90 / Pro 订阅期内置余额也不应误报红点。
     walletLow() {
       if (this.wallet.available === false) return false
+      if (Number(this.wallet.subscriptionAvailableCents) > 0) return false
       const cents = Number(this.wallet.balanceCents)
-      return Number.isFinite(cents) && cents < 2000
+      return Number.isFinite(cents) && cents < 100
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -3330,13 +3339,14 @@ export default {
     versionWorkStatusLabel() {
       const s = this.versionWorkStatus
       if (s.onDraft && s.onDraft.name) return this.$t('workbench.workingOnDraft', { name: s.onDraft.name })
-      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }) : this.$t('version.changesAutoRecorded')
+      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }, s.changedCount) : this.$t('version.changesAutoRecorded')
       return ''
     },
     versionEntry() {
-      return versionEntryState((key, params) => this.$t(key, params), {
+      return versionEntryState((key, params, plural) => (plural === undefined ? this.$t(key, params) : this.$t(key, params, plural)), {
         status: this.versionWorkStatus, cloud: this.collabCloud,
         conflict: this.adoptConflictPending, unavailable: this.versionStatusError,
+        review: this.mergeNeighborUnseen,
       })
     },
     isClientView() {
@@ -3483,6 +3493,7 @@ export default {
           return this.loadHistoryChat(conversation)
         },
         openAccount: () => this.openSettingsTab({ nav: 'account' }),
+        subscribePro: () => requireSubscription(),
         importVoiceText: signal => new Promise(resolve => {
           this.handleFilePickerCancel()
           const finish = (text, fileId) => {
@@ -3844,6 +3855,7 @@ export default {
     }
   },
   beforeUnmount() {
+    if (this._onMergeNeighbors) uni.$off(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
     clearTimeout(this._selectionRefreshTimer)
     this.resetPdfPreviewPool()
     this._pdfPreviewRefs = {}
@@ -4291,6 +4303,9 @@ export default {
     }
   },
   mounted() {
+    this._onMergeNeighbors = () => this.refreshMergeNeighborUnseen()
+    uni.$on(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
+    this.refreshMergeNeighborUnseen()
     this._stopPluginUpdateChecks = startPluginUpdateChecks()
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
@@ -4687,7 +4702,7 @@ export default {
       this._historyEscHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.showHistoryDrawer = false } }
       window.addEventListener('keydown', this._historyEscHandler, true)
     },
-    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
+    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
     pdfPermissionIdentity() { this.resetPdfPreviewPool() },
@@ -4787,6 +4802,9 @@ export default {
     'rightFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
   },
   methods: {
+    refreshMergeNeighborUnseen() {
+      this.mergeNeighborUnseen = this.projectId ? unseenMergeNeighborNotices(this.projectId).length : 0
+    },
     // 批量命令（find_replace 逐命中路径 / apply_house_style）的「第 x/y 处」进度
     // （dev-board#108）。AI 过程卡没有工具内进度位，先用 toast 降级显示；一批一帧
     // （30 命中 / 500 元素），不会刷屏。total=0 表示命令不预知总数。
@@ -4875,13 +4893,16 @@ export default {
             available: data.available !== false,
             balanceCents: data.balanceCents,
             membership: data.membership || null,
+            subscriptionAvailableCents: data.subscription && data.subscription.active
+              ? Number(data.subscription.availableCents || 0)
+              : 0,
           }
         } else {
-          this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
+          this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 }
         }
       } catch (e) {
         // 旧后端没有该端点 / 请求失败：chip 不渲染
-        this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
+        this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 }
       }
     },
     /** 宽限弹窗的主按钮：联网复验那条去账户设置，其余去官网。 */
@@ -8001,7 +8022,7 @@ export default {
             if (ok) count++
         })
         if (multi && count > 0) {
-            uni.showToast({ title: this.$t('workbench.filesAdded', { count }), icon: 'none' })
+            uni.showToast({ title: this.$t('workbench.filesAdded', { count }, count), icon: 'none' })
         }
     },
     /** 已打开的标签（两侧窗格）按 id 查一条；id 统一按字符串比较 */

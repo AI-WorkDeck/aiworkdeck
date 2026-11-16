@@ -148,6 +148,26 @@ export default {
     "titles": "Vui lòng nhập tiêu đề cho tất cả các mục."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Lời mời này dành cho tài khoản AI WorkDeck. Bạn có thể trao đổi với luật sư trong cuộc trò chuyện dự án tại đây.",
+      "openChat": "Mở trò chuyện dự án",
+      "joinFirst": "Trước tiên hãy vào dự án bằng mã truy cập luật sư đã gửi cho bạn, sau đó dùng trò chuyện dự án.",
+      "title": "Trò chuyện dự án",
+      "hint": "Trao đổi với đội ngũ pháp lý của bạn về dự án này. Luật sư của bạn quyết định bạn được xem những tin nhắn và tệp trước đó nào.",
+      "tabChecklist": "Danh mục kiểm tra",
+      "loading": "Đang tải tin nhắn…",
+      "empty": "Chưa có tin nhắn. Bạn có thể hỏi luật sư của mình tại đây.",
+      "older": "Tải tin nhắn cũ hơn",
+      "you": "Bạn",
+      "filePending": "Tệp vẫn đang được chuẩn bị. Vui lòng liên hệ luật sư của bạn.",
+      "placeholder": "Nhập tin nhắn. Nhấn Enter để gửi, Shift+Enter để xuống dòng",
+      "attach": "Gửi tệp",
+      "send": "Gửi",
+      "sending": "Đang gửi…",
+      "fileTooLarge": "Một tệp không được vượt quá {size} MB",
+      "quotaFull": "Bạn đã đạt giới hạn tải lên tổng cộng {size} MB cho dự án này. Vui lòng liên hệ luật sư của bạn.",
+      "unavailable": "Trò chuyện dự án hiện không khả dụng. Vui lòng thử lại sau."
+    },
     "messageUnavailable": "Dự án hoặc danh mục được mời này không còn khả dụng. Vui lòng làm mới và thử lại.",
     "workspaceTitle": "Cộng tác khách hàng",
     "workspaceHint": "Chuẩn bị tài liệu theo danh mục của luật sư, nộp từng mục và theo dõi phản hồi.",

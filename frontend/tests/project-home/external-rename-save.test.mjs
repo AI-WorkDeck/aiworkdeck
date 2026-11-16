@@ -188,3 +188,21 @@ test('后端 404（记录已被对账移除）同样落成 movedSaveFailed', asy
   assert.equal(vm.statusKey, 'movedSaveFailed')
   assert.equal(vm.dirty, true)
 })
+
+// O14：打开时有密码的文件，上传的必须是 sealForStorage 重新加密后的字节；加密失败整笔放弃，不传明文。
+test('有打开密码的文件：上传的是重新加密后的字节；加密失败不上传', async () => {
+  const sent = []
+  const sealed = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])
+  const vm = makeVm({ uploadBytes: async (url, bytes) => { sent.push(bytes) }, sealForStorage: async (u8, fileId) => { assert.equal(fileId, 7); return sealed } })
+  assert.equal(await vm.saveDocument(), true)
+  assert.deepEqual(sent, [sealed])
+
+  const vm2 = makeVm({ uploadBytes: async (url, bytes) => { sent.push(bytes) }, sealForStorage: async () => { throw new Error('encrypt failed') } })
+  assert.equal(await vm2.saveDocument(), false)
+  assert.equal(sent.length, 1, '加密失败绝不上传明文')
+  assert.equal(vm2.statusKey, 'saveFailed')
+
+  globalThis.uni = { showToast() {} }
+  const vm3 = makeVm({ sealForStorage: async () => { throw new Error('encrypt failed') } })
+  assert.equal(await vm3.saveCopyAs(), false, '「另存为」同样不落明文副本')
+})

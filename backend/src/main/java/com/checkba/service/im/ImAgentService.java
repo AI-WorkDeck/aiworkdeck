@@ -299,7 +299,10 @@ public class ImAgentService {
             if (readable) readers.add(m.getUserId());
             client.put(m.getUserId(),isClient); fingerprint.append('|').append(m.getUserId()).append(':').append(m.getRole()).append(':').append(isClient).append(':').append(readable);
         });
-        List<ImMessage> history=new ArrayList<>(messages.findByConversationIdAndIdLessThanOrderByIdDesc(c.getId(),sourceId+1,PageRequest.of(0,24)).getContent());
+        // The reply is posted to every member, so it may only draw on messages every member can read.
+        long floor=audience.stream().map(ImMember::getHistoryAfterId).filter(Objects::nonNull).mapToLong(Long::longValue).max().orElse(0);
+        if (sourceId<=floor) throw bad("audience changed");
+        List<ImMessage> history=new ArrayList<>(messages.findByConversationIdAndIdGreaterThanAndIdLessThanOrderByIdDesc(c.getId(),floor,sourceId+1,PageRequest.of(0,24)).getContent());
         Collections.reverse(history);
         StringBuilder context=new StringBuilder("当前会话："+c.getTitle()+"\n层级："+c.getAgentScope()+"\n会话内容（按时间顺序，最后一条是待回复消息）：\n");
         List<AttachmentRef> readableFiles=new ArrayList<>();

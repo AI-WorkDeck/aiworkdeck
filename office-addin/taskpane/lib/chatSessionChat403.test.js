@@ -39,7 +39,7 @@ globalThis.Word = {
   run: async (cb) => cb({ document: { body: { load() {}, text: '' } }, sync: async () => {} })
 }
 
-const { activateSession, send, messages, stop } = await import('./chatSession.js')
+const { activateSession, send, messages, stop, banner } = await import('./chatSession.js')
 const { t, ZH } = await import('./i18n.js')
 // 会话 ID 的存储键除了项目与宿主，还按**文档**分一层（dev-board#717）：同项目里的两份
 // Word 必须拿到各自的 conversationId，否则跨文档读写按会话下发时两个窗格分不开。
@@ -137,7 +137,8 @@ test('重发仍失败才报错，且文案说清下一步（不是裸的 HTTP 40
 
     // 一共两次 chat：原会话一次 + 新会话重发一次，不无限重试
     assert.equal(chatConversationIds(f.calls).length, 2)
-    const err = lastAssistant().error
+    // 发送失败不留空助手气泡：错误走横幅，消息放回输入框（见 chatSessionSendFailure.test.js）
+    const err = banner.value
     assert.equal(err, t('conversationExpiredRetryFailed'))
     assert.ok(!/HTTP 403/.test(err), '错误文案不该把裸状态码甩给用户: ' + err)
   } finally {
@@ -165,7 +166,7 @@ test('有落库历史的会话 403 不换 ID（那是归属问题），文案如
     assert.equal(issued, 0, '有历史的会话不该被悄悄丢掉换新的')
     assert.deepEqual(chatConversationIds(f.calls), ['conv-owned-by-someone-else'])
     assert.equal(store.get(convKey(23)), 'conv-owned-by-someone-else')
-    assert.equal(lastAssistant().error, t('conversationDenied'))
+    assert.equal(banner.value, t('conversationDenied'))
   } finally {
     await stop()
     f.restore()

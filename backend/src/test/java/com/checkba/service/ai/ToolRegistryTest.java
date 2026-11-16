@@ -347,6 +347,7 @@ class ToolRegistryTest {
         meta.setTools(List.of(info));
         ps.getPlugins().add(meta);
         ps.registerToolObject(new FakePluginTools(), pluginId);
+        ps.approveToolChanges(pluginId, null); // 手工登记绕过了 loadPlugins 的基线对账，这里显式批准
         return ps;
     }
 

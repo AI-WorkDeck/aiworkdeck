@@ -1206,7 +1206,7 @@ public class ProjectRepoService {
 
     private static final Set<String> MERGE_CONTEXTS =
             Set.of(MERGE_CONTEXT_ADOPT, MERGE_CONTEXT_CLOUD, MERGE_CONTEXT_SESSION_END);
-    private static final Set<String> DECISION_ACTIONS = Set.of("A", "R", "X", "F");
+    private static final Set<String> DECISION_ACTIONS = Set.of("A", "R", "X", "F", "N");
     private static final Set<String> DECISION_SIDES = Set.of("M", "T");
 
     /**
@@ -1223,14 +1223,32 @@ public class ProjectRepoService {
                 .toList();
         StringBuilder sb = new StringBuilder();
         for (MergeRecord m : sorted) {
+            // 自动合并只记两侧各合几处；相邻、已自动合入的单元（action N）追加成 Np3T 这样的项——
+            // 老的读侧按首字母只认 M/T，多出来的项原样跳过，兼容
             String list = "auto".equals(m.mode())
                     ? "M" + Math.max(0, m.mainCount()) + ",T" + Math.max(0, m.otherCount())
+                        + neighborItems(m.decisions())
                     : manualDecisionList(m.decisions());
             if (sb.length() > 0) sb.append("; ");
             sb.append(encodeResolutionPath(m.path())).append('=')
               .append(m.mode()).append(':').append(list);
         }
         return sb.length() == 0 ? null : sb.toString();
+    }
+
+    /** 自动合并那一笔里的相邻单元：{@code ,Np3T,Np5M}（上限同逐处裁决）。 */
+    private static String neighborItems(List<Decision> decisions) {
+        if (decisions == null || decisions.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        int written = 0;
+        for (Decision d : decisions) {
+            if (d == null || !"N".equals(d.action())) continue;
+            String one = decisionItem(d);
+            if (one == null || written >= MERGES_TRAILER_MAX_ITEMS) continue;
+            sb.append(",N").append(one, 0, one.length() - 1);
+            written++;
+        }
+        return sb.toString();
     }
 
     /** 逐处裁决：{@code p3MA,p7TA,p9X,p20F}，超过上限截断并追加 {@code +N}。 */
@@ -1264,7 +1282,7 @@ public class ProjectRepoService {
         String action = d.action() == null ? "" : d.action().trim();
         if (!DECISION_ACTIONS.contains(action)) return null;
         String side = d.side() == null ? "" : d.side().trim();
-        if ("A".equals(action) || "R".equals(action)) {
+        if ("A".equals(action) || "R".equals(action) || "N".equals(action)) {
             if (!DECISION_SIDES.contains(side)) return null;
         } else {
             side = "";
@@ -1301,9 +1319,16 @@ public class ProjectRepoService {
             if ("auto".equals(mode)) {
                 int mainCount = 0;
                 int otherCount = 0;
+                List<Decision> neighbors = new ArrayList<>();
                 for (String tok : list.split(",")) {
                     String t = tok.trim();
                     if (t.length() < 2) continue;
+                    if (t.charAt(0) == 'N') {
+                        // 相邻、已自动合入的单元：Np3T → (p3, T, N)
+                        Decision d = parseDecisionItem(t.substring(1) + "N");
+                        if (d != null) neighbors.add(d);
+                        continue;
+                    }
                     try {
                         int n = Integer.parseInt(t.substring(1));
                         if (t.charAt(0) == 'M') mainCount = n;
@@ -1312,7 +1337,7 @@ public class ProjectRepoService {
                         // 手工改花了的尾注：这一项不算数，别让整条历史读不出来
                     }
                 }
-                out.add(new VersionEntry.MergeSummary(path, "auto", List.of(), mainCount, otherCount));
+                out.add(new VersionEntry.MergeSummary(path, "auto", List.copyOf(neighbors), mainCount, otherCount));
             } else if ("manual".equals(mode)) {
                 List<Decision> decisions = new ArrayList<>();
                 for (String tok : list.split(",")) {
@@ -1332,7 +1357,7 @@ public class ProjectRepoService {
         if (!DECISION_ACTIONS.contains(action)) return null;
         String head = item.substring(0, item.length() - 1);
         String side = "";
-        if ("A".equals(action) || "R".equals(action)) {
+        if ("A".equals(action) || "R".equals(action) || "N".equals(action)) {
             if (head.isEmpty()) return null;
             side = head.substring(head.length() - 1);
             if (!DECISION_SIDES.contains(side)) return null;

@@ -184,3 +184,24 @@ test('desktop: local OCR services are started before the first file; failures an
   await web.vm.onExplorerOcr({ action: 'copy', items: [pdf(1)] })
   assert.ok(web.calls.some(c => c[0] === 'clipboard'), 'no desktop host: nothing to start')
 })
+
+test('server 429 rate limit: waits the retry hint and finishes the file instead of failing it', async () => {
+  let limited = 1
+  const { vm, calls } = fixture({ server: id => {
+    if (id === 2 && limited-- > 0) {
+      throw Object.assign(new Error('Too many requests'), { status: 429, data: { retryAfterSeconds: 0.01 } })
+    }
+    return { status: 'done', text: `T${id}` }
+  } })
+  const realTimeout = globalThis.setTimeout
+  const waits = []
+  globalThis.setTimeout = (fn, ms) => { waits.push(ms); return realTimeout(fn, 0) }
+  try {
+    await vm.onExplorerOcr({ action: 'copy', items: [pdf(1), pdf(2)] })
+  } finally {
+    globalThis.setTimeout = realTimeout
+  }
+  assert.deepEqual(calls.filter(c => c[0] === 'api').map(c => c[2]), [1, 2, 2], 'the limited file is retried once')
+  assert.deepEqual(waits, [1000], 'waits at least one second')
+  assert.deepEqual(calls.find(c => c[0] === 'clipboard').slice(1, 2), ['【s1.pdf】\nT1\n\n【s2.pdf】\nT2'])
+})

@@ -146,6 +146,7 @@ public class EditorBridgeService {
             // 原生「导出为 PDF」入口转宿主导出（dev-board#886），与 export_document 同量级。
             Map.entry("export_pdf", 180),
             Map.entry("build_merge_draft", 180),
+            Map.entry("resolve_merge_mechanics", 180),
             Map.entry("build_comparison_document", 180),
             // 宿主动作（agentClientActions.handleCompareDocxFiles）：取两份字节 + 隐藏引擎原生比较 + 导出 + 落盘，
             // 比 build_comparison_document 多读写两段，给 240 秒；三处同表。

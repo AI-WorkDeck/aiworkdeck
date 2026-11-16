@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "이 배치에서 로컬 인식이 완료되지 않은 파일은 클라우드 인식으로 처리할 수 있습니다. 사용하지 않으면 해당 파일은 업로드되지 않습니다.",
   "ocrLocalFailedConfirm": "클라우드 인식 사용",
   "ocrAlreadySearchable": "\"{name}\"에는 이미 텍스트 레이어가 있어 검색할 수 있으므로 새 파일을 만들지 않았습니다",
-  "ocrStopped": "중지됨, 미처리 {count}개"
+  "ocrStopped": "중지됨, 미처리 {count}개",
+  "subscribeProBtn": "Pro ¥9.9",
 }

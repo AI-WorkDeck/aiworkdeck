@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 150
     env:
       # 与 desktop-build.yml 相同的自建 zh-CN LOWA 引擎（脚本在缓存缺失时经 fetch-lowa-assets.js 拉取）
-      LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r8/
+      LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r10/
     steps:
       # 脚本取默认分支的版本；被测的 before/after 是 git ref，由脚本自己建临时 worktree，所以要完整历史。
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

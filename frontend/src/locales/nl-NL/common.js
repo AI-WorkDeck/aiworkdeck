@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Naar Instellingen",
   "later": "Op een later moment",
   "requestFailedWithStatus": "Aanvraag mislukt ({status})",
+  "tooManyRequests": "Te veel verzoeken. Wacht even en probeer het opnieuw",
   "smsVerificationRequired": "Deze actie vereist SMS-verificatie",
   "freeQuotaExceeded": "U hebt al uw gratis credits verbruikt",
   "serviceErrorRetryLater": "Servicefout. Probeer het later opnieuw",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "Taal selecteren",
   "languageFollowSystem": "Systeem volgen",
   "languageSearchPlaceholder": "Talen zoeken…",
-  "languageNoMatch": "Geen overeenkomende talen"
+  "languageNoMatch": "Geen overeenkomende talen",
+  "serverLabelAccountBridge": "Accountbrug",
+  "serverLabelGenericClient": "Klant (algemeen)",
+  "serverLabelPersonalMemory": "Persoonlijk geheugen",
+  "serverLabelProjectMemory": "Projectgeheugen"
 }

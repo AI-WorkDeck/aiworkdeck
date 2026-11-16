@@ -21,7 +21,7 @@
     <template v-else-if="working || changedCount > 0">
       <view class="session-status">
         <view class="session-dot" />
-        <text class="session-text">{{ changedCount ? $t('version.pendingFileCount', { count: changedCount }) : $t('version.changesAutoRecorded') }}</text>
+        <text class="session-text">{{ changedCount ? $t('version.pendingFileCount', { count: changedCount }, changedCount) : $t('version.changesAutoRecorded') }}</text>
       </view>
       <view class="session-actions">
         <component :is="'button'" type="button" class="session-btn session-btn-main" :disabled="busy" @click="openNaming">{{ $t('version.endSession') }}</component>

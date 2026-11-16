@@ -216,6 +216,20 @@ class HostServiceRegistryTest {
         assertFalse(out.contains("乙公司诉讼"));
     }
 
+    /** 团队服务器（非 local-mode）：三个 lawfirm 只读操作读的都是本机台账，即便是管理员也一律拒绝，且不触达台账。 */
+    @Test
+    void lawfirmReadsAreRefusedOnServerProfile() {
+        doThrow(new IllegalArgumentException("本机收费台账仅在桌面端可用")).when(lawfirm).requireLocalLedger();
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        for (var op : List.of(Map.entry("overview", Map.<String, Object>of()), Map.entry("overview", Map.<String, Object>of("projectId", 5)),
+                Map.entry("feeLedger", Map.<String, Object>of()), Map.entry("conflictCheck", Map.<String, Object>of("clientName", "甲公司")))) {
+            var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("lawfirm", op.getKey(), 7L, null, op.getValue()), op.getKey());
+            assertTrue(e.getMessage().contains("本机收费台账仅在桌面端可用"), e.getMessage());
+        }
+        verify(lawfirm, never()).execute(any(), any(), any(), any());
+        verify(lawfirm, never()).listProjectMatters(any());
+    }
+
     private void makeMember() {
         when(lawfirm.canViewFirmWide(7L)).thenReturn(false);
         doThrow(new IllegalArgumentException("无权查看：全所收费台账与看板仅限律所管理员")).when(lawfirm).requireFirmWide(7L);
@@ -315,6 +329,20 @@ class HostServiceRegistryTest {
                 .thenThrow(new IllegalArgumentException("无权访问该会话"));
         var e = assertThrows(IllegalArgumentException.class, () -> registry.invoke("im", "readMessages", 7L, null, Map.of("imConversationId", "other")));
         assertEquals("无权访问该会话", e.getMessage());
+    }
+
+    @Test
+    void worklogSummaryIsOwnRecordsOnlyAndNeedsProjectReadAccess() {
+        var worklog = mock(com.checkba.service.activity.WorklogSummaryService.class);
+        registry.setWorklog(worklog);
+        when(members.hasReadPermission(9L, 7L)).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> registry.invoke("worklog", "summary", 7L, 9L, Map.of("userId", 99)));
+        verify(worklog, never()).summarize(any(), any());
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        when(worklog.summarize(7L, 5L)).thenReturn(Map.of("totalHours", 3.5));
+        // 模型传的 userId 不影响：只按服务端身份汇总
+        assertTrue(registry.invoke("worklog", "summary", 7L, 5L, Map.of("userId", 99)).contains("3.5"));
+        verify(worklog).summarize(7L, 5L);
     }
 
     private static Long eq5() { return org.mockito.ArgumentMatchers.eq(5L); }

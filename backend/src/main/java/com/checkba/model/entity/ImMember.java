@@ -5,7 +5,7 @@ package com.checkba.model.entity;
 
 import jakarta.persistence.*;
 
-@Entity @Table(name="im_member", uniqueConstraints=@UniqueConstraint(columnNames={"conversation_id","user_id"})) @lombok.Data
+@Entity @Table(name="im_member", uniqueConstraints=@UniqueConstraint(columnNames={"conversation_id","user_id"}),indexes=@Index(columnList="user_id")) @lombok.Data
 public class ImMember {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @Column(name="conversation_id",nullable=false,length=36) private String conversationId;
@@ -13,4 +13,6 @@ public class ImMember {
  @Column(nullable=false,length=16) private String role;
  @Column(nullable=false) private long lastReadId;
  @Column(nullable=false) private java.time.Instant joinedAt;
+ /** Null = full history (staff, and every membership created before this column existed). Otherwise only message ids above this are readable. */
+ @Column(name="history_after_id") private Long historyAfterId;
 }

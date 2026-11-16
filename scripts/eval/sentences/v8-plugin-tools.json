@@ -1,0 +1,29 @@
+{
+  "_comment": "官方插件声明的 Agent 工具能否被律师的自然问法找到（fix/plugin-tools-discovery，tutorial：问「哪些案子开了票还没收齐款」Agent 说没有台账工具、劝装 capability_install）。实例以 installPlugins 按广场安装形态装 lawfirm-management。矩阵是 server 模式（SECURITY_LOCAL_MODE=false），#1520 起台账工具在服务器上会拒绝执行并回一句「仅在桌面端可用」——这里只判发现与调用（mustUse），不判台账内容；台账数据在桌面单机模式另验。",
+  "sentences": [
+    {
+      "id": "p01-firm-receivables",
+      "text": "所里哪些案子还有应收账款没收回？",
+      "hostState": "nofile",
+      "requiresPlugin": "lawfirm-management",
+      "installPlugins": ["lawfirm-management"],
+      "expect": {
+        "mustUse": [["lawfirm_management_fee_ledger", "lawfirm_management_matter_overview"]],
+        "mustNotUse": ["capability_install", "capability_list"],
+        "maxRounds": 6
+      }
+    },
+    {
+      "id": "p02-firm-ledger-by-plugin-name",
+      "text": "用律所管理插件的案件台账查一下：哪些案子开了票还没收齐款？",
+      "hostState": "nofile",
+      "requiresPlugin": "lawfirm-management",
+      "installPlugins": ["lawfirm-management"],
+      "expect": {
+        "mustUse": [["lawfirm_management_fee_ledger", "lawfirm_management_matter_overview"]],
+        "mustNotUse": ["capability_install", "capability_list"],
+        "maxRounds": 6
+      }
+    }
+  ]
+}

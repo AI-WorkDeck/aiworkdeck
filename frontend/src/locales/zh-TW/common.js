@@ -31,6 +31,7 @@ export default {
   "goToSettings": "前往設定",
   "later": "稍後",
   "requestFailedWithStatus": "請求失敗 ({status})",
+  "tooManyRequests": "操作太頻繁，請稍候再試",
   "smsVerificationRequired": "本次操作需要短信驗證",
   "freeQuotaExceeded": "免費額度已滿",
   "serviceErrorRetryLater": "服務異常，請稍後重試",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "選擇界面語言",
   "languageFollowSystem": "跟隨系統",
   "languageSearchPlaceholder": "搜索語言…",
-  "languageNoMatch": "無匹配語言"
+  "languageNoMatch": "無匹配語言",
+  "serverLabelAccountBridge": "帳戶橋接",
+  "serverLabelGenericClient": "客戶(通用)",
+  "serverLabelPersonalMemory": "個人記憶",
+  "serverLabelProjectMemory": "專案記憶"
 }

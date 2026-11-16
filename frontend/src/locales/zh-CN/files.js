@@ -24,6 +24,7 @@ export default {
   sizeLabel: '大小：{size}',
   renderingDoc: '正在渲染文档…',
   renderingSlides: '正在渲染演示文稿…',
+  slidesNotShown: '还有 {count} 页未显示，打开文件可查看全部',
   officePreviewUnsupported: '该文件暂不支持在线预览',
   fileTypeHintOpenLocal: '文件类型: {type}，可在访达/资源管理器中找到它，用本机软件打开',
   unknown: '未知',

@@ -74,8 +74,17 @@ public class UserSessionService {
         s.setCreatedAt(now);
         s.setLastUsedAt(now);
         repository.save(s);
+        if (firmAudit != null) {
+            firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("AUTH", "LOGIN").actor(userId));
+        }
         return plaintext;
     }
+
+    /** 律所审计日志（S20）：每次签发会话 = 一次登录（口令 / 短信 / 邮箱 / 账户登录都经这里）。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
 
     /** 未命中或已过期返回 null——调用方（静态鉴权入口）把 null 当未登录处理。 */
     public Long resolveUserId(String plaintext) {

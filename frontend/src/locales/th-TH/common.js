@@ -31,6 +31,7 @@ export default {
   "goToSettings": "ไปที่การตั้งค่า",
   "later": "ภายหลัง",
   "requestFailedWithStatus": "คำขอล้มเหลว ({status})",
+  "tooManyRequests": "มีคำขอมากเกินไป โปรดรอสักครู่แล้วลองอีกครั้ง",
   "smsVerificationRequired": "การดำเนินการนี้ต้องยืนยันตัวตนผ่าน SMS",
   "freeQuotaExceeded": "คุณได้ใช้เครดิตฟรีทั้งหมดแล้ว",
   "serviceErrorRetryLater": "เกิดข้อผิดพลาดของบริการ กรุณาลองใหม่ภายหลัง",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "เลือกภาษา",
   "languageFollowSystem": "ตามระบบ",
   "languageSearchPlaceholder": "ค้นหาภาษา…",
-  "languageNoMatch": "ไม่พบภาษาที่ตรงกัน"
+  "languageNoMatch": "ไม่พบภาษาที่ตรงกัน",
+  "serverLabelAccountBridge": "สะพานบัญชี",
+  "serverLabelGenericClient": "ลูกค้า (ทั่วไป)",
+  "serverLabelPersonalMemory": "หน่วยความจำส่วนตัว",
+  "serverLabelProjectMemory": "หน่วยความจำโครงการ"
 }

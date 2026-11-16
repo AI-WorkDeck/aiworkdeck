@@ -30,10 +30,20 @@ public class LawFirmWorkflowService {
     private final MessageCenterService notices;
     private final EntityManager entities;
     private final PlatformTransactionManager transactionManager;
+    private final LawFirmCloudClientService cloudClients;
     public static final Set<String> ACTIONS=Set.of("workflowOverview","workflowLookup","workflowAppoint","workflowAppointmentDecision",
             "workflowSubmit","workflowDetail","workflowClearance","workflowReview");
 
     public Map<String,Object> execute(Long userId,String action,Map<String,Object> raw) {
+        try { return executeChecked(userId,action,raw); }
+        catch(LawFirmAuthority.AccessDenied denied) {
+            // 跨所或无权的利冲操作：记「权限拒绝」（同人同资源 10 分钟一条）
+            if(firmAudit!=null) firmAudit.recordDenied(userId,"conflict-workflow:"+action,"not_permitted");
+            throw denied;
+        }
+    }
+
+    private Map<String,Object> executeChecked(Long userId,String action,Map<String,Object> raw) {
         boolean submission="workflowSubmit".equals(action);
         LawFirmAuthority.Member me=authority.current(userId);
         TransactionTemplate transaction=new TransactionTemplate(transactionManager);
@@ -88,6 +98,11 @@ public class LawFirmWorkflowService {
         return Map.of("self",me,"committee",committee,"records",records);
     }
 
+    /** 律所审计日志（S20）：利冲委员指派与撤销是律所内的角色变更。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit=firmAudit; }
+
     private Map<String,Object> appoint(LawFirmAuthority.Member me,Map<String,Object> p) {
         if(!me.firmAdmin()) throw LawFirmAuthority.denied();
         Long target=number(p,"userId");
@@ -102,6 +117,8 @@ public class LawFirmWorkflowService {
         if(a==null) { a=new LawFirmCommitteeAppointment();a.setId(UUID.randomUUID().toString());a.setFirmId(me.firmId());a.setUserId(target); }
         a.setAppointedBy(me.userId());a.setState(revoke?"REVOKED":"PENDING");a.setUpdatedAt(Instant.now());
         appointments.saveAndFlush(a);
+        if(firmAudit!=null) firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("MEMBERSHIP",revoke?"FIRM_COMMITTEE_REVOKED":"FIRM_COMMITTEE_APPOINTED")
+                .actor(me.userId()).targetUser(target));
         String event="appointment/"+a.getId()+"/"+a.getVersion();
         notify(me.userId(),List.of(target),event,"COMMITTEE_APPOINTMENT",revoke?LangText.of("利冲委员指派已撤销","Conflict committee appointment revoked"):LangText.of("请确认利冲委员指派","Please confirm conflict committee appointment"),
                 revoke?LangText.of("你已不再具备该律所的利冲终审权限。","You no longer hold final conflict review authority for this law firm."):LangText.of("律所管理员邀请你担任利冲委员，请在律所管理中接受或拒绝。","The law firm administrator has invited you to serve on the conflict committee. Please accept or decline in Law Firm Management."),revoke?"CANCELLED":"PENDING",a.getId());
@@ -157,12 +174,18 @@ public class LawFirmWorkflowService {
         List<LawFirmWorkflow> previous=workflows.findByFirmIdOrderByCreatedAtDesc(me.firmId());
         var draft=projection(null,title,client,counter,practice,lead,me.userId());
         List<LawFirmMatterIntake> corpus=previous.stream().map(w -> projection(w,w.getTitle(),w.getClientName(),w.getCounterpartyName(),w.getPracticeArea(),w.getLeadId(),w.getApplicantId())).toList();
-        var check=engine.evaluateConflict(draft,corpus,List.of(),Map.of());
+        // 律所开启了「客户管理」云端功能：一并检索全所客户与关联主体（含多层股权、实控人、配偶等关系）。
+        // 命中只把关系链写进被征询律师本人的私密摘要，申请人看到的仍只是核查事项。
+        if(cloudClients.enabledFor(me.firmId()) && p.get("clientPartyId") instanceof Number partyId) draft.setClientId(partyId.longValue());
+        var check=cloudClients.enabledFor(me.firmId())
+                ?engine.evaluateConflict(draft,corpus,List.of(),Map.of(),cloudClients.graphForFirm(me.firmId()))
+                :engine.evaluateConflict(draft,corpus,List.of(),Map.of());
         for(var hit:check.getHits()) if(hit.getHandlerUserId()!=null) {
             Long target=hit.getHandlerUserId();authority.requireMember(me.userId(),target);
             String rule=Objects.toString(hit.getRuleTitle(),"");
             requested.merge(target,"系统发现该律师承办案件存在关联；核查事项："+rule,(a,b)->clip(a+"\n"+b,4000));
-            String detail="本人关联案件："+Objects.toString(hit.getMatchedMatterTitle(),"")+"；命中主体："+Objects.toString(hit.getMatchedPartyName(),"")+"；核查事项："+rule;
+            String detail="本人关联案件："+Objects.toString(hit.getMatchedMatterTitle(),"")+"；命中主体："+Objects.toString(hit.getMatchedPartyName(),"")+"；核查事项："+rule
+                    +(hit.getRelationPath()==null?"":"；关系链："+hit.getRelationPath());
             privateDetails.merge(target,clip(detail,4000),(a,b)->clip(a+"\n"+b,4000));
         }
         if(requested.size()>20) throw new IllegalArgumentException(LangText.of("关联律师超过20位，请先由律所管理员分批核查", "More than 20 related lawyers found; please have the firm administrator review in batches"));
@@ -180,7 +203,7 @@ public class LawFirmWorkflowService {
         workflows.saveAndFlush(w);
         for(var entry:requested.entrySet()) {
             var c=new LawFirmWorkflowClearance();c.setId(UUID.randomUUID().toString());c.setWorkflowId(id);c.setTargetId(entry.getKey());c.setSummary(entry.getValue());c.setPrivateSummary(privateDetails.get(entry.getKey()));c.setDecision("PENDING");clearances.save(c);
-            notify(me.userId(),List.of(c.getTargetId()),"workflow/"+id+"/clearance/"+c.getTargetId(),"CONFLICT_CLEARANCE","待你确认："+title,
+            notify(me.userId(),List.of(c.getTargetId()),"workflow/"+id+"/clearance/"+c.getTargetId(),"CONFLICT_CLEARANCE",LangText.of("待你确认：","Pending your confirmation: ")+title,
                     "有一项关联案件利冲征询需要本人确认，请打开律所管理查看与你有关的摘要。","PENDING",id);
         }
         if(requested.isEmpty()) notifyCommittee(w,me.userId());
@@ -204,11 +227,11 @@ public class LawFirmWorkflowService {
         }
         if(!"PENDING_LAWYER_CLEARANCE".equals(w.getStatus())) throw new IllegalStateException(LangText.of("申请已结束或进入终审，不能继续放行", "This application has concluded or entered final review and cannot be cleared"));
         c.setDecision(decision);c.setComment(comment);c.setDecidedAt(Instant.now());clearances.saveAndFlush(c);
-        notices.updateBusinessState("lawfirm","workflow/"+w.getId()+"/clearance/"+me.userId(),List.of(me.userId()),"done");
+        notices.updateBusinessState("lawfirm","workflow/"+w.getId()+"/clearance/"+me.userId(),List.of(me.userId()),"done",LangText.of("已确认：","Confirmed: ")+w.getTitle());
         if("REJECTED".equals(decision)) {
             w.setStatus("REJECTED");
             for(var pending:all) if("PENDING".equals(pending.getDecision()))
-                notices.updateBusinessState("lawfirm","workflow/"+w.getId()+"/clearance/"+pending.getTargetId(),List.of(pending.getTargetId()),"cancelled");
+                notices.updateBusinessState("lawfirm","workflow/"+w.getId()+"/clearance/"+pending.getTargetId(),List.of(pending.getTargetId()),"cancelled",LangText.of("已终止：","Closed: ")+w.getTitle());
         }
         else if(all.stream().allMatch(x->!"PENDING".equals(x.getDecision()))) {w.setStatus("PENDING_COMMITTEE_REVIEW");notifyCommittee(w,me.userId());}
         w.setUpdatedAt(Instant.now());workflows.saveAndFlush(w);
@@ -228,7 +251,7 @@ public class LawFirmWorkflowService {
         }
         if(!"PENDING_COMMITTEE_REVIEW".equals(w.getStatus())) throw new IllegalStateException(LangText.of("关联律师尚未全部放行", "Not all related lawyers have granted clearance yet"));
         w.setStatus(decision);w.setDecisionComment(comment);w.setUpdatedAt(Instant.now());workflows.saveAndFlush(w);
-        notices.updateBusinessState("lawfirm","workflow/"+w.getId()+"/committee",List.of(me.userId()),"done");
+        notices.updateBusinessState("lawfirm","workflow/"+w.getId()+"/committee",List.of(me.userId()),"done",LangText.of("已终审：","Reviewed: ")+w.getTitle());
         notify(me.userId(),new ArrayList<>(new LinkedHashSet<>(List.of(w.getApplicantId(),w.getLeadId()))),"workflow/"+w.getId()+"/review","COMMITTEE_RESULT",
                 LangText.of("利冲终审已有结论：","Conflict final review completed: ")+w.getTitle(),"APPROVED".equals(decision)?LangText.of("指定委员已终审通过。该结果不代表已在本机创建项目。","The designated committee member has approved the review. This does not automatically create a local project."):LangText.of("指定委员已终审拒绝，请查看意见。","The designated committee member has rejected the review. Please check the comments."),"COMPLETED",w.getId());
         return view(w,me);
@@ -259,6 +282,9 @@ public class LawFirmWorkflowService {
             entities.clear(); // Reload workflow and clearance state after waiting for the common user locks.
         }
         var w=(lock?workflows.lockById(id):workflows.findById(id)).orElseThrow(LawFirmAuthority::denied);
+        // Locking read first: these managed rows are what every later clearance query in this transaction resolves to.
+        // A plain re-read here could be answered from the result H2 remembered before the wait for the locks above.
+        if(lock) clearances.lockByWorkflowId(id);
         if(!w.getFirmId().equals(me.firmId()) || !visible(w,me)) throw LawFirmAuthority.denied();
         return w;
     }
@@ -278,12 +304,17 @@ public class LawFirmWorkflowService {
         if(relevantClearances.stream().anyMatch(c->Objects.equals(c.getTargetId(),me.userId())))
             out.put("consultationContext",Map.of("title",w.getTitle(),"clientName",w.getClientName(),"counterpartyName",Objects.toString(w.getCounterpartyName(),"")));
         out.put("clearances",relevantClearances.stream().filter(c->full||Objects.equals(c.getTargetId(),me.userId())).map(c->{
-            Map<String,Object> row=new LinkedHashMap<>();row.put("targetId",c.getTargetId());
+            Map<String,Object> row=new LinkedHashMap<>();row.put("targetId",c.getTargetId());row.put("targetName",displayName(me,c.getTargetId()));
             row.put("summary",c.getSummary()+(Objects.equals(c.getTargetId(),me.userId())&&c.getPrivateSummary()!=null?"\n"+c.getPrivateSummary():""));
             row.put("decision",c.getDecision());row.put("comment",c.getComment());return row;
         }).toList());
         out.put("canReview",Objects.equals(w.getCommitteeId(),me.userId())&&accepted(me.firmId(),me.userId())&&"PENDING_COMMITTEE_REVIEW".equals(w.getStatus()));
         return out;
+    }
+    /** Colleague name from the (request-cached) directory; null when it cannot be resolved, never an account id. */
+    private String displayName(LawFirmAuthority.Member me,Long userId) {
+        if(Objects.equals(me.userId(),userId)) return me.name();
+        try { return authority.requireMember(me.userId(),userId).name(); } catch(RuntimeException unresolved) { return null; }
     }
     private Map<String,Object> appointmentView(LawFirmCommitteeAppointment a,LawFirmAuthority.Member member) {
         return Map.of("id",a.getId(),"member",member,"state",a.getState(),"version",a.getVersion());

@@ -106,7 +106,8 @@ export default {
     "switch": "Tukar",
     "cancel": "Batal",
     "switchFailed": "Gagal menukar tapak. Cuba lagi kemudian.",
-    "rescueFailed": "Masih belum dibuka kunci selepas menukar tapak. Semak kod dan cuba lagi."
+    "rescueFailed": "Masih belum dibuka kunci selepas menukar tapak. Semak kod dan cuba lagi.",
+    "proIntroBanner": "Credits permulaan percuma selepas daftar · Personal Pro ¥9.9/bln (3 bulan pertama)",
   },
   "hint": {
     "learnMore": "Ketahui Lebih Lanjut",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Sahkan",
     "purchaseSuccess": "Dibuka kunci",
     "purchaseFailed": "Pembelian gagal",
-    "goRecharge": "Tambah Nilai"
+    "goRecharge": "Tambah Nilai",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Dapatkan Personal Pro",
   },
   "identity": {
     "title": "Pilih Ruang Kerja Tempatan",

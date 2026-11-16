@@ -37,7 +37,9 @@ test('destination resolves notice permission again, then opens same-project DD a
 })
 test('plugin destinations require installed enabled scope and preserve recordId through message-open',async()=>{
  const f=fixture({projectId:1,hasProject:true,dynamicPlugins:[{pluginId:'example-plugin'}]});await f.vm.openMessageTarget({kind:'plugin',pluginId:'example-plugin',view:'records',recordId:'record-one'});assert.deepEqual(f.events[0],['awd:plugin-sidebar-command',{pluginId:'example-plugin',command:'message-open',view:'records',recordId:'record-one',projectId:1}]);await assert.rejects(()=>f.vm.openMessageTarget({kind:'plugin',pluginId:'missing',view:'records',recordId:'one'}),/pluginUnavailable/)
- const noProject=fixture({dynamicPlugins:[{pluginId:'example-plugin'}]});await assert.rejects(()=>noProject.vm.openMessageTarget({kind:'plugin',pluginId:'example-plugin',view:'records',recordId:'one'}),/pluginUnavailable/)
+ // QA D3: an installed project-scoped plugin with no project open asks for a project; it is not "not installed".
+ const noProject=fixture({dynamicPlugins:[{pluginId:'example-plugin'}]});await assert.rejects(()=>noProject.vm.openMessageTarget({kind:'plugin',pluginId:'example-plugin',view:'records',recordId:'one'}),error=>error.projectRequired===true&&/projectRequired/.test(error.message)&&!/pluginUnavailable/.test(error.message))
+ await assert.rejects(()=>noProject.vm.openMessageTarget({kind:'plugin',pluginId:'missing-plugin',view:'records',recordId:'one'}),error=>/pluginUnavailable/.test(error.message)&&!error.projectRequired)
 })
 test('late plugin lookup after account replacement cannot navigate',async()=>{
  let resolve;const promise=new Promise(r=>resolve=r);const f=fixture({projectId:1,hasProject:true,dynamicPlugins:[{pluginId:'example-plugin'}],loadDynamicPlugins:()=>promise});const work=f.vm.openMessageTarget({kind:'plugin',pluginId:'example-plugin',view:'records',recordId:'one'});f.replaceAccount();resolve();assert.equal(await work,false);assert.equal(f.business.length,0)

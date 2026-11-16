@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Dimensione: {size}",
   "renderingDoc": "Rendering del documento…",
   "renderingSlides": "Rendering della presentazione…",
+  "slidesNotShown": "Altre {count} diapositive non mostrate. Apri il file per vederle tutte.",
   "officePreviewUnsupported": "L'anteprima online non è disponibile per questo file",
   "fileTypeHintOpenLocal": "Tipo di file: {type}. Trovalo in Finder o in Esplora file e aprilo con un'applicazione locale.",
   "unknown": "Sconosciuto",

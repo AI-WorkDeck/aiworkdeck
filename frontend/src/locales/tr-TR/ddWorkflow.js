@@ -147,6 +147,26 @@ export default {
     "titles": "Her madde için bir başlık girin."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Bu davet AI WorkDeck hesapları içindir. Burada proje sohbetinde avukatlarınızla konuşabilirsiniz.",
+      "openChat": "Proje sohbetini aç",
+      "joinFirst": "Önce avukatınızın gönderdiği erişim koduyla projeye girin, ardından proje sohbetini kullanın.",
+      "title": "Proje sohbeti",
+      "hint": "Bu proje hakkında hukuk ekibinizle görüşün. Hangi önceki mesaj ve dosyaları görebileceğinize avukatlarınız karar verir.",
+      "tabChecklist": "Kontrol listesi",
+      "loading": "Mesajlar yükleniyor…",
+      "empty": "Henüz mesaj yok. Avukatlarınıza buradan soru sorabilirsiniz.",
+      "older": "Önceki mesajları yükle",
+      "you": "Siz",
+      "filePending": "Dosya hâlâ hazırlanıyor. Lütfen avukatınızla iletişime geçin.",
+      "placeholder": "Bir mesaj yazın. Göndermek için Enter, yeni satır için Shift+Enter",
+      "attach": "Dosya gönder",
+      "send": "Gönder",
+      "sending": "Gönderiliyor…",
+      "fileTooLarge": "Tek bir dosya {size} MB'ı geçemez",
+      "quotaFull": "Bu proje için {size} MB toplam yükleme sınırına ulaştınız. Lütfen avukatınızla iletişime geçin.",
+      "unavailable": "Proje sohbeti şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin."
+    },
     "messageUnavailable": "Bu davet edilen proje veya kontrol listesi artık kullanılamıyor. Yenileyip tekrar deneyin.",
     "workspaceTitle": "Müvekkil iş birliği",
     "workspaceHint": "Avukatınızın kontrol listesindeki belgeleri hazırlayın, her maddeyi gönderin ve geri bildirimleri takip edin.",

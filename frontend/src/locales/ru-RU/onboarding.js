@@ -106,7 +106,8 @@ export default {
     "switch": "Переключить",
     "cancel": "Отмена",
     "switchFailed": "Не удалось переключить сайт. Попробуйте позже.",
-    "rescueFailed": "После переключения сайта разблокировка не удалась. Проверьте код и попробуйте снова."
+    "rescueFailed": "После переключения сайта разблокировка не удалась. Проверьте код и попробуйте снова.",
+    "proIntroBanner": "Стартовые кредиты при регистрации · Personal Pro ¥9.9/мес первые 3 месяца",
   },
   "hint": {
     "learnMore": "Подробнее",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Подтвердить",
     "purchaseSuccess": "Разблокировано",
     "purchaseFailed": "Ошибка покупки",
-    "goRecharge": "Пополнить"
+    "goRecharge": "Пополнить",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Подключить Pro",
   },
   "identity": {
     "title": "Выберите локальное рабочее пространство",

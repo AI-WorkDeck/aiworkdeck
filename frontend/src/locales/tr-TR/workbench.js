@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Kopyalanacak içeriği seçin",
+  scratchCopySelected: "{count} seçildi",
+  scratchCopyFiles: "Dosyalar",
+  scratchCopyConversations: "Konuşmalar",
+  scratchCopyNoProjects: "Uygun proje yok. Önce bir proje oluşturun.",
   scratchCopyTitle: "Projeye kopyala",
   scratchCopyHint: "Seçili konuşmaları ve dosyaları, asıllarını koruyarak kopyalayın. Hedef proje üyeleri kopyalara erişebilir.",
   "restartPending": "{count} görev devam ettirilebilir",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "Dosya aç…",
   "looseFilesOpenFolder": "Klasör Aç…",
   "mobileBackup": {
+    "undecided": "Seçim bekliyor",
     "cleanupDeadline": "Bulut içeriğinin silinmesini önlemek için borcunuzu {time} tarihine kadar tamamen ödeyin. Yerel dosyalar etkilenmez.",
     "billingSummary": "Borç: {debt}; kullanılabilir kredi: {available}.",
     "manageBilling": "Hesap ve faturalandırma",

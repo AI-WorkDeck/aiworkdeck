@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "大小：{size}",
   "renderingDoc": "正在渲染文檔…",
   "renderingSlides": "正在渲染演示文稿…",
+  "slidesNotShown": "還有 {count} 頁未顯示，開啟檔案可查看全部",
   "officePreviewUnsupported": "該文件暫不支持在線預覽",
   "fileTypeHintOpenLocal": "文件類型: {type}，可在訪達/資源管理器中找到它，用本機軟件打開",
   "unknown": "未知",

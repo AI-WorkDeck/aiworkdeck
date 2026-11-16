@@ -72,12 +72,12 @@ test('AdminPane 只 import 它真正用到的四个能力接口（plan/apply 走
   }
 })
 
-test('开发者模式默认开（维护者裁决 dev-board#497），且打开前必须弹二次确认', () => {
+test('开发者模式：发行版默认关、开发态/源码构建默认开（2026-11-14 裁决，英文 QA 第 9 条），且打开前必须弹二次确认', () => {
   assert.match(adminPane, /capabilityDevMode: null/, '加载前不认定为关，避免开关闪一下「关」')
   assert.match(
     slotRegistry,
-    /systemSettingService\.get\(DEV_MODE_KEY,\s*"true"\)/,
-    '后端未设置时的默认字串必须是 "true"',
+    /systemSettingService\.get\(DEV_MODE_KEY,\s*releaseBuild \? "false" : "true"\)/,
+    '后端未设置时：发行版默认 "false"，其余 "true"（行为见 CapabilitySlotRegistryTest）',
   )
   const idx = adminPane.indexOf('onToggleCapabilityDevMode(on)')
   assert.ok(idx > 0)

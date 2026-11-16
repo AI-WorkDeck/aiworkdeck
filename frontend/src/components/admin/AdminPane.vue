@@ -408,12 +408,15 @@
                 <text class="account-note">{{ $t('admin.subscriptionEnds', { date: formatUsageTime(subscription.periodEnd) }) }}</text>
                 <text class="account-note">{{ $t(subscription.walletFallbackEnabled ? 'admin.subscriptionFallbackOn' : 'admin.subscriptionFallbackOff') }}</text>
                 <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
-                <button v-else class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                <view v-else class="comp-actions">
+                  <button v-if="isCnSite" class="comp-btn" @tap="onSubscribePro">{{ $t('admin.subscriptionRenewBtn') }}</button>
+                  <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                </view>
               </view>
               <view v-else class="provider-card">
-                <text class="account-note">{{ $t('admin.subscriptionInactiveNote') }}</text>
+                <text class="account-note">{{ $t(isCnSite ? 'admin.subscriptionInactiveNoteCn' : 'admin.subscriptionInactiveNote') }}</text>
                 <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
-                <button v-else class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionSubscribeBtn') }}</button>
+                <button v-else class="comp-btn" @tap="isCnSite ? onSubscribePro() : openSubscriptionAccount()">{{ $t(isCnSite ? 'admin.subscriptionSubscribeBtnCn' : 'admin.subscriptionSubscribeBtn') }}</button>
               </view>
             </SettingsSection>
 
@@ -785,14 +788,14 @@
                   <view v-if="telemetrySummary.byMatterCategory.length" class="telemetry-list">
                     <text class="telemetry-list-title">{{ $t('admin.matterCategoryTitle') }}</text>
                     <view v-for="item in telemetrySummary.byMatterCategory" :key="'m-' + item.name" class="telemetry-list-row">
-                      <text class="telemetry-list-name">{{ item.name }}</text>
+                      <text class="telemetry-list-name">{{ matterTypeLabel(item.name, $t) }}</text>
                       <text class="telemetry-list-count">{{ item.count }}</text>
                     </view>
                   </view>
                   <view v-if="telemetrySummary.byTool.length" class="telemetry-list">
                     <text class="telemetry-list-title">{{ $t('admin.topToolsTitle') }}</text>
                     <view v-for="item in telemetrySummary.byTool.slice(0, 8)" :key="'t-' + item.name" class="telemetry-list-row">
-                      <text class="telemetry-list-name">{{ item.name }}</text>
+                      <text class="telemetry-list-name" :title="item.name">{{ toolDisplayName(item.name) }}</text>
                       <text class="telemetry-list-count">{{ item.count }}</text>
                     </view>
                   </view>
@@ -971,7 +974,7 @@
               </view>
               <view v-for="slot in capabilitySlots" :key="slot.id" class="comp-row">
                 <view class="comp-main">
-                  <text class="comp-name">{{ slot.name }}</text>
+                  <text class="comp-name">{{ capabilitySlotName(slot) }}</text>
                   <text class="comp-sub">
                     {{ slot.id }} · {{ $t('admin.capabilityCurrent') }}{{ capabilityCurrentLabel(slot) }}
                     <text v-if="slot.degraded" class="comp-error"> · {{ $t('admin.capabilityDegraded') }}</text>
@@ -1059,6 +1062,10 @@
             </view>
           </SettingsSection>
         </scroll-view>
+        <!-- 律所审计日志（S20）：只有服务端确认是律所管理员时这一栏才出现（firmAuditAvailable） -->
+        <scroll-view v-else-if="activeNav === 'audit_log'" scroll-y class="config-scroll">
+          <FirmAuditLogPanel />
+        </scroll-view>
         <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
              activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
         <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
@@ -1089,6 +1096,7 @@ import {
   getSiteStatus, selectSite,
   getPlatformServices, getPlatformServiceRemote, savePlatformBudget,
   packUninstall,
+  firmCloudAction,
 } from '@/services/api.js'
 import { getCurrentUser, getSessionId, setSessionUser } from '@/utils/auth.js'
 import { getInitial } from '@/utils/textInitial.js'
@@ -1096,7 +1104,7 @@ import { openExternalUrl } from '@/utils/externalLink.js'
 import { accountPageUrl, siteBaseUrl, siteLinks, loadSiteLinks, resetSiteLinks } from '@/utils/siteLinks.js'
 import { host } from '@/services/host.js'
 import { signOut } from '@/utils/signOut.js'
-import { requireAccount, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { requireAccount, requireSubscription, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { refreshEntitlements, isEnabled, FEATURES } from '@/composables/useEntitlement.js'
 import { loadIdentityProfile, readNudgeRecords, markNudgeShown, PROFILE_SOURCE } from '@/services/accountProfile.js'
@@ -1113,6 +1121,7 @@ import PersonalFavoritesPanel from '@/components/userprofile/PersonalFavoritesPa
 import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
 import TeamPanel from '@/components/admin/TeamPanel.vue'
+import FirmAuditLogPanel from '@/components/admin/FirmAuditLogPanel.vue'
 import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
@@ -1123,6 +1132,9 @@ import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import DocGeneratorSetting from '@/components/settings/DocGeneratorSetting.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
+import { matterTypeLabel } from '@/config/matterTypes.js'
+import { localizeSites } from '@/utils/siteNames.js'
+import { toolDisplayName } from '@/utils/toolDisplayNames.js'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { openPermissionOnboarding, normalizePermissionItems } from '@/utils/permissionOnboarding.js'
 
@@ -1134,6 +1146,7 @@ const NAV_LABEL_KEYS = {
   todos: 'account.tabTodos',
   personal_settings: 'admin.navPersonalSettings',
   team: 'team.navTeam',
+  audit_log: 'auditLog.nav',
   memory: 'chat.memoryButton',
   workflows: 'chat.builtinWorkflowsFoldEntry',
   mcp: 'mcp.title',
@@ -1183,7 +1196,7 @@ export default {
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    McpConnectionsPanel, TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
+    McpConnectionsPanel, TeamPanel, FirmAuditLogPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
     LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
@@ -1220,6 +1233,8 @@ export default {
       // 「系统」组是否可见。原来这条规则长在个人中心的 checkAdminTab（只有管理员
       // 才多出一个「系统设置」tab），两页合并后它就是这一处。
       isAdminUser: cachedIsAdmin(),
+      // 律所审计日志一栏是否出现：服务端确认当前账户是律所管理员后才置 true（见 probeFirmAudit）
+      firmAuditAvailable: false,
       // 非管理员进来时默认落「个人资料与登录」——落在一个自己看不见的面板上等于空白页
       activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings',
       /** 服务端记录的同意时间戳；空 = 未同意或告知文本已改版需重新征求 */
@@ -1240,6 +1255,9 @@ export default {
         // 团队（dev-board#496）：挂「个人」组而不是「系统」组——团队是每个人自己的归属，
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
+        // 律所审计日志（S20）：律所管理员才有。是否显示由服务端说了算（cloud.settings.get 的 firmAdmin），
+        // 不是闸门——读日志的接口自己按账户名录拒绝非管理员。
+        { key: 'audit_log', label: this.$t('auditLog.nav'), group: 'personal', firmAdminOnly: true },
         { key: 'mcp', label: this.$t('mcp.title'), group: 'personal' },
         { key: 'memory', label: this.$t('chat.memoryButton'), group: 'personal' },
         { key: 'workflows', label: this.$t('chat.builtinWorkflowsFoldEntry'), group: 'personal' },
@@ -1462,6 +1480,7 @@ export default {
           if (n.desktopOnly && !this.isDesktop) return false
           if (n.macOnly && !this.permissionsSupported) return false
           if (n.group === 'system' && !this.isAdminUser) return false
+          if (n.firmAdminOnly && !this.firmAuditAvailable) return false
           return true
         })
         .map((n) => ({
@@ -1545,9 +1564,11 @@ export default {
     },
     // ---------- 会员钱包卡（dev-board#183） ----------
     // 货币符号按站点：cn 人民币，其余美元。site 还没拉到时用 siteLinks 的缓存/兜底
+    isCnSite() {
+      return (this.site.current || siteLinks().current) === 'cn'
+    },
     walletCurrencySymbol() {
-      const current = this.site.current || siteLinks().current
-      return current === 'cn' ? '¥' : '$'
+      return this.isCnSite ? '¥' : '$'
     },
     // 余额大字：分→元两位小数；官网不可达 / 还没拉到时「—」，绝不拿 0 冒充
     walletBalanceText() {
@@ -1657,6 +1678,7 @@ export default {
   },
   mounted() {
     this.loadUserInfo()
+    this.probeFirmAudit()
     // 深链定位面板（顶栏「已连接账户」chip → ?nav=account）；只认当前可见的本页面板
     const nav = resolveAdminNavKey(this.initialNav)
     if (nav && this.visibleNavItems.some((n) => n.key === nav)) {
@@ -1746,6 +1768,21 @@ export default {
     }
   },
   methods: {
+    // 律所审计日志（S20）：问一次服务端「我是不是律所管理员」。未连接账户、不在律所、
+    // 服务器没开名录都只是不显示这一栏，不提示、不弹登录层。
+    probeFirmAudit() {
+      firmCloudAction('cloud.settings.get')
+        .then((d) => { this.firmAuditAvailable = !!(d && d.firmAdmin) })
+        .catch(() => { this.firmAuditAvailable = false })
+    },
+    // 本机用量统计：事项类别存的是后端中文类别名、工具是内部代号，按界面语言显示（英文 QA 2026-11-14 第 4 条）
+    matterTypeLabel,
+    toolDisplayName,
+    // 能力槽名：后端给的是中文配置名，已知槽按 id 换词条；新槽未收录前原样显示
+    capabilitySlotName(slot) {
+      const key = { 'litigation.diagram': 'admin.capabilitySlotLitigationDiagram' }[slot && slot.id]
+      return key ? this.$t(key) : ((slot && slot.name) || '')
+    },
     goBackToWorkbench() {
       uni.reLaunch({ url: '/pages/project-overview/project-overview' })
     },
@@ -2487,7 +2524,7 @@ export default {
     async loadSite() {
       try {
         const s = await getSiteStatus()
-        const sites = (s && s.sites) || []
+        const sites = localizeSites((s && s.sites) || [], this.$t.bind(this))
         const current = sites.find((x) => x.id === (s && s.current))
         this.site = {
           current: (s && s.current) || '',
@@ -2604,6 +2641,13 @@ export default {
     },
     openSubscriptionAccount() {
       openExternalUrl(accountPageUrl())
+    },
+    async onSubscribePro() {
+      const ok = await requireSubscription()
+      if (ok) {
+        await this.loadWallet()
+        await this.loadAccountUsage()
+      }
     },
     async loadWallet() {
       try {
@@ -3173,7 +3217,8 @@ $brand-accent: $brand-mint;
   font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   color: var(--awd-text-3);
-  word-break: break-all;
+  /* 英文按词换行（break-all 会把 Affero、WorkDeck 拆成两半）；只有长 URL 这类无空格串才在任意处断开 */
+  overflow-wrap: anywhere;
 }
 
 .legal-strong {

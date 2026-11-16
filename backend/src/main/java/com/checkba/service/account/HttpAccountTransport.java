@@ -21,6 +21,13 @@ public class HttpAccountTransport implements AccountTransport {
     static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     /**
+     * POST /api/account/ai-key 的响应超时。官网重启后首次拉平台模型目录要 ~5.7 秒（冷启动），
+     * 5 秒会把新用户首次登录判成网络失败、AI 额度显示「尚未就绪」。
+     * 只放宽这一条；其余账户请求仍是 5 秒。连接超时不变，服务器真挂了仍然很快失败。
+     */
+    static final Duration AI_KEY_TIMEOUT = Duration.ofSeconds(15);
+
+    /**
      * 固定 HTTP/1.1。JDK HttpClient 默认 HTTP_2，对明文地址会先发 h2c 升级请求——
      * Node/Next 的开发服务器收到后直接不回字节，客户端报「header parser received no bytes」，
      * 在上层看只是一句「无法连接服务器」，排查成本极高（本地联调实测踩到）。
@@ -43,6 +50,7 @@ public class HttpAccountTransport implements AccountTransport {
                     .timeout(TIMEOUT)
                     .method(method, body);
             if (URI.create(url).getPath().equals("/api/account/ai-key")) {
+                builder.timeout(AI_KEY_TIMEOUT);
                 builder.header("X-AWD-AI-Protocol", "2");
                 builder.header("X-AWD-AI-Capabilities", "intl-gateway");
             }

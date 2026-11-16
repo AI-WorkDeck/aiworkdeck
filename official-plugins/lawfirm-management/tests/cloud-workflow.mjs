@@ -78,3 +78,30 @@ test('consulted lawyer sees the current application parties before personally co
   assert.deepEqual(h.calls.find(c => c.action === 'workflowClearance').params,
     { recordId: id, decision: 'APPROVED', comment: '本人对照双方信息后确认' });
 });
+test('clearance rows show the colleague name from the server, never a raw account id; risk is localized', async t => {
+  const h = await harness({ self: { userId: 11, name: '合成申请人', firmAdmin: false } });
+  t.after(() => h.dom.window.close());
+  const table = {}; new Function('window', readFileSync(new URL('../web/expenses-l10n.js', import.meta.url), 'utf8'))({ get AWD_LAWFIRM_EXPENSE_L10N() { return table; }, set AWD_LAWFIRM_EXPENSE_L10N(v) { Object.assign(table, v); } });
+  h.dom.window.AWD_LAWFIRM_T = key => table['zh-CN'][key] ?? key;
+  h.data.records = [{ id, title: '合成案件', status: 'PENDING_LAWYER_CLEARANCE', risk: 'GREEN',
+    clearances: [{ targetId: 3, targetName: '合成同事', decision: 'PENDING', summary: 's' }, { targetId: 4, decision: 'PENDING', summary: 's' }] }];
+  await h.refresh();
+  const text = h.$('workflow-records').textContent;
+  assert.match(text, /合成同事 · 待本人接受/); assert.doesNotMatch(text, /账户 \d/);
+  assert.match(text, /同所同事/); assert.match(text, /风险提示 绿色/); assert.doesNotMatch(text, /GREEN/);
+});
+test('committee badge only for accepted members; successful submit clears the form; stale top notice is cleared', async t => {
+  const h = await harness({ self: { userId: 33, name: '合成委员', firmAdmin: false } });
+  t.after(() => h.dom.window.close());
+  h.$('notice').textContent = '旧提示';
+  h.data.committee[0].state = 'PENDING'; await h.refresh();
+  assert.doesNotMatch(h.$('self-badge').textContent, /利冲委员/);
+  assert.equal(h.$('notice').textContent, '', 'top notice cleared by a later action');
+  h.data.committee[0].state = 'ACCEPTED'; await h.refresh();
+  assert.match(h.$('self-badge').textContent, /利冲委员/);
+  const lead = await harness(); t.after(() => lead.dom.window.close()); await lead.refresh();
+  lead.$('workflow-title').value = '合成案件'; lead.$('workflow-client').value = '合成委托人'; lead.$('workflow-consent').checked = true;
+  lead.$('workflow-form').dispatchEvent(new lead.dom.window.Event('submit', { cancelable: true })); await tick();
+  assert.equal(lead.calls.filter(x => x.action === 'workflowSubmit').length, 1);
+  assert.equal(lead.$('workflow-title').value, ''); assert.equal(lead.$('workflow-client').value, ''); assert.equal(lead.$('workflow-consent').checked, false);
+});

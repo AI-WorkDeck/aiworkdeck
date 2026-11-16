@@ -78,6 +78,72 @@ class AuthClientLoginGuardTest {
         assertEquals(0, c.clientLogin(req("GOOD", null), http("5.6.7.8")).get("code"));
     }
 
+    /** 同机 nginx 反代：对端恒为回环，真实来源在 nginx 覆盖写入的 X-Real-IP 里。 */
+    private static MockHttpServletRequest viaNginx(String realIp) {
+        MockHttpServletRequest r = http("127.0.0.1");
+        r.addHeader("X-Real-IP", realIp);
+        return r;
+    }
+
+    private AuthController lockoutController() {
+        ClientInvitationService invitations = mock(ClientInvitationService.class);
+        when(invitations.validateCode(any())).thenThrow(new IllegalArgumentException("访问码无效"));
+        ProjectInvitation good = new ProjectInvitation();
+        good.setProjectId(1L);
+        good.setRelatedUserId(10L);
+        org.mockito.Mockito.doReturn(good).when(invitations).validateCode("GOOD");
+        UserService users = mock(UserService.class);
+        User u = new User();
+        u.setId(10L);
+        u.setUsername("client_x");
+        u.setDisplayName("客户");
+        u.setRole("CLIENT");
+        u.setSubscriptionType("FREE");
+        when(users.getUserById(10L)).thenReturn(u);
+        return controller(invitations, users);
+    }
+
+    @Test
+    @DisplayName("同机 nginx 反代下按真实 IP 锁：一个来源连错 5 次，别的客户照常进")
+    void lockoutIsPerRealIpBehindLoopbackProxy() {
+        AuthController c = lockoutController();
+        for (int i = 0; i < 5; i++) {
+            assertEquals(1, c.clientLogin(req("BAD" + i, null), viaNginx("198.51.100.7")).get("code"));
+        }
+        assertEquals(1, c.clientLogin(req("GOOD", null), viaNginx("198.51.100.7")).get("code"));
+        assertEquals(0, c.clientLogin(req("GOOD", null), viaNginx("203.0.113.20")).get("code"));
+    }
+
+    @Test
+    @DisplayName("非回环对端自带的 X-Real-IP 不采信：换着头连错照样锁在对端地址上")
+    void spoofedRealIpFromNonLoopbackPeerIsIgnored() {
+        AuthController c = lockoutController();
+        for (int i = 0; i < 5; i++) {
+            MockHttpServletRequest r = http("192.0.2.50");
+            r.addHeader("X-Real-IP", "10.0.0." + i);
+            assertEquals(1, c.clientLogin(req("BAD" + i, null), r).get("code"));
+        }
+        MockHttpServletRequest again = http("192.0.2.50");
+        again.addHeader("X-Real-IP", "10.0.0.99");
+        assertEquals(1, c.clientLogin(req("GOOD", null), again).get("code"));
+    }
+
+    @Test
+    @DisplayName("全站宽上限：分散到很多 IP 的错码累计到上限后，新来源也先被挡住")
+    void globalCeilingBlocksDistributedGuessing() {
+        AuthController c = lockoutController();
+        // 每个来源只错 4 次（不触发单 IP 锁），50 个来源共 200 次
+        for (int ip = 0; ip < 50; ip++) {
+            for (int i = 0; i < 4; i++) {
+                assertEquals(1, c.clientLogin(req("BAD", null), viaNginx("198.51.100." + ip)).get("code"));
+            }
+        }
+        Map<String, Object> blocked = c.clientLogin(req("GOOD", null), viaNginx("203.0.113.20"));
+        assertEquals(1, blocked.get("code"));
+        String message = String.valueOf(blocked.get("message"));
+        assertTrue(message.contains("过多") || message.contains("Too many"), message);
+    }
+
     @Test
     @DisplayName("带称呼登录走复用路径（同码同称呼同一个用户）")
     void displayNameGoesThroughReusePath() {

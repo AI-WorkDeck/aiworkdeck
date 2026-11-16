@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "U kunt cloudherkenning gebruiken voor de bestanden in deze batch die lokaal mislukten. Doet u dat niet, dan worden die bestanden niet geüpload.",
   "ocrLocalFailedConfirm": "Cloudherkenning gebruiken",
   "ocrAlreadySearchable": "“{name}” heeft al een tekstlaag en is doorzoekbaar; er is geen nieuw bestand gemaakt",
-  "ocrStopped": "Gestopt; {count} bestand(en) niet verwerkt"
+  "ocrStopped": "Gestopt; {count} bestand(en) niet verwerkt",
+  "subscribeProBtn": "Pro ¥9.9",
 }

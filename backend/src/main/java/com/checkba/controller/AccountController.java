@@ -382,7 +382,16 @@ public class AccountController {
         return ok(accountService.createRecharge(amountCents, idempotencyKey));
     }
 
-    /** 查询充值订单状态：转发官网 payment/query，字段以官网为准，原样透传。 */
+    /** 发起个人 Pro 订阅单（优先首 3 月 ¥9.9 体验价，满次自动回落正价）。 */
+    @PostMapping("/subscription/create")
+    public Map<String, Object> createSubscription(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireUser(sessionId);
+        String idempotencyKey = UUID.randomUUID().toString();
+        return ok(accountService.createSubscriptionOrder(idempotencyKey));
+    }
+
+    /** 查询充值/订阅订单状态：转发官网 payment/query，paid 时同步刷新权益与余额缓存。 */
     @GetMapping("/recharge/status")
     public Map<String, Object> rechargeStatus(
             @RequestParam(value = "outTradeNo", required = false) String outTradeNo,
@@ -391,7 +400,11 @@ public class AccountController {
         if (outTradeNo == null || outTradeNo.isBlank()) {
             throw new IllegalArgumentException(LangText.of("outTradeNo 不能为空", "outTradeNo cannot be empty"));
         }
-        return ok(accountService.queryRecharge(outTradeNo));
+        Map<String, Object> status = accountService.queryRecharge(outTradeNo);
+        if (status.get("order") instanceof Map<?, ?> order && "paid".equals(order.get("status"))) {
+            entitlementService.refreshQuietly();
+        }
+        return ok(status);
     }
 
     /**

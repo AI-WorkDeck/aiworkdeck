@@ -319,4 +319,33 @@ class PlatformAiKeyServiceTest {
         assertEquals(2.5, withUsage.get("usageUsd"));
         assertEquals(7.5, withUsage.get("remainingUsd"));
     }
+
+    @Test
+    @DisplayName("额度面板币种：官网给了汇率/毛利就把美元折成本币实付额；没给就如实标美元，不自拟换算")
+    void statusConvertsUsdToSiteCurrencyOnlyWithWebsiteRate() {
+        bind(1L, "acc_alice");
+        websiteReturnsKey(RUNTIME_KEY, 2.39);
+        Map<String, Object> usage = new HashMap<>();
+        usage.put("exchangeRate", 7.2);
+        usage.put("marginMultiplier", 1.16);
+        usage.put("currency", "CNY");
+        when(accountService.fetchAiUsageWith(anyString())).thenReturn(usage);
+        service.provision(1L, AWDK);
+
+        PlatformUsageAccountant accountant = mock(PlatformUsageAccountant.class);
+        when(accountant.probeUsageForDisplay(any(), anyString())).thenReturn(0.39);
+        Map<String, Object> status = service.status(1L, accountant);
+        assertEquals("CNY", status.get("currency"));
+        assertEquals(19.96, (Double) status.get("limitAmount"), 0.0001); // 2.39 * 7.2 * 1.16
+        assertEquals(3.26, (Double) status.get("usageAmount"), 0.0001);
+        assertEquals(16.7, (Double) status.get("remainingAmount"), 0.0001);
+        assertEquals(2.39, status.get("limitUsd"), "美元原值保持不变");
+
+        // 官网取不到汇率：重新 provision 清掉旧口径，回到美元
+        when(accountService.fetchAiUsageWith(anyString())).thenThrow(new RuntimeException("down"));
+        service.provision(1L, AWDK);
+        Map<String, Object> usd = service.status(1L, accountant);
+        assertEquals("USD", usd.get("currency"));
+        assertEquals(2.39, usd.get("limitAmount"));
+    }
 }

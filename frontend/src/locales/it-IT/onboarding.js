@@ -106,7 +106,8 @@ export default {
     "switch": "Cambia",
     "cancel": "Annulla",
     "switchFailed": "Impossibile cambiare sito. Riprova più tardi.",
-    "rescueFailed": "Ancora non sbloccato dopo il cambio di sito. Controlla il codice e riprova."
+    "rescueFailed": "Ancora non sbloccato dopo il cambio di sito. Controlla il codice e riprova.",
+    "proIntroBanner": "Crediti di benvenuto alla registrazione · Personal Pro ¥9.9/mese (primi 3 mesi)",
   },
   "hint": {
     "learnMore": "Scopri di più",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Conferma",
     "purchaseSuccess": "Sbloccato",
     "purchaseFailed": "Acquisto non riuscito",
-    "goRecharge": "Ricarica"
+    "goRecharge": "Ricarica",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Passa a Personal Pro",
   },
   "identity": {
     "title": "Scegli uno spazio di lavoro locale",

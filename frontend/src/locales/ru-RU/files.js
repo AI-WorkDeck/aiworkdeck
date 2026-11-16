@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Размер: {size}",
   "renderingDoc": "Отрисовка документа…",
   "renderingSlides": "Отрисовка презентации…",
+  "slidesNotShown": "Ещё {count} слайдов не показано. Откройте файл, чтобы увидеть все.",
   "officePreviewUnsupported": "Онлайн-просмотр этого файла недоступен",
   "fileTypeHintOpenLocal": "Тип файла: {type}. Найдите его в Finder или Проводнике и откройте в локальном приложении.",
   "unknown": "Неизвестно",

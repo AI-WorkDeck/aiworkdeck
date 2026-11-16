@@ -73,6 +73,17 @@ class ImProjectFilesTest {
         when(gateway.executeWithinScope(2L,"account-A", "members", Map.of("conversationId", conversation))).thenReturn(Map.of("members", List.of()));
     }
 
+    @Test void previewingTheIdentityNeverWritesIntoTheProjectButMatchesWhatIsLaterRecorded() throws Exception {
+        assertEquals(projectUid, service.previewIdentity(2L, 1L, "account-A"));
+        assertTrue(tree.isEmpty()); assertTrue(content.isEmpty());
+        verify(files, never()).createFile(anyLong(), anyLong(), anyString(), anyString(), anyLong(), any(), any(), anyLong(), any());
+        assertEquals(projectUid, service.ensureIdentity(2L, 1L, "account-A"));
+        assertTrue(tree.containsKey("项目沟通/项目标识.json"));
+        assertEquals(projectUid, service.previewIdentity(2L, 1L, "account-A"));
+        when(access.hasWritePermission(1L, 2L)).thenReturn(false); tree.clear();
+        assertThrows(IllegalArgumentException.class, () -> service.previewIdentity(2L, 1L, "account-A"));
+    }
+
     @Test void deniesProjectReadOrWriteBeforeAnyRemoteAction() {
         when(access.hasWritePermission(1L,2L)).thenReturn(false);
         assertThrows(IllegalArgumentException.class, () -> service.execute(2L,1L,"import",Map.of("conversationId",conversation,"attachmentId",attachment)));

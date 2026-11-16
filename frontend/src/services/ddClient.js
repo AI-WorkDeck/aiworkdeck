@@ -34,7 +34,12 @@ export function ddClientErrorMessage(message) {
 }
 function check(data, status) {
   if (status < 200 || status >= 300 || (data && data.code !== undefined && ![0, 200].includes(data.code))) {
-    throw new Error(ddClientErrorMessage(data?.message))
+    const error = new Error(ddClientErrorMessage(data?.message))
+    error.status = status
+    if (data?.reason) error.reason = data.reason
+    if (data?.code !== undefined) error.code = data.code
+    if (typeof data?.limitBytes === 'number') error.limitBytes = data.limitBytes
+    throw error
   }
   return unpack(data)
 }
@@ -76,6 +81,11 @@ export async function connectDdClient(code, cloudConnectionId) {
 export async function removeDdClientConnection(id) {
   if (id.startsWith('portal-')) { portalConnections.delete(id); savePortalConnections(); return }
   await ddClientJson(`/api/dd-client/connections/${encodeURIComponent(id)}`, 'DELETE')
+}
+// Project chat in the client portal (B4). The case server pins an access-code client to this project's group and
+// re-checks the code on every call; the portal only mirrors what the server allows.
+export function portalChat(connectionId, action, params = {}) {
+  return ddClientJson('/api/im/action', 'POST', { action, params }, connectionId)
 }
 export function ddClientPath(scope, path) {
   if (scope.connectionId && !String(scope.connectionId).startsWith('portal-')) {

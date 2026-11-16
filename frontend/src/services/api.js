@@ -824,6 +824,17 @@ export function setPluginEnabled(pluginId, enabled) {
   });
 }
 
+// 批准插件当前的工具定义（权限升级的工具批准前对 Agent 不可用；仅管理员）。
+// token 取自 /api/plugins/list 的 toolApprovalToken；查看期间插件又变了会被拒绝（409）。
+export function approvePluginToolChanges(pluginId, token) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/tool-approval`,
+    method: 'POST',
+    data: { token },
+    header: { 'Content-Type': 'application/json' },
+  });
+}
+
 // 在线插件广场：拉取官网注册表列表（仅含已审核签名的插件）
 export function getPluginMarket({ accountPrompt = true } = {}) {
   return request({
@@ -1815,6 +1826,20 @@ export function createAccountRecharge(amountCents) {
   }).then(unwrapEnvelope);
 }
 
+// 发起个人 Pro 订阅开通（仅国内站微信扫码；首次前 3 个月走体验价 pro_monthly_intro ¥9.90，
+// 第 4 个周期起自动回落 ¥149.00，不自动扣款）。响应形状同 createAccountRecharge，
+// 多出 skuId（pro_monthly_intro | pro_monthly）。
+export function createAccountSubscriptionOrder() {
+  return request({
+    url: '/api/account/subscription/create',
+    method: 'POST',
+    data: {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  }).then(unwrapEnvelope);
+}
+
 // 查询充值订单状态（轮询用）。已支付形如 { success: true, order: { ..., status: 'paid' } }，
 // 未付 order.status 为 pending 等，字段以官网为准。
 export function getRechargeStatus(outTradeNo) {
@@ -2076,11 +2101,11 @@ export function clientLogin(accessCode, displayName) {
   })
 }
 
-export function inviteClient(projectId, clientName) {
+export function inviteClient(projectId, clientName, shareHistory = false) {
   return request({
     url: `/api/projects/${projectId}/invite/client`,
     method: 'POST',
-    data: { clientName },
+    data: { clientName, shareHistory: shareHistory === true },
     header: { 'Content-Type': 'application/json' }
   })
 }
@@ -2703,6 +2728,12 @@ export function generateTtsAudio(payload, options = {}) {
   });
 }
 
+// 浏览器面板（Web/H5 iframe 链路）的代理票据：iframe 发不了 X-Session-Id 头、会话 id 又不能进 URL，
+// 由这次已登录请求换一张绑定用户、几分钟有效的签名票据，随 /api/browser/proxy 链接走
+export function createBrowserProxyTicket() {
+  return request({ url: '/api/browser/ticket', method: 'POST', accountPrompt: false })
+}
+
 export function createProjectFavorite(projectId, payload) {
   return request({
     url: `/api/projects/${projectId}/favorites`,
@@ -2780,19 +2811,22 @@ export function refreshDocInsightEntity(projectId, entityId) {
 }
 
 // Local writing vocabulary. Only lookupWritingSelection performs external retrieval.
+// 打开文档时的后台读写（词表、设置、学习、自动补全）不弹账户/登录框：会话失效时静默失败，
+// 由用户主动操作（改写、采用建议）时再提示（office-tier1 O8：无账户时打字途中冒出登录框）。
 export function listWritingCompletions(projectId) {
-  return request({ url: `/api/projects/${projectId}/completion`, method: 'GET' })
+  return request({ url: `/api/projects/${projectId}/completion`, method: 'GET', accountPrompt: false })
 }
 
 // Explicit semantic writing requests; merely opening a document never generates text.
 export function getSemanticWritingSettings(projectId) {
-  return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'GET' })
+  return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'GET', accountPrompt: false })
 }
 export function saveSemanticWritingSettings(projectId, data) {
   return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'PUT', data })
 }
 export function createSemanticWritingSuggestion(projectId, data) {
-  return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions`, method: 'POST', data, timeout: 120000 })
+  return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions`, method: 'POST', data, timeout: 120000,
+    ...(data && data.mode === 'autocomplete' ? { accountPrompt: false } : {}) })
 }
 export function getSemanticWritingSuggestion(projectId, id) {
   return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions/${encodeURIComponent(id)}`, method: 'GET' })
@@ -2807,7 +2841,7 @@ export function getWritingCompletionDetail(projectId, id) {
   return request({ url: `/api/projects/${projectId}/completion/entries/${encodeURIComponent(id)}`, method: 'GET' })
 }
 export function learnWritingCompletions(projectId, data) {
-  return request({ url: `/api/projects/${projectId}/completion/learn`, method: 'POST', data })
+  return request({ url: `/api/projects/${projectId}/completion/learn`, method: 'POST', data, accountPrompt: false })
 }
 export function deleteWritingCompletion(projectId, id) {
   return request({ url: `/api/projects/${projectId}/completion/entries/${encodeURIComponent(id)}`, method: 'DELETE' })
@@ -3152,6 +3186,15 @@ export function getUserActivityHistory(range = {}) {
     url: '/api/activity/history',
     method: 'GET',
     data
+  })
+}
+
+// 本人在某项目上的工作记录汇总（按月/类别小时数与用时最多的文件）；插件 worklog.summary 服务用
+export function getProjectWorklogSummary(projectId) {
+  return request({
+    url: '/api/activity/project-summary',
+    method: 'GET',
+    data: { projectId }
   })
 }
 
@@ -4588,9 +4631,10 @@ export function removeCloudMember(projectId, remoteUserId) {
 
 // 经案件库签发客户访问码（dev-board#1050）。回 {accessCode, expiresAt, clientUserId, clientUrl}；
 // 发给客户的链接是 `${clientUrl}#code=<码>`（utils/memberLookup.js clientPortalLink）。
-export function inviteCloudClient(projectId, clientName) {
+// shareHistory：客户在项目沟通里能否看加入之前的消息（B4），默认 false
+export function inviteCloudClient(projectId, clientName, shareHistory = false) {
   return request({ url: `/api/cloud/projects/${projectId}/invite/client`, method: 'POST',
-    data: { clientName }, header: { 'Content-Type': 'application/json' } })
+    data: { clientName, shareHistory: shareHistory === true }, header: { 'Content-Type': 'application/json' } })
 }
 
 // ==================== 记忆同步 ====================
@@ -4993,3 +5037,16 @@ export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions
 export const recordPendingRevisionProgress = (id, appliedCount) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/progress`, method: 'POST', data: { appliedCount } })
 export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
 export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })
+
+// ---- 律所审计日志（readiness S20）----
+// 走律所云端统一入口 POST /api/lawfirm/cloud：服务端直接分发，桌面端经网关转发到官方协作服务。
+// 身份与「是否律所管理员」一律由服务端按账户名录判定；这里只传动作与筛选条件。
+export function firmCloudAction(action, params = {}) {
+  return request({
+    url: '/api/lawfirm/cloud',
+    method: 'POST',
+    data: { action, params },
+    header: { 'Content-Type': 'application/json' },
+    accountPrompt: false,
+  }).then(unwrapEnvelope)
+}

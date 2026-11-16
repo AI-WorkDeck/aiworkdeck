@@ -3,6 +3,7 @@
 
 package com.checkba.service.ai;
 
+import com.checkba.service.LangText;
 import com.checkba.service.SystemSettingService;
 import dev.langchain4j.agent.tool.ToolSpecification;
 import dev.langchain4j.agent.tool.ToolSpecifications;
@@ -40,9 +41,13 @@ public class PluginService {
         return "hr-template-pack".equals(pluginId);
     }
 
-    /** manifest 已定义的权限值（v1 四项 + v2.7 的 ai），未知值仅告警不拒绝（向前兼容） */
-    private static final Set<String> KNOWN_PERMISSIONS =
-            Set.of("file_read", "file_write", "network", "editor", "ai", "im", "lawfirm", "notifications", "tasks");
+    /**
+     * manifest 已定义的权限值，未知值仅告警不拒绝（向前兼容）。唯一宿主清单：PluginDevService 直接复用；
+     * SDK schema、官网上传校验（aiworkdeck-website lib/plugin-manifest-platform.ts）与市场页标签
+     * 由 PluginPermissionParityTest 钉住，改这里要同批改那几处。
+     */
+    static final Set<String> KNOWN_PERMISSIONS = Set.of("file_read", "file_write", "network", "editor", "ai", "im",
+            "notifications", "lawfirm", "speech", "tasks", "clipboard", "worklog_read");
 
     /** manifest.packs 里的 pack id 规则，与 NativePackService / PluginMarketService 同一套 */
     private static final java.util.regex.Pattern PACK_ID =
@@ -112,6 +117,21 @@ public class PluginService {
     private final Set<String> devInstalledPluginIds = ConcurrentHashMap.newKeySet();
 
     private volatile long disabledStateRefreshedAt = 0L;
+
+    /**
+     * 当前这一代清单里已获批准的工具定义对象（PluginToolInfo / McpToolDecl，按引用比）。
+     * 只有在这里的对象才会交给 Agent、面板直调与对外 MCP（见 {@link PluginToolApprovals}）。
+     * 按引用而不是按名字：rescan 换上新对象前它们天然不在集合里，判定与执行用的是同一个对象，
+     * 不会出现「按旧定义放行、按新定义执行」的竞态。
+     */
+    private final Set<Object> approvedToolDefinitions =
+            Collections.newSetFromMap(Collections.synchronizedMap(new IdentityHashMap<>()));
+
+    /** pluginId -> 待用户批准的工具升级（rescan 时重算，批准后清掉） */
+    private final Map<String, List<PluginToolApprovals.Change>> pendingToolChanges = new ConcurrentHashMap<>();
+
+    /** systemSettingService 为 null（直接 new 的测试）时的基线存放处 */
+    private final Map<String, String> memoryToolApprovals = new ConcurrentHashMap<>();
 
     private final SystemSettingService systemSettingService;
 
@@ -291,6 +311,12 @@ public class PluginService {
          * 写入只经宿主表单——配置权在用户手里。
          */
         private List<PluginSettingDecl> settings;
+        /**
+         * 除桌面端与 Office/WPS 任务窗格（缺省就支持）之外还声明支持的宿主（规范 §2，W1）。
+         * 目前只认 {@code "web"}：声明了它，本插件的 Agent 工具才会出现在网页版会话里；
+         * 缺省不出现（插件工具多数假设桌面环境，判不准时放行在网页上会变成死路径）。
+         */
+        private List<String> hosts;
     }
 
     /** manifest.contributes：插件向宿主贡献的声明式内容（规范 v2.8 P3 起，只加不改） */
@@ -556,6 +582,8 @@ public class PluginService {
         pluginDirById.clear();
         incompatiblePluginIds.clear();
         devInstalledPluginIds.clear();
+        approvedToolDefinitions.clear();
+        pendingToolChanges.clear();
         pluginL10n.clear();
         // 插件证据来源整批清空重建（规范 v2.8 P3）；内置来源不动
         if (evidenceRetrieverRegistry != null) {
@@ -611,6 +639,168 @@ public class PluginService {
         return devInstalledPluginIds.contains(pluginId);
     }
 
+    // ==================== 工具升级重新授权 ====================
+
+    /**
+     * 对比本插件工具的当前定义与已批准基线（规则见 {@link PluginToolApprovals}）：
+     * 不升级的定义直接获批并把基线跟过去，升级的留在待批准表里、基线保留旧值。
+     *
+     * <p>没有基线时：广场/内置插件按当前定义建基线（装机与启用本身经过验签和用户确认；也覆盖升级到本版之前已装的插件）；
+     * dev 免签直装的插件从空基线算起，非 read 工具都要先批准——它们装完即启用，且 Agent 自己就能经 plugin_dev_install 重装。
+     * 卸载不清基线：dev 卸载后重装照样和上次批准的定义比。
+     */
+    private void reconcileToolApprovals(PluginMetadata meta, boolean devInstalled) {
+        String id = meta.getId();
+        PluginToolApprovals.Snapshot current = PluginToolApprovals.snapshot(meta);
+        String raw = readToolApprovals(id);
+        Map<String, PluginToolApprovals.Definition> approved;
+        if (raw == null) {
+            // 真正没有记录才按来源建基线；存了空串/坏值一律按空基线（失败方向是拦）
+            approved = devInstalled ? Map.of() : current.definitions();
+        } else if (raw.isBlank()) {
+            approved = Map.of();
+        } else {
+            try {
+                approved = PluginToolApprovals.fromJson(raw);
+            } catch (RuntimeException corrupt) {
+                log.warn("Plugin {} tool approval record unreadable, treating as empty: {}", id, corrupt.getMessage());
+                approved = Map.of();
+            }
+        }
+        Map<String, PluginToolApprovals.Definition> next = new LinkedHashMap<>();
+        List<PluginToolApprovals.Change> pending = new ArrayList<>();
+        for (var e : current.definitions().entrySet()) {
+            String key = e.getKey();
+            PluginToolApprovals.Definition before = approved.get(key);
+            List<String> reasons = PluginToolApprovals.escalation(before, e.getValue());
+            if (reasons.isEmpty()) {
+                next.put(key, e.getValue());
+                approvedToolDefinitions.add(current.objects().get(key));
+            } else {
+                String[] names = current.names().get(key);
+                pending.add(new PluginToolApprovals.Change(key, names[0], names[1], reasons, before, e.getValue()));
+                if (before != null) next.put(key, before);
+            }
+        }
+        if (!pending.isEmpty()) {
+            pendingToolChanges.put(id, List.copyOf(pending));
+            log.warn("Plugin {} has tool changes awaiting user approval: {}", id,
+                    pending.stream().map(c -> c.label() + c.reasons()).toList());
+        }
+        if (raw == null || raw.isBlank() || !next.equals(approved)) writeToolApprovals(id, PluginToolApprovals.toJson(next));
+    }
+
+    /** 没有记录返回 null（区分于存了空串）。 */
+    private String readToolApprovals(String pluginId) {
+        String key = PluginToolApprovals.KEY_PREFIX + pluginId;
+        if (systemSettingService == null) return memoryToolApprovals.get(key);
+        String value = systemSettingService.get(key, ABSENT);
+        return ABSENT.equals(value) ? null : value == null ? "" : value;
+    }
+
+    private static final String ABSENT = "\u0000absent";
+
+    private void writeToolApprovals(String pluginId, String json) {
+        String key = PluginToolApprovals.KEY_PREFIX + pluginId;
+        if (systemSettingService == null) memoryToolApprovals.put(key, json);
+        else systemSettingService.set(key, json);
+    }
+
+    /** 这个清单对象（PluginToolInfo / McpToolDecl）的定义是否已获用户批准；执行与下发前按引用判定。 */
+    public boolean isToolDefinitionApproved(Object definition) {
+        return definition != null && approvedToolDefinitions.contains(definition);
+    }
+
+    /** JAR @Tool 工具：按名字找到所属插件 manifest 里的同名条目再判；manifest 没有这条（没有可比的定义）放行。 */
+    public boolean isPluginToolApproved(String toolName) {
+        String pluginId = toolToPluginId.get(toolName);
+        PluginMetadata meta = pluginId == null ? null : getPlugin(pluginId);
+        if (meta == null || meta.getTools() == null) return true;
+        return meta.getTools().stream().filter(t -> t != null && toolName.equals(t.getName())).findFirst()
+                .map(this::isToolDefinitionApproved).orElse(true);
+    }
+
+    /** pluginId → 待批准的升级（全部插件，含已停用的；调用方按需过滤） */
+    public Map<String, List<PluginToolApprovals.Change>> allPendingToolChanges() {
+        return Map.copyOf(pendingToolChanges);
+    }
+
+    public List<PluginToolApprovals.Change> pendingToolChanges(String pluginId) {
+        return pendingToolChanges.getOrDefault(pluginId, List.of());
+    }
+
+    public record ToolApprovalView(List<PluginToolApprovals.Change> changes, String token) {}
+
+    /** 提示内容与批准凭据必须来自同一代定义；与 rescan / approve 共用锁，不能分别读取。 */
+    public synchronized ToolApprovalView toolApprovalView(String pluginId) {
+        List<PluginToolApprovals.Change> changes = pendingToolChanges.getOrDefault(pluginId, List.of());
+        return new ToolApprovalView(changes, changes.isEmpty() ? null : toolApprovalToken(pluginId));
+    }
+
+    /** 当前定义的摘要，批准请求要原样带回（见 {@link #approveToolChanges}）。 */
+    public String toolApprovalToken(String pluginId) {
+        PluginMetadata meta = getPlugin(pluginId);
+        return meta == null ? null : PluginToolApprovals.token(PluginToolApprovals.snapshot(meta).definitions());
+    }
+
+    /**
+     * 该名字的工具此刻因升级待批准而不可用时，给模型/调用方的说明；否则 null。
+     * 只用于给出可读的拒绝原因，真正的闸是 {@link #isToolDefinitionApproved}。
+     */
+    public String pendingToolNotice(String toolName) {
+        if (toolName == null) return null;
+        for (var e : pendingToolChanges.entrySet()) {
+            for (PluginToolApprovals.Change c : e.getValue()) {
+                if (toolName.equals(c.name())) {
+                    PluginMetadata meta = getPlugin(e.getKey());
+                    String plugin = meta == null ? e.getKey() : localize(e.getKey(), meta.getName());
+                    return LangText.of(
+                            "插件「" + plugin + "」的工具 " + c.label() + " 定义有变（权限升高），用户批准前不能使用。"
+                                    + "请告诉用户到「插件中心 → " + plugin + "」查看并批准这项变更，不要改用其他工具绕过。",
+                            "Tool " + c.label() + " of plugin \"" + plugin + "\" changed to a higher-privilege definition and cannot be used "
+                                    + "until the user approves it. Ask the user to review and approve the change in Plugin Center → " + plugin
+                                    + "; do not work around it with other tools.");
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 宿主内置安装路径用：只有当前加载的定义恰好就是随宿主发的那份清单时才批准
+     * （安装与批准之间若被别的来源换掉，按普通变更等用户批准）。
+     */
+    public synchronized boolean approveBundledToolDefinitions(String pluginId, String bundledManifestJson) {
+        PluginMetadata bundled = parseManifest(bundledManifestJson);
+        if (bundled == null || !pluginId.equals(bundled.getId())) return false;
+        applyDeclaredTools(bundled);
+        try {
+            approveToolChanges(pluginId, PluginToolApprovals.token(PluginToolApprovals.snapshot(bundled).definitions()));
+            return true;
+        } catch (IllegalStateException | IllegalArgumentException changed) {
+            log.warn("Plugin {} loaded definitions differ from the bundled manifest; left for user approval", pluginId);
+            return false;
+        }
+    }
+
+    /**
+     * 用户（管理员）批准插件当前的全部工具定义。{@code token} 必须等于 {@link #toolApprovalToken}：
+     * 用户看提示期间插件又被重装/改动过，就拒绝，让用户看新的变更（null = 宿主自己发的内置包，不核对）。
+     */
+    public synchronized void approveToolChanges(String pluginId, String token) {
+        PluginMetadata meta = getPlugin(pluginId);
+        if (meta == null) throw new IllegalArgumentException("Plugin not found: " + pluginId);
+        PluginToolApprovals.Snapshot current = PluginToolApprovals.snapshot(meta);
+        if (token != null && !token.equals(PluginToolApprovals.token(current.definitions()))) {
+            throw new IllegalStateException(LangText.of("插件在你查看期间又有变动，请重新查看变更后再批准。",
+                    "The plugin changed while you were reviewing it. Review the new changes before approving."));
+        }
+        writeToolApprovals(pluginId, PluginToolApprovals.toJson(current.definitions()));
+        approvedToolDefinitions.addAll(current.objects().values());
+        pendingToolChanges.remove(pluginId);
+        log.info("Plugin {} tool definitions approved", pluginId);
+    }
+
     /** 相对路径守卫（模板/画像文件声明）：非空、不以 / 开头、不含 ..、不含反斜杠 */
     private static boolean isSafeRelFile(String file) {
         return file != null && !file.isBlank() && !file.startsWith("/") && !file.contains("..")
@@ -659,12 +849,36 @@ public class PluginService {
     private static final Set<String> L10N_LANGS = com.checkba.util.AppLocale.supportedCodes();
     private static final long L10N_MAX_BYTES = 256 * 1024;
 
+    /** 宿主随包分发的内置插件目录；未安装的内置插件在广场列表里用它的 l10n 表显示名称与简介。 */
+    @Value("${ai.plugins.bundled-dir:}")
+    String bundledDir = "";
+
+    /** pluginId -> 内置包 l10n 表（只读、随安装包固定，不随 rescan 清空） */
+    private final Map<String, Map<String, Map<String, String>>> bundledL10n = new ConcurrentHashMap<>();
+
     private void loadL10n(String pluginId, File pluginDir) {
-        File dir = new File(pluginDir, "l10n");
-        if (!dir.isDirectory()) {
-            return;
+        Map<String, Map<String, String>> tables = readL10n(pluginId, pluginDir);
+        if (!tables.isEmpty()) {
+            pluginL10n.put(pluginId, tables);
         }
+    }
+
+    private Map<String, Map<String, String>> l10nTables(String pluginId) {
+        Map<String, Map<String, String>> tables = pluginL10n.get(pluginId);
+        if (tables != null || bundledDir == null || bundledDir.isBlank() || !PACK_ID.matcher(pluginId).matches()) {
+            return tables;
+        }
+        Map<String, Map<String, String>> bundled = bundledL10n.computeIfAbsent(pluginId,
+                id -> readL10n(id, new File(bundledDir, id)));
+        return bundled.isEmpty() ? null : bundled;
+    }
+
+    private static Map<String, Map<String, String>> readL10n(String pluginId, File pluginDir) {
+        File dir = new File(pluginDir, "l10n");
         Map<String, Map<String, String>> tables = new HashMap<>();
+        if (!dir.isDirectory()) {
+            return tables;
+        }
         for (String lang : L10N_LANGS) {
             File f = new File(dir, lang + ".json");
             if (!f.isFile() || f.length() > L10N_MAX_BYTES) {
@@ -685,12 +899,10 @@ public class PluginService {
                 log.warn("Plugin {} l10n/{}.json 解析失败，忽略: {}", pluginId, lang, e.getMessage());
             }
         }
-        if (!tables.isEmpty()) {
-            pluginL10n.put(pluginId, tables);
-        }
+        return tables;
     }
 
-    private static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
+    static final Map<String, Map<String, String>> BUILTIN_PLUGIN_EN = Map.ofEntries(
             Map.entry("baoqingtian", Map.ofEntries(
                     Map.entry("plugin.name", "Baoqingtian · Leads & Notes"),
                     Map.entry("包晴天 · 案源与笔记", "Baoqingtian · Leads & Notes"),
@@ -715,9 +927,10 @@ public class PluginService {
                     Map.entry("查找剪贴记录、复制和插入内容。", "Search clipboard history, copy, and insert content.")
             )),
             Map.entry("desensitize", Map.ofEntries(
-                    Map.entry("plugin.name", "Desensitize"),
-                    Map.entry("view.main.name", "Desensitize"),
-                    Map.entry("脱敏", "Desensitize"),
+                    Map.entry("plugin.name", "File Redaction"),
+                    Map.entry("view.main.name", "File Redaction"),
+                    Map.entry("脱敏", "File Redaction"),
+                    Map.entry("文件脱敏", "File Redaction"),
                     Map.entry("plugin.description", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages."),
                     Map.entry("核查敏感信息并生成脱敏副本，可用恢复包复敏。", "Inspect sensitive information, generate desensitized copies, and restore with recovery packages.")
             )),
@@ -777,8 +990,8 @@ public class PluginService {
                     Map.entry("选择案卷材料，生成并管理可编辑的诉讼图表。", "Select case materials to generate and manage editable litigation charts.")
             )),
             Map.entry("project-im", Map.ofEntries(
-                    Map.entry("plugin.name", "Project Messaging"),
-                    Map.entry("项目沟通", "Project Messaging"),
+                    Map.entry("plugin.name", "Project Chat"),
+                    Map.entry("项目沟通", "Project Chat"),
                     Map.entry("plugin.description", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only."),
                     Map.entry("律所、团队与项目的沟通：共享助手、私聊、文件归档与 AI 引用。目前仅支持中国大陆站账号，国际站暂未开通。", "Law firm, team, and project communication: shared assistant, direct messages, file archiving, and AI references. Currently available for Mainland China accounts only.")
             )),
@@ -812,7 +1025,7 @@ public class PluginService {
             return raw;
         }
         boolean isToken = raw.length() >= 3 && raw.charAt(0) == '%' && raw.charAt(raw.length() - 1) == '%';
-        Map<String, Map<String, String>> tables = pluginId != null ? pluginL10n.get(pluginId) : null;
+        Map<String, Map<String, String>> tables = pluginId != null ? l10nTables(pluginId) : null;
         com.checkba.util.AppLocale current = com.checkba.util.AppLocale.fromCode(
                 com.checkba.service.LangText.localeCode());
         if (isToken) {
@@ -848,6 +1061,12 @@ public class PluginService {
             return builtinEn != null ? builtinEn : raw;
         }
         return raw;
+    }
+
+    /** 广场/内置包列表的名称与简介：同 localize，但解析不了的 %key% 占位符绝不外露，改用 fallback。 */
+    public String localizeListing(String pluginId, String raw, String fallback) {
+        String value = localize(pluginId, raw);
+        return value != null && value.length() >= 3 && value.startsWith("%") && value.endsWith("%") ? fallback : value;
     }
 
     private static String localizeToken(Map<String, Map<String, String>> tables,
@@ -1054,6 +1273,13 @@ public class PluginService {
         return toolToPluginId.get(toolName);
     }
 
+    /** 插件 manifest 的 {@code hosts} 是否声明了网页版（{@code "web"}，大小写不敏感）。未知插件为 false。 */
+    public boolean supportsWebClient(String pluginId) {
+        PluginMetadata meta = pluginId == null ? null : getPlugin(pluginId);
+        if (meta == null || meta.getHosts() == null) return false;
+        return meta.getHosts().stream().anyMatch(h -> h != null && "web".equalsIgnoreCase(h.trim()));
+    }
+
     /** manifest 以 {@code agent:false} 标为仅供 UI 直调的工具名（不下发给模型、不投影 MCP）。 */
     public boolean isAgentHidden(String toolName) {
         for (PluginMetadata plugin : plugins) {
@@ -1213,6 +1439,8 @@ public class PluginService {
                 validateFrontendEntry(pluginDir, meta);
                 PluginManifestContractValidator.validateViews(meta, pluginDir);
                 applyDeclaredTools(meta);
+                // 必须在 plugins.add 之前：登记进列表的那一刻，工具是否获批已经确定（缺省不批）
+                reconcileToolApprovals(meta, new File(pluginDir, ".awd-dev").exists());
                 plugins.add(meta);
                 pluginDirById.put(meta.getId(), pluginDir);
 
@@ -1626,7 +1854,8 @@ public class PluginService {
                 @Override
                 public java.util.List<com.checkba.service.ai.evidence.EvidenceItem> retrieve(
                         com.checkba.service.ai.evidence.EvidenceQuery query) {
-                    return isEnabled(pluginId) ? inner.retrieve(query) : java.util.List.of();
+                    // 远程证据来源改了地址/凭据/工具名而用户还没批准：不发出检索
+                    return isEnabled(pluginId) && isToolDefinitionApproved(d) ? inner.retrieve(query) : java.util.List.of();
                 }
             });
         }

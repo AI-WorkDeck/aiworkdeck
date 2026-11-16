@@ -86,6 +86,7 @@ plugins/
 | `tools` | object[] | 否 | 工具清单（`name` + 中文 `description` + 可选 `permissions`），用于插件广场展示、人工审查与 v2 权限校验。`name` 应与 JAR 中 `@Tool` 方法名一致；`permissions` 声明**该工具运行所需**的能力（v2 新增，见 §3）。 |
 | `frontendEntry` | string | 否 | **v2.3 起激活**：`web/index.html` 这样的相对路径 = Web 插件（见 §8）；`http(s)://` 绝对 URL = 旧形态，宿主直接 iframe 打开外部页面。 |
 | `minHostVersion` | string | 否 | **v2.7 新增**：本插件需要的最低宿主版本（semver）。宿主低于它时插件登记但**不生效**（不加载 JAR、不注册工具、不服务 web/），管理页提示「需要宿主 ≥ X，请升级客户端」，enable 明确拒绝；广场安装与 dev 直装在装前就拦。非法格式视为缺省并 WARN。dev 态宿主（版本 `dev`）跳过校验。注意它保护不了 0.27.3 及更老的宿主（它们不认识这个字段）——用了 v2.7 能力的插件应声明 `"0.27.4"`，缺口随存量宿主升级自然收敛。 |
+| `hosts` | string[] | 否 | **W1 新增**：除桌面端与 Office/WPS 任务窗格（缺省就支持）之外还支持的宿主，目前只认 `"web"`。声明了 `["web"]`，本插件的 Agent 工具（JAR `@Tool`、声明式 `tools[]`、`contributes.mcpServers` 投影的工具）才会出现在**网页版**（官网 `/web/` 工作台，`clientCapability:"web"`）会话里；**缺省不出现**——插件工具多数假设桌面环境（本机文件、桌面前端、编辑器桥），判不准时放行在网页上会变成死路径。只声明你的工具在纯云端（无本机文件、无终端、编辑器只开 DOCX）也能跑通的插件。不影响桌面端与任务窗格的可见性。宿主实现见 `ClientCapabilityService` / `WebClientToolSurface`。 |
 | `backendJars` | string[] | 否 | 相对插件目录的 JAR 文件名列表，启动/重扫时加载其中带 `@Tool` 注解的类。 |
 | `skills` | string[] | 否 | **v2.1 新增**：插件携带的 Skill 子目录名列表（相对插件目录），见 §7。 |
 | `packs` | string[] | 否 | **v2.3 新增**：依赖的原生资源包 id 列表，见 §9 与 [NATIVE_PACK_DISTRIBUTION.md](NATIVE_PACK_DISTRIBUTION.md)。 |
@@ -103,6 +104,15 @@ plugins/
 | `network` | 访问外部网络（HTTP 等出站请求） |
 | `editor` | 操作文档编辑器（LOWA/LibreOffice 相关原语） |
 | `ai` | **v2.7 新增**：经宿主平台通道调用 AI 模型（桥 `ai.request`，消耗**用户的** Credits）。广场受理时的人工审查重点项 |
+| `im` | 项目沟通固定动作（桥 `im.request`、宿主服务 `im`） |
+| `notifications` | 向当前用户发宿主通知 |
+| `lawfirm` | 律所管理固定动作（桥 `lawfirm.request`、宿主服务 `lawfirm`） |
+| `speech` | 本机语音组件进度事件（`speech.progress` / `speech.stopped`） |
+| `tasks` | 日程与任务（宿主服务 `calendar`、事件 `calendar.changed`） |
+| `clipboard` | 宿主剪贴板历史（服务 `clipboard`、事件 `clipboard.changed`） |
+| `worklog_read` | 只读本人工作记录汇总（宿主服务 `worklog.summary`，宿主 0.86.0+） |
+
+权限全集以 `PluginService.KNOWN_PERMISSIONS` 为准，SDK schema、官网上传校验与市场页标签由 `PluginPermissionParityTest` 对拍（官网仓有同名守卫测试）。
 
 > **先读这一段，否则会高估它的作用。**
 >
@@ -953,6 +963,8 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 单文件客户权限是服务端统一规则（`ProjectFileAccessService`）：当前项目成员中的内部角色默认可读；项目 CLIENT 或全局 CLIENT 只读自己上传的文件及明确 `clientVisible=true` 的文件。旧 NULL 视为 false。非成员仍不能访问；文件权限不因加入聊天或 Git 克隆扩大。`GET/PUT /api/projects/{projectId}/files/{fileId}/access` 读取或设置客户可见性，写入需非客户项目写权限。拒绝正文固定为“抱歉文件还在准备中，请联系您的律师。”。下载、文本、搜索、移动端文件源共用此规则；拥有整个项目工具能力的律师 AI 工作台及跨文件派生分析暂不向客户开放。
 
 项目文件引用是发送时快照，携带 `source.projectUid/fileUid`，不含本机路径；引用前检查原文件可读。快照权限独立：默认内部可见，上传者本人仍可读，只有会话的非客户 OWNER 或上传者可通过 `fileAccess` 为会话内客户开放/收回。不可读附件消息仅返回 `{id,available:false,message}`，不泄露名称、摘要或来源；下载同样鉴权。权限收回禁止后续读取，但不能撤回对方已保存的副本。每次可见态轮询刷新最近页的附件权限，显式刷新覆盖全部已加载历史。
+
+客户历史可见范围：`invite` 接受可选布尔 `shareHistory`（默认 false），回包回显同名字段；未回显说明协作服务尚未执行该选择。客户身份的新成员（CLIENT 邀请码、持 MEMBER 码的全局 CLIENT 账号、进入项目群的项目客户）默认只能读取入群之后的消息，`messages` 的各种分页、未读数、归档、Agent 只读工具与消息中心同口径；只在入群前发出过的附件 `download` 返回固定待准备提示，逐文件 `clientVisible` 继续叠加。共享助手只依据全体成员都能读到的消息作答。规则上线前已存在的成员不受影响。
 
 上传 `clientMessageId` 与发送相同，仅同一发送重试复用附件；同键异内容/来源拒绝，缺键每次新建，新发送不会继承旧附件公开权限。归档同时受10000条和16 MiB限制，超限回滚，不生成部分成品。项目写入用项目行锁串行化，回滚清理本次新增物理文件。
 

@@ -29,7 +29,7 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
       this.menuBarCalls = []
       this.webContents = new EventEmitter()
       this.webContents.send = (...args) => this.sent.push(args)
-      this.webContents.setWindowOpenHandler = () => {}
+      this.webContents.setWindowOpenHandler = (handler) => { this.windowOpenHandler = handler }
       this.webContents.session = new EventEmitter()
       this.webContents.session.webRequest = {
         onBeforeRequest(listener) { this.listener = listener },
@@ -60,7 +60,8 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
     async readText() { return this.text },
   }
   const context = vm.createContext({
-    app, BrowserWindow: Window, clipboard, path, console, prepareRendererForQuit: prepare,
+    app, BrowserWindow: Window, clipboard, path, console, prepareRendererForQuit: prepare, URL,
+    shell: { opened: [], openExternal(url) { this.opened.push(url); return Promise.resolve() } },
     // createMainWindow 用 nativeTheme 决定窗口的 backgroundColor（首屏白闪兜底，dev-board#731）。
     // 默认给浅色：桌面壳启动时 applyNativeTheme('light') 就是出厂值，与真实运行一致。
     nativeTheme: { shouldUseDarkColors: false },
@@ -80,6 +81,7 @@ function harness(platform = 'darwin', engine = '', prepare = async () => {}) {
         './reload-guard': { attachReloadGuard: () => true },
         './services/backend-request-gate': require('../main/services/backend-request-gate'),
         './window-state': require('../main/window-state'),
+        './navigation-guard': require('../main/navigation-guard'),
       }
       assert.ok(name in stubs, 'createMainWindow 里多了一个没桩的 require: ' + name)
       return stubs[name]
@@ -116,6 +118,29 @@ test('mac activation during service startup waits for the allocated backend port
   assert.equal(h.windows.length, 1)
   assert.equal(typeof h.windows[0].webContents.session.webRequest.listener, 'function')
   assert.ok(h.windows[0].options.webPreferences.additionalArguments.includes('--checkba-api-base=http://127.0.0.1:9799'))
+})
+
+test('S26: main window is sandboxed and keeps external links out of the privileged page', async () => {
+  const h = harness()
+  h.context.finishStartup()
+  const win = h.windows[0]
+  const prefs = win.options.webPreferences
+  assert.equal(prefs.sandbox, true)
+  assert.equal(prefs.contextIsolation, true)
+  assert.equal(prefs.nodeIntegration, false)
+  let prevented = false
+  win.webContents.emit('will-navigate', { url: 'https://example.com/a', preventDefault() { prevented = true } }, 'https://example.com/a')
+  assert.equal(prevented, true)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual([...h.context.shell.opened], ['https://example.com/a'])
+  // The shipped app page (frontend/dist/build/h5 next to the desktop dir in unpackaged runs) stays navigable.
+  prevented = false
+  const appPage = require('node:url').pathToFileURL(path.join(__dirname, '../../frontend/dist/build/h5/index.html')).href + '#/pages/x'
+  win.webContents.emit('will-navigate', { url: appPage, preventDefault() { prevented = true } }, appPage)
+  assert.equal(prevented, false)
+  assert.equal(win.windowOpenHandler({ url: 'about:blank' }).action, 'deny')
+  assert.equal(win.windowOpenHandler({ url: 'https://example.com/b' }).action, 'deny')
+  assert.equal(JSON.stringify(win.sent.at(-1)), JSON.stringify(['checkba:browser-open-new-tab', { id: 'renderer', url: 'https://example.com/b' }]))
 })
 
 test('dev-board#726: win32 window hides the native menu bar and turns off its Alt auto-hide toggle', () => {

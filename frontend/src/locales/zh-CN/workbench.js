@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  scratchCopyChoose: "选择要转存的内容",
+  scratchCopySelected: "已选 {count} 项",
+  scratchCopyFiles: "文件",
+  scratchCopyConversations: "对话",
+  scratchCopyNoProjects: "暂无可转存的正式项目，请先创建项目。",
   scratchCopyTitle: "转存到正式项目",
   scratchCopyHint: "复制所选对话和文件，保留原件；目标项目的成员可查看转存内容。",
   restartPending: '{count} 个任务可继续',
@@ -37,6 +42,7 @@ export default {
   looseFilesOpenFile: '打开文件…',
   looseFilesOpenFolder: '打开文件夹…',
   mobileBackup: {
+    "undecided": "待选择",
     "accessRequired": "云功能无需订阅。请到账户页查看按量价格、确认后付费规则或处理欠款；本机文件不受影响。",
     "manageBilling": "账户与计费",
     "billingSummary": "欠款：{debt}；可用授信：{available}。",
@@ -200,7 +206,7 @@ export default {
   railLabelDpia: 'DPIA',
   railLabelLawfirm: '律所管理',
   railLabelTmeet: '腾讯会议',
-  railLabelProjectIm: '项目群聊',
+  railLabelProjectIm: '项目沟通',
   railLabelDesensitize: '文件脱敏',
   railLabelTabular: '表格审阅',
   railEditDoneBtn: '完成',
@@ -383,7 +389,7 @@ export default {
     baoqingtian: '包晴天 · 案源与笔记',
     dpiaWorkbench: 'DPIA 数据合规工作台',
     lawfirmManagement: '律所管理',
-    projectIm: '项目群聊',
+    projectIm: '项目沟通',
   },
   sensitiveEditorNotReadyError: '编辑器尚未就绪，无法保存当前修改，请稍后重试',
   sensitiveSavePendingError: '当前修改尚未保存成功，请先保存文件后重试',

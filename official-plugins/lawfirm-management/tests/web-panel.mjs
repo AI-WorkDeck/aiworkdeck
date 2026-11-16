@@ -18,6 +18,7 @@ const html = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8')
 const sdkSource = readFileSync(new URL('../../../sdk/plugin-sdk/awd-plugin-sdk.js', import.meta.url), 'utf8');
 const panelSource = readFileSync(new URL('../web/panel.js', import.meta.url), 'utf8');
 const cssSource = readFileSync(new URL('../web/panel.css', import.meta.url), 'utf8');
+const l10nSource = readFileSync(new URL('../web/expenses-l10n.js', import.meta.url), 'utf8');
 
 const tick = async (rounds = 4) => {
   for (let i = 0; i < rounds; i++) {
@@ -37,11 +38,11 @@ function createDemoState() {
       {
         id: 1,
         intakeNo: 'LF-2026-0001',
-        title: '华星半导体科创板IPO专项法律服务',
+        title: '澜曜微电子科创板IPO专项法律服务',
         practiceArea: 'CAPITAL_MARKET',
         departmentName: '资本市场与并购部',
         leadLawyerName: '韩泽伟律师',
-        clientName: '华星半导体股份有限公司',
+        clientName: '澜曜微电子股份有限公司',
         clientCreditCode: '91110108MA001111XX',
         counterpartyName: '无',
         feeMode: 'FIXED',
@@ -55,18 +56,18 @@ function createDemoState() {
       {
         id: 2,
         intakeNo: 'LF-2026-0002',
-        title: '蓝海光电诉华星半导体（集团）有限公司技术秘密侵权纠纷',
+        title: '朗绮光电诉澜曜微电子（集团）有限公司技术秘密侵权纠纷',
         practiceArea: 'IP_TECH',
         departmentName: '争议解决部',
         leadLawyerName: '林致远律师',
-        clientName: '苏州蓝海光电科技有限公司',
+        clientName: '苏州朗绮光电科技有限公司',
         clientCreditCode: '91320500MA002222YY',
-        counterpartyName: '华星半导体（集团）有限公司',
+        counterpartyName: '澜曜微电子（集团）有限公司',
         feeMode: 'CONTINGENCY',
         contractAmountCents: 120000000,
         contingencyRateBps: 2000,
         conflictRiskLevel: 'YELLOW',
-        conflictSummary: '【YELLOW · Y1_EXISTING_CLIENT_OTHER_MATTER】新案对方当事人与本所在办案件委托人「华星半导体股份有限公司」商号核心词干一致，需征询主办律师放行并建立信息隔离墙。',
+        conflictSummary: '【YELLOW · Y1_EXISTING_CLIENT_OTHER_MATTER】新案对方当事人与本所在办案件委托人「澜曜微电子股份有限公司」商号核心词干一致，需征询主办律师放行并建立信息隔离墙。',
         feeComplianceWarning: '《关于进一步规范律师服务收费的意见》分段递减上限提示：风险代理收费最高不得超过标的额的30%，且分段递减上限为：不超过100万元部分≤18%',
         status: 'PENDING_LAWYER_CLEARANCE',
         imConversationId: 'im-conv-conflict-2'
@@ -80,8 +81,8 @@ function createDemoState() {
         targetUserId: 101,
         targetUserName: '韩泽伟律师',
         matchedProjectId: 11,
-        matchedMatterTitle: '华星半导体科创板IPO专项法律服务',
-        matchedPartyName: '华星半导体股份有限公司',
+        matchedMatterTitle: '澜曜微电子科创板IPO专项法律服务',
+        matchedPartyName: '澜曜微电子股份有限公司',
         conflictRuleCitation: '全国律协《律师执业行为规范》第五十一条第（三）项、第五十二条第（一）项',
         decision: 'PENDING',
         comment: '',
@@ -94,14 +95,14 @@ function createDemoState() {
         invoiceAppNo: 'INV-2026-001',
         intakeId: 1,
         intakeNo: 'LF-2026-0001',
-        matterTitle: '华星半导体科创板IPO专项法律服务',
+        matterTitle: '澜曜微电子科创板IPO专项法律服务',
         departmentName: '资本市场与并购部',
         invoiceType: 'DIGITAL_SPECIAL',
         amountCents: 180000000,
         taxRateBps: 600,
         taxAmountCents: 10188679,
         netAmountCents: 169811321,
-        buyerName: '华星半导体股份有限公司',
+        buyerName: '澜曜微电子股份有限公司',
         buyerTaxId: '91110108MA001111XX',
         status: 'ISSUED',
         invoiceNumber: 'SD-000801',
@@ -115,10 +116,10 @@ function createDemoState() {
         collectionNo: 'COL-2026-001',
         intakeId: 1,
         intakeNo: 'LF-2026-0001',
-        matterTitle: '华星半导体科创板IPO专项法律服务',
+        matterTitle: '澜曜微电子科创板IPO专项法律服务',
         invoiceId: 801,
         invoiceAppNo: 'INV-2026-001',
-        payerName: '华星半导体股份有限公司',
+        payerName: '澜曜微电子股份有限公司',
         amountCents: 120000000,
         paymentMethod: 'BANK_TRANSFER',
         bankVoucherNo: 'BK-20261010-7712',
@@ -266,7 +267,7 @@ async function mountPanel(options = {}) {
         }
         if (result === undefined) {
           if (msg.method === 'context.get') {
-            result = { pluginId: 'lawfirm-management', projectId: 1, language: 'zh-CN', theme: 'light' };
+            result = { pluginId: 'lawfirm-management', projectId: 1, language: options.language || 'zh-CN', theme: 'light' };
           } else if (msg.method === 'events.subscribe' || msg.method === 'events.unsubscribe') {
             result = { subscribed: msg.params?.events || [] };
           } else if (msg.method === 'lawfirm.request') {
@@ -283,7 +284,8 @@ async function mountPanel(options = {}) {
                   invoices: state.invoices,
                   collections: state.collections,
                   dashboard: state.dashboard,
-                  restricted: state.restricted === true
+                  restricted: state.restricted === true,
+                  localLedger: state.localLedger === true
                 };
                 break;
               case 'conflictPreview':
@@ -297,8 +299,8 @@ async function mountPanel(options = {}) {
                       riskLevel: 'YELLOW',
                       ruleTitle: '新案对方当事人系本所在办案件委托人',
                       statutoryCitation: '《律师法》第39条 / 《全国律协执业行为规范》第51条',
-                      matchedMatterTitle: '华星半导体科创板IPO专项法律服务',
-                      matchedPartyName: params.counterpartyName || '华星半导体股份有限公司',
+                      matchedMatterTitle: '澜曜微电子科创板IPO专项法律服务',
+                      matchedPartyName: params.counterpartyName || '澜曜微电子股份有限公司',
                       handlerUserName: '韩泽伟律师'
                     }
                   ],
@@ -361,7 +363,7 @@ async function mountPanel(options = {}) {
                   id: state.invoices.length + 801,
                   invoiceAppNo: `INV-2026-00${state.invoices.length + 1}`,
                   intakeId: params.intakeId,
-                  matterTitle: '华星半导体科创板IPO专项法律服务',
+                  matterTitle: '澜曜微电子科创板IPO专项法律服务',
                   departmentName: '资本市场与并购部',
                   invoiceType: params.invoiceType,
                   amountCents: params.amountCents,
@@ -387,13 +389,19 @@ async function mountPanel(options = {}) {
                 result = inv || {};
                 break;
               }
+              case 'voidInvoice': {
+                const inv = state.invoices.find((i) => i.id === params.invoiceId);
+                if (inv) inv.status = params.mode;
+                result = inv || {};
+                break;
+              }
               case 'recordCollection': {
                 const col = {
                   id: state.collections.length + 901,
                   collectionNo: `COL-2026-00${state.collections.length + 1}`,
                   intakeId: params.intakeId,
                   invoiceId: params.invoiceId,
-                  matterTitle: '华星半导体科创板IPO专项法律服务',
+                  matterTitle: '澜曜微电子科创板IPO专项法律服务',
                   invoiceAppNo: params.invoiceId ? 'INV-2026-002' : null,
                   payerName: params.payerName,
                   amountCents: params.amountCents,
@@ -445,6 +453,8 @@ async function mountPanel(options = {}) {
     });
   };
 
+  if (options.reload) dom.window.AWD_LAWFIRM_RELOAD = options.reload;
+  if (options.language) dom.window.eval(l10nSource);
   dom.window.eval(sdkSource);
   dom.window.eval(panelSource);
 
@@ -454,7 +464,7 @@ async function mountPanel(options = {}) {
     context: {
       pluginId: 'lawfirm-management',
       projectId: 1,
-      language: 'zh-CN',
+      language: options.language || 'zh-CN',
       theme: 'light',
       themeTokens: {
         '--awd-surface': '#ffffff',
@@ -499,6 +509,8 @@ test('1. Handshake init, theme token injection (light & dark), SDK lawfirm helpe
   assert.match(p.$('self-badge').textContent, /韩泽伟律师.*资本市场与并购部/);
   assert.match(p.$('intake-list').textContent, /LF-2026-0001/);
   assert.match(p.$('intake-list').textContent, /LF-2026-0002/);
+  assert.doesNotMatch(p.$('intake-list').textContent, /G0_CLEAR|[A-Z]\d_[A-Z_]+/, 'rule codes stay internal');
+  assert.match(p.$('intake-list').textContent, /【无冲突】/);
 
   // Verify host event lawfirm.navigate switches tabs
   p.sendToPlugin({ awd: 1, type: 'event', event: 'lawfirm.navigate', data: { tab: 'dashboard' } });
@@ -512,11 +524,11 @@ test('2. Real-time conflict preview and submitting a case intake with statutory 
   const p = await mountPanel();
   t.after(() => p.dom.window.close());
 
-  p.$('intake-title').value = '华星高管职务侵占刑事控告与追偿专项';
+  p.$('intake-title').value = '澜曜高管职务侵占刑事控告与追偿专项';
   p.$('intake-practice-area').value = 'CRIMINAL';
   p.$('intake-fee-mode').value = 'CONTINGENCY';
   p.$('intake-client-name').value = '蓝海控股集团有限公司';
-  p.$('intake-counterparty-name').value = '华星半导体股份有限公司';
+  p.$('intake-counterparty-name').value = '澜曜微电子股份有限公司';
   p.$('intake-contract-amount').value = '150';
   p.$('intake-contingency-rate').value = '25';
 
@@ -534,11 +546,11 @@ test('2. Real-time conflict preview and submitting a case intake with statutory 
 
   const submitCalls = p.calls.filter((c) => c.method === 'lawfirm.request' && c.params.action === 'submitIntake');
   assert.equal(submitCalls.length, 1);
-  assert.equal(submitCalls[0].params.params.title, '华星高管职务侵占刑事控告与追偿专项');
+  assert.equal(submitCalls[0].params.params.title, '澜曜高管职务侵占刑事控告与追偿专项');
   assert.equal(submitCalls[0].params.params.contractAmountCents, 150000000);
 
   // Verify 5-step progress tracker rendered for the newly submitted intake
-  assert.match(p.$('intake-list').textContent, /LF-2026-0003.*华星高管职务侵占刑事控告与追偿专项/);
+  assert.match(p.$('intake-list').textContent, /LF-2026-0003.*澜曜高管职务侵占刑事控告与追偿专项/);
   const steps = p.$('intake-list').querySelectorAll('.item-card:first-child .step-pill');
   assert.equal(steps.length, 5);
   assert.equal(steps[0].dataset.state, 'done');
@@ -603,7 +615,7 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
 
   // Submit a new digital invoice
   p.$('invoice-amount-yuan').value = '500000';
-  p.$('invoice-buyer-name').value = '华星半导体股份有限公司';
+  p.$('invoice-buyer-name').value = '澜曜微电子股份有限公司';
   p.$('invoice-buyer-tax-id').value = '91110108MA001111XX';
   p.$('btn-submit-invoice').click();
   await tick();
@@ -617,16 +629,24 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
   // Issue the newly submitted invoice
   const issueBtn = p.$('invoice-list').querySelector('.btn-issue-invoice');
   assert.ok(issueBtn, 'Expected issue invoice button');
+  // 没填发票号码不发请求（以前会写死占位号码 SD-xxxxxx）
   issueBtn.click();
+  await tick();
+  assert.equal(p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'issueInvoice'), undefined);
+  assert.match(p.$('notice').textContent, /发票号码/);
+  p.$('invoice-list').querySelector('.invoice-number-input').value = '26112000000012345678';
+  p.$('invoice-list').querySelector('.btn-issue-invoice').click();
   await tick();
 
   const issueCall = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'issueInvoice');
   assert.ok(issueCall);
   assert.equal(issueCall.params.params.invoiceId, 802);
+  assert.equal(issueCall.params.params.invoiceNumber, '26112000000012345678');
+  assert.equal(issueCall.params.params.invoiceCode, undefined, 'no made-up invoice code either');
 
   // Record manual fee collection against the issued invoice
   p.$('collection-invoice-id').value = '802';
-  p.$('collection-payer-name').value = '华星半导体股份有限公司';
+  p.$('collection-payer-name').value = '澜曜微电子股份有限公司';
   p.$('collection-amount-yuan').value = '500000';
   p.$('collection-voucher-no').value = 'BK-20261015-9901';
   p.$('btn-record-collection').click();
@@ -638,6 +658,19 @@ test('4. Submitting a digital invoice, issuing it, recording manual fee collecti
   assert.equal(colCall.params.params.bankVoucherNo, 'BK-20261015-9901');
   assert.match(p.$('collection-list').textContent, /BK-20261015-9901/);
   assert.match(p.$('invoice-list').textContent, /已全额回款/);
+
+  // 已开出的发票只能红冲：第一次点击只是确认提示，第二次才发请求
+  const redBtn = [...p.$('invoice-list').querySelectorAll('.btn-void-invoice')].find((b) => b.textContent === '红冲');
+  assert.ok(redBtn, 'issued invoices offer 红冲');
+  redBtn.click();
+  await tick();
+  assert.equal(p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'voidInvoice'), undefined, 'first click only arms');
+  assert.equal(redBtn.textContent, '再点一次确认红冲');
+  redBtn.click();
+  await tick();
+  const voidCall = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'voidInvoice');
+  assert.equal(voidCall.params.params.mode, 'RED_INVOICED');
+  assert.match(p.$('invoice-list').textContent, /已红冲/);
 
   // Sync with Kingdee / Yonyou ERP
   p.$('btn-sync-erp').click();
@@ -695,4 +728,109 @@ test('6. Restricted-view banner stays visible after a refresh overwrites the sta
   const admin = await mountPanel();
   t.after(() => admin.dom.window.close());
   assert.equal(admin.$('restrictedBanner').hidden, true);
+});
+
+test('7. On a team server the local ledger is refused: panel shows the message and stays usable', async (t) => {
+  const refusal = '本机收费台账仅在桌面端可用。团队服务器上请使用「律所云端利冲协作」。';
+  const p = await mountPanel({
+    onCall: (msg) => {
+      if (msg.method === 'lawfirm.request' && !String(msg.params?.action || '').startsWith('workflow')) {
+        throw new Error(refusal);
+      }
+    }
+  });
+  t.after(() => p.dom.window.close());
+  assert.equal(p.$('notice').textContent, refusal);
+  assert.equal(p.$('notice').dataset.error, 'true');
+  assert.equal(p.$('restrictedBanner').hidden, true);
+
+  p.$('tab-conflict').click();
+  await tick();
+  assert.equal(p.$('panel-conflict').hidden, false, 'tabs still switch');
+  p.$('refresh-data').click();
+  await tick(8);
+  assert.equal(p.$('notice').textContent, refusal, 'refresh shows the refusal again instead of crashing');
+});
+
+test('8. Non-admin dashboard labels follow the real scope; missing metrics show an empty state, not invented numbers', async (t) => {
+  const mine = await mountPanel({ onCall: (msg, state) => {
+    if (msg.method === 'lawfirm.request') {
+      state.restricted = true;
+      for (const lead of state.dashboard.teamLeads || []) { delete lead.avgFilingHours; delete lead.avgCycleHours; delete lead.conflictPassRatePercent; delete lead.firstPassConflictRatePercent; }
+    }
+  } });
+  t.after(() => mine.dom.window.close());
+  mine.$('tab-dashboard').click();
+  await tick();
+  assert.doesNotMatch(mine.$('dashboard-kpis').textContent, /全所/);
+  assert.match(mine.$('dashboard-kpis').textContent, /我的签约合同总额/);
+  assert.doesNotMatch(mine.$("self-badge").textContent, / · 利冲委员$/);
+  const row = mine.$('lead-table').textContent;
+  assert.doesNotMatch(row, /3\.5/); assert.match(row, /—/);
+
+  const admin = await mountPanel();
+  t.after(() => admin.dom.window.close());
+  assert.match(admin.$('dashboard-kpis').textContent, /全所签约合同总额/);
+
+  // QA D11: the desktop ledger is this device's data even when the user may view all of it.
+  const device = await mountPanel({ onCall: (msg, state) => { if (msg.method === 'lawfirm.request') state.localLedger = true; } });
+  t.after(() => device.dom.window.close());
+  device.$('tab-dashboard').click();
+  await tick();
+  assert.doesNotMatch(device.$('dashboard-kpis').textContent, /全所/);
+  assert.match(device.$('dashboard-kpis').textContent, /本机签约合同总额/);
+  assert.match(device.$('dashboard-kpis').textContent, /本机开票率/);
+});
+
+test('9. A successful intake submit clears the form so it cannot be submitted twice; switching tabs clears the stale notice', async (t) => {
+  const p = await mountPanel();
+  t.after(() => p.dom.window.close());
+  p.$('intake-title').value = '重复提交测试案件';
+  p.$('intake-client-name').value = '测试委托人';
+  p.$('btn-submit-intake').click();
+  await tick(8);
+  assert.ok(p.calls.some((c) => c.method === 'lawfirm.request' && c.params.action === 'submitIntake'));
+  assert.equal(p.$('intake-title').value, '');
+  assert.equal(p.$('intake-client-name').value, '');
+  assert.match(p.$('notice').textContent, /已提交收案申请/);
+  p.$('tab-finance').click();
+  assert.equal(p.$('notice').textContent, '');
+});
+
+test('10. When another tab changes the invoice ledger (hourly bill confirmed), the panel reloads it without 刷新数据', async (t) => {
+  const p = await mountPanel();
+  t.after(() => p.dom.window.close());
+  const overviews = () => p.calls.filter((c) => c.method === 'lawfirm.request' && c.params?.action === 'overview').length;
+  const before = overviews();
+  p.state.invoices.push({ ...p.state.invoices[0], id: 990, invoiceAppNo: 'INV-2026-0990', status: 'PENDING_APPROVAL', invoiceNumber: null });
+  p.dom.window.dispatchEvent(new p.dom.window.CustomEvent('lawfirm:ledger-changed'));
+  await tick(8);
+  assert.equal(overviews(), before + 1);
+  assert.match(p.$('panel-finance').textContent, /INV-2026-0990/);
+});
+
+test('11. Switching the host language reloads the open panel on the same tab; a theme push without a language change does not', async (t) => {
+  const reloads = [];
+  const p = await mountPanel({ reload: (url) => reloads.push(url) });
+  t.after(() => p.dom.window.close());
+  p.$('tab-finance').click();
+  await tick();
+  p.sendToPlugin({ awd: 1, type: 'theme', theme: 'dark', tokens: {}, language: 'zh-CN' });
+  await tick();
+  assert.equal(reloads.length, 0, 'same language: only the theme changes');
+  p.sendToPlugin({ awd: 1, type: 'theme', theme: 'dark', tokens: {}, language: 'en-US' });
+  await tick();
+  assert.equal(reloads.length, 1);
+  assert.equal(new URL(reloads[0]).searchParams.get('tab'), 'finance');
+});
+
+test('12. English ledger rows translate the practice group recorded at intake', async (t) => {
+  const p = await mountPanel({ language: 'en-US' });
+  t.after(() => p.dom.window.close());
+  p.state.invoices[0].departmentName = '知识产权与数据合规';
+  p.dom.window.dispatchEvent(new p.dom.window.CustomEvent('lawfirm:ledger-changed'));
+  await tick(8);
+  const row = [...p.dom.window.document.querySelectorAll('#panel-finance tr')].find((r) => r.textContent.includes('INV-2026-001'));
+  assert.match(row.textContent, /\(IP & Data Compliance\)/);
+  assert.doesNotMatch(row.textContent, /知识产权与数据合规/);
 });

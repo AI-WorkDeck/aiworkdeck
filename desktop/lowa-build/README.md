@@ -16,7 +16,7 @@
 
 ```bash
 # 全新 Ubuntu 22.04 VM（≥32 核、≥64GB RAM、~40GB 盘；国际直连，境内到 GitHub 极慢）
-scp mega-build.sh patches/apply-source-patches.py patches/fs-image-patch.py \
+scp mega-build.sh patches/apply-source-patches.py patches/apply-qt-patches.py patches/apply-emscripten-patches.py patches/fs-image-patch.py \
     patches/ZZZ-aiworkdeck-locale-zh-CN.xcd root@<vm>:/root/
 ssh root@<vm> 'nohup bash /root/mega-build.sh > /root/mega.log 2>&1 &'
 # 轮询：grep -E "PHASE_._DONE|MEGA_" /root/mega.log

@@ -24,7 +24,7 @@ SDK 会自动注入 `awd-plugin-ui.css` 的核心规则，可直接用：
 
 ```html
 <div class="awd-notice awd-notice-danger" role="alert">请先连接 AI WorkDeck 账户 <button class="awd-btn awd-btn-xs">去连接</button></div>
-<div class="awd-table-wrap"><table class="awd-table">…<td class="awd-cell-text">东海精密装备诉华星半导体…</td>…</table></div>
+<div class="awd-table-wrap"><table class="awd-table">…<td class="awd-cell-text">霁岚精密装备诉澜曜微电子…</td>…</table></div>
 <div class="awd-empty"><p class="awd-empty-title">还没有发票</p><p class="awd-empty-desc">在「提交发票申请」里开第一张</p></div>
 ```
 
@@ -48,7 +48,7 @@ background: var(--awd-danger-wash);          /* ✗ 宿主没有这个令牌，�
 
 ## 3. 中文会在任意两个字之间断行：表格、标签、按钮要防挤压
 
-中文没有空格，浏览器可以在任何两个字之间折行。容器一窄，「苏婉清（合伙人）」会被拆成三行，
+中文没有空格，浏览器可以在任何两个字之间折行。容器一窄，「蔺若曦（合伙人）」会被拆成三行，
 「收案与立项」标签会变成「收案与立 / 项」。
 
 - **表格**：外面套 `overflow-x: auto` 的容器；`th, td { white-space: nowrap; }`；

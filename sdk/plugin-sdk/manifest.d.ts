@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-export type Permission = 'file_read' | 'file_write' | 'network' | 'editor' | 'ai' | 'im' | 'notifications' | 'lawfirm' | 'speech' | 'tasks' | 'clipboard';
+export type Permission = 'file_read' | 'file_write' | 'network' | 'editor' | 'ai' | 'im' | 'notifications' | 'lawfirm' | 'speech' | 'tasks' | 'clipboard' | 'worklog_read';
 export type Dock = 'left' | 'right' | 'bottom';
 export interface ViewDeclaration {
   id: string; name: string; entry: string; placement: 'sidebar' | 'workspace'; scope: 'project' | 'global'; defaultDock?: Dock; allowedDocks?: Dock[];
@@ -46,7 +46,7 @@ export interface DeclarativeToolDeclaration {
 }
 export interface PluginManifest {
   $schema?: string; id: string; name: string; version: string; description?: string; author?: string; homepage?: string; icon?: string;
-  minHostVersion?: string; frontendEntry?: string; permissions?: Permission[]; backendJars?: string[]; skills?: string[]; packs?: string[];
+  minHostVersion?: string; /** Extra hosts beyond desktop and Office/WPS panes; "web" = agent tools also offered on the web workbench. */ hosts?: "web"[]; frontendEntry?: string; permissions?: Permission[]; backendJars?: string[]; skills?: string[]; packs?: string[];
   tools?: (LegacyToolDeclaration | DeclarativeToolDeclaration)[];
   settings?: SettingDeclaration[]; guide?: Record<string, unknown>;
   contributes?: {

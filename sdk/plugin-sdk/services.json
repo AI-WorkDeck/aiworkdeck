@@ -35,6 +35,11 @@
         "listConversations": { "access": "read", "requiredPermissions": ["im"] },
         "readMessages": { "access": "read", "requiredPermissions": ["im"] }
       }
+    },
+    "worklog": {
+      "operations": {
+        "summary": { "access": "read", "requiredPermissions": ["worklog_read"] }
+      }
     }
   }
 }

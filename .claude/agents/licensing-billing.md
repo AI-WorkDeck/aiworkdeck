@@ -168,6 +168,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   `connect/disconnect/status/fetchProfile/fetchEntitlements/fetchLedger/fetchAiUsage/fetchAiKey/currentKeyOrNull`，
   以及个人档案那一组 `profileIdentity/updateDisplayName/uploadAvatar/deleteAvatar`（见下方「身份展示」一节）。
 - `service/account/AccountTransport.java` + `HttpAccountTransport.java` — 出站 HTTP 缝（单测打桩不依赖网络）；固定 HTTP/1.1。
+- `POST /api/account/ai-key` 是账户请求里唯一不按 5 秒超时的：`HttpAccountTransport.AI_KEY_TIMEOUT`=15 秒（官网重启后首次拉平台模型目录冷启动约 5.7 秒；5 秒会让新用户首次登录落成「额度尚未就绪」，而桥接登录的 `tryProvision` 只记日志不重试，用户只有这一次机会）。`AccountService.fetchAiKeyWith` 遇网络失败再重试一次（幂等端点，仅一次）。回归：`HttpAccountTransportColdStartTest`、`AccountServiceTest.aiKey*Retr*`。
   `sendMultipart(method,url,bearer,Multipart)` 是头像上传那条路，**默认实现直接抛**——
   给个默认返回值会让「桩根本没接这条路」在测试里表现成一次成功的上传。
 - `service/account/AccountEndpoint.java` — 授权服务器地址的协议校验（https，回环 http 例外），`LicenseService` 与 `AccountService` 共用。
@@ -255,7 +256,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
 - 前端 `frontend/src/utils/marketPricing.js` — 价格展示与状态判定的唯一出口。
 
 **server 模式加固（插件云后端，2026-08-06）**
-- `backend/src/main/java/com/checkba/service/AuthAbuseGuard.java` — 注册闸（`security.registration-mode: open|closed`，默认 open）+ 登录失败锁定（IP+用户名 5 次失败锁 10 分钟）+ 注册按 IP 限频（10/小时）+ **成员查询限频**（dev-board#444：按发起的项目管理员，10 分钟 30 次；`GET /api/projects/{id}/members/lookup` 与 `POST .../members` **共用这一个计数**——两者是同一个「这个手机号注册过没有」的探测面，分开计等于把额度翻倍，交替调两个端点即可绕开）。进程内内存计数，**多实例部署必须前置 nginx limit_req**；local-mode 全部旁路。新增维度记得同步 `purgeIfOversized`（否则伪造维度能把内存撑爆）。
+- `backend/src/main/java/com/checkba/service/AuthAbuseGuard.java` — 注册闸（`security.registration-mode: open|closed`，默认 open）+ 登录失败锁定（IP+用户名 5 次失败锁 10 分钟）+ 注册按 IP 限频（10/小时）+ **成员查询限频**（dev-board#444：按发起的项目管理员，10 分钟 30 次；`GET /api/projects/{id}/members/lookup` 与 `POST .../members` **共用这一个计数**——两者是同一个「这个手机号注册过没有」的探测面，分开计等于把额度翻倍，交替调两个端点即可绕开）。进程内内存计数，**多实例部署必须前置 nginx limit_req**；local-mode 全部旁路。**IP 一律取 `util/ClientIp.of(request)`**，不要直接 `getRemoteAddr()`：后端只听回环、同机 nginx 反代时对端恒为 127.0.0.1，`ClientIp` 只在对端为回环时采信 nginx 用 `$remote_addr` 覆盖写入的 `X-Real-IP`（deploy 下每个反代 `/api/` 的 location 都写了），永不看 X-Forwarded-For；case/cloud 另开着 RemoteIpValve，那里对端已是真实地址、原样采用。客户访问码另有全站宽上限（10 分钟 200 次失败，`checkClientCodeGlobalCeiling`/`recordClientCodeFailure`）。新增维度记得同步 `purgeIfOversized`（否则伪造维度能把内存撑爆）。
 - `backend/src/main/java/com/checkba/service/account/AwdkLoginService.java` — 官网账户 → server 会话桥。核心一段：awdk_ Key 调官网 `/api/account/me` 实时校验 → `account_binding` 映射（键是官网稳定 `accountId`，官网侧已实施并进了权威契约与 contract-check）→ 首登 `UserService.registerExternal` 建无密码用户（`awd_` 前缀）→ `DeviceTokenService.issue` 签发 awdt_ → **顺手为该用户取一把 per-user 平台 AI key**（`PlatformAiKeyService.tryProvision`，失败绝不拖垮桥接）。
   Key 有两种来源，桥接之后完全相同：**账户登录**（`loginWithPhone`/`loginWithPassword`，先调官网 `/api/auth/exchange-key` 换出 Key，用户看不见它；配套 `sendLoginCode`）与**手工粘贴**（`login(key)`，私有部署与团队服务器）。两者共用开关 `security.awdk-login-enabled`（默认 false）——同一条桥的两个入口，**刻意不拆成两个开关**，否则会出现「登录能用但桥是关的」这种自相矛盾的配置。
   端点全在 `AuthController`，全部匿名：`POST /api/auth/awdk-login`、`POST /api/auth/account-login`、`POST /api/auth/account-login/send-code`。

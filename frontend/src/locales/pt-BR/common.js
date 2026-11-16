@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Ir para as Configurações",
   "later": "Mais tarde",
   "requestFailedWithStatus": "Falha na solicitação ({status})",
+  "tooManyRequests": "Muitas solicitações. Aguarde um momento e tente novamente",
   "smsVerificationRequired": "Esta ação requer verificação por SMS",
   "freeQuotaExceeded": "Você usou todos os seus créditos gratuitos",
   "serviceErrorRetryLater": "Erro do serviço. Tente novamente mais tarde",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "Selecionar idioma",
   "languageFollowSystem": "Seguir o sistema",
   "languageSearchPlaceholder": "Pesquisar idiomas…",
-  "languageNoMatch": "Nenhum idioma correspondente"
+  "languageNoMatch": "Nenhum idioma correspondente",
+  "serverLabelAccountBridge": "Ponte de conta",
+  "serverLabelGenericClient": "Cliente (geral)",
+  "serverLabelPersonalMemory": "Memória pessoal",
+  "serverLabelProjectMemory": "Memória do projeto"
 }

@@ -2609,6 +2609,11 @@ public class ProjectFileService {
      * 版本记录是保险不是主流程——任何异常只记日志，绝不阻断文件操作。
      */
     void signalChange(Long projectId, Long userId) {
+        signalChange(projectId, userId, false);
+    }
+
+    /** diskScan：来自本地文件夹对账，见 {@link com.checkba.version.WorkSessionService#onDiskScanSignal}。 */
+    void signalChange(Long projectId, Long userId, boolean diskScan) {
         if (projectId == null) return;
         // 埋点：仅计数，不带任何文件/项目信息
         telemetryService.record("file.changed", null);
@@ -2625,8 +2630,9 @@ public class ProjectFileService {
                     name = ownerName;
                 }
             }
-            workSessionService.onChangeSignal(projectId, userId,
-                    name != null ? name : LangText.of("用户", "User"));
+            String signer = name != null ? name : LangText.of("用户", "User");
+            if (diskScan) workSessionService.onDiskScanSignal(projectId, userId, signer);
+            else workSessionService.onChangeSignal(projectId, userId, signer);
         } catch (Exception e) {
             log.warn("发送版本变更信号失败: project={}", projectId, e);
         }

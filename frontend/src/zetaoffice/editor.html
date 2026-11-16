@@ -14,6 +14,15 @@
         document.documentElement.classList.add('theme-dark');
       }
     } catch (e) { /* ignore */ }
+    // 设备像素比钉在启动值（台账 B1，教程问题记录第 148 条）：窗口拖到/最大化到像素比不同的
+    // 屏幕上（Retina 2x ⇄ 外接 1x）时，Qt 按新比例重设画布，引擎里的 LibreOffice 仍按启动时
+    // 的比例排版——页面被放大、偏到右边、右半截被裁，标尺和页面对不上，拉宽窗口也不恢复。
+    // 引擎只从这里读比例（emscripten_get_device_pixel_ratio），钉住后两边始终一致；换屏后
+    // 画布交给浏览器按新屏缩放（1x→2x 会略发虚，重新打开文件即按新屏启动）。
+    try {
+      var bootDpr = window.devicePixelRatio || 1;
+      Object.defineProperty(window, 'devicePixelRatio', { get: function () { return bootDpr; }, configurable: true });
+    } catch (e) { /* ignore */ }
   </script>
   <style>
     /* 配色令牌。本页是**独立 document**（桌面壳是 <webview partition="persist:zetaoffice">，

@@ -106,7 +106,8 @@ export default {
     "switch": "Beralih",
     "cancel": "Batal",
     "switchFailed": "Gagal mengganti situs. Coba lagi nanti.",
-    "rescueFailed": "Masih belum terbuka setelah mengganti situs. Periksa kode dan coba lagi."
+    "rescueFailed": "Masih belum terbuka setelah mengganti situs. Periksa kode dan coba lagi.",
+    "proIntroBanner": "Credits gratis saat mendaftar · Promo Personal Pro ¥9.9/bln (3 bulan pertama)",
   },
   "hint": {
     "learnMore": "Pelajari Lebih Lanjut",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Konfirmasi",
     "purchaseSuccess": "Terbuka",
     "purchaseFailed": "Pembelian gagal",
-    "goRecharge": "Isi Ulang"
+    "goRecharge": "Isi Ulang",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Dapatkan Personal Pro",
   },
   "identity": {
     "title": "Pilih Ruang Kerja Lokal",

@@ -837,4 +837,23 @@ class PluginServiceTest {
         assertFalse(service.isEnabled("hello-plugin"));
         assertTrue(service.getPluginTools().isEmpty(), "禁用插件的工具不应被注册");
     }
+
+    @Test
+    @DisplayName("未安装的内置插件在广场列表按界面语言显示名称与简介，绝不外露 %key% 或中文")
+    void bundledListingLocalizesUninstalledPlugins() {
+        PluginService service = new PluginService();
+        service.bundledDir = Path.of("../official-plugins").toString();
+        com.checkba.service.AppLanguageScope.run("ja-JP", () -> {
+            // manifest 写中文原文（日程），按内置包 l10n 表回到日文
+            assertEquals("カレンダー", service.localizeListing("calendar", "日程", "calendar"));
+            assertEquals("クリップボード", service.localizeListing("clipboard", "剪贴板", "clipboard"));
+            // 主题包 manifest 写 %plugin.name% 占位符
+            assertEquals("墨彩禅 · 書道スキン", service.localizeListing("theme-inkwash-zen", "%plugin.name%", "theme-inkwash-zen"));
+            // 解析不了的占位符给回退值，不外露
+            assertEquals("unknown-plugin", service.localizeListing("unknown-plugin", "%plugin.name%", "unknown-plugin"));
+            assertEquals("", service.localizeListing("theme-inkwash-zen", "%no.such.key%", ""));
+        });
+        com.checkba.service.AppLanguageScope.run("de-DE", () ->
+                assertNotEquals("%plugin.desc%", service.localizeListing("theme-aurora-glass", "%plugin.desc%", "")));
+    }
 }

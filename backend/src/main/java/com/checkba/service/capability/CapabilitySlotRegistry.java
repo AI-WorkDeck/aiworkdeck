@@ -371,12 +371,24 @@ public class CapabilitySlotRegistry {
     // ==================== 开发者模式 ====================
 
     /**
+     * 正式发行版（官方 CI 打的安装包，桌面壳注入 AWD_RELEASE_BUILD=1）。
+     * 开发态、自己从源码打的包都没有这个标记。
+     */
+    @org.springframework.beans.factory.annotation.Value("${awd.release-build:false}")
+    private boolean releaseBuild;
+
+    void setReleaseBuild(boolean releaseBuild) {
+        this.releaseBuild = releaseBuild;
+    }
+
+    /**
      * 开发者模式：允许把从 GitHub 拉来的、未签名的 process 型实现装到本机。
-     * 默认开——维护者裁决（dev-board#497）：这类能力包目前只有开发者自己会装，
-     * 默认开更贴合首期使用场景；不需要时可在设置页关闭。
+     * 默认值：正式发行版**关**，开发态与源码构建开（2026-11-14 维护者裁决，英文 QA 第 9 条：
+     * 律所 IT 验收会查「默认允许装未签名代码」这一项；此前 dev-board#497 是一律默认开）。
+     * 用户自己在设置页明确开过/关过的值照存照用，不受默认值变化影响。
      */
     public boolean devMode() {
-        return "true".equals(systemSettingService.get(DEV_MODE_KEY, "true"));
+        return "true".equals(systemSettingService.get(DEV_MODE_KEY, releaseBuild ? "false" : "true"));
     }
 
     public void setDevMode(boolean on) {

@@ -27,15 +27,21 @@ public class ImController {
             @RequestHeader(value="X-Session-Id",required=false) String sessionId) throws IOException {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("请先登录");
-        Map<String,Object> body = readBody(request, mapper);
-        return Map.of("code", 0, "data", service.execute(userId, ImService.string(body, "action"), params(body)));
+        Map<String,Object> body = readBody(request, mapper, service.maxRequestBytes());
+        return Map.of("code", 0, "data", service.executeRequest(userId, ImService.string(body, "action"), params(body)));
     }
 
     /** Bound raw JSON before parsing, including requests using chunked transfer encoding. */
     public static Map<String,Object> readBody(HttpServletRequest request, ObjectMapper mapper) throws IOException {
-        if (request.getContentLengthLong() > ImGatewayService.MAX_JSON_BYTES) throw new IllegalArgumentException(com.checkba.service.LangText.of("请求过大，文件不能超过8MiB", "Request too large; file cannot exceed 8 MiB"));
-        byte[] bytes = request.getInputStream().readNBytes(ImGatewayService.MAX_JSON_BYTES + 1);
-        if (bytes.length > ImGatewayService.MAX_JSON_BYTES) throw new IllegalArgumentException(com.checkba.service.LangText.of("请求过大，文件不能超过8MiB", "Request too large; file cannot exceed 8 MiB"));
+        return readBody(request, mapper, ImGatewayService.MAX_JSON_BYTES);
+    }
+
+    /** {@code maxBytes}: client uploads (scanned evidence) may be larger than staff files; see {@link ImService#maxRequestBytes()}. */
+    public static Map<String,Object> readBody(HttpServletRequest request, ObjectMapper mapper, long maxBytes) throws IOException {
+        int cap = (int) Math.min(Integer.MAX_VALUE - 1, maxBytes);
+        if (request.getContentLengthLong() > cap) throw new IllegalArgumentException(com.checkba.service.LangText.of("请求过大，文件超出上传上限", "Request too large; the file exceeds the upload limit"));
+        byte[] bytes = request.getInputStream().readNBytes(cap + 1);
+        if (bytes.length > cap) throw new IllegalArgumentException(com.checkba.service.LangText.of("请求过大，文件超出上传上限", "Request too large; the file exceeds the upload limit"));
         try {
             Map<String,Object> body = mapper.readValue(bytes, new TypeReference<Map<String,Object>>() {});
             if (body == null) throw new IllegalArgumentException(com.checkba.service.LangText.of("请求格式无效", "Invalid request format"));

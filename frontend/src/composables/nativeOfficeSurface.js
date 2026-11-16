@@ -270,7 +270,8 @@ export function createNativeOfficeSurface({ api, info, document: doc = document 
     const read = ['get_ui_state', 'get_selection', 'list_revisions', 'list_comments', 'list_fonts', 'list_styles',
       'get_document_text', 'get_paragraph', 'get_outline', 'find_text_locations', 'get_cursor_context',
       'get_hyperlink_at_cursor', 'get_bookmark_context', 'check_link_anchors', 'get_selection_hyperlink', 'get_review_layout',
-      'get_review_context', 'get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'set_host_context_menu', 'get_ruler_state'].includes(action)
+      'get_review_context', 'get_completion_context', 'get_context_menu_context', 'capture_writing_context', 'set_host_context_menu', 'get_ruler_state',
+      'get_engine_heap', 'get_view_position', 'restore_view_position'].includes(action)
     if (!read && assistanceOperation !== assistance?.mutationScope) assistance?.externalChange()
     const reviewOwner = !read && action !== 'set_review_balloons' ? reviewBalloons : null
     let suspended = false, loading = false, exporting

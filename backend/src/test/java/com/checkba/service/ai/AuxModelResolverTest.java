@@ -82,4 +82,17 @@ class AuxModelResolverTest {
         assertNull(AuxModelResolver.firstNonBlank(null, "", "   "));
         assertNull(AuxModelResolver.firstNonBlank());
     }
+
+    @Test
+    @DisplayName("W6：核验员模型默认跟主模型；ai.verifierModel=subagent 回落子 Agent 模型（null），显式 ID 原样用")
+    void verifierModelFollowsMainUnlessConfigured() {
+        assertEquals("qwen3.8-max", resolver().verifierModelId("qwen3.8-max"));
+        when(settings.get(org.mockito.ArgumentMatchers.eq(AuxModelResolver.SETTING_VERIFIER_MODEL), any())).thenReturn("subagent");
+        assertEquals(null, resolver().verifierModelId("qwen3.8-max"));
+        when(settings.get(org.mockito.ArgumentMatchers.eq(AuxModelResolver.SETTING_VERIFIER_MODEL), any())).thenReturn("main");
+        assertEquals("qwen3.8-max", resolver().verifierModelId("qwen3.8-max"));
+        when(settings.get(org.mockito.ArgumentMatchers.eq(AuxModelResolver.SETTING_VERIFIER_MODEL), any())).thenReturn("qwen/qwen3.7-flash");
+        assertEquals("qwen/qwen3.7-flash", resolver().verifierModelId("qwen3.8-max"));
+    }
 }
+

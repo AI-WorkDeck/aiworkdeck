@@ -159,8 +159,8 @@ public class PluginMarketService {
         list.removeIf(view -> PluginService.isRetired(view.getId()));
         for (MarketPluginView view : list) {
             if (view.getId() != null) {
-                view.setName(pluginService.localize(view.getId(), view.getName()));
-                view.setDescription(pluginService.localize(view.getId(), view.getDescription()));
+                view.setName(pluginService.localizeListing(view.getId(), view.getName(), view.getId()));
+                view.setDescription(pluginService.localizeListing(view.getId(), view.getDescription(), ""));
             }
             // 安装状态只由本机扫描决定，不能接受远端同名字段。
             view.setInstalled(false);
@@ -678,7 +678,9 @@ public class PluginMarketService {
             }
             resp = req.execute();
         } catch (Exception e) {
-            throw new IllegalStateException(LangText.of("注册表不可达: ", "Registry unreachable: ") + e.getMessage());
+            // The technical cause (proxy, DNS, timeout...) stays in the log; the UI gets a plain sentence.
+            log.warn("Plugin/skill registry unreachable: {}: {}", e.getClass().getSimpleName(), e.getMessage());
+            throw new IllegalStateException(LangText.of("暂时连不上插件广场，请检查网络或代理设置后重试。", "Can't reach the plugin marketplace right now. Check your network or proxy settings and try again."));
         }
         return new RegistryReply(resp.getStatus(), resp.bodyBytes());
     }

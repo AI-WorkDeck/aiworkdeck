@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Μετάβαση στις Ρυθμίσεις",
   "later": "Αργότερα",
   "requestFailedWithStatus": "Το αίτημα απέτυχε ({status})",
+  "tooManyRequests": "Πάρα πολλά αιτήματα. Περιμένετε λίγο και δοκιμάστε ξανά",
   "smsVerificationRequired": "Αυτή η ενέργεια απαιτεί επαλήθευση μέσω SMS",
   "freeQuotaExceeded": "Έχετε χρησιμοποιήσει όλες τις δωρεάν πιστώσεις σας",
   "serviceErrorRetryLater": "Σφάλμα υπηρεσίας. Δοκιμάστε ξανά αργότερα",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "Επιλογή γλώσσας",
   "languageFollowSystem": "Ως στο σύστημα",
   "languageSearchPlaceholder": "Αναζήτηση γλωσσών…",
-  "languageNoMatch": "Δεν βρέθηκαν γλώσσες"
+  "languageNoMatch": "Δεν βρέθηκαν γλώσσες",
+  "serverLabelAccountBridge": "Γέφυρα λογαριασμού",
+  "serverLabelGenericClient": "Πελάτης (γενικός)",
+  "serverLabelPersonalMemory": "Προσωπική μνήμη",
+  "serverLabelProjectMemory": "Μνήμη έργου"
 }

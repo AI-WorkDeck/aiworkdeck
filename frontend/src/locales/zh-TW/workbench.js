@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "選擇要轉存的內容",
+  scratchCopySelected: "已選 {count} 項",
+  scratchCopyFiles: "檔案",
+  scratchCopyConversations: "對話",
+  scratchCopyNoProjects: "暫無可轉存的正式專案，請先建立專案。",
   scratchCopyTitle: "轉存到正式專案",
   scratchCopyHint: "複製所選對話和檔案，保留原件；目標專案成員可查看轉存內容。",
   "restartPending": "{count} 個任務可繼續",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "打開文件…",
   "looseFilesOpenFolder": "打開文件夾…",
   "mobileBackup": {
+    "undecided": "待選擇",
     "cleanupDeadline": "請於 {time} 前付清欠款，否則將清理雲端內容，本機檔案不受影響。",
     "billingSummary": "欠款：{debt}；可用授信：{available}。",
     "manageBilling": "帳戶與計費",
@@ -189,7 +195,7 @@ export default {
   "railLabelDpia": "DPIA",
   "railLabelLawfirm": "律所管理",
   "railLabelTmeet": "騰訊會議",
-  "railLabelProjectIm": "專案群聊",
+  "railLabelProjectIm": "專案溝通",
   "railLabelDesensitize": "檔案脫敏",
   "railLabelTabular": "表格審閱",
   "railEditDoneBtn": "完成",
@@ -353,7 +359,7 @@ export default {
     "baoqingtian": "包晴天 · 案源與筆記",
     "dpiaWorkbench": "DPIA 數據合規工作台",
     "lawfirmManagement": "律所管理",
-    "projectIm": "項目群聊"
+    "projectIm": "專案溝通"
   },
   "sensitiveEditorNotReadyError": "編輯器尚未就緒，無法保存當前修改，請稍後重試",
   "sensitiveSavePendingError": "當前修改尚未保存成功，請先保存文件後重試",

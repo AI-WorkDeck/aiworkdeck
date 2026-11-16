@@ -106,7 +106,8 @@ export default {
     "switch": "स्विच करें",
     "cancel": "रद्द करें",
     "switchFailed": "साइट बदलने में विफल। बाद में पुनः प्रयास करें।",
-    "rescueFailed": "साइट बदलने के बाद भी अनलॉक नहीं हुआ। कोड जांचें और पुनः प्रयास करें।"
+    "rescueFailed": "साइट बदलने के बाद भी अनलॉक नहीं हुआ। कोड जांचें और पुनः प्रयास करें।",
+    "proIntroBanner": "साइन अप पर मुफ़्त शुरुआती Credits · Personal Pro ¥9.9/माह (पहले 3 महीने)",
   },
   "hint": {
     "learnMore": "अधिक जानें",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "पुष्टि करें",
     "purchaseSuccess": "अनलॉक हो गया",
     "purchaseFailed": "खरीद विफल रही",
-    "goRecharge": "टॉप अप करें"
+    "goRecharge": "टॉप अप करें",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro पाएं",
   },
   "identity": {
     "title": "स्थानीय कार्यक्षेत्र चुनें",

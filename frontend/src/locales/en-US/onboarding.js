@@ -114,6 +114,7 @@ export default {
     cancel: 'Cancel',
     switchFailed: 'Failed to switch site. Try again later.',
     rescueFailed: 'Still not unlocked after switching site. Check the code and try again.',
+    "proIntroBanner": "Free starter Credits on signup · Personal Pro intro ¥9.9/mo (first 3 months)",
   },
   hint: {
     learnMore: 'Learn More',
@@ -126,6 +127,8 @@ export default {
     purchaseSuccess: 'Unlocked',
     purchaseFailed: 'Purchase failed',
     goRecharge: 'Top Up',
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Get Personal Pro",
   },
   identity: {
     title: 'Choose a Local Workspace',

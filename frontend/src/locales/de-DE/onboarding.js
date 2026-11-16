@@ -106,7 +106,8 @@ export default {
     "switch": "Wechseln",
     "cancel": "Abbrechen",
     "switchFailed": "Standortwechsel fehlgeschlagen. Versuchen Sie es später erneut.",
-    "rescueFailed": "Nach dem Standortwechsel weiterhin nicht freigeschaltet. Prüfen Sie den Code und versuchen Sie es erneut."
+    "rescueFailed": "Nach dem Standortwechsel weiterhin nicht freigeschaltet. Prüfen Sie den Code und versuchen Sie es erneut.",
+    "proIntroBanner": "Gratis-Startguthaben bei Registrierung · Personal Pro 3 Monate ¥9.9/Monat",
   },
   "hint": {
     "learnMore": "Mehr erfahren",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Bestätigen",
     "purchaseSuccess": "Freigeschaltet",
     "purchaseFailed": "Kauf fehlgeschlagen",
-    "goRecharge": "Aufladen"
+    "goRecharge": "Aufladen",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro holen",
   },
   "identity": {
     "title": "Lokalen Arbeitsbereich auswählen",

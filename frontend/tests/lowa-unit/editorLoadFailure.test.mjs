@@ -125,3 +125,18 @@ test('结构化超时跨语言保持装载分类，且只自愈一次', () => {
     assert.equal(shouldSelfHealLoadFailure(error, true), false)
   }
 })
+
+// office-tier1：设了打开密码的 OOXML 是 CFB 复合文档，单独诊断，不当成「文件损坏」让用户反复重试
+import { isEncryptedOoxml, DIAG_DOC_ENCRYPTED } from '../../src/utils/editorLoadFailure.js'
+import { readFileSync as readEnc } from 'node:fs'
+test('password-protected Office files are recognised by their compound-file header', () => {
+  const cfb = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0])
+  const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0])
+  assert.equal(DIAG_DOC_ENCRYPTED, 'DOC_ENCRYPTED')
+  for (const name of ['a.xlsx', 'B.DOCX', 'c.pptx']) assert.equal(isEncryptedOoxml(cfb, name), true, name)
+  assert.equal(isEncryptedOoxml(cfb.buffer, 'a.xlsx'), true)
+  assert.equal(isEncryptedOoxml(zip, 'a.xlsx'), false, 'normal OOXML zip')
+  assert.equal(isEncryptedOoxml(cfb, 'legacy.xls'), false, 'old binary formats share the header but are not encrypted OOXML')
+  assert.equal(isEncryptedOoxml(null, 'a.xlsx'), false)
+  assert.equal(isEncryptedOoxml(readEnc(new URL('../../../scripts/eval/fixtures/case-ledger.xlsx', import.meta.url)), 'case-ledger.xlsx'), false)
+})

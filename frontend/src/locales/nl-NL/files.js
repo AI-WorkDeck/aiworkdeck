@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Grootte: {size}",
   "renderingDoc": "Document wordt weergegeven…",
   "renderingSlides": "Presentatie wordt weergegeven…",
+  "slidesNotShown": "Nog {count} dia’s niet weergegeven. Open het bestand om alles te zien.",
   "officePreviewUnsupported": "Online voorbeeld is niet beschikbaar voor dit bestand",
   "fileTypeHintOpenLocal": "Bestandstype: {type}. Zoek het in Finder of Verkenner en open het met een lokale app.",
   "unknown": "Onbekend",

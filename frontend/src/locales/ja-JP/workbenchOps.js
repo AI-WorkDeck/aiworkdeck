@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "このバッチでローカル認識が完了しなかったファイルは、クラウド認識に切り替えられます。切り替えない場合、それらのファイルはアップロードされません。",
   "ocrLocalFailedConfirm": "クラウド認識に切り替える",
   "ocrAlreadySearchable": "「{name}」にはすでにテキストレイヤーがあり検索できるため、新しいファイルは作成しませんでした",
-  "ocrStopped": "停止しました。未処理 {count} 件"
+  "ocrStopped": "停止しました。未処理 {count} 件",
+  "subscribeProBtn": "Pro ¥9.9",
 }

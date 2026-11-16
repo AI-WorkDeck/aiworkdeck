@@ -993,9 +993,12 @@ public class VersionController {
         } catch (Exception e) {
             throw new VersionException("写入合并结果失败: " + target, e);
         }
+        // 相邻、已自动合入的单元（action N，取自分析结果，不信客户端）也记进这一笔，版本记录里看得到
+        List<com.checkba.version.merge.Decision> neighbors = com.checkba.version.merge.ThreeWayAnalyzer.neighborDecisions(analysis);
+        List<com.checkba.version.merge.Decision> recorded = new java.util.ArrayList<>("auto".equals(normalized) ? List.of() : decisions);
+        recorded.addAll(neighbors);
         pendingMergeStore.put(projectId, new com.checkba.version.merge.MergeRecord(
-                rel, normalized, "auto".equals(normalized) ? List.of() : decisions,
-                mainCount, otherCount));
+                rel, normalized, List.copyOf(recorded), mainCount, otherCount));
 
         Map<String, Object> data = new HashMap<>();
         data.put("path", rel);
@@ -1160,9 +1163,25 @@ public class VersionController {
             String text = tika.parseToString(in);
             return ok(Map.of("text", text == null ? "" : text));
         } catch (Exception e) {
+            // 设了打开密码的 Office 文件：抽不出文本是预期，不是故障——给明确原因，
+            // 别让律师对着「版本记录操作失败，请重试」反复重试（前端按 kind 换成界面语言）
+            if (isEncryptedDocument(e)) {
+                throw VersionException.passwordProtected(LangText.of(
+                        "该文件设有打开密码，暂不支持比对/合并，请先另存为无密码副本",
+                        "This file is protected with an open password, so comparing and merging are not supported yet. Save a copy without a password first."));
+            }
             log.warn("版本文本抽取失败: project={}, ref={}", projectId, ref, e);
             throw new VersionException("文本抽取失败", e);
         }
+    }
+
+    private static boolean isEncryptedDocument(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof org.apache.tika.exception.EncryptedDocumentException
+                    || t instanceof org.apache.poi.EncryptedDocumentException) return true;
+            if (t.getCause() == t) break;
+        }
+        return false;
     }
 
     @PostMapping("/versions/{sha}/milestone")

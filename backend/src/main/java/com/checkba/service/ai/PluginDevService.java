@@ -62,7 +62,6 @@ public class PluginDevService {
     /** 开发安装的来源标记文件名（JSON：projectId / folderId / installedAt） */
     public static final String DEV_MARKER = ".awd-dev";
 
-    private static final Set<String> ALLOWED_PERMISSIONS = Set.of("file_read", "file_write", "network", "editor", "ai", "im", "lawfirm", "tasks", "clipboard", "speech");
     private static final int MAX_FILES = 200;
     private static final long MAX_FILE_BYTES = 5L * 1024 * 1024;
     private static final long MAX_TOTAL_BYTES = 20L * 1024 * 1024;
@@ -441,10 +440,10 @@ public class PluginDevService {
         JSONArray permissions = manifest.getJSONArray("permissions");
         if (permissions != null) {
             for (Object p : permissions) {
-                if (!ALLOWED_PERMISSIONS.contains(String.valueOf(p))) {
+                if (!PluginService.KNOWN_PERMISSIONS.contains(String.valueOf(p))) {
+                    String allowed = String.join(" / ", new java.util.TreeSet<>(PluginService.KNOWN_PERMISSIONS));
                     errors.add(LangText.of("未知权限: ", "Unknown permission: ") + p
-                            + LangText.of("（可用: file_read / file_write / network / editor / ai / im / lawfirm / tasks / clipboard / speech）",
-                                          " (allowed: file_read / file_write / network / editor / ai / im / lawfirm / tasks / clipboard / speech)"));
+                            + LangText.of("（可用: " + allowed + "）", " (allowed: " + allowed + ")"));
                 }
             }
         }

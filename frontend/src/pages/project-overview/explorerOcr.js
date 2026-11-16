@@ -51,8 +51,18 @@ export default {
           recognize: async (item, { consentVersion, name, route }) => {
             const body = { jobId, output: spec.output, name, consentVersion }
             if (route) body.route = route
-            const res = await recognizeProjectFileText(projectId, item.id, body)
-            return res && res.data
+            // Server deployments rate-limit OCR per user (HTTP 429 + retryAfterSeconds). A long batch of
+            // quick images can outrun it; wait out the hint and continue instead of failing those files.
+            for (let attempt = 0; ; attempt++) {
+              try {
+                const res = await recognizeProjectFileText(projectId, item.id, body)
+                return res && res.data
+              } catch (e) {
+                if (!e || e.status !== 429 || attempt >= 5 || this.explorerOcr.cancelling) throw e
+                const waitSeconds = Math.min(60, Math.max(1, Number(e.data && e.data.retryAfterSeconds) || 3))
+                await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000))
+              }
+            }
           },
           // Local engine failed: say why, and let the user opt into the cloud for this batch with the
           // same tick-to-confirm notice as any upload. Never retried in the cloud without this.

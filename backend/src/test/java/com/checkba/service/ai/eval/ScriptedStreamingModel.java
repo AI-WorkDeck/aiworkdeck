@@ -106,7 +106,7 @@ public class ScriptedStreamingModel implements StreamingChatLanguageModel {
                 requests.add(ToolExecutionRequest.builder()
                         .id(UUID.randomUUID().toString())
                         .name(call.name)
-                        .arguments(toJson(call.arguments))
+                        .arguments(call.rawArguments == null ? toJson(call.arguments) : call.rawArguments)
                         .build());
             }
             handler.onComplete(Response.from(AiMessage.from(requests)));

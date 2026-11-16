@@ -40,16 +40,18 @@ class AccountControllerRechargeTest {
 
     private AccountController controller;
     private AccountService accountService;
+    private com.checkba.service.entitlement.EntitlementService entitlementService;
     private final GlobalExceptionHandler globalHandler = new GlobalExceptionHandler();
 
     @BeforeEach
     void setUp() {
         AuthController.registerLocalIdentityService(null);
         accountService = mock(AccountService.class);
+        entitlementService = mock(com.checkba.service.entitlement.EntitlementService.class);
         MachineAccountGuard guard = mock(MachineAccountGuard.class); // requireMachineScope 默认放行（void no-op）
         controller = new AccountController(accountService, mock(PlatformAiChannel.class),
                 mock(AccountSwitchCleanup.class), mock(TokenUsageRepository.class), guard,
-                mock(com.checkba.service.entitlement.EntitlementService.class),
+                entitlementService,
                 mock(com.checkba.service.team.TeamUsageSettings.class),
                 mock(com.checkba.service.team.TeamUsageUploadService.class),
                 mock(com.checkba.service.team.TeamSettingsCache.class),
@@ -178,6 +180,31 @@ class AccountControllerRechargeTest {
                 () -> controller.rechargeStatus(null, null));
         assertEnvelopeIsBusinessError(e);
         verifyNoInteractions(accountService);
+    }
+
+    @Test
+    @DisplayName("个人 Pro 订阅建单：生成新 idempotencyKey 并转发 AccountService")
+    void createSubscriptionForwardsAndUsesFreshKeys() {
+        when(accountService.createSubscriptionOrder(anyString()))
+                .thenReturn(Map.of("success", true, "present", "qrcode", "outTradeNo", "PRO1", "skuId", "pro_monthly_intro", "amount", 990));
+        Map<String, Object> r1 = controller.createSubscription(null);
+        Map<String, Object> r2 = controller.createSubscription(null);
+        assertEquals(0, r1.get("code"));
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(accountService, times(2)).createSubscriptionOrder(captor.capture());
+        assertNotEquals(captor.getAllValues().get(0), captor.getAllValues().get(1));
+    }
+
+    @Test
+    @DisplayName("recharge/status 查到 paid 时同步刷新 entitlementService；pending 时不刷新")
+    void rechargeStatusRefreshesEntitlementsOnPaid() {
+        when(accountService.queryRecharge("P1")).thenReturn(Map.of("order", Map.of("status", "pending")));
+        controller.rechargeStatus("P1", null);
+        verifyNoInteractions(entitlementService);
+
+        when(accountService.queryRecharge("P2")).thenReturn(Map.of("order", Map.of("status", "paid")));
+        controller.rechargeStatus("P2", null);
+        verify(entitlementService, times(1)).refreshQuietly();
     }
 
     // ==================== 内部 ====================

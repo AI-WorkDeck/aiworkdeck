@@ -41,6 +41,10 @@
             />
           </div>
           <span v-if="inputError" class="recharge-error">{{ inputError }}</span>
+          <div v-if="isCnSite" class="recharge-pro-upsell">
+            <span class="recharge-pro-upsell-text">{{ $t('admin.rechargeProUpsellText') }}</span>
+            <button type="button" class="recharge-pro-upsell-btn" @click="openProSubscribe">{{ $t('admin.rechargeProUpsellBtn') }}</button>
+          </div>
         </template>
 
         <!-- 步骤二 A：站内二维码（微信站） -->
@@ -286,6 +290,10 @@ export default {
         this._pollTimer = null
       }
     },
+    openProSubscribe() {
+      this.close()
+      import('@/utils/requireAccount.js').then(({ requireSubscription }) => requireSubscription()).catch(() => {})
+    },
     close() {
       this.stopPolling()
       this.$emit('update:visible', false)
@@ -449,6 +457,40 @@ export default {
   font-family: var(--awd-font-sans);
   font-size: var(--awd-panel-fs);
   color: var(--awd-info-text);
+}
+.recharge-pro-upsell {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-accent-soft);
+  border: 1px solid var(--awd-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.recharge-pro-upsell-text {
+  flex: 1;
+  font-family: var(--awd-font-sans);
+  font-size: var(--awd-panel-fs);
+  line-height: var(--awd-line-height-ui);
+  color: var(--awd-text);
+}
+.recharge-pro-upsell-btn {
+  flex: none;
+  padding: 5px 10px;
+  border: 1px solid var(--awd-accent);
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-surface);
+  color: var(--awd-accent-text);
+  font-family: var(--awd-font-sans);
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.recharge-pro-upsell-btn:hover {
+  background: var(--awd-surface-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -91,7 +91,7 @@ export const EN = {
   quotaRemaining: '{remaining} left of {limit}',
   quotaUsed: '{used} used',
   recharge: 'Top up',
-  rechargeTitle: 'Top up on the website account page (opens in browser, same account as this add-in)',
+  rechargeTitle: "Top up or subscribe to Personal Pro on the website (opens in browser, same account as this add-in)",
   quotaExhaustedNotice: 'Your account is out of credit; this turn was stopped. Top up and resend this message to continue.',
 
   // ---- App.vue：新建项目（dev-board#196）----
@@ -122,6 +122,9 @@ export const EN = {
   noProjectSelected: 'No project selected: pick one from the dropdown at the top.',
   welcomeTitle: 'Draft, redline and review with AI, without leaving Office',
   welcomeBenefit1: 'Ask for a change in plain language. Edits land in your document as tracked changes you accept or reject.',
+  welcomeBenefit1Sheet: 'Ask for a change in plain language. AI applies it directly in your workbook or slides.',
+  sessionExpired: 'Your session has expired. Please sign in again.',
+  retrySend: 'Retry',
   welcomeBenefit2: 'Work through every comment, and proofread long documents section by section.',
   welcomeBenefit3: 'Answers grounded in the files of your own matter, in Word, Excel and PowerPoint.',
   createFreeAccount: 'Create a free account',
@@ -373,6 +376,7 @@ export const EN = {
   apiConversationIssueFailedHttp: 'Failed to issue conversation (HTTP {status})',
   apiChatUnreachable: 'Backend unreachable: message not sent',
   apiChatFailedHttp: 'Chat request failed (HTTP {status})',
+  apiChatRateLimited: 'Too many requests. Please wait a moment and try again',
   conversationRenewedNotice: 'The previous conversation was no longer valid. A new one was started and this message was sent again.',
   conversationExpiredRetryFailed: 'This conversation is no longer valid, and resending it in a new conversation also failed. Tap "New chat" at the bottom to start over; if it keeps failing, check your network connection or try again later.',
   conversationDenied: 'This conversation cannot be continued: it may belong to another device or another account. Tap "New chat" at the bottom to start over.',

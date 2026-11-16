@@ -23,6 +23,10 @@ public class FileOcrController {
 
     public FileOcrController(FileOcrService service) { this.service = service; }
 
+    /** 按用户限频（server 模式）。可缺省：手工装配的测试不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
     private static Long user(String session) {
         Long user = AuthController.getUserIdFromSession(session);
         if (user == null) throw new UnauthorizedException("请先登录");
@@ -40,6 +44,7 @@ public class FileOcrController {
                                          @RequestBody(required = false) Map<String, Object> body,
                                          @RequestHeader(value = "X-Session-Id", required = false) String session) throws Exception {
         Long user = user(session);
+        if (rateLimiter != null) rateLimiter.check(com.checkba.service.UserRateLimiter.Kind.OCR, user);
         String outputName = str(body, "output");
         FileOcrService.Output output;
         try {

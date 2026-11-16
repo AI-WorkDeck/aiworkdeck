@@ -102,7 +102,8 @@
 // 插件开发左栏面板：列出项目「插件开发/<id>/」目录下的插件项目，提供
 // 新建/装到本机/卸载/让 AI 开发/打开运行五个动作。数据与安装链路见
 // services/api.js 的 pluginDev* 四个封装，契约由后端另一条线实现（不改）。
-import { pluginDevScaffold, pluginDevStatus, pluginDevInstall, pluginDevUninstall } from '@/services/api.js'
+import { pluginDevScaffold, pluginDevStatus, pluginDevInstall, pluginDevUninstall, getPlugins } from '@/services/api.js'
+import { pendingToolChanges, promptToolApproval } from '@/utils/pluginToolApproval.js'
 import { ICONS } from '@/config/icons.js'
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,49}$/
@@ -205,6 +206,7 @@ export default {
         this.errors[item.id] = ''
         uni.showToast({ title: this.$t('panels.pdInstallSuccess'), icon: 'none' })
         await this.loadStatus()
+        await this.reviewToolChanges(item)
         this.$emit('refresh-plugins')
       } catch (e) {
         console.error('安装插件失败:', e)
@@ -214,6 +216,21 @@ export default {
       } finally {
         this.busyId = ''
         this.busyAction = ''
+      }
+    },
+    // dev 直装后若有权限升高的工具（含首次安装的写入/删除类工具），批准前后端对 Agent 屏蔽它们
+    async reviewToolChanges(item) {
+      try {
+        const res = await getPlugins()
+        const list = Array.isArray(res) ? res : res?.data
+        const record = Array.isArray(list) ? list.find(p => p.id === item.id) : null
+        if (!pendingToolChanges(record).length) return
+        if (await promptToolApproval(record, item.name || item.id)) {
+          uni.showToast({ title: this.$t('market.toolApprovalDone'), icon: 'none' })
+        }
+      } catch (e) {
+        this.errors[item.id] = e?.message || this.$t('market.toolApprovalFailed')
+        this.expandedErrors[item.id] = true
       }
     },
     async uninstall(item) {

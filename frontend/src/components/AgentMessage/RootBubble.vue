@@ -59,9 +59,9 @@
                </div>
             </template>
             <div v-else-if="entry.type === 'text'" class="main-content" data-chat-answer>
-              <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming)" :key="pi">
+              <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming, allowPlainJson)" :key="pi">
                 <LegalReferenceCard v-if="part.type === 'reference'" :reference="corroborateReference(part.reference, liveLawOutputs)" @open="openReference" />
-                <MarkdownPreview v-else :content="part.text" />
+                <MarkdownPreview v-else :content="stripEmoji(part.text)" />
               </template>
             </div>
           </template>
@@ -190,8 +190,9 @@ import SkillCreatedCard from './SkillCreatedCard.vue'
 import LegalReferenceCard from '../legal/LegalReferenceCard.vue'
 import CrossBorderConsentCard from '../account/CrossBorderConsentCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
-import { legalMessageParts, referencesFromTools, legalReadableText, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
+import { legalMessageParts, referencesFromTools, legalReadableText, allowPlainJsonLegalReferences, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
+import { stripEmoji } from '@/utils/stripEmoji.js'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'
 import { APPROVAL_PLAN_TYPES } from './chatTurns.mjs'
@@ -202,6 +203,7 @@ import { resolveSavedPath } from '@/utils/planReview.js'
 
 const props = defineProps({
   bubble: { type: Object, required: true },
+  userMessage: { type: String, default: '' },
   fileChanges: { type: Array, default: () => [] },
   /** 是否为最新一条助手消息（决定计划卡是否可操作） */
   isLatest: { type: Boolean, default: false },
@@ -217,10 +219,11 @@ function onConsentAccepted() {
 
 // 计划文件的相对路径：历史回放没有 saved 事件，计划卡靠它反查 fileId。流式中不算（正文还在长）。
 const savedPath = computed(() => (props.bubble.isStreaming ? '' : resolveSavedPath(props.bubble.content) || ''))
+const allowPlainJson = computed(() => allowPlainJsonLegalReferences(props.userMessage, props.bubble.content))
 
 // 载荷形状对齐 project-overview.handleChatInterfaceAction({ type, msg })，msg 只需 content
 function sendAction(type) {
-  emit('message-action', { type, msg: { content: legalReadableText(props.bubble.content, t) } })
+  emit('message-action', { type, msg: { content: legalReadableText(props.bubble.content, t, allowPlainJson.value) } })
 }
 
 const openLegalReferenceTab = inject('openLegalReferenceTab', null)
@@ -244,7 +247,7 @@ function pickAction(type) {
 // 复制拿的是纯文本化之后的正文：粘进邮件里的不该是 **加粗** 与 <final>（见 utils/chatClipboard.js）。
 // 这里同时当作可见性判据——纯文本化后为空（整条只有工具执行、没有一个字的回答）就不出按钮，
 // 出一颗点下去什么都没复制走的按钮比没有按钮更糟。
-const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(legalReadableText(props.bubble.content, t))))
+const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(legalReadableText(props.bubble.content, t, allowPlainJson.value))))
 const showCopy = computed(() => !!copyableText.value)
 const showRegenerate = computed(() => props.isLatest && !props.bubble.isStreaming && !!props.bubble.content)
 function copyAnswer() {

@@ -36,6 +36,7 @@ class ImServiceTest {
  @Autowired UserRepository users;
  @Autowired ImInvitationRepository invitations;
  @Autowired ImMessageRepository messages;
+ @Autowired ImMemberRepository memberRows;
  @Autowired AccountBindingRepository accountBindings;
  @Autowired ProjectRepository projects;
  @Autowired ProjectMemberRepository projectMembers;
@@ -108,6 +109,13 @@ class ImServiceTest {
   var row=invitations.findById(ImService.sha(expired.getBytes(java.nio.charset.StandardCharsets.UTF_8))).orElseThrow();
   row.setExpiresAt(Instant.now().minusSeconds(1)); invitations.saveAndFlush(row);
   assertThrows(IllegalArgumentException.class,()->call(client,"join",Map.of("code",expired)));
+ }
+ @Test void replacedCodeStopsWorkingButStaysRecognisableForThePortal() {
+  // QA D4: a replaced code was deleted, so the client portal could only answer "invalid access code".
+  String group=create("GROUP"), first=invite(group,"CLIENT"), second=invite(group,"CLIENT");
+  assertTrue(invitations.existsById(ImService.sha(first.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+  assertThrows(IllegalArgumentException.class,()->call(client,"join",Map.of("code",first)));
+  call(client,"join",Map.of("code",second));
  }
  @Test void concurrentInvitationRedemptionHasExactlyOneWinner() throws Exception {
   String id=create("GROUP"), code=invite(id,"MEMBER"); CountDownLatch start=new CountDownLatch(1);
@@ -205,13 +213,13 @@ class ImServiceTest {
   assertEquals(ImService.FILE_UNAVAILABLE,assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",aid))).getMessage());
  }
  @Test void globalClientCannotGainInternalAccessByAcceptingMemberInvitation() {
+  // Access-code clients (the only global CLIENT accounts) reach their project group only (B4): no code joins them elsewhere.
   User global=users.findById(client).orElseThrow();global.setRole("CLIENT");users.saveAndFlush(global);
-  String id=create("GROUP");join(client,id,"MEMBER");
-  var file=call(owner,"upload",Map.of("conversationId",id,"name","内部.txt","base64","YQ=="));
-  call(owner,"send",Map.of("conversationId",id,"clientMessageId","internal","attachmentId",file.get("id")));
-  assertEquals(false,attachmentFor(client,id).get("available"));
-  assertThrows(IllegalArgumentException.class,()->call(client,"fileAccess",Map.of("conversationId",id,"attachmentId",file.get("id"),"clientVisible",true)));
-  assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",file.get("id"))));
+  String id=create("GROUP");
+  var invite=call(owner,"invite",Map.of("conversationId",id,"role","MEMBER"));
+  assertThrows(IllegalArgumentException.class,()->call(client,"join",Map.of("code",invite.get("code"))));
+  assertTrue(memberRows.findByConversationIdAndUserId(id,client).isEmpty());
+  assertThrows(IllegalArgumentException.class,()->call(client,"messages",Map.of("conversationId",id)));
  }
  @Test void clientOwnUploadIsReadableOnlyToSelfAndInternalMembersByDefault() {
   String id=create("GROUP");join(client,id,"CLIENT");join(stranger,id,"CLIENT");join(colleague,id,"MEMBER");
@@ -255,6 +263,88 @@ class ImServiceTest {
   assertEquals(ImService.FILE_UNAVAILABLE,assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",second.get("id")))).getMessage());
   var rows=(List<?>)call(client,"messages",Map.of("conversationId",id)).get("messages");
   assertEquals(Map.of("id",second.get("id"),"available",false,"message",ImService.FILE_UNAVAILABLE),((Map<?,?>)rows.get(1)).get("attachment"));
+ }
+ // ---- 客户入群前的历史（负责人 2026-11-12 决定：默认只看入群之后，开放此前内容须邀请时明确选择）----
+ @SuppressWarnings("unchecked") List<String> texts(Long user,Map<String,Object> p) {
+  return ((List<Map<String,Object>>)call(user,"messages",p).get("messages")).stream().map(m->(String)m.get("text")).toList();
+ }
+ String sharedFile(String id,String key,boolean clientVisible) {
+  String aid=(String)call(owner,"upload",Map.of("conversationId",id,"name",key+".txt","base64","YQ==")).get("id");
+  call(owner,"send",Map.of("conversationId",id,"clientMessageId",key,"attachmentId",aid));
+  if(clientVisible) call(owner,"fileAccess",Map.of("conversationId",id,"attachmentId",aid,"clientVisible",true));
+  return aid;
+ }
+ @Test void clientInvitedByDefaultSeesOnlyMessagesAndFilesFromAfterJoining() {
+  String id=create("GROUP"); join(colleague,id,"MEMBER");
+  var before=send(owner,id,"before","入群前的内部讨论"); String oldFile=sharedFile(id,"此前已开放材料",true);
+  var joined=call(client,"join",Map.of("code",invite(id,"CLIENT")));
+  assertEquals(0L,joined.get("unreadCount"));
+  long beforeId=((Number)before.get("id")).longValue();
+  for(Map<String,Object> pull:List.<Map<String,Object>>of(Map.of("conversationId",id),Map.of("conversationId",id,"afterId",0),
+    Map.of("conversationId",id,"afterId",0,"limit",1),Map.of("conversationId",id,"beforeId",beforeId+1),Map.of("conversationId",id,"beforeId",Long.MAX_VALUE,"limit",1))) {
+   var page=call(client,"messages",pull); assertEquals(List.of(),page.get("messages"),pull.toString()); assertEquals(false,page.get("hasMore"),pull.toString());
+  }
+  assertEquals(ImService.FILE_UNAVAILABLE,assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",oldFile))).getMessage());
+  send(owner,id,"after","入群后的消息");
+  assertEquals(List.of("入群后的消息"),texts(client,Map.of("conversationId",id)));
+  assertEquals(List.of("入群后的消息"),texts(client,Map.of("conversationId",id,"afterId",0)));
+  var listed=(Map<?,?>)((List<?>)call(client,"list",Map.of()).get("conversations")).get(0); assertEquals(1L,listed.get("unreadCount"));
+  // 入群后重新发出的旧文件随新消息可见；逐个文件的客户可见开关仍叠加在上面。
+  call(owner,"send",Map.of("conversationId",id,"clientMessageId","resend","attachmentId",oldFile));
+  assertEquals("YQ==",call(client,"download",Map.of("conversationId",id,"attachmentId",oldFile)).get("base64"));
+  String internal=sharedFile(id,"入群后内部材料",false);
+  assertEquals(ImService.FILE_UNAVAILABLE,assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",internal))).getMessage());
+  // 内部成员不受影响。
+  assertEquals(5,texts(colleague,Map.of("conversationId",id)).size()); assertEquals("入群前的内部讨论",texts(colleague,Map.of("conversationId",id,"afterId",0)).get(0));
+  assertEquals("YQ==",call(colleague,"download",Map.of("conversationId",id,"attachmentId",oldFile)).get("base64"));
+ }
+ @Test void clientInvitedWithSharedHistorySeesEarlierMessagesButFileToggleStillApplies() {
+  String id=create("GROUP"); send(owner,id,"before","入群前的讨论");
+  String open=sharedFile(id,"此前已开放材料",true), internal=sharedFile(id,"此前内部材料",false);
+  var invite=call(owner,"invite",Map.of("conversationId",id,"role","CLIENT","shareHistory",true)); assertEquals(true,invite.get("shareHistory"));
+  call(client,"join",Map.of("code",invite.get("code")));
+  assertEquals("入群前的讨论",texts(client,Map.of("conversationId",id)).get(0)); assertEquals(3,texts(client,Map.of("conversationId",id,"afterId",0)).size());
+  assertEquals("YQ==",call(client,"download",Map.of("conversationId",id,"attachmentId",open)).get("base64"));
+  assertEquals(ImService.FILE_UNAVAILABLE,assertThrows(IllegalArgumentException.class,()->call(client,"download",Map.of("conversationId",id,"attachmentId",internal))).getMessage());
+ }
+ @Test void historyChoiceDefaultsToLimitedIsValidatedAndCoversClientAccountsHoldingMemberCodes() {
+  String id=create("GROUP"); send(owner,id,"before","入群前的讨论");
+  assertEquals(false,call(owner,"invite",Map.of("conversationId",id,"role","CLIENT")).get("shareHistory"));
+  assertThrows(IllegalArgumentException.class,()->call(owner,"invite",Map.of("conversationId",id,"role","CLIENT","shareHistory","true")));
+  join(colleague,id,"MEMBER"); assertEquals(List.of("入群前的讨论"),texts(colleague,Map.of("conversationId",id)));
+ }
+ @Test void memberCodeNeverOpensEarlierMessagesToAClientEvenWhenAskedTo() {
+  String id=create("GROUP"); send(owner,id,"before","入群前的内部讨论");
+  // The history choice belongs to client invitations; a member code that asks for it records and echoes false.
+  var invite=call(owner,"invite",Map.of("conversationId",id,"role","MEMBER","shareHistory",true)); assertEquals(false,invite.get("shareHistory"));
+  join(colleague,id,"MEMBER"); assertEquals(List.of("入群前的内部讨论"),texts(colleague,Map.of("conversationId",id)));
+  // A client account holding an invitation code (role CLIENT member, not an access-code client) keeps the floor.
+  var clientInvite=call(owner,"invite",Map.of("conversationId",id,"role","CLIENT"));
+  call(client,"join",Map.of("code",clientInvite.get("code"))); assertEquals(List.of(),texts(client,Map.of("conversationId",id)));
+  // A stored row from before this rule (member role + shared history) is still floored when a client redeems it.
+  String second=create("GROUP"); send(owner,second,"before","另一群的早期讨论");
+  var legacy=call(owner,"invite",Map.of("conversationId",second,"role","MEMBER"));
+  var row=invitations.findById(ImService.sha(legacy.get("code").toString().getBytes(java.nio.charset.StandardCharsets.UTF_8))).orElseThrow();
+  row.setShareHistory(true); invitations.saveAndFlush(row);
+  call(stranger,"join",Map.of("code",legacy.get("code"))); assertEquals(List.of("另一群的早期讨论"),texts(stranger,Map.of("conversationId",second)),
+    "a MEMBER code is for internal members; the stored true is ignored and members see history as always");
+ }
+ @Test void projectClientEnteringProjectGroupLaterSeesOnlyLaterMessages() {
+  var project=new com.checkba.model.entity.Project(); project.setName("合成项目群历史"); project.setProjectType("TEST"); project.setListedCompanyName("合成公司"); project.setTargetCompanyName("合成标的"); project.setUserId(owner);
+  long projectId=projects.saveAndFlush(project).getId();
+  String id=call(owner,"projectGroup",Map.of("projectId",projectId)).get("id").toString(); send(owner,id,"before","客户加入前的内部讨论");
+  var member=new com.checkba.model.entity.ProjectMember(); member.setProjectId(projectId); member.setUserId(client); member.setRole("CLIENT"); projectMembers.saveAndFlush(member);
+  assertEquals(0L,call(client,"projectGroup",Map.of("projectId",projectId)).get("unreadCount"));
+  send(owner,id,"after","欢迎加入"); assertEquals(List.of("欢迎加入"),texts(client,Map.of("conversationId",id)));
+  assertEquals(List.of("欢迎加入"),texts(client,Map.of("conversationId",id,"afterId",0)));
+  assertEquals(2,texts(owner,Map.of("conversationId",id)).size());
+ }
+ @Test void clientMembershipsFromBeforeThisRuleKeepTheirFullHistory() {
+  String id=create("GROUP"); send(owner,id,"before","既有协作中的早期消息"); join(client,id,"CLIENT");
+  // 升级前的成员行没有 history_after_id（列为新增的可空列）。
+  var row=memberRows.findByConversationIdAndUserId(id,client).orElseThrow(); assertNotNull(row.getHistoryAfterId());
+  row.setHistoryAfterId(null); memberRows.saveAndFlush(row);
+  assertEquals(List.of("既有协作中的早期消息"),texts(client,Map.of("conversationId",id)));
  }
  Map<?,?> attachmentFor(Long user,String conversationId) {
   var rows=(List<?>)call(user,"messages",Map.of("conversationId",conversationId)).get("messages");

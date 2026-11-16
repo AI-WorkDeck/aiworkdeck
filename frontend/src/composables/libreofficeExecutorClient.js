@@ -98,6 +98,8 @@ export const EDITOR_ACTIONS = [
   // [#79 click-to-open] LO WASM 不触发 window.open（v0.7.1 真机证实）：编辑器页
   // 监听 canvas 点击后经此原语读取光标处链接再转发宿主。
   'get_hyperlink_at_cursor',
+  // [R-086 引擎换新] 宿主保存后量引擎堆高水位；换引擎前后记录/恢复阅读位置。
+  'get_engine_heap', 'get_view_position', 'restore_view_position',
   // [EvidenceLink dev-board#103] 书签名 = linkKey 的证据锚点五原语。Host-initiated
   //（EvidenceLink 服务 / 拖拽关联 / 底稿面板），不是 AI 管线；失败双字段 error+message。
   'bookmark_selection', 'get_bookmark_context', 'check_link_anchors', 'adopt_legacy_links', 'goto_bookmark',
@@ -112,7 +114,7 @@ export const EDITOR_ACTIONS = [
   // 冲突「用律师乙的」。sheet_get_active_cell / slide_get_current 是逐段溯源里
   // 「当前这一格 / 当前这一页」的取数原语（顶上那条版本身份小条 #672 起是文件级的，
   // 不再用它们；两条原语本身是引擎公开 API，lowa-e2e 组 34 有用例）。
-  'build_merge_draft', 'merge_take_other', 'sheet_get_active_cell', 'slide_get_current',
+  'build_merge_draft', 'merge_take_other', 'resolve_merge_mechanics', 'sheet_get_active_cell', 'slide_get_current',
   'office_get_navigation', 'office_activate_item', 'slide_get_thumbnail',
   // [格式增强] 富格式原语：编号/表格/格式读取/全文标准格式化；insert_under_heading
   // 是后端一直在派发但从未接通的原语（本次补齐 worker 实现）。
@@ -209,6 +211,7 @@ export const ACTION_BUDGET_MS = {
   // 三方合并：三次 load（另一侧/上一版/主线）+ 两遍格式扫描 + 一次原生比较 + 逐段重放
   // 全在一条命令里；420 段 32 页的夹具实测约 22 秒，按 load_document 同量级给预算。
   build_merge_draft: 180000,
+  resolve_merge_mechanics: 180000,
   build_comparison_document: 180000,
   compare_docx_files: 240000,
   // 读取类（dev-board#729 ③）：此前全部吃 30s 默认值。doc_open_file 是 fire-and-forget，

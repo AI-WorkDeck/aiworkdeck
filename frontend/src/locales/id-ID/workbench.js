@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Pilih konten untuk disalin",
+  scratchCopySelected: "{count} dipilih",
+  scratchCopyFiles: "File",
+  scratchCopyConversations: "Percakapan",
+  scratchCopyNoProjects: "Tidak ada proyek yang tersedia. Buat proyek terlebih dahulu.",
   scratchCopyTitle: "Salin ke proyek",
   scratchCopyHint: "Salin percakapan dan berkas terpilih tanpa menghapus aslinya. Anggota proyek tujuan dapat melihat salinan.",
   "restartPending": "{count} tugas dapat dilanjutkan",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "Buka File…",
   "looseFilesOpenFolder": "Buka Folder…",
   "mobileBackup": {
+    "undecided": "Perlu keputusan",
     "cleanupDeadline": "Lunasi tagihan sebelum {time} agar konten cloud tidak dihapus. File lokal tidak terpengaruh.",
     "billingSummary": "Tagihan: {debt}; kredit tersedia: {available}.",
     "manageBilling": "Akun dan tagihan",

@@ -31,6 +31,7 @@ export default {
   "goToSettings": "Đi tới Cài đặt",
   "later": "Để sau",
   "requestFailedWithStatus": "Yêu cầu thất bại ({status})",
+  "tooManyRequests": "Quá nhiều yêu cầu. Vui lòng đợi một lát rồi thử lại",
   "smsVerificationRequired": "Hành động này yêu cầu xác minh qua SMS",
   "freeQuotaExceeded": "Bạn đã sử dụng hết lượt miễn phí",
   "serviceErrorRetryLater": "Lỗi dịch vụ. Vui lòng thử lại sau",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "Chọn ngôn ngữ",
   "languageFollowSystem": "Theo hệ thống",
   "languageSearchPlaceholder": "Tìm kiếm ngôn ngữ…",
-  "languageNoMatch": "Không có ngôn ngữ phù hợp"
+  "languageNoMatch": "Không có ngôn ngữ phù hợp",
+  "serverLabelAccountBridge": "Cầu nối tài khoản",
+  "serverLabelGenericClient": "Khách hàng (chung)",
+  "serverLabelPersonalMemory": "Bộ nhớ cá nhân",
+  "serverLabelProjectMemory": "Bộ nhớ dự án"
 }

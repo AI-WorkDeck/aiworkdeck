@@ -341,6 +341,65 @@ class HttpMobileBillingClientTest {
     }
 
     @Test
+    @DisplayName("channel=wxpay-app：只上行 channel（无 productId/wxCode），七个 SDK 字段解回 appPay")
+    void wxpayAppFieldsComeBack() {
+        HttpMobileBillingClient c = stubbed(200,
+                "{\"present\":\"app\",\"outTradeNo\":\"OT-app-1\",\"amountCents\":5000,"
+                        + "\"appId\":\"wxapp1\",\"partnerId\":\"1900000001\",\"prepayId\":\"wx123\","
+                        + "\"packageValue\":\"Sign=WXPay\",\"nonceStr\":\"n0nce\",\"timeStamp\":\"1760000000\","
+                        + "\"sign\":\"c2lnbg==\"}");
+
+        MobileBillingClient.RechargeOrder order = c.createRecharge("acct-x", 5000, "idem-app-0001",
+                "wxpay-app", null, null);
+
+        assertEquals("app", order.present());
+        assertEquals("OT-app-1", order.outTradeNo());
+        assertEquals("wxapp1", order.appPay().get("appId"));
+        assertEquals("1900000001", order.appPay().get("partnerId"));
+        assertEquals("wx123", order.appPay().get("prepayId"));
+        assertEquals("Sign=WXPay", order.appPay().get("packageValue"));
+        assertEquals("n0nce", order.appPay().get("nonceStr"));
+        assertEquals("1760000000", order.appPay().get("timeStamp"));
+        assertEquals("c2lnbg==", order.appPay().get("sign"));
+        assertNull(order.codeUrl());
+        String sent = lastRequest.get();
+        assertTrue(sent.contains("\"channel\":\"wxpay-app\""), sent);
+        assertFalse(sent.contains("productId"), sent);
+        assertFalse(sent.contains("wxCode"), sent);
+    }
+
+    @Test
+    @DisplayName("channel=wxpay-app 网络失败重试一次：幂等键兜底，没有一次性凭证")
+    void wxpayAppRetries() {
+        HttpMobileBillingClient c = stubbed(200, "{}");
+        stubDrop.set(true);
+
+        assertEquals(MobileBillingKind.UNAVAILABLE,
+                assertThrows(MobileBillingException.class,
+                        () -> c.createRecharge("acct-x", 5000, "idem-app-0002",
+                                "wxpay-app", null, null)).getKind());
+        assertEquals(2, hits.get());
+    }
+
+    @Test
+    @DisplayName("channel=wxpay-app：官网 503 channel_unavailable 是「没开通」，翻成 DISABLED 而不是 UNAVAILABLE")
+    void wxpayAppChannelOffIsDisabled() {
+        MobileBillingException off = assertThrows(MobileBillingException.class,
+                () -> stubbed(503, "{\"error\":\"channel_unavailable\"}").createRecharge("acct-x", 5000, "idem-app-0003",
+                        "wxpay-app", null, null));
+        assertEquals(MobileBillingKind.DISABLED, off.getKind());
+        assertEquals("channel_unavailable", off.getMachineError());
+    }
+
+    @Test
+    @DisplayName("非 APP 通道：appPay 为 null")
+    void otherChannelsHaveNoAppPay() {
+        HttpMobileBillingClient c = stubbed(200,
+                "{\"present\":\"qrcode\",\"outTradeNo\":\"OT-q\",\"amountCents\":5000,\"codeUrl\":\"weixin://x\"}");
+        assertNull(c.createRecharge("acct-x", 5000, "idem-q-00001", null, null, null).appPay());
+    }
+
+    @Test
     @DisplayName("channel=appstore 网络失败仍重试一次：没有一次性凭证，建单是幂等的")
     void appstoreRetriesLikeDefaultChannel() {
         HttpMobileBillingClient c = stubbed(200, "{}");
@@ -422,6 +481,68 @@ class HttpMobileBillingClientTest {
                 assertThrows(MobileBillingException.class,
                         () -> new HttpMobileBillingClient("", "", om)
                                 .confirmAppstore("acct-x", "OT-ios-1", "jws")).getKind());
+    }
+
+    @Test
+    @DisplayName("googleplay 下单与 confirm-googleplay 成功：action/productId/purchaseToken 上行，空 outTradeNo 省略")
+    void googleplayCreateAndConfirmSuccess() {
+        HttpMobileBillingClient createClient = stubbed(200,
+                "{\"outTradeNo\":\"OT-gp-1\",\"amountCents\":1000,\"status\":\"pending\",\"present\":\"native\"}");
+        MobileBillingClient.RechargeOrder order = createClient.createRecharge(
+                "acct-x", 1000L, "idem-gp-1", "googleplay", "credits.usd.10", null);
+        assertEquals("OT-gp-1", order.outTradeNo());
+        assertEquals("native", order.present());
+        assertTrue(lastRequest.get().contains("\"channel\":\"googleplay\""), lastRequest.get());
+        assertTrue(lastRequest.get().contains("\"productId\":\"credits.usd.10\""), lastRequest.get());
+
+        HttpMobileBillingClient confirmClient = stubbed(200,
+                "{\"status\":\"paid\",\"paid\":true,\"amountCents\":7200}");
+        MobileBillingClient.RechargeStatus s = confirmClient.confirmGooglePlay(
+                "acct-x", "OT-gp-1", "credits.usd.10", "tok-1");
+        assertEquals("paid", s.status());
+        assertTrue(s.paid());
+        assertEquals(7200L, s.amountCents());
+        String sent = lastRequest.get();
+        assertTrue(sent.contains("\"action\":\"confirm-googleplay\""), sent);
+        assertTrue(sent.contains("\"accountId\":\"acct-x\""), sent);
+        assertTrue(sent.contains("\"outTradeNo\":\"OT-gp-1\""), sent);
+        assertTrue(sent.contains("\"productId\":\"credits.usd.10\""), sent);
+        assertTrue(sent.contains("\"purchaseToken\":\"tok-1\""), sent);
+
+        assertTrue(confirmClient.confirmGooglePlay("acct-x", null, "credits.usd.10", "tok-1").paid());
+        assertFalse(lastRequest.get().contains("outTradeNo"), lastRequest.get());
+    }
+
+    @Test
+    @DisplayName("confirm-googleplay 的失败映射与不重试/未配置短路")
+    void confirmGooglePlayFailures() {
+        MobileBillingException invalid = assertThrows(MobileBillingException.class,
+                () -> stubbed(400, "{\"error\":\"transaction_invalid\"}")
+                        .confirmGooglePlay("acct-x", "OT-gp-1", "credits.usd.10", "tok"));
+        assertEquals(MobileBillingKind.REJECTED, invalid.getKind());
+        assertEquals("transaction_invalid", invalid.getMachineError());
+        assertEquals("交易验证失败，请稍后重试", invalid.getMessage());
+
+        MobileBillingException reused = assertThrows(MobileBillingException.class,
+                () -> stubbed(409, "{\"error\":\"transaction_reused\"}")
+                        .confirmGooglePlay("acct-x", "OT-gp-1", "credits.usd.10", "tok"));
+        assertEquals(MobileBillingKind.REJECTED, reused.getKind());
+        assertEquals("transaction_reused", reused.getMachineError());
+        assertEquals("该交易已使用", reused.getMessage());
+
+        HttpMobileBillingClient dropping = stubbed(200, "{}");
+        stubDrop.set(true);
+        hits.set(0);
+        assertEquals(MobileBillingKind.UNAVAILABLE,
+                assertThrows(MobileBillingException.class,
+                        () -> dropping.confirmGooglePlay("acct-x", "OT-gp-1", "credits.usd.10", "tok")).getKind());
+        assertEquals(1, hits.get(), "confirm-googleplay 不许重试");
+        stubDrop.set(false);
+
+        assertEquals(MobileBillingKind.DISABLED,
+                assertThrows(MobileBillingException.class,
+                        () -> new HttpMobileBillingClient("", "", om)
+                                .confirmGooglePlay("acct-x", "OT-gp-1", "credits.usd.10", "tok")).getKind());
     }
 
     // ==================== 注销传导（dev-board#434） ====================

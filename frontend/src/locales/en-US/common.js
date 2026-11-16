@@ -32,6 +32,7 @@ export default {
   goToSettings: 'Go to Settings',
   later: 'Later',
   requestFailedWithStatus: 'Request failed ({status})',
+  tooManyRequests: 'Too many requests. Please wait a moment and try again',
   smsVerificationRequired: 'This action requires SMS verification',
   freeQuotaExceeded: 'You have used all your free credits',
   serviceErrorRetryLater: 'Service error. Please try again later',
@@ -56,8 +57,8 @@ export default {
   cannotResolveParentFolder: 'Cannot determine the folder containing this file',
   // ---- utils/projectHomeFormat.js ----
   dateTimeMdHm: '{year}-{month}-{day} {time}',
-  registeredItems: '{count} items registered',
-  filesCount: '{count} files',
+  registeredItems: '{count} item registered | {count} items registered',
+  filesCount: '{count} file | {count} files',
   statusRunning: 'Running',
   statusPaused: 'Paused',
   statusInterrupted: 'Interrupted',
@@ -79,4 +80,8 @@ export default {
   languageFollowSystem: 'Follow system',
   languageSearchPlaceholder: 'Search languages…',
   languageNoMatch: 'No matching languages',
+  serverLabelAccountBridge: 'Account bridge',
+  serverLabelGenericClient: 'Client (general)',
+  serverLabelPersonalMemory: 'Personal memory',
+  serverLabelProjectMemory: 'Project memory',
 }

@@ -41,6 +41,26 @@ class AgentOrchestratorFinishReasonTest {
                 "只要有 token 给用户看过就绝不能悄悄重放——会看到重复内容");
     }
 
+    private static AiMessage calls(String... names) {
+        List<ToolExecutionRequest> reqs = new java.util.ArrayList<>();
+        for (int i = 0; i < names.length; i++) {
+            reqs.add(ToolExecutionRequest.builder().id("c" + i).name(names[i]).arguments("{\"arguments\": \"\"}").build());
+        }
+        return AiMessage.from(reqs);
+    }
+
+    @Test
+    @DisplayName("伪工具 final（O11 DeepSeek V4 Pro）：本轮只有 final 才当收尾；夹带真工具照常执行")
+    void pseudoFinalOnlyWhenEveryCallIsFinal() {
+        assertTrue(AgentOrchestrator.isPseudoFinalCall(calls("final")));
+        assertTrue(AgentOrchestrator.isPseudoFinalCall(calls("Final", " final ")));
+
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(calls("final", "slide_set_text")), "混了真工具不能吞掉真调用");
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(calls("finalize_report")));
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(AiMessage.from("纯文本")));
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(null));
+    }
+
     @Test
     @DisplayName("LENGTH 截断轮判定：只有 LENGTH + 带工具调用才拦，其余一概放行（含 finishReason 为 null 的通道）")
     void truncatedToolCallRoundRequiresLengthAndToolCalls() {

@@ -15,6 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readXlsx, readPptx, zipPart } from './office-xml.mjs'
+import { waitSavedAfterWrite, isDocWriteTool } from './save-wait.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const REPO = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: HERE, encoding: 'utf8' }).trim()
@@ -328,8 +329,8 @@ async function loadPlaywright() {
 
 // ---------- 后端实例 ----------
 class Instance {
-  constructor({ label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl }) {
-    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl })
+  constructor({ label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl, plugins = [] }) {
+    Object.assign(this, { label, build, model, pg, tmp, java, outDir, profile, llmBaseUrl, plugins })
     this.db = 'awd_' + sanitize(label)
     this.dir = path.join(tmp, 'inst-' + sanitize(label))
     this.logFile = path.join(outDir, 'backend-' + sanitize(label) + '.log')
@@ -338,7 +339,17 @@ class Instance {
   async start() {
     await this.pg.psql('postgres', `create database ${this.db}`)
     this.port = await freePort()
-    for (const d of ['home', 'storage', 'plugins']) fs.mkdirSync(path.join(this.dir, d), { recursive: true })
+    for (const d of ['home', 'storage', 'plugins', 'skills']) fs.mkdirSync(path.join(this.dir, d), { recursive: true })
+    // 句子 installPlugins 点名的官方插件（不随包内置安装的，如 lawfirm-management）：按广场安装的落盘形态拷进实例 plugins/
+    for (const id of this.plugins) {
+      const src = path.join(this.build.wt, 'official-plugins', id)
+      const dst = path.join(this.dir, 'plugins', id)
+      if (fs.existsSync(path.join(src, 'manifest.json')) && !fs.existsSync(dst)) {
+        fs.mkdirSync(dst, { recursive: true })
+        for (const f of ['manifest.json', 'README.md']) if (fs.existsSync(path.join(src, f))) fs.copyFileSync(path.join(src, f), path.join(dst, f))
+        for (const d of ['web', 'l10n', 'skills']) if (fs.existsSync(path.join(src, d))) fs.cpSync(path.join(src, d), path.join(dst, d), { recursive: true })
+      }
+    }
     const env = {
       ...process.env, // OPENROUTER_API_KEY 随环境继承给子进程，不经过任何日志
       JAVA_HOME: this.java,
@@ -349,6 +360,9 @@ class Instance {
       SPRING_DATASOURCE_URL: `jdbc:postgresql://127.0.0.1:${this.pg.port}/${this.db}`,
       SPRING_DATASOURCE_USERNAME: 'awd', SPRING_DATASOURCE_PASSWORD: 'x',
       STORAGE_LOCAL_ROOT_PATH: path.join(this.dir, 'storage'), AI_PLUGINS_DIR: path.join(this.dir, 'plugins'),
+      // 可写 skill 目录按实例隔离：默认是相对 cwd 的 skills/，自进化升格的 user-evo-* 会落在跑评测的目录里，
+      // 下一次运行照样加载并自动激活（O11 实测一条 user-evo skill 跨运行生效），污染对照
+      AI_SKILLS_DIR: path.join(this.dir, 'skills'),
       AI_SKILLS_BUILTIN_DIR: path.join(this.build.wt, 'backend/skills'), AI_PLUGINS_BUNDLED_DIR: path.join(this.build.wt, 'official-plugins'),
     }
     // bailian 路由：BYOK OpenRouter 档的地址指向本机转发口，key 只是占位（真 key 由转发口加上）
@@ -382,6 +396,15 @@ class Instance {
     try { return JSON.parse(text) } catch { return { _status: res.status, _text: text.slice(0, 300) } }
   }
   sql(q) { return this.pg.psql(this.db, q) }
+  // 项目里某个文件（按名）当前服务器内容的 sha256；找不到或下载失败 = null
+  async hostSha(pid, name) {
+    try {
+      const f = (await this.rows(`select id, name, is_folder, is_deleted from project_file where project_id=${pid} order by id`)).find(x => !x.is_deleted && !x.is_folder && x.name === name)
+      if (!f) return null
+      const r = await fetch(`${this.base}/api/files/${f.id}/download`, { headers: { 'X-Session-Id': this.sid } })
+      return r.ok ? crypto.createHash('sha256').update(Buffer.from(await r.arrayBuffer())).digest('hex') : null
+    } catch { return null }
+  }
   async rows(q) { const t = await this.sql(`select coalesce(json_agg(t),'[]'::json) from (${q}) t`); return JSON.parse(t) }
   async stop() {
     if (this.proc && !this.exited) { this.proc.kill('SIGTERM'); for (let i = 0; i < 20 && !this.exited; i++) await sleep(250); if (!this.exited) this.proc.kill('SIGKILL') }
@@ -496,6 +519,7 @@ class Instance {
       }
       rec.editorReadyMs = Date.now() - t0
       const t1 = Date.now()
+      const shaBefore = await this.hostSha(pid, hostFile) // 本轮开始前服务器上这份文件的内容摘要，用来确认「写命令之后确有一次上传」
       const box = page.locator('.chat-input-rich').last()
       await box.click()
       await page.keyboard.insertText(sentence.text)
@@ -524,6 +548,16 @@ class Instance {
         const body = await page.locator('body').innerText().catch(() => '')
         clean = /更改待保存|保存中|Changes pending save|Saving/.test(body) ? 0 : clean + 1
         if (clean < 2) await sleep(500)
+      }
+      // 状态栏干净只说明编辑器没标脏——宿主若根本没标脏（#1545 修复前的 PPT 就是）会立刻读到旧稿。
+      // 本轮有写命令时，再核对服务器上的内容确实变了（相对本轮开始前），并连续两次一致（没有更晚的上传在途）；
+      // 等不到就如实记 staleRead，不假装读到的是终稿。
+      const logNow = (() => { const fd = fs.openSync(this.logFile, 'r'); try { const sz = fs.fstatSync(fd).size; const b = Buffer.alloc(sz - rec.logOffset); fs.readSync(fd, b, 0, b.length, rec.logOffset); return b.toString('utf8') } finally { fs.closeSync(fd) } })()
+      const wroteDoc = parseLogSlice(logNow, rec.conversationId).tools.some(isDocWriteTool)
+      if (wroteDoc && shaBefore) {
+        const saved = await waitSavedAfterWrite(() => this.hostSha(pid, hostFile), shaBefore)
+        rec.savedAfterWrite = saved
+        if (!saved) rec.staleRead = true
       }
       rec.text =(await this.rows(`select content from project_ai_message where conversation_id='${rec.conversationId}' and role='ASSISTANT' order by id desc limit 1`))[0]?.content || ''
     } catch (e) {
@@ -1056,7 +1090,7 @@ async function main() {
     const byRef = Object.fromEntries(built.map(b => [b.ref, b]))
     const sides = []
     for (const side of ['before', 'after']) for (const model of o.models) sides.push({ side, model, build: byRef[o[side]] })
-    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile], llmBaseUrl: proxy?.baseUrl }), { side: s.side }))
+    for (const s of sides) instances.push(Object.assign(new Instance({ label: `${s.side}-${s.model}`, build: s.build, model: s.model, pg, tmp, java, outDir, profile: PROFILES[o.profile], llmBaseUrl: proxy?.baseUrl, plugins: [...new Set(sentences.flatMap(x => x.installPlugins || []))] }), { side: s.side }))
 
     // 以并发 K 启动实例
     const queue = (items, k, fn) => { let i = 0; return Promise.all(Array.from({ length: Math.min(k, items.length) }, async () => { while (i < items.length) await fn(items[i++]) })) }

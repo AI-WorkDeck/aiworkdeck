@@ -69,6 +69,22 @@ public class ProjectInvitation {
     @Column
     private Long createdBy;
 
+    /**
+     * 客户进项目群时能否看到入群之前的消息（B4，客户门户项目沟通）。律师签码时选，
+     * null 或 false = 只看入群之后（默认）。只在客户第一次进群、建成员行时读一次；
+     * 之后重新签发改了这一项，已进群的客户的可见下限不变。
+     */
+    @Column(name = "im_share_history")
+    private Boolean imShareHistory;
+
+    public Boolean getImShareHistory() {
+        return imShareHistory;
+    }
+
+    public void setImShareHistory(Boolean imShareHistory) {
+        this.imShareHistory = imShareHistory;
+    }
+
     public Long getId() {
         return id;
     }

@@ -57,7 +57,8 @@ test('pages.json 注册了两个新页且都显式写 navigationStyle: custom', 
   const home = PAGES.pages.find((x) => x.path === 'pages/project-home/project-home')
   assert.ok(home, 'pages.json 里没有 project-home（归 Task 16 组注册）')
   assert.equal(home.style.navigationStyle, 'custom', 'globalStyle 里没有这一项，漏写会得到系统导航栏')
-  assert.equal(home.style.navigationBarTitleText, '项目概览页')
+  // 页面都是自绘标题栏，navigationBarTitleText 只落到桌面窗口标题上：一律写品牌名，不随语言变（英文 QA 2026-11-14 第 8 条）
+  assert.equal(home.style.navigationBarTitleText, 'AI WorkDeck')
   const list = PAGES.pages.find((x) => x.path === 'pages/project-list/project-list')
   assert.ok(list, 'pages.json 里没有 project-list')
   assert.equal(list.style.navigationStyle, 'custom')
@@ -230,4 +231,11 @@ test('loadConversations：翻页不自增请求代，但仍要比对请求代丢
   // 自己正常的追加结果——「代号变了就该丢」只对「别人刷新了整页」成立，不对「我自己在翻页」成立。
   const incrCount = (PANE_CODE.match(/this\.loadGeneration\+\+/g) || []).length
   assert.equal(incrCount, 1, 'this.loadGeneration++ 应当只在 loadAll 出现一次')
+})
+
+test('pages.json 的窗口标题不写死中文（自绘标题栏，标题只落到窗口标题栏，英文界面会露出中文）', () => {
+  const titles = [...PAGES.pages, ...((PAGES.subPackages || []).flatMap((p) => p.pages || []))]
+    .map((x) => [x.path, x.style && x.style.navigationBarTitleText])
+    .concat([['globalStyle', PAGES.globalStyle && PAGES.globalStyle.navigationBarTitleText]])
+  for (const [path, title] of titles) assert.ok(!/[\u4e00-\u9fff]/.test(title || ''), path + ': ' + title)
 })

@@ -57,8 +57,18 @@ public class DeviceTokenService {
                 ? LangText.of("未命名设备", "Unnamed device") : name.trim());
         t.setCreatedAt(LocalDateTime.now());
         t = repository.save(t);
+        if (firmAudit != null) {
+            firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("DEVICES", "DEVICE_TOKEN_ISSUED").actor(userId)
+                    .target("DEVICE_TOKEN", t.getId(), t.getName()));
+        }
         return new IssuedToken(t.getId(), plaintext);
     }
+
+    /** 律所审计日志（S20）：设备连接（含账户 Key 桥接登录）与撤销。只记令牌行 id 与设备名，不记令牌。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
 
     /**
      * 解析结果：这枚令牌是谁的（{@code userId}）、是哪一台设备（{@code tokenId}）。
@@ -94,7 +104,13 @@ public class DeviceTokenService {
     public void revoke(Long userId, Long tokenId) {
         repository.findById(tokenId)
                 .filter(t -> t.getUserId().equals(userId))
-                .ifPresent(repository::delete);
+                .ifPresent(t -> {
+                    repository.delete(t);
+                    if (firmAudit != null) {
+                        firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("DEVICES", "DEVICE_TOKEN_REVOKED").actor(userId)
+                                .target("DEVICE_TOKEN", t.getId(), t.getName()));
+                    }
+                });
     }
 
     public List<DeviceToken> listMine(Long userId) {

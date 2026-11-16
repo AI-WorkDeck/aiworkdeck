@@ -36,6 +36,15 @@ tooltip frames receive `WindowTransparentForInput`, and compositor hit testing
 honors that flag. Interactive combo popups also use the `ToolTip` window type;
 their branch remains unchanged. Painting, stacking and mouse clocks are unchanged.
 
+The Emscripten proxying deadlock fix (r10) in
+`desktop/lowa-build/patches/apply-emscripten-patches.py` backports the upstream
+versions of `get_or_add_tasks_for_thread` and `do_proxy` from
+emscripten-core/emscripten#28186 ("[Proxying] Do not allocate while holding mutex",
+commit `a0d06c7ba525cc53b8c3e499bd3b939d025ec534`, MIT / University of Illinois NCSA,
+Copyright 2021 The Emscripten Authors) into the allotropia fork `fixed-3.1.65`
+(`949ee1d40467b80e90a9fdc67155d443426fef2d`), whose `proxying.c` predates it. The
+fork's upstream license header is unchanged; only those two function bodies change.
+
 ### Local Modifications (`desktop/lowa-build/`)
 
 - **`patches/apply-source-patches.py` & `patches/source-patches.diff`**:
@@ -92,3 +101,24 @@ Full 51-patch audit and Tier A / Tier B classification are documented in [`deskt
 ## 3. LitViz (`@ checks/litviz`)
 
 See [`litviz/UPSTREAM.md`](litviz/UPSTREAM.md) for upstream provenance of the LitViz visualization workspace.
+
+## 4. msoffcrypto-tool (legacy Office decryption port)
+
+| Field | Value |
+|---|---|
+| Upstream Project | msoffcrypto-tool by nolze |
+| Upstream Repository | `https://github.com/nolze/msoffcrypto-tool` (release `6.1.0`) |
+| Upstream License | `MIT` |
+| Local Paths | `frontend/src/utils/legacyOfficeDecrypt.js` (port), `frontend/tests/lowa-e2e/fixtures/encrypted/legacy/` (test inputs from upstream `tests/inputs/`) |
+
+`legacyOfficeDecrypt.js` is a JavaScript port of the *decryption* parts of
+`msoffcrypto/format/doc97.py`, `xls97.py`, `ppt97.py` and `method/rc4.py`,
+`rc4_cryptoapi.py`, `xor_obfuscation.py`. The full MIT notice is kept in the file
+header (`SPDX-License-Identifier: AGPL-3.0-or-later AND MIT`). Local changes: browser
+WebCrypto SHA-1 plus in-file MD5/RC4, the `cfb` package for the compound file, the
+decrypted streams patched into the original sectors (version-4 containers are
+repacked as version 3, which the engine requires), and decryption of the `Pictures`
+stream, which upstream leaves encrypted (segment-wise RC4 reset as in Apache POI's
+`HSLFSlideShowEncrypted`, verified on a real Mac PowerPoint deck). Encryption of the
+new Agile `.docx/.xlsx/.pptx` copies is our own code (`officeEncryption.js`) and was
+checked against msoffcrypto-tool as an independent implementation.

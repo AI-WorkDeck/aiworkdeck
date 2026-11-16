@@ -10,7 +10,7 @@
           <!-- AppSource 1100.1.5 首次使用体验：首屏先讲清能做什么，再给登录与注册两个入口 -->
           <div class="welcome-title">{{ t('welcomeTitle') }}</div>
           <ul class="welcome-benefits">
-            <li>{{ t('welcomeBenefit1') }}</li>
+            <li>{{ t(detectHost() === 'word' ? 'welcomeBenefit1' : 'welcomeBenefit1Sheet') }}</li>
             <li>{{ t('welcomeBenefit2') }}</li>
             <li>{{ t('welcomeBenefit3') }}</li>
           </ul>
@@ -355,7 +355,10 @@
       </div>
       <p v-if="reconnecting" class="banner conn">{{ t('reconnectingBanner') }}</p>
       <p v-else-if="notice" class="banner conn">{{ notice }}</p>
-      <p v-if="banner" class="banner">{{ banner }}</p>
+      <p v-if="banner" class="banner">
+        {{ banner }}
+        <button v-if="sendFailed" class="banner-retry" @click="send">{{ t('retrySend') }}</button>
+      </p>
       <!-- 「当前模型看不了图」：常驻在 composer 里，不挂在模型 pill 上——拉不到清单时
            pill 整个消失，而那时用户正走后端默认模型，恰恰最需要知道这件事。
            自成一条独立通道：notice/banner 都会被 send() 清掉（dev-board#264） -->
@@ -365,9 +368,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, TransitionGroup } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, TransitionGroup } from 'vue'
 import {
-  messages, input, streaming, stopping, toolPrep, passProgress, reconnecting, banner, notice, includeDocument, scrollSignal,
+  messages, input, streaming, stopping, toolPrep, passProgress, reconnecting, banner, sendFailed, notice, includeDocument, scrollSignal,
   activateSession, send as sendMessage, stop as stopRun, newConversation,
   answerQuestion, answerAskUser, modelCatalog, selectedModel, chooseModel, skillList, selectedSkillIds,
   toggleSkill, loadConversationList, switchConversation, attachedFiles, toggleAttachedFile,
@@ -376,6 +379,7 @@ import {
   activeModelVision, defaultModelInfo, visionNotice, isImageAttachment
 } from '../lib/chatSession.js'
 import { isAskUserQuestion } from '../lib/askUser.js'
+import { extractCitations } from '../lib/citations.js'
 import AskUserCard from './AskUserCard.vue'
 import { openTransfer } from '../lib/transfer.js'
 import { readDocumentMeta, detectHost, locateInDocument, commandDisplayName } from '../lib/hostBridge.js'
@@ -778,19 +782,15 @@ const quickPrompts = computed(() => {
 /** 回答里被「」或 “” 包住的原文引用（6-80 字符），可点击定位（仅 Word 宿主） */
 function citations(msg) {
   if (!msg.text || detectHost() !== 'word') return []
-  const out = []
-  const seen = new Set()
-  const re = /「([^「」\n]{6,80})」|“([^“”\n]{6,80})”/g
-  let m
-  while ((m = re.exec(msg.text)) && out.length < 4) {
-    const t = (m[1] || m[2] || '').trim()
-    if (t && !seen.has(t)) { seen.add(t); out.push(t) }
-  }
-  return out
+  return extractCitations(msg.text, missingQuotes)
 }
+
+/** 点过定位却在文档里找不到的引文：下次渲染起不再给 chip（reactive，点完立刻消失） */
+const missingQuotes = reactive(new Set())
 
 async function locateQuote(text) {
   const r = await locateInDocument(text)
+  if (!r.found) missingQuotes.add(text)
   notice.value = r.found ? '' : t('quoteNotFound')
 }
 
@@ -1627,6 +1627,16 @@ textarea:focus {
 }
 
 .banner.conn { color: var(--awd-text-secondary); }
+.banner-retry {
+  margin-left: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--awd-accent);
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  cursor: pointer;
+}
 
 .panel-builtin-note {
   padding: 8px 12px;
@@ -1668,6 +1678,11 @@ textarea:focus {
 .md pre code { background: none; padding: 0; }
 
 .md a { color: var(--awd-accent); }
+/* GFM 表格：窄窗格里横向滚动，不撑破气泡 */
+.md .md-table-wrap { overflow-x: auto; margin: 0 0 8px; max-width: 100%; }
+.md table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+.md th, .md td { border: 1px solid var(--awd-border, rgba(128, 128, 128, 0.35)); padding: 3px 8px; vertical-align: top; text-align: left; }
+.md th { font-weight: 600; background: rgba(128, 128, 128, 0.12); white-space: nowrap; }
 
 /* 流式光标挂在最后一个块的尾部，跟着 Markdown 排版走 */
 .md-streaming > :last-child::after {

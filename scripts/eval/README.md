@@ -24,7 +24,7 @@ node scripts/eval/model-matrix.mjs \
 | `--models` | 逗号分隔的 OpenRouter 模型 id，随请求的 `model` 字段下发 |
 | `--sentences` | 句子集 JSON（见下） |
 | `--runs N` | 每句重复次数（默认 1） |
-| `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题 |
+| `--concurrency K` | 同时启动的后端实例数（默认 4）；启动完成后各实例并行跑题。所有实例（2 个分支 × 模型数）会同时在跑，每个实例连同编辑器引擎约占 2–3 GB 内存：先估算总量，别和 Android 模拟器、桌面实例等重活同时跑（曾整机崩溃） |
 | `--profile cn\|intl` | 站点/语言档位（默认 `cn`）。`cn`：界面语言 zh-CN（`system_prompt.md` + 中文 LangText），账户站点保持默认 aiworkdeck.com；`intl`：界面语言 en-US（`system_prompt.en.md` + 英文 LangText），实例设 `AI_ACCOUNT_BASE_URL=https://www.workdeck.ai`（`OfficialCloudEndpoint.isInternationalSite` 按主机判定的就是它）。语言经请求体 `appLanguage` + `X-App-Language` 头下发，编辑器句子经浏览器 `checkba_app_language` |
 | `--route openrouter\|bailian` | 模型走哪条线（默认 `openrouter`，行为不变）。`bailian` 直连阿里云百炼（国内用户的生产路径），见下节「百炼路由」 |
 | `--tier cheap\|release` | 默认模型档（默认 `cheap`）。cn cheap = `deepseek/deepseek-v4-flash` + `qwen/qwen3.7-flash`；intl cheap = `google/gemini-3.6-flash` + `anthropic/claude-haiku-4.5`；`release` 在 cheap 之上再加 cn：`qwen/qwen3.8-max-0902`、`deepseek/deepseek-v4-pro`，intl：`anthropic/claude-sonnet-5`、`openai/gpt-5.6-terra`。`--models` 显式给出时覆盖 |
@@ -87,6 +87,7 @@ qwen3.7-flash 240 次运行有 171 次（71%）记为基础设施故障、deepse
   "text": "把合同.docx移到归档文件夹",
   "hostState": "nofile",            // nofile | docx:<夹具>（xlsx/pptx/attachments 暂不支持，SKIPPED）
   "requiresPlugin": "desensitize",  // 可选：实例 plugins/ 里没有该插件时整句 SKIPPED（报告里写明原因）
+  "installPlugins": ["lawfirm-management"], // 可选：启动实例前把 official-plugins/<id> 按广场安装的落盘形态（manifest/web/l10n/skills）拷进实例 plugins/
   "task": true,                     // 可选：多步任务（只按结果判分），报告里单列「多步任务」表
   "followUps": [{ "whenStatus": "awaiting_input", "text": "执行" }], // 可选，仅 API 句：本轮以 whenStatus 结束时在同一会话里再发一条（按顺序、每条最多一次）；上一轮停在 ask_user 卡（确认卡/反问卡）时按卡片回答「Selected: - 执行」，否则作为普通消息
   "seed": {

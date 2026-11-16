@@ -90,22 +90,70 @@ class ThreeWayAnalyzerTest {
     }
 
     @Test
-    @DisplayName("相邻两段各改一边：也算冲突，进人工裁决")
-    void adjacentParagraphsAreManual() {
+    @DisplayName("相邻两段各改一边：逐段判，各合各的，不问律师（JGit 把它们并成一个冲突区）")
+    void adjacentParagraphsMergeAutomatically() {
         byte[] base = MergeFixtures.docx(BASE_PARAGRAPHS.toArray(new String[0]));
         byte[] main = paragraphs(l -> l.set(2, "第三条 标的（我改的）"));
         byte[] other = paragraphs(l -> l.set(3, "第四条 价款（律师乙改的）"));
 
         Analysis a = ThreeWayAnalyzer.analyze("合同.docx", base, main, other);
 
-        assertEquals(MergeDecision.MANUAL, a.decision());
-        assertEquals(MergeReason.OVERLAP, a.reason());
-        assertEquals(List.of("p2", "p3"), a.overlaps().stream().map(Overlap::key).toList());
+        assertEquals(MergeDecision.AUTO, a.decision());
+        assertTrue(a.overlaps().isEmpty(), a.overlaps().toString());
+        assertEquals(List.of("p2:M", "p3:T"), a.neighbors().stream().map(n -> n.key() + ":" + n.side()).toList());
+        assertEquals(List.of(2), a.plan().mainChunks().stream().map(Chunk::baseStart).toList());
+        assertEquals(List.of(3), a.plan().otherChunks().stream().map(Chunk::baseStart).toList());
+        assertTrue(a.plan().mainChunks().stream().noneMatch(Chunk::conflict));
+        assertTrue(a.plan().otherChunks().stream().noneMatch(Chunk::conflict));
     }
 
     @Test
-    @DisplayName("表格单元与它紧挨着的段落分属两边：相邻，进人工裁决")
-    void tableCellNextToEditedParagraphIsManual() {
+    @DisplayName("冲突区里逐段判：主线改 3、4 段、另一侧改 2、3 段 → 只有第 3 段要律师定（真机：3 处 → 1 处）")
+    void onlyParagraphsChangedOnBothSidesAreDecisions() {
+        byte[] base = MergeFixtures.docx(BASE_PARAGRAPHS.toArray(new String[0]));
+        byte[] main = paragraphs(l -> { l.set(2, "第三条 标的（主线）"); l.set(3, "第四条 价款（主线）"); });
+        byte[] other = paragraphs(l -> { l.set(1, "第二条 定义（稿）"); l.set(2, "第三条 标的（稿）"); });
+
+        Analysis a = ThreeWayAnalyzer.analyze("合同.docx", base, main, other);
+
+        assertEquals(MergeDecision.MANUAL, a.decision());
+        assertEquals(List.of("p2"), a.overlaps().stream().map(Overlap::key).toList());
+        assertEquals(List.of("2:true", "3:false"), a.plan().mainChunks().stream().map(c -> c.baseStart() + ":" + c.conflict()).toList());
+        assertEquals(List.of("1:false", "2:true"), a.plan().otherChunks().stream().map(c -> c.baseStart() + ":" + c.conflict()).toList());
+        // 只一侧改的那两段不要裁决，但列出来请律师过目；记进版本记录时段序取合并结果里的
+        assertEquals(List.of("p1:T", "p3:M"), a.neighbors().stream().map(n -> n.key() + ":" + n.side()).toList());
+        assertEquals(List.of(new Decision("p1", "T", "N"), new Decision("p3", "M", "N")), ThreeWayAnalyzer.neighborDecisions(a));
+    }
+
+    @Test
+    @DisplayName("两侧把同一段改得一模一样：不算冲突")
+    void identicalChangeOnBothSidesIsNotAConflict() {
+        byte[] base = MergeFixtures.docx(BASE_PARAGRAPHS.toArray(new String[0]));
+        byte[] main = paragraphs(l -> { l.set(2, "第三条 标的（同一改法）"); l.set(3, "第四条 价款（主线）"); });
+        byte[] other = paragraphs(l -> l.set(2, "第三条 标的（同一改法）"));
+
+        Analysis a = ThreeWayAnalyzer.analyze("合同.docx", base, main, other);
+
+        assertEquals(MergeDecision.AUTO, a.decision());
+        assertTrue(a.overlaps().isEmpty(), a.overlaps().toString());
+    }
+
+    @Test
+    @DisplayName("冲突区里有增删段（段数对不齐）：仍整块交给律师")
+    void unequalRegionStaysWhole() {
+        byte[] base = MergeFixtures.docx(BASE_PARAGRAPHS.toArray(new String[0]));
+        byte[] main = paragraphs(l -> l.set(2, "第三条 标的（主线）"));
+        byte[] other = paragraphs(l -> { l.set(2, "第三条 标的（稿）"); l.add(3, "第三条之一 新增（稿）"); });
+
+        Analysis a = ThreeWayAnalyzer.analyze("合同.docx", base, main, other);
+
+        assertEquals(MergeDecision.MANUAL, a.decision());
+        assertFalse(a.overlaps().isEmpty());
+    }
+
+    @Test
+    @DisplayName("表格单元与它紧挨着的段落分属两边：逐单元判，各合各的")
+    void tableCellNextToEditedParagraphMergesAutomatically() {
         byte[] base = MergeFixtures.docxWithTable(
                 List.of("表前说明"), new String[][]{{"注册资本 100 万"}}, List.of("表后说明"));
         byte[] main = MergeFixtures.docxWithTable(
@@ -115,8 +163,8 @@ class ThreeWayAnalyzerTest {
 
         Analysis a = ThreeWayAnalyzer.analyze("尽调表.docx", base, main, other);
 
-        assertEquals(MergeDecision.MANUAL, a.decision());
-        assertEquals(List.of("p0", "t0.0.0"), a.overlaps().stream().map(Overlap::key).toList());
+        assertEquals(MergeDecision.AUTO, a.decision());
+        assertTrue(a.overlaps().isEmpty(), a.overlaps().toString());
     }
 
     @Test

@@ -23,28 +23,28 @@
 		{
 			"path": "pages/unlock/unlock",
 			"style": {
-				"navigationBarTitleText": "解锁",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/identity/identity",
 			"style": {
-				"navigationBarTitleText": "选择本机工作区",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/login/login",
 			"style": {
-				"navigationBarTitleText": "登录",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/newproject/index",
 			"style": {
-				"navigationBarTitleText": "新建项目",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
@@ -52,14 +52,14 @@
 		{
 			"path": "pages/project-overview/project-overview",
 			"style": {
-				"navigationBarTitleText": "项目概览",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/project-list/project-list",
 			"style": {
-				"navigationBarTitleText": "我的项目",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		}
@@ -68,42 +68,42 @@
 		{
 			"path": "pages/project-home/project-home",
 			"style": {
-				"navigationBarTitleText": "项目概览页",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/calendar/calendar",
 			"style": {
-				"navigationBarTitleText": "日程",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/variable-library/variable-library",
 			"style": {
-				"navigationBarTitleText": "变量库管理",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/userprofile/userprofile",
 			"style": {
-				"navigationBarTitleText": "设置",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/admin/admin",
 			"style": {
-				"navigationBarTitleText": "设置",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/plugin-market/plugin-market",
 			"style": {
-				"navigationBarTitleText": "插件广场",
+				"navigationBarTitleText": "AI WorkDeck",
 				"navigationStyle": "custom"
 			}
 		}

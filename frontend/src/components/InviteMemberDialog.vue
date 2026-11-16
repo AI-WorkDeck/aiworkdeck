@@ -208,6 +208,25 @@
                    :placeholder="$t('version.clientNamePlaceholder')"
                  />
                </view>
+               <!-- 默认签具名码：项目沟通只认具名码（通用码是持码人共用的一个身份）。要通用码须明确勾选（B4） -->
+               <text v-if="!clientGeneric && !clientName.trim()" class="code-tip">{{ $t('version.clientNameRequired') }}</text>
+               <view class="history-option" :class="{ selected: clientGeneric }" role="checkbox" :aria-checked="clientGeneric" @tap="clientGeneric = !clientGeneric">
+                 <text class="history-dot" aria-hidden="true">{{ clientGeneric ? '☑' : '☐' }}</text>
+                 <text>{{ $t('version.clientGenericOption') }}</text>
+               </view>
+               <text v-if="clientGeneric" class="code-tip">{{ $t('version.clientChatNeedsName') }}</text>
+               <!-- 项目沟通里客户能看到的消息范围（B4）：默认只看加入之后，开放此前消息须明确选择 -->
+               <view class="form-group" role="radiogroup" :aria-label="$t('version.clientChatHistoryLabel')">
+                 <text class="form-label">{{ $t('version.clientChatHistoryLabel') }}</text>
+                 <view class="history-option" :class="{ selected: !clientShareHistory }" role="radio" :aria-checked="!clientShareHistory" @tap="clientShareHistory = false">
+                   <text class="history-dot" aria-hidden="true">{{ clientShareHistory ? '○' : '●' }}</text>
+                   <text>{{ $t('version.clientChatHistoryAfter') }}</text>
+                 </view>
+                 <view class="history-option" :class="{ selected: clientShareHistory }" role="radio" :aria-checked="clientShareHistory" @tap="clientShareHistory = true">
+                   <text class="history-dot" aria-hidden="true">{{ clientShareHistory ? '●' : '○' }}</text>
+                   <text>{{ $t('version.clientChatHistoryAll') }}</text>
+                 </view>
+               </view>
            </view>
 
            <view v-else class="code-result-box">
@@ -225,6 +244,7 @@
                    </view>
                </template>
                <text v-if="clientExpiryDate" class="code-tip">{{ $t('version.clientCodeExpires', { date: clientExpiryDate }) }}</text>
+               <text class="code-tip">{{ clientHistoryResult }}</text>
                <text class="code-tip">{{ clientPortalLinkText ? $t('version.clientPortalAccessCodeTip') : $t('version.accessCodeTip') }}</text>
                <view v-if="clientPortalLinkText" class="code-actions-row">
                    <text class="copy-link" @tap="copyClientInvite">{{ $t('version.clientCopyInvite') }}</text>
@@ -248,7 +268,7 @@
             </view>
         </block>
         <block v-else>
-            <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading }">
+            <view v-if="!clientInviteCode" class="workdeck-btn workdeck-btn-primary" @tap="generateClientCode" :class="{ disabled: loading || !canGenerateClientCode }" :aria-disabled="loading || !canGenerateClientCode">
                 {{ loading ? $t('version.generatingEllipsis') : $t('version.generateAccessCode') }}
             </view>
             <view v-else class="workdeck-btn workdeck-btn-primary" @tap="close">{{ $t('common.done') }}</view>
@@ -317,6 +337,9 @@ export default {
       identifier: '',
       role: 'PARTICIPANT',
       clientName: '',
+      clientShareHistory: false,
+      clientGeneric: false,
+      clientHistoryEcho: null,
       clientInviteCode: '',
       // 云端轨签码回执（dev-board#1050）：门户地址、有效期、案件库那一侧的客户用户 id（撤销用）
       clientPortalUrl: '',
@@ -388,6 +411,13 @@ export default {
     clientPortalLinkText() {
       return clientPortalLink(this.clientPortalUrl, this.clientInviteCode)
     },
+    // A named code unless the lawyer explicitly asked for a shared one (which cannot be used for project chat).
+    canGenerateClientCode() { return this.clientGeneric || !!this.clientName.trim() },
+    clientHistoryResult() {
+        if (this.clientHistoryEcho === true) return this.$t('version.clientChatHistoryResultAll')
+        if (this.clientHistoryEcho === false || !this.clientShareHistory) return this.$t('version.clientChatHistoryResultAfter')
+        return this.$t('version.clientChatHistoryNotApplied')
+    },
     clientExpiryDate() {
       return expiryDate(this.clientExpiresAt)
     },
@@ -415,6 +445,9 @@ export default {
         this.identifier = ''
         this.role = 'PARTICIPANT'
         this.clientName = ''
+        this.clientShareHistory = false
+        this.clientGeneric = false
+        this.clientHistoryEcho = null
         this.clientInviteCode = ''
         this.clientPortalUrl = ''
         this.clientExpiresAt = ''
@@ -648,18 +681,21 @@ export default {
       })
     },
     async generateClientCode() {
+        if (this.loading || !this.canGenerateClientCode) return
         this.loading = true
         try {
             // 云端轨：案卷在团队案件库里，码必须由案件库签（客户登录的是案件库的门户，
             // 本机签的码案件库上不存在）；本机轨（自建服务器）照旧打本机接口
             const res = this.isCloudTrack
-              ? await inviteCloudClient(this.projectId, this.clientName)
-              : await inviteClient(this.projectId, this.clientName)
+              ? await inviteCloudClient(this.projectId, this.clientGeneric ? '' : this.clientName, this.clientShareHistory)
+              : await inviteClient(this.projectId, this.clientGeneric ? '' : this.clientName, this.clientShareHistory)
             if (res.code === 0 && res.data && res.data.accessCode) {
                 this.clientInviteCode = res.data.accessCode
                 this.clientPortalUrl = res.data.clientUrl || ''
                 this.clientExpiresAt = res.data.expiresAt || ''
                 this.clientUserId = res.data.clientUserId != null ? res.data.clientUserId : null
+                // 服务端回显才算执行了这次选择；老案件库不回显，按「只看加入之后」处理
+                this.clientHistoryEcho = typeof res.data.shareHistory === 'boolean' ? res.data.shareHistory : null
             } else {
                 throw new Error(this.$t('version.generateFailed'))
             }
@@ -1164,4 +1200,7 @@ export default {
   border-color: var(--awd-info);
   color: var(--awd-text);
 }
+.history-option { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin-top: 4px; border-radius: var(--awd-radius-sm); cursor: pointer; }
+.history-option.selected { background: var(--awd-surface-2); }
+.history-dot { color: var(--awd-accent); }
 </style>

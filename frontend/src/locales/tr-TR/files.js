@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Boyut: {size}",
   "renderingDoc": "Belge işleniyor…",
   "renderingSlides": "Sunum işleniyor…",
+  "slidesNotShown": "{count} slayt daha gösterilmiyor. Tümünü görmek için dosyayı açın.",
   "officePreviewUnsupported": "Bu dosya için çevrimiçi önizleme kullanılamıyor",
   "fileTypeHintOpenLocal": "Dosya türü: {type}. Finder veya Dosya Gezgini'nde bulun ve yerel bir uygulamayla açın.",
   "unknown": "Bilinmiyor",

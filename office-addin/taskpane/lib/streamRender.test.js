@@ -223,6 +223,47 @@ test('配额耗尽错误换成引导文案并打 quota 标记，上游英文原�
   }
 })
 
+test('平台通道 no_credits 错误同样打上 quota 标记以便渲染充值与个人 Pro 入口', async () => {
+  store.clear()
+  const chunks = [
+    sseEvent('error', { message: '账户 Credits 余额不足，请充值后重试', reason: 'no_credits', kind: 'CONFLICT' })
+  ]
+  const f = stubFetch((url) => {
+    if (url.includes('/api/ai/history')) return jsonReply([])
+    if (url.endsWith('/api/agent/conversations')) return jsonReply({ conversationId: 'conv-sr-nc' })
+    if (url.includes('/api/agent/connect/')) return sseScriptedResponse([])
+    if (url.endsWith('/api/agent/chat')) return jsonReply({ code: 0 })
+    if (url.includes('/api/ai/models') || url.includes('/api/skills/list')) return jsonReply([], false, 404)
+    if (url.includes('/api/agent/cancel/')) return jsonReply({})
+    throw new Error('未预期请求: ' + url)
+  })
+  try {
+    await activateSession({
+      settings: { serverUrl: 'https://x.example', token: 'awdt_srnc' }, projectId: '24'
+    })
+    await stop()
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/api/agent/connect/')) return sseScriptedResponse(chunks)
+      if (String(url).endsWith('/api/agent/chat')) return jsonReply({ code: 0 })
+      if (String(url).includes('/api/ai/history')) return jsonReply([])
+      return jsonReply({}, false, 404)
+    }
+    input.value = '触发 no_credits'
+    await send()
+    assert.ok(await until(() => {
+      const last = messages.value[messages.value.length - 1]
+      return last && last.role === 'assistant' && last.error
+    }), '等待 no_credits error 事件超时')
+    const last = messages.value[messages.value.length - 1]
+    assert.equal(last.errorKind, 'quota')
+    assert.equal(last.error, '账户 Credits 余额不足，请充值后重试')
+    assert.equal(streaming.value, false)
+  } finally {
+    await stop()
+    f.restore()
+  }
+})
+
 test('发送契约：不附带正文也上送 activeContext 壳；model/skillIds 随选择上送', async () => {
   store.clear()
   let chatBody = null

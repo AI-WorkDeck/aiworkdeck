@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Puoi usare il riconoscimento nel cloud per i file di questo gruppo non completati in locale. In caso contrario, questi file non verranno caricati.",
   "ocrLocalFailedConfirm": "Usa il riconoscimento nel cloud",
   "ocrAlreadySearchable": "«{name}» ha già un livello di testo ed è ricercabile; non è stato creato alcun nuovo file",
-  "ocrStopped": "Interrotto; {count} file non elaborati"
+  "ocrStopped": "Interrotto; {count} file non elaborati",
+  "subscribeProBtn": "Pro ¥9.9",
 }

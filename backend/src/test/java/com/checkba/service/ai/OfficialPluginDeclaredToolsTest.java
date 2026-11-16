@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -157,6 +158,73 @@ class OfficialPluginDeclaredToolsTest {
         var r = registry.execute("project_im_read_messages", "{\"imConversationId\":\"c9\"}", ctx);
         assertTrue(r.output().startsWith("Error"), r.output());
         assertTrue(r.output().contains("无权访问该会话"), r.output());
+    }
+
+
+    /**
+     * 律师的自然问法要能把律所管理的台账工具带到模型面前（tutorial：问「哪些案子开了票还没收齐款」，Agent 说没有台账工具、
+     * 去翻 plugin 类目、劝装 capability_install）。开发安装（目录带 .awd-dev）与广场安装（无标记）两种落盘形态都要成立。
+     */
+    @org.junit.jupiter.params.ParameterizedTest(name = "dev={0}")
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void lawyerQuestionsAboutReceivablesSurfaceTheLedgerTools(boolean devInstall) throws IOException {
+        install("lawfirm-management");
+        if (devInstall) {
+            Files.writeString(pluginsDir.resolve("lawfirm-management/.awd-dev"), "");
+            plugins.rescan();
+        }
+        assertEquals(devInstall, plugins.isDevInstalled("lawfirm-management"));
+        ToolDisclosurePolicy policy = wiredPolicy();
+        List<ToolSpecification> session = registry.getAllSpecifications();
+        assertTrue(session.stream().anyMatch(s -> s.name().equals("lawfirm_management_fee_ledger")), "台账工具应已注册");
+
+        for (String question : List.of(
+                "所里哪些案子还有应收账款没收回？",
+                "用律所管理插件的案件台账查一下：哪些案子开了票还没收齐款？",
+                // 同句还命中别的三类时，plugin-tools 靠 manifest keywords 计分，不被「插件」一词挤出前三
+                "用律所管理插件查一下回款，再把表格的格式统一一下，顺便建个待办提醒我跟进")) {
+            Set<String> putBack = policy.categoriesPutBackFor(question);
+            assertTrue(putBack.contains(ToolDisclosurePolicy.PLUGIN_TOOLS_CATEGORY), question + " → " + putBack);
+            List<String> offered = policy.narrow(session, putBack, false, Set.of()).stream().map(ToolSpecification::name).toList();
+            assertTrue(offered.contains("lawfirm_management_fee_ledger"), question + " 首轮应下发台账工具: " + offered);
+        }
+        // 律所无关的普通句不放回
+        assertFalse(policy.categoriesPutBackFor("帮我把这份合同的违约金条款改一下").contains(ToolDisclosurePolicy.PLUGIN_TOOLS_CATEGORY));
+    }
+
+    @Test
+    void listToolsFindsPluginToolsByKeywordAndPluginNameAndPointsAwayFromThePluginCategory() throws IOException {
+        install("lawfirm-management");
+        ToolDisclosurePolicy policy = wiredPolicy();
+        var discovery = new com.checkba.service.ai.tools.ToolDiscoveryTools(policy);
+        List<ToolSpecification> session = registry.getAllSpecifications();
+        com.checkba.service.ai.tools.ToolContextHolder.set(new ToolContext(1L, "conv", 7L, null, session,
+                Set.of(), "run-1", java.util.concurrent.ConcurrentHashMap.newKeySet()));
+        try {
+            // 中文整句当一个词搜：「应收账款」只靠描述里的「应收」是搜不到的，要靠 manifest keywords
+            assertTrue(discovery.list_tools(null, "应收账款", null, "conv").contains("lawfirm_management_fee_ledger("));
+            assertTrue(discovery.list_tools(null, "哪些案子应收账款没收回", null, "conv").contains("lawfirm_management_fee_ledger("),
+                    "整句当一个词：含 keywords 里的词即算命中");
+            assertTrue(discovery.list_tools(null, "律所管理", null, "conv").contains("lawfirm_management_fee_ledger("),
+                    "按插件名搜应命中该插件的工具");
+            assertTrue(discovery.list_tools(null, "receivables", null, "conv").contains("lawfirm_management_fee_ledger("));
+            assertTrue(discovery.list_tools(null, "pdf merge", null, "conv").startsWith("No tool"), "无关词不误中插件工具");
+            // 照字面展开 plugin 类目（开发插件 / 能力包）时，指明已安装插件的工具在 plugin-tools
+            String plugin = discovery.list_tools("plugin", null, null, "conv");
+            assertTrue(plugin.contains("plugin-tools") && plugin.contains("lawfirm_management_fee_ledger"), plugin);
+        } finally {
+            com.checkba.service.ai.tools.ToolContextHolder.clear();
+        }
+        plugins.setEnabled("lawfirm-management", false);
+        assertTrue(policy.searchTermsOf("lawfirm_management_fee_ledger").isEmpty(), "停用后不再参与检索");
+    }
+
+    private ToolDisclosurePolicy wiredPolicy() {
+        ToolDisclosurePolicy policy = new ToolDisclosurePolicy(true, true);
+        policy.setPluginToolNames(registry::pluginToolNames);
+        policy.setPluginToolKeywords(registry::declaredToolKeywords);
+        policy.setPluginToolSearchTerms(registry::declaredToolSearchTerms);
+        return policy;
     }
 
     private static <T> T isNull() { return org.mockito.ArgumentMatchers.isNull(); }

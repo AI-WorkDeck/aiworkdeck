@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Größe: {size}",
   "renderingDoc": "Dokument wird gerendert…",
   "renderingSlides": "Präsentation wird gerendert…",
+  "slidesNotShown": "{count} weitere Folien werden nicht angezeigt. Öffnen Sie die Datei, um alle zu sehen.",
   "officePreviewUnsupported": "Die Online-Vorschau ist für diese Datei nicht verfügbar",
   "fileTypeHintOpenLocal": "Dateityp: {type}. Suchen Sie die Datei im Finder oder Datei-Explorer und öffnen Sie sie mit einer lokalen App.",
   "unknown": "Unbekannt",

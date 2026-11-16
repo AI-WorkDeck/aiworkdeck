@@ -111,6 +111,7 @@ dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
 - `GET/PUT /api/mobile/backup-consent` 保存账户决定；PUT 必须显式传 enabled 和当前
   `consentVersion:2026-10-11`。旧行 nullable 字段默认关闭/未决定，不替用户同意。
   返回 `enabled/decided/subscriptionActive/consentVersion/cleanupPending`。
+  桌面 `MobileBackupConsent.vue` 只在工作台挂载与账户变化（uni 总线 `awd:account-changed`，不是 window 事件）后的那一次查询里、且用户此后没有点击/按键时自动弹出未决定的说明；60 秒后台复查从不自己弹窗，未决定时状态栏显示「文件云端备份 · 待选择」（QA D9，`frontend/tests/mobile-backup/prompt-timing.test.mjs`）。
 - 桌面 worker 定期查账户决定和订阅；同意后推 `/backup/manifest` 元数据（含空文件夹），
   仅为支持格式计算 SHA256、读取字节；`GET /backup/files?deviceId=&projectKey=` 对账，
   省略 projectKey 返回此设备全部备份，便于清理已删除项目。`PUT /backup/files` 是 query
@@ -626,3 +627,7 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 ## 包晴天律师（2026-11-06，aiworkdeck_website#380 / aiworkdeck#1403）
 
 `GET /api/mobile/billing/balance` 透传官网 `billingLine`（standard|circle|bqt）与 `bqtMember`（schema `BqtMember`，mobile-v1.yaml），经 `MobileBillingClient.BalanceResult.billing` → `BqtBilling.copyBillingFields`，旧官网缺字段按 standard/null。billingLine=bqt 时四端只显示包晴天积分折算额度（balanceCents 已是折算值），隐藏本站充值/Pro/兑换码，提示去包晴天 App 充值续费。网关拒绝码 `bqt_*` 不是登录失效。手机端登录建议：建扫码会话后打开 `bqtlawyer:///pages/scan/result?qrid=&timestamp=&source=`（包晴天 App 现有 scheme 与确认页），回前台继续轮询 status；未装包晴天则显示二维码或手机号登录。回归：`MobileApiContractTest`（bqt 分支覆盖 BqtMember 每个键）。
+
+## Google Play 消耗型内购桥接（2026-11-13，dev-board#665）
+
+`POST /api/mobile/billing/recharge` 放行 `channel=googleplay`（必传 `productId=credits.usd.10|20|50`，响应 `present=native`）；新增 `POST /api/mobile/billing/recharge/confirm-googleplay`（`outTradeNo` 可缺省、`productId` 必传、`purchaseToken` ≤4KB），原样转发官网 `action=confirm-googleplay`，仅在 `paid=true` 时作废余额缓存并由客户端 `consumeAsync` 消耗商品。回归：`MobileBillingServiceTest`、`HttpMobileBillingClientTest`、`MobileBillingRechargeDisabledTest` 与 `MobileApiContractTest`。

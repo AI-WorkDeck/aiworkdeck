@@ -147,6 +147,26 @@ export default {
     "titles": "Inserisci un titolo per ogni elemento."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Questo invito è destinato agli account AI WorkDeck. Qui puoi parlare con i tuoi avvocati nella chat del progetto.",
+      "openChat": "Apri la chat del progetto",
+      "joinFirst": "Entra prima nel progetto con il codice di accesso inviato dal tuo avvocato, poi usa la chat del progetto.",
+      "title": "Chat di progetto",
+      "hint": "Parla con il tuo team legale di questo progetto. Sono i tuoi avvocati a decidere quali messaggi e file precedenti puoi vedere.",
+      "tabChecklist": "Checklist",
+      "loading": "Caricamento dei messaggi…",
+      "empty": "Ancora nessun messaggio. Puoi fare domande ai tuoi avvocati qui.",
+      "older": "Carica messaggi precedenti",
+      "you": "Tu",
+      "filePending": "Il file è ancora in preparazione. Contatta il tuo avvocato.",
+      "placeholder": "Scrivi un messaggio. Invio per inviare, Maiusc+Invio per andare a capo",
+      "attach": "Invia un file",
+      "send": "Invia",
+      "sending": "Invio in corso…",
+      "fileTooLarge": "Un singolo file non può superare {size} MB",
+      "quotaFull": "Hai raggiunto il limite totale di caricamento di {size} MB per questo progetto. Contatta il tuo avvocato.",
+      "unavailable": "La chat di progetto non è disponibile al momento. Riprova più tardi."
+    },
     "messageUnavailable": "Questo progetto invitato o questa checklist non è più disponibile. Aggiorna e riprova.",
     "workspaceTitle": "Collaborazione con il cliente",
     "workspaceHint": "Prepara i documenti seguendo la checklist del tuo avvocato, invia ogni elemento e segui i riscontri.",

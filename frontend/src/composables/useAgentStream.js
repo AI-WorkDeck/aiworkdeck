@@ -993,6 +993,8 @@ export function useAgentStream() {
             })
             // fetch 对 4xx/5xx 不 reject，需显式校验，否则会话过期/后端错误时加载态永久卡死
             if (!chatResp.ok) {
+                // 429 = 服务器按用户限频（server 部署），给可读的「稍候再试」而不是裸状态码
+                if (chatResp.status === 429) throw Object.assign(new Error(t('common.tooManyRequests')), { status: 429 })
                 throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
             }
             const responseBody = await chatResp.json()
@@ -1308,7 +1310,10 @@ export function useAgentStream() {
         if (evt === 'skill_update') {
             try {
                 const d = JSON.parse(dataStr)
-                const incoming = Array.isArray(d.skills) ? d.skills : []
+                // 内置工作流不在手动勾选清单里，它的 manual 只可能来自点工作流卡片（随消息显式带上 id）：
+                // 展示上仍按自动接管处理（闪一下、出「已加载」提示），与按触发词命中时一致
+                const incoming = (Array.isArray(d.skills) ? d.skills : []).map(s =>
+                    s && s.builtinWorkflow && s.source === 'manual' ? { ...s, source: 'auto' } : s)
                 // 「新出现的自动命中技能」才闪：手动选的是用户自己点的，不需要提醒他自己；
                 // 连续几轮都命中同一个技能也不该每轮闪一次（那是噪音，不是信息）。
                 const knownAutoIds = new Set(

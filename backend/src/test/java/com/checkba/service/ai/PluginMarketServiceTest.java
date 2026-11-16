@@ -103,6 +103,15 @@ class PluginMarketServiceTest {
                 pluginService, gate);
     }
 
+    @Test void unreachableRegistryShowsFriendlyMessageWithoutRawExceptionText() {
+        var service = new PluginMarketService("http://127.0.0.1:1/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, gate);
+        var e = assertThrows(IllegalStateException.class, service::listMarket);
+        assertFalse(e.getMessage().contains("IOException"), e.getMessage());
+        assertFalse(e.getMessage().contains("127.0.0.1"), e.getMessage());
+        assertTrue(e.getMessage().contains("插件广场"), e.getMessage());
+    }
+
     @Test void lateRevocationResponseIsRejectedAfterSiteSwitch() {
         var account = mock(AccountService.class);
         var snapshot = new AccountService.ConnectionSnapshot("https://www.workdeck.ai", "test-key", "test", 2L);

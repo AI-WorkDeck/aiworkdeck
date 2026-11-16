@@ -111,6 +111,9 @@ public class PluginBundledInstaller {
             catch (Exception e) { if (backup != null) Files.move(backup, target, StandardCopyOption.ATOMIC_MOVE); throw e; }
             committed = true;
             settings.set("plugin.bundled." + id, String.valueOf(meta.get("version")));
+            // 随宿主发的包与宿主同一信任级：它的工具定义直接作为已批准基线，升级内置包不打扰用户
+            settings.set(PluginToolApprovals.KEY_PREFIX + id,
+                    PluginToolApprovals.toJson(PluginToolApprovals.snapshot(staged).definitions()));
         } catch (java.io.IOException e) { throw new IllegalStateException("Unable to install bundled plugin", e); }
         finally { delete(staging); if (committed) delete(backup); }
     }

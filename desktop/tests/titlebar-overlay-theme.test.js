@@ -86,6 +86,7 @@ function harness({ platform = 'win32', systemDark = false } = {}) {
         './reload-guard': { attachReloadGuard: () => true },
         './services/backend-request-gate': require('../main/services/backend-request-gate'),
         './window-state': require('../main/window-state'),
+        './navigation-guard': require('../main/navigation-guard'),
       }
       assert.ok(name in stubs, '多了一个没桩的 require: ' + name)
       return stubs[name]

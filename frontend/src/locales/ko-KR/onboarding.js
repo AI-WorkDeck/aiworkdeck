@@ -107,7 +107,8 @@ export default {
     "switch": "전환",
     "cancel": "취소",
     "switchFailed": "사이트 전환에 실패했습니다. 나중에 다시 시도하세요.",
-    "rescueFailed": "사이트를 전환한 후에도 잠금 해제되지 않았습니다. 코드를 확인하고 다시 시도하세요."
+    "rescueFailed": "사이트를 전환한 후에도 잠금 해제되지 않았습니다. 코드를 확인하고 다시 시도하세요.",
+    "proIntroBanner": "가입 시 무료 체험 크레딧 제공 · Personal Pro 첫 3개월 ¥9.9/월",
   },
   "hint": {
     "learnMore": "자세히 알아보기",
@@ -118,7 +119,9 @@ export default {
     "purchaseConfirmOk": "확인",
     "purchaseSuccess": "잠금 해제됨",
     "purchaseFailed": "구매 실패",
-    "goRecharge": "충전하기"
+    "goRecharge": "충전하기",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro 시작",
   },
   "identity": {
     "title": "로컬 워크스페이스 선택",

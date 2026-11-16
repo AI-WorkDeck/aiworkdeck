@@ -12,11 +12,11 @@ import en from '../../src/locales/en-US/ddWorkflow.js'
 
 const messages = { 'zh-CN': { ddWorkflow: zh }, 'en-US': { ddWorkflow: en } }
 const source = file => readFileSync(new URL(`../../src/${file}`, import.meta.url), 'utf8')
-const files = ['components/dd/DdClientWorkspace.vue', 'components/dd/DdClientChecklist.vue', 'pages/client-portal/client-portal.vue']
+const files = ['components/dd/DdClientWorkspace.vue', 'components/dd/DdClientChecklist.vue', 'pages/client-portal/client-portal.vue', 'components/dd/ClientPortalChat.vue']
 function component(file) {
   const s = source(file)
   const body = s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
-  const options = new Function('DdClientWorkspace', 'DdClientChecklist', 'ddNotificationPermission', body)({ render: () => null }, { render: () => null }, () => 'unavailable')
+  const options = new Function('DdClientWorkspace', 'DdClientChecklist', 'ClientPortalChat', 'ddNotificationPermission', 'portalChat', body)({ render: () => null }, { render: () => null }, { render: () => null }, () => 'unavailable', async () => ({}))
   const code = compile(s.match(/<template>([\s\S]*?)<\/template>/)[1], { mode: 'function', isCustomElement: tag => ['view', 'checkbox-group', 'checkbox', 'progress'].includes(tag) }).code
   options.render = new Function('Vue', code)(Vue)
   return options
@@ -112,4 +112,14 @@ test('portal invitation failures localize real access-code responses and keep Ch
     await assert.rejects(serviceFixture('en-US', fetch).connectDdClient('invalid-code'), { message: english })
     await assert.rejects(serviceFixture('zh-CN', fetch).connectDdClient('invalid-code'), { message })
   }
+})
+
+test('the portal chat renders in English with no fixed Chinese copy (B4)', async () => {
+  const html = await render('components/dd/ClientPortalChat.vue', 'en-US', {
+    loading: false, conversationId: 'group-1', selfId: 9,
+    messages: [{ id: 1, senderId: 9, text: 'Hello', createdAt: '2026-11-13T08:00:00Z' },
+      { id: 2, senderId: 1, senderName: 'Lawyer', text: '', createdAt: '2026-11-13T08:01:00Z', attachment: { id: 'a', available: false } }],
+  }, { connectionId: 'portal-1', projectId: 1 })
+  assert.match(html, /Project chat/); assert.match(html, /Send a file/); assert.match(html, /still being prepared/)
+  assert.doesNotMatch(html, /[\p{Script=Han}]/u)
 })

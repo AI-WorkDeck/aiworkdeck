@@ -13,7 +13,7 @@ export default {
 
   // ---- 三态外壳 ----
   subtitle: '律所、团队、项目三级协作，使用统计按团队汇总',
-  privacyLine: '团队统计只上传计数与匿名项目编号，不含文档内容、文件名与对话',
+  privacyLine: '团队统计上传计数；项目名仅在团队开启共享且本机确认同意后才随统计上传，否则只传匿名项目编号。不含文档内容、文件名与对话',
   needAccountTitle: '尚未连接账户',
   needAccountDesc: '团队挂在 AI WorkDeck 账户上。到「账户与余额」连接账户后再回来。',
   goAccount: '前往账户与余额',
@@ -86,7 +86,7 @@ export default {
   // ---- 项目 ----
   projectsTitle: '项目',
   projectsEmpty: '暂无项目数据',
-  projectsNote: '项目名随统计上传；管理者关闭共享后只显示匿名编号，可起别名。',
+  projectsNote: '项目名只在团队开启共享、且成员在本机确认同意后才随统计上传；否则只显示匿名编号，可起别名。',
   colProject: '项目',
   colProjectMembers: '参与人数',
   setAlias: '起别名',
@@ -142,7 +142,7 @@ export default {
   lastUploadLabel: '上次上报',
   sharingTitle: '向团队共享我的使用统计',
   sharingSwitchDesc: '开启后每天上传一次当日计数',
-  sharingDesc: '每天上传一条计数（投入时长、AI 轮次、编辑动作数、匿名项目编号），不含任何文档内容。默认关闭。',
+  sharingDesc: '每天上传一条计数（投入时长、AI 轮次、编辑动作数）。项目名仅在团队开启共享且本机确认同意后才一并上传，否则只带匿名项目编号。不含任何文档内容。默认关闭。',
   sharingDesktopOnly: '这台机器是团队服务器模式，使用统计按人区分不了，该开关不可用。',
   uploadNow: '立即上报',
   lastUploadAt: '上次上报：{time}',
@@ -236,6 +236,7 @@ export default {
   weekColDays: "周一至周五",
   weekColCurrent: "正在处理",
   weekColHours: "本周工时",
+  weekColHoursLastWeek: "上周工时",
   weekColLoad: "负荷",
   weekProjectHidden: "项目名未共享",
   weekSetTitle: "设置职务",

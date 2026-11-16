@@ -106,7 +106,8 @@ export default {
     "switch": "Alternar",
     "cancel": "Cancelar",
     "switchFailed": "Falha ao alternar de site. Tente novamente mais tarde.",
-    "rescueFailed": "Ainda não desbloqueado após alternar de site. Verifique o código e tente novamente."
+    "rescueFailed": "Ainda não desbloqueado após alternar de site. Verifique o código e tente novamente.",
+    "proIntroBanner": "Créditos iniciais grátis ao cadastrar · Personal Pro ¥9.9/mês (3 primeiros meses)",
   },
   "hint": {
     "learnMore": "Saiba mais",
@@ -117,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Confirmar",
     "purchaseSuccess": "Desbloqueado",
     "purchaseFailed": "Falha na compra",
-    "goRecharge": "Recarregar"
+    "goRecharge": "Recarregar",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Obter Personal Pro",
   },
   "identity": {
     "title": "Escolher um espaço de trabalho local",

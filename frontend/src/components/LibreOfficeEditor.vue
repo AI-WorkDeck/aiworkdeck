@@ -19,15 +19,28 @@
            说清楚、给诊断码、给出路（只读预览 / 下载原文件 / 重启再试），不再对着 95% 干等。 -->
       <view v-if="!previewReady && openFailed" class="libre-loading-card libre-open-failed">
         <text class="libre-loading-name">{{ loadingTitle }}</text>
-        <text class="libre-loading-error">{{ $t('editor.openFailed.title') }}</text>
-        <text class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
-        <view v-if="canReadOnlyPreview" class="libre-loading-retry" @click="openReadOnlyPreview">
+        <!-- 设了打开密码（O14）：在这里输密码，宿主解密后交给引擎；不支持的加密方式退回原说明 -->
+        <view v-if="passwordPromptVisible" class="libre-password">
+          <text class="libre-loading-error">{{ $t('editor.openFailed.passwordPrompt') }}</text>
+          <input :key="'pw' + passwordAttempts" v-model="passwordInput" class="libre-password-input" type="password" password focus
+            :placeholder="$t('editor.openFailed.passwordPlaceholder')" :disabled="passwordState === 'checking'" @confirm="submitPassword($event)" />
+          <text v-if="passwordState === 'wrong' || passwordState === 'error'" class="libre-password-error">
+            {{ passwordState === 'wrong' ? $t('editor.openFailed.passwordWrong') : $t('editor.openFailed.passwordError') }}
+          </text>
+          <view class="libre-loading-retry libre-password-submit" :class="{ busy: passwordState === 'checking' }" @click="submitPassword()">
+            <text>{{ passwordState === 'checking' ? $t('editor.openFailed.passwordChecking') : $t('editor.openFailed.passwordOpen') }}</text>
+          </view>
+          <text class="libre-loading-dl">{{ $t('editor.openFailed.passwordNote') }}</text>
+        </view>
+        <text v-if="!passwordPromptVisible" class="libre-loading-error">{{ openFailCode === 'DOC_ENCRYPTED' ? $t('editor.openFailed.encryptedTitle') : (openFailLegacy && openFailCode === 'DOC_REJECTED' ? $t('editor.openFailed.legacyTitle') : $t('editor.openFailed.title')) }}</text>
+        <text v-if="!passwordPromptVisible" class="libre-loading-dl">{{ $t('editor.openFailed.code', { code: openFailCode }) }}</text>
+        <view v-if="canReadOnlyPreview && openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="openReadOnlyPreview">
           <text>{{ $t('editor.openFailed.readOnlyPreview') }}</text>
         </view>
         <view class="libre-loading-retry" @click="downloadOriginal">
           <text>{{ $t('editor.openFailed.download') }}</text>
         </view>
-        <view class="libre-loading-retry" @click="retryLoad">
+        <view v-if="openFailCode !== 'DOC_ENCRYPTED'" class="libre-loading-retry" @click="retryLoad">
           <text>{{ $t('editor.openFailed.retry') }}</text>
         </view>
       </view>
@@ -93,11 +106,16 @@
         <text class="libre-save-label" :title="saveStateText">{{ saveStateText }}</text>
         <text v-if="(statusKey === 'saveFailed' || statusKey === 'movedSaveFailed') && !saving" class="libre-save-retry" @tap="retrySave">{{ $t('editor.retrySave') }}</text>
         <text v-if="statusKey === 'movedSaveFailed' && !saving" class="libre-save-retry" @tap="saveCopyAs">{{ $t('editor.saveCopyAs') }}</text>
+        <text v-if="legacyProtected" class="libre-save-retry libre-legacy-copy" :class="{ busy: legacyCopyBusy }" @tap="saveProtectedCopy">{{ legacyCopyBusy ? $t('editor.legacyProtected.copying') : $t(legacyImport ? 'editor.legacyProtected.saveCopyPlain' : 'editor.legacyProtected.saveCopy', { ext: legacyProtected }) }}</text>
       </view>
     </view>
     <!-- 外部 Agent（MCP propose_revision）的待审修订：仅激活的已打开文件显示，接受后以修订痕迹落入文档 -->
     <!-- PendingRevisionBar 在 main.js 全局注册：不进本组件的 script，免得抽取源码构建组件的测试夹具逐个补桩 -->
     <PendingRevisionBar v-if="file && file.id && active" :project-id="projectId" :file-id="file.id" :executor="pendingRevisionExecutor" />
+    <view v-if="engineNotice" class="libre-input-error libre-engine-notice" role="alert">
+      <text>{{ engineNotice }}</text>
+      <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="engineNotice = ''">×</button>
+    </view>
     <view v-if="inputError" class="libre-input-error" role="alert">
       <text>{{ inputError }}</text>
       <button :title="$t('common.close')" type="button" :aria-label="$t('common.close')" @click="inputError = ''">×</button>
@@ -197,12 +215,12 @@
 import { beginDocumentSave, checkpointSaveBarrier, documentCheckpointGeneration, reconcileCheckpointSaveBarrier } from '@/utils/checkpointSaveBarrier.js'
 import { webviewTransport, iframeTransport } from '@/composables/useZetaOfficeWebview.js'
 import { createRelayExecutor, PROBE_ACTION, PROBE_BUDGET_MS } from '@/composables/zetaOfficeRelay.js'
-import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED } from '@/utils/editorLoadFailure.js'
+import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED, DIAG_DOC_REJECTED, DIAG_DOC_ENCRYPTED, isEncryptedOoxml } from '@/utils/editorLoadFailure.js'
 import ReviewPanel from '@/components/ReviewPanel.vue'
 import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
-import { getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
+import { createFile, getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
 import { createAuthorNameResolver, REDLINE_AUTHOR_KEY } from '@/utils/editorAuthor.js'
 import { host } from '@/services/host.js'
@@ -214,8 +232,9 @@ import { EVIDENCE_CHANGED_EVENT } from '@/utils/evidenceEvents.js'
 import { DOC_MUTATED_EVENT } from '@/utils/docEvents.js'
 import { buildAiFormatPrompt, buildAiSelectionRevisePrompt, AI_PROMPT_EVENT } from '@/utils/paragraphFormat.js'
 import { getResolvedTheme, APP_THEME_EVENT } from '@/utils/appTheme.js'
-// 冷启动 PPT 只读预览的体量上限（office-tier1）：更大的演示文稿本地解析会拖慢引擎启动，直接等可编辑视图
-const PPTX_PREVIEW_MAX_BYTES = 15 * 1024 * 1024
+// 懒建：只有 PPT 路径会用到（组件脚本在多个测试桩里求值，模块顶层不调导入）
+let slidePreviewCacheInstance = null
+const slidePreviewCache = () => slidePreviewCacheInstance || (slidePreviewCacheInstance = createSlidePreviewCache())
 import { isEnglish, getAppLanguage } from '@/utils/appLanguage.js'
 import { stampApplication } from '@/utils/docxAppProps.js'
 import { documentStampApplication } from '@/utils/documentGeneratorSetting.js'
@@ -223,6 +242,7 @@ import { createInlineReviewHost } from '@/composables/inlineReviewHost.js'
 import { requireAccount, requireRecharge } from '@/utils/requireAccount.js'
 import { createWritingAssistanceHost } from '@/composables/writingAssistanceHost.js'
 import { createSemanticWritingHost } from '@/composables/semanticWritingHost.js'
+import { createSlidePreviewCache, fingerprint as previewFingerprint, renderSlideCards } from '@/composables/slidePreviewCache.js'
 import { getSemanticWritingSettings, saveSemanticWritingSettings, createSemanticWritingSuggestion, getSemanticWritingSuggestion, cancelSemanticWritingSuggestion, acceptSemanticWritingSuggestion } from '@/services/api.js'
 import { getProvenance, reviewDocInsight, listWritingCompletions, learnWritingCompletions, deleteWritingCompletion, clearWritingCompletions, lookupWritingSelection, getDocInsightEntity, getWritingCompletionDetail } from '@/services/api.js'
 import { guestPointToHost } from '@/utils/insightPopup.js'
@@ -254,6 +274,10 @@ function authorNames() {
 function currentAuthorName() { return authorNames().current() }
 // 保存失败后的有界退避（B7）：第 n 次连续失败等 SAVE_RETRY_DELAYS_MS[n]，封顶 60 秒。
 const SAVE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000]
+// 自动保存所需的空闲时长：上次导出耗时的 2 倍，夹在 1.5–8 秒（office-tier1 O8）
+function autoSaveIdleMs(lastExportMs) {
+  return Math.max(1500, Math.min(8000, 2 * (Number(lastExportMs) || 0)))
+}
 // 脏数据存活超过该时长即不再为「命令繁忙 / 刚输入」让路，强制导出保存（崩溃丢失上限）。
 const FORCE_SAVE_DIRTY_AGE_MS = 10000
 // AI 命令在飞（修订风暴）时仍按旧的 60s 上限：每 10s 硬塞一次全文导出会把风暴中的
@@ -312,6 +336,8 @@ export default {
       // AI 审校（dev-board#723/#724/#749）：宿主这边只存一份 host publish 出来的快照，
       // 下传给审阅面板的「AI 审校」标签。null = 这份文档没有审校（非 Writer/没项目/没就绪）。
       inlineReviewState: null,
+      // 引擎意外停止后已自动恢复：告诉用户恢复到了哪一刻、哪些改动没保存上（R-086）
+      engineNotice: '',
       // 有据续写（dev-board#748）：面板长在客体页里，宿主只持有它上报的两个位——
       // 这份文档有没有这项能力（非 Writer / 只读 / 未就绪时为假）、面板此刻开着没有。
       // 不在本地乐观翻：客体里的「关闭」与 Esc 也走同一条回报，两边才不会漂。
@@ -370,6 +396,17 @@ export default {
       stuck: false,
       // 「文档无法打开」终态的诊断码（DOC_REJECTED / EDITOR_LOAD_TIMEOUT，见 editorLoadFailure.js）
       openFailCode: '',
+      // 引擎拒收的是一份结构完整的老 Office 文件（.doc/.xls/.ppt）：说「格式过旧」而不是「损坏」
+      openFailLegacy: false,
+      // 打开密码框（O14）：输入值只在提交前存在；state '' | checking | wrong | error | unsupported
+      passwordInput: '',
+      passwordState: '',
+      passwordAttempts: 0,
+      // 带密码的旧格式已打开（只读）：另存副本的目标扩展名 docx/xlsx/pptx，否则 ''
+      legacyProtected: '',
+      // Office 97 之前的格式（Word 2/6/95、Excel 5/95，台账 B10）：只读打开，修改另存为副本，原件不写
+      legacyImport: false,
+      legacyCopyBusy: false,
       // 客体页 boot 失败时的原因串（lo-relay 'boot-failed'），显示在加载面板上。
       bootFailReason: '',
       // 改字 stale 提示条当前展示的条目 [{linkKey, text, link}]（合并规则见 StaleQueue）
@@ -428,6 +465,7 @@ export default {
     // 不用浮动胶囊提示保存，固定细栏在防抖等待期间也明确显示未落盘状态。
     saveStateText() {
       if (!this.ready || !this.file || this.loadingOverlayVisible || this.docLoadFailed) return ''
+      if (this.legacyProtected) return this.$t(this.dirty ? 'editor.legacyProtected.edited' : (this.legacyImport ? 'editor.legacyProtected.readOnlyOldFormat' : 'editor.legacyProtected.readOnly'), { ext: this.legacyProtected })
       if (this.saving) return this.$t('editor.status.saving')
       if (this.localContentSaveText) return this.localContentSaveText
       if (this.statusKey === 'saveFailed' && this.saveRetryDelaySec > 0) return this.$t('editor.status.saveRetryScheduled', { seconds: this.saveRetryDelaySec })
@@ -460,10 +498,16 @@ export default {
     openFailed() {
       return this.statusKey === STATUS_OPEN_FAILED
     },
-    // 只读预览：Word 用 docx-preview，PPT 用 pptx-preview（office-tier1：冷启动时演示文稿也先给可读画面）；表格只给下载出口。
+    // 设了打开密码且加密方式受支持（O14）：加载面板显示密码框，不显示「无法打开」
+    passwordPromptVisible() {
+      return this.openFailCode === DIAG_DOC_ENCRYPTED && this.passwordState !== 'unsupported'
+    },
+    // 「打不开时的只读预览」按钮只对 Word 生效（docx-preview）；PPT 冷启动只显示缓存的引擎渲染页
+    // （见 tryDocxPreview / slidePreviewCache，没有缓存就不显示），表格冷启动只显示第一屏
+    // （xlsxQuickPreview），打不开时只给下载出口——前 60 行不能冒充整份文件。
     canReadOnlyPreview() {
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
-      return t === 'docx' || t === 'doc' || t === 'pptx'
+      return t === 'docx' || t === 'doc'
     },
     loadingOverlayVisible() {
       // Model readiness precedes native menu hiding. Keep the guest covered
@@ -596,6 +640,8 @@ export default {
     }
   },
   beforeUnmount() {
+    clearTimeout(this._slidePreviewTimer)
+    this.revokeSlidePreviewUrls()
     if (this._onIdentityUpdated) uni.$off('awd:identity-updated', this._onIdentityUpdated)
     this._nativeSurface?.dispose()?.catch(error => this.appendLog('native close failed: ' + error.message))
     this._nativeSurface = null
@@ -605,6 +651,8 @@ export default {
     this.invalidateBackendSaveHint()
     clearTimeout(this._provReloadTimer)
     clearTimeout(this._provRetryTimer)
+    clearTimeout(this._renewTimer)
+    clearTimeout(this._heapTimer)
     this._provSeq = (this._provSeq || 0) + 1
     if (this._writingHost) { this._writingHost.destroy(); this._writingHost = null }
     if (this._inlineReviewHost) { this._inlineReviewHost.destroy(); this._inlineReviewHost = null }
@@ -1446,8 +1494,14 @@ export default {
           this.$emit('cursor-context', ctx)
         } else if (msg.type === 'boot-log') {
           this.onBootLog(String(msg.msg || ''))
+        } else if (msg.type === 'ime-composing') {
+          this._imeComposing = !!msg.composing
+          this._lastInteractionAt = Date.now()
         } else if (msg.type === 'engine-failed') {
           this.$emit('engine-failed')
+          // 已装着文档的实例：引擎中止后画布还停在最后一帧，看着能编辑其实已经死了（R-086）。
+          // 立刻换引擎重装，别留一个假的可编辑标签。备胎（无文件）由工作台回收。
+          if (this.file && this._endpointUp) this.onGuestProcessGone('engine aborted')
         } else if (msg.type === 'boot-failed') {
           this.$emit('engine-failed')
           this.onBootFailed(String(msg.message || ''))
@@ -1596,6 +1650,86 @@ export default {
         return false
       }
     },
+    // ---- 引擎换新（R-086 浸泡）---------------------------------------------
+    // 引擎堆固定 1 GB，LibreOffice 原生侧有收不回的小泄漏（长文档逐段读约 0.9 KB/段、每次装载约
+    // 22 MB），只有换一台新引擎才收得回。保存成功后量一下堆的高水位（不分配内存的扫描），过阈值就在
+    // 安静、已全部保存、不在输入法组字中的时刻换新引擎、重装刚保存的内容、恢复阅读位置。
+    // 阈值与量的间隔可以不发版调整：localStorage「awd.engineHeap」= {"recycleAt":0.7,"checkEveryMs":60000}。
+    engineHeapPolicy() {
+      let o = null
+      try { o = JSON.parse(globalThis.localStorage?.getItem('awd.engineHeap') || 'null') } catch (e) { o = null }
+      const at = Number(o && o.recycleAt), every = Number(o && o.checkEveryMs)
+      return { recycleAt: at > 0 && at <= 1 ? at : 0.7, checkEveryMs: Number.isFinite(every) && every >= 0 ? every : 60000 }
+    },
+    // 保存流程之外再量：留出 2 s，期间又改了或又在存就不量（量只在干净、空闲时有意义）。
+    scheduleEngineHeapCheck() {
+      clearTimeout(this._heapTimer)
+      this._heapTimer = setTimeout(() => {
+        this._heapTimer = null
+        if (!this.dirty && !this.saving && !this._backendHealthDisposed) this.checkEngineHeap()
+      }, 2000)
+    },
+    async checkEngineHeap() {
+      const policy = this.engineHeapPolicy()
+      const executor = this.executor
+      if (!executor || !this.file || this._engineRenewDue || Date.now() - (this._heapCheckedAt || 0) < policy.checkEveryMs) return
+      this._heapCheckedAt = Date.now()
+      let r = null
+      try { r = await executor.executeCommand('get_engine_heap', {}, { background: true }) } catch (e) { return }
+      if (executor !== this.executor || !r || !r.success || !(r.limitBytes > 0)) return
+      this.appendLog('[heap] engine ' + Math.round(r.usedBytes / 1048576) + ' / ' + Math.round(r.limitBytes / 1048576) + ' MB')
+      if (r.usedBytes / r.limitBytes < policy.recycleAt) return
+      this._engineRenewDue = true
+      this.tryRenewEngine()
+    },
+    engineRenewBlocked() {
+      return !this.ready || !this.executor || !this.file || this.docLoadFailed || this.dirty || this.saving ||
+        this._imeComposing || this._cmdBusy > 0 || this._reloading || this._pendingReload || this._saveDiscarded ||
+        this._checkpointInvalidated || this.statusKey !== 'ready' ||
+        Date.now() - Math.max(this._lastInteractionAt || 0, this._lastCmdAt || 0) < 8000
+    },
+    tryRenewEngine() {
+      clearTimeout(this._renewTimer)
+      this._renewTimer = null
+      if (!this._engineRenewDue || this._backendHealthDisposed) return
+      if (this.engineRenewBlocked()) { this._renewTimer = setTimeout(() => this.tryRenewEngine(), 3000); return }
+      this.renewEngine()
+    },
+    async renewEngine() {
+      const executor = this.executor
+      let position = null
+      try { position = await executor.executeCommand('get_view_position', {}, { background: true }) } catch (e) { position = null }
+      // 取位置的这一下里用户可能又动了：重新排队，绝不在有未保存改动时换。
+      if (executor !== this.executor || this.engineRenewBlocked()) { this._renewTimer = setTimeout(() => this.tryRenewEngine(), 3000); return }
+      this._engineRenewDue = false
+      this._engineRenewal = { kind: 'renew', position: position && position.success ? position : null }
+      this.appendLog('engine renew: heap over threshold → fresh engine with the saved document')
+      this._bytesPromise = null // 重装刚保存到后端的内容，不是打开时预取的字节
+      this.dlLoaded = 0
+      this.dlTotal = 0
+      this._loadSelfHealed = false
+      await this.remountEditor()
+    },
+    async afterEngineRenewed() {
+      const renewal = this._engineRenewal
+      this._engineRenewal = null
+      this.appendLog('engine renewed (' + renewal.kind + ')')
+      if (renewal.kind === 'renew') {
+        if (renewal.position) {
+          let r = null
+          try { r = await this.executor.executeCommand('restore_view_position', renewal.position, { background: true }) } catch (e) { /* 位置恢复失败不影响编辑 */ }
+          this.appendLog('  view position restored: ' + JSON.stringify(r))
+        }
+        uni.showToast({ title: this.$t('editor.engineRenewed'), icon: 'none', duration: 4000 })
+        return
+      }
+      const parts = [renewal.lastSavedAt
+        ? this.$t('editor.engineRecoveredAt', { time: new Date(renewal.lastSavedAt).toLocaleTimeString() })
+        : this.$t('editor.engineRecoveredDisk')]
+      if (renewal.unsaved) parts.push(this.$t('editor.engineUnsavedLost'))
+      // 中日文句号后不加空格
+      this.engineNotice = parts.join(/[。！？]$/.test(parts[0]) ? '' : ' ')
+    },
     // webview 的渲染进程没了（被系统回收 / OOM / 崩溃）。引擎连同文档一起消失，
     // 界面上却什么都看不出来——不重启的话下一条命令要等到 relay 超时才报错。
     // 重启引擎并重装当前文件（未保存的编辑随进程一起没了，重装拿到的是后端
@@ -1609,6 +1743,8 @@ export default {
         return
       }
       this._guestGoneAt = Date.now()
+      // 重装后告诉用户恢复到了哪一刻、有没有没保存上的改动（不能静默丢改动）。
+      this._engineRenewal = { kind: 'crashed', unsaved: !!this.dirty || !!this.saving, lastSavedAt: this._lastSavedAt || 0 }
       this.appendLog('render-process-gone（' + reason + '）→ 重启引擎并重装当前文档')
       // 进程里的文档已经没了：脏标记与预取字节都作废，保存闸等重装结果说话。
       this.dirty = false
@@ -1698,6 +1834,14 @@ export default {
           // 下载超时/网络错 = 请检查网络、其余（含引擎装载失败与 relay 超时）
           // 沿用 loadFailed。几个 key 都以 'Failed' 结尾，既有判据不必改。
           if (open) this.openFailCode = open.code
+          this.openFailLegacy = false
+          if (open && open.code === DIAG_DOC_REJECTED && this._legacyProbe) {
+            try {
+              const { detectLegacyFormat } = await import('@/utils/legacyOfficeDecrypt.js')
+              this.openFailLegacy = !!detectLegacyFormat(this._legacyProbe.bytes, this._legacyProbe.name)
+            } catch (err) { /* 判不出就按原来的泛化文案 */ }
+          }
+          this._legacyProbe = null
           this.statusKey = open ? open.statusKey : classifyLoadFailure(e)
           // 记下这次失败时的世代号——迟到的 load_document 结果（见
           // onLateLoadResult）只在世代仍相符（没有更晚的装载尝试发生过）时
@@ -1718,10 +1862,12 @@ export default {
         this._perfOpenAt = 0
       }
       this.$emit('ready', this.executor)
+      if (this._engineRenewal && this.file && !this.docLoadFailed) this.afterEngineRenewed()
       // 备胎（还没有文件）空闲时预热引擎：付掉首份文档的一次性初始化（约 1.3s），
       // 用户点开文件时就是「第二份文档」的速度。过继时 adoptAndLoad 先等它结束。
       // 备胎此刻还没有 docKind（没装过文档）；是不是空白 Writer 由 worker 自己判定。
       if (!this.file) this.warmSpare()
+      else if (this._bytesPromise) this._bytesPromise.then(b => this.scheduleSlidePreviewCapture(b)).catch(() => {})
       // EvidenceLink 首轮：拉缓存 → 旧式链接收编书签（仅 writer）→ 核对锚点。
       // 不 await：核对是后台事，不能拖住 ready 之后的任何链路。
       this.initEvidence()
@@ -1800,6 +1946,38 @@ export default {
     },
     // 引擎 boot 期间先把预取到的 docx 渲成只读预览（docx-preview 本地解析，
     // 同 FilePreview.renderDocx 的配置）。失败静默回落进度卡片。
+    // 缓存的引擎渲染页做成卡片：画布底色上居中、圆角阴影、页码；宽度随窗格，最大 960。
+    renderCachedSlides(container, cached) {
+      this.revokeSlidePreviewUrls()
+      const more = (cached.total || 0) > cached.slides.length ? this.$t('editor.slidePreviewMore', { count: cached.total - cached.slides.length }) : ''
+      this._slidePreviewUrls = renderSlideCards(container, cached, more)
+    },
+    revokeSlidePreviewUrls() {
+      for (const url of this._slidePreviewUrls || []) URL.revokeObjectURL(url)
+      this._slidePreviewUrls = []
+    },
+    // 引擎就绪 / 保存成功后，空闲时把前几页渲染进缓存，供下次冷启动显示（只 PPT；后台只读命令）。
+    scheduleSlidePreviewCapture(bytes) {
+      const t = String((this.file && this.file.fileType) || '').toLowerCase()
+      if (t !== 'pptx' || !bytes || !this.executor) return
+      // 有密码的演示文稿不把渲染页写进本机缓存（IndexedDB 不加密，等于把受保护内容落盘）
+      if (this._docCrypto || isEncryptedOoxml(bytes, '.' + t)) return
+      clearTimeout(this._slidePreviewTimer)
+      const seq = this._docLoadSeq, fileId = this.file?.id
+      const isCurrent = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
+      const attempt = async (tries) => {
+        if (!isCurrent()) return
+        if (!this.canRunNavigationWork) { if (tries < 20) this._slidePreviewTimer = setTimeout(() => attempt(tries + 1), 3000); return }
+        try {
+          const key = await previewFingerprint(bytes)
+          const nav = await this.executor.executeCommand('office_get_navigation', {}, { background: true })
+          const total = Array.isArray(nav?.items) ? nav.items.length : 0
+          await slidePreviewCache().capture((a, p, o) => this.executor.executeCommand(a, p, o),
+            { key, total, documentSeq: nav?.documentSeq, isCurrent: () => isCurrent() && this.canRunNavigationWork })
+        } catch (e) { /* 缓存失败不影响编辑 */ }
+      }
+      this._slidePreviewTimer = setTimeout(() => attempt(0), 4000)
+    },
     async tryDocxPreview(buf, force = false) {
       if (!buf || buf.byteLength === 0 || this.previewReady) return
       // 热备胎已能直接装载，不再同时用 docx-preview 解包并布局同一份文档。
@@ -1807,23 +1985,38 @@ export default {
       if (!force && this._endpointUp) { this._previewSkippedForWarmEngine = true; return }
       if (!force && (this.ready || this.previewFailed)) return
       const t = String((this.file && this.file.fileType) || '').toLowerCase()
-      if (t !== 'docx' && t !== 'doc' && t !== 'pptx') return
-      // 大演示文稿的本地解析会和引擎启动抢主线程：只给常见体量的 PPT 做冷启动预览
-      if (t === 'pptx' && !force && buf.byteLength > PPTX_PREVIEW_MAX_BYTES) return
+      if (t !== 'docx' && t !== 'doc' && t !== 'pptx' && t !== 'xlsx') return
+      if (isEncryptedOoxml(buf, '.' + t)) return // 有密码：等用户输入后由引擎显示
+      // PPT：只显示「上次打开时引擎自己渲染、按文件字节命中」的前几页（slidePreviewCache）；
+      // 没有缓存就保持进度卡片——前端解析 pptx 的画面在真实课件上错位裁切，不如不显示。
+      let cached = null
+      if (t === 'pptx') {
+        cached = await slidePreviewCache().load(await previewFingerprint(buf)).catch(() => null)
+        if (!cached) return
+      }
+      // 表格：直接从文件读打开后的第一屏（xlsxQuickPreview），首次打开就有；第一屏有图片/按钮等对象时不显示
+      let sheetScreen = null
+      if (t === 'xlsx') {
+        const { readXlsxFirstScreen } = await import('@/composables/xlsxQuickPreview.js')
+        sheetScreen = await readXlsxFirstScreen(buf).catch(() => null)
+        if (!sheetScreen) return
+      }
       const seq = this._docLoadSeq, fileId = this.file?.id
       const generation = documentCheckpointGeneration(this.projectId, fileId)
       const current = () => !this._backendHealthDisposed && seq === this._docLoadSeq && fileId === this.file?.id
         && generation === documentCheckpointGeneration(this.projectId, fileId)
       try {
-        const renderer = t === 'pptx' ? await import('pptx-preview') : await import('docx-preview')
+        const renderer = t === 'pptx' || t === 'xlsx' ? null : await import('docx-preview')
         await this.$nextTick() // 过继路径上 overlay 可能刚重新显示，等 ref 挂上
         const ref = this.$refs.docxPreviewHost
         const container = ref && (ref.$el || ref)
         if (!container || !current() || (!force && (this._endpointUp || this.ready))) return
         container.innerHTML = ''
         if (t === 'pptx') {
-          const width = Math.max(320, (container.clientWidth || 960) - 32)
-          await renderer.init(container, { width, height: Math.round(width * 9 / 16) }).preview(buf)
+          this.renderCachedSlides(container, cached)
+        } else if (t === 'xlsx') {
+          const { renderSheetPreview } = await import('@/composables/xlsxQuickPreview.js')
+          renderSheetPreview(container, sheetScreen)
         } else {
         await renderer.renderAsync(buf, container, null, {
           className: 'docx',
@@ -1941,7 +2134,7 @@ export default {
         }
       }
       assertCurrentGeneration()
-      const bytes = new Uint8Array(buf || new ArrayBuffer(0))
+      let bytes = new Uint8Array(buf || new ArrayBuffer(0))
       const name = f.name || (String(fileId) + '.' + String(f.fileType || 'docx'))
       // Empty body = a brand-new / unsaved document — the backend streams HTTP
       // 200 with 0 bytes for it. That's NOT a load failure: keep the clean blank
@@ -1967,11 +2160,52 @@ export default {
           this.appendLog('修订署名下发失败 / redline author push failed: ' + (e && e.message ? e.message : e))
         }
         assertCurrentGeneration()
+        this._docCrypto = null
+        this.legacyProtected = ''
+        this.legacyImport = false
         this._localContentMetadata = this._contentSnapshots?.get(buf) || null
         this._checkpointGeneration = generation
         this._checkpointInvalidated = false
         return false
       }
+      // 设了打开密码的 Word/Excel/PPT（O14）：引擎带密码也打不开，由宿主解密后交明文。
+      // 已用密码解开过（_pendingCrypto）或本文件重载（保存后/引擎重启，_docCrypto）用内存里的文件密钥；
+      // 没有就落 DOC_ENCRYPTED，加载面板请用户输入密码（submitPassword）。
+      let crypt = null
+      if (isEncryptedOoxml(bytes, name)) {
+        const { decryptWithSession, takeHandedOffSession } = await import('@/utils/officeEncryption.js')
+        // 「另存为加密副本」刚建出来的文件：会话由原编辑器交过来，不再问一次密码
+        const handed = takeHandedOffSession(fileId)
+        if (handed) this._pendingCrypto = { fileId, session: handed }
+        const held = [this._pendingCrypto, this._docCrypto].find(c => c && c.fileId === fileId && c.session) || null
+        const plain = held ? await decryptWithSession(bytes, held.session) : null
+        assertCurrentGeneration()
+        if (!plain) throw Object.assign(new Error('document is password protected'), { code: DIAG_DOC_ENCRYPTED })
+        crypt = held
+        bytes = plain
+      } else if (/\.(doc|xls|ppt)$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf) {
+        // 带密码的旧格式（.doc/.xls/.ppt，O14b）：引擎打不开（.xls/.ppt 带密码也不行），宿主解成明文旧格式交给引擎，
+        // 只读——旧格式写不回加密，修改要另存为同密码的 .docx/.xlsx/.pptx 副本（saveProtectedCopy）。
+        const { detectLegacyEncryption, decryptLegacyOffice } = await import('@/utils/legacyOfficeDecrypt.js')
+        if (detectLegacyEncryption(bytes, name)) {
+          const held = [this._pendingCrypto, this._docCrypto].find(c => c && c.fileId === fileId && c.legacy) || null
+          let plain = null
+          if (held) { try { plain = await decryptLegacyOffice(bytes, name, held.password) } catch (e) { plain = null } }
+          assertCurrentGeneration()
+          if (!plain) throw Object.assign(new Error('document is password protected'), { code: DIAG_DOC_ENCRYPTED })
+          crypt = held
+          bytes = plain
+        }
+      }
+      // Office 97 之前的格式（Word 2/6/95、Excel 5/95，台账 B10）：读得进、写不回原格式，按只读打开
+      let pre97 = null
+      if (!crypt && /\.(doc|xls)$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf) {
+        const { detectPre97Format } = await import('@/utils/legacyOfficeDecrypt.js')
+        pre97 = detectPre97Format(bytes, name)
+        assertCurrentGeneration()
+      }
+      // 引擎拒收时用来区分「格式过旧」与「损坏」：只留旧格式文件的字节引用，失败分支用完即清
+      this._legacyProbe = /\.(doc|xls|ppt)$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf ? { bytes, name } : null
       // office 是单线程消息循环，两条 load_document 会按到达顺序依次执行，后到的
       // 那条把先装好的文档整个换掉——被取代的这次到此为止，不再发命令。
       if (seq !== (this._docLoadSeq || 0)) throw new Error('装载已被更晚的一次尝试取代 / load superseded')
@@ -2003,6 +2237,11 @@ export default {
       this._checkpointGeneration = generation
       this._checkpointInvalidated = false
       if (res.kind) this.docKind = res.kind
+      // 之后每一笔保存都按它重新加密（sealForStorage）；明文文件清空。旧格式进只读（legacyProtected）
+      this._docCrypto = crypt
+      this._pendingCrypto = null
+      this.legacyImport = !!pre97
+      this.legacyProtected = (crypt && crypt.legacy) || pre97 ? ({ doc: 'docx', xls: 'xlsx', ppt: 'pptx' })[String(name).split('.').pop().toLowerCase()] || '' : ''
       // 换文档后工具栏必须重读一次激活态：worker 的 retarget 会把修订显示方式
       // 复位到默认（上一份文档设过「最终稿」就在这一步被打回来），工具栏若还
       // 端着上一份的读数，显示的态就跟画布对不上。
@@ -2404,6 +2643,7 @@ export default {
     },
     scheduleAutoSave() {
       clearTimeout(this._saveTimer)
+      if (this._docCrypto?.legacy || this.legacyImport) return
       if (this._savePaused || this._saveDiscarded || this._flushPromise || this._pendingReload) return
       const elapsed = Date.now() - this._dirtySince
       const delay = Math.max(200, Math.min(2500, 15000 - elapsed))
@@ -2422,7 +2662,11 @@ export default {
       // 大文档整篇导出本身就要十几秒（150 页基准 12–17s），期间输入冻住；上限至少取
       // 上次导出耗时的 4 倍，冻住的时间不超过编辑时间的约五分之一。
       const forceAfter = Math.max(this._cmdBusy > 0 ? FORCE_SAVE_DIRTY_AGE_BUSY_MS : FORCE_SAVE_DIRTY_AGE_MS, 4 * (this._lastExportMs || 0))
-      if ((this._cmdBusy > 0 || sinceCmd < 1500) && dirtyAge < forceAfter) {
+      // 空闲门随导出耗时伸缩（office-tier1 O8）：14MB 演示文稿一次导出冻住 2.5–4s，固定 1.5s 空闲门让
+      // 每次停笔都触发一次冻结（逐字慢打实测每键 ~3.4s 才上屏）。改为上次导出耗时的 2 倍、夹在 1.5–8s；
+      // 小文件不变。崩溃丢失上限仍由 forceAfter 兜底。
+      const idleNeeded = autoSaveIdleMs(this._lastExportMs)
+      if ((this._cmdBusy > 0 || sinceCmd < idleNeeded) && dirtyAge < forceAfter) {
         clearTimeout(this._saveTimer)
         this._saveTimer = setTimeout(() => this.autoSave(), 2000)
         return
@@ -2624,6 +2868,8 @@ export default {
     async saveDocument({ trackSnapshot = false } = {}) {
       const f = this.file
       if (!f || !this.executor || this.saving || this._saveDiscarded || this._pendingReload) return false
+      // 带密码的旧格式只读（O14b），Office 97 之前的格式同样只读（B10）：不写回原文件，修改走「另存为副本」
+      if (this._docCrypto?.legacy || this.legacyImport) return false
       // 一笔保存开始，之前排的退避重试与「N 秒后重试」文案都作废；只有 catch 里认定的安全失败类别才再排。
       this._saveRetryKind = null
       clearTimeout(this._saveRetryTimer)
@@ -2705,6 +2951,7 @@ export default {
           return false
         }
         u8 = await this.stampGeneratorMetadata(u8)
+        u8 = await this.sealForStorage(u8, fileId)
         if (this._reloading || this._saveDiscarded || checkpointSaveBarrier(this.projectId, fileId) ||
             documentCheckpointGeneration(this.projectId, fileId) !== generation) return false
         this.appendLog('  ← exported ' + u8.length + ' bytes, uploading…')
@@ -2757,6 +3004,7 @@ export default {
         }
         safeToOverwrite = true
         this._savedOnce = true
+        this.scheduleSlidePreviewCapture(u8)
         // 保存确认后通知项目入口刷新；过期文件/重载中的回执不参与当前状态。
         if (!this._reloading && !this._saveDiscarded && !this._pendingReload && !this._checkpointInvalidated &&
             saveContext === (this._backendSaveContext || 0) && this.file?.id === fileId &&
@@ -2764,6 +3012,8 @@ export default {
           try { uni.$emit('awd:file-saved', { projectId: saveProjectId, fileId }) } catch (e) { /* ignore */ }
         }
         this.appendLog('  ← saved to backend (fileId=' + fileId + ')')
+        this._lastSavedAt = Date.now()
+        this.scheduleEngineHeapCheck()
         this.appendLog('[perf] save bytes=' + (u8 ? u8.length : 0) + ' export=' + (tUpload - tExp) + 'ms upload=' + (Date.now() - tUpload) + 'ms total=' + (Date.now() - tExp) + 'ms')
         this._savePaused = false
         this._saveRetryAttempt = 0
@@ -2773,6 +3023,12 @@ export default {
         this.scheduleProvenanceReload()
         return true
       } catch (e) {
+        // 引擎已经停了（R-086 OOM 中止）：换引擎恢复接管全部状态，这笔不落 saveFailed、也不排重试，
+        // 否则恢复期间状态栏会闪「保存失败」、重试还会去导一台新引擎里的旧内容。
+        if (e?.code === 'EDITOR_ENGINE_FAILED' || (e?.code === 'EDITOR_DISPOSED' && this._engineRenewal)) {
+          this.appendLog('save aborted: document engine stopped')
+          return false
+        }
         // Only the server's explicit pre-publication busy response proves this upload
         // cannot arrive later. Network failures and other statuses retain the write guard.
         const notPublished = uploadRecoverySeq !== null && e?.saveNotPublished === true
@@ -2858,6 +3114,12 @@ export default {
         return false
       }
       u8 = await this.stampGeneratorMetadata(u8)
+      try { u8 = await this.sealForStorage(u8, f.id) } catch (e) {
+        this._copyExporting = false
+        this.appendLog('save copy failed: ' + (e && e.message ? e.message : e))
+        uni.showToast({ title: this.$t('editor.saveCopyAsFailed', { reason: (e && e.message) || 'encrypt' }), icon: 'none' })
+        return false
+      }
       this._copyExporting = false
       const url = URL.createObjectURL(new Blob([u8], { type: 'application/octet-stream' }))
       const link = document.createElement('a')
@@ -2867,6 +3129,107 @@ export default {
       setTimeout(() => URL.revokeObjectURL(url), 60000)
       uni.showToast({ title: this.$t('editor.savedCopyAs', { name }), icon: 'none' })
       return true
+    },
+    // 打开时有密码的文件，导出的明文在离开编辑器前按同一密码重新加密（O14）。
+    // 加密失败就让这笔保存失败——绝不把明文写回用户的加密文件。
+    async sealForStorage(u8, fileId) {
+      const c = this._docCrypto
+      if (!c) return u8
+      if (c.legacy) throw new Error('password-protected legacy document is read-only')
+      if (c.fileId !== fileId) throw new Error('encrypted document session does not match file ' + fileId)
+      const { encryptOoxml } = await import('@/utils/officeEncryption.js')
+      const sealed = await encryptOoxml(u8, c.session)
+      this.appendLog('  ← re-encrypted ' + u8.length + ' → ' + sealed.length + ' bytes')
+      return sealed
+    },
+    // 带密码的旧格式 → 同目录下同密码的 .docx/.xlsx/.pptx 副本（O14b），包含此刻画布上的修改；原文件不动。
+    // 建好后把会话交给副本的编辑器（不再问密码）并打开它。
+    async saveProtectedCopy() {
+      const c = this._docCrypto, f = this.file
+      const plain = !c?.legacy && this.legacyImport // Office 97 之前的格式（B10）：不加密，直接另存
+      if ((!c?.legacy && !plain) || !f?.id || !this.executor || this.legacyCopyBusy || !this.legacyProtected) return false
+      const ext = this.legacyProtected, projectId = this.projectId
+      const stem = String(f.name || f.fileName || 'document').replace(/\.[^.]+$/, '')
+      this.legacyCopyBusy = true
+      try {
+        const res = await this.executor.executeCommand('export_document', { name: stem + '.' + ext })
+        const raw = res && res.success ? res.bytes : null
+        let u8 = raw instanceof Uint8Array ? raw : raw instanceof ArrayBuffer ? new Uint8Array(raw)
+          : raw && raw.buffer instanceof ArrayBuffer ? new Uint8Array(raw.buffer, raw.byteOffset || 0, raw.byteLength)
+            : Array.isArray(raw) ? new Uint8Array(raw) : null
+        if (!u8 || !u8.length) throw new Error((res && (res.message || res.error)) || 'export failed')
+        u8 = await this.stampGeneratorMetadata(u8)
+        const { createEncryptionSession, encryptOoxml, handOffSession } = await import('@/utils/officeEncryption.js')
+        const session = plain ? null : await createEncryptionSession(c.password)
+        const sealed = plain ? u8 : await encryptOoxml(u8, session)
+        let created = null, lastError = null
+        for (let i = 0; i < 6 && !created; i++) {
+          const name = stem + (i ? ' (' + i + ')' : '') + '.' + ext
+          try { created = await createFile(projectId, f.parentId ?? null, name, ext, sealed.length, null) }
+          catch (e) { lastError = e }
+        }
+        if (!created || created.id == null) throw lastError || new Error('create file failed')
+        await this.uploadBytes(getFileWriteUrl(created.id), sealed, created.name)
+        if (session) handOffSession(created.id, session)
+        // 修改已经带进副本：原标签不再算有未保存修改（原文件本来就不写）
+        this.dirty = false
+        this._dirtySince = 0
+        this.appendLog((plain ? '另存为副本 / copy saved: ' : '另存为加密副本 / protected copy saved: ') + created.name)
+        uni.showToast({ title: this.$t(plain ? 'editor.legacyProtected.copySavedPlain' : 'editor.legacyProtected.copySaved', { name: created.name }), icon: 'none' })
+        uni.$emit('awd:open-evidence-target', { fileId: created.id })
+        return true
+      } catch (e) {
+        this.appendLog('protected copy failed: ' + (e && e.message ? e.message : e))
+        uni.showToast({ title: this.$t('editor.legacyProtected.copyFailed', { reason: (e && e.message) || '' }), icon: 'none' })
+        return false
+      } finally {
+        this.legacyCopyBusy = false
+      }
+    },
+    // 加载面板上的密码框（O14）：先在宿主验证密码，对了才重新走装载；密码本身不保存。
+    async submitPassword(event) {
+      // 回车（@confirm）带着输入框此刻的值：uni 的 v-model 比按键晚一拍，快速输入后直接回车时
+      // passwordInput 还缺最后几个字（真机实测 8 位只到了 5 位），会被当成密码错
+      const typed = event && event.detail && typeof event.detail.value === 'string' ? event.detail.value : null
+      const password = typed != null ? typed : this.passwordInput
+      if (!password || this.passwordState === 'checking' || !this.file?.id) return
+      const fileId = this.file.id, seq = this._docLoadSeq
+      this.passwordState = 'checking'
+      try {
+        if (!this._bytesPromise) this.prefetchBytes()
+        const buf = await this._bytesPromise
+        if (!buf) throw new Error('download failed')
+        const bytes = new Uint8Array(buf)
+        const name = this.file.name || this.file.fileName || ''
+        let pending
+        if (isEncryptedOoxml(bytes, name)) {
+          const { decryptOoxml } = await import('@/utils/officeEncryption.js')
+          pending = { fileId, session: (await decryptOoxml(bytes, password)).session }
+        } else {
+          // 旧格式没有可复用的文件密钥：密码只留在这个编辑器的内存里，供重载与「另存为加密副本」
+          const { decryptLegacyOffice } = await import('@/utils/legacyOfficeDecrypt.js')
+          await decryptLegacyOffice(bytes, name, password)
+          pending = { fileId, legacy: true, password }
+        }
+        if (fileId !== this.file?.id || seq !== this._docLoadSeq) return
+        this._pendingCrypto = pending
+        this.passwordInput = ''
+        this.passwordState = ''
+        this.appendLog('密码已验证，重新装载 / password accepted, loading')
+        this.openFailCode = ''
+        // docLoadFailed 留给 finishDocLoad 在装载成功后撤：ready 还是上一轮失败时置的 true，
+        // 提前撤闸会让装载途中引擎发来的 modified 把刚打开的文档标脏（真机实测，触发一笔多余的自动保存）
+        this.statusKey = 'loadingDoc'
+        this.bootStageKey = 'openingDoc'
+        this.bootCap = Math.max(this.bootCap, 95)
+        this.startBootTrickle()
+        this.finishDocLoad()
+      } catch (e) {
+        if (fileId !== this.file?.id) return
+        this.passwordState = e?.code === 'WRONG_PASSWORD' ? 'wrong' : e?.code === 'UNSUPPORTED_ENCRYPTION' ? 'unsupported' : 'error'
+        // 同系统登录框：输错清空、重新聚焦。uni 的 input 不随 v-model 置空刷新，换 key 重建它
+        if (e?.code === 'WRONG_PASSWORD') { this.passwordInput = ''; this.passwordAttempts++ }
+      }
     },
     // 文档 Generator 元数据（可溯源性设计规范附录 B4）：把导出件 docProps/app.xml 的
     // <Application> 换成「AI WorkDeck <版本>」。引擎 API 改不到这个字段（oox 导出器硬写
@@ -3019,7 +3382,39 @@ export default {
 .libre-strip-error { color: var(--awd-danger); }
 .libre-open-failed .libre-loading-error { font-size: 13px; margin-top: 10px; }
 .libre-open-failed .libre-loading-retry + .libre-loading-retry { margin-top: 6px; }
+.libre-password { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.libre-password-input { box-sizing: border-box; width: min(280px, 100%); height: 34px; margin-top: 4px; padding-inline: 10px;
+  border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); color: var(--awd-text);
+  font-size: 13px; text-align: start; direction: ltr; }
+.libre-password-error { font-size: 12px; color: var(--awd-danger); }
+.libre-password-submit.busy { opacity: 0.6; cursor: progress; }
+.libre-password + .libre-loading-retry { margin-top: 6px; }
 .libre-preview-host { position: absolute; inset: 0; top: 34px; overflow-y: auto; background: var(--awd-surface-2); }
 /* docx-preview 生成的页面居中呈现（deep：内容是运行时注入的非 scoped DOM） */
 .libre-preview-host :deep(.docx-wrapper) { background: transparent; padding: 16px 0; }
+/* 演示文稿冷启动预览：缓存的引擎渲染页做成卡片 */
+.libre-preview-host :deep(.awd-slide-preview) { max-width: 960px; margin: 0 auto; padding: 24px 32px 40px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 22px; }
+.libre-preview-host :deep(.awd-slide-preview-card) { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.libre-preview-host :deep(.awd-slide-preview-card img) { display: block; width: 100%; height: auto; border-radius: 6px;
+  background: #fff; box-shadow: 0 1px 2px rgba(31, 35, 40, 0.08), 0 8px 24px rgba(31, 35, 40, 0.10); }
+.libre-preview-host :deep(.awd-slide-preview-card figcaption) { text-align: center; font-size: 11px; color: var(--awd-text-3);
+  font-variant-numeric: tabular-nums; }
+.libre-preview-host :deep(.awd-slide-preview-more) { text-align: center; font-size: 12px; color: var(--awd-text-3); padding-bottom: 8px; }
+/* 表格冷启动预览：与 Calc 画布同一观感（白底网格、灰色行列头、底部工作表标签）。
+   单元格是文档内容，深浅主题下都保持白底黑字，与引擎画布一致。 */
+.libre-preview-host :deep(.awd-sheet-preview) { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fff; }
+.libre-preview-host :deep(.awd-sheet-preview__grid) { flex: 1; overflow: hidden; }
+.libre-preview-host :deep(.awd-sheet-preview table) { border-collapse: collapse; table-layout: fixed; width: max-content;
+  font: 14.7px/1.25 -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; color: #000; }
+.libre-preview-host :deep(.awd-sheet-preview th) { background: #f3f3f3; color: #444; font-weight: 400; font-size: 12px;
+  border: 1px solid #c8c8c8; text-align: center; padding: 0 2px; height: 20px; }
+.libre-preview-host :deep(.awd-sheet-preview tr > th:first-child) { font-variant-numeric: tabular-nums; }
+.libre-preview-host :deep(.awd-sheet-preview td) { border: 1px solid #dadada; padding: 0 3px; white-space: nowrap; overflow: hidden;
+  text-overflow: clip; vertical-align: bottom; }
+.libre-preview-host :deep(.awd-sheet-preview__tabs) { flex: none; display: flex; gap: 2px; padding: 0 8px; height: 28px; align-items: flex-end;
+  background: #f3f3f3; border-top: 1px solid #c8c8c8; font-size: 12px; color: #444; overflow: hidden; }
+.libre-preview-host :deep(.awd-sheet-preview__tabs span) { padding: 4px 14px; white-space: nowrap; }
+.libre-preview-host :deep(.awd-sheet-preview__tabs .is-active) { background: #fff; color: #000; font-weight: 600;
+  border: 1px solid #c8c8c8; border-top: none; border-radius: 0 0 4px 4px; }
 </style>

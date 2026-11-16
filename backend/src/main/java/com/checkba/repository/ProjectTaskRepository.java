@@ -59,4 +59,11 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, Long> 
     List<ProjectTask> findByProjectIdInAndStatus(
             @Param("projectIds") List<Long> projectIds,
             @Param("status") String status);
+
+    /** 律所客户档案「最近往来」：每个项目在 today 及以前最后一次会议/开庭日程，行为 [projectId, max(dueDate)]。 */
+    @Query("SELECT t.projectId, MAX(t.dueDate) FROM ProjectTask t WHERE t.projectId IN :projectIds "
+            + "AND t.type IN ('MEETING', 'HEARING') AND t.dueDate <= :today GROUP BY t.projectId")
+    List<Object[]> latestMeetingDateByProjectIds(
+            @Param("projectIds") java.util.Collection<Long> projectIds,
+            @Param("today") LocalDate today);
 }

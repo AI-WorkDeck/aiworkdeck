@@ -61,7 +61,7 @@ export default {
   uploadLocation: 'Destination',
   rootFolder: 'Root Directory',
   uploadFolder: 'Add Folder',
-  filesSelected: '{count} files selected',
+  filesSelected: '{count} file selected | {count} files selected',
   clickSelectFolder: 'Click to select a folder...',
   selectFilesMulti: 'Select files (multiple allowed)',
   cancel: 'Cancel',

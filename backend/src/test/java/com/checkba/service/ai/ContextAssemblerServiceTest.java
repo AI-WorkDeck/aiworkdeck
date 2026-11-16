@@ -1616,6 +1616,8 @@ class ContextAssemblerServiceTest {
             assertTrue(system.contains(english ? "always AI synthesis awaiting verification" : "统一为 AI 整理、待核对"));
             assertTrue(system.contains(english ? "do not themselves require an additional paid search" : "不为展示卡片额外要求付费查询"));
             assertTrue(system.contains(english ? "Never write this card protocol into the user's document" : "不把资料卡协议写进用户文档"));
+            assertTrue(system.contains("```legal-reference\n{\"kind\":\"LAW\""), "完整字面围栏示例");
+            assertTrue(system.contains(english ? "never the ordinary json label" : "不能用普通 json 围栏"));
             assertFalse(system.contains("LEGAL_REFERENCE_CARDS_"));
             for (String officeHost : List.of("word", "excel", "powerpoint")) {
                 capabilityService.record("conv-1", "office", officeHost);

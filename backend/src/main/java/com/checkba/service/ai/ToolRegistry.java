@@ -604,6 +604,8 @@ public class ToolRegistry {
         String pluginId = declared.pluginId();
         if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
                 || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
+        // 权限升级待用户批准的定义：不下发、不投影、不执行（按对象判，执行用的就是这里返回的同一个对象）
+        if (!pluginService.isToolDefinitionApproved(tool)) return null;
         try {
             return new DeclaredToolBinding(pluginId, tool, ToolSpecification.builder()
                     .name(tool.getName())
@@ -613,6 +615,31 @@ public class ToolRegistry {
             log.warn("Declared tool {} of plugin {} skipped: {}", tool.getName(), pluginId, invalid.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 权限升级待用户批准的插件工具：只下发一个无参占位规格（不带新定义的入参与说明），
+     * 模型若按用户要求去调，{@link #doExecute} 回「请用户到插件中心批准」的说明而不执行——
+     * 否则模型只会看到工具消失，对用户说「没装这个插件」。不进 MCP 投影、不过确认闸。
+     */
+    private List<ToolSpecification> pendingApprovalStubs() {
+        List<ToolSpecification> out = new ArrayList<>();
+        for (var entry : pluginService.allPendingToolChanges().entrySet()) {
+            String pluginId = entry.getKey();
+            if (!pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) continue;
+            for (PluginToolApprovals.Change c : entry.getValue()) {
+                String name = c.name();
+                if (name == null || !name.matches("[A-Za-z][A-Za-z0-9_]{1,63}") || builtinTools.containsKey(name)
+                        || pluginService.isAgentHidden(name)) continue;
+                out.add(ToolSpecification.builder().name(name)
+                        .description(LangText.of(
+                                "【待用户批准】该插件工具的权限刚升高，用户在插件中心批准前不可用；调用只会返回待批准说明。",
+                                "[Awaiting user approval] This plugin tool's privileges just increased; it is unavailable until the user approves it in Plugin Center. Calling it only returns that notice."))
+                        .parameters(dev.langchain4j.model.chat.request.json.JsonObjectSchema.builder().build())
+                        .build());
+            }
+        }
+        return out;
     }
 
     /** userId/conversationId 由服务端注入，不向模型暴露；projectId 在 schema 里声明了才是「目标项目」参数。 */
@@ -719,7 +746,8 @@ public class ToolRegistry {
             if (unusable.contains(name) || builtinTools.containsKey(name) || pluginService.isAgentHidden(name)) continue;
             // 外部 Agent 答不了确认卡：需要确认的工具（destructive / confirm:always）无论 mcp:true 都不投影
             if (requiresConfirmation(name)) continue;
-            ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, b.tool().getAccess());
+            // 按生效档位（声明与绑定的服务操作取高者）：声明 read 却绑写操作的工具不能当只读工具投影
+            ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, PluginToolApprovals.effectiveAccess(b.tool()));
             Boolean mcp = b.tool().getMcp();
             boolean projected = access == ToolMeta.Access.READ ? !Boolean.FALSE.equals(mcp)
                     : access == ToolMeta.Access.WRITE && Boolean.TRUE.equals(mcp);
@@ -735,7 +763,7 @@ public class ToolRegistry {
     public Set<String> declaredReadToolNames() {
         Set<String> names = new java.util.HashSet<>();
         for (DeclaredToolBinding b : declaredBindings()) {
-            if (com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(b.tool().getName(), b.tool().getAccess())
+            if (com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(b.tool().getName(), PluginToolApprovals.effectiveAccess(b.tool()))
                     == ToolMeta.Access.READ) names.add(b.specification().name());
         }
         return names;
@@ -750,6 +778,26 @@ public class ToolRegistry {
             }
         }
         return words;
+    }
+
+    /**
+     * 启用插件的工具检索词（工具名 → manifest keywords + 插件名 + 插件 id），喂 {@code list_tools(query)}：
+     * 用户说「律所管理插件」「应收账款」时模型去搜，命中的应是插件工具而不是空结果。含 handler=jar 的带 keywords 条目。
+     */
+    public Map<String, List<String>> declaredToolSearchTerms() {
+        Map<String, List<String>> terms = new java.util.LinkedHashMap<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            String pluginId = declared.pluginId();
+            if (!pluginService.isEnabled(pluginId)) continue;
+            List<String> words = new ArrayList<>();
+            if (declared.tool().getKeywords() != null) words.addAll(declared.tool().getKeywords());
+            words.add(pluginId);
+            var meta = pluginService.getPlugin(pluginId);
+            if (meta != null && meta.getName() != null && !meta.getName().startsWith("%")) words.add(meta.getName());
+            if (meta != null && meta.getName() != null) words.add(pluginService.localize(pluginId, meta.getName()));
+            terms.put(declared.tool().getName(), words);
+        }
+        return terms;
     }
 
     private final List<AgentToolComponent> toolComponents;
@@ -802,9 +850,32 @@ public class ToolRegistry {
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
             disclosurePolicy.setPluginToolKeywords(this::declaredToolKeywords);
+            disclosurePolicy.setPluginToolSearchTerms(this::declaredToolSearchTerms);
+        }
+        if (clientCapabilityService != null) {
+            clientCapabilityService.setWebPluginToolPredicate(this::pluginToolSupportsWeb);
         }
         log.info("ToolRegistry initialized: {} built-in tools from {} components",
                 builtinTools.size(), toolComponents.size());
+    }
+
+    /**
+     * 插件工具（JAR / 声明式 / 插件 MCP）在网页版会话里是否可见：所属插件 manifest 声明了
+     * {@code hosts} 含 {@code "web"} 才放行（W1 设计 §4.6）。内置工具与用户自配 MCP 一律 false——
+     * 内置工具在 {@link WebClientToolSurface} 里静态归类，用户 MCP 多是本机进程，网页上不可达。
+     */
+    boolean pluginToolSupportsWeb(String name) {
+        if (name == null || builtinTools.containsKey(name)) return false;
+        String pluginId = pluginService.getPluginIdForTool(name);
+        if (pluginId == null) {
+            DeclaredToolBinding declared = declaredBinding(name);
+            if (declared != null) pluginId = declared.pluginId();
+        }
+        if (pluginId == null && pluginMcpService != null) {
+            var binding = pluginMcpService.find(name);
+            if (binding != null) pluginId = binding.pluginId();
+        }
+        return pluginId != null && pluginService.supportsWebClient(pluginId);
     }
 
     /**
@@ -815,6 +886,7 @@ public class ToolRegistry {
         Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         declaredBindings().forEach(b -> names.add(b.specification().name()));
+        pendingApprovalStubs().forEach(s -> names.add(s.name()));
         names.removeIf(pluginService::isAgentHidden);
         return java.util.Collections.unmodifiableSet(names);
     }
@@ -983,10 +1055,14 @@ public class ToolRegistry {
         declaredBindings().forEach(b -> { if (!pluginService.isAgentHidden(b.specification().name())) all.add(b.specification()); });
         if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
-            if (pluginToolEnabled(spec.name()) && !pluginService.isAgentHidden(spec.name())) {
+            if (pluginToolEnabled(spec.name()) && !pluginService.isAgentHidden(spec.name())
+                    && pluginService.isPluginToolApproved(spec.name())) {
                 all.add(offerable(spec));
             }
         }
+        Set<String> present = new java.util.HashSet<>();
+        all.forEach(s -> present.add(s.name()));
+        for (ToolSpecification stub : pendingApprovalStubs()) if (present.add(stub.name())) all.add(stub);
         // 顺序只由规范序决定（见 ToolDisclosurePolicy#canonicalOrder），不取决于 bean 扫描 / 反射方法 / 插件加载顺序
         if (disclosurePolicy != null) return disclosurePolicy.canonicalOrder(all);
         all.sort(Comparator.comparing(ToolSpecification::name));
@@ -1208,7 +1284,7 @@ public class ToolRegistry {
             DeclaredToolBinding declared = tool != null && tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry
                     ? declaredBinding(name) : null;
             String access = (declared != null
-                    ? com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, declared.tool().getAccess())
+                    ? com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, PluginToolApprovals.effectiveAccess(declared.tool()))
                     : com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, tool == null ? null : tool.meta()))
                     .name().toLowerCase(java.util.Locale.ROOT);
             String pluginId = declared != null ? declared.pluginId() : pluginService.getPluginIdForTool(name);
@@ -1275,6 +1351,10 @@ public class ToolRegistry {
         // 会话能力过滤：能力档位下不可见的工具按"不存在"拒绝（模型收到与未知工具一致的反馈）
         Optional<RegisteredTool> toolOpt = resolve(resolvedName, ctx != null ? ctx.conversationId() : null);
         if (toolOpt.isEmpty()) {
+            // 插件工具升级待批准（bind / PluginMcpService 已把它摘掉）：给出点名工具的可读原因。
+            // 只在这个名字此刻解析不到任何已批准工具时才说，免得别的插件的同名待批准条目挡住真正可用的工具。
+            String pendingApproval = pluginService.pendingToolNotice(resolvedName);
+            if (pendingApproval != null) return new ToolResult("Error: " + pendingApproval, null, true);
             return new ToolResult(unknownToolMessage(resolvedName), null, false);
         }
         RegisteredTool tool = toolOpt.get();
@@ -1294,6 +1374,11 @@ public class ToolRegistry {
 
         // 插件工具权限校验（规范 v2）：所需权限未在 manifest permissions 中声明即拒绝
         if (tool.fromPlugin()) {
+            if (!pluginService.isPluginToolApproved(resolvedName)) {
+                String pendingApproval = pluginService.pendingToolNotice(resolvedName);
+                return pendingApproval != null ? new ToolResult("Error: " + pendingApproval, null, true)
+                        : new ToolResult(unknownToolMessage(resolvedName), null, false);
+            }
             List<String> missing = pluginService.missingPermissionsForTool(resolvedName);
             if (!missing.isEmpty()) {
                 log.warn("Tool '{}' rejected: requires undeclared permission(s) {}", resolvedName, missing);

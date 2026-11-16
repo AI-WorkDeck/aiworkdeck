@@ -76,11 +76,23 @@ export EM_CONFIG=$ROOT/emsdk/.emscripten
 export EMSDK_QUIET=1
 export PATH=/usr/local/bin:\$PATH
 ENV
+# r10: backport emscripten#28186 (no allocation while holding the proxying queue
+# mutex) — the r8/r9 engines occasionally deadlocked at boot in do_proxy. Must run
+# before --clear-cache so libc-mt is rebuilt from the patched source.
+python3 /root/apply-emscripten-patches.py "$FORK" || die emscripten-patches
+grep -q "emscripten#28186 backport" "$FORK/system/lib/pthread/proxying.c" || die emscripten-patch-missing
 source "$ROOT/env.sh"
 emcc --clear-cache >/dev/null 2>&1
 mkdir -p /tmp/emtest && cd /tmp/emtest
 printf '%s\n' '#include <stdio.h>' 'int main(void){ printf("EMHELLO_OK\n"); return 0; }' > t.c
 emcc t.c -o t.js >/dev/null 2>&1 && node t.js | grep -q EMHELLO_OK || die emcc-sanity
+# Threaded sanity: forces libc-mt (incl. the patched proxying.c) to compile and runs
+# a pthread that proxies work back to the main thread.
+printf '%s\n' '#include <stdio.h>' '#include <pthread.h>' '#include <emscripten/proxying.h>' '#include <emscripten/threading.h>' \
+  'static void hi(void* a){ printf("PROXY_OK\\n"); }' \
+  'static void* run(void* a){ emscripten_proxy_sync(emscripten_proxy_get_system_queue(), emscripten_main_runtime_thread_id(), hi, NULL); return NULL; }' \
+  'int main(void){ pthread_t t; pthread_create(&t, NULL, run, NULL); pthread_join(t, NULL); return 0; }' > tp.c
+emcc -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME tp.c -o tp.js >/dev/null 2>&1 && node tp.js | grep -q PROXY_OK || die emcc-pthread-proxy-sanity
 log "PHASE_3_DONE $(emcc --version 2>/dev/null | head -1)"
 
 # ---------- Phase 4: qt5 (background) + core prep (parallel) -------------------

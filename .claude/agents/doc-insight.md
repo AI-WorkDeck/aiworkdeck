@@ -540,6 +540,8 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 
 ## 法律资料卡与阅读标签（dev-board#1611）
 
+普通 JSON 围栏兼容（dev-board#1735）：仅在关联用户问题含条号、且问题与回答没有代码/JSON/示例意图时启用普通围栏兼容；缺失关联用户的历史片段保留代码。模型误用顶层 `json` 围栏时，仅完整且严格符合资料字段的 LAW/CASE/PENALTY 对象（或全有效数组）转成卡片；必须有标题、来源或安全 URL、摘要或节选。未知字段、嵌套对象、未闭合围栏及引用/嵌套代码示例保持原文。卡片仍为「来源待核验」，沿用实时法宝输出互证规则；复制、插入和历史回放共用解析，不再泄露资料 JSON。
+
 `utils/legalReferences.js` 复用 insightDetail 的法条/裁判/案号字段整形，区分目录与真实返回的正文，不把合成元数据当正文。`writingAssistanceHost` 将快捷查询或已有资料的 REST 结果保留在宿主，以会话票据和索引回应客体；客体右上角阅读按钮只传票据，不提交任意资料对象。查询更新、失活、销毁均废止旧票据，原有内容插入与失效保护保留。新文案通过宿主翻译后传给客体。
 
 宿主注入 `openLegalReferenceTab`，右侧分屏开 `legal-reference` 标签，不替换原编辑器；身份包含类别、正文、版本字段、来源、查询时间和提示。LAW/CASE/PENALTY 复用 `components/legal/LegalReferencePane.vue` 三种正式阅读样式，来源外链沿 `openBrowserTab`，只允许无凭据 HTTP(S)。REST 检索返回不等于法律适用性已核验；AI 整理与引用节选单列，模型不能授予自己“已核验”。

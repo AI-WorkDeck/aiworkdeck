@@ -147,6 +147,26 @@ export default {
     "titles": "Geben Sie für jedes Element einen Titel ein."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Diese Einladung ist für AI WorkDeck-Konten bestimmt. Sie können hier im Projektchat mit Ihren Anwälten sprechen.",
+      "openChat": "Projektchat öffnen",
+      "joinFirst": "Öffnen Sie zuerst das Projekt mit dem Zugangscode Ihres Anwalts und nutzen Sie dann den Projektchat.",
+      "title": "Projektchat",
+      "hint": "Besprechen Sie dieses Projekt mit Ihrem Anwaltsteam. Ihre Anwälte entscheiden, welche früheren Nachrichten und Dateien Sie sehen können.",
+      "tabChecklist": "Checkliste",
+      "loading": "Nachrichten werden geladen…",
+      "empty": "Noch keine Nachrichten. Sie können Ihren Anwälten hier Fragen stellen.",
+      "older": "Frühere Nachrichten laden",
+      "you": "Sie",
+      "filePending": "Die Datei wird noch vorbereitet. Bitte wenden Sie sich an Ihren Anwalt.",
+      "placeholder": "Nachricht eingeben. Enter zum Senden, Shift+Enter für eine neue Zeile",
+      "attach": "Datei senden",
+      "send": "Senden",
+      "sending": "Wird gesendet…",
+      "fileTooLarge": "Eine einzelne Datei darf höchstens {size} MB groß sein",
+      "quotaFull": "Sie haben das Gesamtlimit von {size} MB für Uploads in diesem Projekt erreicht. Bitte wenden Sie sich an Ihren Anwalt.",
+      "unavailable": "Der Projektchat ist derzeit nicht verfügbar. Bitte versuchen Sie es später erneut."
+    },
     "messageUnavailable": "Dieses eingeladene Projekt oder diese Checkliste ist nicht mehr verfügbar. Aktualisieren Sie die Ansicht und versuchen Sie es erneut.",
     "workspaceTitle": "Mandanten-Kollaboration",
     "workspaceHint": "Bereiten Sie Dokumente anhand der Checkliste Ihres Anwalts vor, reichen Sie jedes Element ein und verfolgen Sie die Rückmeldungen.",

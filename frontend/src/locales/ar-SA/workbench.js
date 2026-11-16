@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "اختر المحتوى المراد نسخه",
+  scratchCopySelected: "تم تحديد {count}",
+  scratchCopyFiles: "الملفات",
+  scratchCopyConversations: "المحادثات",
+  scratchCopyNoProjects: "لا توجد مشاريع متاحة. أنشئ مشروعًا أولاً.",
   scratchCopyTitle: "نسخ إلى مشروع",
   scratchCopyHint: "انسخ المحادثات والملفات المحددة مع الاحتفاظ بالأصول. يمكن لأعضاء المشروع المستهدف الوصول إلى النسخ.",
   "restartPending": "يمكن استئناف {count} من المهام",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "فتح ملف…",
   "looseFilesOpenFolder": "فتح مجلد…",
   "mobileBackup": {
+    "undecided": "بانتظار القرار",
     "cleanupDeadline": "سدّد المبلغ بالكامل قبل {time} لتجنب حذف المحتوى السحابي. لن تتأثر الملفات المحلية.",
     "billingSummary": "المبلغ المستحق: {debt}؛ الائتمان المتاح: {available}.",
     "manageBilling": "الحساب والفوترة",

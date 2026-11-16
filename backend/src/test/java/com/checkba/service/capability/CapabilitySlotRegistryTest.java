@@ -225,12 +225,23 @@ class CapabilitySlotRegistryTest {
     }
 
     @Test
-    @DisplayName("开发者模式默认开——维护者裁决（dev-board#497），不需要时可在设置页关闭")
+    @DisplayName("开发态/源码构建：开发者模式默认开，不需要时可在设置页关闭")
     void devModeDefaultsOn() {
         assertTrue(registry.devMode());
         registry.setDevMode(false);
         assertFalse(registry.devMode());
         registry.setDevMode(true);
         assertTrue(registry.devMode());
+    }
+
+    @Test
+    @DisplayName("正式发行版：开发者模式默认关（英文 QA 第 9 条）；用户明确开过的照旧保持开")
+    void releaseBuildDefaultsDevModeOff() {
+        registry.setReleaseBuild(true);
+        assertFalse(registry.devMode(), "fresh release install must not allow unsigned packages");
+        registry.setDevMode(true);
+        assertTrue(registry.devMode(), "an explicit choice survives the release default");
+        registry.setDevMode(false);
+        assertFalse(registry.devMode());
     }
 }

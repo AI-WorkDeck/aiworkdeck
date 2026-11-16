@@ -3,12 +3,62 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { retrievalSourceLabel } from '../../src/utils/insightDetail.js'
-import { referencesFromEntity, referenceFromModel, legalMessageParts, referencesFromTools, safeLegalUrl, legalReadableText, liveLawToolOutputs, corroborateReference } from '../../src/utils/legalReferences.js'
+import { referencesFromEntity, referenceFromModel, legalMessageParts, allowPlainJsonLegalReferences, referencesFromTools, safeLegalUrl, legalReadableText, liveLawToolOutputs, corroborateReference } from '../../src/utils/legalReferences.js'
 import { legalReferenceTabMethods } from '../../src/pages/project-overview/legalReferenceTab.js'
 import { serializeTab } from '../../src/pages/project-overview/tabSnapshot.js'
 import { isContextEligibleTab } from '../../src/pages/project-overview/activeTabContext.js'
 const model = { kind: 'PENALTY', title: 'Synthetic decision', documentNumber: 'TEST-1', summary: 'AI summary', excerpt: 'Source excerpt', url: 'https://example.org/decision', status: 'verified' }
 const fence = value => '```legal-reference\n' + JSON.stringify(value) + '\n```\n'
+const jsonFence = value => '```json\n' + JSON.stringify(value) + '\n```\n'
+
+test('complete legal reference data in a plain JSON fence renders as an unverified card', () => {
+  const value = { kind: 'LAW', title: '合成测试法规 第938条', documentNumber: 'TEST-938', authority: '测试机关',
+    effectiveDate: '2026-01-01', validity: '测试状态', source: '测试资料来源', excerpt: '合成条文原文。' }
+  for (const kind of ['LAW', 'CASE', 'PENALTY']) {
+    const content = 'Answer\n' + jsonFence({ ...value, kind }) + 'After'
+    for (const streaming of [true, false]) {
+      const parts = legalMessageParts(content, streaming, true)
+      assert.deepEqual(parts.map(part => part.type), ['text', 'reference', 'text'])
+      assert.equal(parts[1].reference.status, 'unverified')
+      assert.equal(parts[1].reference.sections[0].text, value.excerpt)
+      assert.equal(parts[2].text, 'After')
+    }
+    const readable = legalReadableText(content, undefined, true)
+    assert.ok(readable.includes(value.excerpt) && readable.includes('legalReference.status.unverified'))
+    assert.ok(!readable.includes('"kind"') && !readable.includes('```'))
+  }
+})
+
+test('JSON compatibility preserves ordinary data, unknown fields, partial blocks and quoted examples', () => {
+  const value = { kind: 'LAW', title: 'Synthetic act', source: 'Test source', excerpt: 'Test passage' }
+  const inputs = [jsonFence({ kind: 'LAW', title: 'Data only' }), jsonFence({ ...value, extra: 'Keep me' }),
+    jsonFence({ ...value, excerpt: { text: 'Not the presentation schema' } }), jsonFence([value, { kind: 'OTHER' }]),
+    '```json\n{"kind":"LAW",', '````markdown\n' + jsonFence(value) + '````\n',
+    jsonFence(value).trimEnd().split('\n').map(line => '> ' + line).join('\n') + '\n']
+  for (const input of inputs) for (const streaming of [false, true]) {
+    assert.deepEqual(legalMessageParts(input, streaming, true), [{ type: 'text', text: input }])
+  }
+  assert.equal(legalMessageParts(jsonFence([value, { ...value, kind: 'CASE' }]), false, true).length, 2)
+})
+
+test('plain JSON requires an article question and preserves explicit code requests and examples', () => {
+  const content = jsonFence({ kind: 'LAW', title: 'Synthetic act', source: 'Test source', excerpt: 'Test passage' })
+  assert.deepEqual(legalMessageParts(content), [{ type: 'text', text: content }])
+  for (const question of ['民法典第938条是什么', 'What is Article 938 of the Civil Code?']) {
+    assert.equal(allowPlainJsonLegalReferences(question, content), true)
+  }
+  for (const question of ['', '第1条建议是什么', 'Article 2 of this data spec', '解释接口结构', '把民法典第938条信息输出为JSON', '民法典第938条的数据示例', 'Article 938 as JSON']) {
+    const allowed = allowPlainJsonLegalReferences(question, content)
+    assert.equal(allowed, false)
+    assert.equal(legalReadableText(content, undefined, allowed), content)
+  }
+  for (const prefix of ['下面是接口响应示例，请原样复制 JSON：\n', 'Example response:\n']) {
+    const answer = prefix + content
+    const allowed = allowPlainJsonLegalReferences('民法典第938条是什么', answer)
+    assert.equal(allowed, false)
+    assert.equal(legalReadableText(answer, undefined, allowed), answer)
+  }
+})
 
 test('model references never acquire verification from status/source/url', () => {
   const ref = referenceFromModel(model)

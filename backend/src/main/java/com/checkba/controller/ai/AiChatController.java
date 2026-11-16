@@ -358,7 +358,7 @@ public class AiChatController {
         try {
             Long userId = AuthController.getUserIdFromSession(sessionId);
             if (userId == null) {
-                return ResponseEntity.status(401).body("请先登录");
+                return ResponseEntity.status(401).body(LangText.of("请先登录", "Please sign in first"));
             }
             Long projectId = request.getProjectId();
             if (projectId == null) {

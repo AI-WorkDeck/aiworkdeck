@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Kies inhoud om te kopiëren",
+  scratchCopySelected: "{count} geselecteerd",
+  scratchCopyFiles: "Bestanden",
+  scratchCopyConversations: "Gesprekken",
+  scratchCopyNoProjects: "Geen geschikte projecten. Maak eerst een project aan.",
   scratchCopyTitle: "Naar project kopiëren",
   scratchCopyHint: "Kopieer geselecteerde gesprekken en bestanden met behoud van de originelen. Leden van het doelproject hebben toegang tot de kopieën.",
   "restartPending": "{count} taken kunnen worden hervat",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "Bestand openen…",
   "looseFilesOpenFolder": "Map openen…",
   "mobileBackup": {
+    "undecided": "Keuze nodig",
     "cleanupDeadline": "Betaal het volledige bedrag vóór {time} om verwijdering van cloudinhoud te voorkomen. Lokale bestanden blijven intact.",
     "billingSummary": "Openstaand bedrag: {debt}; beschikbaar krediet: {available}.",
     "manageBilling": "Account en facturering",

@@ -26,16 +26,19 @@ try {
   await page.addStyleTag({ content: `${tokens}\nhtml,body{margin:0;height:100%;font-family:var(--awd-font-sans)}*{box-sizing:border-box}view,scroll-view{display:block}text{display:inline}body{display:grid;grid-template-columns:420px minmax(0,1fr)}#app,#reader{height:100vh;min-width:0}` })
   await page.evaluate(async () => {
     window.loadFixture('single')
-    document.querySelector('.chat-input-rich').textContent = '查询合成测试法规、案例与处罚。'
+    document.querySelector('.chat-input-rich').textContent = '合成测试法规第938条是什么？'
     await window.chatState.handleSubmit('steer')
   })
   await page.waitForFunction(() => window.chatState.isStreaming && window.sseController)
   const send = (event, data) => page.evaluate(({ event, data }) => window.sseController.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)), { event, data })
   const text = content => send('text_delta', { content })
+  await text('以下资料供核对。\n')
   await text('<process name="检索"><tool_code>law_search({"query":"synthetic"})</tool_code><tool_output status="SUCCESS">' + JSON.stringify({ data: [{ title: '合成法规检索条目', article: '第一条　仅用于自动化测试。', url: 'https://example.org/law' }] }) + '</tool_output></process>')
   await page.waitForSelector('.legal-reference-card')
   const references = ['LAW', 'CASE', 'PENALTY'].map(kind => ({ kind, title: `合成${kind}资料`, documentNumber: 'TEST-1', summary: '这是 AI 整理的测试摘要。', excerpt: '这是测试摘录。', url: `https://example.org/${kind}`, status: 'verified' }))
-  const final = '<final>以下资料供核对。\n```legal-reference\n' + JSON.stringify(references) + '\n```\n请查看来源原文。</final>'
+  const { status, ...plainJsonLaw } = references[0]
+  const final = '<final>以下资料供核对。\n```json\n' + JSON.stringify(plainJsonLaw)
+    + '\n```\n```legal-reference\n' + JSON.stringify(references.slice(1)) + '\n```\n请查看来源原文。</final>'
   for (let offset = 0; offset < final.length; offset += 23) await text(final.slice(offset, offset + 23))
   await send('bubble_end', { status: 'finished' })
   await page.waitForFunction(() => !window.chatState.isStreaming && document.querySelectorAll('.legal-reference-card').length === 4)
@@ -58,11 +61,34 @@ try {
   await page.evaluate(async () => {
     const last = window.chatState.bubbles.filter(b => b.role === 'ASSISTANT').at(-1)
     window.savedLegalBubble = JSON.parse(JSON.stringify(last))
+    window.savedLegalUser = JSON.parse(JSON.stringify(window.chatState.bubbles.filter(b => b.role === 'USER').at(-1)))
     window.chatState.bubbles.splice(0)
   })
   await page.waitForFunction(() => !document.querySelector('.legal-reference-card'))
-  await page.evaluate(() => window.chatState.bubbles.push(window.savedLegalBubble))
+  await page.evaluate(() => window.chatState.bubbles.push(window.savedLegalUser, window.savedLegalBubble))
   await page.waitForFunction(() => document.querySelectorAll('.legal-reference-card').length === 4)
+  await page.evaluate(() => { window.uni.setClipboardData = ({ data, success }) => { window.copiedLegalText = data; success?.() } })
+  await page.click('.msg-copy-btn')
+  assert.ok(!(await page.evaluate(() => window.copiedLegalText)).includes('"kind"'), 'copy uses readable card text')
+  // The same data must stay code when explicitly requested, including retained history.
+  await page.evaluate(() => {
+    window.chatState.bubbles.find(b => b.role === 'USER').content = '请把第938条信息输出为 JSON'
+  })
+  await page.waitForFunction(() => document.querySelectorAll('[data-chat-answer] pre').length === 1)
+  assert.equal(await page.evaluate(() => document.querySelectorAll('.legal-reference-card').length), 3)
+  await page.click('.msg-copy-btn')
+  assert.ok((await page.evaluate(() => window.copiedLegalText)).includes('"kind"'), 'explicit JSON remains copyable')
+  await page.evaluate(() => {
+    window.chatState.bubbles.find(b => b.role === 'USER').content = '合成测试法规第938条是什么？'
+  })
+  await page.waitForFunction(() => document.querySelectorAll('.legal-reference-card').length === 4)
+  await page.evaluate(() => {
+    // A process boundary makes this introduction a different timeline text slice.
+    const last = window.chatState.bubbles.find(b => b.role === 'ASSISTANT')
+    // Equal-length replacement preserves the recorded timeline offsets.
+    last.content = last.content.replace('以下资料供核对。', 'JSON示例： ')
+  })
+  await page.waitForFunction(() => document.querySelectorAll('[data-chat-answer] pre').length === 1)
   assert.deepEqual(errors, [])
   console.log(`PASS real chat SSE, three reader types, keyboard/source actions, dedupe, retained bubble replay; ${artifacts}`)
 } finally { await browser?.close(); await server.close() }

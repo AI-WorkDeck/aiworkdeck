@@ -22,6 +22,17 @@ export function openExternalUrl(url) {
   }
 }
 
+// 渲染出来的 Markdown 正文（AI 输出、他人上传的 .md）里的链接点击：一律不在本页打开（S26）。
+// http(s) 交给 openExternalUrl（桌面端系统浏览器）；其它（相对路径、#锚点、mailto 等）只拦不开——
+// 正文所在的是应用页，放行会把整个工作台导航走。返回是否处理了这次点击，供容器的事件委托使用。
+export function handleRenderedLinkClick(event) {
+  const link = event && event.target && event.target.closest && event.target.closest('a[href]')
+  if (!link) return false
+  event.preventDefault()
+  openExternalUrl(link.href)
+  return true
+}
+
 // Plugin login/checkout must not report "opened" when the browser rejected it.
 // Keep the legacy fire-and-forget helper above unchanged for existing callers.
 export async function openExternalUrlChecked(value) {

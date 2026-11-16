@@ -287,8 +287,13 @@ export default {
 
 .account-message-badge {
   position: absolute;
-  top: -5px;
-  right: -7px;
+  top: -4px;
+  /* Sit on the avatar's outer corner so the initial/photo stays readable */
+  inset-inline-end: -9px;
+  min-width: 14px;
+  height: 14px;
+  line-height: 14px;
+  font-size: 9px;
   box-shadow: 0 0 0 2px var(--awd-surface);
   pointer-events: none;
 }

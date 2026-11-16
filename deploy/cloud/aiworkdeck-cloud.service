@@ -14,11 +14,17 @@ WorkingDirectory=/opt/aiworkdeck/cloud
 # 密钥全走 EnvironmentFile（0600，root:aiworkdeck 属主），不进 unit 文件
 EnvironmentFile=/opt/aiworkdeck/cloud/env
 LimitNOFILE=65535
-ExecStart=/usr/bin/java -Xms256m -Xmx1536m -XX:+ExitOnOutOfMemoryError -jar /opt/aiworkdeck/cloud/backend.jar --spring.profiles.active=cloud
+# 堆 3G（原 1536m）：首次容量压测（2026-11-13，2 核 8G 同机）里，1536m 的堆在完全回收后仍有
+# 约 1.1G 常驻，75 人起反复做 4–5 秒的全量回收，期间所有云端请求一起卡住。调到 3072m 后，
+# 同样 200 人：最长 GC 停顿 4.9 秒 → 0.6 秒，AI 对话失败率 6.06% → 0.11%，项目列表 p95 3.7 秒 → 0.27 秒。
+ExecStart=/usr/bin/java -Xms256m -Xmx3072m -XX:+ExitOnOutOfMemoryError -jar /opt/aiworkdeck/cloud/backend.jar --spring.profiles.active=cloud
 Restart=always
 RestartSec=5
 # 共享 4c8G 机器上的资源护栏
-MemoryMax=2560M
+# MemoryMax 必须给堆外留约 1G：压测实测进程常驻内存在 1536m 堆时到 2.4G、3072m 堆时到 3.9G
+# （元空间、代码缓存、线程栈、直接缓冲合计约 0.85G）。比 4096M 小会在高负载时被 cgroup 直接杀掉。
+# 代价：同机可用内存最低值从约 3.1G 降到约 1.5G，同机再跑官网构建等大内存任务前先看 free -m。
+MemoryMax=4096M
 CPUWeight=80
 # 日志走 journald：journalctl -u aiworkdeck-cloud
 StandardOutput=journal

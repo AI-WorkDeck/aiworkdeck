@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Você pode usar o reconhecimento na nuvem para os arquivos deste lote que falharam localmente. Se não usar, esses arquivos não serão enviados.",
   "ocrLocalFailedConfirm": "Usar reconhecimento na nuvem",
   "ocrAlreadySearchable": "«{name}» já tem camada de texto e permite pesquisa; nenhum arquivo novo foi criado",
-  "ocrStopped": "Interrompido; {count} arquivo(s) não processados"
+  "ocrStopped": "Interrompido; {count} arquivo(s) não processados",
+  "subscribeProBtn": "Pro ¥9.9",
 }

@@ -31,6 +31,7 @@ export default {
   "goToSettings": "सेटिंग्स पर जाएँ",
   "later": "बाद में",
   "requestFailedWithStatus": "अनुरोध विफल रहा ({status})",
+  "tooManyRequests": "बहुत अधिक अनुरोध। कृपया कुछ देर प्रतीक्षा करके फिर से प्रयास करें",
   "smsVerificationRequired": "इस कार्रवाई के लिए SMS सत्यापन आवश्यक है",
   "freeQuotaExceeded": "आपने अपने सभी मुफ़्त क्रेडिट उपयोग कर लिए हैं",
   "serviceErrorRetryLater": "सेवा त्रुटि। कृपया बाद में पुनः प्रयास करें",
@@ -73,5 +74,9 @@ export default {
   "languagePickerLabel": "भाषा चुनें",
   "languageFollowSystem": "सिस्टम के अनुसार",
   "languageSearchPlaceholder": "भाषाएँ खोजें…",
-  "languageNoMatch": "कोई मेल खाती भाषा नहीं"
+  "languageNoMatch": "कोई मेल खाती भाषा नहीं",
+  "serverLabelAccountBridge": "खाता ब्रिज",
+  "serverLabelGenericClient": "क्लाइंट (सामान्य)",
+  "serverLabelPersonalMemory": "व्यक्तिगत मेमोरी",
+  "serverLabelProjectMemory": "प्रोजेक्ट मेमोरी"
 }

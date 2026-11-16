@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "कॉपी करने के लिए सामग्री चुनें",
+  scratchCopySelected: "{count} चुने गए",
+  scratchCopyFiles: "फ़ाइलें",
+  scratchCopyConversations: "बातचीत",
+  scratchCopyNoProjects: "कोई उपयुक्त प्रोजेक्ट नहीं है। पहले एक प्रोजेक्ट बनाएं।",
   scratchCopyTitle: "प्रोजेक्ट में कॉपी करें",
   scratchCopyHint: "चुनी गई बातचीत और फ़ाइलें कॉपी करें; मूल सुरक्षित रहेंगे। गंतव्य प्रोजेक्ट के सदस्य कॉपियाँ देख सकते हैं।",
   "restartPending": "{count} कार्य फिर से शुरू किए जा सकते हैं",
@@ -36,6 +41,7 @@ export default {
   "looseFilesOpenFile": "फ़ाइल खोलें…",
   "looseFilesOpenFolder": "फ़ोल्डर खोलें…",
   "mobileBackup": {
+    "undecided": "निर्णय बाकी",
     "cleanupDeadline": "क्लाउड सामग्री हटने से बचाने के लिए {time} तक पूरा बकाया चुकाएँ। स्थानीय फ़ाइलें प्रभावित नहीं होंगी।",
     "billingSummary": "बकाया: {debt}; उपलब्ध क्रेडिट: {available}।",
     "manageBilling": "खाता और बिलिंग",

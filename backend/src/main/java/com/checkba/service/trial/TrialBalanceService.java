@@ -114,8 +114,12 @@ public class TrialBalanceService {
     /**
      * 幂等发放：已有行原样返回（不重置时钟、不加次数）。并发双发时依赖 user_id 唯一约束兜底，
      * 输的一方回读赢家那行。
+     *
+     * <p>刻意<b>不</b>加 {@code @Transactional}：插入失败后整个事务已被标记回滚、持久化上下文里还挂着
+     * 没 id 的实体——在同一事务里回读会触发 flush 报 Hibernate AssertionFailure（null identifier），
+     * 侥幸读到也会在提交时抛 UnexpectedRollbackException。现在插入与回读各走仓库自己的事务：
+     * 输的一方插入干净回滚，再用新事务读赢家那行（真并发测试 TrialBalanceGrantRaceTest）。
      */
-    @Transactional
     public TrialBalance grant(Long userId, String region) {
         if (userId == null) throw new IllegalArgumentException("userId required");
         Optional<TrialBalance> existing = repository.findByUserId(userId);

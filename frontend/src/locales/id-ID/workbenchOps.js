@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Anda dapat memakai pengenalan di cloud untuk file dalam batch ini yang gagal diproses secara lokal. Jika tidak, file tersebut tidak akan diunggah.",
   "ocrLocalFailedConfirm": "Gunakan pengenalan cloud",
   "ocrAlreadySearchable": "\"{name}\" sudah memiliki lapisan teks dan dapat dicari; tidak ada file baru yang dibuat",
-  "ocrStopped": "Dihentikan; {count} file tidak diproses"
+  "ocrStopped": "Dihentikan; {count} file tidak diproses",
+  "subscribeProBtn": "Pro ¥9.9",
 }

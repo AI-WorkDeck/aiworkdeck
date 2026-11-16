@@ -66,6 +66,8 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   const EDIT_DELAY = 250, FRESH_DELAY = 900
   let wantFresh = true, freshTimer = null, refreshAfterSuspend = false, pendingPolls = 0
   let enabled = false, cards = [], focusKey = '', busy = false, editingKey = '', pointerDown = false
+  // 引擎回过 available:false（非 Writer 文档 / 无几何契约）：本文档内不再逐键问，换文档时复位（office-tier1 O8）
+  let unsupported = false
   // Last read's gutter conclusion; the width only moves once two reads agree.
   let lastWantGutter = false
   const pageLayers = new Map()
@@ -302,6 +304,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       if (pointerDown) { again = true; return }
       if (!data?.success) { showNotice(labels.failed); return }
       if (data.available === false) {
+        unsupported = true
         root.hidden = true; snapshot = null
         // An unsupported engine retains its own notes. Do not keep probing or
         // reserve an empty gutter when the geometry contract is unavailable.
@@ -354,7 +357,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   }
   // After a card action the content itself changed: read it back at once.
   function refreshNow() { wantFresh = true; schedule(0) }
-  const edited = () => { schedule(EDIT_DELAY); armFresh() }
+  const edited = () => { if (unsupported) return; schedule(EDIT_DELAY); armFresh() }
   const scheduleViewport = () => {
     // Nothing is shown: a scroll or resize has nothing to move.
     if (disposed || viewportTimer || !enabled) return
@@ -384,6 +387,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       // over the host's loading screen while the engine is still generating it.
       if (['load_document', 'compare_document', 'build_comparison_document', 'build_merge_draft'].includes(action)) {
         refreshAfterSuspend = true
+        unsupported = false
         actionFailure = ''; busy = false; editingKey = ''; pointerDown = false; snapshot = null; cards = []; focusKey = ''; enabled = false; lastWantGutter = false
         list.replaceChildren(); pageLayers.clear(); svg.replaceChildren(); root.hidden = true
       }
@@ -392,7 +396,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
       suspended = Math.max(0, suspended - 1)
       if (suspended) return
       // Content edits also arrive as documentChanged; a command alone only moves things.
-      if (refreshAfterSuspend) { refreshAfterSuspend = false; refreshNow() } else schedule(EDIT_DELAY)
+      if (refreshAfterSuspend) { refreshAfterSuspend = false; refreshNow() } else if (!unsupported) schedule(EDIT_DELAY)
     },
     documentChanged: edited,
     cursorMoved() { if (enabled) schedule(200) },

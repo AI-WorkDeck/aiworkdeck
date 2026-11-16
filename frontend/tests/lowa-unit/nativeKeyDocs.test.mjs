@@ -106,7 +106,7 @@ for (const kind of ['calc', 'impress']) {
     assert.deepEqual(seen.posted.map((k) => k.ch), ['x', 'c', '5', '中'])
     assert.ok(seen.posted.every((k) => k.source === componentWindow && k.code === 0 && k.mod === 0))
     assert.deepEqual(seen.writerInserts, [])
-    assert.equal(seen.wakes, kind === 'impress' ? 1 : 0, 'a multi-character batch wakes Impress once, never Calc')
+    assert.equal(seen.wakes, 1, 'a multi-character batch wakes the Qt idle loop once (Impress and Calc; office-tier1 O8: Calc bursts painted only after the last key)')
   })
 
   test(kind + '：文本里的换行投递回车键，不当字符插入（否则被引擎静默吞掉，success:true 但内容少一段）', () => {
@@ -134,7 +134,7 @@ for (const kind of ['calc', 'impress']) {
     assert.deepEqual(seen.posted.map((k) => [k.code, k.mod]), [[KEY.BACKSPACE, 0], [KEY.DELETE, 0], [KEY.RIGHT, 0], [KEY.UP, 1], [KEY.TAB, 1]])
     assert.deepEqual(seen.dispatched, [], '.uno:SwBackspace 在表格里是哑弹，.uno:Delete 在 Calc 是「删除内容」对话框')
     assert.equal(EXEC.move_cursor({ dir: 'sideways' }).success, false)
-    assert.equal(seen.wakes, kind === 'impress' ? 5 : 0, 'each accepted input batch wakes once; invalid input does not wake')
+    assert.equal(seen.wakes, 5, 'each accepted input batch wakes once (Impress and Calc); invalid input does not wake')
   })
 
   test(kind + '：Home/End/PageDown 与 Esc 走原生按键，加粗之类的格式命令照旧派发', () => {

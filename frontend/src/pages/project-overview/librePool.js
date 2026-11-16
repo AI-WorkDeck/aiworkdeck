@@ -24,6 +24,16 @@ const LOW_MEMORY_INSTANCE_BUDGET = 2
 // 备胎延迟建：避开项目打开期（文件树/面板初始化）的资源竞争，同时尽早预热，
 // 让首开文档免整链冷启动。原 4s 偏长，用户常在 4s 内就点开第一份文档。
 const LIBRE_SPARE_DELAY_MS = 2000
+// 备胎只在用户停手这么久后才启动（见 initLibreSpareWhenIdle）
+const LIBRE_SPARE_IDLE_MS = 2000
+// 宿主页自己的输入（缩略图栏切页、工作表标签、面板）不经编辑器 iframe，单靠编辑器上报的
+// _lastInteractionAt 看不到：O8 实测在缩略图栏点到第 2 页时备胎照样启动。
+let lastHostInputAt = 0
+if (typeof window !== 'undefined' && window.addEventListener) {
+    for (const ev of ['pointerdown', 'keydown', 'wheel']) {
+        window.addEventListener(ev, e => { if (e.isTrusted) lastHostInputAt = Date.now() }, { capture: true, passive: true })
+    }
+}
 
 // 引擎固定基座远大于小文档本身；低内存设备不能只按压缩后的文件体积记账。
 // 用宿主真实物理内存，旧壳/网页缺失时保守处理，不依赖浏览器截断的 deviceMemory。
@@ -178,7 +188,18 @@ export const librePoolMethods = {
         clearTimeout(this._libreSpareTimer)
         if (this.hasActiveNativeDocument()) return
         if (useConservativeLibrePool() && this.hasLibreDocumentInstance()) return
-        this._libreSpareTimer = setTimeout(() => this.initLibreSpare(), LIBRE_SPARE_DELAY_MS)
+        this._libreSpareTimer = setTimeout(() => this.initLibreSpareWhenIdle(0), LIBRE_SPARE_DELAY_MS)
+    },
+    // 备胎启动会和前台文档争 CPU / 合成器：冷开大文档后马上打字时，首字要 1–1.8s 才上屏
+    // （office-tier1 O8 整机测量）。用户还在输入就往后让，停手 LIBRE_SPARE_IDLE_MS 再建，最多等 ~60s。
+    initLibreSpareWhenIdle(attempt) {
+        const refs = this._libreRefs || {}
+        const lastInput = Math.max(lastHostInputAt, ...Object.values(refs).map(r => (r && r._lastInteractionAt) || 0))
+        if (attempt < 30 && Date.now() - lastInput < LIBRE_SPARE_IDLE_MS) {
+            this._libreSpareTimer = setTimeout(() => this.initLibreSpareWhenIdle(attempt + 1), LIBRE_SPARE_IDLE_MS)
+            return
+        }
+        this.initLibreSpare()
     },
     initLibreSpare() {
         // 页面栈多实例守卫：只有活跃 overview 实例建备胎（PR#148/#151 模式）。
@@ -314,12 +335,53 @@ export const librePoolMethods = {
             _spare: sp,
         }
     },
-    releaseLibreHiddenInstance(handle) {
+    // 文件预览/QuickLook 的演示文稿（O13）：借隐藏引擎把每页渲染成图片——与编辑器同一个引擎，
+    // 不再用前端 pptx-preview 解析（真实课件上背景图错位裁切）。一次只跑一份：新请求作废上一份，
+    // 作废的那份在下一页前停下并归还引擎。返回 { slides, total }；拿不到引擎或装载失败回 null（调用方退回旧渲染）。
+    async renderSlidesForPreview(bytes, name, { maxSlides = 40, width = 1280, isCancelled = null } = {}) {
+        const job = this._slidePreviewJob = (this._slidePreviewJob || 0) + 1
+        const cancelled = () => job !== this._slidePreviewJob || (typeof isCancelled === 'function' && isCancelled())
+        const handle = await this.acquireLibreHiddenInstance({ timeoutMs: 120000, isCancelled: cancelled })
+        if (!handle) return null
+        try {
+            if (cancelled()) return null
+            const loaded = await handle.run('load_document', { bytes: new Uint8Array(bytes), name: String(name || 'preview.pptx') })
+            if (!loaded || !loaded.success || cancelled()) return null
+            const nav = await handle.run('office_get_navigation', {}, { background: true })
+            const total = Array.isArray(nav && nav.items) ? nav.items.length : 0
+            const slides = []
+            for (let n = 1; n <= Math.min(total, maxSlides); n++) {
+                if (cancelled()) return null
+                const r = await handle.run('slide_get_thumbnail', { slideNumber: n, width, format: 'jpeg', preview: true, documentSeq: nav.documentSeq }, { background: true })
+                if (!r || !r.success || !r.bytes) break
+                slides.push({ bytes: r.bytes instanceof Uint8Array ? r.bytes : new Uint8Array(r.bytes), width: r.width, height: r.height })
+            }
+            return slides.length ? { slides, total } : null
+        } catch (e) {
+            console.warn('[ProjectOverview] slide preview render failed', e)
+            return null
+        } finally {
+            this.releaseLibreHiddenInstance(handle, { recycle: true })
+        }
+    },
+    // recycle（台账 B5，QuickLook 用）：借的是预热备胎时，先让它换回空白文档再原样归还，
+    // 而不是丢掉重建——空格预览后马上打开文件是常见动作，丢掉就得冷启动 4–6 秒。清场
+    // 期间仍是 borrowed，不会被过继；清场失败才按老规矩丢掉、重排预热。
+    releaseLibreHiddenInstance(handle, { recycle = false } = {}) {
         const sp = handle && (handle._spare || handle)
         // #1122: array entries are Vue proxies; acquired handles retain the raw object.
         const key = sp && sp.key
         if (!Number.isSafeInteger(key) || key < 1) return
         const reused = this.libreSpares.some((x) => x.key === key && x.borrowed)
+        if (recycle && reused && handle.run) {
+            const discard = () => this.releaseLibreHiddenInstance(handle)
+            Promise.resolve(handle.run('load_document', { blank: true, name: 'blank.docx' })).then((r) => {
+                const entry = this.libreSpares.find((x) => x.key === key)
+                if (r && r.success && r.blank && entry) entry.borrowed = false
+                else if (entry) discard()
+            }, discard)
+            return
+        }
         this.libreSpares = this.libreSpares.filter((x) => x.key !== key)
         // 借走的是预热备胎：还掉后补一个，下一次打开文档/比对仍有热引擎可用
         if (reused && typeof this.scheduleLibreSpare === 'function') this.scheduleLibreSpare()

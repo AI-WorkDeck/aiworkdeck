@@ -543,6 +543,22 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("ai-key 首次网络失败（官网冷启动）：自动重试一次，用户无需再登录")
+    void aiKeyRetriesOnceOnNetworkFailure() {
+        AccountService service = connected();
+        transport.enqueueNetworkFailure().enqueue(200, "{\"openrouterKey\":\"sk-or-v1-retry\",\"limitUsd\":5.0}");
+        assertEquals("sk-or-v1-retry", service.fetchAiKey().get("openrouterKey"));
+    }
+
+    @Test
+    @DisplayName("ai-key 连续两次网络失败：仍报 NETWORK，不无限重试")
+    void aiKeyRetryIsBounded() {
+        AccountService service = connected();
+        transport.enqueueNetworkFailure().enqueueNetworkFailure();
+        assertEquals(AccountException.Kind.NETWORK, assertThrows(AccountException.class, service::fetchAiKey).getKind());
+    }
+
+    @Test
     @DisplayName("ai-usage：返回额度三个数，hasKey 区分「未分配额度」")
     void aiUsageReturnsQuota() {
         AccountService service = connected();
@@ -1302,5 +1318,32 @@ class AccountServiceTest {
         assertTrue(service.isConnected());
         assertEquals("张律师", confirmed.get("displayName"));
         assertNotNull(confirmed.get("qingtian"));
+    }
+
+    @Test
+    @DisplayName("个人 Pro 订阅建单：首 3 月 ¥9.9 满次回 409 intro_quota_exhausted 时自动回落 ¥149；403 pro_purchase_disabled 不掉线")
+    void createSubscriptionOrderIntroFallbackAndDisabledPreservesConnection() {
+        transport = new StubTransport()
+                .enqueue(200, "{\"username\":\"u\"}")
+                .enqueue(409, "{\"code\":\"intro_quota_exhausted\",\"error\":\"体验价已用完\"}")
+                .enqueue(200, "{\"success\":true,\"present\":\"qrcode\",\"outTradeNo\":\"PRO-STD-1\",\"qrCode\":\"weixin://wxpay/std\"}");
+        AccountService service = service();
+        service.connect(KEY);
+
+        Map<String, Object> created = service.createSubscriptionOrder("idem-1");
+        assertEquals("pro_monthly", created.get("skuId"));
+        assertEquals(14900L, ((Number) created.get("amount")).longValue());
+        assertEquals("PRO-STD-1", created.get("outTradeNo"));
+        assertTrue(transport.bodies.get(1).contains("\"skuId\":\"pro_monthly_intro\""));
+        assertTrue(transport.bodies.get(1).contains("\"amount\":990"));
+        assertTrue(transport.bodies.get(2).contains("\"skuId\":\"pro_monthly\""));
+        assertTrue(transport.bodies.get(2).contains("\"amount\":14900"));
+        assertTrue(service.isConnected());
+
+        transport.enqueue(403, "{\"code\":\"pro_purchase_disabled\",\"error\":\"Pro 购买暂未开放\"}");
+        AccountException ex = assertThrows(AccountException.class, () -> service.createSubscriptionOrder("idem-2"));
+        assertEquals(AccountException.Kind.REJECTED, ex.getKind());
+        assertEquals("pro_purchase_disabled", ex.getReason());
+        assertTrue(service.isConnected(), "pro_purchase_disabled 属于业务开关，绝不能清掉本地连接");
     }
 }
