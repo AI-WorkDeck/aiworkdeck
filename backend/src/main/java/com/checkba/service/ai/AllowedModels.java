@@ -76,20 +76,20 @@ import java.util.List;
  */
 public enum AllowedModels {
 
-    // Aggregate catalogue snapshot: https://openrouter.ai/api/v1/models, checked 2026-11-02.
+    // Aggregate catalogue snapshot: https://openrouter.ai/api/v1/models, checked 2026-11-16.
     // ==================== 国内直连（境内外均可用）====================
 
     DEEPSEEK_V4_FLASH("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash",
             Vendor.DEEPSEEK, Region.GLOBAL, 1_048_576,
-            tier(0, 0.091, 0.182)),
+            tier(0, 0.09, 0.18)),
 
     DEEPSEEK_V4_PRO("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro",
             Vendor.DEEPSEEK, Region.GLOBAL, 1_048_576,
-            tier(0, 1.6, 3.2)),
+            tier(0, 0.9, 1.5)),
 
     GLM_5_2("z-ai/glm-5.2", "GLM-5.2",
             Vendor.ZHIPU, Region.GLOBAL, 1_048_576,
-            tier(0, 0.006, 6.8)),
+            tier(0, 0.007, 6.8)),
 
     KIMI_K2_6("moonshotai/kimi-k2.6", "Kimi K2.6",
             Vendor.MOONSHOT, Region.GLOBAL, 262_144,
@@ -100,12 +100,12 @@ public enum AllowedModels {
     KIMI_K3("moonshotai/kimi-k3", "Kimi K3",
             Vendor.MOONSHOT, Region.GLOBAL, 1_048_576,
             true,
-            tier(0, 0.192, 15.0)),
+            tier(0, 0.192, 16.0)),
 
     KIMI_K3_1_PRO("moonshotai/kimi-k3.1-pro", "Kimi K3.1 Pro",
             Vendor.MOONSHOT, Region.GLOBAL, 1_048_576,
             true,
-            tier(0, 2.0, 10.0)),
+            tier(0, 0.2403, 8.4023)),
 
     // The unversioned ID is no longer listed; retain the enum name for existing router references.
     QWEN_3_8_MAX("qwen/qwen3.8-max-0902", "Qwen3.8 Max (0902)",
