@@ -41,6 +41,9 @@ function harness(kind = 'detail', { local = localPlugin(), remote = remotePlugin
     getPluginMarket: async () => ({ plugins: [structuredClone(state.remote)], accountConnected: state.accountConnected }),
     getBundledPlugins: async () => ({ plugins: [{ id: 'project-im', version: '0.1.0', bundled: true, installed: true }] }),
     getSkills: async () => [], getSkillMarket: async () => ({ skills: [] }),
+    getPluginSettings: async () => state.getSettings ? state.getSettings() : ({ settings: [{ key: 'endpoint', value: 'saved' }] }),
+    getContributedStyleProfiles: async () => ({ profiles: state.local?.enabled ? [{ pluginId: 'project-im', id: 'style' }] : [] }),
+    getContributedThemes: async () => state.getThemes ? state.getThemes() : ({ themes: state.local?.enabled ? [{ pluginId: 'project-im', id: 'theme' }] : [] }),
     installMarketPlugin: async id => {
       calls.push(['install', id])
       if (state.installFails) throw Error('signature rejected')
@@ -61,14 +64,14 @@ function harness(kind = 'detail', { local = localPlugin(), remote = remotePlugin
     accountConnected,
     installedInfo: state.local && structuredClone(state.local), marketInfo: structuredClone(state.remote),
     busy: false, pluginBusyId: '', pluginActionError: '', pluginActionHint: '',
-    reloadGeneration: 0,
+    reloadGeneration: 0, contributionGeneration: 0, settingsGeneration: 0,
     pluginActionErrors: {}, pluginActionHints: {}, plugins: state.local ? [structuredClone(state.local)] : [],
     loadContribution: async () => {}, stopPackPoll() {},
     loadSkills: async () => {}, loadMarket: async () => {},
   }
   const source = kind === 'detail' ? detail : pane
   const names = kind === 'detail'
-    ? ['reload', 'notifyChanged', 'doInstallPlugin', 'onPluginToggle', 'onPurchasedRefresh', 'loginThenContinue', 'reviewToolChanges']
+    ? ['reload', 'loadContribution', 'notifyChanged', 'doInstallPlugin', 'onPluginToggle', 'onPurchasedRefresh', 'loginThenContinue', 'reviewToolChanges']
     : ['reloadAll', 'loadPlugins', 'loadPluginMarket', 'installPlugin', 'notifyMarketChanged', 'installedPluginVersion', 'pluginUpdateAvailable', 'onToggle', 'permissionLabel', 'marketAction', 'refreshPluginPurchase', 'loginThenInstall']
   for (const name of names) vm[name] = method(source, name, deps).bind(vm)
   if (kind === 'detail') {
@@ -135,7 +138,7 @@ test('open detail refreshes after manual update checks and removes its listener 
   }
   const reloads = []
   let previewUpdates = 0
-  const vm = { reload: (...args) => { reloads.push(args) }, loadContribution() {}, pushThemePreview() { previewUpdates++ }, stopPackPoll() {}, contributionGeneration: 0, reloadGeneration: 0 }
+  const vm = { reload: (...args) => { reloads.push(args) }, loadContribution() {}, pushThemePreview() { previewUpdates++ }, stopPackPoll() {}, contributionGeneration: 0, settingsGeneration: 0, reloadGeneration: 0 }
   vm.onUpdatesChecked = method(detail, 'onUpdatesChecked', {}).bind(vm)
   const lifecycle = name => {
     const start = detail.indexOf(`  ${name}() {`)
@@ -355,4 +358,67 @@ test('uninstalled catalogue entries retain downloads and bundled entries retain 
   h.vm.installedInfo = localPlugin({ installationSource: 'bundled' })
   assert.equal(h.vm.sourceText, 'pluginPlatform.bundled')
   assert.equal(h.vm.display.downloads, '')
+})
+
+test('detail enable and disable immediately refresh theme and style contributions without a sidebar event', async () => {
+  const h = harness('detail', { local: localPlugin({ enabled: false }) })
+  await h.reload()
+  assert.deepEqual(h.vm.ownThemes, [])
+  await h.vm.onPluginToggle(true)
+  assert.deepEqual(h.vm.ownThemes, [{ pluginId: 'project-im', id: 'theme' }])
+  assert.deepEqual(h.vm.ownStyleProfiles, [{ pluginId: 'project-im', id: 'style' }])
+  await h.vm.onPluginToggle(false)
+  assert.deepEqual(h.vm.ownThemes, [])
+  assert.deepEqual(h.vm.ownStyleProfiles, [])
+})
+
+test('a theme response from before disabling cannot restore removed contributions', async () => {
+  const h = harness()
+  await h.reload()
+  let releaseOld, requested
+  const started = new Promise(resolve => { requested = resolve })
+  h.state.getThemes = () => new Promise(resolve => { releaseOld = resolve; requested() })
+  const oldLoad = h.vm.loadContribution()
+  await started
+  h.state.getThemes = null
+  await h.vm.onPluginToggle(false)
+  releaseOld({ themes: [{ pluginId: 'project-im', id: 'theme' }] })
+  await oldLoad
+  assert.deepEqual(h.vm.ownThemes, [])
+})
+
+test('failed enable retains disabled state and exposes no theme contribution', async () => {
+  const h = harness('detail', { local: localPlugin({ enabled: false }), enableFails: true })
+  await h.reload()
+  await h.vm.onPluginToggle(true)
+  assert.equal(h.vm.installedInfo.enabled, false)
+  assert.deepEqual(h.vm.ownThemes, [])
+  assert.equal(h.events.length, 0)
+})
+
+
+test('detail enable and disable preserve unsaved plugin settings', async () => {
+  const h = harness('detail', { local: localPlugin({ enabled: false }) })
+  await h.reload()
+  h.vm.settingsDraft.endpoint = 'unsaved'
+  const settings = h.vm.pluginSettings
+  for (const enabled of [true, false]) {
+    await h.vm.onPluginToggle(enabled)
+    assert.deepEqual(h.vm.settingsDraft, { endpoint: 'unsaved' })
+    assert.equal(h.vm.pluginSettings, settings)
+  }
+})
+
+
+test('toggling while settings are loading keeps the in-flight settings response', async () => {
+  const h = harness('detail', { local: localPlugin({ enabled: false }) })
+  let releaseSettings
+  h.state.getSettings = () => new Promise(resolve => { releaseSettings = resolve })
+  const loading = h.vm.loadContribution()
+  await h.vm.onPluginToggle(true)
+  releaseSettings({ settings: [{ key: 'endpoint', value: 'saved' }] })
+  await loading
+  assert.deepEqual(h.vm.pluginSettings, [{ key: 'endpoint', value: 'saved' }])
+  assert.deepEqual(h.vm.settingsDraft, { endpoint: 'saved' })
+  assert.deepEqual(h.vm.ownThemes, [{ pluginId: 'project-im', id: 'theme' }])
 })
