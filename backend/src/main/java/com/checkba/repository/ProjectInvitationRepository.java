@@ -13,6 +13,8 @@ import java.util.Optional;
 @Repository
 public interface ProjectInvitationRepository extends JpaRepository<ProjectInvitation, Long> {
     Optional<ProjectInvitation> findByAccessCode(String accessCode);
+
+    List<ProjectInvitation> findByRelatedUserId(Long relatedUserId);
     /**
      * 返回 List 而不是 Optional：(project_id, type) 上没有、也不该有唯一约束——
      * CLIENT_NAMED 天然一个项目多行。而 inviteClient 是先查后建，两个并发的

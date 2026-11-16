@@ -15,7 +15,7 @@
       <text v-if="saving" class="evidence-bar-error-text" role="status">{{ $t('workbench.evidence.tags.saving') }}</text>
       <text v-else-if="errorText" class="evidence-bar-error-text" role="alert">{{ errorText }}</text>
     </template>
-    <text class="evidence-bar-close" @tap="$emit('close')">x</text>
+    <text :title="$t('common.close')" class="evidence-bar-close" @tap="$emit('close')">x</text>
   </view>
 </template>
 

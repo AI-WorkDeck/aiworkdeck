@@ -88,7 +88,7 @@ prune_oss_installers() {
 # 清理旧安装包：只删「比上一版更老的」，当前版与上一版都留着。
 #
 # 为什么不能一换 latest.json 就把旧包全删——2026-08-18 发 v0.18.0 时实测到的 404 窗口：
-# 官网 /start 的下载按钮是服务端渲染的，数据源 aiworkdeck_website 的 lib/latest-release.ts
+# 官网 /start 的下载按钮是服务端渲染的，数据源官网仓 aiworkdeck-website 的 lib/latest-release.ts
 # 对本清单用了 `revalidate: 300`。latest.json 已指向新版、旧包已被删，而页面缓存里还是
 # 旧版文件名，用户点下载直接 404（stale-while-revalidate 还会让过期后的第一个访客继续
 # 拿到旧页面，真实窗口比 300 秒更长）。

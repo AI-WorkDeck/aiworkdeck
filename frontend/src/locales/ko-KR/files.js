@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "크기: {size}",
   "renderingDoc": "문서 렌더링 중…",
   "renderingSlides": "프레젠테이션 렌더링 중…",
+  "slidesNotShown": "표시되지 않은 슬라이드가 {count}개 더 있습니다. 파일을 열면 모두 볼 수 있습니다.",
   "officePreviewUnsupported": "이 파일은 온라인 미리보기를 지원하지 않습니다",
   "fileTypeHintOpenLocal": "파일 유형: {type}. Finder 또는 파일 탐색기에서 찾아 로컬 앱으로 여세요.",
   "unknown": "알 수 없음",
@@ -66,7 +67,7 @@ export default {
     "submitted": "자막을 생성 중입니다. 완료되면 표시됩니다.",
     "ready": "자막이 준비되었습니다",
     "failed": "자막 생성에 실패했습니다. 자막 버튼을 클릭하여 다시 시도하세요.",
-    "notConfigured": "전사 기능이 설정되지 않았습니다. 자막을 생성하려면 시스템 설정 - 플랫폼 서비스 - 회의 전사에서 설정하세요.",
+    "notConfigured": "전사 기능이 설정되지 않았습니다. 자막을 생성하려면 설정 - 플랫폼 서비스 - 회의 전사에서 설정하세요.",
     "noticePending": "등록되었습니다. 먼저 음성 - 회의 녹음에서 녹음 알림을 확인한 후 자막 버튼을 클릭하세요.",
     "submitFailed": "자막 생성을 시작할 수 없습니다",
     "empty": "음성이 감지되지 않았습니다"

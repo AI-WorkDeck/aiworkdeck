@@ -37,6 +37,98 @@ function createMockLibreOfficeTree(rootDir, { use242Layout = false } = {}) {
     '',
   ].join('\n'))
 
+  // Exact dark-page anchors from core dced3bc711d18407a2cc2400eb46e8261b663d95.
+  writeFileEnsured(path.join(rootDir, 'vcl/qt5/QtGraphics_Controls.cxx'), [
+    '#include <vcl/decoview.hxx>',
+    '                m_image->fill(QApplication::palette().color(QPalette::Window).rgb());',
+    '                break;',
+    '            }',
+    '            [[fallthrough]]; // Qt::transparent',
+    '            draw(QStyle::CC_ScrollBar, option, m_image.get(), rBackgroundColor,',
+    '',
+  ].join('\n'))
+  writeFileEnsured(path.join(rootDir, 'svtools/source/control/ruler.cxx'), [
+    '    const StyleSettings& rStyleSettings = rRenderContext.GetSettings().GetStyleSettings();',
+    '    tools::Long    nP1;            // pixel position of Page1',
+    '',
+  ].join('\n'))
+  writeFileEnsured(path.join(rootDir, 'sw/source/core/txtnode/fntcache.cxx'), [
+    "        bChgFntColor = COL_AUTO == rFnt.GetColor() || bChgLineColor;",
+    "",
+    "        if ( bChgFntColor )",
+    "        {",
+    "            // check if current background has a user defined setting",
+    "            std::optional<Color> pCol;",
+    "            if (GetFont())",
+    "                pCol = GetFont()->GetBackColor();",
+    "            if( ! pCol || COL_TRANSPARENT == *pCol )",
+    "            {",
+    "                const SvxBrushItem* pItem;",
+    "                SwRect aOrigBackRect;",
+    "                drawinglayer::attribute::SdrAllFillAttributesHelperPtr aFillAttributes;",
+    "",
+    "                /// OD 21.08.2002",
+    "                ///     consider, that [GetBackgroundBrush(...)] can set <pCol>",
+    "                ///     - see implementation in /core/layout/paintfrm.cxx",
+    "                /// OD 21.08.2002 #99657#",
+    "                ///     There is a user defined setting for the background, if there",
+    "                ///     is a background brush and its color is *not* \"no fill\"/\"auto fill\".",
+    "                if( GetFrame()->GetBackgroundBrush( aFillAttributes, pItem, pCol, aOrigBackRect, false, /*bConsiderTextBox=*/true ) )",
+    "                {",
+    "                    if (aFillAttributes && aFillAttributes->isUsed())",
+    "                    {",
+    "                        // First see if fill attributes provide a color.",
+    "                        pCol = Color(aFillAttributes->getAverageColor(aGlobalRetoucheColor.getBColor()));",
+    "                    }",
+    "",
+    "                    // If not, then fall back to the old brush item.",
+    "                    if ( !pCol )",
+    "                    {",
+    "                        pCol = pItem->GetColor();",
+    "                    }",
+    "",
+    "                    /// OD 30.08.2002 #99657#",
+    "                    /// determined color <pCol> can be <COL_TRANSPARENT>. Thus, check it.",
+    "                    if ( *pCol == COL_TRANSPARENT)",
+    "                        pCol.reset();",
+    "                }",
+    "                else",
+    "                    pCol.reset();",
+    "            }",
+    "",
+    "            // no user defined color at paragraph or font background",
+    "            if ( ! pCol )",
+    "                pCol = aGlobalRetoucheColor;",
+    "",
+    "            if (pVSh && bOutputToWindow)",
+    "            {",
+    "                // here we determine the preferred window text color for painting",
+    "                const SwViewOption* pViewOption = pVSh->GetViewOptions();",
+    "                if(pViewOption->IsPagePreview() &&",
+    "                        !officecfg::Office::Common::Accessibility::IsForPagePreviews::get())",
+    "                    nNewColor = COL_BLACK;",
+    "                else",
+    "                    // we take the font color from the appearance page",
+    "                    nNewColor = pViewOption->GetFontColor();",
+    "            }",
+    "",
+    "            // change painting color depending of dark/bright background",
+    "            Color aTmpColor( nNewColor );",
+    "            if ( pCol->IsDark() && aTmpColor.IsDark() )",
+    "                nNewColor = COL_WHITE;",
+    "            else if ( pCol->IsBright() && aTmpColor.IsBright() )",
+    "                nNewColor = COL_BLACK;",
+    '',
+  ].join('\n'))
+  writeFileEnsured(path.join(rootDir, 'sc/source/core/data/patattr.cxx'), [
+    "            //  use aSysTextColor (black for ScAutoFontColorMode::Print, from style settings otherwise)",
+    "            aColor = aSysTextColor;",
+    "        }",
+    "    }",
+    "    aComplexColor.setFinalColor(aColor);",
+    '',
+  ].join('\n'))
+
   writeFileEnsured(
     path.join(rootDir, 'solenv/gbuild/platform/EMSCRIPTEN_INTEL_GCC.mk'),
     [
@@ -396,6 +488,27 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     const selectedText = header.match(/SetHighlightTextColor\(Color\(0x([A-Fa-f0-9]{6})\)\)/)
     assert.equal('#' + selectedText[1], roles.light['text-on-accent'])
     assert.equal('#' + selectedText[1], roles.dark['text-on-accent'])
+
+    const fntcache = fs.readFileSync(path.join(tmpDir, 'sw/source/core/txtnode/fntcache.cxx'), 'utf8')
+    assert.match(fntcache, /const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n            && aGlobalRetoucheColor\.IsDark\(\) && rFnt\.GetColor\(\)\.GetLuminance\(\) < 64;/)
+    assert.match(fntcache, /if \( bChgFntColor \|\| bDarkExplicit \)/)
+    assert.match(fntcache, /if \(bDarkExplicit\)\n            \{\n                if \(pCol->IsDark\(\)\)/)
+    const patattr = fs.readFileSync(path.join(tmpDir, 'sc/source/core/data/patattr.cxx'), 'utf8')
+    assert.match(patattr, /else if \(eAutoMode == ScAutoFontColorMode::Display && aColor\.GetLuminance\(\) < 64\)/)
+
+    const ruler = fs.readFileSync(path.join(tmpDir, 'svtools/source/control/ruler.cxx'), 'utf8')
+    assert.match(ruler, /GetColorValue\(svtools::APPBACKGROUND\)\.nColor\.IsDark\(\)/)
+    assert.match(ruler, /const StyleSettings& rStyleSettings = maVirDev->GetSettings\(\)\.GetStyleSettings\(\);/)
+    const rulerRoles = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'design/tokens/awd-palette.json'), 'utf8')).roles.dark
+    for (const [setter, role] of Object.entries({ WindowColor: 'surface', DialogColor: 'bg', ShadowColor: 'border', DarkShadowColor: 'text-2', WorkspaceColor: 'canvas' })) {
+      const m = ruler.match(new RegExp(`Set${setter}\\(Color\\(0x([A-Fa-f0-9]{6})\\)\\)`))
+      assert.ok(m, setter)
+      assert.equal('#' + m[1], rulerRoles[role])
+    }
+
+    const qtControls = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtGraphics_Controls.cxx'), 'utf8')
+    assert.match(qtControls, /#include <vcl\/settings\.hxx>/)
+    assert.equal(qtControls.match(/MiscSettings::GetAppColorMode\(\) == 2/g).length, 2)
 
     // Verify instdir dictionary slimming & Lightproof removal
     assert.ok(fs.existsSync(path.join(tmpDir, 'instdir/share/extensions/dict-en/en_US.aff')))

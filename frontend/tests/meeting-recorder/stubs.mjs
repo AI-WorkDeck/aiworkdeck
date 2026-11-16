@@ -11,6 +11,8 @@ export const reactive = (o) => o
 
 export const getApiBaseUrl = () => 'http://127.0.0.1:0'
 export const getAuthHeaders = () => ({ 'X-Test': '1' })
+// 上传前取云端写入头（de712ebe9 起 meetingRecorder 改走 api.js 的 getCloudWriteHeaders）
+export const getCloudWriteHeaders = async () => getAuthHeaders()
 export const createMeetingRecording = async () => ({
   meeting: { id: 'm1', audioFileId: 'f1' }, configured: true,
 })

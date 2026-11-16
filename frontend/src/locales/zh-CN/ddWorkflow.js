@@ -147,6 +147,26 @@ export default {
     "titles": "请填写每个清单项的名称。"
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "此邀请码用于 AI WorkDeck 账户；你可以在这里的项目沟通里与律师交流。",
+      "openChat": "打开项目沟通",
+      "joinFirst": "请先用律师发给你的访问码进入项目，再在项目沟通里交流。",
+      "title": "项目沟通",
+      "hint": "与律师团队沟通本项目。能看到哪些此前的消息和文件，由律师决定。",
+      "tabChecklist": "尽调清单",
+      "loading": "正在加载消息…",
+      "empty": "还没有消息。有问题可以直接在这里留言。",
+      "older": "加载更早的消息",
+      "you": "我",
+      "filePending": "文件还在准备中，请联系您的律师。",
+      "placeholder": "输入消息，Enter 发送，Shift+Enter 换行",
+      "attach": "发送文件",
+      "send": "发送",
+      "sending": "正在发送…",
+      "fileTooLarge": "单个文件不能超过 {size} MB",
+      "quotaFull": "你在本项目上传的文件总量已达 {size} MB 上限，请联系律师。",
+      "unavailable": "项目沟通暂不可用，请稍后再试"
+    },
     "messageUnavailable": "该消息对应的受邀项目或清单已不可访问，请刷新后重试。",
     "workspaceTitle": "客户协作",
     "workspaceHint": "按律师清单准备材料，逐项提交并查看反馈。",

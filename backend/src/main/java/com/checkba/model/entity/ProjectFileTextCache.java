@@ -34,8 +34,13 @@ import java.time.LocalDateTime;
 @Setter
 public class ProjectFileTextCache {
 
-    /** 文字层 / Tika 抽出来的（不花钱）。 */
-    public static final String SOURCE_TEXT = "text";
+    /**
+     * 文字层 / Tika 抽出来的（不花钱）。值带口径版本：docx 待处理修订改为「最终文本 + ⟦⟧ 标记」后，
+     * 旧口径 {@link #LEGACY_SOURCE_TEXT} 的行可能还是「715」那种拼接正文，读到即作废重抽。
+     */
+    public static final String SOURCE_TEXT = "text-r2";
+    /** 修订标记之前的文字层口径；只用于识别并丢弃旧行。 */
+    public static final String LEGACY_SOURCE_TEXT = "text";
     /** 云端 OCR 识别出来的（平台档按页扣过 Credits，最值得缓存的一档）。 */
     public static final String SOURCE_OCR = "ocr";
 

@@ -422,6 +422,17 @@ const KNOWN_TAGS = new Set([
   'question', 'option'
 ])
 const TAG_RE = /^<(\/?)([a-zA-Z_][\w-]*)(\s[^>]*)?>$/
+
+/**
+ * Office history rows stored before the backend fix lost their leading "<"
+ * (OfficeConversationPrivacy.forStorage), so they start with e.g. `process name="…">`
+ * or `/thinking>`. Put the "<" back when the row starts with a known protocol tag, so the
+ * parser hides it instead of showing the fragment as text. The lost text itself cannot be recovered.
+ */
+export function restoreLostTagOpener(content) {
+  const m = /^\/?([a-z_]+)(?:\s+[\w-]+="[^"]*")*\s*>/.exec(content || '')
+  return m && KNOWN_TAGS.has(m[1]) ? '<' + content : content
+}
 // "<" 之后仍可能补成合法标签的形态（尚未见到 ">"）
 const PARTIAL_TAG_RE = /^<\/?[a-zA-Z_]?[\w-]*(\s[^>]*)?$/
 // 协议标签的形状：全小写 ASCII 的短 snake_case 名（协议里全部标签都长这样）。

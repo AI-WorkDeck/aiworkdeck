@@ -112,10 +112,53 @@ def _para():
             '<Cell N="HorzAlign" V="1"/><Cell N="SpLine" V="-1.2"/></Row></Section>')
 
 
+def _slack(w, fs):
+    """Extra width for a borderless text box, so the reader never re-wraps it.
+
+    `_text_w` is the renderers' own estimate. Readers measure with their own
+    fonts, add their own CJK/Latin autospacing and a default 4pt margin each
+    side, so a box fitted to the estimate is narrow enough to be broken again:
+    a one-line caption came out as two, and the second line ran into the date
+    above it. The box has no fill and no line, so extra width is invisible;
+    the text stays anchored where the master put it (see _anchored)."""
+    return w * 0.25 + fs * 2
+
+
+def _anchored(p_x, anchor, w):
+    """(centre-x, HorzAlign, margin cells) that keep text at the master's
+    anchor however wide its box is."""
+    if anchor == "start":
+        return p_x + w / 2, 0, '<Cell N="LeftMargin" V="0"/><Cell N="RightMargin" V="0"/>'
+    if anchor == "end":
+        return p_x - w / 2, 2, '<Cell N="LeftMargin" V="0"/><Cell N="RightMargin" V="0"/>'
+    return p_x, 1, ""
+
+
+def _para_at(align, lines):
+    """Paragraph row with the master's own baseline gap as ABSOLUTE spacing.
+
+    A proportional value (-1.2) is read against the font's natural line height
+    by some readers and against its size by others; for a CJK face the two
+    differ by a third, which pushed a two-line caption out of its box. A
+    positive SpLine is inches, and every reader takes it literally."""
+    ys = [l["y"] for l in lines]
+    gaps = [b - a for a, b in zip(ys, ys[1:]) if b - a > 0.5]
+    sp = _in(min(gaps)) if gaps else -1.2
+    return (f'<Section N="Paragraph"><Row IX="0"><Cell N="HorzAlign" V="{align}"/>'
+            f'<Cell N="SpLine" V="{sp}"/></Row></Section>')
+
+
 def _text(lines):
+    """多行文字：每一行都作为**独立段落**写出（<pp> 指向 Paragraph 的行）。
+
+    原来只用换行符分行。Visio 与 PowerPoint 认它，ProcessOn 不认：一张卡片里的
+    几行会被接成一长行，于是文字撑出卡片，连日期都从「2019.11.29」变成「201911.29」
+    （原图里日期在窄卡片上本来就分两行写）。显式段落标记三家都认。
+    换行符保留，段落标记与换行符同时给，不会多出空行（LibreOffice 实测）。"""
     if not lines:
         return ""
-    body = "".join(f'<cp IX="{i}"/>{escape(l["t"])}' + ("\n" if i < len(lines) - 1 else "")
+    body = "".join(f'<pp IX="0"/><cp IX="{i}"/>{escape(l["t"])}'
+                   + ("\n" if i < len(lines) - 1 else "")
                    for i, l in enumerate(lines))
     return f"<Text>{body}</Text>"
 
@@ -205,14 +248,18 @@ def _text_shape(sid, group, page):
     master's own baselines."""
     fs = group[0]["fs"]
     widest = max(_text_w(l["t"], fs, l.get("track", 0)) for l in group)
-    w = widest + fs
+    w = widest + _slack(widest, fs)
     top = min(l["y"] for l in group) - fs
     bot = max(l["y"] for l in group) + fs * 0.4
     h = bot - top
-    cx = group[0]["x"] if group[0]["anchor"] == "middle" else group[0]["x"] + w / 2
+    cx, align, margins = _anchored(group[0]["x"], group[0]["anchor"], w)
+    # One Character row PER LINE, matching the <cp IX=n/> that _text() writes
+    # for every line. Passing only the first row left line 2 onwards pointing at
+    # a row that does not exist, and readers fall back to the default format:
+    # the second line of a white caption on a red card came out black and small.
     return _shape(sid, "Caption", page.x(cx), page.y((top + bot) / 2), _in(w), _in(h),
-                  '<Cell N="FillPattern" V="0"/><Cell N="LinePattern" V="0"/>',
-                  _rect_geom(), _char(group[:1]) + _para() + _text(group))
+                  '<Cell N="FillPattern" V="0"/><Cell N="LinePattern" V="0"/>' + margins,
+                  _rect_geom(), _char(group) + _para_at(align, group) + _text(group))
 
 
 def build_shapes(prims, page):
@@ -221,15 +268,15 @@ def build_shapes(prims, page):
         if p["k"] == "text":
             if p.get("used"):
                 continue
-            tw = _text_w(p["t"], p["fs"], p.get("track", 0)) + p["fs"]
-            anchor = p["anchor"]
-            cx_px = p["x"] + (0 if anchor == "middle" else
-                              (tw / 2 if anchor == "start" else -tw / 2))
+            tw = _text_w(p["t"], p["fs"], p.get("track", 0))
+            tw += _slack(tw, p["fs"])
+            cx_px, align, margins = _anchored(p["x"], p["anchor"], tw)
             cy_px = p["y"] - p["fs"] * 0.36
             out.append(_shape(sid, "Label", page.x(cx_px), page.y(cy_px),
                               _in(tw), _in(p["fs"] * 1.6),
-                              '<Cell N="FillPattern" V="0"/><Cell N="LinePattern" V="0"/>',
-                              _rect_geom(), _char([p]) + _para() + _text([p])))
+                              '<Cell N="FillPattern" V="0"/><Cell N="LinePattern" V="0"/>'
+                              + margins,
+                              _rect_geom(), _char([p]) + _para_at(align, [p]) + _text([p])))
             sid += 1
             continue
 
@@ -286,7 +333,7 @@ def _rels(items):
 
 
 def export(svg_path, out_path):
-    svg = open(svg_path, encoding="utf-8").read()
+    svg = open(svg_path, encoding="utf-8-sig").read()
     m = re.search(r'<svg[^>]*width="([\d.]+)"[^>]*height="([\d.]+)"', svg)
     W, H = (float(m.group(1)), float(m.group(2))) if m else (960.0, 720.0)
     page = Page(W, H)
@@ -336,5 +383,20 @@ def export(svg_path, out_path):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     p, n = export(sys.argv[1], sys.argv[2])
     print(f"vsdx: {p}  ({n} editable shapes)")

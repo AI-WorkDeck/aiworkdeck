@@ -103,6 +103,53 @@ const rows = data.rows.map(function (r, idx) {
   });
 });
 
+// ---- 未上图的原文（可选）-------------------------------------------------
+// 本图是摘要图：卡片只放一行标题，标题是原句删出来的。删掉的部分逐条列在这里，
+// 「涉及」一列标出其中的限制性表述（金额、期限、条件、质量、违约、担保）。
+// 这是交付清单里「完整内容所在位置」指向的那一处，所以一个字都不截。
+const OW = [1150, 2000, 5850];
+const omissions = data.omissions || [];
+const omitBlock = [];
+if (omissions.length) {
+  const oHeader = new TableRow({
+    tableHeader: true,
+    children: ["图上编号", "涉及", "未上图的原文"].map(function (t, i) {
+      return cell(t, OW[i], { bold: true, center: true, top: LINE, bottom: LINE,
+                              left: i === 0 ? NONE : HAIR,
+                              right: i === 2 ? NONE : HAIR });
+    }),
+  });
+  const oRows = omissions.map(function (r, idx) {
+    return new TableRow({
+      children: [r.no, r.kinds, r.omitted].map(function (t, i) {
+        return cell(t, OW[i], {
+          center: i === 0,
+          bottom: idx === omissions.length - 1 ? LINE : HAIR,
+          left: i === 0 ? NONE : HAIR,
+          right: i === 2 ? NONE : HAIR,
+        });
+      }),
+    });
+  });
+  omitBlock.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 480, after: 240 },
+      children: [run("未上图的原文", { bold: true, size: 28 })],
+    }),
+    new Paragraph({
+      spacing: { after: 240 },
+      children: [run("本图是摘要图，卡片只放一行标题。下列事项的原句有部分内容没有画到图上，" +
+                     "请据此核对；\u201c涉及\u201d一列标出其中的限制性表述。")],
+    }),
+    new Table({
+      columnWidths: OW,
+      width: { size: OW.reduce(function (a, b) { return a + b; }, 0), type: WidthType.DXA },
+      rows: [oHeader].concat(oRows),
+    }),
+  );
+}
+
 const doc = new Document({
   sections: [{
     properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
@@ -144,7 +191,7 @@ const doc = new Document({
         children: [run(data.foot ||
           "\u201c定位\u201d为材料规范化后的句号，可据此回到原文逐字核对。")],
       }),
-    ],
+    ].concat(omitBlock),
   }],
 });
 

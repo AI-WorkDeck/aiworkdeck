@@ -35,10 +35,16 @@ public class EvalCase {
     public String category;
     /** 协议标注（仅文档用途）：xml / native / mixed */
     public String protocol;
+    /** 本用例的模型是否走原生工具协议的提示变体（gap P2）；缺省 false = 改造前的 XML 文本协议 */
+    public boolean nativeProtocol;
     /** Agent 模式：AGENT（默认）/ PLAN / ASK */
     public String mode = "AGENT";
     /** 用户输入 */
     public String userInput;
+    /** Optional synthetic assembled history; null preserves legacy replay setup. Never loads real history. */
+    public List<dev.langchain4j.data.message.ChatMessage> contextHistory;
+    /** Optional stored row count for testing truncated/compacted history. Includes the current user row. */
+    public Integer persistedMessageCount;
     /**
      * 可选：本轮的活跃文档（编辑器里打开着的那一份）。
      * 决定编排器下发哪一套编辑原语（dev-board#729 ①：docx 不下发 sheet_* / slide_*）。
@@ -71,6 +77,8 @@ public class EvalCase {
      * 这一类藏了、那一类回来了」，被全局开关改掉模式后断言本身就不成立，跑了也只是噪音红。
      */
     public Boolean docSessionCategoryTrim;
+    /** 可选：本轮用户消息带一个附件（决定条件核心 list_attached_files，tool-system-v2 V2）。 */
+    public boolean withAttachment;
     /** 非 null 时该用例进入真实 LLM 冒烟集（RealLlmSmokeTest） */
     public Smoke smoke;
     /** 预录的模型输出，按轮次回放 */
@@ -79,6 +87,13 @@ public class EvalCase {
     public Map<String, String> toolStubs = new HashMap<>();
     /** Explicit database records for file identity and project-boundary validation. */
     public List<com.checkba.model.entity.ProjectFile> projectFiles = new ArrayList<>();
+    /**
+     * 可选：编辑器桥 {@code get_document_text} 的逐次回包（整段 JSON，如 {"paragraphs":[{"index":0,"text":"…"}]}），
+     * 按调用顺序依次返回，用完后一直返回最后一份。缺省为空 = 桥是裸 mock（返回 null）。
+     * 写后核对（gap P5）用：第一份是本轮第一次正文写入前的底稿，第二份是收尾时回读的改后全文。
+     * 模型自己调的 doc_* 读取工具仍走 toolStubs，不消耗这里的回包。
+     */
+    public List<String> editorReads = new ArrayList<>();
     /** 断言 */
     public Expect expect = new Expect();
 
@@ -101,6 +116,8 @@ public class EvalCase {
     public static class NativeCall {
         public String name;
         public Map<String, Object> arguments = new HashMap<>();
+        /** Deliberately malformed arguments for protocol/validation regression tests. */
+        public String rawArguments;
     }
 
     /** 真实 LLM 冒烟断言：首个工具调用应属于集合（空集合 = 期望不调用任何工具） */
@@ -133,6 +150,12 @@ public class EvalCase {
         /** 每次携带工具的 LLM 调用中，可见工具应排除的名字（Skill 裁剪断言；空 = 不断言） */
         public List<String> offeredToolsExclude = new ArrayList<>();
         /**
+         * 这些工具名在真实工具 bean 里必须<b>不存在</b>（没有任何 {@code @Tool} 方法叫这个名字）。
+         * 用于已被 tool-system-v2 V3 删除的长期隐藏工具：删除前这里写在 offeredToolsExclude，
+         * 删除后那条断言恒过，改为直接断言「未注册」。
+         */
+        public List<String> toolsNotRegistered = new ArrayList<>();
+        /**
          * 只对**第一次**携带工具的调用断言排除（dev-board#729 ①）。
          * 用于「起跑时按活跃文档类型裁掉，中途新建/切换文档后又放回来」这种<b>逐轮变化</b>的形态——
          * 全轮次的 offeredToolsExclude 在这里必然自相矛盾。
@@ -140,10 +163,20 @@ public class EvalCase {
         public List<String> offeredToolsExcludeFirstCall = new ArrayList<>();
         /** 只对**最后一次**携带工具的调用断言包含；与上一条配对使用。 */
         public List<String> offeredToolsIncludeLastCall = new ArrayList<>();
+        /** 第一次携带工具的 LLM 调用下发的工具个数上限（null = 不断言；tool-surface-audit S0） */
+        public Integer maxOfferedToolsFirstCall;
+        /** 第二次及以后每次 LLM 调用下发的工具个数上限（中途增长封顶，tool-system-v2 V2；null = 不断言） */
+        public Integer maxOfferedToolsLaterCalls;
+        /** 第一次携带工具的 LLM 调用下发的 schema token 上限（o200k，口径见 ToolSurfaceMetrics；null = 不断言） */
+        public Integer maxOfferedTokensFirstCall;
         /** 会话文件夹重命名（<title> 协议）应包含的子串（null = 不断言） */
         public String renamedTitleContains;
         /** 应在某次 LLM 调用的上下文中出现的子串（断言编排器回喂了某条系统提醒；空 = 不断言） */
         public List<String> promptContains = new ArrayList<>();
+        /** 不应在任何一次 LLM 调用的上下文中出现的子串（断言编排器<b>没有</b>追加某条提醒；空 = 不断言） */
+        public List<String> promptNotContains = new ArrayList<>();
+        /** 编辑器桥 get_document_text 应被调用的次数（null = 不断言；写后核对的底稿 + 回读） */
+        public Integer editorReadCount;
         /**
          * 允许本轮出现「调了一个本会话里不存在或不可见的工具」的分发（默认 false = 不允许）。
          *

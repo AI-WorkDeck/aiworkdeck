@@ -5,7 +5,15 @@ package com.checkba.controller.ai;
 
 import com.checkba.service.LocalIdentityService;
 import com.checkba.service.mcpserver.LocalMcpServerSettings;
+import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ai.ToolRegistry;
+import com.checkba.service.ai.tools.ToolContext;
+import com.checkba.service.ai.tools.ToolMeta;
 import com.checkba.service.mcpserver.LocalMcpServerTools;
+import com.checkba.service.mcpserver.McpToolProjection;
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.model.chat.request.json.JsonObjectSchema;
+import org.mockito.ArgumentCaptor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +48,8 @@ class LocalMcpServerControllerTest {
     private LocalMcpServerSettings settings;
     private LocalMcpServerTools tools;
     private LocalIdentityService identity;
+    private ToolRegistry registry;
+    private ProjectMemberService members;
     private MockMvc mvc;
 
     @BeforeEach
@@ -51,8 +61,12 @@ class LocalMcpServerControllerTest {
         when(identity.localUserId()).thenReturn(7L);
         when(settings.isEnabled()).thenReturn(true);
         when(settings.verify(TOKEN)).thenReturn(true);
+        registry = mock(ToolRegistry.class);
+        members = mock(ProjectMemberService.class);
+        ObjectMapper mapper = new ObjectMapper();
+        McpToolProjection projection = new McpToolProjection(registry, members, mapper);
         mvc = MockMvcBuilders.standaloneSetup(
-                new LocalMcpServerController(settings, tools, identity, new ObjectMapper())).build();
+                new LocalMcpServerController(settings, tools, projection, identity, mapper)).build();
     }
 
     private ResultActions rpc(String body) throws Exception {
@@ -96,22 +110,45 @@ class LocalMcpServerControllerTest {
     }
 
     @Test
-    void toolsListIsReadOnly() throws Exception {
+    void toolsListIsReadOnlyExceptProposeRevision() throws Exception {
         rpc("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
                 .andExpect(jsonPath("$.result.tools", hasSize(LocalMcpServerTools.DEFINITIONS.size())))
-                .andExpect(jsonPath("$.result.tools[*].annotations.readOnlyHint", everyItem(org.hamcrest.Matchers.is(true))))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='propose_revision')]", hasSize(1)))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='propose_revision')].annotations.readOnlyHint",
+                        everyItem(org.hamcrest.Matchers.is(false))))
+                .andExpect(jsonPath("$.result.tools[?(@.name!='propose_revision')].annotations.readOnlyHint",
+                        everyItem(org.hamcrest.Matchers.is(true))))
                 .andExpect(jsonPath("$.result.tools[*].annotations.destructiveHint", everyItem(org.hamcrest.Matchers.is(false))));
     }
 
     @Test
+    void proposeRevisionCallPassesClientNameAndReportsInvalidAsToolError() throws Exception {
+        when(tools.call(eq("propose_revision"), anyMap(), eq(7L), eq("claude-code/1.0")))
+                .thenReturn(Map.of("proposalId", 5, "status", "PENDING"));
+        mvc.perform(post("/mcp").header("Authorization", "Bearer " + TOKEN).header("User-Agent", "claude-code/1.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"tools/call\",\"params\":{\"name\":\"propose_revision\",\"arguments\":{\"fileId\":1,\"baseVersion\":\"v\",\"edits\":[{\"find\":\"a\",\"replace\":\"b\"}]}}}"))
+                .andExpect(jsonPath("$.result.isError").value(false))
+                .andExpect(jsonPath("$.result.content[0].text", containsString("\"proposalId\":5")));
+
+        when(tools.call(eq("propose_revision"), anyMap(), eq(7L), eq("claude-code/1.0")))
+                .thenThrow(new LocalMcpServerTools.ToolError("find must not be empty"));
+        mvc.perform(post("/mcp").header("Authorization", "Bearer " + TOKEN).header("User-Agent", "claude-code/1.0")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"tools/call\",\"params\":{\"name\":\"propose_revision\",\"arguments\":{\"fileId\":1,\"baseVersion\":\"v\",\"edits\":[{\"find\":\"\",\"replace\":\"b\"}]}}}"))
+                .andExpect(jsonPath("$.result.isError").value(true))
+                .andExpect(jsonPath("$.result.content[0].text").value("find must not be empty"));
+    }
+
+    @Test
     void toolsCallRunsAsLocalUserAndReportsToolErrorsInResult() throws Exception {
-        when(tools.call(eq("list_projects"), anyMap(), eq(7L))).thenReturn(List.of(Map.of("projectId", 1)));
+        when(tools.call(eq("list_projects"), anyMap(), eq(7L), any())).thenReturn(List.of(Map.of("projectId", 1)));
         rpc("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"list_projects\",\"arguments\":{}}}")
                 .andExpect(jsonPath("$.id").value(3))
                 .andExpect(jsonPath("$.result.isError").value(false))
                 .andExpect(jsonPath("$.result.content[0].text").value("[{\"projectId\":1}]"));
 
-        when(tools.call(eq("read_file"), anyMap(), any())).thenThrow(new LocalMcpServerTools.ToolError("File not found: 9"));
+        when(tools.call(eq("read_file"), anyMap(), any(), any())).thenThrow(new LocalMcpServerTools.ToolError("File not found: 9"));
         rpc("{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"read_file\",\"arguments\":{\"fileId\":9}}}")
                 .andExpect(jsonPath("$.result.isError").value(true))
                 .andExpect(jsonPath("$.result.content[0].text").value("File not found: 9"));
@@ -138,5 +175,68 @@ class LocalMcpServerControllerTest {
                 .andExpect(jsonPath("$.token").doesNotExist());
         mvc.perform(post("/api/mcp-server/disable")).andExpect(jsonPath("$.enabled").value(false));
         verify(settings).disable();
+    }
+
+    private static ToolRegistry.McpCandidate candidate(String name, ToolMeta.Access access, boolean needsProject) {
+        ToolSpecification spec = ToolSpecification.builder().name(name).description(name + " desc")
+                .parameters(JsonObjectSchema.builder()
+                        .addStringProperty("from", "Start date").build()).build();
+        return new ToolRegistry.McpCandidate(spec, access, needsProject);
+    }
+
+    @Test
+    void toolsListAppendsProjectedRegistryToolsAndCuratedWinsOnNameClash() throws Exception {
+        when(registry.mcpCandidates()).thenReturn(List.of(
+                candidate("task_list", ToolMeta.Access.READ, true),
+                candidate("read_file", ToolMeta.Access.READ, false),
+                candidate("hello_note_add", ToolMeta.Access.WRITE, false)));
+        rpc("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
+                .andExpect(jsonPath("$.result.tools", hasSize(LocalMcpServerTools.DEFINITIONS.size() + 2)))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='read_file')]", hasSize(1)))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='task_list')].annotations.readOnlyHint",
+                        everyItem(org.hamcrest.Matchers.is(true))))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='task_list')].inputSchema.properties.projectId.type",
+                        everyItem(org.hamcrest.Matchers.is("integer"))))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='task_list')].inputSchema.properties.userId", hasSize(0)))
+                .andExpect(jsonPath("$.result.tools[?(@.name=='hello_note_add')].annotations.readOnlyHint",
+                        everyItem(org.hamcrest.Matchers.is(false))));
+    }
+
+    @Test
+    void projectedCallRunsThroughRegistryAsLocalUserAndChecksProjectPermission() throws Exception {
+        when(registry.mcpCandidates()).thenReturn(List.of(candidate("task_list", ToolMeta.Access.READ, true)));
+        when(members.hasReadPermission(5L, 7L)).thenReturn(true);
+        when(registry.execute(eq("task_list"), any(), any(ToolContext.class)))
+                .thenReturn(new ToolRegistry.ToolResult("共 1 项日程任务", null, true));
+        rpc("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"task_list\",\"arguments\":{\"projectId\":5,\"userId\":99}}}")
+                .andExpect(jsonPath("$.result.isError").value(false))
+                .andExpect(jsonPath("$.result.content[0].text").value("共 1 项日程任务"));
+        ArgumentCaptor<ToolContext> ctx = ArgumentCaptor.forClass(ToolContext.class);
+        verify(registry).execute(eq("task_list"), any(), ctx.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(7L, ctx.getValue().userId());
+        org.junit.jupiter.api.Assertions.assertEquals(5L, ctx.getValue().projectId());
+        org.junit.jupiter.api.Assertions.assertTrue(ctx.getValue().conversationId().matches("mcp:[0-9a-f]{8}"));
+
+        // 无权限的项目：不进注册表，与「项目不存在」同一句
+        rpc("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"task_list\",\"arguments\":{\"projectId\":6}}}")
+                .andExpect(jsonPath("$.result.isError").value(true))
+                .andExpect(jsonPath("$.result.content[0].text", containsString("6")));
+        verify(registry, org.mockito.Mockito.times(1)).execute(eq("task_list"), any(), any(ToolContext.class));
+
+        // 工具自报的错误进 isError
+        when(registry.execute(eq("task_list"), any(), any(ToolContext.class)))
+                .thenReturn(new ToolRegistry.ToolResult("Error: bad date", null, true));
+        rpc("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"task_list\",\"arguments\":{\"projectId\":5}}}")
+                .andExpect(jsonPath("$.result.isError").value(true));
+    }
+
+    @Test
+    void unprojectedToolNameIsUnknownTool() throws Exception {
+        when(registry.mcpCandidates()).thenReturn(List.of());
+        when(tools.call(eq("task_create"), anyMap(), eq(7L), any()))
+                .thenThrow(new LocalMcpServerTools.ToolError("Unknown tool: task_create"));
+        rpc("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"task_create\",\"arguments\":{}}}")
+                .andExpect(jsonPath("$.result.isError").value(true));
+        verify(registry, never()).execute(any(), any(), any());
     }
 }

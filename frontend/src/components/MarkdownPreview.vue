@@ -10,10 +10,12 @@
     <!-- 两段 v-html（dev-board#811 K31）：前一段是已经定稿的前缀，字符串不变 Vue 就不碰它的
          DOM——用户在那里选中的文字不会被下一个 token 清掉，也不用重新解析。切点规则见
          utils/markdownStableSplit.js。正文短的时候 stableHtml 恒为空串，形态与改造前一致。 -->
-    <view v-else class="markdown-body" @click="handleBodyClick">
+    <!-- 委托容器用原生 div（S26）：uni 的 <view> 上的 @click 在桌面端实测拿不到原生事件，
+         正文链接的 preventDefault 不生效，点击会落到 target=_blank 的默认行为上。 -->
+    <div v-else class="markdown-body" @click="handleBodyClick">
       <view v-if="stableHtml" class="markdown-stable" v-html="stableHtml"></view>
       <view v-if="tailHtml" class="markdown-tail" v-html="tailHtml"></view>
-    </view>
+    </div>
   </view>
 </template>
 
@@ -21,6 +23,7 @@
 import { renderMarkdown } from '@/utils/markdownRenderer.js'
 import { nextStableLength } from '@/utils/markdownStableSplit.js'
 import { copyToClipboard } from '@/utils/chatClipboard.js'
+import { handleRenderedLinkClick } from '@/utils/externalLink.js'
 import { t } from '@/i18n'
 import { getFileBytesUrl } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
@@ -104,6 +107,7 @@ export default {
      * （&lt; &amp;）在 textContent 里已经还原成原字符，复制走的就是代码原文。
      */
     handleBodyClick(event) {
+      if (handleRenderedLinkClick(event)) return
       const button = event.target && event.target.closest && event.target.closest('[data-md-copy]')
       if (!button) return
       event.preventDefault()

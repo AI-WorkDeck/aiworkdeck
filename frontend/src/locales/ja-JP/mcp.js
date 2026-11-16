@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "MCP 接続",
+  "title": "外部ツール連携（MCP）",
   "description": "MCP は AI の会話・タスクに外部ツールを接続します。Skill は手順、Plugin はデスクトップ機能を追加します。",
   "billing": "有効な独自接続を優先し、データ呼び出しにプラットフォーム残高を使いません。提供元の料金と AI モデルの利用料は別途発生します。失敗時に有料経路へ切り替えません。",
   "transport": "HTTPS Streamable HTTP、Bearer、OAuth に対応。ローカル stdio コマンドはデスクトップのローカルモードでのみ実行でき、事前の確認が必要です。",
@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "ファイルを読み取れませんでした。再選択するか JSON を貼り付けてください。",
   "localConfirm": "このコマンドを実行しますか？{command} — ローカルアカウントの権限で動作し、ファイルやネットワークにアクセスする場合があります。信頼できるプログラムの場合のみ続行してください。",
   "commandHint": "コマンド、引数、作業ディレクトリは表示されます。秘密情報は専用の認証情報欄または環境変数欄に入力してください。",
-  "oauthSaveFirst": "認可する前に、この接続を設定して保存してください。"
+  "oauthSaveFirst": "認可する前に、この接続を設定して保存してください。",
+  "localTitle": "ローカル MCP サービス",
+  "localDesc": "このコンピューター上の Claude Code、Codex などのツールが AI WorkDeck のプロジェクトを読み取り、修正を提案できるようにします。修正はあなたが確認するまで文書に反映されません。",
+  "localOn": "オン",
+  "localOff": "オフ",
+  "localEnable": "オンにする",
+  "localDisable": "オフにする",
+  "localRotate": "再度オンにする（新しいトークン）",
+  "localWarn": "トークンは一度だけ表示されます。今すぐコピーしてください。再度オンにすると新しいトークンが発行され、古いトークンは無効になります。",
+  "localClaude": "Claude Code のコマンド",
+  "localCodex": "Codex の設定（~/.codex/config.toml）",
+  "localCopy": "コピー"
 }

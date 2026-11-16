@@ -33,6 +33,17 @@ class DocumentTextServiceTest {
     }
 
     @Test
+    void trackedChangesFixtureDoesNotConcatenateDeletedAndInsertedText() throws Exception {
+        // scripts/eval/fixtures/contract-tracked.docx：第三条 7 → 15（删除 + 插入修订）。
+        // 曾经抽成「收到货物后 715 日内验收」，模型以为是笔误、停下来问（gap-analysis R1）。
+        java.nio.file.Path fixture = java.nio.file.Path.of("..", "scripts", "eval", "fixtures", "contract-tracked.docx");
+        String text = service.parse(java.nio.file.Files.newInputStream(fixture));
+        assertTrue(!text.contains("715"), "删除修订与插入修订不能拼在一起，实际: " + text);
+        assertTrue(text.contains("甲方应在收到货物后 15⟦原:7⟧ 日内验收。"), "改写应显示为 15⟦原:7⟧，实际: " + text);
+        assertTrue(text.contains("第四条 违约金：⟦增:违约方应按合同总价的 20% 支付违约金。⟧"), "单纯插入应标 ⟦增:⟧，实际: " + text);
+    }
+
+    @Test
     void extractsTailFromThreeHundredPageBreaksAndThirtyThousandCharacters() throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (XWPFDocument doc = new XWPFDocument()) {

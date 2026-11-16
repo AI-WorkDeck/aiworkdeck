@@ -49,7 +49,7 @@ class AskUserQuestionTest {
         for (String p : List.of("question", "options", "multi_select", "header")) {
             assertTrue(params.contains(p), "缺参数 " + p + ": " + params);
         }
-        assertTrue(spec.description().contains("DO NOT CALL IT"), "描述必须同时给出「不要问」的判据");
+        assertTrue(spec.description().contains("何时不用"), "描述必须同时给出「不要问」的判据");
     }
 
     @Test

@@ -54,6 +54,54 @@ public class LegalTools implements AgentToolComponent {
             java.util.Set.of("law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
 
     /**
+     * 法宝上游（MCP 返回错误 / Unknown tool）失败时，回给模型的消息里带的机器可识别标记。
+     * 与语言无关：{@code HarnessDiagnosticService} 与编排器据此跳过「澄清护栏」与类目自愈，并把其余法宝工具本轮置为不可用。
+     */
+    public static final String VENDOR_UNAVAILABLE_MARKER = "[pkulaw_unavailable]";
+
+    /** 是不是 {@link #vendorUnavailable} 产出的消息。 */
+    public static boolean isVendorUnavailable(String output) {
+        return output != null && output.contains(VENDOR_UNAVAILABLE_MARKER);
+    }
+
+    /** 法宝工具名集合（只读），供编排器在上游整体失败后本轮整体下线。 */
+    public static java.util.Set<String> pkulawToolNames() {
+        return PKULAW_TOOLS;
+    }
+
+    /**
+     * 上游返回的是错误（而非参数校验错误——那种模型改参数还能救）时，换成一句明确的模型向说明。
+     * 以 {@code Error:} 开头 = 判失败；原因原文保留，方便排查。
+     */
+    static String vendorUnavailable(String raw) {
+        String reason = raw.length() > 300 ? raw.substring(0, 300) + "…" : raw;
+        return com.checkba.service.LangText.of(
+                "Error: " + VENDOR_UNAVAILABLE_MARKER + " 北大法宝法源暂时不可用（" + reason + "）。"
+                        + "不要重试其他法宝工具（law_search / get_law_article / law_recognition / case_search 同源，本轮已下线）。"
+                        + "本轮最多再用 search_web / browse_url 共 2 次查找条文（系统强制，超出不执行），结果只能作为线索，"
+                        + "优先国家法律法规数据库 flk.npc.gov.cn 原文；之后直接根据已有资料回答。"
+                        + "可以凭法律知识给出条文内容与结论，但凡没有从权威来源取得原文的，须逐条标注「未核实」，不得当作原文引用，也不得声称已核实。",
+                "Error: " + VENDOR_UNAVAILABLE_MARKER + " The PKULaw legal source is temporarily unavailable (" + reason + "). "
+                        + "Do not retry other PKULaw tools (law_search / get_law_article / law_recognition / case_search share the same source and are disabled for this run). "
+                        + "You may use search_web / browse_url at most 2 more times in total to look for the text (enforced; further calls are not executed); "
+                        + "treat results as leads only and prefer the original text on the National Laws and Regulations Database flk.npc.gov.cn. "
+                        + "Then answer with what you have; you may give statute content and conclusions from legal knowledge, but mark every statute text "
+                        + "not retrieved from an authoritative source as \"unverified\", never present it as a verbatim quotation and never claim it was verified.");
+    }
+
+    private static boolean isVendorError(String out) {
+        if (out == null) {
+            return false;
+        }
+        String t = out.stripLeading();
+        if (t.contains("validation error for call[")) {
+            return false;
+        }
+        return t.startsWith("Error from MCP server") || t.contains("Unknown tool")
+                || t.contains("MCP server has no credential");
+    }
+
+    /**
      * 没连账户时不把法宝检索下发给模型（dev-board#750）。{@code read_document} 读的是项目里
      * 已有的文件、全程不出网，绝不能跟着一起藏——那会让模型以为它连文件都读不了。
      */
@@ -100,14 +148,6 @@ public class LegalTools implements AgentToolComponent {
      * OCR 失败一律 {@code Error:} 开头并带上底层原因——此前它以「[System: OCR 识别失败…]」形态
      * 返回，非空且无 Error 前缀，会被当成正文原样注进上下文。
      */
-    @ToolMeta(displayName = "读取文档", category = "file", offerToModel = false)
-    @Tool("Read a project file's full plain text by its database fileId (from doc_list_project_files). "
-            + "Handles Word/Excel/PowerPoint, PDF and plain text; images and scanned PDFs are OCR'd "
-            + "automatically in the cloud (no local setup, no Docker, no script). "
-            + "Very long documents are truncated (the reply says so; ask for a specific section instead of "
-            + "re-reading the whole file). "
-            + "**If the id might be a FOLDER, call extract_file_text instead** — it is the same extractor but "
-            + "answers a folder id with a listing of its children (id + name + type) rather than an error.")
     public String read_document(String fileId) {
         log.info("Tool: read_document called for fileId={}", fileId);
         try {
@@ -148,9 +188,31 @@ public class LegalTools implements AgentToolComponent {
 
     // --- PKULaw MCP Integration（服务器名对应配置 mcp.servers[].name）---
 
-    @ToolMeta(displayName = "语义搜索法规", category = "legal")
-    @Tool("Search for laws and regulations using PKULaw MCP Semantic Search. Use this for general legal questions. Returns a list of relevant articles.")
-    public String law_search(@P("要检索的法律问题或关键词，用自然语言描述即可") String query) {
+    @ToolMeta(displayName = "检索法规", category = "legal", access = ToolMeta.Access.READ)
+    @Tool("用北大法宝检索法律法规，返回相关条文或法规列表。mode=semantic（缺省）按 query 语义检索；mode=keyword 按 title/fulltext 关键词找法规。\n"
+            + "已知法规名和条号用 get_law_article；中国大陆以外的法域用 search_web。")
+    public String law_search(
+            @P(value = "法律问题或关键词，自然语言；semantic 必填", required = false) String query,
+            @P(value = "semantic（缺省）/ keyword", required = false) String mode,
+            @P(value = "法规名关键词如「公司法」，keyword 用", required = false) String title,
+            @P(value = "法规正文关键词，keyword 用", required = false) String fulltext) {
+        String m = mode == null ? "semantic" : mode.trim().toLowerCase(java.util.Locale.ROOT);
+        if (m.isEmpty()) m = "semantic";
+        if ("keyword".equals(m)) {
+            log.info("Tool: law_search (keyword) called for title='{}', fulltext='{}'", title, fulltext);
+            Map<String, Object> args = new HashMap<>();
+            // 模型常把关键词放进 query：title / fulltext 都没给时，query 当法规名关键词
+            String t = StringUtils.hasText(title) ? title : (StringUtils.hasText(fulltext) ? null : query);
+            if (StringUtils.hasText(t)) args.put("title", t.trim());
+            if (StringUtils.hasText(fulltext)) args.put("fulltext", fulltext.trim());
+            if (args.isEmpty()) {
+                return "Error: title or fulltext is required.";
+            }
+            return callPkulaw("pkulaw-keyword", "get_law_list", args);
+        }
+        if (!"semantic".equals(m)) {
+            return "Error: mode 须为 semantic 或 keyword。";
+        }
         log.info("Tool: law_search (semantic) called for query='{}'", query);
         // 先校验再解引用：query 缺省时 Map.of("query", query) 会直接抛 NPE（getMessage()==null），
         // 被 ToolRegistry 的通用异常处理兜成一句不可行动的 "Error executing tool: null"——
@@ -162,6 +224,11 @@ public class LegalTools implements AgentToolComponent {
         // search_case 同口径）；传 query 会触发上游 FastMCP/Pydantic 校验错误：
         // "1 validation error for call[search_article] text Missing required argument"。
         return callPkulaw("pkulaw-semantic", "search_article", Map.of("text", query.trim()));
+    }
+
+    /** 语义检索的便捷重载（非工具入口）。 */
+    public String law_search(String query) {
+        return law_search(query, null, null, null);
     }
 
     @ToolMeta(displayName = "检索司法案例", category = "legal")
@@ -176,22 +243,6 @@ public class LegalTools implements AgentToolComponent {
         return callPkulaw("pkulaw-case-semantic", "search_case", Map.of("text", query.trim()));
     }
 
-    @ToolMeta(displayName = "关键词搜索法规", category = "legal")
-    @Tool("Search for laws by keywords in title or fulltext. Use this when you need specific laws by name.")
-    public String law_search_keyword(
-            @P(value = "法规名称中的关键词（如「公司法」）；与 fulltext 至少给一个", required = false) String title,
-            @P(value = "法规正文中的关键词；与 title 至少给一个", required = false) String fulltext) {
-        log.info("Tool: law_search_keyword called for title='{}', fulltext='{}'", title, fulltext);
-        Map<String, Object> args = new HashMap<>();
-        if (StringUtils.hasText(title)) args.put("title", title.trim());
-        if (StringUtils.hasText(fulltext)) args.put("fulltext", fulltext.trim());
-        if (args.isEmpty()) {
-            return "Error: title or fulltext is required.";
-        }
-
-        return callPkulaw("pkulaw-keyword", "get_law_list", args);
-    }
-
     @ToolMeta(displayName = "法条识别与溯源", category = "legal")
     @Tool("Identify law names and articles from text and trace their source.")
     public String law_recognition(@P("要识别其中法规名称与条文号的原文") String text) {
@@ -204,7 +255,8 @@ public class LegalTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查询法条", category = "legal")
-    @Tool("Get the full content of a specific law article by its title and article number. Use this when you have article info from law_search results.")
+    @Tool("按法规全称和条号取一条法律条文的完整内容。\n"
+            + "何时用：已有 law_search 结果里的法规名和条号，或用户点名某一条；不知道哪条先用 law_search。")
     public String get_law_article(
             @P("法规全称（如「中华人民共和国民法典」），可取自 law_search 的结果") String title,
             @P("条文号（如「第五百七十七条」或「577」）") String number) {
@@ -231,7 +283,12 @@ public class LegalTools implements AgentToolComponent {
      */
     private String callPkulaw(String server, String tool, Map<String, Object> args) {
         try {
-            return pkulawChannel.callTool(server, tool, args);
+            String out = pkulawChannel.callTool(server, tool, args);
+            if (isVendorError(out)) {
+                log.warn("法宝上游失败 server={} tool={}: {}", server, tool, out);
+                return vendorUnavailable(out);
+            }
+            return out;
         } catch (com.checkba.service.platform.GatewayException e) {
             switch (e.getKind()) {
                 case NOT_CONNECTED, UNAUTHORIZED, NO_CREDITS -> throw e;

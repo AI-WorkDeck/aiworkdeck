@@ -25,12 +25,18 @@ def _norm(s):
 
 # ------------------------------------------------------------------ 4 classify
 
-def check_classify(sentences, verdicts):
+def check_classify(sentences, verdicts, scope=None):
     """verdicts: [{"i": int, "is_event": bool, "why": str}]
 
     A sentence left out is the failure this guards against. A model asked to
     return only the events will return only the events and look complete, so the
     protocol demands a verdict per sentence and this counts them.
+
+    `scope`（可选）：勾选范围内的句号集合。给了它，「一句不漏」就在这个范围内数，
+    范围外的句子不必判，判了也不报错。不给就与原来完全一样，全文逐句数。
+    起因是实测：四份材料 119 句，只勾一份剩 25 句、再勾一个年份剩 17 句，而原来
+    仍要写满 119 条判定。范围外的句子到算容量那一步本来就会被剔掉、画不上图，
+    所以判它们只是白花 token；范围内一句不漏的保证原样保留。
     """
     errs, redo = [], []
     seen = {}
@@ -48,7 +54,8 @@ def check_classify(sentences, verdicts):
         if not (v.get("why") or "").strip():
             errs.append(f"句 {i}: 未给出判定理由")
             redo.append(i)
-    missing = [i for i in range(len(sentences)) if i not in seen]
+    _need = sorted(scope) if scope is not None else range(len(sentences))
+    missing = [i for i in _need if i not in seen]
     if missing:
         errs.append(f"{len(missing)} 句未判定：{missing[:10]}"
                     + ("…" if len(missing) > 10 else ""))
@@ -60,6 +67,14 @@ def check_classify(sentences, verdicts):
 
 _CERT = {"exact", "range", "relative", "order"}
 _KIND = {"occur", "sign", "effect", "send", "arrive", "receipt", "record", "due"}
+
+
+try:
+    from cndate import arabize as _arabize                      # 汉字日期：只用于识别
+except ImportError:                                              # 被按文件路径单独加载时
+    import os as _os, sys as _sys
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from cndate import arabize as _arabize
 
 
 def _has_day(sent, y, m, d):
@@ -77,6 +92,9 @@ def _has_day(sent, y, m, d):
     月与日都允许有没有前导零。**不放宽到「只要句中出现这个数字就算」** ——
     那样「数量 15」也会被当成 15 日，等于把这条判据废掉。
     """
+    # 判决书、裁定书落款「二〇二五年十二月二十九日」这类汉字日期先换成数字再比对
+    # （只换来识别，原句与 raw 一字不改；见 cndate.py 的来历）。
+    sent = _arabize(sent)
     _m, _d = int(m), int(d)
     pats = [
         rf"{_d}\s*日",                                        # 3 月 15 日
@@ -190,7 +208,7 @@ def report(name, errs, redo):
 
 
 # ---------------------------------------------------------------- 前端：拆解
-def check_parts(sentences, parts, max_parts=8, blocks=None, events=None):
+def check_parts(sentences, parts, max_parts=8, blocks=None, events=None, scope=None):
     """检查模型给出的「部分清单」（交互第三步）。
 
     parts: [{"id":int, "name":str, "sids":[int], "span":str, "first":str, "last":str}]
@@ -251,7 +269,21 @@ def check_parts(sentences, parts, max_parts=8, blocks=None, events=None):
                 redo.append(pid)
             else:
                 seen[s] = pid
-    missing = [i for i in range(n) if i not in seen]
+    # scope：与 check_classify 同一个口径。给了就只要求勾选范围内的句子一句不漏；
+    # 范围外的句子写进部分里也照收（照旧写满全部句子的做法仍然通过）。
+    _need = sorted(scope) if scope is not None else range(n)
+    # 只在按范围校验时才有的一个死结，比对新旧两条路时撞出来的：勾了时间段之后，
+    # 某个叙述块（比如诉称）里的带日期句子全被筛到范围外，块里只剩几句不带日期、
+    # 也不是事实的句子。它们单独成一个部分，违反「部分里至少一个事实句」；并进相邻
+    # 部分，又违反「不许跨叙述块」—— 两条规则都对，合起来却无解。
+    # 这几句不是事实，画不出东西，所以放行：**叙述块在范围内没有任何事实句时，
+    # 块里的非事实句可以不进部分**。事实句一句都不放行，范围内的事实照旧一句不漏。
+    _exempt = set()
+    if scope is not None and blocks and events is not None:
+        _evs = set(events)
+        _blk_has_ev = {_blk_of(i) for i in _need if i in _evs}
+        _exempt = {i for i in _need if i not in _evs and _blk_of(i) not in _blk_has_ev}
+    missing = [i for i in _need if i not in seen and i not in _exempt]
     if missing:
         errs.append(f"{len(missing)} 句没有落在任何部分里：{missing[:10]}"
                     f"{' …' if len(missing) > 10 else ''}；"
@@ -345,10 +377,14 @@ def check_capacity(items, cap_chars, cap_title=None, title=None, sentences=None)
                                 for s in sids):
                     room = len(_norm("".join(sentences[s] for s in sids)))
             if room is None or len(h) < room * 0.6:
-                warns.append(f"事项 {it.get('id')}: 只写了 {len(h)} 字，容量有 "
-                             f"{cap_chars} 字"
-                             + (f"、原句有 {room} 字" if room else "")
-                             + " —— 容量既是上限也是目标")
+                # 门槛写明白：告警只在「不足容量四成**且**不足原句六成」时出现。
+                # 真实运行里模型把这条读成「要写到接近容量」，于是把八张卡片从三四十字
+                # 扩写到 66–103 字，白写了一堆字也多花了时间。写到门槛之上就不必再扩。
+                _floor = int(cap_chars * 0.4) + 1
+                warns.append(f"事项 {it.get('id')}: 只写了 {len(h)} 字"
+                             + (f"，原句有 {room} 字" if room else "")
+                             + f"，容量 {cap_chars} 字。写到 {_floor} 字以上这条提醒就不再出现，"
+                             f"**不必逼近容量**；原句没有更多可用的内容就保持现状。")
     if title is not None and cap_title:
         if len(title) > cap_title:
             errs.append(f"图名 {len(title)} 字超过容量 {cap_title} 字，请改短")
@@ -401,9 +437,22 @@ def check_subsequence(items, sentences):
         for ch in txt:
             i = src.find(ch, i)
             if i < 0:
-                errs.append(f"事项 {it.get('id')}: 文字不是句 {list(sids)} 的子序列"
-                            f"（出现了原句里没有的字或改了顺序），"
-                            f"只许删减不许改写")
+                # 报错要能一次改对。真实运行里三轮都卡在同一类地方：跨句拼接的接缝上
+                # 多了一个原句没有的字（多写一个逗号、加一个「提出」），模型只看到
+                # 「不是子序列」，便去换一句概括，反而离原文更远。所以这里指出
+                # **卡在哪个字**，以及原句在那个位置往后真正写的是什么。
+                _at = txt.index(ch)
+                _ok = txt[:_at]
+                _pos = 0
+                for _c in _ok:
+                    _pos = src.find(_c, _pos) + 1
+                _after = src[_pos:_pos + 12]
+                errs.append(
+                    f"事项 {it.get('id')}: 文字不是句 {list(sids)} 的子序列 —— "
+                    f"卡在第 {_at + 1} 个字「{ch}」"
+                    f"（前面「…{_ok[-8:]}」是对的）；原句到这里往后写的是"
+                    f"「{_after}…」。把这个字改成原句真有的那个即可，"
+                    f"不要换一句概括。")
                 redo.append(it.get("id"))
                 break
             i += 1

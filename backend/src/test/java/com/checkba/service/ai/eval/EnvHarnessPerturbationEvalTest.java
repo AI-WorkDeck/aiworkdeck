@@ -104,18 +104,18 @@ class EnvHarnessPerturbationEvalTest {
         doc.fileType = "docx";
         c.activeDocument = doc;
         c.toolStubs = Map.of(
-                "doc_table_add_row", "{\"success\":true}");
+                "doc_table_insert", "{\"success\":true}");
 
         EvalCase.Turn turn1 = new EvalCase.Turn();
         EvalCase.NativeCall call1 = new EvalCase.NativeCall();
-        call1.name = "doc_table_add_row";
-        call1.arguments = Map.of("tableIndex", 0, "afterRow", 0);
+        call1.name = "doc_table_insert";
+        call1.arguments = Map.of("axis", "row", "tableIndex", 0);
         turn1.toolCalls = List.of(call1);
 
         EvalCase.Turn turn2 = new EvalCase.Turn();
         EvalCase.NativeCall call2 = new EvalCase.NativeCall();
-        call2.name = "doc_table_add_row";
-        call2.arguments = Map.of("tableIndex", 0, "afterRow", 1);
+        call2.name = "doc_table_insert";
+        call2.arguments = Map.of("axis", "row", "tableIndex", 0, "before", "2");
         turn2.toolCalls = List.of(call2);
 
         EvalCase.Turn turn3 = new EvalCase.Turn();
@@ -124,8 +124,8 @@ class EnvHarnessPerturbationEvalTest {
         c.turns = List.of(turn1, turn2, turn3);
 
         EnvPerturbation setupPerturbation = EnvPerturbation.setupTransientFailure(
-                "doc_table_add_row",
-                "Error: Tool not found in current disclosed surface: doc_table_add_row",
+                "doc_table_insert",
+                "Error: Tool not found in current disclosed surface: doc_table_insert",
                 "{\"success\":true}");
 
         EvalHarness.RunResult result = EvalHarness.run(c, setupPerturbation);
@@ -133,7 +133,7 @@ class EnvHarnessPerturbationEvalTest {
         assertEquals(0, result.remainingScriptTurns());
         assertFalse(result.events("harness_adaptation").isEmpty());
         assertTrue(result.events("harness_adaptation").get(0).data().contains("EXPAND_TOOL_CATEGORY"));
-        assertTrue(result.toolNamesOfferedPerLlmCall().get(1).contains("doc_table_add_row"),
-                "Expected doc_table_add_row to be offered in round 2 after EXPAND_TOOL_CATEGORY self-healing");
+        assertTrue(result.toolNamesOfferedPerLlmCall().get(1).contains("doc_table_insert"),
+                "Expected doc_table_insert to be offered in round 2 after EXPAND_TOOL_CATEGORY self-healing");
     }
 }

@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Kích thước: {size}",
   "renderingDoc": "Đang hiển thị tài liệu…",
   "renderingSlides": "Đang hiển thị bài thuyết trình…",
+  "slidesNotShown": "Còn {count} trang chiếu chưa hiển thị. Mở tệp để xem tất cả.",
   "officePreviewUnsupported": "Không thể xem trực tuyến tệp này",
   "fileTypeHintOpenLocal": "Loại tệp: {type}. Tìm nó trong Finder hoặc File Explorer và mở bằng ứng dụng cục bộ.",
   "unknown": "Không xác định",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Đang tạo phụ đề. Chúng sẽ hiển thị khi sẵn sàng.",
     "ready": "Phụ đề đã sẵn sàng",
     "failed": "Tạo phụ đề thất bại. Nhấp vào nút phụ đề để thử lại.",
-    "notConfigured": "Chưa thiết lập ghi chép. Cấu hình trong Cài đặt hệ thống - Dịch vụ nền tảng - Ghi chép cuộc họp để tạo phụ đề.",
+    "notConfigured": "Chưa thiết lập ghi chép. Cấu hình trong Cài đặt - Dịch vụ nền tảng - Ghi chép cuộc họp để tạo phụ đề.",
     "noticePending": "Đã đăng ký. Xác nhận thông báo ghi âm trong Voice - Ghi âm cuộc họp trước, sau đó nhấp vào nút phụ đề.",
     "submitFailed": "Không thể bắt đầu tạo phụ đề",
     "empty": "Không phát hiện thấy lời nói"

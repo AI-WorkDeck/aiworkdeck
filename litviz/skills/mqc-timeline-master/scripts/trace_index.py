@@ -16,6 +16,7 @@
   这里生成时就写进每个 pPr，一步到位）。
 - 表头行 tblHeader 跨页重复；单元格纵向居中；第 1、4 列水平居中，其余两端对齐。
 - A4 纵向，页边距四周 1440 缇；页脚正中页码（Times New Roman 9pt）。
+- payload 带 omissions 时，尾注后追加「未上图的原文」三列表（图上编号 / 涉及 / 未上图的原文）。
 
 用法（与 js 版命令行兼容）：
     python trace_index.py <trace.json> <输出.docx>
@@ -148,6 +149,34 @@ def build_document_xml(data):
              f'</w:tblPr><w:tblGrid>{grid}</w:tblGrid>'
              f'{header_row}{"".join(body_rows)}</w:tbl>')
 
+    # 「未上图的原文」（上游 v3.1.0 trace_index.js 新增，可选）：三列 1150/2000/5850，
+    # 版式同主表；标题 14pt 加粗居中、段前 480 段后 240。原文一个字都不截。
+    omit_block = ""
+    omissions = data.get("omissions") or []
+    if omissions:
+        ow = [1150, 2000, 5850]
+        o_header = "".join(
+            _cell(t, ow[i], bold=True, center=True, top=_line, bottom=_line,
+                  left=_none if i == 0 else None, right=_none if i == 2 else None)
+            for i, t in enumerate(("图上编号", "涉及", "未上图的原文")))
+        o_rows = "".join(
+            "<w:tr>" + "".join(
+                _cell(r.get(k, ""), ow[i], center=(i == 0),
+                      bottom=_line if idx == len(omissions) - 1 else None,
+                      left=_none if i == 0 else None, right=_none if i == 2 else None)
+                for i, k in enumerate(("no", "kinds", "omitted"))) + "</w:tr>"
+            for idx, r in enumerate(omissions))
+        omit_block = (
+            _para("未上图的原文", size=28, bold=True, center=True, before=480, after=240)
+            + _para("本图是摘要图，卡片只放一行标题。下列事项的原句有部分内容没有画到图上，"
+                    "请据此核对；“涉及”一列标出其中的限制性表述。", after=240)
+            + '<w:tbl><w:tblPr>'
+            f'<w:tblW w:w="{sum(ow)}" w:type="dxa"/><w:tblLayout w:type="fixed"/>'
+            '</w:tblPr><w:tblGrid>'
+            + "".join(f'<w:gridCol w:w="{w}"/>' for w in ow)
+            + '</w:tblGrid>'
+            f'<w:tr><w:trPr><w:tblHeader/></w:trPr>{o_header}</w:tr>{o_rows}</w:tbl>')
+
     footer_para = ('<w:p><w:pPr>' + _AUTOSPACE + '<w:jc w:val="center"/></w:pPr>'
                    '<w:fldSimple w:instr=" PAGE ">' + _run("1", size=18, eastasia=EN)
                    + '</w:fldSimple></w:p>')
@@ -162,6 +191,7 @@ def build_document_xml(data):
         + _para(data.get("foot")
                 or "“定位”为材料规范化后的句号，可据此回到原文逐字核对。",
                 before=240)
+        + omit_block
         + '<w:sectPr>'
         '<w:footerReference w:type="default" r:id="rId2"/>'
         '<w:pgSz w:w="11906" w:h="16838"/>'

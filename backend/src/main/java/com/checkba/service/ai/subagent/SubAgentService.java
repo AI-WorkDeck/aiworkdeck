@@ -5,6 +5,7 @@ package com.checkba.service.ai.subagent;
 
 import cn.hutool.json.JSONUtil;
 import com.checkba.dto.ai.TaskProgressEvent;
+import com.checkba.service.LangText;
 import com.checkba.service.ai.AllowedModels;
 import com.checkba.service.ai.AuxModelResolver;
 import com.checkba.service.ai.ChatModelFactory;
@@ -127,10 +128,20 @@ public class SubAgentService {
      * 循环开头调用，记录"这一刻已经完整跑完的轮数"，与 runLoop 自己失败分支里 {@code round - 1}
      * 的口径保持一致。
      */
+    /** 记为「实际读过某份材料」的工具：按 fileId 读全文。检索摘要与读当前稿都不算读过底稿。 */
+    /**
+     * 收尾核验员（mustConsult）最多查材料的轮数；之后一轮 tool_choice=none，只许依据已读材料作答。
+     * W6 staging：不设上限时 qwen3.8-max 一轮读一个文件，12 个文件 14 轮，每轮重发整段上下文。
+     */
+    public static final int MAX_CONSULT_ROUNDS = 4;
+    static final java.util.Set<String> READ_FILE_TOOLS = java.util.Set.of("extract_file_text", "read_document");
+
     static final class Progress {
         Long activeFileId;
         private final List<String> toolsUsed = new java.util.concurrent.CopyOnWriteArrayList<>();
         private final List<SubAgentResult.FileChange> fileChanges = new java.util.concurrent.CopyOnWriteArrayList<>();
+        /** 读文件工具成功读过的文件 ID（去重、按首次读取顺序）。 */
+        private final List<Long> filesRead = new java.util.concurrent.CopyOnWriteArrayList<>();
         private final AtomicInteger completedRounds = new AtomicInteger(0);
         private final AtomicBoolean cancelled = new AtomicBoolean();
 
@@ -199,6 +210,26 @@ public class SubAgentService {
      */
     public SubAgentResult dispatch(String taskDescription, String expectedOutput,
                                    List<String> toolScope, ToolContext parentCtx) {
+        return dispatch(taskDescription, expectedOutput, toolScope, parentCtx, null);
+    }
+
+    /**
+     * modelOverride 非空时用它代替配置的子 Agent 模型（仍走同一道可用清单校验）。
+     * 收尾核验用主轮次的模型（W6：flash 档核验员会编造不存在的来源文件）。
+     */
+    public SubAgentResult dispatch(String taskDescription, String expectedOutput,
+                                   List<String> toolScope, ToolContext parentCtx, String modelOverride) {
+        return dispatch(taskDescription, expectedOutput, toolScope, parentCtx, modelOverride, false);
+    }
+
+    /**
+     * @param mustConsult 子 Agent 第一次想交卷时一次工具都没调过，就在同一对话里顶回一次、要求先查材料
+     *                    （收尾核验用：staging 实测 qwen3.8-max 拿着可用的读文件工具、一轮就写了 1.3 万字结论，
+     *                    一份底稿都没读）。只顶一次；还是不查就照常交卷，由调用方按「未查阅」处理。
+     */
+    public SubAgentResult dispatch(String taskDescription, String expectedOutput,
+                                   List<String> toolScope, ToolContext parentCtx, String modelOverride,
+                                   boolean mustConsult) {
         String subtaskId = "subtask-" + UUID.randomUUID().toString().substring(0, 8);
         // started/结束事件必须成对发出（前端的子任务卡按 taskId 配对渲染），
         // 所以模型校验失败那条路径也走"先 started 再 failed"，不能只发一个 failed
@@ -208,7 +239,8 @@ public class SubAgentService {
         // 模型在提交线程解析，非白名单在起跑前就拒绝：ChatModelFactory 对非白名单的处置是
         // 静默回落默认模型——failover 链踩过的同一个坑（看着「配了便宜模型」，实际跑的是主模型，
         // 账单要到月底才看得出来）。这里给出可读提示，让模型与面板都能看到原因。
-        String configuredModel = auxModelResolver.subAgentModelId(props.getModel());
+        String configuredModel = modelOverride != null && !modelOverride.isBlank()
+                ? modelOverride : auxModelResolver.subAgentModelId(props.getModel());
         String modelId = chatModelFactory.usesProviderCatalog()
                 ? chatModelFactory.resolveEffectiveModelId(configuredModel) : configuredModel;
         if (!(chatModelFactory.usesProviderCatalog() ? chatModelFactory.isAvailableModel(modelId) : AllowedModels.isAllowed(modelId))) {
@@ -247,7 +279,7 @@ public class SubAgentService {
                 if (editorBridgeService != null) {
                     editorBridgeService.setCurrentConversationId(parentCtx == null ? null : parentCtx.conversationId());
                 }
-                return runLoop(subtaskId, taskDescription, expectedOutput, toolScope, parentCtx, modelId, progress);
+                return runLoop(subtaskId, taskDescription, expectedOutput, toolScope, parentCtx, modelId, progress, mustConsult);
             } finally {
                 if (editorBridgeService != null) {
                     if (previousConversation == null) editorBridgeService.clearCurrentConversationId();
@@ -306,7 +338,7 @@ public class SubAgentService {
                 result.success() ? com.checkba.service.LangText.of("子任务完成", "Subtask completed")
                         : cancelledByUser ? com.checkba.service.LangText.of("子任务已停止", "Subtask stopped")
                         : com.checkba.service.LangText.of("子任务失败：", "Subtask failed: ") + brief(result.error()));
-        return result.withFileChanges(progress.fileChanges);
+        return result.withFileChanges(progress.fileChanges).withFilesRead(progress.filesRead);
     }
 
     /**
@@ -352,6 +384,13 @@ public class SubAgentService {
      */
     SubAgentResult runLoop(String subtaskId, String taskDescription, String expectedOutput,
                            List<String> toolScope, ToolContext parentCtx, String modelId, Progress progress) {
+        return runLoop(subtaskId, taskDescription, expectedOutput, toolScope, parentCtx, modelId, progress, false);
+    }
+
+    SubAgentResult runLoop(String subtaskId, String taskDescription, String expectedOutput,
+                           List<String> toolScope, ToolContext parentCtx, String modelId, Progress progress,
+                           boolean mustConsult) {
+        boolean consultNudged = false;
         // 子 Agent 继承主会话的客户端能力（不变式 3 同款思路）：
         // office 会话派生的子 Agent 同样不该看到 doc_*/sheet_* 死路径工具
         String parentConversationId = parentCtx != null ? parentCtx.conversationId() : null;
@@ -369,7 +408,7 @@ public class SubAgentService {
                         specs, allowed, null, null, () -> progress.isCancelled(parentCtx), parentCtx.defaultOutputFolderId(), parentCtx.activeFileId(), parentCtx.fileChangeListener());
 
         List<ChatMessage> messages = new ArrayList<>();
-        messages.add(SystemMessage.from(buildSystemPrompt(expectedOutput, allowed)));
+        messages.add(SystemMessage.from(buildSystemPrompt(expectedOutput, allowed, mustConsult)));
         messages.add(UserMessage.from(taskDescription));
 
         // 与 progress 共用同一个列表引用：executeScoped 往这里 add，dispatch() 的超时/中断/
@@ -393,22 +432,50 @@ public class SubAgentService {
             }
 
             Response<AiMessage> response;
+            Integer[] cacheUsage = new Integer[2];
             try {
                 // Recheck account/balance and key ownership before every paid round.
-                ChatLanguageModel model = chatModelFactory.getChatModel(modelId);
-                response = specs.isEmpty() ? model.generate(messages) : model.generate(messages, specs);
+                // 优先走与主循环同一个流式通道（W6）：它给 system 打提示缓存断点、并回报 cached_tokens；
+                // 非流式 OpenAiChatModel 两样都没有——核验员 10 轮调用全部按全价算、cached 一栏全是空。
+                dev.langchain4j.model.chat.StreamingChatLanguageModel streaming = chatModelFactory.getStreamingChatModel(modelId);
+                // 只有平台/OpenRouter 的流式实现支持带工具的三参 generate 并回报缓存；Ollama 等走原路
+                // mustConsult 第一轮：强制先调一次检索/读取工具（tool_choice 具名函数），之后回到 auto
+                String choice = mustConsult && !specs.isEmpty() ? consultToolChoice(round, toolsUsed.isEmpty(), specs) : null;
+                if (choice != null && !"auto".equals(choice)) log.info("[SubAgent] {} round {} tool_choice {}", subtaskId, round, choice);
+                if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel orm && choice != null) {
+                    response = generateBlocking(orm, messages, specs, choice, cacheUsage);
+                } else if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel) {
+                    response = generateBlocking(streaming, messages, specs, cacheUsage);
+                } else {
+                    ChatLanguageModel model = chatModelFactory.getChatModel(modelId);
+                    response = specs.isEmpty() ? model.generate(messages) : model.generate(messages, specs);
+                }
             } catch (Exception e) {
                 log.warn("Sub-agent {} LLM call failed at round {}", subtaskId, round, e);
                 return SubAgentResult.failure(subtaskId,
                         "sub-agent LLM call failed: " + e.getMessage(), toolsUsed, round - 1);
             }
-            recordUsage(response, modelId, parentCtx);
+            recordUsage(response, modelId, parentCtx, cacheUsage[0], cacheUsage[1]);
             if (progress.isCancelled(parentCtx)) throw new CancellationException();
             AiMessage aiMessage = response.content();
             messages.add(aiMessage);
 
+            // 读取轮次用完后仍要调工具（tool_choice=none 被忽略）：不再执行，按已读材料收尾；再犯一次判失败
+            if (mustConsult && round > MAX_CONSULT_ROUNDS && aiMessage.hasToolExecutionRequests()) {
+                if (round > MAX_CONSULT_ROUNDS + 1) {
+                    return SubAgentResult.failure(subtaskId, "verifier kept requesting tools after its read budget", toolsUsed, round);
+                }
+                for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
+                    messages.add(ToolExecutionResultMessage.from(req, com.checkba.service.LangText.of(
+                            "读取轮次已用完，本次未执行。请依据已读材料作答，没读到来源的命题标为未核实。",
+                            "Read budget used up; not executed. Answer from what you have read and mark unsourced propositions unverified.")));
+                }
+                continue;
+            }
             // 协议 1：原生 function calling
             if (aiMessage.hasToolExecutionRequests()) {
+                log.info("[SubAgent] {} round {} tool requests: {}", subtaskId, round,
+                        aiMessage.toolExecutionRequests().stream().map(ToolExecutionRequest::name).toList());
                 for (ToolExecutionRequest req : aiMessage.toolExecutionRequests()) {
                     String output = executeScoped(req.name(), req.arguments(), allowed, subCtx, toolsUsed, progress);
                     messages.add(ToolExecutionResultMessage.from(req, output));
@@ -435,6 +502,26 @@ public class SubAgentService {
 
             // 无工具调用 = 最终答案
             if (progress.isCancelled(parentCtx)) throw new CancellationException();
+            if (mustConsult && toolsUsed.isEmpty() && !consultNudged && !specs.isEmpty()) {
+                consultNudged = true;
+                log.info("[SubAgent] {} tried to finish at round {} without consulting any tool; asking once to read the materials first",
+                        subtaskId, round);
+                messages.add(UserMessage.from(com.checkba.service.LangText.of(
+                        "你还没有查阅任何材料就给出了结论。没有读过来源材料的结论会被系统判为无效。"
+                                + "请先用可用的读取/检索工具（extract_file_text、search_project_content 等）读取与各命题相关的材料，"
+                                + "再按要求逐槽给出引文与判定。",
+                        "You gave conclusions without consulting any material. Conclusions not based on sources you "
+                                + "actually read will be ruled invalid by the system. First read the materials relevant to each "
+                                + "proposition with the available read/search tools (extract_file_text, search_project_content, ...), "
+                                + "then give the per-slot quotes and verdicts as required.")));
+                continue;
+            }
+            // W6：核验员一次工具都没调就交卷（没读过正文）以前只能靠推断，记下来
+            // 只记形状不记正文：长度，以及正文里是否夹着本循环不解析的工具调用标记（如 Qwen 的 <tool_call>）
+            // pushedBack：mustConsult 顶回过一次——日志里数它占收尾核验的比例，看模型多常需要被提醒
+            log.info("[SubAgent] {} finished after {} round(s); tools offered={} used={}; pushedBack={}; answer chars={} toolMarkup={}",
+                    subtaskId, round, specs.size(), toolsUsed, consultNudged, text.length(),
+                    text.contains("<tool_call") || text.contains("<function") || text.contains("\"name\":") );
             return SubAgentResult.success(subtaskId, text.trim(), toolsUsed, round);
         }
     }
@@ -449,7 +536,84 @@ public class SubAgentService {
      * <p>归属取主会话上下文（不变式 3：projectId/conversationId/userId 一律继承，模型可独立），
      * 记账失败绝不影响子任务结果。
      */
+    /**
+     * 流式通道的阻塞包装：等 onComplete/onError，把提示缓存读写数写进 cacheUsage[0..1]。
+     * 被 dispatch 的超时/取消打断时 get() 抛 InterruptedException，与非流式一样按失败返回。
+     */
+    /**
+     * 收尾核验员这一轮的 tool_choice：第一轮还没查过材料→强制检索/读取；查满 {@link #MAX_CONSULT_ROUNDS} 轮→none；其余 auto。
+     */
+    static String consultToolChoice(int round, boolean nothingConsulted, List<ToolSpecification> specs) {
+        if (round > MAX_CONSULT_ROUNDS) return "none";
+        if (round == 1 && nothingConsulted) {
+            String forced = forcedConsultTool(specs);
+            if (forced != null) return forced;
+        }
+        return "auto";
+    }
+
+    /** 收尾核验第一轮强制调用的工具：优先全文检索（模型自己定查什么），没有就读文件。 */
+    static String forcedConsultTool(List<ToolSpecification> specs) {
+        for (String name : List.of("search_project_content", "extract_file_text", "read_document")) {
+            if (specs.stream().anyMatch(s -> name.equals(s.name()))) return name;
+        }
+        return null;
+    }
+
+    static Response<AiMessage> generateBlocking(com.checkba.service.ai.OpenRouterStreamingChatModel model,
+                                                List<ChatMessage> messages, List<ToolSpecification> specs,
+                                                String toolChoice, Integer[] cacheUsage) throws Exception {
+        java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
+        com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
+            @Override public void onNext(String token) { }
+            @Override public void onComplete(Response<AiMessage> response) { done.complete(response); }
+            @Override public void onError(Throwable error) { done.completeExceptionally(error); }
+            @Override public void onCacheUsage(int promptTokens, int cachedTokens, int cacheWriteTokens) {
+                cacheUsage[0] = cachedTokens;
+                cacheUsage[1] = cacheWriteTokens;
+            }
+        };
+        model.generateConsultRound(messages, specs, toolChoice, handler);
+        try {
+            return done.get();
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception ex) throw ex;
+            throw e;
+        }
+    }
+
+    static Response<AiMessage> generateBlocking(dev.langchain4j.model.chat.StreamingChatLanguageModel model,
+                                                List<ChatMessage> messages,
+                                                List<dev.langchain4j.agent.tool.ToolSpecification> specs,
+                                                Integer[] cacheUsage) throws Exception {
+        java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
+        com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
+            @Override public void onNext(String token) { }
+            @Override public void onComplete(Response<AiMessage> response) { done.complete(response); }
+            @Override public void onError(Throwable error) { done.completeExceptionally(error); }
+            @Override public void onCacheUsage(int promptTokens, int cachedTokens, int cacheWriteTokens) {
+                cacheUsage[0] = cachedTokens;
+                cacheUsage[1] = cacheWriteTokens;
+            }
+        };
+        if (specs == null || specs.isEmpty()) model.generate(messages, handler);
+        else model.generate(messages, specs, handler);
+        try {
+            return done.get();
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception ex) throw ex;
+            throw e;
+        }
+    }
+
     private void recordUsage(Response<AiMessage> response, String modelId, ToolContext parentCtx) {
+        recordUsage(response, modelId, parentCtx, null, null);
+    }
+
+    private void recordUsage(Response<AiMessage> response, String modelId, ToolContext parentCtx,
+                             Integer cachedTokens, Integer cacheWriteTokens) {
         if (response == null || response.tokenUsage() == null) {
             return;
         }
@@ -459,7 +623,12 @@ public class SubAgentService {
                     ? parentCtx.userId()
                     : PlatformAiUserScope.current();
             String conversationId = parentCtx != null ? parentCtx.conversationId() : null;
-            tokenUsageService.recordUsage(projectId, userId, modelId, response.tokenUsage(), conversationId);
+            if (cachedTokens == null && cacheWriteTokens == null) {
+                tokenUsageService.recordUsage(projectId, userId, modelId, response.tokenUsage(), conversationId);
+            } else {
+                tokenUsageService.recordUsage(projectId, userId, modelId, response.tokenUsage(), conversationId,
+                        cachedTokens, cacheWriteTokens);
+            }
         } catch (Exception e) {
             log.warn("子 Agent token 记账失败（不影响子任务结果）: {}", e.getMessage());
         }
@@ -478,11 +647,26 @@ public class SubAgentService {
             return "Error: ask_user is not available inside a sub-agent. Finish with what you have and "
                     + "state the open question in your result; the main agent will ask the user.";
         }
+        // 需要用户确认的工具（destructive / confirm:always）：子 Agent 没有确认卡可出，交回主 Agent 走确认闸
+        if (toolRegistry.requiresConfirmation(resolved)) {
+            return "Error: " + LangText.of(
+                    "工具 '" + resolved + "' 需要用户确认，不能在子 Agent 中使用。请说明需要执行的操作，由主 Agent 征得用户确认后执行。",
+                    "tool '" + resolved + "' needs the user's confirmation and is not available inside a sub-agent. "
+                            + "Report what should be done; the main agent will ask the user and run it.");
+        }
         if (!allowed.contains(resolved)) {
+            log.info("[SubAgent] refused out-of-scope tool '{}' (scope {})", resolved, allowed);
             return "Error: tool '" + resolved + "' is outside this sub-agent's tool scope.";
         }
         toolsUsed.add(resolved);
         ToolRegistry.ToolResult result = toolRegistry.execute(rawName, argsJson, subCtx);
+        if (result.success() && READ_FILE_TOOLS.contains(resolved)) {
+            try {
+                var id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(argsJson).path("fileId");
+                long value = id.isIntegralNumber() || (id.isTextual() && id.asText().matches("\\d+")) ? Long.parseLong(id.asText()) : 0;
+                if (value > 0 && !progress.filesRead.contains(value)) progress.filesRead.add(value);
+            } catch (Exception ignored) { /* 读不出 fileId 就不算读过 */ }
+        }
         if (result.success() && result.fileChanged()) {
             if ("doc_open_file".equals(resolved) || "doc_start_stream".equals(resolved)) {
                 try { progress.activeFileId = Long.parseLong(new com.fasterxml.jackson.databind.ObjectMapper()
@@ -543,7 +727,7 @@ public class SubAgentService {
         return allowed;
     }
 
-    private String buildSystemPrompt(String expectedOutput, Set<String> allowed) {
+    private String buildSystemPrompt(String expectedOutput, Set<String> allowed, boolean mustConsult) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个专注的子任务执行 Agent，只负责完成下面这一个子任务。\n");
         sb.append("规则：\n");
@@ -555,6 +739,14 @@ public class SubAgentService {
         }
         if (!allowed.isEmpty()) {
             sb.append("可用工具：").append(String.join(", ", allowed)).append("\n");
+        }
+        if (mustConsult) {
+            sb.append(com.checkba.service.LangText.of(
+                    "4. 查材料最多 " + MAX_CONSULT_ROUNDS + " 轮：先检索，再把要读的文件在同一轮里一次性全部请求（多个并行工具调用），"
+                            + "不要一轮只读一个；之后依据已读材料作答，没读到来源的命题标为未核实。\n",
+                    "4. At most " + MAX_CONSULT_ROUNDS + " rounds of consulting: search first, then request every file you need "
+                            + "in ONE round (several parallel tool calls), not one file per round; then answer from what you read "
+                            + "and mark any proposition without a source you read as unverified.\n"));
         }
         return sb.toString();
     }

@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Tamaño: {size}",
   "renderingDoc": "Renderizando documento…",
   "renderingSlides": "Renderizando presentación…",
+  "slidesNotShown": "Hay {count} diapositivas más sin mostrar. Abra el archivo para verlas todas.",
   "officePreviewUnsupported": "La vista previa en línea no está disponible para este archivo",
   "fileTypeHintOpenLocal": "Tipo de archivo: {type}. Búscuelo en Finder o en el Explorador de archivos y ábralo con una aplicación local.",
   "unknown": "Desconocido",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Generando subtítulos. Aparecerán cuando estén listos.",
     "ready": "Los subtítulos están listos",
     "failed": "Error al generar los subtítulos. Haga clic en el botón de subtítulos para reintentar.",
-    "notConfigured": "La transcripción no está configurada. Configúrela en Configuración del sistema - Servicios de plataforma - Transcripción de reuniones para generar subtítulos.",
+    "notConfigured": "La transcripción no está configurada. Configúrela en Ajustes - Servicios de plataforma - Transcripción de reuniones para generar subtítulos.",
     "noticePending": "Registrado. Confirme primero el aviso de grabación en Voz - Grabación de reuniones y, a continuación, haga clic en el botón de subtítulos.",
     "submitFailed": "No se pudo iniciar la generación de subtítulos",
     "empty": "No se detectó voz"

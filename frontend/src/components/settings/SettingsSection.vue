@@ -46,6 +46,7 @@ export default {
 
 .awd-set-section-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
@@ -53,8 +54,9 @@ export default {
   border-bottom: 1px solid var(--awd-border);
 }
 
+/* 说明文字至少留 280px；放不下时右侧按钮整组换到下一行，而不是把说明挤成一字宽的竖条 */
 .awd-set-section-head-text {
-  flex: 1;
+  flex: 1 1 280px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -74,9 +76,13 @@ export default {
   color: var(--awd-text-2);
 }
 
+/* 按钮多、译文长（英/德/俄）时换行，不被截在卡片右缘外；空间够时与原来一样排成一行 */
 .awd-set-section-actions {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "label": "MCP",
-  "title": "Sambungan MCP",
+  "title": "Sambungan alat luaran (MCP)",
   "description": "MCP menghubungkan alat luaran dengan perbualan dan tugas AI. Skill menyediakan kaedah kerja; Plugin menambah fungsi desktop.",
   "billing": "Sambungan aktif anda diutamakan tanpa kredit platform untuk panggilan data. Caj penyedia dan model AI masih terpakai. Kegagalan tidak beralih ke saluran berbayar.",
   "transport": "HTTPS Streamable HTTP menyokong Bearer dan OAuth. Arahan stdio setempat memerlukan mod desktop setempat serta pengesahan sebelum dijalankan.",
@@ -77,5 +77,16 @@ export default {
   "fileReadFailed": "Fail tidak dapat dibaca. Pilih semula atau tampal JSON.",
   "localConfirm": "Jalankan arahan ini? {command} — Ia menggunakan kebenaran akaun setempat anda dan boleh mengakses fail serta rangkaian. Teruskan hanya jika anda mempercayai program ini.",
   "commandHint": "Arahan, argumen dan direktori kerja kekal kelihatan. Masukkan rahsia dalam medan kelayakan atau pemboleh ubah persekitaran.",
-  "oauthSaveFirst": "Konfigurasikan dan simpan sambungan ini sebelum memberi kebenaran."
+  "oauthSaveFirst": "Konfigurasikan dan simpan sambungan ini sebelum memberi kebenaran.",
+  "localTitle": "Perkhidmatan MCP setempat",
+  "localDesc": "Benarkan Claude Code, Codex dan alat lain pada komputer ini membaca projek AI WorkDeck anda dan mencadangkan suntingan. Suntingan hanya masuk ke dokumen selepas anda menyemaknya.",
+  "localOn": "Hidup",
+  "localOff": "Mati",
+  "localEnable": "Hidupkan",
+  "localDisable": "Matikan",
+  "localRotate": "Hidupkan semula (token baharu)",
+  "localWarn": "Token hanya dipaparkan sekali, jadi salin sekarang. Menghidupkan semula akan mengeluarkan token baharu dan token lama tidak lagi sah.",
+  "localClaude": "Arahan Claude Code",
+  "localCodex": "Konfigurasi Codex (~/.codex/config.toml)",
+  "localCopy": "Salin"
 }

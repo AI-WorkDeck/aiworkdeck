@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,15 +77,12 @@ public class ToolRegistry {
      * 两条已删；{@code doc_find_replace.replaceAll} 也一并搬回工具自身（口径不变：缺省替换全部），
      * 缺省值贴着工具描述放才不会两头漂。回归 {@code ToolRegistryLegacyDefaultsTest}。
      *
-     * <p>还留在这里的四条都是真·可选参数：给不给都不会改错东西。
+     * <p>还留在这里的三条都是真·可选参数：给不给都不会改错东西。
      */
     private static final Map<String, Object> LEGACY_DEFAULTS = Map.of(
             "doc_find_text.matchCase", Boolean.FALSE,
-            "doc_delete_text.deleteAll", Boolean.FALSE,
             "list_files.subPath", ".",
-            "query_memory.type", "all",
-            "doc_replace_nth_match.matchIndex", 1,
-            "doc_delete_match.matchIndex", 1
+            "query_memory.type", "all"
     );
 
     /**
@@ -115,16 +113,23 @@ public class ToolRegistry {
      * 别往里堆：每多一条就多一处「本该报错却被兜住」的地方。
      */
     private static final Map<String, String> UNKNOWN_TOOL_HINTS = Map.ofEntries(
-            Map.entry("search_laws", "法规检索请用 law_search（语义检索法源）、law_search_keyword"
-                    + "（按法规名+关键词）或 get_law_article（按条文号取原文）；"
+            Map.entry("search_laws", "法规检索请用 law_search（语义检索法源；mode=keyword 按法规名+关键词）"
+                    + "或 get_law_article（按条文号取原文）；"
                     + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。"),
-            Map.entry("search_law", "法规检索请用 law_search（语义检索法源）、law_search_keyword"
-                    + "（按法规名+关键词）或 get_law_article（按条文号取原文）；"
-                    + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。")
+            Map.entry("search_law", "法规检索请用 law_search（语义检索法源；mode=keyword 按法规名+关键词）"
+                    + "或 get_law_article（按条文号取原文）；"
+                    + "search_web 是公网搜索，不是法源，其结果不得当作法条原文引用。"),
+            // P7：qwen 在 gate-35 g10/g15 反复拼出这个假名（r083 cn 2 次、P7 矩阵 3 次），拿回裸 not-found 后
+            // 还要再查两轮目录才找到真名
+            Map.entry("list_project_files", "列项目文件与文件夹请用 doc_list_project_files"
+                    + "（foldersOnly=true 只列文件夹，取 folderId）；按文件名找用 search_project_files。")
     );
 
     /** 未注册工具的统一反馈：有指路就带上，没有就保持原样那一句。 */
     public static String unknownToolMessage(String name) {
+        // V4/V5 合并后删掉的旧名（V9）：明说改成了什么、新调用怎么写，模型下一轮自己改调
+        String renamed = com.checkba.service.ai.tools.ToolShims.renamedMessage(name);
+        if (renamed != null) return renamed;
         String hint = name == null ? null : UNKNOWN_TOOL_HINTS.get(name);
         return hint == null
                 ? "Tool not found or arguments invalid."
@@ -136,19 +141,32 @@ public class ToolRegistry {
      * 当 LangText.isEnglish() 为 true 时，RegisteredTool.displayName() 返回对应的英文展示名。
      */
     private static final Map<String, String> ENGLISH_TOOL_DISPLAY_NAMES = Map.ofEntries(
+            Map.entry("doc_revisions", "Resolve revisions"),
+            Map.entry("office_revisions", "Resolve revisions"),
+            Map.entry("doc_update_comment", "Update comment"),
+            Map.entry("office_update_comment", "Update comment"),
+            Map.entry("office_excel_update_comment", "Update comment"),
+            Map.entry("doc_table_insert", "Insert table rows/columns"),
+            Map.entry("doc_table_delete", "Delete table rows/columns"),
+            Map.entry("office_table_insert", "Insert table rows/columns"),
+            Map.entry("office_table_delete", "Delete table rows/columns"),
+            Map.entry("doc_insert_note", "Insert footnote/endnote"),
+            Map.entry("office_insert_note", "Insert footnote/endnote"),
+            Map.entry("doc_select", "Select or move cursor"),
+            Map.entry("pdf_pages", "PDF page operations"),
+            Map.entry("office_file", "Host file action"),
+            Map.entry("pptx_outline", "PPT outline"),
+            Map.entry("move_files", "Move files"),
             Map.entry("todo_write", "Update plan"),
             Map.entry("ask_user", "Ask the user"),
-            Map.entry("get_project_context", "Get project context"),
             Map.entry("update_project_info", "Update project info"),
-            Map.entry("get_conversation_summary", "Recall conversation"),
             Map.entry("list_project_folders", "List folders"),
             Map.entry("task_create", "Create task"),
             Map.entry("task_list", "List tasks"),
             Map.entry("task_update", "Update task"),
+            Map.entry("deadline_compute", "Compute deadline"),
             Map.entry("search_web", "Web search"),
             Map.entry("browse_url", "Browse page"),
-            Map.entry("deep_search", "Deep search"),
-            Map.entry("search_knowledge_base", "Search knowledge base"),
             Map.entry("qichacha_query", "Company registry lookup"),
             Map.entry("qichacha_ipr", "Company IP lookup"),
             Map.entry("tushare_query", "Financial data lookup"),
@@ -157,7 +175,6 @@ public class ToolRegistry {
             Map.entry("law_search_keyword", "Keyword law search"),
             Map.entry("law_recognition", "Identify citations"),
             Map.entry("get_law_article", "Look up article"),
-            Map.entry("read_document", "Read document"),
             Map.entry("search_project_files", "Search files"),
             Map.entry("search_project_content", "Search file contents"),
             Map.entry("read_file", "Read file"),
@@ -172,14 +189,11 @@ public class ToolRegistry {
             Map.entry("text_write_file", "Write text file"),
             Map.entry("text_find_replace", "Text find and replace"),
             Map.entry("capability_list", "List capabilities"),
-            Map.entry("capability_install", "Prepare capability upgrade"),
+            Map.entry("capability_install", "Install capability"),
             Map.entry("capability_apply", "Apply capability upgrade"),
             Map.entry("capability_select", "Switch capability"),
             Map.entry("plugin_dev_scaffold", "Scaffold plugin"),
             Map.entry("plugin_dev_install", "Install plugin locally"),
-            Map.entry("scan_files", "Scan files"),
-            Map.entry("delete_file", "Delete file"),
-            Map.entry("move_file", "Move file"),
             Map.entry("create_folder", "Create folder"),
             Map.entry("rename_project_file", "Rename file"),
             Map.entry("move_project_file", "Move file"),
@@ -198,7 +212,6 @@ public class ToolRegistry {
             Map.entry("save_memory", "Save memory"),
             Map.entry("query_memory", "Query memory"),
             Map.entry("retrieve_evidence", "Retrieve evidence"),
-            Map.entry("get_user_profile", "Get user profile"),
             Map.entry("dispatch_subtask", "Delegate subtask"),
             Map.entry("list_tools", "Browse tool catalog"),
             Map.entry("use_skill", "Use a skill"),
@@ -211,23 +224,18 @@ public class ToolRegistry {
             Map.entry("doc_get_clauses", "Map contract clauses"),
             Map.entry("doc_audit_structure", "Audit contract structure"),
             Map.entry("doc_get_outline", "Get outline"),
-            Map.entry("doc_get_selection", "Read selection"),
             Map.entry("doc_get_cursor_context", "Inspect cursor"),
             Map.entry("doc_get_paragraph", "Read paragraph"),
             Map.entry("doc_goto", "Move cursor"),
-            Map.entry("doc_set_selection", "Set selection"),
             Map.entry("doc_find_text", "Find in document"),
             Map.entry("doc_find_replace", "Find & replace"),
-            Map.entry("doc_replace_nth_match", "Replace match"),
-            Map.entry("doc_delete_match", "Delete match"),
-            Map.entry("doc_delete_text", "Delete text"),
             Map.entry("doc_replace_selection", "Replace selection"),
             Map.entry("doc_insert_at_cursor", "Insert text"),
             Map.entry("doc_modify_paragraph", "Edit paragraph"),
             Map.entry("doc_insert_under_heading", "Insert under heading"),
             Map.entry("doc_export_pdf", "Export to PDF"),
             Map.entry("pdf_inspect_visual", "Inspect page design"),
-            Map.entry("doc_search_related_docs", "Find related docs"),
+            Map.entry("doc_view_pages", "View rendered pages"),
             Map.entry("doc_select_anchor", "Select anchor"),
             Map.entry("doc_select_paragraph", "Select paragraph"),
             Map.entry("doc_collapse_cursor", "Collapse cursor"),
@@ -252,7 +260,6 @@ public class ToolRegistry {
             Map.entry("doc_undo", "Undo"),
             Map.entry("doc_redo", "Redo"),
             Map.entry("doc_add_comment", "Add comment"),
-            Map.entry("doc_debug_revisions", "Inspect revisions"),
             Map.entry("doc_restore_checkpoint", "Restore snapshot"),
             Map.entry("version_status", "Check version status"),
             Map.entry("version_history", "View version history"),
@@ -277,6 +284,8 @@ public class ToolRegistry {
             Map.entry("doc_link_evidence", "Link evidence"),
             Map.entry("doc_list_evidence", "List evidence links"),
             Map.entry("dd_export", "Export due-diligence deliverable"),
+            Map.entry("compare_docx_summary", "Compare documents"),
+            Map.entry("compare_docx_redline", "Build comparison document"),
             Map.entry("web_verify_import", "Import web-verification archive"),
             Map.entry("evidence_verify", "Verify evidence"),
             Map.entry("doc_insert_image", "Insert image"),
@@ -446,15 +455,9 @@ public class ToolRegistry {
             Map.entry("pptx_generate", "Generate slides"),
             Map.entry("pptx_generate_outline", "Outline slides"),
             Map.entry("pptx_refine_outline", "Refine outline"),
-            Map.entry("pptx_open_file", "Open slides"),
-            Map.entry("pptx_list_files", "List slide files"),
-            Map.entry("pptx_search_files", "Search slide files"),
             Map.entry("pptx_get_project_pages", "Get slide pages"),
-            Map.entry("pptx_edit_page", "Edit slide"),
             Map.entry("pptx_export_editable", "Export editable slides"),
             Map.entry("pptx_inspect_format", "Inspect slide formatting"),
-            Map.entry("pptx_apply_format", "Format slides"),
-            Map.entry("pdf_list_files", "List PDF files"),
             Map.entry("pdf_inspect", "Inspect PDF"),
             Map.entry("pdf_highlight", "Highlight PDF text"),
             Map.entry("pdf_annotate", "Annotate PDF"),
@@ -473,6 +476,7 @@ public class ToolRegistry {
             Map.entry("litigation_timeline_start", "Read timeline materials"),
             Map.entry("litigation_timeline_step", "Advance timeline pipeline"),
             Map.entry("litigation_timeline_render", "Draw case timeline"),
+            Map.entry("meeting_list", "List meetings"),
             Map.entry("meeting_list_recordings", "List meeting recordings"),
             Map.entry("meeting_get_transcript", "Read meeting transcript"),
             Map.entry("tmeet_list_meetings", "List Tencent meetings"),
@@ -572,6 +576,230 @@ public class ToolRegistry {
 
     public void setPluginMcpService(com.checkba.service.ai.mcp.PluginMcpService service) { this.pluginMcpService = service; }
 
+    /** 声明式工具（manifest tools[].handler.type=service）的执行表；required=false 同 pluginHostFactory（手工 new 的测试不装配）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.plugin.HostServiceRegistry hostServices;
+
+    void setHostServiceRegistry(com.checkba.service.plugin.HostServiceRegistry registry) { this.hostServices = registry; }
+
+    /** 一条可用的声明式工具：所属插件 + manifest 条目 + 给模型的规格（模式同 PluginMcpService.Binding）。 */
+    public record DeclaredToolBinding(String pluginId, PluginService.PluginToolInfo tool, ToolSpecification specification) {}
+
+    /**
+     * 当前可用的声明式工具：插件已启用、未撤销、未被宿主版本挡住，且 handler=service 且服务表认得。
+     * handler=jar 走既有 JAR 路径；connection/view 在 PluginService 加载时已记日志，这里不注册。
+     * 名字与内置工具冲突时内置优先。
+     */
+    public List<DeclaredToolBinding> declaredBindings() {
+        List<DeclaredToolBinding> all = new ArrayList<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            DeclaredToolBinding binding = bind(declared);
+            if (binding != null) all.add(binding);
+        }
+        return all;
+    }
+
+    private DeclaredToolBinding bind(PluginService.DeclaredTool declared) {
+        PluginService.PluginToolInfo tool = declared.tool();
+        String pluginId = declared.pluginId();
+        if (hostServices == null || !"service".equals(tool.handlerType()) || builtinTools.containsKey(tool.getName())
+                || !pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) return null;
+        // 权限升级待用户批准的定义：不下发、不投影、不执行（按对象判，执行用的就是这里返回的同一个对象）
+        if (!pluginService.isToolDefinitionApproved(tool)) return null;
+        try {
+            return new DeclaredToolBinding(pluginId, tool, ToolSpecification.builder()
+                    .name(tool.getName())
+                    .description(pluginService.localize(pluginId, tool.getDescription()))
+                    .parameters(declaredParameters(tool)).build());
+        } catch (RuntimeException invalid) {
+            log.warn("Declared tool {} of plugin {} skipped: {}", tool.getName(), pluginId, invalid.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 权限升级待用户批准的插件工具：只下发一个无参占位规格（不带新定义的入参与说明），
+     * 模型若按用户要求去调，{@link #doExecute} 回「请用户到插件中心批准」的说明而不执行——
+     * 否则模型只会看到工具消失，对用户说「没装这个插件」。不进 MCP 投影、不过确认闸。
+     */
+    private List<ToolSpecification> pendingApprovalStubs() {
+        List<ToolSpecification> out = new ArrayList<>();
+        for (var entry : pluginService.allPendingToolChanges().entrySet()) {
+            String pluginId = entry.getKey();
+            if (!pluginService.isEnabled(pluginId) || pluginService.revokedReason(pluginId) != null) continue;
+            for (PluginToolApprovals.Change c : entry.getValue()) {
+                String name = c.name();
+                if (name == null || !name.matches("[A-Za-z][A-Za-z0-9_]{1,63}") || builtinTools.containsKey(name)
+                        || pluginService.isAgentHidden(name)) continue;
+                out.add(ToolSpecification.builder().name(name)
+                        .description(LangText.of(
+                                "【待用户批准】该插件工具的权限刚升高，用户在插件中心批准前不可用；调用只会返回待批准说明。",
+                                "[Awaiting user approval] This plugin tool's privileges just increased; it is unavailable until the user approves it in Plugin Center. Calling it only returns that notice."))
+                        .parameters(dev.langchain4j.model.chat.request.json.JsonObjectSchema.builder().build())
+                        .build());
+            }
+        }
+        return out;
+    }
+
+    /** userId/conversationId 由服务端注入，不向模型暴露；projectId 在 schema 里声明了才是「目标项目」参数。 */
+    @SuppressWarnings("unchecked")
+    private static dev.langchain4j.model.chat.request.json.JsonObjectSchema declaredParameters(PluginService.PluginToolInfo tool) {
+        Map<String, Object> schema = tool.getInputSchema() == null
+                ? Map.of("type", "object") : new java.util.LinkedHashMap<>(tool.getInputSchema());
+        if (schema.get("properties") instanceof Map<?, ?> props) {
+            Map<String, Object> kept = new java.util.LinkedHashMap<>((Map<String, Object>) props);
+            kept.keySet().removeAll(Set.of("userId", "conversationId"));
+            schema.put("properties", kept);
+            if (schema.get("required") instanceof List<?> req) schema.put("required", req.stream().filter(kept::containsKey).toList());
+        }
+        return com.checkba.service.ai.mcp.PluginMcpSchema.object(schema);
+    }
+
+    /** 声明为 destructive，或绑定的服务操作本身是 destructive（如 calendar/delete）。 */
+    private static boolean isDestructive(PluginService.PluginToolInfo tool) {
+        if ("destructive".equals(tool.getAccess())) return true;
+        var h = tool.getHandler();
+        return com.checkba.service.plugin.HostServiceRegistry.spec(h.getService(), h.getOperation())
+                .map(spec -> "destructive".equals(spec.access())).orElse(false);
+    }
+
+    /**
+     * 分发前是否必须先让用户确认（C5 / P2-1）：内置工具 access=DESTRUCTIVE；声明式插件工具 destructive
+     * 或 {@code confirm:always}。{@code confirm:never} 对 destructive 无效。插件 JAR @Tool 与 MCP 不在此列。
+     */
+    public boolean requiresConfirmation(String name) {
+        if (name == null) return false;
+        name = dispatchName(name);
+        RegisteredTool builtin = builtinTools.get(name);
+        if (builtin != null) {
+            return com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, builtin.meta())
+                    == ToolMeta.Access.DESTRUCTIVE;
+        }
+        DeclaredToolBinding declared = declaredBinding(name);
+        if (declared == null) return false;
+        return isDestructive(declared.tool()) || "always".equals(declared.tool().getConfirm());
+    }
+
+    DeclaredToolBinding declaredBinding(String name) {
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            if (Objects.equals(declared.tool().getName(), name)) {
+                DeclaredToolBinding binding = bind(declared);
+                if (binding != null) return binding;
+            }
+        }
+        return null;
+    }
+
+    /** 对外 MCP 投影的候选（docs/plans/agent-app-control.md C7）：规格已摘掉服务端注入参数，needsProject 标明是否要调用方显式给 projectId。 */
+    public record McpCandidate(ToolSpecification spec, ToolMeta.Access access, boolean needsProject) {}
+
+    /** 这些前缀的工具依赖编辑器/Office 宿主会话，即使没声明 requiresHost 也不对外投影。 */
+    private static final List<String> MCP_HOST_PREFIXES = List.of("doc_", "sheet_", "slide_", "office_", "ref_");
+
+    /** 只对应应用内对话流程（向用户提问、工具目录、本轮附件），对外 Agent 没有可用语义，不投影。 */
+    private static final Set<String> MCP_IN_APP_ONLY = Set.of("ask_user", "list_tools", "list_attached_files",
+            "todo_write", "use_skill", "dispatch_subtask", "create_skill");
+
+    /**
+     * 首批对外投影的内置 write 工具（A10/P2-5）：都不是 destructive、不需确认卡（外部 Agent 答不了），
+     * 且不碰文档正文（文档内容只走 propose_revision）。新增须同步 McpToolProjectionTest。
+     */
+    private static final Set<String> MCP_WRITE_ALLOWED = Set.of("task_create", "task_update", "tag_file", "create_folder");
+
+    /**
+     * 按量计费的外部服务工具（搜索/企查查/Tushare/北大法宝，即 {@code ExternalServiceProvider} 的 SEARCH/QICHACHA/TUSHARE/PKULAW）
+     * 不对外投影：外部 Agent 可能循环调用、在用户看不见的地方花光积分。工具类上没有可读的「走付费网关」信号
+     * （档位判定在各工具方法体内，经 ExternalServiceAvailability），所以这里是显式名单，新增此类工具须同步登记。
+     */
+    private static final Set<String> MCP_METERED_EXTERNAL = Set.of("search_web", "tushare_query",
+            "law_search", "law_search_keyword", "law_recognition", "get_law_article", "case_search");
+    private static final String MCP_METERED_PREFIX = "qichacha_";
+
+    /**
+     * 可投影到对外 MCP 的工具：内置工具只放 access=READ 且 requiresHost=NONE 且 offerToModel；
+     * 声明式插件工具 read 缺省投影、write 须显式 {@code mcp:true}，{@code mcp:false} 一律不投；destructive 永不投影。
+     * 此刻不可用的工具（{@link #unusableToolNames()}）与已停用插件的工具不在其中。插件 JAR 的 @Tool 不投影。
+     */
+    public List<McpCandidate> mcpCandidates() {
+        List<McpCandidate> out = new ArrayList<>();
+        Set<String> unusable = unusableToolNames();
+        Map<AgentToolComponent, Boolean> availability = new java.util.IdentityHashMap<>();
+        for (ToolSpecification spec : builtinSpecifications) {
+            String name = spec.name();
+            RegisteredTool registered = builtinTools.get(name);
+            ToolMeta meta = registered.meta();
+            boolean writeAllowed = MCP_WRITE_ALLOWED.contains(name) && !requiresConfirmation(name);
+            if (unusable.contains(name) || MCP_IN_APP_ONLY.contains(name) || MCP_METERED_EXTERNAL.contains(name)
+                    || name.startsWith(MCP_METERED_PREFIX)
+                    || MCP_HOST_PREFIXES.stream().anyMatch(name::startsWith)
+                    || (meta != null && meta.requiresHost() != ToolMeta.Host.NONE)
+                    || (!writeAllowed && com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, meta) != ToolMeta.Access.READ)) continue;
+            if (registered.bean() instanceof AgentToolComponent component
+                    && !availability.computeIfAbsent(component, this::componentAvailable)) continue;
+            boolean needsProject = registered.method() != null && java.util.Arrays.stream(registered.method().getParameters())
+                    .anyMatch(p -> "projectId".equals(p.getName()));
+            out.add(new McpCandidate(spec, writeAllowed ? ToolMeta.Access.WRITE : ToolMeta.Access.READ, needsProject));
+        }
+        for (DeclaredToolBinding b : declaredBindings()) {
+            String name = b.specification().name();
+            if (unusable.contains(name) || builtinTools.containsKey(name) || pluginService.isAgentHidden(name)) continue;
+            // 外部 Agent 答不了确认卡：需要确认的工具（destructive / confirm:always）无论 mcp:true 都不投影
+            if (requiresConfirmation(name)) continue;
+            // 按生效档位（声明与绑定的服务操作取高者）：声明 read 却绑写操作的工具不能当只读工具投影
+            ToolMeta.Access access = com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, PluginToolApprovals.effectiveAccess(b.tool()));
+            Boolean mcp = b.tool().getMcp();
+            boolean projected = access == ToolMeta.Access.READ ? !Boolean.FALSE.equals(mcp)
+                    : access == ToolMeta.Access.WRITE && Boolean.TRUE.equals(mcp);
+            if (!projected) continue;
+            var params = b.specification().parameters();
+            out.add(new McpCandidate(b.specification(), access,
+                    params != null && params.properties() != null && params.properties().containsKey("projectId")));
+        }
+        return out;
+    }
+
+    /** 声明式 read 工具名：ASK 模式放行（与 AgentOrchestrator.ASK_READ_TOOLS 并集）。 */
+    public Set<String> declaredReadToolNames() {
+        Set<String> names = new java.util.HashSet<>();
+        for (DeclaredToolBinding b : declaredBindings()) {
+            if (com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(b.tool().getName(), PluginToolApprovals.effectiveAccess(b.tool()))
+                    == ToolMeta.Access.READ) names.add(b.specification().name());
+        }
+        return names;
+    }
+
+    /** 启用中插件的声明式工具 keywords（含 handler=jar 条目，如 tencent_meeting_action），喂工具披露的 plugin-tools 预放回。 */
+    public List<String> declaredToolKeywords() {
+        List<String> words = new ArrayList<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            if (declared.tool().getKeywords() != null && pluginService.isEnabled(declared.pluginId())) {
+                words.addAll(declared.tool().getKeywords());
+            }
+        }
+        return words;
+    }
+
+    /**
+     * 启用插件的工具检索词（工具名 → manifest keywords + 插件名 + 插件 id），喂 {@code list_tools(query)}：
+     * 用户说「律所管理插件」「应收账款」时模型去搜，命中的应是插件工具而不是空结果。含 handler=jar 的带 keywords 条目。
+     */
+    public Map<String, List<String>> declaredToolSearchTerms() {
+        Map<String, List<String>> terms = new java.util.LinkedHashMap<>();
+        for (PluginService.DeclaredTool declared : pluginService.getDeclaredTools()) {
+            String pluginId = declared.pluginId();
+            if (!pluginService.isEnabled(pluginId)) continue;
+            List<String> words = new ArrayList<>();
+            if (declared.tool().getKeywords() != null) words.addAll(declared.tool().getKeywords());
+            words.add(pluginId);
+            var meta = pluginService.getPlugin(pluginId);
+            if (meta != null && meta.getName() != null && !meta.getName().startsWith("%")) words.add(meta.getName());
+            if (meta != null && meta.getName() != null) words.add(pluginService.localize(pluginId, meta.getName()));
+            terms.put(declared.tool().getName(), words);
+        }
+        return terms;
+    }
+
     private final List<AgentToolComponent> toolComponents;
     private final PluginService pluginService;
     private final ClientCapabilityService clientCapabilityService;
@@ -621,9 +849,33 @@ public class ToolRegistry {
         }
         if (disclosurePolicy != null) {
             disclosurePolicy.setPluginToolNames(this::pluginToolNames);
+            disclosurePolicy.setPluginToolKeywords(this::declaredToolKeywords);
+            disclosurePolicy.setPluginToolSearchTerms(this::declaredToolSearchTerms);
+        }
+        if (clientCapabilityService != null) {
+            clientCapabilityService.setWebPluginToolPredicate(this::pluginToolSupportsWeb);
         }
         log.info("ToolRegistry initialized: {} built-in tools from {} components",
                 builtinTools.size(), toolComponents.size());
+    }
+
+    /**
+     * 插件工具（JAR / 声明式 / 插件 MCP）在网页版会话里是否可见：所属插件 manifest 声明了
+     * {@code hosts} 含 {@code "web"} 才放行（W1 设计 §4.6）。内置工具与用户自配 MCP 一律 false——
+     * 内置工具在 {@link WebClientToolSurface} 里静态归类，用户 MCP 多是本机进程，网页上不可达。
+     */
+    boolean pluginToolSupportsWeb(String name) {
+        if (name == null || builtinTools.containsKey(name)) return false;
+        String pluginId = pluginService.getPluginIdForTool(name);
+        if (pluginId == null) {
+            DeclaredToolBinding declared = declaredBinding(name);
+            if (declared != null) pluginId = declared.pluginId();
+        }
+        if (pluginId == null && pluginMcpService != null) {
+            var binding = pluginMcpService.find(name);
+            if (binding != null) pluginId = binding.pluginId();
+        }
+        return pluginId != null && pluginService.supportsWebClient(pluginId);
     }
 
     /**
@@ -633,6 +885,9 @@ public class ToolRegistry {
     public Set<String> pluginToolNames() {
         Set<String> names = new java.util.HashSet<>(pluginService.getPluginTools().keySet());
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        declaredBindings().forEach(b -> names.add(b.specification().name()));
+        pendingApprovalStubs().forEach(s -> names.add(s.name()));
+        names.removeIf(pluginService::isAgentHidden);
         return java.util.Collections.unmodifiableSet(names);
     }
 
@@ -649,7 +904,11 @@ public class ToolRegistry {
 
     /** Keep eligible specs registered; component readiness is checked when a new turn requests them. */
     private void registerBean(Object bean) {
-        for (Method method : bean.getClass().getDeclaredMethods()) {
+        // getDeclaredMethods() 的顺序 JVM 未规定；重名工具谁覆盖谁也取决于它，所以先定序
+        Method[] methods = bean.getClass().getDeclaredMethods();
+        java.util.Arrays.sort(methods, Comparator.comparing(Method::getName)
+                .thenComparing(m -> java.util.Arrays.toString(m.getParameterTypes())));
+        for (Method method : methods) {
             if (!method.isAnnotationPresent(Tool.class)) {
                 continue;
             }
@@ -793,12 +1052,20 @@ public class ToolRegistry {
                     || availability.computeIfAbsent(component, this::componentAvailable)) all.add(spec);
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> all.add(b.specification()));
+        declaredBindings().forEach(b -> { if (!pluginService.isAgentHidden(b.specification().name())) all.add(b.specification()); });
         if (userMcpService != null) userMcpService.bindings().forEach(b -> all.add(b.specification()));
         for (ToolSpecification spec : pluginService.getToolSpecifications()) {
-            if (pluginToolEnabled(spec.name())) {
+            if (pluginToolEnabled(spec.name()) && !pluginService.isAgentHidden(spec.name())
+                    && pluginService.isPluginToolApproved(spec.name())) {
                 all.add(offerable(spec));
             }
         }
+        Set<String> present = new java.util.HashSet<>();
+        all.forEach(s -> present.add(s.name()));
+        for (ToolSpecification stub : pendingApprovalStubs()) if (present.add(stub.name())) all.add(stub);
+        // 顺序只由规范序决定（见 ToolDisclosurePolicy#canonicalOrder），不取决于 bean 扫描 / 反射方法 / 插件加载顺序
+        if (disclosurePolicy != null) return disclosurePolicy.canonicalOrder(all);
+        all.sort(Comparator.comparing(ToolSpecification::name));
         return all;
     }
 
@@ -858,6 +1125,12 @@ public class ToolRegistry {
      * 插件启停过滤：内置工具（不属于任何插件，pid == null）恒可见；
      * 插件工具仅在所属插件启用时可见。
      */
+    /** 腾讯会议插件已安装且启用：meeting_list/meeting_get_transcript 的 tencent 来源以插件为准（E4），未装则读内置同步表。 */
+    public boolean tencentMeetingPluginActive() {
+        String pid = pluginService.getPluginIdForTool("tencent_meeting_action");
+        return pid != null && pluginService.isEnabled(pid);
+    }
+
     private boolean pluginToolEnabled(String toolName) {
         String pid = pluginService.getPluginIdForTool(toolName);
         return pid == null || pluginService.isEnabled(pid);
@@ -898,6 +1171,7 @@ public class ToolRegistry {
             }
         }
         if (pluginMcpService != null) pluginMcpService.bindings().forEach(b -> names.add(b.specification().name()));
+        declaredBindings().forEach(b -> names.add(b.specification().name()));
         if (userMcpService != null) userMcpService.bindings().forEach(b -> names.add(b.specification().name()));
         names.sort(Comparator.comparingInt(String::length).reversed());
         return names;
@@ -930,6 +1204,8 @@ public class ToolRegistry {
             var binding = pluginMcpService.find(name);
             if (binding != null) return Optional.of(new RegisteredTool(pluginMcpService, null, binding.specification(), null, true));
         }
+        var declared = declaredBinding(name);
+        if (declared != null) return Optional.of(new RegisteredTool(hostServices, null, declared.specification(), null, true));
         // 插件工具：先过启停过滤（禁用插件的工具视同不存在，重新启用即恢复）
         if (!pluginToolEnabled(name)) {
             return Optional.empty();
@@ -966,7 +1242,99 @@ public class ToolRegistry {
      * @param ctx      服务端上下文（覆盖同名参数）
      */
     public ToolResult execute(String name, String argsJson, ToolContext ctx) {
+        return execute(name, argsJson, ctx, null);
+    }
+
+    /** source 显式指定审计来源（agent|mcp|plugin-ui）；null = 按 ctx 推断（conversationId 以 "mcp:" 开头为 mcp，否则 agent）。 */
+    public ToolResult execute(String name, String argsJson, ToolContext ctx, String source) {
+        long started = System.nanoTime();
+        ToolResult result = null;
+        try {
+            result = doExecute(name, argsJson, ctx);
+            return result;
+        } finally {
+            audit(dispatchName(name), argsJson, ctx, source, result, started);
+        }
+    }
+
+    // 审计（agent-app-control C8）：只记工具名与参数摘要，绝不记参数值/输出（律师保密）。
+    private static final Set<String> AUDIT_SKIPPED = Set.of("list_tools", "use_skill");
+    private static final java.util.concurrent.Executor AUDIT_EXECUTOR =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "tool-audit");
+                t.setDaemon(true);
+                return t;
+            });
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserActivityLogService activityLogService;
+
+    /** 测试可替换为同步执行器。 */
+    java.util.concurrent.Executor auditExecutor = AUDIT_EXECUTOR;
+
+    private void audit(String name, String argsJson, ToolContext ctx, String source, ToolResult result, long started) {
+        try {
+            if (activityLogService == null || ctx == null || ctx.userId() == null || name == null
+                    || AUDIT_SKIPPED.contains(name) || (result != null && !result.found())) return;
+            long durationMs = (System.nanoTime() - started) / 1_000_000;
+            boolean ok = result != null && !(result.output() != null && result.output().startsWith("Error"));
+            String src = source != null ? source
+                    : ctx.conversationId() != null && ctx.conversationId().startsWith("mcp:") ? "mcp" : "agent";
+            RegisteredTool tool = result == null ? null : result.tool();
+            DeclaredToolBinding declared = tool != null && tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry
+                    ? declaredBinding(name) : null;
+            String access = (declared != null
+                    ? com.checkba.service.ai.capability.CapabilityCatalog.accessOfDeclared(name, PluginToolApprovals.effectiveAccess(declared.tool()))
+                    : com.checkba.service.ai.capability.CapabilityCatalog.accessOf(name, tool == null ? null : tool.meta()))
+                    .name().toLowerCase(java.util.Locale.ROOT);
+            String pluginId = declared != null ? declared.pluginId() : pluginService.getPluginIdForTool(name);
+            Map<String, Object> meta = new java.util.LinkedHashMap<>();
+            meta.put("source", src);
+            meta.put("access", access);
+            if (pluginId != null) meta.put("pluginId", pluginId);
+            meta.put("argsDigest", sha256(argsJson == null ? "" : argsJson));
+            meta.put("ok", ok);
+            meta.put("durationMs", durationMs);
+            String metaJson = cn.hutool.json.JSONUtil.toJsonStr(meta);
+            Long userId = ctx.userId();
+            Long projectId = ctx.projectId();
+            auditExecutor.execute(() -> {
+                try {
+                    activityLogService.logActivity(userId, "ai_tool", null, name, durationMs, metaJson, projectId);
+                } catch (Exception e) {
+                    log.warn("Tool audit write failed for '{}': {}", name, e.toString());
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Tool audit failed for '{}': {}", name, e.toString());
+        }
+    }
+
+    private static String sha256(String text) throws java.security.NoSuchAlgorithmException {
+        byte[] d = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return java.util.HexFormat.of().formatHex(d);
+    }
+
+    /**
+     * 实际分发用的名字：别名表，再加参数完全相同的已删除旧名（{@link com.checkba.service.ai.tools.ToolShims#sameArgsTarget}）。
+     * 确认闸与审计都按它判，旧名调到 destructive 新工具同样过闸。
+     */
+    private static String dispatchName(String name) {
+        String resolved = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        String renamed = com.checkba.service.ai.tools.ToolShims.sameArgsTarget(resolved);
+        return renamed != null ? renamed : resolved;
+    }
+
+    private ToolResult doExecute(String name, String argsJson, ToolContext ctx) {
         String resolvedName = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        String sameArgsTarget = com.checkba.service.ai.tools.ToolShims.sameArgsTarget(resolvedName);
+        if (sameArgsTarget != null) {
+            ToolResult r = doExecute(sameArgsTarget, argsJson, ctx);
+            return r.found()
+                    ? new ToolResult(com.checkba.service.ai.tools.ToolShims.hint(r.output(), resolvedName), r.tool(), true)
+                    : r;
+        }
         if (userMcpService != null && resolvedName.startsWith("user_mcp_")) {
             var binding = userMcpService.find(resolvedName, ctx == null ? null : ctx.userId());
             if (binding == null || !clientCapabilityService.isToolVisible(resolvedName, ctx == null ? null : ctx.conversationId()))
@@ -983,6 +1351,10 @@ public class ToolRegistry {
         // 会话能力过滤：能力档位下不可见的工具按"不存在"拒绝（模型收到与未知工具一致的反馈）
         Optional<RegisteredTool> toolOpt = resolve(resolvedName, ctx != null ? ctx.conversationId() : null);
         if (toolOpt.isEmpty()) {
+            // 插件工具升级待批准（bind / PluginMcpService 已把它摘掉）：给出点名工具的可读原因。
+            // 只在这个名字此刻解析不到任何已批准工具时才说，免得别的插件的同名待批准条目挡住真正可用的工具。
+            String pendingApproval = pluginService.pendingToolNotice(resolvedName);
+            if (pendingApproval != null) return new ToolResult("Error: " + pendingApproval, null, true);
             return new ToolResult(unknownToolMessage(resolvedName), null, false);
         }
         RegisteredTool tool = toolOpt.get();
@@ -996,8 +1368,17 @@ public class ToolRegistry {
             }
         }
 
+        if (tool.bean() instanceof com.checkba.service.plugin.HostServiceRegistry) {
+            return executeDeclared(resolvedName, argsJson, ctx, tool);
+        }
+
         // 插件工具权限校验（规范 v2）：所需权限未在 manifest permissions 中声明即拒绝
         if (tool.fromPlugin()) {
+            if (!pluginService.isPluginToolApproved(resolvedName)) {
+                String pendingApproval = pluginService.pendingToolNotice(resolvedName);
+                return pendingApproval != null ? new ToolResult("Error: " + pendingApproval, null, true)
+                        : new ToolResult(unknownToolMessage(resolvedName), null, false);
+            }
             List<String> missing = pluginService.missingPermissionsForTool(resolvedName);
             if (!missing.isEmpty()) {
                 log.warn("Tool '{}' rejected: requires undeclared permission(s) {}", resolvedName, missing);
@@ -1046,6 +1427,42 @@ public class ToolRegistry {
         }
     }
 
+    /**
+     * 声明式工具（handler=service）分发：权限 = 工具声明的 permissions ∪ 服务表要求的 permissions，
+     * 必须都在 manifest.permissions 里，否则拒绝；userId 取服务端上下文，模型传的 userId 不可信。
+     * 项目级成员权限在 HostServiceRegistry 里按目标 projectId 核。
+     */
+    private ToolResult executeDeclared(String name, String argsJson, ToolContext ctx, RegisteredTool tool) {
+        DeclaredToolBinding binding = declaredBinding(name);
+        if (binding == null) return new ToolResult(unknownToolMessage(name), null, false);
+        var handler = binding.tool().getHandler();
+        var plugin = pluginService.getPlugin(binding.pluginId());
+        Set<String> granted = plugin == null || plugin.getPermissions() == null ? Set.of() : new java.util.HashSet<>(plugin.getPermissions());
+        Set<String> required = new java.util.LinkedHashSet<>();
+        if (binding.tool().getPermissions() != null) required.addAll(binding.tool().getPermissions());
+        com.checkba.service.plugin.HostServiceRegistry.spec(handler.getService(), handler.getOperation())
+                .ifPresent(spec -> required.addAll(spec.requiredPermissions()));
+        required.removeAll(granted);
+        if (!required.isEmpty()) {
+            log.warn("Tool '{}' rejected: requires undeclared permission(s) {}", name, required);
+            return new ToolResult("Error: permission denied — tool '" + name + "' requires permission(s) "
+                    + required + " not declared in the plugin manifest \"permissions\".", tool, true);
+        }
+        try {
+            Map<String, Object> args = new java.util.LinkedHashMap<>(parseArgs(argsJson));
+            args.remove("userId");
+            args.remove("conversationId");
+            String out = hostServices.invoke(handler.getService(), handler.getOperation(),
+                    ctx == null ? null : ctx.userId(), ctx == null ? null : ctx.projectId(), args);
+            return new ToolResult(out.isEmpty() ? "OK" : out, tool, true);
+        } catch (IllegalArgumentException e) {
+            return new ToolResult("Error: " + e.getMessage(), tool, true);
+        } catch (RuntimeException e) {
+            log.error("Declared tool '{}' failed", name, e);
+            return new ToolResult("Error executing tool: " + e.getMessage(), tool, true);
+        }
+    }
+
     /** 实际反射调用（参数解析 → 绑定 → invoke），异常一律转成可回喂模型的工具结果。 */
     private ToolResult invokeTool(String resolvedName, RegisteredTool tool, String argsJson, ToolContext ctx) {
         try {
@@ -1069,9 +1486,15 @@ public class ToolRegistry {
                         projectFileService, ctx == null ? null : ctx.projectId(), requested,
                         ctx == null ? null : ctx.defaultOutputFolderId()));
             }
+            if ("move_files".equals(resolvedName)) {
+                com.checkba.service.ai.tools.MoveFilesArgs.fold(args);
+            }
             Object[] boundArgs = bindArguments(resolvedName, tool.method(), args, ctx);
             Object result = tool.method().invoke(tool.bean(), boundArgs);
-            return new ToolResult(result != null ? result.toString() : "", tool, true);
+            String out = result != null ? result.toString() : "";
+            // 只对改文件的工具补注：ask_user 等协议型工具的输出会被编排器解析，不能动
+            boolean modifies = tool.meta() != null && "MODIFIED".equals(tool.meta().fileEffect());
+            return new ToolResult(modifies ? out + ignoredArgumentsNote(tool.method(), args, out) : out, tool, true);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             ToolResult accountResult = accountActionResult(cause, tool, ctx);
@@ -1164,6 +1587,30 @@ public class ToolRegistry {
             values[i] = value;
         }
         return values;
+    }
+
+    /**
+     * 模型传了本工具没有的参数名（如把 color 写成 textColor）时，langchain 式绑定会静默丢掉它，
+     * 工具照常成功、模型就以为改到了（office-tier1：Qwen「改成红色」只加粗了）。不拒绝调用——
+     * 多余的无害键很常见——而是在结果末尾点名被忽略的参数与可用参数，让模型下一轮自己补上。
+     */
+    static String ignoredArgumentsNote(Method method, cn.hutool.json.JSONObject args, String out) {
+        if (args == null || args.isEmpty() || out == null || out.startsWith("Error")) return "";
+        java.util.Set<String> known = new java.util.LinkedHashSet<>();
+        java.util.List<String> offered = new java.util.ArrayList<>();
+        for (Parameter p : method.getParameters()) {
+            known.add(p.getName());
+            known.addAll(ARG_ALIASES.getOrDefault(p.getName(), List.of()));
+            if (!SERVER_CONTEXT_PARAMS.contains(p.getName())) offered.add(p.getName());
+        }
+        java.util.List<String> ignored = new java.util.ArrayList<>();
+        for (String key : args.keySet()) {
+            if (!known.contains(key) && !SERVER_CONTEXT_PARAMS.contains(key)) ignored.add(key);
+        }
+        if (ignored.isEmpty()) return "";
+        return "\n" + com.checkba.service.LangText.of(
+                "[注意] 参数 " + String.join("、", ignored) + " 不是本工具的参数，已被忽略——想靠它们做的修改没有发生，需要的话换成正确参数重调。可用参数：" + String.join(", ", offered),
+                "[Note] Argument(s) " + String.join(", ", ignored) + " are not parameters of this tool and were ignored; anything you meant them to change did NOT happen — re-call with the right parameter if needed. Valid parameters: " + String.join(", ", offered));
     }
 
     /** 显式空串是有效值；只有缺失/null 才尝试历史别名。 */

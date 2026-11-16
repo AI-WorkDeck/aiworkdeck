@@ -59,14 +59,16 @@
                </div>
             </template>
             <div v-else-if="entry.type === 'text'" class="main-content" data-chat-answer>
-              <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming)" :key="pi">
-                <LegalReferenceCard v-if="part.type === 'reference'" :reference="part.reference" @open="openReference" />
-                <MarkdownPreview v-else :content="part.text" />
+              <template v-for="(part, pi) in legalMessageParts(bubble.content.slice(entry.start, entry.end), bubble.isStreaming, allowPlainJson)" :key="pi">
+                <LegalReferenceCard v-if="part.type === 'reference'" :reference="corroborateReference(part.reference, liveLawOutputs)" @open="openReference" />
+                <MarkdownPreview v-else :content="stripEmoji(part.text)" />
               </template>
             </div>
           </template>
 
             <LegalReferenceCard v-for="reference in toolReferences" :key="reference.id" :reference="reference" @open="openReference" />
+            <!-- 平台 AI 被跨境同意闸拦下：原地征求，同意后由 ChatInterface 把这一问原样重发 -->
+            <CrossBorderConsentCard v-if="bubble.consentRequired" class="bubble-consent-card" @accepted="onConsentAccepted" />
             <details v-if="inlineReference" open class="legal-inline-reader">
               <summary>{{ inlineReference.title }}</summary>
               <LegalReferencePane :reference="inlineReference" />
@@ -186,9 +188,11 @@ import QuestionCard from './QuestionCard.vue'
 import VerificationReportCard from './VerificationReportCard.vue'
 import SkillCreatedCard from './SkillCreatedCard.vue'
 import LegalReferenceCard from '../legal/LegalReferenceCard.vue'
+import CrossBorderConsentCard from '../account/CrossBorderConsentCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
-import { legalMessageParts, referencesFromTools, legalReadableText } from '@/utils/legalReferences.js'
+import { legalMessageParts, referencesFromTools, legalReadableText, allowPlainJsonLegalReferences, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
+import { stripEmoji } from '@/utils/stripEmoji.js'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'
 import { APPROVAL_PLAN_TYPES } from './chatTurns.mjs'
@@ -199,6 +203,7 @@ import { resolveSavedPath } from '@/utils/planReview.js'
 
 const props = defineProps({
   bubble: { type: Object, required: true },
+  userMessage: { type: String, default: '' },
   fileChanges: { type: Array, default: () => [] },
   /** 是否为最新一条助手消息（决定计划卡是否可操作） */
   isLatest: { type: Boolean, default: false },
@@ -206,19 +211,25 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+function onConsentAccepted() {
+  props.bubble.consentRequired = false
+  emit('consent-accepted')
+}
 
 // 计划文件的相对路径：历史回放没有 saved 事件，计划卡靠它反查 fileId。流式中不算（正文还在长）。
 const savedPath = computed(() => (props.bubble.isStreaming ? '' : resolveSavedPath(props.bubble.content) || ''))
+const allowPlainJson = computed(() => allowPlainJsonLegalReferences(props.userMessage, props.bubble.content))
 
 // 载荷形状对齐 project-overview.handleChatInterfaceAction({ type, msg })，msg 只需 content
 function sendAction(type) {
-  emit('message-action', { type, msg: { content: legalReadableText(props.bubble.content, t) } })
+  emit('message-action', { type, msg: { content: legalReadableText(props.bubble.content, t, allowPlainJson.value) } })
 }
 
 const openLegalReferenceTab = inject('openLegalReferenceTab', null)
 const inlineReference = ref(null)
 const toolReferences = computed(() => referencesFromTools(props.bubble.processes || []))
+const liveLawOutputs = computed(() => liveLawToolOutputs(props.bubble.processes || []))
 function openReference(reference) {
   emit('reading-interaction')
   if (openLegalReferenceTab) openLegalReferenceTab(reference)
@@ -236,7 +247,7 @@ function pickAction(type) {
 // 复制拿的是纯文本化之后的正文：粘进邮件里的不该是 **加粗** 与 <final>（见 utils/chatClipboard.js）。
 // 这里同时当作可见性判据——纯文本化后为空（整条只有工具执行、没有一个字的回答）就不出按钮，
 // 出一颗点下去什么都没复制走的按钮比没有按钮更糟。
-const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(legalReadableText(props.bubble.content, t))))
+const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(legalReadableText(props.bubble.content, t, allowPlainJson.value))))
 const showCopy = computed(() => !!copyableText.value)
 const showRegenerate = computed(() => props.isLatest && !props.bubble.isStreaming && !!props.bubble.content)
 function copyAnswer() {
@@ -601,4 +612,24 @@ function isApprovalPending(art) {
 @media (pointer: coarse) {
   .turn-file { min-height: var(--awd-control-height-touch); }
 }
+.bubble-consent-card {
+  margin-top: var(--awd-space-2);
+}
+/* 没有阅读标签页可开时（如全局对话），法规原文就地展开 */
+.legal-inline-reader {
+  margin-top: var(--awd-space-2);
+  border: 1px solid var(--awd-border);
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-surface);
+  overflow: hidden;
+}
+.legal-inline-reader > summary {
+  padding: var(--awd-space-2) var(--awd-space-3);
+  color: var(--awd-text-2); font-size: var(--awd-panel-fs); line-height: 1.6;
+  cursor: pointer; overflow-wrap: anywhere;
+}
+.legal-inline-reader > summary:hover { color: var(--awd-text); }
+.legal-inline-reader > summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: -2px; }
+.legal-inline-reader[open] > summary { border-bottom: 1px solid var(--awd-border); }
+.legal-inline-reader > .legal-reference-pane { height: auto; max-height: min(70vh, 640px); }
 </style>

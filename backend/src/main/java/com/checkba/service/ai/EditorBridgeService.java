@@ -146,7 +146,11 @@ public class EditorBridgeService {
             // 原生「导出为 PDF」入口转宿主导出（dev-board#886），与 export_document 同量级。
             Map.entry("export_pdf", 180),
             Map.entry("build_merge_draft", 180),
+            Map.entry("resolve_merge_mechanics", 180),
             Map.entry("build_comparison_document", 180),
+            // 宿主动作（agentClientActions.handleCompareDocxFiles）：取两份字节 + 隐藏引擎原生比较 + 导出 + 落盘，
+            // 比 build_comparison_document 多读写两段，给 240 秒；三处同表。
+            Map.entry("compare_docx_files", 240),
             // 整段插入类（dev-board#464）：一份十几页的报告经修订逐行落字远超 30s，
             // worker 那边照旧写完，后端却已经放弃等待。
             Map.entry("insert_at_cursor", 120),
@@ -312,8 +316,15 @@ public class EditorBridgeService {
      * 一轮下来四份。这里让「同一轮、同一目标」的第二次新建直接拿回第一次那份。
      * 跨轮（用户说「重新生成」）仍然新建：那是用户明确要的新一份。
      */
-    private final ConcurrentHashMap<String, ConcurrentHashMap<String, Long>> generatedThisRun =
+    private final ConcurrentHashMap<String, ConcurrentHashMap<String, Generated>> generatedThisRun =
             new ConcurrentHashMap<>();
+
+    /**
+     * 一条登记：fileId，以及 write_docx 写进去的整篇 Markdown 与样式画像参数。
+     * markdown 为 null = 这份不是 write_docx 渲染出来的（doc_start_stream 开在编辑器里、pdf_to_word），
+     * write_docx 不能拿 Markdown 整篇重写它。
+     */
+    public record Generated(Long fileId, String markdown, String styleProfileJson) {}
 
     /** 新建一份 docx 的目标键：目标文件夹 + 文件名（大小写不敏感，缺 .docx 补上）。 */
     public static String newDocxKey(Long parentId, String fileName) {
@@ -329,24 +340,36 @@ public class EditorBridgeService {
 
     /** 本轮这个目标已经生成过的 fileId；没有（或拿不到当前会话）返回 null。 */
     public Long generatedInRun(String key) {
+        Generated g = generatedEntry(key);
+        return g == null ? null : g.fileId();
+    }
+
+    /** 本轮这个目标的完整登记；没有（或拿不到当前会话）返回 null。 */
+    public Generated generatedEntry(String key) {
         String conversationId = currentConversationId.get();
         if (conversationId == null || key == null) return null;
-        java.util.Map<String, Long> seen = generatedThisRun.get(conversationId);
+        java.util.Map<String, Generated> seen = generatedThisRun.get(conversationId);
         return seen == null ? null : seen.get(key);
     }
 
     /** 登记本轮新建成功的文档。只在真的建成（且对流式写入而言：真的打开了）之后调。 */
     public void noteGenerated(String key, Long fileId) {
+        noteGeneratedDocx(key, fileId, null, null);
+    }
+
+    /** write_docx 的登记：连同这份文档当前的整篇 Markdown，供同轮重写比对与 append 续写。 */
+    public void noteGeneratedDocx(String key, Long fileId, String markdown, String styleProfileJson) {
         String conversationId = currentConversationId.get();
         if (conversationId == null || key == null || fileId == null) return;
-        generatedThisRun.computeIfAbsent(conversationId, k -> new ConcurrentHashMap<>()).put(key, fileId);
+        generatedThisRun.computeIfAbsent(conversationId, k -> new ConcurrentHashMap<>())
+                .put(key, new Generated(fileId, markdown, styleProfileJson));
     }
 
     /** 登记指向的文件已经不在了（用户这一轮里删了它）：撤掉，让下一次照常新建。 */
     public void forgetGenerated(String key) {
         String conversationId = currentConversationId.get();
         if (conversationId == null || key == null) return;
-        java.util.Map<String, Long> seen = generatedThisRun.get(conversationId);
+        java.util.Map<String, Generated> seen = generatedThisRun.get(conversationId);
         if (seen != null) seen.remove(key);
     }
 
@@ -722,6 +745,15 @@ public class EditorBridgeService {
      * @return 执行结果的 JSON 字符串
      */
     public String executeEditorCommand(String action, Map<String, Object> params) {
+        return executeEditorCommand(action, params, timeoutSecondsFor(action));
+    }
+
+    /**
+     * 同上，但由调用方给等待上限（秒）。给系统自己发起、用户没在等的只读命令用（写后核对，gap P5）：
+     * 编辑器不在了（标签关了、页面没了）时不能按读取类的 120 秒干等，否则模型的回答早流完了、
+     * 本轮却迟迟不结束。
+     */
+    public String executeEditorCommand(String action, Map<String, Object> params, int timeoutSeconds) {
         String conversationId = currentConversationId.get();
         if (conversationId == null) {
             return "{\"error\": \"No active conversation. Please ensure a document is open.\"}";
@@ -757,7 +789,7 @@ public class EditorBridgeService {
             log.info("Sent editor command: action={}, requestId={}", action, requestId);
 
             // 等待前端执行结果
-            EditorActionResult result = future.get(timeoutSecondsFor(action), TimeUnit.SECONDS);
+            EditorActionResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
             
             if (result.isSuccess()) {
                 recordBridge(action, "ok", conversationId, bridgeStartMs);

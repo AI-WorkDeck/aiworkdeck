@@ -279,6 +279,53 @@ public class AgentInboxService implements org.springframework.boot.ApplicationRu
         return null;
     }
 
+    /** 破坏性工具确认闸挂起的调用（随本轮请求快照落库，应用重启后仍能重放）。 */
+    public record PendingCall(String tool, String argsJson) {}
+
+    public void rememberPendingCall(String runId, String questionId, PendingCall call) {
+        var latest = repository.findByRunIdAndState(runId, APPLIED).stream().max(Comparator.comparingLong(row ->
+                row.getAppliedSequence() == null ? 0L : row.getAppliedSequence()));
+        for (AgentInboxItem row : latest.stream().toList()) {
+            try {
+                var json = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(row.getRequestJson());
+                json.put("_pendingCallQuestionId", questionId);
+                json.set("_pendingCall", mapper.valueToTree(call));
+                row.setRequestJson(mapper.writeValueAsString(json));
+                repository.save(row);
+            } catch (Exception e) {
+                throw new IllegalStateException("Could not retain pending tool call", e);
+            }
+        }
+    }
+
+    /** 取走（并清除）与这条回答对应的挂起调用；一次性，重复回答取不到第二次。 */
+    public PendingCall takePendingCall(String conversationId, Long projectId, Long userId, String answer) {
+        if (!AskUserQuestion.isAnswerMessage(answer)) return null;
+        var match = java.util.regex.Pattern.compile("^\\s*<ask_user_answer\\s+id=\"([^\"]+)\"\\s*>").matcher(answer);
+        if (!match.find()) return null;
+        synchronized (conversationLock(conversationId)) {
+            var rows = repository.findByConversationIdOrderByPositionAscCreatedAtAsc(conversationId).stream()
+                    .sorted(Comparator.comparing(AgentInboxItem::getUpdatedAt)).toList();
+            for (int i = rows.size() - 1; i >= 0; i--) {
+                AgentInboxItem row = rows.get(i);
+                if (!APPLIED.equals(row.getState()) || !Objects.equals(projectId, row.getProjectId())
+                        || !Objects.equals(userId, row.getUserId())) continue;
+                try {
+                    var json = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(row.getRequestJson());
+                    if (!match.group(1).equals(json.path("_pendingCallQuestionId").asText())) continue;
+                    PendingCall call = mapper.treeToValue(json.get("_pendingCall"), PendingCall.class);
+                    json.remove(List.of("_pendingCallQuestionId", "_pendingCall"));
+                    row.setRequestJson(mapper.writeValueAsString(json));
+                    repository.save(row);
+                    return call;
+                } catch (Exception e) {
+                    throw new IllegalStateException("Could not restore pending tool call", e);
+                }
+            }
+        }
+        return null;
+    }
+
     public AgentInboxItem claim(String id, String runId) {
         return claim(id, runId, true);
     }

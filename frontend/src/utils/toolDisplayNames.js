@@ -12,6 +12,7 @@ import { t } from '@/i18n'
 import { isEnglish } from '@/utils/appLanguage.js'
 
 const LOCALIZED_NAMES = {
+  "deadline_compute": "editor.officeToolNames.deadline_compute",
   "list_attached_files": "editor.officeToolNames.listAttachedFiles",
   "case_search": "legalReference.caseSearch",
   "office_ppt_add_image": "editor.officeToolNames.office_ppt_add_image",
@@ -36,6 +37,25 @@ const LOCALIZED_NAMES = {
 }
 
 const NAMES = {
+  // tool-system-v2 V4 合并后的新名（旧名条目保留：老会话过程卡与兼容壳期内的调用仍显示友好名）
+  doc_revisions: { zh: '处置修订', en: 'Resolve revisions' },
+  office_revisions: { zh: '处置修订', en: 'Resolve revisions' },
+  doc_update_comment: { zh: '更新批注', en: 'Update comment' },
+  office_update_comment: { zh: '更新批注', en: 'Update comment' },
+  office_excel_update_comment: { zh: '更新批注', en: 'Update comment' },
+  doc_table_insert: { zh: '插入表格行列', en: 'Insert table rows/columns' },
+  doc_table_delete: { zh: '删除表格行列', en: 'Delete table rows/columns' },
+  office_table_insert: { zh: '插入表格行列', en: 'Insert table rows/columns' },
+  office_table_delete: { zh: '删除表格行列', en: 'Delete table rows/columns' },
+  doc_insert_note: { zh: '插入脚注尾注', en: 'Insert footnote/endnote' },
+  office_insert_note: { zh: '插入脚注尾注', en: 'Insert footnote/endnote' },
+  doc_select: { zh: '选中定位', en: 'Select or move cursor' },
+  pdf_pages: { zh: 'PDF页面操作', en: 'PDF page operations' },
+  office_file: { zh: '宿主文件操作', en: 'Host file action' },
+  pptx_outline: { zh: 'PPT大纲', en: 'PPT outline' },
+  move_files: { zh: '移动文件', en: 'Move files' },
+  // 注：tool-system-v2 V3 已删除 22 个长期隐藏工具（get_user_profile、read_document、pptx_open_file 等），
+  // 它们在下面保留的条目是 history-only：只为老会话的过程卡继续显示友好名，不对应任何现存工具。
   // 计划 / 项目
   todo_write: { zh: '更新任务清单', en: 'Update plan' },
   ask_user: { zh: '向用户提问', en: 'Ask the user' },
@@ -53,6 +73,7 @@ const NAMES = {
   // AI 单次工作步骤条是两个概念，不要合并成一个分组。
   task_create: { zh: '创建日程任务', en: 'Create task' },
   task_list: { zh: '查询日程任务', en: 'List tasks' },
+  deadline_compute: { zh: '计算法定期限', en: 'Compute deadline' },
   task_update: { zh: '修改日程任务', en: 'Update task' },
   // 网络
   search_web: { zh: '网络搜索', en: 'Web search' },
@@ -66,7 +87,7 @@ const NAMES = {
   qichacha_ipr: { zh: '查询企业知识产权', en: 'Company IP lookup' },
   tushare_query: { zh: '查询金融数据', en: 'Financial data lookup' },
   // 法律
-  law_search: { zh: '语义搜索法规', en: 'Search regulations' },
+  law_search: { zh: '检索法规', en: 'Search regulations' },
   law_search_keyword: { zh: '关键词搜索法规', en: 'Keyword law search' },
   law_recognition: { zh: '法条识别与溯源', en: 'Identify citations' },
   get_law_article: { zh: '查询法条', en: 'Look up article' },
@@ -90,7 +111,7 @@ const NAMES = {
   text_find_replace: { zh: '文本查找替换', en: 'Text find and replace' },
   // 插件开发形态（PluginDevTools，dev-board#61）
   capability_list: { zh: '查看能力实现', en: 'List capabilities' },
-  capability_install: { zh: '准备能力升级', en: 'Prepare capability upgrade' },
+  capability_install: { zh: '安装能力包', en: 'Install capability' },
   capability_apply: { zh: '执行能力升级', en: 'Apply capability upgrade' },
   capability_select: { zh: '切换能力实现', en: 'Switch capability' },
   plugin_dev_scaffold: { zh: '创建插件骨架', en: 'Scaffold plugin' },
@@ -195,6 +216,8 @@ const NAMES = {
   doc_set_hyperlink: { zh: '设置超链接', en: 'Set hyperlink' },
   doc_link_evidence: { zh: '关联底稿', en: 'Link evidence' },
   doc_list_evidence: { zh: '查看底稿关联', en: 'List evidence links' },
+  compare_docx_summary: { zh: '比对两份文档摘要', en: 'Compare documents' },
+  compare_docx_redline: { zh: '生成修订比对稿', en: 'Build comparison document' },
   dd_export: { zh: '导出尽调交付件', en: 'Export due-diligence deliverable' },
   web_verify_import: { zh: '导入网核压缩包', en: 'Import web-verification archive' },
   evidence_verify: { zh: '勾稽核查', en: 'Verify evidence' },
@@ -369,6 +392,7 @@ const NAMES = {
   // PDF
   pdf_list_files: { zh: '列出PDF文件', en: 'List PDF files' },
   pdf_inspect_visual: { zh: '检查页面设计', en: 'Inspect page design' },
+  doc_view_pages: { zh: '查看页面画面', en: 'View rendered pages' },
   pdf_inspect: { zh: '读取PDF内容', en: 'Inspect PDF' },
   pdf_highlight: { zh: '高亮PDF文本', en: 'Highlight PDF text' },
   pdf_annotate: { zh: '添加PDF批注', en: 'Annotate PDF' },
@@ -390,6 +414,8 @@ const NAMES = {
   litigation_timeline_step: { zh: '推进时间轴管线', en: 'Advance timeline pipeline' },
   litigation_timeline_render: { zh: '生成案件时间轴', en: 'Draw case timeline' },
   // 会议录音与腾讯会议
+  meeting_list: { zh: '列出会议', en: 'List meetings' },
+  // 旧名保留给历史对话（V5 合流后不再下发）
   meeting_list_recordings: { zh: '列出会议录音', en: 'List meeting recordings' },
   meeting_get_transcript: { zh: '读取会议转写稿', en: 'Read meeting transcript' },
   tmeet_list_meetings: { zh: '列出腾讯会议', en: 'List Tencent meetings' },

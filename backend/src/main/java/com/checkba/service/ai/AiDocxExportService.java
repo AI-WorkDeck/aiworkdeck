@@ -138,25 +138,7 @@ public class AiDocxExportService {
         StorageService storageService = storageServiceFactory.getStorageService();
 
         try {
-            // flexmark 配置：表格扩展必须开，否则 markdown 表格会退化成竖线文本，
-            // 画像里的表格格式（边框/列宽/表头）根本没有落点
-            MutableDataSet options = markdownOptions();
-            Parser parser = Parser.builder(options).build();
-            DocxRenderer renderer = DocxRenderer.builder(options).build();
-
-            Document mdDocument = parser.parse(markdownContent);
-
-            // 渲染为 docx 到内存中的 WordprocessingMLPackage
-            WordprocessingMLPackage wordMLPackage = WordprocessingMLPackage.createPackage();
-            // 添加缺失的样式（BodyText, Quotations），避免 docx4j PropertyResolver 报错
-            com.checkba.util.DocxStyleHelper.addMissingStyles(wordMLPackage);
-            renderer.render(mdDocument, wordMLPackage);
-            // 样式画像：缺省 = 项目画像 / 系统默认 / house-default（律所标准格式）
-            StyleProfile effective = profile != null ? profile : styleProfileResolver.resolve(projectId, null);
-            com.checkba.util.DocxStyleHelper.applyProfile(wordMLPackage, effective);
-
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            wordMLPackage.save(bos);
+            ByteArrayOutputStream bos = renderDocx(projectId, markdownContent, profile);
 
             ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
             String savedPath = storageService.save(filePath, bis);
@@ -187,6 +169,50 @@ public class AiDocxExportService {
             throw new RuntimeException("生成 Word 文件失败: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * 用新的 Markdown 整篇重写一份已有的 docx（write_docx 同轮重写/分段追加本轮自己生成的那份，tasks-10 t03/t04）。
+     * 不新建行、不改名：字节经 {@link ProjectFileService#overwriteBinaryContent} 落盘并进版本记录，再增量刷新知识库。
+     */
+    public ProjectFile overwriteMarkdownDocx(Long projectId, Long fileId, Long userId,
+                                             String markdownContent, StyleProfile profile) {
+        String markdown = stripXmlInvalidChars(markdownContent == null ? "" : markdownContent);
+        ByteArrayOutputStream bos;
+        try {
+            bos = renderDocx(projectId, markdown, profile);
+        } catch (Exception e) {
+            throw new RuntimeException("生成 Word 文件失败: " + e.getMessage(), e);
+        }
+        ProjectFile file = projectFileService.overwriteBinaryContent(projectId, fileId, bos.toByteArray(), userId);
+        try {
+            projectRagService.refreshProjectKnowledgeIncremental(String.valueOf(projectId), file.getFilePath());
+        } catch (Exception ragEx) {
+            log.warn("刷新项目知识库失败: projectId={}, path={}", projectId, file.getFilePath(), ragEx);
+        }
+        return file;
+    }
+
+    private ByteArrayOutputStream renderDocx(Long projectId, String markdownContent, StyleProfile profile)
+            throws Exception {
+        // flexmark 配置：表格扩展必须开，否则 markdown 表格会退化成竖线文本，
+        // 画像里的表格格式（边框/列宽/表头）根本没有落点
+        MutableDataSet options = markdownOptions();
+        Parser parser = Parser.builder(options).build();
+        DocxRenderer renderer = DocxRenderer.builder(options).build();
+
+        Document mdDocument = parser.parse(markdownContent);
+
+        // 渲染为 docx 到内存中的 WordprocessingMLPackage
+        WordprocessingMLPackage wordMLPackage = WordprocessingMLPackage.createPackage();
+        // 添加缺失的样式（BodyText, Quotations），避免 docx4j PropertyResolver 报错
+        com.checkba.util.DocxStyleHelper.addMissingStyles(wordMLPackage);
+        renderer.render(mdDocument, wordMLPackage);
+        // 样式画像：缺省 = 项目画像 / 系统默认 / house-default（律所标准格式）
+        StyleProfile effective = profile != null ? profile : styleProfileResolver.resolve(projectId, null);
+        com.checkba.util.DocxStyleHelper.applyProfile(wordMLPackage, effective);
+
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        wordMLPackage.save(bos);
+        return bos;
+    }
 }
-
-

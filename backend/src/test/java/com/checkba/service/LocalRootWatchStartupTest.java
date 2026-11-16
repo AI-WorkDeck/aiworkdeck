@@ -315,9 +315,20 @@ class LocalRootWatchStartupTest {
             service.onStartup();
             assertTrue(entered.await(5, TimeUnit.SECONDS));
             assertTrue(service.ensureWatch(2L, opened.toString()));
-            Files.writeString(opened.resolve("changed.txt"), "real filesystem change");
-            verify(projects, timeout(3000)).reconcileProject(2L);
-            verify(changes, timeout(2000)).filesChanged(2L);
+            // ensureWatch 返回时底层事件流不一定已经就绪（macOS FSEvents 异步启动，CI 高负载下
+            // 事件循环线程也可能迟起），就绪前写入的文件只会成为基线、不产生事件。
+            // 因此每轮写一个新文件再等待对账，直到观察到调用为止；防抖 800ms，总期限 60s。
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+            for (int i = 0; ; i++) {
+                Files.writeString(opened.resolve("changed" + i + ".txt"), "real filesystem change");
+                try {
+                    verify(projects, timeout(2500)).reconcileProject(2L);
+                    break;
+                } catch (org.mockito.exceptions.verification.WantedButNotInvoked e) {
+                    if (System.nanoTime() > deadline) throw e;
+                }
+            }
+            verify(changes, timeout(30000)).filesChanged(2L);
             assertEquals(1, release.getCount(), "The old-project scan must still be blocked");
         } finally {
             release.countDown();

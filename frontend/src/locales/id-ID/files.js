@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Ukuran: {size}",
   "renderingDoc": "Merender dokumen…",
   "renderingSlides": "Merender presentasi…",
+  "slidesNotShown": "{count} slide lainnya tidak ditampilkan. Buka file untuk melihat semuanya.",
   "officePreviewUnsupported": "Pratinjau daring tidak tersedia untuk berkas ini",
   "fileTypeHintOpenLocal": "Tipe berkas: {type}. Cari di Finder atau File Explorer dan buka dengan aplikasi lokal.",
   "unknown": "Tidak diketahui",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Sedang menghasilkan takarir. Takarir akan muncul saat siap.",
     "ready": "Takarir sudah siap",
     "failed": "Pembuatan takarir gagal. Klik tombol takarir untuk mencoba lagi.",
-    "notConfigured": "Transkripsi belum dikonfigurasi. Atur di Pengaturan sistem - Layanan Platform - Transkripsi Rapat untuk menghasilkan takarir.",
+    "notConfigured": "Transkripsi belum dikonfigurasi. Atur di Pengaturan - Layanan Platform - Transkripsi Rapat untuk menghasilkan takarir.",
     "noticePending": "Terdaftar. Konfirmasi pemberitahuan rekaman di Voice - Rekaman Rapat terlebih dahulu, lalu klik tombol takarir.",
     "submitFailed": "Tidak dapat memulai pembuatan takarir",
     "empty": "Tidak ada suara yang terdeteksi"

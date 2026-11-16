@@ -32,6 +32,7 @@ public class LawFirmManagementController {
     private final LawFirmBundledPluginInstaller installer;
     private final UserRepository userRepository;
     private final AdminAccessService adminAccessService;
+    private final com.checkba.service.lawfirm.LawFirmBillingService billing;
 
     @GetMapping("/overview")
     public Map<String, Object> overview(@RequestParam(value = "scope", required = false) String scope,
@@ -51,6 +52,8 @@ public class LawFirmManagementController {
         Long projectId = parseProjectId(b.get("projectId"));
         @SuppressWarnings("unchecked")
         Map<String, Object> params = b.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        if (com.checkba.service.lawfirm.LawFirmBillingService.ACTIONS.contains(action))
+            return run(() -> com.checkba.service.lawfirm.LawFirmBillingService.concurrencySafe(() -> billing.execute(userId, projectId, action, params)));
         return run(() -> service.execute(userId, projectId, action, params));
     }
 
@@ -68,8 +71,8 @@ public class LawFirmManagementController {
 
     @GetMapping("/finance/export-csv")
     public ResponseEntity<byte[]> exportCsv(@RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
-        requireUser(sessionId);
-        byte[] bytes = service.exportFinanceCsv().getBytes(StandardCharsets.UTF_8);
+        Long userId = requireUser(sessionId);
+        byte[] bytes = service.exportFinanceCsvFor(userId).getBytes(StandardCharsets.UTF_8);
         String filename = "lawfirm-finance-ledger-" + LocalDate.now() + ".csv";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

@@ -60,6 +60,33 @@ class SkillRegistryTest {
     }
 
     @Test
+    @DisplayName("V4：用户自建 skill 的 allowed_tools 里写旧工具名，加载时映射到合并后的新名并去重（不静默裁掉能力）")
+    void renamedToolsInAllowedToolsAreMigratedToTheirReplacements() throws IOException {
+        Path dir = tempDir.resolve("legacy-skill");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("skill.yml"), """
+                id: legacy-skill
+                name: 旧白名单
+                description: 旧名字
+                triggers:
+                  - 旧技能
+                prompt: prompt.md
+                tool_policy: restrict
+                allowed_tools:
+                  - doc_accept_revision
+                  - doc_reject_all_revisions
+                  - law_search_keyword
+                  - law_search
+                  - write_docx
+                """);
+        Files.writeString(dir.resolve("prompt.md"), "## 技能指引");
+        SkillRegistry registry = newRegistry(tempDir, new PluginService());
+
+        assertEquals(List.of("doc_revisions", "law_search", "write_docx"),
+                registry.getSkill("legacy-skill").orElseThrow().getAllowedTools());
+    }
+
+    @Test
     @DisplayName("解析合法 skill.yml：字段与 prompt 模板全部就位")
     void parsesValidSkill() throws IOException {
         writeSkill(tempDir.resolve("test-skill"), "test-skill", "output: 输出一份比较分析\n");

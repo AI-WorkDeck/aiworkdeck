@@ -29,6 +29,9 @@ public final class ToolFileGuard {
         if (file == null) {
             return null; // 「文件不存在」由调用方自己的分支处理，这里不抢
         }
+        if (Boolean.TRUE.equals(file.getIsDeleted())) {
+            return "Error: File not found in database: " + file.getId();
+        }
         Long currentProjectId = ProjectContextHolder.getProjectIdAsLong();
         if (currentProjectId == null) {
             return "Error: no project context for this request; refusing to access file "
@@ -51,6 +54,10 @@ public final class ToolFileGuard {
             ProjectFile file,
             com.checkba.service.ProjectMemberService projectMemberService) {
         if (file == null) return null;
+        // 回收站里的文件对 Agent 不可见（与 UI 一致）：按 id 也读不到
+        if (Boolean.TRUE.equals(file.getIsDeleted())) {
+            return "Error: File not found in database: " + file.getId();
+        }
         Long currentProjectId = ProjectContextHolder.getProjectIdAsLong();
         if (currentProjectId == null) {
             return "Error: no project context for this request; refusing to access file " + file.getId() + ".";

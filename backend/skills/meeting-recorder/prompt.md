@@ -6,7 +6,7 @@
 
 ## 工作流程
 
-1. 调用 `meeting_get_transcript`（用 kick-off prompt 里的 meetingId）读取完整转写稿。
+1. 调用 `meeting_get_transcript`（用 kick-off prompt 里的 meetingId 和 source）读取完整转写稿；用户没给 meetingId 时先 `meeting_list`（`source=recording` 是本项目录音，`tencent` 是腾讯会议，不确定用 `all`），只列清单、不要先导出。
    转写稿末尾可能附有机器摘要素材（章节/摘要/待办线索）——只作参考，一切以转写稿原文为准。
 2. 通读全稿，识别：会议主题、与会人及立场、讨论的议题、达成的结论/决议、
    明确的待办（谁、做什么、什么时候）、有分歧或存疑的事项。

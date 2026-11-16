@@ -89,7 +89,7 @@
             <text class="form-label">{{ $t('chat.uploadFolder') }}</text>
             <view class="awd-field clickable" @tap="triggerFolderUploadInput">
                <view v-if="isFolderUpload && uploadSelectedFiles.length > 0" class="field-content-row">
-                  <text class="field-value">{{ $t('chat.filesSelected', { count: uploadSelectedFiles.length }) }}</text>
+                  <text class="field-value">{{ $t('chat.filesSelected', { count: uploadSelectedFiles.length }, uploadSelectedFiles.length) }}</text>
                </view>
                <view v-else>
                   <text class="field-placeholder">{{ $t('chat.clickSelectFolder') }}</text>
@@ -291,19 +291,19 @@
        </view>
        <view class="header-actions">
           <view class="memory-header-btn" @tap="$emit('open-settings', { nav: 'memory' })">{{ $t('chat.memoryButton') }}</view>
-          <view class="icon-btn" @tap="$emit('toggle-history')" title="History">
+          <view class="icon-btn" @tap="$emit('toggle-history')" :title="$t('workbench.historyConversations')">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <circle cx="12" cy="12" r="9" />
                <path d="M12 7v5l3 2" />
              </svg>
              <view v-if="historyBadge" class="conv-dot header-dot" :class="historyBadge"></view>
           </view>
-          <view class="icon-btn" @tap="startNewChat" title="New Chat">
+          <view class="icon-btn" @tap="startNewChat" :title="$t('chat.newConversation')">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <path d="M12 5v14M5 12h14" />
              </svg>
           </view>
-          <view class="icon-btn" @tap="$emit('close')" title="Close">
+          <view class="icon-btn" @tap="$emit('close')" :title="$t('common.close')">
              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                <path d="M18 6L6 18M6 6l12 12" />
              </svg>
@@ -427,6 +427,7 @@
           <div v-else-if="msg.role === 'ASSISTANT'" class="assistant-root-wrapper">
              <RootBubble
                :bubble="msg"
+               :user-message="turn.user?.bubble.content || ''"
                :is-latest="index === bubbles.length - 1"
                :review-states="reviewStates"
                :file-changes="filesForBubble(msg)"
@@ -437,9 +438,16 @@
                @answer-question="handleQuestionAnswer"
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
+               @consent-accepted="retryAfterConsent(index)"
                @stop-generation="handleAbort"
                @reading-interaction="followLatest = false"
              />
+             <!-- 撤销本次 AI 修改（用户控制 3/4）：只挂在最后一条、改过文档且快照仍在的气泡下 -->
+             <view v-if="showRunUndo(msg, index)" class="run-undo-row">
+                <text v-if="runUndo.state === 'done'" class="run-undo-done">{{ $t('chat.undoRunDoneLabel') }}</text>
+                <text v-else class="run-undo-link" :class="{ 'is-busy': runUndo.state === 'running' }"
+                      :title="$t('chat.undoRunTitle')" @tap="handleUndoRun">{{ runUndo.state === 'running' ? $t('chat.undoRunRunning') : $t('chat.undoRun') }}</text>
+             </view>
              <!-- <span v-if="msg.timestamp" class="bubble-timestamp assistant">{{ msg.timestamp }}</span> -->
           </div>
         </view>
@@ -474,21 +482,21 @@
                <view v-if="pastedImages.length > 0" class="input-images-preview">
                   <view v-for="(img, index) in pastedImages" :key="index" class="preview-image-item">
                      <image v-if="img.path" :src="img.path" mode="aspectFill" class="preview-thumb" />
-                     <text class="preview-remove" @tap="removePastedImage(index)">×</text>
+                     <text :title="$t('common.remove')" class="preview-remove" @tap="removePastedImage(index)">×</text>
                   </view>
                </view>
                <!-- 当前文档 chip（K14 ①）：看得见、摘得掉。摘掉只对这一轮生效 -->
                <view v-if="activeDocChip" class="active-doc-chip" :title="$t('chat.activeDocChipTitle')">
                   <text class="active-doc-label">{{ $t('chat.activeDocChipLabel') }}</text>
                   <text class="active-doc-name">{{ activeDocChip.name }}</text>
-                  <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
+                  <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
                </view>
                <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
                <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
                   <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
                   <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
-                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
-                  <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+                  <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { n: activeSelectionChip.length }) }}</text>
+                  <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
                </view>
                <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
                <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
@@ -502,7 +510,7 @@
                 @paste="handlePaste"
                 @keydown="handleInputKeydown"
                 @click="handleInputClick"
-                :data-placeholder="$t('chat.inputPlaceholderEmpty')"
+                :data-placeholder="$t('chat.inputPlaceholderEmpty') + '\n' + $t('chat.inputKeysHint')"
               ></div>
               <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
               <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
@@ -514,13 +522,13 @@
                        class="skill-chip"
                        :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
                     <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
-                    <text v-if="chip.source === 'manual'" class="skill-chip-remove"
+                    <text :title="$t('common.remove')" v-if="chip.source === 'manual'" class="skill-chip-remove"
                           @tap.stop="removeSelectedSkill(chip.id)">×</text>
                  </view>
               </view>
               <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
                  <view class="action-bar-left">
-                    <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" title="Add File">
+                    <view class="icon-btn mini file-add-btn" @tap="triggerFileSelect" :title="$t('chat.uploadFileTitle')">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                  </view>
                     <!-- Agent Mode Selector -->
@@ -578,7 +586,7 @@
                                       @tap.stop="applyBuiltinWorkflow(bw)"
                                       @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                    <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                                   <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                                   <text :title="$t('chat.builtinWorkflowRightClickHint')" class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                                 </view>
                              </view>
                           </view>
@@ -616,8 +624,9 @@
                     <view v-if="isStreaming" class="alternate-send" @tap="handleSubmit(followUpMode === 'steer' ? 'queue' : 'steer')">
                        {{ followUpMode === 'steer' ? $t('chat.queueInstead') : $t('chat.steerInstead') }}
                     </view>
-                    <button v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
-                    <button type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
+                    <button :title="pausePending ? $t('chat.pausePending') : $t('chat.pauseRun')" v-if="isStreaming" type="button" class="pause-btn" :class="{ 'is-pending': pausePending }" :aria-label="$t('chat.pauseRun')" :disabled="pausePending" @click="handlePause"><text>❚❚</text></button>
+                    <button :title="$t('chat.stop')" v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
+                    <button :title="$t('chat.sendAria')" type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
                        <text class="send-icon">↑</text>
                     </button>
                  </view>
@@ -625,47 +634,31 @@
           </view>
           <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
             @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
+          <!-- 四个内置工作流直接摆在输入框下（空会话态）：不必先展开「高级设置」才找得到。
+               点击把快捷指令填进输入框；右键或 ⋯ 切换项目版本 / 编辑规则（同原折叠区行为）。 -->
+          <view class="empty-workflows">
+             <view class="empty-workflows-head">
+                <text class="empty-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</text>
+                <text class="empty-workflows-link" @tap="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
+             </view>
+             <view class="empty-workflows-grid">
+                <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
+                      class="empty-workflow-card" :data-bw-card="bw.id"
+                      :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
+                      :title="$t('chat.builtinWorkflowRightClickHint')"
+                      @tap="applyBuiltinWorkflow(bw)"
+                      @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
+                   <view class="empty-workflow-top">
+                      <text class="empty-workflow-name">{{ bw.title }}</text>
+                      <text :title="$t('chat.builtinWorkflowRightClickHint')" class="empty-workflow-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                   </view>
+                   <text class="empty-workflow-desc">{{ bw.desc }}</text>
+                </view>
+             </view>
+          </view>
           <details class="composer-advanced-settings">
           <summary class="composer-advanced-summary">{{ $t('chat.composerAdvancedSettings') }}</summary>
           <view class="composer-preferences">
-          <details class="builtin-workflows-fold" :class="{ customized: builtinCustomActiveCount > 0 }">
-             <summary class="builtin-workflows-summary">
-                <span class="builtin-workflows-entry">
-                   <span class="builtin-workflows-heading">
-                      <span class="builtin-workflows-title">{{ $t('chat.builtinWorkflowsFoldEntry') }}</span>
-                      <span class="builtin-workflows-summary-state" :class="{ custom: builtinCustomActiveCount > 0 }">
-                         {{ builtinCustomActiveCount > 0 ? $t('chat.builtinWorkflowsCustomCount', { count: builtinCustomActiveCount }) : $t('chat.builtinWorkflowBadge') }}
-                      </span>
-                   </span>
-                   <span class="builtin-workflows-scope">{{ $t('chat.builtinWorkflowsScope') }}</span>
-                </span>
-                <span class="builtin-workflows-summary-right">
-                   <button type="button" class="builtin-workflows-adv-btn"
-                           @click.stop.prevent="openBuiltinWorkflowEditor(builtinQuickWorkflows[0], builtinQuickWorkflows[0]?.activeVersionId)">
-                      {{ $t('chat.builtinWorkflowsAdvancedBtn') }}
-                   </button>
-                </span>
-             </summary>
-             <view class="builtin-workflows-body">
-                <view class="builtin-workflows-grid">
-                   <view v-for="bw in builtinQuickWorkflows" :key="bw.id"
-                         class="builtin-workflow-card" :data-bw-card="bw.id"
-                         :class="{ 'is-custom-version': !bw.activeIsSystemDefault }"
-                         :title="$t('chat.builtinWorkflowRightClickHint')"
-                         @tap="applyBuiltinWorkflow(bw)"
-                         @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
-                      <view class="builtin-workflow-card-top">
-                         <text class="builtin-workflow-name">{{ bw.title }}</text>
-                         <view class="builtin-workflow-card-actions" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">
-                            <text class="builtin-workflow-ver-tag" :class="{ custom: !bw.activeIsSystemDefault }">{{ bw.activeVersionName }}</text>
-                            <text class="builtin-workflow-more-btn">⋯</text>
-                         </view>
-                      </view>
-                      <text class="builtin-workflow-desc">{{ bw.desc }}</text>
-                   </view>
-                </view>
-             </view>
-          </details>
           <ChatSuggestionControl v-if="chatSuggestions.available" :enabled="suggestionEnabled" @toggle="chatSuggestions.toggle" />
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
           </view>
@@ -675,7 +668,10 @@
 
        <!-- Bottom: History (pushed to bottom with flexbox) -->
        <view class="empty-bottom-section">
-          <view class="recent-history-header">{{ $t('chat.recentChats') }}</view>
+          <view class="recent-history-header">
+             <text>{{ $t('chat.recentChats') }}</text>
+             <text v-if="recentHistory && recentHistory.length > 0" class="recent-history-all" role="button" @tap="$emit('toggle-history')">{{ $t('chat.recentChatsAll') }}</text>
+          </view>
           <view class="recent-history" v-if="recentHistory && recentHistory.length > 0">
              <view v-for="h in recentHistory" :key="h.id" class="history-item" @tap="$emit('load-history', h)">
                 <view v-if="recentDotClass(h)" class="conv-dot" :class="recentDotClass(h)"></view>
@@ -702,6 +698,10 @@
        <!-- 任务清单进度卡已随消息流内联展示（RootBubble），不再常驻输入框上方，
             避免与气泡内的步骤分组重复（用户反馈：线性时序结构） -->
        <!-- 步数超限暂停 / 上次进程被杀：一键继续，免得用户手动输入「继续」 -->
+       <!-- 用户点了暂停：后端在下一个安全步骤（当前这批工具跑完、下一次调用模型前）才停 -->
+       <view v-if="isStreaming && pausePending" class="link-bar">
+          <text class="link-hint">{{ $t('chat.pausePending') }}</text>
+       </view>
        <view v-if="agentPaused && !isStreaming" class="continue-bar">
           <text class="continue-hint">{{ continueHint }}</text>
           <view class="continue-btn" @tap="handleContinue">{{ $t('chat.continueRun') }}</view>
@@ -782,6 +782,7 @@
                <text class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
            </view>
        </view>
+       <NowDoingStrip :active="isStreaming" :bubble="nowDoingBubble" />
        <AgentInbox
          :items="pendingInbox"
          :stream-ids="inboxStreamIds"
@@ -806,21 +807,21 @@
            <view v-if="pastedImages.length > 0" class="input-images-preview">
               <view v-for="(img, index) in pastedImages" :key="index" class="preview-image-item">
                  <image v-if="img.path" :src="img.path" mode="aspectFill" class="preview-thumb" />
-                 <text class="preview-remove" @tap="removePastedImage(index)">×</text>
+                 <text :title="$t('common.remove')" class="preview-remove" @tap="removePastedImage(index)">×</text>
               </view>
            </view>
            <!-- 当前文档 chip（K14 ①）：看得见、摘得掉。摘掉只对这一轮生效 -->
            <view v-if="activeDocChip" class="active-doc-chip" :title="$t('chat.activeDocChipTitle')">
               <text class="active-doc-label">{{ $t('chat.activeDocChipLabel') }}</text>
               <text class="active-doc-name">{{ activeDocChip.name }}</text>
-              <text class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
+              <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveDoc">×</text>
            </view>
            <!-- 当前文档选区 chip（dev-board#1430）：选中正文后自动浮出，可直接对选区提修订意见 -->
            <view v-if="activeSelectionChip" class="active-doc-chip active-selection-chip" :title="$t('chat.activeSelectionChipTitle')">
               <text class="active-doc-label">{{ $t('chat.activeSelectionChipLabel') }}</text>
               <text class="active-doc-name">{{ $t('chat.activeSelectionChipPreview', { text: activeSelectionChip.preview }) }}</text>
-              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { count: activeSelectionChip.charCount }) }}</text>
-              <text class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
+              <text class="active-selection-count">{{ $t('chat.activeSelectionChipCount', { n: activeSelectionChip.length }) }}</text>
+              <text :title="$t('common.remove')" class="active-doc-remove" @tap.stop="dismissActiveSelection">×</text>
            </view>
            <!-- 「模型看不了图」常驻提示（K21 ⑨）：粘的、拖的图片都覆盖；能力未知一律不提示 -->
            <text v-if="visionNotice" class="input-images-note">{{ $t(visionNotice) }}</text>
@@ -834,7 +835,7 @@
             @paste="handlePaste"
             @keydown="handleInputKeydown"
             @click="handleInputClick"
-            :data-placeholder="$t('chat.inputPlaceholder')"
+            :data-placeholder="composerPlaceholder"
           ></div>
           <!-- `@` 引用选择器（dev-board#794 K15）：浮在输入卡上沿 -->
           <MentionPicker v-if="mentionOpen" ref="mentionPicker" :files="mentionCandidates" :skills="mentionSkills"
@@ -846,13 +847,13 @@
                    class="skill-chip"
                    :class="{ auto: chip.source === 'auto', 'is-builtin': chip.builtinWorkflow, flash: chip.justActivated }">
                 <text class="skill-chip-name">{{ chip.builtinWorkflow ? $t('chat.builtinWorkflowChipPrefix', { name: chip.customVersion && chip.versionName ? `${chip.name} · ${chip.versionName}` : chip.name }) : chip.name }}</text>
-                <text v-if="chip.source === 'manual'" class="skill-chip-remove"
+                <text :title="$t('common.remove')" v-if="chip.source === 'manual'" class="skill-chip-remove"
                       @tap.stop="removeSelectedSkill(chip.id)">×</text>
              </view>
           </view>
           <view class="input-footer" :class="{ 'is-streaming': isStreaming }">
              <view class="action-bar-left">
-                <view class="icon-btn mini" @tap="triggerFileSelect" title="Add File">
+                <view class="icon-btn mini" @tap="triggerFileSelect" :title="$t('chat.uploadFileTitle')">
                    <svg class="plus-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </view>
                 <!-- Agent Mode Selector -->
@@ -910,7 +911,7 @@
                                   @tap.stop="applyBuiltinWorkflow(bw)"
                                   @contextmenu.prevent.stop="openBuiltinWorkflowContextMenu($event, bw)">
                                <text class="skill-builtin-pill-label">{{ bw.activeIsSystemDefault ? bw.title : `${bw.title} · ${bw.activeVersionName}` }}</text>
-                               <text class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
+                               <text :title="$t('chat.builtinWorkflowRightClickHint')" class="skill-builtin-pill-more" :data-bw-actions="bw.id" @tap.stop="openBuiltinWorkflowContextMenu($event, bw)" @click.stop="openBuiltinWorkflowContextMenu($event, bw)">⋯</text>
                             </view>
                          </view>
                       </view>
@@ -948,8 +949,9 @@
                 <view v-if="isStreaming" class="alternate-send" @tap="handleSubmit(followUpMode === 'steer' ? 'queue' : 'steer')">
                    {{ followUpMode === 'steer' ? $t('chat.queueInstead') : $t('chat.steerInstead') }}
                 </view>
-                <button v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
-                <button type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
+                <button :title="pausePending ? $t('chat.pausePending') : $t('chat.pauseRun')" v-if="isStreaming" type="button" class="pause-btn" :class="{ 'is-pending': pausePending }" :aria-label="$t('chat.pauseRun')" :disabled="pausePending" @click="handlePause"><text>❚❚</text></button>
+                <button :title="$t('chat.stop')" v-if="isStreaming" type="button" class="stop-btn" :aria-label="$t('chat.stop')" @click="handleAbort"><text>■</text></button>
+                <button :title="$t('chat.sendAria')" type="button" class="send-btn" :class="{ disabled: !inputPrompt.trim() || isUploadingPasted }" :aria-label="$t('chat.sendAria')" @click="handleSubmit(followUpMode)">
                    <text class="send-icon">↑</text>
                 </button>
              </view>
@@ -1094,7 +1096,9 @@ import { buildChatTurns, isPlanSnapshotCall, pendingAttention, recoverPlanTodos 
 import { useChatReadingPosition } from '@/composables/useChatReadingPosition.js'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
+import NowDoingStrip from './AgentMessage/NowDoingStrip.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
+import { formatUndoFiles, shouldOfferRunUndo, undoResultView } from '@/utils/agentRunControl.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
@@ -1155,7 +1159,7 @@ import {
 
 export default {
   name: 'ChatInterface',
-  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, OptionalComponentCard },
+  components: { OcrRoutingCard, ChatSuggestionControl, DecisionAssistControl, ModelSelectorDropdown, RootBubble, ChatTurnRail, MentionPicker, BackgroundTaskIndicator, AgentInbox, NowDoingStrip, OptionalComponentCard },
   inject: { openSettingsTab: { default: null } },
   methods: {
     goToMcpManagement() {
@@ -1228,6 +1232,8 @@ export default {
       isStreaming,
       sendMessage: sendAgentMessage,
       abort,
+      pause,
+      pausePending,
       setConversationId,
       clearBubbles,
       parseAssistantHistory,
@@ -1503,6 +1509,24 @@ export default {
      * 点它，后端 acceptInboxSubmission 是幂等的（进去先查活跃轮次，有就原样返回）。
      */
     const inboxRunActive = computed(() => isStreaming.value)
+    /**
+     * 输入框占位语（用户控制 1）：轮次在跑时告诉用户「现在打字会怎样」——
+     * 插话模式下一步就改方向，排队模式等这轮做完再跑。判据与发送路径同源
+     * （isStreaming + followUpMode），不另起状态。空态那只输入框只在没轮次时出现，不用跟。
+     */
+    // 常驻条读的是正在写的那条助手气泡（插话会另起一段，取最后一条即可）
+    const nowDoingBubble = computed(() => {
+      if (!isStreaming.value) return null
+      for (let i = bubbles.value.length - 1; i >= 0; i--) {
+        if (bubbles.value[i].role === 'ASSISTANT') return bubbles.value[i]
+      }
+      return null
+    })
+    const composerPlaceholder = computed(() => {
+      const lead = !isStreaming.value ? t('chat.inputPlaceholder')
+        : followUpMode.value === 'queue' ? t('chat.inputPlaceholderQueue') : t('chat.inputPlaceholderSteer')
+      return lead + '\n' + t('chat.inputKeysHint')
+    })
     const messageList = ref(null)
     const messageContent = ref(null)
     // 内容没变的轮次要保持同一个 turn 对象（dev-board#811 K31）：模板上那条 v-memo
@@ -2131,9 +2155,19 @@ export default {
     }
     watch(() => builtinWorkflowMenu.value.visible, open => setGlobalOverlay(open, workflowMenuHolder), { flush: 'sync' })
     watch([() => props.visible, () => props.projectId], closeBuiltinWorkflowContextMenu)
-    onMounted(() => window.addEventListener('keydown', dismissWorkflowMenu, true))
+    // 模式下拉开着时 Esc 收起（与点遮罩同效）
+    const dismissModeDropdown = (event) => {
+      if (event.key !== 'Escape' || !showModeDropdown.value) return
+      event.stopPropagation()
+      showModeDropdown.value = false
+    }
+    onMounted(() => {
+      window.addEventListener('keydown', dismissWorkflowMenu, true)
+      window.addEventListener('keydown', dismissModeDropdown, true)
+    })
     onBeforeUnmount(() => {
       window.removeEventListener('keydown', dismissWorkflowMenu, true)
+      window.removeEventListener('keydown', dismissModeDropdown, true)
       setGlobalOverlay(false, workflowMenuHolder)
     })
 
@@ -2185,6 +2219,9 @@ export default {
         if (agentMode) selectMode(agentMode)
       }
       inputPrompt.value = bw.prompt
+      // 卡片点名的工作流随这条消息显式带上（skillIds），不靠后端按触发词猜：
+      // 卡片措辞一改、或命中门槛漏了某个动词，技能就静默不生效（tutorial #146）
+      pendingWorkflowSkillId.value = bw.id
       if (richInput.value) {
         const existingTags = Array.from(richInput.value.querySelectorAll('[data-file-id]'))
           .map(el => el.outerHTML)
@@ -2196,7 +2233,17 @@ export default {
 
     // 每个 sendMessage 出口都要带上它。「继续」「按此推进」「点选项」都是同一件任务的后续轮次，
     // 漏带的话用户选的技能会在这些路径上静默掉线（旧的 pinnedSkillId 就只有主发送路径带）。
-    const currentSkillIds = () => (skillDisabledByMode.value ? [] : [...selectedSkillIds.value])
+    // 点内置工作流卡片后待发的那个工作流 id：同一份草稿发出（或清空）前一直带着，发完随草稿清掉
+    const pendingWorkflowSkillId = ref(null)
+    watch(inputPrompt, (value) => {
+      if (!String(value || '').trim()) pendingWorkflowSkillId.value = null
+    })
+    const currentSkillIds = () => {
+      if (skillDisabledByMode.value) return []
+      const ids = [...selectedSkillIds.value]
+      if (pendingWorkflowSkillId.value && !ids.includes(pendingWorkflowSkillId.value)) ids.push(pendingWorkflowSkillId.value)
+      return ids
+    }
 
     const toggleSkillSelection = (skillId) => {
       if (!skillId) return
@@ -2563,6 +2610,13 @@ export default {
       // 只有对话框真开了才算数：openRollbackDialog 可能在流式中 / 定位不到时提前返回，
       // 那时把标志留成 true，下一次普通回退就会莫名其妙地自动重发。
       rollbackResend.value = showRollbackDialog.value
+    }
+
+    // 同意卡点了「同意并继续」：用户的意图就是「接着问刚才那句」，走重新生成同一条链路
+    // （截断 + 存档 + 原样重发），只是不再弹确认框——确认刚刚已经做过了
+    const retryAfterConsent = async (assistantIndex) => {
+      openRegenerateDialog(assistantIndex)
+      if (rollbackResend.value) await confirmRollback()
     }
 
     const cancelRollback = () => {
@@ -3049,6 +3103,71 @@ export default {
       return abort()
     }
 
+    // 暂停（用户控制 5）：后端在下一个安全步骤收尾成 paused/user_pause，之后用「继续执行」续跑
+    const handlePause = async () => {
+      if (!isStreaming.value || pausePending.value) return
+      const outcome = await pause()
+      if (outcome === 'failed') uni.showToast({ title: t('chat.pauseFailed'), icon: 'none' })
+    }
+
+    // 撤销本次 AI 修改（用户控制 3/4）。快照只在后端内存里（24 小时、新一轮开始即替换），
+    // 所以入口出不出要问后端；按「会话 + 最后一条气泡」记一份，换了就重新问。
+    const runUndo = ref({ key: '', available: false, files: [], state: 'idle' })
+    const agentRunApi = (path, method = 'GET') => fetch(`${getApiBaseUrl()}/api/agent/${path}/${currentConversationId.value}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Session-Id': getSessionId() || '' }
+    })
+    const lastBubbleUndoKey = computed(() => {
+      const list = bubbles.value
+      const last = list.length ? list[list.length - 1] : null
+      if (!currentConversationId.value || !shouldOfferRunUndo(last, { isLatest: true, isStreaming: isStreaming.value })) return ''
+      return `${currentConversationId.value}:${last.id}`
+    })
+    watch(lastBubbleUndoKey, async (key) => {
+      if (runUndo.value.key === key) return
+      runUndo.value = { key, available: false, files: [], state: 'idle' }
+      if (!key) return
+      try {
+        const response = await agentRunApi('undo')
+        const body = response.ok ? await response.json() : null
+        if (runUndo.value.key !== key) return
+        runUndo.value = { key, available: !!(body && body.available), files: (body && body.files) || [], state: 'idle' }
+      } catch (e) {
+        console.warn('[ChatInterface] undo status unavailable:', e)
+      }
+    })
+    const showRunUndo = (msg, index) => {
+      if (!runUndo.value.key || !(runUndo.value.available || runUndo.value.state === 'done')) return false
+      return shouldOfferRunUndo(msg, { isLatest: index === bubbles.value.length - 1, isStreaming: isStreaming.value })
+    }
+    const handleUndoRun = () => {
+      const current = runUndo.value
+      if (current.state !== 'idle' || !current.available || isStreaming.value) return
+      uni.showModal({
+        title: t('chat.undoRunConfirmTitle'),
+        content: t('chat.undoRunConfirmContent', { files: formatUndoFiles(current.files, t) }),
+        confirmText: t('chat.undoRunConfirmOk'),
+        success: async (res) => {
+          if (!res.confirm || runUndo.value !== current) return
+          current.state = 'running'
+          let view
+          try {
+            const response = await agentRunApi('undo', 'POST')
+            let body = null
+            try { body = await response.json() } catch (e) { /* 读不出来按状态码判 */ }
+            view = undoResultView(response.status, body, t)
+          } catch (e) {
+            view = { state: 'idle', message: t('chat.undoRunFailed', { error: e.message || String(e) }) }
+          }
+          if (runUndo.value !== current) return
+          current.state = view.state === 'gone' ? 'idle' : view.state
+          if (view.state === 'gone') current.available = false
+          if (view.state === 'done') uni.showToast({ title: view.message, icon: 'none' })
+          else uni.showModal({ title: t('chat.undoRunConfirmTitle'), content: view.message, showCancel: false, confirmText: t('chat.gotIt') })
+        }
+      })
+    }
+
     const toggleFollowUpMode = () => {
       followUpMode.value = followUpMode.value === 'steer' ? 'queue' : 'steer'
       try { uni.setStorageSync('awd_agent_follow_up_mode', followUpMode.value) } catch (e) { /* ignore */ }
@@ -3151,9 +3270,11 @@ export default {
 
     // 续跑提示文案：区分「步数用完」和「上次进程被杀」两种中断来源
     const continueHint = computed(() => {
-      return agentPaused.value && agentPaused.value.reason === 'process_interrupted'
-        ? t('chat.continueHintInterrupted')
-        : t('chat.continueHintPaused')
+      const reason = agentPaused.value && agentPaused.value.reason
+      if (reason === 'process_interrupted') return t('chat.continueHintInterrupted')
+      if (reason === 'user_pause') return t('chat.continueHintUserPaused')
+      if (reason === 'max_depth') return t('chat.continueHintPaused')
+      return t('chat.continueHintPausedGeneric')
     })
 
     // 一键续跑（步数超限暂停 / 进程中断）：等价于用户输入「继续」（后端 depth 归零重新起循环），
@@ -4434,6 +4555,9 @@ export default {
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve()
+          } else if (xhr.status === 429) {
+            // 服务器按用户限频：该项标为失败、可重试（建好的文件行会被复用）
+            reject(Object.assign(new Error(t('common.tooManyRequests')), { status: 429 }))
           } else {
             reject(new Error(`HTTP ${xhr.status}`))
           }
@@ -4752,7 +4876,7 @@ export default {
        followLatest, handleMessageScroll, handleHistoryScroll, scrollToBottom, attentionNotice, jumpToAttention,
        historyHasMore, historyLoadingOlder, loadOlderMessages,
        activeTurnKey, handleTurnJump,
-       receiptLabel, inboxStreamIds, inboxRunActive, handleInboxLocate,
+       receiptLabel, inboxStreamIds, inboxRunActive, composerPlaceholder, nowDoingBubble, handleInboxLocate,
        contextFiles,
        pendingAudioFiles,
        handleTranscribeAudio,
@@ -4771,6 +4895,11 @@ export default {
        isUploadingPasted,
        handleSubmit,
        handleAbort,
+       handlePause,
+       pausePending,
+       runUndo,
+       showRunUndo,
+       handleUndoRun,
        handleRichInput,
        handleInputClick,
        handlePaste,
@@ -4804,6 +4933,7 @@ export default {
        rollbackLocator,
        rollbackResend,
        openRegenerateDialog,
+       retryAfterConsent,
        branchFromMessage,
        openRollbackDialog,
        cancelRollback,
@@ -5366,7 +5496,17 @@ export default {
   color: var(--awd-text-3);
   margin-bottom: 8px;
   letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+
+.recent-history-all {
+  font-size: var(--awd-panel-fs-meta);
+  font-weight: 400;
+  cursor: pointer;
+}
+.recent-history-all:hover { color: var(--awd-accent-text); }
 
 .recent-history {
   display: flex;
@@ -5474,6 +5614,7 @@ export default {
 
 .chat-input-rich:empty:before {
   content: attr(data-placeholder);
+  white-space: pre-line;
   color: var(--awd-text-3);
 }
 
@@ -5748,7 +5889,8 @@ export default {
 /* 发送 / 停止改成真 <button>（K16 ④）：能 Tab 到、能回车按。uni-h5 的 button 自带
    一套默认样式与 ::after 边框，这里整片打平——照 .return-to-latest button 的既有写法。 */
 .send-btn,
-.stop-btn {
+.stop-btn,
+.pause-btn {
   appearance: none;
   -webkit-appearance: none;
   border: none;
@@ -5759,7 +5901,8 @@ export default {
   overflow: visible;
 }
 .send-btn::after,
-.stop-btn::after { border: 0; }
+.stop-btn::after,
+.pause-btn::after { border: 0; }
 
 .send-btn {
   background: var(--awd-accent);
@@ -5779,6 +5922,15 @@ export default {
 .follow-mode { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .alternate-send:hover { background: var(--awd-surface-2); }
 .stop-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-danger); color: var(--awd-text-on-accent); font-size: var(--awd-panel-fs-meta); cursor: pointer; }
+/* 暂停：与停止同尺寸的中性圆钮，不抢停止键的颜色 */
+.pause-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--awd-surface-2); color: var(--awd-text); font-size: var(--awd-panel-fs-meta); letter-spacing: -2px; cursor: pointer; }
+.pause-btn.is-pending { opacity: 0.5; cursor: default; }
+/* 撤销本次 AI 修改：气泡下一行安静的文字操作 */
+.run-undo-row { padding: 0 4px 12px; font-size: var(--awd-panel-fs-meta); text-align: start; }
+.run-undo-link { color: var(--awd-text-2); text-decoration: underline; cursor: pointer; }
+.run-undo-link:hover { color: var(--awd-accent-text); }
+.run-undo-link.is-busy { cursor: default; text-decoration: none; opacity: 0.7; }
+.run-undo-done { color: var(--awd-text-3); }
 .send-btn:hover {
   background: var(--awd-accent-hover);
 }
@@ -6589,6 +6741,77 @@ export default {
 }
 .composer-preferences > :deep(:not(:first-child)) {
   border-top: 1px solid var(--awd-border-subtle);
+}
+/* 空会话态：输入框下的内置工作流卡片（2x2，安静的描边卡片） */
+.empty-workflows { margin-top: 10px; min-width: 0; }
+.empty-workflows-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 6px;
+}
+.empty-workflows-title { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); }
+.empty-workflows-link {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-3);
+  cursor: pointer;
+}
+.empty-workflows-link:hover { color: var(--awd-accent-text); }
+.empty-workflows-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.empty-workflow-card {
+  display: flex;
+  flex-direction: column;
+  row-gap: 2px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--awd-radius-md);
+  background: transparent;
+  border: 1px solid var(--awd-border-subtle);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.empty-workflow-card:hover {
+  border-color: var(--awd-accent);
+  background: var(--awd-accent-wash);
+}
+.empty-workflow-card.is-custom-version { border-color: var(--awd-accent); }
+.empty-workflow-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  column-gap: 6px;
+  min-width: 0;
+}
+.empty-workflow-name {
+  font-size: var(--awd-panel-fs);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--awd-text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.empty-workflow-more {
+  flex-shrink: 0;
+  font-size: var(--awd-panel-fs);
+  line-height: 1;
+  color: var(--awd-text-3);
+  padding: 0 2px;
+}
+.empty-workflow-more:hover { color: var(--awd-accent-text); }
+.empty-workflow-desc {
+  font-size: var(--awd-panel-fs-meta);
+  line-height: 1.35;
+  color: var(--awd-text-3);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 .builtin-workflows-fold { width: 100%; color: var(--awd-text-2); box-sizing: border-box; }
 .builtin-workflows-summary {

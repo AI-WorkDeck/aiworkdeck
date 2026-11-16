@@ -216,7 +216,7 @@ class FileToolsBatchMoveTest {
     }
 
     @Test
-    @DisplayName("两版 system prompt 的 File Operations 表都点名批量移动与三个文件树原语")
+    @DisplayName("两版 system prompt 把文件树原语指到 files 类目，不再点名首轮不下发的工具（P7）")
     void bothPromptsListTheFileTreePrimitives() throws Exception {
         for (String name : List.of("prompts/system_prompt.md", "prompts/system_prompt.en.md")) {
             String text;
@@ -224,10 +224,12 @@ class FileToolsBatchMoveTest {
                 assertTrue(in != null, name + " 应存在");
                 text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             }
-            assertTrue(text.contains("move_files_batch"), name + " 的文件操作表应点名批量移动工具");
-            assertTrue(text.contains("create_folder"), name + " 的文件操作表缺 create_folder");
-            assertTrue(text.contains("move_project_file"), name + " 的文件操作表缺 move_project_file");
-            assertTrue(text.contains("rename_project_file"), name + " 的文件操作表缺 rename_project_file");
+            // P7：基底三档共用、每轮都在；这几个工具不在核心集，点名就是教模型调一个首轮清单里没有的名字
+            // （SystemPromptToolVisibilityContractTest 逐宿主对拍）。改为指到 files 类目，规则留在工具描述里。
+            assertTrue(text.contains("files 类目") || text.contains("files category"), name + " 应指到 files 类目");
+            for (String tool : List.of("move_files", "create_folder", "rename_project_file", "list_files")) {
+                assertFalse(text.contains("`" + tool + "`"), name + " 不应再点名非核心工具 " + tool);
+            }
         }
     }
 
@@ -245,9 +247,9 @@ class FileToolsBatchMoveTest {
 
     private Method batchMethod() {
         try {
-            return FileTools.class.getMethod("move_files_batch", String.class);
+            return FileTools.class.getMethod("move_files", String.class);
         } catch (NoSuchMethodException e) {
-            fail("FileTools 没有批量移动工具 move_files_batch(String)：文件树的每个变更原语都是单项的，"
+            fail("FileTools 没有批量移动工具 move_files(String)：文件树的每个变更原语都是单项的，"
                     + "整理十几份文件就会一轮一个地耗尽 30 步预算（dev-board#466）");
             throw new AssertionError("unreachable");
         }
@@ -257,7 +259,7 @@ class FileToolsBatchMoveTest {
         try {
             return String.valueOf(batchMethod().invoke(tools, movesJson));
         } catch (InvocationTargetException e) {
-            throw new AssertionError("move_files_batch 抛异常了（工具必须返回 Error: 文本，不能抛）", e.getCause());
+            throw new AssertionError("move_files 抛异常了（工具必须返回 Error: 文本，不能抛）", e.getCause());
         } catch (IllegalAccessException e) {
             throw new AssertionError(e);
         }

@@ -22,8 +22,20 @@ public record ToolContext(
         java.util.function.BooleanSupplier cancellationCheck,
         Long defaultOutputFolderId,
         Long activeFileId,
-        java.util.function.BiConsumer<Long, String> fileChangeListener
+        java.util.function.BiConsumer<Long, String> fileChangeListener,
+        /** 本轮用户消息原文（服务端注入，绝不进工具规格；工具用它核对模型传来的项目称呼是否被用户真的说过）。 */
+        String userMessage
 ) {
+
+    public ToolContext(Long projectId, String conversationId, Long userId, String modelId,
+                       java.util.List<dev.langchain4j.agent.tool.ToolSpecification> sessionTools,
+                       java.util.Set<String> offeredTools, String runId,
+                       java.util.Set<String> disclosedCategories,
+                       java.util.function.BooleanSupplier cancellationCheck, Long defaultOutputFolderId, Long activeFileId,
+                       java.util.function.BiConsumer<Long, String> fileChangeListener) {
+        this(projectId, conversationId, userId, modelId, sessionTools, offeredTools, runId,
+                disclosedCategories, cancellationCheck, defaultOutputFolderId, activeFileId, fileChangeListener, null);
+    }
 
     public ToolContext(Long projectId, String conversationId, Long userId, String modelId,
                        java.util.List<dev.langchain4j.agent.tool.ToolSpecification> sessionTools,

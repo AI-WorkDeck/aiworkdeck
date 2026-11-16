@@ -87,6 +87,11 @@ export default {
     "privacyName": "Privacybeleid",
     "crossBorderLabel": "Afzonderlijke toestemming: inhoud die bij AI wordt ingediend voor verwerking doorgeven aan buitenlandse modelaanbieders",
     "crossBorderView": "Kennisgeving bekijken",
+    "consentCardTitle": "Bevestig vóór gebruik van de platform-AI één toestemming voor gegevensverwerking",
+    "consentAccept": "Akkoord en doorgaan",
+    "consentHideNotice": "Melding verbergen",
+    "consentFailed": "Opslaan mislukt. Probeer het opnieuw.",
+    "consentLater": "Later",
     "crossBorderNoticeTitle": "Kennisgeving grensoverschrijdende doorgifte",
     "crossBorderNoticeBody": "De Chinese site maakt via AI WorkDeck-servers verbinding met Alibaba Cloud Bailian; de internationale site gebruikt OpenRouter. Tekst en bestandsfragmenten die naar AI worden gestuurd, worden gebruikt voor inferentie en facturering. Afhankelijk van het model kan verwerking buiten het Chinese vasteland plaatsvinden. Als u uw toestemming in Instellingen intrekt, wordt het AI-kanaal van het platform uitgeschakeld.",
     "agreementRequired": "Vink het vakje aan om akkoord te gaan met de Servicevoorwaarden en het Privacybeleid om door te gaan",
@@ -101,7 +106,8 @@ export default {
     "switch": "Wisselen",
     "cancel": "Annuleren",
     "switchFailed": "Kan niet van site wisselen. Probeer het later opnieuw.",
-    "rescueFailed": "Na het wisselen van site nog steeds niet ontgrendeld. Controleer de code en probeer het opnieuw."
+    "rescueFailed": "Na het wisselen van site nog steeds niet ontgrendeld. Controleer de code en probeer het opnieuw.",
+    "proIntroBanner": "Gratis starttegoed bij registratie · Personal Pro ¥9.9/mnd eerste 3 maanden",
   },
   "hint": {
     "learnMore": "Meer informatie",
@@ -112,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Bevestigen",
     "purchaseSuccess": "Ontgrendeld",
     "purchaseFailed": "Aankoop mislukt",
-    "goRecharge": "Opwaarderen"
+    "goRecharge": "Opwaarderen",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro",
   },
   "identity": {
     "title": "Kies een lokale werkruimte",

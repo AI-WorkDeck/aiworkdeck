@@ -28,7 +28,7 @@ import static org.mockito.Mockito.*;
 @TestPropertySource(properties={"spring.datasource.url=jdbc:h2:mem:lawfirm-workflow;MODE=PostgreSQL;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
         "spring.datasource.driver-class-name=org.h2.Driver","spring.datasource.username=sa","spring.datasource.password=",
         "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect","spring.jpa.hibernate.ddl-auto=create-drop"})
-@Import({LawFirmWorkflowService.class,LawFirmAuthority.class,LawFirmConflictEngine.class,MessageCenterService.class,LawFirmMessageAccessPolicy.class,ObjectMapper.class})
+@Import({LawFirmWorkflowService.class,LawFirmCloudClientService.class,LawFirmAuthority.class,LawFirmConflictEngine.class,MessageCenterService.class,LawFirmMessageAccessPolicy.class,ObjectMapper.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class LawFirmWorkflowTest {
     @Autowired LawFirmWorkflowService workflow;
@@ -41,6 +41,7 @@ class LawFirmWorkflowTest {
     @Autowired UserRepository users;
     @MockBean AccountDirectoryClient directory;
     @MockBean ProjectMemberService projectPermissions;
+    @MockBean LawFirmCloudSwitches cloudSwitches;
     final Map<String,OrgMembership> membership=new ConcurrentHashMap<>();
     Long admin,applicant,lawyer,committee,outsider;
     String firm;
@@ -78,6 +79,8 @@ class LawFirmWorkflowTest {
         call(committee,"workflowAppointmentDecision",Map.of("recordId",aid,"expectedVersion",a.get("version"),"decision","ACCEPTED"));
         var record=call(applicant,"workflowSubmit",draft());String id=(String)record.get("id");
         assertEquals("PENDING_LAWYER_CLEARANCE",record.get("status"));assertEquals(1,inbox(lawyer).size());
+        assertEquals("合成律师 account-"+lawyer,clearances(record).get(0).get("targetName"),"clearance rows carry the colleague name, so the panel never shows a raw account id");
+        assertTrue(inbox(lawyer).get(0).get("title").toString().startsWith("待你确认"));
         assertThrows(IllegalArgumentException.class,()->call(admin,"workflowClearance",Map.of("recordId",id,"decision","APPROVED","comment","冒名")));
         assertThrows(IllegalStateException.class,()->call(committee,"workflowReview",Map.of("recordId",id,"decision","APPROVED","comment","过早")));
         var lawyerView=call(lawyer,"workflowDetail",Map.of("recordId",id));assertFalse(lawyerView.containsKey("clientName"));assertEquals(1,clearances(lawyerView).size());
@@ -86,6 +89,8 @@ class LawFirmWorkflowTest {
         assertThrows(IllegalArgumentException.class,()->call(admin,"workflowDetail",Map.of("recordId",id)));
         var response=call(lawyer,"workflowClearance",Map.of("recordId",id,"decision","APPROVED_WITH_WALL","comment","合成核查条件"));
         assertEquals("PENDING_COMMITTEE_REVIEW",response.get("status"));
+        assertTrue(inbox(lawyer).get(0).get("title").toString().startsWith("已确认"),"a finished item must not keep the pending title");
+        assertEquals("done",inbox(lawyer).get(0).get("actionState"));
         var done=call(committee,"workflowReview",Map.of("recordId",id,"decision","APPROVED","comment","已人工核查条件"));assertEquals("APPROVED",done.get("status"));
         assertEquals("APPROVED",call(committee,"workflowReview",Map.of("recordId",id,"decision","APPROVED","comment","已人工核查条件")).get("status"));
         assertEquals(2,inbox(applicant).size());assertTrue(inbox(applicant).stream().allMatch(n->"done".equals(n.get("actionState"))));

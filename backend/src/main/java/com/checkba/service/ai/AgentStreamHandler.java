@@ -345,7 +345,8 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
     }
 
     /**
-     * 提示缓存命中情况：只打一条 info 日志，<b>不参与计费</b>。
+     * 提示缓存命中情况：打一条 info 日志，并记下来在本轮 {@code recordUsage} 时随 {@code token_usage} 行落库
+     * （{@code cachedTokens / cacheWriteTokens}，供评测与成本分析用），<b>不参与计费</b>。
      *
      * <p>BYOK 的成本估算仍按 {@link AllowedModels} 的单价表算全价，命中缓存的轮次会偏高
      * （已知偏差，见 {@code TokenUsageService.calculateCost} 的注释）；平台通道走真实扣费对账，
@@ -354,9 +355,15 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
      */
     @Override
     public void onCacheUsage(int promptTokens, int cachedTokens, int cacheWriteTokens) {
+        this.cachedTokens = cachedTokens;
+        this.cacheWriteTokens = cacheWriteTokens;
         log.info("Prompt cache conv={} model={} provider={} promptTokens={} cachedTokens={} cacheWriteTokens={}",
                 conversationId, modelId, providerForLog(), promptTokens, cachedTokens, cacheWriteTokens);
     }
+
+    /** 本轮上游回报的缓存读/写 token 数；null = 上游没回缓存字段。handler 每轮新建，不需跨轮清零。 */
+    private volatile Integer cachedTokens;
+    private volatile Integer cacheWriteTokens;
 
     /**
      * 上游供应商：同一个模型在 OpenRouter 上可能有十几家供应商，首字慢/断流常常只是某一家在排队。
@@ -850,7 +857,8 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
         // Record Usage
         if (response.tokenUsage() != null) {
             tokenUsageService.recordUsage(
-                Long.parseLong(projectId), userId, modelId, response.tokenUsage(), conversationId
+                Long.parseLong(projectId), userId, modelId, response.tokenUsage(), conversationId,
+                cachedTokens, cacheWriteTokens
             );
         }
         

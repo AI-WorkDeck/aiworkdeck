@@ -37,13 +37,16 @@ V2_LAYOUTS = {"vertical_single_column"}
 
 
 def check(path):
-    m = json.load(open(path, encoding="utf-8"))
+    m = json.load(open(path, encoding="utf-8-sig"))
     E, W = [], []
     sv = m.get("schema_version")
     layout = m.get("layout", "")
 
     # ---- 对 v1 与 v2 都适用的基本盘 ----
-    if sv not in (1, 2):
+    if isinstance(sv, int) and not isinstance(sv, bool) and sv > 2:
+        # 更新版本的时间轴大师写的：明说「请升级」，别让人以为文件坏了（多人共用时最常见）
+        E.append(f'这份说明是更新版本的时间轴大师写的（schema_version {sv}），本机的版本只认到 2：请把插件升级到最新版再试')
+    elif sv not in (1, 2):
         E.append(f'schema_version 应为 1 或 2，实为 {sv!r}')
     if not m.get("title_text"):
         E.append("缺少 title_text")
@@ -57,15 +60,22 @@ def check(path):
 
     sc = m.get("scope")
 
-    # ---- 卡片结构：一个标题行 + 一个正文块，二者不得并存 ----
+    # ---- 卡片结构：摘要图，卡片只放一行标题 ----
+    # 主路由的三个渲染器（编号型横向 / 纵向多列 / 日期型）只画 head。原来这里在没有
+    # body 时报「无正文块」告警，等于要求模型写一段**根本不会上图**的正文 —— 外部复核
+    # 指出的「正文静默遗漏」就是从这条旧规矩来的。现在反过来：写了 body / items 的
+    # 要告警，说清它们不上图（出图时 omission.py 会逐条披露）。
     for e in events:
         i = e.get("id", "?")
         if not e.get("head"):
             E.append(f"事件 {i}: v2 要求 head（唯一的标题行）")
         if e.get("body") and e.get("items"):
             E.append(f"事件 {i}: body 与 items 不得并存")
-        if not e.get("body") and not e.get("items"):
-            W.append(f"事件 {i}: 无正文块，卡片只有标题行")
+        # 纵向单列（render_vertical）是唯一画正文的一档，那里的 body 会上图，不告警
+        if (e.get("body") or e.get("items")) and layout != "vertical_single_column":
+            W.append(f"事件 {i}: 写了{'body' if e.get('body') else 'items'}，"
+                     f"但本图是摘要图、卡片只画 head —— 这段正文不会上图，"
+                     f"出图时会作为「未上图」逐条披露")
 
     # ---- 禁用标点：破折号与引号 ----
     for e in events:
@@ -360,4 +370,19 @@ def main(paths):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     sys.exit(main(sys.argv[1:]))

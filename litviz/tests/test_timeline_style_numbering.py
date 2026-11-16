@@ -28,18 +28,25 @@ class StyleNumberingTest(unittest.TestCase):
     def test_next_hint_matches_real_style_ids(self):
         with tempfile.TemporaryDirectory() as wd:
             with open(os.path.join(wd, "state.json"), "w", encoding="utf-8") as f:
-                json.dump({"sentences": ["x"], "files": ["a.txt"], "pick_r1": [], "pick_r2": []}, f)
+                json.dump({"sentences": ["x"], "files": ["a.txt"],
+                           "picked_files": ["a.txt"], "picked_spans": []}, f)
             out = subprocess.run([sys.executable, "-I", _PIPELINE, "next"], cwd=wd,
                                  capture_output=True, text=True, check=True).stdout
-        expected = " / ".join(f"{s['id']} {s['name']}" for s in pick.STYLES)
-        self.assertIn(expected, out)
+        # 上游 v3.1.0 的提示带括号说明（「1 奇川风（当事人与客户）/ 2 歸藏风…」），
+        # 所以逐对核：提示里出现的每个「编号 风格名」都必须与 pick.STYLES 一致。
+        real = {s["name"]: str(s["id"]) for s in pick.STYLES}
+        pairs = re.findall(r"(\d) (%s)" % "|".join(real), out)
+        self.assertEqual({n for _, n in pairs}, set(real), out)
+        for num, name in pairs:
+            self.assertEqual(num, real[name], f"提示把 {name} 编成了 {num}")
         self.assertNotIn("法官白描", out)
 
     def test_no_hint_defaults_to_a_non_default_style(self):
         src = open(_PIPELINE, encoding="utf-8").read()
         default = next(s["id"] for s in pick.STYLES if s["name"] == "奇川风")
         hinted = set(re.findall(r"pipeline\.py style (\d)", src))
-        self.assertEqual(hinted, {str(default)}, f"style 的跑法提示只该指向默认档：{hinted}")
+        # 上游 v3.1.0 改由 _ask_style() 从 pick 取号，源码里可能已无手写提示；有就只许指向默认档。
+        self.assertLessEqual(hinted, {str(default)}, f"style 的跑法提示只该指向默认档：{hinted}")
 
 
 if __name__ == "__main__":

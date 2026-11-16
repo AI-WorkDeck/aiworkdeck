@@ -34,7 +34,7 @@ export default {
   signIn: 'Sign in',
   signInTitle: 'Sign in (needed for AI, paid hub items and the team case library)',
   noProjectTitle: 'Open a project to get started',
-  noProjectHint: 'Open a project from Projects on the left, or create one from the Welcome page.',
+  noProjectHint: 'Click “All Projects” at the top left to pick a project, or create one on the Welcome page.',
   startupDisabledHint: 'The welcome page no longer opens on startup.',
   openWelcome: 'Open Welcome page',
   aiNeedsProject: 'Open a project first to use AI chat',

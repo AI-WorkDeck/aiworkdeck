@@ -98,12 +98,18 @@ public class MessageCenterService {
         row.setActionState(state); row.setUpdatedAt(Instant.now()); notices.save(row); return view(row);
     }
 
-    @Transactional
     public void updateBusinessState(String sourceId,String eventKey,List<Long> recipients,String state) {
+        updateBusinessState(sourceId,eventKey,recipients,state,null);
+    }
+
+    /** A finished item must not keep a "pending" title, so callers may also supply the title to show from now on. */
+    @Transactional
+    public void updateBusinessState(String sourceId,String eventKey,List<Long> recipients,String state,String title) {
         if (!STATES.contains(state)) throw bad(com.checkba.service.LangText.of("处理状态无效", "Invalid action state"));
         lockUsers(recipients);
         for (Long userId : recipients) notices.findByRecipientIdAndSourceIdAndEventKey(userId,sourceId,eventKey)
                 .filter(n -> "BUSINESS".equals(n.getSourceKind())).ifPresent(n -> {
+                    if (title != null) n.setTitle(title.length() > 256 ? title.substring(0, 256) : title);
                     n.setActionState(state); n.setUpdatedAt(Instant.now()); notices.save(n);
                 });
     }

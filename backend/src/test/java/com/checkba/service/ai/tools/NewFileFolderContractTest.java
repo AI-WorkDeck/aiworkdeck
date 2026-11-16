@@ -61,9 +61,9 @@ class NewFileFolderContractTest {
                     assertTrue(!p.required(),
                             name + " 的目标文件夹参数必须是可选的（required = false），"
                                     + "否则不指定文件夹的老用法全部报错");
-                    assertTrue(p.value().contains("list_project_folders"),
+                    assertTrue(p.value().contains("foldersOnly=true"),
                             name + " 的目标文件夹参数说明必须告诉模型去哪儿取 id"
-                                    + "（list_project_folders），实际是：" + p.value());
+                                    + "（doc_list_project_files 的 foldersOnly=true），实际是：" + p.value());
                 }
             }
             assertTrue(found, name + " 没有目标文件夹参数，用户指定的文件夹无从传达。当前参数：" + actual);
@@ -77,8 +77,8 @@ class NewFileFolderContractTest {
             Tool t = tool(name).getAnnotation(Tool.class);
             assertNotNull(t, name + " 应当是 @Tool");
             String desc = String.join("", t.value());
-            assertTrue(desc.contains("list_project_folders"),
-                    name + " 的描述没告诉模型「用户指名文件夹时先 list_project_folders 拿 id」，实际是：" + desc);
+            assertTrue(desc.contains("foldersOnly=true"),
+                    name + " 的描述没告诉模型「用户指名文件夹时先 doc_list_project_files(foldersOnly=true) 拿 id」，实际是：" + desc);
         }
     }
 }

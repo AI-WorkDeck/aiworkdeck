@@ -1215,10 +1215,15 @@ public class CloudSyncService {
      *         那一侧的客户用户 id，撤销时交给 {@link #proxyRemoveMember}。
      */
     public Map<String, Object> proxyInviteClient(long projectId, String clientName) {
+        return proxyInviteClient(projectId, clientName, false);
+    }
+
+    public Map<String, Object> proxyInviteClient(long projectId, String clientName, boolean shareHistory) {
         ProjectRemote remote = requireRemoteBinding(projectId);
         CloudConnection conn = connectionOf(remote);
         Map<String, Object> reqBody = new HashMap<>();
         if (clientName != null && !clientName.isBlank()) reqBody.put("clientName", clientName.trim());
+        reqBody.put("shareHistory", shareHistory);
         JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPost(
                 conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/invite/client",
                 JSONUtil.toJsonStr(reqBody), conn.getDeviceToken())));
@@ -1232,6 +1237,8 @@ public class CloudSyncService {
         out.put("accessCode", data.getStr("accessCode"));
         out.put("expiresAt", JSONUtil.isNull(data.get("expiresAt")) ? null : data.getStr("expiresAt"));
         out.put("clientUserId", data.getLong("clientUserId", null));
+        // 老案件库不认 shareHistory、不回显：回 null，桌面端据此提示「按只看入群之后处理」
+        out.put("shareHistory", data.containsKey("shareHistory") ? data.getBool("shareHistory", false) : null);
         out.put("clientUrl", clientPortalUrl(conn.getServerUrl()));
         return out;
     }

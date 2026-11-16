@@ -3,6 +3,7 @@
 package com.checkba.service.ai.mcp;
 
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.LangText;
 import com.checkba.service.SystemSettingService;
 import com.checkba.service.ai.PluginService;
 import com.checkba.service.ai.tools.ToolContext;
@@ -37,6 +38,8 @@ public class PluginMcpService {
             if (!active(plugin.getId())) continue;
             try {
                 for (var server : declarations(plugin)) for (var tool : server.getTools()) {
+                    // 新增或改绑（地址/凭证引用/入参）待用户批准的远程工具不下发
+                    if (!plugins.isToolDefinitionApproved(tool)) continue;
                     all.add(new Binding(plugin.getId(), server, tool, ToolSpecification.builder()
                             .name(agentName(plugin.getId(), server.getId(), tool.getName()))
                             .description(tool.getDescription()).parameters(PluginMcpSchema.object(tool.getInputSchema())).build()));
@@ -71,6 +74,9 @@ public class PluginMcpService {
                 .orElseThrow(() -> failure("not_found", 404, "MCP server is not declared by this plugin."));
         var tool = server.getTools().stream().filter(t -> t.getName().equals(name)).findFirst()
                 .orElseThrow(() -> failure("not_found", 404, "MCP tool is not declared by this plugin."));
+        if (!plugins.isToolDefinitionApproved(tool)) throw failure("approval_required", 403, LangText.of(
+                "此 MCP 工具已变更，需要用户先到插件中心批准。",
+                "This MCP tool changed and needs the user's approval in Plugin Center first."));
         if (arguments == null) arguments = Map.of();
         try { if (json.writeValueAsBytes(arguments).length > 128 * 1024) throw failure("invalid_arguments", 400, "MCP arguments exceed the size limit."); }
         catch (java.io.IOException e) { throw failure("invalid_arguments", 400, "Invalid MCP arguments."); }

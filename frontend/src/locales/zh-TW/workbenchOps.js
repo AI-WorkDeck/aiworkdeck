@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "正在取消…",
   "ocrBatchBusy": "已有一批識別在進行，請等它完成或取消",
   "ocrConsentTitle": "使用雲端識別文字？",
-  "ocrConsentHint": "帶文字層的 PDF 直接擷取，不上傳、不計費；只有掃描件和圖片需要雲端識別。本次確認只對這一批生效，可在「設定 → 帳戶與用量 → 掃描件識別」改為一律雲端或僅本機。",
+  "ocrConsentHint": "帶文字層的 PDF 直接擷取，不上傳、不計費；只有掃描件和圖片需要雲端識別。本次確認只對這一批生效，可在「設定 → AI 功能設定 → 掃描件識別」改為一律雲端或僅本機。",
   "ocrConsentCheck": "我已知悉上述資料去向與計費方式",
   "ocrConsentConfirm": "開始識別",
   "ocrCopied": "已複製 {count} 份檔案的文字，並記入剪貼簿歷史",
@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "可以改用雲端識別本批中本機未完成的檔案。不改用的話，這些檔案不會上傳。",
   "ocrLocalFailedConfirm": "改用雲端識別",
   "ocrAlreadySearchable": "「{name}」本身帶文字層，已經可以搜尋，未產生新檔案",
-  "ocrStopped": "已停止，{count} 份未處理"
+  "ocrStopped": "已停止，{count} 份未處理",
+  "subscribeProBtn": "個人 Pro ¥9.9",
 }

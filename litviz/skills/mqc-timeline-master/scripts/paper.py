@@ -162,6 +162,22 @@ def over_budget(w, h, landscape=True):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    import sys
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     print(f"每像素上限 {MM_PER_PX:.5f} mm（12px 字印出来正好 8pt）")
     print(f"交付整幅 横版 {SHEET_LAND_W} x {SHEET_LAND_H} px（长宽比 "
           f"{SHEET_LAND_W/SHEET_LAND_H:.4f}，可打印区 "
@@ -207,12 +223,21 @@ def title_fit(text, avail_w, text_w, wrap_fn):      # [C5] 图名块
     出图之前拦住并要求改短，渲染器不做截断（图上不许出现省略号）。
     """
     ladder = title_ladder()
+
+    def _wrap(t, fs, w):
+        """图名折行：数字与拉丁字母串不许被折断（案号折在数字中间看着像写错）。
+        wrap 支持 keep_alnum 就用它；不支持（老版本 common）就照旧。"""
+        try:
+            return wrap_fn(t, fs, w, keep_alnum=True)
+        except TypeError:
+            return wrap_fn(t, fs, w)
+
     for fs in ladder:
-        lines = wrap_fn(text, fs, avail_w) or [text]
+        lines = _wrap(text, fs, avail_w) or [text]
         if len(lines) <= TITLE_MAX_LINES:
             return fs, lines, title_zone_h(fs, len(lines))
     fs = ladder[-1]
-    lines = (wrap_fn(text, fs, avail_w) or [text])[:TITLE_MAX_LINES]
+    lines = (_wrap(text, fs, avail_w) or [text])[:TITLE_MAX_LINES]
     return fs, lines, title_zone_h(fs, len(lines))
 
 

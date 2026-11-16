@@ -236,7 +236,7 @@ public class FileContextLoader {
     /** Agent preparation keeps folders lazy; the file tool supplies bounded, resumable pages. */
     public String buildFolderReference(String folderId) {
         return "[Path base: all listing paths are relative to the attached folder (ID: " + folderId
-                + "), NOT the project root. Resolve its full project-relative path using list_project_folders "
+                + "), NOT the project root. Resolve its full project-relative path using doc_list_project_files(foldersOnly=true) "
                 + "before path-based moves.]\n"
                 + "[Folder contents have not been listed or read. Call extract_file_text with fileId="
                 + folderId + ", offset=0, maxChars=12000. Follow nextOffset to enumerate remaining children; "
@@ -273,7 +273,7 @@ public class FileContextLoader {
             sb.append("### Directory Content:\n");
             sb.append("[Path base: all listing paths and file headings below are relative to the attached folder (ID: ")
               .append(folderId).append("), NOT the project root. Before path-based moves, resolve the folder ID to its full project-relative path ")
-              .append("using list_project_folders; prepend that path to these entries. ")
+              .append("using doc_list_project_files(foldersOnly=true); prepend that path to these entries. ")
               .append("Do not infer the full path from the folder name alone.]\n");
             for (FolderEntry entry : allFiles) {
                 ProjectFile f = entry.file();

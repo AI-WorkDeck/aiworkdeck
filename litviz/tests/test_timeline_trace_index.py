@@ -286,7 +286,9 @@ class TraceIndexDocxTest(unittest.TestCase):
         ]
         S = ["「2023年1月12日」双方签订合同。", "约定货款 100 万元。",
              "乙方未付款。"]
-        st = {"title": "合成时间轴", "files": ["材料A", "材料B"]}
+        # origin：每句出自哪份材料。上游 v3.1.0 起定位按材料内句号（从 1 起）记。
+        st = {"title": "合成时间轴", "files": ["材料A", "材料B"],
+              "origin": ["材料A", "材料A", "材料B"]}
         old_path = os.environ.get("PATH")
         os.environ["PATH"] = ""   # 拿不到 node 也必须出索引
         try:
@@ -303,8 +305,27 @@ class TraceIndexDocxTest(unittest.TestCase):
         with zipfile.ZipFile(docx) as z:
             doc = z.read("word/document.xml").decode("utf-8")
         self.assertIn("合成时间轴・溯源索引", doc)
-        self.assertIn("句0、1", doc)
+        self.assertIn("句1、2", doc)
         self.assertIn("\u201c2023年1月12日\u201d双方签订合同。", doc)
+
+    def test_omissions_table_matches_upstream_js(self):
+        """上游 v3.1.0 的 trace_index.js 在尾注后追加「未上图的原文」三列表；替身必须同样写出。"""
+        sys.path.insert(0, SCRIPTS)
+        self.addCleanup(sys.path.remove, SCRIPTS)
+        import trace_index
+        payload = {"title": "图", "rows": [{"no": "E-01", "head": "签约", "file": "A",
+                                             "locator": "句1", "quote": "签约。"}],
+                   "omissions": [{"no": "E-01", "kinds": "金额、期限",
+                                  "omitted": "约定货款 100 万元，30 日内付清。"}]}
+        doc, _ = trace_index.build_document_xml(payload)
+        for text in ("未上图的原文", "图上编号", "涉及", "金额、期限",
+                     "约定货款 100 万元，30 日内付清。"):
+            self.assertIn(text, doc)
+        self.assertLess(doc.index("可据此回到原文逐字核对"), doc.index("未上图的原文"))
+        self.assertEqual(doc.count("<w:tbl>"), 2)
+        self.assertEqual(doc.count("<w:tblHeader/>"), 2)
+        bare, _ = trace_index.build_document_xml(dict(payload, omissions=[]))
+        self.assertNotIn("未上图的原文", bare)
 
     def test_atomic_no_partial_docx_on_failure(self):
         sys.path.insert(0, SCRIPTS)

@@ -424,6 +424,8 @@ def render(m, out_path, target_w=None, min_card=None, fs_body=None, fs_date=None
         # 档的卡宽 86px 就是被它拒的，而日期折两行之后只要 61px。
         need_date = date_floor(evs)
         if cw < max(floor, need_date):
+            _why("卡片被挤到 %.0fpx 宽，而日期那一行至少要 %.0fpx" % (cw, max(floor, need_date)),
+                 "事项少一点，或把日期写成材料里更短的那种表述")
             return None
         # [M2] 本档泳道允许的正文行数。装不下就换下一档，不截断文字。
         # 三泳道那一档只允许一行，因为三层两行的图高 864px，超出纸高 138px，怎么调都
@@ -438,12 +440,19 @@ def render(m, out_path, target_w=None, min_card=None, fs_body=None, fs_date=None
         _rows_cap = int((_hc_max - PAD_Y * 2 - FS_DATE - DATE_GAP) // LH)
         _rows_cap = max(1, _rows_cap)
         CARD_W = cw
-        if any(len(card_lines(e)) > _rows_cap for e in evs):
+        _over = [e for e in evs if len(card_lines(e)) > _rows_cap]
+        if _over:
+            _why("第 %s 项的正文要 %d 行，这一档每张卡最多 %d 行（再多就超出纸高）"
+                 % ("、".join(str(x.get("id")) for x in _over[:3]),
+                    max(len(card_lines(e)) for e in _over), _rows_cap),
+                 "把这几项的正文改短（capacity 会报每张卡的容量）")
             return None
         CARD_W = cw
         xs = [snap(MARGIN_X + gut + CARD_W / 2 + i * p) for i in range(n)]
         bd = assign_bands(evs, side_of, xs, bands, CW)
         if bd is None:
+            _why("同一侧的卡片在 %d 条泳道里分不开" % bands,
+                 "把相邻两项分到轴的两侧，或减少同侧事项")
             return None
         # a card pushed past the last band is an overflow, not a seat
         for arr in (up, dn):
@@ -455,6 +464,9 @@ def render(m, out_path, target_w=None, min_card=None, fs_body=None, fs_date=None
                 for a, z in seen.setdefault(k, []):
                     if not (cx + _w / 2 + CARD_CLEAR <= a or
                             cx - _w / 2 - CARD_CLEAR >= z):
+                        _why("第 %s 项的卡片与同一泳道上的邻卡重叠（卡宽 %.0fpx，间距不够）"
+                             % (e.get("id"), _w),
+                             "这两项的日期挨得太近：合并成一项，或把其中一项移到轴另一侧")
                         return None
                 seen[k].append((cx - _w / 2 - CARD_CLEAR,
                                 cx + _w / 2 + CARD_CLEAR))
@@ -475,9 +487,18 @@ def render(m, out_path, target_w=None, min_card=None, fs_body=None, fs_date=None
                     if bd[f["id"]] <= bd[e["id"]]:
                         continue
                     if abs(xs[idx[f["id"]]] - ex) < CW[bd[e["id"]]] / 2 + CARD_CLEAR:
+                        _why("第 %s 项的卡片会压住第 %s 项的引线" % (e.get("id"), f.get("id")),
+                             "把其中一项移到轴的另一侧，或把正文改短让卡片变窄")
                         return None
         globals()["CW_BY_BAND"] = CW
         return bands, st, p, xs, bd
+
+    # 记下每一档是被哪条约束卡住的。原来只报「过于密集」，模型据此以为事项太多，
+    # 于是反复删事项、重渲六次（真实运行记录）；其实卡住的常常是某一项正文太长。
+    _fail = {}
+
+    def _why(what, how):
+        _fail["what"], _fail["how"] = what, how
 
     got = None
     # [M3] 层数由座次算出：起点查表，排不下加一层，三层仍排不下才拒绝
@@ -487,7 +508,10 @@ def render(m, out_path, target_w=None, min_card=None, fs_body=None, fs_date=None
             break
     if not got:
         raise ValueError(
-            f"{n} 个事件在轴上下各 {BAND_LADDER[-1][1]} 条泳道内仍排不开（过于密集）")
+            f"{n} 个事件在轴上下各 {BAND_LADDER[-1][1]} 条泳道内仍排不开。"
+            + (f"卡在这一条：{_fail['what']}。可行的改法：{_fail['how']}。"
+               if _fail else "")
+            + "（也可以什么都不改：事项再多一些会自动改用纵向时间轴。）")
     max_bands, stride, pitch, xof, band = got
     # [M14] 声明了三条以上泳道时，**层号由 lane 决定**，覆盖按拥挤程度算出的那一套。
     # 这是「语义分方」与「几何错开」的分界：泳道要的是同一类主体永远在同一条带上，
@@ -846,9 +870,24 @@ def render(m, out_path, target_w=None, min_card=None, fs_body=None, fs_date=None
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     src = sys.argv[1]
     out = sys.argv[2]
-    m = json.load(open(src, encoding="utf-8"))
+    m = json.load(open(src, encoding="utf-8-sig"))
     tw = int(sys.argv[3]) if len(sys.argv) > 3 else None
     w, h, bu, bd, fits, pitch = render(m, out, tw)
     print(f"画布 {w}x{h}   上方 {bu} 层 / 下方 {bd} 层   卡宽 {CARD_W}px   "

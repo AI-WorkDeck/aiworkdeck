@@ -8,10 +8,11 @@
 | 上游仓库 | https://github.com/MiaoQichuan/new-litigation-visualization |
 | 仓库内路径 | `plugins/mqc-nlv/skills/mqc-litigation-visual-redraw`、`plugins/mqc-nlv/skills/mqc-timeline-master` |
 | 作者 | 缪奇川（Miao Qichuan） |
-| 协议 | MIT（见各模块 `LICENSE`，随发行版一同保留） |
-| vendor 版本 | 重画 v1.0.2 · 时间轴大师 v2.0.1 |
-| vendor commit | `0b2c8f81f272e52e89b8e2c60d83ac1a3b1685e0`（2026-08-23） |
-| vendor 日期 | 2026-08-25 |
+| 协议 | AGPL-3.0-only（上游 v3.0.0 起；此前为 MIT）。全文见重画模块的 `LICENSE`，随发行版一同保留 |
+| 授权 | 2026-11-11 作者同意并入本产品，条件：署名 + 保持开源。署名见 `backend/skills/litigation-visual/skill.yml` 的 `credits` |
+| vendor 版本 | 重画 v1.1.0 · 时间轴大师 v2.2.0（上游 release v3.1.0） |
+| vendor commit | `16c480c3947e78ba49623423ea0486277f5fe99d`（2026-11-10） |
+| vendor 日期 | 2026-11-11 |
 
 历史沿革：重画引擎最初 vendor 自独立仓库 mqc-litigation-visual-redraw（v1.0.2，
 commit `9c6558f`，2026-08-08，当时放在 `litviz/engine/`）。2026-08-23 上游把它并进
@@ -32,13 +33,16 @@ monorepo `new-litigation-visualization` 并新增时间轴大师模块；我们 
 AUTHOR.md CHANGELOG.md`；时间轴大师另有 `docs/adr/`（决策记录，升级前值得读）与
 `README.md`、`HANDOVER.md`、`RELAY-*.md`。
 
+2026-11-11 起另拷两个模块的 `assets/README.md`（「这些图是给人看的，模型不要读」告示，上游有回归守卫查它）。
+时间轴大师上游本身没有 `LICENSE` 文件，由上游仓库根的 AGPL 全文覆盖；本仓库根 `LICENSE` 同为 AGPL-3.0 全文，`REUSE.toml` 登记其版权与许可。
+
 **没拷两个模块 `assets/` 下的美术资源**（重画约 10MB、时间轴约 4.2MB 的 README
 长图与展示图）——与出图链路无关，带上会让安装包白白胖十几 MB。
 唯一例外是 `mqc-litigation-visual-redraw/assets/style-tokens.json`：它是
 `scripts/common.py` 启动就要读的配色/字体令牌（写死的相对路径
 `../assets/style-tokens.json`），必须保留。
 
-重画模块的上游 README.md 也没拷（引用的全是没拷的图），代价是上游 149 项回归里
+重画模块的上游 README.md 也没拷（引用的全是没拷的图），代价是上游 163 项回归里
 3 项 README 文档守卫恒红——`litviz/tests/test_cli.py` 断言失败的**正好是且仅是**
 那 3 项。
 
@@ -52,8 +56,9 @@ git clone --depth 1 https://github.com/MiaoQichuan/new-litigation-visualization 
 2. 重新套用 `PATCHES.md` 里记录的每一条本地补丁，逐条确认上游是否已自行修掉——
    已修的就从 PATCHES.md 里删掉，别叠着打。
 3. 跑上游回归：
-   `python3 litviz/skills/mqc-litigation-visual-redraw/tests/run_checks.py`（要 graphviz，预期 146/149）；
-   `cd litviz/skills/mqc-timeline-master && python3 tests/run_checks.py`（预期全绿）。
+   `python3 litviz/skills/mqc-litigation-visual-redraw/tests/run_checks.py`（预期 160/163，缺的是 3 项 README 守卫）；
+   `cd litviz/skills/mqc-timeline-master && python3 tests/run_checks.py`（除 node `docx@9` 与 `reportlab` 两项环境缺席外全绿）。
+   重画引擎会被打包运行时 3.11 加载，升级后另用 3.9 与 3.11 各 `py_compile` 一遍 `litviz/`。
 4. 跑我们的契约测试：`python3 litviz/tests/test_cli.py`。
 5. 更新本文的 commit / 版本 / 日期。
 

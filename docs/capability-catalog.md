@@ -11,7 +11,7 @@
 - 权限范围 `awd:<领域>.<read|write>`：project 项目文件与数据、editor 桌面编辑器、office-addin 任务窗格、memory 用户记忆、external 外部服务、system 代码执行与扩展安装。
 - 宿主：NONE 纯后端可完成；LOWA 需桌面编辑器；OFFICE 需 Office/WPS 任务窗格。
 
-合计 342 个工具：read 100，write 220，destructive 22。
+合计 293 个工具：read 90，write 195，destructive 8。
 
 ## MCP 服务器工具（本机 `/mcp`，只读）
 
@@ -21,23 +21,19 @@
 | `list_project_files` | read | awd:project.read | `list_files`, `search_project_files` |
 | `read_file` | read | awd:project.read | `extract_file_text`, `read_file` |
 | `search_project` | read | awd:project.read | `search_project_content` |
+| `propose_revision` | write | awd:project.propose | — |
 
 ## editor
 
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
-| `doc_accept_all_revisions` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_accept_revision` | write | awd:editor.write | document | NONE | 是 | — |
+| `compare_docx_redline` | write | awd:editor.write | document | LOWA | 是 | — |
 | `doc_add_comment` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_apply_standard_format` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_apply_style_profile` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_audit_structure` | read | awd:editor.read | document | NONE | 是 | — |
-| `doc_collapse_cursor` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_debug_revisions` | read | awd:editor.read | document | NONE | 否 | — |
-| `doc_delete_comment` | destructive | awd:editor.write | document | NONE | 是 | — |
-| `doc_delete_match` | destructive | awd:editor.write | document | NONE | 否 | — |
-| `doc_delete_selection` | destructive | awd:editor.write | document | NONE | 是 | — |
-| `doc_delete_text` | destructive | awd:editor.write | document | NONE | 否 | — |
+| `doc_delete_comment` | write | awd:editor.write | document | NONE | 是 | — |
+| `doc_delete_selection` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_edit_header_footer` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_export_pdf` | write | awd:editor.write | document | LOWA | 是 | — |
 | `doc_find_replace` | write | awd:editor.write | document | NONE | 是 | — |
@@ -51,13 +47,10 @@
 | `doc_get_formatting` | read | awd:editor.read | document | NONE | 是 | — |
 | `doc_get_outline` | read | awd:editor.read | document | NONE | 是 | — |
 | `doc_get_paragraph` | read | awd:editor.read | document | NONE | 是 | — |
-| `doc_get_selection` | read | awd:editor.read | document | NONE | 否 | — |
-| `doc_goto` | read | awd:editor.read | document | NONE | 是 | — |
 | `doc_insert_at_cursor` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_insert_break` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_insert_endnote` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_insert_footnote` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_insert_image` | write | awd:editor.write | document | NONE | 是 | — |
+| `doc_insert_note` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_insert_table` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_insert_toc` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_insert_under_heading` | write | awd:editor.write | document | NONE | 是 | — |
@@ -68,33 +61,26 @@
 | `doc_modify_paragraph` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_open_file` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_redo` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_reject_all_revisions` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_reject_revision` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_replace_at_anchor` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_replace_nth_match` | write | awd:editor.write | document | NONE | 否 | — |
 | `doc_replace_selection` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_reply_comment` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_resolve_comment` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_restore_checkpoint` | destructive | awd:editor.write | document | NONE | 是 | — |
-| `doc_search_related_docs` | read | awd:editor.read | document | NONE | 否 | — |
-| `doc_select_anchor` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_select_paragraph` | write | awd:editor.write | document | NONE | 是 | — |
+| `doc_revisions` | write | awd:editor.write | document | NONE | 是 | — |
+| `doc_select` | read | awd:editor.read | document | NONE | 是 | — |
 | `doc_set_hyperlink` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_set_numbering` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_set_page_setup` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_set_paragraph_format` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_set_selection` | write | awd:editor.write | document | NONE | 否 | — |
 | `doc_set_style` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_start_stream` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_table_add_col` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_table_add_row` | write | awd:editor.write | document | NONE | 是 | — |
-| `doc_table_delete_col` | destructive | awd:editor.write | document | NONE | 是 | — |
-| `doc_table_delete_row` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `doc_table_delete` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `doc_table_insert` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_table_read` | read | awd:editor.read | document | NONE | 是 | — |
 | `doc_table_set_cell` | write | awd:editor.write | document | NONE | 是 | — |
 | `doc_undo` | write | awd:editor.write | document | NONE | 是 | — |
-| `litigation_checkpoint` | write | awd:editor.write | litigation-visual | LOWA | 是 | — |
-| `litigation_reference` | write | awd:editor.write | litigation-visual | LOWA | 是 | — |
+| `doc_update_comment` | write | awd:editor.write | document | NONE | 是 | — |
+| `doc_view_pages` | read | awd:editor.read | document | LOWA | 是 | — |
+| `litigation_checkpoint` | read | awd:editor.read | litigation-visual | LOWA | 是 | — |
+| `litigation_reference` | read | awd:editor.read | litigation-visual | LOWA | 是 | — |
 | `litigation_render` | write | awd:editor.write | litigation-visual | LOWA | 是 | — |
 | `litigation_timeline_render` | write | awd:editor.write | litigation-visual | LOWA | 是 | — |
 | `litigation_timeline_start` | write | awd:editor.write | litigation-visual | LOWA | 是 | — |
@@ -104,21 +90,18 @@
 | `pdf_redact` | destructive | awd:editor.write | pdf | LOWA | 是 | — |
 | `pdf_replace_text` | write | awd:editor.write | pdf | LOWA | 是 | — |
 | `pdf_to_word` | write | awd:editor.write | pdf | LOWA | 是 | — |
-| `pptx_apply_format` | write | awd:editor.write | pptx | LOWA | 否 | — |
 | `pptx_check_service` | read | awd:editor.read | pptx | LOWA | 是 | — |
 | `pptx_export_editable` | write | awd:editor.write | - | LOWA | 是 | — |
 | `pptx_generate` | write | awd:editor.write | pptx | LOWA | 是 | — |
-| `pptx_generate_outline` | write | awd:editor.write | pptx | LOWA | 是 | — |
 | `pptx_get_project_pages` | read | awd:editor.read | - | LOWA | 是 | — |
-| `pptx_open_file` | write | awd:editor.write | pptx | LOWA | 否 | — |
-| `pptx_refine_outline` | write | awd:editor.write | - | LOWA | 是 | — |
+| `pptx_outline` | write | awd:editor.write | pptx | LOWA | 是 | — |
 | `sheet_add_chart` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_add_comment` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_add_pivot_table` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_conditional_format` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_create_file` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_define_name` | write | awd:editor.write | document | NONE | 是 | — |
-| `sheet_delete_comment` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `sheet_delete_comment` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_edit_rows_cols` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_find_replace` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_format_cells` | write | awd:editor.write | document | NONE | 是 | — |
@@ -131,7 +114,7 @@
 | `sheet_protect_sheet` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_read_range` | read | awd:editor.read | document | NONE | 是 | — |
 | `sheet_search` | read | awd:editor.read | document | NONE | 是 | — |
-| `sheet_select_range` | write | awd:editor.write | document | NONE | 是 | — |
+| `sheet_select_range` | read | awd:editor.read | document | NONE | 是 | — |
 | `sheet_set_autofilter` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_set_borders` | write | awd:editor.write | document | NONE | 是 | — |
 | `sheet_set_data_validation` | write | awd:editor.write | document | NONE | 是 | — |
@@ -145,8 +128,8 @@
 | `slide_add_table` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_add_text_box` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_create_file` | write | awd:editor.write | slides | NONE | 是 | — |
-| `slide_delete_page` | destructive | awd:editor.write | document | NONE | 是 | — |
-| `slide_delete_shape` | destructive | awd:editor.write | document | NONE | 是 | — |
+| `slide_delete_page` | write | awd:editor.write | document | NONE | 是 | — |
+| `slide_delete_shape` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_chart` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_shape` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_format_text` | write | awd:editor.write | document | NONE | 是 | — |
@@ -166,7 +149,6 @@
 | `slide_table_set_style` | write | awd:editor.write | document | NONE | 是 | — |
 | `slide_write_notes` | write | awd:editor.write | document | NONE | 是 | — |
 | `text_find_replace` | write | awd:editor.write | file | LOWA | 是 | — |
-| `text_write_file` | write | awd:editor.write | file | LOWA | 是 | — |
 | `version_changes` | read | awd:editor.read | version | LOWA | 是 | — |
 | `version_commit` | write | awd:editor.write | version | LOWA | 是 | — |
 | `version_history` | read | awd:editor.read | version | LOWA | 是 | — |
@@ -183,19 +165,15 @@
 | `get_law_article` | read | awd:external.read | legal | NONE | 是 | — |
 | `law_recognition` | read | awd:external.read | legal | NONE | 是 | — |
 | `law_search` | read | awd:external.read | legal | NONE | 是 | — |
-| `law_search_keyword` | read | awd:external.read | legal | NONE | 是 | — |
 | `qichacha_ipr` | read | awd:external.read | data | NONE | 是 | — |
 | `qichacha_query` | read | awd:external.read | data | NONE | 是 | — |
 | `search_web` | read | awd:external.read | web | NONE | 是 | — |
-| `tmeet_get_transcript` | read | awd:external.read | meeting | NONE | 是 | — |
-| `tmeet_list_meetings` | read | awd:external.read | meeting | NONE | 是 | — |
 | `tushare_query` | read | awd:external.read | data | NONE | 是 | — |
 
 ## memory
 
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
-| `get_user_profile` | read | awd:memory.read | memory | NONE | 否 | — |
 | `memory_delete` | destructive | awd:memory.write | memory | NONE | 是 | — |
 | `memory_edit` | write | awd:memory.write | memory | NONE | 是 | — |
 | `memory_list` | read | awd:memory.read | memory | NONE | 是 | — |
@@ -210,20 +188,19 @@
 
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
-| `office_accept_revision` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_add_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_apply_standard_format` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_apply_style` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_apply_style_profile` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_audit_structure` | read | awd:office-addin.read | office | NONE | 是 | — |
-| `office_delete_comment` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_delete_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_edit_header_footer` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_add_chart` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_add_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_add_pivot_table` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_conditional_format` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_define_name` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_excel_delete_comment` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_excel_delete_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_edit_rows_cols` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_format_cells` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_freeze_panes` | write | awd:office-addin.write | office | NONE | 是 | — |
@@ -235,20 +212,15 @@
 | `office_excel_merge_cells` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_protect_sheet` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_replace` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_excel_reply_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_excel_resolve_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_search` | read | awd:office-addin.read | office | NONE | 是 | — |
-| `office_excel_select_range` | write | awd:office-addin.write | office | NONE | 是 | — |
+| `office_excel_select_range` | read | awd:office-addin.read | office | NONE | 是 | — |
 | `office_excel_set_autofilter` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_set_borders` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_set_data_validation` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_excel_set_formulas` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_set_values` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_excel_sort_range` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_file_create` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_file_export_pdf` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_file_open` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_file_save` | write | awd:office-addin.write | office | NONE | 是 | — |
+| `office_excel_update_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
+| `office_file` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_format_table` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_format_text` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_get_clauses` | read | awd:office-addin.read | office | NONE | 是 | — |
@@ -260,9 +232,8 @@
 | `office_get_selection` | read | awd:office-addin.read | office | NONE | 是 | — |
 | `office_get_text` | read | awd:office-addin.read | office | NONE | 是 | — |
 | `office_insert_break` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_insert_endnote` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_insert_footnote` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_insert_image` | write | awd:office-addin.write | office | NONE | 是 | — |
+| `office_insert_note` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_insert_table` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_insert_text` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_insert_toc` | write | awd:office-addin.write | office | NONE | 是 | — |
@@ -274,7 +245,7 @@
 | `office_ppt_add_slide` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_add_table` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_add_text_box` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_ppt_delete_shape` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_ppt_delete_shape` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_delete_slide` | destructive | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_format_chart` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_format_shape` | write | awd:office-addin.write | office | NONE | 是 | — |
@@ -294,24 +265,21 @@
 | `office_ppt_table_set_cell` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_table_set_style` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_ppt_write_notes` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_reject_revision` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_replace_batch` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_replace_nth_match` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_replace_text` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_reply_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_resolve_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
+| `office_revisions` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_search` | read | awd:office-addin.read | office | NONE | 是 | — |
 | `office_set_document_properties` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_set_hyperlink` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_set_numbering` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_set_page_setup` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_set_paragraph_format` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_table_add_col` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_table_add_row` | write | awd:office-addin.write | office | NONE | 是 | — |
-| `office_table_delete_col` | destructive | awd:office-addin.write | office | NONE | 是 | — |
-| `office_table_delete_row` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_table_delete` | destructive | awd:office-addin.write | office | NONE | 是 | — |
+| `office_table_insert` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `office_table_read` | read | awd:office-addin.read | office | NONE | 是 | — |
 | `office_table_set_cell` | write | awd:office-addin.write | office | NONE | 是 | — |
+| `office_update_comment` | write | awd:office-addin.write | office | NONE | 是 | — |
 | `ref_edit` | write | awd:office-addin.write | reference | NONE | 是 | — |
 | `ref_list` | read | awd:office-addin.read | reference | NONE | 是 | — |
 | `ref_open` | write | awd:office-addin.write | reference | NONE | 是 | — |
@@ -322,48 +290,33 @@
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ask_user` | read | awd:project.read | planning | NONE | 是 | — |
+| `compare_docx_summary` | read | awd:project.read | document | NONE | 是 | — |
 | `copy_files` | write | awd:project.write | file | NONE | 是 | — |
 | `create_file_from_template` | write | awd:project.write | - | NONE | 是 | — |
 | `create_folder` | write | awd:project.write | file | NONE | 是 | — |
 | `dd_export` | write | awd:project.write | document | NONE | 是 | — |
-| `deep_search` | read | awd:project.read | - | NONE | 否 | — |
-| `delete_file` | destructive | awd:project.write | file | NONE | 否 | — |
+| `deadline_compute` | read | awd:project.read | task | NONE | 是 | — |
 | `docx_inspect_template` | read | awd:project.read | file | NONE | 是 | — |
 | `evidence_verify` | read | awd:project.read | document | NONE | 是 | — |
 | `extract_file_text` | read | awd:project.read | file | NONE | 是 | `read_file` |
-| `get_conversation_summary` | read | awd:project.read | - | NONE | 否 | — |
-| `get_project_context` | read | awd:project.read | - | NONE | 否 | — |
 | `image_generate_asset` | write | awd:project.write | document | NONE | 是 | — |
 | `image_get_generation` | write | awd:project.write | document | NONE | 是 | — |
 | `list_attached_files` | read | awd:project.read | file | NONE | 是 | — |
 | `list_contributed_templates` | read | awd:project.read | - | NONE | 是 | — |
 | `list_files` | read | awd:project.read | file | NONE | 是 | `list_project_files` |
-| `list_project_folders` | read | awd:project.read | - | NONE | 是 | — |
 | `meeting_get_transcript` | read | awd:project.read | meeting | NONE | 是 | — |
-| `meeting_list_recordings` | read | awd:project.read | meeting | NONE | 是 | — |
-| `move_file` | write | awd:project.write | file | NONE | 否 | — |
-| `move_files_batch` | write | awd:project.write | file | NONE | 是 | — |
-| `move_project_file` | write | awd:project.write | file | NONE | 是 | — |
+| `meeting_list` | read | awd:project.read | meeting | NONE | 是 | — |
+| `move_files` | write | awd:project.write | file | NONE | 是 | — |
 | `move_to_trash` | destructive | awd:project.write | file | NONE | 是 | — |
 | `pdf_add_page_numbers` | write | awd:project.write | pdf | NONE | 是 | — |
-| `pdf_delete_pages` | destructive | awd:project.write | pdf | NONE | 是 | — |
-| `pdf_extract_pages` | write | awd:project.write | pdf | NONE | 是 | — |
+| `pdf_delete_pages` | write | awd:project.write | pdf | NONE | 是 | — |
 | `pdf_inspect` | read | awd:project.read | pdf | NONE | 是 | — |
 | `pdf_inspect_visual` | read | awd:project.read | pdf | NONE | 是 | — |
-| `pdf_list_files` | read | awd:project.read | pdf | NONE | 否 | — |
 | `pdf_merge` | write | awd:project.write | pdf | NONE | 是 | — |
-| `pdf_rotate_pages` | write | awd:project.write | pdf | NONE | 是 | — |
-| `pdf_split` | write | awd:project.write | pdf | NONE | 是 | — |
-| `pptx_edit_page` | write | awd:project.write | - | NONE | 否 | — |
+| `pdf_pages` | write | awd:project.write | pdf | NONE | 是 | — |
 | `pptx_inspect_format` | read | awd:project.read | pptx | NONE | 是 | — |
-| `pptx_list_files` | read | awd:project.read | pptx | NONE | 否 | — |
-| `pptx_search_files` | read | awd:project.read | pptx | NONE | 否 | — |
-| `read_document` | read | awd:project.read | file | NONE | 否 | — |
 | `read_file` | read | awd:project.read | file | NONE | 是 | `read_file` |
 | `rename_project_file` | write | awd:project.write | file | NONE | 是 | — |
-| `scan_files` | write | awd:project.write | file | NONE | 否 | — |
-| `search_across_projects` | read | awd:project.read | file | NONE | 是 | — |
-| `search_knowledge_base` | read | awd:project.read | - | NONE | 否 | — |
 | `search_project_content` | read | awd:project.read | file | NONE | 是 | `search_project` |
 | `search_project_files` | read | awd:project.read | file | NONE | 是 | `list_project_files` |
 | `tag_file` | write | awd:project.write | file | NONE | 是 | — |
@@ -382,7 +335,6 @@
 
 | 工具 | 访问 | 权限范围 | 类目 | 宿主 | 下发给模型 | MCP |
 | --- | --- | --- | --- | --- | --- | --- |
-| `capability_apply` | write | awd:system.write | plugin | NONE | 是 | — |
 | `capability_install` | write | awd:system.write | plugin | NONE | 是 | — |
 | `capability_list` | read | awd:system.read | plugin | NONE | 是 | — |
 | `capability_select` | write | awd:system.write | plugin | NONE | 是 | — |

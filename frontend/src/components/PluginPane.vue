@@ -28,8 +28,11 @@
 <script>
 // 插件面板：承载 manifest.frontendEntry 指向的页面。两种形态，行为刻意不同。
 //
-// 1) 绝对 http(s) URL（旧形态）：iframe 直接打开，不加 sandbox、不发握手、不响应桥调用。
-//    这类插件从来就是"内嵌一个外部网页"，改动它只会打断存量插件。
+// 1) 绝对 http(s) URL（旧形态）：iframe 直接打开，不发握手、不响应桥调用。
+//    这类插件从来就是"内嵌一个外部网页"，所以保留它自己的源（allow-same-origin，登录态/存储照常）
+//    与脚本、表单、弹窗、下载；sandbox 只收走顶层导航（S26：不带 sandbox 的外站 iframe 能把整个
+//    工作台导航到别的页面）。它与应用页（file:// / dev server）不同源，allow-same-origin 不会让它
+//    碰到宿主；下面那条「绝不能加」说的是走 /api/plugin-web/ 的 Web 插件。
 // 2) web/ 相对路径（规范 v2.3 的 Web 插件）：后端 /api/plugin-web/ 静态服务，
 //    iframe 带 sandbox="allow-scripts allow-forms"，与宿主只通过 postMessage 桥通信。
 //
@@ -55,7 +58,7 @@ import {
   getPlugins, getProjectFiles, getFileText, getAiConversations, invokePluginTool, pluginAiComplete, getPluginSettings, requestPluginIm, requestPluginNotifications,
   requestPluginLawFirm,
   createEvidenceLink, addEvidenceTargets, getEvidenceLink, listEvidenceLinks,
-  getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags,
+  getTeam, getProjectMembers, getCurrentUser, searchProjectContent, getProjectTags, getProjectWorklogSummary,
   getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile, getSensitiveRecovery,
   getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall
 } from '@/services/api.js'
@@ -151,6 +154,40 @@ function pluginDownloadTarget(raw) {
   const name = String(raw == null ? '' : raw).replace(/[\\/:*?"<>|\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '_').replace(/^[. ]+|[. ]+$/g, '').trim().slice(0, 120)
   const type = DOWNLOAD_TYPES[extOf(name)]
   return type && name.length > extOf(name).length + 1 ? { name, type } : null
+}
+
+// 授权指纹：判断「插件元数据变了、旧实例必须作废」时只比与权限和能力有关的字段。
+// /api/plugins/list 按当前界面语言返回工具说明、视图/主题/模板/样式/依据来源的名称与说明；
+// 切换语言后这些文案变了，若一并比较，下一次桥调用就会把面板当成「授权已变」重建 iframe，
+// 插件回到入口地址、丢掉当前页签与路由（0.86.0 律所管理 B5）。标识、版本、入口、权限、
+// 开发者安装标记、工具名与工具权限、各贡献项的 id/文件/入口等仍逐项比较。
+const LOCALIZED_CONTRIBUTION_TEXT = {
+  views: ['name'],
+  themes: ['name', 'description'],
+  templates: ['name', 'description'],
+  styleProfiles: ['name'],
+  evidenceSources: ['name', 'description']
+}
+function omitKeys(item, keys) {
+  if (!item || typeof item !== 'object') return item
+  const copy = { ...item }
+  for (const key of keys) delete copy[key]
+  return copy
+}
+function authorizationFingerprint(record) {
+  if (!record) return 'null'
+  const tools = Array.isArray(record.tools) ? record.tools.map(tool => omitKeys(tool, ['description'])) : record.tools
+  let contributes = record.contributes
+  if (contributes && typeof contributes === 'object') {
+    contributes = { ...contributes }
+    for (const [list, keys] of Object.entries(LOCALIZED_CONTRIBUTION_TEXT)) {
+      if (Array.isArray(contributes[list])) contributes[list] = contributes[list].map(item => omitKeys(item, keys))
+    }
+  }
+  // 待批准的工具变更与批准凭据只是「用户还没点批准」的状态，不是面板实例的授权：
+  // 工具定义本身（access/confirm/mcp/handler/inputSchema）已在 tools 里逐项比较，升级时实例照样作废；
+  // 批准动作不该再把面板重建一次。闸在后端（未批准的工具调用一律被拒）。
+  return JSON.stringify({ ...omitKeys(record, ['pendingToolChanges', 'toolApprovalToken']), tools, contributes })
 }
 
 export default {
@@ -249,13 +286,14 @@ export default {
       const [major, minor, patch] = this.installedPluginVersion.split('.').map(Number)
       return major === 0 && (minor === 0 || (minor === 1 && patch < 2))
     },
-    // 只有走 /api/plugin-web/ 的 Web 插件才 sandbox + 握手。
-    // 绑定 null 会让 Vue 移除该属性，绝对 URL 形态因此与改造前逐字节一致。
+    // 只有走 /api/plugin-web/ 的 Web 插件才握手；两种形态都带 sandbox，取值不同（见文件头）。
     isWebPlugin() {
       return String(this.url || '').indexOf('/api/plugin-web/') >= 0
     },
     sandboxAttr() {
-      return this.isWebPlugin ? 'allow-scripts allow-forms' : null
+      return this.isWebPlugin
+        ? 'allow-scripts allow-forms'
+        : 'allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-downloads'
     }
   },
   created() {
@@ -419,7 +457,7 @@ export default {
       try {
         const record = await this.readAuthorization()
         if (generation !== this.sessionGeneration || this._authorizationDestroyed) return false
-        if (!record || JSON.stringify(record) !== JSON.stringify(this._authorizationSnapshot)) {
+        if (!record || authorizationFingerprint(record) !== authorizationFingerprint(this._authorizationSnapshot)) {
           this.invalidateAuthorization(record)
           return false
         }
@@ -446,7 +484,15 @@ export default {
         const collections = createPluginCollectionServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, openFile: file => uni.$emit('awd:open-evidence-target', { fileId: file.id }) })
         const insight = createPluginInsightServices({ projectId: () => this.projectId, permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration, actions, listFiles: () => this.listProjectFiles() })
         this._businessServices = createPluginBusinessServices({
-          delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal) },
+          delegates: { ...Object.fromEntries(['calendar', 'favorites', 'clipboard'].map(service => [service, (operation, params, signal) => collections.request(service, operation, params, signal)])), voice: (operation, params, signal) => voice.request(operation, params, signal), insight: (operation, params, signal) => insight.request(operation, params, signal),
+            // 工作记录汇总：只读、只含本人、只给聚合数；须声明 worklog_read（安装时向用户展示）
+            worklog: async (operation) => {
+              if (operation !== 'summary') throw Object.assign(new Error('Unknown service operation'), { code: 'unknown_operation' })
+              if (!this.hasPermission('worklog_read')) throw Object.assign(new Error('worklog_read is required'), { code: 'permission_denied' })
+              if (!this.projectId) throw Object.assign(new Error('A project is required'), { code: 'no_project' })
+              const res = await getProjectWorklogSummary(this.projectId)
+              return res && res.data !== undefined ? res.data : res
+            } },
           api: { searchProjectContent, getProjectTags, getSensitiveOptions, previewSensitiveFile, desensitizeFile, restoreSensitiveFile, getSensitiveRecovery,
             getLitigationVisualStatus, getLitigationDiagrams, getLitigationKickoffPrompt, restyleLitigationDiagram, packStatus, packInstall },
           projectId: () => this.projectId,
@@ -691,6 +737,8 @@ export default {
             if (!res || res.code !== 0) {
               return { ok: false, error: { code: 'invoke_failed', message: res?.message || L('律所管理服务请求失败', 'Law firm management service request failed') } }
             }
+            // 插件每次写入、加载样板或「刷新数据」后都会重读 overview：通知左栏摘要卡同步数字
+            if (action === 'overview' || action === 'seedDemo' || action === 'seedDemoData') uni.$emit('awd:lawfirm-data-changed')
             return { ok: true, result: res.data }
           } catch (e) {
             return { ok: false, error: { code: 'invoke_failed', message: e?.message || L('律所管理服务请求失败', 'Law firm management service request failed') } }
@@ -1292,7 +1340,7 @@ export default {
   gap: 16px;
   padding: 32px;
   line-height: 1.7;
-  button { background: var(--awd-accent); color: var(--awd-on-accent, #fff); border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
+  button { background: var(--awd-accent); color: var(--awd-text-on-accent); border: 0; border-radius: 6px; padding: 8px 16px; cursor: pointer; }
 }
 .plugin-error {
   padding: var(--awd-panel-gap-lg) var(--awd-panel-pad-x);

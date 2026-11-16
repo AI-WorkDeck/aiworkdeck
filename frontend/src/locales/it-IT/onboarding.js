@@ -87,6 +87,11 @@ export default {
     "privacyName": "Informativa sulla privacy",
     "crossBorderLabel": "Consenso separato: trasferire i contenuti inviati all'IA a fornitori di modelli all'estero per l'elaborazione",
     "crossBorderView": "Visualizza informativa",
+    "consentCardTitle": "Prima di usare l’IA della piattaforma, conferma un consenso al trattamento dei dati",
+    "consentAccept": "Accetta e continua",
+    "consentHideNotice": "Nascondi informativa",
+    "consentFailed": "Impossibile salvare. Riprova.",
+    "consentLater": "Più tardi",
     "crossBorderNoticeTitle": "Informativa sul trasferimento transfrontaliero",
     "crossBorderNoticeBody": "Il sito cinese si collega ad Alibaba Cloud Bailian tramite i server AI WorkDeck; il sito internazionale usa OpenRouter. I testi e gli estratti di file inviati all’IA sono usati per inferenza e fatturazione. In base al modello, possono essere elaborati fuori dalla Cina continentale. La revoca del consenso nelle impostazioni disattiva il canale IA della piattaforma.",
     "agreementRequired": "Seleziona la casella per accettare i Termini di servizio e l'Informativa sulla privacy e continuare",
@@ -101,7 +106,8 @@ export default {
     "switch": "Cambia",
     "cancel": "Annulla",
     "switchFailed": "Impossibile cambiare sito. Riprova più tardi.",
-    "rescueFailed": "Ancora non sbloccato dopo il cambio di sito. Controlla il codice e riprova."
+    "rescueFailed": "Ancora non sbloccato dopo il cambio di sito. Controlla il codice e riprova.",
+    "proIntroBanner": "Crediti di benvenuto alla registrazione · Personal Pro ¥9.9/mese (primi 3 mesi)",
   },
   "hint": {
     "learnMore": "Scopri di più",
@@ -112,11 +118,13 @@ export default {
     "purchaseConfirmOk": "Conferma",
     "purchaseSuccess": "Sbloccato",
     "purchaseFailed": "Acquisto non riuscito",
-    "goRecharge": "Ricarica"
+    "goRecharge": "Ricarica",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Passa a Personal Pro",
   },
   "identity": {
     "title": "Scegli uno spazio di lavoro locale",
-    "subtitle": "Su questo dispositivo sono stati trovati più account esistenti. Scegli lo spazio di lavoro con cui continuare. Non ti verrà più chiesto e potrai modificarlo in seguito in Impostazioni → Account e utilizzo.",
+    "subtitle": "Su questo dispositivo sono stati trovati più account esistenti. Scegli lo spazio di lavoro con cui continuare. Non ti verrà più chiesto e potrai modificarlo in seguito in Impostazioni → Account e saldo.",
     "reading": "Lettura degli account locali",
     "retry": "Riprova",
     "itemMeta": "{projects} progetti · {files} file",

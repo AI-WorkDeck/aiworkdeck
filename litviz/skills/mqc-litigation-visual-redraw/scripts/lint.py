@@ -172,7 +172,7 @@ def lint_svg(svg, w=None, h=None):
 
 
 def main(path):
-    svg = open(path, encoding="utf-8").read()
+    svg = open(path, encoding="utf-8-sig").read()
     warns = lint_svg(svg)
     if warns:
         print(f"lint: {len(warns)} warning(s) in {path}")
@@ -194,5 +194,20 @@ def _quiet_broken_pipe():
         pass
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     _quiet_broken_pipe()
     sys.exit(main(sys.argv[1]))

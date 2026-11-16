@@ -99,3 +99,15 @@ test('问题卡接线：解析器读 kind/id/header/multi 与 option description
     assert.ok(bubble.includes(prop), `RootBubble 没把 ${prop} 传给 QuestionCard`)
   }
 })
+
+test('破坏性确认卡（P2-1）：沿用 ask_user 卡，点「执行」产生后端 isApproval 认的回答形状', () => {
+  const card = normalizeAskUserEvent({
+    v: 1, id: 'ask-confirm1', question: '确认执行「移入回收站」：targetsJson=1 项（合同草稿.docx）？', header: '确认',
+    options: [{ label: '执行', description: '按上述参数执行一次' }, { label: '取消', description: '不执行' }],
+    multiSelect: false
+  })
+  assert.deepEqual(card.options, ['执行', '取消'])
+  const run = formatAskUserAnswer({ id: card.id, question: card.question, selected: ['执行'] })
+  assert.match(run.prompt, /^<ask_user_answer id="ask-confirm1">(?:\nQuestion: .*)?\nSelected:\n- 执行\n<\/ask_user_answer>$/)
+  assert.deepEqual(parseAskUserAnswer(run.prompt).selected, ['执行'])
+})

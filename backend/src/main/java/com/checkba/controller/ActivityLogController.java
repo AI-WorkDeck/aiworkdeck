@@ -19,6 +19,7 @@ import java.util.Map;
 public class ActivityLogController {
 
     private final UserActivityLogService userActivityLogService;
+    private final com.checkba.service.activity.WorklogSummaryService worklogSummaryService;
 
     // X-Session-Id 一律 required=false：local-mode 免登请求不带 header，required
     // 会在进 controller 前被 Spring 以 MissingRequestHeaderException 500 掉；
@@ -67,6 +68,24 @@ public class ActivityLogController {
         result.put("code", 0);
         result.put("data", page.logs());
         result.put("truncated", page.truncated());
+        return result;
+    }
+
+    /**
+     * 本人在某项目上的工作记录汇总（按月、按类别的小时数与用时最多的文件）。插件经 worklog_read 权限的
+     * services.request('worklog','summary') 调到这里；只回调用人自己的记录。
+     */
+    @GetMapping("/project-summary")
+    public Map<String, Object> projectSummary(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestParam("projectId") Long projectId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (userId == null) {
+            throw new IllegalArgumentException(com.checkba.service.LangText.of("未登录", "Not signed in"));
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 0);
+        result.put("data", worklogSummaryService.summarize(userId, projectId));
         return result;
     }
 

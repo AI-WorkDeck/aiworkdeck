@@ -57,7 +57,7 @@
 | `缺 state.json，先跑 read` | 从头开始：`python scripts/pipeline.py read <材料...>` |
 | `缺 verdicts.json` / `parts.json` / `skeleton.json` / `items.json` | 这一步要模型先写那份 JSON。形状与判据现查：`python scripts/pipeline.py shape verdicts.json` |
 | 不知道走到第几步了 | `python scripts/pipeline.py next`。它按**产物**判断，不靠自称，所以换会话、跑错顺序、文件写坏之后都问得出来 |
-| `没有第 5 项，请报 1 到 4` | 风格只有三档加一个「让我定」：1 白描、2 奇川风、3 歸藏风、4 由它定 |
+| `没有第 5 项，请报 1 到 4` | 风格只有三档加一个「让我定」：1 奇川风、2 歸藏风、3 白描、4 由它定（以 `style` 打印的表为准） |
 | `剔完没有事项了` | 勾选的范围里没有可画的内容。放宽范围：`span 全部` 或 `budget all` |
 
 ---
@@ -84,7 +84,7 @@
 ## 五 · 环境类：少一个工具
 
 跑一次环境自检，它逐项列出缺什么、缺了会退化成什么样。自检脚本属于共享内核：完整
-仓库里是 `python3 ../mqc-litigation-visual-redraw/scripts/doctor.py`，SkillHub 的
+仓库里是 `python3 ../mqc-litigation-visual-redraw/scripts/doctor.py --for timeline`，SkillHub 的
 单目录分发包里内核随包带上，直接跑 `python3 scripts/doctor.py`。
 **没有一项是装不上，都是少一种格式**：
 
@@ -93,7 +93,7 @@
 | LibreOffice 或 poppler | 出不了 PNG。SVG 母版照常交付，插进 Word 一样能用 |
 | poppler 的 `pdftoppm` | 读不了没有文字层的扫描件与照片。有文字层的材料不受影响 |
 | node | 出不了溯源索引 docx。图照常出 |
-| `python-docx` | 读不了 `.docx` 材料。把材料另存成 txt 或 PDF 即可 |
+| `python-docx` | 读不了 `.docx` 材料。把材料另存成 txt，或直接交 PDF（有文字层的 PDF 由 read 直接读） |
 
 **每一种格式独立守护**：任何一种失败都只是少一种格式，绝不影响已经写好的 SVG。
 

@@ -85,9 +85,8 @@ public class WebTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "网络搜索", category = "web")
-    @Tool("Search the web using Bocha AI. Useful for finding latest news, regulations, or legal cases, and for the law "
-            + "of jurisdictions other than Mainland China. For PRC statutes prefer law_search / get_law_article (an "
-            + "authoritative database) and cite from those. Returns a summary of search results.")
+    @Tool("用博查搜索网页，返回搜索结果摘要，适合最新新闻、监管动态、案例，以及中国大陆以外法域的法律。\n"
+            + "何时不用：中国大陆法律法规用 law_search / get_law_article（权威库），并据此引用。")
     public String search_web(@P("搜索关键词") String query) {
         log.info("Tool: search_web called for query='{}'", query);
 
@@ -219,7 +218,8 @@ public class WebTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "浏览网页", category = "web")
-    @Tool("Browse a specific URL and extract its main content.")
+    @Tool("打开一个网址并提取其正文。\n"
+            + "何时用：已有具体 URL；还没有网址先 search_web。")
     public String browse_url(@P("要打开的网页地址；不带协议时按 https 处理") String url) {
         log.info("Tool: browse_url called for url='{}'", url);
         if (url == null || url.isBlank()) {

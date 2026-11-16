@@ -543,6 +543,22 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("ai-key 首次网络失败（官网冷启动）：自动重试一次，用户无需再登录")
+    void aiKeyRetriesOnceOnNetworkFailure() {
+        AccountService service = connected();
+        transport.enqueueNetworkFailure().enqueue(200, "{\"openrouterKey\":\"sk-or-v1-retry\",\"limitUsd\":5.0}");
+        assertEquals("sk-or-v1-retry", service.fetchAiKey().get("openrouterKey"));
+    }
+
+    @Test
+    @DisplayName("ai-key 连续两次网络失败：仍报 NETWORK，不无限重试")
+    void aiKeyRetryIsBounded() {
+        AccountService service = connected();
+        transport.enqueueNetworkFailure().enqueueNetworkFailure();
+        assertEquals(AccountException.Kind.NETWORK, assertThrows(AccountException.class, service::fetchAiKey).getKind());
+    }
+
+    @Test
     @DisplayName("ai-usage：返回额度三个数，hasKey 区分「未分配额度」")
     void aiUsageReturnsQuota() {
         AccountService service = connected();
@@ -834,6 +850,82 @@ class AccountServiceTest {
         assertEquals("silver", membership.get("key"));
         assertEquals(2, membership.get("level"));
         assertFalse(membership.containsKey("bonusPermille"), "balance 只挑四个展示字段，摘要不是全量转发");
+    }
+
+    @Test
+    @DisplayName("balance：包晴天积分通道透传 billingLine 与 bqtMember")
+    void balanceSnapshotPassesBqtMember() {
+        AccountService service = connected();
+        transport.enqueue(200, "{\"balanceCents\":12345,\"plan\":\"pro\",\"billingLine\":\"bqt\","
+                + "\"bqtMember\":{\"points\":\"1234.5\",\"cents\":12345,\"outstandingCents\":0,\"failedCount\":0,"
+                + "\"centsPerPoint\":10,\"levelCode\":\"GROWTH\",\"status\":\"ACTIVE\",\"aiWorkbench\":true,"
+                + "\"expireAt\":\"2027-01-01T00:00:00Z\",\"fetchedAt\":\"2026-11-05T00:00:00Z\",\"rechargeAllowed\":false}}");
+        transport.enqueue(200, "{}");
+
+        Map<String, Object> result = service.balanceSnapshot();
+
+        assertEquals("bqt", result.get("billingLine"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> member = (Map<String, Object>) result.get("bqtMember");
+        assertEquals("GROWTH", member.get("levelCode"));
+        assertEquals("1234.5", member.get("points"));
+        assertEquals(12345, member.get("cents"));
+    }
+
+    @Test
+    @DisplayName("balance：旧官网没有 billingLine 时记 standard、bqtMember 为 null")
+    void balanceSnapshotDefaultsToStandardLine() {
+        AccountService service = connected();
+        transport.enqueue(200, "{\"balanceCents\":500,\"plan\":\"free\"}");
+        transport.enqueue(200, "{}");
+        Map<String, Object> result = service.balanceSnapshot();
+        assertEquals("standard", result.get("billingLine"));
+        assertTrue(result.containsKey("bqtMember"));
+        assertNull(result.get("bqtMember"));
+    }
+
+    @Test
+    @DisplayName("balance：普通计费线也透传 bqtMember（绑定了包晴天的账户，积分优先抵 DeepSeek）")
+    void balanceSnapshotPassesBqtMemberOnStandardLine() {
+        AccountService service = connected();
+        transport.enqueue(200, "{\"balanceCents\":500,\"plan\":\"free\",\"billingLine\":\"standard\",\"bqtMember\":{\"points\":\"1\"}}");
+        transport.enqueue(200, "{}");
+        Map<String, Object> result = service.balanceSnapshot();
+        assertEquals("standard", result.get("billingLine"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> member = (Map<String, Object>) result.get("bqtMember");
+        assertEquals("1", member.get("points"));
+    }
+
+    @Test
+    @DisplayName("包晴天拒绝码：403 不判凭据失效，充值端点回 bqt_recharge_via_bqt 带 reason")
+    void bqtRefusalsDoNotExpireTheAccount() {
+        AccountService service = connected();
+        transport.enqueue(403, "{\"error\":\"bqt_member_invalid\"}");
+        AccountException e = assertThrows(AccountException.class, service::fetchProfile);
+        assertEquals(AccountException.Kind.REJECTED, e.getKind());
+        assertEquals("bqt_member_invalid", e.getReason());
+        assertTrue(service.isConnected(), "会员失效不是 Key 失效，账户必须保持连接");
+
+        transport.enqueue(403, "{\"error\":\"bqt_recharge_via_bqt\"}");
+        AccountException recharge = assertThrows(AccountException.class,
+                () -> service.createRecharge(5000, "idem"));
+        assertEquals("bqt_recharge_via_bqt", recharge.getReason());
+
+        transport.enqueue(402, "{\"error\":\"bqt_insufficient_points\"}");
+        AccountException key = assertThrows(AccountException.class, service::fetchAiKey);
+        assertEquals("bqt_insufficient_points", key.getReason());
+        assertTrue(service.isConnected());
+    }
+
+    @Test
+    @DisplayName("包晴天拒绝码能从模型网关的异常链里认出来")
+    void bqtCodeFoundInErrorChain() {
+        RuntimeException err = new RuntimeException("stream failed", new RuntimeException(
+                "{\"error\":{\"code\":\"bqt_ai_closed\",\"message\":\"AI closed\"}}"));
+        assertEquals("bqt_ai_closed", BqtBilling.errorCodeIn(err));
+        assertNull(BqtBilling.errorCodeIn(new RuntimeException("status code: 402 insufficient credits")));
+        assertNull(BqtBilling.errorCodeIn("xbqt_ai_closed_y"));
     }
 
     @Test
@@ -1226,5 +1318,32 @@ class AccountServiceTest {
         assertTrue(service.isConnected());
         assertEquals("张律师", confirmed.get("displayName"));
         assertNotNull(confirmed.get("qingtian"));
+    }
+
+    @Test
+    @DisplayName("个人 Pro 订阅建单：首 3 月 ¥9.9 满次回 409 intro_quota_exhausted 时自动回落 ¥149；403 pro_purchase_disabled 不掉线")
+    void createSubscriptionOrderIntroFallbackAndDisabledPreservesConnection() {
+        transport = new StubTransport()
+                .enqueue(200, "{\"username\":\"u\"}")
+                .enqueue(409, "{\"code\":\"intro_quota_exhausted\",\"error\":\"体验价已用完\"}")
+                .enqueue(200, "{\"success\":true,\"present\":\"qrcode\",\"outTradeNo\":\"PRO-STD-1\",\"qrCode\":\"weixin://wxpay/std\"}");
+        AccountService service = service();
+        service.connect(KEY);
+
+        Map<String, Object> created = service.createSubscriptionOrder("idem-1");
+        assertEquals("pro_monthly", created.get("skuId"));
+        assertEquals(14900L, ((Number) created.get("amount")).longValue());
+        assertEquals("PRO-STD-1", created.get("outTradeNo"));
+        assertTrue(transport.bodies.get(1).contains("\"skuId\":\"pro_monthly_intro\""));
+        assertTrue(transport.bodies.get(1).contains("\"amount\":990"));
+        assertTrue(transport.bodies.get(2).contains("\"skuId\":\"pro_monthly\""));
+        assertTrue(transport.bodies.get(2).contains("\"amount\":14900"));
+        assertTrue(service.isConnected());
+
+        transport.enqueue(403, "{\"code\":\"pro_purchase_disabled\",\"error\":\"Pro 购买暂未开放\"}");
+        AccountException ex = assertThrows(AccountException.class, () -> service.createSubscriptionOrder("idem-2"));
+        assertEquals(AccountException.Kind.REJECTED, ex.getKind());
+        assertEquals("pro_purchase_disabled", ex.getReason());
+        assertTrue(service.isConnected(), "pro_purchase_disabled 属于业务开关，绝不能清掉本地连接");
     }
 }

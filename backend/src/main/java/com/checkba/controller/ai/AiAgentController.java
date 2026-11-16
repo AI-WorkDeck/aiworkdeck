@@ -44,6 +44,14 @@ public class AiAgentController {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ai.InlineContentCache inlineContentCache;
 
+    /** 字段注入（同 inlineContentCache）：不动构造器，既有手工装配的测试一行不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.checkba.service.ai.DocumentCheckpointService documentCheckpointService;
+
+    /** 按用户限频（server 模式）。字段注入、可缺省：手工装配的既有测试不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
@@ -113,13 +121,19 @@ public class AiAgentController {
         return connect(conversationId, sessionId, clientInstance, lastEventId, response, null);
     }
 
+    public ResponseEntity<SseEmitter> connect(String conversationId, String sessionId, String clientInstance,
+            String lastEventId, HttpServletResponse response, String conversationScope) {
+        return connect(conversationId, sessionId, clientInstance, lastEventId, response, conversationScope, null);
+    }
+
     @GetMapping(value = "/connect/{conversationId}", produces = "text/event-stream")
     public ResponseEntity<SseEmitter> connect(@PathVariable String conversationId,
                               @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                               @RequestHeader(value = "X-Client-Instance", required = false) String clientInstance,
                               @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId,
                               HttpServletResponse response,
-                              @RequestParam(required = false) String conversationScope) {
+                              @RequestParam(required = false) String conversationScope,
+                              @RequestHeader(value = "Origin", required = false) String origin) {
         // 归属校验：emitter 表只按 conversationId 索引且新连接直接覆盖旧连接，
         // 此前 userId 仅用于打日志，任何人猜到会话 ID 即可劫持他人的整条输出流
         Long userId = AuthController.getUserIdFromSession(sessionId);
@@ -135,6 +149,12 @@ public class AiAgentController {
         }
         if (!java.util.Objects.equals(scope, messageService.conversationScopeOf(conversationId))) {
             return ResponseEntity.status(409).build();
+        }
+        // 网页版连接（web- 实例 id 或网页来源）把会话钉在 WEB：进程重启后登记表清空、
+        // 或网页端漏带 clientCapability 时，也不会回落到桌面工具面（W1 设计 §4.6）
+        if (com.checkba.service.ai.ClientCapabilityService.isWebClientInstance(clientInstance)
+                || clientCapabilityService.isWebOrigin(origin)) {
+            clientCapabilityService.markWebClient(conversationId);
         }
 
         // 添加响应头禁用缓冲，确保流式响应实时到达客户端
@@ -184,11 +204,16 @@ public class AiAgentController {
      * 发送用户消息 (触发 Agent 思考)。
      * 这是一个异步接口，立刻返回 200 OK，后续通过 SSE 推送结果。
      */
+    public ResponseEntity<?> startSession(AgentChatRequest request, String sessionId, String appLanguageHeader) {
+        return startSession(request, sessionId, appLanguageHeader, null);
+    }
+
     @PostMapping("/chat")
     public ResponseEntity<?> startSession(@RequestBody AgentChatRequest request,
                                           @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                                           @RequestHeader(value = com.checkba.config.AppLanguageRequestFilter.HEADER,
-                                                  required = false) String appLanguageHeader) {
+                                                  required = false) String appLanguageHeader,
+                                          @RequestHeader(value = "Origin", required = false) String origin) {
         // 界面语言：请求体优先，缺省时补上请求头里的那个。补这一手是因为编排循环跑在池线程上，
         // 过滤器建的 ThreadLocal 作用域不跟着走——只有随请求体带过去的值才能活到那一轮。
         if (com.checkba.service.AppLanguageScope.normalize(request.getAppLanguage()) == null) {
@@ -201,6 +226,7 @@ public class AiAgentController {
         if (userId == null) {
             return chatError(401, LangText.of("请先登录", "Please sign in first"));
         }
+        if (rateLimiter != null) rateLimiter.check(com.checkba.service.UserRateLimiter.Kind.CHAT, userId);
         if (request.getProjectId() == null || !projectMemberService.hasReadPermission(request.getProjectId(), userId)) {
             return chatError(403, LangText.of("无权访问该项目", "You do not have access to this project"));
         }
@@ -254,8 +280,17 @@ public class AiAgentController {
 
         // 会话级客户端能力登记（Phase C）：lowa（默认，主前端）/ office（Office 插件）/ none（纯对话）；
         // office 会话再按宿主细分（word / excel / powerpoint，缺省 word），工具可见性按宿主过滤
+        // 网页来源一律按 web 登记（W1 设计 §4.6）；已钉在 WEB 的会话（含 web- 连接见过的）
+        // 把 web 写回请求体，inbox 落库的那份请求重启回放时也不会回落到桌面工具面
+        if (clientCapabilityService.isWebOrigin(origin)) {
+            clientCapabilityService.markWebClient(request.getConversationId());
+        }
         clientCapabilityService.record(request.getConversationId(), request.getClientCapability(),
                 request.getOfficeHost(), request.getOfficeFamily());
+        if (clientCapabilityService.capabilityOf(request.getConversationId())
+                == com.checkba.service.ai.ClientCapabilityService.Capability.WEB) {
+            request.setClientCapability("web");
+        }
 
         try {
             com.checkba.model.entity.AgentInboxItem item = agentInboxService.submit(request, userId);
@@ -324,6 +359,78 @@ public class AiAgentController {
             log.error("Cancel failed", e);
             return ResponseEntity.status(500).body("{\"status\":\"error\", \"message\":\"Cancel failed\"}");
         }
+    }
+
+    private static ResponseEntity<?> forbidden() {
+        return ResponseEntity.status(403).body(java.util.Map.of("status", "error", "message",
+                LangText.of("无权操作该会话", "You do not have permission for this conversation")));
+    }
+
+    /**
+     * 暂停当前轮次（用户控制）：只置标志，轮次在下一个安全边界（下一次调用模型之前，
+     * 与插话同一处）收尾为 PAUSED / reason=user_pause；「继续」走既有续跑。
+     * paused=false 表示没有活跃轮次（那一轮已经自己结束了），同 /cancel 不回 404。
+     */
+    @PostMapping("/pause/{conversationId}")
+    public ResponseEntity<?> pauseGeneration(@PathVariable String conversationId,
+                                             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        boolean paused = agentOrchestrator.requestPause(conversationId);
+        log.info("Pause request received: conv={}, user={}, hit={}", conversationId, userId, paused);
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "paused", paused));
+    }
+
+    /**
+     * 「撤销本次 AI 修改」能不能做：本会话最近一轮的文档快照还在（内存登记，24 小时 TTL，
+     * 新一轮开始即被替换）时列出它覆盖的文件，供确认框写清楚会恢复哪几份。
+     */
+    @GetMapping("/undo/{conversationId}")
+    public ResponseEntity<?> undoStatus(@PathVariable String conversationId,
+                                        @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        java.util.List<java.util.Map<String, Object>> files = documentCheckpointService.describeCheckpoint(conversationId);
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "available", !files.isEmpty(), "files", files));
+    }
+
+    /**
+     * 用户撤销本次 AI 修改：把最近一轮快照覆盖的全部文件恢复到这一轮开始前
+     * （与 doc_restore_checkpoint 同一条 prepare → 写回 → reload 路径；用户亲手发起，不过模型确认闸）。
+     * 轮次还在跑时拒绝（409 RUN_ACTIVE）：它随时可能再写一笔，恢复与它会互相覆盖。
+     */
+    @PostMapping("/undo/{conversationId}")
+    public ResponseEntity<?> undoRun(@PathVariable String conversationId,
+                                     @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        if (agentOrchestrator.hasActiveRun(conversationId)) {
+            return ResponseEntity.status(409).body(java.util.Map.of("status", "error", "code", "RUN_ACTIVE",
+                    "message", LangText.of("AI 仍在运行，请等它停下后再撤销", "The AI is still running. Undo after it stops.")));
+        }
+        log.info("Undo run requested: conv={}, user={}", conversationId, userId);
+        var result = documentCheckpointService.restoreForUser(conversationId);
+        switch (result.status()) {
+            case NO_CHECKPOINT:
+                return ResponseEntity.status(404).body(java.util.Map.of("status", "error", "code", "NO_CHECKPOINT",
+                        "message", LangText.of("本次修改的快照已不可用，无法撤销",
+                                "The snapshot for this run is no longer available, so it cannot be undone")));
+            case IN_PROGRESS:
+                return ResponseEntity.status(409).body(java.util.Map.of("status", "error", "code", "UNDO_IN_PROGRESS",
+                        "message", LangText.of("撤销正在进行中", "An undo is already in progress")));
+            default:
+                break;
+        }
+        var outcome = result.outcome();
+        java.util.List<java.util.Map<String, Object>> failures = outcome.failures().stream()
+                .map(f -> java.util.Map.<String, Object>of(
+                        "fileId", f.fileId(),
+                        "name", f.name() == null ? "" : f.name(),
+                        "error", f.missing() ? LangText.of("文件已不存在", "The file no longer exists")
+                                : (f.error() == null ? "" : f.error())))
+                .toList();
+        String status = failures.isEmpty() ? "ok" : outcome.restored().isEmpty() ? "failed" : "partial";
+        return ResponseEntity.ok(java.util.Map.of("status", status, "restored", outcome.restored(), "failures", failures));
     }
 
     /**
@@ -480,6 +587,7 @@ public class AiAgentController {
             return ResponseEntity.status(401).body("{\"status\":\"error\", \"message\":\"" +
                     LangText.of("请先登录", "Please sign in first") + "\"}");
         }
+        if (rateLimiter != null) rateLimiter.check(com.checkba.service.UserRateLimiter.Kind.CHAT, userId);
         if (request.getProjectId() == null || !projectMemberService.hasWritePermission(request.getProjectId(), userId)
                 || fileAccess.isClient(request.getProjectId(), userId)) {
             return ResponseEntity.status(403).body("{\"status\":\"error\", \"message\":\"" +
@@ -654,8 +762,8 @@ public class AiAgentController {
         @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = DecisionOptInDeserializer.class)
         private boolean decisionAssistEnabled;
         /**
-         * 可选：客户端文档编辑能力（lowa / office / none，Phase C）。
-         * 缺省按 lowa 处理，兼容不发送该字段的存量主前端。
+         * 可选：客户端文档编辑能力（lowa / office / none / web，Phase C；web 见 W1）。
+         * 缺省按 lowa 处理，兼容不发送该字段的存量主前端；网页来源的请求一律按 web。
          */
         private String clientCapability;
         /**

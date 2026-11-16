@@ -334,9 +334,35 @@ def order_by_time(events):
         return None                      # relative / order：靠 anchor
 
     by_id = {e.get("id"): e for e in events}
-    fixed = [(i, e) for i, e in enumerate(events) if key_of(e) is not None]
+    pos_of = {id(e): i for i, e in enumerate(events)}      # 列表顺序 = 材料里的先后
+    coarse = [e for e in events if _coarse_span(e) is not None]
+    fixed = [(i, e) for i, e in enumerate(events)
+             if key_of(e) is not None and _coarse_span(e) is None]
     fixed.sort(key=lambda p: (_ymd(key_of(p[1])), p[0]))
     out = [e for _i, e in fixed]
+
+    # 只写到年（「2021年」）或只写到月（「2025年1月」）的区间，**不假定是哪一天**。
+    # 按 from 排会把「2021年起诉」当成 2021 年 1 月 1 日，排到 3 月 26 日那份通知前面，
+    # 锚在它身上的「驳回上诉」也跟着提前 —— 真实运行里正是这样错的，而那个 1 月 1 日是
+    # 代码推算出来的，材料里没有。作者定的规矩：不推算、不计算日期。
+    # 所以它放在「同一年（同一月）里、材料中出现在它之前的最后一个精确事项」之后；
+    # 同年同月里没有更早出现的，就放在该年（该月）第一个事项之前。
+    # 实测：那份判决书的 18 个事项顺序变对，仓库全部示例的顺序一个不变。
+    for e in sorted(coarse, key=lambda x: pos_of[id(x)]):
+        span = _coarse_span(e)
+        def _in_span(x, span=span):
+            k = key_of(x)
+            return k is not None and _ymd(k)[:len(span)] == span
+        prior = [j for j, x in enumerate(out)
+                 if _in_span(x) and pos_of.get(id(x), 10 ** 9) < pos_of[id(e)]]
+        if prior:
+            at = prior[-1] + 1
+        else:
+            start = _ymd((e.get("time") or {}).get("from"))
+            later = [j for j, x in enumerate(out)
+                     if key_of(x) is not None and _ymd(key_of(x)) >= start]
+            at = later[0] if later else len(out)
+        out.insert(at, e)
 
     # 把靠 anchor 的插到它锚定的那个事项之后；锚不到就按原顺序放到末尾
     floating = [e for e in events if key_of(e) is None]
@@ -356,6 +382,24 @@ def order_by_time(events):
                 pos += 1
             out.insert(pos, e)
     return out
+
+
+def _coarse_span(e):
+    """只到年的区间返回 (年,)，只到月的返回 (年, 月)，其余返回 None。"""
+    import calendar
+    t = e.get("time") or {}
+    if t.get("certainty") != "range" or not (t.get("from") and t.get("to")):
+        return None
+    try:
+        y1, m1, d1 = _ymd(t["from"])
+        y2, m2, d2 = _ymd(t["to"])
+    except Exception:
+        return None
+    if y1 == y2 and (m1, d1, m2, d2) == (1, 1, 12, 31):
+        return (y1,)
+    if y1 == y2 and m1 == m2 and d1 == 1 and d2 == calendar.monthrange(y2, m2)[1]:
+        return (y1, m1)
+    return None
 
 
 def _ymd(s):

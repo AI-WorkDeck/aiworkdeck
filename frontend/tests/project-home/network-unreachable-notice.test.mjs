@@ -12,6 +12,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { isAccountRequired, isCreditsRequired } from '../../src/utils/requireAccountCore.js'
+import { bqtErrorCode, bqtErrorMessage } from '../../src/utils/bqtBilling.js'
 import zh from '../../src/locales/zh-CN/agentStream.js'
 import en from '../../src/locales/en-US/agentStream.js'
 
@@ -55,14 +56,33 @@ function parseAccountPayload(dataStr) {
   }
 }
 
-function renderError(dataStr) {
-  const bubble = { value: { content: '' } }
+function renderError(dataStr, prompts = [], bubble = { value: { content: '' } }) {
   const run = new Function('dataStr', 'currentAssistantBubble', 't', 'accountPayload',
-    'isAccountRequired', 'isCreditsRequired', 'promptAccountAction', BRANCH)
+    'isAccountRequired', 'isCreditsRequired', 'promptAccountAction', 'bqtErrorCode', 'bqtErrorMessage', BRANCH)
   // This suite tests rendered error copy; the account dialog is verified in paid-service.mjs.
-  run(dataStr, bubble, (k, args) => k + (args?.message ? ' ' + args.message : ''), parseAccountPayload(dataStr), isAccountRequired, isCreditsRequired, () => {})
+  run(dataStr, bubble, (k, args) => k + (args?.message ? ' ' + args.message : ''), parseAccountPayload(dataStr), isAccountRequired, isCreditsRequired, payload => prompts.push(payload), bqtErrorCode, bqtErrorMessage)
   return bubble.value.content
 }
+
+test('包晴天积分通道拒绝：按码给「去包晴天 App」提示，不弹本应用充值层', () => {
+  const cases = {
+    bqt_member_invalid: /agentStream\.bqtMemberInvalid/,
+    bqt_ai_closed: /agentStream\.bqtAiClosed/,
+    bqt_insufficient_points: /agentStream\.bqtInsufficientPoints/,
+    bqt_outstanding_debt: /agentStream\.bqtOutstandingDebt/,
+    bqt_unavailable: /agentStream\.bqtUnavailable/,
+  }
+  for (const [code, expected] of Object.entries(cases)) {
+    const prompts = []
+    const content = renderError(JSON.stringify({ message: 'server', code: 1, kind: 'REJECTED', reason: code }), prompts)
+    assert.match(content, expected)
+    assert.doesNotMatch(content, /executionInterrupted|quotaExhaustedNotice/)
+    assert.deepEqual(prompts, [], code + ' 不能打开充值或登录弹层')
+  }
+  // 后端没认出、只留了原始响应体的字符串载荷也要认得
+  assert.match(renderError('Stream Error: AI_QUOTA_EXHAUSTED: {"error":"bqt_insufficient_points"}'), /bqtInsufficientPoints/)
+  assert.match(renderError(JSON.stringify({ message: 'x', code: 1, kind: 'CONFLICT', reason: 'no_credits' })), /^\n\nx\n$/)
+})
 
 test('账户类载荷（JSON）：4011 → 登录引导；其余 kind 显示 message 原文而不是整段 JSON', () => {
   assert.ok(SRC.includes('function parseAccountErrorPayload(dataStr)'), '源码判据改了，本用例的复刻要跟着改')
@@ -103,4 +123,18 @@ test('attachment timeout and occupied reader produce translated actionable error
   assert.match(renderError(JSON.stringify({ code: 'CONTEXT_PREPARATION_TIMEOUT', message: 'fallback' })), /chat\.contextPreparationTimeout/)
   assert.match(renderError(JSON.stringify({ code: 'ATTACHMENTS_REQUIRE_TOOLS', message: 'fallback' })), /chat\.attachmentsRequireTools/)
   assert.match(renderError(JSON.stringify({ code: 'ATTACHMENT_READER_BUSY', message: 'fallback' })), /chat\.attachmentReaderBusy/)
+})
+
+test('跨境同意闸（reason=cross_border_consent_required）：气泡挂同意卡，不贴后端长文案、不弹登录/充值层', () => {
+  const prompts = []
+  const bubble = { value: { content: '' } }
+  const payload = JSON.stringify({ message: '平台 AI 通道已停用：当前账户在本站点还没有有效的跨境传输单独同意（或已撤回）。到「设置 → AI 服务配置」勾选同意后即可继续', code: 409, kind: 'CONFLICT', reason: 'cross_border_consent_required' })
+  const content = renderError(payload, prompts, bubble)
+  assert.equal(bubble.value.consentRequired, true)
+  assert.equal(content, '', '不能再把「到设置 → AI 服务配置勾选」那段话贴进气泡')
+  assert.deepEqual(prompts, [])
+  // 防空断言：同为 CONFLICT、但不是这个 reason 的账户错误仍按原样显示
+  const other = { value: { content: '' } }
+  renderError(JSON.stringify({ message: 'x', code: 1, kind: 'CONFLICT', reason: 'other' }), [], other)
+  assert.notEqual(other.value.consentRequired, true)
 })

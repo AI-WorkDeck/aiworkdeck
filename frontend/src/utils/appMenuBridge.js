@@ -137,7 +137,12 @@ async function runAppCommand(verb, arg) {
       uni.navigateTo({ url: '/pages/admin/admin' })
       return
     case 'openAccount':
-      uni.navigateTo({ url: '/pages/userprofile/userprofile' })
+      // 「账户与余额」分区：工作台里开设置标签并定位，其余页面走薄壳页的 ?nav=account
+      if (state.page === 'workbench') {
+        uni.$emit(COMMAND_EVENT, { verb: 'openSettings', arg: 'account' })
+        return
+      }
+      uni.navigateTo({ url: '/pages/admin/admin?nav=account' })
       return
     case 'logout': {
       // 自带确认框；退出后停在当前页面、广播 awd:account-changed（见 utils/signOut.js）

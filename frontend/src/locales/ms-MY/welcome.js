@@ -32,7 +32,7 @@ export default {
   "signIn": "Daftar masuk",
   "signInTitle": "Log masuk (diperlukan untuk AI, item hub berbayar dan pustaka kes pasukan)",
   "noProjectTitle": "Buka projek untuk bermula",
-  "noProjectHint": "Buka projek daripada Projects di sebelah kiri, atau cipta satu daripada halaman Selamat Datang.",
+  "noProjectHint": "Klik “Semua Projek” di kiri atas untuk memilih projek, atau cipta projek baharu di halaman alu-aluan.",
   "startupDisabledHint": "Halaman aluan tidak lagi dibuka semasa permulaan.",
   "openWelcome": "Buka halaman aluan",
   "aiNeedsProject": "Buka projek terlebih dahulu untuk menggunakan sembang AI"

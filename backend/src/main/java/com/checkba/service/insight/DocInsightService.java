@@ -1263,7 +1263,7 @@ public class DocInsightService {
         if (!StringUtils.hasText(server)) return null;
         String raw;
         try {
-            raw = pkulawChannel.callTool(server, props.getCaseNumberTool(),
+            raw = pkulawChannel.callToolForData(server, props.getCaseNumberTool(),
                     Map.of("text", recognitionText(row)));
         } catch (Exception e) {
             log.warn("案号识别失败（跳过，不影响判决书检索）name={}: {}", row.getName(), e.getMessage());
@@ -1337,7 +1337,7 @@ public class DocInsightService {
         row.setRetrievalSource(server);
         String raw;
         try {
-            raw = pkulawChannel.callTool(server, tool, args);
+            raw = pkulawChannel.callToolForData(server, tool, args);
         } catch (GatewayException ge) {
             unavailableGateway(row, ge, unavailablePrefix);
             return false;
@@ -1629,7 +1629,7 @@ public class DocInsightService {
             args.put("answerlaw", List.of(Map.of("title", title, "text", clue)));
             args.put("prompt", quote);
         }
-        String raw = pkulawChannel.callTool(server, props.getCitationTool(), args);
+        String raw = pkulawChannel.callToolForData(server, props.getCitationTool(), args);
         if (!StringUtils.hasText(raw) || raw.startsWith(ERROR_PREFIX)) return null;
         JsonNode node = unwrapMcp(raw);
         if (node == null || !node.isArray()) return null;   // 形状不认得 = 校验不可用，不当成引用有错

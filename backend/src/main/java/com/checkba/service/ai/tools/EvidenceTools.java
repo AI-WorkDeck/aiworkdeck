@@ -56,7 +56,7 @@ public class EvidenceTools implements AgentToolComponent {
     @ToolMeta(displayName = "检索证据", category = "memory")
     public String retrieve_evidence(
             @P("检索文本，描述要找依据的主张或问题") String query,
-            @P("返回结果数量，默认10") int limit
+            @P(value = "返回结果数量，默认10", required = false) int limit
     ) {
         log.info("Tool: retrieve_evidence called query='{}', limit={}", query, limit);
 
@@ -146,8 +146,8 @@ public class EvidenceTools implements AgentToolComponent {
             + "该写「待补」或提示用户人工核。返回精简摘要：四类结论计数 + 有矛盾的链接清单 + 续跑游标 nextOffset。")
     public String evidence_verify(
             @P("报告文件 ID（系统提醒里的 id=）；与 linkKey 二选一，给了就核整篇") Long docFileId,
-            @P("只核这一条链接的 linkKey（doc_list_evidence 返回的），可不传") String linkKey,
-            @P("章节前缀过滤，如 \"一/（二）\"，只在按 docFileId 核整篇时有效，可不传") String scope
+            @P(value = "只核这一条链接的 linkKey（doc_list_evidence 返回的），可不传", required = false) String linkKey,
+            @P(value = "章节前缀过滤，如 \"一/（二）\"，只在按 docFileId 核整篇时有效，可不传", required = false) String scope
     ) {
         log.info("Tool: evidence_verify called docFileId={}, linkKey={}, scope={}", docFileId, linkKey, scope);
         Long projectId = ProjectContextHolder.getProjectIdAsLong();

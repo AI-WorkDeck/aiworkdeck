@@ -180,7 +180,7 @@
     </view>
   </view>
 
-  <!-- MIT 许可要求保留版权声明：出图引擎 vendor 自 mqc-litigation-visual-redraw，见 litviz/UPSTREAM.md -->
+  <!-- 署名是作者同意并入的条件，AGPL 也要求保留版权声明：出图引擎 vendor 自 new-litigation-visualization（缪奇川），见 litviz/UPSTREAM.md -->
   <view class="lv-credit">
     <text class="lv-credit-text">{{ $t('panels.litCreditText') }}</text>
   </view>

@@ -295,7 +295,7 @@
         "body": {
           "type": "string",
           "minLength": 1,
-          "description": "Flowing prose. Mutually exclusive with items."
+          "description": "LEGACY. Flowing prose. NOT drawn by the main-route renderers (numbered horizontal, vertical columns, dated): the figure is a summary that shows head only. If present it is disclosed as not-on-figure at render time (scripts/omission.py) and validate_map warns. Only render_vertical.py draws it. Mutually exclusive with items."
         },
         "items": {
           "type": "array",
@@ -304,7 +304,7 @@
             "minLength": 1
           },
           "minItems": 2,
-          "description": "Numbered list. Only when the source itself enumerates. Mutually exclusive with body."
+          "description": "LEGACY. Numbered list. Same status as body: not drawn by the main-route renderers, disclosed as not-on-figure at render time. Mutually exclusive with body."
         },
         "index_note": {
           "type": "string",

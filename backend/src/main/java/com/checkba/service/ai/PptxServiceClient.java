@@ -913,37 +913,6 @@ public class PptxServiceClient {
     }
 
     /**
-     * 编辑页面图片
-     * 
-     * @param projectId 项目 ID
-     * @param pageId 页面 ID
-     * @param editInstruction 编辑指令（自然语言）
-     * @return 任务 ID
-     */
-    public String editPageImage(String projectId, String pageId, String editInstruction) {
-        log.info("Editing page image: projectId={}, pageId={}, instruction={}", 
-                projectId, pageId, editInstruction.length() > 50 ? editInstruction.substring(0, 50) + "..." : editInstruction);
-        
-        JSONObject body = new JSONObject();
-        body.set("edit_instruction", editInstruction);
-        
-        HttpResponse resp = HttpRequest.post(baseUrl + "/api/projects/" + projectId + "/pages/" + pageId + "/edit/image")
-                .header("Content-Type", "application/json")
-                .body(body.toString())
-                .timeout(timeoutSeconds * 1000)
-                .execute();
-        
-        if (resp.getStatus() != 202 && resp.getStatus() != 200) {
-            throw new RuntimeException("Failed to start page edit: " + resp.body());
-        }
-        
-        JSONObject result = JSONUtil.parseObj(resp.body());
-        String taskId = result.getJSONObject("data").getStr("task_id");
-        log.info("Page edit started, task_id: {}", taskId);
-        return taskId;
-    }
-
-    /**
      * 获取项目详情（包含页面列表）
      * 
      * @param projectId 项目 ID
@@ -987,38 +956,6 @@ public class PptxServiceClient {
 
         if (resp.getStatus() != 200) {
             throw new RuntimeException("Failed to inspect PPTX: " + resp.body());
-        }
-
-        return JSONUtil.parseObj(resp.body()).getJSONObject("data");
-    }
-
-    /**
-     * 对存量 PPTX 执行批量格式操作（原地写回）
-     *
-     * 调用 checkba 自有端点 POST /api/pptx/format。六种 op（set_run_format /
-     * set_paragraph_format / replace_text / set_shape_text / set_cell_text /
-     * set_cell_format）见 pptx-service backend/services/pptx_format_service.py；
-     * 定位索引 0 起，与 inspectPptx 输出一致，落字自动去 markdown。
-     *
-     * @param pptxFilePath 本地 PPTX 文件路径（结果直接写回该文件）
-     * @param ops 操作数组，每项含 action 及定位/格式字段
-     * @return data 对象：{output_path, applied, failed, results:[...]}
-     */
-    public JSONObject formatPptx(String pptxFilePath, JSONArray ops) {
-        log.info("Applying {} format op(s) to PPTX: {}", ops == null ? 0 : ops.size(), pptxFilePath);
-
-        JSONObject body = new JSONObject();
-        body.set("pptx_path", pptxFilePath);
-        body.set("ops", ops);
-
-        HttpResponse resp = HttpRequest.post(baseUrl + "/api/pptx/format")
-                .header("Content-Type", "application/json")
-                .body(body.toString())
-                .timeout(timeoutSeconds * 1000)
-                .execute();
-
-        if (resp.getStatus() != 200) {
-            throw new RuntimeException("Failed to format PPTX: " + resp.body());
         }
 
         return JSONUtil.parseObj(resp.body()).getJSONObject("data");
@@ -1238,7 +1175,6 @@ public class PptxServiceClient {
     // 注：曾有 getPageScreenshot / editStandaloneImage / editPptxSlide 三个方法，调用的
     // /api/files/screenshot、/api/projects/edit-standalone-image、/api/projects/edit-pptx-slide
     // 在 0.4.0 re-vendor 后服务侧已不存在（2026-08-01 实测），已随对应死路径工具一并下线。
-    // 存量文件的文本/格式修改改走 inspectPptx / formatPptx（/api/pptx/*）。
 
     /**
      * 模型配置

@@ -15,8 +15,8 @@ export const EXCLUDED_DIR_PREFIXES = [
   'docs/',
   'experiments/',
   '.claude/',
-  'litviz/skills/mqc-litigation-visual-redraw/', // 上游 vendor（重画引擎，MIT，见 litviz/UPSTREAM.md）
-  'litviz/skills/mqc-timeline-master/', // 上游 vendor（时间轴大师，MIT，见 litviz/UPSTREAM.md）
+  'litviz/skills/mqc-litigation-visual-redraw/', // 上游 vendor（重画引擎，AGPL-3.0-only，见 litviz/UPSTREAM.md）
+  'litviz/skills/mqc-timeline-master/', // 上游 vendor（时间轴大师，AGPL-3.0-only，见 litviz/UPSTREAM.md）
   'frontend/src/static/',
   'office-addin/assets/',
   // pptx-service 整目录是上游 banana-slides 的 vendored 源码（AGPL-3.0，vendor 自

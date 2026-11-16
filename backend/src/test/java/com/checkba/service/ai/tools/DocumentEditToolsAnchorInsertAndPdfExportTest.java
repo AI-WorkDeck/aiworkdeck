@@ -79,7 +79,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
         when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
 
-        String out = toolsWithBridge(bridge).doc_insert_at_cursor("新增一句。", "__ai_anchor_7", "before");
+        String out = toolsWithBridge(bridge).doc_insert_at_cursor("新增一句。", "__ai_anchor_7", "before", null);
 
         assertEquals(OK, out, "三步都成功时返回插入那一步的回执");
         List<Map<String, Object>> params = paramsInOrder(bridge,
@@ -96,7 +96,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
             EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
             when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
 
-            toolsWithBridge(bridge).doc_insert_at_cursor("补充条款", "__ai_anchor_3", position);
+            toolsWithBridge(bridge).doc_insert_at_cursor("补充条款", "__ai_anchor_3", position, null);
 
             List<Map<String, Object>> params = paramsInOrder(bridge,
                     List.of("set_selection", "collapse_selection", "insert_at_cursor"));
@@ -112,7 +112,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
             EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
             when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
             String text = "before".equals(position) ? "新增标题\n新增内容\n" : "\n新增标题\n新增内容";
-            assertEquals(OK, toolsWithBridge(bridge).doc_insert_at_cursor(text, "anchor", position));
+            assertEquals(OK, toolsWithBridge(bridge).doc_insert_at_cursor(text, "anchor", position, null));
             var params = paramsInOrder(bridge, List.of("set_selection", "collapse_selection", "insert_at_cursor"));
             assertEquals(Map.of("text", text), params.get(2), "段落分隔符不能被 trim 或变成字面量反斜杠 n");
         }
@@ -124,8 +124,8 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
         when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
 
-        toolsWithBridge(bridge).doc_insert_at_cursor("原样插入", null, "before");
-        toolsWithBridge(bridge).doc_insert_at_cursor("原样插入", "  ", null);
+        toolsWithBridge(bridge).doc_insert_at_cursor("原样插入", null, "before", null);
+        toolsWithBridge(bridge).doc_insert_at_cursor("原样插入", "  ", null, null);
 
         verify(bridge, times(2)).executeEditorCommand(eq("insert_at_cursor"), eq(Map.of("text", "原样插入")));
         verify(bridge, never()).executeEditorCommand(eq("set_selection"), any());
@@ -139,7 +139,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         when(bridge.executeEditorCommand(eq("set_selection"), any()))
                 .thenReturn("{\"error\": \"anchor not found: __ai_anchor_9\"}");
 
-        String out = toolsWithBridge(bridge).doc_insert_at_cursor("x", "__ai_anchor_9", "after");
+        String out = toolsWithBridge(bridge).doc_insert_at_cursor("x", "__ai_anchor_9", "after", null);
 
         assertTrue(out.startsWith("Error: 第 1 步"), out);
         assertTrue(out.contains("set_selection") && out.contains("anchor not found") && out.contains("没有插入任何内容"), out);
@@ -154,7 +154,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         when(bridge.executeEditorCommand(eq("set_selection"), any())).thenReturn(OK);
         when(bridge.executeEditorCommand(eq("collapse_selection"), any()))
                 .thenReturn("{\"success\":false,\"message\":\"no view cursor\"}");
-        String out = toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "before");
+        String out = toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "before", null);
         assertTrue(out.startsWith("Error: 第 2 步") && out.contains("collapse_selection") && out.contains("no view cursor"), out);
         verify(bridge, never()).executeEditorCommand(eq("insert_at_cursor"), any());
 
@@ -163,7 +163,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         when(bridge3.executeEditorCommand(eq("collapse_selection"), any())).thenReturn(OK);
         when(bridge3.executeEditorCommand(eq("insert_at_cursor"), any()))
                 .thenReturn("{\"error\": \"操作超时：编辑器可能仍在执行该命令\", \"outcomeUnknown\": true}");
-        String out3 = toolsWithBridge(bridge3).doc_insert_at_cursor("x", "a1", "after");
+        String out3 = toolsWithBridge(bridge3).doc_insert_at_cursor("x", "a1", "after", null);
         assertTrue(out3.startsWith("Error: 第 3 步") && out3.contains("insert_at_cursor") && out3.contains("操作超时"), out3);
         assertFalse(out3.contains("没有插入任何内容"), "第 3 步超时的结局未知，不能说没插进去：" + out3);
     }
@@ -175,7 +175,7 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
         String booting = "{\"error\": \"编辑器仍在启动\", \"code\": \"EDITOR_BOOTING\", \"retryable\": true}";
         when(bridge.executeEditorCommand(eq("set_selection"), any())).thenReturn(booting);
 
-        assertEquals(booting, toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "after"));
+        assertEquals(booting, toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "after", null));
         verify(bridge, never()).executeEditorCommand(eq("insert_at_cursor"), any());
     }
 
@@ -183,9 +183,54 @@ class DocumentEditToolsAnchorInsertAndPdfExportTest {
     @DisplayName("position 只认 before / after，其它值一条命令都不发")
     void unknownPositionIsRejectedBeforeDispatch() {
         EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
-        String out = toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "middle");
+        String out = toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "middle", null);
         assertTrue(out.startsWith("Error:") && out.contains("before 或 after"), out);
         verify(bridge, never()).executeEditorCommand(anyString(), any());
+    }
+
+    // ==================== gap 2026-11-11 P3：newParagraph ====================
+
+    @Test
+    @DisplayName("newParagraph=true：一条 insert_at_cursor{text,newParagraph,anchor}，不走三步串")
+    void newParagraphIsOneWorkerCommandCarryingAnchorAndSide() {
+        for (String position : new String[]{"before", " AFTER ", null}) {
+            EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
+            when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
+
+            assertEquals(OK, toolsWithBridge(bridge).doc_insert_at_cursor("第五条 保密", "__ai_anchor_2", position, true));
+
+            List<Map<String, Object>> params = paramsInOrder(bridge, List.of("insert_at_cursor"));
+            String side = "before".equals(position) ? "before" : "after";
+            assertEquals(Map.of("text", "第五条 保密", "newParagraph", side, "anchor", "__ai_anchor_2"), params.get(0),
+                    "position=" + position);
+        }
+    }
+
+    @Test
+    @DisplayName("newParagraph=true 不给 anchorId：相对光标所在段落，不带 anchor 参数")
+    void newParagraphWithoutAnchorUsesTheCursorParagraph() {
+        EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
+        when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
+
+        toolsWithBridge(bridge).doc_insert_at_cursor("新段落", " ", "before", true);
+
+        verify(bridge).executeEditorCommand(eq("insert_at_cursor"),
+                eq(Map.of("text", "新段落", "newParagraph", "before")));
+        verify(bridge, never()).executeEditorCommand(eq("set_selection"), any());
+    }
+
+    @Test
+    @DisplayName("newParagraph=false/null 与改动前一字不差；坏 position 一条命令都不发")
+    void newParagraphFalseKeepsTheOldPathAndBadPositionIsRejected() {
+        EditorBridgeService bridge = Mockito.mock(EditorBridgeService.class);
+        when(bridge.executeEditorCommand(anyString(), any())).thenReturn(OK);
+        toolsWithBridge(bridge).doc_insert_at_cursor("x", "a1", "before", false);
+        paramsInOrder(bridge, List.of("set_selection", "collapse_selection", "insert_at_cursor"));
+
+        EditorBridgeService bridge2 = Mockito.mock(EditorBridgeService.class);
+        String out = toolsWithBridge(bridge2).doc_insert_at_cursor("x", "a1", "middle", true);
+        assertTrue(out.startsWith("Error:") && out.contains("before 或 after"), out);
+        verify(bridge2, never()).executeEditorCommand(anyString(), any());
     }
 
     // ==================== T-25：导出 PDF ====================

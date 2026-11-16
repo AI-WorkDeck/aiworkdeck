@@ -32,7 +32,7 @@ export default {
   "signIn": "Entrar",
   "signInTitle": "Fazer login (necessário para IA, itens pagos do hub e a biblioteca de casos da equipe)",
   "noProjectTitle": "Abra um projeto para começar",
-  "noProjectHint": "Abra um projeto em Projetos à esquerda ou crie um pela página de Boas-vindas.",
+  "noProjectHint": "Clique em “Todos os projetos” no canto superior esquerdo para escolher um projeto, ou crie um na página de boas-vindas.",
   "startupDisabledHint": "A página de Boas-vindas não abre mais na inicialização.",
   "openWelcome": "Abrir página de Boas-vindas",
   "aiNeedsProject": "Abra um projeto primeiro para usar o chat de IA"

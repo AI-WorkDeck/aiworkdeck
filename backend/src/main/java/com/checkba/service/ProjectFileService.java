@@ -1768,18 +1768,27 @@ public class ProjectFileService {
      */
     @Transactional
     public ProjectFile overwriteTextContent(Long projectId, Long fileId, String text, Long userId) {
+        return overwriteBinaryContent(projectId, fileId,
+                (text == null ? "" : text).getBytes(java.nio.charset.StandardCharsets.UTF_8), userId);
+    }
+
+    /**
+     * 用一段字节整篇覆盖已有文件（write_docx 同轮重写本轮自己生成的那份 docx，tasks-10 t04）。
+     * 收尾与 {@link #overwriteTextContent} 完全相同：落盘 → 回写 fileSize / updatedAt → signalChange 进版本记录。
+     */
+    @Transactional
+    public ProjectFile overwriteBinaryContent(Long projectId, Long fileId, byte[] bytes, Long userId) {
         ProjectFile file = getFile(fileId);
         if (!Objects.equals(projectId, file.getProjectId())) {
             throw new IllegalArgumentException(LangText.of("文件不属于该项目", "This file does not belong to this project"));
         }
         if (Boolean.TRUE.equals(file.getIsFolder())) {
-            throw new IllegalArgumentException(LangText.of("文件夹不能写入文本", "Cannot write text into a folder"));
+            throw new IllegalArgumentException(LangText.of("文件夹不能写入内容", "Cannot write content into a folder"));
         }
         String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
         if (!StringUtils.hasText(key)) {
             throw new IllegalStateException("文件没有存储路径: " + fileId);
         }
-        byte[] bytes = (text == null ? "" : text).getBytes(java.nio.charset.StandardCharsets.UTF_8);
         if (cloudStorageQuota != null) {
             cloudStorageQuota.requireFileCapacity(file, bytes.length, false);
             key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
@@ -2366,6 +2375,107 @@ public class ProjectFileService {
         return root;
     }
 
+    /**
+     * 右键「压缩为 ZIP」：把选中的文件/文件夹（文件夹连子孙）打成一个 zip，存在首项所在目录
+     * （重名自动加序号）。单项取其名，多项为「首项名等N项.zip」。条目数与总量沿用解压的护栏。
+     */
+    @Transactional
+    public ProjectFile compressToZip(Long projectId, List<Long> fileIds, Long userId) {
+        if (fileIds == null || fileIds.stream().noneMatch(Objects::nonNull)) {
+            throw new IllegalArgumentException(LangText.of("请选择要压缩的文件", "Please select files to compress"));
+        }
+        List<ProjectFile> roots = new ArrayList<>();
+        for (Long id : new java.util.LinkedHashSet<>(fileIds)) {
+            if (id == null) continue;
+            ProjectFile f = getFile(id);
+            if (!Objects.equals(projectId, f.getProjectId()) || Boolean.TRUE.equals(f.getIsDeleted())) {
+                throw new IllegalArgumentException(LangText.of("文件不存在或不属于该项目", "File does not exist or does not belong to this project"));
+            }
+            roots.add(f);
+        }
+        ProjectFile first = roots.get(0);
+        String stem = first.getName();
+        int dot = Boolean.TRUE.equals(first.getIsFolder()) ? -1 : stem.lastIndexOf('.');
+        if (dot > 0) stem = stem.substring(0, dot);
+        String zipName = roots.size() == 1 ? stem + ".zip"
+                : stem + LangText.of("等" + roots.size() + "项.zip", "_and_" + (roots.size() - 1) + "_more.zip");
+
+        java.nio.file.Path tmp = null;
+        try {
+            tmp = java.nio.file.Files.createTempFile("awd-zip-", ".zip");
+            long[] totals = { 0L, 0L }; // entries, bytes
+            java.util.Set<String> used = new java.util.HashSet<>();
+            try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(
+                    java.nio.file.Files.newOutputStream(tmp), java.nio.charset.StandardCharsets.UTF_8)) {
+                for (ProjectFile root : roots) {
+                    zipRecursive(zos, root, "", used, totals);
+                }
+            }
+            long size = java.nio.file.Files.size(tmp);
+            ProjectFile created = createFile(projectId, first.getParentId(), zipName, "zip", size,
+                    null, generateWpsFileId(projectId), userId, ConflictPolicy.RENAME);
+            try (java.io.InputStream in = java.nio.file.Files.newInputStream(tmp)) {
+                storageServiceFactory.getStorageService().save(created.getFilePath(), in);
+            }
+            signalChange(projectId, userId);
+            log.info("压缩完成: {} 项 -> 「{}」({} 条目, {} bytes)", roots.size(), created.getName(), totals[0], totals[1]);
+            return created;
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException(LangText.of("压缩失败: ", "Compression failed: ") + e.getMessage(), e);
+        } finally {
+            if (tmp != null) {
+                try { java.nio.file.Files.deleteIfExists(tmp); } catch (java.io.IOException ignored) { }
+            }
+        }
+    }
+
+    private void zipRecursive(java.util.zip.ZipOutputStream zos, ProjectFile node, String prefix,
+                              java.util.Set<String> used, long[] totals) throws Exception {
+        if (++totals[0] > MAX_ARCHIVE_ENTRIES) {
+            throw new IllegalArgumentException(LangText.of("文件过多，无法压缩（上限 ", "Too many files to compress (limit ") + MAX_ARCHIVE_ENTRIES + LangText.of("）", ")"));
+        }
+        boolean folder = Boolean.TRUE.equals(node.getIsFolder());
+        String entryName = uniqueEntryName(prefix, node.getName(), folder, used);
+        if (folder) {
+            zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+            zos.closeEntry();
+            for (ProjectFile child : projectFileRepository.findByProjectIdAndParentIdAndIsDeletedFalseOrderBySortOrderAsc(node.getProjectId(), node.getId())) {
+                zipRecursive(zos, child, entryName, used, totals);
+            }
+            return;
+        }
+        zos.putNextEntry(new java.util.zip.ZipEntry(entryName));
+        if (StringUtils.hasText(node.getFilePath())) {
+            try (java.io.InputStream in = storageServiceFactory.getStorageService().load(node.getFilePath()).getInputStream()) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    totals[1] += n;
+                    if (totals[1] > MAX_ARCHIVE_BYTES) {
+                        throw new IllegalArgumentException(LangText.of("文件总量超过 1GB，无法压缩", "Total size exceeds 1GB and cannot be compressed"));
+                    }
+                    zos.write(buf, 0, n);
+                }
+            }
+        }
+        zos.closeEntry();
+    }
+
+    /** 同一 zip 内条目名去重（跨目录选中的同名项、选中项与其子孙同时被选）："a.pdf" → "a (2).pdf"。 */
+    private static String uniqueEntryName(String prefix, String name, boolean folder, java.util.Set<String> used) {
+        String suffix = folder ? "/" : "";
+        String candidate = prefix + name + suffix;
+        int dot = folder ? -1 : name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
+        for (int i = 2; !used.add(candidate); i++) {
+            candidate = prefix + base + " (" + i + ")" + ext + suffix;
+        }
+        return candidate;
+    }
+
     private String archiveType(ProjectFile pf) {
         String t = pf.getFileType() == null ? "" : pf.getFileType().toLowerCase();
         if (!ARCHIVE_TYPES.contains(t)) throw new IllegalArgumentException(LangText.of("不支持的压缩包类型: ", "Unsupported archive type: ") + t);
@@ -2499,6 +2609,11 @@ public class ProjectFileService {
      * 版本记录是保险不是主流程——任何异常只记日志，绝不阻断文件操作。
      */
     void signalChange(Long projectId, Long userId) {
+        signalChange(projectId, userId, false);
+    }
+
+    /** diskScan：来自本地文件夹对账，见 {@link com.checkba.version.WorkSessionService#onDiskScanSignal}。 */
+    void signalChange(Long projectId, Long userId, boolean diskScan) {
         if (projectId == null) return;
         // 埋点：仅计数，不带任何文件/项目信息
         telemetryService.record("file.changed", null);
@@ -2515,8 +2630,9 @@ public class ProjectFileService {
                     name = ownerName;
                 }
             }
-            workSessionService.onChangeSignal(projectId, userId,
-                    name != null ? name : LangText.of("用户", "User"));
+            String signer = name != null ? name : LangText.of("用户", "User");
+            if (diskScan) workSessionService.onDiskScanSignal(projectId, userId, signer);
+            else workSessionService.onChangeSignal(projectId, userId, signer);
         } catch (Exception e) {
             log.warn("发送版本变更信号失败: project={}", projectId, e);
         }

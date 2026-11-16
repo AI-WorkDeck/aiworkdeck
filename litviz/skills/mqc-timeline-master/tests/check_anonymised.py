@@ -63,7 +63,7 @@ SCAN_EXT = (".json", ".md", ".py", ".txt", ".jsonc")
 
 # ------------------------------------------------------- 机构名（结构性规则一）
 # A name ending in an organisational tail must carry a placeholder somewhere in
-# it. 甲公司 passes, 丁建设有限公司 passes, 目标公司 passes, 年年吉祥公司 does not.
+# it. 甲公司 passes, 丁建设有限公司 passes, 目标公司 passes, 岁岁平安公司 does not.
 #
 # Looking only at the character immediately before the tail was tried first and
 # is wrong: it rejects 甲控股集团 and 丁建设有限公司, which are exactly how a
@@ -86,7 +86,7 @@ PLACEHOLDER = (
     "该本案涉原被告"            # 该公司、本案、案涉公司、原告公司
 )
 # The window stops at anything that cannot sit INSIDE a Chinese company name.
-# Without this, 丙公司为华鼎实业集团 passed: the window reached back far enough to
+# Without this, 丙公司为恒岳实业集团 passed: the window reached back far enough to
 # find the 丙 of the previous clause, and one placeholder anywhere was enough. A
 # planted name being let through is exactly what the plant tests are for.
 BOUNDARY = "为与和及或向由在是对从至到把被让给并的了着过将其此该按据经名"

@@ -150,7 +150,7 @@ PR#146 起 SkillController 走此唯一出口，PluginController 待对齐）。
 
 ## 8.1 在线 Skill 广场（官网 registry，PR#146）
 
-官网（仓库 `zeweihan/aiworkdeck_website`）提供公开注册表，桌面端 `SkillMarketService` 消费，
+官网（仓库 `AI-WorkDeck/aiworkdeck-website`）提供公开注册表，桌面端 `SkillMarketService` 消费，
 配置键 `ai.skills.registry-url`（默认 `https://www.aiworkdeck.com/api/registry/skills`）：
 
 - `GET {registry-url}`：数组，元素含 `id/name/description/icon/version/author/authorDisplayName/triggers/allowedTools/downloads/updatedAt/homepage`；
@@ -164,7 +164,7 @@ PR#146 起 SkillController 走此唯一出口，PluginController 待对齐）。
 
 | id | 名称 | 触发（节选） | 工具白名单 |
 |---|---|---|---|
-| `listing-pathway` | 上市路径选择比较分析 | 上市路径 / IPO / 科创板 / 北交所 / 红筹 / VIE / 借壳 / 证券化 / SPAC… | law_search、law_search_keyword、get_law_article、law_recognition、search_web、browse_url、write_docx |
+| `listing-pathway` | 上市路径选择比较分析 | 上市路径 / IPO / 科创板 / 北交所 / 红筹 / VIE / 借壳 / 证券化 / SPAC… | law_search、get_law_article、law_recognition、search_web、browse_url、write_docx |
 
 ## 10. 与架构不变式的关系（docs/AI_ARCHITECTURE.md §2）
 

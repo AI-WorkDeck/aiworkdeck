@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Tamanho: {size}",
   "renderingDoc": "Renderizando documento…",
   "renderingSlides": "Renderizando apresentação…",
+  "slidesNotShown": "Mais {count} slides não exibidos. Abra o arquivo para ver todos.",
   "officePreviewUnsupported": "A pré-visualização online não está disponível para este arquivo",
   "fileTypeHintOpenLocal": "Tipo de arquivo: {type}. Encontre-o no Finder ou no Explorador de Arquivos e abra-o com um aplicativo local.",
   "unknown": "Desconhecido",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Gerando legendas. Elas aparecerão quando estiverem prontas.",
     "ready": "As legendas estão prontas",
     "failed": "Falha na geração de legendas. Clique no botão de legendas para tentar novamente.",
-    "notConfigured": "A transcrição não está configurada. Configure em Configurações do sistema - Serviços da Plataforma - Transcrição de Reuniões para gerar legendas.",
+    "notConfigured": "A transcrição não está configurada. Configure em Configurações - Serviços da Plataforma - Transcrição de Reuniões para gerar legendas.",
     "noticePending": "Registrado. Confirme o aviso de gravação em Voz - Gravação de Reunião primeiro e, em seguida, clique no botão de legendas.",
     "submitFailed": "Não foi possível iniciar a geração de legendas",
     "empty": "Nenhuma fala detectada"

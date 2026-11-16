@@ -61,7 +61,7 @@
           <view class="sm-slot-files">
             <view v-for="f in slotFiles(check, slot)" :key="f.id" class="sm-slot-file">
               <text class="sm-file-name">{{ f.name }}</text>
-              <text class="sm-file-remove" @tap="removeMaterial(check, slot, f)">×</text>
+              <text :title="$t('common.remove')" class="sm-file-remove" @tap="removeMaterial(check, slot, f)">×</text>
             </view>
             <text v-if="slotFiles(check, slot).length === 0" class="sm-slot-empty">{{ slot.optional ? $t('panels.smNotLinkedOptional') : $t('panels.smNotLinked') }}</text>
           </view>

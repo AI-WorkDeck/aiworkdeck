@@ -27,6 +27,10 @@ Web 插件与宿主之间那座 postMessage 桥的插件侧实现。单文件、
 SDK 必须排在业务脚本**之前**且用同步 `<script>`：宿主在 iframe `load`
 之后立刻发 `init`，晚注册监听会错过握手，`ready()` 将永远挂起。
 
+**做界面前先读 [UI-GUIDELINES.md](UI-GUIDELINES.md)**：可直接用的 `.awd-*` 样式类、令牌写法、
+中文断行与表格防挤压、错误提示形制，以及交付前的三档宽度/四种数据截图自检。
+SDK 1.9 起自带表格 `.awd-table`、提示条 `.awd-notice`、空状态 `.awd-empty`，标签 `.awd-subnav-item` 不再折行。
+
 ## 表面
 
 | 成员 | 说明 |
@@ -130,6 +134,12 @@ node scripts/plugin-dev.mjs submissions --endpoint https://YOUR-PORTAL/api/plugi
 侧栏服务事件：`calendar.changed` 需 tasks、`favorites.changed` 需 file_read、`clipboard.changed` 需 clipboard，收到后重新读取授权数据。`speech.progress` 需 speech，只转发本机 Kokoro/ASR 组件进度。事件不携带平台凭据；账户/项目变更必须丢弃旧请求和缓存。新宿主能力目前尚未发版。
 
 宿主固定服务、权限与取消语义详见 [SERVICES.md](SERVICES.md)。
+
+## 声明式 Agent 工具（规范 v2.13，宿主运行时随后续版本）
+
+`manifest.json` 的 `tools[]` 除老形态（JAR 工具：`name`/`description`/`permissions`）外，新增声明式形态：`name`（非 JAR 工具须以 `<插件id 连字符转下划线>_` 开头）、`description`（可用 `%key%`）、`access`（`read|write|destructive`）、`inputSchema`（与 `contributes.mcpServers` 相同的受限子集）、`handler`（`jar` | `service` | `connection` | `view`）、`permissions`（⊆ manifest.permissions）、`mcp`、`confirm`、`keywords`、`agent`（`false` = 登记但不下发给模型、不投影 MCP，仅供插件界面直调；老形态 JAR 条目也可带）。`validate` 另按 A5 描述门禁检查声明式工具的 `description`（`%key%` 取 `l10n/zh-CN.json`）：首行 ≤80 字符、单一语言（中文）、动词开头，「何时用」写第二行起；并拒绝 destructive / `confirm:always` / `agent:false` 工具写 `mcp:true`。`handler.type=service` 的服务与操作名取自 [services.json](services.json)（宿主服务表的发布副本，与 `awd.services.request` 同名）；`view` 属第四期，`awd.tools.handle` 目前只有类型占位，`awd.tools.list()` 待宿主桥方法。`init` 生成的模板带一个 read 样例工具，`validate` 离线检查全部规则。详见 docs/PLUGIN_SPEC.md §20。
+
+**工具权限升级需用户重新批准**：已安装插件的工具若 access 升档（read→write/destructive、write→destructive）、confirm 放松、打开 `mcp` 投影、非 read 工具改 `handler`/`inputSchema`，或新增非 read 工具（改名同此），宿主在用户于插件中心批准前不让 Agent、面板直调与对外 MCP 使用该工具；降档与只改说明不受影响。dev 直装的插件首次安装时，其 write/destructive 工具也要先批准一次。
 
 ## 消息中心通知（SDK 1.7）
 

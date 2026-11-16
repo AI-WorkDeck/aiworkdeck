@@ -168,3 +168,40 @@ test('explicit null parameters are invalid, not omitted defaults', () => {
     }
   }
 })
+
+const SAMPLE_OPTIONS = [{ label: '提供文件', description: '上传相关法律文书，我帮您查找期限' }, { label: '口头说明', description: '您直接告诉我下个月有哪些期限' }]
+const ATTR_FORMS = {
+  'single-quoted options': `<ask_user question="没有文件，请问是哪个期限？" options='${JSON.stringify(SAMPLE_OPTIONS)}' />`,
+  'double-quoted options': `<ask_user question="没有文件，请问是哪个期限？" options="${JSON.stringify(SAMPLE_OPTIONS)}" />`,
+  'entity-escaped quotes': `<ask_user question=&quot;没有文件，请问是哪个期限？&quot; options=&quot;${JSON.stringify(SAMPLE_OPTIONS).replace(/"/g, '&quot;')}&quot; />`,
+}
+for (const [name, tag] of Object.entries(ATTR_FORMS)) {
+  for (const size of [1, 5, 99999]) {
+    test(`self-closing attribute form/${name}/${size}: one answerable card, no raw tag in body`, () => {
+      const s = stream()
+      const text = '先问一下：\n' + tag + '\n'
+      feed(s, text, size)
+      s.handleEvent('bubble_end', JSON.stringify({ status: 'awaiting_input' }))
+      for (const b of [s.bubbles.value[0], s.parseAssistantHistory(text)]) {
+        assert.ok(!b.content.includes('<ask_user'), b.content)
+        assert.equal(b.question.text, '没有文件，请问是哪个期限？')
+        assert.deepEqual(b.question.options, SAMPLE_OPTIONS.map(o => o.label))
+        assert.deepEqual(b.question.descriptions, SAMPLE_OPTIONS.map(o => o.description))
+      }
+    })
+  }
+}
+
+test('self-closing attribute form: string-array options, and code-fenced / malformed forms stay literal', () => {
+  const s = stream()
+  feed(s, `<ask_user question='怎么整理？' options='["仅格式","仅措辞"]' />`, 3)
+  s.handleEvent('bubble_end', JSON.stringify({ status: 'awaiting_input' }))
+  assert.deepEqual(s.bubbles.value[0].question.options, ['仅格式', '仅措辞'])
+  for (const text of ['```\n<ask_user question="x" />\n```', '<ask_user options=\'["a"]\' />', '<ask_user question="x" options=\'[not json]\' />']) {
+    const t = stream()
+    feed(t, text, 2)
+    t.handleEvent('bubble_end', JSON.stringify({ status: 'finished' }))
+    assert.equal(t.bubbles.value[0].question, null)
+    assert.ok(t.bubbles.value[0].content.includes('<ask_user'))
+  }
+})

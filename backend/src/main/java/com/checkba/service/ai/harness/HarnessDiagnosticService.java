@@ -57,13 +57,9 @@ public class HarnessDiagnosticService {
 
     private static final Set<String> DOC_EDIT_TOOLS = Set.of(
             "doc_find_replace", "doc_replace_at_anchor", "doc_modify_paragraph",
-            "doc_replace_selection", "doc_replace_nth_match", "doc_delete_match",
+            "doc_replace_selection",
             "office_replace_text", "office_replace_batch", "sheet_find_replace",
             "slide_replace_text", "office_ppt_replace_text");
-
-    private static final Set<String> SEARCH_LOOKUP_TOOLS = Set.of(
-            "search_project_files", "search_project_content", "law_search",
-            "law_search_keyword", "get_law_article", "extract_file_text", "ref_read");
 
     /**
      * 一次运行期自愈动作的结构化记录（同时作为 SSE {@code harness_adaptation} 的载荷）。
@@ -132,9 +128,9 @@ public class HarnessDiagnosticService {
         }
         String safeTool = failedToolName == null ? "" : failedToolName.trim();
         String safeResult = resultText == null ? "" : resultText;
-        String combinedContext = (userInstruction == null ? "" : userInstruction)
-                + " " + (toolArgsSummary == null ? "" : toolArgsSummary)
-                + " " + safeResult;
+        // 技能挂载与类目展开只看用户指令+工具参数：工具输出（网页/文档正文）可被第三方控制，不得驱动挂载
+        String hintContext = (userInstruction == null ? "" : userInstruction)
+                + " " + (toolArgsSummary == null ? "" : toolArgsSummary);
 
         // 1. INVARIANT 层：文档锚点/原文替换未命中时，优先注入回读探针（Anchor Probe Recovery）
         if (DOC_EDIT_TOOLS.contains(safeTool) && isAnchorOrMatchMiss(safeResult)
@@ -172,13 +168,16 @@ public class HarnessDiagnosticService {
 
         // 2. INVARIANT 层：检查是否需要展开尚未披露的工具类目
         Set<String> candidateCategories = new LinkedHashSet<>();
-        if (!safeTool.isEmpty()) {
+        if (!safeTool.isEmpty() && !isToolUnavailable(safeResult) && !isPermissionDenied(safeResult)) {
             String toolCategory = toolDisclosurePolicy.categoryOf(safeTool);
             if (!"core".equals(toolCategory) && !ToolDisclosurePolicy.FALLBACK_CATEGORY.equals(toolCategory)) {
                 candidateCategories.add(toolCategory);
             }
         }
-        candidateCategories.addAll(toolDisclosurePolicy.categoriesHintedBy(combinedContext));
+        // 关键词只从用户指令与参数里找：工具输出里的 "Error from MCP server: Unknown tool"
+        // 是上游供应商的文本，不是我们注册表的未知工具，不能因其含 "MCP" 就展开 [mcp] 类目
+        // 绝不从工具输出推导类目展开：输出是供应商/运行环境的文本，与我们的类目表无关
+        candidateCategories.addAll(toolDisclosurePolicy.categoriesHintedBy(hintContext));
         if (DOC_EDIT_TOOLS.contains(safeTool)) {
             candidateCategories.add("edit");
         }
@@ -214,7 +213,7 @@ public class HarnessDiagnosticService {
         }
 
         // 3. DOMAIN 层：检查任务上下文是否命中尚未激活的领域 Skill，动态挂载其领域指引与白名单类目
-        Optional<SkillDefinition> matchedDomainSkill = findUnactivatedDomainSkill(runId, combinedContext);
+        Optional<SkillDefinition> matchedDomainSkill = findUnactivatedDomainSkill(runId, hintContext);
         if (matchedDomainSkill.isPresent()
                 && !alreadyTriggered(existingAdaptations, ACTION_MOUNT_DOMAIN_SKILL, matchedDomainSkill.get().getId())) {
             SkillDefinition skill = matchedDomainSkill.get();
@@ -257,8 +256,10 @@ public class HarnessDiagnosticService {
                     System.currentTimeMillis()));
         }
 
-        // 4. DOMAIN 层：连续检索/查找无结果或累计失败 >= 2 次时，处方立即向用户澄清而非盲猜
-        if ((SEARCH_LOOKUP_TOOLS.contains(safeTool) || consecutiveFailures >= 2)
+        // 4. DOMAIN 层：连续检索/查找无结果或累计失败 >= 2 次时（所有工具一视同仁，首次未命中不触发），处方立即向用户澄清而非盲猜
+        // 供应商不可用（上游 MCP 报错）不是盲猜关键词，让用户补材料没用，不触发
+        if (consecutiveFailures >= 2
+                && !isToolUnavailable(safeResult) && !isPermissionDenied(safeResult)
                 && !alreadyTriggered(existingAdaptations, ACTION_CLARIFY_WITH_USER, safeTool)) {
             String title = LangText.of(
                     "Harness 自愈：阻断盲目重试，切换为证据缺口澄清",
@@ -313,6 +314,54 @@ public class HarnessDiagnosticService {
             }
         }
         return Optional.ofNullable(best);
+    }
+
+    private static final java.util.regex.Pattern HTTP_ERROR =
+            java.util.regex.Pattern.compile("(?i)(returned|status|http)\\s*[45]\\d\\d\\b");
+
+    /**
+     * 工具「不可用」类失败：凭证/Key 未配置、账户未连接、上游供应商报错（含上游 Unknown tool、4xx/5xx）。
+     * 与「盲猜关键词」「注册表未知工具」无关：不展开类目、不触发 ask_user 护栏，改给不可用说明。
+     */
+    public static boolean isToolUnavailable(String resultText) {
+        if (resultText == null || resultText.isBlank()) {
+            return false;
+        }
+        String lower = resultText.toLowerCase(Locale.ROOT);
+        return resultText.contains("Error from MCP server")
+                || com.checkba.service.ai.tools.LegalTools.isVendorUnavailable(resultText)
+                || lower.contains("has no credential")
+                || lower.contains("not_connected")
+                || lower.contains("not configured")
+                || resultText.contains("未配置")
+                || resultText.contains("尚未连接")
+                || resultText.contains("本次已跳过")
+                || HTTP_ERROR.matcher(resultText).find();
+    }
+
+    private static final java.util.regex.Pattern HTTP_403 = java.util.regex.Pattern.compile(
+            "(?i)(http|status)\\s*:?\\s*403\\b|\\b403\\s+forbidden");
+
+    /**
+     * 权限拒绝类的失败结果（Not permitted / 无权 / 没有权限 / access denied / forbidden / HTTP 403）。
+     * 与「不可用」同样不展开类目、不触发 ask_user 护栏；缺权限不是缺事实，问用户补材料没用。
+     *
+     * <p>只能用于已判定失败的工具结果（调用方已要求 success=false），且短语必须出现在开头 200 字内：
+     * 法律文书正文常含「无权代理」「无权处分」「forbidden」「403」，成功输出绝不能被它命中。
+     */
+    public static boolean isPermissionDenied(String resultText) {
+        if (resultText == null || resultText.isBlank()) {
+            return false;
+        }
+        String head = resultText.length() > 200 ? resultText.substring(0, 200) : resultText;
+        String lower = head.toLowerCase(Locale.ROOT);
+        return lower.contains("not permitted")
+                || lower.contains("permission denied")
+                || lower.contains("access denied")
+                || lower.contains("forbidden:")
+                || head.contains("无权访问") || head.contains("无权查看") || head.contains("无权限")
+                || head.contains("没有权限")
+                || HTTP_403.matcher(head).find();
     }
 
     private static boolean isAnchorOrMatchMiss(String resultText) {

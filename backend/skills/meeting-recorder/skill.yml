@@ -2,7 +2,7 @@
 #
 # 本 skill 是「会议录音」面板插件的 AI 侧：面板负责录音/转写（说话人分离走通义听悟），
 # 「生成纪要」按钮拼含触发词的 kick-off prompt 交给 AI 编排，命中本 skill 后
-# 用 meeting_get_transcript 读转写稿、write_docx 产出律师级纪要。
+# 用 meeting_list / meeting_get_transcript 读转写稿、write_docx 产出律师级纪要。
 id: meeting-recorder
 name: 会议录音
 description: 开会一键录音，自动转写并区分说话人，AI 生成结构化会议纪要（议题、讨论要点、决议、待办、风险提示）落进项目文件。转写走阿里云通义听悟，需在设置中配置凭证。
@@ -83,7 +83,7 @@ tool_policy: restrict
 
 allowed_tools:
   # 录音与转写稿
-  - meeting_list_recordings
+  - meeting_list
   - meeting_get_transcript
   # 新起一份纪要交付物
   - write_docx

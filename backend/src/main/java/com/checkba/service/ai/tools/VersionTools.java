@@ -47,7 +47,8 @@ public class VersionTools implements AgentToolComponent {
     public String version_pull() { return result(() -> actions.request("pull", Map.of())); }
 
     @Tool("将整个项目恢复到用户选定的历史版本。必须先查version_history并明确目标；不是只恢复当前文件，也不是本轮检查点。服务先保留当前已保存内容，再追加恢复版本，不删除历史。ref须完整40位版本编号。结果未知时禁止重发。")
-    @ToolMeta(displayName = "恢复历史版本", category = "version", requiresHost = ToolMeta.Host.LOWA)
+    // access：把整个项目回退到历史版本，会改变所有文件的当前状态
+    @ToolMeta(access = ToolMeta.Access.DESTRUCTIVE, displayName = "恢复历史版本", category = "version", requiresHost = ToolMeta.Host.LOWA)
     public String version_restore(@P("从版本历史中核实的完整40位版本编号") String ref) {
         return result(() -> actions.request("restore", Map.of("ref", ref == null ? "" : ref)));
     }

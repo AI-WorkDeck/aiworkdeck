@@ -5,6 +5,8 @@ import { unwrapResult, resultRecords, lawArticle, caseRecord, authoritative, cas
 import { markdownInstance } from './markdownRenderer.js'
 
 const KINDS = new Set(['LAW', 'CASE', 'PENALTY'])
+const MODEL_FIELDS = new Set(['kind', 'title', 'documentNumber', 'caseNumber', 'authority', 'court', 'date',
+  'effectiveDate', 'validity', 'parties', 'source', 'url', 'summary', 'excerpt', 'content'])
 const FAILED = new Set(['ERROR', 'FAILED', 'NOT_FOUND', 'UNAVAILABLE'])
 const scalar = value => typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
 const pick = (obj, keys) => keys.map(key => scalar(obj?.[key])).find(Boolean) || ''
@@ -102,9 +104,29 @@ export function referenceFromModel(value) {
     sections: [section('aiSummary', scalar(value.summary)), section('excerpt', scalar(value.excerpt || value.content))] })
 }
 
+// Some models label presentation data as json instead of legal-reference. Require the complete
+// reference shape before consuming it; ordinary data and unknown fields must remain copyable code.
+function isLegalJsonReference(value) {
+  return value && !Array.isArray(value) && typeof value === 'object'
+    && KINDS.has(value.kind) && scalar(value.title)
+    && (scalar(value.source) || safeLegalUrl(value.url))
+    && (scalar(value.excerpt) || scalar(value.content) || scalar(value.summary))
+    && Object.entries(value).every(([key, item]) => MODEL_FIELDS.has(key)
+      && (item == null || typeof item === 'string' || typeof item === 'number'))
+}
+
+// Plain JSON is ambiguous. Opt in only for article questions, never code/data requests or examples.
+export function allowPlainJsonLegalReferences(userMessage = '', content = '') {
+  const codeContext = /\b(?:json|schema|example|sample|source code|code block)\b|代码|示例|样例|格式|接口|数据结构/i
+  if (!/(?:第?\s*[0-9０-９一二三四五六七八九十百千零〇两]+\s*条|\barticle\s+\d+)/i.test(userMessage)
+    || !/(?:法|条例|规章|\b(?:law|act|statute|regulation|civil code|criminal code)\b)/i.test(userMessage)
+    || codeContext.test(userMessage)) return false
+  return !markdownInstance().parse(content, {}).some(token => token.type === 'inline' && codeContext.test(token.content))
+}
+
 /** Keep malformed/unknown blocks visible as ordinary Markdown; only consume complete valid blocks. */
-export function legalMessageParts(content = '', streaming = false) {
-  if (!content.includes('legal-reference')) return content ? [{ type: 'text', text: content }] : []
+export function legalMessageParts(content = '', streaming = false, allowPlainJson = false) {
+  if (!content.includes('legal-reference') && !content.includes('"kind"')) return content ? [{ type: 'text', text: content }] : []
   const parts = []
   const lines = content.match(/[^\n]*\n|[^\n]+$/g) || []
   const offsets = [0]
@@ -112,11 +134,13 @@ export function legalMessageParts(content = '', streaming = false) {
   let cursor = 0
   // Use the shared Markdown parser so quoted examples inside other code fences stay examples.
   for (const token of markdownInstance().parse(content, {})) {
-    if (token.type !== 'fence' || token.info.trim() !== 'legal-reference' || !token.map) continue
+    if (token.type !== 'fence' || !token.map) continue
+    const explicit = token.info.trim() === 'legal-reference'
+    if (!explicit && (!allowPlainJson || token.info.trim() !== 'json' || token.level !== 0)) continue
     const [start, end] = token.map
     const closed = lines[end - 1]?.trim() === token.markup
     if (!closed) {
-      if (streaming) {
+      if (streaming && explicit) {
         if (offsets[start] > cursor) parts.push({ type: 'text', text: content.slice(cursor, offsets[start]) })
         cursor = content.length
       }
@@ -124,6 +148,7 @@ export function legalMessageParts(content = '', streaming = false) {
     }
     const value = parse(token.content)
     const values = Array.isArray(value) ? value : [value]
+    if (!explicit && !values.every(isLegalJsonReference)) continue
     const references = values.map(referenceFromModel)
     if (!references.length || references.some(item => !item)) continue
     if (offsets[start] > cursor) parts.push({ type: 'text', text: content.slice(cursor, offsets[start]) })
@@ -138,7 +163,7 @@ export function referencesFromTools(processes = []) {
   const found = new Map()
   for (const process of processes) for (const item of process.items || []) {
     if (item.type !== 'tool' || item.status !== 'success') continue
-    const tool = /\b(law_search_keyword|law_search|law_recognition|get_law_article|case_search)\s*\(/.exec(item.code || '')?.[1]
+    const tool = LAW_TOOL_RE.exec(item.code || '')?.[1]
     const result = parse(item.output)
     if (!tool || !result || result.error || result.isError) continue
     for (const reference of referencesFromEntity({ kind: tool === 'case_search' ? 'CASE' : 'LAW', retrievalStatus: 'OK', detail: { source: 'pkulaw', result } })) {
@@ -153,9 +178,40 @@ export function referencesFromTools(processes = []) {
   return [...found.values()]
 }
 
+const LAW_TOOL_RE = /\b(law_search_keyword|law_search|law_recognition|get_law_article|case_search)\s*\(/
+const squash = value => String(value || '').replace(/\s+/g, '')
+
+/** Raw outputs of law tools that succeeded in this turn's live stream (same trust rule as referencesFromTools). */
+export function liveLawToolOutputs(processes = []) {
+  const outputs = []
+  for (const process of processes) for (const item of process.items || []) {
+    if (item.type === 'tool' && item.status === 'success' && item.live === true && LAW_TOOL_RE.test(item.code || '') && item.output) outputs.push(String(item.output))
+  }
+  return outputs
+}
+
+/**
+ * A model-authored card is promoted to "retrieved" only when a live law-tool output in the same turn
+ * contains both its source URL and its excerpt verbatim (whitespace ignored). The PKULaw gateway now
+ * answers in plain text, so referencesFromTools cannot build a card itself; corroboration is how the
+ * retrieved article keeps its provenance. Metadata the output does not contain is dropped rather than
+ * shown under a "retrieved" label.
+ */
+export function corroborateReference(reference, outputs = []) {
+  if (!reference || reference.status !== 'unverified' || !reference.url || !outputs.length) return reference
+  const excerpt = squash(reference.sections.find(item => item.labelKey === 'legalReference.excerpt')?.text)
+  if (!excerpt) return reference
+  let page = reference.url
+  try { const url = new URL(reference.url); page = url.origin + url.pathname } catch { /* safeLegalUrl already vetted it */ }
+  const output = outputs.find(text => text.includes(page) && squash(text).includes(excerpt))
+  if (!output) return reference
+  const haystack = squash(output)
+  return finish({ ...reference, status: 'retrieved', metadata: reference.metadata.filter(item => haystack.includes(squash(item.value))) })
+}
+
 /** Keep presentation JSON out of copy, insert, replacement and exported documents. */
-export function legalReadableText(content, translate = key => key) {
-  return legalMessageParts(content).map(part => {
+export function legalReadableText(content, translate = key => key, allowPlainJson = false) {
+  return legalMessageParts(content, false, allowPlainJson).map(part => {
     if (part.type === 'text') return part.text
     const r = part.reference
     return [r.title, translate('legalReference.status.unverified'),

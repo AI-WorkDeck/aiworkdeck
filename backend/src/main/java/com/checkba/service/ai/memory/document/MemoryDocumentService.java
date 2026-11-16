@@ -432,7 +432,7 @@ public class MemoryDocumentService {
         if (!readable || (write && !writable)) throw denied(write
                 ? LangText.of("无权修改这个记忆空间", "No permission to modify this memory space")
                 : LangText.of("无权读取这个记忆空间", "No permission to read this memory space"));
-        if(cloudEnabled() && !write && !cloudQuota.canRead(billingOwner(space.getScope(),space.getOwnerKey())))
+        if(cloudEnabled(space.getScope(),space.getOwnerKey()) && !write && !cloudQuota.canRead(billingOwner(space.getScope(),space.getOwnerKey())))
             throw denied(com.checkba.service.mobile.CloudBillingText.get("readUnavailable"));
         return new LocalAccess(space, writable);
     }
@@ -453,7 +453,13 @@ public class MemoryDocumentService {
         });
     }
 
-    private boolean cloudEnabled() { return cloudQuota!=null && cloudQuota.isEnabled() && cloudQuota.postpaidEnabled(); }
+    /** Owners that have not accepted postpaid keep the switch-off behaviour; unknown owners stay on the strict path. */
+    private boolean cloudEnabled(String scope,String key) {
+        if(cloudQuota==null || !cloudQuota.isEnabled() || !cloudQuota.postpaidEnabled())return false;
+        Long id=parseLong(key);
+        Long owner="user".equals(scope)?id:"project".equals(scope)&&id!=null?projects.findById(id).map(Project::getUserId).orElse(null):null;
+        return owner==null || cloudQuota.postpaidFor(owner);
+    }
     private Long billingOwner(String scope,String key) {
         Long id=parseLong(key);
         if(id==null)throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));
@@ -467,19 +473,19 @@ public class MemoryDocumentService {
         return project.getCloudBillingOwnerId();
     }
     private void beginMutation(String scope,String key) {
-        if(!cloudEnabled())return;
+        if(!cloudEnabled(scope,key))return;
         if("project".equals(scope))cloudQuota.requireProjectCapacity(parseLong(key),0);
         else cloudQuota.requirePersistentCapacity(billingOwner(scope,key),0);
     }
     private void finishMutation(MemoryDocumentSpace space) {
-        if(!cloudEnabled())return;
+        if(!cloudEnabled(space.getScope(),space.getOwnerKey()))return;
         documents.flush();legacyEntries.flush();
         if("project".equals(space.getScope()))cloudQuota.requireCurrentProjectUsage(parseLong(space.getOwnerKey()));
         else cloudQuota.requireCurrentPersistentUsage(billingOwner(space.getScope(),space.getOwnerKey()));
     }
     private void beginReduction(MemoryDocumentSpace space) {beginReduction(space.getScope(),space.getOwnerKey());}
     private void beginReduction(String scope,String key) {
-        if(!cloudEnabled())return;
+        if(!cloudEnabled(scope,key))return;
         Long owner=billingOwner(scope,key);
         cloudUsers.lockStorageOwner(owner).orElseThrow();
         if(!Objects.equals(owner,billingOwner(scope,key)))throw denied(com.checkba.service.mobile.CloudBillingText.get("writesPaused"));

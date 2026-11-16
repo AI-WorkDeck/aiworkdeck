@@ -2,8 +2,8 @@
 
 把案件材料画成能直接进诉讼材料的图：时间轴、流程图、当事人关系图。
 
-出图引擎来自 [mqc-litigation-visual-redraw](https://github.com/MiaoQichuan/mqc-litigation-visual-redraw)
-（作者 **缪奇川**，MIT），vendor 在 `mqc-litigation-visual-redraw/`（重画引擎）与 `mqc-timeline-master/`（时间轴大师）下。改它之前先读 [UPSTREAM.md](UPSTREAM.md)
+出图引擎来自 [new-litigation-visualization](https://github.com/MiaoQichuan/new-litigation-visualization)
+（作者 **缪奇川**，AGPL-3.0-only），vendor 在 `mqc-litigation-visual-redraw/`（重画引擎）与 `mqc-timeline-master/`（时间轴大师）下。改它之前先读 [UPSTREAM.md](UPSTREAM.md)
 与 [PATCHES.md](PATCHES.md)。
 
 ## 分工

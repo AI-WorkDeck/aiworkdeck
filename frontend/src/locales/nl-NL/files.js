@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Grootte: {size}",
   "renderingDoc": "Document wordt weergegeven…",
   "renderingSlides": "Presentatie wordt weergegeven…",
+  "slidesNotShown": "Nog {count} dia’s niet weergegeven. Open het bestand om alles te zien.",
   "officePreviewUnsupported": "Online voorbeeld is niet beschikbaar voor dit bestand",
   "fileTypeHintOpenLocal": "Bestandstype: {type}. Zoek het in Finder of Verkenner en open het met een lokale app.",
   "unknown": "Onbekend",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Ondertitels worden gegenereerd. Ze verschijnen zodra ze klaar zijn.",
     "ready": "De ondertitels zijn klaar",
     "failed": "Genereren van ondertitels mislukt. Klik op de ondertitelknop om het opnieuw te proberen.",
-    "notConfigured": "Transcriptie is niet ingesteld. Stel het in via Systeeminstellingen - Platformdiensten - Vergadertranscriptie om ondertitels te genereren.",
+    "notConfigured": "Transcriptie is niet ingesteld. Stel het in via Instellingen - Platformdiensten - Vergadertranscriptie om ondertitels te genereren.",
     "noticePending": "Geregistreerd. Bevestig eerst de opnamemelding onder Stem - Vergaderopname en klik vervolgens op de ondertitelknop.",
     "submitFailed": "Kan generatie van ondertitels niet starten",
     "empty": "Geen spraak gedetecteerd"

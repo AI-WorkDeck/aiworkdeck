@@ -7,7 +7,7 @@
     @click.stop="$emit('click')"
   >
     <text class="tag-name">{{ tag.name }}</text>
-    <view v-if="closable" class="tag-close" @click.stop="$emit('close')">×</view>
+    <view :title="$t('common.remove')" v-if="closable" class="tag-close" @click.stop="$emit('close')">×</view>
   </view>
 </template>
 

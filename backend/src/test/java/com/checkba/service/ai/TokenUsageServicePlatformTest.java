@@ -24,4 +24,16 @@ class TokenUsageServicePlatformTest {
         assertEquals(12,row.getTotalTokens());verify(accountant).reconcileAsync(123L,72L);
         verifyNoInteractions(models);
     }
+
+    @Test void recordUsagePersistsCacheReadAndWriteTokens() {
+        var repository=mock(TokenUsageRepository.class);
+        var models=mock(ChatModelFactory.class);
+        var service=new TokenUsageService(repository,models,mock(PlatformUsageAccountant.class));
+        service.recordUsage(1L,2L,"deepseek/deepseek-v4-flash",new dev.langchain4j.model.output.TokenUsage(1000,20),"c",900,5);
+        service.recordUsage(1L,2L,"deepseek/deepseek-v4-flash",new dev.langchain4j.model.output.TokenUsage(10,2),"c");
+        var capture=ArgumentCaptor.forClass(TokenUsage.class);verify(repository,times(2)).save(capture.capture());
+        assertEquals(900,capture.getAllValues().get(0).getCachedTokens());assertEquals(5,capture.getAllValues().get(0).getCacheWriteTokens());
+        assertEquals(1000,capture.getAllValues().get(0).getPromptTokens());
+        assertNull(capture.getAllValues().get(1).getCachedTokens());assertNull(capture.getAllValues().get(1).getCacheWriteTokens());
+    }
 }

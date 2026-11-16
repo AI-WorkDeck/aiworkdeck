@@ -29,6 +29,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 - **ci.yml**（push master + 所有 PR）：三并行 job——backend（temurin **21**，`mvn -B test`）、frontend（node 20，`check:emits` + `check:locales` + `check:nav:full` + `test:project-home` + `test:commands` + `build:h5`）、desktop（仅 `npm ci`）。不打安装包。
 - **desktop-build.yml**（发版主 workflow）：触发 = workflow_dispatch / tag `v*` / PR 改动 desktop|backend|frontend|pptx-service 路径（pptx-service 于 2026-09-09 补入，PR#766：它的源码与 requirements.lock 原样进包，re-vendor 类 PR 必须跑打包冒烟）。矩阵：tag 或手动 = mac+win；**普通 PR 只跑 windows**（mac runner 1h+）。每平台步骤顺序（**不可乱**，PR#176）：build:h5 → build:zetaoffice → fetch-lowa-assets（LOWA_BASE_URL=自建 zh-CN 引擎 24.2.8-zhcn-r2）→ desktop npm test → mvn package(-Djavacpp.platform) + prepare-backend(jar+jlink JRE) → CPython 运行时 `prepare-python-service.js --runtime-only 1`（**0.38.0 起四个 Python 服务不再随包**，见下「Python 运行时 pack」） → **(mac)sign-mac-natives.sh → 冒烟（backend /api/admin/wizard 120s；四个 Python 服务的冒烟移到 pack-release.yml 的 runtime 腿）** → electron-builder（mac 签名+公证，先抬 maxfiles/ulimit 524288 防 EMFILE；win 走 Azure Artifact Signing，tag/手动才签，见 4.3）→ 失败时 notarytool history/log 打印 Apple 拒因 → upload-artifact（dmg/exe + windows 腿单独产的 patch/*）。**发布收口在独立的 `release` job**（`needs: [build]`；`always()` 避免 tag 上 PR 专属祖先 job 的跳过传播，再显式检查 `!cancelled()`、`needs.build.result == 'success'` 和 tag，build 任一矩阵腿失败则不发布；`sync-mirror` 同样显式要求 release 成功，dev-board#74/#1399）：下载两平台 artifact 合并后统一跑 softprops/action-gh-release 附 dmg/exe/patch + 双语 body。
+- **model-matrix.yml**（仅 workflow_dispatch，产生真实模型费用）：在 GitHub 美国 runner 上跑 `scripts/eval/model-matrix.mjs`（本机访问不到 intl 档的 Google/Anthropic/OpenAI 模型）；用法、密钥与产物见 `scripts/eval/README.md`。
 - **star-history.yml**（周一 cron）：重画 star SVG 强推 star-history 分支。
 
 构建字体来源补充（2026-10-27）：NotoSansKhmer 的旧 jsDelivr/googlefonts 路径实际返回 403；`fetch-lowa-assets.js` 仅该字体改为规范仓 notofonts/noto-fonts 的固定提交 raw URL，仍执行原字体校验，不影响运行时离线加载。
@@ -36,6 +37,8 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 ## 关于窗口与更新准备状态（dev-board#1401/#1402）
 
 `app-menu.js` 的关于入口使用 `about-window.js` 独立本地窗口，原生 About 的固定 copyright 区无法容纳完整双语许可文案。新窗口正文可换行/滚动、版本仅显示一次；保留版权、AGPL、源码/许可证/商标链接与说明。无脚本、sandbox/contextIsolation 开启，只允许三个固定法律链接交给系统浏览器，重复打开复用窗口。浅色/深色从 `design/tokens/awd-palette.json` 生成 --awd-* 角色令牌快照，测试逐项对拍；更新色源须同步该快照。验证：`desktop/tests/about-window.test.js`，真实窗口用 Electron 运行 `desktop/tests/about-window.electron.js`（独立 profile，不启动产品后端）。
+
+主窗口导航白名单（S26，`desktop/main/navigation-guard.js`）：主窗口带完整 preload 桥，顶层导航到外站时 preload 会在新页面再注入一次，所以 `will-navigate` / `will-redirect` 只放行应用页（打包态前端目录内的 file://、开发态 dev server 同源）；`checkba:` 交渲染层；http(s)/mailto 拦下后交 `shell.openExternal`（重定向不自动外开）；其余拦下。`setWindowOpenHandler` 一律 deny：http(s) 照旧发 `checkba:browser-open-new-tab` 给工作区浏览器标签，其余 scheme（含 about:blank）不再建继承 preload 的子窗口。`will-attach-webview` 只认 LOWA（zetaoffice preload + `persist:zetaoffice` + 本机 http）与人机验证（captcha preload + 默认分区 + https，本机联调允许 loopback http），并强制 nodeIntegration 关、contextIsolation/sandbox 开、去掉 allowpopups——新增 `<webview>` 形态要先在 `webviewKinds` 登记。主窗口显式 `sandbox: true`。渲染层 Markdown 链接带 target/rel，点击经 `utils/externalLink.js` 的 `handleRenderedLinkClick` 交系统浏览器。回归：`desktop/tests/navigation-guard.test.js`、`main-window-lifecycle.test.js`、`frontend/tests/markdown-table/mdLinks.test.mjs`、`frontend/tests/desktop-e2e/external-link-navigation.mjs`（真 Electron）。
 
 完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。准备过程分阶段（dev-board#1713，问题 92）：`full-update.js` 的 `prepare(file, version, onStage)` 依次报 `mount`（hdiutil 挂载）/ `package`（ditto 转 ZIP）/ `verify`（Squirrel 验签准备；Windows 只有这一段），`update-service` 写进 `progress.stage` 并再广播 `preparing`，前端 `shell.updatePreparing{Mount,Package,Verify}` 提示当前阶段与「通常需要几分钟」。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
 
@@ -91,6 +94,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    覆盖面：win-unpacked 的应用 exe 与 extraResources 里的 exe、卸载器、安装器由 NSIS 目标逐个调钩子；**ARM64 壳**是 `electron-builder --dir --arm64` 那一步里就签好的，installer.nsh 用 `File /r` 原样塞进安装器，之后不会再过签名，所以那一步也必须在签名环境变量生效之后跑。打包后 `Verify Windows signatures` 对安装器、x64 应用 exe、ARM64 壳 exe 跑 `signtool verify /pa /v` 并要求输出含时间戳；卸载器编在安装器里取不出来，只靠钩子自身的回读。DLL 不签（`signDlls` 未开）。
    签名不会让 SmartScreen 立刻消失：信誉随下载量累积在签名主体上，首批用户仍可能见到提示，这是预期，不要加任何绕过。native pack（`pptx/mineru/kokoro/asr-runtime` 等）里的 exe 不经此流程、仍未签名。
 4.3.1. **单平台 FFmpeg 依赖（dev-board#1335）**：Maven 3.10 限制仓库 POM 依据命令行属性激活 profile。旧 `ffmpeg-platform` 因而不再遵循 `-Djavacpp.platform`，0.64.0 Mac 混入16个其他平台原生 JAR（162676460字节），329→345个依赖。现在 `backend/pom.xml` 的本项目 profile 按 `${javacpp.platform}` 显式引入 FFmpeg/JavaCPP classifier；未传属性时保留全平台开发/服务器行为。桌面 CI 跑真实 MP4/QTA 转码测试，`prepare-backend.js --native-platform` 检查拆包后的基础 Java JAR、目标原生 JAR，拒绝其他平台及聚合包。无须降级 Maven 或关闭其安全限制。依赖变更须随完整安装包发布，不能只发 app.jar 补丁。
+4.3.2. **Spring Boot 3.5.16 与 BOM 覆盖（2026-11）**：后端 parent 为 Boot 3.5.16（Hibernate 6.6、H2 2.3.232、Framework 6.2），它是 3.5 线最后一个开源补丁，3.5 开源支持已于 2026-06-30 结束；开源支持线只剩 4.0（至 2026-12-31）与 4.1（至 2027-07-31）。此后的 CVE 只能在 `backend/pom.xml` 属性里逐项覆盖 BOM（现有 jackson-bom/tomcat/commons-lang3/log4j2），升 Boot 4 时删除。`spring-webmvc` 6.2.19 的 CVE-2026-47890（SSE 视图片段）/CVE-2026-47884（XsltView）在开源 6.2 无修复版，本仓未用这两项功能。Hibernate 6.6 起 merge 一个库里不存在的生成型 id 会抛 `StaleObjectStateException`（旧版静默插入新行）：新实体不得手设 `@GeneratedValue` 的 id。全新库 DDL 有变：H2 的 `@Enumerated(STRING)` 改用原生 `enum`、PG 部分表 `bigserial` 改 identity、MySQL 唯一约束名去掉下划线；`ddl-auto: update` 对既有 PG/H2 库零变更，对 MySQL 只有两条 `modify column`（`cloud_cleanup_job.completed_items_json` tinytext→longtext、`work_session.status` 枚举重排），回退旧 jar 会把前者改回 tinytext。surefire 钉 3.1.2（`maven-surefire-plugin.version`）：BOM 的 3.5.6 把报告 XML 的 testcase classname 写成 `@DisplayName`（3.5.3 起），ci.yml「Surefire report integrity」会判串套件；跟回 BOM 前先用带 `@DisplayName` 的类跑一遍该校验。
 
 4.4. **Mac DMG 压缩（dev-board#1335）**：桌面打包完成后、上传 artifact 前运行 `bash desktop/scripts/compress-mac-dmg.sh <DMG>`，把默认 UDZO 转为 ULMO（LZMA，macOS 10.15+；产品仅 Apple Silicon/macOS 11+）。electron-builder 24 的 schema 不接受 ULMO，不能直接填 `dmg.format`；其默认 UDZO 已用 zlib-level=9，继续提高等级无收益。脚本先转临时件、校验，再仅在变小时原子替换；失败保留原件。当前公证/装订的是内部 `.app`；脚本拒绝处理外层已签名或装订的 DMG，未来若改为容器签名须调整顺序。`dmg.writeUpdateInfo=false` 避免重压缩后留下旧 blockmap/更新元数据；本产品更新走自有签名 manifest，不发布 electron-updater 的 latest-mac.yml。0.64.1 同一卷实测630045735→591992141字节（约6%），不裁剪组件。更换压缩格式后必须挂载、逐文件/权限/符号链接对比，并核验应用签名、Gatekeeper、装订与隔离启动；旧macOS真机兼容仍按实测范围说明。
 4.5. **Office 插件安装器是发版硬步骤（2026-08-19 维护者定，自 v0.21.0 之后的发版起强制）**：
@@ -142,8 +146,8 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    但 `/api/site` 仍返回 `cn`。2026-11-03 已备份后修正并核新进程环境、公开 `/api/site`
    的 `current=intl` / `pinned=true` 及 `sites[].baseUrl=https://www.workdeck.ai`。后续部署
    要一起核对站点标识与账户地址；不能只凭国际域名或登录成功判断区域配置正确。
-   不再与「不存在的端点」相同（后者恒为 `{"code":1,"message":"服务器内部错误"}` + 200，
-   这也是判「接口没上」最快的探法）。表结构靠 `ddl-auto: update` 自动建，无手动迁移。
+   不再与「不存在的端点」相同（后者现为 HTTP 404 `{"code":1,"message":"接口不存在"}`，方法不对为 405，
+   路径参数类型不对为 400，均不打 ERROR；此前恒为 200 + 「服务器内部错误」。判「接口没上」看 404）。表结构靠 `ddl-auto: update` 自动建，无手动迁移。
 4.7. **独立发布件逐项查、有更新随发版一起发（2026-09-11 维护者定，dev-board#592）**：
    五个 native pack（`pptx/mineru/kokoro/asr-runtime` + `litigation-visual`）、广场官方插件
    （`due-diligence` 在私有仓 `zeweihan/aiworkdeck-dd-plugin`、`hr-template-pack`）、LOWA 引擎
@@ -160,7 +164,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    的 `LOWA_BASE_URL` 变了 → `publish-lowa-engine.sh publish/verify` 先于打 tag。
    内置 skill（`backend/skills/*`，脱敏等）只随完整安装包走，不在此列。它们由 extraResources 放到 `Resources/skills`，SkillRegistry 从该物理目录加载；`backend-app` 补丁只有 `app.jar`，没有 skill 资源或 classpath 补偿。`patch-gate.sh` 拒绝内置 skill 变更的小版本（dev-board#1114），必须升 `0.(X+1).0`；临时 Git 仓回归见 `desktop/tests/patch-gate.test.js`。
 4.8. **官网版本记录是发版硬步骤（2026-09-23 维护者定，dev-board#862）**：
-   每发一个 0.X 大版本，就在官网仓 `zeweihan/aiworkdeck_website`（本机 `1-1 aiworkdeckweb`）的
+   每发一个 0.X 大版本，就在官网仓 `AI-WorkDeck/aiworkdeck-website`（2026-11-11 起公开新仓；旧 `aiworkdeck_website` 已归档只读；本机 `1-1 aiworkdeckweb` 的 origin 已指向新仓）的
    `content/releases.ts` 数组头部加一条：`version`（0.X.0）、`date`（tag 日期）、`headline` 一句、
    `items` 三到五条，中英双语。**补丁版 0.X.Y 并入所在大版本那条**，不单独立卡。写给律师看——
    「这一版你能多做什么 / 什么不再烦你」，不写内部重构、测试、CI、文档、营销件；口吻照该文件
@@ -322,7 +326,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 | 命令 | 目录 | 覆盖 |
 |---|---|---|
-| `mvn -B test` | backend/ | 51 个 *Test.java：IDOR/鉴权/分片上传/编排/记忆/证据/市场/脱敏 + **回放评测 OrchestratorReplayEvalTest**（resources/ai-eval/cases/ 10 组）+ DesktopContextSmokeTest。**必须 JDK 21**（本机默认 25 SIGBUS） |
+| `mvn -B test` | backend/ | 51 个 *Test.java：IDOR/鉴权/分片上传/编排/记忆/证据/市场/脱敏 + **回放评测 OrchestratorReplayEvalTest**（resources/ai-eval/cases/ 10 组）+ DesktopContextSmokeTest。**必须 JDK 21**（本机默认 25 SIGBUS）。surefire 堆在 pom 里显式 `-Xmx6g`：全量套件末尾常驻约 3.5GB，CI 默认堆（16GB 的 1/4）不够 |
 | `OPENROUTER_API_KEY=… mvn test -Dtest=RealLlmSmokeTest` | backend/ | 真实 LLM 冒烟（默认跳过） |
 | `npm test` | desktop/ | service-manager / model-manager / pysvc-runtime / overlay（补丁覆盖层）/ update-service（验签/下载/激活/回滚，本地 HTTP 伪造更新服务器） |
 | `npm run check:emits` | frontend/ | @event 绑定 vs $emit 声明静态护栏（scripts/check-emit-bindings.mjs） |
@@ -371,6 +375,20 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 - `deploy/web/` — Web 服务器版（瘦客户端 Phase A2/鸿蒙路线）：nginx.conf.example、能力探针 probe/、后端 prod 只听 127.0.0.1。
 - `deploy/cloud/` — 官方托管的插件云后端（addin.aiworkdeck.com）：nginx server 块、systemd unit、env 模板、部署实录。
+- **服务器健康与指标（`application-ops.yml` + `deploy/ops/`，说明在 deploy/cloud/README.md「运维监控」）**：
+  cloud/case/prod 经 `application.yml` 的 `spring.profiles.group` 自动带 `ops` profile；新增服务器 profile 要同样加进 group。
+  `application.yml` 默认 Actuator 全关（`management.server.port=-1`、端点全禁、`metrics/observations.enable.all=false`），
+  桌面版靠这组默认值保持零暴露、不采指标——`DesktopContextSmokeTest` 断言 `-1`。ops 开**只绑 127.0.0.1 的独立管理端口**
+  （默认 `"1"+server.port`：19696/19797，同机两实例不撞），只暴露 health + prometheus；公网只有
+  `OpsReadinessController` 的 `GET /api/health/ready`（readiness 组 = readinessState+db+diskSpace，回 UP/DOWN 不带明细；
+  无 ops 时 404）。**地雷**：① 本应用对未映射路径回 HTTP 200 `{"code":1}`（GlobalExceptionHandler，管理端口子上下文也继承），
+  所以「端点不存在」不能用 404 判，测试比对与未知路径同响应；② `@SpringBootTest` 默认把指标导出换成空实现，
+  测 prometheus 要 `@AutoConfigureObservability`；③ actuator 的 `additional-path` 只认单段路径，不能挂 `/api/...`，
+  所以公网探针是自写控制器；④ 业务 gauge（`OpsMetrics`）在抓取时才经 ObjectProvider 取 bean，别改成构造注入
+  `AgentOrchestrator`（构造器一动要同步 EvalHarness）。⑤ micrometer 跟 Boot 3.5.16 BOM 为 1.15.12（CVE-2026-40984 的修复版；Boot 3.2 的 1.12.4 受影响，
+  所以本功能排在 Boot 升级之后合并），不要在 pom 里单独钉回旧版。
+  回归：`mvn test -Dtest=OpsHealthMetricsTest,DesktopContextSmokeTest`；巡检脚本 `python3 -I deploy/ops/awd-health-check_test.py`。
+  pom 加了依赖 → 只能随大版本（`patch-gate`）。
 - `deploy/update-mirror-sync.sh` — 官网 ECS 上每小时一跑的镜像同步（补丁产物 + 安装包 + installers/latest.json）。
   **安装包留最新两版，别改回「只留最新一版」**：官网 /start 的下载按钮是服务端渲染的，
   数据源（官网仓 lib/latest-release.ts）对 latest.json 用了 `revalidate: 300`。旧包一删、
@@ -403,6 +421,26 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
   data 断言解压后字节数等于 metadata 里的 `remote_package_size`（emscripten 自带真值，
   下游 fetch-lowa-assets.js 对 data 只查「长度 ≥1024」，兜不住双重压缩）。
   落盘先落 web root 之外的暂存区、校验通过再 rename 换入，旧版本自动备份到 `/root/lowa-engine-backup/`。
+- **server 模式按用户限频与单次上传上限（S2，2026-11-12）**：`service/UserRateLimiter`（令牌桶，桶容量 =
+  每分钟额度，按额度/60 每秒回填；按 (类别, userId) 分桶；`security.local-mode=true` 整体旁路，所以桌面/dev 零变化）。
+  配置 `security.rate-limit.*`（application.yml，`<=0` 关闭该项）：`chat-per-minute: 30`（`POST /api/agent/chat`
+  含插话、`/api/agent/ppt/generate`）、`upload-per-minute: 300`（`/api/files/{id}/upload` 只计 offset 缺省/0 的「上传开头」，
+  录音等分片续传不计；浏览器拖入文件夹逐个串行上传、编辑器 3 秒防抖自动保存都走这条）、`ocr-per-minute: 20`
+  （`/api/ocr/recognize` + `/api/projects/{p}/files/{f}/ocr`）、`browser-proxy-per-minute: 120`（`/api/browser/proxy`，
+  按票据里的 userId；只有导航走代理，子资源靠 `<base>` 直连原站）。超限 → **真 HTTP 429** + `Retry-After` +
+  `{code:4290, reason:"RATE_LIMITED", message, retryAfterSeconds}`（`RateLimitedException` → `GlobalExceptionHandler`；
+  上传与代理在控制器内直接回，代理回纯文本给 iframe）。文案不得含「登录/未授权/请先」。前端：`request()` 对非 200
+  直接用 body.message；`useAgentStream` 与 `ChatInterface.uploadFileContent` 的 429 → `common.tooManyRequests`；
+  Office 加载项 `postChat` 429 → `apiChatRateLimited`。资源管理器批量 OCR 遇 429 按 `retryAfterSeconds` 等待重试（`explorerOcrHost.test.mjs`）。**进程内计数**：重启归零、多实例各算各的——多实例时以 nginx
+  `limit_req` 为准（与 `AuthAbuseGuard` 同一立场）。控制器里都是 `@Autowired(required=false)` 字段注入并判空，手工装配的测试不用改。
+  **单次上传上限 `storage.max-upload-size`**：默认 `${storage.project-size-limit:20GB}`（桌面不变），multipart 的
+  `max-file-size/max-request-size` 引用它；裸 octet-stream（浏览器/桌面/Office 的主上传路径，Spring multipart 管不到）
+  由 `FileController.uploadFile` 按 Content-Length 拦，413 `UPLOAD_TOO_LARGE`。cloud / prod = 200MB（对齐
+  `deploy/cloud/nginx-addin.conf.example`、`deploy/web/nginx.conf.example` 的 `client_max_body_size 200m`），case = 2GB
+  （对齐 `deploy/case/nginx-case*.conf.example` 里 `/api/` 的 2g；整段案卷历史走 `/git/` 的 4g，不受此限）。
+  改任一侧要两处同改；接线由 `ProjectStorageResolverTest.profilesWireTheSizeLimit` 钉住。
+  回归：`UserRateLimiterTest`、`FileControllerUploadLimitsTest`、`AiAgentControllerTest`、`BrowserProxyControllerTest`、
+  `FileOcrControllerTest`、前端 `tests/project-home/server-rate-limit-429.test.mjs`、加载项 `postChatRateLimit.test.js`。
 - 官网部署在独立仓库（website/，gitignore 掉），服务器 ssh -i ~/.ssh/aiworkdeck_ops root@47.92.111.102；ECS 8.137.95.63(~/.ssh/checkba_ecs)。
 - **kokoro/asr 模型下载源顺序（dev-board#583）**：先 ModelScope，失败再回落 hf-mirror，经 `model-fetch.py --source hf` 读取固定 revision 与逐文件 metadata，大小及 LFS SHA256 / Git blob SHA1 验证后才发布 refs/main（`CHECKBA_MODEL_SOURCE=modelscope|hf` 强制单源）。原因：hf-mirror 只代理元数据，大文件 302 到 HF 官方 CDN（cas-bridge.xethub.hf.co），国内无代理必挂 `LocalEntryNotFoundError`。ModelScope 路径是 `desktop/main/services/model-fetch.py`（纯标准库，按 HF 缓存布局落 `HF_HOME/hub/models--*/{blobs/<sha256>, snapshots/<ModelScope commit>, refs/main}`，续传临时文件 `blobs/<sha256>.incomplete`，refs/main 最后写——所以旧的半截缓存里 refs/main 指向不存在的 snapshot 也能直接续下），运行侧 pack 的 app.py 不用改。**地雷**：脚本随 `main/**` 进 app.asar，Python 读不了，model-manager 每次下载前把它拷到 `~/.aiworkdeck/models/.model-fetch.py` 再跑。mineru 仍走 MinerU 官方 CLI（`-s modelscope`），不动。
 - 模型不进包：mineru/kokoro/asr 模型首启在"组件管理"下载（下载进度按字节级整体，PR#142）。asr 的 faster-whisper medium 约 1.5GB，依赖闭包 182MB（压缩后约 57MB 进安装包，大头是 onnxruntime 70MB + PyAV 44MB，两者都是 faster-whisper 的硬依赖）。
@@ -615,7 +653,7 @@ stash 误 pop 之类）之后，5174 上的页面可能变成**整页无样式**
 
 `PgVectorConfig` 对非 PostgreSQL JDBC 数据源直接构造既有内存向量存储；H2 不得先调用模型 `dimension()` 或构建 PG 连接再降级。PostgreSQL 仍动态探测并缓存模型维度。`PgVectorConfigTest` 验证 H2 零模型/PG 调用、两个存储的独立检索及 PostgreSQL 原有建库参数。
 
-桌面 profile 的 JPA 仓库使用 `bootstrap-mode: deferred`，配合异步 EntityManagerFactory 初始化；上下文刷新仍校验全部仓库，不使用全局 lazy 或将查询校验转嫁给首次操作。`AsyncExecutorConfig` 的交互池以 `applicationTaskExecutor` 为正式 bean 名、`taskExecutor` 为兼容别名：Spring Boot 3.2.4 在多个 `AsyncTaskExecutor` 存在时从 Map 按正式名称选择 JPA bootstrap executor，仅把框架名称设为别名会静默失去异步初始化。不得改池大小或复用 memory/context 池来补这个接线问题。`AsyncExecutorConfigTest` 覆盖实际三池 Map、Boot customizer 选择、别名同实例及三种 `@Async` 调用。延后仓库初始化会使 HTTP 端口和 `SELECT 1` 早于业务初始化完成；启动验收须分别记录 HTTP 健康、Spring Ready 事件与 `ACCEPTING_TRAFFIC`，并验证首次身份、项目及文件读写，不把提前可连通算作完整提速。诊断入口的事件耗时与并发区间不能简单相加成墙钟收益；正式 A/B 仍用出货入口、冻结 JAR 和隔离数据目录。
+桌面 profile 的 JPA 仓库使用 `bootstrap-mode: deferred`，配合异步 EntityManagerFactory 初始化；上下文刷新仍校验全部仓库，不使用全局 lazy 或将查询校验转嫁给首次操作。`AsyncExecutorConfig` 的交互池以 `applicationTaskExecutor` 为正式 bean 名、`taskExecutor` 为兼容别名：Spring Boot（3.2.4 起，3.5.16 不变）在多个 `AsyncTaskExecutor` 存在时从 Map 按正式名称选择 JPA bootstrap executor，仅把框架名称设为别名会静默失去异步初始化。不得改池大小或复用 memory/context 池来补这个接线问题。`AsyncExecutorConfigTest` 覆盖实际三池 Map、Boot customizer 选择、别名同实例及三种 `@Async` 调用。延后仓库初始化会使 HTTP 端口和 `SELECT 1` 早于业务初始化完成；启动验收须分别记录 HTTP 健康、Spring Ready 事件与 `ACCEPTING_TRAFFIC`，并验证首次身份、项目及文件读写，不把提前可连通算作完整提速。诊断入口的事件耗时与并发区间不能简单相加成墙钟收益；正式 A/B 仍用出货入口、冻结 JAR 和隔离数据目录。
 
 `DesktopHealthController` 只有在 `ApplicationAvailability` 为 `ACCEPTING_TRAFFIC` 且有界数据库探测成功时返回 UP；必要 runner、同步 ready listener 尚未结束或应用正在关闭时返回 503。不要在最高优先级 Ready listener 中提前置位。`DesktopStartupReadinessTest` 使用真实 HTTP 监听与门闩验证未完成/失败启动；其专用配置用 `@TestConfiguration`，避免污染全应用扫描。既有补丁健康判定、回退与退出流程仍消费同一接口。
 

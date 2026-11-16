@@ -51,7 +51,7 @@ function setup(shapes = []) {
     insertNewByIndex(index) { const added = page(); added.shapes.push({ kind: 'placeholder' }); pages.splice(Math.min(index + 1, pages.length), 0, added); return added } }
   const realm = vm.createContext({
     xModel: { getDrawPages: () => collection, createInstance: () => properties({}), setModified() {} },
-    isImpressDoc: () => true, ensureShapeNames: () => {}, shapeKind: s => s.kind || 'text',
+    isImpressDoc: () => true, ensureShapeNames: () => {}, shapeKind: s => s.kind || 'text', slidePageListBrief: () => [],
     shapeText: s => s.getText?.().getString() || '', slideFail: error => ({ success: false, error, message: error }),
     errStr: e => e.message, locatePageIndex: page => pages.indexOf(page), movePageTo: () => -1,
     suspendModifyListener() {}, resumeModifyListener() {},
@@ -245,6 +245,7 @@ function tableStyleSetup() {
   } })
   s.realm.css.awt.FontWeight = { BOLD: 150, NORMAL: 100 }
   s.realm.setCharProp = (target, key, value) => target.setPropertyValue(key, value)
+  s.realm.setCharColor = (target, value) => target.setPropertyValue('CharColor', value)
   return { ...s, cells, style: method('slide_table_set_style', s.realm) }
 }
 test('table header range gets dark background and white text without changing body', () => {

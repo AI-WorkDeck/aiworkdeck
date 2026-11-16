@@ -56,12 +56,59 @@ public class XmlToolCallParser {
         }
     }
 
+    /** DeepSeek 原生工具调用语法（全角竖线 DSML 标签）泄漏进正文时的收尾标签。 */
+    private static final Pattern LEAKED_DSML_TAG = Pattern.compile("</?[\\uFF5C|]DSML[\\uFF5C|][^>]*>");
+
+    /**
+     * 把泄漏的 DeepSeek DSML 收尾标签规整成本协议的 {@code </tool_code>}。
+     *
+     * <p>病灶（s07「新建一份Word文档」DeepSeek 0/5）：模型按 XML 兜底协议写出
+     * {@code <tool_code>write_docx(...)}，却用它原生格式的收尾
+     * {@code </｜DSML｜parameter></｜DSML｜invoke></｜DSML｜tool_calls>} 结尾，没有 {@code </tool_code>}。
+     * 解析器提不出调用、截断守卫又判定「标签未闭合」，两轮「请重发」后整轮以一句截断说明收尾，
+     * 文档始终没建——而内容其实一个字都没缺。这里把<b>第一个</b> DSML 收尾标签当作缺失的
+     * {@code </tool_code>}，其余 DSML 标签一律丢弃。
+     */
+    public static String normalizeLeakedClosers(String content) {
+        if (content == null || !content.contains("DSML")) return content;
+        Matcher m = LEAKED_DSML_TAG.matcher(content);
+        if (!m.find()) return content;
+        int open = content.lastIndexOf("<tool_code>", m.start());
+        boolean unclosed = open >= 0 && content.indexOf("</tool_code>", open) < 0;
+        String head = content.substring(0, m.start());
+        String tail = content.substring(m.start());
+        return head + (unclosed ? "</tool_code>" : "") + LEAKED_DSML_TAG.matcher(tail).replaceAll("");
+    }
+
+    private static final Pattern CODE_SPAN = Pattern.compile("(?s)```.*?(?:```|$)|~~~.*?(?:~~~|$)|`[^`\\n]*`");
+    private static final Pattern CALL_ATTEMPT = Pattern.compile(
+            "<(?:tool_code|tool_calls?\\b|function_calls?\\b|function=|invoke\\b|parameter[=\\s]|ask_user[\\s>/]"
+            + "|[\\uFF5C|]DSML[\\uFF5C|]|\\|tool_call)");
+    private static final Pattern THINKING_OR_TITLE =
+            Pattern.compile("(?s)<thinking>.*?(?:</thinking>|$)|<title>.*?</title>");
+
+    /**
+     * 正文里有没有「写成文字的工具调用」痕迹（gap R3）：畸形的 {@code <tool_code=…}、严格边界外的
+     * {@code <ask_user><parameter=…>}、泄漏的原生调用语法等。只在本轮<b>没有任何工具被执行</b>时用来判
+     * 「这一轮不能当正常完成」；代码围栏与行内代码里的不算（那是在讲解，不是在调用）。
+     */
+    public static boolean containsUnexecutedCallAttempt(String content) {
+        return content != null && CALL_ATTEMPT.matcher(CODE_SPAN.matcher(content).replaceAll("")).find();
+    }
+
+    /** 整轮只有 {@code <thinking>}（可带 {@code <title>}），没有任何给用户看的正文（gap R4）。 */
+    public static boolean isThinkingOnly(String content) {
+        return content != null && content.contains("<thinking>")
+                && THINKING_OR_TITLE.matcher(content).replaceAll("").isBlank();
+    }
+
     /**
      * 内容中是否包含 XML 工具调用标签。
      */
     public boolean containsToolCall(String content) {
         return content != null && (content.contains("<tool_code>") || content.contains("<code>")
-                || !bareAskUserCalls(content).isEmpty());
+                || !bareAskUserCalls(content).isEmpty() || !qwenTemplateCalls(content).isEmpty()
+                || !bareToolTagCalls(content).isEmpty());
     }
 
     /**
@@ -96,11 +143,114 @@ public class XmlToolCallParser {
             }
         }
         calls.addAll(bareAskUserCalls(content));
+        calls.addAll(qwenTemplateCalls(content));
+        calls.addAll(bareToolTagCalls(content));
         calls.sort(java.util.Comparator.comparingInt(LocatedCall::offset));
         return calls.stream().map(LocatedCall::call).toList();
     }
 
     private record LocatedCall(int offset, ParsedCall call) {}
+
+    /**
+     * Qwen 原生工具模板泄漏进正文：{@code <function=名><parameter=键>值</parameter>…</function>}，
+     * 或把工具名直接当标签 {@code <名><parameter=键>值</parameter>…</function>}（2026-11-11 百炼 qwen3.7-flash 实录：
+     * 新建文档 / 新建文件夹 / 记住偏好时偶发，纠正一轮后仍照写，整轮什么都没做）。按调用执行，和 vLLM 的 qwen 工具解析同一思路。
+     * 代码围栏与行内代码里的不算；参数值一律按字符串传，类型由工具注册表照常转换。
+     */
+    private static final Pattern QWEN_TEMPLATE_HEAD = Pattern.compile(
+            "<function=([A-Za-z_]\\w*)>|<([A-Za-z_]\\w*)>(?=\\s*<parameter=)");
+    private static final Pattern QWEN_TEMPLATE_PARAM = Pattern.compile(
+            "(?s)<parameter=([A-Za-z_]\\w*)>\\n?(.*?)\\n?</parameter>");
+
+    /** 线性扫描（不用嵌套重复的大正则，免 ReDoS）：找头 → 找最近的 {@code </function>} → 中间只能是参数块。 */
+    private List<LocatedCall> qwenTemplateCalls(String content) {
+        if (!content.contains("</function>")) return List.of();
+        String visible = blankCodeSpans(content);
+        List<LocatedCall> calls = new ArrayList<>();
+        Matcher head = QWEN_TEMPLATE_HEAD.matcher(visible);
+        int from = 0;
+        while (from < visible.length() && head.find(from)) {
+            int close = visible.indexOf("</function>", head.end());
+            if (close < 0) break;
+            String body = content.substring(head.end(), close);
+            String name = head.group(1) != null ? head.group(1) : head.group(2);
+            com.fasterxml.jackson.databind.node.ObjectNode args = JSON.createObjectNode();
+            Matcher p = QWEN_TEMPLATE_PARAM.matcher(body);
+            StringBuilder rest = new StringBuilder();
+            int last = 0;
+            while (p.find()) {
+                rest.append(body, last, p.start());
+                args.put(p.group(1), p.group(2));
+                last = p.end();
+            }
+            rest.append(body.substring(last));
+            int end = close + "</function>".length();
+            // 头与 </function> 之间只能是参数块；裸标签形态至少要有一个参数，免得误认普通标签
+            if (rest.toString().isBlank() && (head.group(1) != null || !args.isEmpty())) {
+                calls.add(new LocatedCall(head.start(), new ParsedCall(name, args.toString(), content.substring(head.start(), end), null)));
+                from = end;
+            } else {
+                from = head.end();
+            }
+        }
+        return calls;
+    }
+
+    /**
+     * Qwen 另一种泄漏形态（office-tier1，2026-11-12 百炼 qwen3.7-flash 实录）：工具名当外层标签、参数各自成标签，
+     * {@code <slide_write_notes><slideNumber>1</slideNumber><text>…</text></slide_write_notes>}，整轮只输出这一块，什么都没执行。
+     * 只在三条都满足时当调用：外层名是已注册工具；子标签全是该工具的参数名（或别名）且至少一个；
+     * 整段输出除这些块外只剩空白或 {@code <thinking>}。正文里夹带的 XML 片段一律不认。
+     */
+    private static final Pattern BARE_TOOL_CHILD = Pattern.compile("(?s)\\s*<([A-Za-z_]\\w*)>(.*?)</\\1>");
+
+    private List<LocatedCall> bareToolTagCalls(String content) {
+        if (toolRegistry == null || content == null || content.indexOf('<') < 0) return List.of();
+        String visible = blankCodeSpans(THINKING_OR_TITLE.matcher(content).replaceAll(m -> " ".repeat(m.group().length())));
+        List<LocatedCall> calls = new ArrayList<>();
+        int cursor = 0;
+        while (cursor < visible.length()) {
+            while (cursor < visible.length() && Character.isWhitespace(visible.charAt(cursor))) cursor++;
+            if (cursor >= visible.length()) break;
+            Matcher head = TAG_HEAD.matcher(visible).region(cursor, visible.length());
+            if (!head.lookingAt() || !head.group(1).isEmpty()) return List.of();
+            String name = head.group(2);
+            var tool = toolRegistry.resolve(name);
+            if (tool.isEmpty() || tool.get().method() == null) return List.of();
+            String closeTag = "</" + name + ">";
+            int close = visible.indexOf(closeTag, head.end());
+            if (close < 0) return List.of();
+            java.util.Set<String> params = new java.util.HashSet<>();
+            for (java.lang.reflect.Parameter prm : tool.get().method().getParameters()) params.add(prm.getName());
+            com.fasterxml.jackson.databind.node.ObjectNode args = JSON.createObjectNode();
+            Matcher child = BARE_TOOL_CHILD.matcher(content).region(head.end(), close);
+            int pos = head.end();
+            while (pos < close && child.region(pos, close).lookingAt()) {
+                if (!params.contains(child.group(1))) return List.of();
+                args.put(child.group(1), unescapeXml(child.group(2).strip()));
+                pos = child.end();
+            }
+            if (args.isEmpty() || !content.substring(pos, close).isBlank()) return List.of();
+            int end = close + closeTag.length();
+            calls.add(new LocatedCall(cursor, new ParsedCall(name, args.toString(), content.substring(cursor, end), null)));
+            cursor = end;
+        }
+        return calls;
+    }
+
+    private static String unescapeXml(String s) {
+        return s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
+    }
+
+    /** 代码围栏 / 行内代码换成等长空白：偏移不变，里面的标签不被当成调用。 */
+    private static String blankCodeSpans(String content) {
+        Matcher m = CODE_SPAN.matcher(content);
+        StringBuilder out = new StringBuilder(content);
+        while (m.find()) {
+            for (int i = m.start(); i < m.end(); i++) if (out.charAt(i) != '\n') out.setCharAt(i, ' ');
+        }
+        return out.toString();
+    }
 
     /**
      * #1078: 部分模型把提问写成独立的自闭合标签。只恢复这一种别名，交给原分发、
@@ -140,7 +290,8 @@ public class XmlToolCallParser {
             if (content.startsWith("<ask_user", cursor)
                     && cursor + 9 < content.length()
                     && (Character.isWhitespace(content.charAt(cursor + 9)) || content.charAt(cursor + 9) == '/')) {
-                BareAsk parsed = bareAskArguments(content, cursor + 9);
+                BareAsk parsed = entityQuotedAskArguments(content, cursor + 9);
+                if (parsed == null) parsed = bareAskArguments(content, cursor + 9);
                 if (parsed == null) return List.of();
                 String raw = content.substring(cursor, parsed.end());
                 calls.add(new LocatedCall(cursor, new ParsedCall("ask_user",
@@ -200,6 +351,26 @@ public class XmlToolCallParser {
     }
 
     private record BareAsk(int end, String argsJson) {}
+
+    private static final Pattern ENTITY_QUOTED_HEAD =
+            Pattern.compile("\\s+[a-z_]+\\s*=\\s*&(?:quot|#34|#39|apos);");
+
+    /**
+     * 属性引号被 HTML 转义（{@code question=&quot;…&quot;}）的自闭合形态：先整体反转义再走常规解析。
+     * 结束位置按反转义后的 "/>" 折回原文偏移；不是该形态（或没有结束符）返回 null，交给常规路径。
+     */
+    private BareAsk entityQuotedAskArguments(String content, int cursor) {
+        if (!ENTITY_QUOTED_HEAD.matcher(content).region(cursor, content.length()).lookingAt()) return null;
+        int close = content.indexOf("/>", cursor);
+        if (close < 0) return null;
+        String slice = content.substring(cursor, close + 2);
+        String decoded = slice.replace("&quot;", "\"").replace("&#34;", "\"")
+                .replace("&#39;", "'").replace("&apos;", "'")
+                .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+        BareAsk parsed = bareAskArguments(decoded, 0);
+        if (parsed == null || parsed.end() != decoded.length()) return null;
+        return new BareAsk(close + 2, parsed.argsJson());
+    }
 
     /** 属性值与外层结束符用同一次扫描定位，值里的 <br/> 不是标签结束。
      * 不明确的参数走现有 question-required 错误反馈；未闭合的语法不猜边界。
@@ -408,6 +579,8 @@ public class XmlToolCallParser {
             ToolRegistry.RegisteredTool tool, List<String> params) {
         var names = new java.util.HashSet<>(params);
         for (String param : params) names.addAll(ToolRegistry.aliasesFor(param));
+        boolean moveFiles = "move_files".equals(ToolRegistry.TOOL_NAME_ALIASES.getOrDefault(toolName, toolName));
+        if (moveFiles) names.addAll(com.checkba.service.ai.tools.MoveFilesArgs.extraNames());
         var named = new java.util.LinkedHashMap<String, String>();
         List<String> positional = new ArrayList<>();
         String bareName = null;
@@ -442,6 +615,14 @@ public class XmlToolCallParser {
                 }
             }
             if (value != null) args.set(param, schemaArgument(tool, param, unquote(value.strip())));
+        }
+        if (moveFiles) {
+            // move_files 常见的自造参数名原样带过去，由 MoveFilesArgs.fold 在分发时折成 movesJson
+            for (var e : named.entrySet()) {
+                if (!args.containsKey(e.getKey()) && !params.contains(e.getKey())) {
+                    args.set(e.getKey(), unquote(e.getValue().strip()));
+                }
+            }
         }
         int index = 0;
         for (String param : params) {

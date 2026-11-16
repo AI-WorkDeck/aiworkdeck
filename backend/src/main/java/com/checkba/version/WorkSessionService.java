@@ -96,6 +96,20 @@ public class WorkSessionService {
     // Compare active physical scopes, so unrelated folders can save during background version work.
     private final PathScopedRepoLock.Registry localFolderRepoLocks = new PathScopedRepoLock.Registry();
     private final Set<Long> deletedProjects = ConcurrentHashMap.newKeySet();
+    private final Set<Long> sessionChangedProjects = ConcurrentHashMap.newKeySet();
+    private final LocalDateTime sessionStartedAt = LocalDateTime.now();
+
+    public Set<Long> sessionChangedProjectIds() {
+        return Set.copyOf(sessionChangedProjects);
+    }
+
+    public void markSessionChanged(long projectId) {
+        if (!deletedProjects.contains(projectId)) sessionChangedProjects.add(projectId);
+    }
+
+    public LocalDateTime sessionStartedAt() {
+        return sessionStartedAt;
+    }
 
     /**
      * push 落库延后的项目 → 最早的基线 sha（Task 6）。内存态，服务端重启即丢失——
@@ -104,7 +118,13 @@ public class WorkSessionService {
     private final Map<Long, String> pendingIngestBase = new ConcurrentHashMap<>();
     private final Set<Long> ingestTasks = ConcurrentHashMap.newKeySet();
 
-    private record PendingActor(Long userId, String userName) {}
+    /**
+     * diskScan：信号来自对账扫盘（外部改动、或版本操作自己切分支改写了文件的修改时间）。
+     * 这种信号只在工作区相对 HEAD 真有改动时才开新工作段（QA D10）。
+     */
+    private record PendingActor(Long userId, String userName, boolean diskScan) {
+        PendingActor(Long userId, String userName) { this(userId, userName, false); }
+    }
 
     /** 结束工作把工作段并回主线成功后发布，供 CloudSyncService（同包）监听触发自动上传。 */
     public record MainlineMergedEvent(long projectId) {}
@@ -488,8 +508,22 @@ public class WorkSessionService {
      * 自动结束）。防抖自动存档仍然照排，稿上的改动也需要落盘存档。
      */
     public void onChangeSignal(long projectId, Long userId, String userName) {
+        onChangeSignal(projectId, new PendingActor(userId, userName));
+    }
+
+    /**
+     * 对账扫盘发现的改动。结束工作会先切回主线再合并，本地文件夹里的文件被改写两次、内容不变
+     * 但修改时间变新；对账把它当成改动发信号，信号又排在仍持锁的自动上传之后——随后就凭空开出
+     * 一段新工作，交稿清单退回第 1 步、状态条一直「有改动还没交稿」（QA D10）。所以没有进行中的
+     * 工作段时，只有工作区相对 HEAD 真有改动才开段。
+     */
+    public void onDiskScanSignal(long projectId, Long userId, String userName) {
+        onChangeSignal(projectId, new PendingActor(userId, userName, true));
+    }
+
+    private void onChangeSignal(long projectId, PendingActor actor) {
         if (deletedProjects.contains(projectId)) return;
-        PendingActor actor = new PendingActor(userId, userName);
+        sessionChangedProjects.add(projectId);
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -523,7 +557,9 @@ public class WorkSessionService {
 
     private void deferSignal(long projectId, PendingActor actor) {
         if (deletedProjects.contains(projectId)) return;
-        deferredSignals.put(projectId, actor);
+        // An ordinary signal waiting in the queue must not be downgraded by a later scan signal.
+        deferredSignals.merge(projectId, actor, (old, next) -> !old.diskScan() && next.diskScan()
+                ? new PendingActor(next.userId(), next.userName()) : next);
         scheduleSignal(projectId);
     }
 
@@ -571,6 +607,10 @@ public class WorkSessionService {
         }
         if (awaitingAdoptResolution(projectId)) return;
         boolean draft = onDraftBranch(projectId);
+        if (!draft && actor.diskScan() && activeSession(projectId).isEmpty()
+                && repoService.pendingChanges(projectId).stream().allMatch(c -> c.path().startsWith(".awd/"))) {
+            return;
+        }
         Long sessionId = null;
         if (!draft) {
             WorkSession session = ensureSession(projectId, actor.userId(), actor.userName());
@@ -723,6 +763,9 @@ public class WorkSessionService {
     private WorkSession ensureSession(long projectId, Long userId, String userName) {
         Optional<WorkSession> existing = activeSession(projectId);
         if (existing.isPresent()) return existing.get();
+        if (repoService.resolveRef(projectId, "HEAD") == null) {
+            repoService.init(projectId, userName, email(projectId, userId, userName));
+        }
 
         String branch = "work/" + System.currentTimeMillis();
         repoService.createBranch(projectId, branch, "HEAD");
@@ -749,8 +792,15 @@ public class WorkSessionService {
 
     public ExitStatus exitStatus(long projectId) {
         ReentrantLock lock = repoLock(projectId);
-        if (!lock.tryLock()) throw VersionException.busy(LangText.of(
-                "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        // Nested local folders share one path-scoped lock, so the quit dialog's parallel scan of a
+        // parent and its child always collides; wait briefly (under the client's 8s timeout).
+        try {
+            if (!lock.tryLock(5, java.util.concurrent.TimeUnit.SECONDS)) throw VersionException.busy(LangText.of(
+                    "正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw VersionException.busy(LangText.of("正在整理版本，请稍后重试", "Version history is busy; please try again shortly"));
+        }
         try {
             if (!repoService.isInitialized(projectId)) return new ExitStatus(false, false, 0, null, false);
             WorkSession draft = activeDraftOnBranch(projectId).orElse(null);
@@ -1128,6 +1178,7 @@ public class WorkSessionService {
             if (!onDraftBranch(projectId)) {
                 ensureSession(projectId, userId, AI_AUTHOR_NAME);
             }
+            sessionChangedProjects.add(projectId);
             String msg = changesKnown ? describeChanges(changes)
                     : LangText.of("修改了项目文件", "Edited project files");
             return repoService.commitAll(projectId, msg, "auto", null,

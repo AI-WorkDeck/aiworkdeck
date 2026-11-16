@@ -47,17 +47,7 @@ public class CalendarController {
         Long userId = AuthController.getUserIdFromSession(sessionId);
         if (userId == null) throw new IllegalArgumentException("未登录");
 
-        List<Project> projects = projectService.getUserProjects(userId);
-        Map<Long, String> projectNames = new HashMap<>();
-        for (Project p : projects) {
-            projectNames.put(p.getId(), p.getName());
-        }
-
-        List<Map<String, Object>> tasks = taskService.listAcrossProjects(
-                List.copyOf(projectNames.keySet()), from, to);
-        for (Map<String, Object> task : tasks) {
-            task.put("projectName", projectNames.get(task.get("projectId")));
-        }
+        List<Map<String, Object>> tasks = taskService.listForUser(userId, from, to);
         return ok(Map.of("tasks", tasks));
     }
 

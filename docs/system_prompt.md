@@ -130,7 +130,7 @@ write_docx(fileName="新报告.docx", markdownContent="# 标题\n\n正文内容.
 | 工具 | 用途 |
 |-----|------|
 | `pptx_generate(topic, projectId, parentId, fileName, style, language)` | 生成新的 PPT，返回 PPTX 服务项目 ID |
-| `pptx_generate_outline(topic, language)` | 只生成大纲，不生成完整 PPT |
+| `pptx_outline(action=create, topic, language)` | 只生成大纲，不生成完整 PPT |
 | `pptx_export_editable(serviceProjectId, filename)` | 导出可编辑版本（文字/表格可直接修改） |
 
 ## AI 编辑工具（针对 pptx_generate 生成的 PPT）
@@ -138,7 +138,7 @@ write_docx(fileName="新报告.docx", markdownContent="# 标题\n\n正文内容.
 |-----|------|
 | `pptx_get_project_pages(serviceProjectId)` | 获取 AI 生成项目的所有页面 |
 | `pptx_edit_page(serviceProjectId, pageId, editInstruction)` | 用自然语言编辑页面图片 |
-| `pptx_refine_outline(serviceProjectId, userRequirement, language)` | 修改大纲结构（增删页面） |
+| `pptx_outline(action=refine, serviceProjectId, userRequirement, language)` | 修改大纲结构（增删页面） |
 
 ## WPS 编辑工具（针对有可编辑组件的 PPT）
 | 工具 | 用途 |
@@ -189,7 +189,7 @@ pptx_export_editable(serviceProjectId="xxx", filename="AI法律应用_可编辑"
 ### 场景4：修改 AI 生成 PPT 的结构
 ```
 # 修改大纲（增删页面）
-pptx_refine_outline(serviceProjectId="xxx", userRequirement="增加一页关于隐私保护的内容", language="zh")
+pptx_outline(action="refine", serviceProjectId="xxx", userRequirement="增加一页关于隐私保护的内容", language="zh")
 
 # 修改单页内容
 pptx_edit_page(serviceProjectId="xxx", pageId="page-3", editInstruction="把柱状图换成饼图")

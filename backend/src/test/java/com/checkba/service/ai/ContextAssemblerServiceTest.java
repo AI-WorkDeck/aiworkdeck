@@ -1065,7 +1065,7 @@ class ContextAssemblerServiceTest {
 
         String systemText = assembleSystemText(officeDoc("名称\t金额\n甲\t100"));
         assertTrue(systemText.contains("office_excel_get_range"), "活跃文档段应指引 office_excel_* 读取");
-        assertTrue(systemText.contains("office_excel_set_formulas"), "活跃文档段应点名公式工具（批次6）");
+        assertTrue(systemText.contains("office_excel_set_values"), "活跃文档段应点名写值/公式工具（批次6；公式并入 set_values，V4）");
         assertTrue(systemText.contains("office_excel_get_overview"), "活跃文档段应点名总览工具（批次6追加）");
         assertFalse(systemText.contains("office_get_text"), "活跃文档段不应再点名 Word 面工具");
     }
@@ -1616,6 +1616,8 @@ class ContextAssemblerServiceTest {
             assertTrue(system.contains(english ? "always AI synthesis awaiting verification" : "统一为 AI 整理、待核对"));
             assertTrue(system.contains(english ? "do not themselves require an additional paid search" : "不为展示卡片额外要求付费查询"));
             assertTrue(system.contains(english ? "Never write this card protocol into the user's document" : "不把资料卡协议写进用户文档"));
+            assertTrue(system.contains("```legal-reference\n{\"kind\":\"LAW\""), "完整字面围栏示例");
+            assertTrue(system.contains(english ? "never the ordinary json label" : "不能用普通 json 围栏"));
             assertFalse(system.contains("LEGAL_REFERENCE_CARDS_"));
             for (String officeHost : List.of("word", "excel", "powerpoint")) {
                 capabilityService.record("conv-1", "office", officeHost);
@@ -2087,5 +2089,67 @@ class ContextAssemblerServiceTest {
         assertTrue(all.contains("<cursor_paragraph id=\"123\"") && all.contains("]]&gt;"), "原文进 CDATA 围栏且转义闭合符");
         assertFalse(all.contains("anchorId=__ai_anchor_3"), "非编辑器生成的锚点名一律丢弃");
         assertTrue(last.contains("doc_get_paragraph"), "锚点被丢弃时退回先回读该段");
+    }
+
+    // ==================== 工具协议变体（gap P2） ====================
+
+    private String protocolSystemText(boolean english, AgentMode mode, boolean nativeProtocol) {
+        when(appLanguageService.isEnglish()).thenReturn(english);
+        when(chatModelFactory.nativeToolProtocol(any())).thenReturn(nativeProtocol);
+        assembler.setToolDisclosurePolicy(new ToolDisclosurePolicy(true));
+        return ((SystemMessage) assembler.assemble("conv-1", "run-1", "把这几份文件归档", null, activeDoc(),
+                null, null, "88", mode, 1L, "deepseek/deepseek-v4-flash").get(0)).text();
+    }
+
+    @Test
+    @DisplayName("原生协议变体：三种模式两种语言的系统提示都不再教 <tool_code>/<thinking> 文本协议")
+    void nativeProtocolPromptTeachesNoTextProtocol() {
+        for (boolean english : new boolean[] {false, true}) {
+            for (AgentMode mode : AgentMode.values()) {
+                String system = protocolSystemText(english, mode, true);
+                String where = (english ? "en/" : "zh/") + mode;
+                assertFalse(system.contains("<tool_code"), where);
+                assertFalse(system.contains("awd:protocol"), where);
+                assertFalse(system.contains("(always required)"), where);
+                assertFalse(system.contains("[REQUIRED] Briefly analyze"), where);
+                assertFalse(system.contains("<thinking>分析") || system.contains("<thinking>Analyzing"), where);
+                assertFalse(system.contains("`<process>`") && system.contains("Tool invocations (if any)"), where);
+                assertTrue(system.contains("Call tools ONLY through the function-calling interface"), where);
+                // 前端据以路由的回答标签与停机条件原样保留
+                assertTrue(system.contains("`<final>` - **MAIN ANSWER**"), where);
+                assertTrue(system.contains("**ALSO STOP** when you output `<question>`"), where);
+                for (String[] pair : ToolProtocolPrompt.NATIVE_REWRITES) {
+                    assertFalse(system.contains(pair[0]), where + " 残留 XML 写法: " + pair[0]);
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("XML 变体仍是改造前的文本协议；改写表每一条都对得上原文（防表腐烂）")
+    void xmlProtocolPromptKeepsTheTextProtocolAndRewriteTableMatchesIt() {
+        StringBuilder all = new StringBuilder();
+        for (boolean english : new boolean[] {false, true}) {
+            for (AgentMode mode : AgentMode.values()) {
+                String system = protocolSystemText(english, mode, false);
+                assertTrue(system.contains("<tool_code>tool_name(args)</tool_code>"), system.substring(0, 2000));
+                assertTrue(system.contains("1. `<thinking>` - Brief intent analysis (always required)"));
+                assertFalse(system.contains("awd:protocol"));
+                assertFalse(system.contains("function-calling interface"));
+                all.append(system);
+            }
+        }
+        for (String[] pair : ToolProtocolPrompt.NATIVE_REWRITES) {
+            assertTrue(all.indexOf(pair[0]) >= 0, "改写表左侧在 XML 变体里找不到（原文改了而表没跟）: " + pair[0]);
+        }
+    }
+
+    @Test
+    @DisplayName("原生协议变体的稳定段逐轮逐字节相同（提示缓存前缀不抖）")
+    void nativeProtocolStablePrefixIsDeterministic() {
+        String sep = ContextAssemblerService.SYSTEM_VOLATILE_SEPARATOR;
+        String first = protocolSystemText(false, AgentMode.AGENT, true);
+        String second = protocolSystemText(false, AgentMode.AGENT, true);
+        assertEquals(first.substring(0, first.indexOf(sep)), second.substring(0, second.indexOf(sep)));
     }
 }

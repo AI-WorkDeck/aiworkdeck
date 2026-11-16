@@ -28,7 +28,7 @@ class MobileBackupServiceTest {
     }
     @Test void pausedBackupRetainsConsentButNeedsExplicitEnableAfterAccountResume() {
         user.setFileCloudBackupEnabled(true);user.setCloudBackupPaused(true);
-        when(quota.postpaidEnabled()).thenReturn(true);when(quota.cloudAccess(1L)).thenReturn(Map.of("frozen",false));
+        when(quota.postpaidEnabled()).thenReturn(true);when(quota.postpaidFor(anyLong())).thenReturn(true);when(quota.cloudAccess(1L)).thenReturn(Map.of("frozen",false));
         assertEquals(false,service.consent(1L).get("enabled"));assertTrue(user.isFileCloudBackupEnabled());
         assertTrue(service.eligible(1L),"after account resume remaining bytes can be read");
         assertThrows(IllegalArgumentException.class,()->service.manifest(1L,"desktop","42",List.of(),0));
@@ -36,7 +36,7 @@ class MobileBackupServiceTest {
     }
     @Test void failedResumeCannotClearPausedBackup() {
         user.setFileCloudBackupEnabled(true);user.setCloudBackupPaused(true);
-        when(quota.postpaidEnabled()).thenReturn(true);when(quota.cloudAccess(1L)).thenReturn(Map.of("frozen",true));
+        when(quota.postpaidEnabled()).thenReturn(true);when(quota.postpaidFor(anyLong())).thenReturn(true);when(quota.cloudAccess(1L)).thenReturn(Map.of("frozen",true));
 
         assertThrows(IllegalArgumentException.class,()->service.consent(1L,true,MobileBackupService.CONSENT_VERSION));
         assertTrue(user.isCloudBackupPaused());assertTrue(user.isFileCloudBackupEnabled());verify(quota,never()).resumeCloud(anyLong());

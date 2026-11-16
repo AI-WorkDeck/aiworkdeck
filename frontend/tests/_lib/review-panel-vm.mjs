@@ -6,6 +6,8 @@
 // **真实现**，只有子组件（EvidencePanel）是桩。
 import { readFileSync } from 'node:fs'
 import * as reviewGrouping from '../../src/utils/reviewGrouping.js'
+import { charDiff } from '../../src/utils/textDiff.js'
+import { MERGE_MECH_MARK } from '../../src/utils/mergeRevisionView.js'
 
 const SRC = readFileSync(new URL('../../src/components/ReviewPanel.vue', import.meta.url), 'utf8')
 
@@ -15,8 +17,9 @@ export function makeReviewComponent() {
     .replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
   const names = Object.keys(reviewGrouping)
   // eslint-disable-next-line no-new-func
-  const factory = new Function('EvidencePanel', 'InlineReviewPanel', ...names, script.replace('export default', 'return'))
-  return factory({}, {}, ...names.map((n) => reviewGrouping[n]))
+  // 三方合并（台账 B13 起）用到的纯函数喂真实现，相邻段落清单子组件是桩
+  const factory = new Function('EvidencePanel', 'InlineReviewPanel', 'MergeNeighborList', 'charDiff', 'MERGE_MECH_MARK', ...names, script.replace('export default', 'return'))
+  return factory({}, {}, {}, charDiff, MERGE_MECH_MARK, ...names.map((n) => reviewGrouping[n]))
 }
 
 // props 里给的字段直接铺到 this 上（组件里 props 与 data 同层可见）。

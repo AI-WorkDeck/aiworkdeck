@@ -183,6 +183,30 @@ class WorkSessionServiceTest {
     }
 
     @Test
+    void aiFileMutationJoinsTheCurrentExitScopeEvenWithoutASaveSignal() {
+        svc.commitAiRound(7L, 1L, true);
+
+        assertTrue(svc.sessionChangedProjectIds().contains(7L));
+    }
+
+    @Test
+    void diskScanAfterEndSessionDoesNotStartAPhantomSession() throws Exception {
+        // QA D10: ending a session checks out main and merges; the folder scan then reports the rewritten
+        // file (same content, newer mtime). That must not open a new session.
+        svc.onChangeSignal(7L, 1L, "韩泽伟");
+        Files.writeString(root.resolve("projects/7/合同.txt"), "二稿");
+        svc.commitNow(7L, 1L, "韩泽伟", "改了");
+        svc.endSession(7L, 1L, "韩泽伟", "第一轮");
+        svc.onDiskScanSignal(7L, 1L, "韩泽伟");
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertEquals(repoSvc.mainBranch(), repoSvc.currentBranch(7L));
+
+        Files.writeString(root.resolve("projects/7/合同.txt"), "三稿");
+        svc.onDiskScanSignal(7L, 1L, "韩泽伟");
+        assertTrue(svc.activeSession(7L).isPresent(), "a real edit found by the scan still starts a session");
+    }
+
+    @Test
     void secondSignalReusesTheSameSession() {
         svc.onChangeSignal(7L, 1L, "韩泽伟");
         String branch = svc.activeSession(7L).orElseThrow().getBranchName();
@@ -205,6 +229,24 @@ class WorkSessionServiceTest {
         assertTrue(svc.activeSession(7L).isEmpty());
         assertEquals(WorkSession.Status.MERGED,
                 sessions.values().iterator().next().getStatus());
+    }
+
+    @Test
+    void endSessionRepairsUnbornRepositoryBeforeCreatingWorkSession() throws Exception {
+        repoSvc.deleteRepository(7L);
+        repoSvc.initEmptyForReceive(7L);
+        assertNull(repoSvc.resolveRef(7L, "HEAD"));
+        Files.writeString(root.resolve("projects/7/合同.txt"), "首次提交保留当前文件");
+
+        var result = svc.endSession(7L, 1L, "韩泽伟", "首次提交");
+
+        String head = repoSvc.resolveRef(7L, "HEAD");
+        assertNotNull(head);
+        assertEquals("首次提交保留当前文件", Files.readString(root.resolve("projects/7/合同.txt")));
+        assertEquals("首次提交保留当前文件", new String(repoSvc.readBlobAtCommit(7L, head, "合同.txt")));
+        assertTrue(repoSvc.pendingChanges(7L).isEmpty());
+        assertTrue(svc.activeSession(7L).isEmpty());
+        assertNotNull(result);
     }
 
     @Test

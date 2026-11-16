@@ -135,5 +135,54 @@
       ],
       "bubbleEndStatus": "finished"
     }
+  },
+  {
+    "id": "truncated-write-docx-recovers-by-appending",
+    "title": "write_docx 整篇塞进参数被截断：纠正提醒给出分段 + append=true，模型分两次写完（tasks-10 t03）",
+    "category": "files",
+    "protocol": "xml",
+    "userInput": "比对两版协议，把差异写成「差异说明.docx」",
+    "turns": [
+      {
+        "text": "<process name=\"写差异说明\"><tool_code>write_docx(fileName=\"差异说明.docx\", markdownContent=\"# 差异说明\\n\\n一、付款期限由 30 日改为 15 日。\\n\\n二、违约金"
+      },
+      {
+        "text": "<process name=\"写差异说明\"><tool_code>write_docx(fileName=\"差异说明.docx\", markdownContent=\"# 差异说明\\n\\n一、付款期限由 30 日改为 15 日。\", projectId=1)</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"续写\"><tool_code>write_docx(fileName=\"差异说明.docx\", markdownContent=\"二、违约金由 10% 提高到 20%。\\n\\n三、新增保密条款。\", projectId=1, append=true)</tool_code></process>"
+      },
+      {
+        "text": "<final>已写好「差异说明.docx」。</final>"
+      }
+    ],
+    "toolStubs": {
+      "write_docx": "{\"status\":\"success\",\"db_id\":88,\"file_name\":\"差异说明.docx\"}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "write_docx",
+          "argsContain": {
+            "fileName": "差异说明.docx"
+          }
+        },
+        {
+          "name": "write_docx",
+          "argsContain": {
+            "fileName": "差异说明.docx",
+            "append": "true"
+          }
+        }
+      ],
+      "promptContains": [
+        "标签未闭合",
+        "append=true"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
   }
 ]

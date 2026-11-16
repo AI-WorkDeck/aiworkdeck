@@ -18,6 +18,18 @@
 标记的背景矩形收养，认标记修）与 PATCH 7（同一函数再加包含关系判定，连没有标记的
 日期型/期间型/分页内容底也认得出来，dev-board#893），都是**修上游的 bug**，上游修好就能删。
 
+2026-11-11 升级到上游 release v3.1.0 `16c480c`（重画 v1.1.0 / 时间轴 v2.2.0），三方合并逐条复核：
+- **PATCH 2 删除**：上游已自行把 f-string 里的反斜杠提出来（`_emph_attr`），取上游写法。下文 PATCH 2 一节留作沿革。
+- **PATCH 9 缩小**：上游改由 `_ask_style()` 从 `pick.round_three()` 单一来源取号，两处 `style 2` 提示与 `next` 的编号都已修好；
+  只剩 `STEPS` 表那一行（上游仍写「呈报给谁 → 白描 / 奇川风 / 歸藏风」，顺序与真实编号不符）。
+- **PATCH 7 收窄**：上游新增守卫「卡片里日期 + 正文整块收进同一个形状」——只有一个卡片、卡片里只有字时，
+  原包含关系判定会把这张卡当成背景、文字不被收养。改为：形状须包住所有其他图元，**且其中至少有一个非文字图元**，
+  才算背景。真实的内容底总包着卡片与轴线，判定不变；`test_timeline_pptx_title_backdrop.py` 照旧全绿。
+- **PATCH 8 跟进**：上游 `trace_index.js` 新增「未上图的原文」三列表（`payload.omissions`），`trace_index.py` 同步补上，
+  由 `test_timeline_trace_index.py::test_omissions_table_matches_upstream_js` 钉住，LibreOffice 实渲染核对过。
+- **PATCH 3 删除**：上游 schema 的 layout 枚举已含 `comparison_table`，并新增回归守卫；取上游原文件。
+- PATCH 1、4、5、6 无冲突，原样保留。
+
 ---
 
 ## PATCH 1 · 跨平台探测中文宋体（`scripts/render.py` · `_best_installed_song`）
@@ -41,7 +53,7 @@
 
 只在探不到时才多做事，Linux 上逐字节等价。**值得回馈上游。**
 
-## PATCH 2 · 去掉 PEP 701 语法（`scripts/render_relation.py` · `render()` 内节点输出）
+## PATCH 2 · 去掉 PEP 701 语法（2026-11-11 已删：上游 v1.1.0 自行修好）（`scripts/render_relation.py` · `render()` 内节点输出）
 
 **症状**：`import render` 直接 `SyntaxError`，整个出图链路在 import 期就死，
 和地图内容无关。
@@ -69,7 +81,7 @@ out.append(f'<g data-role="node" data-id="{nid}"{emph_attr}>')
 打完补丁后，整个 `mqc-litigation-visual-redraw/scripts/` 在 Python 3.9 上都能 import，3.11 自然覆盖。
 **同样值得回馈上游**（顺带把 doctor.py 的版本门槛说法一并纠正）。
 
-## PATCH 3 · schema 的 layout 枚举补上 `comparison_table`（`schemas/semantic-map.schema.json`）
+## PATCH 3 · schema 的 layout 枚举补上 `comparison_table`（2026-11-11 已删：上游 v1.1.0 自行修好）（`schemas/semantic-map.schema.json`）
 
 **症状**：`comparison_table`（A vs B 对比表）一律画不出来，报
 `schema: layout: 'comparison_table' is not one of [...]`——**但只在装了 `jsonschema`
@@ -358,5 +370,5 @@ mqc-litigation-visual-redraw/scripts/render.py` 也直接调它），没有理�
 python3 litviz/skills/mqc-litigation-visual-redraw/tests/run_checks.py
 ```
 
-上游自带 149 项，要 graphviz（`brew install graphviz`）。补丁不该让任何一项变红——
+上游自带 163 项（2026-11-11 起；预期 160/163）。补丁不该让任何一项变红——
 两条补丁都是等价改写，红了就是改错了。

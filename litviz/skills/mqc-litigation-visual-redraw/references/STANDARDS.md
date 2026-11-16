@@ -37,7 +37,7 @@ unreadable/uncertain goes in `provenance.uncertainties` and is raised at the
    declined ledger in §9. Adopt schema/lint/CLI/rasterizer discipline; refuse
    model-places-coordinates, multi-colour, legends, and infographic shells.
 3. **Deterministic quality floor** — the pipeline (frozen tokens + scripts-do-geometry
-   + validate + audit + lint + 136 regression guards, 149 assertions) means a correct JSON always
+   + validate + audit + lint + 150 regression guards, 163 assertions) means a correct JSON always
    renders to standard, regardless of model strength.
 
 ---
@@ -49,8 +49,8 @@ unreadable/uncertain goes in `provenance.uncertainties` and is raised at the
 | timeline · numbered | `numbered_point_timeline` | order matters, spacing does NOT (dense / undated events) | render_points | no |
 | timeline · dated | `dated_point_timeline` | real time distances matter; long, well-separated points | render_dated | no |
 | timeline · gantt | `proportional_gantt` | periods that run/overlap/gap (时效, 保证期间) | render_spans | no |
-| flowchart | `graphviz_flow` | steps / decisions / branches / merges | render_flow | **yes** |
-| relationship · network | `graphviz_relation` | free-form labeled relationships | render_relation | **yes** |
+| flowchart | `graphviz_flow` | steps / decisions / branches / merges | render_flow | optional (built-in fallback) |
+| relationship · network | `graphviz_relation` | free-form labeled relationships | render_relation | optional (built-in fallback) |
 | relationship · tree | `relation_tree` | top-down hierarchy (主体关系图, 股权/控制) | render_tree | no |
 | relationship · table | `comparison_table` | A vs B read across, dimension by dimension (两裁判要旨 / 两方案) | render_compare | no |
 
@@ -257,20 +257,24 @@ with a real time ruler on the axis (a time ruler REQUIRES a proportional axis).
 
 ## Versioning
 
-Now **v1.0.2**. The CHANGELOG records what each release changed.
+Now **v1.1.0**. The CHANGELOG records what each release changed.
 Author/footer: 缪奇川律师 · mqc-legal-skills.
 
-> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.0.2
+> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.1.0
 
 ## Mode & emphasis defaults (frozen)
 
 - **Default mode is 奇川风** (colour master). 白描 and 歸藏风 engage only when the
   user picks them (checkpoint answer, `visual_mode` in the JSON, or a CLI flag).
-- **Red is opt-in only.** The deep-red accent marks whatever the USER names at the
-  checkpoint. **If the user skips the question, says "just render it", or does not
-  reply, the figure carries NO red at all** — the model must never pick an emphasis
-  on its own to fill the gap. In 歸藏风 / 白描 the same user choice is re-expressed
-  (solid blue block / black), and the same opt-in rule applies.
+- **Where the red comes from is recorded, and enforced in code** (`common.strip_unearned_emphasis`).
+  The checkpoint always proposes one element (「建议标」). If the user names one, that
+  is used (`emphasis_source: "user"`, up to two). **If the user does not reply, the
+  proposal is adopted** (`emphasis_source: "model"`): exactly one element stays red,
+  the output says out loud which one, and the files remain `*-draft` until confirmed.
+  Replying 0 means no red at all (`"none"`). A map that cannot say where its red came
+  from draws none. In 歸藏风 / 白描 the same choice is re-expressed (solid blue block /
+  black). This matches SKILL.md and the checkpoint's own wording 「不回 = 采纳建议」;
+  an older draft of this section said "no reply → no red", which the code never did.
 - The delivery summary always states the mode used and either the chosen emphasis
   or "emphasis: none".
 

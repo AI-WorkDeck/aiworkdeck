@@ -10,9 +10,16 @@ preflight()
 const server = await startServer({ patchServed(url, content) {
   if (!url.endsWith('/office_thread.js')) return content
   // 只在内存注入失败，验证异常链路；不改源码、构建产物或正常建表路径。
-  return Buffer.from(content.toString()
-    .replace('function insertStyledTable(rows, headerRows) {', "function insertStyledTable(rows, headerRows) { if (rows[0][0] === '__TEST_TABLE_FAIL__') throw new Error('模拟建表失败');")
-    .replace("dispatchUno('.uno:RemoveBullets');", "if (!p.debugNoop) dispatchUno('.uno:RemoveBullets');"))
+  // 签名变了（曾加 plainText 参数）注入会静默落空、测试误红，所以按函数名匹配并断言命中。
+  const src = content.toString()
+  const hook = /function insertStyledTable\(([^)]*)\) \{/
+  const fallback = 'for (let i = 0; i < tgt.paragraphs.length; i++) clearNumOn(tgt.paragraphs[i]);'
+  if (!hook.test(src) || !src.includes("dispatchUno('.uno:RemoveBullets');") || !src.includes(fallback)) throw new Error('generated-docx: fault-injection anchors not found in office_thread.js')
+  return Buffer.from(src
+    .replace(hook, (m) => `${m} if (rows[0][0] === '__TEST_TABLE_FAIL__') throw new Error('模拟建表失败');`)
+    .replace("dispatchUno('.uno:RemoveBullets');", "if (!p.debugNoop) dispatchUno('.uno:RemoveBullets');")
+    // 模拟「去编号整体没生效」：派发与逐段兜底都跳过，验证最终用真实状态判定
+    .replace(fallback, `if (!p.debugNoop) ${fallback}`))
 } })
 const browser = await launchBrowser(await loadPuppeteer())
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'

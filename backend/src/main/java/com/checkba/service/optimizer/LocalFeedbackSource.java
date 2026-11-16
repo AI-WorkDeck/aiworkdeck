@@ -6,6 +6,7 @@ package com.checkba.service.optimizer;
 import com.checkba.model.entity.FeedbackAttachment;
 import com.checkba.model.entity.UserFeedback;
 import com.checkba.repository.UserFeedbackRepository;
+import com.checkba.service.feedback.FeedbackAiReportService;
 import com.checkba.service.feedback.FeedbackService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -32,6 +33,13 @@ public class LocalFeedbackSource implements OptimizerFeedbackSource {
 
     @Override
     public void save(UserFeedback fb) {
+        if (fb.getId() != null && !UserFeedback.STATUS_RESOLVED.equals(fb.getStatus())) {
+            boolean alreadyResolved = repository.findById(fb.getId())
+                    .filter(current -> UserFeedback.STATUS_RESOLVED.equals(current.getStatus()))
+                    .filter(FeedbackAiReportService::isAiContentReport)
+                    .isPresent();
+            if (alreadyResolved) return;
+        }
         repository.save(fb);
     }
 

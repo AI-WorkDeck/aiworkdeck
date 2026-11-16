@@ -3,6 +3,7 @@
 
 package com.checkba.service.task;
 
+import com.checkba.model.entity.Project;
 import com.checkba.model.entity.ProjectFile;
 import com.checkba.model.entity.ProjectTask;
 import com.checkba.model.entity.ProjectTaskFile;
@@ -14,6 +15,7 @@ import com.checkba.repository.UserRepository;
 import com.checkba.service.LangText;
 import com.checkba.service.LocalIdentityService;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,17 +68,20 @@ public class ProjectTaskService {
     private final ProjectTaskFileRepository taskFileRepository;
     private final UserRepository userRepository;
     private final ProjectMemberService projectMemberService;
+    private final ProjectService projectService;
 
     public ProjectTaskService(ProjectTaskRepository taskRepository,
                               ProjectFileRepository projectFileRepository,
                               ProjectTaskFileRepository taskFileRepository,
                               UserRepository userRepository,
-                              ProjectMemberService projectMemberService) {
+                              ProjectMemberService projectMemberService,
+                              ProjectService projectService) {
         this.taskRepository = taskRepository;
         this.projectFileRepository = projectFileRepository;
         this.taskFileRepository = taskFileRepository;
         this.userRepository = userRepository;
         this.projectMemberService = projectMemberService;
+        this.projectService = projectService;
     }
 
     /**
@@ -250,8 +255,8 @@ public class ProjectTaskService {
      */
     public List<Map<String, Object>> listByProject(Long projectId, LocalDate from, LocalDate to, Long fileId) {
         List<ProjectTask> tasks = fileId == null
-                ? taskRepository.findByProjectIdAndDueDateRange(projectId, from, to)
-                : taskRepository.findByProjectIdAndFileIdAndDueDateRange(projectId, fileId, from, to);
+                ? taskRepository.findByProjectIdAndDueDateRange(projectId, lowerBound(from), upperBound(to))
+                : taskRepository.findByProjectIdAndFileIdAndDueDateRange(projectId, fileId, lowerBound(from), upperBound(to));
         return toMaps(tasks);
     }
 
@@ -260,8 +265,145 @@ public class ProjectTaskService {
         if (projectIds == null || projectIds.isEmpty()) {
             return List.of();
         }
-        List<ProjectTask> tasks = taskRepository.findByProjectIdInAndDueDateRange(projectIds, from, to);
+        List<ProjectTask> tasks = taskRepository.findByProjectIdInAndDueDateRange(projectIds, lowerBound(from), upperBound(to));
         return toMaps(tasks);
+    }
+
+    /*
+     * 日期区间空端换成哨兵值再下发：PostgreSQL 推不出空 LocalDate 参数的类型，
+     * 「:from IS NULL OR …」会炸 could not determine data type of parameter（H2 不炸，单测测不出）。
+     * due_date 列 NOT NULL，哨兵与「不限」语义等价。
+     */
+    static final LocalDate NO_LOWER_BOUND = LocalDate.of(1900, 1, 1);
+    static final LocalDate NO_UPPER_BOUND = LocalDate.of(9999, 12, 31);
+
+    private static LocalDate lowerBound(LocalDate from) {
+        return from == null ? NO_LOWER_BOUND : from;
+    }
+
+    private static LocalDate upperBound(LocalDate to) {
+        return to == null ? NO_UPPER_BOUND : to;
+    }
+
+    /**
+     * 用户可见全部项目（创建的 ∪ 成员项目，同 ProjectService.getUserProjects）在日期区间内的事项，
+     * 每条带 projectName。日历页 GET /api/calendar 与 AI 工具 task_list（跨项目）共用。
+     */
+    public List<Map<String, Object>> listForUser(Long userId, LocalDate from, LocalDate to) {
+        Map<Long, String> projectNames = new HashMap<>();
+        for (Project p : projectService.getUserProjects(userId)) {
+            projectNames.put(p.getId(), p.getName());
+        }
+        List<Map<String, Object>> tasks = listAcrossProjects(List.copyOf(projectNames.keySet()), from, to);
+        for (Map<String, Object> task : tasks) {
+            task.put("projectName", projectNames.get(task.get("projectId")));
+        }
+        return tasks;
+    }
+
+    /** 隐藏的随手工作区（SCRATCH）：写入类工具不得把它当作用户指的项目。查不到视为否。 */
+    public boolean isScratchProject(Long projectId) {
+        if (projectId == null) return false;
+        try {
+            return projectService.getProject(projectId).isScratchWorkspace();
+        } catch (RuntimeException notFound) {
+            return false;
+        }
+    }
+
+    /**
+     * 把用户原话里的项目称呼解析到用户可访问的非 SCRATCH 项目（含没有任何事项的项目）。
+     * 称呼与某项目全名完全相等（忽略大小写），且没有其他项目名包含该称呼 → 只返回它（无歧义）；
+     * 否则返回所有「项目名包含称呼」或「称呼包含项目名」的项目。0 个 = 没找到，1 个 = 唯一，多个 = 歧义。
+     *
+     * @param write true 时只考虑用户可写且非 CLIENT 的项目（建事项）；false 只需可读（查事项）
+     */
+    public List<Project> resolveProjects(Long userId, String text, boolean write) {
+        String needle = text == null ? "" : text.trim().toLowerCase();
+        if (needle.isEmpty()) return List.of();
+        List<Project> candidates = projectService.getUserProjects(userId).stream()
+                .filter(p -> !p.isScratchWorkspace() && p.getName() != null && !p.getName().isBlank())
+                .filter(p -> !write || (projectMemberService.hasWritePermission(p.getId(), userId)
+                        && !projectMemberService.isClient(p.getId(), userId)))
+                .toList();
+        List<Project> exact = candidates.stream().filter(p -> p.getName().trim().toLowerCase().equals(needle)).toList();
+        List<Project> related = candidates.stream().filter(p -> {
+            String name = p.getName().trim().toLowerCase();
+            return name.contains(needle) || needle.contains(name);
+        }).toList();
+        if (exact.size() == 1 && related.stream().noneMatch(p -> !p.getId().equals(exact.get(0).getId())
+                && p.getName().trim().toLowerCase().contains(needle))) {
+            return exact;
+        }
+        return related;
+    }
+
+    /** 项目名/用户消息归一化时先剔掉的泛称（长词在前）。 */
+    private static final List<String> GENERIC_WORDS = List.of("有限公司", "一案", "项目", "案件", "纠纷", "合同", "公司", "事项",
+            "matter", "case", "project", "案", "诉", "与", "关于", "的");
+
+    private static String normalizeForMention(String text, char separator) {
+        String t = text == null ? "" : text.toLowerCase();
+        for (String w : GENERIC_WORDS) t = t.replace(w, String.valueOf(separator));
+        StringBuilder sb = new StringBuilder();
+        for (char c : t.toCharArray()) sb.append(Character.isLetterOrDigit(c) ? c : separator);
+        return sb.toString();
+    }
+
+    private static String longestCommonSubstring(String a, String b) {
+        int best = 0, end = 0;
+        int[] prev = new int[b.length() + 1];
+        for (int i = 1; i <= a.length(); i++) {
+            int[] cur = new int[b.length() + 1];
+            for (int j = 1; j <= b.length(); j++) {
+                if (a.charAt(i - 1) == b.charAt(j - 1)) {
+                    cur[j] = prev[j - 1] + 1;
+                    if (cur[j] > best) { best = cur[j]; end = i; }
+                }
+            }
+            prev = cur;
+        }
+        return a.substring(end - best, end);
+    }
+
+    /**
+     * 用户这句话指向哪些项目（服务端确定性判定，不信模型传来的称呼）：名称与消息各自剔掉泛称后取最长公共子串，
+     * 长度须达阈值（含 CJK ≥2，纯拉丁 ≥4）；取全体最大长度 M，达到 M 的项目即候选。空 = 用户没点名项目。
+     */
+    public static List<Project> mentionedProjects(List<Project> projects, String message) {
+        if (message == null || message.isBlank() || projects == null) return List.of();
+        String normalizedMessage = normalizeForMention(message.length() > 2000 ? message.substring(0, 2000) : message, '\u0002');
+        int max = 0;
+        java.util.Map<Project, Integer> lengths = new java.util.LinkedHashMap<>();
+        for (Project p : projects) {
+            if (p.getName() == null) continue;
+            String common = longestCommonSubstring(normalizeForMention(p.getName(), '\u0001'), normalizedMessage);
+            boolean cjk = common.chars().anyMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN
+                    || (c >= 0x3040 && c <= 0x30ff) || (c >= 0xac00 && c <= 0xd7af));
+            if (common.length() >= (cjk ? 2 : 4)) {
+                lengths.put(p, common.length());
+                max = Math.max(max, common.length());
+            }
+        }
+        final int m = max;
+        return lengths.entrySet().stream().filter(e -> e.getValue() == m).map(java.util.Map.Entry::getKey).toList();
+    }
+
+    /** 用户可写且非 CLIENT（建事项的前提）。 */
+    public boolean canWrite(Long userId, Project project) {
+        return projectMemberService.hasWritePermission(project.getId(), userId)
+                && !projectMemberService.isClient(project.getId(), userId);
+    }
+
+    /** 用户可访问的非 SCRATCH 项目里最近的 limit 个（getUserProjects 按创建时间倒序），给「没找到」提示做候选。 */
+    public List<Project> recentProjects(Long userId, int limit) {
+        return projectService.getUserProjects(userId).stream().filter(p -> !p.isScratchWorkspace()).limit(limit).toList();
+    }
+
+    /** 同 {@link #mentionedProjects(List, String)}，范围为用户可访问的非 SCRATCH 项目。 */
+    public List<Project> projectsMentionedBy(Long userId, String message) {
+        return mentionedProjects(projectService.getUserProjects(userId).stream()
+                .filter(p -> !p.isScratchWorkspace()).toList(), message);
     }
 
     /** 单任务响应体（含 fileName）。create/update 端点用，字段集与列表端点完全一致。 */

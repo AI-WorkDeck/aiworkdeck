@@ -429,7 +429,8 @@ class LocalCoreBootstrapTest {
                 assertEquals(1, business.getCount()); assertFalse(refresh.isDone());
                 var lease = fixture.capture.ownership.acquireCoreLease();
                 allowEmf.countDown();
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                // 30s：整套测试满载并行时 bootstrap 线程 10s 内可能还没被调度到（只在全量跑偶发）
+                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
                 while (fixture.capture.ownership.state() == LocalCoreOwnership.State.CORE && System.nanoTime() < deadline) Thread.sleep(10);
                 assertEquals(LocalCoreOwnership.State.DRAINING, fixture.capture.ownership.state());
                 assertEquals(1, business.getCount()); assertEquals(0, fixture.capture.handedOff);
@@ -627,4 +628,18 @@ class LocalCoreBootstrapTest {
             assertTrue(afterClose.waitFor(5, TimeUnit.SECONDS)); assertEquals(0, afterClose.exitValue());
         } finally { release(afterClose); }
     }
+
+    /**
+     * S22：桌面库 URL 带 OPTIMIZE_REUSE_RESULTS=FALSE。h2File 只认白名单里的选项——漏了它就返回 null，
+     * 本地核心启动整段被跳过，挂着待恢复本地内容的用户还会直接启动失败。
+     */
+    @Test void desktopProfileJdbcUrlIsAcceptedIncludingResultReuseOff(@TempDir java.nio.file.Path home) throws Exception {
+        String yml = new String(getClass().getResourceAsStream("/application-desktop.yml").readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("url:\\s*(jdbc:h2:file:\\S+)").matcher(yml);
+        org.junit.jupiter.api.Assertions.assertTrue(m.find(), "desktop datasource url");
+        String url = m.group(1).replace("${user.home}", home.toString());
+        org.junit.jupiter.api.Assertions.assertTrue(url.contains(";OPTIMIZE_REUSE_RESULTS=FALSE"), url);
+        org.junit.jupiter.api.Assertions.assertEquals(home.resolve(".aiworkdeck/local.mv.db").normalize(), LocalCoreBootstrap.h2File(url));
+    }
 }
+

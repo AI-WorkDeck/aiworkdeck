@@ -17,7 +17,7 @@
 > v2.10（能力槽与能力包，dev-board#497）：`contributes.capabilities`（§15）把插件目录里的一份实现
 > 挂进宿主的某个「能力槽」，用户/AI 可切换、可回滚；首期只注册 `litigation.diagram` 一个槽。
 > 配套后端 `com.checkba.service.capability`（槽注册表 / 源码拉取 / 安装计划）+ `/api/capabilities`
-> + AI 工具 `capability_list` / `capability_install` / `capability_apply` / `capability_select`。
+> + AI 工具 `capability_list` / `capability_install`（先 url 出计划，确认后 planId 安装）/ `capability_select`。
 > 设计定稿见 docs/superpowers/specs/2026-09-07-capability-slots-self-upgrade-design.md。
 > 示例插件：[examples/hello-plugin/](../examples/hello-plugin/)（JAR 工具）、
 > [examples/hello-web-plugin/](../examples/hello-web-plugin/)（纯前端）。
@@ -86,6 +86,7 @@ plugins/
 | `tools` | object[] | 否 | 工具清单（`name` + 中文 `description` + 可选 `permissions`），用于插件广场展示、人工审查与 v2 权限校验。`name` 应与 JAR 中 `@Tool` 方法名一致；`permissions` 声明**该工具运行所需**的能力（v2 新增，见 §3）。 |
 | `frontendEntry` | string | 否 | **v2.3 起激活**：`web/index.html` 这样的相对路径 = Web 插件（见 §8）；`http(s)://` 绝对 URL = 旧形态，宿主直接 iframe 打开外部页面。 |
 | `minHostVersion` | string | 否 | **v2.7 新增**：本插件需要的最低宿主版本（semver）。宿主低于它时插件登记但**不生效**（不加载 JAR、不注册工具、不服务 web/），管理页提示「需要宿主 ≥ X，请升级客户端」，enable 明确拒绝；广场安装与 dev 直装在装前就拦。非法格式视为缺省并 WARN。dev 态宿主（版本 `dev`）跳过校验。注意它保护不了 0.27.3 及更老的宿主（它们不认识这个字段）——用了 v2.7 能力的插件应声明 `"0.27.4"`，缺口随存量宿主升级自然收敛。 |
+| `hosts` | string[] | 否 | **W1 新增**：除桌面端与 Office/WPS 任务窗格（缺省就支持）之外还支持的宿主，目前只认 `"web"`。声明了 `["web"]`，本插件的 Agent 工具（JAR `@Tool`、声明式 `tools[]`、`contributes.mcpServers` 投影的工具）才会出现在**网页版**（官网 `/web/` 工作台，`clientCapability:"web"`）会话里；**缺省不出现**——插件工具多数假设桌面环境（本机文件、桌面前端、编辑器桥），判不准时放行在网页上会变成死路径。只声明你的工具在纯云端（无本机文件、无终端、编辑器只开 DOCX）也能跑通的插件。不影响桌面端与任务窗格的可见性。宿主实现见 `ClientCapabilityService` / `WebClientToolSurface`。 |
 | `backendJars` | string[] | 否 | 相对插件目录的 JAR 文件名列表，启动/重扫时加载其中带 `@Tool` 注解的类。 |
 | `skills` | string[] | 否 | **v2.1 新增**：插件携带的 Skill 子目录名列表（相对插件目录），见 §7。 |
 | `packs` | string[] | 否 | **v2.3 新增**：依赖的原生资源包 id 列表，见 §9 与 [NATIVE_PACK_DISTRIBUTION.md](NATIVE_PACK_DISTRIBUTION.md)。 |
@@ -103,6 +104,15 @@ plugins/
 | `network` | 访问外部网络（HTTP 等出站请求） |
 | `editor` | 操作文档编辑器（LOWA/LibreOffice 相关原语） |
 | `ai` | **v2.7 新增**：经宿主平台通道调用 AI 模型（桥 `ai.request`，消耗**用户的** Credits）。广场受理时的人工审查重点项 |
+| `im` | 项目沟通固定动作（桥 `im.request`、宿主服务 `im`） |
+| `notifications` | 向当前用户发宿主通知 |
+| `lawfirm` | 律所管理固定动作（桥 `lawfirm.request`、宿主服务 `lawfirm`） |
+| `speech` | 本机语音组件进度事件（`speech.progress` / `speech.stopped`） |
+| `tasks` | 日程与任务（宿主服务 `calendar`、事件 `calendar.changed`） |
+| `clipboard` | 宿主剪贴板历史（服务 `clipboard`、事件 `clipboard.changed`） |
+| `worklog_read` | 只读本人工作记录汇总（宿主服务 `worklog.summary`，宿主 0.86.0+） |
+
+权限全集以 `PluginService.KNOWN_PERMISSIONS` 为准，SDK schema、官网上传校验与市场页标签由 `PluginPermissionParityTest` 对拍（官网仓有同名守卫测试）。
 
 > **先读这一段，否则会高估它的作用。**
 >
@@ -937,7 +947,7 @@ manifest 摘要、档位、权限、文件数、目标槽、`canAutoInstall`、�
 - 撞广场已装的 id 在 `plan` 阶段就报，不进入 `apply`。
 
 AI 工具 `capability_install(url)` 内部只做 `plan`；模型必须用 `<question>` 停机把计划
-念给用户听，确认后才调 `capability_apply(planId)`。**工具的登录 + admin 闸写在代码里**，
+念给用户听，确认后才调 `capability_install(planId)`。**工具的登录 + admin 闸写在代码里**，
 不靠 skill 的 `allowed_tools`（那份白名单只裁可见性、不拦分发）。
 
 ## 16. 项目沟通与项目文件材料（v2.11，宿主 0.61.0+）
@@ -953,6 +963,8 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 单文件客户权限是服务端统一规则（`ProjectFileAccessService`）：当前项目成员中的内部角色默认可读；项目 CLIENT 或全局 CLIENT 只读自己上传的文件及明确 `clientVisible=true` 的文件。旧 NULL 视为 false。非成员仍不能访问；文件权限不因加入聊天或 Git 克隆扩大。`GET/PUT /api/projects/{projectId}/files/{fileId}/access` 读取或设置客户可见性，写入需非客户项目写权限。拒绝正文固定为“抱歉文件还在准备中，请联系您的律师。”。下载、文本、搜索、移动端文件源共用此规则；拥有整个项目工具能力的律师 AI 工作台及跨文件派生分析暂不向客户开放。
 
 项目文件引用是发送时快照，携带 `source.projectUid/fileUid`，不含本机路径；引用前检查原文件可读。快照权限独立：默认内部可见，上传者本人仍可读，只有会话的非客户 OWNER 或上传者可通过 `fileAccess` 为会话内客户开放/收回。不可读附件消息仅返回 `{id,available:false,message}`，不泄露名称、摘要或来源；下载同样鉴权。权限收回禁止后续读取，但不能撤回对方已保存的副本。每次可见态轮询刷新最近页的附件权限，显式刷新覆盖全部已加载历史。
+
+客户历史可见范围：`invite` 接受可选布尔 `shareHistory`（默认 false），回包回显同名字段；未回显说明协作服务尚未执行该选择。客户身份的新成员（CLIENT 邀请码、持 MEMBER 码的全局 CLIENT 账号、进入项目群的项目客户）默认只能读取入群之后的消息，`messages` 的各种分页、未读数、归档、Agent 只读工具与消息中心同口径；只在入群前发出过的附件 `download` 返回固定待准备提示，逐文件 `clientVisible` 继续叠加。共享助手只依据全体成员都能读到的消息作答。规则上线前已存在的成员不受影响。
 
 上传 `clientMessageId` 与发送相同，仅同一发送重试复用附件；同键异内容/来源拒绝，缺键每次新建，新发送不会继承旧附件公开权限。归档同时受10000条和16 MiB限制，超限回滚，不生成部分成品。项目写入用项目行锁串行化，回滚清理本次新增物理文件。
 
@@ -1056,3 +1068,30 @@ UI 的 `dpia_workbench_action` 和 Agent 的 `dpia_workbench_task` 按可信调�
 6. **长耗时任务安全进度反馈（Safe Progress Bar）**
    - 超过 2 秒的文档抽取、批量核查或 AI 推理，必须通过 `awd.ui.progress(target, { title, detail, percent, safetyNote, cancelText, onCancel })` 或 `.awd-safe-progress` 展示当前阶段、进度百分比、可取消按钮及「本地底稿与已保存进度不受影响」的安全感知提示，严禁使用无反馈的全屏死锁遮罩。
 
+## 20. 声明式 Agent 工具（tools[]，v2.13）
+
+> 本节是 `docs/plans/agent-app-control.md` C2/C3/C9 的 SDK 侧落地。P1-1 只交付 schema、`sdk/plugin-sdk/services.json`、`plugin-dev validate` 离线校验与文档；宿主运行时注册（`ToolRegistry` 接入、`HostServiceRegistry`、安装期共用校验）由后续 PR 落地，在此之前宿主仍按老形态处理 `tools`。只加不改（§12.1）：只有 `name`/`description`/`permissions` 的老 manifest 继续按 JAR 工具解释。
+
+`tools[]` 每项二选一：
+
+- **老形态（JAR）**：`name` = `@Tool` 方法名，可带 `description`、`permissions`；不得含下列任何声明式字段。
+- **声明式**：
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `name` | 是 | 非 JAR 工具必须以 `<pluginId 连字符转下划线>_` 开头 |
+| `description` | 是 | 非空；支持 l10n `%key%`（§14.4）；第一行进模型目录，须满足下方「描述门禁」 |
+| `access` | 是 | `read` \| `write` \| `destructive`；读写分级是策略唯一轴 |
+| `inputSchema` | 否 | `mcpObjectSchema` 子集（§17.5） |
+| `handler` | 否 | 缺省 `{type:"jar"}`；`{type:"service",service,operation}`、`{type:"connection",connectionId,operation}`、`{type:"view",viewId}`（第四期） |
+| `permissions` | 否 | 运行所需，⊆ `manifest.permissions` |
+| `mcp` | 否 | 是否投影到对外 MCP；缺省 read→true，write/destructive→false。destructive、`confirm:always`、`agent:false` 的工具无论如何不投影（外部 Agent 答不了确认卡），`validate` 对这三类写 `mcp:true` 直接报错 |
+| `confirm` | 否 | `auto`（缺省，按 access；destructive 必确认）\| `always` \| `never` |
+| `keywords` | 否 | 命中即在起跑时放回本插件工具 |
+| `agent` | 否 | `false` = 登记但不下发给模型、不投影 MCP，仅供插件界面直调（对应内置 `offerToModel=false`）；缺省 `true`。**老形态（JAR）条目也可带 `agent:false`**，它不算声明式字段 |
+
+**描述门禁**（`docs/plans/tool-system-v2.md` A5，与内置工具同一把尺子）：`validate` 对声明式工具的 `description`（`%key%` 取 `l10n/zh-CN.json` 的译文；取不到则跳过）检查第一行——到第一个换行或「。」为止——① 不超过 80 字符；② 单一语言（中文；标识符、引号内容、括号里的纯 ASCII 同义词如 `（compare, redline）` 不算）；③ 动词开头，不以「用户」「当」「仅」「先」等名词/条件/禁令起手。「何时用 / 何时不用」写在第二行之后。其他语言的 l10n 译文保持同样的句序即可，不受此门禁检查。老形态条目不检查。
+
+内置 MCP 投影（`McpToolProjection`）另有一张会话内生排除表（`ask_user`、`list_tools`、`todo_write`、`use_skill`、`dispatch_subtask`、`list_attached_files`、`create_skill`）：这些工具只对一次对话有意义，不对外暴露。
+
+`validate` 规则：非 JAR 名字前缀；`access` 必填；`description` 非空；`inputSchema` 过 §17.5 子集；`service/operation` 必须在 `sdk/plugin-sdk/services.json`（宿主服务表发布副本，首批 `calendar`、`search`、`sensitive`，P2-3 增只读 `lawfirm`、`im`）；`connection` 必须是已声明的 `contributes.connections` 且操作存在；`view` 必须是已声明视图；`permissions` ⊆ `manifest.permissions`。SDK：`awd.tools.handle` 仅类型占位（第四期），`awd.tools.list()` 待宿主桥方法。

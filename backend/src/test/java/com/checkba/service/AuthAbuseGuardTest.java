@@ -184,4 +184,27 @@ class AuthAbuseGuardTest {
         }
         assertDoesNotThrow(() -> guard.checkMemberLookupRate(77L));
     }
+
+    // ==================== 客户访问码全站上限 ====================
+
+    @Test
+    @DisplayName("访问码全站失败到上限即拒，窗口过后自动恢复；文案不像掉线")
+    void clientCodeGlobalCeiling() {
+        AuthAbuseGuard guard = serverGuard("open");
+        for (int i = 0; i < AuthAbuseGuard.MAX_CLIENT_CODE_FAILURES_GLOBAL - 1; i++) guard.recordClientCodeFailure();
+        assertDoesNotThrow(guard::checkClientCodeGlobalCeiling);
+        guard.recordClientCodeFailure();
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, guard::checkClientCodeGlobalCeiling);
+        assertNotMistakenForLogout(e.getMessage());
+        advance(AuthAbuseGuard.CLIENT_CODE_GLOBAL_WINDOW.plusSeconds(1));
+        assertDoesNotThrow(guard::checkClientCodeGlobalCeiling);
+    }
+
+    @Test
+    @DisplayName("local-mode：访问码全站上限旁路")
+    void localModeBypassesClientCodeCeiling() {
+        AuthAbuseGuard guard = new AuthAbuseGuard(true, "open", now::get);
+        for (int i = 0; i < AuthAbuseGuard.MAX_CLIENT_CODE_FAILURES_GLOBAL + 5; i++) guard.recordClientCodeFailure();
+        assertDoesNotThrow(guard::checkClientCodeGlobalCeiling);
+    }
 }

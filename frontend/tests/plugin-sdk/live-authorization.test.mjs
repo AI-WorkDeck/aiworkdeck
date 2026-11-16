@@ -83,3 +83,68 @@ test('metadata changes refresh stale parent props once; network failure does not
   await h.call(); assert.equal(h.posted.at(-1).error.code, 'permission_denied')
   h.fetcher = async () => { throw Error('offline') }; await h.call(); assert.equal(h.events.length, 2)
 })
+
+// 0.86.0 律所管理 B5：/api/plugins/list 的工具说明、视图/主题等名称按界面语言返回。切换语言不是授权变化，
+// 否则下一次桥调用就会作废实例、重建 iframe，插件回到入口地址，丢掉当前页签和路由。
+const localizedRecord = (lang) => ({
+  ...record(),
+  tools: [{ name: 'demo_overview', description: lang === 'zh' ? '查看概况' : 'Show the overview', permissions: ['file_read'] }],
+  contributes: {
+    capabilities: ['x'],
+    views: [{ id: 'main', name: lang === 'zh' ? '律所管理' : 'Law firm', entry: 'web/index.html', placement: 'workspace' }],
+    themes: [{ id: 't', name: lang === 'zh' ? '水墨' : 'Ink', description: lang === 'zh' ? '说明' : 'About', file: 'themes/t.json' }],
+    templates: [{ id: 'tpl', name: lang === 'zh' ? '模板' : 'Template', description: lang === 'zh' ? '说明' : 'About', file: 'templates/a.docx', genre: 'bid' }],
+    styleProfiles: [{ id: 'sp', name: lang === 'zh' ? '样式' : 'Style', file: 'profiles/s.json' }],
+    evidenceSources: [{ sourceId: 'ev', name: lang === 'zh' ? '依据' : 'Basis', description: lang === 'zh' ? '说明' : 'About', transport: 'mcp', server: 's', tool: 't' }]
+  }
+})
+test('switching the app language keeps the live instance: localized names and descriptions are not authority', async () => {
+  const h = harness(); h.rows = [localizedRecord('zh')]
+  await h.vm.initializeAuthorization(); assert.equal(h.vm.authorizationReady, true)
+  const generation = h.vm.sessionGeneration
+  h.rows = [localizedRecord('en')]
+  await h.call()
+  assert.equal(h.calls, 1, 'the call runs')
+  assert.equal(h.vm.authorizationReady, true)
+  assert.equal(h.vm.sessionGeneration, generation, 'no new iframe, so the panel keeps its route')
+  assert.deepEqual(h.events, [], 'no market refresh either')
+})
+for (const [label, mutate] of [
+  ['a tool added', r => ({ ...r, tools: [...r.tools, { name: 'demo_delete', description: 'x', permissions: ['file_write'] }] })],
+  ['a tool permission widened', r => ({ ...r, tools: [{ ...r.tools[0], permissions: ['file_read', 'file_write'] }] })],
+  ['a view entry changed', r => ({ ...r, contributes: { ...r.contributes, views: [{ ...r.contributes.views[0], entry: 'web/other.html' }] } })],
+  ['an evidence source pointed at another server', r => ({ ...r, contributes: { ...r.contributes, evidenceSources: [{ ...r.contributes.evidenceSources[0], server: 'other' }] } })]
+]) test(`${label} still invalidates even when the language changed at the same time`, async () => {
+  const h = harness(); h.rows = [localizedRecord('zh')]
+  await h.vm.initializeAuthorization()
+  h.rows = [mutate(localizedRecord('en'))]
+  await h.call()
+  assert.equal(h.calls, 0); assert.equal(h.vm.authorizationReady, false)
+})
+
+// 插件工具权限升级重新授权：列表现在带工具的 access/confirm/mcp/handler/inputSchema，任一变化都作废旧实例；
+// pendingToolChanges / toolApprovalToken 只是「还没批准」的状态，批准时不该再重建面板（闸在后端）。
+const toolRecord = (tool = {}) => ({ ...record(), tools: [{ name: 'demo_add', description: 'x', permissions: [], access: 'write',
+  handler: { type: 'service', service: 'calendar', operation: 'create' }, inputSchema: { type: 'object' }, ...tool }] })
+for (const [label, change] of [
+  ['access widened', { access: 'destructive' }],
+  ['confirm turned off', { confirm: 'never' }],
+  ['MCP projection turned on', { mcp: true }],
+  ['handler rebound', { handler: { type: 'service', service: 'calendar', operation: 'delete' } }],
+  ['input schema changed', { inputSchema: { type: 'object', properties: { taskId: { type: 'integer' } } } }]
+]) test(`tool ${label} invalidates the live instance`, async () => {
+  const h = harness(); h.rows = [toolRecord()]
+  await h.vm.initializeAuthorization()
+  h.rows = [toolRecord(change)]
+  await h.call()
+  assert.equal(h.calls, 0); assert.equal(h.vm.authorizationReady, false)
+})
+test('approving pending tool changes does not rebuild the panel', async () => {
+  const pending = { ...toolRecord(), pendingToolChanges: [{ name: 'demo_add', reasons: ['access'] }], toolApprovalToken: 'abc' }
+  const h = harness(); h.rows = [pending]
+  await h.vm.initializeAuthorization()
+  const generation = h.vm.sessionGeneration
+  h.rows = [toolRecord()]
+  await h.call()
+  assert.equal(h.calls, 1); assert.equal(h.vm.sessionGeneration, generation)
+})

@@ -27,8 +27,8 @@
       <view class="agent-inbox-actions">
         <text v-if="editingId === item.id" class="inbox-action primary" @tap="saveEdit(item)">{{ $t('chat.save') }}</text>
         <text v-else class="inbox-action" @tap="beginEdit(item)">{{ $t('chat.inboxEdit') }}</text>
-        <text class="inbox-action" :class="{ disabled: index === 0 }" @tap="index > 0 && $emit('move', { item, position: index - 1 })">↑</text>
-        <text class="inbox-action" :class="{ disabled: index === items.length - 1 }" @tap="index < items.length - 1 && $emit('move', { item, position: index + 1 })">↓</text>
+        <text :title="$t('common.moveUp')" class="inbox-action" :class="{ disabled: index === 0 }" @tap="index > 0 && $emit('move', { item, position: index - 1 })">↑</text>
+        <text :title="$t('common.moveDown')" class="inbox-action" :class="{ disabled: index === items.length - 1 }" @tap="index < items.length - 1 && $emit('move', { item, position: index + 1 })">↓</text>
         <text v-if="canSendNow(item)" class="inbox-action primary" @tap="$emit('send-now', item)">{{ $t('chat.inboxSendNow') }}</text>
         <text class="inbox-action danger" @tap="$emit('delete', item)">{{ $t('chat.inboxDelete') }}</text>
       </view>

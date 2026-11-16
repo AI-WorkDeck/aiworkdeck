@@ -2,12 +2,14 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
       <view v-if="activeModalWorkflow" class="bw-editor-dialog">
-        <view class="awd-dialog-header bw-editor-header">
+        <!-- 嵌在设置页时外层 SettingsSection 已有标题与同一句说明，下方切换栏也标明了当前工作流；
+             再画一遍弹窗头就是重复的两层标题 -->
+        <view v-if="!embeddedInSettings" class="awd-dialog-header bw-editor-header">
           <view class="bw-editor-header-text">
             <text class="awd-dialog-title">{{ $t('chat.builtinWorkflowModalTitle', { name: activeModalWorkflow.title }) }}</text>
             <text class="bw-editor-subtitle">{{ $t('chat.builtinWorkflowModalSubtitle') }}</text>
           </view>
-          <text v-if="!embeddedInSettings" class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
+          <text :title="$t('common.close')" v-if="!embeddedInSettings" class="awd-dialog-close" @tap="closeBuiltinWorkflowModal">×</text>
         </view>
 
         <!-- 顶部四大工作流切换栏：从「高级设置」进入后可一站式配置任意内置工作流 -->

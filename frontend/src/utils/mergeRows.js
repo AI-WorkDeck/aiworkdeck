@@ -69,7 +69,10 @@ const WHOLE_REASON_KEYS = {
 // 其余统一说一句"没能合上"，不要把 stage 原文抖给律师看。
 const FAIL_REASON_KEYS = {
   align: 'version.mergeFailReasonAlign',
+  'align-other': 'version.mergeFailReasonAlign',
   engine: 'version.mergeFailReasonEngine',
+  // 台账 B13：有原样搬不过来的待处理修订（格式修订、表格里的修订等）时停下，不静默接受
+  'pending-redlines': 'version.mergeFailReasonPendingRedlines',
 }
 
 export function mergeRowText(t, row, sides = {}, opts = {}) {
@@ -81,12 +84,15 @@ export function mergeRowText(t, row, sides = {}, opts = {}) {
     case 'merged': {
       const mainCount = Number(row.mainCount != null ? row.mainCount : row.mainChanges) || 0
       const otherCount = Number(row.otherCount != null ? row.otherCount : row.otherChanges) || 0
-      return t('version.mergeRowMerged', {
+      const merged = t('version.mergeRowMerged', {
         main: sideName(t, sides && sides.main, given.main),
         mainCount,
         other: sideName(t, sides && sides.other, given.other),
         otherCount,
       })
+      // 挨着另一侧改动、只一侧改过、已自动合入的段（不要裁决，请过目）
+      const neighbors = Number(row.neighborCount) || 0
+      return neighbors ? merged + t('version.mergeRowNeighbors', { count: neighbors }) : merged
     }
     case 'manual-docx': {
       // 降级成 MANUAL 有两条不同的路：后端判「同一段两边都改了」（overlapCount>0），

@@ -32,7 +32,7 @@ export default {
   "signIn": "Inloggen",
   "signInTitle": "Inloggen (nodig voor AI, betaalde hub-items en de teamzaakbibliotheek)",
   "noProjectTitle": "Open een project om te beginnen",
-  "noProjectHint": "Open een project via Projecten aan de linkerkant, of maak er een via de welkomstpagina.",
+  "noProjectHint": "Klik linksboven op „Alle projecten” om een project te kiezen, of maak er een aan op de welkomstpagina.",
   "startupDisabledHint": "De welkomstpagina wordt niet meer geopend bij het opstarten.",
   "openWelcome": "Welkomstpagina openen",
   "aiNeedsProject": "Open eerst een project om AI-chat te gebruiken"

@@ -63,19 +63,20 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 文件管理工具 ====================
 
     @ToolMeta(displayName = "列出项目文件", category = "document")
-    @Tool("**项目文件的权威清单，一次列全**：Word / Excel / PPT / PDF / 纯文本(txt,md,csv…) / 图片 / 其他，"
-            + "每条给出 fileId、名称、项目相对路径与类型标注，同名文件按路径区分（父目录异常时仅列已知路径部分）。"
-            + "它是文件 ID 的主要来源——doc_open_file、extract_file_text、pdf_inspect、"
-            + "rename_project_file / move_project_file 的 fileId 从这里取；文件夹 ID 用 list_project_folders。\n"
-            + "用户问「项目里都有什么」时调这一个就够了。按文件名找用 search_project_files，"
-            + "按正文内容找用 search_project_content；只列文件夹用 list_project_folders；"
-            + "只要物理磁盘路径不要 ID 才用 list_files。")
+    @Tool("列出项目全部文件的权威清单，一次列全：每条有 fileId、名称、项目相对路径和类型。\n"
+            + "覆盖 Word / Excel / PPT / PDF / 纯文本 / 图片 / 其他。何时用：用户问「项目里都有什么」，或需要 fileId（doc_open_file、extract_file_text、pdf_inspect、rename_project_file 的 fileId 都从这里取；move_files 用路径）。\n"
+            + "何时不用：按文件名找用 search_project_files，按正文找用 search_project_content；只要物理磁盘路径用 list_files。\n"
+            + "foldersOnly=true 只列文件夹，是 folderId（write_docx 的 parentFolderId）的来源；新建文件夹用 create_folder。")
     public String doc_list_project_files(
-            @P("项目ID") Long projectId
+            @P("项目ID") Long projectId,
+            @P(value = "true=只列文件夹", required = false) Boolean foldersOnly
     ) {
-        log.info("Tool: doc_list_project_files called for projectId={}", projectId);
+        log.info("Tool: doc_list_project_files called for projectId={}, foldersOnly={}", projectId, foldersOnly);
         try {
             List<ProjectFile> files = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
+            if (Boolean.TRUE.equals(foldersOnly)) {
+                return folderListing(files);
+            }
 
             // 全类型清单（dev-board#807，审计 B-11）：此前只过 isEditableDocument（六种 Office 后缀），
             // PDF / txt / md / 图片一个都不在，于是「看看我项目里有什么」这件事要连调三四个
@@ -119,6 +120,32 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
+    /** 列文件的便捷重载（非工具入口）。 */
+    public String doc_list_project_files(Long projectId) {
+        return doc_list_project_files(projectId, null);
+    }
+
+    /** 只列文件夹的清单（doc_list_project_files foldersOnly=true）。 */
+    static String folderListing(List<ProjectFile> allFiles) {
+        java.util.Map<Long, ProjectFile> byId = new java.util.HashMap<>();
+        allFiles.stream().filter(f -> !Boolean.TRUE.equals(f.getIsDeleted())).forEach(f -> byId.put(f.getId(), f));
+        List<ProjectFile> folders = allFiles.stream()
+                .filter(f -> Boolean.TRUE.equals(f.getIsFolder()))
+                .filter(f -> !Boolean.TRUE.equals(f.getIsDeleted()))
+                .collect(Collectors.toList());
+        if (folders.isEmpty()) {
+            return "项目中没有文件夹。可传 parentId=0 明确保存到项目根目录。";
+        }
+        StringBuilder sb = new StringBuilder("项目文件夹列表 (共 " + folders.size() + " 个):\n");
+        sb.append("- ID: 0, 名称: 根目录 (明确选择；省略时沿用本轮源文档目录)\n");
+        for (ProjectFile f : folders) {
+            sb.append(String.format("- ID: %d, 名称: %s, 完整路径: /%s\n",
+                    f.getId(), f.getName(), FileTools.relativeProjectPath(f, byId)));
+        }
+        sb.append("\n提示：在 pptx_generate 中使用上述文件夹 ID 作为 parentId，可以将生成的 PPT 保存到对应文件夹。");
+        return sb.toString();
+    }
+
     /**
      * 清单里的类型标注。判据只看扩展名——{@code ProjectFile.fileType} 是客户端自填、原样落库、
      * 无校验的（见 ai-chat.md 图片多模态那一节），拿它分桶会把「用户随手填了个 doc」
@@ -157,7 +184,7 @@ public class DocumentEditTools implements AgentToolComponent {
                 // 纯文本不进文档编辑器（dev-board#37 起走轻量文本编辑器），给模型指对路
                 if (TextFileEditTools.isPlainText(file)) {
                     return "Error: " + file.getName() + " 是纯文本文件，不在文档编辑器中打开。"
-                            + "读取用 extract_file_text，修改用 text_write_file / text_find_replace"
+                            + "读取用 extract_file_text，修改用 write_file(mode=overwrite) / text_find_replace"
                             + "（改动会自动同步到用户已打开的文本标签）。";
                 }
                 // 清单现在一次列全类型（审计 B-11），所以模型更容易拿一个 PDF/图片的
@@ -272,12 +299,12 @@ public class DocumentEditTools implements AgentToolComponent {
         ProjectFile folder = projectFileRepository.findById(parentFolderId).orElse(null);
         if (folder == null || Boolean.TRUE.equals(folder.getIsDeleted())) {
             throw new IllegalArgumentException("目标文件夹不存在：parentFolderId=" + parentFolderId
-                    + "。请调用 list_project_folders 取正确的文件夹 ID；确实没有这个文件夹就问用户，不要凭空填。");
+                    + "。请调用 doc_list_project_files(foldersOnly=true) 取正确的文件夹 ID；确实没有这个文件夹就问用户，不要凭空填。");
         }
         if (!Boolean.TRUE.equals(folder.getIsFolder())) {
             throw new IllegalArgumentException("parentFolderId=" + parentFolderId
                     + " 指向的是文件而不是文件夹：" + folder.getName()
-                    + "。文件夹 ID 用 list_project_folders 取。");
+                    + "。文件夹 ID 用 doc_list_project_files(foldersOnly=true) 取。");
         }
         if (projectId != null && !projectId.equals(folder.getProjectId())) {
             throw new IllegalArgumentException("目标文件夹 " + parentFolderId
@@ -287,19 +314,15 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "流式写入文档", category = "document", fileEffect = "MODIFIED")
-    @Tool("开始实时流式写入文档。使用此工具后，模型生成的后续内容将直接写入打开的文档中。" +
-          "**重要：创建新文件时必须提供 fileName 参数（fileId 传 null）。** " +
-          "用户指名了要放进哪个文件夹时，先调 list_project_folders 拿到该文件夹的 ID，再作为 parentFolderId 传进来；" +
-          "省略则沿用本轮开始时打开文档所在目录，没有有效文档才用根目录；传0明确放根目录。" +
-          "调用此工具后，你必须立即开始生成文档内容，并且必须使用严格的 Markdown 格式（Markdown Heading #, ##, ### 等）。" +
-          "不要在调用此工具后输出任何非文档内容的闲聊，也不要把正文包进 <artifact>/<process>/<thinking> 等协议标签"
-          + "（标签内的文字不会进入文档，会得到一份空白文件），直接开始输出文档标题和正文。"
-          + "与 write_docx 的取舍：篇幅长、要让用户看着一段段写出来的起草用本工具；一次性落盘一份写好的文书用 write_docx。")
+    @Tool("开始流式写入文档：调用后你生成的内容直接写进打开的文档。\n"
+            + "何时用：篇幅长、要让用户看着逐段写出的起草；一次性落盘写好的文书用 write_docx。\n"
+            + "新建文件必须传 fileName（fileId 传 null）。用户指名文件夹时，先 doc_list_project_files(foldersOnly=true) 取 ID 作 parentFolderId；省略则沿用本轮打开文档所在目录，传 0 放根目录。\n"
+            + "调用后立即输出严格 Markdown（#、##、### 标题等），不要闲聊，不要把正文包进 <artifact>/<process>/<thinking> 等标签（标签内文字不进文档，会得到空白文件）。")
     public String doc_start_stream(
             @P("要打开的文件ID (如果是新建文件则传 null)") Long fileId,
             @P("新建文件名 (如 '法律意见书.docx')，仅当 fileId=null 时必填") String fileName,
             @P("项目ID，仅当 fileId=null 时必填") Long projectId,
-            @P(value = "目标文件夹ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。用户指名文件夹时必须传，ID 用 list_project_folders 取。",
+            @P(value = "目标文件夹ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。用户指名文件夹时必须传，ID 用 doc_list_project_files(foldersOnly=true) 取。",
                required = false) Long parentFolderId
     ) {
         log.info("Tool: doc_start_stream called fileId={}, fileName={}, projectId={}, parentFolderId={}",
@@ -426,71 +449,22 @@ public class DocumentEditTools implements AgentToolComponent {
 
     // ==================== 选区和光标操作 ====================
 
-    // 只登记、不下发（dev-board#1065 T-15）：内容被 doc_get_cursor_context（选中内容 + 前后文 +
-    // 所在段落）完全覆盖，两个「看选区」同时摆着只会让模型二选一。
-    @ToolMeta(displayName = "读取选区", category = "document", offerToModel = false)
-    @Tool("获取文档中当前选区的文本内容和位置信息。用于了解用户当前光标位置和选中的文本。")
-    public String doc_get_selection() {
-        log.info("Tool: doc_get_selection called");
-        try {
-            return editorBridgeService.executeEditorCommand("get_selection", null);
-        } catch (Exception e) {
-            log.error("Failed to get selection", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只宣告编辑器真的实现了的两种：office_thread.js 的 goto() 只处理 start/end，
-    // paragraph/bookmark/line 一律返回 "goto type not supported yet"。
-    // 描述里挂着做不到的能力 = 模型反复往死路上撞、白烧步数预算。
-    @ToolMeta(displayName = "跳转光标", category = "document")
-    @Tool("把光标移到文档开头或结尾。只支持 start/end；要定位到某一段用 doc_select_paragraph，"
-          + "要定位到某处文本用 doc_find_text 拿 anchorId 再 doc_select_anchor。")
-    public String doc_goto(
-            @P("定位类型：start(文档开头) 或 end(文档结尾)") String type,
-            @P("保留参数，start/end 用不到，传空即可") String target
-    ) {
-        log.info("Tool: doc_goto called type={}, target={}", type, target);
-        try {
-            return editorBridgeService.executeEditorCommand("goto", 
-                    java.util.Map.of("type", type, "target", target != null ? target : ""));
-        } catch (Exception e) {
-            log.error("Failed to goto position", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-15）：参数是 0 基字符偏移，而本类的设计原则写明「禁止使用
-    // 整数字符偏移（跨富文本必然错位）」，模型也拿不到可靠的偏移。选中某处一律走 doc_find_text →
-    // doc_select_anchor。worker 的 set_selection 仍被 doc_select_anchor 与插件使用。
-    @ToolMeta(displayName = "设置选区", category = "document", offerToModel = false)
-    @Tool("设置文档的选区范围（精确控制光标/选区）。Start 和 End 是字符索引位置。")
-    public String doc_set_selection(
-            @P("选区开始位置 (0-based 字符索引)") Integer start,
-            @P("选区结束位置 (0-based 字符索引)") Integer end
-    ) {
-        log.info("Tool: doc_set_selection called start={}, end={}", start, end);
-        try {
-            return editorBridgeService.executeEditorCommand("set_selection", 
-                    java.util.Map.of("start", start, "end", end));
-        } catch (Exception e) {
-            log.error("Failed to set selection", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
     // ==================== 查找和替换 ====================
 
     @ToolMeta(displayName = "查找定位", category = "document")
-    @Tool("【找】在文档中查找文本。anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位，不在替换范围内。每个匹配返回：text（匹配原文）、matchIndex（序号，从 1 开始）、anchorId（通常随编辑移动的临时书签，并非用一次就失效，目标原文未变时可复用；目标原文变化须重新查找；切换/重开文档或清理锚点后失效（按引文建证据链接也会清理），失效时重新查找）、前后文 contextBefore/contextAfter、段落片段 paragraph（最多160字，paragraphLength 为完整长度；paragraphTruncated=true 时须回读完整目标段落）。" +
-          "支持自动编号回退匹配：若段落使用 Word/Writer 自动编号（如 ListLabelString 为「第一条」「一、」「1.1」），搜索「第一条 服务内容」或「第一条」会自动匹配编号标签+正文，并额外返回 paragraphIndex 与 numbering。" +
-          "有多个匹配时先根据上下文确认哪一个才是目标，再用 anchorId 直接 doc_replace_at_anchor（精准替换，会自动滚动定位并返回改后段落）。" +
-          "单处修改先定位并核对上下文，不凭印象判断全文唯一。正文查找排除已删除修订；删除历史用 doc_list_revisions。多处独立修改拿到各自 anchorId 后连续调用。")
+    @Tool("【找】在文档中查找文本，返回每处命中的 anchorId 和上下文，供 doc_replace_at_anchor 等精确编辑。\n"
+            + "anchorId 只覆盖 matches[].text（命中的文本）；contextBefore/contextAfter 和 paragraph 仅供定位。每个匹配含 text、matchIndex（从 1 开始）、anchorId、前后文、paragraph（最多 160 字，paragraphTruncated=true 时须回读完整段落）。\n"
+            + "anchorId 是随编辑移动的临时书签，并非用一次就失效：目标原文未变时可复用，原文变了须重新查找；切换或重开文档、清理锚点后失效（按引文建证据链接也会清理），失效时重新查找。\n"
+            + "自动编号段落可连编号带正文搜（如「第一条 服务内容」），并返回 paragraphIndex 与 numbering。\n"
+            + "先据上下文确认目标再改，不凭印象判断全文唯一；多处独立修改拿到各自 anchorId 后连续调用。查找排除已删除修订，删除历史用 doc_list_revisions。\n"
+            + "注入正文里的修订标记 ⟦原:…⟧/⟦删:…⟧/⟦增:…⟧ 不是文档文字，keyword 不要带（误带时自动去掉）。")
     public String doc_find_text(
             @P("要查找的文本") String keyword,
-            @P("是否区分大小写，默认 false") Boolean matchCase
+            @P(value = "是否区分大小写，默认 false", required = false) Boolean matchCase
     ) {
         log.info("Tool: doc_find_text called keyword={}", keyword);
+        // 模型可能从注入正文整段照抄，带上 ⟦⟧ 修订标记；编辑器正文是最终文本，按最终文本找
+        keyword = com.checkba.service.DocxPendingRevisionText.stripMarkers(keyword);
         try {
             // Updated to call 'find_text_locations' which returns detailed positions
             String raw = editorBridgeService.executeEditorCommand("find_text_locations", 
@@ -504,8 +478,8 @@ public class DocumentEditTools implements AgentToolComponent {
 
     /**
      * worker 的 find_text_locations 返回 matchIndex: i（0 起）；模型面的 matchIndex 一律 1 基
-     * （doc_replace_nth_match / doc_delete_match 下发前减 1）。回给模型前加 1，模型从这里看到的
-     * 序号才能原样喂给 doc_replace_nth_match——否则「第二个匹配 matchIndex=1」传过去减一改的是第一个。
+     * （doc_replace_nth_match / doc_delete_match 两个工具已于 V3 删除，worker action 仍留给插件）。
+     * 回给模型前加 1，模型看到的序号与 doc_find_text 描述里的「从 1 开始」一致。
      * 解析失败（error / 非 JSON）原样透传。
      */
     static String oneBasedMatchIndexes(String raw) {
@@ -526,15 +500,14 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查找替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("仅在用户明确要求全文统一修改时使用查找替换；单处修改先 doc_find_text 核对上下文，再 doc_replace_at_anchor。查找以最终正文为准，排除已删除修订。所有修改将以修订模式进行，用户可以审阅后接受或拒绝。" +
-          "全文替换一次调用即可完成（大量命中也很快；纯插入型替换会分批处理并回传进度），不要因为耗时较长而重复调用；" +
-          "返回 replaced（已替换数）与 total（命中数），cancelled=true 表示用户中途取消、done 为已完成数。" +
-          "replaceText 传空字符串即删除（以修订删除痕迹呈现）。" +
-          REDLINE_GRANULARITY_NOTE)
+    @Tool("全文查找并替换，以修订模式进行（用户可审阅后接受或拒绝）。\n"
+            + "何时用：仅在用户明确要求全文统一修改时使用；单处修改先 doc_find_text 核对上下文，再 doc_replace_at_anchor。\n"
+            + "一次调用完成全文替换，不要因耗时长而重复调用。回执 replaced（已替换）、total（命中），cancelled=true 表示用户中途取消。查找以最终正文为准，排除已删除修订；replaceText 传空字符串即删除。\n"
+            + REDLINE_GRANULARITY_NOTE)
     public String doc_find_replace(
             @P("要查找的文本") String findText,
             @P("替换为的文本") String replaceText,
-            @P("是否替换全部匹配项；不传即替换全部。只想改第一处必须显式传 false") Boolean replaceAll
+            @P(value = "是否替换全部匹配项；不传即替换全部。只想改第一处必须显式传 false", required = false) Boolean replaceAll
     ) {
         log.info("Tool: doc_find_replace called find={}, replace={}", findText, replaceText);
         if (findText == null || findText.isEmpty() || replaceText == null) {
@@ -549,88 +522,6 @@ public class DocumentEditTools implements AgentToolComponent {
                     ));
         } catch (Exception e) {
             log.error("Failed to find and replace", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-14）：文档里「删一句 / 改第 N 处」原先有八条路，
-    // 这三条描述里没有任何判据，模型在它们与 doc_find_replace / doc_replace_at_anchor 之间随机挑。
-    // 删除一律走 doc_replace_at_anchor(anchorId, "") 或 doc_find_replace(…, "")；第 N 处先
-    // doc_find_text 按上下文挑出那一处的 anchorId。登记保留（插件经 DOC_ACTIONS 按 worker 契约
-    // 直接调这几个 action，老会话回放与 XML 兜底路径调到时照常执行）。
-    @ToolMeta(displayName = "替换指定匹配", category = "document", fileEffect = "MODIFIED",
-            offerToModel = false)
-    @Tool("将文档中第 N 个可见匹配项替换为新文本。" +
-          "索引从 1 开始，只计算用户可见的匹配（排除修订模式下被删除的内容）。" +
-          "如果要删除文本，将 replaceText 设置为空字符串即可。" +
-          REDLINE_GRANULARITY_NOTE)
-    public String doc_replace_nth_match(
-            @P("要查找的文本") String findText,
-            @P("替换为的文本") String replaceText,
-            @P("第几个可见匹配（从 1 开始）") Integer matchIndex
-    ) {
-        log.info("Tool: doc_replace_nth_match called find={}, replace={}, index={}", findText, replaceText, matchIndex);
-        try {
-            if (matchIndex == null || matchIndex < 1) {
-                return "Error: matchIndex 必须是从 1 开始的正整数";
-            }
-            // 模型面 1 基（描述/prompt/LEGACY_DEFAULTS 一致），worker 的 replace_nth_match 与它的
-            // 其它整数定位一样 0 基，且插件经 PluginHostImpl.DOC_ACTIONS 直接按 worker 契约调用——
-            // 归一只能落在这里：下发前减 1（MatchIndexBaseTest 钉着）。
-            return editorBridgeService.executeEditorCommand("replace_nth_match",
-                    java.util.Map.of(
-                            "findText", findText,
-                            "replaceText", replaceText,
-                            "matchIndex", matchIndex - 1
-                    ));
-        } catch (Exception e) {
-            log.error("Failed to replace nth match", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-14），理由见 doc_replace_nth_match 上方。
-    @ToolMeta(displayName = "删除匹配文本", category = "document", fileEffect = "MODIFIED",
-            offerToModel = false)
-    @Tool("删除文档中第 N 个可见的匹配文本。专门用于删除操作，通过查找文本并执行删除。")
-    public String doc_delete_match(
-            @P("要删除的文本内容") String findText,
-            @P("第几个可见匹配（从 1 开始）") Integer matchIndex
-    ) {
-        log.info("Tool: doc_delete_match called find={}, index={}", findText, matchIndex);
-        try {
-            if (matchIndex == null || matchIndex < 1) {
-                return "Error: matchIndex 必须是从 1 开始的正整数";
-            }
-            // 同 doc_replace_nth_match：模型面 1 基 → worker 0 基，下发前减 1。
-            return editorBridgeService.executeEditorCommand("delete_match",
-                    java.util.Map.of(
-                            "findText", findText,
-                            "matchIndex", matchIndex - 1
-                    ));
-        } catch (Exception e) {
-            log.error("Failed to delete match", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    // 只登记、不下发（dev-board#1065 T-14），理由见 doc_replace_nth_match 上方。
-    @ToolMeta(displayName = "删除文本", category = "document", fileEffect = "MODIFIED",
-            offerToModel = false)
-    @Tool("删除文档中的文本内容。可以删除所有匹配项，或只删除第一个匹配项。")
-    public String doc_delete_text(
-            @P("要删除的文本内容") String text,
-            @P("是否删除所有匹配项；不传只删第一处，要全部删掉必须显式传 true") Boolean deleteAll
-    ) {
-        log.info("Tool: doc_delete_text called text={}, all={}", text, deleteAll);
-        try {
-            return editorBridgeService.executeEditorCommand("delete_text", 
-                    java.util.Map.of(
-                            "text", text, 
-                            "deleteAll", deleteAll != null ? deleteAll : true
-                    ));
-        } catch (Exception e) {
-            log.error("Failed to delete text", e);
             return "Error: " + e.getMessage();
         }
     }
@@ -660,31 +551,46 @@ public class DocumentEditTools implements AgentToolComponent {
     // ==================== 插入和修改 ====================
 
     @ToolMeta(displayName = "插入文本", category = "document", fileEffect = "MODIFIED")
-    @Tool("插入文本，以修订模式进行。不给 anchorId 时插在当前光标处；" +
-          "要在某句话之前/之后插入：先 doc_find_text 拿到那句话的 anchorId，再调本工具并传 anchorId " +
-          "与 position（before=插在它前面，after=插在它后面，默认 after），一次调用完成定位与插入，" +
-          "不需要先 doc_select_anchor / doc_collapse_cursor。before/after 是锚点文字边界，不会自动换段；" +
-          "独立标题/段落须在 text 中提供实际换行符（段末插入以换行开头，段首插入以换行结尾），插入后回读相邻段落核对。")
+    @Tool("插入文本，以修订模式进行；默认插在光标处，给 anchorId 则插在该锚点前后。\n"
+            + "何时用：在某句话前/后插入——先 doc_find_text 取 anchorId，再传 anchorId 与 position（before/after，默认 after），不必先 doc_select(target=anchor)。\n"
+            + "新增一条条款/独立段落：传 newParagraph=true，text 成为锚点（或光标）所在段落之前/之后的新段落，沿用该段样式，一次调用完成；"
+            + "回执给出新段落段号与前后相邻段落，可直接核对，不必另行回读。\n"
+            + "不传 newParagraph 时 before/after 只是锚点文字边界，不会自动换段，text 里的实际换行符才会分段。")
     public String doc_insert_at_cursor(
-            @P("要插入的文本内容；独立标题/段落用实际换行符分隔，不能只靠 Markdown 标记") String text,
+            @P("要插入的文本内容；多段之间用实际换行符分隔，不能只靠 Markdown 标记") String text,
             @P(value = "doc_find_text 返回的 anchorId；给了就插在这个锚点的前面或后面，不给就插在当前光标处",
                     required = false) String anchorId,
-            @P(value = "相对锚点的位置：before 或 after（默认 after）；不给 anchorId 时忽略",
-                    required = false) String position
+            @P(value = "before 或 after（默认 after）：相对锚点；newParagraph=true 时相对锚点或光标所在段落",
+                    required = false) String position,
+            @P(value = "true = 作为独立新段落插在所在段落之前/之后（新增条款用它）", required = false)
+                    Boolean newParagraph
     ) {
-        log.info("Tool: doc_insert_at_cursor called, text length={}, anchor={}, position={}",
-                text == null ? -1 : text.length(), anchorId, position);
+        log.info("Tool: doc_insert_at_cursor called, text length={}, anchor={}, position={}, newParagraph={}",
+                text == null ? -1 : text.length(), anchorId, position, newParagraph);
         if (text == null) {
             return "Error: 缺少必填参数 text。";
         }
         try {
+            if (Boolean.TRUE.equals(newParagraph)) {
+                String to = normalizeInsertPosition(position);
+                if (to == null) {
+                    return "Error: position 只能是 before 或 after（收到：" + position + "）。";
+                }
+                // 一条 worker 命令完成「定位所在段落 → 分段 → 写入 → 沿用相邻段样式」，
+                // 同一撤销组；不再走下面三步串（那条路只能落在锚点文字边界上）。
+                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                params.put("text", text);
+                params.put("newParagraph", to);
+                if (anchorId != null && !anchorId.isBlank()) params.put("anchor", anchorId);
+                return editorBridgeService.executeEditorCommand("insert_at_cursor", params);
+            }
             if (anchorId != null && !anchorId.isBlank()) {
                 String to = normalizeInsertPosition(position);
                 if (to == null) {
                     return "Error: position 只能是 before 或 after（收到：" + position + "）。";
                 }
                 // 服务端把「选中锚点 → 收起到开头/结尾 → 光标处插入」三步串起来，与
-                // doc_select_anchor / doc_collapse_cursor / 本工具各自下发的命令逐字相同
+                // doc_select（anchor / collapse）/ 本工具各自下发的命令逐字相同
                 // （dev-board#1065 T-16）。任何一步失败即停，后面的步骤不再发。
                 String selected = editorBridgeService.executeEditorCommand("set_selection",
                         java.util.Map.of("anchor", anchorId));
@@ -849,11 +755,10 @@ public class DocumentEditTools implements AgentToolComponent {
     // （ToolDeclarationContractTest）一眼看得出它离不开桌面编辑器——字节是编辑器里的引擎导出来的。
     @ToolMeta(displayName = "导出为PDF", category = "document", refreshFiles = true,
             requiresHost = ToolMeta.Host.LOWA)
-    @Tool("把编辑器里当前打开的文档导出为 PDF，存进项目、放在原文档所在的文件夹（同名不覆盖，自动加序号），原文档不动。" +
-          "导出的是编辑器此刻的内容（不必先保存），版面按编辑器当前的显示方式（修订痕迹若在显示中也会印出来）。" +
-          "返回新 PDF 的文件名与文件 ID，之后可用 pdf_* 工具处理它。")
+    @Tool("把编辑器里当前打开的文档导出为 PDF，存进项目、放在原文档所在文件夹，原文档不动。\n"
+            + "导出的是编辑器此刻的内容（不必先保存），版面按当前显示方式（显示中的修订痕迹也会印出）；同名不覆盖，自动加序号。回执含新 PDF 的文件名与文件 ID，之后可用 pdf_* 工具处理。")
     public String doc_export_pdf(
-            @P(value = "导出的文件名（可选；默认与原文档同名，扩展名自动改为 .pdf）", required = false) String fileName
+            @P(value = "导出文件名（可选；默认与原文档同名，扩展名自动改为 .pdf）", required = false) String fileName
     ) {
         log.info("Tool: doc_export_pdf called fileName={}", fileName);
         String raw;
@@ -949,75 +854,18 @@ public class DocumentEditTools implements AgentToolComponent {
 
     // ==================== 智能搜索 ====================
 
-    // dev-board#1065（审计 T-03）：描述说「在文件名和文档内容中搜索」，实现只比文件名（内容搜索是个 TODO），
-    // 无命中时还回「项目里前 10 个可编辑文档」冒充结果。全文检索由 search_project_content 承担，
-    // 本工具只登记不下发（老会话回放与 XML 兜底照常执行）。
-    @ToolMeta(displayName = "搜索相关文档", category = "document", offerToModel = false)
-    @Tool("搜索项目中可能需要修改的相关文档。根据关键词在文件名和文档内容中搜索。")
-    public String doc_search_related_docs(
-            @P("搜索关键词，如'交易方案'、'股东决议'等") String keyword,
-            @P("项目ID") Long projectId
-    ) {
-        log.info("Tool: doc_search_related_docs called keyword={}, projectId={}", keyword, projectId);
-        try {
-            List<ProjectFile> allFiles = projectFileRepository.findByProjectIdOrderBySortOrderAsc(projectId);
-            
-            // 1. 首先按文件名匹配
-            List<ProjectFile> matchedByName = allFiles.stream()
-                    .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                    .filter(f -> isEditableDocument(f.getName()))
-                    .filter(f -> f.getName().contains(keyword))
-                    .collect(Collectors.toList());
-            
-            // 2. 如果文件名匹配不够，可以考虑内容搜索（使用 RAG 服务）
-            // TODO: 集成 ProjectRagService 进行内容搜索
-            
-            if (matchedByName.isEmpty()) {
-                // 返回所有可编辑文档供参考
-                List<ProjectFile> editableFiles = allFiles.stream()
-                        .filter(f -> !Boolean.TRUE.equals(f.getIsFolder()))
-                        .filter(f -> isEditableDocument(f.getName()))
-                        .limit(10)
-                        .collect(Collectors.toList());
-                
-                if (editableFiles.isEmpty()) {
-                    return "未找到包含关键词'" + keyword + "'的文档，项目中也没有其他可编辑文档。";
-                }
-                
-                StringBuilder sb = new StringBuilder("未找到包含关键词'" + keyword + "'的文档。以下是项目中的可编辑文档供参考:\n");
-                for (ProjectFile f : editableFiles) {
-                    sb.append(String.format("- ID: %d, 名称: %s\n", f.getId(), f.getName()));
-                }
-                return sb.toString();
-            }
-            
-            StringBuilder sb = new StringBuilder("找到 " + matchedByName.size() + " 个可能相关的文档:\n");
-            for (ProjectFile f : matchedByName) {
-                sb.append(String.format("- ID: %d, 名称: %s, 类型: %s\n", 
-                        f.getId(), f.getName(), f.getFileType()));
-            }
-            sb.append("\n建议：使用 doc_open_file 打开需要修改的文档，然后使用其他文档编辑工具进行编辑。");
-            return sb.toString();
-            
-        } catch (Exception e) {
-            log.error("Failed to search related docs", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
     // ==================== 拟人式原语（嵌入式 LibreOffice 编辑器） ====================
     // 设计文档：docs/AI_EDITOR_PRIMITIVES.md。工作循环：看 → 找 → 选 → 改 → 验。
     // 定位一律使用 doc_find_text 返回的 anchorId（书签锚点，随文档编辑自动跟随），
     // 禁止使用整数字符偏移（跨富文本必然错位）。
 
     @ToolMeta(displayName = "通读文档", category = "document")
-    @Tool("【看】分段读取文档正文。返回带编号的段落列表（含标题级别与自动编号元数据 numbering），是了解文档内容的首选工具。" +
-          "每段含 index（0 开始）、text（段落纯文本）和 numbering（{available, label, level, hasLabel}）：当段落使用 Word/Writer 自动编号时，可见编号前缀在 numbering.label（如 '第一条'、'一、'、'1.1'），不在 text 中。" +
-          "文档很长时结果会分页：返回 truncated=true 和 nextStartParagraph，用它继续读下一段。" +
-          "多段或结构调整后，最后一次修改结束须回读改动范围及相邻段落，核对标题分段、编号和句意完整，再交付。")
+    @Tool("【看】分段读取文档正文，返回带编号的段落列表，是了解文档内容的首选工具。\n"
+            + "每段含 index（0 起）、text 和 numbering（{available, label, level, hasLabel}）；自动编号的可见前缀（如「第一条」「一、」「1.1」）在 numbering.label，不在 text 里。\n"
+            + "文档长时分页：truncated=true 时用 nextStartParagraph 继续读。多段或结构性修改后，最后一次修改结束须回读改动范围及相邻段落，核对标题分段、编号和句意，再交付。")
     public String doc_get_document_text(
-            @P("起始段落号（0 开始，默认 0）") Integer startParagraph,
-            @P("最多返回的段落数（默认 200）") Integer maxParagraphs
+            @P(value = "起始段落号（0 开始，默认 0）", required = false) Integer startParagraph,
+            @P(value = "最多返回的段落数（默认 200）", required = false) Integer maxParagraphs
     ) {
         log.info("Tool: doc_get_document_text called start={}, max={}", startParagraph, maxParagraphs);
         try {
@@ -1032,11 +880,9 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "识别合同条款", category = "document")
-    @Tool("【看】识别合同/协议的条款结构。同时识别正文手打编号与 Word/Writer 自动编号（ListLabelString，如「第X条 / 第X章 / 一、二、 / （一） / 1.」），" +
-          "把段落归并成条款，返回每条条款的编号、标题、段落范围（startParagraph~endParagraph）及是否自动编号（autoNumbered/listLabel）。" +
-          "统计条款数、按条款定位或整条修改格式时必须先用本工具，禁止把段落数/行数当条款数。" +
-          "目录最多返回 300 条，totalClauseCount 为完整目录数量；truncated=true 时用 nextStartParagraph 继续读取剩余正文。" +
-          "拿到段落范围后可用 doc_get_document_text(startParagraph) 精读某条条款，或将 startParagraph/endParagraph 传给 doc_format_selection / doc_set_paragraph_format 批量调整条款格式。")
+    @Tool("【看】识别合同/协议的条款结构，返回编号、标题、段落范围和是否自动编号。\n"
+            + "何时用：统计条款数、按条款定位或整条改格式前必须先用本工具，不要把段落数/行数当条款数。同时识别手打编号与自动编号（第X条、第X章、一、、（一）、1.），每条给 startParagraph~endParagraph。\n"
+            + "目录最多 300 条，totalClauseCount 为完整数量；truncated=true 时用 nextStartParagraph 续读。拿到范围后用 doc_get_document_text(startParagraph) 精读某条，或把 startParagraph/endParagraph 传给 doc_format_selection / doc_set_paragraph_format 批量改格式。")
     public String doc_get_clauses() {
         log.info("Tool: doc_get_clauses called");
         try {
@@ -1059,63 +905,62 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "选中定位点", category = "document")
-    @Tool("【选】选中 doc_find_text 返回的某个匹配（按 anchorId）。编辑器会滚动到该处并高亮选区，用户能看到 AI 正在操作哪里。" +
-          "选中后可接 doc_replace_selection / doc_delete_selection / doc_format_selection / doc_collapse_cursor。")
-    public String doc_select_anchor(
-            @P("doc_find_text 返回的 anchorId") String anchorId
+    // 只宣告编辑器真的实现了的 goto 两种：office_thread.js 的 goto() 只处理 start/end，
+    // paragraph/bookmark/line 一律返回 "goto type not supported yet"。
+    // 描述里挂着做不到的能力 = 模型反复往死路上撞、白烧步数预算。
+    @ToolMeta(displayName = "选中定位", category = "document", access = ToolMeta.Access.READ)
+    @Tool("选中文档中的一处并滚动到该处高亮，或移动光标；只动视图、不改内容。target 取值：\n"
+          + "start/end 光标移到文档开头/结尾；anchor 选中 doc_find_text 返回的匹配（需 anchorId）；"
+          + "paragraph 选中第 index 段（0 开始），传 endIndex 则选中 [index, endIndex] 连续多段；"
+          + "collapse_start/collapse_end 把光标落到当前选区的开头/结尾（取消选中）。\n"
+          + "选中后可接 doc_replace_selection / doc_delete_selection / doc_format_selection。"
+          + "在某句话之前/之后插入文本不必先选中，直接 doc_insert_at_cursor(text, anchorId, position)。")
+    public String doc_select(
+            @P("start / end / anchor / paragraph / collapse_start / collapse_end") String target,
+            @P(value = "doc_find_text 返回的 anchorId，仅 target=anchor 用", required = false) String anchorId,
+            @P(value = "段落号（0 开始），仅 target=paragraph 用", required = false) Integer index,
+            @P(value = "结束段落号（0 开始，可选），仅 target=paragraph 用", required = false) Integer endIndex
     ) {
-        log.info("Tool: doc_select_anchor called anchor={}", anchorId);
+        log.info("Tool: doc_select called target={}, anchor={}, index={}, endIndex={}", target, anchorId, index, endIndex);
+        String t = target == null ? "" : target.trim().toLowerCase(java.util.Locale.ROOT);
         try {
-            return editorBridgeService.executeEditorCommand("set_selection",
-                    java.util.Map.of("anchor", anchorId != null ? anchorId : ""));
+            switch (t) {
+                case "start", "end" -> {
+                    return editorBridgeService.executeEditorCommand("goto",
+                            java.util.Map.of("type", t, "target", ""));
+                }
+                case "anchor" -> {
+                    if (anchorId == null || anchorId.isBlank()) {
+                        return "Error: target=anchor 需要 anchorId 参数（来自 doc_find_text）";
+                    }
+                    return editorBridgeService.executeEditorCommand("set_selection", java.util.Map.of("anchor", anchorId));
+                }
+                case "paragraph" -> {
+                    java.util.Map<String, Object> params = new java.util.HashMap<>();
+                    params.put("index", index != null ? index : 0);
+                    if (endIndex != null) params.put("endIndex", endIndex);
+                    return editorBridgeService.executeEditorCommand("select_paragraph", params);
+                }
+                case "collapse_start", "collapse_end" -> {
+                    return editorBridgeService.executeEditorCommand("collapse_selection",
+                            java.util.Map.of("to", t.endsWith("start") ? "start" : "end"));
+                }
+                default -> {
+                    return "Error: target 须为 start / end / anchor / paragraph / collapse_start / collapse_end";
+                }
+            }
         } catch (Exception e) {
-            log.error("Failed to select anchor", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    @ToolMeta(displayName = "选中段落", category = "document")
-    @Tool("【选】按段落号选中单个段落或连续多段范围（0 开始，配合 doc_get_document_text / doc_get_clauses 的段落号）。" +
-          "只传 index 选中单段；同时传 index 与 endIndex 则跨段选中 [index, endIndex] 闭区间内的所有段落。编辑器会滚动到该处并高亮。")
-    public String doc_select_paragraph(
-            @P("段落号（0 开始）") Integer index,
-            @P(value = "结束段落号（0 开始，可选；传入则跨段选中 index..endIndex 闭区间）", required = false) Integer endIndex
-    ) {
-        log.info("Tool: doc_select_paragraph called index={}, endIndex={}", index, endIndex);
-        try {
-            java.util.Map<String, Object> params = new java.util.HashMap<>();
-            params.put("index", index != null ? index : 0);
-            if (endIndex != null) params.put("endIndex", endIndex);
-            return editorBridgeService.executeEditorCommand("select_paragraph", params);
-        } catch (Exception e) {
-            log.error("Failed to select paragraph", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    @ToolMeta(displayName = "收起光标", category = "document")
-    @Tool("【选】把光标落到当前选区的开头或结尾（取消选中）。要在某句话'之前/之后'插入文本时不必用本工具：" +
-          "直接 doc_insert_at_cursor(text, anchorId, position=before|after) 一次完成。本工具只在选区不是来自锚点" +
-          "（例如 doc_select_paragraph 选中的整段）时用来落光标。")
-    public String doc_collapse_cursor(
-            @P("start=选区开头, end=选区结尾") String to
-    ) {
-        log.info("Tool: doc_collapse_cursor called to={}", to);
-        try {
-            return editorBridgeService.executeEditorCommand("collapse_selection",
-                    java.util.Map.of("to", to != null ? to : "end"));
-        } catch (Exception e) {
-            log.error("Failed to collapse cursor", e);
+            log.error("Failed to select", e);
             return "Error: " + e.getMessage();
         }
     }
 
     @ToolMeta(displayName = "锚点替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改】仅把 anchorId 覆盖的 matches[].text 替换为 newText，以修订模式进行，锚点外文字保持不变。contextBefore/contextAfter 和 paragraph 仅供定位，不要把它们拼进 newText。整段重写须先查找完整原段取得整段锚点，或用 doc_modify_paragraph；仅被替换范围内未改动的字需照抄。会自动把编辑器视图滚动到该处；返回 paragraphAfterEdit（最多200字）及完整长度 paragraphAfterEditLength；paragraphAfterEditTruncated=true 时用 doc_get_paragraph 回读完整目标段落（段号未知先用 doc_get_document_text 定位），不得把片段当作完整验证；未截断时核对回执即可，不需要先 doc_select_anchor。" +
-          "先 doc_find_text 拿到带上下文的匹配列表，选定目标的 anchorId 后用本工具替换；执行前自动核对锚点原文，变化或失效则拒绝，须重新查找核对，不能用全文替换绕过；多处独立替换在同一轮连续输出多个调用。" +
-          "newText 传空字符串即删除该处文本（以修订删除痕迹呈现）。" +
-          REDLINE_GRANULARITY_NOTE)
+    @Tool("【改】把 anchorId 对应的匹配文本替换为 newText，以修订模式进行，锚点外文字不变。\n"
+            + "何时用：doc_find_text 取得 anchorId 并核对上下文后的精准替换。执行前自动核对锚点原文，变了或失效则拒绝，须重新查找，不能用全文替换绕过；多处独立替换同一轮连续调用。\n"
+            + "newText 只放 matches[].text 被替换范围的新文本；contextBefore/contextAfter 和 paragraph 仅供定位，不要拼入。空字符串即删除。整段重写先查完整原段取整段锚点，或用 doc_modify_paragraph。\n"
+            + "回执含 paragraphAfterEdit（最多 200 字）；paragraphAfterEditTruncated=true 时用 doc_get_paragraph 回读完整段落，未截断时核对回执即可，不必先 doc_select(target=anchor)。\n"
+            + REDLINE_GRANULARITY_NOTE)
     public String doc_replace_at_anchor(
             @P("doc_find_text 返回的 anchorId") String anchorId,
             @P("仅替换该锚点 matches[].text 的新文本；不要拼回锚点外的周边文字，空字符串表示删除该匹配") String newText
@@ -1125,15 +970,27 @@ public class DocumentEditTools implements AgentToolComponent {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("anchor", anchorId != null ? anchorId : "");
             params.put("newText", newText != null ? newText : "");
-            return editorBridgeService.executeEditorCommand("replace_at_position", params);
+            return withEmptyParagraphNote(editorBridgeService.executeEditorCommand("replace_at_position", params));
         } catch (Exception e) {
             log.error("Failed to replace at anchor", e);
             return "Error: " + e.getMessage();
         }
     }
 
-    @ToolMeta(displayName = "删除选区", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改】删除当前选中的文本（以修订模式）。先用 doc_select_anchor / doc_select_paragraph 选中要删的内容。没有选区时会报错。")
+    /**
+     * 整段删除后修订模式只标删文字、段落标记保留成空段落；模型曾因此反复找/选/替换空段落，
+     * 空转 13–42 轮（g16「删除第三条」）。回执为空段落时明确告知这是完成状态。
+     */
+    static String withEmptyParagraphNote(String result) {
+        if (result == null || !result.contains("\"paragraphAfterEdit\":\"\"")) return result;
+        int end = result.lastIndexOf('}');
+        if (end < 0) return result;
+        return result.substring(0, end)
+                + ",\"note\":\"整段文字已标删。修订模式下段落标记保留为一个空段落，这是正常结果、没有工具能单独删除它；不要再查找、选中或替换空段落，直接向用户汇报完成。\"}";
+    }
+
+    @ToolMeta(displayName = "删除选区", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.WRITE)
+    @Tool("【改】删除当前选中的文本（以修订模式）。先用 doc_select(target=anchor|paragraph) 选中要删的内容。没有选区时会报错。")
     public String doc_delete_selection() {
         log.info("Tool: doc_delete_selection called");
         try {
@@ -1146,21 +1003,21 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "设置文字格式", category = "document", fileEffect = "MODIFIED")
     @Tool("【格式】设置字符格式：加粗/斜体/下划线/删除线/高亮/字色/字号/中西文字体。只传需要改的参数。" +
-          "可先选中文本（doc_select_anchor / doc_select_paragraph），也可直接传 startParagraph（及可选 endParagraph）对整段或连续多段批量设字符格式（会自动覆盖段内原有的 run 级直接格式）。" +
+          "可先选中文本（doc_select），也可直接传 startParagraph（及可选 endParagraph）对整段或连续多段批量设字符格式（会自动覆盖段内原有的 run 级直接格式）。" +
           "常见中文字号对应磅值：初号=42、小初=36、一号=26、小一=24、二号=22、小二=18、三号=16、小三=15、四号=14、小四=12、五号=10.5、小五=9。" +
           "中西文字体分设时传 fontNameAsian（如 宋体/仿宋_GB2312/楷体_GB2312/黑体）与 fontNameWestern（如 Times New Roman/Arial）。" +
           "下划线：underline=true/false，或用 underlineStyle 指定 single/double/dotted/dashed/wave/bold/none。" +
           "高亮支持 yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB；none 取消高亮。")
     public String doc_format_selection(
-            @P("加粗 true/false，不改则不传") Boolean bold,
-            @P("斜体 true/false，不改则不传") Boolean italic,
-            @P("下划线 true/false，不改则不传") Boolean underline,
-            @P("删除线 true/false，不改则不传") Boolean strikeout,
-            @P("高亮颜色：yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB，不改则不传") String highlight,
-            @P("文字颜色：#RRGGBB 或 auto，不改则不传") String color,
-            @P("字号（磅，如 小四=12、五号=10.5、四号=14、小三=15、三号=16、小二=18、二号=22），不改则不传") Double fontSize,
-            @P("字体名（中西文一起改），不改则不传") String fontName,
-            @P("中文字体名（只改中文，如 宋体、仿宋_GB2312、楷体_GB2312、黑体；与 fontName 同给时以它为准），不改则不传") String fontNameAsian,
+            @P(value = "加粗 true/false，不改则不传", required = false) Boolean bold,
+            @P(value = "斜体 true/false，不改则不传", required = false) Boolean italic,
+            @P(value = "下划线 true/false，不改则不传", required = false) Boolean underline,
+            @P(value = "删除线 true/false，不改则不传", required = false) Boolean strikeout,
+            @P(value = "高亮颜色：yellow/green/cyan/magenta/red/blue/gray/none 或 #RRGGBB，不改则不传", required = false) String highlight,
+            @P(value = "文字颜色：#RRGGBB 或 auto，不改则不传", required = false) String color,
+            @P(value = "字号（磅，如 小四=12、五号=10.5、四号=14、小三=15、三号=16、小二=18、二号=22），不改则不传", required = false) Double fontSize,
+            @P(value = "字体名（中西文一起改），不改则不传", required = false) String fontName,
+            @P(value = "中文字体名（只改中文，如 宋体、仿宋_GB2312、楷体_GB2312、黑体；与 fontName 同给时以它为准），不改则不传", required = false) String fontNameAsian,
             @P(value = "西文字体名（只改西文与数字，如 Times New Roman、Arial、Calibri），不改则不传", required = false) String fontNameWestern,
             @P(value = "下划线线型（single/double/dotted/dashed/wave/bold/none；传了优先于 underline），不改则不传", required = false) String underlineStyle,
             @P(value = "起始段落号（0 开始，可选；传入则无需预先选中，直接对该段或 startParagraph..endParagraph 范围设格式）", required = false) Integer startParagraph,
@@ -1199,15 +1056,15 @@ public class DocumentEditTools implements AgentToolComponent {
           "缩进：firstLineIndentChars 首行缩进字符数（中文合同常用 2；传 0 取消首行缩进并顶格，按段落当前中文字号精算），" +
           "firstLineIndentPt 首行缩进磅数，leftIndentChars 左缩进字符数，leftIndentPt/rightIndentPt 左右缩进磅数。")
     public String doc_set_paragraph_format(
-            @P("对齐：left/right/center/justify，不改则不传") String alignment,
-            @P("标题级别：1-9 为标题，0 恢复正文，不改则不传") Integer headingLevel,
-            @P("行距模式：single/1.5/double/multiple/proportional/atLeast/exactly，不改则不传") String lineSpacingMode,
+            @P(value = "对齐：left/right/center/justify，不改则不传", required = false) String alignment,
+            @P(value = "标题级别：1-9 为标题，0 恢复正文，不改则不传", required = false) Integer headingLevel,
+            @P(value = "行距模式：single/1.5/double/multiple/proportional/atLeast/exactly，不改则不传", required = false) String lineSpacingMode,
             @P("行距值：proportional/multiple 时为百分比(如 150)或倍数(如 1.5)，atLeast/exactly 时为磅数(如 20)") Double lineSpacingValue,
-            @P("段前间距（磅），不改则不传") Double spaceBeforePt,
-            @P("段后间距（磅），不改则不传") Double spaceAfterPt,
-            @P("首行缩进（字符数，如 2；传 0 取消缩进顶格），不改则不传") Double firstLineIndentChars,
-            @P("左缩进（磅），不改则不传") Double leftIndentPt,
-            @P("右缩进（磅），不改则不传") Double rightIndentPt,
+            @P(value = "段前间距（磅），不改则不传", required = false) Double spaceBeforePt,
+            @P(value = "段后间距（磅），不改则不传", required = false) Double spaceAfterPt,
+            @P(value = "首行缩进（字符数，如 2；传 0 取消缩进顶格），不改则不传", required = false) Double firstLineIndentChars,
+            @P(value = "左缩进（磅），不改则不传", required = false) Double leftIndentPt,
+            @P(value = "右缩进（磅），不改则不传", required = false) Double rightIndentPt,
             @P(value = "首行缩进（磅；传 0 取消缩进），不改则不传", required = false) Double firstLineIndentPt,
             @P(value = "左缩进（字符数，如 2），不改则不传", required = false) Double leftIndentChars,
             @P(value = "段前间距（行数，如 0.5 或 1），不改则不传", required = false) Double spaceBeforeLines,
@@ -1242,7 +1099,7 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "设置编号", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】给当前选区所在段落设置自动编号或项目符号（先用 doc_select_paragraph 选中段落，传 endIndex 可跨多段）。" +
+    @Tool("【格式】给当前选区所在段落设置自动编号或项目符号（先用 doc_select(target=paragraph) 选中段落，传 endIndex 可跨多段）。" +
           "preset: bullet(•)/decimal(1. 2. 3.)/chinese(一、二、)/clause(第一条、第二条)/paren_chinese(（一）（二）)/multilevel(多级编号 1. → 1.1 → 1.1.1)/none(清除自动编号和项目符号)。" +
           "用户要求普通段落或去掉项目符号时用 none；只改字号、居中或 headingLevel=0 不会清除列表。" +
           "要把图注改成普通居中段落：先选中该段设 preset=none，再用 doc_set_paragraph_format 设 headingLevel=0、alignment=center。" +
@@ -1250,7 +1107,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "level: 编号层级 1-9，默认 1；multilevel 配合不同 level 形成 1.1、1.1.1 结构。")
     public String doc_set_numbering(
             @P("编号类型：bullet/decimal/chinese/clause/paren_chinese/multilevel/none") String preset,
-            @P("编号层级 1-9，默认 1") Integer level
+            @P(value = "编号层级 1-9，默认 1", required = false) Integer level
     ) {
         log.info("Tool: doc_set_numbering called preset={}, level={}", preset, level);
         try {
@@ -1276,20 +1133,20 @@ public class DocumentEditTools implements AgentToolComponent {
           "不要试图用其他工具绕（插入新表、整表重写都改不了列宽）。")
     public String doc_format_table(
             @P("一键套标准表格式 true/false") Boolean applyStandard,
-            @P("边框线宽（磅，如 1.5），不改则不传") Double borderWidthPt,
-            @P("表格字号（磅），不改则不传") Double fontSizePt,
-            @P("首行加粗 true/false，不改则不传") Boolean firstRowBold,
-            @P("单元格垂直对齐：top/center/bottom，不改则不传") String cellVerticalAlign,
+            @P(value = "边框线宽（磅，如 1.5），不改则不传", required = false) Double borderWidthPt,
+            @P(value = "表格字号（磅），不改则不传", required = false) Double fontSizePt,
+            @P(value = "首行加粗 true/false，不改则不传", required = false) Boolean firstRowBold,
+            @P(value = "单元格垂直对齐：top/center/bottom，不改则不传", required = false) String cellVerticalAlign,
             @P("【已弃用，本引擎做不到，传了也不会生效】列宽百分比") String columnWidthsPercent,
-            @P("行高（磅），不改则不传") Double rowHeightPt,
-            @P("行高规则：min(最小值,默认)/exact(固定值)") String rowHeightRule,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
-            @P("边框颜色 #RRGGBB，不改则不传") String borderColor,
-            @P("边框线型：single/double/dashed，不改则不传") String borderStyle,
-            @P("外框线宽（磅），不改则不传") Double outsideBorderWidthPt,
-            @P("内框线宽（磅），不改则不传") Double insideBorderWidthPt,
-            @P("表头底纹：#RRGGBB 或 none 清除，不改则不传") String headerFill,
-            @P("跨页重复表头 true/false，不改则不传") Boolean repeatHeader,
+            @P(value = "行高（磅），不改则不传", required = false) Double rowHeightPt,
+            @P(value = "行高规则：min(最小值,默认)/exact(固定值)", required = false) String rowHeightRule,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
+            @P(value = "边框颜色 #RRGGBB，不改则不传", required = false) String borderColor,
+            @P(value = "边框线型：single/double/dashed，不改则不传", required = false) String borderStyle,
+            @P(value = "外框线宽（磅），不改则不传", required = false) Double outsideBorderWidthPt,
+            @P(value = "内框线宽（磅），不改则不传", required = false) Double insideBorderWidthPt,
+            @P(value = "表头底纹：#RRGGBB 或 none 清除，不改则不传", required = false) String headerFill,
+            @P(value = "跨页重复表头 true/false，不改则不传", required = false) Boolean repeatHeader,
             @P("【已弃用，本引擎做不到，传了也不会生效】列宽厘米") String columnWidthsCm
     ) {
         log.info("Tool: doc_format_table called standard={}, border={}, tableIndex={}", applyStandard, borderWidthPt, tableIndex);
@@ -1376,7 +1233,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "rowsJson 是 JSON 二维数组，如 [[\"项目\",\"金额\"],[\"咨询费\",\"10000\"]]，第一行默认为表头。")
     public String doc_insert_table(
             @P("表格内容，JSON 二维字符串数组，第一行为表头") String rowsJson,
-            @P("第一行是否表头，默认 true") Boolean headerRow
+            @P(value = "第一行是否表头，默认 true", required = false) Boolean headerRow
     ) {
         log.info("Tool: doc_insert_table called, json length={}", rowsJson != null ? rowsJson.length() : 0);
         if (rowsJson == null || rowsJson.isBlank()) {
@@ -1407,10 +1264,10 @@ public class DocumentEditTools implements AgentToolComponent {
           "返回的 cells 按行给出，行号从 1 开始、列号从 A 开始（左上角是 A1），" +
           "doc_table_set_cell 的 cell 参数就用这套坐标。表里有合并/拆分单元格时返回 note 说明。")
     public String doc_table_read(
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名（如 Table1），一般不用传") String tableName,
-            @P("最多读多少行，默认 200") Integer maxRows,
-            @P("最多读多少列，默认 30") Integer maxCols
+            @P(value = "最多读多少行，默认 200", required = false) Integer maxRows,
+            @P(value = "最多读多少列，默认 30", required = false) Integer maxCols
     ) {
         log.info("Tool: doc_table_read called tableIndex={}, tableName={}", tableIndex, tableName);
         try {
@@ -1434,7 +1291,7 @@ public class DocumentEditTools implements AgentToolComponent {
     public String doc_table_set_cell(
             @P("单元格坐标，如 B2（列字母 + 行号，行号 1 开始）") String cell,
             @P("该单元格的新文本") String text,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
             @P("表名，一般不用传") String tableName
     ) {
         log.info("Tool: doc_table_set_cell called cell={}, tableIndex={}", cell, tableIndex);
@@ -1454,77 +1311,67 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "插入表格行", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改/表格】给表格插入空白行。insertBeforeRow1Based 是**行号（1 开始）**，新行插在该行之前；" +
-          "不传则追加到表尾。count 一次插几行（默认 1）。插完用 doc_table_set_cell 逐格填内容。" +
-          "定位：tableIndex 第几张表（0 开始），不传则用光标所在表格。" +
-          "注意行号基准：doc_* 这一族表格工具的行/列号都是 **1 开始**（Office 任务窗格里的 office_table_* 是 0 开始，别混用）。")
-    public String doc_table_add_row(
-            @P("【已弃用，等价于 insertBeforeRow1Based】插入位置行号（1 开始）") Integer position,
-            @P("插入几行，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P("新行插在第几行之前，**行号 1 开始**；不传则追加到表尾") Integer insertBeforeRow1Based
+    @ToolMeta(displayName = "插入表格行列", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.WRITE)
+    @Tool("给表格插入空白行或列。axis: row 插行，col 插列。插完用 doc_table_set_cell 逐格填内容。\n"
+          + "before 是新行/列插在哪一行/列之前：行用行号（**1 开始**），列用列字母（如 B）或列号（**1 开始**）；不传则追加到表尾/最右。"
+          + "count 一次插几行/列（默认 1）；tableIndex 第几张表（0 开始），不传用光标所在表格。"
+          + "合并过单元格的表格按列插入可能被引擎拒绝，失败会明确报出来。"
+          + "doc_* 这一族表格工具的行/列号都是 1 开始（office_table_* 是 0 开始，别混用）。删除行列用 doc_table_delete。")
+    public String doc_table_insert(
+            @P("row=插行 / col=插列") String axis,
+            @P(value = "新行/列插在哪一行/列之前：行号或列字母/列号（1 开始）；不传则追加到末尾", required = false) String before,
+            @P(value = "插入几行/列，默认 1", required = false) Integer count,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
+            @P(value = "表名，一般不用传", required = false) String tableName
     ) {
-        Integer row = insertBeforeRow1Based != null ? insertBeforeRow1Based : position;
-        log.info("Tool: doc_table_add_row called row={}, count={}, tableIndex={}", row, count, tableIndex);
-        return dispatchTableStructureCommand("table_add_row", row, count, tableIndex, tableName);
-    }
-
-    @ToolMeta(displayName = "删除表格行", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改/表格】删除表格的整行。rowNumber1Based 是要删的行号（**1 开始**，必填），count 连删几行（默认 1）。" +
-          "注意：删行是**直接删除、不留修订痕迹**（不像改文字那样能在修订里看到），删错只能靠撤销，" +
-          "所以删之前务必先用 doc_table_read 看清要删的是哪一行。表格至少要留一行，删不掉全部行。" +
-          "定位：tableIndex 第几张表（0 开始），不传则用光标所在表格。")
-    public String doc_table_delete_row(
-            @P("【已弃用，等价于 rowNumber1Based】要删的行号（1 开始）") Integer position,
-            @P("连删几行，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P("要删的行号，**1 开始**（第一行 = 1）") Integer rowNumber1Based
-    ) {
-        Integer row = rowNumber1Based != null ? rowNumber1Based : position;
-        log.info("Tool: doc_table_delete_row called row={}, count={}, tableIndex={}", row, count, tableIndex);
-        if (row == null) {
-            return "Error: 缺少 rowNumber1Based 参数（要删的行号，1 开始）";
+        log.info("Tool: doc_table_insert called axis={}, before={}, count={}, tableIndex={}", axis, before, count, tableIndex);
+        String ax = axis == null ? "" : axis.trim().toLowerCase(java.util.Locale.ROOT);
+        String pos = before == null || before.isBlank() ? null : before.trim();
+        if ("row".equals(ax)) {
+            Integer row = null;
+            if (pos != null) {
+                try {
+                    row = Integer.valueOf(pos);
+                } catch (NumberFormatException e) {
+                    return "Error: axis=row 时 before 须为行号（1 开始的整数）";
+                }
+            }
+            return dispatchTableStructureCommand("table_add_row", row, count, tableIndex, tableName);
         }
-        return dispatchTableStructureCommand("table_delete_row", row, count, tableIndex, tableName);
-    }
-
-    @ToolMeta(displayName = "插入表格列", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改/表格】给表格插入空白列。insertBeforeColumn 是列字母（如 B）或列号（**1 开始**），新列插在该列之前；" +
-          "不传则追加到最右。count 一次插几列（默认 1）。" +
-          "合并过单元格的表格按列插入可能被引擎拒绝，失败会明确报出来。" +
-          "定位：tableIndex 第几张表（0 开始），不传则用光标所在表格。")
-    public String doc_table_add_col(
-            @P("【已弃用，等价于 insertBeforeColumn】列字母（如 B）或列号（1 开始）") String position,
-            @P("插入几列，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P("新列插在哪一列之前：列字母（如 B）或列号（**1 开始**）；不传则追加到最右") String insertBeforeColumn
-    ) {
-        String col = (insertBeforeColumn != null && !insertBeforeColumn.isBlank()) ? insertBeforeColumn : position;
-        log.info("Tool: doc_table_add_col called col={}, count={}, tableIndex={}", col, count, tableIndex);
-        return dispatchTableStructureCommand("table_add_col", col, count, tableIndex, tableName);
-    }
-
-    @ToolMeta(displayName = "删除表格列", category = "document", fileEffect = "MODIFIED")
-    @Tool("【改/表格】删除表格的整列。columnRef 是列字母（如 B）或列号（**1 开始**，必填），count 连删几列（默认 1）。" +
-          "与删行一样是**直接删除、不留修订痕迹**，删前先用 doc_table_read 看清。表格至少要留一列。" +
-          "定位：tableIndex 第几张表（0 开始），不传则用光标所在表格。")
-    public String doc_table_delete_col(
-            @P("【已弃用，等价于 columnRef】要删的列字母（如 B）或列号（1 开始）") String position,
-            @P("连删几列，默认 1") Integer count,
-            @P("表格序号（0 开始），不传则用光标所在表格") Integer tableIndex,
-            @P("表名，一般不用传") String tableName,
-            @P("要删的列：列字母（如 B）或列号（**1 开始**）") String columnRef
-    ) {
-        String col = (columnRef != null && !columnRef.isBlank()) ? columnRef : position;
-        log.info("Tool: doc_table_delete_col called col={}, count={}, tableIndex={}", col, count, tableIndex);
-        if (col == null || col.isBlank()) {
-            return "Error: 缺少 columnRef 参数（要删的列字母如 B，或 1 开始的列号）";
+        if ("col".equals(ax)) {
+            return dispatchTableStructureCommand("table_add_col", pos, count, tableIndex, tableName);
         }
-        return dispatchTableStructureCommand("table_delete_col", col, count, tableIndex, tableName);
+        return "Error: axis 须为 row 或 col";
+    }
+
+    @ToolMeta(displayName = "删除表格行列", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.DESTRUCTIVE)
+    @Tool("删除表格的整行或整列。axis: row 删行，col 删列。\n"
+          + "target 是要删的行号（**1 开始**）或列字母（如 B）/列号（1 开始），必填；count 连删几行/列（默认 1）。"
+          + "删除是**直接删除、不留修订痕迹**，删错只能靠撤销，删前务必先用 doc_table_read 看清；表格至少要留一行一列。"
+          + "tableIndex 第几张表（0 开始），不传用光标所在表格。")
+    public String doc_table_delete(
+            @P("row=删行 / col=删列") String axis,
+            @P("要删的行号（1 开始）或列字母/列号（1 开始）") String target,
+            @P(value = "连删几行/列，默认 1", required = false) Integer count,
+            @P(value = "表格序号（0 开始），不传则用光标所在表格", required = false) Integer tableIndex,
+            @P(value = "表名，一般不用传", required = false) String tableName
+    ) {
+        log.info("Tool: doc_table_delete called axis={}, target={}, count={}, tableIndex={}", axis, target, count, tableIndex);
+        String ax = axis == null ? "" : axis.trim().toLowerCase(java.util.Locale.ROOT);
+        String pos = target == null || target.isBlank() ? null : target.trim();
+        if ("row".equals(ax)) {
+            if (pos == null) return "Error: 缺少 target 参数（要删的行号，1 开始）";
+            try {
+                return dispatchTableStructureCommand("table_delete_row", Integer.valueOf(pos), count, tableIndex, tableName);
+            } catch (NumberFormatException e) {
+                return "Error: axis=row 时 target 须为行号（1 开始的整数）";
+            }
+        }
+        if ("col".equals(ax)) {
+            if (pos == null) return "Error: 缺少 target 参数（要删的列字母如 B，或 1 开始的列号）";
+            return dispatchTableStructureCommand("table_delete_col", pos, count, tableIndex, tableName);
+        }
+        return "Error: axis 须为 row 或 col";
     }
 
     /**
@@ -1569,23 +1416,19 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "应用标准格式", category = "document", fileEffect = "MODIFIED")
-    @Tool("【格式】对整篇文档应用律所标准格式（支持传参覆盖默认正文格式）：默认正文楷体_GB2312/西文 Arial 12 号黑色、两端对齐、段前 0 段后 18 磅、" +
-          "行距最小值 16 磅、首行缩进 2 字符（自动编号列表项不额外加首行缩进）；首段短文本视为主标题（16 号加粗居中）；" +
-          "章/节/条标题（含第X章/第X条/一、，无论手打还是自动编号）整段加粗；" +
-          "表格套 Grid 1.5 磅边框、10 号字、首行加粗居中、数字居右；表格后首段段前 18 磅。" +
-          "用户要求'规范格式/按标准排版'时用本工具，正文中既有的加粗强调不会被抹掉，且会穿透清除段落内残留的局部字体/字号直接格式。" +
-          "若用户同时指定了具体字体/字号/行距/缩进/段前段后（如'全文改为宋体小四、1.5倍行距'），可直接传入对应可选参数覆盖默认值。" +
-          "系统提醒说「本项目模板画像：无」时，排版一律用本工具，不要去找模板文件夹。" +
-          "长文档会分批处理并回传进度（最长约 2 分钟），一次调用即可完成，不要重复调用；返回 truncated=false 表示全文已处理。")
+    @Tool("【格式】对整篇文档套用律所标准格式，可传参覆盖默认正文格式。\n"
+            + "何时用：用户要求「规范格式 / 按标准排版」；系统提醒「本项目模板画像：无」时排版一律用它，不要去找模板文件夹。用户指定了字体/字号/行距/缩进/段间距时，传对应可选参数覆盖。\n"
+            + "默认：正文楷体_GB2312 / 西文 Arial 12 号、两端对齐、段后 18 磅、行距最小值 16 磅、首行缩进 2 字符；首段短文本为主标题（16 号加粗居中）；章节条标题加粗；表格 Grid 1.5 磅边框、10 号字、首行加粗居中、数字居右。不抹掉既有加粗强调。\n"
+            + "长文档分批处理（最长约 2 分钟），一次调用即可；truncated=false 表示全文已处理。")
     public String doc_apply_standard_format(
-            @P(value = "覆盖正文中文字体（如 宋体、仿宋_GB2312、楷体_GB2312），不传用默认", required = false) String fontNameAsian,
-            @P(value = "覆盖正文西文字体（如 Times New Roman、Arial），不传用默认", required = false) String fontNameWestern,
-            @P(value = "覆盖正文字号（磅，如 小四=12、四号=14），不传用默认", required = false) Double fontSize,
-            @P(value = "覆盖正文行距模式（single/1.5/double/multiple/proportional/atLeast/exactly），不传用默认", required = false) String lineSpacingMode,
-            @P(value = "覆盖正文行距值（倍数如 1.5、百分比如 150、或磅数如 20），不传用默认", required = false) Double lineSpacingValue,
-            @P(value = "覆盖正文首行缩进字符数（如 2；传 0 取消缩进），不传用默认", required = false) Double firstLineIndentChars,
-            @P(value = "覆盖正文段前间距（磅），不传用默认", required = false) Double spaceBeforePt,
-            @P(value = "覆盖正文段后间距（磅），不传用默认", required = false) Double spaceAfterPt
+            @P(value = "正文中文字体，如 宋体、仿宋_GB2312；不传用默认", required = false) String fontNameAsian,
+            @P(value = "正文西文字体，如 Times New Roman；不传用默认", required = false) String fontNameWestern,
+            @P(value = "正文字号（磅，小四=12、四号=14）；不传用默认", required = false) Double fontSize,
+            @P(value = "行距模式：single/1.5/double/multiple/proportional/atLeast/exactly；不传用默认", required = false) String lineSpacingMode,
+            @P(value = "行距值（倍数 1.5、百分比 150 或磅数 20）；不传用默认", required = false) Double lineSpacingValue,
+            @P(value = "首行缩进字符数（0 取消缩进）；不传用默认", required = false) Double firstLineIndentChars,
+            @P(value = "段前间距（磅）；不传用默认", required = false) Double spaceBeforePt,
+            @P(value = "段后间距（磅）；不传用默认", required = false) Double spaceAfterPt
     ) {
         log.info("Tool: doc_apply_standard_format called");
         try {
@@ -1627,7 +1470,7 @@ public class DocumentEditTools implements AgentToolComponent {
           "不要为了确认这件事去 list_files / search_project_files 翻模板文件夹——那要白花一整轮。" +
           "长文档分批处理并回传进度，一次调用即可，truncated=false 表示全文已处理。")
     public String doc_apply_style_profile(
-            @P("document=全文（默认）/ selection=选区 / styles-only=只改样式定义") String scope
+            @P(value = "document=全文（默认）/ selection=选区 / styles-only=只改样式定义", required = false) String scope
     ) {
         log.info("Tool: doc_apply_style_profile called scope={}", scope);
         try {
@@ -1651,9 +1494,9 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【结构】在光标处（position=start 时在文首）插入由标题级别自动生成的目录（真正的目录域，可更新）。" +
           "levels 收几级标题（默认 3），title 目录标题（默认 '目录'）。文档里的标题要先用 doc_set_paragraph_format 的 headingLevel 标好级别，否则目录为空。")
     public String doc_insert_toc(
-            @P("收入目录的标题级数 1-10，默认 3") Integer levels,
-            @P("目录标题文本，默认 '目录'") String title,
-            @P("插入位置（不是序号、不是页码）：cursor=光标处（默认）/ start=文首") String position
+            @P(value = "收入目录的标题级数 1-10，默认 3", required = false) Integer levels,
+            @P(value = "目录标题文本，默认 '目录'", required = false) String title,
+            @P(value = "插入位置（不是序号、不是页码）：cursor=光标处（默认）/ start=文首", required = false) String position
     ) {
         log.info("Tool: doc_insert_toc called levels={}, title={}", levels, title);
         try {
@@ -1672,13 +1515,13 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【结构】设置纸张与页边距（单位毫米）：widthMm/heightMm 纸张尺寸（A4 为 210x297）、orientation portrait/landscape、" +
           "marginTopMm/marginBottomMm/marginLeftMm/marginRightMm 页边距。只传需要改的参数；只给 orientation 时按当前纸张旋转。")
     public String doc_set_page_setup(
-            @P("纸张宽（毫米），不改则不传") Double widthMm,
-            @P("纸张高（毫米），不改则不传") Double heightMm,
-            @P("方向：portrait/landscape，不改则不传") String orientation,
-            @P("上边距（毫米），不改则不传") Double marginTopMm,
-            @P("下边距（毫米），不改则不传") Double marginBottomMm,
-            @P("左边距（毫米），不改则不传") Double marginLeftMm,
-            @P("右边距（毫米），不改则不传") Double marginRightMm
+            @P(value = "纸张宽（毫米），不改则不传", required = false) Double widthMm,
+            @P(value = "纸张高（毫米），不改则不传", required = false) Double heightMm,
+            @P(value = "方向：portrait/landscape，不改则不传", required = false) String orientation,
+            @P(value = "上边距（毫米），不改则不传", required = false) Double marginTopMm,
+            @P(value = "下边距（毫米），不改则不传", required = false) Double marginBottomMm,
+            @P(value = "左边距（毫米），不改则不传", required = false) Double marginLeftMm,
+            @P(value = "右边距（毫米），不改则不传", required = false) Double marginRightMm
     ) {
         log.info("Tool: doc_set_page_setup called w={}, h={}, orientation={}", widthMm, heightMm, orientation);
         try {
@@ -1705,7 +1548,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "撤销修改", category = "document", fileEffect = "MODIFIED")
     @Tool("【验/撤销】撤销最近的编辑操作。改错了（核对返回的段落文本发现不对）就用它退回，再重新操作。")
     public String doc_undo(
-            @P("撤销步数，默认 1") Integer steps
+            @P(value = "撤销步数，默认 1", required = false) Integer steps
     ) {
         log.info("Tool: doc_undo called steps={}", steps);
         try {
@@ -1721,7 +1564,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "重做修改", category = "document", fileEffect = "MODIFIED")
     @Tool("【验/撤销】重做刚撤销的操作。")
     public String doc_redo(
-            @P("重做步数，默认 1") Integer steps
+            @P(value = "重做步数，默认 1", required = false) Integer steps
     ) {
         log.info("Tool: doc_redo called steps={}", steps);
         try {
@@ -1735,9 +1578,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "添加批注", category = "document", fileEffect = "MODIFIED")
-    @Tool("【批注】在指定锚点处的文本上添加 Word 批注（comment）。修订文档时，解释、说明、修改理由等不属于正文的内容" +
-          "**必须**用本工具以批注呈现，禁止写入正文。先 doc_find_text 拿到目标文本的 anchorId，再对它加批注；" +
-          "批注署名 AI WorkDeck，附着在目标文本上，保存为 docx 后可在 Word 中查看。")
+    @Tool("【批注】在锚点文本上添加 Word 批注，署名 AI WorkDeck，保存为 .docx 后可在 Word 中查看。\n"
+            + "何时用：修订文档时，解释、说明、修改理由等不属于正文的内容必须用批注呈现，禁止写入正文。先 doc_find_text 取目标文本的 anchorId 再加批注。")
     public String doc_add_comment(
             @P("doc_find_text 返回的 anchorId（批注附着的目标文本）") String anchorId,
             @P("批注内容（解释/说明/修改理由）") String comment
@@ -1767,50 +1609,40 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "回复批注", category = "document", fileEffect = "MODIFIED")
-    @Tool("【批注】回复一条已有批注（commentId 来自 doc_get_comments 返回的 id）。回复以新批注呈现，" +
-          "附着在同一处文本，内容自动标出回复对象；署名 AI WorkDeck。")
-    public String doc_reply_comment(
-            @P("要回复的批注 id（来自 doc_get_comments）") String commentId,
-            @P("回复内容") String text
-    ) {
-        log.info("Tool: doc_reply_comment called commentId={}", commentId);
-        if (commentId == null || commentId.isBlank()) {
-            return "Error: 缺少 commentId 参数（来自 doc_get_comments 返回的 id）";
-        }
-        try {
-            java.util.Map<String, Object> params = new java.util.HashMap<>();
-            params.put("id", commentId);
-            params.put("text", text != null ? text : "");
-            return editorBridgeService.executeEditorCommand("reply_comment", params);
-        } catch (Exception e) {
-            log.error("Failed to reply comment", e);
-            return "Error: " + e.getMessage();
-        }
-    }
-
-    @ToolMeta(displayName = "解决批注", category = "document", fileEffect = "MODIFIED")
-    @Tool("【批注】把一条批注标记为已解决/取消已解决（commentId 来自 doc_get_comments 返回的 id）。")
-    public String doc_resolve_comment(
+    @ToolMeta(displayName = "更新批注", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.WRITE)
+    @Tool("回复一条批注，或把它标记为已解决/重新打开。action: reply 回复（需 text），resolve 标记已解决，reopen 取消已解决。\n"
+          + "commentId 来自 doc_get_comments 返回的 id；回复以新批注呈现并附着在同一处文本，署名 AI WorkDeck。"
+          + "删除批注不在此列，用 doc_delete_comment。")
+    public String doc_update_comment(
             @P("批注 id（来自 doc_get_comments）") String commentId,
-            @P("true=标记已解决，false=取消已解决，默认 true") Boolean resolved
+            @P("reply=回复 / resolve=标记已解决 / reopen=取消已解决") String action,
+            @P(value = "回复内容，仅 action=reply 用", required = false) String text
     ) {
-        log.info("Tool: doc_resolve_comment called commentId={}, resolved={}", commentId, resolved);
+        log.info("Tool: doc_update_comment called commentId={}, action={}", commentId, action);
         if (commentId == null || commentId.isBlank()) {
             return "Error: 缺少 commentId 参数（来自 doc_get_comments 返回的 id）";
+        }
+        String a = action == null ? "" : action.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!java.util.Set.of("reply", "resolve", "reopen").contains(a)) {
+            return "Error: action 须为 reply / resolve / reopen";
         }
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("id", commentId);
-            params.put("resolved", resolved == null || resolved);
+            if ("reply".equals(a)) {
+                params.put("text", text != null ? text : "");
+                return editorBridgeService.executeEditorCommand("reply_comment", params);
+            }
+            params.put("resolved", "resolve".equals(a));
             return editorBridgeService.executeEditorCommand("set_comment_resolved", params);
         } catch (Exception e) {
-            log.error("Failed to resolve comment", e);
+            log.error("Failed to update comment", e);
             return "Error: " + e.getMessage();
         }
     }
 
-    @ToolMeta(displayName = "删除批注", category = "document", fileEffect = "MODIFIED")
+    // access：批注是审阅元数据，不是正文内容；批量清批注不应逐条弹确认
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除批注", category = "document", fileEffect = "MODIFIED")
     @Tool("【批注】删除一条批注（commentId 来自 doc_get_comments 返回的 id）。删除不可撤销为修订，删前先确认。")
     public String doc_delete_comment(
             @P("批注 id（来自 doc_get_comments）") String commentId
@@ -1844,24 +1676,40 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "接受修订", category = "document", fileEffect = "MODIFIED")
-    @Tool("【修订】接受一条修订（index 来自 doc_list_revisions，0 开始）。")
-    public String doc_accept_revision(
-            @P("修订序号，0 开始（来自 doc_list_revisions）") Integer index
+    @ToolMeta(displayName = "处置修订", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.WRITE)
+    @Tool("接受或拒绝文档中的修订。action: accept/reject 处置 index 指定的一条，accept_all/reject_all 处置全部。\n"
+          + "index 来自 doc_list_revisions（0 开始），仅 accept/reject 用；处置后其余条目的 index 会前移。"
+          + "accept_all/reject_all 是批量、不可逐条撤销的操作，先确认这确实是用户想要的。")
+    public String doc_revisions(
+            @P("accept=接受一条 / reject=拒绝一条 / accept_all=接受全部 / reject_all=拒绝全部") String action,
+            @P(value = "修订序号，0 开始（来自 doc_list_revisions）；accept/reject 必填，*_all 不用", required = false) Integer index
     ) {
-        log.info("Tool: doc_accept_revision called index={}", index);
-        if (index == null) return "Error: 缺少 index 参数（来自 doc_list_revisions）";
-        return dispatchRevisionResolve(index, "accept");
-    }
-
-    @ToolMeta(displayName = "拒绝修订", category = "document", fileEffect = "MODIFIED")
-    @Tool("【修订】拒绝一条修订（index 来自 doc_list_revisions，0 开始）。")
-    public String doc_reject_revision(
-            @P("修订序号，0 开始（来自 doc_list_revisions）") Integer index
-    ) {
-        log.info("Tool: doc_reject_revision called index={}", index);
-        if (index == null) return "Error: 缺少 index 参数（来自 doc_list_revisions）";
-        return dispatchRevisionResolve(index, "reject");
+        log.info("Tool: doc_revisions called action={} index={}", action, index);
+        String a = action == null ? "" : action.trim().toLowerCase(java.util.Locale.ROOT);
+        switch (a) {
+            case "accept", "reject" -> {
+                if (index == null) return "Error: action=" + a + " 需要 index 参数（来自 doc_list_revisions）";
+                String done = dispatchRevisionResolve(index, a);
+                if (done == null || done.startsWith("Error")) return done;
+                // 处置一条后其余 index 前移。光在说明里写，模型仍按旧编号接着处置（tasks-10 t08 实录：要拒绝 7→15 的
+                // 删除+插入两条，拒了 0 再拒「1」，实际拒掉的是原来的 2 号违约金条款）。回执直接附上重排后的清单。
+                String remaining = doc_list_revisions();
+                if (remaining == null || remaining.startsWith("Error")) return done;
+                return done + "\n\n" + com.checkba.service.LangText.of(
+                        "处置后剩余修订（编号已重排，继续处置请用下面的 index）：",
+                        "Remaining revisions after this change (renumbered; use these indexes for the next step):")
+                        + "\n" + remaining;
+            }
+            case "accept_all" -> {
+                return dispatchRevisionResolveAll("accept");
+            }
+            case "reject_all" -> {
+                return dispatchRevisionResolveAll("reject");
+            }
+            default -> {
+                return "Error: action 须为 accept / reject / accept_all / reject_all";
+            }
+        }
     }
 
     private String dispatchRevisionResolve(Integer index, String action) {
@@ -1874,20 +1722,6 @@ public class DocumentEditTools implements AgentToolComponent {
             log.error("Failed to resolve revision", e);
             return "Error: " + e.getMessage();
         }
-    }
-
-    @ToolMeta(displayName = "接受全部修订", category = "document", fileEffect = "MODIFIED")
-    @Tool("【修订】一次性接受文档中的全部修订。这是批量不可逐条撤销的操作，先确认这确实是用户想要的。")
-    public String doc_accept_all_revisions() {
-        log.info("Tool: doc_accept_all_revisions called");
-        return dispatchRevisionResolveAll("accept");
-    }
-
-    @ToolMeta(displayName = "拒绝全部修订", category = "document", fileEffect = "MODIFIED")
-    @Tool("【修订】一次性拒绝文档中的全部修订。")
-    public String doc_reject_all_revisions() {
-        log.info("Tool: doc_reject_all_revisions called");
-        return dispatchRevisionResolveAll("reject");
     }
 
     private String dispatchRevisionResolveAll(String action) {
@@ -1908,11 +1742,11 @@ public class DocumentEditTools implements AgentToolComponent {
           "fontName/fontSize 设页眉页脚的字体字号。")
     public String doc_edit_header_footer(
             @P("header=页眉，footer=页脚") String target,
-            @P("页眉/页脚文本（只放页码时可不传）") String text,
-            @P("对齐：left/center/right/justify，不改则不传") String align,
-            @P("页码模板，{PAGE}=当前页 {NUMPAGES}=总页数，如 '第 {PAGE} 页 共 {NUMPAGES} 页'；不要页码则不传") String pageNumberPattern,
-            @P("字体名，不改则不传") String fontName,
-            @P("字号（磅），不改则不传") Double fontSize
+            @P(value = "页眉/页脚文本（只放页码时可不传）", required = false) String text,
+            @P(value = "对齐：left/center/right/justify，不改则不传", required = false) String align,
+            @P(value = "页码模板，{PAGE}=当前页 {NUMPAGES}=总页数，如 '第 {PAGE} 页 共 {NUMPAGES} 页'；不要页码则不传", required = false) String pageNumberPattern,
+            @P(value = "字体名，不改则不传", required = false) String fontName,
+            @P(value = "字号（磅），不改则不传", required = false) Double fontSize
     ) {
         log.info("Tool: doc_edit_header_footer called target={}", target);
         if (text == null && (pageNumberPattern == null || pageNumberPattern.isBlank())) {
@@ -1950,26 +1784,19 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "插入脚注", category = "document", fileEffect = "MODIFIED")
-    @Tool("【插入】在文中位置插入一条脚注（页面底部编号注释），常用于法律文件的引用/释义说明。" +
-          "anchorId 传 doc_find_text 返回的锚点则插在该处之后，不传则插在当前光标处。")
-    public String doc_insert_footnote(
-            @P("doc_find_text 返回的 anchorId，插入位置；不传则用当前光标") String anchorId,
-            @P("脚注正文内容") String text
+    @ToolMeta(displayName = "插入脚注尾注", category = "document", fileEffect = "MODIFIED", access = ToolMeta.Access.WRITE)
+    @Tool("在文中位置插入一条脚注或尾注，常用于法律文件的引用、释义说明。kind: footnote 页面底部脚注，endnote 文档末尾尾注。\n"
+          + "anchorId 传 doc_find_text 返回的锚点则插在该处之后，不传则插在当前光标处。")
+    public String doc_insert_note(
+            @P("footnote=脚注（页面底部）/ endnote=尾注（文档末尾）") String kind,
+            @P("注释正文内容") String text,
+            @P(value = "doc_find_text 返回的 anchorId，插入位置；不传则用当前光标", required = false) String anchorId
     ) {
-        log.info("Tool: doc_insert_footnote called anchor={}", anchorId);
-        return dispatchInsertNote("insert_footnote", anchorId, text);
-    }
-
-    @ToolMeta(displayName = "插入尾注", category = "document", fileEffect = "MODIFIED")
-    @Tool("【插入】在文中位置插入一条尾注（文档末尾编号注释）。anchorId 传 doc_find_text 返回的锚点则插在该处之后，" +
-          "不传则插在当前光标处。")
-    public String doc_insert_endnote(
-            @P("doc_find_text 返回的 anchorId，插入位置；不传则用当前光标") String anchorId,
-            @P("尾注正文内容") String text
-    ) {
-        log.info("Tool: doc_insert_endnote called anchor={}", anchorId);
-        return dispatchInsertNote("insert_endnote", anchorId, text);
+        log.info("Tool: doc_insert_note called kind={} anchor={}", kind, anchorId);
+        String k = kind == null ? "" : kind.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("footnote".equals(k)) return dispatchInsertNote("insert_footnote", anchorId, text);
+        if ("endnote".equals(k)) return dispatchInsertNote("insert_endnote", anchorId, text);
+        return "Error: kind 须为 footnote / endnote";
     }
 
     private String dispatchInsertNote(String action, String anchorId, String text) {
@@ -2038,9 +1865,9 @@ public class DocumentEditTools implements AgentToolComponent {
             @P("报告原文片段，必须在文档中恰好出现一次；与 anchorId 二选一") String anchorQuote,
             @P("doc_find_text 返回的 anchorId；给了就不再按 anchorQuote 查找") String anchorId,
             @P("底稿清单 JSON 数组：[{fileId 或 path, locator?, relation?, method?, note?}]") String targetsJson,
-            @P("默认核查方式 written_review/written_statement/web_check/third_party/interview（单条 target 可覆盖），可不传") String method,
-            @P("默认关系 supports（默认）/contradicts/partial（单条 target 可覆盖）") String relation,
-            @P("默认备注，可不传") String note
+            @P(value = "默认核查方式 written_review/written_statement/web_check/third_party/interview（单条 target 可覆盖），可不传", required = false) String method,
+            @P(value = "默认关系 supports（默认）/contradicts/partial（单条 target 可覆盖）", required = false) String relation,
+            @P(value = "默认备注，可不传", required = false) String note
     ) {
         log.info("Tool: doc_link_evidence called docFileId={}, anchorId={}, quote={}", docFileId, anchorId, anchorQuote);
         Long projectId = com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong();
@@ -2108,9 +1935,9 @@ public class DocumentEditTools implements AgentToolComponent {
     public String doc_list_evidence(
             @P("报告文件 ID（系统提醒里的 id=）；与 fileId 二选一") Long docFileId,
             @P("底稿文件 ID：反查它被哪些锚点引用；给了就忽略 docFileId 之外的过滤") Long fileId,
-            @P("章节前缀过滤，如 \"一/（二）\"，可不传") String sectionPath,
-            @P("状态过滤 active/unverified/stale/orphan，可不传") String status,
-            @P("最多返回多少条，默认 100，上限 500；超出时 truncated=true，用 sectionPath/status 缩小范围") Integer limit
+            @P(value = "章节前缀过滤，如 \"一/（二）\"，可不传", required = false) String sectionPath,
+            @P(value = "状态过滤 active/unverified/stale/orphan，可不传", required = false) String status,
+            @P(value = "最多返回多少条，默认 100，上限 500；超出时 truncated=true，用 sectionPath/status 缩小范围", required = false) Integer limit
     ) {
         log.info("Tool: doc_list_evidence called docFileId={}, fileId={}, sectionPath={}, status={}, limit={}", docFileId, fileId, sectionPath, status, limit);
         Long projectId = com.checkba.service.ai.context.ProjectContextHolder.getProjectIdAsLong();
@@ -2350,11 +2177,11 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "应用样式", category = "document", fileEffect = "MODIFIED")
     @Tool("【格式】给当前选区套用文档中已有的段落样式或字符样式（按样式名，不是本工具集里的标准格式化）。" +
-          "必须先选中目标（doc_select_anchor / doc_select_paragraph）。kind=paragraph（默认）或 character；" +
+          "必须先选中目标（doc_select(target=anchor|paragraph)）。kind=paragraph（默认）或 character；" +
           "样式名不存在会报错并列出可用样式名供改用。")
     public String doc_set_style(
             @P("样式名，如 'Heading 1'、'Quotations'（引擎内部样式名，不是中文标题）") String styleName,
-            @P("paragraph=段落样式（默认），character=字符样式") String kind
+            @P(value = "paragraph=段落样式（默认），character=字符样式", required = false) String kind
     ) {
         log.info("Tool: doc_set_style called styleName={}, kind={}", styleName, kind);
         if (styleName == null || styleName.isBlank()) {
@@ -2402,8 +2229,8 @@ public class DocumentEditTools implements AgentToolComponent {
     // 首次修改前的文档检查点（fileEffect=MODIFIED）仍是最后防线。
 
     @ToolMeta(displayName = "查看工作表结构", category = "document")
-    @Tool("【表格·看】查看当前打开的电子表格（xlsx）的工作表结构：每张工作表的名称、序号、已用区域和行列数。" +
-          "打开 xlsx 后先用本工具了解结构，再决定读哪个区域。Word 文档请用 doc_* 工具，本工具仅对表格文档有效。")
+    @Tool("【表格·看】查看当前打开的电子表格（xlsx）的工作表结构：名称、序号、已用区域、行列数。\n"
+            + "打开 xlsx 后先用它了解结构，再决定读哪个区域。仅对表格文档有效，Word 文档用 doc_* 工具。")
     public String sheet_get_overview() {
         log.info("Tool: sheet_get_overview called");
         try {
@@ -2415,12 +2242,8 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "读取单元格区域", category = "document")
-    @Tool("【表格·看】读取电子表格指定区域的单元格内容。返回二维数组 rows（文本为字符串、数值/公式结果为数字，日期是序列数）" +
-          "和公式清单 formulas。range 不传则读整个已用区域；区域过大会截断并提示分块读取。" +
-          "withFormat=true 时另返回 format：按「格式相同的连续行」分组，每列只列与默认格式不同的项" +
-          "（fontName/fontNameAsian/fontSize/bold/italic/color/background/hAlign/vAlign/numberFormat/wrap/borders，" +
-          "键名与 sheet_format_cells 参数同名，可原样套回去；borders 为 all/none 或 t/b/l/r 子集），上限 400 格。" +
-          "新增行列或往表里插内容前，用它看清相邻格式，再用 sheet_format_cells/sheet_set_borders 对齐。")
+    @Tool("【表格·看】读取电子表格指定区域的单元格内容，返回二维数组（rows）和公式清单（formulas）。\n"
+            + "文本为字符串，数值/公式结果为数字，日期是序列数。range 不传读整个已用区域，过大会截断并提示分块读。withFormat=true 另返回 format：按格式相同的连续行分组，每列只列与默认不同的项，键名与 sheet_format_cells 参数同名、可原样套回，上限 400 格。往表里新增行列或插内容前，用它看清相邻格式，再用 sheet_format_cells / sheet_set_borders 对齐。")
     public String sheet_read_range(
             @P(value = "区域，如 'A1:D20' 或单个单元格 'B3'；不传则读整个已用区域", required = false) String range,
             @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet,
@@ -2440,17 +2263,12 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "写入单元格", category = "document", fileEffect = "MODIFIED")
-    @Tool("【表格·写】从起始单元格开始按二维数组批量写入。rowsJson 是 JSON 二维数组，如 " +
-          "[[\"项目\",\"金额\"],[\"咨询费\",10000],[\"合计\",\"=SUM(B2:B2)\"]]：数字与数字样式字符串写为数值，" +
-          "'=' 开头写为公式，其余写为文本；null 跳过不动该格。写入即生效（无修订痕迹），返回实际写入区域和首行回读值供核对。" +
-          "公式用英文函数名，按 Excel 习惯写即可（逗号分隔、跨表 Sheet!A1 会自动归一为引擎方言）；" +
-          "SUM/AVERAGE/IF/COUNT/VLOOKUP/SUMIF/COUNTIF/INDEX+MATCH/IFERROR/TEXT/日期函数等均可用，" +
-          "但引擎是 LibreOffice 24.2，**不支持 XLOOKUP 等新函数**（用 VLOOKUP 或 INDEX+MATCH 代替）。" +
-          "任何公式出错都会在返回值 formulaErrors 里列出（单元格/公式/错误码），看到后必须修正并重写该格。" +
-          "**往表格末尾追加行时自动沿用上一行格式**：某行写入前在写入列范围内全空、且上方两行都有内容并格式一致时，" +
-          "先把紧邻上一行对应列的格式（字体/字号/加粗/对齐/数字格式/边框/底色/行高）抄过来再写值，" +
-          "返回值 formatInherited 列出沿用了哪几行（如 [{row:9, from:8}]）。表头下第一条数据、新增列、中间插入等情形不会自动沿用，" +
-          "需先 sheet_read_range(withFormat=true) 看相邻格式再用 sheet_format_cells/sheet_set_borders 对齐。inheritFormat=false 可关闭沿用。")
+    @Tool("【表格·写】从起始单元格起批量写入二维数组 rowsJson，写入即生效（无修订痕迹），回执带各格地址与回读值。\n"
+            + "回执 cellsAfterWrite 列出首行、末行与每个公式格的「地址=回读值」，写完对照地址确认落点。\n"
+            + "startCell 是 rowsJson 第一个值落的格子，每行从左往右依次落到相邻列：要在 D10 放求和、C10 放「合计」，写 startCell=C10、rowsJson=[[\"合计\",\"=SUM(D2:D9)\"]]；只写一格时 startCell 就是目标格。\n"
+            + "rowsJson 如 [[\"项目\",\"金额\"],[\"咨询费\",10000],[\"合计\",\"=SUM(B2:B2)\"]]：数字写为数值；「10,000」「¥1,000.00」「15%」「2024-01-01」「2024年1月5日」写为数值并配千分位/金额/百分比/日期格式；超过 15 位的数字串（身份证号、银行卡号）和 0 开头的编号保持文本，请以字符串传入；「=」开头写为公式，其余写为文本，null 跳过该格。\n"
+            + "公式用英文函数名、Excel 写法（逗号分隔，跨表 Sheet!A1 自动归一）；引擎是 LibreOffice 24.2，不支持 XLOOKUP 等新函数，用 VLOOKUP 或 INDEX+MATCH。公式出错会列在 formulaErrors（单元格/公式/错误码），必须修正并重写该格。\n"
+            + "往表格末尾追加行时自动沿用上一行格式（写入列全空、上方两行有内容且格式一致），回执 formatInherited 列出沿用的行，如 [{row:9, from:8}]；表头下第一行、新增列、中间插入不沿用，先 sheet_read_range(withFormat=true) 看相邻格式，再用 sheet_format_cells / sheet_set_borders 对齐。inheritFormat=false 关闭沿用。")
     public String sheet_write_cells(
             @P("起始单元格，如 'A1'") String startCell,
             @P("写入内容，JSON 二维数组") String rowsJson,
@@ -2486,7 +2304,7 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "选中单元格区域", category = "document")
+    @ToolMeta(displayName = "选中单元格区域", category = "document", access = ToolMeta.Access.READ)
     @Tool("【表格·选】选中电子表格的一个区域（视图滚动到该处并高亮，用户能看到 AI 正在操作哪里）。" +
           "选中后可接 sheet_format_cells / sheet_set_borders 等格式操作。")
     public String sheet_select_range(
@@ -2508,7 +2326,8 @@ public class DocumentEditTools implements AgentToolComponent {
     @ToolMeta(displayName = "设置单元格格式", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·格式】设置电子表格区域的格式，只传需要改的参数：加粗/斜体/下划线、字号、字体、字色、底色、" +
           "水平对齐 hAlign(left/center/right/standard)、垂直对齐 vAlign(top/center/bottom/standard)、自动换行 wrap、" +
-          "数字格式 numberFormat（LibreOffice 格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'、'@'=文本）。")
+          "数字格式 numberFormat（LibreOffice 格式码，如 '#,##0.00'、'0.00%'、'yyyy-mm-dd'、'@'=文本）。" +
+          "列宽、行高（含显示成 ### 的列加宽）不归这里，用 sheet_set_row_col。")
     public String sheet_format_cells(
             @P("区域，如 'A1:D1'") String range,
             @P(value = "加粗 true/false，不改则不传", required = false) Boolean bold,
@@ -2600,13 +2419,13 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "新建演示文稿", category = "slides", fileEffect = "ADDED")
-    @Tool("Start a new PPT here, including when a Word reference is active: create a native editable 16:9 PPTX with one blank slide and open it. If a reference is supplied, inspect its structure AND actual rendered pages first (doc_export_pdf then pdf_inspect_visual purpose=reference); structured text alone does not establish its appearance. Other slide_* tools may be hidden until this succeeds; do not wait to discover them before creating. "
-            + "Use slide_* primitives to compose content, backgrounds and formatting. No image-generation service is required. "
-            + "When a destination folder is specified, first resolve its ID with list_project_folders. Existing files are not overwritten. Omitted parentFolderId follows the source document folder; 0 selects the root.")
+    @Tool("新建一个原生可编辑的 16:9 PPTX（含一页空白）并打开；已有 Word 参考文档时也在这里新建。\n"
+            + "何时用：用户要做 PPT。slide_* 工具在创建成功前可能不可见，不要等它们出现再建。有参考文档时先看结构和实际渲染（doc_export_pdf 后 pdf_inspect_visual purpose=reference），只有结构化文字不能确定外观。\n"
+            + "内容、背景、格式用 slide_* 原语编排，不需要图像生成服务。指定目标文件夹时先用 doc_list_project_files(foldersOnly=true) 取 ID；已有文件不会被覆盖；省略 parentFolderId 沿用源文档目录，0 表示根目录。")
     public String slide_create_file(
-            @P("File name, with optional .pptx suffix") String fileName,
-            @P("Project ID") Long projectId,
-            @P(value = "Optional destination folder database ID; resolve with list_project_folders", required = false) Long parentFolderId) {
+            @P("文件名，可省略 .pptx 后缀") String fileName,
+            @P("项目 ID") Long projectId,
+            @P(value = "可选。目标文件夹 ID，用 doc_list_project_files(foldersOnly=true) 取", required = false) Long parentFolderId) {
         if (fileName == null || fileName.isBlank() || projectId == null)
             return "Error: " + com.checkba.service.LangText.of("请提供文件名与项目", "File name and project are required");
         try {
@@ -2630,14 +2449,12 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "新建表格文件", category = "document", fileEffect = "ADDED")
-    @Tool("【表格·建】在项目中新建一个空白 Excel 表格文件（.xlsx）并在编辑器中打开。" +
-          "创建后用 sheet_write_cells 写入数据、sheet_format_cells 等做格式。重名会自动加序号。" +
-          "用户指名了要放进哪个文件夹时，先调 list_project_folders 拿到该文件夹的 ID 再传 parentFolderId；" +
-          "不传就落在项目根目录。")
+    @Tool("【表格·建】在项目中新建空白 Excel 文件（.xlsx）并在编辑器中打开，重名自动加序号。\n"
+            + "创建后用 sheet_write_cells 写数据、sheet_format_cells 等设格式。用户指名了文件夹时，先 doc_list_project_files(foldersOnly=true) 取 ID 传 parentFolderId；不传落在项目根目录。")
     public String sheet_create_file(
             @P("文件名，如 '费用明细表.xlsx'（.xlsx 后缀可省略）") String fileName,
             @P("项目ID") Long projectId,
-            @P(value = "目标文件夹ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。用户指名文件夹时必须传，ID 用 list_project_folders 取。",
+            @P(value = "目标文件夹ID（可选；省略沿用本轮源文档目录，传0明确放根目录）。用户指名文件夹时必须传，ID 用 doc_list_project_files(foldersOnly=true) 取。",
                required = false) Long parentFolderId
     ) {
         log.info("Tool: sheet_create_file called fileName={}, projectId={}, parentFolderId={}",
@@ -2701,18 +2518,26 @@ public class DocumentEditTools implements AgentToolComponent {
 
     @ToolMeta(displayName = "插入删除行列", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·结构】插入或删除整行/整列。op: insert_rows/delete_rows/insert_cols/delete_cols；" +
-          "start 是 1 开始的行号（如 '3'）或列标（如 'B'）；count 默认 1。插入的新行/列占据 start 的位置（原内容后移）。")
+          "start 是 1 开始的行号（如 '3'）或列标（如 'B'）；count 默认 1。插入的新行/列占据 start 的位置（原内容后移）。" +
+          "按用户说法传 position：「在案由（C 列）后面加一列」= insert_cols start='C' position='after'；「在第 5 行下面加一行」= insert_rows start='5' position='after'；不传 position 就是插在 start 前面。" +
+          "回执里的 usedRange / headerRow 是插入后的新地址。插入后再用 sheet_write_cells 往新列/行填表头和内容——不要用写入覆盖相邻列来「挪」数据。")
     public String sheet_edit_rows_cols(
             @P("操作：insert_rows/delete_rows/insert_cols/delete_cols") String op,
             @P("起始位置：行号（1 开始，如 '3'）或列标（如 'B'）") String start,
             @P(value = "行/列数，默认 1", required = false) Integer count,
-            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet
+            @P(value = "工作表名称或序号（0 开始）；不传用当前活动工作表", required = false) String sheet,
+            @P(value = "插入位置：before（默认，插在 start 前面）/ after（插在 start 后面）；删除时不用传", required = false) String position
     ) {
-        log.info("Tool: sheet_edit_rows_cols called op={}, start={}, count={}", op, start, count);
+        log.info("Tool: sheet_edit_rows_cols called op={}, start={}, count={}, position={}", op, start, count, position);
         try {
             java.util.Map<String, Object> params = new java.util.HashMap<>();
             params.put("op", op != null ? op : "");
-            params.put("start", start != null ? start : "");
+            String at = start != null ? start.trim() : "";
+            if ("after".equalsIgnoreCase(position) && op != null && op.toLowerCase().startsWith("insert") && !at.isEmpty()) {
+                at = nextRowOrColumn(at);
+                if (at == null) return "Error: start 无效：" + start + "（行号如 '3'，列标如 'B'）";
+            }
+            params.put("start", at);
             if (count != null) params.put("count", count);
             if (sheet != null && !sheet.isBlank()) params.put("sheet", sheet);
             return executeSheetCommand("sheet_edit_rows_cols", params);
@@ -2720,6 +2545,19 @@ public class DocumentEditTools implements AgentToolComponent {
             log.error("Failed to edit rows/cols", e);
             return "Error: " + e.getMessage();
         }
+    }
+
+    /** '5' → '6'，'C' → 'D'，'Z' → 'AA'；无效返回 null。 */
+    static String nextRowOrColumn(String start) {
+        String t = start.trim().toUpperCase(java.util.Locale.ROOT);
+        if (t.matches("[1-9]\\d*")) return String.valueOf(Long.parseLong(t) + 1);
+        if (!t.matches("[A-Z]{1,3}")) return null;
+        int n = 0;
+        for (char ch : t.toCharArray()) n = n * 26 + (ch - 'A' + 1);
+        n++;
+        StringBuilder sb = new StringBuilder();
+        for (; n > 0; n = (n - 1) / 26) sb.insert(0, (char) ('A' + (n - 1) % 26));
+        return sb.toString();
     }
 
     @ToolMeta(displayName = "合并单元格", category = "document", fileEffect = "MODIFIED")
@@ -2892,7 +2730,8 @@ public class DocumentEditTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "删除单元格批注", category = "document", fileEffect = "MODIFIED")
+    // access：批注是审阅元数据，不是单元格内容
+    @ToolMeta(access = ToolMeta.Access.WRITE, displayName = "删除单元格批注", category = "document", fileEffect = "MODIFIED")
     @Tool("【表格·批注】删除指定单元格上的批注。一个单元格最多一条批注，按单元格地址定位删除。")
     public String sheet_delete_comment(
             @P("单元格，如 'B2'") String cell,
@@ -2963,7 +2802,7 @@ public class DocumentEditTools implements AgentToolComponent {
     @Tool("【表格·结构】以区域数据建一个图表。chartType: column（柱状）/ bar（条状）/ line（折线）/ pie（饼图）。" +
           "只做「建图表 + 选类型 + 标题」三件事，位置固定在数据区域右侧、默认尺寸，不支持自定义位置/尺寸/多系列等复杂配置。")
     public String sheet_add_chart(
-            @P("数据区域，如 'A1:B10'（含表头）") String range,
+            @P("数据区域，如 'A1:B10'（含表头；多列时首列作分类标签）。只画某一列且标签列不相邻时用逗号分开：标签列在前、数据列在后，如 'A1:A7,D1:D7'") String range,
             @P("图表类型：column/bar/line/pie") String chartType,
             @P(value = "图表标题，不设则不传", required = false) String title,
             @P(value = "图表名称，不传自动生成", required = false) String name,
@@ -3023,16 +2862,12 @@ public class DocumentEditTools implements AgentToolComponent {
     public static final int MAX_SHEET_REPLACEMENTS = 2000;
 
     @ToolMeta(displayName = "表格内替换", category = "document", fileEffect = "MODIFIED")
-    @Tool("【表格·写】在电子表格区域内查找并替换文本，只改命中的那些格——区域内其他格一个字都不动。" +
-          "成批改写一律用本工具，不要「sheet_search 查坐标 + sheet_write_cells 回写」：" +
-          "后者按矩形区域写，会把区域内不该动的格子一起覆盖掉。区域不传则用整个已用区域；" +
-          "缺省是包含匹配、不区分大小写，wholeCell=true 时要求整格内容与 find 完全相等。" +
-          "只动纯文本格：公式格与数值格即使显示出来的文本命中也跳过不改" +
-          "（改了会毁掉公式、或把数字变成文本），跳过多少格在返回值里如实交代。" +
-          "返回 {replaced 改了几格, occurrences 共替换几处, cells 前若干个坐标, truncated}。" +
-          "上限 20000 格扫描、单次最多替换 " + MAX_SHEET_REPLACEMENTS + " 格，超限先缩小 range 分块做。" +
-          "电子表格没有修订机制，写入即刻生效、不留修订痕迹——改错了立刻用 doc_undo 撤销。" +
-          "仅对表格文档有效（Word 文档用 doc_find_replace）。")
+    @Tool("【表格·写】在电子表格区域内查找并替换文本，只改命中的格，区域内其他格不动。\n"
+            + "何时用：成批改写一律用它，不要「sheet_search 查坐标 + sheet_write_cells 回写」（后者按矩形覆盖，会连带改掉不该动的格）。Word 文档用 doc_find_replace。\n"
+            + "range 不传用整个已用区域；默认包含匹配、不区分大小写，wholeCell=true 要求整格相等。只改纯文本格，公式格与数值格即使命中也跳过（改了会毁掉公式或把数字变成文本），跳过数在回执里交代。回执 {replaced, occurrences, cells, truncated}；扫描上限 20000 格，单次最多替换 "
+            + MAX_SHEET_REPLACEMENTS
+            + " 格，超限缩小 range 分块做。\n"
+            + "电子表格没有修订机制，写入即生效，改错了立刻 doc_undo。")
     public String sheet_find_replace(
             @P("查找内容（字面量，不是正则）") String find,
             @P("替换成什么；传空字符串表示删除命中的文本。不能省略") String replace,
@@ -3184,21 +3019,6 @@ public class DocumentEditTools implements AgentToolComponent {
     }
 
     // ==================== 调试工具 ====================
-
-    // 调试工具不下发规格（审计 A15）：它与 doc_list_revisions 功能重合、描述自称
-    // 「用于分析和诊断修订模式下的文本操作问题」，不该出现在律师面前的过程卡里。
-    // 同样只裁 spec：维护者排障时经 XML 兜底路径仍调得到。
-    @ToolMeta(displayName = "检查修订记录", category = "document", offerToModel = false)
-    @Tool("调试工具：获取文档中所有修订记录的详细信息，包括修订类型、位置、内容等。用于分析和诊断修订模式下的文本操作问题。")
-    public String doc_debug_revisions() {
-        log.info("Tool: doc_debug_revisions called");
-        try {
-            return editorBridgeService.executeEditorCommand("debug_revisions", null);
-        } catch (Exception e) {
-            log.error("Failed to debug revisions", e);
-            return "Error: " + e.getMessage();
-        }
-    }
 
     // ==================== 辅助方法 ====================
 

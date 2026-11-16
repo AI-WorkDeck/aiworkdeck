@@ -41,6 +41,7 @@ public class MobileAssistantService {
     private final ToolRegistry tools;
     private final TokenUsageService usage;
     private final UserRepository users;
+    private final MobileAssistantContentSafetyService contentSafety;
     private final TransactionTemplate tx;
     private final ObjectMapper json = new ObjectMapper();
     private final Set<String> generating = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -49,11 +50,12 @@ public class MobileAssistantService {
             MobileAssistantTurnRepository turns, MobileProjectDirRepository directories,
             MobileBackupService backupService, CloudStorageQuotaService quota, ProjectFileTextExtractor extractor,
             ChatModelFactory models, ToolRegistry tools, TokenUsageService usage, UserRepository users,
-            PlatformTransactionManager transactions, MobileAssistantDesktopCopyRepository desktopCopies) {
+            PlatformTransactionManager transactions, MobileAssistantDesktopCopyRepository desktopCopies,
+            MobileAssistantContentSafetyService contentSafety) {
         this.consents=consents; this.summaries=summaries; this.turns=turns; this.directories=directories;
         this.backupService=backupService; this.quota=quota; this.extractor=extractor;
         this.models=models; this.tools=tools; this.usage=usage; this.users=users; this.tx=new TransactionTemplate(transactions);
-        this.desktopCopies=desktopCopies;
+        this.desktopCopies=desktopCopies; this.contentSafety=contentSafety;
     }
 
     public Map<String,Object> status(Long user) {
@@ -293,10 +295,14 @@ public class MobileAssistantService {
 
     public record ChatInput(String conversationId,String requestId,String message) {}
     public Map<String,Object> chat(Long user,ChatInput input) {
+        return chat(user,input,null);
+    }
+    public Map<String,Object> chat(Long user,ChatInput input,com.checkba.service.UserActivityLogService.RequestMetadata metadata) {
         requireBillableUse(user);
         long revision=requireEnabled(user);
         String request=uuid(input.requestId()), question=required(input.message(),8000);
         String conversation=input.conversationId()==null || input.conversationId().isBlank() ? UUID.randomUUID().toString() : uuid(input.conversationId());
+        contentSafety.checkInput(user,conversation,request,question,metadata);
         var claimed=new java.util.concurrent.atomic.AtomicBoolean();
         MobileAssistantTurn turn=tx.execute(s -> {
             checkConsent(consents.lockByUserId(user).orElseThrow(),revision);
@@ -321,6 +327,7 @@ public class MobileAssistantService {
         try {
             var refs=new LinkedHashMap<Long,Map<String,Object>>();
             String answer=PlatformAiUserScope.call(user,()->answer(user,revision,turn,refs));
+            contentSafety.checkOutput(user,turn.getConversationId(),request,answer,metadata);
             requireRevision(user,revision);
             // Revalidate every source before delivery, not only when the model started reading it.
             for (var reference:refs.values()) requireReference(user,reference);

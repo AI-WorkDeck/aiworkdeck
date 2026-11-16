@@ -142,8 +142,7 @@ public class CrossBorderConsentService {
      * 而登录弹层本身就征求同意；连着账户却没有有效同意时拒绝。
      */
     public void requireForPlatformCall() {
-        if (currentAccountIdentity() == null) return;
-        if (hasConsent()) return;
+        if (!isRequired()) return;
         // 文案红线：不得含「登录」「未授权」「请先」——前端 api.js 用这三个子串判掉线并清会话
         throw new AccountException(AccountException.Kind.CONFLICT, LangText.of(
                 "平台 AI 通道已停用：当前账户在本站点还没有有效的跨境传输单独同意（或已撤回）。"
@@ -151,6 +150,28 @@ public class CrossBorderConsentService {
                 "The platform AI channel is paused: this account has no valid cross-border transfer consent on this site (or it was withdrawn). "
                         + "Check the consent box under Settings → AI Service Settings to continue, or use a local model to keep content on this device."),
                 REASON);
+    }
+
+    /**
+     * 就地记下同意（对话里的同意卡、启动时的征求框）：与设置页勾选写同样的键——时间、当前告知版本，
+     * 再由 {@link #stampIdentity} 盖上当前账户与站点。
+     */
+    public void record() {
+        Map<String, String> updates = new LinkedHashMap<>();
+        updates.put(KEY_AT, Instant.now().toString());
+        updates.put(KEY_VERSION, NOTICE_VERSION);
+        stampIdentity(updates);
+        settings.setMany(updates);
+    }
+
+    /** 连着账户、但本账户在本站点没有有效同意：平台通道此刻会被 {@link #requireForPlatformCall()} 拦下。 */
+    public boolean isRequired() {
+        return currentAccountIdentity() != null && !hasConsent();
+    }
+
+    /** 当前站点 id（cn / intl），前端按它选「可能涉及境外处理」或「跨境传输」的措辞。 */
+    public String currentSite() {
+        return siteProfileService.currentSite();
     }
 
     /** 当前连接账户的身份；未连接返回 null。 */

@@ -26,7 +26,30 @@ export const railSortData = () => ({
   railEditMode: false,
 })
 
+// rail 图标下的短标签（10px 一行，放不下全名）。没列在这里的项（动态插件等）用自己的全名，超长截断。
+const RAIL_SHORT_LABEL_KEYS = {
+  home: 'workbench.railLabelHome',
+  'dd-client': 'workbench.railLabelClient',
+  files: 'workbench.railLabelFiles',
+  market: 'workbench.railLabelPlugins',
+  dev: 'workbench.railLabelDev',
+  // 名字超过一行能放下的官方插件（全名仍在悬停提示里）
+  'plugin-litigation-visual': 'workbench.railLabelLitigation',
+  'plugin-baoqingtian': 'workbench.railLabelBaoqingtian',
+  'plugin-dpia-workbench': 'workbench.railLabelDpia',
+  'plugin-lawfirm-management': 'workbench.railLabelLawfirm',
+  'plugin-tencent-meeting': 'workbench.railLabelTmeet',
+  'plugin-project-im': 'workbench.railLabelProjectIm',
+  'plugin-desensitize': 'workbench.railLabelDesensitize',
+  'plugin-tabular-review': 'workbench.railLabelTabular',
+}
+
 export const railSortMethods = {
+  railLabelOf(p) {
+    const k = RAIL_SHORT_LABEL_KEYS[p.key]
+    return k ? this.$t(k) : (p.labelKey && this.$t(p.labelKey)) || p.label || ''
+  },
+
   loadRailOrder() {
     try {
       const saved = uni.getStorageSync(RAIL_ORDER_STORAGE_KEY)

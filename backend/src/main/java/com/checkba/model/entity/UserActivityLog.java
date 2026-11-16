@@ -85,6 +85,17 @@ public class UserActivityLog {
     @Column(columnDefinition = "TEXT")
     private String metaInfo;
 
+    /** Trusted-proxy-adjusted client address and port for security audit records. */
+    @Column(name = "source_address", length = 128)
+    private String sourceAddress;
+
+    @Column(name = "source_port")
+    private Integer sourcePort;
+
+    /** Client-reported User-Agent, retained as a device characteristic rather than a verified device identity. */
+    @Column(name = "device_characteristics", length = 512)
+    private String deviceCharacteristics;
+
     public Long getId() {
         return id;
     }
@@ -163,6 +174,30 @@ public class UserActivityLog {
 
     public void setMetaInfo(String metaInfo) {
         this.metaInfo = metaInfo;
+    }
+
+    public String getSourceAddress() {
+        return sourceAddress;
+    }
+
+    public void setSourceAddress(String sourceAddress) {
+        this.sourceAddress = sourceAddress;
+    }
+
+    public Integer getSourcePort() {
+        return sourcePort;
+    }
+
+    public void setSourcePort(Integer sourcePort) {
+        this.sourcePort = sourcePort;
+    }
+
+    public String getDeviceCharacteristics() {
+        return deviceCharacteristics;
+    }
+
+    public void setDeviceCharacteristics(String deviceCharacteristics) {
+        this.deviceCharacteristics = deviceCharacteristics;
     }
 
     @Override

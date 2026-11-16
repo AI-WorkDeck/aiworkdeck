@@ -15,8 +15,10 @@ import { ASK_USER_KIND, decodeAttr, normalizeAskUserEvent } from '../../src/util
 import { captureChatTimeline } from '../../src/components/AgentMessage/chatTimeline.mjs'
 import { nextBubbleId } from '../../src/composables/bubbleId.js'
 import { documentEditedFromProcesses } from '../../src/utils/useInDocumentVisibility.js'
+import { cancelledEditedDocument, stopNoticeForCancelled } from '../../src/utils/agentRunControl.js'
 import { isSameFileChange } from '../../src/utils/chatFileChange.js'
 import { isAccountRequired, isCreditsRequired } from '../../src/utils/requireAccountCore.js'
+import { bqtErrorCode, bqtErrorMessage } from '../../src/utils/bqtBilling.js'
 import { createLegacyAskUserMarkup } from '../../src/composables/legacyAskUserMarkup.mjs'
 import { isUserQuestionAwaiting } from '../../src/composables/awaitingInput.mjs'
 
@@ -37,6 +39,8 @@ const DEPS = {
   nextBubbleId,
   captureChatTimeline,
   documentEditedFromProcesses,
+  cancelledEditedDocument,
+  stopNoticeForCancelled,
   isSameFileChange,
   createInboxState,
   applyInboxReceipt,
@@ -58,6 +62,8 @@ const DEPS = {
   createLegacyAskUserMarkup,
   isAccountRequired,
   isCreditsRequired,
+  bqtErrorCode,
+  bqtErrorMessage,
 }
 
 /**

@@ -57,7 +57,7 @@ def _render_words(pptx_path, workdir):
         raise RuntimeError("LibreOffice produced no PDF")
     box = os.path.join(workdir, "words.xml")
     subprocess.run(["pdftotext", "-bbox", pdf, box], capture_output=True, timeout=120)
-    xml = open(box, encoding="utf-8", errors="replace").read()
+    xml = open(box, encoding="utf-8-sig", errors="replace").read()
     pg = re.search(r'<page width="([\d.]+)" height="([\d.]+)"', xml)
     W = float(pg.group(1)) / PT_PER_PX if pg else 0
     H = float(pg.group(2)) / PT_PER_PX if pg else 0
@@ -76,7 +76,7 @@ def verify(svg_path, doc_path):
 
     Works on any file LibreOffice can convert — .pptx and .vsdx are both in use.
     Returns a list of problems; empty means the render matches the master."""
-    svg = open(svg_path, encoding="utf-8").read()
+    svg = open(svg_path, encoding="utf-8-sig").read()
     want = [p for p in parse_svg(svg) if p["k"] == "text"]
     work = tempfile.mkdtemp(prefix="verifyppt-")
     try:
@@ -165,6 +165,21 @@ def _quiet_broken_pipe():
         pass
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     _quiet_broken_pipe()
     if not available():
         print("verify_pptx: soffice / pdftotext unavailable — skipped"); sys.exit(0)

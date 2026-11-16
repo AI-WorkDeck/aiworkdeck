@@ -147,6 +147,26 @@ export default {
     "titles": "Saisissez un titre pour chaque élément."
   },
   "client": {
+    "chat": {
+      "chatInviteCode": "Cette invitation est destinée aux comptes AI WorkDeck. Vous pouvez échanger avec vos avocats dans le chat du projet ici.",
+      "openChat": "Ouvrir le chat du projet",
+      "joinFirst": "Entrez d’abord dans le projet avec le code d’accès envoyé par votre avocat, puis utilisez le chat du projet.",
+      "title": "Discussion du projet",
+      "hint": "Échangez avec votre équipe juridique au sujet de ce projet. Vos avocats décident des messages et fichiers antérieurs que vous pouvez voir.",
+      "tabChecklist": "Liste de contrôle",
+      "loading": "Chargement des messages…",
+      "empty": "Aucun message pour l’instant. Vous pouvez poser vos questions à vos avocats ici.",
+      "older": "Charger les messages précédents",
+      "you": "Vous",
+      "filePending": "Le fichier est encore en préparation. Veuillez contacter votre avocat.",
+      "placeholder": "Saisissez un message. Entrée pour envoyer, Maj+Entrée pour un saut de ligne",
+      "attach": "Envoyer un fichier",
+      "send": "Envoyer",
+      "sending": "Envoi en cours…",
+      "fileTooLarge": "Un fichier ne peut pas dépasser {size} Mo",
+      "quotaFull": "Vous avez atteint la limite totale d’envoi de {size} Mo pour ce projet. Veuillez contacter votre avocat.",
+      "unavailable": "La discussion du projet n’est pas disponible pour le moment. Veuillez réessayer plus tard."
+    },
     "messageUnavailable": "Ce projet invité ou cette liste de contrôle n'est plus disponible. Actualisez et réessayez.",
     "workspaceTitle": "Collaboration client",
     "workspaceHint": "Préparez les documents à partir de la liste de contrôle de votre avocat, soumettez chaque élément et suivez les retours.",

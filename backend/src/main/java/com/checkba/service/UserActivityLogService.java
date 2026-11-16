@@ -24,11 +24,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserActivityLogService {
 
-    /**
-     * 日志保留窗口（天）。本类自己定的默认值，非产品要求：这张表目前只服务
-     * getUserLogs 的「最近动态」（findTop500ByUserIdOrderByTimestampDesc，见该方法注释），
-     * 没有任何更长周期的统计依赖它，180 天足够覆盖「最近」语义，同时不再无限增长。
-     */
+    /** 用户活动与内容安全审计共用 180 天保留窗口；每日任务删除超过窗口的记录。 */
     static final long RETENTION_DAYS = 180;
 
     /** 不带日期范围时的老上限（与 findTop500 一致）。 */
@@ -46,7 +42,15 @@ public class UserActivityLogService {
     private final UserActivityLogRepository repository;
     private final ProjectRepository projectRepository;
 
+    /** Server-observed network metadata plus the client User-Agent; never includes request content. */
+    public record RequestMetadata(String sourceAddress, Integer sourcePort, String deviceCharacteristics) {}
+
     public void logActivity(Long userId, String actionType, Long targetId, String targetName, Long duration, String metaInfo, Long projectId) {
+        logActivity(userId, actionType, targetId, targetName, duration, metaInfo, projectId, null);
+    }
+
+    public void logActivity(Long userId, String actionType, Long targetId, String targetName, Long duration,
+                            String metaInfo, Long projectId, RequestMetadata request) {
         UserActivityLog log = new UserActivityLog();
         log.setUserId(userId);
         log.setActionType(actionType);
@@ -55,7 +59,18 @@ public class UserActivityLogService {
         log.setDuration(duration);
         log.setMetaInfo(metaInfo);
         log.setProjectId(projectId);
+        if (request != null) {
+            log.setSourceAddress(trim(request.sourceAddress(), 128));
+            log.setSourcePort(request.sourcePort());
+            log.setDeviceCharacteristics(trim(request.deviceCharacteristics(), 512));
+        }
         repository.save(log);
+    }
+
+    private static String trim(String value, int max) {
+        if (value == null) return null;
+        String cleaned = value.replaceAll("[\\p{Cntrl}]", " ").trim();
+        return cleaned.length() > max ? cleaned.substring(0, max) : cleaned;
     }
 
     public List<UserActivityLog> getUserLogs(Long userId) {

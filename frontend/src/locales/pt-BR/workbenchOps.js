@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "Cancelando…",
   "ocrBatchBusy": "Já há um lote em andamento; aguarde ou cancele",
   "ocrConsentTitle": "Usar reconhecimento na nuvem?",
-  "ocrConsentHint": "PDFs com camada de texto são extraídos diretamente, sem envio nem cobrança; só digitalizações e imagens precisam de OCR na nuvem. Esta confirmação vale só para este lote; altere para «sempre nuvem» ou «somente local» em Configurações → Conta e uso → Reconhecimento de digitalizações.",
+  "ocrConsentHint": "PDFs com camada de texto são extraídos diretamente, sem envio nem cobrança; só digitalizações e imagens precisam de OCR na nuvem. Esta confirmação vale só para este lote; altere para «sempre nuvem» ou «somente local» em Configurações → Configurações de IA → Reconhecimento de digitalizações.",
   "ocrConsentCheck": "Estou ciente do destino dos dados e da cobrança",
   "ocrConsentConfirm": "Iniciar",
   "ocrCopied": "Texto de {count} arquivo(s) copiado e salvo no histórico da área de transferência",
@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Você pode usar o reconhecimento na nuvem para os arquivos deste lote que falharam localmente. Se não usar, esses arquivos não serão enviados.",
   "ocrLocalFailedConfirm": "Usar reconhecimento na nuvem",
   "ocrAlreadySearchable": "«{name}» já tem camada de texto e permite pesquisa; nenhum arquivo novo foi criado",
-  "ocrStopped": "Interrompido; {count} arquivo(s) não processados"
+  "ocrStopped": "Interrompido; {count} arquivo(s) não processados",
+  "subscribeProBtn": "Pro ¥9.9",
 }

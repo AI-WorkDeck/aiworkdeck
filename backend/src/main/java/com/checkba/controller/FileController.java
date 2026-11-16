@@ -85,6 +85,18 @@ public class FileController {
     @org.springframework.beans.factory.annotation.Qualifier("taskExecutor")
     private java.util.concurrent.Executor taskExecutor;
 
+    /** 按用户限频（server 模式；local-mode 内部旁路）。可缺省：手工装配的测试不用改。 */
+    @Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
+    /**
+     * 单次上传请求的字节上限（storage.max-upload-size）。multipart 由 Spring 的
+     * spring.servlet.multipart.* 管，但浏览器与桌面的主路径是裸 octet-stream，那条路
+     * Spring 不管，必须在这里按 Content-Length 拦。桌面默认等于项目总量闸（行为不变）。
+     */
+    @org.springframework.beans.factory.annotation.Value("${storage.max-upload-size:20GB}")
+    private org.springframework.util.unit.DataSize maxUploadSize = org.springframework.util.unit.DataSize.ofGigabytes(20);
+
     private static final java.util.concurrent.ExecutorService FALLBACK_UPLOAD_EXECUTOR =
             new java.util.concurrent.ThreadPoolExecutor(
                     2, 8, 60L, java.util.concurrent.TimeUnit.SECONDS,
@@ -133,6 +145,12 @@ public class FileController {
      * 浏览器 &lt;a&gt; 下载无法设请求头，只能用 ?token=&lt;sessionId&gt;；fetch/XHR 走 X-Session-Id 头。
      * 两者取其一解析出 userId 后校验项目成员资格。此前这些接口完全无鉴权，可按数字 id 遍历下载他人文件。
      */
+    /** 律所审计日志（S20）；桌面单机与未配名录的服务器上是空操作。 */
+    private com.checkba.service.audit.FirmAuditLog firmAudit;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setFirmAudit(com.checkba.service.audit.FirmAuditLog firmAudit) { this.firmAudit = firmAudit; }
+
     private boolean isAuthorizedForFile(String token, String sessionHeader, ProjectFile file) {
         if (file == null) {
             return false;
@@ -284,7 +302,8 @@ public class FileController {
             @PathVariable("fileId") String fileId,
             @RequestParam(value = "token", required = false) String token,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionHeader,
-            @RequestParam(value = "inline", defaultValue = "false") boolean inline) {
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline,
+            @RequestHeader(value = "Range", required = false) String range) {
         log.info("[FileDownload] ===== 开始处理下载请求 =====");
         log.info("[FileDownload] 收到下载请求: fileId={}", fileId);
         
@@ -371,6 +390,13 @@ public class FileController {
             // 并写 Accept-Ranges——前提是返回类型声明为 Resource（改成 ResponseEntity<?> 会让
             // ResourceRegionHttpMessageConverter 拒写）。它依赖 contentLength()；取不到长度的资源
             // （对象存储等）包成 InputStreamResource，Spring 对它跳过 Range 处理，退回 200 全量。
+            // 律所审计日志（S20）：只记谁取了哪份文件（id + 文件名），不记内容。音视频分段请求只记起始那一段，免得一次播放刷出几十行。
+            if (firmAudit != null && projectFileOpt.isPresent() && (range == null || range.startsWith("bytes=0-"))) {
+                ProjectFile pf = projectFileOpt.get();
+                firmAudit.record(com.checkba.service.audit.FirmAuditLog.event("DATA", "FILE_DOWNLOADED")
+                        .actor(AuthController.getUserIdFromSession(StringUtils.hasText(sessionHeader) ? sessionHeader : token))
+                        .project(pf.getProjectId()).target("FILE", pf.getId(), downloadFilename).detail("inline", inline));
+            }
             if (contentLengthOrNegative(resource) < 0) {
                 return ResponseEntity.ok()
                         .contentType(mediaType)
@@ -480,6 +506,16 @@ public class FileController {
                 if (storageResolver.exceedsProjectSizeLimit(projectId, totalSize, 0L)) {
                      return ResponseEntity.status(400).body(Map.of("code", -1, "message", storageResolver.projectSizeLimitMessage()));
                 }
+                // 限频只计「一次上传的开头」（offset 缺省或 0）：录音等分片续传（offset>0）
+                // 属于同一份文件，按片计数会把正常的长录音掐断
+                if (rateLimiter != null && (offset == null || offset == 0)) {
+                    String limitSid = StringUtils.hasText(sessionHeader) ? sessionHeader : token;
+                    long wait = rateLimiter.acquire(com.checkba.service.UserRateLimiter.Kind.UPLOAD,
+                            AuthController.getUserIdFromSession(limitSid));
+                    if (wait > 0) {
+                        return com.checkba.config.GlobalExceptionHandler.rateLimitedResponse(wait);
+                    }
+                }
             } else {
                 // 找不到文件记录就无从判断归属：此前只要求登录，resolveUploadStoragePath
                 // 会把裸 fileId 当存储键，任何登录用户都能凭它往存储根写字节
@@ -540,6 +576,12 @@ public class FileController {
                     } catch (NumberFormatException ignored) {
                         // 头解析不了不是这里要处理的问题，交给后续既有逻辑
                     }
+                }
+                if (maxUploadSize != null && request.getContentLengthLong() > maxUploadSize.toBytes()) {
+                    return ResponseEntity.status(413).body(Map.of("code", -1, "reason", "UPLOAD_TOO_LARGE",
+                            "message", com.checkba.service.LangText.of(
+                                    "单个文件超过上传上限（" + maxUploadSize.toMegabytes() + " MB）",
+                                    "The file exceeds the upload limit (" + maxUploadSize.toMegabytes() + " MB)")));
                 }
                 inputStream = request.getInputStream();
             }

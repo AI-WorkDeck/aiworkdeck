@@ -3,7 +3,7 @@
 <template>
   <view class="dlp-mask" @tap="$emit('close')">
     <view ref="card" class="dlp-card" role="dialog" aria-modal="true" tabindex="-1" :aria-label="words.title" :style="position" @tap.stop>
-      <view class="dlp-head"><strong>{{ words.title }}</strong><button :aria-label="words.close" @tap="$emit('close')">×</button></view>
+      <view class="dlp-head"><strong>{{ words.title }}</strong><button :title="words.close" :aria-label="words.close" @tap="$emit('close')">×</button></view>
       <text v-if="preview.error" class="dlp-note" role="alert">{{ preview.error }}</text>
       <template v-if="preview.target">
         <text class="dlp-name">{{ preview.target.name }}</text>

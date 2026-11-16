@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { isEncryptedOoxml } from '../../src/utils/editorLoadFailure.js'
 import { readFileSync } from 'node:fs'
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
 import * as protocol from '../../src/utils/localContentProtocol.js'
@@ -26,6 +27,7 @@ function vmFor(send, projectId, events = []) {
   getFileBytesUrl:id=>`http://127.0.0.1:8765/api/files/${id}/download`, getFileWriteUrl:id=>`/upload/${id}`,
   getCurrentUser:()=>({displayName:'Test'}), createAuthorNameResolver:()=>({current:()=> 'Test'}), loadBudgetMs:()=>30000,
   classifyLoadFailure:()=> 'loadFailed', shouldSelfHealLoadFailure:()=>false, openFailureOf:()=>null,
+  isEncryptedOoxml,
  }
  const methods=new Function(...Object.keys(deps),body)(...Object.values(deps)).methods
  const vm={file:{id:7,name:'test.docx',fileType:'docx',fileSize:3}, projectId, ready:true, dirty:true,

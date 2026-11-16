@@ -56,7 +56,11 @@ declare namespace awd {
       openFile(path: string, options?: CallOptions): Promise<unknown>;
       progress(target: string | Element | null, state?: ProgressState | null | false): ProgressController;
     };
-    tools: { invoke(name: string, args?: Params, options?: CallOptions): Promise<string> };
+    tools: {
+      invoke(name: string, args?: Params, options?: CallOptions): Promise<string>;
+      /** Phase 4 placeholder (spec v2.13 section 20): resident handler for `handler.type=view` tools. Not implemented by the SDK or hosts yet; `tools.list()` is also pending a host bridge call. */
+      handle?(name: string, fn: (args: Params) => unknown | Promise<unknown>): void;
+    };
     chat: { send(prompt: string, options?: CallOptions): Promise<unknown>; addFile(path: string, options?: CallOptions): Promise<unknown> };
     im: { request<T = unknown>(action: string, params?: Params, options?: CallOptions): Promise<T> };
     notifications: {

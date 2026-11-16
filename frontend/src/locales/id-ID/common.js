@@ -8,6 +8,12 @@ export default {
   "cancel": "Batal",
   "save": "Simpan",
   "close": "Tutup",
+  "remove": "Hapus dari daftar",
+  "clear": "Bersihkan",
+  "zoomIn": "Perbesar",
+  "zoomOut": "Perkecil",
+  "moveUp": "Naikkan",
+  "moveDown": "Turunkan",
   "done": "Selesai",
   "delete": "Hapus",
   "rename": "Ubah nama",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "Buka Pengaturan",
   "later": "Nanti",
   "requestFailedWithStatus": "Permintaan gagal ({status})",
+  "tooManyRequests": "Terlalu banyak permintaan. Harap tunggu sebentar lalu coba lagi",
   "smsVerificationRequired": "Tindakan ini memerlukan verifikasi SMS",
   "freeQuotaExceeded": "Anda telah menggunakan seluruh kredit gratis Anda",
   "serviceErrorRetryLater": "Kesalahan layanan. Silakan coba lagi nanti",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "Pilih bahasa",
   "languageFollowSystem": "Ikuti sistem",
   "languageSearchPlaceholder": "Cari bahasa…",
-  "languageNoMatch": "Tidak ada bahasa yang cocok"
+  "languageNoMatch": "Tidak ada bahasa yang cocok",
+  "serverLabelAccountBridge": "Jembatan akun",
+  "serverLabelGenericClient": "Klien (umum)",
+  "serverLabelPersonalMemory": "Memori pribadi",
+  "serverLabelProjectMemory": "Memori proyek"
 }

@@ -32,7 +32,7 @@ export default {
   "signIn": "Đăng nhập",
   "signInTitle": "Đăng nhập (cần thiết cho AI, các mục trả phí trên hub và thư viện hồ sơ nhóm)",
   "noProjectTitle": "Mở một dự án để bắt đầu",
-  "noProjectHint": "Mở dự án từ phần Dự án bên trái, hoặc tạo một dự án từ trang Chào mừng.",
+  "noProjectHint": "Nhấp “Tất cả dự án” ở góc trên bên trái để chọn một dự án, hoặc tạo dự án mới ở trang chào mừng.",
   "startupDisabledHint": "Trang chào mừng sẽ không còn mở khi khởi động.",
   "openWelcome": "Mở trang Chào mừng",
   "aiNeedsProject": "Mở một dự án trước để sử dụng trò chuyện AI"

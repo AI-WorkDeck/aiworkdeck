@@ -1,0 +1,127 @@
+[
+  {
+    "id": "compare-two-contract-versions-summary",
+    "title": "「把合同v1和v2比对一下，看改了哪些条款」：先 doc_list_project_files 取 fileId，再调 compare_docx_summary 读差异（V7 D1，只读，不动原件）",
+    "category": "document",
+    "protocol": "native",
+    "userInput": "把合同v1和v2比对一下，看改了哪些条款",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_project_files",
+            "arguments": {
+              "projectId": 1
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "compare_docx_summary",
+            "arguments": {
+              "baseFileId": 101,
+              "revisedFileId": 102
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>v2 相比 v1 改了两处：第二条付款期限由 10 日改为 15 日；第三条违约金比例由 10% 提高到 20%。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_project_files": "- 合同v1.docx (fileId=101, type=docx)\n- 合同v2.docx (fileId=102, type=docx)",
+      "compare_docx_summary": "基准稿《合同v1.docx》(fileId=101) 对 修订稿《合同v2.docx》(fileId=102)\n共 2 处差异：修改 2、新增 0、删除 0。\n1. [修改] 第二条\n   原：价款 1000 万元，10 日内支付。\n   新：价款 1000 万元，15 日内支付。\n2. [修改] 第三条\n   原：违约金为转让价款的 10%。\n   新：违约金为转让价款的 20%。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_project_files"
+        },
+        {
+          "name": "compare_docx_summary",
+          "argsContain": {
+            "baseFileId": 101,
+            "revisedFileId": 102
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "compare_docx_summary",
+        "compare_docx_redline",
+        "list_tools"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    },
+    "progressiveDisclosure": true
+  },
+  {
+    "id": "compare-summary-available-without-editor-redline-is-not",
+    "title": "纯对话会话也能比对出差异摘要（纯后端），修订比对稿需要桌面编辑器所以不下发（V7 D1）",
+    "category": "document",
+    "protocol": "native",
+    "userInput": "把合同v1和v2比对一下，看改了哪些条款",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_project_files",
+            "arguments": {
+              "projectId": 1
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "compare_docx_summary",
+            "arguments": {
+              "baseFileId": 101,
+              "revisedFileId": 102
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>v2 相比 v1 改了两处：第二条付款期限由 10 日改为 15 日；第三条违约金比例由 10% 提高到 20%。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_project_files": "- 合同v1.docx (fileId=101, type=docx)\n- 合同v2.docx (fileId=102, type=docx)",
+      "compare_docx_summary": "基准稿《合同v1.docx》(fileId=101) 对 修订稿《合同v2.docx》(fileId=102)\n共 2 处差异：修改 2、新增 0、删除 0。\n1. [修改] 第二条\n   原：价款 1000 万元，10 日内支付。\n   新：价款 1000 万元，15 日内支付。\n2. [修改] 第三条\n   原：违约金为转让价款的 10%。\n   新：违约金为转让价款的 20%。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_project_files"
+        },
+        {
+          "name": "compare_docx_summary",
+          "argsContain": {
+            "baseFileId": 101,
+            "revisedFileId": 102
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "compare_docx_summary",
+        "list_tools"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsExclude": [
+        "compare_docx_redline"
+      ]
+    },
+    "progressiveDisclosure": true,
+    "clientCapability": "none"
+  }
+]

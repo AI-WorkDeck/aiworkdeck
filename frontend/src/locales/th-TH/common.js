@@ -8,6 +8,12 @@ export default {
   "cancel": "ยกเลิก",
   "save": "บันทึก",
   "close": "ปิด",
+  "remove": "นำออก",
+  "clear": "ล้าง",
+  "zoomIn": "ซูมเข้า",
+  "zoomOut": "ซูมออก",
+  "moveUp": "เลื่อนขึ้น",
+  "moveDown": "เลื่อนลง",
   "done": "เสร็จสิ้น",
   "delete": "ลบ",
   "rename": "เปลี่ยนชื่อ",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "ไปที่การตั้งค่า",
   "later": "ภายหลัง",
   "requestFailedWithStatus": "คำขอล้มเหลว ({status})",
+  "tooManyRequests": "มีคำขอมากเกินไป โปรดรอสักครู่แล้วลองอีกครั้ง",
   "smsVerificationRequired": "การดำเนินการนี้ต้องยืนยันตัวตนผ่าน SMS",
   "freeQuotaExceeded": "คุณได้ใช้เครดิตฟรีทั้งหมดแล้ว",
   "serviceErrorRetryLater": "เกิดข้อผิดพลาดของบริการ กรุณาลองใหม่ภายหลัง",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "เลือกภาษา",
   "languageFollowSystem": "ตามระบบ",
   "languageSearchPlaceholder": "ค้นหาภาษา…",
-  "languageNoMatch": "ไม่พบภาษาที่ตรงกัน"
+  "languageNoMatch": "ไม่พบภาษาที่ตรงกัน",
+  "serverLabelAccountBridge": "สะพานบัญชี",
+  "serverLabelGenericClient": "ลูกค้า (ทั่วไป)",
+  "serverLabelPersonalMemory": "หน่วยความจำส่วนตัว",
+  "serverLabelProjectMemory": "หน่วยความจำโครงการ"
 }

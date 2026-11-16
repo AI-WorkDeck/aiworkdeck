@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# host,prompt,offeredTools,offeredSchemaTokens(o200k)
+# 2026-11-07 S1（没开文件态入口核心集 + 关键词预放回 ≤3 类 + create_file 退出核心集）后重测；S0 基线见 git 历史
+# 2026-11-10 V7 D1：list_tools 描述多念 compare 类目（非 ask 档各 +9 token）
+# 2026-11-07 取自 master 8ee11eadc，与 docs/plans/tool-surface-audit.md §1.1 一致
+# 2026-11-07 tool-system-v2 V1（核心集描述按 A5 模板重写，不改名不改行为）后重测；V1 前基线见 git 历史
+# 2026-11-08 tool-system-v2 V2（核心集重切 8 个名字退出 + 条件核心 list_attached_files/doc_restore_checkpoint + memory_search 退出固定追加）后重测；V2 前基线见 git 历史
+# 2026-11-09 tool-system-v2 V4（22 族合并为单名、旧名转 @ToolShim 隐藏；law_search/search_project_files/doc_list_project_files 吸收合并参数）后重测；V4 前基线见 git 历史
+# 2026-11-09 tool-system-v2 V5（meeting_list_recordings/tmeet_* 并入 meeting_list，meeting_get_transcript 加 source）后重测：仅 worst 提示命中 meeting 类目，4 个工具 → 2 个；V5 前基线见 git 历史
+# 2026-11-10 tool-system-v2 V7 D2（deadline_compute 进 task 类目；典型提示多命中 task 类目）合并 master 后重测
+# 2026-11-11 P1（tracked-change 读法：doc_find_text / extract_file_text 描述补 ⟦⟧ 记号说明）后重测
+# 2026-11-11 P3（doc_insert_at_cursor 加 newParagraph）后重测 lowa-docx 三行
+# 2026-11-11 P7（case_search 进核心集；基础提示不再点名未下发工具）合并 P3 后重测
+# 2026-11-11 write_docx 加 append 参数（同轮重写/分段写）合并 P7 后重测
+# 2026-11-12 office-tier1：doc_view_pages 进核心集（各宿主 +1 工具）；xlsx/pptx 会话常用 sheet_*/slide_* 进核心集
+# 2026-11-12 fix/plugin-tools-discovery：list_tools 描述注明 plugin（插件开发）/ plugin-tools（已装插件的工具）后重测（xlsx 三行此前已漂到 2% 边缘，一并对齐实测）
+lowa-docx,neutral,33,7566
+lowa-docx,typical,42,10386
+lowa-docx,worst,35,7903
+lowa-xlsx,neutral,34,8381
+lowa-xlsx,typical,53,13170
+lowa-xlsx,worst,36,8718
+lowa-pptx,neutral,35,8647
+lowa-pptx,typical,40,10379
+lowa-pptx,worst,37,8984
+lowa-nofile,neutral,23,5291
+lowa-nofile,typical,27,6820
+lowa-nofile,worst,25,5628
+office-word,neutral,28,6256
+office-word,typical,32,7785
+office-word,worst,30,6593
+office-excel,neutral,26,6091
+office-excel,typical,30,7620
+office-excel,worst,28,6428
+office-ppt,neutral,25,5848
+office-ppt,typical,29,7377
+office-ppt,worst,27,6185
+none,neutral,19,4423
+none,typical,23,5952
+none,worst,21,4760
+ask,neutral,8,1253
+ask,typical,8,1253
+ask,worst,8,1253

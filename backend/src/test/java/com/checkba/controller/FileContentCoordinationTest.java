@@ -216,7 +216,7 @@ class FileContentCoordinationTest {
         try {
             Future<String> writer = pool.submit(() -> {
                 ProjectContextHolder.setProjectId("7"); ProjectContextHolder.setUserId(3L);
-                try { return textTools.text_write_file(11L, "complete"); }
+                try { return textTools.overwriteText(11L, "complete"); }
                 finally { ProjectContextHolder.clear(); }
             });
             assertTrue(notifying.await(3, TimeUnit.SECONDS));

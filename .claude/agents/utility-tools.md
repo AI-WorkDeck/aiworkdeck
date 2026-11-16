@@ -90,6 +90,14 @@ metaInfo 追加 `IdleSegments: <开始毫秒>-<结束毫秒>;...`，`PersonalWor
 - 跨窗格双开在 Web 下是**两个独立 iframe**（`tabDragSplit.moveTabTo` 跨窗格复制了 tab 对象，
   左右各有自己的 `tab.url`），与桌面端「一个 BrowserView、`wanted` 计数」不是一回事。
 
+**代理要票据（改这块之前必读）**：`/api/browser/proxy` 不带有效 `ticket` 一律 401，在发起任何抓取之前——
+服务器部署（cloud/case/prod）里它曾对任何调用方开放。iframe 发不了 `X-Session-Id`、会话 id 又绝不能进 URL，
+所以 BrowserPane 先 `POST /api/browser/ticket`（`createBrowserProxyTicket`，走正常鉴权；local-mode 免登照样换得到）
+换一张绑定用户的 HMAC 票据（`v1.<userId>.<首次换票ms>.<过期ms>.<sig>`，有效 10 分钟，密钥进程内随机、重启即作废），
+`loadInIframe` 把票据与地址**同一拍**写进 `iframeTicket`/`iframeUrl`（单独换票会让 src 变、整页重载）。
+代理回 HTML 时注入续签的 `TICKET`，`proxify` 带着它，页内连续浏览不断；续签沿用首次换票时间，整条链封顶 8 小时。
+桌面端走 BrowserView，不经这个端点。护栏：`BrowserProxyControllerTest`、`frontend/tests/browser/proxy-ticket.test.mjs`。
+
 **注入脚本的三条硬规则**（`BrowserProxyController.inject`，`BrowserProxyControllerTest` 钉住）：
 1. **整段拼成一行，里面绝不能出现 `//` 行注释**——它会把后面全部代码一起注释掉。
    这个 bug 从写下那天一直活到 2026-08：页面上只留一句
@@ -288,7 +296,7 @@ project_file 上加列**。AI 侧读文件时经 `MeetingRecordingService.findBy
 mtime+size 指纹没变，缓存里那句「请先转写」会永久生效且不报错；② 扩展名表全仓只有
 `MeetingRecordingService.AUDIO_EXTENSIONS`（前端那份在 `frontend/src/utils/audioAttachment.js`，
 由 `tests/project-home/audio-attachment.test.mjs` 读 Java 源码对拍），`FileTree` 右键与
-`ChatInterface` 的未转写提示条共用它。`meeting_get_transcript` / `meeting_list_recordings`
+`ChatInterface` 的未转写提示条共用它。`meeting_get_transcript` / `meeting_list`（V5 起 `meeting_list_recordings` 只是兼容壳）
 是模型**主动**读会议的入口（按 meetingId），与这条「附件自动注入」互不替代。
 
 **QTA 转写（dev-board#1310）**：前后端音频判据含 `.qta`（大小写不敏感），可右键转写，
@@ -595,8 +603,11 @@ FilePickerDialog :298 / EasyVoicePane :537 / DesensitizePane :543 / SearchPanel 
 
 ## 已知地雷
 
-- **commons-compress 1.26+ 依赖 commons-lang3 ≥3.14（ArrayFill），而 Spring Boot 3.2 BOM 钉 3.13**：
-  pom 已属性覆盖 `<commons-lang3.version>3.14.0</commons-lang3.version>`（PR#435），别删。缺了它，
+- **server 模式按用户限频（2026-11-12）**：`/api/browser/proxy` 按票据 userId 计 `browser-proxy-per-minute`（默认 120，超限回纯文本 429 给 iframe）；`/api/ocr/recognize` 与资源管理器「识别文字」`/api/projects/{p}/files/{f}/ocr` 共用 `ocr-per-minute`（默认 20，桶容量 20、之后每 3 秒一个；资源管理器批量识别 `explorerOcr.js` 遇 429 按 `retryAfterSeconds` 等待后重试同一文件，最多 5 次、取消即停；其余调用由 `request()` 显示后端 message）。local-mode 旁路。契约见 eng-infra.md「部署与其它」。
+
+- **commons-compress 1.26+ 依赖 commons-lang3 ≥3.14（ArrayFill）**：Spring Boot 3.2 BOM 曾钉 3.13，
+  PR#435 起 pom 属性覆盖；升 Boot 3.5.16 后覆盖为 `<commons-lang3.version>3.18.0</commons-lang3.version>`
+  （BOM 的 3.17.0 有 CVE-2025-48924），别删、别降到 3.14 以下。缺了它，
   压缩包预览/解压遇到老 PKZIP imploded 条目（`BinaryTree` 解码）与 tar 写路径会
   `NoClassDefFoundError`——且是 Error，`walkArchive` 外层 `catch (Exception)` 兜不住，直接 500。
   回归用例 `extractZipWithImplodedEntryDecodesContent`（fixture `imploding-8Kdict-3trees.zip`）。

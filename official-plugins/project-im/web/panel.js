@@ -6,7 +6,10 @@
   const state = { epoch: 0, selection: 0, context: null, self: null, conversations: [], active: null,
     agents: [], projectAgentReason: '', agentOpenSequence: 0, agentStatus: null, agentRequesting: false, agentFailures: new Map(),
     directory: null, expandedGroups: { project: true, org: false, firm: false, friends: false },
-    messages: [], drafts: new Map(), pending: new Map(), imports: new Map(), timer: null, loading: false };
+    messages: [], drafts: new Map(), pending: new Map(), imports: new Map(), timer: null, loading: false,
+    recentRevision: undefined, quietPolls: 0 };
+  // Polls between full re-reads of the recent page while the server reports no revision change (names, avatars).
+  const RECENT_EVERY = 10;
   const scopeLabels = { project: '项目', team: '团队', firm: '律所' };
   const privateAgent = (c = state.active) => !!c?.agent && (c.agent.private || c.type === 'AGENT_DIRECT');
   const conversationLabel = (c) => c.agent ? (privateAgent(c) ? '云端助手私聊 · 仅你可见' : '云端助手群聊 · 群成员可见') : `${c.type === 'DIRECT' ? '私聊' : '群聊'} · ${roles[c.role] || '成员'}`;
@@ -14,6 +17,8 @@
   const request = (action, params = {}) => awd.call('im.request', { action, params });
   const scope = () => ({ epoch: state.epoch, selection: state.selection, id: state.active?.id });
   const current = (s) => s.epoch === state.epoch && s.selection === state.selection && s.id === state.active?.id;
+  // 新增文案走 l10n/<locale>.json（panel.*，由 scripts/sync-panel-l10n.mjs 生成 panel-l10n.js）。
+  const t = (key, vars = {}) => ((window.AWD_IM_L10N[state.context?.language] || window.AWD_IM_L10N['zh-CN'])['panel.' + key] || '').replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? '');
   const node = (tag, text, className) => { const el = document.createElement(tag); if (text != null) el.textContent = text; if (className) el.className = className; return el; };
   function avatar(name, url, assistant = false) {
     const el = node('span', assistant ? null : (name || '').slice(0, 1), 'avatar' + (assistant ? ' assistant-avatar' : ''));
@@ -353,6 +358,7 @@
   }
   async function select(c) {
     state.selection++; state.active = c; state.messages = []; state.loading = false; state.agentStatus = null; state.agentRequesting = false;
+    state.recentRevision = undefined; state.quietPolls = 0;
     $('workspace').classList.add('chat-open'); $('welcome').hidden = true; $('active-chat').hidden = false;
     $('chat-title').textContent = c.title; $('chat-subtitle').textContent = conversationLabel(c);
     renderAgentInfo(c);
@@ -384,17 +390,28 @@
       if (!state.agentRequesting && Object.prototype.hasOwnProperty.call(result, 'agentStatus')) applyAgentStatus(result.agentStatus);
       renderAgentStatus();
       if (mode === 'initial' || mode === 'older') $('older').hidden = !result.hasMore;
+      if (mode === 'initial' || mode === 'recent') { state.recentRevision = result.revision; state.quietPolls = 0; }
       // Reconcile an uncertain send response against server acknowledgements.
       const pending = state.pending.get(s.id) || [];
       state.pending.set(s.id, pending.filter((p) => !state.messages.some((m) => m.clientMessageId === p.clientMessageId && String(m.senderId) === String(state.self.id))));
       if (JSON.stringify(state.messages) !== previousMessages || pending.length !== state.pending.get(s.id).length || mode === 'initial') renderMessages();
       if (mode === 'older') $('message-scroll').scrollTop = oldTop + $('message-scroll').scrollHeight - oldHeight;
       else if (mode === 'initial' || nearBottom) $('message-scroll').scrollTop = $('message-scroll').scrollHeight;
-      if (document.visibilityState !== 'hidden' && document.hasFocus() && state.messages.length) {
-        await request('read', { conversationId: s.id, lastReadId: state.messages.at(-1).id });
-        if (current(s)) { state.active.unreadCount = 0; renderList(); }
+      // The server cursor only moves forward, so a read it has already acknowledged is not sent again.
+      const lastId = state.messages.at(-1)?.id;
+      if (document.visibilityState !== 'hidden' && document.hasFocus() && state.messages.length
+          && !(Number(state.active.lastReadId) >= lastId && !state.active.unreadCount)) {
+        const read = await request('read', { conversationId: s.id, lastReadId: lastId });
+        if (current(s)) { state.active.unreadCount = 0; state.active.lastReadId = Math.max(Number(read?.lastReadId) || 0, lastId); renderList(); }
       }
+      return result;
     } finally { if (current(s)) state.loading = false; }
+  }
+  // The recent page is re-read to refresh what already-shown messages say (attachment access). A server that reports a
+  // revision changes it whenever that can differ, so an unchanged revision skips the re-read; older servers send none.
+  function recentDue(delta) {
+    if (!delta || typeof delta.revision !== 'string' || delta.revision !== state.recentRevision) return true;
+    return ++state.quietPolls >= RECENT_EVERY;
   }
   function time(value) { const d = new Date(value); return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
   function renderMessages() {
@@ -403,7 +420,10 @@
       const row = node('article', null, 'message' + (String(message.senderId) === String(state.self?.id) ? ' mine' : ''));
       const content = node('div', null, 'message-content');
       row.append(avatar(message.senderName || message.agentName, message.senderAvatarUrl, message.actorType === 'AGENT'), content);
-      content.append(node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta'));
+      const meta = node('div', `${message.senderName || message.agentName || '成员'}${message.actorType === 'AGENT' ? ' · AI 助手' : ''} · ${time(message.createdAt)}`, 'message-meta');
+      // 客户（门户访问码客户或项目客户）发的消息明确标出，律师一眼分清对内对外
+      if (message.fromClient) meta.append(node('span', t('fromClient'), 'client-badge'));
+      content.append(meta);
       const bubble = node('div', null, 'bubble'); if (message.text) bubble.append(node('div', message.text));
       if (message.attachment) bubble.append(fileCard(message.attachment));
       content.append(bubble); $('messages').append(row);
@@ -581,7 +601,12 @@
     dialog('会话成员', '', null);
     for (const m of result.members || []) {
       const row = node('div', null, 'member-row'); row.append(node('span', `${m.displayName || m.name || m.id || '助手'} · ${m.actorType === 'AGENT' ? 'AI 助手' : (roles[m.role] || '成员')}`));
-      if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER') row.append(button('移除', async () => {
+      // A client who came in by access code is removed by revoking that code (B4); a plain remove would bounce back.
+      if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER' && m.accessCode) row.append(button(t('revokeCode'), async () => {
+        if (!await confirmAction(t('revokeCodeConfirm'))) return;
+        await request('removeMember', { conversationId: s.id, userId: m.id, revokeCode: true }); if (current(s)) await membersDialog();
+      }, 'danger'));
+      else if (!privateAgent() && m.actorType !== 'AGENT' && state.active.role === 'OWNER' && m.role !== 'OWNER') row.append(button('移除', async () => {
         if (!await confirmAction('将该成员移出当前会话？')) return;
         await request('removeMember', { conversationId: s.id, userId: m.id }); if (current(s)) await membersDialog();
       })); $('dialog-body').append(row);
@@ -589,11 +614,20 @@
     if (!privateAgent() && (!state.active.agent || state.active.agent.scope === 'project') && state.active.role === 'OWNER') {
       const body = $('dialog-body');
       const role = selectField('邀请身份', [['MEMBER', '成员'], ['CLIENT', '客户']]);
+      // 客户默认只看入群之后的消息；开放此前的消息须在邀请时明确选择。
+      const history = selectField(t('historyScope'), [['after', t('historyAfterJoin')], ['all', t('historyWithEarlier')]]);
+      const showHistory = () => { history.parentElement.hidden = role.value !== 'CLIENT'; }; role.addEventListener('change', showHistory); showHistory();
       const actions = node('div', null, 'dialog-actions'); actions.append(button('生成邀请码', async () => {
-        const invite = await request('invite', { conversationId: s.id, role: role.value }); if (!current(s) || !$('dialog').open || !body.contains(role)) return;
+        const client = role.value === 'CLIENT';
+        const invite = await request('invite', { conversationId: s.id, role: role.value, ...(client ? { shareHistory: history.value === 'all' } : {}) }); if (!current(s) || !$('dialog').open || !body.contains(role)) return;
         const old = $('invite-result'); if (old) old.remove();
         const box = node('div'); box.id = 'invite-result'; const input = node('input'); input.value = invite.code; input.readOnly = true; input.setAttribute('aria-label', '生成的邀请码'); box.append(input);
-        box.append(node('p', '持码人可加入会话并查看历史消息。文件按访问权限开放，请仅交给预期成员。有效期至 ' + time(invite.expiresAt), 'hint'));
+        // 旧版协作服务不回 shareHistory，也不限制历史：此时如实沿用原提示。
+        box.append(node('p', client && typeof invite.shareHistory === 'boolean'
+          ? t(invite.shareHistory ? 'inviteHintWithHistory' : 'inviteHintAfterJoin', { time: time(invite.expiresAt) })
+          : '持码人可加入会话并查看历史消息。文件按访问权限开放，请仅交给预期成员。有效期至 ' + time(invite.expiresAt), 'hint'));
+        // 告诉律师对方在哪儿用这串码：要 AI WorkDeck 账号、在应用里输入，客户门户不收（QA D4）。
+        box.append(node('p', t('inviteJoinHow'), 'hint'));
         box.append(button('复制邀请码', async () => {
           input.focus(); input.select();
           try { await navigator.clipboard.writeText(invite.code); notice('邀请码已复制。'); }
@@ -620,8 +654,8 @@
   }
   const controlIds = ['new-chat', 'join-chat', 'refresh', 'add-friend', 'directory-home'];
   const EN_EXACT = {
-    '项目沟通 · AI WorkDeck': 'Project Messaging · AI WorkDeck',
-    '正在连接项目沟通…': 'Connecting to Project Messaging…',
+    '项目沟通 · AI WorkDeck': 'Project Chat · AI WorkDeck',
+    '正在连接项目沟通…': 'Connecting to Project Chat…',
     '会话与通讯录': 'Conversations & Directory',
     '新建会话': 'New Chat',
     '邀请码加入': 'Join with Code',
@@ -637,7 +671,7 @@
     '当前团队与律所': 'Current Team & Firm',
     '添加联系人': 'Add Contact',
     '当前会话': 'Active Chat',
-    '项目沟通': 'Project Messaging',
+    '项目沟通': 'Project Chat',
     '从左侧选择会话，继续讨论。': 'Select a conversation on the left to continue.',
     '同事与客户可通过邀请码加入。需要联系项目成员时，展开通讯录。': 'Colleagues and clients can join via invite code. Expand the directory to reach project members.',
     '返回会话列表': 'Back to conversations',
@@ -668,9 +702,9 @@
     '确认操作': 'Confirm Action',
     '取消': 'Cancel',
     '继续': 'Continue',
-    '请先选择一个项目，再使用项目沟通。': 'Please select a project first to use Project Messaging.',
+    '请先选择一个项目，再使用项目沟通。': 'Please select a project first to use Project Chat.',
     '没有操作权限，或已不在此会话中。请刷新会话。': 'Permission denied or you are no longer in this conversation. Please refresh.',
-    '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。': 'Your client does not support Project Messaging. Please upgrade to 0.61.0 or newer.',
+    '当前客户端不支持项目沟通，请升级至 0.61.0 或更新版本。': 'Your client does not support Project Chat. Please upgrade to 0.61.0 or newer.',
     '操作未完成，请检查连接后重试。草稿仍保留在当前会话。': 'Operation incomplete. Please check your connection and try again. Your draft is preserved.',
     '未命名团队': 'Unnamed Team',
     '尚未加入团队': 'Not in a Team Yet',
@@ -839,6 +873,7 @@
     for (const id of controlIds) if ($(id)) $(id).disabled = true;
     try {
       const context = await awd.call('context.get', {}); if (epoch !== state.epoch) return; state.context = context;
+      applyHostSidebar();
       maybeEnableEnglish(context);
       if (!context.projectId) { notice('请先选择一个项目，再使用项目沟通。'); return; }
       syncHostSidebar();
@@ -847,8 +882,12 @@
       await refreshList(epoch); if (epoch !== state.epoch) return; notice();
       try {
         await loadAgentScopes(epoch); if (epoch !== state.epoch) return;
+        // Opening the panel must not write into the project (QA D15): creating the assistant chat writes
+        // 项目沟通/项目标识.json, so that waits for a click. An existing private assistant chat is resumed.
         const projectAgent = state.agents.find((agent) => agent.scope === 'project');
-        if (projectAgent) await openAgent(projectAgent);
+        const resumable = projectAgent && state.conversations.find((c) => c.agent && privateAgent(c) && c.agent.scope === 'project'
+          && (c.agent.scopeKey === projectAgent.scopeKey || c.agent.scopeKey === projectAgent.legacyScopeKey));
+        if (resumable && !state.active) await select(resumable);
       } catch (error) { if (epoch === state.epoch) notice('助手暂不可用：' + failure(error), true); }
     } catch (error) { if (epoch === state.epoch) notice(failure(error), true); }
     finally {
@@ -866,17 +905,24 @@
         const self = await request('self'); if (epoch !== state.epoch) return;
         if (!state.self || String(self.id) !== String(state.self.id)) { await reload(); return; }
         await refreshList(epoch); if (epoch !== state.epoch) return;
-        await loadMessages();
-        if (epoch === state.epoch && document.visibilityState !== 'hidden') await loadMessages('recent');
+        const delta = await loadMessages();
+        if (epoch === state.epoch && document.visibilityState !== 'hidden' && recentDue(delta)) await loadMessages('recent');
       } catch (error) { if (epoch === state.epoch) notice(failure(error), true); }
       finally { if (epoch === state.epoch) schedule(epoch); }
     }, 3000);
+  }
+  function applyHostSidebar() {
+    const want = state.hostSidebar;
+    $('workspace').classList.toggle('host-sidebar', !!want && want.visible && want.projectId === String(state.context?.projectId));
   }
   async function handleSidebarCommand(payload = {}) {
     const cmd = payload?.command;
     if (!cmd) return;
     if (cmd === 'host-sidebar') {
-      if (String(payload.projectId) === String(state.context?.projectId)) $('workspace').classList.toggle('host-sidebar', payload.visible === true);
+      // 宿主可能在 context 读回之前就发来这条：先记下，读到 context 后再套用；
+      // 否则插件自带的会话列表会和宿主侧栏同时出现两份。
+      state.hostSidebar = { projectId: String(payload.projectId), visible: payload.visible === true };
+      applyHostSidebar();
       return;
     }
     if (cmd === 'select-conversation') {

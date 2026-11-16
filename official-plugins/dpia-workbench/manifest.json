@@ -17,7 +17,7 @@
     {"key":"sofficePath","type":"string","label":"LibreOffice 可执行文件","description":"仅报告 PDF 与页面预览需要；留空尝试系统安装位置。"}
   ],
   "tools": [
-    {"name":"dpia_workbench_action","description":"DPIA 案件、材料、事实确认、补答、运行状态及报告操作。仅供工作台界面调用，AI 不可调用人工确认/审批入口。","permissions":["file_read","file_write","ai","network"]},
+    {"name":"dpia_workbench_action","description":"DPIA 案件、材料、事实确认、补答、运行状态及报告操作。仅供工作台界面调用，AI 不可调用人工确认/审批入口。","agent":false,"permissions":["file_read","file_write","ai","network"]},
     {"name":"dpia_workbench_task","description":"执行当前冻结的 DPIA 任务：context/read/write/script/commit/report；严格限定当前用户项目及案件输出目录，不执行任意代码。","permissions":["file_read","file_write","ai","network"]}
   ]
 }

@@ -5,7 +5,7 @@
     <view class="awd-dialog collab-dialog" @tap.stop>
       <view class="awd-header collab-header">
         <text class="awd-title">{{ $t('version.collabTitle') }}</text>
-        <view class="collab-close" @tap="close">×</view>
+        <view :title="$t('common.close')" class="collab-close" @tap="close">×</view>
       </view>
 
       <view class="collab-tabs">

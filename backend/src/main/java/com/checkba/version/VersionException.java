@@ -53,6 +53,13 @@ public class VersionException extends RuntimeException {
         return new VersionException(message, true, "VERSION_BUSY");
     }
 
+    /** 设了打开密码的 Office 文件抽不出文本/比对不了；kind 与前端 DIAG_DOC_ENCRYPTED 同名。 */
+    public static final String DOC_ENCRYPTED = "DOC_ENCRYPTED";
+
+    public static VersionException passwordProtected(String message) {
+        return new VersionException(message, true, DOC_ENCRYPTED);
+    }
+
     public String getKind() { return kind; }
 
     public boolean isUserFacing() {

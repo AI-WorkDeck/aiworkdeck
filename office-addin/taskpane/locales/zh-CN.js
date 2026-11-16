@@ -92,7 +92,7 @@ export const ZH = {
   quotaRemaining: '剩余 {remaining} / 共 {limit}',
   quotaUsed: '已用 {used}',
   recharge: '充值',
-  rechargeTitle: '在官网账户页充值（浏览器打开，与插件同一账户）',
+  rechargeTitle: "在官网账户页充值或开通个人 Pro（浏览器打开，与插件同一账户）",
   quotaExhaustedNotice: '账户额度不足，本轮已中止。充值到账后重发这条消息即可继续。',
 
   // ---- App.vue：新建项目（dev-board#196）----
@@ -124,10 +124,13 @@ export const ZH = {
   noProjectSelected: '尚未选择项目：在顶部下拉中选一个项目。',
   welcomeTitle: '不离开 Office，用 AI 起草、修订、审阅',
   welcomeBenefit1: '用日常语言说出要改什么，改动以修订形式写进文档，由你逐条接受或拒绝。',
+  welcomeBenefit1Sheet: '用日常语言说出要改什么，AI 直接在表格或演示文稿里完成。',
+  sessionExpired: '登录已失效，请重新登录',
+  retrySend: '重试',
   welcomeBenefit2: '逐条处理文档批注，长文档按章节分段校对。',
   welcomeBenefit3: '回答以你自己项目中的文件为依据，Word、Excel、PowerPoint 均可使用。',
   createFreeAccount: '免费注册账户',
-  welcomeFootnote: '插件免费安装。AI 用量从你的 AI WorkDeck 账户扣除 Credits，与桌面版是同一个账户。',
+  welcomeFootnote: '插件免费安装。AI 用量从你的 AI WorkDeck 账户余额中扣费，与桌面版是同一个账户。',
 
   // ---- ChatView.vue：快捷入口 ----
   quickSummarizeLabel: '总结当前文档',
@@ -226,6 +229,14 @@ export const ZH = {
   newConversationTitle: '开始新对话',
   newConversationButton: '新对话',
   inputPlaceholder: '输入消息，Enter 发送，/ 选技能',
+  inputPlaceholderSteer: '输入新要求，AI 会在下一步调整方向',
+  stopping: '正在停止…',
+  stopUnconfirmed: '已发送停止指令，未收到后台确认',
+  steerReceiptPending: '尚未读取 · 下一步调整',
+  steerReceiptApplied: '已送达',
+  steerReceiptHeld: '任务已停下，这条会随你的下一条消息一起送达',
+  steerReceiptFailed: '未送出',
+  runningTool: '正在{name}…',
   stop: '停止',
   send: '发送',
   reconnectingBanner: '连接中断，正在自动重连……',
@@ -374,6 +385,7 @@ export const ZH = {
   apiConversationIssueFailedHttp: '会话签发失败（HTTP {status}）',
   apiChatUnreachable: '后端不可达：消息未送出',
   apiChatFailedHttp: '对话请求失败（HTTP {status}）',
+  apiChatRateLimited: '操作太频繁，请稍候再试',
   // 会话失效自愈（dev-board#715）：文案里不出现「登录/未授权/请先」三个子串（见 api.js 文件头）
   conversationRenewedNotice: '原会话已失效，已自动新建一场会话并把这条消息重新发出。',
   conversationExpiredRetryFailed: '会话已失效：自动新建会话后重发仍未成功。请点击底部的「新对话」重新开始；若仍然失败，请检查网络连接或稍后再试。',
@@ -568,5 +580,6 @@ export const ZH = {
   languageFollowSystem: '跟随系统',
   languageSearchPlaceholder: '搜索语言…',
   languageNoMatch: '无匹配语言',
+  pausedByUser: '（已按你的要求暂停。直接发一条「继续」即可接着做同一个任务。）',
 }
 export default ZH

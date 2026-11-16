@@ -50,6 +50,7 @@
         :executor="executor"
         :refresh-key="refreshKey"
         :merge-conflicts="conflicts"
+        :merge-neighbors="neighbors"
         :merge-format-only="formatOnly"
         :main-author="mainAuthor"
         :other-author="otherAuthor"
@@ -59,6 +60,7 @@
         :other-when="otherWhen"
         @close="$emit('close-tab')"
         @merge-state="onMergeState"
+        @merge-recreated="onMergeRecreated"
         @open-other-version="onOpenOtherVersion"
       />
     </view>
@@ -67,9 +69,12 @@
 
 <script>
 import ReviewPanel from '@/components/ReviewPanel.vue'
+import { restoreRecreatedRedlineDates, mergeMarkedAuthors } from '@/services/mergeRedlineDates.js'
+import { acceptedViewText } from '@/utils/mergeRevisionView.js'
 import { createWebviewEditorExecutor, createIframeEditorExecutor } from '@/composables/useZetaOfficeWebview.js'
 import { fetchVersionFileBytes, postMergeResolveFile, getFileBytesUrl } from '@/services/api.js'
 import { fetchMergeInputs, buildMergeDraft } from '@/services/mergeDraft.js'
+import { assertNotPasswordProtected, isPasswordProtectedError } from '@/utils/officeCompareGuard.js'
 import { collectDecisions } from '@/utils/mergeReviewDecisions.js'
 import { resolveMergeSideNames } from '@/utils/mergeSideNames.js'
 import { getAuthHeaders } from '@/utils/auth.js'
@@ -107,6 +112,8 @@ export default {
       pendingRevisions: 0,
       mergeState: { conflictChoices: [], revisionOutcomes: [] },
       finished: false,
+      recreated: [],
+      neighbors: [],
       finishing: false,
     }
   },
@@ -169,7 +176,7 @@ export default {
       this.ready = true
     } catch (e) {
       console.warn('[MergeReview] 失败', e)
-      this.statusText = (e && e.message) || this.$t('version.mergeBuildFailed')
+      this.statusText = isPasswordProtectedError(e) ? this.$t('version.officePasswordProtected') : ((e && e.message) || this.$t('version.mergeBuildFailed'))
     }
   },
   beforeUnmount() {
@@ -216,7 +223,20 @@ export default {
       // 没重放另一侧，从文档里读不出对方那一栏。
       const overlaps = (inputs.analysis && inputs.analysis.overlaps) || []
       const conflictKeys = new Set(res.conflicts || [])
-      this.conflicts = overlaps.filter((o) => !conflictKeys.size || conflictKeys.has(o.key))
+      // 台账 B13：引擎回报每处冲突两侧这一段的修订结构——「用对方的」要据此原样做回对方的待处理
+      // 修订；两栏显示接受修订后的文字（后端的字是 POI 取的，删掉的字也连在里面，读不懂）。
+      const sides = new Map((res.conflictSides || []).map((s) => [s.key, s]))
+      this.conflicts = overlaps.filter((o) => !conflictKeys.size || conflictKeys.has(o.key)).map((o) => {
+        const s = sides.get(o.key)
+        if (!s) return o
+        return Object.assign({}, o, {
+          paraKey: s.paraKey, side: s.side, order: s.order,
+          otherText: acceptedViewText(s.side) ?? o.otherText,
+          mainText: s.mainSide ? acceptedViewText(s.mainSide) : o.mainText,
+        })
+      })
+      this.recreated = (res.recreated || []).slice()
+      this.neighbors = (inputs.analysis && inputs.analysis.neighbors) || []
       // 修订视图默认「全部」：律师要同时看见两边改了什么。
       await this.run('set_revision_view', { mode: 'all' }).catch(() => {})
       this.refreshKey++
@@ -227,6 +247,7 @@ export default {
       this.statusText = this.$t('version.mergeFetchingVersions')
       const baseBytes = await fetchVersionFileBytes(spec.projectId, spec.mergeBase, spec.path)
       const mergedBytes = await this.fetchMergedBytes()
+      assertNotPasswordProtected(spec.path, baseBytes, mergedBytes)
       const loaded = await this.run('load_document', {
         bytes: mergedBytes, name: spec.name, authorName: this.$t('version.compareAuthorName'),
       })
@@ -241,6 +262,10 @@ export default {
       const resp = await fetch(getFileBytesUrl(spec.fileId), { headers: getAuthHeaders() })
       if (!resp.ok) throw new Error(this.$t('version.compareFetchBytesFailed'))
       return new Uint8Array(await resp.arrayBuffer())
+    },
+    // 「用对方的」按原作者重建的修订：存盘前一并改回原日期
+    onMergeRecreated(info) {
+      for (const r of (info && info.recreated) || []) this.recreated.push(r)
     },
     onMergeState(state) {
       this.mergeState = { conflictChoices: state.conflictChoices, revisionOutcomes: state.revisionOutcomes }
@@ -275,8 +300,11 @@ export default {
         })
         const exported = await this.run('export_document', { name: this.mergeSpec.name })
         if (!exported || exported.success !== true) throw new Error(this.$t('version.mergeExportFailed'))
-        const bytes = this.normalizeBytes(exported.bytes)
+        let bytes = this.normalizeBytes(exported.bytes)
         if (!bytes || !bytes.length) throw new Error(this.$t('version.mergeExportFailed'))
+        // 台账 B13：按原作者重建的待处理修订改回原日期；合并自己的修订一条都不许留在存出的文件里
+        bytes = (await restoreRecreatedRedlineDates(bytes, { recreated: this.recreated })).bytes
+        if ((await mergeMarkedAuthors(bytes)).length) throw new Error(this.$t('version.mergeMechanicsLeft'))
         await postMergeResolveFile(this.mergeSpec.projectId, {
           path: this.mergeSpec.path, mode: 'manual', decisions, bytes, name: this.mergeSpec.name,
         })

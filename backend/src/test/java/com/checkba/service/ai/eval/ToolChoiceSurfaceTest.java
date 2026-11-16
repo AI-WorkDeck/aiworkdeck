@@ -98,9 +98,10 @@ class ToolChoiceSurfaceTest {
         }
 
         // 这三个取的东西每轮都已注入系统提示（ContextAssemblerService），下发只是白花一次往返
+        // （V3 起已整个删除，不再只是不下发）
         for (String duplicate : List.of("get_user_profile", "get_project_context", "get_conversation_summary")) {
             assertFalse(offered.contains(duplicate), duplicate + " 与每轮注入的上下文重复，不该下发");
-            descriptionOf(registry, duplicate); // 登记仍在：老会话回放与 XML 兜底照常执行
+            assertTrue(registry.resolve(duplicate).isEmpty(), duplicate + " 已在 V3 删除，不应再登记");
         }
     }
 
@@ -122,7 +123,7 @@ class ToolChoiceSurfaceTest {
         List<String> slideSession = offeredNames(registry, "conv", ClientCapabilityService.DOC_KIND_SLIDE);
         // pptx_list_files 不在这份名单里了：它是 doc_list_project_files 按 .pptx 过滤的子集，
         // dev-board#1065（T-27）起只登记不下发——文件 ID 统一从全类型清单拿
-        for (String kept : List.of("pptx_generate", "pptx_generate_outline", "pptx_export_editable",
+        for (String kept : List.of("pptx_generate", "pptx_outline", "pptx_export_editable",
                 "doc_list_project_files", "pptx_inspect_format")) {
             assertTrue(slideSession.contains(kept),
                     kept + " 是不可替代的那一批，不该跟着撤下：" + String.join(", ", slideSession));
@@ -138,14 +139,8 @@ class ToolChoiceSurfaceTest {
     void theThreeReadersCrossReferenceEachOther() {
         RecordingToolRegistry registry = registry();
 
-        String readDocument = descriptionOf(registry, "read_document");
-        assertTrue(readDocument.contains("extract_file_text"),
-                "read_document 是 base-tools 的兜底工具，没 skill 时模型大概率挑它——"
-                        + "它必须指出「id 可能是文件夹时用 extract_file_text」，"
-                        + "否则「把一个卷宗文件夹当材料范围交进来」这条能力永远不会被发现：" + readDocument);
-        assertTrue(readDocument.contains("OCR"), "要说清会自动 OCR，模型才不会转头去调 run_python：" + readDocument);
-        assertTrue(readDocument.length() > 200,
-                "改动前它只有一句 79 字的英文，信息量远低于同功能的 extract_file_text：" + readDocument);
+        // read_document 已在 V3 删除（Java 方法留给上下文组装与 run_python），不再是模型可选的读取入口
+        assertTrue(registry.resolve("read_document").isEmpty(), "read_document 已在 V3 删除，不应再登记");
 
         String readFile = descriptionOf(registry, "read_file");
         assertTrue(readFile.contains("extract_file_text"), "read_file 要说清「有 fileId 时用哪个」：" + readFile);
@@ -166,14 +161,9 @@ class ToolChoiceSurfaceTest {
                             + inventory);
         }
 
-        for (Map.Entry<String, String> e : Map.of(
-                "pdf_list_files", "PDF",
-                "pptx_list_files", "PPTX").entrySet()) {
-            String d = descriptionOf(registry, e.getKey());
-            assertTrue(d.contains("doc_list_project_files"),
-                    e.getKey() + " 要自报是权威清单按类型过滤后的子集，否则模型会为了凑齐全貌挨个调一遍：" + d);
-            assertFalse(d.contains("唯一来源"),
-                    e.getKey() + " 不再是「唯一来源」——那句话现在是错的：" + d);
+        // 按类型过滤的子集 pdf_list_files / pptx_list_files 已在 V3 删除，权威清单是唯一入口
+        for (String subset : List.of("pdf_list_files", "pptx_list_files")) {
+            assertTrue(registry.resolve(subset).isEmpty(), subset + " 已在 V3 删除，不应再登记");
         }
 
         String listFiles = descriptionOf(registry, "list_files");
@@ -196,6 +186,50 @@ class ToolChoiceSurfaceTest {
         for (String subset : List.of("pdf_list_files", "pptx_list_files", "pptx_search_files")) {
             assertFalse(offered.contains(subset), subset + " 不该再下发：" + String.join(", ", offered));
         }
+    }
+
+    /** V4 合并族：新名 → 被并入的旧名（旧名的 @ToolShim 壳 V9 已删）。meeting 两族属 V5，不在此列。 */
+    private static final Map<String, List<String>> V4_FAMILIES = Map.ofEntries(
+            Map.entry("doc_revisions", List.of("doc_accept_revision", "doc_reject_revision", "doc_accept_all_revisions", "doc_reject_all_revisions")),
+            Map.entry("office_revisions", List.of("office_accept_revision", "office_reject_revision")),
+            Map.entry("doc_update_comment", List.of("doc_reply_comment", "doc_resolve_comment")),
+            Map.entry("office_update_comment", List.of("office_reply_comment", "office_resolve_comment")),
+            Map.entry("office_excel_update_comment", List.of("office_excel_reply_comment", "office_excel_resolve_comment")),
+            Map.entry("doc_table_insert", List.of("doc_table_add_row", "doc_table_add_col")),
+            Map.entry("doc_table_delete", List.of("doc_table_delete_row", "doc_table_delete_col")),
+            Map.entry("office_table_insert", List.of("office_table_add_row", "office_table_add_col")),
+            Map.entry("office_table_delete", List.of("office_table_delete_row", "office_table_delete_col")),
+            Map.entry("doc_insert_note", List.of("doc_insert_footnote", "doc_insert_endnote")),
+            Map.entry("office_insert_note", List.of("office_insert_footnote", "office_insert_endnote")),
+            Map.entry("doc_select", List.of("doc_goto", "doc_select_anchor", "doc_select_paragraph", "doc_collapse_cursor")),
+            Map.entry("pdf_pages", List.of("pdf_split", "pdf_extract_pages", "pdf_rotate_pages")),
+            Map.entry("office_file", List.of("office_file_create", "office_file_save", "office_file_export_pdf", "office_file_open")),
+            Map.entry("pptx_outline", List.of("pptx_generate_outline", "pptx_refine_outline")),
+            Map.entry("law_search", List.of("law_search_keyword")),
+            Map.entry("write_file", List.of("text_write_file")),
+            Map.entry("move_files", List.of("move_files_batch", "move_project_file")),
+            Map.entry("doc_list_project_files", List.of("list_project_folders")),
+            Map.entry("search_project_files", List.of("search_across_projects")),
+            Map.entry("office_excel_set_values", List.of("office_excel_set_formulas")),
+            Map.entry("capability_install", List.of("capability_apply")));
+
+    @Test
+    @DisplayName("V4 合并族：每族在会话里只剩新名下发，旧名已不再注册（V9 删壳）")
+    void eachMergedFamilyOffersExactlyOneName() {
+        RecordingToolRegistry registry = registry();
+        registry.capabilities().record("conv-word", "office");
+        registry.capabilities().record("conv-excel", "office", "excel");
+        java.util.Set<String> offeredAnywhere = new java.util.TreeSet<>();
+        for (String conv : List.of("conv", "conv-word", "conv-excel")) {
+            offeredAnywhere.addAll(offeredNames(registry, conv, null));
+        }
+        V4_FAMILIES.forEach((fresh, olds) -> {
+            assertTrue(offeredAnywhere.contains(fresh), fresh + " 必须下发");
+            for (String old : olds) {
+                assertFalse(offeredAnywhere.contains(old), old + " 已并入 " + fresh + "，不该再下发");
+                assertTrue(registry.resolve(old).isEmpty(), old + " 的兼容壳 V9 已删，不该再注册");
+            }
+        });
     }
 
     @Test
@@ -237,10 +271,12 @@ class ToolChoiceSurfaceTest {
         List<String> offered = offeredNames(registry, "conv", null);
         assertTrue(offered.contains("extract_file_text"));
         assertFalse(offered.contains("read_document"), "与 extract_file_text 同一个抽取器，只留一个入口");
-        assertTrue(offered.contains("move_files_batch"));
-        assertFalse(offered.contains("move_file"), "单条移动也走 move_files_batch");
-        assertFalse(descriptionOf(registry, "move_files_batch").contains("keep using move_file"),
-                "move_files_batch 不许再把单条移动指回一个已不下发的工具");
+        assertTrue(offered.contains("move_files"));
+        assertFalse(offered.contains("move_file"), "单条移动也走 move_files");
+        assertFalse(offered.contains("move_files_batch") || offered.contains("move_project_file"),
+                "移动只剩 move_files 一个下发名（V4 合并，旧名 V9 已删）");
+        assertFalse(descriptionOf(registry, "move_files").contains("keep using move_file"),
+                "move_files 不许再把单条移动指回一个已不下发的工具");
         assertTrue(offered.contains("write_file"));
         assertFalse(offered.contains("scan_files"), "write_file 有了 parentFolderId，scan_files 只剩维护用途");
         assertTrue(String.valueOf(registry.getAllSpecifications("conv", null).stream()
@@ -259,9 +295,11 @@ class ToolChoiceSurfaceTest {
         RecordingToolRegistry registry = registry();
         List<String> offered = offeredNames(registry, "conv", null);
 
-        for (String law : List.of("law_search", "law_search_keyword", "get_law_article", "law_recognition")) {
+        for (String law : List.of("law_search", "get_law_article", "law_recognition")) {
             assertTrue(offered.contains(law), law + " 必须下发：" + String.join(", ", offered));
         }
+        assertFalse(offered.contains("law_search_keyword"), "law_search_keyword 已并入 law_search(mode=keyword)，旧名 V9 已删");
+        assertTrue(descriptionOf(registry, "law_search").contains("keyword"), "law_search 要写明 mode=keyword");
         assertFalse(offered.contains("search_laws"), "search_laws 从来不是真工具，别把它注册出来");
         assertTrue(ToolRegistry.TOOL_NAME_ALIASES.isEmpty(),
                 "别名 = 静默改道。要容错写错的工具名请改 not-found 的指路文案：" + ToolRegistry.TOOL_NAME_ALIASES);
@@ -276,14 +314,23 @@ class ToolChoiceSurfaceTest {
 
         // 判据只认 @ToolMeta(offerToModel = false)：isAvailable() 那类进程级闸（本机有没有 Docker）
         // 随机器而变，把它算进来会让同一条断言在不同机器上一红一绿。
-        List<String> retired = registry.toolNamesLongestFirst().stream()
-                .filter(name -> registry.resolve(name)
-                        .map(t -> t.meta() != null && !t.meta().offerToModel())
-                        .orElse(false))
-                .sorted()
-                .toList();
+        // V3 起长期隐藏工具已整个删除，名单改为这份固定清单（仍把注解里现取的 offerToModel=false 并进来）；
+        // 描述里再点名其中任何一个，模型就会经 XML 兜底去调一个不存在的名字。
+        List<String> retired = java.util.stream.Stream.concat(
+                        registry.toolNamesLongestFirst().stream()
+                                .filter(name -> registry.resolve(name)
+                                        .map(t -> t.meta() != null && !t.meta().offerToModel())
+                                        .orElse(false)),
+                        java.util.stream.Stream.of(
+                                "doc_get_selection", "doc_set_selection", "doc_replace_nth_match", "doc_delete_match",
+                                "doc_delete_text", "doc_search_related_docs", "doc_debug_revisions", "scan_files",
+                                "delete_file", "move_file", "read_document", "get_user_profile", "get_project_context",
+                                "search_knowledge_base", "deep_search", "get_conversation_summary", "pdf_list_files",
+                                "pptx_list_files", "pptx_search_files", "pptx_open_file", "pptx_apply_format",
+                                "pptx_edit_page"))
+                .distinct().sorted().toList();
         assertTrue(retired.contains("pptx_apply_format") && retired.contains("delete_file"),
-                "名单是从注解里现取的，取空了这条断言就成了空断言：" + retired);
+                "名单取空了这条断言就成了空断言：" + retired);
 
         List<String> offenders = new java.util.ArrayList<>();
         for (ToolSpecification spec : registry.getAllSpecifications()) {
@@ -319,10 +366,10 @@ class ToolChoiceSurfaceTest {
                 "另一头也要点名，只写一边的话从 Office 那侧过来的模型照样差一页");
 
         // 表格行号：doc_* 1 基、office_* 0 基
-        ToolSpecification deleteRow = registry.resolve("doc_table_delete_row").orElseThrow().spec();
-        assertTrue(String.valueOf(deleteRow.parameters().properties()).contains("rowNumber1Based"),
-                "doc_table_delete_row 要有 rowNumber1Based：" + deleteRow.parameters().properties());
-        assertTrue(descriptionOf(registry, "office_table_delete_row").contains("0 开始"),
+        ToolSpecification deleteRow = registry.resolve("doc_table_delete").orElseThrow().spec();
+        assertTrue(deleteRow.description().contains("1 开始"),
+                "doc_table_delete 要明写行/列号 1 开始：" + deleteRow.description());
+        assertTrue(descriptionOf(registry, "office_table_delete").contains("0 开始"),
                 "office_ 那一族要明写 0 基——删行不留修订痕迹，删错只能靠撤销");
     }
 }

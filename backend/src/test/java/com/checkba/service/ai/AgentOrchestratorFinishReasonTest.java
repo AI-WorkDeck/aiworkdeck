@@ -41,6 +41,26 @@ class AgentOrchestratorFinishReasonTest {
                 "只要有 token 给用户看过就绝不能悄悄重放——会看到重复内容");
     }
 
+    private static AiMessage calls(String... names) {
+        List<ToolExecutionRequest> reqs = new java.util.ArrayList<>();
+        for (int i = 0; i < names.length; i++) {
+            reqs.add(ToolExecutionRequest.builder().id("c" + i).name(names[i]).arguments("{\"arguments\": \"\"}").build());
+        }
+        return AiMessage.from(reqs);
+    }
+
+    @Test
+    @DisplayName("伪工具 final（O11 DeepSeek V4 Pro）：本轮只有 final 才当收尾；夹带真工具照常执行")
+    void pseudoFinalOnlyWhenEveryCallIsFinal() {
+        assertTrue(AgentOrchestrator.isPseudoFinalCall(calls("final")));
+        assertTrue(AgentOrchestrator.isPseudoFinalCall(calls("Final", " final ")));
+
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(calls("final", "slide_set_text")), "混了真工具不能吞掉真调用");
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(calls("finalize_report")));
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(AiMessage.from("纯文本")));
+        assertFalse(AgentOrchestrator.isPseudoFinalCall(null));
+    }
+
     @Test
     @DisplayName("LENGTH 截断轮判定：只有 LENGTH + 带工具调用才拦，其余一概放行（含 finishReason 为 null 的通道）")
     void truncatedToolCallRoundRequiresLengthAndToolCalls() {
@@ -54,5 +74,22 @@ class AgentOrchestratorFinishReasonTest {
         assertFalse(AgentOrchestrator.isTruncatedToolCallRound(null, withToolCall()),
                 "部分通道不回 finishReason（含回放评测），行为必须与改造前一致");
         assertFalse(AgentOrchestrator.isTruncatedToolCallRound(FinishReason.LENGTH, null));
+    }
+
+    @Test
+    @DisplayName("截断纠正提醒：被截断的是 write_docx 时给出分段 + append=true 的精确恢复办法（tasks-10 t03），其余工具不加")
+    void truncationCorrectionNamesTheWriteDocxRecovery() {
+        String nativeDocx = AgentOrchestrator.truncationCorrection(true, "write_docx ");
+        assertTrue(nativeDocx.contains("单次输出长度上限"), nativeDocx);
+        assertTrue(nativeDocx.contains("append=true"), nativeDocx);
+
+        String xmlDocx = AgentOrchestrator.truncationCorrection(false,
+                "<tool_code>write_docx(fileName=\"差异说明.docx\", markdownContent=\"# 差异说明 一、");
+        assertTrue(xmlDocx.contains("标签未闭合"), xmlDocx);
+        assertTrue(xmlDocx.contains("append=true"), xmlDocx);
+
+        assertFalse(AgentOrchestrator.truncationCorrection(true, "write_file ").contains("append=true"));
+        assertFalse(AgentOrchestrator.truncationCorrection(false, "<todo_write").contains("append=true"));
+        assertFalse(AgentOrchestrator.truncationCorrection(false, null).contains("append=true"));
     }
 }

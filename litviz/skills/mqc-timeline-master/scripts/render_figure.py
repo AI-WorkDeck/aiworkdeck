@@ -45,7 +45,7 @@ def _sheet_size(path):
     700x1580」而文件里其实是 784x1638。报出去的数与产物不符，比不报更糟。
     """
     import re as _re
-    svg = open(path, encoding="utf-8").read()
+    svg = open(path, encoding="utf-8-sig").read()
     m = _re.search(r'<svg[^>]*width="([\d.]+)"[^>]*height="([\d.]+)"', svg)
     return (float(m.group(1)), float(m.group(2))) if m else (0.0, 0.0)
 
@@ -59,7 +59,7 @@ def _frame_file(path, landscape=True):
     裱在最后一步做，渲染器一律只画内容 —— 让每个渲染器各自留边，那个数就会被抄成
     五份然后开始漂移。
     """
-    svg = open(path, encoding="utf-8").read()
+    svg = open(path, encoding="utf-8-sig").read()
     open(path, "w", encoding="utf-8").write(paper.frame(svg, landscape=landscape))
 
 
@@ -172,10 +172,35 @@ def predict(m):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     src, out = sys.argv[1], sys.argv[2]
-    m = json.load(open(src, encoding="utf-8"))
+    m = json.load(open(src, encoding="utf-8-sig"))
     kind, form, why, (w, h) = deliver(m, out)
     print(f"[{kind} · {form}] {w:.0f}x{h:.0f}  {why}")
     print(f"PNG 导出请放大 {paper.raster_scale(w)} 倍（纸上 "
           f"{paper.raster_dpi(w):.0f} dpi，印刷下限 {paper.PRINT_DPI}）")
     print(f"已写入 {out}")
+    # 未上图披露：直接拿地图出图时没有原句可比，但地图里写了 body / items 的，
+    # 渲染器一个字都不画 —— 照实说出来，不许静默丢掉（方案一，见 omission.py）。
+    try:
+        import omission as _OM
+        _recs = _OM.review_map(m)
+        if _OM.with_omission(_recs) or _OM.flagged(_recs):
+            for _ln in _OM.summary_lines(_recs, with_index=False):
+                print(_ln)
+    except Exception as _exc:                     # 披露失败也要说出来，不吞
+        print(f"未上图核对没有做成（{type(_exc).__name__}），请人工核对正文是否上图。")

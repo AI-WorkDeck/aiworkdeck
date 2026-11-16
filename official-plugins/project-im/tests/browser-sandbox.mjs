@@ -36,7 +36,7 @@ test('real sandbox SDK bridge supports explicit import/export/member/leave confi
     if (req.url === '/') text = host;
     else if (req.url === '/drag-helper.js') { text = readFileSync(new URL('../../../frontend/src/utils/pluginImDrag.js', import.meta.url)); type = 'text/javascript'; }
     else if (req.url === '/awd-plugin-sdk.js') { text = readFileSync(new URL('../../../sdk/plugin-sdk/awd-plugin-sdk.js', import.meta.url)); type = 'text/javascript'; }
-    else if (['/index.html','/panel.js','/panel.css'].includes(req.url)) { text = readFileSync(new URL(req.url.slice(1), webRoot)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
+    else if (['/index.html','/panel.js','/panel-l10n.js','/panel.css'].includes(req.url)) { text = readFileSync(new URL(req.url.slice(1), webRoot)); type = req.url.endsWith('.js') ? 'text/javascript' : req.url.endsWith('.css') ? 'text/css' : type; }
     else { res.writeHead(404); res.end(); return; }
     res.setHeader('Content-Type', type + '; charset=utf-8'); res.end(text);
   });
@@ -72,6 +72,10 @@ test('real sandbox SDK bridge supports explicit import/export/member/leave confi
     assert.equal(layout.overflow, false, `${width} ${theme}`); assert.equal(layout.send, true);
   }
   // Actual plugin button + actual SDK request + host helper + physical mouse drop.
+  // Park the pointer first: the resizes below can slide the drag button under a stationary
+  // pointer, firing pointerenter (and files.prepareDrag) before dragHelpers exists. The later
+  // move onto the button would then not count as an entry, and no drag handle is ever made.
+  await page.mouse.move(1, 1);
   await page.setViewport({ width: 1000, height: 760 });
   await page.evaluate(async () => {
     window.dragHelpers = await import('/drag-helper.js'); window.dragOwner = { sessionGeneration: 1 };

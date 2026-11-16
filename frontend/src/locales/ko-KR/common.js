@@ -8,6 +8,12 @@ export default {
   "cancel": "취소",
   "save": "저장",
   "close": "닫기",
+  "remove": "제거",
+  "clear": "지우기",
+  "zoomIn": "확대",
+  "zoomOut": "축소",
+  "moveUp": "위로 이동",
+  "moveDown": "아래로 이동",
   "done": "완료",
   "delete": "삭제",
   "rename": "이름 바꾸기",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "설정으로 이동",
   "later": "나중에",
   "requestFailedWithStatus": "요청 실패 ({status})",
+  "tooManyRequests": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요",
   "smsVerificationRequired": "이 작업에는 SMS 인증이 필요합니다",
   "freeQuotaExceeded": "무료 크레딧을 모두 사용했습니다",
   "serviceErrorRetryLater": "서비스 오류입니다. 나중에 다시 시도해 주세요",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "언어 선택",
   "languageFollowSystem": "시스템 설정 따르기",
   "languageSearchPlaceholder": "언어 검색…",
-  "languageNoMatch": "일치하는 언어 없음"
+  "languageNoMatch": "일치하는 언어 없음",
+  "serverLabelAccountBridge": "계정 브리지",
+  "serverLabelGenericClient": "클라이언트(일반)",
+  "serverLabelPersonalMemory": "개인 메모리",
+  "serverLabelProjectMemory": "프로젝트 메모리"
 }

@@ -8,6 +8,12 @@ export default {
   "cancel": "إلغاء",
   "save": "حفظ",
   "close": "إغلاق",
+  "remove": "إزالة",
+  "clear": "مسح",
+  "zoomIn": "تكبير",
+  "zoomOut": "تصغير",
+  "moveUp": "نقل لأعلى",
+  "moveDown": "نقل لأسفل",
   "done": "تم",
   "delete": "حذف",
   "rename": "إعادة تسمية",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "الانتقال إلى الإعدادات",
   "later": "لاحقًا",
   "requestFailedWithStatus": "فشل الطلب ({status})",
+  "tooManyRequests": "طلبات كثيرة جدًا. يرجى الانتظار قليلًا ثم المحاولة مرة أخرى",
   "smsVerificationRequired": "يتطلب هذا الإجراء التحقق عبر الرسائل النصية القصيرة (SMS)",
   "freeQuotaExceeded": "لقد استخدمت جميع أرصدتك المجانية",
   "serviceErrorRetryLater": "حدث خطأ في الخدمة. يرجى المحاولة مرة أخرى لاحقًا",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "اختيار اللغة",
   "languageFollowSystem": "اتباع النظام",
   "languageSearchPlaceholder": "البحث في اللغات…",
-  "languageNoMatch": "لا توجد لغات مطابقة"
+  "languageNoMatch": "لا توجد لغات مطابقة",
+  "serverLabelAccountBridge": "جسر الحساب",
+  "serverLabelGenericClient": "عميل (عام)",
+  "serverLabelPersonalMemory": "الذاكرة الشخصية",
+  "serverLabelProjectMemory": "ذاكرة المشروع"
 }

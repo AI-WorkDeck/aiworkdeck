@@ -19,7 +19,7 @@
         <view v-for="(tag, index) in draft" :key="index" class="tag-row">
           <input class="tag-input" :value="tag" :maxlength="maxLength" :aria-label="$t('workbench.evidence.tags.name', { index: index + 1 })"
             @input="updateDraft(index, $event)" @blur="updateDraft(index, $event)" @confirm="updateDraft(index, $event)" />
-          <button role="button" tabindex="0" class="tag-manage" :aria-label="$t('workbench.evidence.tags.removeName', { name: tag })" @click.stop="draft.splice(index, 1)" @keydown.enter.prevent.stop="draft.splice(index, 1)" @keydown.space.prevent.stop="draft.splice(index, 1)">{{ $t('workbench.evidence.tags.remove') }}</button>
+          <button :title="$t('workbench.evidence.tags.removeName', { name: tag })" role="button" tabindex="0" class="tag-manage" :aria-label="$t('workbench.evidence.tags.removeName', { name: tag })" @click.stop="draft.splice(index, 1)" @keydown.enter.prevent.stop="draft.splice(index, 1)" @keydown.space.prevent.stop="draft.splice(index, 1)">{{ $t('workbench.evidence.tags.remove') }}</button>
         </view>
       </view>
       <button v-if="draft.length < maxTags" role="button" tabindex="0" class="tag-manage" @click.stop="draft.push('')" @keydown.enter.prevent.stop="draft.push('')" @keydown.space.prevent.stop="draft.push('')">+ {{ $t('workbench.evidence.tags.add') }}</button>

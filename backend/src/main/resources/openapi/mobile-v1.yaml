@@ -415,6 +415,22 @@ components:
         message: { type: string, nullable: true }
         kind: { type: string }
         data: { $ref: '#/components/schemas/LoginData' }
+    BqtMember:
+      type: object
+      description: 包晴天会员与积分（官网 lib/bqt-account.ts bqtMemberView）。
+      required: [points, cents, outstandingCents, failedCount, centsPerPoint, levelCode, status, aiWorkbench, expireAt, fetchedAt, rechargeAllowed]
+      properties:
+        points: { type: string, description: 可用积分，两位小数字符串，如 "98.92" }
+        cents: { type: integer, format: int64, description: 折算后的可用额度（分），已扣除尚未扣成的部分 }
+        outstandingCents: { type: integer, format: int64, description: 已提供服务但尚未从包晴天扣成的分 }
+        failedCount: { type: integer, description: 扣减失败未处理的笔数；> 0 时应提示用户在包晴天充值后联系客服 }
+        centsPerPoint: { type: number, description: 1 积分折合多少分（1 元 = 3 积分时为 33.33…） }
+        levelCode: { type: string, nullable: true, enum: [LIGHT, GROWTH, null], description: LIGHT 轻享会员 / GROWTH 律师成长会员 }
+        status: { type: string, enum: [ACTIVE, EXPIRED] }
+        aiWorkbench: { type: boolean, description: 会员有效但为 false 时是「AI 工作台已在包晴天关闭」，不是未开通 }
+        expireAt: { type: string, nullable: true, description: 会员到期时刻 ISO-8601 }
+        fetchedAt: { type: string, description: 快照时间 ISO-8601 }
+        rechargeAllowed: { type: boolean, enum: [false] }
     BillingBalance:
       type: object
       description: |
@@ -429,6 +445,17 @@ components:
       properties:
         balanceCents: { type: integer, format: int64, description: 余额，整数分（Credits 1 元 = 100 分） }
         currency: { type: string, enum: [CNY, USD], description: 站点币种，由部署站点决定 }
+        billingLine:
+          type: string
+          enum: [standard, circle, bqt]
+          description: |
+            计费线（包晴天积分通道，2026-11-06）。旧服务器缺失时按 standard。
+            bqt = 包晴天律师：只显示包晴天积分折算的额度（balanceCents 已是折算值），
+            不显示本站充值、Pro 购买、兑换码，改为提示在包晴天 App 充值/续费。
+        bqtMember:
+          nullable: true
+          description: billingLine=bqt 时的包晴天会员与积分快照；其他计费线恒为 null。bqt 线下也可能为 null（包晴天暂不可达）。
+          allOf: [{ $ref: '#/components/schemas/BqtMember' }]
         subscription:
           type: object
           description: 订阅服务额度快照，与充值余额分账；旧服务器可能缺失
@@ -484,9 +511,14 @@ components:
         product.purchase(options:[.appAccountToken(UUID)])，成功后把 Transaction.jwsRepresentation
         交给 POST /api/mobile/billing/recharge/confirm；**收到 paid 之前绝不 tx.finish()**。
         验签在官网（苹果根证书 / bundleId / appAppleId 都在那边），云后端同样只当管道。
+
+        present=app 是安卓微信支付 APP 支付（dev-board#428，channel=wxpay-app）：appId/partnerId/prepayId/
+        packageValue/nonceStr/timeStamp/sign 七个字段平铺且都有值，原样填进微信 OpenSDK 的 PayReq
+        （packageValue 对应 PayReq.packageValue，值为 "Sign=WXPay"）。**SDK 回调的 errCode 不作数**，
+        端上必须再调 GET /recharge/status 确认 paid。官网未配 WXPAY_APP_APPID 时本通道不可用（信封 code 1）。
       required: [present, outTradeNo, amountCents]
       properties:
-        present: { type: string, enum: [qrcode, redirect, virtual, native] }
+        present: { type: string, enum: [qrcode, redirect, virtual, native, app] }
         outTradeNo: { type: string, description: 商户订单号，查状态用 }
         amountCents: { type: integer, format: int64, description: 下单金额，整数分 }
         codeUrl: { type: string, description: present=qrcode：支付链接原文 }
@@ -495,6 +527,13 @@ components:
         signData: { type: string, description: 'present=virtual 必有：待签名 JSON 串（offerId/buyQuantity/env/currencyType/productId/goodsPrice/outTradeNo/attach）' }
         paySig: { type: string, description: 'present=virtual 必有：hex(hmac_sha256(appKey, "requestVirtualPayment&" + signData))' }
         signature: { type: string, description: 'present=virtual 必有：hex(hmac_sha256(session_key, signData))' }
+        appId: { type: string, description: 'present=app 必有：微信开放平台「移动应用」AppID' }
+        partnerId: { type: string, description: 'present=app 必有：商户号' }
+        prepayId: { type: string, description: 'present=app 必有：预支付交易会话 ID' }
+        packageValue: { type: string, description: 'present=app 必有：扩展字段，固定 Sign=WXPay' }
+        nonceStr: { type: string, description: 'present=app 必有：随机串' }
+        timeStamp: { type: string, description: 'present=app 必有：秒级时间戳（字符串）' }
+        sign: { type: string, description: 'present=app 必有：官网算好的签名' }
         appAccountToken:
           type: string
           description: |
@@ -748,6 +787,39 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MobileAssistantSource"
+    FeedbackMineItem:
+      type: object
+      required: [id, kind, status, uploaded, aiContentReport]
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64, nullable: true }
+        username: { type: string }
+        projectId: { type: integer, format: int64, nullable: true }
+        kind: { type: string, enum: [BUG, IDEA] }
+        text: { type: string, nullable: true }
+        voiceTranscript: { type: string, nullable: true }
+        page: { type: string, nullable: true }
+        appVersion: { type: string, nullable: true }
+        platform: { type: string, nullable: true }
+        status: { type: string, enum: [NEW, PR_OPENED, EMAILED, SKIPPED, FAILED, RESOLVED] }
+        triageVerdict: { type: string, nullable: true }
+        prUrl: { type: string, nullable: true }
+        attempts: { type: integer }
+        createdAt: { type: string, nullable: true }
+        handledAt: { type: string, nullable: true }
+        resolvedAt: { type: string, nullable: true }
+        reporterResponse: { type: string, nullable: true, description: 已发布给举报人的答复；不表示推送、送达或已读 }
+        responsePublishedAt: { type: string, nullable: true }
+        aiContentReport: { type: boolean }
+        uploaded: { type: boolean }
+    FeedbackMine:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackMineItem"
     MobileAssistantChatInput:
       type: object
       required:
@@ -1305,6 +1377,30 @@ paths:
                         properties:
                           registered: *a2
                   - $ref: "#/components/schemas/MobileWorkspaceError"
+  /api/feedback/mine:
+    get:
+      summary: 当前账户自己的反馈状态与已发布人工答复；不包含内部处置记录
+      parameters:
+        - *a1
+      responses:
+        "200":
+          description: 当前账户反馈；未登录返回统一错误信封
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - type: object
+                    required: [code, data]
+                    properties:
+                      code: { type: integer, enum: [0] }
+                      message: { type: string }
+                      data: { $ref: "#/components/schemas/FeedbackMine" }
+                  - $ref: "#/components/schemas/MobileWorkspaceError"
+        "401":
+          description: 未提供有效会话
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MobileWorkspaceError" }
   /api/mobile/assistant/status:
     get:
       summary: 云端个人助理权益、授权、摘要数量与开通原因
@@ -2350,19 +2446,23 @@ paths:
                     官网 orders 表有 UNIQUE(userId, idempotencyKey) 兜底。
                 channel:
                   type: string
-                  enum: [wxvp, appstore]
+                  enum: [wxvp, appstore, googleplay, wxpay-app]
                   description: |
-                    支付通道（dev-board#427/#426）。**缺省 = 站点默认通道**（第一期行为，扫码/跳转）；
+                    支付通道（dev-board#427/#426/#665）。**缺省 = 站点默认通道**（第一期行为，扫码/跳转）；
                     wxvp = 微信小程序虚拟支付，**channel=wxvp 时 channel/productId/wxCode 三者必填**，
                     响应为 present=virtual；appstore = iOS 内购，**productId 必填、wxCode 不传**，
-                    响应为 present=native。别的取值一律 code 1（通用 handler，无 kind）。
+                    响应为 present=native；googleplay = Google Play 内购，**productId 必填、wxCode 不传**，
+                    响应为 present=native；wxpay-app = 安卓微信支付 APP 支付，**只传金额，productId/wxCode 不传**
+                    （传了也被忽略），响应为 present=app + 七个 PayReq 字段。别的取值一律 code 1（通用 handler，无 kind）。
                 productId:
                   type: string
                   pattern: '^[a-z0-9_.]{1,64}$'
                   description: |
                     channel=wxvp 时必填：微信道具 id（credits_cny_10 / credits_cny_50 / credits_cny_100）；
                     channel=appstore 时必填：App Store 商品 id，**带点号**
-                    （credits.cny.50 / credits.cny.100 / credits.cny.300）。
+                    （credits.cny.50 / credits.cny.100 / credits.cny.300）；
+                    channel=googleplay 时必填：Google Play 商品 id，**带点号**
+                    （credits.usd.10 / credits.usd.20 / credits.usd.50）。
                     服务端按通道分别校形态：wxvp 是 `^[a-z0-9_]{1,64}$`，appstore 是 `^[a-z0-9_.]{1,64}$`。
                     **价格权威在官网**，云后端只校形态；档位与金额不符时官网回 400 product_mismatch
                     → 信封 kind=REJECTED。message 目前逐字是「充值档位与金额不符，请更新小程序后重试」
@@ -2415,6 +2515,47 @@ paths:
                   description: |
                     StoreKit 2 的 Transaction.jwsRepresentation 原文。云后端**不验签**、不解析，
                     原样转给官网；超过 16KB 即 code 1。
+      responses:
+        "200":
+          description: 裸对象（形状同 /recharge/status）；未登录 Envelope(4010)；业务错误 Envelope(code 1)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RechargeStatus'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/billing/recharge/confirm-googleplay:
+    post:
+      summary: 上报 Google Play 购买凭证完成内购确认（dev-board#665）
+      description: |
+        客户端 Play Billing 拿到 PURCHASED 的 purchaseToken 后调此接口，云后端转发官网用 Android Publisher API
+        校验并入账（若尚未入账）。只有 paid=true 时安卓才可调用 consumeAsync 消耗商品。
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, purchaseToken]
+              properties:
+                outTradeNo:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{1,64}$'
+                  description: |
+                    **可缺省**：重启恢复未消耗订单时本地可能没有下单号，
+                    此时可不传 outTradeNo，官网凭 obfuscatedExternalAccountId + productId/purchaseToken 对账。
+                productId:
+                  type: string
+                  pattern: '^[a-z0-9_.]{1,64}$'
+                  description: Google Play 商品 id（credits.usd.10 / credits.usd.20 / credits.usd.50）。
+                purchaseToken:
+                  type: string
+                  maxLength: 4096
+                  description: |
+                    Google Play Billing Library 返回的 Purchase.purchaseToken 原文。云后端不自行验签，
+                    原样转给官网；超过 4KB 即 code 1。
       responses:
         "200":
           description: 裸对象（形状同 /recharge/status）；未登录 Envelope(4010)；业务错误 Envelope(code 1)

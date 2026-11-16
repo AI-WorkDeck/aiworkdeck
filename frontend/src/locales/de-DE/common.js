@@ -8,6 +8,12 @@ export default {
   "cancel": "Abbrechen",
   "save": "Speichern",
   "close": "Schließen",
+  "remove": "Entfernen",
+  "clear": "Löschen",
+  "zoomIn": "Vergrößern",
+  "zoomOut": "Verkleinern",
+  "moveUp": "Nach oben",
+  "moveDown": "Nach unten",
   "done": "Fertig",
   "delete": "Löschen",
   "rename": "Umbenennen",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "Zu den Einstellungen",
   "later": "Später",
   "requestFailedWithStatus": "Anfrage fehlgeschlagen ({status})",
+  "tooManyRequests": "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut",
   "smsVerificationRequired": "Diese Aktion erfordert eine SMS-Verifizierung",
   "freeQuotaExceeded": "Sie haben alle Ihre kostenlosen Guthaben verbraucht",
   "serviceErrorRetryLater": "Dienstfehler. Bitte versuchen Sie es später erneut",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "Sprache auswählen",
   "languageFollowSystem": "System folgen",
   "languageSearchPlaceholder": "Sprachen suchen…",
-  "languageNoMatch": "Keine übereinstimmenden Sprachen"
+  "languageNoMatch": "Keine übereinstimmenden Sprachen",
+  "serverLabelAccountBridge": "Kontobrücke",
+  "serverLabelGenericClient": "Kunde (allgemein)",
+  "serverLabelPersonalMemory": "Persönliches Gedächtnis",
+  "serverLabelProjectMemory": "Projektgedächtnis"
 }

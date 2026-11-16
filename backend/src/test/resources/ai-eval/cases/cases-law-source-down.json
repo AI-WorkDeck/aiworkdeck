@@ -1,0 +1,156 @@
+[
+  {
+    "id": "law-source-down-bounded-lookups-xml",
+    "title": "法宝不可用：替代网页查询只放行 2 次，自称已核实的条文回答被补一轮「未核实」说明（gap P8）",
+    "category": "law-source-down",
+    "protocol": "xml",
+    "userInput": "民法典第1082条是什么",
+    "turns": [
+      {
+        "text": "<process name=\"查询法条\"><tool_code>get_law_article(title=\"中华人民共和国民法典\", number=\"1082\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"查找\"><tool_code>search_web(query=\"民法典第1082条 原文\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"查找\"><tool_code>browse_url(url=\"https://example.com/a\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"查找\"><tool_code>search_web(query=\"民法典 第一千零八十二条 全文\")</tool_code></process>"
+      },
+      {
+        "text": "<process name=\"查找\"><tool_code>browse_url(url=\"https://example.com/b\")</tool_code></process>"
+      },
+      {
+        "text": "<final>意见书引用的《民法典》第1082条有误：该条规定的是女方怀孕期间男方不得提出离婚，与离婚财产分割无关。以上条文均已核实。</final>"
+      },
+      {
+        "text": "<final>补充说明：本轮北大法宝法源不可用，上文《民法典》第1082条的内容来自非权威网页，未核实，请以国家法律法规数据库原文为准；前文「均已核实」的说法不准确，予以更正。</final>"
+      }
+    ],
+    "toolStubs": {
+      "get_law_article": "Error: [pkulaw_unavailable] 北大法宝法源暂时不可用（Error from MCP server: MCP server has no credential）。不要重试其他法宝工具。",
+      "search_web": "[{\"title\":\"民法典第1082条 - 某法律网\",\"url\":\"https://example.com/a\",\"snippet\":\"女方在怀孕期间……男方不得提出离婚……\"}]",
+      "browse_url": "某法律网转载：民法典第一千零八十二条 女方在怀孕期间、分娩后一年内或者终止妊娠后六个月内，男方不得提出离婚……"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "get_law_article"
+        },
+        {
+          "name": "search_web"
+        },
+        {
+          "name": "browse_url"
+        }
+      ],
+      "structureContains": [
+        "<final>",
+        "未核实"
+      ],
+      "promptContains": [
+        "替代查询（search_web / browse_url）已用满 2 次",
+        "法源不可用后的替代查询 1/2",
+        "本轮北大法宝法源不可用，你的回答引用了具体条文",
+        "search_web / browse_url 本轮不再提供"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "law-source-down-bounded-lookups-native",
+    "title": "法宝不可用：替代网页查询只放行 2 次，自称已核实的条文回答被补一轮「未核实」说明（gap P8）",
+    "category": "law-source-down",
+    "protocol": "native",
+    "userInput": "民法典第1082条是什么",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "get_law_article",
+            "arguments": {
+              "title": "中华人民共和国民法典",
+              "number": "1082"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "search_web",
+            "arguments": {
+              "query": "民法典第1082条 原文"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "browse_url",
+            "arguments": {
+              "url": "https://example.com/a"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "search_web",
+            "arguments": {
+              "query": "民法典 第一千零八十二条 全文"
+            }
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "browse_url",
+            "arguments": {
+              "url": "https://example.com/b"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>意见书引用的《民法典》第1082条有误：该条规定的是女方怀孕期间男方不得提出离婚，与离婚财产分割无关。以上条文均已核实。</final>"
+      },
+      {
+        "text": "<final>补充说明：本轮北大法宝法源不可用，上文《民法典》第1082条的内容来自非权威网页，未核实，请以国家法律法规数据库原文为准；前文「均已核实」的说法不准确，予以更正。</final>"
+      }
+    ],
+    "toolStubs": {
+      "get_law_article": "Error: [pkulaw_unavailable] 北大法宝法源暂时不可用（Error from MCP server: MCP server has no credential）。不要重试其他法宝工具。",
+      "search_web": "[{\"title\":\"民法典第1082条 - 某法律网\",\"url\":\"https://example.com/a\",\"snippet\":\"女方在怀孕期间……男方不得提出离婚……\"}]",
+      "browse_url": "某法律网转载：民法典第一千零八十二条 女方在怀孕期间、分娩后一年内或者终止妊娠后六个月内，男方不得提出离婚……"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "get_law_article"
+        },
+        {
+          "name": "search_web"
+        },
+        {
+          "name": "browse_url"
+        }
+      ],
+      "structureContains": [
+        "<final>",
+        "未核实"
+      ],
+      "promptContains": [
+        "替代查询（search_web / browse_url）已用满 2 次",
+        "法源不可用后的替代查询 1/2",
+        "本轮北大法宝法源不可用，你的回答引用了具体条文",
+        "search_web / browse_url 本轮不再提供"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  }
+]

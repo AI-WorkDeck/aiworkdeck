@@ -107,7 +107,8 @@ const DEBUG_ACTIONS = `
         'com.sun.star.configuration.ConfigurationAccess',
         [mkProp('nodepath', '/org.openoffice.Office.UI/ColorScheme/ColorSchemes')]);
       const c = schemes.getByName(name).getByName('AppBackground').getByName('Color');
-      return { success: true, scheme: name, color: Number(c) };
+      const d = schemes.getByName(name).getByName('DocColor').getByName('Color');
+      return { success: true, scheme: name, color: Number(c), docColor: Number(d) };
     } catch (e) { return { success: false, message: errStr(e) }; }
   },
   // 组 31 探针：绕开 set_revision_view 自己直读两个引擎开关（不让断言变成
@@ -2113,12 +2114,14 @@ try {
     check('set_app_theme dark 成功', dark.success === true && dark.mode === 'dark', JSON.stringify(dark))
     const bgDark = await exec('debug_app_bg')
     check('AppBackground 配置写入 0x141210', bgDark.success === true && bgDark.color === 0x141210, JSON.stringify(bgDark))
+    check('DocColor 配置写入 0x221F1A（深色纸面）', bgDark.docColor === 0x221F1A, JSON.stringify(bgDark))
     await new Promise((r) => setTimeout(r, 900))
     const shotDark = await shotOf()
     const light = await exec('set_app_theme', { mode: 'light' })
     check('set_app_theme light 成功', light.success === true && light.mode === 'light', JSON.stringify(light))
     const bgLight = await exec('debug_app_bg')
     check('AppBackground 配置回到 0xE4E0D4', bgLight.success === true && bgLight.color === 0xE4E0D4, JSON.stringify(bgLight))
+    check('DocColor 配置回到 0xFFFFFF（纸白）', bgLight.docColor === 0xFFFFFF, JSON.stringify(bgLight))
     await new Promise((r) => setTimeout(r, 900))
     const shotLight = await shotOf()
     const ratio = darkenedRatio(shotDark, shotLight)
@@ -2536,17 +2539,20 @@ try {
         vis.rulers && vis.rulers.ShowHoriRuler === false && vis.rulers.ShowVertRuler === false, JSON.stringify(vis.rulers))
     }
 
-    // (1) 两位作者的修订：主线侧来自原生比较，另一侧来自逐段重放，两边都必须署对人。
+    // (1) 台账 B13 起合并稿 = 主线那份文件原样载入（不再与共同的上一版做原生比较——比较会把原有的
+    // 待处理修订和比较修订叠在一起、还会多出段落）。修订只来自另一侧的重放，署名是「对方 + U+2060」
+    // （合并自己的修订的标记，收尾只接受带标记的，原有的待处理修订不碰）。
+    const MECH = OTHER_AUTHOR + '\u2060'
     const byAuthor = {}
     ;((built && built.revisions) || []).forEach((r) => { byAuthor[r.author] = (byAuthor[r.author] || 0) + 1 })
-    check('修订只署这两位律师（没有「版本对比」「本地用户」之类的漏网）',
-      Object.keys(byAuthor).sort().join(',') === [MAIN_AUTHOR, OTHER_AUTHOR].sort().join(','), JSON.stringify(byAuthor))
-    check('主线侧修订数 ≥ 夹具的 6 处改动（5 段 + 同段冲突那段）',
-      (byAuthor[MAIN_AUTHOR] || 0) >= fx.expected.mainEditCount, JSON.stringify(byAuthor))
+    check('修订只来自另一侧的重放（署名带合并标记），没有「版本对比」「本地用户」之类的漏网',
+      Object.keys(byAuthor).join(',') === MECH, JSON.stringify(byAuthor))
+    check('另一侧重放出的修订都标成合并自己的修订（mergeMechanics）',
+      ((built && built.revisions) || []).every((r) => r.mergeMechanics === true), JSON.stringify(((built && built.revisions) || []).slice(0, 3)))
     check('另一侧重放出的修订数 ≥ 夹具的 7 处改动（4 段 + 表格单元 + 插入 + 删除）',
-      (byAuthor[OTHER_AUTHOR] || 0) >= fx.expected.otherReplayCount, JSON.stringify(byAuthor))
-    check('mainCount / otherCount 与按作者分组一致',
-      built.mainCount === (byAuthor[MAIN_AUTHOR] || 0) && built.otherCount === (byAuthor[OTHER_AUTHOR] || 0),
+      (byAuthor[MECH] || 0) >= fx.expected.otherReplayCount, JSON.stringify(byAuthor))
+    check('mainCount = 0、otherCount 与重放修订数一致',
+      built.mainCount === 0 && built.otherCount === (byAuthor[MECH] || 0),
       JSON.stringify({ mainCount: built.mainCount, otherCount: built.otherCount, byAuthor }))
 
     // (2)(3) 同一段两边都改了：只报冲突，不重放——正文里必须只有主线侧那版文字。
@@ -2569,8 +2575,10 @@ try {
       !(built.formatOnly || []).some((x) => /【P(20|60|130|260)】/.test(String(x.preview || ''))), JSON.stringify(built.formatOnly))
 
     // (5) 全部接受之后，正文逐段等于预期合并文本（表格单元另测）。
-    const accepted = await exec('resolve_all_revisions', { action: 'accept' })
-    check('resolve_all_revisions(accept) 成功', accepted.success === true && accepted.remaining === 0, JSON.stringify({ resolved: accepted.resolved, remaining: accepted.remaining }))
+    const accepted = await exec('resolve_merge_mechanics', { action: 'accept' })
+    const leftAfterAccept = await exec('list_revisions', { limit: 500 })
+    check('resolve_merge_mechanics(accept) 成功、夹具里没有原有的待处理修订所以一条不剩',
+      accepted.success === true && (leftAfterAccept.revisions || []).length === 0, JSON.stringify({ accepted, left: (leftAfterAccept.revisions || []).length }))
     paras = await allParas()
     check('合并后段数 = 预期（原 420 段 − 另一侧删 1 段 + 另一侧新增 1 段）',
       paras.length === fx.expected.paragraphCount, paras.length + ' vs ' + fx.expected.paragraphCount)
@@ -2592,8 +2600,11 @@ try {
     // (4) 同段冲突「用律师乙的」：拒掉主线侧那处、以对方作者写入对方文字并接受。
     paras = await allParas()
     const conflictIdx2 = indexOfToken(paras, '【P' + fx.expected.conflictParaKey + '】')
+    // 另一侧这一段的结构由 build_merge_draft 回报（台账 B13：「用对方的」要原样做回对方的待处理修订）
+    const side2 = ((built2 && built2.conflictSides) || []).find((x) => x.paraKey === conflictIdx2)
+    check('build_merge_draft 回报同段冲突的另一侧结构', !!side2, JSON.stringify(built2 && built2.conflictSides))
     const took = await exec('merge_take_other', {
-      paraKey: conflictIdx2, text: fx.expected.conflictOtherText, author: OTHER_AUTHOR,
+      paraKey: conflictIdx2, side: side2 && side2.side, author: OTHER_AUTHOR,
     })
     check('merge_take_other 成功', took && took.success === true, JSON.stringify(took))
     const paraAfter = await exec('select_paragraph', { index: conflictIdx2 })

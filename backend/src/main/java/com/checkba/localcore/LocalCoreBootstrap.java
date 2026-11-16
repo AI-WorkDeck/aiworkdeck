@@ -49,7 +49,9 @@ public final class LocalCoreBootstrap implements ApplicationListener<Application
     // Only the desktop URL options understood here are eligible. In particular INIT must never run
     // while merely checking whether the database is eligible for a writable early core.
     private static final Set<String> URL_OPTIONS = Set.of("MODE", "DATABASE_TO_LOWER", "DEFAULT_NULL_ORDERING",
-            "NON_KEYWORDS", "AUTO_SERVER", "AUTO_SERVER_PORT", "IFEXISTS", "DB_CLOSE_ON_EXIT", "LOCK_TIMEOUT");
+            "NON_KEYWORDS", "AUTO_SERVER", "AUTO_SERVER_PORT", "IFEXISTS", "DB_CLOSE_ON_EXIT", "LOCK_TIMEOUT",
+            // S22：桌面库关掉 H2 结果复用（application-desktop.yml）
+            "OPTIMIZE_REUSE_RESULTS");
 
     public interface Callbacks {
         /** Pending durable writes must be recovered even when the experiment is disabled. */

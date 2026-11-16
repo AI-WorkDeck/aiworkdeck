@@ -13,7 +13,13 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import JSZip from 'jszip'
 import { useDocumentMerge } from '../../src/composables/useDocumentMerge.js'
+
+// 宿主存盘前会把导出的 docx 拆开核对（台账 B13：不许留下合并自己的修订），桩引擎导出一份真的最小 docx
+const zip = new JSZip()
+zip.file('word/document.xml', '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>x</w:t></w:r></w:p></w:body></w:document>')
+const EXPORTED = await zip.generateAsync({ type: 'uint8array' })
 
 const t = (key, params) => (params === undefined ? key : `${key}(${JSON.stringify(params)})`)
 
@@ -26,7 +32,7 @@ function makeHarness(over = {}) {
   const handle = {
     run: async (action, payload) => {
       calls.engineRuns.push(action)
-      if (action === 'export_document') return { success: true, bytes: new Uint8Array([1, 2, 3]), name: payload && payload.name }
+      if (action === 'export_document') return { success: true, bytes: EXPORTED, name: payload && payload.name }
       return { success: true }
     },
   }
@@ -342,16 +348,31 @@ test('引擎借不到（备胎起不来）→ 记成 engine 失败，不收尾',
   assert.equal(merge.state.rows[0].failReason, 'engine')
 })
 
-test('导出前必须先把两边的修订全部接受，顺序不许颠倒', async () => {
+test('导出前只接受合并自己产生的修订（台账 B13：原有的待处理修订不许一并接受），顺序不许颠倒', async () => {
   const { calls, deps } = makeHarness()
   const merge = useDocumentMerge(deps)
   await merge.onConflictStatus(conflictOf([docxRow()]), 'adopt')
 
-  const accept = calls.engineRuns.indexOf('resolve_all_revisions')
+  const accept = calls.engineRuns.indexOf('resolve_merge_mechanics')
   const exportAt = calls.engineRuns.indexOf('export_document')
   assert.ok(accept >= 0 && exportAt >= 0, '两条命令都要发：' + JSON.stringify(calls.engineRuns))
-  assert.ok(accept < exportAt, '接受修订必须在导出之前')
-  assert.equal(calls.resolveFile[0].bytes.length, 3)
+  assert.ok(accept < exportAt, '接受合并改动必须在导出之前')
+  assert.ok(!calls.engineRuns.includes('resolve_all_revisions'), '不许「全部接受」：' + JSON.stringify(calls.engineRuns))
+  assert.deepEqual(Array.from(calls.resolveFile[0].bytes), Array.from(EXPORTED))
+})
+
+test('存出的文件里还留着合并自己的修订（署名带 U+2060）：按失败处理，不落盘', async () => {
+  const z = new JSZip()
+  z.file('word/document.xml', '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:ins w:id="1" w:author="李律师\u2060" w:date="2026-11-15T08:00:00Z"><w:r><w:t>x</w:t></w:r></w:ins></w:p></w:body></w:document>')
+  const leftover = await z.generateAsync({ type: 'uint8array' })
+  const { calls, deps, handle } = makeHarness()
+  const base = handle.run
+  handle.run = async (action, payload) => action === 'export_document' ? { success: true, bytes: leftover } : base(action, payload)
+  const merge = useDocumentMerge(deps)
+  await merge.onConflictStatus(conflictOf([docxRow()]), 'adopt')
+  assert.equal(calls.resolveFile.length, 0)
+  const row = merge.state.rows.find((r) => r.path === '合同.docx')
+  assert.equal(row.failed, true)
 })
 
 test('同一轮冲突被并发触发两次，仍然只合一遍、照样收尾（协作抽屉 conflict+changed 各调一次）', async () => {

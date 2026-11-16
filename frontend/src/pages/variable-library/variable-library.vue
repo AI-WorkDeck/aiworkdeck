@@ -32,7 +32,7 @@
         :placeholder="$t('config.variables.searchPlaceholder')"
         confirm-type="search"
       />
-      <view v-if="searchKeyword" class="search-clear" @tap="searchKeyword = ''">×</view>
+      <view :title="$t('common.clear')" v-if="searchKeyword" class="search-clear" @tap="searchKeyword = ''">×</view>
     </view>
 
     <!-- 变量列表 -->

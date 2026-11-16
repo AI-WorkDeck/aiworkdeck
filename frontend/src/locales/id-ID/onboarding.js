@@ -87,6 +87,11 @@ export default {
     "privacyName": "Kebijakan Privasi",
     "crossBorderLabel": "Persetujuan terpisah: mentransfer konten yang dikirimkan ke AI kepada penyedia model di luar negeri untuk diproses",
     "crossBorderView": "Lihat pemberitahuan",
+    "consentCardTitle": "Sebelum memakai AI platform, konfirmasikan satu persetujuan pemrosesan data",
+    "consentAccept": "Setuju dan lanjutkan",
+    "consentHideNotice": "Sembunyikan pemberitahuan",
+    "consentFailed": "Gagal menyimpan. Silakan coba lagi.",
+    "consentLater": "Nanti",
     "crossBorderNoticeTitle": "Pemberitahuan transfer lintas batas",
     "crossBorderNoticeBody": "Situs Tiongkok terhubung ke Alibaba Cloud Bailian melalui server AI WorkDeck; situs internasional menggunakan OpenRouter. Teks dan kutipan berkas yang dikirim ke AI digunakan untuk inferensi dan penagihan. Bergantung pada model, pemrosesan dapat berlangsung di luar Tiongkok daratan. Pencabutan persetujuan di Pengaturan menonaktifkan kanal AI platform.",
     "agreementRequired": "Centang kotak untuk menyetujui Ketentuan Layanan dan Kebijakan Privasi guna melanjutkan",
@@ -101,7 +106,8 @@ export default {
     "switch": "Beralih",
     "cancel": "Batal",
     "switchFailed": "Gagal mengganti situs. Coba lagi nanti.",
-    "rescueFailed": "Masih belum terbuka setelah mengganti situs. Periksa kode dan coba lagi."
+    "rescueFailed": "Masih belum terbuka setelah mengganti situs. Periksa kode dan coba lagi.",
+    "proIntroBanner": "Credits gratis saat mendaftar · Promo Personal Pro ¥9.9/bln (3 bulan pertama)",
   },
   "hint": {
     "learnMore": "Pelajari Lebih Lanjut",
@@ -112,11 +118,13 @@ export default {
     "purchaseConfirmOk": "Konfirmasi",
     "purchaseSuccess": "Terbuka",
     "purchaseFailed": "Pembelian gagal",
-    "goRecharge": "Isi Ulang"
+    "goRecharge": "Isi Ulang",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Dapatkan Personal Pro",
   },
   "identity": {
     "title": "Pilih Ruang Kerja Lokal",
-    "subtitle": "Ditemukan beberapa akun yang sudah ada di perangkat ini. Pilih ruang kerja untuk melanjutkan. Anda tidak akan ditanya lagi, dan Anda dapat mengubahnya nanti di Pengaturan → Akun & Penggunaan.",
+    "subtitle": "Ditemukan beberapa akun yang sudah ada di perangkat ini. Pilih ruang kerja untuk melanjutkan. Anda tidak akan ditanya lagi, dan Anda dapat mengubahnya nanti di Pengaturan → Akun & saldo.",
     "reading": "Membaca akun lokal",
     "retry": "Coba lagi",
     "itemMeta": "{projects} proyek · {files} berkas",

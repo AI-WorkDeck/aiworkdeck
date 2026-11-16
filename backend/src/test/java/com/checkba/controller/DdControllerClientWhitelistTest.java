@@ -9,7 +9,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 import org.mockito.MockedStatic;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
@@ -19,19 +18,16 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * 尽调清单的客户白名单（dev-board#1050）：案件库托管客户门户之后，CLIENT 是公网上凭访问码
  * 进来的人。只许读清单、传文件、留言（外加回看自己传的文件）；其余写端点逐个 403，
- * 并且在碰到业务层之前就被挡住。
+ * 并且在碰到业务层之前就被挡住——写端点的逐条分类由 {@link DdClientRouteClassificationTest}
+ * 按反射穷举（含 DdAiController），本类只留白名单可用性与律师侧行为。
  */
 class DdControllerClientWhitelistTest {
 
@@ -65,42 +61,6 @@ class DdControllerClientWhitelistTest {
     @AfterEach
     void tearDown() {
         auth.close();
-    }
-
-    private void assertForbidden(String name, Executable call) {
-        assertThrows(DdController.ClientForbiddenException.class, call, name + " 应对客户 403");
-    }
-
-    @Test
-    @DisplayName("十个写端点对客户逐个 403，且业务层一个都没被调到")
-    void everyWriteEndpointRejectsClient() {
-        DdController.CreateRequestDto create = new DdController.CreateRequestDto();
-        create.setName("x");
-        assertForbidden("createRequest", () -> controller.createRequest(PROJECT, create, "c"));
-        assertForbidden("addItems", () -> controller.addItems(REQUEST, create, "c"));
-        DdController.UpdateRequestDto rename = new DdController.UpdateRequestDto();
-        rename.setName("y");
-        assertForbidden("updateRequest", () -> controller.updateRequest(REQUEST, rename, "c"));
-        assertForbidden("addItem", () -> controller.addItem(REQUEST, new DdController.AddItemDto(), "c"));
-        assertForbidden("moveItem", () -> controller.moveItem(ITEM, new DdController.MoveItemDto(), "c"));
-        DdController.UpdateStatusDto status = new DdController.UpdateStatusDto();
-        status.setStatus("APPROVED");
-        assertForbidden("updateStatus", () -> controller.updateStatus(ITEM, status, "c"));
-        assertForbidden("updateInfo", () -> controller.updateInfo(ITEM, new DdController.UpdateInfoDto(), "c"));
-        assertForbidden("deleteItem", () -> controller.deleteItem(ITEM, "c"));
-        assertForbidden("deleteRequest", () -> controller.deleteRequest(REQUEST, "c"));
-        assertForbidden("copyRequest", () -> controller.copyRequest(REQUEST, "c"));
-
-        verify(ddService, never()).createRequest(any(), any(), any(), any());
-        verify(ddService, never()).addItems(any(), any());
-        verify(ddService, never()).updateRequest(any(), any());
-        verify(ddService, never()).addItem(any(), any());
-        verify(ddService, never()).moveItem(any(), any());
-        verify(ddService, never()).updateItemStatus(any(), any(), any(), any());
-        verify(ddService, never()).updateItemInfo(any(), any(), any());
-        verify(ddService, never()).deleteItem(anyLong(), any());
-        verify(ddService, never()).deleteRequest(anyLong(), any());
-        verify(ddService, never()).copyRequest(any(), any());
     }
 
     @Test

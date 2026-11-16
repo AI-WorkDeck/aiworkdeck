@@ -72,8 +72,8 @@ class ToolDiscoveryToolsSearchTest {
         assertFalse(out.contains("pdf_merge("), "只命中一个词的不算：" + out);
         assertFalse(out.contains("doc_insert_page_number("), "没有 pdf 这个词的不算：" + out);
         assertTrue(out.contains("from the NEXT turn on"), "尾句必须还在：" + out);
-        assertTrue(out.contains("<tool_code>"), out);
-        assertEquals(Set.of("pdf"), disclosed, "命中工具的类目要回写给编排器");
+        assertFalse(out.contains("<tool_code>"), "gap P2：回执不再教文本调用写法：" + out);
+        assertEquals(Set.of("tool:pdf_add_page_numbers", "tool:pdf_split"), disclosed, "V2：只回写命中的工具名，不连带类目");
     }
 
     @Test
@@ -113,7 +113,7 @@ class ToolDiscoveryToolsSearchTest {
         assertFalse(out.contains("- pdf_split("), "names 是精确匹配，不是前缀：" + out);
         assertTrue(out.contains("not found in this session: pdf_mer, nope"), out);
         assertFalse(out.startsWith("Error"), "部分命中不算失败：" + out);
-        assertEquals(Set.of("pdf", "litigation"), disclosed);
+        assertEquals(Set.of("tool:pdf_merge", "tool:litigation_render"), disclosed);
     }
 
     @Test
@@ -139,7 +139,7 @@ class ToolDiscoveryToolsSearchTest {
         String byQuery = tools().list_tools("litigation", "merge", null, "conv");
         assertTrue(byQuery.contains("- pdf_merge("), byQuery);
         assertFalse(byQuery.contains("litigation_render("), byQuery);
-        assertEquals(Set.of("pdf"), disclosed);
+        assertEquals(Set.of("tool:pdf_merge"), disclosed);
     }
 
     @Test
@@ -196,5 +196,24 @@ class ToolDiscoveryToolsSearchTest {
         def.setName(name);
         def.setDescription(description);
         return def;
+    }
+
+    @Test
+    @DisplayName("category 展开页也列出已在核心集里的同类工具，标 (already available) 且不重复签名")
+    void categoryListingIncludesCoreToolsOfThatCategory() {
+        List<ToolSpecification> session = List.of(
+                spec("law_search", "semantic law search"),
+                spec("get_law_article", "get article"),
+                spec("law_search_keyword", "keyword law search"),
+                spec("case_search", "case search"),
+                spec("list_tools", "catalog"));
+        bindContext(session, "run-1");
+        String out = tools().list_tools("legal", null, null, "conv");
+
+        assertTrue(out.contains("== legal (4 tools) =="), out);
+        assertTrue(out.contains("- law_search (already available)"), out);
+        assertTrue(out.contains("- get_law_article (already available)"), out);
+        assertTrue(out.contains("- law_search_keyword("), "非核心的仍给全签名：" + out);
+        assertTrue(out.contains("- case_search (already available)"), "P7 起 case_search 在核心集：" + out);
     }
 }

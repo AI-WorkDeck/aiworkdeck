@@ -19,6 +19,7 @@ import java.util.*;
 @ControllerAdvice
 public class CloudDownloadBillingAdvice implements ResponseBodyAdvice<Object> {
  private final CloudStorageQuotaService quota;private final CloudEgressService egress;private final MobileBillingService billing;
+ @org.springframework.beans.factory.annotation.Autowired(required=false) private CloudPostpaidShadowService shadow;
  public CloudDownloadBillingAdvice(CloudStorageQuotaService quota,CloudEgressService egress,MobileBillingService billing) {
   this.quota=quota;this.egress=egress;this.billing=billing;
  }
@@ -27,10 +28,14 @@ public class CloudDownloadBillingAdvice implements ResponseBodyAdvice<Object> {
  }
  public Object beforeBodyWrite(Object body,MethodParameter method,MediaType type,
        Class<? extends HttpMessageConverter<?>> converter,ServerHttpRequest request,ServerHttpResponse response) {
-  if(!quota.isEnabled() || !quota.postpaidEnabled() || body==null) return body;
+  if(!quota.isEnabled() || body==null) return body;
+  if(!quota.postpaidEnabled()) { shadow(body,request,response); return body; }
   if(!(request instanceof ServletServerHttpRequest servletRequest) || !(response instanceof ServletServerHttpResponse servletResponse)) return body;
   var req=servletRequest.getServletRequest();var res=servletResponse.getServletResponse();
   if(res.getStatus()<200 || res.getStatus()>=300) return body;
+  // Accounts that have not accepted postpaid get the unmodified switch-off response.
+  CloudDownloadContext owner=CloudDownloadContext.from(req);
+  if(owner!=null && !quota.postpaidFor(owner.userId())) return body;
   Resource resource;long start=0,size,total;
   if(body instanceof ResourceRegion region) {resource=region.getResource();start=region.getPosition();size=region.getCount();}
   else if(body instanceof List<?> regions && !regions.isEmpty() && regions.get(0) instanceof ResourceRegion region) {
@@ -81,5 +86,23 @@ public class CloudDownloadBillingAdvice implements ResponseBodyAdvice<Object> {
    egress.write(download,output);
    return null; // Already delivered synchronously; no converter or async task can replay it.
   } catch(IOException failure) {throw new UncheckedIOException(failure);}
+ }
+ /** Shadow only: record the response size the unchanged body will send. Upper bound; never alters the response. */
+ private void shadow(Object body,ServerHttpRequest request,ServerHttpResponse response) {
+  if(shadow==null || !shadow.active()) return;
+  if(!(request instanceof ServletServerHttpRequest servletRequest) || !(response instanceof ServletServerHttpResponse servletResponse)) return;
+  int status=servletResponse.getServletResponse().getStatus();
+  CloudDownloadContext context=CloudDownloadContext.from(servletRequest.getServletRequest());
+  if(context==null || status<200 || status>=300) return;
+  long size=-1;
+  try {
+   if(body instanceof ResourceRegion region) size=region.getCount();
+   else if(body instanceof List<?> regions) {size=0;for(Object item:regions) if(item instanceof ResourceRegion region) size+=region.getCount();}
+   else if(body instanceof InputStreamResource) size=response.getHeaders().getContentLength();
+   else if(body instanceof Resource value) size=value.contentLength();
+   else if(body instanceof byte[] bytes) size=bytes.length;
+   else if(body instanceof String text) size=text.getBytes(StandardCharsets.UTF_8).length;
+  } catch(IOException | RuntimeException unknown) { return; }
+  if(size>=0) shadow.egress(context.userId(),context.resourceId(),size,false);
  }
 }

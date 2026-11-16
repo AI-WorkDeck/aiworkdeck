@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-def extra_body(base, ratio='16:9', resolution='2k'):
+def extra_body(base, ratio='16:9', resolution='2k', is_platform=False):
     source = Path(__file__).parents[2] / 'services/ai_providers/image/openai_provider.py'
     tree = ast.parse(source.read_text())
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef))
@@ -14,11 +14,16 @@ def extra_body(base, ratio='16:9', resolution='2k'):
     module = ast.Module(body=[method], type_ignores=[])
     scope = {}
     exec(compile(module, str(source), 'exec'), scope)
-    return scope['_build_extra_body'](SimpleNamespace(api_base=base), ratio, resolution)
+    return scope['_build_extra_body'](SimpleNamespace(api_base=base, is_platform=is_platform), ratio, resolution)
 
 
 def test_openrouter_gets_native_image_config():
     assert extra_body('https://openrouter.ai/api/v1') == {
+        'image_config': {'aspect_ratio': '16:9', 'image_size': '2K'}}
+
+
+def test_platform_key_gets_native_image_config_on_any_base():
+    assert extra_body('https://proxy.example/v1', is_platform=True) == {
         'image_config': {'aspect_ratio': '16:9', 'image_size': '2K'}}
 
 

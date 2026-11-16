@@ -86,6 +86,9 @@ public class RecordingToolRegistry extends ToolRegistry {
     @Override
     public ToolResult execute(String name, String argsJson, ToolContext ctx) {
         String resolved = TOOL_NAME_ALIASES.getOrDefault(name, name);
+        // 已删除的旧名里参数完全相同的纯改名，生产按新名执行（tool-system-v2 V9），这里同口径
+        String sameArgsTarget = com.checkba.service.ai.tools.ToolShims.sameArgsTarget(resolved);
+        if (sameArgsTarget != null) resolved = sameArgsTarget;
         // 会话能力过滤必须和生产走同一条：生产的 ToolRegistry.execute 用的是
         // resolve(name, conversationId)，能力档下不可见的工具按「不存在」拒绝。
         // 这里原来调的是单参 resolve(name)，把那一层闸整个跳过了——于是

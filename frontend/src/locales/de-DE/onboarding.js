@@ -87,6 +87,11 @@ export default {
     "privacyName": "Datenschutzerklärung",
     "crossBorderLabel": "Gesonderte Einwilligung: Übermittlung der an die KI gesendeten Inhalte an Modellanbieter im Ausland zur Verarbeitung",
     "crossBorderView": "Hinweis anzeigen",
+    "consentCardTitle": "Bitte bestätigen Sie vor der Nutzung der Plattform-KI eine Einwilligung zur Datenverarbeitung",
+    "consentAccept": "Zustimmen und fortfahren",
+    "consentHideNotice": "Hinweis ausblenden",
+    "consentFailed": "Konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "consentLater": "Später",
     "crossBorderNoticeTitle": "Hinweis zur grenzüberschreitenden Datenübermittlung",
     "crossBorderNoticeBody": "Die chinesische Website verbindet sich über AI WorkDeck-Server mit Alibaba Cloud Bailian; die internationale Website nutzt OpenRouter. An die KI übermittelte Texte und Dateiauszüge dienen der Inferenz und Abrechnung. Je nach Modell kann die Verarbeitung außerhalb Festlandchinas erfolgen. Sie können Ihre Einwilligung in den Einstellungen widerrufen; dadurch wird der Plattform-KI-Zugang deaktiviert.",
     "agreementRequired": "Aktivieren Sie das Kontrollkästchen, um den Nutzungsbedingungen und der Datenschutzerklärung zuzustimmen und fortzufahren",
@@ -101,7 +106,8 @@ export default {
     "switch": "Wechseln",
     "cancel": "Abbrechen",
     "switchFailed": "Standortwechsel fehlgeschlagen. Versuchen Sie es später erneut.",
-    "rescueFailed": "Nach dem Standortwechsel weiterhin nicht freigeschaltet. Prüfen Sie den Code und versuchen Sie es erneut."
+    "rescueFailed": "Nach dem Standortwechsel weiterhin nicht freigeschaltet. Prüfen Sie den Code und versuchen Sie es erneut.",
+    "proIntroBanner": "Gratis-Startguthaben bei Registrierung · Personal Pro 3 Monate ¥9.9/Monat",
   },
   "hint": {
     "learnMore": "Mehr erfahren",
@@ -112,11 +118,13 @@ export default {
     "purchaseConfirmOk": "Bestätigen",
     "purchaseSuccess": "Freigeschaltet",
     "purchaseFailed": "Kauf fehlgeschlagen",
-    "goRecharge": "Aufladen"
+    "goRecharge": "Aufladen",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro holen",
   },
   "identity": {
     "title": "Lokalen Arbeitsbereich auswählen",
-    "subtitle": "Auf diesem Gerät wurden mehrere bestehende Konten gefunden. Wählen Sie den Arbeitsbereich aus, mit dem Sie fortfahren möchten. Sie werden nicht erneut gefragt und können dies später unter Einstellungen → Konto & Nutzung ändern.",
+    "subtitle": "Auf diesem Gerät wurden mehrere bestehende Konten gefunden. Wählen Sie den Arbeitsbereich aus, mit dem Sie fortfahren möchten. Sie werden nicht erneut gefragt und können dies später unter Einstellungen → Konto & Guthaben ändern.",
     "reading": "Lokale Konten werden gelesen",
     "retry": "Erneut versuchen",
     "itemMeta": "{projects} Projekte · {files} Dateien",

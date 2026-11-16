@@ -141,7 +141,7 @@ class PluginControllerInvokeToolTest {
     @DisplayName("放行：ToolContext 用服务端 projectId/userId，args 原样透传")
     void happyPath() {
         when(projectMemberService.hasWritePermission(1L, 7L)).thenReturn(true);
-        when(toolRegistry.execute(eq("dd_ping"), anyString(), any()))
+        when(toolRegistry.execute(eq("dd_ping"), anyString(), any(), eq("plugin-ui")))
                 .thenReturn(new ToolRegistry.ToolResult("pong: dd-demo", null, true));
         try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("sess")).thenReturn(7L);
@@ -151,7 +151,7 @@ class PluginControllerInvokeToolTest {
             assertEquals("pong: dd-demo", r.getBody().get("output"));
             ArgumentCaptor<ToolContext> ctx = ArgumentCaptor.forClass(ToolContext.class);
             ArgumentCaptor<String> argsJson = ArgumentCaptor.forClass(String.class);
-            verify(toolRegistry).execute(eq("dd_ping"), argsJson.capture(), ctx.capture());
+            verify(toolRegistry).execute(eq("dd_ping"), argsJson.capture(), ctx.capture(), eq("plugin-ui"));
             assertEquals(1L, ctx.getValue().projectId());
             assertEquals(7L, ctx.getValue().userId());
             assertNull(ctx.getValue().conversationId());

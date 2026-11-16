@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "ขนาด: {size}",
   "renderingDoc": "กำลังเรนเดอร์เอกสาร…",
   "renderingSlides": "กำลังเรนเดอร์งานนำเสนอ…",
+  "slidesNotShown": "ยังมีอีก {count} สไลด์ที่ไม่ได้แสดง เปิดไฟล์เพื่อดูทั้งหมด",
   "officePreviewUnsupported": "ไม่มีตัวอย่างออนไลน์สำหรับไฟล์นี้",
   "fileTypeHintOpenLocal": "ประเภทไฟล์: {type} ค้นหาใน Finder หรือ File Explorer แล้วเปิดด้วยแอปภายในเครื่อง",
   "unknown": "ไม่ทราบ",
@@ -66,7 +67,7 @@ export default {
     "submitted": "กำลังสร้างคำบรรยาย ซึ่งจะปรากฏเมื่อพร้อมใช้งาน",
     "ready": "คำบรรยายพร้อมแล้ว",
     "failed": "การสร้างคำบรรยายล้มเหลว คลิกปุ่มคำบรรยายเพื่อลองอีกครั้ง",
-    "notConfigured": "ยังไม่ได้ตั้งค่าการถอดความ โปรดตั้งค่าใน System settings - Platform Services - Meeting Transcription เพื่อสร้างคำบรรยาย",
+    "notConfigured": "ยังไม่ได้ตั้งค่าการถอดความ โปรดตั้งค่าใน การตั้งค่า - Platform Services - Meeting Transcription เพื่อสร้างคำบรรยาย",
     "noticePending": "ลงทะเบียนแล้ว โปรดยืนยันข้อแจ้งการบันทึกการประชุมใน Voice - Meeting Recording ก่อน จากนั้นคลิกปุ่มคำบรรยาย",
     "submitFailed": "ไม่สามารถเริ่มสร้างคำบรรยายได้",
     "empty": "ไม่พบเสียงพูด"

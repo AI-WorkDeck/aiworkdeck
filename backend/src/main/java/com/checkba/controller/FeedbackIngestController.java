@@ -7,6 +7,7 @@ import com.checkba.model.entity.FeedbackAttachment;
 import com.checkba.model.entity.UserFeedback;
 import com.checkba.repository.UserFeedbackRepository;
 import com.checkba.service.LangText;
+import com.checkba.service.feedback.FeedbackAiReportService;
 import com.checkba.service.feedback.FeedbackIngestGuard;
 import com.checkba.service.feedback.FeedbackService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -113,7 +114,7 @@ public class FeedbackIngestController {
      *
      * <p>鉴权就是 installId 本身：只返回 install_id 等于入参且 source=CLOUD 的行，
      * <b>绝不能认 X-Optimizer-Token</b>——那是维护者取全部待办的钥匙，不能发给每个客户端。
-     * 只回状态字段（clientRef/status/triageVerdict/prUrl/handledAt），正文/附件/上下文一律不带，
+     * 只回状态与已发布答复，正文/附件/上下文及内部处置字段一律不带，
      * 最小化返回面；走的还是 ingest 同一套配额闸，防的是同一类滥用。
      */
     @PostMapping("/ingest/status")
@@ -141,6 +142,9 @@ public class FeedbackIngestController {
                 m.put("triageVerdict", fb.getTriageVerdict());
                 m.put("prUrl", fb.getPrUrl());
                 m.put("handledAt", fb.getHandledAt() == null ? null : fb.getHandledAt().toString());
+                m.put("resolvedAt", fb.getResolvedAt() == null ? null : fb.getResolvedAt().toString());
+                m.put("reporterResponse", fb.getReporterResponse());
+                m.put("responsePublishedAt", fb.getResponsePublishedAt() == null ? null : fb.getResponsePublishedAt().toString());
                 items.add(m);
             }
         }
@@ -204,6 +208,13 @@ public class FeedbackIngestController {
         if (fb == null) return ResponseEntity.ok(error(LangText.of("反馈不存在", "Feedback not found")));
 
         String status = str(body.get("status"));
+        if (FeedbackAiReportService.isAiContentReport(fb)
+                && (UserFeedback.STATUS_RESOLVED.equals(fb.getStatus())
+                || UserFeedback.STATUS_RESOLVED.equals(status))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of(
+                    "AI 内容举报只能由管理员通过人工处置端点结案；已结案记录不能被优化者改写",
+                    "AI content reports can only be resolved through the admin handling endpoint; optimizer receipts cannot rewrite resolved reports")));
+        }
         if (status != null && !status.isBlank()) fb.setStatus(status);
         if (body.containsKey("triageVerdict")) fb.setTriageVerdict(str(body.get("triageVerdict")));
         if (body.containsKey("triageJson")) fb.setTriageJson(str(body.get("triageJson")));

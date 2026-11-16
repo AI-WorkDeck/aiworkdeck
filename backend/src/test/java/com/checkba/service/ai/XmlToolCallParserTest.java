@@ -556,4 +556,106 @@ class XmlToolCallParserTest {
         assertEquals("甲方", args.getStr("findText"));
         assertEquals("乙方", args.getStr("replaceText"));
     }
+
+    @Test
+    void bareAskUserRecognisedFromRecordedSampleAndEntityEscapedQuotes() {
+        String sample = "<ask_user question=\"没有文件，请问是哪个期限？\" options='[{\"label\":\"提供文件\",\"description\":\"上传文书\"},"
+                + "{\"label\":\"口头说明\",\"description\":\"直接告诉我\"}]' /> <process name=\"Query memory\">"
+                + "<tool_code>query_memory({\"query\": \"期限\"})</tool_code><tool_output status=\"SUCCESS\">无</tool_output></process>";
+        var calls = parser.parse(sample);
+        assertEquals("ask_user", calls.get(0).toolName());
+        assertEquals(2, AskUserQuestion.fromArgsJson(calls.get(0).argsJson(), "test").options().size());
+
+        // HTML 实体转义的引号：属性与 JSON 内部都是 &quot;
+        String escaped = "<ask_user question=&quot;选哪个？&quot; options=&quot;[&quot;甲&quot;,&quot;乙&quot;]&quot; />";
+        var q = AskUserQuestion.fromArgsJson(single(escaped).argsJson(), "test");
+        assertEquals("选哪个？", q.question());
+        assertEquals(2, q.options().size());
+    }
+
+    /** s07 回放：DeepSeek 用原生 DSML 收尾代替 </tool_code>（真实日志原文，正文含换行与引号）。 */
+    @Test
+    @DisplayName("泄漏的 DSML 收尾标签当作缺失的 </tool_code>：不再被判截断，参数完整")
+    void leakedDsmlClosersAreTreatedAsToolCodeClose() {
+        String raw = "<process name=\"创建文档\">\n  <step>正在生成...</step>\n"
+                + "  <tool_code>write_docx(fileName=\"法律意见书.docx\", markdownContent=\"# 法律意见书\n\n**致：** [名称]\n\n"
+                + "## 一、依据\n\n1. 本所依据《律师法》出具。\")"
+                + "</\uFF5CDSML\uFF5Cparameter>\n</\uFF5CDSML\uFF5Cinvoke>\n</\uFF5CDSML\uFF5Ctool_calls>";
+        assertTrue(AgentOrchestrator.endsWithUnclosedTag(raw), "病灶还原：规整前被判为截断");
+
+        String fixed = XmlToolCallParser.normalizeLeakedClosers(raw);
+
+        assertFalse(AgentOrchestrator.endsWithUnclosedTag(fixed));
+        assertFalse(fixed.contains("DSML"));
+        var call = single(fixed);
+        assertNull(call.parseError());
+        assertEquals("write_docx", call.toolName());
+        var args = cn.hutool.json.JSONUtil.parseObj(call.argsJson());
+        assertEquals("法律意见书.docx", args.getStr("fileName"));
+        assertTrue(args.getStr("markdownContent").startsWith("# 法律意见书\n\n**致：**"), call.argsJson());
+        assertTrue(args.getStr("markdownContent").endsWith("出具。"), call.argsJson());
+    }
+
+    @Test
+    @DisplayName("已有 </tool_code> 或没有 DSML 时规整是恒等变换；真截断仍判截断")
+    void normalizeLeavesWellFormedAndTrulyTruncatedAlone() {
+        String ok = "<tool_code>todo_write(todos=\"[]\")</tool_code>";
+        assertEquals(ok, XmlToolCallParser.normalizeLeakedClosers(ok));
+        assertEquals(ok, XmlToolCallParser.normalizeLeakedClosers(ok + "</\uFF5CDSML\uFF5Ctool_calls>"));
+        String truncated = "<tool_code>write_docx(fileName=\"a.docx\", markdownContent=\"# 标";
+        assertEquals(truncated, XmlToolCallParser.normalizeLeakedClosers(truncated));
+        assertTrue(AgentOrchestrator.endsWithUnclosedTag(truncated));
+    }
+
+    @Test
+    @DisplayName("Qwen 原生模板泄漏进正文（<function=名> 与 <名> 两种头）按调用解析；代码块里的不算")
+    void qwenTemplateCallsAreSalvaged() {
+        String fn = "<function=save_memory>\n<parameter=key>\n客户会议时间偏好\n</parameter>\n"
+                + "<parameter=isProtected>\nfalse\n</parameter>\n</function>";
+        assertTrue(parser.containsToolCall(fn));
+        var calls = parser.parse(fn);
+        assertEquals(1, calls.size());
+        assertEquals("save_memory", calls.get(0).toolName());
+        assertEquals("{\"key\":\"客户会议时间偏好\",\"isProtected\":\"false\"}", calls.get(0).argsJson());
+
+        String bare = "好的。\n<create_folder>\n<parameter=folderName>\n证据\n</parameter>\n</function>";
+        var bareCalls = parser.parse(bare);
+        assertEquals(1, bareCalls.size());
+        assertEquals("create_folder", bareCalls.get(0).toolName());
+        assertEquals("{\"folderName\":\"证据\"}", bareCalls.get(0).argsJson());
+
+        String multi = "<write_docx>\n<parameter=fileName>\n法律意见书.docx\n</parameter>\n"
+                + "<parameter=markdownContent>\n# 法律意见书\n\n第一段\n</parameter>\n</function>";
+        assertEquals("{\"fileName\":\"法律意见书.docx\",\"markdownContent\":\"# 法律意见书\\n\\n第一段\"}",
+                parser.parse(multi).get(0).argsJson());
+
+        String fenced = "示例：\n```\n<function=save_memory><parameter=key>x</parameter></function>\n```";
+        assertFalse(parser.containsToolCall(fenced));
+        assertTrue(parser.parse(fenced).isEmpty());
+        // 裸标签没有参数不算（不把任意标签当工具）
+        assertTrue(parser.parse("<final>完成</final> </function>").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Qwen 把工具名当外层标签、参数各自成标签：整段只有这一块且子标签都是参数时才执行")
+    void bareToolTagWithChildParametersIsSalvagedOnlyWhenUnambiguous() {
+        var bridge = org.mockito.Mockito.mock(EditorBridgeService.class);
+        var registry = new ToolRegistry(List.of(new com.checkba.service.ai.tools.SlideEditTools(bridge)),
+                new PluginService(), new ClientCapabilityService());
+        registry.init();
+        var slideParser = new XmlToolCallParser(registry);
+        String leaked = "<slide_write_notes>\n<slideNumber>1</slideNumber>\n<text>开场先介绍承办律师团队 &amp; 分工</text>\n</slide_write_notes>";
+        assertTrue(slideParser.containsToolCall(leaked));
+        var calls = slideParser.parse(leaked);
+        assertEquals(1, calls.size());
+        assertEquals("slide_write_notes", calls.get(0).toolName());
+        assertEquals("{\"slideNumber\":\"1\",\"text\":\"开场先介绍承办律师团队 & 分工\"}", calls.get(0).argsJson());
+        // 允许前置 <thinking>
+        assertEquals(1, slideParser.parse("<thinking>写备注</thinking>\n" + leaked).size());
+        // 不认：正文夹带、未知工具、非参数子标签、空块
+        assertTrue(slideParser.parse("已为你写好：\n" + leaked).isEmpty());
+        assertTrue(slideParser.parse("<not_a_tool><text>x</text></not_a_tool>").isEmpty());
+        assertTrue(slideParser.parse("<slide_write_notes><bogus>1</bogus></slide_write_notes>").isEmpty());
+        assertTrue(slideParser.parse("<slide_write_notes></slide_write_notes>").isEmpty());
+    }
 }

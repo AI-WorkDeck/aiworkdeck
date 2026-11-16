@@ -114,6 +114,49 @@ class OpenRouterStreamingChatModelTest {
     }
 
     @Test
+    @DisplayName("百炼 qwen 先说一句话再发工具调用：正文与工具调用都要保留（2026-11-11 实录）")
+    void bailianQwenTextThenToolCallKeepsToolCall() throws Exception {
+        serveStream(new String(getClass().getResourceAsStream("/sse/bailian-qwen-text-then-tool.sse").readAllBytes(),
+                StandardCharsets.UTF_8));
+        OpenRouterStreamingChatModel model = new OpenRouterStreamingChatModel(
+                "sk-test", baseUrl(), "qwen/qwen3.7-flash", Duration.ofSeconds(5));
+        Collector c = new Collector();
+        model.generate(List.of(UserMessage.from("在第五条前插入保密条款")),
+                List.of(ToolSpecification.builder().name("doc_find_text").description("find").build()), c);
+        c.await();
+        assertNull(c.error.get(), () -> "不该出错：" + c.error.get());
+        AiMessage m = c.done.get().content();
+        assertTrue(m.text() != null && m.text().contains("confidentiality"), m::toString);
+        assertTrue(m.hasToolExecutionRequests(), m::toString);
+        assertEquals("doc_find_text", m.toolExecutionRequests().get(0).name());
+    }
+
+    @Test
+    @DisplayName("首个工具调用的 id/name 与正文同一分片到达：不能变成无名调用（deepseek 并行调用实录形态）")
+    void toolCallHeaderBesideContentKeepsName() throws Exception {
+        serveStream(chunk("{\"content\":\"先定位。\",\"tool_calls\":[{\"index\":0,\"id\":\"call_a\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"doc_find_text\",\"arguments\":\"\"}}]}", null)
+                + chunk("{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"keyword\\\":\\\"第三条\\\"}\"}}]}", null)
+                + chunk("{\"tool_calls\":[{\"index\":1,\"id\":\"call_b\",\"type\":\"function\","
+                        + "\"function\":{\"name\":\"doc_find_text\",\"arguments\":\"{\\\"keyword\\\":\\\"第四条\\\"}\"}}]}", null)
+                + chunk("{}", "tool_calls") + "data: [DONE]\n\n");
+        OpenRouterStreamingChatModel model = new OpenRouterStreamingChatModel(
+                "sk-test", baseUrl(), "deepseek/deepseek-v4-flash", Duration.ofSeconds(5));
+        Collector c = new Collector();
+        model.generate(List.of(UserMessage.from("改第三条和第四条")),
+                List.of(ToolSpecification.builder().name("doc_find_text").description("find").build()), c);
+        c.await();
+        assertNull(c.error.get(), () -> "不该出错：" + c.error.get());
+        AiMessage m = c.done.get().content();
+        assertEquals("先定位。", m.text());
+        assertEquals(2, m.toolExecutionRequests().size(), m::toString);
+        assertEquals("call_a", m.toolExecutionRequests().get(0).id());
+        assertEquals("doc_find_text", m.toolExecutionRequests().get(0).name());
+        assertEquals("{\"keyword\":\"第三条\"}", m.toolExecutionRequests().get(0).arguments());
+        assertEquals("doc_find_text", m.toolExecutionRequests().get(1).name());
+    }
+
+    @Test
     void bailianStreamsToolsAndReasoningWithoutOpenRouterExtensions() throws Exception {
         serveStream(chunk("{\"reasoning_content\":\"consider\"}", null)
                 + chunk("{\"tool_calls\":[{\"index\":0,\"id\":\"call_bailian\",\"type\":\"function\",\"function\":{\"name\":\"read_file\",\"arguments\":\"{}\"}}]}", null)
@@ -274,5 +317,26 @@ class OpenRouterStreamingChatModelTest {
                 m1.httpClient().dispatcher(),
                 m2.httpClient().dispatcher(),
                 "不同模型实例应复用同一个 OkHttp Dispatcher");
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("W6：核验员一轮——并行工具调用总是打开；具名强制 / none / auto，其余字段不动")
+    void consultRoundSetsParallelCallsAndToolChoice() throws Exception {
+        String body = "{\"model\":\"q\",\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"search_project_content\"}}]}";
+        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+        com.fasterxml.jackson.databind.JsonNode forced = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "search_project_content", true));
+        org.junit.jupiter.api.Assertions.assertEquals("function", forced.path("tool_choice").path("type").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("search_project_content", forced.path("tool_choice").path("function").path("name").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(forced.path("parallel_tool_calls").asBoolean());
+        org.junit.jupiter.api.Assertions.assertEquals("q", forced.path("model").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(1, forced.path("tools").size());
+        com.fasterxml.jackson.databind.JsonNode none = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "none", false));
+        org.junit.jupiter.api.Assertions.assertEquals("none", none.path("tool_choice").asText());
+        org.junit.jupiter.api.Assertions.assertEquals(1, none.path("tools").size(), "tools stay declared so earlier tool calls remain valid");
+        com.fasterxml.jackson.databind.JsonNode auto = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "auto", false));
+        org.junit.jupiter.api.Assertions.assertTrue(auto.path("tool_choice").isMissingNode());
+        org.junit.jupiter.api.Assertions.assertTrue(auto.path("parallel_tool_calls").asBoolean());
+        com.fasterxml.jackson.databind.JsonNode undeclared = om.readTree(OpenRouterStreamingChatModel.withConsultRound(body, "read_document", false));
+        org.junit.jupiter.api.Assertions.assertTrue(undeclared.path("tool_choice").isMissingNode());
     }
 }

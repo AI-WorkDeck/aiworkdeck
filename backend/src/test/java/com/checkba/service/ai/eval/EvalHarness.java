@@ -68,7 +68,31 @@ public final class EvalHarness {
             List<List<String>> toolNamesOfferedPerLlmCall,
             List<String> promptTexts,
             List<Long> checkpointFileIds,
-            int remainingScriptTurns) {
+            int remainingScriptTurns,
+            List<Integer> offeredToolCountPerCall,
+            List<Integer> offeredSchemaTokensPerCall,
+            int editorReadCount) {
+
+        /** 第一次携带工具的 LLM 调用的下发工具数（没有则 0） */
+        public int firstCallOfferedTools() {
+            for (int i = 0; i < toolsOfferedPerLlmCall.size(); i++) {
+                if (toolsOfferedPerLlmCall.get(i)) {
+                    return offeredToolCountPerCall.get(i);
+                }
+            }
+            return 0;
+        }
+
+        /** 第一次携带工具的 LLM 调用的下发 schema token（没有则 0） */
+        public int firstCallOfferedSchemaTokens() {
+            for (int i = 0; i < toolsOfferedPerLlmCall.size(); i++) {
+                if (toolsOfferedPerLlmCall.get(i)) {
+                    return offeredSchemaTokensPerCall.get(i);
+                }
+            }
+            return 0;
+        }
+
 
         /** 最终保存的 ASSISTANT 消息（含 executionLog 前缀） */
         public Optional<String> lastAssistantMessage() {
@@ -145,6 +169,12 @@ public final class EvalHarness {
         toolBeans.stream()
                 .filter(bean -> bean instanceof com.checkba.service.ai.tools.ToolDiscoveryTools)
                 .forEach(bean -> ((com.checkba.service.ai.tools.ToolDiscoveryTools) bean).setSkillRouter(skillRouter));
+        // run_python 只在本机 Docker 可用时下发（PythonTools 探测 `docker version`）。CI 机器有 Docker、多数开发机与
+        // 律师电脑没有，不钉住的话同一提交在两边下发的工具面不同（tool-surface 基线差一个 run_python）。
+        // 评测一律按「无 Docker」——这也是律师桌面端的常态。
+        toolBeans.stream()
+                .filter(bean -> bean instanceof com.checkba.service.ai.tools.PythonTools)
+                .forEach(EvalHarness::pinDockerUnavailable);
         RecordingToolRegistry registry = new RecordingToolRegistry(toolBeans, pluginService);
         registry.init();
         registry.setStubs(c.toolStubs);
@@ -158,12 +188,16 @@ public final class EvalHarness {
 
         ChatModelFactory chatModelFactory = mock(ChatModelFactory.class);
         when(chatModelFactory.getStreamingChatModel(any())).thenReturn(scripted);
+        when(chatModelFactory.nativeToolProtocol(any())).thenReturn(c.nativeProtocol);
 
         List<SavedMessage> savedMessages = new CopyOnWriteArrayList<>();
         ProjectAiMessageService messageService = mock(ProjectAiMessageService.class);
         // dev-board#729 ⑤：编排器改用 countByConversationId 判首轮；mock 默认回 0 会误判首轮、起异步标题线程
         // 与下一次 when(...) 打架（CI 上 Mockito WrongTypeOfReturnValue）。计数跟随 list 桩，保持各用例原语义。
-        when(messageService.countByConversationId(any())).thenAnswer(inv -> (long) messageService.listByConversationId(inv.getArgument(0)).size());
+        when(messageService.countByConversationId(any())).thenAnswer(inv -> c.persistedMessageCount != null
+                ? c.persistedMessageCount.longValue() : c.contextHistory != null ? (long) c.contextHistory.size() + 1
+                : (long) messageService.listByConversationId(inv.getArgument(0)).size());
+        when(messageService.generateConversationTitle(any(), any())).thenReturn("Eval conversation");
         // USER 消息落库走六参重载（契约 D：末位是 displayContent，缺省 null）。
         // 编排器只调六参那一个，五参重载在这里不桩也无妨；但**两个都桩着**是刻意的——
         // 哪天有人把调用点改回五参，评测不会因为「一条 USER 消息都没记录」而给出误导性的失败。
@@ -194,10 +228,18 @@ public final class EvalHarness {
         TokenUsageService tokenUsage = mock(TokenUsageService.class);
 
         ContextAssemblerService assembler = mock(ContextAssemblerService.class);
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenAnswer(inv -> new ArrayList<>(List.of(
-                        SystemMessage.from("[eval] system prompt placeholder"),
-                        UserMessage.from(c.userInput))));
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    var assembled = new ArrayList<dev.langchain4j.data.message.ChatMessage>();
+                    assembled.add(SystemMessage.from("[eval] system prompt placeholder"));
+                    if (c.contextHistory != null) {
+                        assembled.addAll(c.contextHistory);
+                        // Production assembly includes the just-persisted user row, then the current prompt.
+                        assembled.add(UserMessage.from(c.userInput));
+                    }
+                    assembled.add(UserMessage.from(c.userInput));
+                    return assembled;
+                });
 
         MemoryPipelineService memoryPipeline = mock(MemoryPipelineService.class);
 
@@ -219,6 +261,12 @@ public final class EvalHarness {
 
         EditorBridgeService editorBridge = mock(EditorBridgeService.class);
         when(editorBridge.isStreamingMode(any())).thenReturn(false);
+        java.util.concurrent.atomic.AtomicInteger editorReadCalls = new java.util.concurrent.atomic.AtomicInteger();
+        if (!c.editorReads.isEmpty()) {
+            when(editorBridge.executeEditorCommand(org.mockito.ArgumentMatchers.eq("get_document_text"), any(),
+                    org.mockito.ArgumentMatchers.anyInt()))
+                    .thenAnswer(inv -> c.editorReads.get(Math.min(editorReadCalls.getAndIncrement(), c.editorReads.size() - 1)));
+        }
 
         ConversationFileChangeService fileChange = mock(ConversationFileChangeService.class);
 
@@ -231,6 +279,8 @@ public final class EvalHarness {
             checkpointFileIds.add(inv.getArgument(1));
             return null;
         }).when(checkpointService).ensureCheckpoint(any(), any());
+        // 条件核心 doc_restore_checkpoint（tool-system-v2 V2）：本轮建过检查点之后 hasCheckpoint 才为真
+        when(checkpointService.hasCheckpoint(any())).thenAnswer(inv -> !checkpointFileIds.isEmpty());
         com.checkba.version.WorkSessionService workSessionService = mock(com.checkba.version.WorkSessionService.class);
 
         // 故障转移与自动 compaction 用真实配置默认值：备选链默认为空（不会在回放里切模型），
@@ -300,12 +350,21 @@ public final class EvalHarness {
             request.setActiveContext(active);
         }
 
+        if (c.withAttachment) {
+            AiAgentController.ContextItem attachment = new AiAgentController.ContextItem();
+            attachment.setId("9001");
+            attachment.setName("附件.pdf");
+            attachment.setFileType("pdf");
+            request.setContextItems(List.of(attachment));
+        }
+
         orchestrator.handleUserMessage(request, 7L);
 
         return new RunResult(c, registry.dispatches(), List.copyOf(sseEvents), List.copyOf(savedMessages),
                 List.copyOf(artifactSaves), List.copyOf(folderRenames),
                 scripted.toolsOfferedPerCall(), scripted.toolNamesOfferedPerCall(),
-                scripted.promptTextPerCall(), List.copyOf(checkpointFileIds), scripted.remainingTurns());
+                scripted.promptTextPerCall(), List.copyOf(checkpointFileIds), scripted.remainingTurns(),
+                scripted.offeredToolCountPerCall(), scripted.offeredSchemaTokensPerCall(), editorReadCalls.get());
     }
 
     /** 内置 skills 目录（与 EvalCase.casesDir 同思路：兼容从 backend/ 或仓库根目录跑测试） */
@@ -316,5 +375,15 @@ public final class EvalHarness {
             }
         }
         return "skills";
+    }
+
+    private static void pinDockerUnavailable(com.checkba.service.ai.tools.AgentToolComponent python) {
+        try {
+            java.lang.reflect.Field f = com.checkba.service.ai.tools.PythonTools.class.getDeclaredField("dockerAvailable");
+            f.setAccessible(true);
+            f.set(python, Boolean.FALSE);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("PythonTools.dockerAvailable 改名了？评测需要钉住 Docker 可用性", e);
+        }
     }
 }

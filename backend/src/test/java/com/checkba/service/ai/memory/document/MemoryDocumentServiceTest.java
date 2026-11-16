@@ -51,7 +51,7 @@ class MemoryDocumentServiceTest {
 
     private void enableCloud() {
         when(cloudQuota.isEnabled()).thenReturn(true);
-        when(cloudQuota.postpaidEnabled()).thenReturn(true);
+        when(cloudQuota.postpaidEnabled()).thenReturn(true);when(cloudQuota.postpaidFor(anyLong())).thenReturn(true);
         when(cloudQuota.canRead(anyLong())).thenReturn(true);
     }
 

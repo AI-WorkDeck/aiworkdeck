@@ -139,7 +139,7 @@ public class ImageAssetTools implements AgentToolComponent {
         }
     }
 
-    @ToolMeta(displayName = "查询图片素材", category = "document", fileEffect = "ADDED")
+    @ToolMeta(displayName = "查询图片素材", category = "document", fileEffect = "ADDED", access = ToolMeta.Access.WRITE)
     @Tool(
             "Check a previously started image generation and import its completed image once. Does"
                 + " not call the image model again. Supply generationId from image_generate_asset."

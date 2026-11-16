@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "취소 중…",
   "ocrBatchBusy": "이미 인식 작업이 진행 중입니다. 완료를 기다리거나 취소하세요",
   "ocrConsentTitle": "클라우드 텍스트 인식을 사용할까요?",
-  "ocrConsentHint": "텍스트 레이어가 있는 PDF는 업로드나 과금 없이 바로 추출합니다. 클라우드 OCR은 스캔본과 이미지에만 필요합니다. 이 확인은 이번 일괄 작업에만 적용되며, 설정 → 계정 및 사용량 → 스캔 문서 인식에서 항상 클라우드 또는 로컬 전용으로 바꿀 수 있습니다.",
+  "ocrConsentHint": "텍스트 레이어가 있는 PDF는 업로드나 과금 없이 바로 추출합니다. 클라우드 OCR은 스캔본과 이미지에만 필요합니다. 이 확인은 이번 일괄 작업에만 적용되며, 설정 → AI 설정 → 스캔 문서 인식에서 항상 클라우드 또는 로컬 전용으로 바꿀 수 있습니다.",
   "ocrConsentCheck": "데이터 전송처와 과금 방식을 확인했습니다",
   "ocrConsentConfirm": "시작",
   "ocrCopied": "파일 {count}개의 텍스트를 복사하고 클립보드 기록에 저장했습니다",
@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "이 배치에서 로컬 인식이 완료되지 않은 파일은 클라우드 인식으로 처리할 수 있습니다. 사용하지 않으면 해당 파일은 업로드되지 않습니다.",
   "ocrLocalFailedConfirm": "클라우드 인식 사용",
   "ocrAlreadySearchable": "\"{name}\"에는 이미 텍스트 레이어가 있어 검색할 수 있으므로 새 파일을 만들지 않았습니다",
-  "ocrStopped": "중지됨, 미처리 {count}개"
+  "ocrStopped": "중지됨, 미처리 {count}개",
+  "subscribeProBtn": "Pro ¥9.9",
 }

@@ -8,6 +8,12 @@ export default {
   "cancel": "Annuler",
   "save": "Enregistrer",
   "close": "Fermer",
+  "remove": "Retirer",
+  "clear": "Effacer",
+  "zoomIn": "Zoom avant",
+  "zoomOut": "Zoom arrière",
+  "moveUp": "Monter",
+  "moveDown": "Descendre",
   "done": "Terminé",
   "delete": "Supprimer",
   "rename": "Renommer",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "Accéder aux Paramètres",
   "later": "Plus tard",
   "requestFailedWithStatus": "Échec de la requête ({status})",
+  "tooManyRequests": "Trop de requêtes. Veuillez patienter un instant et réessayer",
   "smsVerificationRequired": "Cette action nécessite une vérification par SMS",
   "freeQuotaExceeded": "Vous avez utilisé tous vos crédits gratuits",
   "serviceErrorRetryLater": "Erreur de service. Veuillez réessayer plus tard",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "Sélectionner la langue",
   "languageFollowSystem": "Suivre le système",
   "languageSearchPlaceholder": "Rechercher des langues…",
-  "languageNoMatch": "Aucune langue correspondante"
+  "languageNoMatch": "Aucune langue correspondante",
+  "serverLabelAccountBridge": "Passerelle de compte",
+  "serverLabelGenericClient": "Client (général)",
+  "serverLabelPersonalMemory": "Mémoire personnelle",
+  "serverLabelProjectMemory": "Mémoire du projet"
 }

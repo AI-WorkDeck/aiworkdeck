@@ -29,6 +29,12 @@ public interface MobileBillingClient {
                 CloudBillingText.get("unavailable"), "cloud_billing_disabled");
     }
 
+    /** Shadow report about cloud users without an account mapping; carries cloud user ids only. */
+    default Map<String, Object> shadowUnmapped(Map<String, Object> report) {
+        throw new MobileBillingException(MobileBillingKind.DISABLED,
+                CloudBillingText.get("unavailable"), "cloud_billing_disabled");
+    }
+
     /**
      * 余额。
      *
@@ -38,9 +44,20 @@ public interface MobileBillingClient {
      *                     只返回 {@code paid} / {@code free}，<b>不是套餐名，也基本不会为 null</b>
      *                     （只有上游没给这个字段时才是 null）。各端不要当套餐名直接渲染。
      */
-    record BalanceResult(long balanceCents, String currency, String plan, Map<String, Object> subscription) {
+    record BalanceResult(long balanceCents, String currency, String plan, Map<String, Object> subscription,
+            Map<String, Object> billing) {
         public BalanceResult(long balanceCents, String currency, String plan) {
             this(balanceCents, currency, plan, Map.of());
+        }
+        /** 旧官网没有计费线字段：billingLine=standard、bqtMember=null（见 BqtBilling.copyBillingFields）。 */
+        public BalanceResult(long balanceCents, String currency, String plan, Map<String, Object> subscription) {
+            this(balanceCents, currency, plan, subscription, null);
+        }
+        /** 包晴天积分通道：{billingLine, bqtMember}，恒非空。 */
+        public BalanceResult {
+            Map<String, Object> fields = new java.util.LinkedHashMap<>();
+            com.checkba.service.account.BqtBilling.copyBillingFields(billing, fields);
+            billing = java.util.Collections.unmodifiableMap(fields);
         }
     }
 
@@ -49,6 +66,10 @@ public interface MobileBillingClient {
      * {@code "redirect"}（redirectUrl 有值）、{@code "virtual"}
      * （小程序虚拟支付，signData/paySig/signature 三者都有值）或 {@code "native"}
      * （iOS 内购，appAccountToken 有值）；不适用的字段为 null。
+     *
+     * <p>{@code appPay} 是 present=app（安卓微信支付 APP 支付，{@code channel="wxpay-app"}）时官网给的
+     * 七个 OpenSDK PayReq 字段（appId/partnerId/prepayId/packageValue/nonceStr/timeStamp/sign），
+     * 云后端原样透传；其它通道为 null。
      *
      * <p>三个 virtual 字段是 {@code wx.requestVirtualPayment} 的入参，由官网算出来后原样透传：
      * 云后端<b>不持有</b>虚拟支付 AppKey，也不碰小程序 session_key，全程只当管道
@@ -62,7 +83,16 @@ public interface MobileBillingClient {
     record RechargeOrder(String present, String outTradeNo, long amountCents,
                          String codeUrl, String qrCode, String redirectUrl,
                          String signData, String paySig, String signature,
-                         String appAccountToken) {}
+                         String appAccountToken, Map<String, String> appPay) {
+        /** 非 APP 支付通道：appPay 为 null。 */
+        public RechargeOrder(String present, String outTradeNo, long amountCents,
+                             String codeUrl, String qrCode, String redirectUrl,
+                             String signData, String paySig, String signature,
+                             String appAccountToken) {
+            this(present, outTradeNo, amountCents, codeUrl, qrCode, redirectUrl,
+                    signData, paySig, signature, appAccountToken, null);
+        }
+    }
 
     /** 充值单状态：status ∈ {pending, paid, closed, expired}。 */
     record RechargeStatus(String status, boolean paid, long amountCents) {}
@@ -163,6 +193,15 @@ public interface MobileBillingClient {
      *                                NOT_FOUND = 官网 404 查无此单；其余同其它动作
      */
     RechargeStatus confirmAppstore(String accountId, String outTradeNo, String signedTransaction);
+
+    /**
+     * 确认一笔 Google Play 内购交易（action=confirm-googleplay，dev-board#665）。
+     *
+     * <p>云后端不持有 Google Play 服务账号凭据，只把 {@code productId} 与 {@code purchaseToken}
+     * 透传官网；官网调 Play Developer API 核验、按目录面值入账并 consume。
+     * 客户端在收到 {@code paid=true} 之前不 consume 购买，可由应用重放或 RTDN 兜底。
+     */
+    RechargeStatus confirmGooglePlay(String accountId, String outTradeNo, String productId, String purchaseToken);
 
     record SubscriptionCapability(boolean available, String productId) {}
 

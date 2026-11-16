@@ -115,10 +115,10 @@
       <!-- Center Logo -->
       <view class="header-center">
         <view class="mode-switch-capsule" role="tablist" :aria-label="$t('workbench.chatMode.modeSwitchLabel')">
-          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" role="tab" :aria-selected="viewMode === 'chat' ? 'true' : 'false'" @click="switchViewMode('chat')">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'chat' }" :title="$t('workbench.chatMode.modeChatTitle')" role="tab" :aria-selected="viewMode === 'chat' ? 'true' : 'false'" @click="switchViewMode('chat')">
             <text class="mode-switch-label">{{ $t('workbench.chatMode.modeChat') }}</text>
           </view>
-          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" role="tab" :aria-selected="viewMode === 'ide' ? 'true' : 'false'" @click="switchViewMode('ide')">
+          <view class="mode-switch-item" :class="{ active: viewMode === 'ide' }" :title="$t('workbench.chatMode.modeIdeTitle')" role="tab" :aria-selected="viewMode === 'ide' ? 'true' : 'false'" @click="switchViewMode('ide')">
             <text class="mode-switch-label">{{ $t('workbench.chatMode.modeIde') }}</text>
           </view>
         </view>
@@ -179,18 +179,6 @@
             </view>
           </view>
           <view v-if="themeMenuOpen" class="theme-menu-mask" @tap="themeMenuOpen = false"></view>
-          <!-- rail 整理模式开关（dev-board#215/#221）：从 rail 挪到顶栏（原「已连接账户」chip 位），
-               开着时 rail 可拖项抖动+虚线框、点击不打开面板，再按一次退出 -->
-          <view
-            class="top-bar-btn"
-            :class="{ active: railEditMode }"
-            :title="railEditMode ? $t('workbench.railEditDone') : $t('workbench.railEditEnter')"
-            @tap="toggleRailEditMode"
-          >
-            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path v-for="(d, gi) in GLYPHS.sort" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </view>
           <!-- 1. Left Sidebar -->
           <view
             class="top-bar-btn"
@@ -330,7 +318,9 @@
     <!-- 主体布局 -->
     <view class="main-layout" :class="{ 'is-compact': isCompactLayout }">
       <!-- Cursor 风格：最左常驻栏（Activity Bar） -->
-      <view class="left-rail">
+      <view class="left-rail" @contextmenu="openRailMenu($event)">
+        <!-- 整理图标入口：右键 rail 空白处或任一图标 →「整理图标」；整理中这里出「完成」退出 -->
+        <text v-if="railEditMode" class="rail-edit-done" role="button" tabindex="0" @tap="toggleRailEditMode" @keydown.enter.prevent="toggleRailEditMode">{{ $t('workbench.railEditDoneBtn') }}</text>
         <view class="rail-tools awd-hairline-scroll" tabindex="0">
         <!-- rail 的顺序就是 config/leftSidebarPlugins.js 里数组的顺序（项目概览 →
              资源管理器 → 插件中心 → 语音 → 脱敏 → 门控项）。
@@ -347,7 +337,7 @@
           @dragstart="onRailDragStart(p.key, $event)"
           @dragover="onRailDragOver(p.key, $event)"
           @dragend="onRailDragEnd"
-          @contextmenu="openDockMenu(p.key, $event)"
+          @contextmenu="openDockMenu(p.key, $event, true)"
         >
           <view v-if="p.avatarUrl" class="rail-icon-wrapper rail-avatar-wrapper">
             <image :src="p.avatarUrl" class="rail-plugin-avatar" mode="aspectFill" />
@@ -381,6 +371,7 @@
             </svg>
           </view>
           <text v-else class="rail-icon">{{ p.icon }}</text>
+          <text class="rail-label">{{ railLabelOf(p) }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
@@ -393,7 +384,7 @@
           >{{ railScheduleCount > 99 ? '99+' : railScheduleCount }}</text>
         </view>
 
-        <!-- 整理模式开关已挪到顶栏 header-tools（dev-board#221，原在 rail 上太显眼） -->
+        <!-- 整理模式入口：rail 右键菜单「整理图标」（原顶栏按钮已撤，见 openRailMenu） -->
 
         </view>
 
@@ -413,6 +404,7 @@
               <path v-for="(d, gi) in GLYPHS.inbox" :key="gi" :d="d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text class="rail-label">{{ $t('workbench.railLabelStaging') }}</text>
         </view>
 
         <!-- 插件中心与系统设置都不在 rail 底部了（2026-08-19）：前者升成 rail 数组
@@ -440,6 +432,7 @@
               <path v-for="(path, idx) in VERSION_PLUGIN.svgPaths" :key="idx" :d="path.d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text class="rail-label">{{ $t('workbench.railLabelVersion') }}</text>
           <text v-if="versionEntry.badge" class="rail-badge" :class="{ 'is-overdue': versionEntry.attention }" aria-hidden="true">{{ versionEntry.badge }}</text>
         </view>
 
@@ -514,6 +507,7 @@
               <path v-for="(d, gi) in GLYPHS.feedback" :key="gi" :d="d" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-icon-path" />
             </svg>
           </view>
+          <text class="rail-label">{{ $t('workbench.railLabelFeedback') }}</text>
         </view>
         </view>
       </view>
@@ -740,6 +734,8 @@
             @ocr-files="onExplorerOcr"
             @create-recording="onCreateRecording"
           />
+          <!-- 已自动合入的相邻段落，请过目（版本面板上方；点开一次才消失，与版本入口小角标同源） -->
+          <MergeNeighborNotices v-if="leftPaneKey === 'version' && hasNamedProject" :project-id="projectId" />
           <view v-if="leftPaneKey === 'dd-client'" class="dd-client-entry">
             <component :is="'button'" type="button" class="dd-client-nav" :class="{ active: workspaceTabState('dd-client') === 'active' }" :aria-current="workspaceTabState('dd-client') === 'active' ? 'page' : undefined" @click.stop="openDdClientTab">
               <text class="dd-client-nav-label">{{ $t('ddWorkflow.client.invitedProjects') }}</text>
@@ -958,7 +954,7 @@
                         <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <text class="tab-name">{{ getTabDisplayName(file) }}</text>
-                      <text class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
+                      <text :title="$t('common.close')" class="tab-close" @tap.stop="closeFile(file.id, 'left')">×</text>
                     </view>
                   </view>
                 </scroll-view>
@@ -1001,7 +997,7 @@
                         <path v-for="(d, gi) in getFileIconPaths(file.fileType, file.tabType, file.pluginId || (file.marketSpec && file.marketSpec.id))" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                       </svg>
                       <text class="tab-name">{{ getTabDisplayName(file) }}</text>
-                      <text class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
+                      <text :title="$t('common.close')" class="tab-close" @tap.stop="closeFile(file.id, 'right')">×</text>
                     </view>
                   </view>
                 </scroll-view>
@@ -1270,7 +1266,7 @@
                       :key="activeFileLeft.id"
                       :version-spec="activeFileLeft.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileLeft.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileLeft.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" :open-projects="openProjectsPane" />
                     <DdClientWorkspace v-else-if="activeFileLeft.tabType === 'dd-client'" :navigation-target="activeFileLeft.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileLeft)"
@@ -1554,7 +1550,7 @@
                       :key="activeFileRight.id"
                       :version-spec="activeFileRight.versionSpec"
                     />
-                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" />
+                    <MessageCenterPane v-else-if="activeFileRight.tabType === 'message-center'" :current-project-id="projectId" :active-file-ids="messageActiveFileIds" :initial-conversation-id="activeFileRight.messageFocus || ''" :open-target="openMessageTarget" :invite-project="inviteMessageProject" :open-projects="openProjectsPane" />
                     <DdClientWorkspace v-else-if="activeFileRight.tabType === 'dd-client'" :navigation-target="activeFileRight.ddClientTarget || null" />
                     <DdRequestEditor
                       v-else-if="isDdRequest(activeFileRight)"
@@ -1725,7 +1721,7 @@
                       :placeholder="toolsSearchPlaceholder"
                       confirm-type="search"
                     />
-                    <view v-if="toolsSearchKeyword" class="tools-search-clear" @tap="toolsSearchKeyword = ''">×</view>
+                    <view :title="$t('common.clear')" v-if="toolsSearchKeyword" class="tools-search-clear" @tap="toolsSearchKeyword = ''">×</view>
                   </view>
                 </view>
 
@@ -1918,7 +1914,7 @@
                         :maxlength="60"
                         :placeholder="$t('workbench.historyFilterPlaceholder')"
                     />
-                    <text v-if="historyFilter" class="history-filter-clear" @tap.stop="historyFilter = ''">×</text>
+                    <text :title="$t('common.clear')" v-if="historyFilter" class="history-filter-clear" @tap.stop="historyFilter = ''">×</text>
                 </view>
                 <scroll-view scroll-y class="drawer-list" style="max-height: 350px;">
                     <view v-if="loadingHistory" class="menu-item" style="color:var(--awd-text-3);">{{ $t('workbench.loadingText') }}</view>
@@ -1951,13 +1947,9 @@
                             </view>
                             <text class="item-preview" style="display:block; font-size:11px; color:var(--awd-text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ chat.lastMessage }}</text>
                         </view>
-                        <!-- 悬停才出的行内操作（dev-board#796）。@tap.stop 是硬要求：
-                             整行点击就是打开会话，不拦住的话点「删除」会先把它打开一遍。 -->
-                        <view v-if="renamingConversationId !== chat.conversationId" class="conv-actions" @tap.stop>
-                            <text class="conv-action" @tap.stop="beginRenameConversation(chat)">{{ $t('workbench.conversationRename') }}</text>
-                            <text class="conv-action" @tap.stop="togglePinConversation(chat)">{{ chat.pinned ? $t('workbench.conversationUnpin') : $t('workbench.conversationPin') }}</text>
-                            <text class="conv-action danger" @tap.stop="confirmDeleteConversation(chat)">{{ $t('workbench.conversationDelete') }}</text>
-                        </view>
+                        <!-- 行内操作收进常驻的「⋯」（平时淡显、行悬停提亮），点开才是重命名 / 置顶 / 删除（dev-board#796）。
+                             @tap.stop 是硬要求：整行点击就是打开会话，不拦住的话点「⋯」会先把它打开一遍。 -->
+                        <text v-if="renamingConversationId !== chat.conversationId" class="conv-more" role="button" :title="$t('workbench.conversationMore')" :aria-label="$t('workbench.conversationMore')" @tap.stop="openConvMenu(chat, $event)">⋯</text>
                         <view style="display:flex; flex-direction:column; align-items:flex-end; margin-left:8px; flex-shrink:0;">
                             <text class="item-time" style="font-size:var(--awd-panel-fs-sec); color:var(--awd-text-3);">{{ formatTime(chat.updatedAt) }}</text>
                             <text v-if="convStatusLabel(chat)" class="conv-status-label" :class="convDotClass(chat)">{{ convStatusLabel(chat) }}</text>
@@ -2040,6 +2032,7 @@
         v-if="quickLookFile"
         :file="quickLookFile"
         :project-id="projectId"
+        :render-slides="libreOfficePreferred ? renderSlidesForPreview : null"
         @close="closeQuickLook"
         @navigate="navigateQuickLook"
         @open="handleFileTreeOpen(quickLookFile)"
@@ -2048,7 +2041,7 @@
       <!-- 图片预览（剪贴板等）：桌面端 BrowserView 盖 DOM，须走 desktopOverlayActive 守卫 -->
       <view v-if="imagePreviewUrl" class="image-preview-mask" @tap="closeImagePreview">
         <image class="image-preview-img" :src="imagePreviewUrl" mode="aspectFit"></image>
-        <view class="image-preview-close" @tap.stop="closeImagePreview">✕</view>
+        <view :title="$t('common.close')" class="image-preview-close" @tap.stop="closeImagePreview">✕</view>
       </view>
 
       <!-- Screenshot Save Dialog -->
@@ -2269,6 +2262,18 @@
         @close="taskDialog.visible = false"
       />
 
+      <!-- 平台 AI 同意已失效（告知改版 / 换账户 / 切站点）：启动时原地征求一次，别等用户提问撞上报错 -->
+      <view v-if="showConsentPrompt" class="awd-dialog-mask" @tap="showConsentPrompt = false">
+        <view class="awd-dialog" @tap.stop>
+          <view class="awd-dialog-body">
+            <CrossBorderConsentCard bare :site="consentPromptSite" @accepted="showConsentPrompt = false" />
+          </view>
+          <view class="awd-dialog-footer">
+            <button class="awd-btn awd-btn-secondary" @tap="showConsentPrompt = false">{{ $t('onboarding.unlock.consentLater') }}</button>
+          </view>
+        </view>
+      </view>
+
       <!-- 试用版 / 宽限预警说明弹窗（同一个壳，文案与主按钮随 graceKind 切换） -->
       <view v-if="showTrialInfo" class="awd-dialog-mask" @tap="showTrialInfo = false">
         <view class="awd-dialog" @tap.stop>
@@ -2295,7 +2300,7 @@
       :style="{ left: dockMenu.x + 'px', top: dockMenu.y + 'px' }"
       @tap.stop
     >
-      <view class="dock-menu-title">{{ dockMenuTitle }}</view>
+      <view v-if="dockMenuTitle" class="dock-menu-title">{{ dockMenuTitle }}</view>
       <view
         v-for="opt in dockMenuOptions"
         :key="opt.dock"
@@ -2306,6 +2311,17 @@
         <text>{{ opt.label }}</text>
         <text v-if="opt.disabled" class="dock-menu-cur">{{ $t('workbench.dockCurrent') }}</text>
       </view>
+      <view v-if="dockMenu.rail" class="dock-menu-item" :class="{ 'dock-menu-sep': dockMenuOptions.length }" @tap="startRailEditFromMenu">
+        <text>{{ $t('workbench.railEditMenuItem') }}</text>
+      </view>
+    </view>
+
+    <!-- 历史对话行的「⋯」菜单：重命名 / 置顶 / 删除（复用右键菜单的样式） -->
+    <view v-if="convMenu.visible" class="dock-menu-mask" @tap="closeConvMenu" @contextmenu.prevent="closeConvMenu"></view>
+    <view v-if="convMenu.visible" class="dock-menu" :style="{ left: convMenu.x + 'px', top: convMenu.y + 'px' }" @tap.stop>
+      <view class="dock-menu-item" @tap="runConvMenu('rename')"><text>{{ $t('workbench.conversationRename') }}</text></view>
+      <view class="dock-menu-item" @tap="runConvMenu('pin')"><text>{{ convMenu.chat && convMenu.chat.pinned ? $t('workbench.conversationUnpin') : $t('workbench.conversationPin') }}</text></view>
+      <view class="dock-menu-item conv-menu-danger" @tap="runConvMenu('delete')"><text>{{ $t('workbench.conversationDelete') }}</text></view>
     </view>
 
     <!-- 面板停靠：拖拽投放高亮层。只在拖拽期间存在，只铺三个 dock 自身的区域
@@ -2397,6 +2413,8 @@
 </template>
 
 <script>
+import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
+import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
 import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
 import { defineAsyncComponent } from 'vue'
 import { registerOpenWorkbench, unregisterOpenWorkbench } from '@/utils/ideOpen.js'
@@ -2448,6 +2466,7 @@ import InsightHoverCard from '@/components/InsightHoverCard.vue'
 import LegalReferencePane from '@/components/legal/LegalReferencePane.vue'
 import InsightEntityDetailPane from '@/components/InsightEntityDetailPane.vue'
 import VersionPanel from '@/components/version/VersionPanel.vue'
+import MergeNeighborNotices from '@/components/version/MergeNeighborNotices.vue'
 import CommitHistoryTab from '@/components/version/CommitHistoryTab.vue'
 // 异步组件：历史上是为了不把 FullCalendar 拖进工作台主 chunk；dev-board#899 重做后面板
 // 已不依赖 FullCalendar，懒加载保留（只有点开「日程」面板的会话才付这份代码的成本）。
@@ -2509,6 +2528,7 @@ import {
   deleteProject,
   bindShareholderMeetingConversation, // 股东大会核查：会话绑定
   getAccountStatus,
+  getCrossBorderConsent,
   getLicenseStatus, // 试用版/正式版标识（含 accountConnected 组合口径）
   getAccountBalance, // Credits 余额 chip（dev-board#187，后端带 TTL 缓存的轻端点）
   getCloudAccountGeneration,
@@ -2528,7 +2548,7 @@ import {
 } from '@/services/api.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
-import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { requireAccount, requireSubscription, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
@@ -2673,6 +2693,8 @@ export default {
     }
   },
   components: {
+    MergeNeighborNotices,
+    CrossBorderConsentCard,
     ScratchTransferDialog,
     BackendHealthStatus,
     MobileReceiveStatus,
@@ -2732,6 +2754,8 @@ export default {
   },
   data() {
     return {
+      // 已自动合入的相邻段落还没过目的条数（mergeNeighborNotices.js），版本入口的小角标用
+      mergeNeighborUnseen: 0,
       pdfRecovery: null,
       restartPendingTasks: [],
       restartRestoring: false,
@@ -2780,6 +2804,8 @@ export default {
       // 授权状态（试用版标识，商业化解锁门）
       licenseMode: '',
       showTrialInfo: false,
+      showConsentPrompt: false,
+      consentPromptSite: '',
       // 账户连接状态（商业化 PR-B）：已连接时不再显示任何 chip（「已连接账户」标注已删，dev-board#221），
       // 仍用于压掉「试用版」chip
       accountConnected: false,
@@ -2788,7 +2814,7 @@ export default {
       graceDays: 0,
       // Credits 余额 chip（dev-board#187）。loaded=false 或 connected=false 时不渲染，
       // 绝不显示 0 冒充余额；available=false（官网不可达）时余额位显示「—」。
-      wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null },
+      wallet: { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 },
 
       // 布局状态
       viewMode: 'ide',
@@ -2884,6 +2910,7 @@ export default {
 
       // AI New Features
       showHistoryDrawer: false,
+      convMenu: { visible: false, chat: null, x: 0, y: 0 },
       loadingHistory: false,
       chatHistoryList: [],
       // 历史下拉的纯前端过滤（dev-board#796）：按标题/预览子串匹配，不发请求
@@ -3175,12 +3202,13 @@ export default {
     railScheduleCount() {
       return this.railScheduleSummary.overdue + this.railScheduleSummary.today
     },
-    // 余额不足：低于 20 元（2000 分）视为要提醒。官网不可达（余额未知）不算——
-    // 那是连接问题不是钱的问题，用「—」表达就够了，不该冒充告急。
+    // 余额不足：低于 1 Credit（100 分）且当前无有效个人 Pro 订阅额度时才提醒。
+    // 官网不可达（余额未知）不算；新户 $9.90 / Pro 订阅期内置余额也不应误报红点。
     walletLow() {
       if (this.wallet.available === false) return false
+      if (Number(this.wallet.subscriptionAvailableCents) > 0) return false
       const cents = Number(this.wallet.balanceCents)
-      return Number.isFinite(cents) && cents < 2000
+      return Number.isFinite(cents) && cents < 100
     },
     meetingRecorderEnabled() { return this.dynamicPlugins.some(plugin => plugin.pluginId === 'voice') },
     /**
@@ -3240,7 +3268,8 @@ export default {
       // 动态插件与项目面板一律不上 rail——它们都带着 projectId 干活。
       if (user?.role === 'CLIENT') return getPluginsForUser('CLIENT')
       if (!this.hasProject || this.isLooseWorkspace) {
-        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
+        // 客户协作按钮无项目态不上 rail（面板本身仍可由消息中心等入口打开，见 NO_PROJECT_PANE_KEYS）
+        const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => p.key !== 'dd-client' && isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
         return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
       }
       const base = (user && user.role === 'CLIENT')
@@ -3310,13 +3339,14 @@ export default {
     versionWorkStatusLabel() {
       const s = this.versionWorkStatus
       if (s.onDraft && s.onDraft.name) return this.$t('workbench.workingOnDraft', { name: s.onDraft.name })
-      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }) : this.$t('version.changesAutoRecorded')
+      if (s.working) return s.changedCount ? this.$t('version.pendingFileCount', { count: s.changedCount }, s.changedCount) : this.$t('version.changesAutoRecorded')
       return ''
     },
     versionEntry() {
-      return versionEntryState((key, params) => this.$t(key, params), {
+      return versionEntryState((key, params, plural) => (plural === undefined ? this.$t(key, params) : this.$t(key, params, plural)), {
         status: this.versionWorkStatus, cloud: this.collabCloud,
         conflict: this.adoptConflictPending, unavailable: this.versionStatusError,
+        review: this.mergeNeighborUnseen,
       })
     },
     isClientView() {
@@ -3463,6 +3493,7 @@ export default {
           return this.loadHistoryChat(conversation)
         },
         openAccount: () => this.openSettingsTab({ nav: 'account' }),
+        subscribePro: () => requireSubscription(),
         importVoiceText: signal => new Promise(resolve => {
           this.handleFilePickerCancel()
           const finish = (text, fileId) => {
@@ -3824,6 +3855,7 @@ export default {
     }
   },
   beforeUnmount() {
+    if (this._onMergeNeighbors) uni.$off(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
     clearTimeout(this._selectionRefreshTimer)
     this.resetPdfPreviewPool()
     this._pdfPreviewRefs = {}
@@ -3915,6 +3947,10 @@ export default {
     if (typeof window !== 'undefined' && this._ideKeymapHandler) {
       window.removeEventListener('keydown', this._ideKeymapHandler, true)
       this._ideKeymapHandler = null
+    }
+    if (typeof window !== 'undefined' && this._historyEscHandler) {
+      window.removeEventListener('keydown', this._historyEscHandler, true)
+      this._historyEscHandler = null
     }
     clearTimeout(this._libreSpareTimer)
     this.teardownResponsiveListener()
@@ -4267,6 +4303,9 @@ export default {
     }
   },
   mounted() {
+    this._onMergeNeighbors = () => this.refreshMergeNeighborUnseen()
+    uni.$on(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
+    this.refreshMergeNeighborUnseen()
     this._stopPluginUpdateChecks = startPluginUpdateChecks()
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
@@ -4654,7 +4693,16 @@ export default {
   watch: {
     // 证据标签默认组跟着项目类型走（教程反馈 77）。
     'project.projectType': { immediate: true, handler(type) { setEvidenceProjectType(type) } },
-    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool() },
+    // AI 面板「历史」下拉：开着时 Esc 收起（与点遮罩同效）
+    showHistoryDrawer(open) {
+      if (typeof window === 'undefined') return
+      if (this._historyEscHandler) window.removeEventListener('keydown', this._historyEscHandler, true)
+      this._historyEscHandler = null
+      if (!open) return
+      this._historyEscHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.showHistoryDrawer = false } }
+      window.addEventListener('keydown', this._historyEscHandler, true)
+    },
+    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
     pdfPermissionIdentity() { this.resetPdfPreviewPool() },
@@ -4701,7 +4749,11 @@ export default {
     // （幂等，见 tabDragSplit.rebindTabsWheel）。
     splitMode() {
       this.pushMenuState()
-      this.$nextTick(() => this.rebindTabsWheel())
+      // 窗格宽度减半 / 恢复：文档按新宽度重新适配缩放，免得只看得到半页。
+      this.$nextTick(() => {
+        this.rebindTabsWheel()
+        Object.values(this._libreRefs || {}).forEach(ed => ed?.fitPaneWidth?.())
+      })
       // 重开分屏会重建右侧引擎，活动文件 ID 没变也必须重新核算驻留预算。
       if (this.splitMode) this.onActiveOfficeFileChanged('right', this.activeFileRight)
       else {
@@ -4750,6 +4802,9 @@ export default {
     'rightFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
   },
   methods: {
+    refreshMergeNeighborUnseen() {
+      this.mergeNeighborUnseen = this.projectId ? unseenMergeNeighborNotices(this.projectId).length : 0
+    },
     // 批量命令（find_replace 逐命中路径 / apply_house_style）的「第 x/y 处」进度
     // （dev-board#108）。AI 过程卡没有工具内进度位，先用 toast 降级显示；一批一帧
     // （30 命中 / 500 元素），不会刷屏。total=0 表示命令不预知总数。
@@ -4789,6 +4844,21 @@ export default {
     },
     // 授权标识：桌面端查授权模式与账户连接状态
     // （已连接账户 → 不显示 chip；未连接且 mode=trial → 「试用版」chip；dev-board#221）
+    // 每次启动最多问一次；查不到就不问（对话里还有同意卡兜底）
+    async checkCrossBorderConsentOnce() {
+      if (this._consentChecked) return
+      this._consentChecked = true
+      try {
+        const res = await getCrossBorderConsent()
+        const data = (res && res.data) || res || {}
+        if (data.required) {
+          this.consentPromptSite = data.site || ''
+          this.showConsentPrompt = true
+        }
+      } catch (e) {
+        // 网络或旧后端（没有这个端点）：静默
+      }
+    },
     async loadLicenseMode() {
       if (!isDesktopHost()) return
       const requestId = this._accountStateRequest = (this._accountStateRequest || 0) + 1
@@ -4800,6 +4870,7 @@ export default {
         this.licenseMode = (status && status.mode) || ''
         // 只有账户状态决定是否已登录，不能用尚在宽限期的授权票据代替。
         this.accountConnected = !!account?.connected
+        if (this.accountConnected) this.checkCrossBorderConsentOnce()
         // 宽限预警：后端只在真的需要提醒时才下发这两个字段（存量试用倒计时 /
         // 账户离线复验剩 ≤7 天），不需要提醒时形状与过去一模一样。
         this.graceKind = (status && status.graceKind) || ''
@@ -4822,13 +4893,16 @@ export default {
             available: data.available !== false,
             balanceCents: data.balanceCents,
             membership: data.membership || null,
+            subscriptionAvailableCents: data.subscription && data.subscription.active
+              ? Number(data.subscription.availableCents || 0)
+              : 0,
           }
         } else {
-          this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
+          this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 }
         }
       } catch (e) {
         // 旧后端没有该端点 / 请求失败：chip 不渲染
-        this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null }
+        this.wallet = { loaded: false, connected: false, available: true, balanceCents: null, membership: null, subscriptionAvailableCents: 0 }
       }
     },
     /** 宽限弹窗的主按钮：联网复验那条去账户设置，其余去官网。 */
@@ -4915,6 +4989,8 @@ export default {
     onLibreReady(executor, pane, fileId) {
       librePoolMethods.onLibreReady.call(this, executor, pane, fileId)
       this.notifyRestartRecovery()
+      // 分屏中打开的文档落在半宽窗格里，同样按窗格宽度适配一次。
+      if (this.splitMode) this._libreRefs?.[pane + ':' + fileId]?.fitPaneWidth?.(0)
     },
     openFile(file, options = {}) {
       if (!options.restartRecovery) this.cancelRestartRecovery()
@@ -7946,7 +8022,7 @@ export default {
             if (ok) count++
         })
         if (multi && count > 0) {
-            uni.showToast({ title: this.$t('workbench.filesAdded', { count }), icon: 'none' })
+            uni.showToast({ title: this.$t('workbench.filesAdded', { count }, count), icon: 'none' })
         }
     },
     /** 已打开的标签（两侧窗格）按 id 查一条；id 统一按字符串比较 */
@@ -8475,6 +8551,28 @@ export default {
       }
     },
     // --- AI Header Actions ---
+    openConvMenu(chat, evt) {
+      const native = typeof window !== 'undefined' ? window.event : null
+      const rawX = (evt && Number(evt.clientX)) || (native && Number(native.clientX)) || 0
+      const rawY = (evt && Number(evt.clientY)) || (native && Number(native.clientY)) || 0
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 0
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 0
+      // 菜单 fixed 定位：贴右 / 下边缘时往里收，免得被顶出屏外
+      const x = vw ? Math.min(rawX, Math.max(0, vw - 168)) : rawX
+      const y = vh ? Math.min(rawY, Math.max(0, vh - 120)) : rawY
+      this.convMenu = { visible: true, chat, x, y }
+    },
+    closeConvMenu() {
+      if (this.convMenu.visible) this.convMenu = { visible: false, chat: null, x: 0, y: 0 }
+    },
+    runConvMenu(action) {
+      const chat = this.convMenu.chat
+      this.closeConvMenu()
+      if (!chat) return
+      if (action === 'rename') this.beginRenameConversation(chat)
+      else if (action === 'pin') this.togglePinConversation(chat)
+      else if (action === 'delete') this.confirmDeleteConversation(chat)
+    },
     toggleHistoryDrawer() {
         this.showHistoryDrawer = !this.showHistoryDrawer
         if (this.showHistoryDrawer) {

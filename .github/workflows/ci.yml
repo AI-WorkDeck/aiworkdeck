@@ -28,6 +28,9 @@ jobs:
         run: node scripts/check-palette.mjs
       - name: Check migrated design tokens and iframe contract
         run: node scripts/check-design-system.mjs
+      # 静默失效守卫：不存在的 --awd-* 令牌、插件令牌缺兜底、模板类名毫无样式（只拦新增，基线见 scripts/ui-hygiene-baseline.json）
+      - name: Check UI hygiene (unknown tokens, unstyled classes)
+        run: node scripts/check-ui-hygiene.mjs
       - name: Test design token guards and control behavior
         run: node --test frontend/tests/design-system/*.test.mjs frontend/tests/plugin-sdk/theme-channel.test.mjs
       # 两族编辑工具对拍（dev-board#806）：同一件事在工作台（doc_/sheet_/slide_）与
@@ -39,6 +42,30 @@ jobs:
       - name: Check multi-language tokenization and locale parity
         working-directory: frontend
         run: npm run check:locales
+
+  revert-guard:
+    name: Revert guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 200
+      - name: Fetch base branch history
+        run: git fetch --no-tags --depth=200 origin "$BASE_REF"
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+      # A PR must not silently undo recent master commits (stale-base squash, #1595).
+      # Intentional reverts: put "revert-guard: allow <sha>" in the PR description.
+      - name: Fail if the PR reverts recent base commits
+        run: scripts/ci/revert-guard.sh "origin/$BASE_REF" "$HEAD_SHA"
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+      - name: Test revert guard
+        run: node --test scripts/tests/revert-guard.test.mjs
 
   backend:
     # Keep the required check identity; verify also exercises the packaged contract.
@@ -64,6 +91,8 @@ jobs:
         run: ./official-plugins/tencent-meeting/build.sh
       - name: Build and test Baoqingtian marketplace plugin
         run: ./official-plugins/baoqingtian/build.sh
+      - name: Build and test bids and proposals plugin
+        run: ./official-plugins/pitch-materials/build.sh
       - name: Test
         working-directory: backend
         # backend/pom.xml configures the real TCP ForkNodeFactory. A JVM -D...factory
@@ -133,8 +162,14 @@ jobs:
       - name: Install document rendering dependencies
         run: |
           python -m pip install -r official-plugins/dpia-workbench/runtime/requirements.txt
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libreoffice-writer fonts-noto-cjk fonts-wqy-zenhei
+          # 2026-11-11 Azure runner 解析不了 Ubuntu 源达数小时，这一步全红。runner 的 apt 源走
+          # mirror+file:/etc/apt/apt-mirrors.txt，按行依次尝试：追加两个公共镜像作后备。
+          # 包仍由 Ubuntu 签名的 InRelease 校验，镜像无法替换内容。
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf '%s\n' https://mirrors.edge.kernel.org/ubuntu/ https://mirror.math.princeton.edu/pub/ubuntu/ | sudo tee -a /etc/apt/apt-mirrors.txt > /dev/null
+          fi
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends libreoffice-writer fonts-noto-cjk fonts-wqy-zenhei
       - name: Test original workflow and native report lifecycle
         env:
           DSH_DPIA_PYTHON: python
@@ -199,7 +234,7 @@ jobs:
         run: npm run test:account
       - name: Test unified account project catalog
         working-directory: frontend
-        run: node --test tests/project-catalog.test.mjs
+        run: node --test tests/project-catalog.test.mjs tests/firm-audit/*.test.mjs
       - name: Test project-home page
         working-directory: frontend
         run: npm run test:project-home
@@ -313,6 +348,46 @@ jobs:
       - name: Build H5
         working-directory: frontend
         run: npm run build:h5
+
+  pptx-service:
+    # 随包的 PPT 服务（上游 banana-slides 的 vendored 代码）单元测试；此前 CI 完全没跑过，
+    # image options 测试因此红了一阵才被发现。只跑 unit（不含集成），几十秒。
+    # 不做路径过滤：ci.yml 其它 job 都无路径过滤，且被过滤跳过的 job 若被设为 required 会一直 pending。
+    name: PPT service unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # CI-PYPI1：依赖下载老在镜像超时上挂（uv.lock 把每个包的地址钉在清华镜像上）。
+      # ① uv 缓存按两份锁文件做键，命中就不下载；② 主镜像装不上（超时/挂了）就换官方 PyPI，
+      #    按 requirements.lock（uv export 出的同一组精确版本）重建环境；测试一步只管跑测试，
+      #    下载失败不再被当成测试失败。
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11.12'
+          enable-cache: true
+          cache-dependency-glob: |
+            pptx-service/uv.lock
+            pptx-service/requirements.lock
+      - name: Install dependencies (locked mirror)
+        id: deps
+        continue-on-error: true
+        working-directory: pptx-service
+        env:
+          UV_HTTP_TIMEOUT: '60'
+        run: uv sync --frozen && uv pip install pytest
+      - name: Install dependencies (fallback index pypi.org)
+        if: steps.deps.outcome == 'failure'
+        working-directory: pptx-service
+        env:
+          UV_HTTP_TIMEOUT: '60'
+        run: |
+          echo "::warning::locked mirror install failed; reinstalling the same pinned versions from pypi.org"
+          rm -rf .venv
+          uv venv --python 3.11.12 .venv
+          uv pip install --python .venv/bin/python --index-url https://pypi.org/simple -r requirements.lock pytest
+      - name: Unit tests
+        working-directory: pptx-service
+        run: .venv/bin/python -m pytest -q backend/tests/unit
 
   desktop:
     name: Desktop (install deps)

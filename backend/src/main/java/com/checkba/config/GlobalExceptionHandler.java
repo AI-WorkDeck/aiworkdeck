@@ -41,6 +41,32 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 按用户限频（UserRateLimiter）：真 HTTP 429 + Retry-After，不走「统一 200」口径——
+     * 前端 request() 对非 200 直接拿 message 报错，fetch 调用方按 status 识别。
+     */
+    @ExceptionHandler(com.checkba.exception.RateLimitedException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimited(com.checkba.exception.RateLimitedException e) {
+        return rateLimitedResponse(e.getRetryAfterSeconds(), e.getMessage());
+    }
+
+    /** 同一份 429 响应，供自带 catch-all 的控制器（如上传）直接返回。 */
+    public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds) {
+        return rateLimitedResponse(retryAfterSeconds, com.checkba.exception.RateLimitedException.message(retryAfterSeconds));
+    }
+
+    public static ResponseEntity<Map<String, Object>> rateLimitedResponse(long retryAfterSeconds, String message) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 4290);
+        result.put("status", "error");
+        result.put("reason", "RATE_LIMITED");
+        result.put("message", message);
+        result.put("retryAfterSeconds", retryAfterSeconds);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(retryAfterSeconds))
+                .body(result);
+    }
+
+    /**
      * 功能未配置：返回可识别的 code=4001 + feature 字段，前端据此引导"去设置"
      * 而非显示通用报错。/ Feature not configured — return a recognizable
      * code=4001 with a feature id so the frontend can prompt "go to settings".
@@ -102,6 +128,7 @@ public class GlobalExceptionHandler {
             result.put("reason", com.checkba.service.account.AccountRequired.REASON_GATEWAY);
         }
         result.put("gatewayKind", e.getKind().name());
+        if (e.getReason() != null) result.put("reason", e.getReason());
         result.put("canUseOwnKey", e.suggestsByok());
         result.put("message", e.getMessage());
         return ResponseEntity.ok().body(result);
@@ -151,6 +178,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok().body(result);
     }
 
+    /** Project-chat refusal for an access-code client: the usual shape plus a machine reason (B4). */
+    @ExceptionHandler(com.checkba.service.im.ImAccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleImAccessDenied(com.checkba.service.im.ImAccessDeniedException e) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("reason", e.getReason());
+        result.put("message", e.getMessage());
+        return ResponseEntity.ok().body(result);
+    }
+
+    /** A client's chat upload over a configured limit: the usual shape plus reason and the limit in bytes (B4). */
+    @ExceptionHandler(com.checkba.service.im.ImLimitException.class)
+    public ResponseEntity<Map<String, Object>> handleImLimit(com.checkba.service.im.ImLimitException e) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("reason", e.getReason());
+        result.put("limitBytes", e.getLimitBytes());
+        result.put("message", e.getMessage());
+        return ResponseEntity.ok().body(result);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("GlobalExceptionHandler caught IllegalArgumentException: {}", e.getMessage());
@@ -164,6 +212,51 @@ public class GlobalExceptionHandler {
                 : e.getMessage() != null ? e.getMessage() : LangText.of("请求参数错误", "Invalid request parameters"));
         // 统一返回 HTTP 200，通过 code 字段表示失败
         return ResponseEntity.ok().body(result);
+    }
+
+    /**
+     * 没有这个路径：真 HTTP 404，不走「统一 200」口径，也不打 ERROR。
+     * 此前落到下面的兜底变成 200 + 「服务器内部错误」，而各端判「旧后端没有这个端点」
+     * 认的都是 HTTP 404（office-addin api.js、MobileRelayClientService、CloudSyncService）。
+     * 主端口上没有 /actuator/**，同样走这里；管理端口的 actuator 端点不受影响。
+     */
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.servlet.NoHandlerFoundException.class})
+    public ResponseEntity<Map<String, Object>> handleNotFound(Exception e) {
+        log.debug("No handler: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", LangText.of("接口不存在", "API endpoint not found"));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(result);
+    }
+
+    /** 路径存在但方法不对：真 HTTP 405 + Allow 头，理由同上。 */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotAllowed(
+            org.springframework.web.HttpRequestMethodNotSupportedException e) {
+        log.debug("Method not allowed: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", LangText.of("该接口不支持此请求方法", "HTTP method not allowed for this endpoint"));
+        var response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (e.getSupportedHttpMethods() != null && !e.getSupportedHttpMethods().isEmpty()) {
+            response.allow(e.getSupportedHttpMethods().toArray(org.springframework.http.HttpMethod[]::new));
+        }
+        return response.body(result);
+    }
+
+    /**
+     * 路径参数类型不对（如 GET /api/projects/list 落到 /{id} 而 id 是 Long）：HTTP 400，
+     * 是调用方的错不是服务器故障，不打 ERROR 堆栈。
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException e) {
+        log.debug("Argument type mismatch: {}", e.getMessage());
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 1);
+        result.put("message", LangText.of("请求参数格式不正确：" + e.getName(), "Invalid request parameter: " + e.getName()));
+        return ResponseEntity.badRequest().body(result);
     }
 
     @ExceptionHandler(Exception.class)

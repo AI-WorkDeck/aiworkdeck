@@ -15,8 +15,9 @@ function component(name, overrides = {}) {
   })
   const body = script.replace(/^import\s[\s\S]*?from\s+'[^']+'\s*;?\s*$/gm, '')
     .replace("import('docx-preview')", 'previewModule()')
+    .replace(/import\('@\/composables\/xlsxQuickPreview\.js'\)/g, 'xlsxPreviewModule()')
     .replace('export default', 'return')
-  return new Function(...names, 'previewModule', body)(...names.map(n => overrides[n] || (() => {})), overrides.previewModule)
+  return new Function(...names, 'previewModule', 'xlsxPreviewModule', body)(...names.map(n => overrides[n] || (() => {})), overrides.previewModule, overrides.xlsxPreviewModule)
 }
 
 function deferred() {
@@ -84,6 +85,25 @@ function previewVm({ endpointUp = false, module } = {}) {
   }
   return { vm, events, options }
 }
+
+test('cold engine boot shows cached engine renders for PPTX, and nothing (not a wrong picture) without a cache', async () => {
+  const cached = { total: 7, slides: [{ bytes: new Uint8Array([1]), width: 960, height: 540 }] }
+  for (const hit of [true, false]) {
+    const events = []
+    const options = component('LibreOfficeEditor', { documentCheckpointGeneration: () => 0,
+      createSlidePreviewCache: () => ({ load: async (key) => { events.push('load:' + key); return hit ? cached : null } }),
+      previewFingerprint: async () => 'sha-of-bytes',
+      previewModule: async (kind) => { events.push('import:' + (kind || 'docx')); return {} } })
+    const vm = { _endpointUp: false, ready: false, previewReady: false, previewFailed: false,
+      projectId: 1, file: { id: 7, fileType: 'pptx' }, $nextTick: async () => {}, $refs: { docxPreviewHost: { innerHTML: '' } }, appendLog() {},
+      renderCachedSlides: (_c, entry) => events.push('cards:' + entry.slides.length + '/' + entry.total),
+      tryDocxPreview: options.methods.tryDocxPreview }
+    await vm.tryDocxPreview(new ArrayBuffer(16))
+    assert.deepEqual(events, hit ? ['load:sha-of-bytes', 'cards:1/7'] : ['load:sha-of-bytes'])
+    assert.equal(vm.previewReady, hit)
+    assert.ok(!events.some(e => e.startsWith('import:')), 'no front-end pptx parsing')
+  }
+})
 
 test('a warm engine opens DOCX without importing or rendering a duplicate preview', async () => {
   const { vm, events } = previewVm({ endpointUp: true })
@@ -218,4 +238,30 @@ test('an actual edit in flight or recent user interaction still postpones export
   flight.resolve({ success: true }); await pending
   vm._lastCmdAt = 0; vm._lastInteractionAt = Date.now()
   await vm.autoSave(); clearTimeout(vm._saveTimer); assert.equal(saves, 0)
+})
+
+test('xlsx cold open: the first screen read from the file is shown; a sheet with pictures on screen keeps the progress card (O10)', async () => {
+  for (const screen of [{ sheets: ['台账'], active: 0, columns: [], rows: [], merges: [] }, null]) {
+    const events = []
+    const options = component('LibreOfficeEditor', { documentCheckpointGeneration: () => 0,
+      previewModule: async () => { events.push('import:docx-preview'); return {} },
+      xlsxPreviewModule: async () => ({
+        readXlsxFirstScreen: async () => { events.push('read'); return screen },
+        renderSheetPreview: () => events.push('render'),
+      }) })
+    const vm = { _endpointUp: false, ready: false, previewReady: false, previewFailed: false,
+      projectId: 1, file: { id: 8, fileType: 'xlsx' }, $nextTick: async () => {}, $refs: { docxPreviewHost: { innerHTML: '' } }, appendLog() {},
+      tryDocxPreview: options.methods.tryDocxPreview }
+    await vm.tryDocxPreview(new ArrayBuffer(16))
+    assert.deepEqual(events, screen ? ['read', 'render'] : ['read'])
+    assert.equal(vm.previewReady, !!screen)
+  }
+  // warm engine: no parsing at all
+  const events = []
+  const options = component('LibreOfficeEditor', { documentCheckpointGeneration: () => 0,
+    xlsxPreviewModule: async () => { events.push('import'); return {} } })
+  const vm = { _endpointUp: true, ready: false, previewReady: false, previewFailed: false, file: { id: 8, fileType: 'xlsx' },
+    tryDocxPreview: options.methods.tryDocxPreview }
+  await vm.tryDocxPreview(new ArrayBuffer(16))
+  assert.deepEqual(events, [])
 })

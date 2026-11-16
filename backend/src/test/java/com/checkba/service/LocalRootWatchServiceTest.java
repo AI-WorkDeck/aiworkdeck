@@ -3,6 +3,7 @@
 
 package com.checkba.service;
 
+import com.checkba.version.WorkSessionService;
 import io.methvin.watcher.hashing.FileHash;
 import io.methvin.watcher.hashing.FileHasher;
 import org.junit.jupiter.api.Test;
@@ -160,6 +161,21 @@ class LocalRootWatchServiceTest {
             Files.writeString(dir.resolve("起诉状.docx"), "real change");
             verify(projectService, timeout(LocalRootWatchService.DEBOUNCE_MILLIS + 2000).atLeastOnce())
                     .reconcileProject(1L);
+        } finally {
+            svc.shutdown();
+        }
+    }
+
+    @Test
+    void fileEventJoinsExitScopeBeforeDebouncedReconcile(@TempDir Path dir) throws Exception {
+        var sessions = mock(WorkSessionService.class);
+        LocalRootWatchService svc = new LocalRootWatchService(mock(com.checkba.repository.ProjectRepository.class),
+                mock(LocalProjectService.class), mock(LocalProjectFileChangeService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "workSessionService", sessions);
+        try {
+            assertTrue(svc.ensureWatch(7L, dir.toString()));
+            Files.writeString(dir.resolve("note.txt"), "changed");
+            verify(sessions, timeout(2000)).markSessionChanged(7L);
         } finally {
             svc.shutdown();
         }

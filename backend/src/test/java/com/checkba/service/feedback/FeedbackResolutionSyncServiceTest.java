@@ -8,8 +8,10 @@ import com.checkba.repository.UserFeedbackRepository;
 import com.checkba.service.telemetry.InstallIdentityService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -83,6 +85,62 @@ class FeedbackResolutionSyncServiceTest {
         assertEquals("https://github.com/a/b/pull/1", row.getPrUrl());
         assertNotNull(row.getHandledAt());
         verify(repo).save(row);
+    }
+
+    @Test
+    void emailedAiReportStillSyncsResolutionAndPublishedResponse() {
+        UserFeedback row = localRow(9L, UserFeedback.STATUS_EMAILED);
+        row.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");
+        stubPending(row);
+
+        service((url, body) -> new FeedbackResolutionSyncService.Response(200, """
+                {"code":0,"data":{"items":[
+                  {"clientRef":"9","status":"RESOLVED","resolvedAt":"2026-11-09T12:00:00",
+                   "reporterResponse":"The answer was removed.","responsePublishedAt":"2026-11-09T12:00:00"}
+                ]}}""")).sync();
+
+        assertEquals(UserFeedback.STATUS_RESOLVED, row.getStatus());
+        assertEquals("The answer was removed.", row.getReporterResponse());
+        assertEquals(LocalDateTime.of(2026, 11, 9, 12, 0), row.getResponsePublishedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 9, 12, 0), row.getResolvedAt());
+        verify(repo).save(row);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> statuses = ArgumentCaptor.forClass(List.class);
+        verify(repo).findByUploadedTrueAndSourceAndStatusInOrderByIdAsc(
+                eq(UserFeedback.SOURCE_LOCAL), statuses.capture(), any(Pageable.class));
+        assertTrue(statuses.getValue().contains(UserFeedback.STATUS_EMAILED));
+    }
+
+    @Test
+    void legacyReceiptWithoutReplyFieldsPreservesExistingPublishedResponse() {
+        UserFeedback row = localRow(9L, UserFeedback.STATUS_EMAILED);
+        row.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");
+        row.setReporterResponse("Keep this published reply");
+        row.setResponsePublishedAt(LocalDateTime.of(2026, 11, 9, 11, 30));
+        row.setResolvedAt(LocalDateTime.of(2026, 11, 9, 11, 20));
+        stubPending(row);
+
+        service((url, body) -> new FeedbackResolutionSyncService.Response(200,
+                "{\"code\":0,\"data\":{\"items\":[{\"clientRef\":\"9\",\"status\":\"EMAILED\"}]}}")).sync();
+
+        assertEquals("Keep this published reply", row.getReporterResponse());
+        assertEquals(LocalDateTime.of(2026, 11, 9, 11, 30), row.getResponsePublishedAt());
+        assertEquals(LocalDateTime.of(2026, 11, 9, 11, 20), row.getResolvedAt());
+        verify(repo).save(row);
+    }
+
+    @Test
+    void staleCloudReceiptCannotReopenResolvedAiReport() {
+        UserFeedback row = localRow(9L, UserFeedback.STATUS_RESOLVED);
+        row.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");
+        stubPending(row);
+
+        service((url, body) -> new FeedbackResolutionSyncService.Response(200, """
+                {"code":0,"data":{"items":[{"clientRef":"9","status":"FAILED"}]}}
+                """)).sync();
+
+        assertEquals(UserFeedback.STATUS_RESOLVED, row.getStatus());
+        verify(repo, never()).save(any());
     }
 
     @Test

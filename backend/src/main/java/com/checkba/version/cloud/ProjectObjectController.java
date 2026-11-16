@@ -114,12 +114,15 @@ public class ProjectObjectController {
                 return;
             }
             byte[] buffer = new byte[64 * 1024];
+            final long total = length;
             while (length > 0) {
                 int n = in.read(buffer, 0, (int)Math.min(buffer.length, length));
                 if (n < 0) throw new EOFException("Incomplete object");
                 response.getOutputStream().write(buffer, 0, n);
                 length -= n;
             }
+            if(downloads!=null && downloads.shadowActive())
+                downloads.shadowDelivered(access.authorize(request,projectId,false).userId(),"git-object:"+projectId+":"+sha256+":"+part,total);
         }
     }
 

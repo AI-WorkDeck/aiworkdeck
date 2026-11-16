@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Taille : {size}",
   "renderingDoc": "Rendu du document…",
   "renderingSlides": "Rendu de la présentation…",
+  "slidesNotShown": "{count} diapositives supplémentaires non affichées. Ouvrez le fichier pour toutes les voir.",
   "officePreviewUnsupported": "L'aperçu en ligne n'est pas disponible pour ce fichier",
   "fileTypeHintOpenLocal": "Type de fichier : {type}. Trouvez-le dans le Finder ou l'Explorateur de fichiers et ouvrez-le avec une application locale.",
   "unknown": "Inconnu",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Génération des sous-titres en cours. Ils apparaîtront dès qu'ils seront prêts.",
     "ready": "Les sous-titres sont prêts",
     "failed": "Échec de la génération des sous-titres. Cliquez sur le bouton des sous-titres pour réessayer.",
-    "notConfigured": "La transcription n'est pas configurée. Configurez-la dans Paramètres système - Services de la plateforme - Transcription des réunions pour générer des sous-titres.",
+    "notConfigured": "La transcription n'est pas configurée. Configurez-la dans Paramètres - Services de la plateforme - Transcription des réunions pour générer des sous-titres.",
     "noticePending": "Inscrit. Confirmez d'abord l'avis d'enregistrement dans Voix - Enregistrement de réunion, puis cliquez sur le bouton des sous-titres.",
     "submitFailed": "Impossible de démarrer la génération des sous-titres",
     "empty": "Aucune parole détectée"

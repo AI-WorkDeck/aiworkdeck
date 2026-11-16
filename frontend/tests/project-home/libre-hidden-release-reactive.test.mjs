@@ -65,3 +65,47 @@ test('fatal event removing a starting hidden engine ends acquisition without wai
   assert.equal(await pending, null)
   assert.equal(vm.libreSpares.length, 0)
 })
+
+// ---- 台账 B5：QuickLook 借的预热备胎换回空白文档后原样归还 ----
+function warmVm(executeCommand) {
+  const vm = makeVm()
+  let scheduled = 0
+  vm.scheduleLibreSpare = () => { scheduled++ }
+  vm._libreSpareSeq = 1
+  vm.libreSpares.push({ key: 1, file: null, executor: { executeCommand } })
+  return { vm, scheduled: () => scheduled }
+}
+const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+
+test('recycle: a borrowed warm spare is reset to a blank document and returned to the pool', async () => {
+  const calls = []
+  const { vm, scheduled } = warmVm((action, p) => { calls.push([action, p]); return { success: true, blank: !!p?.blank } })
+  const handle = await vm.acquireLibreHiddenInstance()
+  assert.equal(vm.libreSpares[0].borrowed, true)
+  vm.releaseLibreHiddenInstance(handle, { recycle: true })
+  assert.equal(vm.libreSpares[0].borrowed, true, 'still borrowed while the blank reset runs, so it cannot be adopted mid-reset')
+  await tick()
+  assert.deepEqual(calls, [['load_document', { blank: true, name: 'blank.docx' }]])
+  assert.deepEqual(vm.libreSpares.map(x => [x.key, !!x.borrowed]), [[1, false]], 'same warm engine is back in the pool')
+  assert.equal(scheduled(), 0, 'no replacement spare needed')
+  // 下一次借用拿到的仍是这台热引擎，而不是冷启动一台新的
+  const again = await vm.acquireLibreHiddenInstance()
+  assert.equal(again._spare.key, 1)
+})
+
+test('recycle: a failed or rejected blank reset falls back to discarding the spare and re-warming', async () => {
+  for (const exec of [() => ({ success: false }), () => ({ success: true }), () => Promise.reject(new Error('worker gone'))]) {
+    const { vm, scheduled } = warmVm(exec)
+    const handle = await vm.acquireLibreHiddenInstance()
+    vm.releaseLibreHiddenInstance(handle, { recycle: true })
+    await tick(); await tick()
+    assert.equal(vm.libreSpares.length, 0)
+    assert.equal(scheduled(), 1)
+  }
+})
+
+test('recycle does not apply to a cold hidden instance (nothing warm was borrowed)', async () => {
+  const vm = makeVm(), handle = await acquire(vm)
+  vm.releaseLibreHiddenInstance(handle, { recycle: true })
+  assert.equal(vm.libreSpares.length, 0)
+})

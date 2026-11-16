@@ -87,6 +87,11 @@ export default {
     "privacyName": "Politique de confidentialité",
     "crossBorderLabel": "Consentement distinct : transfert du contenu soumis à l'IA vers des fournisseurs de modèles à l'étranger pour traitement",
     "crossBorderView": "Consulter l'avis",
+    "consentCardTitle": "Avant d’utiliser l’IA de la plateforme, veuillez confirmer un consentement au traitement des données",
+    "consentAccept": "Accepter et continuer",
+    "consentHideNotice": "Masquer l’avis",
+    "consentFailed": "Enregistrement impossible. Veuillez réessayer.",
+    "consentLater": "Plus tard",
     "crossBorderNoticeTitle": "Avis de transfert transfrontalier",
     "crossBorderNoticeBody": "Le site chinois utilise Alibaba Cloud Bailian via les serveurs AI WorkDeck ; le site international utilise OpenRouter. Les textes et extraits de fichiers envoyés à l’IA servent à l’inférence et à la facturation. Selon le modèle choisi, leur traitement peut avoir lieu hors de Chine continentale. Le retrait du consentement dans les paramètres désactive le canal IA de la plateforme.",
     "agreementRequired": "Cochez la case pour accepter les Conditions d'utilisation et la Politique de confidentialité afin de continuer",
@@ -101,7 +106,8 @@ export default {
     "switch": "Changer",
     "cancel": "Annuler",
     "switchFailed": "Échec du changement de site. Veuillez réessayer plus tard.",
-    "rescueFailed": "Toujours pas débloqué après le changement de site. Vérifiez le code et réessayez."
+    "rescueFailed": "Toujours pas débloqué après le changement de site. Vérifiez le code et réessayez.",
+    "proIntroBanner": "Crédits offerts à l’inscription · Personal Pro ¥9.9/mois les 3 premiers mois",
   },
   "hint": {
     "learnMore": "En savoir plus",
@@ -112,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Confirmer",
     "purchaseSuccess": "Débloqué",
     "purchaseFailed": "Échec de l'achat",
-    "goRecharge": "Recharger"
+    "goRecharge": "Recharger",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Passer à Personal Pro",
   },
   "identity": {
     "title": "Choisir un espace de travail local",

@@ -1,0 +1,47 @@
+{
+  "$schema": "./manifest.schema.json",
+  "id": "hello-agent-tools",
+  "name": "Hello Agent 工具",
+  "version": "0.1.0",
+  "description": "声明式 Agent 工具的最小示例：manifest 里声明一个只读工具和一个写入工具，零后端代码，装上后应用内 Agent 即可调用。",
+  "author": "AI WorkDeck contributors",
+  "permissions": ["tasks"],
+  "minHostVersion": "0.81.0",
+  "frontendEntry": "web/index.html",
+  "tools": [
+    {
+      "name": "hello_agent_tools_list_tasks",
+      "description": "列出用户所有可见项目在日期范围内的日程事项（只读）。",
+      "access": "read",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string", "description": "Start date, YYYY-MM-DD" },
+          "to": { "type": "string", "description": "End date, YYYY-MM-DD" }
+        },
+        "additionalProperties": false
+      },
+      "handler": { "type": "service", "service": "calendar", "operation": "listForUser" },
+      "permissions": ["tasks"],
+      "keywords": ["hello agent"]
+    },
+    {
+      "name": "hello_agent_tools_add_task",
+      "description": "在指定项目新增一条日程事项（写入）。",
+      "access": "write",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "integer", "description": "Target project id; defaults to the current project" },
+          "title": { "type": "string", "description": "Item title" },
+          "dueDate": { "type": "string", "description": "Date, YYYY-MM-DD" }
+        },
+        "required": ["title", "dueDate"],
+        "additionalProperties": false
+      },
+      "handler": { "type": "service", "service": "calendar", "operation": "create" },
+      "permissions": ["tasks"]
+    }
+  ],
+  "backendJars": []
+}

@@ -10,7 +10,7 @@
           <!-- AppSource 1100.1.5 首次使用体验：首屏先讲清能做什么，再给登录与注册两个入口 -->
           <div class="welcome-title">{{ t('welcomeTitle') }}</div>
           <ul class="welcome-benefits">
-            <li>{{ t('welcomeBenefit1') }}</li>
+            <li>{{ t(detectHost() === 'word' ? 'welcomeBenefit1' : 'welcomeBenefit1Sheet') }}</li>
             <li>{{ t('welcomeBenefit2') }}</li>
             <li>{{ t('welcomeBenefit3') }}</li>
           </ul>
@@ -31,7 +31,9 @@
       <TransitionGroup :css="false" @enter="onMessageEnter" @leave="onMessageLeave">
       <div v-for="(msg, i) in messages" :key="i" class="message" :class="msg.role">
         <template v-if="msg.role === 'user'">
-          <div class="bubble user-bubble">{{ msg.text }}</div>
+          <div class="bubble user-bubble" :class="{ 'is-unread': msg.steer && msg.receipt !== 'applied' }">{{ msg.text }}</div>
+          <!-- 插话的送达回执（与工作台 receiptState 同义）：尚未读取 → 已送达；停下/失败如实说 -->
+          <div v-if="msg.steer && msg.receipt" class="steer-receipt" :class="msg.receipt">{{ steerReceiptText(msg.receipt) }}</div>
         </template>
         <template v-else>
           <details v-if="msg.thinking" class="thinking">
@@ -76,6 +78,7 @@
           <div v-else-if="msg.text || !isAskUserQuestion(msg.question)" class="bubble assistant-bubble">
             <div class="md" :class="{ 'md-streaming': msg.streaming }" v-html="renderMarkdown(msg.text)"></div>
             <div v-if="msg.streaming && toolPrep" class="prep-line">{{ t('preparingDocumentContent') }}</div>
+            <div v-else-if="msg.streaming && runningToolName(msg)" class="prep-line">{{ t('runningTool', { name: runningToolName(msg) }) }}</div>
           </div>
           <!-- 引用定位：回答里引用的原文片段可点击，在文档中选中滚动到位（仅 Word 宿主） -->
           <div v-if="citations(msg).length" class="cite-row">
@@ -327,7 +330,7 @@
         <textarea
           v-model="input"
           rows="2"
-          :placeholder="t('inputPlaceholder')"
+          :placeholder="inputPlaceholder"
           @keydown.enter.exact.prevent="send"
         ></textarea>
         <button
@@ -346,12 +349,16 @@
             <line x1="12" y1="18" x2="12" y2="21"/>
           </svg>
         </button>
-        <button v-if="streaming" class="btn stop" @click="stop">{{ t('stop') }}</button>
-        <button v-else class="btn send" :disabled="!canSend" @click="send">{{ t('send') }}</button>
+        <!-- 运行中也能发（插话）：有字时发送键与停止键并排，空着时只留停止键 -->
+        <button v-if="!streaming || input.trim()" class="btn send" :disabled="!canSend" @click="send">{{ t('send') }}</button>
+        <button v-if="streaming" class="btn stop" :disabled="stopping" @click="stop">{{ stopping ? t('stopping') : t('stop') }}</button>
       </div>
       <p v-if="reconnecting" class="banner conn">{{ t('reconnectingBanner') }}</p>
       <p v-else-if="notice" class="banner conn">{{ notice }}</p>
-      <p v-if="banner" class="banner">{{ banner }}</p>
+      <p v-if="banner" class="banner">
+        {{ banner }}
+        <button v-if="sendFailed" class="banner-retry" @click="send">{{ t('retrySend') }}</button>
+      </p>
       <!-- 「当前模型看不了图」：常驻在 composer 里，不挂在模型 pill 上——拉不到清单时
            pill 整个消失，而那时用户正走后端默认模型，恰恰最需要知道这件事。
            自成一条独立通道：notice/banner 都会被 send() 清掉（dev-board#264） -->
@@ -361,9 +368,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, TransitionGroup } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, TransitionGroup } from 'vue'
 import {
-  messages, input, streaming, toolPrep, passProgress, reconnecting, banner, notice, includeDocument, scrollSignal,
+  messages, input, streaming, stopping, toolPrep, passProgress, reconnecting, banner, sendFailed, notice, includeDocument, scrollSignal,
   activateSession, send as sendMessage, stop as stopRun, newConversation,
   answerQuestion, answerAskUser, modelCatalog, selectedModel, chooseModel, skillList, selectedSkillIds,
   toggleSkill, loadConversationList, switchConversation, attachedFiles, toggleAttachedFile,
@@ -372,6 +379,7 @@ import {
   activeModelVision, defaultModelInfo, visionNotice, isImageAttachment
 } from '../lib/chatSession.js'
 import { isAskUserQuestion } from '../lib/askUser.js'
+import { extractCitations } from '../lib/citations.js'
 import AskUserCard from './AskUserCard.vue'
 import { openTransfer } from '../lib/transfer.js'
 import { readDocumentMeta, detectHost, locateInDocument, commandDisplayName } from '../lib/hostBridge.js'
@@ -394,8 +402,30 @@ function pendingStatusText(msg) {
       ? t('passProgressWithEdits', { chunk: p.chunk, total: p.total, replaced: p.replaced })
       : t('passProgress', { chunk: p.chunk, total: p.total })
   }
+  if (stopping.value) return t('stopping')
   if (toolPrep.value) return t('preparingDocumentContent')
+  const running = runningToolName(msg)
+  if (running) return t('runningTool', { name: running })
   return msg && msg.tools && msg.tools.length ? t('workingOnDocument') : t('thinkingEllipsis')
+}
+
+/** 本条气泡里正在执行的那条文档命令的显示名（chip 只追加，倒着找第一个 running） */
+function runningToolName(msg) {
+  const tools = (msg && msg.tools) || []
+  for (let i = tools.length - 1; i >= 0; i--) {
+    if (tools[i].status === 'running') return commandDisplayName(tools[i].command)
+  }
+  return ''
+}
+
+const STEER_RECEIPT_KEYS = {
+  pending: 'steerReceiptPending',
+  applied: 'steerReceiptApplied',
+  held: 'steerReceiptHeld',
+  failed: 'steerReceiptFailed'
+}
+function steerReceiptText(receipt) {
+  return STEER_RECEIPT_KEYS[receipt] ? t(STEER_RECEIPT_KEYS[receipt]) : ''
 }
 
 /**
@@ -414,8 +444,15 @@ const listEl = ref(null)
 // 未登录欢迎卡的 Logo：与 App.vue 同款运行时相对路径（绕开 vite 静态改写）
 const logoSrc = 'icon-64.png'
 
+// 运行中也能发：发出去的是插话（chatSession.send 内分流），只有「正在停止」时不收
 const canSend = computed(() =>
-  props.configured && props.projectId && input.value.trim().length > 0 && !streaming.value)
+  props.configured && props.projectId && input.value.trim().length > 0 && !stopping.value)
+
+/** 运行中提示「现在打字会怎样」：下一步就改方向（插话），停止中则说明在停 */
+const inputPlaceholder = computed(() => {
+  if (!streaming.value) return t('inputPlaceholder')
+  return stopping.value ? t('stopping') : t('inputPlaceholderSteer')
+})
 
 /** 官网充值页（仅官方云后端有；私有部署/桌面本机为空串，入口隐藏） */
 const siteRecharge = computed(() => rechargeUrl(props.settings.serverUrl))
@@ -745,19 +782,15 @@ const quickPrompts = computed(() => {
 /** 回答里被「」或 “” 包住的原文引用（6-80 字符），可点击定位（仅 Word 宿主） */
 function citations(msg) {
   if (!msg.text || detectHost() !== 'word') return []
-  const out = []
-  const seen = new Set()
-  const re = /「([^「」\n]{6,80})」|“([^“”\n]{6,80})”/g
-  let m
-  while ((m = re.exec(msg.text)) && out.length < 4) {
-    const t = (m[1] || m[2] || '').trim()
-    if (t && !seen.has(t)) { seen.add(t); out.push(t) }
-  }
-  return out
+  return extractCitations(msg.text, missingQuotes)
 }
+
+/** 点过定位却在文档里找不到的引文：下次渲染起不再给 chip（reactive，点完立刻消失） */
+const missingQuotes = reactive(new Set())
 
 async function locateQuote(text) {
   const r = await locateInDocument(text)
+  if (!r.found) missingQuotes.add(text)
   notice.value = r.found ? '' : t('quoteNotFound')
 }
 
@@ -915,6 +948,19 @@ async function confirmDelete(c) {
   border: 1px solid rgba(46, 90, 80, 0.18);
   border-radius: 10px 10px 3px 10px;
 }
+
+/* 插话还没被读入：与工作台 .is-unread 同一视觉语言（降透明度 + 虚线边） */
+.user-bubble.is-unread {
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.steer-receipt {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--awd-text-secondary);
+}
+.steer-receipt.failed { color: var(--awd-danger); }
 
 .assistant-bubble {
   background: var(--awd-surface);
@@ -1541,6 +1587,7 @@ textarea:focus {
 
 .btn.send:hover:not(:disabled) { background: var(--awd-primary-hover); }
 .btn.send:disabled { opacity: 0.5; cursor: default; }
+.btn.stop:disabled { opacity: 0.6; cursor: default; }
 
 .btn.mic {
   padding: 5px 9px;
@@ -1580,6 +1627,16 @@ textarea:focus {
 }
 
 .banner.conn { color: var(--awd-text-secondary); }
+.banner-retry {
+  margin-left: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--awd-accent);
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  cursor: pointer;
+}
 
 .panel-builtin-note {
   padding: 8px 12px;
@@ -1621,6 +1678,11 @@ textarea:focus {
 .md pre code { background: none; padding: 0; }
 
 .md a { color: var(--awd-accent); }
+/* GFM 表格：窄窗格里横向滚动，不撑破气泡 */
+.md .md-table-wrap { overflow-x: auto; margin: 0 0 8px; max-width: 100%; }
+.md table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+.md th, .md td { border: 1px solid var(--awd-border, rgba(128, 128, 128, 0.35)); padding: 3px 8px; vertical-align: top; text-align: left; }
+.md th { font-weight: 600; background: rgba(128, 128, 128, 0.12); white-space: nowrap; }
 
 /* 流式光标挂在最后一个块的尾部，跟着 Markdown 排版走 */
 .md-streaming > :last-child::after {

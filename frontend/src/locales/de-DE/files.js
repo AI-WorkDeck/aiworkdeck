@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "Größe: {size}",
   "renderingDoc": "Dokument wird gerendert…",
   "renderingSlides": "Präsentation wird gerendert…",
+  "slidesNotShown": "{count} weitere Folien werden nicht angezeigt. Öffnen Sie die Datei, um alle zu sehen.",
   "officePreviewUnsupported": "Die Online-Vorschau ist für diese Datei nicht verfügbar",
   "fileTypeHintOpenLocal": "Dateityp: {type}. Suchen Sie die Datei im Finder oder Datei-Explorer und öffnen Sie sie mit einer lokalen App.",
   "unknown": "Unbekannt",
@@ -66,7 +67,7 @@ export default {
     "submitted": "Untertitel werden generiert. Sie erscheinen, sobald sie bereit sind.",
     "ready": "Untertitel sind bereit",
     "failed": "Generierung der Untertitel fehlgeschlagen. Klicken Sie auf die Untertitel-Schaltfläche, um es erneut zu versuchen.",
-    "notConfigured": "Transkription ist nicht eingerichtet. Konfigurieren Sie sie unter Systemeinstellungen - Plattformdienste - Meeting-Transkription, um Untertitel zu generieren.",
+    "notConfigured": "Transkription ist nicht eingerichtet. Konfigurieren Sie sie unter Einstellungen - Plattformdienste - Meeting-Transkription, um Untertitel zu generieren.",
     "noticePending": "Registriert. Bestätigen Sie zuerst den Aufnahmehinweis unter Stimme - Meeting-Aufnahme und klicken Sie dann auf die Untertitel-Schaltfläche.",
     "submitFailed": "Generierung der Untertitel konnte nicht gestartet werden",
     "empty": "Keine Sprache erkannt"

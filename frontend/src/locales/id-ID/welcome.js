@@ -32,7 +32,7 @@ export default {
   "signIn": "Masuk",
   "signInTitle": "Masuk (diperlukan untuk AI, item berbayar di hub, dan pustaka perkara tim)",
   "noProjectTitle": "Buka sebuah proyek untuk memulai",
-  "noProjectHint": "Buka proyek dari menu Proyek di sebelah kiri, atau buat proyek baru dari halaman Sambutan.",
+  "noProjectHint": "Klik “Semua Proyek” di kiri atas untuk memilih proyek, atau buat proyek baru di halaman selamat datang.",
   "startupDisabledHint": "Halaman sambutan tidak lagi terbuka saat memulai.",
   "openWelcome": "Buka halaman Sambutan",
   "aiNeedsProject": "Buka proyek terlebih dahulu untuk menggunakan obrolan AI"

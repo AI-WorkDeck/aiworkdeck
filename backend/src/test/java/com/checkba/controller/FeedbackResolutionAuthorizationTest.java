@@ -25,7 +25,7 @@ class FeedbackResolutionAuthorizationTest {
         verifyNoInteractions(repository);
     }
 
-    @Test void authorizedResolutionRecordsHumanNotesWithoutDeletingOriginalReport() {
+    @Test void authorizedResolutionRecordsTriageNotesWithoutDeletingOriginalReport() {
         var repository = mock(UserFeedbackRepository.class);
         var controller = new FeedbackIngestController(mock(FeedbackService.class), mock(FeedbackIngestGuard.class), repository);
         ReflectionTestUtils.setField(controller, "optimizerToken", "synthetic");
@@ -41,5 +41,22 @@ class FeedbackResolutionAuthorizationTest {
         verify(repository).findById(7L);
         verify(repository).save(report);
         verifyNoMoreInteractions(repository);
+    }
+
+    @Test void optimizerTokenCannotResolveAiReportOrRewriteResolvedReport() {
+        var repository = mock(UserFeedbackRepository.class);
+        var controller = new FeedbackIngestController(mock(FeedbackService.class), mock(FeedbackIngestGuard.class), repository);
+        ReflectionTestUtils.setField(controller, "optimizerToken", "synthetic");
+        var report = new UserFeedback();
+        report.setId(7L);
+        report.setStatus(UserFeedback.STATUS_EMAILED);
+        report.setContextJson("{\"client\":{\"type\":\"ai-content-report\"}}");
+        when(repository.findById(7L)).thenReturn(Optional.of(report));
+
+        assertEquals(403, controller.resolution("synthetic", 7L, Map.of("status", "RESOLVED")).getStatusCode().value());
+        report.setStatus(UserFeedback.STATUS_RESOLVED);
+        assertEquals(403, controller.resolution("synthetic", 7L, Map.of("status", "FAILED")).getStatusCode().value());
+        assertEquals(UserFeedback.STATUS_RESOLVED, report.getStatus());
+        verify(repository, never()).save(any());
     }
 }

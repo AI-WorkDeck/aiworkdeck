@@ -227,4 +227,81 @@ class ClientCapabilityServiceTest {
         assertFalse(capabilities.isToolVisible("office_ppt_add_image", "conv-office-excel"));
     }
 
+
+    // ---------------------------------------------------------------- 网页版（W1）
+
+    @Test
+    @DisplayName("clientCapability=web 解析为 WEB，大小写不敏感")
+    void webCapabilityIsParsed() {
+        capabilities.record("conv-web", "web");
+        capabilities.record("conv-web-upper", "WEB");
+        assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web"));
+        assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-upper"));
+    }
+
+    @Test
+    @DisplayName("网页会话一旦确认就钉死在 WEB：之后漏带 / 声明成别的 / 未知值都不回落到桌面工具面")
+    void webConversationNeverFallsBackToDesktop() {
+        capabilities.record("conv-web", "web");
+        for (String raw : new String[] {null, "", "lowa", "office", "bogus"}) {
+            capabilities.record("conv-web", raw);
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web"), String.valueOf(raw));
+            assertFalse(capabilities.isToolVisible("version_commit", "conv-web"), String.valueOf(raw));
+            assertFalse(capabilities.isToolVisible("run_python", "conv-web"), String.valueOf(raw));
+        }
+    }
+
+    @Test
+    @DisplayName("web- 连接实例或网页 Origin 见过的会话：未登记（进程重启）时按 WEB 兜底，后来声明 lowa 也不放宽")
+    void webMarkerCoversRestartAndMissingField() {
+        assertTrue(ClientCapabilityService.isWebClientInstance("web-1b2c"));
+        assertFalse(ClientCapabilityService.isWebClientInstance("pane-1b2c"));
+        assertFalse(ClientCapabilityService.isWebClientInstance(null));
+        capabilities.markWebClient("conv-restarted");
+        assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-restarted"));
+        assertFalse(capabilities.isToolVisible("version_status", "conv-restarted"));
+        capabilities.record("conv-restarted", "lowa");
+        assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-restarted"));
+        // 已登记成 LOWA 的会话被网页连接见到：同样收窄成 WEB
+        capabilities.markWebClient("conv-lowa");
+        assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-lowa"));
+    }
+
+    @Test
+    @DisplayName("网页来源按配置精确匹配，没有通配")
+    void webOriginsAreExactMatches() {
+        capabilities.setWebOrigins(" https://www.aiworkdeck.com , https://www.workdeck.ai ,");
+        assertTrue(capabilities.isWebOrigin("https://www.aiworkdeck.com"));
+        assertTrue(capabilities.isWebOrigin("https://www.workdeck.ai"));
+        assertFalse(capabilities.isWebOrigin("https://addin.aiworkdeck.com"));
+        assertFalse(capabilities.isWebOrigin("https://www.aiworkdeck.com.evil.example"));
+        assertFalse(capabilities.isWebOrigin("http://www.aiworkdeck.com"));
+        assertFalse(capabilities.isWebOrigin(null));
+        assertFalse(new ClientCapabilityService().isWebOrigin("https://www.aiworkdeck.com"), "未配置时没有网页来源");
+    }
+
+    @Test
+    @DisplayName("WEB 是白名单：Writer 编辑工具与纯后端工具可见，桌面专属与未归类名字（插件）一律不可见")
+    void webIsAnAllowlist() {
+        capabilities.record("conv-web", "web");
+        assertTrue(capabilities.isToolVisible("doc_replace_at_anchor", "conv-web"));
+        assertTrue(capabilities.isToolVisible("doc_replace_at_anchor", "conv-web", DOC_KIND_WRITER_FOR_TEST));
+        assertTrue(capabilities.isToolVisible("doc_list_project_files", "conv-web", "sheet"));
+        assertFalse(capabilities.isToolVisible("doc_replace_at_anchor", "conv-web", "sheet"));
+        assertTrue(capabilities.isToolVisible("write_docx", "conv-web"));
+        assertTrue(capabilities.isToolVisible("law_search", "conv-web"));
+        for (String denied : new String[] {"doc_view_pages", "doc_export_pdf", "sheet_write_cells", "slide_get_page",
+                "office_get_text", "ref_read", "pptx_generate", "version_commit", "run_python", "text_find_replace",
+                "some_plugin_tool", "user_mcp_files_read"}) {
+            assertFalse(capabilities.isToolVisible(denied, "conv-web"), denied);
+        }
+        capabilities.setWebPluginToolPredicate("some_plugin_tool"::equals);
+        assertTrue(capabilities.isToolVisible("some_plugin_tool", "conv-web"), "manifest 声明了网页支持的插件工具放行");
+        assertFalse(capabilities.isToolVisible("run_python", "conv-web"), "插件谓词不能放宽显式拒绝的内置工具");
+        // 其它档位不受影响
+        assertTrue(capabilities.isToolVisible("version_commit", "conv-lowa"));
+        assertTrue(capabilities.isToolVisible("some_plugin_tool", "conv-lowa"));
+    }
+
+    private static final String DOC_KIND_WRITER_FOR_TEST = ClientCapabilityService.DOC_KIND_WRITER;
 }

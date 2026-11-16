@@ -88,6 +88,11 @@ export default {
     "privacyName": "プライバシーポリシー",
     "crossBorderLabel": "個別同意：AI に送信するコンテンツを海外のモデル提供事業者に越境転送して処理すること",
     "crossBorderView": "通知を表示",
+    "consentCardTitle": "プラットフォーム AI を使う前に、データ処理への同意を 1 つ確認してください",
+    "consentAccept": "同意して続ける",
+    "consentHideNotice": "通知を閉じる",
+    "consentFailed": "保存できませんでした。もう一度お試しください",
+    "consentLater": "後で",
     "crossBorderNoticeTitle": "越境データ転送に関する通知",
     "crossBorderNoticeBody": "中国サイトは AI WorkDeck のサーバー経由で Alibaba Cloud Bailian に接続し、国際サイトは OpenRouter を使用します。AI に送信するテキストやファイルの抜粋は推論と課金に使用され、選択したモデルによっては中国本土外で処理されます。設定で同意を撤回すると、プラットフォームの AI が無効になります。",
     "agreementRequired": "続行するには利用規約とプライバシーポリシーへの同意にチェックを入れてください",
@@ -102,7 +107,8 @@ export default {
     "switch": "切り替え",
     "cancel": "キャンセル",
     "switchFailed": "サイトの切り替えに失敗しました。後ほど再試行してください。",
-    "rescueFailed": "サイト切り替え後もロックを解除できませんでした。コードを確認して再試行してください。"
+    "rescueFailed": "サイト切り替え後もロックを解除できませんでした。コードを確認して再試行してください。",
+    "proIntroBanner": "登録で無料体験クレジット進呈 · Personal Pro 初回 3 か月 ¥9.9/月",
   },
   "hint": {
     "learnMore": "詳細を見る",
@@ -113,7 +119,9 @@ export default {
     "purchaseConfirmOk": "確認",
     "purchaseSuccess": "ロック解除済み",
     "purchaseFailed": "購入に失敗しました",
-    "goRecharge": "チャージへ"
+    "goRecharge": "チャージへ",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro へ",
   },
   "identity": {
     "title": "ローカルワークスペースを選択",

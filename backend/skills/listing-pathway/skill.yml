@@ -71,7 +71,6 @@ tool_policy: restrict
 allowed_tools:
   # 法源核实
   - law_search
-  - law_search_keyword
   - get_law_article
   - law_recognition
   # 监管口径、交易所问答、境外规则

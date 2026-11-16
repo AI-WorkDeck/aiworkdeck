@@ -31,13 +31,19 @@ public class CloudGitWriteGuard {
    throw new GitAccessDeniedException(403);
   return project.getCloudBillingOwnerId();
  }
+ /** Owners that have not accepted postpaid keep the switch-off behaviour; unknown projects stay on the strict path. */
+ private boolean live(Long projectId,Long personalOwner) {
+  if(!enabled())return false;
+  Long candidate=projectId==null?personalOwner:projects.findById(projectId).map(com.checkba.model.entity.Project::getUserId).orElse(null);
+  return candidate==null || quota.postpaidFor(candidate);
+ }
  public Map<String,Object> state(Long projectId,Long personalOwner) {
-  if(!enabled())return Map.of("cloudAccess",Map.of("epoch",0,"canWrite",true));
+  if(!live(projectId,personalOwner))return Map.of("cloudAccess",Map.of("epoch",0,"canWrite",true));
   var access=(Map<?,?>)billing.cloudState(owner(projectId,personalOwner)).get("cloudAccess");
   return Map.of("cloudAccess",Map.of("epoch",access.get("epoch"),"canWrite",Boolean.TRUE.equals(access.get("canWrite"))));
  }
  public void write(Long projectId,Long personalOwner,Runnable operation) {
-  if(!enabled()){operation.run();return;}
+  if(!live(projectId,personalOwner)){operation.run();return;}
   tx.executeWithoutResult(status->{
    Long owner=owner(projectId,personalOwner);users.lockStorageOwner(owner).orElseThrow(()->new GitAccessDeniedException(403));
    // A locking query observes deletion after waiting, unlike a cached findById entity.

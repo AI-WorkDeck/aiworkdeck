@@ -1,0 +1,35 @@
+<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title></title>
+  <link rel="stylesheet" href="panel.css">
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="panel-l10n.js"></script>
+  <script src="review-core.js"></script>
+  <script src="xlsx.js"></script>
+  <script src="pitch-core.js"></script>
+  <script src="panel.js" defer></script>
+</head>
+<body>
+  <main class="awd-plugin-stage pm-stage">
+    <header class="awd-plugin-header">
+      <div>
+        <h1 class="awd-title" data-i18n="panel.title"></h1>
+        <p class="awd-subtitle" data-i18n="panel.subtitle"></p>
+      </div>
+    </header>
+    <nav class="pm-tabs" role="tablist">
+      <button type="button" role="tab" id="tab-library" data-tab="library" data-i18n="panel.tab.library"></button>
+      <button type="button" role="tab" id="tab-tender" data-tab="tender" data-i18n="panel.tab.tender"></button>
+      <button type="button" role="tab" id="tab-generate" data-tab="generate" data-i18n="panel.tab.generate"></button>
+    </nav>
+    <div id="notice" role="status" aria-live="polite" hidden></div>
+    <div id="confirm" class="confirm-bar" role="alertdialog" hidden></div>
+    <section id="view" aria-live="polite"></section>
+  </main>
+</body>
+</html>

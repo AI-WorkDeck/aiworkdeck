@@ -84,7 +84,7 @@
           <text v-if="reading.generating" class="player-progress">{{ $t('panels.evPreparedSegments', { done: reading.generated, total: reading.segments.length }) }}</text>
         </view>
         <view class="player-actions">
-          <button class="ev-btn play-btn primary" role="button" :tabindex="reading.status === 'error' ? -1 : 0"
+          <button :title="playActionLabel" class="ev-btn play-btn primary" role="button" :tabindex="reading.status === 'error' ? -1 : 0"
             :disabled="reading.status === 'error'" :aria-disabled="reading.status === 'error'" @tap="togglePlay"
             @keydown="onActionKey($event, togglePlay, reading.status === 'error')" :aria-label="playActionLabel">
             <svg class="btn-glyph" aria-hidden="true" viewBox="0 0 24 24" fill="none"><path v-for="(d, gi) in (canPause ? ICONS.pause : ICONS.play)" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>

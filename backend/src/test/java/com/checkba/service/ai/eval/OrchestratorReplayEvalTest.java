@@ -115,6 +115,21 @@ class OrchestratorReplayEvalTest {
             }
         }
 
+        // 5.1.0 已删除的工具必须真的不在注册面上（V3：原 offeredToolsExclude 的隐藏工具名单）
+        if (!c.expect.toolsNotRegistered.isEmpty()) {
+            java.util.Set<String> registered = new java.util.HashSet<>();
+            for (var bean : RealToolBeans.instantiateAll()) {
+                for (var m : bean.getClass().getDeclaredMethods()) {
+                    if (m.isAnnotationPresent(dev.langchain4j.agent.tool.Tool.class)) {
+                        registered.add(m.getName());
+                    }
+                }
+            }
+            for (String name : c.expect.toolsNotRegistered) {
+                assertFalse(registered.contains(name), "工具 [" + name + "] 应已删除，但仍有 @Tool 方法");
+            }
+        }
+
         // 5.1.1 逐轮变化的可见性（dev-board#729 ①）：起跑时按活跃文档类型裁掉，
         // 中途新建/切换到别的类型的文档后放回全集。首尾两次调用分别断言。
         if (!c.expect.offeredToolsExcludeFirstCall.isEmpty()
@@ -135,11 +150,42 @@ class OrchestratorReplayEvalTest {
             }
         }
 
+        // 5.1.2 每轮下发体量（tool-surface-audit S0）：报告里逐轮打印，用例写了上限就卡首轮
+        if (r.offeredToolCountPerCall().stream().anyMatch(n -> n > 0)) {
+            System.out.printf("[eval-offered] %s offeredToolsPerCall=%s offeredSchemaTokensPerCall=%s%n",
+                    c.id, r.offeredToolCountPerCall(), r.offeredSchemaTokensPerCall());
+        }
+        if (c.expect.maxOfferedToolsFirstCall != null) {
+            assertTrue(r.firstCallOfferedTools() <= c.expect.maxOfferedToolsFirstCall,
+                    "首轮下发工具数 " + r.firstCallOfferedTools() + " 超过上限 " + c.expect.maxOfferedToolsFirstCall);
+        }
+        if (c.expect.maxOfferedToolsLaterCalls != null) {
+            List<Integer> counts = r.offeredToolCountPerCall();
+            for (int i = 1; i < counts.size(); i++) {
+                assertTrue(counts.get(i) <= c.expect.maxOfferedToolsLaterCalls,
+                        "第 " + (i + 1) + " 次 LLM 调用下发 " + counts.get(i) + " 个工具，超过中途封顶 "
+                                + c.expect.maxOfferedToolsLaterCalls + "：" + counts);
+            }
+        }
+        if (c.expect.maxOfferedTokensFirstCall != null) {
+            assertTrue(r.firstCallOfferedSchemaTokens() <= c.expect.maxOfferedTokensFirstCall,
+                    "首轮下发 schema token " + r.firstCallOfferedSchemaTokens()
+                            + " 超过上限 " + c.expect.maxOfferedTokensFirstCall);
+        }
+
         // 5.2 回喂断言：编排器主动追加的系统提醒应出现在某次 LLM 上下文里
         for (String marker : c.expect.promptContains) {
             assertTrue(r.promptTexts().stream().anyMatch(p -> p.contains(marker)),
                     "期望某次 LLM 调用的上下文中包含 [" + marker + "]，但 " + r.promptTexts().size()
                             + " 次调用里都没有出现");
+        }
+
+        for (String marker : c.expect.promptNotContains) {
+            assertTrue(r.promptTexts().stream().noneMatch(p -> p.contains(marker)),
+                    "不应有任何一次 LLM 调用的上下文包含 [" + marker + "]");
+        }
+        if (c.expect.editorReadCount != null) {
+            assertEquals(c.expect.editorReadCount.intValue(), r.editorReadCount(), "编辑器桥 get_document_text 调用次数");
         }
 
         // 5.2.1 一次 Tool not found = 白烧一整轮模型往返（dev-board#809 实测「发现 A」的形态）。

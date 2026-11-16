@@ -564,6 +564,22 @@ public class ChatModelFactory {
         return model != null && model.supportsTools();
     }
 
+    /**
+     * 哪些通道的系统提示只讲原生工具协议（gap P2）。逗号分隔的 {@link AiModelProperties.Provider} 名，
+     * 留空 = 全部沿用 XML 文本协议的提示。OLLAMA 不在默认值里：本地模型的原生工具调用不可靠。
+     */
+    @org.springframework.beans.factory.annotation.Value("${ai.prompt.native-protocol:AWD_CLOUD,OPENROUTER}")
+    private String nativeProtocolProviders;
+
+    /** 本轮实际生效的通道与模型是否只用原生工具协议（提示里不再教 XML 文本调用；解析器仍兜底）。 */
+    public boolean nativeToolProtocol(String modelId) {
+        if (nativeProtocolProviders == null || nativeProtocolProviders.isBlank()) return false;
+        String channel = resolveTarget(modelId, false).channel().name();
+        return java.util.Arrays.stream(nativeProtocolProviders.split(","))
+                .anyMatch(p -> p.trim().equalsIgnoreCase(channel))
+                && effectiveModelSupportsTools(modelId);
+    }
+
     public void ensureToolCapableModel(String modelId) {
         if (!effectiveModelSupportsTools(modelId)) {
             throw new com.checkba.service.account.AccountException(
@@ -635,6 +651,17 @@ public class ChatModelFactory {
                     targetModel, defaultModel);
         }
         return defaultModel;
+    }
+
+    /**
+     * 与 {@link #platformConnection()} 里的跨境同意闸同一判据：现在发一条平台 AI 请求会不会被拦。
+     * 给前端在用户开口之前就地征求同意（启动检查、对话里的同意卡），不必等撞上报错再去设置页。
+     */
+    public boolean crossBorderConsentRequired(Long userId) {
+        return crossBorderConsent != null
+                && resolveProvider() == AiModelProperties.Provider.AWD_CLOUD
+                && platformAiChannel.usesMachineKey(userId)
+                && crossBorderConsent.isRequired();
     }
 
     /** Check before starting asynchronous paid work so callers receive the account error directly. */

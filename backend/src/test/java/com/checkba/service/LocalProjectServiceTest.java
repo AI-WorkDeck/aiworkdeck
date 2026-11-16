@@ -399,6 +399,21 @@ class LocalProjectServiceTest {
     }
 
     @Test
+    void reconcileDetectsSameSizeExternalEditThroughDiskMtime(@TempDir Path folder) throws Exception {
+        Path file = folder.resolve("a.txt");
+        Files.writeString(file, "1");
+        Long projectId = svc.openLocalFolder(folder.toString(), false, null, null, 1L).project().getId();
+        java.time.LocalDateTime before = projectFileRepository.findByProjectId(projectId).get(0).getUpdatedAt();
+
+        Files.writeString(file, "2");
+        Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.from(java.time.Instant.now().plusSeconds(2)));
+        LocalProjectService.ReconcileResult r = svc.reconcileProject(projectId);
+
+        assertEquals(1, r.changed());
+        assertTrue(projectFileRepository.findByProjectId(projectId).get(0).getUpdatedAt().isAfter(before));
+    }
+
+    @Test
     void reconcileAbortsWhenRootUnreachable(@TempDir Path tmp) throws Exception {
         Path folder = tmp.resolve("proj");
         Files.createDirectories(folder);
@@ -540,7 +555,15 @@ class LocalProjectServiceTest {
             long start = System.currentTimeMillis();
             long deadline = start + 30000;
             boolean found = false;
+            int touches = 0;
             while (System.currentTimeMillis() < deadline) {
+                // ensureWatch 返回时事件流未必已就绪，就绪前的写入只成为基线、不产生事件；
+                // 每 2 秒再碰一次 b.txt 的 mtime，让就绪后的事件一定能到（对账幂等，多触发无害）。
+                if (!found && (System.currentTimeMillis() - start) / 2000 > touches) {
+                    touches++;
+                    Files.setLastModifiedTime(folder.resolve("b.txt"),
+                            java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + touches));
+                }
                 found = projectFileRepository.findByProjectId(projectId).stream()
                         .anyMatch(f -> "b.txt".equals(f.getName()) && !Boolean.TRUE.equals(f.getIsDeleted()));
                 if (found) break;

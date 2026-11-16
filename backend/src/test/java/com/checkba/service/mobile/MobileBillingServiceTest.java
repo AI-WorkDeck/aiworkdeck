@@ -401,6 +401,39 @@ class MobileBillingServiceTest {
     }
 
     @Test
+    @DisplayName("channel=wxpay-app：无 productId 放行，productId/wxCode 不上行，appPay 原样带回")
+    void wxpayAppChannelNeedsNoProduct() {
+        User u = phoneUser();
+        String accountId = "acct-app-" + u.getId();
+        bind(u.getId(), accountId);
+        java.util.Map<String, String> pay = java.util.Map.of("appId", "wxapp1", "sign", "s");
+        when(billing.createRecharge(accountId, 5000L, "idem-app-0001", "wxpay-app", null, null))
+                .thenReturn(new RechargeOrder("app", "OT-app", 5000L, null, null, null,
+                        null, null, null, null, pay));
+
+        RechargeOrder order = service.createRecharge(u.getId(), 5000L, "idem-app-0001",
+                "wxpay-app", "credits.cny.50", "0a1b2c3d4e");
+
+        assertEquals("app", order.present());
+        assertEquals(pay, order.appPay());
+        verify(billing).createRecharge(accountId, 5000L, "idem-app-0001", "wxpay-app", null, null);
+    }
+
+    @Test
+    @DisplayName("channel=wxpay-app 金额与幂等键仍按通用规则校验：不合格不发上游")
+    void wxpayAppStillValidatesAmountAndKey() {
+        User u = phoneUser();
+        bind(u.getId(), "acct-app-bad-" + u.getId());
+        for (Long bad : new Long[]{null, 0L, -1L}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> service.createRecharge(u.getId(), bad, "idem-app-0003", "wxpay-app", null, null));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createRecharge(u.getId(), 5000L, "bad key", "wxpay-app", null, null));
+        verify(billing, never()).createRecharge(anyString(), anyLong(), anyString(), eq("wxpay-app"), any(), any());
+    }
+
+    @Test
     @DisplayName("channel=appstore 带了 wxCode：那是微信那条路的凭证，不上行也不报错")
     void appstoreIgnoresWxCode() {
         User u = phoneUser();
@@ -519,6 +552,102 @@ class MobileBillingServiceTest {
                 () -> service.confirmAppstore(u.getId(), "OT-ios-gone", "jws.a.b"));
         assertEquals(MobileBillingKind.NOT_FOUND, missing.getKind());
         // 查单/确认的 404 分不出「账户没了」与「单号不是你的」，一律不动绑定行
+        assertTrue(accountBindingRepository.findByUserId(u.getId()).isPresent());
+    }
+
+    // ==================== Google Play 内购充值与确认（dev-board#665） ====================
+
+    @Test
+    @DisplayName("recharge：channel=googleplay 时放行 credits.usd.* 并原样上行 productId")
+    void googleplayCreateRechargeRequiresValidProductId() {
+        User u = phoneUser();
+        String accountId = "acct-gp-crt-" + u.getId();
+        bind(u.getId(), accountId);
+        when(billing.createRecharge(accountId, 1000L, "idem-gp-1", "googleplay", "credits.usd.10", null))
+                .thenReturn(new RechargeOrder("native", "OT-gp-1", 1000L, null, null, null,
+                        null, null, null, "00000000-0000-4000-8000-000000000001"));
+
+        RechargeOrder order = service.createRecharge(u.getId(), 1000L, "idem-gp-1",
+                "googleplay", "credits.usd.10", null);
+        assertEquals("OT-gp-1", order.outTradeNo());
+        assertEquals("native", order.present());
+        verify(billing).createRecharge(accountId, 1000L, "idem-gp-1", "googleplay", "credits.usd.10", null);
+
+        for (String bad : new String[]{null, "", "   ", "Credits.USD.10", "credits usd 10"}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> service.createRecharge(u.getId(), 1000L, "idem-gp-bad",
+                            "googleplay", bad, null));
+        }
+    }
+
+    @Test
+    @DisplayName("confirm-googleplay：outTradeNo/productId/purchaseToken 上行；paid=true 作废余额缓存")
+    void confirmGooglePlayPassesThroughAndInvalidatesBalance() {
+        User u = phoneUser();
+        String accountId = "acct-gp-cf-" + u.getId();
+        bind(u.getId(), accountId);
+        when(billing.balance(accountId)).thenReturn(new BalanceResult(100L, "CNY", "free"));
+        when(billing.confirmGooglePlay(accountId, "OT-gp-1", "credits.usd.10", "tok.a.b"))
+                .thenReturn(new RechargeStatus("paid", true, 7200L));
+
+        service.balance(u.getId());
+        RechargeStatus s = service.confirmGooglePlay(u.getId(), "OT-gp-1", "credits.usd.10", "tok.a.b");
+
+        assertEquals("paid", s.status());
+        assertTrue(s.paid());
+        assertEquals(7200L, s.amountCents());
+        verify(billing).confirmGooglePlay(accountId, "OT-gp-1", "credits.usd.10", "tok.a.b");
+        service.balance(u.getId());
+        verify(billing, times(2)).balance(accountId);
+    }
+
+    @Test
+    @DisplayName("confirm-googleplay：outTradeNo 可缺省；productId 与 purchaseToken 校验失败不打上游")
+    void confirmGooglePlayAcceptsMissingOutTradeNoAndValidatesArgs() {
+        User u = phoneUser();
+        String accountId = "acct-gp-cf2-" + u.getId();
+        bind(u.getId(), accountId);
+        when(billing.confirmGooglePlay(accountId, null, "credits.usd.20", "tok.recover"))
+                .thenReturn(new RechargeStatus("paid", true, 14400L));
+
+        assertTrue(service.confirmGooglePlay(u.getId(), null, "credits.usd.20", "tok.recover").paid());
+        assertTrue(service.confirmGooglePlay(u.getId(), "  ", "credits.usd.20", "tok.recover").paid());
+        verify(billing, times(2)).confirmGooglePlay(accountId, null, "credits.usd.20", "tok.recover");
+
+        for (String badProd : new String[]{null, "", "   ", "Credits.USD.10", "credits/usd/10"}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> service.confirmGooglePlay(u.getId(), "OT-gp-1", badProd, "tok.ok"));
+        }
+        for (String badTok : new String[]{null, "", "   ", "x".repeat(4097)}) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> service.confirmGooglePlay(u.getId(), "OT-gp-1", "credits.usd.10", badTok));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> service.confirmGooglePlay(u.getId(), "非法单号!!", "credits.usd.10", "tok.ok"));
+        verify(billing, never()).confirmGooglePlay(accountId, "OT-gp-1", "credits.usd.10", "tok.ok");
+    }
+
+    @Test
+    @DisplayName("confirm-googleplay：官网 REJECTED / NOT_FOUND 保留判别位与文案")
+    void confirmGooglePlayFailuresKeepTheirKind() {
+        User u = phoneUser();
+        String accountId = "acct-gp-cf3-" + u.getId();
+        bind(u.getId(), accountId);
+
+        doThrow(new MobileBillingException(MobileBillingKind.REJECTED,
+                "该交易已使用", "transaction_reused"))
+                .when(billing).confirmGooglePlay(accountId, "OT-gp-used", "credits.usd.10", "tok.used");
+        MobileBillingFailureException reused = assertThrows(MobileBillingFailureException.class,
+                () -> service.confirmGooglePlay(u.getId(), "OT-gp-used", "credits.usd.10", "tok.used"));
+        assertEquals(MobileBillingKind.REJECTED, reused.getKind());
+        assertEquals("该交易已使用", reused.getMessage());
+
+        doThrow(new MobileBillingException(MobileBillingKind.NOT_FOUND,
+                "未找到对应的统一账户", "order_not_found"))
+                .when(billing).confirmGooglePlay(accountId, "OT-gp-gone", "credits.usd.10", "tok.gone");
+        MobileBillingFailureException missing = assertThrows(MobileBillingFailureException.class,
+                () -> service.confirmGooglePlay(u.getId(), "OT-gp-gone", "credits.usd.10", "tok.gone"));
+        assertEquals(MobileBillingKind.NOT_FOUND, missing.getKind());
         assertTrue(accountBindingRepository.findByUserId(u.getId()).isPresent());
     }
 

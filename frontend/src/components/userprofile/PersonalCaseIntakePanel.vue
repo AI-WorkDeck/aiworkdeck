@@ -21,7 +21,7 @@
           </button>
         </view>
       </template>
-      <text class="field-label">{{ $t('account.caseLocalLedgerDisclaimer') }}</text>
+      <text class="field-label intake-disclaimer">{{ $t('account.caseLocalLedgerDisclaimer') }}</text>
 
       <!-- 顶部子视图切换胶囊 -->
       <view class="intake-subnav">
@@ -486,6 +486,7 @@
 </template>
 
 <script>
+import { formatCnyCompact } from '@/utils/cnyAmount'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import {
   getLawFirmOverview,
@@ -659,16 +660,16 @@ export default {
     },
     formatAmountCents(cents, wanFallback) {
       if (typeof cents === 'number' && Number.isFinite(cents)) {
-        return this.$t('account.caseAmountWanCurrency', { amount: (cents / 1000000).toFixed(2) })
+        return formatCnyCompact(cents / 100, 'account.caseAmountWanCurrency')
       }
       if (wanFallback !== undefined && wanFallback !== null && wanFallback !== '') {
-        return this.$t('account.caseAmountWanCurrency', { amount: Number(wanFallback).toFixed(2) })
+        return formatCnyCompact(Number(wanFallback) * 10000, 'account.caseAmountWanCurrency')
       }
-      return this.$t('account.caseAmountWanCurrency', { amount: '0.00' })
+      return formatCnyCompact(0, 'account.caseAmountWanCurrency')
     },
     formatCentsYuan(cents) {
       const n = Number(cents || 0)
-      return this.$t('account.caseAmountWanCurrency', { amount: (n / 1000000).toFixed(2) })
+      return formatCnyCompact(n / 100, 'account.caseAmountWanCurrency')
     },
     formatPercent(val) {
       const n = Number(val || 0)
@@ -1066,6 +1067,12 @@ export default {
 .field-label {
   font-size: 11.5px;
   color: var(--awd-text-2);
+}
+
+.intake-disclaimer {
+  display: block;
+  margin-bottom: 10px;
+  line-height: 1.6;
 }
 
 .field-input {

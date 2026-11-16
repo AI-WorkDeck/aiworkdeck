@@ -178,7 +178,7 @@ like typeset copy, not a raw character dump:
 
 ---
 
-> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.0.2
+> **把法律画出来 · Make the Law Visible** ｜ 新诉讼可视化 New Litigation Visualization ｜ 缪奇川 出品 ｜ v1.1.0
 
 ## 白描 mode (court / print) — frozen standard
 

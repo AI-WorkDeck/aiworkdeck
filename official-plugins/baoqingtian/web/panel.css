@@ -5,10 +5,10 @@
   color-scheme: light;
   --bqt-bg: var(--awd-surface-2, #F1EFE7);
   --bqt-surface: var(--awd-surface, #FCFBF7);
-  --bqt-surface-hover: var(--awd-surface-hover, #EAE6DC);
+  --bqt-surface-hover: var(--awd-panel-hover, #EAE6DC);
   --bqt-text: var(--awd-text, #1F1E1B);
-  --bqt-text-secondary: var(--awd-text-secondary, #5C5952);
-  --bqt-text-muted: var(--awd-text-muted, #8A857B);
+  --bqt-text-secondary: var(--awd-text-2, #5C5952);
+  --bqt-text-muted: var(--awd-text-3, #8A857B);
   --bqt-border: var(--awd-border, #DDD8CA);
   --bqt-border-subtle: var(--awd-border-subtle, #E8E3D7);
   --bqt-accent: var(--awd-accent, #2E5A50);
@@ -32,7 +32,7 @@
   --tag-radius: var(--awd-radius-sm, 4px);
   --space: var(--awd-space-4, 16px);
   --control: var(--awd-control-height, 32px);
-  --control-sm: var(--awd-control-height-sm, 28px);
+  --control-sm: var(--awd-control-sm, 28px);
   --shadow: var(--awd-shadow-sm, 0 1px 2px rgba(58, 52, 40, 0.06));
   --sky: var(--bqt-bg);
 }

@@ -9,6 +9,7 @@
 // 规格：docs/superpowers/specs/2026-09-14-docx-three-way-merge-design.md §5.1 / §5.2。
 
 import { fetchVersionFileBytes, getMergeAnalysis } from '@/services/api.js'
+import { assertNotPasswordProtected } from '@/utils/officeCompareGuard.js'
 
 /**
  * 取一份冲突文件的三方输入。
@@ -28,6 +29,8 @@ export async function fetchMergeInputs(projectId, path, { mergeBase, mainRef, ot
     fetchVersionFileBytes(projectId, otherRef, path),
     getMergeAnalysis(projectId, path),
   ])
+  // 带打开密码的文件：隐藏引擎只会拒收，入口先判，让界面给出明确原因（不解密、不落盘）
+  assertNotPasswordProtected(path, baseBytes, mainBytes, otherBytes)
   return {
     baseBytes,
     mainBytes,

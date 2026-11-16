@@ -38,7 +38,7 @@ export const panelDockingData = () => ({
   // 拖拽时高亮哪个投放区
   dockDragOver: null,
   // 右键「移到…」小菜单
-  dockMenu: { visible: false, panelKey: '', x: 0, y: 0 },
+  dockMenu: { visible: false, panelKey: '', x: 0, y: 0, rail: false },
 })
 
 export const panelDockingMethods = {
@@ -169,10 +169,14 @@ export const panelDockingMethods = {
   },
 
   // ——————————————————— 右键菜单（保底路径） ———————————————————
-  openDockMenu(key, evt) {
+  openDockMenu(key, evt, fromRail = false) {
     // rail 上不是每个按钮都能移动（文件树/搜索不行），不能移动的就把右键让给系统默认行为，
     // 所以 preventDefault 在这里做、不在模板上写 .prevent 修饰符。
-    if (!isMovablePanel(key, this.dockPanels)) return
+    // 从 rail 来的右键，不可移动的按钮也要给「整理图标」，改走 rail 自己的菜单。
+    if (!isMovablePanel(key, this.dockPanels)) {
+      if (fromRail) this.openRailMenu(evt)
+      return
+    }
     // uni 会把 <view> 上的原生事件重建成普通对象，只有 mouse 系补了坐标；
     // 补不到就从正在派发的原生事件上取（同 fileOpenTabs.js 的 mouseButtonOf）。
     const native = typeof window !== 'undefined' ? window.event : null
@@ -189,11 +193,36 @@ export const panelDockingMethods = {
     const vh = typeof window !== 'undefined' ? window.innerHeight : 0
     const x = vw ? Math.min(rawX, Math.max(0, vw - 168)) : rawX
     const y = vh ? Math.min(rawY, Math.max(0, vh - 132)) : rawY
-    this.dockMenu = { visible: true, panelKey: key, x, y }
+    this.dockMenu = { visible: true, panelKey: key, x, y, rail: fromRail }
+  },
+
+  /**
+   * rail 空白处 / 不可移动图标上的右键：只有一项「整理图标」。
+   * 可移动图标的右键已由 openDockMenu 先接住（事件从图标冒泡到 rail 时菜单已开，这里直接让过）。
+   */
+  openRailMenu(evt) {
+    if (this.dockMenu.visible) return
+    const native = typeof window !== 'undefined' ? window.event : null
+    try {
+      if (evt && typeof evt.preventDefault === 'function') evt.preventDefault()
+      else if (native && typeof native.preventDefault === 'function') native.preventDefault()
+    } catch (e) {
+      // 拦不住系统右键菜单不影响本菜单弹出
+    }
+    const rawX = (evt && Number(evt.clientX)) || (native && Number(native.clientX)) || 0
+    const rawY = (evt && Number(evt.clientY)) || (native && Number(native.clientY)) || 0
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 0
+    const y = vh ? Math.min(rawY, Math.max(0, vh - 48)) : rawY
+    this.dockMenu = { visible: true, panelKey: '', x: rawX, y, rail: true }
+  },
+
+  startRailEditFromMenu() {
+    this.closeDockMenu()
+    if (!this.railEditMode) this.toggleRailEditMode()
   },
 
   closeDockMenu() {
-    if (this.dockMenu.visible) this.dockMenu = { visible: false, panelKey: '', x: 0, y: 0 }
+    if (this.dockMenu.visible) this.dockMenu = { visible: false, panelKey: '', x: 0, y: 0, rail: false }
   },
 
   // ——————————————————— HTML5 拖拽（桌面增强） ———————————————————
@@ -223,7 +252,7 @@ export const panelDockingMethods = {
    * 没有尺寸可跟，给一个够看清标签的最小值）。
    */
   dockZoneStyle(dock) {
-    const RAIL = 50   // .left-rail
+    const RAIL = 56   // .left-rail
     const HEADER = 42 // .project-header
     const STATUS = 26 // .status-bar
     const left = this.sidebarCollapsed ? 0 : Number(this.sidebarWidth) || 0

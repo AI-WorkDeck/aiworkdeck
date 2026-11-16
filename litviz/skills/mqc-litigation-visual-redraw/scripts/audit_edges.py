@@ -20,14 +20,28 @@ sample columns to agree, skips corner arcs, and ignores windows swamped by text.
 
 Usage:  python3 scripts/audit_edges.py figure.svg figure.png
 """
+
+# 放在第三方依赖的 import 之前：没装 openpyxl / Pillow / numpy 的机器上 --help 也要能看用法
+if __name__ == "__main__" and {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+    getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+    print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+    raise SystemExit(0)
+if __name__ == "__main__":                  # 出错边界也装在第三方 import 之前：没装 openpyxl / Pillow 时说缺什么、怎么装
+    try:
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
 from PIL import Image
 import re, sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
 from export_pptx import parse_svg          # honours <g transform="translate(...)">
 
 def run(svgf, pngf, tol=0.25):
-    s = open(svgf).read()
-    W = float(re.search(r'width="([\d.]+)"', s).group(1))
+    s = open(svgf, encoding="utf-8-sig").read()   # 不写编码时中文 Windows 按 GBK 读，自己画的 SVG 都读不了
+    _w = re.search(r'width="([\d.]+)"', s)
+    if not _w:                                  # 给的不是 SVG：说清楚，不甩 AttributeError
+        raise RuntimeError(f"{svgf} 不是一张 SVG（找不到 width）：第一个参数给出图的 .svg，第二个给对应的 .png")
+    W = float(_w.group(1))
     im = Image.open(pngf).convert("L"); k = im.width / W
     base = im.getpixel((3, 3))
     def ink(px, py):
@@ -67,5 +81,16 @@ def _quiet_broken_pipe():
         pass
 
 if __name__ == "__main__":
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     _quiet_broken_pipe()
     r = run(sys.argv[1], sys.argv[2]); print("\n".join(r) if r else "对称")

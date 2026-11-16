@@ -144,6 +144,11 @@ public class SseEmitterService {
         heartbeatScheduler.shutdownNow();
     }
 
+    /** 当前在册的 AI 对话 SSE 连接数（运维指标 awd.sse.connections）。 */
+    public int activeConnectionCount() {
+        return emitters.size();
+    }
+
     /**
      * 创建连接
      * @param connectionId 会话ID或用户ID

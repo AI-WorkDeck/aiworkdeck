@@ -6,7 +6,8 @@
 
 import { getProjectFiles, createFolder, batchMoveFiles, getStageUsage } from '@/services/api.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
-import { accountPageUrl } from '@/utils/siteLinks.js'
+import { requireSubscription } from '@/utils/requireAccount.js'
+import { accountPageUrl, siteLinks } from '@/utils/siteLinks.js'
 
 export const stagingAreaMethods = {
     // 免费额度用量（顶部用量条的数据源）。取不到就当作「不限制」处理——
@@ -148,13 +149,16 @@ export const stagingAreaMethods = {
           // 用 modal 而不是 toast——这条提示要说清「已有文件不会被删除」，toast 放不下。
           this.stagingPinned = true
           this.loadStagingUsage()
+          const isCn = siteLinks().current === 'cn'
           uni.showModal({
             title: this.$t('workbenchOps.stagingFullTitle'),
             content: e.message,
-            confirmText: this.$t('workbenchOps.learnMore'),
+            confirmText: isCn ? this.$t('workbenchOps.subscribeProBtn') : this.$t('workbenchOps.learnMore'),
             cancelText: this.$t('workbenchOps.okKnown'),
             success: (r) => {
-              if (r.confirm) openExternalUrl(accountPageUrl())
+              if (!r.confirm) return
+              if (isCn) void requireSubscription()
+              else openExternalUrl(accountPageUrl())
             }
           })
           return

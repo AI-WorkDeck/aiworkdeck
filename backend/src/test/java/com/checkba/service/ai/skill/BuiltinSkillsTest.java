@@ -85,7 +85,7 @@ class BuiltinSkillsTest {
         assertEquals(referencesVisible, visible.contains("ref_read"));
         Set<String> restrictedNames = restricted.stream().map(ToolSpecification::name)
                 .collect(java.util.stream.Collectors.toSet());
-        for (String writeTool : List.of("ref_edit", "doc_start_stream", "write_docx", "text_write_file")) {
+        for (String writeTool : List.of("ref_edit", "doc_start_stream", "write_docx", "write_file")) {
             assertTrue(realToolNames.contains(writeTool), writeTool + " must be a real tool for this guard to mean anything");
             assertFalse(restrictedNames.contains(writeTool), writeTool + " must remain restricted");
         }
@@ -113,11 +113,52 @@ class BuiltinSkillsTest {
                 ? List.of(readTool, "doc_find_text", "doc_find_replace", "doc_insert_at_cursor", "doc_insert_table")
                 : List.of(readTool, "office_search", "office_replace_text", "office_insert_text", "office_insert_table");
         assertTrue(visible.containsAll(editingTools), visible.toString());
-        assertTrue(visible.containsAll(List.of("tmeet_list_meetings", "tmeet_get_transcript", "task_create", "write_docx")),
+        assertTrue(visible.containsAll(List.of("meeting_list", "meeting_get_transcript", "task_create", "write_docx")),
                 visible.toString());
         assertFalse(visible.contains(otherHostTool), visible.toString());
         assertTrue(realToolNames.contains("doc_start_stream"));
         assertFalse(visible.contains("doc_start_stream"), "Tencent Meeting must retain its restricted tool policy");
+    }
+
+    @Test
+    @DisplayName("触发词并列：赢家按位置选，但并列 skill 的工具白名单并入；单纯「整理会议纪要」保持 meeting-recorder 原工具集")
+    void tiedTriggersUnionToolsWhateverTheWordOrder() {
+        SkillRouter router = new SkillRouter(registry, new SkillProperties(),
+                org.mockito.Mockito.mock(com.checkba.service.telemetry.TelemetryService.class), null);
+        List<ToolSpecification> all = new ArrayList<>(realToolNames.stream()
+                .map(name -> ToolSpecification.builder().name(name).description(name).build()).toList());
+        all.add(ToolSpecification.builder().name("tencent_meeting_action").description("x").build());
+
+        router.activateForTurn("c", "r1", "刚开完腾讯会议，帮我整理成会议纪要", null);
+        assertEquals("tencent-meeting", router.activeSkill("r1").orElseThrow().getId());
+        Set<String> v1 = names(router.visibleTools("r1", all));
+        assertTrue(v1.contains("tencent_meeting_action") && v1.contains("meeting_list"), v1.toString());
+
+        router.activateForTurn("c", "r2", "整理会议纪要，就是刚才腾讯会议那个", null);
+        assertEquals("meeting-recorder", router.activeSkill("r2").orElseThrow().getId());
+        Set<String> v2 = names(router.visibleTools("r2", all));
+        assertTrue(v2.contains("tencent_meeting_action") && v2.contains("meeting_list"), v2.toString());
+
+        router.activateForTurn("c", "r3", "帮我整理会议纪要", null);
+        assertEquals("meeting-recorder", router.activeSkill("r3").orElseThrow().getId());
+        Set<String> v3 = names(router.visibleTools("r3", all));
+        assertTrue(v3.contains("meeting_list"));
+        assertFalse(v3.contains("tencent_meeting_action"), v3.toString());
+        assertFalse(v3.contains("tmeet_get_transcript"), v3.toString());
+        assertTrue(v1.contains("meeting_get_transcript") && v2.contains("meeting_get_transcript"));
+    }
+
+    private static Set<String> names(List<ToolSpecification> specs) {
+        return specs.stream().map(ToolSpecification::name).collect(java.util.stream.Collectors.toSet());
+    }
+
+    @Test
+    @DisplayName("腾讯会议：内置 skill 与插件自带 skill 的白名单都放行 tencent_meeting_action")
+    void tencentMeetingSkillsAllowThePluginTool() throws Exception {
+        assertTrue(registry.getSkill("tencent-meeting").orElseThrow().getAllowedTools().contains("tencent_meeting_action"));
+        Path pluginSkill = Path.of("..", "official-plugins", "tencent-meeting", "skill", "skill.yml");
+        assertTrue(Files.readString(pluginSkill).contains("  - tencent_meeting_action"),
+                "插件 skill 是 restrict，白名单漏列插件工具会在触发词命中时把它裁掉");
     }
 
     @Test
@@ -209,7 +250,8 @@ class BuiltinSkillsTest {
         List<String> bogus = new ArrayList<>();
         for (SkillDefinition skill : registry.getSkills()) {
             for (String tool : skill.getAllowedTools()) {
-                if (!realToolNames.contains(tool)) {
+                // 插件工具（腾讯会议插件的 JAR 工具）不在内置扫描范围内
+                if (!realToolNames.contains(tool) && !"tencent_meeting_action".equals(tool)) {
                     bogus.add(skill.getId() + " -> " + tool);
                 }
             }
@@ -286,7 +328,7 @@ class BuiltinSkillsTest {
         assertTrue(s.getTriggers().contains("会议纪要"),
                 "面板 kick-off prompt 以「会议纪要」开头，触发词缺了整条链路断掉");
         assertTrue(s.getAllowedTools().containsAll(
-                        List.of("meeting_get_transcript", "meeting_list_recordings", "write_docx")),
+                        List.of("meeting_get_transcript", "meeting_list", "write_docx")),
                 "读稿两件套与 write_docx 必须都在白名单里：" + s.getAllowedTools());
         assertTrue(s.isEnabledByDefault(),
                 "「语音」合并插件成员默认启用（dev-board#66：与 text-to-speech 启停一体，"

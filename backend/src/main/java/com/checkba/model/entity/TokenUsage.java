@@ -49,6 +49,17 @@ public class TokenUsage {
     private BigDecimal cost;
 
     /**
+     * 本次调用 promptTokens 中命中提示缓存的部分（缓存读，约按输入价 1/10 计）。
+     * 可空：历史行、上游没回缓存字段的通道为 null（与「命中 0」区分开）。ddl-auto 自动建列。
+     */
+    @Column
+    private Integer cachedTokens;
+
+    /** 本次调用写入提示缓存的 token 数（Anthropic/Qwen 显式缓存，约 1.25x 输入价）。可空，语义同 cachedTokens。 */
+    @Column
+    private Integer cacheWriteTokens;
+
+    /**
      * cost 的口径（Spec §3「本地统计 vs 平台结算」两套数字必须分开标注）：
      * <ul>
      *   <li>{@code estimate}：BYOK 通道，按 {@code AllowedModels} 的单价表本地估算，不是真实账单；</li>
@@ -130,6 +141,22 @@ public class TokenUsage {
 
     public void setCost(BigDecimal cost) {
         this.cost = cost;
+    }
+
+    public Integer getCachedTokens() {
+        return cachedTokens;
+    }
+
+    public void setCachedTokens(Integer cachedTokens) {
+        this.cachedTokens = cachedTokens;
+    }
+
+    public Integer getCacheWriteTokens() {
+        return cacheWriteTokens;
+    }
+
+    public void setCacheWriteTokens(Integer cacheWriteTokens) {
+        this.cacheWriteTokens = cacheWriteTokens;
     }
 
     public String getCostSource() {

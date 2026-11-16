@@ -83,10 +83,10 @@ const buildUndoStep = ({ kind = 'undo', writer = true, inMargin = true, remember
   if (remembered) entries[kind] = { model: foreignModel ? { refresh() {} } : xModel, ...remembered }
   const step = new Function(
     'isWriterDoc', 'readShowChangesInMargin', 'inlineUndoEntries', 'revisionViewState',
-    'withViewOnlyChange', 'applyRevisionView', 'xModel',
+    'withViewOnlyChange', 'applyRevisionView', 'xModel', 'noteRedlinesMayHaveBeenRemoved',
     `${declaration('topUndoEntry')};${oneLiner('sameUndoEntry')};${declaration('undoStep')};return undoStep`)(
     () => writer, () => inMargin, entries, () => ({ mode }), fn => fn(),
-    next => { seen.modes.push(next); mode = next }, xModel)
+    next => { seen.modes.push(next); mode = next }, xModel, () => {})
   return { xModel, step: () => step(um, kind, run), seen, entries, modeNow: () => mode }
 }
 

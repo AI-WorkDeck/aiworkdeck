@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { fetchAgentConnection } from './sharedAgentConnection.mjs'
 import { isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
+import { bqtErrorCode, bqtErrorMessage } from '@/utils/bqtBilling.js'
 import { ref, reactive, nextTick, onUnmounted, getCurrentInstance } from 'vue'
 import { deleteAgentInboxItem, getAgentInbox, getApiBaseUrl, getConversationMetadata, updateAgentInboxItem } from '@/services/api.js'
 import { getSessionId } from '@/utils/auth.js'
@@ -10,6 +11,7 @@ import { t } from '@/i18n'
 import { captureChatTimeline } from '@/components/AgentMessage/chatTimeline.mjs'
 import { nextBubbleId } from './bubbleId.js'
 import { documentEditedFromProcesses } from '@/utils/useInDocumentVisibility.js'
+import { cancelledEditedDocument, stopNoticeForCancelled } from '@/utils/agentRunControl.js'
 import { isSameFileChange } from '@/utils/chatFileChange.js'
 import { ASK_USER_KIND, decodeAttr, normalizeAskUserEvent } from '@/utils/askUserAnswer.mjs'
 import { createLegacyAskUserMarkup } from './legacyAskUserMarkup.mjs'
@@ -156,7 +158,11 @@ export function useAgentStream() {
 
     // STATE: 任务待续跑——步数超限暂停（bubble_end status=paused）或上次进程被杀
     // （run_state status=INTERRUPTED）。前端据此渲染一键「继续」按钮
-    const agentPaused = ref(null) // null | { reason: 'max_depth' | 'process_interrupted' | ... }
+    const agentPaused = ref(null) // null | { reason: 'max_depth' | 'process_interrupted' | 'user_pause' | ... }
+
+    // STATE: 用户点了「暂停」、后端已接下，正在等下一个安全步骤（下一次调用模型之前）。
+    // 任何终态事件（bubble_end / cancelled / error）或新一轮开始都清掉。
+    const pausePending = ref(false)
 
     // STATE: 当前会话的后端运行状态（run_state/bubble_end 驱动）
     // 'RUNNING' | 'PAUSED' | 'AWAITING_APPROVAL' | 'AWAITING_INPUT' | 'FINISHED' | 'ERROR'
@@ -439,6 +445,7 @@ export function useAgentStream() {
         skillNotice.value = null
         routedModelInfo.value = null
         agentPaused.value = null
+        pausePending.value = false
         agentRunStatus.value = null
         agentAwaitingInput.value = false
         // 后台任务完成态现在不再自动销毁（改为保留可查），切换会话时必须把已结束的条目摘掉，
@@ -890,6 +897,7 @@ export function useAgentStream() {
             // 却要按「本轮」呈现，那是一句谎话。
             tokenUsage.value = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
             agentPaused.value = null
+            pausePending.value = false
             agentRunStatus.value = 'RUNNING'
             agentAwaitingInput.value = false
             disconnectedBubble = null
@@ -985,6 +993,8 @@ export function useAgentStream() {
             })
             // fetch 对 4xx/5xx 不 reject，需显式校验，否则会话过期/后端错误时加载态永久卡死
             if (!chatResp.ok) {
+                // 429 = 服务器按用户限频（server 部署），给可读的「稍候再试」而不是裸状态码
+                if (chatResp.status === 429) throw Object.assign(new Error(t('common.tooManyRequests')), { status: 429 })
                 throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
             }
             const responseBody = await chatResp.json()
@@ -1079,11 +1089,54 @@ export function useAgentStream() {
      * 后端的 cancelled 事件到了：把「正在停止…」落成终态文案。
      * 两条事件分支都要调（气泡指针为 null 的兜底分支也算数）。
      */
-    const noteStopConfirmed = () => {
+    const noteStopConfirmed = (payload) => {
         if (stopConfirmTimer) { clearTimeout(stopConfirmTimer); stopConfirmTimer = null }
         const bubble = pendingStopBubble
         pendingStopBubble = null
-        if (bubble) bubble.stopNotice = t('agentStream.stopConfirmed')
+        if (bubble) {
+            bubble.stopNotice = stopNoticeForCancelled(payload, t)
+            // 停止前已经落地的修改不会回滚：标记本轮动过文档，「撤销本次 AI 修改」据此出现
+            if (cancelledEditedDocument(payload)) bubble.documentEdited = true
+        }
+    }
+
+    /**
+     * 用户「暂停」：后端只置标志，本轮在下一个安全步骤（当前这批工具跑完、下一次调用模型之前）
+     * 以 bubble_end paused / user_pause 收尾，随后由既有的「继续」按钮续跑。
+     * 返回 'pending'（已接下，等安全步骤）/ 'finished'（该轮次已经结束）/ 'failed'。
+     */
+    const pause = async () => {
+        const conversationId = currentConversationId.value
+        if (!conversationId || !isStreaming.value) return 'finished'
+        pausePending.value = true
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 10000)
+        try {
+            const response = await fetch(`${getApiBaseUrl()}/api/agent/pause/${conversationId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Session-Id': getSessionId() || '' },
+                signal: controller.signal
+            })
+            if (!response.ok) throw new Error(`Pause request failed: ${response.status}`)
+            let paused = true
+            try {
+                const body = await response.json()
+                if (body && body.paused === false) paused = false
+            } catch (parseError) { /* 读不出来按接下处理，终态事件会把状态落定 */ }
+            if (!paused) {
+                pausePending.value = false
+                return 'finished'
+            }
+            // 请求在路上时这一轮可能已经自己收尾了：终态事件已到就不再挂着「正在暂停」
+            if (!isStreaming.value) pausePending.value = false
+            return 'pending'
+        } catch (e) {
+            console.warn('[AgentStream] Pause request failed:', e)
+            pausePending.value = false
+            return 'failed'
+        } finally {
+            clearTimeout(timer)
+        }
     }
 
     const abort = async () => {
@@ -1257,7 +1310,10 @@ export function useAgentStream() {
         if (evt === 'skill_update') {
             try {
                 const d = JSON.parse(dataStr)
-                const incoming = Array.isArray(d.skills) ? d.skills : []
+                // 内置工作流不在手动勾选清单里，它的 manual 只可能来自点工作流卡片（随消息显式带上 id）：
+                // 展示上仍按自动接管处理（闪一下、出「已加载」提示），与按触发词命中时一致
+                const incoming = (Array.isArray(d.skills) ? d.skills : []).map(s =>
+                    s && s.builtinWorkflow && s.source === 'manual' ? { ...s, source: 'auto' } : s)
                 // 「新出现的自动命中技能」才闪：手动选的是用户自己点的，不需要提醒他自己；
                 // 连续几轮都命中同一个技能也不该每轮闪一次（那是噪音，不是信息）。
                 const knownAutoIds = new Set(
@@ -1473,7 +1529,9 @@ export function useAgentStream() {
                 if (d.status === 'RUNNING') {
                     isStreaming.value = true // 后台在跑：封发送框，等续流
                 } else if (d.status === 'PAUSED') {
-                    agentPaused.value = { reason: 'max_depth' } // 切回后恢复「继续」按钮
+                    // 切回后恢复「继续」按钮。run_state 不带暂停原因（步数上限、用户暂停……），
+                    // 留空让提示语走通用「任务已暂停」，不替用户猜成步数上限
+                    agentPaused.value = { reason: '' }
                 } else if (d.status === 'INTERRUPTED') {
                     // 上次进程执行中被杀（关 app/崩溃/断电），启动回收标记出来的：
                     // 半截回复已带 [进程中断] 说明，这里补上同一条「继续」入口
@@ -1641,9 +1699,10 @@ export function useAgentStream() {
             if (evt === 'bubble_end' || evt === 'error' || evt === 'cancelled') {
                 isStreaming.value = false
                 roundSettled = true
-                if (evt === 'cancelled') noteStopConfirmed()
+                pausePending.value = false
                 try {
                     const d = JSON.parse(dataStr || '{}')
+                    if (evt === 'cancelled') noteStopConfirmed(d)
                     agentPaused.value = (evt === 'bubble_end' && d.status === 'paused')
                         ? { reason: d.reason || '' } : null
                     // 反问停机（AWAITING_INPUT）：这一路是「重连落在快照未建窗口」的兜底，
@@ -1655,6 +1714,7 @@ export function useAgentStream() {
                         : d.status === 'awaiting_approval' ? 'AWAITING_APPROVAL'
                         : isUserQuestionAwaiting(d) ? 'AWAITING_INPUT' : 'FINISHED'
                 } catch (e) {
+                    if (evt === 'cancelled') noteStopConfirmed(null)
                     agentPaused.value = null
                     agentAwaitingInput.value = false
                     agentRunStatus.value = evt === 'error' ? 'ERROR' : 'FINISHED'
@@ -1820,6 +1880,7 @@ export function useAgentStream() {
             agentRunStatus.value = 'CANCELLED'
             agentAwaitingInput.value = false
             agentPaused.value = null
+            pausePending.value = false
             console.log('[SSE] Received cancelled event')
             flushRemainingBuffer()
             clearDocStreamingPlaceholder(currentAssistantBubble.value)
@@ -1835,9 +1896,18 @@ export function useAgentStream() {
             finalizeProcesses('error')
             // 停止提示的终态文案在这里落定：abort() 之后一直停在「正在停止…」，
             // 收到这条事件才说明后端确实停下来了（计划 K4 ⑦）。
-            noteStopConfirmed()
+            // 载荷带本轮已完成的文档修改次数：有修改时文案写「已停止。已完成 N 次文档修改」，
+            // 气泡标记 documentEdited，「撤销本次 AI 修改」随之出现（别处停止的也一样）
+            let cancelledPayload = null
+            try { cancelledPayload = JSON.parse(dataStr || '{}') } catch (e) { /* 旧后端：纯文案 */ }
+            if (cancelledEditedDocument(cancelledPayload)) {
+                currentAssistantBubble.value.documentEdited = true
+                currentAssistantBubble.value.stopNotice = stopNoticeForCancelled(cancelledPayload, t)
+            }
+            noteStopConfirmed(cancelledPayload)
             isStreaming.value = false
         } else if (evt === 'bubble_end' || evt === 'error') {
+            pausePending.value = false
             // Flush any remaining content in parserBuffer before ending
             flushRemainingBuffer()
             clearDocStreamingPlaceholder(currentAssistantBubble.value)
@@ -1885,13 +1955,21 @@ export function useAgentStream() {
                 let attachmentErrorKey = ''
                 try { const payload = JSON.parse(dataStr); attachmentErrorKey = ({ CONTEXT_PREPARATION_TIMEOUT: 'chat.contextPreparationTimeout', ATTACHMENT_READER_BUSY: 'chat.attachmentReaderBusy', ATTACHMENTS_REQUIRE_TOOLS: 'chat.attachmentsRequireTools' })[payload?.code] || '' } catch (_) { /* plain-text error */ }
                 const errMsg = attachmentErrorKey ? t(attachmentErrorKey) : dataStr && accountPayload ? (accountPayload.message || dataStr) : (dataStr || "Unknown Error")
-                if (isAccountRequired(accountPayload)) {
+                const bqtCode = bqtErrorCode(accountPayload) || bqtErrorCode(errMsg)
+                if (bqtCode) {
+                    // 包晴天积分通道的网关拒绝：只能在包晴天 App 处理，不弹本应用的充值层
+                    currentAssistantBubble.value.content += '\n\n' + bqtErrorMessage(bqtCode, t) + '\n'
+                } else if (isAccountRequired(accountPayload)) {
                     // 这台电脑还没登录账户：就地弹登录层（不是会话失效，不清会话）。
                     // 这一轮不自动重发——登录完用户重发即可。平时走不到这里：ChatInterface
                     // 发送前已经用 requireAccount 拦过，这是后端兜底（如退出登录的同一秒里发出的消息）
                     currentAssistantBubble.value.content +=
                         '\n\n' + t('account.loginDialog.aiNotice') + '\n'
                     promptAccountAction(accountPayload)
+                } else if (accountPayload && accountPayload.reason === 'cross_border_consent_required') {
+                    // 跨境同意闸（后端 CrossBorderConsentService.REASON）：不贴后端那段长文案，
+                    // 气泡里就地出同意卡（RootBubble），同意后原样重发这一问——不让用户跳去设置页
+                    currentAssistantBubble.value.consentRequired = true
                 } else if (isCreditsRequired(accountPayload)) {
                     currentAssistantBubble.value.content += '\n\n' + errMsg + '\n'
                     promptAccountAction(accountPayload)
@@ -2938,6 +3016,8 @@ export function useAgentStream() {
         isStreaming,
         sendMessage,
         abort,
+        pause,
+        pausePending,
         setConversationId: setConversationIdWithReset,
         setConversationScope: value => { conversationScope = value || null },
         resetSSE,

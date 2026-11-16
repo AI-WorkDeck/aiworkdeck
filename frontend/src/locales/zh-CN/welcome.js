@@ -34,7 +34,7 @@ export default {
   signIn: '登录',
   signInTitle: '登录账户（使用 AI、广场付费内容与团队案件库时需要）',
   noProjectTitle: '打开一个项目开始工作',
-  noProjectHint: '在左侧「项目」里打开一个项目，或从欢迎页新建。',
+  noProjectHint: '点左上角「全部项目」选择一个项目，或在欢迎页新建',
   startupDisabledHint: '启动时不再自动显示欢迎页。',
   openWelcome: '打开欢迎页',
   aiNeedsProject: '先打开一个项目，再使用 AI 对话',

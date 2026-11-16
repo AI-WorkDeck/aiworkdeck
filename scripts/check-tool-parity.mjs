@@ -43,7 +43,6 @@ const SKILLS_DIR = path.join(ROOT, 'backend/skills')
 const MATRIX = [
   // ---- 文字（doc_ ↔ office_）----
   ['读取正文', 'doc_get_document_text', 'office_get_text'],
-  ['读取选区', 'doc_get_selection', 'office_get_selection'],
   ['查找文本', 'doc_find_text', 'office_search'],
   ['查找替换', 'doc_find_replace', 'office_replace_text'],
   ['光标处插入', 'doc_insert_at_cursor', 'office_insert_text'],
@@ -56,27 +55,22 @@ const MATRIX = [
   ['插入表格', 'doc_insert_table', 'office_insert_table'],
   ['读取表格', 'doc_table_read', 'office_table_read'],
   ['写表格单元格', 'doc_table_set_cell', 'office_table_set_cell'],
-  ['表格插行', 'doc_table_add_row', 'office_table_add_row'],
-  ['表格删行', 'doc_table_delete_row', 'office_table_delete_row'],
-  ['表格插列', 'doc_table_add_col', 'office_table_add_col'],
-  ['表格删列', 'doc_table_delete_col', 'office_table_delete_col'],
+  ['表格插行列', 'doc_table_insert', 'office_table_insert'],
+  ['表格删行列', 'doc_table_delete', 'office_table_delete'],
   ['表格格式', 'doc_format_table', 'office_format_table'],
   ['分页/分节符', 'doc_insert_break', 'office_insert_break'],
   ['超链接', 'doc_set_hyperlink', 'office_set_hyperlink'],
   ['页眉页脚', 'doc_edit_header_footer', 'office_edit_header_footer'],
   ['插入目录', 'doc_insert_toc', 'office_insert_toc'],
   ['页面设置', 'doc_set_page_setup', 'office_set_page_setup'],
-  ['插入脚注', 'doc_insert_footnote', 'office_insert_footnote'],
-  ['插入尾注', 'doc_insert_endnote', 'office_insert_endnote'],
+  ['插入脚注尾注', 'doc_insert_note', 'office_insert_note'],
   ['插入图片', 'doc_insert_image', 'office_insert_image'],
   ['添加批注', 'doc_add_comment', 'office_add_comment'],
   ['读取批注', 'doc_get_comments', 'office_get_comments'],
-  ['回复批注', 'doc_reply_comment', 'office_reply_comment'],
-  ['解决批注', 'doc_resolve_comment', 'office_resolve_comment'],
+  ['回复/解决批注', 'doc_update_comment', 'office_update_comment'],
   ['删除批注', 'doc_delete_comment', 'office_delete_comment'],
   ['读取修订', 'doc_list_revisions', 'office_get_revisions'],
-  ['接受修订', 'doc_accept_revision', 'office_accept_revision'],
-  ['拒绝修订', 'doc_reject_revision', 'office_reject_revision'],
+  ['接受/拒绝修订', 'doc_revisions', 'office_revisions'],
 
   // ---- 表格（sheet_ ↔ office_excel_）----
   ['表格读区域', 'sheet_read_range', 'office_excel_get_range'],
@@ -106,7 +100,6 @@ const MATRIX = [
 
   ['文档大纲', 'doc_get_outline', 'office_get_outline'],
   ['文档条款', 'doc_get_clauses', 'office_get_clauses'],
-  ['第N处精确替换', 'doc_replace_nth_match', 'office_replace_nth_match'],
   ['结构审计', 'doc_audit_structure', 'office_audit_structure'],
   ['应用样式模板', 'doc_apply_style_profile', 'office_apply_style_profile'],
   // ---- 演示（slide_ ↔ office_ppt_）----
@@ -115,9 +108,7 @@ const MATRIX = [
   ['设置形状样式', 'slide_format_shape', 'office_ppt_format_shape'],
   ['跳转幻灯片', 'slide_goto', 'office_ppt_goto'],
   ['设置幻灯片版式', 'slide_set_layout', 'office_ppt_set_layout'],
-  ['新建表格（桌面项目文件；插件当前宿主空白文档）', 'sheet_create_file', 'office_file_create'],
-  ['打开文件（插件从项目打开新副本）', 'doc_open_file', 'office_file_open'],
-  ['PDF导出到项目', 'doc_export_pdf', 'office_file_export_pdf'],
+  ['文件新建/打开/保存/导出（插件 office_file 的 action；桌面对应 doc_open_file 等）', 'doc_open_file', 'office_file'],
   ['演示概览', 'slide_get_overview', 'office_ppt_get_slides'],
   ['读取单页', 'slide_get_page', 'office_ppt_get_slide_details'],
   ['演示查找替换', 'slide_replace_text', 'office_ppt_replace_text'],
@@ -146,26 +137,21 @@ const MATRIX = [
  * 插件面补不了这些**不是缺口**——理由必须说清为什么补不了或不该补。
  */
 const LOWA_ONLY = {
-  '演示新建由上表office_file_create在PowerPoint/WPS演示宿主覆盖；插件返回未保存文稿，桌面创建项目PPTX': ['slide_create_file'],
+  '看真实画面靠桌面引擎把当前文档导出 PDF 再渲染（office-tier1）；Office.js 没有页面渲染/截图接口，插件在真 Word/PPT 里由用户自己看': ['doc_view_pages'],
+  '新建演示/表格、导出PDF由插件 office_file 的 create / export_pdf 动作覆盖（V4 合并）；插件返回未保存文稿，桌面创建项目文件': ['slide_create_file', 'sheet_create_file', 'doc_export_pdf'],
   '桌面引擎历史/检查点/流式调试机制；Office无公开撤销栈，WPS未在本桥暴露对应命令；不与接受/拒绝修订混同': [
-    'doc_undo', 'doc_redo', 'doc_restore_checkpoint', 'doc_start_stream', 'doc_debug_revisions'
-  ],
-  '全量修订动作并入既有office_accept_revision(acceptAll=true)/office_reject_revision(rejectAll=true)，不是插件缺失；宿主版本门槛与原生验收仍独立': [
-    'doc_accept_all_revisions', 'doc_reject_all_revisions'
+    'doc_undo', 'doc_redo', 'doc_restore_checkpoint', 'doc_start_stream'
   ],
   '光标/选区定位面：LOWA 的编辑是「先选中再改」，插件面一律按锚点文本定位，没有独立的选区原语': [
-    'doc_select_anchor', 'doc_select_paragraph', 'doc_set_selection', 'doc_collapse_cursor',
-    'doc_goto', 'doc_get_cursor_context', 'doc_replace_selection', 'doc_delete_selection'
+    'doc_select', 'doc_get_cursor_context', 'doc_replace_selection', 'doc_delete_selection'
   ],
   'office_get_paragraphs提供当前快照段落序号（编辑后可漂移，非稳定ID）；读取可分页，按旧序号写入/标题下插入仍需重新定位，不宣称字符分页等价': [
     'doc_get_paragraph', 'doc_modify_paragraph',
     'doc_insert_under_heading'
   ],
   '桌面anchorId不可移植到插件文字锚点；须重新读取核验目标，replaceAll不是单处锚点替代': ['doc_replace_at_anchor'],
-  '第N处删除由office_replace_nth_match(matchIndex为1基,replaceText为空)表达；不能改用replaceAll扩大范围': ['doc_delete_match'],
-  '按文本删除由office_replace_text空替换表达，严格保持首处/全部选择；不是任意定位等价': ['doc_delete_text'],
   '项目文件面，不属于文档编辑基本面（插件会话用 read_file / search_project_files 等通用工具）': [
-    'doc_list_project_files', 'doc_search_related_docs', 'doc_link_evidence', 'doc_list_evidence'
+    'doc_list_project_files', 'doc_link_evidence', 'doc_list_evidence'
   ],
   '表格行高列宽：插件面并进了 office_excel_edit_rows_cols 的 set_width / set_height 两个 action': [
     'sheet_set_row_col'
@@ -177,18 +163,17 @@ const LOWA_ONLY = {
  */
 const OFFICE_ONLY = {
   '段落结构分页读取，保留原office_get_text字符分页': ['office_get_paragraphs'],
-  '显式保存宿主当前文档；桌面使用正常自动保存；Microsoft PPT无公开原位保存API': ['office_file_save'],
+  'LOWA 侧 doc_get_selection / doc_replace_nth_match 已在工具体系 v2 V3 删除（选区由 doc_get_cursor_context、按序号改写由 doc_find_text + doc_replace_at_anchor 覆盖）；插件面保留原语': [
+    'office_get_selection', 'office_replace_nth_match'
+  ],
   '批量/过卷原语：Office.js 每处改动都要一次 Word.run 往返，几十处就会撞上单轮步数上限；LOWA 侧一次 find_replace 就是引擎原生全文替换，不需要成批提交': [
     'office_replace_batch', 'office_pass_step'
   ],
   'Word 专属对象模型：LOWA（LibreOffice）没有对等概念或没有可用的写入路径': [
     'office_manage_content_control', 'office_set_document_properties'
   ],
-  '公式单独成面：LOWA 的 sheet_write_cells 同一条命令就能写公式，插件面因 Office.js 的 values 与 formulas 是两个属性而拆成两条': [
-    'office_excel_set_formulas'
-  ],
   '表格批注线程：Excel 的批注有线程语义（回复/解决），LibreOffice Calc 的批注是单条，没有对等动作': [
-    'office_excel_reply_comment', 'office_excel_resolve_comment'
+    'office_excel_update_comment'
   ]
 }
 

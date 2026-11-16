@@ -8,7 +8,7 @@
         <path v-for="(d, gi) in ICONS.search" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
       <input class="msb-search-input" v-model="searchText" :placeholder="$t('common.search') + ' · ' + $t('market.sectionSkillTitle') + ' / ' + $t('market.sectionPluginTitle') + ' / ' + $t('mcp.label')" />
-      <view v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
+      <view :title="$t('common.clear')" v-if="searchText" class="msb-search-clear" @tap="searchText = ''">×</view>
     </view>
 
     <view class="msb-body">
@@ -70,6 +70,7 @@
             <text>{{ row.stateLabel }}</text>
           </view>
         </view>
+        <view class="msb-list-end" />
         </scroll-view>
       </view>
       </view>
@@ -205,6 +206,7 @@
             </view>
           </view>
         </template>
+        <view class="msb-list-end" />
         </scroll-view>
       </view>
       </view>
@@ -590,7 +592,7 @@ export default {
     async installPluginRow(row) {
       if (this.pluginBusyId) return
       const m = row.raw
-      const labels = { file_read: 'permFileRead', file_write: 'permFileWrite', network: 'permNetwork', im: 'permIm', notifications: 'permNotifications', editor: 'permEditor', ai: 'permAi', speech: 'permSpeech', tasks: 'permTasks', clipboard: 'permClipboard', lawfirm: 'permLawfirm' }
+      const labels = { file_read: 'permFileRead', file_write: 'permFileWrite', network: 'permNetwork', im: 'permIm', notifications: 'permNotifications', editor: 'permEditor', ai: 'permAi', speech: 'permSpeech', tasks: 'permTasks', clipboard: 'permClipboard', lawfirm: 'permLawfirm', worklog_read: 'permWorklogRead' }
       const perms = (m.permissions || []).map(p => labels[p] ? this.$t(`market.${labels[p]}`) : p).join(this.$t('market.listSeparator')) || this.$t('market.noSensitiveCapability')
       const ok = await new Promise(resolve => {
         uni.showModal({
@@ -748,6 +750,14 @@ export default {
   flex: 1;
   height: 0;
   min-height: 0;
+  /* 底部淡出：两组对半分高时，被截断的行渐隐，看得出「下面还有、可滚动」，
+     而不是像被下一组压住。末尾的 .msb-list-end 垫出同样高度，滚到底时最后一行完整可见。 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+
+.msb-list-end {
+  height: 24px;
 }
 
 /* 分组头：VS Code 式全大写小字 + 计数 */

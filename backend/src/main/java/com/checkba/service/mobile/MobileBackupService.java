@@ -56,7 +56,7 @@ public class MobileBackupService {
     public Map<String,Object> consent(Long id, boolean enabled, String version) {
         if (!CONSENT_VERSION.equals(version)) throw new IllegalArgumentException(com.checkba.service.LangText.of("请阅读并确认当前文件云端备份说明", "Please review and confirm the current cloud backup notice"));
         User u=users.lockStorageOwner(id).orElseThrow(() -> new IllegalArgumentException(com.checkba.service.LangText.of("用户不存在", "User not found")));
-        if(enabled && quota.postpaidEnabled()) {
+        if(enabled && quota.postpaidFor(id)) {
             var state=quota.cloudAccess(id);
             if(Boolean.TRUE.equals(state.get("frozen"))) throw new IllegalArgumentException(CloudBillingText.get("writesPaused"));
         }

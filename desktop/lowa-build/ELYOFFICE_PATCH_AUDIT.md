@@ -9,7 +9,7 @@
 |---|---|
 | Upstream Project | [ElyOffice](https://git.zacharyzhang.com/ZacharyZhang-NY/ElyOffice) |
 | Upstream Version / Commit | `0.1.8` (`0d991e1c715859abd1282981fd46989e7e2319c7`) |
-| Upstream Author & License | Copyright Zachary Zhang and ElyOffice contributors — `AGPL-3.0-or-later` (LibreOffice patches modify MPL-2.0 files and introduce MPL-2.0 headers on new LibreOffice source files) |
+| Upstream Author & License | Copyright Zachary Zhang and ElyOffice contributors — `AGPL-3.0-or-later` (LibreOffice patches modify MPL-2.0 files and introduce MPL-2.0 headers on new LibreOffice source files) (on 2026-10-19 upstream relicensed its own code to MIT; the LibreOffice patches remain MPL-2.0) |
 | ElyOffice LO Base | LibreOffice `26.2.6.3` (`8221e31`) |
 | AI WorkDeck LOWA Base | LibreOffice `24.2.8` (`distro/allotropia/zeta-24-2`, rev `dced3bc71`) |
 

@@ -512,6 +512,8 @@ function createMainWindow() {
       ],
       contextIsolation: true,
       nodeIntegration: false,
+      // 显式写明：preload 只用 contextBridge/ipcRenderer/webUtils 与 process.argv，沙箱下可用（S26）
+      sandbox: true,
       // 允许跨域 Cookie（历史：为第三方在线编辑器 SameSite Cookie 而设；行为保留以兼容其它跨域资源）
       webSecurity: false,
       // Epic #43: allow <webview> for the embedded LibreOffice editor (isolated
@@ -547,6 +549,7 @@ function createMainWindow() {
   })
 
   // UI：直接复用现有 frontend（开发态用 dev server）
+  let appEntryPath = null
   if (IS_DEV) {
     mainWindow.loadURL(DEV_SERVER_URL)
     // 截图走查时那扇分离的 DevTools 窗恒在应用窗之上，正文区域拍不到；给个开关关掉它。
@@ -566,6 +569,7 @@ function createMainWindow() {
         }
       } catch (e) { /* overlay 损坏时静默回内置 */ }
     }
+    appEntryPath = distPath
     mainWindow.loadFile(distPath)
   }
 
@@ -591,44 +595,21 @@ function createMainWindow() {
   mainWindow.on('unmaximize', sendChromeState)
   mainWindow.webContents.on('did-finish-load', sendChromeState)
 
-  // 拦截渲染进程里的 window.open（包括嵌入页/iframe 点击超链接）
+  // 主窗口导航 / window.open / <webview> 白名单（S26）：主窗口带 preload 桥，只能停在应用页上。
   // - 内部协议 checkba://... => 交给渲染层打开“网核中心定位”
-  // - 其它 http(s) => 走工作区浏览器新 tab
-  try {
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-      const u = String(url || '')
-      if (u.startsWith('checkba:')) {
-        try {
-          mainWindow.webContents.send('checkba:app-open-internal', { url: u })
-        } catch (e) {
-          // ignore
-        }
-        return { action: 'deny' }
-      }
-      if (/^https?:\/\//i.test(u)) {
-        try {
-          mainWindow.webContents.send('checkba:browser-open-new-tab', { id: 'renderer', url: u })
-        } catch (e) {
-          // ignore
-        }
-        return { action: 'deny' }
-      }
-      return { action: 'allow' }
-    })
-    mainWindow.webContents.on('will-navigate', (event, url) => {
-      const u = String(url || '')
-      if (u.startsWith('checkba:')) {
-        event.preventDefault()
-        try {
-          mainWindow.webContents.send('checkba:app-open-internal', { url: u })
-        } catch (e) {
-          // ignore
-        }
-      }
-    })
-  } catch (e) {
-    // ignore
-  }
+  // - window.open 的 http(s) => 走工作区浏览器新 tab（独立 BrowserView，无 preload）
+  // - 顶层导航到 http(s)/mailto => 拦下，交给系统浏览器；其余拦下
+  // 判定与测试见 navigation-guard.js / tests/navigation-guard.test.js
+  const guardedContents = mainWindow.webContents
+  require('./navigation-guard').installMainWindowGuards(guardedContents, {
+    appRoot: IS_DEV ? null : path.dirname(appEntryPath),
+    devOrigin: IS_DEV ? DEV_SERVER_URL : null,
+    preloadDir: path.join(__dirname, '../preload'),
+    openExternal: (url) => shell.openExternal(url),
+    sendInternal: (url) => guardedContents.send('checkba:app-open-internal', { url }),
+    sendOpenTab: (url) => guardedContents.send('checkba:browser-open-new-tab', { id: 'renderer', url }),
+    log: (kind, detail) => console.warn('[navigation-guard]', kind, detail),
+  })
 
   // 启动时恢复用户上次手动最大化的状态（问题 18）——唯一一处打在主窗口上的几何 setter
   if (restored.maximized) mainWindow.maximize()

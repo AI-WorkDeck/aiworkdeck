@@ -90,7 +90,7 @@
                <!-- 与资源管理器文件行同一个图标组件（dev-board#973） -->
                <view class="file-icon"><FileTypeIcon :type="file.fileType" /></view>
                <text class="file-name" :title="file.name">{{ file.name }}</text>
-               <text class="remove-btn" @tap.stop="$emit('remove', file.id)">×</text>
+               <text :title="$t('common.remove')" class="remove-btn" @tap.stop="$emit('remove', file.id)">×</text>
             </view>
         </scroll-view>
 

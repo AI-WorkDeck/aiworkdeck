@@ -141,6 +141,13 @@
                   <span>{{ item.statusLabel }}</span>
                   <div v-if="item.prUrl" class="awdfb-mine-pr" role="button" @click="openPr(item.prUrl)">{{ $t('feedback.viewPr') }}</div>
                 </div>
+                <div v-if="item.reporterResponse" class="awdfb-mine-response">
+                  <div class="awdfb-mine-response-label">{{ $t('feedback.reporterResponse') }}</div>
+                  <div class="awdfb-mine-response-text">{{ item.reporterResponse }}</div>
+                  <div v-if="item.responseTimeLabel" class="awdfb-mine-response-time">
+                    {{ $t('feedback.responsePublishedAt', { time: item.responseTimeLabel }) }}
+                  </div>
+                </div>
               </div>
             </div>
           </template>
@@ -173,12 +180,13 @@ import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 const MAX_IMAGES = 10
 const MAX_RECORD_SECONDS = 120
 
-// 状态对用户的说法：不暴露 NEW/PR_OPENED/EMAILED/SKIPPED/FAILED 这些内部枚举。
+// 状态对用户的说法：不暴露 NEW/PR_OPENED/EMAILED/SKIPPED/FAILED/RESOLVED 这些内部枚举。
 const MINE_STATUS_LABELS = {
   PR_OPENED: 'feedback.statusPrOpened',
   EMAILED: 'feedback.statusEmailed',
   SKIPPED: 'feedback.statusSkipped',
   FAILED: 'feedback.statusFailed',
+  RESOLVED: 'feedback.statusResolved',
 }
 
 function mineStatusLabel(item) {
@@ -208,6 +216,8 @@ function formatMineItem(item) {
     timeLabel: mineTimeLabel(item.createdAt),
     statusLabel: mineStatusLabel(item),
     prUrl: item.prUrl || '',
+    reporterResponse: String(item.reporterResponse || '').trim(),
+    responseTimeLabel: mineTimeLabel(item.responsePublishedAt),
   }
 }
 
@@ -978,6 +988,32 @@ function pickAudioMime() {
 
 .awdfb-mine-pr:hover {
   text-decoration: underline;
+}
+
+.awdfb-mine-response {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: var(--awd-radius-sm);
+  background: var(--awd-bg);
+}
+
+.awdfb-mine-response-label,
+.awdfb-mine-response-time {
+  font-size: var(--awd-panel-fs-meta);
+  color: var(--awd-text-2);
+}
+
+.awdfb-mine-response-text {
+  margin-top: 4px;
+  font-size: var(--awd-panel-fs);
+  line-height: 1.5;
+  color: var(--awd-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.awdfb-mine-response-time {
+  margin-top: 4px;
 }
 
 .awdfb-badge {

@@ -41,7 +41,7 @@
       "上市法律意见书复核"
     ],
     "allowedTools": [
-      "read_document",
+      "extract_file_text",
       "doc_get_document_text",
       "doc_get_outline",
       "doc_get_clauses",
@@ -49,7 +49,6 @@
       "search_project_files",
       "read_file",
       "law_search",
-      "law_search_keyword",
       "get_law_article",
       "law_recognition",
       "write_docx",
@@ -59,11 +58,9 @@
       "doc_add_comment",
       "search_web",
       "browse_url",
-      "deep_search",
       "query_memory",
       "save_memory",
-      "retrieve_evidence",
-      "get_user_profile"
+      "retrieve_evidence"
     ],
     "category": "compliance",
     "downloads": 4,
@@ -141,7 +138,7 @@
       "条款换立场"
     ],
     "allowedTools": [
-      "read_document",
+      "extract_file_text",
       "write_docx",
       "doc_add_comment"
     ],
@@ -168,7 +165,7 @@
       "条款摘要"
     ],
     "allowedTools": [
-      "read_document",
+      "extract_file_text",
       "write_docx"
     ],
     "category": "contract",
@@ -195,7 +192,7 @@
     ],
     "allowedTools": [
       "list_files",
-      "read_document",
+      "extract_file_text",
       "write_docx"
     ],
     "category": "office",
@@ -222,7 +219,7 @@
     ],
     "allowedTools": [
       "list_files",
-      "read_document",
+      "extract_file_text",
       "write_docx"
     ],
     "category": "compliance",
@@ -249,7 +246,7 @@
     ],
     "allowedTools": [
       "list_files",
-      "read_document",
+      "extract_file_text",
       "write_docx"
     ],
     "category": "contract",
@@ -275,7 +272,7 @@
       "检查引注"
     ],
     "allowedTools": [
-      "read_document",
+      "extract_file_text",
       "law_search",
       "web_search",
       "doc_add_comment"

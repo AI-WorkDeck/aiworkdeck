@@ -47,12 +47,7 @@ class ToolSchemaBudgetTest {
      * 真要估 token、估钱，看这一个。
      */
     static int wireBytes(List<ToolSpecification> specs) {
-        if (specs.isEmpty()) {
-            return 0;
-        }
-        String json = dev.ai4j.openai4j.Json.toJson(
-                dev.langchain4j.model.openai.InternalOpenAiHelper.toTools(specs, false));
-        return json.replaceAll("[ \\t\\n\\r]", "").length();
+        return ToolSurfaceMetrics.wireJson(specs).length();
     }
 
     /** 粗估一份工具规格的体量：名字 + 描述 + 每个参数的名字与说明。与真实 JSON schema 同量级。 */
@@ -206,11 +201,10 @@ class ToolSchemaBudgetTest {
         // 改动前在这些会话里同样下发的「桌面专属 + 永久停用」工具。它们一个前缀都不带，
         // 所以旧规则下每种会话都放行；这里按名字取回规格，算出改动前的体量做对照。
         List<String> hiddenByDeclaration = List.of(
-                "pptx_open_file", "pptx_generate", "pptx_apply_format",
+                "pptx_generate",
                 "litigation_render", "litigation_timeline_render",
                 "pdf_to_word", "pdf_highlight", "pdf_annotate", "pdf_redact", "pdf_replace_text",
-                "text_write_file", "text_find_replace",
-                "delete_file");
+                "text_find_replace");
         List<ToolSpecification> hiddenSpecs = hiddenByDeclaration.stream()
                 .map(n -> registry.resolve(n).orElseThrow(
                         () -> new AssertionError("登记必须保留（只裁 spec、不裁 resolve）：" + n)).spec())
@@ -226,7 +220,7 @@ class ToolSchemaBudgetTest {
             // 这里只挑三个最能说明问题的：发 UI 指令的、发配置界面的、改纯文本的。
             assertFalse(names.contains("pptx_generate"), conv + "：" + names);
             assertFalse(names.contains("litigation_render"), conv + "：" + names);
-            assertFalse(names.contains("text_write_file"), conv + "：" + names);
+            assertFalse(names.contains("text_find_replace"), conv + "：" + names);
             // 只读面必须留着：收窄的是"改"，不是"读"
             assertTrue(names.contains("pdf_inspect"), conv + " 的 PDF 读取面不该跟着消失：" + names);
         }

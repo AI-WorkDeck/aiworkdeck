@@ -221,6 +221,29 @@ class PluginDevServiceTest {
         verify(pluginService, never()).rescan();
     }
 
+    private static final String DECLARED_TOOL = "{\"name\":\"demo_plugin_agenda\",\"description\":\"x\",\"access\":\"read\","
+            + "\"handler\":{\"type\":\"service\",\"service\":\"calendar\",\"operation\":\"listForUser\"},\"permissions\":[\"file_read\"]}";
+
+    @Test
+    void installAcceptsDeclarativeToolsButNotJarTools() throws Exception {
+        Long ok = seedSourcePlugin("demo-plugin", validManifest("demo-plugin").replace("\"tools\":[]", "\"tools\":[" + DECLARED_TOOL + "]"));
+        service.install(PROJECT, ok);
+        assertTrue(Files.exists(pluginsDir.resolve("demo-plugin/manifest.json")));
+
+        Long legacy = seedSourcePlugin("legacy-plugin", validManifest("legacy-plugin")
+                .replace("\"tools\":[]", "\"tools\":[{\"name\":\"legacyTool\",\"description\":\"x\"}]"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> service.install(PROJECT, legacy)).getMessage().contains("tools"));
+        assertFalse(Files.exists(pluginsDir.resolve("legacy-plugin")));
+    }
+
+    @Test
+    void installRejectsInvalidDeclarativeTool() {
+        Long bad = seedSourcePlugin("demo-plugin", validManifest("demo-plugin")
+                .replace("\"tools\":[]", "\"tools\":[" + DECLARED_TOOL.replace("demo_plugin_agenda", "other_agenda") + "]"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> service.install(PROJECT, bad)).getMessage().contains("demo_plugin_"));
+        assertFalse(Files.exists(pluginsDir.resolve("demo-plugin")));
+    }
+
     @Test
     void installCollectsReadableErrorsForBadManifest() {
         String manifest = "{\"id\":\"other-name\",\"name\":\"x\",\"frontendEntry\":\"index.html\","

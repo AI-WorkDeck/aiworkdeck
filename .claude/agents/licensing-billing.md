@@ -168,6 +168,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   `connect/disconnect/status/fetchProfile/fetchEntitlements/fetchLedger/fetchAiUsage/fetchAiKey/currentKeyOrNull`，
   以及个人档案那一组 `profileIdentity/updateDisplayName/uploadAvatar/deleteAvatar`（见下方「身份展示」一节）。
 - `service/account/AccountTransport.java` + `HttpAccountTransport.java` — 出站 HTTP 缝（单测打桩不依赖网络）；固定 HTTP/1.1。
+- `POST /api/account/ai-key` 是账户请求里唯一不按 5 秒超时的：`HttpAccountTransport.AI_KEY_TIMEOUT`=15 秒（官网重启后首次拉平台模型目录冷启动约 5.7 秒；5 秒会让新用户首次登录落成「额度尚未就绪」，而桥接登录的 `tryProvision` 只记日志不重试，用户只有这一次机会）。`AccountService.fetchAiKeyWith` 遇网络失败再重试一次（幂等端点，仅一次）。回归：`HttpAccountTransportColdStartTest`、`AccountServiceTest.aiKey*Retr*`。
   `sendMultipart(method,url,bearer,Multipart)` 是头像上传那条路，**默认实现直接抛**——
   给个默认返回值会让「桩根本没接这条路」在测试里表现成一次成功的上传。
 - `service/account/AccountEndpoint.java` — 授权服务器地址的协议校验（https，回环 http 例外），`LicenseService` 与 `AccountService` 共用。
@@ -255,7 +256,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
 - 前端 `frontend/src/utils/marketPricing.js` — 价格展示与状态判定的唯一出口。
 
 **server 模式加固（插件云后端，2026-08-06）**
-- `backend/src/main/java/com/checkba/service/AuthAbuseGuard.java` — 注册闸（`security.registration-mode: open|closed`，默认 open）+ 登录失败锁定（IP+用户名 5 次失败锁 10 分钟）+ 注册按 IP 限频（10/小时）+ **成员查询限频**（dev-board#444：按发起的项目管理员，10 分钟 30 次；`GET /api/projects/{id}/members/lookup` 与 `POST .../members` **共用这一个计数**——两者是同一个「这个手机号注册过没有」的探测面，分开计等于把额度翻倍，交替调两个端点即可绕开）。进程内内存计数，**多实例部署必须前置 nginx limit_req**；local-mode 全部旁路。新增维度记得同步 `purgeIfOversized`（否则伪造维度能把内存撑爆）。
+- `backend/src/main/java/com/checkba/service/AuthAbuseGuard.java` — 注册闸（`security.registration-mode: open|closed`，默认 open）+ 登录失败锁定（IP+用户名 5 次失败锁 10 分钟）+ 注册按 IP 限频（10/小时）+ **成员查询限频**（dev-board#444：按发起的项目管理员，10 分钟 30 次；`GET /api/projects/{id}/members/lookup` 与 `POST .../members` **共用这一个计数**——两者是同一个「这个手机号注册过没有」的探测面，分开计等于把额度翻倍，交替调两个端点即可绕开）。进程内内存计数，**多实例部署必须前置 nginx limit_req**；local-mode 全部旁路。**IP 一律取 `util/ClientIp.of(request)`**，不要直接 `getRemoteAddr()`：后端只听回环、同机 nginx 反代时对端恒为 127.0.0.1，`ClientIp` 只在对端为回环时采信 nginx 用 `$remote_addr` 覆盖写入的 `X-Real-IP`（deploy 下每个反代 `/api/` 的 location 都写了），永不看 X-Forwarded-For；case/cloud 另开着 RemoteIpValve，那里对端已是真实地址、原样采用。客户访问码另有全站宽上限（10 分钟 200 次失败，`checkClientCodeGlobalCeiling`/`recordClientCodeFailure`）。新增维度记得同步 `purgeIfOversized`（否则伪造维度能把内存撑爆）。
 - `backend/src/main/java/com/checkba/service/account/AwdkLoginService.java` — 官网账户 → server 会话桥。核心一段：awdk_ Key 调官网 `/api/account/me` 实时校验 → `account_binding` 映射（键是官网稳定 `accountId`，官网侧已实施并进了权威契约与 contract-check）→ 首登 `UserService.registerExternal` 建无密码用户（`awd_` 前缀）→ `DeviceTokenService.issue` 签发 awdt_ → **顺手为该用户取一把 per-user 平台 AI key**（`PlatformAiKeyService.tryProvision`，失败绝不拖垮桥接）。
   Key 有两种来源，桥接之后完全相同：**账户登录**（`loginWithPhone`/`loginWithPassword`，先调官网 `/api/auth/exchange-key` 换出 Key，用户看不见它；配套 `sendLoginCode`）与**手工粘贴**（`login(key)`，私有部署与团队服务器）。两者共用开关 `security.awdk-login-enabled`（默认 false）——同一条桥的两个入口，**刻意不拆成两个开关**，否则会出现「登录能用但桥是关的」这种自相矛盾的配置。
   端点全在 `AuthController`，全部匿名：`POST /api/auth/awdk-login`、`POST /api/auth/account-login`、`POST /api/auth/account-login/send-code`。
@@ -380,7 +381,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
 
 **手机号强制登录与补绑期（2026-08-18）**
 - 设计 `docs/superpowers/specs/2026-08-17-phone-login-design.md` §5。官网侧同一口径的参照实现是
-  `aiworkdeck_website` 的 `lib/phone-policy.ts`（`gateForUser()`）+ `app/api/auth/login/route.ts`。
+  官网仓 `aiworkdeck-website` 的 `lib/phone-policy.ts`（`gateForUser()`）+ `app/api/auth/login/route.ts`。
 - `config/PhoneLoginGuard.java` 一个类兼两职：**启动期**断言（开了强制但短信网关是暗的 → 拒绝启动，
   不静默降级成谁都进不来）＋**运行期**三态闸 `gateFor(user)` → `OK` / `MUST_BIND` / `BLOCKED`。
   `required = phone-login-required && !local-mode`——local-mode 免登没有登录环节，闸恒不生效。
@@ -608,6 +609,15 @@ mobile | meeting | dictation`（缺省不带这个键，前端用通用说明）
 `recordAccountConsents()`：协议版本 `POST /api/license/agreement` + `POST /api/admin/config {ai:{crossBorderConsent:true}}`，
 失败不拦路）。**新增连接账户的入口必须接这一步**，并在连上后调 `AccountSwitchCleanup.afterConnect()`
 （它把这份 pending 同意绑到新账户）。前端 `getWizardStatus`/`submitWizard` 两个 api 封装随之删除。
+
+**同意失效时就地征求，不让用户跳设置页（2026-11-11）**：告知改版、换账户、切站后，已登录的人不会再经过登录弹层，
+以前只在对话里撞上一段「到设置 → AI 服务配置勾选」的长报错。现在两处原地征求，都用
+`components/account/CrossBorderConsentCard.vue`（措辞按站点取登录弹层同一套 `onboarding.unlock.crossBorder*[Domestic]`）：
+① 对话：SSE error 载荷 `reason === 'cross_border_consent_required'` → `useAgentStream` 给气泡置 `consentRequired`，
+RootBubble 出同意卡；「同意并继续」后 ChatInterface `retryAfterConsent` 走重新生成同一条链路（截断+存档+原样重发），不再弹确认框。
+② 启动：工作台 `loadLicenseMode` 确认已连账户后调 `GET /api/ai/cross-border-consent`，`required` 时弹一次征求框（可「以后再说」）。
+判据 `ChatModelFactory.crossBorderConsentRequired` 与运行时闸同一份；记录走 `POST /api/ai/cross-border-consent`
+→ `CrossBorderConsentService.record()`（写法同设置页勾选，盖当前账户与站点）。同意从不预设，只在用户点按钮时记。
 
 **跨境同意按「账户 + 站点」记录，且有运行时闸（dev-board#1713，问题 130）**：判定与记录只在
 `service/ai/CrossBorderConsentService`。键：`ai.crossBorder.consentAt/consentVersion`（原有）+
@@ -1618,6 +1628,12 @@ The mobile capability endpoint passes the authenticated user through the existin
 国际 Circle 账户可取得本站受限网关通道；国内仍要求百炼。缓存同时核账户指纹、站点与网关 base URL。包晴天扫码入口仅在大陆且 captcha-config 的 bqtScanEnabled 严格为 true 时显示；服务端未配置时正常密码登录仍可用。二维码只含公开 qrid，create 回执的 pollToken 仅留当前会话内存；前端请求本机 X-Bqt-Poll-Token，Java 通过专用登录 GET 的 Authorization Bearer 转发官网。不得把 pollToken 放进 URL 或二维码。网站原子消费扫码会话，确认响应丢失需刷新二维码；前端轮询互斥且丢弃已替换会话回执。
 
 验证：frontend/tests/account/bqt-poll.test.mjs 的缺 proof/串行/迟到结果保护；AccountServiceTest 校验 proof 透传、缺值拒绝。真实上游扫码需原位生产凭据和显式启用后另验。
+
+## 包晴天积分通道（billingLine=bqt）
+
+官网是余额与扣点权威。`/api/account/me` 的 `billingLine`（bqt|circle|standard）与 `bqtMember` 由 `BqtBilling.copyBillingFields` 透传到 `/api/account/balance` 与 `/api/account/usage` 的 platform 段；旧官网缺省记 standard/null，非 bqt 线一律不透 bqtMember。有 bqtMember 时设置页会员卡（`AdminPane` 的 `walletBqtMember`）取代旧 `bqtQingtian` 晴天币块；`isBqtBilling` 隐藏充值按钮、兑换码、Pro 订阅/管理按钮，改显示「请在包晴天 App 充值/续费」；`RechargeDialog` 打开时查一次余额，bqt 线只显示说明、不建单（覆盖 requireRecharge 自动弹层与写作宿主入口）。
+
+错误码 `bqt_member_invalid/ai_closed/insufficient_points/outstanding_debt/unavailable/recharge_via_bqt` 是业务态：`AccountService.handle`/ai-key/purchase 转 REJECTED（或 SkuPurchaseException）+ reason；`PlatformGatewayClient` 在状态码分类前识别（否则 403 会被判 UNAUTHORIZED 并标账户失效），带 `reason` 出信封；`AgentOrchestrator` onError 沿异常链认码后直接终态，不重试、不换模型、不转 no_credits。前端 `utils/bqtBilling.js` 与 `api.js`（内联同一规则，因 request() 被测试按源码注入）按 reason 取 `agentStream.bqt*` 20 语种文案。验证：`AccountServiceTest`、`PlatformGatewayClientTest`、`tests/account/bqt-billing.test.mjs`、`tests/project-home/network-unreachable-notice.test.mjs`。
 
 ## 云按量账务与后付费（dev-board#1701/#1703，默认关闭）
 

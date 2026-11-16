@@ -41,7 +41,7 @@ export const APP_COMMANDS = [
     id: 'app.account',
     // 文案里别用 &：Electron 把它当助记符标记吃掉（真机实测菜单显示成
     // 「Account  License…」，中间空两格）。要么写 &&，要么换词——换词更省事。
-    label: { zh: '账户与授权…', en: 'Account and License…' },
+    label: { zh: '账户与余额…', en: 'Account and Balance…' },
     menu: 'app', group: 2,
     run: 'app:openAccount',
   },

@@ -2,7 +2,7 @@
 name: 作者名片
 skill: mqc-litigation-visual-redraw
 project: 新诉讼可视化 · New Litigation Visualization
-version: 1.0.2
+version: 1.1.0
 last_updated: 2026-07-09
 ---
 
@@ -57,4 +57,4 @@ Visualization」** 开源项目的首个模块，专责把凌乱或"AI 味"的�
 ---
 
 <p align="center"><b>把法律画出来 · Make the Law Visible</b><br/>
-新诉讼可视化 New Litigation Visualization · 缪奇川 出品 · v1.0.2</p>
+新诉讼可视化 New Litigation Visualization · 缪奇川 出品 · v1.1.0</p>

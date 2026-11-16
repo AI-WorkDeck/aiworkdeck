@@ -31,14 +31,25 @@ try {
     { name: 'template.docx', bytes: read('../../../docs/template.docx'), writer: true },
     { name: 'comment-batch-revisions.docx', bytes: read('./fixtures/comment-batch-revisions.docx'), writer: true },
     { name: 'impress-smoke.pptx', bytes: read('./fixtures/impress-smoke.pptx') },
-    { name: '未提供文件.xlsx', bytes: read('../../../data/projects/9/0-尽调材料/1-收购报告书底稿/未提供文件.xlsx') },
+    // 原用 data/ 下的项目样本，data/ 已出库（泄露处置），改用入库的评测台账样本
+    { name: 'case-ledger.xlsx', bytes: read('../../../scripts/eval/fixtures/case-ledger.xlsx') },
+    // 旧 .ppt 的形状天生没名字：get_ui_state 给它们起内部名曾把文档标成 modified，打开即被自动保存改写（O14b）
+    { name: 'plain.ppt', bytes: read('./fixtures/encrypted/legacy/plain.ppt'), impress: true },
+    // 旧版格式导入（台账 B10）：Word 2 的 .doc、Excel 5/95 的 .xls 打开几秒后被自动保存按新格式改写原件
+    { name: 'word2-nfib.doc', bytes: read('./fixtures/legacy-import/word2-nfib.doc'), writer: true },
+    { name: 'excel95.xls', bytes: read('./fixtures/legacy-import/excel95.xls') },
+    { name: 'excel5-book.xls', bytes: read('./fixtures/legacy-import/excel5-book.xls') },
   ]
   for (const doc of docs) {
-    await ok('load_document', { name: doc.name, bytes: doc.bytes, authorName: '测试用户' })
+    const before = await ok('debug_open_dirty')
+    const res = await ok('load_document', { name: doc.name, bytes: doc.bytes, authorName: '测试用户' })
     const loaded = await ok('debug_open_dirty')
     assert.equal(loaded.modified, false, doc.name + ': 装载后模型不应是 modified')
-    // 宿主 ready 之后的纯视图/只读命令（工具栏 bootstrap、写作辅助取正文、审阅面板）
-    await ok('set_chrome', { menubar: false, statusbar: false, toolbars: false })
+    // 装载过程中也不许向宿主报 modified（台账 B10）：这一声会在宿主就绪之后才到，被当成编辑自动保存
+    assert.equal(loaded.posts, before.posts, doc.name + ': 装载期间不得向宿主报 modified ' + JSON.stringify({ before, loaded }))
+    // 宿主 ready 之后的纯视图/只读命令（工具栏 bootstrap、写作辅助取正文、审阅面板）；
+    // 表格与宿主一致要藏工作表标签（LibreOfficeEditor 的 set_chrome 对 calc 带 sheetTabs:false）
+    await ok('set_chrome', { menubar: false, statusbar: false, toolbars: false, ...(res.kind === 'calc' ? { sheetTabs: false } : {}) })
     if (doc.writer) {
       await ok('set_view_options', { formattingMarks: false, ruler: true, paragraphMarks: true, lineBreaks: true, spaces: true, tabs: true, textBoundaries: false })
       await ok('adopt_legacy_links', {})
@@ -50,6 +61,14 @@ try {
     const settled = await ok('debug_open_dirty')
     assert.equal(settled.posts, loaded.posts, doc.name + ': 只打开不得向宿主报 modified ' + JSON.stringify({ loaded, settled }))
     assert.equal(settled.modified, false, doc.name)
+    if (doc.impress) {
+      const shapes = (await ok('slide_get_page', { slideNumber: 1 })).shapes
+      assert.ok(shapes.length && shapes.every(sh => sh.name), doc.name + ': 形状仍拿到可定位的名字')
+      const shape = shapes.find(sh => typeof sh.text === 'string')
+      await ok('slide_set_shape_text', { slideNumber: 1, shapeName: shape.name, text: '真编辑' })
+      const edited = await ok('debug_open_dirty')
+      assert.ok(edited.posts > settled.posts && edited.modified, doc.name + ': 真编辑仍报 modified')
+    }
     if (doc.writer) {
       await ok('insert_at_cursor', { text: '真编辑' })
       const edited = await ok('debug_open_dirty')

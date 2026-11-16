@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "İptal ediliyor…",
   "ocrBatchBusy": "Zaten bir tanıma işlemi sürüyor; bitmesini bekleyin veya iptal edin",
   "ocrConsentTitle": "Bulut metin tanıma kullanılsın mı?",
-  "ocrConsentHint": "Metin katmanı olan PDF’ler yükleme ve ücret olmadan doğrudan çıkarılır; yalnızca taramalar ve görseller bulut OCR gerektirir. Bu onay yalnızca bu toplu işlem için geçerlidir; Ayarlar → Hesap ve kullanım → Taranmış belge tanıma bölümünden «her zaman bulut» veya «yalnızca yerel» seçebilirsiniz.",
+  "ocrConsentHint": "Metin katmanı olan PDF’ler yükleme ve ücret olmadan doğrudan çıkarılır; yalnızca taramalar ve görseller bulut OCR gerektirir. Bu onay yalnızca bu toplu işlem için geçerlidir; Ayarlar → AI Ayarları → Taranmış belge tanıma bölümünden «her zaman bulut» veya «yalnızca yerel» seçebilirsiniz.",
   "ocrConsentCheck": "Verinin nereye gittiğini ve nasıl ücretlendirildiğini anladım",
   "ocrConsentConfirm": "Başlat",
   "ocrCopied": "{count} dosyanın metni kopyalandı ve pano geçmişine kaydedildi",
@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Bu gruptaki yerel olarak tamamlanamayan dosyalar için bulut tanıma kullanabilirsiniz. Kullanmazsanız bu dosyalar yüklenmez.",
   "ocrLocalFailedConfirm": "Bulut tanımayı kullan",
   "ocrAlreadySearchable": "\"{name}\" zaten metin katmanına sahip ve aranabilir; yeni dosya oluşturulmadı",
-  "ocrStopped": "Durduruldu; {count} dosya işlenmedi"
+  "ocrStopped": "Durduruldu; {count} dosya işlenmedi",
+  "subscribeProBtn": "Pro ¥9.9",
 }

@@ -48,6 +48,7 @@ triggers_en:
   - organize evidence
   - evidence list
   - evidence index
+  - evidence catalog
   - due diligence report
   - legal memo
   - memorandum
@@ -60,7 +61,7 @@ tool_policy: passthrough
 allowed_tools:
   - write_docx
   - doc_open_file
-  - office_file_open
+  - office_file
   - doc_get_document_text
   - doc_find_text
   # doc_* / office_* 两族同时列出：ClientCapabilityService 按客户端只放行一族

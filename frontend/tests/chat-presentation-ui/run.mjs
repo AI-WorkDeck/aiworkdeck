@@ -186,6 +186,41 @@ try {
   await wait(() => document.querySelector('.question-card .q-choice:not(.q-choice-other)'))
   await page.click('.question-card .q-choice:not(.q-choice-other)')
   await wait(() => window.chatState.isStreaming)
+  // 用户控制 1 / 6：运行中输入框告诉用户「现在打字会怎样」，输入框上方钉一行「正在做什么」。
+  // 都是真组件 + 真 SSE 驱动；停止键走 handleAbort 同一条路。
+  const placeholder = () => page.$eval('.input-area-wrapper .chat-input-rich', el => el.getAttribute('data-placeholder').split('\n')[0])
+  assert.equal(await placeholder(), '输入新要求，AI 会在下一步调整方向', 'steer mode placeholder while a run is live')
+  await page.evaluate(() => window.chatState.toggleFollowUpMode())
+  await wait(() => document.querySelector('.input-area-wrapper .chat-input-rich').getAttribute('data-placeholder').startsWith('输入后续要求'))
+  await page.evaluate(() => window.chatState.toggleFollowUpMode())
+  assert.equal(await placeholder(), '输入新要求，AI 会在下一步调整方向')
+  await wait(() => document.querySelector('.now-doing-strip'))
+  assert.equal(await page.$eval('.now-doing-activity', el => el.textContent.trim()), '思考中', 'no tool running yet')
+  await send('plan_update', { todos: [
+    { content: '阅读合同及附件', status: 'completed' },
+    { content: '核对违约责任与付款安排', activeForm: '正在核对付款与违约条款', status: 'in_progress' },
+    { content: '整理修改建议', status: 'pending' }
+  ] })
+  await send('text_delta', { content: '<process name="读取合同"><tool_code>read_document({"fileId":7})</tool_code>' })
+  await wait(() => document.querySelector('.now-doing-activity')?.textContent.trim() === '读取文档')
+  assert.equal(await page.$eval('.now-doing-progress', el => el.textContent.trim()), '1/3')
+  assert.equal(await page.$eval('.now-doing-step', el => el.textContent.trim()), '正在核对付款与违约条款')
+  assert.match(await page.$eval('.now-doing-elapsed', el => el.textContent.trim()), /^\d+:\d\d$/)
+  assert.ok(await page.$eval('.now-doing-strip', el => el.getBoundingClientRect().height <= 32), 'one quiet line')
+  for (const width of [320, 420]) {
+    await page.setViewport({ width, height: 860 })
+    assert.ok(await page.$eval('.now-doing-strip', el => el.scrollWidth <= el.clientWidth + 1), `strip never overflows at ${width}px`)
+  }
+  await page.screenshot({ path: `${shots}/now-doing-strip.png` })
+  // 条只放信息：停止/暂停集中在输入区那一处，条里不许再长出控件
+  assert.equal(await page.$$eval('.now-doing-strip button, .now-doing-strip [role="button"]', els => els.length), 0, 'the strip is information only')
+  await page.click('.input-area-wrapper .stop-btn')
+  await wait(() => !window.chatState.isStreaming && !document.querySelector('.now-doing-strip'))
+  assert.equal(await placeholder(), '问点什么，或描述要做的事', 'idle placeholder comes back once the run stops')
+  await page.evaluate(() => window.loadFixture('question'))
+  await wait(() => document.querySelector('.question-card .q-choice:not(.q-choice-other)'))
+  await page.click('.question-card .q-choice:not(.q-choice-other)')
+  await wait(() => window.chatState.isStreaming)
   const interject = (text) => page.evaluate(async (text) => {
     document.querySelector('.chat-input-rich').textContent = text
     await window.chatState.handleSubmit('steer')

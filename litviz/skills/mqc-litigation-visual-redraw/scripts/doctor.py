@@ -16,11 +16,40 @@ import shutil
 import subprocess
 import sys
 
+def _tests_cmd():
+    """本模块的回归命令（时间轴模式下是时间轴大师的），同样写成真实路径。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    tl = os.path.normpath(os.path.join(here, "..", "..", "mqc-timeline-master", "tests", "run_checks.py"))
+    own = os.path.normpath(os.path.join(here, "..", "tests", "run_checks.py"))
+    p = tl if (("--for" in sys.argv and "timeline" in sys.argv) and os.path.exists(tl)) else own
+    return f'python3 "{p}"' if " " in p else f"python3 {p}"
+
+
+def _py(script):
+    """给用户看的下一步命令：用脚本的真实路径，在哪个目录里照抄都能跑（0.9.8：SKILL.md 要求在用户的工作目录里运行）。"""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), script)
+    return f'python3 "{p}"' if " " in p else f"python3 {p}"
+
+
 OK, WARN, BAD = "  ok  ", " warn ", " MISS "
 
 
+def _find(cmd):
+    """与 render.py 用同一套查找：PATH 之外还查 Windows 的常见安装位置。
+
+    真实运行记录里撞到的：用户机器上装了 Inkscape（C:\\Program Files\\Inkscape\\bin），
+    出图那边已经能自动找到，自检这边还只看 PATH，于是报「none found / PNG preview will not」，
+    使用者以为环境不全，又去手工加 PATH。两处必须用同一套判据。"""
+    try:
+        from render import _find_tool          # 同目录，出图用的就是它
+        got = _find_tool(cmd)
+        return got if got and os.path.exists(got) or got != cmd else None
+    except Exception:
+        return shutil.which(cmd)
+
+
 def _has(cmd):
-    return shutil.which(cmd) is not None
+    return _find(cmd) is not None
 
 
 def _fonts():
@@ -35,7 +64,8 @@ def _fonts():
     if _has("fc-list"):
         try:
             out = subprocess.run(["fc-list", "--format", "%{family}\n"],
-                                 capture_output=True, text=True, timeout=20)
+                                 capture_output=True, text=True, timeout=20,
+                                 encoding="utf-8", errors="replace")   # fc-list 输出 UTF-8
             if out.stdout.strip():
                 return out.stdout
         except Exception:
@@ -101,7 +131,7 @@ def install_plex_mono():
     os.makedirs(dest, exist_ok=True)
     work = tempfile.mkdtemp(prefix="plex-")
     r = subprocess.run(["npm", "pack", "@fontsource/ibm-plex-mono"],
-                       cwd=work, capture_output=True, text=True)
+                       cwd=work, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         print("could not fetch the font package (network?):", r.stderr.strip()[:200])
         return 1
@@ -129,6 +159,14 @@ def install_plex_mono():
     return 0 if n else 1
 
 
+def _importable(name):
+    import importlib.util
+    try:
+        return importlib.util.find_spec(name) is not None
+    except Exception:
+        return False
+
+
 def main():
     if "--fix-fonts" in sys.argv[1:]:
         return install_plex_mono()
@@ -140,19 +178,37 @@ def main():
                  f"found {sys.version.split()[0]}" if py_ok else "upgrade Python"))
     fatal |= not py_ok
 
+    # 时间轴大师也用这份自检（单目录分发包里它就在 pipeline.py 旁边）。graphviz 只有
+    # 诉讼可视化重画画流程图才要；对时间轴用户报「MISS / REQUIRED」是误导 —— 真实运行
+    # 里模型据此以为环境不全。用 --for timeline，或与 pipeline.py 同目录时自动认出。
+    _timeline = ("--for" in sys.argv and "timeline" in sys.argv) or \
+        os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline.py"))
     dot = _has("dot")
-    rows.append((OK if dot else BAD, "graphviz (dot)",
-                 "flowchart node positioning" if dot else
-                 "REQUIRED for flowcharts — apt install graphviz / brew install graphviz"))
-    fatal |= not dot
+    if _timeline:
+        rows.append((OK if dot else WARN, "graphviz (dot)",
+                     "found" if dot else "not needed by the timeline skill (flowcharts only)"))
+        _pdf = [m for m in ("pymupdf", "fitz", "pypdf") if _importable(m)]
+        rows.append((OK if _pdf else WARN, "PDF text layer (PyMuPDF / pypdf)",
+                     f"using {_pdf[0]}" if _pdf else
+                     "missing — PDF materials cannot be read directly: pip install pymupdf"))
+    else:
+        # graphviz 不再是必需项：没装时由内置排布算坐标（layout_fallback.py），
+        # 流程图与关系图照样出得来，实测画布与 graphviz 版只差两三个像素。
+        # 装它仍有好处（分层更紧凑），所以留作建议，不再拦人。
+        rows.append((OK if dot else WARN, "graphviz (dot)",
+                     "flowchart node positioning" if dot else
+                     "not installed — 内置排布会顶上（装上可得到更紧凑的分层）"))
 
     # --- png rasteriser (any one) -----------------------------------------
     raster = [c for c in ("rsvg-convert", "inkscape", "soffice") if _has(c)]
+    # 找到了就把路径也报出来，免得使用者以为技能没用上它
+    _paths = {c: _find(c) for c in raster}
     if raster:
-        rows.append((OK, "PNG rasteriser", f"using {raster[0]}"))
+        rows.append((OK, "PNG rasteriser",
+                     f"using {raster[0]}（{_paths.get(raster[0]) or 'PATH'}）"))
     else:
         rows.append((WARN, "PNG rasteriser",
-                     "none found — SVG still renders, PNG preview will not. "
+                     "none found (PATH 与常见安装位置都没有) — SVG still renders, PNG preview will not. "
                      "Install one: librsvg2-bin / inkscape / libreoffice"))
 
     # --- fonts (optional, affect looks only) ------------------------------
@@ -223,7 +279,7 @@ def main():
 
     # optional QA tooling: renders a generated .pptx and measures where the text
     # actually landed. Not needed to PRODUCE anything — only to self-check.
-    pdftotext = shutil.which("pdftotext")
+    pdftotext = _find("pdftotext")
     rows.append((OK if pdftotext else WARN, "pdftotext (pptx render self-check)",
                  "verify_pptx.py can measure a rendered deck" if pdftotext else
                  "missing — `python3 scripts/verify_pptx.py fig.svg fig.pptx` will skip; "
@@ -235,7 +291,8 @@ def main():
                                           "to install IBM Plex Mono"))
 
     # --- report -----------------------------------------------------------
-    print("\nmqc-litigation-visual-redraw · environment check\n")
+    print("\nmqc-timeline-master · 环境自检（共享内核）\n" if _timeline
+          else "\nmqc-litigation-visual-redraw · environment check\n")
     for state, name, note in rows:
         print(f"[{state}] {name:<34} {note}")
     print()
@@ -244,8 +301,17 @@ def main():
         return 1
     warns = sum(1 for s, _, _ in rows if s == WARN)
     print(f"Result: ready to render{f' ({warns} optional item(s) degraded)' if warns else ''}.\n")
-    print("Next:  python3 scripts/render.py examples/flowchart.json /tmp/out")
-    print("       python3 tests/run_checks.py\n")
+    if _timeline:                       # 下一步给时间轴大师自己的命令：在那个目录里，V1 的 render.py 不存在
+        _pl = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "mqc-timeline-master",
+                                            "scripts", "pipeline.py"))
+        if not os.path.exists(_pl):                 # 单目录分发包：pipeline.py 与本文件同目录
+            _pl = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline.py")
+        print(f'Next:  python3 "{_pl}" next' if " " in _pl else f"Next:  python3 {_pl} next")
+        print(f"       {_tests_cmd()}\n")
+        return 0
+    _ex = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "examples", "flowchart.json"))
+    print(f"Next:  {_py('render.py')} {_ex} out/flowchart")
+    print(f"       {_tests_cmd()}\n")
     return 0
 
 
@@ -260,5 +326,20 @@ def _quiet_broken_pipe():
         pass
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     _quiet_broken_pipe()
     raise SystemExit(main())

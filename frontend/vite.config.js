@@ -3,9 +3,11 @@
 import { defineConfig } from "vite";
 import uni from "@dcloudio/vite-plugin-uni";
 import { browserSafeChunks } from "./scripts/browser-safe-chunks.mjs";
+import { uniInputSync } from "./scripts/uni-input-sync.mjs";
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [uni(), browserSafeChunks()],
+    // uniInputSync：输入框 v-model 同步回写，修「点按钮时只剩第一个字」（UI-INPUT1）
+    plugins: [uniInputSync(), uni(), browserSafeChunks()],
     resolve: {
         alias: {
             "punycode.js": "punycode",

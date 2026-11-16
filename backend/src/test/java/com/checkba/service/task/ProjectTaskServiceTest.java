@@ -11,6 +11,7 @@ import com.checkba.repository.ProjectTaskFileRepository;
 import com.checkba.repository.ProjectTaskRepository;
 import com.checkba.repository.UserRepository;
 import com.checkba.service.ProjectMemberService;
+import com.checkba.service.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,12 +68,14 @@ class ProjectTaskServiceTest {
     private UserRepository userRepository;
 
     private ProjectMemberService memberService;
+    private ProjectService projectService;
     private ProjectTaskService service;
 
     @BeforeEach
     void setUp() {
         memberService = mock(ProjectMemberService.class);
-        service = new ProjectTaskService(taskRepository, fileRepository, taskFileRepository, userRepository, memberService);
+        projectService = mock(ProjectService.class);
+        service = new ProjectTaskService(taskRepository, fileRepository, taskFileRepository, userRepository, memberService, projectService);
     }
 
     private User saveUser(String username, String displayName) {
@@ -426,5 +429,77 @@ class ProjectTaskServiceTest {
         Map<String, Object> empty = service.summarize(List.of(), today);
         assertEquals(0, empty.get("overdue"));
         assertNull(empty.get("nextDue"));
+    }
+
+    @Test
+    @DisplayName("listForUser：只聚合 getUserProjects 返回的项目，结果带 projectName，区间外与无权项目被排除")
+    void listForUserAggregatesOnlyAccessibleProjectsWithNames() {
+        com.checkba.model.entity.Project mine = new com.checkba.model.entity.Project();
+        mine.setId(101L);
+        mine.setName("我的案");
+        when(projectService.getUserProjects(7L)).thenReturn(List.of(mine));
+        taskRepository.save(rawTask(101L, "我的截止", LocalDate.of(2026, 9, 3)));
+        taskRepository.save(rawTask(101L, "区间外", LocalDate.of(2026, 12, 3)));
+        taskRepository.save(rawTask(202L, "别人的案", LocalDate.of(2026, 9, 3)));
+
+        List<Map<String, Object>> out = service.listForUser(7L, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 7));
+
+        assertEquals(1, out.size(), out.toString());
+        assertEquals("我的截止", out.get(0).get("title"));
+        assertEquals("我的案", out.get(0).get("projectName"));
+    }
+
+    private ProjectTask rawTask(Long projectId, String title, LocalDate due) {
+        ProjectTask t = new ProjectTask();
+        t.setUid(java.util.UUID.randomUUID().toString());
+        t.setUserId(7L);
+        t.setProjectId(projectId);
+        t.setTitle(title);
+        t.setDueDate(due);
+        t.setType("DEADLINE");
+        t.setStatus("OPEN");
+        t.setPriority("NORMAL");
+        t.setSource("user");
+        return t;
+    }
+
+    private static com.checkba.model.entity.Project proj(long id, String name, boolean scratch) {
+        var p = new com.checkba.model.entity.Project();
+        p.setId(id);
+        p.setName(name);
+        if (scratch) p.setProjectType(com.checkba.model.entity.Project.SCRATCH);
+        return p;
+    }
+
+    @Test
+    void resolveProjectsFollowsUserWordingRules() {
+        when(projectService.getUserProjects(7L)).thenReturn(List.of(
+                proj(1L, "股权转让项目-星河并购", false), proj(2L, "星河租赁合同纠纷", false),
+                proj(3L, "金冠纾困", false), proj(4L, "星河临时", true), proj(5L, "星河并购", false)));
+        when(memberService.hasWritePermission(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(true);
+        when(memberService.isClient(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(7L))).thenReturn(false);
+
+        // 「星河」→ 多个（含没有事项的项目），scratch 不参与
+        assertEquals(List.of(1L, 2L, 5L), service.resolveProjects(7L, "星河", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        // 全名唯一相等，但另一项目名包含它（"股权转让项目-星河并购" 含 "星河并购"）→ 仍歧义
+        assertEquals(2, service.resolveProjects(7L, "星河并购", true).size());
+        // 全名唯一相等且无他项目包含 → 直接用
+        assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        // 称呼更长（含项目名）→ 命中
+        assertEquals(List.of(3L), service.resolveProjects(7L, "金冠纾困案的开庭", true).stream().map(com.checkba.model.entity.Project::getId).toList());
+        assertTrue(service.resolveProjects(7L, "不存在", true).isEmpty());
+    }
+
+    @Test
+    void mentionedProjectsFindsLongestCommonSubstringWithThresholds() {
+        var all = List.of(proj(1L, "股权转让项目-星河并购", false), proj(2L, "星河租赁合同纠纷", false), proj(3L, "张某劳动争议案", false));
+        java.util.function.Function<String, List<Long>> ids = m -> ProjectTaskService.mentionedProjects(all, m)
+                .stream().map(com.checkba.model.entity.Project::getId).toList();
+        assertEquals(List.of(1L, 2L), ids.apply("下周三上午十点给星河加一个开庭提醒"));
+        assertEquals(List.of(1L), ids.apply("给星河并购加一个开庭提醒"));
+        assertEquals(List.of(3L), ids.apply("给劳动争议案加一个开庭提醒"));
+        assertTrue(ids.apply("给这个案子加一个开庭提醒").isEmpty());
+        assertTrue(ProjectTaskService.mentionedProjects(List.of(proj(9L, "Alpha Holdings", false)), "add a hearing for alp").isEmpty(),
+                "纯拉丁字符阈值是 4");
     }
 }

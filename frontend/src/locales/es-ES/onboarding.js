@@ -87,6 +87,11 @@ export default {
     "privacyName": "Política de Privacidad",
     "crossBorderLabel": "Consentimiento separado: transferencia del contenido enviado a la IA a proveedores de modelos en el extranjero para su procesamiento",
     "crossBorderView": "Ver aviso",
+    "consentCardTitle": "Antes de usar la IA de la plataforma, confirme un consentimiento de tratamiento de datos",
+    "consentAccept": "Aceptar y continuar",
+    "consentHideNotice": "Ocultar aviso",
+    "consentFailed": "No se pudo guardar. Inténtelo de nuevo.",
+    "consentLater": "Más tarde",
     "crossBorderNoticeTitle": "Aviso de transferencia transfronteriza",
     "crossBorderNoticeBody": "El sitio de China conecta con Alibaba Cloud Bailian mediante los servidores de AI WorkDeck; el sitio internacional utiliza OpenRouter. Los textos y fragmentos de archivos enviados a la IA se usan para inferencia y facturación. Según el modelo, pueden procesarse fuera de China continental. Puedes retirar el consentimiento en Configuración, lo que desactiva el canal de IA de la plataforma.",
     "agreementRequired": "Marque la casilla para aceptar los Términos del Servicio y la Política de Privacidad y continuar",
@@ -101,7 +106,8 @@ export default {
     "switch": "Cambiar",
     "cancel": "Cancelar",
     "switchFailed": "No se pudo cambiar de sitio. Inténtelo de nuevo más tarde.",
-    "rescueFailed": "Sigue sin desbloquearse después de cambiar de sitio. Compruebe el código e inténtelo de nuevo."
+    "rescueFailed": "Sigue sin desbloquearse después de cambiar de sitio. Compruebe el código e inténtelo de nuevo.",
+    "proIntroBanner": "Créditos de bienvenida al registrarte · Personal Pro ¥9.9/mes (3 primeros meses)",
   },
   "hint": {
     "learnMore": "Más información",
@@ -112,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Confirmar",
     "purchaseSuccess": "Desbloqueado",
     "purchaseFailed": "Error en la compra",
-    "goRecharge": "Recargar"
+    "goRecharge": "Recargar",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Obtener Personal Pro",
   },
   "identity": {
     "title": "Elegir un Workspace local",

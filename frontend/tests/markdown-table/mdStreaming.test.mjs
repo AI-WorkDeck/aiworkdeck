@@ -34,6 +34,7 @@ function loadComponent(render = renderMarkdown) {
     // nextStableLength 供流式分段渲染（dev-board#811 K31）
     t: (k) => k,
     copyToClipboard: () => true,
+    handleRenderedLinkClick: () => false,
     nextStableLength,
   }
   const script = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))

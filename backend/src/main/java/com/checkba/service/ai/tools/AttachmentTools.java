@@ -22,12 +22,11 @@ public class AttachmentTools implements AgentToolComponent {
     private final com.checkba.service.ProjectMemberService projectMembers;
 
     @ToolMeta(displayName = "列出本轮附件", category = "file")
-    @Tool("List the attachments of a USER message in this conversation. Use the messageId supplied in the attachment "
-            + "manifest. Returns at most 100 references, not file contents. Start with afterId=0 and follow nextAfterId "
-            + "until complete. Read each file/folder with extract_file_text; folder listings also have pagination.")
+    @Tool("列出本会话某条用户消息的附件（最多 100 条引用，不含内容）。\n"
+            + "messageId 取自附件清单；首页 afterId 传 0 或省略，之后按 nextAfterId 翻页。文件或文件夹的内容用 extract_file_text 读。")
     public String list_attached_files(
-            @P("Message ID from the attachment manifest") Long messageId,
-            @P(value = "Cursor from nextAfterId; omit or use 0 for the first page", required = false) Long afterId,
+            @P("附件清单里的消息 ID") Long messageId,
+            @P(value = "可选。上一页返回的 nextAfterId；首页省略或传 0", required = false) Long afterId,
             Long userId, Long projectId, String conversationId) {
         if (messageId == null || userId == null || projectId == null || conversationId == null) return denied();
         var message = messages.findById(messageId).orElse(null);

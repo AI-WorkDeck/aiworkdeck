@@ -85,6 +85,13 @@ public class PluginController {
         private boolean devInstalled;
         /** manifest.contributes（规范 v2.8 起）：广场展示与审查用，null = 无贡献内容 */
         private PluginService.Contributes contributes;
+        /**
+         * 权限升高、待用户批准的工具变更（见 PluginToolApprovals）：每条 {name, label, reasons, before, after}，
+         * before/after 只含 access/confirm/mcp。批准前这些工具对 Agent、面板直调与对外 MCP 都不可用。
+         */
+        private List<Map<String, Object>> pendingToolChanges;
+        /** 批准时原样带回的当前定义摘要；查看期间插件又变了，批准会被拒绝 */
+        private String toolApprovalToken;
     }
 
     @GetMapping("/list")
@@ -104,6 +111,33 @@ public class PluginController {
             @PathVariable("id") String pluginId,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         return setEnabled(pluginId, false, sessionId);
+    }
+
+    /**
+     * 批准插件当前的工具定义（权限升高的工具在此之前对 Agent 不可用）。仅管理员；
+     * body {token} 必须等于列表里的 toolApprovalToken，插件在用户查看期间又变了就拒绝。
+     */
+    @PostMapping("/{id}/tool-approval")
+    public ResponseEntity<Map<String, Object>> approveToolChanges(
+            @PathVariable("id") String pluginId,
+            @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        if (!isAdmin(sessionId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(LangText.of("仅管理员可操作", "Administrator permission required")));
+        }
+        String token = body == null ? null : body.get("token");
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(error(LangText.of("缺少批准凭据", "Approval token is required")));
+        }
+        try {
+            pluginService.approveToolChanges(pluginId, token);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(LangText.of("插件不存在: ", "Plugin not found: ") + pluginId));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error(e.getMessage()));
+        }
+        telemetryService.record("plugin.lifecycle", Map.of("pluginId", pluginId, "op", "approve-tools"));
+        return ResponseEntity.ok(ok());
     }
 
     @PostMapping("/rescan")
@@ -252,7 +286,7 @@ public class PluginController {
             return ResponseEntity.badRequest().body(error(LangText.of("args 不是合法 JSON 对象", "args is not a valid JSON object")));
         }
         ToolRegistry.ToolResult result = toolRegistry.execute(toolName,
-                argsJson, new ToolContext(projectId, null, userId, null));
+                argsJson, new ToolContext(projectId, null, userId, null), "plugin-ui");
         Map<String, Object> out = new HashMap<>();
         out.put("code", result.found() ? 0 : 1);
         out.put("output", result.output());
@@ -521,6 +555,12 @@ public class PluginController {
                 copy.setName(tool.getName());
                 copy.setDescription(pluginService.localize(id, tool.getDescription()));
                 copy.setPermissions(tool.getPermissions());
+                // 决定 Agent 能做什么的五个字段也进列表：PluginPane 的授权指纹据此识别工具定义变化
+                copy.setAccess(tool.getAccess());
+                copy.setConfirm(tool.getConfirm());
+                copy.setMcp(tool.getMcp());
+                copy.setHandler(tool.getHandler());
+                copy.setInputSchema(tool.getInputSchema());
                 return copy;
             }).toList());
         }
@@ -532,7 +572,29 @@ public class PluginController {
         view.setIncompatibleReason(pluginService.incompatibleReason(id));
         view.setDevInstalled(pluginService.isDevInstalled(id));
         view.setContributes(localizeContributes(id, meta.getContributes()));
+        var approval = pluginService.toolApprovalView(id);
+        view.setPendingToolChanges(approval.changes().stream().map(PluginController::changeView).toList());
+        view.setToolApprovalToken(approval.token());
         return view;
+    }
+
+    private static Map<String, Object> changeView(com.checkba.service.ai.PluginToolApprovals.Change c) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("name", c.name());
+        out.put("label", c.label());
+        out.put("kind", c.after().kind());
+        out.put("reasons", c.reasons());
+        out.put("before", c.before() == null ? null : definitionView(c.before()));
+        out.put("after", definitionView(c.after()));
+        return out;
+    }
+
+    private static Map<String, Object> definitionView(com.checkba.service.ai.PluginToolApprovals.Definition d) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("access", d.access());
+        out.put("confirm", d.confirm());
+        out.put("mcp", d.mcp());
+        return out;
     }
 
     private PluginService.PluginGuide localizeGuide(String pluginId, PluginService.PluginGuide guide) {

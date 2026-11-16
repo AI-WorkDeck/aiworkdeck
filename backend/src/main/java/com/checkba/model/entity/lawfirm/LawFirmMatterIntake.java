@@ -58,6 +58,9 @@ public class LawFirmMatterIntake {
     @Column(length = 512)
     private String teamMemberNames;
 
+    /** 客户（{@link LawFirmParty} 中 client=true 的行）；旧收案为空，由 LawFirmClientService 按名称/信用代码归集后回填。 */
+    private Long clientId;
+
     @Column(length = 256)
     private String clientName;
 

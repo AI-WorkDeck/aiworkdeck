@@ -291,4 +291,63 @@ class DocumentCheckpointServiceTest {
         service.cleanupExpiredCheckpoints(expiredNow);
         assertFalse(service.hasCheckpoint("conv-1"));
     }
+
+    @Test
+    @DisplayName("用户撤销：没有快照直接报 NO_CHECKPOINT，不碰存储与编辑器")
+    void userRestoreWithoutCheckpointTouchesNothing() throws Exception {
+        var result = service.restoreForUser("conv-none");
+        assertEquals(DocumentCheckpointService.UserRestoreStatus.NO_CHECKPOINT, result.status());
+        verify(storage, never()).save(anyString(), any());
+        verify(editorBridgeService, never()).executeEditorCommand(anyString(), any());
+        assertTrue(service.describeCheckpoint("conv-none").isEmpty());
+    }
+
+    @Test
+    @DisplayName("用户撤销：多文件全部恢复、编辑器指令按本会话寻址；全部成功后快照清掉，不能再撤一次")
+    void userRestoreRestoresEveryFileRoutesToTheConversationAndClears() throws Exception {
+        when(projectFileService.getFile(1L)).thenReturn(fileOf(1L, "A.docx", "projects/1/A.docx"));
+        when(projectFileService.getFile(2L)).thenReturn(fileOf(2L, "B.docx", "projects/1/B.docx"));
+        when(projectFileService.getFileBytes(anyLong())).thenReturn("baseline".getBytes());
+        when(storage.load(anyString())).thenReturn(new ByteArrayResource("baseline".getBytes()));
+        service.ensureCheckpoint("conv-1", 1L);
+        service.ensureCheckpoint("conv-1", 2L);
+        assertEquals(2, service.describeCheckpoint("conv-1").size());
+
+        var result = service.restoreForUser("conv-1");
+
+        assertEquals(DocumentCheckpointService.UserRestoreStatus.DONE, result.status());
+        assertEquals(java.util.Set.of("A.docx", "B.docx"), new java.util.HashSet<>(result.outcome().restored()));
+        assertTrue(result.outcome().failures().isEmpty());
+        verify(editorBridgeService).setCurrentConversationId("conv-1");
+        verify(editorBridgeService).clearCurrentConversationId();
+        verify(storage).save(eq("projects/1/A.docx"), any());
+        verify(storage).save(eq("projects/1/B.docx"), any());
+        assertFalse(service.hasCheckpoint("conv-1"), "撤销成功后再点一次会把此后的手动修改也抹掉");
+    }
+
+    @Test
+    @DisplayName("用户撤销：部分失败时点名失败的文件并保留快照以便重试")
+    void userRestorePartialFailureKeepsCheckpoint() throws Exception {
+        when(projectFileService.getFile(1L)).thenReturn(fileOf(1L, "A.docx", "projects/1/A.docx"));
+        when(projectFileService.getFileBytes(1L)).thenReturn("baseline".getBytes());
+        when(storage.load(anyString())).thenReturn(new ByteArrayResource("baseline".getBytes()));
+        service.ensureCheckpoint("conv-1", 1L);
+        when(editorBridgeService.executeEditorCommand(eq("doc_checkpoint_restore"), any())).thenAnswer(inv -> {
+            java.util.Map<?, ?> params = inv.getArgument(1);
+            return "prepare".equals(params.get("phase"))
+                    ? "{\"error\":\"Target editor is not ready yet; snapshot was not restored\"}"
+                    : "{\"success\":true}";
+        });
+
+        var result = service.restoreForUser("conv-1");
+
+        assertEquals(DocumentCheckpointService.UserRestoreStatus.DONE, result.status());
+        assertTrue(result.outcome().restored().isEmpty());
+        assertEquals(1, result.outcome().failures().size());
+        assertEquals("A.docx", result.outcome().failures().get(0).name());
+        assertTrue(result.outcome().failures().get(0).error().contains("not ready"),
+                "编辑器回的本地化原因原样交给用户：" + result.outcome().failures());
+        verify(storage, never()).save(eq("projects/1/A.docx"), any());
+        assertTrue(service.hasCheckpoint("conv-1"));
+    }
 }

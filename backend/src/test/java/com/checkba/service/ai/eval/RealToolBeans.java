@@ -6,6 +6,7 @@ package com.checkba.service.ai.eval;
 import com.checkba.service.ai.tools.AgentToolComponent;
 import com.checkba.service.ai.tools.AskUserTools;
 import com.checkba.service.ai.tools.DdExportTools;
+import com.checkba.service.ai.tools.DocCompareTools;
 import com.checkba.service.ai.tools.DocumentAuditTools;
 import com.checkba.service.ai.tools.DocumentEditTools;
 import com.checkba.service.ai.tools.EvidenceTools;
@@ -110,6 +111,7 @@ final class RealToolBeans {
                 ContentSearchTools.class,
                 ContributedTemplateTools.class,
                 DdExportTools.class,
+                DocCompareTools.class,
                 DocumentAuditTools.class,
                 DocumentEditTools.class,
                 EnterpriseDataTools.class,
@@ -124,6 +126,8 @@ final class RealToolBeans {
                 OfficeEditTools.class,
                 PdfTools.class,
                 com.checkba.service.ai.tools.PdfVisualTools.class,
+                // doc_view_pages（office-tier1）：看编辑器里文档的真实渲染画面
+                com.checkba.service.ai.tools.DocViewTools.class,
                 PluginDevTools.class,
                 PptxTools.class,
                 PythonTools.class,
@@ -149,6 +153,7 @@ final class RealToolBeans {
                 ToolDiscoveryTools.class,
                 TagTools.class,
                 TaskTools.class,
+                com.checkba.service.ai.tools.DeadlineTools.class,
                 TencentMeetingTools.class,
                 TemplateTools.class,
                 WebTools.class,

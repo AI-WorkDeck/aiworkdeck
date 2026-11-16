@@ -9,6 +9,13 @@ server:
 spring:
   application:
     name: checkba-backend
+  # 三个服务器形态自动带上 ops（就绪探针 + 回环指标，见 application-ops.yml）。
+  # desktop / dev / 无 profile 不带：管理端口关闭、指标不采。
+  profiles:
+    group:
+      cloud: ops
+      case: ops
+      prod: ops
   task:
     scheduling:
       pool:
@@ -32,11 +39,29 @@ spring:
   servlet:
     multipart:
       enabled: true
-      # 单请求上限与项目总量闸同源（storage.project-size-limit）
-      max-file-size: ${storage.project-size-limit:20GB}
-      max-request-size: ${storage.project-size-limit:20GB}
+      # 单请求上限 = storage.max-upload-size（默认与项目总量闸同值；云端/案件库 profile 显式收紧）
+      max-file-size: ${storage.max-upload-size:20GB}
+      max-request-size: ${storage.max-upload-size:20GB}
       # 超过这个大小的分块才落临时盘；1GB 意味着一个大分块整块压在堆里
       file-size-threshold: 8MB
+
+# Actuator 默认全关（桌面 / dev / 无 profile）：不开管理端口、不暴露任何端点、
+# 不采指标，桌面端只多几项自动装配判断。服务器形态由 application-ops.yml 打开。
+management:
+  server:
+    port: -1
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include: ""
+  metrics:
+    enable:
+      all: false
+  observations:
+    enable:
+      all: false
 
 # 外部服务配置
 external:
@@ -71,20 +96,22 @@ external:
 # token-setting-key：系统设置里的 token 覆盖键，后台管理界面可在线修改
 mcp:
   servers:
+    # 全部 pkulaw-* 统一指向聚合端点 mcp-law-agg/mcp：各分服务端点已不再提供这些工具
+    # （上游回 "Unknown tool: get_article"）。server 名不变，调用方无需改动。
     - name: pkulaw-semantic
-      url: https://apim-gateway.pkulaw.com/mcp-law-search-service
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-keyword
-      url: https://apim-gateway.pkulaw.com/mcp-law
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-recognition
-      url: https://apim-gateway.pkulaw.com/law_recognition
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
@@ -93,13 +120,13 @@ mcp:
     # 语义检索 search_case（参数 text，可带 case_type/doc_type 筛选）与
     # 关键词检索 get_case_list（title/正文关键词）。insight.case-server 指向语义档。
     - name: pkulaw-case-semantic
-      url: https://apim-gateway.pkulaw.com/mcp-case-search-service
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-case-keyword
-      url: https://apim-gateway.pkulaw.com/mcp-case
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
@@ -115,25 +142,25 @@ mcp:
     #   pkulaw-case-number       anhao_recognition(text)                    案号识别+标准化（带法院/判决书标题/法宝链接/GID）
     #   pkulaw-agg               聚合 server：以 server.tool 命名空间挂全部 10 个工具（URL 带 /mcp 后缀，别掉）
     - name: pkulaw-fatiao
-      url: https://apim-gateway.pkulaw.com/mcp-fatiao
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-doc-link
-      url: https://apim-gateway.pkulaw.com/add-doc-link
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-citation-validator
-      url: https://apim-gateway.pkulaw.com/pku_citation_validator
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
       enabled: true
     - name: pkulaw-case-number
-      url: https://apim-gateway.pkulaw.com/case_number_recognition
+      url: https://apim-gateway.pkulaw.com/mcp-law-agg/mcp
       token: ${PKULAW_TOKEN:}
       token-setting-key: external.pkulaw.token
       timeout-seconds: 60
@@ -347,6 +374,12 @@ ai:
   # 首字节前只收到 OpenRouter 保活注释（请求排在某家供应商的队里）超过这么多秒，
   # 就掐掉本次请求、换一家供应商重发一次（只对启用了供应商路由的模型）。0 = 不重发。
   first-byte-requeue-seconds: 30
+  # 系统提示的工具协议（gap P2）：列在这里的通道，只要模型支持工具，提示里就只讲原生函数调用，
+  # 不再教 <thinking>/<tool_code> 文本协议（XML 解析器仍保留为兜底，旧会话照常解析）。
+  # 取值是通道名的逗号列表（AWD_CLOUD = 平台通道，OPENROUTER = 自备 Key）；留空 = 全部沿用文本协议提示。
+  # OLLAMA 不在默认值里：本地模型的原生工具调用不可靠。
+  prompt:
+    native-protocol: ${AI_PROMPT_NATIVE_PROTOCOL:AWD_CLOUD,OPENROUTER}
   # AI 上下文与压缩配置（对应 AiContextProperties，以下均为默认值，可按需覆盖）
   context:
     # 上下文总 token 预算的**兜底值**：只在模型标识解析不出上下文长度时用到
@@ -734,8 +767,12 @@ addin:
 storage:
   # 存储类型：只支持 local（本地文件系统）
   type: local
-  # 单个项目的文件总量上限（上传与本机导入共用；multipart 单请求上限也引用它）
+  # 单个项目的文件总量上限（上传与本机导入共用）
   project-size-limit: 20GB
+  # 单次上传请求的字节上限：multipart 与裸 octet-stream（FileController.uploadFile 按
+  # Content-Length 拦，413 UPLOAD_TOO_LARGE）共用。默认跟项目总量闸走，桌面行为不变；
+  # 公网 server profile 显式收紧（cloud 200MB / case 2GB），并与 nginx client_max_body_size 对齐。
+  max-upload-size: ${storage.project-size-limit:20GB}
   # 本机文件夹项目（打开本机文件夹的项目）是否豁免上面的总量闸；桌面 profile 打开
   exempt-local-folder-projects: false
   # 本地存储配置
@@ -762,6 +799,23 @@ security:
   # 缺失直接拒绝启动——明文降级属于潜伏逃生门，不留。
   # local-mode 与未开桥接的团队服务器不受影响：它们走机器级密钥文件，不碰这条路。
   platform-key-secret: ${AWD_PLATFORM_KEY_SECRET:}
+  # 按用户限频（UserRateLimiter，令牌桶：桶容量 = 每分钟额度，按额度/60 每秒匀速回填）。
+  # 只在 server 模式生效（cloud / case / prod）；local-mode（桌面/dev）整体旁路。超限 → HTTP 429
+  # + Retry-After。进程内计数：重启归零、多实例各算各的（那时以 nginx limit_req 为准）。
+  # 取值依据：真实律师手速远到不了这些数，只挡脚本/盗用会话的连发。<=0 关闭该项。
+  rate-limit:
+    # POST /api/agent/chat（含插话、ask_user 回答）与 /api/agent/ppt/generate：一分钟 30 条
+    # 已是两秒一条的持续发送
+    chat-per-minute: 30
+    # /api/files/{id}/upload 的「一次上传开头」（offset 缺省或 0；分片续传不计）。
+    # 浏览器拖入整个案卷文件夹是逐个串行上传，几百个小文件一口气传完要靠这个桶；
+    # 编辑器自动保存（3 秒防抖）也走这条路
+    upload-per-minute: 300
+    # /api/ocr/recognize 与 /api/projects/{p}/files/{f}/ocr：批量识别由前端逐个串行，
+    # 扫描件一份就要几秒到几分钟
+    ocr-per-minute: 20
+    # /api/browser/proxy：只有导航（地址栏/点链接）走代理，子资源直连原站，即每分钟翻页数
+    browser-proxy-per-minute: 120
 
 # LangChain4j Ollama Configuration
 langchain4j:
@@ -776,16 +830,16 @@ langchain4j:
       model-name: nomic-embed-text
       timeout: 300s
 
-# 诉讼可视化（litviz）—— 出图引擎 vendor 自 mqc-litigation-visual-redraw（MIT，缪奇川），
+# 诉讼可视化（litviz）—— 出图引擎 vendor 自 new-litigation-visualization（AGPL-3.0-only，缪奇川），
 # 见仓库 litviz/。三项留空即走自动探测，正常无需配置：
 #   dir     litviz 目录。留空时：显式配置 → 环境变量 LITVIZ_DIR（桌面端注入）→ 相对
 #           后端工作目录往上找 litviz/（dev 态后端 cwd 是 backend/，命中 ../litviz）。
 #   python  解释器。留空时：配置 → LITVIZ_PYTHON → AWD_PYTHON_HOME 下的打包运行时 →
 #           PATH 上的 python3/python。**只接受 3.11 及以上**：引擎里有 PEP 701 语法，
-#           低版本 import 期就 SyntaxError（已由 litviz/PATCHES.md 的 PATCH 2 抹平到 3.9，
+#           低版本 import 期就 SyntaxError（上游 v1.1.0 已自行改掉，可 import 到 3.9，
 #           但下限仍按打包运行时 3.11 把关，避免用户机器上挑到远古 python2）。
-#   graphviz-dir  dot 所在目录。**只有流程图（graphviz_flow）需要**，其余六种布局零原生
-#           依赖。留空时找 litviz 同级的 graphviz/bin（打包态约定位置）。
+#   graphviz-dir  dot 所在目录。可选：引擎 v1.1.0 起流程图没有 dot 也会用纯 Python
+#           布局兜底，装了 dot 时流程图产物与以前逐字节相同。留空时找 litviz 同级的 graphviz/bin（打包态约定位置）。
 litviz:
   dir: ${LITVIZ_DIR:}
   python: ${LITVIZ_PYTHON:}

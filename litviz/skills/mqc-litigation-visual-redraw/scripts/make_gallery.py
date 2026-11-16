@@ -143,6 +143,7 @@ def renderer_id():
         if shutil.which(exe):
             try:
                 out = subprocess.run([exe] + args, capture_output=True, text=True,
+                                     encoding="utf-8", errors="replace",
                                      timeout=60)
                 ver = (out.stdout or out.stderr).strip().splitlines()[0][:60]
             except Exception:
@@ -202,7 +203,7 @@ def build(check_only=False):
         _was = ""
         try:
             if os.path.exists(_stamp):
-                _was = open(_stamp, encoding="utf-8").read().strip()
+                _was = open(_stamp, encoding="utf-8-sig").read().strip()
         except OSError:
             _was = ""
         _want = _rid + "\n" + font_id()
@@ -343,7 +344,32 @@ def _quiet_broken_pipe():
         pass
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     _quiet_broken_pipe()
+    # Refuse arguments it does not understand. Without this, `make_gallery.py some.json out`
+    # silently regenerated — and overwrote — every image in assets/ with whatever fonts the
+    # current machine has (found by a self-check sweep in 0.9.8; an agent can do the same).
+    _extra = [a for a in sys.argv[1:] if a != "--check"]
+    if _extra:
+        print(f"make_gallery.py takes no arguments except --check; got {' '.join(_extra)}\n"
+              "  python3 scripts/make_gallery.py --check   # compare, write nothing\n"
+              "  python3 scripts/make_gallery.py           # REWRITE every image in assets/screenshots and assets/modes",
+              file=sys.stderr)
+        raise SystemExit(2)
     # Say what is missing instead of ending on a traceback. Regenerating the
     # gallery needs a CJK face to draw the mode labels, and a Windows box has
     # no Noto CJK by default — a stack trace tells that user nothing they can act on.

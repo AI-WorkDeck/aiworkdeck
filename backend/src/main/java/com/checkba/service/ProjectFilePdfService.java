@@ -153,6 +153,13 @@ public class ProjectFilePdfService {
         return saveGeneratedPdf(projectId, first.getParentId(), mergedName, mergedBytes, userId);
     }
 
+    /**
+     * 右键「打印」：把单个文件（PDF/Word/PPT/Excel/图片）渲染成 PDF 字节，只读、不在项目里落新文件。
+     */
+    public byte[] renderPrintablePdf(Long projectId, Long fileId, Long userId) {
+        return convertSingleFileToPdfBytes(requireValidProjectFile(projectId, fileId, userId, true));
+    }
+
     private ProjectFile requireValidProjectFile(Long projectId, Long fileId, Long userId, boolean allowPdf) {
         if (fileId == null) {
             throw new IllegalArgumentException(LangText.of("文件 ID 不能为空", "File ID must not be empty"));

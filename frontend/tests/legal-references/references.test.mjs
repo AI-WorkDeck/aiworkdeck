@@ -3,12 +3,62 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { retrievalSourceLabel } from '../../src/utils/insightDetail.js'
-import { referencesFromEntity, referenceFromModel, legalMessageParts, referencesFromTools, safeLegalUrl, legalReadableText } from '../../src/utils/legalReferences.js'
+import { referencesFromEntity, referenceFromModel, legalMessageParts, allowPlainJsonLegalReferences, referencesFromTools, safeLegalUrl, legalReadableText, liveLawToolOutputs, corroborateReference } from '../../src/utils/legalReferences.js'
 import { legalReferenceTabMethods } from '../../src/pages/project-overview/legalReferenceTab.js'
 import { serializeTab } from '../../src/pages/project-overview/tabSnapshot.js'
 import { isContextEligibleTab } from '../../src/pages/project-overview/activeTabContext.js'
 const model = { kind: 'PENALTY', title: 'Synthetic decision', documentNumber: 'TEST-1', summary: 'AI summary', excerpt: 'Source excerpt', url: 'https://example.org/decision', status: 'verified' }
 const fence = value => '```legal-reference\n' + JSON.stringify(value) + '\n```\n'
+const jsonFence = value => '```json\n' + JSON.stringify(value) + '\n```\n'
+
+test('complete legal reference data in a plain JSON fence renders as an unverified card', () => {
+  const value = { kind: 'LAW', title: '合成测试法规 第938条', documentNumber: 'TEST-938', authority: '测试机关',
+    effectiveDate: '2026-01-01', validity: '测试状态', source: '测试资料来源', excerpt: '合成条文原文。' }
+  for (const kind of ['LAW', 'CASE', 'PENALTY']) {
+    const content = 'Answer\n' + jsonFence({ ...value, kind }) + 'After'
+    for (const streaming of [true, false]) {
+      const parts = legalMessageParts(content, streaming, true)
+      assert.deepEqual(parts.map(part => part.type), ['text', 'reference', 'text'])
+      assert.equal(parts[1].reference.status, 'unverified')
+      assert.equal(parts[1].reference.sections[0].text, value.excerpt)
+      assert.equal(parts[2].text, 'After')
+    }
+    const readable = legalReadableText(content, undefined, true)
+    assert.ok(readable.includes(value.excerpt) && readable.includes('legalReference.status.unverified'))
+    assert.ok(!readable.includes('"kind"') && !readable.includes('```'))
+  }
+})
+
+test('JSON compatibility preserves ordinary data, unknown fields, partial blocks and quoted examples', () => {
+  const value = { kind: 'LAW', title: 'Synthetic act', source: 'Test source', excerpt: 'Test passage' }
+  const inputs = [jsonFence({ kind: 'LAW', title: 'Data only' }), jsonFence({ ...value, extra: 'Keep me' }),
+    jsonFence({ ...value, excerpt: { text: 'Not the presentation schema' } }), jsonFence([value, { kind: 'OTHER' }]),
+    '```json\n{"kind":"LAW",', '````markdown\n' + jsonFence(value) + '````\n',
+    jsonFence(value).trimEnd().split('\n').map(line => '> ' + line).join('\n') + '\n']
+  for (const input of inputs) for (const streaming of [false, true]) {
+    assert.deepEqual(legalMessageParts(input, streaming, true), [{ type: 'text', text: input }])
+  }
+  assert.equal(legalMessageParts(jsonFence([value, { ...value, kind: 'CASE' }]), false, true).length, 2)
+})
+
+test('plain JSON requires an article question and preserves explicit code requests and examples', () => {
+  const content = jsonFence({ kind: 'LAW', title: 'Synthetic act', source: 'Test source', excerpt: 'Test passage' })
+  assert.deepEqual(legalMessageParts(content), [{ type: 'text', text: content }])
+  for (const question of ['民法典第938条是什么', 'What is Article 938 of the Civil Code?']) {
+    assert.equal(allowPlainJsonLegalReferences(question, content), true)
+  }
+  for (const question of ['', '第1条建议是什么', 'Article 2 of this data spec', '解释接口结构', '把民法典第938条信息输出为JSON', '民法典第938条的数据示例', 'Article 938 as JSON']) {
+    const allowed = allowPlainJsonLegalReferences(question, content)
+    assert.equal(allowed, false)
+    assert.equal(legalReadableText(content, undefined, allowed), content)
+  }
+  for (const prefix of ['下面是接口响应示例，请原样复制 JSON：\n', 'Example response:\n']) {
+    const answer = prefix + content
+    const allowed = allowPlainJsonLegalReferences('民法典第938条是什么', answer)
+    assert.equal(allowed, false)
+    assert.equal(legalReadableText(answer, undefined, allowed), answer)
+  }
+})
 
 test('model references never acquire verification from status/source/url', () => {
   const ref = referenceFromModel(model)
@@ -122,4 +172,40 @@ test('source field aliases and legal category labels preserve their meaning', ()
   assert.ok(!procedure.metadata.some(x => x.labelKey.endsWith('cause')))
   const modelCase = referenceFromModel({ kind: 'CASE', title: 'Case', authority: 'Court', documentNumber: 'TEST-CASE', date: '2026-10-29' })
   assert.deepEqual(modelCase.metadata.map(x => x.labelKey), ['legalReference.caseNumber', 'legalReference.court', 'legalReference.judgmentDate'])
+})
+
+// 真实会话（2026-11-11 民法典第1082条）：法宝网关现在回纯文本，模型卡片一直显示「来源待核验」。
+const PKULAW_TEXT = `《中华人民共和国民法典》第一千零八十二条（现行有效）
+施行日期：2021-01-01
+
+第一千零八十二条 女方在怀孕期间、分娩后一年内或者终止妊娠后六个月内，男方不得提出离婚；但是，女方提出离婚或者人民法院认为确有必要受理男方离婚请求的除外。
+
+gid：aa00daaeb5a4fe4ebdfb
+https://www.pkulaw.com/chl/aa00daaeb5a4fe4ebdfb.html?way=mcp#tiao_1082
+
+request_id: db9ef8b6-2004-43fc-a331-73c2b3a346c0`
+const card1082 = { kind: 'LAW', title: '中华人民共和国民法典 第一千零八十二条', documentNumber: '主席令第四十五号', authority: '全国人民代表大会',
+  date: '2020-05-28', effectiveDate: '2021-01-01', validity: '现行有效', source: '北大法宝',
+  url: 'https://www.pkulaw.com/chl/aa00daaeb5a4fe4ebdfb.html?way=mcp#tiao_1082',
+  excerpt: '女方在怀孕期间、分娩后一年内或者终止妊娠后六个月内，男方不得提出离婚；但是，女方提出离婚或者人民法院认为确有必要受理男方离婚请求的除外。' }
+const proc = (live, output = PKULAW_TEXT, status = 'success') => [{ items: [{ type: 'tool', status, live, code: 'get_law_article(title="中华人民共和国民法典", number="1082")', output }] }]
+
+test('model card matching a live PKULaw text output (URL + verbatim excerpt) becomes retrieved; unmatched metadata dropped', () => {
+  const ref = corroborateReference(referenceFromModel(card1082), liveLawToolOutputs(proc(true)))
+  assert.equal(ref.status, 'retrieved')
+  const shown = ref.metadata.map(item => item.value)
+  assert.ok(shown.includes('2021-01-01') && shown.includes('现行有效'))
+  for (const unsupported of ['主席令第四十五号', '全国人民代表大会', '2020-05-28']) assert.ok(!shown.includes(unsupported), unsupported)
+  assert.notEqual(ref.id, referenceFromModel(card1082).id)
+})
+
+test('corroboration refuses: history replay, failed tool, altered excerpt, other URL, non-law tool', () => {
+  const model = referenceFromModel(card1082)
+  assert.equal(corroborateReference(model, liveLawToolOutputs(proc(false))).status, 'unverified')
+  assert.equal(corroborateReference(model, liveLawToolOutputs(proc(true, PKULAW_TEXT, 'error'))).status, 'unverified')
+  assert.equal(corroborateReference(referenceFromModel({ ...card1082, excerpt: '男方在任何情况下都不得提出离婚。' }), liveLawToolOutputs(proc(true))).status, 'unverified')
+  assert.equal(corroborateReference(referenceFromModel({ ...card1082, url: 'https://www.pkulaw.com/chl/ffff.html' }), liveLawToolOutputs(proc(true))).status, 'unverified')
+  const web = [{ items: [{ type: 'tool', status: 'success', live: true, code: 'search_web(query="1082")', output: PKULAW_TEXT }] }]
+  assert.equal(corroborateReference(model, liveLawToolOutputs(web)).status, 'unverified')
+  assert.equal(corroborateReference(referenceFromModel({ ...card1082, excerpt: '' }), liveLawToolOutputs(proc(true))).status, 'unverified')
 })

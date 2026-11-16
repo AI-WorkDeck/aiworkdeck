@@ -16,6 +16,9 @@ async function fixture(t) {
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   const dir = path.join(root, 'example')
   await initPlugin(dir, 'test-plugin')
+  // Most tests rewrite permissions wholesale; the init example tool has its own test below.
+  const initial = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8'))
+  await fs.writeFile(path.join(dir, 'manifest.json'), JSON.stringify({ ...initial, permissions: [], tools: [] }))
   return { root, dir, manifest: path.join(dir, 'manifest.json') }
 }
 async function editManifest(file, edit) {
@@ -235,4 +238,96 @@ test('packaging excludes development provenance and service-trust markers', asyn
   const checked = await validatePlugin(dir)
   assert.deepEqual(checked.excluded, ['.awd-dev', '.awd-service-trust', '.awd-service-trust-fixture.tmp'])
   assert.ok(checked.files.every(file => !file.name.startsWith('.awd-')))
+})
+
+const declared = (extra = {}) => ({
+  name: 'test_plugin_week', description: '%tools.week.desc%', access: 'read',
+  inputSchema: { type: 'object', properties: { from: { type: 'string' } } },
+  handler: { type: 'service', service: 'calendar', operation: 'list' }, permissions: ['tasks'], ...extra
+})
+const withTools = (tools, extra = () => {}) => m => { m.permissions = ['tasks', 'network']; m.tools = tools; extra(m) }
+const connection = { id: 'crm', label: 'CRM', baseUrl: 'https://crm.example.invalid', auth: { type: 'bearer' }, operations: { listMatters: { path: '/matters', method: 'GET' } } }
+
+test('init template ships one valid read declarative tool', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'awd-plugin-init-'))
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const dir = path.join(root, 'my-plugin')
+  await initPlugin(dir, 'my-plugin')
+  const { manifest } = await validatePlugin(dir)
+  assert.equal(manifest.tools.length, 1)
+  assert.equal(manifest.tools[0].access, 'read')
+  assert.ok(manifest.tools[0].name.startsWith('my_plugin_'))
+})
+
+test('valid declarative tool declarations', async t => {
+  const { dir, manifest } = await fixture(t)
+  const cases = [
+    [declared()],                                                                  // service read
+    [declared({ access: 'write', handler: { type: 'service', service: 'calendar', operation: 'create' }, mcp: true, confirm: 'auto', keywords: ['deadline', '日程'] })],
+    [declared({ name: 'test_plugin_matters', permissions: ['network'], handler: { type: 'connection', connectionId: 'crm', operation: 'listMatters' } })], // connection
+    [{ name: 'legacyJarMethod', description: 'old', permissions: ['file_read'] }, { name: 'legacyBare' }],  // legacy form, mixed
+    [{ name: 'uiOnlyJar', description: 'English is fine for legacy entries', agent: false }],              // legacy JAR tool hidden from the model
+    [declared({ agent: false })],                                                                           // declarative UI-only
+    [declared({ description: '读取项目文件的纯文本（only the first line counts）。\n用户问到全文时用。' })],      // A5 shape: verb-first, zh, trigger on line 2
+    [declared({ description: '比对两份合同（compare, redline）并列出差异。' })],                             // parenthesised ASCII synonyms allowed
+    [declared({ name: 'jarThing', access: 'destructive', handler: { type: 'jar' }, inputSchema: undefined, permissions: undefined })] // declarative JAR: prefix not required
+  ]
+  for (const tools of cases) {
+    await editManifest(manifest, withTools(tools, m => { m.contributes = { connections: [connection] } }))
+    await validatePlugin(dir)
+  }
+})
+
+test('invalid declarative tool declarations are rejected', async t => {
+  const { dir, manifest } = await fixture(t)
+  const cases = [
+    [declared({ name: 'week_agenda' }), /must start with test_plugin_/],
+    [declared({ access: undefined }), /access is required/],
+    [declared({ description: '  ' }), /description must not be blank/],
+    [declared({ inputSchema: { type: 'object', properties: { x: { type: 'string', pattern: '.*' } } } }), /inputSchema/],
+    [declared({ handler: { type: 'service', service: 'calendar', operation: 'nope' } }), /unknown host service operation/],
+    [declared({ handler: { type: 'service', service: 'ghost', operation: 'list' } }), /unknown host service operation/],
+    [declared({ handler: { type: 'connection', connectionId: 'missing', operation: 'x' } }), /not a declared connection/],
+    [declared({ permissions: ['clipboard'] }), /not declared in manifest.permissions/],
+    [declared({ confirm: 'sometimes' }), /declared variant/],
+    [declared({ extra: 1 }), /declared variant/],
+    // V8: the V0 description gate (first line <= 80, one language, verb-first)
+    [declared({ description: '读'.repeat(81) }), /first line is 81 chars/],
+    [declared({ description: 'List the user calendar tasks.' }), /single language/],
+    [declared({ description: '查询 the calendar tasks 并返回结果。' }), /single language/],
+    [declared({ description: '用户问到日程时用。查询日程事项。' }), /must start with a verb/],
+    [declared({ description: '仅供内部使用的查询。' }), /must start with a verb/],
+    // V8: agent flag and MCP projection rules
+    [declared({ agent: 'no' }), /agent must be a boolean|declared variant/],
+    [declared({ access: 'destructive', mcp: true }), /destructive tools cannot set mcp:true/],
+    [declared({ access: 'write', confirm: 'always', mcp: true }), /confirm:always tools are never projected/],
+    [declared({ agent: false, mcp: true }), /agent:false tools are UI-only/]
+  ]
+  for (const [tool, pattern] of cases) {
+    await editManifest(manifest, withTools([tool]))
+    await assert.rejects(validatePlugin(dir), pattern, JSON.stringify(tool))
+  }
+})
+
+test('install surfaces the local host validation message instead of a generic rejection', async t => {
+  const server = createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ code: 400, message: 'Invalid declarative tool: tools.x: access is required' }))
+  })
+  server.listen(0, '127.0.0.1'); await once(server, 'listening')
+  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections() }))
+  const endpoint = 'http://127.0.0.1:' + server.address().port
+  await assert.rejects(main(['install', '--endpoint', endpoint, '--project-id', '7', '--folder-id', '9'], {}), /Host rejected request: Invalid declarative tool: tools\.x: access is required/)
+})
+
+test('description gate judges the zh-CN catalogue for %key% descriptions and skips unresolved keys', async t => {
+  const { dir, manifest } = await fixture(t)
+  await editManifest(manifest, withTools([declared()]))
+  await validatePlugin(dir)                       // no catalogue: placeholder is left to the host
+  await fs.mkdir(path.join(dir, 'l10n'))
+  const catalogue = text => fs.writeFile(path.join(dir, 'l10n/zh-CN.json'), JSON.stringify({ 'tools.week.desc': text }))
+  await catalogue('用户问到本周安排时用。列出本周日程。')
+  await assert.rejects(validatePlugin(dir), /must start with a verb/)
+  await catalogue('列出本周日程。用户问到本周安排时用。')
+  await validatePlugin(dir)
 })

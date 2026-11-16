@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// 外部 Agent（MCP propose_revision）待审修订：角标、编辑器顶栏与审阅列表
+export default {
+  bannerCount: "{count} externe wijziging(en) wachten op beoordeling",
+  review: "Beoordelen",
+  collapse: "Inklappen",
+  source: "Bron: {source}",
+  reason: "Reden: {reason}",
+  accept: "Accepteren en toepassen als bijgehouden wijzigingen",
+  reject: "Afwijzen",
+  stale: "Verouderd",
+  staleHint: "Het document is na dit voorstel gewijzigd en kan niet worden toegepast. U kunt het nog wel bekijken of afwijzen.",
+  applied: "Toegepast als bijgehouden wijzigingen. Accepteer of wijs ze af in het document.",
+  editorNotReady: "De editor is niet gereed of het document is alleen-lezen; de wijziging kan nog niet worden toegepast.",
+  failed: "Mislukt: {message}",
+  noMatch: "Wijziging {index} komt niet meer overeen met het document; er is niets toegepast. U kunt dit voorstel afwijzen.",
+  partial: "Gestopt na {done} van {total} wijzigingen ({message}). Opnieuw accepteren hervat bij de eerste niet-toegepaste wijziging.",
+  progress: "{done} van {total} toegepast",
+}

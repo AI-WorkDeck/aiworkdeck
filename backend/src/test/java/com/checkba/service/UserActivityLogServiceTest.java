@@ -80,6 +80,18 @@ class UserActivityLogServiceTest {
     }
 
     @Test
+    void requestAuditPersistsBoundedNetworkAndDeviceMetadata() {
+        service.logActivity(USER, "mobile_assistant_content", null, "INPUT", 0L, "{}", null,
+                new UserActivityLogService.RequestMetadata("203.0.113.9\nignored", 443, "  Android\nAgent  "));
+
+        ArgumentCaptor<UserActivityLog> captor = ArgumentCaptor.forClass(UserActivityLog.class);
+        verify(repository).save(captor.capture());
+        assertEquals("203.0.113.9 ignored", captor.getValue().getSourceAddress());
+        assertEquals(443, captor.getValue().getSourcePort());
+        assertEquals("Android Agent", captor.getValue().getDeviceCharacteristics());
+    }
+
+    @Test
     void getUserLogsFillsProjectNameByBatchQuery() {
         UserActivityLog withProject = log(5L);
         when(repository.findTop500ByUserIdOrderByTimestampDesc(USER))

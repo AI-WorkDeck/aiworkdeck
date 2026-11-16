@@ -355,6 +355,7 @@
 </template>
 
 <script>
+import { pendingToolChanges, promptToolApproval } from '@/utils/pluginToolApproval.js'
 import { getPlugins, setPluginEnabled, rescanPlugins, getSkills, setSkillActivation, rescanSkills, getSkillMarket, installMarketSkill, uninstallMarketSkill, getPluginMarket, installMarketPlugin, uninstallMarketPlugin, getBundledPlugins, installBundledPlugin } from '@/services/api.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { mergePluginCatalog, isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
@@ -381,6 +382,7 @@ const PERMISSION_LABELS = {
   get tasks() { return t('market.permTasks') },
   get clipboard() { return t('market.permClipboard') },
   get lawfirm() { return t('market.permLawfirm') },
+  get worklog_read() { return t('market.permWorklogRead') },
 }
 
 // 分类沿用官网 SKILL_CATEGORIES（aiworkdeckweb lib/skill-categories）；registry 未返回 category 时归入"其他"
@@ -687,6 +689,18 @@ export default {
         await this.reloadAll()
         this.notifyMarketChanged()
         uni.showToast({ title: this.pluginActionHints[plugin.id] || this.$t(isUpdate ? 'market.updatedToast' : 'market.installedEnableHint'), icon: 'none' })
+        // 新版里有权限升高的工具：更新确认框只列插件级权限，这里再逐个工具征得同意（批准前后端对 Agent 屏蔽它们）
+        const refreshed = this.plugins.find(p => p.id === plugin.id)
+        if (pendingToolChanges(refreshed).length) {
+          try {
+            if (await promptToolApproval(refreshed, plugin.name)) {
+              uni.showToast({ title: this.$t('market.toolApprovalDone'), icon: 'none' })
+              await this.reloadAll()
+            }
+          } catch (e) {
+            this.pluginActionHints[plugin.id] = e?.message || this.$t('market.toolApprovalFailed')
+          }
+        }
       } catch (e) {
         console.error('安装插件失败:', e)
         // 后端 4011（价格没查到的降级路径）：api.js 已就地弹过登录层；登录成功就重拉列表，
@@ -871,11 +885,10 @@ export default {
       }
     },
     goBack() {
-      uni.navigateBack({
-        fail: () => {
-          uni.redirectTo({ url: '/pages/admin/admin' })
-        }
-      })
+      // 直接打开本页（没有历史栈）时 navigateBack 会静默失败，回工作台
+      const toWorkbench = () => uni.reLaunch({ url: '/pages/project-overview/project-overview' })
+      if (getCurrentPages().length <= 1) return toWorkbench()
+      uni.navigateBack({ fail: toWorkbench })
     },
   }
 }

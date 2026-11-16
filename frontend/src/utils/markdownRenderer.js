@@ -54,6 +54,23 @@ md.renderer.rules.code_block = (tokens, idx, options, env, self) =>
   wrapWithCopy((defaultCodeBlock || self.renderToken.bind(self))(tokens, idx, options, env, self), env)
 
 /**
+ * 正文里的链接一律带 target="_blank" rel="noopener noreferrer"（S26）：渲染结果所在的是带桌面桥的
+ * 应用页，裸 <a href> 被点一下就会把整个工作台导航走（相对链接、#锚点同理会打乱路由）。
+ * 点击本身由容器的事件委托交给 utils/externalLink.js 的 handleRenderedLinkClick；
+ * 这两个属性是委托缺席时的兜底（桌面壳的 window.open 拦截不会让主窗口离开应用页）。
+ */
+export function withExternalLinkAttrs(instance) {
+  const defaultLinkOpen = instance.renderer.rules.link_open
+  instance.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+    tokens[idx].attrSet('target', '_blank')
+    tokens[idx].attrSet('rel', 'noopener noreferrer')
+    return (defaultLinkOpen || self.renderToken.bind(self))(tokens, idx, options, env, self)
+  }
+  return instance
+}
+withExternalLinkAttrs(md)
+
+/**
  * 把 Markdown 渲染成 HTML 字符串。
  * @param text 源文本
  * @param env markdown-it 的 env。目前只认 copyLabel：给了才在代码块右上角渲染复制键。

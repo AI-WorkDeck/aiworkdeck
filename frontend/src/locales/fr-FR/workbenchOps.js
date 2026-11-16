@@ -71,7 +71,7 @@ export default {
   "ocrCancelling": "Annulation…",
   "ocrBatchBusy": "Une reconnaissance est déjà en cours ; attendez-la ou annulez-la",
   "ocrConsentTitle": "Utiliser la reconnaissance dans le cloud ?",
-  "ocrConsentHint": "Les PDF avec couche texte sont extraits directement, sans envoi ni facturation ; seuls les scans et images nécessitent l’OCR cloud. Cette confirmation ne vaut que pour ce lot ; passez à « toujours cloud » ou « local uniquement » dans Paramètres → Compte et utilisation → Reconnaissance des scans.",
+  "ocrConsentHint": "Les PDF avec couche texte sont extraits directement, sans envoi ni facturation ; seuls les scans et images nécessitent l’OCR cloud. Cette confirmation ne vaut que pour ce lot ; passez à « toujours cloud » ou « local uniquement » dans Paramètres → Paramètres IA → Reconnaissance des scans.",
   "ocrConsentCheck": "J’ai pris connaissance de la destination des données et de la facturation",
   "ocrConsentConfirm": "Démarrer",
   "ocrCopied": "Texte de {count} fichier(s) copié et ajouté à l’historique du presse-papiers",
@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Vous pouvez utiliser la reconnaissance dans le cloud pour les fichiers de ce lot qui ont échoué en local. Sinon, ces fichiers ne seront pas envoyés.",
   "ocrLocalFailedConfirm": "Utiliser la reconnaissance dans le cloud",
   "ocrAlreadySearchable": "« {name} » contient déjà une couche de texte et est interrogeable ; aucun nouveau fichier n'a été créé",
-  "ocrStopped": "Arrêté ; {count} fichier(s) non traité(s)"
+  "ocrStopped": "Arrêté ; {count} fichier(s) non traité(s)",
+  "subscribeProBtn": "Pro ¥9.9",
 }

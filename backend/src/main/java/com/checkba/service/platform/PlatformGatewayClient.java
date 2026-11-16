@@ -195,6 +195,13 @@ public class PlatformGatewayClient {
             // 非 JSON 响应：落到下面按状态码分类
         }
 
+        if (com.checkba.service.account.BqtBilling.ERROR_CODES.contains(code)) {
+            // 包晴天积分通道的拒绝是业务态：不能落到下面 403 → UNAUTHORIZED（会把账户标成失效），
+            // 也不归 NO_CREDITS（那会打开本应用的充值弹层，而这类账户只能在包晴天 App 充值）
+            return new GatewayException("bqt_unavailable".equals(code)
+                    ? GatewayException.Kind.UPSTREAM_FAILED : GatewayException.Kind.SERVICE_DISABLED,
+                    com.checkba.service.account.BqtBilling.message(code), code);
+        }
         return switch (code) {
             case "no_credits" -> new GatewayException(GatewayException.Kind.NO_CREDITS,
                     fallback(serverMessage, LangText.of(

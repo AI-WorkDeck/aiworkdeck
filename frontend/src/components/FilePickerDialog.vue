@@ -5,7 +5,7 @@
     <view class="file-picker-dialog" @tap.stop>
       <view class="dialog-header">
         <text class="dialog-title">{{ title }}</text>
-        <text class="dialog-close" @tap="handleCancel">×</text>
+        <text :title="$t('common.close')" class="dialog-close" @tap="handleCancel">×</text>
       </view>
       
       <view class="dialog-body">

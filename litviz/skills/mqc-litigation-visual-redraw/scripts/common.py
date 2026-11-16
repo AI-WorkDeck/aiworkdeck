@@ -12,7 +12,7 @@ from datetime import date
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _TOKENS_PATH = os.path.join(_HERE, "..", "assets", "style-tokens.json")
 
-with open(_TOKENS_PATH, encoding="utf-8") as _f:
+with open(_TOKENS_PATH, encoding="utf-8-sig") as _f:
     TOKENS = json.load(_f)
 
 C = TOKENS["colors"]
@@ -121,7 +121,7 @@ NO_START = set("，。、；：！？）】》」』〕｝’”》〉…—·%�
 NO_END = set("（【《「『〔｛‘“《〈#￥")
 
 
-def wrap(text: str, fs: float, max_w: float):
+def wrap(text: str, fs: float, max_w: float, keep_alnum: bool = False):
     """Greedy character wrap to a max pixel width, honoring CJK 禁则 (no line may
     start with closing punctuation or end with opening punctuation). Returns a
     list of lines. Verbatim: only inserts line breaks, never edits characters."""
@@ -151,6 +151,29 @@ def wrap(text: str, fs: float, max_w: float):
             acc += w
     if cur:
         lines.append(cur)
+    # 末行孤字：只剩一个字时从上一行借一个下来。只挪断点、不改字。
+    # 同类毛病在法律关系图大师的真实运行里出现过（图上「…某某大酒 / 店」）；
+    # 实测本 skill 的八份示例里有一处，改后为零，只有一张图的产物随之变化。
+    # 门槛定在「只剩一个字」：早先试过「一两个字」，会动到五张示例，得不偿失。
+    if len(lines) >= 2 and len(lines[-1]) == 1 and len(lines[-2]) > 2:
+        _prev, _last = lines[-2], lines[-1]
+        if _prev[-1] not in NO_END and _last[0] not in NO_START:
+            if sum(char_w(c, fs) for c in _prev[-1] + _last) <= max_w:
+                lines[-2], lines[-1] = _prev[:-1], _prev[-1] + _last
+    if keep_alnum:
+        # 只给图名用：数字与拉丁字母串不许被折断。真实运行里图名中的案号被折在
+        # 「475 / 09」中间，看起来就像写错了号。断点往前挪到这一串之前；挪不动就保持原样。
+        # 数字串里的千分位逗号与小数点也算在串内：否则「4,912,376.06」会断成「4,」「912…」
+        _an = lambda c: c.isascii() and (c.isalnum() or c in ",.")
+        for _k in range(1, len(lines)):
+            prev, nxt = lines[_k - 1], lines[_k]
+            if not (prev and nxt and _an(prev[-1]) and _an(nxt[0])):
+                continue
+            cut = len(prev)
+            while cut > 0 and _an(prev[cut - 1]):
+                cut -= 1
+            if 0 < cut < len(prev):
+                lines[_k - 1], lines[_k] = prev[:cut], prev[cut:] + nxt
     return lines or [""]
 
 
@@ -184,7 +207,7 @@ def load_map(path):
     nothing it can fix, so it retries the same call.
     """
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             return json.load(f)
     except FileNotFoundError:
         raise RuntimeError(f'no semantic map at "{path}" — check the path') from None
@@ -195,7 +218,7 @@ def load_map(path):
     except json.JSONDecodeError as e:
         line = ""
         try:
-            src = open(path, encoding="utf-8", errors="replace").read().splitlines()
+            src = open(path, encoding="utf-8-sig", errors="replace").read().splitlines()
             if 0 < e.lineno <= len(src):
                 line = f'\n    line {e.lineno}: {src[e.lineno - 1].strip()[:90]}'
         except OSError:
@@ -290,6 +313,10 @@ def validate_map(m):
     sv = m.get("schema_version")
     if sv is None:
         warns.append('missing "schema_version" (expected 1)')
+    elif isinstance(sv, int) and not isinstance(sv, bool) and sv > SCHEMA_VERSION:
+        # a file from a NEWER version of this skill: say so, instead of an error that reads like a broken file
+        errs.append(f'schema_version {sv} was written by a newer version of this skill (this one reads up to '
+                    f'{SCHEMA_VERSION}): update the plugin to the latest version, then try again')
     elif sv != SCHEMA_VERSION:
         errs.append(f'unsupported schema_version {sv!r} (this build expects {SCHEMA_VERSION})')
     for k in m:
@@ -379,7 +406,7 @@ def _schema_errors(m, errs):
     if not os.path.exists(path):
         return
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:
             schema = json.load(f)
         v = jsonschema.Draft202012Validator(schema)
         for e in sorted(v.iter_errors(m), key=lambda e: list(e.path)):

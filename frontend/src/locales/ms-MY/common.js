@@ -8,6 +8,12 @@ export default {
   "cancel": "Batal",
   "save": "Simpan",
   "close": "Tutup",
+  "remove": "Alih keluar",
+  "clear": "Kosongkan",
+  "zoomIn": "Zum masuk",
+  "zoomOut": "Zum keluar",
+  "moveUp": "Alih ke atas",
+  "moveDown": "Alih ke bawah",
   "done": "Selesai",
   "delete": "Padam",
   "rename": "Namakan semula",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "Pergi ke Tetapan",
   "later": "Kemudian",
   "requestFailedWithStatus": "Permintaan gagal ({status})",
+  "tooManyRequests": "Terlalu banyak permintaan. Sila tunggu sebentar dan cuba lagi",
   "smsVerificationRequired": "Tindakan ini memerlukan pengesahan SMS",
   "freeQuotaExceeded": "Anda telah menggunakan semua Credits percuma anda",
   "serviceErrorRetryLater": "Ralat perkhidmatan. Sila cuba lagi nanti",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "Pilih bahasa",
   "languageFollowSystem": "Ikut sistem",
   "languageSearchPlaceholder": "Cari bahasa…",
-  "languageNoMatch": "Tiada bahasa yang sepadan"
+  "languageNoMatch": "Tiada bahasa yang sepadan",
+  "serverLabelAccountBridge": "Jambatan akaun",
+  "serverLabelGenericClient": "Pelanggan (umum)",
+  "serverLabelPersonalMemory": "Memori peribadi",
+  "serverLabelProjectMemory": "Memori projek"
 }

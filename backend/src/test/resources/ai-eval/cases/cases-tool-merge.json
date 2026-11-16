@@ -1,0 +1,1127 @@
+[
+  {
+    "id": "merge-doc-revisions-accept-all",
+    "title": "V4：接受全部修订 → doc_revisions(action=accept_all)，四个旧名已删除",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "接受文档里所有修订",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_revisions",
+            "arguments": {
+              "action": "accept_all"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_revisions": "{\"resolved\":5}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_revisions",
+          "argsContain": {
+            "action": "accept_all"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_revisions",
+        "doc_list_revisions"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "doc_accept_all_revisions",
+        "doc_accept_revision",
+        "doc_reject_revision",
+        "doc_reject_all_revisions"
+      ]
+    }
+  },
+  {
+    "id": "merge-doc-revisions-reject-one",
+    "title": "V4：拒绝第 2 条修订 → doc_revisions(action=reject,index=1)",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "拒绝第二条修订",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_revisions",
+            "arguments": {}
+          },
+          {
+            "name": "doc_revisions",
+            "arguments": {
+              "action": "reject",
+              "index": 1
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_revisions": "[{\"index\":0},{\"index\":1}]",
+      "doc_revisions": "{\"resolved\":1}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_revisions"
+        },
+        {
+          "name": "doc_revisions",
+          "argsContain": {
+            "action": "reject",
+            "index": "1"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_revisions"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "merge-doc-update-comment-reply",
+    "title": "V4：回复批注 → doc_update_comment(action=reply)",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "回复第一条批注：同意，已按此修改",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_get_comments",
+            "arguments": {}
+          },
+          {
+            "name": "doc_update_comment",
+            "arguments": {
+              "commentId": "c-1",
+              "action": "reply",
+              "text": "同意，已按此修改"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_get_comments": "[{\"id\":\"c-1\",\"text\":\"违约金偏高\"}]",
+      "doc_update_comment": "{\"replied\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_get_comments"
+        },
+        {
+          "name": "doc_update_comment",
+          "argsContain": {
+            "action": "reply",
+            "commentId": "c-1"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_update_comment"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "doc_reply_comment",
+        "doc_resolve_comment"
+      ]
+    }
+  },
+  {
+    "id": "merge-doc-update-comment-resolve",
+    "title": "V4：标记批注已解决 → doc_update_comment(action=resolve)",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把第一条批注标记为已解决",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_update_comment",
+            "arguments": {
+              "commentId": "c-1",
+              "action": "resolve"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_update_comment": "{\"resolved\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_update_comment",
+          "argsContain": {
+            "action": "resolve"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_update_comment"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "merge-doc-table-insert-row",
+    "title": "V4：在表格末尾插一行 → doc_table_insert(axis=row)，删除另列 doc_table_delete",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在这张表格最后插入一行",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_table_insert",
+            "arguments": {
+              "axis": "row",
+              "count": 1
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_table_insert": "{\"success\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_table_insert",
+          "argsContain": {
+            "axis": "row"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_table_insert",
+        "doc_table_delete"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "doc_table_add_row",
+        "doc_table_add_col",
+        "doc_table_delete_row",
+        "doc_table_delete_col"
+      ]
+    }
+  },
+  {
+    "id": "merge-doc-table-delete-col",
+    "title": "V4：删掉第 3 列 → doc_table_delete(axis=col)，destructive 单列不并入 insert（destructive：P2-1 确认闸暂停，不执行）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把表格的第 3 列删掉",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_table_delete",
+            "arguments": {
+              "axis": "col",
+              "target": "3"
+            }
+          }
+        ]
+      }
+    ],
+    "toolStubs": {
+      "doc_table_delete": "{\"success\":true}"
+    },
+    "expect": {
+      "offeredToolsInclude": [
+        "doc_table_delete",
+        "doc_table_insert"
+      ],
+      "bubbleEndStatus": "awaiting_input",
+      "structureContains": [
+        "确认执行「"
+      ]
+    }
+  },
+  {
+    "id": "merge-doc-insert-note",
+    "title": "V4：加脚注 → doc_insert_note(kind=footnote)",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在第三条后面加一条脚注：参见附件一",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_insert_note",
+            "arguments": {
+              "kind": "footnote",
+              "text": "参见附件一"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_insert_note": "{\"success\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_insert_note",
+          "argsContain": {
+            "kind": "footnote"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_insert_note"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "doc_insert_footnote",
+        "doc_insert_endnote"
+      ]
+    }
+  },
+  {
+    "id": "merge-doc-select-paragraph",
+    "title": "V4：选中第 5 段 → doc_select(target=paragraph)（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "先选中第 5 段",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_select",
+            "arguments": {
+              "target": "paragraph",
+              "index": 4
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_select": "{\"selected\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_select",
+          "argsContain": {
+            "target": "paragraph",
+            "index": "4"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "doc_select"
+      ],
+      "toolsNotRegistered": [
+        "doc_select_anchor",
+        "doc_select_paragraph",
+        "doc_goto",
+        "doc_collapse_cursor"
+      ]
+    }
+  },
+  {
+    "id": "merge-pdf-pages-extract",
+    "title": "V4：把第 10–20 页抽出来 → pdf_pages(op=extract)，删页另列 pdf_delete_pages",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把卷宗.pdf 的第 10 到 20 页抽出来存成新文件",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "pdf_pages",
+            "arguments": {
+              "fileId": 7,
+              "op": "extract",
+              "ranges": "10-20"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "pdf_pages": "{\"status\":\"success\"}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "pdf_pages",
+          "argsContain": {
+            "op": "extract",
+            "ranges": "10-20"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "pdf_pages",
+        "pdf_delete_pages"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "pdf_split",
+        "pdf_extract_pages",
+        "pdf_rotate_pages"
+      ]
+    }
+  },
+  {
+    "id": "merge-pdf-delete-pages-stays-separate",
+    "title": "V4：删掉第 2 页仍走 pdf_delete_pages（删页产出新 PDF、原件不动，显式 WRITE，不弹确认卡）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把卷宗.pdf 的第 2 页删掉",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "pdf_delete_pages",
+            "arguments": {
+              "fileId": 7,
+              "ranges": "2"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "pdf_delete_pages": "{\"status\":\"success\"}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "pdf_delete_pages",
+          "argsContain": {
+            "ranges": "2"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "pdf_delete_pages",
+        "pdf_pages"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "merge-doc-list-folders-only",
+    "title": "V4：只要文件夹清单 → doc_list_project_files(foldersOnly=true)",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "列出项目里有哪些文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_project_files",
+            "arguments": {
+              "foldersOnly": true
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_project_files": "项目文件夹列表 (共 1 个):\n- ID: 5, 名称: 归档"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_project_files",
+          "argsContain": {
+            "foldersOnly": "true"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_list_project_files"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "list_project_folders"
+      ]
+    }
+  },
+  {
+    "id": "merge-search-files-scope-all",
+    "title": "V4：跨项目找文件 → search_project_files(scope=all)",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在我所有项目里找名字带『保密协议』的文件",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "search_project_files",
+            "arguments": {
+              "fileNamePattern": "保密协议",
+              "scope": "all"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "search_project_files": "- [项目: A (projectId=1)] 保密协议.docx (fileId=9, type=docx)"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "search_project_files",
+          "argsContain": {
+            "scope": "all"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "search_project_files"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "search_across_projects"
+      ]
+    }
+  },
+  {
+    "id": "merge-write-file-overwrite",
+    "title": "V4：整篇覆盖纯文本 → write_file(mode=overwrite)（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把 notes.txt 整个改写成：第一版纪要",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "write_file",
+            "arguments": {
+              "mode": "overwrite",
+              "fileId": 12,
+              "content": "第一版纪要"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "write_file": "已写入 notes.txt（5 字符）。改动已进入版本记录。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "write_file",
+          "argsContain": {
+            "mode": "overwrite",
+            "fileId": "12"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "write_file"
+      ],
+      "toolsNotRegistered": [
+        "text_write_file"
+      ]
+    }
+  },
+  {
+    "id": "merge-move-files-single",
+    "title": "V4：移动一份文件 → move_files（原 move_files_batch / move_project_file）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把合同.docx 移到归档文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_files",
+            "arguments": {
+              "movesJson": "[{\"sourcePath\":\"合同.docx\",\"destPath\":\"归档/合同.docx\"}]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "move_files": "moved: 1"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "move_files",
+          "argsContain": {
+            "movesJson": "归档/合同.docx"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "move_files"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "move_files_batch",
+        "move_project_file"
+      ]
+    }
+  },
+  {
+    "id": "merge-capability-install-two-step",
+    "title": "V4：安装能力包两步都走 capability_install（planId 步需用户确认之后）（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "按 https://github.com/acme/litviz-engine 装一个能力包",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "capability_install",
+            "arguments": {
+              "url": "https://github.com/acme/litviz-engine"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "capability_install": "安装计划 planId=p1 ……"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "capability_install",
+          "argsContain": {
+            "url": "github.com/acme/litviz-engine"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "capability_install"
+      ],
+      "toolsNotRegistered": [
+        "capability_apply"
+      ]
+    }
+  },
+  {
+    "id": "merge-office-revisions-accept",
+    "title": "V4：Word 窗格接受全部修订 → office_revisions(action=accept_all)（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "接受文档里所有的修订",
+    "clientCapability": "office",
+    "officeHost": "word",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "office_revisions",
+            "arguments": {
+              "action": "accept_all"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "office_revisions": "{\"accepted\":3}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "office_revisions",
+          "argsContain": {
+            "action": "accept_all"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "office_revisions"
+      ],
+      "toolsNotRegistered": [
+        "office_accept_revision",
+        "office_reject_revision"
+      ]
+    }
+  },
+  {
+    "id": "merge-office-update-comment-reply",
+    "title": "V4：Word 窗格回复批注 → office_update_comment(action=reply)（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "回复第一条批注：已核实",
+    "clientCapability": "office",
+    "officeHost": "word",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "office_update_comment",
+            "arguments": {
+              "action": "reply",
+              "commentIndex": 0,
+              "reply": "已核实"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "office_update_comment": "{\"replied\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "office_update_comment",
+          "argsContain": {
+            "action": "reply"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "office_update_comment"
+      ],
+      "toolsNotRegistered": [
+        "office_reply_comment",
+        "office_resolve_comment"
+      ]
+    }
+  },
+  {
+    "id": "merge-office-table-insert",
+    "title": "V4：Word 窗格插一行 → office_table_insert(axis=row)（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在表格最后加一行",
+    "clientCapability": "office",
+    "officeHost": "word",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "office_table_insert",
+            "arguments": {
+              "axis": "row"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "office_table_insert": "{\"inserted\":1}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "office_table_insert",
+          "argsContain": {
+            "axis": "row"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "office_table_insert"
+      ],
+      "toolsNotRegistered": [
+        "office_table_add_row",
+        "office_table_add_col"
+      ]
+    }
+  },
+  {
+    "id": "merge-office-file-create",
+    "title": "V4：Word 窗格新建空白文件 → office_file(action=create)（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "新建一份空白文档",
+    "clientCapability": "office",
+    "officeHost": "word",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "office_file",
+            "arguments": {
+              "action": "create"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "office_file": "{\"created\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "office_file",
+          "argsContain": {
+            "action": "create"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "office_file"
+      ],
+      "toolsNotRegistered": [
+        "office_file_create",
+        "office_file_open",
+        "office_file_save",
+        "office_file_export_pdf"
+      ]
+    }
+  },
+  {
+    "id": "merge-office-excel-formulas-via-set-values",
+    "title": "V4：Excel 窗格写公式 → office_excel_set_values（= 开头即公式）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在 B2 写入公式 =SUM(A1:A10)",
+    "clientCapability": "office",
+    "officeHost": "excel",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "office_excel_set_values",
+            "arguments": {
+              "rangeAddress": "B2",
+              "valuesJson": "[[\"=SUM(A1:A10)\"]]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "office_excel_set_values": "{\"written\":1}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "office_excel_set_values",
+          "argsContain": {
+            "valuesJson": "=SUM(A1:A10)"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "office_excel_set_values"
+      ],
+      "bubbleEndStatus": "finished",
+      "toolsNotRegistered": [
+        "office_excel_set_formulas"
+      ]
+    }
+  },
+  {
+    "id": "merge-pptx-outline-refine",
+    "title": "V4：改大纲 → pptx_outline(action=refine)，不再下发两个旧名（非核心工具：首轮靠关键词/点名放回，断言看末轮）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把大纲里的第 3 页和第 4 页合并",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "pptx_outline",
+            "arguments": {
+              "action": "refine",
+              "serviceProjectId": "sp-1",
+              "userRequirement": "把第3页和第4页合并"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "pptx_outline": "大纲修改成功！"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "pptx_outline",
+          "argsContain": {
+            "action": "refine"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "offeredToolsIncludeLastCall": [
+        "pptx_outline"
+      ],
+      "toolsNotRegistered": [
+        "pptx_generate_outline",
+        "pptx_refine_outline"
+      ]
+    }
+  },
+  {
+    "id": "merge-doc-table-insert-pricelist-turn1",
+    "title": "V4：「在价目表最后插一行」不含「表格」二字，首轮也要下发 doc_table_insert（精确放回）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "在价目表最后插一行",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_table_insert",
+            "arguments": {
+              "axis": "row"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已插入。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_table_insert": "{\"success\":true}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_table_insert",
+          "argsContain": {
+            "axis": "row"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_table_insert",
+        "doc_table_read"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "merge-removed-old-name-gets-rename-error",
+    "title": "V9：模型调到已删除的旧名 doc_accept_all_revisions → 回执「renamed to doc_revisions」，下一轮改调新名",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "接受文档里所有修订",
+    "activeDocument": {
+      "id": "1001",
+      "name": "股份认购协议.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_accept_all_revisions",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "doc_revisions",
+            "arguments": {
+              "action": "accept_all"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_revisions": "{\"resolved\":5}"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_accept_all_revisions"
+        },
+        {
+          "name": "doc_revisions",
+          "argsContain": {
+            "action": "accept_all"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "promptContains": [
+        "was renamed to 'doc_revisions'",
+        "doc_revisions(action=accept_all)"
+      ],
+      "allowUnresolvedTools": true,
+      "toolsNotRegistered": [
+        "doc_accept_all_revisions"
+      ]
+    }
+  },
+  {
+    "id": "merge-removed-same-args-name-resolves",
+    "title": "V9：参数完全相同的旧名 move_files_batch 直接按 move_files 分发（不算未知工具）",
+    "category": "tool-merge",
+    "protocol": "native",
+    "userInput": "把合同.docx 移到归档文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_files_batch",
+            "arguments": {
+              "movesJson": "[{\"sourcePath\":\"合同.docx\",\"destPath\":\"归档/合同.docx\"}]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已完成。</final>"
+      }
+    ],
+    "toolStubs": {
+      "move_files": "moved: 1"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "move_files",
+          "argsContain": {
+            "movesJson": "归档/合同.docx"
+          }
+        }
+      ],
+      "bubbleEndStatus": "finished",
+      "promptContains": [
+        "moved: 1"
+      ],
+      "toolsNotRegistered": [
+        "move_files_batch"
+      ]
+    }
+  }
+]

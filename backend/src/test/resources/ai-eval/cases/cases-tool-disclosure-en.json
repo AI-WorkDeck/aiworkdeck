@@ -1,0 +1,461 @@
+[
+  {
+    "id": "en-accept-all-tracked-changes",
+    "title": "英文关键词预放回（gate-35-en）：「Accept all tracked changes」首轮可见修订工具（s06）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "userInput": "Accept all tracked changes",
+    "activeDocument": {
+      "id": "1001",
+      "name": "Contract.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_revisions",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_revisions": "3 revisions"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_revisions"
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_revisions",
+        "doc_list_revisions"
+      ],
+      "offeredToolsExclude": [
+        "move_to_trash",
+        "pdf_inspect"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-reject-one-accept-rest",
+    "title": "英文关键词预放回（gate-35-en）：「Reject the first tracked change and accept all the others」（g12）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "userInput": "Reject the first tracked change and accept all the others",
+    "activeDocument": {
+      "id": "1001",
+      "name": "Contract.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_list_revisions",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_list_revisions": "3 revisions"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_list_revisions"
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_revisions",
+        "doc_list_revisions"
+      ],
+      "offeredToolsExclude": [
+        "move_to_trash"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-deadlines-this-week",
+    "title": "英文关键词预放回（gate-35-en）：「What deadlines do I have this week?」首轮可见 task_list（s10）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "What deadlines do I have this week?",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "task_list",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "task_list": "1. File the statement of defence (due in 1 day)"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "task_list"
+        }
+      ],
+      "offeredToolsInclude": [
+        "task_list",
+        "task_create"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect",
+        "tag_file"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-create-reminder",
+    "title": "英文关键词预放回（gate-35-en）：「create a reminder for 18 November 2026」首轮可见 task_create（g06/g07）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "In the “Xinghe Technology Sales Contract Dispute” project, create a reminder for 18 November 2026: submit the evidence list",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "task_create",
+            "arguments": {
+              "title": "Submit the evidence list",
+              "dueDate": "2026-11-18"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "task_create": "created"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "task_create"
+        }
+      ],
+      "offeredToolsInclude": [
+        "task_create",
+        "task_list"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-new-folder",
+    "title": "英文关键词预放回（gate-35-en）：「Create a new folder called Evidence」首轮可见 create_folder（s13）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "Create a new folder called Evidence",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "create_folder",
+            "arguments": {
+              "name": "Evidence"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "create_folder": "created"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "create_folder"
+        }
+      ],
+      "offeredToolsInclude": [
+        "create_folder"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect",
+        "litigation_render"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-move-to-archive",
+    "title": "英文关键词预放回（gate-35-en）：「Move Contract.docx to the Archive folder」首轮可见 move_files（s08）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "Move Contract.docx to the Archive folder",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_files",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "move_files": "moved"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "move_files"
+        }
+      ],
+      "offeredToolsInclude": [
+        "move_files",
+        "create_folder"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-recall-preference",
+    "title": "英文关键词预放回（gate-35-en）：「Do you remember the client preference I told you about last time?」首轮可见 memory_search（s15）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "Do you remember the client preference I told you about last time?",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "memory_search",
+            "arguments": {
+              "query": "client preference"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "memory_search": "no results"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "memory_search"
+        }
+      ],
+      "offeredToolsInclude": [
+        "memory_search",
+        "query_memory"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-add-row-to-table",
+    "title": "英文关键词预放回（gate-35-en）：「Add a row at the end of the price table」首轮可见 doc_table_insert（g11 同族）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "userInput": "Add a row at the end of the price table",
+    "activeDocument": {
+      "id": "1001",
+      "name": "Contract.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_table_insert",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_table_insert": "inserted"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_table_insert"
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_table_insert"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-standard-format-then-pdf",
+    "title": "英文关键词预放回（gate-35-en）：「Apply the firm's standard formatting and then export to PDF」只精确放回两个工具（s16）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "userInput": "Apply the firm's standard formatting and then export to PDF",
+    "activeDocument": {
+      "id": "1001",
+      "name": "Contract.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_apply_standard_format",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_apply_standard_format": "formatted"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_apply_standard_format"
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_apply_standard_format",
+        "doc_export_pdf"
+      ],
+      "offeredToolsExclude": [
+        "doc_set_font",
+        "pdf_inspect"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "en-delete-article-is-not-trash",
+    "title": "英文关键词预放回（gate-35-en）：「Delete Article 3」开着文档且没提文件：不放回 move_to_trash（file-mention 闸，g16）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "userInput": "Delete Article 3",
+    "activeDocument": {
+      "id": "1001",
+      "name": "Contract.docx",
+      "fileType": "docx"
+    },
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_get_clauses",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>Done.</final>"
+      }
+    ],
+    "toolStubs": {
+      "doc_get_clauses": "1. Article 1"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_get_clauses"
+        }
+      ],
+      "offeredToolsInclude": [
+        "doc_get_clauses"
+      ],
+      "offeredToolsExclude": [
+        "move_to_trash",
+        "move_files"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  }
+]

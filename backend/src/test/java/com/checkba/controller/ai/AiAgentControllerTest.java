@@ -107,6 +107,51 @@ class AiAgentControllerTest {
     }
 
     @Test
+    @DisplayName("网页来源的 chat 一律按 web 登记并写回请求体；web- 连接实例把会话钉在 WEB（W1）")
+    void webOriginAndWebClientInstancePinTheConversationToWeb() {
+        ClientCapabilityService capabilities = new ClientCapabilityService();
+        org.springframework.test.util.ReflectionTestUtils.invokeMethod(capabilities, "setWebOrigins",
+                "https://www.aiworkdeck.com,https://www.workdeck.ai");
+        AiAgentController web = new AiAgentController(sse, agentOrchestrator, messageService, backgroundTaskService,
+                pptxTools, mock(TodoListService.class), mock(AgentRunStateService.class), projectMemberService,
+                capabilities, subAgentService, inboxService, chatModelFactory, fileAccess);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            for (String conv : new String[] {"conv-web-chat", "conv-desktop-chat", "conv-web-connect"}) {
+                when(messageService.canUseConversation(conv, 7L)).thenReturn(true);
+            }
+            var item = new com.checkba.model.entity.AgentInboxItem(); item.setId("web-item");
+            when(inboxService.submit(any(), eq(7L))).thenReturn(item);
+
+            // 网页来源漏带 clientCapability：不回落到 LOWA
+            var req = new AiAgentController.AgentChatRequest();
+            req.setProjectId(42L); req.setConversationId("conv-web-chat"); req.setMessage("hi");
+            assertEquals(200, web.startSession(req, "s", null, "https://www.aiworkdeck.com").getStatusCode().value());
+            assertEquals("web", req.getClientCapability(), "inbox 落库的请求也要是 web，重启回放才不会回落");
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-chat"));
+            assertFalse(capabilities.isToolVisible("version_commit", "conv-web-chat"));
+
+            // 其它来源（Office 插件域名）照旧按声明登记
+            var desk = new AiAgentController.AgentChatRequest();
+            desk.setProjectId(42L); desk.setConversationId("conv-desktop-chat"); desk.setMessage("hi");
+            assertEquals(200, web.startSession(desk, "s", null, "https://addin.aiworkdeck.com").getStatusCode().value());
+            assertEquals(ClientCapabilityService.Capability.LOWA, capabilities.capabilityOf("conv-desktop-chat"));
+
+            // SSE 连接：web- 实例 id 钉住会话，之后 chat 声明 lowa 也不放宽
+            assertEquals(200, web.connect("conv-web-connect", "s", "web-7f3a", null,
+                    new org.springframework.mock.web.MockHttpServletResponse(), null, null).getStatusCode().value());
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-connect"));
+            var later = new AiAgentController.AgentChatRequest();
+            later.setProjectId(42L); later.setConversationId("conv-web-connect"); later.setMessage("hi");
+            later.setClientCapability("lowa");
+            assertEquals(200, web.startSession(later, "s", null, null).getStatusCode().value());
+            assertEquals(ClientCapabilityService.Capability.WEB, capabilities.capabilityOf("conv-web-connect"));
+            assertEquals("web", later.getClientCapability());
+        }
+    }
+
+    @Test
     void cacheMissRejectsBeforeInboxOrModelAndFullRetryIsAcceptedOnce() {
         var cache = new com.checkba.service.ai.InlineContentCache();
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "inlineContentCache", cache);
@@ -224,6 +269,34 @@ class AiAgentControllerTest {
         }
     }
 
+    /** Server profile: chat starts over the per-user limit are 429 before the inbox; local mode never is. */
+    @Test
+    void chatStartsOverThePerUserLimitAreRejectedBeforeTheInbox() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L); req.setConversationId("conv-1"); req.setMessage("hi");
+        var item = new com.checkba.model.entity.AgentInboxItem(); item.setId("item-1");
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "rateLimiter",
+                    new com.checkba.service.UserRateLimiter(false, 1, 300, 20, 120));
+            assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+            var limited = org.junit.jupiter.api.Assertions.assertThrows(
+                    com.checkba.exception.RateLimitedException.class, () -> controller.startSession(req, "s", null));
+            var resp = new com.checkba.config.GlobalExceptionHandler().handleRateLimited(limited);
+            assertEquals(429, resp.getStatusCode().value());
+            assertEquals(String.valueOf(limited.getRetryAfterSeconds()), resp.getHeaders().getFirst("Retry-After"));
+            verify(inboxService, org.mockito.Mockito.times(1)).submit(req, 7L);
+
+            org.springframework.test.util.ReflectionTestUtils.setField(controller, "rateLimiter",
+                    new com.checkba.service.UserRateLimiter(true, 1, 300, 20, 120));
+            for (int i = 0; i < 3; i++) assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+        }
+    }
+
     @Test
     void unpaidChatDoesNotEnterInboxOrStartWork() {
         var req = new AiAgentController.AgentChatRequest();
@@ -272,6 +345,80 @@ class AiAgentControllerTest {
         r.setConversationId(conv);
         r.setTaskId(taskId);
         return r;
+    }
+
+    private com.checkba.service.ai.DocumentCheckpointService injectCheckpoints() {
+        var checkpoints = mock(com.checkba.service.ai.DocumentCheckpointService.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "documentCheckpointService", checkpoints);
+        return checkpoints;
+    }
+
+    @Test
+    @DisplayName("暂停：会话无权 403 且不碰编排器；打中/没打中都回 200 并如实带 paused")
+    void pauseAuthAndShape() {
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(false);
+            assertEquals(403, controller.pauseGeneration("conv-1", "s").getStatusCode().value());
+            verify(agentOrchestrator, never()).requestPause(any());
+
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(agentOrchestrator.requestPause("conv-1")).thenReturn(true);
+            ResponseEntity<?> hit = controller.pauseGeneration("conv-1", "s");
+            assertEquals(200, hit.getStatusCode().value());
+            assertEquals(Boolean.TRUE, ((java.util.Map<?, ?>) hit.getBody()).get("paused"));
+
+            when(agentOrchestrator.requestPause("conv-1")).thenReturn(false);
+            ResponseEntity<?> miss = controller.pauseGeneration("conv-1", "s");
+            assertEquals(200, miss.getStatusCode().value(), "没有活跃轮次不是错误");
+            assertEquals(Boolean.FALSE, ((java.util.Map<?, ?>) miss.getBody()).get("paused"));
+        }
+    }
+
+    @Test
+    @DisplayName("撤销本次 AI 修改：无权 403 不碰快照；轮次在跑 409；没有快照 404；成功/部分失败如实回报")
+    void undoAuthStatesAndShape() {
+        var checkpoints = injectCheckpoints();
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(false);
+            assertEquals(403, controller.undoRun("conv-1", "s").getStatusCode().value());
+            assertEquals(403, controller.undoStatus("conv-1", "s").getStatusCode().value());
+            verify(checkpoints, never()).restoreForUser(any());
+            verify(checkpoints, never()).describeCheckpoint(any());
+
+            when(messageService.canUseConversation("conv-1", 7L)).thenReturn(true);
+            when(agentOrchestrator.hasActiveRun("conv-1")).thenReturn(true);
+            ResponseEntity<?> busy = controller.undoRun("conv-1", "s");
+            assertEquals(409, busy.getStatusCode().value());
+            assertEquals("RUN_ACTIVE", ((java.util.Map<?, ?>) busy.getBody()).get("code"));
+            verify(checkpoints, never()).restoreForUser(any());
+
+            when(agentOrchestrator.hasActiveRun("conv-1")).thenReturn(false);
+            when(checkpoints.restoreForUser("conv-1")).thenReturn(new com.checkba.service.ai.DocumentCheckpointService.UserRestoreResult(
+                    com.checkba.service.ai.DocumentCheckpointService.UserRestoreStatus.NO_CHECKPOINT, null));
+            ResponseEntity<?> none = controller.undoRun("conv-1", "s");
+            assertEquals(404, none.getStatusCode().value());
+            assertEquals("NO_CHECKPOINT", ((java.util.Map<?, ?>) none.getBody()).get("code"));
+
+            when(checkpoints.restoreForUser("conv-1")).thenReturn(new com.checkba.service.ai.DocumentCheckpointService.UserRestoreResult(
+                    com.checkba.service.ai.DocumentCheckpointService.UserRestoreStatus.DONE,
+                    new com.checkba.service.ai.DocumentCheckpointService.RestoreOutcome(java.util.List.of("A.docx"), java.util.List.of(
+                            new com.checkba.service.ai.DocumentCheckpointService.RestoreFailure(2L, "B.docx", "reload failed", false)))));
+            ResponseEntity<?> partial = controller.undoRun("conv-1", "s");
+            assertEquals(200, partial.getStatusCode().value());
+            var body = (java.util.Map<?, ?>) partial.getBody();
+            assertEquals("partial", body.get("status"));
+            assertEquals(java.util.List.of("A.docx"), body.get("restored"));
+            assertTrue(String.valueOf(body.get("failures")).contains("B.docx"), "失败的文件要点名：" + body);
+
+            when(checkpoints.describeCheckpoint("conv-1")).thenReturn(java.util.List.of());
+            assertEquals(Boolean.FALSE, ((java.util.Map<?, ?>) controller.undoStatus("conv-1", "s").getBody()).get("available"));
+            when(checkpoints.describeCheckpoint("conv-1")).thenReturn(java.util.List.of(java.util.Map.of("fileId", 1L, "name", "A.docx")));
+            var status = (java.util.Map<?, ?>) controller.undoStatus("conv-1", "s").getBody();
+            assertEquals(Boolean.TRUE, status.get("available"));
+            assertTrue(String.valueOf(status.get("files")).contains("A.docx"));
+        }
     }
 
     @Test

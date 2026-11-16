@@ -3,11 +3,11 @@ name: version-control
 description: 项目级版本记录领域。任务涉及版本记录/工作段（work session）、时间线、退回版本、丢弃工作、另起一稿/多稿并行/采纳-放弃-冲突三选一、项目 Git 仓库（com.checkba.version 包）、文件树清单 .awd/tree.json 时，先读本文档再动代码。
 ---
 
-## 软件退出的统一项目提交选择（dev-board#1685 / #1687）
+## 软件退出的统一项目提交选择（dev-board#1685 / #1687 / #1722）
 
-`App.vue` 的 desktop quit guard 先暂停 AI 并 `flushQuitWorkbenches` 确认文件落盘，再调用全局 `projectExitDialog.js`；不依赖当前项目或页面实例。`ProjectExitDialog.vue` 立即显示，最多三路读取全部本地项目的 `/version/exit-status`（8 秒请求预算，失败保持可见且可重试），只展示有待提交内容、冲突或统计失败的项目，默认不勾选。全部干净时自动退出；直接退出保留未提交改动，最终仍经 quit guard 再次保存校验。选中项目逐个调用既有 `/session/end` 并核查轻量状态；成功回执先取消勾选，部分失败留在弹窗，重试不重复提交已成功项目。退出提交携带 receiptEpoch:UUID；网络失败或 RUNNING/UNKNOWN 回执作为未结提交跨弹窗保留，禁止直接退出及新增提交，重试复用原请求 ID。普通状态读取成功不能替代提交终态；SUCCEEDED/FAILED 才解除未结保护，旧进程 epoch 不重放。提交中禁止退出按钮；切项目仅保存文件，不再询问提交。退出登录沿用原有确认行为。
+`App.vue` 的 desktop quit guard 先暂停 AI 并 `flushQuitWorkbenches` 确认文件落盘，再调用全局 `projectExitDialog.js`；不依赖当前项目或页面实例。`WorkSessionService` 在当前后端进程内记录收到真实改动信号及 AI 落版的项目，`GET /api/projects/exit-projects` 同时并入本次启动后文件活动时间不早于启动点的项目，只返回当前用户可见的 ID；`ProjectExitDialog.vue` 立即显示，最多三路读取这批项目及未结回执的 `/version/exit-status`（8 秒请求预算，失败保持可见且可重试），不再扫描未更新项目。设置「退出时检查项目改动」默认开启，偏好读写必须经 `uniStorage`（发行 H5 的裸 `globalThis.uni` 是空壳），关闭后仅保存文件并直接退出；未结回执仍必须处理。只展示有待提交内容、冲突或统计失败的项目，默认不勾选。全部干净时自动退出；直接退出保留未提交改动，最终仍经 quit guard 再次保存校验。选中项目逐个调用既有 `/session/end` 并核查轻量状态；成功回执先取消勾选，部分失败留在弹窗，重试不重复提交已成功项目。退出提交携带 receiptEpoch:UUID；网络失败或 RUNNING/UNKNOWN 回执作为未结提交跨弹窗保留，禁止直接退出及新增提交，重试复用原请求 ID。普通状态读取成功不能替代提交终态；SUCCEEDED/FAILED 才解除未结保护，旧进程 epoch 不重放。提交中禁止退出按钮；切项目仅保存文件，不再询问提交。退出登录沿用原有确认行为。
 
-独立弹窗沿既有 DOM createApp 宿主方式挂载（uni 会覆盖 App 模板），持有全局浮层隐藏原生 BrowserView；取消代次丢弃迟到结果。`projectExitState.js` 严格核对状态及提交回执，不能把读取失败当成零改动。四格式原有保存屏障未变：Word/PPT/Excel 共用 LibreOfficeEditor；PDF 的预览不新增伪保存路径，其他既有编辑实例仍由原注册表校验。回归 `project-exit.test.mjs`、`desktop-quit-app.test.mjs`、`flush-dirty-editors.test.mjs`。浏览器夹具 `tests/project-exit-ui/build.mjs` 生成真实组件+合成API页面，验证窄窗和部分失败；不等于正式客户端/真实文件退出实测。
+独立弹窗沿既有 DOM createApp 宿主方式挂载（uni 会覆盖 App 模板），持有全局浮层隐藏原生 BrowserView；取消代次丢弃迟到结果。`projectExitState.js` 严格核对状态及提交回执，不能把读取失败当成零改动；FAILED 回执的 message 保留在对应项目行，提交重试与状态重读分开，直接退出仍保留文件。`ProjectRepoService.init` 对没有 HEAD 且没有任何引用的中断空仓续建初始版本，已有其他引用时拒绝制造无关历史；`ensureSession` 在建工作段前调用该恢复。`LocalRootWatchService` 在事件到达时先登记项目再排防抖对账，覆盖退出撞上 800ms 窗口；`LocalProjectService` 对账同时比较磁盘 mtime 与行更新时间，同尺寸外部编辑也会更新活动；无变化仍不写库。四格式原有保存屏障未变：Word/PPT/Excel 共用 LibreOfficeEditor；PDF 的预览不新增伪保存路径，其他既有编辑实例仍由原注册表校验。回归 `project-exit.test.mjs`、`desktop-quit-app.test.mjs`、`flush-dirty-editors.test.mjs`。浏览器夹具 `tests/project-exit-ui/build.mjs` 生成真实组件+合成API页面，验证窄窗和部分失败；不等于正式客户端/真实文件退出实测。
 
 ## 提交弹窗「AI 写说明」
 
@@ -102,7 +102,7 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
   - `gc()`（:366）：只重打包 + 清理不可达对象，不碰可达历史。
   - `ensureExcludes()`（dev-board#463，私有）：幂等把 `~$*` 写进 `$GIT_DIR/info/exclude`，`init()`（在那笔 `add(".")` 之前）与 `open()` 两处各调一次。见下方「忽略规则只有两处」。
   - `repoSizeBytes()`/`deleteRepository()`（dev-board#438）：前者 walk gitDir 求和（缺失回 0，不读取文件正文、不写索引或对象库），后者删掉整个 gitDir、**绝不碰工作区**（这是「历史永不重写」唯一的例外口子：删的是整座仓库而不是改写其中某段历史）。
-  - `pendingChanges()`（dev-board#1216/#1218）：只读 `git.status` 分类工作区相对 HEAD 的增删改；暂存与工作区交叠时仅对相关路径做 HEAD→工作区 diff，识别暂存后恢复原文。未跟踪文件不读取内容，不允许为状态查询执行 `git add`；MERGING/MERGING_RESOLVED 仍只返回待裁决路径。`pendingChangesLocked()` 仓库忙时立即返回 `kind=VERSION_BUSY`，不能阻塞 HTTP 请求与数据库连接；`VersionPanel` 仅对此类状态读取失败按 500ms 间隔最多尝试 10 次，代次变化/卸载停止后续重试，真实错误或耗尽仍显示错误。首次挂载先完成状态读取再探测案件库，避免自身 `/check` 的远端 fetch 抢占仓库锁；待恢复的远端 ingest 仅派发去重后台任务，不在查询线程物化工作区，原工作段收尾重试仍保留。
+  - `pendingChanges()`（dev-board#1216/#1218）：只读 `git.status` 分类工作区相对 HEAD 的增删改；暂存与工作区交叠时仅对相关路径做 HEAD→工作区 diff，识别暂存后恢复原文。未跟踪文件不读取内容，不允许为状态查询执行 `git add`；MERGING/MERGING_RESOLVED 仍只返回待裁决路径。`pendingChangesLocked()` 仓库忙时立即返回 `kind=VERSION_BUSY`，不能阻塞 HTTP 请求与数据库连接；`VersionPanel` 仅对此类状态读取失败按 500ms 间隔最多尝试 10 次，代次变化/卸载停止后续重试，真实错误或耗尽仍显示错误。交稿清单 `SubmitDraftGuide.refresh` 同口径重试（弹窗关闭即停），且「结束本次工作」成功后先把 `localWorking` 置 false，状态重读仍失败也不会退回第 1 步（QA D10，`tests/version-merge/submitGuideBusyStatus.test.mjs`）。首次挂载先完成状态读取再探测案件库，避免自身 `/check` 的远端 fetch 抢占仓库锁；待恢复的远端 ingest 仅派发去重后台任务，不在查询线程物化工作区，原工作段收尾重试仍保留。
 - `WorkSessionService.java` —— 工作段/稿生命周期业务逻辑，唯一认识「工作段」「稿」业务语义的类。
   - `onChangeSignal()`：外部改动信号入口，事务内调用只注册 afterCommit，回调只入后台队列，不沿用事务连接读写数据库；非事务入口 tryLock，仓库忙时按项目合并信号异步重试，绝不让保存请求持连接等待仓库锁。分支判定、开段、署名与定时器同锁，结束/丢弃/切线时 cancelPending 也清理未处理信号，避免迟到信号重开工作段。非稿分支才隐式开工作段 + 武装空闲定时器；防抖（默认 2 分钟，`setDebounceMillis` 测试用）调度自动存档两种分支都照排。`onDraftBranch()`（:131）/`awaitingAdoptResolution()`（:149）两道守卫，查询失败一律按「否」处理（版本记录是保险，不能自己查询失败反而阻断主流程）。
   - `ensureSession()`（:298）：没有 ACTIVE 工作段则建分支 `work/{currentTimeMillis}` 并切过去，同时武装空闲定时器（唯一真正建段的入口）。
@@ -213,7 +213,7 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
 - `CloudAcceptDialog.vue`（`frontend/src/components/`，注意不在 `version/` 目录下）—— v2 新增，入口在 `userprofile.vue`，PR-E 后按钮文案是「从团队案件库取一份案卷」。列出当前连接下可见的案卷（`.cloud-project-row`/`.cloud-project-name`），逐个「取到本机」（`acceptCloudProject`）；没有连接时**只说一句** `version.noLibraryAvailableShort`——dev-board#440 撤掉了「去连一个」跳 `admin.vue` 那条路（目的地已经没有连库表单了），也撤掉了 `connections.length > 1` 的连接选择器（PR-E 为地雷 #31 加的那个），恒用 `conns[0]`。#439 起没有连接但官方可用时会先 `connectOfficialCloud()` 当场连上，连接失败须显示实际不可用原因，两站都可派生官方连接。这个入口也是 `CollabDialog.inviteText` 邀请话术第 1 步指向的地方，改文案要同步改邀请话术。
 - `VersionTimeline.vue` —— 拉 `getVersionTimeline`，按 `kind==='session'` 分组（`grouped` computed），自动存档折进对应工作段节点下可展开；节点标题有 milestone 时前置「重要版本」flag 并用 milestone 名字整个替换掉原标题（`titleOf()` 只在无 milestone 时才退回 `note || message`）。采纳产生的合并提交 `kind` 也是 `session`（见下方「MERGING 态即冲突态」附近对 `adoptMessage` 的说明），作为独立的顶层节点渲染，标题就是 `"采纳：" + 稿名`。**连线已经画了**（曾经的「有意降级」已作废）：合并节点在左侧轨道上带一段 `.merge-curve`（`isMerge(group.head)` 判真时渲染），进行中的稿另有 Phase B 的分叉线（`.draft-fork-curve`，数据来自 `loadDraftBranches` 逐稿拉 `/drafts/{id}/timeline` 找分叉点）——**分叉点落在当前拉到的主线历史窗口之外、端点出错或 404 时一律优雅降级为不画**，不弹错误弹窗。完整的 `git log --graph --all` 那一份在「提交历史」标签页（`CommitHistoryTab.vue` + `utils/historyGraph.js`），不在这个面板里。
 - `VersionNodeDetail.vue` —— 点某个节点弹出的详情弹窗：拉该 sha 的变更列表、「退回到这一版」二次确认、「标为重要版本」、第 3 期新增「从这一版另起一稿」（`openDraftNaming`，独立嵌套 `.awd-dialog`，同款 `.uni-input-input` 陷阱；`createDraft(projectId, version.sha, name)`，任意节点都能开，包括采纳产生的双亲合并节点）、对 `MODIFY` 类型且非根提交的改动行渲染「和上一版对比」按钮，`@tap` 上抛 `{path, sha}` 交给宿主页面决定走桌面修订稿分支还是文本降级分支。
-- `MergeReviewTab.vue` —— 三方合并新增（dev-board#630），**可编辑**的合并比对稿宿主：主线侧改动是一批带作者的修订，另一侧不重叠的改动被逐段重放成另一位作者的修订，同一段两边都改了的那几处刻意没重放、交给右栏 `ReviewPanel`（`mode="merge"`）三选一。与 `VersionCompareTab` 一样**没有 upload 路径**（导出字节只走 `POST /version/merge/resolve-file`，绝不写回 `ProjectFile`）、不进保活池、不派发 `.uno:EditDoc`（spike A5 实测 r5 上不生效，只读靠的是「没有保存路径」）。标签管道见 `sidebar-shell.md` 的 `merge-review` 一条。
+- `MergeReviewTab.vue` —— 三方合并新增（dev-board#630），**可编辑**的合并比对稿宿主：主线那份文件原样载入（台账 B13 起不再与共同的上一版做原生比较），另一侧不重叠的改动被逐段重放成合并自己的修订（署名带 U+2060 标记），同一段两边都改了的那几处刻意没重放、交给右栏 `ReviewPanel`（`mode="merge"`）三选一。与 `VersionCompareTab` 一样**没有 upload 路径**（导出字节只走 `POST /version/merge/resolve-file`，绝不写回 `ProjectFile`）、不进保活池、不派发 `.uno:EditDoc`（spike A5 实测 r5 上不生效，只读靠的是「没有保存路径」）。标签管道见 `sidebar-shell.md` 的 `merge-review` 一条。
 - `VersionCompareTab.vue` —— 第 2 期新增，「和上一版对比」的桌面 docx 展示宿主，**只读、绝无保存路径**：不订阅 `lo-relay` 的 `modified` 信号、不进保活池（`_libreRefs`/LRU 一概不注册）、`beforeUnmount` 只 `dispose executor` + 移除 `<webview>`。流程：并行下载新旧字节 + 启动引擎 → `load_document` 新版 → `compare_document` 一次性生成修订并自动切只读。
 - **三方合并的前端纯函数与编排**：`composables/useDocumentMerge.js`（自动合并编排，纯工厂）、`services/mergeDraft.js`（`fetchMergeInputs` + `buildMergeDraft`，自动合并与比对稿标签页共用）、`utils/mergeRows.js`（裁决总览行态与文案）、`utils/mergeReviewDecisions.js`（`collectDecisions`）、`utils/historyMerges.js`（把两条新尾注翻成人话）、`utils/provenanceAlign.js`（溯源 LCS 对齐 + 自带同步 sha256）、`utils/mergeSideNames.js`（两侧的称呼与喂给引擎的署名 = 修订分桶键，见下方「两侧的称呼与分桶键」）。后五个是纯函数，`node --test` 直接跑（`mergeSideNames` 只 import `historyMerges`，其余零依赖）。
 
@@ -223,7 +223,7 @@ AI 版本入口（dev-board#1498）复用本领域控制器与服务，工具/�
 - `frontend/src/pages/project-overview/fileOpenTabs.js` 的 `onVersionCompareFile({path, sha, newRef, oldRef, name, oldLabel, newLabel})`：**两处来源共用同一个入口**——① `VersionNodeDetail` 的「和上一版对比」冒泡 `{path, sha}`，`newRef=sha`、`oldRef=sha+'^'`，标签走默认「上一版/这一版」；② 第 3 期新增，`AdoptConflictDialog` 的「对比」冒泡 `{path, newRef, oldRef, oldLabel, newLabel}`，两个 ref 已经是主线侧/稿侧的具体 sha，不需要再推导，「上一版/这一版」在这个场景里说不通（两边不是先后关系）改用调用方传入的标签。`桌面 + docx/doc` 走 `openVersionCompareTab`（`VersionCompareTab.vue`，LOWA 修订稿），其余走 `openVersionTextDiffTab`（`DocDiffViewer.vue` 的 `versionSpec` 模式，Monaco 红绿文本对比降级）。两个标签都是 `leftFiles`/`rightFiles` 里的普通标签页。**标签现在与左栏面板完全解耦，不需要再为新标签类型「放行」任何面板**（dev-board#394）：`project-overview.vue` 的 `isTabVisible()` 委托 `pages/project-overview/tabVisibility.js` 的 `isTabVisibleInPane`，规则只剩一条「只要标签存在就可见」。此前那里是一张按 `leftPaneKey` 放行的白名单（最初只放 `files`，每发现一个功能「点了没反应」就补一项），版本对比标签当年正是因为漏了 `version` 而被整块藏死（第 2 期终审 C1）——那张名单已经整个撤掉，函数保留只是为了把契约钉在一个可单测的纯函数上。
 - `frontend/src/components/FileTree.vue` 右键菜单「这份文件的历史」（`@tap="$emit('file-history', contextMenu.targetItem); closeContextMenu()"`）→ `project-overview.vue` 的 `onFileHistory(file)`：设置 `versionFileFilter = {fileId, name}` 并把左栏切到 `version` 面板。右键菜单本身绑定的是原生 `@contextmenu.prevent`（不是 uni `@tap`），真实鼠标右键能直接触发（见下方「验证」一节的 e2e 配方）。
 - `frontend/src/config/leftSidebarPlugins.js`：入口 `version`（图标为时钟 SVG path，非图片资源）。**2026-08-19 挪出了 `LEFT_SIDEBAR_PLUGINS` 数组**——此前排在 rail 顶部那一串（项目概览/文件树/搜索/插件中心/语音/脱敏/门控项）的末尾，现在视觉上挪到 rail 底部、夹在「暂存区」与「成员堆叠」之间，独立导出成 `VERSION_PLUGIN` 并进 `OFF_RAIL_PLUGINS`（照 `DD_FILES_PLUGIN` 的先例）；`getLeftSidebarPlugin('version')` 与 `leftPaneTitle` 兜底仍能查到它（`OFF_RAIL_PLUGINS` 是它们的查找兜底表）。`getPluginsForUser('CLIENT')` 不返回它（CLIENT 只见 `dd-files`，与后端权限口径一致）。`project-overview.vue` 的命令面板「跳转到面板」清单（`menuCommands.js` 的 `pushMenuState`）读的是 `LEFT_SIDEBAR_PLUGINS`，version 挪出数组后需要手动把 `VERSION_PLUGIN` 拼回那份 `views` 清单，否则命令面板会漏掉这一项。`toggleLeftPane('version')` 语义、`VersionPanel.vue` 挂载点本身都没动。
-- 后端触发点：`ProjectFileService.signalChange()`与 `FileController.signalChange()` 两处调用 `workSessionService.onChangeSignal(...)`，都用 try/catch 包死、绝不阻断文件操作/上传。IDE 化本地文件夹项目（`Project.localRoot` 非空）另有 `LocalRootWatchService`（FSEvents 监听 + 防抖 800ms）触发 `LocalProjectService.reconcileProject` 对账——对账只写数据库、绝不写磁盘，新建/更新/软删除走 ProjectFileService 服务方法，signalChange 因此自带，**Finder 里的增删改同样进版本记录**。对账三条硬规则：无变化不动行（防版本噪声与修改时间失真）、回收站行不复活（软删除不动磁盘）、根目录不可达整体跳过（防外置盘拔出误判成全删）。
+- 后端触发点：`ProjectFileService.signalChange()`与 `FileController.signalChange()` 两处调用 `workSessionService.onChangeSignal(...)`，都用 try/catch 包死、绝不阻断文件操作/上传。IDE 化本地文件夹项目（`Project.localRoot` 非空）另有 `LocalRootWatchService`（FSEvents 监听 + 防抖 800ms）触发 `LocalProjectService.reconcileProject` 对账——对账只写数据库、绝不写磁盘，新建/更新/软删除走 ProjectFileService 服务方法，signalChange 因此自带，**Finder 里的增删改同样进版本记录**。对账三条硬规则：无变化不动行（防版本噪声与修改时间失真）、回收站行不复活（软删除不动磁盘）、根目录不可达整体跳过（防外置盘拔出误判成全删）。**对账发的是扫盘信号（`onDiskScanSignal`，QA D10）**：结束工作先切主线再合并，本地文件夹里刚改的文件被改写两次、内容不变但修改时间变新，对账随即报 changed=1；这个信号排在仍持仓库锁的自动上传之后，以前会凭空开出一段新工作（交稿清单退回第 1 步、状态条一直「有改动还没交稿」）。现在没有进行中的工作段时，扫盘信号只在 `pendingChanges` 相对 HEAD 真有（`.awd/` 以外的）改动才开段；排队合并时普通信号不会被后来的扫盘信号降级。保存/上传/AI 等普通信号不变（数据库层的排序、回收站等只进清单的改动仍要开段）。护栏 `WorkSessionServiceTest.diskScanAfterEndSessionDoesNotStartAPhantomSession`。
   - **反过来，应用里对文件夹做的事必须落到磁盘上（dev-board#885）**：对账以磁盘为真相源，「行在库、目录不在盘」就判成律师在 Finder 里删了它。`ProjectFileService` 在本地文件夹项目里：新建/恢复/复制/会话文件夹都 `materializeLocalFolder` 建目录；文件夹改名/移动走 `relocateLocalFolder` 整体搬目录并改写子孙 `filePath`（搬不动就抛错回滚，大小写改名借临时名过渡）。此前这几处只落库——空文件夹在下一次任意磁盘变化（新建文档、保存、写 `.awd/`）触发的对账里必进回收站、恢复后再进；改名被对账撤回并连子孙一起送进回收站；移动在原位置导回幽灵。唯一例外是根下的 `__staging_area__`（`ProjectFileService.isRootStagingFolder`）：不建空目录、对账的删除同步也跳过它。解析器是字段注入（`setStorageResolverForTest`），手工 new 的实例里整段跳过。护栏 `LocalProjectServiceTest` 的五条 #885 用例。
   - **监听状态必须可观测**（2026-08-17）：`ensureWatch` 返回 boolean、另有 `isWatching(projectId)`，两者都以「事件循环还活着」为准。`DirectoryWatcher.watchAsync` 把注册（`registerPaths`）**同步跑在调用线程上**、只把事件循环丢给执行器，注册异常与事件循环中途死亡**都只体现在它返回的 future 上**；早先把这个 future 丢掉，于是 inotify 名额耗尽、权限被拒、目录刚好被移走这类失败全都静默——日志照打「已监听项目文件夹」，用户在 Finder 里的改动从此不再同步且毫无线索。现在 future 的完成会打 WARN 并按实例清除已注册状态（不误伤已重建的新监听），因此下次 `ensureWatch` 能重建。**推论：挂载不需要 sleep 等**——`watchAsync` 返回即已在监听，测试里拿返回值断言就行。
   - **启动注册不阻塞 Ready**（2026-10-25，dev-board#1472）：存量 localRoot 注册是 `watchExecutor` 上唯一可取消的后台任务；不得占用防抖/对账专用单线程，否则一个大目录扫描会阻塞另一项目的 Finder 通知。明确打开同一项目仍等待那一次注册，其他项目不共用扫描锁。stop/shutdown 使迟到注册失效；`ProjectService.ProjectDeletedEvent` 仅在删除事务提交后发出，已删除 ID 的迟到打开不可复活，回滚保持原监听。注册成功后另做本代补偿对账，捕捉排队期间成为监听初始基线的文件变化。权限查库/SSE 发送不持生命周期锁；macOS 注册与关闭共用底层 monitor，未注册完成时只撤代，交由注册 finally 关闭。`LocalRootWatchStartupTest` 与真实 H2/HTTP/文件变动测试覆盖这些竞争；这不代表 JPA 已移出启动链。
@@ -561,6 +561,17 @@ userId，本机 userId 与它毫无关系，所以 `proxyCollabEvents` 外层补
 
 ## 三方合并与逐段溯源（2026-09-14，dev-board#630/#631/#632，spec `docs/superpowers/specs/2026-09-14-docx-three-way-merge-design.md`）
 
+**待处理修订（台账 B13，0.86.1）——合并绝不许把三份稿里原有的待处理修订静默接受掉**。AI 改稿默认带修订、律师多开着修订改，三份稿里都有待处理修订是常态，交付物就是修订稿。契约：
+- 合并稿 = 主线那份文件原样载入 + 另一侧的改动；**不再对主线侧做 `.uno:CompareDocuments`**（真机实测：比较修订会套在律师原有的插入上、把共同的上一版已删的字再删一遍；共同的上一版或两侧有待处理插入段时多出段落，「段数对不上：当前 6，按计划应为 5」）。主线与共同的上一版里原有的修订因此一条不动。比对稿里看不到「主线改了哪几处」的修订，这是有意的取舍。
+- 合并自己产生的修订署名 = 该侧名 + `\u2060`（`office_thread.js` 的 `MERGE_MECH_MARK`，前端 `utils/mergeRevisionView.js`）。收尾一律 `resolve_merge_mechanics`（只处置带标记的，处置完核对其余修订一条没变），**不许再用 `resolve_all_revisions` 收尾**。`ReviewPanel.mergeSideOf` 只认带标记的修订，`list_revisions` 回 `mergeMechanics:true`。
+- 另一侧的段落按它真实的修订结构重建（`rebuildParagraphFromSide`）：先清掉合并稿这段原有的段内修订（普通删除逐条拒绝，插入的字关掉修订记录直接删——拒绝一条「叠在 AI 插入上的删除」会把插入翻出来另起一条、还会和段落标记上的插入并在一起），以合并署名写入对方定稿的文字，再按原作者逐条做回待处理的插入 / 删除 / 「删掉别人的插入」（LO 把它表示成一条 Delete，`RedlineSuccessorData` 里是底下那条 Insert）。新增一整段待处理插入的，以原作者插在下一段开头（文字 + 段落标记），不插在锚点段末尾。
+- 引擎里修订日期只读：按原作者重建的修订署名先带 `\u2061`（`MERGE_RECREATED_MARK`），`build_merge_draft` / `merge_take_other` 回 `recreated[]`（原作者、原日期、单元序 `para`）。宿主导出后用 `services/mergeRedlineDates.js` 只认带 `\u2061` 的：去掉标记、按文档顺序改回原日期（被引擎并成一条的按原来几条拆回去）；**不按「日期晚于合并开始」认**——同事在别的时区时原有修订的日期可能比本机还晚（B13b 真机实测）。最后核对存出的文件里 `\u2060` / `\u2061` 一个都不剩，有就按失败处理、不落盘。
+- 表格单元格（台账 B13b）：只有一段的格与正文段落同一套重建（`rebuildParagraphWith` 的段落取自格里那一段）；多段的格带待处理修订、格式类修订、修订套修订（除「删掉别人的插入」）、段里有域/脚注又带修订，停在 `stage:'pending-redlines'`，裁决总览给整份二选一并说明原因，绝不猜。块里段落与表格单元混在一起时（后端会把挨着的段落与首格并成一块）段序位移按**单元数**算，不按段落数。
+- 对齐核对与后端同口径：POI `XWPFParagraph.getText()` **不含 `w:delText`**（接受了修订之后的字），引擎侧按段的修订结构算出同一口径（`acceptedText`）再比；不要用 `para.getString()`（模型里删掉的字也在）。
+- 后端 `Unit.rev`（`DocxUnitReader.revisionSignature`）：段落/单元格里待处理修订的签名，同类型同作者同日期相邻的几条并成一条（引擎导出会把一条修订拆成几个 `w:ins`）。没有修订时为空串，`ThreeWayAnalyzer.hashLines` 与以前逐字节相同——普通文档的比对结果不变。
+- **相邻段落：只裁决两侧都改了的，只一侧改的自动合入但列出请过目**（2026-11-15）：`ThreeWayAnalyzer.analyzeSequence` 在 JGit 冲突区里三侧段数相同时逐单元判（与 `hashLines` 同一身份 `identity()`）。两侧改得不一样的进 overlaps（要裁决）；只一侧改的出成非冲突块并记进 `Analysis.neighbors`——不静默：比对稿右栏折叠块（`MergeNeighborList`）、自动合并时总览行 `neighborCount` + 本机提示 `utils/mergeNeighborNotices.js`（`MergeNeighborNotices.vue` 挂在左栏版本面板上方，版本入口 `versionEntryState({review})` 小角标，点开「过目」一次才消失）、尾注 `X-AWD-Merges` 的 action `N`（自动那一笔追加 `Np3T`，`ThreeWayAnalyzer.neighborDecisions` 把段序换成合并结果里的）。注意：`VersionPanel.vue` / `ReviewPanel.vue` 各有单测用「剥 import + new Function 喂依赖」的方式编译（`tests/_lib/review-panel-vm.mjs` 等），给它们加 import 要同步改这些桩。
+- 测试：`frontend/tests/lowa-e2e/merge-pending-redlines.mjs`（真引擎；A 自动合并走真宿主 `useDocumentMerge`，B 同段两边都带修订的两种选法，C 发版前回归的原样三份稿 `fixtures/merge/b13-rc086/`）、`DocxPendingRevisionTest`。
+
 裁决界面此前只有「整份三选一」：同事改了第 3 段、我改了第 200 段，律师也只能二选一整份丢掉一边的工。
 这一节把裁决从「整份」降到「一段 / 一格 / 一页」，再加一条反向的问句——「这一段是谁写的」。
 零 Git 术语与「历史永不重写」两条纪律一字未松：合并只往前写新提交，溯源只读历史。
@@ -704,7 +715,7 @@ xlsx 是无序集合，按单元格键比交集（`analyzeCells` :228），公�
 否则退到线的称呼，直接借 `historyMerges.mergeSideLabels`（提交历史那几句用的就是它，两处说法必须一致），
 采纳语境另有稿名 `version.mergeSideDraftNamed`（「稿《对方第三版回稿》」）。
 ② **`mainKey`/`otherKey` 是喂给引擎的署名，也就是修订的分桶键，出参保证互不相同**——
-引擎 `build_merge_draft` 按修订作者分桶（`office_thread.js` :6135），ReviewPanel 的 `mergeSideOf` 也按它分，
+引擎 `build_merge_draft` 按修订作者分桶，ReviewPanel 的 `mergeSideOf` 也按它分（B13 起只认带 `\u2060` 标记的合并修订），
 两侧署名一样就把两边的修订全算进一桶，块 2 的分组与 `X-AWD-Merges` 尾注里的 M/T 一起错（进用户产物）。
 `byPerson` 时 key 仍是两位的**真名**（引擎署名不变）；分不开时 key 就是线的称呼。
 稿名只有 `AdoptConflictDialog` 知道，所以它经 `openMergeReviewTab` 的 `mergeSpec.draftName` 传给标签页。
@@ -912,7 +923,7 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 45. **`awdk-login` 的回包形状是跨端契约，Office 插件云后端也吃它**——dev-board#439 给它加了 `tokenId` 与 `displayName`（`AwdkLoginService.BridgeSession` 相应加了两个分量，桌面端拿 `tokenId` 才撤得掉远端那枚长期设备令牌）。加字段是安全的，但 **`tokenId` 缺失时必须整个键不下发**：用 `Map.of` 就得给个非 null 值，回落成 0 会让调用方存下一个不存在的令牌行 id，断开时对着 0 号令牌发撤销请求。护栏 `AuthControllerHardeningTest.awdkLoginOmitsTokenIdWhenAbsent`。
 
 
-46. **查人与加人必须共用同一个限频计数，挂一处等于没挂**（dev-board#444）——两个端点回答的是同一个问题「这个手机号在 AI WorkDeck 上注册过没有」：只给 lookup 限频的话，攻击者交替调 lookup 与 addMember 就把额度翻了倍（addMember 撞到「用户已在项目中」与「对方还没登录过」两句不同的话，一样能区分号码存不存在）。所以 `ProjectMemberController` 的两个方法都调 `checkMemberLookupRate`+`recordMemberLookup`，且 `AuthAbuseGuard` 里是**同一张表**。维度选的是发起人（项目管理员）不是 IP：这条路必须先过项目管理员权限，攻击者手上是一个具体账号，IP 可以随便换、账号不能；何况基线部署 nginx 与后端同机时 IP 维度本来就退化成全局（`AuthAbuseGuard` 类注释）。**新增任何限频维度都要顺手进 `purgeIfOversized`**，否则伪造维度能把那张 map 撑爆。护栏 `AuthAbuseGuardTest.memberLookupRateLimitPerRequester` + `ProjectMemberLookupControllerTest.addingAMemberCountsAgainstTheSameRateLimit`。
+46. **查人与加人必须共用同一个限频计数，挂一处等于没挂**（dev-board#444）——两个端点回答的是同一个问题「这个手机号在 AI WorkDeck 上注册过没有」：只给 lookup 限频的话，攻击者交替调 lookup 与 addMember 就把额度翻了倍（addMember 撞到「用户已在项目中」与「对方还没登录过」两句不同的话，一样能区分号码存不存在）。所以 `ProjectMemberController` 的两个方法都调 `checkMemberLookupRate`+`recordMemberLookup`，且 `AuthAbuseGuard` 里是**同一张表**。维度选的是发起人（项目管理员）不是 IP：这条路必须先过项目管理员权限，攻击者手上是一个具体账号，IP 可以随便换、账号不能。**新增任何限频维度都要顺手进 `purgeIfOversized`**，否则伪造维度能把那张 map 撑爆。护栏 `AuthAbuseGuardTest.memberLookupRateLimitPerRequester` + `ProjectMemberLookupControllerTest.addingAMemberCountsAgainstTheSameRateLimit`。
 
 47. **`ProjectMemberService` 的构造器被两个测试类手工 `new`，新依赖一律走字段注入**（dev-board#444）——查人卡片的头像要 `AccountBindingRepository` 与 `ai.account.base-url`，两样都用 `@Autowired(required=false)` / `@Value` **字段**注入，包内可见的 `setAccountLookupForTest` 给手工 new 出来的实例补上（`ProjectRepoService.maxTrackedFileSizeBytes` 的同款先例）。改成构造器参数就要同步改 `ProjectMemberAddByContactTest` 与 `ProjectMemberServiceAddMemberRaceTest`，是纯 churn。
 
@@ -948,9 +959,10 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 - `version/CloudSyncService.java` — `proxyInviteClient` / `proxyRemoveMember` / `proxyDd`（原字节转发，`httpRaw` seam 非 200 不抛，403 原样带回）/ `hasRemoteBinding` / `clientPortalUrl`。
 - `config/DdCloudProxyFilter.java` — local-mode 下 `/api/dd/*` 在已上云案卷上整体转发到 `{server}/api/dd/*`。
 - `service/DdCloudMigrationService.java` — 首读清单列表时把本机未迁移的清单推上去；`DdRequest.cloudRequestId` 非空 = 已迁移。
-- `controller/DdController.java` — CLIENT 白名单（`requireStaffBy*` + `ClientForbiddenException` → 真 HTTP 403）；`GET /api/dd/items/{itemId}/file`（清单项取件口，`?token=` 兜底）。
+- `controller/DdController.java` — CLIENT 白名单（`requireStaffBy*` + `ClientForbiddenException` → 真 HTTP 403）；`DdController`/`DdAiController` 的写路由由 `DdClientRouteClassificationTest` 按反射穷举：客户可调的只有其 `CLIENT_WRITE_ROUTES`（上传/提交/说明/申诉/留言/通知已读/核验自己的提交），其余客户调用必须在业务层之前 403，新增写路由不归类就红；`GET /api/dd/items/{itemId}/file`（清单项取件口，`?token=` 兜底）。
 - `service/ClientInvitationService.java` — `issueClientCode`（`Issued{code, expiresAt, clientUserId}`）、30 天有效期、同码同称呼复用、local-mode 一律不签（`IssueViaLibraryException`）。
-- `controller/AuthController.clientLogin` — 接 `AuthAbuseGuard`（维度 `::client-code`）。
+- `controller/AuthController.clientLogin` — 接 `AuthAbuseGuard`（维度 真实客户端 IP + `::client-code`，IP 取自 `util/ClientIp`：只在对端为回环时采信 nginx 写入的 `X-Real-IP`，永不看 X-Forwarded-For），同 IP 错 5 次只锁该 IP；另有全站 10 分钟 200 次失败上限（`checkClientCodeGlobalCeiling`）压分布式猜码。
+- `controller/ProjectMemberController.getMembers` — 客户（`isClient`）一律拒绝：门户与客户工作区不读成员名单，名单含用户名/官网账户 id/带账户 id 的头像地址/其他客户。
 - 前端：`pages/client-portal/client-portal.vue`、`utils/clientPortal.js`（门户构建的路由收口）、`utils/memberLookup.js` 的 `clientPortalLink`/`codeFromHash`/`expiryDate`、`InviteMemberDialog.vue`（云端轨签码 + 撤销）、`collab/CollabDialog.vue`（参与人「移出」）、`services/api.js` 的 `ddUrl`/`inviteCloudClient`/`removeCloudMember`。
 - 部署：`deploy/case/nginx-case.conf.example`（`location ^~ /client/`、`/api/auth/client-login` 限频）、`deploy/case/README.md`「六之二」。
 
@@ -994,6 +1006,8 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
   `utils/clientPortal.js` 在 `main.js` 里把其余硬编码跳转（4010 回登录页、退出登录回启动页、日程……）改写回门户；门户不埋点。
   这只是入口收口，真闸在后端。
 
+- **门户项目沟通（B4）**：门户工作区（只在门户构建、`portal-` 连接上）多一个「项目沟通」视图 `components/dd/ClientPortalChat.vue`，用门户会话直接调 `/api/im/action`（`ddClient.js` 的 `portalChat`），3 秒 `afterId` 轮询；服务端明确拒绝（200+错误码、401/403，如访问码失效）就停轮询、禁用输入，429/5xx/断网只提示不停。权限全在 `ImService`（见 plugin-system.md「客户门户项目沟通」），前端不做闸。签码时律师选客户在项目沟通里能否看加入之前的消息（`InviteMemberDialog` 的单选，默认只看加入之后），存在 `project_invitation.im_share_history`。
+
 ### 已知地雷
 
 - `DdCloudProxyFilter` **绝不能调 `request.getParameter`**：Tomcat 会顺手把 multipart 请求体解析掉，原字节转发就断了；查询串自己拆（`parseQuery`）。
@@ -1010,7 +1024,7 @@ spec §5.5 已改，初版口径在那里划掉留痕）**。它原本是「溯�
 - dev-board#1216/#1218：`ProjectRepoHistoryTest` 钉查询不改索引/对象、暂存后恢复原文与 rm --cached 后的工作区语义；`ChangeSignalNonBlockingTest` 钉仓库忙时保存信号立即返回、同项目合并最新署名、提交后异步派发/回滚不派发、异常重试与关闭版本取消迟到信号、状态查询忙时快速返回。现场根因是状态查询全量 add 大文件，上传事务随后持数据库连接等同一把仓库锁；try/catch 只能降级异常，不能解除无限等待。
 
 ```bash
-cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ClientPortalRoundTripTest,DdControllerClientWhitelistTest,DdItemReviewStatusTest,DdCloudProxyFilterTest,AuthClientLoginGuardTest,ClientInvitationServiceTest'
+cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='ClientPortalRoundTripTest,DdControllerClientWhitelistTest,DdClientRouteClassificationTest,ProjectMemberClientRosterTest,ClientIpTest,DdItemReviewStatusTest,DdCloudProxyFilterTest,AuthClientLoginGuardTest,ClientInvitationServiceTest'
 cd frontend && node --test tests/member-invite/*.test.mjs && npm run build:client-portal
 ```
 `ClientPortalRoundTripTest` 起一个 local-mode=false 的内嵌案件库，桌面栈手工 new：放进案件库 → 本机旧清单首读迁上去（含 multipart 附件）→ 代理签码 →
@@ -1116,3 +1130,9 @@ cd backend && JAVA_HOME=$(/usr/libexec/java_home -v 21) mvn -q test -Dtest='Inte
 - 桌面 local-mode 可无 session 创建和提交本机项目。全局退出清单必须以 `isDesktopHost()` 纳入匿名桌面，不能用缺少 session 跳过；只有未登录 Web 且无待确认提交回执才可略过（#1695）。
 
 - 退出清单通过动态 `component :is` 渲染原生 `label/input/button`，样式必须使用专用 class。Uni H5 会将 CSS 标签选择器 `label/button` 改写为 `uni-label/uni-button`，原生元素因此无法命中；脱离 Uni 的 SFC/esbuild 预览不能发现这一差异。#1695 在真实 H5 编译 CSS 中复现失配，已安装 QA 的 `checkExitList` 同时核对行 `display:flex`、行矩形不重叠和按钮 padding/radius，截图仍需人工复核。
+
+## 比对时新版自身已带修订（台账 B12，2026-11-14）
+- `VersionCompareTab` 走 `compare_document`（不是 `build_comparison_document`）：以前直接拿新版原样比，新版里原有的修订（如 AI 的 5→2）与比对修订叠在一起，律师看到「52050%」、共 5 处。
+- 现在默认 `compare_document{acceptExisting:true}`：先在对比专用实例里接受新版原有修订再比（旧版一侧原生比较本就按最终文本读），返回 `acceptedExisting`；横幅说明「已按接受后的正文比对」，并可「显示原有修订」切回原样（每台实例只能比一次，切换即整台重建）。
+- 回归：`frontend/tests/lowa-e2e/compare-accepted.mjs`（接受模式 2 处、只有「版本对比」署名；原样模式 5 处、含原 AI 修订）。
+

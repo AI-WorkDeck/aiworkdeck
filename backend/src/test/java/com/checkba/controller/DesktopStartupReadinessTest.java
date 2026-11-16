@@ -80,6 +80,10 @@ class DesktopStartupReadinessTest {
         app.addListeners((ApplicationListener<ApplicationReadyEvent>) event -> {
             if (blockReadyListener) gate.run();
         });
+        // --logging.level.root=ERROR 经 Spring LoggingSystem 改的是 JVM 全局 logback 根级别，关闭上下文不会还原，
+        // 会让同 JVM 里之后依赖 WARN 日志的测试随执行顺序失败；结束时手工还原。
+        var rootLogger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        var previousRootLevel = rootLogger.getLevel();
         var executor = Executors.newSingleThreadExecutor();
         var startup = executor.submit(() -> app.run("--spring.config.name=readiness-test-empty",
                 "--server.address=127.0.0.1", "--server.port=0", "--security.local-mode=true",
@@ -110,9 +114,13 @@ class DesktopStartupReadinessTest {
             try {
                 try { startup.get(15, TimeUnit.SECONDS); } catch (ExecutionException ignored) { }
             } finally {
-                if (context.get() != null) context.get().close();
-                executor.shutdownNow();
-                assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+                try {
+                    if (context.get() != null) context.get().close();
+                    executor.shutdownNow();
+                    assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+                } finally {
+                    rootLogger.setLevel(previousRootLevel);
+                }
             }
         }
     }

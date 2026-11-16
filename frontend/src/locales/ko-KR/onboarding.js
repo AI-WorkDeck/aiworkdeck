@@ -88,6 +88,11 @@ export default {
     "privacyName": "개인정보 처리방침",
     "crossBorderLabel": "별도 동의: AI에 제출한 콘텐츠를 해외 모델 제공업체로 이전하여 처리",
     "crossBorderView": "고지 사항 보기",
+    "consentCardTitle": "플랫폼 AI를 사용하기 전에 데이터 처리 동의 한 가지를 확인해 주세요",
+    "consentAccept": "동의하고 계속",
+    "consentHideNotice": "안내 접기",
+    "consentFailed": "저장하지 못했습니다. 다시 시도해 주세요",
+    "consentLater": "나중에",
     "crossBorderNoticeTitle": "국외 이전 안내",
     "crossBorderNoticeBody": "중국 사이트는 AI WorkDeck 서버를 통해 Alibaba Cloud Bailian에 연결하며, 국제 사이트는 OpenRouter를 사용합니다. AI에 제출한 텍스트와 파일 발췌문은 추론과 요금 계산에 사용되며, 선택한 모델에 따라 중국 본토 밖에서 처리될 수 있습니다. 설정에서 동의를 철회하면 플랫폼 AI가 비활성화됩니다.",
     "agreementRequired": "계속하려면 서비스 약관 및 개인정보 처리방침 동의에 체크해 주세요",
@@ -102,7 +107,8 @@ export default {
     "switch": "전환",
     "cancel": "취소",
     "switchFailed": "사이트 전환에 실패했습니다. 나중에 다시 시도하세요.",
-    "rescueFailed": "사이트를 전환한 후에도 잠금 해제되지 않았습니다. 코드를 확인하고 다시 시도하세요."
+    "rescueFailed": "사이트를 전환한 후에도 잠금 해제되지 않았습니다. 코드를 확인하고 다시 시도하세요.",
+    "proIntroBanner": "가입 시 무료 체험 크레딧 제공 · Personal Pro 첫 3개월 ¥9.9/월",
   },
   "hint": {
     "learnMore": "자세히 알아보기",
@@ -113,11 +119,13 @@ export default {
     "purchaseConfirmOk": "확인",
     "purchaseSuccess": "잠금 해제됨",
     "purchaseFailed": "구매 실패",
-    "goRecharge": "충전하기"
+    "goRecharge": "충전하기",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Personal Pro 시작",
   },
   "identity": {
     "title": "로컬 워크스페이스 선택",
-    "subtitle": "이 기기에서 여러 기존 계정이 발견되었습니다. 계속 사용할 워크스페이스를 선택하세요. 다시 묻지 않으며 나중에 '설정 → 계정 및 사용량'에서 변경할 수 있습니다.",
+    "subtitle": "이 기기에서 여러 기존 계정이 발견되었습니다. 계속 사용할 워크스페이스를 선택하세요. 다시 묻지 않으며 나중에 '설정 → 계정 및 잔액'에서 변경할 수 있습니다.",
     "reading": "로컬 계정 읽는 중",
     "retry": "다시 시도",
     "itemMeta": "프로젝트 {projects}개 · 파일 {files}개",

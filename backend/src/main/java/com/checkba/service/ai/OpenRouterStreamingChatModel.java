@@ -299,6 +299,22 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
     private Inflight send(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
                           Integer maxOutputTokens, StreamingResponseHandler<AiMessage> handler) {
+        return send(messages, toolSpecifications, maxOutputTokens, handler, null);
+    }
+
+    /**
+     * 收尾核验员（mustConsult 子任务）的一轮：始终带 {@code parallel_tool_calls:true}——百炼/Qwen 兼容端点默认 false，
+     * 核验员于是一轮只读一个文件、每轮重发整段上下文（W6 staging：12 个文件读了 14 轮，核验费用占整个任务 34%）。
+     * {@code toolChoice}：{@code "auto"} 照常；{@code "none"} 本轮只许作答（工具仍声明，历史里的工具调用才合法）；
+     * 其余按工具名强制先调它（OpenAI 兼容 tool_choice 的具名函数形态）——qwen3.8-max 拿着读工具却直接写结论（W6）。
+     */
+    public Call generateConsultRound(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
+                                     String toolChoice, StreamingResponseHandler<AiMessage> handler) {
+        return send(messages, toolSpecifications, null, handler, toolChoice).firstCall;
+    }
+
+    private Inflight send(List<ChatMessage> messages, List<ToolSpecification> toolSpecifications,
+                          Integer maxOutputTokens, StreamingResponseHandler<AiMessage> handler, String consultToolChoice) {
         // 分界标记绝不能漏进报文，三条路各自处理（都在序列化之前做）：
         //   显式缓存（Anthropic/Qwen）→ 留着标记，markSystemForCaching 按它拆 content block；
         //   自动缓存且形态已验证 → 按标记拆成两条 system 消息（dev-board#750，见 splitVolatileSystem）；
@@ -330,6 +346,10 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         }
         if (reasoningEffort != null) {
             body = withReasoningEffort(body, reasoningEffort);
+        }
+        if (consultToolChoice != null && toolSpecifications != null && !toolSpecifications.isEmpty()) {
+            body = withConsultRound(body, consultToolChoice,
+                    toolSpecifications.stream().anyMatch(t -> consultToolChoice.equals(t.name())));
         }
         // Explicit routing also applies to bounded writing; local provider requeue remains disabled below.
         if (providerRouting != null) {
@@ -423,6 +443,25 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             }
         });
         return call;
+    }
+
+    /** 核验员一轮的请求体：并行工具调用 + tool_choice（"auto" 不写、"none"、或已声明的工具名）；未声明的名字按 auto。 */
+    static String withConsultRound(String body, String toolChoice, boolean declared) {
+        try {
+            ObjectNode root = (ObjectNode) LENIENT.readTree(body);
+            root.put("parallel_tool_calls", true);
+            if ("none".equals(toolChoice)) {
+                root.put("tool_choice", "none");
+            } else if (!"auto".equals(toolChoice) && declared) {
+                ObjectNode choice = LENIENT.createObjectNode().put("type", "function");
+                choice.set("function", LENIENT.createObjectNode().put("name", toolChoice));
+                root.set("tool_choice", choice);
+            }
+            return LENIENT.writeValueAsString(root);
+        } catch (IOException | ClassCastException e) {
+            log.warn("Could not add consult options to request body: {}", e.getClass().getSimpleName());
+            return body;
+        }
     }
 
     /**
@@ -895,6 +934,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 if (p != null && p.isTextual()) noteProvider(p.asText());
             }
             builder.append(chunk);
+            appendToolCallsBesideContent(root);
             JsonNode usage = root.path("usage");
             if (usage.path("prompt_tokens").isIntegralNumber() && usage.path("completion_tokens").isIntegralNumber()) {
                 int input = usage.path("prompt_tokens").asInt(), output = usage.path("completion_tokens").asInt();
@@ -922,6 +962,26 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 }
             }
             return false;
+        }
+
+        /**
+         * langchain4j 0.36 的 {@code OpenAiStreamingResponseBuilder.append} 见到 {@code delta.content} 非 null
+         * 就收下正文直接 return，同一分片里的 {@code tool_calls} 被丢掉。百炼 qwen 的每个工具调用分片都带
+         * {@code "content":""}（2026-11-11 实录），于是整条工具调用消失、本轮按「只说了一句话」收尾。
+         * 两者同在时，把去掉 content 的同一分片再 append 一次，工具调用照常按 index 拼装。
+         */
+        private void appendToolCallsBesideContent(JsonNode root) {
+            JsonNode delta = root.path("choices").path(0).path("delta");
+            JsonNode content = delta.get("content");
+            JsonNode toolCalls = delta.get("tool_calls");
+            if (content == null || content.isNull() || toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) return;
+            ObjectNode copy = root.deepCopy();
+            ((ObjectNode) copy.path("choices").path(0).path("delta")).remove("content");
+            try {
+                builder.append(LENIENT.treeToValue(copy, ChatCompletionResponse.class));
+            } catch (IOException e) {
+                log.warn("Tool-call part of SSE chunk could not be read, ignored");
+            }
         }
 
         /** OpenRouter 统一成 {@code delta.reasoning}；各家原生兼容端点多用 {@code reasoning_content}。 */

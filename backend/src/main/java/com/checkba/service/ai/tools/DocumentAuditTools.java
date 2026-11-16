@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 
 /**
  * 合同审查的「机械核对」工具（dev-board#375）：把全文从编辑器分页拉完，交给
@@ -45,49 +46,16 @@ public class DocumentAuditTools implements AgentToolComponent {
     private final EditorBridgeService editorBridgeService;
 
     @ToolMeta(displayName = "结构审计", category = "document")
-    @Tool("【看·审查合同必用】对当前打开的文档做一次机械核对并返回报告：全文字形（繁體/简体）与混入段落、"
-            + "各套条款编号是否连续（第X条 / N. / N.M / (一) / (a) / (1)）、正文引用的「第X条」「附表X」是否都存在、"
-            + "空白与待定处、金额/股数台账与同段「股数×每股价=总价」算术复核、多币种并存、前一轮修订按作者/类型汇总与大段删除。"
-            + "只报事实不下法律结论；审查/审阅合同时在通读之后、动手修改之前调用一次，把报告里的每一项都核成结论或排除。"
-            + "本工具自己会把全文分页读完，不需要先调 doc_get_document_text。")
+    @Tool("【看·审查合同必用】对当前打开的文档做一次机械核对，返回事实报告。\n"
+            + "核对项：繁简字形与混入段落、各套条款编号是否连续、「第X条」「附表X」引用是否存在、空白与待定处、金额/股数台账与「股数×每股价=总价」算术、多币种并存、前一轮修订汇总与大段删除。\n"
+            + "何时用：审查合同时在通读之后、动手修改之前调用一次，把报告里每一项核成结论或排除。只报事实不下法律结论；自己会把全文读完，不必先 doc_get_document_text。")
     public String doc_audit_structure() {
         log.info("Tool: doc_audit_structure called");
-        List<Paragraph> paragraphs = new ArrayList<>();
-        int start = 0;
-        for (int page = 0; page < MAX_PAGES; page++) {
-            Map<String, Object> params = new HashMap<>();
-            params.put("startParagraph", start);
-            params.put("maxParagraphs", PAGE_SIZE);
-            String raw;
-            try {
-                raw = editorBridgeService.executeEditorCommand("get_document_text", params);
-            } catch (Exception e) {
-                log.error("doc_audit_structure: get_document_text failed", e);
-                return "Error: " + e.getMessage();
-            }
-            JsonNode node = parse(raw);
-            if (node == null) {
-                return "Error: 编辑器返回了无法解析的内容：" + head(raw);
-            }
-            if (node.hasNonNull("error")) {
-                return "Error: " + node.get("error").asText();
-            }
-            JsonNode arr = node.get("paragraphs");
-            if (arr == null || !arr.isArray()) {
-                return "Error: 编辑器没有返回段落列表（当前文档可能不是 Word 文档，或没有打开文档）";
-            }
-            int before = paragraphs.size();
-            for (JsonNode p : arr) {
-                paragraphs.add(new Paragraph(p.path("index").asInt(paragraphs.size()), p.path("text").asText(""), numbering(p.get("numbering"))));
-            }
-            if (!node.path("truncated").asBoolean(false) || paragraphs.size() == before) {
-                break;
-            }
-            start = node.path("nextStartParagraph").asInt(paragraphs.size());
+        ParagraphRead read = readParagraphs(editorBridgeService::executeEditorCommand, MAX_PAGES);
+        if (read.error() != null) {
+            return "Error: " + read.error();
         }
-        if (paragraphs.isEmpty()) {
-            return "Error: 文档没有可读的段落";
-        }
+        List<Paragraph> paragraphs = read.paragraphs();
 
         List<Revision> revisions = new ArrayList<>();
         String revisionNote = null;
@@ -108,6 +76,50 @@ public class DocumentAuditTools implements AgentToolComponent {
         }
 
         return ContractStructureAudit.run(paragraphs, revisions, revisionNote).render();
+    }
+
+    /** 分页读全文的结果：error 非空表示读取失败（文案可直接接在「Error: 」后）；complete=false 表示到页数上限还没读完。 */
+    public record ParagraphRead(List<Paragraph> paragraphs, String error, boolean complete) {}
+
+    /**
+     * 用既有 worker action {@code get_document_text} 分页读完全文（含原生编号元数据）。
+     * 收尾核对（{@link com.checkba.service.ai.PostWriteCheck}）与本工具共用这一份读取，口径一致。
+     */
+    public static ParagraphRead readParagraphs(BiFunction<String, Map<String, Object>, String> bridge, int maxPages) {
+        List<Paragraph> paragraphs = new ArrayList<>();
+        int start = 0;
+        for (int page = 0; page < maxPages; page++) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("startParagraph", start);
+            params.put("maxParagraphs", PAGE_SIZE);
+            String raw;
+            try {
+                raw = bridge.apply("get_document_text", params);
+            } catch (Exception e) {
+                log.error("get_document_text failed", e);
+                return new ParagraphRead(paragraphs, String.valueOf(e.getMessage()), false);
+            }
+            JsonNode node = parse(raw);
+            if (node == null) {
+                return new ParagraphRead(paragraphs, "编辑器返回了无法解析的内容：" + head(raw), false);
+            }
+            if (node.hasNonNull("error")) {
+                return new ParagraphRead(paragraphs, node.get("error").asText(), false);
+            }
+            JsonNode arr = node.get("paragraphs");
+            if (arr == null || !arr.isArray()) {
+                return new ParagraphRead(paragraphs, "编辑器没有返回段落列表（当前文档可能不是 Word 文档，或没有打开文档）", false);
+            }
+            int before = paragraphs.size();
+            for (JsonNode p : arr) {
+                paragraphs.add(new Paragraph(p.path("index").asInt(paragraphs.size()), p.path("text").asText(""), numbering(p.get("numbering"))));
+            }
+            if (!node.path("truncated").asBoolean(false) || paragraphs.size() == before) {
+                return new ParagraphRead(paragraphs, paragraphs.isEmpty() ? "文档没有可读的段落" : null, true);
+            }
+            start = node.path("nextStartParagraph").asInt(paragraphs.size());
+        }
+        return new ParagraphRead(paragraphs, paragraphs.isEmpty() ? "文档没有可读的段落" : null, false);
     }
 
     private static ContractStructureAudit.Numbering numbering(JsonNode node) {

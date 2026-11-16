@@ -3,7 +3,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit } from '../../src/utils/projectExitState.js'
+import { inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit, selectExitProjectRows } from '../../src/utils/projectExitState.js'
+import { shouldScanProjectsOnExit, setScanProjectsOnExit } from '../../src/utils/projectExitPreferences.js'
 const pending = { receiptEpoch: 'test-epoch', enabled: true, canCommit: true, working: true, changedCount: 4 }
 const clean = { receiptEpoch: 'test-epoch', enabled: true, canCommit: false, working: false, changedCount: 0 }
 const row = id => ({ id, receiptEpoch: 'test-epoch', name: `Project ${id}`, state: 'ready', count: 4, selected: true })
@@ -92,11 +93,12 @@ test('real Vue chooser loads asynchronously, starts unchecked and commits only c
   const script = descriptor.script.content.replace(/import[^\n]+\n/g, '').replace('export default', 'return')
   let resolveProjects
   const committed = []
-  const component = new Function('getMyProjects', 'getVersionExitStatus', 'endWorkSession', 'inspectExitProject', 'commitExitProjects', 'pendingExitProjects', 'settleExitCommit', script)(
+  const component = new Function('getMyProjects', 'getVersionExitProjects', 'getVersionExitStatus', 'endWorkSession', 'inspectExitProject', 'commitExitProjects', 'pendingExitProjects', 'settleExitCommit', 'selectExitProjectRows', script)(
     () => new Promise(resolve => { resolveProjects = resolve }),
+    async () => ({ projectIds: [2] }),
     async id => ({ data: committed.includes(id) ? clean : pending }),
     async id => { committed.push(id); return { data: { receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' } } },
-    inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit,
+    inspectExitProject, commitExitProjects, pendingExitProjects, settleExitCommit, selectExitProjectRows,
   )
   component.render = new Function('Vue', compile(descriptor.template.content, { mode: 'function' }).code)(Vue)
   const root = document.createElement('div'); document.body.append(root)
@@ -109,11 +111,11 @@ test('real Vue chooser loads asynchronously, starts unchecked and commits only c
   resolveProjects({ data: [{ id: 1, name: 'First' }, { id: 2, name: 'Second' }] })
   await new Promise(resolve => setTimeout(resolve, 0)); await Vue.nextTick()
   const choices = [...root.querySelectorAll('input')]
-  assert.equal(choices.length, 2)
+  assert.equal(choices.length, 1, 'untouched projects never enter the scan')
   assert.ok(choices.every(input => !input.checked))
   assert.match(root.textContent, /pendingFileCount:4/)
-  choices[1].checked = true
-  choices[1].dispatchEvent(new window.Event('change', { bubbles: true }))
+  choices[0].checked = true
+  choices[0].dispatchEvent(new window.Event('change', { bubbles: true }))
   await Vue.nextTick()
   const submit = [...root.querySelectorAll('button')].find(b => b.textContent.includes('exitProjectsCommit'))
   assert.equal(submit.disabled, false)
@@ -164,9 +166,9 @@ test('anonymous desktop quit opens the chooser; only unauthenticated web can ski
       return { config: { globalProperties: {} }, mount() { mounts++ }, unmount() { unmounts++ } }
     }
     const confirm = new Function('createApp', 'ProjectExitDialog', 't', 'pendingExitProjects', 'getSessionId',
-      'isDesktopHost', 'setGlobalOverlay', 'document', source + '; return confirmProjectExit')(
+      'isDesktopHost', 'setGlobalOverlay', 'shouldScanProjectsOnExit', 'document', source + '; return confirmProjectExit')(
         createApp, {}, key => key, () => state.receipts, () => state.session,
-        () => state.desktop, open => overlays.push(open), document)
+        () => state.desktop, open => overlays.push(open), () => true, document)
     const result = confirm()
     assert.equal(mounts, state.expectedMounts, JSON.stringify(state))
     if (mounts) finish(false)
@@ -174,4 +176,40 @@ test('anonymous desktop quit opens the chooser; only unauthenticated web can ski
     assert.equal(unmounts, mounts)
     assert.deepEqual(overlays, mounts ? [true, false] : [])
   }
+})
+
+test('only projects changed in this session plus unresolved receipts enter the scan', () => {
+  const projects = [
+    { id: 1, name: 'Untouched' },
+    { id: 2, name: 'Changed' },
+    { id: 3, name: 'Scratch', projectType: 'SCRATCH' },
+  ]
+  const rows = selectExitProjectRows(projects, [2], [{ id: 41, state: 'uncertain' }])
+  assert.deepEqual(rows.map(row => row.id), [2, 41])
+  assert.equal(rows[0].state, 'checking')
+  assert.equal(rows[0].selected, false)
+})
+
+test('terminal commit failure retains its actionable reason until a successful retry', async () => {
+  const r = row(51)
+  assert.equal(await settleExitCommit(r,
+    async () => ({ receiptState: 'FAILED', message: '版本正忙，请稍后重试' }), async () => pending), false)
+  assert.equal(r.error, '版本正忙，请稍后重试')
+  assert.equal(r.state, 'ready')
+  assert.equal(await settleExitCommit(r,
+    async () => ({ receiptState: 'SUCCEEDED', sha: 'receipt', notice: '' }), async () => clean), true)
+  assert.equal(r.error, '')
+})
+
+test('exit auto scan preference defaults on and persists an explicit off choice', () => {
+  const values = new Map()
+  const storage = {
+    getStorageSync: key => values.get(key),
+    setStorageSync: (key, value) => values.set(key, value),
+  }
+  assert.equal(shouldScanProjectsOnExit(storage), true)
+  setScanProjectsOnExit(false, storage)
+  assert.equal(shouldScanProjectsOnExit(storage), false)
+  setScanProjectsOnExit(true, storage)
+  assert.equal(shouldScanProjectsOnExit(storage), true)
 })

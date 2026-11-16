@@ -1463,7 +1463,7 @@ def _():
     import tempfile
     import textwrap
     d = tempfile.mkdtemp()
-    with open(os.path.join(d, "sitecustomize.py"), "w") as f:
+    with open(os.path.join(d, "sitecustomize.py"), "w", encoding="utf-8") as f:
         f.write(textwrap.dedent("""
             import shutil, os.path
             MISSING = {"fc-list","fc-cache","soffice","libreoffice","pdftoppm",
@@ -1489,7 +1489,7 @@ def _():
     for name, args, want in cases:
         args = [os.path.join(root, args[0])] + args[1:]
         r = _sp.run([sys.executable] + args, capture_output=True, text=True,
-                    env=env, timeout=600)
+                    env=env, timeout=600, encoding="utf-8")
         blob = r.stdout + r.stderr
         assert "Traceback" not in blob, \
             f"{name} ends on a traceback on a bare box:\n{blob[-320:]}"
@@ -1508,7 +1508,7 @@ def _():
     import tempfile
     import textwrap
     d = tempfile.mkdtemp()
-    with open(os.path.join(d, "sitecustomize.py"), "w") as f:
+    with open(os.path.join(d, "sitecustomize.py"), "w", encoding="utf-8") as f:
         f.write(textwrap.dedent("""
             import shutil
             _w = shutil.which
@@ -1517,7 +1517,7 @@ def _():
     env = dict(os.environ)
     env["PYTHONPATH"] = d + os.pathsep + env.get("PYTHONPATH", "")
     r = _sp.run([sys.executable, os.path.join(HERE, "..", "scripts", "doctor.py")],
-                capture_output=True, text=True, env=env, timeout=180)
+                capture_output=True, text=True, env=env, timeout=180, encoding="utf-8")
     out = r.stdout + r.stderr
     assert "Traceback" not in out, f"doctor crashed without fc-list:\n{out[-400:]}"
     assert "UnboundLocalError" not in out, "a variable is defined on only one branch"
@@ -1584,6 +1584,365 @@ def _():
     # …and the footer, which is where the version was last left behind
     assert f"v{ver.group(1)}" in doc.strip().splitlines()[-1], \
         "the README footer carries a different version from the badge"
+
+
+@check("2026-09-20 真实运行批次 · 金额不折断、Mermaid 放行、清单扫连线、10 件转纵向、编号型文案")
+def _():
+    """2026-09-20 真实运行（五个 skill 全跑）暴露的五条，一并盯住：
+      · 关系图连线标签把「4,912,376.06美元」折成「4,9 / 12,376.06」——法庭材料里的硬伤；
+      · Mermaid 导出的 SVG 文字在 foreignObject 里，被预检误判成位图拦下；
+      · 核对清单不扫连线，图上有红边却印「全图不标」；
+      · 10 件事件仍走横向，内容只占画布 22.7%；
+      · 确认清单把编号型说成「无精确日期」，而那次每条都到日。"""
+    import importlib.util as _il, subprocess, tempfile
+    sp = lambda n: _il.spec_from_file_location(n, os.path.join(HERE, "..", "scripts", n + ".py"))
+    cm = _il.module_from_spec(sp("common")); sp("common").loader.exec_module(cm)
+    L = cm.wrap("改判：甲方连带赔偿 4,912,376.06美元 折合人民币30,118,760.10元", 12, 130,
+                keep_alnum=True)
+    flat = "|".join(L)
+    assert "4,912,376.06" in flat and "30,118,760.10" in flat, f"金额被折断：{L}"
+    d = tempfile.mkdtemp(); f = os.path.join(d, "m.svg")
+    open(f, "w", encoding="utf-8").write(
+        '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject width="9" height="9">'
+        '<div xmlns="http://www.w3.org/1999/xhtml">甲公司</div></foreignObject></svg>')
+    r = subprocess.run([sys.executable, os.path.join(HERE, "..", "scripts", "source_check.py"), f],
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, "Mermaid 式 SVG（文字在 foreignObject 里）被当成位图拦下"
+    rsrc = open(os.path.join(HERE, "..", "scripts", "render.py"), encoding="utf-8").read()
+    assert 'm.get("edges")' in rsrc.split("def _print_checklist")[1][:2500], "核对清单没扫连线上的深红"
+    tall = open(os.path.join(HERE, "..", "scripts", "render_points_tall.py"), encoding="utf-8").read()
+    assert ">= THRESHOLD" in tall, "10 件事件仍不转纵向"
+    ck = open(os.path.join(HERE, "..", "scripts", "checkpoint.py"), encoding="utf-8").read()
+    assert "只有先后顺序，无精确日期" not in ck, "编号型的说明仍在断言「无精确日期」"
+
+
+@check("guizang · 长图名按字数缩到装得下，不许被画布裁掉")
+def _():
+    """真实运行记录：42 字的图名（含案号）在歸藏风被按画布宽度放到 60px，
+    左右各超出画布约 164px，两端的字被裁掉，而奇川风同一图名正常。
+    这里量真出的 SVG：图名那一行必须完整落在画布内，短图名仍用大字号。"""
+    import subprocess, tempfile, json as _json
+    base = _json.load(open(os.path.join(EXAMPLES, "timeline-points.json"), encoding="utf-8"))
+    def _title_box(title):
+        m = _json.loads(_json.dumps(base))
+        m["title_text"] = title
+        m["checkpoint"] = {"confirmed": True, "emphasis_source": "none"}
+        d = tempfile.mkdtemp()
+        _json.dump(m, open(os.path.join(d, "m.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        subprocess.run([sys.executable, os.path.join(HERE, "..", "scripts", "render.py"),
+                        os.path.join(d, "m.json"), os.path.join(d, "g"),
+                        "--formats=svg", "--guizang"], capture_output=True)
+        svg = open(os.path.join(d, "g.svg"), encoding="utf-8").read()
+        W = float(re.search(r'width="([\d.]+)"', svg).group(1))
+        for t in re.finditer(r'<text([^>]*)>([^<]+)</text>', svg):
+            fs = re.search(r'font-size="([\d.]+)"', t.group(1))
+            x = re.search(r'\sx="([\d.]+)"', t.group(1))
+            if fs and x and float(fs.group(1)) >= 20:
+                f = float(fs.group(1))
+                w = sum(f if ord(c) > 0x2E80 else f * 0.55 for c in t.group(2))
+                return float(x.group(1)) - w / 2, float(x.group(1)) + w / 2, W, f
+        return None
+    long_t = "某某公司与某某酒店管理公司合同纠纷·（某年）某民初字第某某某某号一审诉讼经过时间轴"
+    l, r, W, f = _title_box(long_t)
+    assert l >= 0 and r <= W, f"长图名被裁：左 {l:.0f} 右 {r:.0f}，画布 {W:.0f}（字号 {f:.0f}）"
+    l2, r2, W2, f2 = _title_box("担保纠纷案件事实经过时间轴")
+    assert f2 > f, f"短图名没用上大字号（短 {f2:.0f} vs 长 {f:.0f}）"
+
+
+@check("arrow · 线不许顶穿箭头：端点埋在三角内，且该处三角比线宽")
+def _():
+    """老毛病：线一直画到节点边，箭头贴在线端上，视觉上就成了平头（三角被线盖住）。
+    这里按 marker 定义硬算：端点到尖端的距离必须为正（线不露在三角外），
+    且端点处三角的高度必须大于线宽（两侧不露白）。量的是真出的 SVG，不是注释。"""
+    import subprocess, tempfile, glob
+    d = tempfile.mkdtemp()
+    for ex in ("flowchart", "relationship"):
+        subprocess.run([sys.executable, os.path.join(HERE, "..", "scripts", "render.py"),
+                        os.path.join(EXAMPLES, ex + ".json"), os.path.join(d, ex),
+                        "--formats=svg"], capture_output=True)
+    bad, n = [], 0
+    for f in glob.glob(os.path.join(d, "*.svg")):
+        svg = open(f, encoding="utf-8").read()
+        mk = {}
+        for m in re.finditer(r'<marker[^>]*id="([^"]+)"[^>]*>(.*?)</marker>', svg, re.S):
+            a = m.group(0)
+            gv = lambda k: float((re.search(rf'{k}="([\d.\-]+)"', a) or [0, 0])[1])
+            vb = re.search(r'viewBox="([\d.\- ]+)"', a)
+            vb = [float(x) for x in vb.group(1).split()] if vb else [0, 0, gv("markerWidth"),
+                                                                     gv("markerHeight")]
+            pts = re.findall(r'(-?[\d.]+)[ ,]+(-?[\d.]+)',
+                             (re.search(r'd="([^"]+)"', m.group(2)) or ["", ""])[1])
+            mk[m.group(1)] = (gv("refX"), gv("markerWidth"), vb,
+                              max((float(x) for x, _ in pts), default=vb[2]))
+        for pm in re.finditer(r'<path\s([^>]*?)(?<![\w-])d="([^"]+)"([^>]*?)/?>', svg):
+            at = pm.group(1) + pm.group(3)
+            me = re.search(r'marker-end="url\(#([^)]+)\)"', at)
+            if not me or me.group(1) not in mk:
+                continue
+            n += 1
+            refX, mw, vb, tipvb = mk[me.group(1)]
+            scale = (mw / vb[2]) if vb[2] else 1
+            ahead = (tipvb - refX) * scale
+            hgt = vb[3] * (1 - (refX / tipvb if tipvb else 0)) * scale
+            sw = float((re.search(r'stroke-width="([\d.]+)"', at) or [0, "1"])[1])
+            if ahead <= 0:
+                bad.append((os.path.basename(f), "线冲出尖端", round(ahead, 2)))
+            elif hgt <= sw:
+                bad.append((os.path.basename(f), "端点处三角比线细", round(hgt, 2), sw))
+    assert n >= 10, f"没量到足够多的箭头（只有 {n} 个），量具可能失灵"
+    assert not bad, f"箭头几何有问题：{bad[:3]}"
+
+
+@check("formats · 不选只出 SVG+PPTX；PNG 选了才出；转图兜底认得 resvg-js / Playwright")
+def _():
+    """2026-09-20 真实运行：五个 skill 在典型 Windows 上都出不了 PNG，模型每轮现场装工具；
+    而律师多数时候只要 SVG 与 PPTX。所以命令行默认只出这两种，PNG 选了才出；
+    转图链在 cairosvg 之前先试 resvg-js 与 Playwright（中文正常），都没有就说清怎么补。"""
+    import subprocess, tempfile, glob
+    d = tempfile.mkdtemp()
+    src = os.path.join(EXAMPLES, "flowchart.json")
+    subprocess.run([sys.executable, os.path.join(HERE, "..", "scripts", "render.py"), src,
+                    os.path.join(d, "f")], capture_output=True)
+    got = sorted(os.path.splitext(p)[1] for p in glob.glob(os.path.join(d, "f.*")))
+    assert got == [".pptx", ".svg"], f"不选格式时出了 {got}"
+    rsrc = open(os.path.join(HERE, "..", "scripts", "render.py"), encoding="utf-8").read()
+    body = rsrc.split("def svg_to_png")[1].split("\ndef ")[0]
+    assert body.index("raster_fallback") < body.index("import cairosvg"), \
+        "转图兜底要排在 cairosvg 之前（cairosvg 缺中文字体时会静默出豆腐块）"
+    import importlib.util as _il
+    sp = _il.spec_from_file_location("rf", os.path.join(HERE, "..", "scripts", "raster_fallback.py"))
+    rf = _il.module_from_spec(sp); sp.loader.exec_module(rf)
+    assert "npm install @resvg/resvg-js" in rsrc or "npm install @resvg/resvg-js" in \
+        open(os.path.join(HERE, "..", "scripts", "raster_fallback.py"), encoding="utf-8").read(), \
+        "转图工具都没有时，没说清怎么补"
+    other = os.path.join(HERE, "..", "..", "mqc-trial-confrontation-master", "scripts",
+                         "raster_fallback.py")
+    if os.path.exists(other):
+        strip = lambda t: "\n".join(l for l in t.splitlines() if not l.startswith("# ⚠")
+                                    and "单独分发、不带 V1 内核" not in l)
+        a = strip(open(os.path.join(HERE, "..", "scripts", "raster_fallback.py"), encoding="utf-8").read())
+        b = strip(open(other, encoding="utf-8").read())
+        assert a == b, "庭审对抗图大师里那份 raster_fallback.py 与本 skill 的不一致了"
+
+
+@check("wrap · 折行后末行不留孤字（只挪断点、不改字）")
+def _():
+    """同类毛病在法律关系图大师的真实运行里出现过（图上把机构名的末字甩成孤行）。
+    门槛定在「只剩一个字」：试过「一两个字」会动到五张示例，得不偿失；
+    只剩一个字这一档，八份示例里只有一处、改后为零。"""
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("cm", os.path.join(HERE, "..", "scripts", "common.py"))
+    cm = _il.module_from_spec(spec); spec.loader.exec_module(cm)
+    bad = []
+    for t in ("甲公司与乙公司签署合作经营合同书",
+              "支持工程款请求", "签订借款合同和保证承诺书"):
+        for w in (90, 104, 118, 130, 146):
+            L = cm.wrap(t, 13, w)
+            if len(L) >= 2 and len(L[-1]) == 1:
+                bad.append((t[:6], w, L[-2:]))
+    assert not bad, f"折行后末行只剩一个字：{bad[:3]}"
+
+
+@check("graphviz · 没装 dot 时内置排布顶上：节点不重叠、画布与 dot 版相当")
+def _():
+    """真实反馈里已有两个人卡在「要先装 graphviz」。它在这里只当定位引擎用，
+    连线与画图本来就由本技能完成，所以没装时用纯 Python 的分层排布算坐标。
+    这条把 dot 强行「弄没」，检查兜底出的图能不能用。"""
+    import subprocess as _sp, importlib.util as _il
+    m = json.load(open(os.path.join(EXAMPLES, "flowchart.json"), encoding="utf-8"))
+    spec = _il.spec_from_file_location("rf", os.path.join(HERE, "..", "scripts",
+                                                          "render_flow.py"))
+    rf = _il.module_from_spec(spec); spec.loader.exec_module(rf)
+    real = _sp.run
+    def fake(*a, **k):
+        if a and isinstance(a[0], list) and a[0][0] in ("dot", "neato", "fdp", "circo"):
+            raise FileNotFoundError()
+        return real(*a, **k)
+    _sp.run = fake
+    rf.subprocess.run = fake
+    try:
+        svg_fb, w_fb, h_fb = rf.render(json.loads(json.dumps(m)))
+    finally:
+        _sp.run = real
+        rf.subprocess.run = real
+    svg_dot, w_dot, h_dot = rf.render(json.loads(json.dumps(m)))
+    assert svg_fb.count("</text>") == svg_dot.count("</text>"), "兜底排布掉了文字"
+    boxes = flow_geo(json.loads(json.dumps(m)))
+    assert 0.7 < (w_fb * h_fb) / (w_dot * h_dot) < 1.6, \
+        f"兜底排布的画布与 dot 版差太多（{w_fb}x{h_fb} 对 {w_dot}x{h_dot}）"
+    # 兜底出的图里，任何两张卡片不许重叠
+    rects = re.findall(r'<rect[^>]*x="([\d.]+)"[^>]*y="([\d.]+)"[^>]*width="([\d.]+)"'
+                       r'[^>]*height="([\d.]+)"', svg_fb)
+    rs = [tuple(map(float, r)) for r in rects if float(r[2]) < w_fb * 0.9]
+    for i in range(len(rs)):
+        for j in range(i + 1, len(rs)):
+            a, b = rs[i], rs[j]
+            if (a[0] < b[0] + b[2] - 1 and b[0] < a[0] + a[2] - 1
+                    and a[1] < b[1] + b[3] - 1 and b[1] < a[1] + a[3] - 1):
+                raise AssertionError(f"兜底排布让两张卡片重叠了：{a} / {b}")
+
+
+@check("doctor · 装在 Program Files 里的转图工具要能被认出来（不再误报 none found）")
+def _():
+    """真实运行记录里撞到的：用户装了 Inkscape（C:\\Program Files\\Inkscape\\bin），
+    出图那边已能自动找到，自检却只看 PATH，报「none found / PNG preview will not」，
+    使用者以为环境不全又去手工加 PATH。两处必须用同一套查找。"""
+    import importlib.util as _il, tempfile
+    spec = _il.spec_from_file_location("rnd", os.path.join(HERE, "..", "scripts", "render.py"))
+    rnd = _il.module_from_spec(spec); spec.loader.exec_module(rnd)
+    root = tempfile.mkdtemp()
+    exe = os.path.join(root, "Inkscape", "bin", "inkscape.exe")
+    os.makedirs(os.path.dirname(exe)); open(exe, "wb").write(b"")
+    old_name, old_pf = os.name, os.environ.get("ProgramFiles")
+    try:
+        os.name = "nt"                       # 只影响本进程内的这次查找
+        os.environ["ProgramFiles"] = root
+        rnd._TOOL_CACHE.clear()
+        got = rnd._find_tool("inkscape")
+    finally:
+        os.name = old_name
+        if old_pf is None:
+            os.environ.pop("ProgramFiles", None)
+        else:
+            os.environ["ProgramFiles"] = old_pf
+        rnd._TOOL_CACHE.clear()
+    assert got == exe, f"装在 Program Files 里的 Inkscape 没被找到：{got}"
+
+
+@check("tall · 搬自时间轴大师的三个文件必须与那边保持一致")
+def _():
+    """纵向时间轴那套（render_vcolumns / geom / paper）两边各留一份，互不依赖。
+    风险是改了一边忘了另一边，于是逐字节比对（只忽略文件头那段同步告示）。"""
+    other = os.path.join(HERE, "..", "..", "mqc-timeline-master", "scripts")
+    if not os.path.isdir(other):
+        return                       # 单目录分发包里没有邻居，跳过
+    strip = lambda t: "\n".join(l for l in t.splitlines() if not l.startswith("# ⚠")
+                                and "必须保持一致" not in l and "回归里有一条守卫" not in l
+                                and "它来自时间轴大师" not in l)
+    for f in ("render_vcolumns.py", "geom.py", "paper.py"):
+        a = strip(open(os.path.join(HERE, "..", "scripts", f), encoding="utf-8").read())
+        b = strip(open(os.path.join(other, f), encoding="utf-8").read())
+        assert a == b, f"{f} 与时间轴大师的版本不一致了，改了一边要同步另一边"
+
+
+@check("tall · 事件多时自动转纵向：判据、画布与逐字忠实")
+def _():
+    """真实运行里撞到的：28 个事件横向出图 6770x4668，内容只占 7%，A4 上读不出。
+    判据由代码算（超过 10 件转纵向），不问使用者；十件以内一切照旧，产物逐字节不变。"""
+    import importlib.util as _il, re as _re
+    spec = _il.spec_from_file_location("tall", os.path.join(HERE, "..", "scripts",
+                                                            "render_points_tall.py"))
+    tall = _il.module_from_spec(spec); spec.loader.exec_module(tall)
+    base = json.load(open(os.path.join(EXAMPLES, "timeline-points.json"), encoding="utf-8"))
+    assert not tall.should_go_tall(base), "7 个事件被误判成要转纵向"
+    many = json.loads(json.dumps(base))
+    src = many["events"]
+    many["events"] = [dict(e, id=str(i + 1)) for i in range(12)
+                      for e in [src[i % len(src)]]]
+    assert tall.should_go_tall(many), "12 个事件没有转纵向"
+    svg, w, h = tall.render(many)
+    # 判据不是「竖着」——事件少时纵向画布本来就矮（12 件实测 700x535）。
+    # 真正要保证的是：比横向省得多，且画布不失控。
+    spec2 = _il.spec_from_file_location("pts", os.path.join(HERE, "..", "scripts",
+                                                            "render_points.py"))
+    pts = _il.module_from_spec(spec2); spec2.loader.exec_module(pts)
+    _, hw, hh = pts.render(many)
+    assert w * h < hw * hh / 3, f"纵向没比横向省多少（纵 {w}x{h} 对 横 {hw}x{hh}）"
+    assert w <= 1200 and h <= 2400, f"纵向图的画布失控（{w}x{h}）"
+    flat = _re.sub(r"\s", "", "".join(_re.findall(r">([^<]+)</text>", svg)))
+    for e in many["events"]:
+        t = _re.sub(r"\s", "", e.get("text", ""))
+        assert t in flat, f"纵向图上找不到原文：{t[:12]}"
+
+
+@check("assets · 展示图必须标明「模型不要读」，SKILL.md 里也要写到")
+def _():
+    """真实隐患（打包时才发现）：assets/longform 下四张长图的 SVG 版合计约 67 万 token，
+    对模型来说是纯文本，打开一张这一轮就废了，而运行时一个字都用不到。
+    仓库里保留它们（公众号要用），但必须在两处写明不要读：assets/README.md 与 SKILL.md。"""
+    note = os.path.join(HERE, "..", "assets", "README.md")
+    assert os.path.exists(note), "assets/README.md 不见了（那是给模型的「不要读」告示）"
+    txt = open(note, encoding="utf-8").read()
+    assert "不要读" in txt and "token" in txt, "assets/README.md 没写清楚为什么不要读"
+    skill = re.sub(r"\s+", " ", open(os.path.join(HERE, "..", "SKILL.md"),
+                                     encoding="utf-8").read())
+    assert "Never open anything under `assets/`" in skill, "SKILL.md 缺「不要读 assets」这条"
+
+
+@check("source_check · 位图与扫描件要先警告代价并等使用者回话（退出码 3）")
+def _():
+    """真实运行里撞到的：源是截图，模型闷头去读、读不了又用像素猜字，花了大量时间与 token。
+    所以位图与扫描件必须在**开工之前**被拦一道：说清代价、给出更省的做法、问一句是否继续，
+    并以退出码 3 表示等使用者回话。矢量与有文字层的 PDF 不拦（退出码 0），不给人添堵。"""
+    import subprocess, tempfile
+    sc = os.path.join(HERE, "..", "scripts", "source_check.py")
+    d = tempfile.mkdtemp()
+    svg = os.path.join(d, "a.svg")
+    open(svg, "w", encoding="utf-8").write(
+        '<svg xmlns="http://www.w3.org/2000/svg"><text x="1" y="1">甲</text></svg>')
+    png = os.path.join(d, "b.png")
+    open(png, "wb").write(b"\x89PNG\r\n\x1a\n" + b"\0" * 32)
+    r_ok = subprocess.run([sys.executable, sc, svg], capture_output=True, text=True, encoding="utf-8")
+    r_bad = subprocess.run([sys.executable, sc, png], capture_output=True, text=True, encoding="utf-8")
+    assert r_ok.returncode == 0, "矢量源被无故拦下"
+    assert r_bad.returncode == 3, f"位图源没有拦住（退出码 {r_bad.returncode}）"
+    for kw in ("token", "继续", "SVG"):
+        assert kw in r_bad.stdout, f"位图的提醒里缺「{kw}」"
+    skill = re.sub(r"\s+", " ", open(os.path.join(HERE, "..", "SKILL.md"),
+                                     encoding="utf-8").read())
+    assert "source_check.py" in skill and "exit code 3" in skill.lower(), \
+        "SKILL.md 没把预检写成第一步"
+
+
+@check("checkpoint · 交互里提醒源图用矢量原件（省 token、文字可逐字抄）")
+def _():
+    """真实运行里撞到的：源图是截图，宿主又不让模型读图，模型就用像素测量去「还原」
+    文字，还标成逐字照录。提醒要落在**交互输出**里（那段是原样给使用者看的），
+    光写在文档里使用者看不到。"""
+    import importlib.util as _il
+    spec = _il.spec_from_file_location("cp_mod", os.path.join(HERE, "..", "scripts",
+                                                              "checkpoint.py"))
+    cp = _il.module_from_spec(spec); spec.loader.exec_module(cp)
+    m = json.load(open(os.path.join(EXAMPLES, "timeline-points.json"), encoding="utf-8"))
+    out = cp.render_questions(m, suggest=None)
+    assert "SVG" in out and "截图" in out, "确认问题里没有源图格式的提醒"
+    quick = open(os.path.join(HERE, "..", "references", "quick-map.md"),
+                 encoding="utf-8").read()
+    skill = open(os.path.join(HERE, "..", "SKILL.md"), encoding="utf-8").read()
+    # 文档里会换行，先把空白归一再找，免得守卫被一个换行骗过去（本条就这样漏过一次）
+    flat = lambda t: re.sub(r"\s+", " ", t)
+    assert "不许用像素测量" in flat(quick), "速查页缺「不许用像素还原文字」这条红线"
+    assert "Never reconstruct text from pixel measurements" in flat(skill), \
+        "SKILL.md 缺「不许用像素还原文字」这条红线"
+
+
+@check("docs · quick-map.md 与示例逐项对账（版式、顶层字段、元素字段）")
+def _():
+    """速查页是为了让模型不必读三份长文就能写对地图（约 4.8 万字节降到约 5 千）。
+    风险只有一个：它与真实格式脱节。所以逐个示例把实际用到的字段取出来，
+    与速查页比对；示例里有、速查页没写的，当场报错。"""
+    quick = open(os.path.join(HERE, "..", "references", "quick-map.md"),
+                 encoding="utf-8").read()
+    missing = []
+    for name in sorted(os.listdir(EXAMPLES)):
+        if not name.endswith(".json"):
+            continue
+        m = json.load(open(os.path.join(EXAMPLES, name), encoding="utf-8"))
+        lay = m.get("layout")
+        if lay and lay not in quick:
+            missing.append(f"{name}: 版式 {lay}")
+        for key in ("axis", "events", "spans", "points", "nodes", "edges",
+                    "columns", "rows"):
+            if key not in m:
+                continue
+            if key not in quick:
+                missing.append(f"{name}: 顶层 {key}")
+            first = m[key][0] if isinstance(m[key], list) and m[key] else m[key]
+            if isinstance(first, dict):
+                for f in first:
+                    if f not in quick:
+                        missing.append(f"{name}: {key}[].{f}")
+    assert not missing, "速查页没写到的字段：" + "；".join(sorted(set(missing))[:8])
 
 
 @check("docs · the guard count STANDARDS.md cites is the real one")
@@ -2752,7 +3111,7 @@ def _long_text():
     import re as _re, json as _json, subprocess, sys, pathlib, tempfile
     import render as _render
     root = pathlib.Path(__file__).resolve().parent.parent
-    m = _json.loads((root / "examples" / "comparison-table.json").read_text())
+    m = _json.loads((root / "examples" / "comparison-table.json").read_text(encoding="utf-8"))
     m["title_text"] = "关于某某市某某区某某工程建设项目施工合同纠纷一案二审判决与再审裁定裁判要旨逐项对比分析表"
     mod = _render.choose(m)
     svg, w, h = mod.render(m)
@@ -2765,12 +3124,46 @@ def _long_text():
     with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
         f.write(fitted); p = f.name
     r = subprocess.run([sys.executable, str(root / "scripts" / "lint.py"), p],
-                       capture_output=True, text=True, timeout=60)
+                       capture_output=True, text=True, timeout=60, encoding="utf-8")
     assert "overflows canvas" not in r.stdout, f"still overflowing: {r.stdout}"
     # a short title is left completely alone
-    m2 = _json.loads((root / "examples" / "comparison-table.json").read_text())
+    m2 = _json.loads((root / "examples" / "comparison-table.json").read_text(encoding="utf-8"))
     s2, _, _ = _render.choose(m2).render(m2)
     assert _render.fit_title(s2) == s2, "fit_title touched a title that already fits"
+
+
+# ---- schema agrees with the code ----------------------------------------
+@check("schema · the JSON schema accepts every layout the code renders, and every example")
+def _():
+    """The schema file is enforced whenever `jsonschema` happens to be installed.
+    It once lacked `comparison_table`, so on such a machine the shipped example —
+    and every A-vs-B table a user asked for — was refused with "not one of [...]",
+    while machines without jsonschema rendered it fine. The two validators must
+    agree, so this compares them directly (no jsonschema needed for part 1)."""
+    import inspect
+    from common import validate_map
+    schema = json.load(open(os.path.join(HERE, "..", "schemas", "semantic-map.schema.json"),
+                            encoding="utf-8"))
+    enum = set(schema["properties"]["layout"]["enum"])
+    code = set(re.findall(r'"([a-z_]+)"', inspect.getsource(validate_map).split("_schema_errors")[0]))
+    handled = {l for l in code if l in enum or l.endswith(("_timeline", "_gantt", "_flow",
+                                                             "_relation", "_tree", "_table"))}
+    missing = sorted(handled - enum)
+    assert not missing, f"layouts the code renders but the schema rejects: {missing}"
+    try:
+        import jsonschema
+    except ImportError:
+        return
+    v = jsonschema.Draft202012Validator(schema)
+    bad = []
+    for f in sorted(os.listdir(EXAMPLES)):
+        if f.endswith(".json"):
+            for e in v.iter_errors(json.load(open(os.path.join(EXAMPLES, f), encoding="utf-8"))):
+                bad.append(f"{f}: {'/'.join(map(str, e.absolute_path))}: {e.message[:80]}")
+    for f in ("edge_relation_dense.json",):
+        for e in v.iter_errors(load(f)):
+            bad.append(f"{f}: {'/'.join(map(str, e.absolute_path))}: {e.message[:80]}")
+    assert not bad, "schema rejects shipped input:\n  " + "\n  ".join(bad[:6])
 
 
 # ---- environment doctor --------------------------------------------------
@@ -2779,7 +3172,7 @@ def _doctor():
     import subprocess, sys, pathlib
     root = pathlib.Path(__file__).resolve().parent.parent
     r = subprocess.run([sys.executable, str(root / "scripts" / "doctor.py")],
-                       capture_output=True, text=True, timeout=60)
+                       capture_output=True, text=True, timeout=60, encoding="utf-8")
     out = r.stdout
     for needle in ("Python", "graphviz", "PNG rasteriser", "IBM Plex Mono", "Result:"):
         assert needle in out, f"doctor.py never reported {needle!r}"

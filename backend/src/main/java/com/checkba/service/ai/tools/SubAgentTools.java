@@ -38,21 +38,13 @@ public class SubAgentTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "委派子任务", category = "agent")
-    @Tool("Delegate a self-contained subtask to an independent sub-agent that runs its own tool-use loop "
-            + "and returns only the final structured result (JSON: success/result/error/toolsUsed/rounds). "
-            + "Use ONLY for complex sub-problems that need independent multi-step exploration or produce lots "
-            + "of intermediate output. NEVER delegate simple tasks you can do directly with one or two tool calls. "
-            + "task_description: complete standalone description of the subtask (the sub-agent cannot see this "
-            + "conversation). expected_output: precise description of what the result must contain. "
-            + "tool_scope: tool names the sub-agent may use, as a JSON array or comma-separated string "
-            + "(empty = all tools; grant only the minimal set the subtask needs). "
-            + "dispatch_subtask itself is never available to the sub-agent. "
-            + "If it returns success=false (timeout, budget exceeded, rounds exhausted), take the work over yourself "
-            + "or change strategy - do NOT re-dispatch the same task unchanged.")
+    @Tool("把自包含的子任务派给独立子 Agent，由它自己跑工具循环，只返回最终结构化结果。\n"
+            + "何时用：需要独立多步探索、或会产生大量中间输出的复杂子问题；一两次工具调用能做完的不要派。\n"
+            + "回执是 JSON：success/result/error/toolsUsed/rounds。task_description 要完整独立（子 Agent 看不到本对话）；tool_scope 只给最小必要的工具集。success=false 时自己接手或换策略，不要原样重派。")
     public String dispatch_subtask(
             @P("子任务的完整独立描述（子 Agent 看不到本对话）") String task_description,
-            @P(value = "结果必须包含什么；不传则由子 Agent 自行决定产出形式", required = false) String expected_output,
-            @P(value = "子 Agent 可用的工具名，JSON 数组或逗号分隔；不传即全部工具", required = false) String tool_scope) {
+            @P(value = "结果必须包含什么；不传则由子 Agent 自行决定", required = false) String expected_output,
+            @P(value = "子 Agent 可用的工具名，JSON 数组或逗号分隔；不传即全部", required = false) String tool_scope) {
         log.info("Tool: dispatch_subtask called, scope='{}'", tool_scope);
         if (SubAgentService.inSubAgent()) {
             // 防递归第二道防线（第一道在 SubAgentService 的分发拦截）

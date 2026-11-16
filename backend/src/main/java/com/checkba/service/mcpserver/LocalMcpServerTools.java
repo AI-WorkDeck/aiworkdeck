@@ -12,8 +12,10 @@ import com.checkba.service.ContentSearchService;
 import com.checkba.service.LangText;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.ProjectService;
+import com.checkba.service.UserActivityLogService;
 import com.checkba.service.ai.tools.ToolMeta;
 import com.checkba.service.file.ProjectFileTextExtractor;
+import com.checkba.service.revision.PendingRevisionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -78,21 +80,85 @@ public class LocalMcpServerTools {
                             "projectId", prop("integer", "Project id from list_projects"),
                             "query", prop("string", "Text to look for (literal, case-insensitive)")),
                             List.of("projectId", "query")),
-                    ToolMeta.Access.READ, "awd:project.read", List.of("search_project_content")));
+                    ToolMeta.Access.READ, "awd:project.read", List.of("search_project_content")),
+            new Definition("propose_revision",
+                    "Propose edits to a Word document (.docx/.doc). Nothing is written to the file: the proposal "
+                            + "is queued and the lawyer reviews it in AI WorkDeck; on acceptance it lands as tracked "
+                            + "changes (redlines). Pass the `version` returned by read_file as baseVersion; if the "
+                            + "file changed since, the proposal is marked stale and not applied. Each edit replaces "
+                            + "the first occurrence of `find` (copy it verbatim from read_file, make it unique); "
+                            + "`replace` may be empty to delete. Max " + PendingRevisionService.MAX_EDITS + " edits.",
+                    proposeSchema(),
+                    ToolMeta.Access.WRITE, "awd:project.propose", List.of()));
+
+    public static boolean isCurated(String name) {
+        return DEFINITIONS.stream().anyMatch(d -> d.name().equals(name));
+    }
 
     private final ProjectService projectService;
     private final ProjectMemberService projectMemberService;
     private final ProjectFileRepository projectFileRepository;
     private final ProjectFileTextExtractor textExtractor;
     private final ContentSearchService contentSearchService;
+    private final PendingRevisionService pendingRevisionService;
+    private final UserActivityLogService activityLog;
 
     /** 执行一个工具，返回可 JSON 序列化的结果；参数或权限问题抛 {@link ToolError}。 */
     public Object call(String name, Map<String, Object> args, Long userId) {
+        return call(name, args, userId, null);
+    }
+
+    /** clientName 来自 MCP 请求头，只用于标注待审修订的来源（mcp:&lt;clientName&gt;）。 */
+    public Object call(String name, Map<String, Object> args, Long userId, String clientName) {
+        long started = System.currentTimeMillis();
+        boolean ok = false;
+        try {
+            Object result = dispatch(name, args, userId, clientName);
+            ok = true;
+            return result;
+        } finally {
+            audit(name, args, userId, ok, System.currentTimeMillis() - started);
+        }
+    }
+
+    /**
+     * 精修工具不经 ToolRegistry，在这里补与 ToolRegistry.execute 同形的审计（agent-app-control.md C8）：
+     * actionType=ai_tool，metaInfo 只有 source/access/argsDigest/ok/durationMs，不记参数值与输出。审计失败不影响调用。
+     */
+    private void audit(String name, Map<String, Object> args, Long userId, boolean ok, long durationMs) {
+        try {
+            String access = DEFINITIONS.stream().filter(d -> d.name().equals(name)).findFirst()
+                    .map(d -> d.access().name().toLowerCase(java.util.Locale.ROOT)).orElse("unknown");
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("source", "mcp");
+            meta.put("access", access);
+            meta.put("argsDigest", argsDigest(args));
+            meta.put("ok", ok);
+            meta.put("durationMs", durationMs);
+            Object projectId = args == null ? null : args.get("projectId");
+            Long pid = projectId instanceof Number n ? n.longValue() : null;
+            activityLog.logActivity(userId, "ai_tool", null, name == null ? "" : name, durationMs,
+                    new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(meta), pid);
+        } catch (Exception e) {
+            log.warn("MCP audit failed for {}: {}", name, e.getMessage());
+        }
+    }
+
+    private static String argsDigest(Map<String, Object> args) throws Exception {
+        String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .writeValueAsString(args == null ? Map.of() : args);
+        byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return java.util.HexFormat.of().formatHex(d);
+    }
+
+    private Object dispatch(String name, Map<String, Object> args, Long userId, String clientName) {
         Map<String, Object> a = args == null ? Map.of() : args;
         return switch (name == null ? "" : name) {
             case "list_projects" -> listProjects(userId);
             case "list_project_files" -> listProjectFiles(readableProject(a, userId));
             case "read_file" -> readFile(a, userId);
+            case "propose_revision" -> proposeRevision(a, userId, clientName);
             case "search_project" -> search(readableProject(a, userId), a, userId);
             default -> throw new ToolError(LangText.of("未知工具：", "Unknown tool: ") + name);
         };
@@ -153,6 +219,7 @@ public class LocalMcpServerTools {
         out.put("fileId", pf.getId());
         out.put("projectId", pf.getProjectId());
         out.put("name", pf.getName());
+        out.put("version", PendingRevisionService.fileVersion(pf));
         out.put("totalChars", body.length());
         out.put("offset", start);
         out.put("nextOffset", end < body.length() ? end : null);
@@ -188,6 +255,66 @@ public class LocalMcpServerTools {
         out.put("totalMatches", result == null ? 0 : result.getTotalMatches());
         out.put("hits", hits);
         return out;
+    }
+
+    private Map<String, Object> proposeRevision(Map<String, Object> a, Long userId, String clientName) {
+        Long fileId = longArg(a, "fileId", true);
+        Object bv = a.get("baseVersion");
+        if (!(bv instanceof String baseVersion) || baseVersion.isBlank()) {
+            throw new ToolError(LangText.of("缺少参数 baseVersion", "Missing argument: baseVersion"));
+        }
+        if (!(a.get("edits") instanceof List<?> raw)) {
+            throw new ToolError(LangText.of("缺少参数 edits（数组）", "Missing argument: edits (array)"));
+        }
+        List<PendingRevisionService.Edit> edits = new ArrayList<>();
+        for (Object o : raw) {
+            if (!(o instanceof Map<?, ?> m) || !(m.get("find") instanceof String find)
+                    || !(m.get("replace") instanceof String replace)) {
+                throw new ToolError(LangText.of("每条 edit 需要字符串 find 和 replace",
+                        "Each edit needs string find and replace"));
+            }
+            Object reason = m.get("reason");
+            edits.add(new PendingRevisionService.Edit(find, replace, reason instanceof String s ? s : null));
+        }
+        String source = "mcp:" + sanitizeClient(clientName);
+        try {
+            var r = pendingRevisionService.propose(userId, fileId, baseVersion, edits, source);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("proposalId", r.getId());
+            out.put("status", r.getStatus());
+            out.put("edits", edits.size());
+            out.put("note", LangText.of("已提交待审，未修改文件；等待用户在 AI WorkDeck 中审阅。",
+                    "Queued for review; the file was not changed. The user reviews it in AI WorkDeck."));
+            return out;
+        } catch (PendingRevisionService.RevisionException e) {
+            throw new ToolError(e.getMessage());
+        }
+    }
+
+    static String sanitizeClient(String name) {
+        String n = name == null ? "" : name.replaceAll("[^A-Za-z0-9._ -]", "").trim();
+        if (n.length() > 40) n = n.substring(0, 40);
+        return n.isEmpty() ? "client" : n;
+    }
+
+    private static Map<String, Object> proposeSchema() {
+        Map<String, Object> edit = new LinkedHashMap<>();
+        edit.put("type", "object");
+        edit.put("properties", new java.util.TreeMap<>(Map.of(
+                "find", prop("string", "Exact text to find (non-empty, max " + PendingRevisionService.MAX_FIND_CHARS + " chars)"),
+                "replace", prop("string", "Replacement text (empty to delete, max " + PendingRevisionService.MAX_REPLACE_CHARS + " chars)"),
+                "reason", prop("string", "Why (shown to the reviewer, max " + PendingRevisionService.MAX_REASON_CHARS + " chars)"))));
+        edit.put("required", List.of("find", "replace"));
+        Map<String, Object> edits = new LinkedHashMap<>();
+        edits.put("type", "array");
+        edits.put("description", "Edits in order (max " + PendingRevisionService.MAX_EDITS + ")");
+        edits.put("minItems", 1);
+        edits.put("maxItems", PendingRevisionService.MAX_EDITS);
+        edits.put("items", edit);
+        return schema(Map.of(
+                "fileId", prop("integer", "File id from list_project_files"),
+                "baseVersion", prop("string", "The `version` returned by read_file for this file"),
+                "edits", edits), List.of("fileId", "baseVersion", "edits"));
     }
 
     private Long readableProject(Map<String, Object> a, Long userId) {

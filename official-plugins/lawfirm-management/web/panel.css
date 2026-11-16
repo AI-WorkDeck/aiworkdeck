@@ -123,7 +123,7 @@ select {
 
 .hint,
 small {
-  font-size: var(--awd-font-size-caption, 12px);
+  font-size: var(--awd-panel-fs, 12px);
   color: var(--awd-text-2, var(--fallback-muted));
 }
 
@@ -187,16 +187,21 @@ p {
 
 .tabbar {
   display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 3px;
   padding: 3px;
   margin-bottom: 10px;
   background: var(--awd-surface-2, var(--fallback-surface-2));
   border: 1px solid var(--awd-border-subtle, var(--fallback-border));
   border-radius: var(--awd-radius-md, 6px);
-  overflow-x: auto;
+  /* 页签已有七八个：窄窗格里换行显示，而不是横向滚动把后面的页签藏到看不见的地方 */
+  flex-wrap: wrap;
 }
 
 .tab-btn {
+  flex: none;
+  white-space: nowrap;
   border: 1px solid transparent;
   border-radius: var(--awd-radius-sm, 4px);
   background: transparent;
@@ -224,6 +229,20 @@ p {
 }
 
 /* Notice Bar */
+#restrictedBanner {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid #d9b25f;
+  background: #fff7e0;
+  color: #6b4b00;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+#restrictedBanner[hidden] {
+  display: none;
+}
+
 #notice {
   padding: 8px 16px;
   background: var(--awd-accent-wash, var(--fallback-wash));
@@ -343,9 +362,9 @@ p {
 }
 
 .badge-green {
-  color: var(--awd-success-text, var(--fallback-success));
+  color: var(--awd-accent-text, var(--fallback-success));
   background: var(--fallback-success-wash);
-  border-color: var(--awd-success-text, var(--fallback-success));
+  border-color: var(--awd-accent-text, var(--fallback-success));
 }
 
 .badge-neutral {
@@ -416,16 +435,20 @@ p {
 }
 
 /* 5-Step Progress Tracker */
+/* 五步固定 5 列在半宽卡片里会把「提交收案申请」逐字折成两行；按最小宽度自动换行 */
 .progress-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 6px;
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px dashed var(--awd-border, var(--fallback-border));
 }
 
+/* 步骤名在英文、德文、俄文等语言里比中文长得多：换行显示，不截断 */
 .step-pill {
+  white-space: normal;
+  overflow-wrap: anywhere;
   padding: 5px 6px;
   border-radius: var(--awd-radius-sm, 6px);
   border: 1px solid var(--awd-border, var(--fallback-border));
@@ -436,8 +459,8 @@ p {
 
 .step-pill[data-state="done"] {
   background: var(--fallback-success-wash);
-  color: var(--awd-success-text, var(--fallback-success));
-  border-color: var(--awd-success-text, var(--fallback-success));
+  color: var(--awd-accent-text, var(--fallback-success));
+  border-color: var(--awd-accent-text, var(--fallback-success));
   font-weight: 600;
 }
 
@@ -521,9 +544,12 @@ table {
   font-size: 12px;
 }
 
+/* 中文可在任意字间断行：表格被压窄时「蔺若曦（合伙人）」会被拆成三行。
+   短值一律不折行、由 .table-wrap 横向滚动；长文本列显式标 .cell-text 才允许折行。 */
 th,
 td {
-  text-align: left;
+  white-space: nowrap;
+  text-align: start;
   padding: 8px 10px;
   border-bottom: 1px solid var(--awd-border, var(--fallback-border));
   vertical-align: middle;
@@ -534,6 +560,12 @@ th {
   color: var(--awd-text-2, var(--fallback-muted));
   background: var(--awd-surface-2, var(--fallback-surface-2));
   white-space: nowrap;
+}
+
+td.cell-text {
+  white-space: normal;
+  min-width: 12em;
+  max-width: 22em;
 }
 
 .workload-bar-wrap {
@@ -563,7 +595,152 @@ th {
   .field-span-2 {
     grid-column: span 1;
   }
-  .progress-steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
+}
+
+/* 客户管理（clients.js） */
+.client-toolbar,
+.client-rel-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block-end: 10px;
+}
+.client-toolbar > *,
+.client-rel-form > *,
+.client-toolbar input,
+.client-toolbar select,
+.client-rel-form input,
+.client-rel-form select {
+  width: auto;
+  flex: 0 1 auto;
+}
+.client-rel-form #rel-party,
+.client-rel-form #contact-note {
+  flex: 1 1 220px;
+}
+.client-toolbar input[type="search"] {
+  min-width: 220px;
+  flex: 1 1 260px;
+}
+.client-rel-form input[type="text"] {
+  min-width: 160px;
+}
+.client-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.client-title {
+  flex: 1;
+}
+.client-title h2 {
+  margin: 0;
+}
+.client-contact-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 6px;
+}
+.client-row {
+  cursor: pointer;
+}
+.client-row:hover,
+.client-row:focus {
+  background: var(--awd-accent-wash, var(--fallback-wash));
+}
+td.num {
+  text-align: end;
+  white-space: nowrap;
+}
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+#panel-clients h3 {
+  font-size: 13px;
+  margin: 14px 0 6px;
+}
+#clients-status[data-error="true"] {
+  color: var(--awd-danger-text, var(--fallback-danger));
+}
+/* 计时收费（billing.js） */
+.hb-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+.hb-month { display: inline-flex; align-items: center; gap: 6px; }
+.hb-subnav { display: inline-flex; gap: 4px; }
+.hb-subnav button[aria-selected="true"] {
+  background: var(--awd-accent-soft, #e8f0fe);
+  color: var(--awd-accent-text, inherit);
+  font-weight: 600;
+}
+#hb-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
+.hb-totals {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 4px 24px;
+  margin: 12px 0;
+  margin-inline-start: auto;
+  width: max-content;
+  font-variant-numeric: tabular-nums;
+}
+.hb-totals dt { color: var(--awd-text-2, #555); }
+.hb-totals dd { margin: 0; text-align: end; }
+.hb-totals .hb-total { font-weight: 700; }
+.hb-total-row td { font-weight: 600; }
+.hb-audit {
+  margin: 8px 0 0;
+  padding-inline-start: 18px;
+  font-size: 12px;
+  color: var(--awd-text-2, #555);
+}
+.hb-edit, .hb-confirm { margin-top: 8px; }
+/* 律所云端（cloud.js） */
+#cl-status[data-error="true"] { color: var(--awd-danger-text, #b42318); }
+.cl-purge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.client-cloud-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-block-end: 12px;
+}
+.client-restricted {
+  padding: 10px 12px;
+  border-radius: var(--awd-radius-sm, 6px);
+  background: var(--awd-surface-2, var(--fallback-surface-2));
+}
+.client-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-block-end: 12px;
+  border-radius: var(--awd-radius-sm, 6px);
+  background: var(--awd-danger-soft, var(--fallback-danger-wash));
+}
+.client-confirm p {
+  margin: 0;
+  flex: 1 1 100%;
+}
+.invoice-number-input { display: block; width: 12em; margin-top: 4px; box-sizing: border-box; }
+.hb-cloud { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.hb-cloud .hint { margin: 0; }
+.btn-void-invoice { margin-inline-start: 6px; }
+.invoice-number { font-size: 12px; color: var(--awd-text-2, #555); font-variant-numeric: tabular-nums; }
+
+/* 表格里的状态胶囊（负荷/风险）在长语言下换行，不被表格边缘截断 */
+td .badge {
+  white-space: normal;
+  min-width: 8em;
+}
+/* 中文胶囊本来就短，保持一行（换行反而把「可优先派案」拆开） */
+:lang(zh) td .badge {
+  white-space: nowrap;
 }

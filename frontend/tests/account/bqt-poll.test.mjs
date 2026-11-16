@@ -62,3 +62,17 @@ test('top login mode buttons use native disabled controls during authentication'
  buttons[1].click(); assert.deepEqual(clicked, ['bqt'])
  app.unmount(); dom.window.close()
 })
+
+test('scan tab opens without consent but only requests a QR code once both consents are given', () => {
+ const start = source.indexOf('switchMode(next) {')
+ const code = source.slice(start, source.indexOf('\n    stopBqtPoll()', start))
+ const switchMode = new Function(`return ({${code}}).switchMode`)()
+ for (const consent of [false, true]) {
+  let started = 0
+  const state = { mode: 'login', submitBusy: false, sendingCode: false, bqtScanEnabled: true, isPhoneSite: true,
+   errorMsg: '', consentGatePassed: () => consent, startBqtScan: () => { started++ } }
+  switchMode.call(state, 'bqt')
+  assert.equal(state.mode, 'bqt')
+  assert.equal(started, consent ? 1 : 0)
+ }
+})

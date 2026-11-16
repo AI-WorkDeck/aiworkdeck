@@ -26,7 +26,7 @@
         { "name": "law_search", "argsContain": { "query": "股东出资责任" } }
       ],
       "promptContains": ["不是法源"],
-      "offeredToolsInclude": ["law_search", "law_search_keyword", "get_law_article"],
+      "offeredToolsInclude": ["law_search", "get_law_article"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -54,7 +54,7 @@
     "expect": {
       "toolCalls": [{ "name": "query_memory", "argsContain": { "depth": "hybrid" } }],
       "offeredToolsInclude": ["query_memory"],
-      "offeredToolsExclude": ["search_knowledge_base", "deep_search"],
+      "toolsNotRegistered": ["search_knowledge_base", "deep_search"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -82,7 +82,7 @@
     "expect": {
       "toolCalls": [{ "name": "query_memory", "argsContain": { "depth": "deep" } }],
       "offeredToolsInclude": ["query_memory"],
-      "offeredToolsExclude": ["deep_search", "search_knowledge_base"],
+      "toolsNotRegistered": ["deep_search", "search_knowledge_base"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -116,7 +116,7 @@
         { "name": "extract_file_text", "argsContain": { "fileId": "1001" } }
       ],
       "offeredToolsInclude": ["doc_list_project_files", "extract_file_text", "search_project_content"],
-      "offeredToolsExclude": ["read_document"],
+      "toolsNotRegistered": ["read_document"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -169,7 +169,7 @@
     "expect": {
       "toolCalls": [{ "name": "slide_set_shape_text" }],
       "offeredToolsInclude": ["slide_set_shape_text", "slide_get_overview", "slide_add_page"],
-      "offeredToolsExclude": ["pptx_apply_format", "pptx_edit_page", "pptx_open_file"],
+      "toolsNotRegistered": ["pptx_apply_format", "pptx_edit_page", "pptx_open_file"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"
     }
@@ -231,19 +231,19 @@
       {
         "toolCalls": [
           {
-            "name": "law_search_keyword",
-            "arguments": { "title": "劳动合同法", "fulltext": "经济补偿" }
+            "name": "law_search",
+            "arguments": { "mode": "keyword", "title": "劳动合同法", "fulltext": "经济补偿" }
           }
         ]
       },
       { "text": "<final>经济补偿标准规定在《劳动合同法》第四十七条。</final>" }
     ],
     "toolStubs": {
-      "law_search_keyword": "《中华人民共和国劳动合同法》第四十七条：经济补偿按劳动者在本单位工作的年限……"
+      "law_search": "《中华人民共和国劳动合同法》第四十七条：经济补偿按劳动者在本单位工作的年限……"
     },
     "expect": {
-      "toolCalls": [{ "name": "law_search_keyword" }],
-      "offeredToolsInclude": ["law_search", "law_search_keyword", "get_law_article"],
+      "toolCalls": [{ "name": "law_search", "argsContain": { "mode": "keyword" } }],
+      "offeredToolsInclude": ["law_search", "get_law_article"],
       "offeredToolsExclude": ["search_laws"],
       "structureContains": ["<final>"],
       "bubbleEndStatus": "finished"

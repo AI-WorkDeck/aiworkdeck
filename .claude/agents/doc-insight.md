@@ -26,7 +26,7 @@ dev-board#181（后端部分）+ #182 + #541（DOC 第四类实体）。
 
 测试：`CompletionServiceTest`、`CompletionPersistenceTest`、`CompletionControllerTest` 与 `DocInsightServiceTest`（授权、并发、限额、失败缓存与显式检索边界）。
 
-右键资料卡与插入正文（教程反馈 43–48/107–109，dev-board#1713）：`completionDetails(entity, {translate, locale})` 由宿主注入语言包——来源内部名经 `insightDetail.retrievalSourceLabel` 映射（`pkulaw` / `pkulaw-*` → `insight.source.pkulaw`，`qichacha` / `qichacha+mcp` → `insight.source.qichacha`；依据窗格浮窗、AI 回答法规卡同用这一张表），查询日期 `formatQueryDate` 只取年月日并按界面语言本地化（中文「2026年11月4日」）；来源/日期行、工商表题（`editor.writingAssist.companyTable`，作为 COMPANY variant 的 `text` 放在 `rows` 前）都是语言包词条。后端 `retrievalSource` 契约不变。模糊匹配的「仅替换为正确全称」variant 带 `mode:'replace-selection'`，客体只在选区令牌下展示，引擎同一撤销组先删选区再写入。客体页文案表由宿主 `writingAssistanceLabels(translate)` 生成、随 `writing-config.labels` 下发，客体只留英文兜底；结果卡沿用右键菜单坐标，插入按钮在 sticky 底栏 `.awd-wa-actions`。AI 回答里的法规卡：只有本轮实时流的工具事件（`useAgentStream` 给 tool 条目打的 `live:true`）保留「检索返回内容」，历史回灌的一律「来源待核验」。
+右键资料卡与插入正文（教程反馈 43–48/107–109，dev-board#1713）：`completionDetails(entity, {translate, locale})` 由宿主注入语言包——来源内部名经 `insightDetail.retrievalSourceLabel` 映射（`pkulaw` / `pkulaw-*` → `insight.source.pkulaw`，`qichacha` / `qichacha+mcp` → `insight.source.qichacha`；依据窗格浮窗、AI 回答法规卡同用这一张表），查询日期 `formatQueryDate` 只取年月日并按界面语言本地化（中文「2026年11月4日」）；来源/日期行、工商表题（`editor.writingAssist.companyTable`，作为 COMPANY variant 的 `text` 放在 `rows` 前）都是语言包词条。后端 `retrievalSource` 契约不变。模糊匹配的「仅替换为正确全称」variant 带 `mode:'replace-selection'`，客体只在选区令牌下展示，引擎同一撤销组先删选区再写入。客体页文案表由宿主 `writingAssistanceLabels(translate)` 生成、随 `writing-config.labels` 下发，客体只留英文兜底；结果卡沿用右键菜单坐标，插入按钮在 sticky 底栏 `.awd-wa-actions`。AI 回答里的法规卡：只有本轮实时流的工具事件（`useAgentStream` 给 tool 条目打的 `live:true`）保留「检索返回内容」，历史回灌的一律「来源待核验」。模型自己写的 ```legal-reference``` 卡默认「来源待核验」；同一轮实时流里有成功的法宝工具输出**同时含该卡 URL（origin+pathname）和逐字节选**（忽略空白）时，`corroborateReference` 把它升为「检索返回内容」，输出里没有的元数据（文号、发布机关等模型补的）从卡上去掉。地雷：法宝网关现在回纯文本，`referencesFromTools` 只认 JSON，纯文本输出不会自己出卡，靠这条互证。
 
 **服务层 `backend/src/main/java/com/checkba/service/insight/`**
 - `DocInsightService.java` — 管线主体。`startParse` / `latest` / `entityDetail` / `refreshEntity` 四个公有入口，其余全是私有管线。
@@ -282,6 +282,7 @@ DOC 实体的 `detail`（命中项目文件时；`GET /entities/{id}` 才下发�
 `application-prod.yml` 不重复定义 `mcp` 列表（抄一份必然漂移），只在 `external.qichacha` 下留了 `QICHACHA_MCP_TOKEN` 的部署清单注释。
 
 ## 已知地雷
+- **法宝 2026-11 改名与回包换形（2026-11-11 实测）**：上游工具全部改名（get_article→get_law_article(law_title, article_number)、search_article→search_law_articles(query_text)、get_law_list→search_laws_by_keyword / search_law_articles_by_keyword、law_recognition→recognize_law_citations、search_case→search_cases、anhao_recognition→recognize_case_numbers、adjust_provisions→verify_law_citations(user_law[{law_title,…}], answer_law[…])），回包改成「可读文本 + `structuredContent`」，字段名也换了（law_title / article_content / document_no / implement_date…）。`McpResponseParser` 只拼 content 文本、丢 structuredContent，多条 content（search_article 10 条）会被拼成 `{…}{…}` 坏 JSON。对策：网关档由官网 adapters/pkulaw.ts 换名换参；依据窗格走 `PkulawChannel.callToolForData`，由 `legal/PkulawCompat.legacyFromRaw` 把 structuredContent 还原成本文件「数据模型」里的旧形状（下游解析、空结果判定、前端 insightDetail 都不用改）；「查无此条」上游当成功回（isError=false），换算成 article/content/text 全空 → NOT_FOUND。模型那条（LegalTools）仍吃可读文本。不走网关的两档（自备 Key、用户自建 MCP 连接）先按旧名打，上游回 Unknown tool / `tool_unavailable` 才按 `PkulawCompat.translate` 的现名重试——用户自连的端点 10-29 快照里仍是旧名。夹具：`backend/src/test/resources/pkulaw/2026-11/*.raw`（真实回包）。
 
 1. **桌面端上法宝凭证不在用户机器上，必须走平台网关**（dev-board#395 的病灶）。
    `PKULAW_TOKEN` / 系统设置 `external.pkulaw.token` 只在开发机与自建部署上有；打包发出去的桌面端两个都是空的。
@@ -538,6 +539,8 @@ cd backend && mvn clean test                      # 全量（跨类常量内联�
 - 验证：后端 `ContractReviewServiceTest,ContractReviewOutputTest,ContractReviewPersistenceTest,ProjectDeleteCascadeTest`；前端 `tests/contract-review/*.test.mjs` 与 `tests/insight/insightPane.test.mjs`。测试桩通过不等于真实模型法律判断准确率或正式客户端已发布。
 
 ## 法律资料卡与阅读标签（dev-board#1611）
+
+普通 JSON 围栏兼容（dev-board#1735）：仅在关联用户问题含条号、且问题与回答没有代码/JSON/示例意图时启用普通围栏兼容；缺失关联用户的历史片段保留代码。模型误用顶层 `json` 围栏时，仅完整且严格符合资料字段的 LAW/CASE/PENALTY 对象（或全有效数组）转成卡片；必须有标题、来源或安全 URL、摘要或节选。未知字段、嵌套对象、未闭合围栏及引用/嵌套代码示例保持原文。卡片仍为「来源待核验」，沿用实时法宝输出互证规则；复制、插入和历史回放共用解析，不再泄露资料 JSON。
 
 `utils/legalReferences.js` 复用 insightDetail 的法条/裁判/案号字段整形，区分目录与真实返回的正文，不把合成元数据当正文。`writingAssistanceHost` 将快捷查询或已有资料的 REST 结果保留在宿主，以会话票据和索引回应客体；客体右上角阅读按钮只传票据，不提交任意资料对象。查询更新、失活、销毁均废止旧票据，原有内容插入与失效保护保留。新文案通过宿主翻译后传给客体。
 

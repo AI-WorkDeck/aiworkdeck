@@ -22,6 +22,7 @@ public class CloudEgressService {
  private final MobileBillingService billing;private final CloudStorageQuotaService quota;
  private final CloudEgressReceiptRepository receipts;private final UserRepository users;
  private final TransactionTemplate tx;
+ @org.springframework.beans.factory.annotation.Autowired(required=false) private CloudPostpaidShadowService shadow;
  public CloudEgressService(ProjectCatalogService catalog,MobileBackupService backups,MobileBillingService billing,
   CloudStorageQuotaService quota,CloudEgressReceiptRepository receipts,UserRepository users,PlatformTransactionManager manager) {
   this.catalog=catalog;this.backups=backups;this.billing=billing;this.quota=quota;this.receipts=receipts;this.users=users;this.tx=new TransactionTemplate(manager);
@@ -39,10 +40,11 @@ public class CloudEgressService {
   MobilePreviewPolicy.requireSupported((String)selected(user,project,file).get("name"));
  }
  public Map<String,Object> quote(Long user,String project,String file) throws IOException {
-  if(quota.postpaidEnabled() && !quota.canRead(user))throw new IllegalArgumentException(CloudBillingText.get("readUnavailable"));
+  boolean live=quota.postpaidFor(user);
+  if(live && !quota.canRead(user))throw new IllegalArgumentException(CloudBillingText.get("readUnavailable"));
   var selected=selected(user,project,file);
   try(var snapshot=snapshot(user,project,file,selected)) {
-   if(!quota.postpaidEnabled()) return Map.of("credits",0,"quoteCents",0,"cashCurrency",billing.balance(user).currency(),"resourceHash",snapshot.hash,"estimated",true);
+   if(!live) return Map.of("credits",0,"quoteCents",0,"cashCurrency",billing.balance(user).currency(),"resourceHash",snapshot.hash,"estimated",true);
    var state=billing.cloudState(user);var access=map(state.get("cloudAccess"));
    Map<String,Object> input=new LinkedHashMap<>();input.put("bytes",Long.toString(snapshot.size));input.put("resourceHash",snapshot.hash);
    if(access.get("caseId")!=null) input.put("exportCaseId",access.get("caseId"));
@@ -74,13 +76,13 @@ public class CloudEgressService {
   return prepare(user,project,file,requestId,null);
  }
  public Download prepare(Long user,String project,String file,String requestId,String expectedHash) throws IOException {
-  if(quota.postpaidEnabled() && !quota.canRead(user))throw new IllegalArgumentException(CloudBillingText.get("readUnavailable"));
+  if(quota.postpaidFor(user) && !quota.canRead(user))throw new IllegalArgumentException(CloudBillingText.get("readUnavailable"));
   var entry=selected(user,project,file);
   return reserve(user,snapshot(user,project,file,entry),requestId,expectedHash);
  }
  /** The caller must authorize this account and resource before supplying any bytes. */
  public Download prepareSource(Long user,String trustedResourceId,InputStream source,long maxBytes,String requestId,String expectedHash) throws IOException {
-  if(quota.postpaidEnabled() && !quota.canRead(user)) {
+  if(quota.postpaidFor(user) && !quota.canRead(user)) {
    source.close();throw new IllegalArgumentException(CloudBillingText.get("readUnavailable"));
   }
   return reserve(user,snapshotSource(user,trustedResourceId,source,maxBytes),requestId,expectedHash);
@@ -88,7 +90,8 @@ public class CloudEgressService {
  private Download reserve(Long user,Snapshot snapshot,String requestId,String expectedHash) throws IOException {
   try {
    if(expectedHash!=null && !snapshot.hash.equals(expectedHash)) throw new IllegalArgumentException(CloudBillingText.get("downloadChanged"));
-   if(!quota.postpaidEnabled() || snapshot.size==0)return new Download(snapshot,null,user,false);
+   // Accounts that have not accepted postpaid download exactly as with the switch off (never billed).
+   if(snapshot.size==0 || !quota.postpaidFor(user))return new Download(snapshot,null,user,false);
    if(requestId==null || !requestId.matches("[A-Za-z0-9_-]{16,80}"))throw new IllegalArgumentException(CloudBillingText.get("downloadUpdate"));
    String event="egress-"+user+"-"+requestId;
    tx.executeWithoutResult(s->{
@@ -117,7 +120,10 @@ public class CloudEgressService {
  public void recordDelivery(Download download,long delivered,boolean completed) {
   if(delivered<0 || delivered>download.size() || (completed && delivered!=download.size()))
    throw new IllegalArgumentException("Invalid cloud delivery receipt");
-  if(!download.billed)return;
+  if(!download.billed) {
+   if(shadow!=null) shadow.egress(download.user,download.snapshot.hash,delivered,completed);
+   return;
+  }
   tx.executeWithoutResult(s->{
    users.lockStorageOwner(download.user).orElseThrow();
    var row=receipts.findById(download.eventId).orElseThrow();

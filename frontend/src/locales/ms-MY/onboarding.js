@@ -87,6 +87,11 @@ export default {
     "privacyName": "Dasar Privasi",
     "crossBorderLabel": "Persetujuan berasingan: pindahkan kandungan yang diserahkan kepada AI ke penyedia model luar negara untuk diproses",
     "crossBorderView": "Lihat notis",
+    "consentCardTitle": "Sebelum menggunakan AI platform, sila sahkan satu persetujuan pemprosesan data",
+    "consentAccept": "Setuju dan teruskan",
+    "consentHideNotice": "Sembunyikan notis",
+    "consentFailed": "Tidak dapat disimpan. Sila cuba lagi.",
+    "consentLater": "Kemudian",
     "crossBorderNoticeTitle": "Notis pemindahan rentas sempadan",
     "crossBorderNoticeBody": "Laman China menyambung ke Alibaba Cloud Bailian melalui pelayan AI WorkDeck; laman antarabangsa menggunakan OpenRouter. Teks dan petikan fail yang dihantar kepada AI digunakan untuk inferens dan pengebilan. Bergantung pada model, pemprosesan mungkin berlaku di luar tanah besar China. Penarikan persetujuan dalam Tetapan melumpuhkan saluran AI platform.",
     "agreementRequired": "Tandakan kotak untuk menerima Terma Perkhidmatan dan Dasar Privasi bagi meneruskan",
@@ -101,7 +106,8 @@ export default {
     "switch": "Tukar",
     "cancel": "Batal",
     "switchFailed": "Gagal menukar tapak. Cuba lagi kemudian.",
-    "rescueFailed": "Masih belum dibuka kunci selepas menukar tapak. Semak kod dan cuba lagi."
+    "rescueFailed": "Masih belum dibuka kunci selepas menukar tapak. Semak kod dan cuba lagi.",
+    "proIntroBanner": "Credits permulaan percuma selepas daftar · Personal Pro ¥9.9/bln (3 bulan pertama)",
   },
   "hint": {
     "learnMore": "Ketahui Lebih Lanjut",
@@ -112,11 +118,13 @@ export default {
     "purchaseConfirmOk": "Sahkan",
     "purchaseSuccess": "Dibuka kunci",
     "purchaseFailed": "Pembelian gagal",
-    "goRecharge": "Tambah Nilai"
+    "goRecharge": "Tambah Nilai",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Dapatkan Personal Pro",
   },
   "identity": {
     "title": "Pilih Ruang Kerja Tempatan",
-    "subtitle": "Berbilang akaun sedia ada ditemui pada peranti ini. Pilih ruang kerja untuk diteruskan. Anda tidak akan ditanya lagi, dan anda boleh menukarnya kemudian dalam Tetapan → Akaun & Penggunaan.",
+    "subtitle": "Berbilang akaun sedia ada ditemui pada peranti ini. Pilih ruang kerja untuk diteruskan. Anda tidak akan ditanya lagi, dan anda boleh menukarnya kemudian dalam Tetapan → Akaun & baki.",
     "reading": "Sedang membaca akaun tempatan",
     "retry": "Cuba lagi",
     "itemMeta": "{projects} projek · {files} fail",

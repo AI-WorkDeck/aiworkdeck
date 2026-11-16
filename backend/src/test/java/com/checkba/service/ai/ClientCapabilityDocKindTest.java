@@ -76,7 +76,6 @@ class ClientCapabilityDocKindTest {
         // 列文件/打开文件/搜文件是换目标文档的唯一入口，回滚检查点是 Calc 写入即生效的安全网。
         assertTrue(caps.isToolVisible("doc_list_project_files", "conv", kind));
         assertTrue(caps.isToolVisible("doc_open_file", "conv", kind));
-        assertTrue(caps.isToolVisible("doc_search_related_docs", "conv", kind));
         assertTrue(caps.isToolVisible("doc_restore_checkpoint", "conv", kind));
     }
 

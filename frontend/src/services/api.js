@@ -410,8 +410,13 @@ async function request(options) {
             err.usage = res.data.usage || null;
             reject(err);
           } else {
-            // 业务失败：code=1 或其他非0值
-            const errorMessage = res.data.message || t('common.serviceErrorRetryLater')
+            // 业务失败：code=1 或其他非0值。包晴天积分通道的拒绝（reason=bqt_*）按界面语言换成
+            // 「去包晴天 App 处理」的提示，后端文案只有中英两种。码表与词条名同 utils/bqtBilling.js；
+            // 这里内联是因为 request() 被多处测试按源码注入依赖求值，不再引新模块
+            const bqtReason = /^bqt_(?:member_invalid|ai_closed|insufficient_points|outstanding_debt|unavailable|model_not_allowed|recharge_via_bqt)$/.test(res.data.reason || '')
+              ? res.data.reason : ''
+            const errorMessage = (bqtReason && t('agentStream.' + bqtReason.replace(/_([a-z])/g, (_, c) => c.toUpperCase())))
+              || res.data.message || t('common.serviceErrorRetryLater')
             console.error('业务错误:', {
               code: res.data.code,
               message: errorMessage,
@@ -816,6 +821,17 @@ export function setPluginEnabled(pluginId, enabled) {
   return request({
     url: `/api/plugins/${encodeURIComponent(pluginId)}/${enabled ? 'enable' : 'disable'}`,
     method: 'POST'
+  });
+}
+
+// 批准插件当前的工具定义（权限升级的工具批准前对 Agent 不可用；仅管理员）。
+// token 取自 /api/plugins/list 的 toolApprovalToken；查看期间插件又变了会被拒绝（409）。
+export function approvePluginToolChanges(pluginId, token) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/tool-approval`,
+    method: 'POST',
+    data: { token },
+    header: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -1425,6 +1441,16 @@ export function activateLicense(code) {
 
 // 当前站点与可选站点（双主站）。
 // 返回 { current, pinned, multiSite, sites: [{ id, displayName, baseUrl, accountPageUrl }] }
+// 平台 AI 跨境单独同意的就地征求（对话里的同意卡、启动时的征求框）。
+// GET → { required, site: 'cn'|'intl', noticeVersion }；POST 记同意（写法同设置页勾选）。
+export function getCrossBorderConsent() {
+  return request({ url: '/api/ai/cross-border-consent', method: 'GET' })
+}
+
+export function acceptCrossBorderConsent() {
+  return request({ url: '/api/ai/cross-border-consent', method: 'POST' })
+}
+
 export function getSiteStatus() {
   return request({
     url: '/api/site',
@@ -1800,6 +1826,20 @@ export function createAccountRecharge(amountCents) {
   }).then(unwrapEnvelope);
 }
 
+// 发起个人 Pro 订阅开通（仅国内站微信扫码；首次前 3 个月走体验价 pro_monthly_intro ¥9.90，
+// 第 4 个周期起自动回落 ¥149.00，不自动扣款）。响应形状同 createAccountRecharge，
+// 多出 skuId（pro_monthly_intro | pro_monthly）。
+export function createAccountSubscriptionOrder() {
+  return request({
+    url: '/api/account/subscription/create',
+    method: 'POST',
+    data: {},
+    header: {
+      'Content-Type': 'application/json',
+    },
+  }).then(unwrapEnvelope);
+}
+
 // 查询充值订单状态（轮询用）。已支付形如 { success: true, order: { ..., status: 'paid' } }，
 // 未付 order.status 为 pending 等，字段以官网为准。
 export function getRechargeStatus(outTradeNo) {
@@ -2061,11 +2101,11 @@ export function clientLogin(accessCode, displayName) {
   })
 }
 
-export function inviteClient(projectId, clientName) {
+export function inviteClient(projectId, clientName, shareHistory = false) {
   return request({
     url: `/api/projects/${projectId}/invite/client`,
     method: 'POST',
-    data: { clientName },
+    data: { clientName, shareHistory: shareHistory === true },
     header: { 'Content-Type': 'application/json' }
   })
 }
@@ -2442,6 +2482,34 @@ export function batchCopyFiles(projectId, fileIds, targetParentId) {
   });
 }
 
+// 右键「打印」：取可打印的 PDF 字节（Office/图片后端现转，不落新文件），返回 Blob
+export async function fetchPrintablePdf(projectId, fileId) {
+  const res = await fetch(`${getApiBaseUrl()}/api/projects/${projectId}/files/${fileId}/print-pdf`, {
+    headers: getAuthHeaders() || {},
+  })
+  if (!res.ok) {
+    let message = ''
+    try { message = (await res.json()).message || '' } catch (e) { /* 非 JSON 报错体 */ }
+    throw new Error(message || `HTTP ${res.status}`)
+  }
+  return res.blob()
+}
+
+// 右键「压缩为 ZIP」：选中的文件/文件夹打成一个 zip，存在首项所在目录
+export function compressFilesToZip(projectId, fileIds) {
+  return request({
+    url: `/api/projects/${projectId}/files/batch/zip`,
+    method: 'POST',
+    timeout: 300000,
+    data: {
+      fileIds,
+    },
+    header: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
 // 单个文件（Word/PPT/Excel/图片）转为 PDF（dev-board#1291）
 export function convertFileToPdf(projectId, fileId) {
   return request({
@@ -2660,6 +2728,12 @@ export function generateTtsAudio(payload, options = {}) {
   });
 }
 
+// 浏览器面板（Web/H5 iframe 链路）的代理票据：iframe 发不了 X-Session-Id 头、会话 id 又不能进 URL，
+// 由这次已登录请求换一张绑定用户、几分钟有效的签名票据，随 /api/browser/proxy 链接走
+export function createBrowserProxyTicket() {
+  return request({ url: '/api/browser/ticket', method: 'POST', accountPrompt: false })
+}
+
 export function createProjectFavorite(projectId, payload) {
   return request({
     url: `/api/projects/${projectId}/favorites`,
@@ -2737,19 +2811,22 @@ export function refreshDocInsightEntity(projectId, entityId) {
 }
 
 // Local writing vocabulary. Only lookupWritingSelection performs external retrieval.
+// 打开文档时的后台读写（词表、设置、学习、自动补全）不弹账户/登录框：会话失效时静默失败，
+// 由用户主动操作（改写、采用建议）时再提示（office-tier1 O8：无账户时打字途中冒出登录框）。
 export function listWritingCompletions(projectId) {
-  return request({ url: `/api/projects/${projectId}/completion`, method: 'GET' })
+  return request({ url: `/api/projects/${projectId}/completion`, method: 'GET', accountPrompt: false })
 }
 
 // Explicit semantic writing requests; merely opening a document never generates text.
 export function getSemanticWritingSettings(projectId) {
-  return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'GET' })
+  return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'GET', accountPrompt: false })
 }
 export function saveSemanticWritingSettings(projectId, data) {
   return request({ logBody: false, url: `/api/projects/${projectId}/writing/settings`, method: 'PUT', data })
 }
 export function createSemanticWritingSuggestion(projectId, data) {
-  return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions`, method: 'POST', data, timeout: 120000 })
+  return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions`, method: 'POST', data, timeout: 120000,
+    ...(data && data.mode === 'autocomplete' ? { accountPrompt: false } : {}) })
 }
 export function getSemanticWritingSuggestion(projectId, id) {
   return request({ logBody: false, url: `/api/projects/${projectId}/writing/suggestions/${encodeURIComponent(id)}`, method: 'GET' })
@@ -2764,7 +2841,7 @@ export function getWritingCompletionDetail(projectId, id) {
   return request({ url: `/api/projects/${projectId}/completion/entries/${encodeURIComponent(id)}`, method: 'GET' })
 }
 export function learnWritingCompletions(projectId, data) {
-  return request({ url: `/api/projects/${projectId}/completion/learn`, method: 'POST', data })
+  return request({ url: `/api/projects/${projectId}/completion/learn`, method: 'POST', data, accountPrompt: false })
 }
 export function deleteWritingCompletion(projectId, id) {
   return request({ url: `/api/projects/${projectId}/completion/entries/${encodeURIComponent(id)}`, method: 'DELETE' })
@@ -3109,6 +3186,15 @@ export function getUserActivityHistory(range = {}) {
     url: '/api/activity/history',
     method: 'GET',
     data
+  })
+}
+
+// 本人在某项目上的工作记录汇总（按月/类别小时数与用时最多的文件）；插件 worklog.summary 服务用
+export function getProjectWorklogSummary(projectId) {
+  return request({
+    url: '/api/activity/project-summary',
+    method: 'GET',
+    data: { projectId }
   })
 }
 
@@ -4066,6 +4152,10 @@ export function getCalendarSummary() {
 // ==================== 版本记录 ====================
 // 术语对齐 spec 第四节：对外只说「版本 / 本次工作」，不说 commit / branch。
 
+export function getVersionExitProjects() {
+  return request({ url: '/api/projects/exit-projects', method: 'GET' });
+}
+
 export function getVersionExitStatus(projectId) {
   return request({ url: `/api/projects/${projectId}/version/exit-status`, method: 'GET', timeout: 8000 });
 }
@@ -4541,9 +4631,10 @@ export function removeCloudMember(projectId, remoteUserId) {
 
 // 经案件库签发客户访问码（dev-board#1050）。回 {accessCode, expiresAt, clientUserId, clientUrl}；
 // 发给客户的链接是 `${clientUrl}#code=<码>`（utils/memberLookup.js clientPortalLink）。
-export function inviteCloudClient(projectId, clientName) {
+// shareHistory：客户在项目沟通里能否看加入之前的消息（B4），默认 false
+export function inviteCloudClient(projectId, clientName, shareHistory = false) {
   return request({ url: `/api/cloud/projects/${projectId}/invite/client`, method: 'POST',
-    data: { clientName }, header: { 'Content-Type': 'application/json' } })
+    data: { clientName, shareHistory: shareHistory === true }, header: { 'Content-Type': 'application/json' } })
 }
 
 // ==================== 记忆同步 ====================
@@ -4922,6 +5013,11 @@ export const revertHarnessEvolution = (id) => request({
 })
 
 
+// 本机「对外 MCP 服务」开关（仅单机模式；其余模式 404）。enable 响应带一次性令牌，不记日志。
+export const getLocalMcpServerStatus = () => request({ logBody: false, url: '/api/mcp-server/status' })
+export const enableLocalMcpServer = () => request({ logBody: false, url: '/api/mcp-server/enable', method: 'POST' })
+export const disableLocalMcpServer = () => request({ logBody: false, url: '/api/mcp-server/disable', method: 'POST' })
+
 // Independent user-scoped MCP connections. Credentials are write-only.
 export const getMcpConnections = () => request({ logBody: false, url: '/api/mcp/connections' })
 export const saveMcpConnection = (id, data, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/connections' + (id ? '/' + encodeURIComponent(id) : ''), method: id ? 'PUT' : 'POST', data })
@@ -4933,3 +5029,24 @@ export const previewMcpImport = (json, scopeToken) => request({ header: { 'X-MCP
 export const importMcpConnections = (json, selectedIndices, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: '/api/mcp/import', method: 'POST', data: { json, selectedIndices } })
 export const authorizeMcpConnection = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth/authorize`, method: 'POST', timeout: 75000 })
 export const disconnectMcpOAuth = (id, scopeToken) => request({ header: { 'X-MCP-Scope': scopeToken }, logBody: false, url: `/api/mcp/connections/${encodeURIComponent(id)}/oauth`, method: 'DELETE' })
+
+// ==================== 外部 Agent 待审修订（MCP propose_revision，docs/plans/agent-app-control.md C7） ====================
+export const listPendingRevisions = (params) => request({ url: '/api/revisions/pending', method: 'GET', params })
+export const acceptPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/accept`, method: 'POST' })
+export const markPendingRevisionApplied = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/applied`, method: 'POST' })
+export const recordPendingRevisionProgress = (id, appliedCount) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/progress`, method: 'POST', data: { appliedCount } })
+export const rejectPendingRevision = (id) => request({ url: `/api/revisions/pending/${encodeURIComponent(id)}/reject`, method: 'POST' })
+export const getMcpServerStatus = () => request({ url: '/api/mcp-server/status', method: 'GET' })
+
+// ---- 律所审计日志（readiness S20）----
+// 走律所云端统一入口 POST /api/lawfirm/cloud：服务端直接分发，桌面端经网关转发到官方协作服务。
+// 身份与「是否律所管理员」一律由服务端按账户名录判定；这里只传动作与筛选条件。
+export function firmCloudAction(action, params = {}) {
+  return request({
+    url: '/api/lawfirm/cloud',
+    method: 'POST',
+    data: { action, params },
+    header: { 'Content-Type': 'application/json' },
+    accountPrompt: false,
+  }).then(unwrapEnvelope)
+}

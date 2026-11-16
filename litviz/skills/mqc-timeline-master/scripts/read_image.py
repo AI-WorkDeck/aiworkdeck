@@ -52,8 +52,20 @@ import subprocess
 import sys
 
 
+def _py(script):
+    """给用户看的下一步命令：用脚本的真实路径，在哪个目录里照抄都能跑。"""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), script)
+    return f'python3 "{p}"' if " " in p else f"python3 {p}"
+
+
+RIMG = _py("read_image.py")
+
+
 def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    # poppler 的 pdftotext / pdfinfo 输出 UTF-8。不指定编码时按系统区域设置解码，
+    # 中文 Windows 上是 GBK：中文要么乱码、要么解码报错（与 V4、V5 的 ingest 同一修法）。
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=180,
+                          encoding="utf-8", errors="replace")
 
 
 def probe(path):
@@ -128,6 +140,21 @@ def check_transcript(decl, totals, total_pages):
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(__import__("sys").argv[1:]):   # 只打印用法、什么都不做（原来会把 --help 当成文件名）
+        getattr(__import__("sys").stdout, "reconfigure", lambda **k: None)(encoding="utf-8")
+        print((__doc__ or "").strip() or "用法见本模块的 SKILL.md")
+        raise SystemExit(0)
+    try:                                   # 常见输入错误（路径、JSON、编码）说人话，不甩堆栈
+        __import__("_cli_errors").install()
+    except ImportError:
+        pass
+    # Windows 中文系统的控制台默认 GBK：不固定成 UTF-8，外部 AI（按 UTF-8 读）看到的是乱码，
+    # 自检里的「↳」这类字符还会直接让程序崩溃。写法与关系图大师 make.py 一致。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(2)
@@ -147,7 +174,7 @@ if __name__ == "__main__":
                 print(f"  **页数偏多**：{r['pages']} 页读完会占掉很大一块上下文。"
                       f"要不要全部读、还是先给关键的几页，请让律师定 —— "
                       f"代码不替他挑页，挑漏了没人知道。")
-            print(f"下一步：python read_image.py rasterize {sys.argv[2]} pages/")
+            print(f"下一步：{RIMG} rasterize {sys.argv[2]} pages/")
     elif cmd == "rasterize":
         files = rasterize(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "pages")
         print(f"栅格化 {len(files)} 页到 {sys.argv[3] if len(sys.argv)>3 else 'pages'}/："
@@ -155,7 +182,7 @@ if __name__ == "__main__":
         print("下一步：逐页看图，写转写稿（每页一节、标页码），"
               "并声明每页覆盖的编号区间与材料上印的编号总数。")
     elif cmd == "check":
-        d = json.load(open(sys.argv[2], encoding="utf-8"))
+        d = json.load(open(sys.argv[2], encoding="utf-8-sig"))
         errs = check_transcript(d.get("pages_declared") or [],
                                 d.get("series_totals") or {},
                                 int(d.get("total_pages") or 0))

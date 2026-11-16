@@ -32,7 +32,7 @@ export default {
   "signIn": "로그인",
   "signInTitle": "로그인 (AI, 유료 허브 항목, 팀 케이스 라이브러리에 필요)",
   "noProjectTitle": "시작하려면 프로젝트를 여세요",
-  "noProjectHint": "왼쪽의 프로젝트에서 프로젝트를 열거나, 환영 페이지에서 새로 만드세요.",
+  "noProjectHint": "왼쪽 위의 “모든 프로젝트”을(를) 눌러 프로젝트를 선택하거나 시작 페이지에서 새로 만드세요.",
   "startupDisabledHint": "시작할 때 환영 페이지가 더 이상 열리지 않습니다.",
   "openWelcome": "환영 페이지 열기",
   "aiNeedsProject": "AI 채팅을 사용하려면 먼저 프로젝트를 여세요"

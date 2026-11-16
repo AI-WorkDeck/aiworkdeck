@@ -63,6 +63,19 @@ public final class CapabilityCatalog {
         return ToolMeta.Access.WRITE;
     }
 
+    /** 声明式插件工具（manifest tools[].access）：以声明为准，不推断；未声明或无法识别时才退回按名推断。 */
+    public static ToolMeta.Access accessOfDeclared(String toolName, String declared) {
+        if (declared != null) {
+            switch (declared.toLowerCase(Locale.ROOT)) {
+                case "read": return ToolMeta.Access.READ;
+                case "write": return ToolMeta.Access.WRITE;
+                case "destructive": return ToolMeta.Access.DESTRUCTIVE;
+                default: break;
+            }
+        }
+        return inferAccess(toolName);
+    }
+
     /** 显式声明优先；声明了文件副作用的工具至少是写入。 */
     public static ToolMeta.Access accessOf(String toolName, ToolMeta meta) {
         if (meta != null && meta.access() != ToolMeta.Access.INFERRED) return meta.access();

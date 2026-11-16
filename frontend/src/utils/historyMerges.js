@@ -42,7 +42,7 @@ export function mergeSideLabels(t, mergeContext, names = {}) {
 }
 
 /** 单元键翻成律师的话：p12 → 第 13 段（后端段落键 0 基，界面与合并比对稿面板一样按 1 基说）；t1.2.3 → 表格里的一格；s3 → 第 3 页（页键本就 1 基）；xlsx 的格原样。 */
-function unitLabel(t, key) {
+export function unitLabel(t, key) {
   const k = s(key)
   let m = /^p(\d+)$/.exec(k)
   if (m) return t('version.mergeUnitParagraph', { n: Number(m[1]) + 1 })
@@ -68,6 +68,9 @@ function decisionPhrase(t, marks, sides) {
   if (otherAccepted) return t('version.mergeDecisionKept', { side: sides.other })
   if (marks.has('MR')) return t('version.mergeDecisionRejected', { side: sides.main })
   if (marks.has('TR')) return t('version.mergeDecisionRejected', { side: sides.other })
+  // N：挨着另一侧改动、只一侧改过、已自动合入的段（请过目，不是裁决）
+  if (marks.has('MN')) return t('version.mergeDecisionNeighbor', { side: sides.main })
+  if (marks.has('TN')) return t('version.mergeDecisionNeighbor', { side: sides.other })
   return ''
 }
 
@@ -79,7 +82,7 @@ function manualItems(t, decisions, sides) {
     const key = s(d.key)
     if (!byKey.has(key)) { byKey.set(key, new Set()); order.push(key) }
     const action = s(d.action).toUpperCase()
-    byKey.get(key).add(action === 'A' || action === 'R' ? s(d.side).toUpperCase() + action : action)
+    byKey.get(key).add(action === 'A' || action === 'R' || action === 'N' ? s(d.side).toUpperCase() + action : action)
   }
   const items = []
   for (const key of order) {
@@ -112,6 +115,14 @@ export function historyMergeLines(t, entry, names = {}) {
         mainName: sides.main, otherName: sides.other,
         mainCount: Number(m.mainCount) || 0, otherCount: Number(m.otherCount) || 0,
       })
+      const neighbors = (Array.isArray(m.decisions) ? m.decisions : []).filter((d) => d && s(d.action).toUpperCase() === 'N' && d.key)
+      if (neighbors.length) {
+        const full = text + t('version.mergeNeighborsHistory', {
+          count: neighbors.length, items: neighbors.map((d) => unitLabel(t, s(d.key))).join(t('version.mergeItemSep')),
+        })
+        lines.push({ text: full, more: 0, full })
+        continue
+      }
       lines.push({ text, more: 0, full: text })
       continue
     }

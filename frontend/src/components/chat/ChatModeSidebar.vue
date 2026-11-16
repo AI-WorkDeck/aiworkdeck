@@ -91,6 +91,7 @@
             <text class="chat-sidebar-row-name" :title="file.relativePath || file.name">{{ file.name }}</text>
           </view>
           <text v-if="!regularWorkspaceFiles.length" class="chat-sidebar-empty">{{ $t('workbench.chatMode.noWorkspaceFiles') }}</text>
+          <text class="chat-sidebar-empty">{{ $t('workbench.chatMode.workspaceFilesHint') }}</text>
         </view>
 
         <view class="chat-sidebar-section cross-project-section">

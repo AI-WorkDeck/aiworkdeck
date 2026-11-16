@@ -3,6 +3,8 @@
 
 package com.checkba.service.ai;
 
+import com.checkba.service.ai.context.OfficeOutlineText;
+
 import com.checkba.config.AiContextProperties;
 import com.checkba.model.ai.AgentMode;
 import com.checkba.model.entity.ConversationSummary;
@@ -87,6 +89,8 @@ public class ContextAssemblerService {
                                    ClientCapabilityService.OfficeHost officeHost) {
         return switch (capability) {
             case NONE -> "tools-none";
+            // 网页版（W1）：同一个编辑器执行器但只有 Writer + 云端项目，片段只教白名单里的工具
+            case WEB -> "tools-web";
             case OFFICE -> switch (officeHost) {
                 case EXCEL -> "tools-office-excel";
                 case POWERPOINT -> "tools-office-ppt";
@@ -490,7 +494,10 @@ public class ContextAssemblerService {
 
         // Load Base Prompt（按语言各缓存一份，见 loadBasePrompt——原来是每轮一次 classpath 读盘；
         // 缓存的是基底原文，工具指引片段按会话能力在 spliceToolGuidance 里拼，dev-board#809/#812）
-        systemText.append(spliceToolGuidance(loadBasePrompt(english), conversationId, english, agentMode));
+        // 工具协议变体（gap P2）：按通道与模型二选一，会话内不变，所以仍属稳定段。
+        final boolean nativeProtocol = resolveNativeProtocol(modelKey);
+        systemText.append(spliceToolGuidance(ToolProtocolPrompt.select(loadBasePrompt(english), nativeProtocol),
+                conversationId, english, agentMode));
 
         // Determine current phase based on state
         String currentPhase = determinePhase(planId, taskListId);
@@ -537,7 +544,7 @@ public class ContextAssemblerService {
 1. `<thinking>` - Brief intent analysis (always required)
 2. `<title>` - Session title (complex tasks only)
 3. `<process>` - Tool invocations (if any)
-4. `<artifact>` - Only `implementation_plan` or `task_list` (if applicable)
+4. `<artifact>` - Only `type="implementation_plan"` or `type="task_list"` (if applicable)
 5. `<final>` - **MAIN ANSWER** (REQUIRED for all non-chitchat responses)
    - EXCEPTION: when the turn ends with `<question>` or an `ask_user` call, `<final>` is
      NOT required and you SHOULD omit it. Do NOT invent an answer just to satisfy this rule - you are asking
@@ -559,14 +566,16 @@ public class ContextAssemblerService {
 - When you receive `TOOL_RESULT`, you MUST continue execution. Do NOT ask "should I continue?".
 - Do NOT output `<final>` in the same turn as `<tool_code>`.
 """;
-        systemText.append(enforcement);
+        systemText.append(nativeProtocol ? ToolProtocolPrompt.nativeText(enforcement) : enforcement);
 
         // [Injection] Mode-Specific Constraints (CRITICAL)
-        systemText.append(english ? getModeConstraintsEn(agentMode) : getModeConstraints(agentMode));
+        String modeConstraints = english ? getModeConstraintsEn(agentMode) : getModeConstraints(agentMode);
+        systemText.append(nativeProtocol ? ToolProtocolPrompt.nativeText(modeConstraints) : modeConstraints);
 
         // [Injection] 工具渐进披露的硬规则（dev-board#810；活跃文档类目裁剪生效时同样注入，#1064）。
         // 两个开关都不适用时是空串。
-        systemText.append(toolDisclosureRule(english, activeContext, agentMode));
+        String disclosureRule = toolDisclosureRule(english, activeContext, agentMode);
+        systemText.append(nativeProtocol ? ToolProtocolPrompt.nativeText(disclosureRule) : disclosureRule);
 
         // [Injection] Skill（Phase 3B，规范见 docs/SKILL_SPEC.md）：
         // 把本轮生效的每个 skill 的 prompt 模板注入系统消息。
@@ -630,7 +639,7 @@ public class ContextAssemblerService {
                 break;
             case "EXECUTE":
                 volatileText.append("- You are in EXECUTION phase. The plan has been approved.\n");
-                volatileText.append("- Output `task_list` first (optional), then execute tools.\n");
+                volatileText.append("- Output `<artifact type=\"task_list\">` first (optional), then execute tools.\n");
                 volatileText.append("- After completion, output `<final>` with main answer.\n");
                 break;
             case "CHAT":
@@ -944,7 +953,7 @@ public class ContextAssemblerService {
                         }
                         case "text" -> {
                             systemText.append("这是一份纯文本文件（txt/md），在轻量文本编辑器中打开，没有修订机制。" +
-                                    "读取用 extract_file_text，修改用 text_write_file（整篇覆盖）或 " +
+                                    "读取用 extract_file_text，修改用 write_file(mode=overwrite)（整篇覆盖）或 " +
                                     "text_find_replace（字面量查找替换），改动直接生效、自动进入版本记录并同步刷新" +
                                     "用户打开的文本标签——**无需也不要**对它调用 doc_* / sheet_* / slide_* 工具。\n\n");
                         }
@@ -1093,38 +1102,42 @@ public class ContextAssemblerService {
         if (clientCapabilityService.capabilityOf(conversationId) != ClientCapabilityService.Capability.OFFICE) {
             if (english) {
                 systemText.append("**When organising, archiving or re-filing SEVERAL project files, you MUST submit them in one ");
-                systemText.append("`move_files_batch` call (up to 50 entries per batch); do NOT call ");
-                systemText.append("`move_project_file` / `create_folder` once per file.** ");
+                systemText.append("call to the batch move tool (files category, up to 50 entries per batch); do NOT call ");
+                systemText.append("the move or create-folder tool once per file.** ");
                 systemText.append("One item per round adds avoidable model round trips, leaving the user waiting ");
                 systemText.append("with the tidy-up unfinished. ");
-                systemText.append("Missing destination folders are created automatically, so you do not need `create_folder` first. ");
+                systemText.append("Missing destination folders are created automatically, so you do not need to create folders first. ");
                 systemText.append("Retry only the entries the report lists under FAILED - never resend the whole batch. ");
-                systemText.append("A single file goes through `move_files_batch` too (one entry). ");
+                systemText.append("A single file goes through the batch move tool too (one entry). ");
                 systemText.append("For \"organize this folder\", work inside the specified folder and preserve that folder itself: ");
                 systemText.append("create groups beneath it. Confirming a grouping method does not authorize moving outside it or deleting it, even after it becomes empty. ");
                 systemText.append("Only an explicit user instruction to move outside, flatten into a named parent or delete the specified folder changes this boundary; follow that instruction within its scope. ");
-                systemText.append("For `move_files_batch`, source and destination must both be project-relative paths; an attached folder's listing may instead be folder-relative. ");
-                systemText.append("Resolve the folder ID to its full project path with `list_project_folders` before moving; retain its prefix on both sides for internal organization. ");
-                systemText.append("Intermediate or temporary files you no longer need go to the recycle bin with `move_to_trash` ");
+                systemText.append("For batch moves, source and destination must both be project-relative paths; an attached folder's listing may instead be folder-relative. ");
+                systemText.append("Resolve the folder ID to its full project path with the project file inventory tool in folders-only mode (`foldersOnly=true`) before moving; retain its prefix on both sides for internal organization. ");
+                systemText.append("Intermediate or temporary files you no longer need go to the recycle bin with the recycle-bin tool ");
                 systemText.append("(recoverable by the user); never create a \"to delete\" folder as a workaround. ");
                 systemText.append("More generally: tool calls that do not depend on each other's results belong in the SAME turn ");
-                systemText.append("(emit several `<tool_code>` blocks back to back); one call per turn burns the step budget.\n\n");
+                systemText.append(nativeProtocol
+                        ? "(issue several tool calls in one response); one call per turn burns the step budget.\n\n"
+                        : "(emit several `<tool_code>` blocks back to back); one call per turn burns the step budget.\n\n");
             } else {
-                systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用 `move_files_batch` 一次提交一批");
-                systemText.append("（每批最多 50 条），不要逐个调用 `move_project_file` / `create_folder`。** ");
+                systemText.append("**整理文件夹、归档、把多份文件按类别归类时，必须用批量移动工具（files 类目）一次提交一批");
+                systemText.append("（每批最多 50 条），不要逐个调用移动或建文件夹工具。** ");
                 systemText.append("逐个调用会增加模型往返，避免让用户长时间等在中途，");
                 systemText.append("用户看到的是「文件整理了一半停住了」。");
-                systemText.append("缺失的目标文件夹会自动补建，不需要先调 `create_folder`。");
+                systemText.append("缺失的目标文件夹会自动补建，不需要先建文件夹。");
                 systemText.append("返回值里 FAILED 段列出的条目单独重试，**绝不要整批重发**——已成功的会被搬第二遍。");
-                systemText.append("只移动一份文件也用 `move_files_batch`（传一条）。");
+                systemText.append("只移动一份文件也用批量移动工具（传一条）。");
                 systemText.append("用户说「整理这个文件夹」时，默认在指定目录内部整理并保留该目录本身，分类目录建在它下面。");
                 systemText.append("确认归类方式不等于授权移出或删除该目录，即使整理后它已空也不例外。");
                 systemText.append("只有用户明确要求移出、扁平化到指定父级或删除指定目录时，才按指示改变该边界，并遵守指示范围。");
-                systemText.append("`move_files_batch` 的 source 和 destination 均须使用项目相对路径；附件目录清单可能是相对附件目录的路径。");
-                systemText.append("移动前用 `list_project_folders` 按目录 ID 核对其完整项目路径；内部整理时两端都保留该目录前缀。");
-                systemText.append("不再需要的中间文件、临时文件用 `move_to_trash` 移入回收站（用户可恢复），不要另建「待删除」文件夹绕行。");
+                systemText.append("批量移动的 source 和 destination 均须使用项目相对路径；附件目录清单可能是相对附件目录的路径。");
+                systemText.append("移动前用项目文件清单工具的文件夹模式（`foldersOnly=true`）按目录 ID 核对其完整项目路径；内部整理时两端都保留该目录前缀。");
+                systemText.append("不再需要的中间文件、临时文件用回收站工具移入回收站（用户可恢复），不要另建「待删除」文件夹绕行。");
                 systemText.append("同理，彼此之间不需要看对方结果的工具调用要放在同一轮里并行发出");
-                systemText.append("（连续输出多个 `<tool_code>` 块），一轮一个地挤牙膏会白白烧掉步数预算。\n\n");
+                systemText.append(nativeProtocol
+                        ? "（在同一次响应里发出多个工具调用），一轮一个地挤牙膏会白白烧掉步数预算。\n\n"
+                        : "（连续输出多个 `<tool_code>` 块），一轮一个地挤牙膏会白白烧掉步数预算。\n\n");
             }
         }
 
@@ -1411,6 +1424,16 @@ public class ContextAssemblerService {
      * 模型：非白名单会被回落成默认模型、显式本地档会忽略云端模型，两条都只 warn 一行日志。
      * 按请求里那个 id 判，就会把 image 内容块发给一个读不了图的模型，换来一个英文 400。
      */
+    /** 本轮是否用原生工具协议的提示变体；判不出来就留在改造前的 XML 变体。 */
+    private boolean resolveNativeProtocol(String modelKey) {
+        try {
+            return chatModelFactory != null && chatModelFactory.nativeToolProtocol(modelKey);
+        } catch (Exception e) {
+            log.warn("[Protocol] Capability probe failed for model '{}', keeping the XML prompt variant", modelKey, e);
+            return false;
+        }
+    }
+
     private boolean resolveVisionCapable(String modelKey) {
         try {
             return chatModelFactory.effectiveModelSupportsVision(modelKey);
@@ -1993,7 +2016,7 @@ public class ContextAssemblerService {
                 case "text" -> "\n\n[系统提醒] 用户此刻打开的是纯文本文件" + docLabel + "（id="
                         + activeContext.getId() + "），其内容见 system prompt 的 <active_document>。"
                         + "用户未指明别的文件时，「这个」「当前文件」「改一下」等都指它——"
-                        + "读取用 extract_file_text，修改用 text_write_file / text_find_replace"
+                        + "读取用 extract_file_text，修改用 write_file(mode=overwrite) / text_find_replace"
                         + "（写入直接生效并进入版本记录），**禁止**对它调用 doc_* / sheet_* / slide_* 工具。";
                 default -> "\n\n[系统提醒] 编辑器中当前已打开文档" + docLabel + "（id="
                         + activeContext.getId() + "），其正文见 system prompt 的 <active_document>。"
@@ -2184,7 +2207,21 @@ public class ContextAssemblerService {
             }
             return cached;
         }
-        return legalTools.read_document(activeContext.getId());
+        String text = legalTools.read_document(activeContext.getId());
+        // xlsx / pptx：权限与抽取都过了之后换成带行号列标 / 页码的版本（office-tier1）；任何失败都退回纯文本
+        if (projectFileService != null && OfficeOutlineText.supports(activeContext.getName())
+                && text != null && !text.startsWith("Error") && !text.startsWith("Warning")) {
+            try {
+                String outline = OfficeOutlineText.of(activeContext.getName(),
+                        projectFileService.getFileBytes(Long.parseLong(activeContext.getId())));
+                return com.checkba.service.ai.tools.ToolFileGuard.capToolText(activeContext.getName(),
+                        Long.parseLong(activeContext.getId()), outline);
+            } catch (Exception e) {
+                log.warn("[Context] office outline failed for {}, falling back to plain text: {}",
+                        activeContext.getName(), e.toString());
+            }
+        }
+        return text;
     }
 
     // Chinese and other non-ASCII text can consume substantially more than chars/2.
@@ -2427,7 +2464,7 @@ public class ContextAssemblerService {
    动作词没说标准（「清理」「整理」「优化一下」「规范一下」）、或者一个动作会大范围
    删改文档而用户没有明确授权这个范围——可先只读了解相关材料，改动前先调 `ask_user` 给 2-4 个具体选项，回答后才改动。
    指令明确（说清了改哪里、怎么改，如「把第 12 到 21 段删掉」）就直接执行，不要反问。
-2. **智能规划**: 对于复杂任务可以生成 `task_list`（但不会停止等待确认）
+2. **智能规划**: 对于复杂任务可以生成 `<artifact type="task_list">`（但不会停止等待确认）
 3. **工具使用**: 可以使用所有可用工具（搜索、读写文件、法律研究等）
 4. **正常流程**: 按照标准的 [Thought -> Action -> Observation] 循环执行
 """;
@@ -2472,7 +2509,7 @@ public class ContextAssemblerService {
 1. `<thinking>` - Brief intent analysis (always required)
 2. `<title>` - Session title (complex tasks only)
 3. `<process>` - Tool invocations (if any)
-4. `<artifact>` - Only `implementation_plan` or `task_list` (if applicable)
+4. `<artifact>` - Only `type="implementation_plan"` or `type="task_list"` (if applicable)
 5. `<final>` - **MAIN ANSWER** (REQUIRED for all non-chitchat responses)
    - EXCEPTION: when the turn ends with `<question>` or an `ask_user` call, `<final>` is
      NOT required and you SHOULD omit it. Do NOT invent an answer just to satisfy this rule - you are asking
@@ -2592,7 +2629,7 @@ You are in Agent mode, the default full-capability mode:
    without the user explicitly authorising that scope - call `ask_user` with 2-4 concrete
    options before editing; read-only discovery of relevant materials may precede the question. When the instruction is specific (it says what to change and how,
    e.g. "delete paragraphs 12 to 21"), just do it - do not ask back.
-2. **Smart planning**: for complex tasks you may produce a `task_list` (which does NOT stop and wait for confirmation)
+2. **Smart planning**: for complex tasks you may produce an `<artifact type="task_list">` (which does NOT stop and wait for confirmation)
 3. **Tool use**: all available tools may be used (search, file read/write, legal research, etc.)
 4. **Normal flow**: follow the standard [Thought -> Action -> Observation] loop
 """;
@@ -2630,7 +2667,7 @@ This is a spreadsheet. Read and modify it exclusively with the sheet_* tools (sh
 """;
 
     private static final String EN_GUIDE_LOWA_TEXT = """
-This is a plain-text file (txt/md), open in the lightweight text editor; it has no track-changes mechanism. Read it with extract_file_text; modify it with text_write_file (whole-file overwrite) or text_find_replace (literal find and replace). Changes take effect immediately, enter the version history automatically, and refresh the user's open text tab. You need NOT - and must NOT - call doc_* / sheet_* / slide_* tools on it.
+This is a plain-text file (txt/md), open in the lightweight text editor; it has no track-changes mechanism. Read it with extract_file_text; modify it with write_file(mode=overwrite) (whole-file overwrite) or text_find_replace (literal find and replace). Changes take effect immediately, enter the version history automatically, and refresh the user's open text tab. You need NOT - and must NOT - call doc_* / sheet_* / slide_* tools on it.
 
 """;
 
@@ -2782,7 +2819,7 @@ All doc_* editing and reading tools act directly on this document. You need NOT 
                         + " (id=" + activeContext.getId() + ") open; its content is in the system prompt's "
                         + "<active_document>. Unless the user names another file, \"this\", \"the current file\", "
                         + "\"change it\", and the like refer to it - read it with extract_file_text and modify it with "
-                        + "text_write_file / text_find_replace (writes take effect immediately and enter the version "
+                        + "write_file(mode=overwrite) / text_find_replace (writes take effect immediately and enter the version "
                         + "history). Calling doc_* / sheet_* / slide_* tools on it is **FORBIDDEN**.";
                 default -> "\n\n[System reminder] The editor currently has the document " + docLabel
                         + " (id=" + activeContext.getId() + ") open; its body text is in the system prompt's "

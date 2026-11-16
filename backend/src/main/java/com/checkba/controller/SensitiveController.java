@@ -70,7 +70,11 @@ public class SensitiveController {
     }
 
     private ResponseEntity<?> execute(Request request, String sessionId, String action) {
-        Long userId = AuthController.getUserIdFromSession(sessionId);
+        return executeAs(request, AuthController.getUserIdFromSession(sessionId), action);
+    }
+
+    /** 与 HTTP 端点同一条路径（含读/写权限闸），供宿主服务表（HostServiceRegistry）以已鉴权的用户身份调用。 */
+    public ResponseEntity<?> executeAs(Request request, Long userId, String action) {
         if (userId == null) return response(401, Map.of("error", "Unauthorized"));
         if (request.fileId() == null) return response(400, Map.of("error", "fileId is required"));
         try {

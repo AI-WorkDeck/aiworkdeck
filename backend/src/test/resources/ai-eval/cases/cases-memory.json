@@ -62,26 +62,167 @@
   },
   {
     "id": "memory-user-profile-noarg-xml",
-    "title": "无参工具调用 get_user_profile（XML 协议；该工具已不下发，验的是兼容入口仍能执行）",
+    "title": "无参工具调用 memory_list()（XML 协议；验的是无参 XML 调用仍能执行）",
     "category": "memory",
     "protocol": "xml",
     "userInput": "按我平时的习惯格式，整理一份会议纪要模板的要点",
     "turns": [
       {
-        "text": "<process name=\"读取用户偏好\"><tool_code>get_user_profile()</tool_code></process>"
+        "text": "<process name=\"列出记忆文件\"><tool_code>memory_list()</tool_code></process>"
       },
       {
         "text": "<final>根据您的偏好（要点式、先结论后论证），会议纪要模板建议包含：会议要素、结论清单、分歧与待办、责任人与期限。</final>"
       }
     ],
     "toolStubs": {
-      "get_user_profile": "用户偏好：要点式表达；先结论后论证；文书默认宋体小四。"
+      "memory_list": "user 记忆文件：偏好.md（要点式表达；先结论后论证；文书默认宋体小四）。"
     },
     "expect": {
       "toolCalls": [
-        { "name": "get_user_profile" }
+        { "name": "memory_list" }
       ],
       "structureContains": ["<process", "<final>"],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-no-tool-nudged-native",
+    "title": "「记住」但模型只口头答已记录：补救一轮后调 save_memory（原生）",
+    "category": "memory",
+    "protocol": "native",
+    "userInput": "记住：客户偏好周五开会",
+    "turns": [
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      },
+      {
+        "toolCalls": [
+          {
+            "name": "save_memory",
+            "arguments": {
+              "type": "preference",
+              "key": "客户开会偏好",
+              "value": "客户偏好周五开会",
+              "isProtected": false
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      }
+    ],
+    "toolStubs": {
+      "save_memory": "✓ 记忆已保存\n- 层级: L3\n- 类型: preference"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "save_memory",
+          "argsContain": {
+            "key": "客户开会偏好"
+          }
+        }
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-no-tool-nudged-xml",
+    "title": "「记住」但模型只口头答已记录：补救一轮后调 save_memory（XML）",
+    "category": "memory",
+    "protocol": "xml",
+    "userInput": "请记下客户偏好周五开会",
+    "turns": [
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      },
+      {
+        "text": "<process name=\"保存记忆\"><tool_code>save_memory(type=\"preference\", key=\"客户开会偏好\", value=\"客户偏好周五开会\", isProtected=false)</tool_code></process>"
+      },
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      }
+    ],
+    "toolStubs": {
+      "save_memory": "✓ 记忆已保存\n- 层级: L3\n- 类型: preference"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "save_memory",
+          "argsContain": {
+            "key": "客户开会偏好"
+          }
+        }
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-tool-first-no-nudge",
+    "title": "「记住」且模型先调 save_memory：不注入补救",
+    "category": "memory",
+    "protocol": "native",
+    "userInput": "记住：客户偏好周五开会",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "save_memory",
+            "arguments": {
+              "type": "preference",
+              "key": "客户开会偏好",
+              "value": "客户偏好周五开会",
+              "isProtected": false
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已记录：客户偏好周五开会。</final>"
+      }
+    ],
+    "toolStubs": {
+      "save_memory": "✓ 记忆已保存\n- 层级: L3\n- 类型: preference"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "save_memory",
+          "argsContain": {
+            "key": "客户开会偏好"
+          }
+        }
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "remember-absent-no-nudge",
+    "title": "无「记住」措辞：直接收尾不注入补救",
+    "category": "memory",
+    "protocol": "native",
+    "userInput": "客户一般周几开会比较合适？",
+    "turns": [
+      {
+        "text": "<final>这个需要结合客户日程，建议先问对方助理。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [],
+      "structureContains": [
+        "<final>"
+      ],
       "bubbleEndStatus": "finished"
     }
   }

@@ -8,7 +8,7 @@ import {
   deleteConversation as apiDeleteConversation, renameConversation as apiRenameConversation,
   uploadRelayDocument
 } from './api.js'
-import { createSseConnection, createTagStreamParser } from './sse.js'
+import { createSseConnection, createTagStreamParser, restoreLostTagOpener } from './sse.js'
 import {
   readActiveDocument, readDocumentMeta, detectHost, hashContent,
   executeCommand, hostFamily, documentIdentity
@@ -149,6 +149,12 @@ export const input = ref('')
 export const streaming = ref(false)
 export const reconnecting = ref(false)
 /**
+ * 已点停止、还在等后端的 cancelled 事件（与桌面端 useAgentStream.abort 同口径）。
+ * 停止期间不拆 SSE：拆了 cancelled 就永远到不了，「到底停没停」窗格永远不知道。
+ * 兜底计时器到点仍没收到才本地收尾并如实说「未收到确认」。
+ */
+export const stopping = ref(false)
+/**
  * 模型正在 <tool_code> 里生成工具参数（如整篇要写入文档的内容）：这段可长达
  * 一两分钟且不产生任何可见正文，此前是渲染盲区——界面据此显示「正在准备文档内容」，
  * 别让盲区伪装成卡死。由流式解析器的 onToolPrep 进出回调驱动。
@@ -162,6 +168,8 @@ export const toolPrep = ref(false)
 export const passProgress = ref(null)
 /** 错误类提示（红） */
 export const banner = ref('')
+/** 上一次发送失败（消息已放回输入框）：界面据此在横幅旁给「重试」按钮，下一次发送开始时清零 */
+export const sendFailed = ref(false)
 /** 中性提示（灰），如「上一次的任务仍在进行中」 */
 export const notice = ref('')
 export const includeDocument = ref(true)
@@ -402,6 +410,7 @@ export async function activateSession({ settings, projectId }) {
   currentAssistant = null
   parser = null
   streaming.value = false
+  clearStopping()
   toolPrep.value = false
   passProgress.value = null
   clearReconnectNotice()
@@ -885,7 +894,7 @@ function toLocalMessage(row) {
     onQuestion: (q) => { question = questionFromParsed(q) },
     onArtifact: (c) => { artifact = artifact ? artifact + '\n\n' + c : c }
   })
-  p.feed(content)
+  p.feed(restoreLostTagOpener(content))
   p.flush()
   text = text.replace(/\s+$/, '')
   return reactive({ role: 'assistant', text, thinking, streaming: false, error: '', tools: [], question, artifact })
@@ -904,6 +913,7 @@ function historyToMessages(history) {
 function finishStreaming() {
   if (currentAssistant) currentAssistant.streaming = false
   streaming.value = false
+  clearStopping()
   toolPrep.value = false
   passProgress.value = null
   notice.value = ''
@@ -1236,7 +1246,7 @@ function handleEvent(evt, dataStr) {
       reason = String(d.reason || '')
     } catch (e) { /* 无 status 按普通收尾 */ }
     const lower = status.toLowerCase()
-    // 后端的 bubble_end 有五种 status：finished / paused(max_depth|max_tokens) /
+    // 后端的 bubble_end 有五种 status：finished / paused(max_depth|max_tokens|no_progress|user_pause) /
     // awaiting_approval / awaiting_input / 无（空信封）。
     // **只有 finished 与空信封算"写完了"**——paused 是编排器撞上步数或长度预算主动停机，
     // awaiting_* 是球在用户这边。此前它们统统被渲染成「已完成 · N 秒」，
@@ -1245,8 +1255,12 @@ function handleEvent(evt, dataStr) {
     const ballWithUser = lower === 'awaiting_input' || lower === 'awaiting_approval'
     const finished = currentAssistant
     finishStreaming()
+    // 只有正常收尾后端才会自动接续待处理的插话；其余收尾队列暂停，如实告诉用户
+    if (stoppedEarly || ballWithUser) holdPendingSteers()
     if (stoppedEarly && finished) {
-      finished.notice = reason === 'max_tokens' ? t('pausedMaxTokens') : t('pausedMaxDepth')
+      // user_pause：桌面端用户点了「暂停」（任务窗格没有暂停键，但同一会话会镜像过来）
+      finished.notice = reason === 'max_tokens' ? t('pausedMaxTokens')
+        : reason === 'user_pause' ? t('pausedByUser') : t('pausedMaxDepth')
     }
     if (ballWithUser && lower === 'awaiting_approval') notice.value = t('awaitingConfirmation')
     // 显式完成态（dev-board#147）：光标消失太隐晦，「写完了没」要有明示。
@@ -1269,12 +1283,20 @@ function handleEvent(evt, dataStr) {
     if (lower === 'awaiting_input') notice.value = t('awaitingAnswer')
   } else if (evt === 'error') {
     let msg = t('executionError')
-    try { msg = JSON.parse(dataStr).message || msg } catch (e) { /* ignore */ }
+    let reason = ''
+    try {
+      const parsed = JSON.parse(dataStr)
+      if (parsed && parsed.message) msg = parsed.message
+      if (parsed && parsed.reason) reason = String(parsed.reason)
+    } catch (e) { /* ignore */ }
     if (currentAssistant) {
-      // 配额耗尽（后端 LlmErrorClassifier.QUOTA_EXHAUSTED_MARKER）：载荷是上游英文原文，
-      // 原样拼给用户等于没有信息。换成引导文案并打标记，界面据此追加充值入口（dev-board#198）
+      // 配额耗尽（后端 LlmErrorClassifier.QUOTA_EXHAUSTED_MARKER 或网关 no_credits）：
+      // 载荷若是上游英文原文则换成引导文案，并打 quota 标记让界面展示充值 / Pro 升级入口。
       if (msg.includes('AI_QUOTA_EXHAUSTED')) {
         currentAssistant.error = t('quotaExhaustedNotice')
+        currentAssistant.errorKind = 'quota'
+      } else if (reason === 'no_credits' || reason === 'insufficient_credits') {
+        currentAssistant.error = msg || t('quotaExhaustedNotice')
         currentAssistant.errorKind = 'quota'
       } else {
         currentAssistant.error = msg
@@ -1282,9 +1304,16 @@ function handleEvent(evt, dataStr) {
     }
     disableDocDedup()
     finishStreaming()
+    holdPendingSteers()
   } else if (evt === 'cancelled') {
+    const requestedStop = stopping.value
     if (currentAssistant && !currentAssistant.text) currentAssistant.text = t('stoppedPlaceholder')
     finishStreaming()
+    holdPendingSteers()
+    // 停止确认到了，才按原来的生命周期关连接（下一条消息由 preconnect 兜底重连）
+    if (requestedStop) closeConnection()
+  } else if (evt === 'input_applied') {
+    handleInputApplied(dataStr)
   } else if (evt === 'pass_progress') {
     handlePassProgress(dataStr)
   } else if (evt === 'ask_user') {
@@ -1352,6 +1381,7 @@ function handleRunState(dataStr) {
     const finished = currentAssistant
     finishStreaming()
     // 断线期间漏掉了 bubble_end：解锁之后把「等用户」这一档的提示补回来
+    if (name !== 'COMPLETED' && name !== 'FINISHED') holdPendingSteers()
     if (awaitingUser) {
       notice.value = awaitingHint
     } else if (name === 'COMPLETED' || name === 'FINISHED') {
@@ -1627,6 +1657,187 @@ function buildActiveContext(doc, hash) {
 }
 
 /**
+ * POST /api/agent/chat 的请求体。正常发送与插话（submissionMode='steer'）共用一份：
+ * 插话会被 AgentInbox 原样持久化，并在安全边界拿它的 activeContext/附件重新组装上下文，
+ * 所以字段必须与正常发送完全一致，只多一个 submissionMode。
+ */
+function buildChatPayload({ clientRequestId, projectId, prompt, displayText, submissionMode }, context) {
+  return {
+    clientRequestId,
+    ...(submissionMode ? { submissionMode } : {}),
+    projectId: parseInt(projectId, 10),
+    conversationId,
+    message: prompt,
+    // 契约 D：用户看的那一句（ask_user 的回答只显示所选各项）。空值不上送，同值等于不传
+    ...(displayText && displayText !== prompt ? { displayText } : {}),
+    mode: 'AGENT',
+    activeContext: context,
+    // 按次指定模型与手选 skill（后端 AgentChatRequest 原生字段；空值不上送走默认）
+    ...(selectedModel.value ? { model: selectedModel.value } : {}),
+    ...(selectedSkillIds.value.length ? { skillIds: [...selectedSkillIds.value] } : {}),
+    // 附加的项目文件：contextItems 是后端既有字段，按 fileId 由服务端读内容
+    ...(attachedFiles.value.length ? {
+      contextItems: attachedFiles.value.map((f) => ({ id: String(f.id), name: f.name, fileType: f.fileType || '' }))
+    } : {}),
+    // 声明客户端能力（Phase C）：后端据此让本会话只见 office_* 工具、隐藏 doc_*；
+    // officeHost 再按宿主细分（word/excel/powerpoint），点名对应工具面；
+    // officeFamily（dev-board#298）只用于对话镜像的来源标注（Word 插件 vs WPS 文字），
+    // 不参与工具过滤，旧后端不认识该字段也无害
+    clientCapability: 'office',
+    officeHost: detectHost() || 'word',
+    officeFamily: hostFamily() === 'wps' ? 'wps' : 'office',
+    // 本轮界面语言（dev-board#713）：后端据它选中/英文 system prompt，回答语言跟随界面。
+    // 必须随请求体走而不是只靠 X-App-Language 头——编排循环跑在池线程上，
+    // HTTP 线程上的语言作用域不跟着过去，而且请求体会被 AgentInbox 持久化，
+    // 排队/续跑的那一轮照样说对语言。旧后端不认识该字段，无害。
+    appLanguage: getLangTag()
+  }
+}
+
+// ==================== 插话（运行中发送）与停止 ====================
+
+/**
+ * 运行中发送 = 插话（与桌面端 useAgentStream 同一条线：POST /chat 带 submissionMode='steer'，
+ * 后端 AgentInboxService 记成 pending，编排器在下一个安全边界读入，读入时推 input_applied）。
+ * 用户气泡先以「尚未读取」挂出来，回执/事件到了再落成「已送达」。
+ *
+ * 气泡上的 receipt 只有四种值，不另起状态机：
+ *   pending —— 后端收下了，还没被读入；
+ *   applied —— 已读入（回执直接是 applied，或收到 input_applied）；
+ *   held    —— 这一轮以停止/出错/待回答/暂停收尾，后端队列按设计暂停，
+ *              它会在用户下一条消息开跑后的第一个安全边界被读入；
+ *   failed  —— POST 本身失败，没进收件箱。
+ */
+async function steerRunningTurn(prompt, fromInput) {
+  if (documentChangedDuringTurn || rejectChangedDocument()) {
+    banner.value = t('fileOperationStale')
+    return { needSettings: false }
+  }
+  const settings = ctx.settings
+  const projectId = ctx.projectId
+  const gen = generation
+  if (fromInput) input.value = ''
+  const clientRequestId = randomId()
+  const bubble = reactive({ role: 'user', text: prompt, steer: true, receipt: 'pending', inboxId: '', clientRequestId })
+  messages.value.push(bubble)
+  bumpScroll()
+  try {
+    // 插话也带当前文档：后端在安全边界按这条请求重新组装上下文，文档没变时省传规则照旧
+    let read = null
+    if (includeDocument.value) {
+      const doc = await readActiveDocument()
+      read = doc ? { doc, hash: await hashContent(doc.inlineContent) } : null
+    }
+    const context = read ? buildActiveContext(read.doc, read.hash) : readDocumentMeta()
+    const fields = { clientRequestId, projectId, prompt, submissionMode: 'steer' }
+    let receipt
+    try {
+      receipt = await postChat(settings, buildChatPayload(fields, context))
+    } catch (e) {
+      if (!(e.status === 409 && e.code === 'INLINE_CONTENT_CACHE_MISS' && e.retryWithInlineContent && read)) throw e
+      receipt = await postChat(settings, buildChatPayload(fields, { ...read.doc, inlineContentHash: read.hash }))
+    }
+    if (gen !== generation) return { needSettings: false }
+    if (receipt && receipt.messageId) bubble.inboxId = String(receipt.messageId)
+    if (receipt && receipt.state === 'applied') {
+      // 赶上了轮次刚好收尾：后端直接用它起了新的一轮（这条 POST 不会再收到 input_applied）
+      beginSteeredSegment(bubble)
+    } else if (!streaming.value && queuePaused && bubble.receipt === 'pending') {
+      bubble.receipt = 'held'
+    }
+  } catch (e) {
+    if (gen !== generation) return { needSettings: false }
+    bubble.receipt = 'failed'
+    banner.value = sendErrorText(e)
+  }
+  return { needSettings: false }
+}
+
+/**
+ * 插话被读入：上一段助手回复到此为止，这条用户消息挪到当前末尾，后续正文另起一个气泡
+ * （后端在同一刻把上一段落库、另起助手段，历史回灌时顺序与此一致）。
+ * 切段前必须先 flush 解析器——缓冲里那截无标签正文否则会随解析器一起丢掉。
+ */
+function beginSteeredSegment(userBubble) {
+  if (userBubble.receipt === 'applied') return
+  userBubble.receipt = 'applied'
+  if (parser) parser.flush()
+  const prev = currentAssistant
+  const list = messages.value
+  if (prev) {
+    if (prev.text) prev.text = prev.text.replace(/\s+$/, '')
+    prev.streaming = false
+    // 一个字都没出就被插话接走的那段，留着就是一个空白气泡
+    if (!hasVisibleContent(prev) && !prev.thinking && !(prev.tools && prev.tools.length)) {
+      const at = list.indexOf(prev)
+      if (at >= 0) list.splice(at, 1)
+    }
+  }
+  const at = list.indexOf(userBubble)
+  if (at >= 0) list.splice(at, 1)
+  list.push(userBubble)
+  currentAssistant = null
+  parser = null
+  toolPrep.value = false
+  // 自动接续时上一轮已收尾解锁过，这里重新进入「在跑」
+  streaming.value = true
+  queuePaused = false
+  notice.value = ''
+  bumpScroll()
+}
+
+function handleInputApplied(dataStr) {
+  let d = null
+  try { d = JSON.parse(dataStr) } catch (e) { return }
+  if (!d) return
+  const id = d.messageId ? String(d.messageId) : ''
+  const bubble = messages.value.find((m) => m.role === 'user' && m.steer
+    && ((id && m.inboxId === id) || (d.clientRequestId && m.clientRequestId === d.clientRequestId)))
+  if (bubble) {
+    if (id) bubble.inboxId = id
+    beginSteeredSegment(bubble)
+    return
+  }
+  // 不是本窗格发的（窗格重建后本地没有这条）：只在确有轮次在跑时切段，
+  // 空闲时收到的多半是重放，切段会把界面错误地置回「在跑」
+  if (!streaming.value) return
+  if (parser) parser.flush()
+  if (currentAssistant) currentAssistant.streaming = false
+  currentAssistant = null
+  parser = null
+}
+
+/** 本轮以非正常收尾结束：还没读入的插话不会自动送达，改口为「随下一条消息送达」 */
+function holdPendingSteers() {
+  queuePaused = true
+  for (const m of messages.value) {
+    if (m.role === 'user' && m.steer && m.receipt === 'pending') m.receipt = 'held'
+  }
+}
+
+/** 上一轮是否以「队列暂停」的方式收尾（停止/出错/待回答/暂停）；正常收尾或新一轮开跑时清零 */
+let queuePaused = false
+
+/**
+ * 停止后等 cancelled 的兜底时限，与桌面端 STOP_CONFIRM_TIMEOUT_MS 同值：
+ * 正常情况取消在 2 秒内回来，这一档只给「SSE 恰好也死了」用。
+ */
+const STOP_CONFIRM_TIMEOUT_MS = 15000
+let stopConfirmTimer = null
+
+function clearStopping() {
+  stopping.value = false
+  if (stopConfirmTimer) { clearTimeout(stopConfirmTimer); stopConfirmTimer = null }
+}
+
+function finishStopLocally() {
+  closeConnection()
+  if (currentAssistant && !currentAssistant.text) currentAssistant.text = t('stoppedPlaceholder')
+  finishStreaming()
+  holdPendingSteers()
+}
+
+/**
  * 发一条消息。overrideText 非空字符串时这条消息不来自输入框（点反问选项作答），
  * 此时不清空输入框——用户可能正打着别的内容，点个选项不该把草稿吞掉。
  * 类型判断是必需的：模板里若直接把本函数绑到 @click，第一个实参会是事件对象。
@@ -1650,7 +1861,11 @@ export async function send(overrideText, sendOpts) {
     return { needSettings: false }
   }
   const prompt = (override === null ? input.value : override).trim()
-  if (!prompt || streaming.value || pendingOfficeResults) return { needSettings: false }
+  if (!prompt || stopping.value) return { needSettings: false }
+  sendFailed.value = false
+  // 运行中发送 = 插话：不新开一轮、不新建助手气泡，也不等在途的文档命令（插话本来就在它们之间读入）
+  if (streaming.value) return steerRunningTurn(prompt, override === null)
+  if (pendingOfficeResults) return { needSettings: false }
   if (documentChangedDuringTurn) {
     await syncActiveDocument()
     if (documentChangedDuringTurn) { banner.value = t('fileOperationStale'); return { needSettings: false } }
@@ -1661,7 +1876,8 @@ export async function send(overrideText, sendOpts) {
   if (override === null) input.value = ''
   // 用户已经作答（不管是点选项还是自己打字）：所有反问的按钮就此封掉
   sealStaleQuestions(true)
-  messages.value.push({ role: 'user', text: displayText || prompt })
+  const userBubble = { role: 'user', text: displayText || prompt }
+  messages.value.push(userBubble)
   if (typeof opts.onAccepted === 'function') opts.onAccepted()
 
   currentAssistant = null
@@ -1674,6 +1890,7 @@ export async function send(overrideText, sendOpts) {
   turnDisconnected = false
   // 上一轮若被中途停止，它的待提交哈希就此作废——本轮带不带正文由本轮说了算
   pendingDocHash = ''
+  queuePaused = false
   streaming.value = true
   bumpScroll()
 
@@ -1697,35 +1914,7 @@ export async function send(overrideText, sendOpts) {
     if (!activeContext) activeContext = readDocumentMeta()
 
     const clientRequestId = randomId()
-    const buildPayload = (context) => ({
-      clientRequestId,
-      projectId: parseInt(projectId, 10),
-      conversationId,
-      message: prompt,
-      // 契约 D：用户看的那一句（ask_user 的回答只显示所选各项）。空值不上送，同值等于不传
-      ...(displayText && displayText !== prompt ? { displayText } : {}),
-      mode: 'AGENT',
-      activeContext: context,
-      // 按次指定模型与手选 skill（后端 AgentChatRequest 原生字段；空值不上送走默认）
-      ...(selectedModel.value ? { model: selectedModel.value } : {}),
-      ...(selectedSkillIds.value.length ? { skillIds: [...selectedSkillIds.value] } : {}),
-      // 附加的项目文件：contextItems 是后端既有字段，按 fileId 由服务端读内容
-      ...(attachedFiles.value.length ? {
-        contextItems: attachedFiles.value.map((f) => ({ id: String(f.id), name: f.name, fileType: f.fileType || '' }))
-      } : {}),
-      // 声明客户端能力（Phase C）：后端据此让本会话只见 office_* 工具、隐藏 doc_*；
-      // officeHost 再按宿主细分（word/excel/powerpoint），点名对应工具面；
-      // officeFamily（dev-board#298）只用于对话镜像的来源标注（Word 插件 vs WPS 文字），
-      // 不参与工具过滤，旧后端不认识该字段也无害
-      clientCapability: 'office',
-      officeHost: detectHost() || 'word',
-      officeFamily: hostFamily() === 'wps' ? 'wps' : 'office',
-      // 本轮界面语言（dev-board#713）：后端据它选中/英文 system prompt，回答语言跟随界面。
-      // 必须随请求体走而不是只靠 X-App-Language 头——编排循环跑在池线程上，
-      // HTTP 线程上的语言作用域不跟着过去，而且请求体会被 AgentInbox 持久化，
-      // 排队/续跑的那一轮照样说对语言。旧后端不认识该字段，无害。
-      appLanguage: getLangTag()
-    })
+    const buildPayload = (context) => buildChatPayload({ clientRequestId, projectId, prompt, displayText }, context)
 
     try {
       await postChat(settings, buildPayload(activeContext))
@@ -1757,11 +1946,33 @@ export async function send(overrideText, sendOpts) {
     conversationPersisted = true
     if (perfRound) perfRound.chatAcceptedMs = perfSince()
   } catch (e) {
-    assistant.error = sendErrorText(e)
-    disableDocDedup()
-    finishStreaming()
+    failSend(e, assistant, userBubble, prompt, displayText)
   }
   return { needSettings: false }
+}
+
+/**
+ * 发送失败的收尾：这条消息没有送达，所以不留空白助手气泡，也不留一条「看似已发出」的用户气泡，
+ * 原文放回输入框（用户正打着别的内容时不覆盖）并给「重试」；错误说明走横幅。
+ * 带 displayText 的（问题卡作答）发出的是结构化文本，放回输入框没有意义，保留气泡、只在错误行说明。
+ */
+function failSend(e, assistant, userBubble, prompt, displayText) {
+  const text = sendErrorText(e)
+  disableDocDedup()
+  finishStreaming()
+  if (displayText) {
+    assistant.error = text
+    return
+  }
+  const list = messages.value
+  for (const m of [assistant, userBubble]) {
+    const at = list.indexOf(m)
+    if (at >= 0) list.splice(at, 1)
+  }
+  if (currentAssistant === assistant) currentAssistant = null
+  if (!input.value.trim()) input.value = prompt
+  banner.value = text
+  sendFailed.value = true
 }
 
 /**
@@ -1770,6 +1981,7 @@ export async function send(overrideText, sendOpts) {
  */
 function sendErrorText(e) {
   const status = e && e.status
+  if (e && e.authExpired) return t('sessionExpired')
   if (status === 403 || status === 404) {
     return conversationPersisted ? t('conversationDenied') : t('conversationExpiredRetryFailed')
   }
@@ -1820,11 +2032,39 @@ export async function answerAskUser(answer) {
   })
 }
 
+/**
+ * 停止。轮次在跑时**先不拆 SSE**（与桌面端 useAgentStream.abort 的计划 K4 ⑥ 同口径）：
+ * 先拆流的话，后端随后发的 cancelled 永远到不了，窗格就只能假装「已停止」。
+ * 现在发出取消后挂「正在停止…」，等 cancelled（handleEvent 里收尾后再关连接，
+ * 连接生命周期仍是「停止即关」，只是关在确认之后）；后端说没打中活跃轮次、或通道
+ * 已经不在，就没有 cancelled 可等，当场收尾；兜底计时器到点仍没收到，本地收尾并如实
+ * 提示「未收到确认」。没有轮次在跑时保持原来的硬收尾（关连接 + 复位）。
+ */
 export async function stop() {
-  if (conversationId) await postCancel(ctx.settings, conversationId)
-  closeConnection()
-  if (currentAssistant && !currentAssistant.text) currentAssistant.text = t('stoppedPlaceholder')
-  finishStreaming()
+  if (!streaming.value) {
+    if (conversationId) await postCancel(ctx.settings, conversationId)
+    closeConnection()
+    if (currentAssistant && !currentAssistant.text) currentAssistant.text = t('stoppedPlaceholder')
+    finishStreaming()
+    return
+  }
+  if (stopping.value) return
+  stopping.value = true
+  const gen = generation
+  const hit = conversationId ? await postCancel(ctx.settings, conversationId) : false
+  // cancelled 可能比取消请求的响应先到，那时 finishStreaming 已经收过尾了
+  if (gen !== generation || !stopping.value) return
+  if (!hit || !connection) {
+    finishStopLocally()
+    return
+  }
+  stopConfirmTimer = setTimeout(() => {
+    stopConfirmTimer = null
+    if (gen !== generation || !stopping.value) return
+    finishStopLocally()
+    notice.value = t('stopUnconfirmed')
+  }, STOP_CONFIRM_TIMEOUT_MS)
+  if (stopConfirmTimer.unref) stopConfirmTimer.unref()
 }
 
 export function newConversation() {
@@ -1844,6 +2084,7 @@ export function newConversation() {
   everReconnected = false
   turnDisconnected = false
   streaming.value = false
+  clearStopping()
   toolPrep.value = false
   passProgress.value = null
   resetDocCache()

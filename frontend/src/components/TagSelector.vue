@@ -10,7 +10,7 @@
         @focus="showDropdown = true"
         confirm-type="done"
       />
-      <text v-if="searchText" class="clear-icon" @click.stop="searchText = ''">
+      <text :title="$t('common.clear')" v-if="searchText" class="clear-icon" @click.stop="searchText = ''">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
         </svg>
@@ -90,7 +90,7 @@
         
         <view class="dropdown-footer">
           <text class="manage-link" @click="openManager">{{ $t('files.manageAllTags') }}</text>
-          <view class="close-btn-icon" @click.stop="showDropdown = false">
+          <view :title="$t('common.close')" class="close-btn-icon" @click.stop="showDropdown = false">
              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
              </svg>

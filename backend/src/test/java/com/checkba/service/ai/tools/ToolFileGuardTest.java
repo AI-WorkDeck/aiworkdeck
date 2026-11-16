@@ -52,4 +52,13 @@ class ToolFileGuardTest {
         ProjectContextHolder.setProjectId("1");
         assertNull(ToolFileGuard.rejectIfOutsideProject(null));
     }
+
+    @Test
+    void rejectsSoftDeletedFileOnBothGuards() {
+        ProjectContextHolder.setProjectId("1");
+        ProjectFile f = fileInProject(1L);
+        f.setIsDeleted(true);
+        assertNotNull(ToolFileGuard.rejectIfOutsideProject(f));
+        assertNotNull(ToolFileGuard.rejectIfCannotRead(f, null));
+    }
 }

@@ -87,5 +87,6 @@ export default {
   "ocrLocalFailedHint": "Anda boleh menggunakan pengecaman awan untuk fail dalam kumpulan ini yang gagal secara tempatan. Jika tidak, fail tersebut tidak akan dimuat naik.",
   "ocrLocalFailedConfirm": "Guna pengecaman awan",
   "ocrAlreadySearchable": "\"{name}\" sudah mempunyai lapisan teks dan boleh dicari; tiada fail baharu dibuat",
-  "ocrStopped": "Dihentikan; {count} fail tidak diproses"
+  "ocrStopped": "Dihentikan; {count} fail tidak diproses",
+  "subscribeProBtn": "Pro ¥9.9",
 }

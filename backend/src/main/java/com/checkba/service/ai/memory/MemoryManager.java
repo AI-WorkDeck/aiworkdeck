@@ -1081,13 +1081,6 @@ public class MemoryManager {
 
     // ==================== 用户记忆操作 ====================
 
-    /**
-     * 获取用户记忆
-     */
-    public Optional<UserMemory> getUserMemory(Long userId) {
-        return userMemoryRepository.findByUserId(userId);
-    }
-
     /** find-then-insert 竞态的进程内互斥锁，同 {@link #projectMemorySaveLock}，理由见 {@link #saveProjectMemory}。 */
     private final Object userMemorySaveLock = new Object();
 
@@ -1126,18 +1119,5 @@ public class MemoryManager {
         um.getPreferences().put(key, value);
         
         userMemoryRepository.save(um);
-    }
-
-    // ==================== 统计与监控 ====================
-
-    /**
-     * 获取项目记忆统计
-     */
-    public Map<String, Object> getMemoryStats(Long projectId) {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalMemories", memoryEntryRepository.countByProjectId(projectId));
-        stats.put("typeBreakdown", memoryEntryRepository.countByProjectIdGroupByType(projectId));
-        stats.put("hasProjectMemory", projectMemoryRepository.existsByProjectId(projectId));
-        return stats;
     }
 }

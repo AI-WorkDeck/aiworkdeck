@@ -1,0 +1,68 @@
+{
+  "_comment": "tool-system-v2 V7 D2 deadline_compute 三句（nofile，纯后端 SSE）。通过 = 调了 deadline_compute 且最终回复含正确到期日：v01 普通上诉期 2026-11-18；v02 落在国庆假期顺延 2026-10-08；v03 6 个月落月末周日、顺延到 2027-03-01（2027 国办表）。日期写全年份，免得依赖模型对「今年」的推断。",
+  "sentences": [
+    {
+      "id": "v01-appeal-period",
+      "text": "判决书2026年11月3日送达，上诉期什么时候到期？",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "deadline_compute",
+          "list_tools"
+        ],
+        "mustUse": [
+          [
+            "deadline_compute"
+          ]
+        ],
+        "mustNotUse": [
+          "run_python",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = String(ctx.finalText||'').replace(/\\s+/g,''); return /2026[-年/.]0?11[-月/.]0?18|11月18日/.test(t);"
+      }
+    },
+    {
+      "id": "v02-appeal-lands-on-national-day",
+      "text": "一审判决2026年9月16日送达我方，要上诉的话最迟哪天要把上诉状递上去？",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "deadline_compute",
+          "list_tools"
+        ],
+        "mustUse": [
+          [
+            "deadline_compute"
+          ]
+        ],
+        "mustNotUse": [
+          "run_python",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = String(ctx.finalText||'').replace(/\\s+/g,''); return /2026[-年/.]0?10[-月/.]0?8(?!\\d)|10月8日/.test(t);"
+      }
+    },
+    {
+      "id": "v03-retrial-month-end-weekend",
+      "text": "民事判决2026年8月31日发生法律效力，申请再审的6个月期限几号届满？",
+      "hostState": "nofile",
+      "expect": {
+        "firstToolAnyOf": [
+          "deadline_compute",
+          "list_tools"
+        ],
+        "mustUse": [
+          [
+            "deadline_compute"
+          ]
+        ],
+        "mustNotUse": [
+          "run_python",
+          "move_to_trash"
+        ],
+        "outcomeCheck": "const t = String(ctx.finalText||'').replace(/\\s+/g,''); return /2027[-年/.]0?3[-月/.]0?1(?!\\d)|3月1日/.test(t);"
+      }
+    }
+  ]
+}

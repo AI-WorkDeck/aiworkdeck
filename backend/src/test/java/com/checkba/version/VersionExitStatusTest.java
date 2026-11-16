@@ -41,7 +41,7 @@ class VersionExitStatusTest {
     }
 
     @Test
-    void busyRepositoryFailsFastInsteadOfClaimingThereAreNoChanges() throws Exception {
+    void busyRepositoryFailsInsteadOfClaimingThereAreNoChanges() throws Exception {
         var repo = mock(ProjectRepoService.class);
         var service = new WorkSessionService(repo, null, mock(WorkSessionRepository.class),
                 mock(org.springframework.scheduling.TaskScheduler.class), null, event -> {});
@@ -57,10 +57,57 @@ class VersionExitStatusTest {
         holder.start();
         try {
             assertTrue(ready.await(2, java.util.concurrent.TimeUnit.SECONDS));
-            assertTimeoutPreemptively(java.time.Duration.ofSeconds(1),
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(7),
                     () -> assertThrows(VersionException.class, () -> service.exitStatus(7L)));
             verify(repo, never()).pendingChanges(anyLong());
         } finally { release.countDown(); holder.join(2000); }
+    }
+
+    @Test
+    void briefOverlappingHolderIsWaitedForInsteadOfFailing() throws Exception {
+        var repo = mock(ProjectRepoService.class);
+        var service = new WorkSessionService(repo, null, mock(WorkSessionRepository.class),
+                mock(org.springframework.scheduling.TaskScheduler.class), null, event -> {});
+        var ready = new java.util.concurrent.CountDownLatch(1);
+        Thread holder = new Thread(() -> {
+            var lock = service.repoLock(7L);
+            lock.lock();
+            try { ready.countDown(); Thread.sleep(300); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            finally { lock.unlock(); }
+        });
+        holder.start();
+        try {
+            assertTrue(ready.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            assertFalse(service.exitStatus(7L).enabled());
+        } finally { holder.join(2000); }
+    }
+
+    @Test
+    void exitProjectScopeContainsOnlyChangesFromThisBackendSession() {
+        var repo = mock(ProjectRepoService.class);
+        var service = new WorkSessionService(repo, null, mock(WorkSessionRepository.class),
+                mock(org.springframework.scheduling.TaskScheduler.class), null, event -> {});
+        service.onChangeSignal(7L, 1L, "Tester");
+        service.onChangeSignal(9L, 1L, "Tester");
+
+        assertEquals(java.util.Set.of(7L, 9L), service.sessionChangedProjectIds());
+
+        var projects = mock(com.checkba.service.ProjectService.class);
+        var first = new com.checkba.model.dto.ProjectCardDTO(); first.setId(7L);
+        var untouched = new com.checkba.model.dto.ProjectCardDTO(); untouched.setId(8L);
+        untouched.setLastActivityAt(service.sessionStartedAt().minusNanos(1));
+        var unsignalled = new com.checkba.model.dto.ProjectCardDTO(); unsignalled.setId(10L);
+        unsignalled.setLastActivityAt(service.sessionStartedAt().plusNanos(1));
+        var otherUser = new com.checkba.model.dto.ProjectCardDTO(); otherUser.setId(9L);
+        when(projects.getUserProjectCardDTOs(1L)).thenReturn(java.util.List.of(first, untouched, unsignalled));
+        var controller = new com.checkba.controller.ProjectController(projects, null, null, null);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "workSessionService", service);
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("session")).thenReturn(1L);
+            Map<?, ?> body = controller.exitProjects("session");
+            assertEquals(java.util.List.of(7L, 10L), body.get("projectIds"));
+        }
     }
 
     @Test

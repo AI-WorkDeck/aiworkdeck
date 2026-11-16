@@ -55,3 +55,13 @@ test('all three read APIs return identical metadata without changing text, index
   assert.equal(review.selectedText, '😀'); assert.equal(all.nextStartParagraph, 1); assert.equal(all.totalParagraphs, 2);
   assert.equal(worker.get_document_text({ startParagraph: 1 }).paragraphs[0].index, 1);
 });
+test('bulk reads return the whole body in one call; default paging keeps the 500 / 15000 caps (office-tier1 O8)', () => {
+  const long = Array.from({ length: 1200 }, (_, i) => paragraph(native, '第' + i + '段' + 'x'.repeat(40)))
+  const worker = methods(long)
+  const paged = worker.get_document_text({ maxParagraphs: 10000 })
+  assert.ok(paged.paragraphs.length <= 500 && paged.truncated, 'AI tool paging unchanged')
+  const bulk = worker.get_document_text({ maxParagraphs: 10000, bulk: true })
+  assert.equal(bulk.paragraphs.length, 1200)
+  assert.equal(bulk.truncated, undefined)
+  assert.equal(bulk.totalParagraphs, 1200)
+})

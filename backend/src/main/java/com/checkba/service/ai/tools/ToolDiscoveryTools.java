@@ -100,29 +100,16 @@ public class ToolDiscoveryTools implements AgentToolComponent {
     }
 
     @ToolMeta(displayName = "查看工具目录", category = "agent")
-    @Tool("Find tools that exist in this session but are NOT in the tool list you were given, and the "
-            + "specialised workflows (skills) you can switch to with use_skill. "
-            + "Call this BEFORE telling the user something cannot be done — the capability is very often here. "
-            + "Categories: table, revision (incl. checkpoint restore), evidence, template, "
-            + "edit (cursor/selection, delete, rewrite a paragraph, insert under a heading), "
-            + "files (incl. export to PDF), format (fonts/paragraphs/page setup/TOC/footnotes/images), "
-            + "spreadsheet, slides, office, pdf, litigation (diagrams), reference, memory, enterprise-data, legal, "
-            + "version (Git status/history/changed paths, commit, pull latest, restore history), meeting, task, tag (file tags), plugin, python, plugin-tools (tools from installed plugins), mcp (user-configured remote MCP connections), misc. "
-            + "With no argument you get every category with the tool names in it, plus the skills (cheap, do this first). "
-            + "With query you search tool names and descriptions by keywords (every word must match, up to 15 hits); "
-            + "with names you get exactly those tools; with a category (comma-separate several) you get the whole category. "
-            + "If several are given, names wins over query, and query over category. "
-            + "Every tool whose full signature is printed is added to your regular tool list from the NEXT turn on. "
-            + "You may call any tool it printed IMMEDIATELY in this same turn by writing it as "
-            + "<tool_code>name(arg=\"value\")</tool_code>; plain function calling only works from the next turn.")
+    @Tool("查找本会话里存在、但不在当前工具清单中的工具，以及可用 use_skill 切换的专项技能。\n"
+            + "何时用：告诉用户「做不了」之前先调它，能力常常就在这里。无参数时返回全部类目及其工具名，外加技能清单（便宜，先这样调）。\n"
+            + "类目：table、revision（含检查点恢复）、compare（比对两份 docx）、evidence、template、edit（光标选区、删除、改写段落）、files（含导出 PDF）、format（字体段落页面、目录、脚注、图片）、spreadsheet、slides、office、pdf、litigation、reference、memory、enterprise-data、legal、version（Git）、meeting、task、tag、plugin（插件开发）、python、plugin-tools（已装插件的工具）、mcp、misc。\n"
+            + "优先级 names > query > category。返回完整签名的工具从下一轮起进入常规清单。")
     public String list_tools(
-            @P(value = "Category to expand, e.g. \"format\" or \"table,revision\". Omit to see all categories.",
+            @P(value = "要展开的类目，如 \"format\" 或 \"table,revision\"；省略则列出全部类目",
                     required = false) String category,
-            @P(value = "Keywords to search tool names and descriptions, e.g. \"pdf merge\" or \"页码\". "
-                    + "Every word must match. Returns up to 15 tools with full signatures.",
+            @P(value = "搜工具名和描述的关键词，如 \"pdf merge\"，每个词都要命中；最多 15 条",
                     required = false) String query,
-            @P(value = "Exact tool names, comma-separated, e.g. \"pdf_merge,pdf_split\". "
-                    + "Returns their full signatures.",
+            @P(value = "精确工具名，逗号分隔，如 \"pdf_merge,pdf_pages\"",
                     required = false) String names,
             String conversationId
     ) {
@@ -216,7 +203,9 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         int shown = 0;
         for (String category : requested) {
             List<ToolSpecification> specs = candidates.stream()
-                    .filter(s -> category.equals(policy.categoryOf(s.name())))
+                    .filter(s -> category.equals(policy.categoryOf(s.name()))
+                            || ("core".equals(policy.categoryOf(s.name()))
+                                    && category.equals(policy.ruleCategoryOf(s.name()))))
                     .toList();
             sb.append("== ").append(category).append(" (").append(specs.size()).append(" tools) ==\n");
             if (specs.isEmpty()) {
@@ -224,13 +213,40 @@ public class ToolDiscoveryTools implements AgentToolComponent {
                         + "it needs a different document type or client)\n");
             }
             for (ToolSpecification spec : specs) {
+                if ("core".equals(policy.categoryOf(spec.name()))) {
+                    // 核心集里的同类工具：已在工具列表里，只点名不重复签名（省字符）
+                    sb.append("- ").append(spec.name()).append(" (already available)\n");
+                    continue;
+                }
                 shown++;
                 appendTool(sb, spec);
             }
             sb.append('\n');
         }
+        appendPluginToolsHint(sb, candidates, requested);
         appendTrailer(sb, shown);
         return sb.toString();
+    }
+
+    /**
+     * 要了 plugin（开发插件 / 安装能力包）却没要 plugin-tools 时，点名已安装插件带来的工具：
+     * 用户说「用律所管理插件查一下」，模型照字面展开 plugin，只看到 capability_install，就劝用户去装（实测如此）。
+     */
+    private void appendPluginToolsHint(StringBuilder sb, List<ToolSpecification> candidates, Set<String> requested) {
+        if (!requested.contains("plugin") || requested.contains(ToolDisclosurePolicy.PLUGIN_TOOLS_CATEGORY)) {
+            return;
+        }
+        List<String> installed = candidates.stream().map(ToolSpecification::name)
+                .filter(n -> ToolDisclosurePolicy.PLUGIN_TOOLS_CATEGORY.equals(policy.categoryOf(n))).toList();
+        if (installed.isEmpty()) {
+            return;
+        }
+        sb.append(LangText.of(
+                "注意：plugin 类目是开发插件与安装能力包。已安装插件提供的工具在 plugin-tools 类目：",
+                "Note: the plugin category is for developing plugins and installing capability packs. Tools provided by installed plugins are in plugin-tools: "))
+                .append(String.join(", ", installed))
+                .append(LangText.of("。用 list_tools(category=\"plugin-tools\") 展开。\n\n",
+                        ". Expand them with list_tools(category=\"plugin-tools\").\n\n"));
     }
 
     /** 按确切工具名给全签名；查不到的单列一行（不是错误：查到的那些照样有效）。 */
@@ -263,7 +279,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         if (found.isEmpty()) {
             return sb.toString().trim();
         }
-        record(ctx, categoriesOf(found));
+        recordNames(ctx, found);
         appendTrailer(sb, found.size());
         return sb.toString();
     }
@@ -274,8 +290,10 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         List<ToolSpecification> hits = new ArrayList<>();
         int total = 0;
         for (ToolSpecification spec : candidates) {
-            String haystack = spec.name() + " " + (spec.description() == null ? "" : spec.description());
-            if (matchesAll(haystack, terms)) {
+            List<String> keywords = policy.searchTermsOf(spec.name());
+            String haystack = spec.name() + " " + (spec.description() == null ? "" : spec.description())
+                    + " " + String.join(" ", keywords);
+            if (matchesAll(haystack, keywords, terms)) {
                 total++;
                 if (hits.size() < MAX_QUERY_HITS) {
                     hits.add(spec);
@@ -302,7 +320,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         if (hits.isEmpty()) {
             return sb.toString().trim();
         }
-        record(ctx, categoriesOf(hits));
+        recordNames(ctx, hits);
         appendTrailer(sb, hits.size());
         return sb.toString();
     }
@@ -318,25 +336,49 @@ public class ToolDiscoveryTools implements AgentToolComponent {
     }
 
     private static boolean matchesAll(String haystack, List<String> terms) {
+        return matchesAll(haystack, List.of(), terms);
+    }
+
+    /**
+     * 每个词都要命中：词出现在 haystack 里，或词里含有某个检索词（插件 keywords / skill 触发词，≥2 字）。
+     * 后一支治的是中文整句当一个词搜：「应收账款」含 keywords 里的「应收」，「法律意见书核查」含触发词「法律意见书」。
+     */
+    private static boolean matchesAll(String haystack, List<String> keywords, List<String> terms) {
         if (terms.isEmpty()) {
             return false;
         }
         String text = haystack.toLowerCase(Locale.ROOT);
         for (String term : terms) {
-            if (!text.contains(term)) {
+            if (!text.contains(term) && !containsKeyword(term, keywords)) {
                 return false;
             }
         }
         return true;
     }
 
+    private static boolean containsKeyword(String term, List<String> keywords) {
+        for (String keyword : keywords) {
+            if (keyword == null || keyword.strip().length() < 2) {
+                continue;
+            }
+            if (SkillRouter.containsTrigger(term, keyword.strip().toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** id、名称或描述命中全部关键词、且本轮还没生效的 skill，每条一行。 */
     private List<String> matchingSkills(List<String> terms, String runId) {
         List<String> lines = new ArrayList<>();
         for (SkillDefinition skill : invocableSkills(runId)) {
+            List<String> triggers = new ArrayList<>();
+            if (skill.getTriggers() != null) triggers.addAll(skill.getTriggers());
+            if (skill.getTriggersEn() != null) triggers.addAll(skill.getTriggersEn());
             String haystack = skill.getId() + " " + nullToEmpty(skill.getName()) + " "
-                    + nullToEmpty(skill.getNameEn()) + " " + nullToEmpty(skill.getDescription());
-            if (matchesAll(haystack, terms)) {
+                    + nullToEmpty(skill.getNameEn()) + " " + nullToEmpty(skill.getDescription())
+                    + " " + String.join(" ", triggers);
+            if (matchesAll(haystack, triggers, terms)) {
                 lines.add(skillLine(skill));
                 if (lines.size() >= MAX_QUERY_SKILL_HITS) {
                     break;
@@ -391,10 +433,19 @@ public class ToolDiscoveryTools implements AgentToolComponent {
         }
     }
 
-    private Set<String> categoriesOf(List<ToolSpecification> specs) {
-        Set<String> categories = new LinkedHashSet<>();
-        specs.forEach(spec -> categories.add(policy.categoryOf(spec.name())));
-        return categories;
+    /**
+     * names / query 模式只把<b>这几个工具</b>写给编排器（键 {@code tool:<name>}），不连带它们所在的整个类目——
+     * 否则要一个 move_to_trash 就把 files 全类放回来，绕过每轮下发封顶（tool-system-v2 V2）。核心集不算。
+     */
+    private void recordNames(ToolContext ctx, List<ToolSpecification> specs) {
+        if (ctx == null || ctx.disclosedCategories() == null) {
+            return;
+        }
+        for (ToolSpecification spec : specs) {
+            if (!"core".equals(policy.categoryOf(spec.name()))) {
+                ctx.disclosedCategories().add(ToolDisclosurePolicy.TOOL_KEY + spec.name());
+            }
+        }
     }
 
     /** 按类目分组给全签名（query / names 共用；类目按首次出现的顺序）。 */
@@ -417,8 +468,7 @@ public class ToolDiscoveryTools implements AgentToolComponent {
 
     private static void appendTrailer(StringBuilder sb, int shown) {
         sb.append("These ").append(shown)
-                .append(" tools are now part of your regular tool list from the NEXT turn on. ")
-                .append("To use one right now, call it as <tool_code>name(arg=\"value\")</tool_code>.");
+                .append(" tools are now part of your regular tool list from the NEXT turn on.");
     }
 
     private String parameterList(ToolSpecification spec) {

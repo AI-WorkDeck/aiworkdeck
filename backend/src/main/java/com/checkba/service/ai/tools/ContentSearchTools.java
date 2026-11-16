@@ -52,22 +52,17 @@ public class ContentSearchTools implements AgentToolComponent {
     private final ProjectFileRepository projectFileRepository;
 
     @ToolMeta(displayName = "搜索文件内容", category = "file")
-    @Tool("Full-text search across the TEXT of every project file (Word/Excel/PowerPoint, text-layer PDF, "
-            + "txt/md/csv): answers 'which material mentions X, and where'. Returns up to " + MAX_HITS
-            + " hits, each as 'name (fileId=N) [path] line L: matched snippet'; then read the surrounding text "
-            + "with extract_file_text(fileId, offset). "
-            + "Pick the right finder: to find a file by its NAME use search_project_files; to find text inside the "
-            + "document that is OPEN in the editor use doc_find_text (or office_search in the Office add-in); "
-            + "to find which PROJECT FILE contains a phrase use this tool. "
-            + "Plain words are matched literally and case-insensitively; set useRegex=true for a Java regular "
-            + "expression, wholeWord=true to match whole words only (useful for English terms). "
-            + "Scanned PDFs and images are searchable only after they have been read once (their OCR text is cached).")
+    @Tool("在项目所有文件的正文里全文检索（Word/Excel/PowerPoint、含文字层的 PDF、txt/md/csv），回答「哪份材料提到了 X、在哪」。\n"
+            + "何时用：找哪个项目文件含某句话；按文件名找用 search_project_files，在当前打开的文档里找用 doc_find_text（Office 加载项用 office_search）。\n"
+            + "最多返回 "
+            + MAX_HITS
+            + " 条，每条形如 name (fileId=N) [path] line L: 片段，再用 extract_file_text 读上下文。默认字面匹配、不区分大小写；扫描件 PDF 和图片读过一次（OCR 缓存）后才可检索。")
     public String search_project_content(
-            @P("Text to look for, e.g. '违约金' or '第八条'; a regular expression when useRegex=true") String query,
-            @P(value = "Optional: true to treat query as a Java regular expression (default false)",
+            @P("要找的文字，如「违约金」「第八条」；useRegex=true 时为正则") String query,
+            @P(value = "可选。true 按 Java 正则解释 query，默认 false",
                     required = false) Boolean useRegex,
-            @P(value = "Optional: true to match whole words only (default false)", required = false) Boolean wholeWord,
-            @P(value = "Optional: comma-separated extensions to search, e.g. 'docx,pdf' (default: all searchable types)",
+            @P(value = "可选。true 只匹配整词，默认 false", required = false) Boolean wholeWord,
+            @P(value = "可选。限定扩展名，逗号分隔，如 docx,pdf；默认全部可检索类型",
                     required = false) String fileTypes
     ) {
         log.info("Tool: search_project_content called regex={} wholeWord={} types={}", useRegex, wholeWord, fileTypes);

@@ -190,6 +190,10 @@ public class GitHttpController {
                         try(var output=java.nio.file.Files.newOutputStream(snapshot)) {up.upload(body(request),output,null);}
                         downloads.deliver(who.userId(),"git:"+repo,java.nio.file.Files.newInputStream(snapshot),java.nio.file.Files.size(snapshot),request,response);
                     } finally {java.nio.file.Files.deleteIfExists(snapshot);}
+                } else if(downloads!=null && downloads.shadowActive()) {
+                    var counted=new com.checkba.service.mobile.CloudProtocolDownloadService.CountingOutput(response.getOutputStream());
+                    up.upload(body(request),counted,null);
+                    downloads.shadowDelivered(who.userId(),"git:"+repo,counted.count);
                 } else up.upload(body(request), response.getOutputStream(), null);
             }
         } catch (ZipException e) {

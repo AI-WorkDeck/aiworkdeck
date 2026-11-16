@@ -185,7 +185,7 @@ filelink 点击定位、多 target 弹窗、method 小条；契约见 ai-doc-bri
 
 消息中心入口在顶栏右上角 `AccountEntry.vue`：已登录头像显示未读数字（超过 99 显示 `99+`），下拉首个动作是「消息中心」。消息来自现有 `messageCenterTab.js` 轮询；来源暂不可用时不能把未读归零，未知且部分失败显示 `·`，并保留不可用说明。余额/宽限提醒小点与消息角标共存。未连接统一账户时，登录按钮旁仍提供消息图标，因为受邀 DD 连接可独立于统一账户使用；旧 CLIENT 视角仍不开放消息入口。
 
-头像动作直接调用 `openMessageCenterTab`，沿用跨左右窗格的单例标签，不切换或展开左栏。`messages` 不再属于 rail / 无项目左栏白名单；旧有项目 `leftPaneKey=messages` 迁移成 `files`，无项目恢复默认空面板并收栏（#1582）。`MessageCenterPane.vue` 保留对话、通知、待处理分类及原业务跳转；阅读不替代业务确认，项目切换仍走落盘出口，账号切换仍清除旧内容和迟到响应。
+头像动作直接调用 `openMessageCenterTab`，沿用跨左右窗格的单例标签，不切换或展开左栏。`messages` 不再属于 rail / 无项目左栏白名单；旧有项目 `leftPaneKey=messages` 迁移成 `files`，无项目恢复默认空面板并收栏（#1582）。`MessageCenterPane.vue` 保留对话、通知、待处理分类及原业务跳转；阅读不替代业务确认，项目切换仍走落盘出口，账号切换仍清除旧内容和迟到响应。「去处理」指向已安装但限项目使用的插件、而当前没开项目时，`openMessageTarget` 抛带 `projectRequired` 的错误，面板显示「请先打开一个项目」并给「打开项目…」按钮（`openProjects` prop = `openProjectsPane`）；只有插件确实不在可用列表里才说「尚未安装或启用」（QA D3，`tests/messages/message-navigation.test.mjs`）。对话里的「邀请码」不再一键签发成员码，见 plugin-system.md 的 QA D1 段。
 
 验证：`node --test tests/messages/*.test.mjs tests/account/account-entry-account-changed.test.mjs`（`frontend/`），`npm run check:nav:full`。头像浏览器测试使用实际组件与单例方法、合成账户状态，隔离夹具把 uni `tap` 映射为 H5 点击；不代表正式 Electron 客户端、真实账户或跨设备已验。
 
@@ -305,6 +305,23 @@ type/priority/notes/assigneeId/remindBefore 与多文件关联表 `project_task_
 **地雷：uni-h5 的 `<input>` 把 type 收窄成白名单**（text/number/idcard/digit/password/tel），
 `type="date"/"time"` 会静默降级成文本框。日期/时间输入一律用 `components/AwdDatePicker.vue`
 （mounted 手工挂真原生 input 绕开 uni 模板劫持；只监听 change 防中间值上抛）。同理 `MentionInput` 用 `<component :is="'textarea'">` 绕开 uni 的 textarea（140 字上限/100ms 节流/不透传 keydown）。
+
+## 地雷：uni-h5 内置元素的默认版式（2026-11 设置页/插件版式排查）
+
+- **`<button>` → `<uni-button>`，自带 `margin-left/right: auto` 且是块级**：在 flex 行里被挤到中间，
+  在块容器里撑满整行。按钮类一律写 `margin: 0`（`.comp-btn` / `.btn-save` 已补）。
+- **`<form>` → `<uni-form><span>…</span></uni-form>`**：写在 form 上的 flex/grid/gap 只作用到中间那层 span，
+  子元素全挤在一起。`App.vue` 已全局 `uni-form > span { display: contents }`，不要删。
+- **`<form @submit>` 在应用里不会提交（QA D1 第二轮）**：uni-button 只有 `form-type="submit"` 才触发表单提交
+  （`type="submit"` 被忽略），uni-input 回车只发 `@confirm`，uni-form 的 submit 事件对象没有 `preventDefault`。
+  表单里的按钮一律 `type="button"` + `@click` 直接调处理函数（输入框回车用 `@confirm`）。同理模板里的
+  `<textarea>`/`<input>` 是 uni 组件，input 事件的值在 `detail.value`，读 `$event.target.value` 会丢字
+  （消息中心输入框曾因此永远点不亮「发送」）；要原生元素就写 `<component :is="'textarea'">`。jsdom/Chrome
+  单测里挂的是原生元素，派发 submit 照样全绿——守卫 `frontend/tests/design-system/uni-form-buttons.test.mjs`
+  （CI 首个 job）静态拦这两类；真页面回归 `npm run test:message-center-e2e`（uni 编译产物 + 真实鼠标点击）。
+- **模板里用了类名却没写样式不会报错**（团队看板 `scope-tab` 曾渲染成三行裸大字），
+  `<text>` 不设字号会继承 16px。新组件交付前按 `sdk/plugin-sdk/UI-GUIDELINES.md` 第 8 条截图自检。
+- `var(--awd-xxx)` 名字写错同样静默失效；`scripts/check-design-system.mjs` 只查 MIGRATED_FILES 里的文件。
 
 ## 地雷：uni-app H5 把 `<view>` 上的事件重建成普通对象，`button` 一类字段全丢
 
@@ -1522,6 +1539,17 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 - 前端 `FileTree.vue` 与 `utils/fileTreePdfActions.js`：单选可转 PDF 文件（`doc/docx/ppt/pptx/xls/xlsx` 及图片）右键菜单显示「转为 PDF」；多选（含已有 `pdf`）2 个及以上文件时右键菜单显示「合并为 PDF」。
 - 后端 `ProjectFileController`（`POST /api/projects/{projectId}/files/{fileId}/convert-pdf`、`POST /api/projects/{projectId}/files/batch/merge-pdf`）与 `ProjectFilePdfService`：Office 文档优先调本机 LibreOffice，不可用时走内置 POI + PDFBox 中文字体渲染兜底，在原目录生成同名（自动递增序号）PDF 并刷新文件树。回归：`ProjectFilePdfServiceTest`、`fileTreePdfActions.test.mjs`。
 
+## 资源管理器右键：打印 / 移动到… / 压缩为 ZIP / 解压到此处（2026-11-10）
+
+- 判定在 `frontend/src/utils/fileTreeExtraActions.js`：「打印…」单选、扩展名同可合并 PDF 集合（PDF/Office/图片）；「解压到此处」单选 zip/7z/rar 且非只读；「移动到…」「压缩为 ZIP」单选多选都给（文件夹连子孙勾着时只算文件夹，同 `contextTargetItems`）；回收站一律不给。
+- 打印：`GET /api/projects/{p}/files/{id}/print-pdf`（只读权限、`@CloudMeteredDownload`、不落新文件，`ProjectFilePdfService.renderPrintablePdf`）→ `printPdfBlob` 把 Blob 放进隐藏 iframe 调 `contentWindow.print()`，走 Chromium 内置 PDF 引擎。
+- 移动到…：复用批量选择的「选择文件夹」弹窗；对象存在 `contextActionIds`，`executeBatchAction` 优先用它、用完清空，`openBatchAction` 也会清，避免和勾选串味。
+- 压缩：`POST /api/projects/{p}/files/batch/zip`（写权限）→ `ProjectFileService.compressToZip`，先写临时文件再流进存储，条目数/总量沿用解压护栏（5000 条、1GB）；同一 zip 内重名条目加「 (2)」。解压复用既有 `archive/extract`。
+- 回归：`ProjectFileServiceArchiveTest`（compressToZip*）、`frontend/tests/project-home/file-tree-extra-menu.test.mjs`。
+- 菜单版式：六个 `.context-menu-group`（AI/内容 → 编辑 → 事项与权限 → 输出与转换 → 位置与历史+其他 → 删除），分隔线只画在非空组之间（`:empty` 隐藏全被 v-if 掉的组，依赖 Vue 把空白文本节点压掉）；行高 32、4px 内边距、accent 悬停，同 `ExplorerCreateMenu`。打开后 `clampContextMenu` 把菜单挪回视口。
+- 子菜单「识别文字（OCR）」「其他」悬停展开为侧边浮层（`ctxSub` + `.context-menu-flyout`，放不下翻到左侧），离开触发行走 `utils/menuAim.js` 的斜移宽限。「其他」里放「复制路径」（桌面、仅文件，走 `/local-path`）与「复制相对路径」（父链拼项目内路径）。刻意不做「下载」「用其他应用打开」（本地应用，访达里就有）。
+- 现有测试按「`<view v-if=` 紧挨 `$t('key')`」在模板里找菜单项（BUG-73），菜单项保持模板逐行写法，不要改成数据驱动渲染。
+
 ## 资源管理器与暂存区文件向外拖拽（dev-board#1288）
 
 `FileTree` 与 `FileStagingArea` 支持将文件直接拖到软件窗口外部（如微信聊天、Finder/资源管理器）。微信等外部桌面应用只认 OS 级文件拖拽（macOS `NSFilenamesPboardType` / Windows `CF_HDROP`），不认 Chromium HTML5 `dataTransfer`。
@@ -1658,6 +1686,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 ## 2026-11-03 临时项目转存（dev-board#1656）
 
 SCRATCH 展示统一为「临时项目」，复用既有对话模式身份。项目概览新增转存对话框，选择文件/对话及正式项目后复制，保留原件；成功后回执，失败保留选择以重试。原「转为正式项目」仍可用。Office 插件默认选择同账户 SCRATCH，不按名字迁移旧项目。前端项目主页套件 1981 条、插件 847 条及两者构建通过；复制服务接口与边界见 mobile-sync.md。
+
+## 随手工作区转存弹窗（dev-board#1739）
+
+`ScratchTransferDialog` 的文件与会话复选框必须用 `<component :is="'input'" type="checkbox">` 配显式 checked/change，不能写普通 `<input type="checkbox" v-model="数组">`：Uni H5 会改成仅支持文本类型的 uni-input，暴露内部 ID 且无法选择，确认按钮一直禁用。原生控件样式使用专属 class，不能用 input/button 标签选择器（同样会被 Uni 改写）。目标项目复用 `AwdSelect`，内容按文件/对话分组，选中数量可见；空目标/空选区/保存中禁止提交，保存失败或复制失败保留选择。焦点在弹窗内循环，下拉 Escape 先关菜单，之后再退出弹窗。
+
+回归：`tests/project-home/scratch-transfer.test.mjs`（真实 Vue 选择与提交、错误重试、防重复、保存前置），另需真实 Uni H5 验证 checkbox 类型和确认可用，普通 Vue/JSDOM 无法单独复现标签改写。2026-11-16 本次旧版真实 H5：7 个文本输入显示 ID、0 个 checkbox、选项目后确认禁用；新版 7 个原生 checkbox，选择后合成 HTTP 收到精确文件/对话 ID，亮暗/窄窗长名/RTL/键盘通过。隔离 HTTP 回执不是实际生产文件复制或正式安装包验收。
 
 ## 欢迎页模型选择（dev-board#1684）
 

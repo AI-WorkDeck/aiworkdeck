@@ -51,10 +51,10 @@ export default {
 .decision-assist-label { flex: 1; min-width: 0; }
 .decision-assist-state { flex-shrink: 0; font-weight: 600; }
 .enabled .decision-assist-state { color: var(--awd-accent-text); }
-.decision-assist-track { display: flex; align-items: center; flex-shrink: 0; width: 26px; height: 16px; padding: 2px; box-sizing: border-box; border-radius: 12px; background: var(--awd-text-tertiary, #777); }
+.decision-assist-track { display: flex; align-items: center; flex-shrink: 0; width: 26px; height: 16px; padding: 2px; box-sizing: border-box; border-radius: 12px; background: var(--awd-text-3); }
 .decision-assist-track > span { width: 12px; height: 12px; border-radius: 50%; background: var(--awd-surface, white); }
 .enabled .decision-assist-track { justify-content: flex-end; background: var(--awd-accent); }
-.decision-assist-hint { display: block; margin-top: 4px; color: var(--awd-text-secondary); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.decision-assist-hint { display: block; margin-top: 4px; color: var(--awd-text-2); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .decision-assist-details { margin-top: 4px; font-size: 11px; line-height: 1.5; }
 .decision-assist-details > summary { color: var(--awd-accent-text); cursor: pointer; }
 .decision-assist-details > summary:focus-visible { outline: 2px solid var(--awd-accent); outline-offset: 2px; }

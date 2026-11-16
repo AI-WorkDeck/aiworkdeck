@@ -8,6 +8,12 @@ export default {
   "cancel": "İptal",
   "save": "Kaydet",
   "close": "Kapat",
+  "remove": "Kaldır",
+  "clear": "Temizle",
+  "zoomIn": "Yakınlaştır",
+  "zoomOut": "Uzaklaştır",
+  "moveUp": "Yukarı taşı",
+  "moveDown": "Aşağı taşı",
   "done": "Bitti",
   "delete": "Sil",
   "rename": "Yeniden adlandır",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "Ayarlar'a git",
   "later": "Daha sonra",
   "requestFailedWithStatus": "İstek başarısız oldu ({status})",
+  "tooManyRequests": "Çok fazla istek. Lütfen biraz bekleyip tekrar deneyin",
   "smsVerificationRequired": "Bu işlem SMS doğrulaması gerektirir",
   "freeQuotaExceeded": "Tüm ücretsiz kredilerinizi kullandınız",
   "serviceErrorRetryLater": "Hizmet hatası. Lütfen daha sonra tekrar deneyin",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "Dil seçin",
   "languageFollowSystem": "Sistemi takip et",
   "languageSearchPlaceholder": "Dil arayın…",
-  "languageNoMatch": "Eşleşen dil yok"
+  "languageNoMatch": "Eşleşen dil yok",
+  "serverLabelAccountBridge": "Hesap köprüsü",
+  "serverLabelGenericClient": "Müşteri (genel)",
+  "serverLabelPersonalMemory": "Kişisel bellek",
+  "serverLabelProjectMemory": "Proje belleği"
 }

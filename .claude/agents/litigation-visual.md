@@ -19,10 +19,10 @@ JSON 对不对，不取决于模型对像素多聪明——这是上游的核心
 ## 关键文件
 
 **引擎（vendor，别手改）**
-- `litviz/skills/mqc-litigation-visual-redraw/` — 重画引擎 v1.0.2（作者缪奇川，MIT）原样拷贝，
+- `litviz/skills/mqc-litigation-visual-redraw/` — 重画引擎 v1.1.0（作者缪奇川，AGPL-3.0-only；作者同意以署名 + 开源为条件并入）拷贝，
   2026-08-25 前叫 `litviz/engine/`。上游已并入 monorepo
   MiaoQichuan/new-litigation-visualization。
-- `litviz/skills/mqc-timeline-master/` — 时间轴大师 v2.0.1（同一上游、同作者）：从原始卷宗
+- `litviz/skills/mqc-timeline-master/` — 时间轴大师 v2.2.0（同一上游、同作者）：从原始卷宗
   直接出案件时间轴的确定性管线（多泳道/双方对读/纵向分页/忠实性子序列校验）。
   **两个目录名必须保持上游原名**：时间轴脚本与测试有十几处
   `../../mqc-litigation-visual-redraw/scripts` 兄弟目录硬引用（共享内核机制），
@@ -223,7 +223,12 @@ skill.yml 的 `output`/`output_en`、两份 prompt。
 - 勾选答复只认窄写法：`budget` 只认 `all`（「全部」会 `int()` 抛错，用户被反复带回第四轮），
   `style` 只认编号。`LitigationTimelineTools.normalizeAnswer` 把「全部/全选/所有/all…」统一成 `all`、
   「1、2」规范成「1,2」、风格名（奇川/歸藏/归藏/白描）映射成 1/2/3（名字优先于标签里的数字），
-  认不出的风格直接回错误提示（dev-board#1713）。上游提示里的错号已由 PATCH 9 改正。
+  认不出的风格直接回错误提示（dev-board#1713）。上游 v2.2.0 已改为从 `pick.round_three()` 单一来源取号，
+  PATCH 9 只剩 `STEPS` 表的顺序一行。
+- 上游 v2.2.0 新增三个阶段：`formats`（第三轮顺带问格式，默认只出 SVG+PPTX）、`scope`（列出范围内的句子）、
+  `ack`（用户确认「未上图的原文」）。`cli.py` 与 `STEP_STAGES` 两份白名单都要放行。**宿主要 `.drawio`**
+  （`LitigationTimelineTools` 用它打开编辑器），所以 `cli.py` 在 render 前若 state.json 没有 `formats`，
+  先替它跑 `formats 全部`，保持升级前「五种格式都出」的行为。
 - 材料文字版先过 `normalizeChineseDates`：上游 `pick._DATE` 不认「二〇二六年二月二十日」，合同会被判成
   「0 句带日期」。改写后的阿拉伯数字日期就是管线的原文——子序列忠实性校验与溯源索引都只比对
   `materials/*.txt`，不回头比对原件。
@@ -235,13 +240,13 @@ skill.yml 的 `output`/`output_en`、两份 prompt。
 | | 需要 graphviz？ |
 |---|---|
 | 三种时间轴 / `relation_tree` / `comparison_table` / **`graphviz_relation`** | 否 |
-| `graphviz_flow`（流程图） | **是** |
+| `graphviz_flow`（流程图） | 否（v1.1.0 起无 dot 走 `layout_fallback.py`；有 dot 时逐字节不变） |
 
 `graphviz_relation` 名字里带 graphviz，但 v1.0.2 起已换成确定性的无 graphviz 布局
 （`_layout_nodes`），那个文件里的 `run_dot` 是死代码。这条矩阵由
 `litviz/tests/test_cli.py` 的「无 graphviz 时的布局矩阵」钉住。
 
-Python 下限 **3.11**（与打包运行时一致）。引擎原本要 3.12+，已由 PATCH 2 抹平。
+Python 下限 **3.11**（与打包运行时一致）。引擎曾要 3.12+（PEP 701），上游 v1.1.0 已自行改掉。
 
 ## 已知地雷
 
@@ -345,8 +350,7 @@ Python 下限 **3.11**（与打包运行时一致）。引擎原本要 3.12+，�
   `EvalToolBeanParityTest` 现在会红）。
 - skill 命中时的工具可见性由回放用例 `skill-litigation-visual-tools-visible`
   （`backend/src/test/resources/ai-eval/cases/cases-skill.json`）守住。
-- 上游 `doctor.py` 自称「Python ≥ 3.9」与实际不符（见 PATCHES.md PATCH 2）；
-  `schemas/` 的 layout 枚举曾漏 `comparison_table`（PATCH 3）。**升级引擎后
+- `schemas/` 的 layout 枚举曾漏 `comparison_table`（PATCH 3）。**升级引擎后
   重跑 `litviz/tests/test_cli.py`，别信上游的自述。**
 - **`.drawio` 打不开不能只说「没有编辑器」就完事**：v0.21.0 摘除随包 drawio 资源后，
   `checkba:drawio-editor`（`desktop/main/main.js`）在 `isAvailable()` 为假时除了
@@ -362,7 +366,7 @@ Python 下限 **3.11**（与打包运行时一致）。引擎原本要 3.12+，�
 ## 验证
 
 ```bash
-python3 litviz/tests/test_cli.py                       # 契约 + 上游 149 项（预期 146/149）
+python3 litviz/tests/test_cli.py                       # 契约 + 上游 163 项（预期 160/163）
 cd backend && mvn test -Dtest='Litigation*,BuiltinSkillsTest,SkillRegistryTest,SkillRouterTest'
 node desktop/scripts/prepare-graphviz.js --from "$(brew --prefix graphviz)" --out /tmp/gv
 node desktop/scripts/fetch-drawio-assets.js            # 幂等；已就位会跳过
@@ -373,7 +377,7 @@ cd frontend && npm run check:emits && npm run build:h5
 `fetch-drawio-assets.js` 支持 `DRAWIO_WAR_URL=file:///abs/path/draw.war` 从本地包解，
 离线或反复调白名单时不用每次下 53 MB。
 
-上游 149 项预期 **146/149**：缺的 3 项是 README 文档守卫（我们没 vendor 上游 README），
+上游 163 项预期 **160/163**：缺的 3 项是 README 文档守卫（我们没 vendor 上游 README），
 测试会断言失败的**正好是且仅是**那 3 项，别把它当成可以忽略的红。
 
 要跑全 `LitigationPngServiceTest`（含中文覆盖与真图光栅化）得先有随包字体：

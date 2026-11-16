@@ -82,6 +82,9 @@ security:
 
 storage:
   type: local
+  # 单次上传请求上限：案卷附件经 API 上传（大案卷整段历史走 /git/，不受此限），
+  # 与 deploy/case/nginx-case*.conf.example 里 /api/ 的 client_max_body_size 2g 同值
+  max-upload-size: 2GB
   # 全部数据落在一个可整体搬走的根下（迁移单元，见 deploy/case/README.md）。
   # repos/（裸库）、projects/（托管工作区）、template.docx 都在 root-path 之下：
   #   ProjectRepoService: gitDir  = {globalRoot}/repos/project-{id}.git
@@ -136,3 +139,12 @@ collab:
 ref:
   internal:
     serve: true
+
+# 律所审计日志的内部上报口（readiness S20）：同机官网经 127.0.0.1 POST /api/internal/firm-audit，
+# 把入所/退所、角色变更、官网登录失败、账户 Key 签发与吊销写进同一份审计日志。
+# 开关只在本 profile 打开；密钥为空 = 不收（裸 404）。与名录、参考口是三把不同的密钥，
+# 官网侧 AWD_FIRM_AUDIT_SECRET 配同一个值。公网 nginx 的 ^~ /api/internal/ 恒 404 兜底。
+audit:
+  ingest:
+    serve: true
+    secret: ${AWD_AUDIT_INGEST_SECRET:}

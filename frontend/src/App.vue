@@ -254,6 +254,13 @@ uni-toast {
     font-family: var(--awd-font-sans);
 }
 
+/* uni H5 把 <form> 渲染成 <uni-form><span>…</span></uni-form>：组件给 form 写的
+   flex/grid/gap 只作用到那层 span 上，真正的子元素全部挤在一起（客户协作邀请卡、
+   消息中心新建会话表单都中过招）。让这层包裹不参与布局，form 上的版式才落到子元素。 */
+uni-form > span {
+    display: contents;
+}
+
 /* ============ 颜色语义令牌（浅色/深色两套取值） =====}
 
    改造前全前端有 3950 处硬编码颜色、435 种色值，文字/背景/边框各自混着四套

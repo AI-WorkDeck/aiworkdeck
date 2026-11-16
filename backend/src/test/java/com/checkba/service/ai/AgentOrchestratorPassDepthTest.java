@@ -229,4 +229,60 @@ class AgentOrchestratorPassDepthTest {
         assertTrue(saved.getAllValues().stream().anyMatch(v -> v.contains("...(truncated)") || v.contains("...(截断)")));
         assertTrue(saved.getAllValues().stream().noneMatch(v -> v.contains("FULL_TAIL")));
     }
+
+    /** O12：DeepSeek V4 Pro 用不存在的原生 final 工具表示「答完了」；此前每次回「未知工具」，它再发，直到轮数耗尽。 */
+    private int runPseudoFinal(String conversationId, String finalText) {
+        List<String> executed = new CopyOnWriteArrayList<>();
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            executed.add(inv.getArgument(0));
+            return new ToolRegistry.ToolResult("{\"success\":true}", null, true);
+        });
+        AtomicInteger calls = new AtomicInteger();
+        StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+            @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                int n = calls.incrementAndGet();
+                if (n == 1) {
+                    handler.onComplete(Response.from(AiMessage.from(List.of(ToolExecutionRequest.builder()
+                            .id("w").name("slide_set_text").arguments("{}").build()))));
+                    return;
+                }
+                if (n > 4) { // 修复前：一直发 final，这里兜底让测试结束
+                    handler.onNext("x");
+                    handler.onComplete(Response.from(AiMessage.from("x")));
+                    return;
+                }
+                if (!finalText.isEmpty()) handler.onNext(finalText);
+                List<ToolExecutionRequest> fin = List.of(ToolExecutionRequest.builder()
+                        .id("f" + n).name("final").arguments("{\"arguments\": \"\"}").build());
+                handler.onComplete(Response.from(finalText.isEmpty() ? AiMessage.from(fin) : AiMessage.from(finalText, fin)));
+            }
+
+            @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools,
+                                           StreamingResponseHandler<AiMessage> handler) {
+                generate(messages, handler);
+            }
+        };
+        when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+        AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
+        request.setProjectId(1L);
+        request.setConversationId(conversationId);
+        request.setMessage("把第三页标题改短");
+        request.setModel(MODEL);
+        orchestrator.handleUserMessage(request, 7L);
+        assertEquals(List.of("slide_set_text"), executed, "final 不能当工具执行");
+        assertTrue(String.valueOf(bubbleEndData()).contains("finished"));
+        return calls.get();
+    }
+
+    @Test
+    @DisplayName("原生伪工具 final 带正文：当本轮收尾，不再回「未知工具」让模型重发")
+    void pseudoFinalWithTextEndsTheTurn() {
+        assertEquals(2, runPseudoFinal("conv-final-text", "已把标题改短。"));
+    }
+
+    @Test
+    @DisplayName("原生伪工具 final 无正文：同样收尾，不当空响应重试")
+    void pseudoFinalWithoutTextEndsTheTurn() {
+        assertEquals(2, runPseudoFinal("conv-final-blank", ""));
+    }
 }

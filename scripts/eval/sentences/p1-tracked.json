@@ -1,0 +1,17 @@
+{
+  "_comment": "gap-analysis P1（R1）：带修订的 docx 正文给模型时不能把删除与插入拼成「715」。t01 只看结果：答出 15 日且没出现 715；不计首个工具（直接读注入正文作答即可）。",
+  "sentences": [
+    {
+      "id": "t01-tracked-read",
+      "text": "第三条的验收期限是几天？",
+      "hostState": "docx:contract-tracked",
+      "expect": {
+        "mustNotUse": [
+          "move_to_trash"
+        ],
+        "maxRounds": 6,
+        "outcomeCheck": "return /15\\s*日/.test(ctx.finalText) && !/715/.test(ctx.finalText);"
+      }
+    }
+  ]
+}

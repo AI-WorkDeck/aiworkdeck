@@ -342,7 +342,7 @@ public class TencentMeetingService {
             } catch (Exception ignored) {}
         }
 
-        sb.append("\n请调用 tmeet_get_transcript 工具（recordId=").append(record.getId())
+        sb.append("\n请调用 meeting_get_transcript 工具（source=tencent, meetingId=").append(record.getId())
                 .append("）读取全文及智能纪要素材，提炼以下四大模块：\n")
                 .append("1. 会议基本信息与背景概览\n")
                 .append("2. 核心议题讨论与各方关键陈述\n")
@@ -365,7 +365,7 @@ public class TencentMeetingService {
         sb.append("（recordId=").append(record.getId()).append("）中的所有行动项（Action Items / ToDo List）。\n\n");
 
         sb.append("请按以下要求处理：\n")
-                .append("1. 调用 tmeet_get_transcript（recordId=").append(record.getId()).append("）读取会议全文；\n")
+                .append("1. 调用 meeting_get_transcript（source=tencent, meetingId=").append(record.getId()).append("）读取会议全文；\n")
                 .append("2. 提炼出明确的待办事项、负责人与预期完成时间；\n")
                 .append("3. 为每一条重要待办事项调用系统工具 task_create，将其作为日程任务添加到当前项目中进行跟踪；\n")
                 .append("4. 输出清晰易读的待办清单表格汇总。");

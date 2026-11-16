@@ -87,11 +87,11 @@
             </view>
             <view class="rp-three-col">
               <text class="rp-three-h">{{ mainSideLabel }}</text>
-              <text class="rp-three-t">{{ c.mainText || $t('editor.review.emptyText') }}</text>
+              <text class="rp-three-t"><text v-for="(seg, si) in c.mainDiff" :key="si" :class="'rp-d-' + seg.type">{{ seg.text }}</text><text v-if="!c.mainText">{{ $t('editor.review.emptyText') }}</text></text>
             </view>
             <view class="rp-three-col">
               <text class="rp-three-h">{{ otherSideLabel }}</text>
-              <text class="rp-three-t">{{ c.otherText || $t('editor.review.emptyText') }}</text>
+              <text class="rp-three-t"><text v-for="(seg, si) in c.otherDiff" :key="si" :class="'rp-d-' + seg.type">{{ seg.text }}</text><text v-if="!c.otherText">{{ $t('editor.review.emptyText') }}</text></text>
             </view>
           </view>
           <view class="rp-acts">
@@ -102,10 +102,18 @@
         </view>
       </view>
 
+      <!-- ①b 已自动合入的相邻段落：只一侧改过、挨着另一侧的改动，不要裁决，折叠着请过目 -->
+      <view v-if="(mergeNeighbors || []).length" class="rp-sec">
+        <view class="rp-sec-h rp-fold" @tap="neighborsOpen = !neighborsOpen">
+          <text>{{ (neighborsOpen ? '▾ ' : '▸ ') + $t('version.mergeNeighborsSection', { count: mergeNeighbors.length }) }}</text>
+        </view>
+        <MergeNeighborList v-if="neighborsOpen" :neighbors="mergeNeighbors" :main-label="mainSideLabel" :other-label="otherSideLabel" />
+      </view>
       <!-- ② 修订按两侧作者分组 -->
       <view class="rp-sec">
-        <text class="rp-sec-h">{{ $t('version.mergeBlockRevisions', { count: allGroups.length }) }}</text>
-        <view v-if="revLoaded && !allGroups.length" class="rp-empty">
+        <text class="rp-sec-h">{{ $t('version.mergeBlockRevisions', { count: mergeSideGroupCount }) }}</text>
+        <text v-if="mergeKeptPending" class="rp-merge-kept">{{ $t('version.mergePendingKept', { count: mergeKeptPending }) }}</text>
+        <view v-if="revLoaded && !mergeSideGroupCount" class="rp-empty">
           <text class="rp-empty-t">{{ $t('version.mergeNoPendingRevisions') }}</text>
         </view>
         <view v-for="side in mergeSideGroups" :key="'ms-' + side.side" class="rp-sub">
@@ -255,6 +263,9 @@
 //   作者  卡片带色条 + 作者标识，顶部四桶筛选（全部/AI/我/其他人）；
 //   类型  引擎 RedlineType 如实映射成 插入/删除/格式/段落格式，认不出的原样显示；
 //   理由  位置上与修订重叠/相接的批注挂进卡片，处置后顺手标记为已解决。
+import { MERGE_MECH_MARK } from '@/utils/mergeRevisionView.js'
+import { charDiff } from '@/utils/textDiff.js'
+import MergeNeighborList from '@/components/version/MergeNeighborList.vue'
 import EvidencePanel from '@/components/EvidencePanel.vue'
 import InlineReviewPanel from '@/components/InlineReviewPanel.vue'
 import {
@@ -290,8 +301,8 @@ function fenceSnapshot(src, fields) {
 
 export default {
   name: 'ReviewPanel',
-  components: { EvidencePanel, InlineReviewPanel },
-  emits: ['close', 'changed', 'locate', 'merge-state', 'open-other-version', 'open-history', 'inline-review'],
+  components: { EvidencePanel, InlineReviewPanel, MergeNeighborList },
+  emits: ['merge-recreated', 'close', 'changed', 'locate', 'merge-state', 'open-other-version', 'open-history', 'inline-review'],
   props: {
     documentLocation: { type: Object, default: () => ({}) },
     // LibreOffice executor（executeCommand(action, params)）。null 时面板静默。
@@ -309,6 +320,8 @@ export default {
     mode: { type: String, default: 'review' },
     // 同一段两边都改了：后端 analysis.overlaps 原样传下来 [{key, baseText, mainText, otherText}]
     mergeConflicts: { type: Array, default: () => [] },
+    // 挨着另一侧改动、只一侧改过、已自动合入的段（后端 analysis.neighbors），只列不裁决
+    mergeNeighbors: { type: Array, default: () => [] },
     // 另一侧只改了格式、没被自动带过来的段：引擎 build_merge_draft 的 formatOnly [{paraKey, preview}]
     mergeFormatOnly: { type: Array, default: () => [] },
     // 两侧修订的作者名（引擎在比较时署上的），用来把每条修订归到哪一边
@@ -342,7 +355,7 @@ export default {
       authorFilter: 'all',
       // 合并模式的两笔账：块 1 每处选了哪一边，块 2 每条修订怎么处置的。
       // 「完成裁决」时由宿主用 collectDecisions 合成尾注清单。
-      mergeChoices: {}, mergeOutcomes: [],
+      mergeChoices: {}, mergeOutcomes: [], neighborsOpen: false,
     }
   },
   computed: {
@@ -361,7 +374,10 @@ export default {
           choice,
           choiceLabel: this.conflictChoiceLabel(choice),
           where: this.unitLabel(c.key),
-          paraKey: this.paraIndexOf(c.key),
+          paraKey: c.paraKey != null ? c.paraKey : this.paraIndexOf(c.key),
+          // 每一侧相对共同的上一版改了哪几个字，轻量标出来（合并稿里不再有主线侧的比较修订，律师在这里决定）
+          mainDiff: charDiff(c.baseText || '', c.mainText || ''),
+          otherDiff: charDiff(c.baseText || '', c.otherText || ''),
         })
       })
     },
@@ -373,6 +389,12 @@ export default {
     },
     // 块 2：修订按两侧分组。作者名对不上任何一侧的（律师自己在正文里手改出来的）
     // 不进这两组——它们既不是「你改的」也不是「律师乙改的」，逐处裁决的账里没有位置。
+    mergeSideGroupCount() { return this.mergeSideGroups.reduce((n, s) => n + s.groups.length, 0) },
+    // 三份文件里原有的、合并原样保留的待处理修订条数（台账 B13）——告诉律师它们还在
+    mergeKeptPending() {
+      if (!this.isMerge) return 0
+      return (this.revisions || []).filter((r) => !String(r.author || '').endsWith(MERGE_MECH_MARK)).length
+    },
     mergeSideGroups() {
       const buckets = { M: [], T: [] }
       for (const g of this.allGroups) {
@@ -477,9 +499,13 @@ export default {
     },
     /** 一条修订属于哪一侧。作者名是引擎在同一条命令内署上的（spike A2）。 */
     mergeSideOf(author) {
+      // 只有合并自己产生的修订（署名末尾带 U+2060，台账 B13）算某一侧的改动；同名律师本人原有的
+      // 待处理修订不进这两组，「完成裁决」也不会顺手把它们接受掉。
       const a = String(author || '')
-      if (a && a === this.mainAuthor) return 'M'
-      if (a && a === this.otherAuthor) return 'T'
+      if (!a.endsWith(MERGE_MECH_MARK)) return ''
+      const name = a.slice(0, -1)
+      if (name === this.mainAuthor) return 'M'
+      if (name === this.otherAuthor) return 'T'
       return ''
     },
     emitMergeState() {
@@ -514,16 +540,15 @@ export default {
       this.resolving = true
       try {
         if (choice === 'main') {
-          const items = this.revisionsInUnit(row)
-          if (items.length) {
-            const indices = items.map((r) => r.index).sort((a, b) => b - a)
-            await this.run('resolve_revisions', { indices, action: 'accept' })
-          }
+          // 合并稿里这一段本来就是主线那一版（连同它原有的待处理修订，台账 B13），不用动文档
         } else if (choice === 'other') {
           const res = await this.run('merge_take_other', {
-            paraKey: row.paraKey, text: row.otherText || '', author: this.otherAuthor,
+            // 结构化克隆过中继：Vue 的响应式代理传不过去（真机实测 "An object could not be cloned"），给一份纯数据
+            paraKey: row.paraKey, side: row.side ? JSON.parse(JSON.stringify(row.side)) : null, author: this.otherAuthor,
+            order: row.order != null ? row.order : null,
           })
           if (!res) return // run() 已经把失败写进红条；这一处仍算未处理，别记账
+          this.$emit('merge-recreated', { recreated: res.recreated || [] })
         } else if (choice === 'self') {
           this.gotoParagraph(row.paraKey)
         } else {
@@ -575,10 +600,10 @@ export default {
     async acceptRemainingRevisions() {
       const sides = this.mergeSideGroups
       for (const s of sides) for (const g of s.groups) this.recordOutcome(s.side, g, 'accept')
-      if (sides.some((s) => s.groups.length)) {
-        await this.run('resolve_all_revisions', { action: 'accept' })
-        await this.reload()
-      }
+      // 只接受合并自己产生的修订；三份文件里原有的待处理修订保持待处理（台账 B13）
+      const accepted = await this.run('resolve_merge_mechanics', { action: 'accept' })
+      if (!accepted) throw new Error(this.error || this.$t('version.mergeMechanicsLeft'))
+      await this.reload()
       this.emitMergeState()
       return {
         conflictChoices: (this.mergeConflicts || []).map((c) => ({ key: c.key, choice: this.mergeChoices[c.key] || '' })),
@@ -892,6 +917,10 @@ export default {
 /* 合并比对稿模式的三块（dev-board#630） */
 .rp-merge-title { font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); }
 .rp-sec { margin-bottom: 14px; }
+.rp-d-ins { background: var(--awd-accent-soft); color: var(--awd-accent-text); text-decoration: underline; }
+.rp-d-del { color: var(--awd-danger-text); text-decoration: line-through; }
+.rp-fold { cursor: pointer; }
+.rp-merge-kept { display: block; font-size: var(--awd-panel-fs); color: var(--awd-text-3); line-height: 1.5; margin: 2px 0 6px; }
 .rp-sec-h { display: block; font-size: var(--awd-panel-fs); font-weight: 600; color: var(--awd-text); margin: 4px 0 6px; }
 .rp-sec-s { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.5; margin-bottom: 6px; }
 .rp-sub { margin-bottom: 10px; }

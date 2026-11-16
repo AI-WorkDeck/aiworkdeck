@@ -111,6 +111,7 @@ dev-board#30）；更早的产品设计 `2026-08-17-mobile-clients-design.md`。
 - `GET/PUT /api/mobile/backup-consent` 保存账户决定；PUT 必须显式传 enabled 和当前
   `consentVersion:2026-10-11`。旧行 nullable 字段默认关闭/未决定，不替用户同意。
   返回 `enabled/decided/subscriptionActive/consentVersion/cleanupPending`。
+  桌面 `MobileBackupConsent.vue` 只在工作台挂载与账户变化（uni 总线 `awd:account-changed`，不是 window 事件）后的那一次查询里、且用户此后没有点击/按键时自动弹出未决定的说明；60 秒后台复查从不自己弹窗，未决定时状态栏显示「文件云端备份 · 待选择」（QA D9，`frontend/tests/mobile-backup/prompt-timing.test.mjs`）。
 - 桌面 worker 定期查账户决定和订阅；同意后推 `/backup/manifest` 元数据（含空文件夹），
   仅为支持格式计算 SHA256、读取字节；`GET /backup/files?deviceId=&projectKey=` 对账，
   省略 projectKey 返回此设备全部备份，便于清理已删除项目。`PUT /backup/files` 是 query
@@ -601,9 +602,19 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 
 `MobileAssistantTranscript.from` 是云端项目复制与电脑转存的共用文本出口：每条已完成assistant回答前增加LangText可见AI说明，用户问题不标，保留来源段与时间且不改原始turn。旧快照不回填；文本前缀不是文件标准隐式元数据。测试 `MobileAssistantTranscriptTest` 与 `MobileAssistantServiceTest`；其他客户端复制/导出另验。
 
+## 个人助理内容安全与审计（dev-board#1717）
+
+`MobileAssistantContentSafetyService` 在 `MobileAssistantService.chat()` 中对输入和最终输出分别执行本地规则检查，不向另一家审核服务发送正文。BLOCK 输入在建 turn 和调用模型前停止；BLOCK/REVIEW 输出不保存或展示；REVIEW 通过既有 `user_feedback` 的 `ai-content-report` 队列生成幂等人工复核单，正文不自动附入复核单。
+
+审核事件复用 `UserActivityLog`（`actionType=mobile_assistant_content`），保留账户、时间、会话/请求 ID、阶段、SHA-256、类别、规则版本、决定及复核单 ID；`UserActivityLogService.RequestMetadata` 另保存经可信反代还原的来源 IP/端口和 User-Agent。不得在 metaInfo 写完整输入、输出或来源文件内容。该表由既有每日任务清理 180 天前记录；安全审计留存与账户业务内容删除是不同边界。
+
+`MobileAssistantController` 必须从 `HttpServletRequest` 和 User-Agent 构造 RequestMetadata；客户端不得自报来源 IP。回归：`MobileAssistantServiceTest`、`UserActivityLogServiceTest` 与举报结案域测试。规则初筛不等于全量风险识别或生产人工值守证明。
+
 ### #1703 云按量能力与清理后的备份暂停
 
 原subscriptionActive继续表示真实订阅；客户端功能准入读cloudAccess而非订阅。mobile-v1.yaml含cloud-state/postpaid-accept/resume-cloud、quote报价hash及content expectedHash。所有新增云写带当前epoch；桌面relay会话捕获同一次epoch，旧会话不能跨generation重新发布。
+
+**按账户生效（2026-11-05）**：后付费准入、PERSONAL归属、epoch与下载计费只对已接受政策账户（`CloudStorageQuotaService.postpaidFor`，读cloud-state的`billing.accepted`）生效；未接受账户即使全局开关打开也走订阅配额，与关闭时一致。新增准入点别直接用全局`postpaidEnabled()`判断单个账户。影子计量`CloudPostpaidShadowService`（`storage.postpaid.shadow`）只上报`shadow-*`，实时开关打开时失效，回归`CloudPostpaidShadowServiceTest`。
 
 `BackupConsent.enabled` 在cloudBackupPaused时为false，`backupPaused`明确是清理暂停；User真实备份同意仍保留，不能复用主动撤销同意让手机删除本机缓存。冻结期间不可读；用户resume后剩余非pendingDeletion字节可读，仍须明确开启备份才恢复新增上传。账户resume与开启备份是两步，未决清理claim不能被开启备份绕过。
 
@@ -612,3 +623,11 @@ Apple 订阅桥接：GET `/api/mobile/billing/subscription/appstore/capability`�
 - **网络读不进事务/锁**：`MobileRelayController.versionObjectPart` 先把请求体落临时文件再调 `MobileVersionObjectService.put`（事务 + 属主行锁）；`GitHttpController.receivePack` 先落临时文件再进 `repoLock`；`CloudSyncService.uploadToCloud` 在锁外先预传一遍版本对象（持锁段保留原调用补漏）。新增同类入口别在锁内读 socket / 走 WAN。
 - **收件箱下载必须有读取期限**：`MobileRelayClientService` 里 `content.body()` 一律包 `DeadlineInputStream(…, inboxBodyDeadline)`（默认 30 分钟，整次下载总期限）。`ofInputStream` 拿到响应头后 `HttpRequest.timeout` 不再约束读取，不包的话卡住的下载永远占着 `inboxRunning`，整条手机同步冻结。
 - **传输请求状态转换用条件更新**：`MobileTransferService.upload`（`stageIfPending`）与 `cancel`（`failIfPending`）靠 `where status='PENDING'` 互斥，输家不得再整行 save 覆盖；`push()` 扣费后读文件/暂存失败要 `refundChargeQuietly`（此时没有行，TTL 清扫兜不到）。
+
+## 包晴天律师（2026-11-06，aiworkdeck_website#380 / aiworkdeck#1403）
+
+`GET /api/mobile/billing/balance` 透传官网 `billingLine`（standard|circle|bqt）与 `bqtMember`（schema `BqtMember`，mobile-v1.yaml），经 `MobileBillingClient.BalanceResult.billing` → `BqtBilling.copyBillingFields`，旧官网缺字段按 standard/null。billingLine=bqt 时四端只显示包晴天积分折算额度（balanceCents 已是折算值），隐藏本站充值/Pro/兑换码，提示去包晴天 App 充值续费。网关拒绝码 `bqt_*` 不是登录失效。手机端登录建议：建扫码会话后打开 `bqtlawyer:///pages/scan/result?qrid=&timestamp=&source=`（包晴天 App 现有 scheme 与确认页），回前台继续轮询 status；未装包晴天则显示二维码或手机号登录。回归：`MobileApiContractTest`（bqt 分支覆盖 BqtMember 每个键）。
+
+## Google Play 消耗型内购桥接（2026-11-13，dev-board#665）
+
+`POST /api/mobile/billing/recharge` 放行 `channel=googleplay`（必传 `productId=credits.usd.10|20|50`，响应 `present=native`）；新增 `POST /api/mobile/billing/recharge/confirm-googleplay`（`outTradeNo` 可缺省、`productId` 必传、`purchaseToken` ≤4KB），原样转发官网 `action=confirm-googleplay`，仅在 `paid=true` 时作废余额缓存并由客户端 `consumeAsync` 消耗商品。回归：`MobileBillingServiceTest`、`HttpMobileBillingClientTest`、`MobileBillingRechargeDisabledTest` 与 `MobileApiContractTest`。

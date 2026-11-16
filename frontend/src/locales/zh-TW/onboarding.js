@@ -88,6 +88,11 @@ export default {
     "privacyName": "《隱私政策》",
     "crossBorderLabel": "單獨同意：將送入 AI 的內容跨境傳輸至境外模型服務商處理",
     "crossBorderView": "查看告知",
+    "consentCardTitle": "使用平台 AI 前，請確認一項資料處理同意",
+    "consentAccept": "同意並繼續",
+    "consentHideNotice": "收起告知",
+    "consentFailed": "沒有記上，請再點一次",
+    "consentLater": "以後再說",
     "crossBorderNoticeTitle": "向境外提供個人信息的單獨同意",
     "crossBorderNoticeBody": "國內站透過 AI WorkDeck 伺服器接入阿里雲百煉，國際站使用 OpenRouter。提交給 AI 的文字與相關檔案片段用於模型推論和計費；所選模型可能在境外處理這些內容。你可以在設定中撤回同意，撤回後平台 AI 通道停用。",
     "agreementRequired": "需勾選同意《服務條款》與《隱私政策》後繼續",
@@ -102,7 +107,8 @@ export default {
     "switch": "切換",
     "cancel": "取消",
     "switchFailed": "切換站點失敗，稍後重試",
-    "rescueFailed": "切換站點後仍未解鎖，檢查後重試"
+    "rescueFailed": "切換站點後仍未解鎖，檢查後重試",
+    "proIntroBanner": "註冊即享免費體驗額度 · 個人 Pro 前 3 個月特惠 ¥9.9/月",
   },
   "hint": {
     "learnMore": "瞭解詳情",
@@ -113,11 +119,13 @@ export default {
     "purchaseConfirmOk": "確認購買",
     "purchaseSuccess": "已解鎖",
     "purchaseFailed": "購買失敗",
-    "goRecharge": "去充值"
+    "goRecharge": "去充值",
+    "subscribeProBtn": "個人 Pro ¥9.9",
+    "clipboardProBtn": "開通個人 Pro",
   },
   "identity": {
     "title": "選擇本機工作區",
-    "subtitle": "檢測到本機有多個歷史賬號，請選擇要繼續使用的工作區。選定後不會再問，之後可在「設置 - 賬戶與用量」裡更改。",
+    "subtitle": "檢測到本機有多個歷史賬號，請選擇要繼續使用的工作區。選定後不會再問，之後可在「設置 - 帳戶與餘額」裡更改。",
     "reading": "正在讀取本機賬號",
     "retry": "重試",
     "itemMeta": "{projects} 個項目 · {files} 個文件",

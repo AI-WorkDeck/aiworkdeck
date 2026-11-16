@@ -7,6 +7,58 @@ description: 文档编辑器（LOWA/zetaoffice）领域。任务涉及 LibreOffi
 
 职责边界：编辑器内核与宿主集成。AI 发编辑指令的链路属 ai-doc-bridge 领域。引擎 = LibreOffice 24.2.8 自建 zh-CN 版（LO core 分支 distro/allotropia/zeta-24-2）。
 
+## 交互卡顿根因（office-tier1 O8，2026-11-12）
+
+整机测量：`frontend/tests/desktop-e2e/office-interaction-latency.mjs`（真 Electron + 备胎 + 正常自动保存，Word/PPT/Excel 同链路；`OFFICE_LATENCY_*` 环境变量传本机文件）。根因与处理：
+- **soffice.js 是 Embind ASSERTIONS 版**：`attachFinalizer` 给每个传到 JS 的智能指针造 `new Error`+`captureStackTrace`+`.stack`，只为 GC 时打印「leaked C++ instance」。整机 trace 占 office worker CPU 约 40%。`desktop/scripts/fetch-lowa-assets.js` 取件时经 `lowa-js-patches.js` 摘掉这段（保留 finalizer 注册），引擎内实测 get_ui_state 114→28ms、读页 110→16、写格 127→17、首存 article.docx 11.5→3.6s。下次重烧引擎改用非 ASSERTIONS 构建从源头去掉。
+- **自动保存空闲门**固定 1.5s → 大演示文稿每次停笔都整篇导出（14MB 冻 2.5–4s）。改为 `autoSaveIdleMs` = 上次导出耗时×2，夹在 1.5–8s；`forceAfter` 兜底不变。
+- **Calc 逐键不重绘**：`postNativeKeys` 原只给 Impress 唤醒 Qt 空闲循环，Calc 连打时最后一键才上屏；现两者都按批唤醒一次（不逐键、不轮询）。
+- **审阅气泡轮询**：非 Writer 文档回 `available:false` 后，逐键 resume/documentChanged 不再排 `get_review_layout`；换文档（load_document/比对构建）复位。
+- **后台写作调用**（设置/词表/学习/自动补全）`accountPrompt:false`：会话失效时静默失败，不在打字途中弹登录框；改写/采用等主动操作照常提示。
+- 待办：三个写作辅助宿主各自分页通读全文（大文档 Word 主因），宜按 revision 共享一次读取；PPT 缩略图与备胎启动在打开后 10s 内与交互争 worker。
+
+## QuickLook 借预热备胎后原样归还（台账 B5，2026-11-13）
+
+- 空格预览演示文稿借用预热备胎渲染（`renderSlidesForPreview`）。过去用完即弃，紧接着打开文件就要冷启动（真机 3.1s）；现在 `releaseLibreHiddenInstance(handle, { recycle: true })` 先发 `load_document{blank:true}`（worker 新建空白 Writer 文档、经 retarget 关掉预览的那份），成功才把 `borrowed` 清掉归还池子，紧接着打开落在热引擎上（真机 0.43–0.47s）。清场期间保持 borrowed，不会被过继；清场失败/拒收才按老规矩丢掉重排预热。
+- 三方合并等其他借用方**不走**回收（它们端着别人的文档跑重活，仍用完即弃）。
+- `load_document{blank}` 不是「空字节」：空字节保持当前文档不变（新建空文件的语义），清场必须用 blank。
+- 回归：`tests/project-home/libre-hidden-release-reactive.test.mjs`（回收/失败回退/冷实例不回收）、`node tests/lowa-e2e/blank-reset.mjs`（真引擎：预览→清场无残留→再装三种格式可编辑）、`node tests/desktop-e2e/quicklook-slides.mjs` 末段 B5（预览后马上打开 Word：热引擎、打字自动保存落盘、关闭重开核对；再开同一份演示文稿）。
+## 换屏后页面偏右被裁（台账 B1，2026-11-13）
+
+- 现象：窗口拖到/最大化到像素比不同的屏幕（Retina 2x ⇄ 外接 1x）后，Word 页面放大、偏右、右半截被裁、标尺对不上；PPT 缩放跳变、Excel 单元格放大。之后怎么拉窗口都不恢复。单纯改窗口宽度（前台/后台标签、加载中、动画式最大化、备胎过继）都**不会**出问题——别再往 resize 上找。
+- 根因：Qt 每次布局都重读 `devicePixelRatio`（引擎唯一读取点是 `emscripten_get_device_pixel_ratio`），LibreOffice 的排版比例在启动时定死，两边一错开就是上面的样子。
+- 修法：`editor.html` 头部内联脚本把 `window.devicePixelRatio` 钉在启动值（必须在 `editor-main.js` 之前）。代价：换到更高像素比的屏后画布略发虚，重新打开文件即按新屏启动。**别删这段，也别在客体页别处读 `devicePixelRatio` 当真实像素比用**（读到的是启动值）。
+- 回归：`node --test tests/lowa-unit/pinned-device-pixel-ratio.test.mjs`；真机 `node tests/desktop-e2e/resize-recenter.mjs`（默认 `RESIZE_MODE=dpr`，用 CDP 把客体像素比 2→1 仿真换屏，三种格式各一，去掉钉值即转红）。PDF 走 pdf.js iframe，不经 LOWA，不受影响。
+
+## 引擎堆 1 GB 与换引擎（R-086 浸泡，2026-11-14）
+- 现象：150 页合同（修订开启）在可见标签上每轮自动保存漏约 10 MB，约 30 轮引擎 OOM 中止；中止后画布停在最后一帧像能编辑，保存永远失败。
+- 根因三层：① zetajs 代理只在 V8 GC 时释放（FinalizationRegistry），worker JS 堆小到几乎不 GC → 加 `zetajs.release()`，段落索引换下的旧数组在无命令在途时显式释放；② 宿主 `__agent` 读切修订视图再切回，每次切都清索引 → 索引按视图存放（`parkedParaIndexes`），正文没变（`reviewRevision`）就原样取回；③ **LibreOffice 原生侧**逐段 `nextElement` 约 0.9 KB/段、每次 `load_document` 约 22 MB 收不回（释放代理、重装文档都收不回）→ 宿主兜底：保存后 `get_engine_heap`（不分配内存的高水位扫描，**绝不用 malloc 探**），过阈值在安静、已全部保存、不在输入法组字时换新引擎并恢复光标位置（`get_view_position`/`restore_view_position`）。
+- 地雷：控制器 `restoreViewData` 运行期调用不生效，位置一律按光标恢复。阈值/间隔可不发版调：localStorage `awd.engineHeap` = `{"recycleAt":0.7,"checkEveryMs":60000}`。
+- 引擎中止（`engine-failed`）与渲染进程没了走同一条恢复：换引擎重装最后一次保存的内容，`engineNotice` 写明恢复到哪一刻、之后的改动没保存上；进行中的保存不落 saveFailed。
+- 回归：`npm run test:lowa-heap-cycles`（每轮至多一次整篇枚举、活代理不增长、高水位与探针一致）；真机 `tests/desktop-e2e/engine-renew.mjs`（三种格式换新 + Word 中止恢复）。即时审校停笔重读 2.5 s → 5 s。
+
+## 只打开不许写盘（台账 B10，2026-11-14）
+
+- 现象：Word 2 的 .doc、Excel 5/95 的 .xls 打开几秒后被自动保存按 Word 97/BIFF8 改写原件（标题样式与间距还丢了），用户什么都没做。
+- 根因两处，都在 worker：①`retarget` 先装 XModifyListener 再做装载期规范化（修订开关、显示模式、锚点清场），这些改动先向宿主报一声 modified、随后才清标志——**每一份文档装载都会发这声**（旧 open-not-dirty 只数装载之后的，漏了），宿主若此时已 ready 就标脏自动保存，是否写盘全看时序；②`set_chrome{sheetTabs:false}` 改 Calc 的 `HasSheetTabs`，Calc 记成文档改动（连普通 .xlsx 都中）。修法：监听器挪到清标志之后装；`HasSheetTabs` 包进 `withViewOnlyChange`。
+- 产品规则：Office 97 之前的格式（`detectPre97Format`：.doc 的 FIB nFib < 0x00C1，.xls 主流叫 Book 或首个 BOF 是 BIFF5）引擎读得进、写不回原格式，按只读打开（`legacyImport`，与带密码旧格式共用 `legacyProtected` 横幅），修改走「另存为 .docx/.xlsx 副本」，原件一个字节不动。Word 97+/BIFF8 的 .doc/.xls 照常可编辑保存。
+- 回归：`node tests/lowa-e2e/open-not-dirty.mjs`（装载期间与之后都不许报 modified，含 `fixtures/legacy-import/` 三份旧版格式与表格 sheetTabs）；真机 `node tests/desktop-e2e/legacy-open-no-write.mjs`（打开不写盘、mtime 不变；旧版格式真改一笔仍不写原件，另存副本是合法 zip）。
+
+## PPT/Excel 一流化（office-tier1，2026-11-12）
+
+2026-11-12 在真实 LOWA 引擎实测。
+- Impress 标题占位符：`slideReplaceTextRange` 写后不回读就导出，会按旧长度截断（「案件概况」→「案件基本情况」落盘成「案件基本」）；写后 `text.getString()` 回读修复。
+- Impress 部分 UNO 写入（slide_write_notes、slide_format_text 等）不置 modified、不发修改事件 → 宿主不自动保存、关掉即丢。`execCommand` 末尾 `markSlideWriteModified` 对成功的 slide_* 写命令统一标脏（读类按 `SLIDE_READ_ACTION_RE` 排除）。
+- 文字颜色与主题色：pptx/docx 文字常带主题色，只写 CharColor 导出仍是 schemeClr。统一走 `setCharColor`（同时 CharColorTheme=-1）。Calc 单元格区域没有 CharColorTheme，CharComplexColor 断不开；`setCalcFontColor` 走 `.uno:Color` 派发（实测导出 rgb），失败退回属性写入。
+- `sheet_write_cells` 字符串类型判定 `sheetTypedInput`：>15 位数字串（身份证/银行卡）保文本；千分位、¥金额、百分比、ISO/年月日日期写数值，「常规」格式时配格式；3/4、TRUE、12:30、001 不猜。回执新增 `cellsAfterWrite`（首行、末行、公式格的地址=值）。
+- `slide_move_page`：.uno:MovePage* 是界面派发，两种静默失效——刚插页/刚打开时（让出事件循环重试最多约 1.5s 可恢复）；宿主把菜单栏、状态栏、工具栏三样同时藏掉后一律失效（任两样都正常），`slideMoveRetry` 先把状态栏显示再藏回一次即恢复，此后一直正常。真机矩阵 p07 由 0/4 → 4/4。
+- `sheet_read_range`：日期/时间格式的数值回显示文本（`sheetDateText`，按格式键缓存），不再给序列号。`sheet_write_cells` 回执另有 `overwrote`（被替换的原非空值，最多 20 格），模型写错格能看出并写回。
+- Word 导出慢：`repairMoveRangeBookmarks` 每次导出逐条取 redline（本引擎每条 2–7ms），4107 条修订的定稿每次自动保存白耗 10s。改为按「模型 + redline 条数 + 纪元」缓存「无移动」结论：条数只增 0/1 且纪元（接受/拒绝/撤销/重做/重载时递增，见 `noteRedlinesMayHaveBeenRemoved`）未变则跳过。实测同稿保存 11.7s → 首次全扫后约 1s。已知取舍：新插入与既有同文删除配成移动只 +1 条时会漏补一次书签（Word 里显示为删除+插入），正文不丢。
+- 结构改动回执带新现状：slide_add_page/delete/move 返回 `slides`（页码+标题），add_page 另返回新页 `shapes`；sheet_edit_rows_cols 返回 `usedRange` 与 `headerRow`。
+- 冷启动只读预览扩到 PPT（pptx-preview，≤15MB，`PPTX_PREVIEW_MAX_BYTES`），表格仍无预览。
+- 性能实测（引擎内计时，带 CJK 字体，备胎预热后；`frontend/tests/lowa-e2e/open-format-timing.mjs` / `open-format-postload.mjs`，`OPEN_TIMING_FILES` 可传本机文件）：装载 xlsx 5000 行 1.1s、pptx 5MB 1.8s / 14MB 3.9s、docx 3.3MB 2.1s；导出 xlsx 0.26s、pptx 5MB 1.0s / 14MB 2.7s、docx 3.3MB（含 2.6MB PNG）11.5s（Word 导出偏慢，待查）。
+- 地雷：e2e 页面的 CJK 字体从页面同目录取，`dist/zetaoffice` 里没有 cjk* 时中文全走回退，xlsx 装载虚高到 16s；计时必须在页面内做，导出字节经 CDP 回传 node 要多花数秒。图片是 pptx 装载/导出的主要成本（同稿去图后导出 0.2s）；JPEG 原样写回、不重编码。
+
 ## PPT 局部格式与视觉复核（2026-10-28，dev-board#1570/#1571/#1572）
 
 `office_thread.js` 的 PPT 替换按具体页/形状和可选完整原文校验后，用文字范围游标局部写入，保留其余混合字形；插页按 LO 24.2 前驱页索引语义定位，并在后续填充失败时报告已创建页，不能让上层盲目重试。段落读取增加 runs 与背景/几何信息；段距、行距、首行/左缩进写入共用 Impress 专属处理。非零右缩进当前导出 PPTX 不保留，因此在任何其他格式写入前拒绝；不以运行时成功回包代替保存重开验证。
@@ -43,7 +95,7 @@ PPT 内容修改立即失效缩略图，但全篇导航清单等宿主允许后�
 
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
-当前正式基线是 **24.2.8-zhcn-r6**（2026-10-20 PR#1164，四个产物SHA见 `desktop/lowa-build/RECIPE.md`）；下文历史段落的 r5/r6 描述不能当作当前未完成清单。本轮候选范围与近期内核限制复核在 `desktop/lowa-build/REBUILD-2026-10-26.md`，候选已于2026-10-26编译，哈希与真实验收边界见 `RECIPE.md`；默认下载地址仍为r6，未发布或升级客户端。
+当前正式基线是 **24.2.8-zhcn-r10**（2026-11-13 发布，0.86 起打包；= r8 配方 + Emscripten #28186 代理死锁回移补丁 `desktop/lowa-build/patches/apply-emscripten-patches.py`，修启动偶发挂住；四个产物 SHA 与验证见 `desktop/lowa-build/RECIPE.md`；r8 留在架上作回退，切回只改 desktop-build.yml / model-matrix.yml 的 LOWA_BASE_URL）。任何重编引擎发布前必须跑启动冒烟 ≥40 次（不能只看 run.mjs）。下文历史段落的 r5/r6 描述不能当作当前未完成清单。
 
 Calc 行列标题由原生 `ScHeaderControl` 绘制，字体在构造时缓存，CSS 与事后 UNO `ApplicationFont` 设置不能可靠替换。构建补丁将标题字体设为包内 Liberation Sans 9pt，经 VCL 设备DPI换算；在 Paint 中用独立 StyleSettings 副本映射产品深浅令牌，以现有 `AppBackground` 判主题，不修改正文格式或全局Qt调色板。高对比保留原生路径；这不等于滚动条/菜单等全部Qt chrome已深色化。`Color(sal_uInt32)` 在该基准可为 consteval，动态主题须写成 `dark ? Color(常量) : Color(常量)`。
 
@@ -112,6 +164,45 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 原生 PDF 使用 `storeToURL` 导出当前可见修订态的副本，允许只读；不切换源 URL，不改变脏状态、作者、跟踪或撤销栈，输出路径由会话拥有并清理。标尺支持四边页边距与三个段落缩进，每次拖动先取当前页/选区 token，松手只写一次；跨段混合上下文不显示伪一致手柄。锁定的 Writer 26.2 页边距 slot 参数名为 `Page`、单位整数 twip，不能沿用旧版本 property 名或传 mm/100；直接写页样式属性虽会变值却不产生可撤销记录，应走原生命令并回读验证。`test_native_ruler.py` 覆盖七项单步撤销、分数值量化、权限/过期拒绝与全部值保存重开。制表位、镜像页/复杂分节与完整签名包仍未验，不能据此默认替换所有文档引擎。
 
 **打开编辑器的重复工作（dev-board#1474）**：`LibreOfficeEditor.tryDocxPreview` 的自动预览只在引擎尚未就绪时开始，避免热备胎过继时与 `load_document` 同时解包、布局同一 DOCX；动态加载预览模块后再次核验。冷启动预览与失败后的显式 `force` 只读预览仍保留；热备胎探活失败转冷启动时，复用已下载且曾跳过预览的字节补回预览，文件、装载世代、检查点或缓存已失效则不重放，尚在下载的原回调只执行一次。`EditorToolbar.bootstrap` 先隐藏原生外壳、应用视图偏好并回读真实状态，再拉样式/字体清单；清单尚未返回不阻止视图按钮启用。设置偏好失败仍回读一次状态，不用默认值冒充引擎真实状态。`tests/toolbar/open-critical-path.test.mjs` 覆盖三文种顺序、慢清单、视图失败、热/冷启动预览及模块加载中的就绪竞争；保存、失败诊断与保活预算不变。
+
+**表格冷启动预览（office-tier1 O10）**：`composables/xlsxQuickPreview.js` 直接从 xlsx 读「打开后的第一屏」
+（活动表、保存时的 topLeftCell、冻结窗格、前 60 行 × 26 列、值 + 粗体/填充/对齐/列宽/数字格式/合并），首次打开就有、不需缓存。
+流式解压读够就停（20 000 行 < 1.5 s，实测台账 3–17 ms）。**第一屏有图片/图表/按钮（drawing 锚点或 VML 非 Note 对象）一律返回 null**，
+保持进度卡片——宁可不显示也不显示错的画面（与 PPT 缓存渲染同一原则）。地雷：
+- 内置格式 14/22 按引擎的 zh-CN 区域显示 `2025-03-02`；
+- styles 里自闭合 `<xf/>` 与 `<xf>…</xf>` 混排，必须用同一个元素正则切（先找 `</xf>` 会吞掉前一个，样式序号整体错位）；
+- 流式循环里用过的 g 正则别再拿去 `matchAll`（沿用 lastIndex，中途停下的大表会全空）。
+
+测试 `tests/lowa-unit/xlsx-quick-preview.test.mjs`。
+
+**设了打开密码的 Word/Excel/PPT（office-tier1 O14）**：LOWA 24.2 引擎带不带 `Password` 都拒收加密 OOXML（真机探针：
+三种格式、file/stream 两条路、带/不带 FilterName 一律返回 null），所以由宿主解：`utils/officeEncryption.js`
+（MS-OFFCRYPTO Agile，WebCrypto + `cfb` 读写复合文档）。链路：`loadDocument` 发现 CFB 头 → 手里没有密钥就抛
+`DOC_ENCRYPTED`（**密文不发给引擎**）→ 加载面板显示密码框（`passwordPromptVisible`/`submitPassword`）→ 宿主验密码、
+拿到文件密钥 `_pendingCrypto` → 重走装载，引擎拿明文 → `_docCrypto` 记下密钥。`saveDocument` 与 `saveCopyAs`
+在 stamp 之后过 `sealForStorage`：同一文件密钥重新加密（只换 keyData 盐与 HMAC，不需要密码、不重做 10 万次哈希），
+**加密失败整笔保存失败，绝不写明文**。保存后的重载/引擎重启用内存里的密钥直接解；新开的实例重新要密码；密码本身不保存。
+地雷：
+- WebCrypto 的 AES-CBC 只做 PKCS#7；Agile 是无填充整块——解密要补一个特制尾块（见 `aesDecryptRaw`）；
+- `CFB.find` 是模糊匹配，会把 `EncryptedPackage` 找成 `EncryptionInfo`，按完整路径精确取；
+- 演示文稿冷启动预览缓存（IndexedDB 明文）对加密文件一律不写不读；
+- 只支持 Agile（Office 2010+ / WPS 默认）；Standard 等报 `UNSUPPORTED_ENCRYPTION`，面板回到「请先去掉密码」的说明；
+- 版本合并、比对等隐藏引擎路径直接拿后端字节，加密文件在那里仍会被引擎拒收（安全失败，不写明文）；入口（`VersionCompareTab`、`MergeReviewTab`、`services/mergeDraft.js` 的 `fetchMergeInputs`）先经 `utils/officeCompareGuard.js` 的 `assertNotPasswordProtected` 判定（`isEncryptedOoxml` + `detectLegacyEncryption`，只读字节头、不解密不落盘），抛 `DOC_ENCRYPTED`，界面显示 `version.officePasswordProtected`（请先另存为无密码副本）。xlsx/pptx 等走文本对比（`DocDiffViewer` + 后端 `file-text`）：后端 Tika 遇加密抛 `EncryptedDocumentException` 时回 `kind=DOC_ENCRYPTED`，前端同样显示 `version.officePasswordProtected`。不复用编辑器内存里的会话密钥：隐藏引擎实例与编辑器是不同实例，复用要跨实例传密钥且比对稿会带出明文，得不偿失。
+- 未加密但引擎拒收（`DOC_REJECTED`）的 .doc/.xls/.ppt：`legacyOfficeDecrypt.detectLegacyFormat` 确认是结构完整的复合文档（含对应主数据流）时，加载面板显示 `editor.openFailed.legacyTitle`（格式过旧，请另存为 .docx/.xlsx/.pptx），否则仍是「引擎无响应或文件损坏」。测试 `tests/lowa-unit/office-compare-guard.test.mjs`。
+测试：`tests/lowa-unit/office-encryption.test.mjs`（夹具由独立实现 msoffcrypto-tool 加密，含 node:crypto 独立核 HMAC）、
+`tests/project-home/libre-load-budget-retry.test.mjs`、`external-rename-save.test.mjs`；真机 `tests/desktop-e2e/office-password.mjs`。
+
+**带密码的旧格式 .doc/.xls/.ppt（O14b）**：引擎带密码只开得了 .doc，.xls/.ppt 一律不行（真机探针，含 Office 原生样本），
+统一由宿主解：`utils/legacyOfficeDecrypt.js`（msoffcrypto-tool 6.1.0 移植，MIT，见根 `UPSTREAM.md` §4），引擎拿明文旧格式。
+旧格式写不回加密，所以**只读**：`saveDocument`/`scheduleAutoSave`/`sealForStorage` 对 `_docCrypto.legacy` 一律拒绝，
+保存栏给「另存为加密 .docx/.xlsx/.pptx 并打开」（`saveProtectedCopy`：导出画布当前内容 → `createEncryptionSession(密码)`
+新建 Agile 加密 → 同目录建文件（重名加 ` (1)`）→ `handOffSession` 把会话交给副本的编辑器，副本不再问密码）。
+旧格式没有可复用的文件密钥，密码只留在该编辑器实例内存里。加密 .ppt 的 Pictures 流按 POI 规则逐字段、每段从块 0 重起 RC4（用户真实 17 MB 样本核对；msoffcrypto 未实现这一段）；认不出的图片记录（如 FBSE）报不支持。
+- 4 版复合文档（4096 字节扇区，Mac PowerPoint 会写）里的 .ppt 引擎与桌面 LibreOffice 都打不开，解密后重打包成 3 版（`writeCfb`）。
+地雷：
+- `submitPassword` 不能提前撤 `docLoadFailed`——失败那轮已把 `ready` 置 true，提前撤闸会让装载途中的 modified 把文档标脏；
+- 旧 .ppt 形状没名字，`ensureShapeNames` 起内部名曾把文档标 modified，打开即被自动保存改写成 10 倍大（已包进 `withViewOnlyChange`，
+  `lowa-e2e/open-not-dirty.mjs` 守着）。
 
 **非空文件冷开的首个模型（dev-board#1474）**：`LibreOfficeEditor.mountEditor` 只在挂载时已知 `fileSize>0` 才向 guest 传 `initialDocument=1`，`editor-main`→`bootZetaOffice` 的 pthread bootstrap shim 转给 worker。worker 先建立 UNO desktop，首个模型直接由既有 `load_document` 装入，避免先建空白 Writer 再替换；spare、隐藏合并实例（file=null）、新空文件和大小未知的旧入口仍用空白 boot。relay ready 表示命令通道已接好，`ui_ready` 只在首个模型真正成功后发出，失败不得显示可编辑空白。模型出现前，模型命令回 `DOCUMENT_NOT_READY`；主题、右键配置和样式画像这三种引擎级配置仍可执行。缺 `bytes` 的 `load_document` 只更新署名，绝不能被异步作者解析抢先触发空白模型；显式空字节才允许必要的空白初始化。宿主空文件支路明确传空字节，无模型实例初始化失败继续落保存保护；已有空白实例的署名失败沿用容错。回归：`tests/lowa-unit/first-document-boot.test.mjs`、`tests/revision-view/boot-resize.test.mjs`、`tests/project-home/libre-redline-author.test.mjs`、`tests/toolbar/open-critical-path.test.mjs`。完整性能必须另测未预热实例的正文首帧、IME 和原文件保存，不能把跳过的 blank span 全当净收益（首次 native 公共初始化仍由真实文档承担）。
 
@@ -490,8 +581,9 @@ HOUSE 不再是常量：`buildHouse(profile)` 从画像 JSON 派生写端常量�
 
 | 原语 | 入参 | 成功出参 | 失败 |
 |---|---|---|---|
-| `build_merge_draft`（:5869） | `{baseBytes, mainBytes, otherBytes, mainAuthor, otherAuthor, plan:{mainChunks, otherChunks}, baseUnits, name}` | `{success:true, name, revisions, count, mainCount, otherCount, replayed, conflicts:[单元键], formatOnly:[{paraKey, preview}], elapsedMs:{loadOther, loadBase, compareMain, replay, total}}` | `{success:false, stage, message, elapsedMs}`，`stage ∈ load-other｜load-base｜load-main｜compare-main｜align｜replay`（另有 `compareWithBytes` 自己那三档经 `compare-main` 透出 message） |
-| `merge_take_other`（:6125） | `{paraKey, text, author}` | `{success, paraKey, revisionCount, remainingInParagraph, text}`；`success` 的判据是**该段一条未处理修订都不剩**（`left.length === 0`） | 走 `tableFail`（非 Writer / 段落序非法 / 拒旧修订失败 / 写入失败） |
+| `build_merge_draft` | `{baseBytes, mainBytes, otherBytes, mainAuthor, otherAuthor, plan:{mainChunks, otherChunks}, baseUnits, name}` | `{success:true, name, revisions, count, mainCount:0, otherCount, keptPending, replayed, conflicts:[单元键], conflictSides:[{key, paraKey, side:{segs, markRev, unsupported}, mainSide}], formatOnly:[{paraKey, preview}], recreated:[{type, author, text, date, para}], elapsedMs}` | `{success:false, stage, message, elapsedMs}`，`stage ∈ load-other｜load-base｜load-main｜align｜align-other｜replay｜pending-redlines` |
+| `merge_take_other` | `{paraKey, side, author, order}`（`side` = `conflictSides[].side`；没有就拒做，免得把另一侧已删的字写回正文） | `{success, paraKey, recreated, revisionCount, text}` | 走 `tableFail`；带着搬不过来的修订时附 `stage:'pending-redlines'` |
+| `resolve_merge_mechanics` | `{action:'accept'｜'reject'}` | `{success, resolved, kept}`——只处置署名带 `\u2060` 的合并修订，处置完核对其余修订一条没变 | `tableFail(message)` |
 | `sheet_get_active_cell`（:6165） | 无 | `{success:true, sheet, address}`（`address` 是 `B7` 这种 A1 写法） | `{success:false, error, message}`；非 Calc 文档明确拒绝 |
 | `slide_get_current`（:6184） | 无 | `{success:true, slideNumber}`（**1 基**，与 `slide_goto` 同口径） | `slideFail(...)`；非 Impress 文档明确拒绝 |
 
@@ -499,25 +591,24 @@ HOUSE 不再是常量：`buildHouse(profile)` 从画像 JSON 派生写端常量�
 表格与演示文稿这两条是它的对应物。**编辑器顶上那条小条自 dev-board#672 复测（2026-09-16）起是文件级的，不再用它们**
 （见 version-control.md 的「版本身份小条」）；两条原语本身是引擎公开 API，`lowa-e2e` 组 34 有用例，不要当死代码清掉。
 
-**`build_merge_draft` 的五步链路**（顺序是硬的）：
-① 载入另一侧 → `paragraphScan()`；② 载入共同的上一版 → `paragraphScan()`，两张快照按 `otherChunks` 推出的
-段序位移对齐后逐段比，文字相同而指纹不同的落进 `formatOnly`（:5952-5959）——**文字已被重放的段不再单列**，
-对不上的段**不猜**；③ 载入主线侧 → 以主线署名 `compareWithBytes(baseBytes)`，主线的改动成为带作者的字符级修订
-（含表格/批注/格式）；④ **对齐核对**：按 `mainChunks` 建「基线段序 → 当前段序」映射，先比段数总量（:6001）
-再对每一个未被主线改过的段逐段比归一文字（:6004-6009），任何一处对不上**整份退回 `stage:'align'`**；
-⑤ 切成对方署名，按 `otherChunks` 里 `conflict=false` 的块**从后往前**重放（:6051-6052，前面的段序才不会漂），
-最后恢复 `humanAuthor`。同一段两边都改了的块不重放——正文里只留主线侧那一版，另一侧的文字进 `conflicts`，
-交给面板的三选一（`merge_take_other`）。
-重放的三种块型各有写法：`INSERT` 走 `insertParasAfter`（找基线里前一个段落单元当锚点）、
-`DELETE` 走 `deleteUnit`（段落要**连段末换行一起选中**才是整段消失，:6029）、`MODIFY` 先清多余单元再追加新段、
-其余一一 `writeTrackedText`（字符级最小颗粒度，退化时整段替换）。表格单元走 `parseCellUnitKey` + `tableCellRange`（:3008/:3014）。
+**`build_merge_draft` 的链路**（顺序是硬的；台账 B13 起，详见 version-control.md「待处理修订」）：
+① 载入另一侧 → `paragraphScan()` + `docRevisionSegments()`（每段的修订结构：P/I/D/ID 片段 + 段落标记修订）；
+② 载入共同的上一版 → `paragraphScan()`，文字相同而指纹不同的落进 `formatOnly`，对不上的段**不猜**；
+③ 载入主线侧，**原样，不做原生比较**（比较会和原有的待处理修订叠在一起、还会多出段落）；
+④ **对齐核对**：按 `mainChunks` 推段序位移，先比段数总量，再对未被主线改过的段比「接受了修订之后」的文字
+（`acceptedText`，与 POI 取字同口径——不用 `para.getString()`，模型里删掉的字也在），对不上整份退回 `stage:'align'`；
+⑤ 以「对方 + `\u2060`」署名按 `otherChunks` 里 `conflict=false` 的块**从后往前**重放：正文段落走
+`rebuildParagraphFromSide`（清掉这段原有的段内修订 → 写入对方定稿的文字 → 按原作者做回对方的待处理修订），
+新增段走 `insertParasAfter`（文字 + 段落标记插在下一段开头），整段是一条待处理插入的以原作者插入；
+表格单元：两边格里都没有待处理修订的照旧 `writeTrackedText`；有的，单段格走 `rebuildParagraphWith`（台账 B13b），多段格停在 `pending-redlines`。重建的修订署名带 `\u2061`，宿主导出后还原。
+最后恢复 `humanAuthor`。同一段两边都改了的块不重放，另一侧这一段的结构进 `conflictSides` 交给面板。
 
 **三条地雷**：
 
 - **修订作者只在同一条 worker 命令内设得住**（spike A2 实证）——`execCommand` 每条命令开头都会把署名重置回
   `humanAuthor` / `AI WorkDeck`（见 `setRedlineAuthor` 的说明），跨命令切作者必然失效。
   spike 第一轮两侧修订全签成「本地用户」就是这么来的，而合并稿的全部价值就在于「哪一处是谁改的」。
-  所以 `build_merge_draft` 是一条巨长的命令、`merge_take_other`（拒旧修订 → 切作者 → 写入 → 接受）同理，
+  所以 `build_merge_draft` 是一条巨长的命令、`merge_take_other`（清这段原有修订 → 写入 → 按原作者做回 → 只接受合并修订）同理，
   **不要为了「可读性」把它们拆成几条原语**，也不要在宿主侧用两次 `run()` 去「先设作者再写入」。
   两条命令都在每个出口（含失败出口）恢复 `humanAuthor`（`restoreAuthor` :5872 / :6150、:6153）——漏一条，
   律师接着手打的字就会签成同事的名字。

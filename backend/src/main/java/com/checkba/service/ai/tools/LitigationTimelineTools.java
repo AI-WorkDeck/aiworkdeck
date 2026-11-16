@@ -77,8 +77,8 @@ public class LitigationTimelineTools implements AgentToolComponent {
 
     /** litigation_timeline_step 可驱动的阶段。read/render 各有专职工具，不在此列。 */
     private static final Set<String> STEP_STAGES = Set.of(
-            "pick", "span", "style", "offer", "budget", "capacity",
-            "title", "mark", "next", "steps", "shape");
+            "pick", "span", "style", "formats", "scope", "offer", "budget", "capacity",
+            "title", "mark", "ack", "next", "steps", "shape");
 
     /**
      * 句子清单的总字符上限。verdicts 要求逐句判定、一句不漏，所以句子必须全量
@@ -234,11 +234,14 @@ public class LitigationTimelineTools implements AgentToolComponent {
             requiresHost = ToolMeta.Host.LOWA)
     @Tool("Advance the timeline-master pipeline by ONE stage. Stages: pick (round 1, which "
             + "materials, answer like '1,2' or '全部'), span (round 2, time span), style (round 3: "
-            + "1 奇川风 / 2 歸藏风 / 3 白描 — NEVER leave empty, default to '1'), offer (submit "
+            + "1 奇川风 / 2 歸藏风 / 3 白描 — NEVER leave empty, default to '1'), formats (optional, "
+            + "output formats the user picked, e.g. '1,3' or '全部'), scope (lists the in-scope "
+            + "sentences to judge), offer (submit "
             + "verdicts.json + parts.json via modelFilesJson first), budget (round 4, which parts), "
             + "capacity (submit skeleton.json first), title (the figure title as answer), mark "
             + "(round 5, crimson accent: event id or '0' for none; set emphasisSource honestly), "
-            + "next/steps (where am I). The pipeline text it returns contains the exact question to "
+            + "ack (after render, ONLY once the user has confirmed the listed omitted restrictive "
+            + "wording), next/steps (where am I). The pipeline text it returns contains the exact question to "
             + "relay to the user via <question>/<option> and the instructions for your next move. "
             + "Model-produced JSON files are ALWAYS submitted through modelFilesJson — never via "
             + "write_file.")

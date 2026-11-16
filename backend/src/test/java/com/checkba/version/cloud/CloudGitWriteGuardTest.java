@@ -13,7 +13,7 @@ class CloudGitWriteGuardTest {
  final ProjectRepository projects=mock(ProjectRepository.class);final UserRepository users=mock(UserRepository.class);
  final CloudStorageQuotaService quota=mock(CloudStorageQuotaService.class);final MobileBillingService billing=mock(MobileBillingService.class);
  CloudGitWriteGuard guard() {
-  when(quota.isEnabled()).thenReturn(true);when(quota.postpaidEnabled()).thenReturn(true);
+  when(quota.isEnabled()).thenReturn(true);when(quota.postpaidEnabled()).thenReturn(true);when(quota.postpaidFor(anyLong())).thenReturn(true);
   when(users.lockStorageOwner(7L)).thenReturn(Optional.of(new User()));
   var project=new Project();project.setUserId(7L);project.setCloudBillingOwnerId(7L);project.setCloudOwnership("PERSONAL");
   when(projects.findById(42L)).thenReturn(Optional.of(project));when(projects.lockForImWrite(42L)).thenReturn(Optional.of(project));

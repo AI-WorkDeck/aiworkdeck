@@ -20,6 +20,10 @@
       <!-- Sidebar -->
       <view class="admin-sidebar">
         <view class="nav-card">
+            <!-- 整页形态（/pages/admin/admin、/pages/userprofile/userprofile）没有标签栏可退，自带一个回工作台的出口 -->
+            <view v-if="!embedded" class="nav-back" role="button" tabindex="0" @tap="goBackToWorkbench" @keydown.enter.stop.prevent="goBackToWorkbench">
+              <text>{{ $t('admin.backToWorkbench') }}</text>
+            </view>
             <!-- 紧凑用户行取代了原来单独一张大居中头像卡（dev-board#892）：
                  头像可点：local-mode 且已连接账户时写官网（展示名与头像的唯一权威源），
                  自建服务器仍走原来那条 uni.chooseImage + uploadAvatar。 -->
@@ -42,7 +46,7 @@
                 </view>
               </view>
             </view>
-            <!-- 两组：「个人」（原个人中心四栏）与「系统」（原系统设置各分区）。
+            <!-- 三组：「个人」、「系统」（原系统设置各分区）与垫底的「我的工作」（原个人中心的工作记录等四栏）。
                  分组只是排版，可见性仍由 visibleNavItems 一处决定
                  （desktopOnly + 系统组要 isAdmin）。 -->
             <view v-for="group in navGroups" :key="group.key" class="nav-group">
@@ -109,26 +113,13 @@
                 <text class="platform-link" @tap="switchToOfficialChannel">{{ $t('admin.switchToOfficialChannel') }}</text>
               </view>
 
-              <!-- 跨境传输的单独同意（个保法第三十九条）。官方通道会把内容送往境外，
-                   所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
-              <view class="consent-box">
-                <text class="consent-title">{{ $t('admin.consentTitle') }}</text>
-                <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
-                <view class="consent-check" @tap="toggleCrossBorderConsent">
-                  <view class="consent-box-mark" :class="{ checked: crossBorderConsented }"></view>
-                  <text class="consent-check-label">{{ $t('admin.consentCheckLabel') }}</text>
-                </view>
-                <text v-if="crossBorderConsentAt" class="consent-meta">{{ $t('admin.consentAt', { time: formatConsentAt }) }}</text>
-                <text class="consent-link" @tap="openPrivacyCrossBorder">{{ $t('admin.consentPrivacyLink') }}</text>
-              </view>
-
               <!-- 模型选择。清单唯一来源是后端模型目录（GET /api/ai/models）——
                    历史上前端硬编码过两份互不同步的清单，结果是「后端加模型用户看不到、
                    前端加模型被工厂静默回落默认模型」。
                    系统提示词的 OLLAMA / GEMINI 两个 tab 已随 v1 对话通道移除：
                    唯一读者是已删的 AiChatService，对四条通道本来就全部失效。
                    模型下拉是官方版里用户唯一还能选的 AI 参数。 -->
-              <view class="section-divider"></view>
+              <view v-if="legacyProvider" class="section-divider"></view>
               <view class="section-header-inline">
                   <text class="section-title-sm">{{ $t('admin.modelSelectionTitle') }}</text>
               </view>
@@ -169,6 +160,9 @@
                 <button type="button" class="comp-btn" @tap="onNavTap({ key: 'workflows' })">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</button>
               </SettingsRow>
           </SettingsSection>
+
+          <!-- 扫描件识别（OCR）：属于 AI 功能，原先误放在「账户与余额」里 -->
+          <OcrRoutingSettings :key="'ocr-routing-' + identityCurrentId" />
 
           <!-- 保存按钮 -->
           <view class="fixed-footer">
@@ -308,7 +302,9 @@
                     <view class="wallet-left">
                       <text class="wallet-balance-label">{{ $t('admin.walletBalanceLabel') }}</text>
                       <text class="wallet-balance-value">{{ walletBalanceText }}</text>
-                      <button class="btn-primary wallet-recharge-btn" @tap="showRecharge = true">
+                      <!-- 包晴天积分通道：不在本应用充值（dev-board BQT 积分通道） -->
+                      <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                      <button v-else class="btn-primary wallet-recharge-btn" @tap="showRecharge = true">
                         {{ $t('admin.rechargeButton') }}
                       </button>
                     </view>
@@ -342,8 +338,24 @@
                     <text style="font-size: 13px;">{{ $t('admin.walletQingtianBalance', { remaining: walletBqtQingtian.remainingCoins, monthly: walletBqtQingtian.monthlyCoins }) }}</text>
                     <text style="font-size: 12px; opacity: 0.75;">{{ $t('admin.walletQingtianRatio', { creditsPerCoin: walletBqtQingtian.creditsPerCoin }) }}</text>
                   </view>
-                  <!-- 兑换码 / Circle 联盟所邀请码绑定入口 -->
-                  <view style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">
+                  <!-- 包晴天会员：等级、状态、到期、积分与折算 Credits（DeepSeek 用量优先扣积分）；取代上面的晴天币月度额度 -->
+                  <view v-if="walletBqtMember" class="bqt-member-card">
+                    <view class="bqt-member-head">
+                      <text class="bqt-member-title">{{ $t('admin.bqtMemberTitle') }} · {{ $t(walletBqtMember.levelKey) }}</text>
+                      <text class="bqt-member-status" :class="{ 'is-expired': !walletBqtMember.active }">
+                        {{ walletBqtMember.active ? $t('admin.bqtStatusActive') : $t('admin.bqtStatusExpired') }}
+                      </text>
+                    </view>
+                    <text v-if="walletBqtMember.expireAt" class="account-note">{{ $t('admin.bqtExpireAt', { date: formatUsageTime(walletBqtMember.expireAt) }) }}</text>
+                    <text class="account-note">{{ $t('admin.bqtPointsLine', { points: walletBqtMember.points, credits: walletBqtMember.credits }) }}</text>
+                    <text v-if="walletBqtMember.hasDebt" class="bqt-member-warn">{{ $t('admin.bqtDebtWarning', { count: walletBqtMember.failedCount, amount: walletBqtMember.outstandingCredits }) }}</text>
+                    <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                    <text v-else-if="walletBqtMember.guidance === 'renew'" class="bqt-member-warn">{{ $t('admin.bqtRenewHint', { points: walletBqtMember.points }) }}</text>
+                    <text v-else-if="walletBqtMember.guidance === 'wallet'" class="account-note">{{ $t('admin.bqtWalletHint') }}</text>
+                    <text v-else class="account-note">{{ $t('admin.bqtPriorityNote') }}</text>
+                  </view>
+                  <!-- 兑换码 / Circle 联盟所邀请码绑定入口（储值入口，包晴天积分通道不显示） -->
+                  <view v-if="!isBqtBilling" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.06);">
                     <text style="font-size: 12px; opacity: 0.75; display: block; margin-bottom: 6px;">{{ $t('admin.walletRedeemTitle') }}</text>
                     <view style="display: flex; gap: 8px; align-items: center;">
                       <input
@@ -395,11 +407,16 @@
                 <text class="account-note">{{ $t('admin.subscriptionReset', { date: formatUsageTime(subscription.weeklyEnd) }) }}</text>
                 <text class="account-note">{{ $t('admin.subscriptionEnds', { date: formatUsageTime(subscription.periodEnd) }) }}</text>
                 <text class="account-note">{{ $t(subscription.walletFallbackEnabled ? 'admin.subscriptionFallbackOn' : 'admin.subscriptionFallbackOff') }}</text>
-                <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                <view v-else class="comp-actions">
+                  <button v-if="isCnSite" class="comp-btn" @tap="onSubscribePro">{{ $t('admin.subscriptionRenewBtn') }}</button>
+                  <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionManage') }}</button>
+                </view>
               </view>
               <view v-else class="provider-card">
-                <text class="account-note">{{ $t('admin.subscriptionInactiveNote') }}</text>
-                <button class="comp-btn" @tap="openSubscriptionAccount">{{ $t('admin.subscriptionSubscribeBtn') }}</button>
+                <text class="account-note">{{ $t(isCnSite ? 'admin.subscriptionInactiveNoteCn' : 'admin.subscriptionInactiveNote') }}</text>
+                <text v-if="isBqtBilling" class="account-note">{{ $t('admin.bqtPayInApp') }}</text>
+                <button v-else class="comp-btn" @tap="isCnSite ? onSubscribePro() : openSubscriptionAccount()">{{ $t(isCnSite ? 'admin.subscriptionSubscribeBtnCn' : 'admin.subscriptionSubscribeBtn') }}</button>
               </view>
             </SettingsSection>
 
@@ -549,8 +566,6 @@
               </view>
           </SettingsSection>
 
-          <OcrRoutingSettings :key="'ocr-routing-' + identityCurrentId" />
-
           <!-- 花费闸门。原属已撤销的「平台服务」分区，官方版全部外部服务统一平台代采后
                那个分区已无实际作用；这张卡是其中仍然真实的功能，随通知一起搬来本分区末尾
                （刻意放在最后，减少与本分区其它改动的冲突面）。
@@ -570,7 +585,7 @@
                 />
               </SettingsRow>
 
-              <text v-if="!platformRemote.pricingAvailable" class="field-note">
+              <text v-if="!platformRemote.pricingAvailable" class="field-note region-summary-note">
                 {{ $t('platform.usageUnavailable') }}
               </text>
 
@@ -681,7 +696,22 @@
           scroll-y
           class="config-scroll"
         >
-          <SettingsSection :title="$t('admin.navTelemetry')" :description="$t('admin.telemetrySubtitle')">
+          <!-- 隐私与数据：跨境传输同意 / 匿名使用统计开关 / 文档属性 / 本地使用统计 都收在这一页 -->
+          <SettingsSection :title="$t('admin.consentTitle')">
+              <!-- 跨境传输的单独同意（个保法第三十九条）。官方通道会把内容送往境外，
+                 所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
+            <view class="consent-box">
+              <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
+              <view class="consent-check" @tap="toggleCrossBorderConsent">
+                <view class="consent-box-mark" :class="{ checked: crossBorderConsented }"></view>
+                <text class="consent-check-label">{{ $t('admin.consentCheckLabel') }}</text>
+              </view>
+              <text v-if="crossBorderConsentAt" class="consent-meta">{{ $t('admin.consentAt', { time: formatConsentAt }) }}</text>
+              <text class="consent-link" @tap="openPrivacyCrossBorder">{{ $t('admin.consentPrivacyLink') }}</text>
+            </view>
+          </SettingsSection>
+
+          <SettingsSection :title="$t('admin.telemetrySectionTitle')" :description="$t('admin.telemetrySubtitle')">
               <view class="provider-card">
                 <view class="provider-header telemetry-switch-row">
                   <view class="telemetry-switch-info">
@@ -717,6 +747,8 @@
                 <text class="telemetry-privacy-line">{{ $t('admin.telemetryPrivacyLine') }}</text>
               </view>
           </SettingsSection>
+
+          <DocGeneratorSetting />
 
           <SettingsSection :title="$t('admin.localStatsTitle')" :description="$t('admin.localStatsSubtitle')">
               <template #actions>
@@ -756,14 +788,14 @@
                   <view v-if="telemetrySummary.byMatterCategory.length" class="telemetry-list">
                     <text class="telemetry-list-title">{{ $t('admin.matterCategoryTitle') }}</text>
                     <view v-for="item in telemetrySummary.byMatterCategory" :key="'m-' + item.name" class="telemetry-list-row">
-                      <text class="telemetry-list-name">{{ item.name }}</text>
+                      <text class="telemetry-list-name">{{ matterTypeLabel(item.name, $t) }}</text>
                       <text class="telemetry-list-count">{{ item.count }}</text>
                     </view>
                   </view>
                   <view v-if="telemetrySummary.byTool.length" class="telemetry-list">
                     <text class="telemetry-list-title">{{ $t('admin.topToolsTitle') }}</text>
                     <view v-for="item in telemetrySummary.byTool.slice(0, 8)" :key="'t-' + item.name" class="telemetry-list-row">
-                      <text class="telemetry-list-name">{{ item.name }}</text>
+                      <text class="telemetry-list-name" :title="item.name">{{ toolDisplayName(item.name) }}</text>
                       <text class="telemetry-list-count">{{ item.count }}</text>
                     </view>
                   </view>
@@ -942,7 +974,7 @@
               </view>
               <view v-for="slot in capabilitySlots" :key="slot.id" class="comp-row">
                 <view class="comp-main">
-                  <text class="comp-name">{{ slot.name }}</text>
+                  <text class="comp-name">{{ capabilitySlotName(slot) }}</text>
                   <text class="comp-sub">
                     {{ slot.id }} · {{ $t('admin.capabilityCurrent') }}{{ capabilityCurrentLabel(slot) }}
                     <text v-if="slot.degraded" class="comp-error"> · {{ $t('admin.capabilityDegraded') }}</text>
@@ -1030,6 +1062,10 @@
             </view>
           </SettingsSection>
         </scroll-view>
+        <!-- 律所审计日志（S20）：只有服务端确认是律所管理员时这一栏才出现（firmAuditAvailable） -->
+        <scroll-view v-else-if="activeNav === 'audit_log'" scroll-y class="config-scroll">
+          <FirmAuditLogPanel />
+        </scroll-view>
         <!-- 团队（dev-board#496）。接在链尾：这条 v-if/v-else-if 长链的链头是
              activeNav === 'ai'，动链头会拿到「v-else 没有相邻 v-if」的编译错。 -->
         <scroll-view v-else-if="activeNav === 'team'" scroll-y class="config-scroll">
@@ -1060,6 +1096,7 @@ import {
   getSiteStatus, selectSite,
   getPlatformServices, getPlatformServiceRemote, savePlatformBudget,
   packUninstall,
+  firmCloudAction,
 } from '@/services/api.js'
 import { getCurrentUser, getSessionId, setSessionUser } from '@/utils/auth.js'
 import { getInitial } from '@/utils/textInitial.js'
@@ -1067,7 +1104,7 @@ import { openExternalUrl } from '@/utils/externalLink.js'
 import { accountPageUrl, siteBaseUrl, siteLinks, loadSiteLinks, resetSiteLinks } from '@/utils/siteLinks.js'
 import { host } from '@/services/host.js'
 import { signOut } from '@/utils/signOut.js'
-import { requireAccount, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { requireAccount, requireSubscription, broadcastAccountChanged, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { recordAccountConsents } from '@/utils/accountConsent.js'
 import { refreshEntitlements, isEnabled, FEATURES } from '@/composables/useEntitlement.js'
 import { loadIdentityProfile, readNudgeRecords, markNudgeShown, PROFILE_SOURCE } from '@/services/accountProfile.js'
@@ -1075,6 +1112,7 @@ import { shouldPromptNameNudge } from '@/utils/identityProfile.js'
 import { shouldAcceptResponse } from '@/utils/requestGeneration.js'
 import UnlockHint from '@/components/UnlockHint.vue'
 import RechargeDialog from '@/components/RechargeDialog.vue'
+import { isBqtBillingLine, bqtMemberView } from '@/utils/bqtBilling.js'
 import AwdSelect from '@/components/AwdSelect.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import PersonalWorkLogPanel from '@/components/userprofile/PersonalWorkLogPanel.vue'
@@ -1083,6 +1121,7 @@ import PersonalFavoritesPanel from '@/components/userprofile/PersonalFavoritesPa
 import PersonalTodosPanel from '@/components/userprofile/PersonalTodosPanel.vue'
 import PersonalSettingsPanel from '@/components/userprofile/PersonalSettingsPanel.vue'
 import TeamPanel from '@/components/admin/TeamPanel.vue'
+import FirmAuditLogPanel from '@/components/admin/FirmAuditLogPanel.vue'
 import OcrRoutingSettings from '@/components/admin/OcrRoutingSettings.vue'
 import OptionalComponentCard from '@/components/OptionalComponentCard.vue'
 import McpConnectionsPanel from '@/components/admin/McpConnectionsPanel.vue'
@@ -1091,7 +1130,11 @@ import MemoryBrowser from '@/components/MemoryBrowser.vue'
 import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import DocGeneratorSetting from '@/components/settings/DocGeneratorSetting.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
+import { matterTypeLabel } from '@/config/matterTypes.js'
+import { localizeSites } from '@/utils/siteNames.js'
+import { toolDisplayName } from '@/utils/toolDisplayNames.js'
 import { componentDownloads } from '@/services/componentDownloads.js'
 import { openPermissionOnboarding, normalizePermissionItems } from '@/utils/permissionOnboarding.js'
 
@@ -1103,6 +1146,7 @@ const NAV_LABEL_KEYS = {
   todos: 'account.tabTodos',
   personal_settings: 'admin.navPersonalSettings',
   team: 'team.navTeam',
+  audit_log: 'auditLog.nav',
   memory: 'chat.memoryButton',
   workflows: 'chat.builtinWorkflowsFoldEntry',
   mcp: 'mcp.title',
@@ -1148,10 +1192,11 @@ export function resolveAdminNavKey(key) {
 export default {
   name: 'AdminPane',
   components: {
+    DocGeneratorSetting,
     OcrRoutingSettings,
     UnlockHint, RechargeDialog, AwdSelect, AwdSwitch,
     PersonalWorkLogPanel, PersonalCaseIntakePanel, PersonalFavoritesPanel, PersonalTodosPanel, PersonalSettingsPanel,
-    McpConnectionsPanel, TeamPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
+    McpConnectionsPanel, TeamPanel, FirmAuditLogPanel, OptionalComponentCard, MemoryBrowser, BuiltinWorkflowEditor, ExternalDependenciesPanel,
     LanguagePicker, SettingsSection, SettingsRow,
   },
   /**
@@ -1188,23 +1233,31 @@ export default {
       // 「系统」组是否可见。原来这条规则长在个人中心的 checkAdminTab（只有管理员
       // 才多出一个「系统设置」tab），两页合并后它就是这一处。
       isAdminUser: cachedIsAdmin(),
-      // 非管理员进来时默认落个人组第一栏——落在一个自己看不见的面板上等于空白页
-      activeNav: cachedIsAdmin() ? 'ai' : 'work_log',
+      // 律所审计日志一栏是否出现：服务端确认当前账户是律所管理员后才置 true（见 probeFirmAudit）
+      firmAuditAvailable: false,
+      // 非管理员进来时默认落「个人资料与登录」——落在一个自己看不见的面板上等于空白页
+      activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings',
       /** 服务端记录的同意时间戳；空 = 未同意或告知文本已改版需重新征求 */
       crossBorderConsentAt: '',
-      // 两组导航。group 只决定排版分组，可见性一律在 visibleNavItems 里判。
+      // 三组导航（个人 / 系统 / 我的工作）。group 只决定排版分组，可见性一律在 visibleNavItems 里判。
       navItems: [
-        // 「个人」组：2026-08-20 从个人中心搬来的四栏。key 刻意避开 'account'
-        //（系统组的「账户与用量」已经占了这个 key）。
+        // 2026-08-20 从个人中心搬来的四栏（工作记录 / 立案与利冲 / 全部收藏 / 我的待办）现在单列
+        // 在最后一组「我的工作」。key 刻意避开 'account'（系统组的「账户与余额」已经占了这个 key）。
         { key: 'language', label: this.$t('account.languageGroupTitle'), group: 'personal' },
-        { key: 'work_log', label: this.$t('account.tabWorkLog'), group: 'personal' },
-        { key: 'case_intake', label: this.$t('account.tabCaseIntake'), group: 'personal' },
-        { key: 'favorites', label: this.$t('account.tabFavorites'), group: 'personal' },
-        { key: 'todos', label: this.$t('account.tabTodos'), group: 'personal' },
+        { key: 'work_log', label: this.$t('account.tabWorkLog'), group: 'mywork' },
+        { key: 'case_intake', label: this.$t('account.tabCaseIntake'), group: 'mywork' },
+        { key: 'favorites', label: this.$t('account.tabFavorites'), group: 'mywork' },
+        { key: 'todos', label: this.$t('account.tabTodos'), group: 'mywork' },
         { key: 'personal_settings', label: this.$t('admin.navPersonalSettings'), group: 'personal' },
+        // 隐私与数据（原「数据统计」）：匿名统计开关、跨境传输同意、文档属性都收在这里；
+        // 人人要能看到自己的同意与文档属性开关，所以挂「个人」组而不是仅管理员可见的「系统」组。
+        { key: 'telemetry', label: this.$t('admin.navTelemetry'), group: 'personal' },
         // 团队（dev-board#496）：挂「个人」组而不是「系统」组——团队是每个人自己的归属，
         // 普通成员也要看得到自己的统计与那个数据共享开关，而「系统」组对非管理员整组收起
         { key: 'team', label: this.$t('team.navTeam'), group: 'personal' },
+        // 律所审计日志（S20）：律所管理员才有。是否显示由服务端说了算（cloud.settings.get 的 firmAdmin），
+        // 不是闸门——读日志的接口自己按账户名录拒绝非管理员。
+        { key: 'audit_log', label: this.$t('auditLog.nav'), group: 'personal', firmAdminOnly: true },
         { key: 'mcp', label: this.$t('mcp.title'), group: 'personal' },
         { key: 'memory', label: this.$t('chat.memoryButton'), group: 'personal' },
         { key: 'workflows', label: this.$t('chat.builtinWorkflowsFoldEntry'), group: 'personal' },
@@ -1219,8 +1272,7 @@ export default {
         // 能力升级（dev-board#497）：能力槽切换 + 从 GitHub 装能力包。桌面端才有意义
         //（落盘到本机 plugins/ 目录、进程型引擎跑在本机）
         { key: 'capabilities', label: this.$t('admin.navCapabilities'), group: 'system', desktopOnly: true },
-        { key: 'telemetry', label: this.$t('admin.navTelemetry'), group: 'system' },
-        { key: 'feedback', label: this.$t('admin.navFeedback'), group: 'system' },
+                { key: 'feedback', label: this.$t('admin.navFeedback'), group: 'system' },
         // 'plugins'（插件广场）2026-08-27 已撤——入口统一收敛到左 rail 的插件中心，
         // 独立页 /pages/plugin-market 仍保留给直链。
       ],
@@ -1428,6 +1480,7 @@ export default {
           if (n.desktopOnly && !this.isDesktop) return false
           if (n.macOnly && !this.permissionsSupported) return false
           if (n.group === 'system' && !this.isAdminUser) return false
+          if (n.firmAdminOnly && !this.firmAuditAvailable) return false
           return true
         })
         .map((n) => ({
@@ -1439,6 +1492,7 @@ export default {
       const groups = [
         { key: 'personal', label: this.$t('admin.navGroupPersonal') },
         { key: 'system', label: this.$t('admin.navGroupSystem') },
+        { key: 'mywork', label: this.$t('admin.navGroupMyWork') },
       ]
       return groups
         .map((g) => ({ ...g, items: this.visibleNavItems.filter((n) => n.group === g.key) }))
@@ -1510,9 +1564,11 @@ export default {
     },
     // ---------- 会员钱包卡（dev-board#183） ----------
     // 货币符号按站点：cn 人民币，其余美元。site 还没拉到时用 siteLinks 的缓存/兜底
+    isCnSite() {
+      return (this.site.current || siteLinks().current) === 'cn'
+    },
     walletCurrencySymbol() {
-      const current = this.site.current || siteLinks().current
-      return current === 'cn' ? '¥' : '$'
+      return this.isCnSite ? '¥' : '$'
     },
     // 余额大字：分→元两位小数；官网不可达 / 还没拉到时「—」，绝不拿 0 冒充
     walletBalanceText() {
@@ -1590,7 +1646,18 @@ export default {
         || (this.accountPlatform && this.accountPlatform.circleFirm)
         || null
     },
+    // 包晴天积分通道（billingLine=bqt）：余额由积分折算，充值/续费只在包晴天 App。
+    // 旧后端/旧官网没有 billingLine，按普通账户处理。
+    isBqtBilling() {
+      return isBqtBillingLine(this.walletData) || isBqtBillingLine(this.accountPlatform)
+    },
+    walletBqtMember() {
+      return bqtMemberView((this.walletData && this.walletData.bqtMember)
+        || (this.accountPlatform && this.accountPlatform.bqtMember))
+    },
     walletBqtQingtian() {
+      // 新的积分通道快照取代旧的晴天币月度额度，两块不同时显示
+      if (this.walletBqtMember) return null
       return (this.walletData && this.walletData.bqtQingtian)
         || (this.accountPlatform && this.accountPlatform.bqtQingtian)
         || null
@@ -1611,6 +1678,7 @@ export default {
   },
   mounted() {
     this.loadUserInfo()
+    this.probeFirmAudit()
     // 深链定位面板（顶栏「已连接账户」chip → ?nav=account）；只认当前可见的本页面板
     const nav = resolveAdminNavKey(this.initialNav)
     if (nav && this.visibleNavItems.some((n) => n.key === nav)) {
@@ -1700,6 +1768,24 @@ export default {
     }
   },
   methods: {
+    // 律所审计日志（S20）：问一次服务端「我是不是律所管理员」。未连接账户、不在律所、
+    // 服务器没开名录都只是不显示这一栏，不提示、不弹登录层。
+    probeFirmAudit() {
+      firmCloudAction('cloud.settings.get')
+        .then((d) => { this.firmAuditAvailable = !!(d && d.firmAdmin) })
+        .catch(() => { this.firmAuditAvailable = false })
+    },
+    // 本机用量统计：事项类别存的是后端中文类别名、工具是内部代号，按界面语言显示（英文 QA 2026-11-14 第 4 条）
+    matterTypeLabel,
+    toolDisplayName,
+    // 能力槽名：后端给的是中文配置名，已知槽按 id 换词条；新槽未收录前原样显示
+    capabilitySlotName(slot) {
+      const key = { 'litigation.diagram': 'admin.capabilitySlotLitigationDiagram' }[slot && slot.id]
+      return key ? this.$t(key) : ((slot && slot.name) || '')
+    },
+    goBackToWorkbench() {
+      uni.reLaunch({ url: '/pages/project-overview/project-overview' })
+    },
     resolveAdminNavKey(key) {
       return resolveAdminNavKey(key)
     },
@@ -2438,7 +2524,7 @@ export default {
     async loadSite() {
       try {
         const s = await getSiteStatus()
-        const sites = (s && s.sites) || []
+        const sites = localizeSites((s && s.sites) || [], this.$t.bind(this))
         const current = sites.find((x) => x.id === (s && s.current))
         this.site = {
           current: (s && s.current) || '',
@@ -2556,6 +2642,13 @@ export default {
     openSubscriptionAccount() {
       openExternalUrl(accountPageUrl())
     },
+    async onSubscribePro() {
+      const ok = await requireSubscription()
+      if (ok) {
+        await this.loadWallet()
+        await this.loadAccountUsage()
+      }
+    },
     async loadWallet() {
       try {
         const b = await getAccountBalance()
@@ -2567,6 +2660,8 @@ export default {
             subscription: b.subscription || null,
             circleFirm: b.circleFirm || null,
             bqtQingtian: b.bqtQingtian || null,
+            billingLine: b.billingLine || 'standard',
+            bqtMember: b.bqtMember || null,
           }
         } else {
           this.walletData = { loaded: false, available: true, balanceCents: null, circleFirm: null, bqtQingtian: null }
@@ -3022,6 +3117,15 @@ $brand-accent: $brand-mint;
 
 /* 紧凑用户行（dev-board#892），取代原来单独一张大居中头像卡——头像 36px +
    展示名 13px/600 + 角色小胶囊，坐在导航卡顶部，对齐插件广场侧栏的密度。 */
+.nav-back {
+    padding: 8px 14px;
+    font-size: var(--awd-font-size-body);
+    color: var(--awd-text-2);
+    cursor: pointer;
+
+    &:hover { color: var(--awd-accent-text); background: var(--awd-surface-2); }
+}
+
 .sidebar-user-row {
     display: flex;
     align-items: center;
@@ -3113,7 +3217,8 @@ $brand-accent: $brand-mint;
   font-size: var(--awd-panel-fs-meta);
   line-height: 1.6;
   color: var(--awd-text-3);
-  word-break: break-all;
+  /* 英文按词换行（break-all 会把 Affero、WorkDeck 拆成两半）；只有长 URL 这类无空格串才在任意处断开 */
+  overflow-wrap: anywhere;
 }
 
 .legal-strong {
@@ -3351,6 +3456,7 @@ $brand-accent: $brand-mint;
 }
 
 .btn-save {
+  margin: 0;
   min-width: 120px;
   height: 28px;
   line-height: 28px;
@@ -3446,7 +3552,11 @@ $brand-accent: $brand-mint;
   margin-left: 16px;
 }
 
+/* uni-button 自带 margin-left/right: auto 且是块级：在块容器里会撑满整行，
+   在 flex 行里会被挤到中间。清掉，让按钮按内容宽、跟随容器对齐。 */
 .comp-btn {
+  display: inline-block;
+  margin: 0;
   height: 28px;
   line-height: 26px;
   font-size: var(--awd-panel-fs);
@@ -3723,6 +3833,16 @@ $brand-accent: $brand-mint;
   font-variant-numeric: tabular-nums;
 }
 
+.bqt-member-card {
+  margin-top: 12px; padding: 10px 12px; border-radius: var(--awd-radius-md);
+  background: var(--awd-gold-soft);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.bqt-member-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bqt-member-title { font-size: var(--awd-font-size-body); font-weight: 600; color: var(--awd-gold-text); }
+.bqt-member-status { font-size: var(--awd-panel-fs-meta); color: var(--awd-accent-text); }
+.bqt-member-status.is-expired { color: var(--awd-danger-text); }
+.bqt-member-warn { font-size: var(--awd-panel-fs-meta); color: var(--awd-danger-text); }
 .wallet-recharge-btn {
   margin-top: 4px;
   align-self: flex-start;

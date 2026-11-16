@@ -2,10 +2,13 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <section class="mcp-panel" :aria-label="$t('mcp.title')">
-    <h2>{{ $t('mcp.title') }}</h2>
-    <p>{{ $t('mcp.description') }}</p>
-    <p class="mcp-note">{{ $t('mcp.billing') }}</p>
-    <p class="mcp-note">{{ $t('mcp.transport') }}</p>
+    <header class="mcp-intro">
+      <h2>{{ $t('mcp.title') }}</h2>
+      <p>{{ $t('mcp.description') }}</p>
+      <p class="mcp-note">{{ $t('mcp.billing') }}</p>
+      <p class="mcp-note">{{ $t('mcp.transport') }}</p>
+    </header>
+    <LocalMcpServerToggle />
     <div class="mcp-actions">
       <button :disabled="!!busy || !scopeToken" @click="edit(null)">{{ $t('mcp.add') }}</button>
       <button :disabled="!!busy" @click="load()">{{ $t('mcp.refresh') }}</button>
@@ -14,14 +17,14 @@
     <p v-if="busy" role="status">{{ $t(busy === 'test' ? 'mcp.testing' : 'common.loading') }}</p>
     <p v-if="error" role="alert" class="mcp-error">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
-    <form v-if="importOpen" class="mcp-editor mcp-import" @submit.prevent="previewImport">
+    <form v-if="importOpen" class="mcp-editor mcp-import">
       <h3>{{ $t('mcp.import') }}</h3>
       <p class="mcp-note">{{ $t('mcp.importHint') }}</p>
       <p class="mcp-note">{{ $t('mcp.commandHint') }}</p>
       <label>{{ $t('mcp.importFile') }}<input ref="importFile" type="file" accept=".json,application/json" :disabled="!!busy" @change="readImportFile" /></label>
       <label>{{ $t('mcp.importJson') }}<textarea v-model="importJson" :disabled="!!busy" rows="7" spellcheck="false" autocomplete="off" dir="ltr" @input="invalidatePreview" /></label>
       <div class="mcp-actions">
-        <button type="submit" :disabled="!!busy || !importJson.trim()">{{ $t('mcp.preview') }}</button>
+        <button type="button" :disabled="!!busy || !importJson.trim()" @click="previewImport">{{ $t('mcp.preview') }}</button>
         <button type="button" :disabled="!!busy" @click="closeImport">{{ $t('common.cancel') }}</button>
       </div>
       <div v-if="importPreview" class="mcp-preview">
@@ -39,7 +42,7 @@
         <button type="button" :disabled="!!busy || !selectedIndices.length" @click="importSelected">{{ $t('mcp.importSelected', { count: selectedIndices.length }) }}</button>
       </div>
     </form>
-    <form v-if="draft" class="mcp-editor" @submit.prevent="save">
+    <form v-if="draft" class="mcp-editor">
       <label>{{ $t('mcp.name') }}<input v-model="draft.name" name="mcp-name" required maxlength="100" autocomplete="off" /></label>
       <label>{{ $t('mcp.transportLabel') }}
         <select v-model="draft.transport" name="mcp-transport" :disabled="!!draft.presetId" @change="draft.pairs = []">
@@ -82,7 +85,7 @@
       </details>
       <p class="mcp-note">{{ $t('mcp.dataNotice') }}</p>
       <div class="mcp-actions">
-        <button type="submit" :disabled="!!busy || !draft.name.trim() || !(draft.transport === 'stdio' ? draft.command.trim() : draft.url.trim())">{{ $t('common.save') }}</button>
+        <button type="button" :disabled="!!busy || !draft.name.trim() || !(draft.transport === 'stdio' ? draft.command.trim() : draft.url.trim())" @click="save">{{ $t('common.save') }}</button>
         <button type="button" :disabled="!!busy" @click="draft = null">{{ $t('common.cancel') }}</button>
       </div>
     </form>
@@ -116,9 +119,11 @@
 <script>
 import { getApiBaseUrl, getCloudAccountGeneration, getMcpConnections, saveMcpConnection, testMcpConnection, setMcpConnectionEnabled, deleteMcpConnection, previewMcpImport, importMcpConnections, authorizeMcpConnection, disconnectMcpOAuth } from '@/services/api.js'
 import { getCurrentUser } from '@/utils/auth.js'
+import LocalMcpServerToggle from '@/components/admin/LocalMcpServerToggle.vue'
 import { openExternalUrl, openExternalUrlChecked } from '@/utils/externalLink.js'
 export default {
   name: 'McpConnectionsPanel',
+  components: { LocalMcpServerToggle },
   data: () => ({ connections: [], presets: [], draft: null, scopeToken: '', stdioAvailable: false, busy: '', error: '', notice: '', importOpen: false, importJson: '', importPreview: null, selectedIndices: [], oauthLinks: {} }),
   mounted() {
     this._alive = true; this._owner = this.identity(); this._loadVersion = 0; this._importVersion = 0; this.load()
@@ -318,15 +323,22 @@ export default {
 }
 </script>
 <style scoped>
-.mcp-panel { padding: 24px; color: var(--awd-text); font-size: 14px; line-height: 1.6; min-width: 0; }
-.mcp-panel h2 { font-size: 22px; margin: 0 0 12px; }
-.mcp-panel h3 { font-size: 16px; margin: 0; overflow-wrap: anywhere; }
-.mcp-note, .mcp-url { color: var(--awd-text-2); font-size: 13px; overflow-wrap: anywhere; }
+/* 版式对齐其它设置分区（SettingsSection）：14px 标题、12–13px 正文、卡片 12px 14px 内边距 */
+.mcp-panel { color: var(--awd-text); font-size: 13px; line-height: 1.6; min-width: 0; }
+.mcp-panel p { margin: 4px 0 0; }
+.mcp-intro { padding: 12px 14px; margin-block-end: 12px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); }
+.mcp-panel h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.mcp-intro p { font-size: 12px; }
+.mcp-panel h3 { font-size: 14px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.mcp-heading > span { font-size: 12px; color: var(--awd-text-2); }
+.mcp-note, .mcp-url { color: var(--awd-text-2); font-size: 12px; overflow-wrap: anywhere; }
 .mcp-url { white-space: pre-wrap; unicode-bidi: isolate; }
-.mcp-card, .mcp-editor { padding: 16px; margin-block: 16px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); min-width: 0; }
+.mcp-card, .mcp-editor { padding: 12px 14px; margin-block: 0 12px; border: 1px solid var(--awd-border); border-radius: 8px; background: var(--awd-surface); min-width: 0; }
 .mcp-heading, .mcp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mcp-actions { margin-block: 8px 0; }
+.mcp-panel > .mcp-actions { margin-block: 0 12px; }
 .mcp-heading { justify-content: space-between; }
-.mcp-panel button { margin: 0; padding: 6px 12px; font-size: 13px; line-height: 1.5; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
+.mcp-panel button { margin: 0; padding: 4px 12px; font-size: 12px; line-height: 1.5; color: var(--awd-text); background: var(--awd-surface); border: 1px solid var(--awd-border); border-radius: 6px; cursor: pointer; overflow-wrap: anywhere; }
 .mcp-panel button:disabled { opacity: .5; cursor: default; }
 .mcp-editor label { display: flex; flex-direction: column; gap: 4px; margin-block: 12px; }
 .mcp-editor input, .mcp-editor select, .mcp-editor textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 36px; padding: 8px; border: 1px solid var(--awd-border); border-radius: 4px; background: var(--awd-surface); color: var(--awd-text); font: inherit; }

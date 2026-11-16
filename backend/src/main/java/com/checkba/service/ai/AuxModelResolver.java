@@ -40,6 +40,11 @@ public class AuxModelResolver {
 
     /** 子 Agent 模型的 system_setting 键 */
     public static final String SETTING_SUBAGENT_MODEL = "ai.subagentModel";
+    /**
+     * 意见书收尾核验员的模型（W6）：{@code main}=本轮主模型（默认），{@code subagent}=子 Agent 模型
+     * （通常是 flash 档辅助模型），其余值=显式模型 ID（中档折中）。DB 优先于 yml {@code ai.verifier-model}。
+     */
+    public static final String SETTING_VERIFIER_MODEL = "ai.verifierModel";
 
     private final SystemSettingService systemSettingService;
 
@@ -50,6 +55,24 @@ public class AuxModelResolver {
                             @Value("${ai.aux-model:qwen/qwen3.7-flash}") String ymlAuxModel) {
         this.systemSettingService = systemSettingService;
         this.ymlAuxModel = ymlAuxModel;
+    }
+
+    @Value("${ai.verifier-model:main}")
+    private String ymlVerifierModel = "main";
+
+    /**
+     * 收尾核验员要用的模型：返回 null 表示「按子 Agent 模型走」（{@code subagent}），
+     * 否则是主模型或显式模型 ID。
+     */
+    public String verifierModelId(String mainModelId) {
+        String v = firstNonBlank(setting(SETTING_VERIFIER_MODEL), ymlVerifierModel);
+        if (v == null || "main".equalsIgnoreCase(v.trim())) {
+            return mainModelId;
+        }
+        if ("subagent".equalsIgnoreCase(v.trim())) {
+            return null;
+        }
+        return AllowedModels.canonicalModelId(v.trim());
     }
 
     /** 当前生效的辅助模型 ID（保证非空）。 */

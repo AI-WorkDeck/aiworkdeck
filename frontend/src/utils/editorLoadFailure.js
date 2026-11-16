@@ -89,6 +89,15 @@ export function shouldSelfHealLoadFailure(err, alreadyHealed) {
 export const STATUS_OPEN_FAILED = 'docOpenFailed'
 /** 诊断码：引擎读了字节但两条装载路径都拒收（loadComponentFromURL 返回 null / 抛异常）。 */
 export const DIAG_DOC_REJECTED = 'DOC_REJECTED'
+// 设了「打开密码」的 Word/Excel/PPT（office-tier1）：OOXML 加密后整个文件是 CFB 复合文档（D0 CF 11 E0 …），
+// 引擎带不带密码都拒收（O14 真机探针），由宿主解密（officeEncryption.js）。没有密钥时落这个诊断码，加载面板请用户输密码。
+export const DIAG_DOC_ENCRYPTED = 'DOC_ENCRYPTED'
+const CFB_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]
+export function isEncryptedOoxml(bytes, name) {
+  if (!/\.(docx|xlsx|pptx|docm|xlsm|pptm)$/i.test(String(name || ''))) return false
+  const u8 = bytes instanceof Uint8Array ? bytes : bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : null
+  return !!u8 && u8.length >= 8 && CFB_MAGIC.every((b, i) => u8[i] === b)
+}
 /** 诊断码：重启引擎重装一次后 load_document 仍超过预算没有回音。 */
 export const DIAG_LOAD_TIMEOUT = 'EDITOR_LOAD_TIMEOUT'
 
@@ -121,6 +130,26 @@ export function loadBudgetMs(byteLength) {
  */
 export function openFailureOf(err, alreadyHealed) {
   if (err && err.code === DIAG_DOC_REJECTED) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_DOC_REJECTED }
+  // 宿主侧发现文件有打开密码且手里没有密钥（O14）：落终态，加载面板请用户输入密码
+  if (err && err.code === DIAG_DOC_ENCRYPTED) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_DOC_ENCRYPTED }
   if (alreadyHealed && isRelayTimeout(err)) return { statusKey: STATUS_OPEN_FAILED, code: DIAG_LOAD_TIMEOUT }
   return null
+}
+
+/**
+ * 宿主在装载前先看一眼：这份字节是不是带打开密码的 Office 文件（新式 OOXML 或旧式二进制）。
+ * 版本比对 / 三方合并走隐藏引擎，直接拿后端字节，引擎对加密文件只会安全拒收（用户只看到
+ * 笼统的「生成失败」）。入口先判，给出明确的原因。永不抛错。
+ * @param {Uint8Array|ArrayBuffer} bytes
+ * @param {string} name 带扩展名的文件名/路径
+ * @param {(bytes, name) => any} [detectLegacy] 旧格式判定（legacyOfficeDecrypt.detectLegacyEncryption，按需注入以免本模块依赖 cfb）
+ * @returns {boolean}
+ */
+export function isPasswordProtectedOffice(bytes, name, detectLegacy) {
+  try {
+    if (isEncryptedOoxml(bytes, name)) return true
+    return !!(detectLegacy && detectLegacy(bytes, name))
+  } catch {
+    return false
+  }
 }

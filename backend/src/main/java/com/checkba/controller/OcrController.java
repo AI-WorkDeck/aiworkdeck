@@ -31,6 +31,10 @@ public class OcrController {
     private final UserRepository userRepository;
     private final StorageServiceFactory storageServiceFactory;
 
+    /** 按用户限频（server 模式）。可缺省：手工装配的测试不用改。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.UserRateLimiter rateLimiter;
+
     @PostMapping("/recognize")
     public ResponseEntity<?> recognize(
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
@@ -45,6 +49,7 @@ public class OcrController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error(LangText.of("请先登录", "Please sign in first")));
         }
 
+        if (rateLimiter != null) rateLimiter.check(com.checkba.service.UserRateLimiter.Kind.OCR, userId);
         OcrResult result = ocrService.recognizeGeneral(request.getImageBase64());
         Map<String, Object> ok = new HashMap<>();
         ok.put("code", 0);

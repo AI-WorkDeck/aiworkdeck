@@ -8,8 +8,12 @@
         <span class="recharge-subtitle">{{ $t('admin.rechargeSubtitle') }}</span>
       </div>
       <div class="awd-body">
+        <!-- 包晴天积分通道：余额由包晴天积分折算，只能在包晴天 App 充值/续费 -->
+        <!-- 包晴天还有积分但会员不可用：先告诉用户开会员就能用积分，本站充值照常 -->
+        <span v-if="!bqtOnly && bqtRenewPoints" class="recharge-hint">{{ $t('admin.bqtRenewRechargeNote', { points: bqtRenewPoints }) }}</span>
+        <span v-if="bqtOnly" class="recharge-hint">{{ $t('admin.bqtRechargeNote') }}</span>
         <!-- 步骤一：选金额 -->
-        <template v-if="step === 'pick'">
+        <template v-else-if="step === 'pick'">
           <span class="recharge-label">{{ $t('admin.rechargeAmountLabel') }}</span>
           <div class="recharge-presets">
             <div
@@ -37,6 +41,10 @@
             />
           </div>
           <span v-if="inputError" class="recharge-error">{{ inputError }}</span>
+          <div v-if="isCnSite" class="recharge-pro-upsell">
+            <span class="recharge-pro-upsell-text">{{ $t('admin.rechargeProUpsellText') }}</span>
+            <button type="button" class="recharge-pro-upsell-btn" @click="openProSubscribe">{{ $t('admin.rechargeProUpsellBtn') }}</button>
+          </div>
         </template>
 
         <!-- 步骤二 A：站内二维码（微信站） -->
@@ -67,7 +75,7 @@
       <div class="awd-footer">
         <div class="awd-btn awd-btn-secondary" @click="close">{{ $t('common.close') }}</div>
         <div
-          v-if="step === 'pick'"
+          v-if="step === 'pick' && !bqtOnly"
           class="awd-btn awd-btn-primary"
           :class="{ 'awd-btn-disabled': submitting }"
           @click="submit"
@@ -85,7 +93,8 @@
 //
 // 轮询清理红线（本仓踩过：Stripe 回跳轮询被 cleanup 掐死）：定时器句柄存在组件实例上，
 // beforeUnmount 与「关闭弹窗」都只清**自己的**定时器，不写任何全局 [open] 态互斥逻辑。
-import { createAccountRecharge, getRechargeStatus } from '@/services/api.js'
+import { createAccountRecharge, getRechargeStatus, getAccountBalance } from '@/services/api.js'
+import { isBqtBillingLine, bqtMemberView } from '@/utils/bqtBilling.js'
 import { siteLinks } from '@/utils/siteLinks.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 
@@ -115,6 +124,8 @@ export default {
       outTradeNo: '',
       amountCents: 0,
       pollTimedOut: false,
+      bqtOnly: false,
+      bqtRenewPoints: '',
     }
   },
   computed: {
@@ -150,6 +161,7 @@ export default {
       handler(v) {
         if (v) {
           this.resetState()
+          this.checkBillingLine()
         } else {
           // 弹窗被宿主关掉（v-model）也要停轮询——只清自己的定时器
           this.stopPolling()
@@ -163,6 +175,7 @@ export default {
   methods: {
     resetState() {
       this.stopPolling()
+      this.bqtRenewPoints = ''
       this.step = 'pick'
       this.selectedCents = this.presetCents[0]
       this.customInput = ''
@@ -172,6 +185,19 @@ export default {
       this.outTradeNo = ''
       this.amountCents = 0
       this.pollTimedOut = false
+    },
+    // 包晴天积分通道的账户不在本应用充值：打开时问一次余额端点（后端带缓存），
+    // 失败或旧后端没有 billingLine 就保持原有充值流程
+    async checkBillingLine() {
+      try {
+        const balance = await getAccountBalance()
+        if (!this.visible) return
+        this.bqtOnly = isBqtBillingLine(balance)
+        const member = bqtMemberView(balance && balance.bqtMember)
+        this.bqtRenewPoints = member && member.guidance === 'renew' ? member.points : ''
+      } catch (e) {
+        // 查不到不改变原有行为
+      }
     },
     pickPreset(cents) {
       this.selectedCents = cents
@@ -188,7 +214,7 @@ export default {
       return Math.round(yuan * 100)
     },
     async submit() {
-      if (this.submitting) return
+      if (this.submitting || this.bqtOnly) return
       let cents = this.selectedCents
       if (this.customInput.trim()) {
         const parsed = this.parseCustomCents(this.customInput)
@@ -263,6 +289,10 @@ export default {
         clearInterval(this._pollTimer)
         this._pollTimer = null
       }
+    },
+    openProSubscribe() {
+      this.close()
+      import('@/utils/requireAccount.js').then(({ requireSubscription }) => requireSubscription()).catch(() => {})
     },
     close() {
       this.stopPolling()
@@ -427,6 +457,40 @@ export default {
   font-family: var(--awd-font-sans);
   font-size: var(--awd-panel-fs);
   color: var(--awd-info-text);
+}
+.recharge-pro-upsell {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-accent-soft);
+  border: 1px solid var(--awd-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.recharge-pro-upsell-text {
+  flex: 1;
+  font-family: var(--awd-font-sans);
+  font-size: var(--awd-panel-fs);
+  line-height: var(--awd-line-height-ui);
+  color: var(--awd-text);
+}
+.recharge-pro-upsell-btn {
+  flex: none;
+  padding: 5px 10px;
+  border: 1px solid var(--awd-accent);
+  border-radius: var(--awd-radius-md);
+  background: var(--awd-surface);
+  color: var(--awd-accent-text);
+  font-family: var(--awd-font-sans);
+  font-size: var(--awd-panel-fs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.recharge-pro-upsell-btn:hover {
+  background: var(--awd-surface-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

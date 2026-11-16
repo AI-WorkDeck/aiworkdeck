@@ -26,7 +26,7 @@ export default {
   tierNeedsAccount: '需要连接账户',
   tierDescLocal: '录音与转写都在本机完成，音频不出本机。速度约为实时的一点五倍（两小时的会要跑一小时上下），没有说话人分离。',
   tierDescByok: '用你自己的阿里云听悟账号转写，音频经你自己的 OSS 中转。',
-  tierDescNoPlatform: '本机形态使用自备 Key，在「系统管理 - 平台服务」里填听悟凭证。',
+  tierDescNoPlatform: '本机形态使用自备 Key，在「设置 - 平台服务」里填听悟凭证。',
   tierDescNotConnected: '连接官网账户后即可直接转写，不用自己开通听悟。',
   tierDescPlatform: '由 AI WorkDeck 代为转写，按时长折算 Credits 从账户余额扣；未识别到人声也可能按处理时长计费。音频经我们的对象存储中转，转写完成即删除，另有 24 小时兜底清理。',
   localSwitchLabel: '录音不出本机',
@@ -46,8 +46,8 @@ export default {
   downloadStartFailed: '开始下载失败，稍后重试',
 
   // ---- 未配置转写凭证（录音仍可用）。下一步按档位分 ----
-  notConfiguredPlatform: '转写暂不可用：录音会保存到项目文件，但不能转文字。到「系统管理 - 账户与用量」连接官网账户即可开通。',
-  notConfiguredByok: '未配置转写服务：录音会保存到项目文件，但不能转文字。管理员可在「系统管理 - 平台服务 - 会议录音转写」里填阿里云听悟凭证，或改用平台代采。',
+  notConfiguredPlatform: '转写暂不可用：录音会保存到项目文件，但不能转文字。到「设置 - 账户与余额」连接官网账户即可开通。',
+  notConfiguredByok: '未配置转写服务：录音会保存到项目文件，但不能转文字。管理员可在「设置 - 平台服务 - 会议录音转写」里填阿里云听悟凭证，或改用平台代采。',
 
   // ---- 录音 ----
   micDeviceLabel: '麦克风',

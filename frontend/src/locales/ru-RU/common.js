@@ -8,6 +8,12 @@ export default {
   "cancel": "Отмена",
   "save": "Сохранить",
   "close": "Закрыть",
+  "remove": "Убрать",
+  "clear": "Очистить",
+  "zoomIn": "Увеличить",
+  "zoomOut": "Уменьшить",
+  "moveUp": "Переместить вверх",
+  "moveDown": "Переместить вниз",
   "done": "Готово",
   "delete": "Удалить",
   "rename": "Переименовать",
@@ -25,6 +31,7 @@ export default {
   "goToSettings": "Перейти в настройки",
   "later": "Позже",
   "requestFailedWithStatus": "Ошибка запроса ({status})",
+  "tooManyRequests": "Слишком много запросов. Подождите немного и повторите попытку",
   "smsVerificationRequired": "Для этого действия требуется подтверждение по SMS",
   "freeQuotaExceeded": "Вы использовали все бесплатные кредиты",
   "serviceErrorRetryLater": "Ошибка сервиса. Повторите попытку позже",
@@ -67,5 +74,9 @@ export default {
   "languagePickerLabel": "Выбрать язык",
   "languageFollowSystem": "Как в системе",
   "languageSearchPlaceholder": "Поиск языков…",
-  "languageNoMatch": "Подходящих языков не найдено"
+  "languageNoMatch": "Подходящих языков не найдено",
+  "serverLabelAccountBridge": "Мост аккаунта",
+  "serverLabelGenericClient": "Клиент (общий)",
+  "serverLabelPersonalMemory": "Личная память",
+  "serverLabelProjectMemory": "Память проекта"
 }

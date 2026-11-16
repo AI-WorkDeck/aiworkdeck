@@ -260,7 +260,7 @@ class FileContextLoaderTest {
             String result = loader.buildFolderContext("200", "1", used);
             assertTrue(result.contains("relative to the attached folder (ID: 200), NOT the project root"), result);
             assertTrue(result.contains("resolve the folder ID to its full project-relative path"), result);
-            assertTrue(result.contains("using list_project_folders"), "按目录 ID 查路径须用返回目录的清单，不能用只返回文件的 doc_list_project_files");
+            assertTrue(result.contains("using doc_list_project_files(foldersOnly=true)"), "按目录 ID 查路径须用返回目录的清单（foldersOnly=true），不能用只返回文件的默认模式");
             assertTrue(result.contains("[FILE] 暂放/协议.txt (ID: 61)"), result);
             assertFalse(result.contains(tempDir.toString()), "不输出宿主绝对路径");
             if (used == 0) assertTrue(result.contains("#### File: 暂放/协议.txt\n```\n合成协议正文"), result);

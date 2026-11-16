@@ -87,6 +87,11 @@ export default {
     "privacyName": "Política de Privacidade",
     "crossBorderLabel": "Consentimento específico: transferir o conteúdo enviado à IA para provedores de modelos no exterior para processamento",
     "crossBorderView": "Ver aviso",
+    "consentCardTitle": "Antes de usar a IA da plataforma, confirme um consentimento de tratamento de dados",
+    "consentAccept": "Concordar e continuar",
+    "consentHideNotice": "Ocultar aviso",
+    "consentFailed": "Não foi possível salvar. Tente novamente.",
+    "consentLater": "Depois",
     "crossBorderNoticeTitle": "Aviso de transferência internacional",
     "crossBorderNoticeBody": "O site chinês conecta ao Alibaba Cloud Bailian pelos servidores do AI WorkDeck; o site internacional usa OpenRouter. Textos e trechos de arquivos enviados à IA são usados para inferência e cobrança. Conforme o modelo, o processamento pode ocorrer fora da China continental. A revogação do consentimento nas configurações desativa o canal de IA da plataforma.",
     "agreementRequired": "Marque a caixa para aceitar os Termos de Serviço e a Política de Privacidade para continuar",
@@ -101,7 +106,8 @@ export default {
     "switch": "Alternar",
     "cancel": "Cancelar",
     "switchFailed": "Falha ao alternar de site. Tente novamente mais tarde.",
-    "rescueFailed": "Ainda não desbloqueado após alternar de site. Verifique o código e tente novamente."
+    "rescueFailed": "Ainda não desbloqueado após alternar de site. Verifique o código e tente novamente.",
+    "proIntroBanner": "Créditos iniciais grátis ao cadastrar · Personal Pro ¥9.9/mês (3 primeiros meses)",
   },
   "hint": {
     "learnMore": "Saiba mais",
@@ -112,7 +118,9 @@ export default {
     "purchaseConfirmOk": "Confirmar",
     "purchaseSuccess": "Desbloqueado",
     "purchaseFailed": "Falha na compra",
-    "goRecharge": "Recarregar"
+    "goRecharge": "Recarregar",
+    "subscribeProBtn": "Pro ¥9.9",
+    "clipboardProBtn": "Obter Personal Pro",
   },
   "identity": {
     "title": "Escolher um espaço de trabalho local",

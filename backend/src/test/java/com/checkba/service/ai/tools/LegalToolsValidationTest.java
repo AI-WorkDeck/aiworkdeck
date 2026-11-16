@@ -106,7 +106,7 @@ class LegalToolsValidationTest {
     @Test
     @DisplayName("修复：law_search_keyword 在 title 与 fulltext 均为空时返回可行动的错误")
     void lawSearchKeywordMissingBothArgsReturnsActionableError() {
-        String result = tools.law_search_keyword(" ", null);
+        String result = tools.law_search(null, "keyword", " ", null);
 
         assertTrue(result.startsWith("Error"), result);
         verifyNoInteractions(mcpClientService);
@@ -137,4 +137,18 @@ class LegalToolsValidationTest {
         assertTrue(tools.currentlyUnusableTools().isEmpty());
     }
 
+
+    @Test
+    @DisplayName("V4：law_search(mode=keyword) 走 pkulaw-keyword.get_law_list；query 可兜底当法规名关键词")
+    void lawSearchKeywordMode() {
+        when(mcpClientService.callTool("pkulaw-keyword", "get_law_list", Map.of("title", "公司法", "fulltext", "出资")))
+                .thenReturn("LIST");
+        when(mcpClientService.callTool("pkulaw-keyword", "get_law_list", Map.of("title", "劳动合同法")))
+                .thenReturn("LIST2");
+
+        assertEquals("LIST", tools.law_search(null, "keyword", "公司法", "出资"));
+        assertEquals("LIST2", tools.law_search("劳动合同法", "keyword", null, null));
+        assertTrue(tools.law_search(null, "keyword", null, null).startsWith("Error"));
+        assertTrue(tools.law_search("x", "fuzzy", null, null).startsWith("Error"));
+    }
 }

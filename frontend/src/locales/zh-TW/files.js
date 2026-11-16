@@ -20,6 +20,7 @@ export default {
   "sizeLabel": "大小：{size}",
   "renderingDoc": "正在渲染文檔…",
   "renderingSlides": "正在渲染演示文稿…",
+  "slidesNotShown": "還有 {count} 頁未顯示，開啟檔案可查看全部",
   "officePreviewUnsupported": "該文件暫不支持在線預覽",
   "fileTypeHintOpenLocal": "文件類型: {type}，可在訪達/資源管理器中找到它，用本機軟件打開",
   "unknown": "未知",
@@ -66,7 +67,7 @@ export default {
     "submitted": "已開始生成字幕，完成後自動顯示",
     "ready": "字幕已生成",
     "failed": "字幕生成失敗，可點字幕按鈕重試",
-    "notConfigured": "轉寫服務未開通：到「系統管理 - 平台服務 - 會議錄音轉寫」配置後即可生成字幕",
+    "notConfigured": "轉寫服務未開通：到「設定 - 平台服務 - 會議錄音轉寫」配置後即可生成字幕",
     "noticePending": "已登記。請先在「語音 - 會議錄音」面板確認錄音告知，再點字幕按鈕生成",
     "submitFailed": "字幕生成發起失敗",
     "empty": "未識別到語音"

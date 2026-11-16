@@ -50,13 +50,13 @@
       ],
       "offeredToolsExcludeFirstCall": [
         "doc_format_table",
-        "doc_table_add_row",
+        "doc_table_insert",
         "litigation_render",
         "pdf_highlight"
       ],
       "offeredToolsIncludeLastCall": [
         "doc_format_table",
-        "doc_table_add_row"
+        "doc_table_insert"
       ],
       "structureContains": [
         "<final>"
@@ -114,7 +114,6 @@
         "doc_list_project_files",
         "extract_file_text",
         "search_project_content",
-        "doc_get_document_text",
         "law_search",
         "query_memory",
         "todo_write"
@@ -131,7 +130,7 @@
     "category": "files",
     "protocol": "xml",
     "progressiveDisclosure": true,
-    "userInput": "在正文那张表的末尾加一行",
+    "userInput": "在正文那张表的末尾追加一条记录",
     "activeDocument": {
       "id": "1001",
       "name": "股权转让协议.docx",
@@ -142,7 +141,7 @@
         "text": "先看看还有哪些表格工具。\n<tool_code>list_tools(category=\"table\")</tool_code>"
       },
       {
-        "text": "<tool_code>doc_table_add_row(count=1)</tool_code>"
+        "text": "<tool_code>doc_table_insert(axis=\"row\", count=1)</tool_code>"
       },
       {
         "text": "<final>已在表尾追加一行。</final>"
@@ -154,11 +153,11 @@
           "name": "list_tools"
         },
         {
-          "name": "doc_table_add_row"
+          "name": "doc_table_insert"
         }
       ],
       "offeredToolsExcludeFirstCall": [
-        "doc_table_add_row"
+        "doc_table_insert"
       ],
       "structureContains": [
         "<final>"
@@ -223,7 +222,9 @@
       "offeredToolsExclude": [
         "pdf_inspect",
         "task_create",
-        "doc_get_document_text",
+        "doc_get_document_text"
+      ],
+      "toolsNotRegistered": [
         "read_document"
       ],
       "structureContains": [
@@ -292,7 +293,9 @@
       "offeredToolsExclude": [
         "pdf_inspect",
         "task_create",
-        "doc_get_document_text",
+        "doc_get_document_text"
+      ],
+      "toolsNotRegistered": [
         "read_document"
       ],
       "structureContains": [
@@ -352,7 +355,7 @@
   },
   {
     "id": "disclosure-memory-read-trio-always-write-trio-behind-category",
-    "title": "渐进披露：记忆只读三个（list/read/search）每轮都下发（每轮注入的记忆索引点名要 memory_read），写入三个（write/edit/delete）不再每轮兜底，归 memory 类目（dev-board#1073）",
+    "title": "渐进披露：记忆只读 list/read 每轮都下发（每轮注入的记忆索引点名要 memory_read），memory_search 与写入三个（write/edit/delete）归 memory 类目（dev-board#1073；V2 起 memory_search 退出固定追加）",
     "category": "memory",
     "protocol": "native",
     "progressiveDisclosure": true,
@@ -368,12 +371,12 @@
       "offeredToolsInclude": [
         "memory_list",
         "memory_read",
-        "memory_search",
         "query_memory",
         "save_memory",
         "list_tools"
       ],
       "offeredToolsExclude": [
+        "memory_search",
         "memory_write",
         "memory_edit",
         "memory_delete"
@@ -467,6 +470,264 @@
         "memory_write",
         "memory_edit",
         "memory_delete"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "deadline-appeal-period-after-service",
+    "title": "V7 D2：「判决书11月3日送达，上诉期什么时候到期」起跑时按『上诉期』关键词预放回 task 类目，第一轮直接调 deadline_compute 而不是心算（tool-system-v2 D2）",
+    "category": "task",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "判决书11月3日送达，上诉期什么时候到期？",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "deadline_compute",
+            "arguments": {
+              "startDate": "2026-11-03",
+              "kind": "appeal_judgment"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>上诉期自送达次日起算 15 日，到期日为 2026 年 11 月 18 日（周三）。15 日是判决的常见默认值，请以判决书载明为准。</final>"
+      }
+    ],
+    "toolStubs": {
+      "deadline_compute": "到期日：2026-11-18周三\n待核实：期间长度 15日 是该类期限的常见默认值，请核实。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "deadline_compute",
+          "argsContain": {
+            "startDate": "2026-11-03"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "deadline_compute",
+        "task_create",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect",
+        "tag_file"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "deadline-limitation-with-holiday-roll",
+    "title": "V7 D2：「诉讼时效」说法也能直接命中 deadline_compute（kind=limitation），顺延结果由工具给出",
+    "category": "task",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "2023年10月1日知道权利被侵害，诉讼时效几号到期？",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "deadline_compute",
+            "arguments": {
+              "startDate": "2023-10-01",
+              "kind": "limitation"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>诉讼时效 3 年，最后一日 2026-10-01 在国庆假期，顺延至 2026 年 10 月 8 日（周四）；起算点与中断中止情形请核实。</final>"
+      }
+    ],
+    "toolStubs": {
+      "deadline_compute": "到期日：2026-10-08周四\n顺延：期间最后一日 2026-10-01周四（法定节假日·国庆节）不是工作日，顺延至 2026-10-08周四。"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "deadline_compute",
+          "argsContain": {
+            "startDate": "2023-10-01"
+          }
+        }
+      ],
+      "offeredToolsInclude": [
+        "deadline_compute",
+        "task_create",
+        "list_tools"
+      ],
+      "offeredToolsExclude": [
+        "pdf_inspect",
+        "tag_file"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "p7-native-call-to-undisclosed-tool-runs-and-expands-its-category",
+    "title": "P7：原生调用点名一个本轮没下发、但本会话可用的工具（copy_files）——当轮照常分发，下一轮 files 类目放回（与 XML 兜底同一条路）",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "给合同做个副本",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "copy_files",
+            "arguments": {
+              "fileIds": "[1001]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>已复制一份合同。</final>"
+      }
+    ],
+    "toolStubs": {
+      "copy_files": "copied: 1; failed: 0\n- 【副本】合同.docx (fileId=1002)"
+    },
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "copy_files"
+        }
+      ],
+      "offeredToolsExcludeFirstCall": [
+        "copy_files",
+        "move_files",
+        "create_folder"
+      ],
+      "offeredToolsIncludeLastCall": [
+        "copy_files",
+        "move_files",
+        "create_folder"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "p7-native-call-to-host-gated-tool-is-refused",
+    "title": "P7：纯对话会话里原生调用编辑器工具（doc_get_outline）——宿主闸照拒（Tool not found），不放回任何类目",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "这份合同有什么风险？",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "doc_get_outline",
+            "arguments": {}
+          }
+        ]
+      },
+      {
+        "text": "<final>请先告诉我是哪份合同。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [
+        {
+          "name": "doc_get_outline"
+        }
+      ],
+      "allowUnresolvedTools": true,
+      "promptContains": [
+        "Tool not found or arguments invalid."
+      ],
+      "offeredToolsExclude": [
+        "doc_get_outline",
+        "doc_get_paragraph"
+      ],
+      "structureContains": [
+        "<final>"
+      ],
+      "bubbleEndStatus": "finished"
+    }
+  },
+  {
+    "id": "p7-native-call-to-undisclosed-destructive-tool-still-asks-first",
+    "title": "P7：原生调用点名一个没下发的破坏性工具（move_to_trash）——确认闸照常先问，不分发",
+    "category": "files",
+    "protocol": "native",
+    "progressiveDisclosure": true,
+    "clientCapability": "none",
+    "userInput": "把那个草稿清理掉",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_to_trash",
+            "arguments": {
+              "targetsJson": "[\"草稿.docx\"]"
+            }
+          }
+        ]
+      }
+    ],
+    "toolStubs": {
+      "move_to_trash": "trashed: 1"
+    },
+    "expect": {
+      "toolCalls": [],
+      "offeredToolsExclude": [
+        "move_to_trash"
+      ],
+      "bubbleEndStatus": "awaiting_input",
+      "structureContains": [
+        "确认执行「"
+      ]
+    }
+  },
+  {
+    "id": "p7-native-call-to-write-tool-in-ask-mode-is-refused",
+    "title": "P7：ASK 模式里原生调用写入工具（move_files）——ASK 闸照拒，不分发",
+    "category": "files",
+    "protocol": "native",
+    "mode": "ASK",
+    "userInput": "把合同.docx移到归档文件夹",
+    "turns": [
+      {
+        "toolCalls": [
+          {
+            "name": "move_files",
+            "arguments": {
+              "movesJson": "[{\"sourcePath\":\"合同.docx\",\"destPath\":\"归档/合同.docx\"}]"
+            }
+          }
+        ]
+      },
+      {
+        "text": "<final>对话模式下不能移动文件，请切换到 Agent 模式。</final>"
+      }
+    ],
+    "expect": {
+      "toolCalls": [],
+      "promptContains": [
+        "ASK mode permits only"
       ],
       "structureContains": [
         "<final>"
