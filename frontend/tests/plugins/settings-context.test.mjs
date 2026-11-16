@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
 const detail = readFileSync(new URL('../../src/components/MarketDetailPane.vue', import.meta.url), 'utf8')
 const open = new Function('spec', page.split('    openMarketDetail(spec) {')[1].split('\n    formatTime(')[0].replace(/\n    },\s*$/, ''))
-const loadBody = detail.split('    async loadContribution() {')[1].split('\n    async doSaveSettings()')[0].replace(/\n    },\s*$/, '')
+const loadBody = detail.split('    async loadContribution(refreshSettings = true) {')[1].split('\n    async doSaveSettings()')[0].replace(/\n    },\s*$/, '')
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
 
 test('market entry carries current project and settings.open refreshes an existing singleton tab', () => {
@@ -22,10 +22,10 @@ test('market entry carries current project and settings.open refreshes an existi
 
 test('late project settings cannot replace settings loaded for a new context', async () => {
   const requests = []
-  const load = new AsyncFunction('getPluginSettings', 'getContributedStyleProfiles', loadBody)
+  const load = new AsyncFunction('getPluginSettings', 'getContributedStyleProfiles', 'refreshSettings = true', loadBody)
   const settings = (_id, projectId) => new Promise(resolve => requests.push({ projectId, resolve }))
   const profiles = async () => ({ profiles: [] })
-  const vm = { contributionGeneration: 0, spec: { kind: 'plugin', id: 'example', projectId: 74 }, installedInfo: {} }
+  const vm = { contributionGeneration: 0, settingsGeneration: 0, spec: { kind: 'plugin', id: 'example', projectId: 74 }, installedInfo: {} }
   const old = load.call(vm, settings, profiles)
   vm.spec = { ...vm.spec, projectId: 81 }
   const current = load.call(vm, settings, profiles)
