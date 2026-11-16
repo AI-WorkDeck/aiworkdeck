@@ -8,6 +8,20 @@ const root = path.resolve(__dirname, '../..')
 const read = file => fs.readFileSync(path.join(root, file), 'utf8')
 // Execution remains a Windows integration job. These guards catch privilege/publishing
 // regressions in the acceptance harness itself; they do not claim OS behavior was tested.
+test('verified MSI downloads precede the live probe but installation follows missing evidence', () => {
+  const script = read('desktop/scripts/dependency-clean-windows/run.ps1')
+  const start = script.indexOf('$child = Start-Process')
+  const missing = script.indexOf('while (-not (Test-Path "$root\\before.json"))')
+  const install = script.indexOf('$denied = Start-Process $msiexec')
+  const ready = script.indexOf('New-Item "$root\\installed.ready"')
+  for (const name of ['node', 'lo']) {
+    const download = script.indexOf(`$${name} = Download `)
+    assert.ok(download >= 0 && download < start, `${name} download and verification must finish before the live probe starts`)
+  }
+  assert.ok(start < missing && missing < install && install < ready,
+    'real installation must remain between the missing-dependency evidence and installed.ready')
+  assert.match(read('desktop/scripts/dependency-clean-windows/DependencyProbe.java'), /TimeUnit\.MINUTES\.toNanos\(25\)/)
+})
 test('isolated acceptance cannot receive release credentials or publish installers', () => {
   const workflow = read('.github/workflows/dependency-clean-windows.yml')
   assert.match(workflow, /workflow_call:/)
