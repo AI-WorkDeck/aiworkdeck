@@ -2,12 +2,11 @@
 
 English: [README.en.md](./README.en.md)
 
-
 纯前端插件的最小示例：没有 Java、没有构建步骤，`web/index.html` 就是全部。
 
 ```
 hello-web-plugin/
-├── manifest.json            frontendEntry 指向 web/index.html，permissions 声明 file_read
+├── manifest.json            frontendEntry 指向 web/index.html，permissions 声明 file_read、editor、ai
 └── web/
     ├── index.html           面板本体
     └── awd-plugin-sdk.js    SDK 副本（源头在 sdk/plugin-sdk/，逐字节一致）
@@ -38,7 +37,11 @@ cp -R examples/hello-web-plugin backend/plugins/
 - `awd.storage.get/set`——插件级 KV，宿主代存，总量上限 64 KB
 - `awd.evidence.list({})`——列当前聚焦 Word 文档的底稿关联（需 `file_read`）；
   没有打开 Word 文档时会看到 `no_active_document` 分支。
-  建链 `awd.evidence.link` / 定位 `awd.evidence.locate` 需要 `editor` 权限，本示例未声明
+  建链 `awd.evidence.link` / 定位 `awd.evidence.locate` 需要 `editor` 权限，本示例已声明
+
+- `awd.doc.getText()` / `awd.doc.insertText(text)`——读取当前文档并插入示例文字；编辑文档需要 `editor`。
+- `awd.events.on('files.changed', callback)`——订阅项目文件变化；调用返回的函数可退订。
+- `awd.ai.request(prompt, { purpose: 'demo-summary' })`——通过宿主请求摘要，需要 `ai`。
 
 ## 边界
 

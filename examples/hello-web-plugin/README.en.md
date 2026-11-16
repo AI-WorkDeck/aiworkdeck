@@ -4,7 +4,7 @@ Minimal pure-frontend plugin example: no Java, no build step — `web/index.html
 
 ```
 hello-web-plugin/
-├── manifest.json            frontendEntry points at web/index.html; permissions declare file_read
+├── manifest.json            frontendEntry points at web/index.html; permissions declare file_read, editor, ai
 └── web/
     ├── index.html           panel UI
     └── awd-plugin-sdk.js    SDK copy (source of truth: sdk/plugin-sdk/, byte-identical)
@@ -34,7 +34,11 @@ Plugins dropped manually into `plugins/` are **enabled** on install (only Market
 - `awd.storage.get/set` — plugin-scoped KV stored by the host, 64 KB total cap
 - `awd.evidence.list({})` — lists evidence linked to the focused Word document (needs `file_read`);
   with no Word document open you hit the `no_active_document` branch.
-  Linking (`awd.evidence.link`) / locating (`awd.evidence.locate`) need the `editor` permission; this example does not declare it
+  Linking (`awd.evidence.link`) / locating (`awd.evidence.locate`) need the `editor` permission, which this example declares
+
+- `awd.doc.getText()` / `awd.doc.insertText(text)` — read the active document and insert sample text; document editing requires `editor`.
+- `awd.events.on('files.changed', callback)` — subscribe to project-file changes; call the returned function to unsubscribe.
+- `awd.ai.request(prompt, { purpose: 'demo-summary' })` — request a summary through the host; requires `ai`.
 
 ## Sandbox boundaries
 
