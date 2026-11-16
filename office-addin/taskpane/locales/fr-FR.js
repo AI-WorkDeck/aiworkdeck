@@ -3,7 +3,7 @@
 
 export default {
   legalCopyright: "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED et contributeurs d'AI WorkDeck",
-  legalLicenseTrademark: "Ce programme est distribué sous la licence GNU Affero General Public License v3.0 ou ultérieure, SANS AUCUNE GARANTIE. « AI WorkDeck » est une marque déposée de BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. N'utilisez pas ce nom comme nom de produit lors de la redistribution d'une version modifiée ; voir la mention de marque déposée.",
+  legalLicenseTrademark: "Ce programme est distribué sous la licence GNU Affero General Public License v3.0 ou ultérieure, SANS AUCUNE GARANTIE. « AI WorkDeck » est une marque de BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. N'utilisez pas ce nom comme nom de produit lors de la redistribution d'une version modifiée ; voir la mention de marque.",
   apiCloudAccessRefresh: "Les droits d’accès au cloud ont changé. Actualisez la page ou rouvrez l’application avant de continuer. Les fichiers locaux ne seront pas supprimés.",
   defaultProjectName: "Projet temporaire",
   cmdPptAddImage: "Insérer une image dans la diapositive",

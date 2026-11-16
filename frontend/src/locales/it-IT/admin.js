@@ -399,7 +399,7 @@ export default {
   "legalSourceLabel": "Codice sorgente: ",
   "legalLicenseLabel": "Licenza completa: ",
   "legalTrademarkLabel": "Avviso sul marchio: ",
-  "legalTrademark": "\"AI WorkDeck\" è un marchio registrato di BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Non utilizzare tale nome come nome del prodotto quando si ridistribuisce una versione modificata; vedere l'avviso sul marchio.",
+  "legalTrademark": "\"AI WorkDeck\" è un marchio di BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Non utilizzare tale nome come nome del prodotto quando si ridistribuisce una versione modificata; vedere l'avviso sul marchio.",
   "navPermissions": "Autorizzazioni di sistema",
   "permissionsSectionTitle": "Autorizzazioni di sistema di macOS",
   "permissionsSectionSubtitle": "Concedi le autorizzazioni di sistema per trascinare i file direttamente da WeChat, acquisire screenshot OCR tra finestre e registrare le riunioni",
