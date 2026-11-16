@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // uni-app H5 compiles <form>/<button>/<input> in .vue templates to uni-form/uni-button/uni-input.
 // A uni-button submits its form only with form-type="submit" (type="submit" is ignored), Enter in an

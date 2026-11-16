@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 版本比对 / 三方合并的入口守卫：这两条路径用隐藏引擎直接装后端字节，带打开密码的
 // Office 文件在那里只会被引擎安全拒收，用户看到的是笼统的「生成失败」。入口先判，

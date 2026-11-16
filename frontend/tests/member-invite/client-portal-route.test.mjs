@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 客户门户构建的路由收口（dev-board#1050，src/utils/clientPortal.js）：门户包里只有三页，
 // 其余硬编码跳转（4010 回登录页、退出登录回启动页……）必须改写回门户，否则是空白页。

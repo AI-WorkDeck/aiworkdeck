@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 计划审阅（dev-board#1022）真渲染走查：H5 dev + 无头 Chromium，真鼠标真键盘走完
 //   段一：进审阅态 → 改一行 → 删一行 → 选一行加批注 → 按修订版推进（拦截 POST /api/agent/chat 断言回喂）

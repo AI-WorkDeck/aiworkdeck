@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Εγκαταστάτης Windows (x64)",
   "externalDownloadWindowsArm": "Εγκαταστάτης Windows ARM (Πρόωρη Πρόσβαση)",
   "externalRepair": "Εάν είναι ήδη εγκατεστημένο, ελέγξτε αν το πρόγραμμα εκκινείται, τη διαδρομή του και τα δικαιώματα εκτέλεσης, και μετά ελέγξτε ξανά. Το Tencent Meeting απαιτεί επίσης χρησιμοποιήσιμο Node.js. Αφού αλλάξετε διαδρομές, αποθηκεύστε την εργασία σας και κάντε επανεκκίνηση του AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Παρακαλώ αναβάθμισε μια δυνατότητα από το {url}. {note}Χρησιμοποίησε πρώτα το capability_install για ανάκτηση και επαλήθευση, διάβασέ μου το πλάνο εγκατάστασης και προχώρησε στην εγκατάσταση μόνο αφού επιβεβαιώσω.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Εγκατάσταση αυτού του αποθετηρίου ως δυνατότητας και σύνδεσή του στην αντίστοιχη υποδοχή δυνατότητας",
-  "legalCopyright": "Πνευματικά δικαιώματα 2026 Beijing Jingwei Ziyi Technology Co., Ltd. και συνεισφέροντες του AI WorkDeck",
+  "legalCopyright": "Πνευματικά δικαιώματα 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED και συνεισφέροντες του AI WorkDeck",
   "legalLicense": "Αυτό το πρόγραμμα διατίθεται υπό την άδεια GNU Affero General Public License v3.0 ή νεότερη, ΧΩΡΙΣ ΚΑΜΙΑ ΑΠΟΛΥΤΩΣ ΕΓΓΥΗΣΗ.",
   "legalSourceLabel": "Πηγαίος κώδικας: ",
   "legalLicenseLabel": "Πλήρης άδεια χρήσης: ",
   "legalTrademarkLabel": "Σημείωση για το εμπορικό σήμα: ",
-  "legalTrademark": "Το \"AI WorkDeck\" είναι εμπορικό σήμα της Beijing Jingwei Ziyi Technology Co., Ltd. Μην χρησιμοποιείτε αυτό το όνομα ως όνομα προϊόντος κατά την αναδιανομή τροποποιημένης έκδοσης· δείτε τη σημείωση για το εμπορικό σήμα.",
+  "legalTrademark": "Το \"AI WorkDeck\" είναι εμπορικό σήμα της BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Μην χρησιμοποιείτε αυτό το όνομα ως όνομα προϊόντος κατά την αναδιανομή τροποποιημένης έκδοσης· δείτε τη σημείωση για το εμπορικό σήμα.",
   "navPermissions": "Δικαιώματα συστήματος",
   "permissionsSectionTitle": "Δικαιώματα συστήματος macOS",
   "permissionsSectionSubtitle": "Εκχωρήστε δικαιώματα συστήματος για να σύρετε αρχεία απευθείας από το WeChat, να καταγράφετε στιγμιότυπα OCR μεταξύ παραθύρων και να ηχογραφείτε συσκέψεις",

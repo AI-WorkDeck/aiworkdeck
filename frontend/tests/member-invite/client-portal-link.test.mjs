@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 客户门户链接（dev-board#1050）：码放 fragment（#code=），不进服务器与 access log。
 // 链接拼错一处，客户打开就是一个要他手输 20 位码的空表单，或者更糟——码进了查询串。

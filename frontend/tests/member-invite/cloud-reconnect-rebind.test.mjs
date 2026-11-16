@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程第 11 集（0.78.0 走查）：改名（0.78 之前会换令牌）之后案卷卡在「请明确重新连接云端」，
 // 点「重新连接云端」后端照旧复用那枚已被撤掉的令牌，重放的放进案件库原样失败、界面像没反应。

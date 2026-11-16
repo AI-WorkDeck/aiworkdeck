@@ -2,13 +2,15 @@
 
 *Version 1.1, effective 2026-08-28. Version 1.0 (acceptance by contribution) continues to govern contributions submitted before this date; signing this version ratifies and re-confirms those prior grants under the terms below.*
 
+*Steward identification revised 2026-11-16. Existing signature records are preserved.*
+
 ## 1. Purpose
 
 To keep the **AI WorkDeck** project sustainable, it is offered under a dual-licensing model: AGPLv3 for the community, and commercial licenses for organizations that cannot comply with the AGPLv3. For that model to be lawful when the codebase contains work from many contributors, all rights necessary to relicense must be concentrated in a single entity. This agreement collects those rights. It is a *license*, not a copyright assignment — you keep ownership of your work.
 
 ## 2. Definitions
 
-- **"Steward"** means 北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.), the company that stewards the AI WorkDeck project, holds its trademarks, and offers its commercial licenses in mainland China — together with its affiliates (including 真善美承泽有限公司 / Zhen Shan Mei Grace Legacy Limited, which operates the project's international offering at workdeck.ai), successors, and assigns.
+- **"Steward"** means 北京公富信息技术有限公司 (BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED), the company that stewards the AI WorkDeck project, holds its trademarks, and offers its commercial licenses worldwide — together with its affiliates, successors, and assigns.
 - **"Contribution"** means any original work of authorship (code, documentation, designs, translations, or other material) intentionally submitted by you to this project, in any form (pull request, patch, issue attachment, or otherwise).
 
 ## 3. Grant of Copyright License

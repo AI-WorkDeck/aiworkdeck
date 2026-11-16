@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程问题 89（dev-board#1713）：资源管理器里 Cmd 多选几个文件后关掉一个标签，多选被清空。
 // 根因：关标签 → syncFileTreeSelectionWithActiveTab → FileTree.revealFile 把

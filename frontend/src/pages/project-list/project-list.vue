@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <!-- 直链薄壳（dev-board#1047）：项目列表的内容本体已经是工作台左栏的「项目」面板

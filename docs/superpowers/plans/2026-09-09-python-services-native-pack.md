@@ -834,7 +834,7 @@ git commit -m "ci(pack): pack-release 增加四个 Python 运行时 pack 的双�
 新建 `desktop/tests/pysvc-runtime.pack-resolve.test.js`：
 
 ```js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 四个 Python 服务的根目录解析（设计 §3.2）。优先级与 LitigationVisualService.resolveRuntime
 // 同构：显式 env 覆盖 → pack current 目录（必须带 .pack-complete）→ dev 态 bundled。
@@ -944,7 +944,7 @@ Expected: FAIL —「resolveServiceRoot is not a function」。
 把 `desktop/main/services/pysvc-runtime.js` 整体替换为：
 
 ```js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const path = require('path')
 const fs = require('fs')
@@ -1091,7 +1091,7 @@ git commit -m "feat(desktop): pysvc 运行时改走 pack 解析，删除首启�
 新建 `desktop/tests/pysvc-extract-removed.test.js`（源码级断言，口径同 `main-window-bounds.test.js`：main.js 起手就 new BrowserWindow，node 直接 require 不进来）：
 
 ```js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 首启解压链路必须整段消失（设计 §3.2）。留着它的代价不是多几行死代码：
 // 那段逻辑会在没有 pysvc.tar.gz 的 0.38.0 上给用户弹一个「本地组件解压失败」的错误框。
@@ -1240,7 +1240,7 @@ git commit -m "feat(desktop): 删除 pysvc 首启解压链路与 extraResources 
 新建 `desktop/tests/service-pack-gate.test.js`：
 
 ```js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 四个服务的启动门（设计 §3.2）。pptx/asr 只判 pack 在场；mineru/kokoro 还要判模型。
 // asr 刻意保持「pack 在场就起、模型没下也起」：就绪探测必须能分清
@@ -1625,7 +1625,7 @@ GET /api/packs/optional-components      权限：登录（与 /list 同）
 新建 `PackControllerOptionalComponentsTest.java`：
 
 ```java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.controller;
 
@@ -1704,7 +1704,7 @@ Expected: FAIL — 编译错（`OptionalComponents` / `ModelPresence` / `knownSi
 新建 `OptionalComponents.java`：
 
 ```java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.pack;
 
@@ -1759,7 +1759,7 @@ public final class OptionalComponents {
 新建 `ModelPresence.java`：
 
 ```java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.pack;
 
@@ -1919,7 +1919,7 @@ git commit -m "feat(pack): 新增只读接口 GET /api/packs/optional-components
 - [ ] **Step 1: 写失败测试**
 
 ```java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.pack;
 
@@ -2015,7 +2015,7 @@ git commit -m "fix(pack): 自动补下载跳过四个可选运行时 pack"
 - [ ] **Step 1: 写失败测试**
 
 ```java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.ai.tools;
 

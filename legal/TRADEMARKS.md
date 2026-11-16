@@ -5,7 +5,7 @@ The purpose of this policy is to balance the interests of the open-source commun
 
 ## 2. The Marks and Their Status
 
-All marks below are held by 北京京微资易科技有限公司, the entity behind this project.
+All marks below are held by 北京公富信息技术有限公司, the entity behind this project.
 
 ### 2.1 The logo (device mark)
 

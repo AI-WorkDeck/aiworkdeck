@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Explorer right-click「识别文字（OCR）」host side (tutorial-series#155): FileTree emits
 // `ocr-files {action, items}`; this mixin runs the queue (utils/explorerOcr.js), shows progress with

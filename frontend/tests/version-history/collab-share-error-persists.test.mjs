@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程第 11 集：「此服务器未开通统一账户充值」只闪一下 toast，弹窗没有任何变化，律师以为没点上。
 // 放进案件库 / 重新绑定失败（又不是要重新连接）时，原因必须留在弹窗里，并给出下一步。

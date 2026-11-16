@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // S26 阶段 1：主窗口导航白名单的真 Electron 回归。
 // 源码 Electron + 隔离的后端/H2/HOME/端口 + 本地 OpenAI 兼容假模型（不花钱、不连外网）。

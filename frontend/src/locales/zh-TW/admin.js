@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "北京公富信息技术有限公司",
   "externalDownloadWindows": "下載 Windows 安裝包（x64）",
   "externalDownloadWindowsArm": "下載 Windows ARM 安裝包（搶先體驗）",
   "externalRepair": "如果已經安裝，請檢查程式是否能正常開啟、安裝路徑及執行權限，然後重新偵測。騰訊會議還需檢查 Node.js 是否可用；更改路徑後可儲存工作並重新啟動 AI WorkDeck。",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "幫我升級能力：{url}。{note}請先用 capability_install 拉取並驗證，把安裝計畫唸給我聽，等我確認後再安裝。",
   "capabilityAiPromptNoteClause": "{note}。",
   "capabilityAiPromptDefaultNote": "把這個儲存庫裝成一項能力並接到對應的能力槽",
-  "legalCopyright": "版權所有 2026 北京京微資易科技有限公司及 AI WorkDeck 貢獻者",
+  "legalCopyright": "版權所有 2026 北京公富信息技术有限公司及 AI WorkDeck 貢獻者",
   "legalLicense": "本軟體依 GNU Affero General Public License v3.0 或更高版本發布，不提供任何擔保。",
   "legalSourceLabel": "原始碼：",
   "legalLicenseLabel": "授權條款全文：",
   "legalTrademarkLabel": "商標聲明：",
-  "legalTrademark": "「AI WorkDeck」為北京京微資易科技有限公司的商標，再散布修改版時不得使用該名稱作為產品名（詳見商標聲明）。",
+  "legalTrademark": "「AI WorkDeck」為北京公富信息技术有限公司的商標，再散布修改版時不得使用該名稱作為產品名（詳見商標聲明）。",
   "navPermissions": "系統權限",
   "permissionsSectionTitle": "macOS 系統權限",
   "permissionsSectionSubtitle": "設定系統權限以支援從微信直接拖入檔案、跨視窗全螢幕截圖 OCR 及會議錄音轉寫",

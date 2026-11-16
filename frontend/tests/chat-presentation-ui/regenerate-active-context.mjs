@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Real ChatInterface rollback/resend pipeline; synthetic identity, documents and HTTP only.
 // dev-board#1118：重新生成必须按用户气泡上的 activeContext 发送时快照重放——

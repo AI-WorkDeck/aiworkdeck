@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 资源管理器右键补齐常用项：打印… / 移动到… / 压缩为 ZIP / 解压到此处。跑法：npm run test:project-home
 // 套路同 file-tree-batch-menu.test.mjs：把 FileTree.vue 的 <script> 抠出来真跑。

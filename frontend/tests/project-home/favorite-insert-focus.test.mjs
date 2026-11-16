@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-61：收藏夹 / 剪贴板面板点「插入」写进文档后，Cmd+Z 撤销不掉。
 // 插入本身走的是与 AI doc_* 同一条 insert_at_cursor 原语、进引擎撤销栈；

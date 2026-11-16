@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 审计（dev-board#74）：日程页（#1048 起主体在 components/calendar/CalendarPane.vue）的 loadTasks() 没有请求乱序保护。
 // 连续快点 prev/next 或切视图，每次 datesSet 都立刻发一个新请求；先发的（旧区间）

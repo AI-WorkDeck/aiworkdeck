@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 事项（任务/日程）的共享判定与展示逻辑（唯一出处）。
 // spec: docs/superpowers/specs/2026-09-25-task-calendar-redesign.md 第二节。

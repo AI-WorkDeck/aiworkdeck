@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-41（v0.49.0 真机测试 C5-09）：右栏拖窄到约 300px 或整窗 1100×700 时——
 // ① 模型名「Kimi K3」折成两行；② 空状态输入卡的发送钮掉到控件行下面；

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 滚轮位移的取值口径：uni-app H5 会把 <view>/<scroll-view> 上的原生事件交给
 // createNativeEvent 重建成一个普通对象，只有 { type, timeStamp, target,

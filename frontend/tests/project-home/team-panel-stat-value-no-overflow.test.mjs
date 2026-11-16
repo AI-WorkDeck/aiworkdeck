@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board BUG-46：TeamPanel.vue 的 .stat-value 曾经固定 18px + white-space:
 // nowrap，窄窗口下五列磁贴挤不下「0.0 小时」这类数字+单位组合时会可见溢出

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const test = require('node:test')
 const assert = require('node:assert/strict')
@@ -49,7 +49,8 @@ test('About menu opens one scrollable local window with one version and complete
   const win = windows.at(-1)
   const html = decodeURIComponent(win.url.split(',').slice(1).join(','))
   assert.equal((html.match(/0\.68\.0/g) || []).length, 1)
-  for (const text of ['版权所有', 'Copyright 2026', 'AGPL v3.0 or later', '不提供任何担保', 'ABSOLUTELY NO WARRANTY', '再分发修改版时不得', 'Modified versions must not']) assert.ok(html.includes(text), text)
+  assert.doesNotMatch(html, /京微|Jingwei|Zhen Shan/)
+  for (const text of ['北京公富信息技术有限公司', 'BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED', '版权所有', 'Copyright 2026', 'AGPL v3.0 or later', '不提供任何担保', 'ABSOLUTELY NO WARRANTY', '再分发修改版时不得', 'Do not use that name as the product name']) assert.ok(html.includes(text), text)
   const tokenBlocks = [...html.matchAll(/:root \{ ([^}]+) \}/g)].map((match) => match[1])
   for (const [index, mode] of ['light', 'dark'].entries()) {
     for (const role of ['text', 'text-2', 'surface', 'border', 'accent-text']) {
@@ -112,5 +113,24 @@ test('About shows the effective patch version and the installer version when the
   } finally {
     electron.app.isPackaged = undefined
     fs.rmSync(path.join(userData, '.aiworkdeck'), { recursive: true, force: true })
+  }
+})
+
+
+test('About legal notices cover every registered locale and match the workbench dictionaries', async () => {
+  const { pathToFileURL } = require('node:url')
+  const { SUPPORTED_LOCALE_CODES } = require('../main/app-language')
+  const notices = require('../main/legal-notices.json')
+  for (const locale of SUPPORTED_LOCALE_CODES) {
+    const source = pathToFileURL(path.resolve(__dirname, '../../frontend/src/locales', locale, 'admin.js'))
+    const dict = (await import(source.href)).default
+    assert.equal(notices.copyright[locale], dict.legalCopyright, locale)
+    assert.equal(notices.trademark[locale], dict.legalTrademark, locale)
+    setAppLanguage(locale)
+    const win = showAboutWindow(parent)
+    const html = decodeURIComponent(win.url.split(',').slice(1).join(','))
+    assert.ok(html.replace(/&#39;/g, "'").includes(notices.copyright[locale]), locale)
+    assert.doesNotMatch(html, /京微|Jingwei|Zhen Shan/, locale)
+    win.close()
   }
 })

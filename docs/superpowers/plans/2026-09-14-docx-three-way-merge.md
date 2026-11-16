@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - 界面零 Git 术语（稿/版/交稿/取回/裁决/合并比对稿/溯源/共同的上一版），浅色外壳，禁 emoji，任何界面不显示 username。
-- 新建一方源文件带 SPDX 双行头（`SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors` / `SPDX-License-Identifier: AGPL-3.0-or-later`）。
+- 新建一方源文件带 SPDX 双行头（`SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors` / `SPDX-License-Identifier: AGPL-3.0-or-later`）。
 - 后端 `mvn` 必须 JDK 21；前端 npm；**子代理禁止 commit / push / stash**；同一棵树里不并发跑两个 `mvn test`。
 - 历史永不重写；引擎只在桌面端跑、文档字节不出本机；案件库侧（`GitHttpController` 及 cloud 包服务端）不改。
 - i18n 中英同步（`frontend/src/locales/zh-CN/*.js` + `en-US/*.js`），文案走 `$t`。

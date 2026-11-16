@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程问题 86（dev-board#1713）：暂存区只能单选，勾两个复选框后「对比」按钮出不来。
 // 根因：列表容器 @mousedown=onMouseDown 在无修饰键时清空选择，复选框的 mousedown

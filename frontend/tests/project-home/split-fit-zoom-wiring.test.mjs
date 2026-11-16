@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 分屏开合 → 各文档按窗格宽度重新适配缩放（引擎侧语义见 tests/lowa-unit/split-fit-zoom.test.mjs）。
 import test from 'node:test'

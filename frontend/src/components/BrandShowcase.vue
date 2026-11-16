@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <!-- 登录页左栏（桌面解锁页与云端浏览器登录页共用）。纯展示，没有任何可点的东西。
@@ -20,11 +20,10 @@
       </view>
       <text class="bs-caption">{{ $t('onboarding.unlock.brand.sourcesCaption') }}</text>
     </view>
-    <!-- 缔约主体按站点给：两站是两个商业实体（双主站设计），不跟界面语言走 -->
+    <!-- 国内及国际业务由同一主体运营；站点继续决定服务能力。 -->
     <view class="bs-foot">
       <view class="bs-entity">
         <text class="bs-entity-name">{{ entityName }}</text>
-        <text v-if="entityRegion"> · {{ entityRegion }}</text>
       </view>
       <text>{{ versionLine }}</text>
     </view>
@@ -48,12 +47,6 @@ const SOURCES = [
   { key: 'law', tone: 'research' },
   { key: 'folder', tone: 'bamboo' },
 ]
-
-// 两个站点的缔约主体（法定名称，不翻译）
-const ENTITIES = {
-  cn: { name: '北京京微资易科技有限公司', region: '' },
-  intl: { name: 'Zhen Shan Mei Grace Legacy Limited', regionKey: 'onboarding.unlock.hongKong' },
-}
 
 // 视差幅度上限（度）。只是一点「活着」的感觉，大了会晃眼
 const MAX_TILT = 2
@@ -96,10 +89,7 @@ export default {
       }))
     },
     entityName() {
-      return (this.isIntl ? ENTITIES.intl : ENTITIES.cn).name
-    },
-    entityRegion() {
-      return this.isIntl ? this.$t(ENTITIES.intl.regionKey) : ''
+      return this.$t('admin.legalOwner')
     },
     versionLine() {
       return this.version ? `v${this.version} · AGPL-3.0` : 'AGPL-3.0'

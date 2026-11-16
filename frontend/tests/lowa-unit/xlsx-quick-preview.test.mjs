@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 表格冷启动预览（office-tier1 O10）：从 xlsx 读出打开后的第一屏。
 // 每个用例在测试里现造 xlsx，钉住：活动表、滚动位置/冻结窗格、样式与数字格式、

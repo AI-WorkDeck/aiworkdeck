@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
 // dev-board#1018：AI 生成 docx 后自动开新标签，加载页停在 95%「正在打开文档」几分钟。

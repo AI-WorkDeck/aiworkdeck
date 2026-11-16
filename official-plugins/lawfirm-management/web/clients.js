@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 客户管理：客户列表（按客户看收入/在办/应收/最近往来）、客户档案（联系人、关联关系与间接股权、项目、收费、
 // 利冲记录、往来）、收案表单「选择已有客户」。数据在本机台账（lawfirm.request 的 listClients/getClient/

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#602：断网时 AI 对话只会甩出一句英文原文（UnknownHostException 的 getMessage()
 // 常常就是一个主机名），用户看不出「是网断了」。后端在终态 error 载荷上补了

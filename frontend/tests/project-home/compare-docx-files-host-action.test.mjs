@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // V7 D1：AI 工具 compare_docx_redline 经 editor_command 下发宿主动作 compare_docx_files。
 // 它必须在「当前有没有开着编辑器」的检查之前被拦下（用的是借来的隐藏引擎），走与工作台

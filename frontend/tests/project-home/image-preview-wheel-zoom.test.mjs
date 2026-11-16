@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#1014：图片预览里转滚轮只能缩小、不能放大。
 //   cd frontend && node --test tests/project-home/image-preview-wheel-zoom.test.mjs

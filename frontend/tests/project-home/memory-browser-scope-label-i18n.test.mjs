@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board BUG-44：MemoryBrowser.vue 的空间标签曾经优先用后端下发的中文
 // label（"个人记忆"/"团队记忆"/"律所记忆"），英文界面下也照样显示中文。

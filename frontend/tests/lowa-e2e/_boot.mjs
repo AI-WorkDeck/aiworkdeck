@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // lowa-e2e 共用的启动件：preflight、COOP/COEP 静态服务、无头 Chrome、打开
 // editor.html?verify=1 并等到 window.__loExecutor 就绪。run.mjs（键盘链路回归）

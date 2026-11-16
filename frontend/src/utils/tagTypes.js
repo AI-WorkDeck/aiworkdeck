@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // tagTypes.js — 标签类型维度共享 helper（dev-board#63，见
 // docs/superpowers/specs/2026-08-20-file-party-issue-tags-design.md）。

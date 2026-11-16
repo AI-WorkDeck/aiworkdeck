@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程问题 88（dev-board#1713）：两页小文件的文档对比卡在「正在启动比对 / 正在加载文档」。
 // ① acquireLibreHiddenInstance 每次都冷启一台隐藏引擎（实测 90 秒级），旁边已经 ready 的

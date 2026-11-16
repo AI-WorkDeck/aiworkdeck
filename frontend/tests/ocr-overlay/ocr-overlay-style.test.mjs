@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 截图框选浮层的样式契约（dev-board#474）。
 // 浮层的底图是一张冻结帧截图，框选矩形与提示条都叠在它上面：

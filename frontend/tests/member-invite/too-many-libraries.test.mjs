@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 问题 126 真机复测（dev-board#1713）：这台电脑连着 2 条云端连接时，「放进团队案件库」
 // 一律被拒、提示「请先断开多余的」，但界面上根本没有断开的地方——死胡同。

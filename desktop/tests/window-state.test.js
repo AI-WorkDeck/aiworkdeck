@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 问题 18：窗口大小 / 位置 / 最大化不记住，每次启动都回到 1400×900。
 // 恢复时必须仍落在某块显示器上（拔掉外接屏后不能把窗口放到看不见的地方）。

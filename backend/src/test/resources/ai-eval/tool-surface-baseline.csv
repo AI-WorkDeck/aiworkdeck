@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # host,prompt,offeredTools,offeredSchemaTokens(o200k)
 # 2026-11-07 S1（没开文件态入口核心集 + 关键词预放回 ≤3 类 + create_file 退出核心集）后重测；S0 基线见 git 历史

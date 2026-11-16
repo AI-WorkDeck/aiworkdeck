@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 提交弹窗「AI 写说明」：先保存文件再要建议，建议只填进输入框，失败不动律师已写的内容。
 //   cd frontend && node --test tests/version-history/commitTitleSuggest.test.mjs

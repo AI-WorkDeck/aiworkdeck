@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # CI preparation (outside the standard-user probe):
 # javac -encoding UTF-8 --release 17 -cp "RESOURCES/backend/app.jar;RESOURCES/backend/lib/*" -d CLASSES RuntimeInstallProbe.java

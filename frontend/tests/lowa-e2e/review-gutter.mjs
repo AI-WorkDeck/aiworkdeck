@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 审阅装订线宽度不抖（dev-board#725）：默认的「全部修订」内联视图下，页外审阅区
 // 一条卡片都不画，装订线宽度就必须全程为 0——它是 0 / 280 的全有全无量，每换一次

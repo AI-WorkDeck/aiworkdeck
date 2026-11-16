@@ -9,7 +9,7 @@ New here? The project's governance — roles, the contributor → reviewer → m
 All code contributions require a signed [Contributor License Agreement (CLA)](../legal/CLA.md). Briefly:
 
 1. You assert that you own the code you are submitting (DCO), and you grant a patent license for it.
-2. You grant 北京京微资易科技有限公司 (the project's Steward) the right to distribute your code under both the **AGPLv3** (for the community) and a **commercial license** (for enterprise customers).
+2. You grant 北京公富信息技术有限公司 (the project's Steward) the right to distribute your code under both the **AGPLv3** (for the community) and a **commercial license** (for enterprise customers).
 3. You keep the copyright in your work — the CLA is a license, not an assignment.
 
 Signing is automatic in the PR flow: on your first pull request, the CLA Assistant bot comments with a link, and you sign by replying with the sentence it requests. One signature covers all your past and future contributions. **Unsigned PRs are not merged.**

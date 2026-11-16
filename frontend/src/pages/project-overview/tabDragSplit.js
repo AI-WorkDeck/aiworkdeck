@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // project-overview.vue 的标签页拖拽与分栏布局：tab 跨窗格拖拽（普通拖拽是"移动"，
 // 按住 Alt/Option 才是"在另一侧再开一份"，dev-board#542；可编辑文档除外，#987）、

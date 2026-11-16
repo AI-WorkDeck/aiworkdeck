@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 英文 QA 2026-11-14 第 2 条：AI 输入框上方的选区卡片显示「( chars)」。两处都错：模板传
 // { count }，词条用 {n}；传的字段 charCount 在卡片对象上根本不存在（字段名是 length）。

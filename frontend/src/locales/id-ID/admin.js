@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Penginstal Windows (x64)",
   "externalDownloadWindowsArm": "Penginstal Windows ARM (Akses Awal)",
   "externalRepair": "Jika sudah terpasang, periksa apakah program dapat dijalankan, periksa jalur dan izin eksekusinya, lalu periksa kembali. Tencent Meeting juga memerlukan Node.js yang dapat digunakan. Setelah mengubah jalur, simpan pekerjaan Anda dan mulai ulang AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Silakan tingkatkan kapabilitas dari {url}. {note}Gunakan capability_install terlebih dahulu untuk mengambil dan memvalidasinya, bacakan rencana pemasangan kepada saya, dan pasang hanya setelah saya konfirmasi.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Pasang repositori ini sebagai kapabilitas dan hubungkan ke slot kapabilitas yang sesuai",
-  "legalCopyright": "Hak cipta 2026 Beijing Jingwei Ziyi Technology Co., Ltd. dan kontributor AI WorkDeck",
+  "legalCopyright": "Hak cipta 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED dan kontributor AI WorkDeck",
   "legalLicense": "Program ini dirilis di bawah GNU Affero General Public License v3.0 atau yang lebih baru, TANPA JAMINAN APA PUN.",
   "legalSourceLabel": "Kode sumber: ",
   "legalLicenseLabel": "Lisensi lengkap: ",
   "legalTrademarkLabel": "Pemberitahuan merek dagang: ",
-  "legalTrademark": "\"AI WorkDeck\" adalah merek dagang dari Beijing Jingwei Ziyi Technology Co., Ltd. Jangan gunakan nama tersebut sebagai nama produk saat mendistribusikan ulang versi yang dimodifikasi; lihat pemberitahuan merek dagang.",
+  "legalTrademark": "\"AI WorkDeck\" adalah merek dagang dari BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Jangan gunakan nama tersebut sebagai nama produk saat mendistribusikan ulang versi yang dimodifikasi; lihat pemberitahuan merek dagang.",
   "navPermissions": "Izin Sistem",
   "permissionsSectionTitle": "Izin Sistem macOS",
   "permissionsSectionSubtitle": "Beri izin sistem untuk menyeret file langsung dari WeChat, menangkap tangkapan layar OCR lintas jendela, dan merekam rapat",

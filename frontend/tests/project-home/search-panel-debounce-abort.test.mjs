@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // v0.49.0 真机 BUG-12（C3-08）：搜索面板连续输入会叠出一串请求——旧请求只是在结果
 // 回来时被 seq 丢掉，HTTP 请求本身一直挂着、后端照样把每个文件抽一遍；回车与防抖各发

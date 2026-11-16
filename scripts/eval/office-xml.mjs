@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // model-matrix 的 outcomeCheck 辅助：从 xlsx/pptx 字节里读出单元格与幻灯片内容（只读、无第三方依赖，靠系统 unzip）。

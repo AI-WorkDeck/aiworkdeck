@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
 // 尽调模块 P3 稳定性余项 #2（dev-board#100）：LOWA 编辑器保活池固定 LRU=3，与文档体积

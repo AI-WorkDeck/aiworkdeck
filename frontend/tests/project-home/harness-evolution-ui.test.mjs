@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Harness² 对齐（dev-board#1481）：静默运行期自愈、静默自进化判定与独立核验报告的前端接线断言。
 // 自进化与运行期自愈全部由后端自动判定作用域与技能升格，严禁在对话流或过程卡里弹出打扰用户的三选一卡片。

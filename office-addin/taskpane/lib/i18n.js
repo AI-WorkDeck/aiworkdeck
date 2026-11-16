@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * 极简 i18n（Office Add-in，20 语种 + 跟随系统 system，dev-board#150 / #1477）：
@@ -138,6 +138,9 @@ function syncDocumentLang() {
       const entry = getLocaleEntry(activeTag)
       document.documentElement.lang = entry.bcp47 || activeTag
       document.documentElement.dir = entry.dir || 'ltr'
+      for (const node of document.querySelectorAll('[data-legal-i18n]')) {
+        node.textContent = t(node.getAttribute('data-legal-i18n'))
+      }
     }
   } catch { /* node --test 里没有 document */ }
 }

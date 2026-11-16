@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Non-Chinese UI of the law firm panel (QA post-0.85): no Chinese left in the main views, money from the real amount
 // (¥10.3M used to read "1,030.000k"), header badge and practice-group default localized, sidebar-independent.

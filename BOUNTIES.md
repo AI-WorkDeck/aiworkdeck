@@ -25,5 +25,5 @@ Amounts are stated per issue. Typical ranges:
 - A bounty is a **one-off service payment** for an accepted deliverable. It creates no employment, partnership, agency, or ongoing relationship of any kind.
 - Intellectual property in the deliverable is licensed per the [CLA](legal/CLA.md), same as any other contribution.
 - One bounty per issue; if multiple people contribute materially to the accepted solution, the maintainer splits the bounty at their reasonable discretion, stated on the issue.
-- Bounty listings are invitations, not offers: the amount is payable only on acceptance of the deliverable by a maintainer. The Steward (北京京微资易科技有限公司) may adjust amounts, tiers, and rules prospectively at any time; changes never reduce a bounty already claimed and in progress.
+- Bounty listings are invitations, not offers: the amount is payable only on acceptance of the deliverable by a maintainer. The Steward (北京公富信息技术有限公司) may adjust amounts, tiers, and rules prospectively at any time; changes never reduce a bounty already claimed and in progress.
 - Taxes on bounty income are the recipient's responsibility.

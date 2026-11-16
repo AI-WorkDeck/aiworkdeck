@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 包晴天积分通道（billingLine=bqt）：会员卡展示、所有充值/购 Pro 入口隐藏、网关拒绝码的提示。
 import test from 'node:test'

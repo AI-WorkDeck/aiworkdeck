@@ -1,6 +1,8 @@
 # Commercial Licensing
 
 ## Overview
+The commercial licensor is 北京公富信息技术有限公司 (BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED), the steward of AI WorkDeck and operator of its domestic and international offerings.
+
 AI WorkDeck Community Edition is open-source under the **AGPLv3**. This allows for great freedom in research, personal use, and open-source collaboration.
 
 However, AGPLv3 requires that if you provide the software as a service (SaaS) over a network, you must release the source code of your modifications to your users.

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 分屏开合后按窗格宽度适配缩放（set_zoom{fit:'width'}）：只缩不放、上限是用户自己定的
 // 缩放、用户手动改过就以手动值为准、换文档作废。假 ViewSettings 模拟 LO 的「页宽」

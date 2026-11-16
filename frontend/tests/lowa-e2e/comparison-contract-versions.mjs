@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // V7 D1（compare_docx_redline）的引擎侧验收：用 scripts/eval 的合同 v1/v2 夹具跑
 // build_comparison_document（宿主动作 compare_docx_files 内部就是这一条），断言

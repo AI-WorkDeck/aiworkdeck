@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 助手回答去 emoji 的兜底：样例取自 2026-11-12 评测里 Qwen / DeepSeek 的真实回答。
 import test from 'node:test'

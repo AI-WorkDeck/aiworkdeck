@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <InsightPane v-if="context" :project-id="projectId" :doc-file-id="context.docFileId" :doc-name="context.docName" :get-executor="executor" :can-write="context.canWrite" :prepare-document="prepare" :cursor-context="context.cursorContext" @entities="entities" @open-url="openUrl" @open-settings="settings" @open-hover="hover" @open-doc-file="openDoc" />

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#974（v0.49.0 BUG-78 / C9-09）：从「文件暂存区」把文件拖回资源管理器，
 // 只有拖拽时临时出现的「拖拽到此处移至根目录」小区块生效，放到树的空白处静默无效。

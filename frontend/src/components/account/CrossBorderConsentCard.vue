@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!--
   平台 AI 跨境单独同意的就地征求卡：对话被同意闸拦下时出现在那条回答里，启动时发现同意失效（告知改版、

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI 对话里的组件门（设计 §4.2）：弹窗 → install → 模型 → ensure → 自动重发原消息。
 // 「自动重发」是这条链的重点：让用户装完组件还得自己把刚才那句话再打一遍，

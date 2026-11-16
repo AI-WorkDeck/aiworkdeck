@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#1051：桌面壳里回收站「彻底删除」把磁盘上的文件送进系统废纸篓，而不是让后端直接删。
 // 本机文件夹项目的文件就是律师自己文件夹里的真文件，Files.delete 之后找不回来。

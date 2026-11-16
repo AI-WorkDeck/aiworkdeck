@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 台账 B1：客体页把 devicePixelRatio 钉在启动值，换到像素比不同的屏幕后引擎（Qt 画布）与
 // LibreOffice 的排版比例不再错开。真机回归是 tests/desktop-e2e/resize-recenter.mjs；这里只守

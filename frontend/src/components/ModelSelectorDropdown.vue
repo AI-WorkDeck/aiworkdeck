@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!--
   AI 输入框的模型下拉（dev-board#853 从 ChatInterface 两处重复分支里抽出来）。

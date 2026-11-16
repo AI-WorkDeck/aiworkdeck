@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#1018：损坏 / 含非法 XML 字符的 docx 交给真引擎 load_document，必须在装载预算内
 // 以明确错误（code DOC_REJECTED）返回，不能挂住；正常文档前后都照常能开。

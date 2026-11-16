@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 提示文案的硬性内容要求（设计 §0 用户硬性要求 / §4.3）：每一条提示都必须同时说清
 // 下载什么、多大、解锁哪些功能、不下载则哪些功能不可用。

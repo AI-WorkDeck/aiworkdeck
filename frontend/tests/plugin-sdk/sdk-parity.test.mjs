@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Web 插件 SDK 副本守卫：源头 sdk/plugin-sdk/awd-plugin-sdk.js 与仓内两份分发副本必须逐字节一致
 // （官网 lib/plugin-template.ts 的内联副本在另一个仓，靠 PR 同步；后端 classpath 副本另有

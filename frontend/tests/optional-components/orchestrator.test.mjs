@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 下载编排（设计 §3.1「底层两条通道顺序执行」/ §4.1「逐个顺序下载，带总进度」）。
 // 顺序是硬约束：模型下载器本身跑在 pack 的 venv 里（model-manager.js 的 PYTHONPATH

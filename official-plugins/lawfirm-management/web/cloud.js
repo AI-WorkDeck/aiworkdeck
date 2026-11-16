@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 「律所云端」：律所各项云端功能（客户与主体、计时工时、投标材料……）的统一开关。
 // 开关存在官方协作服务上、按律所一份；只有律所管理员能改，改时带上所见版本，别人刚改过就提示刷新。

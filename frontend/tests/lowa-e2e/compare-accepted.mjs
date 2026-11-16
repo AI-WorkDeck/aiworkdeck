@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎（台账 B12）：版本对比时新版自身已带修订——默认按「接受原有修订后的正文」比对。
 // R-086 真机：短合同第四条有 AI 修订（5→2），「与上一版比对」把比对修订与原有修订叠在一起，

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#755：「写作辅助」改名「自动补全」，画布右下角那颗常驻按钮撤掉，入口并入
 // Writer 自建工具栏、与「有据续写」并排成一组。这里锁宿主这一半（客体那一半在

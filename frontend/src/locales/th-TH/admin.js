@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "โปรแกรมติดตั้ง Windows (x64)",
   "externalDownloadWindowsArm": "โปรแกรมติดตั้ง Windows ARM (เข้าใช้งานก่อนกำหนด)",
   "externalRepair": "หากติดตั้งแล้ว ให้ตรวจสอบว่าโปรแกรมเริ่มทำงานได้ เส้นทางการติดตั้ง และสิทธิ์การเรียกใช้งาน แล้วตรวจสอบอีกครั้ง Tencent Meeting ยังต้องมี Node.js ที่ใช้งานได้ด้วย หลังเปลี่ยนเส้นทาง ให้บันทึกงานและรีสตาร์ท AI WorkDeck",
@@ -398,7 +399,7 @@ export default {
   "legalSourceLabel": "ซอร์สโค้ด: ",
   "legalLicenseLabel": "ใบอนุญาตฉบับเต็ม: ",
   "legalTrademarkLabel": "ประกาศเครื่องหมายการค้า: ",
-  "legalTrademark": "\"AI WorkDeck\" เป็นเครื่องหมายการค้าของ Beijing Jingwei Ziyi Technology Co., Ltd. ห้ามใช้ชื่อนี้เป็นชื่อผลิตภัณฑ์เมื่อแจกจ่ายเวอร์ชันที่แก้ไขแล้ว โปรดดูประกาศเครื่องหมายการค้า",
+  "legalTrademark": "\"AI WorkDeck\" เป็นเครื่องหมายการค้าของ BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. ห้ามใช้ชื่อนี้เป็นชื่อผลิตภัณฑ์เมื่อแจกจ่ายเวอร์ชันที่แก้ไขแล้ว โปรดดูประกาศเครื่องหมายการค้า",
   "navPermissions": "สิทธิ์การเข้าถึงระบบ",
   "permissionsSectionTitle": "สิทธิ์การเข้าถึงระบบของ macOS",
   "permissionsSectionSubtitle": "ให้สิทธิ์ระบบเพื่อลากไฟล์จาก WeChat โดยตรง จับภาพหน้าจอ OCR ข้ามหน้าต่าง และบันทึกการประชุม",

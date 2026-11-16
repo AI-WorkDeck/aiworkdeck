@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#1050：尽调清单入口只对「已放进案件库」的案卷恢复给律师，本机项目维持 08-19 的隐藏，
 // CLIENT 仍只见尽调清单。leftSidebarPlugins.js 引了 '@/i18n'，node 解析不了别名——剥掉 import、

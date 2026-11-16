@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 首启链路：解锁门（unlock）/解锁提示（hint）/本机工作区选择（identity）/启动分流页（launch）——首启向导已于 2026-08-27 下线
 export default {

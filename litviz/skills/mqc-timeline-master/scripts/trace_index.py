@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """溯源索引 DOCX 生成器：trace_index.js 的纯 Python 标准库替身 [AWD-PATCH 8]。
 

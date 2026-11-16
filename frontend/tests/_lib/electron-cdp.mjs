@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 起一个带 CDP 的 dev Electron，再用 puppeteer 连上去 —— desktop / feedback / meeting
 // 三套 e2e 都要这一段。以前三个文件各抄一份，于是同一个坑得踩三次：2026-08-17

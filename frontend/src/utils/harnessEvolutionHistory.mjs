@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Harness 自进化卡片的历史回放（dev-board#1481）。
 // 自进化记录随 SSE harness_evolution 推到当轮气泡上；刷新/切回会话后气泡来自历史接口，

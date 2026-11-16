@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-62：剪贴板面板开着时，外部连续复制三条都不出现，切标签才刷出来。
 // 采集桥入库成功后只经 this.$refs.clipboardPanel 去通知面板——ref 不在这个页面实例上

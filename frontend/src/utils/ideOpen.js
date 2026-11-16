@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // IDE 化「打开文件夹 / 打开文件」共用流程：系统对话框 → open-local API → reLaunch 进项目。
 // newproject 页与应用菜单（App.vue 的 menu-action 处理器）共用，两处只差 busy UI。

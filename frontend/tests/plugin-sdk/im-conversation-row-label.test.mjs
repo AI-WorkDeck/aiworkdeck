@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 英文 QA 2026-11-14 第 5 条：会话行写成「Groups · Owner」——行内类型借用了复数的筛选标签。
 // 抠出生产的 conversationLabel / roleName 真跑，词条取真实 en-US。

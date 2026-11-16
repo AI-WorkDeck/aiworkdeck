@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 「已自动合入的相邻段落，请过目」（2026-11-15）：本机提示点开过一次才消失、总览行 / 版本记录 / 版本入口角标的说法
 import test from 'node:test'

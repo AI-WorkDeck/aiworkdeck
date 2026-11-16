@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 「录音不出本机」的四态出路（设计 §4.2）。四条下一步各不相同：
 // RUNTIME_MISSING 下组件 / MODEL_MISSING 下模型 / SERVICE_DOWN 重启 / READY 可用。

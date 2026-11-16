@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // captcha-webview-preload.js —— 国际站人机验证托管页（官网 /captcha-embed）跑在
 // <webview> 里时的消息桥（dev-board#863）。

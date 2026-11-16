@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // UX 走查（导航清晰度）回归断言：未登录设置入口、设置默认落点、菜单「账户与余额…」目标、
 // 整页设置的返回出口、插件市场返回回落。源码文本断言，口径同本目录其它 source-assertions。

@@ -597,3 +597,8 @@ body 为 `{phone|email,purpose:'login'|'reset'}`，返回 `{id,image,expiresAt}`
 - **不要在用户可能正在用 Mac 时往前台应用打字。** 曾有 "T"/"fa" 漏进文档标题、一次登录被误提交。要么确认用户不在用，要么改用不抢前台的 AXPress 点按钮。
 - 副屏在主屏左侧时 `cliclick` 的负坐标要写 `=-802` 形式。
 - 合成测试文件（python-docx/pptx 默认模板）带日文主题字体，会产生逐字「字体属性」修订和 `lang="zh-CN"` 的字体差异，不是插件缺陷。
+
+
+### 主体告示词典（dev-board#1748）
+
+Office/WPS 两入口的版权与商标告示通过 `taskpane/locales/*` 的 `legalCopyright` / `legalLicenseTrademark` 令牌维护。`legal-notice-html.mjs` 在 Vite 构建和开发时填入中英静态回退，保证脚本不可用时仍可阅读；`i18n.js` 切语言同步页脚节点为当前语言。主体统一北京公富，实际签名证书、服务配置及第三方许可保持原状。

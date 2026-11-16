@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 审计（dev-board#74）：ReviewPanel 的修订卡片「接受/拒绝」没有重入闸，连点两次会
 // 并发跑两轮 resolveGroup。两轮手里是同一份索引，第一轮处置掉一条后引擎里比它大的

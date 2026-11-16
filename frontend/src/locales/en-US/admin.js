@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Unified Settings page (components/admin/AdminPane.vue) copy. The language section keeps its own bilingual ternaries.
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   externalDownloadWindows: "Windows installer (x64)",
   externalDownloadWindowsArm: "Windows ARM installer (Early Access)",
 
@@ -429,12 +430,12 @@ export default {
   capabilityAiPromptNoteClause: '{note}. ',
   capabilityAiPromptDefaultNote: 'Install this repository as a capability and wire it into the matching capability slot',
   // About (AGPL §0 Appropriate Legal Notices).
-  legalCopyright: 'Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. and AI WorkDeck contributors',
+  legalCopyright: 'Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED and AI WorkDeck contributors',
   legalLicense: 'This program is released under the GNU Affero General Public License v3.0 or later, with ABSOLUTELY NO WARRANTY.',
   legalSourceLabel: 'Source code: ',
   legalLicenseLabel: 'Full license: ',
   legalTrademarkLabel: 'Trademark notice: ',
-  legalTrademark: '"AI WorkDeck" is a trademark of Beijing Jingwei Ziyi Technology Co., Ltd. Do not use that name as the product name when redistributing a modified version; see the trademark notice.',
+  legalTrademark: '"AI WorkDeck" is a trademark of BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Do not use that name as the product name when redistributing a modified version; see the trademark notice.',
 
   // macOS System Permissions onboarding & drag-to-settings helper (dev-board#1433)
   navPermissions: 'System Permissions',

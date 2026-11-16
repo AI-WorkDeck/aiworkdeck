@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 本机偏好（~/.aiworkdeck/prefs.json）。「可选组件面板提示过没有」存在这里而不是
 // localStorage：那个随浏览器数据被清、也不区分重装，用户会被反复打扰。

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # 一条命令在本机跑起最小开发栈：PostgreSQL（Docker）+ 后端（dev profile，模拟 AI）+ H5 前端，

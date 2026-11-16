@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // O13 真机验收（由 office-password.mjs 的宿主隔离骨架改出）：QuickLook 预览演示文稿用引擎逐页渲染，不再用前端 pptx-preview。
 // 不碰用户的生产实例：Electron/后端的 home、userData、端口全部在临时目录（同 office-interaction-latency.mjs）。

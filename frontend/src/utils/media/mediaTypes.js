@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 预览用的视频/音频扩展名表与 MIME 映射（规格 4.1）。
 // 注意：这是「预览走播放器」的表，与「能转写」的表（utils/audioAttachment.js，

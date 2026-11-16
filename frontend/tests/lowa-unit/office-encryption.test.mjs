@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // O14：设了打开密码的 Word/Excel/PPT 由宿主解密、保存时按同一密码重新加密（officeEncryption.js）。
 // 夹具由独立实现 msoffcrypto-tool 加密（见 tests/lowa-e2e/fixtures/encrypted/README.md），密码 awd-0414。

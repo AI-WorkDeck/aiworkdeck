@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // sheet_add_chart 的区域（O7 难任务实测）：单列曾被当成分类标签，导出的图表没有系列；
 // 逗号分开的 'A1:A7,D1:D7' = 标签列 + 数据列；多列块照旧首列作标签。

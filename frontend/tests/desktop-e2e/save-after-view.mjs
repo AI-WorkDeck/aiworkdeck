@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真机：PPT 自动保存之后再做一条格式修改（AI 把另一页标题改蓝）必须照样标脏并落盘（O7 实测的丢改动）。
 // SAVE_VARIANT=format|format+pdf|twice（twice 为回归用例）。由 quicklook-slides.mjs 的宿主隔离骨架改出。

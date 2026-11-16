@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 账号域：个人中心（userprofile.vue）、登录/注册/客户登录（login.vue）、
 // 新建/打开项目页（newproject/index.vue）。三个页面共用一个命名空间，跨页面完全同字

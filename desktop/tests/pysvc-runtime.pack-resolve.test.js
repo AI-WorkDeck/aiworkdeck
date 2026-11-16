@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 四个 Python 服务的根目录解析（设计 §3.2）。优先级与 LitigationVisualService.resolveRuntime
 // 同构：显式 env 覆盖 → pack current 目录（必须带 .pack-complete）→ dev 态 bundled。

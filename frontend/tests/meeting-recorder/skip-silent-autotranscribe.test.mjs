@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-57：空录音 / 极短录音结束时不再自动提交云转写（平台档会预扣并结算），
 // 会议留在 RECORDED，由用户确认后手动点「开始转写」。真跑一遍录音引擎，断言 finish 的 transcribe 参数。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // TaskRow.vue 真渲染（dev-board#896）：模板用 vue 自带 compiler-sfc 编译成 SSR 渲染函数，
 // 组件 <script> 抽出来去 import、注入真实的 taskUtils / icons / eventColors，渲染成 HTML 断言

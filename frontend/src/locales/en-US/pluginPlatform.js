@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   devTrustNotice: 'Development plugins can send data to declared remote services and expose Agent tools. Review the source before approval. Manifest changes require approval again.', grantTrust: 'Approve development services', revokeTrust: 'Revoke service approval',

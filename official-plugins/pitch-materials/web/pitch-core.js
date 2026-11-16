@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 投标与提案的纯逻辑：库的增删、从律所管理导入、招标要求抽取与对照的提示词和解析、材料推荐、导出表格。
 // 分段、引文核验、限频重试复用表格化审阅的 review-core.js（同一份文件，测试守着两边一致）。

@@ -6,7 +6,7 @@ This document describes how the AI WorkDeck project is run: who decides what, ho
 
 - **The community** develops AI WorkDeck in the open: issues, RFCs, pull requests, and a monthly community call.
 - **Contributors, reviewers, and maintainers** form a merit ladder. Roles are earned through sustained work and carry real technical authority.
-- **The Steward** — 北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.), together with its international affiliate 真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited, operating workdeck.ai) — provides infrastructure, funds development, holds the trademarks, and is the sole commercial licensor. See [legal/CLA.md](legal/CLA.md), [legal/TRADEMARKS.md](legal/TRADEMARKS.md), and [legal/COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md).
+- **The Steward** — 北京公富信息技术有限公司 (BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED) — provides infrastructure, funds development, holds the trademarks, and is the sole commercial licensor. See [legal/CLA.md](legal/CLA.md), [legal/TRADEMARKS.md](legal/TRADEMARKS.md), and [legal/COMMERCIAL-LICENSE.md](legal/COMMERCIAL-LICENSE.md).
 
 **Governance roles are technical, not economic.** Becoming a reviewer or maintainer grants review and merge authority and a real voice in the project's direction. It does not grant — and nothing in this document should be read to grant — any right to revenue, equity, trademark use, or commercial licensing, all of which rest with the Steward. Community economics (bounties, marketplace revenue sharing, the community fund) are governed by their own documents: [BOUNTIES.md](BOUNTIES.md) and [legal/MARKETPLACE-TERMS.md](legal/MARKETPLACE-TERMS.md).
 

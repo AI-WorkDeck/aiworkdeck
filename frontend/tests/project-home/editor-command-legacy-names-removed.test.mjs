@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // SSE 双轨摘旧名（dev-board#816 / 计划 K36）：后端从此只发新名，前端这层的
 // 「先见新名就丢旧名」latch（_editorContractV2）与全部 wps_* 分支一起摘掉。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // O14 真机验收：设了打开密码的 docx / xlsx / pptx 在真实桌面宿主（Electron + webview LOWA + 正常自动保存）里
 //   打开 → 加载面板出现密码框 → 输错密码提示 → 输对密码进入编辑 → 编辑 → 产品正常自动保存落盘

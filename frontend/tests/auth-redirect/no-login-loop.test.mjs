@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 「未登录 → 跳登录页」这条链在浏览器部署里曾自激成无限刷新（addin.aiworkdeck.com 实测：
 // 8 秒 100 次整页导航、196 次 API 请求）。环路是：

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "exampleNotReady": "जनरेशन कार्य पूर्ण हो गया, परंतु उदाहरण अभी उपलब्ध नहीं है। इसे पुनः जनरेट किए बिना इसकी स्थिति दोबारा जांचें।",

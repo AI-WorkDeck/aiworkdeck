@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-10（v0.49.0 真机批次 I，C3-01）：资源管理器批量选择后点工具栏「删除」弹出的
 // 「移入回收站」确认框按 Esc 不能取消——它是内联在 .file-tree 根节点内的 awd-dialog-mask，

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 新建一方源文件带 SPDX 双行头（`SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors` / `SPDX-License-Identifier: AGPL-3.0-or-later`）。
+- 新建一方源文件带 SPDX 双行头（`SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors` / `SPDX-License-Identifier: AGPL-3.0-or-later`）。
 - 不引入任何第三方播放器库；不新增 npm / maven 依赖。
 - 颜色只用 `--awd-*` 令牌；唯一例外是压在视频画面上的叠层皮（规格 3.1 列出的字面量）。不用 emoji，图标走 `config/icons.js` 的 SVG path 体系。
 - 尺寸用 px。文案进 `locales/zh-CN` 与 `en-US` 两份，键名见规格 3.8。

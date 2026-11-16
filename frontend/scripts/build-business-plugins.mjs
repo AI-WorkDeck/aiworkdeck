@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ids = process.argv.slice(2)
-const license = 'SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors\nSPDX-License-Identifier: AGPL-3.0-or-later'
+const license = 'SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors\nSPDX-License-Identifier: AGPL-3.0-or-later'
 async function licenseAssets(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const file = resolve(dir, entry.name)

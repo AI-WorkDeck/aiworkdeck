@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎：修订开着时给选区建证据链接/书签不产生修订（教程反馈 75），
 // 链接后接着输入不沿用链接（教程反馈 82）。

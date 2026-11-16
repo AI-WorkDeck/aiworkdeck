@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -294,7 +294,7 @@ export async function initPlugin(directory, id) {
   await fs.writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
   await fs.copyFile(path.join(sdkDir, 'manifest.schema.json'), path.join(directory, 'manifest.schema.json'))
   for (const file of ['awd-plugin-sdk.js', 'awd-plugin-sdk.d.ts']) await fs.copyFile(path.join(sdkDir, file), path.join(directory, 'web', file))
-  await fs.writeFile(path.join(directory, 'web/index.html'), '<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->\n<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->\n<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>' + id + '</title><style>body{margin:0;background:var(--awd-bg,#F6F5F0);color:var(--awd-text,#2B2A26)}</style><main class="awd-plugin-stage"><header class="awd-plugin-header"><div><div class="awd-eyebrow">AWD PLUGIN UI V3.0</div><h1 class="awd-title">' + id + '</h1><p id="status" class="awd-subtitle">等待宿主…</p></div></header></main><script src="awd-plugin-sdk.js"></script><script>awd.ready().then(function(ctx){document.getElementById("status").textContent="已连接宿主："+ctx.pluginId;});</script></html>\n')
+  await fs.writeFile(path.join(directory, 'web/index.html'), '<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->\n<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->\n<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>' + id + '</title><style>body{margin:0;background:var(--awd-bg,#F6F5F0);color:var(--awd-text,#2B2A26)}</style><main class="awd-plugin-stage"><header class="awd-plugin-header"><div><div class="awd-eyebrow">AWD PLUGIN UI V3.0</div><h1 class="awd-title">' + id + '</h1><p id="status" class="awd-subtitle">等待宿主…</p></div></header></main><script src="awd-plugin-sdk.js"></script><script>awd.ready().then(function(ctx){document.getElementById("status").textContent="已连接宿主："+ctx.pluginId;});</script></html>\n')
   return { id, directory: path.resolve(directory), installed: false }
 }
 

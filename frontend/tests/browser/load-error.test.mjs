@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#889：内置浏览器加载失败只显示空白。
 // 复现：地址栏输入无法解析的域名 → did-fail-load 只被 console.warn 过，从没传到

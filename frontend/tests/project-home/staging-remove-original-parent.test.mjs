@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程问题 85（dev-board#1713）：文件从资源管理器拖进暂存区再「移出」，回到了根目录
 // 而不是原文件夹。根因：FileTree 的拖拽载荷没带 parentId → FileStagingArea.onDrop

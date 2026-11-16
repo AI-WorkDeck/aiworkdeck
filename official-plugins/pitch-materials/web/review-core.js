@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 表格化审阅的纯逻辑：模板、分段、提示词、答案解析、引文核验（证据锚点）、限频重试队列。
 // 不碰 DOM，浏览器里挂到 window.AWD_TR_CORE，Node 测试里 require。

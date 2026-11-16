@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 客体页（正文那一层）的形态契约，dev-board#723/#724 改造后：
 // 正文里只剩一颗浮球 + 光标旁的小标记，清单在宿主右栏的「审校」标签里。

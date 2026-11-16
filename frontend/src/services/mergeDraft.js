@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 合并比对稿的两个准备动作：取三份字节 + 分析（fetchMergeInputs），
 // 把它们喂给引擎的一条命令（buildMergeDraft）。

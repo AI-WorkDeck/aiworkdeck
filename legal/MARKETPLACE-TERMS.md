@@ -1,6 +1,6 @@
 # Marketplace Revenue Sharing Terms
 
-*Version 1.0, 2026-08-28. These terms cover Skills and plugins published through the AI WorkDeck marketplaces ([aiworkdeck.com](https://www.aiworkdeck.com/zh/skills) and [workdeck.ai](https://www.workdeck.ai/en/skills)). The China marketplace (aiworkdeck.com) is operated by 北京京微资易科技有限公司; the international marketplace (workdeck.ai) is operated by 真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited). "Platform" below means the operator of the site you publish on. These terms may be revised prospectively; revisions never apply retroactively to revenue already earned.*
+*Version 1.0, 2026-08-28; operator identification revised 2026-11-16. These terms cover Skills and plugins published through the AI WorkDeck marketplaces ([aiworkdeck.com](https://www.aiworkdeck.com/zh/skills) and [workdeck.ai](https://www.workdeck.ai/en/skills)). Both the China marketplace (aiworkdeck.com) and the international marketplace (workdeck.ai) are operated by 北京公富信息技术有限公司 (BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED). "Platform" below means this operator. These terms may be revised prospectively; revisions never apply retroactively to revenue already earned.*
 
 ## 1. What you keep
 

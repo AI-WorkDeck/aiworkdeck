@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 分屏开合后按窗格宽度适配缩放（真引擎）：把视口宽度减半模拟开分屏、恢复模拟关分屏，
 // 断言 set_zoom{fit:'width'} 让整页宽度落进画布、关分屏回到原缩放、手动缩放被尊重。

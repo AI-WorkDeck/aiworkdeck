@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 服务器按用户限频（UserRateLimiter）回 HTTP 429：对话发送与浏览器端上传要给可读的
 // 「操作太频繁，请稍候再试」，而不是「对话请求失败: HTTP 429」/「HTTP 429」。

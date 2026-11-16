@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#986（BUG-83）：对话区「已修改 / 新建文件」弹层的图标引用 /static/file.png，
 // 仓库里没有这张图，弹层每一行图标位都是裂图。uni 不会因为静态资源缺失而构建失败，只能靠这里守住：

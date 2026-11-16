@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#985（BUG-82）：与快速打开（#977）同一病灶的另外四处——
 // getProjectFiles(pid) 不带 tree=true，后端 getFilesByParent(pid, null) 只回根目录一层，

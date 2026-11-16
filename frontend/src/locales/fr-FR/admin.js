@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Programme d'installation Windows (x64)",
   "externalDownloadWindowsArm": "Programme d'installation Windows ARM (Accès anticipé)",
   "externalRepair": "Si le programme est déjà installé, vérifiez s'il démarre, son chemin d'accès et ses autorisations d'exécution, puis vérifiez à nouveau. Tencent Meeting nécessite également un Node.js utilisable. Après avoir modifié les chemins, enregistrez votre travail et redémarrez AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Veuillez mettre à niveau une capacité depuis {url}. {note}Utilisez d'abord capability_install pour le récupérer et le valider, relisez-moi le plan d'installation, et n'installez qu'après ma confirmation.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Installer ce dépôt comme capacité et le connecter à l'emplacement de capacité correspondant",
-  "legalCopyright": "Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. et contributeurs d'AI WorkDeck",
+  "legalCopyright": "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED et contributeurs d'AI WorkDeck",
   "legalLicense": "Ce programme est distribué sous la licence GNU Affero General Public License v3.0 ou ultérieure, SANS AUCUNE GARANTIE.",
   "legalSourceLabel": "Code source : ",
   "legalLicenseLabel": "Licence complète : ",
   "legalTrademarkLabel": "Mention de marque déposée : ",
-  "legalTrademark": "« AI WorkDeck » est une marque déposée de Beijing Jingwei Ziyi Technology Co., Ltd. N'utilisez pas ce nom comme nom de produit lors de la redistribution d'une version modifiée ; voir la mention de marque déposée.",
+  "legalTrademark": "« AI WorkDeck » est une marque déposée de BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. N'utilisez pas ce nom comme nom de produit lors de la redistribution d'une version modifiée ; voir la mention de marque déposée.",
   "navPermissions": "Autorisations système",
   "permissionsSectionTitle": "Autorisations système macOS",
   "permissionsSectionSubtitle": "Accordez les autorisations système pour glisser directement des fichiers depuis WeChat, capturer des captures d'écran OCR multi-fenêtres et enregistrer des réunions",

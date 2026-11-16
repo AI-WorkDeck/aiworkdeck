@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // model-matrix 判分前的「写命令之后确有一次上传」核对（独立成模块以便单测，model-matrix.mjs 导入即运行 main）。
 const sleep = ms => new Promise(r => setTimeout(r, ms))

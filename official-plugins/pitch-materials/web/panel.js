@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 投标与提案面板：业绩与团队库 → 招标对照 → 生成 Word 投标书 / PPT 提案。
 // 库、对照表、报价计算、模板填充都在插件 JAR（pitch_materials_action）；AI 抽取与对照走 ai.request。

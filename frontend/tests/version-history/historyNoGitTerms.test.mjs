@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-56（v0.49.0 真机）：「完整历史」页把 Git 露了出来——标签叫「提交历史」、
 // 行徽标「主线」、每行一串 7 位短哈希。版本面板零 Git 术语是产品红线（version-control.md 地雷 #6，

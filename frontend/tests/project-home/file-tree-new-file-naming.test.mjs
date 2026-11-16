@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-27（v0.49.0 真机批次 H）：工具栏「新建文件」此前静默创建英文默认名
 // newdocument.docx，既没有类型选择也没有命名对话框，与紧邻的「新建文件夹」

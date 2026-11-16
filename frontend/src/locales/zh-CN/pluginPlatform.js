@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   devTrustNotice: '开发插件可通过已声明的远程服务发送数据和调用 Agent 工具。请核对插件来源；修改清单后需要重新授权。', grantTrust: '允许开发插件服务', revokeTrust: '撤销服务授权',

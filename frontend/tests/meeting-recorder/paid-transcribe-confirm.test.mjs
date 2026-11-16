@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#968（BUG-72 / QA C9-03）：资源管理器右键「转写」不经确认就提交平台转写并预扣 Credits。
 // 断言三个提交入口「不确认不提交、确认后才提交」，外加确认逻辑本身的档位判定。

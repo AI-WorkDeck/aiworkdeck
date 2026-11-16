@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Windows इंस्टॉलर (x64)",
   "externalDownloadWindowsArm": "Windows ARM इंस्टॉलर (प्रारंभिक पहुँच)",
   "externalRepair": "यदि पहले से इंस्टॉल है, तो जाँचें कि प्रोग्राम शुरू होता है या नहीं, उसका पाथ और निष्पादन अनुमतियाँ, फिर दोबारा जाँचें। Tencent Meeting के लिए उपयोग योग्य Node.js भी आवश्यक है। पाथ बदलने के बाद अपना काम सहेजें और AI WorkDeck पुनः आरंभ करें।",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "कृपया {url} से एक क्षमता अपग्रेड करें। {note}पहले capability_install से इसे फ़ेच और सत्यापित करवाएँ, इंस्टॉल योजना मुझे पढ़कर सुनाएँ, और केवल मेरी पुष्टि के बाद इंस्टॉल करें।",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "इस रिपॉज़िटरी को एक क्षमता के रूप में इंस्टॉल करें और इसे संगत क्षमता स्लॉट से जोड़ें",
-  "legalCopyright": "कॉपीराइट 2026 Beijing Jingwei Ziyi Technology Co., Ltd. और AI WorkDeck योगदानकर्ता",
+  "legalCopyright": "कॉपीराइट 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED और AI WorkDeck योगदानकर्ता",
   "legalLicense": "यह प्रोग्राम GNU Affero General Public License v3.0 या उसके बाद के संस्करण के अंतर्गत जारी किया गया है, बिना किसी प्रकार की वारंटी के।",
   "legalSourceLabel": "सोर्स कोड: ",
   "legalLicenseLabel": "पूर्ण लाइसेंस: ",
   "legalTrademarkLabel": "ट्रेडमार्क सूचना: ",
-  "legalTrademark": "\"AI WorkDeck\" Beijing Jingwei Ziyi Technology Co., Ltd. का ट्रेडमार्क है। संशोधित संस्करण पुनर्वितरित करते समय उस नाम का उपयोग उत्पाद नाम के रूप में न करें; ट्रेडमार्क सूचना देखें।",
+  "legalTrademark": "\"AI WorkDeck\" BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED का ट्रेडमार्क है। संशोधित संस्करण पुनर्वितरित करते समय उस नाम का उपयोग उत्पाद नाम के रूप में न करें; ट्रेडमार्क सूचना देखें।",
   "navPermissions": "सिस्टम अनुमतियाँ",
   "permissionsSectionTitle": "macOS सिस्टम अनुमतियाँ",
   "permissionsSectionSubtitle": "WeChat से सीधे फ़ाइलें ड्रैग करने, क्रॉस-विंडो OCR स्क्रीनशॉट लेने और मीटिंग रिकॉर्ड करने के लिए सिस्टम अनुमतियाँ दें",

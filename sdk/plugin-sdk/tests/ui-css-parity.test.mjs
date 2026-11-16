@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // awd-plugin-ui.css（给插件作者看/单独引用）与 awd-plugin-sdk.js 里自动注入的那份
 // 必须是同一套类名：两份手工同步过，加了组件只改一边，插件里就会出现「有类名没样式」。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Windows-on-ARM（如 Apple Silicon Mac 上的 Parallels/VMware 虚拟机）检测。
 // 我们的 Windows 包只出 x64，在 ARM64 Windows 上整套跑在系统的 x64 转译层里：

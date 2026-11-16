@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI 工具 doc_export_pdf 的前端一半（dev-board#1065 T-25）：把 worker export_pdf 回的 PDF 字节
 // 编成 base64 回传后端，由后端存进项目（与原文档同一文件夹）。零依赖纯函数，node 测试直接 import。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // UX 走查第二批回归断言：左 rail 文字标签、AI 面板空态工作流卡片、历史行「⋯」、
 // 设置分区归位与改名、整理图标入口。源码文本断言，口径同 ux-navigation-clarity.test.mjs。

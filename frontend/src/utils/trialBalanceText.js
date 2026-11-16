@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 试用计量 v0.1.1：把 GET /api/trial/balance 的数据格式化成账户菜单里的一行。
 // 纯函数（t 由调用方注入），只展示后端给的数，不做任何本地扣减或推算。

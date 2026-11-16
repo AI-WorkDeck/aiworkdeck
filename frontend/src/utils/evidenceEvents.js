@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // evidenceEvents.js — EvidenceLink 变化的全局事件名（uni.$emit/$on）。
 // 载荷 { docFileId, source: 'editor' | 'panel' }：编辑器的 stale 核对与审阅面板的

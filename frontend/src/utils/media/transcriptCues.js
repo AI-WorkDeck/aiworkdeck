@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 自动字幕的纯逻辑（规格 3.5）。输入是会议记录 transcriptJson 解析出的段
 // [{ speaker, start, end, text }]（毫秒，后端 MeetingTranscriptParser 落库形状）。

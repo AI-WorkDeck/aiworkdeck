@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程问题 76（dev-board#1713）：分屏时把右侧文件全部关掉，右窗格空着、分屏不退出。
 // 修法：closeFile 关完右侧最后一个标签后调 toggleSplitMode 退出分屏（右侧已空，无需落盘与并入）。

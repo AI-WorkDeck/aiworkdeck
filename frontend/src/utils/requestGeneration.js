@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 请求代次判定：给每次发出的异步请求打一个"代次"号，响应回来时只有代次仍等于
 // "此刻最新一次"，这份响应才允许生效。用于堵住"连续点击触发多个同类请求，

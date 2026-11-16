@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // v0.49.0 真机 BUG-16（C5-01）：每轮 AI 回复结束（含点停止）都闪
 // 「与服务器的连接已断开，正在自动重连（第 1 次）。AI 仍在后台运行，重连后会续上。」

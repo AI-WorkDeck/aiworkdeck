@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 播放器三件套的 SSR 真渲染（dev-board#1023/#1024）：组件的 script 与模板一起装进来
 // （sfcLoader.mjs），按真实 props / data 渲染成 HTML 再断言。只跑纯函数的测试看不到

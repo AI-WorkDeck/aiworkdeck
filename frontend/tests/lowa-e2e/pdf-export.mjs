@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎回归（dev-board#886）：原生「文件→导出为→直接导出 PDF / 导出为 PDF…」与原生工具栏
 // PDF 图标，点了必须有结果。

@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Instalador de Windows (x64)",
   "externalDownloadWindowsArm": "Instalador de Windows ARM (Acceso anticipado)",
   "externalRepair": "Si ya está instalado, compruebe si el programa se inicia, su ruta y sus permisos de ejecución, y vuelva a comprobarlo. Tencent Meeting también requiere un Node.js utilizable. Tras cambiar las rutas, guarde su trabajo y reinicie AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Actualice una capacidad desde {url}. {note}Use primero capability_install para obtenerla y validarla, léame el plan de instalación e instale solo después de que yo confirme.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Instalar este repositorio como capacidad y conectarlo al espacio de capacidad correspondiente",
-  "legalCopyright": "Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. y colaboradores de AI WorkDeck",
+  "legalCopyright": "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED y colaboradores de AI WorkDeck",
   "legalLicense": "Este programa se distribuye bajo la GNU Affero General Public License v3.0 o posterior, SIN NINGUNA GARANTÍA.",
   "legalSourceLabel": "Código fuente: ",
   "legalLicenseLabel": "Licencia completa: ",
   "legalTrademarkLabel": "Aviso de marca registrada: ",
-  "legalTrademark": "\"AI WorkDeck\" es una marca registrada de Beijing Jingwei Ziyi Technology Co., Ltd. No utilice ese nombre como nombre del producto al redistribuir una versión modificada; consulte el aviso de marca registrada.",
+  "legalTrademark": "\"AI WorkDeck\" es una marca registrada de BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. No utilice ese nombre como nombre del producto al redistribuir una versión modificada; consulte el aviso de marca registrada.",
   "navPermissions": "Permisos del sistema",
   "permissionsSectionTitle": "Permisos del sistema de macOS",
   "permissionsSectionSubtitle": "Conceda permisos del sistema para arrastrar archivos directamente desde WeChat, capturar capturas de pantalla con OCR entre ventanas y grabar reuniones",

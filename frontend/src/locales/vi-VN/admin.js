@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Trình cài đặt Windows (x64)",
   "externalDownloadWindowsArm": "Trình cài đặt Windows ARM (Truy cập sớm)",
   "externalRepair": "Nếu đã cài đặt, hãy kiểm tra xem chương trình có khởi động được không, kiểm tra đường dẫn và quyền thực thi, sau đó kiểm tra lại. Tencent Meeting cũng yêu cầu Node.js khả dụng. Sau khi thay đổi đường dẫn, hãy lưu công việc và khởi động lại AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Vui lòng nâng cấp tính năng từ {url}. {note}Trước tiên dùng capability_install để tải về và xác thực, đọc kế hoạch cài đặt cho tôi nghe, và chỉ cài đặt sau khi tôi xác nhận.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Cài đặt kho lưu trữ này làm tính năng và kết nối vào khe tính năng tương ứng",
-  "legalCopyright": "Bản quyền 2026 Beijing Jingwei Ziyi Technology Co., Ltd. và các cộng tác viên của AI WorkDeck",
+  "legalCopyright": "Bản quyền 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED và các cộng tác viên của AI WorkDeck",
   "legalLicense": "Chương trình này được phát hành theo Giấy phép GNU Affero General Public License v3.0 hoặc mới hơn, KHÔNG BẢO HÀNH HOÀN TOÀN.",
   "legalSourceLabel": "Mã nguồn: ",
   "legalLicenseLabel": "Giấy phép đầy đủ: ",
   "legalTrademarkLabel": "Thông báo nhãn hiệu: ",
-  "legalTrademark": "\"AI WorkDeck\" là nhãn hiệu của Beijing Jingwei Ziyi Technology Co., Ltd. Không sử dụng tên này làm tên sản phẩm khi phân phối lại phiên bản đã sửa đổi; xem thông báo nhãn hiệu.",
+  "legalTrademark": "\"AI WorkDeck\" là nhãn hiệu của BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Không sử dụng tên này làm tên sản phẩm khi phân phối lại phiên bản đã sửa đổi; xem thông báo nhãn hiệu.",
   "navPermissions": "Quyền hệ thống",
   "permissionsSectionTitle": "Quyền hệ thống macOS",
   "permissionsSectionSubtitle": "Cấp quyền hệ thống để kéo tệp trực tiếp từ WeChat, chụp ảnh màn hình OCR xuyên cửa sổ và ghi âm cuộc họp",

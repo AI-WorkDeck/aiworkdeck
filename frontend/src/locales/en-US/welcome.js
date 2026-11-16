@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Welcome tab (components/welcome/WelcomePane.vue), the no-project workbench state and the rail account entry (dev-board#1047).
 // Brand title / tagline / lead are not here: they come from onboarding.unlock.brand.* (verbatim copy of design/copy/brand-copy.json).

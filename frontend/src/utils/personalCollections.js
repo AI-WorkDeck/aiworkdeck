@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 设置页「个人」组里「全部收藏」「我的待办」两栏的纯函数（dev-board#872）。
 // 零依赖（不 import @/ 别名、Vue、uni；唯一的相对导入 taskUtils.js 同样零依赖），好让 node --test 直接导入：

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // v2.6 主题通道行为测试：SDK 收到 init/theme 消息后必须自动挂 data-theme、
 // body class 并把令牌写成 CSS 变量；onChange 回调收到推送；未知 type 静默忽略

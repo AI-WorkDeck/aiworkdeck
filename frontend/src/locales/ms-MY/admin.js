@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Pemasang Windows (x64)",
   "externalDownloadWindowsArm": "Pemasang Windows ARM (Akses Awal)",
   "externalRepair": "Jika telah dipasang, semak sama ada program bermula, laluan dan kebenaran pelaksanaannya, kemudian semak semula. Tencent Meeting juga memerlukan Node.js yang boleh digunakan. Selepas menukar laluan, simpan kerja anda dan mulakan semula AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Sila naik taraf keupayaan dari {url}. {note}Gunakan capability_install terlebih dahulu untuk mendapatkan dan mengesahkannya, bacakan pelan pemasangan kepada saya, dan pasang hanya selepas saya mengesahkan.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Pasang repositori ini sebagai keupayaan dan sambungkannya ke slot keupayaan yang sepadan",
-  "legalCopyright": "Hak cipta 2026 Beijing Jingwei Ziyi Technology Co., Ltd. dan penyumbang AI WorkDeck",
+  "legalCopyright": "Hak cipta 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED dan penyumbang AI WorkDeck",
   "legalLicense": "Program ini dikeluarkan di bawah GNU Affero General Public License v3.0 atau lebih baharu, TANPA SEBARANG JAMINAN.",
   "legalSourceLabel": "Kod sumber: ",
   "legalLicenseLabel": "Lesen penuh: ",
   "legalTrademarkLabel": "Notis tanda dagang: ",
-  "legalTrademark": "\"AI WorkDeck\" ialah tanda dagang Beijing Jingwei Ziyi Technology Co., Ltd. Jangan gunakan nama tersebut sebagai nama produk semasa mengedar semula versi yang diubah suai; lihat notis tanda dagang.",
+  "legalTrademark": "\"AI WorkDeck\" ialah tanda dagang BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Jangan gunakan nama tersebut sebagai nama produk semasa mengedar semula versi yang diubah suai; lihat notis tanda dagang.",
   "navPermissions": "Kebenaran Sistem",
   "permissionsSectionTitle": "Kebenaran Sistem macOS",
   "permissionsSectionSubtitle": "Berikan kebenaran sistem untuk menyeret fail terus dari WeChat, menangkap tangkapan skrin OCR merentas tetingkap, dan merakam mesyuarat",

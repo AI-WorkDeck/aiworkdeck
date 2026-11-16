@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-63：剪贴板面板的删除确认气泡早已去掉「5 秒自动收起」（dev-board#455），同款气泡的
 // 收藏夹面板、设置页全部收藏、变量库仍在 5 秒后自己收起——超时之后用户点「确定」

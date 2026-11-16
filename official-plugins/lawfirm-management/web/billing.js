@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 计时收费：合伙人月底审核工时（核减、改描述、不收费、通过、退回，留痕）→ 生成账单（约定费率、折扣、封顶）
 // → 客户确认后生成「发票与财务收费」里的发票申请 → 按真实回款看律师实现率。

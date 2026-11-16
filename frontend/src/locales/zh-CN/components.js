@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 可选组件（四个 Python 运行时 + 各自模型）的文案。设计 §4.3 的模板落在这里：
 // 每一条提示都要同时说清「下载什么 / 多大 / 解锁什么 / 不装则什么不可用」。
