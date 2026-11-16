@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 顶栏外观下拉的键位 → 动作（v0.49.0 BUG-53）。纯函数，不碰 DOM，便于无头测。
 // 形制按 WAI-ARIA menu 模式：上下键循环、Home/End 到头尾、Enter/空格选中、

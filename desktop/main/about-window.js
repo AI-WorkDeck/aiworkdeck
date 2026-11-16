@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const { app, BrowserWindow, shell } = require('electron')
 const { t, getAppLanguage } = require('./app-language')
 const overlay = require('./services/overlay')
+const legalNotices = require('./legal-notices.json')
 
 const SOURCE_URL = 'https://github.com/AI-WorkDeck/aiworkdeck'
 const LEGAL_URLS = [SOURCE_URL, `${SOURCE_URL}/blob/master/LICENSE`, `${SOURCE_URL}/blob/master/legal/TRADEMARKS.md`]
@@ -24,6 +25,11 @@ function versionText() {
 // macOS 原生 About 的 copyright 高度固定，不能承载完整双语许可告示。
 // 使用无脚本的本地页面；正文自然换行、滚动，不依赖主工作台是否加载成功。
 function aboutHtml() {
+  const englishNotice = (key) => {
+    const english = legalNotices[key]['en-US']
+    if (t(legalNotices[key]) === english) return ''
+    return `<span class="english" lang="en">${escapeHtml(english)}</span>`
+  }
   return `<!doctype html><html lang="${getAppLanguage()}"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="light dark"><title>${t({ zh: '关于 AI WorkDeck', en: 'About AI WorkDeck' })}</title>
@@ -43,14 +49,14 @@ a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 @media (prefers-color-scheme: dark) { :root { --awd-text: #EDE9DF; --awd-text-2: #B0AA9C; --awd-surface: #221F1A; --awd-border: #3D372E; --awd-accent-text: #89A8A0; } }
 </style></head><body><header><h1>AI WorkDeck</h1><p class="version">${t({ zh: '版本', en: 'Version' })} ${escapeHtml(versionText())}</p></header>
 <main>
-<p>版权所有 2026 北京京微资易科技有限公司及 AI WorkDeck 贡献者<span class="english" lang="en">Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. and AI WorkDeck contributors</span></p>
+<p>${escapeHtml(t(legalNotices.copyright))}${englishNotice('copyright')}</p>
 <p>本软件依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。<span class="english" lang="en">Released under the GNU AGPL v3.0 or later, with ABSOLUTELY NO WARRANTY.</span></p>
 <nav aria-label="${t({ zh: '源代码与法律声明', en: 'Source code and legal notices' })}">
 <a href="${LEGAL_URLS[0]}" target="_blank" rel="noreferrer">源代码 / Source code</a>
 <a href="${LEGAL_URLS[1]}" target="_blank" rel="noreferrer">许可证全文 / Full license</a>
 <a href="${LEGAL_URLS[2]}" target="_blank" rel="noreferrer">商标说明 / Trademark notice</a>
 </nav>
-<p>「AI WorkDeck」为北京京微资易科技有限公司的商标，再分发修改版时不得使用该名称作为产品名。<span class="english" lang="en">“AI WorkDeck” is a trademark of Beijing Jingwei Ziyi Technology Co., Ltd. Modified versions must not use this name as their product name when redistributed.</span></p>
+<p>${escapeHtml(t(legalNotices.trademark))}${englishNotice('trademark')}</p>
 </main></body></html>`
 }
 

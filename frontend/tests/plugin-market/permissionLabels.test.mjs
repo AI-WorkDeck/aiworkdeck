@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 插件权限的展示名：后端 PluginService.KNOWN_PERMISSIONS 认的每一个权限，三处市场界面（列表、详情、
 // 侧栏安装弹窗）都要有各语种名称，不能把原始键（worklog_read）直接给律师看（0.86 RC 走查发现）。

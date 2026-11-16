@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 站点名按界面语言显示（英文 QA 2026-11-14 第 4 条）：后端 /site 回的 displayName 是
 // application.yml 里的中文配置名（「AI WorkDeck 国内站」），已知站点按 id 换成词条，

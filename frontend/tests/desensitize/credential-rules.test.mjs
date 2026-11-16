@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真机走查（v0.44.1）报的三条脱敏面板缺陷：
 //   B6 点「浏览」毫无反应，连提示都没有 —— 面板必须要到工作台的同步回执，要不到就报错；

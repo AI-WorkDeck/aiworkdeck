@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 三方合并借用的隐藏引擎实例必须挂在 .editors-container 直下、v-if/v-else 之外。
 // 病灶（2026-09-14 真机走查）：备胎 v-for 在 `v-else .editors-grid` 里，左栏没开文档时

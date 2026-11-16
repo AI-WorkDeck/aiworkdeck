@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 审计（dev-board#74）本轮（claude/audit-rE-fe1）四条源码文本断言：ChatInterface.vue
 // 与 FileTree.vue 体量太大（4500+/5300+ 行、几十个 @/ 别名 import），本仓 node:test

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真机（台账 B10）：只打开旧格式 .doc/.xls（含轻度损坏的），不做任何编辑，磁盘上的原件一个字节都不能变、
 // mtime 也不能变。只有用户明确保存才写。由 save-after-view.mjs 的宿主隔离骨架改出。

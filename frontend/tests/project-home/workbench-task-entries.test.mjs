@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台里的事项入口（dev-board#899 入口重整 / #900 文件树与事项双向关联）：
 // rail「日程」徽标、全局 TaskDialog、头像菜单「我的日程」、命令、文件树右键与到期徽标。

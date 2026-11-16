@@ -61,8 +61,9 @@ AI WorkDeck（checkba_cloud）：面向法律行业的 AI 工作台。Java Sprin
   约 120 个子 agent 白跑。
 - **三个 project-\* 路由同名不同物**：`pages/project-overview/project-overview` 在代码里指**工作台**（四列干活界面，刻意不改名）；产品语言里的「项目概览」现在是工作台里的一个标签（内容组件 `components/project-home/ProjectHomePane.vue`），`pages/project-home/project-home` 退成只服务直链的薄壳页；启动落点是工作台外壳（无项目态）+ 欢迎标签；`pages/project-list/project-list` 保留为直链薄壳，旧 `pane=projects` 打开欢迎页全部目录；目录入口集中在顶部切换器与欢迎页，`projects` rail 已移除（dev-board#1582）。日历是工作台标签（`tabType:'calendar'`），`pages/calendar/calendar` 是直链薄壳。写代码以路由为准，写文案以本条为准。导航总规则：凡是工作台参与的跳转一律 `reLaunch`，工作台之外的页面之间用 `navigateTo`（同级页面如设置⇄个人中心用 `redirectTo`，压栈会互相弹成死循环）。详见 `.claude/agents/sidebar-shell.md` 的术语表。
 - **溯源与许可声明（dev-board#505，规范见 `docs/superpowers/specs/2026-09-09-provenance-license-compliance-design.md`）**：
-  新建的一方源文件一律带 SPDX 双行头（`SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors` + `SPDX-License-Identifier: AGPL-3.0-or-later`），CI 的 `scripts/check-spdx.mjs` 只查新增文件。
+  新建的一方源文件一律带 SPDX 双行头（`SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors` + `SPDX-License-Identifier: AGPL-3.0-or-later`），CI 的 `scripts/check-spdx.mjs` 只查新增文件。
   引入第三方代码同一个 PR 里补 `UPSTREAM.md`，上游许可头一字不改。
+  当前项目管理方及国内、国际业务主体统一为北京公富信息技术有限公司（BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED，用户 2026-11-16 确认，dev-board#1748）。署名变更不代表平台迁移完成；签名证书/Team、短信签名、备案与支付配置继续以实际登记为准，不按公司名称批量替换。历史签署记录、第三方权利与 Git 历史保留。
   **不要提议「统一命名 / 清理历史前缀」**：`com.checkba.*` 包根、`--awd-` 令牌、`checkba://` scheme、`X-AWD-*` 提交尾注、插件握手 `awd: 1`、桌面端口链 `[5269, 5369, 5169]`、文档锚点 `__ai_anchor_` 都是写进用户产物或第三方插件的公开契约，有字面量断言测试守着，看不懂的常量先问再动。
   设置页 / Office 与 WPS 任务窗格 / 桌面 About 的许可告示与后端 `X-Source-Code` 响应头是 AGPL 要求的告示，不许删、不许做成强制 logo。
   硬红线：不新增任何未在 `legal/PRIVACY.md` 声明的出站请求，不做隐蔽回传、混淆、魔数水印、故意 bug 陷阱。

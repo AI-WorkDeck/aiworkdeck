@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 保存之后的修改仍要报给宿主（O7 实测的丢改动）：Impress 的 modify 广播只在 false→true 那一下发，
 // 自动保存（export_document 带 saveSnapshotId）若把标志复原成 true，之后 AI 单条格式命令（标题改红）

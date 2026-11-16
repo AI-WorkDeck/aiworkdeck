@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎（台账 B5）：QuickLook 借预热备胎渲染幻灯片后用 load_document{blank} 清场归还。
 // 清场后必须是一份干净、未修改的空白 Writer 文档（预览过的内容一个字都不剩），

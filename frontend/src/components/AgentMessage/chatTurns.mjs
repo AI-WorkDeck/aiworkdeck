@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 后端契约：implementation_plan 才停机等审批，task_list 是内部执行清单、模型继续跑。
 // 「待审批」的判定只能用下面这份窄表——把 task_list 算进来，会在轮次正常 finished 之后

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 「本轮停在等用户回答」的唯一判据。后端组件未就绪时也用 awaiting_input 收尾
 // （reason=component_required），那不是模型反问：输入区不能显示「等你回答」，

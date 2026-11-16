@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 说话人六色循环（从 MeetingRecordingPanel 抽出，会议面板与播放器逐字稿共用一套下标）。
 // 会议面板的 .sp-0..5 样式仍在面板 scss 里（底色 + 字色成对），这里只管下标规则与字色令牌。

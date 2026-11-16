@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 包晴天积分通道（billingLine=bqt）：余额与扣点以官网为准，这类账户只能在包晴天 App 充值/续费。
 // 后端把 billingLine / bqtMember 原样透传（旧官网缺省为 standard / null），

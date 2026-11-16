@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 param([Parameter(Mandatory=$true)][string]$Installer, [Parameter(Mandatory=$true)][string]$OutDir)
 $ErrorActionPreference = 'Stop'
@@ -11,6 +11,13 @@ if (Test-Path $root) { throw 'Acceptance directory must be fresh' }
 New-Item -ItemType Directory -Path $root,$OutDir | Out-Null
 $account = 'awd-dependency-test'
 $child = $null
+$timeline = [System.Diagnostics.Stopwatch]::StartNew()
+function Record-Stage([string]$Stage) {
+    # Persist each boundary immediately, including when the following operation fails.
+    $record = @{stage=$Stage;utc=[DateTime]::UtcNow.ToString('o');elapsedSeconds=[Math]::Round($timeline.Elapsed.TotalSeconds, 3)} | ConvertTo-Json -Compress
+    Add-Content (Join-Path $OutDir 'stage-timings.log') $record
+    Write-Host $record
+}
 function Wait-ProcessChecked($Process, [int]$Seconds, [string]$Label, [int[]]$Allowed = @(0)) {
     if (-not $Process.WaitForExit($Seconds * 1000)) {
         & "$env:SystemRoot\System32\taskkill.exe" /PID $Process.Id /T /F | Out-Null
@@ -22,11 +29,15 @@ function Wait-ProcessChecked($Process, [int]$Seconds, [string]$Label, [int[]]$Al
 }
 function Download([string]$Url, [string]$Name, [string]$Hash) {
     $path = Join-Path $root $Name
+    Record-Stage "$Name download started"
     Invoke-WebRequest -Uri $Url -OutFile $path -TimeoutSec 600
+    Record-Stage "$Name download completed"
     $actual = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -ne $Hash) { throw "SHA256 mismatch: $Name" }
+    Record-Stage "$Name SHA256 verified"
     $signature = Get-AuthenticodeSignature $path
     if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature: $Name ($($signature.Status))" }
+    Record-Stage "$Name Authenticode verified"
     @{url=$Url;sha256=$actual;sha256Source=$(if ($Name -eq 'node.msi') { 'https://nodejs.org/dist/v22.23.3/SHASUMS256.txt' } else { $Url + '.sha256' });signer=$signature.SignerCertificate.Subject;status=[string]$signature.Status} |
         ConvertTo-Json | Set-Content (Join-Path $OutDir "$Name.source.json")
     return $path
@@ -169,8 +180,14 @@ try {
 if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
 
 '@ | Set-Content "$root\probe.ps1" -Encoding utf8
+    # Network transfer and certificate validation are preparation, not same-process
+    # recovery. Finish both before starting the probe's unchanged 25-minute timer.
+    # Downloading MSIs does not install them; absence is still checked below.
+    $node = Download 'https://nodejs.org/dist/v22.23.3/node-v22.23.3-x64.msi' 'node.msi' '1c0efc8449987e7da5d184786a0a96da83ffa11d334421201e5c09b93017cb8d'
+    $lo = Download 'https://downloadarchive.documentfoundation.org/libreoffice/old/25.8.4.2/win/x86_64/LibreOffice_25.8.4.2_Win_x86-64.msi' 'libreoffice.msi' 'b2b23d91bda5ad6e97b38008b082060a55d2a3c7c269b2c0e78daca865133d48'
     $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $savedModulePath = $env:PSModulePath
+    Record-Stage 'same-process probe starting'
     try {
         Remove-Item Env:PSModulePath -ErrorAction SilentlyContinue
         $child = Start-Process $powershell -Credential $credential -LoadUserProfile -PassThru -ArgumentList "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $root\probe.ps1 $root $resources $version" -RedirectStandardOutput "$root\child.stdout.log" -RedirectStandardError "$root\child.stderr.log"
@@ -181,8 +198,7 @@ if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
         if ($child.HasExited -or (Get-Date) -gt $deadline) { throw 'Missing-dependency stage failed; inspect probe.log' }
         Start-Sleep -Seconds 1
     }
-    $node = Download 'https://nodejs.org/dist/v22.23.3/node-v22.23.3-x64.msi' 'node.msi' '1c0efc8449987e7da5d184786a0a96da83ffa11d334421201e5c09b93017cb8d'
-    $lo = Download 'https://downloadarchive.documentfoundation.org/libreoffice/old/25.8.4.2/win/x86_64/LibreOffice_25.8.4.2_Win_x86-64.msi' 'libreoffice.msi' 'b2b23d91bda5ad6e97b38008b082060a55d2a3c7c269b2c0e78daca865133d48'
+    Record-Stage 'missing dependencies confirmed; installation starting'
     $msiexec = "$env:SystemRoot\System32\msiexec.exe"
     $denied = Start-Process $msiexec -Credential $credential -LoadUserProfile -PassThru -ArgumentList "/i $node /qn /norestart ALLUSERS=1 /L*v $root\node-standard-user.log"
     if (-not $denied.WaitForExit(120000)) { & taskkill.exe /PID $denied.Id /T /F | Out-Null; throw 'Non-admin MSI did not fail within two minutes' }
@@ -192,8 +208,10 @@ if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
     if ($denied.ExitCode -in @(0,3010)) { throw 'Unexpected standard-user machine-wide install success; isolation assumption invalid' }
     if ($denied.ExitCode -ne 1625 -and $denial.Count -eq 0) { throw 'Non-admin MSI failed without permission evidence; inspect node-standard-user.log rather than claiming elevation was denied' }
     foreach ($entry in @(@($node,'node'),@($lo,'libreoffice'))) {
+        Record-Stage "$($entry[1]) MSI installation started"
         $process = Start-Process $msiexec -PassThru -ArgumentList "/i $($entry[0]) /qn /norestart ALLUSERS=1 /L*v $root\$($entry[1])-install.log"
         Wait-ProcessChecked $process 600 "$($entry[1]) official MSI" @(0,3010) | Out-Null
+        Record-Stage "$($entry[1]) MSI installation completed"
     }
     $tmeetMetadata = Invoke-RestMethod 'https://registry.npmjs.org/@tencentcloud%2ftmeet/1.0.19' -TimeoutSec 60
     if ($tmeetMetadata.repository.url -ne 'git+https://github.com/TencentCloud/tencentmeeting-cli.git' -or
@@ -205,6 +223,7 @@ if ($stageFailures.Count) { throw ($stageFailures -join '; ') }
     $process = Start-Process 'C:\Program Files\nodejs\node.exe' -PassThru -ArgumentList "`"$npmCli`" install --global --prefix $root\npm --ignore-scripts @tencentcloud/tmeet@1.0.19" -RedirectStandardOutput "$root\npm-install.log" -RedirectStandardError "$root\npm-install.stderr.log"
     Wait-ProcessChecked $process 300 'Official tmeet npm installation' | Out-Null
     New-Item "$root\installed.ready" -ItemType File | Out-Null
+    Record-Stage 'dependencies installed; same-process recovery continuing'
     Wait-ProcessChecked $child 4800 'Same-process recovery, conversion, pack, DPIA and real model inference' | Out-Null
     if (-not (Test-Path "$root\core-passed.json")) { throw 'Probe did not report completion' }
     if (-not (Test-Path "$root\real-models\inference\report.json")) { throw 'Real model inference report missing' }

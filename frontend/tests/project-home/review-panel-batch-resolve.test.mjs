@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 尽调模块 P3 稳定性余项 #1（dev-board#100）：ReviewPanel 批量接受/拒绝一组修订时，
 // 旧实现对组内每个条目都单独调一次 resolve_revision——worker 侧 redlineAt(index) 每次

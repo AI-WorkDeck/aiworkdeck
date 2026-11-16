@@ -1,6 +1,6 @@
 version = 1
 SPDX-PackageName = "AI WorkDeck"
-SPDX-PackageSupplier = "北京京微资易科技有限公司"
+SPDX-PackageSupplier = "北京公富信息技术有限公司"
 
 # 本文件登记仓库里"不是我们自己写的"或"许可不明确"的目录/文件，配合
 # scripts/spdx-scope.mjs 的排除范围一起看。可被机械加头的一方源码不在这里，

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // v0.49.0 BUG-28：PDF 预览「⋮」更多菜单（Two page view / Annotations /
 // Document properties）是英文，即便应用语言是中文。

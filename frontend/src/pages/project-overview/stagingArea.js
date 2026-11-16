@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // project-overview.vue 的文件暂存区：__staging_area__ 目录的懒建/加载、拖入与移出
 // （移出按 stagingOriginalParents 回原目录，原目录已删则退回根目录）、清空与折叠。

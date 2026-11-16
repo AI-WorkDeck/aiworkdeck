@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 资源管理器 / 暂存区文件向软件外（微信聊天、Finder、资源管理器）原生拖出（dev-board#1288）。
 // 零构建别名依赖，便于 node --test 直接导入。

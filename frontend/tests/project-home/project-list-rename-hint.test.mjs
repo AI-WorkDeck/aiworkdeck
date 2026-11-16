@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board BUG-23：方块视图里点击项目名会静默进入重命名态，之前没有任何
 // title/tooltip 提示这是可编辑的，用户容易误以为点了空白处。

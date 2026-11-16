@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 界面「静默失效」守卫（2026-11 版式排查后加）。这几类错误浏览器不报错、测试不红，
 // 界面只是悄悄变丑：

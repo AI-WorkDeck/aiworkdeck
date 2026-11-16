@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Real Uni H5 component build. Default fixtures simulate the executor; NAV_REAL=1
 // additionally runs the same controls against the actual LOWA engine and synthetic Office files.

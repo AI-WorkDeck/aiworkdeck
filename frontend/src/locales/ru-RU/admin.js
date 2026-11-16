@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Установщик Windows (x64)",
   "externalDownloadWindowsArm": "Установщик Windows ARM (ранний доступ)",
   "externalRepair": "Если программа уже установлена, проверьте, запускается ли она, её путь и права на выполнение, затем повторите проверку. Для Tencent Meeting также требуется работающий Node.js. После изменения путей сохраните работу и перезапустите AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Пожалуйста, обновите возможность из {url}. {note}Сначала используйте capability_install для загрузки и проверки, зачитайте мне план установки и устанавливайте только после моего подтверждения.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Установить этот репозиторий как возможность и подключить его к соответствующему слоту возможности",
-  "legalCopyright": "Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. и участники AI WorkDeck",
+  "legalCopyright": "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED и участники AI WorkDeck",
   "legalLicense": "Эта программа распространяется по лицензии GNU Affero General Public License v3.0 или более поздней, БЕЗ АБСОЛЮТНО НИКАКИХ ГАРАНТИЙ.",
   "legalSourceLabel": "Исходный код: ",
   "legalLicenseLabel": "Полная лицензия: ",
   "legalTrademarkLabel": "Уведомление о товарном знаке: ",
-  "legalTrademark": "«AI WorkDeck» является товарным знаком Beijing Jingwei Ziyi Technology Co., Ltd. Не используйте это название как имя продукта при распространении изменённой версии; см. уведомление о товарном знаке.",
+  "legalTrademark": "«AI WorkDeck» является товарным знаком BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Не используйте это название как имя продукта при распространении изменённой версии; см. уведомление о товарном знаке.",
   "navPermissions": "Системные разрешения",
   "permissionsSectionTitle": "Системные разрешения macOS",
   "permissionsSectionSubtitle": "Предоставьте системные разрешения, чтобы перетаскивать файлы прямо из WeChat, делать кросс-оконные OCR-снимки экрана и записывать встречи",

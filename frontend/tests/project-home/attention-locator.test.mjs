@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 待处理定位条（dev-board#663）的判定层：条目从哪来、什么时候消失。
 // 可视区判断在 useChatReadingPosition，真 DOM 覆盖在 tests/chat-presentation-ui。

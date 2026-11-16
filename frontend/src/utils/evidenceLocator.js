@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EvidenceLink 定位符（spec §1.4）与 filelink 链接的纯函数：摘要文案、解包、封装。
 // 链接形态：文档里写 `<base>?u=<encode(checkba://filelink?k=<linkKey>&projectId=<pid>[&t=<targetId>])>`

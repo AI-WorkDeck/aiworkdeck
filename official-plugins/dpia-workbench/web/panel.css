@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors */
+/* SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors */
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 :root{color-scheme:light;--dpia-surface:var(--awd-surface,#fff);--dpia-bg:var(--awd-surface-2,#f5f7f6);--dpia-text:var(--awd-text,#1b2924);--dpia-muted:var(--awd-text-2,#596b62);--dpia-border:var(--awd-border,#dce4df);--dpia-accent:var(--awd-accent,#267154);--dpia-soft:var(--awd-accent-soft,#e8f3ed);--dpia-danger:#a83530;--dpia-error-bg:#fff0ee;--dpia-on-accent:#fff}
 :root[data-theme=dark]{color-scheme:dark;--dpia-surface:var(--awd-surface,#18211c);--dpia-bg:var(--awd-surface-2,#121914);--dpia-text:var(--awd-text,#e3eee7);--dpia-muted:var(--awd-text-2,#a4b4a9);--dpia-border:var(--awd-border,#36483c);--dpia-accent:var(--awd-accent,#79bb94);--dpia-soft:var(--awd-accent-soft,#243b2d);--dpia-danger:#ffb5ae;--dpia-error-bg:#3c2423;--dpia-on-accent:#10291b}

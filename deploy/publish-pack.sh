@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # publish-pack.sh — 校验、签名、发布 native pack 到两台官网镜像
 # （docs/NATIVE_PACK_DISTRIBUTION.md §3/§7.3）。骨架照抄 publish-lowa-engine.sh。

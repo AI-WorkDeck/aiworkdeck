@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 事项共享逻辑（components/calendar/taskUtils.js，dev-board#896）：类型元信息、提醒时刻、
 // 到期徽标、议程分组、本地汇总、提醒判定。

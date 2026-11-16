@@ -1,11 +1,11 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // 共享模块：add-spdx-headers.mjs 与 check-spdx.mjs 共用同一套"谁该有头"的判定，
 // 避免两份规则跑偏。只描述范围与格式，不做文件 I/O。
 
 export const COPYRIGHT_LINE =
-  '2026 北京京微资易科技有限公司 and AI WorkDeck contributors';
+  '2026 北京公富信息技术有限公司 and AI WorkDeck contributors';
 export const LICENSE_ID = 'AGPL-3.0-or-later';
 
 // 整目录排除（相对仓库根的 posix 路径前缀，必须以 "/" 结尾）。

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎（台账 B11 后续）：窗口/侧栏改尺寸不该让长文档的段落索引作废。
 // 真机：关掉 AI 侧栏（编辑区变宽）后第一次整篇读要 ~540 ms，正好压在律师接着打的字上——

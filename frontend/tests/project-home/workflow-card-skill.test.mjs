@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 点内置工作流卡片要把该工作流的 skill id 随消息显式带上（skillIds），不靠后端按触发词猜：
 // 「法律意见书核查」卡片的句子曾因命中门槛漏了「核查/核验」而不激活技能（tutorial #146）。

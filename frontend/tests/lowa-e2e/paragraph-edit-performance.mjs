@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Regression for dev-board#1131/#1132. Use LOWA_ENGINE_DIR and LOWA_FONT_DIR
 // for external assets; MODIFY_WORKER_SOURCE can replay the pre-fix worker.

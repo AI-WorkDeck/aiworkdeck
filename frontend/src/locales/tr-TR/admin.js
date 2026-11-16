@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Windows yükleyici (x64)",
   "externalDownloadWindowsArm": "Windows ARM yükleyici (Erken Erişim)",
   "externalRepair": "Zaten yüklüyse, programın başlayıp başlamadığını, yolunu ve çalıştırma izinlerini kontrol edin, sonra tekrar kontrol edin. Tencent Meeting için ayrıca kullanılabilir Node.js gereklidir. Yolları değiştirdikten sonra çalışmalarınızı kaydedin ve AI WorkDeck'i yeniden başlatın.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Lütfen {url} adresinden bir yeteneği yükselt. {note}Önce indirmek ve doğrulamak için capability_install aracını kullan, kurulum planını bana oku ve yalnızca ben onayladıktan sonra yükle.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Bu depoyu bir yetenek olarak yükle ve eşleşen yetenek yuvasına bağla",
-  "legalCopyright": "Telif Hakkı 2026 Beijing Jingwei Ziyi Technology Co., Ltd. ve AI WorkDeck katkıda bulunanları",
+  "legalCopyright": "Telif Hakkı 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED ve AI WorkDeck katkıda bulunanları",
   "legalLicense": "Bu program, HİÇBİR GARANTİ OLMAKSIZIN GNU Affero Genel Kamu Lisansı v3.0 veya sonraki bir sürümü kapsamında yayınlanmıştır.",
   "legalSourceLabel": "Kaynak kodu: ",
   "legalLicenseLabel": "Tam lisans: ",
   "legalTrademarkLabel": "Marka bildirimi: ",
-  "legalTrademark": "\"AI WorkDeck\", Beijing Jingwei Ziyi Technology Co., Ltd. şirketinin tescilli markasıdır. Değiştirilmiş bir sürümü dağıtırken bu adı ürün adı olarak kullanmayın; marka bildirimine bakın.",
+  "legalTrademark": "\"AI WorkDeck\", BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED şirketinin markasıdır. Değiştirilmiş bir sürümü dağıtırken bu adı ürün adı olarak kullanmayın; marka bildirimine bakın.",
   "navPermissions": "Sistem İzinleri",
   "permissionsSectionTitle": "macOS Sistem İzinleri",
   "permissionsSectionSubtitle": "WeChat'ten doğrudan dosya sürüklemek, çapraz pencere OCR ekran görüntüleri almak ve toplantıları kaydetmek için sistem izinlerini verin",

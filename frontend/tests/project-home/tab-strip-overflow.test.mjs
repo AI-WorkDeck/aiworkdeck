@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 标签栏「开多了就滚不动、也看不出还有更多」（dev-board#543）的三条结构契约。
 // 病灶三件套：① .tab-item 没有 flex-shrink:0，标签一多是整批被压扁而不是溢出，

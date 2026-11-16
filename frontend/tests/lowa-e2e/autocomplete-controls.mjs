@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Real LOWA manual local candidates and shared controls; synthetic vocabulary, no model calls.
 // Automatic semantic off/on is covered separately by automatic-writing-ui.mjs.

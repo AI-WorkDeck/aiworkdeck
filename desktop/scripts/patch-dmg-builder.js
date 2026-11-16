@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // macOS 26.2 起 Finder 拒读 dmgbuild 写进 .DS_Store 的 pBBk 背景书签，DMG 背景整个
 // 不显示（同版 Obsidian/Podman Desktop 全中招；electron-builder#9072 / dmgbuild#273）。

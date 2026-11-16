@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "مثبّت Windows (x64)",
   "externalDownloadWindowsArm": "مثبّت Windows ARM (وصول مبكر)",
   "externalRepair": "إذا كان مثبّتًا بالفعل، تحقق مما إذا كان البرنامج يبدأ التشغيل، ومساره وأذونات التنفيذ، ثم تحقق مجددًا. يتطلب Tencent Meeting أيضًا Node.js قابلًا للاستخدام. بعد تغيير المسارات، احفظ عملك وأعد تشغيل AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "يرجى ترقية قدرة من {url}. {note}استخدم أولًا capability_install لجلبها والتحقق منها، واعرض خطة التثبيت عليّ، ولا تقم بالتثبيت إلا بعد تأكيدي.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "تثبيت هذا المستودع كقدرة وربطه بفتحة القدرة المطابقة",
-  "legalCopyright": "حقوق النشر 2026 شركة Beijing Jingwei Ziyi Technology Co., Ltd. والمساهمون في AI WorkDeck",
+  "legalCopyright": "حقوق النشر 2026 شركة BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED والمساهمون في AI WorkDeck",
   "legalLicense": "يُصدر هذا البرنامج بموجب رخصة جنو أفيرو العمومية (GNU Affero General Public License) الإصدار 3.0 أو أحدث، دون أي ضمان على الإطلاق.",
   "legalSourceLabel": "الكود المصدري: ",
   "legalLicenseLabel": "الرخصة الكاملة: ",
   "legalTrademarkLabel": "إشعار العلامة التجارية: ",
-  "legalTrademark": "\"AI WorkDeck\" علامة تجارية مسجلة لشركة Beijing Jingwei Ziyi Technology Co., Ltd. لا تستخدم هذا الاسم كاسم للمنتج عند إعادة توزيع نسخة معدّلة؛ راجع إشعار العلامة التجارية.",
+  "legalTrademark": "\"AI WorkDeck\" علامة تجارية لشركة BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. لا تستخدم هذا الاسم كاسم للمنتج عند إعادة توزيع نسخة معدّلة؛ راجع إشعار العلامة التجارية.",
   "navPermissions": "أذونات النظام",
   "permissionsSectionTitle": "أذونات نظام macOS",
   "permissionsSectionSubtitle": "امنح أذونات النظام لسحب الملفات مباشرة من WeChat، والتقاط لقطات شاشة OCR عبر النوافذ، وتسجيل الاجتماعات",

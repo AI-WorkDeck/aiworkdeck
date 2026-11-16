@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // meetingRecorder.js 的纯判定逻辑，刻意做成零依赖：既能被 meetingRecorder.js 直接用，
 // 也能在 node:test 里真跑一遍（meetingRecorder.js 自己 import 了 @/ 别名，测不动）。

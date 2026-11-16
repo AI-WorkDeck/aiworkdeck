@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // zetaoffice-verify.js — dedicated "LibreOffice 验证" window for a packaged
 // build. Epic #43. Lets the maintainer install and SEE the embedded LibreOffice

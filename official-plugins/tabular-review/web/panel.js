@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 表格化审阅面板：选文件 → 定义问题列 → 批量抽取 → 表格 → 点格子看出处/跳原文 → 确认/修改 → 导出 xlsx。
 (function () {

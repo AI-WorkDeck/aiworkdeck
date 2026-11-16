@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台几个入口动作（dev-board#1713）：
 //   问题 13：项目已打开时欢迎页提问 = 在本项目新建对话再发送，按钮如实叫「在本项目新建对话」；

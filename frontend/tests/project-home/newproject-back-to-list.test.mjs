@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-07（v0.49.0 真机批次 H）：项目列表页 navigateTo 进「新建项目」向导后，
 // 点向导页「返回项目列表」若也用 navigateTo，会在页面栈里堆出第二个列表实例

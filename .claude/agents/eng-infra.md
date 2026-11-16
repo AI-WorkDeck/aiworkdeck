@@ -38,11 +38,15 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 `app-menu.js` 的关于入口使用 `about-window.js` 独立本地窗口，原生 About 的固定 copyright 区无法容纳完整双语许可文案。新窗口正文可换行/滚动、版本仅显示一次；保留版权、AGPL、源码/许可证/商标链接与说明。无脚本、sandbox/contextIsolation 开启，只允许三个固定法律链接交给系统浏览器，重复打开复用窗口。浅色/深色从 `design/tokens/awd-palette.json` 生成 --awd-* 角色令牌快照，测试逐项对拍；更新色源须同步该快照。验证：`desktop/tests/about-window.test.js`，真实窗口用 Electron 运行 `desktop/tests/about-window.electron.js`（独立 profile，不启动产品后端）。
 
+主体告示（dev-board#1748）：当前权利主体为北京公富；About 的版权/商标文案通过 `app-language.t()` 读取 `desktop/main/legal-notices.json`，与 `frontend/src/locales/*/admin.js` 对齐。仅更新产品署名，下面实际签名团队及验证仍沿用现有证书，须平台迁移完成后另改。
+
 主窗口导航白名单（S26，`desktop/main/navigation-guard.js`）：主窗口带完整 preload 桥，顶层导航到外站时 preload 会在新页面再注入一次，所以 `will-navigate` / `will-redirect` 只放行应用页（打包态前端目录内的 file://、开发态 dev server 同源）；`checkba:` 交渲染层；http(s)/mailto 拦下后交 `shell.openExternal`（重定向不自动外开）；其余拦下。`setWindowOpenHandler` 一律 deny：http(s) 照旧发 `checkba:browser-open-new-tab` 给工作区浏览器标签，其余 scheme（含 about:blank）不再建继承 preload 的子窗口。`will-attach-webview` 只认 LOWA（zetaoffice preload + `persist:zetaoffice` + 本机 http）与人机验证（captcha preload + 默认分区 + https，本机联调允许 loopback http），并强制 nodeIntegration 关、contextIsolation/sandbox 开、去掉 allowpopups——新增 `<webview>` 形态要先在 `webviewKinds` 登记。主窗口显式 `sandbox: true`。渲染层 Markdown 链接带 target/rel，点击经 `utils/externalLink.js` 的 `handleRenderedLinkClick` 交系统浏览器。回归：`desktop/tests/navigation-guard.test.js`、`main-window-lifecycle.test.js`、`frontend/tests/markdown-table/mdLinks.test.mjs`、`frontend/tests/desktop-e2e/external-link-navigation.mjs`（真 Electron）。
 
 完整更新字节与哈希校验后、`prepareInstaller` 返回前，`update-service.js` 必须广播 `preparing`，只有原生准备成功才 `ready`。准备过程分阶段（dev-board#1713，问题 92）：`full-update.js` 的 `prepare(file, version, onStage)` 依次报 `mount`（hdiutil 挂载）/ `package`（ditto 转 ZIP）/ `verify`（Squirrel 验签准备；Windows 只有这一段），`update-service` 写进 `progress.stage` 并再广播 `preparing`，前端 `shell.updatePreparing{Mount,Package,Verify}` 提示当前阶段与「通常需要几分钟」。前端顶部/设置均覆盖该阶段；主页面就绪不自动弹重启确认，用户点击沿用已有保存/退出守卫。缺平台安装包退回手动下载时也必须广播最终 idle/major-available 快照，不能停在 checking。
 
 ## 发版链路
+
+- **Windows 缺依赖验收准备顺序（dev-board#1762）**：`desktop/scripts/dependency-clean-windows/run.ps1` 必须在启动标准用户探针前完成 Node、LibreOffice MSI 下载及固定 SHA256、Authenticode 校验；真正安装仍在探针确认依赖缺失之后。探针保持同一生产对象存活及原有 25 分钟安装等待限制，不把网络下载或证书验证耗时算进恢复窗口。`stage-timings.log` 随失败证据保留下载、哈希、验签及安装边界的 UTC 和累计耗时；本地静态检查不代替真实 Windows 验收。
 
 - 0.72.0 发布准备（dev-board#1516）：LOWA `24.2.8-zhcn-r7` 使用 #1515 的最终 r7b 候选，发布前已在北京、新加坡逐文件解码哈希和 metadata 大小校验。官方插件改资源后必须递增 manifest 版本，避免同版本保留策略让旧用户漏更；JAR 插件同时同步 pom 与 backendJars。独立插件 ZIP 与桌面 extraResources 都须包含 `l10n/`，构建后检查真实包内语言文件。
 
@@ -168,8 +172,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    `content/releases.ts` 数组头部加一条：`version`（0.X.0）、`date`（tag 日期）、`headline` 一句、
    `items` 三到五条，中英双语。**补丁版 0.X.Y 并入所在大版本那条**，不单独立卡。写给律师看——
    「这一版你能多做什么 / 什么不再烦你」，不写内部重构、测试、CI、文档、营销件；口吻照该文件
-   既有条目，不用营销腔。合并后按官网仓惯例 `gh workflow run ci.yml --ref master -f target=both`
-   部署，`/zh/updates` 与 `/en/updates` 顶部出现本次版本号才算完。
+   既有条目，不用营销腔。官网部署以最新已审阅主线为准：先确认同一 `source_sha` 的 CI Web build 成功，再从 `master` 触发 `next-build-artifact.yml`，传入该 SHA、`web_run_id` 及国内/国际两站经核对的公开配置；成功后分别触发 `promote-next-artifact.yml`（`site=cn` / `intl`、`artifact_run_id`、同一 `source_sha`），遵守生产 Environment 审批与产物 provenance 校验。具体命令与配置以官网 `DEPLOY.md` 为准；旧 `ci.yml -f target=both` 已不是部署入口。两站 `/zh/updates` 与 `/en/updates` 顶部出现本次版本号才算完。
    **判据：`https://www.aiworkdeck.com/zh/updates` 顶部版本号 ≠ 本次 tag → 这步没做。**
    断更实锤：0.16.0（08-15）到 0.46.3（09-23）三十个大版本官网一条没写，维护者原话
    「发版每次要写啊」（dev-board#861 一次性补齐）。

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 深色纸面（教程第 18 集：深色模式下 Word 纸面仍是白的）。真实引擎，无后端、无账户。
 // set_app_theme dark 之后逐类断言屏幕像素：

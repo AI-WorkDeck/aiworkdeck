@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 组件管理页与首次登录面板必须共用同一张卡片：两处口径不一致，用户在一处看到
 // 「已就绪」、另一处看到「未安装」，谁都不知道该信哪个。

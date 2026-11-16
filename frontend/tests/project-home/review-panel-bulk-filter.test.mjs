@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // v0.49.0 真机 BUG-18（C5-03）：审阅面板筛到「AI 12」后点「全部接受」，把「我 6」的
 // 修订也一起接受了，而且没有任何确认。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 事项输入框 `@` 关联的纯文本逻辑（dev-board#896）：查询词提取、选中后的文本替换、成员匹配。
 // MentionInput.vue 与 AgentMessage/MentionPicker.vue 共用；零依赖，node --test 直接导入。

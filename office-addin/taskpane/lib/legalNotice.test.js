@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * 窗格底部许可告示的形态契约（dev-board#765）：
@@ -23,11 +23,12 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { renderLegalNoticeHtml } from '../../legal-notice-html.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 /** office-addin/ 根目录（两个入口页在这里） */
 const addinRoot = path.join(here, '..', '..')
-const read = (rel) => fs.readFileSync(path.join(addinRoot, rel), 'utf8')
+const read = (rel) => renderLegalNoticeHtml(fs.readFileSync(path.join(addinRoot, rel), 'utf8'))
 
 /** Office 面与 WPS 面各一个入口页，两份页脚必须一模一样 */
 const ENTRIES = ['taskpane.html', 'taskpane-wps.html']
@@ -51,12 +52,12 @@ function summaryOf(footer) {
 
 /** 展开后才出现的完整告示：删掉任何一条都是许可问题，不是文案问题 */
 const FULL_NOTICE = [
-  '版权所有 2026 北京京微资易科技有限公司及 AI WorkDeck 贡献者',
-  'Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. and AI WorkDeck contributors',
+  '版权所有 2026 北京公富信息技术有限公司及 AI WorkDeck 贡献者',
+  'Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED and AI WorkDeck contributors',
   '依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。',
-  'Released under the GNU Affero General Public License v3.0 or later, with ABSOLUTELY NO WARRANTY.',
-  '为北京京微资易科技有限公司的商标，再分发修改版时不得用作产品名',
-  'is a trademark of Beijing Jingwei Ziyi Technology Co., Ltd.',
+  'This program is released under the GNU Affero General Public License v3.0 or later, with ABSOLUTELY NO WARRANTY.',
+  '为北京公富信息技术有限公司的商标，再分发修改版时不得使用该名称作为产品名',
+  'is a trademark of BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED',
   'https://github.com/AI-WorkDeck/aiworkdeck"',
   'https://github.com/AI-WorkDeck/aiworkdeck/blob/master/LICENSE',
   'https://github.com/AI-WorkDeck/aiworkdeck/blob/master/legal/TRADEMARKS.md'
@@ -140,4 +141,37 @@ test('i18n：切语言时同步 <html lang>，否则页脚永远停在一种语�
   const setLang = i18n.slice(i18n.indexOf('export function setLang'))
   assert.ok(setLang.slice(0, 400).includes('syncDocumentLang()'),
     'setLang 里要跟一句同步，只在模块加载时设一次的话手动切语言页脚不跟着变')
+})
+
+
+test('rendered fallbacks contain the current entity without unresolved dictionary tokens', () => {
+  for (const entry of ENTRIES) {
+    const html = read(entry)
+    assert.ok(html.includes('北京公富信息技术有限公司'))
+    assert.ok(html.includes('BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED'))
+    assert.doesNotMatch(html, /\{\{legal\.|京微|Jingwei|Zhen Shan/)
+  }
+})
+
+test('legal footer follows each registered locale when the language changes', async () => {
+  const i18n = await import('./i18n.js')
+  const originalDocument = globalThis.document
+  const nodes = ['legalCopyright', 'legalLicenseTrademark'].map((key) => ({
+    textContent: '', getAttribute: () => key,
+  }))
+  globalThis.document = { documentElement: {}, querySelectorAll: () => nodes }
+  try {
+    for (const code of i18n.SUPPORTED_LOCALE_CODES) {
+      const mod = await import(`../locales/${code}.js`)
+      const dictionary = mod.default || mod.ZH || mod.EN
+      i18n.registerLocaleDictionary(code, dictionary)
+      i18n.setLang(code)
+      assert.equal(nodes[0].textContent, dictionary.legalCopyright, code)
+      assert.equal(nodes[1].textContent, dictionary.legalLicenseTrademark, code)
+      for (const node of nodes) assert.match(node.textContent, /北京公富信息技术有限公司|BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED/, code)
+      assert.doesNotMatch(nodes.map((node) => node.textContent).join(' '), /京微|Jingwei|Zhen Shan/)
+    }
+  } finally {
+    globalThis.document = originalDocument
+  }
 })

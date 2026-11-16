@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Opt-in real local TTS -> ASR acceptance. Requires prepared runtimes/models; never downloads.
 All writable homes, caches, audio and logs live in --output. No customer input is accepted.

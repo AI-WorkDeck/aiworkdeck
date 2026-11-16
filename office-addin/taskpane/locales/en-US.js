@@ -1,6 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const EN = {
+  legalCopyright: "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED and AI WorkDeck contributors",
+  legalLicenseTrademark: "This program is released under the GNU Affero General Public License v3.0 or later, with ABSOLUTELY NO WARRANTY. \"AI WorkDeck\" is a trademark of BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Do not use that name as the product name when redistributing a modified version; see the trademark notice.",
   apiCloudAccessRefresh: "Cloud access has changed. Refresh the page or reopen the app before continuing. Local files will not be deleted.",
   defaultProjectName: "Temporary project",
   cmdPptAddImage: "Insert slide image",

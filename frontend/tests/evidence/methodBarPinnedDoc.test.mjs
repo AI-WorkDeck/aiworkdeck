@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // method 小条不再自动收起（dev-board#138）之后必须补的一条：它得钉在建链的那份文档上。
 // 否则换标签/关文档之后，上一份文档的「已关联《x》」还挂在窗格左下角——比不显示更糟，

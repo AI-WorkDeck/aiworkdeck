@@ -1,4 +1,4 @@
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <!--
   中栏「欢迎」标签的内容（dev-board#1047，spec 2026-09-29-defer-login-welcome-tab-design §6；结构对齐 VS Code 的 Welcome）。

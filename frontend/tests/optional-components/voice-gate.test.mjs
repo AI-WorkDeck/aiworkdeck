@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 语音面板的三态（设计 §4.2）。0.38.0 起多了一态：运行时本身没装。
 // 「运行时没装」和「模型没下」的下一步不同（前者 200MB，后者 300MB，且必须先装前者），

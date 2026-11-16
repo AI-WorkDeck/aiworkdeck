@@ -122,7 +122,7 @@ AI WorkDeck is an open-source exploration rooted in day-to-day legal work, devel
 
 ## Licensing and stewardship
 
-The steward is **北京京微资易科技有限公司 (Beijing Jingwei Ziyi Technology Co., Ltd.)**; **真善美承泽有限公司 (Zhen Shan Mei Grace Legacy Limited)** operates the international offering. Commercial licensing covers the steward's code; third-party components retain their own terms. See [AGPL-3.0-or-later](legal/LICENSE), [commercial licensing](legal/COMMERCIAL-LICENSE.md), [third-party components](legal/THIRD-PARTY-COMPONENTS.md), and [trademarks](legal/TRADEMARKS.md).
+The steward is **北京公富信息技术有限公司 (BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED)**. The same entity operates the domestic and international offerings. Commercial licensing covers the steward's code; third-party components retain their own terms. See [AGPL-3.0-or-later](legal/LICENSE), [commercial licensing](legal/COMMERCIAL-LICENSE.md), [third-party components](legal/THIRD-PARTY-COMPONENTS.md), and [trademarks](legal/TRADEMARKS.md).
 
 <a id="community-fund"></a>
 

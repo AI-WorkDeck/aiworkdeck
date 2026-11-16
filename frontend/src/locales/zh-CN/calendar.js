@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 日历/任务系统（全局日历页 pages/calendar、项目内日历面板、文件右键设截止日、TaskSchedule 扩展）
 // spec: docs/superpowers/specs/2026-08-20-calendar-view-design.md

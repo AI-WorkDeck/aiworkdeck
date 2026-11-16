@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 主窗口大小 / 位置 / 最大化的记忆（问题 18）。记录落 prefs（~/.aiworkdeck/prefs.json）。
 // 恢复前校验：标题栏那一条至少有一截落在某块显示器的工作区里，否则（例如外接屏拔了）

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // UI-INPUT1：uni-app H5 输入框的 v-model 回写节流 100 ms，确认按钮在这期间读到旧值（稿名只剩第一个字）。
 // 构建时把节流换成同步回写；这里对装着的那份 uni-h5 源码真跑一遍补丁，并用补丁后的同一段逻辑验行为。

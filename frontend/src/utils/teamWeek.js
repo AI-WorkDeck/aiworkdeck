@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 团队「本周」看板的纯函数：周一至周五的日期、成员周汇总、负荷档位、热力格等级。
 // 周一本周还没有过完的工作日，看板改看上周（boardWeek）。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 候选可见时的键盘归属：Tab/Esc/方向键必须由宿主先处理，落在画布上的按键也算。
 // 真机（v0.44.1，macOS）两条症状：候选出现后按 Tab 没有接受，只能用鼠标点；

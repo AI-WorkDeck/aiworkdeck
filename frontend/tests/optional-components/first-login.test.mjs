@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 触发条件（设计 §4.1）：桌面端 + 登录后 + 有未装组件 + 这批组件没提示过。
 // 标记落 electron prefs（不是 localStorage）：记的是「提示过哪些组件」（dev-board#751），

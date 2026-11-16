@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 正文悬停修订气泡（dev-board#1126 需求二）。鼠标悬停在正文修订标记上时，在光标
 // 附近浮现轻量卡片：修订者（本人带「（我）」）、时间、类型与文本；移开或滚动即隐藏。

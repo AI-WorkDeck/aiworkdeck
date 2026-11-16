@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎计时：Word / PPT / Excel 在「备胎」上的打开耗时（load_document 往返）。
 // 每轮一个全新引擎，先跑产品的 warm_engine（与 librePool 备胎空闲时相同），再计时装入目标文档，

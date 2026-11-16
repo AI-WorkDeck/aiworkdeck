@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { mkdir, readFile, writeFile, mkdtemp, symlink, realpath } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 
 export const here = dirname(fileURLToPath(import.meta.url))
 export const frontend = resolve(here, '../..')
-const header = '// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors\n// SPDX-License-Identifier: AGPL-3.0-or-later\n'
+const header = '// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors\n// SPDX-License-Identifier: AGPL-3.0-or-later\n'
 
 export async function buildHarness(output) {
   await mkdir(output, { recursive: true })

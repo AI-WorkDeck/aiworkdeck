@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 英文 QA 2026-11-14 第 9 条：正式发行版里「允许装未签名能力包」默认关，开发态/源码构建默认开。
 // 发行版标记 = 官方 CI 打包时经 extraMetadata 写进 package.json 的 awdReleaseBuild；

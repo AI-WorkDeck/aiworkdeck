@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // team 命名空间的文案红线（dev-board#496）：两语言键集合一致、禁 emoji、
 // 中文不许含 api.js 历史上用来判掉线的三个子串。

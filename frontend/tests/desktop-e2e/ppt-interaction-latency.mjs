@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Full-host PPT interaction benchmark. Build this tree's H5/zetaoffice/backend first.
 // JAVA_HOME must be JDK 21. AWD_ELECTRON_BINARY optionally selects a fixed runtime.

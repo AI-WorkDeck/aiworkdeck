@@ -63,7 +63,7 @@
 
 ```js
 // desktop/tests/prefs.test.js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 本机偏好（~/.aiworkdeck/prefs.json）。「可选组件面板提示过没有」存在这里而不是
 // localStorage：那个随浏览器数据被清、也不区分重装，用户会被反复打扰。
@@ -123,7 +123,7 @@ Expected: FAIL —「Cannot find module '../main/services/prefs'」。
 
 ```js
 // desktop/main/services/prefs.js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 const fs = require('fs')
 const path = require('path')
@@ -250,7 +250,7 @@ git commit -m "feat(desktop): 新增本机偏好存储 ~/.aiworkdeck/prefs.json 
 
 ```js
 // frontend/tests/optional-components/copy.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 提示文案的硬性内容要求（设计 §0 用户硬性要求 / §4.3）：每一条提示都必须同时说清
 // 下载什么、多大、解锁哪些功能、不下载则哪些功能不可用。
@@ -314,7 +314,7 @@ Expected: FAIL — 找不到 `src/locales/zh-CN/components.js`。
 
 ```js
 // frontend/src/locales/zh-CN/components.js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 可选组件（四个 Python 运行时 + 各自模型）的文案。设计 §4.3 的模板落在这里：
 // 每一条提示都要同时说清「下载什么 / 多大 / 解锁什么 / 不装则什么不可用」。
@@ -385,7 +385,7 @@ export default {
 
 ```js
 // frontend/src/locales/en-US/components.js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   panelTitle: 'Optional components',
@@ -496,7 +496,7 @@ git commit -m "feat(i18n): 新增可选组件文案命名空间（zh-CN + en-US�
 
 ```js
 // frontend/tests/optional-components/orchestrator.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 下载编排（设计 §3.1「底层两条通道顺序执行」/ §4.1「逐个顺序下载，带总进度」）。
 // 顺序是硬约束：模型下载器本身跑在 pack 的 venv 里（model-manager.js 的 PYTHONPATH
@@ -635,7 +635,7 @@ export function optionalComponents() {
 // frontend/src/composables/useOptionalComponents.js
 // SPDX-FileCopyr```js
 // frontend/src/composables/useOptionalComponents.js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 可选组件的下载编排（设计 §3.1 / §4.1）。
 //
@@ -854,7 +854,7 @@ git commit -m "feat(components): 可选组件的顺序下载编排（pack → �
 
 ```js
 // frontend/tests/optional-components/card.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 卡片必须把设计 §4.3 的四件事同时说出来：下载什么 / 多大 / 解锁什么 / 不装则什么不可用。
 // 手法同 litigation-visual/packUpdate.test.mjs：抠出 <script> 用 new Function 起一个纯对象。
@@ -933,7 +933,7 @@ Expected: FAIL — 找不到 `OptionalComponentCard.vue`。
 
 ```vue
 <!-- frontend/src/components/OptionalComponentCard.vue -->
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="oc-card" :class="{ ready: item.phase === 'ready', failed: item.phase === 'failed' }">
@@ -1063,7 +1063,7 @@ git commit -m "feat(components): 可选组件卡片（体积/解锁/不装影响
 
 ```js
 // frontend/tests/optional-components/first-login.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 触发条件（设计 §4.1）：桌面端 + 登录后 + 有未装组件 + 本机没标记过。
 // 标记落 electron prefs（不是 localStorage），值是大版本号：下个大版本多出新组件时再提示一次。
@@ -1156,7 +1156,7 @@ export function shouldPromptOptionalComponents({ items, promptedVersion, appVers
 
 ```vue
 <!-- frontend/src/components/OptionalComponentsDialog.vue -->
-<!-- SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
   <view class="ocd-mask" @tap.self="onLater">
@@ -1369,7 +1369,7 @@ git commit -m "feat(components): 首次登录后的可选组件面板（顺序�
 
 ```js
 // frontend/tests/optional-components/admin-reuse.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 组件管理页与首次登录面板必须共用同一张卡片：两处口径不一致，用户在一处看到
 // 「已就绪」、另一处看到「未安装」，谁都不知道该信哪个。
@@ -1518,7 +1518,7 @@ git commit -m "refactor(admin): 组件管理复用可选组件卡片与下载编
 
 ```js
 // frontend/tests/optional-components/chat-gate.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI 对话里的组件门（设计 §4.2）：弹窗 → install → 模型 → ensure → 自动重发原消息。
 // 「自动重发」是这条链的重点：让用户装完组件还得自己把刚才那句话再打一遍，
@@ -1620,7 +1620,7 @@ Expected: FAIL — 找不到 `useComponentRequired.js`。
 
 ```js
 // frontend/src/composables/useComponentRequired.js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI 对话里的「需要下载组件」闸（设计 §4.2）。
 //
@@ -1783,7 +1783,7 @@ git commit -m "feat(chat): component_required 弹窗、下载后自动重发原�
 
 ```js
 // frontend/tests/optional-components/voice-gate.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 语音面板的三态（设计 §4.2）。0.38.0 起多了一态：运行时本身没装。
 // 「运行时没装」和「模型没下」的下一步不同（前者 200MB，后者 300MB，且必须先装前者），
@@ -1981,7 +1981,7 @@ git commit -m "feat(voice): 语音面板下载状态机扩成「运行时 + 模�
 
 ```js
 // frontend/tests/optional-components/recorder-gate.test.mjs
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 「录音不出本机」的四态出路（设计 §4.2）。四条下一步各不相同：
 // RUNTIME_MISSING 下组件 / MODEL_MISSING 下模型 / SERVICE_DOWN 重启 / READY 可用。

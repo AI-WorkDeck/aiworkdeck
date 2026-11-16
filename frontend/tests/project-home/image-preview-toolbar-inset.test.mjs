@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#972（v0.49.0 BUG-76 / C9-07）：图片 / SVG 预览底部的缩放工具条
 // （− 100% + 1:1 适应窗口 旋转）下半截被底部状态栏压住。

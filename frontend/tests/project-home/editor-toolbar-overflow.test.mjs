@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // v0.49.0 BUG-13（工具栏溢出无提示）/ BUG-15（下拉 Esc/点外面关不掉、横滚后与按钮脱开）
 // 的真渲染回归。

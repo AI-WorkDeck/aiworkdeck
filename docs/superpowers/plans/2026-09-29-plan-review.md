@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 新建一方源文件带 SPDX 双行头：`SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors` + `SPDX-License-Identifier: AGPL-3.0-or-later`（Java 用 `//`，Vue 用 `<!-- -->`，js/mjs 用 `//`）。
+- 新建一方源文件带 SPDX 双行头：`SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors` + `SPDX-License-Identifier: AGPL-3.0-or-later`（Java 用 `//`，Vue 用 `<!-- -->`，js/mjs 用 `//`）。
 - 禁止 emoji（代码、文案、提交信息）。
 - 前端包管理 npm；本树 `frontend/` 无 node_modules，跑测试前 `ln -s "/Users/zewei/Documents/2024-2044/5-Tech/1-2 checkba_cloud/frontend/node_modules" frontend/node_modules`，跑完 `rm frontend/node_modules`（先确认不存在再建）。
 - 后端 mvn 必须 `JAVA_HOME=$(/usr/libexec/java_home -v 21)`。

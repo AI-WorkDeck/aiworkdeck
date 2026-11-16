@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#1018：AI 生成文档后自动开新标签，引擎还在 boot/装载，活跃执行器指针是 null。
 // handleEditorCommand 以前**立刻**回「编辑器未就绪，请先打开一个文档」，模型拿着这句话

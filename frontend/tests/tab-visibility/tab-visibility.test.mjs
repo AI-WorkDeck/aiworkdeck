@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 标签页常驻契约（dev-board#394）：左栏切到任何面板，中间列已开的标签都不许消失。
 // 跑法：cd frontend && npm run test:tab-visibility

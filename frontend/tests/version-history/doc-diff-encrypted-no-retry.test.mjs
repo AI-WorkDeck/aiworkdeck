@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 台账 B10 附注 (a)：加密 .xlsx 走文本比对报 DOC_ENCRYPTED 时，「重试」永远不会成功，不该出现。
 import test from 'node:test'

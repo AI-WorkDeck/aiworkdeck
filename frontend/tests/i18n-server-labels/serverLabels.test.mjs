@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 英文界面里不该出现服务端写进数据的中文固定标签（0.86 RC：审计日志「账户桥接」「客户(通用)」，
 // 记忆页「个人记忆」）。只在显示时翻，存的数据不改；别的文字（项目名、律师起的名）原样。

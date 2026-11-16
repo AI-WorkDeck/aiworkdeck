@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-60：地址栏「收藏本页」星标点亮后，到收藏面板把这条收藏删掉，星标仍是实心，
 // 连点刷新都不变，切标签（组件重建）才恢复。两处病灶：

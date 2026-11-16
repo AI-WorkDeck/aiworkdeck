@@ -122,7 +122,7 @@ AI WorkDeck 是一项源于一线法律工作、在工作之余开展的开源�
 
 ## 许可与项目管理
 
-项目管理方为<strong>北京京微资易科技有限公司</strong>，国际业务由<strong>真善美承泽有限公司（Zhen Shan Mei Grace Legacy Limited）</strong>运营。商业许可覆盖管理方拥有权利的代码，第三方组件仍遵循各自条款。详见 [AGPL-3.0-or-later](legal/LICENSE)、[商业许可](legal/COMMERCIAL-LICENSE.md)、[第三方组件](legal/THIRD-PARTY-COMPONENTS.md)与[商标说明](legal/TRADEMARKS.md)。
+项目管理方为<strong>北京公富信息技术有限公司</strong>（<strong>BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED</strong>），统一运营国内及国际业务。商业许可覆盖管理方拥有权利的代码，第三方组件仍遵循各自条款。详见 [AGPL-3.0-or-later](legal/LICENSE)、[商业许可](legal/COMMERCIAL-LICENSE.md)、[第三方组件](legal/THIRD-PARTY-COMPONENTS.md)与[商标说明](legal/TRADEMARKS.md)。
 
 <a id="社区基金"></a>
 

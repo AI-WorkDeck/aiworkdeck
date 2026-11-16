@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 锁桌面 locale 的品牌文案（onboarding.unlock.brand.*）与 design/copy/brand-copy.json 逐字相等。
 // JSON 是各端品牌文案的唯一真源（与 design/tokens/awd-palette.json 同一机制），改文案先改 JSON。

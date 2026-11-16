@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 英文 QA 2026-11-14 第 5 条（「1 files」）：英文词条写成 'x file | x files' 后，调用处必须把数量作为
 // 第三个参数传给 $t / t（vue-i18n 只在有 plural 参数时选形），漏传就会原样显示「x file | x files」。

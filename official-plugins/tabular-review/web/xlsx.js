@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 最小 xlsx 写出器：纯字符串单元格（inlineStr）、首行加粗冻结、自动换行，ZIP 不压缩（stored）。
 // 无第三方依赖，sandbox iframe 与 Node 测试共用。

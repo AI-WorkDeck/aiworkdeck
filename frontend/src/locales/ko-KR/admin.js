@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Windows 설치 프로그램(x64)",
   "externalDownloadWindowsArm": "Windows ARM 설치 프로그램(Early Access)",
   "externalRepair": "이미 설치되어 있다면 프로그램이 시작되는지, 경로와 실행 권한을 확인한 후 다시 확인하세요. Tencent Meeting에는 사용 가능한 Node.js도 필요합니다. 경로를 변경한 후에는 작업을 저장하고 AI WorkDeck을 재시작하세요.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "{url}에서 기능을 업그레이드해 주세요. {note}먼저 capability_install을 사용하여 가져와서 검증한 후, 설치 계획을 나에게 읽어 보여주고, 내가 확인한 후에만 설치하세요.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "이 저장소를 기능으로 설치하고 해당 기능 슬롯에 연결하세요",
-  "legalCopyright": "Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. 및 AI WorkDeck 기여자",
+  "legalCopyright": "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED 및 AI WorkDeck 기여자",
   "legalLicense": "이 프로그램은 GNU Affero General Public License v3.0 이상의 라이선스로 배포되며, 어떠한 보증도 제공하지 않습니다.",
   "legalSourceLabel": "소스 코드: ",
   "legalLicenseLabel": "전체 라이선스: ",
   "legalTrademarkLabel": "상표 고지: ",
-  "legalTrademark": "\"AI WorkDeck\"은 Beijing Jingwei Ziyi Technology Co., Ltd.의 상표입니다. 수정된 버전을 재배포할 때 이 이름을 제품명으로 사용하지 마세요. 상표 고지를 참조하세요.",
+  "legalTrademark": "\"AI WorkDeck\"은 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED의 상표입니다. 수정된 버전을 재배포할 때 이 이름을 제품명으로 사용하지 마세요. 상표 고지를 참조하세요.",
   "navPermissions": "시스템 권한",
   "permissionsSectionTitle": "macOS 시스템 권한",
   "permissionsSectionSubtitle": "시스템 권한을 부여하면 WeChat에서 파일을 직접 드래그하거나, 창 간 OCR 스크린샷을 캡처하고, 회의를 녹음할 수 있습니다",

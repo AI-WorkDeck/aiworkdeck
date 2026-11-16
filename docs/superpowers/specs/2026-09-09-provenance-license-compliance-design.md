@@ -103,7 +103,7 @@ GPLv3/AGPLv3 §8 规定：违约即自动终止，但对方停止违约后若权
 **做法**：按 FSFE REUSE Specification v3.x（https://reuse.software/spec-3.3/）：
 1. 每个一方源文件顶部两行：
    ```
-   SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+   SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
    SPDX-License-Identifier: AGPL-3.0-or-later
    ```
 2. 根目录 `LICENSES/AGPL-3.0-or-later.txt` 放全文（文件名即 SPDX 标识符）。
@@ -462,7 +462,7 @@ SCA 扫描器只认识它索引过的代码。当前 `com.checkba:plugin-api` �
 - **后果**：**任何人现在拿走这个文件，按文件头它就是 MIT 的，我们几乎无法主张 AGPL。** 这不是"防抄措施不足"，这是我们自己把最值钱的资产按 MIT 发出去了。
 - **正确做法**：改成双段头 —— 保留对 allotropia/zetajs 原始 MIT 部分的署名，主体声明为 `AGPL-3.0-or-later`：
   ```
-  /* SPDX-FileCopyrightText: 2025-2026 北京京微资易科技有限公司
+  /* SPDX-FileCopyrightText: 2025-2026 北京公富信息技术有限公司
    * SPDX-FileCopyrightText: 2023 allotropia software GmbH (portions, see below)
    * SPDX-License-Identifier: AGPL-3.0-or-later AND MIT
    * ...
@@ -477,7 +477,7 @@ SCA 扫描器只认识它索引过的代码。当前 `com.checkba:plugin-api` �
   换句话说：**我们的源码里一个自己的版权头都没有。**
 - **做法**：每个一方源文件加两行头：
   ```
-  // SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+  // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
   // SPDX-License-Identifier: AGPL-3.0-or-later
   ```
   并按 FSFE REUSE 规范补 `LICENSES/` 目录与 `REUSE.toml`。

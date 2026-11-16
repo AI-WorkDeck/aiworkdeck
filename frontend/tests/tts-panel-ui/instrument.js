@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 window.__qaAudit = { requests: [], audios: [], audioEvents: [], highlights: [], keys: [], focuses: [], inputs: [], imports: [] }
 document.addEventListener('keydown', event => window.__qaAudit.keys.push({ key: event.key, trusted: event.isTrusted, target: event.target.className }), true)

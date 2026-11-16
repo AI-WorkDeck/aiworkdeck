@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 自动字幕的纯逻辑（utils/media/transcriptCues.js，规格 3.5）：
 //   段 → cue、二分查找、说话人命名、42 字长句切分与 800ms 下限、300ms 间隙连续。

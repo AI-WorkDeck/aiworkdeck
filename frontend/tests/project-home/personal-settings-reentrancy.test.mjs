@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 审计（dev-board#74）：PersonalSettingsPanel 的四个「确认绑定/解绑」handler 没有
 // 重入闸，连点两次会并发发两次请求——第一次成功、第二次因验证码一次性失效而 reject，

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package com.checkba.service.ai.harness;
@@ -1113,7 +1113,7 @@ public class HarnessEvolutionService {
             List<String> triggers,
             String verificationPolicy) {
         StringBuilder sb = new StringBuilder();
-        sb.append("# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors\n");
+        sb.append("# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors\n");
         sb.append("# SPDX-License-Identifier: AGPL-3.0-or-later\n");
         sb.append("id: ").append(skillId).append("\n");
         sb.append("name: \"").append(escapeYaml(skillName)).append("\"\n");

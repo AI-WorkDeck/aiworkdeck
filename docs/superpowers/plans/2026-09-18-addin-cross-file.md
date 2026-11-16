@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - 本机 `mvn` 必须 JDK 21：`export JAVA_HOME=$(/usr/libexec/java_home -v 21)`。
-- 新建一方源文件首两行 SPDX 头：`SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors` / `SPDX-License-Identifier: AGPL-3.0-or-later`（Java 用 `//`，Vue 用 `<!-- -->`，JS 用 `//`）。
+- 新建一方源文件首两行 SPDX 头：`SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors` / `SPDX-License-Identifier: AGPL-3.0-or-later`（Java 用 `//`，Vue 用 `<!-- -->`，JS 用 `//`）。
 - 工具输出永不为空串（`ToolExecutionResultMessage.ensureNotBlank`）。
 - 参考材料文字：不计费、不落盘、日志只记 requestId/长度/耗时，不记正文。
 - 文本上限 200,000 字符，截断标注 `...(截断)`；单文件字节上限 50MB。
@@ -156,7 +156,7 @@ public boolean isConnected(String connectionId) {
 
 ```java
 // PaneRegistry.java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.service.addin;
 
@@ -224,7 +224,7 @@ public class PaneRegistry {
 
 ```java
 // AddinPaneController.java
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 package com.checkba.controller.addin;
 
@@ -1240,7 +1240,7 @@ test('post failures are swallowed', async () => {
 - [ ] **Step 3: Implement**
 
 ```js
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 窗格心跳（dev-board#717）：让云端知道「这个账号现在开着哪些文档的窗格」，供别的窗格跨文档读写。
 export function startHeartbeat({ getState, post, intervalMs = 30000,

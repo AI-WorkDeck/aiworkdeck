@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 欢迎标签（components/welcome/WelcomePane.vue）、工作台无项目态与 rail 底部账户入口的文案（dev-board#1047）。
 // 品牌标题 / tagline / lead 不在这里：一律取 onboarding.unlock.brand.*（design/copy/brand-copy.json 的逐字副本）。

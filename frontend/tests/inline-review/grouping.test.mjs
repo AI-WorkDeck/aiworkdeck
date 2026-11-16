@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // utils/inlineReviewGrouping.js：客体页浮球与宿主「审校」面板共用的判据。
 // 两边各写一份的话，浮球上的数字和面板里的条数会对不上——所以判定只有这一份。

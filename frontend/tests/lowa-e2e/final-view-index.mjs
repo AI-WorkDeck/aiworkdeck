@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎（0.85.3）：删到段落标记的修订在最终稿视图里会合并段落。#1592 把各视图的段落索引存起来、
 // 切回同一视图时原样复用——最终稿视图的段落对象在视图来回切过之后，读出来变成空串、按段号写会落错段。

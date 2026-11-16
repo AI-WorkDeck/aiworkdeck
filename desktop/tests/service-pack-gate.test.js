@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 四个服务的启动门（设计 §3.2）。pptx/asr 只判 pack 在场；mineru/kokoro 还要判模型。
 // asr 刻意保持「pack 在场就起、模型没下也起」：就绪探测必须能分清

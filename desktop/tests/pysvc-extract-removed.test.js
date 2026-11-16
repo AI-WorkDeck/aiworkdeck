@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 首启解压链路必须整段消失（设计 §3.2）。留着它的代价不是多几行死代码：
 // 那段逻辑会在没有 pysvc.tar.gz 的 0.38.0 上给用户弹一个「本地组件解压失败」的错误框。

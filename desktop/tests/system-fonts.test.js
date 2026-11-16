@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 编辑器本机字体（desktop/main/system-fonts.js）：name 表解析、TTC、坏文件、
 // 推荐默认集封顶、启用集持久化只认已知 id、HTTP 取文件入口只认启用集。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 审阅概览（.libre-review-overview）改成浮在画布右侧、不挤宽画布之后，画布上的
 // 宿主浮层要让出面板宽度，否则保存失败的「重试」与改字 stale 条的

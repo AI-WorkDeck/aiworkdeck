@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 产品截图即测试：在虚构演示数据上截取 README / 官网用的产品截图，并与入库基线做像素比对。
 // 设计见 docs/plans/stella-alignment/screenshots.md；工作流 .github/workflows/marketing-screenshots.yml。

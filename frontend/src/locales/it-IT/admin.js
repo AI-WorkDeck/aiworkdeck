@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  legalOwner: "BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED",
   "externalDownloadWindows": "Programma di installazione Windows (x64)",
   "externalDownloadWindowsArm": "Programma di installazione Windows ARM (Accesso Anticipato)",
   "externalRepair": "Se è già installato, verifica se il programma si avvia, il suo percorso e i permessi di esecuzione, poi verifica di nuovo. Tencent Meeting richiede anche un Node.js utilizzabile. Dopo aver modificato i percorsi, salva il tuo lavoro e riavvia AI WorkDeck.",
@@ -393,12 +394,12 @@ export default {
   "capabilityAiPrompt": "Aggiorna una funzionalità da {url}. {note}Usa prima capability_install per recuperarla e validarla, leggimi il piano di installazione e installa solo dopo la mia conferma.",
   "capabilityAiPromptNoteClause": "{note}. ",
   "capabilityAiPromptDefaultNote": "Installa questo repository come funzionalità e collegalo allo slot corrispondente",
-  "legalCopyright": "Copyright 2026 Beijing Jingwei Ziyi Technology Co., Ltd. e contributori di AI WorkDeck",
+  "legalCopyright": "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED e contributori di AI WorkDeck",
   "legalLicense": "Questo programma è rilasciato sotto la GNU Affero General Public License v3.0 o successiva, SENZA ALCUNA GARANZIA.",
   "legalSourceLabel": "Codice sorgente: ",
   "legalLicenseLabel": "Licenza completa: ",
   "legalTrademarkLabel": "Avviso sul marchio: ",
-  "legalTrademark": "\"AI WorkDeck\" è un marchio registrato di Beijing Jingwei Ziyi Technology Co., Ltd. Non utilizzare tale nome come nome del prodotto quando si ridistribuisce una versione modificata; vedere l'avviso sul marchio.",
+  "legalTrademark": "\"AI WorkDeck\" è un marchio di BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Non utilizzare tale nome come nome del prodotto quando si ridistribuisce una versione modificata; vedere l'avviso sul marchio.",
   "navPermissions": "Autorizzazioni di sistema",
   "permissionsSectionTitle": "Autorizzazioni di sistema di macOS",
   "permissionsSectionSubtitle": "Concedi le autorizzazioni di sistema per trascinare i file direttamente da WeChat, acquisire screenshot OCR tra finestre e registrare le riunioni",

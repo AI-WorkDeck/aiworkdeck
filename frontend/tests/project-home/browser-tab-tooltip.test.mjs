@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board BUG-26：顶栏「浏览器」按钮实为「新建标签」动作，之前的 tooltip
 // 只写「浏览器」，与旁边分屏/录制两个真正的开关放在一排，容易被误认成开关。

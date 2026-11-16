@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // useAgentStream.js 带 @/ 别名与 uni 全局，node 直接 import 不进来：
 // 读源码、剥掉全部 import、用 new Function 按形参名注入依赖，再整段跑真实 composable。

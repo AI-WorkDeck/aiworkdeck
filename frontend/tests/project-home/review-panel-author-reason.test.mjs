@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // dev-board#377 组件级：审阅面板的作者筛选、类型标注、理由挂载与处置联动。
 // 纯函数层已由 review-grouping.test.mjs 钉住；这里钉的是**接线**——组件真的把

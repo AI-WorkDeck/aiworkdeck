@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { renderLegalNoticeHtml } from './legal-notice-html.mjs'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -34,7 +35,7 @@ function devHttps() {
 const defaultServerUrl = process.env.VITE_ADDIN_SERVER_URL || 'https://addin.aiworkdeck.com'
 
 export default defineConfig(({ command }) => ({
-  plugins: [vue()],
+  plugins: [vue(), { name: 'legal-notice-locales', transformIndexHtml: renderLegalNoticeHtml }],
   // 构建产物用相对路径引资源：dist 可能被托管在子路径下（官方云是
   // https://addin.aiworkdeck.com/office-addin/），默认的绝对 /assets/... 会打到站点根、
   // 被 SPA 回退顶成 index.html，任务窗格白屏（真机踩过）。dev 仍是 '/' 不受影响。

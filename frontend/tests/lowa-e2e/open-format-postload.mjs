@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 真引擎计时：打开后宿主马上要跑的只读命令（工具栏 get_ui_state、导航清单、缩略图）各格式的耗时。
 import fs from 'node:fs'

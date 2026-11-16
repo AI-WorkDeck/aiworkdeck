@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // doc_export_pdf 的前端一半（dev-board#1065 T-25）：worker 回执 → sendEditorResult 的三个参数。
 // 病灶是通用回传路径会把 Uint8Array 原样交给 JSON.stringify，展开成 {"0":37,"1":80,...}。

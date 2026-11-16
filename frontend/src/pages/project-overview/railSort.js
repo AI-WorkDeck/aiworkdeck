@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 左 rail 图标拖动排序（dev-board#204）：rail 数组（含动态插件与停靠到左侧的工具面板）
 // 的显示顺序做成用户可拖的状态。与 panelDocking.js 的「跨 dock 停靠拖拽」共存：

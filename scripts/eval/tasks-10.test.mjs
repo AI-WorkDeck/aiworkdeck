@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // tasks-10 的 outcomeCheck 离线单测：手工造 ctx 桩（文件表、docx XML、文件正文、调用参数、最终回复），每题至少一个通过、一个不通过用例。

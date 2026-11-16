@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 卡片必须把设计 §4.3 的四件事同时说出来：下载什么 / 多大 / 解锁什么 / 不装则什么不可用。
 // 手法同 litigation-visual/packUpdate.test.mjs：抠出 <script> 用 new Function 起一个纯对象。

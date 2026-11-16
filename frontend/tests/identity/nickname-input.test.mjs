@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 昵称输入框的两处时序缺口（v0.38.2 发版走查抓到）。
 //  ① 打完字立刻回车：uni-h5 的 v-model 有 100ms 节流，confirm 那一刻 displayNameInput

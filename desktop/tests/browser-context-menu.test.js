@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 问题 68：网页右键菜单只有「加入网核收藏」一项，把复制 / 粘贴 / 全选等基础项全替换掉了，
 // 没选中文字时右键干脆没反应。问题 67：截图框选提示钉在左上角压住红绿灯，window 模式文案写成「网页区域」。

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 教程问题 93（dev-board#1713）：提交弹窗打开后输入框没有焦点，还得再点一下才能打字，
 // 回车也不能提交。修法：输入框随弹窗挂载即聚焦；回车提交，输入法选词的回车不算。

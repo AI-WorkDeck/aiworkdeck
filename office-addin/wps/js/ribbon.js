@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // AI WorkDeck WPS 加载项 ribbon 回调（薄壳）：唯一职责是开/关任务窗格。
 // 回调按 ribbon.xml 里写的全局函数名查找（WPS 机制，无注册 API）。

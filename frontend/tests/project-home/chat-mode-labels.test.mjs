@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // BUG-38（v0.49.0 真机测试 C5-06）：模式下拉主标题写死英文 Agent / Ask / Plan，
 // 中文界面只有副标题是中文。主标题要走 i18n，且与菜单栏「AI > 模式：…」同名。

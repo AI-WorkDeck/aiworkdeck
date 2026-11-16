@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 计划审阅（dev-board#1022）Task 6：计划卡「打开修订」、SSE saved 事件、工作台接线。
 import { APPROVAL_PLAN_TYPES } from '../../src/components/AgentMessage/chatTurns.mjs'

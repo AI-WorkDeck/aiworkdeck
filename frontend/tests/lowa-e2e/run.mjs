@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // LOWA 编辑器"真人模拟"端到端回归 / human-simulation e2e for the LibreOffice
 // WASM editor. Boots the REAL engine headlessly and drives the REAL overlay

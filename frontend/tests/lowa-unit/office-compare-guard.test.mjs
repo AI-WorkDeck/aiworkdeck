@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 版本比对 / 三方合并入口对带打开密码文件的预判（B3），以及旧格式「过旧」与「损坏」的区分（B6）。
 import { test } from 'node:test'

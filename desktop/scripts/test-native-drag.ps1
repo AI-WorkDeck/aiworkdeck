@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Signed installed Electron -> real user32 mouse gesture -> STA WinForms CF_HDROP receiver.
 # CDP only reads DOM bounds/state. Never call startDrag, dispatchEvent, DOM click or AX actions.

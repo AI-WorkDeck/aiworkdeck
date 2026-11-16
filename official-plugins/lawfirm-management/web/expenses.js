@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2026 北京京微资易科技有限公司 and AI WorkDeck contributors
+// SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 办案费用台账：诉讼费、鉴定费、差旅费等代垫/直付费用，按事项汇总待向委托人结算金额与缺凭证金额。
 // 本机台账，存在插件 storage（宿主上限 64 KB）；金额一律用分（整数）计算。
