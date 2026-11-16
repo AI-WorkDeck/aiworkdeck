@@ -46,6 +46,8 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 ## 发版链路
 
+- **Windows 缺依赖验收准备顺序（dev-board#1762）**：`desktop/scripts/dependency-clean-windows/run.ps1` 必须在启动标准用户探针前完成 Node、LibreOffice MSI 下载及固定 SHA256、Authenticode 校验；真正安装仍在探针确认依赖缺失之后。探针保持同一生产对象存活及原有 25 分钟安装等待限制，不把网络下载或证书验证耗时算进恢复窗口。`stage-timings.log` 随失败证据保留下载、哈希、验签及安装边界的 UTC 和累计耗时；本地静态检查不代替真实 Windows 验收。
+
 - 0.72.0 发布准备（dev-board#1516）：LOWA `24.2.8-zhcn-r7` 使用 #1515 的最终 r7b 候选，发布前已在北京、新加坡逐文件解码哈希和 metadata 大小校验。官方插件改资源后必须递增 manifest 版本，避免同版本保留策略让旧用户漏更；JAR 插件同时同步 pom 与 backendJars。独立插件 ZIP 与桌面 extraResources 都须包含 `l10n/`，构建后检查真实包内语言文件。
 
 - **Mac 原生升级的 JRE 权限（dev-board#1368，验收总卡 #1367）**：jlink 产出的 `jre/legal/` 中部分许可证为 `0444`。真实签名升级 run `39217849923` 已证明 ShipIt 在复制候选包后、验签/接管文件前清除 quarantine 时对 `java.xml/bcel.md` 报 `EACCES`，重试三次后放弃。`desktop/scripts/after-pack.js` 现在只给该目录内普通文件补 owner-write，保留内容、其他权限和符号链接，发生在外层 app 签名前；不可在验收时 chmod 已签名候选包来掩盖问题。`after-pack.test.js` 包含 macOS 真实 xattr 红绿复现；修复后仍须重打签名候选并跑 `full-upgrade-mac-smoke.yml`，原成功交接 ShipIt 的 0.65 baseline 可保留。该 smoke 在 ShipIt 明确终止重试时立即失败并保存原因，避免再空等十分钟。
@@ -170,8 +172,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
    `content/releases.ts` 数组头部加一条：`version`（0.X.0）、`date`（tag 日期）、`headline` 一句、
    `items` 三到五条，中英双语。**补丁版 0.X.Y 并入所在大版本那条**，不单独立卡。写给律师看——
    「这一版你能多做什么 / 什么不再烦你」，不写内部重构、测试、CI、文档、营销件；口吻照该文件
-   既有条目，不用营销腔。合并后按官网仓惯例 `gh workflow run ci.yml --ref master -f target=both`
-   部署，`/zh/updates` 与 `/en/updates` 顶部出现本次版本号才算完。
+   既有条目，不用营销腔。官网部署以最新已审阅主线为准：先确认同一 `source_sha` 的 CI Web build 成功，再从 `master` 触发 `next-build-artifact.yml`，传入该 SHA、`web_run_id` 及国内/国际两站经核对的公开配置；成功后分别触发 `promote-next-artifact.yml`（`site=cn` / `intl`、`artifact_run_id`、同一 `source_sha`），遵守生产 Environment 审批与产物 provenance 校验。具体命令与配置以官网 `DEPLOY.md` 为准；旧 `ci.yml -f target=both` 已不是部署入口。两站 `/zh/updates` 与 `/en/updates` 顶部出现本次版本号才算完。
    **判据：`https://www.aiworkdeck.com/zh/updates` 顶部版本号 ≠ 本次 tag → 这步没做。**
    断更实锤：0.16.0（08-15）到 0.46.3（09-23）三十个大版本官网一条没写，维护者原话
    「发版每次要写啊」（dev-board#861 一次性补齐）。
