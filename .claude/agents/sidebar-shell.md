@@ -1687,6 +1687,12 @@ rail 上**没有设置齿轮**：设置入口是下拉里的「设置」（`goTo
 
 SCRATCH 展示统一为「临时项目」，复用既有对话模式身份。项目概览新增转存对话框，选择文件/对话及正式项目后复制，保留原件；成功后回执，失败保留选择以重试。原「转为正式项目」仍可用。Office 插件默认选择同账户 SCRATCH，不按名字迁移旧项目。前端项目主页套件 1981 条、插件 847 条及两者构建通过；复制服务接口与边界见 mobile-sync.md。
 
+## 随手工作区转存弹窗（dev-board#1739）
+
+`ScratchTransferDialog` 的文件与会话复选框必须用 `<component :is="'input'" type="checkbox">` 配显式 checked/change，不能写普通 `<input type="checkbox" v-model="数组">`：Uni H5 会改成仅支持文本类型的 uni-input，暴露内部 ID 且无法选择，确认按钮一直禁用。原生控件样式使用专属 class，不能用 input/button 标签选择器（同样会被 Uni 改写）。目标项目复用 `AwdSelect`，内容按文件/对话分组，选中数量可见；空目标/空选区/保存中禁止提交，保存失败或复制失败保留选择。焦点在弹窗内循环，下拉 Escape 先关菜单，之后再退出弹窗。
+
+回归：`tests/project-home/scratch-transfer.test.mjs`（真实 Vue 选择与提交、错误重试、防重复、保存前置），另需真实 Uni H5 验证 checkbox 类型和确认可用，普通 Vue/JSDOM 无法单独复现标签改写。2026-11-16 本次旧版真实 H5：7 个文本输入显示 ID、0 个 checkbox、选项目后确认禁用；新版 7 个原生 checkbox，选择后合成 HTTP 收到精确文件/对话 ID，亮暗/窄窗长名/RTL/键盘通过。隔离 HTTP 回执不是实际生产文件复制或正式安装包验收。
+
 ## 欢迎页模型选择（dev-board#1684）
 
 `WelcomePane` 快速输入区复用 `ModelSelectorDropdown` 与 `fetchAiModels`，初次目录请求传 `accountPrompt:false`，用户主动展开才允许账户提示。欢迎页无项目时聊天实例尚未挂载，因此显式选择随 `start-chat` 的 `model` 交宿主；宿主等待 `ChatInterface` 后先调既有 `selectModel`（持久化及视觉提示），再发首条消息。未显式选择不覆盖聊天默认选择。下拉在欢迎页滚动内容内展开，避免浮层被裁切。回归 `frontend/tests/project-home/welcome-model.test.mjs` 覆盖真实 Vue/JSDOM 组件点击与首条消息选模顺序；不替代正式 Electron 发布验收。

@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Kopyalanacak içeriği seçin",
+  scratchCopySelected: "{count} seçildi",
+  scratchCopyFiles: "Dosyalar",
+  scratchCopyConversations: "Konuşmalar",
+  scratchCopyNoProjects: "Uygun proje yok. Önce bir proje oluşturun.",
   scratchCopyTitle: "Projeye kopyala",
   scratchCopyHint: "Seçili konuşmaları ve dosyaları, asıllarını koruyarak kopyalayın. Hedef proje üyeleri kopyalara erişebilir.",
   "restartPending": "{count} görev devam ettirilebilir",

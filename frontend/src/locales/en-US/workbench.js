@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  scratchCopyChoose: "Choose content to copy",
+  scratchCopySelected: "{count} selected",
+  scratchCopyFiles: "Files",
+  scratchCopyConversations: "Conversations",
+  scratchCopyNoProjects: "No eligible projects. Create a project first.",
   scratchCopyTitle: "Copy to a project",
   scratchCopyHint: "Copy selected conversations and files, keeping the originals. Members of the destination project can access the copies.",
   restartPending: '{count} tasks can be resumed',

@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  scratchCopyChoose: "选择要转存的内容",
+  scratchCopySelected: "已选 {count} 项",
+  scratchCopyFiles: "文件",
+  scratchCopyConversations: "对话",
+  scratchCopyNoProjects: "暂无可转存的正式项目，请先创建项目。",
   scratchCopyTitle: "转存到正式项目",
   scratchCopyHint: "复制所选对话和文件，保留原件；目标项目的成员可查看转存内容。",
   restartPending: '{count} 个任务可继续',
