@@ -455,6 +455,7 @@ export default {
       settingsDraft: {},    // 表单草稿；secret 项只保存被用户改过的（掩码值原样 = 未改）
       settingsBusy: false,
       contributionGeneration: 0,
+      settingsGeneration: 0,
       ownStyleProfiles: [], // 本插件贡献的样式画像 + 是否被选为全局默认
       ownThemes: [],        // 本插件贡献的外观皮肤 + 是否当前启用
     }
@@ -685,6 +686,7 @@ export default {
   beforeUnmount() {
     this.reloadGeneration++
     this.contributionGeneration++
+    this.settingsGeneration++
     uni.$off(APP_THEME_EVENT, this.pushThemePreview)
     uni.$off(APP_LANGUAGE_EVENT, this.pushThemePreview)
     uni.$off('awd:account-changed', this.loadContribution)
@@ -807,28 +809,34 @@ export default {
 
     // ---- 声明式贡献点（规范 v2.9 P4）：设置表单 + 样式画像 ----
 
-    async loadContribution() {
+    async loadContribution(refreshSettings = true) {
       const generation = ++this.contributionGeneration
+      const settingsGeneration = refreshSettings ? ++this.settingsGeneration : this.settingsGeneration
       const { id, projectId } = this.spec
-      this.pluginSettings = []; this.settingsDraft = {}; this.ownStyleProfiles = []; this.ownThemes = []
+      this.ownStyleProfiles = []; this.ownThemes = []
+      if (refreshSettings) { this.pluginSettings = []; this.settingsDraft = {} }
       if (this.spec.kind !== 'plugin' || !this.installedInfo) {
         this.pluginSettings = []
+        this.settingsDraft = {}
         this.ownStyleProfiles = []
         this.ownThemes = []
         return
       }
-      try {
-        const res = await getPluginSettings(id, projectId)
-        if (generation !== this.contributionGeneration) return
-        const body = res && res.settings !== undefined ? res : (res && res.data) || {}
-        this.pluginSettings = Array.isArray(body.settings) ? body.settings : []
-        const draft = {}
-        this.pluginSettings.forEach(s => { draft[s.key] = s.value == null ? '' : String(s.value) })
-        this.settingsDraft = draft
-      } catch (e) {
-        if (generation !== this.contributionGeneration) return
-        this.pluginSettings = []
+      if (refreshSettings) {
+        try {
+          const res = await getPluginSettings(id, projectId)
+          if (settingsGeneration !== this.settingsGeneration) return
+          const body = res && res.settings !== undefined ? res : (res && res.data) || {}
+          this.pluginSettings = Array.isArray(body.settings) ? body.settings : []
+          const draft = {}
+          this.pluginSettings.forEach(s => { draft[s.key] = s.value == null ? '' : String(s.value) })
+          this.settingsDraft = draft
+        } catch (e) {
+          if (settingsGeneration !== this.settingsGeneration) return
+          this.pluginSettings = []
+        }
       }
+      if (generation !== this.contributionGeneration) return
       try {
         const res = await getContributedStyleProfiles()
         if (generation !== this.contributionGeneration) return
@@ -1210,6 +1218,7 @@ export default {
         this.pluginActionHint = ''
         uni.showToast({ title: enabled ? this.$t('market.enabledToast') : this.$t('market.disabledToggleToast'), icon: 'none' })
         this.notifyChanged()
+        await this.loadContribution(false)
       } catch (e) {
         console.error('切换插件状态失败:', e)
         uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
