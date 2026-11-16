@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Επιλέξτε περιεχόμενο για αντιγραφή",
+  scratchCopySelected: "Επιλέχθηκαν {count}",
+  scratchCopyFiles: "Αρχεία",
+  scratchCopyConversations: "Συνομιλίες",
+  scratchCopyNoProjects: "Δεν υπάρχουν διαθέσιμα έργα. Δημιουργήστε πρώτα ένα έργο.",
   scratchCopyTitle: "Αντιγραφή σε έργο",
   scratchCopyHint: "Αντιγράψτε τις επιλεγμένες συνομιλίες και αρχεία διατηρώντας τα πρωτότυπα. Τα μέλη του έργου προορισμού μπορούν να δουν τα αντίγραφα.",
   "restartPending": "{count} εργασίες μπορούν να συνεχιστούν",

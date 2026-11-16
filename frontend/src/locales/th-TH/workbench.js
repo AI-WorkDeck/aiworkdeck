@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "เลือกเนื้อหาที่จะคัดลอก",
+  scratchCopySelected: "เลือกแล้ว {count} รายการ",
+  scratchCopyFiles: "ไฟล์",
+  scratchCopyConversations: "การสนทนา",
+  scratchCopyNoProjects: "ไม่มีโครงการที่พร้อมใช้งาน โปรดสร้างโครงการก่อน",
   scratchCopyTitle: "คัดลอกไปยังโครงการ",
   scratchCopyHint: "คัดลอกการสนทนาและไฟล์ที่เลือกโดยเก็บต้นฉบับไว้ สมาชิกโครงการปลายทางสามารถเข้าถึงสำเนาได้",
   "restartPending": "สามารถดำเนินงานต่อได้ {count} รายการ",

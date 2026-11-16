@@ -35,6 +35,8 @@ class MobileWorkspaceApiContractTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired com.checkba.repository.UserFeedbackRepository feedback;
+    @Autowired com.checkba.service.feedback.FeedbackUploadService feedbackUpload;
+    @Autowired com.checkba.service.optimizer.OptimizerProperties optimizer;
     @MockBean WebTools webTools;
     @MockBean CloudStorageQuotaService quota;
     @MockBean ChatModelFactory models;
@@ -110,12 +112,16 @@ class MobileWorkspaceApiContractTest {
         assertNotNull(AuthController.getUserIdFromSession(sid));
     }
     @Test void feedbackMineReturnsOnlyOwnPublishedReplyAndMatchesOpenApi() throws Exception {
+        assertFalse(feedbackUpload.isConfigured(), "Synthetic feedback must never reach the production inbox");
+        assertFalse(optimizer.isEnabled(), "Tests must never send maintainer notifications");
         String sid=register(),other=register(),conversation=UUID.randomUUID().toString();
         var payload=Map.of("kind","BUG","text","Synthetic AI report","page","mobile/personal/assistant",
                 "clientContext",Map.of("type","ai-content-report","platform","android","conversationId",conversation));
         var created=mvc.perform(multipart("/api/feedback").param("payload",json.writeValueAsString(payload)).header("X-Session-Id",sid))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(0)).andReturn();
         long id=json.readTree(created.getResponse().getContentAsString()).path("data").path("id").asLong();
+        feedbackUpload.flush();
+        assertFalse(feedback.findById(id).orElseThrow().isUploaded());
         var row=feedback.findById(id).orElseThrow();row.setStatus(com.checkba.model.entity.UserFeedback.STATUS_RESOLVED);
         row.setReporterResponse("Synthetic published reply");row.setResponsePublishedAt(java.time.LocalDateTime.now());
         row.setResolvedAt(java.time.LocalDateTime.now());row.setResolvedBy("internal-admin");feedback.saveAndFlush(row);

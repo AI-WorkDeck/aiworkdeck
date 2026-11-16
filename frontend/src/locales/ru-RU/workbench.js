@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Выберите содержимое для копирования",
+  scratchCopySelected: "Выбрано: {count}",
+  scratchCopyFiles: "Файлы",
+  scratchCopyConversations: "Диалоги",
+  scratchCopyNoProjects: "Нет подходящих проектов. Сначала создайте проект.",
   scratchCopyTitle: "Копировать в проект",
   scratchCopyHint: "Копирование выбранных диалогов и файлов с сохранением оригиналов. Участники целевого проекта получат доступ к копиям.",
   "restartPending": "Можно возобновить задач: {count}",

@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Chọn nội dung để sao chép",
+  scratchCopySelected: "Đã chọn {count} mục",
+  scratchCopyFiles: "Tệp",
+  scratchCopyConversations: "Cuộc trò chuyện",
+  scratchCopyNoProjects: "Chưa có dự án phù hợp. Hãy tạo dự án trước.",
   scratchCopyTitle: "Sao chép vào dự án",
   scratchCopyHint: "Sao chép hội thoại và tệp đã chọn, giữ lại bản gốc. Thành viên dự án đích có thể xem các bản sao.",
   "restartPending": "{count} tác vụ có thể tiếp tục",

@@ -127,6 +127,8 @@ optimizer.*」——普通用户永远 enabled=false，只看得到下面的「�
 
 ## 验证
 
+- Spring 集成测试由 test-only `FeedbackIsolationContextCustomizerFactory` 在 Bean 初始化前统一禁用反馈上传及优化者，并清空上传地址（dev-board#1738）。独立 H2/storage 不代表出站隔离；不得仅靠把合成记录改为 RESOLVED 阻止上传。上传链路使用 `FeedbackCloudInboxTest` 的本地假 Transport 验证，真实用户反馈生产配置保持不变。
+
 - `cd backend && mvn test`（JDK 21）：反馈 *Test 覆盖落库、分诊规则、安全护栏、分流、邮件、人工处置授权与历史
 - 人工处置定向回归：`mvn -Dtest=FeedbackAiReportServiceTest,FeedbackAiReportAuthorizationTest,FeedbackHandlingEventTest,FeedbackHandlingEventRepositoryTest,FeedbackControllerMineTest,FeedbackIngestStatusTest,FeedbackResolutionAuthorizationTest,FeedbackResolutionSyncServiceTest,LocalFeedbackSourceTest,FeedbackConsoleAiReportTest test`（JDK 21）
 - `cd frontend && npm run test:feedback-widget`：入口契约（浮钮不许回来、面板落点、三处入口）

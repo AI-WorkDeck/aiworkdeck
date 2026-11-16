@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "選擇要轉存的內容",
+  scratchCopySelected: "已選 {count} 項",
+  scratchCopyFiles: "檔案",
+  scratchCopyConversations: "對話",
+  scratchCopyNoProjects: "暫無可轉存的正式專案，請先建立專案。",
   scratchCopyTitle: "轉存到正式專案",
   scratchCopyHint: "複製所選對話和檔案，保留原件；目標專案成員可查看轉存內容。",
   "restartPending": "{count} 個任務可繼續",

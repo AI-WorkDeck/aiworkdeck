@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  scratchCopyChoose: "Pilih kandungan untuk disalin",
+  scratchCopySelected: "{count} dipilih",
+  scratchCopyFiles: "Fail",
+  scratchCopyConversations: "Perbualan",
+  scratchCopyNoProjects: "Tiada projek tersedia. Cipta projek terlebih dahulu.",
   scratchCopyTitle: "Salin ke projek",
   scratchCopyHint: "Salin perbualan dan fail terpilih sambil mengekalkan yang asal. Ahli projek destinasi boleh mengakses salinan.",
   "restartPending": "{count} tugas boleh disambung semula",
