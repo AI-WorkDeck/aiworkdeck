@@ -394,7 +394,7 @@ export default {
   "capabilityAiPrompt": "โปรดอัปเกรดความสามารถจาก {url} {note}ใช้ capability_install ก่อนเพื่อดาวน์โหลดและตรวจสอบ อ่านแผนการติดตั้งให้ฉันฟัง และติดตั้งเฉพาะเมื่อฉันยืนยันแล้ว",
   "capabilityAiPromptNoteClause": "{note} ",
   "capabilityAiPromptDefaultNote": "ติดตั้งที่เก็บนี้เป็นความสามารถและเชื่อมต่อเข้ากับช่องความสามารถที่ตรงกัน",
-  "legalCopyright": "ลิขสิทธิ์ 2026 บริษัท ปักกิ่ง จิงเหวย จื่ออี้ เทคโนโลยี จำกัด และผู้มีส่วนร่วมพัฒนา AI WorkDeck",
+  "legalCopyright": "ลิขสิทธิ์ 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED และผู้มีส่วนร่วมพัฒนา AI WorkDeck",
   "legalLicense": "โปรแกรมนี้เผยแพร่ภายใต้สัญญาอนุญาต GNU Affero General Public License v3.0 หรือใหม่กว่า โดยไม่มีการรับประกันใดๆ ทั้งสิ้น",
   "legalSourceLabel": "ซอร์สโค้ด: ",
   "legalLicenseLabel": "ใบอนุญาตฉบับเต็ม: ",

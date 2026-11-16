@@ -126,6 +126,8 @@ test('About legal notices cover every registered locale and match the workbench 
     const dict = (await import(source.href)).default
     assert.equal(notices.copyright[locale], dict.legalCopyright, locale)
     assert.equal(notices.trademark[locale], dict.legalTrademark, locale)
+    assert.match(notices.copyright[locale], /北京公富信息技术有限公司|BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED/, locale)
+    assert.match(notices.trademark[locale], /北京公富信息技术有限公司|BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED/, locale)
     setAppLanguage(locale)
     const win = showAboutWindow(parent)
     const html = decodeURIComponent(win.url.split(',').slice(1).join(','))

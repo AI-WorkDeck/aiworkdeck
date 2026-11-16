@@ -168,6 +168,7 @@ test('legal footer follows each registered locale when the language changes', as
       i18n.setLang(code)
       assert.equal(nodes[0].textContent, dictionary.legalCopyright, code)
       assert.equal(nodes[1].textContent, dictionary.legalLicenseTrademark, code)
+      for (const node of nodes) assert.match(node.textContent, /北京公富信息技术有限公司|BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED/, code)
       assert.doesNotMatch(nodes.map((node) => node.textContent).join(' '), /京微|Jingwei|Zhen Shan/)
     }
   } finally {
