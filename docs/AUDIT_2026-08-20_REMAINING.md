@@ -1,3 +1,8 @@
+# 已归档：AUDIT_2026-08-20_REMAINING
+
+本文档已移至 [`docs/dev-notes/AUDIT_2026-08-20_REMAINING.md`](dev-notes/AUDIT_2026-08-20_REMAINING.md)。
+This document has moved to [`docs/dev-notes/AUDIT_2026-08-20_REMAINING.md`](dev-notes/AUDIT_2026-08-20_REMAINING.md)。
+归档日期 / Archived: 2026-08-20
 # 代码稳定性审计 · 清单归档（dev-board#74）
 > **Archived.** This note now lives at [`docs/dev-notes/AUDIT_2026-08-20_REMAINING.md`](dev-notes/AUDIT_2026-08-20_REMAINING.md).
 >
