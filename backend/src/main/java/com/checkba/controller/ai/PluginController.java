@@ -83,6 +83,8 @@ public class PluginController {
         private String incompatibleReason;
         /** 是否本机 dev 免签直装（.awd-dev 标记）；实验 API（x- 前缀桥方法）只对它开放 */
         private boolean devInstalled;
+        /** Host-observed install source: local, bundled, or signature-verified market. */
+        private String installationSource;
         /** manifest.contributes（规范 v2.8 起）：广场展示与审查用，null = 无贡献内容 */
         private PluginService.Contributes contributes;
         /**
@@ -571,6 +573,7 @@ public class PluginController {
         view.setMinHostVersion(meta.getMinHostVersion());
         view.setIncompatibleReason(pluginService.incompatibleReason(id));
         view.setDevInstalled(pluginService.isDevInstalled(id));
+        view.setInstallationSource(pluginService.installationSource(id));
         view.setContributes(localizeContributes(id, meta.getContributes()));
         var approval = pluginService.toolApprovalView(id);
         view.setPendingToolChanges(approval.changes().stream().map(PluginController::changeView).toList());

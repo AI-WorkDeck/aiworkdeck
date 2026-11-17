@@ -115,6 +115,9 @@ public class PluginService {
 
     /** 本机 dev 免签直装（目录带 .awd-dev 标记）的插件 id；实验 API（x- 前缀桥方法）只对它们开放 */
     private final Set<String> devInstalledPluginIds = ConcurrentHashMap.newKeySet();
+    private final Map<String, String> installationSources = new ConcurrentHashMap<>();
+    @Value("${ai.plugins.registry-public-key:}")
+    String registryPublicKey = "";
 
     private volatile long disabledStateRefreshedAt = 0L;
 
@@ -582,6 +585,7 @@ public class PluginService {
         pluginDirById.clear();
         incompatiblePluginIds.clear();
         devInstalledPluginIds.clear();
+        installationSources.clear();
         approvedToolDefinitions.clear();
         pendingToolChanges.clear();
         pluginL10n.clear();
@@ -1298,6 +1302,11 @@ public class PluginService {
                 .findFirst().orElse(null);
     }
 
+    /** Host-observed source at the latest scan; never taken from the plugin manifest or catalogue. */
+    public String installationSource(String pluginId) {
+        return installationSources.getOrDefault(pluginId, "local");
+    }
+
     /** 插件所在目录；未知 id 返回 null（供 PluginWebController 定位 web/ 静态资源） */
     public File getPluginDir(String pluginId) {
         return pluginDirById.get(pluginId);
@@ -1443,6 +1452,12 @@ public class PluginService {
                 reconcileToolApprovals(meta, new File(pluginDir, ".awd-dev").exists());
                 plugins.add(meta);
                 pluginDirById.put(meta.getId(), pluginDir);
+                String source = "local";
+                if (!new File(pluginDir, ".awd-dev").exists()) {
+                    if (PluginMarketService.hasVerifiedReceipt(pluginDir.toPath(), meta, registryPublicKey)) source = "market";
+                    else if (new File(pluginDir, ".awd-bundled").isFile()) source = "bundled";
+                }
+                installationSources.put(meta.getId(), source);
 
                 // dev 免签直装标记（实验 API 只对这些插件开放，见规范 v2.7 §实验 API）
                 if (new File(pluginDir, ".awd-dev").exists()) {

@@ -79,6 +79,7 @@ class PluginMarketServiceTest {
         doAnswer(inv -> settingStore.put(inv.getArgument(0), inv.getArgument(1)))
                 .when(settings).set(anyString(), anyString());
         pluginService = new PluginService(settings, pluginsDir.toString());
+        pluginService.registryPublicKey = publicKeyPem;
     }
 
     /** 与官网 canonicalPayload() 相同的规则：顶层 files<id<publishedAt<version，files 内键排序 */
@@ -256,6 +257,7 @@ class PluginMarketServiceTest {
         assertFalse(PluginMarketService.isSafeRelPath("a\\b.jar"));
         assertFalse(PluginMarketService.isSafeRelPath("C:/x.jar"));
         assertFalse(PluginMarketService.isSafeRelPath("a/../../b"));
+        assertFalse(PluginMarketService.isSafeRelPath(".awd-market-receipt"));
         assertTrue(PluginMarketService.isSafeRelPath("manifest.json"));
         assertTrue(PluginMarketService.isSafeRelPath("lib/tool.jar"));
     }
@@ -279,6 +281,63 @@ class PluginMarketServiceTest {
         assertArrayEquals(jarBytes, Files.readAllBytes(pluginsDir.resolve("demo").resolve("tool.jar")));
         assertFalse(pluginService.isEnabled("demo"), "在线安装的插件必须默认禁用，等用户确认");
         assertTrue(pluginService.getPluginTools().isEmpty(), "禁用状态下不应加载 JAR 注册工具");
+        assertEquals("market", pluginService.installationSource("demo"));
+        assertTrue(Files.isRegularFile(pluginsDir.resolve("demo/.awd-market-receipt")));
+        pluginService.rescan();
+        assertEquals("market", pluginService.installationSource("demo"), "receipt survives a fresh scan");
+        Files.write(pluginsDir.resolve("demo/tool.jar"), new byte[]{1, 2, 3});
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"), "modified payload is no longer signed");
+    }
+
+    @Test void copiedLocalPluginDoesNotInheritCatalogueProvenance() throws Exception {
+        writeInstalledPlugin("1.0.0", false);
+        assertEquals("local", pluginService.installationSource("demo"));
+        Files.writeString(pluginsDir.resolve("demo/.awd-market-receipt"), "{\"id\":\"demo\",\"version\":\"1.0.0\",\"files\":{\"manifest.json\":\"forged\"},\"signature\":\"forged\"}");
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"));
+    }
+
+    @Test void signedReceiptRejectsChangedManifestExtraFilesAndDevMarkers() throws Exception {
+        String manifest = "{\"id\":\"demo\",\"version\":\"1.0.0\"}";
+        PluginMarketService svc = stubbedWithManifest(manifest);
+        svc.install("demo");
+        assertEquals("market", pluginService.installationSource("demo"));
+        Path directory = pluginsDir.resolve("demo");
+        Files.writeString(directory.resolve("manifest.json"), manifest + " ");
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"));
+        Files.writeString(directory.resolve("manifest.json"), manifest);
+        Files.writeString(directory.resolve("extra.js"), "unsigned payload");
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"));
+        Files.delete(directory.resolve("extra.js"));
+        Files.writeString(directory.resolve(".awd-dev"), "{}");
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"));
+        Files.delete(directory.resolve(".awd-dev"));
+        pluginService.rescan();
+        assertEquals("market", pluginService.installationSource("demo"));
+        Files.delete(directory.resolve(".awd-market-receipt"));
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"), "legacy installs without proof stay conservative");
+    }
+
+    @Test void signedReceiptRejectsSymlinksAndWrongKey() throws Exception {
+        PluginMarketService svc = stubbedWithManifest("{\"id\":\"demo\",\"version\":\"1.0.0\"}");
+        svc.install("demo");
+        Path directory = pluginsDir.resolve("demo");
+        Path original = directory.resolve("manifest.json");
+        Path outside = pluginsDir.resolve("outside.json");
+        Files.move(original, outside);
+        Files.createSymbolicLink(original, outside);
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"));
+        Files.delete(original);
+        Files.move(outside, original);
+        pluginService.registryPublicKey = "";
+        pluginService.rescan();
+        assertEquals("local", pluginService.installationSource("demo"));
     }
 
     @Test

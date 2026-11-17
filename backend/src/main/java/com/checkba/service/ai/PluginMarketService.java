@@ -69,6 +69,7 @@ public class PluginMarketService {
 
     /** 单个文件下载上限，防御恶意注册表用超大响应打爆内存 */
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
+    static final String SIGNED_RECEIPT = ".awd-market-receipt";
 
     private final String registryUrl;
     private final String publicKeyPem;
@@ -297,6 +298,10 @@ public class PluginMarketService {
             // minHostVersion 闸（规范 v2.7 P0）：staging 落齐后、上位前校验——宁可装不上，不可装成半残
             checkMinHostVersion(staging);
             checkDeclaredTools(staging);
+            // Retain the verified statement, not a catalogue ID or an unsigned source flag.
+            Files.writeString(staging.resolve(SIGNED_RECEIPT), JSONUtil.toJsonStr(Map.of(
+                    "id", id, "version", version, "publishedAt", publishedAt,
+                    "files", files, "signature", signature)));
 
             purchaseGate.assertConnection(connection);
             replaceInstalledPlugin(staging, id, version);
@@ -470,6 +475,11 @@ public class PluginMarketService {
      */
     boolean verifySignature(String id, String version, String publishedAt,
                             Map<String, String> sortedFiles, String signatureB64) {
+        return verifySignature(publicKeyPem, id, version, publishedAt, sortedFiles, signatureB64);
+    }
+
+    private static boolean verifySignature(String publicKeyPem, String id, String version, String publishedAt,
+                                            Map<String, String> sortedFiles, String signatureB64) {
         try {
             // 用 LinkedHashMap 保序输出；Hutool 的 JSONObject 默认不保证顺序，故手工拼装
             Map<String, Object> payload = new LinkedHashMap<>();
@@ -486,6 +496,46 @@ public class PluginMarketService {
             return verifier.verify(Base64.getDecoder().decode(signatureB64));
         } catch (Exception e) {
             log.error("Signature verification error for plugin {}: {}", id, e.getMessage());
+            return false;
+        }
+    }
+
+    /** Called during plugin scans, never on the repeated catalogue/list request path. */
+    static boolean hasVerifiedReceipt(Path directory, PluginService.PluginMetadata meta, String publicKeyPem) {
+        if (publicKeyPem == null || publicKeyPem.isBlank()) return false;
+        try {
+            Path root = directory.toRealPath();
+            Path receipt = root.resolve(SIGNED_RECEIPT);
+            if (!Files.isRegularFile(receipt, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || Files.size(receipt) > 1024 * 1024) return false;
+            JSONObject signed = JSONUtil.parseObj(Files.readString(receipt));
+            JSONObject entries = signed.getJSONObject("files");
+            if (!meta.getId().equals(signed.getStr("id")) || !java.util.Objects.equals(meta.getVersion(), signed.getStr("version"))
+                    || entries == null || !entries.containsKey("manifest.json")) return false;
+            Map<String, String> files = new TreeMap<>();
+            entries.forEach((name, hash) -> files.put(name, String.valueOf(hash)));
+            if (!verifySignature(publicKeyPem, meta.getId(), meta.getVersion(), signed.getStr("publishedAt"),
+                    files, signed.getStr("signature"))) return false;
+            for (var entry : files.entrySet()) {
+                if (!isSafeRelPath(entry.getKey())) return false;
+                Path file = root.resolve(entry.getKey()).normalize();
+                if (!file.startsWith(root) || !file.toRealPath().startsWith(root)
+                        || !Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        || Files.size(file) > MAX_FILE_BYTES) return false;
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                try (InputStream input = Files.newInputStream(file)) {
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+                }
+                if (!java.util.HexFormat.of().formatHex(digest.digest()).equalsIgnoreCase(entry.getValue())) return false;
+            }
+            // Additional payload files are not covered by the signature either.
+            try (var paths = Files.walk(root)) {
+                return paths.allMatch(path -> !Files.isSymbolicLink(path) && (Files.isDirectory(path)
+                        || path.equals(receipt) || files.containsKey(root.relativize(path).toString().replace('\\', '/'))));
+            }
+        } catch (Exception ignored) {
             return false;
         }
     }
@@ -516,7 +566,7 @@ public class PluginMarketService {
         if (p == null || p.isBlank() || p.length() > 255) return false;
         if (p.startsWith("/") || p.startsWith("\\") || p.contains("\\") || p.matches("^[a-zA-Z]:.*")) return false;
         for (String seg : p.split("/")) {
-            if (seg.equals("..") || seg.equals(".") || seg.isBlank()) return false;
+            if (seg.equals("..") || seg.equals(".") || seg.isBlank() || seg.equals(SIGNED_RECEIPT)) return false;
         }
         return true;
     }

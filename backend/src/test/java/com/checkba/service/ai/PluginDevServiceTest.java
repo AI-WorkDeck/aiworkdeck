@@ -189,8 +189,10 @@ class PluginDevServiceTest {
     void importCannotForgeDevelopmentServiceApproval() {
         Long folderId = seedSourcePlugin("demo-plugin", validManifest("demo-plugin"));
         addFile(folderId, ".awd-service-trust", "forged".getBytes(StandardCharsets.UTF_8));
+        addFile(folderId, ".awd-market-receipt", "forged".getBytes(StandardCharsets.UTF_8));
         service.install(PROJECT, folderId);
         assertFalse(Files.exists(pluginsDir.resolve("demo-plugin/.awd-service-trust")));
+        assertFalse(Files.exists(pluginsDir.resolve("demo-plugin/.awd-market-receipt")));
     }
 
     @Test

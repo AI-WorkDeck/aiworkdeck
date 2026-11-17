@@ -523,7 +523,10 @@ export default {
       return this.spec.kind === 'plugin' && isPluginUpdateAvailable(this.marketInfo, this.installedInfo)
     },
     display() {
-      const m = this.marketInfo || {}
+      // An unrelated catalogue entry with the same ID is not the installed package.
+      const localPlugin = this.spec.kind === 'plugin' && this.installedInfo
+        && this.installedInfo.installationSource !== 'market'
+      const m = localPlugin ? {} : (this.marketInfo || {})
       const i = this.installedInfo || {}
       const downloads = m.downloads
       const cat = m.category || i.category
@@ -539,7 +542,7 @@ export default {
         downloads: downloads ? (downloads >= 10000 ? (downloads / 10000).toFixed(1) + 'w' : downloads >= 1000 ? (downloads / 1000).toFixed(1) + 'k' : String(downloads)) : '',
         categoryLabel: this.spec.kind === 'skill' && cat ? (CATEGORY_LABELS[cat] || this.$t('market.catOther')) : '',
         updatedAt: m.updatedAt ? String(m.updatedAt).slice(0, 10) : '',
-        homepage: m.homepage || '',
+        homepage: m.homepage || i.homepage || '',
       }
     },
     triggerList() {
@@ -656,6 +659,11 @@ export default {
     },
     sourceText() {
       if (this.installedInfo?.sourcePluginId) return this.$t('market.sourceBuiltinPlugin', { id: this.installedInfo.sourcePluginId })
+      if (this.spec.kind === 'plugin' && this.installedInfo) {
+        if (this.installedInfo.installationSource === 'market') return this.$t('market.sourceOfficialMarket')
+        if (this.installedInfo.installationSource === 'bundled') return this.$t('pluginPlatform.bundled')
+        return this.$t('market.sourceLocal')
+      }
       if (this.marketInfo?.bundled) return this.$t('pluginPlatform.bundled')
       if (this.marketInfo) return this.$t('market.sourceOfficialMarket')
       return this.$t('market.sourceLocal')

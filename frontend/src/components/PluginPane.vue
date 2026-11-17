@@ -192,9 +192,8 @@ function authorizationFingerprint(record) {
 
 export default {
   name: 'PluginPane',
-  // chat.send 与 PluginGuidePane 的快捷按钮走同一条 kickoff 路：
-  // prompt 作为可见的用户消息进入 AI 对话，用户随时可停，不存在静默注入
-  emits: ['kickoff', 'files-changed'],
+  // chat.send awaits the workbench receipt before acknowledging the visible user message.
+  emits: ['files-changed'],
   props: {
     surface: { type: String, default: 'workspace' },
     activeFileIds: { type: Array, default: () => [] },
@@ -835,8 +834,18 @@ export default {
           const prompt = String(params.prompt == null ? '' : params.prompt).trim()
           if (!prompt) return { ok: false, error: { code: 'invalid_params', message: L('prompt 不能为空', 'prompt cannot be empty') } }
           if (prompt.length > 4000) return { ok: false, error: { code: 'quota_exceeded', message: L('prompt 超过 4000 字上限', 'prompt exceeds the 4000-character limit') } }
-          this.$emit('kickoff', { prompt })
-          return { ok: true, result: {} }
+          if (!this.projectId) return { ok: false, error: { code: 'no_project', message: this.$t('welcome.aiNeedsProject') } }
+          if (typeof this.businessActions.sendChatPrompt !== 'function') {
+            return { ok: false, error: { code: 'unavailable', message: this.$t('workbench.aiPanelNotReady') } }
+          }
+          const projectId = this.projectId
+          const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.projectId)
+          try {
+            const conversationId = await this.businessActions.sendChatPrompt({ prompt, projectId, isCurrent })
+            if (!isCurrent()) return this.staleContext()
+            if (conversationId) return { ok: true, result: {} }
+          } catch (_) { /* A failed receiver must never become a successful bridge reply. */ }
+          return { ok: false, error: { code: 'send_failed', message: this.$t('common.submitFailed') } }
         }
 
         case 'chat.open': {
