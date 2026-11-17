@@ -10,7 +10,7 @@ const source = parseSfc(readFileSync(new URL('../../src/pages/project-overview/p
 const options = parseJs(source, { sourceType: 'module' }).program.body.find(node => node.type === 'ExportDefaultDeclaration').declaration
 const methods = options.properties.find(node => node.key?.name === 'methods').value
 
-function workbench(send = async () => {}) {
+function workbench(send = async () => 'conversation-1') {
   const calls = { prompts: [], tabs: [], commands: [], drafts: [], resolutions: 0 }
   // Include EVERY matching property in source order, preserving JavaScript's
   // last-definition-wins behavior. Selecting the first match hides this bug.
@@ -21,6 +21,8 @@ function workbench(send = async () => {}) {
     { $emit: (...args) => calls.commands.push(args) }, callback => callback())
   const vm = {
     ...actual,
+    projectId: 7,
+    isActiveOverviewInstance: () => true,
     showAiPanel: false,
     aiPanelMounted: false,
     resolveChatInterface: async () => {
@@ -77,4 +79,37 @@ test('an empty plugin action does not open or submit a chat', async () => {
   assert.equal(calls.resolutions, 0)
   assert.equal(vm.showAiPanel, false)
   assert.equal(vm.aiPanelMounted, false)
+})
+
+test('plugin prompt rejects a missing receiver and changed project before submission', async () => {
+  const absent = workbench()
+  absent.vm.resolveChatInterface = async () => null
+  assert.equal(await absent.vm.onPluginChatPrompt({ prompt: 'Synthetic task' }), null)
+  assert.deepEqual(absent.calls.prompts, [])
+
+  for (const invalidate of [vm => { vm.projectId = 8 }, vm => { vm.isActiveOverviewInstance = () => false }]) {
+    const { vm, calls } = workbench()
+    const resolve = vm.resolveChatInterface
+    vm.resolveChatInterface = async () => { invalidate(vm); return resolve() }
+    assert.equal(await vm.onPluginChatPrompt({ prompt: 'Synthetic task' }), null)
+    assert.deepEqual(calls.prompts, [])
+  }
+  const stale = workbench()
+  assert.equal(await stale.vm.onPluginChatPrompt({ prompt: 'Synthetic task', isCurrent: () => false }), null)
+  assert.equal(stale.calls.resolutions, 0)
+})
+
+test('plugin prompt returns the actual receiver result', async () => {
+  for (const result of ['conversation-1', null]) {
+    const { vm } = workbench(async () => result)
+    assert.equal(await vm.onPluginQuickAction({ prompt: 'Synthetic task' }), result)
+  }
+})
+
+test('projectless guide actions still resolve the panel to show existing project guidance', async () => {
+  const { vm, calls } = workbench()
+  vm.projectId = null
+  assert.equal(await vm.onPluginQuickAction({ prompt: 'Synthetic task' }), null)
+  assert.equal(calls.resolutions, 1)
+  assert.deepEqual(calls.prompts, [])
 })

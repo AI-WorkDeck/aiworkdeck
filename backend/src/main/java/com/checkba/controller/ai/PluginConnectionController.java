@@ -109,6 +109,7 @@ public class PluginConnectionController {
     public ResponseEntity<Map<String, Object>> error(RuntimeException e) {
         String message = e.getMessage() == null ? "Plugin service failed" : e.getMessage();
         String code = "connection_required".equals(message) || "payment_required".equals(message) ? message : "plugin_service_failed";
+        if (com.checkba.service.ai.mcp.PluginMcpEndpointPolicy.isFakeIpResolutionFailure(e)) code = "dns_resolution_failed";
         return ResponseEntity.badRequest().body(Map.of("code", 1, "errorCode", code, "message", message));
     }
 }

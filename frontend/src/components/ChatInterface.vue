@@ -4682,7 +4682,7 @@ export default {
           ...(selectionText ? { selectionText } : {})
         }
       }
-      await sendMessage({
+      const pending = sendMessage({
         prompt,
         projectId: props.projectId,
         modelId: currentModelId.value,
@@ -4690,8 +4690,11 @@ export default {
         skillIds: currentSkillIds(),
         ...(activeContext ? { activeContext } : {})
       })
+      const conversationId = currentConversationId.value
+      const receipt = await pending
+      if (!receipt || receipt.status !== 'accepted' || !receipt.messageId) return null
       scrollToBottom()
-      return currentConversationId.value
+      return conversationId
     }
 
     // ---- 菜单栏「AI」命令入口 ----

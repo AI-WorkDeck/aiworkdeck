@@ -850,7 +850,6 @@
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
-            @kickoff="onPluginQuickAction"
           />
           <PluginWorkspaceSummary
             v-else-if="activeDynamicPlugin"
@@ -1190,7 +1189,6 @@
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
-                      @kickoff="onPluginQuickAction"
                     />
                     <PluginGuidePane v-else :plugin="entry.plugin" @kickoff="onPluginQuickAction" />
                   </view>
@@ -1482,7 +1480,6 @@
                       :add-file-to-ai="onPluginAddFileToAi"
                       @files-changed="onArchiveExtracted"
                       :dev-installed="!!entry.plugin.devInstalled"
-                      @kickoff="onPluginQuickAction"
                     />
                     <PluginGuidePane v-else :plugin="entry.plugin" @kickoff="onPluginQuickAction" />
                   </view>
@@ -1747,7 +1744,6 @@
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeBottomDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
-            @kickoff="onPluginQuickAction"
           />
                   <VariablePanel
                     v-else-if="activeToolKey === 'variables'"
@@ -1868,7 +1864,6 @@
             :add-file-to-ai="onPluginAddFileToAi"
             :dev-installed="!!activeRightDynamicPlugin.devInstalled"
             @files-changed="onArchiveExtracted"
-            @kickoff="onPluginQuickAction"
           />
             <view v-else-if="rightPaneKey === 'variables'" class="right-dock-body dock-tool-pane">
               <view class="dock-tool-head">
@@ -3468,6 +3463,7 @@ export default {
     pluginBusinessActions() {
       return {
         litigationGeneration: (operation, params) => this.requestLitigationGeneration(operation, params),
+        sendChatPrompt: payload => this.onPluginChatPrompt(payload),
         activeFileId: () => ((this.focusedPane === 'left' ? this.activeFileLeft : this.activeFileRight) || this.activeFileLeft)?.id,
         insertContent: payload => this.insertPlainTextToWps(payload),
         previewImage: url => this.openImagePreview(url),
@@ -5962,11 +5958,11 @@ export default {
       })
     },
 
-    async onPluginChatPrompt({ prompt }) {
-      if (!prompt) return
+    async onPluginChatPrompt({ prompt, projectId = this.projectId, isCurrent = () => true }) {
+      if (!prompt || String(projectId) !== String(this.projectId) || !isCurrent()) return null
       const chat = await this.resolveChatInterface()
-      if (!chat) return
-      await chat.sendExternalPrompt(prompt)
+      if (!projectId || !chat || String(projectId) !== String(this.projectId) || !isCurrent() || !this.isActiveOverviewInstance()) return null
+      return chat.sendExternalPrompt(prompt)
     },
 
     async handleLitigationOpenFile({ fileId }) {
@@ -8365,7 +8361,7 @@ export default {
           }
         })
       }
-      if (payload.prompt) await this.onPluginChatPrompt(payload)
+      if (payload.prompt) return this.onPluginChatPrompt(payload)
     },
 
     // 拉「哪些 skill 是启用的」，供左栏插件位过滤（诉讼可视化默认不安装，装了才显示）。

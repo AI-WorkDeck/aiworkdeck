@@ -174,6 +174,13 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 - **安装目标目录 == 内置 skill 扫描目录**（默认 `backend/skills/`），在线安装的与内置的（listing-pathway）并列共存、同一套扫描/启停。
 - 注册表离线只影响"在线广场"区块（marketError 区块内提示，不 500），本地插件/skill 不受影响。
 
+## 安装来源展示（dev-board#1769）
+
+- `/api/plugins/list.installationSource` 由宿主扫描计算：`local`、`bundled`、`market`。同 ID 的在线目录项不代表本地副本来自广场；本地/开发副本详情使用本地名称、作者与描述，不展示目录下载次数。
+- 广场安装在验签与逐文件哈希通过后保留 `.awd-market-receipt`（原签名与文件清单）。扫描时重新验签、比对当前 ID/版本与所有文件、拒绝额外文件及符号链接；只缓存本次扫描的来源，不在每次列表请求重复读完整插件。来源是扫描快照，不是持续完整性监控。
+- 开发安装会剔除外带 receipt，`.awd-dev` 优先判为本地；随包使用既有 `.awd-bundled` 标记，不等同平台签名。旧版本未保留 receipt 的已安装插件保守显示本地，下一次经广场安装/更新后才能证明签名来源。这个字段只控制展示，不授予插件权限或替代现有启停/工具审批。
+- 回归：`PluginMarketServiceTest` / `PluginDevServiceTest` 与 `frontend/tests/plugin-sdk/market-update-detail.test.mjs`；覆盖本地同 ID、伪造/缺失 receipt、内容更改、额外文件、符号链接、离线显示及未安装目录统计。
+
 ## 数据模型
 
 **插件与 skill 不入库，文件系统为准**。数据库唯一相关表 `system_setting`（config_key/value）：`ai.skills.disabled`、`ai.plugins.disabled` 各存禁用 id 的 JSON 数组，内存缓存 TTL 5s，默认全启用。

@@ -396,7 +396,11 @@ public class PluginConnectionService {
                 if (bytes.length > 2 * 1024 * 1024) throw new IllegalStateException("Service response exceeds 2 MB");
                 return new Reply(response.code(), bytes.length == 0 ? Map.of() : JSON.readValue(bytes, MAP));
             } finally { if (calls != null) calls.remove(call); }
-        } catch (Exception e) { throw new IllegalStateException("Service request failed", e); }
+        } catch (Exception e) {
+            if (PluginMcpEndpointPolicy.isFakeIpResolutionFailure(e))
+                throw new IllegalStateException(PluginMcpEndpointPolicy.fakeIpFailureMessage(), e);
+            throw new IllegalStateException("Service request failed", e);
+        }
     }
 
     public String bearerTokenForEndpoint(String pluginId, Long userId, String connectionId, String endpoint) {

@@ -396,8 +396,12 @@ public class UserMcpOAuthService {
                 }
                 return new Reply(response.code(), body, response.challenges());
             } catch (JsonProcessingException e) { throw metadata(); }
-            catch (IOException e) { throw failure("oauth_transport_error", 502,
-                    "授权连接失败或超时，请检查网络后重新授权。", "The authorization connection failed or timed out. Check the network and authorize again."); }
+            catch (IOException e) {
+                if (PluginMcpEndpointPolicy.isFakeIpResolutionFailure(e))
+                    throw new PluginMcpException("dns_resolution_failed", 502, PluginMcpEndpointPolicy.fakeIpFailureMessage());
+                throw failure("oauth_transport_error", 502,
+                        "授权连接失败或超时，请检查网络后重新授权。", "The authorization connection failed or timed out. Check the network and authorize again.");
+            }
         });
         try {
             while (true) {

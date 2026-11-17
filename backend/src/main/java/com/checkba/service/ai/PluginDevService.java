@@ -266,7 +266,7 @@ public class PluginDevService {
      */
     private void installFiles(String id, LinkedHashMap<String, byte[]> files, JSONObject marker,
                               InstallPolicy policy, List<String> errors) {
-        files.keySet().removeIf(path -> java.util.Arrays.stream(path.split("/")).anyMatch(name -> name.matches("\\.awd-(dev|bundled|service-trust)(-.*)?")));
+        files.keySet().removeIf(path -> java.util.Arrays.stream(path.split("/")).anyMatch(name -> name.matches("\\.awd-(dev|bundled|service-trust|market-receipt)(-.*)?")));
         if (files.size() > MAX_FILES) {
             errors.add(LangText.of("文件数超限（最多 " + MAX_FILES + " 个）", "Too many files (max " + MAX_FILES + ")"));
         }
@@ -354,7 +354,7 @@ public class PluginDevService {
         }
         java.util.Arrays.sort(children, java.util.Comparator.comparing(File::getName));
         for (File child : children) {
-            if (child.getName().matches("\\.awd-(dev|bundled|service-trust)(-.*)?")) {
+            if (child.getName().matches("\\.awd-(dev|bundled|service-trust|market-receipt)(-.*)?")) {
                 continue;
             }
             if (child.isDirectory()) {

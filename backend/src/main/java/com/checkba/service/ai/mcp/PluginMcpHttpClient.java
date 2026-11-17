@@ -175,7 +175,11 @@ public class PluginMcpHttpClient {
                         var source = response.body().source();
                         if (source.request(MAX_BYTES + 1L)) throw error("response_too_large", "MCP response exceeds the size limit.");
                         return envelope(JSON.readTree(source.readUtf8()), requestId);
-                    } catch (IOException e) { throw error("transport_error", "MCP connection failed or timed out."); }
+                    } catch (IOException e) {
+                        if (PluginMcpEndpointPolicy.isFakeIpResolutionFailure(e))
+                            throw error("dns_resolution_failed", PluginMcpEndpointPolicy.fakeIpFailureMessage());
+                        throw error("transport_error", "MCP connection failed or timed out.");
+                    }
                 });
                 try {
                     while (true) {

@@ -72,7 +72,7 @@ function harness(kind = 'detail', { local = localPlugin(), remote = remotePlugin
     : ['reloadAll', 'loadPlugins', 'loadPluginMarket', 'installPlugin', 'notifyMarketChanged', 'installedPluginVersion', 'pluginUpdateAvailable', 'onToggle', 'permissionLabel', 'marketAction', 'refreshPluginPurchase', 'loginThenInstall']
   for (const name of names) vm[name] = method(source, name, deps).bind(vm)
   if (kind === 'detail') {
-    for (const name of ['display', 'pendingToolChangeCount', 'pluginUpdateAvailable', 'isBuiltinRedaction', 'paidStateValue', 'needsPurchase', 'pluginPermissionText']) {
+    for (const name of ['display', 'sourceText', 'pendingToolChangeCount', 'pluginUpdateAvailable', 'isBuiltinRedaction', 'paidStateValue', 'needsPurchase', 'pluginPermissionText']) {
       Object.defineProperty(vm, name, { get: method(source, name, deps).bind(vm) })
     }
   }
@@ -323,4 +323,36 @@ for (const kind of ['detail', 'pane']) test(`${kind}: an update without tool esc
   const h = harness(kind)
   await h.install()
   assert.equal(h.calls.filter(c => c[0] === 'approve-tools').length, 0)
+})
+
+for (const local of [
+  localPlugin({ name: 'Local portal', author: 'Local author' }),
+  localPlugin({ name: 'Local portal', author: 'Local author', devInstalled: true, installationSource: 'local' }),
+]) test('local plugin keeps local source and metadata despite a matching catalogue ID', async () => {
+  const h = harness('detail', { local, remote: remotePlugin({ downloads: 1234, author: 'Marketplace author' }) })
+  await h.reload()
+  assert.equal(h.vm.sourceText, 'market.sourceLocal')
+  assert.equal(h.vm.display.downloads, '')
+  assert.equal(h.vm.display.name, 'Local portal')
+  assert.equal(h.vm.display.author, 'Local author')
+  assert.equal(h.vm.pluginUpdateAvailable, true, 'the separately confirmed update route remains available')
+})
+
+test('verified market install retains source offline and catalogue downloads online', async () => {
+  const h = harness('detail', { local: localPlugin({ installationSource: 'market' }), remote: remotePlugin({ downloads: 1234 }) })
+  await h.reload()
+  assert.equal(h.vm.sourceText, 'market.sourceOfficialMarket')
+  assert.equal(h.vm.display.downloads, '1.2k')
+  h.vm.marketInfo = null
+  assert.equal(h.vm.sourceText, 'market.sourceOfficialMarket')
+  assert.equal(h.vm.display.downloads, '')
+})
+
+test('uninstalled catalogue entries retain downloads and bundled entries retain their own source', () => {
+  const h = harness('detail', { local: null, remote: remotePlugin({ downloads: 1234 }) })
+  assert.equal(h.vm.sourceText, 'market.sourceOfficialMarket')
+  assert.equal(h.vm.display.downloads, '1.2k')
+  h.vm.installedInfo = localPlugin({ installationSource: 'bundled' })
+  assert.equal(h.vm.sourceText, 'pluginPlatform.bundled')
+  assert.equal(h.vm.display.downloads, '')
 })
