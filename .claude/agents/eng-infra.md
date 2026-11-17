@@ -346,7 +346,7 @@ Mac 后台打包会实跑 `UserMcpStdioClientTest`。其进程树夹具的 child
 
 **app-e2e 文件编号（dev-board#521）**：`createFile` 新建的测试文件允许 `wpsFileId=null`；J9/J10 的字节覆盖助手必须与 J4/真实编辑器一致，**只用数字 `id`** 调上传端点（dev-board#1035 起 `/api/files/{x}/...` 只认数字主键，前端与 e2e 不再传 `wpsFileId`）。强制要求 `wpsFileId` 会让合法落盘文件被判不存在，随后 MODIFY、分稿与协作步骤连锁失败。
 
-每日全量 QA：`scripts/qa-nightly.sh`（crontab，跑在 ~/aiworkdeck-qa/repo 专用克隆，报告 ~/aiworkdeck-qa/reports/，结果写进一条滚动 issue「每日 QA 滚动报告 / nightly QA (rolling)」（失败追加评论、已关则重开，全绿留言并关闭；标签 bug），引擎取自已安装 app）。
+每日全量 QA：`scripts/qa-nightly.sh`（crontab，跑在 ~/aiworkdeck-qa/repo 专用克隆，报告 ~/aiworkdeck-qa/reports/，结果写进一条滚动 issue「每日 QA 滚动报告 / nightly QA (rolling)」，标签 bug）。lowa-e2e 与 app-e2e 都是必需检查，逐项记录 `passed / failed / not_run`；只有两项都 passed 才留言并关闭滚动 issue，未运行也按未通过处理。引擎与后端取自已安装 app，后端使用独立 user.home 和端口 19685，不回退个人默认 9696。
 
 ## 端口体系（2026-08 起）
 

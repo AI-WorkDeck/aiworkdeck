@@ -17,8 +17,8 @@
 
 | 旅程 | 覆盖 | 备注 |
 |---|---|---|
-| 首启解锁门（试用码真实打字 → 分流） | A ✅ | 三个合法落点：wizard / 项目列表页 / 工作台；落 wizard 时另断言步骤 2 已是「平台服务」总览且不再含 AccessKey / 企查查 Key / Tushare Token / 北大法宝 Token（P5 配置面收敛） |
-| 已解锁重启 → 直达上次项目 | A ✅ | 直达**永远进工作台**，不经概览页（spec §5.3 决策） |
+| 首启 → 工作台外壳 + 欢迎标签 | A ✅ | 桌面 local-mode 免登，不再经过解锁门、项目列表或注册；J1 直接验证当前启动落点 |
+| 重启 → 工作台 | A ✅ | 不停留在旧解锁门口径；账号连接与未连接状态分别按当前产品流程验收 |
 | 登录页真实打字登录 → 跳转 | ❌ | 桌面已去登录，旧 J1 随之移除；login.vue 只剩浏览器访问团队服务器的场景，不在本套件覆盖面 |
 | 注册新账号（UI） | ❌ | 桌面 local-mode 免登，注册接口已不在桌面链路上 |
 | 项目列表页加载（卡片 + 协作入口） | A ✅ | 断言 `.page-project-list` / `.project-item-card` / 「从团队案件库取一份案卷」文案 |
@@ -98,15 +98,17 @@
 ## 每日定时 QA
 
 `scripts/qa-nightly.sh`（经 `~/aiworkdeck-qa/run.sh` 引导，专用克隆，用户 crontab
-每日 12:45 调起）：跑 lowa-e2e（必跑）+ app-e2e（9696 在跑时），报告写
-`~/aiworkdeck-qa/reports/YYYY-MM-DD.md`，有失败自动开 GitHub issue。
+每日 12:45 调起）：lowa-e2e 与 app-e2e 均为必需检查；app-e2e 使用打包版后端、
+隔离 user.home 和端口 19685，不接触个人默认后端。报告写
+`~/aiworkdeck-qa/reports/YYYY-MM-DD.md`，逐项标记 `passed / failed / not_run`；
+只有两项都通过才关闭滚动 issue，未运行不能写成通过。
 desktop-e2e 会弹窗，不进每日，改动编辑器/宿主代码时按需跑。
 
 ## 运行环境备忘
 
 - dev server：worktree 内 `npx uni --port 5174`（5173 常被其他 worktree 占用）
-- 后端：本机打包版常驻 9696 即可；桌面 local-mode 免登（任何请求都解析为本机用户），
-  套件**不再注册任何账号**（旧的 `qa_bot_<ts>` 已随去登录消亡），只自建一个 BLANK 项目
-  并在结束时删掉
+- 后端：每日任务从打包版 JRE/JAR 启动隔离 desktop 后端（独立 user.home、空库、端口 19685）；
+  不使用个人默认 9696 或真实工作区。桌面 local-mode 免登，套件**不再注册任何账号**
+  （旧的 `qa_bot_<ts>` 已随去登录消亡），只在隔离库自建 BLANK 项目并在结束时删掉
 - 编辑器引擎测试见 `frontend/tests/lowa-e2e/README.md`（build:zetaoffice 清 dist 坑）
 - 驱动陷阱汇总在 `frontend/tests/app-e2e/run.mjs` 头注释
