@@ -266,6 +266,7 @@ public class LocalProjectService {
             projectLock.unlock();
         }
         // 导入完成后同步建基线（初始版本 = 导入后的全量），否则首次退出时全部文件都算待提交。
+        // iCloud 占位文件会由版本层暂缓，不能因云端下载卡住项目打开。
         // 放在导入锁外：自动开启自己在仓库锁内完成判定与初始化，避免两把锁反向嵌套。
         var lifecycle = versionLifecycle();
         if (lifecycle != null) {
