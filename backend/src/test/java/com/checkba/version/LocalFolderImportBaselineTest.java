@@ -6,6 +6,7 @@ package com.checkba.version;
 import com.checkba.service.LocalProjectService;
 import com.checkba.storage.ProjectStorageResolver;
 import org.junit.jupiter.api.BeforeAll;
+import org.eclipse.jgit.lib.Constants;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,12 +19,18 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * 教程问题 16（dev-board#1713）：「打开文件夹」导入的项目，第一次退出时弹「N 个文件待提交」。
  * 修法：导入完成后在仓库锁内同步建基线，初始版本 = 导入后的全量；超过护栏时不开，沿用现有提示。
- * 断言紧跟在 openLocalFolder 返回之后、不等待异步触发点，验的是「返回时基线已经建好」。
+ * 本地字节齐全时断言紧跟在 openLocalFolder 返回之后、不等待异步触发点；
+ * iCloud 占位文件则先下载并暂缓基线，不能让版本初始化阻塞打开项目。
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:local-import-baseline;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;NON_KEYWORDS=VALUE;DB_CLOSE_DELAY=-1",
@@ -62,6 +69,27 @@ class LocalFolderImportBaselineTest {
         assertTrue(repoService.listPaths(projectId, "HEAD").contains("证据/聊天记录.txt"));
         assertEquals(0, sessionService.exitStatus(projectId).changedCount(),
                 "刚导入的文件不能算待提交");
+    }
+
+    @Test
+    void datalessFilesDeferBaselineWithoutBlockingFolderOpen(@TempDir Path folder) throws Exception {
+        Files.writeString(folder.resolve("合同.docx"), "x");
+        ICloudFileMaterializer materializer = mock(ICloudFileMaterializer.class);
+        doThrow(VersionException.userFacing("iCloud files are still downloading"))
+                .when(materializer).requireLocalBytes(any());
+        repoService.setICloudFileMaterializerForTest(materializer);
+        try {
+            long projectId = localProjectService.openLocalFolder(folder.toString(), false, null, null, 9100L)
+                    .project().getId();
+
+            assertTrue(projectId > 0);
+            try (var repo = repoService.open(projectId)) {
+                assertNull(repo.resolve(Constants.HEAD), "未下载文件不能进入 JGit 读取阶段");
+            }
+            verify(materializer).requireLocalBytes(folder);
+        } finally {
+            repoService.setICloudFileMaterializerForTest(new ICloudFileMaterializer());
+        }
     }
 
     @Test

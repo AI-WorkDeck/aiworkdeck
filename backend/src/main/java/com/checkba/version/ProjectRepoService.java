@@ -109,7 +109,12 @@ public class ProjectRepoService {
 
     private final ProjectStorageResolver storageResolver;
     private final LocalVersionObjectStore objectStore;
+    private ICloudFileMaterializer iCloudFileMaterializer = new ICloudFileMaterializer();
     public static final String OBJECT_FORMAT_TRAILER = "X-AWD-Object-Format: 1";
+
+    void setICloudFileMaterializerForTest(ICloudFileMaterializer materializer) {
+        this.iCloudFileMaterializer = materializer;
+    }
 
     public LocalVersionObjectStore objects() { return objectStore; }
 
@@ -617,6 +622,7 @@ public class ProjectRepoService {
     }
 
     private void stageAll(Git git, Status changes) throws Exception {
+        iCloudFileMaterializer.requireLocalBytes(git.getRepository().getWorkTree().toPath());
         Set<String> paths = changes == null ? null : new java.util.TreeSet<>();
         if (paths != null) {
             paths.addAll(changes.getModified());
