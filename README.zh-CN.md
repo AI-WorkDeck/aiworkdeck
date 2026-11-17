@@ -110,7 +110,7 @@
 
 <a id="参与贡献"></a>
 
-<strong>参与贡献。</strong>一个小而可复现的问题尤其有价值：某份文档丢失了格式，某条依据无法重新定位，某次修改保存后重开不一致，或者某个安装步骤不够清楚。请使用合成或适当脱敏的材料；较大的改动先在 [Issue](https://github.com/AI-WorkDeck/aiworkdeck/issues) 中讨论范围。提交前阅读[贡献指南](.github/CONTRIBUTING.md)。代码贡献需一次性签署 [CLA](legal/CLA.md)：贡献者保留著作权，并授权项目管理方按开源与商业许可两种方式分发。重要 API 改动走 [RFC 流程](GOVERNANCE.md#rfc-process)；[治理规则](GOVERNANCE.md)与[现任维护者](MAINTAINERS.md)公开列明。插件与 Skill 作者可以通过广场发布作品（[中国站](https://www.aiworkdeck.com/zh/plugins) · [国际站](https://www.workdeck.ai/en/plugins)），按[广场条款](legal/MARKETPLACE-TERMS.md)执行；单项资助任务见[悬赏政策](BOUNTIES.md)，是否开放及具体金额以对应 Issue 为准。
+<strong>参与贡献。</strong>一个小而可复现的问题尤其有价值：某份文档丢失了格式，某条依据无法重新定位，某次修改保存后重开不一致，或者某个安装步骤不够清楚。请使用合成或适当脱敏的材料；较大的改动先在 [Issue](https://github.com/AI-WorkDeck/aiworkdeck/issues) 中讨论范围。提交前阅读[贡献指南](.github/CONTRIBUTING.md)。代码贡献需一次性签署 [CLA](legal/CLA.md)：贡献者保留著作权，并授权项目管理方按开源与商业许可两种方式分发。重要 API 改动走 [RFC 流程](GOVERNANCE.md#rfc-process)；[治理规则](GOVERNANCE.md)、[现任维护者](MAINTAINERS.md)与[贡献者名录](https://www.aiworkdeck.com/zh/contributors)公开列明；代码贡献合并或作品发布后，贡献者姓名会展示在名录中。插件与 Skill 作者可以通过广场发布作品（[中国站](https://www.aiworkdeck.com/zh/plugins) · [国际站](https://www.workdeck.ai/en/plugins)），按[广场条款](legal/MARKETPLACE-TERMS.md)执行；单项资助任务见[悬赏政策](BOUNTIES.md)，是否开放及具体金额以对应 Issue 为准。
 
 <a id="下一步"></a>
 

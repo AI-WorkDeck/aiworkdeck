@@ -399,6 +399,7 @@ export default {
   "legalSourceLabel": "सोर्स कोड: ",
   "legalLicenseLabel": "पूर्ण लाइसेंस: ",
   "legalTrademarkLabel": "ट्रेडमार्क सूचना: ",
+  "legalContributors": "योगदानकर्ता निर्देशिका",
   "legalTrademark": "\"AI WorkDeck\" BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED का ट्रेडमार्क है। संशोधित संस्करण पुनर्वितरित करते समय उस नाम का उपयोग उत्पाद नाम के रूप में न करें; ट्रेडमार्क सूचना देखें।",
   "navPermissions": "सिस्टम अनुमतियाँ",
   "permissionsSectionTitle": "macOS सिस्टम अनुमतियाँ",

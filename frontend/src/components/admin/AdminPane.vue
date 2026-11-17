@@ -81,6 +81,9 @@
             <text> · {{ $t('admin.legalTrademarkLabel') }}</text>
             <text class="legal-link" @tap="openLegalLink(LEGAL_URLS.trademarks)">TRADEMARKS.md</text>
           </view>
+          <view class="legal-line legal-links">
+            <text class="legal-link" @tap="openContributors">{{ $t('admin.legalContributors') }}</text>
+          </view>
           <text class="legal-line">{{ $t('admin.legalTrademark') }}</text>
         </view>
       </view>
@@ -1792,6 +1795,9 @@ export default {
     /** 「关于」区块的外链。与页内其他外链同一条出口：桌面端走系统浏览器。 */
     openLegalLink(url) {
       openExternalUrl(url)
+    },
+    openContributors() {
+      openExternalUrl(`${siteBaseUrl()}/contributors`)
     },
     async loadPermissionsStatus() {
       if (!host.permissions || typeof host.permissions.getStatus !== 'function') return

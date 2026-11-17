@@ -14,7 +14,7 @@ This document describes how the AI WorkDeck project is run: who decides what, ho
 
 ### Contributor
 
-Anyone who has had a pull request merged, published a Skill or plugin through the marketplace, or made a sustained non-code contribution (documentation, triage, translations). No application needed. All code contributions require a signed [CLA](legal/CLA.md).
+Anyone who has had a pull request merged, published a Skill or plugin through the marketplace, or made a sustained non-code contribution (documentation, triage, translations). No application needed. All code contributions require a signed [CLA](legal/CLA.md). Merged code contributors and published marketplace authors are named in the public [contributor directory](https://www.aiworkdeck.com/en/contributors), using their GitHub usernames or public marketplace profiles respectively.
 
 ### Reviewer
 

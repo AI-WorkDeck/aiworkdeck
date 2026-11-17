@@ -403,7 +403,7 @@ export async function main(args = process.argv.slice(2), env = process.env) {
   }
   const response = await jsonRequest(endpoint, { method: 'POST', headers, body: form })
   if (!response.plugin?.id || !response.plugin?.status) throw new Error('Unexpected submission response; verify status in the website developer portal before retrying')
-  return { id: response.plugin.id, version: response.plugin.version, status: response.plugin.status, published: false }
+  return { id: response.plugin.id, version: response.plugin.version, status: response.plugin.status, published: false, attribution: 'After approval, your public marketplace profile will be credited in the contributor directory: https://www.aiworkdeck.com/contributors' }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().then(result => console.log(JSON.stringify(result, null, 2)), error => { console.error(error.message); process.exitCode = 1 })

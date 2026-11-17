@@ -43,6 +43,10 @@ For substantial changes (new subsystems, public API or plugin-SDK contract chang
 2. We may ask for changes or clarifications.
 3. Once approved, we will merge your contribution.
 
+## Public attribution
+
+When your pull request is merged into the main repository, your GitHub username and public contribution count appear in the [contributor directory](https://www.aiworkdeck.com/en/contributors). The directory also credits authors of published Skills and approved plugins through their public marketplace display names and author profiles. No separate application is needed. To correct an attribution, open an issue or contact the maintainers.
+
 ## Provenance and license notices
 
 AI WorkDeck is AGPL-3.0-or-later. We welcome forks, modifications and redistribution; the one thing we ask is that authorship and license information is preserved. These rules keep that information intact and machine-readable (full rationale: `docs/superpowers/specs/2026-09-09-provenance-license-compliance-design.md`).

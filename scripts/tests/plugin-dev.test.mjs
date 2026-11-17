@@ -128,6 +128,7 @@ test('submit requires explicit HTTPS endpoint/cookie, uses multipart ZIP and pre
   await assert.rejects(main(['submit', dir, '--endpoint', 'https://portal.example.invalid/api/plugins'], {}), /AWD_PLUGIN_SESSION_COOKIE/)
   const result = await main(['submit', dir, '--endpoint', 'https://portal.example.invalid/api/plugins'], env)
   assert.equal(result.status, 'pending'); assert.equal(result.published, false); assert.equal(uploads, 1)
+  assert.match(result.attribution, /public marketplace profile.*contributor directory.*https:\/\/www\.aiworkdeck\.com\/contributors/)
 })
 
 test('schema patterns accept semantic versions and web entry paths, reject malformed values', () => {
