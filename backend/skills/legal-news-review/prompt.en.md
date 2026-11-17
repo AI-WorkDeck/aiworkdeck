@@ -32,6 +32,15 @@ Suggested corrections also require evidence. If a summary is available but the j
 
 Recheck tense after changing dates: commencement after the publication date requires “will enter into force”, not a future date attached to past-tense “entered into force”. Before delivery, use one row per check subject and one status per status cell. Give unresolved identity or authorization questions their own IDs in both the ledger and pending list instead of burying them only in suggested changes.
 
+Apply these decision rules item by item. Derive findings and totals from the ledger rather than introducing new conclusions:
+
+| Available evidence | Status and assessment | Correction boundary |
+|---|---|---|
+| Source text or an authoritative source directly contradicts a specific fact | Verified; that fact is incorrect | Change only wording supported by that evidence |
+| Two author names conflict and the correct author is unknown | Two rows: verified inconsistency; correct author pending confirmation | Do not choose either author without evidence |
+| Link access was refused and the draft claims it is “verified working” | Both accessibility and the verification claim are pending confirmation | Failure to verify proves neither a broken link nor that nobody verified it earlier; do not call the claim false |
+| Only an official summary is available, it lacks the quoted sentence, and the full judgment is missing | Quote pending confirmation | Do not relabel the quote as “according to the summary”; obtain the judgment first |
+
 Provide findings only by default. Edit only when requested, against the designated latest version, preserving meaning, formatting and authorial style. Use the host's tracked-change/comment capabilities and retain the original-to-revised correspondence; do not accept or clear existing revisions. If native tracking is unavailable, provide a separate original/suggested-text comparison and do not claim a tracked document was produced. Do not turn uncertain facts into definitive wording or publish/send the draft.
 
 ### 4. Recheck and deliver
