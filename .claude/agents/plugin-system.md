@@ -207,6 +207,8 @@ admin 同 PluginDevController 口径）+ `service/ai/tools/CapabilityTools`（�
 
 ## skill 文件格式（docs/SKILL_SPEC.md、docs/PLUGIN_SPEC.md）
 
+**法律资讯审校（dev-board#1771，社区愿望 PR#1628）**：`backend/skills/legal-news-review/` 是可启停的双语 Skill，默认启用，非强制内置工作流；通过具体触发词、手动选择或 `use_skill` 使用。采用 `passthrough`，保留各宿主原有读取、检索和编辑能力；工具列表同时披露法律检索与网页读取。先确认尚缺的范围/法域/时点/联网许可，建立覆盖台账，区分已核验、待确认、不适用与范围外；只有明确要求才修订，不能把来源不可访问判成事实错误。`LegalNewsReviewSkillTest` 验证真实注册、语言、路由、启停与客户端工具面；提示词本身不能作为事实准确率或真实模型行为已通过的证明。源码随包分发不等于已安装客户端已可用。
+
 目录式：`skills/<id>/skill.yml + prompt.md`。skill.yml 字段：`id`（必需，kebab-case，启停键）、`name`、`description`、`triggers`（必需，关键词数组，用户输入"包含"即命中；拉丁串两端要求整词，口径见下文「触发词匹配口径」）、`prompt`（默认 prompt.md）、`tool_policy`（`passthrough`（缺省，不裁工具）/ `restrict`）、`allowed_tools`（须为 ToolRegistry 真实工具名；只在 `restrict` 下参与裁剪）、`output`、`requires`（如 evidence.retrieve.v1，v1 仅声明）。未知字段忽略；解析失败跳过不阻断。
 
 **应用语言字段（EN 版 PR5，全部可选）**：`languages`（数组，可用的应用语言；**缺省 = 只在 zh-CN 可用**——存量第三方 skill 没这个字段，英文版自动隐藏，方向安全）、`name_en` / `triggers_en` / `output_en`（英文侧文本；triggers_en 只在 en-US 参与匹配，zh-CN 匹配行为不变）、目录下可放 `prompt.en.md`（存在即加载，英文注入优先用它，缺省回退 prompt.md）。语言过滤收口在 `SkillRegistry.isAvailable`（match/钉选/注入三条路径共用，不会只滤列表不滤注入）；内置三 skill：股东大会核查与上市路径 `languages: [zh-CN]`（中国法深度绑定，且后者触发词含 IPO/SPAC/VIE 会命中英文输入，必须真隐藏），诉讼可视化双语（带 triggers_en + prompt.en.md）。守卫在 BuiltinSkillsTest / SkillRouterTest 的语言组测试。注意 `/api/skills/list` 与广场列表**不做**语言过滤（管理面照常展示，只是英文模式下 zh-only skill 永不注入）。**因此该列表带了 `available` 字段（= `SkillRegistry.isAvailable`）与 `nameEn`**：对话面板那个「主动加载技能」选择器必须自己按 `available` 滤一道，否则英文界面下用户能勾中一个 zh-only skill，勾了永远不生效也没有提示。

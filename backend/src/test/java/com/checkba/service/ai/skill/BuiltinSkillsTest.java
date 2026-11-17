@@ -283,6 +283,7 @@ class BuiltinSkillsTest {
         expected.put("evidence-linked-report", SkillDefinition.ToolPolicy.PASSTHROUGH);
         expected.put("file-organization", SkillDefinition.ToolPolicy.PASSTHROUGH);
         expected.put("presentation-design", SkillDefinition.ToolPolicy.PASSTHROUGH);
+        expected.put("legal-news-review", SkillDefinition.ToolPolicy.PASSTHROUGH);
         Map<String, SkillDefinition.ToolPolicy> actual = new TreeMap<>();
         for (SkillDefinition skill : registry.getSkills()) {
             actual.put(skill.getId(), skill.getToolPolicy());
