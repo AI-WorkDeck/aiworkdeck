@@ -435,6 +435,7 @@ export default {
   legalSourceLabel: 'Source code: ',
   legalLicenseLabel: 'Full license: ',
   legalTrademarkLabel: 'Trademark notice: ',
+  legalContributors: "Contributor directory",
   legalTrademark: '"AI WorkDeck" is a trademark of BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Do not use that name as the product name when redistributing a modified version; see the trademark notice.',
 
   // macOS System Permissions onboarding & drag-to-settings helper (dev-board#1433)

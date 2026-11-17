@@ -434,6 +434,7 @@ export default {
   legalSourceLabel: '源代码：',
   legalLicenseLabel: '许可证全文：',
   legalTrademarkLabel: '商标说明：',
+  legalContributors: "贡献者名录",
   legalTrademark: '「AI WorkDeck」为北京公富信息技术有限公司的商标，再分发修改版时不得使用该名称作为产品名（详见商标说明）。',
 
   // macOS 系统权限引导与拖拽授权（dev-board#1433）

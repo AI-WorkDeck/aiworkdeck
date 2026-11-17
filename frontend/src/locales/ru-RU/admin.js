@@ -399,6 +399,7 @@ export default {
   "legalSourceLabel": "Исходный код: ",
   "legalLicenseLabel": "Полная лицензия: ",
   "legalTrademarkLabel": "Уведомление о товарном знаке: ",
+  "legalContributors": "Каталог участников",
   "legalTrademark": "«AI WorkDeck» является товарным знаком BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Не используйте это название как имя продукта при распространении изменённой версии; см. уведомление о товарном знаке.",
   "navPermissions": "Системные разрешения",
   "permissionsSectionTitle": "Системные разрешения macOS",

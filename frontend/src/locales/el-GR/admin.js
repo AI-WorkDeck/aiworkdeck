@@ -399,6 +399,7 @@ export default {
   "legalSourceLabel": "Πηγαίος κώδικας: ",
   "legalLicenseLabel": "Πλήρης άδεια χρήσης: ",
   "legalTrademarkLabel": "Σημείωση για το εμπορικό σήμα: ",
+  "legalContributors": "Κατάλογος συνεισφερόντων",
   "legalTrademark": "Το \"AI WorkDeck\" είναι εμπορικό σήμα της BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Μην χρησιμοποιείτε αυτό το όνομα ως όνομα προϊόντος κατά την αναδιανομή τροποποιημένης έκδοσης· δείτε τη σημείωση για το εμπορικό σήμα.",
   "navPermissions": "Δικαιώματα συστήματος",
   "permissionsSectionTitle": "Δικαιώματα συστήματος macOS",
