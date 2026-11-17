@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Community wish: https://github.com/AI-WorkDeck/aiworkdeck/pull/1628 (maryhung0904).
+id: legal-news-review
+name: 法律资讯审校
+name_en: Legal News Review
+description: 发布法律资讯、月刊或法律通讯前，按约定范围逐项核对法规、案例、日期、链接与署名，输出有来源的问题清单；无法核实的事项保留待确认，仅在用户要求时修订原稿。
+description_en: Review legal news, newsletters or monthly bulletins before publication, checking authorities, cases, dates, links and attribution within the agreed scope. Provide sourced findings, flag unresolved checks, and edit the draft only when requested.
+author: AI WorkDeck
+author_url: https://github.com/AI-WorkDeck/aiworkdeck
+version: 1.0.0
+license: AGPL-3.0-or-later
+credits:
+  - 'Workflow request: maryhung0904 — https://github.com/AI-WorkDeck/aiworkdeck/pull/1628'
+languages: [zh-CN, en-US]
+enabled_by_default: true
+triggers:
+  - 法律资讯审校
+  - 审校法律资讯
+  - 审校这份法律资讯
+  - 法律月刊审校
+  - 审校法律月刊
+  - 法律通讯审校
+  - 审校法律通讯
+  - 法律資訊審校
+  - 審校法律資訊
+  - 法律月刊審校
+  - 法律通訊審校
+triggers_en:
+  - legal newsletter review
+  - legal news review
+  - review this legal newsletter
+prompt: prompt.md
+# Preserve the existing tools of each editor host; also disclose research tools.
+# This list is not an authorization boundary.
+tool_policy: passthrough
+allowed_tools:
+  - extract_file_text
+  - search_project_files
+  - search_project_content
+  - doc_list_project_files
+  - doc_get_document_text
+  - doc_get_outline
+  - doc_find_text
+  - office_get_text
+  - office_get_outline
+  - office_search
+  - law_search
+  - law_search_keyword
+  - get_law_article
+  - search_web
+  - browse_url
+  - write_docx
+output: |
+  按约定范围交付逐项核验台账、分级问题清单和复查汇总；明确已核验、待确认、不适用及排除范围。
+  每个问题包含位置、原文、判断、依据、来源与检索日期、修改建议。需要修订稿时另交可追踪修改及回读结果。
+output_en: |
+  Deliver an itemized verification ledger, prioritized findings and a recheck summary within the agreed scope, distinguishing verified, pending confirmation, not applicable and excluded items.
+  Each finding includes its location, original text, assessment, evidence, source and retrieval date, and suggested correction. If requested, also deliver traceable edits and the reread result.
