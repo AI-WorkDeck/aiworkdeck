@@ -1,3 +1,8 @@
+# 已归档 / Archived
+
+本文档已移至 [docs/dev-notes/AUDIT_2026-08-20_REMAINING.md](../dev-notes/AUDIT_2026-08-20_REMAINING.md)。
+This document now lives at [docs/dev-notes/AUDIT_2026-08-20_REMAINING.md](../dev-notes/AUDIT_2026-08-20_REMAINING.md).
+归档日期 / Archived on: 2026-08-20
 # 已归档：AUDIT_2026-08-20_REMAINING
 
 本文档已移至 [`docs/dev-notes/AUDIT_2026-08-20_REMAINING.md`](dev-notes/AUDIT_2026-08-20_REMAINING.md)。
