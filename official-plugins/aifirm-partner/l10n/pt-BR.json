@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "Para advogados parceiros: os clientes elaboram documentos com a Venture AI no site e depois pedem a revisão de um advogado habilitado, de qualquer escritório. Aqui você vê os fatos, os alertas e as versões, conversa com o cliente, agenda chamadas, edita no Word e finaliza. Vale do Silício e Taipé.",
+  "plugin.description": "Para advogados parceiros: os clientes elaboram documentos com a Venture AI no site e depois pedem a revisão de um advogado habilitado, de qualquer escritório. Aqui você vê os fatos, os alertas e as versões, conversa com o cliente, agenda chamadas, edita no editor do AI WorkDeck e finaliza. Vale do Silício e Taipé.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Cada visitante, o que precisa e quem fará o acompanhamento.",

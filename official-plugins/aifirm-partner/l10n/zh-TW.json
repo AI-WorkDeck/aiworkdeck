@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI 律師端",
-  "plugin.description": "合作律師接收 Venture AI 轉來的審閱請求：客戶在網站上與 Venture AI 對話、生成初稿後，申請任何一家事務所的執業律師審閱。您在這裡檢視事實、風險提示與各版本，與客戶溝通、安排通話，在 Word 中修改並審定定稿。覆蓋矽谷與臺北。",
+  "plugin.description": "合作律師接收 Venture AI 轉來的審閱請求：客戶在網站上與 Venture AI 對話、生成初稿後，申請任何一家事務所的執業律師審閱。您在這裡檢視事實、風險提示與各版本，與客戶溝通、安排通話，在 AI WorkDeck 編輯器中修改並審定定稿。覆蓋矽谷與臺北。",
   "view.main.name": "Venture AI 律師端",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "每一位來訪者的需求，以及由誰跟進。",

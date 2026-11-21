@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Avukat Masası",
-  "plugin.description": "Ortak avukatlar için: müşteriler sitede Venture AI ile taslak hazırlar, ardından herhangi bir hukuk bürosundan lisanslı bir avukattan inceleme ister. Burada olguları, risk işaretlerini ve sürümleri görür, müşteriyle yazışır, görüşme planlar, Word'de düzenler ve kesinleştirirsiniz. Silicon Valley ve Taipei.",
+  "plugin.description": "Ortak avukatlar için: müşteriler sitede Venture AI ile taslak hazırlar, ardından herhangi bir hukuk bürosundan lisanslı bir avukattan inceleme ister. Burada olguları, risk işaretlerini ve sürümleri görür, müşteriyle yazışır, görüşme planlar, AI WorkDeck düzenleyicisinde düzenler ve kesinleştirirsiniz. Silicon Valley ve Taipei.",
   "view.main.name": "Venture AI Avukat Masası",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Her ziyaretçi, ihtiyacı ve takibi kimin yapacağı.",

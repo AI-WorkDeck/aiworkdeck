@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "Untuk peguam rakan kongsi: klien menyediakan draf dengan Venture AI di laman web, kemudian meminta peguam berlesen daripada mana-mana firma untuk menyemak. Di sini anda melihat fakta, bendera merah dan versi, berbual dengan klien, menjadualkan panggilan, menyunting dalam Word dan memuktamadkan dokumen. Silicon Valley dan Taipei.",
+  "plugin.description": "Untuk peguam rakan kongsi: klien menyediakan draf dengan Venture AI di laman web, kemudian meminta peguam berlesen daripada mana-mana firma untuk menyemak. Di sini anda melihat fakta, bendera merah dan versi, berbual dengan klien, menjadualkan panggilan, menyunting dalam editor AI WorkDeck dan memuktamadkan dokumen. Silicon Valley dan Taipei.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Setiap pelawat, keperluan mereka, dan siapa yang akan menyusul.",

@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Espace Avocat",
-  "plugin.description": "Pour les avocats partenaires : les clients rédigent avec Venture AI sur le site, puis demandent à un avocat en exercice, de n'importe quel cabinet, de relire le document. Vous consultez ici les faits, les points d'alerte et les versions, échangez avec le client, planifiez des appels, modifiez dans Word et finalisez. Silicon Valley et Taipei.",
+  "plugin.description": "Pour les avocats partenaires : les clients rédigent avec Venture AI sur le site, puis demandent à un avocat en exercice, de n'importe quel cabinet, de relire le document. Vous consultez ici les faits, les points d'alerte et les versions, échangez avec le client, planifiez des appels, modifiez dans l'éditeur d'AI WorkDeck et finalisez. Silicon Valley et Taipei.",
   "view.main.name": "Venture AI Espace Avocat",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Chaque visiteur, ce dont il a besoin et qui assurera le suivi.",

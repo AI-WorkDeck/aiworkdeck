@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "Voor partneradvocaten: cliënten stellen op de site met Venture AI een concept op en vragen daarna een gelicentieerde advocaat van een willekeurig kantoor om een review. Hier ziet u de feiten, de red flags en de versies, communiceert u met de cliënt, plant u gesprekken, bewerkt u in Word en rondt u het document af. Silicon Valley en Taipei.",
+  "plugin.description": "Voor partneradvocaten: cliënten stellen op de site met Venture AI een concept op en vragen daarna een gelicentieerde advocaat van een willekeurig kantoor om een review. Hier ziet u de feiten, de red flags en de versies, communiceert u met de cliënt, plant u gesprekken, bewerkt u in de AI WorkDeck-editor en rondt u het document af. Silicon Valley en Taipei.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Elke bezoeker, wat die nodig heeft en wie de opvolging doet.",

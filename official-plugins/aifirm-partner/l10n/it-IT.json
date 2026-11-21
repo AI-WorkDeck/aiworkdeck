@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "Per gli avvocati partner: i clienti redigono con Venture AI sul sito, poi chiedono la revisione di un avvocato abilitato di qualsiasi studio. Qui consulti fatti, segnalazioni di rischio e versioni, comunichi con il cliente, fissi le call, modifichi in Word e finalizzi. Silicon Valley e Taipei.",
+  "plugin.description": "Per gli avvocati partner: i clienti redigono con Venture AI sul sito, poi chiedono la revisione di un avvocato abilitato di qualsiasi studio. Qui consulti fatti, segnalazioni di rischio e versioni, comunichi con il cliente, fissi le call, modifichi nell'editor di AI WorkDeck e finalizzi. Silicon Valley e Taipei.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Ogni visitatore, di cosa ha bisogno e chi darà seguito.",
