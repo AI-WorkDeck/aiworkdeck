@@ -14,7 +14,7 @@ declare namespace awd {
   interface McpServer { id: string; name?: string; [key: string]: unknown }
   interface BillingStatus { provider: 'host' | 'developer'; active: boolean; plan?: string; /** Host status: false means cached/offline, not a fresh payment confirmation. */ refreshed?: boolean }
   interface BridgeError extends Error { code: string }
-  interface Context { pluginId?: string; projectId?: number | string | null; language?: string; theme?: 'light' | 'dark'; themeTokens?: Record<string, string>; [key: string]: unknown }
+  interface Context { pluginId?: string; projectId?: number | string | null; openProjectId?: string; capabilities?: string[]; language?: string; theme?: 'light' | 'dark'; themeTokens?: Record<string, string>; [key: string]: unknown }
   interface File { path: string; name: string; size: number; [key: string]: unknown }
   interface Rect { left: number; top: number; width: number; height: number }
   interface Drag extends File { dragToken: string; dragType: string; expiresAt: number; hostHandle?: boolean }
@@ -51,7 +51,8 @@ declare namespace awd {
     };
     ui: {
       /** Open this plugin's declared workspace. Rejects unavailable or unknown_method on older hosts. */
-      openWorkspace(): Promise<Record<string, never>>;
+      /** With projectId (hosts listing 'ui.openWorkspace.projectId' in context.capabilities): open that project, then this plugin's workspace. */
+      openWorkspace(options?: { projectId?: number | string }): Promise<Record<string, never>>;
       toast(message: string, options?: CallOptions): Promise<unknown>;
       openFile(path: string, options?: CallOptions): Promise<unknown>;
       progress(target: string | Element | null, state?: ProgressState | null | false): ProgressController;

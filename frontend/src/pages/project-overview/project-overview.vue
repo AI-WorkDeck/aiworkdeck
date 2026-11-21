@@ -845,6 +845,7 @@
             :plugin-id="activeDynamicPlugin.pluginId"
             :permissions="activeDynamicPlugin.permissions || []"
             :project-id="activeDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
+            :open-project-id="pluginViewProjectId"
             :get-active-editor="getPluginActiveEditor"
             :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
@@ -1184,6 +1185,7 @@
                       :plugin-id="entry.plugin.pluginId"
                       :permissions="entry.plugin.permissions || []"
                       :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
+            :open-project-id="pluginViewProjectId"
                       :get-active-editor="getPluginActiveEditor"
                       :active-file-ids="messageActiveFileIds"
                       :add-file-to-ai="onPluginAddFileToAi"
@@ -1475,6 +1477,7 @@
                       :plugin-id="entry.plugin.pluginId"
                       :permissions="entry.plugin.permissions || []"
                       :project-id="entry.plugin.workspaceView?.scope === 'global' ? null : projectId"
+            :open-project-id="pluginViewProjectId"
                       :get-active-editor="getPluginActiveEditor"
                       :active-file-ids="messageActiveFileIds"
                       :add-file-to-ai="onPluginAddFileToAi"
@@ -1739,6 +1742,7 @@
             :plugin-id="activeBottomDynamicPlugin.pluginId"
             :permissions="activeBottomDynamicPlugin.permissions || []"
             :project-id="activeBottomDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
+            :open-project-id="pluginViewProjectId"
             :get-active-editor="getPluginActiveEditor"
             :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
@@ -1859,6 +1863,7 @@
             :plugin-id="activeRightDynamicPlugin.pluginId"
             :permissions="activeRightDynamicPlugin.permissions || []"
             :project-id="activeRightDynamicPlugin.sidebarView.scope === 'global' ? null : projectId"
+            :open-project-id="pluginViewProjectId"
             :get-active-editor="getPluginActiveEditor"
             :active-file-ids="messageActiveFileIds"
             :add-file-to-ai="onPluginAddFileToAi"
@@ -2539,7 +2544,8 @@ import {
   postMergeResolveStructured,
   resolveAdopt,
   resolveCloudMerge,
-  resolveSessionEnd
+  resolveSessionEnd,
+  getTaskProjectOptions // ui.openWorkspace({ projectId }): the user's own projects (membership)
 } from '@/services/api.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { signOut } from '@/utils/signOut.js'
@@ -2756,6 +2762,7 @@ export default {
       restartRestoring: false,
       restartRecoveryFailed: false,
       projectId: null,
+      pendingPluginWorkspace: null,
       project: {},
       looseWorkspaceHint: false,
       projectInfoLoaded: false,
@@ -3355,6 +3362,11 @@ export default {
      * 工作台有没有打开项目（dev-board#1047）。启动一律落不带 ?id= 的外壳（无项目态）：
      * rail 只留全局项、项目面板不挂载、右栏 AI 不渲染、暂存区不建（spec 2026-09-29 §4）。
      */
+    // A global plugin view sees the open, named project (not the loose scratch workspace); null without one. Every bridge
+    // call against it is still checked per call (project membership in the backend and the file list).
+    pluginViewProjectId() {
+      return this.hasNamedProject ? this.projectId : null
+    },
     isLooseWorkspace() {
       return resolveLooseWorkspace(this.project, this.projectInfoLoaded, this.looseWorkspaceHint)
     },
@@ -3484,6 +3496,7 @@ export default {
           const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
           return !!plugin?.workspaceView && this.openPluginTab(pluginId) === true
         },
+        openPluginWorkspaceInProject: (pluginId, projectId) => this.openPluginWorkspaceInProject(pluginId, projectId, getTaskProjectOptions),
         openConversation: async conversation => {
           if (!await this.resolveChatInterface()) return false
           return this.loadHistoryChat(conversation)
@@ -4176,6 +4189,8 @@ export default {
       if (query?.pane === 'projects') this.openProjectsPane()
       // 深链文件须等标签恢复完成，避免新标签被旧快照覆盖。
       if (query?.openFileId) this.openPendingLocalFile(Number(query.openFileId))
+      // ui.openWorkspace({ projectId }) reloaded into this project: show the plugin's workspace here.
+      if (query?.openPlugin && this.hasProject) { await this._restartProjectReady; this.openPendingPluginWorkspace(String(query.openPlugin)) }
       if (query?.inviteMembers === '1' && this.hasProject) this.showInviteModal = true
       if (query?.tab === 'messages') this.openMessageCenterTab()
       if (query?.messageId) this.resolveMessageTarget(query.messageId)
@@ -8253,6 +8268,7 @@ export default {
           }
           this.reconcilePluginTabs()
           if (this.pendingCalendarOpen) { const pending = this.pendingCalendarOpen; this.pendingCalendarOpen = null; this.openCalendarTab(pending) }
+          if (this.pendingPluginWorkspace) { const pending = this.pendingPluginWorkspace; this.pendingPluginWorkspace = null; this.openPluginTab(pending) }
           this.normalizeDockSelections?.()
           if (this.leftPaneKey?.startsWith('plugin-') && !this.activeDynamicPlugin) {
             this.leftPaneKey = this.hasNamedProject ? 'files' : NO_PROJECT_DEFAULT_PANE

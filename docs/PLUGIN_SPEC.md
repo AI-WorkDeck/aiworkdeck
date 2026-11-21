@@ -994,6 +994,8 @@ SDK 1.5.0 新增可选权限 `im`。`im.request {action,params}` 经 `/api/plugi
 
 **SDK 1.8（待随宿主发版）**：`awd.ui.openWorkspace()` → 桥 `ui.openWorkspace {}` → `{}`。无参数，只打开当前 iframe 所属插件已声明的 workspace；宿主根据当前清单核验可用状态和视图作用域，无可用工作区返回 `unavailable`。不允许指定其他插件、URL 或绕过视图声明，不新增权限名。旧宿主返回 `unknown_method`，开发者应明确提示兼容要求。
 
+**全局视图的项目上下文（宿主 0.88.1 之后，待发版）**：握手 `context` 新增 `openProjectId`（工作台当前打开的命名项目，无项目或随手对话暂存区时为空）。`scope: "global"` 的视图 `projectId` 仍为空，`lawfirm.request`、`im.request`、`services.*`、`ai.request` 行为不变；但 `files.*`、`ui.openFile`、`chat.addFile`、`files.prepareDrag`、`tools.invoke` 按 `openProjectId` 工作，每次调用照旧校验项目成员权限。`awd.ui.openWorkspace({ projectId })` → 桥 `ui.openWorkspace { projectId }`：宿主先核对该项目在用户自己的项目清单（`/api/projects/my`）里，不在则 `permission_denied`；是当前项目则直接打开本插件工作区，否则经工作台离开流程（先落盘）`reLaunch` 进该项目并打开本插件工作区。`projectId` 只接受数字。插件用 `context.capabilities`（含 `view.openProjectId`、`ui.openWorkspace.projectId`）判断；旧宿主没有该字段，且会忽略参数、在原地打开工作区。
+
 搜索、语音、脱敏、诉讼可视化、日历、收藏、剪贴板和洞察使用同一安装、启停、视图与权限通道；源码在 `frontend/plugin-app/`，发行内容在 `official-plugins/<id>/`。宿主保留文件树、工作区编辑器、Agent 对话、账户、插件管理与系统设置等运行基础，以及受权限检查的文件、编辑器和本机设备操作。无需把插件加载器本身再做成插件。
 
 桌面资源通过 `AI_PLUGINS_BUNDLED_DIR` 指向只读随包目录，首次启动复制到可写插件目录；禁用状态迁移，用户卸载后不会每次启动强行恢复。随包升级只更新带宿主管理标记且版本更高的副本，不覆盖独立安装的同名插件；可从广场的“随应用提供”项目重新安装。纯服务端开发需显式配置 `ai.plugins.bundled-dir` 并先构建 Web 包。
