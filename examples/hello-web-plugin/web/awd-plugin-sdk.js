@@ -80,6 +80,15 @@
  *   account.changed is a data-free event: discard cached identity, messages and pending work.
  *   Older hosts return unknown_method; do not emulate IM with localStorage.
  *
+ * Project access for global views (host after 0.88.1; context.capabilities lists what the host supports):
+ *   context.openProjectId  the workbench's open project ('' when none). A global view keeps projectId '' (so
+ *                          lawfirm/im/services/ai behave as before), but files.*, ui.openFile and tools.invoke
+ *                          work on openProjectId; project membership is checked per call.
+ *   ui.openWorkspace       { projectId? } -> {}: with projectId, opens that project (only one the user belongs to,
+ *                          else permission_denied) and this plugin's workspace view there; the page reloads.
+ *   Feature check: (awd.context.capabilities || []).includes('ui.openWorkspace.projectId'); older hosts have no
+ *   capabilities, ignore the argument and open the workspace in place.
+ *
  * SDK 1.6.0: services, MCP, host-managed connections, billing and editable settings.
  * All calls accept transport options { signal, timeoutMs }; timeout defaults to 60000 ms.
  * Timeout/abort discard late responses. Service requests also send best-effort cancellation.
@@ -333,7 +342,7 @@
     },
     ui: {
       /** 打开本插件已声明的工作区；无工作区返回 unavailable，旧宿主返回 unknown_method。 */
-      openWorkspace: function () { return call('ui.openWorkspace', {}); },
+      openWorkspace: function (options) { return call('ui.openWorkspace', options && options.projectId != null ? { projectId: options.projectId } : {}); },
       toast: function (message, options) { return call('ui.toast', { message: message }, options); },
       /** 把项目文件打开到工作台中栏（需 file_read） */
       openFile: function (path, options) { return call('ui.openFile', { path: path }, options); },

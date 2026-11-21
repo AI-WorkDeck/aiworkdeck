@@ -92,6 +92,7 @@ description: 插件系统领域（具体插件实现）。任务涉及尽调/脱
 - 工作区仍使用 `pluginWorkspaceTabs.js` 的 `openPluginTab(pluginId)`，身份跨左右窗格保持单例；只挂当前声明允许的工作区。显式空数组或 sidebar-only 不得因为保留 `frontendEntry` 被自动补出标签。
 - 皮肤等轻量插件在主题切换等贡献点使用，保留插件中心预览/管理；`frontendEntry` 可以只是预览文件，不等于主界面。三款官方皮肤声明 `views: []`。
 - SDK `ui.openWorkspace {}` 无参数，不加权限名，只能打开当前 iframe 自己的已声明 workspace；当前清单不可用、未声明工作区或作用域不允许时返回 `unavailable`。权限与视图声明各自校验，不能通过传其他插件 ID 或 URL 越界。
+- **全局视图的项目上下文（本地分支 plugin-global-view-project，未发版）**：全局视图 `projectId` 仍为 null（lawfirm/im/services/ai 及日历、剪贴板等全局官方插件行为不变），另传 `openProjectId`（工作台打开的命名项目，暂存区不算）：只有 `files.*`、`ui.openFile`、`chat.addFile`、`files.prepareDrag`、`tools.invoke` 用它，成员权限照旧逐次校验。`ui.openWorkspace { projectId }` 先查 `/api/projects/my`，不在清单 `permission_denied`，否则 `leaveWorkbench` → `?id=&openPlugin=` 再开本插件标签（`pluginWorkspaceTabs.js` 的 `openPluginWorkspaceInProject` / `pendingPluginWorkspace`）。插件靠 `context.capabilities` 识别；**地雷**：插件自带的旧 SDK 副本的 `openWorkspace()` 不传参数，要用 `awd.call('ui.openWorkspace', { projectId })`。测试 `frontend/tests/plugin-sdk/global-view-project.test.mjs`、`workspace-opening.test.mjs`。
 - 左右工作区分别按标签 `v-for/v-show` 保留实例，普通标签切换不丢输入；关闭、禁用、卸载、封禁、不兼容或视图不再提供工作区时清理。跨窗格移动可能重建，不承诺未持久化表单保活。插件禁止 Alt 双开。
 - 标签只保存身份，实时 URL/permissions/devInstalled 从 `dynamicPlugins` 解析；快照恢复与插件清单加载两条完成路径都协调清理，清单失败不视为空列表。尚未核验时不挂 iframe。项目视图需要项目，全局视图可以在无项目态使用。
 - 不再走 `openFile({fileType:'plugin'})`：文件类型闸不支持它。`fileKind` 把插件列入非文档，避免误入编辑器/AI 文档上下文。

@@ -16,6 +16,27 @@ export const pluginWorkspaceTabMethods = {
     return opened ? 'open' : 'closed'
   },
 
+  // ui.openWorkspace({ projectId }): the plugin's own workspace view inside a project the user belongs to. Another
+  // project is opened the way the calendar opens one (leaveWorkbench → reLaunch); the reloaded workbench then shows
+  // the tab (query openPlugin). Returns 'opened' | 'forbidden' | 'unavailable'.
+  async openPluginWorkspaceInProject(pluginId, projectId, listMyProjects) {
+    const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
+    if (!plugin?.workspaceView) return 'unavailable'
+    const pid = String(projectId)
+    let mine
+    try { mine = await listMyProjects() } catch { return 'unavailable' }
+    if (!(mine || []).some(p => String(p.id) === pid)) return 'forbidden'
+    if (this.hasProject && !this.isLooseWorkspace && String(this.projectId) === pid) return this.openPluginTab(pluginId) === true ? 'opened' : 'unavailable'
+    const left = await this.leaveWorkbench(`/pages/project-overview/project-overview?id=${encodeURIComponent(pid)}&openPlugin=${encodeURIComponent(pluginId)}`)
+    return left ? 'opened' : 'unavailable'
+  },
+
+  // After the reload: the plugin list may still be loading; it opens the tab once it arrives.
+  openPendingPluginWorkspace(pluginId) {
+    if (this.dynamicPluginsLoaded) this.openPluginTab(pluginId)
+    else this.pendingPluginWorkspace = pluginId
+  },
+
   openPluginTab(pluginId) {
     const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
     if (!canOpenPluginWorkspace(plugin, this.hasProject && !this.isLooseWorkspace)) return false

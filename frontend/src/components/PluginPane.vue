@@ -217,6 +217,13 @@ export default {
       type: [String, Number],
       default: ''
     },
+    // The workbench's open, named project, also for a global view (whose projectId stays null). Only the project-file
+    // methods (files.*, ui.openFile, chat.addFile, files.prepareDrag) and tools.invoke use it, with the same per-call
+    // membership checks; lawfirm/im/services/ai keep the view's own scope.
+    openProjectId: {
+      type: [String, Number],
+      default: null
+    },
     /**
      * 宿主注入的「当前聚焦的 Word 编辑器」适配器：() => { executor(action, params), fileId } | null。
      * evidence.link / evidence.locate 要打书签、跳书签，PluginPane 自己拿不到编辑器，
@@ -391,6 +398,10 @@ export default {
     this.resetEventChannel()
   },
   methods: {
+    // The project the file methods and tools.invoke work on: the view's own, else the workbench's open project.
+    fileProjectId() {
+      return this.projectId || this.openProjectId || ''
+    },
     openPluginUpdate() { uni.$emit('awd:plugin-open-settings', { pluginId: this.pluginId }) },
     // Capture authority before rendering code. Never adopt new privileges into a running iframe.
     async initializeAuthorization() {
@@ -539,6 +550,11 @@ export default {
         pluginId: this.pluginId || '',
         surface: this.surface,
         projectId: this.projectId == null ? '' : String(this.projectId),
+        // Host features a plugin cannot detect from its bundled SDK: openProjectId (files and tools work on it, also in
+        // a global view);
+        // ui.openWorkspace accepts { projectId } (older hosts ignore the argument).
+        openProjectId: this.fileProjectId() ? String(this.fileProjectId()) : '',
+        capabilities: ['view.openProjectId', 'ui.openWorkspace.projectId'],
         language: getAppLanguage(),
         // 外壳自 dev-board#223 起有深浅两态，握手把当前生效的那个告诉插件
         theme: getResolvedTheme(),
@@ -624,6 +640,15 @@ export default {
       switch (method) {
         case 'ui.openWorkspace': {
           // The caller cannot select another plugin or supply an arbitrary URL.
+          // { projectId }: open that project (the workbench checks membership) and this plugin's workspace there.
+          const projectId = params.projectId == null || params.projectId === '' ? '' : String(params.projectId)
+          if (projectId) {
+            if (!/^\d{1,18}$/.test(projectId)) return { ok: false, error: { code: 'invalid_params', message: L('projectId 无效', 'Invalid projectId') } }
+            const state = await this.businessActions.openPluginWorkspaceInProject?.(this.pluginId, projectId)
+            if (state === 'opened') return { ok: true, result: {} }
+            if (state === 'forbidden') return { ok: false, error: { code: 'permission_denied', message: L('无权访问该项目', 'No access to this project') } }
+            return { ok: false, error: { code: 'unavailable', message: L('此插件没有可用的工作区视图', 'This plugin has no available workspace view') } }
+          }
           const opened = this.businessActions.openPluginWorkspace?.(this.pluginId)
           return opened === true
             ? { ok: true, result: {} }
@@ -750,8 +775,8 @@ export default {
           const path = typeof params.path === 'string' ? params.path : ''
           if (!path) return { ok: false, error: { code: 'invalid_params', message: L('缺少项目文件路径 path', 'Missing project file path') } }
           const generation = this.sessionGeneration
-          const projectId = this.projectId
-          const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.projectId)
+          const projectId = this.fileProjectId()
+          const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.fileProjectId())
           try {
             const hit = (await this.listProjectFiles()).find(f => f.path === path)
             if (!isCurrent()) return this.staleContext()
@@ -819,7 +844,7 @@ export default {
           if (!name) return { ok: false, error: { code: 'invalid_params', message: L('缺少工具名 name', 'Missing tool name') } }
           let res
           try {
-            res = await invokePluginTool(this.pluginId, name, this.projectId, params.args || {})
+            res = await invokePluginTool(this.pluginId, name, this.fileProjectId() || null, params.args || {})
           } catch (e) {
             return { ok: false, error: { code: 'invoke_failed', message: (e && e.message) || L('工具调用失败', 'Tool invocation failed') } }
           }
@@ -1212,8 +1237,8 @@ export default {
     // 后端返回的是一份扁平全树（每条带 parentId），这里就地拼出项目内相对路径——
     // 插件拿到的 path 必须是人看得懂、且能原样喂回 files.read 的东西，不是数据库 id。
     async listProjectFiles() {
-      if (!this.projectId) return []
-      const res = await getProjectFiles(this.projectId, null, true)
+      if (!this.fileProjectId()) return []
+      const res = await getProjectFiles(this.fileProjectId(), null, true)
       const rows = Array.isArray(res) ? res : (res && res.data) || []
       const byId = new Map()
       rows.forEach(r => byId.set(r.id, r))
