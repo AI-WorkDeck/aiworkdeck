@@ -42,7 +42,7 @@ test('manifest: unique panel-only tools, the JAR it declares, views, connection 
   assert.ok(manifest.tools.every((t) => t.agent === false), 'tools are for the panel only, never the AI chat')
   assert.deepEqual(manifest.backendJars, [`aifirm-partner-${manifest.version}.jar`])
   const pom = read('backend/pom.xml')
-  assert.match(pom, new RegExp(`<artifactId>aifirm-partner</artifactId><version>${manifest.version.replace(/\./g, '\\.')}</version>`))
+  assert.ok(pom.includes(`<artifactId>aifirm-partner</artifactId><version>${manifest.version}</version>`), 'pom version = manifest version')
   const views = manifest.contributes.views
   assert.deepEqual(views.map((v) => [v.placement, v.scope]), [['workspace', 'global'], ['sidebar', 'global']])
   const conn = manifest.contributes.connections[0]
