@@ -284,9 +284,6 @@ export default {
     }
   },
   computed: {
-    fileProjectId() {
-      return this.projectId || this.openProjectId || ''
-    },
     legacyProjectCommunication() {
       return this.pluginId === 'project-im' && this.authorizationReady && /^0\.[01]\./.test(this.installedPluginVersion)
     },
@@ -401,6 +398,10 @@ export default {
     this.resetEventChannel()
   },
   methods: {
+    // The project the file methods and tools.invoke work on: the view's own, else the workbench's open project.
+    fileProjectId() {
+      return this.projectId || this.openProjectId || ''
+    },
     openPluginUpdate() { uni.$emit('awd:plugin-open-settings', { pluginId: this.pluginId }) },
     // Capture authority before rendering code. Never adopt new privileges into a running iframe.
     async initializeAuthorization() {
@@ -552,7 +553,7 @@ export default {
         // Host features a plugin cannot detect from its bundled SDK: openProjectId (files and tools work on it, also in
         // a global view);
         // ui.openWorkspace accepts { projectId } (older hosts ignore the argument).
-        openProjectId: this.fileProjectId ? String(this.fileProjectId) : '',
+        openProjectId: this.fileProjectId() ? String(this.fileProjectId()) : '',
         capabilities: ['view.openProjectId', 'ui.openWorkspace.projectId'],
         language: getAppLanguage(),
         // 外壳自 dev-board#223 起有深浅两态，握手把当前生效的那个告诉插件
@@ -774,8 +775,8 @@ export default {
           const path = typeof params.path === 'string' ? params.path : ''
           if (!path) return { ok: false, error: { code: 'invalid_params', message: L('缺少项目文件路径 path', 'Missing project file path') } }
           const generation = this.sessionGeneration
-          const projectId = this.fileProjectId
-          const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.fileProjectId)
+          const projectId = this.fileProjectId()
+          const isCurrent = () => generation === this.sessionGeneration && String(projectId) === String(this.fileProjectId())
           try {
             const hit = (await this.listProjectFiles()).find(f => f.path === path)
             if (!isCurrent()) return this.staleContext()
@@ -843,7 +844,7 @@ export default {
           if (!name) return { ok: false, error: { code: 'invalid_params', message: L('缺少工具名 name', 'Missing tool name') } }
           let res
           try {
-            res = await invokePluginTool(this.pluginId, name, this.fileProjectId || null, params.args || {})
+            res = await invokePluginTool(this.pluginId, name, this.fileProjectId() || null, params.args || {})
           } catch (e) {
             return { ok: false, error: { code: 'invoke_failed', message: (e && e.message) || L('工具调用失败', 'Tool invocation failed') } }
           }
@@ -1236,8 +1237,8 @@ export default {
     // 后端返回的是一份扁平全树（每条带 parentId），这里就地拼出项目内相对路径——
     // 插件拿到的 path 必须是人看得懂、且能原样喂回 files.read 的东西，不是数据库 id。
     async listProjectFiles() {
-      if (!this.fileProjectId) return []
-      const res = await getProjectFiles(this.fileProjectId, null, true)
+      if (!this.fileProjectId()) return []
+      const res = await getProjectFiles(this.fileProjectId(), null, true)
       const rows = Array.isArray(res) ? res : (res && res.data) || []
       const byId = new Map()
       rows.forEach(r => byId.set(r.id, r))
