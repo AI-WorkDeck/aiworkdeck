@@ -1,0 +1,139 @@
+{
+  "id": "aifirm-partner",
+  "name": "Venture AI 律师端",
+  "version": "0.9.0",
+  "minHostVersion": "0.88.2",
+  "description": "合作律师接收 Venture AI转来的审阅请求：客户在网站上与 Venture AI对话、生成初稿后，申请任何一家律所的执业律师审阅。您在这里查看事实、风险提示与各版本，与客户沟通、安排通话，在 Word 中修改并审定定稿。覆盖硅谷与台北。",
+  "author": "AI WorkDeck",
+  "permissions": [
+    "network",
+    "ai",
+    "file_read",
+    "file_write",
+    "tasks",
+    "notifications",
+    "lawfirm"
+  ],
+  "frontendEntry": "web/index.html",
+  "tools": [
+    {
+      "name": "aifirmPartnerPutDocx",
+      "description": "把案件文件的 Word 版本放进当前项目，供在 AI WorkDeck 编辑器中修改（同名文件已存在时不覆盖）",
+      "permissions": [
+        "file_write"
+      ],
+      "agent": false
+    },
+    {
+      "name": "aifirmPartnerReadDocx",
+      "description": "读取当前项目中律师修改过的 Word 文件，供保存为案件的新版本",
+      "permissions": [
+        "file_read"
+      ],
+      "agent": false
+    }
+  ],
+  "backendJars": [
+    "aifirm-partner-0.9.0.jar"
+  ],
+  "contributes": {
+    "views": [
+      {
+        "id": "main",
+        "name": "Venture AI 律师端",
+        "entry": "web/index.html",
+        "placement": "workspace",
+        "scope": "global"
+      },
+      {
+        "id": "card",
+        "name": "Venture AI 律师端",
+        "entry": "web/card.html",
+        "placement": "sidebar",
+        "scope": "global",
+        "allowedDocks": [
+          "left"
+        ],
+        "defaultDock": "left"
+      }
+    ],
+    "connections": [
+      {
+        "id": "intake",
+        "label": "Venture AI 律师端 · Venture AI Lawyer Desk",
+        "baseUrl": "https://ai-firm.aiworkdeck.com",
+        "auth": {
+          "type": "bearer"
+        },
+        "operations": {
+          "summary": {
+            "path": "/api/portal/summary",
+            "method": "GET"
+          },
+          "leads": {
+            "path": "/api/portal/leads",
+            "method": "GET"
+          },
+          "lead": {
+            "path": "/api/portal/lead",
+            "method": "GET"
+          },
+          "update": {
+            "path": "/api/portal/lead/update",
+            "method": "POST"
+          },
+          "brief": {
+            "path": "/api/portal/lead/brief",
+            "method": "POST"
+          },
+          "export": {
+            "path": "/api/portal/export",
+            "method": "GET"
+          },
+          "qr": {
+            "path": "/api/portal/qr",
+            "method": "GET"
+          },
+          "matters": {
+            "path": "/api/portal/matters",
+            "method": "GET"
+          },
+          "matter": {
+            "path": "/api/portal/matter",
+            "method": "GET"
+          },
+          "matterUpdate": {
+            "path": "/api/portal/matter/update",
+            "method": "POST"
+          },
+          "matterMessage": {
+            "path": "/api/portal/matter/message",
+            "method": "POST"
+          },
+          "matterVersion": {
+            "path": "/api/portal/matter/version",
+            "method": "POST"
+          },
+          "matterSignoff": {
+            "path": "/api/portal/matter/signoff",
+            "method": "POST"
+          },
+          "matterConsult": {
+            "path": "/api/portal/matter/consult",
+            "method": "POST"
+          },
+          "matterDocx": {
+            "path": "/api/portal/matter/docx",
+            "method": "GET"
+          },
+          "matterVersionDocx": {
+            "path": "/api/portal/matter/version-docx",
+            "method": "POST"
+          }
+        }
+      }
+    ]
+  },
+  "icon": "assets/icon-512.png",
+  "homepage": "https://www.aiworkdeck.com/zh/marketplace/plugins"
+}
