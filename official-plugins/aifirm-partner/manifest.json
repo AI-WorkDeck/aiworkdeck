@@ -1,9 +1,9 @@
 {
   "id": "aifirm-partner",
   "name": "Venture AI 律师端",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "minHostVersion": "0.88.2",
-  "description": "合作律师接收 Venture AI转来的审阅请求：客户在网站上与 Venture AI对话、生成初稿后，申请任何一家律所的执业律师审阅。您在这里查看事实、风险提示与各版本，与客户沟通、安排通话，在 Word 中修改并审定定稿。覆盖硅谷与台北。",
+  "description": "合作律师接收 Venture AI 转来的审阅请求：客户在网站上与 Venture AI 对话、生成初稿后，申请任何一家律所的执业律师审阅。您在这里查看事实、风险提示与各版本，与客户沟通、安排通话，在 AI WorkDeck 编辑器中修改并审定定稿。覆盖硅谷与台北。",
   "author": "AI WorkDeck",
   "permissions": [
     "network",
@@ -34,7 +34,7 @@
     }
   ],
   "backendJars": [
-    "aifirm-partner-0.9.0.jar"
+    "aifirm-partner-0.9.1.jar"
   ],
   "contributes": {
     "views": [

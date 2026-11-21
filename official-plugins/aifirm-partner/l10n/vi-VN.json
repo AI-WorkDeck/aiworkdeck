@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI dành cho luật sư",
-  "plugin.description": "Dành cho luật sư đối tác: khách hàng soạn thảo cùng Venture AI trên website, sau đó đề nghị một luật sư hành nghề của bất kỳ hãng luật nào rà soát. Tại đây bạn xem các dữ kiện, cảnh báo rủi ro và các phiên bản, trao đổi với khách hàng, lên lịch cuộc gọi, chỉnh sửa trong Word và hoàn tất văn bản. Phục vụ Thung lũng Silicon và Đài Bắc.",
+  "plugin.description": "Dành cho luật sư đối tác: khách hàng soạn thảo cùng Venture AI trên website, sau đó đề nghị một luật sư hành nghề của bất kỳ hãng luật nào rà soát. Tại đây bạn xem các dữ kiện, cảnh báo rủi ro và các phiên bản, trao đổi với khách hàng, lên lịch cuộc gọi, chỉnh sửa trong trình soạn thảo AI WorkDeck và hoàn tất văn bản. Phục vụ Thung lũng Silicon và Đài Bắc.",
   "view.main.name": "Venture AI dành cho luật sư",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Mọi khách truy cập, nhu cầu của họ và người sẽ phụ trách theo dõi.",

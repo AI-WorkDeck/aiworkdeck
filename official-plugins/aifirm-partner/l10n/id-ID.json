@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Portal Advokat",
-  "plugin.description": "Untuk advokat mitra: klien menyusun dokumen dengan Venture AI di situs, lalu meminta advokat berlisensi dari firma mana pun untuk meninjaunya. Di sini Anda melihat fakta, tanda bahaya, dan versi dokumen, berkomunikasi dengan klien, menjadwalkan panggilan, menyunting di Word, dan memfinalkan dokumen. Silicon Valley dan Taipei.",
+  "plugin.description": "Untuk advokat mitra: klien menyusun dokumen dengan Venture AI di situs, lalu meminta advokat berlisensi dari firma mana pun untuk meninjaunya. Di sini Anda melihat fakta, tanda bahaya, dan versi dokumen, berkomunikasi dengan klien, menjadwalkan panggilan, menyunting di editor AI WorkDeck, dan memfinalkan dokumen. Silicon Valley dan Taipei.",
   "view.main.name": "Venture AI Portal Advokat",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Setiap pengunjung, kebutuhannya, dan siapa yang menindaklanjuti.",

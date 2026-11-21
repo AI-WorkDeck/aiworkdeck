@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "Para abogados colaboradores: los clientes redactan con Venture AI en el sitio web y después piden a un abogado colegiado de cualquier despacho que lo revise. Aquí puede consultar los hechos, las alertas y las versiones, hablar con el cliente, programar llamadas, editar en Word y finalizar. Silicon Valley y Taipéi.",
+  "plugin.description": "Para abogados colaboradores: los clientes redactan con Venture AI en el sitio web y después piden a un abogado colegiado de cualquier despacho que lo revise. Aquí puede consultar los hechos, las alertas y las versiones, hablar con el cliente, programar llamadas, editar en el editor de AI WorkDeck y finalizar. Silicon Valley y Taipéi.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Cada visitante, lo que necesita y quién hará el seguimiento.",

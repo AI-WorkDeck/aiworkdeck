@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "For partner lawyers: clients draft with Venture AI on the site, then ask a licensed lawyer from any firm to review. Here you see the facts, red flags and versions, talk with the client, schedule calls, edit in Word and finalise. Silicon Valley and Taipei.",
+  "plugin.description": "For partner lawyers: clients draft with Venture AI on the site, then ask a licensed lawyer from any firm to review. Here you see the facts, red flags and versions, talk with the client, schedule calls, edit in the AI WorkDeck editor and finalise. Silicon Valley and Taipei.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Every visitor, what they need, and who will follow up.",

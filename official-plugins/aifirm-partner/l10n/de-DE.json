@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI Lawyer Desk",
-  "plugin.description": "Für Partneranwälte: Mandanten entwerfen auf der Website mit Venture AI und bitten dann eine zugelassene Anwältin oder einen zugelassenen Anwalt einer beliebigen Kanzlei um Prüfung. Hier sehen Sie Sachverhalt, Red Flags und Versionen, kommunizieren mit dem Mandanten, vereinbaren Telefonate, bearbeiten in Word und finalisieren. Silicon Valley und Taipeh.",
+  "plugin.description": "Für Partneranwälte: Mandanten entwerfen auf der Website mit Venture AI und bitten dann eine zugelassene Anwältin oder einen zugelassenen Anwalt einer beliebigen Kanzlei um Prüfung. Hier sehen Sie Sachverhalt, Red Flags und Versionen, kommunizieren mit dem Mandanten, vereinbaren Telefonate, bearbeiten im AI WorkDeck-Editor und finalisieren. Silicon Valley und Taipeh.",
   "view.main.name": "Venture AI Lawyer Desk",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "Alle Besucher, ihr Bedarf und wer nachfasst.",

@@ -1,6 +1,6 @@
 {
   "plugin.name": "Venture AI 변호사 데스크",
-  "plugin.description": "제휴 변호사용: 고객이 사이트에서 Venture AI로 문서를 작성한 뒤 어느 로펌이든 자격을 갖춘 변호사에게 검토를 요청합니다. 여기서 사실관계, 위험 신호, 버전을 확인하고, 고객과 소통하며, 통화 일정을 잡고, Word에서 수정한 뒤 확정합니다. 실리콘밸리와 타이베이.",
+  "plugin.description": "제휴 변호사용: 고객이 사이트에서 Venture AI로 문서를 작성한 뒤 어느 로펌이든 자격을 갖춘 변호사에게 검토를 요청합니다. 여기서 사실관계, 위험 신호, 버전을 확인하고, 고객과 소통하며, 통화 일정을 잡고, AI WorkDeck 편집기에서 수정한 뒤 확정합니다. 실리콘밸리와 타이베이.",
   "view.main.name": "Venture AI 변호사 데스크",
   "panel.eyebrow": "AI WorkDeck",
   "panel.subtitle": "모든 방문자, 필요한 사항, 후속 담당자.",
