@@ -1,0 +1,90 @@
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Event Lead Portal</title>
+  <link rel="stylesheet" href="panel.css">
+  <script src="awd-plugin-sdk.js"></script>
+  <script src="panel-l10n.js"></script>
+  <script src="firm.js"></script>
+  <script src="panel.js" defer></script>
+  <script src="matters.js" defer></script>
+</head>
+<body>
+  <main class="awd-plugin-stage elp">
+    <header class="awd-plugin-header">
+      <div>
+        <div class="awd-eyebrow" data-i18n="panel.eyebrow"></div>
+        <h1 class="awd-title" id="title"></h1>
+        <p class="awd-subtitle" data-i18n="panel.subtitle"></p>
+      </div>
+      <div class="awd-header-actions">
+        <span id="leads-actions" class="awd-header-actions" hidden>
+          <button type="button" id="btn-qr" class="awd-btn awd-btn-sm" data-i18n="panel.qr" disabled></button>
+          <button type="button" id="btn-export" class="awd-btn awd-btn-sm" data-i18n="panel.export" disabled></button>
+        </span>
+        <a id="m-client-link" class="awd-btn awd-btn-sm" target="_blank" rel="noopener" data-i18n="panel.m.clientLink" hidden></a>
+        <button type="button" id="btn-refresh" class="awd-btn awd-btn-sm" data-i18n="panel.refresh"></button>
+      </div>
+    </header>
+
+    <nav id="mode" class="awd-subnav mode" aria-label="View">
+      <button type="button" class="awd-subnav-item" data-mode="matters" data-i18n="panel.mode.matters"></button>
+      <button type="button" class="awd-subnav-item" data-mode="leads" data-i18n="panel.mode.leads"></button>
+    </nav>
+
+    <div id="notice" hidden></div>
+    <div id="m-notice" hidden></div>
+
+    <section id="matters" hidden>
+      <nav id="m-office" class="awd-subnav office" aria-label="Office"></nav>
+      <div id="m-kpis" class="awd-kpi-grid"></div>
+      <div class="toolbar">
+        <nav id="m-status" class="awd-subnav" aria-label="Status"></nav>
+        <input id="m-search" class="awd-input" type="search">
+      </div>
+      <div class="split">
+        <div id="m-list" class="list" role="listbox"></div>
+        <article id="m-detail" class="awd-card detail"></article>
+      </div>
+    </section>
+
+    <div id="leads-view" hidden>
+    <section id="board" hidden>
+      <div id="kpis" class="awd-kpi-grid"></div>
+
+      <div class="toolbar">
+        <select id="event" class="awd-select" aria-label="Event" hidden></select>
+        <nav id="topics" class="awd-subnav" aria-label="Topics"></nav>
+        <select id="status" class="awd-select"></select>
+        <input id="search" class="awd-input" type="search">
+      </div>
+      <label class="anon"><input type="checkbox" id="anon"> <span data-i18n="panel.filter.anon"></span></label>
+
+      <div class="split">
+        <div id="list" class="list" role="listbox"></div>
+        <article id="detail" class="awd-card detail"></article>
+      </div>
+    </section>
+    </div>
+
+    <div id="m-dialog" class="overlay" hidden><div class="awd-card dialog wide" role="dialog" aria-modal="true"></div></div>
+
+    <div id="qr-dialog" class="overlay" hidden>
+      <div class="awd-card dialog" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+        <h2 id="qr-title" class="awd-card-title" data-i18n="panel.qr.title"></h2>
+        <p class="muted" data-i18n="panel.qr.desc"></p>
+        <div id="qr-svg" class="qr"></div>
+        <code id="qr-url" class="url"></code>
+        <div class="row">
+          <button type="button" id="qr-copy" class="awd-btn awd-btn-sm" data-i18n="panel.qr.copy"></button>
+          <button type="button" id="qr-close" class="awd-btn awd-btn-sm awd-btn-primary" data-i18n="panel.qr.close"></button>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

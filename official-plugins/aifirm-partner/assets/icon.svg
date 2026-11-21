@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The partner-network lawyer desk (no firm, no name): a draft page on ink, its last line a bronze seal with a tick
+       (the lawyer's review and finalisation), and a small spark for the AI advisor that drafted it. -->
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#262B2F"/><stop offset="1" stop-color="#121212"/></linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".42" r=".55"><stop offset="0" stop-color="#ffffff" stop-opacity=".07"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#ink)"/>
+  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+  <path d="M150 104 h160 l62 62 v226 a16 16 0 0 1 -16 16 h-206 a16 16 0 0 1 -16 -16 v-272 a16 16 0 0 1 16 -16z" fill="#F3ECE0"/>
+  <path d="M310 104 v46 a16 16 0 0 0 16 16 h46" fill="#D9CBB5"/>
+  <g stroke="#9A8C78" stroke-width="12" stroke-linecap="round">
+    <path d="M182 196 h150"/><path d="M182 236 h150"/><path d="M182 276 h104"/>
+  </g>
+  <circle cx="330" cy="352" r="58" fill="#B08D57"/>
+  <circle cx="330" cy="352" r="58" fill="none" stroke="#121212" stroke-width="10"/>
+  <path d="M302 352 l20 20 36 -40" fill="none" stroke="#FFFEFB" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M410 82 l9 25 25 9 -25 9 -9 25 -9 -25 -25 -9 25 -9z" fill="#CDB894"/>
+</svg>
