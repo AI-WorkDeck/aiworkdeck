@@ -4,6 +4,7 @@ const { app, BrowserWindow, shell } = require('electron')
 const { t, getAppLanguage } = require('./app-language')
 const overlay = require('./services/overlay')
 const legalNotices = require('./legal-notices.json')
+const brand = require('./brand')
 
 const SOURCE_URL = 'https://github.com/AI-WorkDeck/aiworkdeck'
 const LEGAL_URLS = [SOURCE_URL, `${SOURCE_URL}/blob/master/LICENSE`, `${SOURCE_URL}/blob/master/legal/TRADEMARKS.md`]
@@ -22,6 +23,12 @@ function versionText() {
   return t({ zh: `${effective}（安装包 ${appVersion}）`, en: `${effective} (installer ${appVersion})` })
 }
 
+// 贴牌版注明出处（AGPL 告示与商标说明原文保留，见 rfcs/2026-11-21-brand-profile.md §1.2）；默认品牌输出为空。
+function basedOn() {
+  if (!brand.isWhiteLabel()) return ''
+  return `<p class="version">${escapeHtml(t({ zh: `${brand.brand().name} 基于开源软件 AI WorkDeck`, en: `${brand.brand().name} is based on the open-source software AI WorkDeck` }))}</p>`
+}
+
 // macOS 原生 About 的 copyright 高度固定，不能承载完整双语许可告示。
 // 使用无脚本的本地页面；正文自然换行、滚动，不依赖主工作台是否加载成功。
 function aboutHtml() {
@@ -32,7 +39,7 @@ function aboutHtml() {
   }
   return `<!doctype html><html lang="${getAppLanguage()}"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<meta name="color-scheme" content="light dark"><title>${t({ zh: '关于 AI WorkDeck', en: 'About AI WorkDeck' })}</title>
+<meta name="color-scheme" content="light dark"><title>${t({ zh: `关于 ${brand.brand().name}`, en: `About ${brand.brand().name}` })}</title>
 <style>
 /* Generated from design/tokens/awd-palette.json; parity checked by about-window.test.js. */
 :root { --awd-text: #2B2A26; --awd-text-2: #6B675C; --awd-surface: #FCFBF7; --awd-border: #DDD8CA; --awd-accent-text: #2E5A50; }
@@ -47,7 +54,7 @@ nav { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 18px 0; margin: 4p
 a { color: var(--awd-accent-text); text-underline-offset: 3px; }
 a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
 @media (prefers-color-scheme: dark) { :root { --awd-text: #EDE9DF; --awd-text-2: #B0AA9C; --awd-surface: #221F1A; --awd-border: #3D372E; --awd-accent-text: #89A8A0; } }
-</style></head><body><header><h1>AI WorkDeck</h1><p class="version">${t({ zh: '版本', en: 'Version' })} ${escapeHtml(versionText())}</p></header>
+</style></head><body><header><h1>${escapeHtml(brand.brand().name)}</h1><p class="version">${t({ zh: '版本', en: 'Version' })} ${escapeHtml(versionText())}</p>${basedOn()}</header>
 <main>
 <p>${escapeHtml(t(legalNotices.copyright))}${englishNotice('copyright')}</p>
 <p>本软件依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。<span class="english" lang="en">Released under the GNU AGPL v3.0 or later, with ABSOLUTELY NO WARRANTY.</span></p>
@@ -70,7 +77,7 @@ function showAboutWindow(parent) {
     return aboutWindow
   }
   const win = new BrowserWindow({
-    title: t({ zh: '关于 AI WorkDeck', en: 'About AI WorkDeck' }),
+    title: t({ zh: `关于 ${brand.brand().name}`, en: `About ${brand.brand().name}` }),
     parent, width: 560, height: 620, minWidth: 380, minHeight: 360,
     show: false, minimizable: false, maximizable: false, autoHideMenuBar: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },

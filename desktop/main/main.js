@@ -39,7 +39,7 @@ if (!singleInstanceLock) {
 if (app.isPackaged && process.platform === 'win32' && require('./services/full-update').deferWindowsLaunch(require('./awd-home').dataDir(), undefined, () => {
   const { t: langT } = require('./app-language')
   require('electron').dialog.showErrorBox(
-    langT({ zh: 'AI WorkDeck 更新仍在进行', en: 'AI WorkDeck Update Still in Progress' }),
+    langT({ zh: `${require('./brand').brand().name} 更新仍在进行`, en: `${require('./brand').brand().name} Update Still in Progress` }),
     langT({
       zh: '安装过程超过预期，请检查正在运行的安装程序后再打开应用。',
       en: 'Installation is taking longer than expected. Check the running installer before reopening the app.'
@@ -1975,7 +1975,7 @@ app.whenReady().then(() => {
               const { t: tL } = require('./app-language')
               if (evt.type === 'ready' && Notification.isSupported()) {
                 new Notification({
-                  title: tL({ zh: 'AI WorkDeck 更新已就绪', en: 'AI WorkDeck Update Ready' }),
+                  title: tL({ zh: `${require('./brand').brand().name} 更新已就绪`, en: `${require('./brand').brand().name} Update Ready` }),
                   body: tL({
                     zh: `新版本 ${evt.version} 已下载完成，重启应用后生效。`,
                     en: `Version ${evt.version} has been downloaded. Restart the app to apply it.`,
@@ -1983,7 +1983,7 @@ app.whenReady().then(() => {
                 }).show()
               } else if (evt.type === 'major-available' && Notification.isSupported()) {
                 new Notification({
-                  title: tL({ zh: 'AI WorkDeck 新版本发布', en: 'New AI WorkDeck Release' }),
+                  title: tL({ zh: `${require('./brand').brand().name} 新版本发布`, en: `New ${require('./brand').brand().name} Release` }),
                   body: tL({
                     zh: `大版本 ${evt.major} 已发布，请前往官网下载完整安装包。`,
                     en: `Major version ${evt.major} is available. Download the full installer from the website.`,

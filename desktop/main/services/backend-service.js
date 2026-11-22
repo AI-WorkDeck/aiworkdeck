@@ -101,8 +101,10 @@ function backendBuildId(ctx) {
 
 // 隔离实例（AWD_HOME，问题 20）的指纹后缀「@home-<摘要>」。默认实例没有后缀，格式不变。
 // 不同 home 的后端读写的是不同数据目录，端口链上撞见对方的后端绝不能复用（decideReuse）。
+// 贴牌版同理：数据目录是品牌自己的（brand.json dataDirName），撞见 AI WorkDeck 的后端也必须跳过。
 function homeTag(ctx) {
-  return ctx && ctx.awdHome ? '@home-' + createHash('sha256').update(String(ctx.awdHome)).digest('hex').slice(0, 12) : ''
+  const key = ctx && (ctx.awdHome || (require('../brand').isWhiteLabel() ? ctx.dataDir : null))
+  return key ? '@home-' + createHash('sha256').update(String(key)).digest('hex').slice(0, 12) : ''
 }
 function homeTagOfBuild(build) {
   const i = String(build || '').indexOf('@')
@@ -305,6 +307,13 @@ function spawnEnv(ctx) {
   // 后端 build 指纹：wizard 端点回显，复用前对比识破陈旧残留后端（见 backendBuildId）
   env.AWD_BACKEND_BUILD = backendBuildId(ctx)
   env.AWD_BACKEND_CONTROL_TOKEN = randomBytes(32).toString('hex')
+  // 贴牌版：后端状态目录（账户、授权、站点、H2 库…）随品牌数据目录，与 AI WorkDeck 互不干扰。
+  // 默认品牌不注入，后端照旧用 ${user.home}/.aiworkdeck。
+  if (require('../brand').isWhiteLabel() && ctx.dataDir) {
+    if (!env.SECURITY_LICENSE_DIR) env.SECURITY_LICENSE_DIR = ctx.dataDir
+    // 反馈附带的日志路径默认写死 ~/.aiworkdeck/logs（FeedbackContextCollector），这里显式给出品牌目录下的那一份
+    if (!env.FEEDBACK_LOG_FILES) env.FEEDBACK_LOG_FILES = path.join(ctx.dataDir, 'logs', 'backend.log') + ',app.log'
+  }
   // 后端盯住壳进程：壳崩溃后残留的 JVM 自行退出（backend ParentProcessWatchdog）
   env.AWD_PARENT_PID = String(process.pid)
   return env

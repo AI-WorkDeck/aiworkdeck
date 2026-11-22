@@ -29,10 +29,8 @@ MCowBQYDK2VwAyEARzNmFaY6rOsiGPnduwi+O09OROxpYidwiQNLUXksFMs=
 // manifest 地址：官网镜像优先（大陆可达），GitHub Release 兜底。
 // CHECKBA_UPDATE_MANIFEST_URL 供 e2e/排障显式覆盖（叠加自定义公钥需同时设
 // CHECKBA_UPDATE_PUBKEY_FILE——仅本机环境变量可设，不扩大远程攻击面）。
-const DEFAULT_MANIFEST_URLS = [
-  'https://www.aiworkdeck.com/update/desktop/manifest.json',
-  'https://github.com/AI-WorkDeck/aiworkdeck/releases/latest/download/manifest.json'
-]
+// 地址随品牌（brand.json update.manifestUrls）；默认品牌即上面两条。贴牌版不得落到 AI WorkDeck 的清单上。
+const DEFAULT_MANIFEST_URLS = require('../brand').brand().update.manifestUrls
 
 const CHECK_DELAY_MS = 10 * 1000            // 启动后 10s 自动首查，尽早后台拉取更新包
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000 // 周期检查
@@ -306,7 +304,7 @@ function createUpdateService(ctx, hooks = {}) {
         if (manifest.latestMajor && overlay.compareVersions(manifest.latestMajor + '.0', myMajor + '.0') > 0) {
           const majorChannel = manifest.channels && manifest.channels[manifest.latestMajor]
           const majorVersion = (majorChannel && majorChannel.latest) || manifest.latestMajor
-          const fallbackMajorInfo = { major: majorVersion, page: manifest.majorDownloadPage || 'https://www.aiworkdeck.com' }
+          const fallbackMajorInfo = { major: majorVersion, page: manifest.majorDownloadPage || require('../brand').brand().update.downloadPage }
           const platform = ctx.platform || process.platform
           const key = platform === 'win32' ? 'win32' : `${platform}-${ctx.arch || process.arch}`
           const installer = majorChannel && majorChannel.installers && majorChannel.installers[key]

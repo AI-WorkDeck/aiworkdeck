@@ -29,7 +29,7 @@ const { showAboutWindow } = require('./about-window')
 // 注：macOS 菜单栏最左边那个粗体应用名不由这里决定，它取自运行中 .app 包的
 // CFBundleName（打包版=AI WorkDeck；dev 跑 node_modules 里的 Electron.app，
 // 见 scripts/brand-dev-electron.js）。
-const APP_DISPLAY_NAME = 'AI WorkDeck'
+const APP_DISPLAY_NAME = require('./brand').brand().name
 
 let getWindow = () => null
 // 渲染层最近一次下发的业务菜单。null = 渲染层还没就绪，先只挂骨架。

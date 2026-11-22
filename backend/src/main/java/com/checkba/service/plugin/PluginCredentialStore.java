@@ -24,7 +24,7 @@ public class PluginCredentialStore {
     private final SecureRandom random = new SecureRandom();
 
     public PluginCredentialStore(SystemSettingService settings,
-            @Value("${ai.plugins.credential-key-file:${user.home}/.aiworkdeck/plugin-credentials.key}") String keyPath) {
+            @Value("${ai.plugins.credential-key-file:${security.license.dir:${user.home}/.aiworkdeck}/plugin-credentials.key}") String keyPath) {
         this.settings = settings;
         this.keyPath = Path.of(keyPath);
     }

@@ -10,6 +10,7 @@ import {
   registerReactiveLocaleTracker,
   registerLocaleChangeHandler,
 } from '../utils/appLanguage.js'
+import { applyBrandToMessages } from '../brand/index.js'
 
 /**
  * 国际化入口（vue-i18n v9，legacy 模式以兼容 Options API 的 `this.$t` 与模板 `$t`，dev-board#1477）：
@@ -57,7 +58,8 @@ export const i18n = createI18n({
   fallbackLocale: LOCALE_FALLBACK_MAP,
   silentFallbackWarn: true,
   silentTranslationWarn: true,
-  messages: buildMessages(localeModules),
+  // 贴牌构建把词条里的产品名换成品牌名（受保护的法律告示除外）；默认品牌原样
+  messages: applyBrandToMessages(buildMessages(localeModules)),
 })
 
 registerReactiveLocaleTracker(() => (

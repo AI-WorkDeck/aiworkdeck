@@ -30,7 +30,7 @@ function homeDir(env = process.env) {
 
 /** 本机数据目录（原 ~/.aiworkdeck）。所有派生路径都从这里取。 */
 function dataDir(env = process.env) {
-  return path.join(homeDir(env), '.aiworkdeck')
+  return path.join(homeDir(env), require('./brand').brand().dataDirName)
 }
 
 /**
@@ -40,8 +40,16 @@ function dataDir(env = process.env) {
  */
 function applyUserData(app, env = process.env, argv = process.argv) {
   const h = awdHome(env)
-  if (!h) return null
   if ((argv || []).some((a) => /^--user-data-dir(=|$)/.test(String(a)))) return null
+  // 贴牌版（rfcs/2026-11-21-brand-profile.md）：userData 落到品牌自己的目录，与 AI WorkDeck 并装不串登录态。
+  // 默认品牌不进这条分支，userData 仍由 package.json name 推导（见 app-menu.js 的说明）。
+  const brand = require('./brand')
+  if (!h && brand.isWhiteLabel()) {
+    const dir = path.join(app.getPath('appData'), brand.brand().userDataDirName)
+    app.setPath('userData', dir)
+    return dir
+  }
+  if (!h) return null
   const dir = path.join(h, 'userdata')
   app.setPath('userData', dir)
   return dir

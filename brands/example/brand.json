@@ -1,0 +1,12 @@
+{
+  "id": "example",
+  "name": "Example Desk",
+  "appId": "com.example.desk",
+  "dataDirName": ".exampledesk",
+  "userDataDirName": "exampledesk-desktop",
+  "site": "intl",
+  "update": { "manifestUrls": [], "downloadPage": "https://example.com" },
+  "bundledPlugins": { "add": [], "remove": [] },
+  "gate": null,
+  "assets": {}
+}

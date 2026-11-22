@@ -1,0 +1,15 @@
+{
+  "id": "aiworkdeck",
+  "name": "AI WorkDeck",
+  "dataDirName": ".aiworkdeck",
+  "userDataDirName": null,
+  "site": null,
+  "update": {
+    "manifestUrls": [
+      "https://www.aiworkdeck.com/update/desktop/manifest.json",
+      "https://github.com/AI-WorkDeck/aiworkdeck/releases/latest/download/manifest.json"
+    ],
+    "downloadPage": "https://www.aiworkdeck.com"
+  },
+  "gate": null
+}
