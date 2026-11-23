@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Codice invito non valido o disattivato",
   "errInviteAlreadyBound": "Questo account ha già associato un codice invito Circle",
   "errBqtNotLawyer": "Solo gli account avvocato Baoqingtian verificati possono accedere tramite QR",
+  "brandGateTitle": "È necessario un piano attivo",
+  "brandGateSignInBody": "Accedi al tuo account per continuare.",
+  "brandGatePlanBody": "Questa edizione richiede un piano attivo. Scegli un piano o acquistalo sul nostro sito e verifica di nuovo.",
+  "brandGateSignIn": "Accedi",
+  "brandGateChoosePlan": "Scegli un piano",
+  "brandGateOpenSite": "Acquista sul sito",
+  "brandGateRecheck": "Ho pagato, verifica di nuovo",
+  "brandGateStillLocked": "Nessun piano attivo trovato per questo account.",
 }

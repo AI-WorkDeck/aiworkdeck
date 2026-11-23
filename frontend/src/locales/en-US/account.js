@@ -505,4 +505,12 @@ export default {
   "errInvalidInviteCode": "Invalid or inactive invitation code",
   "errInviteAlreadyBound": "This account has already bound a Circle firm invite code",
   "errBqtNotLawyer": "Only verified Baoqingtian lawyer accounts can sign in via QR code",
+  "brandGateTitle": "An active plan is required",
+  "brandGateSignInBody": "Sign in to your account to continue.",
+  "brandGatePlanBody": "This edition is available with an active plan. Choose a plan, or buy one on our website and check again.",
+  "brandGateSignIn": "Sign in",
+  "brandGateChoosePlan": "Choose a plan",
+  "brandGateOpenSite": "Buy on the website",
+  "brandGateRecheck": "I have paid, check again",
+  "brandGateStillLocked": "No active plan was found for this account yet.",
 }

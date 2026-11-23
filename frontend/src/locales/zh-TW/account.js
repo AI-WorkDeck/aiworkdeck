@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "邀請碼無效或已停用，請核對後重試",
   "errInviteAlreadyBound": "目前帳號已綁定過聯盟所邀請碼",
   "errBqtNotLawyer": "僅支援包晴天認證律師帳號掃碼登入",
+  "brandGateTitle": "需要有效方案",
+  "brandGateSignInBody": "請先登入帳戶以繼續。",
+  "brandGatePlanBody": "此版本需開通有效方案後使用。請選擇方案，或於官網購買後重新檢查。",
+  "brandGateSignIn": "登入",
+  "brandGateChoosePlan": "選擇方案",
+  "brandGateOpenSite": "前往官網購買",
+  "brandGateRecheck": "我已付款，重新檢查",
+  "brandGateStillLocked": "此帳戶尚未找到有效方案。",
 }

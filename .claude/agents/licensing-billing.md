@@ -1659,3 +1659,11 @@ The mobile capability endpoint passes the authenticated user through the existin
 冻结后的恢复协议：网站case.executorReconciled是内部字段；cleanup-finish表示全量metadata已提交，或付清后执行器逐项receiptOnly核对（issued:false保留、cancelled保留、completed须确认旧字节不存在并修metadata、pending不得确认），本地修复commit后调用cleanup-reconciled(epoch/caseId/manifestHash)。网站仅在全部issued resolved且执行器确认后允许resume产生新epoch。resume-cloud先运行该恢复；backup consent不暗中resume。紧急关闭破坏清理开关仍允许只读回执核对，避免阻塞付清恢复。
 
 普通共享项目写入的代次与付费身份分离：登记owner承担费用并必须canWrite；原成员权限通过的X-Session-Id调用者使用自己的epoch，不能拿actor头与owner代次比较。quota再次校验成员写权限，并在owner锁后locking query确认项目未删除/归属未变。Git Basic仍用repo-specific owner epoch。未知项目不据creator自动认定付款归属。
+
+## 贴牌版本的整屏付费闸（2026-11-23）
+`ai.brand.paid-gate.entitlement`（如 `plugin:aifirm-partner`）非空时，`BrandGateController` `GET /api/brand/gate[?refresh=true]`
+回 `{required, accountConnected, active, expiresAt, buyUrl, unlocked}`（判定走 `EntitlementService`，与插件 billing.status 同一份缓存）。
+前端 `utils/brandGate.js` 在桌面端挂 `components/account/BrandGate.vue`：z-index 9970，低于订阅弹层 9980 与登录弹层 9990；
+监听 `awd:account-changed` / `awd:entitlements-changed` 自动复查。默认空 = 不设闸，AI WorkDeck 本身不受影响。
+前端锁屏，不是服务端强制：后端接口本身不因闸拒绝请求。
+

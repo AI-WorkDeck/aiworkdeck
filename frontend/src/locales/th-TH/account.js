@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "รหัสเชิญไม่ถูกต้องหรือถูกปิดใช้งาน",
   "errInviteAlreadyBound": "บัญชีนี้ได้ผูกรหัสเชิญของสำนักงาน Circle ไปแล้ว",
   "errBqtNotLawyer": "เฉพาะบัญชีทนาย Baoqingtian ที่ผ่านการตรวจสอบเท่านั้นที่เข้าสู่ระบบด้วย QR ได้",
+  "brandGateTitle": "ต้องมีแผนที่ใช้งานอยู่",
+  "brandGateSignInBody": "ลงชื่อเข้าใช้บัญชีของคุณเพื่อดำเนินการต่อ",
+  "brandGatePlanBody": "รุ่นนี้ใช้งานได้เมื่อมีแผนที่ใช้งานอยู่ เลือกแผน หรือซื้อจากเว็บไซต์ของเราแล้วตรวจสอบอีกครั้ง",
+  "brandGateSignIn": "ลงชื่อเข้าใช้",
+  "brandGateChoosePlan": "เลือกแผน",
+  "brandGateOpenSite": "ซื้อบนเว็บไซต์",
+  "brandGateRecheck": "ชำระเงินแล้ว ตรวจสอบอีกครั้ง",
+  "brandGateStillLocked": "ยังไม่พบแผนที่ใช้งานอยู่สำหรับบัญชีนี้",
 }

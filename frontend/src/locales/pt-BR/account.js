@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Código de convite inválido ou inativo",
   "errInviteAlreadyBound": "Esta conta já vinculou um código de convite da Circle",
   "errBqtNotLawyer": "Somente contas verificadas de advogado Baoqingtian podem entrar por QR code",
+  "brandGateTitle": "É necessário um plano ativo",
+  "brandGateSignInBody": "Entre na sua conta para continuar.",
+  "brandGatePlanBody": "Esta edição exige um plano ativo. Escolha um plano ou compre no nosso site e verifique novamente.",
+  "brandGateSignIn": "Entrar",
+  "brandGateChoosePlan": "Escolher um plano",
+  "brandGateOpenSite": "Comprar no site",
+  "brandGateRecheck": "Já paguei, verificar novamente",
+  "brandGateStillLocked": "Ainda não foi encontrado um plano ativo para esta conta.",
 }

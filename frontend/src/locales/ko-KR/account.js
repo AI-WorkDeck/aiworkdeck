@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "초대 코드가 유효하지 않거나 비활성화되었습니다",
   "errInviteAlreadyBound": "이 계정은 이미 Circle 로펌 초대 코드에 연결되어 있습니다",
   "errBqtNotLawyer": "인증된 바오칭톈 변호사 계정만 QR 코드로 로그인할 수 있습니다",
+  "brandGateTitle": "유효한 플랜이 필요합니다",
+  "brandGateSignInBody": "계속하려면 계정에 로그인하세요.",
+  "brandGatePlanBody": "이 에디션은 유효한 플랜이 있어야 사용할 수 있습니다. 플랜을 선택하거나 웹사이트에서 구매한 후 다시 확인하세요.",
+  "brandGateSignIn": "로그인",
+  "brandGateChoosePlan": "플랜 선택",
+  "brandGateOpenSite": "웹사이트에서 구매",
+  "brandGateRecheck": "결제 완료, 다시 확인",
+  "brandGateStillLocked": "이 계정에서 아직 유효한 플랜을 찾지 못했습니다.",
 }

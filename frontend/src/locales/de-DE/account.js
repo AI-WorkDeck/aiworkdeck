@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Ungültiger oder deaktivierter Einladungscode",
   "errInviteAlreadyBound": "Dieses Konto hat bereits einen Circle-Kanzlei-Einladungscode gebunden",
   "errBqtNotLawyer": "Nur verifizierte Baoqingtian-Anwaltskonten können sich per QR-Code anmelden",
+  "brandGateTitle": "Ein aktiver Tarif ist erforderlich",
+  "brandGateSignInBody": "Melden Sie sich an, um fortzufahren.",
+  "brandGatePlanBody": "Diese Edition ist mit einem aktiven Tarif nutzbar. Wählen Sie einen Tarif oder kaufen Sie ihn auf unserer Website und prüfen Sie erneut.",
+  "brandGateSignIn": "Anmelden",
+  "brandGateChoosePlan": "Tarif wählen",
+  "brandGateOpenSite": "Auf der Website kaufen",
+  "brandGateRecheck": "Bezahlt – erneut prüfen",
+  "brandGateStillLocked": "Für dieses Konto wurde noch kein aktiver Tarif gefunden.",
 }

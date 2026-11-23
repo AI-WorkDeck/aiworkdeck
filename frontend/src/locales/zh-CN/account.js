@@ -518,4 +518,12 @@ export default {
   "errInvalidInviteCode": "邀请码无效或已停用，请核对后重试",
   "errInviteAlreadyBound": "当前账号已绑定过联盟所邀请码",
   "errBqtNotLawyer": "仅支持包晴天认证律师账号扫码登录",
+  "brandGateTitle": "需要有效方案",
+  "brandGateSignInBody": "请先登录账户以继续。",
+  "brandGatePlanBody": "此版本需开通有效方案后使用。请选择方案，或在官网购买后重新检查。",
+  "brandGateSignIn": "登录",
+  "brandGateChoosePlan": "选择方案",
+  "brandGateOpenSite": "前往官网购买",
+  "brandGateRecheck": "我已付款，重新检查",
+  "brandGateStillLocked": "此账户暂未找到有效方案。",
 }

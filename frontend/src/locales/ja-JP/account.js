@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "招待コードが無効または停止されています",
   "errInviteAlreadyBound": "このアカウントはすでに Circle 律所招待コードをバインド済みです",
   "errBqtNotLawyer": "認証済みの包晴天弁護士アカウントのみQRログインできます",
+  "brandGateTitle": "有効なプランが必要です",
+  "brandGateSignInBody": "続行するにはアカウントにサインインしてください。",
+  "brandGatePlanBody": "このエディションは有効なプランでご利用いただけます。プランを選ぶか、ウェブサイトで購入してから再確認してください。",
+  "brandGateSignIn": "サインイン",
+  "brandGateChoosePlan": "プランを選ぶ",
+  "brandGateOpenSite": "ウェブサイトで購入",
+  "brandGateRecheck": "支払い済み、再確認する",
+  "brandGateStillLocked": "このアカウントには有効なプランがまだ見つかりません。",
 }

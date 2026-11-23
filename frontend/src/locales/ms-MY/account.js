@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Kod jemputan tidak sah atau tidak aktif",
   "errInviteAlreadyBound": "Akaun ini telah mengikat kod jemputan firma Circle",
   "errBqtNotLawyer": "Hanya akaun peguam Baoqingtian disahkan boleh log masuk melalui kod QR",
+  "brandGateTitle": "Pelan aktif diperlukan",
+  "brandGateSignInBody": "Log masuk ke akaun anda untuk meneruskan.",
+  "brandGatePlanBody": "Edisi ini tersedia dengan pelan aktif. Pilih pelan, atau beli di laman web kami dan semak semula.",
+  "brandGateSignIn": "Log masuk",
+  "brandGateChoosePlan": "Pilih pelan",
+  "brandGateOpenSite": "Beli di laman web",
+  "brandGateRecheck": "Sudah bayar, semak semula",
+  "brandGateStillLocked": "Tiada pelan aktif ditemui untuk akaun ini lagi.",
 }

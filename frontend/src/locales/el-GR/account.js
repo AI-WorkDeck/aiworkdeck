@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Μη έγκυρος ή ανενεργός κωδικός πρόσκλησης",
   "errInviteAlreadyBound": "Αυτός ο λογαριασμός έχει ήδη συνδέσει κωδικό πρόσκλησης Circle",
   "errBqtNotLawyer": "Μόνο πιστοποιημένοι λογαριασμοί δικηγόρων Baoqingtian μπορούν να συνδεθούν μέσω QR",
+  "brandGateTitle": "Απαιτείται ενεργό πρόγραμμα",
+  "brandGateSignInBody": "Συνδεθείτε στον λογαριασμό σας για να συνεχίσετε.",
+  "brandGatePlanBody": "Αυτή η έκδοση απαιτεί ενεργό πρόγραμμα. Επιλέξτε πρόγραμμα ή αγοράστε το στον ιστότοπό μας και ελέγξτε ξανά.",
+  "brandGateSignIn": "Σύνδεση",
+  "brandGateChoosePlan": "Επιλογή προγράμματος",
+  "brandGateOpenSite": "Αγορά στον ιστότοπο",
+  "brandGateRecheck": "Πλήρωσα, έλεγχος ξανά",
+  "brandGateStillLocked": "Δεν βρέθηκε ακόμη ενεργό πρόγραμμα για αυτόν τον λογαριασμό.",
 }

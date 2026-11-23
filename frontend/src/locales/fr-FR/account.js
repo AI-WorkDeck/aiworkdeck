@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Code d’invitation invalide ou désactivé",
   "errInviteAlreadyBound": "Ce compte a déjà associé un code d’invitation Circle",
   "errBqtNotLawyer": "Seuls les comptes avocat Baoqingtian vérifiés peuvent se connecter par QR code",
+  "brandGateTitle": "Un abonnement actif est requis",
+  "brandGateSignInBody": "Connectez-vous à votre compte pour continuer.",
+  "brandGatePlanBody": "Cette édition nécessite un abonnement actif. Choisissez une offre ou achetez-la sur notre site, puis vérifiez à nouveau.",
+  "brandGateSignIn": "Se connecter",
+  "brandGateChoosePlan": "Choisir une offre",
+  "brandGateOpenSite": "Acheter sur le site",
+  "brandGateRecheck": "J’ai payé, vérifier à nouveau",
+  "brandGateStillLocked": "Aucun abonnement actif n’a encore été trouvé pour ce compte.",
 }

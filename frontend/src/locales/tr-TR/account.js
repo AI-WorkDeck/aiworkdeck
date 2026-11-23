@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Geçersiz veya devre dışı davet kodu",
   "errInviteAlreadyBound": "Bu hesap zaten bir Circle büro davet koduna bağlı",
   "errBqtNotLawyer": "Yalnızca doğrulanmış Baoqingtian avukat hesapları QR kod ile giriş yapabilir",
+  "brandGateTitle": "Etkin bir plan gerekiyor",
+  "brandGateSignInBody": "Devam etmek için hesabınıza giriş yapın.",
+  "brandGatePlanBody": "Bu sürüm etkin bir planla kullanılabilir. Bir plan seçin veya web sitemizden satın alıp yeniden kontrol edin.",
+  "brandGateSignIn": "Giriş yap",
+  "brandGateChoosePlan": "Plan seç",
+  "brandGateOpenSite": "Web sitesinden satın al",
+  "brandGateRecheck": "Ödedim, yeniden kontrol et",
+  "brandGateStillLocked": "Bu hesap için henüz etkin bir plan bulunamadı.",
 }

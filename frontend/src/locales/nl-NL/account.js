@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Ongeldige of gedeactiveerde uitnodigingscode",
   "errInviteAlreadyBound": "Dit account heeft al een Circle-kantooruitnodigingscode gekoppeld",
   "errBqtNotLawyer": "Alleen geverifieerde Baoqingtian-advocaataccounts kunnen inloggen via QR-code",
+  "brandGateTitle": "Een actief abonnement is vereist",
+  "brandGateSignInBody": "Log in op je account om door te gaan.",
+  "brandGatePlanBody": "Deze editie is beschikbaar met een actief abonnement. Kies een abonnement of koop het op onze website en controleer opnieuw.",
+  "brandGateSignIn": "Inloggen",
+  "brandGateChoosePlan": "Abonnement kiezen",
+  "brandGateOpenSite": "Kopen op de website",
+  "brandGateRecheck": "Betaald, opnieuw controleren",
+  "brandGateStillLocked": "Er is nog geen actief abonnement gevonden voor dit account.",
 }

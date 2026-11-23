@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "رمز الدعوة غير صالح أو موقوف، تحقق وأعد المحاولة",
   "errInviteAlreadyBound": "ربط هذا الحساب رمز دعوة Circle مسبقًا",
   "errBqtNotLawyer": "تسجيل الدخول عبر رمز QR متاح فقط لحسابات محامي باوتشينغتيان المعتمدة",
+  "brandGateTitle": "يلزم وجود خطة نشطة",
+  "brandGateSignInBody": "سجّل الدخول إلى حسابك للمتابعة.",
+  "brandGatePlanBody": "يتطلب هذا الإصدار خطة نشطة. اختر خطة أو اشترِها من موقعنا ثم تحقّق مرة أخرى.",
+  "brandGateSignIn": "تسجيل الدخول",
+  "brandGateChoosePlan": "اختر خطة",
+  "brandGateOpenSite": "الشراء من الموقع",
+  "brandGateRecheck": "دفعت، تحقّق مرة أخرى",
+  "brandGateStillLocked": "لم يتم العثور على خطة نشطة لهذا الحساب بعد.",
 }

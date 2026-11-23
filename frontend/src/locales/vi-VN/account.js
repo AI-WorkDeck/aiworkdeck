@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Mã mời không hợp lệ hoặc đã ngừng hoạt động",
   "errInviteAlreadyBound": "Tài khoản này đã liên kết mã mời của hãng luật Circle",
   "errBqtNotLawyer": "Chỉ tài khoản luật sư Baoqingtian đã xác minh mới có thể đăng nhập bằng mã QR",
+  "brandGateTitle": "Cần có gói đang hoạt động",
+  "brandGateSignInBody": "Đăng nhập vào tài khoản để tiếp tục.",
+  "brandGatePlanBody": "Phiên bản này cần có gói đang hoạt động. Hãy chọn gói, hoặc mua trên trang web của chúng tôi rồi kiểm tra lại.",
+  "brandGateSignIn": "Đăng nhập",
+  "brandGateChoosePlan": "Chọn gói",
+  "brandGateOpenSite": "Mua trên trang web",
+  "brandGateRecheck": "Tôi đã thanh toán, kiểm tra lại",
+  "brandGateStillLocked": "Chưa tìm thấy gói đang hoạt động cho tài khoản này.",
 }

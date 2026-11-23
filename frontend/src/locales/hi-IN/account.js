@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "आमंत्रण कोड अमान्य या निष्क्रिय है",
   "errInviteAlreadyBound": "इस अकाउंट ने पहले ही Circle फ़र्म आमंत्रण कोड जोड़ लिया है",
   "errBqtNotLawyer": "केवल सत्यापित Baoqingtian वकील अकाउंट ही QR कोड से साइन इन कर सकते हैं",
+  "brandGateTitle": "सक्रिय प्लान आवश्यक है",
+  "brandGateSignInBody": "जारी रखने के लिए अपने खाते में साइन इन करें।",
+  "brandGatePlanBody": "यह संस्करण सक्रिय प्लान के साथ उपलब्ध है। प्लान चुनें या हमारी वेबसाइट पर खरीदकर फिर से जाँचें।",
+  "brandGateSignIn": "साइन इन करें",
+  "brandGateChoosePlan": "प्लान चुनें",
+  "brandGateOpenSite": "वेबसाइट पर खरीदें",
+  "brandGateRecheck": "मैंने भुगतान किया, फिर से जाँचें",
+  "brandGateStillLocked": "इस खाते के लिए अभी तक कोई सक्रिय प्लान नहीं मिला।",
 }

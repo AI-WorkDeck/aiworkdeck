@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Kode undangan tidak valid atau tidak aktif",
   "errInviteAlreadyBound": "Akun ini sudah mengikat kode undangan firma Circle",
   "errBqtNotLawyer": "Hanya akun pengacara Baoqingtian terverifikasi yang dapat masuk via kode QR",
+  "brandGateTitle": "Diperlukan paket aktif",
+  "brandGateSignInBody": "Masuk ke akun Anda untuk melanjutkan.",
+  "brandGatePlanBody": "Edisi ini tersedia dengan paket aktif. Pilih paket, atau beli di situs web kami lalu periksa lagi.",
+  "brandGateSignIn": "Masuk",
+  "brandGateChoosePlan": "Pilih paket",
+  "brandGateOpenSite": "Beli di situs web",
+  "brandGateRecheck": "Sudah bayar, periksa lagi",
+  "brandGateStillLocked": "Belum ditemukan paket aktif untuk akun ini.",
 }

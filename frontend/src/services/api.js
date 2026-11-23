@@ -1481,6 +1481,14 @@ export function acceptCrossBorderConsent() {
   return request({ url: '/api/ai/cross-border-consent', method: 'POST' })
 }
 
+/** 贴牌版本的整屏付费闸（BrandGateController）。refresh=true 先同步刷新权益，给「重新檢查」用。 */
+export function getBrandGate(refresh = false) {
+  return request({
+    url: `/api/brand/gate${refresh ? '?refresh=true' : ''}`,
+    method: 'GET',
+  });
+}
+
 export function getSiteStatus() {
   return request({
     url: '/api/site',

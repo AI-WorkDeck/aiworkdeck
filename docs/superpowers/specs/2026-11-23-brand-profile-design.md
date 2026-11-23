@@ -37,6 +37,11 @@ Rewrite rules (every rule must match at least once, or the run fails as stale):
 - Typical overlay: backend `config/application.yml` (one site; id `intl` = the email + Turnstile flow, cn off,
   so no site switcher; `cross-border-consent: false` when the operator is outside mainland China), desktop `legal-notices.json` (trademark line names the licensee), icons and installer art.
 
+Paid gate (optional): backend `ai.brand.paid-gate.entitlement` (e.g. `plugin:<id>`) + `buy-url` in the brand's
+`config/application.yml` overlay. `GET /api/brand/gate` reports it; the desktop front end (`components/account/BrandGate.vue`,
+mounted by `utils/brandGate.js`) covers the whole app until the account is signed in and the entitlement is active
+(sign in → choose a plan in the plugin-subscription dialog or on the website → check again). Unset = no gate.
+
 Why a source rewrite instead of `{brand}` placeholders: zero churn in the default build, and it covers Java,
 Vue, Electron, NSIS and plugin text uniformly. The leak check is what keeps it honest.
 

@@ -463,4 +463,12 @@ export default {
   "errInvalidInviteCode": "Пригласительный код недействителен или отключён",
   "errInviteAlreadyBound": "Этот аккаунт уже привязал пригласительный код фирмы Circle",
   "errBqtNotLawyer": "Только верифицированные аккаунты юристов Baoqingtian могут входить по QR-коду",
+  "brandGateTitle": "Требуется активный тариф",
+  "brandGateSignInBody": "Войдите в аккаунт, чтобы продолжить.",
+  "brandGatePlanBody": "Эта редакция доступна с активным тарифом. Выберите тариф или купите его на нашем сайте и проверьте снова.",
+  "brandGateSignIn": "Войти",
+  "brandGateChoosePlan": "Выбрать тариф",
+  "brandGateOpenSite": "Купить на сайте",
+  "brandGateRecheck": "Я оплатил, проверить снова",
+  "brandGateStillLocked": "Для этого аккаунта пока не найден активный тариф.",
 }
