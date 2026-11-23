@@ -536,7 +536,13 @@ function t(pair) {
   return pair['en-US'] || pair.en || pair['zh-CN'] || pair.zh || ''
 }
 
+/** 贴牌默认语言（brand.json defaultLanguage）；默认品牌为 null。 */
+function getBrandDefaultLanguage() {
+  return BRAND_DEFAULT_LANGUAGE
+}
+
 module.exports = {
+  getBrandDefaultLanguage,
   SYSTEM_LANGUAGE_MODE,
   LOCALE_REGISTRY,
   SUPPORTED_LOCALE_CODES,

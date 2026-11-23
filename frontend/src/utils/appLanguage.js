@@ -47,6 +47,16 @@ export const SUPPORTED_LANGUAGES = Object.freeze([
   SYSTEM_LANGUAGE_MODE,
 ])
 
+/** 贴牌桌面版的首启语言（desktop/main/brand.json defaultLanguage，经 preload 传入）；默认品牌为空串。 */
+function brandDefaultLocale() {
+  try {
+    const host = typeof window !== 'undefined' ? window.checkbaDesktop : null
+    return host && host.appLanguage ? normalizeLocaleCode(String(host.appLanguage.brandDefault || '')) : ''
+  } catch (e) {
+    return ''
+  }
+}
+
 function detectSystemLocale() {
   try {
     if (typeof navigator !== 'undefined') {
@@ -147,7 +157,8 @@ export function getAppLanguage() {
     if (stored !== normalized) writeStorage(APP_LANGUAGE_KEY, normalized)
     return normalized
   }
-  const detected = detectSystemLocale()
+  // 首启（从没存过语言）：贴牌版本用品牌默认语言，否则跟系统；用户明确选「跟随系统」时仍走系统语言
+  const detected = brandDefaultLocale() || detectSystemLocale()
   writeStorage(APP_LANGUAGE_KEY, detected)
   return detected
 }

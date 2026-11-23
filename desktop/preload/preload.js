@@ -282,7 +282,9 @@ contextBridge.exposeInMainWorld('checkbaDesktop', {
   // 应用语言（zh-CN/en-US）：渲染层是权威源，启动与切换时推给主进程
   // （菜单/原生对话框文案随之重建，见 desktop/main/app-language.js）。
   appLanguage: {
-    set: (lang) => ipcRenderer.send('checkba:app-language', lang)
+    set: (lang) => ipcRenderer.send('checkba:app-language', lang),
+    // 贴牌版本的首启语言（未选过语言时代替系统语言）；默认品牌为空串
+    brandDefault: (process.argv.find((a) => a.startsWith('--checkba-default-language=')) || '').slice('--checkba-default-language='.length)
   },
   // 外观主题（light/dark/system）：渲染层是权威源，推给主进程去设 nativeTheme，
   // 原生标题栏/交通灯/右键菜单随之一致（dev-board#218/#223）。

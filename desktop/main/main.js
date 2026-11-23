@@ -508,7 +508,17 @@ function createMainWindow() {
         '--checkba-native-docx-max-bytes=' + (process.platform === 'darwin' && process.env?.AWD_EDITOR_ENGINE === 'lok' ? 64 * 1024 * 1024 : 0),
         // ARM 版 Windows（Mac 虚拟机）转译运行时启动看门狗已放宽 8 倍（dev-board#340），
         // 渲染层的等待死线要跟着放大，否则前端仍按 90 秒判超时（dev-board#341）
-        ...(require('./services/win-arch').isWinArmEmulated() ? ['--checkba-win-emulated=1'] : [])
+        ...(require('./services/win-arch').isWinArmEmulated() ? ['--checkba-win-emulated=1'] : []),
+        // 贴牌版本的首启语言（brand.json defaultLanguage）：渲染层是语言的权威源，
+        // 它首启按 navigator.languages 猜，而 macOS 上 --lang 改不动 navigator.languages，所以显式告诉它
+        ...(() => {
+          try {
+            const lang = require('./app-language').getBrandDefaultLanguage?.()
+            return lang ? ['--checkba-default-language=' + lang] : []
+          } catch (e) {
+            return [] // app-language replaced by a test stub
+          }
+        })()
       ],
       contextIsolation: true,
       nodeIntegration: false,
