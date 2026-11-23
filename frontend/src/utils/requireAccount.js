@@ -21,6 +21,7 @@ import { createApp, ref } from 'vue'
 import AccountLoginDialog from '@/components/account/AccountLoginDialog.vue'
 import RechargeDialog from '@/components/RechargeDialog.vue'
 import ProSubscribeDialog from '@/components/ProSubscribeDialog.vue'
+import PluginSubscribeDialog from '@/components/PluginSubscribeDialog.vue'
 import { i18n } from '@/i18n/index.js'
 import { getAccountStatus, getCloudAccountGeneration } from '@/services/api.js'
 import { isDesktopHost } from '@/services/host.js'
@@ -189,6 +190,44 @@ export function invalidateAccountCache() {
 /** 已知连接状态（如设置页刚读过 status）时顺手喂给缓存，省一次查询。 */
 export function noteAccountConnected(connected) {
   gate.noteConnected(connected)
+}
+
+let pluginSubscribePending = null
+export function requirePluginSubscription({ pluginId = 'aifirm-partner' } = {}) {
+  if (pluginSubscribePending) return pluginSubscribePending
+  if (typeof document === 'undefined' || !document.body) return Promise.resolve({ subscribed: false, expiresAt: null })
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  let app
+  let resolveClosed
+  let outcome = { subscribed: false, expiresAt: null }
+  pluginSubscribePending = new Promise(resolve => { resolveClosed = resolve })
+  const pending = pluginSubscribePending
+  const finish = () => {
+    if (!pluginSubscribePending) return
+    app?.unmount()
+    el.remove()
+    setGlobalOverlay(false, 'awd-plugin-subscribe')
+    pluginSubscribePending = null
+    resolveClosed(outcome)
+  }
+  try {
+    app = createApp(PluginSubscribeDialog, {
+      visible: true,
+      pluginId,
+      onSubscribed: payload => {
+        outcome = { subscribed: true, expiresAt: (payload && payload.expiresAt) || null }
+      },
+      'onUpdate:visible': visible => { if (!visible) finish() },
+    })
+    app.use(i18n)
+    setGlobalOverlay(true, 'awd-plugin-subscribe')
+    app.mount(el)
+  } catch (error) {
+    finish()
+    console.warn('[requirePluginSubscription] 订阅弹层挂载失败:', error)
+  }
+  return pending
 }
 
 // Keep above the recharge state block below (tests slice from the recharge declaration to EOF).

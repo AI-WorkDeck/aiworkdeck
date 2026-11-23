@@ -685,6 +685,127 @@ public class AccountService {
         return body;
     }
 
+    // ==================== 插件周期订阅与 scoped plugin-assertion ====================
+
+    private record CachedAssertion(String token, long expSec, String owner) {
+        boolean fresh(String currentOwner) {
+            long nowSec = System.currentTimeMillis() / 1000L;
+            return token != null && !token.isBlank()
+                    && java.util.Objects.equals(owner, currentOwner)
+                    && nowSec < expSec - 60L;
+        }
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, CachedAssertion> pluginAssertionCache =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void clearPluginAssertionCache(String pluginId) {
+        if (pluginId == null || pluginId.isBlank()) return;
+        String suffix = ":" + pluginId;
+        pluginAssertionCache.keySet().removeIf(k -> k.endsWith(suffix));
+    }
+
+    public void clearAllPluginAssertionCaches() {
+        pluginAssertionCache.clear();
+    }
+
+    /** GET /api/account/plugin-subscriptions?pluginId=... —— 读取预付通行证套餐与当前订阅态（未登录也可读套餐）。 */
+    public Map<String, Object> fetchPluginSubscriptionPlans(String pluginId) {
+        if (pluginId == null || pluginId.isBlank()) {
+            throw new IllegalArgumentException("pluginId is required");
+        }
+        ConnectionSnapshot connection = connectionSnapshot();
+        String path = "/api/account/plugin-subscriptions?pluginId="
+                + java.net.URLEncoder.encode(pluginId.trim(), StandardCharsets.UTF_8);
+        AccountTransport.Reply reply = transport.send("GET", connection.baseUrl() + path, connection.key(), null);
+        if (reply.networkFailure()) {
+            throw networkError();
+        }
+        return handle(reply, path);
+    }
+
+    /** POST /api/payment/create —— 创建插件周期通行证订单（CNY 微信扫码 / USD Stripe 跳转）。 */
+    public Map<String, Object> createPluginSubscriptionOrder(
+            String pluginId,
+            String skuId,
+            long amountCents,
+            String idempotencyKey) {
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
+        if (pluginId == null || pluginId.isBlank() || skuId == null || skuId.isBlank() || amountCents <= 0) {
+            throw new IllegalArgumentException("Invalid plugin subscription parameters");
+        }
+        String safeKey = (idempotencyKey == null || idempotencyKey.isBlank())
+                ? UUID.randomUUID().toString()
+                : idempotencyKey.trim();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("amount", amountCents);
+        body.put("kind", "subscription");
+        body.put("skuId", skuId.trim());
+        body.put("idempotencyKey", safeKey);
+        body.put("lang", LangText.isEnglish() ? "en" : "zh");
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(body);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+        AccountTransport.Reply reply = transport.send("POST", connection.baseUrl() + "/api/payment/create", key, json);
+        if (reply.networkFailure()) {
+            throw networkError();
+        }
+        return new LinkedHashMap<>(handlePaymentCreateReply(reply, key, requestVersion));
+    }
+
+    /** 查询插件订阅订单状态，复用统一订单回查。 */
+    public Map<String, Object> queryPluginOrderStatus(String outTradeNo) {
+        return queryRecharge(outTradeNo);
+    }
+
+    /**
+     * POST /api/account/plugin-assertion —— 为可信官方插件换取短期 HMAC 签名身份与订阅断言（awdpa1.*）。
+     * awdk_ 密钥只留在官网通道内，绝不发往第三方/插件业务服务。
+     */
+    public String fetchPluginAssertion(String pluginId) {
+        if (pluginId == null || pluginId.isBlank()) {
+            throw new IllegalArgumentException("pluginId is required");
+        }
+        ConnectionSnapshot connection = requireConnectionSnapshot();
+        long requestVersion = connection.generation();
+        String key = connection.key();
+        String owner = connection.fingerprint() == null ? "unknown" : connection.fingerprint();
+        String cacheKey = owner + ":" + pluginId.trim();
+        CachedAssertion hit = pluginAssertionCache.get(cacheKey);
+        if (hit != null && hit.fresh(owner)) {
+            return hit.token();
+        }
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(Map.of("pluginId", pluginId.trim()));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+        AccountTransport.Reply reply = transport.send(
+                "POST", connection.baseUrl() + "/api/account/plugin-assertion", key, json);
+        if (reply.networkFailure()) {
+            throw networkError();
+        }
+        Map<String, Object> parsed = handleCurrent(reply, "/api/account/plugin-assertion", key, requestVersion);
+        Object rawToken = parsed.get("token");
+        if (!(rawToken instanceof String token) || token.isBlank()) {
+            throw new AccountException(AccountException.Kind.MALFORMED,
+                    LangText.of("官网未返回有效插件凭据，请稍后重试", "Website did not return a valid plugin credential"));
+        }
+        long expSec = parsed.get("exp") instanceof Number n
+                ? n.longValue()
+                : (System.currentTimeMillis() / 1000L) + 300L;
+        if (isCurrentConnection(connection)) {
+            pluginAssertionCache.put(cacheKey, new CachedAssertion(token, expSec, owner));
+        }
+        return token;
+    }
+
     /**
      * POST /api/account/purchase —— 用 Credits 余额购买一个应用内 SKU（dev-board#187）。
      * 官网成功返回 {@code {ok, feature, priceCents, balanceCents, orderId}}；

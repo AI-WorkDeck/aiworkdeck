@@ -17,5 +17,22 @@ export default {
   "active": "Подписка активна",
   "inactive": "Нет активной подписки",
   "bundled": "Входит в стоимость приложения",
-  "checkout": "Открыть оформление покупки"
+  "checkout": "Открыть оформление покупки",
+  "subscribeTitle": "Пропуск на биржу заявок AI Firm",
+  "subscribeSubtitle": "Предоплатный доступ к откликам · Без автопродления",
+  "subscribeLoadFailed": "Не удалось загрузить тарифы",
+  "subscribeCreateFailed": "Не удалось создать заказ, повторите попытку",
+  "subscribeSuccess": "Пропуск активирован",
+  "activeUntilBanner": "Пропуск действует до {date}; покупка продлит срок действия.",
+  "recommendedBadge": "Выгодно",
+  "daysPass": "/ {days} дн.",
+  "planRulesTitle": "Правила отклика (План B: выбор клиента)",
+  "planRuleMaxThree": "• На одну заявку отклик могут подать до 3 адвокатов с активным пропуском",
+  "planRuleUnlock": "• Контакты и документы открываются только после выбора адвоката клиентом",
+  "planRulePrepaid": "• Комиссия платформы с гонорара 0% · Автосписаний нет",
+  "scanWeChatPay": "Оплатите {amount} через WeChat Pay — доступ откроется автоматически",
+  "reopenCheckout": "Открыть страницу оплаты снова",
+  "checkPaymentStatus": "Оплачено — проверить статус",
+  "confirmSubscribe": "Оплатить {amount}",
+  "signInRequiredNotice": "Подключите аккаунт AI WorkDeck для покупки и активации пропуска"
 }

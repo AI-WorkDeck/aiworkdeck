@@ -17,5 +17,22 @@ export default {
   "active": "Abonnement aktiv",
   "inactive": "Kein aktives Abonnement",
   "bundled": "In der App enthalten",
-  "checkout": "Bezahlseite öffnen"
+  "checkout": "Bezahlseite öffnen",
+  "subscribeTitle": "AI Firm Mandatsmarktplatz-Pass",
+  "subscribeSubtitle": "Prepaid-Zugang für Anwaltsvorschläge · Keine automatische Verlängerung",
+  "subscribeLoadFailed": "Tarife konnten nicht geladen werden",
+  "subscribeCreateFailed": "Zahlungsauftrag fehlgeschlagen, bitte erneut versuchen",
+  "subscribeSuccess": "Pass aktiviert",
+  "activeUntilBanner": "Aktiver Pass bis {date}; ein Kauf verlängert die Laufzeit entsprechend.",
+  "recommendedBadge": "Empfohlen",
+  "daysPass": "/ {days} Tage",
+  "planRulesTitle": "Marktplatzregeln (Plan B: Mandantenwahl)",
+  "planRuleMaxThree": "• Maximal 3 abonnierte Anwälte können pro Mandat ein Angebot abgeben",
+  "planRuleUnlock": "• Kontaktdaten und Dokumente öffnen erst nach Wahl durch den Mandanten",
+  "planRulePrepaid": "• 0 % Plattformgebühr auf Honorare · Prepaid-Pass ohne automatische Abbuchung",
+  "scanWeChatPay": "Mit WeChat Pay ({amount}) zahlen; dieses Fenster aktualisiert sich automatisch",
+  "reopenCheckout": "Zahlungsseite erneut öffnen",
+  "checkPaymentStatus": "Zahlung abgeschlossen — jetzt prüfen",
+  "confirmSubscribe": "{amount} bezahlen und freischalten",
+  "signInRequiredNotice": "Verbinden Sie Ihr AI WorkDeck-Konto, um den Pass zu erwerben"
 }

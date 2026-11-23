@@ -17,5 +17,22 @@ export default {
   "active": "Suscripción activa",
   "inactive": "Sin suscripción activa",
   "bundled": "Incluido con la aplicación",
-  "checkout": "Abrir página de pago"
+  "checkout": "Abrir página de pago",
+  "subscribeTitle": "Pase de Mercado Legal AI Firm",
+  "subscribeSubtitle": "Acceso prepago para enviar propuestas · Sin renovación automática",
+  "subscribeLoadFailed": "No se pudieron cargar los planes",
+  "subscribeCreateFailed": "No se pudo crear el pedido; inténtalo de nuevo",
+  "subscribeSuccess": "Pase activado",
+  "activeUntilBanner": "Pase activo hasta {date}; una nueva compra amplía la vigencia.",
+  "recommendedBadge": "Recomendado",
+  "daysPass": "/ {days} días",
+  "planRulesTitle": "Reglas del mercado (Plan B: elección del cliente)",
+  "planRuleMaxThree": "• Hasta 3 abogados suscritos pueden enviar propuesta por cada caso",
+  "planRuleUnlock": "• Datos de contacto y archivos se desbloquean al ser elegido por el cliente",
+  "planRulePrepaid": "• 0 % de comisión sobre honorarios · Pase prepago sin cobro automático",
+  "scanWeChatPay": "Escanea con WeChat Pay ({amount}); esta ventana se actualizará sola",
+  "reopenCheckout": "Reabrir página de pago",
+  "checkPaymentStatus": "Ya pagué — comprobar ahora",
+  "confirmSubscribe": "Pagar {amount} para activar",
+  "signInRequiredNotice": "Conecta tu cuenta de AI WorkDeck para adquirir tu pase"
 }

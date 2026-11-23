@@ -73,3 +73,33 @@ test('checkout waits for opening and discards completion after account change', 
   current = false; finish()
   assert.equal((await pending).error.code, 'cancelled')
 })
+
+test('in_app checkout opens host subscription dialog without external browser modal', async () => {
+  const urls = []
+  let openedPlugin = ''
+  const api = {
+    pluginPlatformRequest: async () => ({ data: { mode: 'in_app', pluginId: 'aifirm-partner', url: 'https://www.workdeck.ai/en/marketplace/plugins' } }),
+    getPluginSettings: async () => ({ settings: [] }),
+    savePluginSettings: async () => {},
+  }
+  const uni = {
+    $emit: () => {},
+    showModal: () => { throw new Error('in_app checkout must not prompt external browser modal') },
+  }
+  const create = new Function('api', 'uni', 'openExternalUrlChecked', `const {pluginPlatformRequest,getPluginSettings,savePluginSettings}=api; ${source}; return createPluginPlatformServices`)(api, uni, async url => urls.push(url))
+  const bridge = create({
+    pluginId: 'aifirm-partner',
+    projectId: '',
+    permissions: ['network'],
+    openPluginSubscribe: async ({ pluginId }) => {
+      openedPlugin = pluginId
+      return { subscribed: true, expiresAt: '2026-12-23T00:00:00.000Z' }
+    },
+  })
+  const res = await bridge.request('billing.checkout')
+  assert.equal(res.ok, true)
+  assert.equal(openedPlugin, 'aifirm-partner')
+  assert.equal(res.result.mode, 'in_app')
+  assert.equal(res.result.subscribed, true)
+  assert.equal(urls.length, 0)
+})

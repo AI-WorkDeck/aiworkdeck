@@ -28,11 +28,17 @@ class PluginBillingControllerTest {
     }
 
     private PluginConnectionController controller(EntitlementService entitlements, MachineAccountGuard guard) {
+        return controller(entitlements, guard, mock(AccountService.class));
+    }
+
+    private PluginConnectionController controller(EntitlementService entitlements, MachineAccountGuard guard, AccountService account) {
         var plugins = mock(PluginService.class);
         when(plugins.getPlugin("paid-demo")).thenReturn(new PluginService.PluginMetadata());
         when(plugins.isEnabled("paid-demo")).thenReturn(true);
+        when(plugins.getPlugin("aifirm-partner")).thenReturn(new PluginService.PluginMetadata());
+        when(plugins.isEnabled("aifirm-partner")).thenReturn(true);
         return new PluginConnectionController(mock(PluginConnectionService.class), plugins, entitlements,
-                guard, mock(ProjectMemberService.class), SiteProfileService.pinnedTo("https://www.workdeck.ai"));
+                guard, mock(ProjectMemberService.class), SiteProfileService.pinnedTo("https://www.workdeck.ai"), account);
     }
 
     @Test void explicitStatusSeesPurchaseWithoutRestartingTheHost() {
@@ -95,10 +101,33 @@ class PluginBillingControllerTest {
         var entitlements = new EntitlementService(mock(LicenseService.class), account, root.toString());
         try (var auth = mockStatic(AuthController.class)) {
             auth.when(() -> AuthController.getUserIdFromSession("test")).thenReturn(1L);
-            var data = (Map<?, ?>) controller(entitlements).billing("paid-demo", null, "test").get("data");
+            var data = (Map<?, ?>) controller(entitlements, mock(MachineAccountGuard.class), account).billing("paid-demo", null, "test").get("data");
             assertEquals(false, data.get("active"));
             assertEquals(false, data.get("refreshed"));
             verify(account, never()).fetchEntitlements();
+        }
+    }
+
+    @Test void aifirmPartnerCheckoutUsesInAppModeAndOrderStatusRefreshesCache() {
+        var account = mock(AccountService.class);
+        when(account.isConnected()).thenReturn(true);
+        when(account.accountFingerprintOrNull()).thenReturn("synthetic-owner");
+        when(account.fetchEntitlements()).thenReturn(List.of(Map.of(
+                "feature", "plugin:aifirm-partner",
+                "expiresAt", "2099-01-01T00:00:00.000Z")));
+        when(account.queryPluginOrderStatus("ORD-1")).thenReturn(Map.of(
+                "success", true,
+                "order", Map.of("outTradeNo", "ORD-1", "status", "paid")));
+        var entitlements = new EntitlementService(mock(LicenseService.class), account, root.toString());
+        try (var auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("test")).thenReturn(1L);
+            var api = controller(entitlements, mock(MachineAccountGuard.class), account);
+            var checkoutData = (Map<?, ?>) api.checkout("aifirm-partner", null, "test").get("data");
+            assertEquals("in_app", checkoutData.get("mode"));
+            var statusData = (Map<?, ?>) api.billingOrderStatus("aifirm-partner", "ORD-1", "test").get("data");
+            assertEquals(true, statusData.get("active"));
+            assertEquals("2099-01-01T00:00:00.000Z", statusData.get("expiresAt"));
+            verify(account).clearPluginAssertionCache("aifirm-partner");
         }
     }
 

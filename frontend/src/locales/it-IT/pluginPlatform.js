@@ -17,5 +17,22 @@ export default {
   "active": "Abbonamento attivo",
   "inactive": "Nessun abbonamento attivo",
   "bundled": "Incluso con l'app",
-  "checkout": "Apri il checkout"
+  "checkout": "Apri il checkout",
+  "subscribeTitle": "Pass Mercato Incarichi AI Firm",
+  "subscribeSubtitle": "Accesso prepagato per inviare proposte · Nessun rinnovo automatico",
+  "subscribeLoadFailed": "Impossibile caricare i piani",
+  "subscribeCreateFailed": "Creazione ordine non riuscita; riprova",
+  "subscribeSuccess": "Pass attivato",
+  "activeUntilBanner": "Pass attivo fino al {date}; l’acquisto estende la scadenza.",
+  "recommendedBadge": "Consigliato",
+  "daysPass": "/ {days} giorni",
+  "planRulesTitle": "Regole (Piano B: scelta del cliente)",
+  "planRuleMaxThree": "• Massimo 3 avvocati abbonati possono inviare una proposta per incarico",
+  "planRuleUnlock": "• Contatti e atti si sbloccano solo dopo la scelta del cliente",
+  "planRulePrepaid": "• 0% commissioni sui compensi · Pass prepagato senza addebito automatico",
+  "scanWeChatPay": "Paga con WeChat Pay ({amount}); questa finestra si aggiornerà da sola",
+  "reopenCheckout": "Riapri pagina di pagamento",
+  "checkPaymentStatus": "Pagamento completato — verifica",
+  "confirmSubscribe": "Paga {amount} per sbloccare",
+  "signInRequiredNotice": "Collega il tuo account AI WorkDeck per acquistare il pass"
 }

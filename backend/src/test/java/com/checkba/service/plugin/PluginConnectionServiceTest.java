@@ -178,6 +178,64 @@ class PluginConnectionServiceTest {
                 () -> service.billingStatus("demo", 1L, "service")).getMessage());
     }
 
+    @Test void awdAccountEnforcesHostAndPluginTrustAllowlist() {
+        declaration.put("baseUrl", "https://ai-firm.aiworkdeck.com");
+        declaration.put("auth", Map.of("type", "awd-account"));
+        declaration.put("operations", Map.of(
+                "preview", Map.of("path", "/api/portal/marketplace/preview", "method", "GET", "anonymousFallback", true),
+                "leads", Map.of("path", "/api/portal/marketplace/leads", "method", "GET"),
+                "bid", Map.of("path", "/api/portal/marketplace/bid", "method", "POST")));
+
+        when(plugins.installationSource("demo")).thenReturn("local");
+        when(plugins.isDevInstalled("demo")).thenReturn(false);
+        assertThrows(IllegalArgumentException.class, () -> service.list("demo", 1L));
+
+        when(plugins.installationSource("demo")).thenReturn("market");
+        declaration.put("baseUrl", "https://evil.example.invalid");
+        assertThrows(IllegalArgumentException.class, () -> service.list("demo", 1L));
+
+        declaration.put("baseUrl", "https://ai-firm.aiworkdeck.com");
+        when(account.isConnected()).thenReturn(false);
+        assertEquals(false, service.list("demo", 1L).get(0).get("connected"));
+        service.response = new PluginConnectionService.Reply(200, Map.of("openCount", 2));
+        assertEquals(2, service.request("demo", 1L, "service", "preview", Map.of()).get("openCount"));
+        assertEquals("", service.lastBearer);
+        assertEquals("account_required", assertThrows(IllegalStateException.class,
+                () -> service.request("demo", 1L, "service", "leads", Map.of())).getMessage());
+    }
+
+    @Test void awdAccountRetriesOnceOn401RefreshesAndPassesConflictCodes() {
+        declaration.put("baseUrl", "https://ai-firm.aiworkdeck.com");
+        declaration.put("auth", Map.of("type", "awd-account"));
+        declaration.put("operations", Map.of(
+                "bid", Map.of("path", "/api/portal/marketplace/bid", "method", "POST"),
+                "matter", Map.of("path", "/api/portal/matter", "method", "GET")));
+        when(plugins.installationSource("demo")).thenReturn("bundled");
+        when(account.isConnected()).thenReturn(true);
+        when(account.fetchPluginAssertion("demo")).thenReturn("awdpa1.stale", "awdpa1.fresh");
+
+        var attempts = new java.util.concurrent.atomic.AtomicInteger();
+        var retrying = new TestService() {
+            @Override protected Reply exchange(String url, String method, String bearer, String body, boolean form) {
+                lastBearer = bearer;
+                if (attempts.incrementAndGet() == 1) return new Reply(401, Map.of("error", "unauthorized"));
+                return new Reply(200, Map.of("ok", true));
+            }
+        };
+        org.springframework.test.util.ReflectionTestUtils.setField(retrying, "localMode", true);
+        assertEquals(true, retrying.request("demo", 1L, "service", "bid", Map.of()).get("ok"));
+        assertEquals("awdpa1.fresh", retrying.lastBearer);
+        verify(account).clearPluginAssertionCache("demo");
+
+        service.response = new PluginConnectionService.Reply(409, Map.of("error", "slots_full"));
+        assertEquals("slots_full", assertThrows(IllegalStateException.class,
+                () -> service.request("demo", 1L, "service", "bid", Map.of())).getMessage());
+
+        service.response = new PluginConnectionService.Reply(403, Map.of("error", "not_selected"));
+        assertEquals("not_selected", assertThrows(IllegalStateException.class,
+                () -> service.request("demo", 1L, "service", "matter", Map.of())).getMessage());
+    }
+
     private static Map<String, String> query(String query) {
         Map<String, String> values = new HashMap<>();
         for (String pair : query.split("&")) { String[] parts = pair.split("=", 2); values.put(parts[0], URLDecoder.decode(parts[1], StandardCharsets.UTF_8)); }

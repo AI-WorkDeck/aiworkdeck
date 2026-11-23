@@ -17,5 +17,22 @@ export default {
   "active": "Abonnement actif",
   "inactive": "Aucun abonnement actif",
   "bundled": "Inclus avec l'application",
-  "checkout": "Ouvrir la page de paiement"
+  "checkout": "Ouvrir la page de paiement",
+  "subscribeTitle": "Pass Place de Marché AI Firm",
+  "subscribeSubtitle": "Accès prépayé aux propositions de dossiers · Sans renouvellement automatique",
+  "subscribeLoadFailed": "Impossible de charger les offres",
+  "subscribeCreateFailed": "Échec de création de commande, veuillez réessayer",
+  "subscribeSuccess": "Pass activé",
+  "activeUntilBanner": "Pass actif jusqu’au {date} ; tout achat prolonge la durée restante.",
+  "recommendedBadge": "Recommandé",
+  "daysPass": "/ {days} jours",
+  "planRulesTitle": "Règles de mise en relation (Plan B : choix du client)",
+  "planRuleMaxThree": "• Jusqu’à 3 avocats abonnés peuvent proposer leurs honoraires par dossier",
+  "planRuleUnlock": "• Coordonnées et pièces débloquées uniquement après sélection par le client",
+  "planRulePrepaid": "• 0 % de commission sur les honoraires · Pass prépayé sans prélèvement auto",
+  "scanWeChatPay": "Scannez avec WeChat Pay ({amount}) ; déblocage automatique après paiement",
+  "reopenCheckout": "Rouvrir la page de paiement",
+  "checkPaymentStatus": "Paiement effectué — vérifier",
+  "confirmSubscribe": "Payer {amount} pour débloquer",
+  "signInRequiredNotice": "Connectez votre compte AI WorkDeck pour activer le pass"
 }

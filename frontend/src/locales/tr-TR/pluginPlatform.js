@@ -17,5 +17,22 @@ export default {
   "active": "Abonelik aktif",
   "inactive": "Aktif abonelik yok",
   "bundled": "Uygulamaya dahil",
-  "checkout": "Ödeme sayfasını aç"
+  "checkout": "Ödeme sayfasını aç",
+  "subscribeTitle": "AI Firm Dava Pazarı Kartı",
+  "subscribeSubtitle": "Teklif vermek için ön ödemeli erişim · Otomatik yenileme yok",
+  "subscribeLoadFailed": "Paketler yüklenemedi",
+  "subscribeCreateFailed": "Ödeme siparişi oluşturulamadı; tekrar deneyin",
+  "subscribeSuccess": "Kart etkinleştirildi",
+  "activeUntilBanner": "Kart {date} tarihine kadar geçerli; yeni alım süreyi uzatır.",
+  "recommendedBadge": "En Avantajlı",
+  "daysPass": "/ {days} gün",
+  "planRulesTitle": "Pazar Kuralları (Plan B: Müvekkil Seçer)",
+  "planRuleMaxThree": "• Her vaka için en fazla 3 abone avukat teklif sunabilir",
+  "planRuleUnlock": "• İletişim bilgileri ve dosyalar yalnızca müvekkil seçtiğinde açılır",
+  "planRulePrepaid": "• Avukatlık ücretinden %0 komisyon · Ön ödemeli kart otomatik yenilenmez",
+  "scanWeChatPay": "WeChat Pay ({amount}) ile ödeyin; ödeme sonrası pencere otomatik açılır",
+  "reopenCheckout": "Ödeme sayfasını yeniden aç",
+  "checkPaymentStatus": "Ödemeyi tamamladım — kontrol et",
+  "confirmSubscribe": "Açmak için {amount} öde",
+  "signInRequiredNotice": "Kart satın almak için AI WorkDeck hesabınızı bağlayın"
 }

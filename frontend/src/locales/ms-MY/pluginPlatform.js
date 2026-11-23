@@ -17,5 +17,22 @@ export default {
   "active": "Langganan aktif",
   "inactive": "Tiada langganan aktif",
   "bundled": "Disertakan bersama aplikasi",
-  "checkout": "Buka checkout"
+  "checkout": "Buka checkout",
+  "subscribeTitle": "Pas Pasaran Kes AI Firm",
+  "subscribeSubtitle": "Akses prabayar untuk cadangan kes · Tiada pembaharuan automatik",
+  "subscribeLoadFailed": "Gagal memuatkan pelan",
+  "subscribeCreateFailed": "Gagal membuat pesanan pembayaran; sila cuba lagi",
+  "subscribeSuccess": "Pas diaktifkan",
+  "activeUntilBanner": "Pas aktif sehingga {date}; pembelian memanjangkan tempoh anda.",
+  "recommendedBadge": "Nilai Terbaik",
+  "daysPass": "/ {days} hari",
+  "planRulesTitle": "Peraturan Pasaran (Pelan B: Klien Memilih)",
+  "planRuleMaxThree": "• Sehingga 3 peguam berlangganan boleh menghantar cadangan bagi setiap kes",
+  "planRuleUnlock": "• Butiran hubungan & dokumen penuh dibuka selepas klien memilih 1 peguam",
+  "planRulePrepaid": "• 0% yuran platform atas fi guaman · Pas prabayar tidak membaharui secara automatik",
+  "scanWeChatPay": "Imbas dengan WeChat Pay ({amount}); tetingkap ini akan dibuka secara automatik",
+  "reopenCheckout": "Buka semula halaman pembayaran",
+  "checkPaymentStatus": "Saya telah bayar — semak sekarang",
+  "confirmSubscribe": "Bayar {amount} untuk buka kunci",
+  "signInRequiredNotice": "Sambungkan akaun AI WorkDeck anda untuk membeli pas"
 }

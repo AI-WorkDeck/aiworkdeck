@@ -17,5 +17,22 @@ export default {
   "active": "訂閱有效",
   "inactive": "暫無有效訂閱",
   "bundled": "隨應用提供",
-  "checkout": "打開付款頁面"
+  "checkout": "打開付款頁面",
+  "subscribeTitle": "AI Firm 案源廣場通行證",
+  "subscribeSubtitle": "預付通行證解鎖接案權限 · 不自動續訂",
+  "subscribeLoadFailed": "載入訂閱方案失敗",
+  "subscribeCreateFailed": "建立訂單失敗，請重試",
+  "subscribeSuccess": "通行證已開通",
+  "activeUntilBanner": "目前通行證有效至 {date}，繼續購買將順延效期。",
+  "recommendedBadge": "推薦方案",
+  "daysPass": "/ {days} 天",
+  "planRulesTitle": "接案規則（方案 B：客戶擇優選定）",
+  "planRuleMaxThree": "• 每件案源最多 3 位訂閱執業律師提交報價提案，額滿即止",
+  "planRuleUnlock": "• 客戶比較並選定 1 位律師後，才解鎖完整聯絡方式與文稿",
+  "planRulePrepaid": "• 平台對律師費 0% 抽成；預付通行證到期不自動扣款",
+  "scanWeChatPay": "微信掃碼支付 {amount}，完成後本視窗將自動解鎖",
+  "reopenCheckout": "重新開啟付款頁面",
+  "checkPaymentStatus": "我已完成付款，立即確認",
+  "confirmSubscribe": "確認支付 {amount} 開通",
+  "signInRequiredNotice": "需要連接 AI WorkDeck 帳戶才能開通通行證並同步授權"
 }

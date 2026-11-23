@@ -63,10 +63,18 @@ public class PluginConnectionService {
         }
     }
 
-    public record Operation(String path, String method) {}
+    public record Operation(String path, String method, boolean anonymousFallback) {
+        public Operation(String path, String method) {
+            this(path, method, false);
+        }
+    }
     public record Connection(String id, String label, String baseUrl, String authType, String authorizationUrl,
             String tokenUrl, String clientId, List<String> scopes, Map<String, Operation> operations,
             String statusOperation, String checkoutUrl) {}
+    private static final Set<String> AWD_ACCOUNT_ALLOWED_HOSTS = Set.of(
+            "ai-firm.aiworkdeck.com", "aifirm.aiworkdeck.com");
+    private static final Set<String> AWD_ACCOUNT_CONFLICT_CODES = Set.of(
+            "slots_full", "already_bid", "already_selected", "profile_incomplete", "bid_closed");
     private record Pending(String pluginId, Long userId, Connection connection, String scope,
             String verifier, String redirectUri, long generation, Instant expiresAt) {}
     public record Reply(int status, Map<String, Object> body) {}
@@ -77,7 +85,9 @@ public class PluginConnectionService {
             row.put("id", c.id()); row.put("label", c.label()); row.put("authType", c.authType());
             boolean connected = "none".equals(c.authType());
             boolean reconnect = false;
-            if (!connected) try {
+            if ("awd-account".equals(c.authType())) {
+                connected = account.isConnected();
+            } else if (!connected) try {
                 String stored = credentials.get(scope(pluginId, userId, c.id()));
                 Map<String, Object> record = stored.isEmpty() ? Map.of() : parse(stored);
                 boolean expiredWithoutRefresh = expired(record) && string(record, "refresh_token", "").isBlank();
@@ -229,6 +239,32 @@ public class PluginConnectionService {
         String url = c.baseUrl() + op.path();
         String body = "GET".equals(op.method()) ? "" : json(args);
         if ("GET".equals(op.method()) && !args.isEmpty()) url += "?" + form(args);
+        if ("awd-account".equals(c.authType())) {
+            String token;
+            if (!account.isConnected()) {
+                if (!op.anonymousFallback()) {
+                    throw new IllegalStateException("account_required");
+                }
+                token = "";
+            } else {
+                token = resolveAwdAccountToken(pluginId, op.anonymousFallback());
+            }
+            assertCurrent(pluginId, userId, c, scope, generation);
+            Reply reply = scopedExchange(scope, generation, url, op.method(), token, body, false);
+            assertCurrent(pluginId, userId, c, scope, generation);
+            if (reply.status() == 401 && !token.isEmpty()) {
+                account.clearPluginAssertionCache(pluginId);
+                token = resolveAwdAccountToken(pluginId, op.anonymousFallback());
+                assertCurrent(pluginId, userId, c, scope, generation);
+                reply = scopedExchange(scope, generation, url, op.method(), token, body, false);
+                assertCurrent(pluginId, userId, c, scope, generation);
+            }
+            requireAwdAccountSuccess(reply);
+            if (containsSecret(reply.body(), token)) {
+                throw new IllegalStateException("Service returned credential data; response withheld");
+            }
+            return reply.body();
+        }
         // Resolve credentials in the captured account scope, never a newly selected account.
         String token = bearerToken(pluginId, userId, c, scope, generation);
         assertCurrent(pluginId, userId, c, scope, generation);
@@ -241,6 +277,19 @@ public class PluginConnectionService {
             throw new IllegalStateException("Service returned credential data; response withheld");
         }
         return reply.body();
+    }
+
+    private String resolveAwdAccountToken(String pluginId, boolean anonymousFallback) {
+        try {
+            String t = account.fetchPluginAssertion(pluginId);
+            return t == null ? "" : t;
+        } catch (RuntimeException e) {
+            if (anonymousFallback) {
+                return "";
+            }
+            throw new IllegalStateException(e.getMessage() == null || e.getMessage().isBlank()
+                    ? "account_required" : e.getMessage(), e);
+        }
     }
 
     public Map<String, Object> billingStatus(String pluginId, Long userId, String connectionId) {
@@ -297,7 +346,25 @@ public class PluginConnectionService {
         if (plugin.getPermissions() == null || !plugin.getPermissions().contains("network")) {
             throw new IllegalArgumentException("Plugin requires the network permission");
         }
-        return parseDeclarations(plugin);
+        List<Connection> parsed = parseDeclarations(plugin);
+        for (Connection c : parsed) {
+            if ("awd-account".equals(c.authType())) {
+                String host = URI.create(c.baseUrl()).getHost();
+                if (!isAwdAccountPluginTrusted(pluginId) || !isAwdAccountHostAllowed(host)) {
+                    throw new IllegalArgumentException("awd-account authentication is restricted to trusted official connections");
+                }
+            }
+        }
+        return parsed;
+    }
+
+    protected boolean isAwdAccountHostAllowed(String host) {
+        return host != null && AWD_ACCOUNT_ALLOWED_HOSTS.contains(host.toLowerCase(Locale.ROOT));
+    }
+
+    protected boolean isAwdAccountPluginTrusted(String pluginId) {
+        String source = plugins.installationSource(pluginId);
+        return "market".equals(source) || "bundled".equals(source) || plugins.isDevInstalled(pluginId);
     }
 
     public static List<Connection> parseDeclarations(PluginService.PluginMetadata plugin) {
@@ -316,7 +383,7 @@ public class PluginConnectionService {
             base = base.replaceAll("/+$", "");
             Map<String, Object> auth = object(raw.get("auth"));
             String type = string(auth, "type", "none");
-            if (!Set.of("none", "bearer", "oauth2").contains(type)) throw new IllegalArgumentException("Unknown connection authentication");
+            if (!Set.of("none", "bearer", "oauth2", "awd-account").contains(type)) throw new IllegalArgumentException("Unknown connection authentication");
             String authorization = null, token = null, clientId = null;
             List<String> scopes = new ArrayList<>();
             if ("oauth2".equals(type)) {
@@ -336,7 +403,7 @@ public class PluginConnectionService {
                 String method = string(op, "method", "GET");
                 if (!entry.getKey().matches("[a-zA-Z][a-zA-Z0-9._-]{0,63}") || !path.matches("/[a-zA-Z0-9/_-]*")
                         || path.contains("//") || !Set.of("GET", "POST").contains(method)) throw new IllegalArgumentException("Invalid service operation");
-                operations.put(entry.getKey(), new Operation(path, method));
+                operations.put(entry.getKey(), new Operation(path, method, Boolean.TRUE.equals(op.get("anonymousFallback"))));
             }
             if (operations.size() > 30) throw new IllegalArgumentException("Too many service operations");
             Map<String, Object> billing = object(raw.get("billing"));
@@ -390,7 +457,9 @@ public class PluginConnectionService {
                 }
             }
             try (Response response = call.execute()) {
-                if (!response.isSuccessful()) return new Reply(response.code(), Map.of());
+                if (!response.isSuccessful()) {
+                    return new Reply(response.code(), safeErrorBody(response));
+                }
                 if (response.body() == null) return new Reply(response.code(), Map.of());
                 byte[] bytes = response.body().byteStream().readNBytes(2 * 1024 * 1024 + 1);
                 if (bytes.length > 2 * 1024 * 1024) throw new IllegalStateException("Service response exceeds 2 MB");
@@ -426,6 +495,41 @@ public class PluginConnectionService {
             String material = json(Arrays.asList(c.baseUrl(), c.authType(), c.authorizationUrl(), c.tokenUrl(), c.clientId(), c.scopes()));
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(material.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception e) { throw new IllegalStateException(e); }
+    }
+
+    private static Map<String, Object> safeErrorBody(Response response) {
+        try {
+            if (response.body() == null) return Map.of();
+            byte[] bytes = response.body().byteStream().readNBytes(16 * 1024 + 1);
+            if (bytes.length == 0 || bytes.length > 16 * 1024) return Map.of();
+            Map<String, Object> parsed = JSON.readValue(bytes, MAP);
+            Object err = parsed.get("error");
+            if (err instanceof String s && s.matches("[a-z0-9_]{1,48}")) {
+                return Map.of("error", s);
+            }
+        } catch (Exception ignored) {
+            // Non-JSON or oversized error responses collapse to empty body.
+        }
+        return Map.of();
+    }
+
+    private static void requireAwdAccountSuccess(Reply reply) {
+        if (reply.status() == 402) throw new IllegalStateException("payment_required");
+        if (reply.status() == 401) throw new IllegalStateException("account_required");
+        if (reply.status() == 403) {
+            String err = string(reply.body(), "error", "");
+            if ("not_selected".equals(err)) throw new IllegalStateException("not_selected");
+            throw new IllegalStateException("connection_required");
+        }
+        if (reply.status() == 409) {
+            String err = string(reply.body(), "error", "");
+            if (AWD_ACCOUNT_CONFLICT_CODES.contains(err)) {
+                throw new IllegalStateException(err);
+            }
+        }
+        if (reply.status() < 200 || reply.status() >= 300) {
+            throw new IllegalStateException("Service returned HTTP " + reply.status());
+        }
     }
 
     private static void requireSuccess(Reply reply) {

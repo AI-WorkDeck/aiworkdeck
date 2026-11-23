@@ -17,5 +17,22 @@ export default {
   "active": "구독 활성",
   "inactive": "활성 구독 없음",
   "bundled": "앱 기본 포함",
-  "checkout": "결제 페이지 열기"
+  "checkout": "결제 페이지 열기",
+  "subscribeTitle": "AI Firm 사건 마켓플레이스 패스",
+  "subscribeSubtitle": "선불 패스로 사건 제안 권한 잠금 해제 · 자동 갱신 없음",
+  "subscribeLoadFailed": "구독 요금제를 불러오지 못했습니다",
+  "subscribeCreateFailed": "결제 주문을 생성하지 못했습니다. 다시 시도해 주세요",
+  "subscribeSuccess": "패스가 활성화되었습니다",
+  "activeUntilBanner": "현재 패스는 {date}까지 유효하며 추가 구매 시 기간이 연장됩니다.",
+  "recommendedBadge": "추천",
+  "daysPass": "/ {days}일",
+  "planRulesTitle": "수임 규칙 (플랜 B: 의뢰인 선택)",
+  "planRuleMaxThree": "• 사건당 구독 변호사 최대 3명까지 견적 제안 가능 (선착순 마감)",
+  "planRuleUnlock": "• 의뢰인이 1명을 선택해야 전체 연락처와 문서가 공개됩니다",
+  "planRulePrepaid": "• 수임료 플랫폼 수수료 0% · 선불 패스는 자동 결제되지 않습니다",
+  "scanWeChatPay": "WeChat Pay로 {amount} 결제 후 창이 자동으로 잠금 해제됩니다",
+  "reopenCheckout": "결제 페이지 다시 열기",
+  "checkPaymentStatus": "결제 완료 — 지금 확인",
+  "confirmSubscribe": "{amount} 결제 및 잠금 해제",
+  "signInRequiredNotice": "패스를 구매하고 동기화하려면 AI WorkDeck 계정을 연결해야 합니다"
 }

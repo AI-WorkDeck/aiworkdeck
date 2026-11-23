@@ -110,6 +110,14 @@ public class PluginService {
     @Value("${telemetry.app-version:${AWD_APP_VERSION:dev}}")
     String appVersion = "dev";
 
+    String codeSourcePath;
+
+    String effectiveAppVersion() {
+        return codeSourcePath != null
+                ? com.checkba.util.EffectiveAppVersion.resolve(appVersion, codeSourcePath)
+                : com.checkba.util.EffectiveAppVersion.resolve(appVersion);
+    }
+
     /** pluginId -> 不兼容原因（宿主版本低于 manifest.minHostVersion）；rescan 时重算 */
     private final Map<String, String> incompatiblePluginIds = new ConcurrentHashMap<>();
 
@@ -1099,16 +1107,17 @@ public class PluginService {
         if (min == null || min.isBlank()) {
             return null;
         }
-        if (!com.checkba.util.Semver.isSemver(appVersion)) {
-            // dev 态（appVersion="dev"）放行，与 NativePackService.checkCompatibility 同口径
+        String effective = effectiveAppVersion();
+        if (!com.checkba.util.Semver.isSemver(effective)) {
+            // dev 态（effective="dev"）放行，与 NativePackService.checkCompatibility 同口径
             log.warn("Host version '{}' is not semver, skip minHostVersion check for plugin {}",
-                    appVersion, meta.getId());
+                    effective, meta.getId());
             return null;
         }
-        if (com.checkba.util.Semver.compare(appVersion, min) < 0) {
+        if (com.checkba.util.Semver.compare(effective, min) < 0) {
             return com.checkba.service.LangText.of(
-                    "需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请升级客户端",
-                    "Requires host version >= " + min + " (current " + appVersion + "); please upgrade the client");
+                    "需要宿主版本 ≥ " + min + "（当前 " + effective + "），请升级客户端",
+                    "Requires host version >= " + min + " (current " + effective + "); please upgrade the client");
         }
         return null;
     }
@@ -1474,7 +1483,7 @@ public class PluginService {
                 if (incompatible != null) {
                     incompatiblePluginIds.put(meta.getId(), incompatible);
                     log.warn("Plugin {} requires host >= {} (current {}), registered but inactive",
-                            meta.getId(), meta.getMinHostVersion(), appVersion);
+                            meta.getId(), meta.getMinHostVersion(), effectiveAppVersion());
                 } else {
                     // MCP 声明式证据来源在元数据阶段注册（SPI 的随 JAR 加载注册，规范 v2.8 P3）；
                     // 适配器自带启用位闸，禁用插件的来源静默返回空

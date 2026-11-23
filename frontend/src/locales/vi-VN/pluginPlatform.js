@@ -17,5 +17,22 @@ export default {
   "active": "Thuê bao đang hoạt động",
   "inactive": "Chưa có thuê bao hoạt động",
   "bundled": "Đi kèm ứng dụng",
-  "checkout": "Mở trang thanh toán"
+  "checkout": "Mở trang thanh toán",
+  "subscribeTitle": "Thẻ Sàn Vụ Việc AI Firm",
+  "subscribeSubtitle": "Gói trả trước để gửi đề xuất nhận việc · Không tự động gia hạn",
+  "subscribeLoadFailed": "Không thể tải danh sách gói",
+  "subscribeCreateFailed": "Không thể tạo đơn thanh toán, vui lòng thử lại",
+  "subscribeSuccess": "Đã kích hoạt thẻ",
+  "activeUntilBanner": "Thẻ hiệu lực đến {date}; mua thêm sẽ được cộng nối thời hạn.",
+  "recommendedBadge": "Tiết kiệm",
+  "daysPass": "/ {days} ngày",
+  "planRulesTitle": "Quy tắc nhận việc (Phương án B: Khách hàng chọn)",
+  "planRuleMaxThree": "• Tối đa 3 luật sư có gói được gửi báo giá cho mỗi hồ sơ",
+  "planRuleUnlock": "• Thông tin liên hệ và tài liệu chỉ mở sau khi khách hàng chọn 1 luật sư",
+  "planRulePrepaid": "• 0% phí nền tảng trên thù lao luật sư · Thẻ trả trước không tự động trừ tiền",
+  "scanWeChatPay": "Quét WeChat Pay ({amount}); cửa sổ này tự động mở khóa khi thanh toán xong",
+  "reopenCheckout": "Mở lại trang thanh toán",
+  "checkPaymentStatus": "Tôi đã thanh toán — kiểm tra ngay",
+  "confirmSubscribe": "Thanh toán {amount} để mở khóa",
+  "signInRequiredNotice": "Kết nối tài khoản AI WorkDeck để mua và đồng bộ thẻ"
 }

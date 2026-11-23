@@ -76,7 +76,7 @@ import { resolveAnchor, toPluginLink, toTargetInputs } from '@/utils/pluginEvide
 import { createEvidenceLinkForSelection } from '@/pages/project-overview/evidenceLinkCore.js'
 import { WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
 import { preparePluginImDrag, endPluginImDrag } from '@/utils/pluginImDrag.js'
-import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
+import { ACCOUNT_CHANGED_EVENT, requirePluginSubscription } from '@/utils/requireAccount.js'
 import { loadImDirectory, addImFriend, removeImFriend } from '@/utils/imDirectory.js'
 
 /** 桥协议版本 */
@@ -110,6 +110,7 @@ const PLUGIN_EVENTS = {
   'account.changed': { permission: null, throttleMs: 0 },
   // v2.9：宿主设置表单保存后推送（只推给设置所属的插件，见 mounted 里的过滤）
   'settings.changed': { permission: null, throttleMs: 0 },
+  'billing.changed': { permission: null, throttleMs: 0 },
   'lawfirm.navigate': { permission: null, throttleMs: 0 },
   // 宿主左栏（PluginWorkspaceSummary）与中栏插件标签联动指令（如切换会话、发起私聊、打开对话框、切换视图）
   'sidebar.command': { permission: null, throttleMs: 0 }
@@ -332,6 +333,11 @@ export default {
     this._onPluginSettingsChanged = (e) => {
       if (e && e.pluginId === this.pluginId) this.forwardEvent('settings.changed', {})
     }
+    this._onPluginBillingChanged = (e) => {
+      if (!e || !e.pluginId || e.pluginId === this.pluginId) {
+        this.forwardEvent('billing.changed', { expiresAt: (e && e.expiresAt) || null })
+      }
+    }
     this._onSidebarCommand = (e) => {
       if (!e || (e.pluginId && e.pluginId !== this.pluginId)) return
       if (this._subscribedEvents && this._subscribedEvents.has('sidebar.command')) {
@@ -344,6 +350,8 @@ export default {
     uni.$on('awd:litviz-restyled', this._onDiagramChanged)
     uni.$on('awd:selection-changed', this._onSelectionChanged)
     uni.$on('awd:plugin-settings-changed', this._onPluginSettingsChanged)
+    uni.$on('awd:plugin-billing-changed', this._onPluginBillingChanged)
+    uni.$on('awd:entitlements-changed', this._onPluginBillingChanged)
     this._onLawfirmTab = (payload) => {
       if (this.pluginId && this.pluginId !== 'lawfirm-management') return
       const tab = typeof payload === 'string' ? payload : (payload && payload.tab) || ''
@@ -391,6 +399,7 @@ export default {
     if (this._onDiagramChanged) { uni.$off('awd:litviz-restyled', this._onDiagramChanged); this._onDiagramChanged = null }
     if (this._onSelectionChanged) { uni.$off('awd:selection-changed', this._onSelectionChanged); this._onSelectionChanged = null }
     if (this._onPluginSettingsChanged) { uni.$off('awd:plugin-settings-changed', this._onPluginSettingsChanged); this._onPluginSettingsChanged = null }
+    if (this._onPluginBillingChanged) { uni.$off('awd:plugin-billing-changed', this._onPluginBillingChanged); uni.$off('awd:entitlements-changed', this._onPluginBillingChanged); this._onPluginBillingChanged = null }
     if (this._onLawfirmTab) { uni.$off('awd:lawfirm-tab', this._onLawfirmTab); this._onLawfirmTab = null }
     if (this._onSidebarCommand) { uni.$off('awd:plugin-sidebar-command', this._onSidebarCommand); this._onSidebarCommand = null }
     if (this._onAccountChanged) { uni.$off(ACCOUNT_CHANGED_EVENT, this._onAccountChanged); this._onAccountChanged = null }
@@ -527,6 +536,7 @@ export default {
         this._platformServices = createPluginPlatformServices({
           pluginId: () => this.pluginId, projectId: () => this.projectId,
           permissions: () => this.effectivePermissions(), isCurrent: () => generation === this.sessionGeneration,
+          openPluginSubscribe: requirePluginSubscription,
         })
       }
       return this._platformServices

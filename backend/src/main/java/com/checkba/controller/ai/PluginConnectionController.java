@@ -5,26 +5,54 @@ package com.checkba.controller.ai;
 import com.checkba.controller.AuthController;
 import com.checkba.service.ProjectMemberService;
 import com.checkba.service.LangText;
+import com.checkba.service.account.AccountException;
+import com.checkba.service.account.AccountService;
 import com.checkba.service.account.MachineAccountGuard;
 import com.checkba.service.ai.PluginService;
 import com.checkba.service.entitlement.EntitlementService;
 import com.checkba.service.plugin.PluginConnectionService;
 import com.checkba.service.site.SiteProfileService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/plugins")
-@RequiredArgsConstructor
 public class PluginConnectionController {
+    private static final Set<String> PASS_THROUGH_ERROR_CODES = Set.of(
+            "connection_required", "payment_required", "account_required",
+            "not_selected", "slots_full", "already_bid", "already_selected",
+            "profile_incomplete", "bid_closed");
+
     private final PluginConnectionService connections;
     private final PluginService plugins;
     private final EntitlementService entitlements;
     private final MachineAccountGuard machineAccountGuard;
     private final ProjectMemberService projectMembers;
     private final SiteProfileService sites;
+    private final AccountService account;
+
+    @Autowired
+    public PluginConnectionController(PluginConnectionService connections, PluginService plugins,
+            EntitlementService entitlements, MachineAccountGuard machineAccountGuard,
+            ProjectMemberService projectMembers, SiteProfileService sites, AccountService account) {
+        this.connections = connections;
+        this.plugins = plugins;
+        this.entitlements = entitlements;
+        this.machineAccountGuard = machineAccountGuard;
+        this.projectMembers = projectMembers;
+        this.sites = sites;
+        this.account = account;
+    }
+
+    public PluginConnectionController(PluginConnectionService connections, PluginService plugins,
+            EntitlementService entitlements, MachineAccountGuard machineAccountGuard,
+            ProjectMemberService projectMembers, SiteProfileService sites) {
+        this(connections, plugins, entitlements, machineAccountGuard, projectMembers, sites, null);
+    }
 
     @GetMapping("/{id}/connections")
     public Map<String, Object> list(@PathVariable String id, @RequestHeader(value="X-Session-Id", required=false) String session) {
@@ -84,17 +112,70 @@ public class PluginConnectionController {
         if (connectionId != null) return Map.of("code", 0, "data", connections.billingStatus(id, userId, connectionId));
         machineAccountGuard.requireMachineScope(session);
         boolean refreshed = entitlements.refreshQuietly();
-        return Map.of("code", 0, "data", Map.of("provider", "host", "active", entitlements.isEnabled("plugin:" + id),
-                "refreshed", refreshed));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("provider", "host");
+        data.put("active", entitlements.isEnabled("plugin:" + id));
+        data.put("expiresAt", entitlements.expiresAt("plugin:" + id));
+        data.put("accountConnected", account != null && account.isConnected());
+        data.put("refreshed", refreshed);
+        return Map.of("code", 0, "data", data);
     }
 
     @GetMapping("/{id}/billing/checkout")
     public Map<String, Object> checkout(@PathVariable String id, @RequestParam(required=false) String connectionId,
             @RequestHeader(value="X-Session-Id", required=false) String session) {
         user(session); requirePlugin(id);
-        String url = connectionId == null ? sites.baseUrl() + (LangText.isEnglish() ? "/en" : "/zh")
-                + "/marketplace/plugins" : connections.checkout(id, connectionId);
-        return Map.of("code", 0, "data", Map.of("url", url));
+        if (connectionId != null) {
+            return Map.of("code", 0, "data", Map.of("url", connections.checkout(id, connectionId)));
+        }
+        String url = sites.baseUrl() + (LangText.isEnglish() ? "/en" : "/zh") + "/marketplace/plugins";
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("url", url);
+        if ("aifirm-partner".equals(id)) {
+            data.put("mode", "in_app");
+            data.put("pluginId", id);
+        }
+        return Map.of("code", 0, "data", data);
+    }
+
+    @GetMapping("/{id}/billing/plans")
+    public Map<String, Object> billingPlans(@PathVariable String id,
+            @RequestHeader(value="X-Session-Id", required=false) String session) {
+        user(session); requirePlugin(id);
+        if (account == null) throw new IllegalStateException("Account service unavailable");
+        return Map.of("code", 0, "data", account.fetchPluginSubscriptionPlans(id));
+    }
+
+    @PostMapping("/{id}/billing/subscribe")
+    public Map<String, Object> subscribe(@PathVariable String id,
+            @RequestHeader(value="X-Session-Id", required=false) String session,
+            @RequestBody(required = false) Map<String, Object> body) {
+        user(session); requirePlugin(id);
+        machineAccountGuard.requireMachineScope(session);
+        if (account == null) throw new IllegalStateException("Account service unavailable");
+        String skuId = body != null && body.get("skuId") instanceof String s ? s.trim() : "";
+        long amount = body != null && body.get("amount") instanceof Number n ? n.longValue() : -1L;
+        String idempotencyKey = body != null && body.get("idempotencyKey") instanceof String k ? k.trim() : null;
+        return Map.of("code", 0, "data", account.createPluginSubscriptionOrder(id, skuId, amount, idempotencyKey));
+    }
+
+    @GetMapping("/{id}/billing/order-status")
+    public Map<String, Object> billingOrderStatus(@PathVariable String id,
+            @RequestParam String outTradeNo,
+            @RequestHeader(value="X-Session-Id", required=false) String session) {
+        user(session); requirePlugin(id);
+        machineAccountGuard.requireMachineScope(session);
+        if (account == null) throw new IllegalStateException("Account service unavailable");
+        if (outTradeNo == null || outTradeNo.isBlank()) throw new IllegalArgumentException("outTradeNo is required");
+        Map<String, Object> status = account.queryPluginOrderStatus(outTradeNo.trim());
+        if (status.get("order") instanceof Map<?, ?> order && "paid".equals(order.get("status"))) {
+            entitlements.refreshQuietly();
+            account.clearPluginAssertionCache(id);
+        }
+        Map<String, Object> out = new LinkedHashMap<>(status);
+        out.put("active", entitlements.isEnabled("plugin:" + id));
+        out.put("expiresAt", entitlements.expiresAt("plugin:" + id));
+        return Map.of("code", 0, "data", out);
     }
 
     private void requirePlugin(String id) {
@@ -105,10 +186,14 @@ public class PluginConnectionController {
         if (id == null) throw new IllegalArgumentException("Sign in required");
         return id;
     }
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class, AccountException.class})
     public ResponseEntity<Map<String, Object>> error(RuntimeException e) {
         String message = e.getMessage() == null ? "Plugin service failed" : e.getMessage();
-        String code = "connection_required".equals(message) || "payment_required".equals(message) ? message : "plugin_service_failed";
+        String code = PASS_THROUGH_ERROR_CODES.contains(message) ? message : "plugin_service_failed";
+        if (e instanceof AccountException ae && (ae.getKind() == AccountException.Kind.NOT_CONNECTED
+                || ae.getKind() == AccountException.Kind.UNAUTHORIZED)) {
+            code = "account_required";
+        }
         if (com.checkba.service.ai.mcp.PluginMcpEndpointPolicy.isFakeIpResolutionFailure(e)) code = "dns_resolution_failed";
         return ResponseEntity.badRequest().body(Map.of("code", 1, "errorCode", code, "message", message));
     }
