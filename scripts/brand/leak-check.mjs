@@ -92,7 +92,7 @@ export function scan(target, findings = [], label = target) {
   return findings
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+if (process.argv[1] && fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(process.argv[1])) {
   const args = process.argv.slice(2)
   const mi = args.indexOf('--max-report')
   const max = mi >= 0 ? Number(args.splice(mi, 2)[1]) : 40

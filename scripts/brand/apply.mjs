@@ -24,11 +24,14 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 // Directories (relative to the tree) whose shipped text is rewritten.
 export const SCAN = [
   'desktop/main',
+  'desktop/preload',
   'desktop/build',
   'desktop/scripts/brand-dev-electron.js',
   'frontend/src',
   'frontend/index.html',
+  'frontend/plugin-app', // shell of the bundled business plugins (official-plugins/*/web)
   'backend/src/main',
+  'backend/skills', // shipped as resources/skills
   'official-plugins', // bundled into the backend jar (lawfirm-management) or preinstalled (aifirm-partner)
   'office-addin', // the workbench imports office-addin/taskpane/lib; the add-ins themselves are phase 5
   'sdk/plugin-sdk', // awd-plugin-sdk.js is copied into bundled plugins
@@ -56,6 +59,7 @@ export function genericRules(brand) {
     { name: 'hosts *.aiworkdeck.com', re: /\b((?:[a-z0-9-]+\.)*)aiworkdeck\.com\b/g, to: (m, sub) => (KEEP_HOSTS.has(m) ? m : `${sub}${brand.domain}`), min: 1 },
     { name: 'hosts *.workdeck.ai', re: /\b((?:[a-z0-9-]+\.)*)workdeck\.ai\b/g, to: (_, sub) => `${sub}${brand.domain}`, min: 1 },
     { name: 'data dir', re: /(?<![\w.-])\.aiworkdeck(?![\w.-])/g, to: brand.dataDirName, min: 1 },
+    { name: 'update-signing key file name (comment)', re: /aiworkdeck_update_signing/g, to: `${brand.id}_update_signing`, min: 1 },
     { name: 'app id (Windows ProgID)', re: /com\.aiworkdeck\.desktop\b/g, to: brand.appId, min: 1 },
     { name: 'Codex MCP config id', re: /(?<=mcp_servers\.)aiworkdeck\b/g, to: brand.id, min: 1 },
     { name: 'local MCP server id', re: /(?<=realm=\\"|http |"name", ")aiworkdeck(?=-mcp\\"| |")/g, to: brand.id, min: 3 },
@@ -143,6 +147,8 @@ export function applyBrand({ id, root, dryRun = false, log = console.log, brands
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
   pkg.name = brand.packageName
   pkg.description = brand.name
+  // Windows exe "CompanyName" comes from author; AGPL attribution stays in copyright.
+  pkg.author = brand.operatorShort || brand.name
   Object.assign(pkg.build, { appId: brand.appId, productName: brand.name, copyright: brand.copyright })
   pkg.build.dmg.title = `${brand.name} \${version}`
   pkg.build.nsis.shortcutName = brand.name
@@ -166,7 +172,7 @@ export function applyBrand({ id, root, dryRun = false, log = console.log, brands
   return { changed, copied, hits }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+if (process.argv[1] && fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(process.argv[1])) {
   const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null }
   const id = arg('--brand')
   if (!id) { console.error('usage: apply.mjs --brand <id> [--root <tree>] [--dry-run]'); process.exit(2) }
