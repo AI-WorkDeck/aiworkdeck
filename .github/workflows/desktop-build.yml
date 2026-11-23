@@ -5,6 +5,21 @@ name: Desktop Build
 # installer works without a local Java/PostgreSQL environment.
 on:
   workflow_dispatch:
+    inputs:
+      brand:
+        description: 'White-label brand (brands/<id>); aiworkdeck = the normal build'
+        type: string
+        default: aiworkdeck
+  # White-label editions: a licensee's private repo holds brands/<id>/ and calls this workflow
+  # (see scripts/brand/README.md). It then builds AI-WorkDeck/aiworkdeck at source_ref with that brand.
+  workflow_call:
+    inputs:
+      brand:
+        type: string
+        required: true
+      source_ref:
+        type: string
+        default: master
   push:
     tags: ['v*']
   pull_request:
@@ -100,11 +115,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # 白标：被授权方私有仓调用时 github.repository 是调用方，这里固定检出本仓的 source_ref。
+          repository: AI-WorkDeck/aiworkdeck
+          ref: ${{ github.repository != 'AI-WorkDeck/aiworkdeck' && inputs.source_ref || '' }}
           # 全量历史：Detect drawio changes 需要拿 PR base / push before 做 diff
           fetch-depth: 0
+      - name: Fetch brand from the calling repository
+        if: github.repository != 'AI-WorkDeck/aiworkdeck'
+        uses: actions/checkout@v4
+        with:
+          path: .brand-src
+      - name: Install brand folder
+        if: github.repository != 'AI-WorkDeck/aiworkdeck'
+        shell: bash
+        run: cp -R .brand-src/brands/. brands/ && rm -rf .brand-src
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Apply white-label brand
+        # scripts/brand/apply.mjs rewrites this checkout (name, hosts, data dir, art) before anything is built;
+        # the default brand skips it. Unit tests assert AI WorkDeck literals, so brand builds skip them below and
+        # run the leak check after packaging instead.
+        if: (inputs.brand || 'aiworkdeck') != 'aiworkdeck'
+        shell: bash
+        run: node scripts/brand/apply.mjs --brand "${{ inputs.brand }}"
+      - name: Read product name
+        shell: bash
+        run: echo "AWD_PRODUCT_NAME=$(node -p "require('./desktop/package.json').build.productName")" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         id: jdk
         with:
@@ -206,6 +243,7 @@ jobs:
             Write-Host "Defender exclusion not applied (harmless): $($_.Exception.Message)"
           }
       - name: Desktop unit tests
+        if: (inputs.brand || 'aiworkdeck') == 'aiworkdeck'
         working-directory: desktop
         # drawio 测试曾在 Windows 上锁死 110 分钟不退出（v0.26.0 首发 run）：
         # 正常全量 ≤5 分钟，给 3 倍预算快挂，别再拖到 job 默认 6 小时上限。
@@ -555,7 +593,7 @@ jobs:
         shell: pwsh
         run: |
           npx electron-builder --dir --arm64 '-c.extraMetadata.awdReleaseBuild=true'
-          if (-not (Test-Path 'release\win-arm64-unpacked\AI WorkDeck.exe')) { throw 'arm64 unpacked dir missing' }
+          if (-not (Test-Path "release\win-arm64-unpacked\$env:AWD_PRODUCT_NAME.exe")) { throw 'arm64 unpacked dir missing' }
           Remove-Item -Recurse -Force 'release\win-arm64-unpacked\resources'
           New-Item -ItemType Directory -Force 'build\win\arm64-shell' | Out-Null
           Move-Item 'release\win-arm64-unpacked\*' 'build\win\arm64-shell\'
@@ -617,8 +655,8 @@ jobs:
           "signtool: $($signtool.FullName)"
           $files = @(Get-ChildItem 'release\*.exe' | ForEach-Object FullName)
           if ($files.Count -eq 0) { throw 'no installer exe in release/' }
-          $files += (Resolve-Path 'release\win-unpacked\AI WorkDeck.exe').Path
-          $files += (Resolve-Path 'build\win\arm64-shell\AI WorkDeck.exe').Path
+          $files += (Resolve-Path "release\win-unpacked\$env:AWD_PRODUCT_NAME.exe").Path
+          $files += (Resolve-Path "build\win\arm64-shell\$env:AWD_PRODUCT_NAME.exe").Path
           foreach ($f in $files) {
             "=== $f"
             $out = & $signtool.FullName verify /pa /v $f 2>&1 | Out-String
@@ -643,11 +681,21 @@ jobs:
             --prev https://www.aiworkdeck.com/update/desktop/manifest.json \
             --out desktop/release/patch
           ls -la desktop/release/patch
+      - name: White-label leak check
+        # Fails if the default product's name or domains survive anywhere in the packaged app (app.asar, backend
+        # jar, resources). Allowed: AGPL notices and internal identifiers (scripts/brand/leak-check.mjs ALLOW).
+        if: (inputs.brand || 'aiworkdeck') != 'aiworkdeck'
+        shell: bash
+        run: |
+          app=$(ls -d desktop/release/mac*/*.app/Contents/Resources desktop/release/win-unpacked/resources 2>/dev/null | head -1)
+          test -n "$app" || { echo "no unpacked app under desktop/release"; ls desktop/release; exit 1; }
+          (cd desktop && npm ls @electron/asar >/dev/null 2>&1 || npm i --no-save @electron/asar)
+          node scripts/brand/leak-check.mjs "$app"
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
           retention-days: 3
-          name: aiworkdeck-${{ matrix.os }}
+          name: ${{ inputs.brand || 'aiworkdeck' }}-${{ matrix.os }}
           path: |
             desktop/release/*.dmg
             desktop/release/*.exe

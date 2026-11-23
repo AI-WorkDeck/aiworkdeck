@@ -1,0 +1,11 @@
+{
+  "$comment": "Default brand: what the AI WorkDeck build ships today. scripts/brand/apply.mjs is a no-op for it. Kept as the reference for the fields a brand must provide.",
+  "id": "aiworkdeck",
+  "name": "AI WorkDeck",
+  "domain": "aiworkdeck.com",
+  "packageName": "aiworkdeck-desktop",
+  "appId": "com.aiworkdeck.desktop",
+  "dataDirName": ".aiworkdeck",
+  "supportEmail": "hi@aiworkdeck.com",
+  "copyright": "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED and AI WorkDeck contributors. Licensed under the GNU AGPL v3.0 or later. Source: https://github.com/AI-WorkDeck/aiworkdeck"
+}

@@ -9,15 +9,18 @@ if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP
 }
 
 $installer = (Resolve-Path -LiteralPath $InstallerPath).Path
-$installDir = Join-Path $env:RUNNER_TEMP ('AI WorkDeck association smoke ' + [guid]::NewGuid().ToString('N'))
-$exe = Join-Path $installDir 'AI WorkDeck.exe'
+# Product name and appId come from package.json so white-label builds (scripts/brand/apply.mjs) run the same smoke.
+$build = (Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '..\package.json') | ConvertFrom-Json).build
+$product = $build.productName
+$installDir = Join-Path $env:RUNNER_TEMP ("$product association smoke " + [guid]::NewGuid().ToString('N'))
+$exe = Join-Path $installDir "$product.exe"
 $extensions = @('doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf', 'txt', 'md', 'markdown', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp')
-$progId = 'com.aiworkdeck.desktop.Document'
+$progId = "$($build.appId).Document"
 $otherHandler = 'AIWorkDeckSmoke.PreviousHandler'
 $changedHandler = 'AIWorkDeckSmoke.ChangedHandler'
 $classes = 'Software\Classes'
-$appKey = "$classes\Applications\AI WorkDeck.exe"
-$capabilities = 'Software\AI WorkDeck\Capabilities'
+$appKey = "$classes\Applications\$product.exe"
+$capabilities = "Software\$product\Capabilities"
 $registeredApps = 'Software\RegisteredApplications'
 # NSIS selects the 64-bit registry view for this x64 installer.
 $registry = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryView]::Registry64)
@@ -95,10 +98,10 @@ function Assert-Installed([string]$Default) {
     $command = '"' + $exe + '" "%1"'
     Assert-Equal (Read-Value "$classes\$progId\shell\open\command" '') $command 'Quoted ProgID command'
     Assert-Equal (Read-Value "$appKey\shell\open\command" '') $command 'Quoted application command'
-    Assert-Equal (Read-Value $registeredApps 'AI WorkDeck') $capabilities 'Default-app registration'
+    Assert-Equal (Read-Value $registeredApps $product) $capabilities 'Default-app registration'
     Assert-Preserved $Default
     # /S without --force-run must not start the client or its backend against the runner profile.
-    $running = @(Get-Process -Name 'AI WorkDeck' -ErrorAction SilentlyContinue)
+    $running = @(Get-Process -Name $product -ErrorAction SilentlyContinue)
     Assert-Equal $running.Count 0 'Silent installer must not launch application'
 }
 
@@ -108,7 +111,7 @@ try {
         $existing = $registry.OpenSubKey($key)
         if ($null -ne $existing) { $existing.Dispose(); throw "Requires a clean runner; key already exists: $key" }
     }
-    if (Has-Value $registeredApps 'AI WorkDeck') { throw 'Requires a clean runner; application already registered.' }
+    if (Has-Value $registeredApps $product) { throw 'Requires a clean runner; application already registered.' }
     foreach ($ext in $extensions) {
         if ((Has-Value "$classes\.$ext\OpenWithProgids" $otherHandler) -or (Has-Value "$classes\.$ext\OpenWithProgids" $progId)) {
             throw "Requires a clean runner; test or application candidate exists for .$ext"
@@ -139,7 +142,7 @@ try {
     Assert-Installed $changedHandler
     Write-Host 'PASS: reinstall preserves a default changed after the first installation.'
 
-    $uninstaller = Join-Path $installDir 'Uninstall AI WorkDeck.exe'
+    $uninstaller = Join-Path $installDir "Uninstall $product.exe"
     Assert-Equal (Test-Path -LiteralPath $uninstaller -PathType Leaf) $true 'Uninstaller present'
     # _?= keeps the uninstaller in this process instead of spawning a temporary copy and exiting early.
     Run-Installer $uninstaller "/S _?=$installDir"
@@ -151,7 +154,7 @@ try {
         $remaining = $registry.OpenSubKey($key)
         if ($null -ne $remaining) { $remaining.Dispose(); throw "Uninstall left application registration: $key" }
     }
-    Assert-Equal (Has-Value $registeredApps 'AI WorkDeck') $false 'Default-app registration removed'
+    Assert-Equal (Has-Value $registeredApps $product) $false 'Default-app registration removed'
     Assert-Preserved $changedHandler
     Write-Host 'PASS: uninstall removes application candidates and preserves other defaults, candidates and UserChoice.'
 } finally {
