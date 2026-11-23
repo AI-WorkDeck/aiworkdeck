@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Đăng nhập bằng số điện thoại hoặc email và mật khẩu của bạn. Lần đầu sử dụng? Hãy xác minh và tạo mật khẩu.",
+  "introEmail": "Đăng nhập bằng email và mật khẩu của bạn. Lần đầu sử dụng? Hãy xác minh email và tạo mật khẩu.",
   "password": "Mật khẩu",
   "confirm": "Xác nhận mật khẩu",
   "register": "Lần đầu sử dụng / Tạo mật khẩu",

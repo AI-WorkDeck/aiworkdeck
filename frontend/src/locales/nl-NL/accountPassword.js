@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Log in met je telefoonnummer of e-mailadres en wachtwoord. Eerste keer? Verifieer en maak een wachtwoord aan.",
+  "introEmail": "Log in met je e-mailadres en wachtwoord. Eerste keer? Verifieer je e-mailadres en maak een wachtwoord aan.",
   "password": "Wachtwoord",
   "confirm": "Wachtwoord bevestigen",
   "register": "Eerste keer / Wachtwoord aanmaken",

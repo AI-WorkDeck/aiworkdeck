@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "intro": "使用手机号或邮箱和密码登录。首次使用请先验证并创建密码。",
+  "introEmail": "使用邮箱和密码登录。首次使用请先验证邮箱并创建密码。",
   "password": "密码",
   "confirm": "确认密码",
   "register": "首次使用 / 创建密码",

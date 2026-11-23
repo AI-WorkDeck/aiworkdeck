@@ -70,8 +70,14 @@ public class CrossBorderConsentService {
         this.siteProfileService = siteProfileService;
     }
 
+    /** 当前站点是否征求这项同意（站点表 {@code cross-border-consent}）；不征求的站点视同已同意。 */
+    public boolean appliesToCurrentSite() {
+        return !siteProfileService.crossBorderConsentWaived(siteProfileService.currentSite());
+    }
+
     /** 当前账户、当前站点下是否有有效（同版本）的同意。 */
     public boolean hasConsent() {
+        if (!appliesToCurrentSite()) return true;
         String at = settings.get(KEY_AT, "");
         String version = settings.get(KEY_VERSION, "");
         if (at == null || at.isBlank() || !NOTICE_VERSION.equals(version)) return false;
