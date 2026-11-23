@@ -17,5 +17,22 @@ export default {
   "active": "Assinatura ativa",
   "inactive": "Nenhuma assinatura ativa",
   "bundled": "Incluído no aplicativo",
-  "checkout": "Abrir página de pagamento"
+  "checkout": "Abrir página de pagamento",
+  "subscribeTitle": "Passe do Mercado Jurídico AI Firm",
+  "subscribeSubtitle": "Acesso pré-pago para propostas de casos · Sem renovação automática",
+  "subscribeLoadFailed": "Falha ao carregar planos",
+  "subscribeCreateFailed": "Falha ao criar pedido; tente novamente",
+  "subscribeSuccess": "Passe ativado",
+  "activeUntilBanner": "Passe ativo até {date}; novas compras somam prazo ao saldo atual.",
+  "recommendedBadge": "Melhor escolha",
+  "daysPass": "/ {days} dias",
+  "planRulesTitle": "Regras da plataforma (Plano B: escolha do cliente)",
+  "planRuleMaxThree": "• Até 3 advogados assinantes podem enviar proposta por demanda",
+  "planRuleUnlock": "• Contatos e documentos liberam somente após seleção pelo cliente",
+  "planRulePrepaid": "• 0% de comissão sobre honorários · Passe pré-pago sem cobrança automática",
+  "scanWeChatPay": "Pague via WeChat Pay ({amount}); a janela será liberada automaticamente",
+  "reopenCheckout": "Reabrir página de pagamento",
+  "checkPaymentStatus": "Já paguei — verificar agora",
+  "confirmSubscribe": "Pagar {amount} para liberar",
+  "signInRequiredNotice": "Conecte sua conta AI WorkDeck para adquirir e sincronizar o passe"
 }

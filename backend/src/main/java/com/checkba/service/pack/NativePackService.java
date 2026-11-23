@@ -234,7 +234,7 @@ public class NativePackService {
             @Value("${telemetry.app-version:${AWD_APP_VERSION:dev}}") String appVersion) {
         this.props = props;
         this.publicKeyPem = publicKeyPem;
-        this.appVersion = appVersion;
+        this.appVersion = com.checkba.util.EffectiveAppVersion.resolve(appVersion);
     }
 
     // ==================== 对外数据结构 ====================

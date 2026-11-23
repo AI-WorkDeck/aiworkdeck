@@ -88,7 +88,8 @@ async function probeExternalBackendHealth(port) {
  * wizard 端点原样回显；复用前对比即可识破「监听着端口的是更新前残留的陈旧后端」——
  * 2026-08-24 维护者真机就复用了 8-21 的旧后端，evidence-links 一路 404 还毫无提示
  * （dev-board#139 根因之一）。指纹取文件属性而不取版本号，是因为 overlay 补丁换
- * app.jar 不改壳版本号，AWD_APP_VERSION 分辨不出 0.24.0 壳下的 0.24.1/0.24.2 后端。
+ * app.jar 不改壳版本号（AWD_APP_VERSION 会按 overlay.effectiveVersion 上报补丁版本，
+ * 但同版本复装或同版本 dev jar 的变化仍靠文件指纹识别）。
  */
 function backendBuildId(ctx) {
   try {
@@ -298,9 +299,15 @@ function spawnEnv(ctx) {
       env.LITVIZ_GRAPHVIZ_DIR = gvBin
     }
   }
-  // 匿名使用统计的版本标注（版本单一来源 desktop/package.json，经 electron app 读取）
+  // 版本标注优先取当前激活的 overlay 版本（未启用 overlay 时回落壳版本号）
   if (!env.AWD_APP_VERSION) {
-    try { env.AWD_APP_VERSION = require('electron').app.getVersion() } catch (e) { /* 非 electron 环境跳过 */ }
+    let shellVersion = ctx.appVersion
+    if (!shellVersion) {
+      try { shellVersion = require('electron').app.getVersion() } catch (e) { /* 非 electron 环境跳过 */ }
+    }
+    if (shellVersion) {
+      env.AWD_APP_VERSION = require('./overlay').effectiveVersion({ ...ctx, appVersion: shellVersion })
+    }
   }
   // 后端 build 指纹：wizard 端点回显，复用前对比识破陈旧残留后端（见 backendBuildId）
   env.AWD_BACKEND_BUILD = backendBuildId(ctx)

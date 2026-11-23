@@ -16,7 +16,7 @@
       <component :is="'input'" v-if="row.authType === 'bearer' && !row.connected" :value="tokens[row.id] || ''" @input="tokens[row.id] = $event.target.value" type="password" maxlength="8192" autocapitalize="off" :spellcheck="false"
         autocomplete="off" class="connection-input" :aria-label="$t('pluginPlatform.token')" :placeholder="$t('pluginPlatform.token')" />
       <view class="connection-actions">
-        <component :is="'button'" type="button" v-if="row.authType !== 'none'" :disabled="!!busy" class="connection-button" @click="act(row)">
+        <component :is="'button'" type="button" v-if="row.authType !== 'none' && row.authType !== 'awd-account'" :disabled="!!busy" class="connection-button" @click="act(row)">
           {{ $t(row.connected ? 'pluginPlatform.disconnect' : 'pluginPlatform.connect') }}
         </component>
         <component :is="'button'" type="button" :disabled="!!busy" class="connection-button" @click="reload">{{ $t('pluginPlatform.refresh') }}</component>

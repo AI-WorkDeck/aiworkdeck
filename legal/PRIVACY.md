@@ -92,6 +92,8 @@
 
 **腾讯会议插件（可选）。** 从插件广场安装并启用后，插件在你检查连接、登录或同步等操作时调用本机腾讯会议官方 `tmeet` CLI，由该 CLI 直接连接腾讯会议服务。授权凭据由官方 CLI 保管；会议列表和同步设置缓存在本机，按需读取的逐字稿也会保存在本机任务结果中，主动归档的材料写入当前项目，不上传到插件广场。CLI 的登录账号由同一操作系统用户共享；退出授权会影响本机其他使用该 CLI 的程序。主动选择生成纪要或待办时，已归档材料按既有 AI 对话流程交给你选定的模型处理。
 
+**AI Firm / Venture AI 律师端插件（可选）。** 启用插件后，本机通过宿主声明式连接向案源平台（`ai-firm.aiworkdeck.com`）请求脱敏案源摘要，并在已连接 AI WorkDeck 账户后向官网请求短期、仅限本插件使用的签名身份与通行证状态断言（不向外发请求传递你的账户 `awdk_` 主密钥，也不读取或上传本机工作区文件）。订阅通行证后，仅当你填写执业资料并提交提案报价时，所填律师执业资料、报价区间与提案说明才发往案源平台展示给对应客户；仅当客户选定你承接该案时，案件联系信息与当前工作区操作所需的审阅版本才在双方之间交换与保存。
+
 ## 二之二、你主动触发的云端中转
 
 下列各项都是你主动使用某项功能时才发生的，内容会经过我们的服务器，或存放在我们的服务器上。表内「留存与删除」一栏以后端代码为准，代码读不出的部分写明「以服务端配置为准」。
@@ -298,6 +300,8 @@ Qichacha and PKULaw retain their built-in channels. Enabling a personal connecti
 Chat membership does not grant project access. Files and chat records enter a project only when you choose to save or archive them; the project's existing access and Git synchronization rules then apply. Chats are not automatically archived to Git. Materials added to AI are processed through the existing model channel when you send an AI request. Account keys and device tokens are never exposed to the plugin page.
 
 **Tencent Meeting plugin (optional).** After installation and activation from the marketplace, actions such as checking the connection, signing in or syncing invoke the official `tmeet` CLI on your device, which connects directly to Tencent Meeting. The official CLI manages authorization credentials. Meeting lists and sync settings are cached locally; transcripts are fetched on demand and retained in local job results; materials you choose to archive are written to the current project and are not uploaded to the plugin marketplace. The CLI account is shared by programs running as the same operating-system user, so signing out also affects those programs. When you choose to generate minutes or action items, the archived material is processed by your selected model through the existing AI conversation flow.
+
+**AI Firm / Venture AI Lawyer Desk plugin (optional).** When enabled, the desktop requests redacted lead previews from the intake service (`ai-firm.aiworkdeck.com`) via host-managed connections and, when your AI WorkDeck account is connected, obtains a short-lived, plugin-scoped signed assertion of your account and pass status from the website (your master `awdk_` account key is never sent to external plugin services, and local workspace files are never scanned or uploaded). After purchasing a prepaid pass, only the bar profile, fee/turnaround quote and pitch you explicitly submit are sent to the intake platform for client comparison; full client contact details and case materials unlock only if the client selects you for that matter.
 
 **Cloud relays you trigger yourself.** The items below happen only when you actively use the feature; the content passes through, or is stored on, our servers. Retention and deletion follow the backend code; where the code does not settle it, we say "per server configuration".
 

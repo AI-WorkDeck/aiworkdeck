@@ -26,6 +26,8 @@
           <button type="button" id="btn-qr" class="awd-btn awd-btn-sm" data-i18n="panel.qr" disabled></button>
           <button type="button" id="btn-export" class="awd-btn awd-btn-sm" data-i18n="panel.export" disabled></button>
         </span>
+        <span id="mp-sub-badge" class="awd-badge awd-badge-success mp-sub-badge" hidden></span>
+        <button type="button" id="btn-profile" class="awd-btn awd-btn-sm" data-i18n="panel.m.mp.profileBtn" hidden></button>
         <a id="m-client-link" class="awd-btn awd-btn-sm" target="_blank" rel="noopener" data-i18n="panel.m.clientLink" hidden></a>
         <button type="button" id="btn-refresh" class="awd-btn awd-btn-sm" data-i18n="panel.refresh"></button>
       </div>
@@ -41,14 +43,36 @@
 
     <section id="matters" hidden>
       <nav id="m-office" class="awd-subnav office" aria-label="Office"></nav>
-      <div id="m-kpis" class="awd-kpi-grid"></div>
-      <div class="toolbar">
-        <nav id="m-status" class="awd-subnav" aria-label="Status"></nav>
-        <input id="m-search" class="awd-input" type="search">
-      </div>
-      <div class="split">
-        <div id="m-list" class="list" role="listbox"></div>
-        <article id="m-detail" class="awd-card detail"></article>
+
+      <div id="m-paywall" class="mp-paywall" hidden></div>
+
+      <div id="m-subscribed" class="mp-subscribed" hidden>
+        <nav id="mp-tabs" class="awd-subnav mp-tabs" aria-label="Marketplace"></nav>
+        <div id="mp-profile-banner" class="awd-notice awd-notice-warning mp-profile-banner" hidden></div>
+
+        <section id="mp-plaza" class="mp-view" hidden>
+          <div id="mp-plaza-kpis" class="awd-kpi-grid"></div>
+          <div class="split">
+            <div id="mp-plaza-list" class="list" role="listbox"></div>
+            <article id="mp-plaza-detail" class="awd-card detail"></article>
+          </div>
+        </section>
+
+        <section id="mp-bids" class="mp-view" hidden>
+          <div id="mp-bids-list" class="mp-bids-grid"></div>
+        </section>
+
+        <section id="mp-desk" class="mp-view" hidden>
+          <div id="m-kpis" class="awd-kpi-grid"></div>
+          <div class="toolbar">
+            <nav id="m-status" class="awd-subnav" aria-label="Status"></nav>
+            <input id="m-search" class="awd-input" type="search">
+          </div>
+          <div class="split">
+            <div id="m-list" class="list" role="listbox"></div>
+            <article id="m-detail" class="awd-card detail"></article>
+          </div>
+        </section>
       </div>
     </section>
 

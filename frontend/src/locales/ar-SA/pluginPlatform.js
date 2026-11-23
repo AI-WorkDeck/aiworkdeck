@@ -17,5 +17,22 @@ export default {
   "active": "الاشتراك نشط",
   "inactive": "لا يوجد اشتراك نشط",
   "bundled": "مضمّن مع التطبيق",
-  "checkout": "فتح صفحة الدفع"
+  "checkout": "فتح صفحة الدفع",
+  "subscribeTitle": "بطاقة دخول سوق القضايا AI Firm",
+  "subscribeSubtitle": "اشتراك مسبق الدفع لتقديم العروض · بدون تجديد تلقائي",
+  "subscribeLoadFailed": "تعذر تحميل الباقات",
+  "subscribeCreateFailed": "تعذر إنشاء طلب الدفع، يرجى المحاولة مجدداً",
+  "subscribeSuccess": "تم تفعيل البطاقة",
+  "activeUntilBanner": "البطاقة نشطة حتى {date}؛ الشراء يمدد صلاحيتك تلقائياً.",
+  "recommendedBadge": "أفضل قيمة",
+  "daysPass": "/ {days} يوماً",
+  "planRulesTitle": "قواعد المنصة (الخطة B: اختيار العميل)",
+  "planRuleMaxThree": "• يمكن لـ 3 محامين مشتركين كحد أقصى تقديم عرض لكل قضية",
+  "planRuleUnlock": "• تُفتح بيانات الاتصال والملفات فقط بعد اختيار العميل لمحامٍ واحد",
+  "planRulePrepaid": "• 0% عمولة على الأتعاب · البطاقة مسبقة الدفع ولا تتجدد تلقائياً",
+  "scanWeChatPay": "امسح للدفع عبر WeChat Pay ({amount})؛ سيتم التفعيل تلقائياً بعد السداد",
+  "reopenCheckout": "إعادة فتح صفحة الدفع",
+  "checkPaymentStatus": "أتممت الدفع — تحقق الآن",
+  "confirmSubscribe": "ادفع {amount} للتفعيل",
+  "signInRequiredNotice": "قم بتوصيل حساب AI WorkDeck لشراء البطاقة ومزامنتها"
 }

@@ -6,7 +6,7 @@ import { openExternalUrlChecked } from '@/utils/externalLink.js'
 const handled = new Set(['settings.open', 'settings.get', 'settings.update', 'connections.list', 'connections.connect',
   'connections.disconnect', 'connections.request', 'billing.status', 'billing.checkout', 'mcp.servers', 'mcp.call'])
 
-export function createPluginPlatformServices({ pluginId, projectId, permissions, isCurrent = () => true }) {
+export function createPluginPlatformServices({ pluginId, projectId, permissions, isCurrent = () => true, openPluginSubscribe = null }) {
   let disposed = false
   const controllers = new Set()
   const current = () => !disposed && isCurrent()
@@ -56,15 +56,26 @@ export function createPluginPlatformServices({ pluginId, projectId, permissions,
             : method === 'mcp.servers' ? { servers: response.servers || [] }
               : method === 'mcp.call' ? response.result : response.data || {}
           if (method === 'billing.checkout') {
-            const url = new URL(result.url)
-            if (url.protocol !== 'https:' || url.username || url.password) return fail('invalid_params', 'Invalid checkout URL')
-            const confirmed = await new Promise(resolve => uni.showModal({
-              title: '打开付款页面 / Open checkout', content: url.hostname,
-              success: answer => resolve(!!answer.confirm), fail: () => resolve(false)
-            }))
-            if (!confirmed || !current()) return fail('cancelled', 'Checkout cancelled')
-            await openExternalUrlChecked(url.href)
-            result = { opened: true }
+            if (result.mode === 'in_app' && typeof openPluginSubscribe === 'function') {
+              const outcome = await openPluginSubscribe({ pluginId: result.pluginId || id })
+              if (!current()) return fail('cancelled', 'Plugin context changed')
+              result = {
+                opened: true,
+                mode: 'in_app',
+                subscribed: !!(outcome && outcome.subscribed),
+                expiresAt: (outcome && outcome.expiresAt) || null,
+              }
+            } else {
+              const url = new URL(result.url)
+              if (url.protocol !== 'https:' || url.username || url.password) return fail('invalid_params', 'Invalid checkout URL')
+              const confirmed = await new Promise(resolve => uni.showModal({
+                title: '打开付款页面 / Open checkout', content: url.hostname,
+                success: answer => resolve(!!answer.confirm), fail: () => resolve(false)
+              }))
+              if (!confirmed || !current()) return fail('cancelled', 'Checkout cancelled')
+              await openExternalUrlChecked(url.href)
+              result = { opened: true }
+            }
           }
         }
         return current() ? { ok: true, result } : fail('cancelled', 'Plugin context changed')

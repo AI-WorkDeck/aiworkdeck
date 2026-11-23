@@ -17,5 +17,22 @@ export default {
   "active": "Abonnement actief",
   "inactive": "Geen actief abonnement",
   "bundled": "Meegeleverd met de app",
-  "checkout": "Betaalpagina openen"
+  "checkout": "Betaalpagina openen",
+  "subscribeTitle": "AI Firm Zakenmarktplaats-pas",
+  "subscribeSubtitle": "Prepaid toegangspas voor voorstellen · Geen automatische verlenging",
+  "subscribeLoadFailed": "Kan abonnementen niet laden",
+  "subscribeCreateFailed": "Bestelling aanmaken mislukt; probeer opnieuw",
+  "subscribeSuccess": "Pas geactiveerd",
+  "activeUntilBanner": "Actieve pas t/m {date}; een aankoop verlengt de resterende duur.",
+  "recommendedBadge": "Beste keuze",
+  "daysPass": "/ {days} dagen",
+  "planRulesTitle": "Marktplaatsregels (Plan B: klant kiest)",
+  "planRuleMaxThree": "• Maximaal 3 geabonneerde advocaten kunnen per zaak een voorstel doen",
+  "planRuleUnlock": "• Contactgegevens en dossiers openen pas nadat de klant 1 advocaat kiest",
+  "planRulePrepaid": "• 0% commissie op honoraria · Prepaid pas wordt niet automatisch verlengd",
+  "scanWeChatPay": "Scan met WeChat Pay ({amount}); dit venster opent automatisch na betaling",
+  "reopenCheckout": "Betaalpagina opnieuw openen",
+  "checkPaymentStatus": "Betaling voltooid — nu controleren",
+  "confirmSubscribe": "{amount} betalen en ontgrendelen",
+  "signInRequiredNotice": "Koppel uw AI WorkDeck-account om uw pas aan te schaffen"
 }

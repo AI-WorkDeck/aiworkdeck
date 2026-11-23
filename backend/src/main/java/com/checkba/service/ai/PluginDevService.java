@@ -76,6 +76,14 @@ public class PluginDevService {
     @Value("${telemetry.app-version:${AWD_APP_VERSION:dev}}")
     String appVersion = "dev";
 
+    String codeSourcePath;
+
+    String effectiveAppVersion() {
+        return codeSourcePath != null
+                ? com.checkba.util.EffectiveAppVersion.resolve(appVersion, codeSourcePath)
+                : com.checkba.util.EffectiveAppVersion.resolve(appVersion);
+    }
+
     public PluginDevService(ProjectFileRepository projectFileRepository,
                             ProjectFileService projectFileService,
                             StorageServiceFactory storageServiceFactory,
@@ -450,15 +458,16 @@ public class PluginDevService {
         // minHostVersion（规范 v2.7 P0）：格式非法报错；宿主可比且不达标也报错（dev 态宿主 "dev" 跳过）
         String minHost = manifest.getStr("minHostVersion", null);
         if (minHost != null && !minHost.isBlank()) {
+            String effective = effectiveAppVersion();
             if (!com.checkba.util.Semver.isSemver(minHost)) {
                 errors.add(LangText.of(
                         "minHostVersion 不是合法的语义化版本号: " + minHost,
                         "minHostVersion is not a valid semver: " + minHost));
-            } else if (com.checkba.util.Semver.isSemver(appVersion)
-                    && com.checkba.util.Semver.compare(appVersion, minHost) < 0) {
+            } else if (com.checkba.util.Semver.isSemver(effective)
+                    && com.checkba.util.Semver.compare(effective, minHost) < 0) {
                 errors.add(LangText.of(
-                        "插件要求宿主版本 ≥ " + minHost + "，当前宿主是 " + appVersion + "，请先升级客户端",
-                        "Plugin requires host >= " + minHost + " but current host is " + appVersion));
+                        "插件要求宿主版本 ≥ " + minHost + "，当前宿主是 " + effective + "，请先升级客户端",
+                        "Plugin requires host >= " + minHost + " but current host is " + effective));
             }
         }
         // 开发安装只收纯 Web 插件：以下字段任一非空即拒装（安全模型见类注释）

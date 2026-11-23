@@ -9,18 +9,25 @@
   const state = { event: '', topic: '', status: '', q: '', anon: false, leads: [], selected: null, detail: null, summary: null, seenHot: null, draft: null }
   let dict = {}
   let zh = false
+  let zht = false
 
   function t(key, vars) {
     let s = dict[key] || (window.ELP_L10N['en-US'] || {})[key] || key
     for (const k in vars || {}) s = s.split('{' + k + '}').join(vars[k])
     return s
   }
-  const pick = (obj) => (obj ? (zh ? obj.zh : obj.en) || obj.en || '' : '')
+  const pick = (obj) => {
+    if (!obj) return ''
+    if (zht) return obj.zht || obj.zh || obj.en || ''
+    if (zh) return obj.zh || obj.zht || obj.en || ''
+    return obj.en || obj.zht || obj.zh || ''
+  }
   function applyLanguage(lang) {
     const all = window.ELP_L10N || {}
     const code = all[lang] ? lang : Object.keys(all).find((k) => k.split('-')[0] === String(lang || '').split('-')[0]) || 'en-US'
     dict = all[code] || {}
     zh = code.startsWith('zh')
+    zht = /^zh-(TW|HK|MO|Hant)/i.test(code) || code === 'zh-TW'
     document.documentElement.lang = code
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n) })
     $('search').placeholder = t('panel.filter.search')
@@ -93,6 +100,7 @@
   let loading = false
   let reloadQueued = false
   async function load() {
+    if (window.FIRM && window.FIRM.events === false) return
     if (loading) { reloadQueued = true; return }
     loading = true
     try {
@@ -387,10 +395,11 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('qr-dialog').hidden = true })
   $('qr-copy').addEventListener('click', () => { navigator.clipboard.writeText($('qr-url').textContent).then(() => { $('qr-copy').textContent = t('panel.action.copied') }).catch(() => {}) })
 
-  window.ELP = { t, pick, h, isZh: () => zh }
+  window.ELP = { t, pick, h, isZh: () => zh, isZht: () => zht }
 
   awd.ready().then((ctx) => {
     applyLanguage(ctx.language)
+    if (window.FIRM && window.FIRM.events === false) return
     awd.events.on('account.changed', () => { state.selected = null; state.detail = null; state.seenHot = null; load() })
     load()
     setInterval(() => { if (!document.hidden) load() }, POLL_MS)

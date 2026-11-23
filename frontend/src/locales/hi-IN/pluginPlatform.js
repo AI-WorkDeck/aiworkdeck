@@ -17,5 +17,22 @@ export default {
   "active": "सब्सक्रिप्शन सक्रिय है",
   "inactive": "कोई सक्रिय सब्सक्रिप्शन नहीं है",
   "bundled": "ऐप के साथ शामिल",
-  "checkout": "चेकआउट खोलें"
+  "checkout": "चेकआउट खोलें",
+  "subscribeTitle": "AI Firm केस मार्केटप्लेस पास",
+  "subscribeSubtitle": "प्रस्ताव भेजने के लिए प्रीपेड पास · कोई ऑटो-रिन्यूअल नहीं",
+  "subscribeLoadFailed": "सदस्यता प्लान लोड करने में विफल",
+  "subscribeCreateFailed": "भुगतान ऑर्डर बनाने में विफल, कृपया पुनः प्रयास करें",
+  "subscribeSuccess": "पास सक्रिय हो गया",
+  "activeUntilBanner": "वर्तमान पास {date} तक सक्रिय है; खरीदने पर अवधि बढ़ जाएगी।",
+  "recommendedBadge": "सर्वोत्तम मूल्य",
+  "daysPass": "/ {days} दिन",
+  "planRulesTitle": "मार्केटप्लेस नियम (प्लान B: क्लाइंट चयन)",
+  "planRuleMaxThree": "• प्रत्येक केस पर अधिकतम 3 सदस्य वकील ही प्रस्ताव भेज सकते हैं",
+  "planRuleUnlock": "• क्लाइंट द्वारा 1 वकील चुनने के बाद ही पूरा संपर्क और दस्तावेज़ खुलते हैं",
+  "planRulePrepaid": "• कानूनी शुल्क पर 0% प्लेटफ़ॉर्म कटौती · प्रीपेड पास स्वतः नवीनीकृत नहीं होता",
+  "scanWeChatPay": "WeChat Pay से {amount} स्कैन करें; भुगतान होते ही विंडो खुल जाएगी",
+  "reopenCheckout": "भुगतान पृष्ठ फिर से खोलें",
+  "checkPaymentStatus": "भुगतान पूरा हुआ — अभी जांचें",
+  "confirmSubscribe": "अनलॉक करने के लिए {amount} भुगतान करें",
+  "signInRequiredNotice": "पास खरीदने और सिंक करने के लिए AI WorkDeck खाता कनेक्ट करें"
 }

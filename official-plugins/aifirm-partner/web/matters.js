@@ -6,11 +6,32 @@
   const POLL_MS = 30000
   const STATUS_TABS = ['', 'review', 'in_review', 'awaiting_client', 'drafted', 'signed']
   const $ = (id) => document.getElementById(id)
-  const OFFICES = (window.FIRM && window.FIRM.offices) || ['sv', 'tw', 'jp', 'sg', 'all'] // from the firm profile
-  const S = { office: 'sv', mode: 'matters', status: '', q: '', list: [], counts: {}, selected: null, detail: null, version: null, ctx: null, intakeUrl: '' }
-  let E // window.ELP from panel.js: { t, pick, h, isZh }
+  const OFFICES = (window.FIRM && window.FIRM.offices) || ['tw', 'sv'] // from the firm profile
+  const S = {
+    office: ((window.FIRM && window.FIRM.offices && window.FIRM.offices[0]) || 'tw'),
+    mode: 'matters',
+    tab: 'plaza',
+    billing: { active: false, expiresAt: null, accountConnected: false },
+    preview: null,
+    mp: { openLeads: [], myBids: [], mySelectedCount: 0, profileComplete: false, profile: null, maxBids: 3 },
+    plazaSelected: null,
+    plazaDetail: null,
+    status: '',
+    q: '',
+    list: [],
+    counts: {},
+    selected: null,
+    detail: null,
+    version: null,
+    ctx: null,
+    intakeUrl: '',
+  }
+  let E // window.ELP from panel.js: { t, pick, h, isZh, isZht }
 
-  const call = (op, params) => awd.connections.request(CONN, op, op.startsWith('matter') && S.office !== 'sv' ? { ...(params || {}), office: S.office } : params || {}, { timeoutMs: 90000 })
+  const call = (op, params) => {
+    const needsOffice = (op.startsWith('matter') || op.startsWith('marketplace')) && S.office !== 'sv'
+    return awd.connections.request(CONN, op, needsOffice ? { ...(params || {}), office: S.office } : params || {}, { timeoutMs: 90000 })
+  }
   const t = (k, v) => E.t('panel.m.' + k, v)
   const h = (...a) => E.h(...a)
   const toast = (m) => awd.ui.toast(m).catch(() => {})
@@ -45,26 +66,398 @@
   }
 
   let loading = false, queued = false
+  function formatMoney(n, cur) {
+    const prefix = cur === 'TWD' ? 'NT$ ' : cur === 'USD' ? 'US$ ' : '¥ '
+    return prefix + Number(n || 0).toLocaleString()
+  }
+  function formatDate(iso) {
+    if (!iso) return ''
+    try { return new Date(iso).toLocaleDateString() } catch { return String(iso).slice(0, 10) }
+  }
+  const VALID_CT = new Set(['startup', 'sme', 'foreign_invest', 'individual', 'other'])
+  const VALID_URG = new Set(['asap_48h', 'this_week', 'this_month', 'flexible'])
+  const VALID_BUD = new Set(['under_30k', '30k_100k', '100k_300k', 'over_300k', 'usd_under_2k', 'usd_2k_5k', 'usd_5k_plus', 'discuss'])
+  function screeningBadges(sc) {
+    if (!sc) return []
+    const out = []
+    if (VALID_CT.has(sc.clientType)) out.push(h('span', { class: 'awd-badge' }, t('mp.screening.clientType.' + sc.clientType)))
+    if (VALID_URG.has(sc.urgency)) out.push(h('span', { class: 'awd-badge ' + (sc.urgency === 'asap_48h' ? 'awd-badge-danger' : 'awd-badge-gold') }, t('mp.screening.urgency.' + sc.urgency)))
+    if (VALID_BUD.has(sc.budgetTier)) out.push(h('span', { class: 'awd-badge awd-badge-accent' }, t('mp.screening.budget.' + sc.budgetTier)))
+    return out
+  }
+  function setTab(tab) {
+    S.tab = tab
+    awd.storage.set('tab', tab).catch(() => {})
+    renderSubscribedTabs()
+    $('mp-plaza').hidden = tab !== 'plaza'
+    $('mp-bids').hidden = tab !== 'bids'
+    $('mp-desk').hidden = tab !== 'matters'
+  }
+  function updateHeaderBilling() {
+    const active = Boolean(S.billing && S.billing.active)
+    const badge = $('mp-sub-badge')
+    const profBtn = $('btn-profile')
+    if (active && S.billing.expiresAt) {
+      badge.textContent = t('mp.subBadge', { date: formatDate(S.billing.expiresAt) })
+      badge.hidden = false
+    } else {
+      badge.hidden = true
+    }
+    if (profBtn) profBtn.hidden = !active
+  }
+  function renderOfficeTabs() {
+    $('m-office').replaceChildren(...OFFICES.map((o) => h('button', {
+      type: 'button',
+      class: 'awd-subnav-item' + (S.office === o ? ' is-active' : ''),
+      'aria-pressed': String(S.office === o),
+      on: { click: () => { if (S.office === o) return; S.office = o; S.selected = null; S.detail = null; S.plazaSelected = null; S.plazaDetail = null; S.status = ''; awd.storage.set('office', o).catch(() => {}); load() } },
+    }, t('office.' + o))))
+  }
+  function leadPreviewCard(item) {
+    const title = item.templateTitle ? E.pick(item.templateTitle) : (item.area ? t('area.' + item.area) : '—')
+    const srcBadge = item.source === 'sample'
+      ? h('span', { class: 'awd-badge' }, t('mp.src.sample'))
+      : item.source === 'recent_completed'
+        ? h('span', { class: 'awd-badge awd-badge-info' }, t('mp.src.recent_completed'))
+        : h('span', { class: 'awd-badge awd-badge-success' }, t('mp.src.live'))
+    return h('div', { class: 'mp-lead-card' },
+      h('div', { class: 'top' }, h('div', { class: 'tags' }, item.area ? areaBadge(item.area) : null, srcBadge), h('span', { class: 'when muted small' }, item.createdAt ? ago(item.createdAt) : '')),
+      h('div', { class: 'mp-title' }, title),
+      h('div', { class: 'tags' },
+        ...screeningBadges(item.screening),
+        item.flagCount ? h('span', { class: 'awd-badge awd-badge-warning' }, t('mp.flagsCount', { n: item.flagCount })) : null,
+        item.versionCount ? h('span', { class: 'awd-badge' }, t('mp.versionsCount', { n: item.versionCount })) : null),
+      h('div', { class: 'mp-slots' }, t('mp.slots', { used: item.slotsUsed || 0, max: item.maxBids || 3 })))
+  }
+  async function startCheckout(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = t('mp.paywall.unlocking') }
+    try {
+      const r = await awd.billing.checkout()
+      if (r && r.subscribed) {
+        toast(t('mp.paywall.unlocked'))
+        await load()
+      }
+    } catch (e) {
+      if (!e || !/cancel/i.test(String(e.code || e.message || ''))) fail(e)
+    } finally {
+      if (btn && !(S.billing && S.billing.active)) { btn.disabled = false; btn.textContent = t('mp.paywall.cta') }
+    }
+  }
+  function renderPaywall() {
+    const p = S.preview || { openCount: 0, thisWeekCount: 0, maxBids: 3, items: [] }
+    const items = Array.isArray(p.items) ? p.items : []
+    const visibleItems = items.slice(0, 2)
+    const blurredItems = items.slice(2)
+    const ctaBtn = h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: () => startCheckout(ctaBtn) } }, t('mp.paywall.cta'))
+    $('m-paywall').replaceChildren(
+      h('div', { class: 'mp-hero' },
+        h('div', { class: 'mp-hero-top' },
+          h('div', {}, h('h2', {}, t('mp.paywall.heroTitle')), h('p', { class: 'muted' }, t('mp.paywall.heroDesc'))),
+          h('div', {}, ctaBtn)),
+        h('div', { class: 'mp-hero-stats' },
+          h('div', { class: 'mp-stat-card' }, h('div', { class: 'mp-stat-val' }, String(p.openCount || 0)), h('div', { class: 'mp-stat-lbl' }, t('mp.paywall.openCount'))),
+          h('div', { class: 'mp-stat-card' }, h('div', { class: 'mp-stat-val' }, String(p.thisWeekCount || 0)), h('div', { class: 'mp-stat-lbl' }, t('mp.paywall.weekCount'))),
+          h('div', { class: 'mp-stat-card' }, h('div', { class: 'mp-stat-val' }, String(p.maxBids || 3)), h('div', { class: 'mp-stat-lbl' }, t('mp.paywall.limitCount'))))),
+      visibleItems.length ? h('div', { class: 'mp-preview-grid' }, ...visibleItems.map(leadPreviewCard)) : null,
+      h('div', { class: 'mp-frosted-wrap' },
+        h('div', { class: 'mp-preview-grid mp-blurred', 'aria-hidden': 'true' }, ...(blurredItems.length ? blurredItems : visibleItems).map(leadPreviewCard)),
+        h('div', { class: 'mp-gate-overlay' },
+          h('div', { class: 'mp-gate-box' },
+            h('h3', {}, t('mp.paywall.gateTitle')),
+            h('ul', { class: 'mp-rules-list' },
+              h('li', {}, t('mp.paywall.rule1')),
+              h('li', {}, t('mp.paywall.rule2')),
+              h('li', {}, t('mp.paywall.rule3')),
+              h('li', {}, t('mp.paywall.rule4'))),
+            h('div', { class: 'row' }, h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: (ev) => startCheckout(ev.currentTarget) } }, t('mp.paywall.cta')))))))
+  }
+  function renderSubscribedTabs() {
+    const mp = S.mp || {}
+    const tabs = [
+      ['plaza', t('mp.tab.plaza', { n: (mp.openLeads || []).length })],
+      ['bids', t('mp.tab.bids', { n: (mp.myBids || []).length })],
+      ['matters', t('mp.tab.matters', { n: S.list.length })],
+    ]
+    $('mp-tabs').replaceChildren(...tabs.map(([k, label]) => h('button', {
+      type: 'button',
+      class: 'awd-subnav-item' + (S.tab === k ? ' is-active' : ''),
+      'aria-pressed': String(S.tab === k),
+      on: { click: () => setTab(k) },
+    }, label)))
+    const banner = $('mp-profile-banner')
+    if (!mp.profileComplete) {
+      banner.hidden = false
+      banner.replaceChildren(
+        h('span', {}, t('mp.profileWarn')),
+        h('button', { type: 'button', class: 'awd-btn awd-btn-xs awd-btn-primary', on: { click: () => openProfileModal() } }, t('mp.profileFill')))
+    } else {
+      banner.hidden = true
+      banner.replaceChildren()
+    }
+  }
+  function renderPlaza() {
+    const mp = S.mp || { openLeads: [], maxBids: 3 }
+    const leads = mp.openLeads || []
+    $('mp-plaza-kpis').replaceChildren(
+      h('div', { class: 'awd-kpi-card' }, h('div', { class: 'awd-kpi-label' }, t('mp.paywall.openCount')), h('div', { class: 'awd-kpi-value' }, String(leads.length))),
+      h('div', { class: 'awd-kpi-card' }, h('div', { class: 'awd-kpi-label' }, t('mp.tab.bids', { n: (mp.myBids || []).length })), h('div', { class: 'awd-kpi-value' }, String((mp.myBids || []).filter((x) => x.bid.status === 'active').length))),
+      h('div', { class: 'awd-kpi-card' }, h('div', { class: 'awd-kpi-label' }, t('mp.tab.matters', { n: S.list.length })), h('div', { class: 'awd-kpi-value' }, String(mp.mySelectedCount || S.list.length))))
+    const listEl = $('mp-plaza-list')
+    if (!leads.length) {
+      listEl.replaceChildren(h('div', { class: 'awd-empty' }, h('p', { class: 'awd-empty-title' }, t('mp.plaza.emptyTitle')), h('p', { class: 'awd-empty-desc' }, t('mp.plaza.emptyDesc'))))
+      $('mp-plaza-detail').replaceChildren(h('div', { class: 'awd-empty' }, h('p', { class: 'awd-empty-desc' }, t('mp.plaza.select'))))
+      return
+    }
+    listEl.replaceChildren(...leads.map((l) => {
+      const title = l.templateTitle ? E.pick(l.templateTitle) : (l.area ? t('area.' + l.area) : '—')
+      return h('button', {
+        type: 'button',
+        role: 'option',
+        'aria-selected': String(S.plazaSelected === l.id),
+        class: 'lead' + (S.plazaSelected === l.id ? ' is-active' : ''),
+        on: { click: () => loadPlazaDetail(l.id) },
+      },
+      h('div', { class: 'top' }, l.area ? areaBadge(l.area) : null, h('span', { class: 'name', title }, title), h('span', { class: 'when' }, l.createdAt ? ago(l.createdAt) : '')),
+      h('div', { class: 'tags' },
+        ...screeningBadges(l.screening),
+        l.myBidStatus === 'active' ? h('span', { class: 'awd-badge awd-badge-success' }, t('mp.bidBadge')) : null,
+        h('span', { class: 'awd-badge' }, t('mp.slots', { used: l.slotsUsed || 0, max: l.maxBids || 3 })),
+        l.flagCount ? h('span', { class: 'awd-badge awd-badge-warning' }, t('mp.flagsCount', { n: l.flagCount })) : null))
+    }))
+    if (!S.plazaDetail || !leads.some((x) => x.id === S.plazaSelected)) {
+      $('mp-plaza-detail').replaceChildren(h('div', { class: 'awd-empty' }, h('p', { class: 'awd-empty-desc' }, t('mp.plaza.select'))))
+    } else {
+      renderPlazaDetail()
+    }
+  }
+  async function loadPlazaDetail(id) {
+    S.plazaSelected = id
+    renderPlaza()
+    try {
+      S.plazaDetail = await call('marketplaceLead', { id })
+      renderPlazaDetail()
+      if (window.innerWidth < 760) $('mp-plaza-detail').scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch (e) {
+      fail(e)
+    }
+  }
+  function renderPlazaDetail() {
+    const d = S.plazaDetail
+    const lead = d && d.lead
+    if (!lead) return
+    const title = lead.templateTitle ? E.pick(lead.templateTitle) : (lead.area ? t('area.' + lead.area) : '—')
+    const sc = d.screening || lead.screening
+    const facts = Object.entries(d.factsRedacted || {})
+    const flags = Array.isArray(d.flags) ? d.flags : []
+    const myBid = d.myBid
+    let actionArea
+    if (myBid && myBid.status === 'active') {
+      actionArea = h('div', { class: 'mp-quote-box' },
+        h('div', { class: 'row' }, h('strong', {}, t('mp.plaza.myBidTitle')), h('span', { class: 'awd-badge awd-badge-success' }, t('mp.bidStatus.active'))),
+        h('div', {}, formatMoney(myBid.feeMin, myBid.currency) + ' – ' + formatMoney(myBid.feeMax, myBid.currency) + ' · ' + myBid.turnaroundDays + 'd'),
+        h('p', { class: 'muted' }, myBid.pitch),
+        h('div', { class: 'row' }, h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: () => withdrawBid(lead.id) } }, t('mp.plaza.withdrawBtn'))))
+    } else if ((lead.slotsUsed || 0) >= (lead.maxBids || 3)) {
+      actionArea = h('div', { class: 'awd-notice awd-notice-warning' }, t('mp.plaza.fullNotice'))
+    } else {
+      actionArea = h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: () => openBidModal(lead) } }, t('mp.plaza.bidBtn')))
+    }
+
+    $('mp-plaza-detail').replaceChildren(
+      h('div', { class: 'head' },
+        h('div', { class: 'section' }, h('h2', {}, title), h('div', { class: 'muted' }, t('office.' + (d.office || S.office)) + (lead.createdAt ? ' · ' + ago(lead.createdAt) : ''))),
+        h('div', { class: 'tags' }, lead.area ? areaBadge(lead.area) : null, ...screeningBadges(sc), h('span', { class: 'awd-badge' }, t('mp.slots', { used: lead.slotsUsed || 0, max: lead.maxBids || 3 })))),
+      h('div', { class: 'mp-rule-banner' }, t('mp.plaza.ruleReminder')),
+      actionArea,
+      h('section', { class: 'section' },
+        h('span', { class: 'section-title' }, t('mp.plaza.factsTitle')),
+        facts.length ? h('dl', { class: 'qa' }, ...facts.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, String(v))])) : h('p', { class: 'muted' }, t('mp.plaza.noFacts'))),
+      h('section', { class: 'section red-flags' },
+        h('span', { class: 'section-title' }, t('mp.plaza.flagsTitle', { n: flags.length })),
+        flags.length ? h('ul', { class: 'flags' }, ...flags.map((f) => h('li', {},
+          h('div', { class: 'tags' }, h('span', { class: 'awd-badge ' + (f.level === 'high' ? 'awd-badge-danger' : 'awd-badge-warning') }, t('flag.' + (f.level === 'high' ? 'high' : 'medium'))),
+            h('strong', {}, (f.section ? f.section + ': ' : '') + f.title)),
+          h('div', {}, f.risk)))) : h('p', { class: 'muted' }, t('mp.plaza.noFlags'))))
+  }
+  async function withdrawBid(matterId) {
+    try {
+      await call('marketplaceWithdraw', { matterId })
+      toast(t('mp.plaza.withdrawnToast'))
+      await load()
+      if (S.plazaSelected === matterId) await loadPlazaDetail(matterId)
+    } catch (e) { fail(e) }
+  }
+  function openProfileModal(onSaved) {
+    const p = (S.mp && S.mp.profile) || {}
+    const fullName = h('input', { class: 'awd-input', value: p.fullName || '' })
+    const barJurisdiction = h('input', { class: 'awd-input', value: p.barJurisdiction || (S.office === 'tw' ? '台北律師公會' : '') })
+    const barNumber = h('input', { class: 'awd-input', value: p.barNumber || '' })
+    const firmName = h('input', { class: 'awd-input', value: p.firmName || '' })
+    const yearsPractice = h('input', { class: 'awd-input', type: 'number', min: '0', max: '80', value: String(p.yearsPractice || 3) })
+    const specialties = h('input', { class: 'awd-input', value: Array.isArray(p.specialties) ? p.specialties.join(', ') : '' })
+    const bio = h('textarea', { class: 'awd-textarea' }); bio.value = p.bio || ''
+    const contactEmail = h('input', { class: 'awd-input', type: 'email', value: p.contactEmail || '' })
+    const phone = h('input', { class: 'awd-input', type: 'tel', value: p.phone || '' })
+    dialog(t('mp.profile.title'), t('mp.profile.desc'), [
+      h('div', { class: 'row' }, field(t('mp.profile.fullName'), fullName), field(t('mp.profile.firmName'), firmName)),
+      h('div', { class: 'row' }, field(t('mp.profile.jurisdiction'), barJurisdiction), field(t('mp.profile.barNumber'), barNumber), field(t('mp.profile.years'), yearsPractice)),
+      field(t('mp.profile.specialties'), specialties),
+      field(t('mp.profile.bio'), bio),
+      h('div', { class: 'row' }, field(t('mp.profile.email'), contactEmail), field(t('mp.profile.phone'), phone)),
+    ], t('mp.profile.save'), async () => {
+      if (!fullName.value.trim() || !barJurisdiction.value.trim() || !barNumber.value.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.value.trim())) {
+        throw userErr(t('mp.profile.invalid'))
+      }
+      const r = await call('lawyerProfileSave', {
+        fullName: fullName.value.trim(),
+        barJurisdiction: barJurisdiction.value.trim(),
+        barNumber: barNumber.value.trim(),
+        firmName: firmName.value.trim(),
+        yearsPractice: Number(yearsPractice.value) || 0,
+        specialties: specialties.value,
+        bio: bio.value,
+        contactEmail: contactEmail.value.trim(),
+        phone: phone.value.trim(),
+      })
+      S.mp.profile = r.profile
+      S.mp.profileComplete = Boolean(r.complete)
+      toast(t('mp.profile.saved'))
+      renderSubscribedTabs()
+      if (typeof onSaved === 'function') setTimeout(() => onSaved(), 0)
+    })
+  }
+  function mpErrMsg(e) {
+    const code = String((e && (e.code || e.message)) || '')
+    if (code.includes('profile_incomplete')) return t('mp.err.profileIncomplete')
+    if (code.includes('slots_full')) return t('mp.err.slotsFull')
+    if (code.includes('already_bid')) return t('mp.err.alreadyBid')
+    if (code.includes('already_selected')) return t('mp.err.alreadySelected')
+    if (code.includes('bid_closed')) return t('mp.err.bidClosed')
+    if (code.includes('invalid_bid')) return t('mp.err.invalidBid')
+    return (e && e.message) || E.t('panel.error.action')
+  }
+  function openBidModal(lead) {
+    if (!S.mp || !S.mp.profileComplete) {
+      openProfileModal(() => openBidModal(lead))
+      return
+    }
+    const isTw = S.office === 'tw'
+    const currency = h('select', { class: 'awd-select' }, ['TWD', 'USD', 'CNY'].map((c) => h('option', { value: c, selected: c === (isTw ? 'TWD' : 'USD') }, c)))
+    const feeMin = h('input', { class: 'awd-input', type: 'number', min: '0', value: isTw ? '30000' : '1500' })
+    const feeMax = h('input', { class: 'awd-input', type: 'number', min: '0', value: isTw ? '60000' : '3000' })
+    const days = h('input', { class: 'awd-input', type: 'number', min: '1', max: '90', value: '3' })
+    const pitch = h('textarea', { class: 'awd-textarea tall', placeholder: t('mp.bidModal.pitchPlaceholder') })
+    dialog(t('mp.bidModal.title'), t('mp.bidModal.desc'), [
+      h('div', { class: 'row' }, field(t('mp.bidModal.currency'), currency), field(t('mp.bidModal.feeMin'), feeMin), field(t('mp.bidModal.feeMax'), feeMax), field(t('mp.bidModal.days'), days)),
+      field(t('mp.bidModal.pitch'), pitch),
+    ], t('mp.bidModal.submit'), async () => {
+      const fMin = Math.floor(Number(feeMin.value))
+      const fMax = Math.floor(Number(feeMax.value))
+      const td = Math.floor(Number(days.value))
+      if (!Number.isFinite(fMin) || !Number.isFinite(fMax) || fMin < 0 || fMax < fMin || !Number.isFinite(td) || td < 1 || td > 90 || pitch.value.trim().length < 10) {
+        throw userErr(t('mp.err.invalidBid'))
+      }
+      try {
+        await call('marketplaceBid', { matterId: lead.id, currency: currency.value, feeMin: fMin, feeMax: fMax, turnaroundDays: td, pitch: pitch.value.trim() })
+      } catch (e) {
+        throw userErr(mpErrMsg(e))
+      }
+      toast(t('mp.bidModal.sent'))
+      await load()
+      if (S.plazaSelected === lead.id) await loadPlazaDetail(lead.id)
+    })
+  }
+  function renderBids() {
+    const bids = (S.mp && S.mp.myBids) || []
+    if (!bids.length) {
+      $('mp-bids-list').replaceChildren(h('div', { class: 'awd-empty' }, h('p', { class: 'awd-empty-desc' }, t('mp.bids.empty'))))
+      return
+    }
+    $('mp-bids-list').replaceChildren(...bids.map((item) => {
+      const b = item.bid || {}, l = item.lead
+      const title = (l && l.templateTitle) ? E.pick(l.templateTitle) : ((l && l.area) ? t('area.' + l.area) : b.matterId)
+      const cls = b.status === 'selected' ? 'awd-badge-success' : b.status === 'active' ? 'awd-badge-info' : b.status === 'not_selected' ? 'awd-badge-warning' : ''
+      const actions = []
+      if (b.status === 'selected') {
+        actions.push(h('button', { type: 'button', class: 'awd-btn awd-btn-sm awd-btn-primary', on: { click: () => { setTab('matters'); loadDetail(b.matterId) } } }, t('mp.bids.openMatter')))
+      } else if (b.status === 'active' && l) {
+        actions.push(h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: () => { setTab('plaza'); loadPlazaDetail(l.id) } } }, t('mp.bids.viewLead')))
+        actions.push(h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: () => withdrawBid(b.matterId) } }, t('mp.plaza.withdrawBtn')))
+      }
+      return h('div', { class: 'mp-bid-item' },
+        h('div', { class: 'top' },
+          h('strong', {}, title),
+          h('div', { class: 'tags' }, h('span', { class: 'awd-badge ' + cls }, t('mp.bidStatus.' + b.status)), h('span', { class: 'awd-badge' }, formatMoney(b.feeMin, b.currency) + ' – ' + formatMoney(b.feeMax, b.currency)))),
+        l ? h('div', { class: 'tags' }, l.area ? areaBadge(l.area) : null, ...screeningBadges(l.screening)) : null,
+        b.pitch ? h('p', { class: 'muted' }, b.pitch) : null,
+        actions.length ? h('div', { class: 'row' }, ...actions) : null)
+    }))
+  }
+
   async function load() {
     if (S.mode !== 'matters') return
     if (loading) { queued = true; return }
     loading = true
     try {
-      const { connections } = await awd.connections.list()
-      const c = (connections || []).find((x) => x.id === CONN)
-      if (!c || !c.connected || c.needsReconnect) { $('matters').hidden = true; return } // panel.js shows the connect prompt
       $('matters').hidden = false
+      renderOfficeTabs()
+      let bill = { active: false, expiresAt: null, accountConnected: false }
+      try {
+        bill = await awd.billing.status()
+      } catch (e) {
+        if (e && e.code === 'unknown_method') { notice('danger', E.t('panel.error.upgrade')); return }
+        throw e
+      }
+      S.billing = bill || { active: false, expiresAt: null, accountConnected: false }
+      updateHeaderBilling()
+
+      if (!S.billing.active) {
+        $('m-subscribed').hidden = true
+        $('m-paywall').hidden = false
+        $('m-client-link').hidden = true
+        S.preview = await call('marketplacePreview')
+        if ($('m-notice').classList.contains('awd-notice-danger')) notice()
+        renderPaywall()
+        return
+      }
+
+      $('m-paywall').hidden = true
+      $('m-subscribed').hidden = false
       const params = {}
       if (S.status) params.status = S.status
       if (S.q) params.q = S.q
-      const r = await call('matters', params)
-      S.list = r.matters || []; S.counts = r.counts || {}; S.intakeUrl = r.intakeUrl || ''
-      $('m-client-link').href = S.intakeUrl; $('m-client-link').hidden = !S.intakeUrl
+      let mpRes, matRes
+      try {
+        ;[mpRes, matRes] = await Promise.all([call('marketplaceLeads'), call('matters', params)])
+      } catch (e) {
+        const msg = String((e && (e.code || e.message)) || '')
+        if (msg.includes('subscription_required') || msg.includes('402')) {
+          S.billing = { ...S.billing, active: false }
+          updateHeaderBilling()
+          $('m-subscribed').hidden = true
+          $('m-paywall').hidden = false
+          S.preview = await call('marketplacePreview')
+          renderPaywall()
+          return
+        }
+        throw e
+      }
+      S.mp = mpRes || { openLeads: [], myBids: [], mySelectedCount: 0, profileComplete: false, profile: null, maxBids: 3 }
+      S.list = (matRes && matRes.matters) || []
+      S.counts = (matRes && matRes.counts) || {}
+      S.intakeUrl = (matRes && matRes.intakeUrl) || ''
+      $('m-client-link').href = S.intakeUrl
+      $('m-client-link').hidden = !S.intakeUrl
       if ($('m-notice').classList.contains('awd-notice-danger')) notice()
-      budgetNotice(r.aiBudget)
+      budgetNotice(matRes && matRes.aiBudget)
+      setTab(S.tab)
+      renderPlaza()
+      renderBids()
       renderKpis(); renderTabs(); renderList()
       notifyNew(S.list)
-      if (S.selected) await loadDetail(S.selected, true)
+      if (S.tab === 'plaza' && S.plazaSelected) await loadPlazaDetail(S.plazaSelected)
+      if (S.tab === 'matters' && S.selected) await loadDetail(S.selected, true)
     } catch (e) { fail(e, 'panel.error.load') } finally {
       loading = false
       if (queued) { queued = false; load() }
@@ -77,8 +470,7 @@
     $('m-kpis').replaceChildren(...['review', 'in_review', 'awaiting_client', 'drafted', 'signed'].map(kpi))
   }
   function renderTabs() {
-    $('m-office').replaceChildren(...OFFICES.map((o) => h('button', { type: 'button', class: 'awd-subnav-item' + (S.office === o ? ' is-active' : ''), 'aria-pressed': String(S.office === o),
-      on: { click: () => { if (S.office === o) return; S.office = o; S.selected = null; S.detail = null; S.status = ''; awd.storage.set('office', o).catch(() => {}); load() } } }, t('office.' + o))))
+    renderOfficeTabs()
     $('m-status').replaceChildren(...STATUS_TABS.map((s) => h('button', { type: 'button', class: 'awd-subnav-item' + (S.status === s ? ' is-active' : ''), 'aria-pressed': String(S.status === s), on: { click: () => { S.status = s; load() } } },
       s ? t('status.' + s) : t('filter.all'))))
   }
@@ -571,20 +963,27 @@
     $('m-search').addEventListener('input', (e) => { clearTimeout(timer); timer = setTimeout(() => { S.q = e.target.value.trim(); load() }, 300) })
     document.querySelectorAll('#mode [data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)))
     $('btn-refresh').addEventListener('click', () => { if (S.mode === 'matters') load() })
+    if ($('btn-profile')) $('btn-profile').addEventListener('click', () => openProfileModal())
     $('m-dialog').addEventListener('click', (e) => { if (e.target === $('m-dialog')) $('m-dialog').hidden = true })
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('m-dialog').hidden = true })
-    awd.events.on('account.changed', () => { S.selected = null; S.detail = null; load() })
+    awd.events.on('billing.changed', () => load())
+    awd.events.on('account.changed', () => { S.selected = null; S.detail = null; S.plazaSelected = null; S.plazaDetail = null; load() })
+    let opened = false
     const links = awd.storage.get('links').then((v) => { S.links = v || {}; if (S.detail) renderDetail() }).catch(() => {})
+    const tabPref = awd.storage.get('tab').then((tab) => { if (!opened && ['plaza', 'bids', 'matters'].includes(tab)) S.tab = tab }).catch(() => {})
     awd.storage.get('open').then((o) => {
       if (!o || !OFFICES.includes(o.office)) return
+      opened = true
       awd.storage.set('open', null).catch(() => {}); S.office = o.office
-      links.then(load).then(() => loadDetail(o.id)).then(() => {
-        if (!S.detail || S.selected !== o.id || !hostEditor()) return
+      if (o.tab && ['plaza', 'bids', 'matters'].includes(o.tab)) S.tab = o.tab
+      else if (o.id) S.tab = 'matters'
+      Promise.all([links, tabPref]).then(load).then(() => o.id ? loadDetail(o.id) : null).then(() => {
+        if (!o.id || !S.detail || S.selected !== o.id || !hostEditor()) return
         if (o.then === 'edit') editInAwd(); else if (o.then === 'save') saveFromAwd()
       })
     }).catch(() => {})
-    awd.storage.get('office').then((o) => { if (OFFICES.includes(o) && o !== S.office) { S.office = o; load() } }).catch(() => {})
-    if (window.FIRM && window.FIRM.events === false) { $('mode').hidden = true; setMode('matters') }
+    awd.storage.get('office').then((o) => { if (!opened && OFFICES.includes(o) && o !== S.office) { S.office = o; load() } }).catch(() => {})
+    if (window.FIRM && window.FIRM.events === false) { $('mode').hidden = true; tabPref.then(() => setMode('matters')) }
     else awd.storage.get('mode').then((m) => setMode(m === 'leads' ? 'leads' : 'matters')).catch(() => setMode('matters'))
     setInterval(() => { if (!document.hidden) load() }, POLL_MS)
   }

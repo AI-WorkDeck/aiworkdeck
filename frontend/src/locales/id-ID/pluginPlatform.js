@@ -17,5 +17,22 @@ export default {
   "active": "Langganan aktif",
   "inactive": "Belum ada langganan aktif",
   "bundled": "Disertakan bersama aplikasi",
-  "checkout": "Buka halaman pembayaran"
+  "checkout": "Buka halaman pembayaran",
+  "subscribeTitle": "Pas Pasar Kasus AI Firm",
+  "subscribeSubtitle": "Akses prabayar untuk proposal kasus · Tanpa perpanjangan otomatis",
+  "subscribeLoadFailed": "Gagal memuat paket langganan",
+  "subscribeCreateFailed": "Gagal membuat pesanan; silakan coba lagi",
+  "subscribeSuccess": "Pas diaktifkan",
+  "activeUntilBanner": "Pas aktif hingga {date}; pembelian akan memperpanjang masa berlaku.",
+  "recommendedBadge": "Paling Hemat",
+  "daysPass": "/ {days} hari",
+  "planRulesTitle": "Aturan Pasar (Paket B: Klien Memilih)",
+  "planRuleMaxThree": "• Maksimal 3 pengacara berlangganan dapat mengirim proposal per kasus",
+  "planRuleUnlock": "• Kontak lengkap dan berkas terbuka hanya setelah klien memilih 1 pengacara",
+  "planRulePrepaid": "• 0% potongan biaya hukum · Pas prabayar tidak memperpanjang otomatis",
+  "scanWeChatPay": "Pindai dengan WeChat Pay ({amount}); jendela terbuka otomatis setelah dibayar",
+  "reopenCheckout": "Buka lagi halaman pembayaran",
+  "checkPaymentStatus": "Sudah bayar — periksa sekarang",
+  "confirmSubscribe": "Bayar {amount} untuk membuka",
+  "signInRequiredNotice": "Hubungkan akun AI WorkDeck Anda untuk membeli pas"
 }

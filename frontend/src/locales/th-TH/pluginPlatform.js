@@ -17,5 +17,22 @@ export default {
   "active": "การสมัครสมาชิกใช้งานอยู่",
   "inactive": "ไม่มีการสมัครสมาชิกที่ใช้งานอยู่",
   "bundled": "มาพร้อมกับแอป",
-  "checkout": "เปิดหน้าชำระเงิน"
+  "checkout": "เปิดหน้าชำระเงิน",
+  "subscribeTitle": "บัตรผ่านตลาดคดี AI Firm",
+  "subscribeSubtitle": "สิทธิ์แบบเติมเงินสำหรับส่งข้อเสนอ · ไม่ต่ออายุอัตโนมัติ",
+  "subscribeLoadFailed": "โหลดแพ็กเกจไม่สำเร็จ",
+  "subscribeCreateFailed": "สร้างคำสั่งชำระเงินไม่สำเร็จ โปรดลองอีกครั้ง",
+  "subscribeSuccess": "เปิดใช้งานบัตรผ่านแล้ว",
+  "activeUntilBanner": "ใช้งานได้ถึง {date} การซื้อเพิ่มจะขยายวันหมดอายุให้อัตโนมัติ",
+  "recommendedBadge": "คุ้มที่สุด",
+  "daysPass": "/ {days} วัน",
+  "planRulesTitle": "กติกาตลาดคดี (แผน B: ลูกความเลือกทนาย)",
+  "planRuleMaxThree": "• ส่งข้อเสนอได้สูงสุด 3 ทนายความต่อ 1 คดี",
+  "planRuleUnlock": "• ข้อมูลติดต่อและเอกสารฉบับเต็มจะเปิดเมื่อลูกความเลือกทนาย 1 ท่านแล้วเท่านั้น",
+  "planRulePrepaid": "• ค่าบริการ 0% บนค่าทนายความ · บัตรเติมเงินไม่มีการหักเงินอัตโนมัติ",
+  "scanWeChatPay": "สแกนจ่ายด้วย WeChat Pay ({amount}) หน้าต่างนี้จะปลดล็อกอัตโนมัติ",
+  "reopenCheckout": "เปิดหน้าชำระเงินอีกครั้ง",
+  "checkPaymentStatus": "ชำระแล้ว — ตรวจสอบตอนนี้",
+  "confirmSubscribe": "ชำระ {amount} เพื่อปลดล็อก",
+  "signInRequiredNotice": "เชื่อมต่อบัญชี AI WorkDeck เพื่อซื้อและซิงค์สิทธิ์ของคุณ"
 }

@@ -111,6 +111,14 @@ public class EntitlementService {
         return accountFeatures().contains(feature);
     }
 
+    /** Returns the cached expiry timestamp for an active account feature, or null if absent/permanent/inactive. */
+    public String expiresAt(String feature) {
+        if (feature == null || feature.isBlank() || !accountService.isConnected()) return null;
+        if (!accountFeatures().contains(feature)) return null;
+        Cache cache = loadCache();
+        return cache.expiresAt == null ? null : cache.expiresAt.get(feature);
+    }
+
     /**
      * GET /api/entitlements 的数据源。
      *

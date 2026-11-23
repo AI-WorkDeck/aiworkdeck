@@ -507,6 +507,19 @@ class PluginServiceTest {
     }
 
     @Test
+    @DisplayName("overlay 补丁 jar 路径下，壳版本虽旧仍按 overlay 版本放行 minHostVersion")
+    void overlayCodeSourcePromotesMinHostVersion() throws IOException {
+        writeManifest("aifirm-partner", """
+                {"id": "aifirm-partner", "name": "Venture AI 律师端", "version": "0.9.1", "minHostVersion": "0.88.2"}
+                """);
+        service.appVersion = "0.88.1";
+        service.codeSourcePath = "/Users/example/.aiworkdeck/overlay/0.88/backend-app/0.88.2/app.jar";
+        service.init();
+        assertTrue(service.isEnabled("aifirm-partner"));
+        assertNull(service.incompatibleReason("aifirm-partner"));
+    }
+
+    @Test
     @DisplayName("目录带 .awd-dev 标记的插件 isDevInstalled=true（实验 API 闸的依据）")
     void devInstalledMarkerDetected() throws IOException {
         writeManifest("p1", """

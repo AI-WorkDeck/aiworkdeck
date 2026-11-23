@@ -931,6 +931,36 @@ export function pluginPlatformRequest(pluginId, action, params = {}, signal) {
 export const getBundledPlugins = () => request({ url: '/api/plugins/bundled', method: 'GET' })
 export const installBundledPlugin = id => request({ url: `/api/plugins/bundled/${encodeURIComponent(id)}/install`, method: 'POST' })
 
+export function getPluginBillingPlans(pluginId) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/billing/plans`,
+    method: 'GET',
+    logBody: false,
+    accountPrompt: false,
+  }).then(unwrapEnvelope);
+}
+
+export function createPluginSubscriptionOrder(pluginId, data) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/billing/subscribe`,
+    method: 'POST',
+    data,
+    logBody: false,
+    header: { 'Content-Type': 'application/json' },
+    accountPrompt: false,
+  }).then(unwrapEnvelope);
+}
+
+export function getPluginBillingOrderStatus(pluginId, outTradeNo) {
+  return request({
+    url: `/api/plugins/${encodeURIComponent(pluginId)}/billing/order-status`,
+    method: 'GET',
+    data: { outTradeNo },
+    logBody: false,
+    accountPrompt: false,
+  }).then(unwrapEnvelope);
+}
+
 // 保存已声明设置：installation 仅管理员，user/project 按身份与项目权限校验。
 export function savePluginSettings(pluginId, values, projectId = null) {
   return request({

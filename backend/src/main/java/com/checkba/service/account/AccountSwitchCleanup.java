@@ -130,6 +130,7 @@ public class AccountSwitchCleanup {
         // /api/account/balance 的 profile/membership TTL 缓存也是账户级内容（dev-board#183/#184）：
         // 不清的话换一个没充值的新账号进来，顶栏会先展示上一个账号的余额/等级直到缓存自然过期
         accountService.clearBalanceCache();
+        accountService.clearAllPluginAssertionCaches();
         // 团队台账同理（dev-board#496）：「哪些天已经传过了」记的是「传给<b>那个</b>账户」，
         // 换了人必须从头传；「共享项目名」是上一个团队的设置，留着会让下一个团队的
         // 日聚合按旧团队的口径带上项目名

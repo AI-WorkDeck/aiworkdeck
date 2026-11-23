@@ -17,5 +17,22 @@ export default {
   "active": "サブスクリプション有効",
   "inactive": "有効なサブスクリプションがありません",
   "bundled": "アプリに含まれています",
-  "checkout": "チェックアウトを開く"
+  "checkout": "チェックアウトを開く",
+  "subscribeTitle": "AI Firm 案件マーケット パス",
+  "subscribeSubtitle": "前払いパスで案件応募権限を解除 · 自動更新なし",
+  "subscribeLoadFailed": "プランの読み込みに失敗しました",
+  "subscribeCreateFailed": "注文の作成に失敗しました。もう一度お試しください",
+  "subscribeSuccess": "パスが有効になりました",
+  "activeUntilBanner": "現在のパスは {date} まで有効です。追加購入で期間が延長されます。",
+  "recommendedBadge": "おすすめ",
+  "daysPass": "/ {days} 日",
+  "planRulesTitle": "応募ルール（プランB：依頼者選定方式）",
+  "planRuleMaxThree": "• 1案件につき有料登録弁護士は最大3名まで見積もり提案可能",
+  "planRuleUnlock": "• 依頼者が1名を選定した時点で連絡先と書類が開示されます",
+  "planRulePrepaid": "• 弁護士報酬へのプラットフォーム手数料0% · 前払いパスは自動課金なし",
+  "scanWeChatPay": "WeChat Pay で {amount} をお支払いください（完了後に自動反映されます）",
+  "reopenCheckout": "決済ページを再度開く",
+  "checkPaymentStatus": "支払い完了・今すぐ確認",
+  "confirmSubscribe": "{amount} を支払って有効化",
+  "signInRequiredNotice": "パスの購入と同期には AI WorkDeck アカウントの接続が必要です"
 }

@@ -32,12 +32,13 @@ public final class ProductIdentity {
 
     private ProductIdentity() {}
 
-    /** 应用版本号；优先系统属性（测试用），其次 AWD_APP_VERSION，都没有则 dev。 */
+    /** 应用版本号；优先系统属性（测试用），其次经 overlay 修正后的 AWD_APP_VERSION，都没有则 dev。 */
     public static String version() {
         String v = System.getProperty(VERSION_PROPERTY);
-        if (v == null || v.isBlank()) v = System.getenv(VERSION_ENV);
+        if (v != null && !v.isBlank()) return v.trim();
+        v = System.getenv(VERSION_ENV);
         if (v == null || v.isBlank()) return DEFAULT_VERSION;
-        return v.trim();
+        return EffectiveAppVersion.resolve(v);
     }
 
     /** 出站请求的 User-Agent：{@code AIWorkDeck/0.36.0 (browser-proxy)}。component 用小写连字符短词。 */

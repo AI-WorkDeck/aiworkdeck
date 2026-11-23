@@ -81,6 +81,14 @@ public class PluginMarketService {
     @org.springframework.beans.factory.annotation.Value("${telemetry.app-version:${AWD_APP_VERSION:dev}}")
     String appVersion = "dev";
 
+    String codeSourcePath;
+
+    String effectiveAppVersion() {
+        return codeSourcePath != null
+                ? com.checkba.util.EffectiveAppVersion.resolve(appVersion, codeSourcePath)
+                : com.checkba.util.EffectiveAppVersion.resolve(appVersion);
+    }
+
     /**
      * 插件 manifest 声明的 pack 依赖由它去装。setter 注入而非构造器参数：
      * pack 联动是安装后的可选副作用，缺了它安装链路必须照常工作（既有单测直接
@@ -590,14 +598,15 @@ public class PluginMarketService {
         if (min == null || min.isBlank() || !com.checkba.util.Semver.isSemver(min)) {
             return;
         }
-        if (!com.checkba.util.Semver.isSemver(appVersion)) {
-            log.warn("Host version '{}' is not semver, skip minHostVersion install gate", appVersion);
+        String effective = effectiveAppVersion();
+        if (!com.checkba.util.Semver.isSemver(effective)) {
+            log.warn("Host version '{}' is not semver, skip minHostVersion install gate", effective);
             return;
         }
-        if (com.checkba.util.Semver.compare(appVersion, min) < 0) {
+        if (com.checkba.util.Semver.compare(effective, min) < 0) {
             throw new IllegalStateException(LangText.of(
-                    "插件需要宿主版本 ≥ " + min + "（当前 " + appVersion + "），请先升级客户端再安装",
-                    "Plugin requires host >= " + min + " (current " + appVersion + "); upgrade the app first"));
+                    "插件需要宿主版本 ≥ " + min + "（当前 " + effective + "），请先升级客户端再安装",
+                    "Plugin requires host >= " + min + " (current " + effective + "); upgrade the app first"));
         }
     }
 

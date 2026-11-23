@@ -195,6 +195,12 @@ class PluginMarketServiceTest {
 
         svc.appVersion = "dev";
         org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> svc.checkMinHostVersion(staging));
+
+        java.nio.file.Files.writeString(staging.resolve("manifest.json"),
+                "{\"id\":\"aifirm-partner\",\"minHostVersion\":\"0.88.2\"}");
+        svc.appVersion = "0.88.1";
+        svc.codeSourcePath = "/Users/example/.aiworkdeck/overlay/0.88/backend-app/0.88.2/app.jar";
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> svc.checkMinHostVersion(staging));
     }
 
     @Test

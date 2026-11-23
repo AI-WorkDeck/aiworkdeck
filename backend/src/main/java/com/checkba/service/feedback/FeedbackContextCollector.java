@@ -37,7 +37,7 @@ public class FeedbackContextCollector {
     public FeedbackContextCollector(
             @Value("${telemetry.app-version:dev}") String appVersion,
             @Value("${feedback.log-files:}") String logFilesCsv) {
-        this.appVersion = appVersion;
+        this.appVersion = com.checkba.util.EffectiveAppVersion.resolve(appVersion);
         this.logFiles = resolveLogFiles(logFilesCsv);
     }
 
