@@ -412,6 +412,7 @@ export default {
   line-height: var(--awd-line-height-ui); color: var(--awd-text-2);
 }
 .psub-rules-title { font-weight: 600; color: var(--awd-text); margin-bottom: 2px; }
+.psub-rules-item { font-size: var(--awd-panel-fs); color: var(--awd-text-2); line-height: var(--awd-line-height-ui); }
 .psub-pay-wrap, .psub-error-wrap {
   display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 4px;
 }
