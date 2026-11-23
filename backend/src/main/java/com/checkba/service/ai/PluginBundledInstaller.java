@@ -19,6 +19,9 @@ public class PluginBundledInstaller {
             "search", "voice", "desensitize", "litigation-visual",
             "calendar", "favorites", "clipboard", "insight",
             "theme-inkwash-zen", "theme-anime-twilight", "theme-aurora-glass");
+    /** White-label editions add plugins here (brand.json bundledPlugins, written by scripts/brand/apply.mjs). */
+    static final String BRAND_LIST = "brand-bundled-plugins.json";
+    private static final java.util.regex.Pattern ID = java.util.regex.Pattern.compile("[a-z0-9][a-z0-9-]{1,49}");
     private static final String MARKER = ".awd-bundled";
     private final SystemSettingService settings;
     private final Path source;
@@ -30,10 +33,24 @@ public class PluginBundledInstaller {
         this.destination = Path.of(destination);
     }
 
+    /** The fixed set plus the brand list shipped in the same read-only bundle (absent in the default build). */
+    private Set<String> ids() {
+        Set<String> ids = new TreeSet<>(IDS);
+        Path list = source == null ? null : source.resolve(BRAND_LIST);
+        if (list == null || !Files.isRegularFile(list)) return ids;
+        try {
+            for (String id : JSON.readValue(Files.readString(list), new TypeReference<List<String>>() {})) {
+                if (id == null || !ID.matcher(id).matches()) throw new IllegalArgumentException("Invalid bundled plugin id");
+                ids.add(id);
+            }
+        } catch (java.io.IOException e) { throw new IllegalStateException("Invalid bundled plugin list", e); }
+        return ids;
+    }
+
     public List<Map<String, Object>> available() {
         if (source == null || !Files.isDirectory(source)) return List.of();
         List<Map<String, Object>> result = new ArrayList<>();
-        for (String id : new TreeSet<>(IDS)) {
+        for (String id : ids()) {
             Path manifest = source.resolve(id).resolve("manifest.json");
             if (!Files.isRegularFile(manifest)) continue;
             try {
@@ -66,7 +83,7 @@ public class PluginBundledInstaller {
     }
 
     public synchronized void install(String id) {
-        if (id == null || !IDS.contains(id)) {
+        if (id == null || !ids().contains(id)) {
             throw new IllegalArgumentException("Bundled plugin not available");
         }
         Map<String, Object> meta = available().stream().filter(m -> id.equals(m.get("id"))).findFirst()
@@ -89,8 +106,15 @@ public class PluginBundledInstaller {
             if (!root.startsWith(sourceRoot)) throw new IllegalArgumentException("Invalid bundled plugin source");
             // Source projects may include src/tests; only signed-distribution payload goes into an installation.
             List<Path> payload = new ArrayList<>(); payload.add(root.resolve("manifest.json"));
-            for (String sub : List.of("web", "l10n", "skills", "themes", "templates", "profiles")) if (Files.isDirectory(root.resolve(sub))) {
+            for (String sub : List.of("web", "l10n", "skills", "themes", "templates", "profiles", "assets")) if (Files.isDirectory(root.resolve(sub))) {
                 try (var files = Files.walk(root.resolve(sub))) { payload.addAll(files.toList()); }
+            }
+            // Backend JARs ship beside the manifest, as in a marketplace package; a declared JAR that is missing is a broken bundle.
+            var declared = cn.hutool.json.JSONUtil.toBean(Files.readString(root.resolve("manifest.json")), PluginService.PluginMetadata.class);
+            for (String jar : Optional.ofNullable(declared.getBackendJars()).orElse(List.of())) {
+                Path file = root.resolve(jar).normalize();
+                if (!file.startsWith(root) || !Files.isRegularFile(file)) throw new IllegalArgumentException("Bundled plugin JAR is missing");
+                payload.add(file);
             }
             for (Path file : payload) {
                 if (Files.isSymbolicLink(file) || !file.toRealPath().startsWith(root)) throw new IllegalArgumentException("Bundled plugin contains a symbolic link");

@@ -326,6 +326,13 @@ jobs:
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
             --out desktop/bundled/win-x64 --native-platform windows-x86_64
+      - name: Stage brand-bundled plugins
+        # brand.json bundledPlugins: SDK + backend JARs into official-plugins/<id> (plugin-api was installed above).
+        if: (inputs.brand || 'aiworkdeck') != 'aiworkdeck'
+        shell: bash
+        env:
+          JAVA_HOME: ${{ steps.jdk.outputs.path }}
+        run: node scripts/brand/stage-bundled-plugins.mjs --brand "${{ inputs.brand }}"
       # ──────────────────────────────────────────────────────────────
       # Python 运行时 / graphviz 的缓存。
       #

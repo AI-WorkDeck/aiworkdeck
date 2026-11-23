@@ -122,4 +122,41 @@ class PluginBundledInstallerTest {
         assertThrows(IllegalArgumentException.class, () -> installer.installDefaults());
         assertEquals("1.0.0", Files.readString(plugins.resolve("search/web/index.html")));
     }
+    void brandPlugin(boolean withJar) throws Exception {
+        Path root = source.resolve("partner-desk");
+        Files.createDirectories(root.resolve("web")); Files.createDirectories(root.resolve("assets"));
+        Files.writeString(root.resolve("manifest.json"), """
+            {"id":"partner-desk","version":"1.0.0","frontendEntry":"web/index.html","backendJars":["partner-desk-1.0.0.jar"],
+             "tools":[{"name":"partnerDeskTool","description":"x","agent":false}],
+             "contributes":{"views":[{"id":"main","entry":"web/index.html","placement":"workspace","scope":"global"}]}}
+            """);
+        Files.writeString(root.resolve("web/index.html"), "desk");
+        Files.writeString(root.resolve("assets/icon.svg"), "<svg/>");
+        if (withJar) Files.writeString(root.resolve("partner-desk-1.0.0.jar"), "jar");
+        Files.createDirectories(root.resolve("backend/src")); Files.writeString(root.resolve("backend/src/A.java"), "src");
+    }
+    @Test void brandListAddsPluginsWithTheirJarsAndNothingWithoutIt() throws Exception {
+        brandPlugin(true);
+        installer.installDefaults();
+        assertFalse(Files.exists(plugins.resolve("partner-desk")), "not bundled unless the brand lists it");
+        Files.writeString(source.resolve(PluginBundledInstaller.BRAND_LIST), "[\"partner-desk\"]");
+        installer.installDefaults();
+        Path installed = plugins.resolve("partner-desk");
+        assertEquals("jar", Files.readString(installed.resolve("partner-desk-1.0.0.jar")));
+        assertTrue(Files.isRegularFile(installed.resolve("assets/icon.svg")));
+        assertTrue(Files.isRegularFile(installed.resolve(".awd-bundled")));
+        assertFalse(Files.exists(installed.resolve("backend")), "plugin sources stay out of the installation");
+        assertTrue(settings.get(PluginToolApprovals.KEY_PREFIX + "partner-desk").contains("partnerDeskTool"));
+    }
+    @Test void brandPluginWithoutItsDeclaredJarIsRejected() throws Exception {
+        brandPlugin(false);
+        Files.writeString(source.resolve(PluginBundledInstaller.BRAND_LIST), "[\"partner-desk\"]");
+        assertThrows(IllegalArgumentException.class, () -> installer.installDefaults());
+        assertFalse(Files.exists(plugins.resolve("partner-desk")));
+    }
+    @Test void brandListRejectsPathLikeIds() throws Exception {
+        Files.createDirectories(source);
+        Files.writeString(source.resolve(PluginBundledInstaller.BRAND_LIST), "[\"../escape\"]");
+        assertThrows(IllegalArgumentException.class, () -> installer.installDefaults());
+    }
 }

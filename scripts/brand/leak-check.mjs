@@ -36,6 +36,7 @@ export const ALLOW = [
   { why: 'internal git identity domain', re: /[\w.-]*aiworkdeck\.local/, cover: true },
   { why: 'partner portal host (shared service)', re: /ai-?firm\.aiworkdeck\.com/, cover: true },
   { why: 'mobile push topic', re: /com\.aiworkdeck\.mobile[\w.]*/, cover: true },
+  { why: 'plugin Java package', re: /com[./]aiworkdeck[./]plugins[\w./$]*/, cover: true },
 ]
 
 // Whole files that never reach users: server-deployment profiles bundled in the shared jar.

@@ -8,6 +8,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { applyBrand, genericRules, rewriteText, overrideKeys, loadBrand } from './apply.mjs'
 import { scan } from './leak-check.mjs'
+import { stageBundledPlugins } from './stage-bundled-plugins.mjs'
 
 // Fixture licensee; real brand folders live in each licensee's private repo.
 const BRANDS = fs.mkdtempSync(path.join(os.tmpdir(), 'brands-'))
@@ -71,4 +72,33 @@ test('leak check flags the old name but allows notices and internal identifiers'
   fs.writeFileSync(path.join(dir, 'c.js'), 'process.env.AIWORKDECK_DESKTOP_DEV')
   const f = scan(dir)
   assert.deepEqual(f.filter((x) => !x.allowed).map((x) => path.basename(x.file)), ['a.js'])
+})
+
+test('bundledPlugins: list file for the backend installer, packaging filter, then SDK + JAR staging', () => {
+  const brands = fs.mkdtempSync(path.join(os.tmpdir(), 'brands-'))
+  fs.mkdirSync(path.join(brands, 'b'))
+  fs.writeFileSync(path.join(brands, 'b/brand.json'), JSON.stringify({ ...brand, id: 'b', replace: [], bundledPlugins: ['desk'] }))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-apply-'))
+  const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text) }
+  put('desktop/package.json', JSON.stringify({ name: 'x', build: { dmg: {}, nsis: {}, extraResources: [{ from: '../official-plugins', to: 'official-plugins', filter: ['search/manifest.json'] }] } }))
+  // every generic rule must match once somewhere in the tree
+  put('desktop/main/x.js', "hi@aiworkdeck.com www.aiworkdeck.com www.workdeck.ai ~/.aiworkdeck aiworkdeck_update_signing com.aiworkdeck.desktop mcp_servers.aiworkdeck AI WorkDeck\n\"name\", \"aiworkdeck\" \"name\", \"aiworkdeck\" \"name\", \"aiworkdeck\"")
+  put('official-plugins/desk/manifest.json', JSON.stringify({ id: 'desk', version: '1.0.0', backendJars: ['desk-1.0.0.jar'] }))
+  put('official-plugins/desk/web/index.html', 'x')
+  put('sdk/plugin-sdk/awd-plugin-sdk.js', 'sdk')
+  applyBrand({ id: 'b', root, log: () => {}, brandsDir: brands })
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, 'official-plugins/brand-bundled-plugins.json'), 'utf8')), ['desk'])
+  const filter = JSON.parse(fs.readFileSync(path.join(root, 'desktop/package.json'), 'utf8')).build.extraResources[0].filter
+  for (const f of ['desk/manifest.json', 'desk/web/**', 'desk/*.jar', 'brand-bundled-plugins.json']) assert.ok(filter.includes(f), f)
+  const built = []
+  stageBundledPlugins({ root, bundled: ['desk'], log: () => {}, build: (pom) => { built.push(pom); put('official-plugins/desk/backend/target/desk-1.0.0.jar', 'jar') } })
+  assert.equal(built.length, 1)
+  assert.equal(fs.readFileSync(path.join(root, 'official-plugins/desk/desk-1.0.0.jar'), 'utf8'), 'jar')
+  assert.equal(fs.readFileSync(path.join(root, 'official-plugins/desk/web/awd-plugin-sdk.js'), 'utf8'), 'sdk')
+})
+
+test('leak check allows the plugin Java package name', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'brand-leak-'))
+  fs.writeFileSync(path.join(dir, 'A.class'), 'com/aiworkdeck/plugins/aifirmpartner/DeskFiles groupId=com.aiworkdeck.plugins')
+  assert.deepEqual(scan(dir).filter((x) => !x.allowed), [])
 })

@@ -10,6 +10,8 @@ Design and lessons: `docs/superpowers/specs/2026-11-23-brand-profile-design.md`.
 1. Private repo with `brands/<id>/brand.json` (copy the fields of `brands/aiworkdeck/brand.json`; add
    `replace[]` for the update feed and update-signing public key, `keyOverrides{}` for the trademark notice),
    `brands/<id>/overlay/**` (files copied over the tree) and `brands/<id>/art/` (sources + render script).
+   Optional `bundledPlugins: ["<plugin id>"]`: official plugins the edition preinstalls (with their backend JARs);
+   apply.mjs lists them for `PluginBundledInstaller`, CI's `stage-bundled-plugins.mjs` adds the SDK and builds the JARs.
 2. `.github/workflows/build.yml` in that repo:
 
    ```yaml

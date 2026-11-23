@@ -51,6 +51,9 @@ export const KEEP_LINE = [
 ]
 
 // Hosts that belong to shared services every edition talks to (the partner-network client portal), not to a brand.
+// Read by backend PluginBundledInstaller.BRAND_LIST from the bundled-plugins directory.
+export const BUNDLED_LIST = 'brand-bundled-plugins.json'
+
 export const KEEP_HOSTS = new Set(['ai-firm.aiworkdeck.com', 'aifirm.aiworkdeck.com'])
 
 export function genericRules(brand) {
@@ -152,6 +155,20 @@ export function applyBrand({ id, root, dryRun = false, log = console.log, brands
   Object.assign(pkg.build, { appId: brand.appId, productName: brand.name, copyright: brand.copyright })
   pkg.build.dmg.title = `${brand.name} \${version}`
   pkg.build.nsis.shortcutName = brand.name
+  // bundledPlugins (optional): official plugins this edition preinstalls. They ship with the other host-distributed
+  // plugins (resources/official-plugins) and PluginBundledInstaller installs them from the list file written here.
+  // stage-bundled-plugins.mjs adds the SDK and the backend JARs once Maven is available.
+  const bundled = brand.bundledPlugins || []
+  if (bundled.length) {
+    const res = pkg.build.extraResources.find((r) => r.to === 'official-plugins')
+    for (const id of bundled) {
+      if (!fs.existsSync(path.join(root, 'official-plugins', id, 'manifest.json'))) throw new Error(`bundledPlugins: no official-plugins/${id}`)
+      res.filter.push(`${id}/manifest.json`, `${id}/web/**`, `${id}/l10n/**`, `${id}/assets/**`, `${id}/*.jar`)
+    }
+    res.filter.push(BUNDLED_LIST)
+    if (!dryRun) fs.writeFileSync(path.join(root, 'official-plugins', BUNDLED_LIST), JSON.stringify(bundled) + '\n')
+    changed.push(`official-plugins/${BUNDLED_LIST}`)
+  }
   if (!dryRun) fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
   changed.push('desktop/package.json')
 
