@@ -157,7 +157,9 @@ export function applyBrand({ id, root, dryRun = false, log = console.log, brands
 
   // Runtime marker (desktop/main/brand.json): tags the backend fingerprint so two brands on one machine never
   // reuse each other's backend (backend-service.js homeTag).
-  if (!dryRun) fs.writeFileSync(path.join(root, 'desktop/main/brand.json'), JSON.stringify({ id: brand.id }, null, 2) + '\n')
+  // defaultLanguage (optional): the UI language until the user picks one, instead of the OS language.
+  const marker = { id: brand.id, ...(brand.defaultLanguage ? { defaultLanguage: brand.defaultLanguage } : {}) }
+  if (!dryRun) fs.writeFileSync(path.join(root, 'desktop/main/brand.json'), JSON.stringify(marker, null, 2) + '\n')
   changed.push('desktop/main/brand.json')
 
   const overlay = path.join(dir, 'overlay')

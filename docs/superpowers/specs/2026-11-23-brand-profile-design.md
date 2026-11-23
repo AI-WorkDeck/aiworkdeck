@@ -14,6 +14,7 @@ text) lives in that licensee's private repo. This repo only carries the tooling 
 
 ```
 brands/<id>/brand.json     name, domain, appId, packageName, dataDirName, supportEmail, copyright,
+                           defaultLanguage (optional: UI language until the user picks one, instead of the OS's),
                            replace[] (exact, brand-specific), keyOverrides{} (locale keys whose meaning changes)
 brands/<id>/overlay/**     files copied over the tree after the rewrite (same paths as the repo)
 brands/<id>/art/           sources + render.sh for the overlay's icons and installer art (outputs committed)
@@ -34,7 +35,7 @@ Rewrite rules (every rule must match at least once, or the run fails as stale):
   attribution), outbound user agents, the version-store magic bytes.
 - `desktop/package.json`: name (→ Electron userData), appId, productName, copyright, DMG title, NSIS shortcut.
 - Typical overlay: backend `config/application.yml` (one site; id `intl` = the email + Turnstile flow, cn off,
-  so no site switcher), desktop `legal-notices.json` (trademark line names the licensee), icons and installer art.
+  so no site switcher; `cross-border-consent: false` when the operator is outside mainland China), desktop `legal-notices.json` (trademark line names the licensee), icons and installer art.
 
 Why a source rewrite instead of `{brand}` placeholders: zero churn in the default build, and it covers Java,
 Vue, Electron, NSIS and plugin text uniformly. The leak check is what keeps it honest.

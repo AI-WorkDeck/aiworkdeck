@@ -420,6 +420,17 @@ function matchCountryToLocale(countryCode) {
 
 let currentResolved = null
 let currentPref = null
+
+// 贴牌版本可在 desktop/main/brand.json 里给 defaultLanguage（scripts/brand/apply.mjs 写入）：
+// 用户没选过语言时用它，而不是跟随系统。默认品牌没有这个字段，行为不变。
+const BRAND_DEFAULT_LANGUAGE = (() => {
+  try {
+    const raw = require('./brand.json').defaultLanguage
+    return (raw && LOWER_CODE_MAP.get(String(raw).toLowerCase())) || null
+  } catch (e) {
+    return null
+  }
+})()
 const listeners = new Set()
 
 function storePath() {
@@ -461,15 +472,16 @@ function guessFromSystem() {
  */
 function getPersistedAppLanguage() {
   const saved = readSaved()
-  if (!saved || saved === SYSTEM_LANGUAGE_MODE) return null
+  if (!saved) return BRAND_DEFAULT_LANGUAGE
+  if (saved === SYSTEM_LANGUAGE_MODE) return null
   return saved
 }
 
 function getAppLanguage() {
   if (!currentResolved) {
     const saved = readSaved()
-    currentPref = saved || SYSTEM_LANGUAGE_MODE
-    currentResolved = (!saved || saved === SYSTEM_LANGUAGE_MODE) ? guessFromSystem() : saved
+    currentPref = saved || BRAND_DEFAULT_LANGUAGE || SYSTEM_LANGUAGE_MODE
+    currentResolved = currentPref === SYSTEM_LANGUAGE_MODE ? guessFromSystem() : currentPref
   }
   return currentResolved
 }
