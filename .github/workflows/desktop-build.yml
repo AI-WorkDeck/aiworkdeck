@@ -446,6 +446,11 @@ jobs:
             export CSC_KEYCHAIN="$RUNNER_TEMP/awd-sign.keychain-db"
             security unlock-keychain -p "awd-tmp-keychain" "$CSC_KEYCHAIN"
             unset CSC_LINK
+          else
+            # 无证书（白标私有仓尚未配置签名）：显式走未签名构建；空的 CSC_LINK 会被当成路径报「not a file」
+            echo "No signing certificate — building unsigned"
+            unset CSC_LINK CSC_KEY_PASSWORD
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
           # 公证凭据：三个环境变量要么全有要么全无——electron-builder 只要见到其中
           # 任意一个非空就要求三个都在，否则抛 InvalidConfigurationError；三个全空
@@ -681,16 +686,6 @@ jobs:
             --prev https://www.aiworkdeck.com/update/desktop/manifest.json \
             --out desktop/release/patch
           ls -la desktop/release/patch
-      - name: White-label leak check
-        # Fails if the default product's name or domains survive anywhere in the packaged app (app.asar, backend
-        # jar, resources). Allowed: AGPL notices and internal identifiers (scripts/brand/leak-check.mjs ALLOW).
-        if: (inputs.brand || 'aiworkdeck') != 'aiworkdeck'
-        shell: bash
-        run: |
-          app=$(ls -d desktop/release/mac*/*.app/Contents/Resources desktop/release/win-unpacked/resources 2>/dev/null | head -1)
-          test -n "$app" || { echo "no unpacked app under desktop/release"; ls desktop/release; exit 1; }
-          (cd desktop && npm ls @electron/asar >/dev/null 2>&1 || npm i --no-save @electron/asar)
-          node scripts/brand/leak-check.mjs "$app"
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
@@ -701,6 +696,20 @@ jobs:
             desktop/release/*.exe
             desktop/release/patch/*
           if-no-files-found: error
+      - name: White-label leak check
+        # Fails if the default product's name or domains survive anywhere in the packaged app (app.asar, backend
+        # jar, resources). Allowed: AGPL notices and internal identifiers (scripts/brand/leak-check.mjs ALLOW).
+        # Runs after the upload so a failing build's installers can still be inspected.
+        if: (inputs.brand || 'aiworkdeck') != 'aiworkdeck'
+        shell: bash
+        run: |
+          app=
+          for d in desktop/release/mac*/*.app/Contents/Resources desktop/release/win-unpacked/resources; do
+            if [ -d "$d" ]; then app=$d; break; fi
+          done
+          test -n "$app" || { echo "no unpacked app under desktop/release"; ls desktop/release; exit 1; }
+          (cd desktop && npm ls @electron/asar >/dev/null 2>&1 || npm i --no-save @electron/asar)
+          node scripts/brand/leak-check.mjs "$app" --max-report 200
 
       - name: Preserve unsigned PR installer for isolated dependency acceptance
         if: github.event_name == 'pull_request' && runner.os == 'Windows' && needs.dependency-scope.outputs.required == 'true'
