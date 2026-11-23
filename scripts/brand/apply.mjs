@@ -149,6 +149,11 @@ export function applyBrand({ id, root, dryRun = false, log = console.log, brands
   if (!dryRun) fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
   changed.push('desktop/package.json')
 
+  // Runtime marker (desktop/main/brand.json): tags the backend fingerprint so two brands on one machine never
+  // reuse each other's backend (backend-service.js homeTag).
+  if (!dryRun) fs.writeFileSync(path.join(root, 'desktop/main/brand.json'), JSON.stringify({ id: brand.id }, null, 2) + '\n')
+  changed.push('desktop/main/brand.json')
+
   const overlay = path.join(dir, 'overlay')
   const copied = []
   if (fs.existsSync(overlay) && !dryRun) copyTree(overlay, root, copied)

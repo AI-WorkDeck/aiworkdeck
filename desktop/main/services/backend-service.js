@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+const BRAND = require('../brand.json')
 const path = require('path')
 const fs = require('fs')
 const net = require('net')
@@ -102,8 +103,11 @@ function backendBuildId(ctx) {
 
 // 隔离实例（AWD_HOME，问题 20）的指纹后缀「@home-<摘要>」。默认实例没有后缀，格式不变。
 // 不同 home 的后端读写的是不同数据目录，端口链上撞见对方的后端绝不能复用（decideReuse）。
+// 白标版（scripts/brand/apply.mjs 改写 ../brand.json）同理：与默认品牌共用端口链、不共用数据目录，
+// 加「@brand-<id>」后缀，两个品牌同机运行时互相当陌生后端跳过。默认品牌不加后缀。
 function homeTag(ctx) {
-  return ctx && ctx.awdHome ? '@home-' + createHash('sha256').update(String(ctx.awdHome)).digest('hex').slice(0, 12) : ''
+  const home = ctx && ctx.awdHome ? '@home-' + createHash('sha256').update(String(ctx.awdHome)).digest('hex').slice(0, 12) : ''
+  return home + (BRAND.default ? '' : '@brand-' + BRAND.id)
 }
 function homeTagOfBuild(build) {
   const i = String(build || '').indexOf('@')

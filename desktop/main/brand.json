@@ -1,0 +1,5 @@
+{
+  "$comment": "Runtime brand marker. scripts/brand/apply.mjs overwrites it in white-label builds; keep default true here.",
+  "id": "aiworkdeck",
+  "default": true
+}

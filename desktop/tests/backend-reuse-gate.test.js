@@ -76,3 +76,9 @@ test('probeBackend：旧后端无 build 字段 → 空串；陌生响应 → our
     stranger.close()
   }
 })
+
+test('decideReuse：白标版与默认品牌互不复用后端（@brand-<id> 指纹后缀）', () => {
+  assert.equal(decideReuse({ ours: true, build: '100-1' }, { packaged: true, expectedBuild: '200-2@brand-example' }), 'skip')
+  assert.equal(decideReuse({ ours: true, build: '200-2@brand-example' }, { packaged: true, expectedBuild: '100-1' }), 'skip')
+  assert.equal(decideReuse({ ours: true, build: '200-2@brand-example' }, { packaged: true, expectedBuild: '200-2@brand-example' }), 'reuse')
+})
