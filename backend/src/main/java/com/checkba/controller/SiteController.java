@@ -56,7 +56,7 @@ public class SiteController {
         result.put("pinned", siteProfileService.isPinned());
         // 只有一个可选站点时前端整行不渲染——单站产品摆一个选择器只会让人以为自己选错了
         result.put("multiSite", sites.size() > 1);
-        result.put("sites", sites.stream().map(SiteController::describe).toList());
+        result.put("sites", sites.stream().map(this::describe).toList());
         return result;
     }
 
@@ -75,12 +75,13 @@ public class SiteController {
     }
 
     /** 只暴露展示与跳转需要的字段。registry / telemetry 地址是内部路由，不外发。 */
-    private static Map<String, Object> describe(SiteProfile profile) {
+    private Map<String, Object> describe(SiteProfile profile) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", profile.id());
         item.put("displayName", profile.displayName());
         item.put("baseUrl", profile.baseUrl());
         item.put("accountPageUrl", profile.accountPageUrl());
+        item.put("crossBorderConsent", !siteProfileService.crossBorderConsentWaived(profile.id()));
         return item;
     }
 }

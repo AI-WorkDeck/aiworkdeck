@@ -37,6 +37,11 @@ public class SiteProperties {
         private String registryBaseUrl = "";
         private String telemetryIngestUrl = "";
         private String accountPageUrl = "";
+        /**
+         * 平台 AI 通道是否要先取得跨境传输的单独同意（个保法第三十九条）。大陆站要；
+         * 服务境外用户、境外主体运营的站点可关掉，关掉后登录弹层、设置页都不再征求，运行时闸也放行。
+         */
+        private boolean crossBorderConsent = true;
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -50,6 +55,8 @@ public class SiteProperties {
         public void setTelemetryIngestUrl(String telemetryIngestUrl) { this.telemetryIngestUrl = telemetryIngestUrl; }
         public String getAccountPageUrl() { return accountPageUrl; }
         public void setAccountPageUrl(String accountPageUrl) { this.accountPageUrl = accountPageUrl; }
+        public boolean isCrossBorderConsent() { return crossBorderConsent; }
+        public void setCrossBorderConsent(boolean crossBorderConsent) { this.crossBorderConsent = crossBorderConsent; }
     }
 
     public String getBaseUrl() { return baseUrl; }

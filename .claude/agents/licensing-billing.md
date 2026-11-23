@@ -629,6 +629,11 @@ RootBubble 出同意卡；「同意并继续」后 ChatInterface `retryAfterCons
 （`usesMachineKey`）、已连接却无有效同意 → `AccountException(CONFLICT, reason=cross_border_consent_required)`；
 未连接放行给下游 4011 登录弹层。本机模型 / 自备 Key 不经过这里。语音听写（`VoiceDictationService`）
 直接取平台密钥、不经工厂，目前不在闸内。
+**站点可免征（2026-11-23）**：站点表 `ai.account.sites.<id>.cross-border-consent: false`（国际站这样配）→
+`SiteProfileService.crossBorderConsentWaived(id)` 为真，`CrossBorderConsentService.hasConsent()` 直接视同已同意
+（闸、`isRequired`、保存门禁一并放行）；站点状态 `GET /api/site` 每个站点带 `crossBorderConsent`，
+设置页配置带只读 `ai.crossBorderConsentApplies`，登录弹层、粘 Key、设置页同意区据此隐藏，
+`recordAccountConsents({ crossBorder:false })` 不替用户记同意。方法取「免征」方向是为了让 Mockito 默认 false = 照旧征求。
 
 **登录弹层跨境同意的措辞按站点分（dev-board#1713，问题 2+38）**：`AccountLoginDialog.crossBorderKey(name)`
 在国内站（`isPhoneSite`）取 `onboarding.unlock.*Domestic`（勾选框 / 告知标题 / 告知正文 / 未勾提示统一

@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Inicie sesión con su número de teléfono o correo electrónico y contraseña. ¿Primera vez? Verifique su identidad y cree una contraseña.",
+  "introEmail": "Inicie sesión con su correo electrónico y contraseña. ¿Primera vez? Verifique su correo y cree una contraseña.",
   "password": "Contraseña",
   "confirm": "Confirmar contraseña",
   "register": "Primera vez / Crear contraseña",

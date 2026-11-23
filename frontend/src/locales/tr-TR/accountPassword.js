@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Telefon numaranız veya e-postanız ve şifrenizle oturum açın. İlk kez mi kullanıyorsunuz? Doğrulayın ve bir şifre oluşturun.",
+  "introEmail": "E-postanız ve şifrenizle oturum açın. İlk kez mi kullanıyorsunuz? E-postanızı doğrulayın ve bir şifre oluşturun.",
   "password": "Şifre",
   "confirm": "Şifreyi onayla",
   "register": "İlk kez / Şifre oluştur",

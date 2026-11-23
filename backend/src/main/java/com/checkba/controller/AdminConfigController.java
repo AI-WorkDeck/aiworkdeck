@@ -330,6 +330,7 @@ public class AdminConfigController {
         // 同意只有版本、账户、站点都对上才算数：告知改版、切站、换账户后显示为未同意，需重新征求
         ai.setCrossBorderConsentAt(crossBorderConsent.consentAtForDisplay());
         ai.setCrossBorderNoticeVersion(CROSS_BORDER_NOTICE_VERSION);
+        ai.setCrossBorderConsentApplies(crossBorderConsent.appliesToCurrentSite());
 
         resp.setAi(ai);
 
@@ -822,6 +823,8 @@ public class AdminConfigController {
         private Boolean crossBorderConsent;
         /** 读：当前告知文本版本，供前端判断是否需要重新征求 */
         private String crossBorderNoticeVersion;
+        /** 只读：当前站点是否征求跨境同意（站点表 {@code cross-border-consent}），设置页据此显示同意区。 */
+        private Boolean crossBorderConsentApplies;
 
         public String getActiveProvider() { return activeProvider; }
         public void setActiveProvider(String activeProvider) { this.activeProvider = activeProvider; }
@@ -843,6 +846,8 @@ public class AdminConfigController {
         public void setCrossBorderConsent(Boolean crossBorderConsent) { this.crossBorderConsent = crossBorderConsent; }
         public String getCrossBorderNoticeVersion() { return crossBorderNoticeVersion; }
         public void setCrossBorderNoticeVersion(String crossBorderNoticeVersion) { this.crossBorderNoticeVersion = crossBorderNoticeVersion; }
+        public Boolean getCrossBorderConsentApplies() { return crossBorderConsentApplies; }
+        public void setCrossBorderConsentApplies(Boolean crossBorderConsentApplies) { this.crossBorderConsentApplies = crossBorderConsentApplies; }
     }
 
     public static class UserSummary {

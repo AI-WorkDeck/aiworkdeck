@@ -136,6 +136,15 @@ public class SiteProfileService {
         return availableSites().size() > 1;
     }
 
+    /**
+     * 该站点是否免于征求跨境传输的单独同意（站点表 {@code cross-border-consent: false}）。
+     * 站点表里没有（团队服务器、老配置）时不免——默认要征求，只有明确配置才放开。
+     */
+    public boolean crossBorderConsentWaived(String siteId) {
+        SiteProperties.Site site = siteId == null ? null : properties.getSites().get(siteId);
+        return site != null && !site.isCrossBorderConsent();
+    }
+
     /** 除当前站点外的其余可选站点。站点错配的引导文案用它点名「你要找的可能是这个」。 */
     public List<SiteProfile> otherSites() {
         return availableSites().stream().filter(s -> !s.id().equals(currentSiteId)).toList();

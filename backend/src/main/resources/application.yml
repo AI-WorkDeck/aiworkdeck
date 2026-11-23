@@ -316,6 +316,9 @@ ai:
         registry-base-url: https://www.workdeck.ai/api/registry
         telemetry-ingest-url: https://www.workdeck.ai/api/telemetry
         account-page-url: https://www.workdeck.ai/en/account
+        # 国际站服务境外用户：不征求个保法第三十九条的跨境单独同意（大陆站不写这一行 = 默认要征求）。
+        # AI 服务商处理说明放在隐私政策里，随「服务条款 / 隐私政策」那一项一并同意。
+        cross-border-consent: false
   # 辅助模型：起标题 / 上下文摘要 / 记忆抽取 / memory_search / 文件自动打标签。
   # 这些调用用户看不见但每轮都在跑，单列一个便宜模型是省钱的主要来源；
   # 默认取白名单里最便宜且支持 tools 的一条（0.03/0.13 美元每 1M token，1M 上下文）。

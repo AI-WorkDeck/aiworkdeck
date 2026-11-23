@@ -272,7 +272,7 @@
                       {{ $t('onboarding.unlock.agreePrefix') }}{{ $t('onboarding.unlock.termsName') }}{{ $t('onboarding.unlock.agreeAnd') }}{{ $t('onboarding.unlock.privacyName') }}
                     </text>
                   </view>
-                  <view class="account-consent-row" @tap="keyCrossBorderChecked = !keyCrossBorderChecked">
+                  <view v-if="crossBorderApplies" class="account-consent-row" @tap="keyCrossBorderChecked = !keyCrossBorderChecked">
                     <view class="account-consent-mark" :class="{ checked: keyCrossBorderChecked }"></view>
                     <text class="account-consent-text">{{ $t('onboarding.unlock.crossBorderLabel') }}</text>
                   </view>
@@ -700,9 +700,10 @@
           class="config-scroll"
         >
           <!-- 隐私与数据：跨境传输同意 / 匿名使用统计开关 / 文档属性 / 本地使用统计 都收在这一页 -->
-          <SettingsSection :title="$t('admin.consentTitle')">
+          <SettingsSection v-if="crossBorderApplies" :title="$t('admin.consentTitle')">
               <!-- 跨境传输的单独同意（个保法第三十九条）。官方通道会把内容送往境外，
-                 所以它恒显示。绝不预勾选——预勾选的同意是无效的。 -->
+                 所以征求同意的站点上它恒显示（站点表 cross-border-consent: false 的站点不显示）。
+                 绝不预勾选——预勾选的同意是无效的。 -->
             <view class="consent-box">
               <text class="consent-body">{{ $t('onboarding.unlock.crossBorderNoticeBody') }}</text>
               <view class="consent-check" @tap="toggleCrossBorderConsent">
@@ -1242,6 +1243,7 @@ export default {
       activeNav: cachedIsAdmin() ? 'ai' : 'personal_settings',
       /** 服务端记录的同意时间戳；空 = 未同意或告知文本已改版需重新征求 */
       crossBorderConsentAt: '',
+      crossBorderApplies: true,
       // 三组导航（个人 / 系统 / 我的工作）。group 只决定排版分组，可见性一律在 visibleNavItems 里判。
       navItems: [
         // 2026-08-20 从个人中心搬来的四栏（工作记录 / 立案与利冲 / 全部收藏 / 我的待办）现在单列
@@ -2517,7 +2519,7 @@ export default {
     // 老用户「切换到官方通道」：置 AWD_CLOUD 后走既有保存路径。后端的跨境同意闸
     //（crossBorderBlockReason）仍然把关，没勾同意会回 400，这里提前说清楚省一次往返。
     async switchToOfficialChannel() {
-      if (!this.crossBorderConsented) {
+      if (this.crossBorderApplies && !this.crossBorderConsented) {
         uni.showToast({ title: this.$t('admin.switchNeedsConsent'), icon: 'none' })
         return
       }
@@ -2880,13 +2882,13 @@ export default {
         return
       }
       // 粘 Key 与登录弹层同一道同意闸（accountConsent.js 文件头）
-      if (!this.keyAgreementChecked || !this.keyCrossBorderChecked) {
+      if (!this.keyAgreementChecked || (this.crossBorderApplies && !this.keyCrossBorderChecked)) {
         uni.showToast({ title: this.$t('account.accountEntry.pasteKeyConsentRequired'), icon: 'none' })
         return
       }
       this.accountBusy = true
       try {
-        await recordAccountConsents()
+        await recordAccountConsents({ crossBorder: this.crossBorderApplies })
         const res = await connectAccount(key)
         this.accountKeyInput = ''
         this.keyPasteOpen = false
@@ -3034,6 +3036,8 @@ export default {
           this.form.ai.subagentModel = data.ai.subagentModel || ''
           this.form.ai.networkRegion = data.ai.networkRegion || 'auto'
           this.crossBorderConsentAt = data.ai.crossBorderConsentAt || ''
+          // 站点表 cross-border-consent: false 的站点不征求跨境同意，同意区与相关闸一并隐藏
+          this.crossBorderApplies = data.ai.crossBorderConsentApplies !== false
           this.form.ai.crossBorderConsent = null
         }
       } catch (e) {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export default {
   "intro": "Sign in with your phone number or email and password. First time? Verify and create a password.",
+  "introEmail": "Sign in with your email and password. First time? Verify your email and create a password.",
   "password": "Password",
   "confirm": "Confirm password",
   "register": "First time / Create password",
