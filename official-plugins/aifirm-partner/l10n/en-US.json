@@ -232,6 +232,7 @@
   "panel.m.err.consult": "The call was added to the calendar, but its status could not be updated ({reason}).",
   "panel.m.request.lawyer": "Chosen lawyer",
   "panel.m.event.consult_requested": "Client asked for a call with a lawyer",
+  "panel.m.event.lawyer_selected": "Client selected a lawyer and unlocked full matter access",
   "panel.m.section.terms": "Term sheet",
   "panel.m.section.flags": "Red flags",
   "panel.m.terms.term": "Term",

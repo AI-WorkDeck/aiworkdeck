@@ -232,6 +232,7 @@
   "panel.m.err.consult": "La llamada se añadió al calendario, pero no se pudo actualizar su estado ({reason}).",
   "panel.m.request.lawyer": "Abogado elegido",
   "panel.m.event.consult_requested": "El cliente pidió una llamada con un abogado",
+  "panel.m.event.lawyer_selected": "El cliente seleccionó a un abogado y desbloqueó el acceso completo al asunto",
   "panel.m.section.terms": "Resumen de términos",
   "panel.m.section.flags": "Alertas",
   "panel.m.terms.term": "Término",

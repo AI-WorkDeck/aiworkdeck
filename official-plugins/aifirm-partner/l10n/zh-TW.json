@@ -232,6 +232,7 @@
   "panel.m.err.consult": "通話已加入日曆，但狀態未能更新（{reason}）。",
   "panel.m.request.lawyer": "指定律師",
   "panel.m.event.consult_requested": "客戶申請與律師通話",
+  "panel.m.event.lawyer_selected": "客戶已選定合作律師並解鎖完整案件",
   "panel.m.section.terms": "條款摘要",
   "panel.m.section.flags": "風險提示",
   "panel.m.terms.term": "條款",

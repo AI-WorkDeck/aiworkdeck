@@ -232,6 +232,7 @@
   "panel.m.err.consult": "Het gesprek is aan de agenda toegevoegd, maar de status kon niet worden bijgewerkt ({reason}).",
   "panel.m.request.lawyer": "Gekozen advocaat",
   "panel.m.event.consult_requested": "Cliënt vroeg om een gesprek met een advocaat",
+  "panel.m.event.lawyer_selected": "Cliënt heeft een advocaat gekozen en volledige dossier-toegang ontgrendeld",
   "panel.m.section.terms": "Term sheet",
   "panel.m.section.flags": "Red flags",
   "panel.m.terms.term": "Bepaling",

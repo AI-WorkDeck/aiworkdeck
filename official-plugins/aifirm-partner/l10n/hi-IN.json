@@ -232,6 +232,7 @@
   "panel.m.err.consult": "कॉल कैलेंडर में जोड़ दी गई, लेकिन उसकी स्थिति अपडेट नहीं हो सकी ({reason})।",
   "panel.m.request.lawyer": "चुना गया वकील",
   "panel.m.event.consult_requested": "क्लाइंट ने वकील के साथ कॉल माँगी",
+  "panel.m.event.lawyer_selected": "क्लाइंट ने वकील चुना और मामले की पूरी पहुँच अनलॉक की",
   "panel.m.section.terms": "टर्म शीट",
   "panel.m.section.flags": "रेड फ़्लैग",
   "panel.m.terms.term": "शर्त",

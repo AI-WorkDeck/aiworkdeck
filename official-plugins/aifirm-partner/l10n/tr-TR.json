@@ -232,6 +232,7 @@
   "panel.m.err.consult": "Görüşme takvime eklendi ancak durumu güncellenemedi ({reason}).",
   "panel.m.request.lawyer": "Seçilen avukat",
   "panel.m.event.consult_requested": "Müşteri bir avukatla görüşme istedi",
+  "panel.m.event.lawyer_selected": "Müşteri bir avukat seçti ve dosyaya tam erişimi açtı",
   "panel.m.section.terms": "Şart özeti",
   "panel.m.section.flags": "Risk işaretleri",
   "panel.m.terms.term": "Şart",

@@ -232,6 +232,7 @@
   "panel.m.err.consult": "Panggilan telah ditambah ke kalendar, tetapi statusnya tidak dapat dikemas kini ({reason}).",
   "panel.m.request.lawyer": "Peguam dipilih",
   "panel.m.event.consult_requested": "Klien meminta panggilan dengan peguam",
+  "panel.m.event.lawyer_selected": "Klien memilih peguam dan membuka akses penuh kepada perkara",
   "panel.m.section.terms": "Helaian terma",
   "panel.m.section.flags": "Bendera merah",
   "panel.m.terms.term": "Terma",
