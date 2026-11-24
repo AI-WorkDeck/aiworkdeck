@@ -143,3 +143,55 @@ test('a disposed window callback cannot remove a later installation', () => {
   second()
   assert.equal(listener, null)
 })
+
+test('while the backend boots, every request to it is held and released when startup settles', t => {
+  const { send, state, launch } = fixture(t)
+  state.booting = true
+  state.launch = undefined
+  const held = ['/api/license/status', '/api/projects/my', '/api/app/language'].map(path => send(path))
+  const post = send('/api/app/language', 'POST')
+  const other = send('http://127.0.0.1:8766/api/site')
+  held.forEach(result => assert.deepEqual(result, []))
+  assert.deepEqual(post, [])
+  assert.deepEqual(other, [{ cancel: false }], 'other ports and origins are never held')
+  t.mock.timers.tick(5000)
+  held.forEach(result => assert.deepEqual(result, []))
+  launch.fullReady = true
+  state.launch = launch
+  state.booting = false
+  t.mock.timers.tick(100)
+  held.forEach(result => assert.deepEqual(result, [{ cancel: false }]))
+  assert.deepEqual(post, [{ cancel: false }])
+})
+
+test('requests held during boot fall back to core-read gating when the backend is only core-ready', t => {
+  const { send, state, launch } = fixture(t)
+  state.booting = true
+  const read = send('/api/projects/my'), optional = send('/api/site')
+  state.booting = false
+  t.mock.timers.tick(100)
+  assert.deepEqual(read, [{ cancel: false }], 'core reads go as soon as boot ends')
+  assert.deepEqual(optional, [], 'optional work keeps waiting for full readiness')
+  launch.fullReady = true
+  t.mock.timers.tick(100)
+  assert.deepEqual(optional, [{ cancel: false }])
+})
+
+test('a failed boot releases held requests so the page sees the failure; quitting cancels them', t => {
+  const failed = fixture(t)
+  failed.state.booting = true
+  failed.state.launch = undefined
+  const request = failed.send('/api/license/status')
+  failed.state.booting = false
+  t.mock.timers.tick(100)
+  assert.deepEqual(request, [{ cancel: false }])
+})
+
+test('quitting during boot cancels held requests', t => {
+  const { send, state } = fixture(t)
+  state.booting = true
+  const request = send('/api/license/status')
+  state.closing = true
+  t.mock.timers.tick(100)
+  assert.deepEqual(request, [{ cancel: true }])
+})
