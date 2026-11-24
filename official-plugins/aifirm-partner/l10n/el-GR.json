@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Δεν ήταν δυνατή η ενημέρωση του ημερολογίου: {reason}",
   "panel.m.err.file": "Δεν ήταν δυνατή η ανάγνωση του αρχείου: {reason}",
   "panel.m.clientLink": "Σελίδα πελάτη",
-  "panel.m.budget.low": "Προϋπολογισμός Venture AI: απομένουν {left} από {limit}. Αυξήστε το όριο πριν εξαντληθεί· κάτω από $1, οι πελάτες καλούνται να επιστρέψουν αργότερα.",
+  "panel.m.budget.low": "Όριο AI: απομένει {pct}%",
   "panel.m.open": "Άνοιγμα PDF",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "Ζητήθηκε κλήση",

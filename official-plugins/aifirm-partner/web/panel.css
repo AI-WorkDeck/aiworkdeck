@@ -219,3 +219,7 @@ li.attention::marker { color: var(--awd-danger, #B23B2B); }
 }
 .mp-card-note { padding: 6px 10px; font-size: 11.5px; color: var(--awd-text-2, #6B675C); }
 
+
+/* AI 额度用量条（只显示比例，不显示金额） */
+.budget-bar { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.1); overflow: hidden; }
+.budget-bar-fill { display: block; height: 100%; background: currentColor; }

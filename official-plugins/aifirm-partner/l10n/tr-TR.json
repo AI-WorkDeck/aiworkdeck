@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Takvim güncellenemedi: {reason}",
   "panel.m.err.file": "Bu dosya okunamadı: {reason}",
   "panel.m.clientLink": "Müşteri sayfası",
-  "panel.m.budget.low": "Venture AI bütçesi: {limit} üzerinden {left} kaldı. Bitmeden önce üst sınırı artırın; 1 $'ın altında müşterilerden daha sonra tekrar gelmeleri istenir.",
+  "panel.m.budget.low": "Yapay zekâ kotası: %{pct} kaldı",
   "panel.m.open": "PDF'yi aç",
   "panel.m.title": "Venture AI Avukat Masası",
   "panel.m.consult.badge": "Görüşme istendi",

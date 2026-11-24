@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "The calendar could not be updated: {reason}",
   "panel.m.err.file": "That file could not be read: {reason}",
   "panel.m.clientLink": "Client page",
-  "panel.m.budget.low": "Venture AI budget: {left} of {limit} left. Raise the cap before it runs out; below $1, clients are asked to come back later.",
+  "panel.m.budget.low": "AI allowance: {pct}% left",
   "panel.m.open": "Open PDF",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "Call requested",

@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Le calendrier n'a pas pu être mis à jour : {reason}",
   "panel.m.err.file": "Ce fichier n'a pas pu être lu : {reason}",
   "panel.m.clientLink": "Page client",
-  "panel.m.budget.low": "Budget Venture AI : il reste {left} sur {limit}. Relevez le plafond avant épuisement ; en dessous de 1 $, les clients sont invités à revenir plus tard.",
+  "panel.m.budget.low": "Quota IA : {pct} % restant",
   "panel.m.open": "Ouvrir le PDF",
   "panel.m.title": "Venture AI Espace Avocat",
   "panel.m.consult.badge": "Appel demandé",
