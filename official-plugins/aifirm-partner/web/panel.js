@@ -335,7 +335,7 @@
       state.draft = await awd.ai.request(
         'Write a short follow-up email (under 160 words) from a lawyer at ' + (d.firm || state.summary.firm || 'our firm') + ' to this visitor we met at ' + pick(d.eventName || state.summary.event) +
         '. Reference what they asked about, propose a 30-minute call this week, and do not give legal advice or quote fees. ' +
-        'Write it in ' + (d.lang === 'zh' ? 'Simplified Chinese' : 'English') + '. Output only the email with a subject line.\n\n' + leadFacts(d),
+        'Write it in ' + (d.lang === 'zht' ? 'Traditional Chinese (Taiwan usage)' : d.lang === 'zh' ? 'Simplified Chinese' : 'English') + '. Output only the email with a subject line.\n\n' + leadFacts(d),
         { purpose: 'event-lead-follow-up', timeoutMs: 90000 })
       if (!state.draft) throw new Error('empty draft')
     } catch (e) {

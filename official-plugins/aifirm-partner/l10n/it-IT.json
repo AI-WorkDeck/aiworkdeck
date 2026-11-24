@@ -130,6 +130,7 @@
   "panel.m.action.import": "Importa file modificato",
   "panel.m.action.edit": "Modifica testo",
   "panel.m.action.signoff": "Finalizza",
+  "panel.m.action.more": "Altro",
   "panel.m.action.close": "Chiudi pratica",
   "panel.m.section.request": "Richiesta di revisione",
   "panel.m.section.facts": "Fatti raccolti da Venture AI",

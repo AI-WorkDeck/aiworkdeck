@@ -223,3 +223,82 @@ li.attention::marker { color: var(--awd-danger, #B23B2B); }
 /* AI 额度用量条（只显示比例，不显示金额） */
 .budget-bar { display: block; height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.1); overflow: hidden; }
 .budget-bar-fill { display: block; height: 100%; background: currentColor; }
+
+/* ---- Desk refresh (2026-11-24): full width, quieter chrome, clear hierarchy ---- */
+/* A working screen uses the whole tab, not the SDK's 1120px reading column. */
+.awd-plugin-stage.elp { max-width: none; padding: 16px 24px 28px; }
+.awd-plugin-header { padding-bottom: 12px; }
+.split { gap: 16px; }
+@media (min-width: 760px) { .split { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); } }
+@media (min-width: 1100px) { .split > .list { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; padding-inline-end: 2px; } }
+
+/* Status counters: one slim strip instead of five tall cards. */
+#m-kpis.awd-kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; background: var(--awd-surface, #fff);
+  border: 1px solid var(--awd-border-subtle, #ECEAE3); border-radius: var(--awd-radius-md, 8px); overflow: hidden; }
+#m-kpis .kpi-btn { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 10px 14px; display: flex; align-items: center;
+  justify-content: space-between; gap: 8px; min-height: 0; }
+#m-kpis .kpi-btn + .kpi-btn { border-inline-start: 1px solid var(--awd-border-subtle, #ECEAE3); }
+#m-kpis .kpi-btn .awd-kpi-label { font-size: 12px; color: var(--awd-text-2, #6B675C); }
+#m-kpis .kpi-btn .awd-kpi-value { font-size: 18px; font-weight: 650; line-height: 1; margin: 0; }
+#m-kpis .kpi-btn:hover { background: var(--awd-surface-2, #F3F1EA); }
+#m-kpis .kpi-btn.is-active { background: var(--awd-accent-wash, #EEF4F0); box-shadow: inset 0 -2px 0 var(--awd-accent, #2F6B4F); }
+@media (max-width: 760px) { #m-kpis.awd-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+#mp-plaza-kpis.awd-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; background: var(--awd-surface, #fff);
+  border: 1px solid var(--awd-border-subtle, #ECEAE3); border-radius: var(--awd-radius-md, 8px); overflow: hidden; }
+#mp-plaza-kpis > * { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 0; }
+#mp-plaza-kpis > * + * { border-inline-start: 1px solid var(--awd-border-subtle, #ECEAE3); }
+#mp-plaza-kpis .awd-kpi-label { font-size: 12px; color: var(--awd-text-2, #6B675C); }
+#mp-plaza-kpis .awd-kpi-value { font-size: 18px; font-weight: 650; line-height: 1; margin: 0; }
+
+/* Matter list cards. */
+.lead { padding: 12px 14px; gap: 6px; }
+.lead .name { font-size: 14px; }
+.lead .headline { font-size: 12.5px; }
+
+/* Matter detail: header, one action bar, then sections separated by hairlines. */
+.detail { padding: 0; gap: 0; overflow: hidden; }
+.detail > * { padding: 16px 20px; }
+.detail > .head { padding-bottom: 12px; align-items: flex-start; }
+.detail > .head h2 { font-size: 18px; font-weight: 650; margin-bottom: 4px; }
+.detail > .section, .detail > details.section { border-top: 1px solid var(--awd-border-subtle, #ECEAE3); gap: 10px; }
+.detail .section-title { font-size: 12px; font-weight: 650; letter-spacing: .04em; color: var(--awd-text-2, #6B675C); }
+.detail > .awd-notice, .detail > .mp-rule-banner, .detail > .mp-quote-box { margin: 0 20px 12px; }
+.detail > .row { padding-top: 4px; }
+.detail .flags { padding: 0; }
+
+.actions { border: 0; border-top: 1px solid var(--awd-border-subtle, #ECEAE3); background: var(--awd-surface-2, #F3F1EA); padding: 10px 20px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions .sep { width: 1px; align-self: stretch; background: var(--awd-border, #DDD9CE); margin: 2px 4px; }
+.actions .more { position: relative; margin-inline-start: auto; }
+.actions .more > summary { list-style: none; }
+.actions .more > summary::-webkit-details-marker { display: none; }
+.actions .more-menu { position: absolute; inset-inline-end: 0; top: calc(100% + 6px); z-index: 5; min-width: 200px; display: grid; gap: 2px; padding: 6px;
+  background: var(--awd-surface, #fff); border: 1px solid var(--awd-border, #DDD9CE); border-radius: var(--awd-radius-md, 8px); box-shadow: 0 10px 28px rgba(0, 0, 0, .12); }
+.actions .more-menu .awd-btn { justify-content: flex-start; width: 100%; border-color: transparent; background: transparent; }
+.actions .more-menu .awd-btn:hover:not(:disabled) { background: var(--awd-surface-2, #F3F1EA); }
+
+/* Label / value pairs: labels sit next to their values. */
+.qa { grid-template-columns: minmax(6.5em, max-content) minmax(0, 1fr); gap: 8px 20px; }
+.qa dd { font-weight: 500; }
+.request .contact { font-size: 13px; color: var(--awd-text, #2B2A26); gap: 4px; }
+
+/* Questions the lawyer must decide: a quiet callout. */
+.for-lawyer { background: color-mix(in srgb, var(--awd-gold, #B8945A) 10%, var(--awd-surface, #fff)); }
+.for-lawyer ol { margin: 0; padding-inline-start: 22px; display: grid; gap: 8px; line-height: 1.6; }
+.for-lawyer ol li::marker { color: var(--awd-gold-text, #8A6A2E); font-weight: 650; }
+
+/* Clause summary table. */
+.terms { font-size: 12.5px; table-layout: fixed; }
+.terms col.c-term { width: 8.5em; }
+.terms col.c-sec { width: 6em; }
+.terms th { font-size: 11.5px; letter-spacing: .04em; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--awd-border, #DDD9CE); }
+.terms td { padding: 9px 10px 9px 0; line-height: 1.55; }
+.terms td:first-child { font-weight: 600; }
+.terms td:nth-child(2) { color: var(--awd-text-2, #6B675C); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.terms tbody tr:hover td { background: var(--awd-surface-2, #F3F1EA); }
+
+/* Risk flags as rows with a severity rail. */
+.flags li { padding: 10px 12px; border-radius: var(--awd-radius-md, 8px); background: var(--awd-surface-2, #F3F1EA); gap: 4px; }
+.consult { border-radius: 0; }
+.section.native { border-inline-start: 0; padding-inline-start: 20px; box-shadow: inset 3px 0 0 var(--awd-accent, #2F6B4F); }

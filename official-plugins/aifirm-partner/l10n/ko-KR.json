@@ -130,6 +130,7 @@
   "panel.m.action.import": "수정한 파일 가져오기",
   "panel.m.action.edit": "텍스트 편집",
   "panel.m.action.signoff": "확정",
+  "panel.m.action.more": "더보기",
   "panel.m.action.close": "사건 종결",
   "panel.m.section.request": "검토 요청",
   "panel.m.section.facts": "Venture AI가 수집한 사실관계",

@@ -130,6 +130,7 @@
   "panel.m.action.import": "Εισαγωγή επεξεργασμένου αρχείου",
   "panel.m.action.edit": "Επεξεργασία κειμένου",
   "panel.m.action.signoff": "Οριστικοποίηση",
+  "panel.m.action.more": "Περισσότερα",
   "panel.m.action.close": "Κλείσιμο υπόθεσης",
   "panel.m.section.request": "Αίτημα ελέγχου",
   "panel.m.section.facts": "Περιστατικά που συνέλεξε το Venture AI",

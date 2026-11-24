@@ -130,6 +130,7 @@
   "panel.m.action.import": "Bewerkt bestand importeren",
   "panel.m.action.edit": "Tekst bewerken",
   "panel.m.action.signoff": "Afronden",
+  "panel.m.action.more": "Meer",
   "panel.m.action.close": "Zaak sluiten",
   "panel.m.section.request": "Reviewverzoek",
   "panel.m.section.facts": "Door Venture AI verzamelde feiten",
