@@ -116,6 +116,7 @@
     "test:plugin-sdk": "node --test tests/plugin-sdk/*.test.mjs",
     "test:panel-dock": "node --test tests/panel-dock/*.test.mjs",
     "test:tab-visibility": "node --test tests/tab-visibility/*.test.mjs",
+    "test:launch": "node --test tests/launch/*.test.mjs",
     "test:version-history": "node --test tests/version-history/*.test.mjs",
     "test:version-merge": "node --test tests/version-merge/*.test.mjs",
     "test:insight": "node --test tests/insight/*.test.mjs tests/legal-references/*.test.mjs",
