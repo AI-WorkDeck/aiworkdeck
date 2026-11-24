@@ -114,6 +114,9 @@ let backendStartupFailed = false
 let mainWindow = null
 // mac activate 可能早于异步服务启动完成；首窗统一由启动链创建。
 let mainWindowStartupReady = false
+// 主窗口在后端端口分配后就创建（不等后端就绪），页面先显示启动页；
+// 这段时间里发往本机后端的请求由 backend-request-gate 暂扣，后端启动链结束再放行。
+let backendBooting = false
 let services = null
 let modelManager = null
 let updateService = null
@@ -545,7 +548,7 @@ function createMainWindow() {
   // 否则首屏那次头像请求会漏在拦截器外面。只挂一次（函数内自带去重标记）。
   attachAvatarCorpRelaxation(mainWindow.webContents.session)
   require('./services/backend-request-gate').installBackendRequestGate(mainWindow.webContents.session, {
-    getState: () => ({ port: services?.ports.backend, launch: services?.getLaunch('backend'), closing: services?.closing })
+    getState: () => ({ port: services?.ports.backend, launch: services?.getLaunch('backend'), closing: services?.closing, booting: backendBooting })
   })
 
   // UI：直接复用现有 frontend（开发态用 dev server）
@@ -1917,12 +1920,19 @@ app.whenReady().then(() => {
   } catch (e) { /* ignore */ }
   // 增量更新：清理非本大版本的 overlay 残留（全量升级后安装器不会替我们清）
   try { require('./services/overlay').cleanupStaleMajors(overlayCtx()) } catch (e) { console.error('[overlay]', e) }
-  // 主窗口只等待 Java 后端真正 HTTP 就绪；已装 Python 组件不参与首屏关键路径。
-  // 四个 Python 服务会在主页面加载后启动，避免模型加载与 Java/H5 首启争抢资源。
+  // 端口一分配好就建主窗口：页面（启动页）与 Java 后端并行加载，用户不再对着空白干等；
+  // 后端没起来之前，发给它的请求由 backend-request-gate 暂扣（backendBooting）。
+  // 四个 Python 服务等后端就绪且主页面加载完才启动，避免模型加载与 Java/H5 首启争抢资源。
   Promise.resolve()
     .then(() => {
       services = createServices()
       return services.allocatePorts()
+    })
+    .then(() => {
+      backendBooting = true
+      mainWindowStartupReady = true
+      createMainWindow()
+      retireFirstLaunchSplash()
     })
     .then(() => services.start('backend').then(
       (backend) => ({ backend }),
@@ -1941,15 +1951,22 @@ app.whenReady().then(() => {
             console.error('[overlay] 后端连续启动失败，已回滚补丁并重试')
             results.backend = await services.restart('backend').catch((e) => ({ ok: false, error: String(e && e.message ? e.message : e) }))
             if (results.backend.ok && results.backend.fullReady !== false) recordBackendBoot(true, results.backend.launch)
+            // 早建的主窗口载的是补丁版前端；回滚后换一扇载回滚版前端的新窗口，前后端版本一致。
+            // destroy() 不触发 close（不走退出确认）；先建新窗再销毁旧窗，不会出现「无窗口」退出。
+            if (!quitInProgress) {
+              const stale = mainWindow
+              mainWindow = null
+              createMainWindow()
+              if (stale && !stale.isDestroyed()) stale.destroy()
+            }
           }
         }
       } catch (e) { console.error('[overlay]', e) }
+      backendBooting = false
       configureBackendSupervision(results.backend?.ok === false)
-      mainWindowStartupReady = true
-      createMainWindow()
-      retireFirstLaunchSplash()
+      if ((!mainWindow || mainWindow.isDestroyed()) && !quitInProgress) createMainWindow()
       const startupServices = services
-      mainWindow.webContents.once('did-finish-load', () => {
+      const startOptional = () => {
         // 退出期间页面可能才加载完；不要把已停止的组件重新拉起。
         if (quitInProgress || startupServices.closing) return
         startupServices.startEager(['backend']).then((optionalResults) => {
@@ -1957,7 +1974,9 @@ app.whenReady().then(() => {
             if (!result.ok && !result.disabled) console.error(`[${name}]`, result.error || 'failed to start')
           }
         }).catch((e) => console.error('[startup] optional services failed', e))
-      })
+      }
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.isLoading()) mainWindow.webContents.once('did-finish-load', startOptional)
+      else startOptional()
       // 应用内更新检查（P1）：启动 2 分钟后静默首查，之后每 6 小时一次
       try {
         const { createUpdateService } = require('./services/update-service')
@@ -2010,6 +2029,7 @@ app.whenReady().then(() => {
     .catch((err) => {
       // 端口分配/启动链失败也要建出主窗口并提示，避免 app 起来却无窗口无提示（静默失败）
       console.error('[startup] service init failed', err)
+      backendBooting = false
       configureBackendSupervision(true)
       mainWindowStartupReady = true
       try { createMainWindow() } catch (e) { /* ignore */ }

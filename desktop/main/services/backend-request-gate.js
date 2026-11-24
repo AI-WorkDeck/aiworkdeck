@@ -34,28 +34,23 @@ function installBackendRequestGate(session, { getState }) {
   }
   const invalid = (state, launch) => state.closing || state.launch !== launch ||
     !launch.process || launch.process.exitCode != null || launch.process.signalCode != null
-  const flush = () => {
-    const state = getState()
-    for (const entry of pending.values()) {
-      if (invalid(state, entry.launch) || state.port !== entry.port) finish(entry, true)
-      else if (entry.launch.fullReady) finish(entry, false)
-      else if (!Number.isFinite(entry.launch.deadline) || Date.now() >= entry.launch.deadline) finish(entry, true)
-    }
-    if (pending.size === 0 && timer) { clearInterval(timer); timer = null }
-  }
-  session.webRequest.onBeforeRequest((details, callback) => {
-    const state = getState(), launch = state.launch
-    if (!launch || launch.fullReady || !launch.coreReadPaths) { callback({ cancel: false }); return }
+  // 'pass' | 'cancel' | 'hold'，并为暂扣的请求带回它所等待的 launch。
+  const decide = (details, state) => {
     let url
-    try { url = new URL(details.url) } catch { callback({ cancel: false }); return }
+    try { url = new URL(details.url) } catch { return { verdict: 'pass' } }
     if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) ||
         Number(url.port || 80) !== state.port || !url.pathname.startsWith('/api/')) {
-      callback({ cancel: false }); return
+      return { verdict: 'pass' }
     }
+    // The window opens while the backend is still starting; hold its requests instead of
+    // letting them fail with connection refused. Released when the startup chain settles.
+    if (state.booting && !state.closing) return { verdict: 'hold', booting: true }
+    const launch = state.launch
+    if (!launch || launch.fullReady || !launch.coreReadPaths) return { verdict: 'pass' }
     const matchers = coreReadMatchers(launch.coreReadPaths)
     // Old/invalid advertisements keep the existing transport, never a fabricated ready state.
-    if (!matchers) { callback({ cancel: false }); return }
-    if (invalid(state, launch)) { callback({ cancel: true }); return }
+    if (!matchers) return { verdict: 'pass' }
+    if (invalid(state, launch)) return { verdict: 'cancel' }
     const method = details.method.toUpperCase()
     const content = launch.coreContentProtocol === 1 &&
       (/^\/api\/local-core\/projects\/[1-9][0-9]*\/files\/[1-9][0-9]*\/content$/.test(url.pathname)
@@ -63,10 +58,38 @@ function installBackendRequestGate(session, { getState }) {
         : ['GET', 'DELETE'].includes(method) && /^\/api\/local-core\/projects\/[1-9][0-9]*\/files\/[1-9][0-9]*\/content\/receipts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(url.pathname))
     if (content || method === 'OPTIONS' || ((method === 'GET' || method === 'HEAD') &&
         matchers.some(pattern => pattern.test(url.pathname)))) {
-      callback({ cancel: false }); return
+      return { verdict: 'pass' }
     }
-    pending.set(details.id, { id: details.id, launch, port: state.port, callback })
+    return { verdict: 'hold', launch }
+  }
+  const hold = (details, callback, state, decision) => {
+    pending.set(details.id, { id: details.id, details, booting: !!decision.booting, launch: decision.launch, port: state.port, callback })
     if (!timer) { timer = setInterval(flush, 100); timer.unref?.() }
+  }
+  const flush = () => {
+    const state = getState()
+    for (const entry of pending.values()) {
+      if (entry.booting) {
+        if (state.closing) { finish(entry, true); continue }
+        if (state.booting) continue
+        // Startup settled: judge the request again under the normal core-read rules.
+        const decision = decide(entry.details, state)
+        if (decision.verdict === 'hold') { entry.booting = false; entry.launch = decision.launch; entry.port = state.port; continue }
+        finish(entry, decision.verdict === 'cancel')
+        continue
+      }
+      if (invalid(state, entry.launch) || state.port !== entry.port) finish(entry, true)
+      else if (entry.launch.fullReady) finish(entry, false)
+      else if (!Number.isFinite(entry.launch.deadline) || Date.now() >= entry.launch.deadline) finish(entry, true)
+    }
+    if (pending.size === 0 && timer) { clearInterval(timer); timer = null }
+  }
+  session.webRequest.onBeforeRequest((details, callback) => {
+    const state = getState()
+    const decision = decide(details, state)
+    if (decision.verdict === 'pass') { callback({ cancel: false }); return }
+    if (decision.verdict === 'cancel') { callback({ cancel: true }); return }
+    hold(details, callback, state, decision)
     flush()
   })
   // Chromium destroys a cancelled request while its before-request callback is still held.
