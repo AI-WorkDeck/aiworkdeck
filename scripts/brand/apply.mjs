@@ -76,10 +76,14 @@ const LOCALE_FILE = /^frontend\/src\/locales\/([a-zA-Z-]+)\//
 export function overrideKeys(rel, text, overrides, hits) {
   const m = rel.split(path.sep).join('/').match(LOCALE_FILE)
   if (!m) return text
-  for (const [key, byLocale] of Object.entries(overrides)) {
+  for (const [name, byLocale] of Object.entries(overrides)) {
+    // "<namespace>/<key>" limits the override to one locale file (keys like `lead` exist in several namespaces)
+    const slash = name.indexOf('/')
+    if (slash > 0 && path.basename(rel, path.extname(rel)) !== name.slice(0, slash)) continue
+    const key = slash > 0 ? name.slice(slash + 1) : name
     const value = byLocale[m[1]] ?? byLocale.en
     text = text.replace(new RegExp(`^(\\s*["']?${key}["']?\\s*:\\s*)(["'])(?:(?!\\2)[^\\\\]|\\\\.)*\\2`, 'm'), (_, head, q) => {
-      hits[`keyOverrides.${key}`] = (hits[`keyOverrides.${key}`] || 0) + 1
+      hits[`keyOverrides.${name}`] = (hits[`keyOverrides.${name}`] || 0) + 1
       return head + (q === '"' ? JSON.stringify(value) : `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
     })
   }

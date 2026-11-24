@@ -53,6 +53,14 @@ test('key overrides work for quoted and unquoted locale keys', () => {
   assert.equal(hits['keyOverrides.legalTrademark'], 2)
 })
 
+test('a namespaced key override only touches that locale file', () => {
+  const hits = {}
+  const o = { 'onboarding/lead': { en: 'NEW' } }
+  assert.equal(overrideKeys('frontend/src/locales/en-US/onboarding.js', "  lead: 'old',", o, hits), "  lead: 'NEW',")
+  assert.equal(overrideKeys('frontend/src/locales/en-US/admin.js', "  lead: 'Lead Counsel',", o, hits), "  lead: 'Lead Counsel',")
+  assert.equal(hits['keyOverrides.onboarding/lead'], 1)
+})
+
 test('the default brand is a no-op', () => {
   const r = applyBrand({ id: 'aiworkdeck', root: os.tmpdir(), log: () => {}, brandsDir: path.join(import.meta.dirname, '../../brands') })
   assert.deepEqual(r.changed, [])
