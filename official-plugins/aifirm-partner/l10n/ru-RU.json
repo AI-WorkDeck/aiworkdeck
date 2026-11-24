@@ -233,6 +233,7 @@
   "panel.m.err.consult": "Звонок добавлен в календарь, но не удалось обновить его статус ({reason}).",
   "panel.m.request.lawyer": "Выбранный юрист",
   "panel.m.event.consult_requested": "Клиент запросил звонок с юристом",
+  "panel.m.event.lawyer_selected": "Клиент выбрал юриста и открыл полный доступ к делу",
   "panel.m.section.terms": "Резюме условий (term sheet)",
   "panel.m.section.flags": "Красные флаги",
   "panel.m.terms.term": "Условие",

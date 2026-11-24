@@ -233,6 +233,7 @@
   "panel.m.err.consult": "Das Telefonat wurde in den Kalender eingetragen, der Status konnte aber nicht aktualisiert werden ({reason}).",
   "panel.m.request.lawyer": "Gewählter Anwalt",
   "panel.m.event.consult_requested": "Mandant hat ein Telefonat mit einem Anwalt angefragt",
+  "panel.m.event.lawyer_selected": "Mandant hat einen Anwalt gewählt und vollen Aktenzugriff freigeschaltet",
   "panel.m.section.terms": "Term Sheet",
   "panel.m.section.flags": "Red Flags",
   "panel.m.terms.term": "Klausel",

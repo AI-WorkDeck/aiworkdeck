@@ -233,6 +233,7 @@
   "panel.m.err.consult": "Panggilan sudah ditambahkan ke kalender, tetapi statusnya tidak dapat diperbarui ({reason}).",
   "panel.m.request.lawyer": "Advokat pilihan",
   "panel.m.event.consult_requested": "Klien meminta panggilan dengan advokat",
+  "panel.m.event.lawyer_selected": "Klien memilih advokat dan membuka akses penuh ke perkara",
   "panel.m.section.terms": "Ringkasan ketentuan (term sheet)",
   "panel.m.section.flags": "Tanda bahaya",
   "panel.m.terms.term": "Ketentuan",

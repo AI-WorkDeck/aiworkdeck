@@ -233,6 +233,7 @@
   "panel.m.err.consult": "通話はカレンダーに追加されましたが、ステータスを更新できませんでした（{reason}）。",
   "panel.m.request.lawyer": "指名された弁護士",
   "panel.m.event.consult_requested": "クライアントが弁護士との通話を依頼しました",
+  "panel.m.event.lawyer_selected": "クライアントが弁護士を選定し、案件の詳細アクセスを解除しました",
   "panel.m.section.terms": "タームシート",
   "panel.m.section.flags": "リスク指摘",
   "panel.m.terms.term": "条件",

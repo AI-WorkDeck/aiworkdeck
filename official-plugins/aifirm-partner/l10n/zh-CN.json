@@ -233,6 +233,7 @@
   "panel.m.err.consult": "通话已加入日历，但状态未能更新（{reason}）。",
   "panel.m.request.lawyer": "指定律师",
   "panel.m.event.consult_requested": "客户申请与律师通话",
+  "panel.m.event.lawyer_selected": "客户已选定合作律师并解锁完整案件",
   "panel.m.section.terms": "条款摘要",
   "panel.m.section.flags": "风险提示",
   "panel.m.terms.term": "条款",

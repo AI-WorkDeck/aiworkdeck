@@ -233,6 +233,7 @@
   "panel.m.err.consult": "أُضيفت المكالمة إلى التقويم، لكن تعذّر تحديث حالتها ({reason}).",
   "panel.m.request.lawyer": "المحامي المختار",
   "panel.m.event.consult_requested": "طلب العميل مكالمة مع محامٍ",
+  "panel.m.event.lawyer_selected": "اختار العميل محاميًا وفتح الوصول الكامل إلى القضية",
   "panel.m.section.terms": "ملخص الشروط",
   "panel.m.section.flags": "نقاط الخطر",
   "panel.m.terms.term": "الشرط",

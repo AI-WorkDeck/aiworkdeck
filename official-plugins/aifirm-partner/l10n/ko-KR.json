@@ -233,6 +233,7 @@
   "panel.m.err.consult": "통화는 캘린더에 추가되었지만 상태를 업데이트할 수 없습니다({reason}).",
   "panel.m.request.lawyer": "지정 변호사",
   "panel.m.event.consult_requested": "고객이 변호사와의 통화를 요청했습니다",
+  "panel.m.event.lawyer_selected": "고객이 변호사를 선정하고 사건 전체 접근 권한을 해제했습니다",
   "panel.m.section.terms": "텀시트",
   "panel.m.section.flags": "위험 신호",
   "panel.m.terms.term": "조건",

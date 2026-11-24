@@ -233,6 +233,7 @@
   "panel.m.err.consult": "L'appel a été ajouté au calendrier, mais son statut n'a pas pu être mis à jour ({reason}).",
   "panel.m.request.lawyer": "Avocat choisi",
   "panel.m.event.consult_requested": "Le client a demandé un appel avec un avocat",
+  "panel.m.event.lawyer_selected": "Le client a sélectionné un avocat et débloqué l'accès complet au dossier",
   "panel.m.section.terms": "Term sheet",
   "panel.m.section.flags": "Points d'alerte",
   "panel.m.terms.term": "Clause",
