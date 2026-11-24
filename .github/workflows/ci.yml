@@ -273,6 +273,9 @@ jobs:
       - name: Tab visibility contract (dev-board#394)
         working-directory: frontend
         run: npm run test:tab-visibility
+      - name: Launch progress estimate (启动页进度条)
+        working-directory: frontend
+        run: npm run test:launch
       - name: Titlebar drag-region contract (全屏浮层必须 no-drag，B4 / 0907 B10)
         working-directory: frontend
         run: npm run test:window-chrome
