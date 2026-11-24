@@ -1,7 +1,7 @@
 {
   "id": "theme-anime-twilight",
   "name": "%plugin.name%",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "%plugin.desc%",
   "author": "AI WorkDeck",
   "frontendEntry": "web/index.html",
