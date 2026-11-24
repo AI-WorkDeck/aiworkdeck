@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Melden Sie sich mit Ihrer Telefonnummer oder E-Mail-Adresse und Ihrem Passwort an. Zum ersten Mal hier? Verifizieren Sie sich und erstellen Sie ein Passwort.",
+  "introEmail": "Melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an. Zum ersten Mal hier? Bestätigen Sie Ihre E-Mail-Adresse und erstellen Sie ein Passwort.",
   "password": "Passwort",
   "confirm": "Passwort bestätigen",
   "register": "Erste Nutzung / Passwort erstellen",

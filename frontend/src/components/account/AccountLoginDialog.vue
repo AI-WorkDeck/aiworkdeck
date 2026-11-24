@@ -80,7 +80,7 @@
            人机验证控件挂在这块里，切到 Key 模式再切回来时 DOM 不能被销毁重建 -->
       <div v-show="mode === 'login'" class="unlock-main">
         <div class="unlock-title">{{ $t('onboarding.unlock.title') }}</div>
-        <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : 'accountPassword.intro') }}</div>
+        <div class="unlock-desc">{{ $t(authFlow === 'setup' ? 'accountPassword.setupHint' : authFlow === 'reset' ? 'accountPassword.resetHint' : (isPhoneSite ? 'accountPassword.intro' : 'accountPassword.introEmail')) }}</div>
         <div v-if="promoActive" class="unlock-promo">{{ $t('onboarding.unlock.promoLine', { amount: promoAmount }) }}</div>
         <div v-else-if="isPhoneSite && mode === 'login' && (authFlow === 'register' || authFlow === 'password')" class="unlock-promo">{{ $t('onboarding.unlock.proIntroBanner') }}</div>
 
@@ -257,7 +257,7 @@
             <span class="unlock-link" @click.stop="openLegalDoc('privacy')">{{ $t('onboarding.unlock.privacyName') }}</span>
           </span>
         </div>
-        <div class="consent-row" role="checkbox" :aria-checked="crossBorderChecked ? 'true' : 'false'" @click="crossBorderChecked = !crossBorderChecked">
+        <div v-if="crossBorderApplies" class="consent-row" role="checkbox" :aria-checked="crossBorderChecked ? 'true' : 'false'" @click="crossBorderChecked = !crossBorderChecked">
           <span class="consent-mark" :class="{ checked: crossBorderChecked }"></span>
           <span class="consent-text">
             {{ $t(crossBorderKey('crossBorderLabel')) }}
@@ -460,8 +460,13 @@ export default {
     submitBusy() {
       return this.loggingIn || this.unlocking || this.compatLoading
     },
+    /** 当前站点是否征求跨境单独同意（后端站点表 cross-border-consent；缺字段按要征求）。 */
+    crossBorderApplies() {
+      const cur = (this.siteStatus.sites || []).find((s) => s && s.id === this.siteStatus.current)
+      return !cur || cur.crossBorderConsent !== false
+    },
     consentsReady() {
-      return this.agreementChecked && this.crossBorderChecked
+      return this.agreementChecked && (this.crossBorderChecked || !this.crossBorderApplies)
     },
   },
   watch: {
@@ -683,7 +688,7 @@ export default {
       this.bqtExpired = false
       this.errorMsg = ''
       try {
-        await recordAccountConsents()
+        await recordAccountConsents({ crossBorder: this.crossBorderApplies })
         const session = await createBqtScanSession()
         if (this.done || this.mode !== 'bqt') return
         this.bqtSession = session
@@ -803,6 +808,11 @@ export default {
     },
     /** 两项同意是提交前置：不满足时把提示给在勾选框旁边，而不是提交失败之后。两项都缺时一次说清（问题 1）。 */
     consentGatePassed() {
+      if (!this.crossBorderApplies) {
+        if (this.agreementChecked) return true
+        this.errorMsg = this.$t('onboarding.unlock.agreementRequired')
+        return false
+      }
       if (!this.agreementChecked && !this.crossBorderChecked) {
         this.errorMsg = this.$t('onboarding.unlock.consentBothRequired')
         return false
@@ -864,7 +874,7 @@ export default {
       this.loggingIn = true
       try {
         // 同意落在连接之前：连上账户就是内容开始能出境的时点（accountConsent.js 文件头）
-        await recordAccountConsents()
+        await recordAccountConsents({ crossBorder: this.crossBorderApplies })
         if (this.done) return
         if (this.authFlow === 'reset') {
           await accountPasswordOperation('reset', { ...payload, password: this.password })
@@ -922,7 +932,7 @@ export default {
       this.errorMsg = ''
       this.unlocking = true
       try {
-        await recordAccountConsents()
+        await recordAccountConsents({ crossBorder: this.crossBorderApplies })
         const res = await activateLicense(code)
         await this.finishUnlock(res)
       } catch (e) {

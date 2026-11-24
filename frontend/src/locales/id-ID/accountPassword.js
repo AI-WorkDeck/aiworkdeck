@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Masuk dengan nomor telepon atau email dan kata sandi Anda. Pertama kali? Verifikasi dan buat kata sandi.",
+  "introEmail": "Masuk dengan email dan kata sandi Anda. Pertama kali? Verifikasi email Anda dan buat kata sandi.",
   "password": "Kata sandi",
   "confirm": "Konfirmasi kata sandi",
   "register": "Pertama kali / Buat kata sandi",

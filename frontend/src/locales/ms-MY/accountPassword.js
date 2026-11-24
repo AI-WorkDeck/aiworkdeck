@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Log masuk dengan nombor telefon atau e-mel dan kata laluan anda. Pertama kali? Sahkan dan cipta kata laluan.",
+  "introEmail": "Log masuk dengan e-mel dan kata laluan anda. Pertama kali? Sahkan e-mel anda dan cipta kata laluan.",
   "password": "Kata laluan",
   "confirm": "Sahkan kata laluan",
   "register": "Pertama kali / Cipta kata laluan",

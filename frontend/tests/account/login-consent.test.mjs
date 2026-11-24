@@ -16,9 +16,9 @@ function extractMethod(name, nextName) {
   return source.slice(start, end)
 }
 
-function gateVm({ agreementChecked, crossBorderChecked, isPhoneSite = true }) {
+function gateVm({ agreementChecked, crossBorderChecked, isPhoneSite = true, crossBorderApplies = true }) {
   const methods = new Function(`return ({${extractMethod('consentGatePassed', 'openLegalDoc')}})`)()
-  const vm = { agreementChecked, crossBorderChecked, isPhoneSite, errorMsg: '', $t: (k) => k }
+  const vm = { agreementChecked, crossBorderChecked, isPhoneSite, crossBorderApplies, errorMsg: '', $t: (k) => k }
   if (source.includes('    crossBorderKey(')) {
     Object.assign(vm, new Function(`return ({${extractMethod('crossBorderKey', 'consentGatePassed')}})`)())
   }
@@ -59,6 +59,18 @@ test('问题 2+38：国内站勾选框、告知、提示统一用「可能涉及
   // 国际站措辞不变
   assert.equal(zh.crossBorderLabel, '单独同意：将送入 AI 的内容跨境传输至境外模型服务商处理')
   assert.equal(enOnboarding.unlock.crossBorderLabel, 'Separate consent: transfer content submitted to AI to overseas model providers for processing')
+})
+
+test('站点表 cross-border-consent: false：不显示跨境勾选框，只看协议一项', () => {
+  let g = gateVm({ agreementChecked: true, crossBorderChecked: false, isPhoneSite: false, crossBorderApplies: false })
+  assert.equal(g.pass(), true)
+  g = gateVm({ agreementChecked: false, crossBorderChecked: false, isPhoneSite: false, crossBorderApplies: false })
+  assert.equal(g.pass(), false)
+  assert.equal(g.vm.errorMsg, 'onboarding.unlock.agreementRequired')
+  assert.match(source, /<div v-if="crossBorderApplies" class="consent-row"/)
+  assert.match(source, /recordAccountConsents\(\{ crossBorder: this\.crossBorderApplies \}\)/)
+  // 邮箱站的说明不提手机号
+  assert.match(source, /isPhoneSite \? 'accountPassword\.intro' : 'accountPassword\.introEmail'/)
 })
 
 test('问题 36：分段控件选中项叫「账号登录」，表单下方不再重复放扫码链接', () => {

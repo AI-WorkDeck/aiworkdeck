@@ -3,6 +3,7 @@
 
 export default {
   "intro": "Connectez-vous avec votre numéro de téléphone ou votre e-mail et votre mot de passe. Première utilisation ? Vérifiez votre identité et créez un mot de passe.",
+  "introEmail": "Connectez-vous avec votre e-mail et votre mot de passe. Première utilisation ? Vérifiez votre e-mail et créez un mot de passe.",
   "password": "Mot de passe",
   "confirm": "Confirmer le mot de passe",
   "register": "Première utilisation / Créer un mot de passe",

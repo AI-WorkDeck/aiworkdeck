@@ -21,12 +21,14 @@ export const AGREEMENT_VERSION = '2026-08-27'
  * 记下两项同意。失败不拦路（与原 completeSetup 同一口径）：设置页 AI 分区仍能补记，
  * 而为一次记录失败把人挡在登录门外不划算。
  */
-export async function recordAccountConsents() {
+export async function recordAccountConsents({ crossBorder = true } = {}) {
   try {
     await acceptLegalAgreement(AGREEMENT_VERSION)
   } catch (e) {
     console.warn('记录协议同意失败（忽略）:', e && e.message)
   }
+  // 不征求跨境同意的站点（站点表 cross-border-consent: false）不替用户记一份他没给过的同意
+  if (!crossBorder) return
   try {
     // 只带 crossBorderConsent：toSettingsUpdates 跳过 null 字段，供应商等其余设置一个都不动
     await saveAdminConfig({ ai: { crossBorderConsent: true } })
