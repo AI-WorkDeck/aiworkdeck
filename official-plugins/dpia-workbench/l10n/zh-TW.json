@@ -1,15 +1,15 @@
 {
   "plugin.name": "DPIA 工作台",
-  "plugin.description": "數據保護影響評估：材料溯源、事實確認、問題補答、風險與整改、持續復評及分版本報告。基於朱玲鳳的 DSH DPIA Workbench 適配；需 Node.js、Python 和 LibreOffice。",
+  "plugin.description": "資料保護影響評估：材料溯源、事實確認、問題補答、風險與整改、持續複評及分版本報告。基於朱玲鳳的 DSH DPIA Workbench 適配；需 Node.js、Python 和 LibreOffice。",
   "plugin.author": "AI WorkDeck（上游：朱玲鳳 / The-Data-Galaxy）",
-  "setting.nodePath.label": "Node.js 可執行文件",
+  "setting.nodePath.label": "Node.js 可執行檔案",
   "setting.nodePath.description": "留空使用系統 PATH 中的 node；需要 Node.js 20 或更新版本。",
-  "setting.pythonPath.label": "Python 可執行文件",
-  "setting.pythonPath.description": "需安裝 runtime/requirements.txt 中的文檔依賴；可填寫獨立虛擬環境中的 Python 路徑。",
-  "setting.pdfFontPath.label": "PDF 中文字體文件",
-  "setting.pdfFontPath.description": "原生 PDF 模板填寫中文需可嵌入的 TrueType 字體（TTF/TTC）；Linux 可安裝文泉驛正黑。留空使用上游系統字體查找。",
-  "setting.sofficePath.label": "LibreOffice 可執行文件",
+  "setting.pythonPath.label": "Python 可執行檔案",
+  "setting.pythonPath.description": "需安裝 runtime/requirements.txt 中的文件依賴；可填寫獨立虛擬環境中的 Python 路徑。",
+  "setting.pdfFontPath.label": "PDF 中文字型檔案",
+  "setting.pdfFontPath.description": "原生 PDF 模板填寫中文需可嵌入的 TrueType 字型（TTF/TTC）；Linux 可安裝文泉驛正黑。留空使用上游系統字型查詢。",
+  "setting.sofficePath.label": "LibreOffice 可執行檔案",
   "setting.sofficePath.description": "僅報告 PDF 與頁面預覽需要；留空嘗試系統安裝位置。",
-  "tool.dpia_workbench_action.description": "DPIA 案件、材料、事實確認、補答、運行狀態及報告操作。僅供工作台界面調用，AI 不可調用人工確認/審批入口。",
-  "tool.dpia_workbench_task.description": "執行當前凍結的 DPIA 任務：context/read/write/script/commit/report；嚴格限定當前用戶項目及案件輸出目錄，不執行任意代碼。"
+  "tool.dpia_workbench_action.description": "DPIA 案件、材料、事實確認、補答、執行狀態及報告操作。僅供工作台介面呼叫，AI 不可呼叫人工確認/審批入口。",
+  "tool.dpia_workbench_task.description": "執行目前凍結的 DPIA 任務：context/read/write/script/commit/report；嚴格限定目前使用者專案及案件輸出目錄，不執行任意程式碼。"
 }
