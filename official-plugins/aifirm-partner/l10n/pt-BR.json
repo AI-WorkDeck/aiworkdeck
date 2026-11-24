@@ -130,6 +130,7 @@
   "panel.m.action.import": "Importar arquivo editado",
   "panel.m.action.edit": "Editar texto",
   "panel.m.action.signoff": "Finalizar",
+  "panel.m.action.more": "Mais",
   "panel.m.action.close": "Encerrar caso",
   "panel.m.section.request": "Pedido de revisão",
   "panel.m.section.facts": "Fatos reunidos pela Venture AI",

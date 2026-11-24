@@ -130,6 +130,7 @@
   "panel.m.action.import": "นำเข้าไฟล์ที่แก้ไขแล้ว",
   "panel.m.action.edit": "แก้ไขข้อความ",
   "panel.m.action.signoff": "สรุปฉบับสมบูรณ์",
+  "panel.m.action.more": "เพิ่มเติม",
   "panel.m.action.close": "ปิดงาน",
   "panel.m.section.request": "คำขอให้ตรวจทาน",
   "panel.m.section.facts": "ข้อเท็จจริงที่ Venture AI รวบรวม",

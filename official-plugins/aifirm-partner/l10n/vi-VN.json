@@ -130,6 +130,7 @@
   "panel.m.action.import": "Nhập tệp đã chỉnh sửa",
   "panel.m.action.edit": "Sửa văn bản",
   "panel.m.action.signoff": "Hoàn tất",
+  "panel.m.action.more": "Thêm",
   "panel.m.action.close": "Đóng vụ việc",
   "panel.m.section.request": "Đề nghị rà soát",
   "panel.m.section.facts": "Dữ kiện do Venture AI thu thập",

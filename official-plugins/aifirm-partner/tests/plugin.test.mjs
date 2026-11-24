@@ -52,7 +52,7 @@ test('manifest: unique panel-only tools, the JAR it declares, views, connection 
   for (const t of manifest.tools) assert.ok(desk.includes(`'${t.name}'`), t.name)
   const firm = read('web/firm.js')
   assert.match(firm, /"offices":\["tw","sv"\]/)
-  assert.equal(manifest.version, '1.0.0')
+  assert.equal(manifest.version, '1.0.1')
   assert.equal(manifest.minHostVersion, '0.89.0')
   assert.equal(conn.auth.type, 'awd-account')
   assert.equal(conn.operations.marketplacePreview.anonymousFallback, true)
