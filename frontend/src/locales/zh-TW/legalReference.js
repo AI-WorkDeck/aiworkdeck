@@ -22,7 +22,7 @@ export default {
   "article": "條款",
   "level": "效力級別",
   "openTab": "在新分頁開啟",
-  "openSource": "查看來源原文",
+  "openSource": "檢視來源原文",
   "readingArea": "資料閱讀區",
   "untitled": "未命名資料",
   "unknownSource": "未提供來源",

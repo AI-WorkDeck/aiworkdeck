@@ -2,22 +2,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "devTrustNotice": "開發插件可通過已聲明的遠程服務發送數據和調用 Agent 工具。請核對插件來源；修改清單後需要重新授權。",
-  "grantTrust": "允許開發插件服務",
+  "devTrustNotice": "開發外掛可透過已宣告的遠端服務傳送資料和呼叫 Agent 工具。請核對外掛來源；修改清單後需要重新授權。",
+  "grantTrust": "允許開發外掛服務",
   "revokeTrust": "撤銷服務授權",
-  "connections": "插件服務連接",
-  "credentialNotice": "憑據由主程序按用戶保存，不提供給插件頁面。",
-  "connected": "已連接",
-  "disconnected": "未連接",
+  "connections": "外掛服務連線",
+  "credentialNotice": "憑據由主程式按使用者儲存，不提供給外掛頁面。",
+  "connected": "已連線",
+  "disconnected": "未連線",
   "token": "服務訪問令牌",
-  "connect": "連接服務",
-  "disconnect": "斷開連接",
-  "refresh": "刷新狀態",
+  "connect": "連線服務",
+  "disconnect": "斷開連線",
+  "refresh": "重新整理狀態",
   "subscription": "查詢訂閱",
   "active": "訂閱有效",
   "inactive": "暫無有效訂閱",
   "bundled": "隨應用提供",
-  "checkout": "打開付款頁面",
+  "checkout": "開啟付款頁面",
   "subscribeTitle": "AI Firm 案源廣場通行證",
   "subscribeSubtitle": "預付通行證解鎖接案權限 · 不自動續訂",
   "subscribeLoadFailed": "載入訂閱方案失敗",
@@ -34,5 +34,5 @@ export default {
   "reopenCheckout": "重新開啟付款頁面",
   "checkPaymentStatus": "我已完成付款，立即確認",
   "confirmSubscribe": "確認支付 {amount} 開通",
-  "signInRequiredNotice": "需要連接 AI WorkDeck 帳戶才能開通通行證並同步授權"
+  "signInRequiredNotice": "需要連線 AI WorkDeck 帳戶才能開通通行證並同步授權"
 }
