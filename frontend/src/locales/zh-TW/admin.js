@@ -417,7 +417,7 @@ export default {
   "permissionsTagOptional": "選用",
   "permissionsGrantBtn": "去開啟",
   "permissionsReopenBtn": "開啟設定",
-  "permissionsSetupAllBtn": "一鍵依序開啟未授權專案",
+  "permissionsSetupAllBtn": "一鍵依序開啟未授權項目",
   "permissionsRefreshBtn": "重新整理狀態",
   "permissionsOpenWizardBtn": "開啟權限引導窗",
   "permissionsSkipBtn": "稍後設定",
