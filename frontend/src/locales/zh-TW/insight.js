@@ -6,9 +6,9 @@ export default {
   "noDoc": "未開啟文件",
   "parse": "全文線上核驗（可能產生費用）",
   "reparse": "再次全文線上核驗（可能產生費用）",
-  "onlineHint": "點擊後先儲存目前文件，再線上核驗已儲存版本。AI 與外部檢索可能產生費用。",
+  "onlineHint": "點選後先儲存目前文件，再線上核驗已儲存版本。AI 與外部檢索可能產生費用。",
   "saveRequired": "目前文件未能完成儲存，請儲存成功後再線上核驗。",
-  "running": "正在線上核驗…",
+  "running": "正線上上核驗…",
   "done": "線上核驗完成",
   "failed": "線上核驗失敗",
   "loading": "載入中…",
@@ -19,7 +19,7 @@ export default {
   "detailFailed": "取得檢索詳情失敗",
   "refreshFailed": "重新檢索失敗",
   "retry": "重試",
-  "goConnectAccount": "去連接帳戶",
+  "goConnectAccount": "去連線帳戶",
   "goRecharge": "去儲值",
   "hint": {
     "NO_CREDENTIAL": "該檢索通道的憑據需要由部署管理員在伺服器端設定。"
@@ -82,10 +82,10 @@ export default {
   "noEditor": "請先啟用一個文件編輯視窗",
   "empty": {
     "noRun": "這份文件尚未線上核驗",
-    "noRunHint": "日常寫作提示在本機進行。點擊上方線上核驗後，AI 才會通讀已儲存文件、抽取實體、查詢外部資料並檢查前後一致性。",
+    "noRunHint": "日常寫作提示在本機進行。點選上方線上核驗後，AI 才會通讀已儲存文件、抽取實體、查詢外部資料並檢查前後一致性。",
     "noEntity": "沒有抽到可檢索的實體",
     "noEntityHint": "文件裡沒有出現公司名、法規條號或案號。",
     "noFinding": "沒有發現前後矛盾",
-    "noFindingHint": "數量陳述與統一社會信用代碼都校驗通過了。"
+    "noFindingHint": "數量陳述與統一社會信用程式碼都校驗通過了。"
   }
 }

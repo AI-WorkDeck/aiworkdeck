@@ -31,7 +31,7 @@ export default {
     "cancelRebind": "取消",
     "delete": "刪除",
     "removeTarget": "移除",
-    "open": "查看底稿",
+    "open": "檢視底稿",
     "ignore": "忽略",
     "expand": "展開",
     "collapse": "收起"
@@ -45,9 +45,9 @@ export default {
     "none": "未標方法"
   },
   "relation": {
-    "supports": "支持",
+    "supports": "支援",
     "contradicts": "矛盾",
-    "partial": "部分支持"
+    "partial": "部分支援"
   },
   "loc": {
     "wholeFile": "整個檔案",

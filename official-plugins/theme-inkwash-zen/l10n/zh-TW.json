@@ -1,12 +1,12 @@
 {
-  "plugin.name": "東方水墨 · 飞白禅圓",
-  "plugin.desc": "宣纸留白、焦浓重淡清五阶水墨與紫墨润开點睛，兼具宣纸白晝與浓墨夜读双境。",
-  "theme.name": "東方水墨 · 飞白禅圓",
-  "theme.desc": "一笔禅圓 · 紫墨润开（生宣留白 × 五阶徽墨 × 紫墨點睛 × 朱砂印泥）",
+  "plugin.name": "東方水墨 · 飛白禪圓",
+  "plugin.desc": "宣紙留白、焦濃重淡清五階水墨與紫墨潤開點睛，兼具宣紙白晝與濃墨夜讀雙境。",
+  "theme.name": "東方水墨 · 飛白禪圓",
+  "theme.desc": "一筆禪圓 · 紫墨潤開（生宣留白 × 五階徽墨 × 紫墨點睛 × 硃砂印泥）",
   "gallery.badge": "佈景主題畫廊",
   "gallery.swatch1": "宣紙白",
   "gallery.swatch2": "濃墨",
   "gallery.swatch3": "紫墨",
-  "gallery.swatch4": "朱砂",
+  "gallery.swatch4": "硃砂",
   "gallery.swatch5": "夜墨"
 }
