@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Không thể cập nhật lịch: {reason}",
   "panel.m.err.file": "Không thể đọc tệp này: {reason}",
   "panel.m.clientLink": "Trang của khách hàng",
-  "panel.m.budget.low": "Hạn mức Venture AI: còn {left} trên {limit}. Hãy nâng hạn mức trước khi hết; khi dưới 1 USD, khách hàng sẽ được đề nghị quay lại sau.",
+  "panel.m.budget.low": "Hạn mức AI: còn {pct}%",
   "panel.m.open": "Mở PDF",
   "panel.m.title": "Venture AI dành cho luật sư",
   "panel.m.consult.badge": "Yêu cầu cuộc gọi",

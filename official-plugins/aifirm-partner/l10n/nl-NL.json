@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "De agenda kon niet worden bijgewerkt: {reason}",
   "panel.m.err.file": "Dat bestand kon niet worden gelezen: {reason}",
   "panel.m.clientLink": "Cliëntpagina",
-  "panel.m.budget.low": "Venture AI-budget: {left} van {limit} resterend. Verhoog het plafond voordat het op is; onder $1 wordt cliënten gevraagd later terug te komen.",
+  "panel.m.budget.low": "AI-tegoed: nog {pct}%",
   "panel.m.open": "PDF openen",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "Gesprek gevraagd",

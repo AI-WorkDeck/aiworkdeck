@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "无法更新日历：{reason}",
   "panel.m.err.file": "无法读取该文件：{reason}",
   "panel.m.clientLink": "客户页面",
-  "panel.m.budget.low": "Venture AI 额度：剩余 {left}（上限 {limit}）。请在用完前提高上限；低于 1 美元时，客户会被请稍后再来。",
+  "panel.m.budget.low": "AI 额度剩余 {pct}%",
   "panel.m.open": "打开 PDF",
   "panel.m.title": "Venture AI 律师端",
   "panel.m.consult.badge": "请求通话",

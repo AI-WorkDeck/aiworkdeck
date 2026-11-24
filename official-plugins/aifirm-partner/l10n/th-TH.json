@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "ไม่สามารถอัปเดตปฏิทินได้: {reason}",
   "panel.m.err.file": "ไม่สามารถอ่านไฟล์นั้นได้: {reason}",
   "panel.m.clientLink": "หน้าลูกค้า",
-  "panel.m.budget.low": "งบประมาณ Venture AI: เหลือ {left} จาก {limit} โปรดเพิ่มวงเงินก่อนหมด หากเหลือต่ำกว่า $1 ลูกค้าจะถูกขอให้กลับมาใหม่ภายหลัง",
+  "panel.m.budget.low": "โควตา AI เหลือ {pct}%",
   "panel.m.open": "เปิด PDF",
   "panel.m.title": "Venture AI สำหรับทนายความ",
   "panel.m.consult.badge": "ขอให้โทร",

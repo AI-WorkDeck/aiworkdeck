@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "تعذّر تحديث التقويم: {reason}",
   "panel.m.err.file": "تعذّرت قراءة الملف: {reason}",
   "panel.m.clientLink": "صفحة العميل",
-  "panel.m.budget.low": "رصيد Venture AI: المتبقي {left} من {limit}. ارفع الحد قبل نفاده؛ وعندما ينخفض عن 1 دولار يُطلب من العملاء العودة لاحقًا.",
+  "panel.m.budget.low": "رصيد الذكاء الاصطناعي: المتبقي {pct}%",
   "panel.m.open": "فتح PDF",
   "panel.m.title": "Venture AI – مكتب المحامي",
   "panel.m.consult.badge": "طلب مكالمة",
