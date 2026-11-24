@@ -119,11 +119,20 @@ public final class ParagraphDiff {
     private static void flush(List<Integer> gapA, List<Integer> gapB, List<String> a, List<String> b,
                               String[] clauseA, String[] clauseB, List<Change> out) {
         int bj = 0;
+        List<int[]> gramsB = new ArrayList<>(gapB.size());
+        List<String> keysB = new ArrayList<>(gapB.size());
+        for (int bi : gapB) {
+            String k = key(b.get(bi));
+            keysB.add(k);
+            gramsB.add(gramCodes(k));
+        }
         for (int ai : gapA) {
             int hit = -1;
             double best = PAIR_THRESHOLD;
+            String ka = key(a.get(ai));
+            int[] ga = gramCodes(ka);
             for (int k = bj; k < gapB.size(); k++) {
-                double s = similarity(key(a.get(ai)), key(b.get(gapB.get(k))));
+                double s = similarity(ka, ga, keysB.get(k), gramsB.get(k));
                 if (s >= best) {
                     best = s;
                     hit = k;
@@ -150,6 +159,49 @@ public final class ParagraphDiff {
     }
 
     /** 字符二元组 Dice 系数；单字符段落退化为整体相等。 */
+    private static double similarity(String x, int[] gx, String y, int[] gy) {
+        if (x.equals(y)) {
+            return 1.0;
+        }
+        if (x.length() < 2 || y.length() < 2) {
+            return 0.0;
+        }
+        int common = 0;
+        int i = 0;
+        int j = 0;
+        while (i < gx.length && j < gy.length) {
+            if (gx[i] == gy[j]) {
+                common++;
+                i++;
+                j++;
+            } else if (gx[i] < gy[j]) {
+                i++;
+            } else {
+                j++;
+            }
+        }
+        return 2.0 * common / (gx.length + gy.length);
+    }
+
+    /** 去重并排好序的字符二元组编码（两个 UTF-16 单元拼成一个 int），与 {@link #bigrams} 一一对应。 */
+    private static int[] gramCodes(String s) {
+        if (s.length() < 2) {
+            return new int[0];
+        }
+        int[] out = new int[s.length() - 1];
+        for (int i = 0; i + 1 < s.length(); i++) {
+            out[i] = (s.charAt(i) << 16) | s.charAt(i + 1);
+        }
+        java.util.Arrays.sort(out);
+        int n = 0;
+        for (int i = 0; i < out.length; i++) {
+            if (i == 0 || out[i] != out[i - 1]) {
+                out[n++] = out[i];
+            }
+        }
+        return java.util.Arrays.copyOf(out, n);
+    }
+
     static double similarity(String x, String y) {
         if (x.equals(y)) {
             return 1.0;
