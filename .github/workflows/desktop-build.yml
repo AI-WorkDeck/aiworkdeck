@@ -20,6 +20,18 @@ on:
       source_ref:
         type: string
         default: master
+    # Callers in another account cannot use `secrets: inherit` (it only works within one org/enterprise),
+    # so the signing secrets are declared here and passed explicitly. All optional: unsigned without them.
+    secrets:
+      CSC_LINK: { required: false }
+      CSC_KEY_PASSWORD: { required: false }
+      APPLE_API_KEY_B64: { required: false }
+      APPLE_API_KEY_ID: { required: false }
+      APPLE_API_ISSUER: { required: false }
+      AZURE_SIGNING_CLIENT_ID: { required: false }
+      AZURE_SIGNING_TENANT_ID: { required: false }
+      AZURE_SIGNING_SUBSCRIPTION_ID: { required: false }
+      UPDATE_SIGNING_KEY: { required: false }
   push:
     tags: ['v*']
   pull_request:
