@@ -232,9 +232,9 @@ window.AWD_THEME_L10N = {
   },
   "zh-TW": {
     "plugin.name": "深海極光 · 冰刃琉璃",
-    "plugin.desc": "靜谧深海藍底、冰青磨砂琉璃與紫水晶星核，专为长时深度审阅打造的冷冽高透双境。",
+    "plugin.desc": "靜謐深海藍底、冰青磨砂琉璃與紫水晶星核，專為長時深度審閱打造的冷冽高透雙境。",
     "theme.name": "深海極光 · 冰刃琉璃",
-    "theme.desc": "深海極光 · 冰刃破圈（靜谧深海藍 × 冰青磨砂琉璃 × 紫水晶星核）",
+    "theme.desc": "深海極光 · 冰刃破圈（靜謐深海藍 × 冰青磨砂琉璃 × 紫水晶星核）",
     "gallery.badge": "佈景主題畫廊",
     "gallery.swatch1": "冰川晨光",
     "gallery.swatch2": "冰青琉璃",

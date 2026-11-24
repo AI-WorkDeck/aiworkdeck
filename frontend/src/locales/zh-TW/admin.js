@@ -400,7 +400,7 @@ export default {
   "legalLicenseLabel": "授權條款全文：",
   "legalTrademarkLabel": "商標宣告：",
   "legalContributors": "貢獻者名錄",
-  "legalTrademark": "「AI WorkDeck」為北京公富信息技术有限公司的商標，再散佈修改版時不得使用該名稱作為產品名（詳見商標宣告）。",
+  "legalTrademark": "「AI WorkDeck」為北京公富信息技术有限公司的商標，再散布修改版時不得使用該名稱作為產品名（詳見商標聲明）。",
   "navPermissions": "系統權限",
   "permissionsSectionTitle": "macOS 系統權限",
   "permissionsSectionSubtitle": "設定系統權限以支援從微信直接拖入檔案、跨視窗全螢幕截圖 OCR 及會議錄音轉寫",
