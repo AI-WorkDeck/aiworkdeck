@@ -229,7 +229,10 @@ export default {
     formatMoney(amountCents, currency) {
       const n = Number(amountCents) || 0
       const major = n % 100 === 0 ? String(n / 100) : (n / 100).toFixed(2)
-      return currency === 'CNY' ? `¥${major}` : `$${major}`
+      if (currency === 'CNY') return `¥${major}`
+      // TWD: whole dollars with thousands separators (NT$1,990), never a bare "$" that reads as USD.
+      if (currency === 'TWD') return `NT$${Math.round(n / 100).toLocaleString('en-US')}`
+      return `$${major}`
     },
     async ensureAccountConnected() {
       try {
