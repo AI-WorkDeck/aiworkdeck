@@ -233,6 +233,7 @@
   "panel.m.err.consult": "Cuộc gọi đã được thêm vào lịch nhưng chưa cập nhật được trạng thái ({reason}).",
   "panel.m.request.lawyer": "Luật sư được chọn",
   "panel.m.event.consult_requested": "Khách hàng yêu cầu cuộc gọi với luật sư",
+  "panel.m.event.lawyer_selected": "Khách hàng đã chọn luật sư và mở khóa toàn bộ hồ sơ vụ việc",
   "panel.m.section.terms": "Term sheet",
   "panel.m.section.flags": "Cảnh báo rủi ro",
   "panel.m.terms.term": "Điều khoản",

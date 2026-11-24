@@ -10,6 +10,7 @@
   let dict = {}
   let zh = false
   let zht = false
+  let uiLocale = 'en-US' // dates follow the host UI language, not Electron's default locale
 
   function t(key, vars) {
     let s = dict[key] || (window.ELP_L10N['en-US'] || {})[key] || key
@@ -26,6 +27,7 @@
     const all = window.ELP_L10N || {}
     const code = all[lang] ? lang : Object.keys(all).find((k) => k.split('-')[0] === String(lang || '').split('-')[0]) || 'en-US'
     dict = all[code] || {}
+    uiLocale = code
     zh = code.startsWith('zh')
     zht = /^zh-(TW|HK|MO|Hant)/i.test(code) || code === 'zh-TW'
     document.documentElement.lang = code
@@ -395,7 +397,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('qr-dialog').hidden = true })
   $('qr-copy').addEventListener('click', () => { navigator.clipboard.writeText($('qr-url').textContent).then(() => { $('qr-copy').textContent = t('panel.action.copied') }).catch(() => {}) })
 
-  window.ELP = { t, pick, h, isZh: () => zh, isZht: () => zht }
+  window.ELP = { t, pick, h, isZh: () => zh, isZht: () => zht, locale: () => uiLocale }
 
   awd.ready().then((ctx) => {
     applyLanguage(ctx.language)

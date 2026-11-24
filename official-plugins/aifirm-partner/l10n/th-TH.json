@@ -233,6 +233,7 @@
   "panel.m.err.consult": "เพิ่มสายลงปฏิทินแล้ว แต่ไม่สามารถอัปเดตสถานะได้ ({reason})",
   "panel.m.request.lawyer": "ทนายความที่เลือก",
   "panel.m.event.consult_requested": "ลูกค้าขอนัดสายกับทนายความ",
+  "panel.m.event.lawyer_selected": "ลูกค้าเลือกทนายความและปลดล็อกสิทธิ์เข้าถึงคดีฉบับเต็มแล้ว",
   "panel.m.section.terms": "สรุปข้อกำหนด (Term sheet)",
   "panel.m.section.flags": "ประเด็นเสี่ยง",
   "panel.m.terms.term": "ข้อกำหนด",

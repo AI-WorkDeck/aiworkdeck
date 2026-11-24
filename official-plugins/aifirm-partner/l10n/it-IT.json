@@ -233,6 +233,7 @@
   "panel.m.err.consult": "La call è stata aggiunta al calendario, ma non è stato possibile aggiornarne lo stato ({reason}).",
   "panel.m.request.lawyer": "Avvocato scelto",
   "panel.m.event.consult_requested": "Il cliente ha chiesto una call con un avvocato",
+  "panel.m.event.lawyer_selected": "Il cliente ha selezionato un avvocato e sbloccato l'accesso completo alla pratica",
   "panel.m.section.terms": "Term sheet",
   "panel.m.section.flags": "Segnalazioni di rischio",
   "panel.m.terms.term": "Termine",

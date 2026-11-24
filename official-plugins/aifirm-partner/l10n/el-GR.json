@@ -233,6 +233,7 @@
   "panel.m.err.consult": "Η κλήση προστέθηκε στο ημερολόγιο, αλλά δεν ήταν δυνατή η ενημέρωση της κατάστασής της ({reason}).",
   "panel.m.request.lawyer": "Επιλεγμένος δικηγόρος",
   "panel.m.event.consult_requested": "Ο πελάτης ζήτησε κλήση με δικηγόρο",
+  "panel.m.event.lawyer_selected": "Ο πελάτης επέλεξε δικηγόρο και ξεκλείδωσε πλήρη πρόσβαση στην υπόθεση",
   "panel.m.section.terms": "Συνοπτικός πίνακας όρων (term sheet)",
   "panel.m.section.flags": "Επισημάνσεις κινδύνου",
   "panel.m.terms.term": "Όρος",
