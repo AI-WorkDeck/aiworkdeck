@@ -27,6 +27,7 @@ import {
 } from '@/services/api.js'
 import { isDesktopHost, host } from '@/services/host.js'
 import { launchProgress, loadExpectedLaunchMs, saveLaunchMs } from './launchProgress.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 
 export default {
   name: 'LaunchPage',
@@ -74,7 +75,7 @@ export default {
     // 首次 boot 从页面加载起算（主窗口与后端同时起步）；重试从点击重试时起算
     startProgress(firstBoot) {
       this.stopProgress()
-      const expected = loadExpectedLaunchMs(uni)
+      const expected = loadExpectedLaunchMs(uniStorage)
       const startedAt = firstBoot ? 0 : performance.now()
       const tick = () => { this.progress = launchProgress(performance.now() - startedAt, expected) }
       tick()
@@ -106,7 +107,7 @@ export default {
         return
       }
       this.progress = 1
-      if (firstBoot) saveLaunchMs(uni, performance.now())
+      if (firstBoot) saveLaunchMs(uniStorage, performance.now())
 
       // 本机工作区待选定：老安装的库里可能有多个都带数据的历史账号，后端不猜，
       // 在这里拦下来让用户自己选，选完才进工作区（选过一次就不会再走这条分支）。
