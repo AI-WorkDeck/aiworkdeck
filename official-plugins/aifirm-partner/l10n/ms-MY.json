@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Kalendar tidak dapat dikemas kini: {reason}",
   "panel.m.err.file": "Fail itu tidak dapat dibaca: {reason}",
   "panel.m.clientLink": "Halaman klien",
-  "panel.m.budget.low": "Belanjawan Venture AI: baki {left} daripada {limit}. Naikkan had sebelum habis; jika kurang daripada $1, klien akan diminta kembali kemudian.",
+  "panel.m.budget.low": "Kuota AI: baki {pct}%",
   "panel.m.open": "Buka PDF",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "Panggilan diminta",

@@ -44,9 +44,15 @@
     el.setAttribute('role', kind === 'danger' ? 'alert' : 'status')
     el.replaceChildren(h('span', {}, text))
   }
+  // AI 额度只给一条用量条和百分比，不显示金额（用户决定 2026-11-23：律师看到美元额度会误以为要自己付费）
   function budgetNotice(b) {
     const low = Boolean(b && b.limit && b.remaining != null && b.remaining < b.limit * 0.3)
-    if (low) notice('warning', t('budget.low', { left: '$' + Math.max(0, b.remaining).toFixed(2), limit: '$' + b.limit }))
+    if (low) {
+      const pct = Math.max(0, Math.min(100, Math.round((b.remaining / b.limit) * 100)))
+      notice('warning', t('budget.low', { pct }))
+      $('m-notice').append(h('span', { class: 'budget-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct) },
+        h('span', { class: 'budget-bar-fill', style: `width:${pct}%` })))
+    }
     else if ($('m-notice').dataset.budget) notice()
     $('m-notice').dataset.budget = low ? '1' : ''
   }

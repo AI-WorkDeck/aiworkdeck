@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "कैलेंडर अपडेट नहीं हो सका: {reason}",
   "panel.m.err.file": "वह फ़ाइल पढ़ी नहीं जा सकी: {reason}",
   "panel.m.clientLink": "क्लाइंट पेज",
-  "panel.m.budget.low": "Venture AI बजट: {limit} में से {left} शेष। खत्म होने से पहले सीमा बढ़ा लें; $1 से कम होने पर क्लाइंट से बाद में आने को कहा जाता है।",
+  "panel.m.budget.low": "AI सीमा: {pct}% शेष",
   "panel.m.open": "PDF खोलें",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "कॉल का अनुरोध",

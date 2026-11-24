@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "캘린더를 업데이트할 수 없습니다: {reason}",
   "panel.m.err.file": "해당 파일을 읽을 수 없습니다: {reason}",
   "panel.m.clientLink": "고객 페이지",
-  "panel.m.budget.low": "Venture AI 예산: {limit} 중 {left} 남음. 소진되기 전에 한도를 올리세요. 1달러 미만이 되면 고객에게 나중에 다시 오도록 안내됩니다.",
+  "panel.m.budget.low": "AI 사용량 {pct}% 남음",
   "panel.m.open": "PDF 열기",
   "panel.m.title": "Venture AI 변호사 데스크",
   "panel.m.consult.badge": "통화 요청",

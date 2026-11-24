@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Não foi possível atualizar o calendário: {reason}",
   "panel.m.err.file": "Não foi possível ler o arquivo: {reason}",
   "panel.m.clientLink": "Página do cliente",
-  "panel.m.budget.low": "Orçamento da Venture AI: restam {left} de {limit}. Aumente o limite antes que acabe; abaixo de US$ 1, os clientes são orientados a voltar mais tarde.",
+  "panel.m.budget.low": "Cota de IA: {pct}% restante",
   "panel.m.open": "Abrir PDF",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "Chamada solicitada",

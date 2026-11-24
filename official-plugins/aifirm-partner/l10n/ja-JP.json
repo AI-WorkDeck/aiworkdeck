@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "カレンダーを更新できませんでした：{reason}",
   "panel.m.err.file": "ファイルを読み込めませんでした：{reason}",
   "panel.m.clientLink": "クライアントページ",
-  "panel.m.budget.low": "Venture AI の予算：上限 {limit} のうち残り {left}。なくなる前に上限を引き上げてください。残高が1ドルを下回ると、クライアントには後で再度お越しいただくよう案内されます。",
+  "panel.m.budget.low": "AI 利用枠の残り {pct}%",
   "panel.m.open": "PDF を開く",
   "panel.m.title": "Venture AI 弁護士デスク",
   "panel.m.consult.badge": "通話の依頼あり",

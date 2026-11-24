@@ -209,7 +209,7 @@
   "panel.m.err.calendar": "Der Kalender konnte nicht aktualisiert werden: {reason}",
   "panel.m.err.file": "Die Datei konnte nicht gelesen werden: {reason}",
   "panel.m.clientLink": "Mandantenseite",
-  "panel.m.budget.low": "Venture AI-Budget: {left} von {limit} übrig. Erhöhen Sie das Limit, bevor es aufgebraucht ist; unter 1 $ werden Mandanten gebeten, später wiederzukommen.",
+  "panel.m.budget.low": "AI-Kontingent: noch {pct} %",
   "panel.m.open": "PDF öffnen",
   "panel.m.title": "Venture AI Lawyer Desk",
   "panel.m.consult.badge": "Telefonat angefragt",
