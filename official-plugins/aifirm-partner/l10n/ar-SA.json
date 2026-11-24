@@ -130,6 +130,7 @@
   "panel.m.action.import": "استيراد الملف المعدَّل",
   "panel.m.action.edit": "تحرير النص",
   "panel.m.action.signoff": "اعتماد نهائي",
+  "panel.m.action.more": "المزيد",
   "panel.m.action.close": "إغلاق القضية",
   "panel.m.section.request": "طلب المراجعة",
   "panel.m.section.facts": "الوقائع التي جمعها Venture AI",

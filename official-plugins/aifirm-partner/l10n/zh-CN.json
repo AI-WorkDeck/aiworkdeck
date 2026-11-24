@@ -130,6 +130,7 @@
   "panel.m.action.import": "导入修改后的文件",
   "panel.m.action.edit": "编辑文本",
   "panel.m.action.signoff": "审定",
+  "panel.m.action.more": "更多",
   "panel.m.action.close": "结案",
   "panel.m.section.request": "审阅申请",
   "panel.m.section.facts": "Venture AI 收集的事实",

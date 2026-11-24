@@ -130,6 +130,7 @@
   "panel.m.action.import": "Импортировать отредактированный файл",
   "panel.m.action.edit": "Редактировать текст",
   "panel.m.action.signoff": "Утвердить",
+  "panel.m.action.more": "Ещё",
   "panel.m.action.close": "Закрыть дело",
   "panel.m.section.request": "Запрос на проверку",
   "panel.m.section.facts": "Факты, собранные Venture AI",

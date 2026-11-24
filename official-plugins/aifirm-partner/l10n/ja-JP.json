@@ -130,6 +130,7 @@
   "panel.m.action.import": "修正済みファイルを取り込む",
   "panel.m.action.edit": "テキストを編集",
   "panel.m.action.signoff": "確定",
+  "panel.m.action.more": "その他",
   "panel.m.action.close": "案件を終了",
   "panel.m.section.request": "レビュー依頼",
   "panel.m.section.facts": "Venture AI が収集した事実",

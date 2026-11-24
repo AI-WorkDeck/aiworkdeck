@@ -112,6 +112,8 @@
     if (profBtn) profBtn.hidden = !active
   }
   function renderOfficeTabs() {
+    // One office (e.g. a Taipei-only edition): no switcher, it would be a lone tab in an empty bar.
+    $('m-office').hidden = OFFICES.length < 2
     $('m-office').replaceChildren(...OFFICES.map((o) => h('button', {
       type: 'button',
       class: 'awd-subnav-item' + (S.office === o ? ' is-active' : ''),
@@ -247,6 +249,13 @@
       fail(e)
     }
   }
+  // Fact labels: the template's own label when the portal sends one (d.fields like the matter detail), else the key made readable.
+  function factLabel(d, key) {
+    const f = Array.isArray(d.fields) ? d.fields.find((x) => x && x.key === key) : null
+    if (f && f.label) return E.pick(f.label)
+    const words = String(key).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim()
+    return words.charAt(0).toUpperCase() + words.slice(1)
+  }
   function renderPlazaDetail() {
     const d = S.plazaDetail
     const lead = d && d.lead
@@ -278,7 +287,7 @@
       actionArea,
       h('section', { class: 'section' },
         h('span', { class: 'section-title' }, t('mp.plaza.factsTitle')),
-        facts.length ? h('dl', { class: 'qa' }, ...facts.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, String(v))])) : h('p', { class: 'muted' }, t('mp.plaza.noFacts'))),
+        facts.length ? h('dl', { class: 'qa' }, ...facts.flatMap(([k, v]) => [h('dt', {}, factLabel(d, k)), h('dd', {}, String(v))])) : h('p', { class: 'muted' }, t('mp.plaza.noFacts'))),
       h('section', { class: 'section red-flags' },
         h('span', { class: 'section-title' }, t('mp.plaza.flagsTitle', { n: flags.length })),
         flags.length ? h('ul', { class: 'flags' }, ...flags.map((f) => h('li', {},
@@ -571,18 +580,24 @@
     const editing = editor && linkOf()?.edit
     const btn = (label, fn, opts = {}) => h('button', { type: 'button', class: 'awd-btn awd-btn-sm' + (opts.primary ? ' awd-btn-primary' : ''), disabled: opts.disabled || false, on: { click: fn } }, label)
 
-    const actions = h('div', { class: 'row actions' },
-      !linkOf() && !closed ? btn(t('action.accept'), acceptMatter, { primary: true }) : null,
+    // One action bar: the next step first (accept / save / sign off), then the document, then the client;
+    // rarely used steps go into 「更多」 so the bar never wraps into an orphan row.
+    const accept = !linkOf() && !closed ? btn(t('action.accept'), acceptMatter, { primary: true }) : null
+    const saveVer = editing && !closed ? btn(t('action.saveVersion'), () => saveFromAwd(), { primary: true }) : null
+    const sign = btn(t('action.signoff'), signOff, { primary: !accept && !saveVer && d.status !== 'review', disabled: closed || !latest })
+    const docBtns = [
+      editor ? btn(t('action.editInAwd'), editInAwd, { disabled: closed || !latest }) : btn(t('action.edit'), () => editText(latest), { disabled: closed || !latest }),
+      btn(t('action.word'), () => openWord(cur), { disabled: !cur }),
+    ]
+    const clientBtns = [btn(t('action.call'), scheduleCall, { disabled: closed }), btn(t('action.message'), messageClient, { disabled: d.status === 'closed' })]
+    const moreBtns = [
       linkOf() ? null : btn(t('action.conflict'), conflictCheck),
       linkOf()?.projectId ? btn(t('action.openProject'), openProject) : null,
-      btn(t('action.call'), scheduleCall, { disabled: closed }),
-      btn(t('action.message'), messageClient, { disabled: d.status === 'closed' }),
-      editor ? btn(t('action.editInAwd'), editInAwd, { disabled: closed || !latest }) : null,
-      editing && !closed ? btn(t('action.saveVersion'), () => saveFromAwd(), { primary: true }) : null,
-      btn(t('action.word'), () => openWord(cur), { disabled: !cur }),
       btn(t('action.import'), importFile, { disabled: closed || !latest }),
-      editor ? null : btn(t('action.edit'), () => editText(latest), { disabled: closed || !latest }),
-      btn(t('action.signoff'), signOff, { primary: d.status !== 'review', disabled: closed || !latest }))
+    ].filter(Boolean)
+    const more = moreBtns.length ? h('details', { class: 'more' }, h('summary', { class: 'awd-btn awd-btn-sm' }, t('action.more')), h('div', { class: 'more-menu' }, moreBtns)) : null
+    if (more) more.querySelectorAll('.more-menu .awd-btn').forEach((b) => b.addEventListener('click', () => { more.open = false }))
+    const actions = h('div', { class: 'actions' }, accept, saveVer, sign, h('span', { class: 'sep' }), ...docBtns, h('span', { class: 'sep' }), ...clientBtns, more)
     const editingNote = editing && !closed ? h('p', { class: 'muted small' }, t('awd.editing', { name: editing.path.split('/').pop() })) : null
 
     const facts = h('section', { class: 'section' }, h('span', { class: 'section-title' }, t('section.facts')),
@@ -625,7 +640,7 @@
 
     const ln = latest && latest.notes
     const terms = ln && ln.terms && ln.terms.length ? h('section', { class: 'section term-sheet' }, h('span', { class: 'section-title' }, t('section.terms') + ' · V' + latest.n),
-      h('table', { class: 'terms' }, h('thead', {}, h('tr', {}, h('th', {}, t('terms.term')), h('th', {}, t('terms.section')), h('th', {}, t('terms.text')))),
+      h('table', { class: 'terms' }, h('colgroup', {}, h('col', { class: 'c-term' }), h('col', { class: 'c-sec' }), h('col', {})), h('thead', {}, h('tr', {}, h('th', {}, t('terms.term')), h('th', {}, t('terms.section')), h('th', {}, t('terms.text')))),
         h('tbody', {}, ln.terms.map((x) => h('tr', {}, h('td', {}, x.term), h('td', {}, x.section || ''), h('td', {}, x.text)))))) : null
     const noted = (d.flagState && d.flagState[latest && latest.n]) || {}
     const flags = ln && ln.flags && ln.flags.length ? h('section', { class: 'section red-flags' }, h('span', { class: 'section-title' }, t('section.flags') + ' · V' + latest.n),
@@ -670,7 +685,7 @@
     $('m-detail').replaceChildren(...[
       h('div', { class: 'head' },
         h('div', { class: 'section' }, h('h2', {}, who(d)), h('div', { class: 'muted' }, [d.template ? E.pick(d.template) : '', d.company].filter(Boolean).join(' · '))),
-        h('div', { class: 'tags' }, statusBadge(d.status), requested(d) ? h('span', { class: 'awd-badge awd-badge-danger call-req' }, t('consult.badge')) : null, forLawyer(d), areaBadge(d.area), h('span', { class: 'awd-badge' }, d.lang === 'zh' ? '中文' : 'EN'), d.wantsCall ? h('span', { class: 'awd-badge awd-badge-gold' }, t('wantsCall')) : null)),
+        h('div', { class: 'tags' }, statusBadge(d.status), requested(d) ? h('span', { class: 'awd-badge awd-badge-danger call-req' }, t('consult.badge')) : null, forLawyer(d), areaBadge(d.area), h('span', { class: 'awd-badge' }, /^zh/.test(d.lang || '') ? '中文' : 'EN'), d.wantsCall ? h('span', { class: 'awd-badge awd-badge-gold' }, t('wantsCall')) : null)),
       d.signoff ? h('div', { class: 'awd-notice awd-notice-success' }, t('event.signed', { n: d.signoff.version, name: d.signoff.name }) + ' · ' + new Date(d.signoff.at).toLocaleString()) : null,
       actions, editingNote, nativeBlock(), consult, request, questions, terms, flags, checkpoints, facts, notesEl, docEl, conv, internal, activity].filter(Boolean))
   }
@@ -728,8 +743,11 @@
         await awd.services.request('calendar', 'create', { data: { projectId, type: 'MEETING', title: t('call.task', { client: who(d), doc }), dueDate: date.value, dueTime: time.value, notes: [d.request && d.request.email, d.request && d.request.phone, d.clientUrl].filter(Boolean).join('\n') } })
       } catch (e) { throw userErr(t('err.calendar', { reason: e.message || e.code })) }
       if (tell.checked) {
-        const zhClient = d.lang === 'zh'
-        const tpl = zhClient ? '我建议我们在 {date} {time}（太平洋时间）通话。如时间不便，请在此回复您方便的时间。' : 'I would suggest we speak on {date} at {time} (Pacific Time). If that does not suit you, please reply here with a time that does.'
+        // The client's own language and the office's time zone (Taipei vs Silicon Valley).
+        const tw = S.office === 'tw'
+        const tpl = d.lang === 'zht' ? '我建議我們在 {date} {time}（' + (tw ? '台灣時間' : '太平洋時間') + '）通話。如時間不便，請在此回覆您方便的時間。'
+          : d.lang === 'zh' ? '我建议我们在 {date} {time}（' + (tw ? '台北时间' : '太平洋时间') + '）通话。如时间不便，请在此回复您方便的时间。'
+          : tw ? 'I would suggest we speak on {date} at {time} (Taipei time). If that does not suit you, please reply here with a time that does.' : 'I would suggest we speak on {date} at {time} (Pacific Time). If that does not suit you, please reply here with a time that does.'
         await call('matterMessage', { id: S.selected, text: tpl.replace('{date}', date.value).replace('{time}', time.value), lawyer: name.value.trim() })
         awd.storage.set('lawyer', { ...p, name: name.value.trim() }).catch(() => {})
       }

@@ -130,6 +130,7 @@
   "panel.m.action.import": "Düzenlenen dosyayı içe aktar",
   "panel.m.action.edit": "Metni düzenle",
   "panel.m.action.signoff": "Kesinleştir",
+  "panel.m.action.more": "Daha fazla",
   "panel.m.action.close": "Dosyayı kapat",
   "panel.m.section.request": "İnceleme talebi",
   "panel.m.section.facts": "Venture AI'ın topladığı olgular",

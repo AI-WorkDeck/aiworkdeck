@@ -231,10 +231,10 @@ window.AWD_THEME_L10N = {
     "gallery.swatch5": "逢魔群青"
   },
   "zh-TW": {
-    "plugin.name": "日漫晨昏 · 逢魔之时",
-    "plugin.desc": "新海诚式群青星空、暮色珊瑚霞光與薰衣草紫星芒，賽璐珞通透流光双境。",
-    "theme.name": "日漫晨昏 · 逢魔之时",
-    "theme.desc": "逢魔之时 · 双星破圈（群青星空 × 暮色珊瑚 × 薰衣草星芒 × 賽璐珞玻璃）",
+    "plugin.name": "日漫晨昏 · 逢魔之時",
+    "plugin.desc": "新海誠式群青星空、暮色珊瑚霞光與薰衣草紫星芒，賽璐珞通透流光雙境。",
+    "theme.name": "日漫晨昏 · 逢魔之時",
+    "theme.desc": "逢魔之時 · 雙星破圈（群青星空 × 暮色珊瑚 × 薰衣草星芒 × 賽璐珞玻璃）",
     "gallery.badge": "佈景主題畫廊",
     "gallery.swatch1": "晨空",
     "gallery.swatch2": "星光靛藍",
