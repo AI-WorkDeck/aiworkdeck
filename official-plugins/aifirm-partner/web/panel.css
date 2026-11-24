@@ -302,3 +302,6 @@ li.attention::marker { color: var(--awd-danger, #B23B2B); }
 .flags li { padding: 10px 12px; border-radius: var(--awd-radius-md, 8px); background: var(--awd-surface-2, #F3F1EA); gap: 4px; }
 .consult { border-radius: 0; }
 .section.native { border-inline-start: 0; padding-inline-start: 20px; box-shadow: inset 3px 0 0 var(--awd-accent, #2F6B4F); }
+
+/* Free browsing: the membership rules are a plain card under the open requests, not a frosted overlay. */
+.mp-gate-inline { width: auto; box-shadow: none; border-color: var(--awd-border-subtle, #ECEAE3); }
