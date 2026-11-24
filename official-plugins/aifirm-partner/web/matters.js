@@ -154,8 +154,8 @@
   function renderPaywall() {
     const p = S.preview || { openCount: 0, thisWeekCount: 0, maxBids: 3, items: [] }
     const items = Array.isArray(p.items) ? p.items : []
-    const visibleItems = items.slice(0, 2)
-    const blurredItems = items.slice(2)
+    // Free browsing (Morris, 2026-11-24): an unsubscribed lawyer sees every open request (type, area, risk count,
+    // budget band, quote slots) unblurred; membership is what lets them quote. The rules box sits below the list.
     const ctaBtn = h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: () => startCheckout(ctaBtn) } }, t('mp.paywall.cta'))
     $('m-paywall').replaceChildren(
       h('div', { class: 'mp-hero' },
@@ -166,18 +166,15 @@
           h('div', { class: 'mp-stat-card' }, h('div', { class: 'mp-stat-val' }, String(p.openCount || 0)), h('div', { class: 'mp-stat-lbl' }, t('mp.paywall.openCount'))),
           h('div', { class: 'mp-stat-card' }, h('div', { class: 'mp-stat-val' }, String(p.thisWeekCount || 0)), h('div', { class: 'mp-stat-lbl' }, t('mp.paywall.weekCount'))),
           h('div', { class: 'mp-stat-card' }, h('div', { class: 'mp-stat-val' }, String(p.maxBids || 3)), h('div', { class: 'mp-stat-lbl' }, t('mp.paywall.limitCount'))))),
-      visibleItems.length ? h('div', { class: 'mp-preview-grid' }, ...visibleItems.map(leadPreviewCard)) : null,
-      h('div', { class: 'mp-frosted-wrap' },
-        h('div', { class: 'mp-preview-grid mp-blurred', 'aria-hidden': 'true' }, ...(blurredItems.length ? blurredItems : visibleItems).map(leadPreviewCard)),
-        h('div', { class: 'mp-gate-overlay' },
-          h('div', { class: 'mp-gate-box' },
-            h('h3', {}, t('mp.paywall.gateTitle')),
-            h('ul', { class: 'mp-rules-list' },
-              h('li', {}, t('mp.paywall.rule1')),
-              h('li', {}, t('mp.paywall.rule2')),
-              h('li', {}, t('mp.paywall.rule3')),
-              h('li', {}, t('mp.paywall.rule4'))),
-            h('div', { class: 'row' }, h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: (ev) => startCheckout(ev.currentTarget) } }, t('mp.paywall.cta')))))))
+      items.length ? h('div', { class: 'mp-preview-grid' }, ...items.map(leadPreviewCard)) : null,
+      h('div', { class: 'mp-gate-box mp-gate-inline' },
+        h('h3', {}, t('mp.paywall.gateTitle')),
+        h('ul', { class: 'mp-rules-list' },
+          h('li', {}, t('mp.paywall.rule1')),
+          h('li', {}, t('mp.paywall.rule2')),
+          h('li', {}, t('mp.paywall.rule3')),
+          h('li', {}, t('mp.paywall.rule4'))),
+        h('div', { class: 'row' }, h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: (ev) => startCheckout(ev.currentTarget) } }, t('mp.paywall.cta')))))
   }
   function renderSubscribedTabs() {
     const mp = S.mp || {}
