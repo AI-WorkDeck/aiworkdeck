@@ -442,7 +442,7 @@ export default {
     "alignCenter": "居中",
     "alignRight": "右對齊",
     "alignJustify": "兩端對齊",
-    "bulletList": "專案符號",
+    "bulletList": "項目符號",
     "numberList": "編號列表",
     "indentLess": "減少縮排",
     "indentMore": "增加縮排",

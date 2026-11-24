@@ -80,6 +80,15 @@
  *   account.changed is a data-free event: discard cached identity, messages and pending work.
  *   Older hosts return unknown_method; do not emulate IM with localStorage.
  *
+ * Project access for global views (host after 0.88.1; context.capabilities lists what the host supports):
+ *   context.openProjectId  the workbench's open project ('' when none). A global view keeps projectId '' (so
+ *                          lawfirm/im/services/ai behave as before), but files.*, ui.openFile and tools.invoke
+ *                          work on openProjectId; project membership is checked per call.
+ *   ui.openWorkspace       { projectId? } -> {}: with projectId, opens that project (only one the user belongs to,
+ *                          else permission_denied) and this plugin's workspace view there; the page reloads.
+ *   Feature check: (awd.context.capabilities || []).includes('ui.openWorkspace.projectId'); older hosts have no
+ *   capabilities, ignore the argument and open the workspace in place.
+ *
  * SDK 1.6.0: services, MCP, host-managed connections, billing and editable settings.
  * All calls accept transport options { signal, timeoutMs }; timeout defaults to 60000 ms.
  * Timeout/abort discard late responses. Service requests also send best-effort cancellation.
@@ -164,8 +173,8 @@
     '.awd-title{margin:0;font-family:var(--awd-font-serif,"Source Han Serif SC","Noto Serif CJK SC","Songti SC",serif);font-size:20px;font-weight:700;line-height:1.3;letter-spacing:-.01em;color:var(--awd-text,#2B2A26)}',
     '.awd-subtitle{margin:4px 0 0;font-size:12.5px;line-height:1.55;color:var(--awd-text-2,#6B675C)}',
     '.awd-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--awd-space-2,8px)}',
-    '.awd-subnav{display:inline-flex;align-items:center;gap:2px;padding:3px;background:var(--awd-surface-2,#E9E6DC);border:1px solid var(--awd-border-subtle,#EAE7DD);border-radius:var(--awd-radius-md,6px);margin-bottom:var(--awd-space-4,16px)}',
-    '.awd-subnav-item{appearance:none;border:1px solid transparent;background:transparent;color:var(--awd-text-2,#6B675C);font:inherit;font-size:12px;font-weight:500;height:var(--awd-control-xs,24px);padding:0 12px;border-radius:var(--awd-radius-sm,4px);cursor:pointer;transition:all var(--awd-motion-fast,140ms) ease}',
+    '.awd-subnav{display:inline-flex;align-items:center;box-sizing:border-box;max-width:100%;overflow-x:auto;gap:2px;padding:3px;background:var(--awd-surface-2,#E9E6DC);border:1px solid var(--awd-border-subtle,#EAE7DD);border-radius:var(--awd-radius-md,6px);margin-bottom:var(--awd-space-4,16px)}',
+    '.awd-subnav-item{flex:none;white-space:nowrap;appearance:none;border:1px solid transparent;background:transparent;color:var(--awd-text-2,#6B675C);font:inherit;font-size:12px;font-weight:500;height:var(--awd-control-xs,24px);padding:0 12px;border-radius:var(--awd-radius-sm,4px);cursor:pointer;transition:all var(--awd-motion-fast,140ms) ease}',
     '.awd-subnav-item.is-active,.awd-subnav-item[aria-selected="true"]{background:var(--awd-surface,#FCFBF7);color:var(--awd-accent-text,#2E5A50);font-weight:600;border-color:var(--awd-border-subtle,#EAE7DD);box-shadow:var(--awd-shadow-btn,0 1px 2px rgba(42,38,30,.06))}',
     '.awd-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--awd-space-3,12px);margin-bottom:var(--awd-space-4,16px)}',
     '.awd-kpi-card{background:var(--awd-surface,#FCFBF7);border:1px solid var(--awd-border,#DDD8CA);border-radius:var(--awd-radius-dialog,8px);padding:var(--awd-space-3,12px) var(--awd-space-4,16px);box-shadow:var(--awd-shadow-card,0 1px 3px rgba(42,38,30,.05))}',
@@ -199,7 +208,20 @@
     '.awd-safe-progress-pct{font-family:var(--awd-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--awd-accent-text,#2E5A50)}',
     '.awd-safe-progress-track{height:5px;border-radius:999px;background:var(--awd-surface-2,#E9E6DC);overflow:hidden;margin-bottom:8px}',
     '.awd-safe-progress-fill{height:100%;border-radius:999px;background:var(--awd-accent,#2E5A50);transition:width 220ms ease}',
-    '.awd-safe-progress-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--awd-text-2,#6B675C)}'
+    '.awd-safe-progress-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--awd-text-2,#6B675C)}',
+    '.awd-table-wrap{max-width:100%;overflow-x:auto;border:1px solid var(--awd-border,#DDD8CA);border-radius:var(--awd-radius-md,6px)}',
+    '.awd-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}',
+    '.awd-table th,.awd-table td{padding:8px 10px;text-align:start;white-space:nowrap;vertical-align:middle;border-bottom:1px solid var(--awd-border-subtle,#EAE7DD)}',
+    '.awd-table th{font-weight:600;color:var(--awd-text-2,#6B675C);background:var(--awd-surface-2,#E9E6DC)}',
+    '.awd-table tr:last-child td{border-bottom:0}',
+    '.awd-table td.awd-cell-text{white-space:normal;min-width:12em;max-width:22em}',
+    '.awd-notice{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;border-inline-start:3px solid var(--awd-info-text,#3C5A73);border-radius:var(--awd-radius-sm,4px);background:var(--awd-info-soft,#E9EFF4);color:var(--awd-text,#2B2A26);font-size:12px;line-height:1.6;overflow-wrap:anywhere}',
+    '.awd-notice-danger{border-inline-start-color:var(--awd-danger-text,#B5483C);background:var(--awd-danger-soft,#F9EBEA);color:var(--awd-danger-text,#B5483C)}',
+    '.awd-notice-warning{border-inline-start-color:var(--awd-warning-text,#8A5D14);background:var(--awd-warning-soft,#F8F0DF);color:var(--awd-warning-text,#8A5D14)}',
+    '.awd-notice-success{border-inline-start-color:var(--awd-accent-text,#2E5A50);background:var(--awd-accent-soft,#E3EDE9);color:var(--awd-accent-text,#2E5A50)}',
+    '.awd-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:var(--awd-space-6,24px) var(--awd-space-4,16px);text-align:center;color:var(--awd-text-2,#6B675C);font-size:12px;line-height:1.6}',
+    '.awd-empty-title{margin:0;font-size:13px;font-weight:600;color:var(--awd-text,#2B2A26)}',
+    '.awd-empty-desc{margin:0;max-width:36em}'
   ].join('\n');
 
   function ensurePluginUiStyle() {
@@ -301,7 +323,7 @@
 
   var awd = {
     /** SDK 版本，与桥协议版本无关 */
-    version: '1.8.0',
+    version: '1.9.0',
     /** 握手拿到的上下文；ready() 之前为 null */
     context: null,
     /** 等待宿主握手，resolve 值即 awd.context */
@@ -320,7 +342,7 @@
     },
     ui: {
       /** 打开本插件已声明的工作区；无工作区返回 unavailable，旧宿主返回 unknown_method。 */
-      openWorkspace: function () { return call('ui.openWorkspace', {}); },
+      openWorkspace: function (options) { return call('ui.openWorkspace', options && options.projectId != null ? { projectId: options.projectId } : {}); },
       toast: function (message, options) { return call('ui.toast', { message: message }, options); },
       /** 把项目文件打开到工作台中栏（需 file_read） */
       openFile: function (path, options) { return call('ui.openFile', { path: path }, options); },

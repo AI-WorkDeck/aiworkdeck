@@ -10,7 +10,7 @@ export default {
   attachmentScanning: "正在掃描資料夾，已找到 {count} 個檔案",
   attachmentImportProgress: "已匯入 {completed}/{total} 項",
   attachmentImportUncertain: "進行中操作的結果尚未確認，可能仍在背景完成。請先在檔案樹核對，避免重複匯入；已完成項保留。",
-  attachmentImportPaused: "匯入已暫停或部分失敗。已完成項保留，可重試剩餘專案。",
+  attachmentImportPaused: "匯入已暫停或部分失敗。已完成項保留，可重試剩餘項目。",
   attachmentRetryRemaining: "重試剩餘 {count} 項",
   contextPreparingProgress: "正在準備附件：已登記 {completed}/{total} 項（不代表已讀內文）",
   contextNoticeDeferred: "另有 {count} 項已保留，將按需分批讀取，可能耗時較長。",

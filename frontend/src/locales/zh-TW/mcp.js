@@ -36,7 +36,7 @@ export default {
   "importFile": "選擇 JSON 檔案",
   "importJson": "設定 JSON",
   "preview": "預覽匯入",
-  "importReview": "選擇有效專案建立連線，不覆寫同名設定。匯入不會執行命令、發起授權或啟用呼叫。",
+  "importReview": "選擇有效項目建立連線，不覆寫同名設定。匯入不會執行命令、發起授權或啟用呼叫。",
   "secretNames": "憑證欄位：{names}",
   "importSelected": "匯入所選（{count}）",
   "transportLabel": "連線方式",
