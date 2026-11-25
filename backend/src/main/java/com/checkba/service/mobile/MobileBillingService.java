@@ -116,7 +116,9 @@ public class MobileBillingService {
     private static final String CHANNEL_WXPAY_APP = "wxpay-app";
 
     /** Pro via WeChat APP pay: the two website SKUs (intro price / standard monthly). */
-    private static final java.util.Set<String> PRO_SKUS = java.util.Set.of("pro_monthly_intro", "pro_monthly");
+    private static final java.util.Set<String> PRO_SKUS = java.util.Set.of("pro_monthly_intro", "pro_monthly",
+            // Owner-approved 1-fen payment test; the website quotes it only to allowlisted accounts.
+            "pro_test");
 
     /** 微信道具 id 围栏。只做形态把关，<b>价格权威在官网</b>（不符时官网回 product_mismatch）。 */
     private static final Pattern PRODUCT_ID = Pattern.compile("^[a-z0-9_]{1,64}$");

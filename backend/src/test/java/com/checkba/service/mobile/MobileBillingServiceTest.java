@@ -968,6 +968,9 @@ class MobileBillingServiceTest {
         when(billing.createPro(account, "pro_monthly_intro", 9900L, "idem-pro-0001")).thenReturn(order);
 
         assertSame(order, service.createPro(user.getId(), " pro_monthly_intro ", 9900L, " idem-pro-0001 "));
+        // The 1-fen payment-test SKU passes the shape check; only the website decides who may buy it.
+        when(billing.createPro(account, "pro_test", 1L, "idem-pro-test1")).thenReturn(order);
+        assertSame(order, service.createPro(user.getId(), "pro_test", 1L, "idem-pro-test1"));
         verify(billing).resolveAccountId(user.getPhone(), null, true);
         assertEquals(account, accountBindingRepository.findByUserId(user.getId()).orElseThrow().getExternalAccountId());
     }

@@ -554,7 +554,7 @@ components:
           type: string
           enum: [disabled, channel_unavailable, appstore_subscription_active, not_connected]
           description: Only when available=false.
-        skuId: { type: string, enum: [pro_monthly_intro, pro_monthly] }
+        skuId: { type: string, enum: [pro_monthly_intro, pro_monthly, pro_test] }
         amountCents: { type: integer, format: int64, description: 'Price to pay now, in cents' }
         standardAmountCents: { type: integer, format: int64, description: 'Regular monthly price, in cents' }
         introEligible: { type: boolean }
@@ -571,7 +571,7 @@ components:
         present: { type: string, enum: [app] }
         outTradeNo: { type: string }
         amountCents: { type: integer, format: int64 }
-        skuId: { type: string, enum: [pro_monthly_intro, pro_monthly] }
+        skuId: { type: string, enum: [pro_monthly_intro, pro_monthly, pro_test] }
         appId: { type: string }
         partnerId: { type: string }
         prepayId: { type: string }
@@ -2698,7 +2698,7 @@ paths:
               type: object
               required: [skuId, amountCents, idempotencyKey]
               properties:
-                skuId: { type: string, enum: [pro_monthly_intro, pro_monthly] }
+                skuId: { type: string, enum: [pro_monthly_intro, pro_monthly, pro_test] }
                 amountCents: { type: integer, format: int64, description: 'The quoted amountCents, > 0' }
                 idempotencyKey:
                   type: string
