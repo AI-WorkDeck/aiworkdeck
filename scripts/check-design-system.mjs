@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Incremental guard: only migrated surfaces are blocking; legacy surfaces remain an audit.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -114,6 +114,28 @@ export function checkStyles(source, filename, definedTokens) {
   return failures
 }
 
+// <style src="./x.scss"> 外链样式此前整段漏检（POLISH X20）：把外链文件内联进来，按同一规则扫。
+// 外链文件里的存量问题记在 design-system-baseline.json（只许减少），新问题照常拦。
+export function expandStyleSources(source, filename) {
+  return source.replace(/<style([^>]*?)\bsrc=["']([^"']+)["']([^>]*)>\s*<\/style>/g, (_all, pre, src, post) => {
+    const file = resolve(root, dirname(filename), src)
+    return existsSync(file) ? `<style${pre}${post}>${readFileSync(file, 'utf8')}</style>` : _all
+  })
+}
+
+export function overBaseline(failures, baseline) {
+  const left = new Map()
+  for (const b of baseline) left.set(b, (left.get(b) || 0) + 1)
+  const extra = []
+  for (const f of failures) {
+    const n = left.get(f) || 0
+    if (n > 0) left.set(f, n - 1)
+    else extra.push(f)
+  }
+  const stale = [...left].filter(([, n]) => n > 0).map(([f]) => f)
+  return { extra, stale }
+}
+
 export function checkTokenContract(app, theme) {
   const definitions = new Set([...app.matchAll(/(--awd-[\w-]+)\s*:/g)].map(m => m[1]))
   const namesSource = theme.match(/export const THEME_TOKEN_NAMES = \[([\s\S]*?)\n\]/)?.[1] || ''
@@ -130,6 +152,16 @@ export function run() {
   const app = readFileSync(resolve(root, 'frontend/src/App.vue'), 'utf8')
   const definedTokens = new Set([...app.matchAll(/(--awd-[\w-]+)\s*:/g)].map(m => m[1]))
   const failures = MIGRATED_FILES.flatMap(f => checkStyles(readFileSync(resolve(root, f), 'utf8'), f, definedTokens))
+  const external = MIGRATED_FILES.flatMap(f => {
+    const raw = readFileSync(resolve(root, f), 'utf8')
+    const expanded = expandStyleSources(raw, f)
+    return expanded === raw ? [] : checkStyles(expanded.replace(/<style(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/style>/g, (block) => raw.includes(block) ? '' : block), f, definedTokens)
+  })
+  const baselinePath = resolve(root, 'scripts/design-system-baseline.json')
+  const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : []
+  const { extra, stale } = overBaseline(external, baseline)
+  failures.push(...extra.map(f => `${f}   (in an external <style src> file; existing ones are listed in scripts/design-system-baseline.json)`))
+  if (stale.length) console.log(`design-system baseline: ${stale.length} entries are fixed — remove them from scripts/design-system-baseline.json`)
   failures.push(...checkTokenContract(readFileSync(resolve(root, 'frontend/src/App.vue'), 'utf8'), readFileSync(resolve(root, 'frontend/src/utils/appTheme.js'), 'utf8')))
   if (failures.length) { console.error(failures.join('\n')); return 1 }
   console.log(`Design system guard passed (${MIGRATED_FILES.length} migrated surfaces; theme export contract).`)
