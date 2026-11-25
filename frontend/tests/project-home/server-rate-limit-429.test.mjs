@@ -13,7 +13,8 @@ const CHAT = read('../../src/components/ChatInterface.vue')
 
 test('POST /api/agent/chat 的 429 先于通用 HTTP 报错映射成可读文案', () => {
   const rate = STREAM.indexOf("chatResp.status === 429")
-  const generic = STREAM.indexOf("t('agentStream.chatRequestFailed', { status: chatResp.status })")
+  // X7: the generic failure now carries the status for toUserMessage (shown under Details only)
+  const generic = STREAM.indexOf("throw Object.assign(new Error('HTTP ' + chatResp.status), { status: chatResp.status })")
   assert.ok(rate >= 0, '缺少 429 分支')
   assert.ok(generic > rate, '429 分支必须排在通用 HTTP 报错之前')
   assert.match(STREAM.slice(rate, generic), /t\('common\.tooManyRequests'\)/)

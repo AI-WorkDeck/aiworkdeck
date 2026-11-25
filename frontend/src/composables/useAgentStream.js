@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { toUserMessage } from '@/utils/userMessage.js'
 import { fetchAgentConnection } from './sharedAgentConnection.mjs'
 import { isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { bqtErrorCode, bqtErrorMessage } from '@/utils/bqtBilling.js'
@@ -995,7 +996,8 @@ export function useAgentStream() {
             if (!chatResp.ok) {
                 // 429 = 服务器按用户限频（server 部署），给可读的「稍候再试」而不是裸状态码
                 if (chatResp.status === 429) throw Object.assign(new Error(t('common.tooManyRequests')), { status: 429 })
-                throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
+                // X7：状态码只进 Details，气泡里由 toUserMessage 换成目录文案
+                throw Object.assign(new Error('HTTP ' + chatResp.status), { status: chatResp.status })
             }
             const responseBody = await chatResp.json()
             // Preflight can reject before a run exists, so no SSE error will follow.
@@ -1017,7 +1019,7 @@ export function useAgentStream() {
             // 否则用户会看到「消息发出去了，但界面永远停在等待」。
             const receipt = responseBody && responseBody.data ? responseBody.data : responseBody
             if (!receipt || receipt.status !== 'accepted' || !receipt.messageId) {
-                throw new Error(t('agentStream.chatRequestFailed', { status: chatResp.status }))
+                throw Object.assign(new Error('Chat request not accepted (HTTP ' + chatResp.status + ')'), { status: chatResp.status >= 400 ? chatResp.status : 500 })
             }
 
             // The request still belongs to the captured conversation even if the user opened
@@ -1066,7 +1068,10 @@ export function useAgentStream() {
                 const stillCurrent = currentConversationId.value === conversationId
                 if (stillCurrent) error.value = err.message
                 if (stillCurrent && !continuingRun && currentAssistantBubble.value) {
-                    currentAssistantBubble.value.content += '\n' + t('agentStream.errorWithMessage', { message: err.message })
+                    // X7：不再把「**错误**: HTTP 502」拼进正文。已收到的部分原样保留，
+                    // 气泡下方出目录文案 + 重试 + 详情（RootBubble 的 AwdInlineError）。
+                    const bubble = currentAssistantBubble.value
+                    bubble.errorNotice = toUserMessage(err, { partial: !!String(bubble.content || '').trim(), desktop: typeof window !== 'undefined' && !!window.checkbaDesktop })
                     currentAssistantBubble.value.isStreaming = false
                     isStreaming.value = false
                     agentRunStatus.value = 'ERROR'
@@ -2004,7 +2009,14 @@ export function useAgentStream() {
                     currentAssistantBubble.value.content +=
                         '\n\n' + t('agentStream.internalErrorNotice') + '\n'
                 } else {
-                    currentAssistantBubble.value.content += '\n\n' + t('agentStream.executionInterrupted', { message: errMsg }) + '\n'
+                    const bubble = currentAssistantBubble.value
+                    if (attachmentErrorKey) {
+                        // 附件类失败已是本地化、可操作的专门文案（chat.contextPreparationTimeout 等），照旧写进气泡
+                        bubble.content += '\n\n' + errMsg + '\n'
+                    } else {
+                        // X7：未归类的后端错误不再把原文拼进正文；原文进 Details
+                        bubble.errorNotice = toUserMessage(errMsg, { partial: !!String(bubble.content || '').trim(), desktop: typeof window !== 'undefined' && !!window.checkbaDesktop })
+                    }
                 }
             }
         }

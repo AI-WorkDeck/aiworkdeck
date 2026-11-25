@@ -13,6 +13,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { isAccountRequired, isCreditsRequired } from '../../src/utils/requireAccountCore.js'
 import { bqtErrorCode, bqtErrorMessage } from '../../src/utils/bqtBilling.js'
+import { toUserMessage } from '../../src/utils/userMessage.js'
 import zh from '../../src/locales/zh-CN/agentStream.js'
 import en from '../../src/locales/en-US/agentStream.js'
 
@@ -58,11 +59,14 @@ function parseAccountPayload(dataStr) {
 
 function renderError(dataStr, prompts = [], bubble = { value: { content: '' } }) {
   const run = new Function('dataStr', 'currentAssistantBubble', 't', 'accountPayload',
-    'isAccountRequired', 'isCreditsRequired', 'promptAccountAction', 'bqtErrorCode', 'bqtErrorMessage', BRANCH)
+    'isAccountRequired', 'isCreditsRequired', 'promptAccountAction', 'bqtErrorCode', 'bqtErrorMessage', 'toUserMessage', BRANCH)
   // This suite tests rendered error copy; the account dialog is verified in paid-service.mjs.
-  run(dataStr, bubble, (k, args) => k + (args?.message ? ' ' + args.message : ''), parseAccountPayload(dataStr), isAccountRequired, isCreditsRequired, payload => prompts.push(payload), bqtErrorCode, bqtErrorMessage)
+  run(dataStr, bubble, (k, args) => k + (args?.message ? ' ' + args.message : ''), parseAccountPayload(dataStr), isAccountRequired, isCreditsRequired, payload => prompts.push(payload), bqtErrorCode, bqtErrorMessage, toUserMessage)
+  lastNotice = bubble.value.errorNotice || null
   return bubble.value.content
 }
+// X7：未归类的错误不再把原文拼进正文，而是挂 errorNotice（目录文案；原文只进 detail）
+let lastNotice = null
 
 test('包晴天积分通道拒绝：按码给「去包晴天 App」提示，不弹本应用充值层', () => {
   const cases = {
@@ -90,8 +94,9 @@ test('账户类载荷（JSON）：4011 → 登录引导；其余 kind 显示 mes
   assert.match(required, /account\.loginDialog\.aiNotice/)
   assert.doesNotMatch(required, /executionInterrupted/)
   const conflict = renderError(JSON.stringify({ message: '请先在官网账户页分配 AI 额度', code: 1, kind: 'CONFLICT' }))
-  assert.match(conflict, /executionInterrupted/)
+  assert.ok(lastNotice && lastNotice.key, 'unclassified account payload gets a catalogued notice')
   assert.doesNotMatch(conflict, /"kind"/, '不能把 JSON 原样甩进气泡')
+  assert.match(lastNotice.detail, /分配 AI 额度/, 'the backend text survives in Details')
 })
 
 test('断网标记 → 「网络连接异常」引导，而不是把英文主机名甩给用户', () => {
@@ -104,8 +109,10 @@ test('断网标记 → 「网络连接异常」引导，而不是把英文主机
 })
 
 test('防空断言：没有标记的错误仍走通用「执行中断」，既有四条标记不被改坏', () => {
-  assert.match(renderError('Stream Error: boom'), /executionInterrupted/,
-    '未分类错误仍要显示原文，否则新分支等于把所有错误都说成网络问题')
+  const raw = renderError('Stream Error: boom')
+  assert.doesNotMatch(raw, /boom/, 'X7: raw backend text never goes into the answer body')
+  assert.equal(lastNotice.key, 'unknown', 'unclassified errors are not passed off as network problems')
+  assert.match(lastNotice.detail, /Stream Error: boom/, 'the raw text stays reachable under Details')
   assert.match(renderError('Stream Error: AI_REGION_BLOCKED: ...'), /regionBlockedNotice/)
   assert.match(renderError('Stream Error: AI_QUOTA_EXHAUSTED: ...'), /quotaExhaustedNotice/)
   assert.match(renderError('Stream Error: AI_CONTEXT_OVERFLOW: ...'), /contextOverflowNotice/)
