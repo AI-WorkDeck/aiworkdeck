@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Pasta de modelos: solte aqui os modelos de relatórios do seu escritório; após o aprendizado, a IA redige com suas fontes, numeração e estilos de tabela",
   "selectFilePrompt": "Selecione um arquivo à esquerda para visualizar",
   "edit": "Editar",
-  "typeLabel": "Tipo: {type}",
-  "sizeLabel": "Tamanho: {size}",
   "renderingDoc": "Renderizando documento…",
   "renderingSlides": "Renderizando apresentação…",
   "slidesNotShown": "Mais {count} slides não exibidos. Abra o arquivo para ver todos.",

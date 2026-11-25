@@ -20,8 +20,6 @@ export default {
   // FilePreview.vue
   selectFilePrompt: '请从左侧选择文件进行预览',
   edit: '编辑',
-  typeLabel: '类型：{type}',
-  sizeLabel: '大小：{size}',
   renderingDoc: '正在渲染文档…',
   renderingSlides: '正在渲染演示文稿…',
   slidesNotShown: '还有 {count} 页未显示，打开文件可查看全部',

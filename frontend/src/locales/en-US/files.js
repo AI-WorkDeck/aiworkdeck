@@ -20,8 +20,6 @@ export default {
   // FilePreview.vue
   selectFilePrompt: 'Select a file on the left to preview',
   edit: 'Edit',
-  typeLabel: 'Type: {type}',
-  sizeLabel: 'Size: {size}',
   renderingDoc: 'Rendering document…',
   renderingSlides: 'Rendering presentation…',
   slidesNotShown: '{count} more slides not shown. Open the file to see them all.',
