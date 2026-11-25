@@ -13,6 +13,8 @@ export default {
   "modelUnavailable": "Model yang dipilih tidak tersedia sekarang. Cuba lagi kemudian, atau pilih model lain di bawah kotak mesej.",
   "modelKeyInvalid": "Penyedia model menolak kunci yang masih digunakan oleh peranti ini daripada tetapan lama. Daftar masuk untuk menggunakan AI AI WorkDeck sebagai gantinya.",
   "streamInterrupted": "Jawapan terputus; bahagian yang sudah diterima dikekalkan di atas. Pilih “Cuba lagi” untuk menjananya semula.",
+  "streamInterruptedResumable": "Jawapan terputus; bahagian yang sudah diterima dikekalkan di atas. Pilih “Teruskan” untuk menyambung dari titik berhenti, atau “Cuba lagi” untuk bermula semula.",
+  "streamInterruptedTwice": "Terputus lagi. Pilih “Cuba lagi” untuk menjana semula keseluruhan jawapan.",
   "serverError": "Berlaku masalah di pihak kami dan tindakan ini tidak selesai. Cuba lagi kemudian; jika berterusan, hantarkan “Maklum Balas” kepada kami.",
   "conflict": "Ini telah diubah di tempat lain, atau tindakan sebelumnya masih berjalan. Muat semula dan cuba lagi.",
   "fileTooLarge": "Fail terlalu besar (had {limit}). Mampatkan atau pecahkan fail, kemudian muat naik semula.",
@@ -26,6 +28,7 @@ export default {
     "details": "Butiran",
     "hideDetails": "Sembunyikan butiran",
     "continue": "Teruskan",
+    "continueTooltip": "Sambung dari titik berhenti tanpa menjana semula bahagian yang sudah ada",
     "refresh": "Segar semula",
     "signIn": "Daftar masuk",
     "feedback": "Maklum Balas"

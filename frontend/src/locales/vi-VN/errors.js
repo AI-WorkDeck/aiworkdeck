@@ -13,6 +13,8 @@ export default {
   "modelUnavailable": "Mô hình đã chọn hiện không khả dụng. Hãy thử lại sau, hoặc chọn mô hình khác bên dưới ô nhập tin nhắn.",
   "modelKeyInvalid": "Nhà cung cấp mô hình đã từ chối khóa mà thiết bị này vẫn đang dùng từ thiết lập cũ. Hãy đăng nhập để dùng AI của AI WorkDeck thay thế.",
   "streamInterrupted": "Câu trả lời bị ngắt giữa chừng; phần đã nhận được vẫn được giữ ở trên. Chọn “Thử lại” để tạo lại.",
+  "streamInterruptedResumable": "Câu trả lời bị ngắt giữa chừng; phần đã nhận được vẫn được giữ ở trên. Chọn “Tiếp tục” để chạy tiếp từ chỗ dừng, hoặc “Thử lại” để bắt đầu lại.",
+  "streamInterruptedTwice": "Câu trả lời lại bị ngắt. Chọn “Thử lại” để tạo lại toàn bộ câu trả lời.",
   "serverError": "Đã có sự cố từ phía chúng tôi và thao tác này chưa hoàn tất. Hãy thử lại sau; nếu vẫn lặp lại, hãy gửi “Phản hồi” cho chúng tôi.",
   "conflict": "Nội dung này đã được thay đổi ở nơi khác, hoặc thao tác trước đó vẫn đang chạy. Hãy làm mới rồi thử lại.",
   "fileTooLarge": "Tệp quá lớn (giới hạn {limit}). Hãy nén hoặc chia nhỏ tệp rồi tải lên lại.",
@@ -26,6 +28,7 @@ export default {
     "details": "Chi tiết",
     "hideDetails": "Ẩn chi tiết",
     "continue": "Tiếp tục",
+    "continueTooltip": "Tiếp tục từ chỗ dừng mà không tạo lại phần đã có",
     "refresh": "Làm mới",
     "signIn": "Đăng nhập",
     "feedback": "Phản hồi"

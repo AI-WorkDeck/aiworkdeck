@@ -13,6 +13,8 @@ export default {
   "modelUnavailable": "Seçilen model şu anda kullanılamıyor. Daha sonra tekrar deneyin veya mesaj kutusunun altından başka bir model seçin.",
   "modelKeyInvalid": "Model sağlayıcı, bu cihazın eski bir kurulumdan hâlâ kullandığı anahtarı reddetti. Bunun yerine AI WorkDeck’in yapay zekâsını kullanmak için giriş yapın.",
   "streamInterrupted": "Yanıt yarıda kesildi; şimdiye kadar gelen kısım yukarıda duruyor. Yeniden oluşturmak için “Tekrar dene”yi seçin.",
+  "streamInterruptedResumable": "Yanıt yarıda kesildi; şimdiye kadar gelen kısım yukarıda duruyor. Kaldığı yerden devam etmek için “Devam Et”i, baştan başlamak için “Tekrar dene”yi seçin.",
+  "streamInterruptedTwice": "Yeniden kesildi. Yanıtın tamamını yeniden oluşturmak için “Tekrar dene”yi seçin.",
   "serverError": "Bizim tarafımızda bir sorun oluştu ve işlem tamamlanmadı. Daha sonra tekrar deneyin; sorun sürerse bize “Geri Bildirim” gönderin.",
   "conflict": "Bu başka bir yerde değiştirildi ya da önceki işlem hâlâ çalışıyor. Yenileyip tekrar deneyin.",
   "fileTooLarge": "Dosya çok büyük (sınır {limit}). Sıkıştırın veya bölün, ardından yeniden yükleyin.",
@@ -26,6 +28,7 @@ export default {
     "details": "Ayrıntılar",
     "hideDetails": "Ayrıntıları gizle",
     "continue": "Devam Et",
+    "continueTooltip": "Zaten oluşturulmuş kısmı yeniden üretmeden kaldığı yerden devam et",
     "refresh": "Yenile",
     "signIn": "Giriş yap",
     "feedback": "Geri Bildirim"

@@ -13,6 +13,8 @@ export default {
   "modelUnavailable": "所选模型暂时不可用。请稍后重试，或在输入框下方换一个模型。",
   "modelKeyInvalid": "这台电脑还在用旧版设置里的模型 Key，已被模型服务拒绝。请登录 AI WorkDeck 账户，改用官方 AI 通道。",
   "streamInterrupted": "回答中途断开了，已收到的内容保留在上面。点“重试”重新生成。",
+  "streamInterruptedResumable": "回答中途断开了，已收到的内容保留在上面。点“继续”接着写，或点“重试”重新生成。",
+  "streamInterruptedTwice": "又断开了。点“重试”重新生成整个回答。",
   "serverError": "服务出了点问题，这次操作没有完成。请稍后重试；如果反复出现，请点“反馈”告诉我们。",
   "conflict": "内容在别处被改过，或上一个操作还没结束。请刷新后再试。",
   "fileTooLarge": "文件太大，超过了上限 {limit}。请压缩或拆分后再上传。",
@@ -26,6 +28,7 @@ export default {
     "details": "详情",
     "hideDetails": "收起详情",
     "continue": "继续",
+    "continueTooltip": "从断开处接着写，不重新生成已有内容",
     "refresh": "刷新",
     "signIn": "登录",
     "feedback": "反馈"

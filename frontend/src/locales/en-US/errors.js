@@ -13,6 +13,8 @@ export default {
   "modelUnavailable": "The selected model is unavailable right now. Try again later, or pick another model below the message box.",
   "modelKeyInvalid": "The model provider rejected the key this computer still uses from an older setup. Sign in to your AI WorkDeck account to use the official AI channel instead.",
   "streamInterrupted": "The answer was cut off; what arrived so far is kept above. Select Retry to generate it again.",
+  "streamInterruptedResumable": "The answer was cut off; what arrived so far is kept above. Select Continue to pick up where it stopped, or Retry to start over.",
+  "streamInterruptedTwice": "It was cut off again. Select Retry to generate the whole answer again.",
   "serverError": "Something went wrong on our side and this action didn't finish. Try again later; if it keeps happening, send us feedback.",
   "conflict": "This was changed elsewhere, or the previous action is still running. Refresh and try again.",
   "fileTooLarge": "The file is too large (limit {limit}). Compress or split it, then upload again.",
@@ -26,6 +28,7 @@ export default {
     "details": "Details",
     "hideDetails": "Hide details",
     "continue": "Continue",
+    "continueTooltip": "Pick up where it stopped without regenerating what's already there",
     "refresh": "Refresh",
     "signIn": "Sign in",
     "feedback": "Feedback"

@@ -13,6 +13,8 @@ export default {
   "modelUnavailable": "O modelo selecionado não está disponível agora. Tente novamente mais tarde ou escolha outro modelo abaixo da caixa de mensagem.",
   "modelKeyInvalid": "O provedor do modelo recusou a chave que este dispositivo ainda usa de uma configuração antiga. Entre para usar a IA do AI WorkDeck no lugar dela.",
   "streamInterrupted": "A resposta foi interrompida; o que chegou até agora fica mantido acima. Selecione “Tentar novamente” para gerá-la de novo.",
+  "streamInterruptedResumable": "A resposta foi interrompida; o que chegou até agora fica mantido acima. Selecione “Continuar” para retomar de onde parou ou “Tentar novamente” para recomeçar.",
+  "streamInterruptedTwice": "Ela foi interrompida novamente. Selecione “Tentar novamente” para gerar a resposta inteira de novo.",
   "serverError": "Algo deu errado do nosso lado e a ação não foi concluída. Tente novamente mais tarde; se continuar, envie “Comentários” para nós.",
   "conflict": "Isto foi alterado em outro lugar, ou a ação anterior ainda está em andamento. Atualize e tente novamente.",
   "fileTooLarge": "O arquivo é grande demais (limite de {limit}). Compacte ou divida o arquivo e envie novamente.",
@@ -26,6 +28,7 @@ export default {
     "details": "Detalhes",
     "hideDetails": "Ocultar detalhes",
     "continue": "Continuar",
+    "continueTooltip": "Retoma de onde parou sem gerar de novo o que já está lá",
     "refresh": "Atualizar",
     "signIn": "Entrar",
     "feedback": "Comentários"
