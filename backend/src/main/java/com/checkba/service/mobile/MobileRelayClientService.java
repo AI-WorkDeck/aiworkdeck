@@ -731,7 +731,7 @@ public class MobileRelayClientService {
         row.put("message", message);
         String root = captureRootName(item.path("projectKey").asText(), item.path("mediaType").asText());
         row.put("savedPath", "document".equals(item.path("mediaType").asText())
-                ? ADDIN_DOC_ROOT_FOLDER + "/" + sanitizedDocName(item.path("fileName").asText())
+                ? root + "/" + sanitizedDocName(item.path("fileName").asText())
                 : root + "/" + captureDate(item) + "/" + landedFileName(item.path("fileName").asText(), item.path("clientMediaId").asText()));
         row.put("updatedAt", System.currentTimeMillis());
         receiptItems.remove(id);
@@ -1087,8 +1087,6 @@ public class MobileRelayClientService {
     // 影像/录音根目录名见 CaptureFolderNames（X44：随界面语言新建、已有则沿用；录音与影像分开）。
     /** 跨设备投送（PUSH）落盘根目录名，与「现场影像/现场录音」并列。 */
     private static final String TRANSFER_ROOT_FOLDER = "跨设备文件";
-    /** 插件文档镜像（dev-board#299）落盘根目录名：固定路径覆盖，不带日期层。 */
-    private static final String ADDIN_DOC_ROOT_FOLDER = "插件文档";
 
     private void landAndAck(JsonNode item) throws IOException, InterruptedException {
         long itemId = item.path("id").asLong();
@@ -1216,7 +1214,8 @@ public class MobileRelayClientService {
     private void landDocumentAndAck(JsonNode item, long itemId, long projectId, Long userId)
             throws IOException, InterruptedException {
         String landedName = sanitizedDocName(item.path("fileName").asText());
-        ProjectFile root = ensureFolder(projectId, null, ADDIN_DOC_ROOT_FOLDER, userId);
+        String docRoot = captureRootName(String.valueOf(projectId), "document");
+        ProjectFile root = ensureFolder(projectId, null, docRoot, userId);
 
         String token = currentToken();
         if (token == null) { receipt(item, "failed", "connection"); return; }
@@ -1233,9 +1232,9 @@ public class MobileRelayClientService {
             return;
         }
 
-        String finalPath = String.format("projects/%d/%s/%s", projectId, ADDIN_DOC_ROOT_FOLDER, landedName);
+        String finalPath = String.format("projects/%d/%s/%s", projectId, docRoot, landedName);
         String marker = item.path("clientMediaId").asText("");
-        String tmpPath = String.format("projects/%d/%s/.tmp-%s-%s", projectId, ADDIN_DOC_ROOT_FOLDER,
+        String tmpPath = String.format("projects/%d/%s/.tmp-%s-%s", projectId, docRoot,
                 marker.length() >= 8 ? marker.substring(0, 8) : "part", landedName);
         try {
             try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) {
@@ -1258,7 +1257,7 @@ public class MobileRelayClientService {
         projectFileService.createOrUpdateFile(projectId, root.getId(), landedName, ext,
                 item.path("fileSize").asLong(0), finalPath, null, userId);
         log.info("手机同步：插件文档 {} 已镜像 项目={} 文件={}/{}", itemId, projectId,
-                ADDIN_DOC_ROOT_FOLDER, landedName);
+                docRoot, landedName);
 
         HttpResponse<String> ack = authed("POST", "/api/mobile/inbox/" + itemId + "/ack", "{}");
         receipt(item, okEnvelope(ack) ? "saved" : "savedPendingAck", "");

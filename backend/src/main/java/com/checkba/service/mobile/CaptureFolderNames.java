@@ -26,7 +26,10 @@ public final class CaptureFolderNames {
 
     public enum Kind {
         MEDIA(Map.of("zh-CN", "现场影像", "zh-TW", "現場影像", "en-US", "Field media")),
-        AUDIO(Map.of("zh-CN", "现场录音", "zh-TW", "現場錄音", "en-US", "Field recordings"));
+        // the phone already says "Field audio" (mobile contract en.json file.prefix.audio)
+        AUDIO(Map.of("zh-CN", "现场录音", "zh-TW", "現場錄音", "en-US", "Field audio")),
+        /** Office/WPS add-in document mirror (dev-board#299): fixed paths, no date layer. */
+        DOCUMENT(Map.of("zh-CN", "插件文档", "zh-TW", "外掛文件", "en-US", "Plugin documents"));
 
         final Map<String, String> names;
         Kind(Map<String, String> names) { this.names = names; }
@@ -47,7 +50,9 @@ public final class CaptureFolderNames {
     }
 
     public static Kind forMediaType(String mediaType) {
-        return "audio".equals(mediaType) ? Kind.AUDIO : Kind.MEDIA;
+        if ("audio".equals(mediaType)) return Kind.AUDIO;
+        if ("document".equals(mediaType)) return Kind.DOCUMENT;
+        return Kind.MEDIA;
     }
 
     /**

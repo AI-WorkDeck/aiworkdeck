@@ -21,9 +21,13 @@ class CaptureFolderNamesTest {
     @Test
     void newRootsFollowTheUiLanguage() {
         assertEquals("Field media", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(MEDIA, Set.of())));
-        assertEquals("Field recordings", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(AUDIO, Set.of())));
+        assertEquals("Field audio", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(AUDIO, Set.of())));
         assertEquals("现场影像", AppLanguageScope.call("zh-CN", () -> CaptureFolderNames.resolve(MEDIA, Set.of())));
         assertEquals("現場影像", AppLanguageScope.call("zh-TW", () -> CaptureFolderNames.resolve(MEDIA, Set.of())));
+        assertEquals("Plugin documents", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(CaptureFolderNames.Kind.DOCUMENT, Set.of())));
+        assertEquals("外掛文件", AppLanguageScope.call("zh-TW", () -> CaptureFolderNames.resolve(CaptureFolderNames.Kind.DOCUMENT, Set.of())));
+        // an existing 插件文档 mirror keeps receiving documents after a switch to English
+        assertEquals("插件文档", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(CaptureFolderNames.Kind.DOCUMENT, Set.of("插件文档"))));
         // languages without their own entry fall back to English
         assertEquals("Field media", AppLanguageScope.call("ja-JP", () -> CaptureFolderNames.resolve(MEDIA, Set.of())));
     }
@@ -35,7 +39,7 @@ class CaptureFolderNamesTest {
         // a root created in English, then the user switches to Chinese: keep "Field media"
         assertEquals("Field media", AppLanguageScope.call("zh-CN", () -> CaptureFolderNames.resolve(MEDIA, Set.of("Field media"))));
         // the audio root is separate from the media root
-        assertEquals("Field recordings", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(AUDIO, Set.of("现场影像"))));
+        assertEquals("Field audio", AppLanguageScope.call("en-US", () -> CaptureFolderNames.resolve(AUDIO, Set.of("现场影像"))));
         // both exist (e.g. created on two devices): the canonical one wins, deterministically
         assertEquals("现场影像", CaptureFolderNames.resolve(MEDIA, Set.of("Field media", "现场影像")));
     }
