@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "긴 컨텍스트는 요금이 더 높음",
   "noVisionTag": "이미지 입력 불가",
   "modelNoVisionToast": "이 모델은 이미지를 직접 읽을 수 없습니다. 이미지는 인식된 텍스트(OCR)로 처리됩니다.",
-  "noModels": "사용 가능한 모델이 없습니다. AI 공급자 설정을 확인하세요.",
+  "noModels": "아직 모델이 없습니다. AI를 사용하려면 AI WorkDeck 계정에 로그인하세요.",
   "networkBasis": "네트워크 확인: {basis}",
   "modelPriceUnitCny": "단위: 100만 토큰당 CNY, 입력 / 출력",
   "modelPriceUnitUsd": "단위: 백만(1M) 토큰당 USD, 입력 / 출력",

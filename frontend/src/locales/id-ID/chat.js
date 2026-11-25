@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "Tarif lebih tinggi untuk konteks panjang",
   "noVisionTag": "Tidak ada input gambar",
   "modelNoVisionToast": "Model ini tidak dapat membaca gambar secara langsung. Gambar akan diproses sebagai teks yang dikenali (OCR).",
-  "noModels": "Tidak ada model yang tersedia. Periksa pengaturan penyedia AI.",
+  "noModels": "Belum ada model. Masuk ke akun AI WorkDeck Anda untuk menggunakan AI.",
   "networkBasis": "Pemeriksaan jaringan: {basis}",
   "modelPriceUnitCny": "Satuan: CNY per 1M token, input / output",
   "modelPriceUnitUsd": "Satuan: USD per 1M token, input / output",

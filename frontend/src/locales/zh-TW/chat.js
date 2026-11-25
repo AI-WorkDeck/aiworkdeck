@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "長上下文單價更高",
   "noVisionTag": "不支援讀圖",
   "modelNoVisionToast": "該模型不支援直接讀圖，圖片將按文字識別（OCR）處理",
-  "noModels": "暫無可用模型，到設定頁檢查 AI 供應商配置",
+  "noModels": "暫無可用模型。登入 AI WorkDeck 帳戶後即可使用 AI。",
   "networkBasis": "網路判定：{basis}",
   "modelPriceUnitCny": "單位：元 / 百萬 tokens，前為輸入、後為輸出",
   "modelPriceUnitUsd": "單位：美元 / 百萬 tokens，前為輸入、後為輸出",
