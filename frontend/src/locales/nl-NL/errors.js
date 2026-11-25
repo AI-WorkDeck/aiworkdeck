@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Opnieuw proberen",
     "details": "Details",
+    "hideDetails": "Details verbergen",
     "continue": "Doorgaan",
     "refresh": "Vernieuwen",
     "signIn": "Inloggen",
