@@ -14,7 +14,7 @@ const LABELS = {
     menu: 'AI 审校设置', aiOn: '关闭 AI 审校', aiOff: '开启 AI 审校', runNow: '立即 AI 审校', collapse: '收起到边缘', expand: '展开 AI 审校浮球',
     autocompleteOn: '自动补全已开启', autocompleteOff: '自动补全已关闭', autocompleteDisable: '关闭自动补全', autocompleteEnable: '开启自动补全', preferenceFailed: '设置未能保存，仍保持原状态，请重试。', autocompleteHint: 'AI 根据上下文建议，会使用 AI 额度；关闭后仍可手动补全。',
     aiBusy: 'AI 审校中', aiOffState: 'AI 审校已关闭（规则检查照常）',
-    blocked: { DEEP_QUOTA: 'AI 审校已暂停：账户额度不足', DEEP_RATE_LIMITED: 'AI 审校已暂停：模型服务限流', DEEP_MODEL_UNAVAILABLE: 'AI 审校已暂停：当前辅助模型不可用', DEEP_REGION: 'AI 审校已暂停：服务商按地域拒绝' },
+    blocked: { DEEP_QUOTA: 'AI 审校已暂停：账户额度不足', DEEP_RATE_LIMITED: 'AI 审校已暂停：模型服务限流', DEEP_MODEL_UNAVAILABLE: 'AI 审校已暂停：当前辅助模型不可用', DEEP_REGION: 'AI 审校已暂停：服务商按地域拒绝', DEEP_SIGNED_OUT: 'AI 审校已暂停：尚未登录' },
   },
   en: {
     title: 'AI review', icon: 'R', checking: 'Checking…', stale: 'Text changed. Waiting for a fresh check.', error: 'Checks are unavailable',
@@ -22,7 +22,7 @@ const LABELS = {
     menu: 'AI review settings', aiOn: 'Turn AI review off', aiOff: 'Turn AI review on', runNow: 'Run AI review now', collapse: 'Collapse to edge', expand: 'Expand the AI review ball',
     autocompleteOn: 'Autocomplete is on', autocompleteOff: 'Autocomplete is off', autocompleteDisable: 'Turn autocomplete off', autocompleteEnable: 'Turn autocomplete on', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', autocompleteHint: 'AI uses context and AI credits to suggest a continuation. Manual completion remains available when off.',
     aiBusy: 'AI review running', aiOffState: 'AI review is off (rule checks still run)',
-    blocked: { DEEP_QUOTA: 'AI review paused: the account is out of credit', DEEP_RATE_LIMITED: 'AI review paused: the model service is rate limiting', DEEP_MODEL_UNAVAILABLE: 'AI review paused: the auxiliary model is unavailable', DEEP_REGION: 'AI review paused: the provider rejected this network region' },
+    blocked: { DEEP_QUOTA: 'AI review paused: the account is out of credit', DEEP_RATE_LIMITED: 'AI review paused: the model service is rate limiting', DEEP_MODEL_UNAVAILABLE: 'AI review paused: the auxiliary model is unavailable', DEEP_REGION: 'AI review paused: the provider rejected this network region', DEEP_SIGNED_OUT: 'AI review paused: not signed in' },
   },
 }
 

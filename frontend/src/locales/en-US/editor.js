@@ -428,6 +428,7 @@ export default {
       DEEP_MODEL_UNAVAILABLE: 'Cause: the auxiliary model is unavailable. Pick another one in settings.',
       DEEP_REGION: 'Cause: the provider rejected this network region. Change the model or the network.',
       DEEP_FAILED: 'Cause: the model call failed.',
+      DEEP_SIGNED_OUT: 'Cause: you are not signed in. Sign in to use AI review.',
     },
   },
   toolbar: {

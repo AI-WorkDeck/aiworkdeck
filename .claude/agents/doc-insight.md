@@ -353,6 +353,7 @@ DOC 实体的 `detail`（命中项目文件时；`GET /entities/{id}` 才下发�
 - `frontend/src/services/api.js` —— `parseDocInsight` / `getDocInsight` / `getDocInsightEntity` / `refreshDocInsightEntity`。
 - 宿主接线在 `frontend/src/pages/project-overview/project-overview.vue`（右栏 `rightPaneKey==='insight'` / 左栏 `leftPaneKey==='insight'` 两条显式分支 + `isInsightDoc` / `getInsightExecutor` / `onOpenInsight` / `onInsightEntities` / `setInsightIndex` / `insightSubscribedFor` / `prefetchInsightIndex` / `onEditorCursorContext` / `openInsightHoverCard` / `closeInsightHoverCard`；浮窗在**根节点**渲染，实体详情标签在左右两条 `v-else-if` 链里各一份）。
 - 入口（教程反馈 49，dev-board#1713 核实）：**工作台右栏 dock 的「依据」标签**（`panelRegistry` 的 `insight`，宿主 `openPanelInItsDock('insight')`），面板内「全文在线核验（可能产生费用）」按钮显式 POST `/parse`。编辑器工具栏早已没有「解析」按钮；残留的 `open-insight` 事件链（`inlineReviewHost` 的 `open-insight` 动作、`LibreOfficeEditor.onToggleInsight`、工作台三处 `@open-insight` 与 `onOpenInsight`）与孤儿词条 `editor.toolbar.insightPanel/insightShort` 已删除。
+- 自动 AI 审校与登录（D1，2026-11-24）：`inlineReviewHost` 停笔后自动排的那一轮以 `run(true, { auto: true })` 调 `review(pid, body, { auto })`；`LibreOfficeEditor` 据此给 `reviewDocInsight` 传 `accountPrompt:false`，未登录（4011 / `accountRequired`）时**不弹全局登录层**，改为 `autoBlocked = DEEP_SIGNED_OUT`（浮球与右栏写明「尚未登录」），本会话不再自动重试；用户手动「立即 AI 审校」仍会弹登录，成功一次即解除。任何后台/自动发起的平台 AI 请求都必须带 `accountPrompt:false`。回归：`frontend/tests/completion/inline-review-host.test.mjs` 的两条 D1 用例。
 
 ### 事件流
 

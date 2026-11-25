@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Oorzaak: dit gedeelte overschrijdt de context van het model. Splits het en beoordeel opnieuw.",
       "DEEP_MODEL_UNAVAILABLE": "Oorzaak: het hulpmodel is niet beschikbaar. Kies een ander model in de instellingen.",
       "DEEP_REGION": "Oorzaak: de provider heeft deze netwerkregio geweigerd. Wijzig het model of het netwerk.",
-      "DEEP_FAILED": "Oorzaak: de modelaanroep is mislukt."
+      "DEEP_FAILED": "Oorzaak: de modelaanroep is mislukt.",
+      "DEEP_SIGNED_OUT": "Oorzaak: u bent niet aangemeld. Meld u aan om AI-controle te gebruiken."
     }
   },
   "toolbar": {

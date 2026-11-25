@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Ursache: Dieser Abschnitt überschreitet den Modellkontext. Bitte teilen Sie ihn auf und prüfen Sie ihn erneut.",
       "DEEP_MODEL_UNAVAILABLE": "Ursache: Das Hilfsmodell ist nicht verfügbar. Bitte wählen Sie in den Einstellungen ein anderes aus.",
       "DEEP_REGION": "Ursache: Der Anbieter hat diese Netzwerkregion abgelehnt. Bitte ändern Sie das Modell oder das Netzwerk.",
-      "DEEP_FAILED": "Ursache: Der Modellaufruf ist fehlgeschlagen."
+      "DEEP_FAILED": "Ursache: Der Modellaufruf ist fehlgeschlagen.",
+      "DEEP_SIGNED_OUT": "Ursache: Sie sind nicht angemeldet. Melden Sie sich an, um die KI-Prüfung zu nutzen."
     }
   },
   "toolbar": {

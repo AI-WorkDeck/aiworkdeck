@@ -27,6 +27,9 @@ const AUTO_AI_MIN_GAP_MS = 180000
 // 这些原因码不是「这一次不巧失败」，自动重试只会再花一次钱／再撞一次同一堵墙：
 // 本会话不再自动跑，手动按钮仍留着（充完值、换完模型即可立刻重试）。
 const AUTO_AI_BLOCKING = new Set(['DEEP_QUOTA', 'DEEP_RATE_LIMITED', 'DEEP_MODEL_UNAVAILABLE', 'DEEP_REGION'])
+// 没登录账户：平台 AI 回 4011（api.js 的 accountRequiredError 会带 accountRequired=true）。
+const SIGNED_OUT = 'DEEP_SIGNED_OUT'
+const isSignedOut = (e) => e?.accountRequired === true || e?.code === 4011
 
 /**
  * Review the live Writer snapshot.
@@ -94,7 +97,7 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
     if (disposed || !ai || !active || !writable || deepBusy || autoBlocked) return
     if (!cachedBodyHash || cachedBodyHash === deepHash) return
     const wait = Math.max(AUTO_AI_IDLE_MS, lastAutoAt + AUTO_AI_MIN_GAP_MS - now())
-    aiTimer = timers.set(() => { aiTimer = null; lastAutoAt = now(); return run(true) }, wait)
+    aiTimer = timers.set(() => { aiTimer = null; lastAutoAt = now(); return run(true, { auto: true }) }, wait)
   }
   function invalidate() {
     if (disposed) return
@@ -152,7 +155,8 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
     }
     return { paragraphs, revision, truncated }
   }
-  async function run(deep) {
+  // auto：停笔后自动排的那一次。它不是用户按的，不能替用户弹登录层（D1）。
+  async function run(deep, { auto = false } = {}) {
     if (disposed || !active || (deep ? !writable || deepBusy : localBusy)) return false
     const gen = generation
     if (deep) { deepBusy = true; clearAiTimer(); publish({ deepStatus: 'checking', message: '' }) }
@@ -165,7 +169,7 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
       // 整篇送：这一条 POST 里的规则检查是跨段落的（交叉引用、前后数量、算式），
       // 只送改动段会让它们算错，而返回的 findings 是整份清单、不是增量补丁。
       // 增量要动后端的检查口径，不在本卡范围。
-      const result = reuse ? cachedResult : unwrap(await review(projectId, { docFileId: fileId, paragraphs: snap.paragraphs, truncated: snap.truncated, deep }))
+      const result = reuse ? cachedResult : unwrap(await review(projectId, { docFileId: fileId, paragraphs: snap.paragraphs, truncated: snap.truncated, deep }, { auto }))
       if (!current(gen)) return false
       // The worker revision also covers edits whose host modified relay has not arrived yet.
       const context = await execute('get_review_context', {})
@@ -180,6 +184,8 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
       if (deep && deepComplete) { deepRevision = snap.revision; deepHash = bodyHash(snap) }
       const reason = deep && !deepComplete ? String(result.summary?.deepReason || '') : ''
       if (AUTO_AI_BLOCKING.has(reason)) autoBlocked = reason
+      // 登录后手动跑通了一次：未登录那条暂停自然解除，自动审校恢复。
+      else if (deep && autoBlocked === SIGNED_OUT) autoBlocked = ''
       const byIndex = new Map(snap.paragraphs.map((p) => [p.index, p.text]))
       const findings = result.findings.slice(0, 200).flatMap((f, i) => {
         const expectedParagraph = byIndex.get(f.paragraphIndex)
@@ -207,6 +213,12 @@ export function createInlineReviewHost({ projectId, fileId, userId, execute, sen
       if (!deep) scheduleAi()
       return true
     } catch (error) {
+      // 未登录时自动那一轮：静默暂停自动 AI 审校并说明原因，不报错、不弹登录层、不再每 3 分钟重试。
+      if (deep && auto && isSignedOut(error)) {
+        autoBlocked = SIGNED_OUT
+        if (current(gen)) publish({ deepStatus: 'idle', message: '', deepReason: '', deepRetried: false })
+        return false
+      }
       if (current(gen) && (deep || deepRevision == null)) publish(deep
         ? { deepStatus: 'error', message: String(error?.message || 'REVIEW_FAILED'), deepReason: '', deepRetried: false }
         : { status: 'error', findings: [], message: String(error?.message || 'REVIEW_FAILED') })
