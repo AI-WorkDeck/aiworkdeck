@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Sequence
 
 ZH_CN_MK_MARKER = "ZZZ-aiworkdeck-locale-zh-CN"
+ZH_TW_MK_MARKER = "AI Workdeck (E1): pack the zh-TW UI catalogs"
 SLIM_MK_MARKER = "AI Workdeck (#1371): slim Lightproof and unused dicts"
 
 DICT_EXTENSION_RE = re.compile(r"(?:^|/)share/extensions/dict-([^/]+)/")
@@ -103,6 +104,12 @@ def should_strip_fs_entry(
         or "registry_zh-CN.xcd" in normalized
         or "ZZZ-aiworkdeck-locale-zh-CN.xcd" in normalized
         or "/program/resource/zh_CN/" in normalized
+        # E1: zh-TW UI (Traditional) catalogs + registry, same set as zh-CN minus the default-locale override
+        or "Langpack-zh-TW.xcd" in normalized
+        or "cjk_zh-TW.xcd" in normalized
+        or "fcfg_langpack_zh-TW.xcd" in normalized
+        or "registry_zh-TW.xcd" in normalized
+        or "/program/resource/zh_TW/" in normalized
     ):
         return False
 
@@ -159,6 +166,27 @@ gb_emscripten_fs_image_files += \\
         applied.append("zh-cn-fs-image-mk")
     else:
         applied.append("zh-cn-fs-image-mk (already applied)")
+
+    if ZH_TW_MK_MARKER not in s:
+        anchor = "endif # !ENABLE_WASM_STRIP_CHART\n"
+        assert s.count(anchor) == 1, f"anchor count = {s.count(anchor)} in {mk_path}"
+        block = (
+            anchor
+            + """
+# AI Workdeck (E1): pack the zh-TW UI catalogs (.mo) + registry (resources produced by
+# --with-lang=zh-TW). No default-locale override: zh-TW is selected at runtime (lowaUiLang).
+gb_emscripten_fs_image_files += \\
+    $(INSTROOT)/$(LIBO_SHARE_FOLDER)/registry/Langpack-zh-TW.xcd \\
+    $(INSTROOT)/$(LIBO_SHARE_FOLDER)/registry/cjk_zh-TW.xcd \\
+    $(INSTROOT)/$(LIBO_SHARE_FOLDER)/registry/res/fcfg_langpack_zh-TW.xcd \\
+    $(INSTROOT)/$(LIBO_SHARE_FOLDER)/registry/res/registry_zh-TW.xcd \\
+    $(wildcard $(INSTROOT)/program/resource/zh_TW/LC_MESSAGES/*.mo)
+"""
+        )
+        s = s.replace(anchor, block, 1)
+        applied.append("zh-tw-fs-image-mk")
+    else:
+        applied.append("zh-tw-fs-image-mk (already applied)")
 
     if slim_dicts:
         if SLIM_MK_MARKER not in s:
