@@ -524,6 +524,15 @@ try {
   const j1Nav = []
   j1Page.on('framenavigated', (f) => { if (f === j1Page.mainFrame()) j1Nav.push(f.url()) })
   j1Page.on('pageerror', (e) => note('pageerror', 'J1: ' + String(e).slice(0, 280)))
+  // D7：首启这一页自己发出的外部请求（不含本机前端 / 后端）。legal/PRIVACY.md 之外的出站是红线。
+  const j1Local = new Set([new URL(BASE).host, new URL(BACKEND).host])
+  const j1Remote = []
+  j1Page.on('request', (r) => {
+    try {
+      const u = new URL(r.url())
+      if (/^https?:$/.test(u.protocol) && !j1Local.has(u.host) && !/^(127\.0\.0\.1|localhost)$/.test(u.hostname)) j1Remote.push(r.url().slice(0, 150))
+    } catch (e) { /* data:/blob: */ }
+  })
   await j1Page.evaluateOnNewDocument((apiBase) => {
     window.checkbaDesktop = {
       apiBaseUrl: apiBase,
@@ -560,6 +569,12 @@ try {
       if (bad.length) throw new Error('启动链路过了不该过的页: ' + JSON.stringify(bad))
       const now = await j1Page.evaluate(() => location.hash)
       if (!now.includes(J1_EXPECT_ROUTE) || /[?&]id=/.test(now)) throw new Error('最终没停在无项目态外壳: ' + now)
+    })
+
+    await step('首启 5 秒内不向任何外部主机发请求（D7）', async () => {
+      // uni 框架 CSS 曾在启动 3 秒后去 cdn.dcloud.net.cn 拉阴影图；等过这个点再判。
+      await sleep(5000)
+      if (j1Remote.length) throw new Error('启动时请求了外部主机: ' + JSON.stringify([...new Set(j1Remote)]))
     })
 
     await step('欢迎标签在位且激活，内容挂载', async () => {

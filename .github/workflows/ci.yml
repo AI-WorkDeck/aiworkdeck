@@ -351,6 +351,9 @@ jobs:
       - name: Build H5
         working-directory: frontend
         run: npm run build:h5
+      - name: No remote resources fetched by the built app at launch (D7)
+        working-directory: frontend
+        run: node scripts/check-dist-egress.mjs
 
   pptx-service:
     # 随包的 PPT 服务（上游 banana-slides 的 vendored 代码）单元测试；此前 CI 完全没跑过，
