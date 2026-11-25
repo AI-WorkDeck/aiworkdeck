@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "새로 만들기",
+    "aria": "새 문서 또는 새 브라우저 탭",
+    "newWord": "새 Word 문서",
+    "newExcel": "새 Excel 통합 문서",
+    "newPowerPoint": "새 PowerPoint 프레젠테이션",
+    "newBrowserTab": "새 브라우저 탭",
+  },
   scratchCopyChoose: "복사할 내용 선택",
   scratchCopySelected: "{count}개 선택됨",
   scratchCopyFiles: "파일",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "휴지통",
   "loadingText": "불러오는 중...",
   "explorerFallback": "탐색기",
-  "newOrCopy": "새로 만들기 / 복제",
   "emptyWorkspace": "파일을 선택하여 시작하세요",
   "emptyWorkspaceHint": "왼쪽 탐색기에서 파일을 열거나 새 문서를 만드세요",
   "railEditEnter": "사이드바 정렬(드래그하여 순서 변경 또는 고정)",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "이 파일을 보낼 수 없습니다",
   "shareUnsupported": "이 시스템에서는 전송이 지원되지 않습니다",
   "shareClipboardHint": "파일이 복사되었습니다. WeChat으로 전환하여 채팅을 선택하고 Ctrl+V를 눌러 보내세요",
-  "copyFailedNoNewFile": "복사 실패: 새 파일이 반환되지 않았습니다",
-  "copyFailed": "복사 실패",
   "recordingStarted": "활동 기록을 시작했습니다",
   "recordingStopped": "활동 기록을 중지했습니다",
   "insertedToDoc": "문서에 삽입되었습니다",

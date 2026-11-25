@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "新規",
+    "aria": "新規ドキュメントまたは新しいブラウザタブ",
+    "newWord": "新規 Word ドキュメント",
+    "newExcel": "新規 Excel ブック",
+    "newPowerPoint": "新規 PowerPoint プレゼンテーション",
+    "newBrowserTab": "新しいブラウザタブ",
+  },
   scratchCopyChoose: "コピーする内容を選択",
   scratchCopySelected: "{count} 件選択中",
   scratchCopyFiles: "ファイル",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "ごみ箱",
   "loadingText": "読み込み中...",
   "explorerFallback": "エクスプローラー",
-  "newOrCopy": "新規 / 複製",
   "emptyWorkspace": "開始するにはファイルを選択してください",
   "emptyWorkspaceHint": "左側のエクスプローラーからファイルを開くか、新しいドキュメントを作成してください",
   "railEditEnter": "サイドバーを整理（ドラッグで並べ替え・ドッキング）",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "このファイルを送信できません",
   "shareUnsupported": "このシステムでは送信はサポートされていません",
   "shareClipboardHint": "ファイルをコピーしました。WeChatに切り替えて、チャットを選択し、Ctrl+Vを押して送信してください",
-  "copyFailedNoNewFile": "コピーに失敗しました: 新しいファイルが返されませんでした",
-  "copyFailed": "コピーに失敗しました",
   "recordingStarted": "アクティビティの記録を開始しました",
   "recordingStopped": "アクティビティの記録を停止しました",
   "insertedToDoc": "ドキュメントに挿入しました",
