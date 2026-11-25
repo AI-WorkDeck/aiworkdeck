@@ -189,7 +189,8 @@ public class HttpMobileBillingClient implements MobileBillingClient {
     public ProQuote proQuote(String accountId) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("action", "pro-quote");
-        body.put("accountId", accountId);
+        // No account yet: the website quotes the offer a new account gets (the account is created on purchase).
+        if (accountId != null && !accountId.isBlank()) body.put("accountId", accountId);
         JsonNode json = call(body);
         if (!json.path("available").asBoolean(false)) {
             return ProQuote.unavailable(json.path("reason").asText("disabled"));

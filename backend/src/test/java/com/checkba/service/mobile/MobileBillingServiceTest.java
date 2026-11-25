@@ -931,15 +931,17 @@ class MobileBillingServiceTest {
     }
 
     @Test
-    @DisplayName("Pro quote without a unified account: not_connected, never create=true, no binding")
+    @DisplayName("Pro quote without a unified account: the new-account offer, never create=true, no binding")
     void proQuoteWithoutAccountDoesNotCreateOne() {
         User user = phoneUser();
         when(billing.resolveAccountId(user.getPhone(), null, false)).thenThrow(
                 new MobileBillingException(MobileBillingKind.NOT_FOUND, "not found"));
-        assertEquals(MobileBillingClient.ProQuote.unavailable("not_connected"), service.proQuote(user.getId()));
+        var offer = new MobileBillingClient.ProQuote(true, null, "pro_monthly_intro", 990, 14900, true, 3, 30);
+        when(billing.proQuote(null)).thenReturn(offer);
+        assertEquals(offer, service.proQuote(user.getId()));
         verify(billing).resolveAccountId(user.getPhone(), null, false);
         verify(billing, never()).resolveAccountId(any(), any(), eq(true));
-        verify(billing, never()).proQuote(any());
+        verify(billing).proQuote(null);
         assertTrue(accountBindingRepository.findByUserId(user.getId()).isEmpty());
     }
 

@@ -687,6 +687,10 @@ class HttpMobileBillingClientTest {
 
         stubBody.set("{\"available\":false,\"reason\":\"appstore_subscription_active\"}");
         assertEquals(MobileBillingClient.ProQuote.unavailable("appstore_subscription_active"), c.proQuote("acct-x"));
+
+        c.proQuote(null);
+        var anonymous = om.readTree(lastRequest.get());
+        assertTrue(anonymous.path("accountId").isMissingNode(), "no account: no accountId key");
     }
 
     @Test

@@ -545,7 +545,7 @@ components:
       description: |
         Personal Pro via WeChat APP pay (Android mainland). available=false carries only reason;
         available=true carries the website-authoritative price. Reads never create a unified account
-        (no account yet → reason=not_connected). Buy with POST /subscription/wxpay/order using
+        (no account yet → the new-account offer; the account is created by the order). Buy with POST /subscription/wxpay/order using
         exactly this skuId + amountCents.
       required: [available]
       properties:

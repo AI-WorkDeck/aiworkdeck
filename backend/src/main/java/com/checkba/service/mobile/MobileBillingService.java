@@ -422,7 +422,8 @@ public class MobileBillingService {
             return callWithAccount(userId, false, true, billing::proQuote);
         } catch (MobileBillingFailureException e) {
             if (e.getKind() != MobileBillingKind.NOT_CONNECTED) throw e;
-            return MobileBillingClient.ProQuote.unavailable("not_connected");
+            // Reads never create accounts: quote the new-account offer; createPro creates the account on purchase.
+            return billing.proQuote(null);
         }
     }
 
