@@ -147,6 +147,13 @@ export default {
     autoRetry: "本机服务恢复后会自动重新读取。读取完成前不能编辑这份文档。",
     retry: "重试",
   },
+  authorPrompt: {
+    text: "修订和批注用什么名字署名？收到文档的人都会看到这个名字。",
+    placeholder: "你的名字或律所名称",
+    save: "保存",
+    later: "以后再说",
+    empty: "请填写名字",
+  },
   openFailed: {
     title: '文档无法打开：引擎无响应或文件损坏',
     encryptedTitle: '这个文件设置了打开密码，编辑器暂不能直接打开。请在 Excel / Word / PowerPoint 或 WPS 中去掉打开密码后再打开，或下载原文件。',
