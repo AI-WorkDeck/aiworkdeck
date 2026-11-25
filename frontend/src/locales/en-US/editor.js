@@ -1003,7 +1003,7 @@ export default {
     sourceLine: 'Source: {source}',
     dateLine: 'Queried on: {date}',
     error: 'The operation failed. Please try again.',
-    login: 'Sign in',
+    login: 'Sign In',
     recharge: 'Add credits',
     saved: 'Inserted. Use Undo to revert.',
     replaced: 'Replaced. Use Undo to revert.',

@@ -75,7 +75,7 @@ export default {
   "enabledTag": "已啟用",
   "disabledTag": "已停用",
   "sectionSkillSub": "提示詞能力：在對話中生效，可設定生效方式",
-  "builtinWorkflowsMarketNotice": "已內建：契約審查、證據整理、檔案整理、法律意見書核查已納入主流程，對話中依任務自動啟用，無需在此安裝或勾選。",
+  "builtinWorkflowsMarketNotice": "內建工作流已自動啟用：契約審查、證據整理、檔案整理、法律意見書核查會在對話中依任務自動啟用，無需在這裡安裝或勾選。",
   "noLocalSkills": "本機還沒有額外擴充套件 Skill",
   "noLocalSkillsHint": "去「Skill 廣場」裝一個，或把 Skill 目錄（含 skill.yml）放進本機 Skill 目錄 ~/.aiworkdeck/skills/ 後點「重新掃描」",
   "fromPlugin": "來自外掛 {pluginId}",
