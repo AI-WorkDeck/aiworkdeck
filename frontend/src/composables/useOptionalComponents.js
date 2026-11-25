@@ -135,7 +135,8 @@ export function createOptionalComponentsController(deps) {
       if (info && info.totalSize) item.downloadBytes = info.totalSize
       if (info && info.unpackedSize) item.unpackedBytes = info.unpackedSize
     } catch (e) {
-      // 镜像不可达：体积保持未知，卡片显示 components.sizeUnknown，不拦下载按钮
+      // 镜像不可达：体积保持未知、不拦下载按钮。D6：标出「查不到」，卡片别永远显示「正在获取…」
+      item.sizeUnavailable = true
     }
     return item
   }

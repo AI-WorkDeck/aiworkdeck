@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} muss heruntergeladen werden (ca. {runtime} MB). Die Daten werden unter ~/.aiworkdeck gespeichert und können unter Einstellungen → Komponenten entfernt werden.",
   "promptUsage": "Ermöglicht: {unlocks}. Ohne diese Komponente: {impact}. Alles andere funktioniert weiterhin.",
   "sizeUnknown": "Größe wird ermittelt…",
+  "sizeUnavailable": "Größe wird beim Download angezeigt",
   "stateNotInstalled": "Nicht installiert",
   "stateReady": "Installiert (noch nicht ausgeführt)",
   "stateServiceStarted": "Dienst gestartet (Funktion noch nicht geprüft)",

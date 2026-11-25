@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "يلزم تنزيل {name} (حوالي {runtime} ميجابايت). يُخزَّن في ~/.aiworkdeck ويمكن إزالته من الإعدادات ← المكونات.",
   "promptUsage": "يشغّل: {unlocks}. بدونه: {impact}. وكل شيء آخر يستمر في العمل.",
   "sizeUnknown": "جارٍ التحقق من الحجم…",
+  "sizeUnavailable": "يظهر الحجم عند بدء التنزيل",
   "stateNotInstalled": "غير مثبَّت",
   "stateReady": "مثبَّت (لم يُشغَّل بعد)",
   "stateServiceStarted": "بدأت الخدمة (لم يتم التحقق من الوظيفة بعد)",

@@ -170,6 +170,11 @@
           </view>
           <text class="welcome-startup-text">{{ $t('welcome.showOnStartup') }}</text>
         </view>
+        <view v-if="componentsSuggested" class="welcome-telemetry welcome-components-notice" role="status">
+          <text class="welcome-telemetry-text">{{ $t('welcome.componentsNotice') }}</text>
+          <text class="welcome-link" @tap="$emit('open-components')">{{ $t('welcome.componentsNoticeReview') }}</text>
+          <text class="welcome-telemetry-close" :title="$t('welcome.componentsNoticeDismiss')" @tap="$emit('dismiss-components')">×</text>
+        </view>
         <view v-if="telemetryNoticeVisible" class="welcome-telemetry">
           <text class="welcome-link welcome-telemetry-text" @tap="openTelemetrySettings">{{ $t('welcome.telemetryNotice') }}</text>
           <text class="welcome-telemetry-close" :title="$t('welcome.telemetryNoticeDismiss')" @tap="dismissTelemetryNotice">×</text>
@@ -217,8 +222,10 @@ export default {
     canStartRecording: { type: Boolean, default: true },
     /** 「启动时显示欢迎页」当前值（本机记忆由宿主持有） */
     showOnStartup: { type: Boolean, default: true },
+    /** D6：首启有可选组件可下载——一行提示，代替自动弹窗 */
+    componentsSuggested: { type: Boolean, default: false },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc', 'start-recording'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc', 'start-recording', 'open-components', 'dismiss-components'],
   data() {
     return {
       quickPrompt: '',
@@ -410,6 +417,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.welcome-components-notice { gap: 8px; }
 .welcome-pane {
   height: 100%;
   background: var(--awd-surface);

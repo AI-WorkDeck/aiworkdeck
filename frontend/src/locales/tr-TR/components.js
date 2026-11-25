@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} indirilmelidir (yaklaşık {runtime} MB). ~/.aiworkdeck altında saklanır ve Ayarlar → Bileşenler bölümünden kaldırılabilir.",
   "promptUsage": "Sağladığı özellikler: {unlocks}. İndirilmezse: {impact}. Diğer tüm özellikler çalışmaya devam eder.",
   "sizeUnknown": "Boyut kontrol ediliyor…",
+  "sizeUnavailable": "Boyut indirme başladığında gösterilir",
   "stateNotInstalled": "Yüklü değil",
   "stateReady": "Yüklendi (henüz çalıştırılmadı)",
   "stateServiceStarted": "Hizmet başlatıldı (işlev henüz doğrulanmadı)",

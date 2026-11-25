@@ -1334,6 +1334,9 @@
                       :key="activeFileLeft.id"
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
+                      :components-suggested="optionalComponentsSuggested"
+                      @open-components="openSuggestedComponents"
+                      @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
                       @activate-current-project="showCurrentProjectFiles"
                       @project-renamed="onProjectRenamedFromPane"
@@ -1615,6 +1618,9 @@
                       :key="activeFileRight.id"
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
+                      :components-suggested="optionalComponentsSuggested"
+                      @open-components="openSuggestedComponents"
+                      @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
                       @activate-current-project="showCurrentProjectFiles"
                       @project-renamed="onProjectRenamedFromPane"
@@ -2663,7 +2669,6 @@ import {
   PROMPTED_PREF_KEY,
   PROMPTED_PACKS_PREF_KEY,
 } from '@/composables/useOptionalComponents.js'
-import { whenPermissionOnboardingStartupSettled } from '@/utils/permissionOnboarding.js'
 import { documentLinkPreviewMethods } from './documentLinkPreview.js'
 import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
 import { useLitigationGeneration } from '@/composables/useLitigationGeneration.js'
@@ -2773,6 +2778,8 @@ export default {
       taskDialogProjects: [],
       // 首次启动的「可选组件」面板（设计 §4.1，随启动落点从项目列表页搬来）
       showOptionalComponents: false,
+      // D6：欢迎页上的「可选组件」提示行（替代首启自动弹窗）
+      optionalComponentsSuggested: false,
       optionalComponentsAppVersion: '',
       // Screenshot Save Dialog
       showScreenshotSaveDialog: false,
@@ -6952,6 +6959,21 @@ export default {
      * 首次启动的「可选组件」面板（设计 §4.1）。原挂在项目列表页 onLoad，启动落点换成工作台外壳后
      * 搬到这里、只在无项目态（= 启动那一次）触发；判据与写回原样照搬。
      */
+    openSuggestedComponents() {
+      this.optionalComponentsSuggested = false
+      this.showOptionalComponents = true
+    },
+    async dismissSuggestedComponents() {
+      this.optionalComponentsSuggested = false
+      try {
+        const stored = await host.prefs.get(PROMPTED_PACKS_PREF_KEY)
+        const prev = stored && stored.value !== undefined ? stored.value : stored
+        await host.prefs.set(PROMPTED_PACKS_PREF_KEY, mergePromptedPackIds(prev, this._optionalComponentItems || []))
+        await host.prefs.set(PROMPTED_PREF_KEY, this.optionalComponentsAppVersion || '')
+      } catch (e) {
+        console.warn('[project-overview] 记录组件提示失败', e)
+      }
+    },
     async maybePromptOptionalComponents() {
       if (!isDesktopHost() || !host.prefs) return
       try {
@@ -6971,12 +6993,13 @@ export default {
           promptedPackIds,
           isDesktop: true,
         })
-        // 首启弹窗排队（问题 4/40）：等权限引导窗关掉（或判定不弹）再弹，两个窗不叠在一起
-        if (shouldShow) await whenPermissionOnboardingStartupSettled()
-        this.showOptionalComponents = shouldShow
+        // D6：首启不再自动弹窗盖住欢迎页（用户什么都还没做）。改为欢迎页上一行可关闭的提示，
+        // 点「查看」才开同一个面板（面板关掉时照旧记「提示过」）；点 × 也记「提示过」。
+        this._optionalComponentItems = items
+        this.optionalComponentsSuggested = shouldShow
         // 0.46 及以前只记了版本号。不弹的时候把「提示过哪些组件」补齐，将来真多出一个新组件
         // 时才认得出来。清单为空（后端没起来 / ai.packs 关着）时不写。
-        if (!this.showOptionalComponents && !Array.isArray(promptedPackIds) && items.length) {
+        if (!shouldShow && !Array.isArray(promptedPackIds) && items.length) {
           await host.prefs.set(PROMPTED_PACKS_PREF_KEY, mergePromptedPackIds(null, items))
         }
       } catch (e) {
