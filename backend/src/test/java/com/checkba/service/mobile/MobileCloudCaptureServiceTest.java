@@ -45,7 +45,9 @@ class MobileCloudCaptureServiceTest {
     @Test void truncatedUploadLeavesNoFileRowOrReceiptAndDeletesTemporaryBytes() throws Exception {
         when(bytes.save(anyString(),any(InputStream.class))).thenAnswer(inv->{inv.getArgument(1,InputStream.class).transferTo(OutputStream.nullOutputStream());return inv.getArgument(0);});
         assertThrows(IllegalStateException.class,()->service.store(1L,"8",clientId,"x.m4a","audio",null,30,new ByteArrayInputStream(new byte[3])));
-        verify(bytes).delete(contains(".capture-"));verifyNoInteractions(files);verify(receipts,never()).saveAndFlush(any());
+        verify(bytes).delete(contains(".capture-"));
+        // X44: the root-name lookup may read the folder list; no file row or folder is created
+        verify(files,atMost(1)).getFilesByParent(anyLong(),isNull());verifyNoMoreInteractions(files);verify(receipts,never()).saveAndFlush(any());
     }
     @Test void wrongOwnerFailsBeforeLockQuotaOrBytes() {
         assertThrows(IllegalArgumentException.class,()->service.store(2L,"8",clientId,"x.m4a","audio",null,3,new ByteArrayInputStream(new byte[3])));

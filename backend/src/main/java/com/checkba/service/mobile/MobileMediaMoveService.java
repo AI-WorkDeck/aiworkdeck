@@ -184,9 +184,13 @@ public class MobileMediaMoveService {
         if(item==null || !Set.of("audio","image","video").contains(item.getMediaType())) return null;
         return new Locator(item.getDeviceId(),item.getProjectKey(),client,relativePath(item),null,null,item.getFileSize(),item.getDeliveredAt()!=null);
     }
+    /**
+     * 旧件（没有 capture id）的身份键。X44 之后新建的根目录可能是英文/繁体名，但新件一律按 capture id
+     * 定位（MobileCaptureMoveFiles.locate），这里只为旧件兜底，所以固定用规范中文名，不随语言变。
+     */
     static String relativePath(MobileMediaInbox item) {
         String date=(item.getCapturedAt()==null?item.getCreatedAt():item.getCapturedAt()).toLocalDate().toString();
-        return ("audio".equals(item.getMediaType())?"现场录音":"现场影像")+"/"+date+"/"
+        return CaptureFolderNames.forMediaType(item.getMediaType()).canonical()+"/"+date+"/"
                 +MobileRelayClientService.landedFileName(item.getFileName(),item.getClientMediaId());
     }
     private void requireUnambiguous(Long user,Locator source) {

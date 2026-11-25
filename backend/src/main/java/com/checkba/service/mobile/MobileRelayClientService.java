@@ -729,7 +729,7 @@ public class MobileRelayClientService {
         row.put("project", projectInfo(item.path("projectKey").asText()));
         row.put("phase", phase);
         row.put("message", message);
-        String root = "audio".equals(item.path("mediaType").asText()) ? AUDIO_ROOT_FOLDER : MEDIA_ROOT_FOLDER;
+        String root = captureRootName(item.path("projectKey").asText(), item.path("mediaType").asText());
         row.put("savedPath", "document".equals(item.path("mediaType").asText())
                 ? ADDIN_DOC_ROOT_FOLDER + "/" + sanitizedDocName(item.path("fileName").asText())
                 : root + "/" + captureDate(item) + "/" + landedFileName(item.path("fileName").asText(), item.path("clientMediaId").asText()));
@@ -1084,10 +1084,7 @@ public class MobileRelayClientService {
 
     // ==================== 落盘 ====================
 
-    /** 归档根目录名，与 buildPhysicalPath 会拼出的物理路径同构，见 landAndAck 内注释。 */
-    private static final String MEDIA_ROOT_FOLDER = "现场影像";
-    /** 录音（mediaType=audio）落这个根目录——律师找录音不该去翻「现场影像」。 */
-    private static final String AUDIO_ROOT_FOLDER = "现场录音";
+    // 影像/录音根目录名见 CaptureFolderNames（X44：随界面语言新建、已有则沿用；录音与影像分开）。
     /** 跨设备投送（PUSH）落盘根目录名，与「现场影像/现场录音」并列。 */
     private static final String TRANSFER_ROOT_FOLDER = "跨设备文件";
     /** 插件文档镜像（dev-board#299）落盘根目录名：固定路径覆盖，不带日期层。 */
@@ -1121,7 +1118,9 @@ public class MobileRelayClientService {
         // 从 mediaType 稳定推导——它同时参与幂等判据（同名文件查找）与 storagePath 拼接，
         // 跨轮重试两处要落在同一棵目录下。
         String mediaType = item.path("mediaType").asText("image");
-        String rootFolderName = "audio".equals(mediaType) ? AUDIO_ROOT_FOLDER : MEDIA_ROOT_FOLDER;
+        // X44：根目录名随界面语言起名，但项目里已有任一语言的同类根目录就沿用它（不改名、不另建、
+        // 换语言后的重试仍落同一棵目录，幂等判据不破）。storagePath 用同一个名字，与目录树同构。
+        String rootFolderName = captureRootName(String.valueOf(projectId), mediaType);
         ProjectFile root = ensureFolder(projectId, null, rootFolderName, userId);
         ProjectFile day = ensureFolder(projectId, root.getId(), dateStr, userId);
 
@@ -1273,6 +1272,20 @@ public class MobileRelayClientService {
         String n = fileName == null ? "" : fileName.replace('\\', '/');
         n = n.substring(n.lastIndexOf('/') + 1).trim();
         return n.isEmpty() ? "document" : n;
+    }
+
+    /** X44：本项目里该类根目录的实际名字（已有任一语言的就沿用），没有则按界面语言新起。 */
+    private String captureRootName(String projectKey, String mediaType) {
+        CaptureFolderNames.Kind kind = CaptureFolderNames.forMediaType(mediaType);
+        try {
+            long projectId = Long.parseLong(projectKey);
+            java.util.Set<String> rootNames = projectFileService.getFilesByParent(projectId, null).stream()
+                    .filter(f -> Boolean.TRUE.equals(f.getIsFolder()) && !Boolean.TRUE.equals(f.getIsDeleted()))
+                    .map(ProjectFile::getName).collect(java.util.stream.Collectors.toSet());
+            return CaptureFolderNames.resolve(kind, rootNames);
+        } catch (RuntimeException e) {
+            return kind.localized();
+        }
     }
 
     private ProjectFile ensureFolder(Long projectId, Long parentId, String name, Long userId) {
