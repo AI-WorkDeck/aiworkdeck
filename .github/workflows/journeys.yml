@@ -1,0 +1,114 @@
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# First-user journey regression suite (QA lane): a fresh, signed-out desktop install driven headless
+# through the real UI. Runs the whole-app journeys (frontend/tests/app-e2e) and the
+# multilingual first-run journeys (frontend/tests/journeys) against a freshly built backend jar
+# with an isolated user.home. Screenshots and reports are uploaded as an artifact on every run.
+name: Journeys
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'official-plugins/**'
+      - '.github/workflows/journeys.yml'
+  push:
+    branches: [master]
+  schedule:
+    - cron: '30 18 * * *' # 02:30 Beijing, so the weekly release cut always has a fresh run
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: journeys-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  journeys:
+    name: First-user journeys (headless)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BACKEND_PORT: '9696'
+      # The locale journeys get their own fresh backend: the first sign-in sheet preselects a site
+      # from the UI language and persists it, which would change what app-e2e sees.
+      JOURNEY_BACKEND_PORT: '9698'
+      FRONTEND_PORT: '5174'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run directory
+        run: echo "RUN_DIR=$RUNNER_TEMP/journeys-run" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build backend jar
+        run: |
+          mvn -B -q -f backend/plugin-api/pom.xml install
+          mvn -B -q -f backend/pom.xml -DskipTests package
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Start isolated desktop backends (app-e2e, locale journeys)
+        run: |
+          cp backend/target/backend-*.jar "$RUNNER_TEMP/backend.jar"
+          mkdir -p "$RUN_DIR/out"
+          start_backend() { # <name> <port>
+            mkdir -p "$RUN_DIR/$1/home" "$RUN_DIR/$1/cwd"
+            (cd "$RUN_DIR/$1/cwd" && SPRING_PROFILES_ACTIVE=desktop SERVER_PORT=$2 \
+              AI_SKILLS_BUILTIN_DIR="$GITHUB_WORKSPACE/backend/skills" \
+              AI_PLUGINS_BUNDLED_DIR="$GITHUB_WORKSPACE/official-plugins" \
+              AWD_APP_VERSION="$(node -p "require('$GITHUB_WORKSPACE/desktop/package.json').version")" \
+              nohup java -Duser.home="$RUN_DIR/$1/home" -jar "$RUNNER_TEMP/backend.jar" > "$RUN_DIR/out/backend-$1.log" 2>&1 &)
+          }
+          start_backend app-e2e $BACKEND_PORT
+          start_backend journeys $JOURNEY_BACKEND_PORT
+      - name: Start H5 dev server
+        working-directory: frontend
+        run: VITE_API_BASE_URL=http://127.0.0.1:$BACKEND_PORT nohup npx uni --port $FRONTEND_PORT > "$RUN_DIR/out/uni.log" 2>&1 &
+      - name: Wait for the servers
+        run: |
+          for i in $(seq 1 120); do
+            a=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$BACKEND_PORT/api/auth/me || true)
+            j=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$JOURNEY_BACKEND_PORT/api/auth/me || true)
+            f=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$FRONTEND_PORT/ || true)
+            [ "$a" = 200 ] && [ "$j" = 200 ] && [ "$f" = 200 ] && echo "ready after ${i}x2s" && exit 0
+            sleep 2
+          done
+          echo "servers did not come up"; tail -50 "$RUN_DIR"/out/backend-*.log; tail -50 "$RUN_DIR/out/uni.log"; exit 1
+      - name: Warm the dev server (avoid vite re-optimize reloads mid-test)
+        working-directory: frontend
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: node tests/journeys/warm-dev-server.mjs http://127.0.0.1:$FRONTEND_PORT http://127.0.0.1:$JOURNEY_BACKEND_PORT "$RUN_DIR/out/uni.log"
+      - name: Multilingual first-run journeys (en-US, zh-CN, zh-TW)
+        working-directory: frontend
+        env:
+          JOURNEY_BASE: http://127.0.0.1:${{ env.FRONTEND_PORT }}
+          JOURNEY_BACKEND: http://127.0.0.1:${{ env.JOURNEY_BACKEND_PORT }}
+          JOURNEY_OUT: ${{ env.RUN_DIR }}/out/journeys
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: node tests/journeys/first-run-locales.mjs
+      - name: Whole-app journeys (app-e2e)
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        env:
+          APP_E2E_BASE: http://127.0.0.1:${{ env.FRONTEND_PORT }}
+          APP_E2E_BACKEND: http://127.0.0.1:${{ env.BACKEND_PORT }}
+          APP_E2E_JAR: ${{ runner.temp }}/backend.jar
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: node tests/app-e2e/run.mjs
+      - name: Collect screenshots and logs
+        if: ${{ always() }}
+        run: cp -R /tmp/app-e2e-out "$RUN_DIR/out/app-e2e" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: journeys-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.RUN_DIR }}/out
+          retention-days: 14
