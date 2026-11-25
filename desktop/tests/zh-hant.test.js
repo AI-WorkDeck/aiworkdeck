@@ -11,7 +11,9 @@ const { toTraditional } = require('../main/zh-hant')
 const TABLE = require('../main/zh-hant-table.json')
 
 test('the shell table is generated from the backend ZhHantConverter and is up to date', () => {
-  assert.strictEqual(fs.readFileSync(OUT, 'utf8'), render(buildTable(fs.readFileSync(JAVA, 'utf8'))),
+  // Windows checkouts may turn LF into CRLF; compare content, not line endings.
+  const lf = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n')
+  assert.strictEqual(lf(OUT), render(buildTable(lf(JAVA))),
     'run: node desktop/scripts/gen-zh-hant.js')
 })
 
