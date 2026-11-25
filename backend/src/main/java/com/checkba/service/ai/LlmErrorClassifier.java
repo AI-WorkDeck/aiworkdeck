@@ -224,6 +224,10 @@ public final class LlmErrorClassifier {
             }
             String msg = t.getMessage();
             if (msg != null && msg.contains("云端不可达")) return true;
+            // Q19：连接在我们这头被掐断（Broken pipe / Connection reset）。传输层已经用同一个
+            // 请求号重试过一次仍失败，才会走到终态：给「网络连不上」的引导，不给 Java 原文。
+            if (t instanceof java.net.SocketException && msg != null
+                    && (msg.contains("Broken pipe") || msg.contains("Connection reset"))) return true;
         }
         return false;
     }
