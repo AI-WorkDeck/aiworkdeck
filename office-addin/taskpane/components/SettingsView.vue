@@ -230,6 +230,7 @@ import { setupCaptcha } from '../lib/captcha.js'
 import { accountIdentityOf, defaultMode, isModeAvailable, visibleCodeTabs } from '../lib/loginTabs.js'
 import { saveSettings, normalizeBaseUrl, DEFAULT_SERVER_URL } from '../lib/settings.js'
 import { t } from '../lib/i18n.js'
+import { errorText } from '../lib/errorText.js'
 import { legalUrl, openExternal, signUpUrl } from '../lib/site.js'
 
 const props = defineProps({
@@ -313,7 +314,7 @@ async function loadChallenge() {
   } catch (e) {
     if (!disposed && generation === challengeGeneration) {
       loginStatusKind.value = 'error'
-      loginStatus.value = e.message || t('compatibleLoadFailed')
+      loginStatus.value = errorText(e, t('compatibleLoadFailed'))
     }
   } finally {
     if (generation === challengeGeneration) challengeLoading.value = false
@@ -488,7 +489,7 @@ async function sendCode(channel) {
     startCooldown()
   } catch (e) {
     loginStatusKind.value = 'error'
-    loginStatus.value = e.message || t('codeSendFailed')
+    loginStatus.value = errorText(e, t('codeSendFailed'))
     if (compatibleMode.value) clearChallenge()
   } finally {
     sendingCode.value = false
@@ -574,7 +575,7 @@ async function connectWithAccount() {
     loginStatus.value = t('connectSuccess')
   } catch (e) {
     loginStatusKind.value = 'error'
-    loginStatus.value = e.message || t('accountConnectFailed')
+    loginStatus.value = errorText(e, t('accountConnectFailed'))
   } finally {
     connecting.value = false
   }
@@ -606,7 +607,7 @@ async function connectWithKey() {
     keyStatus.value = t('connectSuccessWithToken')
   } catch (e) {
     keyStatusKind.value = 'error'
-    keyStatus.value = e.message || t('directConnectFailed')
+    keyStatus.value = errorText(e, t('directConnectFailed'))
   } finally {
     connecting.value = false
   }
@@ -633,7 +634,7 @@ async function testConnection() {
     status.value = t('connectSuccessWithProjects', { count: projects.length })
   } catch (e) {
     statusKind.value = 'error'
-    status.value = e.message || t('connectFailed')
+    status.value = errorText(e, t('connectFailed'))
   } finally {
     testing.value = false
   }
