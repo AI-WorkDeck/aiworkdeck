@@ -7,7 +7,7 @@ export default {
     projects: 'Projects',
     files: 'Explorer',
     ddFiles: 'Due Diligence Files',
-    market: 'Extensions',
+    market: 'Marketplace',
     dev: 'Plugin Development',
     // "Voice" merges text-to-speech and meeting recording; the two below are its tabs
     voice: 'Voice',

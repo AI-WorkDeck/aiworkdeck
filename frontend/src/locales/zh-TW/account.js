@@ -244,7 +244,7 @@ export default {
   "loginBtn": "登 入",
   "totpHint": "請輸入驗證器 App 上目前顯示的 6 位驗證碼",
   "codeSentTo": "驗證碼已寄送至 {phone}",
-  "backAction": "回傳",
+  "backAction": "返回",
   "resendCountdown": "{count}s 後可重新傳送",
   "resendCode": "重新傳送",
   "verifyAndLoginBtn": "驗證並登入",

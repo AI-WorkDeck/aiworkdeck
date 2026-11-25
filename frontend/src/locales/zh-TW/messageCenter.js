@@ -88,7 +88,7 @@ export default {
   "openBusiness": "檢視相關業務",
   "readNotDone": "閱讀通知不會代替業務確認。請進入相關業務檢視並處理。",
   "targetUnavailable": "這則訊息的業務入口暫不可用，請重新整理後重試。",
-  "pluginUnavailable": "相關外掛尚未安裝或啟用，請在外掛中心檢查。",
+  "pluginUnavailable": "相關外掛尚未安裝或啟用，請在外掛市集檢查。",
   "openFailed": "未能開啟相關業務，請重試。",
   "serviceFailed": "訊息服務暫不可用，請重試。",
   "source": "來自 {name}",

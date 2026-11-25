@@ -146,7 +146,7 @@ export default {
   siteSwitchConfirm: 'Switch Site',
   siteSwitchedLine: 'Switched to {name}.',
   siteAiFallbackLine: 'The AI provider has fallen back from AI WorkDeck Cloud to a channel available on this machine; you can choose again in AI Settings.',
-  siteNextLaunchLine: 'The Plugin Marketplace and statistics reporting will point to the new site after the next launch.',
+  siteNextLaunchLine: 'The Marketplace and statistics reporting will point to the new site after the next launch.',
   siteSwitchedTitle: 'Site Switched',
   siteSwitchFailedTitle: 'Switch Incomplete',
   siteSwitchFailedContent: 'Failed to switch sites; the site remains unchanged.',

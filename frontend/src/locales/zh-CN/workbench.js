@@ -166,7 +166,7 @@ export default {
   logout: '退出登录',
   // 左侧常驻栏
   stagingArea: '文件暂存区',
-  pluginMarket: '插件广场',
+  pluginMarket: '插件市场',
   systemSettings: '系统设置（AI 提供商 / API Key）',
   clientInitial: '客',
   addMember: '加人',
@@ -307,7 +307,7 @@ export default {
   recordingActive: '正在记录',
   splitBadge: '分屏',
   // 顶栏工作状态点 / 协作状态
-  workingOnDraft: '正在稿《{name}》上修改',
+  workingOnDraft: '正在修改稿件《{name}》',
   workingChanged: '工作中 · 已改 {count} 份',
   working: '工作中',
   collabOffline: '暂时连不上案件库',
