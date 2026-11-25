@@ -269,10 +269,12 @@ export default {
       // 动态加载 Monaco
       return new Promise((resolve, reject) => {
         const script = document.createElement('script')
-        script.src = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js'
+        // D24：随包的本地 Monaco（scripts/local-monaco.mjs 复制到 static/monaco/vs），不再在运行时从 CDN 拉脚本
+        const vsBase = new URL('static/monaco/vs', document.baseURI).href
+        script.src = vsBase + '/loader.js'
         script.onload = () => {
           window.require.config({
-            paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' }
+            paths: { 'vs': vsBase }
           })
           window.require(['vs/editor/editor.main'], () => {
             resolve(window.monaco)
