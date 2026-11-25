@@ -62,7 +62,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+      # Maven Central answers 429 / drops transfers under load (maven-resources-plugin 3.5.0 failed twice on
+      # 2026-11-25). Restore the nearest older ~/.m2 cache when pom.xml changed (setup-java's cache has no
+      # fallback) and let Maven retry throttled or dropped downloads. Same pattern as desktop-build.yml (#1713).
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-
+      - name: Maven download retries
+        shell: bash
+        run: echo "MAVEN_ARGS=-Daether.connector.http.retryHandler.count=6 -Daether.connector.http.retryHandler.interval=20000 -Daether.connector.http.retryHandler.serviceUnavailable=429,503" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -93,6 +104,7 @@ jobs:
         working-directory: frontend
         run: VITE_API_BASE_URL=http://127.0.0.1:$BACKEND_PORT nohup npx uni --port $FRONTEND_PORT > "$RUN_DIR/out/uni.log" 2>&1 &
       - name: Wait for the servers
+        id: servers
         run: |
           for i in $(seq 1 120); do
             a=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$BACKEND_PORT/api/auth/me || true)
@@ -116,7 +128,9 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
         run: node tests/journeys/first-run-locales.mjs
       - name: Whole-app journeys (app-e2e)
-        if: ${{ !cancelled() }}
+        # Runs even if the locale journeys failed, but only when the stack actually came up; otherwise a failed
+        # build or npm ci surfaced as a misleading "缺少 puppeteer-core" here (2026-11-25).
+        if: ${{ !cancelled() && steps.servers.outcome == 'success' }}
         working-directory: frontend
         env:
           APP_E2E_BASE: http://127.0.0.1:${{ env.FRONTEND_PORT }}

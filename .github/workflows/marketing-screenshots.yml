@@ -83,7 +83,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+      # Maven Central answers 429 / drops transfers under load (maven-resources-plugin 3.5.0 failed twice on
+      # 2026-11-25). Restore the nearest older ~/.m2 cache when pom.xml changed (setup-java's cache has no
+      # fallback) and let Maven retry throttled or dropped downloads. Same pattern as desktop-build.yml (#1713).
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-
+      - name: Maven download retries
+        shell: bash
+        run: echo "MAVEN_ARGS=-Daether.connector.http.retryHandler.count=6 -Daether.connector.http.retryHandler.interval=20000 -Daether.connector.http.retryHandler.serviceUnavailable=429,503" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

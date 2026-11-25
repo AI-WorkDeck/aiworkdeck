@@ -491,3 +491,22 @@ for (const [file, job] of [['journeys.yml', 'journeys'], ['marketing-screenshots
     assert.strictEqual(wf.jobs.scope.if, "github.event_name == 'pull_request'")
   })
 }
+
+// Maven Central flakes (429 / dropped transfers) must not turn required checks red (2026-11-25).
+for (const [file, job] of [['journeys.yml', 'journeys'], ['marketing-screenshots.yml', 'capture'], ['ci.yml', 'backend']]) {
+  test(`${file}: ${job} restores the nearest Maven cache and retries throttled downloads`, () => {
+    const steps = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8')).jobs[job].steps
+    const cache = steps.find((s) => s.name === 'Cache Maven repository')
+    assert.ok(cache && cache.with['restore-keys'], 'restore-keys fallback')
+    const retry = steps.find((s) => s.name === 'Maven download retries')
+    assert.match(retry.run, /retryHandler\.count=\d+.*serviceUnavailable=429,503/)
+    const javaStep = steps.find((s) => String(s.uses).startsWith('actions/setup-java'))
+    assert.ok(!javaStep.with.cache, 'setup-java cache has no fallback; the explicit cache step replaces it')
+  })
+}
+
+test('journeys.yml: app-e2e runs only when the stack came up (no misleading follow-on error after a failed build)', () => {
+  const steps = yaml.load(fs.readFileSync(path.join(workflowsDir, 'journeys.yml'), 'utf8')).jobs.journeys.steps
+  assert.ok(steps.find((s) => s.id === 'servers'))
+  assert.match(steps.find((s) => s.name === 'Whole-app journeys (app-e2e)').if, /steps\.servers\.outcome == 'success'/)
+})
