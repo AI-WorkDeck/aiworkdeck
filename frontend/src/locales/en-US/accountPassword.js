@@ -11,7 +11,7 @@ export default {
   "setup": "Create password",
   "resetTitle": "Reset password",
   "verify": "Verify and continue",
-  "signIn": "Sign in",
+  "signIn": "Sign In",
   "passwordHint": "8–72 characters. Use a unique password.",
   "invalid": "Use a password with 8–72 characters",
   "mismatch": "Passwords do not match",

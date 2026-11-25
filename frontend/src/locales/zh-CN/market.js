@@ -89,7 +89,7 @@ export default {
   enabledTag: '已启用',
   disabledTag: '已停用',
   sectionSkillSub: '提示词能力：在对话中生效，可设置生效方式',
-  builtinWorkflowsMarketNotice: "已内置：合同审查、证据整理、文件整理、法律意见书核查已纳入主流程，对话中按任务自动启用，无需在此安装或勾选。",
+  builtinWorkflowsMarketNotice: "内置工作流已自动启用：合同审查、证据整理、文件整理、法律意见书核查会在对话中按任务自动启用，无需在这里安装或勾选。",
   noLocalSkills: '本机还没有额外安装的技能',
   noLocalSkillsHint: '去插件市场装一个，或把含 skill.yml 的技能文件夹放进本机技能目录 ~/.aiworkdeck/skills/ 后点“重新扫描”',
   fromPlugin: '来自插件 {pluginId}',

@@ -3146,7 +3146,7 @@ try {
     }
     // 版本入口会附带待提交/同步状态，仍核验英文可访问标题而非只检查按钮存在。
     const versionTitle = await page.$eval('.version-entry', (e) => e.getAttribute('title') || '')
-    if (!versionTitle.startsWith('Source Control · ') ||
+    if (!versionTitle.startsWith('Versions · ') ||
         !versionTitle.endsWith('View project changes and sync') || /[一-鿿]/.test(versionTitle)) {
       throw new Error('en-US 下版本入口标题不正确: ' + versionTitle)
     }

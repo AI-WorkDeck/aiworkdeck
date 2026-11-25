@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkStyles, checkTokenContract, expandStyleSources, overBaseline, run } from '../../../scripts/check-design-system.mjs'
+import { checkStyles, checkTokenContract, expandStyleSources, externalStyleSheets, overBaseline, run } from '../../../scripts/check-design-system.mjs'
 const root = fileURLToPath(new URL('../../../', import.meta.url))
 const read = f => readFileSync(resolve(root, f), 'utf8')
 const app = read('frontend/src/App.vue')
@@ -31,6 +31,13 @@ test('external <style src> files are scanned, not skipped (X20)', () => {
   assert.equal(checkStyles(vue, 'fixture').length, 0)
   const expanded = expandStyleSources(vue, 'frontend/tests/design-system/fake.vue')
   assert.deepEqual(checkStyles(expanded, 'fixture'), ['fixture: color: #123456'])
+})
+test('externalStyleSheets returns the linked stylesheet contents only', () => {
+  const vue = '<template><div/></template><style>.inline { color: var(--awd-text); }</style><style lang="scss" scoped src="./fixtures/external-style.scss"></style>'
+  const sheets = externalStyleSheets(vue, 'frontend/tests/design-system/fake.vue')
+  assert.equal(sheets.length, 1)
+  assert.match(sheets[0], /color: #123456/)
+  assert.doesNotMatch(sheets[0], /\.inline/)
 })
 test('baseline tolerates existing external violations only, counting duplicates', () => {
   const { extra, stale } = overBaseline(['a', 'a', 'b'], ['a', 'c'])

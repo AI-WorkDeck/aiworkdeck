@@ -34,7 +34,7 @@ export default {
   portalOpenBtn: 'Open in browser',
   portalHint: 'The matter opens in your browser. No need to sign in to this app.',
   portalUnavailable: 'Could not get the case library address. Check your network and try again.',
-  signIn: 'Sign in',
+  signIn: 'Sign In',
   signInTitle: 'Sign in (needed for AI, paid hub items and the team case library)',
   noProjectTitle: 'Open a project to get started',
   noProjectHint: 'Click “All Projects” at the top left to pick a project, or create one on the Welcome page.',
