@@ -355,6 +355,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { pendingToolChanges, promptToolApproval } from '@/utils/pluginToolApproval.js'
 import { getPlugins, setPluginEnabled, rescanPlugins, getSkills, setSkillActivation, rescanSkills, getSkillMarket, installMarketSkill, uninstallMarketSkill, getPluginMarket, installMarketPlugin, uninstallMarketPlugin, getBundledPlugins, installBundledPlugin } from '@/services/api.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
@@ -725,7 +726,7 @@ export default {
         this.notifyMarketChanged()
       } catch (e) {
         console.error('卸载插件失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.pluginBusyId = ''
       }
@@ -760,7 +761,7 @@ export default {
         console.error('切换插件状态失败:', e)
         // 回滚开关显示
         plugin.enabled = !enabled
-        uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         await this.loadPlugins()
       } finally {
         this.switching = false
@@ -809,7 +810,7 @@ export default {
       } catch (e) {
         console.error('设置 Skill 生效方式失败:', e)
         skill.activationMode = previous
-        uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         await this.loadSkills()
       } finally {
         this.switching = false
@@ -843,7 +844,7 @@ export default {
       } catch (e) {
         console.error('安装 Skill 失败:', e)
         if (isAccountLoginRetry(e)) await this.loadMarket()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.marketBusyId = ''
       }
@@ -859,7 +860,7 @@ export default {
         this.notifyMarketChanged()
       } catch (e) {
         console.error('卸载 Skill 失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.marketBusyId = ''
       }
@@ -879,7 +880,7 @@ export default {
         await this.loadPluginMarket()
       } catch (e) {
         console.error('重新扫描失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.scanFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.scanFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.rescanning = false
       }

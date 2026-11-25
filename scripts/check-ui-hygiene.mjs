@@ -7,6 +7,9 @@
 //   2. 官方插件 / SDK 里的 var(--awd-*) 没带兜底值：老宿主或独立预览下直接失效。
 //   3. .vue 模板里某元素的静态类名一个都没有样式（团队看板 scope-tab 曾因此渲染成三行裸大字）。
 //      已存在的记在 scripts/ui-hygiene-baseline.json，只拦新增；修好后从基线里删掉。
+//   4. Toast 里直接塞异常原文（e.message）：律师会看到「HTTP 502」「Failed to fetch」。一律走
+//      utils/errorToast.js 的 errorText(err, fallback)（X-S1 / POLISH X7）。现存的按文件计数记在
+//      scripts/ui-hygiene-toast-baseline.json，只许减少不许增加。
 // 用法：node scripts/check-ui-hygiene.mjs [--update-baseline]
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -14,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BASELINE = join(root, 'scripts/ui-hygiene-baseline.json')
+const TOAST_BASELINE = join(root, 'scripts/ui-hygiene-toast-baseline.json')
 
 function walk(dir, out = []) {
   if (!existsSync(dir)) return out
@@ -103,17 +107,35 @@ export function unstyledElements() {
   return [...new Set(found)].sort()
 }
 
+/** Raw exception text in a toast, per file: showToast(...) lines that read X.message without errorText(). */
+export function rawToastCounts(files = frontend) {
+  const counts = {}
+  for (const p of files) {
+    if (!/\.(vue|js)$/.test(p)) continue
+    for (const line of stripComments(read(p)).split('\n')) {
+      if (!line.includes('showToast(') || line.includes('errorText(')) continue
+      if (/\b(?:e|err|error|ex)\)?\??\.message\b/.test(line)) counts[rel(p)] = (counts[rel(p)] || 0) + 1
+    }
+  }
+  return counts
+}
+
 export function run(argv = process.argv.slice(2)) {
   const unstyled = unstyledElements()
+  const toasts = rawToastCounts()
   if (argv.includes('--update-baseline')) {
     writeFileSync(BASELINE, JSON.stringify(unstyled, null, 2) + '\n')
-    console.log(`已写入基线：${unstyled.length} 条`)
+    writeFileSync(TOAST_BASELINE, JSON.stringify(Object.fromEntries(Object.entries(toasts).sort()), null, 2) + '\n')
+    console.log(`已写入基线：${unstyled.length} 条；toast 原文 ${Object.values(toasts).reduce((a, b) => a + b, 0)} 处`)
     return 0
   }
+  const toastBaseline = existsSync(TOAST_BASELINE) ? JSON.parse(read(TOAST_BASELINE)) : {}
+  const toastFailures = Object.entries(toasts).filter(([f, n]) => n > (toastBaseline[f] || 0))
+    .map(([f, n]) => `${f}: ${n} toast(s) show raw exception text (baseline ${toastBaseline[f] || 0}) ← use errorText(err, fallback) from @/utils/errorToast.js`)
   const baseline = new Set(existsSync(BASELINE) ? JSON.parse(read(BASELINE)) : [])
   const fresh = unstyled.filter(x => !baseline.has(x))
   const stale = [...baseline].filter(x => !unstyled.includes(x))
-  const failures = [...tokenFailures(), ...fresh.map(x => `${x}  ← 这个元素的类名没有任何样式`)]
+  const failures = [...tokenFailures(), ...fresh.map(x => `${x}  ← 这个元素的类名没有任何样式`), ...toastFailures]
   if (stale.length) console.warn(`提示：基线里有 ${stale.length} 条已经不存在，可运行 --update-baseline 收紧：\n  ` + stale.join('\n  '))
   if (failures.length) {
     console.error(failures.join('\n'))

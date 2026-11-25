@@ -1085,6 +1085,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getAdminConfig, saveAdminConfig,
   getAccountStatus, connectAccount, getAccountUsage,
@@ -1963,7 +1964,7 @@ export default {
         const result = await host.model.cancel(item.modelId)
         if (result?.ok === false) throw new Error(result.error || this.$t('components.errorServiceUnavailable'))
       }
-      catch (e) { uni.showToast({ title: e.message || String(e), icon: 'none' }) }
+      catch (e) { uni.showToast({ title: errorText(e), icon: 'none' }) }
     },
     /** 卸载 = 删模型 + 删 pack 目录（规范 §6：确认框注明可释放体积） */
     handleComponentRemove(item) {
@@ -2054,7 +2055,7 @@ export default {
             uni.showToast({ title: this.$t('account.avatarUpdateSuccess'), icon: 'success' })
           } catch (e) {
             console.error('Avatar upload failed', e)
-            uni.showToast({ title: this.$t('account.avatarUploadFailed', { message: e.message }), icon: 'none' })
+            uni.showToast({ title: this.$t('account.avatarUploadFailed', { message: errorText(e) }), icon: 'none' })
           } finally {
             uni.hideLoading()
           }
@@ -2178,7 +2179,7 @@ export default {
         await selectCapability(slot.id, candidate.ref)
         await this.loadCapabilities()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('admin.capabilitySwitchFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.capabilitySwitchFailed')), icon: 'none' })
       }
     },
 
@@ -2188,7 +2189,7 @@ export default {
         await rollbackCapability(slot.id)
         await this.loadCapabilities()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('admin.capabilityRollbackFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.capabilityRollbackFailed')), icon: 'none' })
       }
     },
 
@@ -2219,7 +2220,7 @@ export default {
         const res = await setCapabilityDevMode(on)
         this.capabilityDevMode = !!res.enabled
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('admin.capabilityDevModeFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.capabilityDevModeFailed')), icon: 'none' })
         await this.loadCapabilities()
       } finally {
         this.capabilityBusy = false
@@ -2263,7 +2264,7 @@ export default {
         this.feedbackList = ((res && res.data && res.data.items) || [])
       } catch (e) {
         if (!shouldAcceptResponse(seq, this.feedbackListSeq)) return
-        uni.showToast({ title: (e && e.message) || this.$t('admin.loadFeedbackFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.loadFeedbackFailed')), icon: 'none' })
       } finally {
         if (shouldAcceptResponse(seq, this.feedbackListSeq)) this.feedbackLoading = false
       }
@@ -2309,7 +2310,7 @@ export default {
         uni.showToast({ title: this.$t('admin.optimizerStarted'), icon: 'none' })
         this.optimizer.running = true
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.triggerFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.triggerFailed')), icon: 'none' })
       }
     },
     async toggleFeedbackDetail(id) {
@@ -2332,7 +2333,7 @@ export default {
         }
       } catch (e) {
         if (this.feedbackDetailPendingId !== id) return
-        uni.showToast({ title: (e && e.message) || this.$t('admin.loadDetailFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.loadDetailFailed')), icon: 'none' })
       }
     },
     formatTriage(json) {
@@ -2423,7 +2424,7 @@ export default {
         uni.removeStorageSync('checkba_last_project_id')
         uni.reLaunch({ url: '/pages/launch/launch' })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.switchFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.switchFailed')), icon: 'none' })
       } finally {
         this.identityBusy = false
       }
@@ -2714,7 +2715,7 @@ export default {
         }
       } catch (e) {
         uni.showToast({
-          title: (e && e.message) || this.$t('admin.walletRedeemFailed'),
+          title: errorText(e, this.$t('admin.walletRedeemFailed')),
           icon: 'none',
         })
       } finally {
@@ -2905,7 +2906,7 @@ export default {
         // 刷新走统一广播：本页的 onAccountChanged、广场按钮、权益缓存都在里面
         broadcastAccountChanged({ connected: true, ...(res || {}) })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.connectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.connectFailed')), icon: 'none' })
       } finally {
         this.accountBusy = false
       }
@@ -2971,7 +2972,7 @@ export default {
         await savePlatformBudget(0, lowBalanceCents)
         uni.showToast({ title: this.$t('platform.budgetSaved'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('platform.budgetSaveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('platform.budgetSaveFailed')), icon: 'none' })
       } finally {
         this.budgetBusy = false
         // 无论成败都重拉：写失败时界面必须回到库里的真相，而不是停在用户以为的值上
@@ -3043,7 +3044,7 @@ export default {
       } catch (e) {
         console.error('加载后台配置失败', e)
         // 403（非 admin 账号）时把后端原因带给用户：请用 admin 账号登录后配置
-        uni.showToast({ title: (e && e.message) || this.$t('admin.loadConfigFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.loadConfigFailed')), icon: 'none' })
       }
     },
     async handleSave() {
@@ -3062,7 +3063,7 @@ export default {
       } catch (e) {
         console.error('保存后台配置失败', e)
         uni.showToast({
-          title: e.message || this.$t('admin.saveFailed'),
+          title: errorText(e, this.$t('admin.saveFailed')),
           icon: 'none',
         })
         return false

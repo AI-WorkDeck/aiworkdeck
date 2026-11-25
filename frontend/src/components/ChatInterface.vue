@@ -1086,6 +1086,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { selectableChatSkills } from '@/utils/chatSelectableSkills.mjs'
 import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
@@ -2730,7 +2731,7 @@ export default {
         }
       } catch (err) {
         console.error('[ChatInterface] Rollback failed:', err)
-        uni.showToast({ title: t('chat.rollbackFailed', { error: err.message || t('chat.unknownError') }), icon: 'none' })
+        uni.showToast({ title: t('chat.rollbackFailed', { error: errorText(err) }), icon: 'none' })
       }
 
       // 重置状态
@@ -3180,7 +3181,7 @@ export default {
       try {
         await action()
       } catch (e) {
-        uni.showToast({ title: e.message || t('chat.inboxUpdateFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, t('chat.inboxUpdateFailed')), icon: 'none' })
       }
     }
     const handleInboxEdit = ({ item, message }) => inboxAction(() =>
@@ -4387,7 +4388,7 @@ export default {
         }
       } catch (error) {
         console.error('[ChatInterface] Create folder failed:', error)
-        uni.showToast({ title: error.message || t('chat.folderCreateFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, t('chat.folderCreateFailed')), icon: 'none' })
       }
     }
 

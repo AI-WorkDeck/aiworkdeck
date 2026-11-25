@@ -8,6 +8,7 @@
 
 
 import { host } from '@/services/host.js'
+import { errorText } from '@/utils/errorToast.js'
 
 export const ocrCaptureMethods = {
     async applyDesktopOcrSelection(payload) {
@@ -337,7 +338,7 @@ export const ocrCaptureMethods = {
     }
       } catch (e) {
         console.error('截图裁剪失败:', e)
-        uni.showToast({ title: e.message || this.$t('workbenchOps.captureFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbenchOps.captureFailed')), icon: 'none' })
       }
       // #endif
     },

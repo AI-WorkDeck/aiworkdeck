@@ -34,6 +34,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 从当前版本另起一稿（挂在 VersionPanel 时间线上方）；从某个历史版本另起一稿走
 // VersionNodeDetail 的同名入口，两处共用 createDraft，只是 ref 不同。
 import { createDraft, switchToDraft } from '@/services/api.js'
@@ -77,7 +78,7 @@ export default {
         uni.showToast({ title: this.$t('version.draftCreatedSwitching', { name }), icon: 'none' })
         this.$emit('created', affectedFileIds)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.createDraftFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.createDraftFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -90,7 +91,7 @@ export default {
         const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
         this.$emit('switched', affectedFileIds)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.switchDraftFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.switchDraftFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

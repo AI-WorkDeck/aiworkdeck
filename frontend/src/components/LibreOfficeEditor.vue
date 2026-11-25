@@ -209,6 +209,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // LibreOfficeEditor.vue — HOST-side embed of the LibreOffice editor as an
 // Electron <webview partition="persist:zetaoffice"> inside the MAIN renderer.
 // Epic #43.
@@ -3142,7 +3143,7 @@ export default {
       try { u8 = await this.sealForStorage(u8, f.id) } catch (e) {
         this._copyExporting = false
         this.appendLog('save copy failed: ' + (e && e.message ? e.message : e))
-        uni.showToast({ title: this.$t('editor.saveCopyAsFailed', { reason: (e && e.message) || 'encrypt' }), icon: 'none' })
+        uni.showToast({ title: this.$t('editor.saveCopyAsFailed', { reason: errorText(e) }), icon: 'none' })
         return false
       }
       this._copyExporting = false
@@ -3205,7 +3206,7 @@ export default {
         return true
       } catch (e) {
         this.appendLog('protected copy failed: ' + (e && e.message ? e.message : e))
-        uni.showToast({ title: this.$t('editor.legacyProtected.copyFailed', { reason: (e && e.message) || '' }), icon: 'none' })
+        uni.showToast({ title: this.$t('editor.legacyProtected.copyFailed', { reason: errorText(e) }), icon: 'none' })
         return false
       } finally {
         this.legacyCopyBusy = false

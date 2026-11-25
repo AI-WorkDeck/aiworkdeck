@@ -200,6 +200,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getCurrentUser as getCurrentUserApi, getLicenseStatus, deactivateLicense,
   sendSmsCode, bindPhone, sendMailCode, bindEmail,
@@ -428,7 +429,7 @@ export default {
         await this.loadAccountProfile()
         uni.$emit('awd:identity-updated')
       } catch (e) {
-        this.displayNameError = this.$t('account.nicknameSaveFailed', { message: (e && e.message) || '' })
+        this.displayNameError = this.$t('account.nicknameSaveFailed', { message: errorText(e) })
         this.displayNameInput = current
       } finally {
         this.displayNameSaving = false
@@ -463,7 +464,7 @@ export default {
             uni.$emit('awd:identity-updated')
             uni.showToast({ title: this.$t('account.avatarUpdateSuccess'), icon: 'success' })
           } catch (e) {
-            uni.showToast({ title: this.$t('account.avatarUploadFailed', { message: (e && e.message) || '' }), icon: 'none' })
+            uni.showToast({ title: this.$t('account.avatarUploadFailed', { message: errorText(e) }), icon: 'none' })
           } finally {
             uni.hideLoading()
             this.avatarBusy = false
@@ -480,7 +481,7 @@ export default {
         uni.$emit('awd:identity-updated')
         uni.showToast({ title: this.$t('account.avatarRemoveSuccess'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: this.$t('account.avatarRemoveFailed', { message: (e && e.message) || '' }), icon: 'none' })
+        uni.showToast({ title: this.$t('account.avatarRemoveFailed', { message: errorText(e) }), icon: 'none' })
       } finally {
         this.avatarBusy = false
       }
@@ -527,7 +528,7 @@ export default {
           },
         })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('account.tokenIssueFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.tokenIssueFailed')), icon: 'none' })
       } finally {
         this.tokenIssuing = false
       }
@@ -545,7 +546,7 @@ export default {
             await this.loadDeviceTokens()
             uni.showToast({ title: this.$t('account.revokedToast'), icon: 'none' })
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('account.revokeFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('account.revokeFailed')), icon: 'none' })
           }
         },
       })
@@ -562,7 +563,7 @@ export default {
             await deactivateLicense()
             uni.reLaunch({ url: '/pages/launch/launch' })
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('account.deactivateFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('account.deactivateFailed')), icon: 'none' })
           }
         },
       })
@@ -618,7 +619,7 @@ export default {
       } catch (e) {
         if (!shouldAcceptResponse(seq, this._totpRequestSeq)) return
         this.showTotpPanel = false
-        uni.showToast({ title: e.message || this.$t('account.getTotpBindInfoFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.getTotpBindInfoFailed')), icon: 'none' })
       } finally {
         if (shouldAcceptResponse(seq, this._totpRequestSeq)) this.totpBusy = false
       }
@@ -637,7 +638,7 @@ export default {
         uni.showToast({ title: this.$t('account.totpBoundSuccess'), icon: 'success' })
         this.cancelTotpPanel()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.bindFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.bindFailed')), icon: 'none' })
       } finally {
         this.totpSubmitting = false
       }
@@ -656,7 +657,7 @@ export default {
         uni.showToast({ title: this.$t('account.totpUnboundSuccess'), icon: 'success' })
         this.cancelTotpPanel()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.unbindFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.unbindFailed')), icon: 'none' })
       } finally {
         this.totpSubmitting = false
       }
@@ -692,7 +693,7 @@ export default {
           }
         }, 1000)
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.sendFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.sendFailed')), icon: 'none' })
       }
     },
     async confirmBindPhone() {
@@ -710,7 +711,7 @@ export default {
         setSessionUser(this.userInfo)
         this.cancelBindPhone()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.bindFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.bindFailed')), icon: 'none' })
       } finally {
         this.bindSubmitting = false
       }
@@ -746,7 +747,7 @@ export default {
           }
         }, 1000)
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.sendFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.sendFailed')), icon: 'none' })
       }
     },
     async confirmBindEmail() {
@@ -764,7 +765,7 @@ export default {
         setSessionUser(this.userInfo)
         this.cancelBindEmail()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.bindFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.bindFailed')), icon: 'none' })
       } finally {
         this.bindEmailSubmitting = false
       }

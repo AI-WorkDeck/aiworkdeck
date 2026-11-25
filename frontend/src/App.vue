@@ -1,6 +1,7 @@
 <!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { getSessionId } from '@/utils/auth.js'
 import { openLocalRootPath, openLocalFilePath } from '@/utils/ideOpen.js'
 import { track } from '@/utils/telemetryClient.js'
@@ -174,7 +175,7 @@ export default {
             if (data.isDirectory) await openLocalRootPath(data.path)
             else await openLocalFilePath(data.path)
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('shell.menuActionFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('shell.menuActionFailed')), icon: 'none' })
           } finally {
             if (data.requestId) host.menu?.ackOpenPath?.(data.requestId)
           }
@@ -212,7 +213,7 @@ export default {
               if (r.confirm) {
                 uni.$emit('awd:cancel-restart-recovery')
                 openLocalRootPath(path).catch((err) => {
-                  uni.showToast({ title: (err && err.message) || this.$t('shell.openFolderFailed'), icon: 'none' })
+                  uni.showToast({ title: errorText(err, this.$t('shell.openFolderFailed')), icon: 'none' })
                 })
               }
             },

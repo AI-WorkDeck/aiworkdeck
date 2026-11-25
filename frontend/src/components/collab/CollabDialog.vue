@@ -310,6 +310,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   listCloudConnections,
   shareProjectToCloud, uploadToCloud, updateFromCloud, checkCloud, getVersionStatus,
@@ -526,7 +527,7 @@ export default {
       try {
         await reconnectOfficialCloud()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.connectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.connectFailed')), icon: 'none' })
         return
       } finally {
         this.busy = false
@@ -632,7 +633,7 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: (e && e.message) || this.$t('version.submitFailed'), icon: 'none' })
+        else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -659,7 +660,7 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: (e && e.message) || this.$t('version.pullFailed'), icon: 'none' })
+        else uni.showToast({ title: errorText(e, this.$t('version.pullFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -671,7 +672,7 @@ export default {
         await checkCloud(this.projectId)
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.libraryOffline'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.libraryOffline')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -682,7 +683,7 @@ export default {
         const res = await getCloudMembers(this.projectId)
         this.members = (res && res.data && res.data.members) || []
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.loadMembersFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.loadMembersFailed')), icon: 'none' })
       } finally {
         this.membersLoading = false
       }
@@ -698,7 +699,7 @@ export default {
             uni.showToast({ title: this.$t('version.removedFromCaseFile'), icon: 'none' })
             this.loadMembers()
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.revokeFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.revokeFailed')), icon: 'none' })
           }
         }
       })
@@ -746,7 +747,7 @@ export default {
         await this.loadMembers()
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.addMemberFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.addMemberFailed')), icon: 'none' })
       } finally {
         this.memberBusy = false
       }

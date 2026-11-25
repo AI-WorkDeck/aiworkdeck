@@ -16,6 +16,7 @@ import { getCloudWriteHeaders, getApiBaseUrl, createMeetingRecording, finishMeet
 import { t } from '@/i18n'
 import { resolveTrackEndedStatus, decideAutoTranscribe } from '@/utils/meetingRecorderStatus.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
+import { errorText } from '@/utils/errorToast.js'
 
 const CHUNK_TIMESLICE_MS = 5000
 const UPLOAD_TIMEOUT_MS = 60000
@@ -249,7 +250,7 @@ export async function stopRecording() {
     recorderState.autoTranscribeSkipped = decision.transcribe && !transcribe ? 'declined' : decision.reason
   } catch (e) {
     console.error('[meeting] finish 失败', e)
-    recorderState.error = t('meeting.finishWriteBackFailed', { message: (e && e.message) || e })
+    recorderState.error = t('meeting.finishWriteBackFailed', { message: errorText(e) })
   }
   recorderState.status = 'idle'
   recorderState.meetingId = null

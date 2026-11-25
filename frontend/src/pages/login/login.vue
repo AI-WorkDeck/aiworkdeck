@@ -122,6 +122,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { login, register, getMyProjects, sendSmsCode, sendMailCode } from '@/services/api.js'
 import { saveSession, getSessionId, getCurrentUser } from '@/utils/auth.js'
 import { syncRecentToMenu } from '@/utils/recentProjects.js'
@@ -264,7 +265,7 @@ export default {
         this.startSmsCountdown();
         uni.showToast({ title: this.$t('account.codeSentToast'), icon: 'none' });
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('account.sendFailed'), icon: 'none' });
+        uni.showToast({ title: errorText(e, this.$t('account.sendFailed')), icon: 'none' });
       }
     },
     async handleSmsLogin() {
@@ -287,7 +288,7 @@ export default {
         }
       } catch (error) {
         this.smsCodeInput = '';
-        uni.showToast({ title: error.message || this.$t('account.verifyFailed'), icon: 'none' });
+        uni.showToast({ title: errorText(error, this.$t('account.verifyFailed')), icon: 'none' });
       } finally {
         this.loginLoading = false;
       }
@@ -325,7 +326,7 @@ export default {
           return;
         }
         console.error('Login Failed', error);
-        uni.showToast({ title: error.message || this.$t('account.loginFailedToast'), icon: 'none' });
+        uni.showToast({ title: errorText(error, this.$t('account.loginFailedToast')), icon: 'none' });
       } finally {
         this.loginLoading = false;
       }
@@ -362,7 +363,7 @@ export default {
         }
       } catch (error) {
         console.error('Register Failed', error);
-        uni.showToast({ title: error.message || this.$t('account.registerFailedToast'), icon: 'none' });
+        uni.showToast({ title: errorText(error, this.$t('account.registerFailedToast')), icon: 'none' });
       } finally {
         this.registerLoading = false;
       }

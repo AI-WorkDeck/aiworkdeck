@@ -69,6 +69,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import TaskRow from '@/components/calendar/TaskRow.vue'
 import TaskDialog from '@/components/calendar/TaskDialog.vue'
 import { isDone, groupByDue } from '@/components/calendar/taskUtils.js'
@@ -162,7 +163,7 @@ export default {
       try {
         await updateTask(task.id, { status: nextStatus })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('calendar.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('calendar.saveFailed')), icon: 'none' })
       }
     },
     onDelete(task) {
@@ -176,7 +177,7 @@ export default {
           try {
             await deleteTask(task.id)
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('calendar.deleteFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('calendar.deleteFailed')), icon: 'none' })
           }
         },
       })
