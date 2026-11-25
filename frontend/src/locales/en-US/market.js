@@ -36,7 +36,6 @@ export default {
   // ---- Skill Marketplace ----
   searchSkillPlaceholder: 'Search by name, description, or trigger phrase',
   marketUnavailableTitle: 'Online marketplace is temporarily unavailable',
-  marketErrorHint: '{error} — locally installed Skills and plugins are unaffected',
   loadingMarket: 'Loading the marketplace',
   noMatchingSkill: 'No matching Skills',
   marketEmptySkill: 'The marketplace is empty for now',
@@ -55,7 +54,6 @@ export default {
 
   // ---- Plugin Marketplace ----
   pluginMarketUnavailableTitle: 'Online plugin marketplace is temporarily unavailable',
-  pluginMarketErrorHint: '{error} — locally installed plugins are unaffected',
   noPluginsYet: 'No plugins published yet',
   localInstallHint: 'You can also install locally: drop a plugin directory into the local plugins folder ~/.aiworkdeck/plugins/, then click "Rescan"',
   pluginLabel: 'Plugin',
@@ -89,7 +87,7 @@ export default {
   enabledTag: 'Enabled',
   disabledTag: 'Disabled',
   sectionSkillSub: 'Prompt-based capabilities: take effect in conversation, with configurable activation',
-  builtinWorkflowsMarketNotice: 'Built-in workflows are auto-enabled: Contract Review, Evidence Organization, File Organization and Legal Opinion Verification start automatically in chat when a task needs them. Nothing to install or toggle here.',
+  builtinWorkflowsMarketNotice: "Built-in workflows are auto-enabled: Contract Review, Evidence Organization, File Organization and Legal Opinion Verification start automatically in chat when a task needs them. Nothing to install or toggle here.",
   noLocalSkills: 'No extra extension Skills installed locally yet',
   noLocalSkillsHint: 'Install one from the "Skill Marketplace", or drop a Skill directory (with skill.yml) into the local Skill folder ~/.aiworkdeck/skills/ and click "Rescan"',
   fromPlugin: 'From plugin {pluginId}',
@@ -124,7 +122,6 @@ export default {
   checkForUpdates: 'Check for updates',
   checkingUpdates: 'Checking for updates…',
   updatesChecked: 'Update check complete',
-  checkingUpdatesFailed: 'Could not check for updates. Please retry.',
   updatingEllipsis: 'Updating…',
   updateFailed: 'Update failed. Please retry.',
   updatedDisabledHint: 'Updated, but could not re-enable the plugin. Resolve the issue, then enable it manually.',
@@ -168,7 +165,7 @@ export default {
   reinstallOrUpdate: 'Reinstall / Update',
   activationModeLabel: 'Activation: {mode} ▾',
   processingEllipsis: 'Processing…',
-  needAccountHint: 'This is a paid item. Connect your AI WorkDeck account under "Account & balance" in Settings first — purchase records can only be verified after that.',
+  needAccountHint: 'This is a paid item. Connect your AI WorkDeck account under "Account & Balance" in Settings first — purchase records can only be verified after that.',
   buyHint: 'This is a paid item. Purchase completes on the official website; after paying, return to this page and click "I\'ve Purchased, Refresh" to install.',
 
   whenToUse: 'When to Use',
@@ -220,7 +217,6 @@ export default {
   noMatchingPlugin: 'No matching plugins',
   marketEmptyPlugin: 'No plugins in the marketplace yet',
   marketEmptySkillShort: 'No Skills in the marketplace yet',
-  marketUnavailablePrefixed: 'Online marketplace unavailable: {error}',
   activationStateAuto: 'Auto',
   activationStateManual: 'Manual',
   fromPluginTag: 'From plugin',
