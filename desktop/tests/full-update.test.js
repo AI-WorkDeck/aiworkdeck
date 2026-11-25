@@ -98,24 +98,6 @@ test('发布汇总：缺任一平台拒绝，齐套后将真实字节哈希绑�
   assert.ok(mac.urls.every(url => url.endsWith('/AI.WorkDeck-0.12.0-arm64.dmg')))
 })
 
-test('发布汇总（贴牌）：安装包只指向本品牌的发布地址与固定文件名，不留默认镜像', async (t) => {
-  const dir = root(t), { privateKey } = crypto.generateKeyPairSync('ed25519')
-  fs.mkdirSync(path.join(dir, 'patch'))
-  const file = path.join(dir, 'patch/manifest.json')
-  const bytes = Buffer.from(JSON.stringify({ schema: 1, channels: { '0.12': { latest: '0.12.0' } } }))
-  fs.writeFileSync(file, bytes)
-  fs.writeFileSync(file + '.sig', crypto.sign(null, bytes, privateKey).toString('base64'))
-  fs.writeFileSync(path.join(dir, 'Brand X-0.12.0-arm64.dmg'), 'dmg')
-  fs.writeFileSync(path.join(dir, 'Brand X Setup 0.12.0.exe'), 'exe')
-  await finalize(dir, '0.12.0', privateKey.export({ type: 'pkcs8', format: 'pem' }), {
-    mirrorBase: '', releaseBase: 'https://github.com/brand-x/releases/releases/download/',
-    names: { 'darwin-arm64': 'Brand-X-mac-arm64.dmg', win32: 'Brand-X-Setup-x64.exe' },
-  })
-  const inst = JSON.parse(fs.readFileSync(file)).channels['0.12'].installers
-  assert.deepEqual(inst.win32.urls, ['https://github.com/brand-x/releases/releases/download/v0.12.0/Brand-X-Setup-x64.exe'])
-  assert.deepEqual(inst['darwin-arm64'].urls, ['https://github.com/brand-x/releases/releases/download/v0.12.0/Brand-X-mac-arm64.dmg'])
-})
-
 test('Windows helper：NSIS失败落日志并保留安装包，普通退出不重开', { skip: process.platform !== 'win32' }, () => {
   const result = require('child_process').spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'install-update.test.ps1')], { encoding: 'utf8', env: windowsPowerShellEnv() })
   assert.equal(result.status, 0, result.stderr || result.stdout)

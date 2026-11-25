@@ -17,9 +17,6 @@
 //     --backend <app.jar> --h5 <h5 dist dir> --zeta <zetaoffice dist dir> \
 //     --out <out dir> \
 //     [--prev <上一版 manifest 的 URL 或本地路径>]
-//     [--release-base <url>] [--mirror-base <url|none>] [--notes-base <url>] [--download-page <url>]
-//
-// 贴牌版本（white-label）用后四个参数把资产地址、发版说明与下载页指向自己的发布位置；不传时为 AI WorkDeck 默认值。
 //
 // 签名私钥经 env UPDATE_SIGNING_KEY（PEM 文本，CI secret）传入；
 // 缺失时报错退出（无签名的 manifest 客户端不会接受）。
@@ -195,10 +192,6 @@ async function main() {
   }
 
   // --- 与上一版 manifest 做内容级去重 ---------------------------------------
-  const releaseBase = args['release-base'] || GH_RELEASE_BASE
-  const mirrorBase = args['mirror-base'] === 'none' ? '' : (args['mirror-base'] || MIRROR_ASSET_BASE)
-  const notesBase = args['notes-base'] || 'https://github.com/AI-WorkDeck/aiworkdeck/releases/tag/'
-  const downloadPage = args['download-page'] || DOWNLOAD_PAGE
   const prev = await loadPrevManifest(args.prev)
   const prevComponents = new Map()
   if (prev && prev.channels && prev.channels[major]) {
@@ -225,8 +218,8 @@ async function main() {
       size: st.size,
       contentHash: hash,
       urls: [
-        ...(mirrorBase ? [mirrorBase + assetName] : []),
-        `${releaseBase}v${version}/${assetName}`
+        MIRROR_ASSET_BASE + assetName,
+        `${GH_RELEASE_BASE}v${version}/${assetName}`
       ]
     })
     console.log(`[build-patch-assets] ${name} -> ${assetName} (${(st.size / 1048576).toFixed(1)}MB)`)
@@ -248,7 +241,7 @@ async function main() {
   const channels = { ...(prev && prev.channels ? prev.channels : {}) }
   channels[major] = {
     latest: version,
-    notes: `${notesBase}v${version}`,
+    notes: `https://github.com/AI-WorkDeck/aiworkdeck/releases/tag/v${version}`,
     components
   }
   // latestMajor 单调不降：本次发布的大版本与上一版记录取大者
@@ -261,7 +254,7 @@ async function main() {
     schema: 1,
     generatedAt: new Date().toISOString(),
     latestMajor,
-    majorDownloadPage: (prev && prev.majorDownloadPage) || downloadPage,
+    majorDownloadPage: (prev && prev.majorDownloadPage) || DOWNLOAD_PAGE,
     ...(prev && prev.telemetryUrl ? { telemetryUrl: prev.telemetryUrl } : {}),
     channels
   }
