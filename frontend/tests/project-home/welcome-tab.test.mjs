@@ -182,7 +182,7 @@ test('无项目态存储键落 global_*，不再写出 project_null_*', () => {
   assert.equal(workbenchStorageKey('12', 'leftPaneKey'), 'project_12_leftPaneKey')
 })
 
-test('无项目态默认不展开面板，rail 只留日程 / 插件中心 / 剪贴板 / 客户协作', () => {
+test('无项目态默认不展开面板，rail 只留日程 / 插件市场 / 剪贴板 / 客户协作', () => {
   assert.deepEqual([...NO_PROJECT_PANE_KEYS].sort(), ['calendar', 'clipboard', 'dd-client', 'market'])
   assert.equal(NO_PROJECT_DEFAULT_PANE, null)
   for (const k of ['projects', 'files', 'search', 'version', 'voice', 'desensitize', 'litigation-visual', 'home', 'insight', 'favorites', 'dev', 'staging', 'plugin-foo']) {

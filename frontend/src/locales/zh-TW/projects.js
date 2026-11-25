@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "這份案卷的檔案還是空的。先把客戶和事項類型填上，同事和客戶點進來一眼就知道這是什麼案子。",
   "startFilling": "開始填寫",
   "selectMatterType": "選擇事項類型",
+  "profileField": {
+    "client": "客戶",
+    "matterType": "事項類型",
+    "openedAt": "立案時間",
+    "nextStep": "下一步",
+    "counterparty": "對方"
+  },
   "notFilled": "未填寫",
   "placeholderClient": "例如：北京某某科技有限公司",
   "placeholderOpenedAt": "例如：2026-08-01",

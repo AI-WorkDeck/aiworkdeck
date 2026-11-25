@@ -28,7 +28,7 @@ export default {
   attachment: '附件', attachmentUnavailable: '文件暂不可用，请联系发送者。', download: '下载附件', downloading: '准备下载…',
   unread: '未读', read: '已读', markRead: '标为已读', statusPending: '待处理', statusDone: '已完成', statusCancelled: '已取消',
   goHandle: '去处理', openBusiness: '查看相关业务', readNotDone: '阅读通知不会代替业务确认。请进入相关业务查看并处理。',
-  targetUnavailable: '这条消息的业务入口暂不可用，请刷新后重试。', pluginUnavailable: '相关插件尚未安装或启用，请在插件中心检查。',
+  targetUnavailable: '这条消息的业务入口暂不可用，请刷新后重试。', pluginUnavailable: '相关插件尚未安装或启用，请在插件市场检查。',
   openFailed: '未能打开相关业务，请重试。', serviceFailed: '消息服务暂不可用，请重试。', source: '来自 {name}',
   "inviteTitle": "生成邀请码",
   "inviteRole": "邀请身份",

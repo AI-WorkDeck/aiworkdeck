@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Contenido del documento {loaded} / {total}",
   "dlLoadedOnly": "Se leyeron {size} del contenido del documento",
   "firstOpenHint": "La primera apertura inicializa el motor de documentos; los documentos grandes pueden tardar un momento",
+  "readFailed": {
+    "autoRetry": "Lo intentaremos de nuevo automáticamente cuando vuelva el servicio local. No se puede editar el documento hasta que se haya leído.",
+    "retry": "Reintentar"
+  },
   "openFailed": {
     "title": "No se puede abrir el documento: el editor no responde o el archivo está dañado",
     "encryptedTitle": "Este archivo está protegido con una contraseña de apertura que el editor aún no puede abrir. Quite la contraseña en Excel, Word, PowerPoint o WPS y vuelva a abrirlo, o descargue el original.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Causa: este pasaje supera el contexto del modelo. Divídelo y vuelve a revisarlo.",
       "DEEP_MODEL_UNAVAILABLE": "Causa: el modelo auxiliar no está disponible. Elige otro en la configuración.",
       "DEEP_REGION": "Causa: el proveedor rechazó esta región de red. Cambia el modelo o la red.",
-      "DEEP_FAILED": "Causa: falló la llamada al modelo."
+      "DEEP_FAILED": "Causa: falló la llamada al modelo.",
+      "DEEP_SIGNED_OUT": "Causa: no has iniciado sesión. Inicia sesión para usar la revisión con IA."
     }
   },
   "toolbar": {

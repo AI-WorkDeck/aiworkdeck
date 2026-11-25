@@ -139,6 +139,10 @@ export default {
   dlLoadedOnly: 'Read {size} of document content',
   firstOpenHint: 'The first open initializes the document engine; large documents may take a moment',
   // "Cannot open" terminal state (dev-board#1018).
+  readFailed: {
+    autoRetry: "We'll try again automatically when the local service is back. The document can't be edited until it has been read.",
+    retry: "Try again",
+  },
   openFailed: {
     title: 'The document cannot be opened: the editor is not responding or the file is damaged',
     encryptedTitle: 'This file is protected with an open password, which the editor can’t open yet. Remove the password in Excel, Word, PowerPoint or WPS and open it again, or download the original.',
@@ -428,6 +432,7 @@ export default {
       DEEP_MODEL_UNAVAILABLE: 'Cause: the auxiliary model is unavailable. Pick another one in settings.',
       DEEP_REGION: 'Cause: the provider rejected this network region. Change the model or the network.',
       DEEP_FAILED: 'Cause: the model call failed.',
+      DEEP_SIGNED_OUT: 'Cause: you are not signed in. Sign in to use AI review.',
     },
   },
   toolbar: {

@@ -1817,6 +1817,7 @@
               <ChatInterface
                 v-if="hasProject"
                 ref="chatInterface"
+                :carry-draft-on-leave="isScratchWorkspace"
                 :visible="showAiPanel && rightPaneKey === 'ai'"
                 :onVnodeMounted="notifyRestartRecovery"
                 :project-id="String(projectId)"

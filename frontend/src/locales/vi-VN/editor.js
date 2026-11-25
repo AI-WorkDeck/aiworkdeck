@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Nội dung tài liệu {loaded} / {total}",
   "dlLoadedOnly": "Đã đọc {size} nội dung tài liệu",
   "firstOpenHint": "Lần mở đầu tiên cần khởi tạo bộ máy tài liệu; tài liệu lớn có thể mất thêm chút thời gian",
+  "readFailed": {
+    "autoRetry": "Chúng tôi sẽ tự động thử lại khi dịch vụ cục bộ hoạt động trở lại. Chưa thể chỉnh sửa tài liệu cho đến khi đọc xong.",
+    "retry": "Thử lại"
+  },
   "openFailed": {
     "title": "Không thể mở tài liệu: trình soạn thảo không phản hồi hoặc tệp bị hỏng",
     "encryptedTitle": "Tệp này được bảo vệ bằng mật khẩu mở mà trình soạn thảo chưa mở được. Hãy gỡ mật khẩu trong Excel, Word, PowerPoint hoặc WPS rồi mở lại, hoặc tải tệp gốc xuống.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Nguyên nhân: đoạn văn bản này vượt quá ngữ cảnh của mô hình. Hãy chia nhỏ đoạn rồi rà soát lại.",
       "DEEP_MODEL_UNAVAILABLE": "Nguyên nhân: mô hình phụ trợ hiện không khả dụng. Vui lòng chọn mô hình khác trong phần cài đặt.",
       "DEEP_REGION": "Nguyên nhân: nhà cung cấp từ chối khu vực mạng hiện tại. Hãy đổi mô hình hoặc kết nối mạng.",
-      "DEEP_FAILED": "Nguyên nhân: gọi mô hình thất bại."
+      "DEEP_FAILED": "Nguyên nhân: gọi mô hình thất bại.",
+      "DEEP_SIGNED_OUT": "Nguyên nhân: bạn chưa đăng nhập. Hãy đăng nhập để dùng tính năng rà soát bằng AI."
     }
   },
   "toolbar": {

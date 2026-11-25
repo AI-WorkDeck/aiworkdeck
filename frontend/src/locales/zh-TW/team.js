@@ -23,7 +23,7 @@ export default {
   "invitesTitle": "收到的邀請",
   "invitesEmpty": "目前沒有收到任何團隊邀請",
   "inviteFrom": "來自 {team}",
-  "inviteRoleAs": "加入后角色：{role}",
+  "inviteRoleAs": "加入後角色：{role}",
   "inviteExpires": "有效期至 {date}",
   "inviteExpiresUnknown": "有效期以官網為準",
   "acceptInvite": "接受",

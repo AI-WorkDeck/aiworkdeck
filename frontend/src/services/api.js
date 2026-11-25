@@ -2829,8 +2829,9 @@ export function evidenceRefCounts(projectId, fileIds) {
 export function reviewDocumentLayout(projectId, data) {
   return request({ url: `/api/projects/${projectId}/visual-review`, method: 'POST', data, logBody: false, timeout: 120000 })
 }
-export function reviewDocInsight(projectId, data) {
-  return request({ url: `/api/projects/${projectId}/insight/review`, method: 'POST', data, logBody: false, timeout: data.deep ? 120000 : 30000 })
+// options.accountPrompt=false：编辑器停笔后自动排的 AI 审校，未登录时不弹登录层（D1）。
+export function reviewDocInsight(projectId, data, options = {}) {
+  return request({ url: `/api/projects/${projectId}/insight/review`, method: 'POST', data, logBody: false, timeout: data.deep ? 120000 : 30000, ...options })
 }
 export function parseDocInsight(projectId, docFileId) {
   return request({ url: `/api/projects/${projectId}/insight/parse`, method: 'POST', data: { docFileId } })

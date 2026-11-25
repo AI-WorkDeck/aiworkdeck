@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "Hogere tarieven voor lange contexten",
   "noVisionTag": "Geen beeldinvoer",
   "modelNoVisionToast": "Dit model kan afbeeldingen niet direct lezen. Afbeeldingen worden verwerkt als herkende tekst (OCR).",
-  "noModels": "Geen modellen beschikbaar. Controleer de AI-providerinstellingen.",
+  "noModels": "Nog geen modellen. Meld u aan bij uw AI WorkDeck-account om AI te gebruiken.",
   "networkBasis": "Netwerkcontrole: {basis}",
   "modelPriceUnitCny": "Eenheid: CNY per 1 mln. tokens, invoer / uitvoer",
   "modelPriceUnitUsd": "Eenheid: USD per 1M tokens, invoer / uitvoer",

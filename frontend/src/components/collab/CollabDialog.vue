@@ -913,15 +913,4 @@ export default {
   display: flex; justify-content: flex-end; gap: 12px;
   padding: 14px 24px; border-top: 1px solid var(--awd-border-subtle); background: var(--awd-bg);
 }
-.awd-btn {
-  height: var(--awd-control-height); box-sizing: border-box;
-  padding: 0 18px; border-radius: var(--awd-radius-md); font-size: var(--awd-font-size-body); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
-.awd-btn-danger { background: var(--awd-surface); color: var(--awd-danger-text); border: 1px solid var(--awd-danger); }
-.awd-btn-disabled { opacity: .45; pointer-events: none; }
 </style>

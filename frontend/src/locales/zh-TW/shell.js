@@ -29,5 +29,5 @@ export default {
   "openFolderConfirm": "把「{name}」作為專案開啟？",
   "open": "開啟",
   "openFolderFailed": "開啟失敗",
-  "back": "回傳"
+  "back": "返回"
 }

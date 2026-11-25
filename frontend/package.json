@@ -4,7 +4,7 @@
   "scripts": {
     "postinstall": "node scripts/patch-uni-h5-scrollview.mjs && node scripts/patch-uni-h5-slots.mjs",
     "check:emits": "node scripts/check-emit-bindings.mjs",
-    "check:locales": "node scripts/check-locale-parity.mjs && node scripts/check-brand-copy.mjs",
+    "check:locales": "node scripts/check-locale-parity.mjs && node scripts/check-brand-copy.mjs && node scripts/check-terminology.mjs",
     "check:nav": "node scripts/check-navigation-contract.mjs",
     "check:nav:full": "CHECK_NAV_FULL=1 node scripts/check-navigation-contract.mjs",
     "dev:custom": "uni -p",
@@ -116,6 +116,7 @@
     "test:plugin-sdk": "node --test tests/plugin-sdk/*.test.mjs",
     "test:panel-dock": "node --test tests/panel-dock/*.test.mjs",
     "test:tab-visibility": "node --test tests/tab-visibility/*.test.mjs",
+    "test:launch": "node --test tests/launch/*.test.mjs",
     "test:version-history": "node --test tests/version-history/*.test.mjs",
     "test:version-merge": "node --test tests/version-merge/*.test.mjs",
     "test:insight": "node --test tests/insight/*.test.mjs tests/legal-references/*.test.mjs",

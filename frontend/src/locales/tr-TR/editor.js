@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Belge içeriği {loaded} / {total}",
   "dlLoadedOnly": "Belge içeriğinin {size} kadarı okundu",
   "firstOpenHint": "İlk açılışta belge motoru başlatılır; büyük belgeler biraz zaman alabilir",
+  "readFailed": {
+    "autoRetry": "Yerel hizmet geri geldiğinde otomatik olarak yeniden deneyeceğiz. Belge okunana kadar düzenlenemez.",
+    "retry": "Tekrar dene"
+  },
   "openFailed": {
     "title": "Belge açılamıyor: düzenleyici yanıt vermiyor veya dosya hasar görmüş",
     "encryptedTitle": "Bu dosya, düzenleyicinin henüz açamadığı bir açılış parolasıyla korunuyor. Parolayı Excel, Word, PowerPoint veya WPS’te kaldırıp yeniden açın ya da orijinal dosyayı indirin.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Neden: bu bölüm model bağlamını aşıyor. Bölüp tekrar inceleyin.",
       "DEEP_MODEL_UNAVAILABLE": "Neden: yardımcı model kullanılamıyor. Ayarlardan başka bir model seçin.",
       "DEEP_REGION": "Neden: sağlayıcı bu ağ bölgesini reddetti. Modeli veya ağı değiştirin.",
-      "DEEP_FAILED": "Neden: model çağrısı başarısız oldu."
+      "DEEP_FAILED": "Neden: model çağrısı başarısız oldu.",
+      "DEEP_SIGNED_OUT": "Neden: oturum açmadınız. Yapay zekâ incelemesini kullanmak için oturum açın."
     }
   },
   "toolbar": {

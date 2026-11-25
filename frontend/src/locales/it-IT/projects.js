@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Il profilo di questo fascicolo è ancora vuoto. Compila prima il cliente e il tipo di pratica, in modo che colleghi e clienti possano capire a colpo d'occhio di cosa si tratta.",
   "startFilling": "Inizia a compilare",
   "selectMatterType": "Seleziona il tipo di pratica",
+  "profileField": {
+    "client": "Cliente",
+    "matterType": "Tipo di pratica",
+    "openedAt": "Aperta il",
+    "nextStep": "Prossimo passo",
+    "counterparty": "Controparte"
+  },
   "notFilled": "Non compilato",
   "placeholderClient": "es.: Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "es.: 01/08/2026",

@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Documentinhoud {loaded} / {total}",
   "dlLoadedOnly": "{size} aan documentinhoud gelezen",
   "firstOpenHint": "Bij het eerste openen wordt de document-engine geïnitialiseerd; grote documenten kunnen even duren",
+  "readFailed": {
+    "autoRetry": "Zodra de lokale service terug is, proberen we het automatisch opnieuw. Tot die tijd kan het document niet worden bewerkt.",
+    "retry": "Opnieuw proberen"
+  },
   "openFailed": {
     "title": "Het document kan niet worden geopend: de editor reageert niet of het bestand is beschadigd",
     "encryptedTitle": "Dit bestand is beveiligd met een openingswachtwoord dat de editor nog niet kan openen. Verwijder het wachtwoord in Excel, Word, PowerPoint of WPS en open het opnieuw, of download het origineel.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Oorzaak: dit gedeelte overschrijdt de context van het model. Splits het en beoordeel opnieuw.",
       "DEEP_MODEL_UNAVAILABLE": "Oorzaak: het hulpmodel is niet beschikbaar. Kies een ander model in de instellingen.",
       "DEEP_REGION": "Oorzaak: de provider heeft deze netwerkregio geweigerd. Wijzig het model of het netwerk.",
-      "DEEP_FAILED": "Oorzaak: de modelaanroep is mislukt."
+      "DEEP_FAILED": "Oorzaak: de modelaanroep is mislukt.",
+      "DEEP_SIGNED_OUT": "Oorzaak: u bent niet aangemeld. Meld u aan om AI-controle te gebruiken."
     }
   },
   "toolbar": {

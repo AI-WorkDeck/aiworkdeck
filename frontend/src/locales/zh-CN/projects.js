@@ -98,6 +98,13 @@ export default {
   profileEmptyGuideDesc: '这份案卷的档案还是空的。先把客户和事项类型填上，同事和客户点进来一眼就知道这是什么案子。',
   startFilling: '开始填写',
   selectMatterType: '选择事项类型',
+  profileField: {
+    client: "客户",
+    matterType: "事项类型",
+    openedAt: "立项时间",
+    nextStep: "下一步",
+    counterparty: "对方",
+  },
   notFilled: '未填写',
   placeholderClient: '例如：北京某某科技有限公司',
   placeholderOpenedAt: '例如：2026-08-01',

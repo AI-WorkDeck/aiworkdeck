@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Dokumentinhalt {loaded} / {total}",
   "dlLoadedOnly": "{size} Dokumentinhalt gelesen",
   "firstOpenHint": "Beim ersten Öffnen wird die Dokument-Engine initialisiert; große Dokumente können einen Moment dauern",
+  "readFailed": {
+    "autoRetry": "Sobald der lokale Dienst wieder läuft, versuchen wir es automatisch erneut. Bis dahin kann das Dokument nicht bearbeitet werden.",
+    "retry": "Erneut versuchen"
+  },
   "openFailed": {
     "title": "Das Dokument kann nicht geöffnet werden: Der Editor reagiert nicht oder die Datei ist beschädigt",
     "encryptedTitle": "Diese Datei ist mit einem Öffnungskennwort geschützt, das der Editor noch nicht öffnen kann. Entfernen Sie das Kennwort in Excel, Word, PowerPoint oder WPS und öffnen Sie sie erneut, oder laden Sie das Original herunter.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Ursache: Dieser Abschnitt überschreitet den Modellkontext. Bitte teilen Sie ihn auf und prüfen Sie ihn erneut.",
       "DEEP_MODEL_UNAVAILABLE": "Ursache: Das Hilfsmodell ist nicht verfügbar. Bitte wählen Sie in den Einstellungen ein anderes aus.",
       "DEEP_REGION": "Ursache: Der Anbieter hat diese Netzwerkregion abgelehnt. Bitte ändern Sie das Modell oder das Netzwerk.",
-      "DEEP_FAILED": "Ursache: Der Modellaufruf ist fehlgeschlagen."
+      "DEEP_FAILED": "Ursache: Der Modellaufruf ist fehlgeschlagen.",
+      "DEEP_SIGNED_OUT": "Ursache: Sie sind nicht angemeldet. Melden Sie sich an, um die KI-Prüfung zu nutzen."
     }
   },
   "toolbar": {

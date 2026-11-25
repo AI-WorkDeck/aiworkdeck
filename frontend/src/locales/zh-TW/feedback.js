@@ -5,7 +5,7 @@ export default {
   "launcherTitle": "報告問題 / 提建議",
   "launcherLabel": "回饋",
   "myFeedback": "我的回饋",
-  "back": "回傳",
+  "back": "返回",
   "close": "關閉",
   "kindBug": "報障",
   "kindIdea": "建議",

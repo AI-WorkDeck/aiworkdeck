@@ -6,7 +6,9 @@
     <view class="launch-center">
       <image class="launch-logo awd-brand-logo" src="/static/logo_full_v2.png" mode="heightFix" />
       <view v-if="!failed" class="launch-loading">
-        <view class="launch-spinner"></view>
+        <view class="launch-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="Math.round(progress * 100)">
+          <view class="launch-progress-fill" :style="{ width: (progress * 100).toFixed(1) + '%' }"></view>
+        </view>
         <text class="launch-status">{{ statusText }}</text>
       </view>
       <view v-else class="launch-error">
@@ -24,6 +26,8 @@ import {
   getLocalIdentityStatus,
 } from '@/services/api.js'
 import { isDesktopHost, host } from '@/services/host.js'
+import { launchProgress, loadExpectedLaunchMs, saveLaunchMs } from './launchProgress.js'
+import { uniStorage } from '@/utils/uniStorage.js'
 
 export default {
   name: 'LaunchPage',
@@ -35,6 +39,11 @@ export default {
       // 后端启动失败的诊断信息（desktop 端 backend.onStatus 推送），浏览器态始终为空
       backendDetail: '',
       unsubscribeBackendStatus: null,
+      // 进度条（0–1）：按本机上次启动耗时估算，后端可达才置满（见 launchProgress.js）
+      progress: 0,
+      progressTimer: null,
+      // 本次页面加载里的第一次 boot 才记启动耗时；失败后重试的不算
+      bootCount: 0,
     }
   },
   onLoad() {
@@ -43,6 +52,7 @@ export default {
   },
   beforeUnmount() {
     if (this.unsubscribeBackendStatus) this.unsubscribeBackendStatus()
+    this.stopProgress()
   },
   methods: {
     isDesktop() {
@@ -62,9 +72,23 @@ export default {
       }
       this.boot()
     },
+    // 首次 boot 从页面加载起算（主窗口与后端同时起步）；重试从点击重试时起算
+    startProgress(firstBoot) {
+      this.stopProgress()
+      const expected = loadExpectedLaunchMs(uniStorage)
+      const startedAt = firstBoot ? 0 : performance.now()
+      const tick = () => { this.progress = launchProgress(performance.now() - startedAt, expected) }
+      tick()
+      this.progressTimer = setInterval(tick, 100)
+    },
+    stopProgress() {
+      if (this.progressTimer) clearInterval(this.progressTimer)
+      this.progressTimer = null
+    },
     async boot() {
       this.failed = false
       this.statusText = this.$t('onboarding.launch.starting')
+      const firstBoot = this.bootCount++ === 0
 
       // 非桌面环境（浏览器访问团队服务器）：走原登录流程，一字不动
       if (!this.isDesktop()) {
@@ -75,11 +99,15 @@ export default {
       // 桌面环境：等本地服务就绪。授权状态端点在这里只当「后端起来了没有」的探针用——
       // 启动不再设解锁门（dev-board#1027 / #1047：登录后置，需要账户的功能在用到时就地登录），
       // unlocked 的真假不参与分流。
+      this.startProgress(firstBoot)
       const status = await this.waitLicenseStatus()
+      this.stopProgress()
       if (!status) {
         this.failed = true
         return
       }
+      this.progress = 1
+      if (firstBoot) saveLaunchMs(uniStorage, performance.now())
 
       // 本机工作区待选定：老安装的库里可能有多个都带数据的历史账号，后端不猜，
       // 在这里拦下来让用户自己选，选完才进工作区（选过一次就不会再走这条分支）。
@@ -155,18 +183,24 @@ export default {
   min-height: 70px;
 }
 
-.launch-spinner {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--awd-border);
-  border-top-color: var(--awd-accent);
-  border-radius: 50%;
-  animation: launch-spin 0.9s linear infinite;
+.launch-progress {
+  width: 200px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--awd-border);
+  overflow: hidden;
 }
 
-@keyframes launch-spin {
-  to {
-    transform: rotate(360deg);
+.launch-progress-fill {
+  height: 100%;
+  background: var(--awd-accent);
+  border-radius: 999px;
+  transition: width 0.2s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-progress-fill {
+    transition: none;
   }
 }
 

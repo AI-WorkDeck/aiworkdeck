@@ -20,7 +20,7 @@ export default {
   "guideAiEdit": "讓 AI 修改一份文件",
   "guideAiEditDesc": "看看律師怎樣用它改契約、寫文書、核對材料。",
   "guidePlugin": "安裝第一個外掛",
-  "guidePluginDesc": "外掛廣場裡的技能與面板，裝上就出現在左欄。",
+  "guidePluginDesc": "外掛市集裡的技能與面板，裝上就出現在左欄。",
   "showOnStartup": "啟動時顯示歡迎頁",
   "telemetryNotice": "已開啟匿名使用統計，可在設定中關閉",
   "telemetryNoticeDismiss": "不再提示",

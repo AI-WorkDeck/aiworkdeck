@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Kandungan dokumen {loaded} / {total}",
   "dlLoadedOnly": "Membaca {size} kandungan dokumen",
   "firstOpenHint": "Pembukaan pertama memulakan enjin dokumen; dokumen besar mungkin mengambil sedikit masa",
+  "readFailed": {
+    "autoRetry": "Kami akan cuba semula secara automatik apabila perkhidmatan setempat kembali. Dokumen tidak boleh disunting sehingga ia dibaca.",
+    "retry": "Cuba lagi"
+  },
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: penyunting tidak memberi respons atau fail rosak",
     "encryptedTitle": "Fail ini dilindungi kata laluan pembukaan yang belum boleh dibuka oleh penyunting. Buang kata laluan dalam Excel, Word, PowerPoint atau WPS dan buka semula, atau muat turun fail asal.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Punca: petikan ini melebihi konteks model. Pisahkannya dan semak semula.",
       "DEEP_MODEL_UNAVAILABLE": "Punca: model tambahan tidak tersedia. Pilih model lain dalam tetapan.",
       "DEEP_REGION": "Punca: pembekal menolak rantau rangkaian ini. Tukar model atau rangkaian.",
-      "DEEP_FAILED": "Punca: panggilan model gagal."
+      "DEEP_FAILED": "Punca: panggilan model gagal.",
+      "DEEP_SIGNED_OUT": "Punca: anda belum log masuk. Log masuk untuk menggunakan semakan AI."
     }
   },
   "toolbar": {

@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "Chi phí cao hơn cho ngữ cảnh dài",
   "noVisionTag": "Không hỗ trợ đầu vào ảnh",
   "modelNoVisionToast": "Mô hình này không thể đọc ảnh trực tiếp. Ảnh sẽ được xử lý dưới dạng văn bản nhận dạng (OCR).",
-  "noModels": "Không có mô hình nào khả dụng. Hãy kiểm tra cài đặt nhà cung cấp AI.",
+  "noModels": "Chưa có mô hình nào. Hãy đăng nhập tài khoản AI WorkDeck để dùng AI.",
   "networkBasis": "Kiểm tra mạng: {basis}",
   "modelPriceUnitCny": "Đơn vị: CNY trên 1 triệu token, đầu vào / đầu ra",
   "modelPriceUnitUsd": "Đơn vị: USD mỗi 1M token, đầu vào / đầu ra",

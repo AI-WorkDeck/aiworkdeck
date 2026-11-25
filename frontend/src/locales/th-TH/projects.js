@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "โปรไฟล์ของแฟ้มคดีนี้ยังว่างอยู่ กรอกข้อมูลลูกความและประเภทคดีก่อน เพื่อให้เพื่อนร่วมงานและลูกความเห็นภาพรวมของคดีได้ทันที",
   "startFilling": "เริ่มกรอกข้อมูล",
   "selectMatterType": "เลือกประเภทคดี",
+  "profileField": {
+    "client": "ลูกความ",
+    "matterType": "ประเภทเรื่อง",
+    "openedAt": "วันที่เปิดเรื่อง",
+    "nextStep": "ขั้นตอนถัดไป",
+    "counterparty": "คู่กรณี"
+  },
   "notFilled": "ยังไม่ได้กรอก",
   "placeholderClient": "เช่น บริษัท เอคมี เทคโนโลยี จำกัด",
   "placeholderOpenedAt": "เช่น 2026-08-01",

@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Contenu du document {loaded} / {total}",
   "dlLoadedOnly": "{size} du contenu du document lus",
   "firstOpenHint": "La première ouverture initialise le moteur de document ; les documents volumineux peuvent prendre un moment",
+  "readFailed": {
+    "autoRetry": "Nous réessaierons automatiquement dès que le service local sera revenu. Le document ne peut pas être modifié avant d’avoir été lu.",
+    "retry": "Réessayer"
+  },
   "openFailed": {
     "title": "Impossible d’ouvrir le document : l’éditeur ne répond pas ou le fichier est endommagé",
     "encryptedTitle": "Ce fichier est protégé par un mot de passe d’ouverture que l’éditeur ne peut pas encore ouvrir. Supprimez le mot de passe dans Excel, Word, PowerPoint ou WPS puis rouvrez-le, ou téléchargez l’original.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Cause : ce passage dépasse la fenêtre de contexte du modèle. Divisez-le et relancez la révision.",
       "DEEP_MODEL_UNAVAILABLE": "Cause : le modèle auxiliaire est indisponible. Choisissez-en un autre dans les paramètres.",
       "DEEP_REGION": "Cause : le fournisseur a rejeté cette région réseau. Changez de modèle ou de réseau.",
-      "DEEP_FAILED": "Cause : l’appel au modèle a échoué."
+      "DEEP_FAILED": "Cause : l’appel au modèle a échoué.",
+      "DEEP_SIGNED_OUT": "Cause : vous n’êtes pas connecté. Connectez-vous pour utiliser la révision IA."
     }
   },
   "toolbar": {

@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # One run per PR: a new push cancels the superseded run. On master (and tags) a run in progress is
+  # never cancelled; GitHub keeps one pending run per group, so a burst of merges collapses to the
+  # latest commit instead of queueing every one (CI capacity, 2026-11-25).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   spdx-check:
     name: SPDX header check
@@ -273,6 +279,9 @@ jobs:
       - name: Tab visibility contract (dev-board#394)
         working-directory: frontend
         run: npm run test:tab-visibility
+      - name: Launch progress estimate (启动页进度条)
+        working-directory: frontend
+        run: npm run test:launch
       - name: Titlebar drag-region contract (全屏浮层必须 no-drag，B4 / 0907 B10)
         working-directory: frontend
         run: npm run test:window-chrome
@@ -348,6 +357,9 @@ jobs:
       - name: Build H5
         working-directory: frontend
         run: npm run build:h5
+      - name: No remote resources fetched by the built app at launch (D7)
+        working-directory: frontend
+        run: node scripts/check-dist-egress.mjs
 
   pptx-service:
     # 随包的 PPT 服务（上游 banana-slides 的 vendored 代码）单元测试；此前 CI 完全没跑过，
@@ -402,3 +414,24 @@ jobs:
       - name: Install dependencies
         working-directory: desktop
         run: npm ci
+
+  desktop-unit:
+    # Desktop unit tests on Linux for every PR. They used to run only inside the Windows installer build
+    # (desktop-build.yml), which PRs now skip unless installer contents change (CI capacity, 2026-11-25).
+    # Not a required check yet; promote it once it has a clean record.
+    name: Desktop unit tests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Desktop unit tests
+        working-directory: desktop
+        run: npm test

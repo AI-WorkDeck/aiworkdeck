@@ -136,6 +136,10 @@ export default {
   "dlProgress": "文件內容 {loaded} / {total}",
   "dlLoadedOnly": "已讀取文件內容 {size}",
   "firstOpenHint": "首次開啟需初始化文件引擎，大文件會稍慢，請稍候",
+  "readFailed": {
+    "autoRetry": "本機服務恢復後會自動重新讀取。讀取完成前無法編輯這份文件。",
+    "retry": "重試"
+  },
   "openFailed": {
     "title": "文件無法開啟：引擎無響應或檔案損壞",
     "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "原因：這一段正文超出模型上下文，請分段後再審校。",
       "DEEP_MODEL_UNAVAILABLE": "原因：目前輔助模型不可用，請到設定頁更換。",
       "DEEP_REGION": "原因：目前網路環境被服務商按地域拒絕，請更換模型或網路。",
-      "DEEP_FAILED": "原因：模型呼叫失敗。"
+      "DEEP_FAILED": "原因：模型呼叫失敗。",
+      "DEEP_SIGNED_OUT": "原因：尚未登入。登入後即可使用 AI 審校。"
     }
   },
   "toolbar": {
@@ -442,7 +447,7 @@ export default {
     "alignCenter": "居中",
     "alignRight": "右對齊",
     "alignJustify": "兩端對齊",
-    "bulletList": "專案符號",
+    "bulletList": "項目符號",
     "numberList": "編號列表",
     "indentLess": "減少縮排",
     "indentMore": "增加縮排",

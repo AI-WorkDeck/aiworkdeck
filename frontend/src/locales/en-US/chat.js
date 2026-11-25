@@ -156,7 +156,7 @@ export default {
   tieredPricing: 'Higher rates for long context',
   noVisionTag: 'No image input',
   modelNoVisionToast: 'This model cannot read images directly. Images will be processed as recognized text (OCR).',
-  noModels: 'No models available. Check the AI provider settings.',
+  noModels: 'No models yet. Sign in to your AI WorkDeck account to use AI.',
   networkBasis: 'Network check: {basis}',
   // Pricing (dev-board#853): two numbers per row; unit, basis and tier meaning live in the footnote
   modelPriceUnitCny: 'Unit: CNY per 1M tokens, input / output',

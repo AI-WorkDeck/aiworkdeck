@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Konten dokumen {loaded} / {total}",
   "dlLoadedOnly": "Membaca {size} dari konten dokumen",
   "firstOpenHint": "Pembukaan pertama menginisialisasi mesin dokumen; dokumen besar mungkin memerlukan waktu sebentar",
+  "readFailed": {
+    "autoRetry": "Kami akan mencoba lagi secara otomatis saat layanan lokal kembali. Dokumen tidak dapat diedit sebelum berhasil dibaca.",
+    "retry": "Coba lagi"
+  },
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: editor tidak merespons atau berkas rusak",
     "encryptedTitle": "File ini dilindungi kata sandi pembuka yang belum dapat dibuka oleh editor. Hapus kata sandi di Excel, Word, PowerPoint, atau WPS lalu buka lagi, atau unduh file aslinya.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "Penyebab: bagian ini melebihi konteks model. Pisahkan lalu tinjau kembali.",
       "DEEP_MODEL_UNAVAILABLE": "Penyebab: model tambahan tidak tersedia. Pilih model lain di pengaturan.",
       "DEEP_REGION": "Penyebab: penyedia menolak wilayah jaringan ini. Ganti model atau jaringan.",
-      "DEEP_FAILED": "Penyebab: pemanggilan model gagal."
+      "DEEP_FAILED": "Penyebab: pemanggilan model gagal.",
+      "DEEP_SIGNED_OUT": "Penyebab: Anda belum masuk. Masuk untuk menggunakan tinjauan AI."
     }
   },
   "toolbar": {

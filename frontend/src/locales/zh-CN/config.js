@@ -7,7 +7,7 @@ export default {
     projects: '项目',
     files: '资源管理器',
     ddFiles: '尽调文件',
-    market: '插件中心',
+    market: '插件市场',
     dev: '插件开发',
     // 「语音」是语音合成 + 会议录音的合并入口；下面两条是面板内部两个 tab 的名字
     voice: '语音',

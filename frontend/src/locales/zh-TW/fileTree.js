@@ -83,7 +83,7 @@ export default {
   "mergeToPdfFailed": "合併為 PDF 失敗",
   "recycleBinCount": "資源回收筒 ({count})",
   "recycleBin": "資源回收筒",
-  "back": "回傳",
+  "back": "返回",
   "recycleBinEmpty": "資源回收筒為空",
   "aiAssistantFilesFolder": "AI 助手檔案",
   "restore": "還原",

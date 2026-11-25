@@ -43,10 +43,27 @@ test('emits save 已声明且 payload 是 {fieldKey, value}', () => {
   assert.match(SRC, /\$emit\('save',\s*\{\s*fieldKey:[^}]*value:[^}]*\}\s*\)/)
 })
 
-test('label 用服务端下发的，不在前端写第二份中文文案表', () => {
-  assert.ok(SRC.includes('f.label'))
+test('labels follow the UI language by fieldKey; the server label is only the fallback (D4)', () => {
+  assert.match(SRC, /\{\{ fieldLabel\(f\) \}\}/)
+  assert.match(SRC, /'projects\.profileField\.' \+ f\.fieldKey/)
+  assert.ok(SRC.includes('f.label'), 'unknown fields fall back to the server label')
   for (const bad of ["'客户'", "'事项类型'", "'立项时间'", "'下一步'", "'对方'"])
-    assert.ok(!SRC.includes(bad), '中文标签的单一来源是服务端: ' + bad)
+    assert.ok(!SRC.includes(bad), 'no Chinese literals in the component: ' + bad)
+})
+
+test('every locale names all five profile fields; zh-CN matches the backend labels (D4)', async () => {
+  const java = readFileSync(new URL('../../../backend/src/main/java/com/checkba/service/ProjectProfileService.java', import.meta.url), 'utf8')
+  const server = Object.fromEntries([...java.matchAll(/"(client|matterType|openedAt|nextStep|counterparty)",\s*"([^"]+)"/g)].map((m) => [m[1], m[2]]))
+  assert.equal(Object.keys(server).length, 5)
+  const { readdirSync } = await import('node:fs')
+  const dir = new URL('../../src/locales/', import.meta.url)
+  for (const locale of readdirSync(dir).filter((d) => /^[a-z]{2}-[A-Z]{2}$/.test(d))) {
+    const src = readFileSync(new URL(locale + '/projects.js', dir), 'utf8').replace(/^\s*export\s+default\s*/m, 'return ')
+    const labels = new Function(src)().profileField || {}
+    for (const key of Object.keys(server)) assert.ok(labels[key], `${locale} lacks projects.profileField.${key}`)
+    if (locale === 'zh-CN') assert.deepEqual(labels, server)
+    if (locale === 'en-US') assert.ok(!/[\u4e00-\u9fff]/.test(Object.values(labels).join('')), 'English labels contain Chinese')
+  }
 })
 
 test('不自己补齐或排序 fields（服务端保证恒 5 条顺序固定）', () => {

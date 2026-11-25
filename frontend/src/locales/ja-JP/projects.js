@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "この案件ファイルのプロフィールはまだ空です。まずクライアントと案件の種類を入力すると、同僚やクライアントが案件の内容をひと目で把握できます。",
   "startFilling": "入力を開始",
   "selectMatterType": "案件の種類を選択",
+  "profileField": {
+    "client": "依頼者",
+    "matterType": "案件の種類",
+    "openedAt": "受任日",
+    "nextStep": "次の対応",
+    "counterparty": "相手方"
+  },
   "notFilled": "未入力",
   "placeholderClient": "例: Acme テクノロジー株式会社",
   "placeholderOpenedAt": "例: 2026-08-01",

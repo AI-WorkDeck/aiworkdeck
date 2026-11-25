@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Профиль этого дела пока пуст. Сначала укажите клиента и тип дела, чтобы коллеги и клиенты сразу понимали, о чём идёт речь.",
   "startFilling": "Заполнить",
   "selectMatterType": "Выберите тип дела",
+  "profileField": {
+    "client": "Клиент",
+    "matterType": "Тип дела",
+    "openedAt": "Дата открытия",
+    "nextStep": "Следующий шаг",
+    "counterparty": "Контрагент"
+  },
   "notFilled": "Не заполнено",
   "placeholderClient": "например, ООО «Акме Технологии»",
   "placeholderOpenedAt": "например, 01.08.2026",

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkStyles, checkTokenContract, run } from '../../../scripts/check-design-system.mjs'
+import { checkStyles, checkTokenContract, expandStyleSources, overBaseline, run } from '../../../scripts/check-design-system.mjs'
 const root = fileURLToPath(new URL('../../../', import.meta.url))
 const read = f => readFileSync(resolve(root, f), 'utf8')
 const app = read('frontend/src/App.vue')
@@ -25,6 +25,17 @@ test('removing a metric from the iframe channel is detected', () => {
 test('undefined and duplicate exported tokens are detected', () => {
   assert.ok(checkTokenContract(app, theme.replace("'bg',", "'missing-token', 'bg', 'bg',")).some(s => s.includes('undefined exported token')))
   assert.ok(checkTokenContract(app, theme.replace("'bg',", "'bg', 'bg',")).includes('duplicate exported token'))
+})
+test('external <style src> files are scanned, not skipped (X20)', () => {
+  const vue = '<template><div/></template><style lang="scss" scoped src="./fixtures/external-style.scss"></style>'
+  assert.equal(checkStyles(vue, 'fixture').length, 0)
+  const expanded = expandStyleSources(vue, 'frontend/tests/design-system/fake.vue')
+  assert.deepEqual(checkStyles(expanded, 'fixture'), ['fixture: color: #123456'])
+})
+test('baseline tolerates existing external violations only, counting duplicates', () => {
+  const { extra, stale } = overBaseline(['a', 'a', 'b'], ['a', 'c'])
+  assert.deepEqual(extra, ['a', 'b'])
+  assert.deepEqual(stale, ['c'])
 })
 test('current migrated shared controls and complete metric channel pass', () => assert.equal(run(), 0))
 

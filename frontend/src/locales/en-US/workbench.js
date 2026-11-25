@@ -166,7 +166,7 @@ export default {
   logout: 'Log Out',
   // Left rail
   stagingArea: 'Staging Area',
-  pluginMarket: 'Plugin Marketplace',
+  pluginMarket: 'Marketplace',
   systemSettings: 'Settings (AI Provider / API Key)',
   clientInitial: 'C',
   addMember: 'Add Member',

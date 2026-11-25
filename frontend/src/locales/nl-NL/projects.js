@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Het profiel van dit dossier is nog leeg. Vul eerst de klant en het type zaak in, zodat collega's en klanten in één oogopslag zien waar deze zaak over gaat.",
   "startFilling": "Begin met invullen",
   "selectMatterType": "Selecteer het zaaktype",
+  "profileField": {
+    "client": "Cliënt",
+    "matterType": "Soort zaak",
+    "openedAt": "Geopend op",
+    "nextStep": "Volgende stap",
+    "counterparty": "Wederpartij"
+  },
   "notFilled": "Niet ingevuld",
   "placeholderClient": "bijv. Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "bijv. 2026-08-01",

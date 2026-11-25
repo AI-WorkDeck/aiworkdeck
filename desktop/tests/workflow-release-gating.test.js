@@ -433,3 +433,39 @@ test('Native Windows baseline directory syntax is bound to known builder lockfil
   for (const version of ['25.0.0', '27.0.0', undefined]) assert.throws(() => nsisDirectoryStyle(lock(version)))
   assert.throws(() => nsisDirectoryStyle({}))
 })
+
+// CI capacity (readiness 2026-11-25): Actions queues were saturated by superseded PR runs and a Windows
+// installer build on almost every PR. These pin the rules: PR runs cancel their superseded run; on master and
+// tags a running run is never cancelled, and pending runs collapse to the newest (one pending per group); the
+// Windows installer build on a PR only runs when dependency-scope says installer contents changed or the PR
+// carries `full-build`; tags still build both platforms and release.
+const CONCURRENCY_GROUP = '${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}'
+for (const file of ['ci.yml', 'supply-chain.yml', 'desktop-build.yml', 'journeys.yml', 'marketing-screenshots.yml']) {
+  test(`${file}: one run per PR; master/tags never cancel a running run`, () => {
+    const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
+    assert.ok(wf.concurrency, `${file} needs a concurrency block`)
+    if (file === 'desktop-build.yml') {
+      // labelled with anything but full-build: own group (never cancels the running build)
+      assert.ok(wf.concurrency.group.startsWith(CONCURRENCY_GROUP), wf.concurrency.group)
+      assert.match(wf.concurrency.group, /github\.event\.label\.name != 'full-build'.*github\.run_id/)
+    } else {
+      assert.strictEqual(wf.concurrency.group, CONCURRENCY_GROUP)
+    }
+    assert.strictEqual(wf.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
+  })
+}
+
+test('desktop-build.yml: PR installer build is gated by dependency-scope.build; tags still build mac+win', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'desktop-build.yml'), 'utf8'))
+  const build = wf.jobs.build
+  assert.match(build.if, /github\.event_name != 'pull_request' \|\| needs\.dependency-scope\.outputs\.build == 'true'/)
+  assert.ok(wf.jobs['dependency-scope'].outputs.build, 'dependency-scope must expose a build output')
+  const scope = wf.jobs['dependency-scope'].steps.find((s) => s.id === 'scope')
+  assert.match(scope.run, /full-build|FULL_BUILD/)
+  assert.match(scope.env.FULL_BUILD, /'full-build'/)
+  assert.match(String(build.strategy.matrix.os), /startsWith\(github\.ref, 'refs\/tags\/v'\).*macos-latest.*windows-latest/)
+  assert.ok(wf.on.schedule && wf.on.schedule.length, 'nightly master build keeps installer coverage for source-only PRs')
+  assert.ok(wf.on.pull_request.types.includes('labeled'), 'adding the full-build label must start the build')
+  assert.match(wf.jobs['dependency-scope'].if, /github\.event\.action != 'labeled' \|\| github\.event\.label\.name == 'full-build'/)
+  assert.match(wf.jobs.release.if, /startsWith\(github\.ref, 'refs\/tags\/v'\)/)
+})

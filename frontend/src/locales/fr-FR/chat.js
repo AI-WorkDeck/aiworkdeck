@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "Tarifs plus élevés pour les longs contextes",
   "noVisionTag": "Pas d'entrée d'image",
   "modelNoVisionToast": "Ce modèle ne peut pas lire les images directement. Les images seront traitées sous forme de texte reconnu (OCR).",
-  "noModels": "Aucun modèle disponible. Vérifiez les paramètres du fournisseur d'IA.",
+  "noModels": "Aucun modèle pour l’instant. Connectez-vous à votre compte AI WorkDeck pour utiliser l’IA.",
   "networkBasis": "Vérification du réseau : {basis}",
   "modelPriceUnitCny": "Unité : CNY par million de tokens, entrée / sortie",
   "modelPriceUnitUsd": "Unité : USD par million de jetons, entrée / sortie",

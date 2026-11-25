@@ -1,7 +1,7 @@
 {
   "id": "tabular-review",
   "name": "表格化审阅",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "minHostVersion": "0.81.0",
   "description": "一组文件 × 一组问题 → 一张审阅表：AI 批量抽取，每个格子带原文出处、可一键跳回，律师逐格确认或修改后导出 Excel。",
   "author": "AI WorkDeck",

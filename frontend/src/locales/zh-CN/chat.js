@@ -158,7 +158,7 @@ export default {
   tieredPricing: '长上下文单价更高',
   noVisionTag: '不支持读图',
   modelNoVisionToast: '该模型不支持直接读图，图片将按文字识别（OCR）处理',
-  noModels: '暂无可用模型，到设置页检查 AI 供应商配置',
+  noModels: '暂无可用模型。登录 AI WorkDeck 账户后即可使用 AI。',
   networkBasis: '网络判定：{basis}',
   // 价格（dev-board#853）：每行只有两个数，单位、口径、档位含义统一写在下拉底部脚注
   modelPriceUnitCny: '单位：元 / 百万 tokens，前为输入、后为输出',

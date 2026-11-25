@@ -22,12 +22,17 @@ test('all 20 locales have the same keys and placeholders', () => {
   }
 })
 
-test('every panel key the code uses is defined', () => {
+test('every panel key and dynamic CLAWS transcript event the code uses is defined', () => {
   const zh = load('zh-CN')
   const src = ['web/matters.js', 'web/panel.js', 'web/card.js'].map(read).join('\n')
   const used = new Set([...src.matchAll(/\bt\('([\w.]+[\w])'/g)].map((m) => 'panel.m.' + m[1]).filter((k) => !k.startsWith('panel.m.panel.')))
+  for (const ev of ['draft', 'lawyer_version', 'review_requested', 'signed', 'consult_requested', 'lawyer_selected']) {
+    used.add('panel.m.event.' + ev)
+  }
   const missing = [...used].filter((k) => !(k in zh) && !(k.replace('panel.m.', 'panel.') in zh))
   assert.deepEqual(missing, [])
+  const l10nJs = read('web/panel-l10n.js')
+  assert.ok(l10nJs.includes('"panel.m.event.lawyer_selected"'), 'panel-l10n.js includes synced event.lawyer_selected')
 })
 
 test('the lawyer finalises; the wording never says the lawyer signs', () => {
@@ -52,7 +57,7 @@ test('manifest: unique panel-only tools, the JAR it declares, views, connection 
   for (const t of manifest.tools) assert.ok(desk.includes(`'${t.name}'`), t.name)
   const firm = read('web/firm.js')
   assert.match(firm, /"offices":\["tw","sv"\]/)
-  assert.equal(manifest.version, '1.0.2')
+  assert.equal(manifest.version, '1.0.4')
   assert.equal(manifest.minHostVersion, '0.89.0')
   assert.equal(conn.auth.type, 'awd-account')
   assert.equal(conn.operations.marketplacePreview.anonymousFallback, true)

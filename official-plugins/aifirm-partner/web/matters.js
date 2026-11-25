@@ -78,7 +78,7 @@
   }
   function formatDate(iso) {
     if (!iso) return ''
-    try { return new Date(iso).toLocaleDateString() } catch { return String(iso).slice(0, 10) }
+    try { return new Date(iso).toLocaleDateString(E.locale()) } catch { return String(iso).slice(0, 10) }
   }
   const VALID_CT = new Set(['startup', 'sme', 'foreign_invest', 'individual', 'other'])
   const VALID_URG = new Set(['asap_48h', 'this_week', 'this_month', 'flexible'])
@@ -624,7 +624,7 @@
         h('dt', {}, t('consult.times')), h('dd', {}, c.times || '—'),
         h('dt', {}, t('consult.note')), h('dd', {}, c.note || '—'),
         h('dt', {}, t('consult.lawyer')), h('dd', {}, c.lawyerName || '—'),
-        h('dt', {}, t('consult.at')), h('dd', {}, c.at ? new Date(c.at).toLocaleString() : '—'),
+        h('dt', {}, t('consult.at')), h('dd', {}, c.at ? new Date(c.at).toLocaleString(E.locale()) : '—'),
         c.lawyerNote ? [h('dt', {}, t('consult.lawyerNote')), h('dd', {}, c.lawyerNote)] : null),
       c.status !== 'done' ? h('div', { class: 'row' }, cBtn(t('action.call'), scheduleCall, c.status === 'requested'), cBtn(t('consult.done'), markCallDone)) : null) : null
 
@@ -677,13 +677,13 @@
     const internal = h('section', { class: 'section' }, h('span', { class: 'section-title' }, t('section.internal')), h('div', { class: 'row' }, owner), notes, h('div', { class: 'row' }, save))
 
     const activity = h('details', { class: 'section' }, h('summary', { class: 'section-title' }, t('section.activity')),
-      h('ul', { class: 'activity' }, (d.activity || []).slice().reverse().map((a) => h('li', {}, h('span', { class: 'when' }, new Date(a.at).toLocaleString()), ' ', a.what))))
+      h('ul', { class: 'activity' }, (d.activity || []).slice().reverse().map((a) => h('li', {}, h('span', { class: 'when' }, new Date(a.at).toLocaleString(E.locale())), ' ', a.what))))
 
     $('m-detail').replaceChildren(...[
       h('div', { class: 'head' },
         h('div', { class: 'section' }, h('h2', {}, who(d)), h('div', { class: 'muted' }, [d.template ? E.pick(d.template) : '', d.company].filter(Boolean).join(' · '))),
         h('div', { class: 'tags' }, statusBadge(d.status), requested(d) ? h('span', { class: 'awd-badge awd-badge-danger call-req' }, t('consult.badge')) : null, forLawyer(d), areaBadge(d.area), h('span', { class: 'awd-badge' }, /^zh/.test(d.lang || '') ? '中文' : 'EN'), d.wantsCall ? h('span', { class: 'awd-badge awd-badge-gold' }, t('wantsCall')) : null)),
-      d.signoff ? h('div', { class: 'awd-notice awd-notice-success' }, t('event.signed', { n: d.signoff.version, name: d.signoff.name }) + ' · ' + new Date(d.signoff.at).toLocaleString()) : null,
+      d.signoff ? h('div', { class: 'awd-notice awd-notice-success' }, t('event.signed', { n: d.signoff.version, name: d.signoff.name }) + ' · ' + new Date(d.signoff.at).toLocaleString(E.locale())) : null,
       actions, editingNote, nativeBlock(), consult, request, questions, terms, flags, checkpoints, facts, notesEl, docEl, conv, internal, activity].filter(Boolean))
   }
 

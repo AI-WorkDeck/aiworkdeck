@@ -215,14 +215,6 @@ export default {
   display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap;
   padding: 14px 24px; border-top: 1px solid var(--awd-border-subtle); background: var(--awd-bg);
 }
-.awd-btn {
-  padding: 8px 18px; border-radius: 6px; font-size: 13.5px; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
 .awd-input {
   width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--awd-border-strong);
   border-radius: 6px; font-size: 14px; color: var(--awd-text); box-sizing: border-box;

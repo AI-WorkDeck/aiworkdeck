@@ -59,3 +59,10 @@ test('浅色红线 + 禁 emoji', () => {
   assert.ok(!SRC.includes('#212629'), '外壳不做深色 chrome')
   assert.ok(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(SRC), '禁 emoji')
 })
+
+test('counts pass the number so English says "1 member", not "1 members" (D4)', () => {
+  for (const k of ['folderCountLabel', 'memberCountLabel', 'runCountLabel'])
+    assert.match(SRC, new RegExp("\\$t\\('projects\\." + k + "', \\{ count: (\\w+) \\}, \\1\\)"), k)
+  const en = readFileSync(new URL('../../src/locales/en-US/projects.js', import.meta.url), 'utf8')
+  assert.match(en, /memberCountLabel: '\{count\} member \| \{count\} members'/)
+})

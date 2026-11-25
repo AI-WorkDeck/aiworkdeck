@@ -136,6 +136,10 @@ export default {
   "dlProgress": "문서 내용 {loaded} / {total}",
   "dlLoadedOnly": "문서 내용 {size} 읽음",
   "firstOpenHint": "처음 열 때는 문서 엔진을 초기화하므로 대용량 문서는 다소 시간이 걸릴 수 있습니다",
+  "readFailed": {
+    "autoRetry": "로컬 서비스가 복구되면 자동으로 다시 시도합니다. 읽기가 끝날 때까지 문서를 편집할 수 없습니다.",
+    "retry": "다시 시도"
+  },
   "openFailed": {
     "title": "문서를 열 수 없습니다: 편집기가 응답하지 않거나 파일이 손상되었습니다",
     "encryptedTitle": "이 파일에는 열기 암호가 설정되어 있어 편집기에서 아직 열 수 없습니다. Excel, Word, PowerPoint 또는 WPS에서 암호를 해제한 뒤 다시 열거나 원본 파일을 다운로드하세요.",
@@ -419,7 +423,8 @@ export default {
       "DEEP_TOO_LONG": "원인: 이 단락이 모델 컨텍스트 길이를 초과합니다. 단락을 나눈 후 다시 검토해 주세요.",
       "DEEP_MODEL_UNAVAILABLE": "원인: 보조 모델을 사용할 수 없습니다. 설정에서 다른 모델을 선택해 주세요.",
       "DEEP_REGION": "원인: 현재 네트워크 지역이 제공업체에서 거부되었습니다. 모델이나 네트워크를 변경해 주세요.",
-      "DEEP_FAILED": "원인: 모델 호출에 실패했습니다."
+      "DEEP_FAILED": "원인: 모델 호출에 실패했습니다.",
+      "DEEP_SIGNED_OUT": "원인: 로그인하지 않았습니다. AI 검토를 사용하려면 로그인하세요."
     }
   },
   "toolbar": {

@@ -524,6 +524,15 @@ try {
   const j1Nav = []
   j1Page.on('framenavigated', (f) => { if (f === j1Page.mainFrame()) j1Nav.push(f.url()) })
   j1Page.on('pageerror', (e) => note('pageerror', 'J1: ' + String(e).slice(0, 280)))
+  // D7：首启这一页自己发出的外部请求（不含本机前端 / 后端）。legal/PRIVACY.md 之外的出站是红线。
+  const j1Local = new Set([new URL(BASE).host, new URL(BACKEND).host])
+  const j1Remote = []
+  j1Page.on('request', (r) => {
+    try {
+      const u = new URL(r.url())
+      if (/^https?:$/.test(u.protocol) && !j1Local.has(u.host) && !/^(127\.0\.0\.1|localhost)$/.test(u.hostname)) j1Remote.push(r.url().slice(0, 150))
+    } catch (e) { /* data:/blob: */ }
+  })
   await j1Page.evaluateOnNewDocument((apiBase) => {
     window.checkbaDesktop = {
       apiBaseUrl: apiBase,
@@ -560,6 +569,12 @@ try {
       if (bad.length) throw new Error('启动链路过了不该过的页: ' + JSON.stringify(bad))
       const now = await j1Page.evaluate(() => location.hash)
       if (!now.includes(J1_EXPECT_ROUTE) || /[?&]id=/.test(now)) throw new Error('最终没停在无项目态外壳: ' + now)
+    })
+
+    await step('首启 5 秒内不向任何外部主机发请求（D7）', async () => {
+      // uni 框架 CSS 曾在启动 3 秒后去 cdn.dcloud.net.cn 拉阴影图；等过这个点再判。
+      await sleep(5000)
+      if (j1Remote.length) throw new Error('启动时请求了外部主机: ' + JSON.stringify([...new Set(j1Remote)]))
     })
 
     await step('欢迎标签在位且激活，内容挂载', async () => {
@@ -1095,7 +1110,7 @@ try {
   })
 
   // dev-board#394：中栏标签常驻，与左栏面板解耦。此前 isTabVisible 是一张按
-  // leftPaneKey 放行的白名单，切到项目概览/插件中心等面板时全部文档标签被
+  // leftPaneKey 放行的白名单，切到项目概览/插件市场等面板时全部文档标签被
   // v-show 藏死、编辑区退成「左侧空闲」。断言标签有真实布局盒（display:none
   // 祖先会让 getClientRects() 为空），而不是只看 leftFiles 里还有没有。
   const assertTabsStayRendered = async (where) => {
@@ -1108,13 +1123,13 @@ try {
     })
     if (ok !== 'ok') throw new Error(`切到「${where}」后中栏标签状态异常: ${ok}`)
   }
-  await step('切到项目概览、插件中心，中栏标签与文档都不许消失（dev-board#394）', async () => {
+  await step('切到项目概览、插件市场，中栏标签与文档都不许消失（dev-board#394）', async () => {
     await mouseClickSel('[title="项目概览"]')
     await sleep(600)
     await assertTabsStayRendered('项目概览')
-    await mouseClickSel('[title="插件中心"]')
+    await mouseClickSel('[title="插件市场"]')
     await sleep(600)
-    await assertTabsStayRendered('插件中心')
+    await assertTabsStayRendered('插件市场')
     await mouseClickSel('[title="资源管理器"]')
     await sleep(400)
     await assertTabsStayRendered('资源管理器')
@@ -1130,11 +1145,11 @@ try {
   for (const title of ['语音', '文件暂存区', '资源管理器']) {
     await step('左栏 ' + title, () => mouseClickSel('[title="' + title + '"]'))
   }
-  await step('插件中心启停脱敏：当前工作台即时更新入口并打开实际面板', async () => {
+  await step('插件市场启停脱敏：当前工作台即时更新入口并打开实际面板', async () => {
     const original = (await api('/api/plugins/list')).find(p => p.id === 'desensitize')
     if (!original) throw new Error('缺少随应用分发的脱敏插件')
     try {
-      await mouseClickSel('[title="插件中心"]')
+      await mouseClickSel('[title="插件市场"]')
       const row = await page.waitForFunction(() => [...document.querySelectorAll('.msb .msb-row-name')]
         .find(el => el.innerText.trim() === '文件脱敏'), { timeout: 15000 })
       await row.asElement().click()
@@ -1562,7 +1577,7 @@ try {
   // ============ J7 独立页面 ============
   console.log('== J7 独立页面 ==')
   for (const [name, route, expectText] of [
-    ['插件广场', '/pages/plugin-market/plugin-market', '插件广场'],
+    ['插件市场', '/pages/plugin-market/plugin-market', '插件市场'],
     ['变量库', '/pages/variable-library/variable-library', '新增变量'],
     // 侧栏标题 2026-08-20 从「系统管理」改成「设置」（个人中心并入这一页）；
     // 「设置」两个字满页都是，所以断言「个人资料与登录」——个人组那一栏的名字，
@@ -3487,7 +3502,7 @@ try {
           await frame.waitForSelector('.lv-pack-bar', { hidden: true, timeout: 15000 })
         })
         await step13('J13 Skill 详情仍提供资源包管理入口', async () => {
-          await j13ClickSel('[title="插件中心"]')
+          await j13ClickSel('[title="插件市场"]')
           await j13ClickTextIn('.msb .msb-tabs', 'Skill')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '已启用', 15000)
@@ -3505,7 +3520,7 @@ try {
           await frame.waitForSelector('.lv-pack-retry', { visible: true, timeout: 15000 })
         })
         await step13('J13 广场手动安装仍可用且完成后自动启用 Skill', async () => {
-          await j13ClickSel('[title="插件中心"]')
+          await j13ClickSel('[title="插件市场"]')
           await j13ClickTextIn('.msb .msb-tabs', 'Skill')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '需下载资源包', 15000)
@@ -3629,11 +3644,11 @@ try {
 
           const shown = await step135('J13.5 广场侧栏的付费项显示「需连接账户」', async () => {
             await pg.goto(BASE + '/#/pages/project-overview/project-overview?id=' + proj.id, { waitUntil: 'domcontentloaded', timeout: 30000 })
-            await pg.waitForSelector('[title="插件中心"]', { timeout: 30000 })
+            await pg.waitForSelector('[title="插件市场"]', { timeout: 30000 })
             // rail 按钮是开关：面板已开着时再点一下正好关上，所以「确保打开」而不是「点一下」
             if (!(await pg.$('.msb'))) {
               const railBox = await pg.evaluate(() => {
-                const r = document.querySelector('[title="插件中心"]').getBoundingClientRect()
+                const r = document.querySelector('[title="插件市场"]').getBoundingClientRect()
                 return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
               })
               await pg.mouse.click(railBox.x, railBox.y)
