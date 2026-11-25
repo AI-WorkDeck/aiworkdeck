@@ -17,7 +17,8 @@
 // 设计见 docs/superpowers/specs/2026-08-16-desktop-chrome-and-command-menu.md。
 
 const { app, Menu, ipcMain, dialog } = require('electron')
-const { t, onAppLanguageChange } = require('./app-language')
+const { t, onAppLanguageChange, getAppLanguage } = require('./app-language')
+const { toTraditional } = require('./zh-hant')
 const { isReloadLocked } = require('./reload-guard')
 const { showAboutWindow } = require('./about-window')
 
@@ -46,10 +47,16 @@ function send(action) {
   win.webContents.send('checkba:menu-action', { action })
 }
 
+// X-S2：渲染层的命令表只有 {zh,en}，zh-TW 下传来的是简中；原生菜单在这里统一转成繁中。
+function pushedText(label) {
+  const s = String(label || '')
+  return getAppLanguage() === 'zh-TW' ? toTraditional(s) : s
+}
+
 /** 下发的一条 JSON 菜单项 → Electron 模板项。 */
 function toTemplate(item) {
   if (!item || item.type === 'separator') return { type: 'separator' }
-  const node = { label: String(item.label || '') }
+  const node = { label: pushedText(item.label) }
   if (item.enabled === false) node.enabled = false
   if (Array.isArray(item.submenu)) {
     node.submenu = item.submenu.map(toTemplate)
@@ -74,7 +81,7 @@ function pushedItems(menuId) {
 function pushedLabel(menuId, fallback) {
   if (!pushed || !Array.isArray(pushed.menus)) return fallback
   const m = pushed.menus.find((x) => x.id === menuId)
-  return (m && m.label) || fallback
+  return (m && m.label) ? pushedText(m.label) : fallback
 }
 
 /**
