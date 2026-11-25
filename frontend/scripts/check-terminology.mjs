@@ -15,7 +15,7 @@ import path from 'node:path'
 const RULES = {
   'zh-CN': [/插件广场/, /插件中心/, /包青天/, /懒人模式/],
   'zh-TW': [/外掛廣場/, /外掛中心/, /包青天/, /后/, /^回傳$/, /(?<![合一])併(?![入購])/, /懶人模式/],
-  'en-US': [/Plugin Marketplace/, /^Extensions$/, /Log ?[Ii]n/, /Log ?[Oo]ut/, /^Login$/, /Lazy Mode/i],
+  'en-US': [/Plugin Marketplace/, /^Extensions$/, /\bLog ?[Ii]n\b/, /\bLog ?[Oo]ut\b/, /^Login$/, /Lazy Mode/i, /^Sign (in|out)$/],
 }
 
 function* strings(obj, prefix = '') {
