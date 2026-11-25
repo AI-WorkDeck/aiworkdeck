@@ -386,6 +386,7 @@ import { readDocumentMeta, detectHost, locateInDocument, commandDisplayName } fr
 import { micSupported, startRecording, MAX_RECORD_MS } from '../lib/wavRecorder.js'
 import { postDictate } from '../lib/api.js'
 import { t } from '../lib/i18n.js'
+import { errorText } from '../lib/errorText.js'
 import { renderMarkdown } from '../lib/markdown.js'
 import { rechargeUrl, signUpUrl, openExternal } from '../lib/site.js'
 import { riseIn, panelUp, popIn, staggerIn } from '../lib/motion.js'
@@ -711,7 +712,7 @@ async function finishDictation() {
       banner.value = t('dictateEmpty')
     }
   } catch (e) {
-    banner.value = t('dictateFailed', { message: (e && e.message) || '' })
+    banner.value = t('dictateFailed', { message: errorText(e, t('networkError')) })
   } finally {
     dictState.value = ''
   }
@@ -808,7 +809,7 @@ async function confirmRename(c) {
     c.title = title
     renamingId.value = ''
   } catch (e) {
-    banner.value = (e && e.message) || t('renameFailed')
+    banner.value = errorText(e, t('renameFailed'))
   }
 }
 
@@ -823,7 +824,7 @@ async function confirmDelete(c) {
     conversations.value = conversations.value.filter((x) => x.conversationId !== c.conversationId)
     deletingId.value = ''
   } catch (e) {
-    banner.value = (e && e.message) || t('deleteFailed')
+    banner.value = errorText(e, t('deleteFailed'))
     deletingId.value = ''
   }
 }
