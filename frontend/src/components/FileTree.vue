@@ -418,7 +418,7 @@
       @dragenter="onTreeDragEnter" @dragover="onTreeDragOver" @dragleave="onTreeDragLeave" @drop="onTreeDrop"
     >
       <!-- Recycle Bin Header -->
-      <view v-if="viewMode === 'recycle'" class="tree-toolbar" style="background: #E8F3ED; border-bottom: 1px solid var(--awd-surface-3); justify-content: space-between;">
+      <view v-if="viewMode === 'recycle'" class="tree-toolbar" style="background: var(--awd-accent-soft); border-bottom: 1px solid var(--awd-surface-3); justify-content: space-between;">
          <svg class="recycle-glyph" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
            <path v-for="(d, gi) in ICONS.trash" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
          </svg>

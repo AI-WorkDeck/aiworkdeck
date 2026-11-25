@@ -332,7 +332,7 @@ export default {
   position: fixed;
   inset: 0;
   z-index: 9998;
-  background: rgba(20, 18, 15, 0.48);
+  background: var(--awd-overlay);
   backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
@@ -347,7 +347,7 @@ export default {
   color: var(--awd-text, #2B2A26);
   border: 1px solid var(--awd-border, #DDD8CA);
   border-radius: 16px;
-  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--awd-shadow-island);
   padding: 22px 24px 20px;
   display: flex;
   flex-direction: column;
@@ -367,7 +367,7 @@ export default {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(46, 90, 80, 0.12);
+  background: var(--awd-accent-soft);
   color: var(--awd-accent-text, #2E5A50);
 }
 
@@ -383,7 +383,7 @@ export default {
   font-size: 15px;
 }
 .awd-perm-close:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--awd-surface-2);
   color: var(--awd-text, #2B2A26);
 }
 
@@ -407,8 +407,8 @@ export default {
   gap: 10px;
   padding: 10px 13px;
   border-radius: 10px;
-  background: rgba(196, 127, 23, 0.12);
-  border: 1px solid rgba(196, 127, 23, 0.32);
+  background: var(--awd-warning-soft);
+  border: 1px solid var(--awd-warning);
   font-size: 12.5px;
   line-height: 1.45;
 }
@@ -417,8 +417,8 @@ export default {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #C47F17;
-  color: #fff;
+  background: var(--awd-warning);
+  color: var(--awd-text-on-accent);
   font-weight: 700;
   font-size: 12px;
   display: inline-flex;
@@ -448,7 +448,7 @@ export default {
 
 .awd-perm-row.is-focused {
   border-color: var(--awd-accent-text, #2E5A50);
-  box-shadow: 0 0 0 2px rgba(46, 90, 80, 0.12);
+  box-shadow: 0 0 0 2px var(--awd-accent-soft);
 }
 
 .awd-perm-row.is-granted {
@@ -477,17 +477,17 @@ export default {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(46, 90, 80, 0.12);
+  background: var(--awd-accent-soft);
   color: var(--awd-accent-text, #2E5A50);
 }
 
 .awd-perm-tag--primary {
-  background: #2E5A50;
-  color: #fff;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 
 .awd-perm-tag--muted {
-  background: rgba(107, 103, 92, 0.14);
+  background: var(--awd-surface-2);
   color: var(--awd-text-2, #6B675C);
 }
 
@@ -512,18 +512,18 @@ export default {
 }
 
 .awd-perm-status--ok {
-  color: #256F46;
+  color: var(--awd-accent-text);
 }
 
 .awd-perm-status--pending {
-  color: #B86E14;
+  color: var(--awd-warning-text);
 }
 
 .awd-perm-drag-box {
   padding: 11px 14px;
   border-radius: 12px;
   border: 1.5px dashed var(--awd-accent-text, #2E5A50);
-  background: rgba(46, 90, 80, 0.05);
+  background: var(--awd-accent-soft);
 }
 
 .awd-perm-drag-hint {
@@ -565,8 +565,8 @@ export default {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: #2E5A50;
-  color: #fff;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
   font-weight: 700;
   font-size: 13px;
   display: flex;
@@ -591,8 +591,8 @@ export default {
 .awd-perm-drag-pill {
   padding: 5px 10px;
   border-radius: 8px;
-  background: #2E5A50;
-  color: #fff;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -622,8 +622,8 @@ export default {
 }
 
 .awd-perm-btn--primary {
-  background: #2E5A50;
-  color: #fff;
+  background: var(--awd-accent);
+  color: var(--awd-text-on-accent);
 }
 .awd-perm-btn--primary:hover {
   opacity: 0.92;
@@ -635,6 +635,6 @@ export default {
   color: var(--awd-text, #2B2A26);
 }
 .awd-perm-btn--ghost:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--awd-surface-2);
 }
 </style>
