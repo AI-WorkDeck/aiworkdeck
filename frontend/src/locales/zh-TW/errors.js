@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "重試",
     "details": "詳情",
+    "hideDetails": "收起詳情",
     "continue": "繼續",
     "refresh": "重新整理",
     "signIn": "登入",

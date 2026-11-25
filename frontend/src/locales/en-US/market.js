@@ -36,7 +36,6 @@ export default {
   // ---- Skill Marketplace ----
   searchSkillPlaceholder: 'Search by name, description, or trigger phrase',
   marketUnavailableTitle: 'Online marketplace is temporarily unavailable',
-  marketErrorHint: '{error} — locally installed Skills and plugins are unaffected',
   loadingMarket: 'Loading the marketplace',
   noMatchingSkill: 'No matching Skills',
   marketEmptySkill: 'The marketplace is empty for now',
@@ -55,7 +54,6 @@ export default {
 
   // ---- Plugin Marketplace ----
   pluginMarketUnavailableTitle: 'Online plugin marketplace is temporarily unavailable',
-  pluginMarketErrorHint: '{error} — locally installed plugins are unaffected',
   noPluginsYet: 'No plugins published yet',
   localInstallHint: 'You can also install locally: drop a plugin directory into the local plugins folder ~/.aiworkdeck/plugins/, then click "Rescan"',
   pluginLabel: 'Plugin',
@@ -124,7 +122,6 @@ export default {
   checkForUpdates: 'Check for updates',
   checkingUpdates: 'Checking for updates…',
   updatesChecked: 'Update check complete',
-  checkingUpdatesFailed: 'Could not check for updates. Please retry.',
   updatingEllipsis: 'Updating…',
   updateFailed: 'Update failed. Please retry.',
   updatedDisabledHint: 'Updated, but could not re-enable the plugin. Resolve the issue, then enable it manually.',
@@ -220,7 +217,6 @@ export default {
   noMatchingPlugin: 'No matching plugins',
   marketEmptyPlugin: 'No plugins in the marketplace yet',
   marketEmptySkillShort: 'No Skills in the marketplace yet',
-  marketUnavailablePrefixed: 'Online marketplace unavailable: {error}',
   activationStateAuto: 'Auto',
   activationStateManual: 'Manual',
   fromPluginTag: 'From plugin',

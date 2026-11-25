@@ -91,17 +91,19 @@
         </component>
       </view>
       <view v-if="sections.market" class="msb-section-content">
-        <view v-if="marketPluginLoading || marketPluginError" class="msb-update-status" :class="{ 'msb-error': marketPluginError }" role="status">
-          <text>{{ marketPluginLoading ? $t('market.checkingUpdates') : $t('market.checkingUpdatesFailed') + ' ' + marketPluginError }}</text>
+        <!-- X8：失败只在列表区出一条目录文案（AwdInlineError），这里只报「正在检查」 -->
+        <view v-if="marketPluginLoading" class="msb-update-status" role="status">
+          <text>{{ $t('market.checkingUpdates') }}</text>
         </view>
         <view class="msb-tabs">
           <view class="msb-tab" :class="{ active: marketTab === 'skill' }" @tap="marketTab = 'skill'">
             <text>{{ $t('market.sectionSkillTitle') }}</text>
-            <text class="msb-tab-count">{{ skillRows.length }}</text>
+            <!-- X8：连不上市场时不显示假的 0 -->
+            <text v-if="!marketError" class="msb-tab-count">{{ skillRows.length }}</text>
           </view>
           <view class="msb-tab" :class="{ active: marketTab === 'plugin' }" @tap="marketTab = 'plugin'">
             <text>{{ $t('market.sectionPluginTitle') }}</text>
-            <text class="msb-tab-count">{{ pluginRows.length }}</text>
+            <text v-if="!marketPluginError" class="msb-tab-count">{{ pluginRows.length }}</text>
           </view>
           <view class="msb-tab" :class="{ active: marketTab === 'mcp' }" @tap="marketTab = 'mcp'">
             <text>{{ $t('mcp.label') }}</text><text class="msb-tab-count">{{ mcpRows.length }}</text>
@@ -123,9 +125,7 @@
             <text class="msb-builtin-action" @tap.stop="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
           <view v-if="marketLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
-          <view v-else-if="marketError" class="msb-empty msb-error">
-            <text>{{ $t('market.marketUnavailablePrefixed', { error: marketError }) }}</text>
-          </view>
+          <AwdInlineError v-else-if="marketError" class="msb-inline-error" :error="marketError" :context="{ area: 'marketplace' }" @refresh="loadMarketSkills" @retry="loadMarketSkills" />
           <view v-else-if="!skillRows.length" class="msb-empty">
             <text>{{ searchText ? $t('market.noMatchingSkill') : $t('market.marketEmptySkillShort') }}</text>
           </view>
@@ -165,9 +165,7 @@
 
         <template v-else>
           <view v-if="marketPluginLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
-          <view v-else-if="marketPluginError" class="msb-empty msb-error">
-            <text>{{ $t('market.marketUnavailablePrefixed', { error: marketPluginError }) }}</text>
-          </view>
+          <AwdInlineError v-else-if="marketPluginError" class="msb-inline-error" :error="marketPluginError" :context="{ area: 'marketplace' }" @refresh="checkForUpdates" @retry="checkForUpdates" />
           <view v-else-if="!pluginRows.length" class="msb-empty">
             <text>{{ searchText ? $t('market.noMatchingPlugin') : $t('market.marketEmptyPlugin') }}</text>
           </view>
@@ -219,6 +217,7 @@
 // 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
 import { getApiBaseUrl, getCloudAccountGeneration, getMcpConnections, installBundledPlugin, getPlugins, getSkills, getSkillMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import AwdInlineError from './AwdInlineError.vue'
 import { pluginUpdates, refreshPluginUpdates } from '@/composables/usePluginUpdates.js'
 import { isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import { ICONS } from '@/config/icons.js'
@@ -283,6 +282,7 @@ function fmtDownloads(n) {
 }
 
 export default {
+  components: { AwdInlineError },
   name: 'MarketSidebarPanel',
   inject: { openWorkflowEditorTab: { default: null }, openSettingsTab: { default: null } },
   emits: ['open-detail'],
@@ -657,6 +657,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.msb-inline-error { margin: 8px 10px; }
 /* VS Code 扩展栏密度 + 产品浅色体系（墨竹青 #2E5A50 主色 / mint var(--awd-mint)（竹月青氛围色）点缀） */
 .msb {
   display: flex;

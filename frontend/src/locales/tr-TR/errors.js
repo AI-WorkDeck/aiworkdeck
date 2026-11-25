@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Tekrar dene",
     "details": "Ayrıntılar",
+    "hideDetails": "Ayrıntıları gizle",
     "continue": "Devam Et",
     "refresh": "Yenile",
     "signIn": "Giriş yap",

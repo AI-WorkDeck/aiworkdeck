@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Thử lại",
     "details": "Chi tiết",
+    "hideDetails": "Ẩn chi tiết",
     "continue": "Tiếp tục",
     "refresh": "Làm mới",
     "signIn": "Đăng nhập",
