@@ -71,6 +71,35 @@ class LocalFolderImportBaselineTest {
                 "刚导入的文件不能算待提交");
     }
 
+    /**
+     * D26（11-24 polish audit）：真实形态的案卷目录（真 docx、二进制 xlsx/pdf/pptx、子目录、
+     * Finder 留下的 .DS_Store）刚打开、一个字都没改时，待提交必须是 0——状态栏不能说
+     * 「3 个文件待提交」，否则律师会以为软件改了他的文件。
+     */
+    @Test
+    void aRealisticUntouchedMatterFolderHasNothingPending(@TempDir Path folder) throws Exception {
+        Path fixtures = Path.of("..", "fixtures");
+        Files.copy(fixtures.resolve("evidence-demo-1076/01-购销合同.docx"), folder.resolve("01-购销合同.docx"));
+        Files.copy(fixtures.resolve("contracts/with-revisions.docx"), folder.resolve("with-revisions.docx"));
+        byte[] binary = new byte[64 * 1024];
+        new java.util.Random(26).nextBytes(binary);
+        Files.write(folder.resolve("fee-ledger.xlsx"), binary);
+        Files.write(folder.resolve("hearing-bundle.pdf"), binary);
+        Files.createDirectories(folder.resolve("证据/扫描件"));
+        Files.write(folder.resolve("证据/扫描件/receipt.pdf"), binary);
+        Files.write(folder.resolve("slides.pptx"), binary);
+        Files.writeString(folder.resolve(".DS_Store"), "finder");
+
+        long projectId = localProjectService.openLocalFolder(folder.toString(), false, null, null, 9100L)
+                .project().getId();
+
+        assertTrue(repoService.isInitialized(projectId));
+        assertEquals(0, sessionService.exitStatus(projectId).changedCount(),
+                "an untouched folder must show 0 files awaiting commit right after opening");
+        assertTrue(sessionService.pendingChangesLocked(projectId).stream().allMatch(c -> c.path().startsWith(".awd/")),
+                () -> "unexpected pending changes: " + sessionService.pendingChangesLocked(projectId));
+    }
+
     @Test
     void datalessFilesDeferBaselineWithoutBlockingFolderOpen(@TempDir Path folder) throws Exception {
         Files.writeString(folder.resolve("合同.docx"), "x");
