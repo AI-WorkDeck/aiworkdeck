@@ -61,7 +61,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+      - name: Maven setup (warm cache read-only, Central fallback mirror, short retries)
+        uses: ./.github/actions/maven-setup
       - name: Install plugin-api (host SPI, local artifact)
         run: mvn -B -q -f backend/plugin-api/pom.xml install -DskipTests
       - name: Maven SBOM (backend, resolved transitive dependencies)
