@@ -7,7 +7,13 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
+  # Nightly Windows build of master: catches installer breakage from source-only PRs that skip the
+  # PR build below, well before the weekly release tag.
+  schedule:
+    - cron: '0 19 * * *' # 03:00 Beijing
   pull_request:
+    # labeled: adding the `full-build` label starts the installer build on a PR
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - '.github/workflows/desktop-build.yml'
       - '.github/workflows/dependency-clean-windows.yml'
@@ -33,6 +39,14 @@ on:
 # "403 Resource not accessible by integration".
 # id-token: write 供 Windows 代码签名的 azure/login 走 GitHub OIDC 换 Azure 令牌
 # （dev-board#1011，不存 client secret）。
+concurrency:
+  # One run per PR: a new push cancels the superseded run. On master (and tags) a run in progress is
+  # never cancelled; GitHub keeps one pending run per group, so a burst of merges collapses to the
+  # latest commit instead of queueing every one (CI capacity, 2026-11-25).
+  # Label events other than full-build get a group of their own, so labelling a PR never cancels its running build.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'full-build' && format('-label-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: write
   id-token: write
@@ -54,12 +68,14 @@ jobs:
 
   dependency-scope:
     name: Detect dependency acceptance changes
-    if: github.event_name == 'pull_request'
+    # A label other than full-build changes nothing: skip, which also skips the build below.
+    if: github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'full-build')
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       required: ${{ steps.scope.outputs.required }}
+      build: ${{ steps.scope.outputs.build }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,6 +86,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          FULL_BUILD: ${{ contains(github.event.pull_request.labels.*.name, 'full-build') }}
         run: |
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" > /tmp/dependency-paths
           if grep -Eq '^(desktop/scripts/dependency-clean-windows/|[.]github/workflows/dependency-clean-windows.yml|backend/src/main/java/com/checkba/(service/(LibreOfficePdfConverter|tmeet/|pack/|ocr/|ai/tools/PythonTools)|controller/ExternalDependenciesController)|desktop/main/services/(model-manager|model-inventory|model-fetch|pysvc-runtime)|asr-service/|kokoro-service/|official-plugins/dpia-workbench/(runtime|backend)/)' /tmp/dependency-paths; then
@@ -77,13 +94,25 @@ jobs:
           else
             echo 'required=false' >> "$GITHUB_OUTPUT"
           fi
+          # Windows installer build on a PR (CI capacity, readiness 2026-11-25): only when the PR changes what
+          # goes into the installer beyond app source (packaging, bundled services, dependency manifests,
+          # dependency-acceptance paths) or carries the `full-build` label. Source-only PRs are covered by
+          # the required CI jobs + Journeys, and by the nightly master build and every v* tag build.
+          if grep -Eq '^([.]github/workflows/(desktop-build|dependency-clean-windows)[.]yml|desktop/|pptx-service/|asr-service/|kokoro-service/|official-plugins/dpia-workbench/(runtime|backend)/|backend/pom[.]xml|frontend/package(-lock)?[.]json)' /tmp/dependency-paths \
+             || grep -q 'required=true' "$GITHUB_OUTPUT" \
+             || [ "$FULL_BUILD" = 'true' ]; then
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'build=false' >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     name: Build (${{ matrix.os }})
     needs: [patch-gate, dependency-scope]
     # patch-gate 只在 tag 上运行；非 tag（PR / 手动触发）时它被 skip，
     # build 必须照常跑，所以放行 success 与 skipped 两种结果
-    if: always() && (needs.patch-gate.result == 'success' || needs.patch-gate.result == 'skipped')
+    # On PRs, only when dependency-scope says the installer contents changed or `full-build` is set.
+    if: always() && (needs.patch-gate.result == 'success' || needs.patch-gate.result == 'skipped') && (github.event_name != 'pull_request' || needs.dependency-scope.outputs.build == 'true')
     strategy:
       fail-fast: false
       matrix:

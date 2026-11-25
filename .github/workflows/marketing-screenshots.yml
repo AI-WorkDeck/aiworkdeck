@@ -50,8 +50,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: marketing-screenshots-${{ github.ref }}
-  cancel-in-progress: true
+  # One run per PR: a new push cancels the superseded run. On master (and tags) a run in progress is
+  # never cancelled; GitHub keeps one pending run per group, so a burst of merges collapses to the
+  # latest commit instead of queueing every one (CI capacity, 2026-11-25).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   capture:
