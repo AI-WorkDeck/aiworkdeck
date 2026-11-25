@@ -7,6 +7,9 @@ description: 工程基建领域。任务涉及构建、发版、CI workflow、�
 
 职责边界：构建/发版/CI/测试/本地开发。各领域自己的业务测试内容见对应领域文档。
 
+**启动零外部请求（D7，2026-11-24）**：构建出的前端自己不得向任何外部主机发请求。uni-h5 框架 CSS 的 shadow-preload 会在启动 3 秒后拉 `cdn.dcloud.net.cn` 的阴影图——`frontend/scripts/no-framework-egress.mjs` 在 `generateBundle` 里把这类 url 改成 `none`（user 插件的 `transform` 拿不到，CSS 那时已被 vite:css 收走）。CI 在 Build H5 之后跑 `scripts/check-dist-egress.mjs`（CSS 远程 url() / index.html 远程 script·link 即红）；app-e2e J1 有「首启 5 秒内不向外部主机发请求」一步。
+
+
 ## Electron 45 运行时（dev-board#1624）
 
 桌面壳固定 Electron **45.1.0**（Chromium 156 / Node 24），应用版本号与运行时版本独立。开发安装要求 Node >=22.12.0；桌面 CI/打包使用 Node 24。Electron 42 起不再通过包自身 postinstall 自动下载二进制，项目 postinstall 必须先执行 `install-electron`，再执行既有 DMG/NSIS 补丁；不得用跳过安装脚本掩盖缺少运行时。打包工具链已升级至 `electron-builder ^26.18.0`（dev-board#1661）：Windows 签名配置位于 `build.win.signtoolOptions.sign`，NSIS `/D=` 参数由 `GetDParameter` 按标准无引号尾参数规则解析。
