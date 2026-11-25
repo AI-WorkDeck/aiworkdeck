@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "템플릿 폴더: 로펌의 보고서 템플릿을 여기에 넣으면, 학습 후 AI가 해당 글꼴, 번호 매기기 및 표 스타일로 초안을 작성합니다",
   "selectFilePrompt": "왼쪽에서 파일을 선택하여 미리보기하세요",
   "edit": "편집",
-  "typeLabel": "유형: {type}",
-  "sizeLabel": "크기: {size}",
   "renderingDoc": "문서 렌더링 중…",
   "renderingSlides": "프레젠테이션 렌더링 중…",
   "slidesNotShown": "표시되지 않은 슬라이드가 {count}개 더 있습니다. 파일을 열면 모두 볼 수 있습니다.",

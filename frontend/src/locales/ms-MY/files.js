@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Folder templat: letakkan templat laporan firma anda di sini; setelah dipelajari, AI akan merangka dengan fon, penomboran dan gaya jadual templat tersebut",
   "selectFilePrompt": "Pilih fail di sebelah kiri untuk pratonton",
   "edit": "Sunting",
-  "typeLabel": "Jenis: {type}",
-  "sizeLabel": "Saiz: {size}",
   "renderingDoc": "Memaparkan dokumen…",
   "renderingSlides": "Memaparkan pembentangan…",
   "slidesNotShown": "{count} lagi slaid tidak dipaparkan. Buka fail untuk melihat semuanya.",

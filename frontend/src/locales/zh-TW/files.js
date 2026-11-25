@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "模板資料夾：放入你所的報告模板，AI 學習後按它的字型、編號與表格樣式起草",
   "selectFilePrompt": "請從左側選擇檔案進行預覽",
   "edit": "編輯",
-  "typeLabel": "類型：{type}",
-  "sizeLabel": "大小：{size}",
   "renderingDoc": "正在渲染文件…",
   "renderingSlides": "正在渲染簡報…",
   "slidesNotShown": "還有 {count} 頁未顯示，開啟檔案可檢視全部",
