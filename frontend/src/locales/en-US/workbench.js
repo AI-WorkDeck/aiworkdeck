@@ -127,7 +127,7 @@ export default {
   listedCompanyLabel: 'Listed Company: {name}',
   createdAtLabel: 'Created: {time}',
   // Top bar right side
-  accountUsage: 'Account & balance',
+  accountUsage: 'Account & Balance',
   accountConnected: 'Account Connected',
   appearance: 'Appearance',
   appearanceLight: 'Light',
@@ -136,7 +136,7 @@ export default {
   skinSectionTitle: 'Theme Skin',
   skinDefaultName: 'Oriental Serenity (Default)',
   walletChipTitle: 'Credits balance and membership tier; click to open account settings',
-  walletMenuLabel: 'Account & balance',
+  walletMenuLabel: 'Account & Balance',
   trialInfo: 'About the Trial',
   // Grace warning chip and dialog (2026-08: official builds require an account)
   trialCountdown: 'Trial - {n} days left',
@@ -163,7 +163,7 @@ export default {
   browser: 'Browser',
   browserNewTabHint: 'New browser tab',
   recordActivity: 'Activity Log',
-  logout: 'Log Out',
+  logout: 'Sign Out',
   // Left rail
   stagingArea: 'Staging Area',
   pluginMarket: 'Marketplace',

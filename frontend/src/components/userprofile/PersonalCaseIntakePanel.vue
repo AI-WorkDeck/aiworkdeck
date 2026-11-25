@@ -486,6 +486,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { formatCnyCompact } from '@/utils/cnyAmount'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import {
@@ -595,7 +596,7 @@ export default {
         uni.$emit('awd:market-changed')
         uni.$emit('awd:open-lawfirm-plugin', { tab: 'conflicts' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseOpenCloudWorkflowFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseOpenCloudWorkflowFailedToast')), icon: 'none' })
       } finally { this.busy = false }
     },
     unwrapData(res) {
@@ -694,7 +695,7 @@ export default {
         const res = await requestLawFirmAction('conflictPreview', this.buildIntakePayload(), this.projectId)
         this.previewResult = this.unwrapData(res)
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.casePreviewFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.casePreviewFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -720,7 +721,7 @@ export default {
         this.intakeForm.relatedPartyName = ''
         uni.showToast({ title: this.$t('account.caseSubmitSuccessToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseSubmitFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseSubmitFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -740,7 +741,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseClearanceSavedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseActionFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseActionFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -771,7 +772,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseCommitteeSavedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseCommitteeFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseCommitteeFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -801,7 +802,7 @@ export default {
         this.invoiceForm.amountWan = ''
         uni.showToast({ title: this.$t('account.caseInvoiceSubmittedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseSubmitInvoiceFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseSubmitInvoiceFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -819,7 +820,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseInvoiceIssuedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseIssueInvoiceFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseIssueInvoiceFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -844,7 +845,7 @@ export default {
         this.collectionForm.referenceNo = ''
         uni.showToast({ title: this.$t('account.caseCollectionSavedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseRecordCollectionFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseRecordCollectionFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -858,7 +859,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseErpSyncedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseSyncErpFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseSyncErpFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -901,7 +902,7 @@ export default {
         else await this.loadOverview()
         uni.showToast({ title: this.$t('account.caseDemoSeededToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseSeedDemoFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseSeedDemoFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -914,7 +915,7 @@ export default {
         uni.$emit('awd:open-lawfirm-plugin')
         uni.showToast({ title: this.$t('account.casePluginOpenedToast'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: e?.message || this.$t('account.caseOpenPluginFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.caseOpenPluginFailedToast')), icon: 'none' })
       } finally {
         this.busy = false
       }

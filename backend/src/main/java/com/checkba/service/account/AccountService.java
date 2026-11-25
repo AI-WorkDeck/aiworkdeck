@@ -37,6 +37,12 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class AccountService {
+    /** 未连接账户的提示。zh-TW 显式给出（ZhHantConverter 缺「点/钮」时会半繁半简）。 */
+    static final java.util.Map<String, String> NOT_CONNECTED_MESSAGE = java.util.Map.of(
+            "zh-CN", "尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
+            "zh-TW", "尚未連接 AI WorkDeck 帳戶，可點右上角的帳戶按鈕連接",
+            "en-US", "No AI WorkDeck account connected yet. Use Sign in at the top right.");
+
 
     private static final String KEY_PREFIX = "awdk_";
 
@@ -252,8 +258,7 @@ public class AccountService {
     private synchronized ConnectionSnapshot requireConnectionSnapshot() {
         ConnectionSnapshot connection = connectionSnapshot();
         if (connection.key() == null) throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                LangText.of("尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
-                        "No AI WorkDeck account connected yet. Use Sign in at the top right."));
+                LangText.of(NOT_CONNECTED_MESSAGE));
         return connection;
     }
 
@@ -1224,8 +1229,7 @@ public class AccountService {
         State state = loadState();
         if (state.authExpired || state.key == null || state.key.isBlank()) {
             throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                    LangText.of("尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
-                            "No AI WorkDeck account connected yet. Use Sign in at the top right."));
+                    LangText.of(NOT_CONNECTED_MESSAGE));
         }
         return state.key;
     }

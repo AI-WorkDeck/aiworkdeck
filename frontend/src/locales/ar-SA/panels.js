@@ -301,6 +301,8 @@ export default {
   "bpForward": "إعادة توجيه",
   "bpRefresh": "تحديث",
   "bpUrlPlaceholder": "أدخل عنوان URL (https://…)",
+  "bpNewTabTitle": "علامة تبويب جديدة",
+  "bpNewTabHint": "اكتب عنوان موقع في الشريط أعلاه.",
   "bpOpen": "فتح",
   "bpNewTab": "علامة تبويب جديدة",
   "bpSwitchToDesktop": "التبديل مرة أخرى إلى عرض سطح المكتب",

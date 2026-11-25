@@ -23,7 +23,7 @@ class AttachmentMessagesTest {
 
     @Test
     void everyAttachmentMessageHasAllSupportedLocalesAndUsesTheirExactText() {
-        assertEquals(18, AttachmentMessages.MESSAGES.size());
+        assertEquals(20, AttachmentMessages.MESSAGES.size());
         for (var entry : AttachmentMessages.MESSAGES.entrySet()) {
             assertEquals(AppLocale.values().length, entry.getValue().size(), entry.getKey());
             for (var locale : AppLocale.values()) {

@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Повторить",
     "details": "Подробности",
+    "hideDetails": "Скрыть подробности",
     "continue": "Продолжить",
     "refresh": "Обновить",
     "signIn": "Войти",

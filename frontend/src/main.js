@@ -5,6 +5,9 @@ import {
 } from "vue";
 import App from "./App.vue";
 import PendingRevisionBar from "./components/PendingRevisionBar.vue";
+import AwdEmptyState from "./components/AwdEmptyState.vue";
+import AwdInlineError from "./components/AwdInlineError.vue";
+import AwdLoadingBlock from "./components/AwdLoadingBlock.vue";
 import { recordFrontendError } from "./utils/errorBuffer.js";
 import { i18n } from "./i18n/index.js";
 import { isClientPortalBuild, capturePortalCode, portalRoute } from "./utils/clientPortal.js";
@@ -23,6 +26,10 @@ export function createApp() {
 	app.use(i18n);
 	// 编辑器顶栏的外部修订待审条（LibreOfficeEditor 模板内使用）
 	app.component("PendingRevisionBar", PendingRevisionBar);
+	// X-S1：统一的空 / 错误 / 加载态，全局注册，列表与面板直接用
+	app.component("AwdEmptyState", AwdEmptyState);
+	app.component("AwdInlineError", AwdInlineError);
+	app.component("AwdLoadingBlock", AwdLoadingBlock);
 	// #ifdef H5
 	// uni.showModal / uni.showActionSheet 转发到应用内对话框 AwdDialog（dev-board#849）：
 	// uni-h5 自带的弹窗缺省按钮是写死的英文 OK/Cancel、字体掉到衬线字。

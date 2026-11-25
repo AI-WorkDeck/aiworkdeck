@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -91,5 +92,26 @@ class AgentOrchestratorFinishReasonTest {
         assertFalse(AgentOrchestrator.truncationCorrection(true, "write_file ").contains("append=true"));
         assertFalse(AgentOrchestrator.truncationCorrection(false, "<todo_write").contains("append=true"));
         assertFalse(AgentOrchestrator.truncationCorrection(false, null).contains("append=true"));
+    }
+
+    // D34 (robustness-20 r14): the model put its whole reply into final({"answer": ...}) with empty text;
+    // the turn finished with nothing shown. The answer is now recovered from the arguments.
+    private static AiMessage finalWith(String args) {
+        return AiMessage.from(List.of(ToolExecutionRequest.builder().id("f").name("final").arguments(args).build()));
+    }
+
+    @Test
+    void pseudoFinalAnswerComesFromTheArguments() {
+        assertEquals("两份已读，第三份打不开。", AgentOrchestrator.pseudoFinalAnswer(finalWith("{\"answer\": \"两份已读，第三份打不开。\"}")));
+        assertEquals("done", AgentOrchestrator.pseudoFinalAnswer(finalWith("{\"content\": \"done\"}")));
+        assertEquals("plain text reply", AgentOrchestrator.pseudoFinalAnswer(finalWith("plain text reply")));
+        assertEquals("quoted", AgentOrchestrator.pseudoFinalAnswer(finalWith("\"quoted\"")));
+    }
+
+    @Test
+    void pseudoFinalWithoutAnyTextIsEmptySoTheTurnIsRetriedNotSilentlyFinished() {
+        assertEquals("", AgentOrchestrator.pseudoFinalAnswer(finalWith("{}")));
+        assertEquals("", AgentOrchestrator.pseudoFinalAnswer(finalWith("{\"arguments\": \"\"}")));
+        assertEquals("", AgentOrchestrator.pseudoFinalAnswer(finalWith("")));
     }
 }

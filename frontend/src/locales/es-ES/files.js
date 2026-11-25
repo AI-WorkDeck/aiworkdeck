@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Carpeta de plantillas: deposite aquí las plantillas de informes de su despacho; una vez aprendidas, la IA redactará con sus fuentes, numeración y estilos de tabla",
   "selectFilePrompt": "Seleccione un archivo a la izquierda para verlo",
   "edit": "Editar",
-  "typeLabel": "Tipo: {type}",
-  "sizeLabel": "Tamaño: {size}",
   "renderingDoc": "Renderizando documento…",
   "renderingSlides": "Renderizando presentación…",
   "slidesNotShown": "Hay {count} diapositivas más sin mostrar. Abra el archivo para verlas todas.",

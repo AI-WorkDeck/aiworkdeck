@@ -140,6 +140,13 @@ export default {
     "autoRetry": "本機服務恢復後會自動重新讀取。讀取完成前無法編輯這份文件。",
     "retry": "重試"
   },
+  "authorPrompt": {
+    "text": "修訂與註解要用什麼名字署名？收到文件的人都會看到這個名字。",
+    "placeholder": "你的名字或事務所名稱",
+    "save": "儲存",
+    "later": "以後再說",
+    "empty": "請填寫名字"
+  },
   "openFailed": {
     "title": "文件無法開啟：引擎無響應或檔案損壞",
     "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",
@@ -232,8 +239,8 @@ export default {
     "next": "下一處",
     "sideBySide": "並排",
     "inline": "內聯",
-    "sourceLabel": "源文件: {name}",
-    "targetLabel": "新文件: {name}",
+    "sourceLabel": "源文件：{name}",
+    "targetLabel": "新文件：{name}",
     "loadingContent": "正在載入文件內容...",
     "retry": "重試",
     "sourceDocDefault": "源文件",
@@ -244,7 +251,7 @@ export default {
     "fetchDocFailed": "獲取文件內容失敗",
     "loadFailed": "載入文件失敗",
     "containerMissing": "找不到編輯器容器",
-    "initFailed": "初始化編輯器失敗: {msg}",
+    "initFailed": "初始化編輯器失敗：{msg}",
     "monacoLoadFailed": "載入 Monaco Editor 失敗"
   },
   "compare": {
@@ -284,7 +291,7 @@ export default {
     "insert": "插入",
     "updateValue": "更新值",
     "delete": "刪除",
-    "confirmDelete": "確認刪除?",
+    "confirmDelete": "確認刪除？",
     "cancel": "取消",
     "confirm": "確定",
     "emptyValue": "（空）",
@@ -297,7 +304,7 @@ export default {
     "create": "建立",
     "activateEditorFirst": "請先點選啟用一個編輯視窗",
     "selectInDocFirst": "請先在文件中選擇內容",
-    "noFieldInsert": "目前 WPS 元件未提供“域插入”能力",
+    "noFieldInsert": "目前 WPS 元件未提供「域插入」能力",
     "created": "已建立",
     "createFailed": "建立失敗",
     "inserted": "插入成功",

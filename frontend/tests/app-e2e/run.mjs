@@ -3146,7 +3146,7 @@ try {
     }
     // 版本入口会附带待提交/同步状态，仍核验英文可访问标题而非只检查按钮存在。
     const versionTitle = await page.$eval('.version-entry', (e) => e.getAttribute('title') || '')
-    if (!versionTitle.startsWith('Source Control · ') ||
+    if (!versionTitle.startsWith('Versions · ') ||
         !versionTitle.endsWith('View project changes and sync') || /[一-鿿]/.test(versionTitle)) {
       throw new Error('en-US 下版本入口标题不正确: ' + versionTitle)
     }
@@ -3425,7 +3425,7 @@ try {
           await j13Page.mouse.click(box.x, box.y)
           await sleep(500)
         }
-        // 限定容器的文本点击：左栏 Skill 广场里一堆未安装项也叫「安装」，
+        // 限定容器的文本点击：左栏插件市场里一堆未安装项也叫「安装」，
         // 不加限定会点到同名的错误按钮（本轮调试实测踩过）。
         const j13ClickTextIn = async (containerSel, label) => {
           const box = await j13Page.evaluate((containerSel, lbl) => {
@@ -3503,7 +3503,7 @@ try {
         })
         await step13('J13 Skill 详情仍提供资源包管理入口', async () => {
           await j13ClickSel('[title="插件市场"]')
-          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
+          await j13ClickTextIn('.msb .msb-tabs', '技能')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '已启用', 15000)
         })
@@ -3521,7 +3521,7 @@ try {
         })
         await step13('J13 广场手动安装仍可用且完成后自动启用 Skill', async () => {
           await j13ClickSel('[title="插件市场"]')
-          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
+          await j13ClickTextIn('.msb .msb-tabs', '技能')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '需下载资源包', 15000)
           await j13ClickSel('.mdp .mdp-btn.primary')

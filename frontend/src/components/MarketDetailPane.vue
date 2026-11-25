@@ -331,6 +331,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 插件广场详情 tab（VS Code 扩展详情页形态）。spec = { kind: 'skill'|'plugin', id, name }
 // 由左栏 MarketSidebarPanel 点行打开。自行拉取市场与已安装两份数据合成视图，
 // 装/卸/启停后通过 uni.$emit('awd:market-changed') 通知左栏刷新。
@@ -878,7 +879,7 @@ export default {
         uni.$emit('awd:plugin-settings-changed', { pluginId: this.spec.id })
         await this.loadContribution()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.saveFailed')), icon: 'none' })
       } finally {
         this.settingsBusy = false
       }
@@ -892,7 +893,7 @@ export default {
         if (body.code !== 0) throw new Error(body.message || this.$t('market.saveFailed'))
         await this.loadContribution()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.saveFailed')), icon: 'none' })
       }
     },
 
@@ -906,7 +907,7 @@ export default {
         try { uni.$emit('awd:skin-changed') } catch (e) { /* ignore */ }
         await this.loadContribution()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('market.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.saveFailed')), icon: 'none' })
       }
     },
     // ---- 原生资源包（native pack）：见 docs/NATIVE_PACK_DISTRIBUTION.md §4.3 ----
@@ -963,7 +964,7 @@ export default {
       } catch (e) {
         this.packBusy = false
         console.error('安装资源包失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       }
     },
     /**
@@ -986,7 +987,7 @@ export default {
       } catch (e) {
         this.packBusy = false
         console.error('资源包追新失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.packUpgradeFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.packUpgradeFailed')), icon: 'none' })
       }
     },
     async doUninstallPack() {
@@ -1018,7 +1019,7 @@ export default {
         this.notifyChanged()
       } catch (e) {
         console.error('卸载资源包失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -1076,7 +1077,7 @@ export default {
         console.error('安装 Skill 失败:', e)
         // 后端 4011 已由 api.js 就地弹过登录层：登录成功就重拉详情，按钮按新账户的已购状态显示
         if (isAccountLoginRetry(e)) await this.reload()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -1101,7 +1102,7 @@ export default {
           if (await requireAccount({ reason: 'market' })) await this.doPublishSkill(true)
           return
         }
-        uni.showToast({ title: e?.message || this.$t('market.publishFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.publishFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -1116,7 +1117,7 @@ export default {
         this.notifyChanged()
       } catch (e) {
         console.error('卸载 Skill 失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -1204,7 +1205,7 @@ export default {
         this.notifyChanged()
       } catch (e) {
         console.error('卸载插件失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -1220,7 +1221,7 @@ export default {
         this.notifyChanged()
       } catch (e) {
         console.error('切换插件状态失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         await this.reload()
       }
     },
@@ -1241,7 +1242,7 @@ export default {
         uni.showToast({ title: enabled ? this.$t('market.enabledToast') : this.$t('market.disabledToggleToast'), icon: 'none' })
         this.notifyChanged()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         this.reload()
       }
     },
@@ -1256,7 +1257,7 @@ export default {
         this.notifyChanged()
       } catch (e) {
         console.error('设置生效方式失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         await this.reload()
       }
     },

@@ -26,6 +26,7 @@ function buildModuleUrl() {
     .replace(/from '@\/services\/api\.js'/, `from '${stubsUrl}'`)
     .replace(/from '@\/utils\/auth\.js'/, `from '${stubsUrl}'`)
     .replace(/from '@\/i18n'/, `from '${stubsUrl}'`)
+    .replace(/from '@\/utils\/errorToast\.js'/, `from '${stubsUrl}'`)
     .replace(/from '@\/utils\/paidTranscribeGate\.js'/, `from '${stubsUrl}'`)
     .replace(/from '@\/utils\/meetingRecorderStatus\.js'/,
       `from '${new URL('../../src/utils/meetingRecorderStatus.js', import.meta.url).href}'`)

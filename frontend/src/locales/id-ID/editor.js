@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Kami akan mencoba lagi secara otomatis saat layanan lokal kembali. Dokumen tidak dapat diedit sebelum berhasil dibaca.",
     "retry": "Coba lagi"
   },
+  "authorPrompt": {
+    "text": "Dengan nama apa perubahan terlacak dan komentar Anda ditandatangani? Semua penerima dokumen akan melihat nama ini.",
+    "placeholder": "Nama Anda atau nama firma",
+    "save": "Simpan",
+    "later": "Nanti saja",
+    "empty": "Masukkan nama"
+  },
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: editor tidak merespons atau berkas rusak",
     "encryptedTitle": "File ini dilindungi kata sandi pembuka yang belum dapat dibuka oleh editor. Hapus kata sandi di Excel, Word, PowerPoint, atau WPS lalu buka lagi, atau unduh file aslinya.",

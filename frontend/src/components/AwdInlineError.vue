@@ -9,7 +9,7 @@
       <view v-if="showAction" class="awd-inline-error-btn primary" role="button" tabindex="0"
         @tap.stop="onAction" @keydown.enter.prevent="onAction">{{ $t('errors.actions.' + message.action) }}</view>
       <view v-if="message.detail" class="awd-inline-error-btn" role="button" tabindex="0" :aria-expanded="detailsOpen"
-        @tap.stop="detailsOpen = !detailsOpen" @keydown.enter.prevent="detailsOpen = !detailsOpen">{{ $t('errors.actions.details') }}</view>
+        @tap.stop="detailsOpen = !detailsOpen" @keydown.enter.prevent="detailsOpen = !detailsOpen">{{ $t(detailsOpen ? 'errors.actions.hideDetails' : 'errors.actions.details') }}</view>
     </view>
     <text v-if="detailsOpen && message.detail" class="awd-inline-error-detail">{{ message.detail }}</text>
   </view>

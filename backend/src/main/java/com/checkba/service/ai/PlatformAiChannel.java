@@ -212,8 +212,11 @@ public class PlatformAiChannel {
         if (!accountService.isConnected()) {
             // reason 决定前端登录弹层顶部那句说明（登录后置 4011 契约，dev-board#1046）
             throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                    LangText.of("「AI WorkDeck 云端」需要连接账户，点右上角的账户按钮即可连接",
-                            "\"AI WorkDeck Cloud\" needs an AI WorkDeck account. Use Sign in at the top right."),
+                    // zh-TW 显式给出：ZhHantConverter 缺「点/钮」时会半繁半简（全员 journeys zh-TW 设置步变红）
+                    LangText.of(java.util.Map.of(
+                            "zh-CN", "「AI WorkDeck 云端」需要连接账户，点右上角的账户按钮即可连接",
+                            "zh-TW", "「AI WorkDeck 雲端」需要連接帳戶，點右上角的帳戶按鈕即可連接",
+                            "en-US", "\"AI WorkDeck Cloud\" needs an AI WorkDeck account. Use Sign in at the top right.")),
                     com.checkba.service.account.AccountRequired.REASON_PLATFORM_AI);
         }
         Cached cached = current();

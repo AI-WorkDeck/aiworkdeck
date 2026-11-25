@@ -26,7 +26,7 @@ export default {
   tierNeedsAccount: '需要连接账户',
   tierDescLocal: '录音与转写都在本机完成，音频不出本机。速度约为实时的一点五倍（两小时的会要跑一小时上下），没有说话人分离。',
   tierDescByok: '用你自己的阿里云听悟账号转写，音频经你自己的 OSS 中转。',
-  tierDescNoPlatform: '本机形态使用自备 Key，在「设置 - 平台服务」里填听悟凭证。',
+  tierDescNoPlatform: '本机形态使用自备 Key，在“设置 - 平台服务”里填听悟凭证。',
   tierDescNotConnected: '连接官网账户后即可直接转写，不用自己开通听悟。',
   tierDescPlatform: '由 AI WorkDeck 代为转写，按时长折算 Credits 从账户余额扣；未识别到人声也可能按处理时长计费。音频经我们的对象存储中转，转写完成即删除，另有 24 小时兜底清理。',
   localSwitchLabel: '录音不出本机',
@@ -46,8 +46,8 @@ export default {
   downloadStartFailed: '开始下载失败，稍后重试',
 
   // ---- 未配置转写凭证（录音仍可用）。下一步按档位分 ----
-  notConfiguredPlatform: '转写暂不可用：录音会保存到项目文件，但不能转文字。到「设置 - 账户与余额」连接官网账户即可开通。',
-  notConfiguredByok: '未配置转写服务：录音会保存到项目文件，但不能转文字。管理员可在「设置 - 平台服务 - 会议录音转写」里填阿里云听悟凭证，或改用平台代采。',
+  notConfiguredPlatform: '转写暂不可用：录音会保存到项目文件，但不能转文字。到“设置 - 账户与余额”连接官网账户即可开通。',
+  notConfiguredByok: '未配置转写服务：录音会保存到项目文件，但不能转文字。管理员可在“设置 - 平台服务 - 会议录音转写”里填阿里云听悟凭证，或改用平台代采。',
 
   // ---- 录音 ----
   micDeviceLabel: '麦克风',
@@ -87,7 +87,7 @@ export default {
 
   // ---- 列表与状态徽标 ----
   sectionTitle: '录音记录',
-  empty: '还没有录音。上面点「开始录音」。',
+  empty: '还没有录音。上面点“开始录音”。',
   statusRecording: '录音中',
   statusRecorded: '未转写',
   statusTranscribing: '转写中',
@@ -123,9 +123,9 @@ export default {
   submitTranscribeFailed: '提交转写失败：{message}',
   resultUnreadable: '未能读取转写结果，请稍后重试。原始录音仍然保留。',
   // 结束录音时没有自动提交转写（BUG-57）：会议留在「未转写」，可手动点「开始转写」
-  autoTranscribeSkippedSilent: '这段录音没有检测到声音，未自动转写以免产生费用；确有对话可点「开始转写」。',
-  autoTranscribeSkippedShort: '录音太短，未自动转写；如需转写可点「开始转写」。',
-  autoTranscribeSkippedDeclined: '未确认转写费用，录音已保存但未提交转写；需要时可点「开始转写」。',
+  autoTranscribeSkippedSilent: '这段录音没有检测到声音，未自动转写以免产生费用；确有对话可点“开始转写”。',
+  autoTranscribeSkippedShort: '录音太短，未自动转写；如需转写可点“开始转写”。',
+  autoTranscribeSkippedDeclined: '未确认转写费用，录音已保存但未提交转写；需要时可点“开始转写”。',
   // ---- 付费转写的提交前确认（dev-board#968）：每次提交都问，不做「不再提示」 ----
   paidConfirmTitle: '提交云端转写',
   paidConfirmBody: '本次由 AI WorkDeck 代为转写，按音频时长折算 Credits 从账户余额扣除，提交时即预扣；未识别到人声也可能按处理时长计费。',
@@ -133,7 +133,7 @@ export default {
   paidConfirmEstimate: '预计费用：约 {credits} Credits（按分钟向上取整估算，以实际结算为准）',
   paidConfirmPerMinute: '单价：每分钟约 {credits} Credits（以实际结算为准）',
   paidConfirmInsufficient: '余额不足：预计消耗超过当前账户余额，提交后可能无法完成转写。',
-  paidConfirmLocalHint: '不想让音频离开本机、也不扣 Credits：取消后在「语音 > 会议录音」打开「录音不出本机」，改用本机转写。',
+  paidConfirmLocalHint: '不想让音频离开本机、也不扣 Credits：取消后在“语音 > 会议录音”打开“录音不出本机”，改用本机转写。',
   paidConfirmOk: '确定转写',
   emptyTranscriptBillingHint: '平台转写可能仍按处理时长扣除 Credits；重试会再次提交并可能再次计费。',
   emptyTranscriptHint: '未检测到有效语音。请检查麦克风选择、输入音量与连接，播放录音确认是否有声音；若确有对话，可重新转写。',
@@ -151,7 +151,7 @@ export default {
   exportTranscript: '导出转写稿',
   // {folder} 是后端回的**实际**文件夹名，不要写死：那个文件夹按建档时的界面语言叫
   // 「会议录音」或 Meeting Recordings，写死一个必然有一种语境下指错地方
-  exported: '已导出：{name}（见「{folder}」文件夹）',
+  exported: '已导出：{name}（见“{folder}”文件夹）',
   transcriptFallbackName: '转写稿',
   exportFailed: '导出失败：{message}',
 

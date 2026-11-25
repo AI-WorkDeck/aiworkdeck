@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Folder templat: letakkan templat laporan firma Anda di sini; setelah dipelajari, AI akan menyusun draf dengan font, penomoran, dan gaya tabelnya",
   "selectFilePrompt": "Pilih berkas di sebelah kiri untuk pratinjau",
   "edit": "Sunting",
-  "typeLabel": "Tipe: {type}",
-  "sizeLabel": "Ukuran: {size}",
   "renderingDoc": "Merender dokumen…",
   "renderingSlides": "Merender presentasi…",
   "slidesNotShown": "{count} slide lainnya tidak ditampilkan. Buka file untuk melihat semuanya.",

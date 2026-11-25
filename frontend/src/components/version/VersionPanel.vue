@@ -126,6 +126,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getVersionStatus, enableVersionControl, disableVersionControl, listDrafts,
   getCloudStatus, checkCloud, listCloudConnections, getOfficialCloud,
@@ -355,7 +356,7 @@ export default {
             uni.showToast({ title: this.$t('version.disabled'), icon: 'none' })
             await this.refresh()
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.disableFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.disableFailed')), icon: 'none' })
           } finally {
             this.busy = false
           }
@@ -369,7 +370,7 @@ export default {
         await enableVersionControl(this.projectId)
         await this.refresh()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.enableFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.enableFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
-  "fileNotFoundNamed": "未找到檔案: {name}",
+  "fileNotFoundNamed": "未找到檔案：{name}",
   "openDocumentFirst": "{name}沒有開啟，請先開啟文件",
   "fetchFileListFailed": "獲取檔案列表失敗",
   "cannotOpenFileTitle": "無法開啟檔案",
@@ -16,10 +16,10 @@ export default {
   "compareNoWritePermission": "目前專案為只讀，無法生成比對稿",
   "updatedOpenFiles": "已更新 {count} 份開啟中的檔案",
   "fileUpdated": "檔案已更新",
-  "openedNamed": "已開啟: {name}",
+  "openedNamed": "已開啟：{name}",
   "fileNotFound": "檔案不存在",
   "openFileFailed": "開啟檔案失敗",
-  "fileUpdatedNamed": "檔案已更新: {name}",
+  "fileUpdatedNamed": "檔案已更新：{name}",
   "reloadFailedNamed": "{name} 重新載入失敗，請關閉標籤後重新開啟",
   "refreshFileFailed": "重新整理檔案失敗",
   "frameNotReady": "截圖畫面未就緒",
@@ -36,7 +36,7 @@ export default {
   "copyFailed": "複製失敗",
   "enterFileName": "請輸入檔名",
   "saveSuccess": "儲存成功",
-  "saveFailedNamed": "儲存失敗: {msg}",
+  "saveFailedNamed": "儲存失敗：{msg}",
   "unknownError": "未知錯誤",
   "addingFavorite": "正在加入收藏…",
   "webExcerpt": "網頁摘錄",

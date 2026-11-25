@@ -298,6 +298,8 @@ export default {
   "bpForward": "Avanti",
   "bpRefresh": "Aggiorna",
   "bpUrlPlaceholder": "Inserisci un URL (https://…)",
+  "bpNewTabTitle": "Nuova scheda",
+  "bpNewTabHint": "Digita un indirizzo web nella barra in alto.",
   "bpOpen": "Apri",
   "bpNewTab": "Nuova scheda",
   "bpSwitchToDesktop": "Torna alla visualizzazione desktop",

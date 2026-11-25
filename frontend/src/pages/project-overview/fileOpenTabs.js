@@ -11,6 +11,7 @@ import { getPluginAvatarUrl, getPluginGlyphPaths } from '@/config/pluginIcons.js
 import { fileKindClass } from './fileKind.js'
 import { findChatFile, isCurrentDocSentinel, matchesActiveTab } from '@/utils/chatFileChange.js'
 import { isDocxDoc, runDocxComparison } from '@/utils/docxComparison.js'
+import { errorText } from '@/utils/errorToast.js'
 
 // 轻量文本编辑器（PlainTextEditor.vue）承接的扩展名（dev-board#37）。
 // dev-board#61 插件开发形态起收纳代码文件（js/json/html/css 等），供律师直改插件源码。
@@ -1022,7 +1023,7 @@ export const fileOpenTabsMethods = {
       } catch (e) {
         if (isCurrent()) this.compareStage = ''
         if (!(e && e.cancelled) && isCurrent()) {
-          uni.showToast({ icon: 'none', title: e && e.message ? e.message : this.$t('editor.compare.failBuild') })
+          uni.showToast({ icon: 'none', title: errorText(e, this.$t('editor.compare.failBuild')) })
         }
         return
       } finally {

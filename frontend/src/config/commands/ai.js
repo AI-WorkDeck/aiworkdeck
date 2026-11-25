@@ -9,7 +9,7 @@
 export const AI_COMMANDS = [
   {
     id: 'ai.newChat',
-    label: { zh: '新建对话', en: 'New Conversation' },
+    label: { zh: '新建对话', 'zh-TW': '新增對話', en: 'New Conversation' },
     accel: 'Alt+CmdOrCtrl+N',
     menu: 'ai', group: 1,
     when: ['workbench', 'notClient'],
@@ -17,7 +17,7 @@ export const AI_COMMANDS = [
   },
   {
     id: 'ai.stop',
-    label: { zh: '停止当前任务', en: 'Stop Current Task' },
+    label: { zh: '停止当前任务', 'zh-TW': '停止目前任務', en: 'Stop Current Task' },
     menu: 'ai', group: 1,
     when: ['workbench', 'notClient', 'aiRunning'],
     run: 'wb:stopAi',
@@ -25,7 +25,7 @@ export const AI_COMMANDS = [
 
   {
     id: 'ai.modeAsk',
-    label: { zh: '模式：问答', en: 'Mode: Ask' },
+    label: { zh: '模式：问答', 'zh-TW': '模式：問答', en: 'Mode: Ask' },
     menu: 'ai', group: 2,
     type: 'checkbox', checked: 'aiModeAsk',
     when: ['workbench', 'notClient'],
@@ -33,7 +33,7 @@ export const AI_COMMANDS = [
   },
   {
     id: 'ai.modePlan',
-    label: { zh: '模式：计划', en: 'Mode: Plan' },
+    label: { zh: '模式：计划', 'zh-TW': '模式：計畫', en: 'Mode: Plan' },
     menu: 'ai', group: 2,
     type: 'checkbox', checked: 'aiModePlan',
     when: ['workbench', 'notClient'],
@@ -41,7 +41,7 @@ export const AI_COMMANDS = [
   },
   {
     id: 'ai.modeAgent',
-    label: { zh: '模式：智能体', en: 'Mode: Agent' },
+    label: { zh: '模式：智能体', 'zh-TW': '模式：智慧體', en: 'Mode: Agent' },
     menu: 'ai', group: 2,
     type: 'checkbox', checked: 'aiModeAgent',
     when: ['workbench', 'notClient'],
@@ -50,7 +50,7 @@ export const AI_COMMANDS = [
 
   {
     id: 'ai.history',
-    label: { zh: '对话历史', en: 'Conversation History' },
+    label: { zh: '对话历史', 'zh-TW': '對話歷史', en: 'Conversation History' },
     menu: 'ai', group: 3,
     when: ['workbench', 'notClient'],
     run: 'wb:openChatHistory',
@@ -58,7 +58,7 @@ export const AI_COMMANDS = [
 
   {
     id: 'ai.pluginMarket',
-    label: { zh: '插件广场', en: 'Plugin Marketplace' },
+    label: { zh: '插件广场', 'zh-TW': '外掛市集', en: 'Plugin Marketplace' },
     menu: 'ai', group: 4,
     when: ['workbench', 'notClient'],
     run: 'wb:openPluginMarket',

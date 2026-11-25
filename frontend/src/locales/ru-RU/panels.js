@@ -301,6 +301,8 @@ export default {
   "bpForward": "Переслать",
   "bpRefresh": "Обновить",
   "bpUrlPlaceholder": "Введите URL (https://…)",
+  "bpNewTabTitle": "Новая вкладка",
+  "bpNewTabHint": "Введите веб-адрес в строке выше.",
   "bpOpen": "Открыть",
   "bpNewTab": "Новая вкладка",
   "bpSwitchToDesktop": "Вернуться к версии для компьютера",

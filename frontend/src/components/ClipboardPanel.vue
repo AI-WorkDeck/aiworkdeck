@@ -86,6 +86,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 /* ... script keeps same logic ... */
 import { listClipboard, deleteClipboardItem, getApiBaseUrl } from '@/services/api.js'
 import { getClipboardTypeMeta } from '@/config/clipboard.js'
@@ -270,7 +271,7 @@ export default {
         if (host.app && host.app.confirm) {
           host.app.confirm({ title: this.$t('panels.cpDeleteFailed'), content: (e && e.message) || '' }).catch(() => {})
         } else {
-          uni.showToast({ title: (e && e.message) || this.$t('panels.cpDeleteFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('panels.cpDeleteFailed')), icon: 'none' })
         }
       } finally {
         if (this.deletingId === id) this.deletingId = null

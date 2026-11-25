@@ -15,6 +15,7 @@ export default {
   "promptNoModel": "ต้องดาวน์โหลด {name} (ประมาณ {runtime} MB) โดยจะจัดเก็บไว้ที่ ~/.aiworkdeck และสามารถลบออกได้ที่ การตั้งค่า → คอมโพเนนต์",
   "promptUsage": "ใช้สำหรับ: {unlocks} หากไม่ติดตั้ง: {impact} ส่วนฟีเจอร์อื่นๆ ยังคงใช้งานได้ตามปกติ",
   "sizeUnknown": "กำลังตรวจสอบขนาด…",
+  "sizeUnavailable": "ขนาดจะแสดงเมื่อเริ่มดาวน์โหลด",
   "stateNotInstalled": "ยังไม่ได้ติดตั้ง",
   "stateReady": "ติดตั้งแล้ว (ยังไม่เคยรัน)",
   "stateServiceStarted": "เริ่มบริการแล้ว (ยังไม่ได้ยืนยันการทำงาน)",

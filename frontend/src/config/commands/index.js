@@ -27,14 +27,14 @@ export const COMMAND_BY_ID = new Map(COMMANDS.map((c) => [c.id, c]))
 /** 菜单栏从左到右的顺序与标题。'app' 由主进程用应用名渲染，这里不给 label。 */
 export const MENU_ORDER = [
   { id: 'app' },
-  { id: 'file', label: { zh: '文件', en: 'File' } },
-  { id: 'edit', label: { zh: '编辑', en: 'Edit' } },
-  { id: 'document', label: { zh: '文档', en: 'Document' } },
-  { id: 'ai', label: { zh: 'AI', en: 'AI' } },
-  { id: 'view', label: { zh: '视图', en: 'View' } },
-  { id: 'go', label: { zh: '转到', en: 'Go' } },
-  { id: 'tools', label: { zh: '工具', en: 'Tools' } },
-  { id: 'help', label: { zh: '帮助', en: 'Help' } },
+  { id: 'file', label: { zh: '文件', 'zh-TW': '檔案', en: 'File' } },
+  { id: 'edit', label: { zh: '编辑', 'zh-TW': '編輯', en: 'Edit' } },
+  { id: 'document', label: { zh: '文档', 'zh-TW': '文件', en: 'Document' } },
+  { id: 'ai', label: { zh: 'AI', 'zh-TW': 'AI', en: 'AI' } },
+  { id: 'view', label: { zh: '视图', 'zh-TW': '檢視', en: 'View' } },
+  { id: 'go', label: { zh: '转到', 'zh-TW': '前往', en: 'Go' } },
+  { id: 'tools', label: { zh: '工具', 'zh-TW': '工具', en: 'Tools' } },
+  { id: 'help', label: { zh: '帮助', 'zh-TW': '說明', en: 'Help' } },
 ]
 
 /**
@@ -49,11 +49,34 @@ export const EDITOR_RESERVED_EXCEPTIONS = new Set([
 
 const lang = (l) => (String(l || '').startsWith('zh') ? 'zh' : 'en')
 
-/** 取本地化文案。label 是 {zh,en}，没有对应语言时回落中文。 */
+/** 取本地化文案。label 是 {zh,'zh-TW',en}：繁体（zh-TW/zh-HK/zh-Hant）用 'zh-TW'（D28），其余中文用 zh，别的语言用 en。 */
 export function labelOf(item, appLang) {
   const l = item && item.label
   if (!l) return ''
-  return (lang(appLang) === 'en' ? l.en : l.zh) || l.zh || l.en || ''
+  if (lang(appLang) === 'en') return l.en || l.zh || ''
+  if (/^zh-(TW|HK|MO|Hant)/i.test(String(appLang || ''))) return l['zh-TW'] || l.zh || l.en || ''
+  return l.zh || l.en || ''
+}
+
+/**
+ * 快捷键提示文字（D16：顶栏图标按钮的悬停提示带上快捷键）。macOS 用 ⌥⌘B 这类符号，
+ * 其他平台写成 Ctrl+Alt+B。没有快捷键的命令返回空串。
+ * @param {string} id 命令 id
+ * @param {boolean} [mac] 默认按 navigator.platform 判断
+ */
+export function accelHint(id, mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '')) {
+  const cmd = COMMANDS.find((c) => c.id === id)
+  const a = cmd && cmd.accel
+  if (!a) return ''
+  if (mac) {
+    return String(a).replace(/CmdOrCtrl|Command|Cmd/g, '⌘').replace(/Alt|Option/g, '⌥')
+      .replace(/Shift/g, '⇧').replace(/Control|Ctrl/g, '⌃').replace(/\+/g, '')
+  }
+  const parts = String(a).replace(/CmdOrCtrl|Command|Cmd/g, 'Ctrl').split('+')
+  const order = ['Ctrl', 'Alt', 'Shift']
+  const mods = order.filter((m) => parts.includes(m))
+  const keys = parts.filter((p) => !order.includes(p))
+  return [...mods, ...keys].join('+')
 }
 
 /**
@@ -96,7 +119,7 @@ function toItem(cmd, state, appLang) {
   }
   if (cmd.id === 'app.language') {
     const currentPref = (state && state.langPref) || appLang || 'zh-CN'
-    const followLabel = lang(appLang) === 'en' ? 'Follow System' : '跟随系统'
+    const followLabel = labelOf({ label: { zh: '跟随系统', 'zh-TW': '跟隨系統', en: 'Follow System' } }, appLang)
     item.submenu = [
       {
         id: 'app.lang.system',
@@ -154,11 +177,11 @@ export function buildMenuPayload(state, appLang) {
         group: 2,
         item: {
           id: 'file.openRecent',
-          label: lang(appLang) === 'en' ? 'Open Recent' : '打开最近',
+          label: labelOf({ label: { zh: '打开最近', 'zh-TW': '開啟最近使用', en: 'Open Recent' } }, appLang),
           enabled: recent.length > 0,
           submenu: recent.length ? recent : [{
             id: 'file.openRecent.empty',
-            label: lang(appLang) === 'en' ? 'No Recent Projects' : '暂无最近项目',
+            label: labelOf({ label: { zh: '暂无最近项目', 'zh-TW': '尚無最近專案', en: 'No Recent Projects' } }, appLang),
             enabled: false,
           }],
         },
@@ -179,7 +202,7 @@ export function buildMenuPayload(state, appLang) {
           group: 2,
           item: {
             id: 'view.openView',
-            label: lang(appLang) === 'en' ? 'Open View' : '打开视图',
+            label: labelOf({ label: { zh: '打开视图', 'zh-TW': '開啟檢視', en: 'Open View' } }, appLang),
             enabled: s.page === 'workbench',
             submenu: views,
           },
@@ -195,7 +218,7 @@ export function buildMenuPayload(state, appLang) {
           group: 3,
           item: {
             id: 'go.switchProject',
-            label: lang(appLang) === 'en' ? 'Switch Project' : '切换项目',
+            label: labelOf({ label: { zh: '切换项目', 'zh-TW': '切換專案', en: 'Switch Project' } }, appLang),
             enabled: true,
             submenu: others.map((r) => ({
               id: 'go.switchProject:' + r.id,

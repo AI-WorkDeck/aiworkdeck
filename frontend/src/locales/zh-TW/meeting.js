@@ -102,7 +102,7 @@ export default {
   "paidConfirmInsufficient": "餘額不足：預計消耗超過目前帳戶餘額，提交後可能無法完成轉寫。",
   "paidConfirmLocalHint": "不想讓音訊離開本機、也不扣 Credits：取消後在「語音 > 會議錄音」開啟「錄音不出本機」，改用本機轉寫。",
   "paidConfirmOk": "確定轉寫",
-  "emptyTranscriptBillingHint": "平台轉寫可能仍按處理時長扣除 Credits；重試會再次提交併可能再次計費。",
+  "emptyTranscriptBillingHint": "平台轉寫可能仍按處理時長扣除 Credits；重試會再次提交並可能再次計費。",
   "emptyTranscriptHint": "未偵測到有效語音。請檢查麥克風選擇、輸入音量與連線，播放錄音確認是否有聲音；若確有對話，可重新轉寫。",
   "speakersTitle": "說話者（點選改名）",
   "speakerDefaultName": "說話者{n}",

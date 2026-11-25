@@ -62,7 +62,7 @@ export default {
     /** 设计 §4.3 第一行：下载什么、多大、落哪、怎么卸载。 */
     sizeLine() {
       const runtime = Math.round((this.item.downloadBytes || 0) / MB)
-      if (!runtime) return this.$t('components.sizeUnknown')
+      if (!runtime) return this.$t(this.item.sizeUnavailable ? 'components.sizeUnavailable' : 'components.sizeUnknown')
       const name = this.title
       if (!this.item.modelId) {
         return this.$t('components.promptNoModel', { name, runtime })

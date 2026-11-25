@@ -12,7 +12,7 @@
 export const GO_COMMANDS = [
   {
     id: 'go.quickOpen',
-    label: { zh: '快速打开…', en: 'Quick Open…' },
+    label: { zh: '快速打开…', 'zh-TW': '快速開啟…', en: 'Quick Open…' },
     accel: 'Alt+CmdOrCtrl+O',
     menu: 'go', group: 1,
     when: ['workbench', 'project'],
@@ -20,7 +20,7 @@ export const GO_COMMANDS = [
   },
   {
     id: 'go.commandPalette',
-    label: { zh: '命令面板…', en: 'Command Palette…' },
+    label: { zh: '命令面板…', 'zh-TW': '命令面板…', en: 'Command Palette…' },
     accel: 'Alt+CmdOrCtrl+P',
     menu: 'go', group: 1,
     when: ['workbench'],
@@ -29,14 +29,14 @@ export const GO_COMMANDS = [
 
   {
     id: 'go.projectHome',
-    label: { zh: '项目概览', en: 'Project Overview' },
+    label: { zh: '项目概览', 'zh-TW': '專案概覽', en: 'Project Overview' },
     menu: 'go', group: 2,
     when: ['workbench', 'project'],
     run: 'wb:goProjectHome',
   },
   {
     id: 'go.allProjects',
-    label: { zh: '全部项目', en: 'All Projects' },
+    label: { zh: '全部项目', 'zh-TW': '全部專案', en: 'All Projects' },
     menu: 'go', group: 2,
     when: ['workbench'],
     run: 'wb:goAllProjects',
@@ -44,7 +44,7 @@ export const GO_COMMANDS = [
   // 全局日程页（dev-board#899）。wb: 而不是 app:——离开工作台前要先落盘编辑器（leaveWorkbench）
   {
     id: 'go.calendar',
-    label: { zh: '日程', en: 'Schedule' },
+    label: { zh: '日程', 'zh-TW': '日程', en: 'Schedule' },
     menu: 'go', group: 2,
     when: ['workbench'],
     run: 'wb:goCalendar',
@@ -53,7 +53,7 @@ export const GO_COMMANDS = [
 
   {
     id: 'go.nextTab',
-    label: { zh: '下一个标签', en: 'Next Tab' },
+    label: { zh: '下一个标签', 'zh-TW': '下一個標籤', en: 'Next Tab' },
     accel: 'Alt+CmdOrCtrl+Right',
     menu: 'go', group: 4,
     when: ['workbench', 'tab'],
@@ -61,7 +61,7 @@ export const GO_COMMANDS = [
   },
   {
     id: 'go.prevTab',
-    label: { zh: '上一个标签', en: 'Previous Tab' },
+    label: { zh: '上一个标签', 'zh-TW': '上一個標籤', en: 'Previous Tab' },
     accel: 'Alt+CmdOrCtrl+Left',
     menu: 'go', group: 4,
     when: ['workbench', 'tab'],

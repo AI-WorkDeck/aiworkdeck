@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "テンプレートフォルダ:貴社の報告書テンプレートをここにドロップしてください。学習されると、AIがそのフォント、番号付け、表のスタイルでドラフトを作成します",
   "selectFilePrompt": "左側でファイルを選択してプレビューします",
   "edit": "編集",
-  "typeLabel": "種類:{type}",
-  "sizeLabel": "サイズ:{size}",
   "renderingDoc": "ドキュメントをレンダリング中…",
   "renderingSlides": "プレゼンテーションをレンダリング中…",
   "slidesNotShown": "ほかに {count} 枚のスライドがあります。ファイルを開くとすべて表示されます。",

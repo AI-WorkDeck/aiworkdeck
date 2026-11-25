@@ -78,7 +78,8 @@ test('中文提示：组件名加书名号，菜单路径箭头两侧留空格',
   const { default: tw } = await import('../../src/locales/zh-TW/components.js')
   for (const [loc, dict] of [['zh-CN', zh], ['zh-TW', tw]]) {
     for (const k of ['promptWithModel', 'promptNoModel']) {
-      assert.match(dict[k], /「\{name\}」/, `${loc} ${k}`)
+      // zh-CN 用大陆引号 “ ”，zh-TW 用「」（CEO 11-24，POLISH X29）
+      assert.match(dict[k], loc === 'zh-CN' ? /“\{name\}”/ : /「\{name\}」/, `${loc} ${k}`)
     }
     for (const [k, v] of Object.entries(dict)) {
       if (typeof v === 'string') assert.doesNotMatch(v, /\S→|→\S/, `${loc} ${k}`)

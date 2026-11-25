@@ -17,7 +17,7 @@ export default {
     search: 'Search',
     tts: 'Text to Speech',
     desensitize: 'File Redaction',
-    version: 'Source Control',
+    version: 'Versions',
     calendar: 'Calendar',
   },
   tools: {

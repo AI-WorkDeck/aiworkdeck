@@ -309,7 +309,7 @@ html[data-theme='dark'] .awd-dlg {
 }
 
 .awd-dlg__title {
-  font: 600 var(--awd-font-size-title)/var(--awd-line-height-ui) var(--awd-font-serif);
+  font: 600 var(--awd-font-size-title)/var(--awd-line-height-ui) var(--awd-font-sans); /* D16 */
   letter-spacing: -0.01em;
   color: var(--awd-text);
   word-break: break-word;

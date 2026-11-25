@@ -512,12 +512,14 @@ function onAppLanguageChange(fn) {
 
 /**
  * 传入 `{ zh: '...', en: '...' }` 返回当前语言对应文案。
- * 对非 zh* 语言优先取 en，缺失时再回退到 zh。
+ * 对非 zh* 语言优先取 en，缺失时再回退到 zh；zh-TW 没有专门的词时由 zh-hant.js 转换。
  */
 function t(pair) {
   if (!pair || typeof pair !== 'object') return String(pair || '')
   const lang = getAppLanguage()
   if (pair[lang]) return pair[lang]
+  // X-S2：繁中没有单独给词时，用与后端同一张表把简中转成繁中（菜单、关于窗、原生对话框）
+  if (lang === 'zh-TW' && (pair['zh-CN'] || pair.zh)) return require('./zh-hant').toTraditional(pair['zh-CN'] || pair.zh)
   if (lang.startsWith('zh')) {
     return pair['zh-CN'] || pair.zh || pair['en-US'] || pair.en || ''
   }

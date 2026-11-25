@@ -15,6 +15,7 @@ export default {
   "promptNoModel": "{name} のダウンロードが必要です（約 {runtime} MB）。~/.aiworkdeck に保存され、「設定 → コンポーネント」から削除できます。",
   "promptUsage": "対象機能：{unlocks}。未導入の場合：{impact}。その他の機能は引き続き利用できます。",
   "sizeUnknown": "サイズを確認中…",
+  "sizeUnavailable": "サイズはダウンロード開始時に表示されます",
   "stateNotInstalled": "未インストール",
   "stateReady": "インストール済み（未実行）",
   "stateServiceStarted": "サービス起動済み（機能未確認）",

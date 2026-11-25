@@ -8,8 +8,8 @@ export default {
   heroWatermark: '技',
   heroEyebrow: 'EXTENSIONS · 能力扩展',
   heroTitle: '插件市场',
-  heroSub: '官网广场的公开 Skill 与经人工审核、平台签名的插件，一键装到本机',
-  statOnlineSkills: '在线 Skill',
+  heroSub: '官网广场的公开技能与经人工审核、平台签名的插件，一键装到本机',
+  statOnlineSkills: '在线技能',
   statOnlinePlugins: '在线插件',
   statInstalledLocal: '本机已安装',
   back: '返回',
@@ -17,7 +17,7 @@ export default {
   rescan: '重新扫描',
 
   // ---- 主页签 ----
-  tabSkillMarket: 'Skill',
+  tabSkillMarket: '技能',
   tabPluginMarket: '插件',
   tabInstalled: '已安装',
   // 左栏面板的在线广场分组：Skill 与插件收进同一个「可安装」组，组内横向双标签
@@ -38,12 +38,11 @@ export default {
   // ---- Skill 广场 ----
   searchSkillPlaceholder: '搜索名称、描述或触发词',
   marketUnavailableTitle: '在线广场暂不可用',
-  marketErrorHint: '{error}——本机已安装的 Skill 与插件不受影响',
   loadingMarket: '正在载入广场',
-  noMatchingSkill: '没有匹配的 Skill',
+  noMatchingSkill: '没有匹配的技能',
   marketEmptySkill: '广场暂时空着',
   tryOtherKeyword: '换个关键词或分类试试',
-  submitFirstSkill: '去官网 Skill 广场提交你的第一个 Skill',
+  submitFirstSkill: '去官网插件市场提交你的第一个技能',
 
   installedTag: '已安装',
   processing: '处理中',
@@ -57,9 +56,8 @@ export default {
 
   // ---- 插件市场 ----
   pluginMarketUnavailableTitle: '在线插件市场暂不可用',
-  pluginMarketErrorHint: '{error}——本机已安装的插件不受影响',
   noPluginsYet: '还没有上架的插件',
-  localInstallHint: '也可本地安装：把插件目录放进本机插件目录 ~/.aiworkdeck/plugins/ 后点「重新扫描」',
+  localInstallHint: '也可本地安装：把插件目录放进本机插件目录 ~/.aiworkdeck/plugins/ 后点“重新扫描”',
   pluginLabel: '插件',
   panelPluginLabel: '面板插件',
   panelPluginHint: '启用后出现在左栏，点开是一个完整面板',
@@ -67,13 +65,13 @@ export default {
   pluginTrustNote: "安装前请核对来源和声明能力。Web 界面在隔离环境中运行，调用工作台功能受权限限制；含后端程序的插件可访问本机资源。手动安装后默认停用。",
 
   // ---- 已安装 ----
-  skillWord: 'Skill',
-  sectionSkillTitle: 'Skill',
+  skillWord: '技能',
+  sectionSkillTitle: '技能',
   sectionPluginTitle: '插件',
   sectionPluginSub: '独立能力：自带工具与界面，启用后显示在左栏',
   loadingLocalPlugins: '正在读取本机插件',
   noLocalPlugins: '本机还没有插件',
-  noLocalPluginsHint: '把插件目录（含 manifest.json）放进本机插件目录 ~/.aiworkdeck/plugins/ 后点「重新扫描」',
+  noLocalPluginsHint: '把插件目录（含 manifest.json）放进本机插件目录 ~/.aiworkdeck/plugins/ 后点“重新扫描”',
   pluginSettingsTitle: '插件设置',
   saveSettings: '保存设置',
   savingEllipsis: '保存中…',
@@ -91,9 +89,9 @@ export default {
   enabledTag: '已启用',
   disabledTag: '已停用',
   sectionSkillSub: '提示词能力：在对话中生效，可设置生效方式',
-  builtinWorkflowsMarketNotice: '懒人模式已开启：合同审查、证据整理、文件整理、法律意见书核查已内置到工程主流程，对话中根据任务自动启用，无需在此安装或勾选。',
-  noLocalSkills: '本机还没有额外扩展 Skill',
-  noLocalSkillsHint: '去「Skill 广场」装一个，或把 Skill 目录（含 skill.yml）放进本机 Skill 目录 ~/.aiworkdeck/skills/ 后点「重新扫描」',
+  builtinWorkflowsMarketNotice: "内置工作流已自动启用：合同审查、证据整理、文件整理、法律意见书核查会在对话中按任务自动启用，无需在这里安装或勾选。",
+  noLocalSkills: '本机还没有额外安装的技能',
+  noLocalSkillsHint: '去插件市场装一个，或把含 skill.yml 的技能文件夹放进本机技能目录 ~/.aiworkdeck/skills/ 后点“重新扫描”',
   fromPlugin: '来自插件 {pluginId}',
 
   // ---- 权限 ----
@@ -113,7 +111,7 @@ export default {
   toolCount: '{count} 个工具',
   requiresPerms: '需要 {perms}',
   noSensitiveCapability: '未声明敏感能力',
-  triggerWrap: '「{trigger}」',
+  triggerWrap: '“{trigger}”',
 
   unknownSize: '未知大小',
 
@@ -126,7 +124,6 @@ export default {
   checkForUpdates: '检查更新',
   checkingUpdates: '正在检查更新…',
   updatesChecked: '已检查更新',
-  checkingUpdatesFailed: '检查更新失败，请重试',
   updatingEllipsis: '正在更新…',
   updateFailed: '更新失败，请重试。',
   updatedDisabledHint: '已更新，但未能恢复启用。请排查原因后手动启用。',
@@ -137,7 +134,7 @@ export default {
   confirmInstallPluginContent: "{name} v{version}\n作者：{author}\n声明能力：{perms}\n\n请核对来源及所需权限。安装后默认停用，需你手动启用。",
   unknownAuthor: '未知',
   cancelBtn: '取消',
-  installedEnableHint: '已安装，请在「已安装」中启用',
+  installedEnableHint: '已安装，请在“已安装”中启用',
   installFailedNeedAdmin: '安装失败（需要管理员权限）',
   uninstalledToast: '已卸载',
   uninstallFailedNeedAdmin: '卸载失败（需要管理员权限）',
@@ -145,24 +142,24 @@ export default {
   enabledToast: '已启用',
   disabledToggleToast: '已禁用',
   operationFailedNeedAdmin: '操作失败（需要管理员权限）',
-  loadSkillListFailed: '加载 Skill 列表失败',
+  loadSkillListFailed: '加载技能列表失败',
 
   activationHintSourcePlugin: '随插件启停，不可单独设置',
   activationHintManual: '仅在对话中手动选用时生效',
   activationHintAuto: '命中触发词时自动生效',
-  setActivationTo: '已设为「{mode}」',
+  setActivationTo: '已设为“{mode}”',
 
   networkUnavailable: '网络不可用',
   updatedToast: '已更新',
   genericInstalledToast: '已安装',
-  scanComplete: '扫描完成：{pluginCount} 个插件、{skillCount} 个 Skill',
+  scanComplete: '扫描完成：{pluginCount} 个插件、{skillCount} 个技能',
   scanFailedNeedAdmin: '扫描失败（需要管理员权限）',
 
   // ---- MarketDetailPane ----
-  kindBadgeSkill: 'Skill',
+  kindBadgeSkill: '技能',
   downloadsCount: '{count} 下载',
   kindNotePlugin: "插件为工作台增加界面、工具或服务。启用前请核对来源和声明能力。",
-  kindNoteSkill: 'Skill 是提示词工作流：教 AI 助手按一套业务方法做事，纯文本、不含可执行代码。',
+  kindNoteSkill: '技能是提示词工作流：教 AI 助手按一套业务方法做事，纯文本、不含可执行代码。',
   buyWithPrice: '购买 {price}',
   refreshing: '刷新中…',
   alreadyPurchasedRefresh: '我已购买，刷新',
@@ -170,8 +167,8 @@ export default {
   reinstallOrUpdate: '重新安装 / 更新',
   activationModeLabel: '生效方式：{mode} ▾',
   processingEllipsis: '处理中…',
-  needAccountHint: '这是付费项目。请先在设置的「账户与余额」中连接 AI WorkDeck 账户，安装时才能校验购买记录。',
-  buyHint: '这是付费项目。购买在官网完成，付款后回到本页点「我已购买，刷新」即可安装。',
+  needAccountHint: '这是付费项目。请先在设置的“账户与余额”中连接 AI WorkDeck 账户，安装时才能校验购买记录。',
+  buyHint: '这是付费项目。购买在官网完成，付款后回到本页点“我已购买，刷新”即可安装。',
 
   whenToUse: '什么时候用',
   scenarioLead: '在对话里说出类似这些诉求时，它会自动接管：',
@@ -208,26 +205,25 @@ export default {
   domainMemory: '工作记忆',
   domainEvidence: '证据核查',
   domainGeneral: '通用对话',
-  toolSummaryText: '{domains} 等 {count} 项（限定范围，仅在本 Skill 生效时可用）',
+  toolSummaryText: '{domains} 等 {count} 项（限定范围，仅在本技能生效时可用）',
 
   marketUnavailableShort: '在线广场不可用',
   purchaseNotFoundHint: '还没查到这一项的购买记录，请确认已在官网完成支付',
   installedUsableHint: '已安装，请启用后使用',
 
   // ---- MarketSidebarPanel ----
-  searchPlaceholder: '搜索 Skill 与插件',
-  rescanTooltip: '重新扫描本机 Skill 与插件',
-  noInstalledYet: '还没有安装任何 Skill 或插件',
+  searchPlaceholder: '搜索技能与插件',
+  rescanTooltip: '重新扫描本机技能与插件',
+  noInstalledYet: '还没有安装任何技能或插件',
   installedShort: '已装',
   noMatchingPlugin: '没有匹配的插件',
   marketEmptyPlugin: '广场暂无插件',
-  marketEmptySkillShort: '广场暂无 Skill',
-  marketUnavailablePrefixed: '在线广场不可用：{error}',
+  marketEmptySkillShort: '广场暂无技能',
   activationStateAuto: '自动',
   activationStateManual: '手动',
   fromPluginTag: '来自插件',
   downloadsSuffix: ' 下载',
-  openedPurchasePage: '已在浏览器打开商品页，购买后回到详情页点「我已购买，刷新」',
+  openedPurchasePage: '已在浏览器打开商品页，购买后回到详情页点“我已购买，刷新”',
   installedNoExecuteHint: '已安装，启用前不会执行任何插件代码',
 
   // ---- marketPricing.js ----
@@ -262,7 +258,7 @@ export default {
   publishBtn: '发布到插件市场',
   publishUpdateBtn: '更新到插件市场',
   publishingEllipsis: '发布中…',
-  publishHint: '发布后，其他律师可以在插件市场安装这个 Skill',
+  publishHint: '发布后，其他律师可以在插件市场安装这个技能',
   publishedHint: '已发布到插件市场',
   publishedVersionHint: '已发布到插件市场（v{version}）',
   publishedToast: '已发布到插件市场',
@@ -270,7 +266,7 @@ export default {
   publishFailed: '发布失败，请稍后重试',
   // ---- 插件工具权限升级的重新授权（PluginToolApprovals）----
   toolApprovalTitle: "批准工具变更",
-  toolApprovalContent: "「{name}」的以下工具权限升高。批准前，AI 助手不能使用它们：\n{changes}\n\n请确认你信任这个插件的新行为。",
+  toolApprovalContent: "“{name}”的以下工具权限升高。批准前，AI 助手不能使用它们：\n{changes}\n\n请确认你信任这个插件的新行为。",
   toolApprovalApprove: "批准",
   toolApprovalLater: "暂不",
   toolApprovalBanner: "{count} 项工具变更待你批准；批准前 AI 助手不能使用这些工具。",

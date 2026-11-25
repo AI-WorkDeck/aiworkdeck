@@ -239,7 +239,7 @@ export default {
   conversationDelete: '删除',
   conversationMore: '更多操作',
   conversationDeleteTitle: '删除对话',
-  conversationDeleteConfirm: '删除「{name}」的全部对话记录。这条对话里生成的文件和文档检查点都会留在项目里，不受影响。删除后无法恢复。',
+  conversationDeleteConfirm: '删除“{name}”的全部对话记录。这条对话里生成的文件和文档检查点都会留在项目里，不受影响。删除后无法恢复。',
   conversationRenameFailed: '重命名失败',
   conversationPinFailed: '置顶操作失败',
   conversationDeleteFailed: '删除对话失败',
@@ -317,12 +317,12 @@ export default {
   // 脚本侧提示
   defaultUserName: '用户',
   folderScopeLabel: '文件夹：{name}',
-  folderScopeDesc: '文件夹「{name}」（folderId={id}）及其下全部材料。先对 {id} 调 extract_file_text 拿到该文件夹的文件清单，再逐份通读。',
+  folderScopeDesc: '文件夹“{name}”（folderId={id}）及其下全部材料。先对 {id} 调 extract_file_text 拿到该文件夹的文件清单，再逐份通读。',
   fileScopeDesc: '《{name}》（fileId={id}）',
   importing: '正在导入...',
   importSuccess: '导入成功',
   importFailed: '导入失败',
-  importFailedWithMsg: '导入失败: {msg}',
+  importFailedWithMsg: '导入失败：{msg}',
   noPermissionRemoveMember: '你没有权限把这个人移出案卷',
   removeMemberTitle: '移出案卷',
   removeMemberConfirm: '把 {name} 移出这份案卷？移出后他不再能打开和修改这里的文件。',
@@ -330,7 +330,7 @@ export default {
   removeFailed: '没能移出',
   aiPanelNotReady: 'AI 面板未就绪，请稍后重试',
   // 插件开发面板「让 AI 开发」的 kick-off prompt：必须以「插件开发」开头才能命中 skill 注入
-  pluginDevAiPrompt: '插件开发：请继续开发本项目「插件开发/{id}/」目录下的插件「{name}」（文件夹 ID {folderId}）。先读取该目录下的 manifest.json 与 web/ 源码了解现状，然后按我的需求迭代；改完用 plugin_dev_install 安装到本机让我测试。',
+  pluginDevAiPrompt: '插件开发：请继续开发本项目“插件开发/{id}/”目录下的插件“{name}”（文件夹 ID {folderId}）。先读取该目录下的 manifest.json 与 web/ 源码了解现状，然后按我的需求迭代；改完用 plugin_dev_install 安装到本机让我测试。',
   projectNameEmpty: '项目名称不能为空',
   renameSuccess: '重命名成功',
   renameFailed: '重命名失败',
@@ -371,7 +371,7 @@ export default {
   selectReplaceContentFirst: '请先在文档中选择要替换的内容',
   selectionReplaced: '已替换选区',
   replaceFailed: '替换失败',
-  fileAdded: '已添加: {name}',
+  fileAdded: '已添加：{name}',
   filesAdded: '已加入 {count} 个文件',
   // 拖进 AI 对话区（dev-board#779 K6 ⑤）：原来所有落空都弹「未获取到拖拽数据」，
   // 用户看不懂那是什么意思，也不知道下一步该干什么。

@@ -16,6 +16,7 @@ export default {
   promptUsage: 'It powers: {unlocks}. Without it: {impact}. Everything else keeps working.',
 
   sizeUnknown: 'Checking size…',
+  sizeUnavailable: "Size shown when the download starts",
   stateNotInstalled: 'Not installed',
   stateReady: 'Installed (not run yet)',
   stateServiceStarted: 'Service started (function not yet verified)',

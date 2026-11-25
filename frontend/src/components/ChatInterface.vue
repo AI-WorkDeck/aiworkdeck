@@ -535,7 +535,7 @@
                     <view class="mode-selector" @tap="toggleModeDropdown">
                        <text class="mode-icon" v-if="currentModeIcon">{{ currentModeIcon }}</text>
                        <text class="mode-name">{{ currentModeName }}</text>
-                       <text class="dropdown-arrow">▼</text>
+                       <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
                        <view v-if="showModeDropdown" class="mode-dropdown down" role="listbox">
                           <view v-for="mode in availableModes" :key="mode.id"
                                 class="mode-option"
@@ -556,7 +556,7 @@
                     <!-- Model Selector：清单来自 GET /api/ai/models，按厂商分组、国际档在后 -->
                     <view class="model-selector" @tap="toggleModelDropdown">
                        <text class="model-name">{{ currentModelName }}</text>
-                       <text class="dropdown-arrow">▼</text>
+                       <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
                        <ModelSelectorDropdown v-if="showModelDropdown" placement="down"
                           :groups="modelGroups" :current-model-id="currentModelId"
                           :price-display="modelPriceDisplay" :network-region-basis="networkRegionBasis"
@@ -663,7 +663,6 @@
           <DecisionAssistControl :enabled="decisionAssistEnabled" :local-only="isLocalOnlyProvider" @toggle="toggleDecisionAssist" />
           </view>
           </details>
-          <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask model-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
 
        <!-- Bottom: History (pushed to bottom with flexbox) -->
@@ -956,7 +955,6 @@
                 </button>
              </view>
           </view>
-          <view v-if="showModelDropdown || showModeDropdown || showSkillDropdown" class="dropdown-mask" @tap="showModelDropdown = false; showModeDropdown = false; showSkillDropdown = false"></view>
        </view>
           <ChatSuggestionControl v-if="chatSuggestions.available && visibleSuggestion" :suggestion="visibleSuggestion" :show-settings="false"
             @edit="chatSuggestions.edit" @dismiss="chatSuggestions.dismiss" />
@@ -1086,6 +1084,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { selectableChatSkills } from '@/utils/chatSelectableSkills.mjs'
 import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
@@ -2015,6 +2014,31 @@ export default {
     // 后端 skill_update 里的 manual 条目只是回执，渲染仍以本地选择为准——否则第一条消息发出去
     // 之前，用户勾了却什么都看不见。
     const showSkillDropdown = ref(false)
+    // D9/D10：下拉原来靠一层全屏透明遮罩收起——遮罩吃掉了点击（点设置导航「没反应」），
+    // Esc 也关不掉。改成捕获阶段监听：点到下拉与触发器之外就收起，点击照常落到目标上；
+    // Esc 与窗口失焦（点进编辑器 webview）也收起。
+    const DROPDOWN_ZONE = '.mode-selector, .model-selector, .skill-selector, .mode-dropdown, .model-dropdown, .skill-dropdown'
+    const closeChatDropdowns = () => { showModelDropdown.value = false; showModeDropdown.value = false; showSkillDropdown.value = false }
+    const onDropdownOutsidePointer = (e) => {
+      const target = e && e.target
+      if (target && typeof target.closest === 'function' && target.closest(DROPDOWN_ZONE)) return
+      closeChatDropdowns()
+    }
+    const onDropdownKeydown = (e) => { if (e && e.key === 'Escape') closeChatDropdowns() }
+    const detachDropdownListeners = () => {
+      if (typeof document === 'undefined') return
+      document.removeEventListener('pointerdown', onDropdownOutsidePointer, true)
+      document.removeEventListener('keydown', onDropdownKeydown, true)
+      window.removeEventListener('blur', closeChatDropdowns)
+    }
+    watch(() => showModelDropdown.value || showModeDropdown.value || showSkillDropdown.value, (open) => {
+      detachDropdownListeners()
+      if (!open || typeof document === 'undefined') return
+      document.addEventListener('pointerdown', onDropdownOutsidePointer, true)
+      document.addEventListener('keydown', onDropdownKeydown, true)
+      window.addEventListener('blur', closeChatDropdowns)
+    })
+    onBeforeUnmount(detachDropdownListeners)
     const availableSkills = ref([])
     const selectedSkillIds = ref([])
 
@@ -2730,7 +2754,7 @@ export default {
         }
       } catch (err) {
         console.error('[ChatInterface] Rollback failed:', err)
-        uni.showToast({ title: t('chat.rollbackFailed', { error: err.message || t('chat.unknownError') }), icon: 'none' })
+        uni.showToast({ title: t('chat.rollbackFailed', { error: errorText(err) }), icon: 'none' })
       }
 
       // 重置状态
@@ -3180,7 +3204,7 @@ export default {
       try {
         await action()
       } catch (e) {
-        uni.showToast({ title: e.message || t('chat.inboxUpdateFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, t('chat.inboxUpdateFailed')), icon: 'none' })
       }
     }
     const handleInboxEdit = ({ item, message }) => inboxAction(() =>
@@ -4387,7 +4411,7 @@ export default {
         }
       } catch (error) {
         console.error('[ChatInterface] Create folder failed:', error)
-        uni.showToast({ title: error.message || t('chat.folderCreateFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, t('chat.folderCreateFailed')), icon: 'none' })
       }
     }
 
@@ -5473,9 +5497,9 @@ export default {
 }
 
 .welcome-text {
-  font-family: var(--awd-font-serif);
+  font-family: var(--awd-font-sans); /* D16：对话问候是界面文字，不是品牌大标题 */
   font-size: var(--awd-font-size-title);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
   display: block;
@@ -5898,16 +5922,6 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.dropdown-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 999;
-  background: transparent;
 }
 
 /* 发送 / 停止改成真 <button>（K16 ④）：能 Tab 到、能回车按。uni-h5 的 button 自带
@@ -7088,16 +7102,6 @@ export default {
   font-weight: 500;
 }
 
-/* Model dropdown mask overlay */
-.dropdown-mask.model-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 199;
-  background: transparent;
-}
 
 /* =============================================
    AI WorkDeck Style - Upload Dialog Styles
