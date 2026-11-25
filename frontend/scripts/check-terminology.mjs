@@ -4,6 +4,7 @@
 // - 插件市场：zh-CN「插件市场」、zh-TW「外掛市集」、en「Marketplace」，旧叫法「插件广场/插件中心」等不许再出现；
 // - 品牌是「包晴天」，不是「包青天」；
 // - zh-TW「并」（和、并且）不许被 OpenCC 误转成「併」（合併、一併、併入、併購除外）；
+// - 中文界面用「技能」「插件/外掛」，不夹英文 Skill / Plugin（技能文件名 skill.yml 小写不受影响）；
 // - zh-TW 不许出现简体「后」，「返回」不许被转换成「回傳」（OpenCC 程序语境误转）。
 // 只看 locale 的取值（import 后遍历），不看注释。
 // 用法：node scripts/check-terminology.mjs（挂在 npm run check:locales 里一起跑）
@@ -12,8 +13,8 @@ import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 const RULES = {
-  'zh-CN': [/插件广场/, /插件中心/, /包青天/],
-  'zh-TW': [/外掛廣場/, /外掛中心/, /包青天/, /后/, /^回傳$/, /(?<![合一])併(?![入購])/],
+  'zh-CN': [/插件广场/, /插件中心/, /包青天/, /Skill/, /Plugin/],
+  'zh-TW': [/外掛廣場/, /外掛中心/, /包青天/, /后/, /^回傳$/, /(?<![合一])併(?![入購])/, /Skill/, /Plugin/],
   'en-US': [/Plugin Marketplace/, /^Extensions$/],
 }
 

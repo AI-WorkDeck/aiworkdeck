@@ -8,8 +8,8 @@ export default {
   heroWatermark: '技',
   heroEyebrow: 'EXTENSIONS · 能力扩展',
   heroTitle: '插件市场',
-  heroSub: '官网广场的公开 Skill 与经人工审核、平台签名的插件，一键装到本机',
-  statOnlineSkills: '在线 Skill',
+  heroSub: '官网广场的公开技能与经人工审核、平台签名的插件，一键装到本机',
+  statOnlineSkills: '在线技能',
   statOnlinePlugins: '在线插件',
   statInstalledLocal: '本机已安装',
   back: '返回',
@@ -17,7 +17,7 @@ export default {
   rescan: '重新扫描',
 
   // ---- 主页签 ----
-  tabSkillMarket: 'Skill',
+  tabSkillMarket: '技能',
   tabPluginMarket: '插件',
   tabInstalled: '已安装',
   // 左栏面板的在线广场分组：Skill 与插件收进同一个「可安装」组，组内横向双标签
@@ -39,10 +39,10 @@ export default {
   searchSkillPlaceholder: '搜索名称、描述或触发词',
   marketUnavailableTitle: '在线广场暂不可用',
   loadingMarket: '正在载入广场',
-  noMatchingSkill: '没有匹配的 Skill',
+  noMatchingSkill: '没有匹配的技能',
   marketEmptySkill: '广场暂时空着',
   tryOtherKeyword: '换个关键词或分类试试',
-  submitFirstSkill: '去官网 Skill 广场提交你的第一个 Skill',
+  submitFirstSkill: '去官网插件市场提交你的第一个技能',
 
   installedTag: '已安装',
   processing: '处理中',
@@ -65,8 +65,8 @@ export default {
   pluginTrustNote: "安装前请核对来源和声明能力。Web 界面在隔离环境中运行，调用工作台功能受权限限制；含后端程序的插件可访问本机资源。手动安装后默认停用。",
 
   // ---- 已安装 ----
-  skillWord: 'Skill',
-  sectionSkillTitle: 'Skill',
+  skillWord: '技能',
+  sectionSkillTitle: '技能',
   sectionPluginTitle: '插件',
   sectionPluginSub: '独立能力：自带工具与界面，启用后显示在左栏',
   loadingLocalPlugins: '正在读取本机插件',
@@ -90,8 +90,8 @@ export default {
   disabledTag: '已停用',
   sectionSkillSub: '提示词能力：在对话中生效，可设置生效方式',
   builtinWorkflowsMarketNotice: "已内置：合同审查、证据整理、文件整理、法律意见书核查已纳入主流程，对话中按任务自动启用，无需在此安装或勾选。",
-  noLocalSkills: '本机还没有额外扩展 Skill',
-  noLocalSkillsHint: '去“Skill 广场”装一个，或把 Skill 目录（含 skill.yml）放进本机 Skill 目录 ~/.aiworkdeck/skills/ 后点“重新扫描”',
+  noLocalSkills: '本机还没有额外安装的技能',
+  noLocalSkillsHint: '去插件市场装一个，或把含 skill.yml 的技能文件夹放进本机技能目录 ~/.aiworkdeck/skills/ 后点“重新扫描”',
   fromPlugin: '来自插件 {pluginId}',
 
   // ---- 权限 ----
@@ -142,7 +142,7 @@ export default {
   enabledToast: '已启用',
   disabledToggleToast: '已禁用',
   operationFailedNeedAdmin: '操作失败（需要管理员权限）',
-  loadSkillListFailed: '加载 Skill 列表失败',
+  loadSkillListFailed: '加载技能列表失败',
 
   activationHintSourcePlugin: '随插件启停，不可单独设置',
   activationHintManual: '仅在对话中手动选用时生效',
@@ -152,14 +152,14 @@ export default {
   networkUnavailable: '网络不可用',
   updatedToast: '已更新',
   genericInstalledToast: '已安装',
-  scanComplete: '扫描完成：{pluginCount} 个插件、{skillCount} 个 Skill',
+  scanComplete: '扫描完成：{pluginCount} 个插件、{skillCount} 个技能',
   scanFailedNeedAdmin: '扫描失败（需要管理员权限）',
 
   // ---- MarketDetailPane ----
-  kindBadgeSkill: 'Skill',
+  kindBadgeSkill: '技能',
   downloadsCount: '{count} 下载',
   kindNotePlugin: "插件为工作台增加界面、工具或服务。启用前请核对来源和声明能力。",
-  kindNoteSkill: 'Skill 是提示词工作流：教 AI 助手按一套业务方法做事，纯文本、不含可执行代码。',
+  kindNoteSkill: '技能是提示词工作流：教 AI 助手按一套业务方法做事，纯文本、不含可执行代码。',
   buyWithPrice: '购买 {price}',
   refreshing: '刷新中…',
   alreadyPurchasedRefresh: '我已购买，刷新',
@@ -205,20 +205,20 @@ export default {
   domainMemory: '工作记忆',
   domainEvidence: '证据核查',
   domainGeneral: '通用对话',
-  toolSummaryText: '{domains} 等 {count} 项（限定范围，仅在本 Skill 生效时可用）',
+  toolSummaryText: '{domains} 等 {count} 项（限定范围，仅在本技能生效时可用）',
 
   marketUnavailableShort: '在线广场不可用',
   purchaseNotFoundHint: '还没查到这一项的购买记录，请确认已在官网完成支付',
   installedUsableHint: '已安装，请启用后使用',
 
   // ---- MarketSidebarPanel ----
-  searchPlaceholder: '搜索 Skill 与插件',
-  rescanTooltip: '重新扫描本机 Skill 与插件',
-  noInstalledYet: '还没有安装任何 Skill 或插件',
+  searchPlaceholder: '搜索技能与插件',
+  rescanTooltip: '重新扫描本机技能与插件',
+  noInstalledYet: '还没有安装任何技能或插件',
   installedShort: '已装',
   noMatchingPlugin: '没有匹配的插件',
   marketEmptyPlugin: '广场暂无插件',
-  marketEmptySkillShort: '广场暂无 Skill',
+  marketEmptySkillShort: '广场暂无技能',
   activationStateAuto: '自动',
   activationStateManual: '手动',
   fromPluginTag: '来自插件',
@@ -258,7 +258,7 @@ export default {
   publishBtn: '发布到插件市场',
   publishUpdateBtn: '更新到插件市场',
   publishingEllipsis: '发布中…',
-  publishHint: '发布后，其他律师可以在插件市场安装这个 Skill',
+  publishHint: '发布后，其他律师可以在插件市场安装这个技能',
   publishedHint: '已发布到插件市场',
   publishedVersionHint: '已发布到插件市场（v{version}）',
   publishedToast: '已发布到插件市场',
