@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "O perfil deste caso ainda está vazio. Preencha primeiro o cliente e o tipo de causa, para que colegas e clientes identifiquem rapidamente do que se trata o caso.",
   "startFilling": "Começar a preencher",
   "selectMatterType": "Selecionar tipo de causa",
+  "profileField": {
+    "client": "Cliente",
+    "matterType": "Tipo de caso",
+    "openedAt": "Aberto em",
+    "nextStep": "Próximo passo",
+    "counterparty": "Parte contrária"
+  },
   "notFilled": "Não preenchido",
   "placeholderClient": "ex.: Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "ex.: 01/08/2026",

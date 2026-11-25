@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Το προφίλ αυτού του φακέλου υπόθεσης είναι ακόμα κενό. Συμπληρώστε πρώτα τον πελάτη και τον τύπο της υπόθεσης, ώστε συνάδελφοι και πελάτες να καταλαβαίνουν με μια ματιά περί τίνος πρόκειται.",
   "startFilling": "Έναρξη συμπλήρωσης",
   "selectMatterType": "Επιλογή τύπου υπόθεσης",
+  "profileField": {
+    "client": "Πελάτης",
+    "matterType": "Τύπος υπόθεσης",
+    "openedAt": "Ημερομηνία ανοίγματος",
+    "nextStep": "Επόμενο βήμα",
+    "counterparty": "Αντισυμβαλλόμενος"
+  },
   "notFilled": "Δεν έχει συμπληρωθεί",
   "placeholderClient": "π.χ. Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "π.χ. 2026-08-01",

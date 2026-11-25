@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Profil berkas perkara ini masih kosong. Isi terlebih dahulu klien dan jenis perkara, agar kolega dan klien dapat langsung mengetahui isi perkara ini secara sekilas.",
   "startFilling": "Mulai Mengisi",
   "selectMatterType": "Pilih Jenis Perkara",
+  "profileField": {
+    "client": "Klien",
+    "matterType": "Jenis perkara",
+    "openedAt": "Tanggal dibuka",
+    "nextStep": "Langkah berikutnya",
+    "counterparty": "Pihak lawan"
+  },
   "notFilled": "Belum diisi",
   "placeholderClient": "mis. PT Teknologi Acme Tbk.",
   "placeholderOpenedAt": "mis. 2026-08-01",

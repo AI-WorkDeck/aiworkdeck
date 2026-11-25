@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "ملف تعريف هذه القضية لا يزال فارغًا. املأ بيانات العميل ونوع القضية أولاً، حتى يتمكن زملاؤك وعملاؤك من معرفة موضوع هذه القضية من النظرة الأولى.",
   "startFilling": "ابدأ التعبئة",
   "selectMatterType": "اختر نوع القضية",
+  "profileField": {
+    "client": "العميل",
+    "matterType": "نوع المسألة",
+    "openedAt": "تاريخ الفتح",
+    "nextStep": "الخطوة التالية",
+    "counterparty": "الطرف المقابل"
+  },
   "notFilled": "غير معبأ",
   "placeholderClient": "مثال: شركة إيكما للتقنية المحدودة",
   "placeholderOpenedAt": "مثال: 2026-08-01",

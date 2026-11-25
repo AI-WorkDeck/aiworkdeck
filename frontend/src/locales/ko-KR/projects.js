@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "이 사건 파일의 프로필이 아직 비어 있습니다. 먼저 클라이언트와 사건 유형을 입력하면 동료와 클라이언트가 사건 내용을 한눈에 파악할 수 있습니다.",
   "startFilling": "입력 시작",
   "selectMatterType": "사건 유형 선택",
+  "profileField": {
+    "client": "의뢰인",
+    "matterType": "사건 유형",
+    "openedAt": "수임일",
+    "nextStep": "다음 단계",
+    "counterparty": "상대방"
+  },
   "notFilled": "미입력",
   "placeholderClient": "예: Acme Technology 주식회사",
   "placeholderOpenedAt": "예: 2026-08-01",

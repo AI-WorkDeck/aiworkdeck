@@ -11,7 +11,7 @@
 
     <view class="profile-fields">
       <view v-for="f in fields" :key="f.fieldKey" class="profile-field">
-        <text class="profile-field-label">{{ f.label }}</text>
+        <text class="profile-field-label">{{ fieldLabel(f) }}</text>
 
         <AwdSelect
           v-if="editingKey === f.fieldKey && f.fieldKey === 'matterType'"
@@ -49,7 +49,9 @@
 
 <script>
 // 项目档案头。fields 是 GET /api/projects/{id}/profile 的 data.fields 原样：
-// 服务端保证恒 5 条、顺序固定、label 由服务端给，本组件不补齐、不排序、不写第二份文案表。
+// 服务端保证恒 5 条、顺序固定，本组件不补齐、不排序。标签按 fieldKey 走界面语言
+// （projects.profileField.*，D4：服务端 label 只有中文，英文界面曾直接露出「客户 / 事项类型」）；
+// 未知字段才退回服务端 label。
 //
 // 编辑走行内 input 不开弹窗：awd-* 弹窗/按钮样式在仓里没有集中定义（project-overview /
 // ChatInterface / FileTree 各自带一份 scoped 副本），走行内就不用复制第四份。
@@ -105,6 +107,10 @@ export default {
     },
   },
   methods: {
+    fieldLabel(f) {
+      const key = 'projects.profileField.' + f.fieldKey
+      return this.$te(key) ? this.$t(key) : f.label
+    },
     matterTypeLabel(val) {
       return formatMatterTypeLabel(val, (key) => (this.$t ? this.$t(key) : t(key)))
     },

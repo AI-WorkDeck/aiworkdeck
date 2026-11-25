@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "La fiche de ce dossier est encore vide. Renseignez d'abord le client et le type de dossier, afin que vos collègues et vos clients puissent comprendre l'objet du dossier en un coup d'œil.",
   "startFilling": "Commencer à remplir",
   "selectMatterType": "Sélectionner le type de dossier",
+  "profileField": {
+    "client": "Client",
+    "matterType": "Type de dossier",
+    "openedAt": "Ouvert le",
+    "nextStep": "Prochaine étape",
+    "counterparty": "Partie adverse"
+  },
   "notFilled": "Non renseigné",
   "placeholderClient": "ex. : Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "ex. : 2026-08-01",

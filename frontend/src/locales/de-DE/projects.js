@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Das Profil dieser Akte ist noch leer. Bitte zunächst Mandant und Mandatsart ausfüllen, damit Kollegen und Mandanten auf einen Blick erkennen, worum es in diesem Fall geht.",
   "startFilling": "Jetzt ausfüllen",
   "selectMatterType": "Mandatsart auswählen",
+  "profileField": {
+    "client": "Mandant",
+    "matterType": "Mandatsart",
+    "openedAt": "Eröffnet am",
+    "nextStep": "Nächster Schritt",
+    "counterparty": "Gegenpartei"
+  },
   "notFilled": "Nicht ausgefüllt",
   "placeholderClient": "z. B. Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "z. B. 2026-08-01",

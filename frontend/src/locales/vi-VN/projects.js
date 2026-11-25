@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Hồ sơ vụ việc này vẫn đang trống. Hãy điền khách hàng và loại vụ việc trước để đồng nghiệp và khách hàng nắm được nội dung vụ việc ngay lập tức.",
   "startFilling": "Bắt đầu điền",
   "selectMatterType": "Chọn loại vụ việc",
+  "profileField": {
+    "client": "Khách hàng",
+    "matterType": "Loại vụ việc",
+    "openedAt": "Ngày mở",
+    "nextStep": "Bước tiếp theo",
+    "counterparty": "Bên đối tác"
+  },
   "notFilled": "Chưa điền",
   "placeholderClient": "vd: Công ty TNHH Công nghệ Acme",
   "placeholderOpenedAt": "vd: 2026-08-01",

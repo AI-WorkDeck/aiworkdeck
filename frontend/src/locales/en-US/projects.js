@@ -97,6 +97,13 @@ export default {
   profileEmptyGuideDesc: "This case file's profile is still empty. Fill in the client and matter type first, so colleagues and clients can tell what this case is about at a glance.",
   startFilling: 'Start Filling In',
   selectMatterType: 'Select Matter Type',
+  profileField: {
+    client: "Client",
+    matterType: "Matter type",
+    openedAt: "Opened",
+    nextStep: "Next step",
+    counterparty: "Counterparty",
+  },
   notFilled: 'Not filled in',
   placeholderClient: 'e.g., Acme Technology Co., Ltd.',
   placeholderOpenedAt: 'e.g., 2026-08-01',
@@ -116,11 +123,11 @@ export default {
 
   // OverviewStatsBar.vue
   statsLoadingHint: 'Loading project status…',
-  folderCountLabel: '{count} folders',
+  folderCountLabel: '{count} folder | {count} folders',
   folderCaption: 'Excludes system directories',
-  memberCountLabel: '{count} members',
+  memberCountLabel: '{count} member | {count} members',
   memberCaption: 'Includes the lead',
-  runCountLabel: '{count} background tasks',
+  runCountLabel: '{count} background task | {count} background tasks',
   noRunningTasks: 'No tasks running right now',
   recentRunPrefix: 'Latest: {status}',
   runFinished: 'Finished',

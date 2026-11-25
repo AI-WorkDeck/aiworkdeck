@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Profil fail kes ini masih kosong. Isi dahulu klien dan jenis perkara, supaya rakan sekerja dan klien dapat memahami kes ini secara sekilas pandang.",
   "startFilling": "Mula Mengisi",
   "selectMatterType": "Pilih Jenis Perkara",
+  "profileField": {
+    "client": "Klien",
+    "matterType": "Jenis perkara",
+    "openedAt": "Tarikh dibuka",
+    "nextStep": "Langkah seterusnya",
+    "counterparty": "Pihak lawan"
+  },
   "notFilled": "Belum diisi",
   "placeholderClient": "cth., Acme Technology Sdn. Bhd.",
   "placeholderOpenedAt": "cth., 2026-08-01",
