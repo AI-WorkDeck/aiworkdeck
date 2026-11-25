@@ -7,6 +7,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
 import { copyMonaco, localMonaco, MONACO_PUBLIC_DIR } from '../../scripts/local-monaco.mjs'
 
 test('the build copies loader, editor core and base worker — and not the language packs', () => {
@@ -40,4 +42,23 @@ test('the dist guard fails on remote code loading in JS', () => {
     fs.writeFileSync(path.join(dist, 'assets', 'a.js'), 'i.src=new URL("static/monaco/vs/loader.js",document.baseURI).href')
     execFileSync(process.execPath, [script, dist], { stdio: 'pipe' })
   } finally { fs.rmSync(dist, { recursive: true, force: true }) }
+})
+
+test('the dev server serves Monaco too (the plugin is not build-only)', async () => {
+  const plugin = localMonaco()
+  const applies = typeof plugin.apply === 'function' ? plugin.apply({}, { command: 'serve' }) : plugin.apply !== 'build'
+  assert.ok(applies, 'apply must include the dev server, otherwise /static/monaco 404s in dev and in Journeys')
+  let mount, handler
+  plugin.configureServer({ middlewares: { use: (p, fn) => { mount = p; handler = fn } } })
+  assert.equal(mount, '/' + MONACO_PUBLIC_DIR)
+  const body = await new Promise((resolve, reject) => {
+    const chunks = []
+    const res = new (require('node:stream').Writable)({ write(c, e, cb) { chunks.push(c); cb() } })
+    res.setHeader = () => {}
+    res.on('finish', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    handler({ url: '/loader.js' }, res, () => reject(new Error('loader.js not served')))
+  })
+  assert.match(body, /define|require/)
+  // a path outside monaco/min/vs is never served
+  await new Promise(resolve => handler({ url: '/../../package.json' }, { setHeader() {} }, resolve))
 })
