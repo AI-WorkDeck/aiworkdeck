@@ -477,3 +477,17 @@ test('ci.yml: Desktop unit tests (Linux) installs frontend deps first (desktop t
   const unit = steps.findIndex((s) => s['working-directory'] === 'desktop' && /npm test/.test(s.run || ''))
   assert.ok(fe >= 0 && unit > fe, 'frontend npm ci must run before the desktop unit tests')
 })
+
+// Journeys and Marketing screenshots are required checks on PRs (master-green, 2026-11-25): they must
+// trigger on every PR and skip their job (skipped counts as passed) instead of using a workflow-level paths
+// filter, which would leave a required check pending forever on PRs that don't touch those paths.
+for (const [file, job] of [['journeys.yml', 'journeys'], ['marketing-screenshots.yml', 'capture']]) {
+  test(`${file}: required-check safe — no PR paths filter, job gated by the scope job`, () => {
+    const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
+    assert.ok(!(wf.on.pull_request && wf.on.pull_request.paths), 'no workflow-level paths filter on pull_request')
+    assert.deepStrictEqual([].concat(wf.jobs[job].needs), ['scope'])
+    assert.ok(wf.jobs[job].if.includes("github.event_name != 'pull_request' || needs.scope.outputs.run == 'true'"))
+    assert.ok(wf.jobs[job].if.includes('!cancelled()'))
+    assert.strictEqual(wf.jobs.scope.if, "github.event_name == 'pull_request'")
+  })
+}
