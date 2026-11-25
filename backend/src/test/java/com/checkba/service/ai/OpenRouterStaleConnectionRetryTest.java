@@ -50,13 +50,21 @@ class OpenRouterStaleConnectionRetryTest {
     }
 
     /** dropFirst 个连接读完请求就 RST；之后的连接回一条正常的 SSE 流。 */
-    private String startServer(int dropFirst) throws IOException {
+    private String startServer(int dropFirst) throws IOException { return startServer(dropFirst, false); }
+
+    /** dropBeforeRead: RST right on accept, without reading the request (the fastest possible failure). */
+    private String startServer(int dropFirst, boolean dropBeforeRead) throws IOException {
         server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
         Thread t = new Thread(() -> {
             int n = 0;
             while (!server.isClosed()) {
                 try (Socket s = server.accept()) {
                     n++;
+                    if (dropBeforeRead && n <= dropFirst) {
+                        requestIds.add("dropped-before-read");
+                        s.setSoLinger(true, 0);
+                        continue;
+                    }
                     readRequest(s.getInputStream());
                     if (n <= dropFirst) {
                         s.setSoLinger(true, 0); // RST, like a peer that already closed the idle connection
@@ -127,6 +135,18 @@ class OpenRouterStaleConnectionRetryTest {
         assertEquals(2, requestIds.size(), "exactly one retry");
         assertNotEquals("null", requestIds.get(0), "the platform gateway's idempotency key must be sent");
         assertEquals(requestIds.get(0), requestIds.get(1), "the retry reuses the same id, so it can never be charged twice");
+    }
+
+    @org.junit.jupiter.api.RepeatedTest(40)
+    @DisplayName("平台通道：连接在 accept 时就被重置（最快的失败），也照样重发一次——不因重试闭包还没就绪而放弃")
+    void retryWorksWhenTheFirstFailureIsImmediate() throws Exception {
+        requestIds.clear();
+        Outcome o = run(startServer(1, true), "awdai_test_key");
+        assertNull(o.error(), () -> "first turn failed: " + o.error());
+        assertTrue(o.completed());
+        assertEquals("好的", o.text());
+        assertEquals(2, requestIds.size(), "one dropped attempt plus one retry");
+        if (server != null) server.close();
     }
 
     @Test
