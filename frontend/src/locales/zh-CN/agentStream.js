@@ -25,7 +25,7 @@ export default {
   // 发送防重入 toast
   alreadyStreamingToast: 'AI 正在执行中，请等待完成或点击停止',
   // 错误提示
-  regionBlockedNotice: '> **该模型在当前网络环境不可用**：境外模型在境内网络会被服务商按地域拒绝。可在设置中改用 AI WorkDeck 云端通道，或换成标注「境内外均可用」的模型后重新发送。',
+  regionBlockedNotice: '> **该模型在当前网络环境不可用**：境外模型在境内网络会被服务商按地域拒绝。可在设置中改用 AI WorkDeck 云端通道，或换成标注“境内外均可用”的模型后重新发送。',
   quotaExhaustedNotice: '> **AI 服务额度不足**：当前通道的余额或配额已用完。使用自备 Key 时请到服务商（如 OpenRouter）充值；使用 AI WorkDeck 云端通道时请到官网账户页检查额度分配。',
   contextOverflowNotice: '> **对话上下文超出模型窗口**：已尝试自动压缩仍超限。建议开启新对话继续，或减少一次携带的文件数量与长度。',
   networkUnreachableNotice: '> **网络连接异常**：本机连不上 AI 服务（可能是断网、DNS 解析失败或代理不通）。请检查网络后重新发送这条消息。',
@@ -66,7 +66,7 @@ export default {
   checkpointRestoringStepSkippedError: '检查点正在恢复，这一步未执行，请等待恢复完成',
   pdfExportFailedError: 'PDF 导出失败',
   pdfExportEmptyError: 'PDF 导出结果为空',
-  pdfExportTooLargeError: '导出的 PDF 超过 {mb}MB，无法经 AI 存进项目；请用菜单「文件 → 导出为 PDF」另存',
+  pdfExportTooLargeError: '导出的 PDF 超过 {mb}MB，无法经 AI 存进项目；请用菜单“文件 → 导出为 PDF”另存',
   // 过程卡兜底标题（ProcessCard.vue 按此串识别系统卡，勿改措辞）
   systemOperation: '系统操作',
   // artifact 兜底文件名
