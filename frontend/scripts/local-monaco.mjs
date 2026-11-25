@@ -26,7 +26,7 @@ export function copyMonaco(outDir) {
 export function localMonaco() {
   return {
     name: 'local-monaco',
-    apply: 'build',
+    // Not build-only: configureServer serves the same path on the dev server (Journeys, local dev).
     writeBundle(options) {
       if (options && options.dir) copyMonaco(options.dir)
     },
