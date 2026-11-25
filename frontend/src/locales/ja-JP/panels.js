@@ -301,6 +301,8 @@ export default {
   "bpForward": "進む",
   "bpRefresh": "更新",
   "bpUrlPlaceholder": "URL を入力してください (https://…)",
+  "bpNewTabTitle": "新しいタブ",
+  "bpNewTabHint": "上のバーにウェブアドレスを入力してください。",
   "bpOpen": "開く",
   "bpNewTab": "新しいタブ",
   "bpSwitchToDesktop": "デスクトップ表示に戻す",

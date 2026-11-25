@@ -313,6 +313,8 @@ export default {
   bpForward: '前进',
   bpRefresh: '刷新',
   bpUrlPlaceholder: '输入网址（https://...）',
+  bpNewTabTitle: "新标签页",
+  bpNewTabHint: "在上方地址栏输入网址。",
   bpOpen: '打开',
   bpNewTab: '新标签页',
   bpSwitchToDesktop: '切换回桌面版',

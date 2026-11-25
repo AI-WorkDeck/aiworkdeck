@@ -301,6 +301,8 @@ export default {
   "bpForward": "आगे",
   "bpRefresh": "रिफ्रेश करें",
   "bpUrlPlaceholder": "एक URL दर्ज करें (https://…)",
+  "bpNewTabTitle": "नया टैब",
+  "bpNewTabHint": "ऊपर की पट्टी में वेब पता लिखें।",
   "bpOpen": "खोलें",
   "bpNewTab": "नया टैब",
   "bpSwitchToDesktop": "डेस्कटॉप व्यू पर वापस स्विच करें",

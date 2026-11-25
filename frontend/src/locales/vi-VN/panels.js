@@ -301,6 +301,8 @@ export default {
   "bpForward": "Tiến tới",
   "bpRefresh": "Làm mới",
   "bpUrlPlaceholder": "Nhập URL (https://…)",
+  "bpNewTabTitle": "Thẻ mới",
+  "bpNewTabHint": "Nhập địa chỉ web vào thanh phía trên.",
   "bpOpen": "Mở",
   "bpNewTab": "Tab mới",
   "bpSwitchToDesktop": "Chuyển lại chế độ xem desktop",
