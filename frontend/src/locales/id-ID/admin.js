@@ -107,6 +107,7 @@ export default {
   "modelSaved": "{model} (tersimpan)",
   "catalogLoadFailedWithMsg": "Daftar model sementara tidak tersedia: {msg}",
   "catalogLoadFailedRetry": "Daftar model sementara tidak tersedia; buka kembali halaman ini nanti untuk mencoba lagi",
+  "catalogNeedsSignIn": "Masuk ke akun AI WorkDeck Anda untuk melihat model yang tersedia.",
   "networkRegionTitle": "Wilayah Jaringan",
   "networkRegionNote": "Model yang hanya tersedia di jaringan internasional akan ditolak oleh penyedia saat diakses dari Tiongkok Daratan, sehingga daftar model difilter berdasarkan wilayah. Deteksi otomatis menggunakan negara/wilayah dan zona waktu sistem; tentukan secara manual di sini jika salah.",
   "regionModeLabel": "Mode Deteksi",

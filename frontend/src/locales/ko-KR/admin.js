@@ -107,6 +107,7 @@ export default {
   "modelSaved": "{model} (저장됨)",
   "catalogLoadFailedWithMsg": "모델 목록을 일시적으로 사용할 수 없음: {msg}",
   "catalogLoadFailedRetry": "모델 목록을 일시적으로 사용할 수 없습니다. 나중에 이 페이지를 다시 열어 재시도하세요.",
+  "catalogNeedsSignIn": "사용 가능한 모델을 보려면 AI WorkDeck 계정에 로그인하세요.",
   "networkRegionTitle": "네트워크 지역",
   "networkRegionNote": "국제 네트워크에서만 사용 가능한 모델은 중국 본토에서 접근 시 공급자에 의해 거부되므로, 모델 목록은 지역별로 필터링됩니다. 자동 감지는 시스템의 국가/지역 및 시간대를 사용하며, 잘못 감지된 경우 여기서 수동으로 지정하세요.",
   "regionModeLabel": "감지 모드",

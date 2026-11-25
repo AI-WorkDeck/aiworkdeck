@@ -107,6 +107,7 @@ export default {
   "modelSaved": "{model} (kaydedildi)",
   "catalogLoadFailedWithMsg": "Model listesi geçici olarak kullanılamıyor: {msg}",
   "catalogLoadFailedRetry": "Model listesi geçici olarak kullanılamıyor; daha sonra bu sayfayı yeniden açarak tekrar deneyin",
+  "catalogNeedsSignIn": "Kullanılabilir modelleri görmek için AI WorkDeck hesabınızda oturum açın.",
   "networkRegionTitle": "Ağ Bölgesi",
   "networkRegionNote": "Yalnızca uluslararası ağlarda kullanılabilen modeller, Çin anakarasından erişildiğinde sağlayıcılar tarafından reddedilir, bu nedenle model listesi bölgeye göre filtrelenir. Otomatik algılama sistem ülkesini/bölgesini ve saat dilimini kullanır; yanlış algılarsa buradan elle belirtin.",
   "regionModeLabel": "Algılama Modu",

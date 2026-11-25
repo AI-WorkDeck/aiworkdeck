@@ -120,6 +120,7 @@ export default {
   modelSaved: '{model}（已保存）',
   catalogLoadFailedWithMsg: '模型清单暂时读取不到：{msg}',
   catalogLoadFailedRetry: '模型清单暂时读取不到，稍后重新进入本页再试',
+  catalogNeedsSignIn: '登录 AI WorkDeck 账户后即可看到可用模型。',
   networkRegionTitle: '网络区域',
   networkRegionNote: '只在境外网络可用的模型，在境内网络会被服务商按地域拒绝，所以模型清单按区域过滤。自动判定看的是本机的系统国家/地区与时区，判错时在这里手动指定。',
   regionModeLabel: '判定方式',

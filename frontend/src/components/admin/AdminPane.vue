@@ -126,7 +126,12 @@
               <view class="section-header-inline">
                   <text class="section-title-sm">{{ $t('admin.modelSelectionTitle') }}</text>
               </view>
-              <text v-if="modelCatalogError" class="field-note field-note-warn">{{ modelCatalogError }}</text>
+              <!-- Q3：没登录时就地给「登录」，不再让人去找不存在的「右上角」 -->
+              <view v-if="modelCatalogNeedsSignIn" class="field-note field-note-warn catalog-signin">
+                <text>{{ $t('admin.catalogNeedsSignIn') }}</text>
+                <text class="platform-link" @tap="onLoginAccount">{{ $t('account.accountEntry.loginAccountButton') }}</text>
+              </view>
+              <text v-else-if="modelCatalogError" class="field-note field-note-warn">{{ modelCatalogError }}</text>
               <SettingsRow :label="$t('admin.defaultModelLabel')" :hint="catalogDefaultModel ? $t('admin.effectiveDefaultModel', { model: catalogDefaultModel }) : ''">
                 <AwdSelect
                   class="mode-picker"
@@ -1344,6 +1349,7 @@ export default {
       // 前端不许再自己硬编码任何模型清单。
       modelCatalog: null,
       modelCatalogError: '',
+      modelCatalogNeedsSignIn: false,
       // 平台 AI 通道是否可选（= 是否已连接账户），来自 /api/account/status
       platformAiAvailable: false,
       // 花费闸门 + 预扣/低余额提醒的数据源（GET /api/platform-services 与其 /remote 端点）。
@@ -2449,9 +2455,11 @@ export default {
         if (this._modelCatalogDisposed) return
         this.modelCatalog = catalog
         this.modelCatalogError = ''
+        this.modelCatalogNeedsSignIn = false
       } catch (e) {
         if (this._modelCatalogDisposed) return
         this.modelCatalog = null
+        this.modelCatalogNeedsSignIn = !!(e && e.accountRequired)
         // 拿不到清单时下拉只剩「跟随内置默认」与已保存的值：宁可少给选项，
         // 也不要在这里塞一份硬编码清单当兜底（那正是三份清单互不同步的来源）
         this.modelCatalogError = (e && e.message)
@@ -2870,6 +2878,8 @@ export default {
       await this.loadAccount()
       this.loadWallet()
       if (this.isDesktop) this.loadPlatformAiAvailability()
+      // 目录可能正因为没登录而拉不到（Q3）：账户一变就重拉
+      if (this.modelCatalogError || this.modelCatalogNeedsSignIn) this.loadModelCatalog()
       if (this.account.connected) {
         this.loadStorageLocation()
         this.maybePromptNameNudge()
@@ -4063,6 +4073,12 @@ $brand-accent: $brand-mint;
 }
 
 /* 平台服务（P5 配置面收敛） */
+.catalog-signin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
 .platform-link {
   align-self: flex-start;
   font-size: var(--awd-panel-fs);

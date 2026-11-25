@@ -107,6 +107,7 @@ export default {
   "modelSaved": "{model} (salvato)",
   "catalogLoadFailedWithMsg": "Elenco dei modelli temporaneamente non disponibile: {msg}",
   "catalogLoadFailedRetry": "Elenco dei modelli temporaneamente non disponibile; riapri questa pagina più tardi per riprovare",
+  "catalogNeedsSignIn": "Accedi al tuo account AI WorkDeck per vedere i modelli disponibili.",
   "networkRegionTitle": "Regione di rete",
   "networkRegionNote": "I modelli disponibili solo su reti internazionali vengono rifiutati dai fornitori quando si accede dalla Cina continentale, quindi l'elenco dei modelli viene filtrato per regione. Il rilevamento automatico utilizza il paese/regione e il fuso orario del sistema; specificarlo manualmente qui in caso di errore.",
   "regionModeLabel": "Modalità di rilevamento",

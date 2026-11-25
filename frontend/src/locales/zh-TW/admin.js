@@ -107,6 +107,7 @@ export default {
   "modelSaved": "{model}（已儲存）",
   "catalogLoadFailedWithMsg": "模型清單暫時讀取不到：{msg}",
   "catalogLoadFailedRetry": "模型清單暫時讀取不到，稍後重新進入本頁再試",
+  "catalogNeedsSignIn": "登入 AI WorkDeck 帳戶後即可看到可用模型。",
   "networkRegionTitle": "網路區域",
   "networkRegionNote": "只在境外網路可用的模型，在境內網路會被服務商按地域拒絕，所以模型清單按區域過濾。自動判定看的是本機的系統國家/地區與時區，判錯時在這裡手動指定。",
   "regionModeLabel": "判定方式",
