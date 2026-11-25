@@ -166,7 +166,7 @@ try {
   await page.type('.msb-search-input input', 'no-match-synthetic-999')
   await page.waitForFunction(() => document.querySelectorAll('.msb-row').length === 0 && document.querySelectorAll('.msb-empty').length === 2)
   const emptyText = await page.$$eval('.msb-empty', items => items.map(item => item.textContent))
-  assert.ok(emptyText[0].includes('插件') && emptyText[1].includes('Skill'), JSON.stringify(emptyText))
+  assert.ok(emptyText[0].includes('插件') && emptyText[1].includes('技能'), JSON.stringify(emptyText))
   await shot('04-market-search-empty')
   await page.click('.msb-search-clear')
   await page.waitForFunction(() => document.querySelector('.msb-search-input input').value === '')
