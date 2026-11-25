@@ -28,7 +28,7 @@ export default {
   "exitProgressCommitting": "正在提交改動（2/3）…",
   "exitProgressSaving": "正在儲存檔案（1/3）…",
   "exitPrompt": "離開「{name}」前，要提交本次改動嗎？檔案已儲存，暫不提交也會保留。",
-  "exitCommit": "提交併退出",
+  "exitCommit": "提交並退出",
   "exitSkip": "直接退出",
   "exitCancel": "取消",
   "exitConflict": "改動存在衝突，請在版本控制面板處理後再離開。",
