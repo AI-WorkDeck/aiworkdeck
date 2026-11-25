@@ -108,6 +108,8 @@ export default {
   "catalogLoadFailedWithMsg": "Model listesi geçici olarak kullanılamıyor: {msg}",
   "catalogLoadFailedRetry": "Model listesi geçici olarak kullanılamıyor; daha sonra bu sayfayı yeniden açarak tekrar deneyin",
   "catalogNeedsSignIn": "Kullanılabilir modelleri görmek için AI WorkDeck hesabınızda oturum açın.",
+  "signInCardText": "Yapay zekayı kullanmak, projeleri cihazlarınız arasında eşzamanlamak ve hukuk büronuzun ekibine katılmak için giriş yapın.",
+  "signInCardTitle": "AI WorkDeck'e giriş yapın",
   "networkRegionTitle": "Ağ Bölgesi",
   "networkRegionNote": "Yalnızca uluslararası ağlarda kullanılabilen modeller, Çin anakarasından erişildiğinde sağlayıcılar tarafından reddedilir, bu nedenle model listesi bölgeye göre filtrelenir. Otomatik algılama sistem ülkesini/bölgesini ve saat dilimini kullanır; yanlış algılarsa buradan elle belirtin.",
   "regionModeLabel": "Algılama Modu",

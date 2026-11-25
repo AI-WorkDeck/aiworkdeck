@@ -89,7 +89,7 @@ export default {
   enabledTag: 'Enabled',
   disabledTag: 'Disabled',
   sectionSkillSub: 'Prompt-based capabilities: take effect in conversation, with configurable activation',
-  builtinWorkflowsMarketNotice: 'Lazy Mode enabled: Contract Review, Evidence Organization, File Organization, and Legal Opinion Verification are built into the core workflow and activate automatically in chat — no installation or manual toggling needed.',
+  builtinWorkflowsMarketNotice: "Built in: Contract Review, Evidence Organization, File Organization and Legal Opinion Verification are part of the core workflow and turn on automatically in chat when a task needs them. There is nothing to install here.",
   noLocalSkills: 'No extra extension Skills installed locally yet',
   noLocalSkillsHint: 'Install one from the "Skill Marketplace", or drop a Skill directory (with skill.yml) into the local Skill folder ~/.aiworkdeck/skills/ and click "Rescan"',
   fromPlugin: 'From plugin {pluginId}',

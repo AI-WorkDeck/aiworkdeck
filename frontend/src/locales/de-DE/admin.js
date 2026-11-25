@@ -108,6 +108,8 @@ export default {
   "catalogLoadFailedWithMsg": "Modellliste vorübergehend nicht verfügbar: {msg}",
   "catalogLoadFailedRetry": "Modellliste vorübergehend nicht verfügbar; öffnen Sie diese Seite später erneut, um es erneut zu versuchen",
   "catalogNeedsSignIn": "Melden Sie sich bei Ihrem AI WorkDeck-Konto an, um die verfügbaren Modelle zu sehen.",
+  "signInCardText": "Melden Sie sich an, um KI zu nutzen, Projekte geräteübergreifend zu synchronisieren und dem Team Ihrer Kanzlei beizutreten.",
+  "signInCardTitle": "Bei AI WorkDeck anmelden",
   "networkRegionTitle": "Netzwerkregion",
   "networkRegionNote": "Modelle, die nur in internationalen Netzwerken verfügbar sind, werden von Anbietern abgelehnt, wenn sie vom Festlandchina aus aufgerufen werden. Daher wird die Modellliste nach Region gefiltert. Die automatische Erkennung verwendet das Land/die Region und die Zeitzone des Systems; geben Sie es hier manuell an, falls die Erkennung falsch ist.",
   "regionModeLabel": "Erkennungsmodus",

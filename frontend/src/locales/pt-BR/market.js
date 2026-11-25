@@ -77,7 +77,7 @@ export default {
   "enabledTag": "Ativado",
   "disabledTag": "Desativado",
   "sectionSkillSub": "Capacidades baseadas em prompt: entram em vigor na conversa, com ativação configurável",
-  "builtinWorkflowsMarketNotice": "Modo preguiçoso ativado: Revisão de contratos, Organização de evidências, Organização de arquivos e Verificação de pareceres jurídicos estão integrados ao fluxo de trabalho principal e são ativados automaticamente no chat — sem necessidade de instalação ou ativação manual.",
+  "builtinWorkflowsMarketNotice": "Integrado: Revisão de contratos, Organização de evidências, Organização de arquivos e Verificação de pareceres jurídicos fazem parte do fluxo de trabalho principal e são ativados automaticamente no chat quando uma tarefa precisa deles. Não há nada para instalar aqui.",
   "noLocalSkills": "Ainda não há skills de extensão adicionais instaladas localmente",
   "noLocalSkillsHint": "Instale uma no \"Marketplace de Skills\", ou solte um diretório de Skill (com skill.yml) na pasta local de Skills ~/.aiworkdeck/skills/ e clique em \"Reescanear\"",
   "fromPlugin": "Do plugin {pluginId}",

@@ -108,6 +108,8 @@ export default {
   "catalogLoadFailedWithMsg": "モデルリストは一時的に利用できません: {msg}",
   "catalogLoadFailedRetry": "モデルリストは一時的に利用できません。後ほどこのページを開き直して再試行してください",
   "catalogNeedsSignIn": "利用可能なモデルを表示するには、AI WorkDeck アカウントにサインインしてください。",
+  "signInCardText": "サインインすると、AI の利用、デバイス間でのプロジェクト同期、所属する法律事務所のチームへの参加ができます。",
+  "signInCardTitle": "AI WorkDeck にサインイン",
   "networkRegionTitle": "ネットワーク地域",
   "networkRegionNote": "国際ネットワークでのみ利用可能なモデルは、中国本土からアクセスするとプロバイダーに拒否されるため、地域ごとにモデルリストをフィルタリングしています。自動検出ではシステムの国/地域とタイムゾーンを使用します。誤検出の場合はここで手動指定してください。",
   "regionModeLabel": "検出モード",

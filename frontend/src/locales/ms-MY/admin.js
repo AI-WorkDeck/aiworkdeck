@@ -108,6 +108,8 @@ export default {
   "catalogLoadFailedWithMsg": "Senarai model tidak tersedia buat sementara waktu: {msg}",
   "catalogLoadFailedRetry": "Senarai model tidak tersedia buat sementara waktu; buka semula halaman ini nanti untuk mencuba semula",
   "catalogNeedsSignIn": "Log masuk ke akaun AI WorkDeck anda untuk melihat model yang tersedia.",
+  "signInCardText": "Daftar masuk untuk menggunakan AI, menyegerakkan projek merentas peranti anda dan menyertai pasukan firma guaman anda.",
+  "signInCardTitle": "Daftar masuk ke AI WorkDeck",
   "networkRegionTitle": "Rangkaian Wilayah",
   "networkRegionNote": "Model yang hanya tersedia pada rangkaian antarabangsa akan ditolak oleh pembekal apabila diakses dari Tanah Besar China, jadi senarai model ditapis mengikut wilayah. Pengesanan automatik menggunakan negara/wilayah dan zon waktu sistem; nyatakan secara manual di sini jika ia salah.",
   "regionModeLabel": "Mod Pengesanan",
