@@ -1102,6 +1102,7 @@ import { formatUndoFiles, shouldOfferRunUndo, undoResultView } from '@/utils/age
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
+import { stashChatDraft, takeChatDraft } from '@/utils/chatDraftCarry.js'
 import { getCloudWriteHeaders, createFolder, createFile, importLocalFile, getProjectFiles, getApiBaseUrl, getAiHistory, rollbackConversation, performPptGeneration, getSkills, selectBuiltinWorkflowVersion, getCurrentUser as getCurrentUserApi, fetchAiModels, getAiConfig, cancelBackgroundTask, listPluginJobs, cancelPluginJob, getMeetingRecordings, resolveProjectFileByPath } from '@/services/api.js'
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
 import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
@@ -1170,6 +1171,8 @@ export default {
   },
   props: {
     visible: { type: Boolean, default: true },
+    // D11：临时工作区里没发出去的问题，换到下一个项目时带过去（工作台 reLaunch 会整页重挂）
+    carryDraftOnLeave: { type: Boolean, default: false },
     projectId: String,
     projectName: String,
     recentHistory: {
@@ -3871,6 +3874,24 @@ export default {
         .map((b) => String(b.displayContent || b.content || ''))
         .filter((s) => s.trim())
 
+    // D11：草稿跨一次 reLaunch。只在离开临时工作区时存；任何聊天框挂上时取一次（10 分钟内有效）。
+    const draftStorage = {
+      get: (k) => { try { return JSON.parse(sessionStorage.getItem(k) || 'null') } catch (e) { return null } },
+      set: (k, v) => sessionStorage.setItem(k, JSON.stringify(v)),
+      remove: (k) => sessionStorage.removeItem(k),
+    }
+    onBeforeUnmount(() => {
+      if (!props.carryDraftOnLeave || typeof sessionStorage === 'undefined') return
+      stashChatDraft(draftStorage, richInput.value ? richInput.value.innerText : '')
+    })
+    onMounted(() => {
+      if (typeof sessionStorage === 'undefined') return
+      nextTick(() => {
+        if (!richInput.value || (richInput.value.innerText || '').trim()) return
+        const carried = takeChatDraft(draftStorage)
+        if (carried) applyRecall(carried)
+      })
+    })
     const applyRecall = (text) => {
       if (!richInput.value) return
       richInput.value.textContent = text
