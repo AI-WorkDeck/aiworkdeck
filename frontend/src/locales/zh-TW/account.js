@@ -412,7 +412,7 @@ export default {
   "statusRejectedConflict": "衝突駁回",
   "caseNeedPartiesToast": "請先填寫委託人或對方當事人主體",
   "caseNeedTitleAndClientToast": "請填寫案件名稱和委託人主體",
-  "caseSubmitSuccessToast": "立案申請已提交併完成利衝掃描",
+  "caseSubmitSuccessToast": "立案申請已提交並完成利衝掃描",
   "caseClearanceSavedToast": "利衝協查意見已儲存",
   "caseCommitteeSavedToast": "風控委終審裁決已生效",
   "caseInvoiceRequiredToast": "請填寫發票抬頭和開票金額",

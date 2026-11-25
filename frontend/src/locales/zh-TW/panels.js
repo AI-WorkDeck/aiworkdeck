@@ -163,7 +163,7 @@ export default {
   "deStepCreate": "3 產生副本",
   "deSelectedStrategies": "已選 {count} 項",
   "deReviewNotice": "請核查預覽及下方提示，確認後產生副本。",
-  "deWorkflow": "選擇原始檔案 → 預覽併產生副本 → 編輯副本 → 本機復敏。切換文件分頁不會更換左側功能區。",
+  "deWorkflow": "選擇原始檔案 → 預覽並產生副本 → 編輯副本 → 本機復敏。切換文件分頁不會更換左側功能區。",
   "deResultEditing": "已在編輯區開啟去識別化副本，可直接修改。左側所選檔案不會隨文件分頁自動切換。",
   "dePdfResult": "已開啟去識別化 PDF 供核查；該結果為點陣化副本，不支援直接編輯或復敏。",
   "deRestoreResult": "復敏這份結果",
