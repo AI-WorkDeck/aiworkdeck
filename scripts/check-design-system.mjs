@@ -123,6 +123,16 @@ export function expandStyleSources(source, filename) {
   })
 }
 
+/** <style src="…"> 指向的外链样式表内容（按出现顺序；文件不存在的跳过）。 */
+export function externalStyleSheets(source, filename) {
+  const out = []
+  for (const m of source.matchAll(/<style[^>]*?\bsrc=["']([^"']+)["'][^>]*>/g)) {
+    const file = resolve(root, dirname(filename), m[1])
+    if (existsSync(file)) out.push(readFileSync(file, 'utf8'))
+  }
+  return out
+}
+
 export function overBaseline(failures, baseline) {
   const left = new Map()
   for (const b of baseline) left.set(b, (left.get(b) || 0) + 1)
@@ -152,11 +162,10 @@ export function run() {
   const app = readFileSync(resolve(root, 'frontend/src/App.vue'), 'utf8')
   const definedTokens = new Set([...app.matchAll(/(--awd-[\w-]+)\s*:/g)].map(m => m[1]))
   const failures = MIGRATED_FILES.flatMap(f => checkStyles(readFileSync(resolve(root, f), 'utf8'), f, definedTokens))
-  const external = MIGRATED_FILES.flatMap(f => {
-    const raw = readFileSync(resolve(root, f), 'utf8')
-    const expanded = expandStyleSources(raw, f)
-    return expanded === raw ? [] : checkStyles(expanded.replace(/<style(?![^>]*\bsrc=)[^>]*>[\s\S]*?<\/style>/g, (block) => raw.includes(block) ? '' : block), f, definedTokens)
-  })
+  // 只扫外链文件本身（不对 HTML 做二次正则剥离；CodeQL js/incomplete-multi-character-sanitization #375）
+  const external = MIGRATED_FILES.flatMap(f => externalStyleSheets(readFileSync(resolve(root, f), 'utf8'), f)
+    .flatMap(css => checkStyles(`<style>${css}</style>`, f, definedTokens)))
+
   const baselinePath = resolve(root, 'scripts/design-system-baseline.json')
   const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : []
   const { extra, stale } = overBaseline(external, baseline)
