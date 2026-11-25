@@ -140,6 +140,13 @@ export default {
     "autoRetry": "本機服務恢復後會自動重新讀取。讀取完成前無法編輯這份文件。",
     "retry": "重試"
   },
+  "authorPrompt": {
+    "text": "修訂與註解要用什麼名字署名？收到文件的人都會看到這個名字。",
+    "placeholder": "你的名字或事務所名稱",
+    "save": "儲存",
+    "later": "以後再說",
+    "empty": "請填寫名字"
+  },
   "openFailed": {
     "title": "文件無法開啟：引擎無響應或檔案損壞",
     "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",

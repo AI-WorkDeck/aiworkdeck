@@ -109,6 +109,13 @@
       @ai-format="onToolbarAiFormat"
     />
     <!-- 文件保存状态只反映当前编辑内容是否落盘；版本提交与同步在全局面板管理。 -->
+    <view v-if="authorPromptVisible" class="libre-author-prompt" role="region" :aria-label="$t('editor.authorPrompt.text')">
+      <text class="libre-author-prompt-text">{{ $t('editor.authorPrompt.text') }}</text>
+      <input v-model="authorPromptInput" class="libre-author-prompt-input" :maxlength="24" :placeholder="$t('editor.authorPrompt.placeholder')" @confirm="saveAuthorPrompt" />
+      <view class="libre-author-prompt-btn primary" role="button" @tap="saveAuthorPrompt()"><text>{{ $t('editor.authorPrompt.save') }}</text></view>
+      <view class="libre-author-prompt-btn" role="button" @tap="dismissAuthorPrompt"><text>{{ $t('editor.authorPrompt.later') }}</text></view>
+      <text v-if="authorPromptError" class="libre-author-prompt-error">{{ authorPromptError }}</text>
+    </view>
     <view v-if="saveStateText" class="libre-save-bar">
       <view v-if="saveStateText" class="libre-save-state" :class="{ error: isError && !saving }" role="status">
         <text class="libre-save-label" :title="saveStateText">{{ saveStateText }}</text>
@@ -230,7 +237,7 @@ import EditorToolbar from '@/components/EditorToolbar.vue'
 import EvidenceStaleBar from '@/components/EvidenceStaleBar.vue'
 import { createFile, getCloudWriteHeaders, getCheckpointRestoreWriteState, getFileBytesUrl, getFileWriteUrl, listEvidenceLinks, reportEvidenceAnchors, keepEvidenceAnchor, getCurrentUser as fetchAuthUser, getFileLocalPath } from '@/services/api.js'
 import { getAuthHeaders, getCurrentUser } from '@/utils/auth.js'
-import { createAuthorNameResolver, REDLINE_AUTHOR_KEY } from '@/utils/editorAuthor.js'
+import { createAuthorNameResolver, REDLINE_AUTHOR_KEY, MAX_REDLINE_AUTHOR_CHARS, needsAuthorPrompt } from '@/utils/editorAuthor.js'
 import { host } from '@/services/host.js'
 import { watchDownloadDone, displayName } from '@/utils/downloadDone.js'
 import { anchorHash } from '@/utils/anchorHash.js'
@@ -280,6 +287,9 @@ function authorNames() {
   return authorResolver
 }
 function currentAuthorName() { return authorNames().current() }
+// D8：「以后再说」只管本次启动，所有编辑器实例共用（不在每份文档上重复问）。
+let authorPromptDismissed = false
+function readAuthorOverride() { try { return uni.getStorageSync(REDLINE_AUTHOR_KEY) || '' } catch (e) { return '' } }
 // 保存失败后的有界退避（B7）：第 n 次连续失败等 SAVE_RETRY_DELAYS_MS[n]，封顶 60 秒。
 const SAVE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000]
 // 自动保存所需的空闲时长：上次导出耗时的 2 倍，夹在 1.5–8 秒（office-tier1 O8）
@@ -358,6 +368,10 @@ export default {
       // 与下面 load_document 传给引擎的 authorName 同源（currentAuthorName），
       // 两处必须是同一个字符串——否则用户自己的修订会被归成「其他人」。
       selfAuthor: currentAuthorName(),
+      // D8：修订署名还是免登占位名（「Local user」）时，在正文上方请用户填一次
+      authorPromptNeeded: false,
+      authorPromptInput: '',
+      authorPromptError: '',
       // 自建工具栏的激活态刷新信号。由「选区/光标动了」和「文档改了」驱动——
       // 没有轮询：编辑器页把 worker 的选区监听与 IME 覆盖层的光标移动合流成
       // 一个 selection 事件送过来，覆盖了用户能让光标动起来的所有途径。
@@ -512,6 +526,9 @@ export default {
     },
     readRetryable() {
       return shouldRetryReadOnRecovery(this.docLoadFailed, this.statusKey)
+    },
+    authorPromptVisible() {
+      return this.authorPromptNeeded && this.ready && !!this.file && this.docKind === 'writer' && this.canWrite && !this.loadingOverlayVisible
     },
     // 设了打开密码且加密方式受支持（O14）：加载面板显示密码框，不显示「无法打开」
     passwordPromptVisible() {
@@ -765,9 +782,25 @@ export default {
     async resolveRedlineAuthor() {
       let name = ''
       try { name = await authorNames().resolve() } catch (e) { name = '' }
+      this.authorPromptNeeded = needsAuthorPrompt({ override: readAuthorOverride(), resolvedName: name, dismissed: authorPromptDismissed })
       if (!name || name === this.selfAuthor) return
       this.selfAuthor = name
       await this.pushRedlineAuthor(name)
+    },
+    saveAuthorPrompt(e) {
+      const next = String((e && e.detail && e.detail.value) || this.authorPromptInput || '').trim()
+      if (!next) { this.authorPromptError = this.$t('editor.authorPrompt.empty'); return }
+      if (next.length > MAX_REDLINE_AUTHOR_CHARS) { this.authorPromptError = this.$t('account.nicknameTooLong'); return }
+      try { uni.setStorageSync(REDLINE_AUTHOR_KEY, next) } catch (err) { /* storage 不可用时只是不生效 */ }
+      this.authorPromptError = ''
+      this.authorPromptNeeded = false
+      authorNames().refresh()
+      // 与个人设置里改署名同一条广播：所有打开的编辑器都换成新名字
+      uni.$emit('awd:identity-updated')
+    },
+    dismissAuthorPrompt() {
+      authorPromptDismissed = true
+      this.authorPromptNeeded = false
     },
     // 只补署名，不动文档：load_document **不带 bytes** 时 worker 只记下 authorName
     // 就返回（office_thread.js 的 load_document 头两行 + 空字节早退），这是既有契约
@@ -3335,6 +3368,20 @@ export default {
 /* Explicit review overview overlays the native gutter without shrinking the canvas. */
 .libre-review-overview { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; max-width: 100%; box-shadow: -8px 0 24px #00000018; }
 /* 文件保存状态固定在工具栏下面，不随正文滚动。 */
+.libre-author-prompt {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  flex-shrink: 0; padding: 6px 10px; box-sizing: border-box;
+  background: var(--awd-accent-soft); border-bottom: 1px solid var(--awd-border-subtle);
+  font-size: 12px; color: var(--awd-text);
+}
+.libre-author-prompt-text { min-width: 0; }
+.libre-author-prompt-input {
+  width: 160px; height: 24px; padding: 0 8px; box-sizing: border-box; font-size: 12px;
+  border: 1px solid var(--awd-border); border-radius: 4px; background: var(--awd-surface); color: var(--awd-text);
+}
+.libre-author-prompt-btn { padding: 2px 10px; border-radius: 4px; cursor: pointer; color: var(--awd-text-2); }
+.libre-author-prompt-btn.primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
+.libre-author-prompt-error { color: var(--awd-danger); }
 .libre-save-bar {
   display: flex; align-items: center; justify-content: flex-end; gap: 6px;
   height: 22px; flex-shrink: 0; padding: 0 10px; box-sizing: border-box;

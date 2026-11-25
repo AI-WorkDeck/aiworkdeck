@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Tentaremos de novo automaticamente quando o serviço local voltar. O documento não pode ser editado até ser lido.",
     "retry": "Tentar novamente"
   },
+  "authorPrompt": {
+    "text": "Com que nome suas alterações controladas e comentários devem ser assinados? Quem receber o documento verá esse nome.",
+    "placeholder": "Seu nome ou do escritório",
+    "save": "Salvar",
+    "later": "Agora não",
+    "empty": "Digite um nome"
+  },
   "openFailed": {
     "title": "Não é possível abrir o documento: o editor não está respondendo ou o arquivo está danificado",
     "encryptedTitle": "Este arquivo está protegido por senha de abertura, que o editor ainda não consegue abrir. Remova a senha no Excel, Word, PowerPoint ou WPS e abra novamente, ou baixe o original.",

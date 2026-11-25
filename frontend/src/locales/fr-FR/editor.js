@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Nous réessaierons automatiquement dès que le service local sera revenu. Le document ne peut pas être modifié avant d’avoir été lu.",
     "retry": "Réessayer"
   },
+  "authorPrompt": {
+    "text": "Sous quel nom signer vos modifications suivies et commentaires ? Toute personne qui reçoit le document le voit.",
+    "placeholder": "Votre nom ou celui du cabinet",
+    "save": "Enregistrer",
+    "later": "Plus tard",
+    "empty": "Saisissez un nom"
+  },
   "openFailed": {
     "title": "Impossible d’ouvrir le document : l’éditeur ne répond pas ou le fichier est endommagé",
     "encryptedTitle": "Ce fichier est protégé par un mot de passe d’ouverture que l’éditeur ne peut pas encore ouvrir. Supprimez le mot de passe dans Excel, Word, PowerPoint ou WPS puis rouvrez-le, ou téléchargez l’original.",

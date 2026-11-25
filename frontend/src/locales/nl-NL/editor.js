@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Zodra de lokale service terug is, proberen we het automatisch opnieuw. Tot die tijd kan het document niet worden bewerkt.",
     "retry": "Opnieuw proberen"
   },
+  "authorPrompt": {
+    "text": "Met welke naam moeten uw bijgehouden wijzigingen en opmerkingen worden ondertekend? Iedereen die het document ontvangt, ziet deze naam.",
+    "placeholder": "Uw naam of kantoornaam",
+    "save": "Opslaan",
+    "later": "Niet nu",
+    "empty": "Voer een naam in"
+  },
   "openFailed": {
     "title": "Het document kan niet worden geopend: de editor reageert niet of het bestand is beschadigd",
     "encryptedTitle": "Dit bestand is beveiligd met een openingswachtwoord dat de editor nog niet kan openen. Verwijder het wachtwoord in Excel, Word, PowerPoint of WPS en open het opnieuw, of download het origineel.",
