@@ -435,13 +435,13 @@ test('Native Windows baseline directory syntax is bound to known builder lockfil
 })
 
 // CI capacity (readiness 2026-11-25): Actions queues were saturated by superseded PR runs and a Windows
-// installer build on almost every PR. These pin the rules: PR runs cancel their superseded run; master, tags,
-// schedules and manual runs never share a group (run_id), so nothing there is cancelled or superseded; the
+// installer build on almost every PR. These pin the rules: PR runs cancel their superseded run; on master and
+// tags a running run is never cancelled, and pending runs collapse to the newest (one pending per group); the
 // Windows installer build on a PR only runs when dependency-scope says installer contents changed or the PR
 // carries `full-build`; tags still build both platforms and release.
-const CONCURRENCY_GROUP = '${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}'
+const CONCURRENCY_GROUP = '${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}'
 for (const file of ['ci.yml', 'supply-chain.yml', 'desktop-build.yml', 'journeys.yml', 'marketing-screenshots.yml']) {
-  test(`${file}: one run per PR, never cancels master/tags/schedules`, () => {
+  test(`${file}: one run per PR; master/tags never cancel a running run`, () => {
     const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
     assert.ok(wf.concurrency, `${file} needs a concurrency block`)
     assert.strictEqual(wf.concurrency.group, CONCURRENCY_GROUP)

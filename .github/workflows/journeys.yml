@@ -20,9 +20,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  # One run per PR: a new push cancels the superseded run. Everything else (master, tags, schedules,
-  # manual runs) gets a group of its own (run_id), so it is never cancelled or superseded.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  # One run per PR: a new push cancels the superseded run. On master (and tags) a run in progress is
+  # never cancelled; GitHub keeps one pending run per group, so a burst of merges collapses to the
+  # latest commit instead of queueing every one (CI capacity, 2026-11-25).
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   journeys:
