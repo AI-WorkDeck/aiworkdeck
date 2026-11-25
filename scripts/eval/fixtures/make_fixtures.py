@@ -149,3 +149,63 @@ write('contract-long.docx', ''.join([
     p('第九条 其他：本合同一式两份，双方各执一份，自双方签字盖章之日起生效。'),
     p('甲方（盖章）：                乙方（盖章）：'),
 ]))
+
+# ---- robustness-20（lane D 代理稳健性巡检）用的夹具 ----
+# 50 页英文庭审卷宗（虚构）：每页一段正文；关键事实落在固定页码，摘要句据此判分。
+def make_text_pdf(path, pages_text):
+    objs = ['<< /Type /Catalog /Pages 2 0 R >>']
+    n = len(pages_text)
+    kids = ' '.join(f'{3 + i * 2} 0 R' for i in range(n))
+    objs.append(f'<< /Type /Pages /Kids [{kids}] /Count {n} >>')
+    for i, lines in enumerate(pages_text):
+        objs.append(f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents {4 + i * 2} 0 R /Resources << /Font << /F1 {3 + n * 2} 0 R >> >> >>')
+        esc = lambda t: t.replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+        body = ' '.join(f'({esc(t)}) Tj 0 -16 Td' for t in lines)
+        stream = f'BT /F1 11 Tf 60 780 Td {body} ET'
+        objs.append(f'<< /Length {len(stream)} >>\nstream\n{stream}\nendstream')
+    objs.append('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+    out = bytearray(b'%PDF-1.4\n'); offsets = []
+    for k, o in enumerate(objs, 1):
+        offsets.append(len(out)); out += f'{k} 0 obj\n{o}\nendobj\n'.encode('latin-1')
+    xref = len(out)
+    out += f'xref\n0 {len(objs) + 1}\n0000000000 65535 f \n'.encode()
+    for off in offsets: out += f'{off:010d} 00000 n \n'.encode()
+    out += f'trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n'.encode()
+    open(path, 'wb').write(out)
+
+FACTS = {
+    3: ['Claimant: Northwind Components Pte. Ltd. (Singapore). Respondent: Harbor Machinery Co., Ltd. (Shanghai).'],
+    7: ['The Supply Agreement was signed on 14 March 2025 for 40 CNC milling units.'],
+    12: ['Clause 9.2 fixes delivery no later than 30 September 2025, Incoterms CIF Singapore.'],
+    23: ['The last units were delivered on 10 November 2025, 41 days after the agreed date.'],
+    31: ['Respondent invoked force majeure citing a port closure; the notice was sent only on 2 December 2025.'],
+    38: ['Claimant claims liquidated damages of USD 1,250,000 and lost profits of USD 480,000.'],
+    44: ['Clause 17 caps liquidated damages at 10% of the contract price of USD 9,800,000.'],
+    46: ['Seat of arbitration: Singapore. Rules: SIAC Rules 2025. Tribunal of three arbitrators.'],
+}
+pages = []
+for i in range(1, 51):
+    lines = [f'HEARING BUNDLE - Northwind v. Harbor (fictional) - page {i} of 50', '']
+    lines += FACTS.get(i, [])
+    lines += [f'Exhibit C-{i}: correspondence and records filed by the parties, paragraph {i}.{k}.' for k in range(1, 9)]
+    pages.append(lines)
+make_text_pdf(os.path.join(HERE, 'dossier-50p.pdf'), pages)
+
+# 120 条的长合同（约 60 页）：第 47 条与第 98 条的责任上限相互矛盾（100% 对 30%），长文档定位与修改句据此判分。
+huge = [p('总承包合同（虚构示范，长文档）'), p('发包人：示范城建投资有限公司；承包人：样例建设工程有限公司。')]
+for k in range(1, 121):
+    if k == 47:
+        huge.append(p('第四十七条 责任上限：承包人在本合同项下的赔偿责任总额以合同总价的 100% 为限。'))
+    elif k == 98:
+        huge.append(p('第九十八条 责任限制：除故意或重大过失外，承包人的赔偿责任总额不超过合同总价的 30%。'))
+    elif k == 63:
+        huge.append(p('第六十三条 工期：承包人应于开工之日起 540 日内完成全部工程并通过竣工验收。'))
+    else:
+        huge.append(p(f'第{k}条 一般约定：双方应按照诚实信用原则履行本条约定的义务，本条所称事项以附件{k}所列为准，'
+                      f'任何一方未经对方书面同意不得变更本条内容，变更应以书面补充协议形式作出并经双方签章确认。'
+                      f'本条项下的通知应以书面形式送达合同首页所载地址，送达时间以签收之日为准；一方地址变更的，应于变更后三日内书面通知对方。'
+                      f'双方确认已就本条内容进行充分协商，对条款含义不存在误解，本条与附件{k}不一致的，以本条为准。'))
+write('contract-huge.docx', ''.join(huge))
+
+# 损坏的 .docx（不是 zip）：工具失败句用，模型/产品应如实说明打不开，不得卡住或吐异常原文
+open(os.path.join(HERE, 'corrupt.docx'), 'wb').write(b'PK\x03\x04' + bytes((i * 37) % 251 for i in range(4096)))
