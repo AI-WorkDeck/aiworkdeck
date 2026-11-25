@@ -4076,20 +4076,20 @@ try {
         throw new Error('第二栏不是律师乙那一侧（两栏的抬头对不上）: ' + JSON.stringify(clicked.side))
       }
       await page.mouse.click(clicked.x, clicked.y)
-      await sleep(500)
-      const confirmed = await page.evaluate((name) => {
+      // Wait for the confirm button to become clickable, then click it through its handle: puppeteer measures
+      // the box at click time. A coordinate taken earlier could land on the backdrop after the row re-laid
+      // out, which closed the whole dialog (master Journeys flake, run 45672230916).
+      const confirmHandle = await page.waitForFunction((name) => {
         const row = [...document.querySelectorAll('.adopt-dialog .adopt-row')].find((r) => {
           const n = r.querySelector('.adopt-row-name')
           return n && (n.innerText || '').trim() === name
         })
-        if (!row) return null
-        const btn = row.querySelector('.merge-cell-confirm')
-        if (!btn || btn.className.includes('awd-btn-disabled')) return null
-        const rect = btn.getBoundingClientRect()
-        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
-      }, NAME.pptxOverlap)
-      if (!confirmed) throw new Error('演示那一份的「这份就这么定」没有变成可点')
-      await page.mouse.click(confirmed.x, confirmed.y)
+        const btn = row && row.querySelector('.merge-cell-confirm')
+        return btn && !btn.className.includes('awd-btn-disabled') ? btn : null
+      }, { timeout: 10000 }, NAME.pptxOverlap).catch(() => null)
+      if (!confirmHandle) throw new Error('演示那一份的「这份就这么定」没有变成可点')
+      await sleep(300) // let the row finish re-laying out
+      await confirmHandle.asElement().click()
       const merged = await pollUntil(async () => {
         const c = await conflictA()
         const p = mergeRowOf(c, NAME.pptxOverlap)
