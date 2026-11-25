@@ -5088,24 +5088,16 @@ export default {
   z-index: 1;
 }
 
-/* Finder 风格：奇偶行浅色差（尽量克制） */
-.tree-list .tree-item:nth-child(odd) {
-  background-color: color-mix(in srgb, var(--awd-text) 4%, transparent);
-}
-
-.tree-list .tree-item:nth-child(even) {
-  background-color: transparent;
-}
-
+/* D19：不做奇偶行底色——灰白相间读起来像「选中了好几行」。行只有悬停与选中两种底色。 */
 .tree-item:hover {
-  background-color: var(--awd-accent-wash);
+  background-color: var(--awd-panel-hover);
 }
 
 .tree-item:active {
   background-color: var(--awd-accent-soft);
 }
 
-/* Selection stays distinct from both alternating rows and hover. */
+/* Selection stays distinct from hover. */
 .tree-list .tree-item.tree-item-selected {
   background-color: var(--awd-mint) !important; /* Forest Green Lighter Tint - darkened for visibility */
   box-shadow: var(--awd-shadow-card);
