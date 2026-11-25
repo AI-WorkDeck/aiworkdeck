@@ -195,6 +195,10 @@ public class AgentOrchestrator {
         final long connectionEpoch;
         /** 本轮已流出的正文（断线重连恢复快照 / 取消与出错时保存半截内容）。 */
         private final StringBuilder streamContent = new StringBuilder();
+        /** D34：最近一次工具调用是否失败（伪工具 final 无正文时据此决定重试还是收尾）。 */
+        volatile boolean lastToolFailed;
+        /** D34：本轮是否已为「失败后空 final」补过一次「请回复用户」的提醒（每轮至多一次）。 */
+        boolean finalNudged;
         /**
          * 当前助手段已经给用户看过的一切（正文 + 工具过程 + 思考，按发生顺序带时间戳），
          * 以及随消息落库的思考全文（dev-board#1060）。见 {@link TurnStreamTrace}。
@@ -350,6 +354,7 @@ public class AgentOrchestrator {
          */
         void noteToolResult(String toolName, boolean success) {
             if (toolName != null) toolsRun.add(toolName);
+            lastToolFailed = !success;
             if (success && ClientCapabilityService.isDocumentWritingTool(toolName)) {
                 documentEdited = true;
                 documentEdits.incrementAndGet();
@@ -3021,7 +3026,31 @@ public class AgentOrchestrator {
             boolean pseudoFinal = isPseudoFinalCall(aiMessage) && toolRegistry.resolve("final").isEmpty();
             if (pseudoFinal) {
                 log.info("Native pseudo-tool 'final' treated as end of turn for {}", conversationId);
-                aiMessage = dev.langchain4j.data.message.AiMessage.from(aiMessage.text() == null ? "" : aiMessage.text());
+                String text = aiMessage.text() == null ? "" : aiMessage.text();
+                if (text.isBlank()) {
+                    // D34（robustness-20 r14）：模型把整段答复放进 final({"answer": …}) 的参数、正文为空。
+                    // 旧逻辑只留 text()，用户看到「工具失败」之后什么都没有，轮次却记成 FINISHED。
+                    // 参数里有话就当正文发出去；参数里也没有，按空响应重试（不能静默收尾）。
+                    // 参数里也没有：上一步工具失败了，就补一轮「请回复用户」的提醒（每轮一次，同「记住」提醒的做法）——
+                    // 用户此刻只看到一条失败，没有任何交代。不走空响应重试：那条会对用户说「模型返回了空响应」，并不属实。
+                    // 上一步成功（O12：改完幻灯片发空 final）照旧收尾，改动本身就是结果。
+                    String answer = pseudoFinalAnswer(aiMessage);
+                    if (answer.isBlank() && guard.lastToolFailed && !guard.finalNudged) {
+                        guard.finalNudged = true;
+                        log.warn("Blank pseudo-final right after a failed tool in {}, asking for a reply once", conversationId);
+                        messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
+                                "[系统提醒] 你还没有回复用户。请根据上面已经拿到的结果直接回答：说明完成了什么、哪一步没成功以及原因（用通俗的话，不要引用技术报错），需要用户做什么。",
+                                "[System reminder] You have not replied to the user yet. Answer now from the results above: what was done, which step did not succeed and why (in plain words, no technical error text), and what the user needs to do.")));
+                        continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                                depth + 1, executionLog, agentMode, guard);
+                        return;
+                    }
+                    if (!answer.isBlank()) {
+                        sendTextDelta(guard, answer);
+                        text = answer;
+                    }
+                }
+                aiMessage = dev.langchain4j.data.message.AiMessage.from(text);
             }
 
             // 本轮真正成功完成（有内容或有工具调用）：清零瞬时错误重试预算与溢出压缩预算
@@ -4958,6 +4987,37 @@ public class AgentOrchestrator {
         if (aiMessage == null) return true;
         return !aiMessage.hasToolExecutionRequests()
                 && (aiMessage.text() == null || aiMessage.text().isBlank());
+    }
+
+    /** 伪工具 final 参数里的答复正文：常见键（answer/content/text/…）或参数本身就是字符串；取不到返回空串。 */
+    static String pseudoFinalAnswer(dev.langchain4j.data.message.AiMessage aiMessage) {
+        if (aiMessage == null || !aiMessage.hasToolExecutionRequests()) return "";
+        StringBuilder out = new StringBuilder();
+        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+        for (var r : aiMessage.toolExecutionRequests()) {
+            String args = r.arguments();
+            if (args == null || args.isBlank()) continue;
+            String piece = "";
+            try {
+                com.fasterxml.jackson.databind.JsonNode n = om.readTree(args);
+                if (n.isTextual()) {
+                    piece = n.asText();
+                } else if (n.isObject()) {
+                    for (String k : java.util.List.of("answer", "content", "text", "message", "response",
+                            "final_answer", "result", "summary", "output", "reply")) {
+                        if (n.path(k).isTextual() && !n.path(k).asText().isBlank()) { piece = n.path(k).asText(); break; }
+                    }
+                }
+            } catch (Exception e) {
+                // 不是 JSON：参数整体就是正文
+                piece = args;
+            }
+            if (!piece.isBlank()) {
+                if (out.length() > 0) out.append("\n\n");
+                out.append(piece.trim());
+            }
+        }
+        return out.toString();
     }
 
     /** 本轮原生工具调用是否全是名为 final 的伪工具（大小写不敏感）。 */
