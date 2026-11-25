@@ -4,7 +4,7 @@
 // changed document, and not after two failed continues.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { continueDecision, CONTINUE_MIN_CHARS } from '../../src/utils/continueDecision.js'
+import { continueDecision, CONTINUE_MIN_CHARS, weightedLength } from '../../src/utils/continueDecision.js'
 
 const long = 'x'.repeat(CONTINUE_MIN_CHARS)
 const base = { errorKey: 'streamInterrupted', partialText: long }
@@ -32,4 +32,12 @@ test('after two failed continues: Retry only, "cut off again" message', () => {
 test('other failures keep their own message and never offer Continue', () => {
   assert.deepEqual(continueDecision({ errorKey: 'balanceLow', partialText: long }), { offerContinue: false, messageKey: 'balanceLow' })
   assert.deepEqual(continueDecision({ errorKey: 'serverError', partialText: long }), { offerContinue: false, messageKey: 'serverError' })
+})
+
+test('length is weighted: CJK characters count 2.5, so about 80 Chinese characters are enough', () => {
+  assert.equal(weightedLength('ab 中文かなㄱ한'), 3 + 2.5 * 6)
+  assert.equal(continueDecision({ ...base, partialText: '合'.repeat(80) }).offerContinue, true)
+  assert.equal(continueDecision({ ...base, partialText: '合'.repeat(79) }).offerContinue, false)
+  assert.equal(continueDecision({ ...base, partialText: '合'.repeat(40) + 'x'.repeat(100) }).offerContinue, true, 'mixed zh/en')
+  assert.equal(continueDecision({ ...base, partialText: '合'.repeat(40) + 'x'.repeat(99) }).offerContinue, false, 'mixed zh/en')
 })

@@ -4,8 +4,17 @@
 // from where it stopped instead of regenerating the whole turn.
 // Pure module (no uni / vue) so node --test can run it.
 
-/** Below this much received text, Retry is just as good. */
+/** Below this much received text (weighted length, see weightedLength), Retry is just as good. */
 export const CONTINUE_MIN_CHARS = 200
+
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u
+
+/** Length where a CJK character (Han, kana, hangul) counts 2.5 and anything else 1: ~80 Chinese chars = 200 Latin. */
+export function weightedLength(text) {
+  let n = 0
+  for (const ch of String(text || '')) n += CJK.test(ch) ? 2.5 : 1
+  return n
+}
 /** After this many failed continues in a row, offer Retry only. */
 export const CONTINUE_MAX_FAILURES = 2
 
@@ -26,7 +35,7 @@ export function continueDecision(s = {}) {
   if (s.errorKey !== 'streamInterrupted') return { offerContinue: false, messageKey: s.errorKey || 'unknown' }
   if (s.stoppedByUser || s.toolInFlight || s.documentChanged) return plain
   if ((s.failedContinues || 0) >= CONTINUE_MAX_FAILURES) return { offerContinue: false, messageKey: 'streamInterruptedTwice' }
-  if (String(s.partialText || '').trim().length < CONTINUE_MIN_CHARS) return plain
+  if (weightedLength(String(s.partialText || '').trim()) < CONTINUE_MIN_CHARS) return plain
   return { offerContinue: true, messageKey: 'streamInterruptedResumable' }
 }
 
