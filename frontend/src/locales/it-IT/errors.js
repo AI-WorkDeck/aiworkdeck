@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Riprova",
     "details": "Dettagli",
+    "hideDetails": "Nascondi dettagli",
     "continue": "Continua",
     "refresh": "Aggiorna",
     "signIn": "Accedi",

@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Επανάληψη",
     "details": "Λεπτομέρειες",
+    "hideDetails": "Απόκρυψη λεπτομερειών",
     "continue": "Συνέχεια",
     "refresh": "Ανανέωση",
     "signIn": "Σύνδεση",
