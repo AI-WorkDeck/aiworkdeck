@@ -133,13 +133,20 @@ try {
       await page.waitForFunction((q) => [...document.querySelectorAll('.message-row.user')].some((e) => e.innerText.includes(q)), { timeout: 30000 }, QUESTION[locale])
       await page.waitForFunction(() => {
         const a = [...document.querySelectorAll('.message-row.assistant')].pop()
-        return a && a.innerText.trim().length > 15 && !document.querySelector('.stop-btn')
+        return a && (a.querySelector('.awd-inline-error, [role=alert]') || a.innerText.trim().length > 15) && !document.querySelector('.stop-btn')
       }, { timeout: 180000, polling: 1000 })
       const replyMs = Date.now() - t0
-      const reply = await page.evaluate(() => [...document.querySelectorAll('.message-row.assistant')].pop().innerText.trim())
+      const turn = await page.evaluate(() => {
+        const a = [...document.querySelectorAll('.message-row.assistant')].pop()
+        const err = a.querySelector('.awd-inline-error, [role=alert]')
+        return { text: a.innerText.trim(), error: err ? err.innerText.trim() : '' }
+      })
+      const reply = turn.text
       r.reply = reply.slice(0, 400)
-      if (/执行中断|執行中斷|Execution (was )?interrupted|Stream Error|Connection reset/i.test(reply)) {
-        throw new Error('the AI turn ended with an error instead of an answer: ' + reply.split('\n')[0].slice(0, 160))
+      // Errors are detected by structure (the inline error block), not by wording: since the user-facing error
+      // vocabulary (#1679) a failed turn reads like a normal Chinese sentence and would pass a language check.
+      if (turn.error || /执行中断|執行中斷|Execution (was )?interrupted|Stream Error|Connection reset/i.test(reply)) {
+        throw new Error('the AI turn ended with an error instead of an answer: ' + (turn.error || reply).split('\n')[0].slice(0, 160))
       }
       const problem = replyLanguageProblem(locale, reply.split('\n')[0])
       if (problem) throw new Error(problem + ': ' + reply.slice(0, 120))
