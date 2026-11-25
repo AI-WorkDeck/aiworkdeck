@@ -383,6 +383,14 @@ find-or-create，影子项目从 `/api/projects/my` 滤掉）。绑定后两条�
   鉴权与响应风格同 `MobileRelayController`（`X-Session-Id`；成功裸对象，业务错误
   200 + `{code:1,kind,message}`，未登录 4010）。契约写进 `openapi/mobile-v1.yaml`，
   `MobileApiContractTest.billingEndpointsMatchSpec` 守着。
+- 安卓大陆个人 Pro 走微信 APP 支付（官网 PR #91）：`GET /subscription/wxpay/quote`（内部口
+  `pro-quote`，只读、`create=false`，无统一账户回 `available:false, reason:not_connected`）与
+  `POST /subscription/wxpay/order`（`create-pro`，显式购买可 `create=true`；形状同 `/recharge`
+  present=app 再加 `skuId`；查单复用 `/recharge/status`）。都受 `recharge-enabled` 总开关约束。
+  `create-pro` 失败翻译在 `HttpMobileBillingClient.remapCreateProFailure`：503 disabled /
+  channel_unavailable → DISABLED；409 appstore_subscription_active → REJECTED（已有 Apple 订阅）；
+  400 product_mismatch → REJECTED「价格已更新，请重新打开订阅页」（客户端须重新报价，**不是**
+  小程序那句）。护栏 `MobileApiContractTest.wxpayProEndpointsMatchSpec`。
 
 ### 失败分类：判据是「响应体里有没有 `error` 字段」，不是状态码
 

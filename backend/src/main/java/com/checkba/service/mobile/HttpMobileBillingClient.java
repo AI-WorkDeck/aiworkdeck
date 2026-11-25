@@ -158,14 +158,6 @@ public class HttpMobileBillingClient implements MobileBillingClient {
             }
             throw e;
         }
-        Map<String, String> appPay = null;
-        if ("app".equals(json.path("present").asText(null))) {
-            appPay = new LinkedHashMap<>();
-            for (String f : new String[]{"appId", "partnerId", "prepayId", "packageValue",
-                    "nonceStr", "timeStamp", "sign"}) {
-                appPay.put(f, textOrNull(json, f));
-            }
-        }
         return new RechargeOrder(
                 json.path("present").asText(null),
                 json.path("outTradeNo").asText(null),
@@ -177,7 +169,89 @@ public class HttpMobileBillingClient implements MobileBillingClient {
                 textOrNull(json, "paySig"),
                 textOrNull(json, "signature"),
                 textOrNull(json, "appAccountToken"),
-                appPay);
+                appPay(json));
+    }
+
+    /** present=app：七个 OpenSDK PayReq 字段；其它 present 为 null。 */
+    private static Map<String, String> appPay(JsonNode json) {
+        if (!"app".equals(json.path("present").asText(null))) {
+            return null;
+        }
+        Map<String, String> appPay = new LinkedHashMap<>();
+        for (String f : new String[]{"appId", "partnerId", "prepayId", "packageValue",
+                "nonceStr", "timeStamp", "sign"}) {
+            appPay.put(f, textOrNull(json, f));
+        }
+        return appPay;
+    }
+
+    @Override
+    public ProQuote proQuote(String accountId) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("action", "pro-quote");
+        body.put("accountId", accountId);
+        JsonNode json = call(body);
+        if (!json.path("available").asBoolean(false)) {
+            return ProQuote.unavailable(json.path("reason").asText("disabled"));
+        }
+        return new ProQuote(true, null,
+                textOrNull(json, "skuId"),
+                json.path("amountCents").asLong(0),
+                json.path("standardAmountCents").asLong(0),
+                json.path("introEligible").asBoolean(false),
+                json.path("introRemainingMonths").asInt(0),
+                json.path("days").asInt(0));
+    }
+
+    /**
+     * Pro via WeChat APP pay (action=create-pro). Retried like wxpay-app recharge: the same
+     * idempotencyKey makes the website replay the pending order's prepay parameters.
+     * ALREADY_PAID / IDEMPOTENCY_CONFLICT (with outTradeNo) come straight from {@link #parse}.
+     */
+    @Override
+    public RechargeOrder createPro(String accountId, String skuId, long amountCents, String idempotencyKey) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("action", "create-pro");
+        body.put("accountId", accountId);
+        body.put("skuId", skuId);
+        body.put("amountCents", amountCents);
+        body.put("idempotencyKey", idempotencyKey);
+        JsonNode json;
+        try {
+            json = callWithRetry(body);
+        } catch (MobileBillingException e) {
+            throw remapCreateProFailure(e);
+        }
+        return new RechargeOrder(
+                json.path("present").asText(null),
+                json.path("outTradeNo").asText(null),
+                json.path("amountCents").asLong(0),
+                null, null, null, null, null, null, null,
+                appPay(json));
+    }
+
+    private MobileBillingException remapCreateProFailure(MobileBillingException e) {
+        String err = e.getMachineError();
+        // 503 disabled / channel_unavailable: this purchase path is off, not a transient fault.
+        if (e.getKind() == MobileBillingKind.UNAVAILABLE
+                && ("disabled".equals(err) || "channel_unavailable".equals(err))) {
+            return new MobileBillingException(MobileBillingKind.DISABLED,
+                    LangText.of("App 内购买 Pro 暂未开通", "Buying Pro in the app is not available yet"),
+                    err);
+        }
+        if (e.getKind() == MobileBillingKind.REJECTED && "appstore_subscription_active".equals(err)) {
+            return new MobileBillingException(MobileBillingKind.REJECTED,
+                    LangText.of("你已有有效的 Apple Pro 订阅，无需重复购买；如需管理请前往 Apple 账户设置",
+                            "You already have an active Apple Pro subscription; manage it in your Apple account settings"),
+                    err);
+        }
+        // Stale quote: the client must re-quote, not update the mini program.
+        if (e.getKind() == MobileBillingKind.REJECTED && "product_mismatch".equals(err)) {
+            return new MobileBillingException(MobileBillingKind.REJECTED,
+                    LangText.of("价格已更新，请重新打开订阅页", "The price has changed; please reopen the subscription page"),
+                    err);
+        }
+        return e;
     }
 
     @Override

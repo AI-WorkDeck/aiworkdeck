@@ -219,6 +219,32 @@ public interface MobileBillingClient {
     }
 
     /**
+     * Personal Pro via WeChat APP pay (Android mainland). {@code available=false} carries
+     * {@code reason} ∈ {disabled, channel_unavailable, appstore_subscription_active, not_connected};
+     * the remaining fields are only meaningful when available. The website is the price authority.
+     */
+    record ProQuote(boolean available, String reason, String skuId, long amountCents,
+                    long standardAmountCents, boolean introEligible, int introRemainingMonths, int days) {
+        public static ProQuote unavailable(String reason) {
+            return new ProQuote(false, reason, null, 0, 0, false, 0, 0);
+        }
+    }
+
+    /** Quote for buying Pro with WeChat APP pay (action=pro-quote). Read-only. */
+    default ProQuote proQuote(String accountId) {
+        return ProQuote.unavailable("disabled");
+    }
+
+    /**
+     * Create a Pro order paid with WeChat APP pay (action=create-pro); the response is
+     * present=app with the seven PayReq fields, payment status via {@link #queryRecharge}.
+     */
+    default RechargeOrder createPro(String accountId, String skuId, long amountCents, String idempotencyKey) {
+        throw new MobileBillingException(MobileBillingKind.DISABLED, com.checkba.service.LangText.of(
+                "App 内购买 Pro 暂未开通", "Buying Pro in the app is not available yet"));
+    }
+
+    /**
      * 删除官网侧的统一账户（action=delete-account，dev-board#434）。
      *
      * <p><b>为什么必须有</b>：手机端一旦能在官网建号（充值前先要有 accountId），就落入

@@ -669,4 +669,102 @@ class HttpMobileBillingClientTest {
                 "{\"balanceCents\":0,\"currency\":\"CNY\",\"plan\":\"free\"}").balance("a").plan());
         assertNull(stubbed(200, "{\"balanceCents\":0,\"currency\":\"CNY\"}").balance("a").plan());
     }
+
+    // ==================== Pro via WeChat APP pay ====================
+
+    @Test
+    @DisplayName("pro-quote: request carries action + accountId; available and unavailable shapes parse")
+    void proQuoteRequestAndShapes() throws Exception {
+        HttpMobileBillingClient c = stubbed(200, "{\"available\":true,\"skuId\":\"pro_monthly_intro\","
+                + "\"amountCents\":9900,\"standardAmountCents\":14900,\"introEligible\":true,"
+                + "\"introRemainingMonths\":3,\"days\":30}");
+        MobileBillingClient.ProQuote q = c.proQuote("acct-x");
+        var sent = om.readTree(lastRequest.get());
+        assertEquals("pro-quote", sent.path("action").asText());
+        assertEquals("acct-x", sent.path("accountId").asText());
+        assertEquals(2, sent.size(), sent.toString());
+        assertEquals(new MobileBillingClient.ProQuote(true, null, "pro_monthly_intro", 9900, 14900, true, 3, 30), q);
+
+        stubBody.set("{\"available\":false,\"reason\":\"appstore_subscription_active\"}");
+        assertEquals(MobileBillingClient.ProQuote.unavailable("appstore_subscription_active"), c.proQuote("acct-x"));
+    }
+
+    @Test
+    @DisplayName("create-pro: body shape and present=app PayReq fields come back")
+    void createProRequestAndAppPay() throws Exception {
+        HttpMobileBillingClient c = stubbed(200,
+                "{\"present\":\"app\",\"outTradeNo\":\"OT-pro-1\",\"amountCents\":9900,\"skuId\":\"pro_monthly_intro\","
+                        + "\"appId\":\"wxapp1\",\"partnerId\":\"1900000001\",\"prepayId\":\"wx123\","
+                        + "\"packageValue\":\"Sign=WXPay\",\"nonceStr\":\"n0nce\",\"timeStamp\":\"1760000000\","
+                        + "\"sign\":\"c2lnbg==\"}");
+        MobileBillingClient.RechargeOrder order = c.createPro("acct-x", "pro_monthly_intro", 9900, "idem-pro-0001");
+
+        var sent = om.readTree(lastRequest.get());
+        assertEquals("create-pro", sent.path("action").asText());
+        assertEquals("acct-x", sent.path("accountId").asText());
+        assertEquals("pro_monthly_intro", sent.path("skuId").asText());
+        assertEquals(9900, sent.path("amountCents").asLong());
+        assertEquals("idem-pro-0001", sent.path("idempotencyKey").asText());
+        assertEquals(5, sent.size(), sent.toString());
+        assertEquals("app", order.present());
+        assertEquals("OT-pro-1", order.outTradeNo());
+        assertEquals(9900, order.amountCents());
+        assertEquals("wx123", order.appPay().get("prepayId"));
+        assertEquals("c2lnbg==", order.appPay().get("sign"));
+        assertEquals(7, order.appPay().size());
+    }
+
+    @Test
+    @DisplayName("create-pro retries once on network failure (same idempotency key)")
+    void createProRetries() {
+        HttpMobileBillingClient c = stubbed(200, "{}");
+        stubDrop.set(true);
+        assertEquals(MobileBillingKind.UNAVAILABLE, assertThrows(MobileBillingException.class,
+                () -> c.createPro("acct-x", "pro_monthly", 14900, "idem-pro-0002")).getKind());
+        assertEquals(2, hits.get());
+    }
+
+    @Test
+    @DisplayName("create-pro error mapping: 503 disabled/channel_unavailable, 409 appstore, 400 product_mismatch, 409 paid")
+    void createProErrorMapping() {
+        for (String err : new String[]{"disabled", "channel_unavailable"}) {
+            MobileBillingException off = assertThrows(MobileBillingException.class,
+                    () -> stubbed(503, "{\"error\":\"" + err + "\"}")
+                            .createPro("acct-x", "pro_monthly", 14900, "idem-pro-0003"));
+            assertEquals(MobileBillingKind.DISABLED, off.getKind(), err);
+            assertEquals(err, off.getMachineError());
+            assertEquals("App 内购买 Pro 暂未开通", off.getMessage());
+        }
+
+        MobileBillingException apple = assertThrows(MobileBillingException.class,
+                () -> stubbed(409, "{\"error\":\"appstore_subscription_active\"}")
+                        .createPro("acct-x", "pro_monthly", 14900, "idem-pro-0004"));
+        assertEquals(MobileBillingKind.REJECTED, apple.getKind());
+        assertEquals("appstore_subscription_active", apple.getMachineError());
+        assertTrue(apple.getMessage().startsWith("你已有有效的 Apple Pro 订阅"), apple.getMessage());
+
+        MobileBillingException stale = assertThrows(MobileBillingException.class,
+                () -> stubbed(400, "{\"error\":\"product_mismatch\",\"skuId\":\"pro_monthly\",\"amountCents\":14900}")
+                        .createPro("acct-x", "pro_monthly_intro", 9900, "idem-pro-0005"));
+        assertEquals(MobileBillingKind.REJECTED, stale.getKind());
+        assertEquals("product_mismatch", stale.getMachineError());
+        assertEquals("价格已更新，请重新打开订阅页", stale.getMessage());
+
+        MobileBillingException paid = assertThrows(MobileBillingException.class,
+                () -> stubbed(409, "{\"error\":\"order_already_paid\",\"outTradeNo\":\"OT-pro-paid\"}")
+                        .createPro("acct-x", "pro_monthly", 14900, "idem-pro-0006"));
+        assertEquals(MobileBillingKind.ALREADY_PAID, paid.getKind());
+        assertEquals("OT-pro-paid", paid.getOutTradeNo());
+
+        MobileBillingException conflict = assertThrows(MobileBillingException.class,
+                () -> stubbed(409, "{\"error\":\"idempotency_conflict\",\"outTradeNo\":\"OT-pro-c\"}")
+                        .createPro("acct-x", "pro_monthly", 14900, "idem-pro-0007"));
+        assertEquals(MobileBillingKind.IDEMPOTENCY_CONFLICT, conflict.getKind());
+        assertEquals("OT-pro-c", conflict.getOutTradeNo());
+
+        // A generic 5xx without a known error stays UNAVAILABLE (not swallowed as DISABLED)
+        assertEquals(MobileBillingKind.UNAVAILABLE, assertThrows(MobileBillingException.class,
+                () -> stubbed(500, "{\"error\":\"internal\"}")
+                        .createPro("acct-x", "pro_monthly", 14900, "idem-pro-0008")).getKind());
+    }
 }

@@ -115,6 +115,9 @@ public class MobileBillingService {
     /** 安卓微信支付 APP 支付通道（dev-board#428）：只要金额，不要档位 / wxCode。 */
     private static final String CHANNEL_WXPAY_APP = "wxpay-app";
 
+    /** Pro via WeChat APP pay: the two website SKUs (intro price / standard monthly). */
+    private static final java.util.Set<String> PRO_SKUS = java.util.Set.of("pro_monthly_intro", "pro_monthly");
+
     /** 微信道具 id 围栏。只做形态把关，<b>价格权威在官网</b>（不符时官网回 product_mismatch）。 */
     private static final Pattern PRODUCT_ID = Pattern.compile("^[a-z0-9_]{1,64}$");
 
@@ -406,6 +409,49 @@ public class MobileBillingService {
                 accountId -> billing.confirmAppstoreSubscription(accountId, jws));
         if ("CONFIRMED".equals(result.status())) balanceCache.remove(userId);
         return result;
+    }
+
+    /**
+     * Pro via WeChat APP pay: quote. A read, so it never creates an account (like
+     * {@link #appstoreSubscriptionCapability}): a user without a unified account gets
+     * {@code available=false, reason=not_connected}.
+     */
+    public MobileBillingClient.ProQuote proQuote(Long userId) {
+        if (!rechargeEnabled) return MobileBillingClient.ProQuote.unavailable("disabled");
+        try {
+            return callWithAccount(userId, false, true, billing::proQuote);
+        } catch (MobileBillingFailureException e) {
+            if (e.getKind() != MobileBillingKind.NOT_CONNECTED) throw e;
+            return MobileBillingClient.ProQuote.unavailable("not_connected");
+        }
+    }
+
+    /**
+     * Pro via WeChat APP pay: create the order. An explicit purchase, so it may create the
+     * account ({@code create=true}, as {@link #prepareAppstoreSubscription}). Price authority
+     * stays on the website: a stale skuId/amount comes back as REJECTED (product_mismatch).
+     */
+    public MobileBillingClient.RechargeOrder createPro(Long userId, String skuId, Long amountCents,
+                                                       String idempotencyKey) {
+        requireRechargeEnabled();
+        String sku = trimToNull(skuId);
+        if (sku == null || !PRO_SKUS.contains(sku)) {
+            throw new IllegalArgumentException(LangText.of(
+                    "缺少或非法的订阅档位，请重新打开订阅页",
+                    "Missing or invalid subscription option; please reopen the subscription page"));
+        }
+        if (amountCents == null || amountCents <= 0) {
+            throw new IllegalArgumentException(LangText.of(
+                    "金额必须大于 0", "Amount must be greater than 0"));
+        }
+        String key = idempotencyKey == null ? "" : idempotencyKey.trim();
+        if (!IDEMPOTENCY_KEY.matcher(key).matches()) {
+            throw new IllegalArgumentException(LangText.of(
+                    "缺少或非法的 idempotencyKey，请升级客户端后重试",
+                    "Missing or invalid idempotencyKey; please update the app and try again"));
+        }
+        return callWithAccount(userId, true, false,
+                accountId -> billing.createPro(accountId, sku, amountCents, key));
     }
 
     // ==================== 身份解析 ====================

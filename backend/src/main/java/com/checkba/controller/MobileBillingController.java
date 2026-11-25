@@ -224,6 +224,63 @@ public class MobileBillingController {
                 request == null ? null : request.getSignedTransaction());
     }
 
+    /**
+     * GET /subscription/wxpay/quote → {available:false, reason} or {available:true, skuId,
+     * amountCents, standardAmountCents, introEligible, introRemainingMonths, days}.
+     */
+    @GetMapping("/subscription/wxpay/quote")
+    public Map<String, Object> wxpayProQuote(
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        MobileBillingClient.ProQuote q = service.proQuote(requireUser(sessionId));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("available", q.available());
+        if (!q.available()) {
+            out.put("reason", q.reason());
+            return out;
+        }
+        out.put("skuId", q.skuId());
+        out.put("amountCents", q.amountCents());
+        out.put("standardAmountCents", q.standardAmountCents());
+        out.put("introEligible", q.introEligible());
+        out.put("introRemainingMonths", q.introRemainingMonths());
+        out.put("days", q.days());
+        return out;
+    }
+
+    @Data
+    public static class ProOrderRequest {
+        /** pro_monthly_intro / pro_monthly, taken from the latest quote. */
+        private String skuId;
+        /** The quoted amount; the website rejects a stale one with product_mismatch. */
+        private Long amountCents;
+        /** Client-generated and persisted before the call, as for /recharge. */
+        private String idempotencyKey;
+    }
+
+    /**
+     * POST /subscription/wxpay/order → same shape as POST /recharge (present=app + seven
+     * PayReq fields) plus skuId. Payment status via GET /recharge/status.
+     */
+    @PostMapping("/subscription/wxpay/order")
+    public Map<String, Object> wxpayProOrder(
+            @RequestBody(required = false) ProOrderRequest request,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = requireUser(sessionId);
+        String skuId = request == null ? null : request.getSkuId();
+        MobileBillingClient.RechargeOrder order = service.createPro(userId, skuId,
+                request == null ? null : request.getAmountCents(),
+                request == null ? null : request.getIdempotencyKey());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("present", order.present());
+        out.put("outTradeNo", order.outTradeNo());
+        out.put("amountCents", order.amountCents());
+        out.put("skuId", skuId.trim());
+        if (order.appPay() != null) {
+            order.appPay().forEach((k, v) -> putIfPresent(out, k, v));
+        }
+        return out;
+    }
+
     private static void putIfPresent(Map<String, Object> out, String key, String value) {
         if (value != null && !value.isEmpty()) {
             out.put(key, value);
