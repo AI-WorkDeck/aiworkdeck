@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Kandungan dokumen {loaded} / {total}",
   "dlLoadedOnly": "Membaca {size} kandungan dokumen",
   "firstOpenHint": "Pembukaan pertama memulakan enjin dokumen; dokumen besar mungkin mengambil sedikit masa",
+  "readFailed": {
+    "autoRetry": "Kami akan cuba semula secara automatik apabila perkhidmatan setempat kembali. Dokumen tidak boleh disunting sehingga ia dibaca.",
+    "retry": "Cuba lagi"
+  },
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: penyunting tidak memberi respons atau fail rosak",
     "encryptedTitle": "Fail ini dilindungi kata laluan pembukaan yang belum boleh dibuka oleh penyunting. Buang kata laluan dalam Excel, Word, PowerPoint atau WPS dan buka semula, atau muat turun fail asal.",

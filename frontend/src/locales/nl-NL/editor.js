@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Documentinhoud {loaded} / {total}",
   "dlLoadedOnly": "{size} aan documentinhoud gelezen",
   "firstOpenHint": "Bij het eerste openen wordt de document-engine geïnitialiseerd; grote documenten kunnen even duren",
+  "readFailed": {
+    "autoRetry": "Zodra de lokale service terug is, proberen we het automatisch opnieuw. Tot die tijd kan het document niet worden bewerkt.",
+    "retry": "Opnieuw proberen"
+  },
   "openFailed": {
     "title": "Het document kan niet worden geopend: de editor reageert niet of het bestand is beschadigd",
     "encryptedTitle": "Dit bestand is beveiligd met een openingswachtwoord dat de editor nog niet kan openen. Verwijder het wachtwoord in Excel, Word, PowerPoint of WPS en open het opnieuw, of download het origineel.",

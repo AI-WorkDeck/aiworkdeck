@@ -24,6 +24,21 @@ export const STATUS_DOWNLOAD_FAILED = 'downloadFailed'
 /** 引擎侧装载失败（含 relay 超时）——原有文案，保持不变。 */
 export const STATUS_LOAD_FAILED = 'loadFailed'
 
+/**
+ * 读取失败（D2）：文档字节没拿到或没装进引擎，画布上只是 boot 出来的空白原型。
+ * 这时必须整块盖住画布——露出来会让人以为文档是空的、还能往里打字，而保存闸
+ * （docLoadFailed）会把这些字悄悄丢掉。
+ * @param {boolean} docLoadFailed @param {string} statusKey
+ */
+export function isReadFailure(docLoadFailed, statusKey) {
+  return !!docLoadFailed && (statusKey === STATUS_DOWNLOAD_FAILED || statusKey === STATUS_LOAD_FAILED || statusKey === STATUS_FILE_MISSING)
+}
+
+/** 本机服务恢复后要不要自动重读。文件已不在磁盘上时重读没有意义。 */
+export function shouldRetryReadOnRecovery(docLoadFailed, statusKey) {
+  return isReadFailure(docLoadFailed, statusKey) && statusKey !== STATUS_FILE_MISSING
+}
+
 function textOf(err) {
   if (err == null) return ''
   if (typeof err === 'string') return err

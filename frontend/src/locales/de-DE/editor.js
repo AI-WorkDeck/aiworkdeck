@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Dokumentinhalt {loaded} / {total}",
   "dlLoadedOnly": "{size} Dokumentinhalt gelesen",
   "firstOpenHint": "Beim ersten Öffnen wird die Dokument-Engine initialisiert; große Dokumente können einen Moment dauern",
+  "readFailed": {
+    "autoRetry": "Sobald der lokale Dienst wieder läuft, versuchen wir es automatisch erneut. Bis dahin kann das Dokument nicht bearbeitet werden.",
+    "retry": "Erneut versuchen"
+  },
   "openFailed": {
     "title": "Das Dokument kann nicht geöffnet werden: Der Editor reagiert nicht oder die Datei ist beschädigt",
     "encryptedTitle": "Diese Datei ist mit einem Öffnungskennwort geschützt, das der Editor noch nicht öffnen kann. Entfernen Sie das Kennwort in Excel, Word, PowerPoint oder WPS und öffnen Sie sie erneut, oder laden Sie das Original herunter.",

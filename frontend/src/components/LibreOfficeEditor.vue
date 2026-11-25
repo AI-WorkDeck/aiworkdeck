@@ -44,7 +44,15 @@
           <text>{{ $t('editor.openFailed.retry') }}</text>
         </view>
       </view>
-      <view v-if="(!previewReady || chromeInitFailed) && !openFailed" class="libre-loading-card">
+      <view v-if="readFailed && !openFailed" class="libre-loading-card libre-open-failed" role="alert">
+        <text class="libre-loading-name">{{ loadingTitle }}</text>
+        <text class="libre-loading-error">{{ $t('editor.status.' + statusKey) }}</text>
+        <text v-if="readRetryable" class="libre-loading-dl">{{ $t('editor.readFailed.autoRetry') }}</text>
+        <view v-if="readRetryable" class="libre-loading-retry" @click="retryLoad">
+          <text>{{ $t('editor.readFailed.retry') }}</text>
+        </view>
+      </view>
+      <view v-if="(!previewReady || chromeInitFailed) && !openFailed && !readFailed" class="libre-loading-card">
         <view class="libre-doc-icon">
           <view class="doc-fold"></view>
           <view class="doc-line l1"></view>
@@ -215,7 +223,7 @@
 import { beginDocumentSave, checkpointSaveBarrier, documentCheckpointGeneration, reconcileCheckpointSaveBarrier } from '@/utils/checkpointSaveBarrier.js'
 import { webviewTransport, iframeTransport } from '@/composables/useZetaOfficeWebview.js'
 import { createRelayExecutor, PROBE_ACTION, PROBE_BUDGET_MS } from '@/composables/zetaOfficeRelay.js'
-import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED, DIAG_DOC_REJECTED, DIAG_DOC_ENCRYPTED, isEncryptedOoxml } from '@/utils/editorLoadFailure.js'
+import { classifyLoadFailure, shouldSelfHealLoadFailure, loadBudgetMs, openFailureOf, STATUS_OPEN_FAILED, DIAG_DOC_REJECTED, DIAG_DOC_ENCRYPTED, isEncryptedOoxml, isReadFailure, shouldRetryReadOnRecovery } from '@/utils/editorLoadFailure.js'
 import ReviewPanel from '@/components/ReviewPanel.vue'
 import OfficeNavigation from '@/components/OfficeNavigation.vue'
 import EditorToolbar from '@/components/EditorToolbar.vue'
@@ -498,6 +506,13 @@ export default {
     openFailed() {
       return this.statusKey === STATUS_OPEN_FAILED
     },
+    // 读取失败（D2）：盖住空白原型画布，说清原因并给重试；本机服务恢复后自动重读。
+    readFailed() {
+      return isReadFailure(this.docLoadFailed, this.statusKey)
+    },
+    readRetryable() {
+      return shouldRetryReadOnRecovery(this.docLoadFailed, this.statusKey)
+    },
     // 设了打开密码且加密方式受支持（O14）：加载面板显示密码框，不显示「无法打开」
     passwordPromptVisible() {
       return this.openFailCode === DIAG_DOC_ENCRYPTED && this.passwordState !== 'unsupported'
@@ -516,6 +531,7 @@ export default {
       // 「文档无法打开」是终态，但原因与出路（只读预览 / 下载 / 重试）只有这块地方能放；
       // 画布上是 boot 出来的空白原型，露出来只会让人以为文档是空的。
       if (this.statusKey === STATUS_OPEN_FAILED) return true
+      if (this.readFailed) return true
       // 「仅桌面版可用」是终态（h5 预览等场景），不是加载中——不展示进度面板。
       // boot 失败是唯一保留面板的失败态：原因与重试按钮都只有这块地方能放。
       if (this.statusKey === 'bootFailed') return !this.ready
@@ -709,8 +725,12 @@ export default {
       if (this._backendHealthDisposed || !snapshot || typeof snapshot.state !== 'string') return
       if (this.backendHealthState?.updatedAt && snapshot.updatedAt < this.backendHealthState.updatedAt) return
       let recovered = false
-      if (snapshot.state === 'healthy' && snapshot.ok === true && ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state)) {
+      // 自动重启的序列是 degraded → restarting → starting → healthy：只看「上一条」会被中间那条
+      // starting 挡住，恢复永远认不出来（D2）。记住「上次健康之后掉过线」，回到健康即算恢复。
+      if (['degraded', 'restarting', 'failed'].includes(snapshot.state)) this._backendWasDown = true
+      if (snapshot.state === 'healthy' && snapshot.ok === true && (this._backendWasDown || ['degraded', 'restarting', 'failed'].includes(this.backendHealthState?.state))) {
         this.backendHealthRecoverySeq = (this.backendHealthRecoverySeq || 0) + 1
+        this._backendWasDown = false
         recovered = true
       }
       observeLocalContentBackend(snapshot)
@@ -719,6 +739,11 @@ export default {
       // 即使迟到，也会被后端 STALE_SAVE 围栏拒绝，不会盖掉这次补存。其余闸门照旧由
       // autoRetrySave 把关（放弃、检查点失效、重载、只能手动的失败类别都不补存）。
       if (recovered && this.backendSaveRetryReady()) this.autoRetrySave()
+      // 读取失败的那份文档（D2）：服务回来了就自己重读，不让人对着错误卡片干等。
+      if (recovered && this.readRetryable) {
+        this.appendLog('本机服务恢复，自动重读 / backend recovered, retrying document read')
+        this.retryLoad()
+      }
     },
     invalidateBackendSaveHint() {
       this.backendFailedUpload = null

@@ -136,6 +136,10 @@ export default {
   "dlProgress": "文件內容 {loaded} / {total}",
   "dlLoadedOnly": "已讀取文件內容 {size}",
   "firstOpenHint": "首次開啟需初始化文件引擎，大文件會稍慢，請稍候",
+  "readFailed": {
+    "autoRetry": "本機服務恢復後會自動重新讀取。讀取完成前無法編輯這份文件。",
+    "retry": "重試"
+  },
   "openFailed": {
     "title": "文件無法開啟：引擎無響應或檔案損壞",
     "encryptedTitle": "這個檔案設定了開啟密碼，編輯器暫時無法直接開啟。請在 Excel / Word / PowerPoint 或 WPS 中移除開啟密碼後再開啟，或下載原始檔案。",

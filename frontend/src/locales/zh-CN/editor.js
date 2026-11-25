@@ -143,6 +143,10 @@ export default {
   dlLoadedOnly: '已读取文档内容 {size}',
   firstOpenHint: '首次打开需初始化文档引擎，大文档会稍慢，请稍候',
   // 「文档无法打开」终态（dev-board#1018）：引擎拒收损坏文件，或重启重装后仍无响应。
+  readFailed: {
+    autoRetry: "本机服务恢复后会自动重新读取。读取完成前不能编辑这份文档。",
+    retry: "重试",
+  },
   openFailed: {
     title: '文档无法打开：引擎无响应或文件损坏',
     encryptedTitle: '这个文件设置了打开密码，编辑器暂不能直接打开。请在 Excel / Word / PowerPoint 或 WPS 中去掉打开密码后再打开，或下载原文件。',
