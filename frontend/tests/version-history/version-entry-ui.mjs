@@ -109,7 +109,7 @@ try {
     await page.waitForSelector('.switcher-item-name')
     await page.click('.switcher-item-name')
     await page.waitForSelector('.awd-dlg--sheet', { visible: true })
-    assert.deepEqual(await page.$$eval('.awd-dlg button', nodes => nodes.map(n => n.textContent)), ['提交并退出', '直接退出', '取消'])
+    assert.deepEqual(await page.$$eval('.awd-dlg button', nodes => nodes.map(n => n.textContent)), ['保存版本并退出', '不保存版本，直接退出', '取消'])
   }
   await reopen()
   await leave()
@@ -136,7 +136,7 @@ try {
   delayCommit = true
   await leave()
   await page.click('.awd-dlg__item')
-  await page.waitForFunction(() => document.body.innerText.includes('正在提交改动（2/3）'))
+  await page.waitForFunction(() => document.body.innerText.includes('正在保存版本（2/3）'))
   assert.match(page.url(), /id=42/)
   assert.equal(commits, 3)
   assert.equal(typeof finishCommit, 'function')
