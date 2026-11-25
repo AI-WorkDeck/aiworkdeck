@@ -3039,7 +3039,7 @@ public class AgentOrchestrator {
                         guard.finalNudged = true;
                         log.warn("Blank pseudo-final right after a failed tool in {}, asking for a reply once", conversationId);
                         messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
-                                "[系统提醒] 你还没有回复用户。请根据上面已经拿到的结果直接回答：说明完成了什么、哪一步没成功以及原因（用通俗的话，不要引用技术报错），需要用户做什么。",
+                                "【系统提醒】你还没有回复用户。请根据上面已经拿到的结果直接回答：说明完成了什么、哪一步没成功以及原因（用通俗的话，不要引用技术报错），需要用户做什么。",
                                 "[System reminder] You have not replied to the user yet. Answer now from the results above: what was done, which step did not succeed and why (in plain words, no technical error text), and what the user needs to do.")));
                         continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                                 depth + 1, executionLog, agentMode, guard);
