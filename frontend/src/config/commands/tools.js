@@ -8,7 +8,7 @@
 export const TOOLS_COMMANDS = [
   {
     id: 'tools.ocrCapture',
-    label: { zh: '截图取词', en: 'Screen Capture OCR' },
+    label: { zh: '截图取词', 'zh-TW': '截圖取詞', en: 'Screen Capture OCR' },
     accel: 'Alt+CmdOrCtrl+4',
     menu: 'tools', group: 1,
     when: ['workbench', 'notClient'],
@@ -16,14 +16,14 @@ export const TOOLS_COMMANDS = [
   },
   {
     id: 'tools.newBrowserTab',
-    label: { zh: '新建浏览器标签', en: 'New Browser Tab' },
+    label: { zh: '新建浏览器标签', 'zh-TW': '新增瀏覽器分頁', en: 'New Browser Tab' },
     menu: 'tools', group: 1,
     when: ['workbench', 'notClient'],
     run: 'wb:openBrowserTab',
   },
   {
     id: 'tools.activityRecord',
-    label: { zh: '工作记录', en: 'Activity Log' },
+    label: { zh: '工作记录', 'zh-TW': '工作記錄', en: 'Activity Log' },
     menu: 'tools', group: 1,
     type: 'checkbox', checked: 'recording',
     when: ['workbench', 'notClient'],
@@ -32,7 +32,7 @@ export const TOOLS_COMMANDS = [
 
   {
     id: 'tools.feedback',
-    label: { zh: '反馈…', en: 'Send Feedback…' },
+    label: { zh: '反馈…', 'zh-TW': '意見回饋…', en: 'Send Feedback…' },
     menu: 'tools', group: 3,
     run: 'app:openFeedback',
   },
