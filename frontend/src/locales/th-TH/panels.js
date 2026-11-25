@@ -301,6 +301,8 @@ export default {
   "bpForward": "ไปข้างหน้า",
   "bpRefresh": "รีเฟรช",
   "bpUrlPlaceholder": "ป้อน URL (https://…)",
+  "bpNewTabTitle": "แท็บใหม่",
+  "bpNewTabHint": "พิมพ์ที่อยู่เว็บในแถบด้านบน",
   "bpOpen": "เปิด",
   "bpNewTab": "แท็บใหม่",
   "bpSwitchToDesktop": "สลับกลับไปมุมมองเดสก์ท็อป",

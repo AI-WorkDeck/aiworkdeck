@@ -301,6 +301,8 @@ export default {
   "bpForward": "前進",
   "bpRefresh": "重新整理",
   "bpUrlPlaceholder": "輸入網址（https://...）",
+  "bpNewTabTitle": "新分頁",
+  "bpNewTabHint": "在上方網址列輸入網址。",
   "bpOpen": "開啟",
   "bpNewTab": "新標籤頁",
   "bpSwitchToDesktop": "切換回桌面版",

@@ -6240,11 +6240,11 @@ export default {
       // - 否则：复制当前文件（后端 batchCopy），并打开新文件
       const active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
       if (active && this.isBrowserTab(active)) {
-        this.openBrowserTab('https://www.baidu.com', pane)
+        this.openBrowserTab('', pane)
         return
       }
       if (!active || !active.id || !this.projectId) {
-        this.openBrowserTab('https://www.baidu.com', pane)
+        this.openBrowserTab('', pane)
         return
       }
       try {
@@ -6359,6 +6359,12 @@ export default {
       const tab = this.findBrowserTab(pane, tabId)
       if (!tab) return
       tab.url = url
+      // D25：空白新标签页叫「新标签页」，不显示 about:blank，也不记成一次浏览
+      if (!url || String(url).startsWith('about:')) {
+        tab.name = this.$t('panels.bpNewTabTitle')
+        this.$forceUpdate()
+        return
+      }
       // 标签名称：尽量短（host）
       try {
         const u = new URL(url)
@@ -6379,6 +6385,8 @@ export default {
       if (!active) return
       const t = String(title || '').trim()
       if (!t) return
+      // D25：空白页的标题就是 about:blank，标签继续叫「新标签页」
+      if (t.startsWith('about:') || !active.url || String(active.url).startsWith('about:')) return
 
       // Update session meta with title?
       // trackActivePage will flush and restart. This might be noisy if title changes often.
@@ -6421,14 +6429,15 @@ export default {
         .concat(this.webKeepAliveKeys.filter(k => k !== key && stillOpen(k)))
         .slice(0, WEB_KEEPALIVE_MAX)
     },
-    openBrowserTab(url = 'https://www.baidu.com', pane = null) {
+    // D25：默认打开空白新标签页（本应用的起始页），不再替用户打开百度
+    openBrowserTab(url = '', pane = null) {
       // 默认在当前聚焦窗格打开；未分屏则左侧
       const targetPane = pane ? (pane === 'right' && this.splitMode ? 'right' : 'left') : (this.splitMode ? this.focusedPane : 'left')
       const list = targetPane === 'left' ? this.leftFiles : this.rightFiles
       const idProp = targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
 
       const id = `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      let name = this.$t('workbench.browser')
+      let name = url ? this.$t('workbench.browser') : this.$t('panels.bpNewTabTitle')
       try {
         const u = new URL(url)
         name = u.host || this.$t('workbench.browser')

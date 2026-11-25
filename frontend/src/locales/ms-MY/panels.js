@@ -301,6 +301,8 @@ export default {
   "bpForward": "Maju",
   "bpRefresh": "Segar semula",
   "bpUrlPlaceholder": "Masukkan URL (https://…)",
+  "bpNewTabTitle": "Tab baharu",
+  "bpNewTabHint": "Taip alamat web di bar di atas.",
   "bpOpen": "Buka",
   "bpNewTab": "Tab Baharu",
   "bpSwitchToDesktop": "Beralih semula ke paparan desktop",

@@ -313,6 +313,8 @@ export default {
   bpForward: 'Forward',
   bpRefresh: 'Refresh',
   bpUrlPlaceholder: 'Enter a URL (https://…)',
+  bpNewTabTitle: "New tab",
+  bpNewTabHint: "Type a web address in the bar above.",
   bpOpen: 'Open',
   bpNewTab: 'New Tab',
   bpSwitchToDesktop: 'Switch back to desktop view',
