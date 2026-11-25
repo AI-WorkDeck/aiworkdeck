@@ -165,8 +165,33 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  paths:
+    # Which optional suites a PR needs (CI capacity, 2026-11-25). Job-level if: on a skipped job reports
+    # "skipped", which never leaves a check pending; push to master always runs everything.
+    name: Detect changed areas
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      dpia: ${{ steps.scope.outputs.dpia }}
+      pptx: ${{ steps.scope.outputs.pptx }}
+    steps:
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate --jq '.[].filename' > /tmp/changed
+          wf='^[.]github/workflows/ci[.]yml$'
+          if grep -Eq "^official-plugins/dpia-workbench/|^frontend/tests/plugin-sdk/dpia|$wf" /tmp/changed; then echo dpia=true; else echo dpia=false; fi >> "$GITHUB_OUTPUT"
+          if grep -Eq "^pptx-service/|$wf" /tmp/changed; then echo pptx=true; else echo pptx=false; fi >> "$GITHUB_OUTPUT"
+
   dpia-reports:
     name: DPIA report lifecycle
+    needs: paths
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.paths.outputs.dpia == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -375,8 +400,11 @@ jobs:
   pptx-service:
     # 随包的 PPT 服务（上游 banana-slides 的 vendored 代码）单元测试；此前 CI 完全没跑过，
     # image options 测试因此红了一阵才被发现。只跑 unit（不含集成），几十秒。
-    # 不做路径过滤：ci.yml 其它 job 都无路径过滤，且被过滤跳过的 job 若被设为 required 会一直 pending。
+    # Job-level gate (not a workflow paths filter): a skipped job reports "skipped", so it can never leave a
+    # required check pending. Runs on master always, and on PRs that touch pptx-service/ or ci.yml.
     name: PPT service unit tests
+    needs: paths
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.paths.outputs.pptx == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

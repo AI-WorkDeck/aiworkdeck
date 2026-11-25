@@ -510,3 +510,27 @@ test('journeys.yml: app-e2e runs only when the stack came up (no misleading foll
   assert.ok(steps.find((s) => s.id === 'servers'))
   assert.match(steps.find((s) => s.name === 'Whole-app journeys (app-e2e)').if, /steps\.servers\.outcome == 'success'/)
 })
+
+test('codeql.yml: PRs analyse the languages they touch; master/schedule analyse all five; default query suite', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'codeql.yml'), 'utf8'))
+  const pick = wf.jobs.languages.steps.find((s) => s.id === 'pick').run
+  assert.match(pick, /all='\["actions","c-cpp","java-kotlin","javascript-typescript","python"\]'/)
+  assert.match(pick, /if \[ "\$EVENT" != pull_request \]/)
+  for (const lang of ['actions', 'c-cpp', 'java-kotlin', 'javascript-typescript', 'python']) assert.ok(pick.includes(`"${lang}"`), lang)
+  assert.ok(wf.on.schedule && wf.on.push.branches.includes('master'))
+  const analyze = wf.jobs.analyze
+  assert.strictEqual(analyze.name, 'Analyze (${{ matrix.language }})')
+  const init = analyze.steps.find((s) => String(s.uses).startsWith('github/codeql-action/init'))
+  assert.strictEqual(init.with.queries, undefined, 'keep the default query suite (what default setup ran)')
+  assert.strictEqual(wf.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
+})
+
+test('ci.yml: DPIA and PPT suites are job-gated by changed paths on PRs and always run on master', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'ci.yml'), 'utf8'))
+  for (const [job, out] of [['dpia-reports', 'dpia'], ['pptx-service', 'pptx']]) {
+    assert.deepStrictEqual([].concat(wf.jobs[job].needs), ['paths'])
+    assert.ok(wf.jobs[job].if.includes(`github.event_name != 'pull_request' || needs.paths.outputs.${out} == 'true'`), job)
+    assert.ok(wf.jobs[job].if.includes('!cancelled()'), `${job} must not be skipped on master just because paths is skipped`)
+  }
+  assert.ok(!wf.on.pull_request || !wf.on.pull_request.paths, 'no workflow-level paths filter: it would leave required checks pending')
+})
