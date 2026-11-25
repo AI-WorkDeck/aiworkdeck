@@ -15,7 +15,12 @@ const read = (f) => readFileSync(fileURLToPath(new URL('../../src/' + f, import.
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g
 
 function rawColors(src) {
-  const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  // Strip comments until nothing changes, so a removal can't splice a new `<!--` together (CodeQL #376).
+  let code = src
+  for (let prev; prev !== code;) {
+    prev = code
+    code = code.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  }
   const noFallbacks = code.replace(/var\(--awd-[\w-]+,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))\s*\)/g, '')
   return noFallbacks.match(COLOR) || []
 }
