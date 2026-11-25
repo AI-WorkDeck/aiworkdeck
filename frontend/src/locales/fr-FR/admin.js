@@ -108,6 +108,8 @@ export default {
   "catalogLoadFailedWithMsg": "Liste de modèles temporairement indisponible : {msg}",
   "catalogLoadFailedRetry": "Liste de modèles temporairement indisponible ; rouvrez cette page plus tard pour réessayer",
   "catalogNeedsSignIn": "Connectez-vous à votre compte AI WorkDeck pour voir les modèles disponibles.",
+  "signInCardText": "Connectez-vous pour utiliser l'IA, synchroniser vos projets entre vos appareils et rejoindre l'équipe de votre cabinet d'avocats.",
+  "signInCardTitle": "Se connecter à AI WorkDeck",
   "networkRegionTitle": "Région réseau",
   "networkRegionNote": "Les modèles disponibles uniquement sur les réseaux internationaux sont rejetés par les fournisseurs lorsqu'ils sont accessibles depuis la Chine continentale ; la liste des modèles est donc filtrée par région. La détection automatique utilise le pays/région et le fuseau horaire du système ; spécifiez-les manuellement ici en cas d'erreur.",
   "regionModeLabel": "Mode de détection",

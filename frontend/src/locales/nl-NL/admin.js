@@ -108,6 +108,8 @@ export default {
   "catalogLoadFailedWithMsg": "Modellenlijst tijdelijk niet beschikbaar: {msg}",
   "catalogLoadFailedRetry": "Modellenlijst tijdelijk niet beschikbaar; open deze pagina later opnieuw om het opnieuw te proberen",
   "catalogNeedsSignIn": "Meld je aan bij je AI WorkDeck-account om de beschikbare modellen te zien.",
+  "signInCardText": "Log in om AI te gebruiken, projecten tussen je apparaten te synchroniseren en deel te nemen aan het team van je advocatenkantoor.",
+  "signInCardTitle": "Inloggen bij AI WorkDeck",
   "networkRegionTitle": "Netwerkregio",
   "networkRegionNote": "Modellen die alleen op internationale netwerken beschikbaar zijn, worden door providers geweigerd wanneer ze vanuit continentaal China worden benaderd, daarom wordt de modellenlijst per regio gefilterd. Automatische detectie gebruikt het land/de regio en de tijdzone van het systeem; geef het hier handmatig op als het fout gaat.",
   "regionModeLabel": "Detectiemodus",

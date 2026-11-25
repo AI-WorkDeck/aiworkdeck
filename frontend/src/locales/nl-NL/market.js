@@ -75,7 +75,7 @@ export default {
   "enabledTag": "Ingeschakeld",
   "disabledTag": "Uitgeschakeld",
   "sectionSkillSub": "Op prompts gebaseerde mogelijkheden: werken in het gesprek, met instelbare activering",
-  "builtinWorkflowsMarketNotice": "Luie modus ingeschakeld: Contractbeoordeling, Bewijsorganisatie, Bestandsorganisatie en Juridische Meningsverificatie zijn ingebouwd in de kernworkflow en worden automatisch geactiveerd in de chat — geen installatie of handmatig inschakelen nodig.",
+  "builtinWorkflowsMarketNotice": "Ingebouwd: Contractbeoordeling, Bewijsorganisatie, Bestandsorganisatie en Juridische Meningsverificatie maken deel uit van de kernworkflow en worden in de chat automatisch ingeschakeld wanneer een taak ze nodig heeft. Hier valt niets te installeren.",
   "noLocalSkills": "Nog geen extra extensie-Skills lokaal geïnstalleerd",
   "noLocalSkillsHint": "Installeer er een vanuit de \"Skill-marktplaats\", of plaats een Skill-map (met skill.yml) in de lokale Skill-map ~/.aiworkdeck/skills/ en klik op \"Opnieuw scannen\"",
   "fromPlugin": "Van plug-in {pluginId}",

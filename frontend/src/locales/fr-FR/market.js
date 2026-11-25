@@ -75,7 +75,7 @@ export default {
   "enabledTag": "Activé",
   "disabledTag": "Désactivé",
   "sectionSkillSub": "Capacités basées sur des prompts : prennent effet dans la conversation, avec activation configurable",
-  "builtinWorkflowsMarketNotice": "Mode paresseux activé : Révision de contrats, Organisation des preuves, Organisation des fichiers et Vérification d'avis juridiques sont intégrés au flux de travail principal et s'activent automatiquement dans le chat — aucune installation ni activation manuelle nécessaire.",
+  "builtinWorkflowsMarketNotice": "Intégré : Révision de contrats, Organisation des preuves, Organisation des fichiers et Vérification d'avis juridiques font partie du flux de travail principal et s'activent automatiquement dans le chat lorsqu'une tâche en a besoin. Il n'y a rien à installer ici.",
   "noLocalSkills": "Aucune compétence d'extension supplémentaire installée localement pour le moment",
   "noLocalSkillsHint": "Installez-en une depuis le « Marché de compétences », ou déposez un répertoire de Skill (avec skill.yml) dans le dossier local de Skills ~/.aiworkdeck/skills/ puis cliquez sur « Rescanner »",
   "fromPlugin": "Depuis le plugin {pluginId}",

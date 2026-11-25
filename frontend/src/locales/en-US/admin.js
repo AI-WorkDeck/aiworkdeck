@@ -121,6 +121,8 @@ export default {
   catalogLoadFailedWithMsg: 'Model list temporarily unavailable: {msg}',
   catalogLoadFailedRetry: 'Model list temporarily unavailable; reopen this page later to retry',
   catalogNeedsSignIn: 'Sign in to your AI WorkDeck account to see the available models.',
+  "signInCardText": "Sign in to use AI, sync projects across your devices and join your firm's team.",
+  "signInCardTitle": "Sign In to AI WorkDeck",
   networkRegionTitle: 'Network Region',
   networkRegionNote: 'Models available only on international networks are rejected by providers when accessed from Mainland China, so the model list is filtered by region. Automatic detection uses the system country/region and time zone; specify manually here if it gets it wrong.',
   regionModeLabel: 'Detection Mode',

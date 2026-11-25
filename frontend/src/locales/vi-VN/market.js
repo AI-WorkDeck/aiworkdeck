@@ -75,7 +75,7 @@ export default {
   "enabledTag": "Đã bật",
   "disabledTag": "Đã tắt",
   "sectionSkillSub": "Khả năng dựa trên prompt: có hiệu lực trong hội thoại, có thể cấu hình cách kích hoạt",
-  "builtinWorkflowsMarketNotice": "Đã bật chế độ Lazy: Xem xét Hợp đồng, Tổ chức Bằng chứng, Tổ chức Tệp và Xác minh Ý kiến Pháp lý được tích hợp sẵn trong quy trình cốt lõi và tự động kích hoạt trong chat — không cần cài đặt hay chuyển đổi thủ công.",
+  "builtinWorkflowsMarketNotice": "Tích hợp sẵn: Xem xét Hợp đồng, Tổ chức Bằng chứng, Tổ chức Tệp và Xác minh Ý kiến Pháp lý là một phần của quy trình cốt lõi và tự động kích hoạt trong chat khi tác vụ cần đến. Không có gì cần cài đặt ở đây.",
   "noLocalSkills": "Chưa có Skill mở rộng bổ sung nào được cài đặt cục bộ",
   "noLocalSkillsHint": "Cài đặt từ \"Skill Marketplace\", hoặc thả thư mục Skill (có skill.yml) vào thư mục Skill cục bộ ~/.aiworkdeck/skills/ rồi nhấp \"Quét lại\"",
   "fromPlugin": "Từ plugin {pluginId}",
