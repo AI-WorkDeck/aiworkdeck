@@ -26,7 +26,7 @@ export default {
   renderingSlides: '正在渲染演示文稿…',
   slidesNotShown: '还有 {count} 页未显示，打开文件可查看全部',
   officePreviewUnsupported: '该文件暂不支持在线预览',
-  fileTypeHintOpenLocal: '文件类型: {type}，可在访达/资源管理器中找到它，用本机软件打开',
+  fileTypeHintOpenLocal: '文件类型：{type}，可在访达/资源管理器中找到它，用本机软件打开',
   unknown: '未知',
   openFileInBrowser: '打开文件',
   videoNotSupported: '您的浏览器不支持视频播放',
@@ -84,7 +84,7 @@ export default {
   extracting: '解压中…',
   readingArchive: '正在读取压缩包…',
   previewUnsupportedType: '该文件类型暂不支持预览',
-  fileTypeHint: '文件类型: {type}',
+  fileTypeHint: '文件类型：{type}',
   fileIdHint: '文件ID: {id}',
   fitWindow: '适应窗口',
   rotate: '旋转',
@@ -105,7 +105,7 @@ export default {
   loadFailed: '加载失败',
   fileUrlEmptyError: '文件地址为空',
   renderContainerNotReadyError: '渲染容器未就绪',
-  resourceLoadFailedStatus: '资源加载失败: {status}',
+  resourceLoadFailedStatus: '资源加载失败：{status}',
   networkErrorResource: '网络错误，资源加载失败',
   archiveReadFailed: '压缩包读取失败',
   extractedTo: '已解压到「{name}」',
@@ -166,7 +166,7 @@ export default {
   typeToSearch: '开始输入以搜索文件',
   // TagSelector.vue / TagManager.vue
   addTagPlaceholder: '添加标签...',
-  createNewTag: '创建新标签: "{name}"',
+  createNewTag: '创建新标签："{name}"',
   pickColor: '选择颜色',
   create: '创建',
   noTagsFound: '未找到相关标签',
@@ -191,5 +191,5 @@ export default {
   tagGroupOther: '其他标签',
   // MarkdownPreview.vue
   loadingDots: '正在加载...',
-  loadFailedWithReason: '加载失败: {reason}',
+  loadFailedWithReason: '加载失败：{reason}',
 }

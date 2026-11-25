@@ -322,7 +322,7 @@ export default {
   importing: '正在导入...',
   importSuccess: '导入成功',
   importFailed: '导入失败',
-  importFailedWithMsg: '导入失败: {msg}',
+  importFailedWithMsg: '导入失败：{msg}',
   noPermissionRemoveMember: '你没有权限把这个人移出案卷',
   removeMemberTitle: '移出案卷',
   removeMemberConfirm: '把 {name} 移出这份案卷？移出后他不再能打开和修改这里的文件。',
@@ -371,7 +371,7 @@ export default {
   selectReplaceContentFirst: '请先在文档中选择要替换的内容',
   selectionReplaced: '已替换选区',
   replaceFailed: '替换失败',
-  fileAdded: '已添加: {name}',
+  fileAdded: '已添加：{name}',
   filesAdded: '已加入 {count} 个文件',
   // 拖进 AI 对话区（dev-board#779 K6 ⑤）：原来所有落空都弹「未获取到拖拽数据」，
   // 用户看不懂那是什么意思，也不知道下一步该干什么。

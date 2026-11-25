@@ -97,11 +97,11 @@ export default {
   branchBtnTitle: '从这条分叉出一条新对话继续——当前对话保持不变',
   branchUnavailable: '这条消息还没保存完成，暂时无法分叉，稍候或刷新后再试',
   branchDone: '已分叉到新对话，原对话保持不变',
-  branchFailed: '分叉失败: {error}',
+  branchFailed: '分叉失败：{error}',
   waitCurrentChat: '请等待当前对话完成',
   rollbackDone: '已回退',
   rollbackDoneArchived: '已回退，原对话已存为分支',
-  rollbackFailed: '回退失败: {error}',
+  rollbackFailed: '回退失败：{error}',
   // ---- 重新生成（dev-board#790）----
   // 与「回退」共用同一个确认框与同一条后端截断通道，只有结尾那一步不同：
   // 回退把原文放回输入框等你改，重新生成直接原样再问一次。

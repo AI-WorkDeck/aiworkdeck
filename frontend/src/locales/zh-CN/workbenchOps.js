@@ -4,7 +4,7 @@
 // OCR 截图与识别、暂存区、剪贴板捕获的 toast/modal/错误文案。
 export default {
   // fileOpenTabs.js
-  fileNotFoundNamed: '未找到文件: {name}',
+  fileNotFoundNamed: '未找到文件：{name}',
   openDocumentFirst: '{name}没有打开，请先打开文档',
   fetchFileListFailed: '获取文件列表失败',
   cannotOpenFileTitle: '无法打开文件',
@@ -20,10 +20,10 @@ export default {
 
   // agentClientActions.js
   fileUpdated: '文件已更新',
-  openedNamed: '已打开: {name}',
+  openedNamed: '已打开：{name}',
   fileNotFound: '文件不存在',
   openFileFailed: '打开文件失败',
-  fileUpdatedNamed: '文件已更新: {name}',
+  fileUpdatedNamed: '文件已更新：{name}',
   reloadFailedNamed: '{name} 重新加载失败，请关闭标签后重新打开',
   refreshFileFailed: '刷新文件失败',
 
@@ -42,7 +42,7 @@ export default {
   copyFailed: '复制失败',
   enterFileName: '请输入文件名',
   saveSuccess: '保存成功',
-  saveFailedNamed: '保存失败: {msg}',
+  saveFailedNamed: '保存失败：{msg}',
   unknownError: '未知错误',
   addingFavorite: '正在加入收藏…',
   webExcerpt: '网页摘录',

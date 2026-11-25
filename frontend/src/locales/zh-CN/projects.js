@@ -59,7 +59,7 @@ export default {
   renameHint: '点击重命名',
   // project-list.vue：卡片
   delete: '删除',
-  managerLabel: '项目负责人: {name}',
+  managerLabel: '项目负责人：{name}',
   unknown: '未知',
   clientLabel: '客户',
   clientMemberTitle: '{name} (客户)',
