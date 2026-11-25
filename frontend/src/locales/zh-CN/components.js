@@ -20,6 +20,7 @@ export default {
   promptUsage: '它用于：{unlocks}。不下载则：{impact}；其余功能不受影响。',
 
   sizeUnknown: '体积获取中…',
+  sizeUnavailable: "开始下载后显示大小",
   stateNotInstalled: '未安装',
   stateReady: '已安装（尚未验证运行）',
   stateServiceStarted: '服务已启动（功能待使用验证）',

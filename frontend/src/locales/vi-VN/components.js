@@ -15,6 +15,7 @@ export default {
   "promptNoModel": "Cần tải xuống {name} (khoảng {runtime} MB). Dữ liệu được lưu tại ~/.aiworkdeck và có thể gỡ bỏ trong Cài đặt → Thành phần.",
   "promptUsage": "Dùng cho: {unlocks}. Nếu không cài đặt: {impact}. Các tính năng khác vẫn hoạt động bình thường.",
   "sizeUnknown": "Đang kiểm tra dung lượng…",
+  "sizeUnavailable": "Dung lượng hiển thị khi bắt đầu tải",
   "stateNotInstalled": "Chưa cài đặt",
   "stateReady": "Đã cài đặt (chưa chạy thử)",
   "stateServiceStarted": "Dịch vụ đã khởi động (chưa xác minh tính năng)",

@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} perlu diunduh (sekitar {runtime} MB). Disimpan di ~/.aiworkdeck dan dapat dihapus melalui Pengaturan → Komponen.",
   "promptUsage": "Komponen ini mendukung: {unlocks}. Tanpanya: {impact}. Fitur lainnya tetap berfungsi.",
   "sizeUnknown": "Memeriksa ukuran…",
+  "sizeUnavailable": "Ukuran ditampilkan saat unduhan dimulai",
   "stateNotInstalled": "Belum terpasang",
   "stateReady": "Terpasang (belum dijalankan)",
   "stateServiceStarted": "Layanan dimulai (fungsi belum diverifikasi)",

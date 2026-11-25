@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} को डाउनलोड करने की आवश्यकता है (लगभग {runtime} MB)। यह ~/.aiworkdeck के अंतर्गत संग्रहीत होता है और इसे सेटिंग्स → घटक से हटाया जा सकता है।",
   "promptUsage": "यह संचालित करता है: {unlocks}। इसके बिना: {impact}। बाकी सब कुछ काम करता रहेगा।",
   "sizeUnknown": "आकार जाँचा जा रहा है…",
+  "sizeUnavailable": "डाउनलोड शुरू होने पर आकार दिखेगा",
   "stateNotInstalled": "इंस्टॉल नहीं है",
   "stateReady": "इंस्टॉल है (अभी तक चलाया नहीं गया)",
   "stateServiceStarted": "सेवा प्रारंभ हो गई (कार्यक्षमता अभी सत्यापित नहीं)",

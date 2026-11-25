@@ -89,6 +89,8 @@ test('首启弹窗排队：权限引导启动检查结束前，可选组件窗�
   const overview = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
   const fn = overview.slice(overview.indexOf('async maybePromptOptionalComponents()'))
   const body = fn.slice(0, fn.indexOf('\n    },\n'))
-  assert.match(body, /await whenPermissionOnboardingStartupSettled\(\)/)
-  assert.ok(body.indexOf('await whenPermissionOnboardingStartupSettled()') < body.indexOf('this.showOptionalComponents = '))
+  // D6: the components prompt no longer opens a modal at startup (it is a Welcome notice the user
+  // opens), so there is nothing left to stack on top of the permission onboarding window.
+  assert.doesNotMatch(body, /this\.showOptionalComponents = /)
+  assert.match(body, /this\.optionalComponentsSuggested = shouldShow/)
 })

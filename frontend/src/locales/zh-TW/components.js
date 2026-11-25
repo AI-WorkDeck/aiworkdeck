@@ -15,6 +15,7 @@ export default {
   "promptNoModel": "需要下載「{name}」（約 {runtime} MB）。落盤於 ~/.aiworkdeck，可在「設定 → 元件管理」解除安裝釋放。",
   "promptUsage": "它用於：{unlocks}。不下載則：{impact}；其餘功能不受影響。",
   "sizeUnknown": "體積獲取中…",
+  "sizeUnavailable": "開始下載後顯示大小",
   "stateNotInstalled": "未安裝",
   "stateReady": "已安裝（尚未驗證執行）",
   "stateServiceStarted": "服務已啟動（功能待使用驗證）",
