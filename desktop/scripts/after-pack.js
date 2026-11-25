@@ -106,9 +106,35 @@ function makeJreLegalFilesOwnerWritable(dir) {
     return changed;
 }
 
+// electron-builder Arch enum (builder-util): only the values we package.
+const ARCH_NAMES = { 1: 'x64', 3: 'arm64' };
+
+/**
+ * Backend CDS archive (POLISH D21, see backend-cds.js). It runs the bundled JVM, so it
+ * only works when packaging for this machine's platform and arch; cross builds skip it
+ * (the app then starts without the archive, as before). Runs here because afterPack
+ * sees the final files: the archive records jar size + mtime, and nothing after this
+ * hook rewrites the jars (mac signing only adds CodeResources).
+ */
+async function buildCdsForPackage(context, resourcesDir, build = require('./backend-cds').buildBackendCds) {
+    const arch = ARCH_NAMES[context.arch];
+    if (context.electronPlatformName !== process.platform || arch !== process.arch) {
+        console.log(`  • backend CDS archive  skipped (cross build ${context.electronPlatformName}-${arch} on ${process.platform}-${process.arch})`);
+        return null;
+    }
+    if (!fs.existsSync(path.join(resourcesDir, 'backend', 'lib')) || !fs.existsSync(path.join(resourcesDir, 'jre'))) {
+        console.log('  • backend CDS archive  skipped (no bundled backend/jre)');
+        return null;
+    }
+    return build(resourcesDir);
+}
+
 /** electron-builder afterPack 钩子。 */
 module.exports = async (context) => {
-    if (context.electronPlatformName !== 'darwin') return;
+    if (context.electronPlatformName !== 'darwin') {
+        await buildCdsForPackage(context, path.join(context.appOutDir, 'resources'));
+        return;
+    }
 
     const appDir = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
     const writable = makeJreLegalFilesOwnerWritable(path.join(appDir, 'Contents/Resources/jre/legal'));
@@ -122,7 +148,9 @@ module.exports = async (context) => {
         `  • prune framework locales  removed=${removed.length} kept=${keptCount} ` +
             `freed=${(bytes / 1024 / 1024).toFixed(1)} MB`,
     );
+    await buildCdsForPackage(context, path.join(appDir, 'Contents', 'Resources'));
 };
 
 module.exports.pruneFrameworkLocales = pruneFrameworkLocales;
 module.exports.KEEP_LPROJ = KEEP_LPROJ;
+module.exports.buildCdsForPackage = buildCdsForPackage;

@@ -182,13 +182,13 @@ test('backend-service javaLaunchArgs：split 布局 + overlay 覆盖 + fat 兼�
   assert.strictEqual(backendLayout(ctx).kind, 'fat')
   assert.deepStrictEqual(javaLaunchArgs(ctx), ['-jar', path.join(resources, 'backend', 'backend.jar')])
 
-  // 新布局：-cp app.jar<sep>lib/* 主类直启
+  // 新布局：-cp lib/*<sep>app.jar 主类直启（lib 在前，见 backend-cds.js）
   fs.writeFileSync(path.join(resources, 'backend', 'app.jar'), 'builtin-app')
   fs.mkdirSync(path.join(resources, 'backend', 'lib'), { recursive: true })
   const args = javaLaunchArgs(ctx)
   const sep = process.platform === 'win32' ? ';' : ':'
   assert.strictEqual(args[0], '-cp')
-  assert.strictEqual(args[1], path.join(resources, 'backend', 'app.jar') + sep + path.join(resources, 'backend', 'lib', '*'))
+  assert.strictEqual(args[1], path.join(resources, 'backend', 'lib', '*') + sep + path.join(resources, 'backend', 'app.jar'))
   assert.strictEqual(args[2], 'com.checkba.CheckbaApplication')
 
   // overlay 覆盖 app.jar
