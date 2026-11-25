@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Shared Maven setup for every CI job that runs mvn (dev-board#1816).
+# - Restores the ~/.m2 cache written by cache-warm.yml (job `maven`), read-only. Only that job saves
+#   the Maven cache: it builds from an empty ~/.m2, so the cache holds every plugin and dependency. When
+#   jobs that build only part of the project saved it, partial caches stuck under an exact key (2026-11-25).
+# - Installs ci-settings.xml: Central first, Google's Central mirror as a fallback repository.
+# - Retries once, quickly: with a fallback repository, long retries on Central only add minutes.
+name: Maven setup
+description: Restore the warm Maven cache read-only, add the Central fallback mirror, set short retries.
+inputs:
+  restore:
+    description: Restore the warm Linux cache. desktop-build keeps its own per-OS cache and passes 'false'.
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Restore warm Maven cache
+      if: inputs.restore == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.m2/repository
+        key: maven-warm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pom.xml') }}-
+        restore-keys: |
+          maven-warm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pom.xml') }}-
+          maven-warm-${{ runner.os }}-${{ runner.arch }}-
+          setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-
+    - name: Central fallback mirror and retries
+      shell: bash
+      run: |
+        mkdir -p ~/.m2
+        cp "$GITHUB_ACTION_PATH/ci-settings.xml" ~/.m2/settings.xml
+        echo "MAVEN_ARGS=-Daether.connector.http.retryHandler.count=1 -Daether.connector.http.retryHandler.interval=1000 -Daether.connector.http.retryHandler.serviceUnavailable=429,503" >> "$GITHUB_ENV"

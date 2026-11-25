@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The only writer of the Linux Maven cache (dev-board#1816). Every other Maven job restores it read-only
+# through .github/actions/maven-setup. This job always starts from an empty ~/.m2 and runs every Maven
+# build the Linux jobs run (plugin-api, the official plugins, backend verify with tests, the SBOM goal),
+# so the saved cache holds every plugin, test provider and dependency they need.
+# The cache is saved only when the whole cold build succeeded, so a half-built ~/.m2 is never saved.
+# On a pull request that changes the Maven setup, the same cold build runs as proof and nothing is saved.
+name: Maven cache (warm)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**/pom.xml'
+      - 'official-plugins/*/build.sh'
+      - '.github/actions/maven-setup/**'
+      - '.github/workflows/maven-cache-warm.yml'
+  pull_request:
+    paths:
+      - '.github/actions/maven-setup/**'
+      - '.github/workflows/maven-cache-warm.yml'
+  schedule:
+    - cron: '30 18 * * *' # 02:30 Beijing, before the nightly desktop build; picks up new default plugin versions
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CYCLONEDX_MAVEN_VERSION: 2.9.1 # keep in step with supply-chain.yml
+
+jobs:
+  maven:
+    name: Maven cache (cold build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Maven setup (no restore — this job proves a cold build)
+        uses: ./.github/actions/maven-setup
+        with:
+          restore: 'false'
+      - name: Cache key (computed before the build can add files)
+        id: key
+        run: echo "key=maven-warm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/pom.xml') }}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+      - name: Empty local repository
+        run: |
+          rm -rf ~/.m2/repository
+          echo "start: $(du -sh ~/.m2 | cut -f1)"
+      - name: Install plugin-api
+        run: mvn -B -q -f backend/plugin-api/pom.xml install
+      - name: Official plugins (same builds as CI)
+        run: |
+          ./official-plugins/dpia-workbench/build.sh
+          ./official-plugins/tencent-meeting/build.sh
+          ./official-plugins/baoqingtian/build.sh
+          ./official-plugins/pitch-materials/build.sh
+      - name: Backend verify (with tests, so test providers are fetched)
+        working-directory: backend
+        # A failing test must not stop the warm-up; the Backend required check judges tests.
+        run: mvn -B -q verify -Dmaven.test.failure.ignore=true
+      - name: SBOM goal (supply-chain.yml)
+        run: |
+          mvn -B -q -f backend/pom.xml \
+            "org.cyclonedx:cyclonedx-maven-plugin:${CYCLONEDX_MAVEN_VERSION}:makeAggregateBom" \
+            -DoutputFormat=json -DoutputName=bom -DincludeTestScope=false
+      - name: Summary
+        run: |
+          echo "local repository: $(du -sh ~/.m2/repository | cut -f1), $(find ~/.m2/repository -name '*.jar' | wc -l) jars"
+          echo "fetched from the fallback mirror: $(grep -rl '>google-maven-central=' ~/.m2/repository --include=_remote.repositories | wc -l) artifacts"
+      - name: Save Maven cache
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ steps.key.outputs.key }}
