@@ -44,7 +44,7 @@
     >
       <template #actions>
         <view class="lf-header-actions">
-          <view class="team-btn small" :class="{ 'is-busy': lawfirmBusy }" @tap="onSeedLawFirmDemo">
+          <view v-if="demoDataTools" class="team-btn small" :class="{ 'is-busy': lawfirmBusy }" @tap="onSeedLawFirmDemo">
             {{ $t('team.lawfirmSeedDemoBtn') }}
           </view>
           <view class="team-btn small primary" :class="{ 'is-busy': lawfirmBusy }" @tap="onOpenLawFirmPlugin('dashboard')">
@@ -630,6 +630,7 @@
 
 <script>
 import { formatCnyCompact } from '@/utils/cnyAmount'
+import { demoDataToolsVisible } from '@/utils/demoData.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
@@ -710,6 +711,10 @@ export default {
     }
   },
   computed: {
+    /** X12：演示数据按钮只在开发版或开发者本机显式打开时出现 */
+    demoDataTools() {
+      return typeof demoDataToolsVisible === 'function' && demoDataToolsVisible()
+    },
     lawfirmDimTabs() {
       return [
         { key: 'departments', label: this.$t('team.lawfirmDimDepartments') },

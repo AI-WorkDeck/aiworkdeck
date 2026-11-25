@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Succesfee-percentage (%)",
   "casePreviewConflictBtn": "Belangenconflict-voorcontrole uitvoeren",
   "caseSubmitIntakeBtn": "Zaakintake & conflictcontrole indienen",
-  "caseIntakeEmpty": "Nog geen intakerecords. Klik hierboven op \"Nieuwe zaakintake\" of \"Qinghe Foods-demo laden\" om te beginnen.",
+  "caseIntakeEmpty": "Nog geen intakerecords. Klik hierboven op \"Nieuwe zaakintake\" om te beginnen.",
   "caseContractedLabel": "Gecontracteerd",
   "caseImBadge": "IM-groep aangemaakt & samenvatting gesynchroniseerd",
   "caseMyClearanceTitle": "Aan mij toegewezen belangenconflictcontroles",

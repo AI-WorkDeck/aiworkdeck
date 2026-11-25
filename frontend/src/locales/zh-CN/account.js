@@ -416,7 +416,7 @@ export default {
   caseFieldContingencyRate: '风险代理比例（%）',
   casePreviewConflictBtn: '实时利冲预检',
   caseSubmitIntakeBtn: '提交立案与利冲检索',
-  caseIntakeEmpty: '暂无立案记录，可点击上方“发起新立案”或“填充青禾食品全流程演示”体验完整流程。',
+  caseIntakeEmpty: '暂无立案记录，可点击上方“发起新立案”开始。',
   caseContractedLabel: '合同额',
   caseImBadge: '已自动拉群并同步案卷摘要',
   caseMyClearanceTitle: '待我确认的利益冲突协查',

@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "कॉन्टिंजेंसी दर (%)",
   "casePreviewConflictBtn": "कॉन्फ्लिक्ट प्री-चेक चलाएँ",
   "caseSubmitIntakeBtn": "इनटेक और कॉन्फ्लिक्ट चेक सबमिट करें",
-  "caseIntakeEmpty": "अभी कोई इनटेक रिकॉर्ड नहीं है। शुरू करने के लिए ऊपर \"नया केस इनटेक\" या \"Qinghe Foods डेमो भरें\" पर क्लिक करें।",
+  "caseIntakeEmpty": "अभी कोई इनटेक रिकॉर्ड नहीं है। शुरू करने के लिए ऊपर \"नया केस इनटेक\" पर क्लिक करें।",
   "caseContractedLabel": "अनुबंधित",
   "caseImBadge": "IM समूह बनाया गया और सारांश सिंक हुआ",
   "caseMyClearanceTitle": "मुझे सौंपी गई कॉन्फ्लिक्ट क्लीरेंस",
