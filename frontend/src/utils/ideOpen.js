@@ -35,35 +35,53 @@ function shouldWarnTruncatedOnce(projectId) {
   }
 }
 
+// 打开/新建本地文件夹要等后端导入并建初始版本：大文件夹或大文件冷启动时要几秒（D-P2 实测
+// 36 MB 单文件约 1.5–5 s）。所有入口（应用菜单、欢迎页、拖放、Finder 打开方式、项目列表）都走这里，
+// 所以在这里统一给一个遮罩式进度提示；弹确认框前先收起，免得遮罩挡住按钮。
+function showOpening() {
+  try { if (typeof uni.showLoading === 'function') uni.showLoading({ title: t('account.busyOpeningFolder'), mask: true }) } catch (e) { /* 提示失败不影响打开 */ }
+}
+function hideOpening() {
+  try { if (typeof uni.hideLoading === 'function') uni.hideLoading() } catch (e) { /* ignore */ }
+}
+
 async function launchProject(payload) {
-  let r = await openLocalProject(payload)
-  if (r?.data?.requiresNestedConfirmation) {
-    const confirmed = await new Promise((resolve) => uni.showModal({
-      title: t('common.nestedFolderTitle'),
-      content: t('common.nestedFolderContent', {
-        names: (r.data.overlappingProjectNames || []).join('、'),
-      }),
-      confirmText: t('common.nestedFolderContinue'),
-      cancelText: t('common.cancel'),
-      success: (result) => resolve(!!result.confirm),
-      fail: () => resolve(false),
-    }))
-    if (!confirmed) return false
-    r = await openLocalProject({ ...payload, allowNested: true })
+  showOpening()
+  try {
+    let r = await openLocalProject(payload)
+    if (r?.data?.requiresNestedConfirmation) {
+      hideOpening()
+      const confirmed = await new Promise((resolve) => uni.showModal({
+        title: t('common.nestedFolderTitle'),
+        content: t('common.nestedFolderContent', {
+          names: (r.data.overlappingProjectNames || []).join('、'),
+        }),
+        confirmText: t('common.nestedFolderContinue'),
+        cancelText: t('common.cancel'),
+        success: (result) => resolve(!!result.confirm),
+        fail: () => resolve(false),
+      }))
+      if (!confirmed) return false
+      showOpening()
+      r = await openLocalProject({ ...payload, allowNested: true })
+    }
+    const d = (r && r.data) || {}
+    if (!d.projectId) {
+      throw new Error(t('common.openProjectFailed'))
+    }
+    if (d.truncated && shouldWarnTruncatedOnce(d.projectId)) {
+      hideOpening()
+      uni.showModal({
+        title: t('common.folderImportTruncatedTitle'),
+        content: t(d.truncatedCountCapped ? 'common.folderImportTruncatedCapped' : 'common.folderImportTruncated',
+          { count: d.truncatedCount || 0 }),
+        showCancel: false,
+      })
+    }
+    return !!(await coordinator.enter(d.projectId, false))
+  } finally {
+    hideOpening()
   }
-  const d = (r && r.data) || {}
-  if (!d.projectId) {
-    throw new Error(t('common.openProjectFailed'))
-  }
-  if (d.truncated && shouldWarnTruncatedOnce(d.projectId)) {
-    uni.showModal({
-      title: t('common.folderImportTruncatedTitle'),
-      content: t(d.truncatedCountCapped ? 'common.folderImportTruncatedCapped' : 'common.folderImportTruncated',
-        { count: d.truncatedCount || 0 }),
-      showCancel: false,
-    })
-  }
-  return !!(await coordinator.enter(d.projectId, false))
 }
 
 /** 打开文件夹… 返回 true=已发起导航，false=用户取消。异常上抛由调用方 toast。 */
