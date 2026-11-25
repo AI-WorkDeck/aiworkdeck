@@ -146,7 +146,7 @@ export default {
   siteSwitchConfirm: '切换站点',
   siteSwitchedLine: '已切换到{name}。',
   siteAiFallbackLine: 'AI 供应商已从「AI WorkDeck 云端」回落到本机可用的通道，可在「AI 功能设置」里重新选择。',
-  siteNextLaunchLine: '插件广场与统计上报将在下次启动后指向新站点。',
+  siteNextLaunchLine: '插件市场与统计上报将在下次启动后指向新站点。',
   siteSwitchedTitle: '站点已切换',
   siteSwitchFailedTitle: '切换未完成',
   siteSwitchFailedContent: '切换站点失败，站点维持不变。',

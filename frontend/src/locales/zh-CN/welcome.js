@@ -21,7 +21,7 @@ export default {
   guideAiEdit: '让 AI 修改一份文档',
   guideAiEditDesc: '看看律师怎样用它改合同、写文书、核对材料。',
   guidePlugin: '安装第一个插件',
-  guidePluginDesc: '插件广场里的技能与面板，装上就出现在左栏。',
+  guidePluginDesc: '插件市场里的技能与面板，装上就出现在左栏。',
   showOnStartup: '启动时显示欢迎页',
   telemetryNotice: '已开启匿名使用统计，可在设置中关闭',
   telemetryNoticeDismiss: '不再提示',

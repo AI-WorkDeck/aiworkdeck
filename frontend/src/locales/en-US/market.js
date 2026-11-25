@@ -7,7 +7,7 @@ export default {
   // ---- Hero ----
   heroWatermark: 'E',
   heroEyebrow: 'EXTENSIONS · Capability Expansion',
-  heroTitle: 'Plugin Marketplace',
+  heroTitle: 'Marketplace',
   heroSub: 'Public Skills from the official marketplace and manually reviewed, platform-signed plugins — install to this machine in one click',
   statOnlineSkills: 'Skills Online',
   statOnlinePlugins: 'Plugins Online',
@@ -17,10 +17,10 @@ export default {
   rescan: 'Rescan',
 
   // ---- Main tabs ----
-  tabSkillMarket: 'Skill Marketplace',
-  tabPluginMarket: 'Plugin Marketplace',
+  tabSkillMarket: 'Skills',
+  tabPluginMarket: 'Plugins',
   tabInstalled: 'Installed',
-  tabMarketplace: 'Marketplace',
+  tabMarketplace: 'Available',
   voiceGroupDesc: 'Voice panel: read documents aloud with on-device text-to-speech; record meetings with one tap, auto-transcribe with speaker separation, and let AI draft structured minutes.',
 
   // ---- Categories ----

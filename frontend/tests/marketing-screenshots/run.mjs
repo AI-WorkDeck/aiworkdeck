@@ -287,8 +287,8 @@ const SHOTS = [
     id: 'plugin-market',
     async prepare(page, { base, projectId }) {
       await openWorkbench(page, base, projectId)
-      await clickTitle(page, '插件中心')
-      await waitText(page, '插件广场')
+      await clickTitle(page, '插件市场')
+      await waitText(page, '插件市场')
       await clickText(page, '创业协议起草')
       await waitText(page, '什么时候用')
       await waitText(page, 'startup-agreement-drafter')

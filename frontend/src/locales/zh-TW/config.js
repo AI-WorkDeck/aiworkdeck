@@ -5,9 +5,9 @@ export default {
   "sidebar": {
     "projectHome": "專案概覽",
     "projects": "專案",
-    "files": "資源管理員",
+    "files": "檔案總管",
     "ddFiles": "盡職調查檔案",
-    "market": "外掛中心",
+    "market": "外掛市集",
     "dev": "外掛開發",
     "voice": "語音",
     "meetingRecorder": "會議錄音",

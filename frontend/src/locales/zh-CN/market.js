@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// 插件广场（MarketPane / MarketDetailPane / MarketSidebarPanel / plugin-market 页 / marketPricing 工具）
+// 插件市场（MarketPane / MarketDetailPane / MarketSidebarPanel / plugin-market 页 / marketPricing 工具）
 export default {
   redactionEngineUpdateNotice: '本地规则自动识别公司与中文姓名，支持预览、编号替换和复敏。实际功能随桌面端补丁升级，重新安装说明文件不会更新引擎。',
   redactionEngineUpdateButton: '检查脱敏引擎更新',
   // ---- Hero ----
   heroWatermark: '技',
   heroEyebrow: 'EXTENSIONS · 能力扩展',
-  heroTitle: '插件广场',
+  heroTitle: '插件市场',
   heroSub: '官网广场的公开 Skill 与经人工审核、平台签名的插件，一键装到本机',
   statOnlineSkills: '在线 Skill',
   statOnlinePlugins: '在线插件',
@@ -17,11 +17,11 @@ export default {
   rescan: '重新扫描',
 
   // ---- 主页签 ----
-  tabSkillMarket: 'Skill 广场',
-  tabPluginMarket: '插件广场',
+  tabSkillMarket: 'Skill',
+  tabPluginMarket: '插件',
   tabInstalled: '已安装',
-  // 左栏面板的在线广场分组：Skill 与插件收进同一个「Marketplace」组，组内横向双标签
-  tabMarketplace: 'Marketplace',
+  // 左栏面板的在线广场分组：Skill 与插件收进同一个「可安装」组，组内横向双标签
+  tabMarketplace: '可安装',
   // 「语音」合并插件（语音合成 + 会议录音，见 leftSidebarPlugins.js 的 VOICE_PLUGIN_GROUP）
   voiceGroupDesc: '语音面板：文本转语音朗读文档（本机离线合成）；开会一键录音、自动转写并区分说话人，AI 生成结构化会议纪要。',
 
@@ -55,8 +55,8 @@ export default {
   noDescription: '暂无描述',
   anonymousAuthor: '匿名作者',
 
-  // ---- 插件广场 ----
-  pluginMarketUnavailableTitle: '在线插件广场暂不可用',
+  // ---- 插件市场 ----
+  pluginMarketUnavailableTitle: '在线插件市场暂不可用',
   pluginMarketErrorHint: '{error}——本机已安装的插件不受影响',
   noPluginsYet: '还没有上架的插件',
   localInstallHint: '也可本地安装：把插件目录放进本机插件目录 ~/.aiworkdeck/plugins/ 后点「重新扫描」',
@@ -259,14 +259,14 @@ export default {
   permLawfirm: "团队信息",
   permWorklogRead: "本人工作记录汇总",
   newlyCreatedTag: '新建',
-  publishBtn: '发布到 Marketplace',
-  publishUpdateBtn: '更新到 Marketplace',
+  publishBtn: '发布到插件市场',
+  publishUpdateBtn: '更新到插件市场',
   publishingEllipsis: '发布中…',
-  publishHint: '发布后，其他律师可以在 Marketplace 安装这个 Skill',
-  publishedHint: '已发布到 Marketplace',
-  publishedVersionHint: '已发布到 Marketplace（v{version}）',
-  publishedToast: '已发布到 Marketplace',
-  publishUpdatedToast: 'Marketplace 上的版本已更新',
+  publishHint: '发布后，其他律师可以在插件市场安装这个 Skill',
+  publishedHint: '已发布到插件市场',
+  publishedVersionHint: '已发布到插件市场（v{version}）',
+  publishedToast: '已发布到插件市场',
+  publishUpdatedToast: '插件市场上的版本已更新',
   publishFailed: '发布失败，请稍后重试',
   // ---- 插件工具权限升级的重新授权（PluginToolApprovals）----
   toolApprovalTitle: "批准工具变更",

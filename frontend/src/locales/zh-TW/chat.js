@@ -191,7 +191,7 @@ export default {
   "builtinWorkflowsScope": "契約 · 證據 · 檔案 · 意見書",
   "builtinWorkflowsCustomCount": "已定製 {count} 項",
   "composerAdvancedSettings": "高階設定",
-  "builtinWorkflowsAdvancedBtn": "高階設定",
+  "builtinWorkflowsAdvancedBtn": "編輯規則",
   "builtinWorkflowsSub": "契約審查、證據整理、檔案整理、法律意見書核查已內建於工程主鏈路，直接交代任務即自動啟動",
   "builtinWorkflowBadge": "內建常駐",
   "builtinWorkflowAutoToast": "內建工作流已自動接管：{name}",
