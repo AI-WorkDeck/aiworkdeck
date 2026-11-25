@@ -4584,7 +4584,8 @@ $color-accent: var(--awd-mint); // Mint Green
   padding: 0 10px;
   gap: 2px;
   color: var(--awd-text-2);
-  font-family: var(--awd-font-mono, 'JetBrains Mono', 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace);
+  /* 状态栏是给律师看的状态句子，用界面无衬线体；等宽只留给路径/版本号等（POLISH X10） */
+  font-family: var(--awd-font-sans);
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   z-index: 150;
