@@ -5,10 +5,11 @@ import uni from "@dcloudio/vite-plugin-uni";
 import { browserSafeChunks } from "./scripts/browser-safe-chunks.mjs";
 import { uniInputSync } from "./scripts/uni-input-sync.mjs";
 import { noFrameworkEgress } from "./scripts/no-framework-egress.mjs";
+import { localMonaco } from "./scripts/local-monaco.mjs";
 // https://vitejs.dev/config/
 export default defineConfig({
     // uniInputSync：输入框 v-model 同步回写，修「点按钮时只剩第一个字」（UI-INPUT1）
-    plugins: [uniInputSync(), uni(), noFrameworkEgress(), browserSafeChunks()],
+    plugins: [uniInputSync(), uni(), noFrameworkEgress(), localMonaco(), browserSafeChunks()],
     resolve: {
         alias: {
             "punycode.js": "punycode",

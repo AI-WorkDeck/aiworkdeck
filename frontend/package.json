@@ -175,6 +175,7 @@
     "linkify-it": "^5.0.2",
     "markdown-it": "^14.3.3",
     "mdurl": "^2.0.0",
+    "monaco-editor": "0.45.0",
     "path-to-regexp": "^0.1.13",
     "pptx-preview": "^1.0.7",
     "punycode": "^2.3.1",
