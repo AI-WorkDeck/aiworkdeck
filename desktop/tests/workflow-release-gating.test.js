@@ -469,3 +469,11 @@ test('desktop-build.yml: PR installer build is gated by dependency-scope.build; 
   assert.match(wf.jobs['dependency-scope'].if, /github\.event\.action != 'labeled' \|\| github\.event\.label\.name == 'full-build'/)
   assert.match(wf.jobs.release.if, /startsWith\(github\.ref, 'refs\/tags\/v'\)/)
 })
+
+test('ci.yml: Desktop unit tests (Linux) installs frontend deps first (desktop tests load jsdom from frontend/node_modules)', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'ci.yml'), 'utf8'))
+  const steps = wf.jobs['desktop-unit'].steps
+  const fe = steps.findIndex((s) => s['working-directory'] === 'frontend' && /npm ci/.test(s.run || ''))
+  const unit = steps.findIndex((s) => s['working-directory'] === 'desktop' && /npm test/.test(s.run || ''))
+  assert.ok(fe >= 0 && unit > fe, 'frontend npm ci must run before the desktop unit tests')
+})
