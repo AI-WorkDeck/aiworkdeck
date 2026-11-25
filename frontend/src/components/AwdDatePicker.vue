@@ -24,7 +24,7 @@
 </template>
 
 <script>
-const BORDER_DEFAULT = '#E6EAE8'
+const BORDER_DEFAULT = 'var(--awd-border)'
 const BORDER_FOCUS = 'var(--awd-mint)'
 
 export default {
@@ -72,7 +72,7 @@ export default {
         'background-color: var(--awd-surface)',
         'font-size: 13px',
         'font-family: inherit',
-        'color: #2B2A26',
+        'color: var(--awd-text)',
         'outline: none',
         'transition: border-color 0.15s ease',
       ].join(';')
