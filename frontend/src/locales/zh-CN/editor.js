@@ -432,6 +432,7 @@ export default {
       DEEP_MODEL_UNAVAILABLE: '原因：当前辅助模型不可用，请到设置页更换。',
       DEEP_REGION: '原因：当前网络环境被服务商按地域拒绝，请更换模型或网络。',
       DEEP_FAILED: '原因：模型调用失败。',
+      DEEP_SIGNED_OUT: '原因：尚未登录。登录后即可使用 AI 审校。',
     },
   },
   toolbar: {

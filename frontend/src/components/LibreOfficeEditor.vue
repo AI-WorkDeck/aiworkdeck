@@ -1917,7 +1917,7 @@ export default {
       this._inlineReviewHost = createInlineReviewHost({
         projectId: Number(this.projectId), fileId: this.file.id, userId: (getCurrentUser() || {}).id || 'local',
         execute: (action, params) => this.executor.executeCommand(action, params), send: this._transportSend,
-        writable: this.canWrite, review: reviewDocInsight, active: this.active !== false,
+        writable: this.canWrite, review: (pid, data, meta) => reviewDocInsight(pid, data, meta && meta.auto ? { accountPrompt: false } : {}), active: this.active !== false,
         storage: { get: (key) => uni.getStorageSync(key), set: (key, value) => uni.setStorageSync(key, value) },
         // 正文浮球只是入口：清单在右栏审阅面板的「AI 审校」标签里。
         openPanel: () => this.openInlineReviewPanel(),

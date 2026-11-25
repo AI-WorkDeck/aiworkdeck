@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Penyebab: bagian ini melebihi konteks model. Pisahkan lalu tinjau kembali.",
       "DEEP_MODEL_UNAVAILABLE": "Penyebab: model tambahan tidak tersedia. Pilih model lain di pengaturan.",
       "DEEP_REGION": "Penyebab: penyedia menolak wilayah jaringan ini. Ganti model atau jaringan.",
-      "DEEP_FAILED": "Penyebab: pemanggilan model gagal."
+      "DEEP_FAILED": "Penyebab: pemanggilan model gagal.",
+      "DEEP_SIGNED_OUT": "Penyebab: Anda belum masuk. Masuk untuk menggunakan tinjauan AI."
     }
   },
   "toolbar": {

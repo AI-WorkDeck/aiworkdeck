@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "原因：這一段正文超出模型上下文，請分段後再審校。",
       "DEEP_MODEL_UNAVAILABLE": "原因：目前輔助模型不可用，請到設定頁更換。",
       "DEEP_REGION": "原因：目前網路環境被服務商按地域拒絕，請更換模型或網路。",
-      "DEEP_FAILED": "原因：模型呼叫失敗。"
+      "DEEP_FAILED": "原因：模型呼叫失敗。",
+      "DEEP_SIGNED_OUT": "原因：尚未登入。登入後即可使用 AI 審校。"
     }
   },
   "toolbar": {

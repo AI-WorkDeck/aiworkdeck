@@ -296,6 +296,44 @@ test('额度/限流一类的失败之后，本会话不再自动跑 AI', async (
   assert.equal(f.calls.length, before + 1, '手动重试仍然可用')
 })
 
+test('D1: signed out, the automatic AI run pauses quietly instead of erroring or retrying every few minutes', async (t) => {
+  const f = fixture(t)
+  const metas = []
+  f.dependencies.review = async (pid, body, meta) => {
+    f.calls.push({ pid, body }); metas.push({ deep: body.deep, auto: !!meta?.auto })
+    if (!body.deep) return { findings: [] }
+    throw Object.assign(new Error('Sign in to use cloud AI'), { accountRequired: true, code: 4011 })
+  }
+  f.host.start(); await f.tick(); await f.tick()
+  assert.deepEqual(metas.at(-1), { deep: true, auto: true }, 'the automatic run tells the caller it is automatic (no login prompt)')
+  const state = f.messages.at(-1)
+  assert.equal(state.autoBlocked, 'DEEP_SIGNED_OUT')
+  assert.equal(state.deepStatus, 'idle', 'not shown as a failure')
+  assert.equal(state.message, '')
+  f.retype('第一条 价款：人民币一百万元。')
+  await f.tick()
+  assert.equal(f.tasks.size, 0, 'no further automatic AI while signed out')
+})
+
+test('D1: the manual AI review is not marked automatic, and a later success lifts the signed-out pause', async (t) => {
+  const f = fixture(t)
+  const metas = []
+  let signedIn = false
+  f.dependencies.review = async (pid, body, meta) => {
+    f.calls.push({ pid, body }); metas.push({ deep: body.deep, auto: !!meta?.auto })
+    if (body.deep && !signedIn) throw Object.assign(new Error('Sign in'), { accountRequired: true })
+    return { findings: [] }
+  }
+  f.host.start(); await f.tick(); await f.tick()
+  assert.equal(f.messages.at(-1).autoBlocked, 'DEEP_SIGNED_OUT')
+  await f.request('deep')
+  assert.deepEqual(metas.at(-1), { deep: true, auto: false }, 'a click may prompt sign-in')
+  assert.equal(f.messages.at(-1).deepStatus, 'error', 'a manual failure is still reported')
+  signedIn = true
+  await f.request('deep')
+  assert.equal(f.messages.at(-1).autoBlocked, '', 'signing in and running once resumes automatic review')
+})
+
 test('旧偏好键的「关掉」按 AI 关迁移过来，不替用户重新打开要花钱的那条链路', async (t) => {
   const stored = new Map([['awd_inline_review_legacy', { enabled: false, hidden: true }]])
   const messages = []

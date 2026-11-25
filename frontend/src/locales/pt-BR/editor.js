@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Causa: este trecho excede o contexto do modelo. Divida-o e revise novamente.",
       "DEEP_MODEL_UNAVAILABLE": "Causa: o modelo auxiliar está indisponível. Escolha outro nas configurações.",
       "DEEP_REGION": "Causa: o provedor rejeitou esta região de rede. Altere o modelo ou a rede.",
-      "DEEP_FAILED": "Causa: a chamada ao modelo falhou."
+      "DEEP_FAILED": "Causa: a chamada ao modelo falhou.",
+      "DEEP_SIGNED_OUT": "Causa: você não está conectado. Entre para usar a revisão com IA."
     }
   },
   "toolbar": {

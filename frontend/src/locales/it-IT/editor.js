@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Causa: questo passaggio supera il contesto del modello. Suddividilo e ripeti la revisione.",
       "DEEP_MODEL_UNAVAILABLE": "Causa: il modello ausiliario non è disponibile. Scegline un altro nelle impostazioni.",
       "DEEP_REGION": "Causa: il fornitore ha rifiutato questa regione di rete. Cambia il modello o la rete.",
-      "DEEP_FAILED": "Causa: la chiamata al modello non è riuscita."
+      "DEEP_FAILED": "Causa: la chiamata al modello non è riuscita.",
+      "DEEP_SIGNED_OUT": "Causa: non hai effettuato l’accesso. Accedi per usare la revisione IA."
     }
   },
   "toolbar": {

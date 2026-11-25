@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Nguyên nhân: đoạn văn bản này vượt quá ngữ cảnh của mô hình. Hãy chia nhỏ đoạn rồi rà soát lại.",
       "DEEP_MODEL_UNAVAILABLE": "Nguyên nhân: mô hình phụ trợ hiện không khả dụng. Vui lòng chọn mô hình khác trong phần cài đặt.",
       "DEEP_REGION": "Nguyên nhân: nhà cung cấp từ chối khu vực mạng hiện tại. Hãy đổi mô hình hoặc kết nối mạng.",
-      "DEEP_FAILED": "Nguyên nhân: gọi mô hình thất bại."
+      "DEEP_FAILED": "Nguyên nhân: gọi mô hình thất bại.",
+      "DEEP_SIGNED_OUT": "Nguyên nhân: bạn chưa đăng nhập. Hãy đăng nhập để dùng tính năng rà soát bằng AI."
     }
   },
   "toolbar": {

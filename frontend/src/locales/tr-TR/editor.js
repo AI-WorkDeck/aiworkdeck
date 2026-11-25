@@ -419,7 +419,8 @@ export default {
       "DEEP_TOO_LONG": "Neden: bu bölüm model bağlamını aşıyor. Bölüp tekrar inceleyin.",
       "DEEP_MODEL_UNAVAILABLE": "Neden: yardımcı model kullanılamıyor. Ayarlardan başka bir model seçin.",
       "DEEP_REGION": "Neden: sağlayıcı bu ağ bölgesini reddetti. Modeli veya ağı değiştirin.",
-      "DEEP_FAILED": "Neden: model çağrısı başarısız oldu."
+      "DEEP_FAILED": "Neden: model çağrısı başarısız oldu.",
+      "DEEP_SIGNED_OUT": "Neden: oturum açmadınız. Yapay zekâ incelemesini kullanmak için oturum açın."
     }
   },
   "toolbar": {
