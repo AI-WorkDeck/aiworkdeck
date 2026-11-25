@@ -19,6 +19,7 @@ import { cancelledEditedDocument, stopNoticeForCancelled } from '../../src/utils
 import { isSameFileChange } from '../../src/utils/chatFileChange.js'
 import { isAccountRequired, isCreditsRequired } from '../../src/utils/requireAccountCore.js'
 import { bqtErrorCode, bqtErrorMessage } from '../../src/utils/bqtBilling.js'
+import { toUserMessage } from '../../src/utils/userMessage.js'
 import { createLegacyAskUserMarkup } from '../../src/composables/legacyAskUserMarkup.mjs'
 import { isUserQuestionAwaiting } from '../../src/composables/awaitingInput.mjs'
 
@@ -62,6 +63,7 @@ const DEPS = {
   createLegacyAskUserMarkup,
   isAccountRequired,
   isCreditsRequired,
+  toUserMessage,
   bqtErrorCode,
   bqtErrorMessage,
 }

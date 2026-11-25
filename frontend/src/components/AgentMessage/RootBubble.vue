@@ -174,6 +174,10 @@
              isReady/hasContent 判定——它不是模型正文，不该让空产出的回合长出
              「用到文档」操作 chip（dev-board#212）。 -->
         <div v-if="bubble.stopNotice" class="stop-notice">{{ bubble.stopNotice }}</div>
+        <!-- X7：这一轮失败了——目录文案 + 重试/登录 + 详情；原始错误只在详情里 -->
+        <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="bubble.errorNotice"
+          :actionable="isLatest || bubble.errorNotice.action === 'signIn'"
+          @retry="$emit('regenerate')" @sign-in="signInForAi" />
     </div>
   </div>
 </template>
@@ -192,6 +196,8 @@ import CrossBorderConsentCard from '../account/CrossBorderConsentCard.vue'
 import LegalReferencePane from '../legal/LegalReferencePane.vue'
 import { legalMessageParts, referencesFromTools, legalReadableText, allowPlainJsonLegalReferences, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
+import AwdInlineError from '../AwdInlineError.vue'
+import { requireAccount } from '@/utils/requireAccount.js'
 import { stripEmoji } from '@/utils/stripEmoji.js'
 import { t } from '@/i18n'
 import { visibleChatTimeline, isTimelineEntryActive } from './chatTimeline.mjs'
@@ -250,6 +256,9 @@ function pickAction(type) {
 const copyableText = computed(() => (props.bubble.isStreaming ? '' : answerPlainText(legalReadableText(props.bubble.content, t, allowPlainJson.value))))
 const showCopy = computed(() => !!copyableText.value)
 const showRegenerate = computed(() => props.isLatest && !props.bubble.isStreaming && !!props.bubble.content)
+function signInForAi() {
+  return requireAccount({ reason: 'ai' })
+}
 function copyAnswer() {
   copyToClipboard(copyableText.value)
 }
@@ -419,6 +428,7 @@ function isApprovalPending(art) {
   letter-spacing: 0.3px;
 }
 
+.bubble-error-notice { margin-bottom: 14px; }
 .stop-notice {
   font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
