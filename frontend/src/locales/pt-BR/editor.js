@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Conteúdo do documento {loaded} / {total}",
   "dlLoadedOnly": "Foram lidos {size} do conteúdo do documento",
   "firstOpenHint": "A primeira abertura inicializa o motor de documentos; documentos grandes podem levar um momento",
+  "readFailed": {
+    "autoRetry": "Tentaremos de novo automaticamente quando o serviço local voltar. O documento não pode ser editado até ser lido.",
+    "retry": "Tentar novamente"
+  },
   "openFailed": {
     "title": "Não é possível abrir o documento: o editor não está respondendo ou o arquivo está danificado",
     "encryptedTitle": "Este arquivo está protegido por senha de abertura, que o editor ainda não consegue abrir. Remova a senha no Excel, Word, PowerPoint ou WPS e abra novamente, ou baixe o original.",

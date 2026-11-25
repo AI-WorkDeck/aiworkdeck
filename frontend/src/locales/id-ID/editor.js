@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Konten dokumen {loaded} / {total}",
   "dlLoadedOnly": "Membaca {size} dari konten dokumen",
   "firstOpenHint": "Pembukaan pertama menginisialisasi mesin dokumen; dokumen besar mungkin memerlukan waktu sebentar",
+  "readFailed": {
+    "autoRetry": "Kami akan mencoba lagi secara otomatis saat layanan lokal kembali. Dokumen tidak dapat diedit sebelum berhasil dibaca.",
+    "retry": "Coba lagi"
+  },
   "openFailed": {
     "title": "Dokumen tidak dapat dibuka: editor tidak merespons atau berkas rusak",
     "encryptedTitle": "File ini dilindungi kata sandi pembuka yang belum dapat dibuka oleh editor. Hapus kata sandi di Excel, Word, PowerPoint, atau WPS lalu buka lagi, atau unduh file aslinya.",

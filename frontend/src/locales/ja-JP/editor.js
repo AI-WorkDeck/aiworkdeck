@@ -136,6 +136,10 @@ export default {
   "dlProgress": "文書データ {loaded} / {total}",
   "dlLoadedOnly": "文書データを {size} 読み込みました",
   "firstOpenHint": "初回起動時は文書エンジンを初期化するため、大きな文書では少し時間がかかる場合があります",
+  "readFailed": {
+    "autoRetry": "ローカルサービスが復旧すると自動で再試行します。読み込みが終わるまで文書は編集できません。",
+    "retry": "再試行"
+  },
   "openFailed": {
     "title": "文書を開けません：エディタが応答しないか、ファイルが破損しています",
     "encryptedTitle": "このファイルには読み取りパスワードが設定されているため、エディタではまだ開けません。Excel・Word・PowerPoint または WPS でパスワードを解除してから開き直すか、元のファイルをダウンロードしてください。",

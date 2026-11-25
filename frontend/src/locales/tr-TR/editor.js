@@ -136,6 +136,10 @@ export default {
   "dlProgress": "Belge içeriği {loaded} / {total}",
   "dlLoadedOnly": "Belge içeriğinin {size} kadarı okundu",
   "firstOpenHint": "İlk açılışta belge motoru başlatılır; büyük belgeler biraz zaman alabilir",
+  "readFailed": {
+    "autoRetry": "Yerel hizmet geri geldiğinde otomatik olarak yeniden deneyeceğiz. Belge okunana kadar düzenlenemez.",
+    "retry": "Tekrar dene"
+  },
   "openFailed": {
     "title": "Belge açılamıyor: düzenleyici yanıt vermiyor veya dosya hasar görmüş",
     "encryptedTitle": "Bu dosya, düzenleyicinin henüz açamadığı bir açılış parolasıyla korunuyor. Parolayı Excel, Word, PowerPoint veya WPS’te kaldırıp yeniden açın ya da orijinal dosyayı indirin.",
