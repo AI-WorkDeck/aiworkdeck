@@ -17,7 +17,7 @@ class ZhHantConverterTest {
 
     /** Simplified-only characters that must never survive conversion (their Traditional forms differ). */
     private static final String SIMPLIFIED_ONLY =
-            "这们个设项语览开关录务计档发应实时间进显为与无会认证账户编辑选择删换页单帮种签网络云题话历类级达动态后说请输从对还没让给过现点击费将该样导识规则别内尽";
+            "这们个设项语览开关录务计档发应实时间进显为与无会认证账户编辑选择删换页单帮种签网络云题话历类级达动态后说请输从对还没让给过现点击费将该样导识规则别内尽钮";
 
     @Test
     void conjunctionBingBecomesBingWithDotsNotMergeBing() {
@@ -44,6 +44,29 @@ class ZhHantConverterTest {
         // 注: attention stays 注; register/annotate = 註
         assertEquals("注意", ZhHantConverter.toTraditional("注意"));
         assertEquals("註冊與批註", ZhHantConverter.toTraditional("注册与批注"));
+    }
+
+    /**
+     * Every zh-CN literal passed to {@code LangText.of(zh, en)} in the backend is what a zh-TW user sees after
+     * conversion. Scan them all, so a new message can't ship half-converted (caught by the zh-TW journey on
+     * 2026-11-25: 「…点右上角的帳戶按钮即可連接」).
+     */
+    @Test
+    void everyBackendLangTextLiteralConvertsCleanly() throws java.io.IOException {
+        java.util.regex.Pattern lit = java.util.regex.Pattern.compile("LangText\\.of\\(\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+        List<String> offenders = new java.util.ArrayList<>();
+        try (var files = java.nio.file.Files.walk(java.nio.file.Path.of("src/main/java"))) {
+            for (var f : (Iterable<java.nio.file.Path>) files.filter(p -> p.toString().endsWith(".java"))::iterator) {
+                var m = lit.matcher(java.nio.file.Files.readString(f));
+                while (m.find()) {
+                    String out = ZhHantConverter.toTraditional(m.group(1));
+                    String left = out.chars().filter(c -> SIMPLIFIED_ONLY.indexOf(c) >= 0)
+                            .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
+                    if (!left.isEmpty()) offenders.add(f.getFileName() + ": [" + left + "] " + out);
+                }
+            }
+        }
+        assertTrue(offenders.isEmpty(), () -> offenders.size() + " zh-TW strings keep Simplified characters:\n" + String.join("\n", offenders));
     }
 
     @Test
