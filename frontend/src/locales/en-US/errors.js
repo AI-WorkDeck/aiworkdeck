@@ -27,7 +27,7 @@ export default {
     "hideDetails": "Hide details",
     "continue": "Continue",
     "refresh": "Refresh",
-    "signIn": "Sign in",
+    "signIn": "Sign In",
     "feedback": "Feedback"
   }
 }
