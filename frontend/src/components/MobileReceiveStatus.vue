@@ -1,7 +1,8 @@
 <!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <view class="mobile-receive">
+  <!-- D14：没开通也没出错时不占状态栏（首次使用的律师看不懂「手机收件：未启用」，也无事可做） -->
+  <view v-if="!inactive || open" class="mobile-receive">
     <button class="receive-trigger" :class="{ attention: hasFailure }" @click="open = !open" :aria-expanded="open">
       <span class="receive-dot" :class="{ busy: status.checking, failed: hasFailure }"></span>
       {{ inactive ? $t('workbench.mobileReceive.inactiveLabel') : $t('workbench.mobileReceive.title') + ' · ' + summary }}
