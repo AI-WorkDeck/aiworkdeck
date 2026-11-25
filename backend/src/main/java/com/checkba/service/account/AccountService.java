@@ -252,8 +252,8 @@ public class AccountService {
     private synchronized ConnectionSnapshot requireConnectionSnapshot() {
         ConnectionSnapshot connection = connectionSnapshot();
         if (connection.key() == null) throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                LangText.of("尚未连接 AI WorkDeck 账户，可在设置页「账户与用量」粘贴账户 Key",
-                        "No AI WorkDeck account connected yet. Paste your account key on the Settings page under \"Account & Usage\""));
+                LangText.of("尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
+                        "No AI WorkDeck account connected yet. Use Sign in at the top right."));
         return connection;
     }
 
@@ -1224,8 +1224,8 @@ public class AccountService {
         State state = loadState();
         if (state.authExpired || state.key == null || state.key.isBlank()) {
             throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                    LangText.of("尚未连接 AI WorkDeck 账户，可在设置页「账户与用量」粘贴账户 Key",
-                            "No AI WorkDeck account connected yet. Paste your account key on the Settings page under \"Account & Usage\""));
+                    LangText.of("尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
+                            "No AI WorkDeck account connected yet. Use Sign in at the top right."));
         }
         return state.key;
     }

@@ -142,7 +142,7 @@ export default {
   "tieredPricing": "Uzun bağlam için daha yüksek ücretler",
   "noVisionTag": "Görüntü girişi yok",
   "modelNoVisionToast": "Bu model görüntüleri doğrudan okuyamaz. Görüntüler tanınan metin (OCR) olarak işlenecek.",
-  "noModels": "Kullanılabilir model yok. AI sağlayıcı ayarlarını kontrol edin.",
+  "noModels": "Henüz model yok. Yapay zekâyı kullanmak için AI WorkDeck hesabınızda oturum açın.",
   "networkBasis": "Ağ kontrolü: {basis}",
   "modelPriceUnitCny": "Birim: 1M token başına CNY, giriş / çıkış",
   "modelPriceUnitUsd": "Birim: 1 milyon token başına ABD doları, giriş / çıkış",

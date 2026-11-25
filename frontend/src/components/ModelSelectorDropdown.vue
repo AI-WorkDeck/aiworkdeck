@@ -55,7 +55,11 @@
         </view>
       </view>
     </view>
-    <view v-if="!groups.length" class="model-empty">{{ $t('chat.noModels') }}</view>
+    <view v-if="!groups.length" class="model-empty">
+      <text>{{ $t('chat.noModels') }}</text>
+      <!-- D5：没登录时模型列表为空，给出路而不是一句死胡同（已登录时 requireAccount 直接放行，不弹层） -->
+      <view class="model-empty-action" role="button" tabindex="0" @tap.stop="signIn" @keydown.enter.prevent="signIn">{{ $t('welcome.signIn') }}</view>
+    </view>
     <view class="model-footnote">
       <template v-if="groups.length">
         <text class="model-footnote-line">{{ unitLine }}</text>
@@ -76,6 +80,7 @@ import {
   normalizePriceDisplay,
   priceLevelOf,
 } from '@/utils/modelPricing.js'
+import { requireAccount } from '@/utils/requireAccount.js'
 
 export default {
   name: 'ModelSelectorDropdown',
@@ -130,6 +135,9 @@ export default {
     },
   },
   methods: {
+    signIn() {
+      return requireAccount({ reason: 'ai' })
+    },
     priceLevelOf,
     priceOf(m) {
       return modelPriceTexts(m, this.display)
@@ -345,6 +353,18 @@ export default {
   padding: 10px 14px;
   font-size: 12px;
   color: var(--awd-text-3);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.model-empty-action {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--awd-text-on-accent);
+  background: var(--awd-accent);
+  cursor: pointer;
 }
 /* 统一脚注：单位、口径、档位含义、网络判定，一处说清，不逐行重复 */
 .model-footnote {
