@@ -1019,7 +1019,7 @@ try {
     const J35_PROMPT = 'J3.5 登录后置回归：这句话不该被发出去 ' + ts
     const hash0 = await page.evaluate(() => location.hash)
     const opened = await step('未连账户时 AI 发送先弹登录层（含站点分段控件与「暂不登录」）', async () => {
-      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title="AI 助手"]')
+      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title^="AI 助手"]')
       await page.waitForSelector('.chat-input-rich', { timeout: 10000 })
       await mouseClickSel('.chat-input-rich')
       await page.keyboard.type(J35_PROMPT, { delay: 5 })
@@ -1267,17 +1267,17 @@ try {
     await page.waitForSelector('.sidebar-left', { timeout: 10000 })
     // 进入设置标签可保留收起状态；先经真实展开按钮建立本用例起点。
     if (await page.$eval('.sidebar-left', el => el.getBoundingClientRect().width) <= 0) {
-      await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
+      await mouseClickSel('.top-bar-btn[title^="展开左侧栏"]')
       await page.waitForFunction(() => document.querySelector('.sidebar-left').getBoundingClientRect().width > 0,
         { timeout: 10000 })
     }
     const widthBefore = await page.$eval('.sidebar-left', (el) => el.getBoundingClientRect().width)
-    await mouseClickSel('.top-bar-btn[title="收起左侧栏"]')
+    await mouseClickSel('.top-bar-btn[title^="收起左侧栏"]')
     await page.waitForFunction(
       () => document.querySelector('.sidebar-left')?.getBoundingClientRect().width === 0,
       { timeout: 8000 },
     )
-    await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
+    await mouseClickSel('.top-bar-btn[title^="展开左侧栏"]')
     await page.waitForFunction(
       () => (document.querySelector('.sidebar-left')?.getBoundingClientRect().width || 0) > 0,
       { timeout: 8000 },
@@ -1297,7 +1297,7 @@ try {
   console.log('== J6.6 剪贴板面板 ==')
   await step('剪贴板面板可打开', async () => {
     // 「常用工具」是开关：面板已开时再点会把它关掉——先探测再决定是否点击
-    if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title="常用工具"]')
+    if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title^="常用工具"]')
     await page.waitForSelector('.bottom-panel', { timeout: 10000 })
     await mouseClickText('剪贴板')
     // 真正进入插件 iframe，不能只验宿主 tab 激活。
@@ -1552,7 +1552,7 @@ try {
     // 提问原文要在两个步骤里复用（定位这一轮），提到外面来
     const J65_PROMPT = '这是自动化测试。请只回复四个字：测试通过'
     await step('AI 面板发送并收到流式回复', async () => {
-      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title="AI 助手"]')
+      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title^="AI 助手"]')
       await page.waitForSelector('.chat-input-rich', { timeout: 10000 })
       await mouseClickSel('.chat-input-rich')
       await page.keyboard.type(J65_PROMPT, { delay: 10 })
@@ -3142,7 +3142,7 @@ try {
 
   await step('J12 工作台四列英文锚点（rail title 属性）', async () => {
     for (const title of ['Explorer', 'AI Assistant', 'Staging Area']) {
-      await page.waitForSelector('[title="' + title + '"]', { timeout: 15000 })
+      await page.waitForSelector('[title^="' + title + '"]', { timeout: 15000 }) // top-bar titles carry a shortcut suffix since #1708
     }
     // 版本入口会附带待提交/同步状态，仍核验英文可访问标题而非只检查按钮存在。
     const versionTitle = await page.$eval('.version-entry', (e) => e.getAttribute('title') || '')
@@ -3211,7 +3211,7 @@ try {
 
   if (process.env.AI_E2E !== '0') {
     await step('J12 AI 面板输入区英文', async () => {
-      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title="AI Assistant"]')
+      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title^="AI Assistant"]')
       await page.waitForSelector('.chat-input-rich', { timeout: 10000 })
       // 只断言输入框占位：面板里其余固定文案要么本来就是英文原文（模式名
       // Agent/Ask/Plan、Ask anything…，中英同值、没有鉴别力），要么与用户数据
