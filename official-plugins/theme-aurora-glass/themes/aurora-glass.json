@@ -1,6 +1,6 @@
 {
   "id": "aurora-glass",
-  "name": "深海极光 · 冰刃琉璃",
+  "name": "极光",
   "previewSwatches": ["#EFF5FA", "#026AA7", "#8B5CF6", "#0B131E"],
   "effects": {
     "aiPulseStyle": "aurora-pulse",

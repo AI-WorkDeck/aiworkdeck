@@ -1,8 +1,8 @@
 {
-  "plugin.name": "Aurora Glass · Abyssal Pro 스킨",
-  "plugin.desc": "심연의 네이비, 서리 낀 아이스 시안 유리, 그리고 자수정 크리스탈 코어로 깊은 집중력을 선사합니다.",
-  "theme.name": "Aurora Glass",
-  "theme.desc": "어비스 네이비 × 프로스티드 아이스 시안 × 자수정 크리스탈 코어",
+  "plugin.name": "오로라",
+  "plugin.desc": "유리 패널 위에 오로라 그린 하이라이트를 더한 심해 블루",
+  "theme.name": "오로라",
+  "theme.desc": "유리 패널 위에 오로라 그린 하이라이트를 더한 심해 블루",
   "gallery.badge": "테마 갤러리",
   "gallery.swatch1": "빙하의 새벽",
   "gallery.swatch2": "얼음 유리",
