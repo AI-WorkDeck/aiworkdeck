@@ -335,6 +335,15 @@ const SHOTS = [
       await openWorkbench(page, base, projectId)
       await clickTitle(page, '客户协作')
       await waitText(page, '律师发送的邀请码')
+      // The join form renders before the connection list has loaded; until it has, a 「正在加载」 line sits
+      // under it, so the shot depended on timing (POLISH X52: 14086 vs 15846 px on the same code).
+      await page.waitForFunction(() => {
+        const ws = document.querySelector('.dd-workspace')
+        return ws && !ws.querySelector('.loading-state')
+      }, { timeout: 20000 })
+      // The header's notification line (「项目消息会显示在这里 · 开启系统提醒」) is rewritten when the first
+      // notification poll returns; that was the remaining 1760 px difference between runs.
+      await page.waitForNetworkIdle({ idleTime: 600, timeout: 20000 })
     },
   },
   {
