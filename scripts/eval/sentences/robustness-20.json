@@ -7,7 +7,7 @@
    "hostState": "docx:contract",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const xml = ctx.docxXml(buf); const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g)||[]).map(p=>({xml:p,text:(p.replace(/<w:del\\b[\\s\\S]*?<\\/w:del>/g,'').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('')})); const P = paras(xml); const p3 = P.find(p=>/第三条/.test(p.text)), p4 = P.find(p=>/第四条/.test(p.text)); if (!p3 || !p4) return false; return /<w:(ins|del)\\b/.test(p3.xml) && /<w:(ins|del)\\b/.test(p4.xml);",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const xml = ctx.docxXml(buf); const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g)||[]).map(p=>({xml:p,text:(p.replace(/<w:del\\b[\\s\\S]*?<\\/w:del>/g,'').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('')})); const P = paras(xml); const p3 = P.find(p=>/第三条/.test(p.text)), p4 = P.find(p=>/第四条/.test(p.text)); if (!p3 || !p4) return false; return /<w:(ins|del)\\b/.test(p3.xml) && /<w:(ins|del)\\b/.test(p4.xml);",
     "_note": "修订痕迹落在第三条与第四条；不要求具体措辞（模型质量另评）"
    },
    "task": true
@@ -18,7 +18,7 @@
    "hostState": "docx:contract",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g)||[]).map(p=>({xml:p,text:(p.replace(/<w:del\\b[\\s\\S]*?<\\/w:del>/g,'').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('')})); const P = paras(ctx.docxXml(buf)); const p3 = P.find(p=>/第三条/.test(p.text)); if (!p3) return false; const others = ['第一条','第二条','第四条','第五条'].every(k => P.filter(p=>p.text.includes(k)).length === 1); return /15\\s*日/.test(p3.text) && !/视为合格/.test(p3.text) && others;",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g)||[]).map(p=>({xml:p,text:(p.replace(/<w:del\\b[\\s\\S]*?<\\/w:del>/g,'').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('')})); const P = paras(ctx.docxXml(buf)); const p3 = P.find(p=>/第三条/.test(p.text)); if (!p3) return false; const others = ['第一条','第二条','第四条','第五条'].every(k => P.filter(p=>p.text.includes(k)).length === 1); return /15\\s*日/.test(p3.text) && !/视为合格/.test(p3.text) && others;",
     "_note": "第三条改写到位，其余四条各只出现一次（无重复/丢失段落）"
    },
    "task": true
@@ -29,7 +29,7 @@
    "hostState": "docx:contract",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; let c = ''; try { c = ctx.docxXml(buf, 'word/comments.xml') } catch { return false } const n = (c.match(/<w:comment\\b/g)||[]).length; return n >= 2;"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; let c = ''; try { c = ctx.docxXml(buf, 'word/comments.xml') } catch { return false } const n = (c.match(/<w:comment\\b/g)||[]).length; return n >= 2;"
    },
    "task": true
   },
@@ -39,7 +39,7 @@
    "hostState": "docx:contract-huge",
    "expect": {
     "maxRounds": 16,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g)||[]).map(p=>({xml:p,text:(p.replace(/<w:del\\b[\\s\\S]*?<\\/w:del>/g,'').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('')})); const P = paras(ctx.docxXml(buf)); const p98 = P.find(p=>/第九十八条/.test(p.text)); const p47 = P.find(p=>/第四十七条/.test(p.text)); if (!p98 || !p47) return false; return /100\\s*%/.test(p98.text) && !/30\\s*%/.test(p98.text) && /100\\s*%/.test(p47.text) && P.length >= 120;",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const paras = xml => (xml.match(/<w:p[ >][\\s\\S]*?<\\/w:p>/g)||[]).map(p=>({xml:p,text:(p.replace(/<w:del\\b[\\s\\S]*?<\\/w:del>/g,'').match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join('')})); const P = paras(ctx.docxXml(buf)); const p98 = P.find(p=>/第九十八条/.test(p.text)); const p47 = P.find(p=>/第四十七条/.test(p.text)); if (!p98 || !p47) return false; return /100\\s*%/.test(p98.text) && !/30\\s*%/.test(p98.text) && /100\\s*%/.test(p47.text) && P.length >= 120;",
     "_note": "长文档（约 2.3 万字，120 条）：定位第 47/98 条矛盾并修改第 98 条；段落数不减"
    },
    "task": true
@@ -50,7 +50,7 @@
    "hostState": "docx:contract-tracked",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const xml = ctx.docxXml(buf); const text = (xml.match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join(''); return !/<w:(ins|del)\\b/.test(xml) && /7\\s*日/.test(text) && !/15\\s*日/.test(text);"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('合同.docx'); if (!buf) return false; const xml = ctx.docxXml(buf); const text = (xml.match(/<w:t(?: [^>]*)?>[^<]*<\\/w:t>/g)||[]).map(t=>t.replace(/<[^>]+>/g,'')).join(''); return !/<w:(ins|del)\\b/.test(xml) && /7\\s*日/.test(text) && !/15\\s*日/.test(text);"
    },
    "task": true
   },
@@ -60,7 +60,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const t = ctx.finalText; return /15\\s*日/.test(t) && /20\\s*%/.test(t) && /保密/.test(t);",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const t = ctx.finalText; return /15\\s*日/.test(t) && /20\\s*%/.test(t) && /保密/.test(t);",
     "_note": "三处实质差异：付款 10→15 日、违约金 10%→20%、新增保密；第二条仅空白差异不应作为实质修改（质量项，不判）"
    },
    "task": true,
@@ -83,7 +83,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const f = (await ctx.files()).find(x=>!x.is_deleted && /违约金对比表.*\\.docx$/.test(x.name)); if (!f) return false; const xml = ctx.docxXml(await ctx.bytes(f.id)); return /<w:tbl>/.test(xml) && /华东/.test(xml) && /华南/.test(xml) && /华北/.test(xml);"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const f = (await ctx.files()).find(x=>!x.is_deleted && /违约金对比表.*\\.docx$/.test(x.name)); if (!f) return false; const xml = ctx.docxXml(await ctx.bytes(f.id)); return /<w:tbl>/.test(xml) && /华东/.test(xml) && /华南/.test(xml) && /华北/.test(xml);"
    },
    "task": true,
    "seed": {
@@ -115,7 +115,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 16,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const t = ctx.finalText; const hits = [/Northwind|北风/i.test(t), /2025.{0,4}3.{0,3}14|14 March 2025|3月14日/.test(t), /41\\s*(天|日|days)/.test(t), /1[,，]?250[,，]?000|125\\s*万/.test(t), /10\\s*%/.test(t), /新加坡|Singapore/i.test(t)]; return hits.filter(Boolean).length >= 5;",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const t = ctx.finalText; const hits = [/Northwind|北风/i.test(t), /2025.{0,4}3.{0,3}14|14 March 2025|3月14日/.test(t), /41\\s*(天|日|days)/.test(t), /1[,，]?250[,，]?000|125\\s*万/.test(t), /10\\s*%/.test(t), /新加坡|Singapore/i.test(t)]; return hits.filter(Boolean).length >= 5;",
     "_note": "关键事实分布在第 3/7/23/38/44/46 页；6 项至少命中 5 项（漏读后半本是产品问题的信号：截断/分页读取）"
    },
    "task": true,
@@ -134,7 +134,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const all = (await ctx.files()).filter(x=>!x.is_deleted && !x.is_folder && /\\.pdf$/i.test(x.name)); const orig = all.find(x=>x.name==='庭审卷宗.pdf'); if (!orig) return false; const out = all.find(x=>x.id!==orig.id); if (!out) return false; const r = await ctx.api('GET', '/api/files/' + out.id + '/text'); const t = String(r?.data ?? ''); return /page 38 of 50/.test(t) && /page 46 of 50/.test(t) && !/page 37 of 50/.test(t) && !/page 47 of 50/.test(t);"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const all = (await ctx.files()).filter(x=>!x.is_deleted && !x.is_folder && /\\.pdf$/i.test(x.name)); const orig = all.find(x=>x.name==='庭审卷宗.pdf'); if (!orig) return false; const out = all.find(x=>x.id!==orig.id); if (!out) return false; const r = await ctx.api('GET', '/api/files/' + out.id + '/text'); const t = String(r?.data ?? ''); return /page 38 of 50/.test(t) && /page 46 of 50/.test(t) && !/page 37 of 50/.test(t) && !/page 47 of 50/.test(t);"
    },
    "task": true,
    "seed": {
@@ -149,20 +149,13 @@
   {
    "id": "r10-table-to-excel",
    "text": "把「合同.docx」里的价目表提取出来，做成一个Excel文件「价目表.xlsx」，再加一列金额（数量×单价）",
-   "hostState": "nofile",
+   "hostState": "docx:contract-table",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const f = (await ctx.files()).find(x=>!x.is_deleted && /价目表.*\\.xlsx$/.test(x.name)); if (!f) return false; const wb = ctx.xlsx(await ctx.bytes(f.id)); const sh = wb.sheet(); const vals = sh ? Object.values(sh.cells).map(c=>String(c.v ?? '')) : []; return vals.includes('传感器') && vals.includes('网关') && (vals.includes('800000') || vals.some(v=>/^800000(\\.0+)?$/.test(v)) || (sh && Object.values(sh.cells).some(c=>/\\*/.test(c.f||''))));"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const f = (await ctx.files()).find(x=>!x.is_deleted && /价目表.*\\.xlsx$/.test(x.name)); if (!f) return false; const wb = ctx.xlsx(await ctx.bytes(f.id)); const sh = wb.sheet(); const vals = sh ? Object.values(sh.cells).map(c=>String(c.v ?? '')) : []; return vals.includes('传感器') && vals.includes('网关') && (vals.includes('800000') || vals.some(v=>/^800000(\\.0+)?$/.test(v)) || (sh && Object.values(sh.cells).some(c=>/\\*/.test(c.f||''))));",
+    "_note": "编辑器宿主（页面在场才有 sheet_create_file 等客户端工具；API 句 clientCapability=none 下模型拿不到建表工具，首轮两次失败即此原因）。新 xlsx 含传感器/网关，且有金额（800000 或乘法公式）"
    },
-   "task": true,
-   "seed": {
-    "files": [
-     {
-      "name": "合同.docx",
-      "fixture": "contract-table.docx"
-     }
-    ]
-   }
+   "task": true
   },
   {
    "id": "r11-excel-sum",
@@ -170,7 +163,7 @@
    "hostState": "xlsx:case-ledger",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const L = ctx.xlsx(buf).sheet('台账'); if (!L) return false; return Object.entries(L.cells).some(([r,x]) => /^D\\d+$/.test(r) && /SUM/i.test(x.f||''));"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('案件台账.xlsx'); if (!buf) return false; const L = ctx.xlsx(buf).sheet('台账'); if (!L) return false; return Object.entries(L.cells).some(([r,x]) => /^D\\d+$/.test(r) && /SUM/i.test(x.f||''));"
    },
    "task": true
   },
@@ -180,7 +173,7 @@
    "hostState": "pptx:case-report",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const last = S[S.length-1]; return S.length === 6 && /下一步工作/.test(last.text) && (last.paragraphs||[]).length >= 3;"
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const buf = await ctx.hostBytes('案件汇报.pptx'); if (!buf) return false; const S = ctx.pptx(buf); const last = S[S.length-1]; return S.length === 6 && /下一步工作/.test(last.text) && (last.paragraphs||[]).length >= 3;"
    },
    "task": true
   },
@@ -190,7 +183,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 20,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; if (ctx.firstTurn.status !== 'cancelled' && ctx.firstTurn.status !== 'finished') return false; if (ctx.firstTurn.cancelLatencyMs != null && ctx.firstTurn.cancelLatencyMs > 15000) return false; const live = (await ctx.files()).filter(x=>!x.is_deleted && !x.is_folder); return live.filter(x=>/\\.docx$/.test(x.name)).length >= 3 && ctx.status === 'finished' && /华东|华南|华北/.test(ctx.finalText);",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; if (ctx.firstTurn.status !== 'cancelled' && ctx.firstTurn.status !== 'finished') return false; if (ctx.firstTurn.cancelLatencyMs != null && ctx.firstTurn.cancelLatencyMs > 15000) return false; const live = (await ctx.files()).filter(x=>!x.is_deleted && !x.is_folder); return live.filter(x=>/\\.docx$/.test(x.name)).length >= 3 && ctx.status === 'finished' && /华东|华南|华北/.test(ctx.finalText);",
     "_note": "12 秒时取消：须在 15 秒内收尾为 cancelled（或已完成）；原件不丢；同一会话的追问能正常答出（取消不毒化会话）"
    },
    "task": true,
@@ -230,7 +223,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const t = ctx.finalText; return ctx.status === 'finished' && /华东|0\\.5\\s*%/.test(t) && /华南|20\\s*%/.test(t) && /(打不开|无法(打开|读取|解析)|损坏|读取失败)/.test(t);",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const t = ctx.finalText; return ctx.status === 'finished' && /华东|0\\.5\\s*%/.test(t) && /华南|20\\s*%/.test(t) && /(打不开|无法(打开|读取|解析)|损坏|读取失败)/.test(t);",
     "_note": "第三份是损坏文件：工具失败后继续处理其余两份，并如实说明那份打不开；不卡住、不吐异常原文"
    },
    "task": true,
@@ -263,7 +256,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; return ctx.status === 'finished' && /50\\s*%|违约金/.test(ctx.finalText);",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; return ctx.status === 'finished' && /50\\s*%|违约金/.test(ctx.finalText);",
     "_note": "模型流式回复在第 6 块后被掐断（模拟网络中断）：产品应自动重试或保留并提示，最终给出完整回答；不能卡住或只给半句"
    },
    "task": true,
@@ -286,7 +279,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const f = (await ctx.files()).find(x=>!x.is_deleted && /备忘录.*\\.docx$/.test(x.name)); if (!f) return false; const xml = ctx.docxXml(await ctx.bytes(f.id)); return /50\\s*%/.test(xml) && /(过高|偏高|调整|30\\s*%|20\\s*%)/.test(xml);",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const f = (await ctx.files()).find(x=>!x.is_deleted && /备忘录.*\\.docx$/.test(x.name)); if (!f) return false; const xml = ctx.docxXml(await ctx.bytes(f.id)); return /50\\s*%/.test(xml) && /(过高|偏高|调整|30\\s*%|20\\s*%)/.test(xml);",
     "_note": "第二轮只说「这个比例」：须沿用上一轮的 50%（上下文不丢）"
    },
    "task": true,
@@ -311,7 +304,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; return /示范仲裁委员会/.test(ctx.finalText) && ctx.status === 'finished';",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; return /示范仲裁委员会/.test(ctx.finalText) && ctx.status === 'finished';",
     "_note": "「第二个文件」指上一轮列出的顺序；两份都约定示范仲裁委员会，答出仲裁即可（若反问是哪份，也算失败）"
    },
    "task": true,
@@ -340,7 +333,7 @@
    "hostState": "docx:contract",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; return ctx.tools.includes('ask_user') || ctx.status === 'awaiting_input';",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; return ctx.tools.includes('ask_user') || ctx.status === 'awaiting_input';",
     "_note": "指令缺关键信息（改成多少），应反问而不是乱改",
     "status": "awaiting_input"
    },
@@ -352,7 +345,7 @@
    "hostState": "nofile",
    "expect": {
     "maxRounds": 14,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const live = (await ctx.files()).filter(x=>!x.is_deleted && !x.is_folder); return live.length === 3 && (ctx.tools.includes('ask_user') || ctx.status === 'awaiting_input');",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const live = (await ctx.files()).filter(x=>!x.is_deleted && !x.is_folder); return live.length === 3 && (ctx.tools.includes('ask_user') || ctx.status === 'awaiting_input');",
     "_note": "批量删除必须先确认，且没确认前一份都不能删",
     "status": "awaiting_input"
    },
@@ -380,7 +373,7 @@
    "hostState": "docx:contract-tracked",
    "expect": {
     "maxRounds": 16,
-    "outcomeCheck": "if (/Exception|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const all = await ctx.files(); const host = all.find(x=>!x.is_deleted && !x.is_folder && x.name==='合同.docx'); if (!host) return false; const xml = ctx.docxXml(await ctx.bytes(host.id)); const pdf = all.find(x=>!x.is_deleted && /\\.pdf$/i.test(x.name)); return !/<w:(ins|del)\\b/.test(xml) && /出具书面验收单/.test(xml) && !!pdf;",
+    "outcomeCheck": "if (/Exception|TIKA-\\d|PackageParser|\\bat com\\.|Failed to fetch|\\bHTTP \\d{3}\\b|SSE Connection|Stream Error|\\bundefined\\b|stack ?trace/i.test((ctx.finalText.split(/<\\/tool_output>|<\\/process>/).pop() || ctx.finalText))) return false; const all = await ctx.files(); const host = all.find(x=>!x.is_deleted && !x.is_folder && x.name==='合同.docx'); if (!host) return false; const xml = ctx.docxXml(await ctx.bytes(host.id)); const pdf = all.find(x=>!x.is_deleted && /\\.pdf$/i.test(x.name)); return !/<w:(ins|del)\\b/.test(xml) && /出具书面验收单/.test(xml) && !!pdf;",
     "_note": "四步串联（回归 t01，判据放宽：无残留修订、新措辞在、有 PDF）"
    },
    "task": true
