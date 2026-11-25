@@ -41,7 +41,7 @@
               :aria-expanded="showModelDropdown ? 'true' : 'false'"
               @tap="toggleModels" @keydown.enter.stop.prevent="toggleModels" @keydown.space.stop.prevent="toggleModels">
               <text>{{ selectedModel ? selectedModel.name : $t('chat.selectModel') }}</text>
-              <text aria-hidden="true">▾</text>
+              <svg class="welcome-quick-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
             </view>
             <view class="welcome-quick-tool" data-quick="new-docx" @tap="$emit('quick-create-doc', 'docx')">
               <svg class="welcome-quick-tool-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -523,6 +523,12 @@ export default {
   align-items: center;
   gap: 4px;
   min-width: 0;
+}
+
+.welcome-quick-caret {
+  /* D16：与语言选择器同一个 chevron */
+  flex: none;
+  opacity: 0.6;
 }
 
 .welcome-quick-tool {
