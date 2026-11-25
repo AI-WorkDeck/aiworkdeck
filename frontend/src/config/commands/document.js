@@ -15,7 +15,7 @@
 export const DOCUMENT_COMMANDS = [
   {
     id: 'doc.trackChanges',
-    label: { zh: '修订模式', en: 'Track Changes' },
+    label: { zh: '修订模式', 'zh-TW': '修訂模式', en: 'Track Changes' },
     accel: 'Alt+CmdOrCtrl+R',
     menu: 'document', group: 1,
     type: 'checkbox', checked: 'trackChanges',
@@ -24,7 +24,7 @@ export const DOCUMENT_COMMANDS = [
   },
   {
     id: 'doc.reviewPanel',
-    label: { zh: '审阅面板', en: 'Review Panel' },
+    label: { zh: '审阅面板', 'zh-TW': '審閱面板', en: 'Review Panel' },
     accel: 'Alt+CmdOrCtrl+E',
     menu: 'document', group: 1,
     type: 'checkbox', checked: 'reviewOpen',
@@ -36,7 +36,7 @@ export const DOCUMENT_COMMANDS = [
     // 只在审阅面板的「AI 审校」页与正文那颗浮球上出现。关掉之后一次模型调用都不发；
     // 不花钱的规则检查始终在跑，不受这个开关影响。
     id: 'doc.aiReview',
-    label: { zh: 'AI 审校', en: 'AI Review' },
+    label: { zh: 'AI 审校', 'zh-TW': 'AI 審校', en: 'AI Review' },
     menu: 'document', group: 1,
     type: 'checkbox', checked: 'aiReview',
     when: ['workbench', 'docTab'],
@@ -45,14 +45,14 @@ export const DOCUMENT_COMMANDS = [
 
   {
     id: 'doc.acceptAll',
-    label: { zh: '接受全部修订', en: 'Accept All Changes' },
+    label: { zh: '接受全部修订', 'zh-TW': '接受全部修訂', en: 'Accept All Changes' },
     menu: 'document', group: 2,
     when: ['workbench', 'docTab'],
     run: 'wb:acceptAllRevisions',
   },
   {
     id: 'doc.rejectAll',
-    label: { zh: '拒绝全部修订', en: 'Reject All Changes' },
+    label: { zh: '拒绝全部修订', 'zh-TW': '拒絕全部修訂', en: 'Reject All Changes' },
     menu: 'document', group: 2,
     when: ['workbench', 'docTab'],
     run: 'wb:rejectAllRevisions',
@@ -60,7 +60,7 @@ export const DOCUMENT_COMMANDS = [
 
   {
     id: 'doc.insertComment',
-    label: { zh: '插入批注', en: 'Insert Comment' },
+    label: { zh: '插入批注', 'zh-TW': '插入批註', en: 'Insert Comment' },
     accel: 'Alt+CmdOrCtrl+M',
     menu: 'document', group: 3,
     when: ['workbench', 'docTab'],
@@ -69,7 +69,7 @@ export const DOCUMENT_COMMANDS = [
 
   {
     id: 'doc.clearFormatting',
-    label: { zh: '清除格式', en: 'Clear Formatting' },
+    label: { zh: '清除格式', 'zh-TW': '清除格式', en: 'Clear Formatting' },
     menu: 'document', group: 4,
     when: ['workbench', 'docTab'],
     run: 'wb:clearFormatting',
@@ -77,7 +77,7 @@ export const DOCUMENT_COMMANDS = [
 
   {
     id: 'doc.versionPanel',
-    label: { zh: '版本记录', en: 'Version History' },
+    label: { zh: '版本记录', 'zh-TW': '版本記錄', en: 'Version History' },
     menu: 'document', group: 5,
     when: ['workbench', 'project', 'notClient'],
     run: 'wb:openVersionPanel',

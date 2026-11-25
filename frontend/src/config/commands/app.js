@@ -9,14 +9,14 @@ import { LOCALE_REGISTRY } from '../../locales/registry.js'
 const LANGUAGE_SUBCOMMANDS = [
   {
     id: 'app.lang.system',
-    label: { zh: '语言：跟随系统', en: 'Language: Follow System' },
+    label: { zh: '语言：跟随系统', 'zh-TW': '語言：跟隨系統', en: 'Language: Follow System' },
     menu: 'app', group: 3,
     inMenu: false,
     run: 'app:setLang:system',
   },
   ...LOCALE_REGISTRY.map((entry) => ({
     id: `app.lang.${entry.code}`,
-    label: { zh: `语言：${entry.nativeName}`, en: `Language: ${entry.nativeName}` },
+    label: { zh: `语言：${entry.nativeName}`, 'zh-TW': `語言：${entry.nativeName}`, en: `Language: ${entry.nativeName}` },
     menu: 'app', group: 3,
     inMenu: false,
     run: `app:setLang:${entry.code}`,
@@ -26,13 +26,13 @@ const LANGUAGE_SUBCOMMANDS = [
 export const APP_COMMANDS = [
   {
     id: 'app.checkUpdate',
-    label: { zh: '检查更新…', en: 'Check for Updates…' },
+    label: { zh: '检查更新…', 'zh-TW': '檢查更新…', en: 'Check for Updates…' },
     menu: 'app', group: 1,
     run: 'app:checkUpdate',
   },
   {
     id: 'app.settings',
-    label: { zh: '设置…', en: 'Settings…' },
+    label: { zh: '设置…', 'zh-TW': '設定…', en: 'Settings…' },
     accel: 'CmdOrCtrl+,',
     menu: 'app', group: 2,
     run: 'app:openSettings',
@@ -41,19 +41,19 @@ export const APP_COMMANDS = [
     id: 'app.account',
     // 文案里别用 &：Electron 把它当助记符标记吃掉（真机实测菜单显示成
     // 「Account  License…」，中间空两格）。要么写 &&，要么换词——换词更省事。
-    label: { zh: '账户与余额…', en: 'Account and Balance…' },
+    label: { zh: '账户与余额…', 'zh-TW': '帳戶與餘額…', en: 'Account and Balance…' },
     menu: 'app', group: 2,
     run: 'app:openAccount',
   },
   {
     id: 'app.logout',
-    label: { zh: '退出登录…', en: 'Log Out…' },
+    label: { zh: '退出登录…', 'zh-TW': '登出…', en: 'Log Out…' },
     menu: 'app', group: 2,
     run: 'app:logout',
   },
   {
     id: 'app.language',
-    label: { zh: '语言', en: 'Language' },
+    label: { zh: '语言', 'zh-TW': '語言', en: 'Language' },
     menu: 'app', group: 3,
     run: 'app:noop',
   },

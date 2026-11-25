@@ -70,7 +70,7 @@ test('文件右键「添加事项…」预置关联这份文件；「查看事�
 test('命令：go.calendar 与 task.new 登记在册', () => {
   const byId = Object.fromEntries(ALL_COMMANDS.map((c) => [c.id, c]))
   assert.equal(byId['go.calendar'].run, 'wb:goCalendar')
-  assert.deepEqual(byId['go.calendar'].label, { zh: '日程', en: 'Schedule' })
+  assert.deepEqual(byId['go.calendar'].label, { zh: '日程', 'zh-TW': '日程', en: 'Schedule' })
   assert.equal(byId['go.calendar'].accel, undefined)
   assert.equal(byId['task.new'].run, 'wb:newTask')
   assert.deepEqual(byId['task.new'].when, ['workbench', 'project'])
