@@ -6,7 +6,7 @@
 // - zh-TW 不许出现简体「后」，「返回」不许被转换成「回傳」（OpenCC 程序语境误转）。
 // 只看 locale 的取值（import 后遍历），不看注释。
 // 用法：node scripts/check-terminology.mjs（挂在 npm run check:locales 里一起跑）
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 
@@ -35,6 +35,20 @@ for (const [locale, rules] of Object.entries(RULES)) {
         console.error(`✗ ${locale}/${file} ${key}: 「${value}」命中已停用叫法 ${hit}`)
         failed++
       }
+    }
+  }
+}
+
+// 官方插件的构建产物内嵌整套工作台 locale：源码改了没重建，旧品牌写法会随插件发出去（POLISH X22）。
+const pluginsRoot = path.resolve(process.cwd(), '../official-plugins')
+const walk = (dir) => readdirSync(dir).flatMap((f) => { const p = path.join(dir, f); return statSync(p).isDirectory() ? walk(p) : [p] })
+for (const id of readdirSync(pluginsRoot)) {
+  const web = path.join(pluginsRoot, id, 'web')
+  try { statSync(web) } catch { continue }
+  for (const file of walk(web).filter((f) => /\.(js|html)$/.test(f))) {
+    if (readFileSync(file, 'utf8').includes('包青天')) {
+      console.error(`✗ ${path.relative(pluginsRoot, file)}: 插件产物含「包青天」，请 npm run build:plugins 重建`)
+      failed++
     }
   }
 }
