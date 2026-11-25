@@ -116,16 +116,8 @@ export default {
 .draft-row-name { font-size: 13.5px; color: var(--awd-text); }
 .draft-row-date { font-size: 12px; color: var(--awd-text-3); }
 
-.awd-btn {
-  padding: 8px 18px; border-radius: 6px; font-size: 13.5px; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
 /* 列表行内的按钮个头小一点，覆盖顺序放在 .awd-btn 之后才生效（同权重按源码序） */
-.draft-new-btn, .draft-row-btn { padding: 5px 12px; font-size: 12px; }
+.draft-new-btn, .draft-row-btn { height: auto; padding: 5px 12px; font-size: 12px; }
 
 .awd-mask {
   position: fixed; inset: 0; background: var(--awd-overlay);

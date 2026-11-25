@@ -404,11 +404,4 @@ export default {
 }
 .version-footer-off { color: var(--awd-text-3); text-decoration: underline; flex-shrink: 0; }
 
-/* awd-* 没有集中定义，各组件 scoped 内各自定义 */
-.awd-btn {
-  display: inline-flex; align-items: center; justify-content: center; height: var(--awd-control-height);
-  padding: 0 14px; border-radius: var(--awd-radius-md);
-  font-size: var(--awd-font-size-body); text-align: center;
-}
-.awd-btn-primary { background: var(--awd-info); color: var(--awd-text-on-accent); }
 </style>
