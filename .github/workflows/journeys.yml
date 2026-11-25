@@ -20,8 +20,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: journeys-${{ github.ref }}
-  cancel-in-progress: true
+  # One run per PR: a new push cancels the superseded run. Everything else (master, tags, schedules,
+  # manual runs) gets a group of its own (run_id), so it is never cancelled or superseded.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   journeys:
     name: First-user journeys (headless)
