@@ -73,16 +73,16 @@ export default {
   // The two sidebar groups (profile merged into settings, 2026-08-20)
   navGroupPersonal: 'Personal',
   navGroupSystem: 'System',
-  navGroupMyWork: 'My work',
+  navGroupMyWork: 'My Work',
   // Personal group: the other three entries reuse account.tab*
-  navPersonalSettings: 'Profile & sign-in',
+  navPersonalSettings: 'Profile & Sign-In',
   backToWorkbench: '← Back to workbench',
   navAi: 'AI Settings',
   navPlatform: 'Platform Services',
-  navAccount: 'Account & balance',
+  navAccount: 'Account & Balance',
   navComponents: 'Components',
   navUpdates: 'Software Update',
-  navTelemetry: 'Privacy & data',
+  navTelemetry: 'Privacy & Data',
   navFeedback: 'User Feedback',
 
   saveConfigButton: 'Save Settings',
