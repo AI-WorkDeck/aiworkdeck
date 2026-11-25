@@ -196,7 +196,7 @@ export default {
   "railLabelLawfirm": "律師事務所管理",
   "railLabelTmeet": "騰訊會議",
   "railLabelProjectIm": "專案溝通",
-  "railLabelDesensitize": "檔案脫敏",
+  "railLabelDesensitize": "檔案去識別化",
   "railLabelTabular": "表格審閱",
   "railEditDoneBtn": "完成",
   "railEditMenuItem": "整理圖示",
