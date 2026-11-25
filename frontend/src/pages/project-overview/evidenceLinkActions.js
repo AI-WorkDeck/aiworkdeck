@@ -13,6 +13,7 @@ import {
 import { evidenceTagLabel, loadEvidenceTags } from '@/utils/evidenceTags.js'
 import { parseFileLinkUrl, locatorSummary } from '@/utils/evidenceLocator.js'
 import { createEvidenceLinkForDrop, pickEvidenceTarget, evidenceBarPlacement } from './evidenceLinkCore.js'
+import { errorText } from '@/utils/errorToast.js'
 
 export { createEvidenceLinkForDrop, pickEvidenceTarget }
 
@@ -206,7 +207,7 @@ export const evidenceLinkMethods = {
         if (this.isDocumentLinkPreviewCurrent(preview)) preview.error = e.message || this.$t('workbench.openFailed')
         return
       }
-      uni.showToast({ title: e.message || this.$t('workbench.openFailed'), icon: 'none' })
+      uni.showToast({ title: errorText(e, this.$t('workbench.openFailed')), icon: 'none' })
     }
   },
   // 编辑器/预览消费完 pendingLocator 后回调清空，避免切回标签时重复跳转

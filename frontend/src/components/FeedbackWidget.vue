@@ -168,6 +168,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { host, isDesktopHost } from '@/services/host.js'
 import { submitFeedback, getMyFeedback } from '@/services/api.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
@@ -488,7 +489,7 @@ export default {
           if (this.recordSeconds >= MAX_RECORD_SECONDS) this.stopRecording(false)
         }, 1000)
       } catch (e) {
-        this.setStatus(this.$t('feedback.micPermissionDenied', { message: (e && e.message) || e }), true)
+        this.setStatus(this.$t('feedback.micPermissionDenied', { message: errorText(e) }), true)
       } finally {
         this._startingRecording = false
       }
@@ -534,7 +535,7 @@ export default {
         this._player.play()
         this.playing = true
       } catch (e) {
-        this.setStatus(this.$t('feedback.playFailed', { message: (e && e.message) || e }), true)
+        this.setStatus(this.$t('feedback.playFailed', { message: errorText(e) }), true)
       }
     },
     stopPlay() {

@@ -31,6 +31,8 @@ function textOf(err) {
   if (typeof err === 'string') return err
   const parts = []
   if (err.message) parts.push(String(err.message))
+  // uni.request rejects with a bare { errMsg: 'request:fail …' } when the connection itself fails
+  if (!err.message && typeof err.errMsg === 'string') parts.push(err.errMsg)
   if (err.data && typeof err.data === 'object' && err.data.message && err.data.message !== err.message) parts.push(String(err.data.message))
   return parts.join(' — ')
 }
@@ -48,7 +50,7 @@ function codeOf(err) {
   return Number.isFinite(n) ? n : String(c || '')
 }
 
-const NETWORK = /failed to fetch|networkerror|network request failed|net::err_|econnrefused|econnreset|load failed|网络错误|network error/i
+const NETWORK = /failed to fetch|networkerror|network request failed|net::err_|econnrefused|econnreset|load failed|网络错误|network error|request:fail(?! timeout)/i
 const TIMEOUT = /time(?:d)?[ -]?out|timeout|超时/i
 const MODEL_UNAVAILABLE = /model[^.]{0,40}(not found|unavailable|does not exist|no such)|模型[^。]{0,12}(不可用|不存在)|AI_MODEL_UNAVAILABLE/i
 const KEY_INVALID = /(invalid|incorrect|bad)[ _-]?api[ _-]?key|api key[^.]{0,20}(invalid|rejected)|AI_KEY_INVALID/i
@@ -108,4 +110,40 @@ export function toUserMessage(err, ctx = {}) {
 /** Text guaranteed to be safe to show: no raw status lines or exception names. */
 export function isRawTechnicalText(s) {
   return /\bHTTP \d{3}\b|Failed to fetch|SSE Connection|Exception|\bError:/.test(String(s || ''))
+}
+
+// Failure kinds worth stating in catalogue words even where the caller has its own wording:
+// the user needs to act on these (sign in, reconnect, wait, top up), not just "X failed".
+const ACTIONABLE = new Set(['offline', 'timeout', 'localServiceDown', 'signInRequired', 'sessionExpired',
+  'forbidden', 'balanceLow', 'rateLimited', 'conflict', 'fileTooLarge', 'modelKeyInvalid'])
+
+// Text that must never reach a lawyer: transport/JS/Java internals, raw payloads.
+const TECHNICAL = /Failed to fetch|NetworkError|net::|ECONN|ETIMEDOUT|Cannot read propert|is not (?:a function|defined)|\bundefined\b|\bnull\b|\[object |status code|\bSSE\b|Stream Error|Broken pipe|Connection reset|\bat [\w.$]+ \(|^[A-Z][A-Za-z]+(?:Error|Exception)\b|^\s*[{[]|<\/?[a-z]/
+
+function isTechnical(msg) {
+  return !msg || msg.length > 200 || isRawTechnicalText(msg) || TECHNICAL.test(msg)
+}
+
+/**
+ * X-S1 part 3: the text for a failure toast. Never raw transport/JS text.
+ *  1. a structurally classified failure (HTTP status, account/rate/conflict code, fetch/timeout error)
+ *     or one whose text is technical, and of an actionable kind → the catalogue message;
+ *  2. otherwise a readable message — a localized backend business error, or our own translated
+ *     error thrown by the component — is shown as is;
+ *  3. otherwise the caller's context-specific fallback ("Install failed"), else the catalogue.
+ * @param {unknown} err
+ * @param {string} fallbackText already-translated, context-specific text (may be '')
+ * @param {(key: string, params?: object) => string} translate
+ * @param {object} [ctx] toUserMessage context
+ */
+export function errorTextFor(err, fallbackText, translate, ctx = {}) {
+  const m = toUserMessage(err, ctx)
+  const msg = typeof err === 'string' ? err.trim() : (err && typeof err.message === 'string' ? err.message.trim() : '')
+  const o = err && typeof err === 'object' ? err : {}
+  const structured = o.accountRequired === true || Number(o.status) >= 400
+    || [4010, 4011, 4020, 4090, 4290].includes(Number(o.code))
+    || ['TypeError', 'TimeoutError'].includes(o.name)
+  if ((structured || isTechnical(msg)) && ACTIONABLE.has(m.key)) return translate('errors.' + m.key, m.params)
+  if (!isTechnical(msg)) return msg
+  return fallbackText || translate('errors.' + m.key, m.params)
 }

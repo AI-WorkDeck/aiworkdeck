@@ -175,6 +175,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { getApiBaseUrl, createProjectFavorite, getProjectFavorites, getMyFavorites, createBrowserProxyTicket } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
 import { host } from '@/services/host.js'
@@ -873,7 +874,7 @@ export default {
         if (host.app && host.app.confirm) {
           host.app.confirm({ title: this.$t('panels.bpFavoriteFailed'), content: (e && e.message) || '' }).catch(() => {})
         } else {
-          uni.showToast({ title: (e && e.message) || this.$t('panels.bpFavoriteFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('panels.bpFavoriteFailed')), icon: 'none' })
         }
       } finally {
         this._favSaving = false

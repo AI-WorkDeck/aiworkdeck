@@ -13,6 +13,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { isDocxDoc, runDocxComparison, sha256Hex } from '../../src/utils/docxComparison.js'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 
 const T = (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k)
 
@@ -48,6 +51,7 @@ function makeHarness(overrides = {}) {
     }
   }
   const deps = {
+    errorText,
     source: { id: 1, name: 'A.docx' },
     target: { id: 2, name: 'B.docx' },
     name: 'B（比对稿）.docx',

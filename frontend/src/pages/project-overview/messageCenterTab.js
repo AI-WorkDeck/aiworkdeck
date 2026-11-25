@@ -5,6 +5,7 @@ import { messageCenterRequest, messageCenterIdentity } from '../../services/mess
 import { getDdRequestDetails } from '../../services/api.js'
 import { isGlobalPlugin } from '../../utils/pluginViews.js'
 import { ACCOUNT_CHANGED_EVENT } from '../../utils/requireAccount.js'
+import { errorText } from '@/utils/errorToast.js'
 
 export const messageCenterTabMethods = {
   startMessageCenterBadge() {
@@ -80,7 +81,7 @@ export const messageCenterTabMethods = {
       if (identity !== messageCenterIdentity() || !this.isActiveOverviewInstance()) return
       await this.openMessageTarget(result.target || result, notificationId)
     } catch (error) {
-      if (identity === messageCenterIdentity()) uni.showToast({ title: error.message || this.$t('messageCenter.openFailed'), icon: 'none' })
+      if (identity === messageCenterIdentity()) uni.showToast({ title: errorText(error, this.$t('messageCenter.openFailed')), icon: 'none' })
     }
   },
   async openMessageTarget(value, notificationId) {

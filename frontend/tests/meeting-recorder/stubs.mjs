@@ -37,3 +37,6 @@ export const confirmPaidTranscription = async (opts) => {
 export const setPaidConfirmResult = (v) => { paidConfirmResult = v }
 export const paidConfirmArgs = () => paidConfirmArgList
 export const deleteMeetingRecording = async () => ({ deleted: true })
+
+// X-S1: utils/errorToast.js (real logic, identity translate)
+export { errorText } from '../_lib/error-text.mjs'

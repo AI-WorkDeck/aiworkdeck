@@ -92,9 +92,9 @@
             </view>
           </view>
 
-          <view v-if="projectsLoading" class="loading-state">
-            <text class="loading-text">{{ $t('projects.loading') }}</text>
-          </view>
+          <AwdLoadingBlock v-if="projectsLoading" class="loading-state" :rows="4" :label="$t('projects.loading')" />
+          <!-- X-S1：加载失败不能落成「还没有项目」 -->
+          <AwdInlineError v-else-if="projectsLoadError && projects.length === 0" class="projects-load-error" :error="projectsLoadError" @retry="loadProjects" @refresh="loadProjects" />
 
           <view v-else-if="projects.length === 0">
             <!-- CLIENT 没有建项目/取案卷的入口，空态只作说明 -->
@@ -216,6 +216,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 /**
  * 左栏「项目」面板（dev-board#1047，spec 2026-09-29-defer-login-welcome-tab-design §4）。
  *
@@ -351,6 +352,7 @@ export default {
       projects: [],
       localMode: null, // 装机形态（local-mode），只用来判「单人本机项目」隐藏皇冠
       projectsLoading: false,
+      projectsLoadError: null,
       deletingProjectId: null,
       renamingProjectId: null,
       renameValue: '',
@@ -446,13 +448,15 @@ export default {
         }))
         if (!shouldAcceptResponse(seq, this.loadProjectsSeq)) return
         this.projects = projectsWithMembers
+        this.projectsLoadError = null
       } catch (error) {
         if (!shouldAcceptResponse(seq, this.loadProjectsSeq)) return
         console.error('加载项目列表失败:', error)
         // 只提示错误，不自己跳页：桌面端免登没有登录页可去；浏览器端会话失效（4010）
-        // 已由 services/api.js 统一清会话并回登录页。
-        uni.showToast({
-          title: error.message || this.$t('projects.loadFailedRetry'),
+        // 已由 services/api.js 统一清会话并回登录页。列表为空时落成面板内错误态，有旧列表时只提示。
+        if (this.projects.length === 0) this.projectsLoadError = error
+        else uni.showToast({
+          title: errorText(error, this.$t('projects.loadFailedRetry')),
           icon: 'none',
           duration: 2000,
         })
@@ -506,7 +510,7 @@ export default {
               uni.showToast({ title: this.$t('projects.removeSuccess'), icon: 'success' })
               this.loadProjects()
             } catch (e) {
-              uni.showToast({ title: e.message || this.$t('projects.removeFailed'), icon: 'none' })
+              uni.showToast({ title: errorText(e, this.$t('projects.removeFailed')), icon: 'none' })
             }
           }
         },
@@ -648,7 +652,7 @@ export default {
             } catch (error) {
               console.error('删除项目失败:', error)
               uni.showToast({
-                title: error.message || this.$t('projects.deleteFailedRetry'),
+                title: errorText(error, this.$t('projects.deleteFailedRetry')),
                 icon: 'none',
                 duration: 2000,
               })
@@ -694,7 +698,7 @@ export default {
       try {
         await flow()
       } catch (err) {
-        uni.showToast({ title: (err && err.message) || this.$t('common.openProjectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(err, this.$t('common.openProjectFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

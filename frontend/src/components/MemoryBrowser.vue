@@ -92,6 +92,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { displayServerLabel } from '@/utils/serverLabels.js'
 import {
   deleteMemoryFile,
@@ -273,7 +274,7 @@ export default {
         this.conflict = false
       } catch (e) {
         if (this.isActiveRequest(spaceId, generation)) {
-          uni.showToast({ title: e.message || this.$t('chat.memoryLoadFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('chat.memoryLoadFailed')), icon: 'none' })
         }
       }
     },
@@ -311,7 +312,7 @@ export default {
         if (this.isActiveRequest(spaceId, generation)) await this.openFile(file.path, generation)
       } catch (e) {
         if (this.isActiveRequest(spaceId, generation)) {
-          uni.showToast({ title: e.message || this.$t('chat.memorySaveFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('chat.memorySaveFailed')), icon: 'none' })
         }
       }
     },
@@ -359,7 +360,7 @@ export default {
           this.draft = mine
           this.conflict = true
         } else if (this.isCurrentFile(target.spaceId, target.path, target.generation)) {
-          uni.showToast({ title: e.message || this.$t('chat.memorySaveFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('chat.memorySaveFailed')), icon: 'none' })
         }
       } finally {
         this.saving = false
@@ -394,7 +395,7 @@ export default {
       } catch (e) {
         if (!this.isCurrentFile(target.spaceId, target.path, target.generation)) return
         if (e && e.status === 409) await this.openFile(target.path)
-        uni.showToast({ title: e.message || this.$t('chat.memoryDeleteFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('chat.memoryDeleteFailed')), icon: 'none' })
       }
     },
     async downloadCurrent() {
@@ -410,7 +411,7 @@ export default {
         anchor.click()
         setTimeout(() => URL.revokeObjectURL(url), 0)
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('chat.memoryDownloadFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('chat.memoryDownloadFailed')), icon: 'none' })
       }
     },
   },

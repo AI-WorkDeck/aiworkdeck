@@ -60,6 +60,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   endWorkSession, discardWorkSession, suggestSessionTitle,
   switchToMainline, adoptDraft, abandonDraft,
@@ -94,7 +95,7 @@ export default {
         const title = (res && res.data && res.data.title) || ''
         if (title && this.naming) this.title = title
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.suggestTitleFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.suggestTitleFailed')), icon: 'none' })
       } finally {
         this.suggesting = false
       }
@@ -113,7 +114,7 @@ export default {
         const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
         this.$emit('mainline-resumed', affectedFileIds)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.returnMainlineFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.returnMainlineFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -132,7 +133,7 @@ export default {
         }
         this.$emit('draft-adopted', data.affectedFileIds || [])
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.adoptFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.adoptFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -150,7 +151,7 @@ export default {
             const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
             this.$emit('draft-abandoned', affectedFileIds)
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.abandonFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.abandonFailed')), icon: 'none' })
           } finally {
             this.busy = false
           }
@@ -171,7 +172,7 @@ export default {
         this.naming = false
         this.$emit('ended')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.endFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.endFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -191,7 +192,7 @@ export default {
             const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
             this.$emit('discarded', affectedFileIds)
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.discardFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.discardFailed')), icon: 'none' })
           } finally {
             this.busy = false
           }

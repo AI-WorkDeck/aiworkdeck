@@ -4,11 +4,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
+import { errorText } from '../_lib/error-text.mjs'
 const source = readFileSync(new URL('../../src/components/welcome/FolderCatalog.vue', import.meta.url), 'utf8')
 function fixture() {
   const calls = [], events = []
   let modal
-  const context = { renameProject: async (...args) => calls.push(['rename', ...args]), uni: { showToast() {}, showModal(value) { modal = value } } }
+  const context = { errorText, renameProject: async (...args) => calls.push(['rename', ...args]), uni: { showToast() {}, showModal(value) { modal = value } } }
   const code = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'globalThis.component =')
   vm.runInNewContext(code, context)
   const component = context.component

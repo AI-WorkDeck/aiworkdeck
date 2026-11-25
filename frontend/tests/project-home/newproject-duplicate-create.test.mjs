@@ -9,6 +9,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 
 const src = readFileSync(new URL('../../src/pages/newproject/index.vue', import.meta.url), 'utf8')
 

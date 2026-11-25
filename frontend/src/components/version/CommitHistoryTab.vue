@@ -293,6 +293,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getVersionHistory, getVersionCompare, getVersionChanges, getCloudEvents,
   getProjectFiles, uploadToCloud, updateFromCloud, enableVersionControl, getVersionStatus,
@@ -682,7 +683,7 @@ export default {
         this.notEnabled = false
         await this.reload()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.enableFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.enableFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -990,7 +991,7 @@ export default {
         this.$emit('changed')
         await this.reload()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.submitFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -1014,7 +1015,7 @@ export default {
         this.$emit('changed')
         await this.reload()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.pullFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.pullFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

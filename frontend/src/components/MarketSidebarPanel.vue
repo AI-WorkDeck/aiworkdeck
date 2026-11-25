@@ -215,6 +215,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
 // 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
@@ -584,7 +585,7 @@ export default {
         console.error('安装 Skill 失败:', e)
         // 后端 4011 已由 api.js 就地弹过登录层：登录成功就刷新列表，按钮按新账户的状态显示
         if (isAccountLoginRetry(e)) await this.reloadAll()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.marketBusyId = ''
       }
@@ -619,7 +620,7 @@ export default {
       } catch (e) {
         console.error('安装插件失败:', e)
         if (isAccountLoginRetry(e)) await this.reloadAll()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.pluginBusyId = ''
       }
@@ -638,7 +639,7 @@ export default {
         uni.$emit('awd:market-changed-from-sidebar')
       } catch (e) {
         console.error('重新扫描失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.scanFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.scanFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.rescanning = false
       }

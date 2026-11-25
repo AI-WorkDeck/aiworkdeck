@@ -186,6 +186,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { getFileBytesUrl, getArchiveEntries, extractArchive } from '@/services/api.js'
 import { createSlidePreviewCache, fingerprint, renderSlideCards } from '@/composables/slidePreviewCache.js'
 import { isEncryptedOoxml } from '@/utils/editorLoadFailure.js'
@@ -1045,7 +1046,7 @@ export default {
           }
           await host.fs.showItemInFolder(r.data.path)
         } catch (e) {
-          uni.showToast({ title: (e && e.message) || this.$t('workbench.revealFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('workbench.revealFailed')), icon: 'none' })
         }
         return
       }

@@ -11,6 +11,8 @@ const cases = [
   ['fetch TypeError (desktop)', Object.assign(new TypeError('Failed to fetch')), { desktop: true }, 'localServiceDown'],
   ['fetch TypeError (web)', new TypeError('Failed to fetch'), {}, 'offline'],
   ['net::ERR', new Error('net::ERR_CONNECTION_REFUSED'), {}, 'offline'],
+  ['uni.request refused (desktop)', { errMsg: 'request:fail' }, { desktop: true }, 'localServiceDown'],
+  ['uni.request timeout', { errMsg: 'request:fail timeout' }, {}, 'timeout'],
   ['client timeout', Object.assign(new Error('signal timed out'), { name: 'TimeoutError' }), {}, 'timeout'],
   ['HTTP 504', http(504), {}, 'timeout'],
   ['code 4011', Object.assign(new Error('Sign in to use cloud AI'), { code: 4011, accountRequired: true }), {}, 'signInRequired'],
@@ -72,4 +74,27 @@ test('the status is not repeated in Details when the text already has it', () =>
 test('a sign-in failure asks to sign in, not to retry', () => {
   assert.equal(toUserMessage(Object.assign(new Error('x'), { accountRequired: true })).action, 'signIn')
   assert.equal(toUserMessage(new Error('Invalid API key')).action, 'signIn')
+})
+
+import { errorTextFor } from '../../src/utils/userMessage.js'
+const tr = (k) => 'T:' + k
+
+test('toast text: actionable failures use the catalogue, whatever the caller says', () => {
+  assert.equal(errorTextFor(new TypeError('Failed to fetch'), 'Install failed', tr, { desktop: true }), 'T:errors.localServiceDown')
+  assert.equal(errorTextFor(Object.assign(new Error('x'), { accountRequired: true }), 'Install failed', tr), 'T:errors.signInRequired')
+  assert.equal(errorTextFor(Object.assign(new Error('HTTP 429'), { status: 429 }), 'Save failed', tr), 'T:errors.rateLimited')
+})
+
+test('toast text: a localized backend business message is kept; raw text never is', () => {
+  assert.equal(errorTextFor(Object.assign(new Error('A project with this name already exists'), { code: 1 }), 'Create failed', tr),
+    'A project with this name already exists')
+  assert.equal(errorTextFor(Object.assign(new Error('java.lang.NullPointerException at com.x.Y.z(Y.java:1)'), { code: 1 }), 'Create failed', tr), 'Create failed')
+  assert.equal(errorTextFor(Object.assign(new Error('HTTP 500'), { status: 500 }), 'Create failed', tr), 'Create failed')
+  assert.equal(errorTextFor(new Error('Cannot read properties of undefined'), 'Create failed', tr), 'Create failed')
+  assert.equal(errorTextFor(new Error(''), '', tr), 'T:errors.unknown')
+  assert.equal(errorTextFor(new Error('对比已取消：文件在生成期间又被修改了'), 'Compare failed', tr), '对比已取消：文件在生成期间又被修改了', 'our own translated error is shown as is')
+})
+
+test('toast text: a bare uni.request failure is a connection problem, not "that didn\'t work"', () => {
+  assert.equal(errorTextFor({ errMsg: 'request:fail' }, 'Load failed', tr, { desktop: true }), 'T:errors.localServiceDown')
 })

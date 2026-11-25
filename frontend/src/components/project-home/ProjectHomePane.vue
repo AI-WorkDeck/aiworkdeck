@@ -72,6 +72,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import ProfileHeader from '@/components/project-home/ProfileHeader.vue'
 import OverviewStatsBar from '@/components/project-home/OverviewStatsBar.vue'
 import ActivityFeed from '@/components/project-home/ActivityFeed.vue'
@@ -300,7 +301,7 @@ export default {
         if (this.$refs.profileHeader) {
           this.$refs.profileHeader.restoreEdit(payload.fieldKey, payload.value)
         }
-        uni.showToast({ title: (e && e.message) || this.$t('projects.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('projects.saveFailed')), icon: 'none' })
       }
     },
   },

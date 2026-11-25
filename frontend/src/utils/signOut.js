@@ -21,6 +21,7 @@ import { isDesktopHost } from '@/services/host.js'
 import { t } from '@/i18n'
 // 广播 awd:account-changed（及广场/权益刷新）的唯一出口
 import { broadcastAccountChanged } from '@/utils/requireAccount.js'
+import { errorText } from '@/utils/errorToast.js'
 
 const confirmModal = (title, content, confirmText) => new Promise((resolve) => uni.showModal({
   title,
@@ -70,7 +71,7 @@ export async function signOut() {
   try {
     result = await disconnectAccount()
   } catch (e) {
-    uni.showToast({ title: (e && e.message) || t('account.logoutFailed'), icon: 'none' })
+    uni.showToast({ title: errorText(e, t('account.logoutFailed')), icon: 'none' })
     return false
   }
 

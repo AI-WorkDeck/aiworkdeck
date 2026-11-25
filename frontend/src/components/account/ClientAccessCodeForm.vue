@@ -38,6 +38,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { clientLogin } from '@/services/api.js'
 import { saveSession } from '@/utils/auth.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
@@ -106,7 +107,7 @@ export default {
           uni.showToast({ title: res.message || this.$t('account.loginFailedToast'), icon: 'none' })
         }
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('account.loginFailedToast'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('account.loginFailedToast')), icon: 'none' })
       } finally {
         this.loading = false
       }

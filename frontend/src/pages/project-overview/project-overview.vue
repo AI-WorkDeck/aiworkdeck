@@ -2420,6 +2420,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
 import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
@@ -4209,7 +4210,7 @@ export default {
       if (this.isChatMode) await this.switchViewMode('chat')
     }).catch((error) => {
       console.error('[project-overview] 初始化对话模式失败', error)
-      uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.scratchFailed'), icon: 'none' })
+      uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.scratchFailed')), icon: 'none' })
     }).finally(() => {
       this._openWorkbenchRestored = true
       this.maybeRegisterOpenWorkbench()
@@ -4547,7 +4548,7 @@ export default {
               if (host.app && host.app.confirm) {
                 host.app.confirm({ title: this.$t('workbench.saveFailed'), content: e.message || '' }).catch(() => {})
               } else {
-                uni.showToast({ title: e.message || this.$t('workbench.saveFailed'), icon: 'none' })
+                uni.showToast({ title: errorText(e, this.$t('workbench.saveFailed')), icon: 'none' })
               }
             }
           })
@@ -5048,7 +5049,7 @@ export default {
         })
       } catch (error) {
         console.error('转写发起失败:', error)
-        uni.showToast({ title: (error && error.message) || this.$t('fileTree.transcribeFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('fileTree.transcribeFailed')), icon: 'none' })
       } finally {
         focus(meetingId, false)
       }
@@ -5282,7 +5283,7 @@ export default {
         }
         if (path) await host.fs.showItemInFolder(path)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('workbench.revealFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.revealFailed')), icon: 'none' })
       }
     },
     // 文件树右键「发送…」/ 菜单「文件 > 发送…」（dev-board#382）：后端解析物理路径，
@@ -5309,7 +5310,7 @@ export default {
           uni.showToast({ title: this.$t('workbench.shareClipboardHint'), icon: 'none', duration: 4000 })
         }
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('workbench.shareFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.shareFailed')), icon: 'none' })
       }
     },
     // 「有一次采纳等待处理」固定条的入口：切到版本面板，AdoptConflictDialog 会随
@@ -5693,7 +5694,7 @@ export default {
             }
         } catch (e) {
             console.error('Failed to import doc text', e)
-            uni.showToast({ title: this.$t('workbench.importFailedWithMsg', { msg: e.message }), icon: 'none' })
+            uni.showToast({ title: this.$t('workbench.importFailedWithMsg', { msg: errorText(e) }), icon: 'none' })
         } finally {
             uni.hideLoading()
             this.easyVoiceImportCallback = null
@@ -5753,7 +5754,7 @@ export default {
               this.loadProjectMembers()
             } catch (e) {
               console.error(e)
-              uni.showToast({ title: e.message || this.$t('workbench.removeFailed'), icon: 'none' })
+              uni.showToast({ title: errorText(e, this.$t('workbench.removeFailed')), icon: 'none' })
             }
           }
         }
@@ -6264,7 +6265,7 @@ export default {
         }
       } catch (e) {
         console.error('复制文件失败', e)
-        uni.showToast({ title: e.message || this.$t('workbench.copyFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.copyFailed')), icon: 'none' })
       }
     },
     focusFavoritePlugin(id) {
@@ -6601,7 +6602,7 @@ export default {
            this.focusLibreEditorFor(this.libreOfficeExecutor)
          } catch (e) {
            console.error(e)
-           uni.showToast({ title: e.message || this.$t('workbench.insertImageFailed'), icon: 'none' })
+           uni.showToast({ title: errorText(e, this.$t('workbench.insertImageFailed')), icon: 'none' })
          }
       }
     },
@@ -6683,7 +6684,7 @@ export default {
         uni.showToast({ title: this.$t('workbench.webMarkInserted'), icon: 'success' })
       } catch (e) {
         console.error('插入网核标记失败:', e)
-        uni.showToast({ title: e.message || this.$t('workbench.insertFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.insertFailed')), icon: 'none' })
       } finally {
         this.stopWebLinkDrag()
       }
@@ -7878,7 +7879,7 @@ export default {
         this.notifyDocMutated()
         uni.showToast({ title: this.$t('workbench.insertedToDoc'), icon: 'success' })
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('workbench.insertFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.insertFailed')), icon: 'none' })
       } finally {
         this._aiMessageInsertBusy = false
       }
@@ -7901,7 +7902,7 @@ export default {
         return
       } catch (e) {
         console.error('替换选区失败', e)
-        uni.showToast({ title: e.message || this.$t('workbench.replaceFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.replaceFailed')), icon: 'none' })
       }
     },
     onPluginAddFileToAi(request) {
@@ -7953,7 +7954,7 @@ export default {
                   return
              }
              this.onPluginAddFileToAi({ projectId: this.projectId, file: pluginDrop.file, isCurrent: pluginDrop.isCurrent })
-                  .catch(err => uni.showToast({ title: err.message || this.$t('workbench.pluginAddToAiFailedToast'), icon: 'none' }))
+                  .catch(err => uni.showToast({ title: errorText(err, this.$t('workbench.pluginAddToAiFailedToast')), icon: 'none' }))
              return
         }
 
@@ -8590,7 +8591,7 @@ export default {
         uni.showToast({ title: this.$t('workbench.docGenerated'), icon: 'none' })
       } catch (e) {
         console.error('导出 Word 失败', e)
-        uni.showToast({ title: e.message || this.$t('workbench.exportFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.exportFailed')), icon: 'none' })
       } finally {
         this.exportLoading = false
       }
@@ -8799,7 +8800,7 @@ export default {
             await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Rename conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationRenameFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.conversationRenameFailed')), icon: 'none' })
         } finally {
             this.historyActionBusy = false
         }
@@ -8816,7 +8817,7 @@ export default {
             await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Pin conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationPinFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.conversationPinFailed')), icon: 'none' })
         } finally {
             this.historyActionBusy = false
         }
@@ -8862,7 +8863,7 @@ export default {
             await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Delete conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationDeleteFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.conversationDeleteFailed')), icon: 'none' })
         } finally {
             this.historyActionBusy = false
         }
@@ -8898,7 +8899,7 @@ export default {
             await this.loadHistoryChat({ conversationId: newId })
         } catch (e) {
             console.error('Fork conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.forkConversationFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.forkConversationFailed')), icon: 'none' })
         } finally {
             this.forkingConversation = false
         }
@@ -8938,7 +8939,7 @@ export default {
         } catch (e) {
             console.error('Branch conversation failed', e)
             uni.showToast({
-                title: this.$t('chat.branchFailed', { error: (e && e.message) || this.$t('chat.unknownError') }),
+                title: this.$t('chat.branchFailed', { error: errorText(e) }),
                 icon: 'none'
             })
         } finally {
@@ -8971,7 +8972,7 @@ export default {
       try {
         await Promise.all([this.loadChatWorkspaceFiles(), this.fetchChatHistory(true)])
         if (String(projectId) === String(this.projectId) && this.isScratchWorkspace) this.showScratchTransfer = true
-      } catch (e) { uni.showToast({ title: e.message || this.$t('common.failed'), icon: 'none' }) }
+      } catch (e) { uni.showToast({ title: errorText(e, this.$t('common.failed')), icon: 'none' }) }
     },
 
     async loadChatWorkspaceFiles() {
@@ -9019,7 +9020,7 @@ export default {
         try {
           if (!this.hasProject) await this.ensureScratchWorkspaceLoaded()
         } catch (error) {
-          uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.scratchFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.scratchFailed')), icon: 'none' })
           return false
         }
         this.aiPanelMounted = true
@@ -9093,7 +9094,7 @@ export default {
         this.chatCanvasOpen = true
         this.$nextTick(() => this.triggerWorkbenchResize?.())
       } catch (error) {
-        uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.createFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.createFailed')), icon: 'none' })
       }
     },
 
@@ -9153,7 +9154,7 @@ export default {
         await this.fetchChatHistory(true)
         uni.showToast({ title: this.$t('workbench.chatMode.promoteSuccess'), icon: 'success' })
       } catch (error) {
-        uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.promoteFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.promoteFailed')), icon: 'none' })
       }
     },
 

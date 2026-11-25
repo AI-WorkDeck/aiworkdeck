@@ -91,6 +91,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   endWorkSession, updateFromCloud, uploadToCloud,
   getVersionStatus, getCloudStatus, checkCloud,
@@ -243,7 +244,7 @@ export default {
         this.localWorking = false
         await this.refresh()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.endFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.endFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -267,7 +268,7 @@ export default {
         }
         await this.refresh()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.pullFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.pullFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -297,7 +298,7 @@ export default {
           await this.refresh()
         }
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.submitFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
