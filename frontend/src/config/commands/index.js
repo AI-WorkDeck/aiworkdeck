@@ -59,6 +59,27 @@ export function labelOf(item, appLang) {
 }
 
 /**
+ * 快捷键提示文字（D16：顶栏图标按钮的悬停提示带上快捷键）。macOS 用 ⌥⌘B 这类符号，
+ * 其他平台写成 Ctrl+Alt+B。没有快捷键的命令返回空串。
+ * @param {string} id 命令 id
+ * @param {boolean} [mac] 默认按 navigator.platform 判断
+ */
+export function accelHint(id, mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || '')) {
+  const cmd = COMMANDS.find((c) => c.id === id)
+  const a = cmd && cmd.accel
+  if (!a) return ''
+  if (mac) {
+    return String(a).replace(/CmdOrCtrl|Command|Cmd/g, '⌘').replace(/Alt|Option/g, '⌥')
+      .replace(/Shift/g, '⇧').replace(/Control|Ctrl/g, '⌃').replace(/\+/g, '')
+  }
+  const parts = String(a).replace(/CmdOrCtrl|Command|Cmd/g, 'Ctrl').split('+')
+  const order = ['Ctrl', 'Alt', 'Shift']
+  const mods = order.filter((m) => parts.includes(m))
+  const keys = parts.filter((p) => !order.includes(p))
+  return [...mods, ...keys].join('+')
+}
+
+/**
  * when 求值：枚举全部满足才通过。不做表达式引擎（YAGNI，见 README）。
  * 同一个判定同时决定「菜单项是否 enabled」和「命令是否允许执行」——
  * 客户视图下按加速键必须什么都不发生，不能只是菜单项不渲染（spec §6.3）。

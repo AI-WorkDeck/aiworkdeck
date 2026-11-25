@@ -137,9 +137,10 @@ $color-accent: var(--awd-mint); // Mint Green
   flex: 0 1 auto;
   min-width: 0;
   @include text-ellipsis;
-  font-family: var(--awd-font-serif);
+  /* D16：衬线只留给品牌字标与欢迎页大标题；顶栏项目名 / 全部项目用界面无衬线 */
+  font-family: var(--awd-font-sans);
   font-size: var(--awd-font-size-title);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--awd-accent-text); // Forest Green for title
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -232,6 +233,16 @@ $color-accent: var(--awd-mint); // Mint Green
   min-width: var(--awd-panel-row-h);
   color: var(--awd-accent-text);
 }
+.top-bar-divider {
+  /* D16：顶栏版面开关与工具之间的细分隔线 */
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  align-self: center;
+  background: var(--awd-border);
+}
+
 .switcher-arrow {
   display: block;
   font-size: var(--awd-panel-fs);
@@ -4147,7 +4158,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .awd-dialog-title {
-  font-family: var(--awd-font-serif);
+  font-family: var(--awd-font-sans); /* D16 */
   font-size: 20px;
   font-weight: 600;
   color: var(--awd-text);

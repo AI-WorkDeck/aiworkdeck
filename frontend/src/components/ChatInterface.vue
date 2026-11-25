@@ -535,7 +535,7 @@
                     <view class="mode-selector" @tap="toggleModeDropdown">
                        <text class="mode-icon" v-if="currentModeIcon">{{ currentModeIcon }}</text>
                        <text class="mode-name">{{ currentModeName }}</text>
-                       <text class="dropdown-arrow">▼</text>
+                       <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
                        <view v-if="showModeDropdown" class="mode-dropdown down" role="listbox">
                           <view v-for="mode in availableModes" :key="mode.id"
                                 class="mode-option"
@@ -556,7 +556,7 @@
                     <!-- Model Selector：清单来自 GET /api/ai/models，按厂商分组、国际档在后 -->
                     <view class="model-selector" @tap="toggleModelDropdown">
                        <text class="model-name">{{ currentModelName }}</text>
-                       <text class="dropdown-arrow">▼</text>
+                       <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
                        <ModelSelectorDropdown v-if="showModelDropdown" placement="down"
                           :groups="modelGroups" :current-model-id="currentModelId"
                           :price-display="modelPriceDisplay" :network-region-basis="networkRegionBasis"
@@ -5497,9 +5497,9 @@ export default {
 }
 
 .welcome-text {
-  font-family: var(--awd-font-serif);
+  font-family: var(--awd-font-sans); /* D16：对话问候是界面文字，不是品牌大标题 */
   font-size: var(--awd-font-size-title);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--awd-text);
   margin-bottom: 8px;
   display: block;

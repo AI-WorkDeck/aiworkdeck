@@ -5638,7 +5638,7 @@ export default {
 }
 
 .awd-dialog-title {
-  font-family: var(--awd-font-serif);
+  font-family: var(--awd-font-sans); /* D16 */
   font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */

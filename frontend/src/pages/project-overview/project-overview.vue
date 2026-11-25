@@ -40,7 +40,7 @@
               :aria-label="$t('workbench.switchRecentProject')" :aria-expanded="projectSwitcherOpen"
               @click.stop="toggleProjectSwitcher" @keydown="handleProjectTitleActivation($event, 'switch')"
               @keyup="handleProjectTitleActivation($event, 'switch')">
-              <text class="switcher-arrow" :class="{ 'is-open': projectSwitcherOpen }" aria-hidden="true">▾</text>
+              <svg class="switcher-arrow" :class="{ 'is-open': projectSwitcherOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             <view v-if="projectSwitcherOpen" class="switcher-mask" @tap.stop="projectSwitcherOpen = false"></view>
             <view v-if="projectSwitcherOpen" class="switcher-menu" @tap.stop>
@@ -184,7 +184,7 @@
             class="top-bar-btn"
             :class="{ active: !sidebarCollapsed }"
             @tap="toggleSidebar"
-            :title="sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar')"
+            :title="topBarTip(sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar'), 'view.sidebar')" :aria-label="topBarTip(sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar'), 'view.sidebar')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.panelLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -198,7 +198,7 @@
             class="top-bar-btn"
             :class="{ active: showToolsPanel }"
             @tap="toggleToolsPanel"
-            :title="$t('workbench.toolsPanel')"
+            :title="topBarTip($t('workbench.toolsPanel'), 'view.toolsPanel')" :aria-label="topBarTip($t('workbench.toolsPanel'), 'view.toolsPanel')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.panelBottom" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -211,7 +211,7 @@
             class="top-bar-btn"
             :class="{ active: showAiPanel }"
             @tap="toggleAiPanel"
-            :title="$t('workbench.aiAssistant')"
+            :title="topBarTip($t('workbench.aiAssistant'), 'view.aiPanel')" :aria-label="topBarTip($t('workbench.aiAssistant'), 'view.aiPanel')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.panelRight" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -223,19 +223,22 @@
             class="top-bar-btn split-btn"
             :class="{ active: splitMode }"
             @tap="toggleSplitMode"
-            :title="splitMode ? $t('workbench.closeSplit') : $t('workbench.openSplit')"
+            :title="topBarTip(splitMode ? $t('workbench.closeSplit') : $t('workbench.openSplit'), 'view.split')" :aria-label="topBarTip(splitMode ? $t('workbench.closeSplit') : $t('workbench.openSplit'), 'view.split')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.splitCols" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
 
+          <!-- D16：版面开关（左/底/右栏、分屏）与工具（截图、网页、录制）分两组 -->
+          <view class="top-bar-divider" aria-hidden="true"></view>
+
           <!-- 5. Screenshot (OCR)：摘录落在项目收藏里，无项目态不给 -->
           <view
             v-if="hasProject"
             class="top-bar-btn"
             @tap="startOcrCapture"
-            :title="$t('workbench.ocrCapture')"
+            :title="topBarTip($t('workbench.ocrCapture'), 'tools.ocrCapture')" :aria-label="topBarTip($t('workbench.ocrCapture'), 'tools.ocrCapture')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.camera" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -247,10 +250,10 @@
           <view
             class="top-bar-btn"
             @tap="openBrowserTab()"
-            :title="$t('workbench.browserNewTabHint')"
+            :title="topBarTip($t('workbench.browserNewTabHint'), 'tools.newBrowserTab')" :aria-label="topBarTip($t('workbench.browserNewTabHint'), 'tools.newBrowserTab')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path v-for="(d, gi) in GLYPHS.web" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path v-for="(d, gi) in GLYPHS.browserWindow" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
 
@@ -260,7 +263,7 @@
             class="top-bar-btn"
             :class="{ active: isRecording, recording: isRecording }"
             @tap="toggleRecording"
-            :title="$t('workbench.recordActivity')"
+            :title="topBarTip($t('workbench.recordActivity'), 'tools.activityRecord')" :aria-label="topBarTip($t('workbench.recordActivity'), 'tools.activityRecord')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.record" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -2596,6 +2599,7 @@ import {
 import { activityTracker } from '@/utils/activityTracker.js'
 
 import { ICONS as GLYPHS } from '@/config/icons.js'
+import { accelHint } from '@/config/commands/index.js'
 import { getPluginAvatarUrl, getPluginRailSvgPaths } from '@/config/pluginIcons.js'
 import { readLocalMode } from '@/services/accountProfile.js'
 import { resolveTrack, TRACK } from '@/utils/memberLookup.js'
@@ -4822,6 +4826,11 @@ export default {
     'rightFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
   },
   methods: {
+    /** D16：顶栏图标按钮的悬停提示 / 读屏名称，有快捷键就带上（例「收起左栏 ⌥⌘B」） */
+    topBarTip(text, commandId) {
+      const keys = accelHint(commandId)
+      return keys ? `${text} ${keys}` : text
+    },
     refreshMergeNeighborUnseen() {
       this.mergeNeighborUnseen = this.projectId ? unseenMergeNeighborNotices(this.projectId).length : 0
     },

@@ -131,7 +131,7 @@
                 <option value="UNAVAILABLE">{{ $t('ddWorkflow.client.unavailable') }}</option>
                 <option value="NOT_APPLICABLE">{{ $t('ddWorkflow.client.notApplicable') }}</option>
               </select>
-              <span class="select-chevron" aria-hidden="true">▾</span>
+              <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
             </div>
             <label :for="`dd-reason-${item.id}`" class="reason-label">{{ $t(formMode === 'appeal' ? 'ddWorkflow.client.appealReason' : 'ddWorkflow.client.explanationReason') }}</label>
             <textarea :id="`dd-reason-${item.id}`" v-model="reason" :disabled="busy" rows="3" maxlength="2000" />
