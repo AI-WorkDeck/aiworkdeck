@@ -203,7 +203,7 @@ test('QA D1: message-center invite never issues a code in one click; the lawyer 
  inviteButton().click();await tick();pick(form().querySelector('select'),'CLIENT');await tick();pick(form().querySelectorAll('select')[1],'all');await submit()
  assert.equal(invites().at(-1).params.params.shareHistory,true);assert.match(form().textContent,/可同时查看此前的消息/)
  ;[...form().querySelectorAll('button')].find(b=>b.textContent==='完成').click();await tick()
- inviteButton().click();await tick();pick(form().querySelector('select'),'MEMBER');await tick();assert.equal(form().querySelectorAll('select').length,1);assert.match(form().textContent,/邀请客户请选择「客户」/);await submit()
+ inviteButton().click();await tick();pick(form().querySelector('select'),'MEMBER');await tick();assert.equal(form().querySelectorAll('select').length,1);assert.match(form().textContent,/邀请客户请选择“客户”/);await submit()
  assert.deepEqual(invites().at(-1).params.params,{conversationId:'c1',role:'MEMBER'});assert.match(form().textContent,/持码人可加入会话并查看此前的消息/)
  // A service that ignores the history choice must not be described as limiting it.
  echo=false;[...form().querySelectorAll('button')].find(b=>b.textContent==='完成').click();await tick()

@@ -4,7 +4,7 @@
 // OCR 截图与识别、暂存区、剪贴板捕获的 toast/modal/错误文案。
 export default {
   // fileOpenTabs.js
-  fileNotFoundNamed: '未找到文件: {name}',
+  fileNotFoundNamed: '未找到文件：{name}',
   openDocumentFirst: '{name}没有打开，请先打开文档',
   fetchFileListFailed: '获取文件列表失败',
   cannotOpenFileTitle: '无法打开文件',
@@ -20,10 +20,10 @@ export default {
 
   // agentClientActions.js
   fileUpdated: '文件已更新',
-  openedNamed: '已打开: {name}',
+  openedNamed: '已打开：{name}',
   fileNotFound: '文件不存在',
   openFileFailed: '打开文件失败',
-  fileUpdatedNamed: '文件已更新: {name}',
+  fileUpdatedNamed: '文件已更新：{name}',
   reloadFailedNamed: '{name} 重新加载失败，请关闭标签后重新打开',
   refreshFileFailed: '刷新文件失败',
 
@@ -42,7 +42,7 @@ export default {
   copyFailed: '复制失败',
   enterFileName: '请输入文件名',
   saveSuccess: '保存成功',
-  saveFailedNamed: '保存失败: {msg}',
+  saveFailedNamed: '保存失败：{msg}',
   unknownError: '未知错误',
   addingFavorite: '正在加入收藏…',
   webExcerpt: '网页摘录',
@@ -85,14 +85,14 @@ export default {
   ocrCancelling: '正在取消…',
   ocrBatchBusy: '已有一批识别在进行，请等它完成或取消',
   ocrConsentTitle: '使用云端识别文字？',
-  ocrConsentHint: '带文字层的 PDF 直接提取，不上传、不计费；只有扫描件和图片需要云端识别。本次确认只对这一批生效，可在「设置 → AI 功能设置 → 扫描件识别」改为始终云端或仅本地。',
+  ocrConsentHint: '带文字层的 PDF 直接提取，不上传、不计费；只有扫描件和图片需要云端识别。本次确认只对这一批生效，可在“设置 → AI 功能设置 → 扫描件识别”改为始终云端或仅本地。',
   ocrConsentCheck: '我已知悉上述数据去向与计费方式',
   ocrConsentConfirm: '开始识别',
   ocrCopied: '已复制 {count} 份文件的文字，并记入剪贴板历史',
   ocrSaved: '已生成：{names}',
   ocrOthersNotOpened: '其余未并排打开的：{names}',
   ocrLocalOnly: '已设置为仅本地识别，图片与扫描件未上传（可在设置中更改）',
-  ocrFailedItem: '「{name}」未完成：{reason}',
+  ocrFailedItem: '“{name}”未完成：{reason}',
   ocrSkipped: '{count} 份需要云端识别的文件未处理（未确认）',
   ocrCancelled: '已取消，{count} 份未处理',
   ocrSummaryTitle: '识别完成 {done}/{total}',
@@ -100,7 +100,7 @@ export default {
   ocrLocalFailedReason: '原因：{reason}',
   ocrLocalFailedHint: '可以改用云端识别本批中本地未完成的文件。不改用的话，这些文件不会上传。',
   ocrLocalFailedConfirm: '改用云端识别',
-  ocrAlreadySearchable: '「{name}」本身带文字层，已经可以搜索，未生成新文件',
+  ocrAlreadySearchable: '“{name}”本身带文字层，已经可以搜索，未生成新文件',
   ocrStopped: '已停止，{count} 份未处理',
   "subscribeProBtn": "个人 Pro ¥9.9",
 }

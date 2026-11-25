@@ -59,7 +59,7 @@ export default {
   renameHint: '点击重命名',
   // project-list.vue：卡片
   delete: '删除',
-  managerLabel: '项目负责人: {name}',
+  managerLabel: '项目负责人：{name}',
   unknown: '未知',
   clientLabel: '客户',
   clientMemberTitle: '{name} (客户)',
@@ -138,7 +138,7 @@ export default {
   // ActivityFeed.vue
   activityLoadingHint: '正在读取动态…',
   noVersionHistoryTitle: '这份案卷还没有版本记录',
-  noVersionHistoryDesc: '开启之后，每次改动都会自动留底，这里会按时间列出做过什么。开启的入口在工作台右侧的「版本」面板里。',
+  noVersionHistoryDesc: '开启之后，每次改动都会自动留底，这里会按时间列出做过什么。开启的入口在工作台右侧的“版本”面板里。',
   noActivityTitle: '还没有动态',
   noActivityDesc: '在工作台里改过文件、或者让 AI 跑过一次任务之后，这里就会有记录。',
   aiTaskLabel: 'AI 任务 {status}',
@@ -162,7 +162,7 @@ export default {
   catalogDeviceUnavailable: "需打开电脑 · {device}",
   catalogLoadingFiles: "正在读取文件清单，可关闭或选择其他项目",
   catalogCancelled: "已停止等待",
-  catalogDeviceUnavailableHelp: "请打开「{device}」上的 AI WorkDeck，再刷新获取文件。",
+  catalogDeviceUnavailableHelp: "请打开“{device}”上的 AI WorkDeck，再刷新获取文件。",
   catalogOtherLocations: '其他位置',
   catalogAvailabilityLocal: '本机',
   catalogAvailabilityCloud: '云端',

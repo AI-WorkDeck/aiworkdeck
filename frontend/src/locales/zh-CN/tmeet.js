@@ -36,7 +36,7 @@ export default {
   syncFailed: '同步失败，请检查 CLI 状态',
   searchPlaceholder: '搜索会议主题或会议号',
   noMeetings: '暂无同步的腾讯会议',
-  noMeetingsHint: '点击上方「立即同步」获取你参与的云录制与纪要',
+  noMeetingsHint: '点击上方“立即同步”获取你参与的云录制与纪要',
   meetingCode: '会议号',
   startTime: '开会时间',
   duration: '时长',

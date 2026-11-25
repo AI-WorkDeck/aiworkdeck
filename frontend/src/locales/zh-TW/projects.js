@@ -51,7 +51,7 @@ export default {
   "rename": "重新命名",
   "renameHint": "點選重新命名",
   "delete": "刪除",
-  "managerLabel": "專案負責人: {name}",
+  "managerLabel": "專案負責人：{name}",
   "unknown": "未知",
   "clientLabel": "客戶",
   "clientMemberTitle": "{name} (客戶)",
