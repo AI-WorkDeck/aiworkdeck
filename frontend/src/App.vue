@@ -235,6 +235,22 @@ export default {
 <style>
 /* AI WorkDeck Global Overrides */
 
+/* ============ 共享按钮 .awd-btn（POLISH X18） ============
+   主按钮 / 次按钮 / 危险按钮的唯一定义。组件里不要再各自 scoped 重定义；
+   需要小号或特殊排版时，用组件自己的类在后面覆盖尺寸，不改配色。 */
+.awd-btn {
+  height: var(--awd-control-height); box-sizing: border-box; padding: 0 18px;
+  border: 1px solid transparent; border-radius: var(--awd-radius-md);
+  font-size: var(--awd-font-size-body); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
+.awd-btn-primary:hover { background: var(--awd-accent-hover); }
+.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border-color: var(--awd-border-strong); }
+.awd-btn-secondary:hover { background: var(--awd-surface-2); }
+.awd-btn-danger { background: var(--awd-surface); color: var(--awd-danger-text); border-color: var(--awd-danger); }
+.awd-btn-disabled, .awd-btn.disabled { opacity: .45; pointer-events: none; }
+
 /* ============ 全局字体（dev-board#849） =====}
 
    此前全仓没有 html/body 字体规则：页面里的组件各自带字体没露馅，挂在 document.body

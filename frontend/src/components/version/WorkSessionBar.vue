@@ -229,15 +229,6 @@ export default {
 .session-btn-main { background: var(--awd-panel-accent-wash); color: var(--awd-accent-text); }
 .session-btn-danger { color: var(--awd-danger-text); }
 
-.awd-btn {
-  padding: 8px 18px; border-radius: 6px; font-size: 13.5px; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
-.awd-btn-danger { background: var(--awd-surface); color: var(--awd-danger-text); border: 1px solid var(--awd-danger); }
 
 .awd-mask {
   position: fixed; inset: 0; background: var(--awd-overlay);
