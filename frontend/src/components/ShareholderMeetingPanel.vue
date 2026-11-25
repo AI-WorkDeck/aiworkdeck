@@ -115,6 +115,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import api from '@/services/api'
 import FilePickerDialog from '@/components/FilePickerDialog.vue'
 
@@ -241,7 +242,7 @@ export default {
         await this.loadChecks()
         this.expandedId = (check && check.id) || null
       } catch (e) {
-        uni.showToast({ title: this.$t('panels.smCreateFailed', { msg: e.message || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.smCreateFailed', { msg: errorText(e) }), icon: 'none' })
       }
     },
     openPicker(check, slot) {
@@ -258,7 +259,7 @@ export default {
         await this.loadChecks()
         this.expandedId = check.id
       } catch (e) {
-        uni.showToast({ title: this.$t('panels.smLinkFailed', { msg: e.message || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.smLinkFailed', { msg: errorText(e) }), icon: 'none' })
       }
     },
     async removeMaterial(check, slot, file) {
@@ -267,7 +268,7 @@ export default {
         await this.loadChecks()
         this.expandedId = check.id
       } catch (e) {
-        uni.showToast({ title: this.$t('panels.smRemoveFailed', { msg: e.message || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.smRemoveFailed', { msg: errorText(e) }), icon: 'none' })
       }
     },
     async fetchCninfo(check) {
@@ -292,7 +293,7 @@ export default {
         await this.loadChecks()
         this.expandedId = check.id
       } catch (e) {
-        uni.showToast({ title: this.$t('panels.smFetchFailedFallback', { msg: e.message || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.smFetchFailedFallback', { msg: errorText(e) }), icon: 'none' })
       } finally {
         this.fetching = false
       }
@@ -312,7 +313,7 @@ export default {
         await this.loadChecks()
         this.expandedId = check.id
       } catch (e) {
-        uni.showToast({ title: this.$t('panels.smStartCheckFailed', { msg: e.message || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.smStartCheckFailed', { msg: errorText(e) }), icon: 'none' })
       } finally {
         this.starting = false
       }
@@ -329,7 +330,7 @@ export default {
         if (this.expandedId === this.deletingCheck.id) this.expandedId = null
         await this.loadChecks()
       } catch (e) {
-        uni.showToast({ title: this.$t('panels.smDeleteFailed', { msg: e.message || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('panels.smDeleteFailed', { msg: errorText(e) }), icon: 'none' })
       } finally {
         this.deletingCheck = null
       }

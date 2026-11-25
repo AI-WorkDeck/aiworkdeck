@@ -15,6 +15,7 @@
   </view>
 </template>
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { renameProject } from '@/services/api.js'
 export default {
   name: 'FolderCatalog',
@@ -54,7 +55,7 @@ export default {
             if (removed === false) return
             this.$emit('deleted', project.id)
             uni.showToast({ title: this.$t('projects.deleteSuccess'), icon: 'success' })
-          } catch (e) { uni.showToast({ title: e.message || this.$t('projects.deleteFailedRetry'), icon: 'none' }) }
+          } catch (e) { uni.showToast({ title: errorText(e, this.$t('projects.deleteFailedRetry')), icon: 'none' }) }
           finally { this.busy = false }
         },
       })

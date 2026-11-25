@@ -12,7 +12,7 @@
 export const VIEW_COMMANDS = [
   {
     id: 'view.sidebar',
-    label: { zh: '左栏', en: 'Sidebar' },
+    label: { zh: '左栏', 'zh-TW': '左欄', en: 'Sidebar' },
     accel: 'Alt+CmdOrCtrl+B',
     menu: 'view', group: 1,
     type: 'checkbox', checked: 'sidebarOpen',
@@ -21,7 +21,7 @@ export const VIEW_COMMANDS = [
   },
   {
     id: 'view.toolsPanel',
-    label: { zh: '底部工具', en: 'Bottom Panel' },
+    label: { zh: '底部工具', 'zh-TW': '底部工具', en: 'Bottom Panel' },
     accel: 'Alt+CmdOrCtrl+J',
     menu: 'view', group: 1,
     type: 'checkbox', checked: 'toolsPanelOpen',
@@ -30,7 +30,7 @@ export const VIEW_COMMANDS = [
   },
   {
     id: 'view.aiPanel',
-    label: { zh: 'AI 面板', en: 'AI Panel' },
+    label: { zh: 'AI 面板', 'zh-TW': 'AI 面板', en: 'AI Panel' },
     accel: 'Alt+CmdOrCtrl+I',
     menu: 'view', group: 1,
     type: 'checkbox', checked: 'aiPanelOpen',
@@ -39,7 +39,7 @@ export const VIEW_COMMANDS = [
   },
   {
     id: 'view.split',
-    label: { zh: '分屏', en: 'Split Editor' },
+    label: { zh: '分屏', 'zh-TW': '分屏', en: 'Split Editor' },
     accel: 'Alt+CmdOrCtrl+\\',
     menu: 'view', group: 1,
     type: 'checkbox', checked: 'splitMode',
@@ -53,7 +53,7 @@ export const VIEW_COMMANDS = [
   // 恢复时连 panelRegistry 的 'variables' 条目一起加回。
   {
     id: 'view.toolFavorites',
-    label: { zh: '收藏夹', en: 'Favorites' },
+    label: { zh: '收藏夹', 'zh-TW': '收藏夾', en: 'Favorites' },
     menu: 'view', group: 3,
     type: 'checkbox', checked: 'toolFavorites',
     when: ['workbench', 'notClient'],
@@ -61,7 +61,7 @@ export const VIEW_COMMANDS = [
   },
   {
     id: 'view.toolClipboard',
-    label: { zh: '剪贴板', en: 'Clipboard' },
+    label: { zh: '剪贴板', 'zh-TW': '剪貼簿', en: 'Clipboard' },
     menu: 'view', group: 3,
     type: 'checkbox', checked: 'toolClipboard',
     when: ['workbench', 'notClient'],

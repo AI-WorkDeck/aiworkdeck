@@ -187,6 +187,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getLitigationVisualStatus,
   getLitigationDiagrams,
@@ -404,7 +405,7 @@ export default {
         await this.refreshPackStatus()
         if (this.litPackStatus && this.litPackStatus.state === 'ready') await this.reload()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('panels.litPackRetryFailedFallback'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('panels.litPackRetryFailedFallback')), icon: 'none' })
       } finally {
         this.litPackRetrying = false
       }
@@ -613,7 +614,7 @@ export default {
         uni.showToast({ title: this.$t('panels.litRestyledTo', { mode: modeText }), icon: 'none' })
       } catch (e) {
         uni.$emit('awd:litviz-restyled', { projectId: this.projectId, folderId: d.folderId, kind: 'restyle', failed: true })
-        uni.showToast({ title: (e && e.message) || this.$t('panels.litRedrawFailedFallback'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('panels.litRedrawFailedFallback')), icon: 'none' })
       } finally {
         uni.hideLoading()
         this.restylingId = null

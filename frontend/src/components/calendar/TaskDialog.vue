@@ -193,6 +193,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import AwdSelect from '@/components/AwdSelect.vue'
 import AwdDatePicker from '@/components/AwdDatePicker.vue'
 import AwdSwitch from '@/components/AwdSwitch.vue'
@@ -584,7 +585,7 @@ export default {
         this.close()
       } catch (e) {
         console.error('[TaskDialog] 保存事项失败', e)
-        uni.showToast({ title: (e && e.message) || this.$t('calendar.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('calendar.saveFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

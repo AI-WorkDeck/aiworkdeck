@@ -8,6 +8,9 @@ import { createComponentDownloadManager } from '../../src/composables/useCompone
 import { createPluginBusinessServices, clonePluginData } from '../../src/utils/pluginBusinessServices.js'
 import { resolveTrackEndedStatus, decideAutoTranscribe } from '../../src/utils/meetingRecorderStatus.js'
 import { insightEntityTabMethods } from '../../src/pages/project-overview/insightEntityTab.js'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 
 function load(path, name, dependencies) {
   const source = readFileSync(new URL(path, import.meta.url), 'utf8')

@@ -79,6 +79,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { ICONS } from '@/config/icons.js'
 import {
   getProjectVariables,
@@ -365,7 +366,7 @@ export default {
         await this.refresh()
         uni.showToast({ title: this.$t('editor.vars.created'), icon: 'success' })
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('editor.vars.createFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('editor.vars.createFailed')), icon: 'none' })
       }
     },
 
@@ -381,7 +382,7 @@ export default {
         uni.showToast({ title: this.$t('editor.vars.inserted'), icon: 'success' })
         await this.fetchDocFields()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('editor.vars.insertFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('editor.vars.insertFailed')), icon: 'none' })
       }
     },
 
@@ -418,7 +419,7 @@ export default {
             await this.fetchDocFields()
             uni.showToast({ title: this.$t('editor.vars.updated'), icon: 'success' })
           } catch (e) {
-            uni.showToast({ title: e.message || this.$t('editor.vars.updateFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('editor.vars.updateFailed')), icon: 'none' })
           }
         }
       })
@@ -456,7 +457,7 @@ export default {
         uni.showToast({ title: this.$t('editor.vars.syncDone', { count: res.updated || 0 }), icon: 'none' })
       } catch (e) {
         uni.hideLoading()
-        uni.showToast({ title: e.message || this.$t('editor.vars.syncFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('editor.vars.syncFailed')), icon: 'none' })
       }
     },
 
@@ -486,7 +487,7 @@ export default {
         }
         uni.showToast({ title: this.$t('editor.vars.deleted'), icon: 'success' })
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('editor.vars.deleteFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('editor.vars.deleteFailed')), icon: 'none' })
       }
     }
   }

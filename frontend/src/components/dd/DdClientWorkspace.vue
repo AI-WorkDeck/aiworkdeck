@@ -87,7 +87,7 @@
                   <option value="">{{ $t('ddWorkflow.client.officialCaseLibrary') }}</option>
                   <option v-for="c in cloudConnections" :key="c.id" :value="c.id">{{ c.displayName || c.serverUrl }}</option>
                 </select>
-                <span class="select-chevron" aria-hidden="true">▾</span>
+                <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
               </div>
             </div>
           </div>
@@ -120,7 +120,7 @@
             <select id="dd-project" :disabled="submissionBusy" :value="selectedId" @change="selectConnection($event.target.value)">
               <option v-for="c in connections" :key="c.id" :value="c.id">{{ c.name }}</option>
             </select>
-            <span class="select-chevron" aria-hidden="true">▾</span>
+            <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
           </div>
         </div>
 

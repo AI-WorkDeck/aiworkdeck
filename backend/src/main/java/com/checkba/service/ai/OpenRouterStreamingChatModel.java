@@ -142,12 +142,44 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
      */
     private static final OkHttpClient SHARED_CLIENT = createSharedClient();
 
+    /**
+     * 空闲连接回收时长（Q19）：必须短于上游的 keep-alive（生产 nginx keepalive_timeout 75s）。
+     * OkHttp 默认 5 分钟——对端早已关掉的连接还留在池里，下一轮复用它写请求体就是
+     * 「Broken pipe / Connection reset」，平台通道又不能在编排层重放（计费），用户第一句话就挂。
+     */
+    static final long IDLE_CONNECTION_EVICT_SECONDS = 30;
+
     private static OkHttpClient createSharedClient() {
         okhttp3.Dispatcher dispatcher = new okhttp3.Dispatcher();
         dispatcher.setMaxRequestsPerHost(DEFAULT_MAX_REQUESTS_PER_HOST);
         return new OkHttpClient.Builder()
                 .dispatcher(dispatcher)
+                .connectionPool(new okhttp3.ConnectionPool(5, IDLE_CONNECTION_EVICT_SECONDS, java.util.concurrent.TimeUnit.SECONDS))
                 .build();
+    }
+
+    /**
+     * 连接层失败（Q19）：请求还没拿到任何响应、错误出在连接本身（对端已关的复用连接、写请求体时
+     * 断管、连接被重置、流在开头就断）。超时不算——那可能是对端已经在处理。
+     */
+    static boolean isConnectionLevelFailure(IOException e) {
+        if (e instanceof java.net.SocketTimeoutException || e instanceof java.io.InterruptedIOException
+                && !(e instanceof java.net.SocketException)) {
+            return false;
+        }
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof java.net.SocketException || t instanceof java.io.EOFException
+                    || t instanceof okhttp3.internal.http2.StreamResetException
+                    || t instanceof okhttp3.internal.http2.ConnectionShutdownException) {
+                return true;
+            }
+            String m = t.getMessage();
+            if (m != null && (m.contains("unexpected end of stream") || m.contains("Broken pipe")
+                    || m.contains("Connection reset"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public OpenRouterStreamingChatModel(String apiKey, String baseUrl, String modelName, Duration timeout) {
@@ -371,7 +403,24 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         // International general chat retains its original policy; domestic requests never replay uncertain charges.
         OkHttpClient transport = maxOutputTokens == null && !(apiKey != null && apiKey.startsWith("awdai_"))
                 ? client : client.newBuilder().retryOnConnectionFailure(false).build();
-        Inflight inflight = new Inflight(enqueue(transport, body, session), session);
+        // Q19：平台通道（awdai_ 账户 Key）的网关按 X-Request-Id 幂等预扣——同一个 id 重发要么被受理
+        // （第一次根本没到网关），要么被拒成 request_already_submitted，绝不重复扣费。
+        // 所以这条通道上「连接层失败、还没拿到任何响应」可以用同一个 id 安全重发一次。
+        final String requestId = apiKey != null && apiKey.startsWith("awdai_") ? java.util.UUID.randomUUID().toString() : null;
+        final Inflight[] holder = new Inflight[1];
+        final String sentBody = body;
+        final AtomicBoolean connectionRetryUsed = new AtomicBoolean(false);
+        java.util.function.Predicate<IOException> retryOnce = requestId == null ? null : e -> {
+            Inflight in = holder[0];
+            if (in == null || in.cancelled || !isConnectionLevelFailure(e) || !connectionRetryUsed.compareAndSet(false, true)) return false;
+            log.warn("Platform AI request {} failed at the connection level ({}); retrying once with the same request id",
+                    requestId, e.getClass().getSimpleName());
+            in.call = enqueue(transport, sentBody, session, requestId, null);
+            if (in.cancelled) in.call.cancel();
+            return true;
+        };
+        Inflight inflight = new Inflight(enqueue(transport, body, session, requestId, retryOnce), session);
+        holder[0] = inflight;
 
         // 首字节前排队换家（dev-board#1061）：判定交给 handler 的看门狗（它手里有「保活 vs 真字节」
         // 的计时），动作在这里做——先让旧会话静默（之后它的任何回调都不再转给 handler，
@@ -392,7 +441,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 log.warn("Requeueing {} on another provider (was {}): only keep-alive before first byte",
                         modelName, from == null ? "unknown" : from);
                 inflight.session = next;
-                inflight.call = enqueue(transport, retryBody, next);
+                inflight.call = enqueue(transport, retryBody, next, null, null);
                 if (inflight.cancelled) inflight.call.cancel();   // 停止恰好落在换家这一刻
                 return true;
             });
@@ -400,19 +449,27 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         return inflight;
     }
 
-    /** 发出一次请求；回调全部转给 session（session 静默后一概不再转给 handler）。 */
-    private Call enqueue(OkHttpClient transport, String body, StreamSession session) {
-        Request request = new Request.Builder()
+    /**
+     * 发出一次请求；回调全部转给 session（session 静默后一概不再转给 handler）。
+     *
+     * @param requestId     非 null 时带 {@code X-Request-Id}（平台网关的幂等键，Q19）
+     * @param onConnFailure 非 null 且返回 true = 已接手重发，这次失败不交给 session
+     */
+    private Call enqueue(OkHttpClient transport, String body, StreamSession session, String requestId,
+                         java.util.function.Predicate<IOException> onConnFailure) {
+        Request.Builder rb = new Request.Builder()
                 .url(endpoint)
                 .header("Authorization", "Bearer " + (apiKey == null ? "" : apiKey))
                 .header("Accept", "text/event-stream")
                 .header("User-Agent", ProductIdentity.userAgent("ai-gateway"))
-                .post(RequestBody.create(body, JSON))
-                .build();
+                .post(RequestBody.create(body, JSON));
+        if (requestId != null) rb.header("X-Request-Id", requestId);
+        Request request = rb.build();
         Call call = transport.newCall(request);
         call.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
+                if (onConnFailure != null && !call.isCanceled() && onConnFailure.test(e)) return;
                 session.fail(e);
             }
 

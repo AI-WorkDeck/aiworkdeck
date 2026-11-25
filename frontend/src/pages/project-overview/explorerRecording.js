@@ -3,6 +3,7 @@
 import { getMeetingRecordings, getMeetingAsrNotice } from '@/services/api.js'
 import { recorderState, isRecordingActive, startRecording } from '@/utils/meetingRecorder.js'
 import { confirmAsrNotice } from '@/utils/asrNoticeDialog.js'
+import { errorText } from '@/utils/errorToast.js'
 
 // Explorer and welcome clicks are host-owned recording actions. Plugin-initiated starts
 // still go through their existing permission checks and confirmation dialog.
@@ -88,7 +89,7 @@ export default {
         if (isCurrent()) this.sendExplorerRecordingFocus()
       } catch (error) {
         if (isCurrent() && error?.code !== 'cancelled') {
-          uni.showToast({ title: error?.message || this.$t('meeting.cannotStartRecording'), icon: 'none' })
+          uni.showToast({ title: errorText(error, this.$t('meeting.cannotStartRecording')), icon: 'none' })
         }
       } finally {
         if (this._explorerRecordingRequest === controller) this._explorerRecordingRequest = null

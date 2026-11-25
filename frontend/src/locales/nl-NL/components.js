@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} moet worden gedownload (ongeveer {runtime} MB). Het wordt opgeslagen onder ~/.aiworkdeck en kan worden verwijderd via Instellingen → Onderdelen.",
   "promptUsage": "Dit onderdeel maakt mogelijk: {unlocks}. Zonder dit onderdeel: {impact}. Al het overige blijft gewoon werken.",
   "sizeUnknown": "Grootte controleren…",
+  "sizeUnavailable": "Grootte zichtbaar zodra de download start",
   "stateNotInstalled": "Niet geïnstalleerd",
   "stateReady": "Geïnstalleerd (nog niet uitgevoerd)",
   "stateServiceStarted": "Service gestart (functie nog niet geverifieerd)",

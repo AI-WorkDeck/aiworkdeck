@@ -53,6 +53,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 内嵌 draw.io 编辑器。
 //
 // 「诉讼可视化」一张图落四个文件：.svg（母版）/.png（插进文书用）/.drawio（可继续
@@ -367,7 +368,7 @@ export default {
         this.$emit('saved', res)
       } catch (e) {
         this.savedTip = ''
-        uni.showToast({ title: (e && e.message) || this.$t('editor.drawio.saveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('editor.drawio.saveFailed')), icon: 'none' })
       }
     },
 
@@ -403,7 +404,7 @@ export default {
           }
           await host.fs.showItemInFolder(r.data.path)
         } catch (e) {
-          uni.showToast({ title: (e && e.message) || this.$t('workbench.revealFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('workbench.revealFailed')), icon: 'none' })
         }
         return
       }
@@ -448,7 +449,7 @@ export default {
         await packInstall(this.packId)
         await this.refreshPackStatus()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('editor.drawio.installPackFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('editor.drawio.installPackFailed')), icon: 'none' })
       } finally {
         this.packInstalling = false
       }

@@ -58,6 +58,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { t } from '../lib/i18n.js'
+import { errorText } from '../lib/errorText.js'
 import { links, loading, loadLinks, addLink, removeLink, linkLabel, validateRepoUrl } from '../lib/gitLink.js'
 
 /**
@@ -90,7 +91,7 @@ onMounted(async () => {
   try {
     await loadLinks(props.settings, props.projectId)
   } catch (e) {
-    error.value = e && e.message ? e.message : String(e)
+    error.value = errorText(e, t('networkError'))
   }
 })
 
@@ -109,7 +110,7 @@ async function save() {
     // 令牌转交完就忘掉：服务端加密存了，这里再留着只是多一份泄露面
     token.value = ''
   } catch (e) {
-    error.value = e && e.message ? e.message : String(e)
+    error.value = errorText(e, t('connectFailed'))
   } finally {
     saving.value = false
   }
@@ -121,7 +122,7 @@ async function unlink(link) {
   try {
     await removeLink(props.settings, link.id)
   } catch (e) {
-    error.value = e && e.message ? e.message : String(e)
+    error.value = errorText(e, t('deleteFailed'))
   } finally {
     removingId.value = null
   }

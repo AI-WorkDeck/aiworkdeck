@@ -232,10 +232,18 @@ class AgentOrchestratorPassDepthTest {
 
     /** O12：DeepSeek V4 Pro 用不存在的原生 final 工具表示「答完了」；此前每次回「未知工具」，它再发，直到轮数耗尽。 */
     private int runPseudoFinal(String conversationId, String finalText) {
+        return runPseudoFinal(conversationId, finalText, "{\"success\":true}", "{\"arguments\": \"\"}", true);
+    }
+
+    private int runPseudoFinal(String conversationId, String finalText, String toolOutput, String finalArgs) {
+        return runPseudoFinal(conversationId, finalText, toolOutput, finalArgs, true);
+    }
+
+    private int runPseudoFinal(String conversationId, String finalText, String toolOutput, String finalArgs, boolean expectFinished) {
         List<String> executed = new CopyOnWriteArrayList<>();
         when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
             executed.add(inv.getArgument(0));
-            return new ToolRegistry.ToolResult("{\"success\":true}", null, true);
+            return new ToolRegistry.ToolResult(toolOutput, null, true);
         });
         AtomicInteger calls = new AtomicInteger();
         StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
@@ -253,7 +261,7 @@ class AgentOrchestratorPassDepthTest {
                 }
                 if (!finalText.isEmpty()) handler.onNext(finalText);
                 List<ToolExecutionRequest> fin = List.of(ToolExecutionRequest.builder()
-                        .id("f" + n).name("final").arguments("{\"arguments\": \"\"}").build());
+                        .id("f" + n).name("final").arguments(finalArgs).build());
                 handler.onComplete(Response.from(finalText.isEmpty() ? AiMessage.from(fin) : AiMessage.from(finalText, fin)));
             }
 
@@ -270,7 +278,7 @@ class AgentOrchestratorPassDepthTest {
         request.setModel(MODEL);
         orchestrator.handleUserMessage(request, 7L);
         assertEquals(List.of("slide_set_text"), executed, "final 不能当工具执行");
-        assertTrue(String.valueOf(bubbleEndData()).contains("finished"));
+        if (expectFinished) assertTrue(String.valueOf(bubbleEndData()).contains("finished"));
         return calls.get();
     }
 
@@ -284,5 +292,22 @@ class AgentOrchestratorPassDepthTest {
     @DisplayName("原生伪工具 final 无正文：同样收尾，不当空响应重试")
     void pseudoFinalWithoutTextEndsTheTurn() {
         assertEquals(2, runPseudoFinal("conv-final-blank", ""));
+    }
+
+    @Test
+    @DisplayName("D34：上一步工具失败、final 无正文也无参数：补一轮「请回复用户」提醒，不让用户只看到一条失败")
+    void pseudoFinalBlankAfterAFailedToolIsRetried() {
+        int calls = runPseudoFinal("conv-final-after-fail", "",
+                "Error: this file cannot be read: it is damaged or not a valid document.", "{}", false);
+        assertTrue(calls > 2, "blank final after a failed tool must not end the turn silently, calls=" + calls);
+    }
+
+    @Test
+    @DisplayName("D34：final 无正文但参数里有答复：答复当正文收尾")
+    void pseudoFinalAnswerInArgumentsBecomesTheReply() {
+        assertEquals(2, runPseudoFinal("conv-final-args", "", "{\"success\":true}", "{\"answer\": \"两份已读，第三份打不开。\"}"));
+        org.mockito.ArgumentCaptor<String> saved = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(messageService, atLeastOnce()).upsertAssistantMessage(any(), any(), any(), any(), saved.capture());
+        assertTrue(saved.getAllValues().stream().anyMatch(v -> v.contains("两份已读，第三份打不开。")), String.valueOf(saved.getAllValues()));
     }
 }

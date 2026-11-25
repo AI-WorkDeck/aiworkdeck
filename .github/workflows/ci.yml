@@ -428,7 +428,13 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
+          cache-dependency-path: |
+            desktop/package-lock.json
+            frontend/package-lock.json
+      # Several desktop tests load jsdom from frontend/node_modules (desktop-build.yml installs it the same way).
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
       - name: Install dependencies
         working-directory: desktop
         run: npm ci

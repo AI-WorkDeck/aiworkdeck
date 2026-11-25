@@ -107,6 +107,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { getProject, getProjectVariables, saveProjectVariable, deleteProjectVariable } from '@/services/api.js'
 import { VARIABLE_LIBRARY_SEARCH_PLACEHOLDER } from '@/config/variables.js'
 
@@ -273,7 +274,7 @@ export default {
       } catch (e) {
         console.error('保存变量失败:', e)
         uni.showToast({
-          title: this.$t('panels.vlSaveFailed', { msg: e.message || this.$t('panels.vlUnknownError') }),
+          title: this.$t('panels.vlSaveFailed', { msg: errorText(e) }),
           icon: 'none'
         })
       } finally {

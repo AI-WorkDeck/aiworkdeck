@@ -9,6 +9,7 @@
 import { ocrRecognize, createProjectFavorite, getProjectFiles, createFile, getApiBaseUrl, promptFeatureNotConfigured } from '@/services/api.js'
 import { getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
+import { errorText } from '@/utils/errorToast.js'
 
 export const ocrActionMethods = {
     async ensureOcrFrozenFrame() {
@@ -246,7 +247,7 @@ export const ocrActionMethods = {
           // OCR 未配置：引导去设置而非报"识别失败"（#18 T7）
           promptFeatureNotConfigured(e)
         } else {
-          uni.showToast({ title: e.message || this.$t('workbenchOps.recognizeFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('workbenchOps.recognizeFailed')), icon: 'none' })
         }
       } finally {
         uni.hideLoading()
@@ -415,7 +416,7 @@ export const ocrActionMethods = {
         })
     } catch (e) {
         console.error('保存失败', e)
-        uni.showToast({ title: this.$t('workbenchOps.saveFailedNamed', { msg: e.message || this.$t('workbenchOps.unknownError') }), icon: 'none' })
+        uni.showToast({ title: this.$t('workbenchOps.saveFailedNamed', { msg: errorText(e) }), icon: 'none' })
     } finally {
         this.screenshotSaveLoading = false
     }
@@ -470,7 +471,7 @@ export const ocrActionMethods = {
         if (host.app && host.app.confirm) {
           host.app.confirm({ title: this.$t('workbenchOps.favoriteFailed'), content: (e && e.message) || '' }).catch(() => {})
         } else {
-          uni.showToast({ title: e.message || this.$t('workbenchOps.favoriteFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('workbenchOps.favoriteFailed')), icon: 'none' })
         }
       }
     },
@@ -565,7 +566,7 @@ export const ocrActionMethods = {
         })
       } catch (e) {
         console.error('网核关联失败:', e)
-        uni.showToast({ title: e.message || this.$t('workbenchOps.webMarkLinkFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbenchOps.webMarkLinkFailed')), icon: 'none' })
       } finally {
         uni.hideLoading()
       }

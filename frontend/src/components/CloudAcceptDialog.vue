@@ -51,6 +51,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   listCloudConnections, listRemoteProjects, acceptCloudProject,
   getOfficialCloud, connectOfficialCloud,
@@ -115,14 +116,14 @@ export default {
             await connectOfficialCloud()
             conns = await this.fetchConnections()
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.connectFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.connectFailed')), icon: 'none' })
           }
         }
         if (!conns.length) { this.noConnection = true; return }
         this.connectionId = conns[0].id
         await this.loadProjects()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.loadRemoteProjectsFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.loadRemoteProjectsFailed')), icon: 'none' })
       } finally {
         this.loading = false
       }
@@ -157,7 +158,7 @@ export default {
         this.close()
         this.$emit('accepted', localProjectId)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.pullToDeviceFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.pullToDeviceFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

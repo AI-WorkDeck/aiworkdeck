@@ -472,6 +472,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { formatCnyCompact } from '@/utils/cnyAmount'
 import { ICONS } from '@/config/icons.js'
 import { getPluginGlyphPaths } from '@/config/pluginIcons.js'
@@ -824,7 +825,7 @@ export default {
         })
         this.directory.friends = [Object.assign({ source: 'personal' }, res.added), ...this.directory.friends.filter(f => f.name !== name)]
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.tr('panels.pwsAddFailedToast', '添加失败'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.tr('panels.pwsAddFailedToast', '添加失败')), icon: 'none' })
         return
       }
       this.friendDraft.name = ''

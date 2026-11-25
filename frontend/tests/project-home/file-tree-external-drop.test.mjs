@@ -35,12 +35,14 @@ import {
   installExternalDragCleanup,
 } from '../../src/utils/fileLocalDrag.js'
 import { collapseToTopmostSelected } from '../../src/utils/fileTreeRecycle.js'
+import { errorText } from '../_lib/error-text.mjs'
 
 const SRC = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 
 // <script> 里的 import 有单行也有多行块（api.js 那组 tag 接口），一并剥掉；
 // 被引用的符号全部由 new Function 的形参喂桩。
 const IMPORT_NAMES = [
+  'errorText',
   'isDesktopHost', 'subscribeLocalProjectFileChanges', 'getProjectFiles', 'createFolder', 'createFile', 'renameFile', 'deleteFile', 'deleteFilePerm',
   'getFilePermDiskPaths', 'restoreFileApi', 'getRecycleBinFiles', 'moveFile', 'batchDeleteFiles', 'batchMoveFiles',
   'batchCopyFiles', 'getApiBaseUrl', 'getContributedTemplates', 'createFileFromContributedTemplate',
@@ -69,6 +71,7 @@ function loadOptions(stubs) {
 function makeVm({ moveFile, batchMoveFiles, createFolder, desktopPaths, desktopFs, importLocalFails, getFileLocalPath } = {}) {
   const calls = { moveFile: [], batchMoveFiles: [], importLocal: [], loadFiles: 0, emits: [], toasts: [] }
   const stubs = {
+    errorText,
     moveFile: async (...a) => { calls.moveFile.push(a); return { parentId: a[2] } },
     batchMoveFiles: batchMoveFiles || (async (...a) => { calls.batchMoveFiles.push(a); return { data: { files: a[1].map(id => ({ id, parentId: a[2] })) } } }),
     collapseToTopmostSelected, clearLocalPathCache,

@@ -10,6 +10,8 @@
       <view class="preview-header">
         <view class="preview-title-row">
           <text class="preview-title">{{ file.name }}</text>
+          <!-- D13：只留大小一项、不带「类型：/大小：」标签——扩展名已在文件名里，开发者式的元数据行对律师是噪音 -->
+          <text class="meta-item" v-if="file.fileSize">{{ formatFileSize(file.fileSize) }}</text>
           <button
             v-if="canEdit && showEditBtn"
             class="btn-edit"
@@ -19,10 +21,6 @@
           >
             {{ $t('files.edit') }}
           </button>
-        </view>
-        <view class="preview-meta">
-          <text class="meta-item" v-if="file.fileType">{{ $t('files.typeLabel', { type: file.fileType }) }}</text>
-          <text class="meta-item" v-if="file.fileSize">{{ $t('files.sizeLabel', { size: formatFileSize(file.fileSize) }) }}</text>
         </view>
       </view>
 
@@ -186,6 +184,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { getFileBytesUrl, getArchiveEntries, extractArchive } from '@/services/api.js'
 import { createSlidePreviewCache, fingerprint, renderSlideCards } from '@/composables/slidePreviewCache.js'
 import { isEncryptedOoxml } from '@/utils/editorLoadFailure.js'
@@ -1045,7 +1044,7 @@ export default {
           }
           await host.fs.showItemInFolder(r.data.path)
         } catch (e) {
-          uni.showToast({ title: (e && e.message) || this.$t('workbench.revealFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('workbench.revealFailed')), icon: 'none' })
         }
         return
       }
@@ -1115,14 +1114,11 @@ export default {
   margin-left: 16rpx;
 }
 
-.preview-meta {
-  display: flex;
-  gap: 24rpx;
-}
-
 .meta-item {
+  margin-left: 16rpx;
   font-size: 24rpx;
   color: var(--awd-text-2);
+  flex-shrink: 0;
 }
 
 .preview-body {

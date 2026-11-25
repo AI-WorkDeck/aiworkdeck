@@ -301,6 +301,8 @@ export default {
   "bpForward": "Εμπρός",
   "bpRefresh": "Ανανέωση",
   "bpUrlPlaceholder": "Εισαγάγετε ένα URL (https://…)",
+  "bpNewTabTitle": "Νέα καρτέλα",
+  "bpNewTabHint": "Πληκτρολογήστε μια διεύθυνση ιστού στη γραμμή επάνω.",
   "bpOpen": "Άνοιγμα",
   "bpNewTab": "Νέα καρτέλα",
   "bpSwitchToDesktop": "Επιστροφή στην προβολή επιφάνειας εργασίας",

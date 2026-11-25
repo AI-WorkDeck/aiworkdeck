@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} precisa ser baixado (cerca de {runtime} MB). Ele fica armazenado em ~/.aiworkdeck e pode ser removido em Configurações → Componentes.",
   "promptUsage": "Ele habilita: {unlocks}. Sem ele: {impact}. Todo o restante continua funcionando.",
   "sizeUnknown": "Verificando tamanho…",
+  "sizeUnavailable": "O tamanho aparece quando o download começar",
   "stateNotInstalled": "Não instalado",
   "stateReady": "Instalado (ainda não executado)",
   "stateServiceStarted": "Serviço iniciado (função ainda não verificada)",

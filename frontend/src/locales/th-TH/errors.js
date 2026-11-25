@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "ลองอีกครั้ง",
     "details": "รายละเอียด",
+    "hideDetails": "ซ่อนรายละเอียด",
     "continue": "ดำเนินการต่อ",
     "refresh": "รีเฟรช",
     "signIn": "ลงชื่อเข้าใช้",

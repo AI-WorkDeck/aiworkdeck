@@ -25,6 +25,7 @@
         <!-- uni 的 v-model 更新有节流；确认/失焦使用事件的完整值，避免快速输入后打开截断地址。 -->
         <input
           v-model="inputUrl"
+          :focus="showStartPage"
           class="url-input"
           :aria-label="$t('panels.bpUrlPlaceholder')"
           :placeholder="$t('panels.bpUrlPlaceholder')"
@@ -142,6 +143,13 @@
         <view class="ble-retry" @tap="retryLoadError"><text>{{ $t('panels.bpRetry') }}</text></view>
       </view>
 
+      <!-- D25：新标签页是本应用自己的中性起始页，不替用户打开任何第三方网站。
+           原生 BrowserView 这时缩到 0x0（同加载失败态，见 syncDesktopBounds），这层才看得见。 -->
+      <view v-if="showStartPage" class="browser-start-page">
+        <text class="bsp-title">{{ $t('panels.bpNewTabTitle') }}</text>
+        <text class="bsp-hint">{{ $t('panels.bpNewTabHint') }}</text>
+      </view>
+
       <!-- H5: 使用 iframe 做最小可用网页展示 -->
       <!-- #ifdef H5 -->
       <!-- 代理把第三方 HTML 以本应用同源的形式返回，sandbox 绝不能带 allow-same-origin：
@@ -167,6 +175,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { getApiBaseUrl, createProjectFavorite, getProjectFavorites, getMyFavorites, createBrowserProxyTicket } from '@/services/api.js'
 import { ICONS } from '@/config/icons.js'
 import { host } from '@/services/host.js'
@@ -246,6 +255,10 @@ export default {
     }
   },
   computed: {
+    // D25：空白新标签页（没有地址、也没在报错）显示本应用的起始页
+    showStartPage() {
+      return this.currentUrl === 'about:blank' && !this.loadError && !this.desktopCreateError
+    },
     ICONS() { return ICONS },
     canGoBack() {
       // 桌面端不看组件里那份 history：面板一卸载它就没了，而 BrowserView 是保活的，
@@ -613,7 +626,7 @@ export default {
         // 同区域的 DOM（toast/OCR 遮挡的老规矩），.browser-load-error 那层 DOM
         // 提示要露出来，唯一办法是让原生层暂时不占这块地方。位置不用管，尺寸
         // 归零后不会画出任何东西。retryLoadError/新导航开始时会把尺寸复原。
-        const bounds = this.loadError
+        const bounds = this.loadError || this.showStartPage
           ? { x: rect.left, y: rect.top, width: 0, height: 0 }
           : { x: rect.left, y: rect.top, width: rect.width, height: rect.height }
         api.setBounds({ id: this._desktopViewId, bounds })
@@ -640,6 +653,8 @@ export default {
         this.loadError = null
         this.syncDesktopBounds()
       }
+      // 从起始页导航出去：原生视图恢复尺寸（currentUrl 已不是 about:blank）
+      if (next !== 'about:blank') this.$nextTick(() => this.syncDesktopBounds())
 
       // Desktop：直接导航 BrowserView。历史由 view 自己维护（见 goBack/goForward），
       // 组件里那份 history 数组只服务 H5 的 iframe 模式。
@@ -859,7 +874,7 @@ export default {
         if (host.app && host.app.confirm) {
           host.app.confirm({ title: this.$t('panels.bpFavoriteFailed'), content: (e && e.message) || '' }).catch(() => {})
         } else {
-          uni.showToast({ title: (e && e.message) || this.$t('panels.bpFavoriteFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, this.$t('panels.bpFavoriteFailed')), icon: 'none' })
         }
       } finally {
         this._favSaving = false
@@ -936,6 +951,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.browser-start-page { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--awd-bg); }
+.bsp-title { font-size: var(--awd-font-size-title); color: var(--awd-text); }
+.bsp-hint { font-size: var(--awd-panel-fs); color: var(--awd-text-3); }
 .browser-pane {
   display: flex;
   flex-direction: column;

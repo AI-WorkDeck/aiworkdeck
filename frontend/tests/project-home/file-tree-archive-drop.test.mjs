@@ -5,6 +5,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { readArchiveEntryDrag, isArchiveEntryDrag, ARCHIVE_ENTRY_MIME } from '../../src/utils/archiveEntryDrag.js'
 import { nativeEvent, nativeDataTransfer, claimExternalDrop } from '../../src/utils/fileTreeExternalDrop.js'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 const source = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>'))
   .replace(/^import\s[\s\S]*?from\s+['"][^'"]+['"]\s*$/gm, '').replace('export default {', 'return {')

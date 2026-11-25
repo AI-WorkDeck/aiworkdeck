@@ -18,7 +18,7 @@ import * as barriers from '../../src/utils/checkpointSaveBarrier.js'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createAuthorNameResolver } from '../../src/utils/editorAuthor.js'
+import { createAuthorNameResolver, needsAuthorPrompt, REDLINE_AUTHOR_KEY, MAX_REDLINE_AUTHOR_CHARS } from '../../src/utils/editorAuthor.js'
 
 const SRC = readFileSync(new URL('../../src/components/LibreOfficeEditor.vue', import.meta.url), 'utf8')
 const BODY = SRC.slice(SRC.indexOf('<script>') + 8, SRC.indexOf('</script>'))
@@ -32,12 +32,14 @@ function makeVm({ cached = null, remote = null, fail = false, endpointUp = true 
   const sent = []
   const options = new Function(...Object.keys(barriers),
     'ReviewPanel', 'EditorToolbar', 'EvidenceStaleBar',
-    'getCurrentUser', 'fetchAuthUser', 'createAuthorNameResolver', 'getFileBytesUrl', BODY)(...Object.values(barriers),
+    'getCurrentUser', 'fetchAuthUser', 'createAuthorNameResolver', 'getFileBytesUrl',
+    'needsAuthorPrompt', 'REDLINE_AUTHOR_KEY', 'MAX_REDLINE_AUTHOR_CHARS', BODY)(...Object.values(barriers),
     null, null, null,
     () => cached,
     async () => { if (fail) throw new Error('401'); return remote ? { code: 0, data: remote } : null },
     createAuthorNameResolver,
-    (id) => '/api/files/' + id + '/download')
+    (id) => '/api/files/' + id + '/download',
+    needsAuthorPrompt, REDLINE_AUTHOR_KEY, MAX_REDLINE_AUTHOR_CHARS)
   const vm = {
     selfAuthor: options.data().selfAuthor,
     _endpointUp: endpointUp,

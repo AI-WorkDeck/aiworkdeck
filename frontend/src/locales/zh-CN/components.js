@@ -9,17 +9,18 @@ export default {
   installSelected: '立即下载所选',
   installOne: '下载此组件',
   later: '稍后再说',
-  laterHint: '随时可以在「设置 → 组件管理」里下载。',
+  laterHint: '随时可以在“设置 → 组件管理”里下载。',
   // 面板里已就绪的组件不再给复选框，收成底部这一行（dev-board#751）
   alreadyReady: '已安装：{names}。',
   nameSeparator: '、',
   manageTitle: '组件管理',
 
-  promptWithModel: '需要下载「{name}」（约 {runtime} MB；含模型约 {total} MB）。落盘于 ~/.aiworkdeck，可在「设置 → 组件管理」卸载释放。',
-  promptNoModel: '需要下载「{name}」（约 {runtime} MB）。落盘于 ~/.aiworkdeck，可在「设置 → 组件管理」卸载释放。',
+  promptWithModel: '需要下载“{name}”（约 {runtime} MB；含模型约 {total} MB）。落盘于 ~/.aiworkdeck，可在“设置 → 组件管理”卸载释放。',
+  promptNoModel: '需要下载“{name}”（约 {runtime} MB）。落盘于 ~/.aiworkdeck，可在“设置 → 组件管理”卸载释放。',
   promptUsage: '它用于：{unlocks}。不下载则：{impact}；其余功能不受影响。',
 
   sizeUnknown: '体积获取中…',
+  sizeUnavailable: "开始下载后显示大小",
   stateNotInstalled: '未安装',
   stateReady: '已安装（尚未验证运行）',
   stateServiceStarted: '服务已启动（功能待使用验证）',
@@ -48,7 +49,7 @@ export default {
   // 对话拦截卡片下方那一句，随阶段变（dev-board#1015；此前恒为 chatInstalling）
   chatStage: {
     preparing: '正在准备组件…',
-    downloading: '正在下载，可以点「后台下载」先继续对话。',
+    downloading: '正在下载，可以点“后台下载”先继续对话。',
     verifying: '下载完成，正在校验内容…',
     extracting: '正在解压安装，文件较多，可能需要几分钟。',
     checking: '正在核对解压出的文件…',
@@ -63,7 +64,7 @@ export default {
 
   // 后台下载（dev-board#581）：关掉面板/收起卡片后下载继续，完成或失败时全局提示
   backgroundDownload: '后台下载',
-  backgroundStarted: '已转入后台下载，可在「设置 → 组件管理」查看进度。',
+  backgroundStarted: '已转入后台下载，可在“设置 → 组件管理”查看进度。',
   backgroundDone: '{name}已安装并启动，可尝试使用。',
   backgroundFailed: '{name}下载失败：{msg}',
 
@@ -76,17 +77,17 @@ export default {
   },
   mineruRuntime: {
     name: '扫描件 OCR 引擎（MinerU）',
-    unlocks: '没有文字层的扫描件 PDF 转 Word、版面识别、PPT 可编辑导出；只有处理扫描件时才需要，并且要先装「PPT 生成与 PDF 转 Word」',
+    unlocks: '没有文字层的扫描件 PDF 转 Word、版面识别、PPT 可编辑导出；只有处理扫描件时才需要，并且要先装“PPT 生成与 PDF 转 Word”',
     impact: '扫描件 PDF 无法转 Word；带文字层的 PDF 不受影响',
   },
   kokoroRuntime: {
     name: '语音合成',
-    unlocks: '语音面板的「语音合成」',
+    unlocks: '语音面板的“语音合成”',
     impact: '语音合成不可用',
   },
   asrRuntime: {
     name: '本机语音识别',
-    unlocks: '录音转写的「录音不出本机」档',
+    unlocks: '录音转写的“录音不出本机”档',
     impact: '只能用云端听悟两档',
   },
 

@@ -386,8 +386,30 @@ public class FileTools implements AgentToolComponent {
             return paged == text ? "[文件 " + pf.getName() + "]\n" + text : paged;
         } catch (Exception e) {
             log.warn("extract_file_text failed for fileId={}", fileId, e);
-            return "Error extracting text: " + e.getMessage();
+            // D32: a corrupt / non-Office / password-protected file must not hand the model a raw parser
+            // exception ("TIKA-198: Illegal IOException from ...PackageParser") - it repeated that text to
+            // the lawyer and kept trying other tools (16 rounds). Say plainly what happened and that retrying
+            // with another tool will not help.
+            String unreadable = unreadableFileMessage(e);
+            return unreadable != null ? unreadable : "Error extracting text: " + e.getMessage();
         }
+    }
+
+    /** Parser failures that no other tool can get past; null for anything else (I/O, storage, permissions). */
+    static String unreadableFileMessage(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof org.apache.tika.exception.EncryptedDocumentException
+                    || (t.getMessage() != null && t.getMessage().contains("EncryptedDocument"))) {
+                return AttachmentMessages.error("fileEncrypted");
+            }
+        }
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof org.apache.tika.exception.TikaException || t instanceof java.util.zip.ZipException
+                    || (t.getMessage() != null && t.getMessage().startsWith("TIKA-"))) {
+                return AttachmentMessages.error("fileUnreadable");
+            }
+        }
+        return null;
     }
 
     /** 从头读的便捷重载（非工具入口；ToolRegistry 只登记带 {@code @Tool} 的那个）。 */

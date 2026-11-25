@@ -5,6 +5,7 @@
     <!-- Hero：深林绿编辑排版，与官网 /skills 同一套语言（见 aiworkdeckweb/DESIGN.md）。
          嵌入设置页时（standalone=false）由 .is-embedded 样式收成与其余设置分区一致的
          浅色页头，见 <style> 末尾「嵌入态」覆盖块。 -->
+.market-inline-error { margin-top: 8px; max-width: 460px; text-align: start; }
     <view class="hero">
       <view class="hero-grain"></view>
       <text class="hero-watermark">{{ $t('market.heroWatermark') }}</text>
@@ -103,7 +104,7 @@
               <path v-for="(d, i) in ICONS.offline" :key="i" :d="d" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <text class="empty-title">{{ $t('market.marketUnavailableTitle') }}</text>
-            <text class="empty-hint">{{ $t('market.marketErrorHint', { error: marketError }) }}</text>
+            <AwdInlineError class="market-inline-error" :error="marketError" :context="{ area: 'marketplace' }" @refresh="loadMarket" @retry="loadMarket" />
           </view>
           <view v-else-if="filteredMarketSkills.length === 0" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -163,13 +164,13 @@
 
         <!-- ============ 插件广场：经平台审核并签名，安装时验签，见 docs/PLUGIN_DISTRIBUTION.md ============ -->
         <template v-else-if="activeTab === 'plugin'">
-          <text v-if="marketPluginError && marketPlugins.length" class="card-update-message">{{ $t('market.pluginMarketErrorHint', { error: marketPluginError }) }}</text>
+          <AwdInlineError v-if="marketPluginError && marketPlugins.length" class="market-inline-error" :error="marketPluginError" :context="{ area: 'marketplace' }" @refresh="loadPluginMarket" @retry="loadPluginMarket" />
           <view v-if="marketPluginError && !marketPlugins.length" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, i) in ICONS.offline" :key="i" :d="d" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <text class="empty-title">{{ $t('market.pluginMarketUnavailableTitle') }}</text>
-            <text class="empty-hint">{{ $t('market.pluginMarketErrorHint', { error: marketPluginError }) }}</text>
+            <AwdInlineError class="market-inline-error" :error="marketPluginError" :context="{ area: 'marketplace' }" @refresh="loadPluginMarket" @retry="loadPluginMarket" />
           </view>
           <view v-else-if="marketPlugins.length === 0" class="empty">
             <svg class="empty-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -355,7 +356,9 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { pendingToolChanges, promptToolApproval } from '@/utils/pluginToolApproval.js'
+import AwdInlineError from './AwdInlineError.vue'
 import { getPlugins, setPluginEnabled, rescanPlugins, getSkills, setSkillActivation, rescanSkills, getSkillMarket, installMarketSkill, uninstallMarketSkill, getPluginMarket, installMarketPlugin, uninstallMarketPlugin, getBundledPlugins, installBundledPlugin } from '@/services/api.js'
 import { canInstall, paidState, priceLabel, purchaseUrl } from '@/utils/marketPricing.js'
 import { mergePluginCatalog, isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
@@ -423,7 +426,7 @@ const TRIGGER_PREVIEW = 3
 
 export default {
   name: 'MarketPane',
-  components: { AwdSelect, AwdSwitch, McpConnectionsPanel },
+  components: { AwdSelect, AwdSwitch, McpConnectionsPanel, AwdInlineError },
   inject: { openWorkflowEditorTab: { default: null }, openSettingsTab: { default: null } },
   props: {
     /** true=独立页面（渲染返回按钮，返回走 uni.navigateBack）；false=嵌入 workbench 窗格 */
@@ -725,7 +728,7 @@ export default {
         this.notifyMarketChanged()
       } catch (e) {
         console.error('卸载插件失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.pluginBusyId = ''
       }
@@ -760,7 +763,7 @@ export default {
         console.error('切换插件状态失败:', e)
         // 回滚开关显示
         plugin.enabled = !enabled
-        uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         await this.loadPlugins()
       } finally {
         this.switching = false
@@ -809,7 +812,7 @@ export default {
       } catch (e) {
         console.error('设置 Skill 生效方式失败:', e)
         skill.activationMode = previous
-        uni.showToast({ title: e?.message || this.$t('market.operationFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.operationFailedNeedAdmin')), icon: 'none' })
         await this.loadSkills()
       } finally {
         this.switching = false
@@ -843,7 +846,7 @@ export default {
       } catch (e) {
         console.error('安装 Skill 失败:', e)
         if (isAccountLoginRetry(e)) await this.loadMarket()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.marketBusyId = ''
       }
@@ -859,7 +862,7 @@ export default {
         this.notifyMarketChanged()
       } catch (e) {
         console.error('卸载 Skill 失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.uninstallFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.uninstallFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.marketBusyId = ''
       }
@@ -879,7 +882,7 @@ export default {
         await this.loadPluginMarket()
       } catch (e) {
         console.error('重新扫描失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.scanFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.scanFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.rescanning = false
       }

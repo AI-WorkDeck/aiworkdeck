@@ -99,6 +99,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 插件开发左栏面板：列出项目「插件开发/<id>/」目录下的插件项目，提供
 // 新建/装到本机/卸载/让 AI 开发/打开运行五个动作。数据与安装链路见
 // services/api.js 的 pluginDev* 四个封装，契约由后端另一条线实现（不改）。
@@ -148,7 +149,7 @@ export default {
         this.items = (res && res.items) || []
       } catch (e) {
         console.error('加载插件开发列表失败:', e)
-        uni.showToast({ title: e?.message || this.$t('panels.pdLoadFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('panels.pdLoadFailed')), icon: 'none' })
       } finally {
         this.loading = false
       }
@@ -255,7 +256,7 @@ export default {
         this.$emit('refresh-plugins')
       } catch (e) {
         console.error('卸载插件失败:', e)
-        uni.showToast({ title: e?.message || this.$t('panels.pdUninstallFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('panels.pdUninstallFailed')), icon: 'none' })
       } finally {
         this.busyId = ''
         this.busyAction = ''

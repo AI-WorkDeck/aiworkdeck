@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Coba lagi",
     "details": "Detail",
+    "hideDetails": "Sembunyikan detail",
     "continue": "Lanjutkan",
     "refresh": "Segarkan",
     "signIn": "Masuk",

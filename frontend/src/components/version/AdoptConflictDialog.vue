@@ -108,6 +108,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   resolveAdopt, abortAdopt,
   resolveCloudMerge, abortCloudMerge,
@@ -418,7 +419,7 @@ export default {
         uni.$emit('awd:merge-file-resolved', { path: row.path })
         uni.showToast({ title: this.$t('version.mergeStructuredSaved'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.mergeStructuredFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.mergeStructuredFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -467,7 +468,7 @@ export default {
         const fallback = this.mode === 'cloud' ? this.$t('version.resolveFailedCloud')
           : this.mode === 'session-end' ? this.$t('version.resolveFailedSessionEnd')
           : this.$t('version.resolveFailedAdopt')
-        uni.showToast({ title: (e && e.message) || fallback, icon: 'none' })
+        uni.showToast({ title: errorText(e, fallback), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -495,7 +496,7 @@ export default {
         uni.showToast({ title: (res && res.message) || fallbackNotice, icon: 'none' })
         this.$emit('aborted')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.abortFailedGeneric'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.abortFailedGeneric')), icon: 'none' })
       } finally {
         this.busy = false
       }

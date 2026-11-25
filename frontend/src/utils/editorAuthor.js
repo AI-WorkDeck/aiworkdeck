@@ -22,6 +22,25 @@ const NAME_KEYS = ['displayName', 'nickname', 'name']
 export const REDLINE_AUTHOR_KEY = 'awd_redline_author'
 export const MAX_REDLINE_AUTHOR_CHARS = 24
 
+// 桌面免登时后端给的占位展示名（LocalIdentityService.LOCAL_DISPLAY_NAME 及其英文输出）。
+// 它不是人名：落进交给对方的修订里就是「Local user」（D8）。
+export const PLACEHOLDER_AUTHOR_NAMES = Object.freeze(['本机用户', 'Local user'])
+
+/** 这个署名是不是免登占位名（不是用户自己的名字）。 */
+export function isPlaceholderAuthor(name) {
+  return PLACEHOLDER_AUTHOR_NAMES.includes(String(name == null ? '' : name).trim())
+}
+
+/**
+ * 要不要在可写的 Word 文档上方请用户填修订署名（D8）。引擎没有改已有修订作者的
+ * 命令，所以必须在第一笔修订之前问：打开即问，存一次永久生效；「以后再说」只管本次启动。
+ */
+export function needsAuthorPrompt({ override, resolvedName, dismissed }) {
+  if (dismissed) return false
+  if (String(override || '').trim()) return false
+  return !String(resolvedName || '').trim() || isPlaceholderAuthor(resolvedName)
+}
+
 /** 按来源顺序取第一个非空展示名；都没有回空串。 */
 export function pickAuthorName(...sources) {
   for (const s of sources) {

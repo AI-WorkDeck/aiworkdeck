@@ -86,6 +86,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // Also mounted as a standalone app by requireRecharge: use native elements and click/input events.
 // 充值弹窗（dev-board#184）：档位按站点（cn ¥50/¥100/¥300，intl $10/$20/$50，与官网
 // RechargeDialog 一致）+ 自定义金额；微信站站内渲染二维码，Stripe 站外跳浏览器。
@@ -253,7 +254,7 @@ export default {
         }
         if (this.outTradeNo) this.startPolling()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.rechargeCreateFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.rechargeCreateFailed')), icon: 'none' })
       } finally {
         this.submitting = false
       }

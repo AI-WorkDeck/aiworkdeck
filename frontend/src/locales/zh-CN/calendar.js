@@ -38,7 +38,7 @@ export default {
   cancel: '取消',
   delete: '删除',
   deleteConfirmTitle: '删除日程',
-  deleteConfirmContent: '确定删除「{title}」吗？',
+  deleteConfirmContent: '确定删除“{title}”吗？',
   requiredTitle: '请填写事项名称',
   requiredDate: '请选择日期',
   requiredProject: '请选择项目',
@@ -61,7 +61,7 @@ export default {
   // 文件右键「设置截止日」
   setDeadline: '设置截止日',
   deadlineDialogTitle: '设置截止日',
-  deadlineForFile: '为「{name}」设置截止日',
+  deadlineForFile: '为“{name}”设置截止日',
   deadlineSet: '截止日已设置',
 
   // TaskSchedule（概览页日程块）扩展
@@ -157,9 +157,9 @@ export default {
 
   // 空态引导（三种创建方式）
   emptyGuideTitle: '还没有事项',
-  emptyGuideCreate: '点右上角「新建事项」直接添加',
-  emptyGuideFile: '在文件上右键「添加事项…」，事项会关联到这份文件',
-  emptyGuideAi: '对 AI 说「下周三开庭，记一下」',
+  emptyGuideCreate: '点右上角“新建事项”直接添加',
+  emptyGuideFile: '在文件上右键“添加事项…”，事项会关联到这份文件',
+  emptyGuideAi: '对 AI 说“下周三开庭，记一下”',
 
   // 项目列表页概览条
   overviewProjects: '项目',

@@ -5,12 +5,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { groupByParent, buildTreeFromGroups } from '../../src/utils/fileTreeBuild.js'
 import { computeDisplayFiles } from '../../src/utils/fileTreeRecycle.js'
+import { errorText } from '../_lib/error-text.mjs'
 
 const source = readFileSync(new URL('../../src/components/FileTree.vue', import.meta.url), 'utf8')
 function setup(initial, overrides = {}) {
   const files = initial.slice()
   const calls = { scrolls: [], created: [], createdFiles: [], toasts: [] }
   const dependencies = {
+    errorText,
     groupByParent, buildTreeFromGroups, computeDisplayFiles,
     getProjectFiles: async () => files.slice(),
     createFolder: async (projectId, parentId, name) => {

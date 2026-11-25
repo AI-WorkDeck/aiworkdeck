@@ -40,7 +40,7 @@
               :aria-label="$t('workbench.switchRecentProject')" :aria-expanded="projectSwitcherOpen"
               @click.stop="toggleProjectSwitcher" @keydown="handleProjectTitleActivation($event, 'switch')"
               @keyup="handleProjectTitleActivation($event, 'switch')">
-              <text class="switcher-arrow" :class="{ 'is-open': projectSwitcherOpen }" aria-hidden="true">▾</text>
+              <svg class="switcher-arrow" :class="{ 'is-open': projectSwitcherOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
             </button>
             <view v-if="projectSwitcherOpen" class="switcher-mask" @tap.stop="projectSwitcherOpen = false"></view>
             <view v-if="projectSwitcherOpen" class="switcher-menu" @tap.stop>
@@ -184,7 +184,7 @@
             class="top-bar-btn"
             :class="{ active: !sidebarCollapsed }"
             @tap="toggleSidebar"
-            :title="sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar')"
+            :title="topBarTip(sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar'), 'view.sidebar')" :aria-label="topBarTip(sidebarCollapsed ? $t('workbench.expandSidebar') : $t('workbench.collapseSidebar'), 'view.sidebar')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.panelLeft" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -198,7 +198,7 @@
             class="top-bar-btn"
             :class="{ active: showToolsPanel }"
             @tap="toggleToolsPanel"
-            :title="$t('workbench.toolsPanel')"
+            :title="topBarTip($t('workbench.toolsPanel'), 'view.toolsPanel')" :aria-label="topBarTip($t('workbench.toolsPanel'), 'view.toolsPanel')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.panelBottom" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -211,7 +211,7 @@
             class="top-bar-btn"
             :class="{ active: showAiPanel }"
             @tap="toggleAiPanel"
-            :title="$t('workbench.aiAssistant')"
+            :title="topBarTip($t('workbench.aiAssistant'), 'view.aiPanel')" :aria-label="topBarTip($t('workbench.aiAssistant'), 'view.aiPanel')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.panelRight" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -223,19 +223,22 @@
             class="top-bar-btn split-btn"
             :class="{ active: splitMode }"
             @tap="toggleSplitMode"
-            :title="splitMode ? $t('workbench.closeSplit') : $t('workbench.openSplit')"
+            :title="topBarTip(splitMode ? $t('workbench.closeSplit') : $t('workbench.openSplit'), 'view.split')" :aria-label="topBarTip(splitMode ? $t('workbench.closeSplit') : $t('workbench.openSplit'), 'view.split')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.splitCols" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
 
+          <!-- D16：版面开关（左/底/右栏、分屏）与工具（截图、网页、录制）分两组 -->
+          <view class="top-bar-divider" aria-hidden="true"></view>
+
           <!-- 5. Screenshot (OCR)：摘录落在项目收藏里，无项目态不给 -->
           <view
             v-if="hasProject"
             class="top-bar-btn"
             @tap="startOcrCapture"
-            :title="$t('workbench.ocrCapture')"
+            :title="topBarTip($t('workbench.ocrCapture'), 'tools.ocrCapture')" :aria-label="topBarTip($t('workbench.ocrCapture'), 'tools.ocrCapture')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.camera" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -247,10 +250,10 @@
           <view
             class="top-bar-btn"
             @tap="openBrowserTab()"
-            :title="$t('workbench.browserNewTabHint')"
+            :title="topBarTip($t('workbench.browserNewTabHint'), 'tools.newBrowserTab')" :aria-label="topBarTip($t('workbench.browserNewTabHint'), 'tools.newBrowserTab')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path v-for="(d, gi) in GLYPHS.web" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              <path v-for="(d, gi) in GLYPHS.browserWindow" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
 
@@ -260,7 +263,7 @@
             class="top-bar-btn"
             :class="{ active: isRecording, recording: isRecording }"
             @tap="toggleRecording"
-            :title="$t('workbench.recordActivity')"
+            :title="topBarTip($t('workbench.recordActivity'), 'tools.activityRecord')" :aria-label="topBarTip($t('workbench.recordActivity'), 'tools.activityRecord')" role="button"
           >
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path v-for="(d, gi) in GLYPHS.record" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -1334,6 +1337,9 @@
                       :key="activeFileLeft.id"
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
+                      :components-suggested="optionalComponentsSuggested"
+                      @open-components="openSuggestedComponents"
+                      @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
                       @activate-current-project="showCurrentProjectFiles"
                       @project-renamed="onProjectRenamedFromPane"
@@ -1615,6 +1621,9 @@
                       :key="activeFileRight.id"
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
+                      :components-suggested="optionalComponentsSuggested"
+                      @open-components="openSuggestedComponents"
+                      @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
                       @activate-current-project="showCurrentProjectFiles"
                       @project-renamed="onProjectRenamedFromPane"
@@ -2414,6 +2423,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
 import ScratchTransferDialog from '@/components/project-home/ScratchTransferDialog.vue'
@@ -2589,6 +2599,7 @@ import {
 import { activityTracker } from '@/utils/activityTracker.js'
 
 import { ICONS as GLYPHS } from '@/config/icons.js'
+import { accelHint } from '@/config/commands/index.js'
 import { getPluginAvatarUrl, getPluginRailSvgPaths } from '@/config/pluginIcons.js'
 import { readLocalMode } from '@/services/accountProfile.js'
 import { resolveTrack, TRACK } from '@/utils/memberLookup.js'
@@ -2663,7 +2674,6 @@ import {
   PROMPTED_PREF_KEY,
   PROMPTED_PACKS_PREF_KEY,
 } from '@/composables/useOptionalComponents.js'
-import { whenPermissionOnboardingStartupSettled } from '@/utils/permissionOnboarding.js'
 import { documentLinkPreviewMethods } from './documentLinkPreview.js'
 import DocumentLinkPreview from '@/components/DocumentLinkPreview.vue'
 import { useLitigationGeneration } from '@/composables/useLitigationGeneration.js'
@@ -2773,6 +2783,8 @@ export default {
       taskDialogProjects: [],
       // 首次启动的「可选组件」面板（设计 §4.1，随启动落点从项目列表页搬来）
       showOptionalComponents: false,
+      // D6：欢迎页上的「可选组件」提示行（替代首启自动弹窗）
+      optionalComponentsSuggested: false,
       optionalComponentsAppVersion: '',
       // Screenshot Save Dialog
       showScreenshotSaveDialog: false,
@@ -4202,7 +4214,7 @@ export default {
       if (this.isChatMode) await this.switchViewMode('chat')
     }).catch((error) => {
       console.error('[project-overview] 初始化对话模式失败', error)
-      uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.scratchFailed'), icon: 'none' })
+      uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.scratchFailed')), icon: 'none' })
     }).finally(() => {
       this._openWorkbenchRestored = true
       this.maybeRegisterOpenWorkbench()
@@ -4540,7 +4552,7 @@ export default {
               if (host.app && host.app.confirm) {
                 host.app.confirm({ title: this.$t('workbench.saveFailed'), content: e.message || '' }).catch(() => {})
               } else {
-                uni.showToast({ title: e.message || this.$t('workbench.saveFailed'), icon: 'none' })
+                uni.showToast({ title: errorText(e, this.$t('workbench.saveFailed')), icon: 'none' })
               }
             }
           })
@@ -4814,6 +4826,11 @@ export default {
     'rightFiles.length'() { this.pruneClosedLibreSpares(); this.prunePdfKeepAlive() },
   },
   methods: {
+    /** D16：顶栏图标按钮的悬停提示 / 读屏名称，有快捷键就带上（例「收起左栏 ⌥⌘B」） */
+    topBarTip(text, commandId) {
+      const keys = accelHint(commandId)
+      return keys ? `${text} ${keys}` : text
+    },
     refreshMergeNeighborUnseen() {
       this.mergeNeighborUnseen = this.projectId ? unseenMergeNeighborNotices(this.projectId).length : 0
     },
@@ -5041,7 +5058,7 @@ export default {
         })
       } catch (error) {
         console.error('转写发起失败:', error)
-        uni.showToast({ title: (error && error.message) || this.$t('fileTree.transcribeFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('fileTree.transcribeFailed')), icon: 'none' })
       } finally {
         focus(meetingId, false)
       }
@@ -5275,7 +5292,7 @@ export default {
         }
         if (path) await host.fs.showItemInFolder(path)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('workbench.revealFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.revealFailed')), icon: 'none' })
       }
     },
     // 文件树右键「发送…」/ 菜单「文件 > 发送…」（dev-board#382）：后端解析物理路径，
@@ -5302,7 +5319,7 @@ export default {
           uni.showToast({ title: this.$t('workbench.shareClipboardHint'), icon: 'none', duration: 4000 })
         }
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('workbench.shareFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.shareFailed')), icon: 'none' })
       }
     },
     // 「有一次采纳等待处理」固定条的入口：切到版本面板，AdoptConflictDialog 会随
@@ -5686,7 +5703,7 @@ export default {
             }
         } catch (e) {
             console.error('Failed to import doc text', e)
-            uni.showToast({ title: this.$t('workbench.importFailedWithMsg', { msg: e.message }), icon: 'none' })
+            uni.showToast({ title: this.$t('workbench.importFailedWithMsg', { msg: errorText(e) }), icon: 'none' })
         } finally {
             uni.hideLoading()
             this.easyVoiceImportCallback = null
@@ -5746,7 +5763,7 @@ export default {
               this.loadProjectMembers()
             } catch (e) {
               console.error(e)
-              uni.showToast({ title: e.message || this.$t('workbench.removeFailed'), icon: 'none' })
+              uni.showToast({ title: errorText(e, this.$t('workbench.removeFailed')), icon: 'none' })
             }
           }
         }
@@ -6233,11 +6250,11 @@ export default {
       // - 否则：复制当前文件（后端 batchCopy），并打开新文件
       const active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
       if (active && this.isBrowserTab(active)) {
-        this.openBrowserTab('https://www.baidu.com', pane)
+        this.openBrowserTab('', pane)
         return
       }
       if (!active || !active.id || !this.projectId) {
-        this.openBrowserTab('https://www.baidu.com', pane)
+        this.openBrowserTab('', pane)
         return
       }
       try {
@@ -6257,7 +6274,7 @@ export default {
         }
       } catch (e) {
         console.error('复制文件失败', e)
-        uni.showToast({ title: e.message || this.$t('workbench.copyFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.copyFailed')), icon: 'none' })
       }
     },
     focusFavoritePlugin(id) {
@@ -6352,6 +6369,12 @@ export default {
       const tab = this.findBrowserTab(pane, tabId)
       if (!tab) return
       tab.url = url
+      // D25：空白新标签页叫「新标签页」，不显示 about:blank，也不记成一次浏览
+      if (!url || String(url).startsWith('about:')) {
+        tab.name = this.$t('panels.bpNewTabTitle')
+        this.$forceUpdate()
+        return
+      }
       // 标签名称：尽量短（host）
       try {
         const u = new URL(url)
@@ -6372,6 +6395,8 @@ export default {
       if (!active) return
       const t = String(title || '').trim()
       if (!t) return
+      // D25：空白页的标题就是 about:blank，标签继续叫「新标签页」
+      if (t.startsWith('about:') || !active.url || String(active.url).startsWith('about:')) return
 
       // Update session meta with title?
       // trackActivePage will flush and restart. This might be noisy if title changes often.
@@ -6414,14 +6439,15 @@ export default {
         .concat(this.webKeepAliveKeys.filter(k => k !== key && stillOpen(k)))
         .slice(0, WEB_KEEPALIVE_MAX)
     },
-    openBrowserTab(url = 'https://www.baidu.com', pane = null) {
+    // D25：默认打开空白新标签页（本应用的起始页），不再替用户打开百度
+    openBrowserTab(url = '', pane = null) {
       // 默认在当前聚焦窗格打开；未分屏则左侧
       const targetPane = pane ? (pane === 'right' && this.splitMode ? 'right' : 'left') : (this.splitMode ? this.focusedPane : 'left')
       const list = targetPane === 'left' ? this.leftFiles : this.rightFiles
       const idProp = targetPane === 'left' ? 'activeFileIdLeft' : 'activeFileIdRight'
 
       const id = `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      let name = this.$t('workbench.browser')
+      let name = url ? this.$t('workbench.browser') : this.$t('panels.bpNewTabTitle')
       try {
         const u = new URL(url)
         name = u.host || this.$t('workbench.browser')
@@ -6585,7 +6611,7 @@ export default {
            this.focusLibreEditorFor(this.libreOfficeExecutor)
          } catch (e) {
            console.error(e)
-           uni.showToast({ title: e.message || this.$t('workbench.insertImageFailed'), icon: 'none' })
+           uni.showToast({ title: errorText(e, this.$t('workbench.insertImageFailed')), icon: 'none' })
          }
       }
     },
@@ -6667,7 +6693,7 @@ export default {
         uni.showToast({ title: this.$t('workbench.webMarkInserted'), icon: 'success' })
       } catch (e) {
         console.error('插入网核标记失败:', e)
-        uni.showToast({ title: e.message || this.$t('workbench.insertFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.insertFailed')), icon: 'none' })
       } finally {
         this.stopWebLinkDrag()
       }
@@ -6952,6 +6978,21 @@ export default {
      * 首次启动的「可选组件」面板（设计 §4.1）。原挂在项目列表页 onLoad，启动落点换成工作台外壳后
      * 搬到这里、只在无项目态（= 启动那一次）触发；判据与写回原样照搬。
      */
+    openSuggestedComponents() {
+      this.optionalComponentsSuggested = false
+      this.showOptionalComponents = true
+    },
+    async dismissSuggestedComponents() {
+      this.optionalComponentsSuggested = false
+      try {
+        const stored = await host.prefs.get(PROMPTED_PACKS_PREF_KEY)
+        const prev = stored && stored.value !== undefined ? stored.value : stored
+        await host.prefs.set(PROMPTED_PACKS_PREF_KEY, mergePromptedPackIds(prev, this._optionalComponentItems || []))
+        await host.prefs.set(PROMPTED_PREF_KEY, this.optionalComponentsAppVersion || '')
+      } catch (e) {
+        console.warn('[project-overview] 记录组件提示失败', e)
+      }
+    },
     async maybePromptOptionalComponents() {
       if (!isDesktopHost() || !host.prefs) return
       try {
@@ -6971,12 +7012,13 @@ export default {
           promptedPackIds,
           isDesktop: true,
         })
-        // 首启弹窗排队（问题 4/40）：等权限引导窗关掉（或判定不弹）再弹，两个窗不叠在一起
-        if (shouldShow) await whenPermissionOnboardingStartupSettled()
-        this.showOptionalComponents = shouldShow
+        // D6：首启不再自动弹窗盖住欢迎页（用户什么都还没做）。改为欢迎页上一行可关闭的提示，
+        // 点「查看」才开同一个面板（面板关掉时照旧记「提示过」）；点 × 也记「提示过」。
+        this._optionalComponentItems = items
+        this.optionalComponentsSuggested = shouldShow
         // 0.46 及以前只记了版本号。不弹的时候把「提示过哪些组件」补齐，将来真多出一个新组件
         // 时才认得出来。清单为空（后端没起来 / ai.packs 关着）时不写。
-        if (!this.showOptionalComponents && !Array.isArray(promptedPackIds) && items.length) {
+        if (!shouldShow && !Array.isArray(promptedPackIds) && items.length) {
           await host.prefs.set(PROMPTED_PACKS_PREF_KEY, mergePromptedPackIds(null, items))
         }
       } catch (e) {
@@ -7846,7 +7888,7 @@ export default {
         this.notifyDocMutated()
         uni.showToast({ title: this.$t('workbench.insertedToDoc'), icon: 'success' })
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('workbench.insertFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.insertFailed')), icon: 'none' })
       } finally {
         this._aiMessageInsertBusy = false
       }
@@ -7869,7 +7911,7 @@ export default {
         return
       } catch (e) {
         console.error('替换选区失败', e)
-        uni.showToast({ title: e.message || this.$t('workbench.replaceFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.replaceFailed')), icon: 'none' })
       }
     },
     onPluginAddFileToAi(request) {
@@ -7921,7 +7963,7 @@ export default {
                   return
              }
              this.onPluginAddFileToAi({ projectId: this.projectId, file: pluginDrop.file, isCurrent: pluginDrop.isCurrent })
-                  .catch(err => uni.showToast({ title: err.message || this.$t('workbench.pluginAddToAiFailedToast'), icon: 'none' }))
+                  .catch(err => uni.showToast({ title: errorText(err, this.$t('workbench.pluginAddToAiFailedToast')), icon: 'none' }))
              return
         }
 
@@ -8558,7 +8600,7 @@ export default {
         uni.showToast({ title: this.$t('workbench.docGenerated'), icon: 'none' })
       } catch (e) {
         console.error('导出 Word 失败', e)
-        uni.showToast({ title: e.message || this.$t('workbench.exportFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('workbench.exportFailed')), icon: 'none' })
       } finally {
         this.exportLoading = false
       }
@@ -8767,7 +8809,7 @@ export default {
             await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Rename conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationRenameFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.conversationRenameFailed')), icon: 'none' })
         } finally {
             this.historyActionBusy = false
         }
@@ -8784,7 +8826,7 @@ export default {
             await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Pin conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationPinFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.conversationPinFailed')), icon: 'none' })
         } finally {
             this.historyActionBusy = false
         }
@@ -8830,7 +8872,7 @@ export default {
             await this.fetchChatHistory(true)
         } catch (e) {
             console.error('Delete conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.conversationDeleteFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.conversationDeleteFailed')), icon: 'none' })
         } finally {
             this.historyActionBusy = false
         }
@@ -8866,7 +8908,7 @@ export default {
             await this.loadHistoryChat({ conversationId: newId })
         } catch (e) {
             console.error('Fork conversation failed', e)
-            uni.showToast({ title: (e && e.message) || this.$t('workbench.forkConversationFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('workbench.forkConversationFailed')), icon: 'none' })
         } finally {
             this.forkingConversation = false
         }
@@ -8906,7 +8948,7 @@ export default {
         } catch (e) {
             console.error('Branch conversation failed', e)
             uni.showToast({
-                title: this.$t('chat.branchFailed', { error: (e && e.message) || this.$t('chat.unknownError') }),
+                title: this.$t('chat.branchFailed', { error: errorText(e) }),
                 icon: 'none'
             })
         } finally {
@@ -8939,7 +8981,7 @@ export default {
       try {
         await Promise.all([this.loadChatWorkspaceFiles(), this.fetchChatHistory(true)])
         if (String(projectId) === String(this.projectId) && this.isScratchWorkspace) this.showScratchTransfer = true
-      } catch (e) { uni.showToast({ title: e.message || this.$t('common.failed'), icon: 'none' }) }
+      } catch (e) { uni.showToast({ title: errorText(e, this.$t('common.failed')), icon: 'none' }) }
     },
 
     async loadChatWorkspaceFiles() {
@@ -8987,7 +9029,7 @@ export default {
         try {
           if (!this.hasProject) await this.ensureScratchWorkspaceLoaded()
         } catch (error) {
-          uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.scratchFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.scratchFailed')), icon: 'none' })
           return false
         }
         this.aiPanelMounted = true
@@ -9061,7 +9103,7 @@ export default {
         this.chatCanvasOpen = true
         this.$nextTick(() => this.triggerWorkbenchResize?.())
       } catch (error) {
-        uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.createFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.createFailed')), icon: 'none' })
       }
     },
 
@@ -9121,7 +9163,7 @@ export default {
         await this.fetchChatHistory(true)
         uni.showToast({ title: this.$t('workbench.chatMode.promoteSuccess'), icon: 'success' })
       } catch (error) {
-        uni.showToast({ title: (error && error.message) || this.$t('workbench.chatMode.promoteFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('workbench.chatMode.promoteFailed')), icon: 'none' })
       }
     },
 

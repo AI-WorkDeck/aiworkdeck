@@ -19,6 +19,7 @@ import {
 } from './settings.js'
 import { isReadOnlyCommand, captureDocumentBytes, sha256Hex } from './docSnapshot.js'
 import { t, getLang, getLangTag } from './i18n.js'
+import { errorText } from './errorText.js'
 import {
   questionFromParsed, normalizeAskUserEvent, formatAskUserAnswer, parseAskUserAnswer,
   answerDisplayText, linkAskUserAnswers, isAskUserQuestion
@@ -693,7 +694,7 @@ async function runUpload(entry) {
     }
   } catch (e) {
     entry.status = 'failed'
-    entry.error = (e && e.message) || t('uploadFailed')
+    entry.error = errorText(e, t('uploadFailed'))
   }
 }
 
@@ -1476,7 +1477,7 @@ async function handleLocalAction(action, scope) {
     })
   } catch (e) {
     chip.status = 'failed'
-    chip.error = t('resultSendFailedPrefix') + ((e && e.message) || t('networkError'))
+    chip.error = t('resultSendFailedPrefix') + errorText(e, t('networkError'))
     if (scope.generation === generation) banner.value = t('toolResultSendFailed')
   }
 }
@@ -1985,7 +1986,7 @@ function sendErrorText(e) {
   if (status === 403 || status === 404) {
     return conversationPersisted ? t('conversationDenied') : t('conversationExpiredRetryFailed')
   }
-  return (e && e.message) || t('sendFailed')
+  return errorText(e, t('sendFailed'))
 }
 
 /**

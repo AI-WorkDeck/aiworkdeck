@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Riproveremo automaticamente quando il servizio locale tornerà disponibile. Il documento non può essere modificato finché non è stato letto.",
     "retry": "Riprova"
   },
+  "authorPrompt": {
+    "text": "Con quale nome firmare le revisioni e i commenti? Lo vede chiunque riceva il documento.",
+    "placeholder": "Il tuo nome o quello dello studio",
+    "save": "Salva",
+    "later": "Non ora",
+    "empty": "Inserisci un nome"
+  },
   "openFailed": {
     "title": "Impossibile aprire il documento: l'editor non risponde o il file è danneggiato",
     "encryptedTitle": "Questo file è protetto da una password di apertura che l’editor non può ancora aprire. Rimuovi la password in Excel, Word, PowerPoint o WPS e riaprilo, oppure scarica l’originale.",

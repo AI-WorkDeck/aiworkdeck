@@ -13,7 +13,7 @@ export default {
   "updateFailed": "更新未完成",
   "updateDetails": "更新詳情",
   "updateRetry": "重試",
-  "updateBackground": "可繼續工作，準備完成後點選“重啟更新”。",
+  "updateBackground": "可繼續工作，準備完成後點選「重啟更新」。",
   "updateReadyHint": "更新 {version} 已就緒。點選重啟更新，會先儲存尚未儲存的編輯。",
   "updateManual": "下載新版本",
   "updateClose": "關閉更新詳情",

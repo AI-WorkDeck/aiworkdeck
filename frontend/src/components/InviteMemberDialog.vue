@@ -279,6 +279,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   addProjectMember, lookupProjectMember, inviteClient,
   getCloudStatus, getOfficialCloud, listCloudConnections,
@@ -700,7 +701,7 @@ export default {
                 throw new Error(this.$t('version.generateFailed'))
             }
         } catch (e) {
-            uni.showToast({ title: e.message || this.$t('version.generateFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.generateFailed')), icon: 'none' })
         } finally {
             this.loading = false
         }
@@ -734,7 +735,7 @@ export default {
                     this.clientUserId = null
                     this.$emit('success')
                 } catch (e) {
-                    uni.showToast({ title: (e && e.message) || this.$t('version.revokeFailed'), icon: 'none' })
+                    uni.showToast({ title: errorText(e, this.$t('version.revokeFailed')), icon: 'none' })
                 }
             }
         })

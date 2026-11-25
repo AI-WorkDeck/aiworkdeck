@@ -302,6 +302,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getMeetingRecordings, getMeetingRecording, transcribeMeetingRecording,
   updateMeetingRecording, exportMeetingTranscript, getMeetingMinutesPrompt,
@@ -618,7 +619,7 @@ export default {
         if (notice) this.asrNotice = notice
         return !!(notice && notice.acknowledged)
       } catch (e) {
-        if (!e || e.code !== 'cancelled') uni.showToast({ title: (e && e.message) || this.noticeCopy.saveFailed, icon: 'none' })
+        if (!e || e.code !== 'cancelled') uni.showToast({ title: errorText(e, this.noticeCopy.saveFailed), icon: 'none' })
         return false
       } finally {
         this.noticeBusy = false
@@ -657,7 +658,7 @@ export default {
         await setPlatformServiceProvider('asr', on ? 'local' : 'platform')
         this.localGateOpen = false
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('meeting.switchFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('meeting.switchFailed')), icon: 'none' })
       } finally {
         this.tierBusy = false
         await this.loadAsrTier()
@@ -820,7 +821,7 @@ export default {
         await this.loadAudioDevices()
         await this.loadMeetings()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('meeting.cannotStartRecording'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('meeting.cannotStartRecording')), icon: 'none' })
       }
     },
     onTogglePause() {
@@ -926,7 +927,7 @@ export default {
       } catch (e) {
         // 后端 4011 已由 api.js 就地弹过登录层：刷新档位，toast 里是「已登录，请再操作一次」
         if (isAccountLoginRetry(e)) await this.loadAsrTier()
-        uni.showToast({ title: this.$t('meeting.submitTranscribeFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.submitTranscribeFailed', { message: errorText(e) }), icon: 'none' })
       }
     },
     async onGenerateMinutes(m, format) {
@@ -936,7 +937,7 @@ export default {
         const res = await getMeetingMinutesPrompt(m.id, format)
         this.$emit('generate-minutes', { meeting: m, prompt: res.prompt })
       } catch (e) {
-        uni.showToast({ title: this.$t('meeting.generateMinutesFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.generateMinutesFailed', { message: errorText(e) }), icon: 'none' })
       } finally {
         this.generatingId = null
       }
@@ -950,7 +951,7 @@ export default {
         const folder = (res && res.folderName) || ''
         uni.showToast({ title: this.$t('meeting.exported', { name, folder }), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: this.$t('meeting.exportFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.exportFailed', { message: errorText(e) }), icon: 'none' })
       }
     },
 
@@ -968,7 +969,7 @@ export default {
         await this.loadMeetings()
         this.expandedId = m.id
       } catch (e) {
-        uni.showToast({ title: this.$t('meeting.saveFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.saveFailed', { message: errorText(e) }), icon: 'none' })
       }
     },
     transcriptionError(m) {
@@ -1033,7 +1034,7 @@ export default {
         this.editingSpeakerId = null
         await this.refreshOne(m.id)
       } catch (e) {
-        uni.showToast({ title: this.$t('meeting.saveFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.saveFailed', { message: errorText(e) }), icon: 'none' })
       }
     },
 
@@ -1064,7 +1065,7 @@ export default {
         this.playingId = m.id
       } catch (e) {
         this.stopPlay()
-        uni.showToast({ title: this.$t('meeting.playFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.playFailed', { message: errorText(e) }), icon: 'none' })
       }
     },
     stopPlay() {
@@ -1092,7 +1093,7 @@ export default {
         if (this.expandedId === this.deletingMeeting.id) this.expandedId = null
         await this.loadMeetings()
       } catch (e) {
-        uni.showToast({ title: this.$t('meeting.deleteFailed', { message: (e && e.message) || e }), icon: 'none' })
+        uni.showToast({ title: this.$t('meeting.deleteFailed', { message: errorText(e) }), icon: 'none' })
       } finally {
         this.deletingMeeting = null
       }
