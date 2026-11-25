@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "再試行",
     "details": "詳細",
+    "hideDetails": "詳細を隠す",
     "continue": "続行",
     "refresh": "更新",
     "signIn": "サインイン",

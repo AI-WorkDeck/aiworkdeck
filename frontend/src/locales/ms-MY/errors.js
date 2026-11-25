@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "Cuba lagi",
     "details": "Butiran",
+    "hideDetails": "Sembunyikan butiran",
     "continue": "Teruskan",
     "refresh": "Segar semula",
     "signIn": "Daftar masuk",
