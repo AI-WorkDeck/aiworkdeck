@@ -43,7 +43,8 @@ concurrency:
   # One run per PR: a new push cancels the superseded run. On master (and tags) a run in progress is
   # never cancelled; GitHub keeps one pending run per group, so a burst of merges collapses to the
   # latest commit instead of queueing every one (CI capacity, 2026-11-25).
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Label events other than full-build get a group of their own, so labelling a PR never cancels its running build.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'full-build' && format('-label-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -67,7 +68,8 @@ jobs:
 
   dependency-scope:
     name: Detect dependency acceptance changes
-    if: github.event_name == 'pull_request'
+    # A label other than full-build changes nothing: skip, which also skips the build below.
+    if: github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'full-build')
     runs-on: ubuntu-latest
     permissions:
       contents: read

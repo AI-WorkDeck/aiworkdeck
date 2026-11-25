@@ -444,7 +444,13 @@ for (const file of ['ci.yml', 'supply-chain.yml', 'desktop-build.yml', 'journeys
   test(`${file}: one run per PR; master/tags never cancel a running run`, () => {
     const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
     assert.ok(wf.concurrency, `${file} needs a concurrency block`)
-    assert.strictEqual(wf.concurrency.group, CONCURRENCY_GROUP)
+    if (file === 'desktop-build.yml') {
+      // labelled with anything but full-build: own group (never cancels the running build)
+      assert.ok(wf.concurrency.group.startsWith(CONCURRENCY_GROUP), wf.concurrency.group)
+      assert.match(wf.concurrency.group, /github\.event\.label\.name != 'full-build'.*github\.run_id/)
+    } else {
+      assert.strictEqual(wf.concurrency.group, CONCURRENCY_GROUP)
+    }
     assert.strictEqual(wf.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
   })
 }
@@ -460,5 +466,6 @@ test('desktop-build.yml: PR installer build is gated by dependency-scope.build; 
   assert.match(String(build.strategy.matrix.os), /startsWith\(github\.ref, 'refs\/tags\/v'\).*macos-latest.*windows-latest/)
   assert.ok(wf.on.schedule && wf.on.schedule.length, 'nightly master build keeps installer coverage for source-only PRs')
   assert.ok(wf.on.pull_request.types.includes('labeled'), 'adding the full-build label must start the build')
+  assert.match(wf.jobs['dependency-scope'].if, /github\.event\.action != 'labeled' \|\| github\.event\.label\.name == 'full-build'/)
   assert.match(wf.jobs.release.if, /startsWith\(github\.ref, 'refs\/tags\/v'\)/)
 })
