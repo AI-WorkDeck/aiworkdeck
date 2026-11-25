@@ -126,6 +126,8 @@ public class PluginMarketService {
         private String authorDisplayName;
         private List<String> permissions = new ArrayList<>();
         private List<Map<String, Object>> tools = new ArrayList<>();
+        /** 注册表多语言块（X47）：目前只用 i18n['zh-hant'] 的 name/description */
+        private Map<String, Object> i18n;
         private Long size;
         private Integer downloads;
         private String publishedAt;
@@ -170,6 +172,10 @@ public class PluginMarketService {
             if (view.getId() != null) {
                 view.setName(pluginService.localizeListing(view.getId(), view.getName(), view.getId()));
                 view.setDescription(pluginService.localizeListing(view.getId(), view.getDescription(), ""));
+                if (RegistryZhHant.active()) {
+                    view.setName(RegistryZhHant.text(view.getI18n(), "name", view.getName()));
+                    view.setDescription(RegistryZhHant.text(view.getI18n(), "description", view.getDescription()));
+                }
             }
             // 安装状态只由本机扫描决定，不能接受远端同名字段。
             view.setInstalled(false);

@@ -167,6 +167,24 @@ class PluginMarketServiceTest {
     }
 
     @Test
+    void zhTwListingPrefersRegistryZhHant() {
+        PluginMarketService svc = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, gate) {
+            @Override protected String httpGet(String url) {
+                return "[{\"id\":\"hello-plugin\",\"name\":\"剪贴板\",\"description\":\"收集剪贴内容\","
+                        + "\"i18n\":{\"zh-hant\":{\"name\":\"剪貼簿（官方）\",\"description\":\"收集剪貼內容（官方）\"}}},"
+                        + "{\"id\":\"other-plugin\",\"name\":\"其他\",\"description\":\"说明\"}]";
+            }
+        };
+        var tw = com.checkba.service.AppLanguageScope.call("zh-TW", svc::listMarket);
+        assertEquals("剪貼簿（官方）", tw.get(0).getName());
+        assertEquals("收集剪貼內容（官方）", tw.get(0).getDescription());
+        assertEquals("說明", tw.get(1).getDescription(), "no zh-hant entry: Simplified converted");
+        var cn = com.checkba.service.AppLanguageScope.call("zh-CN", svc::listMarket);
+        assertEquals("剪贴板", cn.get(0).getName());
+    }
+
+    @Test
     void retiredPluginCannotBeDownloadedEvenWithAStaleRegistry() {
         assertTrue(assertThrows(IllegalStateException.class,
                 () -> service(publicKeyPem).install("hr-template-pack")).getMessage().contains("下架"));
