@@ -107,6 +107,7 @@ export default {
   "modelSaved": "{model} (đã lưu)",
   "catalogLoadFailedWithMsg": "Danh sách mô hình tạm thời không khả dụng: {msg}",
   "catalogLoadFailedRetry": "Danh sách mô hình tạm thời không khả dụng; hãy mở lại trang này sau để thử lại",
+  "catalogNeedsSignIn": "Đăng nhập tài khoản AI WorkDeck để xem các mô hình hiện có.",
   "networkRegionTitle": "Vùng mạng",
   "networkRegionNote": "Các mô hình chỉ khả dụng trên mạng quốc tế sẽ bị nhà cung cấp từ chối khi truy cập từ Trung Quốc đại lục, nên danh sách mô hình được lọc theo vùng. Tự động phát hiện sử dụng quốc gia/vùng và múi giờ của hệ thống; hãy chỉ định thủ công tại đây nếu phát hiện sai.",
   "regionModeLabel": "Chế độ phát hiện",
