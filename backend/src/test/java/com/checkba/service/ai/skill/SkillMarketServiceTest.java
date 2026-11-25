@@ -167,6 +167,27 @@ class SkillMarketServiceTest {
     }
 
     @Test
+    void zhTwListingPrefersRegistryZhHantAndFallsBackToConversion() {
+        StubMarketService service = newService(tempDir.resolve("skills"), new PluginService());
+        service.responses.put(REGISTRY_URL, """
+                [{ "id": "divorce", "name": "离婚协议书起草", "description": "起草离婚协议书", "triggers": ["离婚协议"],
+                   "i18n": { "zh-hant": { "name": "離婚協議書起草（官方）", "description": "起草離婚協議書（官方）", "triggers": ["離婚協議"] } } },
+                 { "id": "plain", "name": "合同审查", "description": "审查合同条款", "triggers": ["合同审查"] }]""");
+
+        List<SkillMarketService.MarketSkillView> tw = com.checkba.service.AppLanguageScope.call("zh-TW", service::listMarket);
+        assertEquals("離婚協議書起草（官方）", tw.get(0).getName());
+        assertEquals("起草離婚協議書（官方）", tw.get(0).getDescription());
+        assertEquals(List.of("離婚協議"), tw.get(0).getTriggers());
+        assertEquals("合同審查", tw.get(1).getName(), "no zh-hant entry: convert the Simplified name");
+        assertEquals("審查合同條款", tw.get(1).getDescription());
+        assertEquals(List.of("合同審查"), tw.get(1).getTriggers());
+
+        List<SkillMarketService.MarketSkillView> cn = com.checkba.service.AppLanguageScope.call("zh-CN", service::listMarket);
+        assertEquals("离婚协议书起草", cn.get(0).getName(), "zh-CN keeps the registry name");
+        assertEquals(List.of("离婚协议"), cn.get(0).getTriggers());
+    }
+
+    @Test
     @DisplayName("listMarket：注册表不可达/返回非数组时抛 IllegalStateException")
     void listMarketFailsCleanly() {
         StubMarketService service = newService(tempDir.resolve("skills"), new PluginService());
