@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "पुनः प्रयास करें",
     "details": "विवरण",
+    "hideDetails": "विवरण छिपाएँ",
     "continue": "जारी रखें",
     "refresh": "रिफ्रेश करें",
     "signIn": "साइन इन करें",

@@ -60,6 +60,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   endWorkSession, discardWorkSession, suggestSessionTitle,
   switchToMainline, adoptDraft, abandonDraft,
@@ -94,7 +95,7 @@ export default {
         const title = (res && res.data && res.data.title) || ''
         if (title && this.naming) this.title = title
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.suggestTitleFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.suggestTitleFailed')), icon: 'none' })
       } finally {
         this.suggesting = false
       }
@@ -113,7 +114,7 @@ export default {
         const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
         this.$emit('mainline-resumed', affectedFileIds)
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.returnMainlineFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.returnMainlineFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -132,7 +133,7 @@ export default {
         }
         this.$emit('draft-adopted', data.affectedFileIds || [])
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.adoptFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.adoptFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -150,7 +151,7 @@ export default {
             const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
             this.$emit('draft-abandoned', affectedFileIds)
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.abandonFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.abandonFailed')), icon: 'none' })
           } finally {
             this.busy = false
           }
@@ -171,7 +172,7 @@ export default {
         this.naming = false
         this.$emit('ended')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.endFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.endFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -191,7 +192,7 @@ export default {
             const affectedFileIds = (res && res.data && res.data.affectedFileIds) || []
             this.$emit('discarded', affectedFileIds)
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.discardFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.discardFailed')), icon: 'none' })
           } finally {
             this.busy = false
           }
@@ -229,15 +230,6 @@ export default {
 .session-btn-main { background: var(--awd-panel-accent-wash); color: var(--awd-accent-text); }
 .session-btn-danger { color: var(--awd-danger-text); }
 
-.awd-btn {
-  padding: 8px 18px; border-radius: 6px; font-size: 13.5px; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
-.awd-btn-danger { background: var(--awd-surface); color: var(--awd-danger-text); border: 1px solid var(--awd-danger); }
 
 .awd-mask {
   position: fixed; inset: 0; background: var(--awd-overlay);

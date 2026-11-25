@@ -11,7 +11,7 @@ export default {
   subtitle: 'Collaborate across law firms, teams and projects; review usage by team',
   privacyLine: 'Team stats upload counts. Project names are uploaded only when the team has turned sharing on and this machine has confirmed consent; otherwise only anonymous project codes are sent. Never document content, file names, or conversations',
   needAccountTitle: 'No account connected',
-  needAccountDesc: 'Teams live on your AI WorkDeck account. Connect one under "Account & balance", then come back.',
+  needAccountDesc: 'Teams live on your AI WorkDeck account. Connect one under "Account & Balance", then come back.',
   goAccount: 'Go to Account & balance',
   loadFailed: 'Team information is temporarily unavailable, retry shortly',
   retry: 'Retry',

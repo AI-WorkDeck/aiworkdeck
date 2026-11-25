@@ -301,6 +301,8 @@ export default {
   "bpForward": "앞으로",
   "bpRefresh": "새로고침",
   "bpUrlPlaceholder": "URL을 입력하세요 (https://…)",
+  "bpNewTabTitle": "새 탭",
+  "bpNewTabHint": "위의 주소 표시줄에 웹 주소를 입력하세요.",
   "bpOpen": "열기",
   "bpNewTab": "새 탭",
   "bpSwitchToDesktop": "데스크톱 보기로 전환",

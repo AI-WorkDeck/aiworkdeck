@@ -72,7 +72,11 @@ public class MobileCloudCaptureService {
         if(stem.length()>100) stem=stem.substring(0,100);
         if(ext.length()>16) ext=mediaType;
         String landed=stem+"-"+clientId+"."+ext;
-        String rootName="audio".equals(mediaType) ? "现场录音" : "document".equals(mediaType) ? "插件文档" : "现场影像";
+        // X44：影像/录音/插件文档根目录随请求语言起名，已有任一语言的同类根目录则沿用
+        String rootName=CaptureFolderNames.resolve(CaptureFolderNames.forMediaType(mediaType),
+                    files.getFilesByParent(projectId,null).stream()
+                        .filter(f->Boolean.TRUE.equals(f.getIsFolder()) && !Boolean.TRUE.equals(f.getIsDeleted()))
+                        .map(ProjectFile::getName).collect(java.util.stream.Collectors.toSet()));
         String day=(capturedAt==null?LocalDateTime.now():capturedAt).toLocalDate().toString();
         String path="projects/"+projectId+"/"+rootName+"/"+day+"/"+landed;
         String temp="projects/"+projectId+"/.capture-"+clientId+".tmp";

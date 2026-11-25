@@ -14,6 +14,7 @@ export default {
   "promptNoModel": "{name} perlu dimuat turun (kira-kira {runtime} MB). Ia disimpan di bawah ~/.aiworkdeck dan boleh dibuang melalui Tetapan → Komponen.",
   "promptUsage": "Ia mengaktifkan: {unlocks}. Tanpanya: {impact}. Semua yang lain tetap berfungsi.",
   "sizeUnknown": "Menyemak saiz…",
+  "sizeUnavailable": "Saiz dipaparkan apabila muat turun bermula",
   "stateNotInstalled": "Belum dipasang",
   "stateReady": "Dipasang (belum dijalankan)",
   "stateServiceStarted": "Perkhidmatan dimulakan (fungsi belum disahkan)",

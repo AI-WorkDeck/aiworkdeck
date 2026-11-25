@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Chúng tôi sẽ tự động thử lại khi dịch vụ cục bộ hoạt động trở lại. Chưa thể chỉnh sửa tài liệu cho đến khi đọc xong.",
     "retry": "Thử lại"
   },
+  "authorPrompt": {
+    "text": "Các thay đổi theo dõi và nhận xét của bạn sẽ được ký bằng tên nào? Mọi người nhận tài liệu đều thấy tên này.",
+    "placeholder": "Tên bạn hoặc tên văn phòng",
+    "save": "Lưu",
+    "later": "Để sau",
+    "empty": "Nhập tên"
+  },
   "openFailed": {
     "title": "Không thể mở tài liệu: trình soạn thảo không phản hồi hoặc tệp bị hỏng",
     "encryptedTitle": "Tệp này được bảo vệ bằng mật khẩu mở mà trình soạn thảo chưa mở được. Hãy gỡ mật khẩu trong Excel, Word, PowerPoint hoặc WPS rồi mở lại, hoặc tải tệp gốc xuống.",

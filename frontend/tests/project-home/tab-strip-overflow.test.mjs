@@ -122,3 +122,22 @@ test('tabDomId 产出的 id 过得了 uni 那道正则（不合就只 console.er
   }
   assert.notEqual(fn('left', 1), fn('right', 1), '左右窗格同一个文件的 id 不能撞')
 })
+
+// D15: once tabs overflow, the "+" stays visible, the hidden side fades, and names aren't cut while there is room.
+test('D15: the scroller flexes beside "+" instead of taking the full width', () => {
+  const scroll = bodyOf(SCSS, 'tabs-scroll')
+  assert.doesNotMatch(scroll, /(^|[;\s])width:\s*100%/)
+  assert.match(scroll, /flex:\s*1 1 auto/)
+  assert.match(scroll, /min-width:\s*0/)
+})
+
+test('D15: an edge fades only on the side that still has tabs scrolled out', () => {
+  assert.match(SCSS, /@keyframes awd-tabs-edge-fade/)
+  assert.match(SCSS, /\.tabs-scroll :deep\(\.uni-scroll-view\) \{[^}]*animation-timeline: scroll\(self inline\)/)
+  assert.match(SCSS, /@property --awd-tabs-fade-start \{[^}]*initial-value: 0px/)
+})
+
+test('D15: the active tab gets more room than the 160px cap so its name is not cut', () => {
+  const active = /&\.active \{[^}]*?max-width:\s*(\d+)px/.exec(bodyOf(SCSS, 'tab-item'))
+  assert.ok(active && Number(active[1]) >= 220, 'active tab max-width ' + (active && active[1]))
+})

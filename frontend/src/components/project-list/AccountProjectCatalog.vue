@@ -3,10 +3,15 @@
 <template>
   <view class="account-catalog">
     <view class="catalog-heading">
-      <text>{{ $t('projects.accountCatalog') }}</text>
-      <button class="catalog-action" :disabled="loading" @tap="load">{{ $t('projects.catalogRefresh') }}</button>
+      <text>{{ signedOut ? $t('projects.otherDevicesTitle') : $t('projects.accountCatalog') }}</text>
+      <button v-if="!signedOut" class="catalog-action" :disabled="loading" @tap="load">{{ $t('projects.catalogRefresh') }}</button>
     </view>
-    <text v-if="loadError" class="catalog-note" role="status">{{ loadError }}</text>
+    <!-- D18：没登录时这一块讲「登录能多出什么」，就地给登录（同 Q3 的登录弹层），不说「已连接账户」 -->
+    <view v-if="signedOut" class="catalog-note catalog-signed-out">
+      <text>{{ $t('projects.otherDevicesSignedOut') }}</text>
+      <text class="catalog-signin" role="button" tabindex="0" @tap="signIn" @keydown.enter.prevent="signIn">{{ $t('projects.otherDevicesSignIn') }}</text>
+    </view>
+    <text v-else-if="loadError" class="catalog-note" role="status">{{ loadError }}</text>
     <text v-else-if="!catalog.length && !loading" class="catalog-note">{{ $t('projects.catalogAllLocal') }}</text>
     <view v-for="project in remoteProjects" :key="project.projectUid" class="catalog-project">
       <view class="catalog-project-entry">
@@ -41,17 +46,38 @@
   </view>
 </template>
 <script>
-import { getAccountProjectCatalog, requestAccountCatalog, importAccountCatalogFile } from '@/services/api.js'
+import { getAccountProjectCatalog, requestAccountCatalog, importAccountCatalogFile, getAccountStatus } from '@/services/api.js'
+import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 export default {
   name: 'AccountProjectCatalog',
   props: { localProjects: { type: Array, default: () => [] }, currentProjectId: { type: [String, Number], default: null } },
   emits: ['imported', 'open-project'],
-  data() { return { catalog: [], selected: null, files: [], loading: false, listing: false, importing: false, loadError: '', error: '', incomplete: false, targetId: '', generation: 0 } },
+  data() { return { signedOut: false, catalog: [], selected: null, files: [], loading: false, listing: false, importing: false, loadError: '', error: '', incomplete: false, targetId: '', generation: 0 } },
   computed: { remoteProjects() { return this.catalog } },
-  mounted() { this.targetId = this.currentProjectId ? String(this.currentProjectId) : ''; this.load() },
-  beforeUnmount() { this.generation++ },
+  mounted() {
+    this.targetId = this.currentProjectId ? String(this.currentProjectId) : ''
+    this.load()
+    this.refreshAccountState()
+    this._onAccountChanged = () => { this.refreshAccountState(); this.load() }
+    try { uni.$on(ACCOUNT_CHANGED_EVENT, this._onAccountChanged) } catch (e) { /* no event bus */ }
+  },
+  beforeUnmount() {
+    this.generation++
+    try { uni.$off(ACCOUNT_CHANGED_EVENT, this._onAccountChanged) } catch (e) { /* no event bus */ }
+  },
   methods: {
+    /** D18：本机读账户状态（不弹登录层）；读不到就保持原样，不把已登录的人误判成没登录。 */
+    async refreshAccountState() {
+      if (typeof getAccountStatus !== 'function') return
+      try {
+        const status = await getAccountStatus({ accountPrompt: false })
+        this.signedOut = !(status && status.connected)
+      } catch (e) { /* unknown: keep the current state */ }
+    },
+    signIn() {
+      if (typeof requireAccount === 'function') requireAccount({ reason: 'account' }).catch(() => {})
+    },
     async load() {
       if (this.loading) return
       this.loading = true; this.loadError = ''
@@ -177,6 +203,8 @@ export default {
 .catalog-heading,.catalog-file { display: flex; align-items: center; justify-content: space-between; gap: var(--awd-space-2); }
 .catalog-heading { min-height: var(--awd-panel-sec-h, 26px); font-size: var(--awd-panel-fs-sec); color: var(--awd-panel-text-2); }
 .catalog-note { display: block; font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-text-2); line-height: var(--awd-line-height-ui); overflow-wrap: anywhere; }
+.catalog-signed-out { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.catalog-signin { color: var(--awd-accent-text); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .catalog-project-entry { display: flex; align-items: center; }
 .catalog-other-locations { font-size: var(--awd-panel-fs-meta); color: var(--awd-panel-accent); }
 .catalog-project { min-width: 0; border-bottom: 1px solid var(--awd-panel-border); }

@@ -14,7 +14,7 @@ test('顶栏浏览器按钮 tooltip 明确说明是「新建标签」动作', ()
   const idx = SRC.indexOf('@tap="openBrowserTab()"')
   assert.ok(idx >= 0, '应能找到打开浏览器标签的按钮渲染行')
   const block = SRC.slice(idx, idx + 200)
-  assert.match(block, /:title="\$t\('workbench\.browserNewTabHint'\)"/, '按钮 tooltip 应引用 browserNewTabHint 而非笼统的 workbench.browser')
+  assert.match(block, /:title="topBarTip\(\$t\('workbench\.browserNewTabHint'\)/, '按钮 tooltip 应引用 browserNewTabHint 而非笼统的 workbench.browser')
 })
 
 test('workbench.browserNewTabHint 中英文案齐备且不同于纯名词 browser', () => {

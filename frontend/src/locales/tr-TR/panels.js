@@ -301,6 +301,8 @@ export default {
   "bpForward": "İleri",
   "bpRefresh": "Yenile",
   "bpUrlPlaceholder": "Bir URL girin (https://…)",
+  "bpNewTabTitle": "Yeni sekme",
+  "bpNewTabHint": "Yukarıdaki çubuğa bir web adresi yazın.",
   "bpOpen": "Aç",
   "bpNewTab": "Yeni Sekme",
   "bpSwitchToDesktop": "Masaüstü görünümüne geri dön",

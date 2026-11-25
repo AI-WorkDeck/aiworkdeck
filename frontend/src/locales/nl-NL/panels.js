@@ -301,6 +301,8 @@ export default {
   "bpForward": "Vooruit",
   "bpRefresh": "Vernieuwen",
   "bpUrlPlaceholder": "Voer een URL in (https://…)",
+  "bpNewTabTitle": "Nieuw tabblad",
+  "bpNewTabHint": "Typ een webadres in de balk hierboven.",
   "bpOpen": "Openen",
   "bpNewTab": "Nieuw tabblad",
   "bpSwitchToDesktop": "Terugkeren naar desktopweergave",

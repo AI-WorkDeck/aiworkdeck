@@ -298,6 +298,8 @@ export default {
   "bpForward": "Suivant",
   "bpRefresh": "Actualiser",
   "bpUrlPlaceholder": "Saisir une URL (https://…)",
+  "bpNewTabTitle": "Nouvel onglet",
+  "bpNewTabHint": "Saisissez une adresse web dans la barre ci-dessus.",
   "bpOpen": "Ouvrir",
   "bpNewTab": "Nouvel onglet",
   "bpSwitchToDesktop": "Revenir à l'affichage bureau",

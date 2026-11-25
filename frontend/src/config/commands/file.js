@@ -5,21 +5,21 @@
 export const FILE_COMMANDS = [
   {
     id: 'file.newProject',
-    label: { zh: '新建项目…', en: 'New Project…' },
+    label: { zh: '新建项目…', 'zh-TW': '新增專案…', en: 'New Project…' },
     accel: 'Shift+CmdOrCtrl+N',
     menu: 'file', group: 1,
     run: 'app:newProject',
   },
   {
     id: 'file.openFolder',
-    label: { zh: '打开文件夹…', en: 'Open Folder…' },
+    label: { zh: '打开文件夹…', 'zh-TW': '開啟資料夾…', en: 'Open Folder…' },
     accel: 'CmdOrCtrl+O',
     menu: 'file', group: 1,
     run: 'app:openFolder',
   },
   {
     id: 'file.openFile',
-    label: { zh: '打开文件…', en: 'Open File…' },
+    label: { zh: '打开文件…', 'zh-TW': '開啟檔案…', en: 'Open File…' },
     accel: 'Shift+CmdOrCtrl+O',
     menu: 'file', group: 1,
     run: 'app:openFile',
@@ -30,28 +30,28 @@ export const FILE_COMMANDS = [
   // 新建事项（dev-board#899）：开工作台唯一的 TaskDialog，项目锁定为当前项目
   {
     id: 'task.new',
-    label: { zh: '新建事项…', en: 'New Task…' },
+    label: { zh: '新建事项…', 'zh-TW': '新增事項…', en: 'New Task…' },
     menu: 'file', group: 3,
     when: ['workbench', 'project'],
     run: 'wb:newTask',
   },
   {
     id: 'file.importFiles',
-    label: { zh: '导入文件到项目…', en: 'Import Files…' },
+    label: { zh: '导入文件到项目…', 'zh-TW': '匯入檔案到專案…', en: 'Import Files…' },
     menu: 'file', group: 3,
     when: ['workbench', 'project'],
     run: 'wb:importFiles',
   },
   {
     id: 'file.revealInFinder',
-    label: { zh: '在访达中显示', en: 'Reveal in Finder' },
+    label: { zh: '在访达中显示', 'zh-TW': '在 Finder 中顯示', en: 'Reveal in Finder' },
     menu: 'file', group: 3,
     when: ['workbench', 'project'],
     run: 'wb:revealInFinder',
   },
   {
     id: 'file.share',
-    label: { zh: '发送…', en: 'Send…' },
+    label: { zh: '发送…', 'zh-TW': '傳送…', en: 'Send…' },
     menu: 'file', group: 3,
     when: ['workbench', 'tab'],
     run: 'wb:shareFile',
@@ -62,14 +62,14 @@ export const FILE_COMMANDS = [
   // LibreOfficeEditor.exportPdf()，跟工具栏那颗图标走同一条代码路径。
   {
     id: 'file.exportPdf',
-    label: { zh: '导出为 PDF…', en: 'Export as PDF…' },
+    label: { zh: '导出为 PDF…', 'zh-TW': '匯出為 PDF…', en: 'Export as PDF…' },
     menu: 'file', group: 4,
     when: ['workbench', 'docTab'],
     run: 'wb:exportPdf',
   },
   {
     id: 'file.closeTab',
-    label: { zh: '关闭标签', en: 'Close Tab' },
+    label: { zh: '关闭标签', 'zh-TW': '關閉標籤', en: 'Close Tab' },
     accel: 'CmdOrCtrl+W',
     menu: 'file', group: 5,
     when: ['workbench', 'tab'],
@@ -77,7 +77,7 @@ export const FILE_COMMANDS = [
   },
   {
     id: 'file.closeProject',
-    label: { zh: '关闭项目', en: 'Close Project' },
+    label: { zh: '关闭项目', 'zh-TW': '關閉專案', en: 'Close Project' },
     menu: 'file', group: 5,
     when: ['workbench', 'project'],
     run: 'app:closeProject',

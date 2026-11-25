@@ -126,6 +126,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getVersionStatus, enableVersionControl, disableVersionControl, listDrafts,
   getCloudStatus, checkCloud, listCloudConnections, getOfficialCloud,
@@ -355,7 +356,7 @@ export default {
             uni.showToast({ title: this.$t('version.disabled'), icon: 'none' })
             await this.refresh()
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.disableFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.disableFailed')), icon: 'none' })
           } finally {
             this.busy = false
           }
@@ -369,7 +370,7 @@ export default {
         await enableVersionControl(this.projectId)
         await this.refresh()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.enableFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.enableFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -404,11 +405,4 @@ export default {
 }
 .version-footer-off { color: var(--awd-text-3); text-decoration: underline; flex-shrink: 0; }
 
-/* awd-* 没有集中定义，各组件 scoped 内各自定义 */
-.awd-btn {
-  display: inline-flex; align-items: center; justify-content: center; height: var(--awd-control-height);
-  padding: 0 14px; border-radius: var(--awd-radius-md);
-  font-size: var(--awd-font-size-body); text-align: center;
-}
-.awd-btn-primary { background: var(--awd-info); color: var(--awd-text-on-accent); }
 </style>

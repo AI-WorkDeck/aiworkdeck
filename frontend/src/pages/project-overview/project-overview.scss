@@ -137,9 +137,10 @@ $color-accent: var(--awd-mint); // Mint Green
   flex: 0 1 auto;
   min-width: 0;
   @include text-ellipsis;
-  font-family: var(--awd-font-serif);
+  /* D16：衬线只留给品牌字标与欢迎页大标题；顶栏项目名 / 全部项目用界面无衬线 */
+  font-family: var(--awd-font-sans);
   font-size: var(--awd-font-size-title);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--awd-accent-text); // Forest Green for title
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -232,6 +233,16 @@ $color-accent: var(--awd-mint); // Mint Green
   min-width: var(--awd-panel-row-h);
   color: var(--awd-accent-text);
 }
+.top-bar-divider {
+  /* D16：顶栏版面开关与工具之间的细分隔线 */
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  align-self: center;
+  background: var(--awd-border);
+}
+
 .switcher-arrow {
   display: block;
   font-size: var(--awd-panel-fs);
@@ -1971,7 +1982,9 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .tabs-scroll {
-  width: 100%;
+  /* D15：按剩余空间伸缩，不占满整行——同一行还有「＋」，占满会在标签溢出时把它挤出可视区 */
+  flex: 1 1 auto;
+  min-width: 0;
 
   /* VS Code 式标签栏：4px 悬浮细滑轨（.awd-hairline-scroll，样式本体在 App.vue
      全局），横滚同时接滚轮（原生挂上去的，见 tabDragSplit.rebindTabsWheel）。
@@ -1992,6 +2005,23 @@ $color-accent: var(--awd-mint); // Mint Green
   height: calc(100% + 4px);
   position: relative;
   z-index: 2;
+}
+/* D15：哪一侧还有被滚出去的标签，那一侧边缘就淡出（滚动驱动动画，纯 CSS）。
+   不溢出时滚动时间线不激活、动画不生效，两侧渐隐量取初始值 0，标签栏原样。
+   真正横滚的是 uni 的内层 div.uni-scroll-view（见 App.vue .awd-hairline-scroll 注释）。 */
+@property --awd-tabs-fade-start { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --awd-tabs-fade-end { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes awd-tabs-edge-fade {
+  0% { --awd-tabs-fade-start: 0px; --awd-tabs-fade-end: 32px; }
+  4% { --awd-tabs-fade-start: 32px; }
+  96% { --awd-tabs-fade-end: 32px; }
+  100% { --awd-tabs-fade-start: 32px; --awd-tabs-fade-end: 0px; }
+}
+.tabs-scroll :deep(.uni-scroll-view) {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--awd-tabs-fade-start), #000 calc(100% - var(--awd-tabs-fade-end)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--awd-tabs-fade-start), #000 calc(100% - var(--awd-tabs-fade-end)), transparent 100%);
+  animation: awd-tabs-edge-fade linear both;
+  animation-timeline: scroll(self inline);
 }
 
 .tabs-list {
@@ -2110,6 +2140,8 @@ $color-accent: var(--awd-mint); // Mint Green
   &.active {
     background: var(--awd-surface);
     box-shadow: var(--awd-specular);
+    /* D15：其余标签仍封顶 160px（#543），当前这一个放宽，免得有空位也把名字截掉 */
+    max-width: 240px;
 
     .tab-icon { opacity: 1; color: var(--awd-tab-kind, var(--awd-accent-text)); }
     .tab-plugin-avatar { opacity: 1; }
@@ -4126,7 +4158,7 @@ $color-accent: var(--awd-mint); // Mint Green
 }
 
 .awd-dialog-title {
-  font-family: var(--awd-font-serif);
+  font-family: var(--awd-font-sans); /* D16 */
   font-size: 20px;
   font-weight: 600;
   color: var(--awd-text);

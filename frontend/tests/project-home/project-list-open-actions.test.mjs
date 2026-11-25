@@ -8,6 +8,9 @@ import { parse } from '@vue/compiler-dom'
 import { createLocalOpenCoordinator } from '../../src/utils/localOpenCoordinator.js'
 import zh from '../../src/locales/zh-CN/projects.js'
 import en from '../../src/locales/en-US/projects.js'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 
 const source = readFileSync(new URL('../../src/components/project-list/ProjectListPane.vue', import.meta.url), 'utf8')
 const template = source.slice(source.indexOf('<template>') + 10, source.indexOf('\n<script>')).replace(/<\/template>\s*$/, '')

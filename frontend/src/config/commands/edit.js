@@ -14,7 +14,7 @@ export const EDIT_COMMANDS = [
     // 编辑器的查找条本来就带替换（replaceCurrent / replaceAll），
     // 不再单开一条「查找和替换」——两条菜单项做同一件事只是噪音。
     id: 'edit.find',
-    label: { zh: '查找和替换…', en: 'Find and Replace…' },
+    label: { zh: '查找和替换…', 'zh-TW': '尋找和取代…', en: 'Find and Replace…' },
     accel: 'CmdOrCtrl+F',
     menu: 'edit', group: 1,
     when: ['workbench', 'docTab'],

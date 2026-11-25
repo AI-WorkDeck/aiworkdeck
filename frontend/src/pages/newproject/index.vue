@@ -132,6 +132,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { createProject, getCurrentUser as fetchCurrentUser } from '@/services/api.js'
 import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { getCurrentUser } from '@/utils/auth.js'
@@ -242,7 +243,7 @@ export default {
       try {
         await flow()
       } catch (err) {
-        uni.showToast({ title: (err && err.message) || this.$t('common.openProjectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(err, this.$t('common.openProjectFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -263,7 +264,7 @@ export default {
           uni.reLaunch({ url: `/pages/project-overview/project-overview?id=${projectId}` })
         }, 500)
       } catch (err) {
-        uni.showToast({ title: (err && err.message) || this.$t('account.createProjectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(err, this.$t('account.createProjectFailed')), icon: 'none' })
         this.busy = false
       }
     },

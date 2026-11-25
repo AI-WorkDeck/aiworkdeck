@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Dossier de modèles : déposez ici les modèles de rapports de votre cabinet ; une fois appris, l'IA rédige avec leurs polices, numérotations et styles de tableaux",
   "selectFilePrompt": "Sélectionnez un fichier à gauche pour l'aperçu",
   "edit": "Modifier",
-  "typeLabel": "Type : {type}",
-  "sizeLabel": "Taille : {size}",
   "renderingDoc": "Rendu du document…",
   "renderingSlides": "Rendu de la présentation…",
   "slidesNotShown": "{count} diapositives supplémentaires non affichées. Ouvrez le fichier pour toutes les voir.",

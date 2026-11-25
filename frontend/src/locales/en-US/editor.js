@@ -143,6 +143,13 @@ export default {
     autoRetry: "We'll try again automatically when the local service is back. The document can't be edited until it has been read.",
     retry: "Try again",
   },
+  authorPrompt: {
+    text: "How should your tracked changes and comments be signed? Everyone who receives the document sees this name.",
+    placeholder: "Your name or firm name",
+    save: "Save",
+    later: "Not now",
+    empty: "Enter a name",
+  },
   openFailed: {
     title: 'The document cannot be opened: the editor is not responding or the file is damaged',
     encryptedTitle: 'This file is protected with an open password, which the editor can’t open yet. Remove the password in Excel, Word, PowerPoint or WPS and open it again, or download the original.',

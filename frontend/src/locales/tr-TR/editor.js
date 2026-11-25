@@ -140,6 +140,13 @@ export default {
     "autoRetry": "Yerel hizmet geri geldiğinde otomatik olarak yeniden deneyeceğiz. Belge okunana kadar düzenlenemez.",
     "retry": "Tekrar dene"
   },
+  "authorPrompt": {
+    "text": "İzlenen değişiklikleriniz ve yorumlarınız hangi adla imzalansın? Belgeyi alan herkes bu adı görür.",
+    "placeholder": "Adınız veya büro adı",
+    "save": "Kaydet",
+    "later": "Şimdi değil",
+    "empty": "Bir ad girin"
+  },
   "openFailed": {
     "title": "Belge açılamıyor: düzenleyici yanıt vermiyor veya dosya hasar görmüş",
     "encryptedTitle": "Bu dosya, düzenleyicinin henüz açamadığı bir açılış parolasıyla korunuyor. Parolayı Excel, Word, PowerPoint veya WPS’te kaldırıp yeniden açın ya da orijinal dosyayı indirin.",

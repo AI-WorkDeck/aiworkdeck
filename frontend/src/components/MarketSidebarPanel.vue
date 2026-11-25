@@ -91,17 +91,19 @@
         </component>
       </view>
       <view v-if="sections.market" class="msb-section-content">
-        <view v-if="marketPluginLoading || marketPluginError" class="msb-update-status" :class="{ 'msb-error': marketPluginError }" role="status">
-          <text>{{ marketPluginLoading ? $t('market.checkingUpdates') : $t('market.checkingUpdatesFailed') + ' ' + marketPluginError }}</text>
+        <!-- X8：失败只在列表区出一条目录文案（AwdInlineError），这里只报「正在检查」 -->
+        <view v-if="marketPluginLoading" class="msb-update-status" role="status">
+          <text>{{ $t('market.checkingUpdates') }}</text>
         </view>
         <view class="msb-tabs">
           <view class="msb-tab" :class="{ active: marketTab === 'skill' }" @tap="marketTab = 'skill'">
             <text>{{ $t('market.sectionSkillTitle') }}</text>
-            <text class="msb-tab-count">{{ skillRows.length }}</text>
+            <!-- X8：连不上市场时不显示假的 0 -->
+            <text v-if="!marketError" class="msb-tab-count">{{ skillRows.length }}</text>
           </view>
           <view class="msb-tab" :class="{ active: marketTab === 'plugin' }" @tap="marketTab = 'plugin'">
             <text>{{ $t('market.sectionPluginTitle') }}</text>
-            <text class="msb-tab-count">{{ pluginRows.length }}</text>
+            <text v-if="!marketPluginError" class="msb-tab-count">{{ pluginRows.length }}</text>
           </view>
           <view class="msb-tab" :class="{ active: marketTab === 'mcp' }" @tap="marketTab = 'mcp'">
             <text>{{ $t('mcp.label') }}</text><text class="msb-tab-count">{{ mcpRows.length }}</text>
@@ -123,9 +125,7 @@
             <text class="msb-builtin-action" @tap.stop="openBuiltinWorkflowSettings">{{ $t('chat.builtinWorkflowsAdvancedBtn') }}</text>
           </view>
           <view v-if="marketLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
-          <view v-else-if="marketError" class="msb-empty msb-error">
-            <text>{{ $t('market.marketUnavailablePrefixed', { error: marketError }) }}</text>
-          </view>
+          <AwdInlineError v-else-if="marketError" class="msb-inline-error" :error="marketError" :context="{ area: 'marketplace' }" @refresh="loadMarketSkills" @retry="loadMarketSkills" />
           <view v-else-if="!skillRows.length" class="msb-empty">
             <text>{{ searchText ? $t('market.noMatchingSkill') : $t('market.marketEmptySkillShort') }}</text>
           </view>
@@ -165,9 +165,7 @@
 
         <template v-else>
           <view v-if="marketPluginLoading" class="msb-empty"><text>{{ $t('market.loadingEllipsis') }}</text></view>
-          <view v-else-if="marketPluginError" class="msb-empty msb-error">
-            <text>{{ $t('market.marketUnavailablePrefixed', { error: marketPluginError }) }}</text>
-          </view>
+          <AwdInlineError v-else-if="marketPluginError" class="msb-inline-error" :error="marketPluginError" :context="{ area: 'marketplace' }" @refresh="checkForUpdates" @retry="checkForUpdates" />
           <view v-else-if="!pluginRows.length" class="msb-empty">
             <text>{{ searchText ? $t('market.noMatchingPlugin') : $t('market.marketEmptyPlugin') }}</text>
           </view>
@@ -215,10 +213,12 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 插件广场左栏面板（VS Code 扩展栏形态）：搜索 + 已安装/Skill 广场/插件广场
 // 两个独立滚动分组的紧凑列表；点行在中栏开详情 tab（emit open-detail），行内快捷安装。
 // 数据与安装链路复用 MarketPane 同一组 services/api.js 封装。
 import { getApiBaseUrl, getCloudAccountGeneration, getMcpConnections, installBundledPlugin, getPlugins, getSkills, getSkillMarket, installMarketSkill, installMarketPlugin, rescanPlugins, rescanSkills } from '@/services/api.js'
+import AwdInlineError from './AwdInlineError.vue'
 import { pluginUpdates, refreshPluginUpdates } from '@/composables/usePluginUpdates.js'
 import { isPluginUpdateAvailable } from '@/utils/marketUpdates.js'
 import { ICONS } from '@/config/icons.js'
@@ -283,6 +283,7 @@ function fmtDownloads(n) {
 }
 
 export default {
+  components: { AwdInlineError },
   name: 'MarketSidebarPanel',
   inject: { openWorkflowEditorTab: { default: null }, openSettingsTab: { default: null } },
   emits: ['open-detail'],
@@ -584,7 +585,7 @@ export default {
         console.error('安装 Skill 失败:', e)
         // 后端 4011 已由 api.js 就地弹过登录层：登录成功就刷新列表，按钮按新账户的状态显示
         if (isAccountLoginRetry(e)) await this.reloadAll()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.marketBusyId = ''
       }
@@ -619,7 +620,7 @@ export default {
       } catch (e) {
         console.error('安装插件失败:', e)
         if (isAccountLoginRetry(e)) await this.reloadAll()
-        uni.showToast({ title: e?.message || this.$t('market.installFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.installFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.pluginBusyId = ''
       }
@@ -638,7 +639,7 @@ export default {
         uni.$emit('awd:market-changed-from-sidebar')
       } catch (e) {
         console.error('重新扫描失败:', e)
-        uni.showToast({ title: e?.message || this.$t('market.scanFailedNeedAdmin'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('market.scanFailedNeedAdmin')), icon: 'none' })
       } finally {
         this.rescanning = false
       }
@@ -657,6 +658,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.msb-inline-error { margin: 8px 10px; }
 /* VS Code 扩展栏密度 + 产品浅色体系（墨竹青 #2E5A50 主色 / mint var(--awd-mint)（竹月青氛围色）点缀） */
 .msb {
   display: flex;

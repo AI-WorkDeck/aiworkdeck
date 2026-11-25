@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "재시도",
     "details": "상세 정보",
+    "hideDetails": "세부 정보 숨기기",
     "continue": "계속",
     "refresh": "새로고침",
     "signIn": "로그인",

@@ -36,7 +36,7 @@ test('工具栏只剩「审阅」：「审校」按钮、它的 props 与 emit �
 test('菜单与命令面板那一条改名，run 与编辑器上的方法名对得上', () => {
   const command = DOCUMENT_COMMANDS.find((c) => c.id === 'doc.aiReview')
   assert.ok(command, '命令 id 改成 doc.aiReview')
-  assert.deepEqual(command.label, { zh: 'AI 审校', en: 'AI Review' })
+  assert.deepEqual(command.label, { zh: 'AI 审校', 'zh-TW': 'AI 審校', en: 'AI Review' })
   assert.equal(command.checked, 'aiReview')
   assert.equal(command.run, 'wb:toggleAiReview')
   assert.equal(DOCUMENT_COMMANDS.some((c) => c.id === 'doc.inlineReview'), false)

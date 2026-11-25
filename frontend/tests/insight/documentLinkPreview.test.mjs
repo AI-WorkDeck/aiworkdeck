@@ -86,6 +86,8 @@ const built = await build({ stdin: { contents: `
   b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path.includes('api')
     ? 'export const getFileDetail=(...a)=>globalThis.__documentLinkTestIo.detail(...a); export const getEvidenceLink=(...a)=>globalThis.__documentLinkTestIo.evidence(...a); export const createEvidenceLink=()=>{}; export const addEvidenceTargets=()=>{}; export const updateEvidenceTarget=()=>{}; export const getProjectFiles=()=>{}; export const fetchProjectFileBytes=()=>{}; export const createComparisonFile=()=>{};'
     : args.path.includes('activityTracker') ? 'export const activityTracker={trackActivePage(){}}' : 'export const ICONS={}; export const fileGlyph=()=>"";' }))
+  // X-S1 toast text: the real helper with an identity translate (the app's @/i18n needs uni)
+  b.onResolve({ filter: /^@\/utils\/errorToast\.js$/ }, () => ({ path: fileURLToPath(new URL('../_lib/error-text.mjs', import.meta.url)) }))
   b.onResolve({ filter: /^@\// }, args => ({ path: path.join(sourceRoot, args.path.slice(2)) }))
 } }] })
 const routes = await import('data:text/javascript;base64,' + Buffer.from(built.outputFiles[0].text).toString('base64'))

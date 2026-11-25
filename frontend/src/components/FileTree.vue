@@ -444,13 +444,11 @@
          </view>
       </view>
 
-      <view v-if="loading && displayFiles.length === 0" class="tree-loading">
-        <text>{{ $t('fileTree.loading') }}</text>
-      </view>
+      <!-- X-S1：加载 / 失败 / 空三态用统一组件。加载失败不能落成「还没有文件」——文件明明在。 -->
+      <AwdLoadingBlock v-if="loading && displayFiles.length === 0" class="tree-loading" :rows="6" :label="$t('fileTree.loading')" />
+      <AwdInlineError v-else-if="loadError && displayFiles.length === 0" class="tree-load-error" :error="loadError" @retry="loadFiles" @refresh="loadFiles" />
       <view v-else-if="displayFiles.length === 0" class="tree-empty">
-        <view class="empty-content">
-          <text>{{ $t(isTagView ? 'files.tagViewNoFiles' : 'fileTree.noFiles') }}</text>
-        </view>
+        <AwdEmptyState class="empty-content" :title="$t(isTagView ? 'files.tagViewNoFiles' : 'fileTree.noFiles')" />
         <!-- Root Drop Zone for empty folders -->
         <!-- #ifdef H5 -->
         <view
@@ -855,6 +853,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import { subscribeLocalProjectFileChanges, getProjectFiles, createFolder, createFile, renameFile, deleteFile, deleteFilePerm, getFilePermDiskPaths, restoreFile as restoreFileApi, getRecycleBinFiles, moveFile, batchDeleteFiles, batchMoveFiles, batchCopyFiles, getContributedTemplates, createFileFromContributedTemplate, importLocalFile, getProjectFileAccess, updateProjectFileAccess, convertFileToPdf, mergeFilesToPdf, fetchPrintablePdf, compressFilesToZip, extractArchive, getFileLocalPath, getApiBaseUrl } from '@/services/api.js'
 import { getAuthHeaders } from '@/utils/auth.js'
 import { host, isDesktopHost } from '@/services/host.js'
@@ -962,6 +961,8 @@ export default {
       fileAccessRequest: 0,
       fileAccessBusy: false,
       loading: false,
+      // X-S1：最近一次加载失败（且没有可展示的文件）时的错误；成功即清空
+      loadError: null,
       selectedFileId: null,
       showRenameDialog: false,
       creatingItem: false,
@@ -1598,6 +1599,7 @@ export default {
         // 插件事件通道（规范 v2.7）：文件清单刷新的单一汇聚点——SSE refresh_files、
         // 窗口 focus 兜底、用户增删改、目录/项目切换全部流经这里；PluginPane 按订阅转发
         uni.$emit('awd:files-changed', { projectId })
+        this.loadError = null
         console.log('加载文件列表成功:', this.files)
       } catch (error) {
         if (!current()) return
@@ -1613,11 +1615,17 @@ export default {
           errMsg: error.errMsg,
           toString: error.toString()
         })
-        uni.showToast({
-          title: error.message || this.$t('fileTree.loadFailed'),
-          icon: 'none',
-          duration: 3000
-        })
+        // 已经有树在显示时（后台刷新失败）只提示一下；没有任何可显示的才落成面板内错误态
+        const shown = Array.isArray(this.displayFiles) ? this.displayFiles.length : ((this.files && this.files.length) || 0)
+        if (shown === 0) {
+          this.loadError = error
+        } else {
+          uni.showToast({
+            title: errorText(error, this.$t('fileTree.loadFailed')),
+            icon: 'none',
+            duration: 3000
+          })
+        }
       } finally {
         if (current()) this.loading = false
       }
@@ -1703,7 +1711,7 @@ export default {
           uni.showToast({ title: this.$t('fileTree.createSuccess'), icon: 'success' })
         }
       } catch (error) {
-        uni.showToast({ title: error.message || this.$t('fileTree.createFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('fileTree.createFailed')), icon: 'none' })
       } finally {
         this.creatingItem = false
       }
@@ -1746,7 +1754,7 @@ export default {
             uni.showToast({ title: String(body2.name || ''), icon: 'none' })
           } catch (e) {
             uni.showToast({
-              title: (e && e.message) || this.$t('fileTree.templateCreateFailed'),
+              title: errorText(e, this.$t('fileTree.templateCreateFailed')),
               icon: 'none'
             })
           }
@@ -1971,7 +1979,7 @@ export default {
       } catch (error) {
         console.error('重命名失败:', error)
         uni.showToast({
-          title: error.message || this.$t('fileTree.renameFailed'),
+          title: errorText(error, this.$t('fileTree.renameFailed')),
           icon: 'none'
         })
       }
@@ -2688,7 +2696,7 @@ export default {
         await this.loadFiles()
       } catch (e) {
         console.error('批量操作失败:', e)
-        uni.showToast({ title: e.message || this.$t('fileTree.batchOpFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('fileTree.batchOpFailed')), icon: 'none' })
       }
     },
     handleContextMenu(item, event) {
@@ -2800,7 +2808,7 @@ export default {
         if (!path) throw new Error(this.$t('workbench.fileNotOnDisk'))
         copyToClipboard(path, 'fileTree.pathCopied')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('fileTree.copyPathFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('fileTree.copyPathFailed')), icon: 'none' })
       }
     },
 
@@ -2901,7 +2909,7 @@ export default {
       } catch (e) {
         console.error('打印失败:', e)
         uni.hideLoading()
-        uni.showToast({ title: e.message || this.$t('fileTree.printFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('fileTree.printFailed')), icon: 'none' })
       }
     },
 
@@ -2944,7 +2952,7 @@ export default {
       } catch (e) {
         console.error(failKey, e)
         uni.hideLoading()
-        uni.showToast({ title: e.message || this.$t(failKey), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t(failKey)), icon: 'none' })
       }
     },
 
@@ -3493,7 +3501,7 @@ export default {
         })
       } catch (error) {
         if (String(this.projectId) === String(projectId)) {
-          uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(error, this.$t('fileTree.moveFailed')), icon: 'none' })
         }
       } finally {
         if (sequence === this.dragSequence) this.handleDragEnd()
@@ -3604,7 +3612,7 @@ export default {
             }
           } catch (error) {
             console.error('移动文件失败:', error)
-            uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(error, this.$t('fileTree.moveFailed')), icon: 'none' })
           }
       }
       // Case 2: External Drag (e.g. from Staging Area)
@@ -3667,7 +3675,7 @@ export default {
                  // Verify if project-overview handles this.
              } catch (error) {
                 console.error('从暂存区移动失败:', error)
-                uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+                uni.showToast({ title: errorText(error, this.$t('fileTree.moveFailed')), icon: 'none' })
              }
           } else {
              // 认不出拖进来的是哪份文件（如编辑器标签），提示而不是静默（dev-board#974）
@@ -3760,7 +3768,7 @@ export default {
             this.draggedFileId = null
           } catch (error) {
             console.error('移动到根目录失败:', error)
-            uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(error, this.$t('fileTree.moveFailed')), icon: 'none' })
           }
       }
       // Case 2: External Drag (e.g. from Staging Area)
@@ -3803,7 +3811,7 @@ export default {
                  this.$emit('files-changed')
              } catch (error) {
                 console.error('从外部移动到根目录失败:', error)
-                uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+                uni.showToast({ title: errorText(error, this.$t('fileTree.moveFailed')), icon: 'none' })
              }
           } else {
              uni.showToast({ title: this.$t('fileTree.dropInvalidTarget'), icon: 'none' })
@@ -3928,7 +3936,7 @@ export default {
         await importArchiveEntry(projectId, payload.fileId, payload.path, targetParentId)
         if (String(this.projectId) === String(projectId)) await this.loadFiles()
       } catch (error) {
-        uni.showToast({ title: error.message || this.$t('fileTree.moveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(error, this.$t('fileTree.moveFailed')), icon: 'none' })
       }
     },
     // 应用内、且不是本树自己发起的文件拖拽（暂存区 → 树）。判据是 uni 的 file-drag-start
@@ -4084,7 +4092,7 @@ export default {
         } catch (error) {
           console.error('移动文件失败:', error)
           uni.showToast({
-            title: error.message || this.$t('fileTree.moveFailed'),
+            title: errorText(error, this.$t('fileTree.moveFailed')),
             icon: 'none'
           })
         }
@@ -4391,6 +4399,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.tree-load-error { margin: 12px; }
 .file-tag-sidebar { margin-top: var(--awd-panel-gap-lg); }
 .tree-content.has-tag-sidebar > .tree-list { height: auto; }
 .tag-view-summary {
@@ -5629,7 +5638,7 @@ export default {
 }
 
 .awd-dialog-title {
-  font-family: var(--awd-font-serif);
+  font-family: var(--awd-font-sans); /* D16 */
   font-size: var(--awd-font-size-title);
   font-weight: 600;
   color: var(--awd-accent-text); /* Forest Green */

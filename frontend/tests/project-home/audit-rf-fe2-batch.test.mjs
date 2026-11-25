@@ -19,6 +19,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { shouldAcceptResponse } from '../../src/utils/requestGeneration.js'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 
 function read(rel) {
   return readFileSync(new URL('../../src/' + rel, import.meta.url), 'utf8')

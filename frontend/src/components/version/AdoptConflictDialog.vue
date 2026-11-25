@@ -108,6 +108,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   resolveAdopt, abortAdopt,
   resolveCloudMerge, abortCloudMerge,
@@ -418,7 +419,7 @@ export default {
         uni.$emit('awd:merge-file-resolved', { path: row.path })
         uni.showToast({ title: this.$t('version.mergeStructuredSaved'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.mergeStructuredFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.mergeStructuredFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -467,7 +468,7 @@ export default {
         const fallback = this.mode === 'cloud' ? this.$t('version.resolveFailedCloud')
           : this.mode === 'session-end' ? this.$t('version.resolveFailedSessionEnd')
           : this.$t('version.resolveFailedAdopt')
-        uni.showToast({ title: (e && e.message) || fallback, icon: 'none' })
+        uni.showToast({ title: errorText(e, fallback), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -495,7 +496,7 @@ export default {
         uni.showToast({ title: (res && res.message) || fallbackNotice, icon: 'none' })
         this.$emit('aborted')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.abortFailedGeneric'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.abortFailedGeneric')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -566,15 +567,6 @@ export default {
   display: flex; justify-content: flex-end; gap: 12px;
   padding: 14px 24px; border-top: 1px solid var(--awd-border-subtle); background: var(--awd-bg);
 }
-.awd-btn {
-  padding: 8px 18px; border-radius: 6px; font-size: 13.5px; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
-.awd-btn-disabled { opacity: .45; pointer-events: none; }
 
 .adopt-collapsed-bar {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);

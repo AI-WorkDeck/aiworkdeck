@@ -24,6 +24,7 @@ export default {
   "actions": {
     "retry": "إعادة المحاولة",
     "details": "التفاصيل",
+    "hideDetails": "إخفاء التفاصيل",
     "continue": "متابعة",
     "refresh": "تحديث",
     "signIn": "تسجيل الدخول",

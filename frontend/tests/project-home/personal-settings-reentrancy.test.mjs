@@ -9,6 +9,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { errorText } from '../_lib/error-text.mjs'
 
 const SRC = readFileSync(
   new URL('../../src/components/userprofile/PersonalSettingsPanel.vue', import.meta.url), 'utf8')
@@ -54,6 +55,7 @@ function onceOnly(okValue) {
 function setup(depsOverride) {
   const toasts = []
   const deps = Object.assign({
+    errorText,
     setSessionUser: () => {}, getAppLanguage: () => 'zh-CN', LOCALE_REGISTRY: [],
     shouldScanProjectsOnExit: () => true, setScanProjectsOnExit: () => {},
   }, depsOverride)

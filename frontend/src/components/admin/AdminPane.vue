@@ -126,7 +126,12 @@
               <view class="section-header-inline">
                   <text class="section-title-sm">{{ $t('admin.modelSelectionTitle') }}</text>
               </view>
-              <text v-if="modelCatalogError" class="field-note field-note-warn">{{ modelCatalogError }}</text>
+              <!-- Q3：没登录时就地给「登录」，不再让人去找不存在的「右上角」 -->
+              <view v-if="modelCatalogNeedsSignIn" class="field-note field-note-warn catalog-signin">
+                <text>{{ $t('admin.catalogNeedsSignIn') }}</text>
+                <text class="platform-link" @tap="onLoginAccount">{{ $t('account.accountEntry.loginAccountButton') }}</text>
+              </view>
+              <text v-else-if="modelCatalogError" class="field-note field-note-warn">{{ modelCatalogError }}</text>
               <SettingsRow :label="$t('admin.defaultModelLabel')" :hint="catalogDefaultModel ? $t('admin.effectiveDefaultModel', { model: catalogDefaultModel }) : ''">
                 <AwdSelect
                   class="mode-picker"
@@ -931,6 +936,10 @@
           <PersonalTodosPanel />
         </scroll-view>
         <scroll-view v-else-if="activeNav === 'personal_settings'" scroll-y class="config-scroll">
+          <!-- Q9：「个人资料与登录」页没登录时，第一屏先给登录，而不是语言和退出设置 -->
+          <SettingsSection v-if="isDesktop && accountLoadState === 'ready' && !account.connected" :title="$t('admin.signInCardTitle')" :description="$t('admin.signInCardText')">
+            <button class="btn-primary account-login-btn" @tap="onLoginAccount">{{ $t('account.accountEntry.loginButton') }}</button>
+          </SettingsSection>
           <PersonalSettingsPanel />
         </scroll-view>
         <scroll-view v-else-if="activeNav === 'language'" scroll-y class="config-scroll">
@@ -1085,6 +1094,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   getAdminConfig, saveAdminConfig,
   getAccountStatus, connectAccount, getAccountUsage,
@@ -1344,6 +1354,7 @@ export default {
       // 前端不许再自己硬编码任何模型清单。
       modelCatalog: null,
       modelCatalogError: '',
+      modelCatalogNeedsSignIn: false,
       // 平台 AI 通道是否可选（= 是否已连接账户），来自 /api/account/status
       platformAiAvailable: false,
       // 花费闸门 + 预扣/低余额提醒的数据源（GET /api/platform-services 与其 /remote 端点）。
@@ -1670,6 +1681,13 @@ export default {
 
   },
   watch: {
+    // Q9：「个人资料与登录」顶部的登录卡要知道是否已登录；账户状态原本只在进「账户与余额」时才拉
+    activeNav: {
+      immediate: true,
+      handler(key) {
+        if (key === 'personal_settings' && this.isDesktop && this.accountLoadState !== 'ready' && typeof this.loadAccount === 'function') this.loadAccount()
+      },
+    },
     /*
      * 工作台里的「系统设置」标签是单例：已经开着时再从别处带深链进来（顶栏
      * 「已连接账户」chip → nav=account、网关错误提示 → nav=platform&service=ocr），
@@ -1963,7 +1981,7 @@ export default {
         const result = await host.model.cancel(item.modelId)
         if (result?.ok === false) throw new Error(result.error || this.$t('components.errorServiceUnavailable'))
       }
-      catch (e) { uni.showToast({ title: e.message || String(e), icon: 'none' }) }
+      catch (e) { uni.showToast({ title: errorText(e), icon: 'none' }) }
     },
     /** 卸载 = 删模型 + 删 pack 目录（规范 §6：确认框注明可释放体积） */
     handleComponentRemove(item) {
@@ -2054,7 +2072,7 @@ export default {
             uni.showToast({ title: this.$t('account.avatarUpdateSuccess'), icon: 'success' })
           } catch (e) {
             console.error('Avatar upload failed', e)
-            uni.showToast({ title: this.$t('account.avatarUploadFailed', { message: e.message }), icon: 'none' })
+            uni.showToast({ title: this.$t('account.avatarUploadFailed', { message: errorText(e) }), icon: 'none' })
           } finally {
             uni.hideLoading()
           }
@@ -2178,7 +2196,7 @@ export default {
         await selectCapability(slot.id, candidate.ref)
         await this.loadCapabilities()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('admin.capabilitySwitchFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.capabilitySwitchFailed')), icon: 'none' })
       }
     },
 
@@ -2188,7 +2206,7 @@ export default {
         await rollbackCapability(slot.id)
         await this.loadCapabilities()
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('admin.capabilityRollbackFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.capabilityRollbackFailed')), icon: 'none' })
       }
     },
 
@@ -2219,7 +2237,7 @@ export default {
         const res = await setCapabilityDevMode(on)
         this.capabilityDevMode = !!res.enabled
       } catch (e) {
-        uni.showToast({ title: e.message || this.$t('admin.capabilityDevModeFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.capabilityDevModeFailed')), icon: 'none' })
         await this.loadCapabilities()
       } finally {
         this.capabilityBusy = false
@@ -2263,7 +2281,7 @@ export default {
         this.feedbackList = ((res && res.data && res.data.items) || [])
       } catch (e) {
         if (!shouldAcceptResponse(seq, this.feedbackListSeq)) return
-        uni.showToast({ title: (e && e.message) || this.$t('admin.loadFeedbackFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.loadFeedbackFailed')), icon: 'none' })
       } finally {
         if (shouldAcceptResponse(seq, this.feedbackListSeq)) this.feedbackLoading = false
       }
@@ -2309,7 +2327,7 @@ export default {
         uni.showToast({ title: this.$t('admin.optimizerStarted'), icon: 'none' })
         this.optimizer.running = true
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.triggerFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.triggerFailed')), icon: 'none' })
       }
     },
     async toggleFeedbackDetail(id) {
@@ -2332,7 +2350,7 @@ export default {
         }
       } catch (e) {
         if (this.feedbackDetailPendingId !== id) return
-        uni.showToast({ title: (e && e.message) || this.$t('admin.loadDetailFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.loadDetailFailed')), icon: 'none' })
       }
     },
     formatTriage(json) {
@@ -2423,7 +2441,7 @@ export default {
         uni.removeStorageSync('checkba_last_project_id')
         uni.reLaunch({ url: '/pages/launch/launch' })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.switchFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.switchFailed')), icon: 'none' })
       } finally {
         this.identityBusy = false
       }
@@ -2449,9 +2467,11 @@ export default {
         if (this._modelCatalogDisposed) return
         this.modelCatalog = catalog
         this.modelCatalogError = ''
+        this.modelCatalogNeedsSignIn = false
       } catch (e) {
         if (this._modelCatalogDisposed) return
         this.modelCatalog = null
+        this.modelCatalogNeedsSignIn = !!(e && e.accountRequired)
         // 拿不到清单时下拉只剩「跟随内置默认」与已保存的值：宁可少给选项，
         // 也不要在这里塞一份硬编码清单当兜底（那正是三份清单互不同步的来源）
         this.modelCatalogError = (e && e.message)
@@ -2714,7 +2734,7 @@ export default {
         }
       } catch (e) {
         uni.showToast({
-          title: (e && e.message) || this.$t('admin.walletRedeemFailed'),
+          title: errorText(e, this.$t('admin.walletRedeemFailed')),
           icon: 'none',
         })
       } finally {
@@ -2870,6 +2890,8 @@ export default {
       await this.loadAccount()
       this.loadWallet()
       if (this.isDesktop) this.loadPlatformAiAvailability()
+      // 目录可能正因为没登录而拉不到（Q3）：账户一变就重拉
+      if (this.modelCatalogError || this.modelCatalogNeedsSignIn) this.loadModelCatalog()
       if (this.account.connected) {
         this.loadStorageLocation()
         this.maybePromptNameNudge()
@@ -2905,7 +2927,7 @@ export default {
         // 刷新走统一广播：本页的 onAccountChanged、广场按钮、权益缓存都在里面
         broadcastAccountChanged({ connected: true, ...(res || {}) })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('admin.connectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.connectFailed')), icon: 'none' })
       } finally {
         this.accountBusy = false
       }
@@ -2971,7 +2993,7 @@ export default {
         await savePlatformBudget(0, lowBalanceCents)
         uni.showToast({ title: this.$t('platform.budgetSaved'), icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('platform.budgetSaveFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('platform.budgetSaveFailed')), icon: 'none' })
       } finally {
         this.budgetBusy = false
         // 无论成败都重拉：写失败时界面必须回到库里的真相，而不是停在用户以为的值上
@@ -3043,7 +3065,7 @@ export default {
       } catch (e) {
         console.error('加载后台配置失败', e)
         // 403（非 admin 账号）时把后端原因带给用户：请用 admin 账号登录后配置
-        uni.showToast({ title: (e && e.message) || this.$t('admin.loadConfigFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('admin.loadConfigFailed')), icon: 'none' })
       }
     },
     async handleSave() {
@@ -3062,7 +3084,7 @@ export default {
       } catch (e) {
         console.error('保存后台配置失败', e)
         uni.showToast({
-          title: e.message || this.$t('admin.saveFailed'),
+          title: errorText(e, this.$t('admin.saveFailed')),
           icon: 'none',
         })
         return false
@@ -4063,6 +4085,12 @@ $brand-accent: $brand-mint;
 }
 
 /* 平台服务（P5 配置面收敛） */
+.catalog-signin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
 .platform-link {
   align-self: flex-start;
   font-size: var(--awd-panel-fs);

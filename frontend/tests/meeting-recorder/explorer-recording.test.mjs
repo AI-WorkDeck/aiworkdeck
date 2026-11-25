@@ -3,6 +3,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { errorText } from '../_lib/error-text.mjs'
+// Sources are evaluated with new Function (global scope): give them the real X-S1 toast-text helper.
+globalThis.errorText = errorText
 
 const source = readFileSync(new URL('../../src/pages/project-overview/explorerRecording.js', import.meta.url), 'utf8')
   .replace(/^import .*\n/gm, '').replace('export default', 'return')

@@ -97,7 +97,7 @@ test('4 设置改名：隐私与数据 / 外部工具连接（MCP） / 后台任
   assert.match(localeText('zh-CN', 'admin'), /subagentModelLabel: '后台任务模型'/)
   assert.match(localeText('zh-CN', 'admin'), /navGroupMyWork: '我的工作'/)
   assert.match(localeText('zh-CN', 'mcp'), /"title": "外部工具连接（MCP）"/)
-  assert.match(localeText('en-US', 'admin'), /navTelemetry: 'Privacy & data'/)
+  assert.match(localeText('en-US', 'admin'), /navTelemetry: 'Privacy & Data'/)
   for (const loc of LOCALES) {
     assert.match(localeText(loc, 'admin'), /"?navGroupMyWork"?: /, loc)
     assert.match(localeText(loc, 'admin'), /"?telemetrySectionTitle"?: /, loc)

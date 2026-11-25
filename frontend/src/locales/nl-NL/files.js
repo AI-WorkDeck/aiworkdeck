@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Sjabloonmap: plaats hier de rapportagesjablonen van uw kantoor; eenmaal aangeleerd, stelt de AI op met hun lettertypen, nummeringen en tabelstijlen",
   "selectFilePrompt": "Selecteer links een bestand om een voorbeeld te bekijken",
   "edit": "Bewerken",
-  "typeLabel": "Soort: {type}",
-  "sizeLabel": "Grootte: {size}",
   "renderingDoc": "Document wordt weergegeven…",
   "renderingSlides": "Presentatie wordt weergegeven…",
   "slidesNotShown": "Nog {count} dia’s niet weergegeven. Open het bestand om alles te zien.",

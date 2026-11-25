@@ -310,6 +310,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 import {
   listCloudConnections,
   shareProjectToCloud, uploadToCloud, updateFromCloud, checkCloud, getVersionStatus,
@@ -526,7 +527,7 @@ export default {
       try {
         await reconnectOfficialCloud()
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.connectFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.connectFailed')), icon: 'none' })
         return
       } finally {
         this.busy = false
@@ -632,7 +633,7 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: (e && e.message) || this.$t('version.submitFailed'), icon: 'none' })
+        else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -659,7 +660,7 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: (e && e.message) || this.$t('version.pullFailed'), icon: 'none' })
+        else uni.showToast({ title: errorText(e, this.$t('version.pullFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -671,7 +672,7 @@ export default {
         await checkCloud(this.projectId)
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.libraryOffline'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.libraryOffline')), icon: 'none' })
       } finally {
         this.busy = false
       }
@@ -682,7 +683,7 @@ export default {
         const res = await getCloudMembers(this.projectId)
         this.members = (res && res.data && res.data.members) || []
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.loadMembersFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.loadMembersFailed')), icon: 'none' })
       } finally {
         this.membersLoading = false
       }
@@ -698,7 +699,7 @@ export default {
             uni.showToast({ title: this.$t('version.removedFromCaseFile'), icon: 'none' })
             this.loadMembers()
           } catch (e) {
-            uni.showToast({ title: (e && e.message) || this.$t('version.revokeFailed'), icon: 'none' })
+            uni.showToast({ title: errorText(e, this.$t('version.revokeFailed')), icon: 'none' })
           }
         }
       })
@@ -746,7 +747,7 @@ export default {
         await this.loadMembers()
         this.$emit('changed')
       } catch (e) {
-        uni.showToast({ title: (e && e.message) || this.$t('version.addMemberFailed'), icon: 'none' })
+        uni.showToast({ title: errorText(e, this.$t('version.addMemberFailed')), icon: 'none' })
       } finally {
         this.memberBusy = false
       }
@@ -913,15 +914,4 @@ export default {
   display: flex; justify-content: flex-end; gap: 12px;
   padding: 14px 24px; border-top: 1px solid var(--awd-border-subtle); background: var(--awd-bg);
 }
-.awd-btn {
-  height: var(--awd-control-height); box-sizing: border-box;
-  padding: 0 18px; border-radius: var(--awd-radius-md); font-size: var(--awd-font-size-body); cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.awd-btn-primary { background: var(--awd-accent); color: var(--awd-text-on-accent); }
-.awd-btn-primary:hover { background: var(--awd-accent-hover); }
-.awd-btn-secondary { background: var(--awd-surface); color: var(--awd-text-2); border: 1px solid var(--awd-border-strong); }
-.awd-btn-secondary:hover { background: var(--awd-surface-2); }
-.awd-btn-danger { background: var(--awd-surface); color: var(--awd-danger-text); border: 1px solid var(--awd-danger); }
-.awd-btn-disabled { opacity: .45; pointer-events: none; }
 </style>

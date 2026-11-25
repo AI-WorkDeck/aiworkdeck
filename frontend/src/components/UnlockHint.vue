@@ -23,6 +23,7 @@
 </template>
 
 <script>
+import { errorText } from '@/utils/errorToast.js'
 // 「解锁」引导：功能触达免费额度上限时的统一行内提示。
 // 只提示与引导，不做拦截——是否拦、拦在哪由调用方自己判断（配合 useEntitlement）。
 // 语气克制：用户没做错事，只是碰到了额度边界。
@@ -120,9 +121,9 @@ export default {
           // 已拥有：权益缓存可能只是旧了，顺手刷新一次，并同样通知额度面板重拉
           await refreshEntitlements(true)
           uni.$emit('awd:entitlements-changed', { skuId: this.skuId })
-          uni.showToast({ title: (e && e.message) || t('onboarding.hint.purchaseFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, t('onboarding.hint.purchaseFailed')), icon: 'none' })
         } else {
-          uni.showToast({ title: (e && e.message) || t('onboarding.hint.purchaseFailed'), icon: 'none' })
+          uni.showToast({ title: errorText(e, t('onboarding.hint.purchaseFailed')), icon: 'none' })
         }
       } finally {
         this.purchasing = false

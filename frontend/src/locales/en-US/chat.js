@@ -204,7 +204,7 @@ export default {
   skillNoneInstalled: 'No extra extension skills installed',
   skillAutoLoadedToast: 'Skill loaded: {name}',
   builtinWorkflowsHeader: 'Built-in Core Workflows · Zero Setup',
-  builtinWorkflowsFoldEntry: 'Built-in workflows',
+  builtinWorkflowsFoldEntry: 'Built-in Workflows',
   builtinWorkflowsScope: 'Contract · Evidence · Files · Opinion',
   builtinWorkflowsCustomCount: '{count} customized',
   composerAdvancedSettings: 'Advanced settings',
