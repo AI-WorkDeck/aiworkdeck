@@ -38,6 +38,7 @@ export default {
   // ---- Skill 广场 ----
   searchSkillPlaceholder: '搜索名称、描述或触发词',
   marketUnavailableTitle: '在线广场暂不可用',
+  marketErrorHint: '{error}——本机已安装的 Skill 与插件不受影响',
   loadingMarket: '正在载入广场',
   noMatchingSkill: '没有匹配的 Skill',
   marketEmptySkill: '广场暂时空着',
@@ -56,6 +57,7 @@ export default {
 
   // ---- 插件市场 ----
   pluginMarketUnavailableTitle: '在线插件市场暂不可用',
+  pluginMarketErrorHint: '{error}——本机已安装的插件不受影响',
   noPluginsYet: '还没有上架的插件',
   localInstallHint: '也可本地安装：把插件目录放进本机插件目录 ~/.aiworkdeck/plugins/ 后点“重新扫描”',
   pluginLabel: '插件',
@@ -89,7 +91,7 @@ export default {
   enabledTag: '已启用',
   disabledTag: '已停用',
   sectionSkillSub: '提示词能力：在对话中生效，可设置生效方式',
-  builtinWorkflowsMarketNotice: "已内置：合同审查、证据整理、文件整理、法律意见书核查已纳入主流程，对话中按任务自动启用，无需在此安装或勾选。",
+  builtinWorkflowsMarketNotice: '内置工作流已自动启用：合同审查、证据整理、文件整理、法律意见书核查会在对话中按任务自动启用，无需在这里安装或勾选。',
   noLocalSkills: '本机还没有额外扩展 Skill',
   noLocalSkillsHint: '去“Skill 广场”装一个，或把 Skill 目录（含 skill.yml）放进本机 Skill 目录 ~/.aiworkdeck/skills/ 后点“重新扫描”',
   fromPlugin: '来自插件 {pluginId}',
@@ -124,6 +126,7 @@ export default {
   checkForUpdates: '检查更新',
   checkingUpdates: '正在检查更新…',
   updatesChecked: '已检查更新',
+  checkingUpdatesFailed: '检查更新失败，请重试',
   updatingEllipsis: '正在更新…',
   updateFailed: '更新失败，请重试。',
   updatedDisabledHint: '已更新，但未能恢复启用。请排查原因后手动启用。',
@@ -219,6 +222,7 @@ export default {
   noMatchingPlugin: '没有匹配的插件',
   marketEmptyPlugin: '广场暂无插件',
   marketEmptySkillShort: '广场暂无 Skill',
+  marketUnavailablePrefixed: '在线广场不可用：{error}',
   activationStateAuto: '自动',
   activationStateManual: '手动',
   fromPluginTag: '来自插件',

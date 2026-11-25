@@ -163,7 +163,7 @@ export default {
   browser: 'Browser',
   browserNewTabHint: 'New browser tab',
   recordActivity: 'Activity Log',
-  logout: 'Log Out',
+  logout: 'Sign Out',
   // Left rail
   stagingArea: 'Staging Area',
   pluginMarket: 'Marketplace',
