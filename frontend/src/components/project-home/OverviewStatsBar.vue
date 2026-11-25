@@ -9,15 +9,15 @@
         <text class="stat-caption">{{ fileCaption }}</text>
       </view>
       <view class="stat-tile">
-        <text class="stat-value">{{ $t('projects.folderCountLabel', { count: folderCount }) }}</text>
+        <text class="stat-value">{{ $t('projects.folderCountLabel', { count: folderCount }, folderCount) }}</text>
         <text class="stat-caption">{{ $t('projects.folderCaption') }}</text>
       </view>
       <view class="stat-tile">
-        <text class="stat-value">{{ $t('projects.memberCountLabel', { count: memberCount }) }}</text>
+        <text class="stat-value">{{ $t('projects.memberCountLabel', { count: memberCount }, memberCount) }}</text>
         <text class="stat-caption">{{ $t('projects.memberCaption') }}</text>
       </view>
       <view class="stat-tile">
-        <text class="stat-value">{{ $t('projects.runCountLabel', { count: runCount }) }}</text>
+        <text class="stat-value">{{ $t('projects.runCountLabel', { count: runCount }, runCount) }}</text>
         <text class="stat-caption">{{ runCaption }}</text>
       </view>
     </view>

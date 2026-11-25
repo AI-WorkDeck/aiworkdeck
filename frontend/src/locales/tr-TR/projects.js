@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "Bu dava dosyasının profili hâlâ boş. Önce müvekkili ve dosya türünü doldurun; böylece meslektaşlarınız ve müşterileriniz bu davayla ne hakkında olduğunu ilk bakışta anlayabilir.",
   "startFilling": "Doldurmaya Başla",
   "selectMatterType": "Dosya Türünü Seç",
+  "profileField": {
+    "client": "Müvekkil",
+    "matterType": "Dosya türü",
+    "openedAt": "Açılış tarihi",
+    "nextStep": "Sonraki adım",
+    "counterparty": "Karşı taraf"
+  },
   "notFilled": "Doldurulmadı",
   "placeholderClient": "örn. Acme Teknoloji A.Ş.",
   "placeholderOpenedAt": "örn. 2026-08-01",

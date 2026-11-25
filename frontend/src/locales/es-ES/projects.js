@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "El perfil de este expediente aún está vacío. Completa primero el cliente y el tipo de asunto para que colegas y clientes puedan saber de un vistazo de qué trata este caso.",
   "startFilling": "Empezar a rellenar",
   "selectMatterType": "Seleccionar tipo de asunto",
+  "profileField": {
+    "client": "Cliente",
+    "matterType": "Tipo de asunto",
+    "openedAt": "Fecha de apertura",
+    "nextStep": "Próximo paso",
+    "counterparty": "Contraparte"
+  },
   "notFilled": "Sin rellenar",
   "placeholderClient": "p. ej., Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "p. ej., 2026-08-01",

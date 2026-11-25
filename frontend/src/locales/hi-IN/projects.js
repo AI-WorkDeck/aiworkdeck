@@ -84,6 +84,13 @@ export default {
   "profileEmptyGuideDesc": "इस केस फ़ाइल की प्रोफ़ाइल अभी खाली है। पहले क्लाइंट और मामले का प्रकार भरें, ताकि सहकर्मी और क्लाइंट एक नज़र में समझ सकें कि यह केस किस बारे में है।",
   "startFilling": "भरना शुरू करें",
   "selectMatterType": "मामले का प्रकार चुनें",
+  "profileField": {
+    "client": "क्लाइंट",
+    "matterType": "मामले का प्रकार",
+    "openedAt": "खोलने की तारीख",
+    "nextStep": "अगला कदम",
+    "counterparty": "प्रतिपक्ष"
+  },
   "notFilled": "भरा नहीं गया",
   "placeholderClient": "उदाहरण: Acme Technology Co., Ltd.",
   "placeholderOpenedAt": "उदाहरण: 2026-08-01",
