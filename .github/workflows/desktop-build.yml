@@ -20,6 +20,23 @@ on:
       source_ref:
         type: string
         default: master
+      # A white-label release build: also make the patch assets and the update manifest, signed with the brand's
+      # UPDATE_SIGNING_KEY, pointing at the brand's own release location (nothing is published from here).
+      release_version:
+        type: string
+        default: ''
+      update_manifest_url:
+        type: string
+        default: ''
+      update_release_base:
+        type: string
+        default: ''
+      update_download_page:
+        type: string
+        default: ''
+      installer_names:
+        type: string
+        default: ''
     # Callers in another account cannot use `secrets: inherit` (it only works within one org/enterprise),
     # so the signing secrets are declared here and passed explicitly. All optional: unsigned without them.
     secrets:
@@ -732,17 +749,27 @@ jobs:
         # 补丁产物平台无关（业务 jar / h5 / 壳层 js 均无原生二进制，mac/win 共
         # 用），只在 windows runner 生成一次（快、且 tag 构建两平台都在矩阵里）。
         # 与上一版 manifest 内容级去重：未变组件沿用旧版本号与旧 asset URL。
-        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/v')
+        # White-label release builds (release_version set) make them too, at the brand's own addresses.
+        if: runner.os == 'Windows' && (startsWith(github.ref, 'refs/tags/v') || inputs.release_version != '')
         shell: bash
         env:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          BRAND_VERSION: ${{ inputs.release_version }}
+          BRAND_MANIFEST: ${{ inputs.update_manifest_url }}
+          BRAND_RELEASE_BASE: ${{ inputs.update_release_base }}
+          BRAND_DOWNLOAD_PAGE: ${{ inputs.update_download_page }}
         run: |
+          if [ -n "$BRAND_VERSION" ]; then
+            [ "$BRAND_VERSION" = "$(node -p "require('./desktop/package.json').version")" ] || { echo "release_version $BRAND_VERSION != desktop/package.json"; exit 1; }
+            BRAND_ARGS=(--release-base "$BRAND_RELEASE_BASE" --mirror-base none --notes-base "${BRAND_RELEASE_BASE%download/}tag/" --download-page "$BRAND_DOWNLOAD_PAGE")
+          fi
           node desktop/scripts/build-patch-assets.js \
-            --version "${GITHUB_REF_NAME#v}" \
+            --version "${BRAND_VERSION:-${GITHUB_REF_NAME#v}}" \
             --backend desktop/bundled/win-x64/backend/app.jar \
             --h5 frontend/dist/build/h5 \
             --zeta frontend/dist/zetaoffice \
-            --prev https://www.aiworkdeck.com/update/desktop/manifest.json \
+            --prev "${BRAND_MANIFEST:-https://www.aiworkdeck.com/update/desktop/manifest.json}" \
+            "${BRAND_ARGS[@]}" \
             --out desktop/release/patch
           ls -la desktop/release/patch
       - uses: actions/upload-artifact@v4
@@ -800,6 +827,44 @@ jobs:
   # upload-artifact 的 path，仅 windows 腿会真的产出这些文件，mac 腿这条 glob
   # 落空不影响该 step——if-no-files-found 看的是全部 path 的汇总匹配）。
   # 下面用 merge-multiple 把 mac/windows 两份 artifact 拍平进同一目录再一起发布。
+  # White-label release: both installers bound into the brand's signed manifest, as one artifact ready for the
+  # licensee's own (gated, manual) publish step. Nothing is uploaded to a release or a server here.
+  brand-release:
+    name: Brand release bundle
+    needs: [build]
+    if: always() && !cancelled() && needs.build.result == 'success' && inputs.release_version != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: AI-WorkDeck/aiworkdeck
+          ref: ${{ inputs.source_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: ${{ inputs.brand }}-*
+          merge-multiple: true
+      - name: Bind installers to the brand's signed update manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          node desktop/scripts/finalize-update-manifest.js artifacts "${{ inputs.release_version }}" \
+            --release-base "${{ inputs.update_release_base }}" --mirror-base none \
+            ${{ inputs.installer_names != '' && format('--names {0}', inputs.installer_names) || '' }}
+          ls -la artifacts artifacts/patch
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 14
+          name: ${{ inputs.brand }}-release-${{ inputs.release_version }}
+          path: |
+            artifacts/*.dmg
+            artifacts/*.exe
+            artifacts/patch/*
+          if-no-files-found: error
+
   release:
     name: Create GitHub Release
     needs: [build]
