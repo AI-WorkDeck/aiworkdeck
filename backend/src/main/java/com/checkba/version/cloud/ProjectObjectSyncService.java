@@ -39,19 +39,21 @@ public class ProjectObjectSyncService {
         Set<ObjectRef> refs = pushedObjects(project);
         if (refs.isEmpty()) return;
         MobileRelayClientService client = relay.getIfAvailable();
-        if (client == null) throw VersionException.userFacing(LangText.of(
-                "大文件已保存在本机，请开启文件云端备份后再交稿", "Large files are saved locally. Enable cloud file backup before submitting them."));
-        String accountScope = client.catalogAccountScope();
-        requireConsent(client, accountScope);
-        Map<String,String> frozenEpoch=repos.cloudWriteHeaders(project,remoteUrl,username,token);
+        String accountScope = client == null ? null : client.catalogAccountScope();
+        // C12b：先问案件库哪些对象已经在了。同事早先传好的大文件，再次交稿时只是被历史引用，
+        // 不产生新的上传，因此不需要本人开启文件云端备份；只有真要上传的对象才走同意检查。
+        Map<String,String> frozenEpoch=null;
         try {
             capabilities(remoteUrl, username, token);
             for (ObjectRef ref : refs) {
-                requireConsent(client, accountScope);
-                repos.objects().verify(project, ref);
                 String base = remoteUrl + "/awd-objects/" + ref.sha256();
                 JsonNode state = responseJson(request(base + "?size=" + ref.size(), username, token).GET().build());
                 if (state.path("complete").asBoolean()) continue;
+                if (client == null) throw VersionException.userFacing(LangText.of(
+                        "大文件已保存在本机，请开启文件云端备份后再交稿", "Large files are saved locally. Enable cloud file backup before submitting them."));
+                requireConsent(client, accountScope);
+                if (frozenEpoch == null) frozenEpoch=repos.cloudWriteHeaders(project,remoteUrl,username,token);
+                repos.objects().verify(project, ref);
                 Set<Integer> ready = new HashSet<>();
                 state.path("parts").forEach(n -> ready.add(n.asInt(-1)));
                 int count = partCount(ref);
