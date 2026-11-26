@@ -40,6 +40,7 @@
   </view>
 </template>
 <script>
+import { OPEN_BACKUP_CONSENT_EVENT } from '@/utils/largeFileBackup.js'
 import { getMobileBackupConsent, setMobileBackupConsent } from '@/services/api.js'
 import { ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { accountPageUrl } from '@/utils/siteLinks.js'
@@ -63,6 +64,9 @@ export default {
   mounted() {
     // Account changes are broadcast on the uni event bus (requireAccount.broadcastAccountChanged), not on window.
     uni.$on(ACCOUNT_CHANGED_EVENT, this.accountChanged)
+    // C12：交稿被大文件挡住时，说明里的「开启文件云端备份」直接打开这里
+    this._openFromElsewhere = () => { this.open = true; this.refresh() }
+    uni.$on(OPEN_BACKUP_CONSENT_EVENT, this._openFromElsewhere)
     document.addEventListener('pointerdown', this.noteInput, true)
     document.addEventListener('keydown', this.noteInput, true)
     this.refresh({ prompt: true })
@@ -70,6 +74,7 @@ export default {
   beforeUnmount() {
     this.stopped = true; this.epoch++; clearTimeout(this.timer)
     uni.$off(ACCOUNT_CHANGED_EVENT, this.accountChanged)
+    if (this._openFromElsewhere) uni.$off(OPEN_BACKUP_CONSENT_EVENT, this._openFromElsewhere)
     document.removeEventListener('pointerdown', this.noteInput, true)
     document.removeEventListener('keydown', this.noteInput, true)
   },

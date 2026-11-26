@@ -293,6 +293,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import {
   getVersionHistory, getVersionCompare, getVersionChanges, getCloudEvents,
@@ -993,7 +994,7 @@ export default {
         this.$emit('changed')
         await this.reload()
       } catch (e) {
-        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

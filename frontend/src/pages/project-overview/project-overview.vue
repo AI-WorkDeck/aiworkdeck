@@ -2287,6 +2287,13 @@
         <text class="adopt-pending-go" role="button" :aria-label="$t('common.close')" @tap="collabMemberBarDismissed = true">×</text>
       </view>
 
+      <!-- C12：版本里有大文件 / 音视频、而文件云端备份没开：保存时就说，不等交稿 -->
+      <view v-if="collabLargeFilesBlocked && !collabMemberBlocked && !largeFilesBarDismissed" class="adopt-pending-bar large-files-bar" role="status">
+        <text class="adopt-pending-text">{{ collabLargeFilesText }}</text>
+        <text class="adopt-pending-go" @tap="openBackupConsent">{{ $t('version.largeFilesEnableBackup') }}</text>
+        <text class="adopt-pending-go" role="button" :aria-label="$t('common.close')" @tap="largeFilesBarDismissed = true">×</text>
+      </view>
+
       <!-- IDE 化 Cmd+P 快速打开 -->
       <QuickOpenPanel
         v-if="quickOpenVisible && hasNamedProject"
@@ -2474,6 +2481,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock, OPEN_BACKUP_CONSENT_EVENT } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
@@ -3112,6 +3120,7 @@ export default {
       // C11：没联网时点了交稿：记下来，联网后自动交一次（按项目存，重启后仍在）
       collabRetryQueued: false,
       collabMemberBarDismissed: false,
+      largeFilesBarDismissed: false,
       collabChecking: false,
       collabNow: Date.now(),
       collabDialogVisible: false,
@@ -3216,6 +3225,16 @@ export default {
     // C16：这份案卷里凭访问码进来的客户人数（案件库名单）
     projectClientCount() {
       return (this.projectMembers || []).filter(m => typeof m?.role === 'string' && m.role.startsWith('CLIENT')).length
+    },
+    collabLargeFilesBlocked() {
+      const c = this.collabCloud
+      return !!(c && c.largeFilesNeedBackup)
+    },
+    collabLargeFilesText() {
+      const names = ((this.collabCloud && this.collabCloud.largeFiles) || []).slice(0, 3)
+      return names.length
+        ? this.$t('workbench.largeFilesBar', { files: names.join(this.$t('workbench.largeFilesSep')) })
+        : this.$t('workbench.largeFilesBarNoNames')
     },
     // C8/C10：案件库里的身份。只读成员与已被移出的人：只读打开、不给交稿、给一条说明。
     collabMemberBlocked() {
@@ -5711,6 +5730,9 @@ export default {
     // 交稿引导（dev-board#645）。页面这边只管开窗：弹窗打开后自己走一次联网的状态
     // 重读（三步清单上的勾选直接决定律师下一步点哪个按钮，用一份几分钟没刷新的快照
     // 渲染它是在骗人），读完再经 changed 事件把页面这份也带新。
+    openBackupConsent() {
+      uni.$emit(OPEN_BACKUP_CONSENT_EVENT)
+    },
     // C11：没联网时交稿 → 记下「待交」，联网后自动交一次
     onSubmitQueuedOffline() {
       this.collabRetryQueued = true
@@ -5737,7 +5759,7 @@ export default {
         else if (d.status === 'CONFLICT') this.onCollabConflict()
         else if (d.message) uni.showToast({ title: d.message, icon: 'none' })
       } catch (e) {
-        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this._collabRetrying = false
         this.fetchCollabState()

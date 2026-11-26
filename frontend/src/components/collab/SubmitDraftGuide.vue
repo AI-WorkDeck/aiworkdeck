@@ -91,6 +91,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import {
   endWorkSession, updateFromCloud, uploadToCloud,
@@ -300,6 +301,8 @@ export default {
           await this.refresh()
         }
       } catch (e) {
+        // C12：大文件要先开文件云端备份——弹带按钮、不会消失的说明，不当成没联网
+        if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { this.close(); return }
         // C11：先联网核对一次，确实是没联网才转成「联网后自动交」；权限类拒绝（只读 / 已移出）
         // 原样说给律师听，不排队——重试永远不会成功
         await this.refresh({ online: true })

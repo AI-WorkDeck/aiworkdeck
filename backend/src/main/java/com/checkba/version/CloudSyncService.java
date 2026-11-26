@@ -1006,6 +1006,19 @@ public class CloudSyncService {
             }
             Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
             describeMyRole(projectId, remoteOpt.get(), conn, m);
+            if (objectSync != null) {
+                try {
+                    List<String> blocked = objectSync.largeFilesBlockingSubmit(projectId);
+                    if (!blocked.isEmpty()) {
+                        // C12：版本里有大文件而文件云端备份没开——现在就告诉律师，别等交稿才弹一句
+                        m.put("largeFilesNeedBackup", true);
+                        m.put("largeFiles", blocked.stream().filter(p -> !p.isBlank())
+                                .map(p -> p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p).toList());
+                    }
+                } catch (Exception e) {
+                    log.warn("检查大文件备份状态失败（状态照常给）: project={}", projectId, e);
+                }
+            }
             return m;
         } finally {
             lock.unlock();

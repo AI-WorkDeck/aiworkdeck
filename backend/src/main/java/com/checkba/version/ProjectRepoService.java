@@ -1625,6 +1625,35 @@ public class ProjectRepoService {
         try (Repository repo = open(projectId)) { return objectPointersAt(repo, ref, includeHistory); }
     }
 
+    /**
+     * C12：主线（含历史）里以大对象指针保存的文件路径，供「交稿前要开文件云端备份」的说明点名。
+     * 最多 {@code limit} 个；读不出来返回空表（说明照常给，只是不点名）。
+     */
+    public List<String> objectPointerPaths(long projectId, String ref, boolean includeHistory, int limit) {
+        java.util.LinkedHashSet<String> paths = new java.util.LinkedHashSet<>();
+        try (Repository repo = open(projectId); RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return List.of();
+            walk.markStart(walk.parseCommit(id));
+            for (RevCommit commit : walk) {
+                if (hasObjectFormat(commit)) {
+                    try (TreeWalk tree = new TreeWalk(repo)) {
+                        tree.addTree(commit.getTree());
+                        tree.setRecursive(true);
+                        while (tree.next() && paths.size() < limit) {
+                            if (tree.getFileMode(0).getObjectType() != Constants.OBJ_BLOB) continue;
+                            if (pointerAt(repo, commit, repo.open(tree.getObjectId(0))) != null) paths.add(tree.getPathString());
+                        }
+                    }
+                }
+                if (!includeHistory || paths.size() >= limit) break;
+            }
+        } catch (Exception e) {
+            return List.of();
+        }
+        return new ArrayList<>(paths);
+    }
+
     /** Also accepts an unaccepted receive-pack commit id. Only explicitly marked commits contain pointers. */
     public List<LocalVersionObjectStore.ObjectRef> objectPointersAt(Repository repo, String ref, boolean includeHistory) {
         try (RevWalk walk = new RevWalk(repo)) {

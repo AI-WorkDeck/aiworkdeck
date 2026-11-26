@@ -51,7 +51,13 @@ public class ProjectObjectSyncService {
                 if (state.path("complete").asBoolean()) continue;
                 if (client == null) throw VersionException.userFacing(LangText.of(
                         "大文件已保存在本机，请开启文件云端备份后再交稿", "Large files are saved locally. Enable cloud file backup before submitting them."));
-                requireConsent(client, accountScope);
+                // C12 step 1: the first object that really needs uploading decides; a refusal becomes the
+                // lasting, actionable backup dialog instead of a toast.
+                try {
+                    requireConsent(client, accountScope);
+                } catch (VersionException e) {
+                    throw largeFilesNeedBackup(project, e);
+                }
                 if (frozenEpoch == null) frozenEpoch=repos.cloudWriteHeaders(project,remoteUrl,username,token);
                 repos.objects().verify(project, ref);
                 Set<Integer> ready = new HashSet<>();
@@ -137,6 +143,41 @@ public class ProjectObjectSyncService {
         JsonNode capability = responseJson(request(url + "/awd-objects/capabilities", user, token).GET().build());
         if (capability.path("version").asInt() != 1 || capability.path("partBytes").asInt() != ProjectObjectTransferService.PART_BYTES)
             throw new IOException("Remote does not support version objects");
+    }
+
+    /**
+     * C12：保存时就提醒，而不是等到交稿才说。主线（含历史）里有大文件、而文件云端备份没开（或云端
+     * 计费不可用）时，回这些文件的路径（最多 4 个）；没有大文件、或已经可以交，回空表。
+     * 会联网问一次备份状态，所以只在联网核对云端状态时调用。
+     */
+    public List<String> largeFilesBlockingSubmit(long project) {
+        if (repos.objectPointersAt(project, repos.mainBranch(), true).isEmpty()) return List.of();
+        MobileRelayClientService client = relay.getIfAvailable();
+        try {
+            if (client == null) throw new IllegalStateException("no relay");
+            client.requireVersionObjectCloudConsent();
+            return List.of();
+        } catch (RuntimeException e) {
+            List<String> paths = repos.objectPointerPaths(project, repos.mainBranch(), true, 4);
+            return paths.isEmpty() ? List.of("") : paths;
+        }
+    }
+
+    /**
+     * C12：交稿被「文件云端备份」挡住时，说清是哪几个文件、该去哪里开、为什么删文件也没用——
+     * 删掉只影响以后的版本，已经保存的版本里仍有它。kind 让桌面端弹一个带按钮、不会消失的说明。
+     */
+    private VersionException largeFilesNeedBackup(long project, VersionException cause) {
+        List<String> paths = repos.objectPointerPaths(project, repos.mainBranch(), true, 4);
+        String names = String.join("、", paths.stream().limit(3).map(p -> p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p).toList())
+                + (paths.size() > 3 ? LangText.of(" 等", " and more") : "");
+        String which = names.isBlank() ? "" : LangText.of("（" + names + "）", " (" + names.replace("、", ", ") + ")");
+        return VersionException.largeFilesNeedBackup(LangText.of(
+                "这份案卷里有大文件或音视频" + which + "，要先开启“文件云端备份”才能交稿。"
+                        + "删掉这个文件也不行：已经保存的版本里还有它。开启后再点交稿即可，本机文件不受影响。",
+                "This case file contains large or audio/video files" + which + ". Turn on cloud file backup before "
+                        + "submitting. Deleting the file won't help: saved versions still contain it. "
+                        + "After turning it on, submit again; your local files are unaffected."));
     }
 
     private void requireConsent(MobileRelayClientService client, String scope) {

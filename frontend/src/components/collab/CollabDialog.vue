@@ -322,6 +322,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock } from '@/utils/largeFileBackup.js'
 const isClientRole = (role) => typeof role === 'string' && role.startsWith('CLIENT')
 import { errorText } from '@/utils/errorToast.js'
 import {
@@ -681,7 +682,7 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        else if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }
