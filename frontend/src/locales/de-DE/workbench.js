@@ -292,7 +292,7 @@ export default {
   "collabInSync": "Mit dem Team synchronisiert",
   "collabChecking": "Abgleich mit dem Team…",
   "collabNotChecked": "Noch nicht mit dem Team abgeglichen",
-  "collabInSyncAsOf": "Stand {age}: auf dem Stand des Teams",
+  "collabInSyncAsOf": "Mit dem Team abgeglichen ({age})",
   "collabAgeSeconds": "vor {n} s",
   "collabAgeMinutes": "vor {n} Min.",
   "collabAgeHours": "vor {n} Std.",

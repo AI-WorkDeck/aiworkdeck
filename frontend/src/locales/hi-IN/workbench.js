@@ -292,7 +292,7 @@ export default {
   "collabInSync": "टीम के साथ सिंक में",
   "collabChecking": "टीम से मिलान हो रहा है…",
   "collabNotChecked": "अभी टीम से मिलान नहीं हुआ",
-  "collabInSyncAsOf": "{age} की जाँच में टीम के मसौदे से मेल",
+  "collabInSyncAsOf": "{age} की जाँच में टीम से मेल",
   "collabAgeSeconds": "{n} सेकंड पहले",
   "collabAgeMinutes": "{n} मिनट पहले",
   "collabAgeHours": "{n} घंटे पहले",

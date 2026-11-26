@@ -318,10 +318,10 @@ export default {
   collabInSync: 'In sync with the team',
   collabChecking: 'Checking with the team…',
   collabNotChecked: 'Not checked with the team yet',
-  collabInSyncAsOf: 'In sync with the team as of {age}',
-  collabAgeSeconds: '{n} s ago',
+  collabInSyncAsOf: 'In sync with the team · checked {age}',
+  collabAgeSeconds: '{n} sec ago',
   collabAgeMinutes: '{n} min ago',
-  collabAgeHours: '{n} h ago',
+  collabAgeHours: '{n} hr ago',
   // Script-side messages
   defaultUserName: 'User',
   folderScopeLabel: 'Folder: {name}',
