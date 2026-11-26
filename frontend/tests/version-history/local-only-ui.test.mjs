@@ -93,6 +93,28 @@ test('the badges follow the collaboration state, not only a window reload (lane 
   assert.match(reload, /this\.\$refs\?\.fileTree\?\.loadLocalOnly\?\.\(\)/, 'files rewritten by a version action re-read them too')
 })
 
+test('running the real collaboration refresh re-reads the tree badges when the case is linked', async () => {
+  const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
+  const body = page.match(/\n    async fetchCollabState\(\{ online = false \} = \{\}\) \{\n([\s\S]*?)\n    \},/)[1]
+  let linked = true
+  const make = () => new Function('checkCloud', 'getCloudStatus', 'getSessionId', 'getCloudAccountGeneration',
+    `return async function({ online = false } = {}) {${body}}`)(
+    async () => ({ data: { linked } }), async () => ({ data: { linked } }), () => 's', () => 1)
+  let reads = 0
+  const vm = { projectId: 12, projectInfoLoaded: true, hasNamedProject: true, collabCloud: null,
+    $refs: { fileTree: { loadLocalOnly: () => { reads++ } } } }
+  vm.fetchCollabState = make().bind(vm)
+  await vm.fetchCollabState()
+  assert.equal(reads, 1, 'a linked case re-reads the badges (the recording may have just arrived)')
+  await vm.fetchCollabState({ online: true })
+  assert.equal(reads, 2, 'the online check (poll, after 取回) does too')
+  linked = false
+  await vm.fetchCollabState()
+  assert.equal(reads, 2, 'a case not in the library has no placeholders to refresh')
+  delete vm.$refs
+  await vm.fetchCollabState() // harnesses and early mounts without refs must not throw
+})
+
 test('the 交稿 result and the tree read the local-only endpoints', () => {
   assert.match(api, /url: `\/api\/cloud\/projects\/\$\{projectId\}\/local-only`, method: 'GET'/)
   assert.match(api, /noticeLocalOnly\(projectId, d\.localOnlyFiles,/)
