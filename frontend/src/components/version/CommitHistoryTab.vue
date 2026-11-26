@@ -473,6 +473,8 @@ export default {
   },
   watch: {
     refreshToken() { this.reload({ keepSelection: true }) },
+    // 标签先于协作状态打开时 cloudLinked 还是 false，事件行要在得知已放进案件库后补读（J11）
+    cloudLinked() { this.loadEvents() },
     focusToken() {
       if (this.focusSha) this.focusBySha(this.focusSha)
       else if (this.focus === 'remote') this.focusFirstRemote()
