@@ -256,7 +256,7 @@ jobs:
         working-directory: frontend
         run: npm run test:standalone
       - name: Test shared, eval and official-plugin helper suites
-        run: node --test shared/tests/*.test.mjs scripts/eval/*.test.mjs official-plugins/aifirm-partner/tests/*.test.mjs official-plugins/dpia-workbench/tests/*.test.mjs official-plugins/pitch-materials/tests/*.test.mjs
+        run: node --test shared/tests/*.test.mjs scripts/eval/*.test.mjs official-plugins/aifirm-partner/tests/plugin.test.mjs official-plugins/dpia-workbench/tests/adapter.test.mjs official-plugins/pitch-materials/tests/core.test.mjs official-plugins/pitch-materials/tests/l10n.test.mjs
       - name: Test built-in Tencent Meeting request and UI contracts
         run: node --test frontend/tests/tmeet/*.test.mjs
       - name: Check emit/binding contracts
