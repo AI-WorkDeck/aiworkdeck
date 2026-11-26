@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "نسخ المخرجات",
   "copyFailed": "فشل النسخ",
   "tokenUsageLine": "{n} رموز في هذا الدور",
-  "viewUsage": "عرض الاستخدام",
+  "viewUsage": "عرض الاستخدام", "turnCost": "هذه الجولة {amount}", "turnCostSubscription": "هذه الجولة {amount} (رصيد الاشتراك)", "turnCostBqt": "هذه الجولة {amount} (نقاط Baoqingtian)", "turnCostSettling": "جارٍ الاحتساب…",
   "statusError": "خطأ",
   "statusSuccess": "نجاح",
   "statusRunning": "قيد التشغيل",

@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "คัดลอกผลลัพธ์",
   "copyFailed": "คัดลอกไม่สำเร็จ",
   "tokenUsageLine": "{n} โทเคนในรอบนี้",
-  "viewUsage": "ดูการใช้งาน",
+  "viewUsage": "ดูการใช้งาน", "turnCost": "รอบนี้ {amount}", "turnCostSubscription": "รอบนี้ {amount} (เครดิตสมาชิก)", "turnCostBqt": "รอบนี้ {amount} (คะแนน Baoqingtian)", "turnCostSettling": "กำลังคำนวณ…",
   "statusError": "ข้อผิดพลาด",
   "statusSuccess": "สำเร็จ",
   "statusRunning": "กำลังทำงาน",

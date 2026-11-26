@@ -19,7 +19,7 @@
 
 - **本地 Ollama**：内容只在本机处理。
 - **自备 Key**：你的机器直连所配置的模型服务商。
-- **国内站「AI WorkDeck 云端」**：文本、相关文件片段、图片及必要会话上下文经 AI WorkDeck 国内服务器转发至阿里云百炼北京接入点，用于模型推理；平台服务器记录账户、模型、用量与结算信息，不将转发正文写入该计费网关的日志或账本。
+- **国内站「AI WorkDeck 云端」**：文本、相关文件片段、图片及必要会话上下文经 AI WorkDeck 国内服务器转发至阿里云百炼北京接入点，用于模型推理；平台服务器记录账户、模型、用量与结算信息，不将转发正文写入该计费网关的日志或账本。每轮对话的请求另带一个本轮计费标记（由本机随机密钥与会话、轮次标识计算出的散列值，不含内容，不可反推会话），网关把它记在该次请求的结算记录上；桌面端随后用同一账户凭据向官网查询这一轮的实扣金额，用于在对话下方显示。
 - **国际站「AI WorkDeck 云端」**：服务器签发限权密钥并结算用量，桌面端使用该密钥连接 OpenRouter，再由其转发给所选模型的实际推理供应商。
 
 国内站使用百炼北京接入点不代表所有模型的推理均在中国内地完成。实际处理地域取决于所选模型及供应商的部署范围，部分模型可能在境外处理；模型供应商的处理及保存规则适用其服务条款与隐私政策，不能将平台网关不保存正文理解为第三方零留存承诺。参见[百炼北京接入与部署范围](https://help.aliyun.com/zh/model-studio/beijing-access-information)。
@@ -242,7 +242,7 @@ Last updated: 2026-10-30
 
 ## Part 1 — Platform services
 
-**AI model request paths.** Local Ollama processes content on the device. With your own key, the desktop connects to the configured model provider. On the China site's platform channel, text, relevant file excerpts, images and necessary conversation context pass through AI WorkDeck's China server to Alibaba Cloud Bailian's Beijing endpoint. The gateway records account, model, usage and settlement metadata; it does not write forwarded content to its billing logs or ledger. On the international platform channel, our server issues a restricted runtime credential and settles usage; the desktop connects to OpenRouter, which routes requests to the selected inference provider.
+**AI model request paths.** Local Ollama processes content on the device. With your own key, the desktop connects to the configured model provider. On the China site's platform channel, text, relevant file excerpts, images and necessary conversation context pass through AI WorkDeck's China server to Alibaba Cloud Bailian's Beijing endpoint. The gateway records account, model, usage and settlement metadata; it does not write forwarded content to its billing logs or ledger. Each request of a conversation turn also carries a per-turn billing tag (a hash computed on the device from a local random secret and the conversation and turn identifiers; it contains no content and cannot be reversed to the conversation). The gateway stores it on that request's settlement record, and the desktop then asks the site, with the same account credential, for the exact amount charged for that turn so it can show it under the reply. On the international platform channel, our server issues a restricted runtime credential and settles usage; the desktop connects to OpenRouter, which routes requests to the selected inference provider.
 
 Using Bailian's Beijing endpoint does not guarantee that inference stays within mainland China. Processing location depends on the selected model and the provider's deployment scope; some models may process data abroad. Provider terms and privacy policies apply, and the gateway's content-handling policy is not a promise of zero retention by third parties. See [Bailian Beijing access and deployment scope](https://help.aliyun.com/zh/model-studio/beijing-access-information).
 

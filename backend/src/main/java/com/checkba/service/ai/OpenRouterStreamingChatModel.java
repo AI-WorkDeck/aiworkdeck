@@ -407,6 +407,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         // （第一次根本没到网关），要么被拒成 request_already_submitted，绝不重复扣费。
         // 所以这条通道上「连接层失败、还没拿到任何响应」可以用同一个 id 安全重发一次。
         final String requestId = apiKey != null && apiKey.startsWith("awdai_") ? java.util.UUID.randomUUID().toString() : null;
+        // Q24：平台通道把本轮计费标记带给网关（官网据此汇总这一轮的实扣金额）；BYOK 与国际通道从不带
+        final String turnTag = requestId != null ? turnTagOf(handler) : null;
         // Set right after the first enqueue. A connection that fails instantly (RST on accept) can reach the
         // retry predicate on OkHttp's dispatcher thread before that assignment, so the predicate waits for it
         // briefly instead of treating "not assigned yet" as "cancelled" (CI flake on Linux, 2026-11-25).
@@ -422,11 +424,11 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             if (in == null || in.cancelled || !isConnectionLevelFailure(e) || !connectionRetryUsed.compareAndSet(false, true)) return false;
             log.warn("Platform AI request {} failed at the connection level ({}); retrying once with the same request id",
                     requestId, e.getClass().getSimpleName());
-            in.call = enqueue(transport, sentBody, session, requestId, null);
+            in.call = enqueue(transport, sentBody, session, requestId, turnTag, null);
             if (in.cancelled) in.call.cancel();
             return true;
         };
-        Inflight inflight = new Inflight(enqueue(transport, body, session, requestId, retryOnce), session);
+        Inflight inflight = new Inflight(enqueue(transport, body, session, requestId, turnTag, retryOnce), session);
         holder.set(inflight);
 
         // 首字节前排队换家（dev-board#1061）：判定交给 handler 的看门狗（它手里有「保活 vs 真字节」
@@ -448,12 +450,21 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 log.warn("Requeueing {} on another provider (was {}): only keep-alive before first byte",
                         modelName, from == null ? "unknown" : from);
                 inflight.session = next;
-                inflight.call = enqueue(transport, retryBody, next, null, null);
+                inflight.call = enqueue(transport, retryBody, next, null, turnTag, null);
                 if (inflight.cancelled) inflight.call.cancel();   // 停止恰好落在换家这一刻
                 return true;
             });
         }
         return inflight;
+    }
+
+    private static final java.util.regex.Pattern TURN_TAG = java.util.regex.Pattern.compile("^[0-9a-f]{32}$");
+
+    /** 只认 32 位小写十六进制；别的一律不带（网关对畸形值也只是忽略，但没必要发）。 */
+    static String turnTagOf(StreamingResponseHandler<AiMessage> handler) {
+        if (!(handler instanceof ReasoningStreamingHandler rh)) return null;
+        String tag = rh.turnTag();
+        return tag != null && TURN_TAG.matcher(tag).matches() ? tag : null;
     }
 
     /**
@@ -463,7 +474,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
      * @param onConnFailure 非 null 且返回 true = 已接手重发，这次失败不交给 session
      */
     private Call enqueue(OkHttpClient transport, String body, StreamSession session, String requestId,
-                         java.util.function.Predicate<IOException> onConnFailure) {
+                         String turnTag, java.util.function.Predicate<IOException> onConnFailure) {
         Request.Builder rb = new Request.Builder()
                 .url(endpoint)
                 .header("Authorization", "Bearer " + (apiKey == null ? "" : apiKey))
@@ -471,6 +482,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 .header("User-Agent", ProductIdentity.userAgent("ai-gateway"))
                 .post(RequestBody.create(body, JSON));
         if (requestId != null) rb.header("X-Request-Id", requestId);
+        if (turnTag != null) rb.header("X-AWD-Turn", turnTag);
         Request request = rb.build();
         Call call = transport.newCall(request);
         call.enqueue(new Callback() {

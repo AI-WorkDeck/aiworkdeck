@@ -5120,3 +5120,9 @@ export function firmCloudAction(action, params = {}) {
     accountPrompt: false,
   }).then(unwrapEnvelope)
 }
+
+// Q24：一轮对话的实扣金额（国内站平台通道）。后端代查官网，凭据与计费标记不出后端。
+export const getTurnCost = (conversationId, runId) => request({
+  url: `/api/agent/turn-cost/${encodeURIComponent(conversationId)}/${encodeURIComponent(runId)}`,
+  method: 'GET'
+})

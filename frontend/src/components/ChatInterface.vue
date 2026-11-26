@@ -783,7 +783,11 @@
                <!-- Q24：平台通道的律师按余额（¥）付费，token 数读不懂也没意义；在本轮准确的 ¥
                     能从官网账单按轮取回之前（0.92，与 lane W 合做），给「查看用量」进账户用量页，
                     token 数只留在悬停提示里。自带密钥（BYOK）的用户照旧看 token。 -->
-               <text v-if="tokenUsage.platform" class="token-value token-usage-link" role="link" tabindex="0"
+               <text v-if="tokenUsage.platform && turnCost && turnCost.amount" class="token-value"
+                     :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })">{{ $t(turnCost.source === 'subscription' ? 'chat.turnCostSubscription' : turnCost.source === 'bqt' ? 'chat.turnCostBqt' : 'chat.turnCost', { amount: turnCost.amount }) }}</text>
+               <text v-else-if="tokenUsage.platform && turnCost && turnCost.settling" class="token-value" role="status"
+                     :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })">{{ $t('chat.turnCostSettling') }}</text>
+               <text v-else-if="tokenUsage.platform" class="token-value token-usage-link" role="link" tabindex="0"
                      :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })"
                      @tap="openUsageSettings" @keydown.enter.prevent="openUsageSettings">{{ $t('chat.viewUsage') }}</text>
                <text v-else class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
@@ -1094,7 +1098,8 @@
 <script>
 import { errorText } from '@/utils/errorToast.js'
 import { selectableChatSkills } from '@/utils/chatSelectableSkills.mjs'
-import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration } from '@/services/api.js'
+import { getPendingAgentRestarts, resumeAgentRestart, getCloudAccountGeneration, getTurnCost } from '@/services/api.js'
+import { pollTurnCost } from '@/utils/turnCost.js'
 import { fileChangesForBubble, summarizeFileChanges } from '@/utils/chatFileChange.js'
 import RootBubble from './AgentMessage/RootBubble.vue'
 import ChatTurnRail from './AgentMessage/ChatTurnRail.vue'
@@ -1417,6 +1422,21 @@ export default {
     watch(isStreaming, (streaming, was) => {
       if (streaming || !was || !(tokenUsage.value && tokenUsage.value.platform)) return
       setTimeout(() => uni.$emit('awd:wallet-refresh', { fresh: true }), 3000)
+    })
+    // Q24：平台通道的轮次结束后去官网账上取这一轮的实扣金额；取不到确定值就仍显示「查看用量」
+    const turnCost = ref(null)
+    let turnCostSeq = 0
+    watch(() => [isStreaming.value, tokenUsage.value && tokenUsage.value.runId, currentConversationId.value], ([streaming, runId, conversationId]) => {
+      const seq = ++turnCostSeq
+      if (streaming || !runId || !conversationId || !tokenUsage.value.platform) { turnCost.value = null; return }
+      turnCost.value = { settling: true }
+      pollTurnCost(async () => {
+        const res = await getTurnCost(conversationId, runId)
+        const data = res && res.data
+        return data && typeof data === 'object' && 'available' in data ? data : null
+      }, { stillCurrent: () => seq === turnCostSeq }).then(shown => {
+        if (seq === turnCostSeq) turnCost.value = shown
+      })
     })
     watch(currentConversationId, () => ocrRouteHandler.cancel())
     onBeforeUnmount(() => ocrRouteHandler.cancel())
@@ -4943,6 +4963,7 @@ export default {
 
     return {
        continueAnswer,
+      turnCost,
        ocrRouteState, chooseOcrRoute, cancelOcrRoute,
        bubbles,
        currentConversationId,

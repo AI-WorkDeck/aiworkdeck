@@ -264,6 +264,9 @@ test('Q24 token_usage 带 platform 时本轮记为平台通道；页脚给「查
   assert.equal(s.tokenUsage.value.platform, true)
   assert.equal(s.tokenUsage.value.totalTokens, 240)
   const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
-  assert.match(chat, /<text v-if="tokenUsage\.platform" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.viewUsage'\) \}\}<\/text>/)
+  // 0.92：本轮实扣金额取到之前（或取不到）都回落到「查看用量」
+  assert.match(chat, /<text v-else-if="tokenUsage\.platform" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.viewUsage'\) \}\}<\/text>/)
+  event('token_usage', { promptTokens: 1, completionTokens: 1, totalTokens: 2, platform: true, runId: '0b6c2f1e-1111-4222-8333-944455556666' })
+  assert.equal(s.tokenUsage.value.runId, '0b6c2f1e-1111-4222-8333-944455556666')
   assert.match(chat, /openUsageSettings\(\) \{\s*if \(this\.openSettingsTab\) this\.openSettingsTab\(\{ nav: 'account' \}\)/)
 })

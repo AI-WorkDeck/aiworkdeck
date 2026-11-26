@@ -578,6 +578,9 @@ public class AgentOrchestrator {
     private volatile AgentInboxService inboxService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ClientCapabilityService clientCapabilities;
+    /** Q24：本轮计费标记的盐（本机 install-secret）；手工装配的测试里为 null，不带标记。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.telemetry.InstallIdentityService installIdentity;
 
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ProjectMemberService projectMemberService;
@@ -2952,6 +2955,9 @@ public class AgentOrchestrator {
         // 取消之后 onNext 还会被回调几次。闸不加在 handler 上的话，这几段会继续打进用户的气泡、
         // 继续进恢复快照、继续往文档里流式写——用户点了停止，画面却还在动。
         handler.setCancellationCheck(guard::isCancelled);
+        // Q24：平台通道请求带本轮计费标记；runId 随 token_usage 给前端，用来查这一轮的实扣金额
+        handler.setRunId(guard.runId);
+        if (installIdentity != null) handler.setTurnTag(installIdentity.turnTag(conversationId, guard.runId));
 
         // 实时更新当前生成的内容 (用于断线重连恢复)
         if (!summaryOnly) handler.setOnToken(guard::appendStream);

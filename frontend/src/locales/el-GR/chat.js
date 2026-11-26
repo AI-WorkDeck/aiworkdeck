@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Αντιγραφή εξόδου",
   "copyFailed": "Η αντιγραφή απέτυχε",
   "tokenUsageLine": "{n} tokens αυτή τη σειρά",
-  "viewUsage": "Προβολή χρήσης",
+  "viewUsage": "Προβολή χρήσης", "turnCost": "Αυτός ο γύρος {amount}", "turnCostSubscription": "Αυτός ο γύρος {amount} (πίστωση συνδρομής)", "turnCostBqt": "Αυτός ο γύρος {amount} (πόντοι Baoqingtian)", "turnCostSettling": "Γίνεται εκκαθάριση…",
   "statusError": "Σφάλμα",
   "statusSuccess": "Επιτυχία",
   "statusRunning": "Εκτελείται",

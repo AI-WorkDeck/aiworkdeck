@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Ausgabe kopieren",
   "copyFailed": "Kopieren fehlgeschlagen",
   "tokenUsageLine": "{n} Token in diesem Durchgang",
-  "viewUsage": "Nutzung anzeigen",
+  "viewUsage": "Nutzung anzeigen", "turnCost": "Diese Runde {amount}", "turnCostSubscription": "Diese Runde {amount} (Abo-Guthaben)", "turnCostBqt": "Diese Runde {amount} (Baoqingtian-Punkte)", "turnCostSettling": "Wird abgerechnet…",
   "statusError": "Fehler",
   "statusSuccess": "Erfolg",
   "statusRunning": "Läuft",
