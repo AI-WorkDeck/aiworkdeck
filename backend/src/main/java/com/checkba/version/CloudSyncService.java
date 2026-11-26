@@ -1008,7 +1008,9 @@ public class CloudSyncService {
             describeMyRole(projectId, remoteOpt.get(), conn, m);
             if (objectSync != null) {
                 try {
-                    List<String> blocked = objectSync.largeFilesBlockingSubmit(projectId);
+                    List<String> blocked = objectSync.largeFilesBlockingSubmit(projectId,
+                            conn.getServerUrl() + "/git/" + remoteOpt.get().getRemoteProjectId() + ".git",
+                            conn.getUsername(), conn.getDeviceToken());
                     if (!blocked.isEmpty()) {
                         // C12：版本里有大文件而文件云端备份没开——现在就告诉律师，别等交稿才弹一句
                         m.put("largeFilesNeedBackup", true);
