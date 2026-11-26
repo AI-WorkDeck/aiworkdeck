@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "वेबसाइट साइन-इन",
     "ACCOUNT_API_KEY_CREATED": "खाता कुंजी जारी की गई",
     "ACCOUNT_API_KEY_REVOKED": "खाता कुंजी रद्द की गई"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "{from} से बदलकर {to} किया गया",
+    "role": "भूमिका: {role}",
+    "team": "टीम: {name}",
+    "firmAdmin": "फर्म प्रशासक",
+    "memberCount": "{count} लोग",
+    "removedBy": "{name} द्वारा हटाया गया",
+    "issuedBy": "{name} द्वारा जारी किया गया",
+    "keyPrefix": "Key की शुरुआत {prefix} से होती है",
+    "label": "नाम: {label}",
+    "via": "माध्यम: {via}",
+    "shareHistoryOn": "संस्करण इतिहास भी साझा किया गया",
+    "shareHistoryOff": "संस्करण इतिहास साझा नहीं किया गया",
+    "enabledOn": "चालू किया गया",
+    "enabledOff": "बंद किया गया",
+    "expiresAt": "{date} तक मान्य",
+    "suppressedRepeats": "{count} समान प्रविष्टियाँ मिला दी गईं",
+    "purgedRows": "{count} समाप्त रिकॉर्ड हटाए गए",
+    "reason": "कारण: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "स्वामी",
+      "ADMIN": "प्रशासक",
+      "MEMBER": "सदस्य",
+      "READ_ONLY": "केवल-पठन सदस्य",
+      "PARTICIPANT": "प्रतिभागी",
+      "MANAGER": "प्रबंधक",
+      "VIEWER": "दर्शक"
+    }
   }
 }

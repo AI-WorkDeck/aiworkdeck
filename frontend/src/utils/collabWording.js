@@ -62,3 +62,15 @@ export function pullStepText(t, status) {
   if (people <= 1) return t('version.submitGuidePullOne', { name: authors[0], count })
   return t('version.submitGuidePullMany', { name: authors[0], people, count })
 }
+
+// C5：「和大家的稿一致」只在最近一次联网核对 15 秒内才说；更早的核对说成「N 前核对时一致」。
+export const COLLAB_FRESH_MS = 15000
+
+/** 核对距今多久，给人读：「刚才」/「N 秒前」/「N 分钟前」/「N 小时前」。 */
+export function collabAgeText(t, ms) {
+  const s = Math.max(0, Math.floor(Number(ms) / 1000) || 0)
+  if (s < 60) return t('workbench.collabAgeSeconds', { n: Math.max(1, s) })
+  const m = Math.floor(s / 60)
+  if (m < 60) return t('workbench.collabAgeMinutes', { n: m })
+  return t('workbench.collabAgeHours', { n: Math.floor(m / 60) })
+}

@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Σύνδεση στον ιστότοπο",
     "ACCOUNT_API_KEY_CREATED": "Εκδόθηκε κλειδί λογαριασμού",
     "ACCOUNT_API_KEY_REVOKED": "Ανακλήθηκε κλειδί λογαριασμού"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Άλλαξε από {from} σε {to}",
+    "role": "Ρόλος: {role}",
+    "team": "Ομάδα: {name}",
+    "firmAdmin": "Διαχειριστής γραφείου",
+    "memberCount": "{count} άτομα",
+    "removedBy": "Αφαιρέθηκε από {name}",
+    "issuedBy": "Εκδόθηκε από {name}",
+    "keyPrefix": "Το Key ξεκινά με {prefix}",
+    "label": "Όνομα: {label}",
+    "via": "Μέσω: {via}",
+    "shareHistoryOn": "Κοινοποιήθηκε και το ιστορικό εκδόσεων",
+    "shareHistoryOff": "Το ιστορικό εκδόσεων δεν κοινοποιήθηκε",
+    "enabledOn": "Ενεργοποιήθηκε",
+    "enabledOff": "Απενεργοποιήθηκε",
+    "expiresAt": "Ισχύει έως {date}",
+    "suppressedRepeats": "Συγχωνεύτηκαν {count} πανομοιότυπες καταχωρίσεις",
+    "purgedRows": "Αφαιρέθηκαν {count} ληγμένες εγγραφές",
+    "reason": "Αιτία: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "κάτοχος",
+      "ADMIN": "διαχειριστής",
+      "MEMBER": "μέλος",
+      "READ_ONLY": "μέλος μόνο ανάγνωσης",
+      "PARTICIPANT": "συμμετέχων",
+      "MANAGER": "υπεύθυνος",
+      "VIEWER": "θεατής"
+    }
   }
 }

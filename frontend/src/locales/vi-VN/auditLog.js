@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Đăng nhập trang web",
     "ACCOUNT_API_KEY_CREATED": "Khóa tài khoản được cấp",
     "ACCOUNT_API_KEY_REVOKED": "Khóa tài khoản bị thu hồi"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Đã đổi từ {from} sang {to}",
+    "role": "Vai trò: {role}",
+    "team": "Nhóm: {name}",
+    "firmAdmin": "Quản trị viên văn phòng luật",
+    "memberCount": "{count} người",
+    "removedBy": "Bị {name} gỡ bỏ",
+    "issuedBy": "Do {name} cấp",
+    "keyPrefix": "Key bắt đầu bằng {prefix}",
+    "label": "Tên: {label}",
+    "via": "Qua: {via}",
+    "shareHistoryOn": "Lịch sử phiên bản cũng được chia sẻ",
+    "shareHistoryOff": "Lịch sử phiên bản không được chia sẻ",
+    "enabledOn": "Đã bật",
+    "enabledOff": "Đã tắt",
+    "expiresAt": "Có hiệu lực đến {date}",
+    "suppressedRepeats": "Đã gộp {count} mục giống nhau",
+    "purgedRows": "Đã xóa {count} bản ghi hết hạn",
+    "reason": "Lý do: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "chủ sở hữu",
+      "ADMIN": "quản trị viên",
+      "MEMBER": "thành viên",
+      "READ_ONLY": "thành viên chỉ xem",
+      "PARTICIPANT": "người tham gia",
+      "MANAGER": "người quản lý",
+      "VIEWER": "người xem"
+    }
   }
 }

@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Вход на сайт",
     "ACCOUNT_API_KEY_CREATED": "Ключ учётной записи выпущен",
     "ACCOUNT_API_KEY_REVOKED": "Ключ учётной записи отозван"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Изменено с {from} на {to}",
+    "role": "Роль: {role}",
+    "team": "Команда: {name}",
+    "firmAdmin": "Администратор фирмы",
+    "memberCount": "{count} чел.",
+    "removedBy": "Удалил(а): {name}",
+    "issuedBy": "Выдал(а): {name}",
+    "keyPrefix": "Key начинается с {prefix}",
+    "label": "Название: {label}",
+    "via": "Способ: {via}",
+    "shareHistoryOn": "История версий также доступна",
+    "shareHistoryOff": "История версий не передаётся",
+    "enabledOn": "Включено",
+    "enabledOff": "Выключено",
+    "expiresAt": "Действует до {date}",
+    "suppressedRepeats": "Объединено одинаковых записей: {count}",
+    "purgedRows": "Удалено просроченных записей: {count}",
+    "reason": "Причина: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "владелец",
+      "ADMIN": "администратор",
+      "MEMBER": "участник",
+      "READ_ONLY": "участник с доступом только для чтения",
+      "PARTICIPANT": "участник процесса",
+      "MANAGER": "руководитель",
+      "VIEWER": "наблюдатель"
+    }
   }
 }

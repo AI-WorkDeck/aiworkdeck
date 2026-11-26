@@ -316,6 +316,12 @@ export default {
   collabRemoteAhead: '同事交了新稿',
   collabPendingUpload: '有改动还没交稿',
   collabInSync: '和大家的稿一致',
+  collabChecking: '正在与团队核对…',
+  collabNotChecked: '尚未与团队核对',
+  collabInSyncAsOf: '已与团队一致 · {age}核对',
+  collabAgeSeconds: '{n} 秒前',
+  collabAgeMinutes: '{n} 分钟前',
+  collabAgeHours: '{n} 小时前',
   // 脚本侧提示
   defaultUserName: '用户',
   folderScopeLabel: '文件夹：{name}',
