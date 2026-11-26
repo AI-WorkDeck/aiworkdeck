@@ -589,4 +589,6 @@ export default {
   mergeExportFailed: 'Failed to export the merged draft. Please try again later.',
   mergeResolveFailed: 'Your decisions could not be saved — everything you did on this draft is still here.',
   mergeReadonlyNeedsFile: 'Open this merged draft from the file list.',
+  transferUploading: 'Uploading large files {done} / {total} MB; this can take a few minutes on a slow connection',
+  transferDownloading: 'Downloading large files {done} / {total} MB; this can take a few minutes on a slow connection',
 }

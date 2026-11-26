@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "병합 검토본을 만들지 못했습니다 ({stage}). 개요 화면으로 돌아가 이 파일은 전체 버전으로 선택해 주세요.",
   "mergeExportFailed": "병합본 내보내기에 실패했습니다. 나중에 다시 시도해 주세요.",
   "mergeResolveFailed": "결정 내용을 저장하지 못했습니다 — 이 초안에서 작업한 내용은 그대로 남아 있습니다.",
-  "mergeReadonlyNeedsFile": "이 병합본은 파일 목록에서 열어 확인해 주세요."
+  "mergeReadonlyNeedsFile": "이 병합본은 파일 목록에서 열어 확인해 주세요.",
+  transferUploading: '대용량 파일 업로드 중 {done} / {total} MB. 연결이 느리면 몇 분 걸릴 수 있습니다',
+  transferDownloading: '대용량 파일 받는 중 {done} / {total} MB. 연결이 느리면 몇 분 걸릴 수 있습니다',
 }

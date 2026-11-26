@@ -30,6 +30,36 @@ public class ProjectObjectSyncService {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER).build();
 
+    /**
+     * C24 / CEO 2026-11-26: a large-file part may take many minutes on a slow link (#1764), and the repo lock
+     * is held meanwhile. The desktop polls this (without the lock) to show 「正在上传大文件 12 / 30 MB」
+     * instead of a silent wait. Totals grow per object as the transfer discovers what is missing.
+     */
+    static final class Transfer {
+        final String direction;
+        final java.util.concurrent.atomic.AtomicLong total = new java.util.concurrent.atomic.AtomicLong();
+        final java.util.concurrent.atomic.AtomicLong done = new java.util.concurrent.atomic.AtomicLong();
+        Transfer(String direction) { this.direction = direction; }
+    }
+    private final Map<Long, Transfer> transfers = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** {active:false} or {active, direction: upload|download, doneBytes, totalBytes}. Never blocks. */
+    public Map<String, Object> transferProgress(long project) {
+        Transfer t = transfers.get(project);
+        if (t == null || t.total.get() == 0) return Map.of("active", false);
+        long total = t.total.get();
+        return Map.of("active", true, "direction", t.direction, "doneBytes", Math.min(t.done.get(), total), "totalBytes", total);
+    }
+
+    private static InputStream counting(InputStream in, Transfer t) {
+        return new FilterInputStream(in) {
+            @Override public int read() throws IOException { int b = super.read(); if (b >= 0) t.done.incrementAndGet(); return b; }
+            @Override public int read(byte[] b, int off, int len) throws IOException {
+                int n = super.read(b, off, len); if (n > 0) t.done.addAndGet(n); return n;
+            }
+        };
+    }
+
     public ProjectObjectSyncService(ProjectRepoService repos, ObjectProvider<MobileRelayClientService> relay,
                                     ObjectMapper json) {
         this.repos = repos; this.relay = relay; this.json = json;
@@ -43,6 +73,8 @@ public class ProjectObjectSyncService {
         // C12b：先问案件库哪些对象已经在了。同事早先传好的大文件，再次交稿时只是被历史引用，
         // 不产生新的上传，因此不需要本人开启文件云端备份；只有真要上传的对象才走同意检查。
         Map<String,String> frozenEpoch=null;
+        Transfer transfer = new Transfer("upload");
+        transfers.put(project, transfer);
         try {
             capabilities(remoteUrl, username, token);
             for (ObjectRef ref : refs) {
@@ -63,6 +95,8 @@ public class ProjectObjectSyncService {
                 Set<Integer> ready = new HashSet<>();
                 state.path("parts").forEach(n -> ready.add(n.asInt(-1)));
                 int count = partCount(ref);
+                for (int part = 0; part < count; part++)
+                    if (!ready.contains(part)) transfer.total.addAndGet(ProjectObjectTransferService.partSize(ref, part));
                 for (int part = 0; part < count; part++) {
                     if (ready.contains(part)) continue;
                     requireConsent(client, accountScope);
@@ -71,7 +105,7 @@ public class ProjectObjectSyncService {
                     try (InputStream in = partStream(project, ref, part)) { hash = LocalVersionObjectStore.fingerprint(in).sha256(); }
                     final int index = part;
                     var publisher = HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofInputStream(() -> {
-                        try { return partStream(project, ref, index); }
+                        try { return counting(partStream(project, ref, index), transfer); }
                         catch (IOException e) { throw new UncheckedIOException(e); }
                     }), length);
                     responseJson(partUploadRequest(base + "/parts/" + part + "?size=" + ref.size(), username, token, frozenEpoch,
@@ -86,6 +120,8 @@ public class ProjectObjectSyncService {
             throw VersionException.userFacing(LangText.of(
                     "大文件尚未完整同步，原文件和版本已保存在本机，请稍后重试交稿",
                     "Large files have not finished syncing. Your local files and versions are safe; retry submitting later."));
+        } finally {
+            transfers.remove(project, transfer);
         }
     }
 
@@ -96,10 +132,13 @@ public class ProjectObjectSyncService {
                 needed.addAll(repos.objectPointersAt(repository, tag.getName(), true));
         } catch (IOException e) { throw new VersionException("Read version references failed", e); }
         if (needed.isEmpty()) return;
+        Transfer transfer = new Transfer("download");
+        transfers.put(project, transfer);
         try {
             for (ObjectRef object : needed) {
                 try { repos.objects().verify(project, object); continue; }
                 catch (IOException absentOrCorrupt) { /* Download to an atomic temporary file. */ }
+                transfer.total.addAndGet(object.size());
                 capabilities(remoteUrl, username, token);
                 int count = partCount(object);
                 Enumeration<InputStream> parts = new Enumeration<>() {
@@ -120,13 +159,15 @@ public class ProjectObjectSyncService {
                         catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new UncheckedIOException(new IOException(e)); }
                     }
                 };
-                try (InputStream in = joinedParts(parts)) { repos.objects().importObject(project, object, in); }
+                try (InputStream in = counting(joinedParts(parts), transfer)) { repos.objects().importObject(project, object, in); }
             }
         } catch (IOException | InterruptedException | UncheckedIOException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             throw VersionException.userFacing(LangText.of(
                     "这份版本的大文件暂时无法取回，尚未替换本地文件，请稍后重试",
                     "Large files for this version are unavailable. Local files have not been replaced; please retry later."));
+        } finally {
+            transfers.remove(project, transfer);
         }
     }
 

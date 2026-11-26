@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "合併比對稿沒能做出來（{stage}），這份檔案請回到裁決總覽整份選擇",
   "mergeExportFailed": "合併稿匯出失敗，請稍後重試",
   "mergeResolveFailed": "裁決沒能儲存，你在這份稿上的處理都還在",
-  "mergeReadonlyNeedsFile": "這份合併稿要從檔案列表裡開啟檢視"
+  "mergeReadonlyNeedsFile": "這份合併稿要從檔案列表裡開啟檢視",
+  transferUploading: '正在上傳大型檔案 {done} / {total} MB，網速慢時需要幾分鐘',
+  transferDownloading: '正在取回大型檔案 {done} / {total} MB，網速慢時需要幾分鐘',
 }

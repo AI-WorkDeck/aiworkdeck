@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "No se pudo generar la revisión de fusión ({stage}). Elija una parte completa para este archivo en la vista general.",
   "mergeExportFailed": "No se pudo exportar el borrador fusionado. Inténtelo de nuevo más tarde.",
   "mergeResolveFailed": "Sus decisiones no se pudieron guardar: todo lo que hizo en este borrador sigue aquí.",
-  "mergeReadonlyNeedsFile": "Abra este borrador fusionado desde la lista de archivos."
+  "mergeReadonlyNeedsFile": "Abra este borrador fusionado desde la lista de archivos.",
+  transferUploading: 'Subiendo archivos grandes {done} / {total} MB; con una conexión lenta puede tardar unos minutos',
+  transferDownloading: 'Descargando archivos grandes {done} / {total} MB; con una conexión lenta puede tardar unos minutos',
 }

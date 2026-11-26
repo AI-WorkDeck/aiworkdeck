@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Tinjauan penggabungan tidak dapat dibuat ({stage}). Pilih satu sisi utuh untuk file ini di ikhtisar.",
   "mergeExportFailed": "Gagal mengekspor draf gabungan. Silakan coba lagi nanti.",
   "mergeResolveFailed": "Keputusan Anda tidak dapat disimpan — semua yang Anda lakukan pada draf ini masih ada di sini.",
-  "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari daftar file."
+  "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari daftar file.",
+  transferUploading: 'Mengunggah file besar {done} / {total} MB; pada koneksi lambat ini bisa memakan beberapa menit',
+  transferDownloading: 'Mengunduh file besar {done} / {total} MB; pada koneksi lambat ini bisa memakan beberapa menit',
 }

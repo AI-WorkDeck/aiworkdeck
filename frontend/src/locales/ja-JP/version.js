@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "マージ比較原稿を作成できませんでした（{stage}）。概要画面に戻り、このファイルはバージョン全体で選択してください。",
   "mergeExportFailed": "マージ済み原稿のエクスポートに失敗しました。しばらくしてからもう一度お試しください。",
   "mergeResolveFailed": "裁定結果を保存できませんでした — この原稿で行った操作はそのまま残っています。",
-  "mergeReadonlyNeedsFile": "このマージ済み原稿はファイル一覧から開いて確認してください。"
+  "mergeReadonlyNeedsFile": "このマージ済み原稿はファイル一覧から開いて確認してください。",
+  transferUploading: '大きなファイルをアップロード中 {done} / {total} MB。回線が遅い場合は数分かかることがあります',
+  transferDownloading: '大きなファイルを取得中 {done} / {total} MB。回線が遅い場合は数分かかることがあります',
 }

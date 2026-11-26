@@ -11,6 +11,7 @@ import { host, isDesktopHost } from '@/services/host.js'
 import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
+import { withTransferProgress } from '@/utils/transferProgress.js'
 import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
 
 import { createCloudEpochGate, needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
@@ -4597,14 +4598,26 @@ export function checkCloud(projectId) {
     request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
 }
 
+export function getCloudTransfer(projectId) {
+  return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET' })
+}
+
+// 大文件慢传时给出进度（见 utils/transferProgress.js）：不挡操作的 loading，字节在走就更新
+const transferProgressUi = {
+  read: getCloudTransfer,
+  show: (title) => uni.showLoading({ title, mask: false }),
+  hide: () => uni.hideLoading(),
+  t,
+}
+
 export function uploadToCloud(projectId) {
-  return observeCloudConnectivity(projectId, 'upload', () =>
-    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' }))
+  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'upload', () =>
+    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })), transferProgressUi)
 }
 
 export function updateFromCloud(projectId) {
-  return observeCloudConnectivity(projectId, 'update', () =>
-    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' }))
+  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'update', () =>
+    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' })), transferProgressUi)
 }
 
 // resolutions: { [path]: 'MAIN' | 'DRAFT' | 'BOTH' }（语境映射见 AdoptConflictDialog）

@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Não foi possível montar a revisão de mesclagem ({stage}). Escolha um lado completo para este arquivo na visão geral.",
   "mergeExportFailed": "Falha ao exportar o rascunho mesclado. Tente novamente mais tarde.",
   "mergeResolveFailed": "Não foi possível salvar suas decisões — tudo o que você fez neste rascunho continua aqui.",
-  "mergeReadonlyNeedsFile": "Abra este rascunho mesclado a partir da lista de arquivos."
+  "mergeReadonlyNeedsFile": "Abra este rascunho mesclado a partir da lista de arquivos.",
+  transferUploading: 'Enviando arquivos grandes {done} / {total} MB; em uma conexão lenta, isso pode levar alguns minutos',
+  transferDownloading: 'Baixando arquivos grandes {done} / {total} MB; em uma conexão lenta, isso pode levar alguns minutos',
 }

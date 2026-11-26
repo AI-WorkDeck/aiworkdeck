@@ -35,6 +35,8 @@ public class CloudController {
             org.slf4j.LoggerFactory.getLogger(CloudController.class);
 
     private final CloudSyncService cloudSyncService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.version.cloud.ProjectObjectSyncService objectSync;
     private final com.checkba.version.OfficialCloudService officialCloudService;
     private final ProjectMemberService projectMemberService;
     private final UserService userService;
@@ -197,6 +199,15 @@ public class CloudController {
         Long userId = requireWriteMember(projectId, sessionId);
         cloudSyncService.unbindProject(projectId, userId);
         return ok(Map.of());
+    }
+
+    /** Large-file transfer progress for 交稿/取回; reads a counter only, never the repository lock. */
+    @GetMapping("/projects/{projectId}/transfer")
+    public ResponseEntity<Map<String, Object>> transfer(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireMemberNonClient(projectId, sessionId);
+        return ok(objectSync == null ? Map.of("active", false) : objectSync.transferProgress(projectId));
     }
 
     @GetMapping("/projects/{projectId}/status")

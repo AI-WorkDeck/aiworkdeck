@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "La révision de fusion n'a pas pu être générée ({stage}). Choisissez une version complète pour ce fichier dans la vue d'ensemble.",
   "mergeExportFailed": "Échec de l'exportation du brouillon fusionné. Veuillez réessayer plus tard.",
   "mergeResolveFailed": "Vos décisions n'ont pas pu être enregistrées — tout ce que vous avez fait sur ce brouillon est toujours là.",
-  "mergeReadonlyNeedsFile": "Ouvrez ce brouillon fusionné depuis la liste des fichiers."
+  "mergeReadonlyNeedsFile": "Ouvrez ce brouillon fusionné depuis la liste des fichiers.",
+  transferUploading: 'Envoi des fichiers volumineux {done} / {total} Mo ; avec une connexion lente, cela peut prendre quelques minutes',
+  transferDownloading: 'Récupération des fichiers volumineux {done} / {total} Mo ; avec une connexion lente, cela peut prendre quelques minutes',
 }

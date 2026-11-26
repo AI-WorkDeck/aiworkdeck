@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "De samenvoegbeoordeling kon niet worden opgebouwd ({stage}). Kies in het overzicht één volledige kant voor dit bestand.",
   "mergeExportFailed": "Kan het samengevoegde concept niet exporteren. Probeer het later opnieuw.",
   "mergeResolveFailed": "Uw beslissingen konden niet worden opgeslagen — alles wat u in dit concept hebt gedaan, staat er nog.",
-  "mergeReadonlyNeedsFile": "Open dit samengevoegde concept vanuit de bestandenlijst."
+  "mergeReadonlyNeedsFile": "Open dit samengevoegde concept vanuit de bestandenlijst.",
+  transferUploading: 'Grote bestanden uploaden {done} / {total} MB; bij een trage verbinding kan dit enkele minuten duren',
+  transferDownloading: 'Grote bestanden downloaden {done} / {total} MB; bij een trage verbinding kan dit enkele minuten duren',
 }

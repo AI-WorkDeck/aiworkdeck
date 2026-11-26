@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Semakan gabungan tidak dapat dibina ({stage}). Pilih satu pihak penuh untuk fail ini dalam gambaran keseluruhan.",
   "mergeExportFailed": "Gagal mengeksport draf gabungan. Sila cuba lagi kemudian.",
   "mergeResolveFailed": "Keputusan anda tidak dapat disimpan — semua yang anda lakukan pada draf ini masih ada di sini.",
-  "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari senarai fail."
+  "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari senarai fail.",
+  transferUploading: 'Memuat naik fail besar {done} / {total} MB; pada sambungan perlahan ini mungkin mengambil beberapa minit',
+  transferDownloading: 'Memuat turun fail besar {done} / {total} MB; pada sambungan perlahan ini mungkin mengambil beberapa minit',
 }
