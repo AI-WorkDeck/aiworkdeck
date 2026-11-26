@@ -415,6 +415,16 @@ class MobileRelayClientHttpTest {
     }
 
     @Test
+    void relayOutageIsNotReportedAsSignedOut() {
+        // Q20 (firstday-1125): signed in, relay unreachable → the catalogue said 「请先连接账户」
+        server.removeContext("/api/auth/awdk-login");
+        server.createContext("/api/auth/awdk-login", ex -> respond(ex, 503, "{\"code\":503}"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service().catalog());
+        assertFalse(e.getMessage().contains("请先连接账户") || e.getMessage().contains("Connect your account first"), e.getMessage());
+        assertTrue(e.getMessage().contains("云端") || e.getMessage().contains("cloud service"), e.getMessage());
+    }
+
+    @Test
     void accountSwitchWhileCatalogueLoadsCannotRelabelOldRowsWithNewScope() {
         server.createContext("/api/mobile/catalog",exchange->{
             when(accountService.accountFingerprintOrNull()).thenReturn("switched-account");
