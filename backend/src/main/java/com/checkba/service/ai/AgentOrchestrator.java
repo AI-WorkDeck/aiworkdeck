@@ -3840,10 +3840,14 @@ public class AgentOrchestrator {
                 saveAssistantMessage(guard, projectId, userId, fullContent);
             }
             // 触发记忆写入管线（异步：对话摘要 / 项目记忆 / MemCell 原子记忆提取）
+            String memoryTurnTag = PlatformTurnScope.current();
             try {
+                // Q24：摘要在后台跑完之前，这一轮的费用查询回 pending，页脚不先给一个偏少的数
+                PlatformTurnScope.beginWork(memoryTurnTag);
                 memoryPipelineService.onConversationTurnCompleted(
-                        conversationId, projectId, userId, new java.util.ArrayList<>(messages));
+                        conversationId, projectId, userId, new java.util.ArrayList<>(messages), memoryTurnTag);
             } catch (Exception memEx) {
+                PlatformTurnScope.endWork(memoryTurnTag);
                 log.warn("Failed to trigger memory pipeline for {}", conversationId, memEx);
             }
             // 版本记录：AI 轮次真正结束后落一笔 AI 署名存档（失败绝不阻断）。

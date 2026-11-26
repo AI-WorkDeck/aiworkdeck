@@ -58,4 +58,19 @@ class PlatformTurnScopeTest {
         assertTrue(PlatformTurnScope.hadUntaggedSpend(TAG));
         assertFalse(PlatformTurnScope.hadUntaggedSpend(other));
     }
+
+    @Test
+    void backgroundWorkOfATurnCountsAsPendingUntilItEnds() {
+        String tag = "11112222333344445555666677778888";
+        assertEquals(0, PlatformTurnScope.openWork(tag));
+        PlatformTurnScope.beginWork(tag);
+        PlatformTurnScope.beginWork(tag);
+        assertEquals(2, PlatformTurnScope.openWork(tag));
+        PlatformTurnScope.endWork(tag);
+        PlatformTurnScope.endWork(tag);
+        PlatformTurnScope.endWork(tag);   // extra end is harmless
+        assertEquals(0, PlatformTurnScope.openWork(tag));
+        PlatformTurnScope.beginWork(null);
+        assertEquals(0, PlatformTurnScope.openWork(null));
+    }
 }

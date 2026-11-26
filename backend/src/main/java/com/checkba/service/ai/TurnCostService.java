@@ -82,7 +82,7 @@ public class TurnCostService {
             out.put("cents", data.path("cents").asLong(0));
             out.put("currency", "USD".equals(data.path("currency").asText()) ? "USD" : "CNY");
             out.put("calls", data.path("calls").asInt(0));
-            out.put("pending", data.path("pending").asInt(0));
+            out.put("pending", data.path("pending").asInt(0) + PlatformTurnScope.openWork(tag));
             out.put("subscriptionCents", data.path("subscriptionCents").asLong(0));
             out.put("walletCents", data.path("walletCents").asLong(0));
             out.put("bqtCents", data.path("bqtCents").asLong(0));
@@ -140,7 +140,7 @@ public class TurnCostService {
         out.put("micros", total.movePointRight(6).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact());
         out.put("cents", total.movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact());
         out.put("calls", ids.size());
-        out.put("pending", pending);
+        out.put("pending", pending + PlatformTurnScope.openWork(tag));
         out.put("excludesPresentation", PlatformTurnScope.hadUntaggedSpend(tag));
         return out;
     }

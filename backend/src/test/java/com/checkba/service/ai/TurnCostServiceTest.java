@@ -71,6 +71,9 @@ class TurnCostServiceTest {
         assertEquals(List.of("tag=" + expectedTag + " Bearer awdai_synthetic"), seen);
         assertFalse(out.toString().contains(expectedTag), "the tag never reaches the renderer");
         assertEquals(false, out.get("excludesPresentation"));
+        PlatformTurnScope.beginWork(expectedTag);      // the turn's memory summary is still running
+        assertEquals(1, service(base, bailian(), dir).turnCost(7L, "conv-1", "0b6c2f1e-1111-4222-8333-944455556666").get("pending"));
+        PlatformTurnScope.endWork(expectedTag);
         PlatformTurnScope.run(expectedTag, PlatformTurnScope::markUntaggedSpend);
         assertEquals(true, service(base, bailian(), dir).turnCost(7L, "conv-1", "0b6c2f1e-1111-4222-8333-944455556666").get("excludesPresentation"));
     }

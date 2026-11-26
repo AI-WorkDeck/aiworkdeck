@@ -68,6 +68,24 @@ public final class PlatformTurnScope {
         return tag != null && UNTAGGED_SPEND.containsKey(tag);
     }
 
+    /**
+     * 轮次结束后还在为这一轮跑的后台工作（对话摘要等）。费用查询把它们算作 pending，
+     * 页脚就不会在这些调用扣费之前给出一个偏少的数。
+     */
+    private static final java.util.Map<String, Integer> OPEN_WORK = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void beginWork(String tag) {
+        if (tag != null && OPEN_WORK.size() < 1000) OPEN_WORK.merge(tag, 1, Integer::sum);
+    }
+
+    public static void endWork(String tag) {
+        if (tag != null) OPEN_WORK.computeIfPresent(tag, (k, n) -> n <= 1 ? null : n - 1);
+    }
+
+    public static int openWork(String tag) {
+        return tag == null ? 0 : OPEN_WORK.getOrDefault(tag, 0);
+    }
+
     private static void restore(String previous) {
         if (previous == null) CURRENT.remove();
         else CURRENT.set(previous);
