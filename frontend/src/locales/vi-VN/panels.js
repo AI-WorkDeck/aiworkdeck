@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Thử lại",
   "bpErrorTitle": "Không thể truy cập trang web này",
   "bpErrorCodeLabel": "Mã lỗi",
-  "bpErrorNameNotResolved": "Tra cứu DNS thất bại — địa chỉ có thể bị sai chính tả hoặc tên miền không tồn tại",
+  "bpErrorNameNotResolved": "Không tìm thấy địa chỉ này — có thể bị viết sai hoặc trang web không tồn tại",
   "bpErrorTimedOut": "Kết nối đã hết thời gian chờ",
   "bpErrorConnectionRefused": "Kết nối bị từ chối",
   "bpErrorConnectionReset": "Kết nối bị đặt lại",

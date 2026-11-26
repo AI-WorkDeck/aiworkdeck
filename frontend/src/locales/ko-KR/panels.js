@@ -312,7 +312,7 @@ export default {
   "bpRetry": "재시도",
   "bpErrorTitle": "이 사이트에 연결할 수 없습니다",
   "bpErrorCodeLabel": "오류 코드",
-  "bpErrorNameNotResolved": "DNS 조회 실패 — 주소 철자가 틀렸거나 도메인이 존재하지 않을 수 있습니다",
+  "bpErrorNameNotResolved": "이 주소를 찾을 수 없습니다. 철자가 틀렸거나 사이트가 없을 수 있습니다",
   "bpErrorTimedOut": "연결 시간이 초과되었습니다",
   "bpErrorConnectionRefused": "연결이 거부되었습니다",
   "bpErrorConnectionReset": "연결이 재설정되었습니다",

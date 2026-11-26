@@ -312,7 +312,7 @@ export default {
   "bpRetry": "再試行",
   "bpErrorTitle": "このサイトにアクセスできません",
   "bpErrorCodeLabel": "エラーコード",
-  "bpErrorNameNotResolved": "DNSルックアップに失敗しました — アドレスのスペルが間違っているか、ドメインが存在しない可能性があります",
+  "bpErrorNameNotResolved": "このアドレスが見つかりません。スペルが間違っているか、サイトが存在しない可能性があります",
   "bpErrorTimedOut": "接続がタイムアウトしました",
   "bpErrorConnectionRefused": "接続が拒否されました",
   "bpErrorConnectionReset": "接続がリセットされました",

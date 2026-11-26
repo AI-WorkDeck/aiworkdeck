@@ -327,7 +327,7 @@ export default {
   // with the raw errorDescription as small print
   bpErrorTitle: 'This site can’t be reached',
   bpErrorCodeLabel: 'Error code',
-  bpErrorNameNotResolved: 'DNS lookup failed — the address may be misspelled or the domain may not exist',
+  bpErrorNameNotResolved: 'Couldn’t find this address. It may be misspelled, or the site may not exist',
   bpErrorTimedOut: 'Connection timed out',
   bpErrorConnectionRefused: 'Connection refused',
   bpErrorConnectionReset: 'Connection reset',

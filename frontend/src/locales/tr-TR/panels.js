@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Tekrar dene",
   "bpErrorTitle": "Bu siteye erişilemiyor",
   "bpErrorCodeLabel": "Hata kodu",
-  "bpErrorNameNotResolved": "DNS araması başarısız oldu — adres yanlış yazılmış olabilir veya etki alanı mevcut olmayabilir",
+  "bpErrorNameNotResolved": "Bu adres bulunamadı — yanlış yazılmış olabilir veya site mevcut olmayabilir",
   "bpErrorTimedOut": "Bağlantı zaman aşımına uğradı",
   "bpErrorConnectionRefused": "Bağlantı reddedildi",
   "bpErrorConnectionReset": "Bağlantı sıfırlandı",

@@ -309,7 +309,7 @@ export default {
   "bpRetry": "Reintentar",
   "bpErrorTitle": "No se puede acceder a este sitio",
   "bpErrorCodeLabel": "Código de error",
-  "bpErrorNameNotResolved": "Error en la búsqueda DNS — la dirección puede estar mal escrita o el dominio puede no existir",
+  "bpErrorNameNotResolved": "No se encuentra esta dirección: puede estar mal escrita o el sitio puede no existir",
   "bpErrorTimedOut": "Tiempo de conexión agotado",
   "bpErrorConnectionRefused": "Conexión rechazada",
   "bpErrorConnectionReset": "Conexión restablecida",

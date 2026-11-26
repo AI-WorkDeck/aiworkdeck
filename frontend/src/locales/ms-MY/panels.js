@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Cuba lagi",
   "bpErrorTitle": "Laman ini tidak dapat diakses",
   "bpErrorCodeLabel": "Kod ralat",
-  "bpErrorNameNotResolved": "Carian DNS gagal — alamat mungkin tersalah eja atau domain mungkin tidak wujud",
+  "bpErrorNameNotResolved": "Alamat ini tidak ditemui — mungkin tersalah eja atau laman tersebut tidak wujud",
   "bpErrorTimedOut": "Sambungan tamat masa",
   "bpErrorConnectionRefused": "Sambungan ditolak",
   "bpErrorConnectionReset": "Sambungan ditetapkan semula",

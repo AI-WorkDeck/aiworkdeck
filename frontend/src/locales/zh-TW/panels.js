@@ -312,7 +312,7 @@ export default {
   "bpRetry": "重試",
   "bpErrorTitle": "無法訪問此網站",
   "bpErrorCodeLabel": "錯誤程式碼",
-  "bpErrorNameNotResolved": "DNS 解析失敗，可能是網址拼寫有誤或該域名不存在",
+  "bpErrorNameNotResolved": "找不到這個網址，可能拼寫有誤或網站不存在",
   "bpErrorTimedOut": "連線超時",
   "bpErrorConnectionRefused": "連線被拒絕",
   "bpErrorConnectionReset": "連線被重置",

@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Opnieuw proberen",
   "bpErrorTitle": "Deze site is niet bereikbaar",
   "bpErrorCodeLabel": "Foutcode",
-  "bpErrorNameNotResolved": "DNS-lookup mislukt — het adres is mogelijk verkeerd gespeld of het domein bestaat mogelijk niet",
+  "bpErrorNameNotResolved": "Dit adres is niet gevonden — het is mogelijk verkeerd gespeld of de site bestaat niet",
   "bpErrorTimedOut": "Time-out bij verbinding",
   "bpErrorConnectionRefused": "Verbinding geweigerd",
   "bpErrorConnectionReset": "Verbinding opnieuw ingesteld",
