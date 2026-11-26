@@ -137,6 +137,9 @@ public class ProjectObjectPlanService {
 
     public List<ProjectObjectLocalOnly> localOnly(long projectId) { return localOnly.findByProjectId(projectId); }
 
+    /** Cheap guard: most cases have no local-only files, so their git paths skip the per-file lookups. */
+    public boolean hasLocalOnly(long projectId) { return localOnly.countByProjectId(projectId) > 0; }
+
     static String nameHint(String pathHint) {
         if (pathHint == null) return null;
         String name = pathHint.replace('\\', '/');

@@ -85,8 +85,10 @@ public class ProjectObjectController {
             authorize(request, projectId, true);
             Runnable publication=()->{try {
                 ObjectRef completed=new ObjectRef(sha256,size);
+                boolean wasLocalOnly=plans!=null && plans.isDeclaredLocalOnly(projectId,completed);
                 transfers.complete(projectId,completed);
                 if(plans!=null)plans.markComplete(projectId,completed); // C12: reservation permanent, declaration ends
+                if(wasLocalOnly)repos.materializeArrivedObject(projectId,completed); // C12: the server's own copy gets it now
             }catch(IOException e){throw new UncheckedIOException(e);}};
             if(cloudWrites==null)publication.run();else cloudWrites.write(projectId,null,publication);
         });

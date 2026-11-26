@@ -671,6 +671,13 @@ public class ProjectRepoService {
             removeNestedMetadataFromIndex(repo);
             return null;
         });
+        // C12：暂存会把工作区里没有的「仅在本机」文件记成删除——放回 HEAD 的条目，提交里保住它的指针
+        Set<String> localOnly = localOnlyMissingPaths(repo);
+        if (!localOnly.isEmpty()) {
+            var reset = git.reset();
+            localOnly.forEach(reset::addPath);
+            reset.call();
+        }
     }
 
     /**
@@ -1427,7 +1434,10 @@ public class ProjectRepoService {
                     }
                 }
             }
+            // C12：「仅在共享人电脑上」的文件在工作区里本就没有，不是删除
+            Set<String> localOnly = localOnlyMissingPaths(repo);
             return changes.entrySet().stream()
+                    .filter(e -> !localOnly.contains(e.getKey()))
                     .map(e -> new FileChange(e.getKey(), e.getValue())).toList();
         } catch (Exception e) {
             throw new VersionException("读取未提交变更失败: project=" + projectId, e);
@@ -1582,6 +1592,39 @@ public class ProjectRepoService {
     }
 
     /** Atomic per-file restore, also supports pre-object-store Git blobs of any size. */
+    private boolean localOnlyPointerAt(long projectId, String ref, String path) {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        if (plans == null || !plans.hasLocalOnly(projectId)) return false;
+        try (Repository repo = open(projectId); RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return false;
+            RevCommit commit = walk.parseCommit(id);
+            ObjectLoader loader = loaderAt(repo, commit, path);
+            if (loader == null) return false;
+            var pointer = pointerAt(repo, commit, loader);
+            return pointer != null && declaredLocalOnly(projectId, pointer);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * C12：一个曾被声明「仅在本机」的对象后来到了案件库（共享人开了备份）：把 HEAD 里指向它、工作区里还没有的
+     * 路径物化出来。只在主线上做；其余情况下一次落库照常带上。
+     */
+    public void materializeArrivedObject(long projectId, LocalVersionObjectStore.ObjectRef object) {
+        try (Repository repo = open(projectId)) {
+            if (repo.resolve("HEAD^{commit}") == null || !MAIN_BRANCH.equals(repo.getBranch())) return;
+            for (var e : pointerPathsAt(repo, "HEAD").entrySet()) {
+                if (!e.getValue().contains(object)) continue;
+                Path target = workTree(projectId).resolve(e.getKey());
+                if (!Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)) copyBlobAtCommit(projectId, "HEAD", e.getKey(), target);
+            }
+        } catch (IOException e) {
+            log.warn("物化后到的版本对象失败（下一次落库会补上）: project={}", projectId, e);
+        }
+    }
+
     public void copyBlobAtCommit(long projectId, String ref, String path, Path target) {
         Path work = workTree(projectId).toAbsolutePath().normalize();
         Path normalized = target.toAbsolutePath().normalize();
@@ -1591,6 +1634,10 @@ public class ProjectRepoService {
             for (Path parent = normalized.getParent(); parent != null && !parent.equals(work); parent = parent.getParent()) {
                 if (Files.isSymbolicLink(parent)) throw new IOException("Restore directory is a symbolic link");
             }
+            // C12：这一版里该路径指向一个「仅在共享人电脑上」的对象：不写文件，旧版本留下的旧字节也删掉，
+            // 网页端不能把旧内容当成现在的版本展示（lane W 复核）。
+            var declaredPointer = localOnlyPointerAt(projectId, ref, path);
+            if (declaredPointer) { Files.deleteIfExists(normalized); return; }
             try (InputStream in = openBlobAtCommit(projectId, ref, path)) {
                 if (in == null) { Files.deleteIfExists(normalized); return; }
                 Files.createDirectories(normalized.getParent());
@@ -1804,6 +1851,40 @@ public class ProjectRepoService {
         return path.contains("/.awd/") || path.endsWith("/.awd");
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.version.cloud.ProjectObjectPlanService> objectPlans;
+
+    /** C12：这个对象不在本机/案件库，而是共享人声明了「仅在本机」（大小一致）。 */
+    private boolean declaredLocalOnly(long projectId, LocalVersionObjectStore.ObjectRef object) {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        if (plans == null || !plans.hasLocalOnly(projectId)) return false;
+        try { objectStore.verify(projectId, object); return false; }
+        catch (IOException absent) { return plans.isDeclaredLocalOnly(projectId, object); }
+    }
+
+    /**
+     * C12（lane W 复核）：HEAD 里那些对象被声明为「仅在共享人电脑上」、因而工作区里本就没有的路径。
+     * 状态与暂存都要跳过它们——否则工作区缺文件会被当成删除，push 前的自动存档把它从历史里删掉，
+     * 或者每次 push 前都多出一笔空的自动存档（#1761 那种被拒）。没有任何声明的案卷直接返回空集。
+     */
+    Set<String> localOnlyMissingPaths(Repository repo) {
+        long projectId;
+        try { projectId = projectIdOf(repo); } catch (RuntimeException e) { return Set.of(); }
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        if (plans == null || !plans.hasLocalOnly(projectId)) return Set.of();
+        Set<String> out = new LinkedHashSet<>();
+        try {
+            if (repo.resolve("HEAD^{commit}") == null) return Set.of();
+            for (var e : pointerPathsAt(repo, "HEAD").entrySet()) {
+                if (Files.exists(repo.getWorkTree().toPath().resolve(e.getKey()), java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+                if (!e.getValue().isEmpty() && e.getValue().stream().allMatch(o -> declaredLocalOnly(projectId, o))) out.add(e.getKey());
+            }
+        } catch (IOException e) {
+            return Set.of();
+        }
+        return out;
+    }
+
     /** Explicit restore only: validate old manifests and recover objects before worktree mutation. */
     public void requireObjectsAt(Repository repo, String ref) {
         try {
@@ -1825,7 +1906,11 @@ public class ProjectRepoService {
                     }
                 }
             }
-            for (var object : objectPointersAt(repo, ref, false)) requireLocalObject(projectIdOf(repo), object);
+            for (var object : objectPointersAt(repo, ref, false)) {
+                // C12：被声明为「仅在共享人电脑上」的对象不算缺失（物化时跳过，见 copyBlobAtCommit）
+                if (declaredLocalOnly(projectIdOf(repo), object)) continue;
+                requireLocalObject(projectIdOf(repo), object);
+            }
         } catch (IOException e) {
             throw VersionException.userFacing(com.checkba.service.LangText.of(
                     "这份版本的文件内容尚未完整保存在本机，请完成同步后重试；当前文件未被替换",
