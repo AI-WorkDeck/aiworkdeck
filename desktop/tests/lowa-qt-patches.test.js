@@ -65,7 +65,8 @@ ${body}
 }
 function succeeds(result) {
   assert.equal(result.status, 0, result.stderr || result.stdout)
-  return result.stdout
+  // Python's text mode writes \r\n on Windows; the anchors below are written with \n.
+  return result.stdout.replace(/\r\n/g, '\n')
 }
 
 test('both event paths use existing Qt elapsed-time overloads and retain dispatch/scrolling', () => {
