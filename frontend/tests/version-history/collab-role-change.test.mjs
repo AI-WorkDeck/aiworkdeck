@@ -82,3 +82,8 @@ test('the lookup card offers 改为协作人 for a read-only member, and the API
   assert.match(dialog, /onChangeRole\(\{ userId: candidate\.memberUserId, role: 'READ_ONLY', displayName: candidate\.displayName \}, 'PARTICIPANT'\)/)
   assert.match(api, /url: `\/api\/cloud\/projects\/\$\{projectId\}\/members\/\$\{remoteUserId\}\/role`, method: 'PUT', data: \{ role \}/)
 })
+
+test('after sharing from the dialog, the online check hands the viewer role to the page (lane C nit)', () => {
+  const share = dialog.slice(dialog.indexOf('async onShare()'), dialog.indexOf('\n    },', dialog.indexOf('async onShare()')))
+  assert.match(share, /const res = await checkCloud\(this\.projectId\)\s*\n\s*this\.\$emit\('changed', \{ cloud: \(res && res\.data\) \|\| null \}\)/)
+})

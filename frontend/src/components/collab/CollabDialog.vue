@@ -580,7 +580,14 @@ export default {
         }
         this.tooManyLibraries = false
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
-        this.$emit('changed')
+        // C9 (lane C): the viewer's role on the library is only known after an online check; without it a dialog
+        // opened before sharing never offers 改为协作人 / the role picker. Same hand-over as 刷新状态.
+        try {
+          const res = await checkCloud(this.projectId)
+          this.$emit('changed', { cloud: (res && res.data) || null })
+        } catch {
+          this.$emit('changed')
+        }
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
         else this.shareError = (e && e.message) || this.$t('version.shareToLibraryFailed')
