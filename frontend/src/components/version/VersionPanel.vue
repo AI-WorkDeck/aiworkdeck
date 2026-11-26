@@ -241,14 +241,16 @@ export default {
         let res
         // A cloud fetch may hold the repository lock. Retry only this transient read failure;
         // never wait for the lock on a server thread or replay a write operation.
-        for (let attempt = 0; attempt < 10; attempt++) {
+        // C29 (lane C): after ending a session the automatic 交稿 pushes under the lock for 4–6 s on a saturated
+        // link. Busy means still working, not a failed read: wait it out (0.5 s, 1 s, then 2 s steps; ~24 s).
+        for (let attempt = 0; attempt < 18; attempt++) {
           if (!shouldAcceptResponse(seq, this.refreshSeq)) return
           try {
             res = await getVersionStatus(this.projectId)
             break
           } catch (e) {
-            if (e.kind !== 'VERSION_BUSY' || attempt === 9) throw e
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            if (e.kind !== 'VERSION_BUSY' || attempt === 17) throw e
+            await new Promise((resolve) => setTimeout(resolve, attempt < 4 ? 500 : attempt < 8 ? 1000 : 2000))
           }
         }
         if (!shouldAcceptResponse(seq, this.refreshSeq)) return
@@ -279,7 +281,9 @@ export default {
         // 去重复点开启。宁可显示可区分的错误态，保留 enabled 的上一次已知值。
         console.warn('[Version] 读取状态失败', e)
         this.loadError = true
-        uni.showToast({ title: this.$t('version.loadFailedToast'), icon: 'none' })
+        // Still busy after the wait: say busy (the server's own words), never 「读取失败」
+        const busyText = e && e.kind === 'VERSION_BUSY' && e.message
+        uni.showToast({ title: busyText || this.$t('version.loadFailedToast'), icon: 'none' })
       } finally {
         if (shouldAcceptResponse(seq, this.refreshSeq)) this.loading = false
       }

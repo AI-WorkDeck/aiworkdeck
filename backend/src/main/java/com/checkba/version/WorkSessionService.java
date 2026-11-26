@@ -1545,6 +1545,37 @@ public class WorkSessionService {
      * 磁盘已经被 checkout 改写，而打开中的编辑器还端着被丢弃分支的内容，不重载的话
      * 下一次 autosave 会把刚被丢弃的工作原样写回去。
      */
+    /**
+     * C27（lane C）：取回之前，一段只动了清单（.awd/）的工作——没有任何律师改过的文件——不该挡住取回。
+     * 这种工作是软件自己留下的（系统目录、清单重排），丢掉它不丢任何人的东西。是这种就丢弃并回 true。
+     */
+    public boolean discardIfManifestOnly(long projectId, Long userId) {
+        ReentrantLock lock = repoLock(projectId);
+        lock.lock();
+        try {
+            if (awaitingAdoptResolution(projectId)) return false;
+            WorkSession s = activeSession(projectId).orElse(null);
+            if (s == null) return false;
+            List<FileChange> committed = repoService.diffNameStatus(projectId, repoService.mainBranch(), s.getBranchName());
+            List<FileChange> pendingNow = repoService.pendingChanges(projectId);
+            boolean committedOnlyManifest = committed.stream().allMatch(c -> c.path().startsWith(".awd/"));
+            boolean pendingOnlyManifest = pendingNow.stream().allMatch(c -> c.path().startsWith(".awd/"));
+            if (!committedOnlyManifest || !pendingOnlyManifest) return false;
+            // CEO: log exactly what is dropped (only manifest paths by construction)
+            log.info("取回前丢弃只改了清单的工作段（没有律师改动）: project={} session={} branch={} dropped committed={} pending={}",
+                    projectId, s.getId(), s.getBranchName(),
+                    committed.stream().map(c -> c.type() + " " + c.path()).toList(),
+                    pendingNow.stream().map(c -> c.type() + " " + c.path()).toList());
+            discardSession(projectId, userId);
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("检查只改了清单的工作段失败，照常要求先处理: project={}", projectId, e);
+            return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public List<Long> discardSession(long projectId, Long userId) {
         ReentrantLock lock = repoLock(projectId);
         lock.lock();

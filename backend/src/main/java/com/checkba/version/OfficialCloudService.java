@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -239,13 +240,72 @@ public class OfficialCloudService {
         return connectionRepository.findFirstByUserIdAndServerUrl(userId, officialBaseUrl).orElse(null);
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.repository.ProjectRemoteRepository projectRemotes;
+
+    /**
+     * C25：0.91 及更早的并发登录可能已经留下同一账户、同一案件库的重复连接。启动时合并：同一本机用户、同一地址、
+     * 同一个案件库账号的几条里，保留挂着案卷的那条（都没挂就留最早的），其余没挂案卷的删掉。挂着案卷的一条都不动。
+     * 手工连接允许同一地址连不同账号——账号不同的不算重复。
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void collapseDuplicateConnections() {
+        try {
+            Map<String, List<CloudConnection>> groups = new java.util.LinkedHashMap<>();
+            for (CloudConnection c : connectionRepository.findAll()) {
+                if (c.getUserId() == null || c.getServerUrl() == null || c.getUsername() == null) continue;
+                groups.computeIfAbsent(c.getUserId() + "|" + c.getServerUrl() + "|" + c.getUsername(), k -> new java.util.ArrayList<>()).add(c);
+            }
+            for (List<CloudConnection> group : groups.values()) {
+                if (group.size() < 2) continue;
+                group.sort(java.util.Comparator.comparing(CloudConnection::getId));
+                CloudConnection keep = group.stream().filter(this::hasProjects).findFirst().orElse(group.get(0));
+                for (CloudConnection c : group) {
+                    if (c == keep || hasProjects(c)) continue;
+                    connectionRepository.delete(c);
+                    log.info("合并重复的案件库连接: 删除 id={}，保留 id={}", c.getId(), keep.getId());
+                }
+            }
+        } catch (RuntimeException e) {
+            log.warn("合并重复的案件库连接失败（不影响使用）: {}", e.toString());
+        }
+    }
+
+    private boolean hasProjects(CloudConnection c) {
+        return projectRemotes != null && !projectRemotes.findByConnectionId(c.getId()).isEmpty();
+    }
+
     private CloudConnection bridge(String base, Long userId, String key,
                                    String fingerprint, CloudConnection existing, AccountService.ConnectionSnapshot snapshot) {
         JSONObject data = requestBridge(base, key);
+        CloudConnection raceWinner = null;
+        CloudConnection saved;
         synchronized (accountService) {
             if (!accountService.isCurrentConnection(snapshot)) throw VersionException.userFacing(LangText.of(
                     "账户已变化，请重试", "Account changed; please try again"));
-            CloudConnection conn = existing != null ? existing : new CloudConnection();
+            CloudConnection conn = existing;
+            if (conn == null) {
+                // C25（lane C）：两个请求同时登录，都在锁外读到「还没有连接」，各自桥接、各自存一行——同一个
+                // 案件库出现两条一模一样的连接，「放进团队案件库」随即报连了太多库，还多出一枚没人撤的令牌。
+                // 锁内再读一次：同一个账户已经有人连好了就用那一条，刚换来的令牌撤掉（锁外做，网络调用）。
+                CloudConnection now = connectionRepository.findFirstByUserIdAndServerUrl(userId, base).orElse(null);
+                if (now != null && fingerprint != null && fingerprint.equals(now.getAccountFingerprint())) raceWinner = now;
+                else conn = now;
+            }
+            saved = raceWinner != null ? null : saveBridged(conn, base, userId, fingerprint, data);
+        }
+        if (raceWinner != null) {
+            log.info("并发登录：沿用已有的官方案件库连接，撤销多换出的令牌: {} user={}", base, userId);
+            try { cloudSyncService.revokeRemoteToken(base, data.getLong("tokenId", null), data.getStr("token")); }
+            catch (RuntimeException e) { log.warn("撤销多余令牌失败（不影响连接）: {}", e.toString()); }
+            return raceWinner;
+        }
+        return saved;
+    }
+
+    private CloudConnection saveBridged(CloudConnection existingOrNull, String base, Long userId, String fingerprint, JSONObject data) {
+        {
+            CloudConnection conn = existingOrNull != null ? existingOrNull : new CloudConnection();
             conn.setUserId(userId);
             conn.setServerUrl(base);
             conn.setUsername(data.getStr("username"));

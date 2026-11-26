@@ -22,7 +22,9 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -112,4 +114,19 @@ class ProjectFileServiceSignalActorTest {
 
         verify(workSessionService).onChangeSignal(eq(PROJECT_ID), eq(AGENT_USER_ID), eq("用户"));
     }
+
+    /**
+     * C27 (lane C): opening a freshly pulled case creates the hidden .stagezone folder. That is the app's own folder,
+     * not the lawyer editing the case, so it must not open a work session (which then blocked the next 取回).
+     */
+    @Test
+    void creatingTheHiddenStagingFolderSendsNoChangeSignalButAnOrdinaryFolderDoes() {
+        when(projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(anyLong(), any(), anyString(), anyLong())).thenReturn(false);
+        service.createFolder(PROJECT_ID, null, ".stagezone", OWNER_ID);
+        service.createFolder(PROJECT_ID, null, "__staging_area__", OWNER_ID);
+        verify(workSessionService, never()).onChangeSignal(anyLong(), any(), any());
+        service.createFolder(PROJECT_ID, null, "证据", OWNER_ID);
+        verify(workSessionService).onChangeSignal(eq(PROJECT_ID), any(), any());
+    }
 }
+

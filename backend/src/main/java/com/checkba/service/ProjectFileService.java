@@ -115,6 +115,9 @@ public class ProjectFileService {
         return projectFileRepository.findByProjectIdAndIdInAndIsDeletedFalse(projectId, fileIds);
     }
 
+    /** Hidden folders the app creates for itself (same set as the frontend's HIDDEN_SYSTEM_FOLDER_NAMES). */
+    static final java.util.Set<String> SYSTEM_FOLDER_NAMES = java.util.Set.of(".stagezone", "__staging_area__");
+
     /**
      * 创建文件夹
      */
@@ -164,7 +167,10 @@ public class ProjectFileService {
 
         ProjectFile savedFolder = projectFileRepository.save(folder);
         materializeLocalFolder(savedFolder);
-        if (signal) signalChange(projectId, userId);
+        // C27（lane C）：打开案卷时前端会建好隐藏的暂存区目录（.stagezone）。那是软件自己的系统目录，不是律师在改案卷——
+        // 原来它也发版本变更信号，刚取回的案卷就以取回人的名义开出一段只改了清单的工作，下一次取回被拒。
+        // C23：客户材料入库走 createFolderQuietly（signal=false），自己记版本，不另开工作段。
+        if (signal && !SYSTEM_FOLDER_NAMES.contains(savedFolder.getName())) signalChange(projectId, userId);
         return savedFolder;
     }
 
