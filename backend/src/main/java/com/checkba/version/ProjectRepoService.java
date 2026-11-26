@@ -178,7 +178,7 @@ public class ProjectRepoService {
                     }
                 }
             }
-            return Math.addExact(total, objectStore.usageBytes(projectId));
+            return Math.addExact(total, billableObjectBytes(projectId));
         } catch (IOException e) {
             log.warn("统计版本记录占用失败: project={}", projectId, e);
             return total;
@@ -1853,6 +1853,27 @@ public class ProjectRepoService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private org.springframework.beans.factory.ObjectProvider<com.checkba.version.cloud.ProjectObjectPlanService> objectPlans;
+
+    /** C12：版本对象占用里减去已完成的免费对象——配额、账单与仓库大小展示同一口径（lane W 复核）。 */
+    public long billableObjectBytes(long projectId) throws IOException {
+        long usage = objectStore.usageBytes(projectId);
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        return plans == null ? usage : Math.max(0, usage - plans.completedFreeBytes(projectId));
+    }
+
+    /** C12：HEAD 里指向这些对象（sha256）的路径——服务端工作区里免费对象的那份副本不计费。 */
+    public Set<String> headPathsPointingTo(long projectId, Set<String> sha256s) {
+        if (sha256s == null || sha256s.isEmpty()) return Set.of();
+        Set<String> out = new LinkedHashSet<>();
+        try (Repository repo = open(projectId)) {
+            if (repo.resolve("HEAD^{commit}") == null) return Set.of();
+            for (var e : pointerPathsAt(repo, "HEAD").entrySet())
+                if (e.getValue().stream().anyMatch(o -> sha256s.contains(o.sha256()))) out.add(e.getKey());
+        } catch (IOException | RuntimeException e) {
+            return Set.of();
+        }
+        return out;
+    }
 
     /** C12：这个对象不在本机/案件库，而是共享人声明了「仅在本机」（大小一致）。 */
     private boolean declaredLocalOnly(long projectId, LocalVersionObjectStore.ObjectRef object) {

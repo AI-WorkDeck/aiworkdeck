@@ -67,6 +67,14 @@ public class ProjectObjectPlanService {
     /** Completed free bytes only: what the storage quota and the bill must leave out. */
     public long completedFreeBytes(long projectId) { return plans.completedFreeBytes(projectId); }
 
+    /** Completed free objects of the case (sha256), for excluding the server's working copies from the bill. */
+    public java.util.Set<String> completedFreeShas(long projectId) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (var row : plans.findByProjectIdAndPlanAndState(projectId, ProjectObjectPlan.FREE, ProjectObjectPlan.COMPLETE))
+            out.add(row.getObjectSha());
+        return out;
+    }
+
     /**
      * Reserve {@code object} on the free plan. Serialized per matter by a row lock on the project and made
      * idempotent by the unique (project, sha) row, so concurrent or repeated uploads count once. The caller runs
