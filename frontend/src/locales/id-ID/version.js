@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari daftar file.",
   transferUploading: 'Mengunggah file besar {done} / {total} MB; pada koneksi lambat ini bisa memakan beberapa menit',
   transferDownloading: 'Mengunduh file besar {done} / {total} MB; pada koneksi lambat ini bisa memakan beberapa menit',
+  "remoteAheadMaterials": "Materi baru dari klien · {count}",
+  "remoteAheadPlusMaterials": "; ditambah {count} materi klien",
+  "submitGuidePullMaterials": "Ambil {count} materi baru dari klien",
 }

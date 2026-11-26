@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Öffnen Sie diesen zusammengeführten Entwurf über die Dateiliste.",
   transferUploading: 'Große Dateien werden hochgeladen: {done} / {total} MB. Bei langsamer Verbindung kann das einige Minuten dauern',
   transferDownloading: 'Große Dateien werden heruntergeladen: {done} / {total} MB. Bei langsamer Verbindung kann das einige Minuten dauern',
+  "remoteAheadMaterials": "Neue Unterlagen vom Mandanten · {count}",
+  "remoteAheadPlusMaterials": "; dazu {count} Unterlagen vom Mandanten",
+  "submitGuidePullMaterials": "Die {count} neuen Unterlagen des Mandanten abrufen",
 }

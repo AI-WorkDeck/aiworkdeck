@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "افتح هذه المسودة المدمجة من قائمة الملفات.",
   transferUploading: 'جارٍ رفع الملفات الكبيرة {done} / {total} ميغابايت؛ قد يستغرق ذلك بضع دقائق على اتصال بطيء',
   transferDownloading: 'جارٍ تنزيل الملفات الكبيرة {done} / {total} ميغابايت؛ قد يستغرق ذلك بضع دقائق على اتصال بطيء',
+  "remoteAheadMaterials": "مواد جديدة من العميل · {count}",
+  "remoteAheadPlusMaterials": "؛ إضافة إلى {count} من مواد العميل",
+  "submitGuidePullMaterials": "اسحب {count} من مواد العميل الجديدة",
 }

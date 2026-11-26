@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Vui lòng mở bản thảo hợp nhất này từ danh sách tệp.",
   transferUploading: 'Đang tải lên tệp lớn {done} / {total} MB; với kết nối chậm có thể mất vài phút',
   transferDownloading: 'Đang tải xuống tệp lớn {done} / {total} MB; với kết nối chậm có thể mất vài phút',
+  "remoteAheadMaterials": "Tài liệu mới từ khách hàng · {count}",
+  "remoteAheadPlusMaterials": "; thêm {count} tài liệu của khách hàng",
+  "submitGuidePullMaterials": "Lấy {count} tài liệu mới của khách hàng",
 }

@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "這份合併稿要從檔案列表裡開啟檢視",
   transferUploading: '正在上傳大型檔案 {done} / {total} MB，網速慢時需要幾分鐘',
   transferDownloading: '正在取回大型檔案 {done} / {total} MB，網速慢時需要幾分鐘',
+  "remoteAheadMaterials": "客戶交來了新材料 · {count} 份",
+  "remoteAheadPlusMaterials": "；另有客戶材料 {count} 份",
+  "submitGuidePullMaterials": "取回客戶交來的 {count} 份材料",
 }

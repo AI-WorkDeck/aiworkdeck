@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Ανοίξτε αυτό το συγχωνευμένο προσχέδιο από τη λίστα αρχείων.",
   transferUploading: 'Μεταφόρτωση μεγάλων αρχείων {done} / {total} MB· σε αργή σύνδεση μπορεί να διαρκέσει λίγα λεπτά',
   transferDownloading: 'Λήψη μεγάλων αρχείων {done} / {total} MB· σε αργή σύνδεση μπορεί να διαρκέσει λίγα λεπτά',
+  "remoteAheadMaterials": "Νέο υλικό από τον πελάτη · {count}",
+  "remoteAheadPlusMaterials": "· επιπλέον {count} υλικό πελάτη",
+  "submitGuidePullMaterials": "Λήψη των {count} νέων υλικών του πελάτη",
 }

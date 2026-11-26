@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Bu birleştirilmiş taslağı dosya listesinden açın.",
   transferUploading: 'Büyük dosyalar yükleniyor {done} / {total} MB; yavaş bağlantıda bu birkaç dakika sürebilir',
   transferDownloading: 'Büyük dosyalar indiriliyor {done} / {total} MB; yavaş bağlantıda bu birkaç dakika sürebilir',
+  "remoteAheadMaterials": "Müvekkilden yeni belgeler · {count}",
+  "remoteAheadPlusMaterials": "; ayrıca {count} müvekkil belgesi",
+  "submitGuidePullMaterials": "Müvekkilin {count} yeni belgesini al",
 }

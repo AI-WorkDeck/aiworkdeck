@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Abra este borrador fusionado desde la lista de archivos.",
   transferUploading: 'Subiendo archivos grandes {done} / {total} MB; con una conexión lenta puede tardar unos minutos',
   transferDownloading: 'Descargando archivos grandes {done} / {total} MB; con una conexión lenta puede tardar unos minutos',
+  "remoteAheadMaterials": "Nuevos materiales del cliente · {count}",
+  "remoteAheadPlusMaterials": "; además {count} materiales del cliente",
+  "submitGuidePullMaterials": "Traer los {count} materiales nuevos del cliente",
 }

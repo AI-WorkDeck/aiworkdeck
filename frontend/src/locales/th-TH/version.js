@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "โปรดเปิดดูฉบับร่างที่รวมแล้วนี้จากรายการไฟล์",
   transferUploading: 'กำลังอัปโหลดไฟล์ขนาดใหญ่ {done} / {total} MB หากเครือข่ายช้าอาจใช้เวลาสองสามนาที',
   transferDownloading: 'กำลังดาวน์โหลดไฟล์ขนาดใหญ่ {done} / {total} MB หากเครือข่ายช้าอาจใช้เวลาสองสามนาที',
+  "remoteAheadMaterials": "เอกสารใหม่จากลูกความ · {count}",
+  "remoteAheadPlusMaterials": "; และเอกสารลูกความอีก {count} รายการ",
+  "submitGuidePullMaterials": "ดึงเอกสารใหม่จากลูกความ {count} รายการ",
 }

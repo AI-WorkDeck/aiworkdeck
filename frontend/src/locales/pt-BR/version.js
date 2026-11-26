@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Abra este rascunho mesclado a partir da lista de arquivos.",
   transferUploading: 'Enviando arquivos grandes {done} / {total} MB; em uma conexão lenta, isso pode levar alguns minutos',
   transferDownloading: 'Baixando arquivos grandes {done} / {total} MB; em uma conexão lenta, isso pode levar alguns minutos',
+  "remoteAheadMaterials": "Novos materiais do cliente · {count}",
+  "remoteAheadPlusMaterials": "; mais {count} materiais do cliente",
+  "submitGuidePullMaterials": "Buscar os {count} novos materiais do cliente",
 }

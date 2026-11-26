@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "इस मर्ज किए गए ड्राफ़्ट को फ़ाइल सूची से खोलें।",
   transferUploading: 'बड़ी फ़ाइलें अपलोड हो रही हैं {done} / {total} MB; धीमे कनेक्शन पर कुछ मिनट लग सकते हैं',
   transferDownloading: 'बड़ी फ़ाइलें डाउनलोड हो रही हैं {done} / {total} MB; धीमे कनेक्शन पर कुछ मिनट लग सकते हैं',
+  "remoteAheadMaterials": "क्लाइंट की नई सामग्री · {count}",
+  "remoteAheadPlusMaterials": "; साथ में क्लाइंट की {count} सामग्री",
+  "submitGuidePullMaterials": "क्लाइंट की {count} नई सामग्री लाएँ",
 }

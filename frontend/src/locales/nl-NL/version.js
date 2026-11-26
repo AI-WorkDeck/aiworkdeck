@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Open dit samengevoegde concept vanuit de bestandenlijst.",
   transferUploading: 'Grote bestanden uploaden {done} / {total} MB; bij een trage verbinding kan dit enkele minuten duren',
   transferDownloading: 'Grote bestanden downloaden {done} / {total} MB; bij een trage verbinding kan dit enkele minuten duren',
+  "remoteAheadMaterials": "Nieuwe stukken van de cliënt · {count}",
+  "remoteAheadPlusMaterials": "; plus {count} stukken van de cliënt",
+  "submitGuidePullMaterials": "De {count} nieuwe stukken van de cliënt ophalen",
 }

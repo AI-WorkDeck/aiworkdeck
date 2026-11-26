@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Ouvrez ce brouillon fusionné depuis la liste des fichiers.",
   transferUploading: 'Envoi des fichiers volumineux {done} / {total} Mo ; avec une connexion lente, cela peut prendre quelques minutes',
   transferDownloading: 'Récupération des fichiers volumineux {done} / {total} Mo ; avec une connexion lente, cela peut prendre quelques minutes',
+  "remoteAheadMaterials": "Nouvelles pièces du client · {count}",
+  "remoteAheadPlusMaterials": "; plus {count} pièces du client",
+  "submitGuidePullMaterials": "Récupérer les {count} nouvelles pièces du client",
 }

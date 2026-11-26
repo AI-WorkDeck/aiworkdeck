@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "このマージ済み原稿はファイル一覧から開いて確認してください。",
   transferUploading: '大きなファイルをアップロード中 {done} / {total} MB。回線が遅い場合は数分かかることがあります',
   transferDownloading: '大きなファイルを取得中 {done} / {total} MB。回線が遅い場合は数分かかることがあります',
+  "remoteAheadMaterials": "依頼者から新しい資料 · {count} 件",
+  "remoteAheadPlusMaterials": "、ほかに依頼者の資料 {count} 件",
+  "submitGuidePullMaterials": "依頼者からの新しい資料 {count} 件を取得",
 }

@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Откройте этот объединённый вариант из списка файлов.",
   transferUploading: 'Загрузка больших файлов {done} / {total} МБ; при медленном соединении это может занять несколько минут',
   transferDownloading: 'Получение больших файлов {done} / {total} МБ; при медленном соединении это может занять несколько минут',
+  "remoteAheadMaterials": "Новые материалы от клиента · {count}",
+  "remoteAheadPlusMaterials": "; ещё материалов клиента: {count}",
+  "submitGuidePullMaterials": "Получить новые материалы клиента: {count}",
 }

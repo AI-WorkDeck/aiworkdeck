@@ -592,4 +592,7 @@ export default {
   mergeReadonlyNeedsFile: 'Open this merged draft from the file list.',
   transferUploading: 'Uploading large files {done} / {total} MB; this can take a few minutes on a slow connection',
   transferDownloading: 'Downloading large files {done} / {total} MB; this can take a few minutes on a slow connection',
+  remoteAheadMaterials: 'New client materials · {count}',
+  remoteAheadPlusMaterials: '; plus {count} client materials',
+  submitGuidePullMaterials: 'Pull the {count} new client materials',
 }

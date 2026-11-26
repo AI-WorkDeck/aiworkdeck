@@ -541,4 +541,7 @@ export default {
   "mergeReadonlyNeedsFile": "Apri questa bozza unita dall'elenco dei file.",
   transferUploading: 'Caricamento dei file di grandi dimensioni {done} / {total} MB; con una connessione lenta può richiedere alcuni minuti',
   transferDownloading: 'Download dei file di grandi dimensioni {done} / {total} MB; con una connessione lenta può richiedere alcuni minuti',
+  "remoteAheadMaterials": "Nuovi materiali dal cliente · {count}",
+  "remoteAheadPlusMaterials": "; più {count} materiali del cliente",
+  "submitGuidePullMaterials": "Recupera i {count} nuovi materiali del cliente",
 }
