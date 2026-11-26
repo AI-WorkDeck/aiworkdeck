@@ -150,5 +150,19 @@ class ProjectObjectPlanServiceTest {
         assertTrue(service.isFreePlan(project, obj('c', 100)));
         assertFalse(service.isFreePlan(project, obj('c', 99)), "size must match");
     }
+
+    /** W review: a free claim on complete without a reservation is checked against the same caps. */
+    @Test void aFreeClaimOnCompleteIsCappedLikeAReservation() {
+        service.markCompleteFree(project, obj('d', 101)); // over the per-file cap: stays paid
+        assertEquals(0, service.completedFreeBytes(project));
+        assertFalse(service.isFreePlan(project, obj('d', 101)));
+        service.reserveFree(project, obj('a', 100));
+        service.reserveFree(project, obj('b', 100));
+        service.markCompleteFree(project, obj('c', 60)); // 200 + 60 > 250: stays paid
+        assertFalse(service.isFreePlan(project, obj('c', 60)));
+        service.markCompleteFree(project, obj('f', 50)); // 200 + 50 = 250: fits, free
+        assertTrue(service.isFreePlan(project, obj('f', 50)));
+        assertEquals(50, service.completedFreeBytes(project));
+    }
 }
 

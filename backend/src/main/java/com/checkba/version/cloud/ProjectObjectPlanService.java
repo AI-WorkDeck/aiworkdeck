@@ -120,6 +120,15 @@ public class ProjectObjectPlanService {
     @Transactional
     public void markCompleteFree(long projectId, ObjectRef object) {
         if (plans.findByProjectIdAndObjectSha(projectId, object.sha256()).isEmpty()) {
+            // W review: the header on complete is a claim, not a right. Without a reservation, the same limits as
+            // reserveFree apply; an object that doesn't fit is recorded as paid (stays billable).
+            projects.lockForImWrite(projectId).orElseThrow(() -> new IllegalArgumentException("Project not found"));
+            plans.releaseExpired(projectId, LocalDateTime.now().minusHours(RESERVATION_TTL_HOURS));
+            long used = plans.freeBytes(projectId);
+            if (object.size() > freePerFileBytes || used + object.size() > freePerProjectBytes) {
+                markComplete(projectId, object);
+                return;
+            }
             ProjectObjectPlan row = new ProjectObjectPlan();
             row.setProjectId(projectId);
             row.setObjectSha(object.sha256());
