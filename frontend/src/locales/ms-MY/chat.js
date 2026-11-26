@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Salin output",
   "copyFailed": "Penyalinan gagal",
   "tokenUsageLine": "{n} token dalam giliran ini",
+  "viewUsage": "Lihat penggunaan",
   "statusError": "Ralat",
   "statusSuccess": "Berjaya",
   "statusRunning": "Sedang berjalan",

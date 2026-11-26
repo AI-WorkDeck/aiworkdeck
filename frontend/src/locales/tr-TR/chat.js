@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Çıktıyı kopyala",
   "copyFailed": "Kopyalama başarısız",
   "tokenUsageLine": "Bu turda {n} token",
+  "viewUsage": "Kullanımı görüntüle",
   "statusError": "Hata",
   "statusSuccess": "Başarılı",
   "statusRunning": "Çalışıyor",

@@ -39,4 +39,22 @@ class AgentStreamHandlerCacheUsageTest {
         verify(service).recordUsage(eq(1L), eq(1L), eq("script"), any(), eq("conv"),
                 org.mockito.ArgumentMatchers.<Integer>isNull(), org.mockito.ArgumentMatchers.<Integer>isNull());
     }
+
+    @Test
+    void tokenUsageEventSaysWhetherThePlatformChannelPaidForIt() {
+        // Q24: on the platform channel the lawyer pays in ¥, so the chat hides the token count
+        for (boolean platform : new boolean[]{true, false}) {
+            TokenUsageService service = mock(TokenUsageService.class);
+            org.mockito.Mockito.when(service.isPlatformChannel()).thenReturn(platform);
+            SseEmitterService sse = mock(SseEmitterService.class);
+            AgentStreamHandler handler = new AgentStreamHandler(sse, "conv", service, "1", 1L, "m", 0L);
+            handler.setOnComplete(ignored -> {});
+            handler.onNext("ok");
+            handler.onComplete(Response.from(AiMessage.from("ok"), new TokenUsage(10, 2)));
+            org.mockito.ArgumentCaptor<Object> payload = org.mockito.ArgumentCaptor.forClass(Object.class);
+            verify(sse, org.mockito.Mockito.atLeastOnce()).send(eq("conv"), eq("token_usage"), payload.capture());
+            String json = String.valueOf(payload.getValue());
+            org.junit.jupiter.api.Assertions.assertTrue(json.contains("\"platform\":" + platform), json);
+        }
+    }
 }

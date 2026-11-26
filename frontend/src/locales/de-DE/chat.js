@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Ausgabe kopieren",
   "copyFailed": "Kopieren fehlgeschlagen",
   "tokenUsageLine": "{n} Token in diesem Durchgang",
+  "viewUsage": "Nutzung anzeigen",
   "statusError": "Fehler",
   "statusSuccess": "Erfolg",
   "statusRunning": "Läuft",

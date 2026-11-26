@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "複製輸出",
   "copyFailed": "複製失敗",
   "tokenUsageLine": "本輪 {n} tokens",
+  "viewUsage": "查看用量",
   "statusError": "出錯",
   "statusSuccess": "成功",
   "statusRunning": "執行中",

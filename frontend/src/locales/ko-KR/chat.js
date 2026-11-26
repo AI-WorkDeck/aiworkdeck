@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "출력 복사",
   "copyFailed": "복사 실패",
   "tokenUsageLine": "이번 턴에 {n} 토큰",
+  "viewUsage": "사용량 보기",
   "statusError": "오류",
   "statusSuccess": "성공",
   "statusRunning": "실행 중",

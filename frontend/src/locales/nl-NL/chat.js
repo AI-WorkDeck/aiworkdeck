@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Uitvoer kopiëren",
   "copyFailed": "Kopiëren mislukt",
   "tokenUsageLine": "{n} tokens deze beurt",
+  "viewUsage": "Gebruik bekijken",
   "statusError": "Fout",
   "statusSuccess": "Geslaagd",
   "statusRunning": "Wordt uitgevoerd",

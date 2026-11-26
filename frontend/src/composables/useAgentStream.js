@@ -1766,6 +1766,8 @@ export function useAgentStream() {
                 tokenUsage.value.promptTokens += d.promptTokens || 0
                 tokenUsage.value.completionTokens += d.completionTokens || 0
                 tokenUsage.value.totalTokens += d.totalTokens || 0
+                // Q24：平台通道按余额扣费，这一轮任一次调用走了平台通道，页脚就不给律师看 token 数
+                if (d.platform === true) tokenUsage.value.platform = true
                 console.log('[AgentStream] Token Usage Updated:', tokenUsage.value)
             } catch (e) {
                 console.error('Failed to parse token_usage', e)
