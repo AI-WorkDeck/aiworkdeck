@@ -581,7 +581,7 @@
         :project-name="project.name || ''"
         :cloud="collabCloud"
         :conflict-pending="adoptConflictPending"
-        :working="!!versionWorkStatus.working"
+        :working="versionUnsaved"
         :initial-tab="collabInitialTab"
         :inviter-name="userDisplayName || (currentUser && currentUser.displayName) || ''"
         @changed="onCollabChanged"
@@ -597,12 +597,13 @@
       <SubmitDraftGuide
         v-model:visible="submitGuideVisible"
         :project-id="projectId"
-        :working="!!versionWorkStatus.working"
+        :working="versionUnsaved"
         :cloud="collabCloud"
         :mode="submitGuideMode"
         @changed="onCollabChanged"
         @reload-files="onVersionReloadFiles"
         @conflict="onCollabConflict"
+        @queued="onSubmitQueuedOffline"
       />
 
       <!-- 文档比较选择对话框 -->
@@ -1364,7 +1365,7 @@
                       :cloud-linked="collabLinked"
                       :refresh-token="collabRefreshToken"
                       :cloud="collabCloud"
-                      :working="!!versionWorkStatus.working"
+                      :working="versionUnsaved"
                       @compare-file="onVersionCompareFile"
                       @reload-files="onVersionReloadFiles"
                       @changed="onCollabChanged"
@@ -1651,7 +1652,7 @@
                       :cloud-linked="collabLinked"
                       :refresh-token="collabRefreshToken"
                       :cloud="collabCloud"
-                      :working="!!versionWorkStatus.working"
+                      :working="versionUnsaved"
                       @compare-file="onVersionCompareFile"
                       @reload-files="onVersionReloadFiles"
                       @changed="onCollabChanged"
@@ -2282,6 +2283,19 @@
         <text class="adopt-pending-go" @tap="goHandleAdoptConflict">{{ $t('workbench.goHandle') }}</text>
       </view>
 
+      <!-- C8/C10：只读成员 / 已被移出——文档打开即只读，交稿入口收起；这条说明说清原因和该找谁 -->
+      <view v-if="collabMemberBlocked && !collabMemberBarDismissed" class="adopt-pending-bar member-blocked-bar" role="status">
+        <text class="adopt-pending-text">{{ collabMemberBarText }}</text>
+        <text class="adopt-pending-go" role="button" :aria-label="$t('common.close')" @tap="collabMemberBarDismissed = true">×</text>
+      </view>
+
+      <!-- C12：版本里有大文件 / 音视频、而文件云端备份没开：保存时就说，不等交稿 -->
+      <view v-if="collabLargeFilesBlocked && !collabMemberBlocked && !largeFilesBarDismissed" class="adopt-pending-bar large-files-bar" role="status">
+        <text class="adopt-pending-text">{{ collabLargeFilesText }}</text>
+        <text class="adopt-pending-go" @tap="openBackupConsent">{{ $t('version.largeFilesEnableBackup') }}</text>
+        <text class="adopt-pending-go" role="button" :aria-label="$t('common.close')" @tap="largeFilesBarDismissed = true">×</text>
+      </view>
+
       <!-- IDE 化 Cmd+P 快速打开 -->
       <QuickOpenPanel
         v-if="quickOpenVisible && hasNamedProject"
@@ -2469,6 +2483,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock, OPEN_BACKUP_CONSENT_EVENT } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
@@ -2591,6 +2606,7 @@ import {
   getCloudAccountGeneration,
   getCloudStatus, // 协作 chip：这份案卷有没有放进团队案件库、状态如何
   checkCloud, // 协作 chip 的联网刷新（cloudStatus 是不联网的本地快照）
+  uploadToCloud, // C11：联网后自动交一次
   getCloudMembers, // 成员堆栈：案卷放进案件库后，同事在库那边的名单本机 /members 里没有
   getCurrentUser as getCurrentUserApi, // 顶栏头像：补一次真实接口，本地缓存只是首屏兜底
   registerMeetingFromFile, // 右键转写：音频文件注册进会议录音面板（dev-board#227）
@@ -3105,6 +3121,10 @@ export default {
       // C5：最近一次**联网**核对团队案件库完成的时间（ms）与是否正在核对；collabNow 每 5 秒走一格，
       // 让「几秒前核对」的判断跟着时间变
       collabCheckedAt: 0,
+      // C11：没联网时点了交稿：记下来，联网后自动交一次（按项目存，重启后仍在）
+      collabRetryQueued: false,
+      collabMemberBarDismissed: false,
+      largeFilesBarDismissed: false,
       collabChecking: false,
       collabNow: Date.now(),
       collabDialogVisible: false,
@@ -3209,6 +3229,32 @@ export default {
     // C16：这份案卷里凭访问码进来的客户人数（案件库名单）
     projectClientCount() {
       return (this.projectMembers || []).filter(m => typeof m?.role === 'string' && m.role.startsWith('CLIENT')).length
+    },
+    // C13：手头有没存成版本的改动——进行中的工作段，或者在访达里直接改名/新增/删掉的文件
+    // （没有工作段，changedCount > 0）。后者原来被当成「一致」，交稿也什么都交不上去。
+    versionUnsaved() {
+      const s = this.versionWorkStatus || {}
+      return !!s.working || Number(s.changedCount) > 0
+    },
+    collabLargeFilesBlocked() {
+      const c = this.collabCloud
+      return !!(c && c.largeFilesNeedBackup)
+    },
+    collabLargeFilesText() {
+      const names = ((this.collabCloud && this.collabCloud.largeFiles) || []).slice(0, 3)
+      return names.length
+        ? this.$t('workbench.largeFilesBar', { files: names.join(this.$t('workbench.largeFilesSep')) })
+        : this.$t('workbench.largeFilesBarNoNames')
+    },
+    // C8/C10：案件库里的身份。只读成员与已被移出的人：只读打开、不给交稿、给一条说明。
+    collabMemberBlocked() {
+      const c = this.collabCloud
+      return !!(c && c.linked !== false && (c.removed || c.myRole === 'READ_ONLY'))
+    },
+    collabMemberBarText() {
+      const c = this.collabCloud || {}
+      if (c.removed) return c.ownerName ? this.$t('workbench.removedMemberBar', { owner: c.ownerName }) : this.$t('workbench.removedMemberBarNoOwner')
+      return c.ownerName ? this.$t('workbench.readOnlyMemberBar', { owner: c.ownerName }) : this.$t('workbench.readOnlyMemberBarNoOwner')
     },
     // C6：负责人是案件的负责人（成员名单里 role=OWNER，共享案件以案件库为准），不是本机这位。
     // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
@@ -3423,6 +3469,9 @@ export default {
           || this.projectId == null || this.projectId === '' || !this.project || this.project.id == null
           || !['USER', 'ADMIN'].includes(role)
           || String(this.project.id) !== String(this.projectId)) return false
+      // C8：案件库说我是只读成员（或已被移出）时只**收紧**不放宽：本机副本照样能读，但不让改——
+      // 改了也交不上去，律师会以为改动到了团队。云端角色从不用来授予写权限。
+      if (this.collabMemberBlocked) return false
       if (this.project.userId != null && String(this.project.userId) === String(uid)) return true
       if (!this.localProjectMembersLoaded
           || String(this.localProjectMembersProjectId) !== String(this.projectId)) return false
@@ -3550,13 +3599,15 @@ export default {
       }
       if (this.adoptConflictPending) return this.$t('workbench.adoptPendingText')
       const c = this.collabCloud || {}
+      if (c.removed) return this.$t('workbench.collabRemoved')
       if (c.offline) return this.$t('workbench.collabOffline')
+      if (this.collabRetryQueued && c.pendingUpload) return this.$t('workbench.collabQueuedOffline')
       // 「同事交了新稿」四处同源（utils/collabWording.js）：后端给得出作者时说清楚是
       // 本人的另一台电脑还是哪位同事、几版；给不出（老服务端）才落回这句老文案。
       if (c.remoteAhead) {
         return remoteAheadText((k, params) => this.$t(k, params), c, { fallbackKey: 'workbench.collabRemoteAhead' })
       }
-      if (c.pendingUpload || this.versionWorkStatus.working) return this.$t('workbench.collabPendingUpload')
+      if (c.pendingUpload || this.versionUnsaved) return this.$t('workbench.collabPendingUpload')
       // C5：只有刚联网核对过（15 秒内）才说「和大家的稿一致」。更早的核对只能说明当时一致——
       // 同事可能刚交了新稿，律师据此在旧稿上动手，之后就是合并或冲突。
       if (!this.collabFresh) {
@@ -3573,8 +3624,8 @@ export default {
       if (this.documentMergeState.running) return 'blue'
       if (this.adoptConflictPending) return 'amber'
       const c = this.collabCloud || {}
-      if (c.offline) return 'amber'
-      if (c.remoteAhead || c.pendingUpload || this.versionWorkStatus.working) return 'blue'
+      if (c.removed || c.offline) return 'amber'
+      if (c.remoteAhead || c.pendingUpload || this.versionUnsaved) return 'blue'
       // 核对过时不亮绿灯（C5）
       return this.collabFresh ? 'green' : 'blue'
     },
@@ -5586,6 +5637,7 @@ export default {
     async onCollabAccountChanged() {
       this.stopCollabPolling()
       this.collabCloud = null
+      if (typeof this.loadQueuedSubmit === 'function') this.loadQueuedSubmit()
       const lifecycle = this._collabStateLifecycle
       const projectId = this.projectId
       const accountGeneration = getCloudAccountGeneration()
@@ -5623,6 +5675,7 @@ export default {
         // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
         if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()
         if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
+        if (online && typeof this.retryQueuedSubmit === 'function') this.retryQueuedSubmit()
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
       } finally {
@@ -5661,11 +5714,14 @@ export default {
       this._collabOnFocus = () => this.recheckCollabIfStale()
       this._collabOnDocInteraction = () => this.recheckCollabIfStale()
       if (typeof window !== 'undefined') window.addEventListener('focus', this._collabOnFocus)
+      // C11：网络恢复时也核对一次（排着队的交稿据此自动交）
+      if (typeof window !== 'undefined') window.addEventListener('online', this._collabOnFocus)
       uni.$on('awd:doc-interaction', this._collabOnDocInteraction)
     },
     stopCollabFreshness() {
       if (this._collabClockTimer) { clearInterval(this._collabClockTimer); this._collabClockTimer = null }
       if (this._collabOnFocus && typeof window !== 'undefined') window.removeEventListener('focus', this._collabOnFocus)
+      if (this._collabOnFocus && typeof window !== 'undefined') window.removeEventListener('online', this._collabOnFocus)
       if (this._collabOnDocInteraction) uni.$off('awd:doc-interaction', this._collabOnDocInteraction)
       this._collabOnFocus = null
       this._collabOnDocInteraction = null
@@ -5684,7 +5740,47 @@ export default {
     // 交稿引导（dev-board#645）。页面这边只管开窗：弹窗打开后自己走一次联网的状态
     // 重读（三步清单上的勾选直接决定律师下一步点哪个按钮，用一份几分钟没刷新的快照
     // 渲染它是在骗人），读完再经 changed 事件把页面这份也带新。
+    openBackupConsent() {
+      uni.$emit(OPEN_BACKUP_CONSENT_EVENT)
+    },
+    // C11：没联网时交稿 → 记下「待交」，联网后自动交一次
+    onSubmitQueuedOffline() {
+      this.collabRetryQueued = true
+      try { uni.setStorageSync('awd_collab_retry_' + this.projectId, '1') } catch (e) { /* storage unavailable */ }
+    },
+    loadQueuedSubmit() {
+      try { this.collabRetryQueued = uni.getStorageSync('awd_collab_retry_' + this.projectId) === '1' } catch (e) { this.collabRetryQueued = false }
+    },
+    clearQueuedSubmit() {
+      this.collabRetryQueued = false
+      try { uni.removeStorageSync('awd_collab_retry_' + this.projectId) } catch (e) { /* storage unavailable */ }
+    },
+    async retryQueuedSubmit() {
+      const c = this.collabCloud || {}
+      if (!this.collabRetryQueued || this._collabRetrying || c.offline || c.removed || c.merging) return
+      if (!c.pendingUpload || this.collabMemberBlocked) { this.clearQueuedSubmit(); return }
+      // 只试一次：先清标志再交，失败也不在这里循环（律师点交稿仍可再试）
+      this._collabRetrying = true
+      this.clearQueuedSubmit()
+      try {
+        const res = await uploadToCloud(this.projectId)
+        const d = (res && res.data) || {}
+        if (d.status === 'UPLOADED') uni.showToast({ title: this.$t('workbench.queuedSubmitDone'), icon: 'none' })
+        else if (d.status === 'CONFLICT') this.onCollabConflict()
+        else if (d.message) uni.showToast({ title: d.message, icon: 'none' })
+      } catch (e) {
+        if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+      } finally {
+        this._collabRetrying = false
+        this.fetchCollabState()
+      }
+    },
     openSubmitGuide() {
+      // C8：只读成员 / 已被移出：不走交稿清单（三步走完才被拒，律师会以为改动交上去了）
+      if (this.collabMemberBlocked) {
+        uni.showToast({ title: this.collabMemberBarText, icon: 'none', duration: 4000 })
+        return
+      }
       this.submitGuideMode = 'guide'
       this.submitGuideVisible = true
     },
@@ -5704,9 +5800,15 @@ export default {
     // 定时器根本没起过；律师随后在抽屉里点「放进团队案件库」，chip 就此定格在这一刻，
     // 同事再交多少稿也不会刷新——假绿灯比不显示更糟（口径见 fetchCollabState 的注释）。
     // startCollabPolling 自带 _collabPollTimer 幂等守卫，每次动作后都调一遍是安全的。
-    onCollabChanged() {
+    onCollabChanged(payload) {
       const lifecycle = this._collabStateLifecycle || 0
-      this.fetchCollabState().then(() => {
+      // C10：协作抽屉「刷新状态」刚联网核对过，直接用它的结果（再读本地快照会把它盖掉）
+      if (payload && payload.cloud) {
+        this.collabCloud = payload.cloud
+        this.collabCheckedAt = Date.now()
+        this.collabNow = this.collabCheckedAt
+      }
+      ;(payload && payload.cloud ? Promise.resolve() : this.fetchCollabState()).then(() => {
         if (this._collabDisposed || lifecycle !== (this._collabStateLifecycle || 0)) return
         if (this.collabLinked) this.startCollabPolling()
       })
@@ -6923,6 +7025,7 @@ export default {
           // 先确认是否已关联案件库，否则首次加载会只留下本机成员。
           this.loadProjectMembers()
           if (!this.collabLinked) return
+          if (typeof this.loadQueuedSubmit === 'function') this.loadQueuedSubmit()
           this.fetchCollabState({ online: true })
           this.startCollabPolling()
         })

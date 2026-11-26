@@ -91,6 +91,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import {
   endWorkSession, updateFromCloud, uploadToCloud,
@@ -113,7 +114,7 @@ export default {
   },
   // changed：状态变了，页面重拉。reload-files：磁盘被改写，重载打开中的编辑器。
   // conflict：撞上了要逐份选择的情况，页面把人送到裁决现场。
-  emits: ['update:visible', 'changed', 'reload-files', 'conflict'],
+  emits: ['queued', 'update:visible', 'changed', 'reload-files', 'conflict'],
   data() {
     return {
       localWorking: false,
@@ -141,7 +142,7 @@ export default {
   },
   watch: {
     visible(v) {
-      if (!v) return
+      if (!v) { this.stopLiveRefresh(); return }
       this.localWorking = !!this.working
       this.localCloud = this.cloud || {}
       this.sessionName = ''
@@ -157,9 +158,43 @@ export default {
       // 还是个可点的主按钮——那一下点下去就是一次什么都没交的空交稿。
       this.busy = true
       this.refresh({ online: true }).finally(() => { this.busy = false })
+      this.startLiveRefresh()
     },
   },
+  beforeUnmount() { this.stopLiveRefresh() },
   methods: {
+    // C20：清单开着的时候案件库会变（同事又交了两版），原来只在打开时和每步做完后重读，
+    // 第 ② 步就一直说「案件库里没有你还没取回的稿」。开着时每 30 秒、窗口回到前台时联网重读一次；
+    // 有一步正在做就跳过（做完那一步自己会重读）。
+    startLiveRefresh() {
+      this.stopLiveRefresh()
+      if (this.mode === 'help') return
+      this._liveTimer = setInterval(() => this.liveRefresh(), 30000)
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        this._onFocus = () => this.liveRefresh()
+        window.addEventListener('focus', this._onFocus)
+      }
+    },
+    stopLiveRefresh() {
+      if (this._liveTimer) clearInterval(this._liveTimer)
+      this._liveTimer = null
+      if (this._onFocus && typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('focus', this._onFocus)
+      this._onFocus = null
+    },
+    async liveRefresh() {
+      if (!this.visible || this.busy || this.mode === 'help' || this._liveInFlight) return
+      this._liveInFlight = true
+      const snapshot = () => JSON.stringify([this.localWorking, ...['remoteAhead', 'remoteAheadCount', 'remoteAheadBySelf', 'offline']
+        .map((k) => (this.localCloud || {})[k])])
+      const before = snapshot()
+      try {
+        await this.refresh({ online: true, quiet: true })
+        // 页面只在清单真的变了时才重拉，不是每 30 秒拉一次
+        if (snapshot() !== before) this.$emit('changed')
+      } finally {
+        this._liveInFlight = false
+      }
+    },
     close() {
       this.$emit('update:visible', false)
     },
@@ -177,6 +212,8 @@ export default {
       }
       if (step.id === 'pull-latest') {
         // 「取回同事交的 6 版」与顶栏那句「同事交了新稿 · 6 版」同源同规则
+        // C11：没联网时不知道案件库有没有新稿，不能说「没有你还没取回的稿」
+        if (this.localCloud && this.localCloud.offline) return this.$t('version.submitGuidePullOffline')
         return step.state === 'done'
           ? this.$t('version.submitGuidePullDone')
           : pullStepText((k, p) => this.$t(k, p), this.localCloud)
@@ -198,7 +235,7 @@ export default {
      *
      * @returns {Promise<boolean>} true = 撞上裁决窗口，调用方不要再往下走
      */
-    async refresh({ online = false } = {}) {
+    async refresh({ online = false, quiet = false } = {}) {
       let conflicted = false
       try {
         // Right after a commit the repository lock may still be held (ingest, idle merge, cloud fetch);
@@ -212,7 +249,8 @@ export default {
           }
         }
         const d = (res && res.data) || {}
-        this.localWorking = !!d.working
+        // C13：访达里直接改过的文件（没有工作段）也要先存成版本，否则交稿交不上去
+        this.localWorking = !!d.working || Number(d.changedCount) > 0
         conflicted = !!(d.sessionEndConflict || d.cloudConflict || d.adoptConflict)
       } catch (e) {
         console.warn('[SubmitGuide] 读取版本状态失败', e)
@@ -223,7 +261,7 @@ export default {
       } catch (e) {
         console.warn('[SubmitGuide] 读取协作状态失败', e)
       }
-      this.$emit('changed')
+      if (!quiet) this.$emit('changed')
       if (conflicted) {
         this.close()
         this.$emit('conflict')
@@ -298,7 +336,18 @@ export default {
           await this.refresh()
         }
       } catch (e) {
-        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        // C12：大文件要先开文件云端备份——弹带按钮、不会消失的说明，不当成没联网
+        if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { this.close(); return }
+        // C11：先联网核对一次，确实是没联网才转成「联网后自动交」；权限类拒绝（只读 / 已移出）
+        // 原样说给律师听，不排队——重试永远不会成功
+        await this.refresh({ online: true })
+        if (this.localCloud && this.localCloud.offline) {
+          this.$emit('queued')
+          uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
+          this.close()
+        } else {
+          uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        }
       } finally {
         this.busy = false
       }
