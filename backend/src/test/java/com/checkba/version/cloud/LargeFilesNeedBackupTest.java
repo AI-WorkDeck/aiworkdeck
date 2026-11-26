@@ -30,6 +30,8 @@ class LargeFilesNeedBackupTest {
     String remote;
     /** Objects the fake case library already holds (sha256). */
     final java.util.Set<String> held = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    final java.util.Map<ObjectRef, String> pathOf = new java.util.LinkedHashMap<>(java.util.Map.of(
+            new ObjectRef("a".repeat(64), 30_000_000L), "证据/庭审录像.mp4"));
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -41,6 +43,13 @@ class LargeFilesNeedBackupTest {
         when(repos.mainBranch()).thenReturn("refs/heads/master");
         when(repos.objectPointersAt(eq(7L), anyString(), eq(true))).thenReturn(List.of(new ObjectRef("a".repeat(64), 30_000_000L)));
         when(repos.objectPointerPaths(eq(7L), anyString(), eq(true), anyInt())).thenReturn(List.of("证据/庭审录像.mp4"));
+        // Filtered variant behaves like the real one: path per pointer, kept only if the predicate passes.
+        when(repos.objectPointerPaths(eq(7L), anyString(), eq(true), anyInt(), any())).thenAnswer(call -> {
+            java.util.function.Predicate<ObjectRef> only = call.getArgument(4);
+            List<String> out = new java.util.ArrayList<>();
+            pathOf.forEach((ref, path) -> { if (only.test(ref)) out.add(path); });
+            return out;
+        });
         when(relay.catalogAccountScope()).thenReturn("scope");
         try {
             org.eclipse.jgit.lib.Repository repo = mock(org.eclipse.jgit.lib.Repository.class);
@@ -103,5 +112,22 @@ class LargeFilesNeedBackupTest {
     void unreachableLibraryKeepsTheWarning() {
         doThrow(VersionException.userFacing("generic")).when(relay).requireVersionObjectCloudConsent();
         assertEquals(List.of("证据/庭审录像.mp4"), sync.largeFilesBlockingSubmit(7L, "http://127.0.0.1:1/git/5.git", "u", "t"));
+    }
+
+    /** 0.91.0 gate (lane C): lead2's new 证据6 was blocked, but the dialog named the partner's files already uploaded. */
+    @Test
+    void onlyFilesStillToUploadAreNamed() {
+        ObjectRef colleagues = new ObjectRef("a".repeat(64), 30_000_000L), mine = new ObjectRef("b".repeat(64), 40_000_000L);
+        pathOf.clear();
+        pathOf.put(colleagues, "证据/证据3-庭前会议录像.mp4");
+        pathOf.put(mine, "证据/证据6-现场录像.mp4");
+        when(repos.objectPointersAt(eq(7L), anyString(), eq(true))).thenReturn(List.of(colleagues, mine));
+        held.add("a".repeat(64));
+        doThrow(VersionException.userFacing("generic")).when(relay).requireVersionObjectCloudConsent();
+        assertEquals(List.of("证据/证据6-现场录像.mp4"), sync.largeFilesBlockingSubmit(7L, remote, "u", "t"));
+        VersionException e = assertThrows(VersionException.class, () -> sync.upload(7L, remote, "u", "t"));
+        assertEquals(VersionException.LARGE_FILES_NEED_BACKUP, e.getKind());
+        assertTrue(e.getMessage().contains("证据6-现场录像.mp4"), e.getMessage());
+        assertFalse(e.getMessage().contains("证据3"), "a colleague's file already in the library is not to blame: " + e.getMessage());
     }
 }

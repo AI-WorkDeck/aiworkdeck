@@ -56,7 +56,7 @@ public class ProjectObjectSyncService {
                 try {
                     requireConsent(client, accountScope);
                 } catch (VersionException e) {
-                    throw largeFilesNeedBackup(project, e);
+                    throw largeFilesNeedBackup(project, e, missingOrJust(refs, ref, remoteUrl, username, token));
                 }
                 if (frozenEpoch == null) frozenEpoch=repos.cloudWriteHeaders(project,remoteUrl,username,token);
                 repos.objects().verify(project, ref);
@@ -160,28 +160,49 @@ public class ProjectObjectSyncService {
             client.requireVersionObjectCloudConsent();
             return List.of();
         } catch (RuntimeException noBackup) { /* Blocked only if something still has to be uploaded. */ }
+        Set<ObjectRef> missing;
         try {
-            capabilities(remoteUrl, username, token);
-            boolean missing = false;
-            for (ObjectRef ref : refs) {
-                JsonNode state = responseJson(request(remoteUrl + "/awd-objects/" + ref.sha256() + "?size=" + ref.size(), username, token).GET().build());
-                if (!state.path("complete").asBoolean()) { missing = true; break; }
-            }
-            if (!missing) return List.of();
+            missing = missingOnServer(refs, remoteUrl, username, token);
+            if (missing.isEmpty()) return List.of();
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             // Unknown: keep the early warning; 交稿 itself still asks the server first.
+            missing = refs;
         }
-        List<String> paths = repos.objectPointerPaths(project, repos.mainBranch(), true, 4);
+        List<String> paths = repos.objectPointerPaths(project, repos.mainBranch(), true, 4, missing::contains);
         return paths.isEmpty() ? List.of("") : paths;
+    }
+
+    /** Objects the case library doesn't hold complete. */
+    private Set<ObjectRef> missingOnServer(Set<ObjectRef> refs, String remoteUrl, String username, String token)
+            throws IOException, InterruptedException {
+        capabilities(remoteUrl, username, token);
+        Set<ObjectRef> missing = new LinkedHashSet<>();
+        for (ObjectRef ref : refs) {
+            JsonNode state = responseJson(request(remoteUrl + "/awd-objects/" + ref.sha256() + "?size=" + ref.size(), username, token).GET().build());
+            if (!state.path("complete").asBoolean()) missing.add(ref);
+        }
+        return missing;
+    }
+
+    /** C12 gate (lane C): name only the files still to upload, not colleagues' files already in the library. */
+    private Set<ObjectRef> missingOrJust(Set<ObjectRef> refs, ObjectRef known, String remoteUrl, String username, String token) {
+        try {
+            Set<ObjectRef> missing = missingOnServer(refs, remoteUrl, username, token);
+            missing.add(known);
+            return missing;
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return Set.of(known);
+        }
     }
 
     /**
      * C12：交稿被「文件云端备份」挡住时，说清是哪几个文件、该去哪里开、为什么删文件也没用——
      * 删掉只影响以后的版本，已经保存的版本里仍有它。kind 让桌面端弹一个带按钮、不会消失的说明。
      */
-    private VersionException largeFilesNeedBackup(long project, VersionException cause) {
-        List<String> paths = repos.objectPointerPaths(project, repos.mainBranch(), true, 4);
+    private VersionException largeFilesNeedBackup(long project, VersionException cause, Set<ObjectRef> missing) {
+        List<String> paths = repos.objectPointerPaths(project, repos.mainBranch(), true, 4, missing::contains);
         String names = String.join("、", paths.stream().limit(3).map(p -> p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p).toList())
                 + (paths.size() > 3 ? LangText.of(" 等", " and more") : "");
         String which = names.isBlank() ? "" : LangText.of("（" + names + "）", " (" + names.replace("、", ", ") + ")");

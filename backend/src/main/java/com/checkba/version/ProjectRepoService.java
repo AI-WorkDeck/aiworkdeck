@@ -1630,6 +1630,12 @@ public class ProjectRepoService {
      * 最多 {@code limit} 个；读不出来返回空表（说明照常给，只是不点名）。
      */
     public List<String> objectPointerPaths(long projectId, String ref, boolean includeHistory, int limit) {
+        return objectPointerPaths(projectId, ref, includeHistory, limit, o -> true);
+    }
+
+    /** Paths whose pointer passes {@code only} (e.g. objects the case library doesn't hold yet). */
+    public List<String> objectPointerPaths(long projectId, String ref, boolean includeHistory, int limit,
+                                           java.util.function.Predicate<LocalVersionObjectStore.ObjectRef> only) {
         java.util.LinkedHashSet<String> paths = new java.util.LinkedHashSet<>();
         try (Repository repo = open(projectId); RevWalk walk = new RevWalk(repo)) {
             ObjectId id = repo.resolve(ref + "^{commit}");
@@ -1642,7 +1648,8 @@ public class ProjectRepoService {
                         tree.setRecursive(true);
                         while (tree.next() && paths.size() < limit) {
                             if (tree.getFileMode(0).getObjectType() != Constants.OBJ_BLOB) continue;
-                            if (pointerAt(repo, commit, repo.open(tree.getObjectId(0))) != null) paths.add(tree.getPathString());
+                            var pointer = pointerAt(repo, commit, repo.open(tree.getObjectId(0)));
+                            if (pointer != null && only.test(pointer)) paths.add(tree.getPathString());
                         }
                     }
                 }

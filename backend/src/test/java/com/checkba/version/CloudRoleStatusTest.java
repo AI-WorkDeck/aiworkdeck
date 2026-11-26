@@ -81,4 +81,36 @@ class CloudRoleStatusTest {
         assertTrue(CloudSyncService.isAccessRefused(new RuntimeException("401 Unauthorized")));
         assertFalse(CloudSyncService.isAccessRefused(new RuntimeException("Connection reset")));
     }
+
+    /**
+     * 0.91.0 gate (lane C, master c1cb22412): with pending local commits, the page re-reads this local
+     * snapshot every 15 s and after each action. It used to drop myRole/removed, so the read-only notice and
+     * 「你已不在这份案卷里」 vanished and 交稿 came back. The local status now carries the last observation.
+     */
+    @Test void localStatusKeepsTheLastObservedReadOnlyRoleWithPendingCommits() {
+        remote.setPendingUpload(true);
+        assertNull(cloud.cloudStatus(7L, 42L).get("myRole"), "nothing observed yet");
+        cloud.checkCloud(7L);
+        Map<String, Object> local = cloud.cloudStatus(7L, 42L);
+        assertEquals(Boolean.TRUE, local.get("pendingUpload"));
+        assertEquals("READ_ONLY", local.get("myRole"));
+        assertEquals("沈律师", local.get("ownerName"));
+    }
+
+    @Test void localStatusKeepsRemovedUntilTheLibraryIsReadableAgain() {
+        remote.setPendingUpload(true);
+        cloud.checkCloud(7L);
+        doThrow(new VersionException("从云端更新失败", new RuntimeException("git-upload-pack not permitted")))
+                .when(repo).fetchFromOrigin(eq(7L), any(), any());
+        cloud.checkCloud(7L);
+        Map<String, Object> local = cloud.cloudStatus(7L, 42L);
+        assertEquals(Boolean.TRUE, local.get("removed"));
+        assertEquals("沈律师", local.get("ownerName"));
+        assertNull(local.get("myRole"), "a removed member has no role to show");
+
+        doReturn(null).when(repo).fetchFromOrigin(eq(7L), any(), any()); // re-added: readable again
+        cloud.checkCloud(7L);
+        assertNull(cloud.cloudStatus(7L, 42L).get("removed"));
+    }
 }
+
