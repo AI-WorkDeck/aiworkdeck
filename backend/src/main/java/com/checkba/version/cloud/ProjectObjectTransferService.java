@@ -125,8 +125,8 @@ public class ProjectObjectTransferService {
                         long previous = Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)
                                 ? Files.size(destination) : 0;
                         if (freeReservation != null) {
+                            quota.requireProjectEpoch(projectId); // W note: fence first, then reserve (same transaction)
                             freeReservation.run();
-                            quota.requireProjectEpoch(projectId);
                         } else {
                             quota.requireProjectCapacity(projectId, Math.max(0, size - previous));
                         }

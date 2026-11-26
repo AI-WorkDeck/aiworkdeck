@@ -1878,9 +1878,12 @@ public class ProjectRepoService {
     /** C12：这个对象不在本机/案件库，而是共享人声明了「仅在本机」（大小一致）。 */
     private boolean declaredLocalOnly(long projectId, LocalVersionObjectStore.ObjectRef object) {
         var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
-        if (plans == null || !plans.hasLocalOnly(projectId)) return false;
-        try { objectStore.verify(projectId, object); return false; }
-        catch (IOException absent) { return plans.isDeclaredLocalOnly(projectId, object); }
+        if (plans == null || !plans.hasLocalOnly(projectId) || !plans.isDeclaredLocalOnly(projectId, object)) return false;
+        // W note: never hash large objects on every status call — presence with the right size is enough here
+        try {
+            Path stored = objectStore.path(projectId, object.sha256());
+            return !(Files.isRegularFile(stored, java.nio.file.LinkOption.NOFOLLOW_LINKS) && Files.size(stored) == object.size());
+        } catch (IOException | RuntimeException e) { return true; }
     }
 
     /**

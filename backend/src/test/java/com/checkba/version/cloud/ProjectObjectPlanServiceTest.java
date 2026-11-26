@@ -123,4 +123,32 @@ class ProjectObjectPlanServiceTest {
         service.reserveFree(project, obj('a', 10));
         assertEquals(ProjectObjectPlan.FREE, plans.findByProjectIdAndObjectSha(project, "a".repeat(64)).orElseThrow().getPlan());
     }
+
+    /** W review must-fix 2: a resumed upload more than 24 h after its first part is still free. */
+    @Test void aResumedFreeUploadKeepsItsReservationAndCompletesFree() {
+        service.reserveFree(project, obj('a', 100));
+        var row = plans.findByProjectIdAndObjectSha(project, "a".repeat(64)).orElseThrow();
+        row.setReservedAt(LocalDateTime.now().minusHours(25));
+        plans.save(row);
+        service.reserveFree(project, obj('a', 100)); // the next part arrives: the reservation is refreshed, not lost
+        assertEquals(100, service.projectFreeUsedBytes(project), "still reserved after the sweep");
+        service.markComplete(project, obj('a', 100));
+        assertEquals(100, service.completedFreeBytes(project));
+    }
+
+    @Test void aSweptReservationIsRecordedFreeAtComplete() {
+        service.reserveFree(project, obj('b', 100));
+        plans.deleteAll(); // swept before complete
+        service.markCompleteFree(project, obj('b', 100));
+        assertEquals(100, service.completedFreeBytes(project), "never billed through the object store usage");
+        assertTrue(service.isFreePlan(project, obj('b', 100)));
+    }
+
+    @Test void laterPartsOfAFreeObjectAreFree() {
+        assertFalse(service.isFreePlan(project, obj('c', 100)));
+        service.reserveFree(project, obj('c', 100));
+        assertTrue(service.isFreePlan(project, obj('c', 100)));
+        assertFalse(service.isFreePlan(project, obj('c', 99)), "size must match");
+    }
 }
+

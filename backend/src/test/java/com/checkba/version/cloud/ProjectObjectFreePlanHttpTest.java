@@ -124,6 +124,10 @@ class ProjectObjectFreePlanHttpTest {
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString("{\"pathHint\":\"证据/庭审录像.mp4\"}"))).statusCode());
         git.requireObjectOrDeclared(p, secondRef); // declared: pre-receive accepts it
+        JsonNode declared = json.readTree(send(HttpRequest.newBuilder(URI.create(base(p) + "/" + secondRef.sha256() + "?size=900")).GET()).body());
+        assertTrue(declared.path("localOnly").asBoolean(), "colleagues learn the file stays on the sharer's computer");
+        assertEquals("c12", declared.path("declaredByName").asText());
+        assertEquals("庭审录像.mp4", declared.path("nameHint").asText());
         assertThrows(java.io.IOException.class, () -> git.requireObjectOrDeclared(p, new ObjectRef(secondRef.sha256(), 901)),
                 "a declaration covers its exact size only");
         git.requireObjectOrDeclared(p, firstRef); // present: as before

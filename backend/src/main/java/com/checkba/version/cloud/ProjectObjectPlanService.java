@@ -87,7 +87,11 @@ public class ProjectObjectPlanService {
         if (existing.isPresent()) {
             ProjectObjectPlan row = existing.get();
             if (row.getObjectSize() != object.size()) throw new IllegalArgumentException("Object size mismatch");
-            if (ProjectObjectPlan.FREE.equals(row.getPlan())) return;
+            if (ProjectObjectPlan.FREE.equals(row.getPlan())) {
+                // W review: a slow or resumed upload keeps its reservation alive while parts keep arriving
+                if (ProjectObjectPlan.RESERVED.equals(row.getState())) { row.setReservedAt(LocalDateTime.now()); plans.save(row); }
+                return;
+            }
         }
         plans.releaseExpired(projectId, LocalDateTime.now().minusHours(RESERVATION_TTL_HOURS));
         long used = plans.freeBytes(projectId);
@@ -101,6 +105,31 @@ public class ProjectObjectPlanService {
         row.setState(ProjectObjectPlan.RESERVED);
         row.setReservedAt(LocalDateTime.now());
         plans.save(row);
+    }
+
+    /** W review: once an object has a free reservation, every later part of it is free, whatever the header says. */
+    public boolean isFreePlan(long projectId, ObjectRef object) {
+        return plans.findByProjectIdAndObjectSha(projectId, object.sha256())
+                .map(row -> ProjectObjectPlan.FREE.equals(row.getPlan()) && row.getObjectSize() == object.size()).orElse(false);
+    }
+
+    /**
+     * W review: the upload went the free path but its reservation was swept (more than 24 h between the last part and
+     * complete): record it as complete and free now, so it is never billed through the object store usage.
+     */
+    @Transactional
+    public void markCompleteFree(long projectId, ObjectRef object) {
+        if (plans.findByProjectIdAndObjectSha(projectId, object.sha256()).isEmpty()) {
+            ProjectObjectPlan row = new ProjectObjectPlan();
+            row.setProjectId(projectId);
+            row.setObjectSha(object.sha256());
+            row.setObjectSize(object.size());
+            row.setPlan(ProjectObjectPlan.FREE);
+            row.setState(ProjectObjectPlan.RESERVED);
+            row.setReservedAt(LocalDateTime.now());
+            plans.save(row);
+        }
+        markComplete(projectId, object);
     }
 
     /** The object is now on the library: its reservation becomes permanent and any local-only declaration ends. */
@@ -144,6 +173,10 @@ public class ProjectObjectPlanService {
     }
 
     public List<ProjectObjectLocalOnly> localOnly(long projectId) { return localOnly.findByProjectId(projectId); }
+
+    public java.util.Optional<ProjectObjectLocalOnly> declaration(long projectId, ObjectRef object) {
+        return localOnly.findByProjectIdAndObjectSha(projectId, object.sha256()).filter(row -> row.getObjectSize() == object.size());
+    }
 
     /** Cheap guard: most cases have no local-only files, so their git paths skip the per-file lookups. */
     public boolean hasLocalOnly(long projectId) { return localOnly.countByProjectId(projectId) > 0; }

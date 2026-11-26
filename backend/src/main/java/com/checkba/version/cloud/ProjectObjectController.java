@@ -23,6 +23,8 @@ public class ProjectObjectController {
     private CloudGitWriteGuard cloudWrites;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private ProjectObjectPlanService plans;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.UserRepository users;
 
     private final GitAccessService access;
     private final ProjectRepoService repos;
@@ -54,7 +56,22 @@ public class ProjectObjectController {
     public Map<String, Object> status(@PathVariable long projectId, @PathVariable String sha256,
                                      @RequestParam long size, HttpServletRequest request) throws IOException {
         authorize(request, projectId, false);
-        return transfers.status(projectId, new ObjectRef(sha256, size));
+        ObjectRef object = new ObjectRef(sha256, size);
+        Map<String, Object> status = transfers.status(projectId, object);
+        // C12: a missing object that its sharer keeps local-only — colleagues show a placeholder, the pull goes on
+        if (plans != null && !Boolean.TRUE.equals(status.get("complete"))) {
+            var declared = plans.declaration(projectId, object);
+            if (declared.isPresent()) {
+                Map<String, Object> out = new java.util.HashMap<>(status);
+                out.put("localOnly", true);
+                out.put("declaredBy", declared.get().getDeclaredBy());
+                if (users != null) users.findById(declared.get().getDeclaredBy()).ifPresent(u ->
+                        out.put("declaredByName", u.getDisplayName() != null && !u.getDisplayName().isBlank() ? u.getDisplayName() : u.getUsername()));
+                if (declared.get().getNameHint() != null) out.put("nameHint", declared.get().getNameHint());
+                return out;
+            }
+        }
+        return status;
     }
 
     @PutMapping("/{sha256}/parts/{part}")
@@ -65,7 +82,9 @@ public class ProjectObjectController {
                                   HttpServletRequest request) throws IOException {
         authorize(request, projectId, true);
         ObjectRef object = new ObjectRef(sha256, size);
-        Runnable freeReservation = "free".equalsIgnoreCase(plan) && plans != null ? () -> plans.reserveFree(projectId, object) : null;
+        // W review: free if this request says so OR the object already has a free reservation (parts 2..n)
+        boolean free = plans != null && ("free".equalsIgnoreCase(plan) || plans.isFreePlan(projectId, object));
+        Runnable freeReservation = free ? () -> plans.reserveFree(projectId, object) : null;
         if (request.getContentLengthLong() != ProjectObjectTransferService.partSize(object, part))
             throw new IllegalArgumentException("Invalid part length");
         transfers.putPart(projectId, object, part, partSha, request.getInputStream(),
@@ -79,7 +98,9 @@ public class ProjectObjectController {
 
     @PostMapping("/{sha256}/complete")
     public Map<String, Object> complete(@PathVariable long projectId, @PathVariable String sha256,
-                                       @RequestParam long size, HttpServletRequest request) throws IOException {
+                                       @RequestParam long size,
+                                       @RequestHeader(value = "X-AWD-Object-Plan", required = false) String plan,
+                                       HttpServletRequest request) throws IOException {
         authorize(request, projectId, true);
         locked(projectId, () -> {
             authorize(request, projectId, true);
@@ -87,7 +108,11 @@ public class ProjectObjectController {
                 ObjectRef completed=new ObjectRef(sha256,size);
                 boolean wasLocalOnly=plans!=null && plans.isDeclaredLocalOnly(projectId,completed);
                 transfers.complete(projectId,completed);
-                if(plans!=null)plans.markComplete(projectId,completed); // C12: reservation permanent, declaration ends
+                if(plans!=null) {
+                    // C12: reservation permanent, declaration ends; a free upload whose reservation was swept stays free (W)
+                    if("free".equalsIgnoreCase(plan))plans.markCompleteFree(projectId,completed);
+                    else plans.markComplete(projectId,completed);
+                }
                 if(wasLocalOnly)repos.materializeArrivedObject(projectId,completed); // C12: the server's own copy gets it now
             }catch(IOException e){throw new UncheckedIOException(e);}};
             if(cloudWrites==null)publication.run();else cloudWrites.write(projectId,null,publication);
