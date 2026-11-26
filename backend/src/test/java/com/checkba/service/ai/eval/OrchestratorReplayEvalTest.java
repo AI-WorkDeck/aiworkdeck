@@ -71,6 +71,13 @@ class OrchestratorReplayEvalTest {
             }
         }
 
+        if (!c.expect.structureNotContains.isEmpty()) {
+            String last = r.lastAssistantMessage().orElse("");
+            for (String marker : c.expect.structureNotContains) {
+                assertFalse(last.contains(marker), "最终 ASSISTANT 消息不该含 [" + marker + "]。实际内容:\n" + last);
+            }
+        }
+
         // 3. artifact 落盘
         if (c.expect.artifact != null) {
             assertFalse(r.artifactSaves().isEmpty(), "期望保存 artifact 但 saveArtifactFile 未被调用");
