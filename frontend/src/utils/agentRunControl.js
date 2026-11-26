@@ -14,6 +14,15 @@ export function stopNoticeForCancelled(payload, t) {
   return t('agentStream.stopConfirmed')
 }
 
+/**
+ * Q26：停止前 AI 已增删条款且编号对不上时，后端在 cancelled 载荷里带一段给用户看的提示
+ * （已本地化的 markdown，与历史里保存的那段一致）。没有就返回空串。
+ */
+export function cancelledNumberingNotice(payload) {
+  const notice = payload && typeof payload.numberingNotice === 'string' ? payload.numberingNotice.trim() : ''
+  return notice
+}
+
 /** cancelled 载荷里「本轮改过文档」的判据（新字段优先，兼容只带布尔的情形）。 */
 export function cancelledEditedDocument(payload) {
   if (!payload) return false

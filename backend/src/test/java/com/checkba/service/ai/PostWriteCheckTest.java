@@ -169,4 +169,82 @@ class PostWriteCheckTest {
                         com.checkba.service.ai.review.PostWriteAudit.Kind.DUPLICATE, 4, "abc", "dup"))));
         assertTrue(en.startsWith("[System reminder]") && en.contains("paragraph 4") && en.contains("duplicate"), en);
     }
+
+    // ---- Q26: clause numbering at the end of the turn (finished or stopped) ----
+
+    private static final String Q26_BEFORE = doc("第十二条 争议：仲裁。", "第十三条 不可抗力：免责。", "第十四条 生效：签字生效。");
+    private static final String Q26_DUPLICATE = doc("第十二条 争议：仲裁。", "第十三条 网络安全责任保险：乙方投保。",
+            "第十三条 不可抗力：免责。", "第十四条 生效：签字生效。");
+    private static final String Q26_RENUMBERED = doc("第十二条 争议：仲裁。", "第十三条 网络安全责任保险：乙方投保。",
+            "第十四条 不可抗力：免责。", "第十五条 生效：签字生效。");
+
+    @Test
+    void writingAClauseLabelIsStructural() {
+        assertTrue(PostWriteCheck.isStructural("doc_replace_at_anchor", "{\"newText\":\"第十三条 网络安全责任保险\"}"));
+        assertTrue(PostWriteCheck.isStructural("doc_insert_at_cursor", "{\"text\":\"第13条 保险\"}"));
+        assertTrue(PostWriteCheck.isStructural("doc_find_replace", "{\"findText\":\"x\",\"replaceText\":\"第五條\"}"));
+        assertFalse(PostWriteCheck.isStructural("doc_replace_at_anchor", "{\"newText\":\"三十日内付款\"}"));
+        assertFalse(PostWriteCheck.isStructural("doc_format_text", "{\"text\":\"第十三条\"}"), "formatting is not a text write");
+    }
+
+    @Test
+    void stoppedAfterInsertingADuplicateClauseTellsTheUser() {
+        // The QA run: the AI inserted a second 第十三条, the user pressed stop before the turn could finish.
+        Bridge bridge = new Bridge(Q26_BEFORE, Q26_DUPLICATE);
+        PostWriteCheck c = new PostWriteCheck();
+        c.beforeTool("doc_insert_at_cursor", 1L, bridge);
+        c.afterTool("doc_insert_at_cursor", "{\"text\":\"第十三条 网络安全责任保险：乙方投保。\"}", true);
+        String notice = c.numberingNotice("conv", 1L, bridge);
+        assertNotNull(notice);
+        assertTrue(notice.contains("条款编号需要核对") && notice.contains("第13条重复出现"), notice);
+        assertTrue(notice.contains("AI 没有自动改号"), notice);
+        assertNull(c.numberingNotice("conv", 1L, bridge), "at most once per turn");
+        assertEquals(2, bridge.actions.size());
+    }
+
+    @Test
+    void renumberedClausesNeedNoNotice() {
+        Bridge bridge = new Bridge(Q26_BEFORE, Q26_RENUMBERED);
+        PostWriteCheck c = new PostWriteCheck();
+        c.beforeTool("doc_insert_at_cursor", 1L, bridge);
+        c.afterTool("doc_insert_at_cursor", "{\"text\":\"第十三条 网络安全责任保险：乙方投保。\"}", true);
+        assertNull(c.numberingNotice("conv", 1L, bridge));
+    }
+
+    @Test
+    void reminderWasIgnoredSoTheFinalNoticeReportsIt() {
+        Bridge bridge = new Bridge(Q26_BEFORE, Q26_DUPLICATE, Q26_DUPLICATE);
+        PostWriteCheck c = new PostWriteCheck();
+        c.beforeTool("doc_insert_at_cursor", 1L, bridge);
+        c.afterTool("doc_insert_at_cursor", "{\"text\":\"第十三条 网络安全责任保险：乙方投保。\"}", true);
+        assertNotNull(c.verify("conv", 1L, bridge), "hidden reminder to the model first");
+        assertNotNull(c.numberingNotice("conv", 1L, bridge), "still broken at the end: tell the user");
+    }
+
+    @Test
+    void cleanVerifyWithNoLaterWritesSkipsTheExtraRead() {
+        Bridge bridge = new Bridge(Q26_BEFORE, Q26_RENUMBERED);
+        PostWriteCheck c = new PostWriteCheck();
+        c.beforeTool("doc_insert_at_cursor", 1L, bridge);
+        c.afterTool("doc_insert_at_cursor", "{\"text\":\"第十三条 网络安全责任保险：乙方投保。\"}", true);
+        assertNull(c.verify("conv", 1L, bridge));
+        assertNull(c.numberingNotice("conv", 1L, bridge));
+        assertEquals(2, bridge.actions.size(), "no third read");
+    }
+
+    @Test
+    void ordinaryEditsAndOtherDocumentsGetNoNumberingCheck() {
+        Bridge bridge = new Bridge(BEFORE, BROKEN);
+        PostWriteCheck c = new PostWriteCheck();
+        c.beforeTool("doc_replace_at_anchor", 1L, bridge);
+        c.afterTool("doc_replace_at_anchor", "{\"newText\":\"45\"}", true);
+        assertNull(c.numberingNotice("conv", 1L, bridge), "one plain edit, never verified: no check");
+        assertEquals(1, bridge.actions.size());
+
+        Bridge other = new Bridge(Q26_BEFORE, Q26_DUPLICATE);
+        PostWriteCheck d = new PostWriteCheck();
+        d.beforeTool("doc_insert_at_cursor", 1L, other);
+        d.afterTool("doc_insert_at_cursor", "{\"text\":\"第十三条 保险\"}", true);
+        assertNull(d.numberingNotice("conv", 2L, other), "switched document: never report");
+    }
 }
