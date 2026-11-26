@@ -5294,7 +5294,7 @@ $color-accent: var(--awd-mint); // Mint Green
   justify-content: flex-end;
 }
 .header-more-btn { display: none; position: relative; }
-.header-more-dots { font-size: 16px; line-height: 1; }
+.header-more-dots { font-size: var(--awd-font-size-title); line-height: 1; }
 .header-tools-optional { display: flex; align-items: center; gap: 4px; }
 /* 窄于 1000px：语言选择只留地球图标（语言名在 tooltip 里，菜单不变） */
 @media (max-width: 999px) {
@@ -5309,7 +5309,7 @@ $color-accent: var(--awd-mint); // Mint Green
   .project-header .project-status-badge { display: none; }
 }
 /* rail「更多」（Q28 / X-S10） */
-.rail-more-dots { font-size: 18px; line-height: 20px; }
+.rail-more-dots { font-size: var(--awd-font-size-title); line-height: 20px; }
 .rail-more-menu {
   position: fixed;
   top: auto;
