@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { normalizeMessageTarget } from '../../src/utils/messageTargets.js'
+import { mentionsAssistant } from '../../src/utils/assistantMention.js'
 import zh from '../../src/locales/zh-CN/messageCenter.js'
 const require = createRequire(import.meta.url)
 const { JSDOM } = require('jsdom'), { parse } = require('@vue/compiler-sfc')
@@ -38,7 +39,7 @@ async function mount(t, { conversations = [conv()], notices = [], override, self
     throw new Error(`unhandled ${action}:${im}`)
   }
   const uni = { $on(name,callback){events.set(name,callback)},$off(name){events.delete(name)},$emit(){} }
-  const options = new Function('MessageConversationPane','messageCenterRequest','messageCenterIdentity','normalizeMessageTarget','requireAccount','ACCOUNT_CHANGED_EVENT','uni',script)(Child,request,()=>identity,normalizeMessageTarget,async()=>false,'account-changed',uni)
+  const options = new Function('MessageConversationPane','messageCenterRequest','messageCenterIdentity','normalizeMessageTarget','requireAccount','ACCOUNT_CHANGED_EVENT','uni','mentionsAssistant',script)(Child,request,()=>identity,normalizeMessageTarget,async()=>false,'account-changed',uni,mentionsAssistant)
   let vm; const host=document.createElement('div');document.body.append(host)
   const app=Vue.createApp({render:()=>Vue.h({...options,template:source.template.content},{currentProjectId:projectId,activeFileIds,inviteProject,openProjects,openTarget:openTarget||(async(...args)=>targets.push(args)),ref:value=>vm=value})})
   app.config.globalProperties.$t=(key,args)=>{let result=zh[key.split('.').at(-1)]||key; for(const[k,v]of Object.entries(args||{}))result=result.replace(`{${k}}`,v);return result}
@@ -70,7 +71,7 @@ test('failed text send stays visible and retries with its original idempotency k
 })
 test('older queued/completed assistant jobs do not erase a later rejected message retry',async t=>{
  let busy=true;const f=await mount(t,{conversations:[conv({localProjectId:1,agent:{scope:'project',scopeKey:'p1',name:'项目助手'}})],override:(a,p)=>{if(p.action==='agentReply'&&p.params.messageId===11&&busy)return Promise.reject(new Error('助手正在回复'))}});await selectChat(f)
- for(const text of ['第一问','第二问']){type(f,text);await f.vm.sendMessage();await tick()}
+ for(const text of ['@助手 第一问','@助手 第二问']){type(f,text);await f.vm.sendMessage();await tick()}
  assert.ok(f.vm.current.failures['11']);await f.vm.loadMessages(f.vm.selectedConversation);assert.ok(f.vm.current.failures['11'])
  f.state.status={status:'completed',messageId:10};await f.vm.loadMessages(f.vm.selectedConversation);await tick();assert.ok(f.vm.current.failures['11']);assert.match(f.host.textContent,/重试助手回复/)
  busy=false;[...f.host.querySelectorAll('button')].find(b=>b.textContent==='重试助手回复').click();await tick();assert.equal(f.vm.current.failures['11'],undefined);assert.equal(f.state.messages.length,2)
@@ -120,7 +121,7 @@ test('new conversation offers direct and group creation without the optional plu
 
 test('shared bound project assistant can reply without reading a local project', async t => {
  const f=await mount(t,{conversations:[conv({projectId:77,agent:{scope:'project',scopeKey:'project:77',private:false}})]});await selectChat(f)
- type(f,'请根据本群材料回复');await f.vm.sendMessage();await tick();assert.equal(f.calls.find(c=>c.params.action==='agentReply').project,null)
+ type(f,'@助手 请根据本群材料回复');await f.vm.sendMessage();await tick();assert.equal(f.calls.find(c=>c.params.action==='agentReply').project,null)
  assert.doesNotMatch(f.host.textContent,/请先打开助手所属的项目/)
 })
 test('invited clients can read AI replies and send messages without unsupported AI controls', async t => {
@@ -224,4 +225,14 @@ test('messages from the client carry the client badge; staff messages do not (B4
  const rows=[...f.host.querySelectorAll('.message-row')]
  assert.equal(rows[0].querySelector('.client-badge'),null)
  assert.equal(rows[1].querySelector('.client-badge').textContent,'客户')
+})
+
+// C14 (lane C S3): a stale member count turned a 30-message exchange into 30 billed assistant turns.
+test('C14: in a project group the assistant answers only when called with @; failures collapse to one row', async t => {
+ const f=await mount(t,{conversations:[conv({localProjectId:1,agent:{scope:'project',scopeKey:'p1',name:'项目助手'}})],override:(a,p)=>p.action==='agentReply'?Promise.reject(new Error('额度不可用')):undefined});await selectChat(f)
+ for(const text of ['大家看一下第五条','明天开会','邮件已发']){type(f,text);await f.vm.sendMessage();await tick()}
+ assert.equal(f.calls.filter(c=>c.params.action==='agentReply').length,0,'plain group messages never call the assistant, even when the member count says 1')
+ for(const text of ['@助手 总结一下','@项目助手 再说一遍']){type(f,text);await f.vm.sendMessage();await tick()}
+ assert.equal(f.calls.filter(c=>c.params.action==='agentReply').length,2)
+ assert.equal(Object.keys(f.vm.current.failures).length,1,'only the latest failure is shown')
 })

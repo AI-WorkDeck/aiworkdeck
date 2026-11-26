@@ -78,6 +78,7 @@
   </section>
 </template>
 <script>
+import { mentionsAssistant } from '@/utils/assistantMention.js'
 import MessageConversationPane from './MessageConversationPane.vue'
 import { messageCenterRequest, messageCenterIdentity } from '@/services/messageCenter.js'
 import { normalizeMessageTarget } from '@/utils/messageTargets.js'
@@ -176,7 +177,7 @@ export default {
       state.status = status || null
       if (!status?.messageId) return
       const id = String(status.messageId)
-      if (status.status === 'failed' && (!conversation || this.canRequestAssistant(conversation))) { const source = state.messages.find(message => String(message.id) === id); if (source && source.actorType !== 'AGENT' && String(source.senderId) === String(this.selfId)) state.failures[id] = { messageId: status.messageId, text: source.text, error: status.error } }
+      if (status.status === 'failed' && (!conversation || this.canRequestAssistant(conversation))) { const source = state.messages.find(message => String(message.id) === id); if (source && source.actorType !== 'AGENT' && String(source.senderId) === String(this.selfId)) state.failures = { [id]: { messageId: status.messageId, text: source.text, error: status.error } } }
       else if (['queued', 'running', 'completed'].includes(status.status)) delete state.failures[id]
     },
     async loadMessages(conversation, older = false) {
@@ -209,13 +210,16 @@ export default {
         const message = await this.im('send', { conversationId: conversation.id, text: pending.text, clientMessageId: pending.clientMessageId }, conversation)
         if (!this.valid(ticket)) return
         this.mergeMessages(state, [message]); state.pending = state.pending.filter(item => item.clientMessageId !== pending.clientMessageId)
-        if (this.canRequestAssistant(conversation) && (conversation.agent.private || conversation.type === 'AGENT_DIRECT' || state.humanCount === 1)) this.requestReply(conversation, message.id)
+        // C14：多人群里助手只在被明确叫到（@助手）时回复；私聊 / 助手直聊才每条都答。原来按「群里只有我一个人」
+        // 自动答，人数是旧的时候 30 条消息触发了 30 次真实计费的 AI 回复
+        if (this.canRequestAssistant(conversation) && (conversation.agent.private || conversation.type === 'AGENT_DIRECT' || mentionsAssistant(pending.text, conversation.agent))) this.requestReply(conversation, message.id)
       } catch (error) { if (this.valid(ticket)) { pending.sending = false; state.error = error.message } }
     },
     async requestReply(conversation, messageId) {
       if (!this.canRequestAssistant(conversation) || !messageId) return
       const ticket = this.ticket(), state = this.state(conversation), id = String(messageId)
-      const fail = error => { state.failures[id] = { messageId, text: state.messages.find(message => String(message.id) === id)?.text, error } }
+      // C14：失败只留最新一条（不在输入框上方堆一排红色重试行）
+      const fail = error => { state.failures = { [id]: { messageId, text: state.messages.find(message => String(message.id) === id)?.text, error } } }
       if (conversation.agent?.scope === 'project' && (conversation.agent.private || conversation.type === 'AGENT_DIRECT') && !conversation.localProjectId) { fail(this.$t('messageCenter.openAssistantProject')); return }
       if (state.admitting) { fail(this.$t('messageCenter.admissionPending')); return }
       state.admitting = true
