@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Buka ruang kerja terkait",
   "readNotDone": "Membaca notifikasi ini tidak menggantikan konfirmasi tindakan bisnis. Buka ruang kerja terkait untuk meninjau dan menanganinya.",
   "targetUnavailable": "Ruang kerja terkait tidak tersedia. Muat ulang dan coba lagi.",
-  "pluginUnavailable": "Plugin terkait belum dipasang atau diaktifkan. Periksa di pusat plugin.",
+  "pluginUnavailable": "Plugin terkait belum dipasang atau diaktifkan. Periksa di pusat plugin.", "enableLawFirmTitle": "Aktifkan Manajemen Kantor Hukum?", "enableLawFirmBody": "Notifikasi ini ditangani di Manajemen Kantor Hukum. Plugin ini sudah disertakan dalam aplikasi; setelah diaktifkan, catatan ini langsung terbuka.", "enableLawFirmConfirm": "Aktifkan dan buka",
   "openFailed": "Tidak dapat membuka ruang kerja terkait. Silakan coba lagi.",
   "serviceFailed": "Layanan pesan sementara tidak tersedia. Silakan coba lagi.",
   "source": "Dari {name}",

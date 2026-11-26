@@ -88,7 +88,7 @@ export default {
   "openBusiness": "関連業務を開く",
   "readNotDone": "通知を既読にしても業務上の確認にはなりません。関連業務を開いて確認・対応してください。",
   "targetUnavailable": "関連業務の画面を現在開けません。更新してからもう一度お試しください。",
-  "pluginUnavailable": "関連プラグインが未インストールまたは無効です。プラグインセンターでご確認ください。",
+  "pluginUnavailable": "関連プラグインが未インストールまたは無効です。プラグインセンターでご確認ください。", "enableLawFirmTitle": "「法律事務所マネジメント」を有効にしますか？", "enableLawFirmBody": "この通知は「法律事務所マネジメント」で対応します。アプリに同梱されており、有効にするとこの記録が直接開きます。", "enableLawFirmConfirm": "有効にして開く",
   "openFailed": "関連業務を開けませんでした。再試行してください。",
   "serviceFailed": "メッセージサービスは一時的に利用できません。再試行してください。",
   "source": "{name} より",
