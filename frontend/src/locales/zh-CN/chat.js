@@ -416,6 +416,7 @@ export default {
   copyFailed: '复制失败',
   // ---- 状态栏用量 ----
   tokenUsageLine: '本轮 {n} tokens',
+  viewUsage: '查看用量',
   // ---- ProcessCard ----
   statusError: '出错',
   statusSuccess: '成功',

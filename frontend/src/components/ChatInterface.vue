@@ -779,7 +779,13 @@
                 低调一行、只在有数时出现：为 0 说明后端还没回 token_usage（Ollama 档不回），
                 挂一个 0 会像是「这一轮不要钱」。 -->
            <view v-if="tokenUsage && tokenUsage.totalTokens > 0" class="status-bar-right">
-               <text class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
+               <!-- Q24：平台通道的律师按余额（¥）付费，token 数读不懂也没意义；在本轮准确的 ¥
+                    能从官网账单按轮取回之前（0.92，与 lane W 合做），给「查看用量」进账户用量页，
+                    token 数只留在悬停提示里。自带密钥（BYOK）的用户照旧看 token。 -->
+               <text v-if="tokenUsage.platform" class="token-value token-usage-link" role="link" tabindex="0"
+                     :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })"
+                     @tap="openUsageSettings" @keydown.enter.prevent="openUsageSettings">{{ $t('chat.viewUsage') }}</text>
+               <text v-else class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
            </view>
        </view>
        <NowDoingStrip :active="isStreaming" :bubble="nowDoingBubble" />
@@ -1167,6 +1173,11 @@ export default {
       this.showSkillDropdown = false
       if (this.openSettingsTab) this.openSettingsTab({ nav: 'mcp' })
       else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
+    },
+    // Q24：页脚「查看用量」→ 设置 · 账户（平台通道的用量与余额在那里）
+    openUsageSettings() {
+      if (this.openSettingsTab) this.openSettingsTab({ nav: 'account' })
+      else uni.navigateTo({ url: '/pages/admin/admin?nav=account' })
     },
   },
   props: {
@@ -7841,6 +7852,7 @@ export default {
   font-family: monospace;
   font-weight: 600;
 }
+.token-usage-link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .token-detail {
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);

@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Αντιγραφή εξόδου",
   "copyFailed": "Η αντιγραφή απέτυχε",
   "tokenUsageLine": "{n} tokens αυτή τη σειρά",
+  "viewUsage": "Προβολή χρήσης",
   "statusError": "Σφάλμα",
   "statusSuccess": "Επιτυχία",
   "statusRunning": "Εκτελείται",

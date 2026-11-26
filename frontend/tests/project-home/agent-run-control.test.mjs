@@ -254,3 +254,16 @@ test('Q21 接线：账户类 error 载荷带 kind 进 errorNotice；错误卡的
   const inline = readFileSync(new URL('../../src/components/AwdInlineError.vue', import.meta.url), 'utf8')
   assert.match(inline, /else if \(a === 'reconnect'\) this\.\$emit\('reconnect'\)/)
 })
+
+// ---- Q24：平台通道的律师看不到 token 数，改给「查看用量」 ----
+test('Q24 token_usage 带 platform 时本轮记为平台通道；页脚给「查看用量」，token 数只在提示里', async () => {
+  const { s, event } = await liveStream()
+  event('token_usage', { promptTokens: 100, completionTokens: 20, totalTokens: 120, platform: false })
+  assert.equal(!!s.tokenUsage.value.platform, false)
+  event('token_usage', { promptTokens: 100, completionTokens: 20, totalTokens: 120, platform: true })
+  assert.equal(s.tokenUsage.value.platform, true)
+  assert.equal(s.tokenUsage.value.totalTokens, 240)
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  assert.match(chat, /<text v-if="tokenUsage\.platform" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.viewUsage'\) \}\}<\/text>/)
+  assert.match(chat, /openUsageSettings\(\) \{\s*if \(this\.openSettingsTab\) this\.openSettingsTab\(\{ nav: 'account' \}\)/)
+})

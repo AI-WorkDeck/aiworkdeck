@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "نسخ المخرجات",
   "copyFailed": "فشل النسخ",
   "tokenUsageLine": "{n} رموز في هذا الدور",
+  "viewUsage": "عرض الاستخدام",
   "statusError": "خطأ",
   "statusSuccess": "نجاح",
   "statusRunning": "قيد التشغيل",

@@ -409,6 +409,7 @@ export default {
   copyFailed: 'Copy failed',
   // ---- Status bar usage ----
   tokenUsageLine: '{n} tokens this turn',
+  viewUsage: 'View usage',
   // ---- ProcessCard ----
   statusError: 'Error',
   statusSuccess: 'Success',

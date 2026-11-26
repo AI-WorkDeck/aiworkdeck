@@ -846,9 +846,11 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
             int completionTokens = usage.outputTokenCount() != null ? usage.outputTokenCount() : 0;
             int totalTokens = usage.totalTokenCount() != null ? usage.totalTokenCount() : (promptTokens + completionTokens);
             
+            // platform：平台通道按余额（¥）扣费，token 数对律师没有意义，前端改给「查看用量」（Q24）
+            boolean platform = tokenUsageService != null && tokenUsageService.isPlatformChannel();
             String usageJson = String.format(
-                "{\"promptTokens\":%d,\"completionTokens\":%d,\"totalTokens\":%d}",
-                promptTokens, completionTokens, totalTokens
+                "{\"promptTokens\":%d,\"completionTokens\":%d,\"totalTokens\":%d,\"platform\":%b}",
+                promptTokens, completionTokens, totalTokens, platform
             );
             flushPendingText();
             sendSse("token_usage", usageJson);

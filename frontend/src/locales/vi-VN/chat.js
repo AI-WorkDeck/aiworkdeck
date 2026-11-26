@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Sao chép đầu ra",
   "copyFailed": "Sao chép thất bại",
   "tokenUsageLine": "{n} token trong lượt này",
+  "viewUsage": "Xem mức sử dụng",
   "statusError": "Lỗi",
   "statusSuccess": "Thành công",
   "statusRunning": "Đang chạy",
