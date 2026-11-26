@@ -101,4 +101,16 @@ class ChatSuggestionServiceTest {
         service.suggest(7L,"c","chosen");
         verify(model).generate(any(dev.langchain4j.data.message.SystemMessage.class), argThat(message -> message.toString().contains("只列第 3 条")));
     }
+
+    @Test void suggestionAfterATurnIsBilledToThatTurn(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        var identity = new com.checkba.service.telemetry.InstallIdentityService(dir.toString());
+        var field = ChatSuggestionService.class.getDeclaredField("installIdentity");
+        field.setAccessible(true);
+        field.set(service, identity);
+        String[] seen = new String[1];
+        when(models.getChatModel(eq("chosen"), any(Duration.class), eq(256))).thenAnswer(inv -> { seen[0] = PlatformTurnScope.current(); return model; });
+        service.suggest(7L, "c", "chosen", "0b6c2f1e-1111-4222-8333-944455556666");
+        assertEquals(identity.turnTag("c", "0b6c2f1e-1111-4222-8333-944455556666"), seen[0]);
+        assertNull(PlatformTurnScope.current());
+    }
 }

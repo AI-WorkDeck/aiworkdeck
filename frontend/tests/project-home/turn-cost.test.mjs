@@ -57,3 +57,12 @@ test('Q24 intl: OpenRouter amounts keep their precision (micros), never rounded 
   assert.deepEqual(formatTurnCost({ available: true, currency: 'USD', micros: 1500000, cents: 150, pending: 0 }), { amount: '$1.50', source: '' })
   assert.deepEqual(formatTurnCost({ available: true, currency: 'USD', micros: 0, cents: 0, pending: 0 }), { amount: '$0.00', source: '' })
 })
+
+test('Q24: the post-turn suggestion is billed to the turn and the footer waits for it', () => {
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  assert.match(chat, /chatSuggestions\.loading\.value\]/)
+  assert.match(chat, /if \(suggesting\) return/)
+  assert.match(chat, /runId: \(\) => tokenUsage\.value && tokenUsage\.value\.runId/)
+  const api = readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
+  assert.match(api, /requestChatSuggestion\(conversationId, modelId, runId = null\)/)
+})
