@@ -12,11 +12,12 @@ const ready = { data: { enabled: true, working: false, changedCount: 0 } }
 function setup(getStatus, timer = (fn) => fn()) {
   let toasts = 0
   let checks = 0
+  let vm
   const options = new Function('getVersionStatus', 'shouldAcceptResponse', 'checkCloud', 'uni', 'setTimeout',
     'WorkSessionBar', 'VersionTimeline', 'DraftList', 'AdoptConflictDialog', 'CloudSyncBar', body)(
     getStatus, (seq, latest) => seq === latest, async () => { checks++; return { data: { linked: true } } },
-    { showToast: () => toasts++ }, timer, {}, {}, {}, {}, {})
-  const vm = { ...options.data(), projectId: 7, $t: (key) => key, $emit() {} }
+    { showToast: (o) => { toasts++; vm.lastToast = o.title } }, timer, {}, {}, {}, {}, {})
+  vm = { ...options.data(), projectId: 7, $t: (key) => key, $emit() {} }
   for (const [name, fn] of Object.entries(options.methods)) vm[name] = fn.bind(vm)
   vm.fetchDrafts = async () => {}
   vm.fetchCloudState = async () => { vm.cloud = { linked: true } }
@@ -35,14 +36,32 @@ test('temporary repository busy recovers without hiding the collaboration panel'
   assert.equal(toasts(), 0)
 })
 
-test('persistent busy is bounded and retains a visible error', async () => {
+// C29 (lane C, C24 retest): ending the session starts the automatic 交稿, whose push holds the repository lock
+// 4–6 s on a saturated link. The panel gave up after ~4.5 s and toasted 「读取失败」 for a 交稿 that landed.
+test('a busy window as long as a push under load recovers without any failure toast', async () => {
+  let clock = 0
   let calls = 0
-  const { vm, toasts } = setup(async () => { calls++; throw busy() })
+  const timer = (fn, ms) => { clock += ms; fn() }
+  const { vm, toasts } = setup(async () => { calls++; if (clock < 6000) throw busy(); return ready }, timer)
   await vm.refresh()
-  assert.equal(calls, 10)
+  assert.ok(clock >= 6000)
+  assert.equal(vm.loadError, false)
+  assert.equal(vm.enabled, true)
+  assert.equal(toasts(), 0, 'busy is not a failure: no 「读取失败」')
+})
+
+test('persistent busy is bounded, keeps a visible state, and says busy rather than failed', async () => {
+  let calls = 0
+  let clock = 0
+  const shown = []
+  const { vm } = setup(async () => { calls++; throw busy() }, (fn, ms) => { clock += ms; fn() })
+  vm.$t = (key) => key
+  await vm.refresh()
+  assert.ok(calls > 10 && calls <= 20, 'bounded: ' + calls)
+  assert.ok(clock >= 20000 && clock <= 30000, 'about half a minute of patience: ' + clock)
   assert.equal(vm.loadError, true)
   assert.equal(vm.loading, false)
-  assert.equal(toasts(), 1)
+  assert.equal(vm.lastToast, 'busy', 'the busy message, not version.loadFailedToast')
 })
 
 test('a genuine status failure is not retried or reported as success', async () => {
