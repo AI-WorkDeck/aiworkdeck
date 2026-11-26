@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "公式サイトへのサインイン",
     "ACCOUNT_API_KEY_CREATED": "アカウントキーの発行",
     "ACCOUNT_API_KEY_REVOKED": "アカウントキーの失効"
+  },
+  "detail": {
+    "sep": "；",
+    "roleChanged": "{from}から{to}に変更",
+    "role": "ロール：{role}",
+    "team": "チーム：{name}",
+    "firmAdmin": "事務所管理者",
+    "memberCount": "{count} 人",
+    "removedBy": "{name} が削除",
+    "issuedBy": "{name} が発行",
+    "keyPrefix": "Key の先頭は {prefix}",
+    "label": "名称：{label}",
+    "via": "経由：{via}",
+    "shareHistoryOn": "バージョン履歴も共有",
+    "shareHistoryOff": "バージョン履歴は共有しない",
+    "enabledOn": "オンにしました",
+    "enabledOff": "オフにしました",
+    "expiresAt": "有効期限：{date}",
+    "suppressedRepeats": "同一の記録 {count} 件を統合",
+    "purgedRows": "期限切れの記録 {count} 件を削除",
+    "reason": "理由：{reason}",
+    "other": "{key}：{value}",
+    "roleName": {
+      "OWNER": "オーナー",
+      "ADMIN": "管理者",
+      "MEMBER": "メンバー",
+      "READ_ONLY": "閲覧専用メンバー",
+      "PARTICIPANT": "参加者",
+      "MANAGER": "マネージャー",
+      "VIEWER": "閲覧者"
+    }
   }
 }

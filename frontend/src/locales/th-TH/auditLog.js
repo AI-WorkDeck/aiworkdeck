@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "เข้าสู่ระบบเว็บไซต์",
     "ACCOUNT_API_KEY_CREATED": "ออกคีย์บัญชี",
     "ACCOUNT_API_KEY_REVOKED": "เพิกถอนคีย์บัญชี"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "เปลี่ยนจาก{from}เป็น{to}",
+    "role": "บทบาท: {role}",
+    "team": "ทีม: {name}",
+    "firmAdmin": "ผู้ดูแลสำนักงาน",
+    "memberCount": "{count} คน",
+    "removedBy": "นำออกโดย {name}",
+    "issuedBy": "ออกโดย {name}",
+    "keyPrefix": "Key ขึ้นต้นด้วย {prefix}",
+    "label": "ชื่อ: {label}",
+    "via": "ผ่านทาง: {via}",
+    "shareHistoryOn": "แชร์ประวัติเวอร์ชันด้วย",
+    "shareHistoryOff": "ไม่แชร์ประวัติเวอร์ชัน",
+    "enabledOn": "เปิดแล้ว",
+    "enabledOff": "ปิดแล้ว",
+    "expiresAt": "มีผลถึง {date}",
+    "suppressedRepeats": "รวมรายการที่ซ้ำกัน {count} รายการ",
+    "purgedRows": "ลบบันทึกที่หมดอายุ {count} รายการ",
+    "reason": "เหตุผล: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "เจ้าของ",
+      "ADMIN": "ผู้ดูแลระบบ",
+      "MEMBER": "สมาชิก",
+      "READ_ONLY": "สมาชิกแบบอ่านอย่างเดียว",
+      "PARTICIPANT": "ผู้เข้าร่วม",
+      "MANAGER": "ผู้จัดการ",
+      "VIEWER": "ผู้ดู"
+    }
   }
 }

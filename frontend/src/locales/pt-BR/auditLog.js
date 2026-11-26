@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Login no site",
     "ACCOUNT_API_KEY_CREATED": "Chave de conta emitida",
     "ACCOUNT_API_KEY_REVOKED": "Chave de conta revogada"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Alterado de {from} para {to}",
+    "role": "Função: {role}",
+    "team": "Equipe: {name}",
+    "firmAdmin": "Administrador do escritório",
+    "memberCount": "{count} pessoas",
+    "removedBy": "Removido por {name}",
+    "issuedBy": "Emitido por {name}",
+    "keyPrefix": "A Key começa com {prefix}",
+    "label": "Nome: {label}",
+    "via": "Via: {via}",
+    "shareHistoryOn": "Histórico de versões também compartilhado",
+    "shareHistoryOff": "Histórico de versões não compartilhado",
+    "enabledOn": "Ativado",
+    "enabledOff": "Desativado",
+    "expiresAt": "Válido até {date}",
+    "suppressedRepeats": "{count} registros idênticos mesclados",
+    "purgedRows": "{count} registros expirados removidos",
+    "reason": "Motivo: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "proprietário",
+      "ADMIN": "administrador",
+      "MEMBER": "membro",
+      "READ_ONLY": "membro somente leitura",
+      "PARTICIPANT": "participante",
+      "MANAGER": "gerente",
+      "VIEWER": "visualizador"
+    }
   }
 }

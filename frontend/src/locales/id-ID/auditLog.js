@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Login situs web",
     "ACCOUNT_API_KEY_CREATED": "Kunci akun diterbitkan",
     "ACCOUNT_API_KEY_REVOKED": "Kunci akun dicabut"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Diubah dari {from} menjadi {to}",
+    "role": "Peran: {role}",
+    "team": "Tim: {name}",
+    "firmAdmin": "Admin kantor hukum",
+    "memberCount": "{count} orang",
+    "removedBy": "Dihapus oleh {name}",
+    "issuedBy": "Diterbitkan oleh {name}",
+    "keyPrefix": "Key diawali dengan {prefix}",
+    "label": "Nama: {label}",
+    "via": "Melalui: {via}",
+    "shareHistoryOn": "Riwayat versi juga dibagikan",
+    "shareHistoryOff": "Riwayat versi tidak dibagikan",
+    "enabledOn": "Diaktifkan",
+    "enabledOff": "Dinonaktifkan",
+    "expiresAt": "Berlaku hingga {date}",
+    "suppressedRepeats": "{count} entri identik digabungkan",
+    "purgedRows": "{count} catatan kedaluwarsa dihapus",
+    "reason": "Alasan: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "pemilik",
+      "ADMIN": "admin",
+      "MEMBER": "anggota",
+      "READ_ONLY": "anggota hanya-baca",
+      "PARTICIPANT": "peserta",
+      "MANAGER": "manajer",
+      "VIEWER": "pelihat"
+    }
   }
 }

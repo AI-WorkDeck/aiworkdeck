@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "تسجيل الدخول إلى الموقع الإلكتروني",
     "ACCOUNT_API_KEY_CREATED": "تم إصدار مفتاح الحساب",
     "ACCOUNT_API_KEY_REVOKED": "تم إلغاء مفتاح الحساب"
+  },
+  "detail": {
+    "sep": "؛ ",
+    "roleChanged": "تم التغيير من {from} إلى {to}",
+    "role": "الدور: {role}",
+    "team": "الفريق: {name}",
+    "firmAdmin": "مدير المكتب",
+    "memberCount": "{count} أشخاص",
+    "removedBy": "أزاله {name}",
+    "issuedBy": "أصدره {name}",
+    "keyPrefix": "يبدأ Key بـ {prefix}",
+    "label": "الاسم: {label}",
+    "via": "عبر: {via}",
+    "shareHistoryOn": "تمت مشاركة سجل الإصدارات أيضًا",
+    "shareHistoryOff": "لم تتم مشاركة سجل الإصدارات",
+    "enabledOn": "تم التشغيل",
+    "enabledOff": "تم الإيقاف",
+    "expiresAt": "صالح حتى {date}",
+    "suppressedRepeats": "تم دمج {count} سجلات مماثلة",
+    "purgedRows": "تمت إزالة {count} من السجلات المنتهية الصلاحية",
+    "reason": "السبب: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "مالك",
+      "ADMIN": "مسؤول",
+      "MEMBER": "عضو",
+      "READ_ONLY": "عضو للقراءة فقط",
+      "PARTICIPANT": "مشارك",
+      "MANAGER": "مدير",
+      "VIEWER": "مُشاهد"
+    }
   }
 }

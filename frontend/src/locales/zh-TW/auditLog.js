@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "官網登入",
     "ACCOUNT_API_KEY_CREATED": "帳號金鑰已核發",
     "ACCOUNT_API_KEY_REVOKED": "帳號金鑰已撤銷"
+  },
+  "detail": {
+    "sep": "；",
+    "roleChanged": "由{from}改為{to}",
+    "role": "角色：{role}",
+    "team": "團隊：{name}",
+    "firmAdmin": "事務所管理員",
+    "memberCount": "共 {count} 人",
+    "removedBy": "由 {name} 移出",
+    "issuedBy": "由 {name} 簽發",
+    "keyPrefix": "Key 開頭為 {prefix}",
+    "label": "名稱：{label}",
+    "via": "途徑：{via}",
+    "shareHistoryOn": "一併共享歷史版本",
+    "shareHistoryOff": "不共享歷史版本",
+    "enabledOn": "已開啟",
+    "enabledOff": "已關閉",
+    "expiresAt": "有效期至 {date}",
+    "suppressedRepeats": "另有 {count} 次相同紀錄已合併",
+    "purgedRows": "清除了 {count} 筆過期紀錄",
+    "reason": "原因：{reason}",
+    "other": "{key}：{value}",
+    "roleName": {
+      "OWNER": "負責人",
+      "ADMIN": "管理員",
+      "MEMBER": "成員",
+      "READ_ONLY": "唯讀成員",
+      "PARTICIPANT": "參與人",
+      "MANAGER": "管理者",
+      "VIEWER": "檢視者"
+    }
   }
 }

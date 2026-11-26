@@ -81,6 +81,8 @@
 import { displayServerLabel } from '@/utils/serverLabels.js'
 import { firmCloudAction } from '@/services/api'
 import { buildAuditCsv, detailText } from '@/utils/firmAuditCsv.js'
+import { auditDetailSentence } from '@/utils/auditDetail.js'
+import { formatDateTime } from '@/utils/projectHomeFormat.js'
 
 const CATEGORIES = ['AUTH', 'DEVICES', 'MEMBERSHIP', 'SHARING', 'CLIENT', 'DATA', 'SETTINGS', 'ACCESS']
 const PAGE = 100
@@ -124,9 +126,8 @@ export default {
     // 表格里省掉只有导出才用得上的内部 id（CSV 仍是全量）
     shortDetail(detail) {
       if (!detail || typeof detail !== 'object') return ''
-      const rest = { ...detail }
-      for (const k of ['actorAccountId', 'teamId', 'conversationId', 'deviceTokenId']) delete rest[k]
-      return detailText(rest)
+      // C7：表格里给管理员读的句子（「由管理员改为成员；团队：…」），CSV 仍是原样的 k=v
+      return auditDetailSentence(this.$t.bind(this), detail, (v) => formatDateTime(v) || String(v))
     },
     query(extra = {}) {
       const p = { ...extra }

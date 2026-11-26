@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Log masuk laman web",
     "ACCOUNT_API_KEY_CREATED": "Kunci akaun dikeluarkan",
     "ACCOUNT_API_KEY_REVOKED": "Kunci akaun dibatalkan"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Diubah daripada {from} kepada {to}",
+    "role": "Peranan: {role}",
+    "team": "Pasukan: {name}",
+    "firmAdmin": "Pentadbir firma",
+    "memberCount": "{count} orang",
+    "removedBy": "Dikeluarkan oleh {name}",
+    "issuedBy": "Dikeluarkan oleh {name}",
+    "keyPrefix": "Key bermula dengan {prefix}",
+    "label": "Nama: {label}",
+    "via": "Melalui: {via}",
+    "shareHistoryOn": "Sejarah versi turut dikongsi",
+    "shareHistoryOff": "Sejarah versi tidak dikongsi",
+    "enabledOn": "Dihidupkan",
+    "enabledOff": "Dimatikan",
+    "expiresAt": "Sah sehingga {date}",
+    "suppressedRepeats": "{count} entri yang sama telah digabungkan",
+    "purgedRows": "{count} rekod tamat tempoh telah dibuang",
+    "reason": "Sebab: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "pemilik",
+      "ADMIN": "pentadbir",
+      "MEMBER": "ahli",
+      "READ_ONLY": "ahli baca sahaja",
+      "PARTICIPANT": "peserta",
+      "MANAGER": "pengurus",
+      "VIEWER": "penonton"
+    }
   }
 }
