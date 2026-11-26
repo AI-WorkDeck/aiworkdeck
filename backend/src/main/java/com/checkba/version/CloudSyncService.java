@@ -1297,12 +1297,6 @@ public class CloudSyncService {
     }
 
     /**
-     * 移出案件库上的一位参与人（dev-board#1050）：同事，或凭访问码进来的客户——案件库那一侧
-     * 移出 CLIENT 时会连带作废他名下的访问码（{@code ProjectMemberService.removeMember}）。
-     * {@code remoteUserId} 是**案件库那一侧**的 userId（参与人列表里的 userId），与本机
-     * user.id 是两个 id 空间。权限规则（不能移自己、参与者只能移只读与客户）都在案件库判。
-     */
-    /**
      * C9：改案件库上一位参与人的角色。权限矩阵在案件库判；本机清掉角色缓存，下一次状态读到新角色。
      */
     public void proxyMemberRole(long projectId, long remoteUserId, String role) {
@@ -1320,6 +1314,12 @@ public class CloudSyncService {
         remoteRoleCache.remove(projectId);
     }
 
+    /**
+     * 移出案件库上的一位参与人（dev-board#1050）：同事，或凭访问码进来的客户——案件库那一侧
+     * 移出 CLIENT 时会连带作废他名下的访问码（{@code ProjectMemberService.removeMember}）。
+     * {@code remoteUserId} 是**案件库那一侧**的 userId（参与人列表里的 userId），与本机
+     * user.id 是两个 id 空间。权限规则（不能移自己、参与者只能移只读与客户）都在案件库判。
+     */
     public void proxyRemoveMember(long projectId, long remoteUserId) {
         ProjectRemote remote = requireRemoteBinding(projectId);
         CloudConnection conn = connectionOf(remote);
@@ -1883,7 +1883,7 @@ public class CloudSyncService {
         }
     }
 
-    /** 单测覆写此 seam 打桩，形状同 httpPost 的三参版本。sessionToken 非空时带 X-Session-Id 头。 */
+    /** C9 role change. Test seam like httpPost/httpDelete; sends X-Session-Id when sessionToken is set. */
     protected String httpPut(String url, String jsonBody, String sessionToken) {
         HttpRequest req = HttpRequest.put(url)
                 .header("Content-Type", "application/json")
@@ -1907,6 +1907,7 @@ public class CloudSyncService {
         }
     }
 
+    /** 单测覆写此 seam 打桩，形状同 httpPost 的三参版本。sessionToken 非空时带 X-Session-Id 头。 */
     protected String httpDelete(String url, String sessionToken) {
         HttpRequest req = HttpRequest.delete(url)
                 .setConnectionTimeout(5000)

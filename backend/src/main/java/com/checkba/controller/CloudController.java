@@ -321,10 +321,6 @@ public class CloudController {
         return ok(Map.of());
     }
 
-    /**
-     * 移出案件库上的一位参与人（dev-board#1050）：撤销客户访问码与移出同事共用这一条。
-     * {@code remoteUserId} 是案件库那一侧的 userId（参与人列表 / 签码回执里的那个）。
-     */
     /** C9：改案件库上一位参与人的角色（body {role}）。 */
     @PutMapping("/projects/{projectId}/members/{remoteUserId}/role")
     public ResponseEntity<Map<String, Object>> changeMemberRole(
@@ -338,6 +334,10 @@ public class CloudController {
         return ok(Map.of());
     }
 
+    /**
+     * 移出案件库上的一位参与人（dev-board#1050）：撤销客户访问码与移出同事共用这一条。
+     * {@code remoteUserId} 是案件库那一侧的 userId（参与人列表 / 签码回执里的那个）。
+     */
     @DeleteMapping("/projects/{projectId}/members/{remoteUserId}")
     public ResponseEntity<Map<String, Object>> removeMember(
             @PathVariable Long projectId,
