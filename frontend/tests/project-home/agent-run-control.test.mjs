@@ -209,3 +209,25 @@ test('bubble_end paused/user_pause：清掉「正在暂停」，挂上「继续�
   assert.equal(s.agentRunStatus.value, 'PAUSED')
   assert.equal(bubble.documentEdited, true)
 })
+
+// ---- Q22：空失败的一轮，「重试」直接重发 ----
+test('Q22 isEmptyFailedTurn：失败且什么都没产出才直接重发；有任何产出仍走确认框', async () => {
+  const { isEmptyFailedTurn } = await import('../../src/utils/agentRunControl.js')
+  const failed = { errorNotice: { kind: 'MALFORMED' }, content: '', processes: [], fileChanges: [], artifacts: [], documentEdited: false }
+  assert.equal(isEmptyFailedTurn(failed), true)
+  assert.equal(isEmptyFailedTurn({ ...failed, errorNotice: null }), false, '没失败不是「重试」')
+  assert.equal(isEmptyFailedTurn({ ...failed, content: '部分回答' }), false)
+  assert.equal(isEmptyFailedTurn({ ...failed, processes: [{ name: 'doc_find_text' }] }), false)
+  assert.equal(isEmptyFailedTurn({ ...failed, documentEdited: true }), false, '改过文档：要讲清楚文档不回滚')
+  assert.equal(isEmptyFailedTurn({ ...failed, fileChanges: [{ id: 1 }] }), false)
+  assert.equal(isEmptyFailedTurn(null), false)
+})
+
+test('Q22 接线：错误卡的「重试」走 retryFailedTurn（空失败直接重发），重新生成按钮仍弹确认框', () => {
+  const root = readFileSync(new URL('../../src/components/AgentMessage/RootBubble.vue', import.meta.url), 'utf8')
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  assert.match(root, /@retry="\$emit\('retry-failed'\)"/)
+  assert.match(chat, /@retry-failed="retryFailedTurn\(index\)"/)
+  assert.match(chat, /@regenerate="openRegenerateDialog\(index\)"/)
+  assert.match(chat, /if \(isEmptyFailedTurn\(bubbles\.value\[assistantIndex\]\)\) return retryAfterConsent\(assistantIndex\)/)
+})

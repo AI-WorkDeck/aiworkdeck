@@ -65,3 +65,17 @@ export function undoResultView(httpStatus, body, t) {
   }
   return { state: 'idle', message: t('chat.undoRunFailed', { error: failureText || b.message || '' }) }
 }
+
+/**
+ * Q22：这一轮失败时什么都没产出（没有正文、没有工具步骤、没有改文件、没有附件产物），
+ * 「重试」就是原样再问一次，不用弹「重新生成」那个四段说明的确认框（分支存档、文档不回滚、
+ * 拒绝修订……对一轮空失败都不适用）。有任何产出时仍走确认框。
+ */
+export function isEmptyFailedTurn(bubble) {
+  if (!bubble || !bubble.errorNotice) return false
+  if (String(bubble.content || '').trim()) return false
+  if (bubble.documentEdited) return false
+  if ((bubble.processes || []).length || (bubble.fileChanges || []).length || (bubble.artifacts || []).length) return false
+  if (bubble.question) return false
+  return true
+}

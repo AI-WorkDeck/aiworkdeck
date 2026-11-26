@@ -177,7 +177,7 @@
         <!-- X7：这一轮失败了——目录文案 + 重试/登录 + 详情；原始错误只在详情里 -->
         <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="bubble.errorNotice"
           :actionable="isLatest || bubble.errorNotice.action === 'signIn'"
-          @retry="$emit('regenerate')" @sign-in="signInForAi" />
+          @retry="$emit('retry-failed')" @sign-in="signInForAi" />
     </div>
   </div>
 </template>
@@ -217,7 +217,7 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'retry-failed', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
 function onConsentAccepted() {
   props.bubble.consentRequired = false
   emit('consent-accepted')
