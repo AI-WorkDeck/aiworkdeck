@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} pemberitahuan kerjasama belum dibaca",
   "clientWorkspace": "Kerjasama pelanggan",
   "clientWorkspaceHint": "Sambung ke projek jemputan dalam ruang kerja ini untuk melihat senarai semak, menghantar dokumen dan mengikuti semakan.",
+  "thisCaseClients": "Klien fail kes ini ({count})",
   "openClientWorkspace": "Buka kerjasama pelanggan",
   "lists": "Senarai semak usaha wajar",
   "refresh": "Segar semula",

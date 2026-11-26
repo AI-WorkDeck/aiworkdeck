@@ -337,7 +337,7 @@ test('selecting an existing shared conversation preserves its group behavior and
   assert.match(p.$('dialog-body').textContent, /合成项目助手 · AI 助手/);
   assert.equal([...p.$('dialog-body').querySelectorAll('.member-row button')].some((b) => b.textContent === '移除'), false);
   assert.doesNotMatch(p.$('dialog-body').textContent, /退出会话/);
-  await p.click('close-dialog'); p.write('这个项目下一步做什么？'); await p.submit();
+  await p.click('close-dialog'); p.write('@助手 这个项目下一步做什么？'); await p.submit();
   const send = p.calls.find((c) => c.action === 'send'), reply = p.calls.find((c) => c.action === 'agentReply');
   assert.equal(reply.params.question, send.params.text);
   assert.ok(send); assert.equal(reply.params.messageId, 30);
@@ -352,7 +352,7 @@ test('multi-human shared group waits for an explicit assistant request', async (
   assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30]);
 });
 test('assistant failures retry the same message without resending user content, completed replies identify AI', async (t) => {
-  const p = await agentPanel(); close(t, p); p.write('请概括进度'); await p.submit();
+  const p = await agentPanel(); close(t, p); p.write('@助手 请概括进度'); await p.submit();
   p.setStatus({ status: 'failed', messageId: 30, error: '模型暂不可用 <script>bad</script>' }); await p.poll();
   assert.match(p.$('agent-status').textContent, /模型暂不可用/); assert.equal(p.$('agent-status').querySelector('script'), null);
   await p.named('重试助手回复');
@@ -430,7 +430,7 @@ test('late default assistant enrollment cannot replace a conversation chosen by 
 test('a rejected assistant admission retains retry after polling without relabeling the sent message as failed', async (t) => {
   let fail = true;
   const p = await agentPanel({ call: ({ action }) => { if (action === 'agentReply' && fail) throw Error('助手暂时繁忙'); } }); close(t, p);
-  p.write('消息已发送，助手可稍后回复'); await p.submit();
+  p.write('@助手 消息已发送，助手可稍后回复'); await p.submit();
   assert.match(p.$('agent-status').textContent, /助手暂时繁忙/);
   assert.doesNotMatch(p.$('messages').textContent, /发送未确认/);
   await p.poll(); assert.match(p.$('agent-status').textContent, /重试助手回复/);
@@ -441,7 +441,7 @@ test('a rejected assistant admission retains retry after polling without relabel
 test('an assistant reply failure after switching conversations cannot replace the new chat status', async (t) => {
   let reject;
   const p = await agentPanel({ call: ({ action }) => action === 'agentReply' ? new Promise((_, fail) => { reject = fail; }) : undefined }); close(t, p);
-  p.write('旧会话消息'); await p.submit(); await p.select(1);
+  p.write('@助手 旧会话消息'); await p.submit(); await p.select(1);
   reject(Error('旧会话回复失败')); await tick();
   assert.equal(p.$('chat-title').textContent, c1.title);
   assert.equal(p.$('agent-status').hidden, true);
@@ -453,9 +453,9 @@ for (const olderStatus of ['queued', 'completed']) test(`older ${olderStatus} tu
   const p = await agentPanel({ call: ({ action, params }) => {
     if (action === 'agentReply' && params.messageId === 31 && rejectSecond) throw Error('助手正在回复，请稍后再试');
   } }); close(t, p);
-  p.write('第一条问题'); await p.submit();
+  p.write('@助手 第一条问题'); await p.submit();
   p.setStatus({ status: olderStatus, messageId: 30 }); await p.poll();
-  p.write('第二条需要保留的问题'); await p.submit();
+  p.write('@助手 第二条需要保留的问题'); await p.submit();
   assert.equal(p.calls.filter((c) => c.action === 'send').length, 2, 'normal messages remain sendable');
   assert.match(p.$('agent-status').textContent, /重试助手回复/);
   await p.poll();
@@ -470,24 +470,21 @@ for (const olderStatus of ['queued', 'completed']) test(`older ${olderStatus} tu
   p.setStatus({ status: 'completed', messageId: 31 }); await p.poll();
   assert.equal(p.$('agent-status').hidden, true);
 });
-test('each rejected reply keeps its own retry even after another failed source is accepted', async (t) => {
+test('C14: failures collapse to the latest retry row instead of stacking', async (t) => {
   let fail = true;
   const p = await agentPanel({ call: ({ action }) => { if (action === 'agentReply' && fail) throw Error('暂时无法连接助手'); } }); close(t, p);
-  p.write('第一条失败问题'); await p.submit(); p.write('第二条失败问题'); await p.submit();
-  await p.poll(); assert.equal(p.$('agent-status').querySelectorAll('button').length, 2);
-  fail = false; p.$('agent-status').querySelector('button').click(); await tick(); await tick();
-  p.setStatus({ status: 'completed', messageId: 30 }); await p.poll();
+  p.write('@助手 第一条失败问题'); await p.submit(); p.write('@助手 第二条失败问题'); await p.submit();
+  await p.poll(); assert.equal(p.$('agent-status').querySelectorAll('button').length, 1, 'one retry row at most');
   assert.match(p.$('agent-status').textContent, /第二条失败问题/);
-  assert.doesNotMatch(p.$('agent-status').textContent, /第一条失败问题/);
-  await p.named('重试助手回复');
-  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 31, 30, 31]);
+  fail = false; await p.named('重试助手回复');
+  assert.deepEqual(p.calls.filter((c) => c.action === 'agentReply').map((c) => c.params.messageId), [30, 31, 31]);
   assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
 });
 test('a second human message sent while admission is pending retains an assistant retry', async (t) => {
   let release, pending = true;
   const p = await agentPanel({ call: ({ action, params }) => action === 'agentReply' && params.messageId === 30 && pending
     ? new Promise((resolve) => { release = resolve; }) : undefined }); close(t, p);
-  p.write('第一条正在申请回复'); await p.submit(); p.write('第二条等待重试'); await p.submit();
+  p.write('@助手 第一条正在申请回复'); await p.submit(); p.write('@助手 第二条等待重试'); await p.submit();
   assert.equal(p.calls.filter((c) => c.action === 'send').length, 2);
   assert.match(p.$('agent-status').textContent, /第二条等待重试/);
   pending = false; release({ accepted: true, status: 'completed', messageId: 30 }); await tick(); await tick();
@@ -545,3 +542,11 @@ test('an access-code client is removed by revoking the code, after a confirmatio
  const texts=rows.map(r=>[...r.querySelectorAll('button')].map(b=>b.textContent))
  assert.deepEqual(texts[0],[]); assert.deepEqual(texts[1],['撤销访问码']); assert.deepEqual(texts[2],['移除'])
 })
+
+test('C14: plain messages in a single-human group never call the assistant; @ does', async (t) => {
+  const p = await agentPanel({ humanCount: 1 }); close(t, p);
+  p.write('只是记一笔'); await p.submit();
+  assert.equal(p.calls.filter((c) => c.action === 'agentReply').length, 0, 'no billed AI turn without an explicit call');
+  p.write('@项目助手 请总结'); await p.submit();
+  assert.equal(p.calls.filter((c) => c.action === 'agentReply').length, 1);
+});

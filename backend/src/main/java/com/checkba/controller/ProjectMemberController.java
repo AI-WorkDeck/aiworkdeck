@@ -70,6 +70,11 @@ public class ProjectMemberController {
                 // 不知道就是 null，前端退回按用户名比。
                 map.put("accountId", projectMemberService.accountIdFor(user, callerId));
             }
+            // C16：客户行带上「能看到加入之前的消息吗」，律师在参与人名单里就能核对每位客户的范围
+            if (member.getRole() != null && member.getRole().startsWith("CLIENT")) {
+                Boolean scope = clientInvitationService.shareHistoryFor(projectId, member.getUserId());
+                if (scope != null) map.put("clientShareHistory", scope);
+            }
             return map;
         }).collect(Collectors.toList());
 

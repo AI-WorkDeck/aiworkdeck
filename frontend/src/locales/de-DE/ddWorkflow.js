@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} ungelesene Kollaborationsbenachrichtigungen",
   "clientWorkspace": "Mandanten-Kollaboration",
   "clientWorkspaceHint": "Verbinden Sie sich in diesem Arbeitsbereich mit eingeladenen Projekten, um Checklisten anzuzeigen, Dokumente einzureichen und Prüfungen zu verfolgen.",
+  "thisCaseClients": "Mandanten dieser Akte ({count})",
   "openClientWorkspace": "Mandanten-Kollaboration öffnen",
   "lists": "Due-Diligence-Checklisten",
   "refresh": "Aktualisieren",

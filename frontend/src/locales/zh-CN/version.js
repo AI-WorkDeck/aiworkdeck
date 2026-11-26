@@ -263,6 +263,16 @@ export default {
   colleagueSubmittedNew: '同事交了新稿',
   hasUnsubmittedChanges: '有改动还没交稿',
   inSyncWithTeam: '和大家的稿一致',
+  clientsInCaseFile: '客户（{count}）',
+  unnamedClient: '未命名客户',
+  clientJoinedAt: '{date} 加入',
+  clientSeesEarlier: '能看加入之前的消息',
+  clientSeesFromJoin: '只看加入之后的消息',
+  clientRole: '客户',
+  revokeClientAccess: '撤销访问',
+  revokeClientConfirm: '撤销 {name} 的访问？撤销后对方立刻不能再进入这份案卷，访问码作废，已发的消息保留。',
+  clientAccessRevoked: '已撤销，对方不能再进入这份案卷',
+  removeColleagueConfirm: '把 {name} 移出这份案卷？对方这台电脑上的副本保留，但不能再取回或交稿。',
 
   // ---- CollabDialog.vue ----
   collabTitle: '协作',

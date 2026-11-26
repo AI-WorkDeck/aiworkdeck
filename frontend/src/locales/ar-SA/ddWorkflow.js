@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} إشعارات تعاون غير مقروءة",
   "clientWorkspace": "تعاون العملاء",
   "clientWorkspaceHint": "اتصل بالمشاريع المدعوة في مساحة العمل هذه لعرض قوائم التدقيق وتقديم المستندات ومتابعة المراجعات.",
+  "thisCaseClients": "عملاء ملف القضية هذا ({count})",
   "openClientWorkspace": "فتح تعاون العملاء",
   "lists": "قوائم تدقيق العناية الواجبة",
   "refresh": "تحديث",

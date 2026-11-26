@@ -35,7 +35,7 @@
         <text class="home-template-line-text">{{ templateLine }}</text>
       </view>
 
-      <OverviewStatsBar :class="{ 'is-sidebar': compact }" :stats="stats" :loading="statsLoading" />
+      <OverviewStatsBar :class="{ 'is-sidebar': compact }" :stats="statsShown" :loading="statsLoading" />
 
       <view class="home-section">
         <text class="home-section-title">{{ $t('projects.activitySectionTitle') }}</text>
@@ -101,6 +101,8 @@ export default {
     projectId: { type: Number, required: true },
     /** true = 嵌在工作台左栏里（窄栏形态：铺满并自己滚动，内容收成单列） */
     compact: { type: Boolean, default: false },
+    /** C16：共享案卷的参与人总数（案件库名单：律师 + 客户）；null = 用本机统计 */
+    sharedMemberCount: { type: Number, default: null },
   },
   // open-task-file：日程块里点了事项关联的文件芯片（{task, fileId}），由宿主决定怎么打开
   emits: ['open-conversation', 'open-task-file'],
@@ -128,6 +130,10 @@ export default {
     }
   },
   computed: {
+    // C16：共享案卷的参与人以案件库为准（含客户），本机统计只知道本机这几位
+    statsShown() {
+      return this.sharedMemberCount == null ? this.stats : { ...this.stats, memberCount: this.sharedMemberCount }
+    },
     backgroundRuns() {
       return Array.isArray(this.stats.backgroundRuns) ? this.stats.backgroundRuns : []
     },

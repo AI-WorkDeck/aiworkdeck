@@ -783,6 +783,11 @@
               <text aria-hidden="true">›</text>
             </component>
             <text class="dd-client-nav-hint">{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
+            <!-- C16：在自己的案卷里，这里还要能看到并管理这份案卷的客户（上面那一项是「我作为客户受邀的项目」） -->
+            <component v-if="hasNamedProject && collabLinked && !isClientView" :is="'button'" type="button" class="dd-client-nav" @click.stop="openCollab('people')">
+              <text class="dd-client-nav-label">{{ $t('ddWorkflow.thisCaseClients', { count: projectClientCount }) }}</text>
+              <text aria-hidden="true">›</text>
+            </component>
           </view>
           <DdFilesPanel
             ref="ddFilesPanel"
@@ -805,6 +810,7 @@
           <ProjectHomePane
             v-else-if="leftPaneKey === 'home'"
             :project-id="Number(projectId)"
+            :shared-member-count="collabLinked && projectMembers && projectMembers.length ? projectMembers.length : null"
             compact
             @open-conversation="openConversationInPanel"
             @open-task-file="onTaskOpenFile"
@@ -3196,6 +3202,10 @@ export default {
     }
   },
   computed: {
+    // C16：这份案卷里凭访问码进来的客户人数（案件库名单）
+    projectClientCount() {
+      return (this.projectMembers || []).filter(m => typeof m?.role === 'string' && m.role.startsWith('CLIENT')).length
+    },
     // C6：负责人是案件的负责人（成员名单里 role=OWNER，共享案件以案件库为准），不是本机这位。
     // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
     projectLeadName() {
