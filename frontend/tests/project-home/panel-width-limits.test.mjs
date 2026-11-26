@@ -91,55 +91,109 @@ test('接线：容器几何在 startResize 里实测，不硬编码 rail 宽等�
   assert.match(body, /containerWidth/, '量到的宽度要缓存到 this.resizing 上给 applyResizeFrame 用')
 })
 
-test('缩小窗口后已保存的左右栏宽度仍留在窗口内', async () => {
-  const { fitPanelWidths } = await import('../../src/pages/project-overview/panelWidthLimits.js')
-  assert.equal(typeof fitPanelWidths, 'function')
-  for (const width of [800, 1000, 1400]) {
-    for (const left of [0, 260, 1000]) {
-      for (const right of [0, 360, 1200]) {
-        const fit = fitPanelWidths(width, 50, left, right)
-        assert.ok(fit.left + fit.right + 50 + EDITOR_MIN_WIDTH <= width)
-        assert.ok(fit.left <= left && fit.right <= right, '回夹不应放大面板')
-        if (!left) assert.equal(fit.left, 0)
-        if (!right) assert.equal(fit.right, 0)
-      }
-    }
+// ---- Q28 / X-S10：窄窗口里面板给文档让路 ----
+import { planPanels, openAsOverlay, TREE_MIN_WIDTH, AI_MIN_WIDTH, REOPEN_HYSTERESIS } from '../../src/pages/project-overview/panelWidthLimits.js'
+import { narrowLayoutMethods } from '../../src/pages/project-overview/narrowLayout.js'
+
+const RAIL = 56
+const open = (width) => ({ open: true, width, auto: false })
+const docOf = (layoutWidth, plan) => layoutWidth - RAIL - plan.tree.width - plan.ai.width
+
+test('文档列恒 ≥ 480：让位顺序是左栏缩、左栏收、AI 缩、AI 收', () => {
+  const at = (w) => planPanels({ layoutWidth: w, railWidth: RAIL, tree: open(260), ai: open(360) })
+  let p = at(1476)
+  assert.deepEqual([p.tree.width, p.ai.width], [260, 360], '宽窗：用户宽原样')
+  p = at(1150)
+  assert.ok(p.tree.width < 260 && p.tree.width >= TREE_MIN_WIDTH && p.ai.width === 360, '先缩左栏：' + JSON.stringify(p))
+  p = at(1000)
+  assert.equal(p.tree.open, false); assert.equal(p.tree.auto, true, '左栏自动收起')
+  assert.equal(p.ai.width, 360)
+  p = at(960)
+  assert.deepEqual([p.tree.open, p.ai.open, p.ai.width], [false, true, 360], '960：rail + AI + 544 文档（截图 23 的窗口）')
+  assert.equal(docOf(960, p), 544)
+  p = at(820)
+  assert.equal(p.ai.open, false); assert.equal(p.ai.auto, true, '再窄 AI 也收起：rail + 文档')
+  for (const w of [1476, 1300, 1150, 1036, 1000, 960, 900, 860, 836, 800]) {
+    const q = at(w)
+    if (q.tree.open || q.ai.open) assert.ok(docOf(w, q) >= EDITOR_MIN_WIDTH, w + ' 文档只剩 ' + docOf(w, q))
   }
 })
 
-test('临时几何小于可见面板最小宽时保留原宽，不能把展开的面板夹成 0', async () => {
-  const { fitPanelWidths } = await import('../../src/pages/project-overview/panelWidthLimits.js')
-  for (const [left, right] of [[260, 0], [0, 360], [260, 360]]) {
-    assert.deepEqual(fitPanelWidths(1, 51, left, right), { left, right })
-    assert.deepEqual(fitPanelWidths(0, 51, left, right), { left, right })
-  }
-  // 刚好容纳两栏下限时仍需回夹，不能把整个窄窗处理都跳过。
-  assert.deepEqual(fitPanelWidths(651, 51, 1000, 1200), { left: 160, right: 240 })
+test('回差：自动收起的面板要多出 24px 才回来；用户自己关的永不自动打开', () => {
+  // 960 时左栏已被自动收起；窗口拉到刚够停靠 200 宽左栏的宽度还不回来，多 24 才回来
+  const edge = RAIL + TREE_MIN_WIDTH + 360 + EDITOR_MIN_WIDTH
+  const auto = { open: false, width: 260, auto: true }
+  assert.equal(planPanels({ layoutWidth: edge, railWidth: RAIL, tree: auto, ai: open(360) }).tree.open, false)
+  assert.equal(planPanels({ layoutWidth: edge + REOPEN_HYSTERESIS, railWidth: RAIL, tree: auto, ai: open(360) }).tree.open, true)
+  const userClosed = { open: false, width: 260, auto: false }
+  const wide = planPanels({ layoutWidth: 1920, railWidth: RAIL, tree: userClosed, ai: open(360) })
+  assert.deepEqual(wide.tree, { open: false, width: 0, auto: false })
 })
 
-test('真实 resize 方法：截图临时 1px → 恢复 1440px 后资源管理器仍可见', async () => {
-  const { fitPanelWidths } = await import('../../src/pages/project-overview/panelWidthLimits.js')
-  const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
-  const start = page.indexOf('    handleResponsiveResize() {')
-  const end = page.indexOf('    // 左栏面板切换方法组', start)
-  const window = { innerWidth: 1440 }
-  const layout = { clientWidth: 1440, querySelector: selector => ({ offsetWidth: selector === '.left-rail' ? 51 : 0 }) }
-  const { handleResponsiveResize } = new Function('window', 'fitPanelWidths', 'return {' + page.slice(start, end) + '}')(window, fitPanelWidths)
-  for (const showAiPanel of [false, true]) {
-    const vm = { $refs: { sidebarLeft: { parentElement: layout } }, sidebarCollapsed: false,
-      sidebarWidth: 260, aiPanelWidth: 360, showAiPanel }
-    window.innerWidth = layout.clientWidth = 1
-    handleResponsiveResize.call(vm)
-    window.innerWidth = layout.clientWidth = 1440
-    handleResponsiveResize.call(vm)
-    assert.equal(vm.sidebarWidth, 260)
-    assert.equal(vm.aiPanelWidth, 360)
-    assert.equal(vm.isCompactLayout, false)
-    window.innerWidth = layout.clientWidth = 700
-    vm.sidebarWidth = 600
-    vm.aiPanelWidth = 400
-    handleResponsiveResize.call(vm)
-    assert.ok(51 + vm.sidebarWidth + (showAiPanel ? vm.aiPanelWidth : 0) + EDITOR_MIN_WIDTH <= 700,
-      '移除外缘把手后，窄窗仍保留编辑区最小宽度')
+test('浮层抽屉不占文档宽、规划不动它；放不下才作浮层', () => {
+  const p = planPanels({ layoutWidth: 800, railWidth: RAIL, tree: { open: true, width: 260, overlay: true }, ai: { open: false, width: 360, auto: true } })
+  assert.equal(p.tree.open, true); assert.equal(p.ai.open, false)
+  assert.equal(openAsOverlay({ layoutWidth: 800, railWidth: RAIL, otherWidth: 0, min: AI_MIN_WIDTH }), true)
+  assert.equal(openAsOverlay({ layoutWidth: 1440, railWidth: RAIL, otherWidth: 260, min: AI_MIN_WIDTH }), false)
+})
+
+function fakeVm(overrides) {
+  const vm = {
+    narrowWidthCap: { tree: 0, ai: 0 },
+    sidebarCollapsed: false, sidebarWidth: 260, showAiPanel: true, aiPanelWidth: 360, aiPanelMounted: true,
+    sidebarOverlay: false, aiPanelOverlay: false, panelAutoCollapsed: { tree: false, ai: false },
+    narrowLayoutApplying: false, isChatMode: false, hasProject: true,
+    $nextTick(fn) { fn() }, ...overrides,
   }
+  for (const [k, fn] of Object.entries(narrowLayoutMethods)) vm[k] = fn.bind(vm)
+  return vm
+}
+
+test('接线：截图临时 1px → 恢复 1440，左栏与 AI 面板自动回来、宽度不变', () => {
+  const vm = fakeVm()
+  vm.applyNarrowLayout({ layoutWidth: 1, railWidth: RAIL })
+  assert.deepEqual([vm.sidebarCollapsed, vm.showAiPanel], [true, false])
+  vm.applyNarrowLayout({ layoutWidth: 1440, railWidth: RAIL })
+  assert.deepEqual([vm.sidebarCollapsed, vm.showAiPanel, vm.sidebarWidth, vm.aiPanelWidth], [false, true, 260, 360])
+  assert.deepEqual(vm.narrowWidthCap, { tree: 0, ai: 0 })
+})
+
+test('接线：窄窗只限显示宽，用户宽不丢；窗口变宽后原样还原', () => {
+  const vm = fakeVm()
+  vm.applyNarrowLayout({ layoutWidth: 1150, railWidth: RAIL })
+  assert.ok(vm.narrowWidthCap.tree > 0 && vm.narrowWidthCap.tree < 260, JSON.stringify(vm.narrowWidthCap))
+  assert.equal(vm.sidebarWidth, 260)
+  vm.applyNarrowLayout({ layoutWidth: 1600, railWidth: RAIL })
+  assert.deepEqual(vm.narrowWidthCap, { tree: 0, ai: 0 })
+})
+
+test('AI 以浮层开着时，自动收起的左栏不会挤回来', () => {
+  const p = planPanels({ layoutWidth: 800, railWidth: RAIL, tree: { open: false, width: 260, auto: true }, ai: { open: true, width: 360, overlay: true } })
+  assert.equal(p.tree.open, false)
+  assert.equal(p.ai.open, true)
+})
+
+test('接线：放不下时用户打开 AI 面板 → 浮层；窗口放宽后落回停靠；Esc 关闭', () => {
+  const vm = fakeVm({ showAiPanel: false, sidebarCollapsed: true })
+  vm.narrowLayoutGeometry = () => ({ layoutWidth: 800, railWidth: RAIL })
+  vm.showAiPanel = true
+  vm.onPanelOpened('ai', true)
+  assert.equal(vm.aiPanelOverlay, true)
+  vm.applyNarrowLayout({ layoutWidth: 800, railWidth: RAIL })
+  assert.equal(vm.showAiPanel, true, '浮层不被窄窗规划收掉')
+  vm.applyNarrowLayout({ layoutWidth: 1440, railWidth: RAIL })
+  assert.equal(vm.aiPanelOverlay, false, '放得下了，落回停靠')
+  vm.aiPanelOverlay = true
+  vm.closePanelOverlays()
+  assert.deepEqual([vm.showAiPanel, vm.aiPanelOverlay], [false, false])
+})
+
+test('接线：用户手动关掉的面板，窗口再宽也不自动打开', () => {
+  const vm = fakeVm()
+  vm.applyNarrowLayout({ layoutWidth: 900, railWidth: RAIL })
+  assert.equal(vm.sidebarCollapsed, true)
+  vm.sidebarCollapsed = false; vm.onPanelOpened('tree', false)   // 用户点开又关
+  vm.sidebarCollapsed = true; vm.onPanelOpened('tree', false)
+  vm.applyNarrowLayout({ layoutWidth: 1920, railWidth: RAIL })
+  assert.equal(vm.sidebarCollapsed, true)
 })

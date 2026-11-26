@@ -622,7 +622,7 @@
     </view>
 
       <!-- 左侧文件树（可收起） -->
-      <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
+      <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed, 'as-overlay': sidebarOverlay && !sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarShownWidth + 'px' }">
         <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
         <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
         <!-- 左栏标题的唯一出处。此前各面板还各画各的 header，于是「诉讼可视化」
@@ -1818,7 +1818,8 @@
             v-show="showAiPanel"
             ref="aiPanel"
             class="side-panel side-panel-ai"
-            :style="{ width: aiPanelWidth + 'px' }"
+            :class="{ 'as-overlay': aiPanelOverlay && showAiPanel }"
+            :style="{ width: aiPanelShownWidth + 'px' }"
             @dragover.prevent="handleAiDragOver"
             @dragleave="handleAiDragLeave"
             @drop="handleAiDrop"
@@ -2676,7 +2677,7 @@ import { stagingAreaMethods } from './stagingArea.js'
 import { evidenceLinkData, evidenceLinkMethods } from './evidenceLinkActions.js'
 import { setEvidenceProjectType } from '@/utils/evidenceTags.js'
 import { tabDragSplitMethods } from './tabDragSplit.js'
-import { fitPanelWidths } from './panelWidthLimits.js'
+import { narrowLayoutMethods } from './narrowLayout.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
 import { railSortData, railSortMethods } from './railSort.js'
 import { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarCollapse.js'
@@ -2882,6 +2883,14 @@ export default {
       // rail 一屏放得下几个插件图标（ResizeObserver 量 .rail-tools；Infinity = 都放得下）
       railFitCount: Infinity,
       railMoreOpen: false,
+      // 窄窗口让位（Q28，见 narrowLayout.js）：放不下时用户打开的面板以浮层抽屉显示；
+      // autoCollapsed 只记窗口自动收起的，窗口变宽时只自动打开这些。
+      sidebarOverlay: false,
+      aiPanelOverlay: false,
+      panelAutoCollapsed: { tree: false, ai: false },
+      // 窄窗时显示宽的上限（0 = 不限）；sidebarWidth / aiPanelWidth 仍是用户宽，窗口变宽后还原
+      narrowWidthCap: { tree: 0, ai: 0 },
+      narrowLayoutApplying: false,
       sidebarCollapsed: true,
       isCompactLayout: false,
       leftPaneKey: null, // Initialize to null to prevent premature loading
@@ -3182,6 +3191,8 @@ export default {
     }
   },
   computed: {
+    sidebarShownWidth() { return this.narrowWidthCap.tree ? Math.min(this.sidebarWidth, this.narrowWidthCap.tree) : this.sidebarWidth },
+    aiPanelShownWidth() { return this.narrowWidthCap.ai ? Math.min(this.aiPanelWidth, this.narrowWidthCap.ai) : this.aiPanelWidth },
     filteredSwitcherProjects() {
       const query = this.projectSwitcherQuery.trim().toLocaleLowerCase()
       return this.switcherProjects.filter(p => !query || String(p.name || '').toLocaleLowerCase().includes(query))
@@ -4028,6 +4039,7 @@ export default {
     }
     clearTimeout(this._libreSpareTimer)
     this.teardownResponsiveListener()
+    if (this._overlayDismiss) this._overlayDismiss()
     // Epic #43: 解绑 ⌘⇧O 嵌入式编辑器监听
     // 清理轮询定时器
     if (this.fileInfoPollingIntervals) {
@@ -4513,6 +4525,7 @@ export default {
     }
     uni.$on('awd:selection-changed', this._onEditorSelectionChanged)
     this.setupResponsiveListener()
+    this.setupPanelOverlayDismiss()
     // IDE 化：窗口重新聚焦时刷新文件树——外部改动（Finder 增删改）都发生在
     // 用户切出去的时候，后端 watcher 已把数据库对齐，聚焦拉一次即可见。
     // 多实例守卫：只让活跃实例刷新（页面栈多实例地雷，PR#148/#151 模式）
@@ -4818,9 +4831,9 @@ export default {
       },
     },
     activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab() },
-    sidebarCollapsed() { this.pushMenuState() },
+    sidebarCollapsed(collapsed) { this.pushMenuState(); this.onPanelOpened('tree', !collapsed) },
     showToolsPanel() { this.pushMenuState() },
-    showAiPanel() { this.pushMenuState() },
+    showAiPanel(open) { this.pushMenuState(); this.onPanelOpened('ai', open) },
     // 分屏开关会把右侧那条标签栏整个建/拆，滚轮横滚是原生挂上去的，得跟着重挂
     // （幂等，见 tabDragSplit.rebindTabsWheel）。
     splitMode() {
@@ -5006,6 +5019,7 @@ export default {
     },
     // Phase 1 外置的方法组（纯搬移，this 即页面实例）
     ...panelSwitchingMethods,
+    ...narrowLayoutMethods,
     ...menuCommandsMethods,
     ...agentClientActionMethods,
     ...librePoolMethods,
@@ -6389,14 +6403,10 @@ export default {
       const compact = viewportWidth <= 1360
       this.isCompactLayout = compact
       if (this.resizing?.active) return
-      const sidebar = this.$refs.sidebarLeft?.$el || this.$refs.sidebarLeft
-      const layout = sidebar?.parentElement
-      if (!layout?.clientWidth) return
-      const rail = layout.querySelector('.left-rail')
-      const fit = fitPanelWidths(layout.clientWidth, rail?.offsetWidth || 0,
-        this.sidebarCollapsed ? 0 : this.sidebarWidth, this.showAiPanel ? this.aiPanelWidth : 0)
-      if (!this.sidebarCollapsed) this.sidebarWidth = fit.left
-      if (this.showAiPanel) this.aiPanelWidth = fit.right
+      // 窄窗口：文档列保住 480，左栏、AI 面板按序让位（Q28，见 narrowLayout.js）
+      const geometry = this.narrowLayoutGeometry()
+      if (!geometry) return
+      this.applyNarrowLayout(geometry)
     },
     // 左栏面板切换方法组已外置 → ./panelSwitching.js（Phase 1）
     // OCR 采集与浮层生命周期方法组已外置（Phase 3c） → ./ocrCapture.js

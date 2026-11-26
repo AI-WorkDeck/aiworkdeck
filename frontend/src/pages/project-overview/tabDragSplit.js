@@ -236,8 +236,8 @@ export const tabDragSplitMethods = {
       const e = evt && evt.touches && evt.touches[0] ? evt.touches[0] : evt
       this.resizing.startX = e?.clientX || 0
       this.resizing.startY = e?.clientY || 0
-      this.resizing.startSidebarWidth = this.sidebarWidth
-      this.resizing.startAiWidth = this.aiPanelWidth
+      this.resizing.startSidebarWidth = this.sidebarShownWidth ?? this.sidebarWidth
+      this.resizing.startAiWidth = this.aiPanelShownWidth ?? this.aiPanelWidth
       this.resizing.startToolsHeight = this.toolsPanelHeight
 
       // Cache DOM element for direct manipulation

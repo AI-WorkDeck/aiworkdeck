@@ -5318,4 +5318,25 @@ $color-accent: var(--awd-mint); // Mint Green
   bottom: 160px;
   max-height: 60vh;
   overflow-y: auto;
+/* 窄窗口浮层抽屉（Q28 / X-S10）：放不下时打开的左栏 / AI 面板压在文档上，不挤它。
+   不加遮罩，文档在旁边照样能读；Esc、点文档、再点开关关闭（narrowLayout.js）。 */
+.sidebar-left.as-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 56px;
+  z-index: 60;
+  max-width: calc(100% - 56px - 48px);
+  box-shadow: var(--awd-shadow-lg);
+}
+.workbench-main { position: relative; }
+.workbench-main > .side-panel-ai.as-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: 0;
+  z-index: 60;
+  max-width: calc(100% - 48px);
+  background: var(--awd-bg);
+  box-shadow: var(--awd-shadow-lg);
 }

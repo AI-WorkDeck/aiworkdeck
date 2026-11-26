@@ -864,6 +864,18 @@ DdFilesPanel / ShareholderMeetingPanel。新面板照抄这套，不要再自定
   `1px → 1440px` resize；旧回夹把展开左栏写成 0 后无法恢复。可用宽连可见面板
   下限（左 160 / 右 240）都装不下时保留原宽，正常窄窗仍回夹；测试运行真实
   `handleResponsiveResize` 的同一时序，不能只断言「左右宽之和不溢出」。
+  **2026-11-25 窄窗让位（Q28 / X-S10，取代上面的 `fitPanelWidths` 回夹）**：`EDITOR_MIN_WIDTH`
+  提到 480（文档是正事）。`handleResponsiveResize` → `narrowLayout.js` 的 `applyNarrowLayout`，
+  规则在纯函数 `planPanels`：文档列不够 480 时按序让位——左栏缩到 200 → 左栏收起 → AI 面板
+  缩到 300 → AI 面板收起。被**自动**收起的记 `panelAutoCollapsed`，窗口变宽（回差 24px）只
+  自动打开这些；用户自己关的永不自动打开；自动收起不写 `saveSidebarCollapsed`。窄窗只限
+  **显示宽**（`narrowWidthCap` → `sidebarShownWidth` / `aiPanelShownWidth`），`sidebarWidth` /
+  `aiPanelWidth` 仍是用户宽，变宽后原样还原；拖拽起点用显示宽（tabDragSplit）。放不下时用户
+  从任何入口打开面板（`sidebarCollapsed` / `showAiPanel` 的 watcher → `onPanelOpened`）一律作
+  **浮层抽屉**（`.as-overlay`，不挤文档；Esc、焦点进编辑器 iframe、点工作区或再点开关关闭；
+  同时只开一个；AI 浮层开着时自动收起的左栏不会挤回来）。截图临时 1px 几何：两栏被自动
+  收起、恢复后自动回来、宽度不变（用例钉着）。审阅面板本来就是编辑器里的浮层，不在规划里。
+  主窗口 `minWidth 760 / minHeight 520`。测试 `panel-width-limits.test.mjs`。
   单测 `frontend/tests/project-home/panel-width-limits.test.mjs`（`npm run test:project-home`）。
   同轮把桌面壳建窗尺寸夹进工作区（`desktop/main/main.js` 的 `createMainWindow`：
   `Math.min(1400, screen.getPrimaryDisplay().workAreaSize.width)`，高度同理）——工作区窄于
