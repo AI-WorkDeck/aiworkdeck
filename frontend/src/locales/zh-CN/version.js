@@ -597,4 +597,6 @@ export default {
   mergeExportFailed: '合并稿导出失败，请稍后重试',
   mergeResolveFailed: '裁决没能保存，你在这份稿上的处理都还在',
   mergeReadonlyNeedsFile: '这份合并稿要从文件列表里打开查看',
+  transferUploading: '正在上传大文件 {done} / {total} MB，网速慢时需要几分钟',
+  transferDownloading: '正在取回大文件 {done} / {total} MB，网速慢时需要几分钟',
 }

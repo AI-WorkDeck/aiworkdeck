@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Die Zusammenführungsprüfung konnte nicht erstellt werden ({stage}). Wählen Sie für diese Datei in der Übersicht eine vollständige Seite aus.",
   "mergeExportFailed": "Export des zusammengeführten Entwurfs fehlgeschlagen. Bitte versuchen Sie es später erneut.",
   "mergeResolveFailed": "Ihre Entscheidungen konnten nicht gespeichert werden — alle Ihre Bearbeitungen an diesem Entwurf sind noch vorhanden.",
-  "mergeReadonlyNeedsFile": "Öffnen Sie diesen zusammengeführten Entwurf über die Dateiliste."
+  "mergeReadonlyNeedsFile": "Öffnen Sie diesen zusammengeführten Entwurf über die Dateiliste.",
+  transferUploading: 'Große Dateien werden hochgeladen: {done} / {total} MB. Bei langsamer Verbindung kann das einige Minuten dauern',
+  transferDownloading: 'Große Dateien werden heruntergeladen: {done} / {total} MB. Bei langsamer Verbindung kann das einige Minuten dauern',
 }

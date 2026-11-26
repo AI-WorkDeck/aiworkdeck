@@ -59,7 +59,8 @@ test('API facade sends all four operations through the shared observation state'
   const facades = Object.fromEntries(['getCloudStatus', 'checkCloud', 'uploadToCloud', 'updateFromCloud'].map(name => {
     const start = api.indexOf(`export function ${name}(`)
     const source = api.slice(start + 7, api.indexOf('\n}', start) + 2)
-    return [name, new Function('request', 'observeCloudConnectivity', `return (${source})`)(request, observe)]
+    // uploadToCloud/updateFromCloud also wrap the call in the large-file progress helper: pass it through
+    return [name, new Function('request', 'observeCloudConnectivity', 'withTransferProgress', 'transferProgressUi', `return (${source})`)(request, observe, (id, run) => run(), {})]
   }))
   await facades.updateFromCloud(5)
   transportResult = cached.data

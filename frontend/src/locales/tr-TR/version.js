@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Birleştirme incelemesi oluşturulamadı ({stage}). Genel görünümde bu dosya için tam bir taraf seçin.",
   "mergeExportFailed": "Birleştirilmiş taslak dışa aktarılamadı. Lütfen daha sonra tekrar deneyin.",
   "mergeResolveFailed": "Kararlarınız kaydedilemedi — bu taslakta yaptığınız her şey hâlâ burada duruyor.",
-  "mergeReadonlyNeedsFile": "Bu birleştirilmiş taslağı dosya listesinden açın."
+  "mergeReadonlyNeedsFile": "Bu birleştirilmiş taslağı dosya listesinden açın.",
+  transferUploading: 'Büyük dosyalar yükleniyor {done} / {total} MB; yavaş bağlantıda bu birkaç dakika sürebilir',
+  transferDownloading: 'Büyük dosyalar indiriliyor {done} / {total} MB; yavaş bağlantıda bu birkaç dakika sürebilir',
 }

@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Impossibile generare la revisione dell'unione ({stage}). Scegli un'intera versione per questo file nella panoramica.",
   "mergeExportFailed": "Impossibile esportare la bozza unita. Riprova più tardi.",
   "mergeResolveFailed": "Non è stato possibile salvare le tue decisioni — tutto ciò che hai fatto su questa bozza è ancora qui.",
-  "mergeReadonlyNeedsFile": "Apri questa bozza unita dall'elenco dei file."
+  "mergeReadonlyNeedsFile": "Apri questa bozza unita dall'elenco dei file.",
+  transferUploading: 'Caricamento dei file di grandi dimensioni {done} / {total} MB; con una connessione lenta può richiedere alcuni minuti',
+  transferDownloading: 'Download dei file di grandi dimensioni {done} / {total} MB; con una connessione lenta può richiedere alcuni minuti',
 }

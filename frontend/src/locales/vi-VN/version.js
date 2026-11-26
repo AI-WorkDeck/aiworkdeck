@@ -537,5 +537,7 @@ export default {
   "mergeBuildFailedStage": "Không thể tạo bản rà soát hợp nhất ({stage}). Vui lòng chọn giữ toàn bộ một bên cho tệp này ở bảng tổng quan.",
   "mergeExportFailed": "Xuất bản thảo hợp nhất thất bại. Vui lòng thử lại sau.",
   "mergeResolveFailed": "Không thể lưu các quyết định của bạn — mọi thao tác bạn đã làm trên bản thảo này vẫn còn nguyên tại đây.",
-  "mergeReadonlyNeedsFile": "Vui lòng mở bản thảo hợp nhất này từ danh sách tệp."
+  "mergeReadonlyNeedsFile": "Vui lòng mở bản thảo hợp nhất này từ danh sách tệp.",
+  transferUploading: 'Đang tải lên tệp lớn {done} / {total} MB; với kết nối chậm có thể mất vài phút',
+  transferDownloading: 'Đang tải xuống tệp lớn {done} / {total} MB; với kết nối chậm có thể mất vài phút',
 }
