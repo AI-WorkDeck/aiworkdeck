@@ -142,7 +142,7 @@ export default {
   },
   watch: {
     visible(v) {
-      if (!v) return
+      if (!v) { this.stopLiveRefresh(); return }
       this.localWorking = !!this.working
       this.localCloud = this.cloud || {}
       this.sessionName = ''
@@ -158,9 +158,43 @@ export default {
       // 还是个可点的主按钮——那一下点下去就是一次什么都没交的空交稿。
       this.busy = true
       this.refresh({ online: true }).finally(() => { this.busy = false })
+      this.startLiveRefresh()
     },
   },
+  beforeUnmount() { this.stopLiveRefresh() },
   methods: {
+    // C20：清单开着的时候案件库会变（同事又交了两版），原来只在打开时和每步做完后重读，
+    // 第 ② 步就一直说「案件库里没有你还没取回的稿」。开着时每 30 秒、窗口回到前台时联网重读一次；
+    // 有一步正在做就跳过（做完那一步自己会重读）。
+    startLiveRefresh() {
+      this.stopLiveRefresh()
+      if (this.mode === 'help') return
+      this._liveTimer = setInterval(() => this.liveRefresh(), 30000)
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        this._onFocus = () => this.liveRefresh()
+        window.addEventListener('focus', this._onFocus)
+      }
+    },
+    stopLiveRefresh() {
+      if (this._liveTimer) clearInterval(this._liveTimer)
+      this._liveTimer = null
+      if (this._onFocus && typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('focus', this._onFocus)
+      this._onFocus = null
+    },
+    async liveRefresh() {
+      if (!this.visible || this.busy || this.mode === 'help' || this._liveInFlight) return
+      this._liveInFlight = true
+      const snapshot = () => JSON.stringify([this.localWorking, ...['remoteAhead', 'remoteAheadCount', 'remoteAheadBySelf', 'offline']
+        .map((k) => (this.localCloud || {})[k])])
+      const before = snapshot()
+      try {
+        await this.refresh({ online: true, quiet: true })
+        // 页面只在清单真的变了时才重拉，不是每 30 秒拉一次
+        if (snapshot() !== before) this.$emit('changed')
+      } finally {
+        this._liveInFlight = false
+      }
+    },
     close() {
       this.$emit('update:visible', false)
     },
@@ -201,7 +235,7 @@ export default {
      *
      * @returns {Promise<boolean>} true = 撞上裁决窗口，调用方不要再往下走
      */
-    async refresh({ online = false } = {}) {
+    async refresh({ online = false, quiet = false } = {}) {
       let conflicted = false
       try {
         // Right after a commit the repository lock may still be held (ingest, idle merge, cloud fetch);
@@ -227,7 +261,7 @@ export default {
       } catch (e) {
         console.warn('[SubmitGuide] 读取协作状态失败', e)
       }
-      this.$emit('changed')
+      if (!quiet) this.$emit('changed')
       if (conflicted) {
         this.close()
         this.$emit('conflict')
