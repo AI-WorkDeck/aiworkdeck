@@ -326,7 +326,7 @@ export default {
   // 未收录 code 的兜底，配合小字里的原始 errorDescription 一起显示
   bpErrorTitle: '无法访问此网站',
   bpErrorCodeLabel: '错误代码',
-  bpErrorNameNotResolved: 'DNS 解析失败，可能是网址拼写有误或该域名不存在',
+  bpErrorNameNotResolved: '找不到这个网址，可能拼写有误或网站不存在',
   bpErrorTimedOut: '连接超时',
   bpErrorConnectionRefused: '连接被拒绝',
   bpErrorConnectionReset: '连接被重置',

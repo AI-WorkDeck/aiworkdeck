@@ -312,7 +312,7 @@ export default {
   "bpRetry": "पुनः प्रयास करें",
   "bpErrorTitle": "यह साइट नहीं खोली जा सकती",
   "bpErrorCodeLabel": "त्रुटि कोड",
-  "bpErrorNameNotResolved": "DNS लुकअप विफल — पता गलत लिखा गया हो सकता है या डोमेन मौजूद नहीं हो सकता है",
+  "bpErrorNameNotResolved": "यह पता नहीं मिला — शायद इसकी वर्तनी गलत है या साइट मौजूद नहीं है",
   "bpErrorTimedOut": "कनेक्शन का समय समाप्त हो गया",
   "bpErrorConnectionRefused": "कनेक्शन अस्वीकृत",
   "bpErrorConnectionReset": "कनेक्शन रीसेट हो गया",

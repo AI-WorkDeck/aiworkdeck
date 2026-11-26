@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Повторить",
   "bpErrorTitle": "Не удаётся получить доступ к сайту",
   "bpErrorCodeLabel": "Код ошибки",
-  "bpErrorNameNotResolved": "Сбой поиска DNS — возможно, адрес указан с ошибкой или домен не существует",
+  "bpErrorNameNotResolved": "Адрес не найден — возможно, в нём опечатка или такого сайта нет",
   "bpErrorTimedOut": "Время ожидания соединения истекло",
   "bpErrorConnectionRefused": "В соединении отказано",
   "bpErrorConnectionReset": "Соединение сброшено",
