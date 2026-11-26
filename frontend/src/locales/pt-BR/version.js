@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Pronto para enviar",
   "submitGuideOfflineTitle": "Não é possível acessar a biblioteca de casos no momento",
   "submitGuideOfflineDesc": "A biblioteca de casos da equipe está inacessível, portanto o envio precisa aguardar o restabelecimento da conexão. Suas alterações estão todas salvas neste computador — nada foi perdido.",
+  "submitGuideOfflineQueuedDesc": "A biblioteca de casos da equipe não está acessível agora. Este envio foi registrado e será feito automaticamente quando você voltar a ficar online. Todas as suas alterações estão neste computador; nada se perde.",
   "submitGuideStateTodo": "Pendente",
   "submitGuideStateActive": "A seguir",
   "submitGuideStateDone": "Concluído",

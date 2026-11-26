@@ -818,8 +818,23 @@ public class CloudSyncService {
         if (remoteAhead) {
             describeRemoteAhead(projectId, userId, m);
         }
+        // C8/C10 gate (lane C 11-26): this local snapshot is re-read every 15 s and after every action, and it
+        // replaced the online /check result, so 「只读成员」 / 「你已不在这份案卷里」 vanished within seconds and
+        // 「有改动还没交稿」 + 交稿 came back. Carry the last observed membership; the next /check refreshes it.
+        String removedOwner = removedFromLibrary.get(projectId);
+        if (removedOwner != null) {
+            m.put("removed", true);
+            if (!removedOwner.isEmpty()) m.put("ownerName", removedOwner);
+        } else {
+            RemoteRole role = remoteRoleCache.get(projectId);
+            if (role != null && role.myRole() != null) m.put("myRole", role.myRole());
+            if (role != null && role.ownerName() != null) m.put("ownerName", role.ownerName());
+        }
         return m;
     }
+
+    /** Last observed 「已被移出」 per project (owner name or ""), cleared when the library is readable again. */
+    private final Map<Long, String> removedFromLibrary = new ConcurrentHashMap<>();
 
     /** 单参版本（userId 未知时的纯 ref 快照）。 */
     public Map<String, Object> cloudStatus(long projectId) {
@@ -989,6 +1004,7 @@ public class CloudSyncService {
             CloudConnection conn = connectionOf(remoteOpt.get());
             try {
                 repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
+                removedFromLibrary.remove(projectId); // readable again (e.g. re-added)
             } catch (Exception e) {
                 Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
                 if (isAccessRefused(e)) {
@@ -998,6 +1014,7 @@ public class CloudSyncService {
                     RemoteRole last = remoteRoleCache.remove(projectId);
                     m.put("removed", true);
                     if (last != null && last.ownerName() != null) m.put("ownerName", last.ownerName());
+                    removedFromLibrary.put(projectId, last != null && last.ownerName() != null ? last.ownerName() : "");
                     return m;
                 }
                 log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);

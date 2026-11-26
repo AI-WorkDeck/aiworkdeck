@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "جاهز للإرسال",
   "submitGuideOfflineTitle": "لا يمكن الوصول إلى مكتبة القضايا في الوقت الحالي",
   "submitGuideOfflineDesc": "مكتبة قضايا الفريق غير متاحة حاليًا، لذا يجب أن ينتظر الإرسال حتى عودة الاتصال. جميع تغييراتك محفوظة على هذا الكمبيوتر — لم يُفقد شيء.",
+  "submitGuideOfflineQueuedDesc": "تعذّر الوصول إلى مكتبة قضايا الفريق الآن. تم حفظ هذا التسليم وسيُرسَل تلقائيًا عند عودة الاتصال. جميع تغييراتك على هذا الكمبيوتر، ولن يضيع منها شيء.",
   "submitGuideStateTodo": "مهام",
   "submitGuideStateActive": "التالي",
   "submitGuideStateDone": "مكتمل",

@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Đã sẵn sàng nộp bản thảo",
   "submitGuideOfflineTitle": "Hiện không thể kết nối tới thư viện vụ việc",
   "submitGuideOfflineDesc": "Hiện không thể kết nối tới thư viện vụ việc nhóm, nên việc nộp bản thảo phải đợi khi có kết nối trở lại. Mọi thay đổi của bạn đều nằm trên máy tính này — không mất gì cả.",
+  "submitGuideOfflineQueuedDesc": "Hiện không kết nối được thư viện hồ sơ của nhóm. Lần nộp này đã được ghi lại và sẽ tự động gửi khi bạn có mạng trở lại. Mọi thay đổi của bạn đều ở trên máy này; không mất gì cả.",
   "submitGuideStateTodo": "Cần làm",
   "submitGuideStateActive": "Tiếp theo",
   "submitGuideStateDone": "Hoàn tất",

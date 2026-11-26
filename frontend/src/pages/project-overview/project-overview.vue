@@ -3601,6 +3601,8 @@ export default {
       const c = this.collabCloud || {}
       if (c.removed) return this.$t('workbench.collabRemoved')
       if (c.offline) return this.$t('workbench.collabOffline')
+      // C8 gate：只读成员的待上传记录永远交不上去——身份排在「有改动还没交稿」之前，与协作弹窗同序
+      if (c.myRole === 'READ_ONLY' && !c.remoteAhead) return this.$t('version.readOnlyMemberState')
       if (this.collabRetryQueued && c.pendingUpload) return this.$t('workbench.collabQueuedOffline')
       // 「同事交了新稿」四处同源（utils/collabWording.js）：后端给得出作者时说清楚是
       // 本人的另一台电脑还是哪位同事、几版；给不出（老服务端）才落回这句老文案。

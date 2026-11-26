@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Klaar om in te dienen",
   "submitGuideOfflineTitle": "Kan de dossierbibliotheek nu niet bereiken",
   "submitGuideOfflineDesc": "De teamdossierbibliotheek is niet bereikbaar, dus het indienen moet wachten tot de verbinding is hersteld. Uw wijzigingen staan allemaal hier op deze computer — er is niets verloren gegaan.",
+  "submitGuideOfflineQueuedDesc": "De dossierbibliotheek van het team is nu niet bereikbaar. Deze inzending is vastgelegd en wordt automatisch verstuurd zodra je weer online bent. Al je wijzigingen staan op deze computer; er gaat niets verloren.",
   "submitGuideStateTodo": "Te doen",
   "submitGuideStateActive": "Volgende",
   "submitGuideStateDone": "Voltooid",

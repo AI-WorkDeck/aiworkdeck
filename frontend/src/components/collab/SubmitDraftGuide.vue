@@ -27,7 +27,7 @@
         <!-- 连不上案件库：三步一步都做不了（取回要联网、交稿也要），摆一排灰按钮
              只会让人以为软件卡住了。说清楚「改动都在本机」再放人走。 -->
         <view v-if="guide.offline && mode !== 'help'" class="sg-offline">
-          {{ $t('version.submitGuideOfflineDesc') }}
+          {{ $t(queuedOffline ? 'version.submitGuideOfflineQueuedDesc' : 'version.submitGuideOfflineDesc') }}
         </view>
 
         <view v-else-if="mode !== 'help'" class="sg-steps">
@@ -122,6 +122,8 @@ export default {
       sessionName: '',
       expanded: false,
       busy: false,
+      // C11：这次打开是来交稿的，而案件库连不上——已经记下「待交」，联网后页面会自动交一次
+      queuedOffline: false,
     }
   },
   computed: {
@@ -148,6 +150,7 @@ export default {
       this.sessionName = ''
       this.expanded = this.mode === 'help'
       this.busy = false
+      this.queuedOffline = false
       if (this.mode === 'help') return
       // 先用页面递过来的快照把清单画出来（便宜、立刻有结果），再走一次联网重读。
       // cloudStatus 是不联网的本地快照，同事可能几小时前就交了新稿而本机还显示
@@ -258,6 +261,13 @@ export default {
       try {
         const res = online ? await checkCloud(this.projectId) : await getCloudStatus(this.projectId)
         this.localCloud = (res && res.data) || this.localCloud
+        // C11（lane C 11-26）：清单一打开就知道连不上时，三步都是灰的、交稿根本没试过，
+        // 原来只有「点了交稿才失败」那条路会记下待交——联网后什么都不会发生。
+        // 律师是来交稿的：现在就记下，页面联网核对成功后自动交一次（retryQueuedSubmit）。
+        if (online && this.mode === 'guide' && this.localCloud && this.localCloud.offline && !this.queuedOffline) {
+          this.queuedOffline = true
+          this.$emit('queued')
+        }
       } catch (e) {
         console.warn('[SubmitGuide] 读取协作状态失败', e)
       }

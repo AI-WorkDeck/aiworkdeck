@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Siap dikirim",
   "submitGuideOfflineTitle": "Tidak dapat menghubungi pustaka perkara saat ini",
   "submitGuideOfflineDesc": "Pustaka perkara tim tidak dapat dijangkau, sehingga pengiriman harus menunggu koneksi pulih kembali. Semua perubahan Anda ada di komputer ini — tidak ada yang hilang.",
+  "submitGuideOfflineQueuedDesc": "Pustaka kasus tim tidak dapat dijangkau saat ini. Pengajuan ini sudah dicatat dan akan dikirim otomatis saat Anda kembali online. Semua perubahan Anda ada di komputer ini; tidak ada yang hilang.",
   "submitGuideStateTodo": "Belum selesai",
   "submitGuideStateActive": "Berikutnya",
   "submitGuideStateDone": "Selesai",

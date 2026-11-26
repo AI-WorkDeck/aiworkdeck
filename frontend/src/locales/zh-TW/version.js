@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "可以交稿了",
   "submitGuideOfflineTitle": "暫時連不上案件庫",
   "submitGuideOfflineDesc": "現在連不上團隊案件庫，交稿要等網路恢復。你的變更都在本機，一個都不會遺失。",
+  "submitGuideOfflineQueuedDesc": "現在連不上團隊案件庫，已記下這次交稿，連上網路後會自動交。你的變更都在本機，一個都不會遺失。",
   "submitGuideStateTodo": "待處理",
   "submitGuideStateActive": "進行中",
   "submitGuideStateDone": "已完成",

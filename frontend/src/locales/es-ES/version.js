@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Listo para enviar",
   "submitGuideOfflineTitle": "No se puede conectar con la biblioteca de expedientes en este momento",
   "submitGuideOfflineDesc": "No se puede acceder a la biblioteca de expedientes del equipo, por lo que el envío deberá esperar a que vuelva la conexión. Todos sus cambios están en este ordenador; no se ha perdido nada.",
+  "submitGuideOfflineQueuedDesc": "Ahora no se puede acceder a la biblioteca de casos del equipo. Este envío queda registrado y se enviará automáticamente cuando vuelvas a estar en línea. Todos tus cambios están en este equipo; no se pierde nada.",
   "submitGuideStateTodo": "Pendiente",
   "submitGuideStateActive": "Siguiente",
   "submitGuideStateDone": "Hecho",

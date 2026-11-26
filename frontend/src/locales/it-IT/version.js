@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Pronto per l'invio",
   "submitGuideOfflineTitle": "Impossibile raggiungere la raccolta fascicoli in questo momento",
   "submitGuideOfflineDesc": "La raccolta fascicoli del team non è raggiungibile, quindi l'invio deve attendere il ripristino della connessione. Le tue modifiche sono tutte qui su questo computer — nulla è andato perso.",
+  "submitGuideOfflineQueuedDesc": "La libreria dei fascicoli del team non è raggiungibile al momento. Questo invio è registrato e verrà inviato automaticamente quando tornerai online. Tutte le modifiche sono su questo computer; non si perde nulla.",
   "submitGuideStateTodo": "Da fare",
   "submitGuideStateActive": "Successivo",
   "submitGuideStateDone": "Completato",

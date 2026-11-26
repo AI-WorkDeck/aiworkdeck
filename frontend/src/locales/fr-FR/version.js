@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Prêt à envoyer",
   "submitGuideOfflineTitle": "Impossible de joindre la bibliothèque de dossiers pour le moment",
   "submitGuideOfflineDesc": "La bibliothèque de dossiers d'équipe est injoignable ; l'envoi doit attendre le rétablissement de la connexion. Vos modifications sont toutes enregistrées sur cet ordinateur — rien n'est perdu.",
+  "submitGuideOfflineQueuedDesc": "La bibliothèque de dossiers de l’équipe est inaccessible pour le moment. Cette remise est enregistrée et sera envoyée automatiquement dès le retour de la connexion. Toutes vos modifications sont sur cet ordinateur ; rien n’est perdu.",
   "submitGuideStateTodo": "À faire",
   "submitGuideStateActive": "Suivant",
   "submitGuideStateDone": "Terminé",
