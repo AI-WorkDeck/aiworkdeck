@@ -9777,7 +9777,16 @@ const EXEC = {
         try { const hiddenText = r.getPropertyValue('RedlineText'); if (hiddenText) it.text = String(hiddenText.getString() || ''); } catch (e) {}
         let curEnd = null;
         try {
-          const rs = r.getPropertyValue('RedlineStart'), re = r.getPropertyValue('RedlineEnd');
+          let rs = r.getPropertyValue('RedlineStart'), re = r.getPropertyValue('RedlineEnd');
+          // Q25: RedlineStart/RedlineEnd are the redline's mark and point, not its
+          // left and right edges. A replacement typed or applied over a selection
+          // reports Start at the RIGHT end (real engine, 2026-11-25: deleting
+          // 0..12 listed start 12), which shifted every offset by the span length
+          // and made a Delete and the Insert right after it look non-adjacent.
+          // Order them by position before computing offsets and contiguity.
+          if (rs && re) {
+            try { if (rs.getText().compareRegionStarts(rs, re) < 0) { const t = rs; rs = re; re = t; } } catch (e) { /* ranges from different stories stay as listed */ }
+          }
           if (rs && re) {
             curEnd = re;
             // 与上一条首尾相接？审阅面板据此把「连按 Backspace 产生的一串单字

@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Di chuyển từ",
     "moveTo": "Di chuyển đến",
     "deletion": "Xóa bỏ",
+    "replacement": "Thay thế",
     "insertion": "Chèn thêm",
     "table": "Bảng biểu",
     "contiguousCount": "{count} mục liên tiếp",

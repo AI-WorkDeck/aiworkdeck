@@ -200,6 +200,7 @@ export default {
     "moveFrom": "이동 원본",
     "moveTo": "이동 대상",
     "deletion": "삭제",
+    "replacement": "바꾸기",
     "insertion": "삽입",
     "table": "표",
     "contiguousCount": "연속 {count}곳",

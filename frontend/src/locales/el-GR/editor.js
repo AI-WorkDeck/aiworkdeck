@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Μετακινήθηκε από",
     "moveTo": "Μετακινήθηκε σε",
     "deletion": "Διαγραφή",
+    "replacement": "Αντικατάσταση",
     "insertion": "Εισαγωγή",
     "table": "Πίνακας",
     "contiguousCount": "{count} συνεχόμενα",

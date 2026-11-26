@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Movido desde",
     "moveTo": "Movido a",
     "deletion": "Eliminación",
+    "replacement": "Sustitución",
     "insertion": "Inserción",
     "table": "Tabla",
     "contiguousCount": "{count} consecutivos",

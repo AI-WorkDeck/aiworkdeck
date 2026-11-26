@@ -200,6 +200,7 @@ export default {
     "moveFrom": "移出",
     "moveTo": "移入",
     "deletion": "刪除",
+    "replacement": "取代",
     "insertion": "插入",
     "table": "表格",
     "contiguousCount": "{count} 處連續",

@@ -128,7 +128,8 @@
               <text v-if="g.inTable" class="rp-tag tbl">{{ $t('editor.review.table') }}</text>
               <text class="rp-date">{{ side.when }}</text>
             </view>
-            <text class="rp-text" :class="{ del: g.typeKey === 'delete' || g.typeKey === 'moveFrom', mov: g.movedId > 1 }">{{ g.text || $t('editor.review.emptyText') }}</text>
+            <text class="rp-text" :class="{ del: g.typeKey === 'delete' || g.typeKey === 'moveFrom' || g.typeKey === 'replace', mov: g.movedId > 1 }">{{ g.text || $t('editor.review.emptyText') }}</text>
+          <text v-if="g.typeKey === 'replace'" class="rp-text ins">{{ g.insText }}</text>
             <text v-if="g.paragraph" class="rp-ctx">{{ g.paragraph }}</text>
             <view class="rp-acts">
               <text class="rp-act ok" @tap.stop="resolveMergeGroup(side, g, 'accept')">{{ $t('editor.review.accept') }}</text>
@@ -175,10 +176,11 @@
             <text v-if="g.items.length > 1 && !g.operationId" class="rp-tag cnt">{{ $t('editor.review.contiguousCount', { count: g.items.length }) }}</text>
             <text class="rp-date">{{ g.date || '' }}</text>
           </view>
-          <text class="rp-text" :class="{ del: g.typeKey === 'delete' || g.typeKey === 'moveFrom', mov: g.movedId > 1 }">{{ g.text || $t('editor.review.emptyText') }}</text>
+          <text class="rp-text" :class="{ del: g.typeKey === 'delete' || g.typeKey === 'moveFrom' || g.typeKey === 'replace', mov: g.movedId > 1 }">{{ g.text || $t('editor.review.emptyText') }}</text>
+          <text v-if="g.typeKey === 'replace'" class="rp-text ins">{{ g.insText }}</text>
           <!-- 引擎给的说明只对格式类（正文是空的、光看文字说不出改了什么）有信息量；
                插入/删除卡上文字本身已经说明一切，不再重复一行。 -->
-          <text v-if="g.description && g.typeKey !== 'insert' && g.typeKey !== 'delete'" class="rp-desc">{{ g.description }}</text>
+          <text v-if="g.description && g.typeKey !== 'insert' && g.typeKey !== 'delete' && g.typeKey !== 'replace'" class="rp-desc">{{ g.description }}</text>
           <text v-if="g.paragraph" class="rp-ctx">{{ g.paragraph }}</text>
           <!-- 修订理由：位置上与本条修订重叠/相接的批注（AI 把改动理由挂成批注）。 -->
           <view v-for="c in g.reasons" :key="'r' + c.index" class="rp-reason">
@@ -278,12 +280,13 @@ import { isEnglish } from '@/utils/appLanguage.js'
 const TYPE_I18N = {
   insert: 'editor.review.insertion',
   delete: 'editor.review.deletion',
+  replace: 'editor.review.replacement',
   moveFrom: 'editor.review.moveFrom',
   moveTo: 'editor.review.moveTo',
   format: 'editor.review.typeFormat',
   paraFormat: 'editor.review.typeParaFormat',
 }
-const TYPE_CLASS = { moveFrom: 'mov', moveTo: 'mov', insert: 'ins', delete: 'del', format: 'fmt', paraFormat: 'pfmt', other: 'oth' }
+const TYPE_CLASS = { moveFrom: 'mov', moveTo: 'mov', insert: 'ins', delete: 'del', replace: 'rep', format: 'fmt', paraFormat: 'pfmt', other: 'oth' }
 
 // 围栏快照：只带 worker 围栏（office_thread.js 的 matchRevisionSnapshot /
 // matchCommentSnapshot）实际比对的字段，逐个取值拼成普通对象。
@@ -889,6 +892,7 @@ export default {
 .rp-tag.ins { background: var(--awd-accent-soft); color: var(--awd-accent-text); }
 .rp-tag.mov { background: var(--awd-accent-soft); color: var(--awd-accent-text); border: 1px solid var(--awd-accent-text); }
 .rp-tag.del { background: var(--awd-danger-soft); color: var(--awd-danger-text); }
+.rp-tag.rep { background: var(--awd-warning-soft, var(--awd-accent-soft)); color: var(--awd-text); }
 .rp-tag.fmt, .rp-tag.pfmt { background: var(--awd-warning-soft); color: var(--awd-warning-text); }
 .rp-tag.oth { background: var(--awd-surface-2); color: var(--awd-text-2); }
 .rp-tag.tbl { background: var(--awd-info-soft); color: var(--awd-info-text); }
@@ -898,6 +902,7 @@ export default {
 .rp-date { font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); margin-left: auto; }
 .rp-text { display: block; font-size: var(--awd-font-size-body); color: var(--awd-text); line-height: 1.5; word-break: break-all; }
 .rp-text.del { text-decoration: line-through; color: var(--awd-danger-text); }
+.rp-text.ins { text-decoration: underline; color: var(--awd-accent-text); }
 .rp-text.mov { color: var(--awd-accent-text); text-decoration-style: double; }
 .rp-desc { display: block; margin-top: 3px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-2); }
 .rp-ctx { display: block; margin-top: 4px; font-size: var(--awd-panel-fs-meta); color: var(--awd-text-3); line-height: 1.4;
