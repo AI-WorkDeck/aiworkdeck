@@ -68,8 +68,8 @@ public class ProjectObjectSyncService {
                         try { return partStream(project, ref, index); }
                         catch (IOException e) { throw new UncheckedIOException(e); }
                     }), length);
-                    responseJson(writeRequest(base + "/parts/" + part + "?size=" + ref.size(), username, token,frozenEpoch)
-                            .header("Content-Type", "application/octet-stream").header("X-AWD-Part-Sha256", hash).PUT(publisher).build());
+                    responseJson(partUploadRequest(base + "/parts/" + part + "?size=" + ref.size(), username, token, frozenEpoch,
+                            hash, length, publisher));
                 }
                 requireConsent(client, accountScope);
                 responseJson(writeRequest(base + "/complete?size=" + ref.size(), username, token,frozenEpoch)
@@ -109,7 +109,7 @@ public class ProjectObjectSyncService {
                                     || !response.headers().firstValue("Content-Type").orElse("").startsWith("application/octet-stream")) {
                                 response.body().close(); throw new IOException("Version object part unavailable");
                             }
-                            return new DeadlineInputStream(response.body(), Duration.ofSeconds(90));
+                            return new DeadlineInputStream(response.body(), partTimeout(expected));
                         } catch (IOException e) { throw new UncheckedIOException(e); }
                         catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new UncheckedIOException(new IOException(e)); }
                     }
@@ -146,12 +146,38 @@ public class ProjectObjectSyncService {
     }
 
     private HttpRequest.Builder request(String url, String user, String token) throws IOException {
+        return staticRequest(url, user, token);
+    }
+
+    private static HttpRequest.Builder staticRequest(String url, String user, String token) throws IOException {
         URI uri = URI.create(url);
         if (!Set.of("http", "https").contains(uri.getScheme()) || uri.getUserInfo() != null)
             throw new IllegalArgumentException("Unsupported object endpoint");
         String credential = Base64.getEncoder().encodeToString(((user == null ? "" : user) + ":" + token).getBytes(StandardCharsets.UTF_8));
-        var builder=HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(90)).header("Authorization", "Basic " + credential);
+        var builder=HttpRequest.newBuilder(uri).timeout(CALL_TIMEOUT).header("Authorization", "Basic " + credential);
         return builder;
+    }
+
+    /** Slowest link a part must still get through: 32 KiB/s (~260 kbit/s, weak 4G or hotel Wi-Fi). */
+    private static final long SLOWEST_BYTES_PER_SECOND = 32 * 1024;
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(90);
+
+    /**
+     * A part transfer's time limit. A fixed 90 s aborted every 32 MiB part below ~3 Mbit/s, so a recording
+     * could never be submitted or pulled on a slow link. Bounded, so a dead link still releases the repo lock.
+     */
+    static Duration partTimeout(long bytes) {
+        return CALL_TIMEOUT.plusSeconds(Math.max(0, bytes) / SLOWEST_BYTES_PER_SECOND);
+    }
+
+    static HttpRequest partUploadRequest(String url, String user, String token, Map<String,String> frozenEpoch,
+                                         String partSha256, long length, HttpRequest.BodyPublisher body) {
+        try {
+            var builder = staticRequest(url, user, token).timeout(partTimeout(length));
+            frozenEpoch.forEach(builder::header);
+            return builder.header("Content-Type", "application/octet-stream").header("X-AWD-Part-Sha256", partSha256)
+                    .PUT(body).build();
+        } catch (IOException e) { throw new UncheckedIOException(e); }
     }
 
     private HttpRequest.Builder writeRequest(String url,String user,String token,Map<String,String> frozenEpoch) throws IOException {
