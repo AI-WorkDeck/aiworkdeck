@@ -88,7 +88,7 @@ export default {
   "openBusiness": "İlgili çalışma alanını aç",
   "readNotDone": "Bu bildirimi okumak iş işlemini onaylamaz. İncelemek ve işlem yapmak için ilgili çalışma alanını açın.",
   "targetUnavailable": "İlgili çalışma alanı kullanılamıyor. Yenileyip tekrar deneyin.",
-  "pluginUnavailable": "İlgili eklenti kurulu veya etkin değil. Eklenti merkezini kontrol edin.",
+  "pluginUnavailable": "İlgili eklenti kurulu veya etkin değil. Eklenti merkezini kontrol edin.", "enableLawFirmTitle": "Hukuk Bürosu Yönetimi etkinleştirilsin mi?", "enableLawFirmBody": "Bu bildirim Hukuk Bürosu Yönetimi içinde işlenir. Uygulamayla birlikte gelir; etkinleştirildiğinde bu kayıt doğrudan açılır.", "enableLawFirmConfirm": "Etkinleştir ve aç",
   "openFailed": "İlgili çalışma alanı açılamadı. Lütfen tekrar deneyin.",
   "serviceFailed": "Mesajlar geçici olarak kullanılamıyor. Lütfen tekrar deneyin.",
   "source": "{name} kaynağından",

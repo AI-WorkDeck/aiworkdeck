@@ -258,4 +258,66 @@ class GitHttpIngestTest {
                     Files.readString(root.resolve("projects/23/合同.txt")));
         }
     }
+
+    /**
+     * Lane D 11-26: after the server ingests a version holding a large (.mp4) object, its worktree must read
+     * clean. Before the fix the index stayed at the old commit, pendingChanges fell back to a HEAD-vs-disk diff
+     * that compares the full media bytes against the pointer, and dockDirtyMainlineForReceive then committed a
+     * spurious 「自动存档」 before the next push, so every colleague's push was rejected once.
+     * Receive is simulated with a fetch into the server's git dir (no push, so no pre-push hook).
+     */
+    @Test
+    void ingestedLargeObjectVersionLeavesServerWorktreeClean(@TempDir Path machines) throws Exception {
+        long server = 29L;
+        User user = new User();
+        user.setUsername("git_user_" + server);
+        user.setDisplayName("git_user_" + server);
+        user.setPassword(UserService.encodePassword("x"));
+        user = userRepository.save(user);
+        jdbcTemplate.update(
+                "insert into project (id, name, project_type, listed_company_name, target_company_name, user_id) "
+                        + "values (?, ?, ?, ?, ?, ?)",
+                server, "git-http-ingest-test-" + server, "BLANK", "", "", user.getId());
+        repoService.initEmptyForReceive(server);
+
+        var properties = new com.checkba.storage.StorageProperties();
+        properties.getLocal().setRootPath(machines.resolve("sender").toString());
+        var sender = new com.checkba.version.ProjectRepoService(new com.checkba.storage.ProjectStorageResolver(properties, null));
+        Files.createDirectories(sender.workTree(1));
+        Path media = sender.workTree(1).resolve("录音.mp4");
+        try (var out = Files.newOutputStream(media)) {
+            byte[] block = new byte[64 * 1024];
+            new java.util.Random(17).nextBytes(block);
+            for (int i = 0; i < 513; i++) out.write(block);
+        }
+        Files.writeString(sender.workTree(1).resolve("说明.txt"), "第一版");
+        sender.init(1, "Synthetic sender", "test@example.com");
+
+        String first = receive(sender, server);
+        sessionService.ingestPushedMainline(server, org.eclipse.jgit.lib.ObjectId.zeroId().name(), first);
+        assertEquals(-1, Files.mismatch(media, root.resolve("projects/" + server + "/录音.mp4")));
+        assertEquals(java.util.List.of(), repoService.pendingChanges(server), "first push: no spurious server edits");
+
+        // A later push (index already populated) must stay clean too.
+        Files.writeString(sender.workTree(1).resolve("说明.txt"), "第二版");
+        assertNotNull(sender.commitAll(1, "edit", "auto", null, "Synthetic sender", "test@example.com"));
+        String second = receive(sender, server);
+        sessionService.ingestPushedMainline(server, first, second);
+        assertEquals("第二版", Files.readString(root.resolve("projects/" + server + "/说明.txt")));
+        assertEquals(java.util.List.of(), repoService.pendingChanges(server), "later push: no spurious server edits");
+        String before = repoService.resolveRef(server, "master");
+        sessionService.dockDirtyMainlineForReceive(server);
+        assertEquals(before, repoService.resolveRef(server, "master"), "no 「自动存档」 commit before the next push");
+    }
+
+    /** Objects first (pre-receive requires them), then the ref, as a real receive would. */
+    private String receive(com.checkba.version.ProjectRepoService sender, long server) throws Exception {
+        for (var ref : sender.objects().list(1))
+            try (var in = sender.objects().open(1, ref.sha256())) { repoService.objects().put(server, in); }
+        try (var repo = repoService.open(server); Git git = new Git(repo)) {
+            git.fetch().setRemote(sender.gitDir(1).toUri().toString())
+                    .setRefSpecs(new RefSpec("+refs/heads/master:refs/heads/master")).call();
+            return repo.resolve("refs/heads/master").name();
+        }
+    }
 }

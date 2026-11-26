@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Abrir área relacionada",
   "readNotDone": "Ler esta notificação não confirma a ação de negócio. Abra a área relacionada para revisar e tratar.",
   "targetUnavailable": "A área relacionada está indisponível. Atualize e tente novamente.",
-  "pluginUnavailable": "O plugin relacionado não está instalado ou ativado. Verifique na central de plugins.",
+  "pluginUnavailable": "O plugin relacionado não está instalado ou ativado. Verifique na central de plugins.", "enableLawFirmTitle": "Ativar Gestão de escritório de advocacia?", "enableLawFirmBody": "Este aviso é tratado em Gestão de escritório de advocacia. Ele já vem com o aplicativo; ao ativar, este registro abre diretamente.", "enableLawFirmConfirm": "Ativar e abrir",
   "openFailed": "Não foi possível abrir a área relacionada. Tente novamente.",
   "serviceFailed": "As mensagens estão temporariamente indisponíveis. Tente novamente.",
   "source": "De {name}",

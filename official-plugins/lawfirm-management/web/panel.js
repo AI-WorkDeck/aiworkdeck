@@ -437,8 +437,73 @@
       }
       card.append(stepsWrap);
 
+      const cloudLink = renderCloudLink(item);
+      if (cloudLink) card.append(cloudLink);
+
       container.append(card);
     }
+  }
+
+  // C19：同一件收案在律所云端走过利冲时，把本机记录关联过去，本机进度按云端终审结论更新，
+  // 不再一边「已通过」一边「待利冲委员终审」。
+  const OPEN_INTAKE = new Set(['CONFLICT_CHECKING', 'PENDING_LAWYER_CLEARANCE', 'PENDING_COMMITTEE_REVIEW']);
+  const CLOUD_STATUS = {
+    PENDING_LAWYER_CLEARANCE: ['panel.t.cloudPendingLawyer', '待关联律师确认'],
+    PENDING_COMMITTEE_REVIEW: ['panel.t.cloudPendingCommittee', '待指定委员终审'],
+    APPROVED: ['panel.t.cloudApproved', '已通过'],
+    REJECTED: ['panel.t.cloudRejected', '已拒绝'],
+  };
+  function cloudStatusText(status) {
+    const entry = CLOUD_STATUS[status];
+    return entry ? L(entry[0], entry[1]) : NO_VALUE;
+  }
+  async function linkCloud(btn, intakeId, recordId) {
+    await runAction(btn, async (epoch) => {
+      await request('linkCloudClearance', recordId ? { intakeId, recordId } : { intakeId });
+      if (epoch !== state.epoch) return;
+      await loadOverview(epoch);
+      notice(L('panel.t.cloudSynced', '已按律所云端利冲结论更新本机进度。'));
+    });
+  }
+  function renderCloudLink(item) {
+    const open = OPEN_INTAKE.has(item.status);
+    if (!item.cloudWorkflowId && !open) return null;
+    const box = node('div', null, 'cloud-link');
+    if (item.cloudWorkflowId) {
+      box.append(node('p', L('panel.t.cloudLinked', '已关联律所云端利冲：{0}', cloudStatusText(item.cloudWorkflowStatus)), 'hint'));
+      if (open) {
+        const sync = node('button', L('panel.t.cloudSync', '取回云端终审结论'));
+        sync.type = 'button';
+        sync.addEventListener('click', () => linkCloud(sync, item.id));
+        box.append(sync);
+      }
+      return box;
+    }
+    const pick = node('button', L('panel.t.cloudLinkPick', '关联律所云端利冲'));
+    pick.type = 'button';
+    pick.addEventListener('click', () => runAction(pick, async (epoch) => {
+      const result = await request('workflowOverview');
+      if (epoch !== state.epoch) return;
+      // 只有本人能看到全文（申请人、主办、委员）的云端记录才能关联
+      const records = (Array.isArray(result?.records) ? result.records : []).filter(r => r && r.id && r.clientName != null);
+      if (!records.length) { notice(L('panel.t.cloudNone', '律所云端还没有你可以关联的利冲记录。'), true); return; }
+      const select = node('select');
+      select.setAttribute('aria-label', L('panel.t.cloudLinkPick', '关联律所云端利冲'));
+      for (const r of records) {
+        const option = node('option', `${r.title} · ${r.clientName} · ${cloudStatusText(r.status)}`);
+        option.value = r.id;
+        select.append(option);
+      }
+      const match = records.find(r => r.title === item.title) || records.find(r => item.clientName && r.clientName === item.clientName);
+      if (match) select.value = match.id;
+      const confirm = node('button', L('panel.t.cloudLinkConfirm', '关联并取回结论'), 'primary');
+      confirm.type = 'button';
+      confirm.addEventListener('click', () => linkCloud(confirm, item.id, select.value));
+      pick.replaceWith(select, confirm);
+      select.focus();
+    }));
+    box.append(node('p', L('panel.t.cloudLinkHint', '这件收案已在律所云端走过利冲？关联后，本机进度按云端终审结论更新。'), 'hint'), pick);
+    return box;
   }
 
   function renderConflictTab() {
