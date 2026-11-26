@@ -244,11 +244,12 @@ export default {
         // Right after a commit the repository lock may still be held (ingest, idle merge, cloud fetch);
         // /status then answers VERSION_BUSY. Retry that read only — a failed read must never repaint
         // the checklist from the stale page snapshot (QA D10: step 1 came back after a commit).
+        // C29: a push under load holds the lock 4–6 s; wait it out (0.5 s, 1 s, then 2 s steps; ~24 s in all).
         let res
         for (let attempt = 0; ; attempt++) {
           try { res = await getVersionStatus(this.projectId); break } catch (e) {
-            if (e?.kind !== 'VERSION_BUSY' || attempt >= 9 || !this.visible) throw e
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            if (e?.kind !== 'VERSION_BUSY' || attempt >= 17 || !this.visible) throw e
+            await new Promise((resolve) => setTimeout(resolve, attempt < 4 ? 500 : attempt < 8 ? 1000 : 2000))
           }
         }
         const d = (res && res.data) || {}
