@@ -410,6 +410,11 @@ export default {
   revokedClientCode: '访问码已撤销',
   revokeFailed: '撤销失败',
   removeFromCaseFile: '移出',
+  changeRoleTitle: '修改角色',
+  changeRoleReadOnlyConfirm: '改成只读后，{name} 不能再修改和交稿。确定吗？',
+  roleChanged: '已把 {name} 改为{role}',
+  changeRoleFailed: '没能修改角色',
+  makeCollaborator: '改为协作人',
   removeCloudMemberConfirm: '把 {name} 移出这份案卷？移出客户会同时作废他的访问码。',
   removedFromCaseFile: '已移出',
 

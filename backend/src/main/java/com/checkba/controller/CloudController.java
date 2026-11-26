@@ -325,6 +325,19 @@ public class CloudController {
      * 移出案件库上的一位参与人（dev-board#1050）：撤销客户访问码与移出同事共用这一条。
      * {@code remoteUserId} 是案件库那一侧的 userId（参与人列表 / 签码回执里的那个）。
      */
+    /** C9：改案件库上一位参与人的角色（body {role}）。 */
+    @PutMapping("/projects/{projectId}/members/{remoteUserId}/role")
+    public ResponseEntity<Map<String, Object>> changeMemberRole(
+            @PathVariable Long projectId,
+            @PathVariable Long remoteUserId,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireWriteMember(projectId, sessionId);
+        String role = body != null && body.get("role") instanceof String r ? r : null;
+        cloudSyncService.proxyMemberRole(projectId, remoteUserId, role);
+        return ok(Map.of());
+    }
+
     @DeleteMapping("/projects/{projectId}/members/{remoteUserId}")
     public ResponseEntity<Map<String, Object>> removeMember(
             @PathVariable Long projectId,
