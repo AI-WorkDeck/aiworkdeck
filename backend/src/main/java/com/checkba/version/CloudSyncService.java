@@ -1657,7 +1657,8 @@ public class CloudSyncService {
         if (repoService.repositoryMerging(projectId)) {
             throw VersionException.userFacing(LangText.of("请先把等你做选择的文件处理完", "Please finish choosing your files first"));
         }
-        if (sessionService.activeSession(projectId).isPresent()) {
+        // C27：一段只动了清单、没有任何律师改动的工作（软件自己留下的）不挡取回
+        if (sessionService.activeSession(projectId).isPresent() && !sessionService.discardIfManifestOnly(projectId, null)) {
             throw VersionException.userFacing(LangText.of("请先结束或丢弃手头这段工作，再取回最新稿", "Please finish or discard your current work session before pulling the latest draft"));
         }
         if (sessionService.onDraftBranch(projectId)) {
