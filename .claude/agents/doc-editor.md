@@ -95,7 +95,7 @@ PPT 内容修改立即失效缩略图，但全篇导航清单等宿主允许后�
 
 ## Calc 标题与输入时钟候选（dev-board#1509 / #1511）
 
-当前正式基线是 **24.2.8-zhcn-r10**（2026-11-13 发布，0.86 起打包；= r8 配方 + Emscripten #28186 代理死锁回移补丁 `desktop/lowa-build/patches/apply-emscripten-patches.py`，修启动偶发挂住；四个产物 SHA 与验证见 `desktop/lowa-build/RECIPE.md`；r8 留在架上作回退，切回只改 desktop-build.yml / model-matrix.yml 的 LOWA_BASE_URL）。任何重编引擎发布前必须跑启动冒烟 ≥40 次（不能只看 run.mjs）。下文历史段落的 r5/r6 描述不能当作当前未完成清单。
+当前正式基线是 **24.2.8-zh-r11**（E1，0.92 起打包；= r10 + zh-TW 界面语言包，构建分支 engine/e1-zh-tw，启动冒烟 40/40、lowa-e2e 610/0；r10 留在架上作回退）。r10 为 **24.2.8-zhcn-r10**（2026-11-13 发布，0.86 起打包；= r8 配方 + Emscripten #28186 代理死锁回移补丁 `desktop/lowa-build/patches/apply-emscripten-patches.py`，修启动偶发挂住；四个产物 SHA 与验证见 `desktop/lowa-build/RECIPE.md`；r8 留在架上作回退，切回只改 desktop-build.yml / model-matrix.yml 的 LOWA_BASE_URL）。任何重编引擎发布前必须跑启动冒烟 ≥40 次（不能只看 run.mjs）。下文历史段落的 r5/r6 描述不能当作当前未完成清单。
 
 Calc 行列标题由原生 `ScHeaderControl` 绘制，字体在构造时缓存，CSS 与事后 UNO `ApplicationFont` 设置不能可靠替换。构建补丁将标题字体设为包内 Liberation Sans 9pt，经 VCL 设备DPI换算；在 Paint 中用独立 StyleSettings 副本映射产品深浅令牌，以现有 `AppBackground` 判主题，不修改正文格式或全局Qt调色板。高对比保留原生路径；这不等于滚动条/菜单等全部Qt chrome已深色化。`Color(sal_uInt32)` 在该基准可为 consteval，动态主题须写成 `dark ? Color(常量) : Color(常量)`。
 
@@ -289,7 +289,7 @@ Writer 切换修订显示会发出大量 `Modify` 通知，不能一律算真实
 - 保存状态固定显示在版本身份细栏：待保存、保存中、已保存或失败；新建零字节模板在首次上传前只显示“无待保存更改”。保存状态不再使用浮动胶囊，失败的重试/另存为入口随状态留在细栏。
 - `closeFile` 保存失败时让用户选「继续编辑 / 放弃并关闭」；不能用 `isError` 跳过保存（保存失败也算 isError）。只有 `docLoadFailed` 才表示空白 boot 文档，不得覆盖后端真文件。
 - 读取失败盖住画布（D2，2026-11-24）：`isReadFailure(docLoadFailed, statusKey)`（`downloadFailed` / `loadFailed` / `fileMissingFailed`）为真时 `loadingOverlayVisible` 必须为真——空白 boot 原型露出来会让人以为文档是空的、还能打字，而保存闸会把这些字悄悄丢掉。卡片说明原因并给「重试」；文件已不在磁盘上时不给重试。本机服务恢复后 `onBackendHealth` 自动 `retryLoad()`。**恢复判定**：supervisor 的自动重启序列是 degraded → restarting → starting → healthy，只看「上一条状态」会被 starting 挡住；用 `_backendWasDown` 记「上次健康之后掉过线」，B7 补存也靠这条。回归：`tests/lowa-unit/read-failure-overlay.test.mjs`。
-- zh-TW 编辑器界面（X-S2，2026-11-24）：LOWA 引擎只带 zh-CN 语言包（24.2.8-zhcn-r10），`LOCALE_REGISTRY` 里 zh-TW 的 `lowaUiLang` 仍是 zh-CN——繁中用户看到的引擎自带界面（极少数原生对话框、右键菜单残项）是简体，属已知缺口；壳层菜单、关于窗与对话框已由 `desktop/main/zh-hant.js` 转繁。引擎出 zh-TW 包后再改 `lowaUiLang`。
+- zh-TW 编辑器界面（X-S2 → E1）：r11 起引擎带 zh-TW 界面语言包，`LOCALE_REGISTRY`（桌面 app-language.js、前端 locales/registry.js、加载项 registry.js 三处同步）里 zh-TW 的 `lowaUiLang` 改为 zh-TW。r10 及更早引擎只有 zh-CN 包，回退到 r10 时要把这三处一起改回 zh-CN，否则繁中用户的引擎界面回落到英文。编辑器内修订气泡/悬浮卡（zetaOfficeReviewBalloons/Hover）对 zh-* 一律用简体文案，属已知小缺口。
 - 明确放弃走 `discardPendingSave`：关掉上传闸并中止当前 XHR，迟到导出不得再上传。LRU 遇到失败/超时保留实例。
 - flush 期间的修改暂缓自动保存；`_flushPromise` 清除后必须补排仍然 dirty 的内容，否则取消关闭后会永久停在 dirty + ready。
 - **保存序号围栏（B7）**：`saveDocument` 的普通上传带 `?saveSession=<本实例随机 id>&saveSeq=<单调序号>`（查询参数，同 `mustExist` 写法：旧后端忽略、不改 CORS 预检头表）；版本忙碌的同份字节重试复用同一序号，每次新导出 +1。后端 `ProjectFileContentService.upload` 在**项目内容锁内**先比对 `fileId → (session → 已落盘最大 seq)`，更小的序号回 **409 `reason:STALE_SAVE`**、一个字节都不写，落盘成功后才记录（仅内存：在途请求随进程消亡，重启不会让旧请求再落地）。不同会话互不围栏，缺参数/格式不对 = 旧行为（office-addin、移动端、录音分片不变）。前端把 `STALE_SAVE` 当「本会话更新的一笔已落盘」，不算失败、不落 movedSaveFailed。本地内容协议（`X-AWD-Content-Protocol`）自带操作 id 回执与 `Expected-SHA256` 比对，不需要这个参数。测试：backend `FileContentCoordinationTest`（staleSaveFence*、uploadsWithoutSaveSequence*），frontend `libre-save-recovery.test.mjs`。
