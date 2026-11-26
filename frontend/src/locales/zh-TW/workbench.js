@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "截圖取詞",
   "browser": "瀏覽器",
   "browserNewTabHint": "新增瀏覽器分頁",
+  "moreTools": "更多工具",
+  "railMore": "更多",
   "recordActivity": "工作記錄",
   "logout": "登出",
   "stagingArea": "檔案暫存區",

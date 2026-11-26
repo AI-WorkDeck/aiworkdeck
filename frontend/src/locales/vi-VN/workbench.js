@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "OCR chụp màn hình",
   "browser": "Trình duyệt",
   "browserNewTabHint": "Tab trình duyệt mới",
+  "moreTools": "Thêm công cụ",
+  "railMore": "Thêm",
   "recordActivity": "Nhật ký hoạt động",
   "logout": "Đăng xuất",
   "stagingArea": "Khu vực tạm",

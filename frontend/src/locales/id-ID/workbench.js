@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "OCR Tangkap Layar",
   "browser": "Peramban",
   "browserNewTabHint": "Tab peramban baru",
+  "moreTools": "Alat lainnya",
+  "railMore": "Lainnya",
   "recordActivity": "Log Aktivitas",
   "logout": "Keluar",
   "stagingArea": "Area Penyimpanan Sementara",

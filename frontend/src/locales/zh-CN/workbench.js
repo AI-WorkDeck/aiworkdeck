@@ -162,6 +162,8 @@ export default {
   ocrCapture: '截图取词',
   browser: '浏览器',
   browserNewTabHint: '新建浏览器标签',
+  moreTools: '更多工具',
+  railMore: '更多',
   recordActivity: '工作记录',
   logout: '退出登录',
   // 左侧常驻栏

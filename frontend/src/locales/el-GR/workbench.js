@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "Λήψη κειμένου από στιγμιότυπο (OCR)",
   "browser": "Περιηγητής",
   "browserNewTabHint": "Νέα καρτέλα προγράμματος περιήγησης",
+  "moreTools": "Περισσότερα εργαλεία",
+  "railMore": "Περισσότερα",
   "recordActivity": "Αρχείο δραστηριότητας",
   "logout": "Αποσύνδεση",
   "stagingArea": "Χώρος εργασίας",
