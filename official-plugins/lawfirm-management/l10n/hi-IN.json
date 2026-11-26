@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "बंद करें और हटाएँ",
   "cloud.purgeCancel": "रद्द करें",
   "billing.groupNoRate": " ({n} प्रविष्टियों की दर तय नहीं, गिनी नहीं गईं)",
-  "billing.groupSummaryNoRate": "{n} प्रविष्टियाँ, {pending} समीक्षा के लिए; {h} बिल योग्य घंटे, दर तय नहीं"
+  "billing.groupSummaryNoRate": "{n} प्रविष्टियाँ, {pending} समीक्षा के लिए; {h} बिल योग्य घंटे, दर तय नहीं",
+  "panel.t.cloudPendingLawyer": "संबंधित वकीलों की प्रतीक्षा",
+  "panel.t.cloudPendingCommittee": "समिति की अंतिम समीक्षा की प्रतीक्षा",
+  "panel.t.cloudApproved": "स्वीकृत",
+  "panel.t.cloudRejected": "अस्वीकृत",
+  "panel.t.cloudSynced": "फर्म क्लाउड के हित-टकराव निर्णय के अनुसार स्थानीय प्रगति अपडेट की गई।",
+  "panel.t.cloudLinked": "फर्म क्लाउड हित-टकराव जाँच से जुड़ा: {0}",
+  "panel.t.cloudSync": "क्लाउड का अंतिम निर्णय लाएँ",
+  "panel.t.cloudLinkPick": "फर्म क्लाउड हित-टकराव जाँच जोड़ें",
+  "panel.t.cloudNone": "फर्म क्लाउड में अभी ऐसा कोई हित-टकराव रिकॉर्ड नहीं है जिसे आप जोड़ सकें।",
+  "panel.t.cloudLinkConfirm": "जोड़ें और निर्णय लाएँ",
+  "panel.t.cloudLinkHint": "क्या इस मामले की हित-टकराव जाँच फर्म क्लाउड में हो चुकी है? जोड़ने पर स्थानीय प्रगति क्लाउड के अंतिम निर्णय के अनुसार चलेगी।",
+  "access.commentRequired": "पहले अपनी समीक्षा टिप्पणी लिखें, फिर स्वीकृति दें या अस्वीकार करें।"
 }

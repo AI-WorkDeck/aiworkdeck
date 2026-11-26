@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "确认关闭并删除",
   "cloud.purgeCancel": "取消",
   "billing.groupNoRate": "（其中 {n} 条未设费率，未计入金额）",
-  "billing.groupSummaryNoRate": "共 {n} 条，待审核 {pending} 条；可收费 {h} 小时，未设费率"
+  "billing.groupSummaryNoRate": "共 {n} 条，待审核 {pending} 条；可收费 {h} 小时，未设费率",
+  "panel.t.cloudPendingLawyer": "待关联律师确认",
+  "panel.t.cloudPendingCommittee": "待指定委员终审",
+  "panel.t.cloudApproved": "已通过",
+  "panel.t.cloudRejected": "已拒绝",
+  "panel.t.cloudSynced": "已按律所云端利冲结论更新本机进度。",
+  "panel.t.cloudLinked": "已关联律所云端利冲：{0}",
+  "panel.t.cloudSync": "取回云端终审结论",
+  "panel.t.cloudLinkPick": "关联律所云端利冲",
+  "panel.t.cloudNone": "律所云端还没有你可以关联的利冲记录。",
+  "panel.t.cloudLinkConfirm": "关联并取回结论",
+  "panel.t.cloudLinkHint": "这件收案已在律所云端走过利冲？关联后，本机进度按云端终审结论更新。",
+  "access.commentRequired": "请先填写本人核查意见，再选择放行或拒绝。"
 }

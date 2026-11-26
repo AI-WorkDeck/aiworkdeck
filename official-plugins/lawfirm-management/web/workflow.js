@@ -42,12 +42,24 @@
   }
   function decisionButton(label, container, actionName, params, commentInput) {
     const button = element('button', label); button.type = 'button';
-    button.addEventListener('click', () => action(button, async started => {
+    button.addEventListener('click', () => {
+      // C22：意见必填时就在意见框旁提示并聚焦，不把提示放到页面顶部（看不见）
+      if (commentInput && !commentInput.value.trim()) { commentRequired(commentInput); return; }
+      action(button, async started => {
       const comment = commentInput?.value.trim();
-      if (commentInput && !comment) throw new Error('请填写本人核查意见后确认');
       await request(actionName, { ...params, ...(commentInput ? { comment } : {}) });
       if (started === epoch) await refresh(started);
-    })); container.append(button); return button;
+    }); }); container.append(button); return button;
+  }
+  function commentRequired(input) {
+    let hint = input.nextElementSibling?.classList.contains('field-error') ? input.nextElementSibling : null;
+    if (!hint) {
+      hint = element('p', null, 'field-error'); hint.setAttribute('role', 'alert'); input.after(hint);
+      input.addEventListener('input', () => { if (input.value.trim()) { hint.remove(); input.removeAttribute('aria-invalid'); } });
+    }
+    hint.textContent = L('access.commentRequired', '请先填写本人核查意见，再选择放行或拒绝。');
+    input.setAttribute('aria-invalid', 'true');
+    input.focus();
   }
   function render() {
     $('workflow-content').hidden = false;

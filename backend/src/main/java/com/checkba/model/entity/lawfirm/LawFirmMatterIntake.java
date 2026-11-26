@@ -123,6 +123,13 @@ public class LawFirmMatterIntake {
     @Column(length = 64)
     private String imConversationId;
 
+    /** C19：关联的律所云端利冲记录（LawFirmWorkflow.id）与最近一次取回的云端状态。 */
+    @Column(length = 36)
+    private String cloudWorkflowId;
+
+    @Column(length = 40)
+    private String cloudWorkflowStatus;
+
     private Instant submittedAt;
     private Instant clearedAt;
     private Instant filedAt;

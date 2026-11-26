@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Turn off and delete",
   "cloud.purgeCancel": "Cancel",
   "billing.groupNoRate": " ({n} entries have no rate and are not counted)",
-  "billing.groupSummaryNoRate": "{n} entries, {pending} to review; {h} billable hours, no rate set"
+  "billing.groupSummaryNoRate": "{n} entries, {pending} to review; {h} billable hours, no rate set",
+  "panel.t.cloudPendingLawyer": "Awaiting related lawyers",
+  "panel.t.cloudPendingCommittee": "Awaiting committee final review",
+  "panel.t.cloudApproved": "Approved",
+  "panel.t.cloudRejected": "Rejected",
+  "panel.t.cloudSynced": "Local progress updated from the Firm cloud conflict decision.",
+  "panel.t.cloudLinked": "Linked to Firm cloud conflict check: {0}",
+  "panel.t.cloudSync": "Fetch cloud final decision",
+  "panel.t.cloudLinkPick": "Link Firm cloud conflict check",
+  "panel.t.cloudNone": "There are no Firm cloud conflict records you can link yet.",
+  "panel.t.cloudLinkConfirm": "Link and fetch decision",
+  "panel.t.cloudLinkHint": "Already cleared this matter in Firm cloud? Link it and local progress follows the cloud final decision.",
+  "access.commentRequired": "Enter your review comment first, then clear or reject."
 }

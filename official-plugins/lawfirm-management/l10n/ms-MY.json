@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Matikan dan padam",
   "cloud.purgeCancel": "Batal",
   "billing.groupNoRate": " ({n} entri tanpa kadar, tidak dikira)",
-  "billing.groupSummaryNoRate": "{n} catatan, {pending} untuk disemak; {h} jam boleh bil, kadar belum ditetapkan"
+  "billing.groupSummaryNoRate": "{n} catatan, {pending} untuk disemak; {h} jam boleh bil, kadar belum ditetapkan",
+  "panel.t.cloudPendingLawyer": "Menunggu peguam berkaitan",
+  "panel.t.cloudPendingCommittee": "Menunggu semakan akhir jawatankuasa",
+  "panel.t.cloudApproved": "Diluluskan",
+  "panel.t.cloudRejected": "Ditolak",
+  "panel.t.cloudSynced": "Kemajuan tempatan dikemas kini mengikut keputusan konflik dalam awan firma.",
+  "panel.t.cloudLinked": "Dipautkan ke semakan konflik awan firma: {0}",
+  "panel.t.cloudSync": "Dapatkan keputusan akhir awan",
+  "panel.t.cloudLinkPick": "Pautkan semakan konflik awan firma",
+  "panel.t.cloudNone": "Belum ada rekod konflik awan firma yang boleh anda pautkan.",
+  "panel.t.cloudLinkConfirm": "Pautkan dan dapatkan keputusan",
+  "panel.t.cloudLinkHint": "Perkara ini sudah disemak konfliknya dalam awan firma? Pautkannya supaya kemajuan tempatan mengikut keputusan akhir awan.",
+  "access.commentRequired": "Isi ulasan semakan anda dahulu, kemudian luluskan atau tolak."
 }

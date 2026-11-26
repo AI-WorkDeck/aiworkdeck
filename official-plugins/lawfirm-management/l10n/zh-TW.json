@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "確認關閉並刪除",
   "cloud.purgeCancel": "取消",
   "billing.groupNoRate": "（其中 {n} 筆未設費率，未計入金額）",
-  "billing.groupSummaryNoRate": "共 {n} 條，待審核 {pending} 條；可收費 {h} 小時，未設費率"
+  "billing.groupSummaryNoRate": "共 {n} 條，待審核 {pending} 條；可收費 {h} 小時，未設費率",
+  "panel.t.cloudPendingLawyer": "待關聯律師確認",
+  "panel.t.cloudPendingCommittee": "待指定委員終審",
+  "panel.t.cloudApproved": "已通過",
+  "panel.t.cloudRejected": "已拒絕",
+  "panel.t.cloudSynced": "已依律師事務所雲端利衝結論更新本機進度。",
+  "panel.t.cloudLinked": "已關聯律師事務所雲端利衝：{0}",
+  "panel.t.cloudSync": "取回雲端終審結論",
+  "panel.t.cloudLinkPick": "關聯律師事務所雲端利衝",
+  "panel.t.cloudNone": "律師事務所雲端尚無你可以關聯的利衝紀錄。",
+  "panel.t.cloudLinkConfirm": "關聯並取回結論",
+  "panel.t.cloudLinkHint": "這件收案已在律師事務所雲端完成利衝審查？關聯後，本機進度依雲端終審結論更新。",
+  "access.commentRequired": "請先填寫本人核查意見，再選擇放行或拒絕。"
 }

@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Tắt và xóa",
   "cloud.purgeCancel": "Hủy",
   "billing.groupNoRate": " ({n} mục chưa có mức phí, không được tính)",
-  "billing.groupSummaryNoRate": "{n} mục, {pending} chờ duyệt; {h} giờ tính phí, chưa đặt mức phí"
+  "billing.groupSummaryNoRate": "{n} mục, {pending} chờ duyệt; {h} giờ tính phí, chưa đặt mức phí",
+  "panel.t.cloudPendingLawyer": "Chờ luật sư liên quan",
+  "panel.t.cloudPendingCommittee": "Chờ ủy viên thẩm định cuối cùng",
+  "panel.t.cloudApproved": "Đã thông qua",
+  "panel.t.cloudRejected": "Đã từ chối",
+  "panel.t.cloudSynced": "Đã cập nhật tiến độ trên máy theo kết luận xung đột lợi ích trên đám mây của công ty.",
+  "panel.t.cloudLinked": "Đã liên kết kiểm tra xung đột trên đám mây công ty: {0}",
+  "panel.t.cloudSync": "Lấy kết luận cuối cùng từ đám mây",
+  "panel.t.cloudLinkPick": "Liên kết kiểm tra xung đột trên đám mây công ty",
+  "panel.t.cloudNone": "Chưa có hồ sơ xung đột nào trên đám mây công ty để bạn liên kết.",
+  "panel.t.cloudLinkConfirm": "Liên kết và lấy kết luận",
+  "panel.t.cloudLinkHint": "Vụ việc này đã được kiểm tra xung đột trên đám mây công ty? Liên kết để tiến độ trên máy theo kết luận cuối cùng của đám mây.",
+  "access.commentRequired": "Hãy nhập ý kiến thẩm tra trước, rồi chấp thuận hoặc từ chối."
 }

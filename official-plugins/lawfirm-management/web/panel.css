@@ -744,3 +744,27 @@ td .badge {
 :lang(zh) td .badge {
   white-space: nowrap;
 }
+
+/* C22：必填意见的就地提示 */
+.field-error {
+  margin: 4px 0 0;
+  color: var(--awd-danger-text, var(--fallback-danger));
+  font-size: inherit;
+}
+
+/* C19：本机收案关联律所云端利冲 */
+.cloud-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cloud-link .hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+.cloud-link select {
+  min-width: 0;
+  max-width: 100%;
+}
