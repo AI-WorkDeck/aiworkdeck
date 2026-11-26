@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Копировать вывод",
   "copyFailed": "Не удалось скопировать",
   "tokenUsageLine": "Токенов за этот ход: {n}",
-  "viewUsage": "Посмотреть расход", "turnCost": "Этот ход {amount}", "turnCostSubscription": "Этот ход {amount} (кредит подписки)", "turnCostBqt": "Этот ход {amount} (баллы Baoqingtian)", "turnCostSettling": "Идёт расчёт…",
+  "viewUsage": "Посмотреть расход", "turnCost": "Этот ход {amount}", "turnCostSubscription": "Этот ход {amount} (кредит подписки)", "turnCostBqt": "Этот ход {amount} (баллы Baoqingtian)", "turnCostSettling": "Идёт расчёт…", "turnCostPartial": "Этот ход {amount} (без создания презентации)",
   "statusError": "Ошибка",
   "statusSuccess": "Успешно",
   "statusRunning": "Выполняется",

@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "출력 복사",
   "copyFailed": "복사 실패",
   "tokenUsageLine": "이번 턴에 {n} 토큰",
-  "viewUsage": "사용량 보기", "turnCost": "이번 턴 {amount}", "turnCostSubscription": "이번 턴 {amount}(구독 크레딧)", "turnCostBqt": "이번 턴 {amount}(Baoqingtian 포인트)", "turnCostSettling": "정산 중…",
+  "viewUsage": "사용량 보기", "turnCost": "이번 턴 {amount}", "turnCostSubscription": "이번 턴 {amount}(구독 크레딧)", "turnCostBqt": "이번 턴 {amount}(Baoqingtian 포인트)", "turnCostSettling": "정산 중…", "turnCostPartial": "이번 턴 {amount}(프레젠테이션 생성 제외)",
   "statusError": "오류",
   "statusSuccess": "성공",
   "statusRunning": "실행 중",

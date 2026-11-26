@@ -462,8 +462,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
 
     /** 只认 32 位小写十六进制；别的一律不带（网关对畸形值也只是忽略，但没必要发）。 */
     static String turnTagOf(StreamingResponseHandler<AiMessage> handler) {
-        if (!(handler instanceof ReasoningStreamingHandler rh)) return null;
-        String tag = rh.turnTag();
+        String tag = handler instanceof ReasoningStreamingHandler rh ? rh.turnTag() : null;
+        if (tag == null) tag = PlatformTurnScope.current();   // 轮次里的辅助流式调用（写作模型等）
         return tag != null && TURN_TAG.matcher(tag).matches() ? tag : null;
     }
 

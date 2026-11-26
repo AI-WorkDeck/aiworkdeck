@@ -783,7 +783,10 @@
                <!-- Q24：平台通道的律师按余额（¥）付费，token 数读不懂也没意义；在本轮准确的 ¥
                     能从官网账单按轮取回之前（0.92，与 lane W 合做），给「查看用量」进账户用量页，
                     token 数只留在悬停提示里。自带密钥（BYOK）的用户照旧看 token。 -->
-               <text v-if="tokenUsage.platform && turnCost && turnCost.amount" class="token-value"
+               <text v-if="tokenUsage.platform && turnCost && turnCost.amount && turnCost.partial" class="token-value token-usage-link" role="link" tabindex="0"
+                     :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })"
+                     @tap="openUsageSettings" @keydown.enter.prevent="openUsageSettings">{{ $t('chat.turnCostPartial', { amount: turnCost.amount }) }}</text>
+               <text v-else-if="tokenUsage.platform && turnCost && turnCost.amount" class="token-value"
                      :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })">{{ $t(turnCost.source === 'subscription' ? 'chat.turnCostSubscription' : turnCost.source === 'bqt' ? 'chat.turnCostBqt' : 'chat.turnCost', { amount: turnCost.amount }) }}</text>
                <text v-else-if="tokenUsage.platform && turnCost && turnCost.settling" class="token-value" role="status"
                      :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })">{{ $t('chat.turnCostSettling') }}</text>

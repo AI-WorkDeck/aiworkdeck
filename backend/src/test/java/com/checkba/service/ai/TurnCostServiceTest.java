@@ -67,6 +67,9 @@ class TurnCostServiceTest {
         String expectedTag = new InstallIdentityService(dir.toString()).turnTag("conv-1", "0b6c2f1e-1111-4222-8333-944455556666");
         assertEquals(List.of("tag=" + expectedTag + " Bearer awdai_synthetic"), seen);
         assertFalse(out.toString().contains(expectedTag), "the tag never reaches the renderer");
+        assertEquals(false, out.get("excludesPresentation"));
+        PlatformTurnScope.run(expectedTag, PlatformTurnScope::markUntaggedSpend);
+        assertEquals(true, service(base, bailian(), dir).turnCost(7L, "conv-1", "0b6c2f1e-1111-4222-8333-944455556666").get("excludesPresentation"));
     }
 
     @Test

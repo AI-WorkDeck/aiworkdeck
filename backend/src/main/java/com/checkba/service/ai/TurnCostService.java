@@ -82,6 +82,8 @@ public class TurnCostService {
             out.put("subscriptionCents", data.path("subscriptionCents").asLong(0));
             out.put("walletCents", data.path("walletCents").asLong(0));
             out.put("bqtCents", data.path("bqtCents").asLong(0));
+            // 这一轮还有带不上标记的平台调用（演示文稿生成），金额只是其余部分
+            out.put("excludesPresentation", PlatformTurnScope.hadUntaggedSpend(tag));
             return out;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

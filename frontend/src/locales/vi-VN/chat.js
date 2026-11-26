@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Sao chép đầu ra",
   "copyFailed": "Sao chép thất bại",
   "tokenUsageLine": "{n} token trong lượt này",
-  "viewUsage": "Xem mức sử dụng", "turnCost": "Lượt này {amount}", "turnCostSubscription": "Lượt này {amount} (tín dụng gói đăng ký)", "turnCostBqt": "Lượt này {amount} (điểm Baoqingtian)", "turnCostSettling": "Đang quyết toán…",
+  "viewUsage": "Xem mức sử dụng", "turnCost": "Lượt này {amount}", "turnCostSubscription": "Lượt này {amount} (tín dụng gói đăng ký)", "turnCostBqt": "Lượt này {amount} (điểm Baoqingtian)", "turnCostSettling": "Đang quyết toán…", "turnCostPartial": "Lượt này {amount} (không gồm tạo bản trình bày)",
   "statusError": "Lỗi",
   "statusSuccess": "Thành công",
   "statusRunning": "Đang chạy",

@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Copier la sortie",
   "copyFailed": "Échec de la copie",
   "tokenUsageLine": "{n} tokens pour ce tour",
-  "viewUsage": "Voir l'utilisation", "turnCost": "Ce tour {amount}", "turnCostSubscription": "Ce tour {amount} (crédit d’abonnement)", "turnCostBqt": "Ce tour {amount} (points Baoqingtian)", "turnCostSettling": "Facturation en cours…",
+  "viewUsage": "Voir l'utilisation", "turnCost": "Ce tour {amount}", "turnCostSubscription": "Ce tour {amount} (crédit d’abonnement)", "turnCostBqt": "Ce tour {amount} (points Baoqingtian)", "turnCostSettling": "Facturation en cours…", "turnCostPartial": "Ce tour {amount} (hors génération de présentation)",
   "statusError": "Erreur",
   "statusSuccess": "Succès",
   "statusRunning": "En cours",

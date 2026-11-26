@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Uitvoer kopiëren",
   "copyFailed": "Kopiëren mislukt",
   "tokenUsageLine": "{n} tokens deze beurt",
-  "viewUsage": "Gebruik bekijken", "turnCost": "Deze beurt {amount}", "turnCostSubscription": "Deze beurt {amount} (abonnementstegoed)", "turnCostBqt": "Deze beurt {amount} (Baoqingtian-punten)", "turnCostSettling": "Wordt verrekend…",
+  "viewUsage": "Gebruik bekijken", "turnCost": "Deze beurt {amount}", "turnCostSubscription": "Deze beurt {amount} (abonnementstegoed)", "turnCostBqt": "Deze beurt {amount} (Baoqingtian-punten)", "turnCostSettling": "Wordt verrekend…", "turnCostPartial": "Deze beurt {amount} (exclusief presentatie maken)",
   "statusError": "Fout",
   "statusSuccess": "Geslaagd",
   "statusRunning": "Wordt uitgevoerd",

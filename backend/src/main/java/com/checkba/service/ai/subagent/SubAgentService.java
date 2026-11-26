@@ -274,7 +274,9 @@ public class SubAgentService {
         // 没有这个快照的话，下面几条 catch 只能硬编 toolsUsed=空/rounds=0——即便子 Agent
         // 已经执行过真实的、可能有副作用的工具调用，父级也完全看不出来（审计条目）。
         Progress progress = new Progress();
-        Callable<SubAgentResult> task = () -> PlatformAiUserScope.call(scopedUser, () -> {
+        // Q24：子任务里的一切平台调用（含非流式回退与工具内的辅助调用）都算进父轮次
+        final String parentTurnTag = turnTag(parentCtx);
+        Callable<SubAgentResult> task = () -> PlatformAiUserScope.call(scopedUser, () -> com.checkba.service.ai.PlatformTurnScope.call(parentTurnTag, () -> {
             IN_SUB_AGENT.set(Boolean.TRUE);
             String previousConversation = editorBridgeService == null ? null
                     : editorBridgeService.getCurrentConversationId();
@@ -290,7 +292,7 @@ public class SubAgentService {
                 }
                 IN_SUB_AGENT.remove();
             }
-        });
+        }));
         // 先登记完整句柄再起线程，父轮取消与提交竞态由持久 checker 补齐。
         FutureTask<SubAgentResult> future = new FutureTask<>(task);
         RunningSubtask handle = new RunningSubtask(

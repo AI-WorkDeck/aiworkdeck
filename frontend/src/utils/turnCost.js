@@ -17,7 +17,8 @@ export function formatTurnCost(data) {
   let source = ''
   if (cents > 0 && Number(data.subscriptionCents) === cents) source = 'subscription'
   else if (cents > 0 && Number(data.bqtCents) === cents) source = 'bqt'
-  return { amount, source }
+  // 这一轮还生成了演示文稿（pptx-service 的调用带不上标记）：金额只是其余部分，页脚注明并给「查看用量」
+  return data.excludesPresentation === true ? { amount, source, partial: true } : { amount, source }
 }
 
 /**

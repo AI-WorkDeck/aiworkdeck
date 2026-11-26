@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Çıktıyı kopyala",
   "copyFailed": "Kopyalama başarısız",
   "tokenUsageLine": "Bu turda {n} token",
-  "viewUsage": "Kullanımı görüntüle", "turnCost": "Bu tur {amount}", "turnCostSubscription": "Bu tur {amount} (abonelik kredisi)", "turnCostBqt": "Bu tur {amount} (Baoqingtian puanı)", "turnCostSettling": "Hesaplanıyor…",
+  "viewUsage": "Kullanımı görüntüle", "turnCost": "Bu tur {amount}", "turnCostSubscription": "Bu tur {amount} (abonelik kredisi)", "turnCostBqt": "Bu tur {amount} (Baoqingtian puanı)", "turnCostSettling": "Hesaplanıyor…", "turnCostPartial": "Bu tur {amount} (sunum oluşturma hariç)",
   "statusError": "Hata",
   "statusSuccess": "Başarılı",
   "statusRunning": "Çalışıyor",

@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Copiar salida",
   "copyFailed": "Error al copiar",
   "tokenUsageLine": "{n} tokens en este turno",
-  "viewUsage": "Ver uso", "turnCost": "Esta ronda {amount}", "turnCostSubscription": "Esta ronda {amount} (crédito de suscripción)", "turnCostBqt": "Esta ronda {amount} (puntos Baoqingtian)", "turnCostSettling": "Liquidando…",
+  "viewUsage": "Ver uso", "turnCost": "Esta ronda {amount}", "turnCostSubscription": "Esta ronda {amount} (crédito de suscripción)", "turnCostBqt": "Esta ronda {amount} (puntos Baoqingtian)", "turnCostSettling": "Liquidando…", "turnCostPartial": "Esta ronda {amount} (sin generación de presentaciones)",
   "statusError": "Fallo",
   "statusSuccess": "Éxito",
   "statusRunning": "En curso",

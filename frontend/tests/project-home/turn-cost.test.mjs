@@ -45,3 +45,9 @@ test('Q24: the stream keeps the platform runId and the footer shows amount / set
   assert.match(chat, /getTurnCost\(conversationId, runId\)/)
   assert.match(chat, /chat\.viewUsage/)
 })
+
+test('Q24: a turn that also generated a presentation shows the partial amount and links to usage', () => {
+  assert.deepEqual(formatTurnCost({ available: true, cents: 170, currency: 'CNY', pending: 0, excludesPresentation: true }), { amount: '¥1.70', source: '', partial: true })
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  assert.match(chat, /turnCost\.partial" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.turnCostPartial'/)
+})

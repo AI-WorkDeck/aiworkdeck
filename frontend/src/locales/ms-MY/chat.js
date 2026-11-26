@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Salin output",
   "copyFailed": "Penyalinan gagal",
   "tokenUsageLine": "{n} token dalam giliran ini",
-  "viewUsage": "Lihat penggunaan", "turnCost": "Pusingan ini {amount}", "turnCostSubscription": "Pusingan ini {amount} (kredit langganan)", "turnCostBqt": "Pusingan ini {amount} (mata Baoqingtian)", "turnCostSettling": "Sedang dikira…",
+  "viewUsage": "Lihat penggunaan", "turnCost": "Pusingan ini {amount}", "turnCostSubscription": "Pusingan ini {amount} (kredit langganan)", "turnCostBqt": "Pusingan ini {amount} (mata Baoqingtian)", "turnCostSettling": "Sedang dikira…", "turnCostPartial": "Pusingan ini {amount} (tidak termasuk penjanaan pembentangan)",
   "statusError": "Ralat",
   "statusSuccess": "Berjaya",
   "statusRunning": "Sedang berjalan",
