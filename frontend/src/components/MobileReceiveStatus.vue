@@ -1,8 +1,9 @@
 <!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <template>
-  <!-- D14：没开通也没出错时不占状态栏（首次使用的律师看不懂「手机收件：未启用」，也无事可做） -->
-  <view v-if="!inactive || open" class="mobile-receive">
+  <!-- D14 / CEO 11-25：只在开通了手机收件、且确实有事（出错、正在收、刚收到）时占状态栏。
+       没开通的律师看到红色「手机收件 · 需要处理」只会困惑——中转站连不上对他不是问题。 -->
+  <view v-if="visible" class="mobile-receive">
     <button class="receive-trigger" :class="{ attention: hasFailure }" @click="open = !open" :aria-expanded="open">
       <span class="receive-dot" :class="{ busy: status.checking, failed: hasFailure }"></span>
       {{ inactive ? $t('workbench.mobileReceive.inactiveLabel') : $t('workbench.mobileReceive.title') + ' · ' + summary }}
@@ -52,9 +53,17 @@ export default {
   data: () => ({ open: false, status: { active: false, items: [] }, loadError: false, requesting: false, timer: null, stopped: false, savedIds: new Set(), requestId: 0 }),
   computed: {
     items() { return [...(this.status.items || [])].reverse() },
-    hasFailure() { return this.loadError || !!this.status.error || this.items.some(i => i.phase === 'failed') },
-    // 没有「是否配置过配对」的状态可依据，未启用统一显示「未启用」而不是吓人的「未连接」
-    inactive() { return !this.hasFailure && !this.status.active },
+    // 开通过：最近一次成功读到的状态里 active 为真（读失败时保留上一次的状态）
+    configured() { return !!this.status.active },
+    // 没开通时，读不到状态或中转站出错都不是用户要处理的事
+    hasFailure() { return this.configured && (this.loadError || !!this.status.error || this.items.some(i => i.phase === 'failed')) },
+    inactive() { return !this.configured },
+    visible() {
+      if (this.open) return true
+      if (!this.configured) return false
+      return this.hasFailure || !!this.status.checking
+        || this.items.some(i => ['pending', 'receiving', 'saved', 'savedPendingAck'].includes(i.phase))
+    },
     summary() {
       if (this.hasFailure) return this.$t('workbench.mobileReceive.needsAttention')
       const receiving = this.items.filter(i => ['pending', 'receiving'].includes(i.phase)).length

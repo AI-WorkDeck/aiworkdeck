@@ -28,7 +28,7 @@ export default {
   exitProgressChecking: '正在确认版本（3/3）…',
   exitProgressCommitting: '正在保存版本（2/3）…',
   exitProgressSaving: '正在保存文件（1/3）…',
-  exitPrompt: '离开「{name}」前，要为本次改动保存一个版本吗？文件已经保存，不保存版本也会保留。',
+  exitPrompt: '离开“{name}”前，要为本次改动保存一个版本吗？文件已经保存，不保存版本也会保留。',
   exitCommit: '保存版本并退出',
   exitSkip: '不保存版本，直接退出',
   exitCancel: '取消',

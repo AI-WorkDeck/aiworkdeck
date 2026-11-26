@@ -25,5 +25,5 @@ test('the status bar uses the interface font and hides an unused mobile inbox', 
   const scss = fs.readFileSync(new URL('../../src/pages/project-overview/project-overview.scss', import.meta.url), 'utf8')
   assert.doesNotMatch(scss, /font-family: var\(--awd-font-mono, 'JetBrains Mono'/)
   const mobile = fs.readFileSync(new URL('../../src/components/MobileReceiveStatus.vue', import.meta.url), 'utf8')
-  assert.match(mobile, /<view v-if="!inactive \|\| open" class="mobile-receive">/)
+  assert.match(mobile, /<view v-if="visible" class="mobile-receive">/)
 })
