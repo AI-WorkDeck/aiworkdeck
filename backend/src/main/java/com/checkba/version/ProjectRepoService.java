@@ -24,6 +24,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -2535,6 +2536,56 @@ public class ProjectRepoService {
             throw new VersionException("从云端更新失败: project=" + projectId, e);
         } catch (Exception e) {
             throw new VersionException("从云端更新失败: project=" + projectId, e);
+        }
+    }
+
+    /** C24: where the routine cloud check fetches the library's master, before it is published as origin/master. */
+    static final String CHECK_FETCH_REF = "refs/awd/check/origin-master";
+
+    /**
+     * C24 (lane C thread dump): the network half of the routine cloud check, safe to run without the repo lock.
+     * Fetches the library's master into {@link #CHECK_FETCH_REF} (never origin/master: an open merge window
+     * must not see it move) plus milestone tags; returns the fetched sha, or null for a library nobody pushed to.
+     * {@link #publishCheckedOrigin} then moves origin/master under the lock.
+     */
+    public String fetchOriginForCheck(long projectId, String username, String token) {
+        try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            git.fetch()
+                    .setRemote(ORIGIN)
+                    .setTransportConfigCallback(CloudGitEpochClient.transport(repo.getConfig().getString("remote", ORIGIN, "url"),username,token))
+                    .setCredentialsProvider(
+                            new org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
+                                    username == null ? "" : username, token == null ? "" : token))
+                    .setRefSpecs(new org.eclipse.jgit.transport.RefSpec("+refs/heads/master:" + CHECK_FETCH_REF),
+                            new org.eclipse.jgit.transport.RefSpec(MILESTONE_SPEC))
+                    .setTimeout(60)
+                    .call();
+            ObjectId fetched = repo.resolve(CHECK_FETCH_REF);
+            return fetched == null ? null : fetched.getName();
+        } catch (org.eclipse.jgit.api.errors.TransportException e) {
+            if (isEmptyRemoteFetchFailure(e)) return null;
+            throw new VersionException("从云端更新失败: project=" + projectId, e);
+        } catch (Exception e) {
+            throw new VersionException("从云端更新失败: project=" + projectId, e);
+        }
+    }
+
+    /** C24: moves origin/master to what {@link #fetchOriginForCheck} fetched (caller holds the repo lock). */
+    public void publishCheckedOrigin(long projectId, String sha) {
+        if (sha == null) return;
+        try (Repository repo = open(projectId)) {
+            RefUpdate update = repo.updateRef(ORIGIN_MASTER);
+            update.setNewObjectId(ObjectId.fromString(sha));
+            update.setForceUpdate(true);
+            RefUpdate.Result result = update.update();
+            if (result != RefUpdate.Result.NEW && result != RefUpdate.Result.FORCED
+                    && result != RefUpdate.Result.FAST_FORWARD && result != RefUpdate.Result.NO_CHANGE) {
+                throw new VersionException("更新云端引用失败: project=" + projectId + " result=" + result);
+            }
+        } catch (VersionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new VersionException("更新云端引用失败: project=" + projectId, e);
         }
     }
 
