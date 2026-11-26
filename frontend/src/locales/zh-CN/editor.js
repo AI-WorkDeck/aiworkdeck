@@ -207,6 +207,7 @@ export default {
     moveFrom: '移出',
     moveTo: '移入',
     deletion: '删除',
+    replacement: '替换',
     insertion: '插入',
     table: '表格',
     contiguousCount: '{count} 处连续',

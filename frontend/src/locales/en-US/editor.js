@@ -203,6 +203,7 @@ export default {
     moveFrom: 'Moved from',
     moveTo: 'Moved to',
     deletion: 'Deletion',
+    replacement: 'Replacement',
     insertion: 'Insertion',
     table: 'Table',
     contiguousCount: '{count} consecutive',

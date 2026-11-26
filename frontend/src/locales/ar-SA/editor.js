@@ -200,6 +200,7 @@ export default {
     "moveFrom": "نُقل من",
     "moveTo": "نُقل إلى",
     "deletion": "حذف",
+    "replacement": "استبدال",
     "insertion": "إدراج",
     "table": "جدول",
     "contiguousCount": "{count} متتالية",

@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Dialihkan daripada",
     "moveTo": "Dialihkan ke",
     "deletion": "Pemadaman",
+    "replacement": "Penggantian",
     "insertion": "Sisipan",
     "table": "Jadual",
     "contiguousCount": "{count} berturut-turut",

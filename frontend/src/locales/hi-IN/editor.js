@@ -200,6 +200,7 @@ export default {
     "moveFrom": "यहाँ से हटाया गया",
     "moveTo": "यहाँ लाया गया",
     "deletion": "विलोपन",
+    "replacement": "प्रतिस्थापन",
     "insertion": "प्रविष्टि",
     "table": "तालिका",
     "contiguousCount": "{count} लगातार",

@@ -16,8 +16,8 @@ export function positionReviewCards(items, gap = 12) {
 export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh' }) {
   const doc = canvas.ownerDocument, win = doc.defaultView, en = Boolean(locale && !String(locale).startsWith('zh'))
   const labels = en
-    ? { title: 'Comments & changes', overview: 'Review list', moveFrom: 'Moved from', moveTo: 'Moved to', insert: 'Inserted', delete: 'Deleted', table: 'Table', comment: 'Comment', accept: 'Accept', reject: 'Reject', resolve: 'Resolve', reopen: 'Reopen', edit: 'Edit', remove: 'Delete', save: 'Save', cancel: 'Cancel', more: 'Some review items are not displayed.', failed: 'Could not update review. Try again.', empty: 'No comments or changes', other: 'Change', format: 'Formatting', paraFormat: 'Paragraph formatting', unknown: 'Unknown author' }
-    : { title: '批注与修订', overview: '审阅列表', moveFrom: '移出', moveTo: '移入', insert: '插入', delete: '删除', table: '表格', comment: '批注', accept: '接受', reject: '拒绝', resolve: '解决', reopen: '重新打开', edit: '编辑', remove: '删除', save: '保存', cancel: '取消', more: '部分审阅条目暂未显示。', failed: '审阅更新失败，请重试。', empty: '暂无批注或修订', other: '更改', format: '格式', paraFormat: '段落格式', unknown: '未知作者' }
+    ? { title: 'Comments & changes', overview: 'Review list', moveFrom: 'Moved from', moveTo: 'Moved to', insert: 'Inserted', delete: 'Deleted', replace: 'Replaced', table: 'Table', comment: 'Comment', accept: 'Accept', reject: 'Reject', resolve: 'Resolve', reopen: 'Reopen', edit: 'Edit', remove: 'Delete', save: 'Save', cancel: 'Cancel', more: 'Some review items are not displayed.', failed: 'Could not update review. Try again.', empty: 'No comments or changes', other: 'Change', format: 'Formatting', paraFormat: 'Paragraph formatting', unknown: 'Unknown author' }
+    : { title: '批注与修订', overview: '审阅列表', moveFrom: '移出', moveTo: '移入', insert: '插入', delete: '删除', replace: '替换', table: '表格', comment: '批注', accept: '接受', reject: '拒绝', resolve: '解决', reopen: '重新打开', edit: '编辑', remove: '删除', save: '保存', cancel: '取消', more: '部分审阅条目暂未显示。', failed: '审阅更新失败，请重试。', empty: '暂无批注或修订', other: '更改', format: '格式', paraFormat: '段落格式', unknown: '未知作者' }
   const root = doc.createElement('div'); root.className = 'awd-review-balloons'; root.hidden = true
   const style = doc.createElement('style'); style.textContent = `
     /* 色值全部走 editor.html 头部那套 --awd-*（本页是独立 document，宿主令牌继承不过来，
@@ -88,11 +88,11 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
     node.classList.toggle('moved', item.kind === 'revision' && item.data.movedId > 1)
     node.classList.toggle('resolved', !!item.data.resolved)
     const r = item.data, meta = doc.createElement('div'); meta.className = 'awd-rb-meta'
-    const type = doc.createElement('strong'); type.textContent = item.kind === 'comment' ? labels.comment : (r.inTable ? labels.table + ' · ' : '') + (r.typeKey === 'moveFrom' ? labels.moveFrom : r.typeKey === 'moveTo' ? labels.moveTo : r.type === 'Delete' ? labels.delete : r.type === 'Insert' ? labels.insert : r.type === 'Format' ? labels.format : r.type === 'ParagraphFormat' ? labels.paraFormat : r.type || labels.other)
+    const type = doc.createElement('strong'); type.textContent = item.kind === 'comment' ? labels.comment : (r.inTable ? labels.table + ' · ' : '') + (r.typeKey === 'moveFrom' ? labels.moveFrom : r.typeKey === 'moveTo' ? labels.moveTo : r.typeKey === 'replace' ? labels.replace : r.type === 'Delete' ? labels.delete : r.type === 'Insert' ? labels.insert : r.type === 'Format' ? labels.format : r.type === 'ParagraphFormat' ? labels.paraFormat : r.type || labels.other)
     const author = doc.createElement('span'); author.textContent = r.author || labels.unknown
     const date = doc.createElement('span'); date.textContent = r.date || ''
     meta.append(type, author, date)
-    const content = doc.createElement('div'); content.className = 'awd-rb-content'; content.textContent = r.content || r.text || r.description || ''
+    const content = doc.createElement('div'); content.className = 'awd-rb-content'; content.textContent = r.content || (r.typeKey === 'replace' ? (r.text || '') + ' → ' + (r.insText || '') : r.text) || r.description || ''
     node.append(meta, content)
     if (r.anchorText) { const quote = doc.createElement('div'); quote.className = 'awd-rb-quote'; quote.textContent = r.anchorText; node.append(quote) }
     // Cards survive index shifts (see reconcile): handlers read the current data.
@@ -163,7 +163,7 @@ export function attachReviewBalloons({ canvas, execute, transport, locale = 'zh'
   const cardSignature = (item, writable) => JSON.stringify(item.kind === 'comment'
     ? [item.kind, writable, ...['id', 'author', 'date', 'timestamp', 'content', 'anchorText', 'resolved'].map(k => item.data[k])]
     : [item.kind, writable, item.data.type, item.data.movedId, item.data.inTable, item.data.author, item.data.date, item.data.text, item.data.description,
-      item.data.items.map(r => [r.identifier, r.type, r.text, r.author, r.timestamp])])
+      item.data.typeKey, item.data.insText, item.data.items.map(r => [r.identifier, r.type, r.text, r.author, r.timestamp])])
   function reconcile(data, items) {
     if (!data.writable && editingKey) { editingKey = ''; busy = false }
     const previous = new Map(cards.map(c => [c.key, c]))

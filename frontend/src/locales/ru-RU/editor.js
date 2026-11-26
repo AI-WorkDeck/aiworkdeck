@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Перемещено из",
     "moveTo": "Перемещено в",
     "deletion": "Удаление",
+    "replacement": "Замена",
     "insertion": "Вставка",
     "table": "Таблица",
     "contiguousCount": "{count} подряд",

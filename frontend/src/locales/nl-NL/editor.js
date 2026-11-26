@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Verplaatst uit",
     "moveTo": "Verplaatst naar",
     "deletion": "Verwijdering",
+    "replacement": "Vervanging",
     "insertion": "Invoeging",
     "table": "Tabel",
     "contiguousCount": "{count} opeenvolgend",
