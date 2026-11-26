@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Sedia untuk dihantar",
   "submitGuideOfflineTitle": "Tidak dapat menghubungi pustaka kes buat masa ini",
   "submitGuideOfflineDesc": "Pustaka kes pasukan tidak dapat dihubungi, jadi penghantaran perlu menunggu sehingga sambungan pulih. Semua perubahan anda ada di komputer ini — tiada apa-apa yang hilang.",
+  "submitGuideOfflineQueuedDesc": "Pustaka kes pasukan tidak dapat dicapai sekarang. Penyerahan ini telah direkodkan dan akan dihantar secara automatik apabila anda kembali dalam talian. Semua perubahan anda ada pada komputer ini; tiada yang hilang.",
   "submitGuideStateTodo": "Belum selesai",
   "submitGuideStateActive": "Seterusnya",
   "submitGuideStateDone": "Selesai",

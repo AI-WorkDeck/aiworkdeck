@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Bereit zum Einreichen",
   "submitGuideOfflineTitle": "Aktenbibliothek ist derzeit nicht erreichbar",
   "submitGuideOfflineDesc": "Die Team-Aktenbibliothek ist nicht erreichbar, daher muss das Einreichen warten, bis die Verbindung wiederhergestellt ist. Ihre Änderungen befinden sich alle auf diesem Computer — nichts geht verloren.",
+  "submitGuideOfflineQueuedDesc": "Die Team-Fallbibliothek ist gerade nicht erreichbar. Diese Einreichung ist vorgemerkt und wird automatisch gesendet, sobald du wieder online bist. Alle Änderungen sind auf diesem Computer; nichts geht verloren.",
   "submitGuideStateTodo": "Offen",
   "submitGuideStateActive": "Als Nächstes",
   "submitGuideStateDone": "Erledigt",

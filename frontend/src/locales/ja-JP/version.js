@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "送信可能です",
   "submitGuideOfflineTitle": "現在、事件ライブラリに接続できません",
   "submitGuideOfflineDesc": "チーム事件ライブラリに接続できないため、送信は接続の回復までお待ちください。変更内容はすべてこのパソコンに保存されており、失われることはありません。",
+  "submitGuideOfflineQueuedDesc": "現在チームの案件ライブラリに接続できません。この提出は記録済みで、オンラインに戻ると自動で送信されます。変更はすべてこのパソコンにあり、失われることはありません。",
   "submitGuideStateTodo": "未完了",
   "submitGuideStateActive": "次へ",
   "submitGuideStateDone": "完了",

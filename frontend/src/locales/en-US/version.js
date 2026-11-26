@@ -420,6 +420,7 @@ export default {
   submitGuideReady: 'Ready to submit',
   submitGuideOfflineTitle: 'Can’t reach the case library right now',
   submitGuideOfflineDesc: 'The team case library is unreachable, so submitting has to wait for the connection to come back. Your changes are all here on this computer — nothing is lost.',
+  submitGuideOfflineQueuedDesc: 'The team case library can’t be reached right now. This submission is saved and will be sent automatically when you’re back online. All your changes are on this computer; nothing is lost.',
   submitGuideStateTodo: 'To do',
   submitGuideStateActive: 'Next',
   submitGuideStateDone: 'Done',

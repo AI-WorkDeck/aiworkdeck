@@ -421,6 +421,7 @@ export default {
   submitGuideReady: '可以交稿了',
   submitGuideOfflineTitle: '暂时连不上案件库',
   submitGuideOfflineDesc: '现在连不上团队案件库，交稿要等网络恢复。你的改动都在本机，一个都不会丢。',
+  submitGuideOfflineQueuedDesc: '现在连不上团队案件库，已经记下这次交稿，联网后会自动交。你的改动都在本机，一个都不会丢。',
   submitGuideStateTodo: '待做',
   submitGuideStateActive: '进行中',
   submitGuideStateDone: '已完成',

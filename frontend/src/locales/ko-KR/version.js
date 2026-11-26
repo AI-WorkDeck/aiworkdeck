@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "제출할 준비가 되었습니다",
   "submitGuideOfflineTitle": "지금은 사건 라이브러리에 연결할 수 없습니다",
   "submitGuideOfflineDesc": "팀 사건 라이브러리에 연결할 수 없어 네트워크가 복구된 후에 제출할 수 있습니다. 작업한 변경 사항은 모두 이 컴퓨터에 안전하게 보관되어 있습니다.",
+  "submitGuideOfflineQueuedDesc": "지금은 팀 사건 라이브러리에 연결할 수 없습니다. 이번 제출은 기록되었으며 다시 온라인이 되면 자동으로 제출됩니다. 모든 변경 사항은 이 컴퓨터에 있어 사라지지 않습니다.",
   "submitGuideStateTodo": "할 일",
   "submitGuideStateActive": "다음",
   "submitGuideStateDone": "완료됨",

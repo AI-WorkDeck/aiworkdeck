@@ -377,6 +377,7 @@ export default {
   "submitGuideReady": "Gönderime hazır",
   "submitGuideOfflineTitle": "Dosya kitaplığına şu anda ulaşılamıyor",
   "submitGuideOfflineDesc": "Ekip dosya kitaplığına ulaşılamıyor, bu nedenle gönderimin bağlantı geri gelene kadar beklemesi gerekiyor. Tüm değişiklikleriniz bu bilgisayarda — hiçbir şey kaybolmadı.",
+  "submitGuideOfflineQueuedDesc": "Ekip dava kitaplığına şu anda ulaşılamıyor. Bu gönderim kaydedildi ve yeniden çevrimiçi olduğunuzda otomatik olarak gönderilecek. Tüm değişiklikleriniz bu bilgisayarda; hiçbir şey kaybolmaz.",
   "submitGuideStateTodo": "Yapılacak",
   "submitGuideStateActive": "İleri",
   "submitGuideStateDone": "Tamamlandı",
