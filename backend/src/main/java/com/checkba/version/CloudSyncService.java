@@ -989,59 +989,80 @@ public class CloudSyncService {
         if (remoteOpt.isEmpty()) {
             return Map.of("linked", false);
         }
+        // C24（lane C 线程转储）：联网的几步（fetch、参与人表、大文件状态）都不持仓库锁——上行被大文件备份
+        // 占满时连 TLS 握手都能卡上几分钟，持锁期间状态 / 保存 / 交稿全被拒成「正在整理版本」。只有两步
+        // 本地操作持锁：开头判合并窗口，fetch 回来后再判一次并把 origin/master 挪到位。
         ReentrantLock lock = sessionService.repoLock(projectId);
         lock.lock();
         try {
-            // 合并窗口期间不 fetch（v2 终审 I3）：fetch 会推进 origin/master，而窗口判定
-            // 靠「MERGE_HEAD 等于/是 origin/master 的祖先」反查——旧的相等判定下 fetch 一次
-            // 就把开着的冲突窗口孤儿化（三语境都对不上号，弹窗消失、裁决端点全拒）。
+            // 合并窗口期间不动 origin/master（v2 终审 I3）：窗口判定靠「MERGE_HEAD 等于/是 origin/master 的
+            // 祖先」反查，挪一次就把开着的冲突窗口孤儿化（三语境都对不上号，弹窗消失、裁决端点全拒）。
             // 状态照常给本地快照，多带 merging:true。
-            if (repoService.repositoryMerging(projectId)) {
-                Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
-                m.put("merging", true);
-                return m;
-            }
-            CloudConnection conn = connectionOf(remoteOpt.get());
-            try {
-                repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
-                removedFromLibrary.remove(projectId); // readable again (e.g. re-added)
-            } catch (Exception e) {
-                Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
-                if (isAccessRefused(e)) {
-                    // C10：案件库明确拒绝读取（git-upload-pack not permitted）= 已不在这份案卷的参与人里，
-                    // 不是网络抖动；负责人名字用最近一次取到的
-                    log.info("云端状态检查：案件库拒绝读取，本机账号已不在参与人里: project={}", projectId);
-                    RemoteRole last = remoteRoleCache.remove(projectId);
-                    m.put("removed", true);
-                    if (last != null && last.ownerName() != null) m.put("ownerName", last.ownerName());
-                    removedFromLibrary.put(projectId, last != null && last.ownerName() != null ? last.ownerName() : "");
-                    return m;
-                }
-                log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);
-                m.put("offline", true);
-                return m;
-            }
-            Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
-            describeMyRole(projectId, remoteOpt.get(), conn, m);
-            if (objectSync != null) {
-                try {
-                    List<String> blocked = objectSync.largeFilesBlockingSubmit(projectId,
-                            conn.getServerUrl() + "/git/" + remoteOpt.get().getRemoteProjectId() + ".git",
-                            conn.getUsername(), conn.getDeviceToken());
-                    if (!blocked.isEmpty()) {
-                        // C12：版本里有大文件而文件云端备份没开——现在就告诉律师，别等交稿才弹一句
-                        m.put("largeFilesNeedBackup", true);
-                        m.put("largeFiles", blocked.stream().filter(p -> !p.isBlank())
-                                .map(p -> p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p).toList());
-                    }
-                } catch (Exception e) {
-                    log.warn("检查大文件备份状态失败（状态照常给）: project={}", projectId, e);
-                }
-            }
-            return m;
+            if (repoService.repositoryMerging(projectId)) return mergingStatus(projectId, userId);
         } finally {
             lock.unlock();
         }
+        CloudConnection conn = connectionOf(remoteOpt.get());
+        String fetched;
+        try {
+            // 抓到专用引用上，不碰 origin/master：抓取期间开出的合并窗口也看不到它动
+            fetched = repoService.fetchOriginForCheck(projectId, conn.getUsername(), conn.getDeviceToken());
+            removedFromLibrary.remove(projectId); // readable again (e.g. re-added)
+        } catch (Exception e) {
+            Map<String, Object> m = lockedStatus(projectId, userId);
+            if (isAccessRefused(e)) {
+                // C10：案件库明确拒绝读取（git-upload-pack not permitted）= 已不在这份案卷的参与人里，
+                // 不是网络抖动；负责人名字用最近一次取到的
+                log.info("云端状态检查：案件库拒绝读取，本机账号已不在参与人里: project={}", projectId);
+                RemoteRole last = remoteRoleCache.remove(projectId);
+                m.put("removed", true);
+                if (last != null && last.ownerName() != null) m.put("ownerName", last.ownerName());
+                removedFromLibrary.put(projectId, last != null && last.ownerName() != null ? last.ownerName() : "");
+                return m;
+            }
+            log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);
+            m.put("offline", true);
+            return m;
+        }
+        Map<String, Object> m;
+        lock.lock();
+        try {
+            if (repoService.repositoryMerging(projectId)) return mergingStatus(projectId, userId);
+            repoService.publishCheckedOrigin(projectId, fetched);
+            m = new HashMap<>(cloudStatus(projectId, userId));
+        } finally {
+            lock.unlock();
+        }
+        describeMyRole(projectId, remoteOpt.get(), conn, m);
+        if (objectSync != null) {
+            try {
+                List<String> blocked = objectSync.largeFilesBlockingSubmit(projectId,
+                        conn.getServerUrl() + "/git/" + remoteOpt.get().getRemoteProjectId() + ".git",
+                        conn.getUsername(), conn.getDeviceToken());
+                if (!blocked.isEmpty()) {
+                    // C12：版本里有大文件而文件云端备份没开——现在就告诉律师，别等交稿才弹一句
+                    m.put("largeFilesNeedBackup", true);
+                    m.put("largeFiles", blocked.stream().filter(p -> !p.isBlank())
+                            .map(p -> p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p).toList());
+                }
+            } catch (Exception e) {
+                log.warn("检查大文件备份状态失败（状态照常给）: project={}", projectId, e);
+            }
+        }
+        return m;
+    }
+
+    private Map<String, Object> mergingStatus(long projectId, Long userId) {
+        Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
+        m.put("merging", true);
+        return m;
+    }
+
+    private Map<String, Object> lockedStatus(long projectId, Long userId) {
+        ReentrantLock lock = sessionService.repoLock(projectId);
+        lock.lock();
+        try { return new HashMap<>(cloudStatus(projectId, userId)); }
+        finally { lock.unlock(); }
     }
 
     /**
@@ -1675,7 +1696,8 @@ public class CloudSyncService {
         if (repoService.repositoryMerging(projectId)) {
             throw VersionException.userFacing(LangText.of("请先把等你做选择的文件处理完", "Please finish choosing your files first"));
         }
-        if (sessionService.activeSession(projectId).isPresent()) {
+        // C27：一段只动了清单、没有任何律师改动的工作（软件自己留下的）不挡取回
+        if (sessionService.activeSession(projectId).isPresent() && !sessionService.discardIfManifestOnly(projectId, null)) {
             throw VersionException.userFacing(LangText.of("请先结束或丢弃手头这段工作，再取回最新稿", "Please finish or discard your current work session before pulling the latest draft"));
         }
         if (sessionService.onDraftBranch(projectId)) {
