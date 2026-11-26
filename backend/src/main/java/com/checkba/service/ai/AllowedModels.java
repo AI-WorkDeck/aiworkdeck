@@ -85,7 +85,7 @@ public enum AllowedModels {
 
     DEEPSEEK_V4_PRO("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro",
             Vendor.DEEPSEEK, Region.GLOBAL, 1_048_576,
-            tier(0, 1.28, 2.56)),
+            tier(0, 0.888188, 1.5463)),
 
     GLM_5_2("z-ai/glm-5.2", "GLM-5.2",
             Vendor.ZHIPU, Region.GLOBAL, 1_048_576,
