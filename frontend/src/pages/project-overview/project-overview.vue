@@ -3200,7 +3200,7 @@ export default {
     // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
     projectLeadName() {
       const owner = (this.projectMembers || []).find(m => m && m.role === 'OWNER')
-      const name = owner && (owner.displayName || owner.nickname || owner.username)
+      const name = owner && (owner.displayName || owner.nickname)
       return name || (this.project && this.project.manager) || this.userDisplayName || ''
     },
     sidebarShownWidth() { return this.narrowWidthCap.tree ? Math.min(this.sidebarWidth, this.narrowWidthCap.tree) : this.sidebarWidth },
