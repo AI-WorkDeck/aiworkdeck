@@ -164,7 +164,7 @@
             <view v-if="membersLoading" class="collab-note">{{ $t('version.loadingGeneric') }}</view>
             <view v-else-if="!members.length" class="collab-note">{{ $t('version.onlyYouInCaseFile') }}</view>
             <view v-else class="collab-member-list">
-              <view v-for="m in members" :key="m.username || m.id" class="collab-member-row">
+              <view v-for="m in lawyerMembers" :key="m.username || m.id" class="collab-member-row">
                 <text class="collab-member-name">{{ m.displayName || $t('version.unnamedColleague') }}</text>
                 <text class="collab-member-role">{{ roleLabel(m.role) }}</text>
                 <!-- 移出（dev-board#1050）：同事与凭访问码进来的客户都在这里移；移出客户连带作废
@@ -174,6 +174,16 @@
                   class="collab-member-remove"
                   @tap="onRemoveMember(m)"
                 >{{ $t('version.removeFromCaseFile') }}</text>
+              </view>
+            </view>
+            <!-- C16：凭访问码进来的客户：谁、什么时候进来的、能不能看加入之前的消息；撤销立即生效（案件库那一侧
+                 移出客户连带作废他的访问码，下一次请求就被拒） -->
+            <view v-if="clientMembers.length" class="collab-member-list collab-client-list">
+              <text class="collab-label">{{ $t('version.clientsInCaseFile', { count: clientMembers.length }) }}</text>
+              <view v-for="m in clientMembers" :key="'c-' + (m.userId || m.id)" class="collab-member-row">
+                <text class="collab-member-name">{{ m.displayName || $t('version.unnamedClient') }}</text>
+                <text class="collab-member-role">{{ clientMetaText(m) }}</text>
+                <text v-if="m.userId != null" class="collab-member-remove" @tap="onRevokeClient(m)">{{ $t('version.revokeClientAccess') }}</text>
               </view>
             </view>
 
@@ -310,6 +320,7 @@
 </template>
 
 <script>
+const isClientRole = (role) => typeof role === 'string' && role.startsWith('CLIENT')
 import { errorText } from '@/utils/errorToast.js'
 import {
   listCloudConnections,
@@ -393,6 +404,9 @@ export default {
     }
   },
   computed: {
+    // C16：律师与客户分开列——客户不是同事，撤销的含义也不同（作废访问码）
+    lawyerMembers() { return (this.members || []).filter(m => !isClientRole(m.role)) },
+    clientMembers() { return (this.members || []).filter(m => isClientRole(m.role)) },
     // 登录层（z-index 9990）开着时本弹窗（9999）整块收起让路，登录完自己回来
     loginLayerOpen() {
       return accountLoginOpen.value
@@ -461,12 +475,37 @@ export default {
   },
   methods: {
     roleLabel,
+    clientMetaText(m) {
+      const parts = []
+      // 案件库回的是它那台服务器的本地时间、不带时区，只显示日期，不冒险换算到分钟
+      if (m.joinedAt) parts.push(this.$t('version.clientJoinedAt', { date: String(m.joinedAt).slice(0, 10) }))
+      if (m.clientShareHistory === true) parts.push(this.$t('version.clientSeesEarlier'))
+      else if (m.clientShareHistory === false) parts.push(this.$t('version.clientSeesFromJoin'))
+      return parts.join(' · ') || this.$t('version.clientRole')
+    },
+    onRevokeClient(m) {
+      uni.showModal({
+        title: this.$t('version.revokeClientAccess'),
+        content: this.$t('version.revokeClientConfirm', { name: m.displayName || this.$t('version.unnamedClient') }),
+        success: async (r) => {
+          if (!r.confirm) return
+          try {
+            await removeCloudMember(this.projectId, m.userId)
+            uni.showToast({ title: this.$t('version.clientAccessRevoked'), icon: 'none' })
+            this.loadMembers()
+          } catch (e) {
+            uni.showToast({ title: errorText(e, this.$t('version.revokeFailed')), icon: 'none' })
+          }
+        },
+      })
+    },
     close() {
       this.$emit('update:visible', false)
     },
     switchTab(key) {
       this.activeTab = key
-      if (key === 'people' && this.linked && !this.members.length) this.loadMembers()
+      // C16：每次打开都重读——原来只在名单为空时读一次，客户后来加入，律师这里永远看不到
+      if (key === 'people' && this.linked) this.loadMembers()
     },
     async loadConnections() {
       try {
@@ -691,7 +730,7 @@ export default {
     onRemoveMember(m) {
       uni.showModal({
         title: this.$t('version.removeFromCaseFile'),
-        content: this.$t('version.removeCloudMemberConfirm', { name: m.displayName || this.$t('version.unnamedColleague') }),
+        content: this.$t('version.removeColleagueConfirm', { name: m.displayName || this.$t('version.unnamedColleague') }),
         success: async (r) => {
           if (!r.confirm) return
           try {

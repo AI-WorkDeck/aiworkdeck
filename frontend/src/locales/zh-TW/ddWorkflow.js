@@ -14,6 +14,7 @@ export default {
   "unreadNotifications": "{count} 條未讀協作通知",
   "clientWorkspace": "客戶協作",
   "clientWorkspaceHint": "在標籤頁中輸入律師提供的邀請碼，查收清單、提交材料並跟進核驗結果。",
+  "thisCaseClients": "這份案卷的客戶（{count}）",
   "openClientWorkspace": "開啟客戶協作",
   "lists": "盡調清單",
   "refresh": "重新整理",

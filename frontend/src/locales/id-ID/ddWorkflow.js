@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} notifikasi kolaborasi belum dibaca",
   "clientWorkspace": "Kolaborasi klien",
   "clientWorkspaceHint": "Hubungkan ke proyek undangan di ruang kerja ini untuk melihat daftar periksa, mengirim dokumen, dan mengikuti tinjauan.",
+  "thisCaseClients": "Klien berkas perkara ini ({count})",
   "openClientWorkspace": "Buka kolaborasi klien",
   "lists": "Daftar periksa uji tuntas",
   "refresh": "Segarkan",

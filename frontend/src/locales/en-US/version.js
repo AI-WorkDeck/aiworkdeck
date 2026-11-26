@@ -262,6 +262,16 @@ export default {
   colleagueSubmittedNew: 'A colleague submitted a new draft',
   hasUnsubmittedChanges: 'There are changes not yet submitted',
   inSyncWithTeam: 'In sync with the team’s draft',
+  clientsInCaseFile: 'Clients ({count})',
+  unnamedClient: 'Unnamed client',
+  clientJoinedAt: 'Joined {date}',
+  clientSeesEarlier: 'Sees earlier messages',
+  clientSeesFromJoin: 'Sees messages from joining',
+  clientRole: 'Client',
+  revokeClientAccess: 'Revoke access',
+  revokeClientConfirm: 'Revoke access for {name}? They lose access to this case file immediately and the access code stops working. Messages already sent are kept.',
+  clientAccessRevoked: 'Access revoked; they can no longer open this case file',
+  removeColleagueConfirm: 'Remove {name} from this case file? Their copy on their computer stays, but they can no longer pull or submit.',
 
   // ---- CollabDialog.vue ----
   collabTitle: 'Collaborate',

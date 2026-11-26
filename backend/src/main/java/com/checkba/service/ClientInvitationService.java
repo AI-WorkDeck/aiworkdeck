@@ -68,6 +68,16 @@ public class ClientInvitationService {
     /** 访问码默认有效天数（dev-board#1050）。重新签发即续期。 */
     public static final int VALID_DAYS = 30;
 
+    /** C16：这位客户最近一次访问码选择的消息范围（true = 能看加入之前的消息）；没有记录回 null。 */
+    public Boolean shareHistoryFor(Long projectId, Long clientUserId) {
+        if (clientUserId == null) return null;
+        return invitationRepository.findByRelatedUserId(clientUserId).stream()
+                .filter(i -> projectId.equals(i.getProjectId()))
+                .max(java.util.Comparator.comparing(i -> i.getId() == null ? 0L : i.getId()))
+                .map(i -> Boolean.TRUE.equals(i.getImShareHistory()))
+                .orElse(null);
+    }
+
     /**
      * 同一张通用码最多能建出多少个具名客户用户（带 displayName 登录那一支）。
      * 同名复用之后，刷不同的名字仍能建人，这是兜底上限——一家客户公司里凭同一张码
