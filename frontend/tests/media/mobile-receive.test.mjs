@@ -49,11 +49,30 @@ test('only actual saved receipts refresh the matching project, once', async () =
   phase = 'saved'
   await vm.refresh(); assert.equal(events.length, 1)
 })
-test('failed status and endpoint failures stay visible', async () => {
-  const { vm } = create(async () => { throw Error('offline') })
-  await vm.refresh(); assert.equal(vm.summary, '需要处理')
+test('failed status and endpoint failures stay visible once mobile receive is set up', async () => {
+  let fail = false
+  const { vm } = create(async () => { if (fail) throw Error('offline'); return { active: true, items: [] } })
+  await vm.refresh(); fail = true
+  await vm.refresh(); assert.equal(vm.summary, '需要处理'); assert.equal(vm.visible, true)
   vm.loadError = false; vm.status = { active: true, items: [row('failed')] }
-  assert.equal(vm.summary, '需要处理')
+  assert.equal(vm.summary, '需要处理'); assert.equal(vm.visible, true)
+})
+test('never set up: hidden even when the relay is unreachable (no red 需要处理 for a first-day user)', async () => {
+  const offline = create(async () => { throw Error('offline') })
+  await offline.vm.refresh()
+  assert.equal(offline.vm.visible, false); assert.equal(offline.vm.hasFailure, false)
+  const off = create(async () => ({ active: false, error: 'relay unreachable', items: [] }))
+  await off.vm.refresh()
+  assert.equal(off.vm.visible, false)
+  off.vm.open = true
+  assert.equal(off.vm.visible, true, 'an open panel stays until the user closes it')
+})
+test('set up and idle: hidden; receiving or just saved: shown', async () => {
+  let items = []
+  const { vm } = create(async () => ({ active: true, items }))
+  await vm.refresh(); assert.equal(vm.visible, false)
+  items = [row('receiving')]; await vm.refresh(); assert.equal(vm.visible, true)
+  items = [row('saved')]; await vm.refresh(); assert.equal(vm.visible, true)
 })
 test('switching projects cannot be overwritten by a late previous response', async () => {
   const pending = []

@@ -1716,7 +1716,7 @@ try {
     await mouseClickText('开启版本记录')
     await page.waitForSelector('.session-bar .session-idle', { timeout: 15000 })
     // 空闲态应明确没有待提交的改动。
-    await waitText('当前没有待提交的改动')
+    await waitText('上个版本之后没有改动')
   })
 
   // 工作段空闲先于子时间线异步加载完成；点击前等本次命名节点真正可见。
@@ -1733,7 +1733,7 @@ try {
     await mouseClickSel('.version-entry')
     await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
 
-    await mouseClickText('提交本次改动…')
+    await mouseClickText('保存版本…')
     // 注意：brief 原写法选 .awd-input（模板里 <input> 标签自带的 class），
     // 但那是 uni-app <input> 组件编译到 H5 后的外层包装元素的 class，
     // 真正可编辑的原生 <input> 在其内部另有 .uni-input-input（顶部注释
@@ -1750,7 +1750,7 @@ try {
     await sleep(300)
     await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
     // 提交后回到无待提交改动态，并在下方核验命名版本节点。
-    await waitText('当前没有待提交的改动')
+    await waitText('上个版本之后没有改动')
     await waitVersionTitle(title)
   }
 
@@ -1856,13 +1856,13 @@ try {
   })
 
   await step('结束追加工作并命名（产生 MODIFY 提交）', async () => {
-    await mouseClickText('提交本次改动…')
+    await mouseClickText('保存版本…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('端到端测试稿四', { delay: 15 })
     await sleep(300)
     await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
-    await waitText('当前没有待提交的改动')
+    await waitText('上个版本之后没有改动')
     await waitVersionTitle('端到端测试稿四')
   })
 
@@ -2068,7 +2068,7 @@ try {
     await mouseClickSel('[title="资源管理器"]')
     await mouseClickSel('.version-entry')
     await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
-    await mouseClickText('提交本次改动…')
+    await mouseClickText('保存版本…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('J10 主线追加修改', { delay: 15 })
@@ -2534,13 +2534,13 @@ try {
       await mouseClickSel('[title="资源管理器"]')
       await mouseClickSel('.version-entry')
       await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
-      await mouseClickText('提交本次改动…')
+      await mouseClickText('保存版本…')
       await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
       const input = await page.$('.awd-dialog .uni-input-input')
       await input.click(); await input.type('甲的撞车工作', { delay: 15 })
       await sleep(300)
       await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
-      await waitText('当前没有待提交的改动')
+      await waitText('上个版本之后没有改动')
     })
 
     await step('A：结束工作后台上传被拒只置待交稿标记（不自动整合）', async () => {
