@@ -755,6 +755,21 @@ public class CloudSyncService {
                 remoteRepository.save(remote);
                 return new UploadResult(UploadStatus.REMOTE_AHEAD, LangText.of("同事交了新稿，先结束手头这段工作再交稿", "A colleague submitted a new draft — please finish your current work session before submitting"));
             } catch (VersionException e) {
+                if (isAccessRefused(e)) {
+                    // C8：案件库按权限拒收（git-receive-pack not permitted）——只读成员或已被移出。重试永远
+                    // 不会成功，不许说「稍后还可以再交」，也不置「待上传」：改动留在这台电脑的版本记录里，
+                    // 但没有、也不会交到案件库。说清楚原因和该找谁。
+                    log.info("交稿被案件库按权限拒绝: project={}", projectId);
+                    RemoteRole role = remoteRoleCache.get(projectId);
+                    String owner = role != null && role.ownerName() != null ? role.ownerName()
+                            : LangText.of("案卷负责人", "the case owner");
+                    throw VersionException.userFacing(LangText.of(
+                            "交稿没有成功：你在这份案卷里是只读成员（或已不在参与人里），改动不会交到案件库。"
+                                    + "你的改动仍保存在这台电脑上。需要修改请联系" + owner + "开通协作人权限。",
+                            "Not submitted: you're a read-only member of this case file (or no longer a member), so your "
+                                    + "changes can't reach the Team Case Library. They are still saved on this computer. "
+                                    + "Ask " + owner + " for edit rights."));
+                }
                 remote.setPendingUpload(true);
                 remoteRepository.save(remote);
                 log.warn("上传/整合失败: project={}", projectId, e);
@@ -975,15 +990,77 @@ public class CloudSyncService {
             try {
                 repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
             } catch (Exception e) {
-                log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);
                 Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
+                if (isAccessRefused(e)) {
+                    // C10：案件库明确拒绝读取（git-upload-pack not permitted）= 已不在这份案卷的参与人里，
+                    // 不是网络抖动；负责人名字用最近一次取到的
+                    log.info("云端状态检查：案件库拒绝读取，本机账号已不在参与人里: project={}", projectId);
+                    RemoteRole last = remoteRoleCache.remove(projectId);
+                    m.put("removed", true);
+                    if (last != null && last.ownerName() != null) m.put("ownerName", last.ownerName());
+                    return m;
+                }
+                log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);
                 m.put("offline", true);
                 return m;
             }
-            return cloudStatus(projectId, userId);
+            Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
+            describeMyRole(projectId, remoteOpt.get(), conn, m);
+            return m;
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * C8/C10：我在案件库里的角色（{@code myRole}：OWNER / ADMIN / PARTICIPANT / READ_ONLY）与负责人名字
+     * （{@code ownerName}），联网核对时顺带取一次参与人表（{@value #REMOTE_ROLE_TTL_MS} 毫秒缓存）。
+     * 只读成员据此在桌面端打开只读、不给交稿——服务端照旧拒绝写入，这里只是别让律师白改一场。
+     * 取不到就不填字段，绝不因此把云端状态打成错误。
+     */
+    record RemoteRole(String myRole, String ownerName, long expiresAt) {}
+
+    static final long REMOTE_ROLE_TTL_MS = 60_000L;
+
+    private final Map<Long, RemoteRole> remoteRoleCache = new ConcurrentHashMap<>();
+
+    private void describeMyRole(long projectId, ProjectRemote remote, CloudConnection conn, Map<String, Object> m) {
+        try {
+            RemoteRole role = remoteRoleCache.get(projectId);
+            if (role == null || role.expiresAt() < System.currentTimeMillis()) {
+                JSONObject resp = JSONUtil.parseObj(httpGet(
+                        conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members",
+                        conn.getDeviceToken()));
+                if (resp.getInt("code", 1) != 0) return;
+                JSONArray rows = resp.getJSONArray("data");
+                cacheRemoteDisplayNames(projectId, rows);
+                String mine = null, owner = null;
+                if (rows != null) {
+                    for (Object o : rows) {
+                        if (!(o instanceof JSONObject row)) continue;
+                        String r = row.getStr("role");
+                        if (conn.getUsername() != null && conn.getUsername().equals(row.getStr("username"))) mine = r;
+                        if ("OWNER".equals(r) && owner == null) owner = row.getStr("displayName");
+                    }
+                }
+                role = new RemoteRole(mine, owner, System.currentTimeMillis() + REMOTE_ROLE_TTL_MS);
+                remoteRoleCache.put(projectId, role);
+            }
+            if (role.myRole() != null) m.put("myRole", role.myRole());
+            if (role.ownerName() != null) m.put("ownerName", role.ownerName());
+        } catch (Exception e) {
+            log.warn("读取我在案件库里的角色失败（状态照常给）: project={}", projectId, e);
+        }
+    }
+
+    /** 案件库明确拒绝（不是连不上）：git 的 not permitted / 401 / 403。 */
+    static boolean isAccessRefused(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            String msg = String.valueOf(t.getMessage()).toLowerCase(java.util.Locale.ROOT);
+            if (msg.contains("not permitted") || msg.contains("not authorized") || msg.contains("403 forbidden")
+                    || msg.contains("401 unauthorized")) return true;
+        }
+        return false;
     }
 
     /** 单参版本（userId 未知时的纯 ref 检查）。 */

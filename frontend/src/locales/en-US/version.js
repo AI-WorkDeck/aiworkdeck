@@ -272,6 +272,11 @@ export default {
   revokeClientConfirm: 'Revoke access for {name}? They lose access to this case file immediately and the access code stops working. Messages already sent are kept.',
   clientAccessRevoked: 'Access revoked; they can no longer open this case file',
   removeColleagueConfirm: 'Remove {name} from this case file? Their copy on their computer stays, but they can no longer pull or submit.',
+  removedFromCaseFileBy: 'You\'re no longer a member of this case file (owner: {owner})',
+  removedFromCaseFileSelf: 'You\'re no longer a member of this case file',
+  readOnlyMemberState: 'Read-only member · changes won\'t reach the case library',
+  submitGuidePullOffline: 'You\'re offline, so it isn\'t known whether the case library has new drafts',
+  submitQueuedOffline: 'You\'re offline. Saved; it will be submitted when you\'re back online',
 
   // ---- CollabDialog.vue ----
   collabTitle: 'Collaborate',

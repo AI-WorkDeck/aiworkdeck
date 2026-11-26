@@ -113,7 +113,7 @@ export default {
   },
   // changed：状态变了，页面重拉。reload-files：磁盘被改写，重载打开中的编辑器。
   // conflict：撞上了要逐份选择的情况，页面把人送到裁决现场。
-  emits: ['update:visible', 'changed', 'reload-files', 'conflict'],
+  emits: ['queued', 'update:visible', 'changed', 'reload-files', 'conflict'],
   data() {
     return {
       localWorking: false,
@@ -177,6 +177,8 @@ export default {
       }
       if (step.id === 'pull-latest') {
         // 「取回同事交的 6 版」与顶栏那句「同事交了新稿 · 6 版」同源同规则
+        // C11：没联网时不知道案件库有没有新稿，不能说「没有你还没取回的稿」
+        if (this.localCloud && this.localCloud.offline) return this.$t('version.submitGuidePullOffline')
         return step.state === 'done'
           ? this.$t('version.submitGuidePullDone')
           : pullStepText((k, p) => this.$t(k, p), this.localCloud)
@@ -298,7 +300,16 @@ export default {
           await this.refresh()
         }
       } catch (e) {
-        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        // C11：先联网核对一次，确实是没联网才转成「联网后自动交」；权限类拒绝（只读 / 已移出）
+        // 原样说给律师听，不排队——重试永远不会成功
+        await this.refresh({ online: true })
+        if (this.localCloud && this.localCloud.offline) {
+          this.$emit('queued')
+          uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
+          this.close()
+        } else {
+          uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        }
       } finally {
         this.busy = false
       }

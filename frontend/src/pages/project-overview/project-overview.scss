@@ -5342,3 +5342,6 @@ $color-accent: var(--awd-mint); // Mint Green
   background: var(--awd-bg);
   box-shadow: var(--awd-shadow-lg);
 }
+
+/* C8/C10：只读成员 / 已被移出的说明条，压在采纳条下面一格 */
+.member-blocked-bar { top: 64px; background: var(--awd-warning, var(--awd-info)); }

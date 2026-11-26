@@ -94,7 +94,9 @@
               <text class="collab-meta-line">{{ $t('version.caseFileLabel', { name: projectName }) }}</text>
             </view>
             <view class="collab-actions">
+              <!-- C8：只读成员 / 已被移出的人没有可交的稿：不给交稿按钮 -->
               <view
+                v-if="!cloud || (!cloud.removed && cloud.myRole !== 'READ_ONLY')"
                 class="awd-btn awd-btn-primary"
                 :class="{ 'awd-btn-disabled': busy }"
                 @tap="onUpload"
@@ -432,7 +434,14 @@ export default {
     stateText() {
       if (this.conflictPending) return this.$t('version.pendingChoice')
       if (!this.cloud) return ''
+      // C10：被移出 ≠ 连不上
+      if (this.cloud.removed) {
+        return this.cloud.ownerName
+          ? this.$t('version.removedFromCaseFileBy', { owner: this.cloud.ownerName })
+          : this.$t('version.removedFromCaseFileSelf')
+      }
       if (this.cloud.offline) return this.$t('version.libraryUnreachable')
+      if (this.cloud.myRole === 'READ_ONLY' && !this.cloud.remoteAhead) return this.$t('version.readOnlyMemberState')
       // 「同事交了新稿」四处同源（utils/collabWording.js）
       if (this.cloud.remoteAhead) {
         return remoteAheadText((k, p) => this.$t(k, p), this.cloud, { fallbackKey: 'version.colleagueSubmittedNew' })
@@ -443,7 +452,7 @@ export default {
     stateClass() {
       if (this.conflictPending) return 'collab-dot-amber'
       if (!this.cloud) return ''
-      if (this.cloud.offline) return 'collab-dot-amber'
+      if (this.cloud.removed || this.cloud.offline) return 'collab-dot-amber'
       if (this.cloud.remoteAhead || this.cloud.pendingUpload || this.working) return 'collab-dot-blue'
       return 'collab-dot-green'
     },
@@ -708,8 +717,10 @@ export default {
       if (this.busy) return
       this.busy = true
       try {
-        await checkCloud(this.projectId)
-        this.$emit('changed')
+        // C10：真联网核对一次，并把结果交给页面（页面那份状态才是界面上显示的）——
+        // 原来核对完只发 changed，页面随后读的是不联网的本地快照，等于白核对
+        const res = await checkCloud(this.projectId)
+        this.$emit('changed', { cloud: (res && res.data) || null })
       } catch (e) {
         uni.showToast({ title: errorText(e, this.$t('version.libraryOffline')), icon: 'none' })
       } finally {

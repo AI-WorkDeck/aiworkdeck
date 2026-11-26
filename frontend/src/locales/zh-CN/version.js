@@ -273,6 +273,11 @@ export default {
   revokeClientConfirm: '撤销 {name} 的访问？撤销后对方立刻不能再进入这份案卷，访问码作废，已发的消息保留。',
   clientAccessRevoked: '已撤销，对方不能再进入这份案卷',
   removeColleagueConfirm: '把 {name} 移出这份案卷？对方这台电脑上的副本保留，但不能再取回或交稿。',
+  removedFromCaseFileBy: '你已不在这份案卷的参与人里（负责人：{owner}）',
+  removedFromCaseFileSelf: '你已不在这份案卷的参与人里',
+  readOnlyMemberState: '你是只读成员 · 改动不会交到案件库',
+  submitGuidePullOffline: '没联网，现在不知道案件库里有没有新稿',
+  submitQueuedOffline: '没联网，已记下。联网后会自动交稿',
 
   // ---- CollabDialog.vue ----
   collabTitle: '协作',
