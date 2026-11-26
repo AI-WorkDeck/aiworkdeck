@@ -1612,16 +1612,21 @@ public class ProjectRepoService {
      * C12：一个曾被声明「仅在本机」的对象后来到了案件库（共享人开了备份）：把 HEAD 里指向它、工作区里还没有的
      * 路径物化出来。只在主线上做；其余情况下一次落库照常带上。
      */
-    public void materializeArrivedObject(long projectId, LocalVersionObjectStore.ObjectRef object) {
+    /** Writes an object that arrived late into every HEAD path pointing at it; true when they are all on disk now. */
+    public boolean materializeArrivedObject(long projectId, LocalVersionObjectStore.ObjectRef object) {
         try (Repository repo = open(projectId)) {
-            if (repo.resolve("HEAD^{commit}") == null || !MAIN_BRANCH.equals(repo.getBranch())) return;
+            if (repo.resolve("HEAD^{commit}") == null || !MAIN_BRANCH.equals(repo.getBranch())) return false;
+            boolean all = true;
             for (var e : pointerPathsAt(repo, "HEAD").entrySet()) {
                 if (!e.getValue().contains(object)) continue;
                 Path target = workTree(projectId).resolve(e.getKey());
                 if (!Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)) copyBlobAtCommit(projectId, "HEAD", e.getKey(), target);
+                all &= Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS);
             }
-        } catch (IOException e) {
+            return all;
+        } catch (IOException | RuntimeException e) {
             log.warn("物化后到的版本对象失败（下一次落库会补上）: project={}", projectId, e);
+            return false;
         }
     }
 
@@ -1930,7 +1935,11 @@ public class ProjectRepoService {
             if (repo.resolve("HEAD^{commit}") == null) return Set.of();
             for (var e : pointerPathsAt(repo, "HEAD").entrySet()) {
                 if (Files.exists(repo.getWorkTree().toPath().resolve(e.getKey()), java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
-                if (!e.getValue().isEmpty() && e.getValue().stream().allMatch(o -> declaredLocalOnly(projectId, o))) out.add(e.getKey());
+                // A colleague's placeholder: the record, not the cache, decides — the object may already be cached
+                // while the file is not written yet (lane C r2: that gap became an automatic 「删除」 of the sharer's
+                // evidence). The sharer's own file is real: deleting it is still recorded.
+                if (!e.getValue().isEmpty() && e.getValue().stream().allMatch(o -> declaredLocalOnly(projectId, o)
+                        || plans.declaration(projectId, o).map(r -> !Boolean.TRUE.equals(r.getMine())).orElse(false))) out.add(e.getKey());
             }
         } catch (IOException e) {
             return Set.of();

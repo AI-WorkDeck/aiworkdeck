@@ -227,6 +227,17 @@ public class ProjectObjectSyncService {
         if (plans != null) plans.recordLocalOnly(project, ref, firstPathOf(project, ref), null, true);
     }
 
+    /**
+     * C12 (lane C r2, data-loss path): an object that was a placeholder here is now in the cache. Write it into the
+     * case folder first and only then drop the placeholder record; while the record stands, the missing file is
+     * never taken for a deletion. Also heals an arrival that was interrupted before the file was written.
+     */
+    private void arrived(long project, ObjectRef object) {
+        var plans = plans();
+        if (plans == null || !plans.hasLocalOnly(project) || !plans.isDeclaredLocalOnly(project, object)) return;
+        if (repos.materializeArrivedObject(project, object)) plans.forgetLocalOnly(project, object);
+    }
+
     private void forgetLocalOnly(long project, ObjectRef ref) {
         var plans = plans();
         if (plans != null && plans.hasLocalOnly(project)) plans.forgetLocalOnly(project, ref);
@@ -285,7 +296,7 @@ public class ProjectObjectSyncService {
         transfers.put(project, transfer);
         try {
             for (ObjectRef object : needed) {
-                try { repos.objects().verify(project, object); continue; }
+                try { repos.objects().verify(project, object); arrived(project, object); continue; }
                 catch (IOException absentOrCorrupt) { /* Download to an atomic temporary file. */ }
                 // A same-sized but corrupt local copy was not counted up front; count it now that it is re-downloaded.
                 if (looksPresent(project, object)) transfer.total.addAndGet(object.size());
@@ -319,7 +330,7 @@ public class ProjectObjectSyncService {
                     }
                 };
                 try (InputStream in = counting(joinedParts(parts), transfer)) { repos.objects().importObject(project, object, in); }
-                forgetLocalOnly(project, object); // it arrived: no placeholder any more
+                arrived(project, object);
             }
         } catch (IOException | InterruptedException | UncheckedIOException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();

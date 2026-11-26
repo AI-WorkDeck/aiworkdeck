@@ -228,4 +228,99 @@ class LargeFileSharingDesktopTest {
         sync(sender, mock(ProjectObjectPlanService.class), true).upload(1, url, "u", token);
         library.objects().verify(remote, big); // backup on: shared now
     }
+
+    /** Stateful stand-in for the desktop's local-only table (record / forget / lookups). */
+    static ProjectObjectPlanService localOnlyTable() {
+        Map<String, com.checkba.model.entity.ProjectObjectLocalOnly> rows = new java.util.concurrent.ConcurrentHashMap<>();
+        ProjectObjectPlanService plans = mock(ProjectObjectPlanService.class);
+        doAnswer(i -> {
+            ObjectRef o = i.getArgument(1);
+            var row = new com.checkba.model.entity.ProjectObjectLocalOnly();
+            row.setObjectSha(o.sha256()); row.setObjectSize(o.size()); row.setMine(i.getArgument(4));
+            rows.put(o.sha256(), row); return null;
+        }).when(plans).recordLocalOnly(anyLong(), any(), any(), any(), anyBoolean());
+        doAnswer(i -> { ObjectRef o = i.getArgument(1); rows.remove(o.sha256()); return null; })
+                .when(plans).forgetLocalOnly(anyLong(), any());
+        when(plans.hasLocalOnly(anyLong())).thenAnswer(i -> !rows.isEmpty());
+        when(plans.declaration(anyLong(), any())).thenAnswer(i -> {
+            ObjectRef o = i.getArgument(1);
+            return java.util.Optional.ofNullable(rows.get(o.sha256())).filter(r -> r.getObjectSize() == o.size());
+        });
+        when(plans.isDeclaredLocalOnly(anyLong(), any())).thenAnswer(i -> plans.declaration(0L, i.getArgument(1)).isPresent());
+        return plans;
+    }
+
+    /**
+     * C12 step 3, colleague side (lane C r2, data-loss path): the sharer turns backup on and the kept-local
+     * recording reaches the library. The colleague's next 取回 must write it into the case folder; before, the
+     * object only went into the cache, the placeholder was cleared, and the next autosave recorded 「删除」 of the
+     * sharer's evidence. While the placeholder record stands, a missing file is never a deletion.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void whenTheKeptLocalRecordingArrivesTheColleaguesPullWritesItAndNothingIsRecordedAsDeleted(@TempDir Path machines) throws Exception {
+        long remote = 12204L;
+        String token = token(remote);
+        String url = "http://localhost:" + port + "/git/" + remote + ".git";
+
+        ProjectRepoService sender = machine(machines.resolve("sender"));
+        doReturn(Map.of()).when(sender).cloudWriteHeaders(anyLong(), anyString(), any(), any());
+        Files.createDirectories(sender.workTree(1));
+        Files.writeString(sender.workTree(1).resolve("说明.txt"), "第一版");
+        sender.init(1, "Synthetic", "s@example.test");
+        ProjectRepoService colleague = machine(machines.resolve("colleague"));
+        Files.createDirectories(colleague.workTree(2));
+        colleague.init(2, "Synthetic", "c@example.test");
+        try (var repo = colleague.open(2); Git g = new Git(repo)) {
+            g.fetch().setRemote(sender.gitDir(1).toUri().toString()).setRefSpecs(new RefSpec("+refs/heads/master:refs/remotes/origin/master")).call();
+            g.reset().setMode(org.eclipse.jgit.api.ResetCommand.ResetType.HARD).setRef("refs/remotes/origin/master").call();
+        }
+        media(sender.workTree(1).resolve("庭审录像.mp4"), 1200, 3);
+        sender.commitAll(1, "加录像", "session", null, "沈砚", "s@example.test");
+        ObjectRef big = sender.objects().list(1).get(0);
+        sync(sender, mock(ProjectObjectPlanService.class)).upload(1, url, "u", token); // backup off: kept local
+
+        ProjectObjectPlanService table = localOnlyTable();
+        ObjectProvider<ProjectObjectPlanService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(table);
+        ReflectionTestUtils.setField(colleague, "objectPlans", provider);
+        try (var repo = colleague.open(2); Git g = new Git(repo)) {
+            g.fetch().setRemote(sender.gitDir(1).toUri().toString()).setRefSpecs(new RefSpec("+refs/heads/master:refs/remotes/origin/master")).call();
+        }
+        sync(colleague, table).download(2, url, "u", token, "refs/remotes/origin/master");
+        colleague.fastForwardMainline(2, "refs/remotes/origin/master");
+        Path recording = colleague.workTree(2).resolve("庭审录像.mp4");
+        assertFalse(Files.exists(recording), "placeholder while it is only on the sharer's computer");
+
+        // Guard: the bytes reached the cache but are not in the case folder yet: still never a deletion.
+        try (var in = Files.newInputStream(sender.workTree(1).resolve("庭审录像.mp4"))) { colleague.objects().importObject(2, big, in); }
+        assertEquals(List.of(), colleague.pendingChanges(2), "a placeholder's missing file is not a deletion");
+
+        // The sharer turns backup on and submits; the colleague pulls (no new version, only the object).
+        sync(sender, mock(ProjectObjectPlanService.class), true).upload(1, url, "u", token);
+        sync(colleague, table).download(2, url, "u", token, "refs/heads/master");
+        assertArrayEquals(Files.readAllBytes(sender.workTree(1).resolve("庭审录像.mp4")), Files.readAllBytes(recording),
+                "the recording is written into the case folder");
+        assertFalse(table.isDeclaredLocalOnly(2L, big), "placeholder cleared only once the file is there");
+        assertEquals(List.of(), colleague.pendingChanges(2), "nothing to submit, above all no deletion");
+    }
+
+    /** The guard above covers colleagues' placeholders only: the sharer deleting their own kept-local file is recorded. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void theSharerDeletingTheirOwnKeptLocalRecordingIsStillRecorded(@TempDir Path machines) throws Exception {
+        ProjectRepoService sender = machine(machines.resolve("sender"));
+        Files.createDirectories(sender.workTree(1));
+        media(sender.workTree(1).resolve("庭审录像.mp4"), 1200, 3);
+        sender.init(1, "Synthetic", "s@example.test");
+        ObjectRef big = sender.objects().list(1).get(0);
+        ProjectObjectPlanService table = localOnlyTable();
+        table.recordLocalOnly(1L, big, "庭审录像.mp4", null, true); // mine
+        ObjectProvider<ProjectObjectPlanService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(table);
+        ReflectionTestUtils.setField(sender, "objectPlans", provider);
+
+        Files.delete(sender.workTree(1).resolve("庭审录像.mp4"));
+        assertEquals(List.of("庭审录像.mp4"), sender.pendingChanges(1).stream().map(c -> c.path()).toList());
+    }
 }
