@@ -87,10 +87,14 @@ class LargeFileSharingDesktopTest {
         byte[] b = new byte[bytes]; new java.util.Random(seed).nextBytes(b); Files.write(file, b);
     }
 
-    @SuppressWarnings("unchecked")
     ProjectObjectSyncService sync(ProjectRepoService repos, ProjectObjectPlanService desktopPlans) {
+        return sync(repos, desktopPlans, false);
+    }
+
+    @SuppressWarnings("unchecked")
+    ProjectObjectSyncService sync(ProjectRepoService repos, ProjectObjectPlanService desktopPlans, boolean backupOn) {
         MobileRelayClientService relay = mock(MobileRelayClientService.class);
-        doThrow(VersionException.userFacing("backup off")).when(relay).requireVersionObjectCloudConsent(); // no consent
+        if (!backupOn) doThrow(VersionException.userFacing("backup off")).when(relay).requireVersionObjectCloudConsent();
         ObjectProvider<MobileRelayClientService> relayProvider = mock(ObjectProvider.class);
         when(relayProvider.getIfAvailable()).thenReturn(relay);
         var sync = new ProjectObjectSyncService(repos, relayProvider, new ObjectMapper());
@@ -198,5 +202,30 @@ class LargeFileSharingDesktopTest {
         }
         assertEquals(List.of(), colleague.pendingChanges(2), "the pull leaves nothing to submit");
         colleague.objects().verify(2, small);
+    }
+
+    /**
+     * C12 step 3 (lane C, case-b): the sharer turns file backup on and submits again. The recording that was kept
+     * local must now go up, so colleagues get it; before, the library's 「local-only」 answer made every later
+     * submit skip it for good. A colleague's local-only object this computer does not hold is still skipped.
+     */
+    @Test
+    void afterBackupIsTurnedOnTheNextSubmitSharesTheLocalOnlyRecording(@TempDir Path machines) throws Exception {
+        long remote = 12203L;
+        String token = token(remote);
+        String url = "http://localhost:" + port + "/git/" + remote + ".git";
+
+        ProjectRepoService sender = machine(machines.resolve("sender"));
+        doReturn(Map.of()).when(sender).cloudWriteHeaders(anyLong(), anyString(), any(), any());
+        Files.createDirectories(sender.workTree(1));
+        media(sender.workTree(1).resolve("庭审录像.mp4"), 1200, 3);
+        sender.init(1, "Synthetic", "s@example.test");
+        ObjectRef big = sender.objects().list(1).get(0);
+
+        sync(sender, mock(ProjectObjectPlanService.class)).upload(1, url, "u", token);
+        assertThrows(java.io.IOException.class, () -> library.objects().verify(remote, big), "backup off: kept local");
+
+        sync(sender, mock(ProjectObjectPlanService.class), true).upload(1, url, "u", token);
+        library.objects().verify(remote, big); // backup on: shared now
     }
 }

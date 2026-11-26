@@ -121,14 +121,21 @@ public class ProjectObjectSyncService {
             JsonNode caps = capabilitiesJson(remoteUrl, username, token);
             List<ObjectRef> missing = new ArrayList<>();
             Map<ObjectRef, JsonNode> states = new HashMap<>();
+            Boolean consentNow = null;
             for (ObjectRef ref : refs) {
                 JsonNode state = responseJson(request(remoteUrl + "/awd-objects/" + ref.sha256() + "?size=" + ref.size(), username, token).GET().build());
                 if (state.path("complete").asBoolean()) { forgetLocalOnly(project, ref); continue; }
-                if (state.path("localOnly").asBoolean()) { recordMine(project, ref); continue; } // declared earlier
+                if (state.path("localOnly").asBoolean()) { // declared earlier
+                    // C12 step 3 (lane C): once file backup is on, a recording kept on this computer goes up on the
+                    // next submit; a colleague's local-only object (not held here) is never ours to upload.
+                    if (!looksPresent(project, ref)) continue; // a colleague's: its placeholder comes from the pull
+                    if (consentNow == null) consentNow = client != null && hasConsent(client, accountScope);
+                    if (!consentNow) { recordMine(project, ref); continue; }
+                }
                 missing.add(ref); states.put(ref, state);
             }
             if (missing.isEmpty()) return;
-            boolean consent = client != null && hasConsent(client, accountScope);
+            boolean consent = consentNow != null ? consentNow : client != null && hasConsent(client, accountScope);
             // C12: new library (free allowance fields) and no backup consent: free when it fits, else local-only
             boolean freeCapable = caps.has("freePerFileBytes") && caps.has("freePerProjectBytes") && caps.has("projectFreeUsedBytes");
             if (!consent && !freeCapable) {
