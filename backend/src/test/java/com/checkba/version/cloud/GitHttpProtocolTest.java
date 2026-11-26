@@ -274,7 +274,14 @@ class GitHttpProtocolTest {
         Files.writeString(receiver.workTree(2).resolve("说明.txt"), "同事改了一行");
         assertNotNull(receiver.commitAll(2, "edit", "auto", null, "Synthetic colleague", "colleague@example.test"));
         colleague.upload(2, remoteUrl(remote), "test", token);
-        assertTrue(receiver.pushMainlineToOrigin(2, "test", token).pushed());
+        // The server ingests the sender's push asynchronously and may dock its worktree meanwhile; a real
+        // client pulls and retries in that window, so retry briefly here instead of racing the ingest.
+        var pushed = receiver.pushMainlineToOrigin(2, "test", token);
+        for (int i = 0; i < 20 && !pushed.pushed(); i++) {
+            Thread.sleep(250);
+            pushed = receiver.pushMainlineToOrigin(2, "test", token);
+        }
+        assertTrue(pushed.pushed(), pushed.message());
         org.mockito.Mockito.verify(noBackup, org.mockito.Mockito.never()).requireVersionObjectCloudConsent();
 
         // A new large object still needs that colleague's consent before anything is uploaded.
