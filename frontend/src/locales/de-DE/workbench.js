@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "Texterfassung per Screenshot (OCR)",
   "browser": "Webbrowser",
   "browserNewTabHint": "Neuer Browser-Tab",
+  "moreTools": "Weitere Werkzeuge",
+  "railMore": "Mehr",
   "recordActivity": "Aktivitätsprotokoll",
   "logout": "Abmelden",
   "stagingArea": "Staging-Bereich",

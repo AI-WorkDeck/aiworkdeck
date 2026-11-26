@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "Ekran Görüntüsünden OCR",
   "browser": "Tarayıcı",
   "browserNewTabHint": "Yeni tarayıcı sekmesi",
+  "moreTools": "Daha fazla araç",
+  "railMore": "Daha fazla",
   "recordActivity": "Etkinlik Günlüğü",
   "logout": "Oturumu Kapat",
   "stagingArea": "Hazırlık Alanı",

@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "OCR จับภาพหน้าจอ",
   "browser": "เบราว์เซอร์",
   "browserNewTabHint": "แท็บเบราว์เซอร์ใหม่",
+  "moreTools": "เครื่องมือเพิ่มเติม",
+  "railMore": "เพิ่มเติม",
   "recordActivity": "บันทึกกิจกรรม",
   "logout": "ออกจากระบบ",
   "stagingArea": "พื้นที่ชั่วคราว",

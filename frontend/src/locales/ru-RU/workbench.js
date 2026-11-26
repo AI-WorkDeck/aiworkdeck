@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "OCR снимка экрана",
   "browser": "Браузер",
   "browserNewTabHint": "Новая вкладка браузера",
+  "moreTools": "Другие инструменты",
+  "railMore": "Ещё",
   "recordActivity": "Журнал активности",
   "logout": "Выйти",
   "stagingArea": "Рабочая область",

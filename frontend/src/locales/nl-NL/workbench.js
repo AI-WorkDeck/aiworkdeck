@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "OCR via schermafbeelding",
   "browser": "Webbrowser",
   "browserNewTabHint": "Nieuw browsertabblad",
+  "moreTools": "Meer hulpmiddelen",
+  "railMore": "Meer",
   "recordActivity": "Activiteitenlogboek",
   "logout": "Uitloggen",
   "stagingArea": "Voorbereidingsgebied",

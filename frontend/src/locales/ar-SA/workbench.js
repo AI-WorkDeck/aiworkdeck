@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "التقاط نص من لقطة الشاشة (OCR)",
   "browser": "المتصفح",
   "browserNewTabHint": "علامة تبويب جديدة في المتصفح",
+  "moreTools": "مزيد من الأدوات",
+  "railMore": "المزيد",
   "recordActivity": "سجل النشاط",
   "logout": "تسجيل الخروج",
   "stagingArea": "منطقة التحضير",

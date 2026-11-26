@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "स्क्रीन कैप्चर OCR",
   "browser": "ब्राउज़र",
   "browserNewTabHint": "नया ब्राउज़र टैब",
+  "moreTools": "और टूल",
+  "railMore": "और",
   "recordActivity": "गतिविधि लॉग",
   "logout": "लॉग आउट",
   "stagingArea": "स्टेजिंग एरिया",

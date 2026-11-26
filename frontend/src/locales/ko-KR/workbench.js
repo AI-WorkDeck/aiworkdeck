@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "화면 캡처 OCR",
   "browser": "브라우저",
   "browserNewTabHint": "새 브라우저 탭",
+  "moreTools": "도구 더보기",
+  "railMore": "더보기",
   "recordActivity": "활동 로그",
   "logout": "로그아웃",
   "stagingArea": "스테이징 영역",

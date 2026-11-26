@@ -233,6 +233,9 @@
           <!-- D16：版面开关（左/底/右栏、分屏）与工具（截图、网页、录制）分两组 -->
           <view class="top-bar-divider" aria-hidden="true"></view>
 
+          <!-- Q28 / X-S10：窄于 880px 时截图 / 新网页 / 工作记录三个按钮收进「⋯」菜单（header-more），
+               主题与布局开关留在顶栏。 -->
+          <view class="header-tools-optional">
           <!-- 5. Screenshot (OCR)：摘录落在项目收藏里，无项目态不给 -->
           <view
             v-if="hasProject"
@@ -269,6 +272,22 @@
               <path v-for="(d, gi) in GLYPHS.record" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
+          </view>
+          <view class="top-bar-btn header-more-btn" :class="{ active: headerMoreOpen }" role="button" tabindex="0" aria-haspopup="menu" :aria-expanded="headerMoreOpen ? 'true' : 'false'" :aria-label="$t('workbench.moreTools')" :title="$t('workbench.moreTools')" @tap.stop="headerMoreOpen = !headerMoreOpen">
+            <text class="header-more-dots" aria-hidden="true">⋯</text>
+            <view v-if="headerMoreOpen" class="theme-menu header-more-menu" role="menu" :aria-label="$t('workbench.moreTools')" @tap.stop>
+              <view v-if="hasProject" class="theme-menu-item" role="menuitem" tabindex="-1" @tap="headerMoreOpen = false; startOcrCapture()">
+                <text class="theme-menu-text">{{ $t('workbench.ocrCapture') }}</text>
+              </view>
+              <view class="theme-menu-item" role="menuitem" tabindex="-1" @tap="headerMoreOpen = false; openBrowserTab()">
+                <text class="theme-menu-text">{{ $t('workbench.browserNewTabHint') }}</text>
+              </view>
+              <view v-if="hasNamedProject" class="theme-menu-item" :class="{ on: isRecording }" role="menuitem" tabindex="-1" @tap="headerMoreOpen = false; toggleRecording()">
+                <text class="theme-menu-text">{{ $t('workbench.recordActivity') }}</text>
+              </view>
+            </view>
+          </view>
+          <view v-if="headerMoreOpen" class="theme-menu-mask" @tap="headerMoreOpen = false"></view>
         </view>
         <view v-else>
             <!-- Client View Only Tools -->
@@ -330,7 +349,7 @@
              2026-08-19 起「项目概览」和「插件中心」也在这个数组里：它们走的都是
              普通的 toggleLeftPane 语义，单独硬编码成 rail 按钮只会让顺序有两个出处。 -->
         <view
-          v-for="p in LEFT_SIDEBAR_PLUGINS"
+          v-for="p in railShownPlugins"
           :key="p.key"
           class="rail-btn"
           :class="{ active: (p.isDynamic && p.hasDeclaredViews && !p.sidebarView && workspaceTabState('plugin', p.pluginId) === 'active') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
@@ -386,11 +405,29 @@
             :aria-label="$t('calendar.railScheduleTitle', railScheduleSummary)"
           >{{ railScheduleCount > 99 ? '99+' : railScheduleCount }}</text>
         </view>
+        <!-- Q28 / X-S10：放不下的插件图标收进「更多」，不半截、不出滚动条（整理模式下照旧全列出来） -->
+        <view
+          v-if="railOverflowPlugins.length"
+          class="rail-btn rail-more-btn"
+          :class="{ active: railMoreOpen || railOverflowPlugins.some(p => leftPaneKey === p.key && !sidebarCollapsed) }"
+          role="button" tabindex="0" aria-haspopup="menu" :aria-expanded="railMoreOpen ? 'true' : 'false'"
+          :title="$t('workbench.railMore')"
+          @tap.stop="railMoreOpen = !railMoreOpen"
+        >
+          <view class="rail-icon-wrapper"><text class="rail-more-dots" aria-hidden="true">⋯</text></view>
+          <text class="rail-label">{{ $t('workbench.railMore') }}</text>
+        </view>
 
         <!-- 整理模式入口：rail 右键菜单「整理图标」（原顶栏按钮已撤，见 openRailMenu） -->
 
         </view>
 
+        <view v-if="railMoreOpen && railOverflowPlugins.length" class="theme-menu rail-more-menu" role="menu" :aria-label="$t('workbench.railMore')" @tap.stop>
+          <view v-for="p in railOverflowPlugins" :key="'more-' + p.key" class="theme-menu-item" :class="{ on: leftPaneKey === p.key && !sidebarCollapsed }" role="menuitem" tabindex="-1" @tap="railMoreOpen = false; onRailBtnTap(p.key)">
+            <text class="theme-menu-text">{{ railLabelOf(p) }}</text>
+          </view>
+        </view>
+        <view v-if="railMoreOpen" class="theme-menu-mask" @tap="railMoreOpen = false"></view>
         <!-- 项目操作常驻底部，不随上方工具列表滚动。成员浮层须能向右展开。 -->
         <view class="rail-footer">
 
@@ -2841,6 +2878,10 @@ export default {
       showScratchTransfer: false,
       chatWorkspaceFiles: [],
       sidebarWidth: 260, // 侧边栏宽度
+      headerMoreOpen: false, // 窄顶栏的「⋯」菜单（Q28 / X-S10）
+      // rail 一屏放得下几个插件图标（ResizeObserver 量 .rail-tools；Infinity = 都放得下）
+      railFitCount: Infinity,
+      railMoreOpen: false,
       sidebarCollapsed: true,
       isCompactLayout: false,
       leftPaneKey: null, // Initialize to null to prevent premature loading
@@ -3276,6 +3317,17 @@ export default {
         !!this.insightHover || !!this.documentLinkPreview ||
         (this.fileLinkPicker && this.fileLinkPicker.visible)
       )
+    },
+    // Q28：放不下时最后一格让给「更多」，其余进它的菜单；整理图标模式下全部列出（可滚动）
+    railShownPlugins() {
+      const all = this.LEFT_SIDEBAR_PLUGINS || []
+      const fit = this.railFitCount
+      if (this.railEditMode || !(fit < all.length)) return all
+      return all.slice(0, Math.max(1, fit - 1))
+    },
+    railOverflowPlugins() {
+      const all = this.LEFT_SIDEBAR_PLUGINS || []
+      return all.slice(this.railShownPlugins.length)
     },
     LEFT_SIDEBAR_PLUGINS() {
       const user = getCurrentUser()
@@ -6302,16 +6354,34 @@ export default {
     setupResponsiveListener() {
       if (typeof window === 'undefined') return
       if (this._windowResizeHandler) return
+      // Q28：rail 放得下几个插件图标（窗口高度变了重量）
+      if (typeof ResizeObserver !== 'undefined') {
+        this._railFitObserver = new ResizeObserver(() => this.measureRailFit())
+        this.$nextTick(() => { const el = this.$el && this.$el.querySelector && this.$el.querySelector('.rail-tools'); if (el) this._railFitObserver.observe(el) })
+      }
       this._windowResizeHandler = () => this.handleResponsiveResize()
       window.addEventListener('resize', this._windowResizeHandler, { passive: true })
       this.$nextTick(() => this.handleResponsiveResize())
     },
     teardownResponsiveListener() {
       if (typeof window === 'undefined') return
+      if (this._railFitObserver) { this._railFitObserver.disconnect(); this._railFitObserver = null }
       if (this._windowResizeHandler) {
         window.removeEventListener('resize', this._windowResizeHandler)
         this._windowResizeHandler = null
       }
+    },
+    // 一格的高度量第一个图标（含 margin-bottom）；放得下 n 格就显示 n 个，不够时最后一格让给「更多」
+    measureRailFit() {
+      const el = this.$el && this.$el.querySelector && this.$el.querySelector('.rail-tools')
+      const first = el && el.querySelector('.rail-btn')
+      if (!el || !first || !el.clientHeight) return
+      const style = window.getComputedStyle(first)
+      const pitch = first.offsetHeight + (parseFloat(style.marginBottom) || 0)
+      if (!pitch) return
+      const fit = Math.floor((el.clientHeight + (parseFloat(style.marginBottom) || 0)) / pitch)
+      const total = (this.LEFT_SIDEBAR_PLUGINS || []).length
+      this.railFitCount = fit >= total ? Infinity : Math.max(1, fit)
     },
     handleResponsiveResize() {
       if (typeof window === 'undefined') return

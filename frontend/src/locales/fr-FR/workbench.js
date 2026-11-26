@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "Capture d’écran OCR",
   "browser": "Navigateur",
   "browserNewTabHint": "Nouvel onglet du navigateur",
+  "moreTools": "Plus d'outils",
+  "railMore": "Plus",
   "recordActivity": "Journal d'activité",
   "logout": "Se déconnecter",
   "stagingArea": "Zone de préparation",

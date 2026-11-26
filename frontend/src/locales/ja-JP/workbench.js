@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "スクリーンショットOCR",
   "browser": "ブラウザ",
   "browserNewTabHint": "新しいブラウザタブ",
+  "moreTools": "その他のツール",
+  "railMore": "その他",
   "recordActivity": "アクティビティログ",
   "logout": "ログアウト",
   "stagingArea": "ステージングエリア",

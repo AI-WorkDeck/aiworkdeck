@@ -162,6 +162,8 @@ export default {
   ocrCapture: 'Screen Capture OCR',
   browser: 'Browser',
   browserNewTabHint: 'New browser tab',
+  moreTools: 'More tools',
+  railMore: 'More',
   recordActivity: 'Activity Log',
   logout: 'Sign Out',
   // Left rail

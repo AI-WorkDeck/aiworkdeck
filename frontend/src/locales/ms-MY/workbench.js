@@ -156,6 +156,8 @@ export default {
   "ocrCapture": "OCR Tangkap Skrin",
   "browser": "Pelayar",
   "browserNewTabHint": "Tab pelayar baharu",
+  "moreTools": "Lagi alatan",
+  "railMore": "Lagi",
   "recordActivity": "Log Aktiviti",
   "logout": "Log Keluar",
   "stagingArea": "Kawasan Sementara",
