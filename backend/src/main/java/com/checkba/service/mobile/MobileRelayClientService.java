@@ -541,14 +541,15 @@ public class MobileRelayClientService {
                     if (Boolean.TRUE.equals(file.getIsFolder()) || !MobilePreviewPolicy.supports(file.getName())) continue;
                     if (file.getFilePath() == null) continue;
                     String identity = projectKey + ":" + file.getId();
+                    // C12: e.g. a colleague's 「仅在 X 的电脑上」 placeholder has no bytes here. Skip it instead of
+                    // aborting the whole run every minute, and keep any earlier backup copy (never erased by absence).
+                    // Ask first: load() logs an ERROR for a missing file (lane C r3: one per minute); the catch is
+                    // only for a file removed between the two calls.
+                    var storage = storageServiceFactory.getStorageService();
+                    if (!storage.exists(file.getFilePath())) { previous.remove(identity); continue; }
                     org.springframework.core.io.Resource resource;
-                    try { resource = storageServiceFactory.getStorageService().load(file.getFilePath()); }
-                    catch (com.checkba.storage.StorageException missing) {
-                        // C12: e.g. a colleague's 「仅在 X 的电脑上」 placeholder has no bytes here. Skip it instead of
-                        // aborting the whole run every minute, and keep any earlier backup copy (never erased by absence).
-                        previous.remove(identity);
-                        continue;
-                    }
+                    try { resource = storage.load(file.getFilePath()); }
+                    catch (com.checkba.storage.StorageException missing) { previous.remove(identity); continue; }
                     long size = resource.contentLength();
                     if (size > MobileTransferService.MAX_TRANSFER_BYTES) continue;
                     JsonNode old = previous.remove(identity);

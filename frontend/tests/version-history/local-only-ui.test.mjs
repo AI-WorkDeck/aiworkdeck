@@ -82,6 +82,17 @@ test('a single click on a colleague placeholder selects and explains, never open
   assert.deepEqual(v.emitted, [['file-select', 1]], 'the sharer opens their own file as before')
 })
 
+test('the badges follow the collaboration state, not only a window reload (lane C r3)', () => {
+  // After 取回 wrote the colleague's recording the open window kept 「仅在沈砚的电脑上」 until a reload.
+  const page = readFileSync(new URL('../../src/pages/project-overview/project-overview.vue', import.meta.url), 'utf8')
+  const tabs = readFileSync(new URL('../../src/pages/project-overview/fileOpenTabs.js', import.meta.url), 'utf8')
+  const collab = page.slice(page.indexOf('    async fetchCollabState('), page.indexOf('    recheckCollabIfStale('))
+  assert.match(collab, /this\.collabCloud = \(res && res\.data\) \|\| null\n[\s\S]*this\.\$refs\?\.fileTree\?\.loadLocalOnly\?\.\(\)/,
+    'every collaboration refresh (poll, after 取回 / 交稿) re-reads the badges')
+  const reload = tabs.slice(tabs.indexOf('    async onVersionReloadFiles('), tabs.indexOf('\n    },', tabs.indexOf('    async onVersionReloadFiles(')))
+  assert.match(reload, /this\.\$refs\?\.fileTree\?\.loadLocalOnly\?\.\(\)/, 'files rewritten by a version action re-read them too')
+})
+
 test('the 交稿 result and the tree read the local-only endpoints', () => {
   assert.match(api, /url: `\/api\/cloud\/projects\/\$\{projectId\}\/local-only`, method: 'GET'/)
   assert.match(api, /noticeLocalOnly\(projectId, d\.localOnlyFiles,/)

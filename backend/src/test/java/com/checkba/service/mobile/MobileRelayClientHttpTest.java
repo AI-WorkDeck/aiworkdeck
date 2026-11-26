@@ -241,6 +241,7 @@ class MobileRelayClientHttpTest {
                 });
 
         storageService = mock(StorageService.class);
+        when(storageService.exists(anyString())).thenReturn(true);
         when(storageService.save(anyString(), any(InputStream.class))).thenAnswer(inv -> {
             callOrder.add("save:" + inv.getArgument(0));
             savedStorageKeys.add(inv.getArgument(0));
@@ -1230,6 +1231,7 @@ class MobileRelayClientHttpTest {
         missing.setUid("0b8a2f62-5d1c-4f43-9a0e-3e7c6d1f2a10"); missing.setFilePath("synthetic/missing.pdf");
         var present = addNode(null, "资料.pdf", false);
         present.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); present.setFilePath("synthetic/doc.pdf");
+        when(storageService.exists("synthetic/missing.pdf")).thenReturn(false);
         when(storageService.load("synthetic/missing.pdf")).thenThrow(new com.checkba.storage.StorageException("文件不存在: synthetic/missing.pdf"));
         byte[] bytes = "synthetic-backup-pdf".getBytes(StandardCharsets.UTF_8);
         String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
@@ -1246,6 +1248,8 @@ class MobileRelayClientHttpTest {
         service().syncFileBackups();
         assertEquals(1, uploads.get(), "the present file is still backed up");
         assertEquals(0, deletes.get(), "the earlier backup of the missing file is kept");
+        // lane C r3: load() logs ERROR 「文件不存在」 before it throws — once a minute. Ask first, never load it.
+        verify(storageService, never()).load("synthetic/missing.pdf");
     }
 
     @Test
