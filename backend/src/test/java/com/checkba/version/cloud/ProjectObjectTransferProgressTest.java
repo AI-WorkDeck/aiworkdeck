@@ -83,4 +83,66 @@ class ProjectObjectTransferProgressTest {
             server.stop(0);
         }
     }
+
+    /** Lane C/Q 07:43: session-end background upload and 交稿 both PUT the same 30 MB part. One must wait and skip. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void concurrentUploadsOfOneCaseSendEachPartOnce(@TempDir Path root) throws Exception {
+        var properties = new StorageProperties();
+        properties.getLocal().setRootPath(root.toString());
+        ProjectRepoService repos = spy(new ProjectRepoService(new ProjectStorageResolver(properties, null)));
+        Files.createDirectories(repos.workTree(1));
+        byte[] media = new byte[2 * 1024 * 1024];
+        new java.util.Random(9).nextBytes(media);
+        Files.write(repos.workTree(1).resolve("录音.mp4"), media);
+        repos.init(1, "Synthetic", "test@example.com");
+        doReturn(Map.of()).when(repos).cloudWriteHeaders(anyLong(), anyString(), any(), any());
+
+        var puts = new java.util.concurrent.atomic.AtomicInteger();
+        var completed = java.util.concurrent.ConcurrentHashMap.<String>newKeySet();
+        CountDownLatch firstPut = new CountDownLatch(1), release = new CountDownLatch(1);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.setExecutor(Executors.newCachedThreadPool());
+        server.createContext("/git/5.git/awd-objects/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            String body;
+            if (path.endsWith("/capabilities")) body = "{\"version\":1,\"partBytes\":" + ProjectObjectTransferService.PART_BYTES + "}";
+            else if (path.contains("/parts/")) {
+                exchange.getRequestBody().readAllBytes();
+                puts.incrementAndGet();
+                firstPut.countDown();
+                try { release.await(10, TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                body = "{\"ok\":true}";
+            } else if (path.endsWith("/complete")) {
+                completed.add(path.split("/")[4]);
+                body = "{\"complete\":true}";
+            } else body = "{\"complete\":" + completed.contains(path.substring(path.lastIndexOf('/') + 1)) + ",\"parts\":[]}";
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (var out = exchange.getResponseBody()) { out.write(bytes); }
+        });
+        server.start();
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            ObjectProvider<MobileRelayClientService> provider = mock(ObjectProvider.class);
+            when(provider.getIfAvailable()).thenReturn(mock(MobileRelayClientService.class));
+            var sync = new ProjectObjectSyncService(repos, provider, new ObjectMapper());
+            String remote = "http://127.0.0.1:" + server.getAddress().getPort() + "/git/5.git";
+            Future<?> background = pool.submit(() -> sync.upload(1, remote, "u", "t"));
+            assertTrue(firstPut.await(10, TimeUnit.SECONDS));
+            Future<?> submit = pool.submit(() -> sync.upload(1, remote, "u", "t"));
+            Thread.sleep(300);
+            assertEquals(1, puts.get(), "the second upload waits instead of sending the part again");
+            assertEquals("upload", sync.transferProgress(1).get("direction"), "progress still shows the running transfer");
+            release.countDown();
+            background.get(10, TimeUnit.SECONDS);
+            submit.get(10, TimeUnit.SECONDS);
+            assertEquals(1, puts.get(), "the object was complete by the time the second upload asked");
+            assertEquals(Map.of("active", false), sync.transferProgress(1));
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+            server.stop(0);
+        }
+    }
 }

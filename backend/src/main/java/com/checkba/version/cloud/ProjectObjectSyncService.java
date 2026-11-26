@@ -65,7 +65,26 @@ public class ProjectObjectSyncService {
         this.repos = repos; this.relay = relay; this.json = json;
     }
 
+    /**
+     * One object transfer per case at a time. 交稿 pre-uploads outside the repo lock, and ending a work session
+     * starts a background 交稿 too; both saw the same object as missing and PUT it twice (lane C/Q 2026-11-26).
+     * The second caller now waits, then finds the object complete and skips it. Never taken inside-out with
+     * the repo lock: nothing here acquires the session lock.
+     */
+    private final Map<Long, java.util.concurrent.locks.ReentrantLock> transferLocks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private java.util.concurrent.locks.ReentrantLock transferLock(long project) {
+        return transferLocks.computeIfAbsent(project, p -> new java.util.concurrent.locks.ReentrantLock());
+    }
+
     public void upload(long project, String remoteUrl, String username, String token) {
+        var lock = transferLock(project);
+        lock.lock();
+        try { uploadExclusive(project, remoteUrl, username, token); }
+        finally { lock.unlock(); }
+    }
+
+    private void uploadExclusive(long project, String remoteUrl, String username, String token) {
         Set<ObjectRef> refs = pushedObjects(project);
         if (refs.isEmpty()) return;
         MobileRelayClientService client = relay.getIfAvailable();
@@ -126,6 +145,13 @@ public class ProjectObjectSyncService {
     }
 
     public void download(long project, String remoteUrl, String username, String token, String ref) {
+        var lock = transferLock(project);
+        lock.lock();
+        try { downloadExclusive(project, remoteUrl, username, token, ref); }
+        finally { lock.unlock(); }
+    }
+
+    private void downloadExclusive(long project, String remoteUrl, String username, String token, String ref) {
         Set<ObjectRef> needed = new LinkedHashSet<>(repos.objectPointersAt(project, ref, true));
         try (var repository = repos.open(project)) {
             for (var tag : repository.getRefDatabase().getRefsByPrefix("refs/tags/"))

@@ -2455,6 +2455,7 @@
         <view class="status-dot" :class="collabTone"></view>
         <text>{{ collabStateText }}</text>
       </view>
+      <CloudTransferStatus v-if="collabLinked" :project-id="projectId" />
       <BackendHealthStatus />
       <MobileBackupConsent v-if="isDesktopApp" />
       <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="$refs.fileTree && $refs.fileTree.loadFiles()" />
@@ -2729,6 +2730,7 @@ import AccountEntry from '@/components/account/AccountEntry.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import OptionalComponentsDialog from '@/components/OptionalComponentsDialog.vue'
 import MobileReceiveStatus from '@/components/MobileReceiveStatus.vue'
+import CloudTransferStatus from '@/components/collab/CloudTransferStatus.vue'
 import BackendHealthStatus from '@/components/BackendHealthStatus.vue'
 import MobileBackupConsent from '@/components/MobileBackupConsent.vue'
 import {
@@ -2773,6 +2775,7 @@ export default {
     ScratchTransferDialog,
     BackendHealthStatus,
     MobileReceiveStatus,
+    CloudTransferStatus,
     MobileBackupConsent,
     LibreOfficeEditor,
     BrowserPane,

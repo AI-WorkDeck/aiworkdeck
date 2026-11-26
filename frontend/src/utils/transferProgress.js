@@ -12,7 +12,8 @@ export function formatTransfer(progress, t) {
   return t(key, { done: mb(Math.min(progress.doneBytes, progress.totalBytes)), total: mb(progress.totalBytes) })
 }
 
-export async function withTransferProgress(projectId, run, { read, show, hide, t, interval = 2000, delay = 1500 } = {}) {
+export async function withTransferProgress(projectId, run, { read, show, hide, t, start, interval = 2000, delay = 1500 } = {}) {
+  if (start) start(projectId)
   let shown = false
   let stopped = false
   let timer = null
