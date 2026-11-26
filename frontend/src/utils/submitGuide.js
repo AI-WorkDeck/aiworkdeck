@@ -101,7 +101,7 @@ export async function submitNeedsGuide({ projectId, working, cloud, readStatus }
   try {
     const res = await readStatus(projectId)
     const d = (res && res.data) || {}
-    if (typeof d.working === 'boolean') fresh = d.working
+    if (typeof d.working === 'boolean') fresh = d.working || Number(d.changedCount) > 0
   } catch (e) {
     console.warn('[SubmitGuide] 读取版本状态失败，退回页面快照判断', e)
   }

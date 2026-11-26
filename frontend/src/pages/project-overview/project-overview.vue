@@ -581,7 +581,7 @@
         :project-name="project.name || ''"
         :cloud="collabCloud"
         :conflict-pending="adoptConflictPending"
-        :working="!!versionWorkStatus.working"
+        :working="versionUnsaved"
         :initial-tab="collabInitialTab"
         :inviter-name="userDisplayName || (currentUser && currentUser.displayName) || ''"
         @changed="onCollabChanged"
@@ -597,7 +597,7 @@
       <SubmitDraftGuide
         v-model:visible="submitGuideVisible"
         :project-id="projectId"
-        :working="!!versionWorkStatus.working"
+        :working="versionUnsaved"
         :cloud="collabCloud"
         :mode="submitGuideMode"
         @changed="onCollabChanged"
@@ -1364,7 +1364,7 @@
                       :cloud-linked="collabLinked"
                       :refresh-token="collabRefreshToken"
                       :cloud="collabCloud"
-                      :working="!!versionWorkStatus.working"
+                      :working="versionUnsaved"
                       @compare-file="onVersionCompareFile"
                       @reload-files="onVersionReloadFiles"
                       @changed="onCollabChanged"
@@ -1650,7 +1650,7 @@
                       :cloud-linked="collabLinked"
                       :refresh-token="collabRefreshToken"
                       :cloud="collabCloud"
-                      :working="!!versionWorkStatus.working"
+                      :working="versionUnsaved"
                       @compare-file="onVersionCompareFile"
                       @reload-files="onVersionReloadFiles"
                       @changed="onCollabChanged"
@@ -3226,6 +3226,12 @@ export default {
     projectClientCount() {
       return (this.projectMembers || []).filter(m => typeof m?.role === 'string' && m.role.startsWith('CLIENT')).length
     },
+    // C13：手头有没存成版本的改动——进行中的工作段，或者在访达里直接改名/新增/删掉的文件
+    // （没有工作段，changedCount > 0）。后者原来被当成「一致」，交稿也什么都交不上去。
+    versionUnsaved() {
+      const s = this.versionWorkStatus || {}
+      return !!s.working || Number(s.changedCount) > 0
+    },
     collabLargeFilesBlocked() {
       const c = this.collabCloud
       return !!(c && c.largeFilesNeedBackup)
@@ -3597,7 +3603,7 @@ export default {
       if (c.remoteAhead) {
         return remoteAheadText((k, params) => this.$t(k, params), c, { fallbackKey: 'workbench.collabRemoteAhead' })
       }
-      if (c.pendingUpload || this.versionWorkStatus.working) return this.$t('workbench.collabPendingUpload')
+      if (c.pendingUpload || this.versionUnsaved) return this.$t('workbench.collabPendingUpload')
       // C5：只有刚联网核对过（15 秒内）才说「和大家的稿一致」。更早的核对只能说明当时一致——
       // 同事可能刚交了新稿，律师据此在旧稿上动手，之后就是合并或冲突。
       if (!this.collabFresh) {
@@ -3615,7 +3621,7 @@ export default {
       if (this.adoptConflictPending) return 'amber'
       const c = this.collabCloud || {}
       if (c.removed || c.offline) return 'amber'
-      if (c.remoteAhead || c.pendingUpload || this.versionWorkStatus.working) return 'blue'
+      if (c.remoteAhead || c.pendingUpload || this.versionUnsaved) return 'blue'
       // 核对过时不亮绿灯（C5）
       return this.collabFresh ? 'green' : 'blue'
     },

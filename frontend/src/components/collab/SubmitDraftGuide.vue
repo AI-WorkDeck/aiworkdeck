@@ -215,7 +215,8 @@ export default {
           }
         }
         const d = (res && res.data) || {}
-        this.localWorking = !!d.working
+        // C13：访达里直接改过的文件（没有工作段）也要先存成版本，否则交稿交不上去
+        this.localWorking = !!d.working || Number(d.changedCount) > 0
         conflicted = !!(d.sessionEndConflict || d.cloudConflict || d.adoptConflict)
       } catch (e) {
         console.warn('[SubmitGuide] 读取版本状态失败', e)
