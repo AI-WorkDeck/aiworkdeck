@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Kapat ve sil",
   "cloud.purgeCancel": "İptal",
   "billing.groupNoRate": " ({n} kayıtta ücret yok, sayılmadı)",
-  "billing.groupSummaryNoRate": "{n} kayıt, {pending} tanesi incelenecek; {h} faturalanabilir saat, ücret belirlenmedi"
+  "billing.groupSummaryNoRate": "{n} kayıt, {pending} tanesi incelenecek; {h} faturalanabilir saat, ücret belirlenmedi",
+  "panel.t.cloudPendingLawyer": "İlgili avukatlar bekleniyor",
+  "panel.t.cloudPendingCommittee": "Komitenin nihai incelemesi bekleniyor",
+  "panel.t.cloudApproved": "Onaylandı",
+  "panel.t.cloudRejected": "Reddedildi",
+  "panel.t.cloudSynced": "Yerel ilerleme, büro bulutundaki çıkar çatışması kararına göre güncellendi.",
+  "panel.t.cloudLinked": "Büro bulutundaki çatışma kontrolüne bağlı: {0}",
+  "panel.t.cloudSync": "Buluttaki nihai kararı getir",
+  "panel.t.cloudLinkPick": "Büro bulutundaki çatışma kontrolünü bağla",
+  "panel.t.cloudNone": "Büro bulutunda bağlayabileceğiniz bir çatışma kaydı henüz yok.",
+  "panel.t.cloudLinkConfirm": "Bağla ve kararı getir",
+  "panel.t.cloudLinkHint": "Bu dosyanın çatışma kontrolü büro bulutunda yapıldı mı? Bağlayın; yerel ilerleme buluttaki nihai kararı izlesin.",
+  "access.commentRequired": "Önce inceleme görüşünüzü yazın, sonra onaylayın veya reddedin."
 }

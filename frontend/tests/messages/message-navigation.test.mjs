@@ -12,7 +12,7 @@ import { isGlobalPlugin } from '../../src/utils/pluginViews.js'
 const code = readFileSync(new URL('../../src/pages/project-overview/messageCenterTab.js',import.meta.url),'utf8').replace(/^import .*$/gm,'').replace('export const messageCenterTabMethods =','return')
 function fixture(overrides={}) {
  const events=[],routes=[],business=[],requests=[];let identity='one'
- const methods=new Function('normalizeMessageTarget','messageCenterRequest','messageCenterIdentity','getDdRequestDetails','isGlobalPlugin','uni','ACCOUNT_CHANGED_EVENT',code)(normalizeMessageTarget,async(action,params)=>{requests.push({action,params});return overrides.target||{kind:'im',conversationId:'one'}},()=>identity,async()=>({request:{id:6,name:'真实尽调清单'},items:[]}),isGlobalPlugin,{$emit:(...args)=>events.push(args),showToast:(message)=>events.push(message)},'account-changed')
+ const methods=new Function('normalizeMessageTarget','messageCenterRequest','messageCenterIdentity','getDdRequestDetails','isGlobalPlugin','uni','ACCOUNT_CHANGED_EVENT','ensureLawFirmPlugin',code)(normalizeMessageTarget,async(action,params)=>{requests.push({action,params});return overrides.target||{kind:'im',conversationId:'one'}},()=>identity,async()=>({request:{id:6,name:'真实尽调清单'},items:[]}),isGlobalPlugin,{$emit:(...args)=>events.push(args),showToast:(message)=>events.push(message),showModal:(opts)=>{events.push(['modal',opts.title]);opts.success({confirm:overrides.modalConfirm!==false})}},'account-changed',overrides.ensureLawFirmPlugin||(async()=>{throw new Error('not expected')}))
  const vm={leftFiles:[],rightFiles:[],focusedPane:'left',splitMode:false,projectId:null,hasProject:false,dynamicPlugins:[],isActiveOverviewInstance:()=>true,$t:k=>k,$nextTick:fn=>fn(),triggerWorkbenchResize(){},leaveWorkbench:async(url)=>{routes.push(url);return true},loadDynamicPlugins:async()=>{},handleOpenDdRequest:request=>business.push(request),openConversationInPanel:id=>business.push(id),openCalendarTab:opts=>business.push(opts),handleOpenLawFirmPlugin:async(opts)=>business.push(opts),openPluginTab:id=>business.push(id),...overrides}
  for(const[name,fn]of Object.entries({...methods,...ddClientTabMethods}))vm[name]=fn.bind(vm)
  return{vm,events,routes,business,requests,replaceAccount(){identity='two'}}
@@ -40,6 +40,21 @@ test('plugin destinations require installed enabled scope and preserve recordId 
  // QA D3: an installed project-scoped plugin with no project open asks for a project; it is not "not installed".
  const noProject=fixture({dynamicPlugins:[{pluginId:'example-plugin'}]});await assert.rejects(()=>noProject.vm.openMessageTarget({kind:'plugin',pluginId:'example-plugin',view:'records',recordId:'one'}),error=>error.projectRequired===true&&/projectRequired/.test(error.message)&&!/pluginUnavailable/.test(error.message))
  await assert.rejects(()=>noProject.vm.openMessageTarget({kind:'plugin',pluginId:'missing-plugin',view:'records',recordId:'one'}),error=>/pluginUnavailable/.test(error.message)&&!error.projectRequired)
+})
+test('C18: a missing law-firm plugin is enabled in one click, then opens the record',async()=>{
+ const installed=[];let plugins=[]
+ const f=fixture({projectId:1,hasProject:true,ensureLawFirmPlugin:async()=>{installed.push(1);plugins=[{pluginId:'lawfirm-management'}]}})
+ f.vm.loadDynamicPlugins=async()=>{f.vm.dynamicPlugins=plugins}
+ assert.equal(await f.vm.openMessageTarget({kind:'plugin',pluginId:'lawfirm-management',view:'conflicts',recordId:'0f8b6f4e-2c1a-4d3b-9e5f-1a2b3c4d5e6f'}),true)
+ assert.equal(installed.length,1)
+ assert.deepEqual(f.events.find(e=>e[0]==='modal'),['modal','messageCenter.enableLawFirmTitle'])
+ assert.ok(f.events.some(e=>e[0]==='awd:market-changed'))
+ assert.deepEqual(f.business,[{tab:'conflicts',recordId:'0f8b6f4e-2c1a-4d3b-9e5f-1a2b3c4d5e6f'}])
+ const declined=fixture({projectId:1,hasProject:true,modalConfirm:false,ensureLawFirmPlugin:async()=>{installed.push(2)}})
+ assert.equal(await declined.vm.openMessageTarget({kind:'plugin',pluginId:'lawfirm-management',view:'conflicts',recordId:'0f8b6f4e-2c1a-4d3b-9e5f-1a2b3c4d5e6f'}),false)
+ assert.deepEqual(installed,[1]);assert.equal(declined.business.length,0)
+ const refused=fixture({projectId:1,hasProject:true,ensureLawFirmPlugin:async()=>{throw new Error('仅管理员可安装插件')}})
+ await assert.rejects(()=>refused.vm.openMessageTarget({kind:'plugin',pluginId:'lawfirm-management',view:'conflicts',recordId:'0f8b6f4e-2c1a-4d3b-9e5f-1a2b3c4d5e6f'}),/仅管理员/)
 })
 test('late plugin lookup after account replacement cannot navigate',async()=>{
  let resolve;const promise=new Promise(r=>resolve=r);const f=fixture({projectId:1,hasProject:true,dynamicPlugins:[{pluginId:'example-plugin'}],loadDynamicPlugins:()=>promise});const work=f.vm.openMessageTarget({kind:'plugin',pluginId:'example-plugin',view:'records',recordId:'one'});f.replaceAccount();resolve();assert.equal(await work,false);assert.equal(f.business.length,0)

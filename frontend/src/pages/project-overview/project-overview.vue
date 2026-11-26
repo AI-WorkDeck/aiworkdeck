@@ -5615,6 +5615,9 @@ export default {
           return
         }
         this.collabCloud = (res && res.data) || null
+        // 成员名单只在已知「放进了案件库」时才并入云端参与人；协作状态落地前跑完的那次只拿到
+        // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
+        if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()
         if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
@@ -6958,7 +6961,8 @@ export default {
         this.localProjectMembersLoaded = true
         // 本机名单先落地；云端网络结果只更新展示，不改变本机权限快照。
         this.projectMembers = local
-        if (!(this.collabCloud && this.collabCloud.linked)) return
+        this._membersMissingCloud = !(this.collabCloud && this.collabCloud.linked)
+        if (this._membersMissingCloud) return
         try {
             const res = await getCloudMembers(projectId)
             if (!current()) return

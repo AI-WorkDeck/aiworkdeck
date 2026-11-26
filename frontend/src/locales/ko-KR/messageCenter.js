@@ -88,7 +88,7 @@ export default {
   "openBusiness": "관련 업무 열기",
   "readNotDone": "알림을 읽는 것만으로는 업무 확인이 완료되지 않습니다. 관련 업무 화면을 열어 확인하고 처리하세요.",
   "targetUnavailable": "관련 업무 화면을 사용할 수 없습니다. 새로고침 후 다시 시도하세요.",
-  "pluginUnavailable": "관련 플러그인이 설치되지 않았거나 활성화되지 않았습니다. 플러그인 센터를 확인하세요.",
+  "pluginUnavailable": "관련 플러그인이 설치되지 않았거나 활성화되지 않았습니다. 플러그인 센터를 확인하세요.", "enableLawFirmTitle": "로펌 관리를 사용하시겠습니까?", "enableLawFirmBody": "이 알림은 로펌 관리에서 처리합니다. 앱에 기본 포함되어 있으며, 사용하면 이 기록이 바로 열립니다.", "enableLawFirmConfirm": "사용하고 열기",
   "openFailed": "관련 업무 화면을 열지 못했습니다. 다시 시도하세요.",
   "serviceFailed": "메시지 서비스를 일시적으로 사용할 수 없습니다. 다시 시도하세요.",
   "source": "{name}에서",

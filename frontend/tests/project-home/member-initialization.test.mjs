@@ -55,3 +55,29 @@ for (const linked of [true, false]) {
     if (linked) assert.equal(vm.projectMembers[1].userId, null)
   })
 }
+
+test('J11: members reload with colleagues once the collab state reports the case is linked', async () => {
+  let cloudReads = 0
+  const local = [{ id: 1, userId: 1, username: 'lawyer_a', accountId: 10, displayName: '本机用户' }]
+  const cloud = [{ id: 21, username: 'awd_lawyer_a', accountId: 10 }, { id: 22, username: 'lawyer_b', accountId: 20, displayName: '律师乙' }]
+  const vm = { projectId: 12, projectInfoLoaded: true, hasNamedProject: true, projectMembers: [], collabCloud: null, isActiveOverviewInstance: () => true }
+  vm.loadProjectMembers = method('loadProjectMembers', {
+    getProjectMembers: async () => ({ data: local }),
+    getCloudMembers: async () => { cloudReads++; return { data: { members: cloud } } },
+    mergeMembers,
+  }).bind(vm)
+  const body = source.match(/\n    async fetchCollabState\(\{ online = false \} = \{\}\) \{\n([\s\S]*?)\n    \},/)[1]
+  vm.fetchCollabState = new Function('checkCloud', 'getCloudStatus', 'getSessionId', 'getCloudAccountGeneration',
+    `return async function({ online = false } = {}) {${body}}`)(
+    async () => ({ data: { linked: true } }), async () => ({ data: { linked: true } }), () => 's', () => 1).bind(vm)
+  // onShow / identity refresh ran before the collab state was known: local list only.
+  await vm.loadProjectMembers()
+  assert.deepEqual(vm.projectMembers.map(m => m.username), ['lawyer_a'])
+  await vm.fetchCollabState()
+  await flush(); await flush()
+  assert.equal(cloudReads, 1)
+  assert.deepEqual(vm.projectMembers.map(m => m.username), ['lawyer_a', 'lawyer_b'])
+  // Already linked: a later status read does not reload again.
+  await vm.fetchCollabState(); await flush()
+  assert.equal(cloudReads, 1)
+})

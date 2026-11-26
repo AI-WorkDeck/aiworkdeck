@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "إيقاف وحذف",
   "cloud.purgeCancel": "إلغاء",
   "billing.groupNoRate": " ({n} قيود بلا سعر ولم تُحتسب)",
-  "billing.groupSummaryNoRate": "{n} قيود، منها {pending} بانتظار المراجعة؛ {h} ساعة قابلة للفوترة، لم يُحدَّد سعر"
+  "billing.groupSummaryNoRate": "{n} قيود، منها {pending} بانتظار المراجعة؛ {h} ساعة قابلة للفوترة، لم يُحدَّد سعر",
+  "panel.t.cloudPendingLawyer": "بانتظار المحامين المعنيين",
+  "panel.t.cloudPendingCommittee": "بانتظار المراجعة النهائية للجنة",
+  "panel.t.cloudApproved": "تمت الموافقة",
+  "panel.t.cloudRejected": "مرفوض",
+  "panel.t.cloudSynced": "تم تحديث التقدّم المحلي وفق قرار تعارض المصالح في سحابة المكتب.",
+  "panel.t.cloudLinked": "مرتبط بفحص تعارض المصالح في سحابة المكتب: {0}",
+  "panel.t.cloudSync": "جلب القرار النهائي من السحابة",
+  "panel.t.cloudLinkPick": "ربط فحص تعارض المصالح في سحابة المكتب",
+  "panel.t.cloudNone": "لا توجد بعد سجلات تعارض مصالح في سحابة المكتب يمكنك ربطها.",
+  "panel.t.cloudLinkConfirm": "ربط وجلب القرار",
+  "panel.t.cloudLinkHint": "هل فُحص تعارض المصالح لهذه القضية في سحابة المكتب؟ اربطها ليتبع التقدّم المحلي القرار النهائي في السحابة.",
+  "access.commentRequired": "أدخل ملاحظات المراجعة أولاً، ثم وافق أو ارفض."
 }

@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Buka ruang kerja berkaitan",
   "readNotDone": "Membaca pemberitahuan ini tidak mengesahkan tindakan urusan. Buka ruang kerja berkaitan untuk menyemak dan menguruskannya.",
   "targetUnavailable": "Ruang kerja berkaitan tidak tersedia. Muat semula dan cuba lagi.",
-  "pluginUnavailable": "Pemalam berkaitan belum dipasang atau diaktifkan. Semak pusat pemalam.",
+  "pluginUnavailable": "Pemalam berkaitan belum dipasang atau diaktifkan. Semak pusat pemalam.", "enableLawFirmTitle": "Dayakan Pengurusan Firma Guaman?", "enableLawFirmBody": "Pemberitahuan ini dikendalikan dalam Pengurusan Firma Guaman. Ia disertakan dengan aplikasi; selepas didayakan, rekod ini dibuka terus.", "enableLawFirmConfirm": "Dayakan dan buka",
   "openFailed": "Tidak dapat membuka ruang kerja berkaitan. Sila cuba lagi.",
   "serviceFailed": "Perkhidmatan mesej tidak tersedia buat sementara waktu. Sila cuba lagi.",
   "source": "Daripada {name}",

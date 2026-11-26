@@ -28,7 +28,7 @@ export default {
   attachment: 'Attachment', attachmentUnavailable: 'This file is unavailable. Please contact its sender.', download: 'Download attachment', downloading: 'Preparing download…',
   unread: 'Unread', read: 'Read', markRead: 'Mark as read', statusPending: 'To handle', statusDone: 'Completed', statusCancelled: 'Cancelled',
   goHandle: 'Review and handle', openBusiness: 'Open related workspace', readNotDone: 'Reading this notification does not confirm the business action. Open the related workspace to review and handle it.',
-  targetUnavailable: 'The related workspace is unavailable. Refresh and try again.', pluginUnavailable: 'The related plugin is not installed or enabled. Check the plugin center.',
+  targetUnavailable: 'The related workspace is unavailable. Refresh and try again.', pluginUnavailable: 'The related plugin is not installed or enabled. Check the plugin center.', enableLawFirmTitle: 'Enable Law Firm Management?', enableLawFirmBody: 'This notice is handled in Law Firm Management. It ships with the app; enabling it opens this record directly.', enableLawFirmConfirm: 'Enable and open',
   openFailed: 'Could not open the related workspace. Please retry.', serviceFailed: 'Messages are temporarily unavailable. Please retry.', source: 'From {name}',
   "inviteTitle": "Create invitation code",
   "inviteRole": "Invite as",

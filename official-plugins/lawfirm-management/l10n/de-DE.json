@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Ausschalten und löschen",
   "cloud.purgeCancel": "Abbrechen",
   "billing.groupNoRate": " ({n} Einträge ohne Satz, nicht mitgezählt)",
-  "billing.groupSummaryNoRate": "{n} Einträge, davon {pending} zu prüfen; {h} abrechenbare Stunden, kein Satz hinterlegt"
+  "billing.groupSummaryNoRate": "{n} Einträge, davon {pending} zu prüfen; {h} abrechenbare Stunden, kein Satz hinterlegt",
+  "panel.t.cloudPendingLawyer": "Wartet auf betroffene Anwälte",
+  "panel.t.cloudPendingCommittee": "Wartet auf Schlussprüfung des Ausschusses",
+  "panel.t.cloudApproved": "Genehmigt",
+  "panel.t.cloudRejected": "Abgelehnt",
+  "panel.t.cloudSynced": "Lokaler Fortschritt nach der Kollisionsentscheidung in der Kanzlei-Cloud aktualisiert.",
+  "panel.t.cloudLinked": "Mit Kollisionsprüfung in der Kanzlei-Cloud verknüpft: {0}",
+  "panel.t.cloudSync": "Cloud-Schlussentscheidung abrufen",
+  "panel.t.cloudLinkPick": "Kollisionsprüfung in der Kanzlei-Cloud verknüpfen",
+  "panel.t.cloudNone": "Es gibt noch keine Kollisionsprüfungen in der Kanzlei-Cloud, die Sie verknüpfen können.",
+  "panel.t.cloudLinkConfirm": "Verknüpfen und Entscheidung abrufen",
+  "panel.t.cloudLinkHint": "Wurde dieses Mandat bereits in der Kanzlei-Cloud geprüft? Verknüpfen Sie es, dann folgt der lokale Fortschritt der Cloud-Schlussentscheidung.",
+  "access.commentRequired": "Geben Sie zuerst Ihre Prüfbemerkung ein und geben Sie dann frei oder lehnen ab."
 }

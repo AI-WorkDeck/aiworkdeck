@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Zugehörigen Arbeitsbereich öffnen",
   "readNotDone": "Das Lesen dieser Mitteilung ersetzt nicht die fachliche Bestätigung. Öffnen Sie den zugehörigen Arbeitsbereich zur Prüfung und Bearbeitung.",
   "targetUnavailable": "Der zugehörige Arbeitsbereich ist nicht verfügbar. Aktualisieren Sie die Ansicht und versuchen Sie es erneut.",
-  "pluginUnavailable": "Das zugehörige Plugin ist nicht installiert oder aktiviert. Prüfen Sie dies im Plugin-Center.",
+  "pluginUnavailable": "Das zugehörige Plugin ist nicht installiert oder aktiviert. Prüfen Sie dies im Plugin-Center.", "enableLawFirmTitle": "Kanzleimanagement aktivieren?", "enableLawFirmBody": "Diese Benachrichtigung wird im Kanzleimanagement bearbeitet. Es ist in der App enthalten; nach dem Aktivieren öffnet sich dieser Eintrag direkt.", "enableLawFirmConfirm": "Aktivieren und öffnen",
   "openFailed": "Der zugehörige Arbeitsbereich konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.",
   "serviceFailed": "Der Nachrichtendienst ist vorübergehend nicht verfügbar. Bitte versuchen Sie es erneut.",
   "source": "Von {name}",
