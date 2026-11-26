@@ -160,4 +160,21 @@ class MobileBillingRechargeDisabledTest {
         assertEquals(12345L, service.balance(u.getId()).balanceCents());
         verify(billing).balance(accountId);
     }
+
+    @Test
+    @DisplayName("Off by default: Pro quote says disabled and Pro order is DISABLED, no upstream call")
+    void wxpayProIsDisabled() {
+        User u = phoneUser();
+
+        assertEquals(MobileBillingClient.ProQuote.unavailable("disabled"), service.proQuote(u.getId()));
+        // Gate comes before argument validation and before any create=true resolve
+        assertEquals(MobileBillingKind.DISABLED,
+                assertThrows(MobileBillingFailureException.class,
+                        () -> service.createPro(u.getId(), null, null, null)).getKind());
+        assertEquals(MobileBillingKind.DISABLED,
+                assertThrows(MobileBillingFailureException.class,
+                        () -> service.createPro(u.getId(), "pro_monthly", 14900L, "idem-off-pro1")).getKind());
+        verifyNoInteractions(billing);
+        assertTrue(accountBindingRepository.findByUserId(u.getId()).isEmpty());
+    }
 }

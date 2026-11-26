@@ -960,6 +960,91 @@ class MobileApiContractTest {
     }
 
     @Test
+    void wxpayProEndpointsMatchSpec() throws Exception {
+        String sid = register("contract_wxpay_pro_" + System.nanoTime());
+        Long userId = com.checkba.controller.AuthController.getUserIdFromSession(sid);
+        AccountBinding binding = new AccountBinding();
+        binding.setUserId(userId);
+        binding.setExternalAccountId("acct-contract-pro-" + userId);
+        binding.setCreatedAt(LocalDateTime.now());
+        accountBindingRepository.save(binding);
+        String account = binding.getExternalAccountId();
+
+        mvc.perform(get("/api/mobile/billing/subscription/wxpay/quote"))
+                .andExpect(jsonPath("$.code").value(4010)).andExpect(openApi().isValid(validator));
+
+        when(billing.proQuote(account)).thenReturn(new MobileBillingClient.ProQuote(
+                true, null, "pro_monthly_intro", 9900L, 14900L, true, 3, 30));
+        mvc.perform(get("/api/mobile/billing/subscription/wxpay/quote").header("X-Session-Id", sid))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.skuId").value("pro_monthly_intro"))
+                .andExpect(jsonPath("$.amountCents").value(9900))
+                .andExpect(jsonPath("$.standardAmountCents").value(14900))
+                .andExpect(jsonPath("$.introRemainingMonths").value(3))
+                .andExpect(jsonPath("$.days").value(30))
+                .andExpect(jsonPath("$.reason").doesNotExist())
+                .andExpect(openApi().isValid(validator));
+
+        when(billing.proQuote(account)).thenReturn(
+                MobileBillingClient.ProQuote.unavailable("appstore_subscription_active"));
+        mvc.perform(get("/api/mobile/billing/subscription/wxpay/quote").header("X-Session-Id", sid))
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.reason").value("appstore_subscription_active"))
+                .andExpect(jsonPath("$.skuId").doesNotExist())
+                .andExpect(openApi().isValid(validator));
+
+        when(billing.createPro(account, "pro_monthly_intro", 9900L, "idem-contract-pro1"))
+                .thenReturn(new MobileBillingClient.RechargeOrder(
+                        "app", "OT-contract-pro", 9900L, null, null, null, null, null, null, null,
+                        Map.of("appId", "wx0123456789abcdef", "partnerId", "1900000001",
+                                "prepayId", "wx1234567890", "packageValue", "Sign=WXPay",
+                                "nonceStr", "abc123", "timeStamp", "1760000000", "sign", "c2ln")));
+        mvc.perform(post("/api/mobile/billing/subscription/wxpay/order").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"skuId":"pro_monthly_intro","amountCents":9900,"idempotencyKey":"idem-contract-pro1"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.present").value("app"))
+                .andExpect(jsonPath("$.outTradeNo").value("OT-contract-pro"))
+                .andExpect(jsonPath("$.skuId").value("pro_monthly_intro"))
+                .andExpect(jsonPath("$.prepayId").value("wx1234567890"))
+                .andExpect(jsonPath("$.packageValue").value("Sign=WXPay"))
+                .andExpect(openApi().isValid(validator));
+
+        doThrow(new MobileBillingClient.MobileBillingException(MobileBillingKind.REJECTED,
+                "价格已更新，请重新打开订阅页", "product_mismatch"))
+                .when(billing).createPro(account, "pro_monthly", 14900L, "idem-contract-pro2");
+        mvc.perform(post("/api/mobile/billing/subscription/wxpay/order").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"skuId":"pro_monthly","amountCents":14900,"idempotencyKey":"idem-contract-pro2"}"""))
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.kind").value("REJECTED"))
+                .andExpect(openApi().isValid(validator));
+
+        doThrow(new MobileBillingClient.MobileBillingException(MobileBillingKind.ALREADY_PAID,
+                "paid", "order_already_paid", "OT-contract-pro-paid"))
+                .when(billing).createPro(account, "pro_monthly", 14900L, "idem-contract-pro3");
+        mvc.perform(post("/api/mobile/billing/subscription/wxpay/order").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"skuId":"pro_monthly","amountCents":14900,"idempotencyKey":"idem-contract-pro3"}"""))
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(jsonPath("$.kind").value("ALREADY_PAID"))
+                .andExpect(jsonPath("$.outTradeNo").value("OT-contract-pro-paid"))
+                .andExpect(openApi().isValid(validator));
+
+        // Validation failure: unknown sku → generic code 1
+        mvc.perform(post("/api/mobile/billing/subscription/wxpay/order").header("X-Session-Id", sid)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {"skuId":"pro_yearly","amountCents":14900,"idempotencyKey":"idem-contract-pro4"}"""))
+                .andExpect(jsonPath("$.code").value(1))
+                .andExpect(openApi().isValid(validator));
+    }
+
+    @Test
     void wxPhoneLoginEnvelopesMatchSpec() throws Exception {
         // 成功：与 sms-login/verify 逐字同形（sessionId + isNewUser + user），data 受 LoginData 约束。
         // 号码用一个本测试专属的段，避免与别的用例抢同一行 users

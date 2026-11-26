@@ -914,4 +914,102 @@ class MobileBillingServiceTest {
         u.setPhone(nextPhone());
         return userRepository.save(u);
     }
+
+    // ==================== Pro via WeChat APP pay ====================
+
+    @Test
+    @DisplayName("Pro quote: bound account is passed through")
+    void proQuoteUsesBoundAccount() {
+        User user = phoneUser();
+        String account = "pro-quote-" + user.getId();
+        bind(user.getId(), account);
+        MobileBillingClient.ProQuote q = new MobileBillingClient.ProQuote(
+                true, null, "pro_monthly_intro", 9900, 14900, true, 3, 30);
+        when(billing.proQuote(account)).thenReturn(q);
+        assertEquals(q, service.proQuote(user.getId()));
+        verify(billing, never()).resolveAccountId(any(), any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("Pro quote without a unified account: the new-account offer, never create=true, no binding")
+    void proQuoteWithoutAccountDoesNotCreateOne() {
+        User user = phoneUser();
+        when(billing.resolveAccountId(user.getPhone(), null, false)).thenThrow(
+                new MobileBillingException(MobileBillingKind.NOT_FOUND, "not found"));
+        var offer = new MobileBillingClient.ProQuote(true, null, "pro_monthly_intro", 990, 14900, true, 3, 30);
+        when(billing.proQuote(null)).thenReturn(offer);
+        assertEquals(offer, service.proQuote(user.getId()));
+        verify(billing).resolveAccountId(user.getPhone(), null, false);
+        verify(billing, never()).resolveAccountId(any(), any(), eq(true));
+        verify(billing).proQuote(null);
+        assertTrue(accountBindingRepository.findByUserId(user.getId()).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Pro quote: upstream failure keeps its kind (not swallowed as unavailable)")
+    void proQuoteUpstreamFailureKeepsKind() {
+        User user = phoneUser();
+        String account = "pro-quote-down-" + user.getId();
+        bind(user.getId(), account);
+        when(billing.proQuote(account)).thenThrow(
+                new MobileBillingException(MobileBillingKind.UNAVAILABLE, "down"));
+        assertEquals(MobileBillingKind.UNAVAILABLE, assertThrows(MobileBillingFailureException.class,
+                () -> service.proQuote(user.getId())).getKind());
+    }
+
+    @Test
+    @DisplayName("Pro order: explicit purchase may create the account and passes sku/amount/key through")
+    void createProMayCreateAccount() {
+        User user = phoneUser();
+        String account = "pro-order-" + user.getId();
+        when(billing.resolveAccountId(user.getPhone(), null, true)).thenReturn(account);
+        RechargeOrder order = new RechargeOrder("app", "OT-pro-1", 9900L, null, null, null, null, null, null, null,
+                java.util.Map.of("prepayId", "wx1"));
+        when(billing.createPro(account, "pro_monthly_intro", 9900L, "idem-pro-0001")).thenReturn(order);
+
+        assertSame(order, service.createPro(user.getId(), " pro_monthly_intro ", 9900L, " idem-pro-0001 "));
+        // The 1-fen payment-test SKU passes the shape check; only the website decides who may buy it.
+        when(billing.createPro(account, "pro_test", 1L, "idem-pro-test1")).thenReturn(order);
+        assertSame(order, service.createPro(user.getId(), "pro_test", 1L, "idem-pro-test1"));
+        verify(billing).resolveAccountId(user.getPhone(), null, true);
+        assertEquals(account, accountBindingRepository.findByUserId(user.getId()).orElseThrow().getExternalAccountId());
+    }
+
+    @Test
+    @DisplayName("Pro order validation: sku whitelist, amount > 0, idempotency key pattern; nothing goes upstream")
+    void createProValidatesArguments() {
+        User user = phoneUser();
+        bind(user.getId(), "pro-order-bad-" + user.getId());
+        Object[][] bad = {
+                {null, 9900L, "idem-pro-0002"},
+                {"pro_yearly", 9900L, "idem-pro-0002"},
+                {"credits_cny_10", 9900L, "idem-pro-0002"},
+                {"pro_monthly", null, "idem-pro-0002"},
+                {"pro_monthly", 0L, "idem-pro-0002"},
+                {"pro_monthly", -1L, "idem-pro-0002"},
+                {"pro_monthly", 14900L, null},
+                {"pro_monthly", 14900L, "short"},
+                {"pro_monthly", 14900L, "has space!!"},
+        };
+        for (Object[] b : bad) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> service.createPro(user.getId(), (String) b[0], (Long) b[1], (String) b[2]),
+                    java.util.Arrays.toString(b));
+        }
+        verifyNoInteractions(billing);
+    }
+
+    @Test
+    @DisplayName("Pro order: ALREADY_PAID keeps kind and outTradeNo")
+    void createProAlreadyPaidKeepsOutTradeNo() {
+        User user = phoneUser();
+        String account = "pro-order-paid-" + user.getId();
+        bind(user.getId(), account);
+        when(billing.createPro(account, "pro_monthly", 14900L, "idem-pro-0003")).thenThrow(
+                new MobileBillingException(MobileBillingKind.ALREADY_PAID, "paid", "order_already_paid", "OT-pro-paid"));
+        MobileBillingFailureException e = assertThrows(MobileBillingFailureException.class,
+                () -> service.createPro(user.getId(), "pro_monthly", 14900L, "idem-pro-0003"));
+        assertEquals(MobileBillingKind.ALREADY_PAID, e.getKind());
+        assertEquals("OT-pro-paid", e.getOutTradeNo());
+    }
 }
