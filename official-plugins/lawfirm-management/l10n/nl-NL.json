@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Uitzetten en verwijderen",
   "cloud.purgeCancel": "Annuleren",
   "billing.groupNoRate": " ({n} regels zonder tarief, niet meegeteld)",
-  "billing.groupSummaryNoRate": "{n} regels, {pending} ter controle; {h} declarabele uren, geen tarief ingesteld"
+  "billing.groupSummaryNoRate": "{n} regels, {pending} ter controle; {h} declarabele uren, geen tarief ingesteld",
+  "panel.t.cloudPendingLawyer": "Wacht op betrokken advocaten",
+  "panel.t.cloudPendingCommittee": "Wacht op eindtoetsing door de commissie",
+  "panel.t.cloudApproved": "Goedgekeurd",
+  "panel.t.cloudRejected": "Afgewezen",
+  "panel.t.cloudSynced": "Lokale voortgang bijgewerkt op basis van de conflictbeslissing in de kantoorcloud.",
+  "panel.t.cloudLinked": "Gekoppeld aan conflictcontrole in de kantoorcloud: {0}",
+  "panel.t.cloudSync": "Eindbeslissing uit de cloud ophalen",
+  "panel.t.cloudLinkPick": "Conflictcontrole in de kantoorcloud koppelen",
+  "panel.t.cloudNone": "Er zijn nog geen conflictcontroles in de kantoorcloud die u kunt koppelen.",
+  "panel.t.cloudLinkConfirm": "Koppelen en beslissing ophalen",
+  "panel.t.cloudLinkHint": "Is deze zaak al op conflicten getoetst in de kantoorcloud? Koppel haar en de lokale voortgang volgt de eindbeslissing in de cloud.",
+  "access.commentRequired": "Vul eerst uw toetsingsopmerking in en geef daarna vrij of wijs af."
 }

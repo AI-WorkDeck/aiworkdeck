@@ -105,3 +105,23 @@ test('committee badge only for accepted members; successful submit clears the fo
   assert.equal(lead.calls.filter(x => x.action === 'workflowSubmit').length, 1);
   assert.equal(lead.$('workflow-title').value, ''); assert.equal(lead.$('workflow-client').value, ''); assert.equal(lead.$('workflow-consent').checked, false);
 });
+test('C22: an empty required comment is flagged next to the comment box, not at the top of the page', async t => {
+  const h = await harness({ self: { userId: 22, name: '合成关联律师', firmAdmin: false } });
+  t.after(() => h.dom.window.close());
+  h.data.records = [{ id, title: '合成新业务', status: 'PENDING_LAWYER_CLEARANCE', risk: 'YELLOW',
+    clearances: [{ targetId: 22, decision: 'PENDING', summary: '核查摘要' }] }];
+  await h.refresh();
+  const box = h.$('workflow-records').querySelector('textarea');
+  const before = h.$('workflow-status').textContent;
+  [...h.$('workflow-records').querySelectorAll('button')].find(b => b.textContent === '本人确认放行').click(); await tick();
+  const hint = box.nextElementSibling;
+  assert.ok(hint?.classList.contains('field-error'), 'hint sits right after the comment box');
+  assert.equal(hint.getAttribute('role'), 'alert');
+  assert.match(hint.textContent, /核查意见/);
+  assert.equal(box.getAttribute('aria-invalid'), 'true');
+  assert.equal(h.dom.window.document.activeElement, box);
+  assert.equal(h.$('workflow-status').textContent, before, 'top status line is not used');
+  assert.equal(h.calls.some(c => c.action === 'workflowClearance'), false);
+  box.value = '本人核查后确认'; box.dispatchEvent(new h.dom.window.Event('input'));
+  assert.equal(box.nextElementSibling?.classList.contains('field-error'), false);
+});

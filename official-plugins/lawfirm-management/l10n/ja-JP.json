@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "オフにして削除",
   "cloud.purgeCancel": "キャンセル",
   "billing.groupNoRate": "（うち {n} 件は単価未設定のため金額に含まれません）",
-  "billing.groupSummaryNoRate": "{n} 件、うち審査待ち {pending} 件。請求対象 {h} 時間、単価未設定"
+  "billing.groupSummaryNoRate": "{n} 件、うち審査待ち {pending} 件。請求対象 {h} 時間、単価未設定",
+  "panel.t.cloudPendingLawyer": "関係弁護士の確認待ち",
+  "panel.t.cloudPendingCommittee": "委員の最終審査待ち",
+  "panel.t.cloudApproved": "承認済み",
+  "panel.t.cloudRejected": "却下",
+  "panel.t.cloudSynced": "事務所クラウドの利益相反判断に基づき端末内の進捗を更新しました。",
+  "panel.t.cloudLinked": "事務所クラウドの利益相反チェックと連携済み：{0}",
+  "panel.t.cloudSync": "クラウドの最終判断を取得",
+  "panel.t.cloudLinkPick": "事務所クラウドの利益相反チェックと連携",
+  "panel.t.cloudNone": "連携できる事務所クラウドの利益相反記録はまだありません。",
+  "panel.t.cloudLinkConfirm": "連携して判断を取得",
+  "panel.t.cloudLinkHint": "この案件は事務所クラウドで利益相反チェック済みですか？連携すると、端末内の進捗がクラウドの最終判断に従います。",
+  "access.commentRequired": "先に確認意見を入力してから、承認または却下してください。"
 }

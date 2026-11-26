@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Désactiver et supprimer",
   "cloud.purgeCancel": "Annuler",
   "billing.groupNoRate": " ({n} entrées sans taux, non comptées)",
-  "billing.groupSummaryNoRate": "{n} entrées, dont {pending} à valider ; {h} heures facturables, aucun taux défini"
+  "billing.groupSummaryNoRate": "{n} entrées, dont {pending} à valider ; {h} heures facturables, aucun taux défini",
+  "panel.t.cloudPendingLawyer": "En attente des avocats concernés",
+  "panel.t.cloudPendingCommittee": "En attente de la décision finale du comité",
+  "panel.t.cloudApproved": "Approuvé",
+  "panel.t.cloudRejected": "Refusé",
+  "panel.t.cloudSynced": "Avancement local mis à jour d’après la décision de conflit dans le cloud du cabinet.",
+  "panel.t.cloudLinked": "Lié au contrôle de conflit du cloud du cabinet : {0}",
+  "panel.t.cloudSync": "Récupérer la décision finale du cloud",
+  "panel.t.cloudLinkPick": "Lier un contrôle de conflit du cloud du cabinet",
+  "panel.t.cloudNone": "Aucun contrôle de conflit du cloud du cabinet ne peut encore être lié.",
+  "panel.t.cloudLinkConfirm": "Lier et récupérer la décision",
+  "panel.t.cloudLinkHint": "Ce dossier a déjà été contrôlé dans le cloud du cabinet ? Liez-le : l’avancement local suivra la décision finale du cloud.",
+  "access.commentRequired": "Saisissez d’abord votre avis, puis autorisez ou refusez."
 }

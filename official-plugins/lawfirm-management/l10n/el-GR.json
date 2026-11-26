@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Απενεργοποίηση και διαγραφή",
   "cloud.purgeCancel": "Άκυρο",
   "billing.groupNoRate": " ({n} καταχωρίσεις χωρίς τιμή δεν υπολογίζονται)",
-  "billing.groupSummaryNoRate": "{n} εγγραφές, {pending} προς έλεγχο· {h} χρεώσιμες ώρες, χωρίς τιμή ακόμη"
+  "billing.groupSummaryNoRate": "{n} εγγραφές, {pending} προς έλεγχο· {h} χρεώσιμες ώρες, χωρίς τιμή ακόμη",
+  "panel.t.cloudPendingLawyer": "Αναμονή σχετικών δικηγόρων",
+  "panel.t.cloudPendingCommittee": "Αναμονή τελικού ελέγχου επιτροπής",
+  "panel.t.cloudApproved": "Εγκρίθηκε",
+  "panel.t.cloudRejected": "Απορρίφθηκε",
+  "panel.t.cloudSynced": "Η τοπική πρόοδος ενημερώθηκε από την απόφαση σύγκρουσης συμφερόντων στο cloud του γραφείου.",
+  "panel.t.cloudLinked": "Συνδεδεμένο με έλεγχο σύγκρουσης στο cloud του γραφείου: {0}",
+  "panel.t.cloudSync": "Λήψη τελικής απόφασης από το cloud",
+  "panel.t.cloudLinkPick": "Σύνδεση ελέγχου σύγκρουσης στο cloud του γραφείου",
+  "panel.t.cloudNone": "Δεν υπάρχουν ακόμη εγγραφές σύγκρουσης στο cloud του γραφείου που μπορείτε να συνδέσετε.",
+  "panel.t.cloudLinkConfirm": "Σύνδεση και λήψη απόφασης",
+  "panel.t.cloudLinkHint": "Έχει ήδη ελεγχθεί αυτή η υπόθεση στο cloud του γραφείου; Συνδέστε την και η τοπική πρόοδος θα ακολουθεί την τελική απόφαση του cloud.",
+  "access.commentRequired": "Συμπληρώστε πρώτα το σχόλιο ελέγχου και μετά εγκρίνετε ή απορρίψτε."
 }

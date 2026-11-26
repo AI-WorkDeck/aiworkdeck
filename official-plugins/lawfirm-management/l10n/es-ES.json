@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Desactivar y eliminar",
   "cloud.purgeCancel": "Cancelar",
   "billing.groupNoRate": " ({n} entradas sin tarifa, no contabilizadas)",
-  "billing.groupSummaryNoRate": "{n} entradas, {pending} por revisar; {h} horas facturables, sin tarifa"
+  "billing.groupSummaryNoRate": "{n} entradas, {pending} por revisar; {h} horas facturables, sin tarifa",
+  "panel.t.cloudPendingLawyer": "Pendiente de los abogados relacionados",
+  "panel.t.cloudPendingCommittee": "Pendiente de revisión final del comité",
+  "panel.t.cloudApproved": "Aprobado",
+  "panel.t.cloudRejected": "Rechazado",
+  "panel.t.cloudSynced": "Progreso local actualizado según la decisión de conflictos en la nube del despacho.",
+  "panel.t.cloudLinked": "Vinculado a la revisión de conflictos en la nube del despacho: {0}",
+  "panel.t.cloudSync": "Obtener decisión final de la nube",
+  "panel.t.cloudLinkPick": "Vincular revisión de conflictos en la nube del despacho",
+  "panel.t.cloudNone": "Aún no hay registros de conflictos en la nube del despacho que pueda vincular.",
+  "panel.t.cloudLinkConfirm": "Vincular y obtener decisión",
+  "panel.t.cloudLinkHint": "¿Este asunto ya pasó la revisión de conflictos en la nube del despacho? Vincúlelo y el progreso local seguirá la decisión final de la nube.",
+  "access.commentRequired": "Escriba primero su comentario de revisión y luego autorice o rechace."
 }
