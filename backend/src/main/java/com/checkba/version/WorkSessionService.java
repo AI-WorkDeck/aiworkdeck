@@ -1510,11 +1510,16 @@ public class WorkSessionService {
             if (awaitingAdoptResolution(projectId)) return false;
             WorkSession s = activeSession(projectId).orElse(null);
             if (s == null) return false;
-            boolean committedOnlyManifest = repoService.diffNameStatus(projectId, repoService.mainBranch(), s.getBranchName())
-                    .stream().allMatch(c -> c.path().startsWith(".awd/"));
-            boolean pendingOnlyManifest = repoService.pendingChanges(projectId).stream().allMatch(c -> c.path().startsWith(".awd/"));
+            List<FileChange> committed = repoService.diffNameStatus(projectId, repoService.mainBranch(), s.getBranchName());
+            List<FileChange> pendingNow = repoService.pendingChanges(projectId);
+            boolean committedOnlyManifest = committed.stream().allMatch(c -> c.path().startsWith(".awd/"));
+            boolean pendingOnlyManifest = pendingNow.stream().allMatch(c -> c.path().startsWith(".awd/"));
             if (!committedOnlyManifest || !pendingOnlyManifest) return false;
-            log.info("取回前丢弃只改了清单的工作段（没有律师改动）: project={} session={}", projectId, s.getId());
+            // CEO: log exactly what is dropped (only manifest paths by construction)
+            log.info("取回前丢弃只改了清单的工作段（没有律师改动）: project={} session={} branch={} dropped committed={} pending={}",
+                    projectId, s.getId(), s.getBranchName(),
+                    committed.stream().map(c -> c.type() + " " + c.path()).toList(),
+                    pendingNow.stream().map(c -> c.type() + " " + c.path()).toList());
             discardSession(projectId, userId);
             return true;
         } catch (RuntimeException e) {
