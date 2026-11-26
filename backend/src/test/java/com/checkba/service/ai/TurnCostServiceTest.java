@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 class TurnCostServiceTest {
 
     private HttpServer server;
+    private String openRouterBase = "https://openrouter.invalid/api/v1";
     private final List<String> seen = new CopyOnWriteArrayList<>();
 
     @AfterEach
@@ -48,7 +49,9 @@ class TurnCostServiceTest {
         when(channel.resolveFor(7L)).thenReturn(resolved);
         AccountService account = mock(AccountService.class);
         when(account.platformAiBaseUrl()).thenReturn(base);
-        return new TurnCostService(channel, account, new InstallIdentityService(dir.toString()), new ObjectMapper());
+        com.checkba.config.AiModelProperties props = new com.checkba.config.AiModelProperties();
+        props.getOpenRouter().setBaseUrl(openRouterBase);
+        return new TurnCostService(channel, account, new InstallIdentityService(dir.toString()), new ObjectMapper(), props);
     }
 
     private static PlatformAiKeyService.Resolved bailian() {
@@ -78,9 +81,44 @@ class TurnCostServiceTest {
         String run = "0b6c2f1e-1111-4222-8333-944455556666";
         assertEquals(false, service(base, bailian(), dir).turnCost(7L, "conv-1", run).get("available"));
         PlatformAiKeyService.Resolved intl = new PlatformAiKeyService.Resolved("sk-or-synthetic", "fp", null);
-        assertEquals(false, service(base, intl, dir).turnCost(7L, "conv-1", run).get("available"));
+        assertEquals(false, service(base, intl, dir).turnCost(7L, "conv-1", run).get("available"), "intl turn with no generations recorded");
         assertEquals(false, service(base, null, dir).turnCost(7L, "conv-1", run).get("available"));
         assertEquals(false, service(base, bailian(), dir).turnCost(7L, "conv-1", "../etc").get("available"));
         assertEquals(1, seen.size(), "only the platform-channel lookup reached the site");
+    }
+
+    @Test
+    void internationalTurnSumsOpenRouterGenerations(@TempDir Path dir) throws Exception {
+        String run = "1b6c2f1e-1111-4222-8333-944455556666";
+        String tag = new InstallIdentityService(dir.toString()).turnTag("conv-intl", run);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/api/v1/generation", ex -> {
+            String q = ex.getRequestURI().getQuery();
+            seen.add(q + " " + ex.getRequestHeaders().getFirst("Authorization"));
+            String body = q.endsWith("gen-a") ? "{\"data\":{\"id\":\"gen-a\",\"total_cost\":0.0012}}"
+                    : q.endsWith("gen-b") ? "{\"data\":{\"id\":\"gen-b\",\"total_cost\":0.0101}}" : "{}";
+            int status = q.endsWith("gen-c") ? 404 : 200;
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(status, bytes.length);
+            ex.getResponseBody().write(bytes);
+            ex.close();
+        });
+        server.start();
+        openRouterBase = "http://127.0.0.1:" + server.getAddress().getPort() + "/api/v1";
+        PlatformAiKeyService.Resolved intl = new PlatformAiKeyService.Resolved("sk-or-synthetic", "fp", null);
+        TurnGenerations.record(tag, "gen-a");
+        TurnGenerations.record(tag, "gen-b");
+        TurnGenerations.record(tag, "gen-a");          // duplicates count once
+        Map<String, Object> out = service("http://unused/api/account/ai/v1", intl, dir).turnCost(7L, "conv-intl", run);
+        assertEquals(true, out.get("available"));
+        assertEquals("USD", out.get("currency"));
+        assertEquals(11300L, out.get("micros"));
+        assertEquals(0, out.get("pending"));
+        assertEquals(2, out.get("calls"));
+        assertTrue(seen.stream().allMatch(x -> x.endsWith("Bearer sk-or-synthetic")));
+        TurnGenerations.record(tag, "gen-c");          // not yet available at OpenRouter
+        assertEquals(1, service("http://unused/api/account/ai/v1", intl, dir).turnCost(7L, "conv-intl", run).get("pending"));
+        PlatformTurnScope.run(tag, TurnGenerations::markIncomplete);   // an aux call without a generation id
+        assertEquals(false, service("http://unused/api/account/ai/v1", intl, dir).turnCost(7L, "conv-intl", run).get("available"));
     }
 }

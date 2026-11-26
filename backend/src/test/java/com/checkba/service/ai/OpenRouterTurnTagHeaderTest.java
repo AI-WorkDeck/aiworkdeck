@@ -100,4 +100,20 @@ class OpenRouterTurnTagHeaderTest {
         run(url, "awdai_synthetic", null);
         assertEquals(List.of("absent", "absent", "absent"), turnHeaders);
     }
+
+    @Test
+    void internationalChannelRecordsTheGenerationIdUnderTheTurn() throws Exception {
+        String tag = "abcdefabcdefabcdefabcdefabcdef01";
+        run(startServer(), "sk-or-synthetic", tag);
+        assertEquals(List.of("gen-1"), TurnGenerations.idsFor(tag));
+        assertEquals(List.of("absent"), turnHeaders, "the intl channel never sends X-AWD-Turn");
+        String cnTag = "abcdefabcdefabcdefabcdefabcdef02";
+        run(startServer2(), "awdai_synthetic", cnTag);
+        assertEquals(List.of(), TurnGenerations.idsFor(cnTag), "cn turns are summed by the site, not by id");
+    }
+
+    private String startServer2() throws IOException {
+        server.close();
+        return startServer();
+    }
 }

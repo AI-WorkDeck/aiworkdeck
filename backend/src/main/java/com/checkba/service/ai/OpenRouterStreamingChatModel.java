@@ -399,6 +399,9 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         }
 
         StreamSession session = new StreamSession(handler, maxOutputTokens != null);
+        // Q24 国际平台通道（非 awdai_）：轮次里的每次生成都记下 OpenRouter 生成 id，按 id 查实扣金额
+        final String generationTag = apiKey != null && !apiKey.startsWith("awdai_") ? turnTagOf(handler) : null;
+        session.generationTag = generationTag;
         // Explicit paid writing requests do not transparently retry a failed connection.
         // International general chat retains its original policy; domestic requests never replay uncertain charges.
         OkHttpClient transport = maxOutputTokens == null && !(apiKey != null && apiKey.startsWith("awdai_"))
@@ -446,6 +449,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 String from = old.provider;
                 inflight.call.cancel();
                 StreamSession next = new StreamSession(handler, false);
+                next.generationTag = generationTag;
                 String retryBody = withProviderRequeue(baseBody, from, providerRouting.sort());
                 log.warn("Requeueing {} on another provider (was {}): only keep-alive before first byte",
                         modelName, from == null ? "unknown" : from);
@@ -940,6 +944,10 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             if (reasoningHandler != null) reasoningHandler.onProvider(provider);
         }
 
+        /** Q24 国际：OpenRouter 的生成 id 记到本轮标记下（只在内存里），之后按 id 查实扣金额。null = 不记。 */
+        volatile String generationTag;
+        private volatile boolean generationReported;
+
         StreamSession(StreamingResponseHandler<AiMessage> handler, boolean privateWriting) {
             this.handler = handler;
             this.privateWriting = privateWriting;
@@ -1003,6 +1011,11 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 if (privateWriting) log.warn("Writing SSE chunk does not fit ChatCompletionResponse, ignored");
                 else log.warn("SSE chunk does not fit ChatCompletionResponse, ignored: {}", abbreviate(payload));
                 return false;
+            }
+            if (!generationReported && generationTag != null) {
+                generationReported = true;
+                JsonNode gid = root.get("id");
+                if (gid != null && gid.isTextual()) TurnGenerations.record(generationTag, gid.asText());
             }
             if (!providerReported) {
                 // 分片顶层的 provider：排在内容回调之前，TTFT 那条日志才能带上它

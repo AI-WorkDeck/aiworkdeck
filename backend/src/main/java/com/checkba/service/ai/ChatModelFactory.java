@@ -742,7 +742,10 @@ public class ChatModelFactory {
      */
     static java.util.Map<String, String> turnHeaders(String apiKey) {
         String tag = PlatformTurnScope.current();
-        if (apiKey == null || !apiKey.startsWith("awdai_") || tag == null || !tag.matches("^[0-9a-f]{32}$")) {
+        if (tag == null || !tag.matches("^[0-9a-f]{32}$")) return java.util.Map.of();
+        if (apiKey == null || !apiKey.startsWith("awdai_")) {
+            // 国际平台通道的非流式调用拿不到 OpenRouter 生成 id：这一轮的金额查不全，页脚回「查看用量」
+            TurnGenerations.markIncomplete();
             return java.util.Map.of();
         }
         return java.util.Map.of("X-AWD-Turn", tag);

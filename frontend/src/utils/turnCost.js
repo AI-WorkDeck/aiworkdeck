@@ -12,8 +12,15 @@ export function formatTurnCost(data) {
   if (!data || data.available !== true || data.pending !== 0) return null
   const cents = Number(data.cents)
   if (!Number.isInteger(cents) || cents < 0) return null
-  const symbol = data.currency === 'USD' ? '$' : '¥'
-  const amount = symbol + (cents / 100).toFixed(2)
+  let amount
+  if (data.currency === 'USD' && Number.isInteger(data.micros) && data.micros >= 0) {
+    // 国际通道按 OpenRouter 的实扣金额（百万分之一美元）：常常不到一美分，显示到有效位，最少两位小数
+    const fixed = (data.micros / 1e6).toFixed(6).replace(/0+$/, '')
+    const [whole, frac = ''] = fixed.split('.')
+    amount = '$' + whole + '.' + frac.padEnd(2, '0')
+  } else {
+    amount = (data.currency === 'USD' ? '$' : '¥') + (cents / 100).toFixed(2)
+  }
   let source = ''
   if (cents > 0 && Number(data.subscriptionCents) === cents) source = 'subscription'
   else if (cents > 0 && Number(data.bqtCents) === cents) source = 'bqt'

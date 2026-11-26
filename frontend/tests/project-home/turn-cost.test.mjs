@@ -51,3 +51,9 @@ test('Q24: a turn that also generated a presentation shows the partial amount an
   const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
   assert.match(chat, /turnCost\.partial" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.turnCostPartial'/)
 })
+
+test('Q24 intl: OpenRouter amounts keep their precision (micros), never rounded to zero', () => {
+  assert.deepEqual(formatTurnCost({ available: true, currency: 'USD', micros: 11300, cents: 1, pending: 0 }), { amount: '$0.0113', source: '' })
+  assert.deepEqual(formatTurnCost({ available: true, currency: 'USD', micros: 1500000, cents: 150, pending: 0 }), { amount: '$1.50', source: '' })
+  assert.deepEqual(formatTurnCost({ available: true, currency: 'USD', micros: 0, cents: 0, pending: 0 }), { amount: '$0.00', source: '' })
+})
