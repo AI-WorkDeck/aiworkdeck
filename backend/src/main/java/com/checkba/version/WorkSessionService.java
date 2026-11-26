@@ -1052,6 +1052,9 @@ public class WorkSessionService {
                 changes = repoService.diffNameStatus(projectId, newSha, oldSha);
             }
             restoreWorkTreeFrom(projectId, newSha, changes);
+            // Receive moved master but not the index; without this, large objects read as server edits
+            // and dockDirtyMainlineForReceive commits a spurious 「自动存档」 before the next push.
+            repoService.resetIndexTo(projectId, newSha);
             syncManifestFromRef(projectId, "HEAD");
             pendingIngestBase.remove(projectId);
             log.info("push 落库完成: project={}, {} 个文件", projectId, changes.size());

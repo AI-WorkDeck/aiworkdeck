@@ -1608,6 +1608,19 @@ public class ProjectRepoService {
         } catch (IOException e) { throw new VersionException("还原版本内容失败: " + path, e); }
     }
 
+    /**
+     * Points the index at {@code ref} without touching the worktree (git reset --mixed). Used after the server
+     * materializes a received version: a stale index made pendingChanges fall back to a HEAD-vs-disk diff that
+     * compares full media bytes against their pointers, so every large object read as a server edit.
+     */
+    public void resetIndexTo(long projectId, String ref) {
+        try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            git.reset().setMode(ResetCommand.ResetType.MIXED).setRef(ref).call();
+        } catch (Exception e) {
+            throw new VersionException("更新版本索引失败: project=" + projectId, e);
+        }
+    }
+
     public List<LocalVersionObjectStore.ObjectRef> objectPointersAt(long projectId, String ref, boolean includeHistory) {
         try (Repository repo = open(projectId)) { return objectPointersAt(repo, ref, includeHistory); }
     }
