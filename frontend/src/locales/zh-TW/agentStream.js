@@ -17,7 +17,7 @@ export default {
   "regionBlockedNotice": "> **該模型在目前網路環境不可用**：境外模型在境內網路會被服務商按地域拒絕。可在設定中改用 AI WorkDeck 雲端通道，或換成標註「境內外均可用」的模型後重新傳送。",
   "quotaExhaustedNotice": "> **AI 服務額度不足**：目前通道的餘額或配額已用完。使用自備 Key 時請到服務商（如 OpenRouter）儲值；使用 AI WorkDeck 雲端通道時請到官網帳戶頁檢查額度分配。",
   "contextOverflowNotice": "> **對話上下文超出模型視窗**：已嘗試自動壓縮仍超限。建議開啟新對話繼續，或減少一次攜帶的檔案數量與長度。",
-  "networkUnreachableNotice": "> **網路連線異常**：本機連不上 AI 服務（可能是斷網、DNS 解析失敗或代理不通）。請檢查網路後重新傳送這條訊息。",
+  "networkUnreachableNotice": "> **網路連線異常**：連不上 AI 服務，可能是網路斷開或網路設定有問題。請檢查網路後重新傳送這條訊息。",
   "interruptedRunEndedNotice": "> **連線曾中斷**：斷線期間這一輪已在後台結束，上面顯示的內容可能不完整。重新整理頁面或重新開啟這個會話可檢視完整記錄。",
   "internalErrorNotice": "> **本輪執行被內部錯誤中斷**：已完成的操作與工具執行過程都已儲存，可在歷史裡檢視。請再發一次訊息繼續；如果反覆出現，請透過右下角回饋把這段對話發給我們。",
   "subtaskStarted": "子任務開始",
