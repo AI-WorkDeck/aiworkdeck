@@ -27,7 +27,8 @@ test('after 交稿 the kept-local files are named once per set, with a button to
 })
 
 function body(src, name) {
-  const start = src.search(new RegExp('^    (?:async )?' + name + '\\(', 'm'))
+  // handleItemClick also survives as a commented-out older copy: take the live one (item, event).
+  const start = src.search(new RegExp('^    (?:async )?' + name + (name === 'handleItemClick' ? '\\(item, event\\)' : '\\('), 'm'))
   assert.ok(start >= 0, name)
   return src.slice(start, src.indexOf('\n    },', start) + 7).trim().replace(/,$/, '')
 }
@@ -44,15 +45,41 @@ test('tree badge: mine reads 仅在本机, a colleague placeholder names who has
 
 test('double-clicking a colleague placeholder explains instead of opening; my own file opens normally', () => {
   const modals = []
-  const explain = fn('explainLocalOnly', { uni: { showModal: (o) => modals.push(o) } })
+  const explain = fn('explainLocalOnly', { uni: { showModal: (o) => modals.push(o) }, Date })
   const v = { $t: t, localOnlyByFileId: { 1: { mine: true }, 2: { mine: false, sharedBy: '沈砚' } },
     localOnlyLabel: (i) => 'label' + i.id, localOnlyTip: (i) => 'tip' + i.id }
+  v.isColleaguePlaceholder = fn('isColleaguePlaceholder').bind(v)
   assert.equal(explain.call(v, { id: 2 }), true)
   assert.equal(modals[0].content, 'tip2')
   assert.equal(explain.call(v, { id: 1 }), false, 'the sharer still opens their own file')
   assert.equal(explain.call(v, { id: 9 }), false)
   assert.match(tree, /if \(item && !item\.isFolder && !this\.explainLocalOnly\(item\)\) this\.\$emit\('file-open', item\)/)
   assert.equal(tree.match(/class="tree-item-due is-local-only"/g).length, 2, 'both tree renderings show the badge')
+})
+
+test('a single click on a colleague placeholder selects and explains, never opens; a double-click explains once', () => {
+  const modals = []
+  const deps = { uni: { showModal: (o) => modals.push(o) }, Date, console }
+  const v = { $t: t, localOnlyByFileId: { 2: { mine: false, sharedBy: '沈砚' }, 1: { mine: true } },
+    localOnlyLabel: (i) => 'label' + i.id, localOnlyTip: (i) => 'tip' + i.id, multiSelectedIds: [], emitted: [] }
+  v.$emit = (name, item) => v.emitted.push([name, item.id])
+  v.isColleaguePlaceholder = fn('isColleaguePlaceholder', deps).bind(v)
+  v.explainLocalOnly = fn('explainLocalOnly', deps).bind(v)
+  const click = fn('handleItemClick', deps).bind(v)
+  const placeholder = { id: 2, isFolder: false, parentId: null }
+  click(placeholder, { metaKey: false, ctrlKey: false })
+  assert.deepEqual(v.emitted, [], 'not opened (the player, 当前文档)')
+  assert.equal(v.selectedFileId, 2, 'still selected')
+  assert.equal(modals.length, 1)
+  assert.equal(v.explainLocalOnly(placeholder), true, 'the dblclick that follows is still handled')
+  assert.equal(modals.length, 1, 'but explained once')
+  v.lastClickTime = 0
+  modals.length = 0; v.localOnlyExplained = null
+  click(placeholder)
+  assert.equal(modals.length, 0, 'arrow keys pass over it silently')
+  v.lastClickTime = 0
+  click({ id: 1, isFolder: false, parentId: null }, { metaKey: false, ctrlKey: false })
+  assert.deepEqual(v.emitted, [['file-select', 1]], 'the sharer opens their own file as before')
 })
 
 test('the 交稿 result and the tree read the local-only endpoints', () => {

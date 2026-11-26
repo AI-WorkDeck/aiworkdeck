@@ -1218,6 +1218,36 @@ class MobileRelayClientHttpTest {
         verify(resource, never()).getInputStream();
     }
 
+    /**
+     * C12 (lane C r2): a colleague's 「仅在 X 的电脑上」 placeholder has no bytes on this computer. It used to abort the
+     * whole backup run every minute (「文件不存在」), so no other file was backed up either. Skip it, back up the rest,
+     * and never delete an earlier backup copy because of a missing file.
+     */
+    @Test
+    void aFileMissingOnDiskIsSkippedTheRestIsBackedUpAndNoBackupIsDeleted() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        var missing = addNode(null, "证据10.pdf", false);
+        missing.setUid("0b8a2f62-5d1c-4f43-9a0e-3e7c6d1f2a10"); missing.setFilePath("synthetic/missing.pdf");
+        var present = addNode(null, "资料.pdf", false);
+        present.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); present.setFilePath("synthetic/doc.pdf");
+        when(storageService.load("synthetic/missing.pdf")).thenThrow(new com.checkba.storage.StorageException("文件不存在: synthetic/missing.pdf"));
+        byte[] bytes = "synthetic-backup-pdf".getBytes(StandardCharsets.UTF_8);
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        when(storageService.load("synthetic/doc.pdf")).thenReturn(new ByteArrayResource(bytes));
+        AtomicInteger uploads = new AtomicInteger(), deletes = new AtomicInteger();
+        server.createContext("/api/mobile/backup/manifest", ex -> respond(ex, 200, "{\"code\":0}"));
+        server.createContext("/api/mobile/backup/files", ex -> {
+            switch (ex.getRequestMethod()) {
+                case "PUT" -> { uploads.incrementAndGet(); ex.getRequestBody().readAllBytes(); respond(ex, 200, "{\"sha256\":\"" + hash + "\"}"); }
+                case "DELETE" -> { deletes.incrementAndGet(); respond(ex, 200, "{\"code\":0}"); }
+                default -> respond(ex, 200, "{\"files\":[{\"projectKey\":\"42\",\"id\":\"" + missing.getId() + "\",\"sha256\":\"" + "a".repeat(64) + "\"}]}");
+            }
+        });
+        service().syncFileBackups();
+        assertEquals(1, uploads.get(), "the present file is still backed up");
+        assertEquals(0, deletes.get(), "the earlier backup of the missing file is kept");
+    }
+
     @Test
     void backupAccountSwitchStopsBeforeUploadingFileBytes() throws Exception {
         server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));

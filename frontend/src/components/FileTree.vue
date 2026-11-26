@@ -1582,10 +1582,17 @@ export default {
       return this.$t('fileTree.localOnlyOtherTip', { name: e.sharedBy || this.$t('fileTree.localOnlyColleague') })
     },
     // 同事那份只是占位：本机没有字节，说明原因而不是去打开一个不存在的文件
-    explainLocalOnly(item) {
+    isColleaguePlaceholder(item) {
       const e = this.localOnlyByFileId[item && item.id]
-      if (!e) return false
-      if (e.mine) return false
+      return !!e && !e.mine
+    },
+    explainLocalOnly(item) {
+      if (!this.isColleaguePlaceholder(item)) return false
+      // A double-click is a click (select) plus a dblclick: explain once, not twice.
+      const now = Date.now()
+      const last = this.localOnlyExplained
+      if (last && last.id === item.id && now - last.at < 1000) return true
+      this.localOnlyExplained = { id: item.id, at: now }
       uni.showModal({
         title: this.localOnlyLabel(item),
         content: this.localOnlyTip(item),
@@ -2665,7 +2672,13 @@ export default {
       // 单选模式：清空多选，只选中当前
       this.multiSelectedIds = [item.id]
       this.selectedFileId = item.id
-      this.$emit('file-select', item)
+      // C12（lane C r2）：单击就会打开文件。同事那份占位在本机没有字节：点它只选中并说明原因，
+      // 不打开播放器、不成为「当前文档」；方向键经过（不带 event）只选中，不弹窗。
+      if (!item.isFolder && this.isColleaguePlaceholder(item)) {
+        if (event) this.explainLocalOnly(item)
+      } else {
+        this.$emit('file-select', item)
+      }
 
       // Update Active Folder for Creation Context
       if (item.isFolder) {

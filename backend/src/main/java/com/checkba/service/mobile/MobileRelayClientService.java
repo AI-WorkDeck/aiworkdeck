@@ -541,7 +541,14 @@ public class MobileRelayClientService {
                     if (Boolean.TRUE.equals(file.getIsFolder()) || !MobilePreviewPolicy.supports(file.getName())) continue;
                     if (file.getFilePath() == null) continue;
                     String identity = projectKey + ":" + file.getId();
-                    var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
+                    org.springframework.core.io.Resource resource;
+                    try { resource = storageServiceFactory.getStorageService().load(file.getFilePath()); }
+                    catch (com.checkba.storage.StorageException missing) {
+                        // C12: e.g. a colleague's 「仅在 X 的电脑上」 placeholder has no bytes here. Skip it instead of
+                        // aborting the whole run every minute, and keep any earlier backup copy (never erased by absence).
+                        previous.remove(identity);
+                        continue;
+                    }
                     long size = resource.contentLength();
                     if (size > MobileTransferService.MAX_TRANSFER_BYTES) continue;
                     JsonNode old = previous.remove(identity);
