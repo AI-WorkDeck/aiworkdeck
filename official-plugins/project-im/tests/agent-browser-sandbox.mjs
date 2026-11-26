@@ -136,9 +136,13 @@ test('assistant group, retry and private chat work through native browser input 
   assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.getElementById('send').getBoundingClientRect().bottom <= innerHeight), true);
   if (process.env.IM_SCREENSHOT_DIR) await page.screenshot({ path: process.env.IM_SCREENSHOT_DIR + '/assistant-private-narrow.png' });
   await page.evaluate(() => { window.rejectAdmissions = true; });
-  for (let i = 0; i < 3; i++) { await frame.type('#draft', `@助手 第${i + 1}条待重试问题`); await frame.focus('#draft'); await page.keyboard.press('Enter'); }
+  // 每条等发送完成（草稿清空、发送键恢复）再输入下一条：负载高时连按 Enter 会落在上一条发送期间
+  for (let i = 0; i < 3; i++) {
+    await frame.type('#draft', `@助手 第${i + 1}条待重试问题`); await frame.focus('#draft'); await page.keyboard.press('Enter');
+    await frame.waitForFunction(() => !document.getElementById('draft').value && !document.getElementById('send').disabled, { timeout: 20000 });
+  }
   // C14：三次失败只留最新一行重试，不再堆在输入框上方；窄窗下发送键仍可见
-  await frame.waitForFunction(() => /第3条待重试问题/.test(document.getElementById('agent-status').textContent));
+  await frame.waitForFunction(() => /第3条待重试问题/.test(document.getElementById('agent-status').textContent), { timeout: 20000 });
   assert.equal(await frame.evaluate(() => document.querySelectorAll('#agent-status button').length), 1, 'failures collapse to one retry row');
   assert.equal(await frame.evaluate(() => document.getElementById('send').getBoundingClientRect().bottom <= innerHeight), true, 'the narrow composer stays accessible');
   await page.setViewport({ width: 260, height: 760 }); await frame.click('#back');
