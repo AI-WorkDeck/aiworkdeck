@@ -225,6 +225,28 @@ public class ProjectObjectSyncService {
         if (plans != null && plans.hasLocalOnly(project)) plans.forgetLocalOnly(project, ref);
     }
 
+    /**
+     * C12 UI: every local-only file of the case at the main line, as {path, name, mine, sharedBy} — the sharer's
+     * own (「仅在本机（未共享）」) and colleagues' placeholders (「仅在 X 的电脑上」).
+     */
+    public List<Map<String, Object>> localOnlyEntries(long project) {
+        var plans = plans();
+        if (plans == null || !plans.hasLocalOnly(project)) return List.of();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (var row : plans.localOnly(project)) {
+            ObjectRef ref = new ObjectRef(row.getObjectSha(), row.getObjectSize());
+            for (String path : repos.objectPointerPaths(project, repos.mainBranch(), false, 20, ref::equals)) {
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("path", path);
+                entry.put("name", path.substring(path.lastIndexOf('/') + 1));
+                entry.put("mine", Boolean.TRUE.equals(row.getMine()));
+                if (row.getDeclaredByName() != null) entry.put("sharedBy", row.getDeclaredByName());
+                out.add(entry);
+            }
+        }
+        return out;
+    }
+
     /** Names of the files this computer keeps local-only for the case (for the 交稿 result). */
     public List<String> localOnlyMine(long project) {
         var plans = plans();

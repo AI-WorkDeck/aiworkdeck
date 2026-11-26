@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "このマージ済み原稿はファイル一覧から開いて確認してください。",
   transferUploading: '大きなファイルをアップロード中 {done} / {total} MB。回線が遅い場合は数分かかることがあります',
   transferDownloading: '大きなファイルを取得中 {done} / {total} MB。回線が遅い場合は数分かかることがあります',
+  "localOnlyNoticeTitle": "これらのファイルはこのパソコンに残りました",
+  "localOnlyNoticeBody": "提出しました。{files} は無料共有枠を超えたため、お使いのパソコンにのみあります。同僚にはプレースホルダーが表示されます。共有するにはクラウドバックアップを有効にして再提出してください。",
+  "localOnlyNoticeMore": " ほか 計 {count} 件",
+  "localOnlyNoticeAction": "ファイルのクラウドバックアップを有効にする",
+  "localOnlyNoticeOk": "OK",
 }

@@ -197,4 +197,11 @@ export default {
   ocrSearchablePdf: 'Make searchable PDF',
   ocrLayoutSuffix: '-OCR layout',
   ocrSearchableSuffix: '-searchable',
+  localOnlyMine: 'On this computer only (not shared)',
+  localOnlyMineTip: 'Over the free sharing allowance, so this file stays on your computer; colleagues see a placeholder. Turn on cloud file backup and submit again to share it.',
+  localOnlyOther: 'Only on {name}’s computer',
+  localOnlyOtherUnknown: 'Only on a colleague’s computer',
+  localOnlyOtherTip: 'This file is only on {name}’s computer and was not shared to the case library. Ask {name} to turn on cloud file backup and submit again.',
+  localOnlyColleague: 'a colleague',
+  localOnlyOk: 'OK',
 }
