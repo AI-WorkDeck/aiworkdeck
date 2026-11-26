@@ -274,11 +274,19 @@ class GitHttpProtocolTest {
         Files.writeString(receiver.workTree(2).resolve("说明.txt"), "同事改了一行");
         assertNotNull(receiver.commitAll(2, "edit", "auto", null, "Synthetic colleague", "colleague@example.test"));
         colleague.upload(2, remoteUrl(remote), "test", token);
-        // The server ingests the sender's push asynchronously and may dock its worktree meanwhile; a real
-        // client pulls and retries in that window, so retry briefly here instead of racing the ingest.
+        // The server may autosave its own worktree right before accepting a push (dockDirtyMainlineForReceive),
+        // so the first push can be non-fast-forward. The real client then integrates and re-pushes
+        // (CloudSyncUploadRepushTest); do the same here. Consent is what this case is about.
         var pushed = receiver.pushMainlineToOrigin(2, "test", token);
-        for (int i = 0; i < 20 && !pushed.pushed(); i++) {
-            Thread.sleep(250);
+        if (!pushed.pushed()) {
+            try (var repo = receiver.open(2); Git git = new Git(repo)) {
+                var credentials = new UsernamePasswordCredentialsProvider("test", token);
+                git.fetch().setRemote("origin").setCredentialsProvider(credentials).call();
+                var merge = git.merge().include(repo.resolve("refs/remotes/origin/master"))
+                        .setMessage("integrate").call();
+                assertTrue(merge.getMergeStatus().isSuccessful(), String.valueOf(merge.getMergeStatus()));
+            }
+            colleague.upload(2, remoteUrl(remote), "test", token);
             pushed = receiver.pushMainlineToOrigin(2, "test", token);
         }
         assertTrue(pushed.pushed(), pushed.message());
