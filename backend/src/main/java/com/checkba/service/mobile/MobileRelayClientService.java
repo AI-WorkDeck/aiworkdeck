@@ -165,7 +165,14 @@ public class MobileRelayClientService {
         requireCatalogAccountScope(scope);
         String token = currentToken();
         requireCatalogAccountScope(scope);
-        if (token == null) throw new IllegalArgumentException(LangText.of("请先连接账户", "Connect your account first"));
+        if (token == null) {
+            // Q20：账户连着、只是云端中转站这会儿连不上（桥接失败）时，不能说「请先连接账户」——
+            // 用户刚登录完，看到这句只会以为登录没成功
+            throw new IllegalArgumentException(active()
+                    ? LangText.of("暂时连不上云端服务，账户本身没有问题。请检查网络，稍后再试。",
+                            "Can't reach the cloud service right now; your account is fine. Check your connection and try again later.")
+                    : LangText.of("请先连接账户", "Connect your account first"));
+        }
         return new CatalogSession(scope, token);
     }
     /** A catalogue operation never rebinds credentials halfway through an account switch. */
