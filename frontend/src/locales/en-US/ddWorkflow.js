@@ -283,7 +283,7 @@ export default {
       "caseLibraryUnavailable": "This site has no case library yet. Choose a connected team case library.",
       "invitationInvalid": "The access code is invalid, expired or revoked. Check the code and retry.",
       "incompleteCaseResponse": "The case library returned incomplete information. Please retry later.",
-      "invitationExpired": "The invitation is no longer valid. Enter the access code again.",
+      "invitationExpired": "This connection has expired. Enter the access code again.",
       "caseAddressChanged": "The case library address has changed. Please reconnect.",
       "caseConnectionFailed": "Unable to connect to the case library. Please retry later.",
       "connectionUnavailable": "The invited project connection is unavailable. Enter the access code again.",

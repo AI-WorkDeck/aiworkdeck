@@ -284,7 +284,7 @@ export default {
       "caseLibraryUnavailable": "本站暫未提供案件庫，請選擇已連線的團隊案件庫",
       "invitationInvalid": "存取碼無效、已過期或已撤銷，請核對後重試",
       "incompleteCaseResponse": "案件庫返回的資訊不完整，請稍後重試",
-      "invitationExpired": "邀請已失效，請重新輸入存取碼",
+      "invitationExpired": "連線已失效，請重新輸入存取碼",
       "caseAddressChanged": "案件庫地址已變更，請重新連線",
       "caseConnectionFailed": "暫時無法連線案件庫，請稍後重試",
       "connectionUnavailable": "受邀專案連線不可用，請重新輸入存取碼",

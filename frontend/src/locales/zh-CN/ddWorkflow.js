@@ -283,7 +283,7 @@ export default {
       "caseLibraryUnavailable": "本站暂未提供案件库，请选择已连接的团队案件库",
       "invitationInvalid": "访问码无效、已过期或已撤销，请核对后重试",
       "incompleteCaseResponse": "案件库返回的信息不完整，请稍后重试",
-      "invitationExpired": "邀请已失效，请重新输入访问码",
+      "invitationExpired": "连接已失效，请重新输入访问码",
       "caseAddressChanged": "案件库地址已变更，请重新连接",
       "caseConnectionFailed": "暂时无法连接案件库，请稍后重试",
       "connectionUnavailable": "受邀项目连接不可用，请重新输入访问码",

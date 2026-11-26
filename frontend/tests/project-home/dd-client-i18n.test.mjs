@@ -96,7 +96,7 @@ test('notification translations preserve business titles and leave unfamiliar me
 
 test('known fixed server errors are translated without rewriting unfamiliar details', async () => {
   const api = serviceFixture('en-US', async () => ({ status: 403, json: async () => ({ message: '邀请已失效，请重新输入邀请码' }) }))
-  await assert.rejects(api.ddClientJson('/anything'), /invitation is no longer valid/)
+  await assert.rejects(api.ddClientJson('/anything'), /connection has expired/)
   assert.equal(api.ddClientErrorMessage('客户原样说明'), '客户原样说明')
   assert.equal(serviceFixture('zh-CN').ddClientErrorMessage('无权访问该清单'), '无权访问该清单')
 })
