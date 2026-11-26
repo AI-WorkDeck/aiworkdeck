@@ -316,6 +316,12 @@ export default {
   collabRemoteAhead: 'A teammate submitted a new draft',
   collabPendingUpload: 'Changes not yet submitted',
   collabInSync: 'In sync with the team',
+  collabChecking: 'Checking with the team…',
+  collabNotChecked: 'Not checked with the team yet',
+  collabInSyncAsOf: 'In sync with the team as of {age}',
+  collabAgeSeconds: '{n} s ago',
+  collabAgeMinutes: '{n} min ago',
+  collabAgeHours: '{n} h ago',
   // Script-side messages
   defaultUserName: 'User',
   folderScopeLabel: 'Folder: {name}',

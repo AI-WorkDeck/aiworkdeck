@@ -2603,7 +2603,7 @@ import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
-import { remoteAheadText } from '@/utils/collabWording.js'
+import { remoteAheadText, collabAgeText, COLLAB_FRESH_MS } from '@/utils/collabWording.js'
 import { versionEntryState } from '@/utils/versionEntryState.js'
 import { createVersionExitGuard } from '@/utils/versionExitGuard.js'
 import { showSheet } from '@/utils/dialog.js'
@@ -3092,6 +3092,11 @@ export default {
       versionStatusError: false,
       // 协作（团队案件库）状态：{linked, serverUrl, pendingUpload, remoteAhead, offline}
       collabCloud: null,
+      // C5：最近一次**联网**核对团队案件库完成的时间（ms）与是否正在核对；collabNow 每 5 秒走一格，
+      // 让「几秒前核对」的判断跟着时间变
+      collabCheckedAt: 0,
+      collabChecking: false,
+      collabNow: Date.now(),
       collabDialogVisible: false,
       collabInitialTab: 'casefile',
       // 交稿引导（dev-board#645）：'guide' = 从「交稿」拦下来的三步清单，'help' = 只看说明
@@ -3531,7 +3536,17 @@ export default {
         return remoteAheadText((k, params) => this.$t(k, params), c, { fallbackKey: 'workbench.collabRemoteAhead' })
       }
       if (c.pendingUpload || this.versionWorkStatus.working) return this.$t('workbench.collabPendingUpload')
+      // C5：只有刚联网核对过（15 秒内）才说「和大家的稿一致」。更早的核对只能说明当时一致——
+      // 同事可能刚交了新稿，律师据此在旧稿上动手，之后就是合并或冲突。
+      if (!this.collabFresh) {
+        if (this.collabChecking) return this.$t('workbench.collabChecking')
+        if (!this.collabCheckedAt) return this.$t('workbench.collabNotChecked')
+        return this.$t('workbench.collabInSyncAsOf', { age: collabAgeText((k, p) => this.$t(k, p), this.collabNow - this.collabCheckedAt) })
+      }
       return this.$t('workbench.collabInSync')
+    },
+    collabFresh() {
+      return !!this.collabCheckedAt && this.collabNow - this.collabCheckedAt <= COLLAB_FRESH_MS
     },
     collabTone() {
       if (this.documentMergeState.running) return 'blue'
@@ -3539,7 +3554,8 @@ export default {
       const c = this.collabCloud || {}
       if (c.offline) return 'amber'
       if (c.remoteAhead || c.pendingUpload || this.versionWorkStatus.working) return 'blue'
-      return 'green'
+      // 核对过时不亮绿灯（C5）
+      return this.collabFresh ? 'green' : 'blue'
     },
     // 是否有权管理成员
     canManageMembers() {
@@ -4812,7 +4828,7 @@ export default {
     },
     // IDE 化窗口标题：「文件名 — 项目名 — AI WorkDeck」（Electron 窗口标题跟随 document.title）
     'project.name'() { this.updateWindowTitle() },
-    activeFileIdLeft() { this.updateWindowTitle(); this.pushMenuState(); this.ensureActiveTabVisible('left'); this.syncFileTreeSelectionWithActiveTab() },
+    activeFileIdLeft() { this.updateWindowTitle(); this.pushMenuState(); this.ensureActiveTabVisible('left'); this.syncFileTreeSelectionWithActiveTab(); this.recheckCollabIfStale() },
     // 菜单栏的勾选/置灰跟着这些走。编辑器与 AI 面板内部的状态走 @menu-state
     // 事件（见对应组件），这里只管工作台自己的。桥那边有浅比较+去抖，
     // 这些 watcher 只管「叫一声」，不必自己节流。
@@ -4830,7 +4846,7 @@ export default {
         if (this.leftPaneKey === 'plugin-insight') this.leftPaneKey = 'files'
       },
     },
-    activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab() },
+    activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab(); this.recheckCollabIfStale() },
     sidebarCollapsed(collapsed) { this.pushMenuState(); this.onPanelOpened('tree', !collapsed) },
     showToolsPanel() { this.pushMenuState() },
     showAiPanel(open) { this.pushMenuState(); this.onPanelOpened('ai', open) },
@@ -5570,6 +5586,7 @@ export default {
       const sessionId = getSessionId()
       const accountGeneration = getCloudAccountGeneration()
       const lifecycle = this._collabStateLifecycle || 0
+      if (online) this.collabChecking = true
       try {
         const res = online ? await checkCloud(projectId) : await getCloudStatus(projectId)
         if (this._collabDisposed || projectId !== this.projectId || lifecycle !== (this._collabStateLifecycle || 0)
@@ -5581,9 +5598,22 @@ export default {
           return
         }
         this.collabCloud = (res && res.data) || null
+        if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
+      } finally {
+        if (online && seq === this._collabStateSeq) this.collabChecking = false
       }
+    },
+    // C5：核对已经过时（> 15 秒）时立刻联网再核对一次。触发点：窗口回到前台、打开一份文件、
+    // 第一次点进文档（紧接着通常就要改字）。没放进案件库、正在核对、刚核对过都不打网络。
+    recheckCollabIfStale() {
+      if (this._collabDisposed || !this.isActiveOverviewInstance()) return
+      if (this.collabCloud && !this.collabLinked) return
+      if (this.collabChecking) return
+      this.collabNow = Date.now()
+      if (this.collabFresh) return
+      this.fetchCollabState({ online: true })
     },
     // 定时保鲜。三道守卫缺一不可：只在活跃实例上跑（页面栈多实例地雷，PR#148/#151）、
     // 窗口不可见时不打网络、没放进案件库就整个不起定时器。
@@ -5597,12 +5627,31 @@ export default {
         if (this.collabCloud && !this.collabLinked) return
         this.fetchCollabState({ online: true })
       }, 120000)
+      if (typeof this.startCollabFreshness === 'function') this.startCollabFreshness()
+    },
+    // C5：「刚核对过」的时钟与联网再核对的触发点（窗口回到前台、第一次点进文档）
+    startCollabFreshness() {
+      if (this._collabClockTimer) return
+      // 时钟：只推进 collabNow，不打网络
+      this._collabClockTimer = setInterval(() => { this.collabNow = Date.now() }, 5000)
+      this._collabOnFocus = () => this.recheckCollabIfStale()
+      this._collabOnDocInteraction = () => this.recheckCollabIfStale()
+      if (typeof window !== 'undefined') window.addEventListener('focus', this._collabOnFocus)
+      uni.$on('awd:doc-interaction', this._collabOnDocInteraction)
+    },
+    stopCollabFreshness() {
+      if (this._collabClockTimer) { clearInterval(this._collabClockTimer); this._collabClockTimer = null }
+      if (this._collabOnFocus && typeof window !== 'undefined') window.removeEventListener('focus', this._collabOnFocus)
+      if (this._collabOnDocInteraction) uni.$off('awd:doc-interaction', this._collabOnDocInteraction)
+      this._collabOnFocus = null
+      this._collabOnDocInteraction = null
     },
     stopCollabPolling({ dispose = false } = {}) {
       if (dispose) this._collabDisposed = true
       this._collabStateLifecycle = (this._collabStateLifecycle || 0) + 1
       this._collabStateSeq = (this._collabStateSeq || 0) + 1
       if (this._collabPollTimer) { clearInterval(this._collabPollTimer); this._collabPollTimer = null }
+      if (typeof this.stopCollabFreshness === 'function') this.stopCollabFreshness()
     },
     openCollab(tab) {
       this.collabInitialTab = typeof tab === 'string' ? tab : 'casefile'

@@ -1518,6 +1518,12 @@ export default {
           }, 1000)
         } else if (msg.type === 'interaction') {
           this._lastInteractionAt = Date.now()
+          // C5：律师第一次点进这份文档（通常紧接着就要改字）——让工作台趁这一刻联网核对一次
+          // 团队案件库，别让他在过时的稿子上动手。每次打开一份文件只发一次。
+          if (!this._interactionAnnounced) {
+            this._interactionAnnounced = true
+            uni.$emit('awd:doc-interaction', { fileId: this.file && this.file.id })
+          }
         } else if (msg.type === 'input-error') {
           this.inputError = String(msg.message || '')
         } else if (msg.type === 'modified') {
@@ -2145,6 +2151,7 @@ export default {
     // （新建/未保存文件），保留 boot 出来的空白文档。reloadFromBackend 靠这个
     // 区分「换成功了」和「什么都没换」——后者在重载语境下必须当失败处理。
     async loadDocument() {
+      this._interactionAnnounced = false
       const f = this.file
       const fileId = f.id // 数字主键（dev-board#1035）
       if (!fileId) throw new Error('file has no id')
