@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Derzeit gibt es zu viele Anfragen, daher drosselt der Modelldienst. Warten Sie eine Minute und versuchen Sie es erneut.",
   "modelUnavailable": "Das ausgewählte Modell ist derzeit nicht verfügbar. Versuchen Sie es später erneut oder wählen Sie unter dem Nachrichtenfeld ein anderes Modell.",
   "modelKeyInvalid": "Der Modellanbieter hat den Schlüssel abgelehnt, den dieses Gerät noch aus einer älteren Einrichtung verwendet. Melden Sie sich an, um stattdessen die KI von AI WorkDeck zu nutzen.",
+  "accountReconnect": "Die Verbindung zu Ihrem AI-Konto muss aktualisiert werden, daher wurde diese Anfrage nicht gesendet. Wählen Sie „Erneut anmelden“ und versuchen Sie es dann noch einmal; es geht nichts verloren.",
   "streamInterrupted": "Die Antwort wurde abgebrochen; der bisher eingetroffene Teil bleibt oben erhalten. Wählen Sie „Erneut versuchen“, um sie neu zu erstellen.",
   "serverError": "Auf unserer Seite ist ein Fehler aufgetreten, die Aktion wurde nicht abgeschlossen. Versuchen Sie es später erneut; tritt das weiterhin auf, senden Sie uns Feedback.",
   "conflict": "Dies wurde an anderer Stelle geändert, oder die vorherige Aktion läuft noch. Aktualisieren Sie und versuchen Sie es erneut.",
@@ -28,6 +29,7 @@ export default {
     "continue": "Fortfahren",
     "refresh": "Aktualisieren",
     "signIn": "Anmelden",
+    "reconnect": "Erneut anmelden",
     "feedback": "Feedback"
   }
 }

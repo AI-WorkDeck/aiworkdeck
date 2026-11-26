@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Troppe richieste in questo momento: il servizio del modello sta limitando il traffico. Attendi un minuto e riprova.",
   "modelUnavailable": "Il modello selezionato non è disponibile al momento. Riprova più tardi oppure scegli un altro modello sotto la casella del messaggio.",
   "modelKeyInvalid": "Il fornitore del modello ha rifiutato la chiave che questo dispositivo usa ancora da una vecchia configurazione. Accedi per usare invece l’AI di AI WorkDeck.",
+  "accountReconnect": "La connessione all'account IA va aggiornata, quindi questa richiesta non è stata inviata. Seleziona «Accedi di nuovo» e riprova; non si perde nulla.",
   "streamInterrupted": "La risposta si è interrotta; quanto ricevuto finora resta qui sopra. Seleziona «Riprova» per generarla di nuovo.",
   "serverError": "Si è verificato un problema da parte nostra e l’azione non è stata completata. Riprova più tardi; se continua, inviaci una segnalazione.",
   "conflict": "L’elemento è stato modificato altrove, oppure l’azione precedente è ancora in corso. Aggiorna e riprova.",
@@ -28,6 +29,7 @@ export default {
     "continue": "Continua",
     "refresh": "Aggiorna",
     "signIn": "Accedi",
+    "reconnect": "Accedi di nuovo",
     "feedback": "Segnalazioni"
   }
 }

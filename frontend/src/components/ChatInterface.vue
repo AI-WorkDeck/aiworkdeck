@@ -438,6 +438,7 @@
                @answer-question="handleQuestionAnswer"
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
+               @retry-failed="retryFailedTurn(index)"
                @consent-accepted="retryAfterConsent(index)"
                @stop-generation="handleAbort"
                @reading-interaction="followLatest = false"
@@ -1097,7 +1098,7 @@ import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
 import NowDoingStrip from './AgentMessage/NowDoingStrip.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
-import { formatUndoFiles, shouldOfferRunUndo, undoResultView } from '@/utils/agentRunControl.js'
+import { formatUndoFiles, isEmptyFailedTurn, shouldOfferRunUndo, undoResultView } from '@/utils/agentRunControl.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
@@ -2637,6 +2638,13 @@ export default {
       // 只有对话框真开了才算数：openRollbackDialog 可能在流式中 / 定位不到时提前返回，
       // 那时把标志留成 true，下一次普通回退就会莫名其妙地自动重发。
       rollbackResend.value = showRollbackDialog.value
+    }
+
+    // 错误卡上的「重试」（Q22）：这一轮什么都没产出就直接原样重发（同一条截断+存档+重发链路，
+    // 只是不弹确认框）；有产出（正文、工具步骤、改过文件）时仍走「重新生成」确认框。
+    const retryFailedTurn = async (assistantIndex) => {
+      if (isEmptyFailedTurn(bubbles.value[assistantIndex])) return retryAfterConsent(assistantIndex)
+      openRegenerateDialog(assistantIndex)
     }
 
     // 同意卡点了「同意并继续」：用户的意图就是「接着问刚才那句」，走重新生成同一条链路
@@ -4982,6 +4990,7 @@ export default {
        rollbackResend,
        openRegenerateDialog,
        retryAfterConsent,
+       retryFailedTurn,
        branchFromMessage,
        openRollbackDialog,
        cancelRollback,

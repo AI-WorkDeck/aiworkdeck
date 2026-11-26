@@ -176,8 +176,8 @@
         <div v-if="bubble.stopNotice" class="stop-notice">{{ bubble.stopNotice }}</div>
         <!-- X7：这一轮失败了——目录文案 + 重试/登录 + 详情；原始错误只在详情里 -->
         <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="bubble.errorNotice"
-          :actionable="isLatest || bubble.errorNotice.action === 'signIn'"
-          @retry="$emit('regenerate')" @sign-in="signInForAi" />
+          :actionable="isLatest || bubble.errorNotice.action === 'signIn' || bubble.errorNotice.action === 'reconnect'"
+          @retry="$emit('retry-failed')" @sign-in="signInForAi" @reconnect="reconnectForAi" />
     </div>
   </div>
 </template>
@@ -217,7 +217,7 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'retry-failed', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
 function onConsentAccepted() {
   props.bubble.consentRequired = false
   emit('consent-accepted')
@@ -258,6 +258,11 @@ const showCopy = computed(() => !!copyableText.value)
 const showRegenerate = computed(() => props.isLatest && !props.bubble.isStreaming && !!props.bubble.content)
 function signInForAi() {
   return requireAccount({ reason: 'ai' })
+}
+// Q21：账户已连着、但 AI 通道连接要刷新（Key 被拒 / 通道与站点不符）：重新登录一次就好，
+// 所以不看本地「已连接」缓存，直接开登录层
+function reconnectForAi() {
+  return requireAccount({ reason: 'ai', force: true })
 }
 function copyAnswer() {
   copyToClipboard(copyableText.value)

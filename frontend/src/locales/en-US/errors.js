@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Too many requests right now, so the model service is throttling. Wait a minute and try again.",
   "modelUnavailable": "The selected model is unavailable right now. Try again later, or pick another model below the message box.",
   "modelKeyInvalid": "The model provider rejected the key this computer still uses from an older setup. Sign in to your AI WorkDeck account to use the official AI channel instead.",
+  "accountReconnect": "Your AI account connection needs refreshing, so this turn wasn't sent. Select Sign In Again to refresh it, then try again; nothing is lost.",
   "streamInterrupted": "The answer was cut off; what arrived so far is kept above. Select Retry to generate it again.",
   "serverError": "Something went wrong on our side and this action didn't finish. Try again later; if it keeps happening, send us feedback.",
   "conflict": "This was changed elsewhere, or the previous action is still running. Refresh and try again.",
@@ -28,6 +29,7 @@ export default {
     "continue": "Continue",
     "refresh": "Refresh",
     "signIn": "Sign In",
+    "reconnect": "Sign In Again",
     "feedback": "Feedback"
   }
 }
