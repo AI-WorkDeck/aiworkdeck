@@ -23,4 +23,8 @@ public class ProjectObjectLocalOnly {
     @Column(nullable = false) private LocalDateTime declaredAt;
     /** Basename only, at most 200 chars, for colleagues' placeholder text. */
     @Column(length = 200) private String nameHint;
+    /** Desktop copy: who keeps the file (for 「仅在 X 的电脑上」). */
+    @Column(length = 128) private String declaredByName;
+    /** Desktop copy: this computer is the one keeping it (「仅在本机（未共享）」). */
+    private Boolean mine;
 }

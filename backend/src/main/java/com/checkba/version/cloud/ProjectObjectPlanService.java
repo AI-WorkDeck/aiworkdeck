@@ -175,6 +175,30 @@ public class ProjectObjectPlanService {
         localOnly.save(row);
     }
 
+    /**
+     * Desktop: remember what the library said (or what this computer declared), so the local git paths skip the
+     * file instead of failing, and the UI can badge it. Upsert, no cap (it mirrors the library).
+     */
+    @Transactional
+    public void recordLocalOnly(long projectId, ObjectRef object, String nameHint, String declaredByName, boolean mine) {
+        ProjectObjectLocalOnly row = localOnly.findByProjectIdAndObjectSha(projectId, object.sha256()).orElseGet(ProjectObjectLocalOnly::new);
+        row.setProjectId(projectId);
+        row.setObjectSha(object.sha256());
+        row.setObjectSize(object.size());
+        if (row.getDeclaredBy() == null) row.setDeclaredBy(0L);
+        if (row.getDeclaredAt() == null) row.setDeclaredAt(LocalDateTime.now());
+        row.setNameHint(nameHint(nameHint));
+        row.setDeclaredByName(declaredByName);
+        row.setMine(mine);
+        localOnly.save(row);
+    }
+
+    /** Desktop: the object is now here (pulled or uploaded with backup): forget the placeholder. */
+    @Transactional
+    public void forgetLocalOnly(long projectId, ObjectRef object) {
+        localOnly.deleteByProjectIdAndObjectSha(projectId, object.sha256());
+    }
+
     /** Pre-receive and ingest: the object may be absent because its sharer declared it local-only (same size). */
     public boolean isDeclaredLocalOnly(long projectId, ObjectRef object) {
         return localOnly.findByProjectIdAndObjectSha(projectId, object.sha256())
