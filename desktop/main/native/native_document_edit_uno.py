@@ -82,7 +82,7 @@ def minimal_edits(old, new):
         return []
     edits = myers_edits(old_middle, new_middle, MAX_DIFF_DISTANCE) if old_middle and new_middle else None
     if edits is None:
-        return [dict(start=prefix, delLen=len(old_middle), insText=new_middle)]
+        return numeric_token_edits(old, new, [dict(start=prefix, delLen=len(old_middle), insText=new_middle)])
     for item in edits:
         item['start'] += prefix
     index = 0
@@ -95,7 +95,61 @@ def minimal_edits(old, new):
             del edits[index]
         else:
             index += 1
-    return edits
+    return numeric_token_edits(old, new, edits)
+
+
+# Q23: same rule as numericTokenEdits in office_thread.js (the oracle test compares
+# both). An edit that touches a number grows over the unchanged digits, Chinese
+# numerals, %/permille and separators between digits, so 70% -> 30% is redlined as
+# delete 70% insert 30%, not delete 7 insert 3 (which reads as 730%).
+NUMERAL = re.compile('[0-9０-９零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬億%％‰]')
+DIGIT = re.compile('[0-9０-９]')
+
+
+def numeric_char_at(text, index):
+    if index < 0 or index >= len(text):
+        return False
+    char = text[index]
+    if NUMERAL.match(char):
+        return True
+    if char in '.,．，':
+        return index > 0 and index + 1 < len(text) and bool(DIGIT.match(text[index - 1])) and bool(DIGIT.match(text[index + 1]))
+    return False
+
+
+def numeric_token_edits(old, new, edits):
+    if not edits:
+        return edits
+    segments, shift = [], 0
+    for item in reversed(edits):
+        new_start = item['start'] + shift
+        segments.append([item['start'], item['start'] + item['delLen'], new_start, new_start + len(item['insText'])])
+        shift += len(item['insText']) - item['delLen']
+    touched = False
+    for k, segment in enumerate(segments):
+        numeric = any(numeric_char_at(old, i) for i in range(segment[0], segment[1])) \
+            or any(numeric_char_at(new, i) for i in range(segment[2], segment[3]))
+        if not numeric:
+            continue
+        left_limit = segments[k - 1][1] if k > 0 else 0
+        right_limit = segments[k + 1][0] if k + 1 < len(segments) else len(old)
+        while segment[0] > left_limit and numeric_char_at(old, segment[0] - 1):
+            segment[0] -= 1
+            segment[2] -= 1
+            touched = True
+        while segment[1] < right_limit and numeric_char_at(old, segment[1]):
+            segment[1] += 1
+            segment[3] += 1
+            touched = True
+    if not touched:
+        return edits
+    merged = []
+    for segment in segments:
+        if merged and segment[0] <= merged[-1][1]:
+            merged[-1][1], merged[-1][3] = segment[1], segment[3]
+        else:
+            merged.append(segment)
+    return [dict(start=a, delLen=b - a, insText=new[c:d]) for a, b, c, d in reversed(merged)]
 
 
 def set_display(model, uno_mod, value, expected_show):
