@@ -1319,6 +1319,7 @@
                       :key="activeFileLeft.id"
                       :request-id="activeFileLeft.requestId"
                       :focus-item-id="activeFileLeft.focusItemId"
+                      :remote-signal="ddRequestSignals[String(activeFileLeft.requestId)]"
                       :project-id="projectId"
                       :client-view="isClientView"
                       :can-write="canWriteProject"
@@ -1606,6 +1607,7 @@
                       :key="activeFileRight.id"
                       :request-id="activeFileRight.requestId"
                       :focus-item-id="activeFileRight.focusItemId"
+                      :remote-signal="ddRequestSignals[String(activeFileRight.requestId)]"
                       :project-id="projectId"
                       :client-view="isClientView"
                       :can-write="canWriteProject"
@@ -2658,6 +2660,7 @@ import MessageCenterPane from '@/components/messages/MessageCenterPane.vue'
 import { messageCenterTabMethods } from './messageCenterTab.js'
 import { pollDdClientNotifications } from '@/services/ddClient'
 import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
+import { ddRequestSignals } from '@/utils/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
 import ChatModeSidebar from '@/components/chat/ChatModeSidebar.vue'
 import {
@@ -3039,6 +3042,7 @@ export default {
       messageCenterBadgePartial: false,
       ddClientUnread: 0,
       ddLawyerNotifications: [],
+      ddRequestSignals: {},
 
       // 网核关联拖拽（将截图证据块拖到 WPS 文档中插入标记）
       webLinkDrag: {
@@ -4824,7 +4828,7 @@ export default {
       this._historyEscHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.showHistoryDrawer = false } }
       window.addEventListener('keydown', this._historyEscHandler, true)
     },
-    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
+    projectId() { this.ddRequestSignals = {}; this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
     pdfPermissionIdentity() { this.resetPdfPreviewPool() },
@@ -5930,7 +5934,13 @@ export default {
           if (this.ddCloudTrack && !this.isClientView) {
             const projectId = this.projectId
             const notices = await getDdNotifications(projectId)
-            if (!this._ddClientPollStopped && String(projectId) === String(this.projectId)) this.ddLawyerNotifications = (notices || []).filter(notice => !notice.readAt)
+            if (!this._ddClientPollStopped && String(projectId) === String(this.projectId)) {
+              const unread = (notices || []).filter(notice => !notice.readAt)
+              this.ddLawyerNotifications = unread
+              // C21: a client's submission reloads the open checklist tab and the list counts.
+              const signals = ddRequestSignals(this.ddRequestSignals, unread)
+              if (signals !== this.ddRequestSignals) { this.ddRequestSignals = signals; this.$refs.ddFilesPanel?.fetchRequests() }
+            }
           } else this.ddLawyerNotifications = []
         }
       } catch { /* The workspace keeps its own actionable connection errors. */ }

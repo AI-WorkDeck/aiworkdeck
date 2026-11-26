@@ -92,3 +92,17 @@ export function ddOrderedItems(items) {
   sorted.forEach(i => visit(i, 0))
   return result
 }
+
+/** Newest unread notice id per checklist. Only grows, so reading a notice never re-triggers a reload. */
+export function ddRequestSignals(previous, notices) {
+  let next = previous
+  for (const notice of notices || []) {
+    if (notice?.requestId == null || notice.id == null) continue
+    const key = String(notice.requestId), id = String(notice.id)
+    const old = next[key]
+    if (old != null && (Number(old) >= Number(id) || old === id)) continue
+    if (next === previous) next = { ...previous }
+    next[key] = id
+  }
+  return next
+}
