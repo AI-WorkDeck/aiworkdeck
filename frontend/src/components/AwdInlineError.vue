@@ -28,7 +28,7 @@ export default {
     // Hide the primary button when the caller has nothing to wire it to.
     actionable: { type: Boolean, default: true },
   },
-  emits: ['retry', 'sign-in', 'refresh', 'action'],
+  emits: ['retry', 'sign-in', 'refresh', 'reconnect', 'action'],
   data() {
     return { detailsOpen: false }
   },
@@ -52,6 +52,7 @@ export default {
       this.$emit('action', a)
       if (a === 'signIn') this.$emit('sign-in')
       else if (a === 'refresh') this.$emit('refresh')
+      else if (a === 'reconnect') this.$emit('reconnect')
       else this.$emit('retry')
     },
   },

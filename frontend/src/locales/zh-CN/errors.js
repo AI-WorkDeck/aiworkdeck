@@ -12,6 +12,7 @@ export default {
   "rateLimited": "请求太频繁，模型服务暂时限流。请等一分钟再试。",
   "modelUnavailable": "所选模型暂时不可用。请稍后重试，或在输入框下方换一个模型。",
   "modelKeyInvalid": "这台电脑还在用旧版设置里的模型 Key，已被模型服务拒绝。请登录 AI WorkDeck 账户，改用官方 AI 通道。",
+  "accountReconnect": "AI 账户连接需要刷新，所以这一轮没有发出去。点“重新登录”刷新连接后再试；不会丢失任何内容。",
   "streamInterrupted": "回答中途断开了，已收到的内容保留在上面。点“重试”重新生成。",
   "serverError": "服务出了点问题，这次操作没有完成。请稍后重试；如果反复出现，请点“反馈”告诉我们。",
   "conflict": "内容在别处被改过，或上一个操作还没结束。请刷新后再试。",
@@ -28,6 +29,7 @@ export default {
     "continue": "继续",
     "refresh": "刷新",
     "signIn": "登录",
+    "reconnect": "重新登录",
     "feedback": "反馈"
   }
 }

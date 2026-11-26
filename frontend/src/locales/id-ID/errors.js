@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Terlalu banyak permintaan saat ini, sehingga layanan model membatasi laju. Tunggu semenit lalu coba lagi.",
   "modelUnavailable": "Model yang dipilih sedang tidak tersedia. Coba lagi nanti, atau pilih model lain di bawah kotak pesan.",
   "modelKeyInvalid": "Penyedia model menolak kunci yang masih digunakan perangkat ini dari pengaturan lama. Masuk untuk menggunakan AI milik AI WorkDeck sebagai gantinya.",
+  "accountReconnect": "Koneksi akun AI Anda perlu diperbarui, jadi permintaan ini tidak terkirim. Pilih \"Masuk lagi\", lalu coba lagi; tidak ada yang hilang.",
   "streamInterrupted": "Jawaban terputus; bagian yang sudah diterima tetap tersimpan di atas. Pilih “Coba lagi” untuk membuatnya ulang.",
   "serverError": "Terjadi masalah di sisi kami dan tindakan ini tidak selesai. Coba lagi nanti; jika terus terjadi, kirimi kami “Masukan”.",
   "conflict": "Ini diubah di tempat lain, atau tindakan sebelumnya masih berjalan. Segarkan lalu coba lagi.",
@@ -28,6 +29,7 @@ export default {
     "continue": "Lanjutkan",
     "refresh": "Segarkan",
     "signIn": "Masuk",
+    "reconnect": "Masuk lagi",
     "feedback": "Masukan"
   }
 }

@@ -231,3 +231,15 @@ test('Q22 接线：错误卡的「重试」走 retryFailedTurn（空失败直接
   assert.match(chat, /@regenerate="openRegenerateDialog\(index\)"/)
   assert.match(chat, /if \(isEmptyFailedTurn\(bubbles\.value\[assistantIndex\]\)\) return retryAfterConsent\(assistantIndex\)/)
 })
+
+test('Q21 接线：账户类 error 载荷带 kind 进 errorNotice；错误卡的「重新登录」强制打开登录层', async () => {
+  const { bubble, event } = await liveStream()
+  event('error', { message: '平台 AI 通道配置与当前站点不符，请刷新账户连接', code: 1, kind: 'MALFORMED' })
+  assert.equal(bubble.errorNotice && bubble.errorNotice.key, 'accountReconnect')
+  assert.equal(bubble.errorNotice.action, 'reconnect')
+  const root = readFileSync(new URL('../../src/components/AgentMessage/RootBubble.vue', import.meta.url), 'utf8')
+  assert.match(root, /@reconnect="reconnectForAi"/)
+  assert.match(root, /function reconnectForAi\(\) \{\s*return requireAccount\(\{ reason: 'ai', force: true \}\)/)
+  const inline = readFileSync(new URL('../../src/components/AwdInlineError.vue', import.meta.url), 'utf8')
+  assert.match(inline, /else if \(a === 'reconnect'\) this\.\$emit\('reconnect'\)/)
+})

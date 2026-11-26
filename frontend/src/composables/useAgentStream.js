@@ -2027,7 +2027,7 @@ export function useAgentStream() {
                         bubble.content += '\n\n' + errMsg + '\n'
                     } else {
                         // X7：未归类的后端错误不再把原文拼进正文；原文进 Details
-                        bubble.errorNotice = toUserMessage(errMsg, { partial: !!String(bubble.content || '').trim(), desktop: typeof window !== 'undefined' && !!window.checkbaDesktop })
+                        bubble.errorNotice = toUserMessage(errMsg, { partial: !!String(bubble.content || '').trim(), desktop: typeof window !== 'undefined' && !!window.checkbaDesktop, accountKind: accountPayload && accountPayload.kind })
                     }
                 }
             }

@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Şu anda çok fazla istek var, bu yüzden model hizmeti hızı sınırlıyor. Bir dakika bekleyip tekrar deneyin.",
   "modelUnavailable": "Seçilen model şu anda kullanılamıyor. Daha sonra tekrar deneyin veya mesaj kutusunun altından başka bir model seçin.",
   "modelKeyInvalid": "Model sağlayıcı, bu cihazın eski bir kurulumdan hâlâ kullandığı anahtarı reddetti. Bunun yerine AI WorkDeck’in yapay zekâsını kullanmak için giriş yapın.",
+  "accountReconnect": "Yapay zekâ hesabı bağlantınızın yenilenmesi gerekiyor, bu yüzden bu istek gönderilmedi. \"Yeniden oturum aç\"ı seçip tekrar deneyin; hiçbir şey kaybolmaz.",
   "streamInterrupted": "Yanıt yarıda kesildi; şimdiye kadar gelen kısım yukarıda duruyor. Yeniden oluşturmak için “Tekrar dene”yi seçin.",
   "serverError": "Bizim tarafımızda bir sorun oluştu ve işlem tamamlanmadı. Daha sonra tekrar deneyin; sorun sürerse bize “Geri Bildirim” gönderin.",
   "conflict": "Bu başka bir yerde değiştirildi ya da önceki işlem hâlâ çalışıyor. Yenileyip tekrar deneyin.",
@@ -28,6 +29,7 @@ export default {
     "continue": "Devam Et",
     "refresh": "Yenile",
     "signIn": "Giriş yap",
+    "reconnect": "Yeniden oturum aç",
     "feedback": "Geri Bildirim"
   }
 }
