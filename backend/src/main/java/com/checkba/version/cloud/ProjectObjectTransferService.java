@@ -71,6 +71,15 @@ public class ProjectObjectTransferService {
 
     public void putPart(long projectId, ObjectRef ref, int part, String sha256, InputStream body,
                         java.util.function.Consumer<Runnable> publicationLock) throws IOException {
+        putPart(projectId, ref, part, sha256, body, publicationLock, null);
+    }
+
+    /**
+     * C12: {@code freeReservation} non-null = the free plan. It runs instead of the storage capacity check, in the
+     * same transaction as the write-permission (epoch) fence, so a refused write never leaves a reservation behind.
+     */
+    public void putPart(long projectId, ObjectRef ref, int part, String sha256, InputStream body,
+                        java.util.function.Consumer<Runnable> publicationLock, Runnable freeReservation) throws IOException {
         long size = partSize(ref, part);
         ObjectRef expectedPart = new ObjectRef(sha256, size);
         Path root = parts(projectId, ref);
@@ -115,7 +124,12 @@ public class ProjectObjectTransferService {
                         if (damagedReplica) Files.delete(replica);
                         long previous = Files.isRegularFile(destination, LinkOption.NOFOLLOW_LINKS)
                                 ? Files.size(destination) : 0;
-                        quota.requireProjectCapacity(projectId, Math.max(0, size - previous));
+                        if (freeReservation != null) {
+                            freeReservation.run();
+                            quota.requireProjectEpoch(projectId);
+                        } else {
+                            quota.requireProjectCapacity(projectId, Math.max(0, size - previous));
+                        }
                         Files.createDirectories(root);
                         try { Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
                         catch (AtomicMoveNotSupportedException e) { Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING); }
