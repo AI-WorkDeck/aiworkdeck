@@ -260,6 +260,8 @@ class CloudSyncUpdateTest {
         CloudSyncService.UpdateResult r = cloud.updateFromCloud(7L, 1L, "韩泽伟");
         assertEquals(CloudSyncService.UpdateStatus.CONFLICT, r.status());
         assertTrue(repoSvc.repositoryMerging(7L));
+        // C28: while the lawyer chooses, the file keeps their own content, never git's conflict markers.
+        assertEquals("我的第二稿", Files.readString(root.resolve("projects/7/合同.txt")));
     }
 
     /**

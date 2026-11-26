@@ -807,6 +807,27 @@ class DraftAdoptTest {
         }
     }
 
+    /**
+     * C28 (lane C): while the choice dialog is open the lawyer may open the file in Word or Finder. It must hold
+     * its pre-merge content, never git's conflict markers; the merge state lives in the index and the two commits.
+     */
+    @Test
+    void conflictWindowLeavesTheFileReadableWithoutMarkersAndChoicesStillLand() throws Exception {
+        db.put(501L, file(501L, "合同.txt"));
+        ConflictScene scene = stageAdoptConflict("合同.txt");
+
+        String onDisk = read("合同.txt");
+        assertFalse(onDisk.contains("<<<<<<<") || onDisk.contains(">>>>>>>"), "no conflict markers in the lawyer's file: " + onDisk);
+        assertEquals("主线：合同.txt", onDisk, "the file keeps the mainline content until the lawyer chooses");
+        assertEquals(List.of(".awd/tree.json", "合同.txt"), repoSvc.conflictingPaths(7L), "the conflict is still recorded in the index");
+
+        WorkSessionService.AdoptOutcome r = svc.resolveAdopt(7L, scene.draftId(),
+                Map.of("合同.txt", WorkSessionService.Resolution.DRAFT), 1L, "陆知微");
+        assertTrue(r.success());
+        assertEquals("稿：合同.txt", read("合同.txt"), "the draft side lands when chosen");
+        assertEquals("稿：合同.txt", new String(repoSvc.readBlobAtCommit(7L, "HEAD", "合同.txt"), java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     // ---- 8. 放弃这一稿 -----------------------------------------------------
 
     @Test
