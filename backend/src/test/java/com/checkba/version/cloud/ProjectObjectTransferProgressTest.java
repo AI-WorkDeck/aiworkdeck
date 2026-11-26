@@ -145,4 +145,24 @@ class ProjectObjectTransferProgressTest {
             server.stop(0);
         }
     }
+
+    /** Lane C round 2 nit: a 60 + 30 MB pull showed 「… / 60.0 MB」, then 「… / 90.0 MB」. Size the pull up front. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void downloadTotalCountsEveryMissingObjectUpFront(@TempDir Path root) throws Exception {
+        var properties = new StorageProperties();
+        properties.getLocal().setRootPath(root.toString());
+        ProjectRepoService repos = new ProjectRepoService(new ProjectStorageResolver(properties, null));
+        ObjectProvider<MobileRelayClientService> provider = mock(ObjectProvider.class);
+        var sync = new ProjectObjectSyncService(repos, provider, new ObjectMapper());
+        byte[] held = new byte[1000], missing = new byte[3000];
+        new java.util.Random(1).nextBytes(held);
+        new java.util.Random(2).nextBytes(missing);
+        var present = repos.objects().put(1, new java.io.ByteArrayInputStream(held));
+        var absent = com.checkba.version.objects.LocalVersionObjectStore.fingerprint(new java.io.ByteArrayInputStream(missing));
+        var absent2 = com.checkba.version.objects.LocalVersionObjectStore.fingerprint(new java.io.ByteArrayInputStream(new byte[500]));
+        assertEquals(3500, sync.bytesToDownload(1, new java.util.LinkedHashSet<>(java.util.List.of(present, absent, absent2))));
+        assertEquals(0, sync.bytesToDownload(1, java.util.Set.of(present)));
+    }
 }
+

@@ -51,6 +51,21 @@ public class ProjectObjectSyncService {
         return Map.of("active", true, "direction", t.direction, "doneBytes", Math.min(t.done.get(), total), "totalBytes", total);
     }
 
+    /** Same-sized local file: assumed present for the progress total (verify still hashes it). */
+    private boolean looksPresent(long project, ObjectRef object) {
+        try {
+            java.nio.file.Path path = repos.objects().path(project, object.sha256());
+            return java.nio.file.Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    && java.nio.file.Files.size(path) == object.size();
+        } catch (IOException | RuntimeException e) { return false; }
+    }
+
+    long bytesToDownload(long project, Set<ObjectRef> needed) {
+        long total = 0;
+        for (ObjectRef object : needed) if (!looksPresent(project, object)) total += object.size();
+        return total;
+    }
+
     private static InputStream counting(InputStream in, Transfer t) {
         return new FilterInputStream(in) {
             @Override public int read() throws IOException { int b = super.read(); if (b >= 0) t.done.incrementAndGet(); return b; }
@@ -159,12 +174,16 @@ public class ProjectObjectSyncService {
         } catch (IOException e) { throw new VersionException("Read version references failed", e); }
         if (needed.isEmpty()) return;
         Transfer transfer = new Transfer("download");
+        // Lane C round 2: the total grew 60 → 90 MB mid-pull. Size it up front from a cheap presence check;
+        // the full hash check below still decides what is downloaded.
+        transfer.total.set(bytesToDownload(project, needed));
         transfers.put(project, transfer);
         try {
             for (ObjectRef object : needed) {
                 try { repos.objects().verify(project, object); continue; }
                 catch (IOException absentOrCorrupt) { /* Download to an atomic temporary file. */ }
-                transfer.total.addAndGet(object.size());
+                // A same-sized but corrupt local copy was not counted up front; count it now that it is re-downloaded.
+                if (looksPresent(project, object)) transfer.total.addAndGet(object.size());
                 capabilities(remoteUrl, username, token);
                 int count = partCount(object);
                 Enumeration<InputStream> parts = new Enumeration<>() {

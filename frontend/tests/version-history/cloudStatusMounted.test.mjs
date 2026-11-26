@@ -67,7 +67,7 @@ function mountScenario() {
   }
   const api = Object.fromEntries(['getCloudStatus', 'checkCloud', 'updateFromCloud'].map(name => {
     const start = apiSource.indexOf(`export function ${name}(`)
-    return [name, new Function('request', 'observeCloudConnectivity', `return (${apiSource.slice(start + 7, apiSource.indexOf('\n}', start) + 2)})`)(request, observe)]
+    return [name, new Function('request', 'observeCloudConnectivity', 'withTransferProgress', 'transferProgressUi', `return (${apiSource.slice(start + 7, apiSource.indexOf('\n}', start) + 2)})`)(request, observe, (id, run) => run(), {})]
   }))
   const Empty = { render: () => null }
   const cloud = options(read('components/version/CloudSyncBar.vue'), { remoteAheadText })
