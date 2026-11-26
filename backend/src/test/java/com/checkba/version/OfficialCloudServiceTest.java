@@ -624,6 +624,18 @@ class OfficialCloudServiceTest {
         verify(connectionRepository, never()).delete(otherAccount);
     }
 
+    /** CEO 2026-11-26: a connection in use by a case is never removed, even when it duplicates another. */
+    @Test void duplicatesThatAllHaveCasesAreAllKept() {
+        var remotes = mock(com.checkba.repository.ProjectRemoteRepository.class);
+        var service = mainland();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "projectRemotes", remotes);
+        CloudConnection a = conn(40L, "awd_u"), b = conn(41L, "awd_u");
+        when(connectionRepository.findAll()).thenReturn(new java.util.ArrayList<>(List.of(a, b)));
+        when(remotes.findByConnectionId(anyLong())).thenReturn(List.of(new com.checkba.model.entity.ProjectRemote()));
+        service.collapseDuplicateConnections();
+        verify(connectionRepository, never()).delete(any(CloudConnection.class));
+    }
+
     private CloudConnection conn(long id, String username) {
         CloudConnection c = new CloudConnection();
         c.setId(id); c.setUserId(ME); c.setServerUrl(OFFICIAL); c.setUsername(username);
