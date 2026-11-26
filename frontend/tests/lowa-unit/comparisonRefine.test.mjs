@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { loadWorkerFunctions } from './_workerFns.mjs'
-const { comparisonRefinePlan } = loadWorkerFunctions(['myersEdits', 'minimalEdits', 'comparisonRefinePlan'])
+const { comparisonRefinePlan } = loadWorkerFunctions(['myersEdits', 'numericCharAt', 'numericTokenEdits', 'minimalEdits', 'comparisonRefinePlan'])
 
 test('合成服务协议→合成采购协议 重写成仅替换中段「服务」为「采购」', () => {
   const plan = comparisonRefinePlan('合成服务协议', '合成采购协议')

@@ -1247,7 +1247,7 @@ function minimalEdits(oldStr, newStr) {
   if (!oMid && !nMid) return [];
   // 纯插入/纯删除本身就是一条片段；差异步数超上限（面目全非）也退化成整块替换。
   const edits = (!oMid || !nMid) ? null : myersEdits(oMid, nMid, MINIMAL_EDITS_MAX_D);
-  if (!edits) return [{ start: p, delLen: oMid.length, insText: nMid }];
+  if (!edits) return numericTokenEdits(oldStr, newStr, [{ start: p, delLen: oMid.length, insText: nMid }]);
   for (let k = 0; k < edits.length; k++) edits[k].start += p;
   // Cleanup: a SINGLE stray equal char sandwiched between two edits (LCS 在中文
   // 里常捞到巧合的"的/、"之类) makes choppy, confusing redlines — fold it into
@@ -1261,7 +1261,57 @@ function minimalEdits(oldStr, newStr) {
       edits.splice(k, 1);
     } else k++;
   }
-  return edits;
+  return numericTokenEdits(oldStr, newStr, edits);
+}
+// Q23: a figure is redlined as a whole token. Char-level diff turned 70% → 30% into
+// struck 7 + inserted 3 + unchanged 0%, which reads as 730%. Any edit that touches a
+// number grows over the unchanged digits, numerals, separators and % around it, so the
+// redline reads 删 70% 插 30%. Numbers: ASCII/fullwidth digits, Chinese numerals
+// (三十日 → 六十日 becomes 删 三十 插 六十), percent/permille, and . , between digits
+// (860,000 and 0.5). Text that is not a number keeps the char-level granularity.
+const MINIMAL_EDITS_NUMERAL = /[0-9０-９零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬億%％‰]/;
+function numericCharAt(str, i) {
+  const ch = str.charAt(i);
+  if (!ch) return false;
+  if (MINIMAL_EDITS_NUMERAL.test(ch)) return true;
+  if (ch === '.' || ch === ',' || ch === '．' || ch === '，') return /[0-9０-９]/.test(str.charAt(i - 1)) && /[0-9０-９]/.test(str.charAt(i + 1));
+  return false;
+}
+function numericTokenEdits(oldStr, newStr, edits) {
+  if (!edits.length) return edits;
+  // Ascending segments in both coordinates.
+  const segs = [];
+  let shift = 0;
+  for (let k = edits.length - 1; k >= 0; k--) {
+    const e = edits[k], ns = e.start + shift;
+    segs.push({ os: e.start, oe: e.start + e.delLen, ns: ns, ne: ns + e.insText.length });
+    shift += e.insText.length - e.delLen;
+  }
+  let touched = false;
+  for (let k = 0; k < segs.length; k++) {
+    const g = segs[k];
+    let numeric = false;
+    for (let i = g.os; i < g.oe && !numeric; i++) numeric = numericCharAt(oldStr, i);
+    for (let i = g.ns; i < g.ne && !numeric; i++) numeric = numericCharAt(newStr, i);
+    if (!numeric) continue;
+    const leftLimit = k > 0 ? segs[k - 1].oe : 0;
+    const rightLimit = k + 1 < segs.length ? segs[k + 1].os : oldStr.length;
+    // Unchanged neighbours are equal in both strings, so both sides move together.
+    while (g.os > leftLimit && numericCharAt(oldStr, g.os - 1)) { g.os--; g.ns--; touched = true; }
+    while (g.oe < rightLimit && numericCharAt(oldStr, g.oe)) { g.oe++; g.ne++; touched = true; }
+  }
+  if (!touched) return edits;
+  const merged = [];
+  for (let k = 0; k < segs.length; k++) {
+    const g = segs[k], last = merged[merged.length - 1];
+    if (last && g.os <= last.oe) { last.oe = g.oe; last.ne = g.ne; } else merged.push(g);
+  }
+  const out = [];
+  for (let k = merged.length - 1; k >= 0; k--) {
+    const g = merged[k];
+    out.push({ start: g.os, delLen: g.oe - g.os, insText: newStr.slice(g.ns, g.ne) });
+  }
+  return out;
 }
 // —— 最小修订比对（dev-board#1126 需求一）的纯判据 ——
 // 原生 CompareDocuments 即使 Mode=ByChar 也会把「合成服务协议 → 合成采购协议」
@@ -4868,11 +4918,14 @@ function replaceEscape(s) { return String(s).replace(/\\/g, '\\\\').replace(/&/g
 function nativeTrackedReplaceAll(findText, replaceText, matchCase) {
   if (!findText || findText === replaceText) return null;
   if (/[\r\n]/.test(findText) || /[\r\n]/.test(replaceText)) return null;
-  const oLen = findText.length, nLen = replaceText.length, maxP = Math.min(oLen, nLen);
-  let pre = 0;
-  while (pre < maxP && findText.charCodeAt(pre) === replaceText.charCodeAt(pre)) pre++;
-  let suf = 0;
-  while (suf < maxP - pre && findText.charCodeAt(oLen - 1 - suf) === replaceText.charCodeAt(nLen - 1 - suf)) suf++;
+  const oLen = findText.length, nLen = replaceText.length;
+  // Trim the unchanged head/tail with minimalEdits so a figure is replaced as a
+  // whole token (Q23: 70% → 30% keeps 删 70% 插 30%, not 删 7 插 3 before 0%).
+  // Callers only take this path when minimalEdits is a single block.
+  const block = minimalEdits(findText, replaceText)[0];
+  if (!block) return null;
+  let pre = block.start;
+  let suf = oLen - block.start - block.delLen;
   // 代理对不能从中间掐开
   const bad = function (str, at) { const c = str.charCodeAt(at); return c >= 0xD800 && c <= 0xDFFF; };
   if ((pre > 0 && (bad(findText, pre - 1) || bad(replaceText, pre - 1))) ||

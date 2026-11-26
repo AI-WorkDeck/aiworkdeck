@@ -8,7 +8,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { loadWorkerFunctions } from './_workerFns.mjs'
 
-const { minimalEdits, replaceAllIsSingleBlock } = loadWorkerFunctions(['myersEdits', 'minimalEdits', 'replaceAllIsSingleBlock'])
+const { minimalEdits, replaceAllIsSingleBlock } = loadWorkerFunctions(['myersEdits', 'numericCharAt', 'numericTokenEdits', 'minimalEdits', 'replaceAllIsSingleBlock'])
 
 // 按 worker 的应用口径（从右到左、旧串坐标）把编辑脚本套回旧串，必须得到新串。
 function applyEdits(oldStr, edits) {
@@ -47,17 +47,18 @@ test('长段落（> 500 字）首尾各一处一字之差 → 两条片段，绝
   const edits = minimalEdits(oldS, newS)
   assertDescending(edits)
   assert.equal(edits.length, 2, '整段被吞成一块：' + JSON.stringify(edits.map((e) => ({ start: e.start, delLen: e.delLen, ins: e.insText.length }))))
-  assert.deepEqual(edits.map((e) => oldS.substr(e.start, e.delLen)), ['三', '甲'])
-  assert.deepEqual(edits.map((e) => e.insText), ['六', '买'])
+  // 数字整词（Q23）：三十 → 六十 整体替换，不是「删三 插六」留下「十」
+  assert.deepEqual(edits.map((e) => oldS.substr(e.start, e.delLen)), ['三十', '甲'])
+  assert.deepEqual(edits.map((e) => e.insText), ['六十', '买'])
   assert.equal(applyEdits(oldS, edits), newS)
 })
 
-test('长段落中部两处改动（离两端都远）→ 仍是两条一字片段', () => {
+test('长段落中部两处改动（离两端都远）→ 仍是两条小片段（数字整词）', () => {
   const oldS = LONG_BODY.slice(0, 400) + '三十日' + LONG_BODY.slice(0, 300) + '甲方' + LONG_BODY.slice(0, 200)
   const newS = LONG_BODY.slice(0, 400) + '六十日' + LONG_BODY.slice(0, 300) + '买方' + LONG_BODY.slice(0, 200)
   const edits = minimalEdits(oldS, newS)
   assert.equal(edits.length, 2, JSON.stringify(edits))
-  assert.ok(edits.every((e) => e.delLen === 1 && e.insText.length === 1), JSON.stringify(edits))
+  assert.deepEqual(edits.map((e) => [oldS.substr(e.start, e.delLen), e.insText]), [['甲', '买'], ['三十', '六十']], JSON.stringify(edits))
   assert.equal(applyEdits(oldS, edits), newS)
 })
 
@@ -129,4 +130,38 @@ test('find_replace 原生 replaceAll 只在差异是单块时启用；多处散�
   assert.equal(replaceAllIsSingleBlock('验收后', '验收合格后'), true)
   assert.equal(replaceAllIsSingleBlock('甲方应于三日内向乙方支付', '乙方应于五日内向甲方支付'), false)
   assert.equal(replaceAllIsSingleBlock('甲方应当在收到货物后三日内向乙方支付全部价款', '买方应当在收到货物后十日内向卖方支付全部价款'), false)
+})
+
+// Q23: figures are redlined as whole tokens (70% → 30% used to read as 7̶30%).
+test('Q23 百分比：70% → 30% 删「70%」插「30%」，不是删 7 插 3', () => {
+  const oldS = '付合同总价的70%作为预付款；验收合格后支付20%；剩余10%。'
+  const newS = '付合同总价的30%作为预付款；验收合格后支付40%；剩余30%。'
+  const edits = minimalEdits(oldS, newS)
+  assertDescending(edits)
+  assert.deepEqual(edits.map((e) => [oldS.substr(e.start, e.delLen), e.insText]), [['10%', '30%'], ['20%', '40%'], ['70%', '30%']])
+  assert.equal(applyEdits(oldS, edits), newS)
+})
+
+test('Q23 金额、日期、小数、纯插入的数字', () => {
+  const cases = [
+    ['总价¥860,000元', '总价¥960,000元', [['860,000', '960,000']]],
+    ['违约金为0.5%', '违约金为0.75%', [['0.5%', '0.75%']]],
+    ['不超过100元', '不超过1000元', [['100', '1000']]],
+    ['人民币捌拾陆万元', '人民币玖拾陆万元', [['捌拾陆万', '玖拾陆万']]],
+    ['第三条', '第四条', [['三', '四']]],
+  ]
+  for (const [o, n, want] of cases) {
+    const edits = minimalEdits(o, n)
+    assert.equal(applyEdits(o, edits), n, o + ' → ' + n)
+    if (want.length) assert.deepEqual(edits.map((e) => [o.substr(e.start, e.delLen), e.insText]), want, o + ' → ' + n + ' ' + JSON.stringify(edits))
+  }
+  // 日期：年与月是两个数字词，各自整体替换
+  const d = minimalEdits('自2026年12月1日起', '自2027年1月1日起')
+  assert.deepEqual(d.map((e) => ['自2026年12月1日起'.substr(e.start, e.delLen), e.insText]), [['12', '1'], ['2026', '2027']])
+})
+
+test('Q23 非数字文字仍按字符最小粒度，句末中文逗号不当成千分位', () => {
+  assert.deepEqual(minimalEdits('我爱你', '我恨你'), [{ start: 1, delLen: 1, insText: '恨' }])
+  const o = '支付30，乙方确认', n = '支付30，甲方确认'
+  assert.deepEqual(minimalEdits(o, n).map((e) => [o.substr(e.start, e.delLen), e.insText]), [['乙', '甲']])
 })

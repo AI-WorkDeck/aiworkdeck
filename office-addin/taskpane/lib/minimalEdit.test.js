@@ -94,9 +94,23 @@ test('中文句：逐字成词，三处改动各自独立（中间隔着 3 个�
   assert.equal(edits.length, 3)
   assert.deepEqual(edits.map((e) => [e.oldText, e.newText]), [
     ['甲', '乙'],
-    ['三', '六'],
+    ['三十', '六十'], // Q23：数字整词
     ['', '全部']
   ])
+})
+
+test('Q23 数字整词：百分比、千分位、小数、中文大写金额都整体删插', () => {
+  const cases = [
+    ['付合同总价的70%作为预付款', '付合同总价的30%作为预付款', [['70%', '30%']]],
+    ['总价1,000元', '总价2,000元', [['1,000', '2,000']]],
+    ['违约金为0.5%', '违约金为0.75%', [['0.5%', '0.75%']]],
+    ['人民币捌拾陆万元', '人民币玖拾陆万元', [['捌拾陆万', '玖拾陆万']]],
+    ['The fee is 10 percent', 'The fee is 20 percent', [['10', '20']]],
+  ]
+  for (const [before, after, want] of cases) {
+    const edits = diff(before, after)
+    assert.deepEqual(edits.map((e) => [e.oldText, e.newText]), want, before + ' → ' + after)
+  }
 })
 
 test('中文句：相邻改动中间只隔 2 个字时并成一段（不再是两段夹一个「双方」）', () => {
