@@ -97,7 +97,7 @@
             </view>
           </view>
           <view v-if="hasNamedProject && !isScratchWorkspace" class="project-meta">
-            <text v-if="!soloLocalProject" class="meta-item">{{ $t('workbench.managerLabel', { name: project.manager || userDisplayName || $t('workbench.me') }) }}</text>
+            <text v-if="!soloLocalProject" class="meta-item">{{ $t('workbench.managerLabel', { name: projectLeadName || $t('workbench.me') }) }}</text>
 
             <block v-if="project.listedCompanyName && project.listedCompanyName !== '-'">
                 <text class="meta-divider">|</text>
@@ -3196,6 +3196,13 @@ export default {
     }
   },
   computed: {
+    // C6：负责人是案件的负责人（成员名单里 role=OWNER，共享案件以案件库为准），不是本机这位。
+    // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
+    projectLeadName() {
+      const owner = (this.projectMembers || []).find(m => m && m.role === 'OWNER')
+      const name = owner && (owner.displayName || owner.nickname || owner.username)
+      return name || (this.project && this.project.manager) || this.userDisplayName || ''
+    },
     sidebarShownWidth() { return this.narrowWidthCap.tree ? Math.min(this.sidebarWidth, this.narrowWidthCap.tree) : this.sidebarWidth },
     aiPanelShownWidth() { return this.narrowWidthCap.ai ? Math.min(this.aiPanelWidth, this.narrowWidthCap.ai) : this.aiPanelWidth },
     filteredSwitcherProjects() {
