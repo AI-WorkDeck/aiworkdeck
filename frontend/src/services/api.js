@@ -417,7 +417,9 @@ async function request(options) {
               ? res.data.reason : ''
             const errorMessage = (bqtReason && t('agentStream.' + bqtReason.replace(/_([a-z])/g, (_, c) => c.toUpperCase())))
               || res.data.message || t('common.serviceErrorRetryLater')
-            console.error('业务错误:', {
+            // Path, code and message as plain text first: harnesses that capture console text (CI app-e2e)
+            // otherwise only see "[object Object]". The query string is left out so no token reaches the logs.
+            console.error('业务错误:', String(options.url || '').split('?')[0], res.data.code, errorMessage, {
               code: res.data.code,
               message: errorMessage,
               data: options.logBody === false ? undefined : res.data.data,
