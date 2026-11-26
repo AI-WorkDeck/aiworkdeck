@@ -589,6 +589,7 @@
         @conflict="onCollabConflict"
         @open-history="onOpenHistoryFromCollab"
         @submit-guide="openSubmitGuide"
+        @queued="onSubmitQueuedOffline"
         @collab-help="openCollabHelp"
       />
 
@@ -1371,6 +1372,7 @@
                       @changed="onCollabChanged"
                       @conflict="onCollabConflict"
                       @submit-guide="openSubmitGuide"
+                      @queued="onSubmitQueuedOffline"
                     />
                     <!-- 「设置」标签：与 pages/admin 薄壳页共用同一个 AdminPane
                          （照插件广场 market-detail 那套 tab 形制）。个人中心 2026-08-20
@@ -1658,6 +1660,7 @@
                       @changed="onCollabChanged"
                       @conflict="onCollabConflict"
                       @submit-guide="openSubmitGuide"
+                      @queued="onSubmitQueuedOffline"
                     />
                     <!-- 「设置」标签：见左窗格同名注释 -->
                     <!-- 「欢迎」标签（dev-board#1047）：单例，照设置标签的形制。无项目态启动时自动打开，

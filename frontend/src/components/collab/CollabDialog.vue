@@ -341,7 +341,7 @@ import { getAppLanguage } from '@/utils/appLanguage.js'
 import { siteBaseUrl } from '@/utils/siteLinks.js'
 import { inviteLinkFor, notFoundPresentation } from '@/utils/memberLookup.js'
 import { remoteAheadText } from '@/utils/collabWording.js'
-import { submitNeedsGuide } from '@/utils/submitGuide.js'
+import { submitNeedsGuide, submitFailedOffline } from '@/utils/submitGuide.js'
 import LibraryConnectionList from './LibraryConnectionList.vue'
 
 export default {
@@ -365,7 +365,7 @@ export default {
   // conflict：撞上了要逐份选择的情况，页面把人送到裁决现场。
   // submit-guide / collab-help：都由页面那一个 SubmitDraftGuide 实例接手（三处交稿入口
   // 共用一个实例，各自判断必然走散）。
-  emits: ['update:visible', 'changed', 'reload-files', 'conflict', 'open-history', 'submit-guide', 'collab-help'],
+  emits: ['update:visible', 'changed', 'reload-files', 'conflict', 'open-history', 'submit-guide', 'collab-help', 'queued'],
   // 工作台 provide 的离开出口（先落盘再 reLaunch）与设置标签入口；宿主不是工作台时为 null
   inject: { leaveWorkbench: { default: null }, openSettingsTab: { default: null } },
   data() {
@@ -682,7 +682,11 @@ export default {
         this.$emit('changed')
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
-        else if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        else if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { /* lasting dialog shown */ }
+        else if (await submitFailedOffline(this.projectId, checkCloud)) {
+          this.$emit('queued')
+          uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
+        } else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

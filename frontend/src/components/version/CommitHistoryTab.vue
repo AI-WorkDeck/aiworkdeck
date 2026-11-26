@@ -297,13 +297,13 @@ import { showLargeFileBackupBlock } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import {
   getVersionHistory, getVersionCompare, getVersionChanges, getCloudEvents,
-  getProjectFiles, uploadToCloud, updateFromCloud, enableVersionControl, getVersionStatus,
+  getProjectFiles, uploadToCloud, updateFromCloud, checkCloud, enableVersionControl, getVersionStatus,
 } from '@/services/api.js'
 import { layoutGraph, laneCountOf } from '@/utils/historyGraph.js'
 import { mergeHistoryRows, groupRowsByDay, eventRowText, comparePaneState } from '@/utils/historyRows.js'
 import { historyMergeLines, resolutionLine } from '@/utils/historyMerges.js'
 import { createVersionActions } from '@/composables/useVersionActions.js'
-import { submitNeedsGuide } from '@/utils/submitGuide.js'
+import { submitNeedsGuide, submitFailedOffline } from '@/utils/submitGuide.js'
 import { roleLabel } from '@/config/memberRoles.js'
 import { excludeSystemFolders } from '@/utils/aiContextFiles.js'
 import AwdSelect from '@/components/AwdSelect.vue'
@@ -338,7 +338,7 @@ export default {
     // 折叠进工作段的自动存档不在默认清单里，本页会把自动存档拉进来再定位一次。
     focusSha: { type: String, default: '' },
   },
-  emits: ['compare-file', 'reload-files', 'changed', 'conflict', 'submit-guide'],
+  emits: ['compare-file', 'reload-files', 'changed', 'conflict', 'submit-guide', 'queued'],
   data() {
     return {
       loading: true, loadingMore: false, loadError: false, notEnabled: false,
@@ -994,7 +994,11 @@ export default {
         this.$emit('changed')
         await this.reload()
       } catch (e) {
-        if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { /* lasting dialog shown */ }
+        else if (await submitFailedOffline(this.projectId, checkCloud)) {
+          this.$emit('queued')
+          uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
+        } else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
       } finally {
         this.busy = false
       }

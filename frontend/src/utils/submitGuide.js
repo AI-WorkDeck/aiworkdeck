@@ -108,3 +108,17 @@ export async function submitNeedsGuide({ projectId, working, cloud, readStatus }
   // working 放在展开之后：现读出来的那一份不该被 cloud 里同名的键盖掉。
   return !submitGuideSteps({ ...(cloud || {}), working: fresh }).canSubmit
 }
+
+/**
+ * C11 edge (lane C 0.91.0 gate): 交稿 pressed directly in the ~2 s before the page noticed it was offline
+ * failed without queuing, so nothing went out after reconnecting. After a failed direct submit, ask the
+ * library once more; true means unreachable, and the caller queues it like the guide does.
+ */
+export async function submitFailedOffline(projectId, checkCloud) {
+  try {
+    const res = await checkCloud(projectId)
+    return !!(res && res.data && res.data.offline)
+  } catch {
+    return false
+  }
+}
