@@ -193,6 +193,17 @@ test('cancelled 带修改次数：气泡标 documentEdited 并写「已完成 N 
   assert.equal(shouldOfferRunUndo(bubble, { isLatest: true, isStreaming: s.isStreaming.value }), true)
 })
 
+test('Q26 cancelled 带条款编号提示：接在本轮回答末尾；不带就不动正文', async () => {
+  const notice = '**条款编号需要核对**：本轮修改后，以下编号与前后条款对不上。\n- 「第十三条 网络安全责任保险」：第十三条重复出现（上一次在段 25）'
+  const a = await liveStream()
+  a.event('cancelled', { message: 'stopped', documentEdited: true, documentEdits: 1, numberingNotice: notice })
+  assert.ok(a.bubble.content.endsWith('\n\n' + notice + '\n'), JSON.stringify(a.bubble.content))
+  const b = await liveStream()
+  const before = b.bubble.content
+  b.event('cancelled', { message: 'stopped', documentEdited: true, documentEdits: 1 })
+  assert.equal(b.bubble.content, before)
+})
+
 test('cancelled 没有修改：不标 documentEdited，不出撤销入口', async () => {
   const { bubble, event } = await liveStream()
   event('cancelled', { message: 'stopped', documentEdited: false, documentEdits: 0 })

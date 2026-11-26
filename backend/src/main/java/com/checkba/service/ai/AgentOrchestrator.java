@@ -1081,6 +1081,19 @@ public class AgentOrchestrator {
         String conversationId = guard.conversationId;
         log.info("Handling cancellation for run {} of conversation {}", guard.runId, conversationId);
 
+        // Q26：停止前 AI 已经增删了条款时，查一次条款编号，有问题写进本轮结尾与停止提示。
+        // 用户在等停止确认，读全文只给 CANCEL_NUMBERING_READ_SECONDS 秒，读不到就不报。
+        String numberingNotice = null;
+        if (isCurrentRun(guard) && isLowaSession(conversationId)) {
+            try {
+                numberingNotice = guard.writeCheck.numberingNotice(conversationId, guard.activeFileId,
+                        (action, params) -> editorBridgeService.executeEditorCommand(action, params,
+                                CANCEL_NUMBERING_READ_SECONDS));
+            } catch (Exception e) {
+                log.warn("[PostWriteVerify] numbering check on cancel failed for {}", conversationId, e);
+            }
+        }
+
         // 已生成的部分正文 + 本轮的工具过程卡
         String partialContent = guard.streamSnapshot();
         String logText = executionLog != null ? executionLog.toString() : "";
@@ -1088,7 +1101,8 @@ public class AgentOrchestrator {
 
         if (!partialContent.isEmpty() || !logText.isEmpty()) {
             String contentToSave = logText + partialContent
-                    + LangText.of("\n\n[已中断]", "\n\n[Interrupted]");
+                    + LangText.of("\n\n[已中断]", "\n\n[Interrupted]")
+                    + (numberingNotice == null ? "" : numberingNotice);
             saveAssistantMessageQuietly(guard, projectId, userId, contentToSave);
             log.info("Saved interrupted round ({} log chars + {} body chars) for cancelled conversation: {}",
                     logText.length(), partialContent.length(), conversationId);
@@ -1107,11 +1121,24 @@ public class AgentOrchestrator {
         sendRunEvent(guard, "cancelled",
                 "{\"message\":\"" + LangText.of("用户已停止生成", "Generation stopped by the user")
                         + "\",\"documentEdited\":" + guard.documentEdited()
-                        + ",\"documentEdits\":" + guard.documentEdits.get() + "}");
+                        + ",\"documentEdits\":" + guard.documentEdits.get()
+                        + (numberingNotice == null ? "" : ",\"numberingNotice\":" + jsonString(numberingNotice.strip()))
+                        + "}");
         closeSse(guard);
 
         // 清理状态
         endRun(guard);
+    }
+
+    /** 停止时的条款编号核对最多等多久读全文（秒）；正常几十到几百毫秒。 */
+    static final int CANCEL_NUMBERING_READ_SECONDS = 3;
+
+    private static String jsonString(String value) {
+        try {
+            return SKILL_UPDATE_MAPPER.writeValueAsString(value);
+        } catch (Exception e) {
+            return "\"\"";
+        }
     }
 
     private static final String STEERING_CANCELLED_TOOL =
@@ -3737,6 +3764,17 @@ public class AgentOrchestrator {
                 continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                         depth + 1, executionLog, agentMode, guard);
                 return;
+            }
+
+            // 3.65 条款编号（Q26）：本轮增删过条款、或收到过写后提醒，收尾前再查一次编号；
+            // 模型没修好就在回答末尾如实告诉用户（不自动改号——改号也是改稿，要用户说了算）
+            if (!summaryOnly && isCurrentRun(guard) && isLowaSession(conversationId)) {
+                String numberingNotice = guard.writeCheck.numberingNotice(conversationId, guard.activeFileId,
+                        this::harnessEditorRead);
+                if (numberingNotice != null) {
+                    sendTextDelta(guard, numberingNotice);
+                    content = content + numberingNotice;
+                }
             }
 
             // 3.7 纠正后仍是口头完成（office-tier1）：如实补一句「没改成」，不再追问

@@ -12,7 +12,7 @@ import { t } from '@/i18n'
 import { captureChatTimeline } from '@/components/AgentMessage/chatTimeline.mjs'
 import { nextBubbleId } from './bubbleId.js'
 import { documentEditedFromProcesses } from '@/utils/useInDocumentVisibility.js'
-import { cancelledEditedDocument, stopNoticeForCancelled } from '@/utils/agentRunControl.js'
+import { cancelledEditedDocument, cancelledNumberingNotice, stopNoticeForCancelled } from '@/utils/agentRunControl.js'
 import { isSameFileChange } from '@/utils/chatFileChange.js'
 import { ASK_USER_KIND, decodeAttr, normalizeAskUserEvent } from '@/utils/askUserAnswer.mjs'
 import { createLegacyAskUserMarkup } from './legacyAskUserMarkup.mjs'
@@ -1909,6 +1909,9 @@ export function useAgentStream() {
                 currentAssistantBubble.value.documentEdited = true
                 currentAssistantBubble.value.stopNotice = stopNoticeForCancelled(cancelledPayload, t)
             }
+            // Q26：停止前插入/删除了条款且编号对不上，提示接在本轮回答末尾（与历史里保存的一致）
+            const numberingNotice = cancelledNumberingNotice(cancelledPayload)
+            if (numberingNotice) currentAssistantBubble.value.content += '\n\n' + numberingNotice + '\n'
             noteStopConfirmed(cancelledPayload)
             isStreaming.value = false
         } else if (evt === 'bubble_end' || evt === 'error') {

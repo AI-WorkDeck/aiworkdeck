@@ -44,7 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -128,6 +130,8 @@ class AgentOrchestratorUserPauseTest {
         }
     }
 
+    private EditorBridgeService editorBridge;
+
     @BeforeEach
     void setUp() throws IOException {
         chatModelFactory = mock(ChatModelFactory.class);
@@ -194,7 +198,7 @@ class AgentOrchestratorUserPauseTest {
         orchestrator = new AgentOrchestrator(
                 chatModelFactory, messageService, sse, mock(TokenUsageService.class), assembler,
                 toolRegistry, skillRouter, parser, mock(MemoryPipelineService.class),
-                mock(ProjectFileService.class), mock(EditorBridgeService.class),
+                mock(ProjectFileService.class), editorBridge = mock(EditorBridgeService.class),
                 mock(ConversationFileChangeService.class), mock(TodoListService.class),
                 mock(DocumentCheckpointService.class),
                 runState,
@@ -349,5 +353,52 @@ class AgentOrchestratorUserPauseTest {
         String cancelled = payloadOf("cancelled");
         assertTrue(cancelled != null && cancelled.contains("\"documentEdited\":true")
                 && cancelled.contains("\"documentEdits\":2"), "两次修改已经落地，第三次没执行：" + cancelled);
+    }
+
+    private static String docJson(String... texts) {
+        StringBuilder sb = new StringBuilder("{\"paragraphs\":[");
+        for (int i = 0; i < texts.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append("{\"index\":").append(i).append(",\"text\":\"").append(texts[i]).append("\"}");
+        }
+        return sb.append("],\"truncated\":false}").toString();
+    }
+
+    @Test
+    @DisplayName("Q26：插入条款后用户点停止，编号重复要写进停止事件和本轮落库的结尾")
+    void stopAfterInsertingADuplicateClauseReportsTheNumbering() throws Exception {
+        String before = docJson("第十二条 争议：仲裁。", "第十三条 不可抗力：免责。");
+        String after = docJson("第十二条 争议：仲裁。", "第十三条 网络安全责任保险：乙方投保。", "第十三条 不可抗力：免责。");
+        java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
+        when(editorBridge.executeEditorCommand(eq("get_document_text"), any(), anyInt()))
+                .thenAnswer(inv -> reads.getAndIncrement() == 0 ? before : after);
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger executed = new java.util.concurrent.atomic.AtomicInteger();
+        when(toolRegistry.execute(any(), any(), any())).thenAnswer(inv -> {
+            if (executed.incrementAndGet() == 2) {
+                started.countDown();
+                awaitQuietly(release);
+            }
+            return new ToolRegistry.ToolResult("ok", null, true);
+        });
+        String insert = "{\"text\":\"第十三条 网络安全责任保险：乙方投保。\",\"newParagraph\":true}";
+        GatedModel model = GatedModel.ungated(
+                AiMessage.from(List.of(
+                        ToolExecutionRequest.builder().id("1").name("doc_insert_at_cursor").arguments(insert).build(),
+                        ToolExecutionRequest.builder().id("2").name("doc_add_comment").arguments("{}").build())),
+                AiMessage.from("<final>不该走到这里</final>"));
+
+        Thread t = runAsync("在第十二条后加第十三条 网络安全责任保险", model);
+        assertTrue(started.await(10, TimeUnit.SECONDS));
+        assertTrue(orchestrator.setCancelled(CONV));
+        release.countDown();
+        join(t);
+
+        String cancelled = payloadOf("cancelled");
+        assertTrue(cancelled != null && cancelled.contains("\"numberingNotice\":") && cancelled.contains("第13条重复出现"),
+                "停止事件带编号提示：" + cancelled);
+        String saved = String.join("\n", rows.values());
+        assertTrue(saved.contains("条款编号需要核对") && saved.contains("第13条重复出现"), "落库的本轮结尾同样带提示：" + saved);
     }
 }
