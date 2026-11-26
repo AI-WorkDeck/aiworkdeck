@@ -10,11 +10,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -576,4 +578,56 @@ class OfficialCloudServiceTest {
                 () -> fence.verifyConfig(config, repo, switched.getUsername(), switched.getDeviceToken()));
         assertEquals(VersionException.CLOUD_RECONNECT_REQUIRED, blocked.getKind());
     }
+
+    /** C25 (lane C): two concurrent sign-in calls must leave one connection and revoke the extra token. */
+    @Test void concurrentConnectsLeaveOneConnectionAndRevokeTheExtraToken() throws Exception {
+        rows = new java.util.concurrent.ConcurrentHashMap<>();
+        connectedAccount("awdk_key", "scope");
+        var bothInBridge = new java.util.concurrent.CountDownLatch(2);
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(i -> new AccountService.ConnectionSnapshot(
+                "https://www.aiworkdeck.com", "awdk_key", "scope", 0)).when(accountService).connectionSnapshot();
+        var service = new OfficialCloudService("", "https://www.aiworkdeck.com", accountService, connectionRepository, cloudSyncService) {
+            @Override protected String httpPost(String url, String jsonBody) {
+                int n = calls.incrementAndGet();
+                bothInBridge.countDown();
+                try { bothInBridge.await(5, java.util.concurrent.TimeUnit.SECONDS); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                return "{\"code\":0,\"data\":{\"token\":\"awdt_" + n + "\",\"userId\":9,\"username\":\"awd_u\",\"displayName\":\"律师\",\"tokenId\":" + (30 + n) + "}}";
+            }
+        };
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var a = pool.submit(() -> service.connectOfficial(ME));
+        var b = pool.submit(() -> service.connectOfficial(ME));
+        CloudConnection first = a.get(10, java.util.concurrent.TimeUnit.SECONDS), second = b.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        pool.shutdown();
+        assertEquals(2, calls.get(), "both really raced into the bridge");
+        assertEquals(1, rows.size(), "one connection, not two identical rows");
+        assertEquals(first.getId(), second.getId());
+        String kept = rows.values().iterator().next().getDeviceToken();
+        String extra = "awdt_1".equals(kept) ? "awdt_2" : "awdt_1";
+        verify(cloudSyncService).revokeRemoteToken(eq("https://case.aiworkdeck.com"), any(), eq(extra));
+    }
+
+    /** C25: duplicates left by older versions collapse at startup; rows with cases attached are never deleted. */
+    @Test void duplicateConnectionsCollapseAtStartupKeepingTheOneWithCases() {
+        var remotes = mock(com.checkba.repository.ProjectRemoteRepository.class);
+        var service = mainland();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "projectRemotes", remotes);
+        CloudConnection older = conn(33L, "awd_u"), linked = conn(34L, "awd_u"), otherAccount = conn(35L, "awd_other");
+        when(connectionRepository.findAll()).thenReturn(new java.util.ArrayList<>(List.of(older, linked, otherAccount)));
+        when(remotes.findByConnectionId(33L)).thenReturn(List.of());
+        when(remotes.findByConnectionId(34L)).thenReturn(List.of(new com.checkba.model.entity.ProjectRemote()));
+        when(remotes.findByConnectionId(35L)).thenReturn(List.of());
+        service.collapseDuplicateConnections();
+        verify(connectionRepository).delete(older);
+        verify(connectionRepository, never()).delete(linked);
+        verify(connectionRepository, never()).delete(otherAccount);
+    }
+
+    private CloudConnection conn(long id, String username) {
+        CloudConnection c = new CloudConnection();
+        c.setId(id); c.setUserId(ME); c.setServerUrl(OFFICIAL); c.setUsername(username);
+        return c;
+    }
 }
+
