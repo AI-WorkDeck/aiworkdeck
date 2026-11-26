@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Возврат к версии",
   "typeAuto": "Автосохранение",
   "typeUpgrade": "Обновление",
+  "typeClientSubmission": "Материалы от клиента",
   "detailTags": "Теги",
   "detailType": "Тип",
   "detailResolutions": "Решение",

@@ -120,6 +120,18 @@ public class ProjectFileService {
      */
     @Transactional
     public ProjectFile createFolder(Long projectId, Long parentId, String name, Long userId) {
+        return createFolder(projectId, parentId, name, userId, true);
+    }
+
+    /**
+     * C23：尽调材料的目录由系统按清单建出来，不是这个人在「改案卷」——不发版本变更信号，否则客户一上传就以
+     * 客户名义开出工作段。材料本身由 {@code WorkSessionService.recordSubmission} 单独存版。
+     */
+    public ProjectFile createFolderQuietly(Long projectId, Long parentId, String name, Long userId) {
+        return createFolder(projectId, parentId, name, userId, false);
+    }
+
+    private ProjectFile createFolder(Long projectId, Long parentId, String name, Long userId, boolean signal) {
         if (projectId == null) {
             throw new IllegalArgumentException(LangText.of("项目 ID 不能为空", "Project ID must not be empty"));
         }
@@ -152,7 +164,7 @@ public class ProjectFileService {
 
         ProjectFile savedFolder = projectFileRepository.save(folder);
         materializeLocalFolder(savedFolder);
-        signalChange(projectId, userId);
+        if (signal) signalChange(projectId, userId);
         return savedFolder;
     }
 

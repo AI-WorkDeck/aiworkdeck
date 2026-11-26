@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Έγινε επαναφορά",
   "typeAuto": "Αυτόματη αποθήκευση",
   "typeUpgrade": "Αναβάθμιση",
+  "typeClientSubmission": "Υποβολή πελάτη",
   "detailTags": "Ετικέτες",
   "detailType": "Τύπος",
   "detailResolutions": "Επίλυση",

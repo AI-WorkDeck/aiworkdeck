@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Revertido",
   "typeAuto": "Salvamento automático",
   "typeUpgrade": "Atualização",
+  "typeClientSubmission": "Envio do cliente",
   "detailTags": "Etiquetas",
   "detailType": "Tipo",
   "detailResolutions": "Resolução",

@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Teruggedraaid",
   "typeAuto": "Automatische opslag",
   "typeUpgrade": "Versie-upgrade",
+  "typeClientSubmission": "Inzending van de cliënt",
   "detailTags": "Labels",
   "detailType": "Soort",
   "detailResolutions": "Oplossing",

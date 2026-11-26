@@ -447,6 +447,7 @@ export default {
   "typeRevert": "バージョン復元",
   "typeAuto": "自動保存",
   "typeUpgrade": "アップグレード",
+  "typeClientSubmission": "依頼者からの提出",
   "detailTags": "位置",
   "detailType": "種類",
   "detailResolutions": "裁定結果",

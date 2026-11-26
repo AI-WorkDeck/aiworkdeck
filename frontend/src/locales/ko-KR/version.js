@@ -447,6 +447,7 @@ export default {
   "typeRevert": "되돌림",
   "typeAuto": "자동 저장",
   "typeUpgrade": "업그레이드",
+  "typeClientSubmission": "의뢰인 제출",
   "detailTags": "태그",
   "detailType": "유형",
   "detailResolutions": "해상도",

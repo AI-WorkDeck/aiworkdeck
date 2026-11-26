@@ -447,6 +447,7 @@ export default {
   "typeRevert": "退回",
   "typeAuto": "自動存檔",
   "typeUpgrade": "升級",
+  "typeClientSubmission": "客戶材料",
   "detailTags": "標籤",
   "detailType": "類型",
   "detailResolutions": "裁決",

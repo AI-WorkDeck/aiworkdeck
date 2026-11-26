@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Zurückgesetzt",
   "typeAuto": "Automatische Speicherung",
   "typeUpgrade": "Aktualisierung",
+  "typeClientSubmission": "Einreichung des Mandanten",
   "detailTags": "Schlagwörter",
   "detailType": "Typ",
   "detailResolutions": "Entscheidung",

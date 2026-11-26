@@ -495,6 +495,7 @@ export default {
   typeRevert: 'Reverted',
   typeAuto: 'Auto-save',
   typeUpgrade: 'Upgrade',
+  typeClientSubmission: 'Client materials',
   detailTags: 'Tags',
   detailType: 'Type',
   detailResolutions: 'Resolution',

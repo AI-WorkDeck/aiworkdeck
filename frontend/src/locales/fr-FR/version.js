@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Annulé",
   "typeAuto": "Sauvegarde automatique",
   "typeUpgrade": "Mettre à niveau",
+  "typeClientSubmission": "Remise du client",
   "detailTags": "Étiquettes",
   "detailType": "Catégorie",
   "detailResolutions": "Résolution",

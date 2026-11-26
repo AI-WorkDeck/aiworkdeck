@@ -447,6 +447,7 @@ export default {
   "typeRevert": "ย้อนกลับเวอร์ชัน",
   "typeAuto": "บันทึกอัตโนมัติ",
   "typeUpgrade": "อัปเกรด",
+  "typeClientSubmission": "ลูกความส่งเอกสาร",
   "detailTags": "ตำแหน่ง",
   "detailType": "ประเภท",
   "detailResolutions": "ผลการตัดสินใจ",

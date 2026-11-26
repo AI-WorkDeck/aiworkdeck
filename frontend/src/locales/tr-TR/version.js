@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Geri alındı",
   "typeAuto": "Otomatik kayıt",
   "typeUpgrade": "Yükselt",
+  "typeClientSubmission": "Müvekkil gönderimi",
   "detailTags": "Etiketler",
   "detailType": "Tür",
   "detailResolutions": "Çözünürlük",

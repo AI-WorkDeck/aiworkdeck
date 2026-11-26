@@ -498,6 +498,7 @@ export default {
   typeRevert: '退回',
   typeAuto: '自动存档',
   typeUpgrade: '升级',
+  typeClientSubmission: '客户材料',
   detailTags: '标签',
   detailType: '类型',
   detailResolutions: '裁决',

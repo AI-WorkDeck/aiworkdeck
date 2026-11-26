@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Dikembalikan",
   "typeAuto": "Simpan automatik",
   "typeUpgrade": "Naik taraf",
+  "typeClientSubmission": "Serahan klien",
   "detailTags": "Tag",
   "detailType": "Jenis",
   "detailResolutions": "Keputusan",

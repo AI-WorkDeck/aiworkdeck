@@ -447,6 +447,7 @@ export default {
   "typeRevert": "استرجاع",
   "typeAuto": "حفظ تلقائي",
   "typeUpgrade": "ترقية",
+  "typeClientSubmission": "تسليم العميل",
   "detailTags": "الوسوم",
   "detailType": "النوع",
   "detailResolutions": "القرار",

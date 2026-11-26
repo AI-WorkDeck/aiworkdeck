@@ -447,6 +447,7 @@ export default {
   "typeRevert": "Đã khôi phục",
   "typeAuto": "Tự động lưu",
   "typeUpgrade": "Nâng cấp",
+  "typeClientSubmission": "Khách hàng nộp",
   "detailTags": "Thẻ",
   "detailType": "Loại",
   "detailResolutions": "Phán quyết",
