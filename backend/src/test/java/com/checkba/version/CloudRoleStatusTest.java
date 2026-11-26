@@ -61,7 +61,7 @@ class CloudRoleStatusTest {
     @Test void fetchRefusedMeansRemovedWithOwnerNameNotOffline() {
         cloud.checkCloud(7L); // remember the owner while still a member
         doThrow(new VersionException("从云端更新失败", new RuntimeException("https://test.invalid/git/5.git: git-upload-pack not permitted")))
-                .when(repo).fetchFromOrigin(eq(7L), any(), any());
+                .when(repo).fetchOriginForCheck(eq(7L), any(), any());
         Map<String, Object> st = cloud.checkCloud(7L);
         assertEquals(Boolean.TRUE, st.get("removed"));
         assertNull(st.get("offline"));
@@ -70,7 +70,7 @@ class CloudRoleStatusTest {
 
     @Test void networkFailureStaysOffline() {
         doThrow(new VersionException("从云端更新失败", new java.net.ConnectException("Connection refused")))
-                .when(repo).fetchFromOrigin(eq(7L), any(), any());
+                .when(repo).fetchOriginForCheck(eq(7L), any(), any());
         Map<String, Object> st = cloud.checkCloud(7L);
         assertEquals(Boolean.TRUE, st.get("offline"));
         assertNull(st.get("removed"));
@@ -101,14 +101,14 @@ class CloudRoleStatusTest {
         remote.setPendingUpload(true);
         cloud.checkCloud(7L);
         doThrow(new VersionException("从云端更新失败", new RuntimeException("git-upload-pack not permitted")))
-                .when(repo).fetchFromOrigin(eq(7L), any(), any());
+                .when(repo).fetchOriginForCheck(eq(7L), any(), any());
         cloud.checkCloud(7L);
         Map<String, Object> local = cloud.cloudStatus(7L, 42L);
         assertEquals(Boolean.TRUE, local.get("removed"));
         assertEquals("沈律师", local.get("ownerName"));
         assertNull(local.get("myRole"), "a removed member has no role to show");
 
-        doReturn(null).when(repo).fetchFromOrigin(eq(7L), any(), any()); // re-added: readable again
+        doReturn(null).when(repo).fetchOriginForCheck(eq(7L), any(), any()); // re-added: readable again
         cloud.checkCloud(7L);
         assertNull(cloud.cloudStatus(7L, 42L).get("removed"));
     }
