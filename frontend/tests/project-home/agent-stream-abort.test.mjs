@@ -69,13 +69,13 @@ function executeAbort(fetchImpl, timers = {}) {
   const build = new Function('currentConversationId', 'currentAssistantBubble', 'isStreaming',
     'messageAbortController', 'sseAbortController', 'finalizeProcesses', 't', 'fetch',
     'getApiBaseUrl', 'getSessionId', 'setTimeout', 'clearTimeout', 'AbortController',
-    'STOP_CONFIRM_TIMEOUT_MS', 'pendingStopBubble', 'stopConfirmTimer',
+    'STOP_CONFIRM_TIMEOUT_MS', 'pendingStopBubble', 'stopConfirmTimer', 'confirmedStops',
     `${abortBody(CODE)}; return abort`)
   const abort = build({ value: 'conversation-old' }, { value: bubble }, isStreaming,
     { abort: () => aborted.push('message') }, { abort: () => aborted.push('sse') },
     () => {}, key => key, fetchImpl, () => '', () => '',
     timers.setTimeout || setTimeout, timers.clearTimeout || clearTimeout, AbortController,
-    15000, null, null)
+    15000, null, null, new WeakSet())
   return { bubble, isStreaming, aborted, promise: abort() }
 }
 
@@ -160,6 +160,43 @@ test('响应体没有 cancelled 字段时按打中处理，不回退成未确认
   await unreadable.promise
   assert.equal(unreadable.bubble.stopNotice, 'agentStream.stopPending',
     '响应体读不出来不改变结论：停止请求本身是成功的')
+})
+
+// Q27（firstday-1125）：后端 1ms 内就处理完取消并发出 cancelled，事件比 POST /cancel 的响应先到。
+// 旧实现直到响应回来才挂 pendingStopBubble，回执落空；随后又写回「正在停止」，20 秒后变成
+// 「已发送停止指令，未收到后台确认」——律师看不出 AI 到底停没停。
+function sliceFrom(code, head) {
+  const start = code.indexOf(head)
+  let depth = 0
+  for (let i = code.indexOf('{', start); i < code.length; i++) {
+    if (code[i] === '{') depth++
+    else if (code[i] === '}') { depth--; if (depth === 0) return code.slice(start, i + 1) }
+  }
+  return null
+}
+test('Q27：cancelled 回执先于 /cancel 响应到达，终态是「已停止」，迟到的响应和兜底计时都不改它', async () => {
+  const timers = timerStub()
+  let respond
+  const bubble = { isStreaming: true, thinking: { status: 'thinking', startTime: Date.now() - 1000 } }
+  const build = new Function('currentConversationId', 'currentAssistantBubble', 'isStreaming',
+    'messageAbortController', 'sseAbortController', 'finalizeProcesses', 't', 'fetch',
+    'getApiBaseUrl', 'getSessionId', 'setTimeout', 'clearTimeout', 'AbortController',
+    'STOP_CONFIRM_TIMEOUT_MS', 'stopNoticeForCancelled', 'cancelledEditedDocument',
+    `let pendingStopBubble = null; let stopConfirmTimer = null; const confirmedStops = new WeakSet();
+     ${sliceFrom(CODE, 'const noteStopConfirmed = (payload) => {')}
+     ${abortBody(CODE)}; return { abort, noteStopConfirmed }`)
+  const { abort, noteStopConfirmed } = build({ value: 'c1' }, { value: bubble }, { value: true },
+    null, null, () => {}, key => key, () => new Promise((resolve) => { respond = resolve }), () => '', () => '',
+    timers.setTimeout, timers.clearTimeout, AbortController, 15000,
+    () => 'agentStream.stopConfirmed', () => false)
+  const run = abort()
+  assert.equal(bubble.stopNotice, 'agentStream.stopPending')
+  noteStopConfirmed({ message: 'stopped', documentEdits: 0 })   // the event wins the race
+  assert.equal(bubble.stopNotice, 'agentStream.stopConfirmed')
+  respond({ ok: true, status: 200, json: async () => ({ cancelled: true }) })
+  await run
+  assert.equal(bubble.stopNotice, 'agentStream.stopConfirmed', '迟到的响应不许改回「正在停止」')
+  assert.equal(timers.fired[15000], undefined, '已确认就不再挂「未收到确认」的兜底')
 })
 
 // 两条 cancelled 分支都要把「正在停止…」落成终态文案，缺一条就会一直停在「正在停止」。
