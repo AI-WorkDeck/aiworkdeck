@@ -1875,6 +1875,35 @@ public class ProjectRepoService {
         return out;
     }
 
+    /**
+     * C12 (lane C step 2): checkout / merge / reset materialize every pointer at the target, but an object the
+     * sharer declared local-only never arrives, so the smudge threw 「Version object is unavailable」 halfway through
+     * and left the worktree half-applied. Leave those out of the materialize set, then remove the pointer stub the
+     * checkout wrote in their place: the path stays absent (the tree shows the placeholder, status skips it).
+     */
+    private <T> T materializingExceptLocalOnly(Repository repo, Map<String, Set<LocalVersionObjectStore.ObjectRef>> paths,
+                                               VersionObjectFilters.Action<T> action) throws Exception {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        long projectId = projectIdOf(repo);
+        if (plans == null || !plans.hasLocalOnly(projectId)) return VersionObjectFilters.materializing(repo, paths, action);
+        Map<String, Set<LocalVersionObjectStore.ObjectRef>> fetch = new LinkedHashMap<>();
+        Map<String, Set<LocalVersionObjectStore.ObjectRef>> localOnly = new LinkedHashMap<>();
+        paths.forEach((path, refs) -> {
+            for (var ref : refs) {
+                (declaredLocalOnly(projectId, ref) ? localOnly : fetch).computeIfAbsent(path, k -> new LinkedHashSet<>()).add(ref);
+            }
+        });
+        T result = VersionObjectFilters.materializing(repo, fetch, action);
+        Path work = repo.getWorkTree().toPath();
+        for (var e : localOnly.entrySet()) {
+            Path file = work.resolve(e.getKey());
+            if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS) || Files.size(file) > VersionObjectPointer.MAX_BYTES) continue;
+            var pointer = VersionObjectPointer.parse(Files.readAllBytes(file));
+            if (pointer != null && e.getValue().contains(pointer)) Files.delete(file);
+        }
+        return result;
+    }
+
     /** C12：这个对象不在本机/案件库，而是共享人声明了「仅在本机」（大小一致）。 */
     private boolean declaredLocalOnly(long projectId, LocalVersionObjectStore.ObjectRef object) {
         var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
@@ -2006,7 +2035,7 @@ public class ProjectRepoService {
             migrateNestedMetadataBranch(repo, name);
             requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, name);
-            VersionObjectFilters.materializing(repo, pointerPathsAt(repo, name),
+            materializingExceptLocalOnly(repo, pointerPathsAt(repo, name),
                     () -> git.checkout().setName(name).call());
         } catch (VersionException e) {
             throw e;
@@ -2124,7 +2153,7 @@ public class ProjectRepoService {
             String fullMessage = message + "\n\n" + KIND_TRAILER + "session\n" + OBJECT_FORMAT_TRAILER;
             Map<String, Set<LocalVersionObjectStore.ObjectRef>> materialized = pointerPathsAt(repo, "HEAD");
             pointerPathsAt(repo, branchName).forEach((path, refs) -> materialized.computeIfAbsent(path, p -> new LinkedHashSet<>()).addAll(refs));
-            MergeResult r = VersionObjectFilters.materializing(repo, materialized, () -> git.merge()
+            MergeResult r = materializingExceptLocalOnly(repo, materialized, () -> git.merge()
                     .include(target)
                     .setMessage(fullMessage)
                     .setFastForward(MergeCommand.FastForwardMode.NO_FF)
@@ -2155,7 +2184,7 @@ public class ProjectRepoService {
                     ? Collections.emptyList()
                     : new ArrayList<>(r.getConflicts().keySet());
             if (resetOnConflict) {
-                VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
+                materializingExceptLocalOnly(repo, pointerPathsAt(repo, "HEAD"),
                         () -> git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call());
             }
             return new MergeOutcome(false, false, conflicts, null);
@@ -2574,7 +2603,7 @@ public class ProjectRepoService {
             if (target == null) throw new VersionException("目标版本不存在: " + targetRef);
             requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, targetRef);
-            var result = VersionObjectFilters.materializing(repo, pointerPathsAt(repo, targetRef), () -> git.merge()
+            var result = materializingExceptLocalOnly(repo, pointerPathsAt(repo, targetRef), () -> git.merge()
                     .include(target)
                     .setFastForward(MergeCommand.FastForwardMode.FF_ONLY)
                     .call());
@@ -2672,7 +2701,7 @@ public class ProjectRepoService {
             try (Repository repo = open(projectId); Git git = new Git(repo)) {
                 beforeCheckout.run();
                 requireObjectsAt(repo, "HEAD");
-                VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
+                materializingExceptLocalOnly(repo, pointerPathsAt(repo, "HEAD"),
                         () -> git.checkout().setName(MAIN_BRANCH).call());
             }
         } catch (VersionException e) {

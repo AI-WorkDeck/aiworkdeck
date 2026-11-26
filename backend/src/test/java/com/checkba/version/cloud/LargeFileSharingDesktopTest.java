@@ -138,4 +138,65 @@ class LargeFileSharingDesktopTest {
         colleague.objects().verify(2, medium);
         verify(colleaguePlans).recordLocalOnly(eq(2L), eq(big), eq("庭审录像.mp4"), eq("沈砚"), eq(false));
     }
+
+    /**
+     * C12 step 2 (lane C, case-b): the colleague already had the case; the new version adds a local-only recording.
+     * 取回 fast-forwards the mainline, which used to smudge every pointer, failed on the absent local-only object
+     * (「Version object is unavailable」) and left the worktree half-applied. It must land, with no file (and no
+     * pointer stub or temp file) where the local-only recording is.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aColleaguesFastForwardLandsAndLeavesTheLocalOnlyRecordingOut(@TempDir Path machines) throws Exception {
+        long remote = 12202L;
+        String token = token(remote);
+        String url = "http://localhost:" + port + "/git/" + remote + ".git";
+
+        ProjectRepoService sender = machine(machines.resolve("sender"));
+        doReturn(Map.of()).when(sender).cloudWriteHeaders(anyLong(), anyString(), any(), any());
+        Files.createDirectories(sender.workTree(1));
+        Files.writeString(sender.workTree(1).resolve("说明.txt"), "第一版");
+        sender.init(1, "Synthetic", "s@example.test");
+
+        // The colleague has the first version already.
+        ProjectRepoService colleague = machine(machines.resolve("colleague"));
+        Files.createDirectories(colleague.workTree(2));
+        colleague.init(2, "Synthetic", "c@example.test");
+        try (var repo = colleague.open(2); Git g = new Git(repo)) {
+            g.fetch().setRemote(sender.gitDir(1).toUri().toString()).setRefSpecs(new RefSpec("+refs/heads/master:refs/remotes/origin/master")).call();
+            g.reset().setMode(org.eclipse.jgit.api.ResetCommand.ResetType.HARD).setRef("refs/remotes/origin/master").call();
+        }
+
+        // The sender adds a small and an over-allowance recording and edits the note.
+        media(sender.workTree(1).resolve("a.mp4"), 300, 1);
+        media(sender.workTree(1).resolve("庭审录像.mp4"), 1200, 3);
+        Files.writeString(sender.workTree(1).resolve("说明.txt"), "第二版");
+        sender.commitAll(1, "加录像", "session", null, "沈砚", "s@example.test");
+        List<ObjectRef> objects = sender.objects().list(1).stream().sorted(Comparator.comparingLong(ObjectRef::size)).toList();
+        ObjectRef small = objects.get(0), big = objects.get(1);
+        sync(sender, mock(ProjectObjectPlanService.class)).upload(1, url, "u", token);
+
+        ProjectObjectPlanService colleaguePlans = mock(ProjectObjectPlanService.class);
+        when(colleaguePlans.hasLocalOnly(2L)).thenReturn(true);
+        when(colleaguePlans.isDeclaredLocalOnly(2L, big)).thenReturn(true);
+        ObjectProvider<ProjectObjectPlanService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(colleaguePlans);
+        ReflectionTestUtils.setField(colleague, "objectPlans", provider);
+        try (var repo = colleague.open(2); Git g = new Git(repo)) {
+            g.fetch().setRemote(sender.gitDir(1).toUri().toString()).setRefSpecs(new RefSpec("+refs/heads/master:refs/remotes/origin/master")).call();
+        }
+        sync(colleague, colleaguePlans).download(2, url, "u", token, "refs/remotes/origin/master");
+
+        colleague.fastForwardMainline(2, "refs/remotes/origin/master");
+
+        Path work = colleague.workTree(2);
+        assertEquals("第二版", Files.readString(work.resolve("说明.txt")));
+        assertArrayEquals(Files.readAllBytes(sender.workTree(1).resolve("a.mp4")), Files.readAllBytes(work.resolve("a.mp4")));
+        assertFalse(Files.exists(work.resolve("庭审录像.mp4")), "no pointer stub where the local-only recording is");
+        try (var listing = Files.list(work)) {
+            assertEquals(List.of(), listing.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".tmp")).toList(), "no temp files left");
+        }
+        assertEquals(List.of(), colleague.pendingChanges(2), "the pull leaves nothing to submit");
+        colleague.objects().verify(2, small);
+    }
 }
