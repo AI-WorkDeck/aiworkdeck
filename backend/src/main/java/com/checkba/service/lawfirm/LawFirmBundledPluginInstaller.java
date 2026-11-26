@@ -44,6 +44,25 @@ public class LawFirmBundledPluginInstaller {
         this.pluginsDir = pluginsDir;
     }
 
+    /**
+     * C18：把随包的律所管理也列进「内置插件」目录。广场没连上（离线、官网不可达）时，
+     * 插件市场原来搜不到它，非管理员律师就找不到入口。没有内置副本时回 null。
+     */
+    public Map<String, Object> bundledListing() {
+        Resource manifest = new PathMatchingResourcePatternResolver().getResource("classpath:" + BUNDLE_ROOT + "manifest.json");
+        if (!manifest.exists()) return null;
+        try (InputStream in = manifest.getInputStream()) {
+            Map<String, Object> row = new java.util.LinkedHashMap<>(cn.hutool.json.JSONUtil.parseObj(
+                    new String(in.readAllBytes(), StandardCharsets.UTF_8)));
+            if (!PLUGIN_ID.equals(row.get("id"))) return null;
+            row.put("bundled", true);
+            return row;
+        } catch (IOException | RuntimeException e) {
+            log.warn("Bundled {} manifest unreadable: {}", PLUGIN_ID, e.getMessage());
+            return null;
+        }
+    }
+
     /** @return {installed, updated, enabled, version} */
     public synchronized Map<String, Object> ensureInstalledAndEnabled() throws IOException {
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();

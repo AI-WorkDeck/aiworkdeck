@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Abrir espacio relacionado",
   "readNotDone": "Leer esta notificación no confirma la acción de negocio. Abre el espacio relacionado para revisarla y gestionarla.",
   "targetUnavailable": "El espacio relacionado no está disponible. Actualiza y vuelve a intentarlo.",
-  "pluginUnavailable": "El complemento relacionado no está instalado o habilitado. Revisa el centro de complementos.",
+  "pluginUnavailable": "El complemento relacionado no está instalado o habilitado. Revisa el centro de complementos.", "enableLawFirmTitle": "¿Activar Gestión de despachos?", "enableLawFirmBody": "Este aviso se gestiona en Gestión de despachos. Viene incluido en la aplicación; al activarlo se abre este registro directamente.", "enableLawFirmConfirm": "Activar y abrir",
   "openFailed": "No se pudo abrir el espacio relacionado. Vuelve a intentarlo.",
   "serviceFailed": "El servicio de mensajes no está disponible temporalmente. Vuelve a intentarlo.",
   "source": "De {name}",

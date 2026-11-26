@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Gerelateerde werkruimte openen",
   "readNotDone": "Het lezen van deze melding bevestigt de zakelijke actie niet. Open de gerelateerde werkruimte om deze te bekijken en af te handelen.",
   "targetUnavailable": "De gerelateerde werkruimte is niet beschikbaar. Vernieuw en probeer het opnieuw.",
-  "pluginUnavailable": "De bijbehorende plug-in is niet geïnstalleerd of ingeschakeld. Controleer het plug-incentrum.",
+  "pluginUnavailable": "De bijbehorende plug-in is niet geïnstalleerd of ingeschakeld. Controleer het plug-incentrum.", "enableLawFirmTitle": "Kantoorbeheer inschakelen?", "enableLawFirmBody": "Deze melding wordt afgehandeld in Kantoorbeheer. Het zit standaard in de app; na inschakelen opent dit item direct.", "enableLawFirmConfirm": "Inschakelen en openen",
   "openFailed": "Kan de gerelateerde werkruimte niet openen. Probeer het opnieuw.",
   "serviceFailed": "Berichten zijn tijdelijk niet beschikbaar. Probeer het opnieuw.",
   "source": "Van {name}",
