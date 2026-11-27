@@ -2196,6 +2196,12 @@ public class ProjectRepoService {
             if (resetOnConflict) {
                 materializingExceptLocalOnly(repo, pointerPathsAt(repo, "HEAD"),
                         () -> git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call());
+            } else {
+                // C28: JGit writes <<<<<<< markers into the conflicting files. The lawyer may open them in Word or
+                // Finder while choosing, so put back the pre-merge (HEAD) bytes; the conflict stays in the index and
+                // every choice is copied from the two commits (applyResolution), never read from this file.
+                Path work = workTree(projectId);
+                for (String p : conflicts) copyBlobAtCommit(projectId, "HEAD", p, work.resolve(p));
             }
             return new MergeOutcome(false, false, conflicts, null);
         } catch (VersionException e) {
