@@ -946,6 +946,10 @@ public class CloudSyncService {
             List<VersionEntry> ahead = repoService.commitsBetween(
                     projectId, repoService.mainBranch(), ORIGIN_MASTER, REMOTE_AHEAD_WALK_CAP);
             if (ahead.isEmpty()) return;
+            // C23 (lane C nit): client portal materials are not anyone's 稿 — count them apart, out of the authors
+            int materials = (int) ahead.stream().filter(e -> HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).count();
+            ahead = ahead.stream().filter(e -> !HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).toList();
+            m.put("remoteAheadMaterials", materials);
             m.put("remoteAheadCount", ahead.size());
             // 案件库确实领先了、这句话非说清是谁不可——只有这条路允许为一个名字联网一次
             Map<String, String> remoteNames = remoteDisplayNames(projectId, true);

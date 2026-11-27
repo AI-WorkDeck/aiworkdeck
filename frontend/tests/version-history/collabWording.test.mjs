@@ -109,3 +109,15 @@ test('引导第②步：算不出版数或作者时落回一句笼统的，不�
     'version.submitGuidePullGeneric({})'
   )
 })
+
+test('C23: client portal materials are counted apart from colleagues\' drafts', () => {
+  const t = (k, p) => k + (p ? JSON.stringify(p) : '')
+  assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 0, remoteAheadMaterials: 3 }),
+    'version.remoteAheadMaterials{"count":3}', 'only client materials: never 「交了新稿」')
+  assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 2, remoteAheadAuthors: ['沈砚'], remoteAheadAuthorCount: 1, remoteAheadMaterials: 1 }),
+    'version.remoteAheadOne{"name":"沈砚","count":2}version.remoteAheadPlusMaterials{"count":1}')
+  assert.equal(pullStepText(t, { remoteAhead: true, remoteAheadCount: 0, remoteAheadMaterials: 2 }),
+    'version.submitGuidePullMaterials{"count":2}')
+  assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 2, remoteAheadAuthors: ['沈砚'], remoteAheadAuthorCount: 1 }),
+    'version.remoteAheadOne{"name":"沈砚","count":2}', 'unchanged without materials (and with older servers)')
+})
