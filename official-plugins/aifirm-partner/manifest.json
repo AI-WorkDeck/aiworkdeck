@@ -1,9 +1,9 @@
 {
   "id": "aifirm-partner",
-  "name": "Venture AI 律师端",
+  "name": "AI Firm 律师端",
   "version": "1.1.0",
   "minHostVersion": "0.91.0",
-  "description": "合作执业律师接入 Draft AI / Venture AI 案源广场与专属工作台：订阅月卡或季卡后即可查看去标识化客户需求与风险提示，最多 3 位订阅律师报价响应，客户选定 1 位后解锁完整联系方式与草稿文件并在 AI WorkDeck 中修改审定定稿（平台 0% 抽成）。优先覆盖台北与硅谷。",
+  "description": "美国执业律师接入 AI Firm 案源广场与专属工作台：订阅月卡或季卡后即可查看去标识化客户需求与风险提示，最多 3 位订阅律师报价响应，客户选定 1 位后解锁完整联系方式与草稿文件并在 AI WorkDeck 中修改审定定稿（平台 0% 抽成）。覆盖美国硅谷。",
   "author": "AI WorkDeck",
   "permissions": [
     "network",
@@ -41,14 +41,14 @@
     "views": [
       {
         "id": "main",
-        "name": "Venture AI 律师端",
+        "name": "AI Firm 律师端",
         "entry": "web/index.html",
         "placement": "workspace",
         "scope": "global"
       },
       {
         "id": "card",
-        "name": "Venture AI 律师端",
+        "name": "AI Firm 律师端",
         "entry": "web/card.html",
         "placement": "sidebar",
         "scope": "global",
@@ -61,7 +61,7 @@
     "connections": [
       {
         "id": "intake",
-        "label": "Venture AI 律师端 · Venture AI Lawyer Desk",
+        "label": "AI Firm 律师端 · AI Firm Lawyer Desk",
         "baseUrl": "https://ai-firm.aiworkdeck.com",
         "auth": {
           "type": "awd-account"
