@@ -1449,7 +1449,7 @@ export default {
       return !!(this.permissionsState && this.permissionsState.supported)
     },
     permissionDisplayRows() {
-      const normalized = normalizePermissionItems(this.permissionsState && this.permissionsState.items)
+      const normalized = normalizePermissionItems(this.permissionsState && this.permissionsState.items, { wechat: this.isCnSite })
       const metaById = {
         fullDiskAccess: {
           title: this.$t('admin.permFullDiskAccessTitle'),

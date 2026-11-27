@@ -44,7 +44,7 @@ export default {
     compatUse: '安全验证加载不出来？使用兼容验证',
     compatRefresh: '换一张验证图片',
     compatLoading: '正在加载验证图片',
-    compatHint: '输入图片中的字符，再获取短信或邮件验证码。输错或过期后请换一张。',
+    compatHint: '输入图片中的字符，再获取短信或邮件验证码。输错或过期后请换一张。', compatHintEmail: '输入图片中的字符后再获取邮箱验证码；输错或过期后请换一张图片。',
     compatImage: '安全验证图片',
     compatAnswer: '图片中的 6 位字符',
     compatAnswerFirst: '请先加载验证图片并填写其中的 6 位字符', compatAuto: '安全验证没有加载出来，已改用兼容验证：请输入图片中的 6 位字符，再获取验证码。',
