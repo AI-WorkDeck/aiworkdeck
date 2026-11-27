@@ -37,14 +37,17 @@
       </view>
     </view>
 
-    <!-- 律所决策者与管委会看板（连接本机 lawfirm-management 引擎，无需云端团队前置） -->
+    <!-- 律所决策者与管委会看板（连接本机 lawfirm-management 引擎，无需云端团队前置）。
+         C4：没有团队、没有律所、本机台账也是空的新用户不先看到它（和那排橙色的待处理计数），
+         而是先看到「团队是做什么的、怎么邀请」；开发版 / 演示开关打开时照旧显示。 -->
     <SettingsSection
+      v-if="showLawfirmDashboard"
       :title="$t('team.lawfirmDashboardTitle')"
       :description="$t('team.lawfirmDashboardDesc')"
     >
       <template #actions>
         <view class="lf-header-actions">
-          <view class="team-btn small" :class="{ 'is-busy': lawfirmBusy }" @tap="onSeedLawFirmDemo">
+          <view v-if="demoDataTools" class="team-btn small" :class="{ 'is-busy': lawfirmBusy }" @tap="onSeedLawFirmDemo">
             {{ $t('team.lawfirmSeedDemoBtn') }}
           </view>
           <view class="team-btn small primary" :class="{ 'is-busy': lawfirmBusy }" @tap="onOpenLawFirmPlugin('dashboard')">
@@ -145,6 +148,18 @@
          三条路并排，一条都不藏在二级菜单里（设计 §10.4 第 4 条）：
          创建团队 / 输入邀请码加入 / 别人按手机号邀请我。 -->
     <template v-else-if="!team">
+      <!-- C4：空团队页先说清团队是做什么的、怎么邀请同事 -->
+      <view class="section-card team-intro">
+        <view class="section-header">
+          <text class="section-title">{{ $t('team.emptyIntroTitle') }}</text>
+          <text class="section-subtitle">{{ $t('team.emptyIntroBody') }}</text>
+        </view>
+        <view class="section-body">
+          <text class="team-intro-step">{{ $t('team.emptyIntroStep1') }}</text>
+          <text class="team-intro-step">{{ $t('team.emptyIntroStep2') }}</text>
+          <text class="team-intro-step">{{ $t('team.emptyIntroStep3') }}</text>
+        </view>
+      </view>
       <view class="join-paths">
         <view class="section-card join-card">
           <view class="section-header">
@@ -630,6 +645,8 @@
 
 <script>
 import { formatCnyCompact } from '@/utils/cnyAmount'
+import { demoDataToolsVisible } from '@/utils/demoData.js'
+import { formatDateTime } from '@/utils/projectHomeFormat.js'
 import AwdSwitch from '@/components/AwdSwitch.vue'
 import AwdSelect from '@/components/AwdSelect.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
@@ -652,6 +669,8 @@ import {
 } from '@/services/api.js'
 import { requireAccount, ACCOUNT_CHANGED_EVENT } from '@/utils/requireAccount.js'
 import { notifyOrgChanged } from '@/utils/orgContext.js'
+// C3：团队面板开着时轻量刷新成员与邀请的间隔
+const TEAM_REFRESH_MS = 20000
 
 const ROLE_KEYS = ['ADMIN', 'MEMBER']
 
@@ -710,6 +729,15 @@ export default {
     }
   },
   computed: {
+    /** X12：演示数据按钮只在开发版或开发者本机显式打开时出现 */
+    showLawfirmDashboard() {
+      if (this.team || this.firm || this.demoDataTools) return true
+      const k = this.lawfirmKpis || {}
+      return Number(k.activeMatters) > 0 || Number(k.pendingClearances) > 0
+    },
+    demoDataTools() {
+      return typeof demoDataToolsVisible === 'function' && demoDataToolsVisible()
+    },
     lawfirmDimTabs() {
       return [
         { key: 'departments', label: this.$t('team.lawfirmDimDepartments') },
@@ -849,9 +877,21 @@ export default {
     this.loadLawFirmDashboard()
     // 在别处登录 / 退出登录之后（登录弹层、顶栏退出），团队态跟着刷新
     uni.$on(ACCOUNT_CHANGED_EVENT, this.reload)
+    // C3：同事在另一台电脑上接受了邀请，开着的面板要自己看见——回到窗口时刷一次，
+    // 开着时每 20 秒轻量刷新成员与邀请（不动输入中的草稿，失败静默）
+    this._teamRefreshOnFocus = () => { if (typeof document === 'undefined' || !document.hidden) this.refreshMembership() }
+    if (typeof window !== 'undefined') window.addEventListener('focus', this._teamRefreshOnFocus)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', this._teamRefreshOnFocus)
+    this._teamRefreshTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      this.refreshMembership()
+    }, TEAM_REFRESH_MS)
   },
   beforeUnmount() {
     uni.$off(ACCOUNT_CHANGED_EVENT, this.reload)
+    if (typeof window !== 'undefined') window.removeEventListener('focus', this._teamRefreshOnFocus)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this._teamRefreshOnFocus)
+    clearInterval(this._teamRefreshTimer)
   },
   methods: {
     unwrapLawFirmData(res) {
@@ -928,10 +968,32 @@ export default {
     // 日期出来——那个数字看起来精确，但只要官网改了有效期就在骗人
     expiryText(raw) {
       if (!raw) return this.$t('team.inviteExpiresUnknown')
-      return this.$t('team.inviteExpires', { date: String(raw).replace('T', ' ').slice(0, 16) })
+      // C2：官网给的是 UTC。原来把原串截成「2026-12-03 01:49」直接显示，北京时间的律师会读早 8 小时。
+      // 不带时区标记的串按 UTC 解析，再按本机时区显示日期和时间；解析不了才退回原串。
+      const text = String(raw)
+      const iso = /T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(text) ? text + 'Z' : text
+      const local = formatDateTime(iso)
+      return this.$t('team.inviteExpires', { date: local || text.replace('T', ' ').slice(0, 16) })
     },
     toast(title) {
       uni.showToast({ title, icon: 'none' })
+    },
+    // C3：后台轻量刷新——只更新团队、成员、邀请与律所，不碰改名草稿、不报错（下次再试）
+    async refreshMembership() {
+      if (!this.connected || this._refreshing) return
+      this._refreshing = true
+      try {
+        const data = await getTeam()
+        const hadTeam = !!this.team
+        this.team = (data && data.team) || null
+        this.members = (data && data.members) || []
+        this.pendingInvites = (data && data.pendingInvites) || []
+        this.receivedInvites = (data && data.invites) || []
+        this.firm = (data && data.firm) || null
+        if (typeof (data && data.myRole) === 'string') this.myRole = data.myRole
+        if (!hadTeam && this.team) { this.renameDraft = this.team.name || ''; await this.loadSummary() }
+      } catch (e) { /* keep what is shown */ }
+      finally { this._refreshing = false }
     },
     async reload() {
       this.loadError = false
@@ -1465,6 +1527,7 @@ export default {
 }
 
 /* 无团队态的三条路并排。窄了自动换行，但每条仍占满一列不塌成一行文字 */
+.team-intro-step { display: block; font-size: var(--awd-font-size-body); color: var(--awd-text-2); line-height: 1.6; }
 .join-paths {
   display: flex;
   flex-wrap: wrap;

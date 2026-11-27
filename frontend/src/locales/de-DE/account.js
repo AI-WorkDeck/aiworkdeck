@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Erfolgshonorarquote (%)",
   "casePreviewConflictBtn": "Konflikt-Vorprüfung starten",
   "caseSubmitIntakeBtn": "Annahme & Konfliktprüfung einreichen",
-  "caseIntakeEmpty": "Noch keine Mandatsannahmen vorhanden. Klicken Sie oben auf „Neue Mandatsannahme“ oder „Qinghe-Foods-Demo laden“, um zu beginnen.",
+  "caseIntakeEmpty": "Noch keine Mandatsannahmen vorhanden. Klicken Sie oben auf „Neue Mandatsannahme“, um zu beginnen.",
   "caseContractedLabel": "Vertragswert",
   "caseImBadge": "IM-Gruppe erstellt & Zusammenfassung synchronisiert",
   "caseMyClearanceTitle": "Mir zugewiesene Interessenkonfliktprüfungen",
