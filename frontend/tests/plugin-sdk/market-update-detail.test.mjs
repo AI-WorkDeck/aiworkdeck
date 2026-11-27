@@ -31,7 +31,7 @@ function harness(kind = 'detail', { local = localPlugin(), remote = remotePlugin
     mergePluginCatalog, isPluginUpdateAvailable, paidState, canInstall,
     refreshEntitlements: async () => { if (state.purchaseOnRefresh) state.remote.purchased = true },
     requireAccount: async () => { state.accountConnected = true; return true },
-    console: quiet, PERMISSION_LABELS: { im: 'Chat', file_write: 'Write files' }, CATEGORY_LABELS: {},
+    errorText: (e, fallback) => fallback, console: quiet, PERMISSION_LABELS: { im: 'Chat', file_write: 'Write files' }, CATEGORY_LABELS: {},
     uni: {
       showModal(options) { confirmations.push(options); options.success({ confirm }) },
       showToast(options) { toasts.push(options.title) },
