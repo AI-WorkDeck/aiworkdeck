@@ -413,7 +413,7 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
   「站点无关」场景的构造入口。
 - `service/site/SiteEnvironmentPostProcessor.java` + `resources/META-INF/spring.factories`
   （**必须是 spring.factories**：Spring Boot 3.x 只从这里发现 EnvironmentPostProcessor；
-  0.91.0 之前登记在不起作用的 `.imports` 文件里，处理器从没在真实应用里跑过，国际站用户每次
+  0.91.0 之前只登记在不起作用的 `.imports` 文件里（该文件保留但无效，删它会触发 CI 的 revert guard），处理器从没在真实应用里跑过，国际站用户每次
   重启都回到国内站。`SiteEnvironmentPostProcessorRegistrationTest` 守着）— 启动期按 `site.json`
   改写属性（`ai.account.base-url`、`ai.plugins.registry-url`、`ai.skills.registry-url`、
   `telemetry.ingest-url`，0.91.0 起还有 `ai.packs.revoked-url` 与 `ai.packs.base-urls`）。
