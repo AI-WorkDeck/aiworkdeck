@@ -332,6 +332,7 @@ public class ChatModelFactory {
         String baseUrl = platform ? platformBaseUrl(connection) : resolveOpenRouterBaseUrl();
         return OpenAiChatModel.builder().apiKey(key).baseUrl(baseUrl).modelName(target.modelId())
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0)
+                .customHeaders(platform ? turnHeaders(key) : java.util.Map.of())
                 .maxTokens(maxOutputTokens).logRequests(false).logResponses(false).build();
     }
 
@@ -353,6 +354,7 @@ public class ChatModelFactory {
         PlatformAiKeyService.Resolved connection = platformConnection(); // Per-user credits, identity and usage baseline; failure is terminal.
         ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
                 .baseUrl(platformBaseUrl(connection)).modelName(modelId)
+                .customHeaders(turnHeaders(connection.apiKey()))
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
                 .logRequests(false).logResponses(false).build();
         recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
@@ -384,6 +386,7 @@ public class ChatModelFactory {
                     com.checkba.service.LangText.of("当前辅助模型不可用或不支持所需输入", "The auxiliary model is unavailable or does not support this input"));
         ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
                 .baseUrl(platformBaseUrl(connection)).modelName(modelId)
+                .customHeaders(turnHeaders(connection.apiKey()))
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
                 .logRequests(false).logResponses(false).build();
         recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
@@ -734,6 +737,20 @@ public class ChatModelFactory {
         return value != null && !value.isBlank();
     }
 
+    /**
+     * Q24：国内站平台通道（awdai_）在轮次作用域里时带 {@code X-AWD-Turn}；其余（BYOK、国际、轮次外）为空。
+     */
+    static java.util.Map<String, String> turnHeaders(String apiKey) {
+        String tag = PlatformTurnScope.current();
+        if (tag == null || !tag.matches("^[0-9a-f]{32}$")) return java.util.Map.of();
+        if (apiKey == null || !apiKey.startsWith("awdai_")) {
+            // 国际平台通道的非流式调用拿不到 OpenRouter 生成 id：这一轮的金额查不全，页脚回「查看用量」
+            TurnGenerations.markIncomplete();
+            return java.util.Map.of();
+        }
+        return java.util.Map.of("X-AWD-Turn", tag);
+    }
+
     /** 缓存 key 带密钥指纹：官网撤销重发后指纹变化，旧实例自然作废。 */
     private ChatLanguageModel getOrCreatePlatformModel(String modelId) {
         recordModelUse("AWD_CLOUD", modelId, false);
@@ -741,6 +758,14 @@ public class ChatModelFactory {
         String apiKey = connection.apiKey();
         String baseUrl = platformBaseUrl(connection);
         String cacheKey = "awd_cloud:" + baseUrl + ":" + connection.fingerprint() + ":" + modelId;
+        java.util.Map<String, String> turnHeaders = turnHeaders(apiKey);
+        if (!turnHeaders.isEmpty()) {
+            // Q24：轮次里的辅助调用要带本轮计费标记；缓存实例的请求头是固定的，所以这里单独建一个
+            AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
+            return OpenAiChatModel.builder().apiKey(apiKey).maxRetries(0).baseUrl(baseUrl).modelName(modelId)
+                    .timeout(config.getTimeout()).customHeaders(turnHeaders)
+                    .logRequests(false).logResponses(false).build();
+        }
         return modelCache.computeIfAbsent(cacheKey, k -> {
             log.info("Creating new AWD Cloud ChatModel instance for: {}", modelId);
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();

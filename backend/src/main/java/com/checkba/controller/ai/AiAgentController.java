@@ -40,6 +40,9 @@ public class AiAgentController {
     private final com.checkba.service.ai.AgentInboxService agentInboxService;
     private final com.checkba.service.ai.ChatModelFactory chatModelFactory;
     private final com.checkba.service.ProjectFileAccessService fileAccess;
+    /** Q24：手工装配的控制器测试里为 null（该端点回 available:false）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ai.TurnCostService turnCostService;
 
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ai.InlineContentCache inlineContentCache;
@@ -364,6 +367,20 @@ public class AiAgentController {
             log.error("Cancel failed", e);
             return ResponseEntity.status(500).body("{\"status\":\"error\", \"message\":\"Cancel failed\"}");
         }
+    }
+
+    /**
+     * Q24：一轮对话的实扣金额（国内站平台通道）。前端在 bubble_end 之后按 0.5/1.5/4/15 秒轮询，
+     * pending 归零才显示；available:false 时保留「查看用量」。凭据与计费标记都不出后端。
+     */
+    @GetMapping("/turn-cost/{conversationId}/{runId}")
+    public ResponseEntity<?> turnCost(@PathVariable String conversationId, @PathVariable String runId,
+                                      @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long userId = AuthController.getUserIdFromSession(sessionId);
+        if (!canUseConversation(conversationId, userId)) return forbidden();
+        Object data = turnCostService == null ? java.util.Map.of("available", false)
+                : turnCostService.turnCost(userId, conversationId, runId);
+        return ResponseEntity.ok(java.util.Map.of("code", 0, "data", data));
     }
 
     private static ResponseEntity<?> forbidden() {

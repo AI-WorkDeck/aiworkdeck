@@ -99,6 +99,9 @@ public class SubAgentService {
      * {@link #dispatch} 返回前一定移除（finally），不做过期清理。
      */
     private final Map<String, RunningSubtask> running = new ConcurrentHashMap<>();
+    /** Q24：子任务的模型调用算进父轮次的费用（同一个计费标记）；手工装配的测试里为 null。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.telemetry.InstallIdentityService installIdentity;
 
     /**
      * 一个在跑的子任务。conversationId 一并记下来是为了鉴权：
@@ -271,7 +274,9 @@ public class SubAgentService {
         // 没有这个快照的话，下面几条 catch 只能硬编 toolsUsed=空/rounds=0——即便子 Agent
         // 已经执行过真实的、可能有副作用的工具调用，父级也完全看不出来（审计条目）。
         Progress progress = new Progress();
-        Callable<SubAgentResult> task = () -> PlatformAiUserScope.call(scopedUser, () -> {
+        // Q24：子任务里的一切平台调用（含非流式回退与工具内的辅助调用）都算进父轮次
+        final String parentTurnTag = turnTag(parentCtx);
+        Callable<SubAgentResult> task = () -> PlatformAiUserScope.call(scopedUser, () -> com.checkba.service.ai.PlatformTurnScope.call(parentTurnTag, () -> {
             IN_SUB_AGENT.set(Boolean.TRUE);
             String previousConversation = editorBridgeService == null ? null
                     : editorBridgeService.getCurrentConversationId();
@@ -287,7 +292,7 @@ public class SubAgentService {
                 }
                 IN_SUB_AGENT.remove();
             }
-        });
+        }));
         // 先登记完整句柄再起线程，父轮取消与提交竞态由持久 checker 补齐。
         FutureTask<SubAgentResult> future = new FutureTask<>(task);
         RunningSubtask handle = new RunningSubtask(
@@ -443,9 +448,9 @@ public class SubAgentService {
                 String choice = mustConsult && !specs.isEmpty() ? consultToolChoice(round, toolsUsed.isEmpty(), specs) : null;
                 if (choice != null && !"auto".equals(choice)) log.info("[SubAgent] {} round {} tool_choice {}", subtaskId, round, choice);
                 if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel orm && choice != null) {
-                    response = generateBlocking(orm, messages, specs, choice, cacheUsage);
+                    response = generateBlocking(orm, messages, specs, choice, cacheUsage, turnTag(parentCtx));
                 } else if (streaming instanceof com.checkba.service.ai.OpenRouterStreamingChatModel) {
-                    response = generateBlocking(streaming, messages, specs, cacheUsage);
+                    response = generateBlocking(streaming, messages, specs, cacheUsage, turnTag(parentCtx));
                 } else {
                     ChatLanguageModel model = chatModelFactory.getChatModel(modelId);
                     response = specs.isEmpty() ? model.generate(messages) : model.generate(messages, specs);
@@ -552,6 +557,11 @@ public class SubAgentService {
         return "auto";
     }
 
+    private String turnTag(ToolContext parentCtx) {
+        if (installIdentity == null || parentCtx == null) return null;
+        return installIdentity.turnTag(parentCtx.conversationId(), parentCtx.runId());
+    }
+
     /** 收尾核验第一轮强制调用的工具：优先全文检索（模型自己定查什么），没有就读文件。 */
     static String forcedConsultTool(List<ToolSpecification> specs) {
         for (String name : List.of("search_project_content", "extract_file_text", "read_document")) {
@@ -562,7 +572,7 @@ public class SubAgentService {
 
     static Response<AiMessage> generateBlocking(com.checkba.service.ai.OpenRouterStreamingChatModel model,
                                                 List<ChatMessage> messages, List<ToolSpecification> specs,
-                                                String toolChoice, Integer[] cacheUsage) throws Exception {
+                                                String toolChoice, Integer[] cacheUsage, String turnTag) throws Exception {
         java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
         com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
             @Override public void onNext(String token) { }
@@ -572,6 +582,7 @@ public class SubAgentService {
                 cacheUsage[0] = cachedTokens;
                 cacheUsage[1] = cacheWriteTokens;
             }
+            @Override public String turnTag() { return turnTag; }
         };
         model.generateConsultRound(messages, specs, toolChoice, handler);
         try {
@@ -586,7 +597,7 @@ public class SubAgentService {
     static Response<AiMessage> generateBlocking(dev.langchain4j.model.chat.StreamingChatLanguageModel model,
                                                 List<ChatMessage> messages,
                                                 List<dev.langchain4j.agent.tool.ToolSpecification> specs,
-                                                Integer[] cacheUsage) throws Exception {
+                                                Integer[] cacheUsage, String turnTag) throws Exception {
         java.util.concurrent.CompletableFuture<Response<AiMessage>> done = new java.util.concurrent.CompletableFuture<>();
         com.checkba.service.ai.ReasoningStreamingHandler handler = new com.checkba.service.ai.ReasoningStreamingHandler() {
             @Override public void onNext(String token) { }
@@ -596,6 +607,7 @@ public class SubAgentService {
                 cacheUsage[0] = cachedTokens;
                 cacheUsage[1] = cacheWriteTokens;
             }
+            @Override public String turnTag() { return turnTag; }
         };
         if (specs == null || specs.isEmpty()) model.generate(messages, handler);
         else model.generate(messages, specs, handler);

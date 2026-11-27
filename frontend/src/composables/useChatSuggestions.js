@@ -6,7 +6,7 @@ import { isDesktopHost } from '@/services/host.js'
 
 /** A suggestion never mutates the editor until the user selects it. */
 export function useChatSuggestions({ conversationId, modelId, projectId, activeFileId, input, inputPrompt,
-  streaming, readOnly, identity, onFinished }) {
+  streaming, readOnly, identity, onFinished, runId = () => null }) {
   const available = isDesktopHost()
   const enabled = ref(true)
   const suggestion = ref(null)
@@ -50,7 +50,7 @@ export function useChatSuggestions({ conversationId, modelId, projectId, activeF
     const scope = context()
     loading.value = true
     try {
-      const result = await requestChatSuggestion(conversationId.value, modelId.value)
+      const result = await requestChatSuggestion(conversationId.value, modelId.value, runId())
       if (ticket !== revision || scope !== context() || !usable() || !empty()) return
       if (result?.id && typeof result.text === 'string' && result.text.length <= 240) { suggestion.value = { ...result, scope }; expiry = setTimeout(reset, 5 * 60 * 1000) }
     } catch { /* optional suggestion failure never affects the completed conversation */ }

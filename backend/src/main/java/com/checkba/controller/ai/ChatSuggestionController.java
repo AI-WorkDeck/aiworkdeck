@@ -14,12 +14,12 @@ import java.util.Map;
 public class ChatSuggestionController {
     private final ChatSuggestionService service;
     public ChatSuggestionController(ChatSuggestionService service) { this.service = service; }
-    public record Request(String conversationId, String modelId) {}
+    public record Request(String conversationId, String modelId, String runId) {}
     public record Feedback(String clientRequestId, boolean dismissed) {}
     @PostMapping
     public ChatSuggestionService.Suggestion suggest(@RequestBody Request request,
             @RequestHeader(value = "X-Session-Id", required = false) String session) {
-        try { return service.suggest(AuthController.getUserIdFromSession(session), request.conversationId(), request.modelId()); }
+        try { return service.suggest(AuthController.getUserIdFromSession(session), request.conversationId(), request.modelId(), request.runId()); }
         catch (org.springframework.web.server.ResponseStatusException e) { throw e; }
         catch (RuntimeException ignored) { return null; } // Never expose provider response bodies or disrupt the main chat.
     }

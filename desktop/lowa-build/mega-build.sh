@@ -119,6 +119,7 @@ fi
 cd "$ROOT/core"
 [ -d translations/source/zh-CN ] || git submodule update --init --depth 1 translations >/root/translations.log 2>&1 || die translations
 [ -d translations/source/zh-CN ] || die translations-zh
+[ -d translations/source/zh-TW ] || die translations-zh-tw
 python3 /root/apply-source-patches.py || die source-patches
 if [ -n "$QT5_PID" ]; then
   wait $QT5_PID; grep -q QT5_OK /root/qt5.log || die qt5-build
@@ -132,7 +133,7 @@ source "$ROOT/env.sh"; cd "$ROOT/core"
 cat > autogen.input <<AUTOGEN
 --with-distro=LibreOfficeWASM32
 --with-package-format=emscripten
---with-lang=en-US zh-CN
+--with-lang=en-US zh-CN zh-TW
 --with-wasm-module=calc writer impress
 QT5DIR=$QT5DIR
 --enable-ccache
@@ -153,6 +154,7 @@ rm -f "$ART/soffice.data" "$ART/soffice.data.js.metadata"
 make -j"$(nproc)" > /root/make6.log 2>&1 || { tail -30 /root/make6.log; die make6; }
 python3 /root/fs-image-patch.py "$ROOT/core" || die fs-image-repack
 grep -q "resource/zh_CN" "$ART/soffice.data.js.metadata" || die metadata-no-zh
+grep -q "resource/zh_TW" "$ART/soffice.data.js.metadata" || die metadata-no-zh-tw
 grep -q "ZZZ-aiworkdeck" "$ART/soffice.data.js.metadata" || die metadata-no-zzz
 log "PHASE_6_DONE"
 

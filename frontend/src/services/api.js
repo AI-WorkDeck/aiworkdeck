@@ -579,8 +579,9 @@ export function fetchCompanyBasicInfo(payload) {
 // 注：aiChat（POST /api/ai/chat）已随 v1 同步对话通道一并移除。
 // 对话走 SSE：见 /api/agent/connect + /api/agent/chat。
 
-export function requestChatSuggestion(conversationId, modelId) {
-  return request({ url: '/api/ai/suggestions', method: 'POST', data: { conversationId, modelId }, timeout: 20000, logBody: false, accountPrompt: false });
+export function requestChatSuggestion(conversationId, modelId, runId = null) {
+  // Q24：带上刚结束那一轮的 runId，建议的费用算进这一轮
+  return request({ url: '/api/ai/suggestions', method: 'POST', data: { conversationId, modelId, ...(runId ? { runId } : {}) }, timeout: 20000, logBody: false, accountPrompt: false });
 }
 
 export function recordChatSuggestionFeedback(id, feedback) {
@@ -5120,3 +5121,9 @@ export function firmCloudAction(action, params = {}) {
     accountPrompt: false,
   }).then(unwrapEnvelope)
 }
+
+// Q24：一轮对话的实扣金额（国内站平台通道）。后端代查官网，凭据与计费标记不出后端。
+export const getTurnCost = (conversationId, runId) => request({
+  url: `/api/agent/turn-cost/${encodeURIComponent(conversationId)}/${encodeURIComponent(runId)}`,
+  method: 'GET'
+})

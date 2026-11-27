@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "出力をコピー",
   "copyFailed": "コピーに失敗しました",
   "tokenUsageLine": "このターンで {n} トークン",
-  "viewUsage": "使用量を見る",
+  "viewUsage": "使用量を見る", "turnCost": "今回 {amount}", "turnCostSubscription": "今回 {amount}（サブスクリプション枠）", "turnCostBqt": "今回 {amount}（Baoqingtian ポイント）", "turnCostSettling": "精算中…", "turnCostPartial": "今回 {amount}（プレゼンテーション生成を除く）",
   "statusError": "エラー",
   "statusSuccess": "完了",
   "statusRunning": "実行中",

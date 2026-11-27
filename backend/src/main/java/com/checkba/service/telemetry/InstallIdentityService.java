@@ -105,6 +105,23 @@ public class InstallIdentityService {
         }
     }
 
+    /**
+     * Q24：平台通道一轮对话的计费标记，HMAC-SHA256(install-secret, "turn:" + conversationId + ":" + runId)
+     * 前 32 位十六进制。随该轮每次网关请求放在 {@code X-AWD-Turn} 头里，官网据此汇总这一轮的实扣金额。
+     * 不含任何内容，不可反推会话或轮次，跨安装不可关联（盐只在本机）；只给本轮费用查询用，不进埋点。
+     */
+    public String turnTag(String conversationId, String runId) {
+        if (conversationId == null || conversationId.isEmpty() || runId == null || runId.isEmpty()) return null;
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+            mac.init(new javax.crypto.spec.SecretKeySpec(secret(), "HmacSHA256"));
+            byte[] digest = mac.doFinal(("turn:" + conversationId + ":" + runId).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 32);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private synchronized byte[] secret() throws IOException {
         if (cachedSecret != null) return cachedSecret;
         Files.createDirectories(secretFile.getParent());
