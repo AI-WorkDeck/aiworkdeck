@@ -8,7 +8,10 @@
 (function () {
   'use strict'
   const $ = (id) => document.getElementById(id)
-  const F = { list: [], selected: null, detail: null, catalog: null, brief: {}, review: {}, rec: null, recTimer: null, busy: '' }
+  const F = { list: [], selected: null, detail: null, catalog: null, brief: {}, review: {}, rec: null, recTimer: null, busy: '', draft: {} }
+  // Unsaved work per matter (notes, memo, ticked documents, consent): the desk's 30-second refresh redraws the
+  // detail, so every field writes here as it changes and is restored from here on render. Cleared once sent.
+  const draftOf = (id) => (F.draft[id] = F.draft[id] || {})
   let D // window.AIF_DESK: { call, t, h, E, toast, fail, S, openMatter }
   const t = (k, v) => D.t('fr.' + k, v)
   const h = (...a) => D.h(...a)
@@ -140,19 +143,22 @@
   // ---- 3. The call: record only with everyone's consent; then AI turns it into a framework and a plan ----
   function callSection(m) {
     const c = m.consult
-    const consent = h('input', { type: 'checkbox' })
-    const indicator = h('span', { class: 'rec-indicator', hidden: !F.rec }, h('i'), h('span', { class: 'rec-time' }, ''))
-    const notes = h('textarea', { class: 'awd-input notes', rows: 7, placeholder: t('notesHint') })
-    if (F.rec && F.rec.matterId === m.id && F.rec.text) notes.value = F.rec.text
-    const recBtn = h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: () => (F.rec && F.rec.active ? stopRec(recBtn, indicator, notes) : startRec(m, consent, recBtn, indicator)) } }, t(F.rec && F.rec.active ? 'recStop' : 'recStart'))
-    const memo = h('textarea', { class: 'awd-input memo', rows: 9 })
-    const docs = h('div', { class: 'docs' })
+    const dr = draftOf(m.id)
+    const consent = h('input', { type: 'checkbox', checked: Boolean(dr.consent), on: { change: () => { dr.consent = consent.checked } } })
+    const recOn = Boolean(F.rec && F.rec.active && F.rec.matterId === m.id)
+    const indicator = h('span', { class: 'rec-indicator', hidden: !recOn }, h('i'), h('span', { class: 'rec-time' }, ''))
+    const notes = h('textarea', { class: 'awd-input notes', rows: 7, placeholder: t('notesHint'), on: { input: () => { dr.notes = notes.value } } })
+    notes.value = dr.notes ?? ((F.rec && F.rec.matterId === m.id && F.rec.text) || '')
+    const recBtn = h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: () => (F.rec && F.rec.active ? stopRec(recBtn, indicator, notes, dr) : startRec(m, consent, recBtn, indicator)) } }, t(recOn ? 'recStop' : 'recStart'))
+    const memo = h('textarea', { class: 'awd-input memo', rows: 9, on: { input: () => { dr.memo = memo.value } } })
+    const docs = h('div', { class: 'docs', on: { change: () => { dr.docs = [...docs.querySelectorAll('input:checked')].map((x) => x.value) } } })
     const fill = (fw) => {
       memo.value = (fw && fw.memo) || ''
       const chosen = new Set((fw && fw.documents) || [])
       docs.replaceChildren(...(F.catalog || []).map((x) => h('label', { class: 'doc' }, h('input', { type: 'checkbox', value: x.id, checked: chosen.has(x.id) }), h('span', {}, D.E.pick(x.title)))))
     }
-    fill(c.framework ? { memo: c.framework.memo, documents: c.framework.documents.map((d) => d.id || d) } : null)
+    const saved = c.framework ? { memo: c.framework.memo, documents: c.framework.documents.map((d) => d.id || d) } : null
+    fill({ memo: dr.memo ?? (saved && saved.memo), documents: dr.docs ?? (saved && saved.documents) })
     const gen = h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: async () => {
       if (notes.value.trim().length < 20) { D.toast(t('notesNeeded')); return }
       gen.disabled = true
@@ -160,14 +166,15 @@
         const list = F.catalog.map((x) => `${x.id}: ${D.E.pick(x.title)}`).join('\n')
         const raw = await ai(`From this framing call with a founder, write the agreed framework and choose the documents to prepare.\nClient's request: "${c.topic || ''}"\nCall notes / transcript:\n${notes.value.slice(0, 12000)}\n\nReturn only JSON: {"memo": "<the framework in 3-8 short bold-labelled lines, e.g. **Seed round:** ...>", "documents": ["<ids, 1 to 5, only from this catalogue>"]}\nCatalogue:\n${list}`, 'aifirm-framing-plan')
         const j = JSON.parse(String(raw).slice(String(raw).indexOf('{'), String(raw).lastIndexOf('}') + 1))
-        fill({ memo: j.memo, documents: (j.documents || []).filter((id) => F.catalog.some((x) => x.id === id)) })
+        dr.memo = j.memo; dr.docs = (j.documents || []).filter((id) => F.catalog.some((x) => x.id === id))
+        fill({ memo: dr.memo, documents: dr.docs })
       } catch (e) { D.toast(t('aiFailed')) } finally { gen.disabled = false }
     } } }, t('generate'))
     const send = h('button', { type: 'button', class: 'awd-btn awd-btn-primary', on: { click: async () => {
       const documents = [...docs.querySelectorAll('input:checked')].map((x) => x.value)
       if (memo.value.trim().length < 20 || !documents.length) { D.toast(t('planNeeded')); return }
       send.disabled = true
-      try { await D.call('matterConsult', { id: m.id, status: 'done', framework: { memo: memo.value.trim(), documents } }); D.toast(t('planSent')); await refresh() } catch (e) { D.fail(e) } finally { send.disabled = false }
+      try { await D.call('matterConsult', { id: m.id, status: 'done', framework: { memo: memo.value.trim(), documents } }); delete F.draft[m.id]; D.toast(t('planSent')); await refresh() } catch (e) { D.fail(e) } finally { send.disabled = false }
     } } }, t(c.framework ? 'planUpdate' : 'planSend'))
     return h('div', { class: 'call' },
       section(t('recTitle'), h('label', { class: 'check' }, consent, h('span', {}, t('recConsent'))), h('div', { class: 'row' }, recBtn, indicator), h('p', { class: 'muted' }, t('recNote'))),
@@ -184,13 +191,14 @@
       F.rec = { matterId: m.id, active: true, at: Date.now(), text: '' }
       indicator.hidden = false
       clearInterval(F.recTimer)
-      F.recTimer = setInterval(() => { const s = Math.floor((Date.now() - F.rec.at) / 1000); indicator.querySelector('.rec-time').textContent = `${t('recording')} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }, 1000)
+      // The timer looks the indicator up on each tick: a refresh may have redrawn it.
+      F.recTimer = setInterval(() => { const s = Math.floor((Date.now() - F.rec.at) / 1000), el = document.querySelector('#fr-detail .rec-time'); if (el) el.textContent = `${t('recording')} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }, 1000)
       btn.textContent = t('recStop')
     } catch (e) {
       D.toast(e && e.code === 'no_project' ? t('recNeedsProject') : e && e.code === 'notice_required' ? t('recNotice') : t('recFailed') + (e && e.code ? ' (' + e.code + ')' : ''))
     } finally { btn.disabled = false }
   }
-  async function stopRec(btn, indicator, notes) {
+  async function stopRec(btn, indicator, notes, dr) {
     btn.disabled = true
     try {
       const meeting = await awd.services.request('voice', 'stop', {})
@@ -202,7 +210,7 @@
           await new Promise((r) => setTimeout(r, 6000))
           const g = await awd.services.request('voice', 'get', { id: meeting.id }).catch(() => null)
           const text = transcriptText(g)
-          if (text) { F.rec.text = text; notes.value = text; break }
+          if (text) { F.rec.text = text; dr.notes = text; const el = document.querySelector('#fr-detail textarea.notes'); if (el) el.value = text; break }
           if (g && /fail|error/i.test(String(g.status || ''))) break
         }
       }
