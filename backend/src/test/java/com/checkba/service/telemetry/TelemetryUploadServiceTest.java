@@ -57,6 +57,7 @@ class TelemetryUploadServiceTest {
     void siteSwitchPausesUploadsWithoutDiscardingPendingDataAndSwitchBackResumes() {
         var sites = mock(com.checkba.service.site.SiteProfileService.class);
         when(sites.siteChosen()).thenReturn(true);
+        when(sites.mayContact(any())).thenReturn(true);
         when(sites.currentSite()).thenReturn("cn");
         when(settings.rollupEnabled()).thenReturn(true);
         var pending = new TelemetryDailyRollup();
@@ -83,6 +84,7 @@ class TelemetryUploadServiceTest {
     void siteSwitchDuringBatchStopsRemainingUploads() {
         var sites = mock(com.checkba.service.site.SiteProfileService.class);
         when(sites.siteChosen()).thenReturn(true);
+        when(sites.mayContact(any())).thenReturn(true);
         when(sites.currentSite()).thenReturn("cn");
         when(settings.rollupEnabled()).thenReturn(true);
         when(settings.eventsEnabled()).thenReturn(true);
@@ -146,6 +148,7 @@ class TelemetryUploadServiceTest {
     void freshInstallWithoutASiteChoiceUploadsNothing() {
         var sites = mock(com.checkba.service.site.SiteProfileService.class);
         when(sites.siteChosen()).thenReturn(false);
+        when(sites.mayContact(any())).thenReturn(false);
         when(sites.currentSite()).thenReturn("cn");
         when(settings.rollupEnabled()).thenReturn(true);
         var pending = new TelemetryDailyRollup();

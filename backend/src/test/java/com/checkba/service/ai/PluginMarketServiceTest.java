@@ -120,7 +120,7 @@ class PluginMarketServiceTest {
                 home.toString(), new com.checkba.service.site.SiteProperties());
         org.springframework.test.util.ReflectionTestUtils.setField(scopedGate, "sites", fresh);
         var calls = new java.util.ArrayList<String>();
-        var service = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+        var service = new PluginMarketService("https://www.aiworkdeck.com/api/registry/plugins", publicKeyPem,
                 pluginsDir.toString(), pluginService, scopedGate) {
             @Override protected String httpGet(String url) { calls.add(url); return "[]"; }
         };

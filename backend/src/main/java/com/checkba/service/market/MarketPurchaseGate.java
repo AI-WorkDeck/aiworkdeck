@@ -41,6 +41,11 @@ public class MarketPurchaseGate {
         return sites == null || sites.siteChosen();
     }
 
+    /** 没选站时只拦落在站点上的注册表地址；测试替身、自建源照常可用。 */
+    public boolean mayContact(String url) {
+        return sites == null || sites.mayContact(url);
+    }
+
     public String registryUrl(String configured, String kind) {
         if (sites == null) return configured;
         for (String host : java.util.List.of("www.aiworkdeck.com", "aiworkdeck.com", "www.workdeck.ai", "workdeck.ai")) {
