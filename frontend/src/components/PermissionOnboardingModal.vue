@@ -115,6 +115,7 @@
 <script>
 import { host } from '@/services/host.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
+import { siteLinks } from '@/utils/siteLinks.js'
 import {
   PERMISSION_ONBOARDING_EVENT,
   PERMISSION_ONBOARDING_PREF_KEY,
@@ -143,7 +144,7 @@ export default {
   },
   computed: {
     displayItems() {
-      const normalized = normalizePermissionItems(this.items)
+      const normalized = normalizePermissionItems(this.items, { wechat: siteLinks().current === 'cn' })
       const metaById = {
         fullDiskAccess: {
           title: this.$t('admin.permFullDiskAccessTitle'),

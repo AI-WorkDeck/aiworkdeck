@@ -40,7 +40,7 @@ export default {
     "compatUse": "Pemeriksaan keamanan tidak muncul? Gunakan verifikasi kompatibilitas",
     "compatRefresh": "Muat gambar verifikasi baru",
     "compatLoading": "Memuat gambar verifikasi",
-    "compatHint": "Masukkan karakter pada gambar, lalu minta kode SMS atau surel Anda. Muat gambar baru setelah percobaan yang salah atau kedaluwarsa.",
+    "compatHint": "Masukkan karakter pada gambar, lalu minta kode SMS atau surel Anda. Muat gambar baru setelah percobaan yang salah atau kedaluwarsa.", "compatHintEmail": "Masukkan karakter pada gambar, lalu minta kode email Anda. Muat gambar baru setelah percobaan salah atau kedaluwarsa.",
     "compatImage": "Gambar verifikasi keamanan",
     "compatAnswer": "6 karakter dari gambar",
     "compatAnswerFirst": "Muat gambar verifikasi dan masukkan 6 karakternya terlebih dahulu", "compatAuto": "Pemeriksaan keamanan tidak termuat, jadi kami beralih ke verifikasi kompatibel: masukkan 6 karakter dari gambar, lalu minta kode lagi.",

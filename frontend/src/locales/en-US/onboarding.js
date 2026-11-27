@@ -44,7 +44,7 @@ export default {
     compatUse: 'Security check not loading? Use compatibility verification',
     compatRefresh: 'Load a new verification image',
     compatLoading: 'Loading verification image',
-    compatHint: 'Enter the image characters, then request your SMS or email code. Load a new image after an incorrect or expired attempt.',
+    compatHint: 'Enter the image characters, then request your SMS or email code. Load a new image after an incorrect or expired attempt.', compatHintEmail: 'Enter the image characters, then request your email code. Load a new image after an incorrect or expired attempt.',
     compatImage: 'Security verification image',
     compatAnswer: '6 characters from the image',
     compatAnswerFirst: 'Load a verification image and enter its 6 characters first', compatAuto: 'The security check didn\'t load, so we switched to compatibility verification: enter the 6 characters from the image, then request your code again.',

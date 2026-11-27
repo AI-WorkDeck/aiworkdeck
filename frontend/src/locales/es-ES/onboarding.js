@@ -40,7 +40,7 @@ export default {
     "compatUse": "¿No carga la verificación de seguridad? Usar verificación de compatibilidad",
     "compatRefresh": "Cargar una nueva imagen de verificación",
     "compatLoading": "Cargando imagen de verificación",
-    "compatHint": "Introduzca los caracteres de la imagen y solicite después el código por SMS o correo. Cargue una imagen nueva tras un intento incorrecto o caducado.",
+    "compatHint": "Introduzca los caracteres de la imagen y solicite después el código por SMS o correo. Cargue una imagen nueva tras un intento incorrecto o caducado.", "compatHintEmail": "Escriba los caracteres de la imagen y solicite su código por correo electrónico. Cargue una imagen nueva tras un intento incorrecto o caducado.",
     "compatImage": "Imagen de verificación de seguridad",
     "compatAnswer": "6 caracteres de la imagen",
     "compatAnswerFirst": "Cargue primero una imagen de verificación e introduzca sus 6 caracteres", "compatAuto": "La verificación de seguridad no se cargó, así que pasamos a la verificación compatible: escriba los 6 caracteres de la imagen y vuelva a solicitar el código.",

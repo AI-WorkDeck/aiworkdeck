@@ -94,3 +94,11 @@ test('首启弹窗排队：权限引导启动检查结束前，可选组件窗�
   assert.doesNotMatch(body, /this\.showOptionalComponents = /)
   assert.match(body, /this\.optionalComponentsSuggested = shouldShow/)
 })
+
+test('international site: Full Disk Access is not labelled "Required for WeChat Drop"', () => {
+  const cn = normalizePermissionItems([{ id: 'fullDiskAccess', status: 'not-granted' }])
+  assert.equal(cn.find((i) => i.id === 'fullDiskAccess').requiredForWeChatDrop, true)
+  const intl = normalizePermissionItems([{ id: 'fullDiskAccess', status: 'not-granted' }], { wechat: false })
+  assert.equal(intl.find((i) => i.id === 'fullDiskAccess').requiredForWeChatDrop, false)
+  assert.equal(intl.find((i) => i.id === 'fullDiskAccess').recommended, true)
+})

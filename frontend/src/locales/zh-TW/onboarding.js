@@ -41,7 +41,7 @@ export default {
     "compatUse": "安全驗證載入不出來？使用相容驗證",
     "compatRefresh": "換一張驗證圖片",
     "compatLoading": "正在載入驗證圖片",
-    "compatHint": "輸入圖片中的字元，再獲取簡訊或電子郵件驗證碼。輸錯或過期後請換一張。",
+    "compatHint": "輸入圖片中的字元，再獲取簡訊或電子郵件驗證碼。輸錯或過期後請換一張。", "compatHintEmail": "輸入圖片中的字元後再取得電子郵件驗證碼；輸錯或過期後請換一張圖片。",
     "compatImage": "安全驗證圖片",
     "compatAnswer": "圖片中的 6 位字元",
     "compatAnswerFirst": "請先載入驗證圖片並填寫其中的 6 位字元", "compatAuto": "安全驗證沒有載入，已改用相容驗證：請輸入圖片中的 6 位字元，再取得驗證碼。",
