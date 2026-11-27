@@ -671,6 +671,17 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
         mustKeep: true,
       },
       {
+        // E1: zh-TW (Traditional) UI catalogs and registry ship alongside zh-CN
+        filename: '/instdir/share/registry/Langpack-zh-TW.xcd',
+        payload: Buffer.from('<oor:data xmlns:oor="http://openoffice.org/2001/registry">zh-TW</oor:data>', 'utf8'),
+        mustKeep: true,
+      },
+      {
+        filename: '/instdir/program/resource/zh_TW/LC_MESSAGES/sw.mo',
+        payload: Buffer.from('\xde\x12\x04\x95\x00\x00\x00\x00zh_TW_sw_mo_catalog', 'binary'),
+        mustKeep: true,
+      },
+      {
         filename: '/instdir/share/fonts/truetype/LiberationSans-Regular.ttf',
         payload: Buffer.from('TTF_LIBERATION_SANS', 'utf8'),
         mustKeep: true,
@@ -717,6 +728,8 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
     // Check CustomTarget_emscripten_fs_image.mk
     const mkPatched = fs.readFileSync(mkPath, 'utf8')
     assert.match(mkPatched, /ZZZ-aiworkdeck-locale-zh-CN\.xcd/)
+    assert.match(mkPatched, /Langpack-zh-TW\.xcd[\s\S]*resource\/zh_TW\/LC_MESSAGES/)
+    assert.doesNotMatch(mkPatched, /ZZZ-aiworkdeck-locale-zh-TW/)
     assert.match(mkPatched, /filter-out[\s\S]*%\/Lightproof\.py/)
 
     // Check repacked soffice.data and metadata
@@ -753,6 +766,8 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
     assert.ok(keptNames.has('/instdir/share/extensions/dict-zh-CN/zh_CN.dic'))
     assert.ok(keptNames.has('/instdir/share/registry/Langpack-zh-CN.xcd'))
     assert.ok(keptNames.has('/instdir/program/resource/zh_CN/LC_MESSAGES/sw.mo'))
+    assert.ok(keptNames.has('/instdir/share/registry/Langpack-zh-TW.xcd'))
+    assert.ok(keptNames.has('/instdir/program/resource/zh_TW/LC_MESSAGES/sw.mo'))
 
     // Second run must be idempotent
     const run2 = spawnSync('python3', [FS_IMAGE_PATCH_PY, tmpDir], { encoding: 'utf8' })
