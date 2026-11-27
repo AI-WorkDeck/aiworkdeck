@@ -1412,6 +1412,12 @@ export default {
     const chooseOcrRoute = (choice, remember) => ocrRouteHandler.choose(choice, remember)
     const cancelOcrRoute = () => ocrRouteHandler.cancel()
     watch(isStreaming, (streaming) => { if (!streaming) ocrRouteHandler.continueReady() })
+    // 0.91.0：平台通道的一轮结束后刷新钱包余额（设置页钱包卡与顶栏 chip），跳过后端缓存；
+    // 官网结算有一两秒延迟，所以稍等再拉
+    watch(isStreaming, (streaming, was) => {
+      if (streaming || !was || !(tokenUsage.value && tokenUsage.value.platform)) return
+      setTimeout(() => uni.$emit('awd:wallet-refresh', { fresh: true }), 3000)
+    })
     watch(currentConversationId, () => ocrRouteHandler.cancel())
     onBeforeUnmount(() => ocrRouteHandler.cancel())
 
