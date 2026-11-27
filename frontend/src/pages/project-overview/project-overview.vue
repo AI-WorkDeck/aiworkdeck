@@ -4547,7 +4547,7 @@ export default {
     })
     // 余额刷新事件（充值弹窗 / SKU 购买成功后 emit）。页面栈多实例地雷：mounted 挂、
     // beforeUnmount 必须按引用 $off，否则每回来一次多一份订阅。
-    this._onWalletRefresh = () => this.loadWalletBalance()
+    this._onWalletRefresh = (payload) => this.loadWalletBalance(!!(payload && payload.fresh))
     uni.$on('awd:wallet-refresh', this._onWalletRefresh)
     // 账户连上 / 断开（登录弹层成功、utils/signOut.js，dev-board#1046）：rail 账户入口的头像、余额抬头、
     // 宽限提示都读本页的授权状态与余额，就地重拉，不刷新页面。刻意不加 isActiveOverviewInstance 守卫：
@@ -5074,10 +5074,10 @@ export default {
     // Credits 余额 chip 数据（dev-board#187）。轻端点（后端 TTL 缓存），随 onShow /
     // awd:wallet-refresh 拉取。connected:false 或失败时置 loaded=false 让 chip 整个消失，
     // 绝不摆一个「¥0.00」冒充余额。
-    async loadWalletBalance() {
+    async loadWalletBalance(fresh = false) {
       if (!isDesktopHost()) return
       try {
-        const data = await getAccountBalance()
+        const data = await getAccountBalance({ fresh })
         if (data && data.connected) {
           this.wallet = {
             loaded: true,

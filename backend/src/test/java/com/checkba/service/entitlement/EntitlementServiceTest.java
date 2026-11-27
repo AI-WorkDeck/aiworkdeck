@@ -43,6 +43,7 @@ class EntitlementServiceTest {
         accountService = mock(AccountService.class);
         when(licenseService.status()).thenReturn(Map.of("unlocked", false, "mode", "none"));
         when(accountService.isConnected()).thenReturn(false);
+        when(accountService.keyBelongsToCurrentSite()).thenReturn(true);
     }
 
     private EntitlementService service() {
@@ -201,6 +202,19 @@ class EntitlementServiceTest {
         EntitlementService svc = service();
         assertFalse(svc.refreshQuietly());
         assertTrue(svc.isEnabled(FeatureCatalog.STAGE_UNLIMITED), "断网不该把已购权益吃掉");
+    }
+
+    @Test
+    @DisplayName("0.91.0：被另一个站点拒绝（站点解析错位）不清任何东西")
+    void rejectionFromTheOtherSiteKeepsTheCache() throws Exception {
+        writeCache(Instant.now(), FeatureCatalog.CLIPBOARD_UNLIMITED);
+        when(accountService.keyBelongsToCurrentSite()).thenReturn(false);
+        when(accountService.fetchEntitlements()).thenThrow(
+                new AccountException(AccountException.Kind.UNAUTHORIZED, "账户 Key 无效或已被撤销"));
+        EntitlementService svc = service();
+        assertFalse(svc.refreshQuietly());
+        assertTrue(svc.isEnabled(FeatureCatalog.CLIPBOARD_UNLIMITED), "a rejection from the wrong site proves nothing");
+        verify(accountService, never()).rememberKeySite();
     }
 
     @Test

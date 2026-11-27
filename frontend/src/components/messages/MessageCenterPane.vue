@@ -79,6 +79,8 @@
 </template>
 <script>
 import { mentionsAssistant } from '@/utils/assistantMention.js'
+import { getCurrentUser } from '@/utils/auth.js'
+const isClientUser = () => { try { const user = getCurrentUser(); return !!(user && user.role === 'CLIENT') } catch (e) { return false } }
 import MessageConversationPane from './MessageConversationPane.vue'
 import { messageCenterRequest, messageCenterIdentity } from '@/services/messageCenter.js'
 import { normalizeMessageTarget } from '@/utils/messageTargets.js'
@@ -140,7 +142,10 @@ export default {
         this.conversations = (result.conversations || []).map(row => this.withProjectContext(row)); this.notifications = result.notifications || []; this.counts = result.counts || {}; this.hasMore = !!result.hasMore; this.unavailableSources = result.unavailableSources || []
         const known = new Map(this.projects.map(project => [project.key, project])); for (const project of result.projects || []) if (project.key) known.set(project.key, project); this.projects = [...known.values()]
         this.error = ''; this.accountRequired = false
-        if (result.cloudStatus === 'unavailable') { this.error = result.cloudError || this.$t('messageCenter.serviceFailed'); this.accountRequired = true }
+        // C17：客户（凭访问码进来）没有 AI WorkDeck 账户，不该被要求「连接账号」——他的项目消息走受邀连接。
+        // 只在不是客户、且没有任何受邀会话时提示连接账户。
+        const clientOnly = isClientUser() || this.conversations.some(row => row.sourceId === 'dd-client')
+        if (result.cloudStatus === 'unavailable' && !clientOnly) { this.error = result.cloudError || this.$t('messageCenter.serviceFailed'); this.accountRequired = true }
         if (!this.identityLoaded) await this.loadIdentity(ticket)
         if (this.valid(ticket) && initial && this.initialConversationId) await this.focusConversation(this.initialConversationId)
       } catch (error) { if (this.valid(ticket) && serial === this.listSerial) { this.error = error.message || this.$t('messageCenter.serviceFailed'); this.accountRequired = !!error.accountRequired } }

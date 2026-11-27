@@ -6,12 +6,13 @@ import { readFileSync } from 'node:fs'
 import { createI18n } from 'vue-i18n'
 import zh from '../../src/locales/zh-CN/ddWorkflow.js'
 
+import { errorTextFor, isRawTechnicalText } from '../../src/utils/userMessage.js'
 const t = createI18n({ legacy: true, locale: 'zh-CN', messages: { 'zh-CN': { ddWorkflow: zh } } }).global.t
 const source = readFileSync(new URL('../../src/components/dd/ClientPortalChat.vue', import.meta.url), 'utf8')
 
 function fixture(chat) {
   const body = source.slice(source.indexOf('<script>') + 8, source.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
-  const options = new Function('portalChat', body)(chat)
+  const options = new Function('portalChat', 'errorTextFor', 'isRawTechnicalText', 'getAppLanguage', body)(chat, errorTextFor, isRawTechnicalText, () => 'zh-CN')
   const vm = { ...options.data(), $t: t, $refs: {}, $nextTick: fn => fn(), connectionId: 'portal-1', projectId: 42 }
   for (const [key, fn] of Object.entries(options.methods)) vm[key] = fn.bind(vm)
   vm.mount = () => options.mounted.call(vm)

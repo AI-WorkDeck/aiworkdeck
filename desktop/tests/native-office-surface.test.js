@@ -815,11 +815,11 @@ test('native byte loads including initial blank read the latest shared toolbar v
     assert.equal(h.events.some(event => event.type === 'ready'), true)
     const first = h.calls.find(call => call.action === 'load_document')
     assert.equal(first.params.bytes.length, 0)
-    assert.deepEqual(first.params.viewOptions, { formattingMarks: false, ruler: false, paragraphMarks: true, lineBreaks: true, spaces: false, tabs: true, textBoundaries: false })
+    assert.deepEqual(first.params.viewOptions, { formattingMarks: false, ruler: false, paragraphMarks: true, lineBreaks: true, spaces: false, tabs: true, textBoundaries: false, bookmarks: false })
     stored = { formattingMarks: true, ruler: true, tabs: false }
     await h.execute('load_document', { bytes: [1], name: 'reload.docx' })
     const reloaded = h.calls.filter(call => call.action === 'load_document').at(-1)
-    assert.deepEqual(reloaded.params.viewOptions, { formattingMarks: true, ruler: true, paragraphMarks: true, lineBreaks: true, spaces: true, tabs: false, textBoundaries: false })
+    assert.deepEqual(reloaded.params.viewOptions, { formattingMarks: true, ruler: true, paragraphMarks: true, lineBreaks: true, spaces: true, tabs: false, textBoundaries: false, bookmarks: false })
     await h.execute('load_document', { authorName: 'author only' })
     assert.equal(Object.hasOwn(h.calls.filter(call => call.action === 'load_document').at(-1).params, 'viewOptions'), false)
   } finally { globalThis.uni = previousUni; await h.close() }

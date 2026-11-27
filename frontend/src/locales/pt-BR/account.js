@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Taxa de êxito (%)",
   "casePreviewConflictBtn": "Executar pré-verificação de conflito",
   "caseSubmitIntakeBtn": "Enviar admissão e verificação de conflito",
-  "caseIntakeEmpty": "Nenhum registro de admissão ainda. Clique em \"Nova admissão de caso\" ou \"Carregar demonstração Qinghe Foods\" acima para começar.",
+  "caseIntakeEmpty": "Nenhum registro de admissão ainda. Clique em \"Nova admissão de caso\" acima para começar.",
   "caseContractedLabel": "Contratado",
   "caseImBadge": "Grupo de IM criado e resumo sincronizado",
   "caseMyClearanceTitle": "Verificações de conflito atribuídas a mim",
