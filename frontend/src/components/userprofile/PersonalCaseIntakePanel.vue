@@ -13,7 +13,7 @@
           <button class="intake-btn primary" @tap="openNewIntakeForm">
             {{ $t('account.caseIntakeNewBtn') }}
           </button>
-          <button class="intake-btn" :disabled="busy" @tap="onSeedDemoData">
+          <button v-if="demoDataTools" class="intake-btn" :disabled="busy" @tap="onSeedDemoData">
             {{ $t('account.caseIntakeSeedBtn') }}
           </button>
           <button class="intake-btn" :disabled="busy" @tap="onOpenPluginInWorkbench">
@@ -488,6 +488,7 @@
 <script>
 import { errorText } from '@/utils/errorToast.js'
 import { formatCnyCompact } from '@/utils/cnyAmount'
+import { demoDataToolsVisible } from '@/utils/demoData.js'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import {
   getLawFirmOverview,
@@ -551,6 +552,10 @@ export default {
     }
   },
   computed: {
+    /** X12：演示数据按钮只在开发版或开发者本机显式打开时出现 */
+    demoDataTools() {
+      return typeof demoDataToolsVisible === 'function' && demoDataToolsVisible()
+    },
     feeModeOptions() {
       return [
         { value: 'FIXED', label: this.$t('account.feeModeFixed') },

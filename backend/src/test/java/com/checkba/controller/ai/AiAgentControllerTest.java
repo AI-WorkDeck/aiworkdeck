@@ -83,6 +83,26 @@ class AiAgentControllerTest {
     }
 
     @Test
+    @DisplayName("X39：只有会话最后一条中途断开的回答能续写，否则 409 且不进收件箱")
+    void continueTurnIsRefusedUnlessTheLastAnswerWasCutOff() {
+        var req = new AiAgentController.AgentChatRequest();
+        req.setProjectId(42L); req.setConversationId("conv-x"); req.setMessage("continue"); req.setContinueTurn(true);
+        try (MockedStatic<AuthController> auth = mockStatic(AuthController.class)) {
+            auth.when(() -> AuthController.getUserIdFromSession("s")).thenReturn(7L);
+            when(projectMemberService.hasReadPermission(42L, 7L)).thenReturn(true);
+            when(messageService.canUseConversation("conv-x", 7L)).thenReturn(true);
+            when(agentOrchestrator.canContinue("conv-x")).thenReturn(false);
+            assertEquals(409, controller.startSession(req, "s", null).getStatusCode().value());
+            org.mockito.Mockito.verifyNoInteractions(inboxService);
+            when(agentOrchestrator.canContinue("conv-x")).thenReturn(true);
+            var item = new com.checkba.model.entity.AgentInboxItem(); item.setId("continue-item");
+            when(inboxService.submit(req, 7L)).thenReturn(item);
+            assertEquals(200, controller.startSession(req, "s", null).getStatusCode().value());
+            verify(inboxService).submit(req, 7L);
+        }
+    }
+
+    @Test
     void dedicatedConversationRejectsGenericSendAndConnectBeforeReplacingStream() {
         var req = new AiAgentController.AgentChatRequest();
         req.setProjectId(42L); req.setConversationId("litigation"); req.setMessage("answer");

@@ -8,7 +8,7 @@ export default {
   newFileMenu: "新建文件",
   newRecording: "录音",
   defaultPresentationName: "新建演示文稿",
-  defaultSpreadsheetName: "新建工作簿",
+  defaultSpreadsheetName: "新建表格",
   recordingPluginRequired: "请先在插件详情中安装或启用“语音”，再开始录音。",
 
   externalDragFailed: '所选内容无法拖出，请确认选中的是本机现有文件后再试。',

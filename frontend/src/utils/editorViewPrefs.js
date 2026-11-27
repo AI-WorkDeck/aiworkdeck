@@ -22,5 +22,5 @@ export function readViewPrefs() {
 export function writeViewPrefs(p) { uni.setStorageSync(VIEW_PREFS_KEY, JSON.stringify(p)) }
 export function getWriterViewOptions(prefs = readViewPrefs()) {
   // Keep the toolbar request identical for native initialization and later updates.
-  return { ...prefs, formattingMarks: !!prefs.formattingMarks, ruler: !!prefs.ruler, textBoundaries: false }
+  return { ...prefs, formattingMarks: !!prefs.formattingMarks, ruler: !!prefs.ruler, textBoundaries: false, bookmarks: false }
 }

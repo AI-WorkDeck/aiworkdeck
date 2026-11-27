@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Nuevo",
+    "aria": "Nuevo documento o nueva pestaña del navegador",
+    "newWord": "Nuevo documento de Word",
+    "newExcel": "Nuevo libro de Excel",
+    "newPowerPoint": "Nueva presentación de PowerPoint",
+    "newBrowserTab": "Nueva pestaña del navegador",
+  },
   scratchCopyChoose: "Seleccionar contenido para copiar",
   scratchCopySelected: "{count} seleccionados",
   scratchCopyFiles: "Archivos",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "Papelera",
   "loadingText": "Cargando...",
   "explorerFallback": "Explorador",
-  "newOrCopy": "Nuevo / Duplicar",
   "emptyWorkspace": "Seleccione un archivo para empezar",
   "emptyWorkspaceHint": "Abra un archivo desde el explorador de la izquierda, o cree un nuevo documento",
   "railEditEnter": "Organizar la barra lateral (arrastrar para reordenar o anclar)",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "No se puede enviar este archivo",
   "shareUnsupported": "El envío no es compatible con este sistema",
   "shareClipboardHint": "Archivo copiado. Cambie a WeChat, elija un chat y pulse Ctrl+V para enviar",
-  "copyFailedNoNewFile": "Error al copiar: no se devolvió ningún archivo nuevo",
-  "copyFailed": "Error al copiar",
   "recordingStarted": "Registro de actividad iniciado",
   "recordingStopped": "Registro de actividad detenido",
   "insertedToDoc": "Insertado en el documento",

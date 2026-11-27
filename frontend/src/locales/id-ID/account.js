@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Tarif Kontingensi (%)",
   "casePreviewConflictBtn": "Jalankan Pemeriksaan Awal Konflik",
   "caseSubmitIntakeBtn": "Kirim Intake & Pemeriksaan Konflik",
-  "caseIntakeEmpty": "Belum ada catatan intake. Klik \"Intake Kasus Baru\" atau \"Data Demo\" di atas untuk memulai.",
+  "caseIntakeEmpty": "Belum ada catatan intake. Klik \"Intake Kasus Baru\" di atas untuk memulai.",
   "caseContractedLabel": "Terikat Kontrak",
   "caseImBadge": "Grup IM Dibuat & Ringkasan Tersinkron",
   "caseMyClearanceTitle": "Persetujuan Konflik yang Ditugaskan kepada Saya",

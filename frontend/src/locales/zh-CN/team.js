@@ -21,6 +21,11 @@ export default {
   retry: '重试',
 
   // ---- 无团队 ----
+  emptyIntroTitle: '团队：和同事一起办案',
+  emptyIntroBody: '团队里的同事可以共享项目、互相审阅修改，团队负责人能看到大家的办案与用量概况（项目默认匿名）。',
+  emptyIntroStep1: '1. 在下面创建一个团队，起个大家认得出的名字。',
+  emptyIntroStep2: '2. 进入团队后，用同事的手机号发出邀请，或把邀请码发给对方。',
+  emptyIntroStep3: '3. 同事在自己的电脑上连上 AI WorkDeck 账户，在这一页接受邀请即可。',
   createTitle: '创建团队',
   createDesc: '创建后你是负责人，可以按手机号邀请同事加入。',
   teamNamePlaceholder: '团队名称，例如并购团队',

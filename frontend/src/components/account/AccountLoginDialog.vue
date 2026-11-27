@@ -172,7 +172,7 @@
           </div>
           <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
-            <div v-if="compatVerification" class="unlock-desc">{{ $t('onboarding.unlock.compatHint') }}</div>
+            <div v-if="compatVerification" class="unlock-desc">{{ $t(isPhoneSite ? 'onboarding.unlock.compatHint' : 'onboarding.unlock.compatHintEmail') }}</div>
             <template v-if="compatChallenge">
               <img :src="compatChallenge.image" width="210" height="70" :alt="$t('onboarding.unlock.compatImage')" />
               <div class="unlock-field-box"><component :is="'input'" class="unlock-field" type="text" maxlength="6" autocomplete="off" :value="compatAnswer" :placeholder="$t('onboarding.unlock.compatAnswer')" :aria-label="$t('onboarding.unlock.compatAnswer')" :disabled="sendingCode" @input="compatAnswer = $event.target.value" /></div>
@@ -321,6 +321,8 @@
 import { localizeSites } from '@/utils/siteNames.js'
 import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, createBqtScanSession, pollBqtScanStatus, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
+import { acquireOrFallback } from '@/utils/captchaFallback.js'
+import { isDesktopHost } from '@/services/host.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { loadSiteLinks, siteBaseUrl, resetSiteLinks } from '@/utils/siteLinks.js'
@@ -751,7 +753,15 @@ export default {
         }
         const got = this.compatVerification
           ? { token: `local:${this.compatChallenge.id}:${this.compatAnswer.trim()}` }
-          : await this.acquireCaptchaToken()
+          : await acquireOrFallback(() => this.acquireCaptchaToken(),
+            { desktop: isDesktopHost(), provider: (this.captcha && this.captcha.provider) || (this.captchaFailure && this.captchaFailure.provider) })
+        if (got.fallback) {
+          // 桌面端 Turnstile 3 秒内没给出通过的 token：自动换成兼容验证，提示用户输入图片字符后再发
+          this.sendingCode = false
+          await this.loadCompatChallenge()
+          if (this.compatChallenge) this.errorMsg = this.$t('onboarding.unlock.compatAuto')
+          return
+        }
         if (got.failure) {
           this.errorMsg = this.captchaFailureMessage(got.failure)
           this.sendingCode = false

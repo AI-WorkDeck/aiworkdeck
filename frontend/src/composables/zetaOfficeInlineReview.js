@@ -17,7 +17,7 @@ const LABELS = {
     blocked: { DEEP_QUOTA: 'AI 审校已暂停：账户额度不足', DEEP_RATE_LIMITED: 'AI 审校已暂停：模型服务限流', DEEP_MODEL_UNAVAILABLE: 'AI 审校已暂停：当前辅助模型不可用', DEEP_REGION: 'AI 审校已暂停：服务商按地域拒绝', DEEP_SIGNED_OUT: 'AI 审校已暂停：尚未登录' },
   },
   en: {
-    title: 'AI review', icon: 'R', checking: 'Checking…', stale: 'Text changed. Waiting for a fresh check.', error: 'Checks are unavailable',
+    title: 'AI review', icon: 'Review', checking: 'Checking…', stale: 'Text changed. Waiting for a fresh check.', error: 'Checks are unavailable',
     open: 'Open the AI review list', count: n => `${n} suggestions`,
     menu: 'AI review settings', aiOn: 'Turn AI review off', aiOff: 'Turn AI review on', runNow: 'Run AI review now', collapse: 'Collapse to edge', expand: 'Expand the AI review ball',
     autocompleteOn: 'Autocomplete is on', autocompleteOff: 'Autocomplete is off', autocompleteDisable: 'Turn autocomplete off', autocompleteEnable: 'Turn autocomplete on', preferenceFailed: 'Could not save the setting. The previous state is unchanged; please retry.', autocompleteHint: 'AI uses context and AI credits to suggest a continuation. Manual completion remains available when off.',
