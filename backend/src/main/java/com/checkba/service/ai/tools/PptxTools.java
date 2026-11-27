@@ -814,6 +814,8 @@ public class PptxTools implements AgentToolComponent {
                 imageModel = "qwen-image-3.0";
             }
             apiKey = platformAiChannel.apiKey();
+            // Q24：pptx-service 在外部进程里直连网关，请求带不上本轮计费标记；页脚据此注明「不含演示文稿生成」
+            com.checkba.service.ai.PlatformTurnScope.markUntaggedSpend();
             // 平台凭据只发送到官方通道地址，不使用用户 BYOK 的自定义地址。
             apiBase = platformAiChannel.baseUrl(orConfig.getBaseUrl());
         } else if (provider == AiModelProperties.Provider.OPENROUTER) {

@@ -85,6 +85,15 @@ public class AgentOrchestrator {
     java.time.Duration attachmentPreparationTimeout = java.time.Duration.ofSeconds(120);
     java.time.Duration attachmentReadTimeout = java.time.Duration.ofSeconds(180);
 
+    /**
+     * 轮次回调的统一入口：试用计量（TrialTurnScope）+ 本轮计费标记（Q24，PlatformTurnScope），
+     * 让这一轮里的辅助平台调用（标题、压缩、附件识读……）也算进页脚的「本轮 ¥」。
+     */
+    private void runInTurn(RunGuard guard, Runnable body) {
+        String tag = installIdentity == null ? null : installIdentity.turnTag(guard.conversationId, guard.runId);
+        com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> PlatformTurnScope.run(tag, body));
+    }
+
     private <T> T boundedAttachmentRead(RunGuard guard, java.util.function.Supplier<T> read,
                                       java.time.Duration timeout) {
         String language = guard.originalRequest != null && guard.originalRequest.getAppLanguage() != null
@@ -94,7 +103,7 @@ public class AgentOrchestrator {
                 () -> PlatformAiUserScope.call(scopedUser, () -> {
                     java.util.concurrent.atomic.AtomicReference<T> result = new java.util.concurrent.atomic.AtomicReference<>();
                     try {
-                        com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> result.set(read.get()));
+                        runInTurn(guard, () -> result.set(read.get()));
                         return result.get();
                     } finally {
                         com.checkba.service.ai.context.ProjectContextHolder.clear();
@@ -578,6 +587,9 @@ public class AgentOrchestrator {
     private volatile AgentInboxService inboxService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ClientCapabilityService clientCapabilities;
+    /** Q24：本轮计费标记的盐（本机 install-secret）；手工装配的测试里为 null，不带标记。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.telemetry.InstallIdentityService installIdentity;
 
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ProjectMemberService projectMemberService;
@@ -2280,7 +2292,7 @@ public class AgentOrchestrator {
             sendRunEvent(guard, "run_state", "{\"status\":\"RUNNING\"}");
             sendRunEvent(guard, "state_recovery", guard.trace.recoveryPayload(guard.streamSnapshot()));
             Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
-                    () -> PlatformAiUserScope.run(userId, () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                    () -> PlatformAiUserScope.run(userId, () -> runInTurn(guard, () -> {
                         try {
                             requireInboxExecutionAccess(conversationId, row.getId(), userId);
                             if (!restartAccountMatches(cp)) throw new SecurityException("Account changed during restart");
@@ -2542,7 +2554,7 @@ public class AgentOrchestrator {
         guard.trialAccountFingerprint = trialTurnMeter == null ? null : trialTurnMeter.accountFingerprint();
         Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
                 () -> PlatformAiUserScope.run(userId,
-                        () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed,
+                        () -> runInTurn(guard,
                                 () -> handleUserMessageInScope(request, userId, guard))));
         java.util.concurrent.Executor executor = this.turnExecutor;
         if (executor == null) {
@@ -2952,6 +2964,9 @@ public class AgentOrchestrator {
         // 取消之后 onNext 还会被回调几次。闸不加在 handler 上的话，这几段会继续打进用户的气泡、
         // 继续进恢复快照、继续往文档里流式写——用户点了停止，画面却还在动。
         handler.setCancellationCheck(guard::isCancelled);
+        // Q24：平台通道请求带本轮计费标记；runId 随 token_usage 给前端，用来查这一轮的实扣金额
+        handler.setRunId(guard.runId);
+        if (installIdentity != null) handler.setTurnTag(installIdentity.turnTag(conversationId, guard.runId));
 
         // 实时更新当前生成的内容 (用于断线重连恢复)
         if (!summaryOnly) handler.setOnToken(guard::appendStream);
@@ -2990,7 +3005,7 @@ public class AgentOrchestrator {
         // 释放 OkHttp Dispatcher 的 maxRequestsPerHost 并发槽位，避免阻塞型工具（编辑器桥最长 180s、
         // dispatch_subtask 630s）与多轮递归长期占死全局 LLM 并发槽。
         handler.setOnComplete(response -> dispatchContinuation(() -> PlatformAiUserScope.run(userId,
-                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                () -> runInTurn(guard, () -> {
           try {
             // 埋点 ai.turn 的 promptTokensFirstRound（dev-board#729 ⑥）：首轮 prompt 有多大，
             // 是判断「工具 schema / 固定前缀是否过肥」的唯一在线证据（本机实测约 5 万，其中 2/3 是工具）。
@@ -3825,10 +3840,14 @@ public class AgentOrchestrator {
                 saveAssistantMessage(guard, projectId, userId, fullContent);
             }
             // 触发记忆写入管线（异步：对话摘要 / 项目记忆 / MemCell 原子记忆提取）
+            String memoryTurnTag = PlatformTurnScope.current();
             try {
+                // Q24：摘要在后台跑完之前，这一轮的费用查询回 pending，页脚不先给一个偏少的数
+                PlatformTurnScope.beginWork(memoryTurnTag);
                 memoryPipelineService.onConversationTurnCompleted(
-                        conversationId, projectId, userId, new java.util.ArrayList<>(messages));
+                        conversationId, projectId, userId, new java.util.ArrayList<>(messages), memoryTurnTag);
             } catch (Exception memEx) {
+                PlatformTurnScope.endWork(memoryTurnTag);
                 log.warn("Failed to trigger memory pipeline for {}", conversationId, memEx);
             }
             // 版本记录：AI 轮次真正结束后落一笔 AI 署名存档（失败绝不阻断）。
@@ -3876,7 +3895,7 @@ public class AgentOrchestrator {
         // 3. 其余 → 终态清理（关 emitter + 复位状态，避免 SSE 挂到超时、前端永久加载）
         // 同 onComplete：错误回调也在 HTTP 线程上，换模型要取平台密钥，身份必须重建
         handler.setOnError(err -> PlatformAiUserScope.run(userId,
-                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                () -> runInTurn(guard, () -> {
           try {
             if (guard.isCancelled()) {
                 // 我们自己掐断在途请求换来的那个 IOException 不是故障（计划 K4 ①）：

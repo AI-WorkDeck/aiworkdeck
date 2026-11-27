@@ -1787,6 +1787,8 @@ export function useAgentStream() {
                 tokenUsage.value.totalTokens += d.totalTokens || 0
                 // Q24：平台通道按余额扣费，这一轮任一次调用走了平台通道，页脚就不给律师看 token 数
                 if (d.platform === true) tokenUsage.value.platform = true
+                // Q24：本轮 runId，页脚据此查这一轮的实扣金额
+                if (d.platform === true && typeof d.runId === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(d.runId)) tokenUsage.value.runId = d.runId
                 console.log('[AgentStream] Token Usage Updated:', tokenUsage.value)
             } catch (e) {
                 console.error('Failed to parse token_usage', e)

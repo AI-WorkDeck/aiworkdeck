@@ -62,6 +62,14 @@ public interface ReasoningStreamingHandler extends StreamingResponseHandler<AiMe
     }
 
     /**
+     * Q24：本轮的计费标记（32 位小写十六进制），平台通道请求据此带 {@code X-AWD-Turn}。
+     * 只有用户对话轮次（主循环与其子任务）返回非空；其余调用不带，费用照常记在账上，只是不归入某一轮。
+     */
+    default String turnTag() {
+        return null;
+    }
+
+    /**
      * 通道交给 handler 的「换家重发」动作（dev-board#1061）：首字节前只收到保活超过
      * {@code afterSeconds} 秒时，handler 的看门狗调用 {@code requeue}。它掐掉本次请求、
      * 带 {@code provider.ignore} 重发<b>一次</b>；返回 false 表示没有重发（已用过/已到终态/已取消）。

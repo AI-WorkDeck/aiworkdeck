@@ -416,7 +416,7 @@ export default {
   copyFailed: '复制失败',
   // ---- 状态栏用量 ----
   tokenUsageLine: '本轮 {n} tokens',
-  viewUsage: '查看用量',
+  viewUsage: '查看用量', turnCost: '本轮 {amount}', turnCostSubscription: '本轮 {amount}（订阅额度）', turnCostBqt: '本轮 {amount}（包晴天点数）', turnCostSettling: '结算中…', turnCostPartial: '本轮 {amount}（不含演示文稿生成）',
   // ---- ProcessCard ----
   statusError: '出错',
   statusSuccess: '成功',

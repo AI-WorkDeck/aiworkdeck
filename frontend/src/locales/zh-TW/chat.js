@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "複製輸出",
   "copyFailed": "複製失敗",
   "tokenUsageLine": "本輪 {n} tokens",
-  "viewUsage": "查看用量",
+  "viewUsage": "查看用量", "turnCost": "本輪 {amount}", "turnCostSubscription": "本輪 {amount}（訂閱額度）", "turnCostBqt": "本輪 {amount}（包晴天點數）", "turnCostSettling": "結算中…", "turnCostPartial": "本輪 {amount}（不含簡報生成）",
   "statusError": "出錯",
   "statusSuccess": "成功",
   "statusRunning": "執行中",
