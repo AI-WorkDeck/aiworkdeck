@@ -33,6 +33,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -332,6 +334,52 @@ class AgentOrchestratorPassDepthTest {
         assertTrue(last.contains("前半段正文。") && last.contains("后半段。") && !last.contains("已中断"), last);
         assertTrue(last.indexOf("前半段正文。") < last.indexOf("后半段。"), last);
         assertTrue(request.getMessage().contains("从断开处直接接着写") || request.getMessage().contains("Continue exactly"), request.getMessage());
+    }
+
+    @Test
+    @DisplayName("X39 + Q24：续写的模型调用带本轮计费标记（同一 runId），费用记进这一轮的页脚")
+    void continueTurnRunsUnderThisRunsPlatformTurnTag(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        var identity = new com.checkba.service.telemetry.InstallIdentityService(dir.toString());
+        var idField = AgentOrchestrator.class.getDeclaredField("installIdentity");
+        idField.setAccessible(true);
+        idField.set(orchestrator, identity);
+        var runsField = AgentOrchestrator.class.getDeclaredField("activeRuns");
+        runsField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        var runs = (java.util.Map<String, AgentOrchestrator.RunGuard>) runsField.get(orchestrator);
+
+        String conv = "conv-continue-tag";
+        when(messageService.listHistoryForAssembly(conv)).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(5L, "USER", "写一份备忘录", 0L),
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(9L, "ASSISTANT",
+                        "前半段正文。\n\n[生成出错，已中断]", 0L)));
+        when(messageService.upsertAssistantMessage(any(), any(), any(), any(), any())).thenReturn(9L);
+        String[] seenTag = new String[1];
+        String[] seenRun = new String[1];
+        StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+            @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                seenTag[0] = PlatformTurnScope.current();
+                AgentOrchestrator.RunGuard g = runs.get(conv);
+                seenRun[0] = g == null ? null : g.runId;
+                handler.onNext("后半段。");
+                handler.onComplete(Response.from(AiMessage.from("后半段。")));
+            }
+            @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools,
+                                           StreamingResponseHandler<AiMessage> handler) { generate(messages, handler); }
+        };
+        when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+        AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
+        request.setProjectId(1L);
+        request.setConversationId(conv);
+        request.setMessage("continue");
+        request.setModel(MODEL);
+        request.setContinueTurn(true);
+        orchestrator.handleUserMessage(request, 7L);
+
+        assertNotNull(seenRun[0], "the continuation ran as a registered run");
+        assertNotNull(seenTag[0], "the continuation's model call carries a platform turn tag");
+        assertEquals(identity.turnTag(conv, seenRun[0]), seenTag[0], "tag = this run's tag, so its cost lands in this turn's footer");
+        assertNull(PlatformTurnScope.current(), "scope is cleared after the turn");
     }
 
     @Test
