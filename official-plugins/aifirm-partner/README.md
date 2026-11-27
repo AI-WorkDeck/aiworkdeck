@@ -19,3 +19,5 @@
 
 构建与测试：`./official-plugins/aifirm-partner/build.sh`（node 测试 + `mvn verify` + 打包 `dist/aifirm-partner-<版本>.zip`）。
 上架走 `docs/PLUGIN_DISTRIBUTION.md` 的审核签名流程。
+
+- 框架沟通（1.1.0，仅美国办公室）：`web/framing.js` 及 `index.html`、`matters.js` 中 `us-framing:start` … `us-framing:end` 标记之间的代码，加上 manifest 的 `speech` 权限与 `operations.svConfig`。品牌构建（Draft AI）可按标记整块删除。
