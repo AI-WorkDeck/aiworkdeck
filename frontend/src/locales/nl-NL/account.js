@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Kan demogegevens niet initialiseren",
   "caseOpenPluginFailedToast": "Kan plugin niet openen",
   "circleInviteLabel": "Circle-uitnodigingscode (optioneel)",
-  "circleInvitePlaceholder": "bijv. KW-ABNR-2026",
+  "circleInvitePlaceholder": "bijv. KW-XXXX-2026",
   "circleInviteHint": "Voer de uitnodigingscode van uw kantoor in om het kantoor-achtervoegsel toe te voegen en toegewijd DeepSeek-quotum te ontgrendelen",
   "bqtScanSwitch": "Baoqingtian-advocaat QR-login",
   "bqtScanTitle": "Scan met de Baoqingtian-advocaat-app om in te loggen",

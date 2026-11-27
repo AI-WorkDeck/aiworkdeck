@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "デモデータの作成に失敗しました",
   "caseOpenPluginFailedToast": "プラグインを開けませんでした",
   "circleInviteLabel": "Circle アライアンス招待コード（任意）",
-  "circleInvitePlaceholder": "例：KW-ABNR-2026",
+  "circleInvitePlaceholder": "例：KW-XXXX-2026",
   "circleInviteHint": "律所専用の招待コードを入力すると、律所サフィックスが付与され、DeepSeek 専用枠が解放されます",
   "bqtScanSwitch": "包晴天弁護士QRログイン",
   "bqtScanTitle": "包晴天弁護士アプリでスキャンしてログイン",
