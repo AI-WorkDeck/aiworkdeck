@@ -43,7 +43,7 @@ export default {
     "compatHint": "Voer de tekens uit de afbeelding in en vraag vervolgens uw sms- of e-mailcode aan. Laad een nieuwe afbeelding na een onjuiste of verlopen poging.",
     "compatImage": "Afbeelding voor veiligheidsverificatie",
     "compatAnswer": "6 tekens uit de afbeelding",
-    "compatAnswerFirst": "Laad eerst een verificatieafbeelding en voer de 6 tekens ervan in",
+    "compatAnswerFirst": "Laad eerst een verificatieafbeelding en voer de 6 tekens ervan in", "compatAuto": "De beveiligingscontrole is niet geladen, daarom is overgeschakeld naar compatibele verificatie: voer de 6 tekens uit de afbeelding in en vraag de code opnieuw aan.",
     "compatContactFirst": "Voer eerst uw telefoonnummer of e-mailadres in",
     "accountNetworkFailed": "Kan geen verbinding maken met de accountservice. Controleer uw verbinding en probeer het opnieuw.",
     "captchaFailed": "Voltooi de veiligheidscontrole en probeer het opnieuw",
