@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Mới",
+    "aria": "Tài liệu mới hoặc tab trình duyệt mới",
+    "newWord": "Tài liệu Word mới",
+    "newExcel": "Sổ làm việc Excel mới",
+    "newPowerPoint": "Bản trình bày PowerPoint mới",
+    "newBrowserTab": "Tab trình duyệt mới",
+  },
   scratchCopyChoose: "Chọn nội dung để sao chép",
   scratchCopySelected: "Đã chọn {count} mục",
   scratchCopyFiles: "Tệp",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "Thùng rác",
   "loadingText": "Đang tải...",
   "explorerFallback": "Trình khám phá",
-  "newOrCopy": "Mới / Nhân bản",
   "emptyWorkspace": "Chọn một tệp để bắt đầu",
   "emptyWorkspaceHint": "Mở tệp từ trình khám phá bên trái hoặc tạo tài liệu mới",
   "railEditEnter": "Sắp xếp thanh bên (kéo để sắp xếp lại hoặc ghim)",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "Không thể gửi tệp này",
   "shareUnsupported": "Hệ thống này không hỗ trợ gửi",
   "shareClipboardHint": "Đã sao chép tệp. Chuyển sang WeChat, chọn cuộc trò chuyện và nhấn Ctrl+V để gửi",
-  "copyFailedNoNewFile": "Sao chép thất bại: không có tệp mới được trả về",
-  "copyFailed": "Sao chép thất bại",
   "recordingStarted": "Đã bắt đầu ghi nhật ký",
   "recordingStopped": "Đã dừng ghi nhật ký",
   "insertedToDoc": "Đã chèn vào tài liệu",

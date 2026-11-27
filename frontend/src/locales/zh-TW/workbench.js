@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "新增",
+    "aria": "新增文件或瀏覽器分頁",
+    "newWord": "新增 Word 文件",
+    "newExcel": "新增 Excel 活頁簿",
+    "newPowerPoint": "新增 PowerPoint 簡報",
+    "newBrowserTab": "新增瀏覽器分頁",
+  },
   scratchCopyChoose: "選擇要轉存的內容",
   scratchCopySelected: "已選 {count} 項",
   scratchCopyFiles: "檔案",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "資源回收筒",
   "loadingText": "載入中...",
   "explorerFallback": "檔案樹",
-  "newOrCopy": "新建/複製",
   "emptyWorkspace": "選擇檔案開始工作",
   "emptyWorkspaceHint": "從左側檔案總管開啟檔案，或新建一份文件",
   "railEditEnter": "整理側欄（拖動排序或停靠）",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "無法傳送這個檔案",
   "shareUnsupported": "目前系統不支援傳送",
   "shareClipboardHint": "檔案已複製，切到微信選好對話後按 Ctrl+V 即可傳送",
-  "copyFailedNoNewFile": "複製失敗：未回傳新檔案",
-  "copyFailed": "複製失敗",
   "recordingStarted": "已開始記錄",
   "recordingStopped": "已停止記錄",
   "insertedToDoc": "已插入文件",

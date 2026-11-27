@@ -40,6 +40,17 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
     private final java.util.function.BooleanSupplier currentRunGate;
 
     private final StringBuilder fullContentBuilder = new StringBuilder();
+    /** Q24：本轮计费标记，编排器建好 handler 后设置；平台通道请求据此带 X-AWD-Turn。 */
+    private volatile String turnTag;
+
+    public void setTurnTag(String turnTag) { this.turnTag = turnTag; }
+    /** Q24：本轮 runId（本机 UUID，不含内容）；随 token_usage 给前端查本轮费用。 */
+    private volatile String runId;
+
+    public void setRunId(String runId) { this.runId = runId != null && runId.matches("[A-Za-z0-9-]{1,64}") ? runId : null; }
+
+    @Override
+    public String turnTag() { return turnTag; }
     private boolean isBubbleStarted = false;
     private String currentBubbleId;
 
@@ -849,8 +860,9 @@ public class AgentStreamHandler implements ReasoningStreamingHandler {
             // platform：平台通道按余额（¥）扣费，token 数对律师没有意义，前端改给「查看用量」（Q24）
             boolean platform = tokenUsageService != null && tokenUsageService.isPlatformChannel();
             String usageJson = String.format(
-                "{\"promptTokens\":%d,\"completionTokens\":%d,\"totalTokens\":%d,\"platform\":%b}",
-                promptTokens, completionTokens, totalTokens, platform
+                "{\"promptTokens\":%d,\"completionTokens\":%d,\"totalTokens\":%d,\"platform\":%b%s}",
+                promptTokens, completionTokens, totalTokens, platform,
+                platform && runId != null ? ",\"runId\":\"" + runId + "\"" : ""
             );
             flushPendingText();
             sendSse("token_usage", usageJson);

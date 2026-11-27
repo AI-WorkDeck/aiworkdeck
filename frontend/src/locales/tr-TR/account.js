@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Başarı Ücreti Oranı (%)",
   "casePreviewConflictBtn": "Çatışma Ön Kontrolünü Çalıştır",
   "caseSubmitIntakeBtn": "Kaydı ve Çatışma Kontrolünü Gönder",
-  "caseIntakeEmpty": "Henüz kayıt yok. Başlamak için yukarıdaki \"Yeni Vaka Kaydı\" veya \"Qinghe Foods Demo Verisi\" seçeneklerine tıklayın.",
+  "caseIntakeEmpty": "Henüz kayıt yok. Başlamak için yukarıdaki \"Yeni Vaka Kaydı\" seçeneğine tıklayın.",
   "caseContractedLabel": "Sözleşmeli",
   "caseImBadge": "IM Grubu Oluşturuldu ve Özet Eşitlendi",
   "caseMyClearanceTitle": "Bana Atanan Çatışma Onayları",

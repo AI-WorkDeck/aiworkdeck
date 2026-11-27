@@ -399,6 +399,9 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         }
 
         StreamSession session = new StreamSession(handler, maxOutputTokens != null);
+        // Q24 国际平台通道（非 awdai_）：轮次里的每次生成都记下 OpenRouter 生成 id，按 id 查实扣金额
+        final String generationTag = apiKey != null && !apiKey.startsWith("awdai_") ? turnTagOf(handler) : null;
+        session.generationTag = generationTag;
         // Explicit paid writing requests do not transparently retry a failed connection.
         // International general chat retains its original policy; domestic requests never replay uncertain charges.
         OkHttpClient transport = maxOutputTokens == null && !(apiKey != null && apiKey.startsWith("awdai_"))
@@ -407,6 +410,8 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         // （第一次根本没到网关），要么被拒成 request_already_submitted，绝不重复扣费。
         // 所以这条通道上「连接层失败、还没拿到任何响应」可以用同一个 id 安全重发一次。
         final String requestId = apiKey != null && apiKey.startsWith("awdai_") ? java.util.UUID.randomUUID().toString() : null;
+        // Q24：平台通道把本轮计费标记带给网关（官网据此汇总这一轮的实扣金额）；BYOK 与国际通道从不带
+        final String turnTag = requestId != null ? turnTagOf(handler) : null;
         // Set right after the first enqueue. A connection that fails instantly (RST on accept) can reach the
         // retry predicate on OkHttp's dispatcher thread before that assignment, so the predicate waits for it
         // briefly instead of treating "not assigned yet" as "cancelled" (CI flake on Linux, 2026-11-25).
@@ -422,11 +427,11 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             if (in == null || in.cancelled || !isConnectionLevelFailure(e) || !connectionRetryUsed.compareAndSet(false, true)) return false;
             log.warn("Platform AI request {} failed at the connection level ({}); retrying once with the same request id",
                     requestId, e.getClass().getSimpleName());
-            in.call = enqueue(transport, sentBody, session, requestId, null);
+            in.call = enqueue(transport, sentBody, session, requestId, turnTag, null);
             if (in.cancelled) in.call.cancel();
             return true;
         };
-        Inflight inflight = new Inflight(enqueue(transport, body, session, requestId, retryOnce), session);
+        Inflight inflight = new Inflight(enqueue(transport, body, session, requestId, turnTag, retryOnce), session);
         holder.set(inflight);
 
         // 首字节前排队换家（dev-board#1061）：判定交给 handler 的看门狗（它手里有「保活 vs 真字节」
@@ -444,16 +449,26 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 String from = old.provider;
                 inflight.call.cancel();
                 StreamSession next = new StreamSession(handler, false);
+                next.generationTag = generationTag;
                 String retryBody = withProviderRequeue(baseBody, from, providerRouting.sort());
                 log.warn("Requeueing {} on another provider (was {}): only keep-alive before first byte",
                         modelName, from == null ? "unknown" : from);
                 inflight.session = next;
-                inflight.call = enqueue(transport, retryBody, next, null, null);
+                inflight.call = enqueue(transport, retryBody, next, null, turnTag, null);
                 if (inflight.cancelled) inflight.call.cancel();   // 停止恰好落在换家这一刻
                 return true;
             });
         }
         return inflight;
+    }
+
+    private static final java.util.regex.Pattern TURN_TAG = java.util.regex.Pattern.compile("^[0-9a-f]{32}$");
+
+    /** 只认 32 位小写十六进制；别的一律不带（网关对畸形值也只是忽略，但没必要发）。 */
+    static String turnTagOf(StreamingResponseHandler<AiMessage> handler) {
+        String tag = handler instanceof ReasoningStreamingHandler rh ? rh.turnTag() : null;
+        if (tag == null) tag = PlatformTurnScope.current();   // 轮次里的辅助流式调用（写作模型等）
+        return tag != null && TURN_TAG.matcher(tag).matches() ? tag : null;
     }
 
     /**
@@ -463,7 +478,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
      * @param onConnFailure 非 null 且返回 true = 已接手重发，这次失败不交给 session
      */
     private Call enqueue(OkHttpClient transport, String body, StreamSession session, String requestId,
-                         java.util.function.Predicate<IOException> onConnFailure) {
+                         String turnTag, java.util.function.Predicate<IOException> onConnFailure) {
         Request.Builder rb = new Request.Builder()
                 .url(endpoint)
                 .header("Authorization", "Bearer " + (apiKey == null ? "" : apiKey))
@@ -471,6 +486,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 .header("User-Agent", ProductIdentity.userAgent("ai-gateway"))
                 .post(RequestBody.create(body, JSON));
         if (requestId != null) rb.header("X-Request-Id", requestId);
+        if (turnTag != null) rb.header("X-AWD-Turn", turnTag);
         Request request = rb.build();
         Call call = transport.newCall(request);
         call.enqueue(new Callback() {
@@ -928,6 +944,10 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             if (reasoningHandler != null) reasoningHandler.onProvider(provider);
         }
 
+        /** Q24 国际：OpenRouter 的生成 id 记到本轮标记下（只在内存里），之后按 id 查实扣金额。null = 不记。 */
+        volatile String generationTag;
+        private volatile boolean generationReported;
+
         StreamSession(StreamingResponseHandler<AiMessage> handler, boolean privateWriting) {
             this.handler = handler;
             this.privateWriting = privateWriting;
@@ -991,6 +1011,11 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
                 if (privateWriting) log.warn("Writing SSE chunk does not fit ChatCompletionResponse, ignored");
                 else log.warn("SSE chunk does not fit ChatCompletionResponse, ignored: {}", abbreviate(payload));
                 return false;
+            }
+            if (!generationReported && generationTag != null) {
+                generationReported = true;
+                JsonNode gid = root.get("id");
+                if (gid != null && gid.isTextual()) TurnGenerations.record(generationTag, gid.asText());
             }
             if (!providerReported) {
                 // 分片顶层的 provider：排在内容回调之前，TTFT 那条日志才能带上它

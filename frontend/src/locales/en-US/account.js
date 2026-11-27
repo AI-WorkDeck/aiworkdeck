@@ -403,7 +403,7 @@ export default {
   caseFieldContingencyRate: 'Contingency Rate (%)',
   casePreviewConflictBtn: 'Run Conflict Pre-check',
   caseSubmitIntakeBtn: 'Submit Intake & Conflict Check',
-  caseIntakeEmpty: 'No intake records yet. Click "New Case Intake" or "Seed Qinghe Foods Demo" above to get started.',
+  caseIntakeEmpty: 'No intake records yet. Click "New Case Intake" above to get started.',
   caseContractedLabel: 'Contracted',
   caseImBadge: 'IM Group Created & Summary Synced',
   caseMyClearanceTitle: 'Conflict Clearances Assigned to Me',

@@ -409,7 +409,7 @@ export default {
   copyFailed: 'Copy failed',
   // ---- Status bar usage ----
   tokenUsageLine: '{n} tokens this turn',
-  viewUsage: 'View usage',
+  viewUsage: 'View usage', turnCost: 'This turn {amount}', turnCostSubscription: 'This turn {amount} (subscription credit)', turnCostBqt: 'This turn {amount} (Baoqingtian points)', turnCostSettling: 'Settling…', turnCostPartial: 'This turn {amount} (excl. presentation generation)',
   // ---- ProcessCard ----
   statusError: 'Error',
   statusSuccess: 'Success',

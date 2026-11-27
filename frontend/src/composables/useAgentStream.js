@@ -866,9 +866,12 @@ export function useAgentStream() {
         prompt, displayText = '', contentHtml = '', fileList = [], projectId,
         modelId = 'default', mode = 'AGENT', activeContext = null, skillIds = [],
         submissionMode = 'steer', clientRequestId = '', decisionAssistEnabled = false,
-        _userImages = [], _userContextFiles = []
+        _userImages = [], _userContextFiles = [],
+        // X39：接着写这个中途断开的气泡（不新建用户/助手气泡，续写追加进同一个气泡）
+        continueBubble = null
     }) => {
         const continuingRun = isStreaming.value || agentRunStatus.value === 'RUNNING'
+        const continueTurn = !!continueBubble && !continuingRun
         const requestId = clientRequestId || createClientRequestId()
         // 发送时快照（dev-board#1118）：气泡与 payload 复用同一份对象，
         // 重新生成（confirmRollback 重发）按它忠实重放，而不是重新取当前打开的文档。
@@ -906,15 +909,28 @@ export function useAgentStream() {
                 if (b.role === 'ASSISTANT' && b.question && !b.question.answered) b.question.answered = true
             })
 
-            let userBubble = bubbles.value.find((candidate) => candidate.clientRequestId === requestId)
-            if (!userBubble) {
+            if (continueTurn) {
+                const bubble = continueBubble
+                bubble.errorNotice = null
+                bubble.continuing = true
+                bubble.continueSeam = true
+                bubble.isStreaming = true
+                if (bubble.thinking) { bubble.thinking.status = 'thinking'; bubble.thinking.startTime = Date.now() }
+                currentAssistantBubble.value = bubble
+                isStreaming.value = true
+                roundSettled = false
+                resetParser()
+            }
+            let userBubble = continueTurn ? null : bubbles.value.find((candidate) => candidate.clientRequestId === requestId)
+            if (!continueTurn && !userBubble) {
                 userBubble = createUserBubble(prompt, _userImages, _userContextFiles, contentHtml, displayText)
                 userBubble.clientRequestId = requestId
                 userBubble.activeContext = activeContextSnapshot
                 bubbles.value.push(userBubble)
             }
 
-            const newBubble = createAssistantBubble()
+            const newBubble = continueTurn ? null : createAssistantBubble()
+            if (newBubble) {
             newBubble.originClientRequestId = requestId
             newBubble.isStreaming = true
             newBubble.thinking.status = 'thinking'
@@ -925,6 +941,7 @@ export function useAgentStream() {
             isStreaming.value = true
             roundSettled = false
             resetParser()
+            }
         }
 
         // 3. Ensure Conversation
@@ -983,7 +1000,9 @@ export function useAgentStream() {
                 // NEW: Active context (auto-detected current tab) — 与用户气泡上的快照同源（dev-board#1118）
                 activeContext: activeContextSnapshot,
                 // 用户主动选择的 Skill；为空则后端只走触发词自动匹配
-                skillIds: Array.isArray(skillIds) && skillIds.length ? skillIds : null
+                skillIds: Array.isArray(skillIds) && skillIds.length ? skillIds : null,
+                // X39：后端据此把本轮当成「接着写最后一条中途断开的回答」（不落用户行、写回同一行）
+                ...(continueTurn ? { continueTurn: true } : {})
             }
 
             const chatResp = await fetch(`${getApiBaseUrl()}/api/agent/chat`, {
@@ -1768,6 +1787,8 @@ export function useAgentStream() {
                 tokenUsage.value.totalTokens += d.totalTokens || 0
                 // Q24：平台通道按余额扣费，这一轮任一次调用走了平台通道，页脚就不给律师看 token 数
                 if (d.platform === true) tokenUsage.value.platform = true
+                // Q24：本轮 runId，页脚据此查这一轮的实扣金额
+                if (d.platform === true && typeof d.runId === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(d.runId)) tokenUsage.value.runId = d.runId
                 console.log('[AgentStream] Token Usage Updated:', tokenUsage.value)
             } catch (e) {
                 console.error('Failed to parse token_usage', e)
@@ -1942,6 +1963,19 @@ export function useAgentStream() {
                 if (!thinking.duration || thinking.duration === 0) {
                     thinking.duration = (Date.now() - thinking.startTime) / 1000
                 }
+            }
+            // X39：断开那一刻是否还有工具在跑（收敛之前取）——工具半途断开不提供「继续」
+            if (evt === 'error') {
+                const b = currentAssistantBubble.value
+                b.toolInFlightAtCut = (b.processes || []).some(p => (p.items || []).some(i => i.type === 'tool' && i.status === 'loading'))
+                b.cutAt = Date.now()
+                b.documentChangedSinceCut = false
+                // 续写又断开：计数（连续两次后只给「重试」）；续写成功则清零
+                b.failedContinues = b.continuing ? (b.failedContinues || 0) + 1 : (b.failedContinues || 0)
+                b.continuing = false
+            } else if (currentAssistantBubble.value.continuing) {
+                currentAssistantBubble.value.continuing = false
+                currentAssistantBubble.value.failedContinues = 0
             }
             // 终态收敛：流结束后不允许任何卡片停留在"执行中/加载中"
             finalizeProcesses(evt === 'error' ? 'error' : 'success')
@@ -2660,7 +2694,9 @@ export function useAgentStream() {
             else {
                 clearDocStreamingPlaceholder(bubble)
                 settleRootThinking(bubble)
-                if (bubble.content && !bubble.content.endsWith('\n\n')) bubble.content += '\n\n'
+                // X39：续写的第一段直接接在断点后面（同一句话），不另起段落
+                if (bubble.continueSeam) bubble.continueSeam = false
+                else if (bubble.content && !bubble.content.endsWith('\n\n')) bubble.content += '\n\n'
                 activeTag = 'final'
             }
         } else if (tagName === 'question') {

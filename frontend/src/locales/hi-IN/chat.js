@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "आउटपुट कॉपी करें",
   "copyFailed": "कॉपी विफल रहा",
   "tokenUsageLine": "इस बारी में {n} टोकन",
-  "viewUsage": "उपयोग देखें",
+  "viewUsage": "उपयोग देखें", "turnCost": "इस राउंड में {amount}", "turnCostSubscription": "इस राउंड में {amount} (सदस्यता क्रेडिट)", "turnCostBqt": "इस राउंड में {amount} (Baoqingtian पॉइंट)", "turnCostSettling": "हिसाब हो रहा है…", "turnCostPartial": "इस राउंड में {amount} (प्रस्तुति निर्माण शामिल नहीं)",
   "statusError": "त्रुटि",
   "statusSuccess": "सफल",
   "statusRunning": "चल रहा है",

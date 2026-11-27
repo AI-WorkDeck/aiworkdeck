@@ -378,7 +378,7 @@ export default {
   "copyToolOutput": "Salin output",
   "copyFailed": "Penyalinan gagal",
   "tokenUsageLine": "{n} token pada giliran ini",
-  "viewUsage": "Lihat penggunaan",
+  "viewUsage": "Lihat penggunaan", "turnCost": "Putaran ini {amount}", "turnCostSubscription": "Putaran ini {amount} (kredit langganan)", "turnCostBqt": "Putaran ini {amount} (poin Baoqingtian)", "turnCostSettling": "Sedang dihitung…", "turnCostPartial": "Putaran ini {amount} (tanpa pembuatan presentasi)",
   "statusError": "Kesalahan",
   "statusSuccess": "Berhasil",
   "statusRunning": "Berjalan",

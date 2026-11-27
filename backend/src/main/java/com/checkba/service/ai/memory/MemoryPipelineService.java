@@ -46,12 +46,23 @@ public class MemoryPipelineService {
     @Async("memoryExecutor")
     public void onConversationTurnCompleted(String conversationId, String projectId,
                                             Long userId, List<ChatMessage> messages) {
-        // Office tool messages and the current document are transient; do not derive a durable summary.
-        if (clientCapabilities != null && clientCapabilities.capabilityOf(conversationId)
-                == com.checkba.service.ai.ClientCapabilityService.Capability.OFFICE) return;
-        // 独立线程池：平台通道按用户计费，摘要/抽取这几次 LLM 调用要落在本人的额度上
-        com.checkba.service.ai.PlatformAiUserScope.run(userId,
-                () -> runPipeline(conversationId, projectId, userId, messages));
+        onConversationTurnCompleted(conversationId, projectId, userId, messages, null);
+    }
+
+    /** Q24：turnTag 为这一轮的计费标记——摘要等调用是这一轮引起的，费用算进这一轮。 */
+    @Async("memoryExecutor")
+    public void onConversationTurnCompleted(String conversationId, String projectId,
+                                            Long userId, List<ChatMessage> messages, String turnTag) {
+        try {
+            // Office tool messages and the current document are transient; do not derive a durable summary.
+            if (clientCapabilities != null && clientCapabilities.capabilityOf(conversationId)
+                    == com.checkba.service.ai.ClientCapabilityService.Capability.OFFICE) return;
+            // 独立线程池：平台通道按用户计费，摘要/抽取这几次 LLM 调用要落在本人的额度上
+            com.checkba.service.ai.PlatformAiUserScope.run(userId, () -> com.checkba.service.ai.PlatformTurnScope.run(turnTag,
+                    () -> runPipeline(conversationId, projectId, userId, messages)));
+        } finally {
+            com.checkba.service.ai.PlatformTurnScope.endWork(turnTag);   // 调用方在提交前 beginWork
+        }
     }
 
     private void runPipeline(String conversationId, String projectId,

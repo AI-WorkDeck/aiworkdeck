@@ -24,7 +24,7 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a)
 
 // ---------- 参数 ----------
 function parseArgs(argv) {
-  const o = { lowaDir: path.join(os.homedir(), '.cache/awd-matrix/lowa'), runs: 1, concurrency: 4, apiOnly: false, keep: false, runTimeout: 300, out: path.join(HERE, 'out') }
+  const o = { lowaDir: process.env.MATRIX_CACHE_DIR ? path.join(process.env.MATRIX_CACHE_DIR, 'lowa') : path.join(os.homedir(), '.cache/awd-matrix/lowa'), runs: 1, concurrency: 4, apiOnly: false, keep: false, runTimeout: 300, out: path.join(HERE, 'out') }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     const next = () => argv[++i]
@@ -146,6 +146,9 @@ function toBailianBody(raw) {
 async function startBailianProxy() {
   const base = process.env.BAILIAN_BASE_URL.replace(/\/+$/, '')
   const stats = {} // `${百炼模型} ${HTTP 状态}` → 次数（含后端自己的重试），写进 meta 供对比路由的故障率
+  // 故障注入（robustness 句的 fault）：下一条请求体含 match 的流式回复只转发前 cutAfterChunks 块就掐断连接，用一次即清除。
+  // 用来验证「模型输出中途断流」时产品的表现（重试/保留已输出/给出可读提示），不是供应商故障，句子侧不按 INFRA 重跑。
+  const faults = []
   const server = http.createServer(async (req, res) => {
     const ac = new AbortController()
     res.on('close', () => ac.abort()) // 后端取消（超时/停止）时一并掐断上游
@@ -160,6 +163,11 @@ async function startBailianProxy() {
         model = b.model
         body = Buffer.from(JSON.stringify(b))
       }
+      // 只掐主循环的请求（带 tools）；起标题等辅助调用也带用户原话，不能被误伤
+      const raw = body.toString('utf8')
+      const fi = req.method === 'POST' && sub.startsWith('/chat/completions') && raw.includes('"tools"') ? faults.findIndex(f => raw.includes(f.match)) : -1
+      const fault = fi >= 0 ? faults.splice(fi, 1)[0] : null
+      if (fault) { const k = `${model} fault_injected`; stats[k] = (stats[k] || 0) + 1 }
       const up = await fetch(base + sub, {
         method: req.method, signal: ac.signal, redirect: 'error',
         headers: { authorization: `Bearer ${process.env.DASHSCOPE_API_KEY}`, 'content-type': req.headers['content-type'] || 'application/json', accept: req.headers.accept || '*/*' },
@@ -167,7 +175,11 @@ async function startBailianProxy() {
       })
       const k = `${model} ${up.status}`; stats[k] = (stats[k] || 0) + 1
       res.writeHead(up.status, { 'content-type': up.headers.get('content-type') || 'application/json' })
-      if (up.body) for await (const c of up.body) res.write(c)
+      let n = 0
+      if (up.body) for await (const c of up.body) {
+        if (fault && n++ >= fault.cutAfterChunks) { ac.abort(); res.destroy(); return }
+        res.write(c)
+      }
       res.end()
     } catch (e) {
       if (ac.signal.aborted) return
@@ -177,7 +189,7 @@ async function startBailianProxy() {
     }
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
-  return { server, stats, baseUrl: `http://127.0.0.1:${server.address().port}/v1` }
+  return { server, stats, faults, baseUrl: `http://127.0.0.1:${server.address().port}/v1` }
 }
 const sanitize = s => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()
 
@@ -313,7 +325,7 @@ function serveH5(build, apiBase) {
 
 // Playwright 自带 Chromium（headless，绝不启用系统 Chrome）；包装在缓存目录里按需安装
 async function loadPlaywright() {
-  const dir = path.join(os.homedir(), '.cache/awd-matrix/pw')
+  const dir = process.env.MATRIX_CACHE_DIR ? path.join(process.env.MATRIX_CACHE_DIR, 'pw') : path.join(os.homedir(), '.cache/awd-matrix/pw')
   if (!fs.existsSync(path.join(dir, 'node_modules/playwright'))) {
     log('安装 playwright（一次性）...')
     fs.mkdirSync(dir, { recursive: true })
@@ -494,6 +506,8 @@ class Instance {
       const user = { id: this.userId, username: this.username }
       await ctx.addInitScript(([sid, u, m, lang]) => {
         localStorage.setItem('checkba_app_language', lang)
+        // 前端界面语言的权威键是 app_language（utils/appLanguage.js）；只写旧键时页面按浏览器 en-US 起，cn 档的编辑器句会用英文作答
+        localStorage.setItem('app_language', JSON.stringify({ type: 'string', data: lang }))
         localStorage.setItem('checkba_session_id', JSON.stringify({ type: 'string', data: sid }))
         localStorage.setItem('checkba_user', JSON.stringify({ type: 'object', data: u }))
         localStorage.setItem('ai_selected_model', JSON.stringify({ type: 'string', data: m }))
@@ -568,7 +582,7 @@ class Instance {
 
   // 发一条消息，消费 SSE 直到 bubble_end（真实的「本轮结束」事件）；无任何固定静默等待
   // conversationId 给出时在同一会话里续一轮（followUps：脚本化的第二条用户消息）
-  async chat(pid, text, timeoutSec, conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`) {
+  async chat(pid, text, timeoutSec, conversationId = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`, { cancelAfterMs = 0 } = {}) {
     const ac = new AbortController()
     const events = []
     let text_ = '', status = null, error = null, ask = null
@@ -607,10 +621,15 @@ class Instance {
     const logOffset = fs.statSync(this.logFile).size
     const r = await this.http('POST', '/api/agent/chat', { projectId: pid, conversationId, message: text, mode: 'AGENT', model: this.model, clientCapability: 'none', appLanguage: this.profile.lang })
     if (r?.status === 'error' || r?._status >= 400) { ac.abort(); return { status: 'rejected', error: JSON.stringify(r).slice(0, 300), conversationId, events, durationMs: Date.now() - t0, logOffset } }
+    // 中途取消（robustness 句的 cancelAfterMs）：像用户点「停止」一样调取消接口，记下从取消到本轮收尾的耗时
+    let cancelSentAt = 0
+    const cancelTimer = cancelAfterMs > 0 ? setTimeout(() => { cancelSentAt = Date.now(); this.http('POST', `/api/agent/cancel/${conversationId}`).catch(() => {}) }, cancelAfterMs) : null
     await done
+    if (cancelTimer) clearTimeout(cancelTimer)
+    const cancelLatencyMs = cancelSentAt ? Date.now() - cancelSentAt : null
     if (status === 'timeout') await this.http('POST', `/api/agent/cancel/${conversationId}`)
     ac.abort()
-    return { status, error, conversationId, events, text: text_, durationMs: Date.now() - t0, logOffset, ask }
+    return { status, error, conversationId, events, text: text_, durationMs: Date.now() - t0, logOffset, ask, cancelLatencyMs }
   }
 }
 
@@ -714,9 +733,11 @@ async function runOne(inst, sentence, runIdx, opts) {
   try {
     await inst.reset()
     const pid = await inst.seed(needsEditor(sentence) ? withHostFile(sentence) : sentence)
+    if (sentence.fault && opts.proxy) opts.proxy.faults.push({ ...sentence.fault })
     let c = needsEditor(sentence)
       ? await inst.chatInEditor(opts.browser, pid, sentence, hostFileName(sentence), opts.runTimeout)
-      : await inst.chat(pid, sentence.text, opts.runTimeout)
+      : await inst.chat(pid, sentence.text, opts.runTimeout, undefined, { cancelAfterMs: sentence.cancelAfterMs || 0 })
+    const firstTurn = { status: c.status, error: c.error, cancelLatencyMs: c.cancelLatencyMs ?? null }
     // followUps（仅 API 句）：本轮以 whenStatus 结束时，在同一会话里发下一条脚本化的用户消息，每条最多用一次、按顺序。
     // 上一轮停在 ask_user 卡（确认卡/反问卡）时按卡片回答（Selected: - <text>），否则作为普通消息发出。
     let turns = 1
@@ -724,7 +745,7 @@ async function runOne(inst, sentence, runIdx, opts) {
       if (c.status !== f.whenStatus) continue
       const next = await inst.chat(pid, followUpMessage(f.text, c.ask), opts.runTimeout, c.conversationId)
       turns++
-      c = { ...next, logOffset: c.logOffset, events: [...c.events, ...next.events], durationMs: c.durationMs + next.durationMs }
+      c = { ...next, logOffset: c.logOffset, events: [...c.events, ...next.events], durationMs: c.durationMs + next.durationMs, cancelLatencyMs: c.cancelLatencyMs }
     }
     await sleep(300) // 让日志/用量落盘（落盘延迟，不是等模型）
     const fd = fs.openSync(inst.logFile, 'r'); const size = fs.fstatSync(fd).size
@@ -744,10 +765,10 @@ async function runOne(inst, sentence, runIdx, opts) {
       todoWrites: tools.filter(t => t === 'todo_write').length, askUser: tools.includes('ask_user'),
       lookAround: isLookAround(tools[0], sentence.expect.firstToolAnyOf),
       toolSetChanges: countChanges(rounds.map(r => r.toolsHash)), toolOrderChanges: countChanges(rounds.map(r => r.toolsOrderHash)),
-      durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, pageText: c.pageText, finalText: c.text || '', events: summarizeEvents(c.events || []), conversationId: c.conversationId,
+      durationMs: c.durationMs, editorReadyMs: c.editorReadyMs, firstTurn, pageText: c.pageText, finalText: c.text || '', events: summarizeEvents(c.events || []), conversationId: c.conversationId,
     })
     const ctx = {
-      projectId: pid, tools, calls, finalText: c.text || '', api: (m, u, b) => inst.http(m, u, b), sql: q => inst.sql(q), rows: q => inst.rows(q),
+      projectId: pid, tools, calls, finalText: c.text || '', firstTurn, status: c.status, error: c.error || '', eventsRaw: c.events || [], api: (m, u, b) => inst.http(m, u, b), sql: q => inst.sql(q), rows: q => inst.rows(q),
       files: () => inst.rows(`select id, name, parent_id, is_folder, is_deleted from project_file where project_id=${pid} order by id`),
       tasks: () => inst.rows(`select id, title, due_date, source from project_task where project_id=${pid} order by id`),
       memory: () => inst.rows('select memory_type, memory_key, memory_value, scope from memory_entry'),
@@ -1086,7 +1107,7 @@ async function main() {
     const needFrontend = sentences.some(runsEditor)
     const [pgRes, ...built] = await Promise.all([startPg(tmp), ...refs.map(r => buildRef(r, tmp, java, o, needFrontend))])
     pg = pgRes; builds = built
-    if (o.route === 'bailian') { proxy = await startBailianProxy(); log(`百炼转发口 ${proxy.baseUrl}（上游 ${process.env.BAILIAN_BASE_URL}）`) }
+    if (o.route === 'bailian') { proxy = await startBailianProxy(); o.proxy = proxy; log(`百炼转发口 ${proxy.baseUrl}（上游 ${process.env.BAILIAN_BASE_URL}）`) }
     const byRef = Object.fromEntries(built.map(b => [b.ref, b]))
     const sides = []
     for (const side of ['before', 'after']) for (const model of o.models) sides.push({ side, model, build: byRef[o[side]] })
@@ -1119,7 +1140,7 @@ async function main() {
           for (let a = 0; ; a++) {
             rec = await runOne(inst, s, r, o)
             rec.infraRetries = a
-            if (a >= INFRA_RETRIES || !isInfraFailure(rec)) break
+            if (a >= INFRA_RETRIES || !isInfraFailure(rec) || s.fault) break
             log(`${inst.label} ${s.id} #${r}: 供应商瞬时故障（${rec.status}），重跑 ${a + 1}/${INFRA_RETRIES}`)
           }
         }

@@ -17,4 +17,5 @@ regexes = [
   '''^SYNTHETIC_PRIVATE_MATERIAL_042$''',     # WritingModelTransportTest
   '''^9f2c1d4e5a6b7c8d$''',                   # TeamUsageUploadServiceTest 项目匿名键
   '''^awdk_harness_e2e_fixture_key$''',       # harness-self-evolving-e2e
+  '''^0b6c2f1e-1111-4222-8333-944455556666$''', # agent-run-control 本轮 runId
 ]

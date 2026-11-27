@@ -1449,7 +1449,7 @@ export default {
       return !!(this.permissionsState && this.permissionsState.supported)
     },
     permissionDisplayRows() {
-      const normalized = normalizePermissionItems(this.permissionsState && this.permissionsState.items)
+      const normalized = normalizePermissionItems(this.permissionsState && this.permissionsState.items, { wechat: this.isCnSite })
       const metaById = {
         fullDiskAccess: {
           title: this.$t('admin.permFullDiskAccessTitle'),
@@ -1719,9 +1719,9 @@ export default {
     // 充值成功 / SKU 购买成功（awd:wallet-refresh）后刷新「账户与用量」分区：
     // 余额、会员进度、权益、存储位置的 entitled 都可能变了。mounted 挂、
     // beforeUnmount 必须按引用 $off（工作台标签可以反复开关，不摘会累积订阅）
-    this._onWalletRefresh = () => {
+    this._onWalletRefresh = (payload) => {
       if (this.activeNav !== 'account') return
-      this.loadWallet()
+      this.loadWallet(!!(payload && payload.fresh))
       if (this.account.connected) {
         this.loadAccountUsage()
         this.loadStorageLocation()
@@ -2677,9 +2677,9 @@ export default {
         await this.loadAccountUsage()
       }
     },
-    async loadWallet() {
+    async loadWallet(fresh = false) {
       try {
-        const b = await getAccountBalance()
+        const b = await getAccountBalance({ fresh })
         if (b && b.connected) {
           this.walletData = {
             loaded: true,

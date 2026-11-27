@@ -56,21 +56,34 @@ public final class PlatformAiUserScope {
     /** 捕获当前身份，供跨线程提交时重放。 */
     public static Runnable wrap(Runnable task) {
         Long captured = CURRENT.get();
-        return () -> run(captured, task);
+        String turn = PlatformTurnScope.current();   // Q24：本轮计费标记随身份一起跨线程
+        return () -> run(captured, () -> PlatformTurnScope.run(turn, task));
     }
 
     /** 捕获当前身份，供跨线程提交时重放（有返回值版本）。 */
     public static <T> Callable<T> wrap(Callable<T> task) {
         Long captured = CURRENT.get();
+        String turn = PlatformTurnScope.current();   // Q24：本轮计费标记随身份一起跨线程
         return () -> {
             Long previous = CURRENT.get();
             set(captured);
             try {
-                return task.call();
+                return PlatformTurnScope.call(turn, () -> {
+                    try { return task.call(); }
+                    catch (RuntimeException e) { throw e; }
+                    catch (Exception e) { throw new WrappedCheckedException(e); }
+                });
+            } catch (WrappedCheckedException e) {
+                throw e.checked;
             } finally {
                 set(previous);
             }
         };
+    }
+
+    private static final class WrappedCheckedException extends RuntimeException {
+        final Exception checked;
+        WrappedCheckedException(Exception checked) { super(null, null, false, false); this.checked = checked; }
     }
 
     private static void set(Long userId) {

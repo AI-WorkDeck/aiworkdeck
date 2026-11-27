@@ -85,6 +85,15 @@ public class AgentOrchestrator {
     java.time.Duration attachmentPreparationTimeout = java.time.Duration.ofSeconds(120);
     java.time.Duration attachmentReadTimeout = java.time.Duration.ofSeconds(180);
 
+    /**
+     * 轮次回调的统一入口：试用计量（TrialTurnScope）+ 本轮计费标记（Q24，PlatformTurnScope），
+     * 让这一轮里的辅助平台调用（标题、压缩、附件识读……）也算进页脚的「本轮 ¥」。
+     */
+    private void runInTurn(RunGuard guard, Runnable body) {
+        String tag = installIdentity == null ? null : installIdentity.turnTag(guard.conversationId, guard.runId);
+        com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> PlatformTurnScope.run(tag, body));
+    }
+
     private <T> T boundedAttachmentRead(RunGuard guard, java.util.function.Supplier<T> read,
                                       java.time.Duration timeout) {
         String language = guard.originalRequest != null && guard.originalRequest.getAppLanguage() != null
@@ -94,7 +103,7 @@ public class AgentOrchestrator {
                 () -> PlatformAiUserScope.call(scopedUser, () -> {
                     java.util.concurrent.atomic.AtomicReference<T> result = new java.util.concurrent.atomic.AtomicReference<>();
                     try {
-                        com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> result.set(read.get()));
+                        runInTurn(guard, () -> result.set(read.get()));
                         return result.get();
                     } finally {
                         com.checkba.service.ai.context.ProjectContextHolder.clear();
@@ -195,6 +204,8 @@ public class AgentOrchestrator {
         final long connectionEpoch;
         /** 本轮已流出的正文（断线重连恢复快照 / 取消与出错时保存半截内容）。 */
         private final StringBuilder streamContent = new StringBuilder();
+        /** X39：续写时被续上的那条回答的干净正文（去掉中断标记），作为本轮落库内容的前缀。 */
+        String continuationPrefix;
         /** D34：最近一次工具调用是否失败（伪工具 final 无正文时据此决定重试还是收尾）。 */
         volatile boolean lastToolFailed;
         /** D34：本轮是否已为「失败后空 final」补过一次「请回复用户」的提醒（每轮至多一次）。 */
@@ -576,6 +587,9 @@ public class AgentOrchestrator {
     private volatile AgentInboxService inboxService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private ClientCapabilityService clientCapabilities;
+    /** Q24：本轮计费标记的盐（本机 install-secret）；手工装配的测试里为 null，不带标记。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.telemetry.InstallIdentityService installIdentity;
 
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.ProjectMemberService projectMemberService;
@@ -840,6 +854,7 @@ public class AgentOrchestrator {
      * 本轮内后续（增量/最终）保存更新同一行；别的轮次有别的 RunGuard，天然互不覆盖。
      */
     private void saveAssistantMessage(RunGuard guard, String projectId, Long userId, String content) {
+        content = joinContinuation(guard.continuationPrefix, content);
         synchronized (guard) {
             String reasoning = guard.trace.reasoningJson();
             Long id = reasoning == null
@@ -2277,7 +2292,7 @@ public class AgentOrchestrator {
             sendRunEvent(guard, "run_state", "{\"status\":\"RUNNING\"}");
             sendRunEvent(guard, "state_recovery", guard.trace.recoveryPayload(guard.streamSnapshot()));
             Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
-                    () -> PlatformAiUserScope.run(userId, () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                    () -> PlatformAiUserScope.run(userId, () -> runInTurn(guard, () -> {
                         try {
                             requireInboxExecutionAccess(conversationId, row.getId(), userId);
                             if (!restartAccountMatches(cp)) throw new SecurityException("Account changed during restart");
@@ -2539,7 +2554,7 @@ public class AgentOrchestrator {
         guard.trialAccountFingerprint = trialTurnMeter == null ? null : trialTurnMeter.accountFingerprint();
         Runnable turn = () -> com.checkba.service.AppLanguageScope.run(request.getAppLanguage(),
                 () -> PlatformAiUserScope.run(userId,
-                        () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed,
+                        () -> runInTurn(guard,
                                 () -> handleUserMessageInScope(request, userId, guard))));
         java.util.concurrent.Executor executor = this.turnExecutor;
         if (executor == null) {
@@ -2632,7 +2647,12 @@ public class AgentOrchestrator {
             // clientRequestId 是本条 USER 行的回退定位键：主键在这一行执行完才存在，而
             // POST /api/agent/chat 的回执早在控制器线程上就发走了，带不上主键（K1 / 审查 D-02）。
             // 返回的行 id 是附件关联的挂载点（K14 ④）——两件事都要，缺一个就各丢一半。
-            Long userMessageId = messageService.saveMessage(
+            // X39：续写上一条中途断开的回答——不落用户行（历史里不出现「继续」这句），
+            // 回答追加到同一行；本轮的提示词换成固定的续写指令（含已执行的写操作清单）。
+            if (request.isContinueTurn()) {
+                request.setMessage(prepareContinuation(guard, projectId, userId, conversationId));
+            }
+            Long userMessageId = request.isContinueTurn() ? null : messageService.saveMessage(
                 projectId, userId, conversationId, "USER", request.getMessage(), request.getDisplayText(),
                 request.getClientRequestId()
             );
@@ -2769,7 +2789,8 @@ public class AgentOrchestrator {
                         userId, effectiveModelId, ledger), attachmentPreparationTimeout);
             } finally {
                 // Retain every original attachment even if preparation times out or is cancelled.
-                ledger.persistTo(userMessageId);
+                // X39 continuation has no user row of its own (nothing new attached).
+                if (userMessageId != null) ledger.persistTo(userMessageId);
             }
             requireAttachmentTools(ledger, effectiveModelId);
 
@@ -2801,7 +2822,7 @@ public class AgentOrchestrator {
             // 4. Start Loop
             log.info("Starting runLoop for conversation: {}, mode: {}", conversationId, agentMode);
             // Track tool executions for history persistence
-            StringBuilder executionLog = new StringBuilder();
+            StringBuilder executionLog = new StringBuilder(guard.continuationPrefix == null ? "" : guard.continuationPrefix);
             // 记录活跃文档 ID（修改前自动检查点的目标）；每轮一个独立检查点
             documentCheckpointService.clearForNewRun(conversationId);
             // 本轮的整段插入去重闸也一并重置（dev-board#464）——闸只在一轮内有效
@@ -2943,6 +2964,9 @@ public class AgentOrchestrator {
         // 取消之后 onNext 还会被回调几次。闸不加在 handler 上的话，这几段会继续打进用户的气泡、
         // 继续进恢复快照、继续往文档里流式写——用户点了停止，画面却还在动。
         handler.setCancellationCheck(guard::isCancelled);
+        // Q24：平台通道请求带本轮计费标记；runId 随 token_usage 给前端，用来查这一轮的实扣金额
+        handler.setRunId(guard.runId);
+        if (installIdentity != null) handler.setTurnTag(installIdentity.turnTag(conversationId, guard.runId));
 
         // 实时更新当前生成的内容 (用于断线重连恢复)
         if (!summaryOnly) handler.setOnToken(guard::appendStream);
@@ -2981,7 +3005,7 @@ public class AgentOrchestrator {
         // 释放 OkHttp Dispatcher 的 maxRequestsPerHost 并发槽位，避免阻塞型工具（编辑器桥最长 180s、
         // dispatch_subtask 630s）与多轮递归长期占死全局 LLM 并发槽。
         handler.setOnComplete(response -> dispatchContinuation(() -> PlatformAiUserScope.run(userId,
-                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                () -> runInTurn(guard, () -> {
           try {
             // 埋点 ai.turn 的 promptTokensFirstRound（dev-board#729 ⑥）：首轮 prompt 有多大，
             // 是判断「工具 schema / 固定前缀是否过肥」的唯一在线证据（本机实测约 5 万，其中 2/3 是工具）。
@@ -3816,10 +3840,14 @@ public class AgentOrchestrator {
                 saveAssistantMessage(guard, projectId, userId, fullContent);
             }
             // 触发记忆写入管线（异步：对话摘要 / 项目记忆 / MemCell 原子记忆提取）
+            String memoryTurnTag = PlatformTurnScope.current();
             try {
+                // Q24：摘要在后台跑完之前，这一轮的费用查询回 pending，页脚不先给一个偏少的数
+                PlatformTurnScope.beginWork(memoryTurnTag);
                 memoryPipelineService.onConversationTurnCompleted(
-                        conversationId, projectId, userId, new java.util.ArrayList<>(messages));
+                        conversationId, projectId, userId, new java.util.ArrayList<>(messages), memoryTurnTag);
             } catch (Exception memEx) {
+                PlatformTurnScope.endWork(memoryTurnTag);
                 log.warn("Failed to trigger memory pipeline for {}", conversationId, memEx);
             }
             // 版本记录：AI 轮次真正结束后落一笔 AI 署名存档（失败绝不阻断）。
@@ -3867,7 +3895,7 @@ public class AgentOrchestrator {
         // 3. 其余 → 终态清理（关 emitter + 复位状态，避免 SSE 挂到超时、前端永久加载）
         // 同 onComplete：错误回调也在 HTTP 线程上，换模型要取平台密钥，身份必须重建
         handler.setOnError(err -> PlatformAiUserScope.run(userId,
-                () -> com.checkba.service.trial.TrialTurnScope.run(guard.platformUsed, () -> {
+                () -> runInTurn(guard, () -> {
           try {
             if (guard.isCancelled()) {
                 // 我们自己掐断在途请求换来的那个 IOException 不是故障（计划 K4 ①）：
@@ -5025,6 +5053,94 @@ public class AgentOrchestrator {
         if (aiMessage == null) return true;
         return !aiMessage.hasToolExecutionRequests()
                 && (aiMessage.text() == null || aiMessage.text().isBlank());
+    }
+
+    // ==================== X39：接着写中途断开的回答 ====================
+
+    /** finishWithError 落库时追加的中断标记（两种语言）。 */
+    static final java.util.List<String> INTERRUPTED_MARKERS = java.util.List.of("[生成出错，已中断]", "[Generation error, interrupted]");
+
+    /** 会话最后一行是不是一条中途断开的回答（只有它能续写）。 */
+    public boolean canContinue(String conversationId) {
+        return lastInterruptedAnswer(conversationId).isPresent();
+    }
+
+    private java.util.Optional<com.checkba.repository.ProjectAiMessageRepository.HistoryLine> lastInterruptedAnswer(String conversationId) {
+        var rows = messageService.listHistoryForAssembly(conversationId);
+        if (rows == null || rows.isEmpty()) return java.util.Optional.empty();
+        var last = rows.get(rows.size() - 1);
+        if (!"ASSISTANT".equals(last.role()) || last.content() == null) return java.util.Optional.empty();
+        return stripInterruptedMarker(last.content()) == null ? java.util.Optional.empty() : java.util.Optional.of(last);
+    }
+
+    /** 去掉末尾的中断标记；没有标记返回 null。 */
+    static String stripInterruptedMarker(String content) {
+        if (content == null) return null;
+        String c = content.stripTrailing();
+        for (String m : INTERRUPTED_MARKERS) {
+            if (c.endsWith(m)) return c.substring(0, c.length() - m.length()).stripTrailing();
+        }
+        return null;
+    }
+
+    /**
+     * 续写准备：确认最后一行是中途断开的回答，去掉中断标记（历史与模型看到的都是干净正文），
+     * 让本轮写回同一行（assistantMessageId + 已有正文打底），返回本轮的续写指令。
+     */
+    String prepareContinuation(RunGuard guard, String projectId, Long userId, String conversationId) {
+        var row = lastInterruptedAnswer(conversationId).orElseThrow(() -> new IllegalStateException(LangText.of(
+                "这条回答不能接着写：它不是最近一条中途断开的回答", "This answer cannot be continued: it is not the latest cut-off answer")));
+        String clean = stripInterruptedMarker(row.content());
+        messageService.upsertAssistantMessage(projectId, userId, conversationId, row.id(), clean);
+        guard.assistantMessageId = row.id();
+        // 落库口径是「executionLog + 本轮内容」：把已有正文放进 executionLog 打底，
+        // 本轮新写的字（以及新的工具过程）就追加在它后面，整条仍是一个回答
+        guard.continuationPrefix = clean;
+        return continuationInstruction(appliedWrites(clean));
+    }
+
+    /**
+     * 续写落库的接缝：前缀停在一个没闭合的 &lt;final&gt; 里（断在一句话中间）、续写又以 &lt;final&gt; 开头时，
+     * 去掉续写那个开标签——历史回放走同一个解析器，多出的开标签会在断点处另起一段。
+     */
+    static String joinContinuation(String prefix, String content) {
+        if (prefix == null || content == null || !content.startsWith(prefix)) return content;
+        String tail = content.substring(prefix.length());
+        int open = prefix.lastIndexOf("<final>");
+        boolean unclosed = open >= 0 && prefix.indexOf("</final>", open) < 0;
+        String lead = tail.stripLeading();
+        if (unclosed && lead.startsWith("<final>")) return prefix + lead.substring("<final>".length());
+        return content;
+    }
+
+    /** 中断前已经成功执行的写类工具调用（从已落库的过程记录里取），续写时不得重做。 */
+    static java.util.List<String> appliedWrites(String content) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        if (content == null) return out;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "<tool_code>\\s*([a-zA-Z_0-9]+)\\((.*?)\\)\\s*</tool_code>\\s*</process>\\s*<tool_output status=\"SUCCESS\"",
+                java.util.regex.Pattern.DOTALL).matcher(content);
+        while (m.find()) {
+            String name = m.group(1);
+            if (!ClientCapabilityService.isDocumentWritingTool(name) && !WRITE_TOOL_HINT.matcher(name).find()) continue;
+            String args = m.group(2).replaceAll("\\s+", " ").trim();
+            out.add(name + "(" + (args.length() > 160 ? args.substring(0, 160) + "…" : args) + ")");
+        }
+        return out;
+    }
+
+    private static final java.util.regex.Pattern WRITE_TOOL_HINT = java.util.regex.Pattern.compile(
+            "^(write|create|move|delete|rename|copy|insert|replace|add|apply|accept|reject|set|update|save|export|generate)_|_(write|create|insert|replace|add|apply|update|delete)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    static String continuationInstruction(java.util.List<String> appliedWrites) {
+        StringBuilder zh = new StringBuilder("你上一条回答在上文末尾被截断。请从断开处直接接着写，不要重复、不要总结已写内容，也不要从头开始。");
+        StringBuilder en = new StringBuilder("Your previous answer was cut off at the end of the text above. Continue exactly from where it stopped. Do not repeat or summarize what is already written, and do not restart.");
+        if (appliedWrites != null && !appliedWrites.isEmpty()) {
+            zh.append("\n以下操作在截断前已经执行完成，不要再次执行：");
+            en.append("\nThese actions were already applied before the cut; do not apply them again:");
+            for (String w : appliedWrites) { zh.append("\n- ").append(w); en.append("\n- ").append(w); }
+        }
+        return LangText.of(zh.toString(), en.toString());
     }
 
     /** 伪工具 final 参数里的答复正文：常见键（answer/content/text/…）或参数本身就是字符串；取不到返回空串。 */
