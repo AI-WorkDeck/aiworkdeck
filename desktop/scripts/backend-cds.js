@@ -204,6 +204,10 @@ async function buildBackendCds(resourcesDir, { log = console.log } = {}) {
             '-XX:SharedArchiveFile=' + archive, '-cp', path.join(libDir, '*')],
         { stdio: ['ignore', 'ignore', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
         if (!fs.existsSync(archive)) throw new Error('java -Xshare:dump produced no archive');
+        // The JVM writes the archive 0444. Mac signing then fails on it ("Permission denied" from
+        // codesign, run 45929621427), and Squirrel.Mac can't clear quarantine on read-only files
+        // (dev-board#1368, same as jre/legal in after-pack.js).
+        fs.chmodSync(archive, 0o644);
 
         const loadLog = path.join(work, 'class-load.log');
         const cachedSec = await runBackendOnce({ java, resourcesDir, home: home('verify-home'),
