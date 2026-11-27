@@ -40,7 +40,7 @@ export default {
     "compatUse": "Il controllo di sicurezza non si carica? Usa la verifica di compatibilità",
     "compatRefresh": "Carica una nuova immagine di verifica",
     "compatLoading": "Caricamento immagine di verifica",
-    "compatHint": "Inserisci i caratteri dell'immagine, quindi richiedi il codice SMS o e-mail. Carica una nuova immagine dopo un tentativo errato o scaduto.",
+    "compatHint": "Inserisci i caratteri dell'immagine, quindi richiedi il codice SMS o e-mail. Carica una nuova immagine dopo un tentativo errato o scaduto.", "compatHintEmail": "Inserisci i caratteri dell’immagine, poi richiedi il codice via email. Carica una nuova immagine dopo un tentativo errato o scaduto.",
     "compatImage": "Immagine di verifica di sicurezza",
     "compatAnswer": "6 caratteri dall'immagine",
     "compatAnswerFirst": "Carica prima un'immagine di verifica e inserisci i suoi 6 caratteri",

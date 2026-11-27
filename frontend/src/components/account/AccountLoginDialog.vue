@@ -172,7 +172,7 @@
           </div>
           <div v-if="authFlow === 'register' || authFlow === 'reset'" class="unlock-compat-verification">
             <component :is="'button'" type="button" class="unlock-link unlock-auth-link" :disabled="submitBusy || sendingCode" @click="loadCompatChallenge">{{ $t(compatLoading ? 'onboarding.unlock.compatLoading' : compatVerification ? 'onboarding.unlock.compatRefresh' : 'onboarding.unlock.compatUse') }}</component>
-            <div v-if="compatVerification" class="unlock-desc">{{ $t('onboarding.unlock.compatHint') }}</div>
+            <div v-if="compatVerification" class="unlock-desc">{{ $t(isPhoneSite ? 'onboarding.unlock.compatHint' : 'onboarding.unlock.compatHintEmail') }}</div>
             <template v-if="compatChallenge">
               <img :src="compatChallenge.image" width="210" height="70" :alt="$t('onboarding.unlock.compatImage')" />
               <div class="unlock-field-box"><component :is="'input'" class="unlock-field" type="text" maxlength="6" autocomplete="off" :value="compatAnswer" :placeholder="$t('onboarding.unlock.compatAnswer')" :aria-label="$t('onboarding.unlock.compatAnswer')" :disabled="sendingCode" @input="compatAnswer = $event.target.value" /></div>

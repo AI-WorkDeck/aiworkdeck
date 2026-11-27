@@ -40,7 +40,7 @@ export default {
     "compatUse": "Semakan keselamatan tidak dimuatkan? Gunakan pengesahan keserasian",
     "compatRefresh": "Muatkan imej pengesahan baharu",
     "compatLoading": "Sedang memuatkan imej pengesahan",
-    "compatHint": "Masukkan aksara imej, kemudian minta kod SMS atau e-mel anda. Muatkan imej baharu selepas percubaan yang salah atau tamat tempoh.",
+    "compatHint": "Masukkan aksara imej, kemudian minta kod SMS atau e-mel anda. Muatkan imej baharu selepas percubaan yang salah atau tamat tempoh.", "compatHintEmail": "Masukkan aksara daripada imej, kemudian minta kod e-mel anda. Muatkan imej baharu selepas cubaan yang salah atau tamat tempoh.",
     "compatImage": "Imej pengesahan keselamatan",
     "compatAnswer": "6 aksara daripada imej",
     "compatAnswerFirst": "Muatkan imej pengesahan dan masukkan 6 aksaranya dahulu",

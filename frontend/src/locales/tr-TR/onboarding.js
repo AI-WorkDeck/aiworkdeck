@@ -40,7 +40,7 @@ export default {
     "compatUse": "Güvenlik kontrolü yüklenmiyor mu? Uyumluluk doğrulamasını kullanın",
     "compatRefresh": "Yeni bir doğrulama görseli yükle",
     "compatLoading": "Doğrulama görseli yükleniyor",
-    "compatHint": "Görseldeki karakterleri girin, ardından SMS veya e-posta kodunuzu isteyin. Hatalı veya süresi dolmuş bir denemeden sonra yeni bir görsel yükleyin.",
+    "compatHint": "Görseldeki karakterleri girin, ardından SMS veya e-posta kodunuzu isteyin. Hatalı veya süresi dolmuş bir denemeden sonra yeni bir görsel yükleyin.", "compatHintEmail": "Görseldeki karakterleri girin, ardından e-posta kodunuzu isteyin. Hatalı veya süresi dolmuş bir denemeden sonra yeni görsel yükleyin.",
     "compatImage": "Güvenlik doğrulama görseli",
     "compatAnswer": "Görseldeki 6 karakter",
     "compatAnswerFirst": "Önce bir doğrulama görseli yükleyin ve 6 karakterini girin",

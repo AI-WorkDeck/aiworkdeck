@@ -40,7 +40,7 @@ export default {
     "compatUse": "Sicherheitsprüfung lädt nicht? Kompatibilitätsprüfung verwenden",
     "compatRefresh": "Neues Prüfbild laden",
     "compatLoading": "Prüfbild wird geladen",
-    "compatHint": "Geben Sie die Zeichen aus dem Bild ein und fordern Sie dann Ihren SMS- oder E-Mail-Code an. Laden Sie nach einem falschen oder abgelaufenen Versuch ein neues Bild.",
+    "compatHint": "Geben Sie die Zeichen aus dem Bild ein und fordern Sie dann Ihren SMS- oder E-Mail-Code an. Laden Sie nach einem falschen oder abgelaufenen Versuch ein neues Bild.", "compatHintEmail": "Geben Sie die Zeichen aus dem Bild ein und fordern Sie dann Ihren E-Mail-Code an. Laden Sie nach einer falschen oder abgelaufenen Eingabe ein neues Bild.",
     "compatImage": "Sicherheitsprüfungsbild",
     "compatAnswer": "6 Zeichen aus dem Bild",
     "compatAnswerFirst": "Laden Sie zuerst ein Prüfbild und geben Sie dessen 6 Zeichen ein",

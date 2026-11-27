@@ -40,7 +40,7 @@ export default {
     "compatUse": "Laadt de veiligheidscontrole niet? Gebruik compatibiliteitsverificatie",
     "compatRefresh": "Nieuwe verificatieafbeelding laden",
     "compatLoading": "Verificatieafbeelding laden",
-    "compatHint": "Voer de tekens uit de afbeelding in en vraag vervolgens uw sms- of e-mailcode aan. Laad een nieuwe afbeelding na een onjuiste of verlopen poging.",
+    "compatHint": "Voer de tekens uit de afbeelding in en vraag vervolgens uw sms- of e-mailcode aan. Laad een nieuwe afbeelding na een onjuiste of verlopen poging.", "compatHintEmail": "Voer de tekens uit de afbeelding in en vraag daarna uw e-mailcode aan. Laad een nieuwe afbeelding na een onjuiste of verlopen poging.",
     "compatImage": "Afbeelding voor veiligheidsverificatie",
     "compatAnswer": "6 tekens uit de afbeelding",
     "compatAnswerFirst": "Laad eerst een verificatieafbeelding en voer de 6 tekens ervan in",
