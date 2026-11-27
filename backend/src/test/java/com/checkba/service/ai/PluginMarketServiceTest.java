@@ -113,6 +113,22 @@ class PluginMarketServiceTest {
         assertTrue(e.getMessage().contains("插件广场"), e.getMessage());
     }
 
+    @Test void freshInstallWithoutASiteChoiceNeverContactsTheRegistry(@org.junit.jupiter.api.io.TempDir java.nio.file.Path home) {
+        var account = mock(AccountService.class);
+        var scopedGate = new MarketPurchaseGate(account, mock(EntitlementService.class));
+        var fresh = new com.checkba.service.site.SiteProfileService(true, "https://www.aiworkdeck.com", "",
+                home.toString(), new com.checkba.service.site.SiteProperties());
+        org.springframework.test.util.ReflectionTestUtils.setField(scopedGate, "sites", fresh);
+        var calls = new java.util.ArrayList<String>();
+        var service = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, scopedGate) {
+            @Override protected String httpGet(String url) { calls.add(url); return "[]"; }
+        };
+        assertEquals(java.util.List.of(), service.listMarket());
+        assertThrows(IllegalStateException.class, service::fetchRevoked);
+        assertEquals(java.util.List.of(), calls, "no registry request before a site is chosen");
+    }
+
     @Test void lateRevocationResponseIsRejectedAfterSiteSwitch() {
         var account = mock(AccountService.class);
         var snapshot = new AccountService.ConnectionSnapshot("https://www.workdeck.ai", "test-key", "test", 2L);

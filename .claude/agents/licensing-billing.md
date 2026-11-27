@@ -411,10 +411,16 @@ identitySync、平台Key申请或令牌签发。完成 setup 后再单独 exchan
 - `service/site/SiteProfileService.java` — 站点的**唯一解析出口**：`currentSite/profile/baseUrl/
   displayName/availableSites/multiSite/otherSites/isPinned`。`pinnedTo(baseUrl)` 是单测与
   「站点无关」场景的构造入口。
-- `service/site/SiteEnvironmentPostProcessor.java` + `resources/META-INF/spring/
-  org.springframework.boot.env.EnvironmentPostProcessor.imports` — 启动期按 `site.json`
-  改写四个属性（`ai.account.base-url`、`ai.plugins.registry-url`、`ai.skills.registry-url`、
-  `telemetry.ingest-url`）。**在属性层解析，是为了让 `service/ai/` 下的三个消费方一行都不用改。**
+- `service/site/SiteEnvironmentPostProcessor.java` + `resources/META-INF/spring.factories`
+  （**必须是 spring.factories**：Spring Boot 3.x 只从这里发现 EnvironmentPostProcessor；
+  0.91.0 之前登记在不起作用的 `.imports` 文件里，处理器从没在真实应用里跑过，国际站用户每次
+  重启都回到国内站。`SiteEnvironmentPostProcessorRegistrationTest` 守着）— 启动期按 `site.json`
+  改写属性（`ai.account.base-url`、`ai.plugins.registry-url`、`ai.skills.registry-url`、
+  `telemetry.ingest-url`，0.91.0 起还有 `ai.packs.revoked-url` 与 `ai.packs.base-urls`）。
+  没有 site.json、但本机已有数据库的老安装记为 `ai.account.legacy-install`（只判定、不写盘）；
+  全新安装 `SiteProfileService.siteChosen()` 为 false，此时不发任何站点相关请求（插件/Skill 广场、
+  封禁表、组件包、匿名统计；桌面壳的更新检查同理）。被另一个站点拒绝（401/403）不清账户权益：
+  `AccountService.keyBelongsToCurrentSite()`（account.json 记 Key 的站点）。**在属性层解析，是为了让 `service/ai/` 下的三个消费方一行都不用改。**
   属性源插在 `systemEnvironment` 之后：压过 application.yml，输给环境变量（本地联调靠这条）。
 - `service/site/SiteStateFile.java` — `~/.aiworkdeck/site.json`，**刻意不依赖 Spring 与 Jackson**
   （要在容器起来之前读一次）。站点是**机器级**状态，与 license/account 同目录同规格；

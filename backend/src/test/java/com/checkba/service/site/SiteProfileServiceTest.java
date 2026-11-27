@@ -182,4 +182,14 @@ class SiteProfileServiceTest {
         assertTrue(svc.multiSite());
         assertEquals(List.of("cn", "intl"), svc.availableSites().stream().map(SiteProfile::id).toList());
     }
+
+    @Test
+    @DisplayName("0.91.0：全新安装没选站 → siteChosen=false；写了 site.json、老安装、被钉住 → true")
+    void siteChosenOnlyFalseForAFreshInstall() throws Exception {
+        assertFalse(service(true, CN, "", true).siteChosen(), "fresh install, no site.json");
+        assertTrue(new SiteProfileService(true, CN, "", tempDir.toString(), props(true), true).siteChosen(), "legacy install");
+        assertTrue(service(false, CN, "", true).siteChosen(), "server mode is a deployment decision");
+        SiteStateFile.write(tempDir, new SiteStateFile.State("intl", "2026-11-26T00:00:00Z", "user"));
+        assertTrue(service(true, INTL, "intl", true).siteChosen(), "site.json written by the picker");
+    }
 }

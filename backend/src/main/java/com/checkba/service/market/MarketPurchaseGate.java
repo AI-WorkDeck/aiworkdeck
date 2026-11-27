@@ -36,6 +36,11 @@ public class MarketPurchaseGate {
     @org.springframework.beans.factory.annotation.Autowired
     private com.checkba.service.site.SiteProfileService sites;
 
+    /** 0.91.0：全新安装还没选站之前，不去任何站点的注册表拉列表或封禁表。 */
+    public boolean siteChosen() {
+        return sites == null || sites.siteChosen();
+    }
+
     public String registryUrl(String configured, String kind) {
         if (sites == null) return configured;
         for (String host : java.util.List.of("www.aiworkdeck.com", "aiworkdeck.com", "www.workdeck.ai", "workdeck.ai")) {

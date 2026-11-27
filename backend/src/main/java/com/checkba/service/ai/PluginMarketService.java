@@ -158,6 +158,7 @@ public class PluginMarketService {
      * @throws IllegalStateException 注册表不可达或返回无法解析（调用方转 {code:1}，不阻断本地功能）
      */
     public List<MarketPluginView> listMarket() {
+        if (!purchaseGate.siteChosen()) return new ArrayList<>();   // 没选站前不连任何站点
         var connection = purchaseGate.connectionSnapshot();
         String body = httpGet(currentRegistryUrl());
         purchaseGate.assertConnection(connection);
@@ -463,6 +464,7 @@ public class PluginMarketService {
      * @throws IllegalStateException 注册表不可达（调用方应容忍，不影响本地功能）
      */
     public List<RevokedPlugin> fetchRevoked() {
+        if (!purchaseGate.siteChosen()) throw new IllegalStateException("site not chosen yet");   // 调用方容忍，不清空已知封禁
         var connection = purchaseGate.connectionSnapshot();
         String body = httpGet(currentRegistryUrl() + "/revoked");
         List<RevokedPlugin> result = new ArrayList<>();

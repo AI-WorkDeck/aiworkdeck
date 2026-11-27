@@ -56,6 +56,7 @@ class TelemetryUploadServiceTest {
     @Test
     void siteSwitchPausesUploadsWithoutDiscardingPendingDataAndSwitchBackResumes() {
         var sites = mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.siteChosen()).thenReturn(true);
         when(sites.currentSite()).thenReturn("cn");
         when(settings.rollupEnabled()).thenReturn(true);
         var pending = new TelemetryDailyRollup();
@@ -81,6 +82,7 @@ class TelemetryUploadServiceTest {
     @Test
     void siteSwitchDuringBatchStopsRemainingUploads() {
         var sites = mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.siteChosen()).thenReturn(true);
         when(sites.currentSite()).thenReturn("cn");
         when(settings.rollupEnabled()).thenReturn(true);
         when(settings.eventsEnabled()).thenReturn(true);
@@ -138,5 +140,23 @@ class TelemetryUploadServiceTest {
 
         // 30 天窗口（与 uploadPendingRollups 的补传窗口口径一致）：昨天 + 更早 29 天 = 30 次
         verify(rollupService, times(30)).rollupFor(any());
+    }
+
+    @Test
+    void freshInstallWithoutASiteChoiceUploadsNothing() {
+        var sites = mock(com.checkba.service.site.SiteProfileService.class);
+        when(sites.siteChosen()).thenReturn(false);
+        when(sites.currentSite()).thenReturn("cn");
+        when(settings.rollupEnabled()).thenReturn(true);
+        var pending = new TelemetryDailyRollup();
+        pending.setDate(LocalDate.now().minusDays(1));
+        pending.setPayload("{}");
+        when(rollupRepository.findByUploadedFalseAndDateAfter(any())).thenReturn(java.util.List.of(pending));
+        var sent = new java.util.ArrayList<String>();
+        service = new TelemetryUploadService(rollupRepository, eventRepository, rollupService,
+                settings, identity, "https://custom.invalid/telemetry", (url, body) -> { sent.add(url); return 200; }, sites);
+        service.sync();
+        assertEquals(java.util.List.of(), sent);
+        verify(rollupRepository, never()).save(any());
     }
 }
