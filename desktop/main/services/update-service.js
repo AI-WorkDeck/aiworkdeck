@@ -40,8 +40,21 @@ const MAX_COMPONENT_BYTES = 512 * 1024 * 1024
 const MAX_INSTALLER_BYTES = 4 * 1024 * 1024 * 1024
 const FETCH_TIMEOUT_MS = 30000
 
-function manifestUrls() {
+// 0.91.0：没选站（全新安装还没出现 site.json）之前不查更新——新装的本来就是最新版，
+// 也不该让海外用户第一次启动就先连大陆域名；选了国际站的从 GitHub Release 取 manifest。
+function chosenSite(dataDir) {
+  try {
+    const file = require('path').join(dataDir || require('../awd-home').dataDir(), 'site.json')
+    const site = JSON.parse(fs.readFileSync(file, 'utf8')).site
+    return typeof site === 'string' && /^[a-z0-9][a-z0-9_-]{0,31}$/.test(site) ? site : null
+  } catch (e) {
+    return null
+  }
+}
+
+function manifestUrls(site) {
   if (process.env.CHECKBA_UPDATE_MANIFEST_URL) return [process.env.CHECKBA_UPDATE_MANIFEST_URL]
+  if (site === 'intl') return [DEFAULT_MANIFEST_URLS[1]]
   return DEFAULT_MANIFEST_URLS
 }
 
@@ -180,7 +193,7 @@ function createUpdateService(ctx, hooks = {}) {
   }
 
   async function fetchManifest() {
-    const urls = manifestUrls()
+    const urls = manifestUrls(chosenSite(ctx.dataDir))
     let lastErr = null
     for (const url of urls) {
       try {
@@ -289,6 +302,8 @@ function createUpdateService(ctx, hooks = {}) {
 
   async function check() {
     if (disabledReason) return snapshot()
+    // 没选站之前一次网络都不发（显式覆盖地址的 e2e 除外）
+    if (!process.env.CHECKBA_UPDATE_MANIFEST_URL && !chosenSite(ctx.dataDir)) return snapshot()
     if (state.available) return snapshot() // 已准备的版本保持 ready，避免重复下载/原生准备
     if (checking) return checking
     checking = (async () => {
@@ -371,4 +386,4 @@ function createUpdateService(ctx, hooks = {}) {
   return { start, stop, check, getState: snapshot, logEvent }
 }
 
-module.exports = { createUpdateService, updatesDisabledReason, fetchUrl, UPDATE_PUBKEY_PEM }
+module.exports = { createUpdateService, updatesDisabledReason, fetchUrl, UPDATE_PUBKEY_PEM, chosenSite, manifestUrls }

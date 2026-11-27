@@ -229,9 +229,15 @@ public class EntitlementService {
                 }
             }
             saveCache(cache);
+            accountService.rememberKeySite();
             log.info("账户权益已同步，共 {} 项", cache.features.size());
             return true;
         } catch (AccountException e) {
+            if (e.getKind() == AccountException.Kind.UNAUTHORIZED && !accountService.keyBelongsToCurrentSite()) {
+                // 0.91.0：拒绝来自别的站点（站点解析错位），不代表 Key 失效，什么都不清
+                log.warn("账户权益同步被另一个站点拒绝，Key 属于其他站点，保留权益缓存");
+                return false;
+            }
             if (e.getKind() == AccountException.Kind.UNAUTHORIZED) {
                 // 官网**明确拒绝** = Key 已吊销。30 天宽限是给「联系不上官网」的，
                 // 拿它兜吊销等于用户止损后付费功能还能再用一个月。立刻清缓存。

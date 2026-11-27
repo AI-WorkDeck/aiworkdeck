@@ -1744,8 +1744,19 @@ public class NativePackService {
         return c;
     }
 
+    /** 0.91.0：全新安装还没选站时，组件包的一切网络请求（清单、下载、封禁表）都不发。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.site.SiteProfileService siteProfileService;
+
+    private void requireSiteChosen(String url) throws IOException {
+        if (siteProfileService != null && !siteProfileService.mayContact(url)) {
+            throw new IOException("site not chosen yet");
+        }
+    }
+
     /** 小体量 GET（manifest / sig / 封禁表）；非 200 抛 IOException */
     protected byte[] httpGetBytes(String url) throws IOException, InterruptedException {
+        requireSiteChosen(url);
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(20))
                 .GET().build();
@@ -1759,6 +1770,7 @@ public class NativePackService {
     /** 大文件 GET，{@code from > 0} 时带 Range 头请求断点续传 */
     protected HttpResponse<InputStream> httpGetRange(String url, long from)
             throws IOException, InterruptedException {
+        requireSiteChosen(url);
         // 这个超时只管到响应头为止（JDK HttpClient 的语义），读体由 fetchToFile 的看门狗管
         long idleMs = props.getReadIdleTimeoutMs();
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
