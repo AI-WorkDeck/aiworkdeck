@@ -13,7 +13,7 @@ export const ERROR_KEYS = Object.freeze([
   'offline', 'timeout', 'localServiceDown', 'signInRequired', 'sessionExpired', 'forbidden',
   'balanceLow', 'rateLimited', 'modelUnavailable', 'modelKeyInvalid', 'streamInterrupted',
   'serverError', 'conflict', 'fileTooLarge', 'fileUnreadable', 'notFound',
-  'marketplaceUnavailable', 'pluginInstallFailed', 'unknown',
+  'marketplaceUnavailable', 'pluginInstallFailed', 'accountReconnect', 'unknown',
 ])
 
 // What the primary button does for each message. The component renders it; callers wire it.
@@ -21,8 +21,13 @@ const ACTION = {
   offline: 'retry', timeout: 'retry', localServiceDown: 'retry', signInRequired: 'signIn',
   sessionExpired: 'signIn', modelKeyInvalid: 'signIn', rateLimited: 'retry', modelUnavailable: 'retry',
   streamInterrupted: 'retry', serverError: 'retry', conflict: 'refresh', notFound: 'refresh',
-  marketplaceUnavailable: 'refresh', pluginInstallFailed: 'retry', unknown: 'retry',
+  marketplaceUnavailable: 'refresh', pluginInstallFailed: 'retry', accountReconnect: 'reconnect', unknown: 'retry',
 }
+
+// Q21: account-class failures of the AI channel (the backend's AccountException kinds) that signing
+// in again fixes: the stored key was rejected (UNAUTHORIZED) or the platform AI connection no longer
+// matches this site (MALFORMED, e.g. 「平台 AI 通道配置与当前站点不符，请刷新账户连接」).
+const RECONNECT_KINDS = new Set(['UNAUTHORIZED', 'MALFORMED'])
 
 const DETAIL_MAX = 300
 
@@ -65,6 +70,7 @@ const MARKETPLACE = /registry|marketplace|插件市场|unable to tunnel/i
  * @param {boolean} [ctx.desktop]   running in the desktop app (fetch failures mean the local service)
  * @param {'marketplace'|'pluginInstall'} [ctx.area]  narrows generic failures to an area message
  * @param {object} [ctx.params]     interpolation params (e.g. {name}, {limit})
+ * @param {string} [ctx.accountKind] AccountException kind from an account-class error payload
  * @returns {{ key: string, params: object, action: string, detail: string }}
  */
 export function toUserMessage(err, ctx = {}) {
@@ -78,6 +84,7 @@ export function toUserMessage(err, ctx = {}) {
   const fallback = ERROR_KEYS.includes(ctx.fallbackKey) ? ctx.fallbackKey : 'unknown'
 
   // Account and billing first: they carry their own codes regardless of HTTP status.
+  if (RECONNECT_KINDS.has(String(ctx.accountKind || (err && err.kind) || ''))) return done('accountReconnect')
   if ((err && err.accountRequired === true) || code === 4011) return done('signInRequired')
   if (code === 4010) return done('sessionExpired')
   if (status === 402 || code === 4020 || /AI_QUOTA_EXHAUSTED|insufficient (balance|credit)|余额不足|额度不足/i.test(text)) return done('balanceLow')

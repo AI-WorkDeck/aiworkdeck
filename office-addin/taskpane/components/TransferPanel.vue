@@ -147,6 +147,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { t } from '../lib/i18n.js'
+import { errorText } from '../lib/errorText.js'
 import {
   transferPreset, fetchQuote, createList, fetchTransfer, createPull, saveToProject,
   createPush, cancelTransfer, pollUntil, newRequestId, fetchLocalProjectFiles, MAX_TRANSFER_BYTES
@@ -261,7 +262,7 @@ async function fetchList() {
       pullListStage.value = 'error'
     }
   } catch (e) {
-    pullListError.value = (e && e.message) || t('transferBadResponse')
+    pullListError.value = errorText(e, t('transferBadResponse'))
     pullListStage.value = 'error'
   }
 }
@@ -282,7 +283,7 @@ async function loadPullQuote() {
   try {
     pullQuote.value = await fetchQuote(props.settings, pullSelectedFile.value.size)
   } catch (e) {
-    pullQuoteError.value = (e && e.message) || t('transferBadResponse')
+    pullQuoteError.value = errorText(e, t('transferBadResponse'))
   } finally {
     pullQuoteLoading.value = false
   }
@@ -322,7 +323,7 @@ async function confirmPull() {
     pullResult.value = await saveToProject(props.settings, id, parseInt(targetProjectId, 10))
     pullStage.value = 'done'
   } catch (e) {
-    pullError.value = (e && e.message) || t('transferBadResponse')
+    pullError.value = errorText(e, t('transferBadResponse'))
     pullStage.value = 'error'
   }
 }
@@ -335,7 +336,7 @@ async function cancelPull() {
     pullStage.value = 'idle'
     pullTransferId.value = ''
   } catch (e) {
-    pullError.value = (e && e.message) || t('transferBadResponse')
+    pullError.value = errorText(e, t('transferBadResponse'))
   } finally {
     pullCancelling.value = false
   }
@@ -394,7 +395,7 @@ async function loadPushQuote() {
   try {
     pushQuote.value = await fetchQuote(props.settings, pushSelectedFile.value.size)
   } catch (e) {
-    pushQuoteError.value = (e && e.message) || t('transferBadResponse')
+    pushQuoteError.value = errorText(e, t('transferBadResponse'))
   } finally {
     pushQuoteLoading.value = false
   }
@@ -413,7 +414,7 @@ async function submitPush() {
     })
     pushStage.value = 'done'
   } catch (e) {
-    pushError.value = (e && e.message) || t('transferBadResponse')
+    pushError.value = errorText(e, t('transferBadResponse'))
     pushStage.value = 'error'
   }
 }

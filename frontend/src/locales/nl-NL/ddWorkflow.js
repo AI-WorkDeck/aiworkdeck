@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} ongelezen samenwerkingsmeldingen",
   "clientWorkspace": "Cliëntsamenwerking",
   "clientWorkspaceHint": "Maak in deze werkruimte verbinding met uitgenodigde projecten om checklists te bekijken, documenten in te dienen en beoordelingen te volgen.",
+  "thisCaseClients": "Cliënten van dit dossier ({count})",
   "openClientWorkspace": "Cliëntsamenwerking openen",
   "lists": "Due diligence-checklists",
   "refresh": "Vernieuwen",

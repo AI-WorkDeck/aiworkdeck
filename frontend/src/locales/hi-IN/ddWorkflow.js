@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} अपठित सहयोग सूचनाएं",
   "clientWorkspace": "क्लाइंट सहयोग",
   "clientWorkspaceHint": "चेकलिस्ट देखने, दस्तावेज़ सबमिट करने और समीक्षाओं का अनुसरण करने के लिए इस कार्यक्षेत्र में आमंत्रित प्रोजेक्ट्स से जुड़ें।",
+  "thisCaseClients": "इस केस फ़ाइल के क्लाइंट ({count})",
   "openClientWorkspace": "क्लाइंट सहयोग खोलें",
   "lists": "ड्यू डिलिजेंस चेकलिस्ट",
   "refresh": "रिफ्रेश करें",

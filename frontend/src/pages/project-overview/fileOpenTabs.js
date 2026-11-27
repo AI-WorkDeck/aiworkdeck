@@ -1147,6 +1147,7 @@ export const fileOpenTabsMethods = {
     // 顶掉，律师只看得见最后一条、还以为只更新了一份。多文件时改为静音逐份重载、
     // 最后聚合成一句。单文件语义一个字不改（仍是原来的逐文件 toast）。
     async onVersionReloadFiles(affectedFileIds) {
+      this.$refs?.fileTree?.loadLocalOnly?.() // C12: a placeholder may have become a real file
       if (this._projectVersionReload) {
         const restored = await this._projectVersionReload()
         const ids = Array.isArray(affectedFileIds) ? affectedFileIds : [...new Set(Object.values(this._pdfPreviewRefs || {}).map(inst => inst.file?.id).filter(id => id != null))]

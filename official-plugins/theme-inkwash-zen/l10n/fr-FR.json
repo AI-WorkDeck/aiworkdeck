@@ -1,8 +1,8 @@
 {
-  "plugin.name": "Zen à l'encre de Chine · Habillage calligraphique",
-  "plugin.desc": "Espaces blancs façon papier de Xuan, hiérarchie en cinq nuances d'encre et accents focaux à l'encre violette, en modes clair et sombre.",
-  "theme.name": "Zen à l'encre de Chine",
-  "theme.desc": "Papier de Xuan × Lavage d'encre à cinq tons × Goutte d'encre violette × Sceau de cinabre",
+  "plugin.name": "Lavis d’encre",
+  "plugin.desc": "Blanc papier de riz avec des gris d’encre superposés",
+  "theme.name": "Lavis d’encre",
+  "theme.desc": "Blanc papier de riz avec des gris d’encre superposés",
   "gallery.badge": "Galerie de thèmes",
   "gallery.swatch1": "Blanc papier de riz",
   "gallery.swatch2": "Encre profonde",

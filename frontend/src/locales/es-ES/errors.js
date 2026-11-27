@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Hay demasiadas solicitudes ahora mismo y el servicio de modelos las está limitando. Espera un minuto e inténtalo de nuevo.",
   "modelUnavailable": "El modelo seleccionado no está disponible ahora. Inténtalo más tarde o elige otro modelo debajo del cuadro de mensaje.",
   "modelKeyInvalid": "El proveedor del modelo rechazó la clave que este dispositivo sigue usando de una configuración anterior. Inicia sesión para usar en su lugar la IA de AI WorkDeck.",
+  "accountReconnect": "Hay que actualizar la conexión de tu cuenta de IA, así que esta petición no se envió. Selecciona «Volver a iniciar sesión» y vuelve a intentarlo; no se pierde nada.",
   "streamInterrupted": "La respuesta se interrumpió; lo recibido hasta ahora se conserva arriba. Pulsa «Reintentar» para generarla de nuevo.",
   "streamInterruptedResumable": "La respuesta se interrumpió; lo recibido hasta ahora se conserva arriba. Pulsa «Continuar» para retomarla donde se detuvo o «Reintentar» para empezar de nuevo.",
   "streamInterruptedTwice": "Se interrumpió de nuevo. Pulsa «Reintentar» para generar la respuesta completa otra vez.",
@@ -31,6 +32,7 @@ export default {
     "continueTooltip": "Retoma donde se detuvo sin volver a generar lo que ya está",
     "refresh": "Actualizar",
     "signIn": "Iniciar sesión",
+    "reconnect": "Volver a iniciar sesión",
     "feedback": "Comentarios"
   }
 }

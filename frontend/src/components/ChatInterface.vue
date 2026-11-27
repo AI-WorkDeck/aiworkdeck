@@ -438,6 +438,7 @@
                @answer-question="handleQuestionAnswer"
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
+               @retry-failed="retryFailedTurn(index)"
                @continue-answer="continueAnswer(msg)"
                @consent-accepted="retryAfterConsent(index)"
                @stop-generation="handleAbort"
@@ -779,7 +780,13 @@
                 低调一行、只在有数时出现：为 0 说明后端还没回 token_usage（Ollama 档不回），
                 挂一个 0 会像是「这一轮不要钱」。 -->
            <view v-if="tokenUsage && tokenUsage.totalTokens > 0" class="status-bar-right">
-               <text class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
+               <!-- Q24：平台通道的律师按余额（¥）付费，token 数读不懂也没意义；在本轮准确的 ¥
+                    能从官网账单按轮取回之前（0.92，与 lane W 合做），给「查看用量」进账户用量页，
+                    token 数只留在悬停提示里。自带密钥（BYOK）的用户照旧看 token。 -->
+               <text v-if="tokenUsage.platform" class="token-value token-usage-link" role="link" tabindex="0"
+                     :title="$t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() })"
+                     @tap="openUsageSettings" @keydown.enter.prevent="openUsageSettings">{{ $t('chat.viewUsage') }}</text>
+               <text v-else class="token-value">{{ $t('chat.tokenUsageLine', { n: tokenUsage.totalTokens.toLocaleString() }) }}</text>
            </view>
        </view>
        <NowDoingStrip :active="isStreaming" :bubble="nowDoingBubble" />
@@ -1098,7 +1105,7 @@ import BackgroundTaskIndicator from './BackgroundTaskIndicator.vue'
 import AgentInbox from './AgentInbox.vue'
 import NowDoingStrip from './AgentMessage/NowDoingStrip.vue'
 import { useAgentStream } from '@/composables/useAgentStream.js'
-import { formatUndoFiles, shouldOfferRunUndo, undoResultView } from '@/utils/agentRunControl.js'
+import { formatUndoFiles, isEmptyFailedTurn, shouldOfferRunUndo, undoResultView } from '@/utils/agentRunControl.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
 import { useBuiltinWorkflows, notifyBuiltinWorkflowsChanged } from '@/composables/useBuiltinWorkflows.js'
 import { ref, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance, computed, inject } from 'vue'
@@ -1167,6 +1174,11 @@ export default {
       this.showSkillDropdown = false
       if (this.openSettingsTab) this.openSettingsTab({ nav: 'mcp' })
       else uni.navigateTo({ url: '/pages/admin/admin?nav=mcp' })
+    },
+    // Q24：页脚「查看用量」→ 设置 · 账户（平台通道的用量与余额在那里）
+    openUsageSettings() {
+      if (this.openSettingsTab) this.openSettingsTab({ nav: 'account' })
+      else uni.navigateTo({ url: '/pages/admin/admin?nav=account' })
     },
   },
   props: {
@@ -2658,6 +2670,13 @@ export default {
       // 只有对话框真开了才算数：openRollbackDialog 可能在流式中 / 定位不到时提前返回，
       // 那时把标志留成 true，下一次普通回退就会莫名其妙地自动重发。
       rollbackResend.value = showRollbackDialog.value
+    }
+
+    // 错误卡上的「重试」（Q22）：这一轮什么都没产出就直接原样重发（同一条截断+存档+重发链路，
+    // 只是不弹确认框）；有产出（正文、工具步骤、改过文件）时仍走「重新生成」确认框。
+    const retryFailedTurn = async (assistantIndex) => {
+      if (isEmptyFailedTurn(bubbles.value[assistantIndex])) return retryAfterConsent(assistantIndex)
+      openRegenerateDialog(assistantIndex)
     }
 
     // 同意卡点了「同意并继续」：用户的意图就是「接着问刚才那句」，走重新生成同一条链路
@@ -5004,6 +5023,7 @@ export default {
        rollbackResend,
        openRegenerateDialog,
        retryAfterConsent,
+       retryFailedTurn,
        branchFromMessage,
        openRollbackDialog,
        cancelRollback,
@@ -7854,6 +7874,7 @@ export default {
   font-family: monospace;
   font-weight: 600;
 }
+.token-usage-link { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .token-detail {
   font-size: var(--awd-panel-fs-meta);
   color: var(--awd-text-3);

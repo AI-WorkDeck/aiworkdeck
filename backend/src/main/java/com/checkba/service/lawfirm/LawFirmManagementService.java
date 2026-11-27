@@ -89,6 +89,10 @@ public class LawFirmManagementService {
     private final LawFirmAccessPolicy access;
     private final LawFirmClientService clientService;
 
+    /** C19：本机收案关联律所云端利冲时用来取云端记录；懒取，避免与云端服务互相依赖。 */
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.beans.factory.ObjectProvider<LawFirmWorkflowGateway> cloudWorkflow;
+
     /**
      * 桌面单机（local-mode）只有一个真人：他同时是申请人、被征询律师与利冲委员（单人所/演示）。
      * 团队服务器（local-mode=false）上每个人只能处理征询给自己的单子，申请人也不能终审自己的申请。
@@ -146,6 +150,7 @@ public class LawFirmManagementService {
             case "submitIntake", "createIntake" -> submitIntake(effectiveUserId, projectId, params);
             case "respondClearance", "clearanceDecision" -> respondClearance(effectiveUserId, params);
             case "committeeReview", "finalizeIntake" -> committeeReview(effectiveUserId, params);
+            case "linkCloudClearance" -> linkCloudClearance(effectiveUserId, params);
             case "submitInvoice", "createInvoice" -> submitInvoice(effectiveUserId, projectId, params);
             case "issueInvoice", "approveInvoice" -> issueInvoice(effectiveUserId, params);
             case "voidInvoice" -> voidInvoice(effectiveUserId, params);
@@ -557,6 +562,55 @@ public class LawFirmManagementService {
     }
 
     @Transactional
+    /**
+     * C19：同一件收案，本机台账一份、律所云端利冲一份。把本机收案关联到云端利冲记录，并按云端终审结论
+     * 更新本机进度：云端已通过 → 本机「已立案」；云端已拒绝 → 本机「利冲阻断」；仍在审 → 只记关联。
+     * 再次调用（不带 recordId）即按已关联记录重新取回结论。只认本人能看到全文的云端记录
+     * （申请人、主办或已接受指派的委员），本机不自行判断利冲。
+     */
+    public Map<String, Object> linkCloudClearance(Long userId, Map<String, Object> params) {
+        Long intakeId = longVal(params.get("intakeId"));
+        if (intakeId == null) throw new IllegalArgumentException(LangText.of("缺少收案申请编号 intakeId", "Missing matter intake ID (intakeId)"));
+        LawFirmMatterIntake intake = intakeRepository.findById(intakeId)
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("收案申请不存在：", "Matter intake not found: ") + intakeId));
+        requireLedgerActor(userId, intake.getApplicantUserId(), intake.getLeadLawyerUserId());
+        String recordId = string(params, "recordId", "").trim();
+        if (recordId.isEmpty()) recordId = intake.getCloudWorkflowId() == null ? "" : intake.getCloudWorkflowId();
+        if (!recordId.matches("[0-9a-fA-F-]{36}")) throw new IllegalArgumentException(LangText.of("请选择要关联的律所云端利冲记录", "Choose the Firm cloud conflict record to link"));
+        LawFirmWorkflowGateway gateway = cloudWorkflow == null ? null : cloudWorkflow.getIfAvailable();
+        if (gateway == null) throw new IllegalStateException(LangText.of("律所云端利冲协作不可用", "Firm cloud conflict collaboration is unavailable"));
+        Map<String, Object> cloud = gateway.execute(userId, "workflowDetail", Map.of("recordId", recordId));
+        if (cloud == null || !recordId.equalsIgnoreCase(String.valueOf(cloud.get("id"))) || !cloud.containsKey("clientName")) {
+            throw new IllegalStateException(LangText.of("只能关联你申请、主办或担任委员的云端利冲记录", "You can only link cloud conflict records you requested, lead or review as committee member"));
+        }
+        String cloudStatus = String.valueOf(cloud.get("status"));
+        if (Set.of("APPROVED_FILED", "REJECTED_CONFLICT", "CLOSED").contains(intake.getStatus())
+                && !recordId.equals(intake.getCloudWorkflowId())) {
+            throw new IllegalStateException(LangText.of("这件收案在本机已有终审结论，不能再关联其他云端记录", "This intake already has a local final decision and cannot be linked to another cloud record"));
+        }
+        intake.setCloudWorkflowId(recordId);
+        intake.setCloudWorkflowStatus(cloudStatus);
+        boolean open = !Set.of("APPROVED_FILED", "REJECTED_CONFLICT", "CLOSED").contains(intake.getStatus());
+        Instant now = Instant.now();
+        String decisionComment = cloud.get("decisionComment") == null ? "" : String.valueOf(cloud.get("decisionComment"));
+        if (open && ("APPROVED".equals(cloudStatus) || "REJECTED".equals(cloudStatus))) {
+            intake.setCommitteeReviewerId(null);
+            intake.setCommitteeReviewerName(LangText.of("律所云端利冲委员", "Firm cloud conflict committee"));
+            intake.setCommitteeComment(LangText.of("按律所云端利冲终审结论：", "Per the Firm cloud conflict final review: ")
+                    + (decisionComment.isBlank() ? LangText.of("（无意见）", "(no comment)") : decisionComment));
+            if ("APPROVED".equals(cloudStatus)) {
+                if (intake.getClearedAt() == null) intake.setClearedAt(now);
+                intake.setStatus("APPROVED_FILED");
+                intake.setFiledAt(now);
+            } else {
+                intake.setStatus("REJECTED_CONFLICT");
+            }
+        }
+        intake.setUpdatedAt(now);
+        intake = intakeRepository.save(intake);
+        return Map.of("intake", toIntakeView(intake, clearanceRepository.findByIntakeIdOrderByIdAsc(intake.getId())));
+    }
+
     public Map<String, Object> committeeReview(Long userId, Map<String, Object> params) {
         Long intakeId = longVal(params.get("intakeId"));
         if (intakeId == null) {
@@ -2431,6 +2485,8 @@ public class LawFirmManagementService {
         map.put("ethicalWallApplied", Boolean.TRUE.equals(i.getEthicalWallApplied()));
         map.put("clientWaiverUploaded", Boolean.TRUE.equals(i.getClientWaiverUploaded()));
         map.put("imConversationId", i.getImConversationId());
+        map.put("cloudWorkflowId", i.getCloudWorkflowId());
+        map.put("cloudWorkflowStatus", i.getCloudWorkflowStatus());
         map.put("submittedAt", i.getSubmittedAt());
         map.put("clearedAt", i.getClearedAt());
         map.put("filedAt", i.getFiledAt());

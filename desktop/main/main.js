@@ -485,6 +485,9 @@ function createMainWindow() {
     { width: Math.min(1400, workArea.width), height: Math.min(900, workArea.height) })
   mainWindow = new BrowserWindow({
     ...restored.bounds,
+    // Q28 / X-S10：再窄顶栏连紧凑形态都放不下（工作台开关压到语言选择上）。
+    minWidth: 760,
+    minHeight: 520,
     icon: path.join(__dirname, '../../frontend/src/static/icon.png'),
     // 首屏白闪修复（dev-board#731）：Electron 默认白底，页面加载完成前会露出。
     // 取值与 design/tokens/awd-palette.json 的 roles.light.bg / roles.dark.bg 一致。

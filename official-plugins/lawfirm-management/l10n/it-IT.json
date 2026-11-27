@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Disattiva ed elimina",
   "cloud.purgeCancel": "Annulla",
   "billing.groupNoRate": " ({n} voci senza tariffa, non conteggiate)",
-  "billing.groupSummaryNoRate": "{n} voci, {pending} da rivedere; {h} ore fatturabili, tariffa non impostata"
+  "billing.groupSummaryNoRate": "{n} voci, {pending} da rivedere; {h} ore fatturabili, tariffa non impostata",
+  "panel.t.cloudPendingLawyer": "In attesa degli avvocati interessati",
+  "panel.t.cloudPendingCommittee": "In attesa della revisione finale del comitato",
+  "panel.t.cloudApproved": "Approvato",
+  "panel.t.cloudRejected": "Respinto",
+  "panel.t.cloudSynced": "Avanzamento locale aggiornato secondo la decisione sui conflitti nel cloud dello studio.",
+  "panel.t.cloudLinked": "Collegato al controllo conflitti nel cloud dello studio: {0}",
+  "panel.t.cloudSync": "Recupera la decisione finale dal cloud",
+  "panel.t.cloudLinkPick": "Collega un controllo conflitti nel cloud dello studio",
+  "panel.t.cloudNone": "Non ci sono ancora controlli conflitti nel cloud dello studio da collegare.",
+  "panel.t.cloudLinkConfirm": "Collega e recupera la decisione",
+  "panel.t.cloudLinkHint": "Questa pratica ha già superato il controllo conflitti nel cloud dello studio? Collegala e l’avanzamento locale seguirà la decisione finale del cloud.",
+  "access.commentRequired": "Inserisci prima il tuo parere, poi autorizza o respingi."
 }

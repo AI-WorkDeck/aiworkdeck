@@ -23,8 +23,9 @@ async function mount(t) {
   let state = { available: false }
   const uni = { $on(name, fn) { handlers.set(name, fn) }, $off(name) { handlers.delete(name) } }
   const getConsent = () => new Promise((resolve) => gets.push(() => resolve({ ...state })))
-  const options = new Function('getMobileBackupConsent', 'setMobileBackupConsent', 'ACCOUNT_CHANGED_EVENT', 'accountPageUrl', 'openExternalUrl', 'uni', script)(
-    getConsent, async () => ({ decided: true }), 'awd:account-changed', () => '', () => {}, uni)
+  // OPEN_BACKUP_CONSENT_EVENT: since #1752 the C12 large-file dialog can open this consent from elsewhere
+  const options = new Function('getMobileBackupConsent', 'setMobileBackupConsent', 'ACCOUNT_CHANGED_EVENT', 'accountPageUrl', 'openExternalUrl', 'uni', 'OPEN_BACKUP_CONSENT_EVENT', script)(
+    getConsent, async () => ({ decided: true }), 'awd:account-changed', () => '', () => {}, uni, 'awd:open-backup-consent')
   globalThis.uni = uni
   const host = document.createElement('div'); document.body.append(host)
   let vm

@@ -25,11 +25,11 @@ const deferred = () => { let resolve; const promise = new Promise(r => { resolve
 
 test('数字只计待提交文件；自动记录、结束工作及关闭记录各自更新', () => {
   assert.equal(entry(state()).badge, '3')
-  assert.match(entry(state()).title, /3 个文件待提交/)
+  assert.match(entry(state()).title, /上个版本之后改动了 3 个文件/)
   assert.equal(entry(state({ changedCount: 140 })).badge, '99+')
   const recorded = entry(state({ changedCount: 0 }))
   assert.equal(recorded.badge, '·')
-  assert.match(recorded.title, /已自动记录/)
+  assert.match(recorded.title, /改动会自动保留/)
   assert.equal(entry(state({ changedCount: 0, working: false })).badge, '')
   assert.equal(entry(state({ enabled: false })).badge, '')
   assert.equal(entry(state({ changedCount: 0, onDraft: { id: 4 } })).badge, '', '主线工作段不是当前稿的待提交状态')

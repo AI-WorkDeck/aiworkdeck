@@ -87,7 +87,7 @@ export default {
   enabledTag: 'Enabled',
   disabledTag: 'Disabled',
   sectionSkillSub: 'Prompt-based capabilities: take effect in conversation, with configurable activation',
-  builtinWorkflowsMarketNotice: 'Lazy Mode enabled: Contract Review, Evidence Organization, File Organization, and Legal Opinion Verification are built into the core workflow and activate automatically in chat — no installation or manual toggling needed.',
+  builtinWorkflowsMarketNotice: "Built-in workflows are auto-enabled: Contract Review, Evidence Organization, File Organization and Legal Opinion Verification start automatically in chat when a task needs them. Nothing to install or toggle here.",
   noLocalSkills: 'No extra extension Skills installed locally yet',
   noLocalSkillsHint: 'Install one from the "Skill Marketplace", or drop a Skill directory (with skill.yml) into the local Skill folder ~/.aiworkdeck/skills/ and click "Rescan"',
   fromPlugin: 'From plugin {pluginId}',
@@ -165,7 +165,7 @@ export default {
   reinstallOrUpdate: 'Reinstall / Update',
   activationModeLabel: 'Activation: {mode} ▾',
   processingEllipsis: 'Processing…',
-  needAccountHint: 'This is a paid item. Connect your AI WorkDeck account under "Account & balance" in Settings first — purchase records can only be verified after that.',
+  needAccountHint: 'This is a paid item. Connect your AI WorkDeck account under "Account & Balance" in Settings first — purchase records can only be verified after that.',
   buyHint: 'This is a paid item. Purchase completes on the official website; after paying, return to this page and click "I\'ve Purchased, Refresh" to install.',
 
   whenToUse: 'When to Use',

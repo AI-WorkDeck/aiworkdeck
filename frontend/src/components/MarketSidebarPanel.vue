@@ -380,8 +380,9 @@ export default {
     },
     installedGroups() {
       return [
-        { key: 'plugin', title: this.$t('market.sectionPluginTitle'), rows: this.installedPluginRows },
+        // 与「可安装」分组和搜索框同序：技能 / 插件 / MCP（POLISH X41）
         { key: 'skill', title: this.$t('market.sectionSkillTitle'), rows: this.installedSkillRows },
+        { key: 'plugin', title: this.$t('market.sectionPluginTitle'), rows: this.installedPluginRows },
         { key: 'mcp', title: this.$t('mcp.label'), rows: this.installedMcpRows },
       ]
     },

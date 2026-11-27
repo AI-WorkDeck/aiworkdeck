@@ -75,7 +75,7 @@ export default {
   "enabledTag": "켜짐",
   "disabledTag": "꺼짐",
   "sectionSkillSub": "프롬프트 기반 기능: 대화에서 적용되며 활성화 설정 가능",
-  "builtinWorkflowsMarketNotice": "지연 모드 사용 중: 계약 검토, 증거 정리, 파일 정리, 법률 의견서 검증이 핵심 워크플로우에 내장되어 대화 중 자동으로 활성화됩니다 — 설치나 수동 전환이 필요하지 않습니다.",
+  "builtinWorkflowsMarketNotice": "기본 제공: 계약 검토, 증거 정리, 파일 정리, 법률 의견서 검증은 핵심 워크플로우의 일부이며 작업에 필요할 때 대화 중 자동으로 켜집니다. 여기에서 설치할 것은 없습니다.",
   "noLocalSkills": "아직 로컬에 설치된 확장 Skill이 없습니다",
   "noLocalSkillsHint": "\"Skill Marketplace\"에서 설치하거나, Skill 디렉터리(skill.yml 포함)를 로컬 Skill 폴더 ~/.aiworkdeck/skills/에 넣고 \"다시 스캔\"을 클릭하세요",
   "fromPlugin": "플러그인 {pluginId}에서 제공",

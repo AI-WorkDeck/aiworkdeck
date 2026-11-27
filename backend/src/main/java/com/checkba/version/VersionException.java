@@ -60,6 +60,16 @@ public class VersionException extends RuntimeException {
         return new VersionException(message, true, DOC_ENCRYPTED);
     }
 
+    /**
+     * C12：版本里有大文件 / 音视频，交稿要先开文件云端备份。kind 回给前端，交稿处弹一个不会自己
+     * 消失、带「开启文件云端备份」按钮的说明，不靠匹配文案去猜。
+     */
+    public static final String LARGE_FILES_NEED_BACKUP = "LARGE_FILES_NEED_BACKUP";
+
+    public static VersionException largeFilesNeedBackup(String message) {
+        return new VersionException(message, true, LARGE_FILES_NEED_BACKUP);
+    }
+
     public String getKind() { return kind; }
 
     public boolean isUserFacing() {

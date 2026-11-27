@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Terlalu banyak permintaan sekarang, jadi perkhidmatan model mengehadkan kadar. Tunggu seminit dan cuba lagi.",
   "modelUnavailable": "Model yang dipilih tidak tersedia sekarang. Cuba lagi kemudian, atau pilih model lain di bawah kotak mesej.",
   "modelKeyInvalid": "Penyedia model menolak kunci yang masih digunakan oleh peranti ini daripada tetapan lama. Daftar masuk untuk menggunakan AI AI WorkDeck sebagai gantinya.",
+  "accountReconnect": "Sambungan akaun AI anda perlu disegarkan, jadi permintaan ini tidak dihantar. Pilih \"Log masuk semula\", kemudian cuba lagi; tiada apa-apa yang hilang.",
   "streamInterrupted": "Jawapan terputus; bahagian yang sudah diterima dikekalkan di atas. Pilih “Cuba lagi” untuk menjananya semula.",
   "streamInterruptedResumable": "Jawapan terputus; bahagian yang sudah diterima dikekalkan di atas. Pilih “Teruskan” untuk menyambung dari titik berhenti, atau “Cuba lagi” untuk bermula semula.",
   "streamInterruptedTwice": "Terputus lagi. Pilih “Cuba lagi” untuk menjana semula keseluruhan jawapan.",
@@ -31,6 +32,7 @@ export default {
     "continueTooltip": "Sambung dari titik berhenti tanpa menjana semula bahagian yang sudah ada",
     "refresh": "Segar semula",
     "signIn": "Daftar masuk",
+    "reconnect": "Log masuk semula",
     "feedback": "Maklum Balas"
   }
 }

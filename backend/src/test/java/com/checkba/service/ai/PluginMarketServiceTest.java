@@ -113,6 +113,22 @@ class PluginMarketServiceTest {
         assertTrue(e.getMessage().contains("插件广场"), e.getMessage());
     }
 
+    @Test void freshInstallWithoutASiteChoiceNeverContactsTheRegistry(@org.junit.jupiter.api.io.TempDir java.nio.file.Path home) {
+        var account = mock(AccountService.class);
+        var scopedGate = new MarketPurchaseGate(account, mock(EntitlementService.class));
+        var fresh = new com.checkba.service.site.SiteProfileService(true, "https://www.aiworkdeck.com", "",
+                home.toString(), new com.checkba.service.site.SiteProperties());
+        org.springframework.test.util.ReflectionTestUtils.setField(scopedGate, "sites", fresh);
+        var calls = new java.util.ArrayList<String>();
+        var service = new PluginMarketService("https://www.aiworkdeck.com/api/registry/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, scopedGate) {
+            @Override protected String httpGet(String url) { calls.add(url); return "[]"; }
+        };
+        assertEquals(java.util.List.of(), service.listMarket());
+        assertThrows(IllegalStateException.class, service::fetchRevoked);
+        assertEquals(java.util.List.of(), calls, "no registry request before a site is chosen");
+    }
+
     @Test void lateRevocationResponseIsRejectedAfterSiteSwitch() {
         var account = mock(AccountService.class);
         var snapshot = new AccountService.ConnectionSnapshot("https://www.workdeck.ai", "test-key", "test", 2L);
@@ -164,6 +180,24 @@ class PluginMarketServiceTest {
         var list = svc.listMarket();
         assertEquals(1, list.size());
         assertEquals("hello-plugin", list.get(0).getId());
+    }
+
+    @Test
+    void zhTwListingPrefersRegistryZhHant() {
+        PluginMarketService svc = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, gate) {
+            @Override protected String httpGet(String url) {
+                return "[{\"id\":\"hello-plugin\",\"name\":\"剪贴板\",\"description\":\"收集剪贴内容\","
+                        + "\"i18n\":{\"zh-hant\":{\"name\":\"剪貼簿（官方）\",\"description\":\"收集剪貼內容（官方）\"}}},"
+                        + "{\"id\":\"other-plugin\",\"name\":\"其他\",\"description\":\"说明\"}]";
+            }
+        };
+        var tw = com.checkba.service.AppLanguageScope.call("zh-TW", svc::listMarket);
+        assertEquals("剪貼簿（官方）", tw.get(0).getName());
+        assertEquals("收集剪貼內容（官方）", tw.get(0).getDescription());
+        assertEquals("說明", tw.get(1).getDescription(), "no zh-hant entry: Simplified converted");
+        var cn = com.checkba.service.AppLanguageScope.call("zh-CN", svc::listMarket);
+        assertEquals("剪贴板", cn.get(0).getName());
     }
 
     @Test

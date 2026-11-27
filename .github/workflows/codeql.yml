@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# CodeQL, advanced setup (replaces GitHub "default setup", which analysed all five languages on every PR).
+# CI capacity decision, 2026-11-25: a PR analyses only the languages it touches, which still means
+# "CodeQL before merge" for the code being changed. master pushes, the weekly schedule and manual runs
+# analyse every language. Default query suite and job names, as in the previous default setup.
+name: CodeQL
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    - cron: '17 3 * * 1' # weekly, Monday 11:17 Beijing
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+permissions:
+  contents: read
+jobs:
+  languages:
+    name: CodeQL languages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          all='["actions","c-cpp","java-kotlin","javascript-typescript","python"]'
+          if [ "$EVENT" != pull_request ]; then echo "matrix=$all" >> "$GITHUB_OUTPUT"; exit 0; fi
+          gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate --jq '.[].filename' > /tmp/changed
+          langs=()
+          grep -Eq '^[.]github/(workflows|actions)/' /tmp/changed && langs+=('"actions"')
+          grep -Eq '[.](c|cc|cpp|cxx|h|hh|hpp)$' /tmp/changed && langs+=('"c-cpp"')
+          grep -Eq '[.](java|kt|kts)$|(^|/)pom[.]xml$|[.]gradle$' /tmp/changed && langs+=('"java-kotlin"')
+          grep -Eq '[.](js|mjs|cjs|jsx|ts|mts|cts|tsx|vue|html|htm)$|(^|/)package(-lock)?[.]json$' /tmp/changed && langs+=('"javascript-typescript"')
+          grep -Eq '[.]py$|(^|/)(requirements[^/]*[.](txt|lock)|pyproject[.]toml|uv[.]lock)$' /tmp/changed && langs+=('"python"')
+          echo "matrix=[$(IFS=,; echo "${langs[*]}")]" >> "$GITHUB_OUTPUT"
+          echo "PR languages: [$(IFS=,; echo "${langs[*]}")]"
+
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    needs: languages
+    if: needs.languages.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(needs.languages.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

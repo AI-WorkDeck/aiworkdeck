@@ -131,8 +131,10 @@ export function groupRevisions(revisions, opts) {
       })
     }
   }
+  pairReplacements(groups)
   for (const g of groups) {
     if (textLimit > 0 && g.text.length > textLimit) g.text = g.text.slice(0, textLimit) + '…'
+    if (textLimit > 0 && g.insText && g.insText.length > textLimit) g.insText = g.insText.slice(0, textLimit) + '…'
     const seen = new Set()
     g.reasons = []
     for (const it of g.items) {
@@ -145,6 +147,48 @@ export function groupRevisions(revisions, opts) {
     }
   }
   return groups
+}
+
+// Q25: a replacement is recorded by the engine as a Delete redline and an Insert
+// redline that starts exactly where the deletion ends. Shown as two cards, a
+// lawyer could accept one half and reject the other and leave a broken sentence
+// (accept the deletion of 「乙方有权根据开发进展自行」 + reject the insertion of
+// 「如需」 → the clause loses its subject). Pair them into one 替换 card whose
+// accept/reject resolves both redlines in one call.
+// Pairing is by position only: the insert's range starts where the delete's ends
+// (worker's `contiguous`), same paragraph, same author, neither is a move or a
+// table operation. Time is deliberately not used: two separate AI edits in the
+// same minute are not adjacent, and a manual edit beside an AI edit has a
+// different author. The paired group keeps type 'Delete' (balloons hide pure
+// Insert cards because insertions are visible inline) and adds insText/insItems.
+function pairable(a, b) {
+  if (a.typeKey !== 'delete' && a.typeKey !== 'insert') return false
+  if (b.typeKey !== (a.typeKey === 'delete' ? 'insert' : 'delete')) return false
+  if (a.operationId || b.operationId || a.insItems || b.insItems) return false
+  if ((a.author || '') !== (b.author || '')) return false
+  const first = b.items[0], last = a.items[a.items.length - 1]
+  if (!first.contiguous) return false
+  if ((last.paraKey >= 0 || first.paraKey >= 0) && last.paraKey !== first.paraKey) return false
+  return (a.tableName || '') === (b.tableName || '')
+}
+function pairReplacements(groups) {
+  for (let i = 0; i + 1 < groups.length; i++) {
+    const a = groups[i], b = groups[i + 1]
+    if (!pairable(a, b)) continue
+    const del = a.typeKey === 'delete' ? a : b
+    const ins = del === a ? b : a
+    groups.splice(i, 2, {
+      ...del,
+      key: a.key,
+      typeKey: 'replace',
+      text: del.text,
+      insText: ins.text,
+      delItems: del.items,
+      insItems: ins.items,
+      items: a.items.concat(b.items),
+      inTable: del.inTable || ins.inTable,
+    })
+  }
 }
 
 // 四个筛选桶的计数。**恒按未筛选的全量算**（与底稿面板同口径）：切了筛选之后

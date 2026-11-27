@@ -37,6 +37,12 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class AccountService {
+    /** 未连接账户的提示。zh-TW 显式给出（ZhHantConverter 缺「点/钮」时会半繁半简）。 */
+    static final java.util.Map<String, String> NOT_CONNECTED_MESSAGE = java.util.Map.of(
+            "zh-CN", "尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
+            "zh-TW", "尚未連接 AI WorkDeck 帳戶，可點右上角的帳戶按鈕連接",
+            "en-US", "No AI WorkDeck account connected yet. Use Sign in at the top right.");
+
 
     private static final String KEY_PREFIX = "awdk_";
 
@@ -86,6 +92,8 @@ public class AccountService {
         public String connectedAt;
         public String lastSyncAt;
         public boolean authExpired;
+        /** 0.91.0：这把 Key 是在哪个站点连上的（cn / intl）。老文件没有这一项，首次同步成功时补上。 */
+        public String site;
     }
 
     // ==================== 连接生命周期 ====================
@@ -115,6 +123,7 @@ public class AccountService {
         state.displayName = str(me.get("displayName"));
         state.connectedAt = Instant.now().toString();
         state.lastSyncAt = state.connectedAt;
+        state.site = siteProfileService.currentSite();
         saveState(state);
         connectionVersion++;
         clearBalanceCache();
@@ -231,6 +240,24 @@ public class AccountService {
         }
     }
 
+    /**
+     * 0.91.0：被拒（401/403）的那次请求是不是发到了这把 Key 自己的站点。不是（比如启动时站点
+     * 解析错了，把国际站的 Key 发到了国内站），那次拒绝说明不了 Key 失效，绝不能据此清掉任何东西。
+     * 老账户文件没记站点时视为属于当前站点（与以前的行为一致），首次同步成功后会补记。
+     */
+    public synchronized boolean keyBelongsToCurrentSite() {
+        State state = loadState();
+        return state.site == null || state.site.isBlank() || state.site.equals(siteProfileService.currentSite());
+    }
+
+    /** 同步成功一次就把当前站点记为这把 Key 的站点（老账户文件补记）。 */
+    public synchronized void rememberKeySite() {
+        State state = loadState();
+        if (state.key == null || state.key.isBlank() || (state.site != null && !state.site.isBlank())) return;
+        state.site = siteProfileService.currentSite();
+        saveState(state);
+    }
+
     /** Credentials and destination are captured under the same lock used by site switching. */
     public record ConnectionSnapshot(String baseUrl, String key, String fingerprint, long generation) {
         @Override public String toString() { return "ConnectionSnapshot[baseUrl=" + baseUrl + ", generation=" + generation + "]"; }
@@ -252,8 +279,7 @@ public class AccountService {
     private synchronized ConnectionSnapshot requireConnectionSnapshot() {
         ConnectionSnapshot connection = connectionSnapshot();
         if (connection.key() == null) throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                LangText.of("尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
-                        "No AI WorkDeck account connected yet. Use Sign in at the top right."));
+                LangText.of(NOT_CONNECTED_MESSAGE));
         return connection;
     }
 
@@ -1224,8 +1250,7 @@ public class AccountService {
         State state = loadState();
         if (state.authExpired || state.key == null || state.key.isBlank()) {
             throw new AccountException(AccountException.Kind.NOT_CONNECTED,
-                    LangText.of("尚未连接 AI WorkDeck 账户，可点右上角的账户按钮连接",
-                            "No AI WorkDeck account connected yet. Use Sign in at the top right."));
+                    LangText.of(NOT_CONNECTED_MESSAGE));
         }
         return state.key;
     }

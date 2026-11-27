@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Website-Anmeldung",
     "ACCOUNT_API_KEY_CREATED": "Konto-Schlüssel ausgestellt",
     "ACCOUNT_API_KEY_REVOKED": "Konto-Schlüssel widerrufen"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Geändert von {from} zu {to}",
+    "role": "Rolle: {role}",
+    "team": "Team: {name}",
+    "firmAdmin": "Kanzleiadministrator",
+    "memberCount": "{count} Personen",
+    "removedBy": "Entfernt von {name}",
+    "issuedBy": "Ausgestellt von {name}",
+    "keyPrefix": "Key beginnt mit {prefix}",
+    "label": "Name: {label}",
+    "via": "Über: {via}",
+    "shareHistoryOn": "Versionsverlauf wird ebenfalls geteilt",
+    "shareHistoryOff": "Versionsverlauf wird nicht geteilt",
+    "enabledOn": "Eingeschaltet",
+    "enabledOff": "Ausgeschaltet",
+    "expiresAt": "Gültig bis {date}",
+    "suppressedRepeats": "{count} identische Einträge zusammengeführt",
+    "purgedRows": "{count} abgelaufene Einträge entfernt",
+    "reason": "Grund: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "Inhaber",
+      "ADMIN": "Administrator",
+      "MEMBER": "Mitglied",
+      "READ_ONLY": "Mitglied mit Lesezugriff",
+      "PARTICIPANT": "Teilnehmer",
+      "MANAGER": "Manager",
+      "VIEWER": "Betrachter"
+    }
   }
 }

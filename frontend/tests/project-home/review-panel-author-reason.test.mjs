@@ -12,8 +12,8 @@ import { makeReviewVm } from '../_lib/review-panel-vm.mjs'
 function makeEngine() {
   const revisions = [
     // AI 的一次替换：删「三」+「十日」（连按 Backspace，引擎记两条，页边模式下都
-    // 塌到 offset 10）+ 插「六十日」。删与插类型不同，必然是两张卡；两条删除首尾
-    // 相接、同作者同分钟，合成同一张。
+    // 塌到 offset 10）+ 插「六十日」。两条删除首尾相接、同作者同分钟，先并成一组；
+    // 紧接着的插入与它相接、同作者，配成一张「替换」卡（Q25：删插分开处置会弄坏句子）。
     { index: 0, type: 'Delete', author: 'AI WorkDeck', date: '2026-09-02 10:00', text: '三', paraKey: 2, start: 10, end: 10, contiguous: false },
     { index: 1, type: 'Delete', author: 'AI WorkDeck', date: '2026-09-02 10:00', text: '十日', paraKey: 2, start: 10, end: 10, contiguous: true },
     { index: 2, type: 'Insert', author: 'AI WorkDeck', date: '2026-09-02 10:00', text: '六十日', paraKey: 2, start: 10, end: 13, contiguous: true },
@@ -60,15 +60,15 @@ test('作者维度：每张卡带 authorKind，四个桶的计数按未筛选全
   const vm = makeReviewVm(engine, { selfAuthor: '韩泽伟' })
   await vm.reload()
   const groups = vm.allGroups
-  assert.equal(groups.length, 4, '两条连续删除并成一张卡；插入型另起一张（类型不同不合并）')
-  assert.deepEqual(groups.map((g) => g.authorKind), ['ai', 'ai', 'me', 'other'])
-  assert.deepEqual(groups.map((g) => g.items.length), [2, 1, 1, 1])
-  assert.deepEqual(vm.authorCounts, { all: 4, ai: 2, me: 1, other: 1 })
+  assert.equal(groups.length, 3, '两条连续删除并成一组，再与相接的插入配成一张替换卡')
+  assert.deepEqual(groups.map((g) => g.authorKind), ['ai', 'me', 'other'])
+  assert.deepEqual(groups.map((g) => g.items.length), [3, 1, 1])
+  assert.deepEqual(vm.authorCounts, { all: 3, ai: 1, me: 1, other: 1 })
 
   vm.authorFilter = 'ai'
-  assert.equal(vm.revisionGroups.length, 2)
+  assert.equal(vm.revisionGroups.length, 1)
   assert.ok(vm.revisionGroups.every((g) => g.author === 'AI WorkDeck'))
-  assert.deepEqual(vm.authorCounts, { all: 4, ai: 2, me: 1, other: 1 }, '筛选后计数不许跟着变')
+  assert.deepEqual(vm.authorCounts, { all: 3, ai: 1, me: 1, other: 1 }, '筛选后计数不许跟着变')
   vm.authorFilter = 'other'
   assert.equal(vm.revisionGroups[0].author, '王律师')
 })
@@ -81,8 +81,10 @@ test('类型标注：格式类修订不再显示成「插入」，并带上引�
   assert.equal(fmt.typeKey, 'format')
   assert.equal(vm.typeLabel(fmt), 'editor.review.typeFormat')
   assert.equal(fmt.description, '属性已更改')
-  const del = vm.allGroups.find((g) => g.typeKey === 'delete')
-  assert.equal(vm.typeLabel(del), 'editor.review.deletion')
+  const rep = vm.allGroups.find((g) => g.typeKey === 'replace')
+  assert.equal(vm.typeLabel(rep), 'editor.review.replacement')
+  assert.equal(rep.text, '三十日')
+  assert.equal(rep.insText, '六十日')
 })
 
 test('理由：位置重叠的批注挂进修订卡，批注列表里也标出已挂载', async () => {
@@ -90,9 +92,9 @@ test('理由：位置重叠的批注挂进修订卡，批注列表里也标出�
   const vm = makeReviewVm(engine, { selfAuthor: '韩泽伟' })
   await vm.reload()
   const aiCards = vm.allGroups.filter((g) => g.authorKind === 'ai')
-  assert.equal(aiCards.length, 2)
+  assert.equal(aiCards.length, 1)
   for (const card of aiCards) {
-    assert.equal(card.reasons.length, 1, '同一条批注同时是删卡与插卡的理由，且组内去重只留一份')
+    assert.equal(card.reasons.length, 1, '同一条批注同时是删与插的理由，组内去重只留一份')
     assert.equal(card.reasons[0].content, '【修訂理由】账期与主协议第 3 条不一致')
   }
   // 挂不上的批注照旧单独列，且不带「已挂载」标记
@@ -104,13 +106,13 @@ test('处置联动：接受一张卡之后，它的理由批注被标记为已�
   const engine = makeEngine()
   const vm = makeReviewVm(engine, { selfAuthor: '韩泽伟' })
   await vm.reload()
-  const ai = vm.allGroups.find((g) => g.typeKey === 'delete')
+  const ai = vm.allGroups.find((g) => g.typeKey === 'replace')
   engine.calls.length = 0
   await vm.resolveGroup(ai, 'accept')
 
   const resolveCalls = engine.calls.filter((c) => c.action === 'resolve_revisions')
   assert.equal(resolveCalls.length, 1, '批量处置仍只发一次 resolve_revisions')
-  assert.deepEqual(resolveCalls[0].params.indices, [1, 0], '仍按降序传索引')
+  assert.deepEqual(resolveCalls[0].params.indices, [2, 1, 0], '删与插一起处置，仍按降序传索引')
   const cmtCalls = engine.calls.filter((c) => c.action === 'set_comment_resolved')
   assert.equal(cmtCalls.length, 1, '只处理关联到的那一条批注')
   assert.equal(cmtCalls[0].params.id, 'cmt1', '按 id 定位——index 在修订处置后会前移')
@@ -125,7 +127,7 @@ test('处置联动：引擎一条都没命中时不去动批注', async () => {
   const engine = makeEngine()
   const vm = makeReviewVm(engine, { selfAuthor: '韩泽伟' })
   await vm.reload()
-  const ai = vm.allGroups.find((g) => g.typeKey === 'delete')
+  const ai = vm.allGroups.find((g) => g.typeKey === 'replace')
   const orig = engine.executeCommand.bind(engine)
   engine.executeCommand = async (action, params) => {
     if (action === 'resolve_revisions') {

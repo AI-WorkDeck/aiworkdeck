@@ -477,3 +477,128 @@ test('ci.yml: Desktop unit tests (Linux) installs frontend deps first (desktop t
   const unit = steps.findIndex((s) => s['working-directory'] === 'desktop' && /npm test/.test(s.run || ''))
   assert.ok(fe >= 0 && unit > fe, 'frontend npm ci must run before the desktop unit tests')
 })
+
+// Journeys and Marketing screenshots are required checks on PRs (master-green, 2026-11-25): they must
+// trigger on every PR and skip their job (skipped counts as passed) instead of using a workflow-level paths
+// filter, which would leave a required check pending forever on PRs that don't touch those paths.
+for (const [file, job] of [['journeys.yml', 'journeys'], ['marketing-screenshots.yml', 'capture']]) {
+  test(`${file}: required-check safe — no PR paths filter, job gated by the scope job`, () => {
+    const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
+    assert.ok(!(wf.on.pull_request && wf.on.pull_request.paths), 'no workflow-level paths filter on pull_request')
+    assert.deepStrictEqual([].concat(wf.jobs[job].needs), ['scope'])
+    assert.ok(wf.jobs[job].if.includes("github.event_name != 'pull_request' || needs.scope.outputs.run == 'true'"))
+    assert.ok(wf.jobs[job].if.includes('!cancelled()'))
+    assert.strictEqual(wf.jobs.scope.if, "github.event_name == 'pull_request'")
+  })
+}
+
+// Maven Central flakes (429 / dropped transfers) must not turn required checks red (2026-11-25, dev-board#1816).
+// One cold-build job writes the Linux Maven cache; every other Maven job restores it read-only and can fall back
+// to Google's Central mirror. Partial caches saved by -DskipTests or dependency-only jobs stuck under an exact key.
+const repoRoot = path.join(workflowsDir, '..', '..')
+const mavenSetup = './.github/actions/maven-setup'
+for (const [file, job] of [
+  ['ci.yml', 'backend'], ['journeys.yml', 'journeys'], ['marketing-screenshots.yml', 'capture'],
+  ['supply-chain.yml', 'sbom'], ['model-matrix.yml', 'matrix'], ['model-catalogue-audit.yml', 'audit'],
+]) {
+  test(`${file}: ${job} restores the warm Maven cache read-only through the shared setup, before any mvn`, () => {
+    const steps = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8')).jobs[job].steps
+    const setup = steps.findIndex((s) => s.uses === mavenSetup)
+    assert.ok(setup >= 0, 'uses the shared Maven setup')
+    assert.ok(!(steps[setup].with && steps[setup].with.restore === 'false'), 'restores the warm cache')
+    const firstMvn = steps.findIndex((s) => /\bmvn\b|build\.sh/.test(String(s.run || '')))
+    assert.ok(firstMvn > setup, 'Maven setup runs before the first mvn')
+    assert.ok(!steps.some((s) => /^actions\/cache@/.test(String(s.uses)) && /\.m2/.test(String(s.with && s.with.path))),
+      'no job but the warm job saves the Maven cache')
+    const javaStep = steps.find((s) => String(s.uses).startsWith('actions/setup-java'))
+    assert.ok(!javaStep.with.cache, 'setup-java cache: maven would save a partial cache')
+  })
+}
+
+test('no workflow uses setup-java cache: maven; only the warm job and desktop-build (macOS/Windows) save ~/.m2', () => {
+  for (const file of fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'))) {
+    const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, file), 'utf8'))
+    for (const [id, job] of Object.entries(wf.jobs || {})) {
+      for (const s of job.steps || []) {
+        assert.ok(!(String(s.uses).startsWith('actions/setup-java') && s.with && s.with.cache), `${file}:${id} setup-java cache`)
+        const savesM2 = /^actions\/cache(\/save)?@/.test(String(s.uses)) && /\.m2/.test(String(s.with && s.with.path))
+        if (savesM2) assert.ok(['maven-cache-warm.yml', 'desktop-build.yml'].includes(file), `${file}:${id} saves ~/.m2`)
+      }
+    }
+  }
+  const matrixOs = yaml.load(fs.readFileSync(path.join(workflowsDir, 'desktop-build.yml'), 'utf8')).jobs.build.strategy.matrix.os
+  assert.ok(!/ubuntu/.test(matrixOs), 'desktop-build caches are per-OS and never Linux')
+})
+
+test('maven-setup action: restore-only cache, fallback settings installed, short retries', () => {
+  const action = yaml.load(fs.readFileSync(path.join(repoRoot, '.github/actions/maven-setup/action.yml'), 'utf8'))
+  const [restore, settings] = action.runs.steps
+  assert.match(restore.uses, /^actions\/cache\/restore@/)
+  assert.match(restore.with.key, /^maven-warm-/)
+  assert.match(restore.with['restore-keys'], /maven-warm-\$\{\{ runner\.os \}\}-\$\{\{ runner\.arch \}\}-\n/)
+  assert.match(settings.run, /ci-settings\.xml" ~\/\.m2\/settings\.xml/)
+  const count = Number(/retryHandler\.count=(\d+)/.exec(settings.run)[1])
+  assert.ok(count <= 2, 'long Central retries delay the fallback by minutes per artifact')
+})
+
+test('ci-settings.xml: Central first, Google mirror second, for dependencies and plugins; no <mirror>', () => {
+  const xml = fs.readFileSync(path.join(repoRoot, '.github/actions/maven-setup/ci-settings.xml'), 'utf8').split('-->').map((p) => p.split('<!--')[0]).join('')
+  assert.ok(!/<mirrors?>/.test(xml), 'a mirror would replace Central instead of backing it up')
+  for (const tag of ['repositories', 'pluginRepositories']) {
+    const block = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(xml)[1]
+    const urls = [...block.matchAll(/<url>([^<]+)<\/url>/g)].map((m) => m[1])
+    assert.deepStrictEqual(urls, ['https://repo.maven.apache.org/maven2', 'https://maven-central.storage-download.googleapis.com/maven2'], tag)
+  }
+  assert.match(xml, /<activeProfile>central-with-fallback<\/activeProfile>/)
+})
+
+test('maven-cache-warm.yml: cold build, key fixed before the build, saved only from a full success off-PR', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'maven-cache-warm.yml'), 'utf8'))
+  const steps = wf.jobs.maven.steps
+  const names = steps.map((s) => s.name || s.uses)
+  const idx = (re) => names.findIndex((n) => re.test(n))
+  assert.ok(idx(/^Cache key/) < idx(/^Empty local repository/))
+  assert.match(steps[idx(/^Empty local repository/)].run, /rm -rf ~\/\.m2\/repository/)
+  assert.strictEqual(steps.find((s) => s.uses === mavenSetup).with.restore, 'false')
+  assert.ok(!steps.some((s) => /^actions\/cache(\/restore)?@/.test(String(s.uses))), 'never restores')
+  for (const re of [/^Install plugin-api/, /^Official plugins/, /^Backend verify/, /^SBOM goal/]) assert.ok(idx(re) > idx(/^Empty local/), String(re))
+  const save = steps[steps.length - 1]
+  assert.match(save.uses, /^actions\/cache\/save@/)
+  assert.strictEqual(save.if, "github.event_name != 'pull_request'")
+  assert.strictEqual(save.with.key, '${{ steps.key.outputs.key }}')
+  assert.ok(wf.on.schedule && wf.on.push.paths.includes('**/pom.xml'))
+  // official plugins built by CI are the ones warmed
+  const ciRuns = yaml.load(fs.readFileSync(path.join(workflowsDir, 'ci.yml'), 'utf8')).jobs.backend.steps.map((s) => String(s.run || ''))
+  const warmRun = steps[idx(/^Official plugins/)].run
+  for (const m of ciRuns.join('\n').matchAll(/official-plugins\/([\w-]+)\/build\.sh/g)) assert.ok(warmRun.includes(m[0]), m[0])
+})
+
+test('journeys.yml: app-e2e runs only when the stack came up (no misleading follow-on error after a failed build)', () => {
+  const steps = yaml.load(fs.readFileSync(path.join(workflowsDir, 'journeys.yml'), 'utf8')).jobs.journeys.steps
+  assert.ok(steps.find((s) => s.id === 'servers'))
+  assert.match(steps.find((s) => s.name === 'Whole-app journeys (app-e2e)').if, /steps\.servers\.outcome == 'success'/)
+})
+
+test('codeql.yml: PRs analyse the languages they touch; master/schedule analyse all five; default query suite', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'codeql.yml'), 'utf8'))
+  const pick = wf.jobs.languages.steps.find((s) => s.id === 'pick').run
+  assert.match(pick, /all='\["actions","c-cpp","java-kotlin","javascript-typescript","python"\]'/)
+  assert.match(pick, /if \[ "\$EVENT" != pull_request \]/)
+  for (const lang of ['actions', 'c-cpp', 'java-kotlin', 'javascript-typescript', 'python']) assert.ok(pick.includes(`"${lang}"`), lang)
+  assert.ok(wf.on.schedule && wf.on.push.branches.includes('master'))
+  const analyze = wf.jobs.analyze
+  assert.strictEqual(analyze.name, 'Analyze (${{ matrix.language }})')
+  const init = analyze.steps.find((s) => String(s.uses).startsWith('github/codeql-action/init'))
+  assert.strictEqual(init.with.queries, undefined, 'keep the default query suite (what default setup ran)')
+  assert.strictEqual(wf.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
+})
+
+test('ci.yml: DPIA and PPT suites are job-gated by changed paths on PRs and always run on master', () => {
+  const wf = yaml.load(fs.readFileSync(path.join(workflowsDir, 'ci.yml'), 'utf8'))
+  for (const [job, out] of [['dpia-reports', 'dpia'], ['pptx-service', 'pptx']]) {
+    assert.deepStrictEqual([].concat(wf.jobs[job].needs), ['paths'])
+    assert.ok(wf.jobs[job].if.includes(`github.event_name != 'pull_request' || needs.paths.outputs.${out} == 'true'`), job)
+    assert.ok(wf.jobs[job].if.includes('!cancelled()'), `${job} must not be skipped on master just because paths is skipped`)
+  }
+  assert.ok(!wf.on.pull_request || !wf.on.pull_request.paths, 'no workflow-level paths filter: it would leave required checks pending')
+})

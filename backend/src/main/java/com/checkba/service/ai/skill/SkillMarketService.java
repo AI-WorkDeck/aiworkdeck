@@ -73,6 +73,8 @@ public class SkillMarketService {
         private String authorDisplayName;
         private List<String> triggers = new ArrayList<>();
         private List<String> allowedTools = new ArrayList<>();
+        /** 注册表多语言块（X47）：目前只用 i18n['zh-hant'] 的 name/description/triggers */
+        private java.util.Map<String, Object> i18n;
         /** 官网 SKILL_CATEGORIES 分类 id；旧注册表可能缺失，前端按"其他"兜底 */
         private String category;
         private Integer downloads;
@@ -101,6 +103,7 @@ public class SkillMarketService {
      * @throws IllegalStateException 注册表不可达或返回内容无法解析（调用方转 {code:1}，不阻断本地功能）
      */
     public List<MarketSkillView> listMarket() {
+        if (!purchaseGate.mayContact(currentRegistryUrl())) return new java.util.ArrayList<>();   // 没选站前不连任何站点
         var connection = purchaseGate.connectionSnapshot();
         String body = httpGet(currentRegistryUrl());
         purchaseGate.assertConnection(connection);
@@ -137,6 +140,11 @@ public class SkillMarketService {
                 if (view.getDescriptionEn() != null && !view.getDescriptionEn().isBlank()) {
                     view.setDescription(view.getDescriptionEn());
                 }
+            }
+            if (com.checkba.service.ai.RegistryZhHant.active()) {
+                view.setName(com.checkba.service.ai.RegistryZhHant.text(view.getI18n(), "name", view.getName()));
+                view.setDescription(com.checkba.service.ai.RegistryZhHant.text(view.getI18n(), "description", view.getDescription()));
+                view.setTriggers(com.checkba.service.ai.RegistryZhHant.list(view.getI18n(), "triggers", view.getTriggers()));
             }
             view.setPurchased(view.getPriceCents() > 0 && view.getId() != null
                     && purchaseGate.purchased(MarketPurchaseGate.skillFeature(view.getId())));

@@ -14,6 +14,7 @@ export default {
   "unreadNotifications": "未読の連携通知 {count} 件",
   "clientWorkspace": "クライアント連携",
   "clientWorkspaceHint": "このワークスペースで招待されたプロジェクトに接続し、チェックリストの確認、資料の提出、レビュー状況の追跡を行えます。",
+  "thisCaseClients": "この事件ファイルのクライアント（{count}）",
   "openClientWorkspace": "クライアント連携を開く",
   "lists": "デューデリジェンス・チェックリスト",
   "refresh": "更新",

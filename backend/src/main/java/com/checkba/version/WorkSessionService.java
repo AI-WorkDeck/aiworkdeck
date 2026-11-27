@@ -1006,6 +1006,52 @@ public class WorkSessionService {
      * git 原生拒绝——客户端走「被拒 → 从云端更新 → 重推」的正常循环，
      * 网页端未存档的编辑分毫不丢。失败吞掉（版本记录不阻断主流程）。
      */
+    /** C23：客户经门户交的材料。 */
+    public void recordClientSubmission(long projectId, List<String> paths, String clientName, String itemTitle) {
+        recordSubmission(projectId, paths, clientName, itemTitle, true);
+    }
+
+    /**
+     * C23（CEO 2026-11-26 批准）：尽调材料落盘后单独存成一版，绝不开工作段，也绝不夹带别人的改动——
+     * 原来客户上传会以客户名义开工作段，那一版把服务端其它待存改动一起收进去，律师在合并窗口里看到
+     * 「客户改了第四条」。先把与这次材料无关的待存改动以系统名义存一版（同 push 前停靠），再只提交
+     * 材料本身与清单文件，作者是提交人，提交说明写明「客户提交了材料：…（清单项：…）」。
+     * 有工作段、合并窗口或不在主线时不动：文件留在磁盘上，下一版照常带走。失败只记日志，不影响上传本身。
+     */
+    public void recordSubmission(long projectId, List<String> paths, String submitterName, String itemTitle, boolean byClient) {
+        if (paths == null || paths.isEmpty() || !repoService.isInitialized(projectId)) return;
+        ReentrantLock lock = repoLock(projectId);
+        lock.lock();
+        try {
+            if (awaitingAdoptResolution(projectId) || activeSession(projectId).isPresent() || onDraftBranch(projectId)
+                    || !repoService.mainBranch().equals(repoService.currentBranch(projectId))) {
+                log.info("尽调材料暂不单独存版（有进行中的工作或合并）: project={}", projectId);
+                return;
+            }
+            java.util.Set<String> own = new java.util.LinkedHashSet<>(paths);
+            boolean otherPending = repoService.pendingChanges(projectId).stream()
+                    .anyMatch(c -> !own.contains(c.path()) && !c.path().startsWith(".awd/"));
+            if (otherPending) {
+                repoService.commitAllExcept(projectId, own, LangText.of("自动存档", "Autosave"), "auto", null,
+                        "AI WorkDeck", "system@aiworkdeck.local");
+            }
+            manifestService.writeToWorkTree(projectId, manifestService.capture(projectId));
+            String names = String.join("、", paths.stream().map(p -> p.substring(p.lastIndexOf('/') + 1)).toList());
+            String item = itemTitle == null || itemTitle.isBlank() ? "" : itemTitle;
+            String message = byClient
+                    ? LangText.of("客户提交了材料：" + names + (item.isEmpty() ? "" : "（清单项：" + item + "）"),
+                            "Client submitted materials: " + names + (item.isEmpty() ? "" : " (item: " + item + ")"))
+                    : LangText.of("提交了材料：" + names + (item.isEmpty() ? "" : "（清单项：" + item + "）"),
+                            "Submitted materials: " + names + (item.isEmpty() ? "" : " (item: " + item + ")"));
+            String who = submitterName == null || submitterName.isBlank() ? LangText.of("客户", "Client") : submitterName;
+            repoService.commitAll(projectId, message, "client-submission", null, who, "client@aiworkdeck.local");
+        } catch (Exception e) {
+            log.warn("尽调材料存版失败（材料已保存）: project={}", projectId, e);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public void dockDirtyMainlineForReceive(long projectId) {
         try {
             if (awaitingAdoptResolution(projectId)) return;
@@ -1052,6 +1098,9 @@ public class WorkSessionService {
                 changes = repoService.diffNameStatus(projectId, newSha, oldSha);
             }
             restoreWorkTreeFrom(projectId, newSha, changes);
+            // Receive moved master but not the index; without this, large objects read as server edits
+            // and dockDirtyMainlineForReceive commits a spurious 「自动存档」 before the next push.
+            repoService.resetIndexTo(projectId, newSha);
             syncManifestFromRef(projectId, "HEAD");
             pendingIngestBase.remove(projectId);
             log.info("push 落库完成: project={}, {} 个文件", projectId, changes.size());
@@ -1496,6 +1545,37 @@ public class WorkSessionService {
      * 磁盘已经被 checkout 改写，而打开中的编辑器还端着被丢弃分支的内容，不重载的话
      * 下一次 autosave 会把刚被丢弃的工作原样写回去。
      */
+    /**
+     * C27（lane C）：取回之前，一段只动了清单（.awd/）的工作——没有任何律师改过的文件——不该挡住取回。
+     * 这种工作是软件自己留下的（系统目录、清单重排），丢掉它不丢任何人的东西。是这种就丢弃并回 true。
+     */
+    public boolean discardIfManifestOnly(long projectId, Long userId) {
+        ReentrantLock lock = repoLock(projectId);
+        lock.lock();
+        try {
+            if (awaitingAdoptResolution(projectId)) return false;
+            WorkSession s = activeSession(projectId).orElse(null);
+            if (s == null) return false;
+            List<FileChange> committed = repoService.diffNameStatus(projectId, repoService.mainBranch(), s.getBranchName());
+            List<FileChange> pendingNow = repoService.pendingChanges(projectId);
+            boolean committedOnlyManifest = committed.stream().allMatch(c -> c.path().startsWith(".awd/"));
+            boolean pendingOnlyManifest = pendingNow.stream().allMatch(c -> c.path().startsWith(".awd/"));
+            if (!committedOnlyManifest || !pendingOnlyManifest) return false;
+            // CEO: log exactly what is dropped (only manifest paths by construction)
+            log.info("取回前丢弃只改了清单的工作段（没有律师改动）: project={} session={} branch={} dropped committed={} pending={}",
+                    projectId, s.getId(), s.getBranchName(),
+                    committed.stream().map(c -> c.type() + " " + c.path()).toList(),
+                    pendingNow.stream().map(c -> c.type() + " " + c.path()).toList());
+            discardSession(projectId, userId);
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("检查只改了清单的工作段失败，照常要求先处理: project={}", projectId, e);
+            return false;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public List<Long> discardSession(long projectId, Long userId) {
         ReentrantLock lock = repoLock(projectId);
         lock.lock();

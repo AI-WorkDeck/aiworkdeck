@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Website-aanmelding",
     "ACCOUNT_API_KEY_CREATED": "Accountsleutel uitgegeven",
     "ACCOUNT_API_KEY_REVOKED": "Accountsleutel ingetrokken"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "Gewijzigd van {from} naar {to}",
+    "role": "Rol: {role}",
+    "team": "Team: {name}",
+    "firmAdmin": "Kantoorbeheerder",
+    "memberCount": "{count} personen",
+    "removedBy": "Verwijderd door {name}",
+    "issuedBy": "Uitgegeven door {name}",
+    "keyPrefix": "Key begint met {prefix}",
+    "label": "Naam: {label}",
+    "via": "Via: {via}",
+    "shareHistoryOn": "Versiegeschiedenis ook gedeeld",
+    "shareHistoryOff": "Versiegeschiedenis niet gedeeld",
+    "enabledOn": "Ingeschakeld",
+    "enabledOff": "Uitgeschakeld",
+    "expiresAt": "Geldig tot {date}",
+    "suppressedRepeats": "{count} identieke vermeldingen samengevoegd",
+    "purgedRows": "{count} verlopen records verwijderd",
+    "reason": "Reden: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "eigenaar",
+      "ADMIN": "beheerder",
+      "MEMBER": "lid",
+      "READ_ONLY": "lid met alleen-lezen-toegang",
+      "PARTICIPANT": "deelnemer",
+      "MANAGER": "manager",
+      "VIEWER": "kijker"
+    }
   }
 }

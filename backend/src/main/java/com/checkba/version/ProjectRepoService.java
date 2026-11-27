@@ -24,6 +24,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -178,7 +179,7 @@ public class ProjectRepoService {
                     }
                 }
             }
-            return Math.addExact(total, objectStore.usageBytes(projectId));
+            return Math.addExact(total, billableObjectBytes(projectId));
         } catch (IOException e) {
             log.warn("统计版本记录占用失败: project={}", projectId, e);
             return total;
@@ -566,6 +567,33 @@ public class ProjectRepoService {
     }
 
     /** Commit the working tree, persisting externalized snapshots before their Git pointers. No cloud I/O. */
+    /**
+     * C23：提交工作区里除 {@code excluded} 之外的全部改动（客户交材料之前，先把服务端别处的待存改动
+     * 以系统名义单独存一版，客户那一版就只含他自己的文件）。没有可提交的回 null。
+     */
+    public String commitAllExcept(long projectId, Collection<String> excluded, String message, String kind,
+                                  String note, String authorName, String authorEmail) {
+        clearStaleIndexLock(projectId);
+        try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            Status pre = git.status().call();
+            if (pre.isClean()) return null;
+            stageAll(git, pre);
+            if (excluded != null && !excluded.isEmpty()) {
+                var reset = git.reset();
+                excluded.forEach(reset::addPath);
+                reset.call();
+            }
+            Status staged = git.status().call();
+            if (staged.getAdded().isEmpty() && staged.getChanged().isEmpty() && staged.getRemoved().isEmpty()) return null;
+            StringBuilder msg = new StringBuilder(message).append("\n\n")
+                    .append(KIND_TRAILER).append(kind).append('\n').append(OBJECT_FORMAT_TRAILER);
+            if (note != null && !note.isBlank()) msg.append('\n').append(NOTE_TRAILER).append(note);
+            return git.commit().setMessage(msg.toString()).setAuthor(authorName, authorEmail).call().getName();
+        } catch (Exception e) {
+            throw new VersionException("提交失败: project=" + projectId, e);
+        }
+    }
+
     public String commitAll(long projectId, String message, String kind, String note,
                             String authorName, String authorEmail) {
         clearStaleIndexLock(projectId);
@@ -671,6 +699,13 @@ public class ProjectRepoService {
             removeNestedMetadataFromIndex(repo);
             return null;
         });
+        // C12：暂存会把工作区里没有的「仅在本机」文件记成删除——放回 HEAD 的条目，提交里保住它的指针
+        Set<String> localOnly = localOnlyMissingPaths(repo);
+        if (!localOnly.isEmpty()) {
+            var reset = git.reset();
+            localOnly.forEach(reset::addPath);
+            reset.call();
+        }
     }
 
     /**
@@ -1427,7 +1462,10 @@ public class ProjectRepoService {
                     }
                 }
             }
+            // C12：「仅在共享人电脑上」的文件在工作区里本就没有，不是删除
+            Set<String> localOnly = localOnlyMissingPaths(repo);
             return changes.entrySet().stream()
+                    .filter(e -> !localOnly.contains(e.getKey()))
                     .map(e -> new FileChange(e.getKey(), e.getValue())).toList();
         } catch (Exception e) {
             throw new VersionException("读取未提交变更失败: project=" + projectId, e);
@@ -1582,6 +1620,44 @@ public class ProjectRepoService {
     }
 
     /** Atomic per-file restore, also supports pre-object-store Git blobs of any size. */
+    private boolean localOnlyPointerAt(long projectId, String ref, String path) {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        if (plans == null || !plans.hasLocalOnly(projectId)) return false;
+        try (Repository repo = open(projectId); RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return false;
+            RevCommit commit = walk.parseCommit(id);
+            ObjectLoader loader = loaderAt(repo, commit, path);
+            if (loader == null) return false;
+            var pointer = pointerAt(repo, commit, loader);
+            return pointer != null && declaredLocalOnly(projectId, pointer);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * C12：一个曾被声明「仅在本机」的对象后来到了案件库（共享人开了备份）：把 HEAD 里指向它、工作区里还没有的
+     * 路径物化出来。只在主线上做；其余情况下一次落库照常带上。
+     */
+    /** Writes an object that arrived late into every HEAD path pointing at it; true when they are all on disk now. */
+    public boolean materializeArrivedObject(long projectId, LocalVersionObjectStore.ObjectRef object) {
+        try (Repository repo = open(projectId)) {
+            if (repo.resolve("HEAD^{commit}") == null || !MAIN_BRANCH.equals(repo.getBranch())) return false;
+            boolean all = true;
+            for (var e : pointerPathsAt(repo, "HEAD").entrySet()) {
+                if (!e.getValue().contains(object)) continue;
+                Path target = workTree(projectId).resolve(e.getKey());
+                if (!Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS)) copyBlobAtCommit(projectId, "HEAD", e.getKey(), target);
+                all &= Files.exists(target, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+            }
+            return all;
+        } catch (IOException | RuntimeException e) {
+            log.warn("物化后到的版本对象失败（下一次落库会补上）: project={}", projectId, e);
+            return false;
+        }
+    }
+
     public void copyBlobAtCommit(long projectId, String ref, String path, Path target) {
         Path work = workTree(projectId).toAbsolutePath().normalize();
         Path normalized = target.toAbsolutePath().normalize();
@@ -1591,6 +1667,10 @@ public class ProjectRepoService {
             for (Path parent = normalized.getParent(); parent != null && !parent.equals(work); parent = parent.getParent()) {
                 if (Files.isSymbolicLink(parent)) throw new IOException("Restore directory is a symbolic link");
             }
+            // C12：这一版里该路径指向一个「仅在共享人电脑上」的对象：不写文件，旧版本留下的旧字节也删掉，
+            // 网页端不能把旧内容当成现在的版本展示（lane W 复核）。
+            var declaredPointer = localOnlyPointerAt(projectId, ref, path);
+            if (declaredPointer) { Files.deleteIfExists(normalized); return; }
             try (InputStream in = openBlobAtCommit(projectId, ref, path)) {
                 if (in == null) { Files.deleteIfExists(normalized); return; }
                 Files.createDirectories(normalized.getParent());
@@ -1608,8 +1688,57 @@ public class ProjectRepoService {
         } catch (IOException e) { throw new VersionException("还原版本内容失败: " + path, e); }
     }
 
+    /**
+     * Points the index at {@code ref} without touching the worktree (git reset --mixed). Used after the server
+     * materializes a received version: a stale index made pendingChanges fall back to a HEAD-vs-disk diff that
+     * compares full media bytes against their pointers, so every large object read as a server edit.
+     */
+    public void resetIndexTo(long projectId, String ref) {
+        try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            git.reset().setMode(ResetCommand.ResetType.MIXED).setRef(ref).call();
+        } catch (Exception e) {
+            throw new VersionException("更新版本索引失败: project=" + projectId, e);
+        }
+    }
+
     public List<LocalVersionObjectStore.ObjectRef> objectPointersAt(long projectId, String ref, boolean includeHistory) {
         try (Repository repo = open(projectId)) { return objectPointersAt(repo, ref, includeHistory); }
+    }
+
+    /**
+     * C12：主线（含历史）里以大对象指针保存的文件路径，供「交稿前要开文件云端备份」的说明点名。
+     * 最多 {@code limit} 个；读不出来返回空表（说明照常给，只是不点名）。
+     */
+    public List<String> objectPointerPaths(long projectId, String ref, boolean includeHistory, int limit) {
+        return objectPointerPaths(projectId, ref, includeHistory, limit, o -> true);
+    }
+
+    /** Paths whose pointer passes {@code only} (e.g. objects the case library doesn't hold yet). */
+    public List<String> objectPointerPaths(long projectId, String ref, boolean includeHistory, int limit,
+                                           java.util.function.Predicate<LocalVersionObjectStore.ObjectRef> only) {
+        java.util.LinkedHashSet<String> paths = new java.util.LinkedHashSet<>();
+        try (Repository repo = open(projectId); RevWalk walk = new RevWalk(repo)) {
+            ObjectId id = repo.resolve(ref + "^{commit}");
+            if (id == null) return List.of();
+            walk.markStart(walk.parseCommit(id));
+            for (RevCommit commit : walk) {
+                if (hasObjectFormat(commit)) {
+                    try (TreeWalk tree = new TreeWalk(repo)) {
+                        tree.addTree(commit.getTree());
+                        tree.setRecursive(true);
+                        while (tree.next() && paths.size() < limit) {
+                            if (tree.getFileMode(0).getObjectType() != Constants.OBJ_BLOB) continue;
+                            var pointer = pointerAt(repo, commit, repo.open(tree.getObjectId(0)));
+                            if (pointer != null && only.test(pointer)) paths.add(tree.getPathString());
+                        }
+                    }
+                }
+                if (!includeHistory || paths.size() >= limit) break;
+            }
+        } catch (Exception e) {
+            return List.of();
+        }
+        return new ArrayList<>(paths);
     }
 
     /** Also accepts an unaccepted receive-pack commit id. Only explicitly marked commits contain pointers. */
@@ -1755,6 +1884,97 @@ public class ProjectRepoService {
         return path.contains("/.awd/") || path.endsWith("/.awd");
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.version.cloud.ProjectObjectPlanService> objectPlans;
+
+    /** C12：版本对象占用里减去已完成的免费对象——配额、账单与仓库大小展示同一口径（lane W 复核）。 */
+    public long billableObjectBytes(long projectId) throws IOException {
+        long usage = objectStore.usageBytes(projectId);
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        return plans == null ? usage : Math.max(0, usage - plans.completedFreeBytes(projectId));
+    }
+
+    /** C12：HEAD 里指向这些对象（sha256）的路径——服务端工作区里免费对象的那份副本不计费。 */
+    public Set<String> headPathsPointingTo(long projectId, Set<String> sha256s) {
+        if (sha256s == null || sha256s.isEmpty()) return Set.of();
+        Set<String> out = new LinkedHashSet<>();
+        try (Repository repo = open(projectId)) {
+            if (repo.resolve("HEAD^{commit}") == null) return Set.of();
+            for (var e : pointerPathsAt(repo, "HEAD").entrySet())
+                if (e.getValue().stream().anyMatch(o -> sha256s.contains(o.sha256()))) out.add(e.getKey());
+        } catch (IOException | RuntimeException e) {
+            return Set.of();
+        }
+        return out;
+    }
+
+    /**
+     * C12 (lane C step 2): checkout / merge / reset materialize every pointer at the target, but an object the
+     * sharer declared local-only never arrives, so the smudge threw 「Version object is unavailable」 halfway through
+     * and left the worktree half-applied. Leave those out of the materialize set, then remove the pointer stub the
+     * checkout wrote in their place: the path stays absent (the tree shows the placeholder, status skips it).
+     */
+    private <T> T materializingExceptLocalOnly(Repository repo, Map<String, Set<LocalVersionObjectStore.ObjectRef>> paths,
+                                               VersionObjectFilters.Action<T> action) throws Exception {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        long projectId = projectIdOf(repo);
+        if (plans == null || !plans.hasLocalOnly(projectId)) return VersionObjectFilters.materializing(repo, paths, action);
+        Map<String, Set<LocalVersionObjectStore.ObjectRef>> fetch = new LinkedHashMap<>();
+        Map<String, Set<LocalVersionObjectStore.ObjectRef>> localOnly = new LinkedHashMap<>();
+        paths.forEach((path, refs) -> {
+            for (var ref : refs) {
+                (declaredLocalOnly(projectId, ref) ? localOnly : fetch).computeIfAbsent(path, k -> new LinkedHashSet<>()).add(ref);
+            }
+        });
+        T result = VersionObjectFilters.materializing(repo, fetch, action);
+        Path work = repo.getWorkTree().toPath();
+        for (var e : localOnly.entrySet()) {
+            Path file = work.resolve(e.getKey());
+            if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS) || Files.size(file) > VersionObjectPointer.MAX_BYTES) continue;
+            var pointer = VersionObjectPointer.parse(Files.readAllBytes(file));
+            if (pointer != null && e.getValue().contains(pointer)) Files.delete(file);
+        }
+        return result;
+    }
+
+    /** C12：这个对象不在本机/案件库，而是共享人声明了「仅在本机」（大小一致）。 */
+    private boolean declaredLocalOnly(long projectId, LocalVersionObjectStore.ObjectRef object) {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        if (plans == null || !plans.hasLocalOnly(projectId) || !plans.isDeclaredLocalOnly(projectId, object)) return false;
+        // W note: never hash large objects on every status call — presence with the right size is enough here
+        try {
+            Path stored = objectStore.path(projectId, object.sha256());
+            return !(Files.isRegularFile(stored, java.nio.file.LinkOption.NOFOLLOW_LINKS) && Files.size(stored) == object.size());
+        } catch (IOException | RuntimeException e) { return true; }
+    }
+
+    /**
+     * C12（lane W 复核）：HEAD 里那些对象被声明为「仅在共享人电脑上」、因而工作区里本就没有的路径。
+     * 状态与暂存都要跳过它们——否则工作区缺文件会被当成删除，push 前的自动存档把它从历史里删掉，
+     * 或者每次 push 前都多出一笔空的自动存档（#1761 那种被拒）。没有任何声明的案卷直接返回空集。
+     */
+    Set<String> localOnlyMissingPaths(Repository repo) {
+        long projectId;
+        try { projectId = projectIdOf(repo); } catch (RuntimeException e) { return Set.of(); }
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        if (plans == null || !plans.hasLocalOnly(projectId)) return Set.of();
+        Set<String> out = new LinkedHashSet<>();
+        try {
+            if (repo.resolve("HEAD^{commit}") == null) return Set.of();
+            for (var e : pointerPathsAt(repo, "HEAD").entrySet()) {
+                if (Files.exists(repo.getWorkTree().toPath().resolve(e.getKey()), java.nio.file.LinkOption.NOFOLLOW_LINKS)) continue;
+                // A colleague's placeholder: the record, not the cache, decides — the object may already be cached
+                // while the file is not written yet (lane C r2: that gap became an automatic 「删除」 of the sharer's
+                // evidence). The sharer's own file is real: deleting it is still recorded.
+                if (!e.getValue().isEmpty() && e.getValue().stream().allMatch(o -> declaredLocalOnly(projectId, o)
+                        || plans.declaration(projectId, o).map(r -> !Boolean.TRUE.equals(r.getMine())).orElse(false))) out.add(e.getKey());
+            }
+        } catch (IOException e) {
+            return Set.of();
+        }
+        return out;
+    }
+
     /** Explicit restore only: validate old manifests and recover objects before worktree mutation. */
     public void requireObjectsAt(Repository repo, String ref) {
         try {
@@ -1776,7 +1996,11 @@ public class ProjectRepoService {
                     }
                 }
             }
-            for (var object : objectPointersAt(repo, ref, false)) requireLocalObject(projectIdOf(repo), object);
+            for (var object : objectPointersAt(repo, ref, false)) {
+                // C12：被声明为「仅在共享人电脑上」的对象不算缺失（物化时跳过，见 copyBlobAtCommit）
+                if (declaredLocalOnly(projectIdOf(repo), object)) continue;
+                requireLocalObject(projectIdOf(repo), object);
+            }
         } catch (IOException e) {
             throw VersionException.userFacing(com.checkba.service.LangText.of(
                     "这份版本的文件内容尚未完整保存在本机，请完成同步后重试；当前文件未被替换",
@@ -1848,7 +2072,7 @@ public class ProjectRepoService {
             migrateNestedMetadataBranch(repo, name);
             requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, name);
-            VersionObjectFilters.materializing(repo, pointerPathsAt(repo, name),
+            materializingExceptLocalOnly(repo, pointerPathsAt(repo, name),
                     () -> git.checkout().setName(name).call());
         } catch (VersionException e) {
             throw e;
@@ -1966,7 +2190,7 @@ public class ProjectRepoService {
             String fullMessage = message + "\n\n" + KIND_TRAILER + "session\n" + OBJECT_FORMAT_TRAILER;
             Map<String, Set<LocalVersionObjectStore.ObjectRef>> materialized = pointerPathsAt(repo, "HEAD");
             pointerPathsAt(repo, branchName).forEach((path, refs) -> materialized.computeIfAbsent(path, p -> new LinkedHashSet<>()).addAll(refs));
-            MergeResult r = VersionObjectFilters.materializing(repo, materialized, () -> git.merge()
+            MergeResult r = materializingExceptLocalOnly(repo, materialized, () -> git.merge()
                     .include(target)
                     .setMessage(fullMessage)
                     .setFastForward(MergeCommand.FastForwardMode.NO_FF)
@@ -1997,8 +2221,14 @@ public class ProjectRepoService {
                     ? Collections.emptyList()
                     : new ArrayList<>(r.getConflicts().keySet());
             if (resetOnConflict) {
-                VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
+                materializingExceptLocalOnly(repo, pointerPathsAt(repo, "HEAD"),
                         () -> git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call());
+            } else {
+                // C28: JGit writes <<<<<<< markers into the conflicting files. The lawyer may open them in Word or
+                // Finder while choosing, so put back the pre-merge (HEAD) bytes; the conflict stays in the index and
+                // every choice is copied from the two commits (applyResolution), never read from this file.
+                Path work = workTree(projectId);
+                for (String p : conflicts) copyBlobAtCommit(projectId, "HEAD", p, work.resolve(p));
             }
             return new MergeOutcome(false, false, conflicts, null);
         } catch (VersionException e) {
@@ -2342,6 +2572,56 @@ public class ProjectRepoService {
         }
     }
 
+    /** C24: where the routine cloud check fetches the library's master, before it is published as origin/master. */
+    static final String CHECK_FETCH_REF = "refs/awd/check/origin-master";
+
+    /**
+     * C24 (lane C thread dump): the network half of the routine cloud check, safe to run without the repo lock.
+     * Fetches the library's master into {@link #CHECK_FETCH_REF} (never origin/master: an open merge window
+     * must not see it move) plus milestone tags; returns the fetched sha, or null for a library nobody pushed to.
+     * {@link #publishCheckedOrigin} then moves origin/master under the lock.
+     */
+    public String fetchOriginForCheck(long projectId, String username, String token) {
+        try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            git.fetch()
+                    .setRemote(ORIGIN)
+                    .setTransportConfigCallback(CloudGitEpochClient.transport(repo.getConfig().getString("remote", ORIGIN, "url"),username,token))
+                    .setCredentialsProvider(
+                            new org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider(
+                                    username == null ? "" : username, token == null ? "" : token))
+                    .setRefSpecs(new org.eclipse.jgit.transport.RefSpec("+refs/heads/master:" + CHECK_FETCH_REF),
+                            new org.eclipse.jgit.transport.RefSpec(MILESTONE_SPEC))
+                    .setTimeout(60)
+                    .call();
+            ObjectId fetched = repo.resolve(CHECK_FETCH_REF);
+            return fetched == null ? null : fetched.getName();
+        } catch (org.eclipse.jgit.api.errors.TransportException e) {
+            if (isEmptyRemoteFetchFailure(e)) return null;
+            throw new VersionException("从云端更新失败: project=" + projectId, e);
+        } catch (Exception e) {
+            throw new VersionException("从云端更新失败: project=" + projectId, e);
+        }
+    }
+
+    /** C24: moves origin/master to what {@link #fetchOriginForCheck} fetched (caller holds the repo lock). */
+    public void publishCheckedOrigin(long projectId, String sha) {
+        if (sha == null) return;
+        try (Repository repo = open(projectId)) {
+            RefUpdate update = repo.updateRef(ORIGIN_MASTER);
+            update.setNewObjectId(ObjectId.fromString(sha));
+            update.setForceUpdate(true);
+            RefUpdate.Result result = update.update();
+            if (result != RefUpdate.Result.NEW && result != RefUpdate.Result.FORCED
+                    && result != RefUpdate.Result.FAST_FORWARD && result != RefUpdate.Result.NO_CHANGE) {
+                throw new VersionException("更新云端引用失败: project=" + projectId + " result=" + result);
+            }
+        } catch (VersionException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new VersionException("更新云端引用失败: project=" + projectId, e);
+        }
+    }
+
     /**
      * 判别「远端裸仓从未有人推过、连 refs/heads/master 都不存在」这一 fetch 失败形态。
      * JGit 对显式 refspec fetch 空仓库固定抛
@@ -2416,7 +2696,7 @@ public class ProjectRepoService {
             if (target == null) throw new VersionException("目标版本不存在: " + targetRef);
             requireObjectsAt(repo, "HEAD");
             requireObjectsAt(repo, targetRef);
-            var result = VersionObjectFilters.materializing(repo, pointerPathsAt(repo, targetRef), () -> git.merge()
+            var result = materializingExceptLocalOnly(repo, pointerPathsAt(repo, targetRef), () -> git.merge()
                     .include(target)
                     .setFastForward(MergeCommand.FastForwardMode.FF_ONLY)
                     .call());
@@ -2514,7 +2794,7 @@ public class ProjectRepoService {
             try (Repository repo = open(projectId); Git git = new Git(repo)) {
                 beforeCheckout.run();
                 requireObjectsAt(repo, "HEAD");
-                VersionObjectFilters.materializing(repo, pointerPathsAt(repo, "HEAD"),
+                materializingExceptLocalOnly(repo, pointerPathsAt(repo, "HEAD"),
                         () -> git.checkout().setName(MAIN_BRANCH).call());
             }
         } catch (VersionException e) {

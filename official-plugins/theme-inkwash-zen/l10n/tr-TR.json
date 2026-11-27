@@ -1,8 +1,8 @@
 {
-  "plugin.name": "Mürekkep Fırçası Zen · Kaligrafi Teması",
-  "plugin.desc": "Xuan kağıdının beyaz boşluğu, beş aşamalı mürekkep yıkama hiyerarşisi ve açık ve koyu modlarda mor-mürekkep odak vurguları.",
-  "theme.name": "Mürekkep Fırçası Zen",
-  "theme.desc": "Xuan Kağıdı × Beş Tonlu Mürekkep Yıkama × Mor Mürekkep Damlası ↯ Aşı Boyası Mühür × Kinovar Mühür",
+  "plugin.name": "Mürekkep",
+  "plugin.desc": "Pirinç kâğıdı beyazı ve katman katman mürekkep grileri",
+  "theme.name": "Mürekkep",
+  "theme.desc": "Pirinç kâğıdı beyazı ve katman katman mürekkep grileri",
   "gallery.badge": "Tema galerisi",
   "gallery.swatch1": "Pirinç kâğıdı beyazı",
   "gallery.swatch2": "Koyu mürekkep",

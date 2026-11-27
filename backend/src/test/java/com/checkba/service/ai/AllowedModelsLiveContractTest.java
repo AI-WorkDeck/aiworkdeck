@@ -45,12 +45,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>失败时的处理顺序：先确认线上是真的变了（浏览器打开 openrouter.ai 的模型页核对），
  * 再改 {@link AllowedModels} 的价格或把模型换掉；**不要**为了让测试变绿而放宽容差。
+ *
+ * <p><b>多供应商模型按区间对拍</b>（2026-11-25，CEO 批准）：OpenRouter 目录里的 headline 单价
+ * 等于当前最便宜的那个在线 endpoint，多供应商模型的 headline 会随供应商上下线反复跳
+ * （deepseek-v4-pro 一天内 $1.28 → $0.58 → $0.89，12 家供应商 $0.89–$1.95）。
+ * 平台计费用的是上游回传的 usage.cost，这张表只决定 BYOK 花费估算和选择器价位，
+ * 所以对「有多个 endpoint 的单档模型」，只要我们记的单价落在线上 endpoint 的最低–最高价之间就算对；
+ * 单供应商模型、分档模型仍按 1% 精确对拍。
  */
 @DisplayName("模型白名单对拍 OpenRouter 线上目录（默认跳过）")
 @EnabledIfEnvironmentVariable(named = "RUN_LIVE_MODEL_CHECK", matches = "1")
 class AllowedModelsLiveContractTest {
 
     private static final String MODELS_URL = "https://openrouter.ai/api/v1/models";
+    /** 单个模型的全部在线供应商及其单价：{@code /models/{id}/endpoints}（公开端点）。 */
+    private static final String ENDPOINTS_URL = "https://openrouter.ai/api/v1/models/%s/endpoints";
 
     /** 单价容差：上游偶有末位舍入差异，1% 足够吸收，又抓得住 14% 这类真错。 */
     private static final double PRICE_TOLERANCE = 0.01;
@@ -133,8 +142,33 @@ class AllowedModelsLiveContractTest {
 
         // OpenRouter 的 pricing 是「每 token 的美元数」字符串，我们记的是 $/1M tokens
         AllowedModels.PriceTier first = model.getPriceTiers().get(0);
+        if (model.getPriceTiers().size() == 1) {
+            List<JsonNode> endpoints = fetchEndpoints(model.getModelId());
+            if (endpoints.size() > 1) {
+                assertPriceWithinEndpoints(model, "输入", first.inputPricePerM(), endpoints, "prompt");
+                assertPriceWithinEndpoints(model, "输出", first.outputPricePerM(), endpoints, "completion");
+                return;
+            }
+        }
         assertPriceClose(model, "输入", first.inputPricePerM(), entry.path("pricing").path("prompt"));
         assertPriceClose(model, "输出", first.outputPricePerM(), entry.path("pricing").path("completion"));
+    }
+
+    /** 多供应商模型：我们记的单价必须落在线上各 endpoint 单价的 [最低, 最高] 之间（各留 1% 舍入余量）。 */
+    private void assertPriceWithinEndpoints(AllowedModels model, String label, double oursPerM,
+                                            List<JsonNode> endpoints, String field) {
+        double min = Double.MAX_VALUE, max = 0d;
+        for (JsonNode e : endpoints) {
+            JsonNode price = e.path("pricing").path(field);
+            assertTrue(price.isTextual() || price.isNumber(),
+                    model.getModelId() + " 的 endpoint " + e.path("provider_name").asText() + " 缺" + label + "单价");
+            double perM = Double.parseDouble(price.asText()) * 1_000_000d;
+            min = Math.min(min, perM);
+            max = Math.max(max, perM);
+        }
+        assertTrue(oursPerM >= min * (1 - PRICE_TOLERANCE) && oursPerM <= max * (1 + PRICE_TOLERANCE), String.format(
+                "%s 的%s单价 $%s/1M 不在线上 %d 家供应商的区间 $%s–$%s/1M 内。改 AllowedModels，不要放宽区间。",
+                model.getModelId(), label, oursPerM, endpoints.size(), min, max));
     }
 
     private void assertPriceClose(AllowedModels model, String label, double oursPerM, JsonNode upstreamPerToken) {
@@ -157,6 +191,31 @@ class AllowedModelsLiveContractTest {
                 "%s 的%s单价漂移 %.1f%%：我们记 $%s/1M，线上是 $%s/1M。"
                         + "偏高就是对用户超收，偏低是低报花费，两者都要改 AllowedModels，不要放宽容差。",
                 model.getModelId(), label, drift * 100, oursPerM, upstreamPerM));
+    }
+
+    /** 某模型的在线 endpoint 列表。 */
+    private List<JsonNode> fetchEndpoints(String modelId) {
+        JsonNode endpoints = getJson(String.format(ENDPOINTS_URL, modelId)).path("data").path("endpoints");
+        assertTrue(endpoints.isArray() && endpoints.size() > 0, modelId + " 没有在线 endpoint，无法完成对拍");
+        List<JsonNode> list = new ArrayList<>();
+        endpoints.forEach(list::add);
+        return list;
+    }
+
+    private JsonNode getJson(String url) {
+        try {
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(30)).header("Accept", "application/json").GET().build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertTrue(response.statusCode() == 200, "拉取 " + url + " 失败，HTTP " + response.statusCode() + "，无法完成对拍");
+            return new ObjectMapper().readTree(response.body());
+        } catch (java.io.IOException e) {
+            throw new AssertionError("拉取 " + url + " 出错，无法完成对拍：" + e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("拉取 " + url + " 被中断");
+        }
     }
 
     /** 拉线上目录，按 id 索引。这里不带 API key——{@code /models} 是公开端点。 */

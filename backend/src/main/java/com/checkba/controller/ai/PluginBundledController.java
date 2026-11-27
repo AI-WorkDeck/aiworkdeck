@@ -7,6 +7,7 @@ import com.checkba.repository.UserRepository;
 import com.checkba.service.AdminAccessService;
 import com.checkba.service.ai.PluginBundledInstaller;
 import com.checkba.service.ai.PluginService;
+import com.checkba.service.lawfirm.LawFirmBundledPluginInstaller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +21,14 @@ public class PluginBundledController {
     private final PluginService plugins;
     private final UserRepository users;
     private final AdminAccessService admins;
+    private final LawFirmBundledPluginInstaller lawFirm;
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> list(@RequestHeader(value="X-Session-Id", required=false) String session) {
         if (AuthController.getUserIdFromSession(session) == null) return ResponseEntity.status(401).body(Map.of("code", 1, "message", "Sign in required"));
-        var rows = installer.available();
+        var rows = new java.util.ArrayList<>(installer.available());
+        var lawFirmRow = lawFirm.bundledListing();
+        if (lawFirmRow != null && rows.stream().noneMatch(r -> LawFirmBundledPluginInstaller.PLUGIN_ID.equals(r.get("id")))) rows.add(lawFirmRow);
         for (Map<String, Object> row : rows) {
             String id = String.valueOf(row.get("id"));
             row.put("name", plugins.localizeListing(id, (String) row.get("name"), id));
@@ -39,6 +43,15 @@ public class PluginBundledController {
         Long userId = AuthController.getUserIdFromSession(session);
         if (userId == null || !users.findById(userId).map(admins::isAdmin).orElse(false)) {
             return ResponseEntity.status(403).body(Map.of("code", 1, "message", "Administrator permission required"));
+        }
+        if (LawFirmBundledPluginInstaller.PLUGIN_ID.equals(id)) {
+            // 律所管理随 app.jar 内置，走它自己的落盘器；用户点了安装即启用（C18）
+            try {
+                lawFirm.ensureInstalledAndEnabled();
+                return ResponseEntity.ok(Map.of("code", 0));
+            } catch (java.io.IOException | RuntimeException e) {
+                return ResponseEntity.badRequest().body(Map.of("code", 1, "message", "Bundled plugin installation failed"));
+            }
         }
         try {
             synchronized (plugins) {

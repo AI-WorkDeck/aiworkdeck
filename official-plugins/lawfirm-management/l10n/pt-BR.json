@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Desativar e excluir",
   "cloud.purgeCancel": "Cancelar",
   "billing.groupNoRate": " ({n} lançamentos sem tarifa, não contabilizados)",
-  "billing.groupSummaryNoRate": "{n} lançamentos, {pending} a revisar; {h} horas faturáveis, sem tarifa definida"
+  "billing.groupSummaryNoRate": "{n} lançamentos, {pending} a revisar; {h} horas faturáveis, sem tarifa definida",
+  "panel.t.cloudPendingLawyer": "Aguardando advogados relacionados",
+  "panel.t.cloudPendingCommittee": "Aguardando revisão final do comitê",
+  "panel.t.cloudApproved": "Aprovado",
+  "panel.t.cloudRejected": "Rejeitado",
+  "panel.t.cloudSynced": "Progresso local atualizado conforme a decisão de conflito na nuvem do escritório.",
+  "panel.t.cloudLinked": "Vinculado à verificação de conflito na nuvem do escritório: {0}",
+  "panel.t.cloudSync": "Buscar decisão final da nuvem",
+  "panel.t.cloudLinkPick": "Vincular verificação de conflito na nuvem do escritório",
+  "panel.t.cloudNone": "Ainda não há registros de conflito na nuvem do escritório que você possa vincular.",
+  "panel.t.cloudLinkConfirm": "Vincular e buscar decisão",
+  "panel.t.cloudLinkHint": "Este caso já passou pela verificação de conflito na nuvem do escritório? Vincule-o e o progresso local seguirá a decisão final da nuvem.",
+  "access.commentRequired": "Preencha primeiro seu parecer e depois libere ou rejeite."
 }

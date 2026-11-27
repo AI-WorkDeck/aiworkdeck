@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Επανάληψη",
   "bpErrorTitle": "Δεν είναι δυνατή η πρόσβαση σε αυτόν τον ιστότοπο",
   "bpErrorCodeLabel": "Κωδικός σφάλματος",
-  "bpErrorNameNotResolved": "Η αναζήτηση DNS απέτυχε — η διεύθυνση ενδέχεται να είναι γραμμένη λανθασμένα ή ο τομέας να μην υπάρχει",
+  "bpErrorNameNotResolved": "Δεν βρέθηκε αυτή η διεύθυνση — ίσως είναι γραμμένη λάθος ή ο ιστότοπος δεν υπάρχει",
   "bpErrorTimedOut": "Λήξη χρονικού ορίου σύνδεσης",
   "bpErrorConnectionRefused": "Η σύνδεση απορρίφθηκε",
   "bpErrorConnectionReset": "Επαναφορά σύνδεσης",

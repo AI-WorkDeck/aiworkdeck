@@ -177,9 +177,9 @@
         <!-- X7：这一轮失败了——目录文案 + 重试/登录 + 详情；原始错误只在详情里 -->
         <!-- X39：长回答中途断开（非停止、非工具半途、文档没变、续写没连败两次）时多一个「继续」 -->
         <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="errorShown"
-          :actionable="isLatest || bubble.errorNotice.action === 'signIn'"
+          :actionable="isLatest || bubble.errorNotice.action === 'signIn' || bubble.errorNotice.action === 'reconnect'"
           :lead-action="continueOffered ? { key: 'continue', title: $t('errors.actions.continueTooltip') } : null"
-          @lead="$emit('continue-answer')" @retry="$emit('regenerate')" @sign-in="signInForAi" />
+          @lead="$emit('continue-answer')" @retry="$emit('retry-failed')" @sign-in="signInForAi" @reconnect="reconnectForAi" />
     </div>
   </div>
 </template>
@@ -220,7 +220,7 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'continue-answer', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'retry-failed', 'continue-answer', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
 
 // X39：「继续」是否出现，以及断开提示用哪一句（可续写 / 又断开了 / 普通）
 const continueState = computed(() => {
@@ -283,6 +283,11 @@ const showCopy = computed(() => !!copyableText.value)
 const showRegenerate = computed(() => props.isLatest && !props.bubble.isStreaming && !!props.bubble.content)
 function signInForAi() {
   return requireAccount({ reason: 'ai' })
+}
+// Q21：账户已连着、但 AI 通道连接要刷新（Key 被拒 / 通道与站点不符）：重新登录一次就好，
+// 所以不看本地「已连接」缓存，直接开登录层
+function reconnectForAi() {
+  return requireAccount({ reason: 'ai', force: true })
 }
 function copyAnswer() {
   copyToClipboard(copyableText.value)

@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} okunmamış iş birliği bildirimi",
   "clientWorkspace": "Müvekkil iş birliği",
   "clientWorkspaceHint": "Kontrol listelerini görüntülemek, belge göndermek ve incelemeleri takip etmek için bu çalışma alanında davet edilen projelere bağlanın.",
+  "thisCaseClients": "Bu dava dosyasının müvekkilleri ({count})",
   "openClientWorkspace": "Müvekkil iş birliğini aç",
   "lists": "Hukuki inceleme (DD) kontrol listeleri",
   "refresh": "Yenile",

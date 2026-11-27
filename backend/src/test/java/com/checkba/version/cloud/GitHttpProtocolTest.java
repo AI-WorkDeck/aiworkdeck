@@ -263,6 +263,45 @@ class GitHttpProtocolTest {
         assertTrue(receiver.pendingChanges(2).isEmpty());
         org.mockito.Mockito.verify(consent, org.mockito.Mockito.atLeastOnce()).requireVersionObjectCloudConsent();
 
+        // C12b: a colleague without cloud backup edits text on a case whose history already holds the
+        // uploaded object. Nothing new needs uploading, so submitting must not ask for their consent.
+        var colleagueProvider = org.mockito.Mockito.mock(org.springframework.beans.factory.ObjectProvider.class);
+        var noBackup = org.mockito.Mockito.mock(com.checkba.service.mobile.MobileRelayClientService.class);
+        org.mockito.Mockito.doThrow(com.checkba.version.VersionException.userFacing("backup off"))
+                .when(noBackup).requireVersionObjectCloudConsent();
+        org.mockito.Mockito.when(colleagueProvider.getIfAvailable()).thenReturn(noBackup);
+        var colleague = new ProjectObjectSyncService(receiver, colleagueProvider, new com.fasterxml.jackson.databind.ObjectMapper());
+        Files.writeString(receiver.workTree(2).resolve("说明.txt"), "同事改了一行");
+        assertNotNull(receiver.commitAll(2, "edit", "auto", null, "Synthetic colleague", "colleague@example.test"));
+        colleague.upload(2, remoteUrl(remote), "test", token);
+        // The server may autosave its own worktree right before accepting a push (dockDirtyMainlineForReceive),
+        // so the first push can be non-fast-forward. The real client then integrates and re-pushes
+        // (CloudSyncUploadRepushTest); do the same here. Consent is what this case is about.
+        var pushed = receiver.pushMainlineToOrigin(2, "test", token);
+        if (!pushed.pushed()) {
+            try (var repo = receiver.open(2); Git git = new Git(repo)) {
+                var credentials = new UsernamePasswordCredentialsProvider("test", token);
+                git.fetch().setRemote("origin").setCredentialsProvider(credentials).call();
+                var merge = git.merge().include(repo.resolve("refs/remotes/origin/master"))
+                        .setMessage("integrate").call();
+                assertTrue(merge.getMergeStatus().isSuccessful(), String.valueOf(merge.getMergeStatus()));
+            }
+            colleague.upload(2, remoteUrl(remote), "test", token);
+            pushed = receiver.pushMainlineToOrigin(2, "test", token);
+        }
+        assertTrue(pushed.pushed(), pushed.message());
+        org.mockito.Mockito.verify(noBackup, org.mockito.Mockito.never()).requireVersionObjectCloudConsent();
+
+        // C12: a new large object within the free allowance (50 MB/file) goes up free with backup off.
+        try (var out = Files.newOutputStream(receiver.workTree(2).resolve("新录音.mp4"))) {
+            byte[] block = new byte[64 * 1024];
+            new java.util.Random(29).nextBytes(block);
+            for (int i = 0; i < 513; i++) out.write(block);
+        }
+        assertNotNull(receiver.commitAll(2, "media", "auto", null, "Synthetic colleague", "colleague@example.test"));
+        colleague.upload(2, remoteUrl(remote), "test", token);
+        assertEquals(2, repoService.objects().list(remote).size(), "shared free, no backup needed");
+
         // Access is project scoped, even when another account knows the exact object digest.
         seedMembership(72002L);
         String auth = java.util.Base64.getEncoder().encodeToString(("test:" + tokenByProject.get(72002L))

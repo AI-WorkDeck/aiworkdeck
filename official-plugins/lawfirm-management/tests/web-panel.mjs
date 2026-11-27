@@ -834,3 +834,36 @@ test('12. English ledger rows translate the practice group recorded at intake', 
   assert.match(row.textContent, /\(IP & Data Compliance\)/);
   assert.doesNotMatch(row.textContent, /知识产权与数据合规/);
 });
+
+test('C19: a pending local intake links to the Firm cloud clearance and follows its final decision', async (t) => {
+  const recordId = '12345678-1234-1234-1234-123456789012';
+  let linked = false;
+  const p = await mountPanel({ onCall: (msg, state) => {
+    if (msg.method !== 'lawfirm.request') return undefined;
+    const { action, params = {} } = msg.params || {};
+    if (action === 'workflowOverview') return { self: { userId: 1 }, records: [
+      { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: '别的案件', status: 'PENDING_LAWYER_CLEARANCE' },
+      { id: recordId, title: state.intakes[0].title, clientName: '合成委托人', status: 'APPROVED' }] };
+    if (action === 'linkCloudClearance') {
+      linked = true;
+      Object.assign(state.intakes[0], { cloudWorkflowId: params.recordId || state.intakes[0].cloudWorkflowId, cloudWorkflowStatus: 'APPROVED', status: 'APPROVED_FILED' });
+      return { intake: state.intakes[0] };
+    }
+    if (action === 'overview' && !linked) state.intakes[0].status = 'PENDING_COMMITTEE_REVIEW';
+    return undefined;
+  } });
+  t.after(() => p.dom.window.close());
+  const card = () => p.$('intake-list').querySelector('.item-card');
+  const pick = [...card().querySelectorAll('.cloud-link button')].find(b => /关联律所云端利冲/.test(b.textContent));
+  assert.ok(pick, 'open intakes offer the cloud link');
+  pick.click(); await tick();
+  const select = card().querySelector('.cloud-link select');
+  assert.equal(select.options.length, 1, 'only records the user can see in full are offered');
+  assert.equal(select.value, recordId, 'the matching matter is preselected');
+  [...card().querySelectorAll('.cloud-link button')].find(b => /关联并取回结论/.test(b.textContent)).click(); await tick();
+  const link = p.calls.find((c) => c.method === 'lawfirm.request' && c.params.action === 'linkCloudClearance');
+  assert.deepEqual(JSON.parse(JSON.stringify(link.params.params)), { intakeId: 1, recordId });
+  assert.match(card().textContent, /已关联律所云端利冲：已通过/);
+  assert.doesNotMatch(card().textContent, /待利冲委员终审/);
+  assert.equal(card().querySelector('.cloud-link button'), null, 'a decided intake has nothing left to fetch');
+});

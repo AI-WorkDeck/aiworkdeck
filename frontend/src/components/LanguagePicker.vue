@@ -17,6 +17,7 @@
       type="button"
       class="awd-lang-trigger"
       :aria-label="$t('common.languagePickerLabel')"
+      :title="triggerLabel"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="listbox"
       @click.stop="toggleOpen"

@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Apri area correlata",
   "readNotDone": "La lettura di questa notifica non conferma l’azione operativa. Apri l’area correlata per esaminarla e gestirla.",
   "targetUnavailable": "L’area correlata non è disponibile. Aggiorna e riprova.",
-  "pluginUnavailable": "Il plugin correlato non è installato o attivato. Controlla nel centro plugin.",
+  "pluginUnavailable": "Il plugin correlato non è installato o attivato. Controlla nel centro plugin.", "enableLawFirmTitle": "Attivare Gestione dello studio legale?", "enableLawFirmBody": "Questa notifica si gestisce in Gestione dello studio legale. È inclusa nell’app; attivandola, questo elemento si apre direttamente.", "enableLawFirmConfirm": "Attiva e apri",
   "openFailed": "Impossibile aprire l’area correlata. Riprova.",
   "serviceFailed": "I messaggi sono temporaneamente non disponibili. Riprova.",
   "source": "Da {name}",

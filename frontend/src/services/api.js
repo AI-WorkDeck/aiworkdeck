@@ -11,6 +11,8 @@ import { host, isDesktopHost } from '@/services/host.js'
 import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
+import { withTransferProgress } from '@/utils/transferProgress.js'
+import { noticeLocalOnly } from '@/utils/localOnlyNotice.js'
 import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
 
 import { createCloudEpochGate, needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
@@ -417,7 +419,9 @@ async function request(options) {
               ? res.data.reason : ''
             const errorMessage = (bqtReason && t('agentStream.' + bqtReason.replace(/_([a-z])/g, (_, c) => c.toUpperCase())))
               || res.data.message || t('common.serviceErrorRetryLater')
-            console.error('业务错误:', {
+            // Path, code and message as plain text first: harnesses that capture console text (CI app-e2e)
+            // otherwise only see "[object Object]". The query string is left out so no token reaches the logs.
+            console.error('业务错误:', String(options.url || '').split('?')[0], res.data.code, errorMessage, {
               code: res.data.code,
               message: errorMessage,
               data: options.logBody === false ? undefined : res.data.data,
@@ -4595,14 +4599,43 @@ export function checkCloud(projectId) {
     request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
 }
 
+// C12：这份案卷里只在共享人电脑上的文件（文件树徽标、占位）
+export function getCloudLocalOnly(projectId) {
+  return request({ url: `/api/cloud/projects/${projectId}/local-only`, method: 'GET' })
+}
+
+export function getCloudTransfer(projectId) {
+  return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET' })
+}
+
+// 大文件慢传时给出进度（见 utils/transferProgress.js）：不挡操作的 loading，字节在走就更新
+const transferProgressUi = {
+  // 状态栏那一格（CloudTransferStatus）也立刻开始快查，不等它 15 秒一次的慢轮询
+  start: (projectId) => { try { uni.$emit('awd:cloud-transfer-kick', projectId) } catch { /* no event bus */ } },
+  read: getCloudTransfer,
+  show: (title) => uni.showLoading({ title, mask: false }),
+  hide: () => uni.hideLoading(),
+  t,
+}
+
 export function uploadToCloud(projectId) {
-  return observeCloudConnectivity(projectId, 'upload', () =>
-    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' }))
+  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'upload', () =>
+    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })), transferProgressUi)
+    .then((res) => {
+      // C12：交稿成功但有文件留在本机：说清楚是哪几份、怎么共享（同一组只说一次）
+      const d = (res && res.data) || {}
+      if (d.status === 'UPLOADED') {
+        noticeLocalOnly(projectId, d.localOnlyFiles, {
+          t, showModal: (o) => uni.showModal(o), openBackup: () => uni.$emit('awd:open-backup-consent'),
+        })
+      }
+      return res
+    })
 }
 
 export function updateFromCloud(projectId) {
-  return observeCloudConnectivity(projectId, 'update', () =>
-    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' }))
+  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'update', () =>
+    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' })), transferProgressUi)
 }
 
 // resolutions: { [path]: 'MAIN' | 'DRAFT' | 'BOTH' }（语境映射见 AdoptConflictDialog）
@@ -4656,6 +4689,11 @@ export function addCloudMember(projectId, identifier, role) {
 
 // 案件库上移出一位参与人（dev-board#1050）：撤销客户访问码与移出同事共用。
 // remoteUserId 是案件库那一侧的 userId（参与人列表 / 签码回执的 clientUserId），不是本机 user.id。
+// C9：改案件库上一位参与人的角色（ADMIN | PARTICIPANT | READ_ONLY）
+export function changeCloudMemberRole(projectId, remoteUserId, role) {
+  return request({ url: `/api/cloud/projects/${projectId}/members/${remoteUserId}/role`, method: 'PUT', data: { role } })
+}
+
 export function removeCloudMember(projectId, remoteUserId) {
   return request({ url: `/api/cloud/projects/${projectId}/members/${remoteUserId}`, method: 'DELETE' })
 }

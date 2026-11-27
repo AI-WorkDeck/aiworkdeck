@@ -14,6 +14,7 @@ export default {
   "unreadNotifications": "읽지 않은 협업 알림 {count}개",
   "clientWorkspace": "고객 협업",
   "clientWorkspaceHint": "이 워크스페이스에서 초대받은 프로젝트에 연결하여 체크리스트를 확인하고 자료를 제출하며 검토 결과를 확인하세요.",
+  "thisCaseClients": "이 사건 파일의 고객 ({count})",
   "openClientWorkspace": "고객 협업 열기",
   "lists": "실사 체크리스트",
   "refresh": "새로고침",

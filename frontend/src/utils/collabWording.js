@@ -27,16 +27,20 @@ export function remoteAheadText(t, status, opts = {}) {
   const fallback = () => t(fallbackKey)
   const s = status || {}
   const count = Number(s.remoteAheadCount) || 0
+  // C23：客户经门户交来的材料不是谁的「稿」，单独说
+  const materials = Number(s.remoteAheadMaterials) || 0
+  if (!count && materials) return t('version.remoteAheadMaterials', { count: materials })
+  const plus = materials ? t('version.remoteAheadPlusMaterials', { count: materials }) : ''
   if (!count) return fallback()
-  if (s.remoteAheadBySelf) return t('version.remoteAheadSelf', { count })
+  if (s.remoteAheadBySelf) return t('version.remoteAheadSelf', { count }) + plus
   const authors = (Array.isArray(s.remoteAheadAuthors) ? s.remoteAheadAuthors : [])
     .map((a) => (a == null ? '' : String(a).trim()))
     .filter(Boolean)
-  if (!authors.length) return fallback()
+  if (!authors.length) return fallback() + plus
   // 名单最多 3 个名字，人数另有其数：缺席（老服务端）才退回名单长度
   const people = Number(s.remoteAheadAuthorCount) || authors.length
-  if (people <= 1) return t('version.remoteAheadOne', { name: authors[0], count })
-  return t('version.remoteAheadMany', { name: authors[0], people, count })
+  if (people <= 1) return t('version.remoteAheadOne', { name: authors[0], count }) + plus
+  return t('version.remoteAheadMany', { name: authors[0], people, count }) + plus
 }
 
 /**
@@ -52,6 +56,8 @@ export function remoteAheadText(t, status, opts = {}) {
 export function pullStepText(t, status) {
   const s = status || {}
   const count = Number(s.remoteAheadCount) || 0
+  const materials = Number(s.remoteAheadMaterials) || 0
+  if (!count && materials) return t('version.submitGuidePullMaterials', { count: materials })
   if (!count) return t('version.submitGuidePullGeneric')
   if (s.remoteAheadBySelf) return t('version.submitGuidePullSelf', { count })
   const authors = (Array.isArray(s.remoteAheadAuthors) ? s.remoteAheadAuthors : [])
@@ -61,4 +67,16 @@ export function pullStepText(t, status) {
   const people = Number(s.remoteAheadAuthorCount) || authors.length
   if (people <= 1) return t('version.submitGuidePullOne', { name: authors[0], count })
   return t('version.submitGuidePullMany', { name: authors[0], people, count })
+}
+
+// C5：「和大家的稿一致」只在最近一次联网核对 15 秒内才说；更早的核对说成「N 前核对时一致」。
+export const COLLAB_FRESH_MS = 15000
+
+/** 核对距今多久，给人读：「刚才」/「N 秒前」/「N 分钟前」/「N 小时前」。 */
+export function collabAgeText(t, ms) {
+  const s = Math.max(0, Math.floor(Number(ms) / 1000) || 0)
+  if (s < 60) return t('workbench.collabAgeSeconds', { n: Math.max(1, s) })
+  const m = Math.floor(s / 60)
+  if (m < 60) return t('workbench.collabAgeMinutes', { n: m })
+  return t('workbench.collabAgeHours', { n: Math.floor(m / 60) })
 }

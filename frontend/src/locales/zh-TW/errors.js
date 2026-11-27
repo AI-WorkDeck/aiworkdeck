@@ -12,6 +12,7 @@ export default {
   "rateLimited": "請求太頻繁，模型服務暫時限流。請等一分鐘再試。",
   "modelUnavailable": "所選模型暫時無法使用。請稍後重試，或在輸入框下方換一個模型。",
   "modelKeyInvalid": "這台電腦仍在使用舊版設定中的模型 Key，已被模型服務拒絕。請登入 AI WorkDeck 帳戶，改用官方 AI 通道。",
+  "accountReconnect": "AI 帳戶連線需要重新整理，所以這一輪沒有送出。點「重新登入」重新整理連線後再試；不會遺失任何內容。",
   "streamInterrupted": "回答中途中斷了，已收到的內容保留在上方。點「重試」重新產生。",
   "streamInterruptedResumable": "回答中途中斷了，已收到的內容保留在上方。點「繼續」接著寫，或點「重試」重新產生。",
   "streamInterruptedTwice": "又中斷了。點「重試」重新產生整個回答。",
@@ -31,6 +32,7 @@ export default {
     "continueTooltip": "從中斷處接著寫，不重新產生已有內容",
     "refresh": "重新整理",
     "signIn": "登入",
+    "reconnect": "重新登入",
     "feedback": "回饋"
   }
 }

@@ -309,7 +309,7 @@ export default {
   "bpRetry": "Erneut versuchen",
   "bpErrorTitle": "Diese Website ist nicht erreichbar",
   "bpErrorCodeLabel": "Fehlercode",
-  "bpErrorNameNotResolved": "DNS-Auflösung fehlgeschlagen — die Adresse ist möglicherweise falsch geschrieben oder die Domain existiert nicht",
+  "bpErrorNameNotResolved": "Diese Adresse wurde nicht gefunden — sie ist möglicherweise falsch geschrieben oder die Website existiert nicht",
   "bpErrorTimedOut": "Zeitüberschreitung bei der Verbindung",
   "bpErrorConnectionRefused": "Verbindung verweigert",
   "bpErrorConnectionReset": "Verbindung zurückgesetzt",

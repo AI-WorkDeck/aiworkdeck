@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Hiện có quá nhiều yêu cầu nên dịch vụ mô hình đang giới hạn tốc độ. Hãy đợi một phút rồi thử lại.",
   "modelUnavailable": "Mô hình đã chọn hiện không khả dụng. Hãy thử lại sau, hoặc chọn mô hình khác bên dưới ô nhập tin nhắn.",
   "modelKeyInvalid": "Nhà cung cấp mô hình đã từ chối khóa mà thiết bị này vẫn đang dùng từ thiết lập cũ. Hãy đăng nhập để dùng AI của AI WorkDeck thay thế.",
+  "accountReconnect": "Cần làm mới kết nối tài khoản AI nên yêu cầu này chưa được gửi. Chọn \"Đăng nhập lại\" rồi thử lại; không mất nội dung nào.",
   "streamInterrupted": "Câu trả lời bị ngắt giữa chừng; phần đã nhận được vẫn được giữ ở trên. Chọn “Thử lại” để tạo lại.",
   "streamInterruptedResumable": "Câu trả lời bị ngắt giữa chừng; phần đã nhận được vẫn được giữ ở trên. Chọn “Tiếp tục” để chạy tiếp từ chỗ dừng, hoặc “Thử lại” để bắt đầu lại.",
   "streamInterruptedTwice": "Câu trả lời lại bị ngắt. Chọn “Thử lại” để tạo lại toàn bộ câu trả lời.",
@@ -31,6 +32,7 @@ export default {
     "continueTooltip": "Tiếp tục từ chỗ dừng mà không tạo lại phần đã có",
     "refresh": "Làm mới",
     "signIn": "Đăng nhập",
+    "reconnect": "Đăng nhập lại",
     "feedback": "Phản hồi"
   }
 }

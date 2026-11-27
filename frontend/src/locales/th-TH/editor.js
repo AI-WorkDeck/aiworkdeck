@@ -200,6 +200,7 @@ export default {
     "moveFrom": "ย้ายออกจาก",
     "moveTo": "ย้ายไปยัง",
     "deletion": "การลบ",
+    "replacement": "การแทนที่",
     "insertion": "การแทรก",
     "table": "ตาราง",
     "contiguousCount": "ต่อเนื่อง {count} จุด",

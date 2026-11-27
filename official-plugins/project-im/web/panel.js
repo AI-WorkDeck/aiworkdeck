@@ -272,7 +272,8 @@
     if (el.hidden) return;
     if (running) el.append(node('span', status.status === 'running' ? '助手正在回复…' : '正在等待助手回复…'));
     else if (state.agentRequesting) el.append(node('span', '正在请求助手回复…'));
-    for (const failed of failures.values()) {
+    // C14：只显示最新的一条失败，不在输入框上方堆一排
+    for (const failed of [...failures.values()].slice(-1)) {
       const row = node('div', null, 'agent-failure');
       const source = ownMessage(failed.messageId) || failed.source, text = source?.text?.trim();
       const preview = text ? `「${text.slice(0, 48)}${text.length > 48 ? '…' : ''}」：` : '';
@@ -305,16 +306,20 @@
       if (current(s)) { state.agentRequesting = false; renderAgentStatus(); }
     }
   }
+  function mentionsAssistant(text, agent) {
+    const t = String(text || '');
+    if (!/[@＠]/.test(t)) return false;
+    const names = ['助手', '项目助手', 'AI 助手', 'AI助手', 'AI', 'assistant'];
+    if (agent?.name) names.push(String(agent.name));
+    return names.some((n) => new RegExp('[@＠]' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])', 'i').test(t));
+  }
   async function replyAfterSend(message) {
     if (!state.active?.agent) return;
     const s = scope();
     if (privateAgent()) { await requestAgentReply(message.id); return; }
-    try {
-      const result = await request('members', { conversationId: s.id });
-      if (!current(s)) return;
-      const humanCount = Number.isFinite(result.humanCount) ? result.humanCount : (result.members || []).filter((m) => m.actorType !== 'AGENT').length;
-      if (humanCount === 1) await requestAgentReply(message.id);
-    } catch { if (current(s)) notice('消息已发送。可点击「请助手回复」继续。'); }
+    // C14：群里助手只在被 @ 叫到时回复（或点「请助手回复」）。原来按「群里只有我一个人」自动答，
+    // 人数一旦是旧的，每条消息都会触发一次计费的 AI 回复
+    if (current(s) && mentionsAssistant(message.text, state.active?.agent)) await requestAgentReply(message.id);
   }
   function draft() {
     const id = state.active?.id;

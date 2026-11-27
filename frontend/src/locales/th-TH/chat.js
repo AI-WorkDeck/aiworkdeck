@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "คัดลอกผลลัพธ์",
   "copyFailed": "คัดลอกไม่สำเร็จ",
   "tokenUsageLine": "{n} โทเคนในรอบนี้",
+  "viewUsage": "ดูการใช้งาน",
   "statusError": "ข้อผิดพลาด",
   "statusSuccess": "สำเร็จ",
   "statusRunning": "กำลังทำงาน",

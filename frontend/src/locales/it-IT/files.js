@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Cartella modelli: inserisci qui i modelli di report del tuo studio; una volta appresi, l'AI redige documenti con i loro caratteri, numerazioni e stili di tabella",
   "selectFilePrompt": "Seleziona un file a sinistra per visualizzarlo",
   "edit": "Modifica",
-  "typeLabel": "Tipo: {type}",
-  "sizeLabel": "Dimensione: {size}",
   "renderingDoc": "Rendering del documento…",
   "renderingSlides": "Rendering della presentazione…",
   "slidesNotShown": "Altre {count} diapositive non mostrate. Apri il file per vederle tutte.",

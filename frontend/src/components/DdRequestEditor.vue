@@ -119,7 +119,7 @@ import { ddSubmissionFor, ddWorkflowStatus, ddWorkflowCounts, ddMatchesFilter, d
 
 export default {
   name: 'DdRequestEditor', components: { DdClientChecklist },
-  props: { requestId: { type: [String, Number], required: true }, projectId: { type: [String, Number], required: true }, clientView: Boolean, focusItemId: { type: [String, Number], default: null }, canWrite: { type: Boolean, default: true } },
+  props: { requestId: { type: [String, Number], required: true }, projectId: { type: [String, Number], required: true }, clientView: Boolean, focusItemId: { type: [String, Number], default: null }, canWrite: { type: Boolean, default: true }, remoteSignal: { type: String, default: null } },
   emits: ['changed', 'deleted', 'invite-client', 'reload-files', 'open-file'],
   data: () => ({ request: null, requestName: '', items: [], submissions: {}, selectedId: null, itemTitle: '', itemDescription: '', filter: 'ALL', search: '', loading: false, busy: false, busyLabel: '', error: '', notice: '', elapsed: 0, fetchSeq: 0, deleted: false, aiReviewEnabled: true, reviewReason: '', comments: [], commentText: '', commentsLoading: false, history: [], historyVisible: false, historyLoading: false, exampleError: false, pendingJob: null, exampleBatch: null }),
   computed: {
@@ -145,7 +145,7 @@ export default {
   },
   mounted() { this._disposed = false; if (!this.clientView) this.fetchData() },
   beforeUnmount() { this._disposed = true; this.fetchSeq++; this._abort?.abort(); clearInterval(this._clock); clearTimeout(this._refreshTimer) },
-  watch: { focusItemId(id) { const item = this.items.find(item => String(item.id) === String(id)); if (item) this.selectItem(item) }, requestId() { this.reset() }, projectId() { this.reset() } },
+  watch: { remoteSignal(next, previous) { if (next && next !== previous && !this.clientView && !this.busy && !this.itemDirty) return this.fetchData() }, focusItemId(id) { const item = this.items.find(item => String(item.id) === String(id)); if (item) this.selectItem(item) }, requestId() { this.reset() }, projectId() { this.reset() } },
   methods: {
     status(item) { return ddIsCategory(item, this.items, this.submissions) ? 'CATEGORY' : ddWorkflowStatus(item, ddSubmissionFor(item, this.submissions)) },
     statusClass(item) { return `is-${this.status(item).toLowerCase()}` },

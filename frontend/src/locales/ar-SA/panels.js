@@ -312,7 +312,7 @@ export default {
   "bpRetry": "إعادة المحاولة",
   "bpErrorTitle": "لا يمكن الوصول إلى هذا الموقع",
   "bpErrorCodeLabel": "رمز الخطأ",
-  "bpErrorNameNotResolved": "فشل البحث في DNS — قد يكون العنوان مكتوبًا بشكل خاطئ أو أن النطاق غير موجود",
+  "bpErrorNameNotResolved": "تعذر العثور على هذا العنوان — ربما كُتب بشكل خاطئ أو أن الموقع غير موجود",
   "bpErrorTimedOut": "انتهت مهلة الاتصال",
   "bpErrorConnectionRefused": "تم رفض الاتصال",
   "bpErrorConnectionReset": "تمت إعادة تعيين الاتصال",

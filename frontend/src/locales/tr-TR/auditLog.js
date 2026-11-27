@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "Web sitesi oturum açma",
     "ACCOUNT_API_KEY_CREATED": "Hesap anahtarı verildi",
     "ACCOUNT_API_KEY_REVOKED": "Hesap anahtarı iptal edildi"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "{from} rolünden {to} rolüne değiştirildi",
+    "role": "Rol: {role}",
+    "team": "Ekip: {name}",
+    "firmAdmin": "Büro yöneticisi",
+    "memberCount": "{count} kişi",
+    "removedBy": "{name} tarafından çıkarıldı",
+    "issuedBy": "{name} tarafından verildi",
+    "keyPrefix": "Key şu ifadeyle başlıyor: {prefix}",
+    "label": "Ad: {label}",
+    "via": "Yöntem: {via}",
+    "shareHistoryOn": "Sürüm geçmişi de paylaşıldı",
+    "shareHistoryOff": "Sürüm geçmişi paylaşılmadı",
+    "enabledOn": "Açıldı",
+    "enabledOff": "Kapatıldı",
+    "expiresAt": "Geçerlilik sonu: {date}",
+    "suppressedRepeats": "{count} aynı kayıt birleştirildi",
+    "purgedRows": "Süresi dolan {count} kayıt silindi",
+    "reason": "Neden: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "sahip",
+      "ADMIN": "yönetici",
+      "MEMBER": "üye",
+      "READ_ONLY": "salt okunur üye",
+      "PARTICIPANT": "katılımcı",
+      "MANAGER": "müdür",
+      "VIEWER": "görüntüleyici"
+    }
   }
 }

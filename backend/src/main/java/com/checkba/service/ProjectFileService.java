@@ -115,11 +115,26 @@ public class ProjectFileService {
         return projectFileRepository.findByProjectIdAndIdInAndIsDeletedFalse(projectId, fileIds);
     }
 
+    /** Hidden folders the app creates for itself (same set as the frontend's HIDDEN_SYSTEM_FOLDER_NAMES). */
+    static final java.util.Set<String> SYSTEM_FOLDER_NAMES = java.util.Set.of(".stagezone", "__staging_area__");
+
     /**
      * 创建文件夹
      */
     @Transactional
     public ProjectFile createFolder(Long projectId, Long parentId, String name, Long userId) {
+        return createFolder(projectId, parentId, name, userId, true);
+    }
+
+    /**
+     * C23：尽调材料的目录由系统按清单建出来，不是这个人在「改案卷」——不发版本变更信号，否则客户一上传就以
+     * 客户名义开出工作段。材料本身由 {@code WorkSessionService.recordSubmission} 单独存版。
+     */
+    public ProjectFile createFolderQuietly(Long projectId, Long parentId, String name, Long userId) {
+        return createFolder(projectId, parentId, name, userId, false);
+    }
+
+    private ProjectFile createFolder(Long projectId, Long parentId, String name, Long userId, boolean signal) {
         if (projectId == null) {
             throw new IllegalArgumentException(LangText.of("项目 ID 不能为空", "Project ID must not be empty"));
         }
@@ -152,7 +167,10 @@ public class ProjectFileService {
 
         ProjectFile savedFolder = projectFileRepository.save(folder);
         materializeLocalFolder(savedFolder);
-        signalChange(projectId, userId);
+        // C27（lane C）：打开案卷时前端会建好隐藏的暂存区目录（.stagezone）。那是软件自己的系统目录，不是律师在改案卷——
+        // 原来它也发版本变更信号，刚取回的案卷就以取回人的名义开出一段只改了清单的工作，下一次取回被拒。
+        // C23：客户材料入库走 createFolderQuietly（signal=false），自己记版本，不另开工作段。
+        if (signal && !SYSTEM_FOLDER_NAMES.contains(savedFolder.getName())) signalChange(projectId, userId);
         return savedFolder;
     }
 

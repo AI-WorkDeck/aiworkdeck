@@ -139,7 +139,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+      # setup-java's `cache: maven` has no fallback: any pom.xml change starts from an empty ~/.m2 and pulls
+      # everything from Maven Central, which answers HTTP 429 under load. Restore the nearest older cache instead
+      # (same key scheme, so existing setup-java caches still count) and fall back to Google's Central mirror on throttled downloads (.github/actions/maven-setup).
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: setup-java-${{ runner.os }}-${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}-maven-
+      - name: Maven setup (Central fallback mirror, short retries; keeps the per-OS cache above)
+        uses: ./.github/actions/maven-setup
+        with:
+          restore: 'false'
       - name: Build frontend
         working-directory: frontend
         # PowerShell can hide a failed npm build when the next npm command succeeds.

@@ -14,6 +14,15 @@ export function stopNoticeForCancelled(payload, t) {
   return t('agentStream.stopConfirmed')
 }
 
+/**
+ * Q26：停止前 AI 已增删条款且编号对不上时，后端在 cancelled 载荷里带一段给用户看的提示
+ * （已本地化的 markdown，与历史里保存的那段一致）。没有就返回空串。
+ */
+export function cancelledNumberingNotice(payload) {
+  const notice = payload && typeof payload.numberingNotice === 'string' ? payload.numberingNotice.trim() : ''
+  return notice
+}
+
 /** cancelled 载荷里「本轮改过文档」的判据（新字段优先，兼容只带布尔的情形）。 */
 export function cancelledEditedDocument(payload) {
   if (!payload) return false
@@ -64,4 +73,18 @@ export function undoResultView(httpStatus, body, t) {
     return { state: 'idle', message: t('chat.undoRunPartial', { files: formatUndoFiles(b.restored, t), failures: failureText }) }
   }
   return { state: 'idle', message: t('chat.undoRunFailed', { error: failureText || b.message || '' }) }
+}
+
+/**
+ * Q22：这一轮失败时什么都没产出（没有正文、没有工具步骤、没有改文件、没有附件产物），
+ * 「重试」就是原样再问一次，不用弹「重新生成」那个四段说明的确认框（分支存档、文档不回滚、
+ * 拒绝修订……对一轮空失败都不适用）。有任何产出时仍走确认框。
+ */
+export function isEmptyFailedTurn(bubble) {
+  if (!bubble || !bubble.errorNotice) return false
+  if (String(bubble.content || '').trim()) return false
+  if (bubble.documentEdited) return false
+  if ((bubble.processes || []).length || (bubble.fileChanges || []).length || (bubble.artifacts || []).length) return false
+  if (bubble.question) return false
+  return true
 }

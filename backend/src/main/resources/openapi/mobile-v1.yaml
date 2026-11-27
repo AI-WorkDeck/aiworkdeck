@@ -540,6 +540,45 @@ components:
             present=native 必有：官网为这张单生成的 UUID（订单的 providerRef）。iOS 把它塞进
             purchase 的 appAccountToken 选项，苹果在 signedTransaction 里原样带回，
             官网据此把交易认回这张单（App 被杀、本地没存下单号时的唯一线索）。
+    WxpayProQuote:
+      type: object
+      description: |
+        Personal Pro via WeChat APP pay (Android mainland). available=false carries only reason;
+        available=true carries the website-authoritative price. Reads never create a unified account
+        (no account yet → the new-account offer; the account is created by the order). Buy with POST /subscription/wxpay/order using
+        exactly this skuId + amountCents.
+      required: [available]
+      properties:
+        available: { type: boolean }
+        reason:
+          type: string
+          enum: [disabled, channel_unavailable, appstore_subscription_active, not_connected]
+          description: Only when available=false.
+        skuId: { type: string, enum: [pro_monthly_intro, pro_monthly, pro_test] }
+        amountCents: { type: integer, format: int64, description: 'Price to pay now, in cents' }
+        standardAmountCents: { type: integer, format: int64, description: 'Regular monthly price, in cents' }
+        introEligible: { type: boolean }
+        introRemainingMonths: { type: integer }
+        days: { type: integer, description: Pro days granted by one payment }
+    WxpayProOrder:
+      type: object
+      description: |
+        Pro order paid with WeChat APP pay: same shape as RechargeOrder present=app (seven PayReq
+        fields, flattened) plus skuId. The SDK errCode is not authoritative; confirm with
+        GET /recharge/status until paid.
+      required: [present, outTradeNo, amountCents, skuId]
+      properties:
+        present: { type: string, enum: [app] }
+        outTradeNo: { type: string }
+        amountCents: { type: integer, format: int64 }
+        skuId: { type: string, enum: [pro_monthly_intro, pro_monthly, pro_test] }
+        appId: { type: string }
+        partnerId: { type: string }
+        prepayId: { type: string }
+        packageValue: { type: string }
+        nonceStr: { type: string }
+        timeStamp: { type: string }
+        sign: { type: string }
     RechargeStatus:
       type: object
       required: [status, paid, amountCents]
@@ -2624,6 +2663,55 @@ paths:
                     properties:
                       status: { type: string, enum: [CONFIRMED] }
                       subscription: { type: object, additionalProperties: true }
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/billing/subscription/wxpay/quote:
+    get:
+      summary: Quote personal Pro via WeChat APP pay (raw object)
+      description: |
+        Read-only; never resolves with create=true. Returns available=false + reason=disabled while
+        mobile.billing.recharge-enabled is off or the website has the Pro channel off.
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        "200":
+          description: Raw quote object; not signed in Envelope(4010); upstream failure Envelope(code 1)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/WxpayProQuote'
+                  - $ref: '#/components/schemas/Envelope'
+  /api/mobile/billing/subscription/wxpay/order:
+    post:
+      summary: Create a personal Pro order paid with WeChat APP pay (raw object)
+      description: |
+        Explicit purchase: may resolve the unified account with create=true. Gated by
+        mobile.billing.recharge-enabled (off → Envelope kind=DISABLED).
+        Failure kinds: DISABLED (Pro purchase not enabled / channel unavailable);
+        REJECTED (active Apple Pro subscription, or stale price product_mismatch → re-quote);
+        ALREADY_PAID / IDEMPOTENCY_CONFLICT carry outTradeNo, as for /recharge.
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skuId, amountCents, idempotencyKey]
+              properties:
+                skuId: { type: string, enum: [pro_monthly_intro, pro_monthly, pro_test] }
+                amountCents: { type: integer, format: int64, description: 'The quoted amountCents, > 0' }
+                idempotencyKey:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{8,64}$'
+                  description: Client-generated and persisted before the call; same key replays the pending order.
+      responses:
+        "200":
+          description: Raw order object; not signed in Envelope(4010); business error Envelope(code 1)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/WxpayProOrder'
                   - $ref: '#/components/schemas/Envelope'
   /api/mobile/billing/recharge/status:
     get:

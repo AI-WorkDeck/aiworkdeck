@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Exporter en Word (conserver la mise en page)",
   "ocrSearchablePdf": "Créer un PDF interrogeable",
   "ocrLayoutSuffix": "-mise en page OCR",
-  "ocrSearchableSuffix": "-interrogeable"
+  "ocrSearchableSuffix": "-interrogeable",
+  "localOnlyMine": "Uniquement sur cet ordinateur (non partagé)",
+  "localOnlyMineTip": "Au-delà du quota de partage gratuit : le fichier reste sur votre ordinateur et vos collègues voient un espace réservé. Activez la sauvegarde cloud des fichiers et remettez à nouveau pour le partager.",
+  "localOnlyOther": "Uniquement sur l’ordinateur de {name}",
+  "localOnlyOtherUnknown": "Uniquement sur l’ordinateur d’un collègue",
+  "localOnlyOtherTip": "Ce fichier n’est que sur l’ordinateur de {name} et n’a pas été partagé dans la bibliothèque de dossiers. Demandez à {name} d’activer la sauvegarde cloud puis de remettre à nouveau.",
+  "localOnlyColleague": "un collègue",
+  "localOnlyOk": "OK",
 }

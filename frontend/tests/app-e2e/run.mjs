@@ -1019,7 +1019,7 @@ try {
     const J35_PROMPT = 'J3.5 登录后置回归：这句话不该被发出去 ' + ts
     const hash0 = await page.evaluate(() => location.hash)
     const opened = await step('未连账户时 AI 发送先弹登录层（含站点分段控件与「暂不登录」）', async () => {
-      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title="AI 助手"]')
+      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title^="AI 助手"]')
       await page.waitForSelector('.chat-input-rich', { timeout: 10000 })
       await mouseClickSel('.chat-input-rich')
       await page.keyboard.type(J35_PROMPT, { delay: 5 })
@@ -1267,17 +1267,17 @@ try {
     await page.waitForSelector('.sidebar-left', { timeout: 10000 })
     // 进入设置标签可保留收起状态；先经真实展开按钮建立本用例起点。
     if (await page.$eval('.sidebar-left', el => el.getBoundingClientRect().width) <= 0) {
-      await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
+      await mouseClickSel('.top-bar-btn[title^="展开左侧栏"]')
       await page.waitForFunction(() => document.querySelector('.sidebar-left').getBoundingClientRect().width > 0,
         { timeout: 10000 })
     }
     const widthBefore = await page.$eval('.sidebar-left', (el) => el.getBoundingClientRect().width)
-    await mouseClickSel('.top-bar-btn[title="收起左侧栏"]')
+    await mouseClickSel('.top-bar-btn[title^="收起左侧栏"]')
     await page.waitForFunction(
       () => document.querySelector('.sidebar-left')?.getBoundingClientRect().width === 0,
       { timeout: 8000 },
     )
-    await mouseClickSel('.top-bar-btn[title="展开左侧栏"]')
+    await mouseClickSel('.top-bar-btn[title^="展开左侧栏"]')
     await page.waitForFunction(
       () => (document.querySelector('.sidebar-left')?.getBoundingClientRect().width || 0) > 0,
       { timeout: 8000 },
@@ -1297,7 +1297,7 @@ try {
   console.log('== J6.6 剪贴板面板 ==')
   await step('剪贴板面板可打开', async () => {
     // 「常用工具」是开关：面板已开时再点会把它关掉——先探测再决定是否点击
-    if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title="常用工具"]')
+    if (!(await page.$('.bottom-panel'))) await mouseClickSel('[title^="常用工具"]')
     await page.waitForSelector('.bottom-panel', { timeout: 10000 })
     await mouseClickText('剪贴板')
     // 真正进入插件 iframe，不能只验宿主 tab 激活。
@@ -1552,7 +1552,7 @@ try {
     // 提问原文要在两个步骤里复用（定位这一轮），提到外面来
     const J65_PROMPT = '这是自动化测试。请只回复四个字：测试通过'
     await step('AI 面板发送并收到流式回复', async () => {
-      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title="AI 助手"]')
+      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title^="AI 助手"]')
       await page.waitForSelector('.chat-input-rich', { timeout: 10000 })
       await mouseClickSel('.chat-input-rich')
       await page.keyboard.type(J65_PROMPT, { delay: 10 })
@@ -1716,7 +1716,7 @@ try {
     await mouseClickText('开启版本记录')
     await page.waitForSelector('.session-bar .session-idle', { timeout: 15000 })
     // 空闲态应明确没有待提交的改动。
-    await waitText('当前没有待提交的改动')
+    await waitText('上个版本之后没有改动')
   })
 
   // 工作段空闲先于子时间线异步加载完成；点击前等本次命名节点真正可见。
@@ -1733,7 +1733,7 @@ try {
     await mouseClickSel('.version-entry')
     await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
 
-    await mouseClickText('提交本次改动…')
+    await mouseClickText('保存版本…')
     // 注意：brief 原写法选 .awd-input（模板里 <input> 标签自带的 class），
     // 但那是 uni-app <input> 组件编译到 H5 后的外层包装元素的 class，
     // 真正可编辑的原生 <input> 在其内部另有 .uni-input-input（顶部注释
@@ -1750,7 +1750,7 @@ try {
     await sleep(300)
     await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
     // 提交后回到无待提交改动态，并在下方核验命名版本节点。
-    await waitText('当前没有待提交的改动')
+    await waitText('上个版本之后没有改动')
     await waitVersionTitle(title)
   }
 
@@ -1856,13 +1856,13 @@ try {
   })
 
   await step('结束追加工作并命名（产生 MODIFY 提交）', async () => {
-    await mouseClickText('提交本次改动…')
+    await mouseClickText('保存版本…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('端到端测试稿四', { delay: 15 })
     await sleep(300)
     await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
-    await waitText('当前没有待提交的改动')
+    await waitText('上个版本之后没有改动')
     await waitVersionTitle('端到端测试稿四')
   })
 
@@ -2068,7 +2068,7 @@ try {
     await mouseClickSel('[title="资源管理器"]')
     await mouseClickSel('.version-entry')
     await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
-    await mouseClickText('提交本次改动…')
+    await mouseClickText('保存版本…')
     await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
     const input = await page.$('.awd-dialog .uni-input-input')
     await input.click(); await input.type('J10 主线追加修改', { delay: 15 })
@@ -2534,13 +2534,13 @@ try {
       await mouseClickSel('[title="资源管理器"]')
       await mouseClickSel('.version-entry')
       await page.waitForSelector('.session-bar .session-dot:not(.draft-dot)', { timeout: 10000 })
-      await mouseClickText('提交本次改动…')
+      await mouseClickText('保存版本…')
       await page.waitForSelector('.awd-dialog .uni-input-input', { timeout: 10000 })
       const input = await page.$('.awd-dialog .uni-input-input')
       await input.click(); await input.type('甲的撞车工作', { delay: 15 })
       await sleep(300)
       await mouseClickSel('.session-bar .awd-dialog .awd-btn-primary')
-      await waitText('当前没有待提交的改动')
+      await waitText('上个版本之后没有改动')
     })
 
     await step('A：结束工作后台上传被拒只置待交稿标记（不自动整合）', async () => {
@@ -3142,11 +3142,11 @@ try {
 
   await step('J12 工作台四列英文锚点（rail title 属性）', async () => {
     for (const title of ['Explorer', 'AI Assistant', 'Staging Area']) {
-      await page.waitForSelector('[title="' + title + '"]', { timeout: 15000 })
+      await page.waitForSelector('[title^="' + title + '"]', { timeout: 15000 }) // top-bar titles carry a shortcut suffix since #1708
     }
     // 版本入口会附带待提交/同步状态，仍核验英文可访问标题而非只检查按钮存在。
     const versionTitle = await page.$eval('.version-entry', (e) => e.getAttribute('title') || '')
-    if (!versionTitle.startsWith('Source Control · ') ||
+    if (!versionTitle.startsWith('Versions · ') ||
         !versionTitle.endsWith('View project changes and sync') || /[一-鿿]/.test(versionTitle)) {
       throw new Error('en-US 下版本入口标题不正确: ' + versionTitle)
     }
@@ -3211,7 +3211,7 @@ try {
 
   if (process.env.AI_E2E !== '0') {
     await step('J12 AI 面板输入区英文', async () => {
-      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title="AI Assistant"]')
+      if (!(await page.$('.chat-input-rich'))) await mouseClickSel('[title^="AI Assistant"]')
       await page.waitForSelector('.chat-input-rich', { timeout: 10000 })
       // 只断言输入框占位：面板里其余固定文案要么本来就是英文原文（模式名
       // Agent/Ask/Plan、Ask anything…，中英同值、没有鉴别力），要么与用户数据
@@ -3425,7 +3425,7 @@ try {
           await j13Page.mouse.click(box.x, box.y)
           await sleep(500)
         }
-        // 限定容器的文本点击：左栏 Skill 广场里一堆未安装项也叫「安装」，
+        // 限定容器的文本点击：左栏插件市场里一堆未安装项也叫「安装」，
         // 不加限定会点到同名的错误按钮（本轮调试实测踩过）。
         const j13ClickTextIn = async (containerSel, label) => {
           const box = await j13Page.evaluate((containerSel, lbl) => {
@@ -3503,7 +3503,7 @@ try {
         })
         await step13('J13 Skill 详情仍提供资源包管理入口', async () => {
           await j13ClickSel('[title="插件市场"]')
-          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
+          await j13ClickTextIn('.msb .msb-tabs', '技能')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '已启用', 15000)
         })
@@ -3521,7 +3521,7 @@ try {
         })
         await step13('J13 广场手动安装仍可用且完成后自动启用 Skill', async () => {
           await j13ClickSel('[title="插件市场"]')
-          await j13ClickTextIn('.msb .msb-tabs', 'Skill')
+          await j13ClickTextIn('.msb .msb-tabs', '技能')
           await j13ClickTextIn('.msb', '诉讼可视化')
           await j13WaitTextIn('.mdp', '需下载资源包', 15000)
           await j13ClickSel('.mdp .mdp-btn.primary')
@@ -4058,6 +4058,7 @@ try {
       if (!merged) throw new Error('确定之后后端没有把这一份记成已合好')
     })
 
+    let j14AutoFinalized = false
     await step('J14-②：逐页裁决——这一页用律师乙的，确定这一份', async () => {
       const clicked = await page.evaluate(() => {
         const rows = [...document.querySelectorAll('.adopt-dialog .merge-cell-row')]
@@ -4076,22 +4077,28 @@ try {
         throw new Error('第二栏不是律师乙那一侧（两栏的抬头对不上）: ' + JSON.stringify(clicked.side))
       }
       await page.mouse.click(clicked.x, clicked.y)
-      await sleep(500)
-      const confirmed = await page.evaluate((name) => {
+      // Wait for the confirm button to become clickable, then click it through its handle: puppeteer measures
+      // the box at click time. A coordinate taken earlier could land on the backdrop after the row re-laid
+      // out, which closed the whole dialog (master Journeys flake, run 45672230916).
+      const confirmHandle = await page.waitForFunction((name) => {
         const row = [...document.querySelectorAll('.adopt-dialog .adopt-row')].find((r) => {
           const n = r.querySelector('.adopt-row-name')
           return n && (n.innerText || '').trim() === name
         })
-        if (!row) return null
-        const btn = row.querySelector('.merge-cell-confirm')
-        if (!btn || btn.className.includes('awd-btn-disabled')) return null
-        const rect = btn.getBoundingClientRect()
-        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
-      }, NAME.pptxOverlap)
-      if (!confirmed) throw new Error('演示那一份的「这份就这么定」没有变成可点')
-      await page.mouse.click(confirmed.x, confirmed.y)
+        const btn = row && row.querySelector('.merge-cell-confirm')
+        return btn && !btn.className.includes('awd-btn-disabled') ? btn : null
+      }, { timeout: 10000 }, NAME.pptxOverlap).catch(() => null)
+      if (!confirmHandle) throw new Error('演示那一份的「这份就这么定」没有变成可点')
+      await sleep(300) // let the row finish re-laying out
+      await confirmHandle.asElement().click()
+      // This was the last open file, so every row is now MERGED. If a /status refresh reaches
+      // useDocumentMerge before our poll does, the app finalizes the merge itself (by design: it never
+      // leaves the lawyer at a dialog that already says everything is merged), and the conflict is gone.
+      // That counts as done too; the next steps check the history and the bytes either way.
+      // Before this, J14-② failed whenever the app won that race (run 45864355264).
       const merged = await pollUntil(async () => {
         const c = await conflictA()
+        if (!c) { j14AutoFinalized = true; return true }
         const p = mergeRowOf(c, NAME.pptxOverlap)
         return !!p && String(p.state).toUpperCase() === 'MERGED'
       }, 30000, 1000)
@@ -4100,7 +4107,14 @@ try {
     })
 
     await step('J14-②：点「就按我选的来」收尾，冲突窗关闭', async () => {
-      await mouseClickText('就按我选的来')
+      // The app may already have finalized on its own (see the step above).
+      if (!j14AutoFinalized && await conflictA()) {
+        try { await mouseClickText('就按我选的来') } catch (e) {
+          if (await conflictA()) throw e // the button vanished because the app finalized meanwhile
+          j14AutoFinalized = true
+        }
+      } else j14AutoFinalized = true
+      if (j14AutoFinalized) note('info', 'J14-②：最后一份确定后应用已自动收尾，没等律师点「就按我选的来」')
       const gone = await pollUntil(async () => !(await conflictA()), 40000, 1500)
       if (!gone) throw new Error('确认之后仓库仍停在冲突态: ' + JSON.stringify(await conflictA()).slice(0, 300))
       await page.waitForFunction(

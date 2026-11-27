@@ -75,7 +75,7 @@ export default {
   "enabledTag": "有効",
   "disabledTag": "無効",
   "sectionSkillSub": "プロンプトベースの機能：会話内で有効になり、アクティブ化の設定が可能です",
-  "builtinWorkflowsMarketNotice": "Lazy モードが有効：契約レビュー、証拠整理、ファイル整理、リーガルオピニオン検証がコアワークフローに組み込まれ、チャット内で自動的に起動します。インストールや手動切り替えは不要です。",
+  "builtinWorkflowsMarketNotice": "標準搭載：契約レビュー、証拠整理、ファイル整理、リーガルオピニオン検証はコアワークフローの一部で、タスクで必要になるとチャット内で自動的にオンになります。ここでインストールするものはありません。",
   "noLocalSkills": "追加の拡張スキルはまだローカルにインストールされていません",
   "noLocalSkillsHint": "「スキルマーケットプレイス」からインストールするか、スキルディレクトリ（skill.yml を含む）をローカルのスキルフォルダ ~/.aiworkdeck/skills/ に配置して「再スキャン」をクリックしてください",
   "fromPlugin": "プラグイン {pluginId} から",

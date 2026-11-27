@@ -138,3 +138,65 @@ test('native move ids distinguish moved ranges without merging ordinary edits or
   assert.equal(groups[1].typeKey, 'moveTo')
   assert.equal(groups[2].items.length, 2)
 })
+
+// Q25: one replacement = one Delete redline + one Insert redline starting where the
+// deletion ends. They must form ONE card so accept/reject always resolves both.
+test('groupRevisions：相接的删+插（同段落、同作者）并成一张「替换」卡，处置同时带上两条', () => {
+  const revs = [
+    { index: 0, type: 'Delete', author: AI_AUTHOR, date: '2026-11-25 15:41', paraKey: 2, start: 10, end: 21, text: '乙方有权根据开发进展自行' },
+    { index: 1, type: 'Insert', author: AI_AUTHOR, date: '2026-11-25 15:41', paraKey: 2, start: 21, end: 23, text: '如需', contiguous: true },
+  ]
+  const gs = groupRevisions(revs)
+  assert.equal(gs.length, 1)
+  const g = gs[0]
+  assert.equal(g.typeKey, 'replace')
+  assert.equal(g.type, 'Delete', '球形批注只隐藏纯插入卡；配对卡按删除型保留')
+  assert.equal(g.text, '乙方有权根据开发进展自行')
+  assert.equal(g.insText, '如需')
+  assert.deepEqual(g.items.map((r) => r.index), [0, 1], '接受/拒绝要一次处置两条')
+})
+
+test('groupRevisions：配对只看位置，不看时间——同一分钟里不相接的两处 AI 修改不合并', () => {
+  const revs = [
+    { index: 0, type: 'Delete', author: AI_AUTHOR, date: '2026-11-25 15:41', paraKey: 2, start: 10, end: 11, text: '三' },
+    { index: 1, type: 'Insert', author: AI_AUTHOR, date: '2026-11-25 15:41', paraKey: 2, start: 30, end: 31, text: '六', contiguous: false },
+  ]
+  const gs = groupRevisions(revs)
+  assert.deepEqual(gs.map((g) => g.typeKey), ['delete', 'insert'])
+})
+
+test('groupRevisions：相接但作者不同（手改紧挨 AI 改）不配对', () => {
+  const revs = [
+    { index: 0, type: 'Delete', author: AI_AUTHOR, date: '2026-11-25 15:41', paraKey: 2, start: 10, end: 11, text: '三' },
+    { index: 1, type: 'Insert', author: '张律师', date: '2026-11-25 15:41', paraKey: 2, start: 11, end: 12, text: '六', contiguous: true },
+  ]
+  assert.deepEqual(groupRevisions(revs, { selfAuthor: '张律师' }).map((g) => g.typeKey), ['delete', 'insert'])
+})
+
+test('groupRevisions：不同段落、移动、插在前删在后', () => {
+  const crossPara = [
+    { index: 0, type: 'Delete', author: AI_AUTHOR, paraKey: 2, start: 20, end: 21, text: '。' },
+    { index: 1, type: 'Insert', author: AI_AUTHOR, paraKey: 3, start: 0, end: 2, text: '第三', contiguous: true },
+  ]
+  assert.deepEqual(groupRevisions(crossPara).map((g) => g.typeKey), ['delete', 'insert'], '跨段落不配对')
+  const moved = [
+    { index: 0, type: 'Delete', author: AI_AUTHOR, paraKey: 2, start: 0, end: 2, text: '甲方', movedId: 5 },
+    { index: 1, type: 'Insert', author: AI_AUTHOR, paraKey: 2, start: 2, end: 4, text: '甲方', movedId: 5, contiguous: true },
+  ]
+  assert.deepEqual(groupRevisions(moved).map((g) => g.typeKey), ['moveFrom', 'moveTo'], '移动不是替换')
+  const insFirst = [
+    { index: 0, type: 'Insert', author: AI_AUTHOR, paraKey: 2, start: 5, end: 6, text: '六' },
+    { index: 1, type: 'Delete', author: AI_AUTHOR, paraKey: 2, start: 6, end: 7, text: '三', contiguous: true },
+  ]
+  const g = groupRevisions(insFirst)
+  assert.equal(g.length, 1)
+  assert.equal(g[0].text, '三')
+  assert.equal(g[0].insText, '六')
+  // 三处相接的 删/插/删：只配一对，第三条单独成卡（不吞并）
+  const chain = [
+    { index: 0, type: 'Delete', author: AI_AUTHOR, paraKey: 2, start: 0, end: 1, text: '七' },
+    { index: 1, type: 'Insert', author: AI_AUTHOR, paraKey: 2, start: 1, end: 2, text: '三', contiguous: true },
+    { index: 2, type: 'Delete', author: AI_AUTHOR, paraKey: 2, start: 2, end: 3, text: '十', contiguous: true },
+  ]
+  assert.deepEqual(groupRevisions(chain).map((x) => x.typeKey), ['replace', 'delete'])
+})

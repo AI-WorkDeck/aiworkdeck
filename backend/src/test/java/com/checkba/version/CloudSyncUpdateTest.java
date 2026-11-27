@@ -260,6 +260,8 @@ class CloudSyncUpdateTest {
         CloudSyncService.UpdateResult r = cloud.updateFromCloud(7L, 1L, "韩泽伟");
         assertEquals(CloudSyncService.UpdateStatus.CONFLICT, r.status());
         assertTrue(repoSvc.repositoryMerging(7L));
+        // C28: while the lawyer chooses, the file keeps their own content, never git's conflict markers.
+        assertEquals("我的第二稿", Files.readString(root.resolve("projects/7/合同.txt")));
     }
 
     /**
@@ -504,11 +506,24 @@ class CloudSyncUpdateTest {
     @Test
     void updateIsRefusedDuringActiveSession() throws Exception {
         linkToBareRemote(7L);
+        // A session with real lawyer work blocks a pull (C27: an empty / manifest-only session no longer does).
+        Files.writeString(root.resolve("projects/7/律师在改.txt"), "还没交稿的改动");
         svc.onChangeSignal(7L, 1L, "韩泽伟");
         svc.commitNow(7L, 1L, "韩泽伟", null);
         VersionException e = assertThrows(VersionException.class,
                 () -> cloud.updateFromCloud(7L, 1L, "韩泽伟"));
         assertTrue(e.isUserFacing());
+        assertTrue(svc.activeSession(7L).isPresent(), "real work is never discarded");
+    }
+
+    /** C27 (lane C): a session with no lawyer change (only the manifest) no longer blocks 取回. */
+    @Test
+    void updateGoesAheadWhenTheOpenSessionHasNoLawyerChange() throws Exception {
+        linkToBareRemote(7L);
+        svc.onChangeSignal(7L, 1L, "陆知微");
+        svc.commitNow(7L, 1L, "陆知微", null);
+        assertDoesNotThrow(() -> cloud.updateFromCloud(7L, 1L, "陆知微"));
+        assertTrue(svc.activeSession(7L).isEmpty(), "the empty session was discarded, not the pull refused");
     }
 
     @Test

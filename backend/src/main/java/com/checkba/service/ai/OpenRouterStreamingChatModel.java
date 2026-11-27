@@ -407,11 +407,18 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
         // （第一次根本没到网关），要么被拒成 request_already_submitted，绝不重复扣费。
         // 所以这条通道上「连接层失败、还没拿到任何响应」可以用同一个 id 安全重发一次。
         final String requestId = apiKey != null && apiKey.startsWith("awdai_") ? java.util.UUID.randomUUID().toString() : null;
-        final Inflight[] holder = new Inflight[1];
+        // Set right after the first enqueue. A connection that fails instantly (RST on accept) can reach the
+        // retry predicate on OkHttp's dispatcher thread before that assignment, so the predicate waits for it
+        // briefly instead of treating "not assigned yet" as "cancelled" (CI flake on Linux, 2026-11-25).
+        final java.util.concurrent.atomic.AtomicReference<Inflight> holder = new java.util.concurrent.atomic.AtomicReference<>();
         final String sentBody = body;
         final AtomicBoolean connectionRetryUsed = new AtomicBoolean(false);
         java.util.function.Predicate<IOException> retryOnce = requestId == null ? null : e -> {
-            Inflight in = holder[0];
+            Inflight in = holder.get();
+            for (int i = 0; in == null && i < 200; i++) {
+                try { Thread.sleep(10); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return false; }
+                in = holder.get();
+            }
             if (in == null || in.cancelled || !isConnectionLevelFailure(e) || !connectionRetryUsed.compareAndSet(false, true)) return false;
             log.warn("Platform AI request {} failed at the connection level ({}); retrying once with the same request id",
                     requestId, e.getClass().getSimpleName());
@@ -420,7 +427,7 @@ public final class OpenRouterStreamingChatModel implements StreamingChatLanguage
             return true;
         };
         Inflight inflight = new Inflight(enqueue(transport, body, session, requestId, retryOnce), session);
-        holder[0] = inflight;
+        holder.set(inflight);
 
         // 首字节前排队换家（dev-board#1061）：判定交给 handler 的看门狗（它手里有「保活 vs 真字节」
         // 的计时），动作在这里做——先让旧会话静默（之后它的任何回调都不再转给 handler，

@@ -197,6 +197,10 @@ public class AgentOrchestrator {
         private final StringBuilder streamContent = new StringBuilder();
         /** X39：续写时被续上的那条回答的干净正文（去掉中断标记），作为本轮落库内容的前缀。 */
         String continuationPrefix;
+        /** D34：最近一次工具调用是否失败（伪工具 final 无正文时据此决定重试还是收尾）。 */
+        volatile boolean lastToolFailed;
+        /** D34：本轮是否已为「失败后空 final」补过一次「请回复用户」的提醒（每轮至多一次）。 */
+        boolean finalNudged;
         /**
          * 当前助手段已经给用户看过的一切（正文 + 工具过程 + 思考，按发生顺序带时间戳），
          * 以及随消息落库的思考全文（dev-board#1060）。见 {@link TurnStreamTrace}。
@@ -352,6 +356,7 @@ public class AgentOrchestrator {
          */
         void noteToolResult(String toolName, boolean success) {
             if (toolName != null) toolsRun.add(toolName);
+            lastToolFailed = !success;
             if (success && ClientCapabilityService.isDocumentWritingTool(toolName)) {
                 documentEdited = true;
                 documentEdits.incrementAndGet();
@@ -1079,6 +1084,19 @@ public class AgentOrchestrator {
         String conversationId = guard.conversationId;
         log.info("Handling cancellation for run {} of conversation {}", guard.runId, conversationId);
 
+        // Q26：停止前 AI 已经增删了条款时，查一次条款编号，有问题写进本轮结尾与停止提示。
+        // 用户在等停止确认，读全文只给 CANCEL_NUMBERING_READ_SECONDS 秒，读不到就不报。
+        String numberingNotice = null;
+        if (isCurrentRun(guard) && isLowaSession(conversationId)) {
+            try {
+                numberingNotice = guard.writeCheck.numberingNotice(conversationId, guard.activeFileId,
+                        (action, params) -> editorBridgeService.executeEditorCommand(action, params,
+                                CANCEL_NUMBERING_READ_SECONDS));
+            } catch (Exception e) {
+                log.warn("[PostWriteVerify] numbering check on cancel failed for {}", conversationId, e);
+            }
+        }
+
         // 已生成的部分正文 + 本轮的工具过程卡
         String partialContent = guard.streamSnapshot();
         String logText = executionLog != null ? executionLog.toString() : "";
@@ -1086,7 +1104,8 @@ public class AgentOrchestrator {
 
         if (!partialContent.isEmpty() || !logText.isEmpty()) {
             String contentToSave = logText + partialContent
-                    + LangText.of("\n\n[已中断]", "\n\n[Interrupted]");
+                    + LangText.of("\n\n[已中断]", "\n\n[Interrupted]")
+                    + (numberingNotice == null ? "" : numberingNotice);
             saveAssistantMessageQuietly(guard, projectId, userId, contentToSave);
             log.info("Saved interrupted round ({} log chars + {} body chars) for cancelled conversation: {}",
                     logText.length(), partialContent.length(), conversationId);
@@ -1105,11 +1124,24 @@ public class AgentOrchestrator {
         sendRunEvent(guard, "cancelled",
                 "{\"message\":\"" + LangText.of("用户已停止生成", "Generation stopped by the user")
                         + "\",\"documentEdited\":" + guard.documentEdited()
-                        + ",\"documentEdits\":" + guard.documentEdits.get() + "}");
+                        + ",\"documentEdits\":" + guard.documentEdits.get()
+                        + (numberingNotice == null ? "" : ",\"numberingNotice\":" + jsonString(numberingNotice.strip()))
+                        + "}");
         closeSse(guard);
 
         // 清理状态
         endRun(guard);
+    }
+
+    /** 停止时的条款编号核对最多等多久读全文（秒）；正常几十到几百毫秒。 */
+    static final int CANCEL_NUMBERING_READ_SECONDS = 3;
+
+    private static String jsonString(String value) {
+        try {
+            return SKILL_UPDATE_MAPPER.writeValueAsString(value);
+        } catch (Exception e) {
+            return "\"\"";
+        }
     }
 
     private static final String STEERING_CANCELLED_TOOL =
@@ -3030,7 +3062,31 @@ public class AgentOrchestrator {
             boolean pseudoFinal = isPseudoFinalCall(aiMessage) && toolRegistry.resolve("final").isEmpty();
             if (pseudoFinal) {
                 log.info("Native pseudo-tool 'final' treated as end of turn for {}", conversationId);
-                aiMessage = dev.langchain4j.data.message.AiMessage.from(aiMessage.text() == null ? "" : aiMessage.text());
+                String text = aiMessage.text() == null ? "" : aiMessage.text();
+                if (text.isBlank()) {
+                    // D34（robustness-20 r14）：模型把整段答复放进 final({"answer": …}) 的参数、正文为空。
+                    // 旧逻辑只留 text()，用户看到「工具失败」之后什么都没有，轮次却记成 FINISHED。
+                    // 参数里有话就当正文发出去；参数里也没有，按空响应重试（不能静默收尾）。
+                    // 参数里也没有：上一步工具失败了，就补一轮「请回复用户」的提醒（每轮一次，同「记住」提醒的做法）——
+                    // 用户此刻只看到一条失败，没有任何交代。不走空响应重试：那条会对用户说「模型返回了空响应」，并不属实。
+                    // 上一步成功（O12：改完幻灯片发空 final）照旧收尾，改动本身就是结果。
+                    String answer = pseudoFinalAnswer(aiMessage);
+                    if (answer.isBlank() && guard.lastToolFailed && !guard.finalNudged) {
+                        guard.finalNudged = true;
+                        log.warn("Blank pseudo-final right after a failed tool in {}, asking for a reply once", conversationId);
+                        messages.add(dev.langchain4j.data.message.UserMessage.from(LangText.of(
+                                "【系统提醒】你还没有回复用户。请根据上面已经拿到的结果直接回答：说明完成了什么、哪一步没成功以及原因（用通俗的话，不要引用技术报错），需要用户做什么。",
+                                "[System reminder] You have not replied to the user yet. Answer now from the results above: what was done, which step did not succeed and why (in plain words, no technical error text), and what the user needs to do.")));
+                        continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
+                                depth + 1, executionLog, agentMode, guard);
+                        return;
+                    }
+                    if (!answer.isBlank()) {
+                        sendTextDelta(guard, answer);
+                        text = answer;
+                    }
+                }
+                aiMessage = dev.langchain4j.data.message.AiMessage.from(text);
             }
 
             // 本轮真正成功完成（有内容或有工具调用）：清零瞬时错误重试预算与溢出压缩预算
@@ -3717,6 +3773,17 @@ public class AgentOrchestrator {
                 continueRunLoop(model, messages, conversationId, projectId, userId, modelId,
                         depth + 1, executionLog, agentMode, guard);
                 return;
+            }
+
+            // 3.65 条款编号（Q26）：本轮增删过条款、或收到过写后提醒，收尾前再查一次编号；
+            // 模型没修好就在回答末尾如实告诉用户（不自动改号——改号也是改稿，要用户说了算）
+            if (!summaryOnly && isCurrentRun(guard) && isLowaSession(conversationId)) {
+                String numberingNotice = guard.writeCheck.numberingNotice(conversationId, guard.activeFileId,
+                        this::harnessEditorRead);
+                if (numberingNotice != null) {
+                    sendTextDelta(guard, numberingNotice);
+                    content = content + numberingNotice;
+                }
             }
 
             // 3.7 纠正后仍是口头完成（office-tier1）：如实补一句「没改成」，不再追问
@@ -5055,6 +5122,37 @@ public class AgentOrchestrator {
             for (String w : appliedWrites) { zh.append("\n- ").append(w); en.append("\n- ").append(w); }
         }
         return LangText.of(zh.toString(), en.toString());
+    }
+
+    /** 伪工具 final 参数里的答复正文：常见键（answer/content/text/…）或参数本身就是字符串；取不到返回空串。 */
+    static String pseudoFinalAnswer(dev.langchain4j.data.message.AiMessage aiMessage) {
+        if (aiMessage == null || !aiMessage.hasToolExecutionRequests()) return "";
+        StringBuilder out = new StringBuilder();
+        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+        for (var r : aiMessage.toolExecutionRequests()) {
+            String args = r.arguments();
+            if (args == null || args.isBlank()) continue;
+            String piece = "";
+            try {
+                com.fasterxml.jackson.databind.JsonNode n = om.readTree(args);
+                if (n.isTextual()) {
+                    piece = n.asText();
+                } else if (n.isObject()) {
+                    for (String k : java.util.List.of("answer", "content", "text", "message", "response",
+                            "final_answer", "result", "summary", "output", "reply")) {
+                        if (n.path(k).isTextual() && !n.path(k).asText().isBlank()) { piece = n.path(k).asText(); break; }
+                    }
+                }
+            } catch (Exception e) {
+                // 不是 JSON：参数整体就是正文
+                piece = args;
+            }
+            if (!piece.isBlank()) {
+                if (out.length() > 0) out.append("\n\n");
+                out.append(piece.trim());
+            }
+        }
+        return out.toString();
     }
 
     /** 本轮原生工具调用是否全是名为 final 的伪工具（大小写不敏感）。 */

@@ -193,6 +193,17 @@ test('cancelled 带修改次数：气泡标 documentEdited 并写「已完成 N 
   assert.equal(shouldOfferRunUndo(bubble, { isLatest: true, isStreaming: s.isStreaming.value }), true)
 })
 
+test('Q26 cancelled 带条款编号提示：接在本轮回答末尾；不带就不动正文', async () => {
+  const notice = '**条款编号需要核对**：本轮修改后，以下编号与前后条款对不上。\n- 「第十三条 网络安全责任保险」：第十三条重复出现（上一次在段 25）'
+  const a = await liveStream()
+  a.event('cancelled', { message: 'stopped', documentEdited: true, documentEdits: 1, numberingNotice: notice })
+  assert.ok(a.bubble.content.endsWith('\n\n' + notice + '\n'), JSON.stringify(a.bubble.content))
+  const b = await liveStream()
+  const before = b.bubble.content
+  b.event('cancelled', { message: 'stopped', documentEdited: true, documentEdits: 1 })
+  assert.equal(b.bubble.content, before)
+})
+
 test('cancelled 没有修改：不标 documentEdited，不出撤销入口', async () => {
   const { bubble, event } = await liveStream()
   event('cancelled', { message: 'stopped', documentEdited: false, documentEdits: 0 })
@@ -208,4 +219,51 @@ test('bubble_end paused/user_pause：清掉「正在暂停」，挂上「继续�
   assert.deepEqual(s.agentPaused.value, { reason: 'user_pause' })
   assert.equal(s.agentRunStatus.value, 'PAUSED')
   assert.equal(bubble.documentEdited, true)
+})
+
+// ---- Q22：空失败的一轮，「重试」直接重发 ----
+test('Q22 isEmptyFailedTurn：失败且什么都没产出才直接重发；有任何产出仍走确认框', async () => {
+  const { isEmptyFailedTurn } = await import('../../src/utils/agentRunControl.js')
+  const failed = { errorNotice: { kind: 'MALFORMED' }, content: '', processes: [], fileChanges: [], artifacts: [], documentEdited: false }
+  assert.equal(isEmptyFailedTurn(failed), true)
+  assert.equal(isEmptyFailedTurn({ ...failed, errorNotice: null }), false, '没失败不是「重试」')
+  assert.equal(isEmptyFailedTurn({ ...failed, content: '部分回答' }), false)
+  assert.equal(isEmptyFailedTurn({ ...failed, processes: [{ name: 'doc_find_text' }] }), false)
+  assert.equal(isEmptyFailedTurn({ ...failed, documentEdited: true }), false, '改过文档：要讲清楚文档不回滚')
+  assert.equal(isEmptyFailedTurn({ ...failed, fileChanges: [{ id: 1 }] }), false)
+  assert.equal(isEmptyFailedTurn(null), false)
+})
+
+test('Q22 接线：错误卡的「重试」走 retryFailedTurn（空失败直接重发），重新生成按钮仍弹确认框', () => {
+  const root = readFileSync(new URL('../../src/components/AgentMessage/RootBubble.vue', import.meta.url), 'utf8')
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  assert.match(root, /@retry="\$emit\('retry-failed'\)"/)
+  assert.match(chat, /@retry-failed="retryFailedTurn\(index\)"/)
+  assert.match(chat, /@regenerate="openRegenerateDialog\(index\)"/)
+  assert.match(chat, /if \(isEmptyFailedTurn\(bubbles\.value\[assistantIndex\]\)\) return retryAfterConsent\(assistantIndex\)/)
+})
+
+test('Q21 接线：账户类 error 载荷带 kind 进 errorNotice；错误卡的「重新登录」强制打开登录层', async () => {
+  const { bubble, event } = await liveStream()
+  event('error', { message: '平台 AI 通道配置与当前站点不符，请刷新账户连接', code: 1, kind: 'MALFORMED' })
+  assert.equal(bubble.errorNotice && bubble.errorNotice.key, 'accountReconnect')
+  assert.equal(bubble.errorNotice.action, 'reconnect')
+  const root = readFileSync(new URL('../../src/components/AgentMessage/RootBubble.vue', import.meta.url), 'utf8')
+  assert.match(root, /@reconnect="reconnectForAi"/)
+  assert.match(root, /function reconnectForAi\(\) \{\s*return requireAccount\(\{ reason: 'ai', force: true \}\)/)
+  const inline = readFileSync(new URL('../../src/components/AwdInlineError.vue', import.meta.url), 'utf8')
+  assert.match(inline, /else if \(a === 'reconnect'\) this\.\$emit\('reconnect'\)/)
+})
+
+// ---- Q24：平台通道的律师看不到 token 数，改给「查看用量」 ----
+test('Q24 token_usage 带 platform 时本轮记为平台通道；页脚给「查看用量」，token 数只在提示里', async () => {
+  const { s, event } = await liveStream()
+  event('token_usage', { promptTokens: 100, completionTokens: 20, totalTokens: 120, platform: false })
+  assert.equal(!!s.tokenUsage.value.platform, false)
+  event('token_usage', { promptTokens: 100, completionTokens: 20, totalTokens: 120, platform: true })
+  assert.equal(s.tokenUsage.value.platform, true)
+  assert.equal(s.tokenUsage.value.totalTokens, 240)
+  const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  assert.match(chat, /<text v-if="tokenUsage\.platform" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.viewUsage'\) \}\}<\/text>/)
+  assert.match(chat, /openUsageSettings\(\) \{\s*if \(this\.openSettingsTab\) this\.openSettingsTab\(\{ nav: 'account' \}\)/)
 })

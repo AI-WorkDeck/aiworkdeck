@@ -133,6 +133,8 @@ public class EvalCase {
         public List<ExpectedToolCall> toolCalls;
         /** 最终保存的 ASSISTANT 消息应包含的子串（输出结构标签断言） */
         public List<String> structureContains = new ArrayList<>();
+        /** 最终保存的 ASSISTANT 消息里不该出现的文字（Q26：已顺延编号就不提示用户）。 */
+        public List<String> structureNotContains = new ArrayList<>();
         /** 期望保存的 artifact（null = 不断言） */
         public Artifact artifact;
         /**

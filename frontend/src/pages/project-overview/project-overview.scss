@@ -5273,3 +5273,76 @@ $color-accent: var(--awd-mint); // Mint Green
   cursor: pointer;
 }
 .explorer-ocr-progress-cancel:disabled { opacity: .6; cursor: default; }
+
+/* 顶栏三段式（Q28 / X-S10）：左（项目名，先缩、省略到 120px）—中（对话/工作台，不缩、不再绝对定位）—右（工具）。
+   原来中间的开关是绝对居中压在顶栏上的，窄窗时 800px 下「工作台」压在语言选择上（firstday-1125 截图 25）。
+   左右各 flex: 1 1 0 让开关在放得下时仍居中；右侧内容放不下时左侧让出，三者永不重叠。
+   Windows 布局把中段隐藏（App.vue html.is-win），这里的规则对它同样成立。 */
+.project-header .header-left {
+  flex: 1 1 0;
+  min-width: 120px;
+  max-width: none;
+}
+.project-header .header-center {
+  position: static;
+  transform: none;
+  flex: 0 0 auto;
+  margin: 0 12px;
+}
+.project-header .header-right {
+  flex: 1 1 0;
+  justify-content: flex-end;
+}
+.header-more-btn { display: none; position: relative; }
+.header-more-dots { font-size: var(--awd-font-size-title); line-height: 1; }
+.header-tools-optional { display: flex; align-items: center; gap: 4px; }
+/* 窄于 1000px：语言选择只留地球图标（语言名在 tooltip 里，菜单不变） */
+@media (max-width: 999px) {
+  .header-lang-picker :deep(.awd-lang-current),
+  .header-lang-picker :deep(.awd-lang-caret) { display: none; }
+}
+/* 窄于 880px：截图 / 新网页 / 工作记录收进「⋯」 */
+@media (max-width: 879px) {
+  .header-tools-optional { display: none; }
+  .header-more-btn { display: flex; }
+  /* 项目名比「进行中」状态徽标要紧：窄时让位给名字（状态在项目概览里照样看得到） */
+  .project-header .project-status-badge { display: none; }
+}
+/* rail「更多」（Q28 / X-S10） */
+.rail-more-dots { font-size: var(--awd-font-size-title); line-height: 20px; }
+.rail-more-menu {
+  position: fixed;
+  top: auto;
+  right: auto;
+  inset-inline-start: 60px;
+  bottom: 160px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* 窄窗口浮层抽屉（Q28 / X-S10）：放不下时打开的左栏 / AI 面板压在文档上，不挤它。
+   不加遮罩，文档在旁边照样能读；Esc、点文档、再点开关关闭（narrowLayout.js）。 */
+.sidebar-left.as-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-start: 56px;
+  z-index: 60;
+  max-width: calc(100% - 56px - 48px);
+  box-shadow: var(--awd-shadow-lg);
+}
+.workbench-main { position: relative; }
+.workbench-main > .side-panel-ai.as-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: 0;
+  z-index: 60;
+  max-width: calc(100% - 48px);
+  background: var(--awd-bg);
+  box-shadow: var(--awd-shadow-lg);
+}
+
+/* C8/C10：只读成员 / 已被移出的说明条，压在采纳条下面一格 */
+.member-blocked-bar { top: 64px; background: var(--awd-warning, var(--awd-info)); }
+.large-files-bar { top: 108px; }

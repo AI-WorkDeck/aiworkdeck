@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "Копировать вывод",
   "copyFailed": "Не удалось скопировать",
   "tokenUsageLine": "Токенов за этот ход: {n}",
+  "viewUsage": "Посмотреть расход",
   "statusError": "Ошибка",
   "statusSuccess": "Успешно",
   "statusRunning": "Выполняется",

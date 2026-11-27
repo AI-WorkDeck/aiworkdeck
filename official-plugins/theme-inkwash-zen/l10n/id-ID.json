@@ -1,8 +1,8 @@
 {
-  "plugin.name": "Tinta Zen · Kulit Kaligrafi",
-  "plugin.desc": "Ruang kosong kertas Xuan, hierarki lima nada tinta, dan aksen fokus tinta ungu pada mode terang dan gelap.",
-  "theme.name": "Tinta Zen",
-  "theme.desc": "Kertas Xuan × Pencucian Tinta Lima Nada × Tetesan Tinta Ungu × Segel Cinnabar",
+  "plugin.name": "Lukisan tinta",
+  "plugin.desc": "Putih kertas beras dengan lapisan abu-abu tinta",
+  "theme.name": "Lukisan tinta",
+  "theme.desc": "Putih kertas beras dengan lapisan abu-abu tinta",
   "gallery.badge": "Galeri tema",
   "gallery.swatch1": "Putih kertas beras",
   "gallery.swatch2": "Tinta pekat",

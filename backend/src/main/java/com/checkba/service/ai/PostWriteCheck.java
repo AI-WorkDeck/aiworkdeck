@@ -61,6 +61,10 @@ final class PostWriteCheck {
     private boolean structural;
     private boolean readAfterLastWrite;
     private boolean done;
+    /** 写入次数：上一次核对时（-1 = 没核对过），以及那一次是否干净。 */
+    private int writesAtVerify = -1;
+    private boolean verifyClean;
+    private boolean noticeChecked;
 
     /** 工具执行前：本轮第一次正文写入之前读底稿。 */
     synchronized void beforeTool(String toolName, Long activeFileId,
@@ -118,10 +122,58 @@ final class PostWriteCheck {
         log.info("[PostWriteVerify] conv={} result={} writes={} structural={} changed={} deleted={} issues={}",
                 conversationId, result.clean() ? "clean" : "issues", writes, structural, result.changed(),
                 result.deletions(), result.issues().size());
+        writesAtVerify = writes;
+        verifyClean = result.clean();
         return result.clean() ? null : reminder(result.issues());
     }
 
+    /**
+     * Q26：本轮增删了条款（结构性写入）或收到过写后提醒，收尾时（正常收尾或用户点了停止）再查一次
+     * 条款编号，仍有本轮造成的编号问题就返回一句给<b>用户</b>看的提示（追加在本轮回答末尾）。
+     * 模型修好了、或核对后没有新写入且上次就干净，返回 null。每轮最多查一次；读不到全文静默放行。
+     * 实录：用户在 AI 插入「第十三条」后 9 秒点了停止，隐形提醒那一步根本没机会跑，合同里留下两个第十三条。
+     */
+    synchronized String numberingNotice(String conversationId, Long activeFileId,
+                                        BiFunction<String, Map<String, Object>, String> bridge) {
+        if (noticeChecked || baseline == null || writes == 0 || !(structural || done)) return null;
+        noticeChecked = true;
+        if (writesAtVerify == writes && verifyClean) return null;
+        if (!Objects.equals(baselineFileId, activeFileId)) return null;
+        DocumentAuditTools.ParagraphRead read = read(bridge);
+        if (read.error() != null || !read.complete()) {
+            log.info("[PostWriteVerify] conv={} notice=unavailable reason={}", conversationId,
+                    read.error() == null ? "too long" : read.error());
+            return null;
+        }
+        List<PostWriteAudit.Issue> numbering = PostWriteAudit.check(baseline, read.paragraphs()).issues().stream()
+                .filter(i -> i.kind() == PostWriteAudit.Kind.NUMBERING).toList();
+        log.info("[PostWriteVerify] conv={} notice={} writes={}", conversationId,
+                numbering.isEmpty() ? "clean" : "numbering:" + numbering.size(), writes);
+        return numbering.isEmpty() ? null : userNotice(numbering);
+    }
+
+    static String userNotice(List<PostWriteAudit.Issue> issues) {
+        StringBuilder zh = new StringBuilder(), en = new StringBuilder();
+        int n = 0;
+        for (PostWriteAudit.Issue i : issues) {
+            if (++n > 5) break;
+            String excerpt = i.excerpt().isEmpty() ? "" : "「" + i.excerpt() + "」";
+            zh.append("\n- ").append(excerpt.isEmpty() ? "" : excerpt + "：").append(i.detail());
+            en.append("\n- ").append(excerpt.isEmpty() ? "" : excerpt + ": ").append(i.detail());
+        }
+        return LangText.of(
+                "\n\n**条款编号需要核对**：本轮修改后，以下编号与前后条款对不上，AI 没有自动改号。"
+                        + "请核对后手动调整，或让 AI 重新编号。" + zh,
+                "\n\n**Check the clause numbering**: after this turn's edits the numbering below no longer "
+                        + "follows on, and the AI did not renumber it. Fix it by hand or ask the AI to renumber." + en);
+    }
+
+    /** 新写入的文字里带「第X条」：插进或删掉一条条款，编号就可能要顺延（Q26）。 */
+    private static final java.util.regex.Pattern CLAUSE_LABEL =
+            java.util.regex.Pattern.compile("第[一二三四五六七八九十百零〇0-9０-９]+[条條]");
+
     static boolean isStructural(String toolName, String argsJson) {
+        if (TEXT_WRITES.contains(toolName) && addsClauseLabel(argsJson)) return true;
         switch (toolName) {
             case "doc_insert_under_heading", "doc_delete_selection" -> {
                 return true;
@@ -181,6 +233,15 @@ final class PostWriteCheck {
             case EMPTY_HEADING -> "empty heading";
             case DUPLICATE -> "duplicate";
         };
+    }
+
+    /** 写入参数里的新文字（text / newText / replaceText / replacement）带条款标号。 */
+    private static boolean addsClauseLabel(String argsJson) {
+        JsonNode args = parse(argsJson);
+        for (String field : List.of("text", "newText", "replaceText", "replacement", "content")) {
+            if (CLAUSE_LABEL.matcher(args.path(field).asText("")).find()) return true;
+        }
+        return false;
     }
 
     private static DocumentAuditTools.ParagraphRead read(BiFunction<String, Map<String, Object>, String> bridge) {

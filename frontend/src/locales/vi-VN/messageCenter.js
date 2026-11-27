@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Mở nghiệp vụ liên quan",
   "readNotDone": "Đọc thông báo không thay thế cho việc xác nhận nghiệp vụ. Vui lòng mở nghiệp vụ liên quan để xem và xử lý.",
   "targetUnavailable": "Lối vào nghiệp vụ của tin nhắn này hiện không khả dụng. Vui lòng làm mới và thử lại.",
-  "pluginUnavailable": "Tiện ích liên quan chưa được cài đặt hoặc bật. Vui lòng kiểm tra trong trung tâm tiện ích.",
+  "pluginUnavailable": "Tiện ích liên quan chưa được cài đặt hoặc bật. Vui lòng kiểm tra trong trung tâm tiện ích.", "enableLawFirmTitle": "Bật Quản lý công ty luật?", "enableLawFirmBody": "Thông báo này được xử lý trong Quản lý công ty luật. Tiện ích đi kèm ứng dụng; khi bật, bản ghi này sẽ mở ngay.", "enableLawFirmConfirm": "Bật và mở",
   "openFailed": "Không thể mở nghiệp vụ liên quan. Vui lòng thử lại.",
   "serviceFailed": "Dịch vụ tin nhắn tạm thời không khả dụng. Vui lòng thử lại.",
   "source": "Từ {name}",

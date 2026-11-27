@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { normalizeMessageTarget } from '../../utils/messageTargets.js'
 import { messageCenterRequest, messageCenterIdentity } from '../../services/messageCenter.js'
-import { getDdRequestDetails } from '../../services/api.js'
+import { getDdRequestDetails, ensureLawFirmPlugin } from '../../services/api.js'
 import { isGlobalPlugin } from '../../utils/pluginViews.js'
 import { ACCOUNT_CHANGED_EVENT } from '../../utils/requireAccount.js'
 import { errorText } from '@/utils/errorToast.js'
@@ -110,7 +110,16 @@ export const messageCenterTabMethods = {
       await this.loadDynamicPlugins()
       if (!stillCurrent()) return false
       const pluginId = target.kind === 'calendar' ? 'calendar' : target.pluginId
-      const plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
+      let plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
+      // C18：律所管理随应用内置。没启用时就地一键启用，再接着打开，不让人去插件市场找
+      if (!plugin && pluginId === 'lawfirm-management') {
+        if (!(await this.confirmEnableLawFirmPlugin())) return false
+        await ensureLawFirmPlugin()
+        uni.$emit('awd:market-changed')
+        await this.loadDynamicPlugins()
+        if (!stillCurrent()) return false
+        plugin = this.dynamicPlugins.find(p => p.pluginId === pluginId)
+      }
       if (!plugin) throw new Error(this.$t('messageCenter.pluginUnavailable'))
       // Installed but project-scoped: the user only needs to open a project, not to check the plugin center.
       if (!this.hasProject && !isGlobalPlugin(plugin)) throw Object.assign(new Error(this.$t('messageCenter.projectRequired')), { projectRequired: true })
@@ -123,5 +132,16 @@ export const messageCenterTabMethods = {
       return true
     }
     throw new Error(this.$t('messageCenter.targetUnavailable'))
+  },
+
+  confirmEnableLawFirmPlugin() {
+    return new Promise(resolve => uni.showModal({
+      title: this.$t('messageCenter.enableLawFirmTitle'),
+      content: this.$t('messageCenter.enableLawFirmBody'),
+      confirmText: this.$t('messageCenter.enableLawFirmConfirm'),
+      cancelText: this.$t('common.cancel'),
+      success: res => resolve(!!res.confirm),
+      fail: () => resolve(false),
+    }))
   },
 }

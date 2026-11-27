@@ -78,6 +78,20 @@ function isWordChar(cp) {
 }
 
 /**
+ * Q23：数字整词。阿拉伯/全角数字、中文数字、%‰，以及夹在两个数字之间的 . ,
+ * 连成一个词，所以 70% → 30%、1,000 → 2,000、三十日 → 六十日 都按整个数字
+ * 删插，不会出现「删 7 插 3」读成 730% 这种修订。
+ */
+const NUMERAL_RE = /[0-9０-９零〇一二三四五六七八九十百千万亿两壹贰叁肆伍陆柒捌玖拾佰仟萬億%％‰]/
+function isNumeralAt(s, i) {
+  const ch = s.charAt(i)
+  if (!ch) return false
+  if (NUMERAL_RE.test(ch)) return true
+  if (ch === '.' || ch === ',' || ch === '．' || ch === '，') return /[0-9０-９]/.test(s.charAt(i - 1)) && /[0-9０-９]/.test(s.charAt(i + 1))
+  return false
+}
+
+/**
  * 切词。返回 `{text, start}` 两个等长数组：text[i] 是第 i 个词的文字，
  * start[i] 是它在原串里的 UTF-16 偏移。词之间首尾相接、不漏字：
  * 连续空白合成一个词，英文字母数字连写成一个词，其余（汉字、标点、
@@ -93,6 +107,14 @@ function tokenize(s) {
     let j = i + (cp > 0xffff ? 2 : 1)
     if (isSpace(s.charAt(i))) {
       while (j < len && isSpace(s.charAt(j))) j++
+    } else if (isNumeralAt(s, i)) {
+      while (j < len && isNumeralAt(s, j)) j++
+      // 10th / 5mm：数字后面紧跟字母时按英文词继续连写
+      while (j < len) {
+        const next = s.codePointAt(j)
+        if (!isWordChar(next)) break
+        j += next > 0xffff ? 2 : 1
+      }
     } else if (isWordChar(cp)) {
       while (j < len) {
         const next = s.codePointAt(j)

@@ -200,6 +200,7 @@ export default {
     "moveFrom": "Şuradan taşındı",
     "moveTo": "Şuraya taşındı",
     "deletion": "Silme",
+    "replacement": "Değiştirme",
     "insertion": "Ekleme",
     "table": "Tablo",
     "contiguousCount": "{count} ardışık",

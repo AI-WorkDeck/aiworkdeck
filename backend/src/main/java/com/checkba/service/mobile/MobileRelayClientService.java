@@ -165,7 +165,14 @@ public class MobileRelayClientService {
         requireCatalogAccountScope(scope);
         String token = currentToken();
         requireCatalogAccountScope(scope);
-        if (token == null) throw new IllegalArgumentException(LangText.of("请先连接账户", "Connect your account first"));
+        if (token == null) {
+            // Q20：账户连着、只是云端中转站这会儿连不上（桥接失败）时，不能说「请先连接账户」——
+            // 用户刚登录完，看到这句只会以为登录没成功
+            throw new IllegalArgumentException(active()
+                    ? LangText.of("暂时连不上云端服务，账户本身没有问题。请检查网络，稍后再试。",
+                            "Can't reach the cloud service right now; your account is fine. Check your connection and try again later.")
+                    : LangText.of("请先连接账户", "Connect your account first"));
+        }
         return new CatalogSession(scope, token);
     }
     /** A catalogue operation never rebinds credentials halfway through an account switch. */
@@ -534,7 +541,15 @@ public class MobileRelayClientService {
                     if (Boolean.TRUE.equals(file.getIsFolder()) || !MobilePreviewPolicy.supports(file.getName())) continue;
                     if (file.getFilePath() == null) continue;
                     String identity = projectKey + ":" + file.getId();
-                    var resource = storageServiceFactory.getStorageService().load(file.getFilePath());
+                    // C12: e.g. a colleague's 「仅在 X 的电脑上」 placeholder has no bytes here. Skip it instead of
+                    // aborting the whole run every minute, and keep any earlier backup copy (never erased by absence).
+                    // Ask first: load() logs an ERROR for a missing file (lane C r3: one per minute); the catch is
+                    // only for a file removed between the two calls.
+                    var storage = storageServiceFactory.getStorageService();
+                    if (!storage.exists(file.getFilePath())) { previous.remove(identity); continue; }
+                    org.springframework.core.io.Resource resource;
+                    try { resource = storage.load(file.getFilePath()); }
+                    catch (com.checkba.storage.StorageException missing) { previous.remove(identity); continue; }
                     long size = resource.contentLength();
                     if (size > MobileTransferService.MAX_TRANSFER_BYTES) continue;
                     JsonNode old = previous.remove(identity);
@@ -729,9 +744,9 @@ public class MobileRelayClientService {
         row.put("project", projectInfo(item.path("projectKey").asText()));
         row.put("phase", phase);
         row.put("message", message);
-        String root = "audio".equals(item.path("mediaType").asText()) ? AUDIO_ROOT_FOLDER : MEDIA_ROOT_FOLDER;
+        String root = captureRootName(item.path("projectKey").asText(), item.path("mediaType").asText());
         row.put("savedPath", "document".equals(item.path("mediaType").asText())
-                ? ADDIN_DOC_ROOT_FOLDER + "/" + sanitizedDocName(item.path("fileName").asText())
+                ? root + "/" + sanitizedDocName(item.path("fileName").asText())
                 : root + "/" + captureDate(item) + "/" + landedFileName(item.path("fileName").asText(), item.path("clientMediaId").asText()));
         row.put("updatedAt", System.currentTimeMillis());
         receiptItems.remove(id);
@@ -1084,14 +1099,9 @@ public class MobileRelayClientService {
 
     // ==================== 落盘 ====================
 
-    /** 归档根目录名，与 buildPhysicalPath 会拼出的物理路径同构，见 landAndAck 内注释。 */
-    private static final String MEDIA_ROOT_FOLDER = "现场影像";
-    /** 录音（mediaType=audio）落这个根目录——律师找录音不该去翻「现场影像」。 */
-    private static final String AUDIO_ROOT_FOLDER = "现场录音";
+    // 影像/录音根目录名见 CaptureFolderNames（X44：随界面语言新建、已有则沿用；录音与影像分开）。
     /** 跨设备投送（PUSH）落盘根目录名，与「现场影像/现场录音」并列。 */
     private static final String TRANSFER_ROOT_FOLDER = "跨设备文件";
-    /** 插件文档镜像（dev-board#299）落盘根目录名：固定路径覆盖，不带日期层。 */
-    private static final String ADDIN_DOC_ROOT_FOLDER = "插件文档";
 
     private void landAndAck(JsonNode item) throws IOException, InterruptedException {
         long itemId = item.path("id").asLong();
@@ -1121,7 +1131,9 @@ public class MobileRelayClientService {
         // 从 mediaType 稳定推导——它同时参与幂等判据（同名文件查找）与 storagePath 拼接，
         // 跨轮重试两处要落在同一棵目录下。
         String mediaType = item.path("mediaType").asText("image");
-        String rootFolderName = "audio".equals(mediaType) ? AUDIO_ROOT_FOLDER : MEDIA_ROOT_FOLDER;
+        // X44：根目录名随界面语言起名，但项目里已有任一语言的同类根目录就沿用它（不改名、不另建、
+        // 换语言后的重试仍落同一棵目录，幂等判据不破）。storagePath 用同一个名字，与目录树同构。
+        String rootFolderName = captureRootName(String.valueOf(projectId), mediaType);
         ProjectFile root = ensureFolder(projectId, null, rootFolderName, userId);
         ProjectFile day = ensureFolder(projectId, root.getId(), dateStr, userId);
 
@@ -1217,7 +1229,8 @@ public class MobileRelayClientService {
     private void landDocumentAndAck(JsonNode item, long itemId, long projectId, Long userId)
             throws IOException, InterruptedException {
         String landedName = sanitizedDocName(item.path("fileName").asText());
-        ProjectFile root = ensureFolder(projectId, null, ADDIN_DOC_ROOT_FOLDER, userId);
+        String docRoot = captureRootName(String.valueOf(projectId), "document");
+        ProjectFile root = ensureFolder(projectId, null, docRoot, userId);
 
         String token = currentToken();
         if (token == null) { receipt(item, "failed", "connection"); return; }
@@ -1234,9 +1247,9 @@ public class MobileRelayClientService {
             return;
         }
 
-        String finalPath = String.format("projects/%d/%s/%s", projectId, ADDIN_DOC_ROOT_FOLDER, landedName);
+        String finalPath = String.format("projects/%d/%s/%s", projectId, docRoot, landedName);
         String marker = item.path("clientMediaId").asText("");
-        String tmpPath = String.format("projects/%d/%s/.tmp-%s-%s", projectId, ADDIN_DOC_ROOT_FOLDER,
+        String tmpPath = String.format("projects/%d/%s/.tmp-%s-%s", projectId, docRoot,
                 marker.length() >= 8 ? marker.substring(0, 8) : "part", landedName);
         try {
             try (InputStream in = new com.checkba.util.DeadlineInputStream(content.body(), inboxBodyDeadline)) {
@@ -1259,7 +1272,7 @@ public class MobileRelayClientService {
         projectFileService.createOrUpdateFile(projectId, root.getId(), landedName, ext,
                 item.path("fileSize").asLong(0), finalPath, null, userId);
         log.info("手机同步：插件文档 {} 已镜像 项目={} 文件={}/{}", itemId, projectId,
-                ADDIN_DOC_ROOT_FOLDER, landedName);
+                docRoot, landedName);
 
         HttpResponse<String> ack = authed("POST", "/api/mobile/inbox/" + itemId + "/ack", "{}");
         receipt(item, okEnvelope(ack) ? "saved" : "savedPendingAck", "");
@@ -1273,6 +1286,20 @@ public class MobileRelayClientService {
         String n = fileName == null ? "" : fileName.replace('\\', '/');
         n = n.substring(n.lastIndexOf('/') + 1).trim();
         return n.isEmpty() ? "document" : n;
+    }
+
+    /** X44：本项目里该类根目录的实际名字（已有任一语言的就沿用），没有则按界面语言新起。 */
+    private String captureRootName(String projectKey, String mediaType) {
+        CaptureFolderNames.Kind kind = CaptureFolderNames.forMediaType(mediaType);
+        try {
+            long projectId = Long.parseLong(projectKey);
+            java.util.Set<String> rootNames = projectFileService.getFilesByParent(projectId, null).stream()
+                    .filter(f -> Boolean.TRUE.equals(f.getIsFolder()) && !Boolean.TRUE.equals(f.getIsDeleted()))
+                    .map(ProjectFile::getName).collect(java.util.stream.Collectors.toSet());
+            return CaptureFolderNames.resolve(kind, rootNames);
+        } catch (RuntimeException e) {
+            return kind.localized();
+        }
     }
 
     private ProjectFile ensureFolder(Long projectId, Long parentId, String name, Long userId) {

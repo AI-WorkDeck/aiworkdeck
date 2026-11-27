@@ -87,5 +87,36 @@ export default {
     "WEBSITE_LOGIN_FAILED": "웹사이트 로그인",
     "ACCOUNT_API_KEY_CREATED": "계정 키 발급",
     "ACCOUNT_API_KEY_REVOKED": "계정 키 폐기"
+  },
+  "detail": {
+    "sep": "; ",
+    "roleChanged": "{from}에서 {to}(으)로 변경",
+    "role": "역할: {role}",
+    "team": "팀: {name}",
+    "firmAdmin": "사무소 관리자",
+    "memberCount": "{count}명",
+    "removedBy": "{name}님이 제거",
+    "issuedBy": "{name}님이 발급",
+    "keyPrefix": "Key 시작 문자열: {prefix}",
+    "label": "이름: {label}",
+    "via": "경로: {via}",
+    "shareHistoryOn": "버전 기록도 함께 공유",
+    "shareHistoryOff": "버전 기록은 공유하지 않음",
+    "enabledOn": "켜짐",
+    "enabledOff": "꺼짐",
+    "expiresAt": "{date}까지 유효",
+    "suppressedRepeats": "동일한 기록 {count}건 병합됨",
+    "purgedRows": "만료된 기록 {count}건 삭제됨",
+    "reason": "사유: {reason}",
+    "other": "{key}: {value}",
+    "roleName": {
+      "OWNER": "소유자",
+      "ADMIN": "관리자",
+      "MEMBER": "구성원",
+      "READ_ONLY": "읽기 전용 구성원",
+      "PARTICIPANT": "참여자",
+      "MANAGER": "매니저",
+      "VIEWER": "조회자"
+    }
   }
 }

@@ -88,7 +88,7 @@ export default {
   "openBusiness": "Ouvrir l’espace associé",
   "readNotDone": "La lecture de cette notification ne vaut pas validation métier. Ouvrez l’espace associé pour l’examiner et la traiter.",
   "targetUnavailable": "L’espace associé est indisponible. Actualisez et réessayez.",
-  "pluginUnavailable": "L’extension associée n’est pas installée ou activée. Vérifiez dans le centre d’extensions.",
+  "pluginUnavailable": "L’extension associée n’est pas installée ou activée. Vérifiez dans le centre d’extensions.", "enableLawFirmTitle": "Activer Gestion de cabinet d’avocats ?", "enableLawFirmBody": "Cette notification se traite dans Gestion de cabinet d’avocats. Le module est inclus dans l’application ; une fois activé, cet élément s’ouvre directement.", "enableLawFirmConfirm": "Activer et ouvrir",
   "openFailed": "Impossible d’ouvrir l’espace associé. Veuillez réessayer.",
   "serviceFailed": "La messagerie est temporairement indisponible. Veuillez réessayer.",
   "source": "De {name}",

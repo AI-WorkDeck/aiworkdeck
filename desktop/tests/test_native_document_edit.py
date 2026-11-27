@@ -68,8 +68,9 @@ class EditContracts(unittest.TestCase):
         old = '甲方应在三十日内交付文件，乙方应在五日内付款。'
         new = '甲方应在六十日内交付文件，乙方应在七日内付款。'
         plan = edit.minimal_edits(old, new)
-        self.assertEqual(sum(x['delLen'] for x in plan), 2)
-        self.assertEqual(''.join(x['insText'] for x in plan), '七六')
+        # Q23: numbers are whole tokens (三十 -> 六十), other text stays char-level
+        self.assertEqual(sum(x['delLen'] for x in plan), 3)
+        self.assertEqual(''.join(x['insText'] for x in plan), '七六十')
         for item in plan:
             old = old[:item['start']] + item['insText'] + old[item['start'] + item['delLen']:]
         self.assertEqual(old, new)
@@ -84,7 +85,10 @@ class EditContracts(unittest.TestCase):
         source = Path(__file__).resolve().parents[2] / 'frontend/src/zetaoffice/public/office_thread.js'
         pairs = [['甲方应付三万元，七日内到账', '乙方应付五万元，十日内到账'], ['ABCABC', 'ABXABC'],
                  ['我爱你', '我恨你'], ['全部删掉', ''], ['', '全部新增'], ['甲的乙的丙', '甲之乙之丙'],
-                 ['中文' * 1100, '其他' * 1100], ['相同', '相同']]
+                 ['中文' * 1100, '其他' * 1100], ['相同', '相同'],
+                 ['付合同总价的70%作为预付款；验收后支付20%', '付合同总价的30%作为预付款；验收后支付40%'],
+                 ['总价¥860,000元', '总价¥960,000元'], ['违约金为0.5%', '违约金为0.75%'], ['不超过100元', '不超过1000元'],
+                 ['支付30，乙方确认', '支付30，甲方确认']]
         script = r'''
 const fs=require('node:fs'),vm=require('node:vm');const src=fs.readFileSync(process.argv[1],'utf8');
 const start=src.indexOf('const MINIMAL_EDITS_MAX_D ='),end=src.indexOf('// —— 最小修订比对',start);

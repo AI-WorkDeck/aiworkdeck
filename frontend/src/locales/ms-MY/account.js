@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Gagal memuatkan data demo",
   "caseOpenPluginFailedToast": "Gagal membuka pemalam",
   "circleInviteLabel": "Kod jemputan Circle Alliance (pilihan)",
-  "circleInvitePlaceholder": "cth. KW-ABNR-2026",
+  "circleInvitePlaceholder": "cth. KW-XXXX-2026",
   "circleInviteHint": "Masukkan kod jemputan firma anda untuk melampirkan akhiran firma dan membuka kuota DeepSeek khusus",
   "bqtScanSwitch": "Log masuk QR Peguam Baoqingtian",
   "bqtScanTitle": "Imbas dengan aplikasi Peguam Baoqingtian untuk log masuk",

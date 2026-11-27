@@ -27,7 +27,7 @@
         <!-- 连不上案件库：三步一步都做不了（取回要联网、交稿也要），摆一排灰按钮
              只会让人以为软件卡住了。说清楚「改动都在本机」再放人走。 -->
         <view v-if="guide.offline && mode !== 'help'" class="sg-offline">
-          {{ $t('version.submitGuideOfflineDesc') }}
+          {{ $t(queuedOffline ? 'version.submitGuideOfflineQueuedDesc' : 'version.submitGuideOfflineDesc') }}
         </view>
 
         <view v-else-if="mode !== 'help'" class="sg-steps">
@@ -91,6 +91,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import {
   endWorkSession, updateFromCloud, uploadToCloud,
@@ -113,7 +114,7 @@ export default {
   },
   // changed：状态变了，页面重拉。reload-files：磁盘被改写，重载打开中的编辑器。
   // conflict：撞上了要逐份选择的情况，页面把人送到裁决现场。
-  emits: ['update:visible', 'changed', 'reload-files', 'conflict'],
+  emits: ['queued', 'update:visible', 'changed', 'reload-files', 'conflict'],
   data() {
     return {
       localWorking: false,
@@ -121,6 +122,8 @@ export default {
       sessionName: '',
       expanded: false,
       busy: false,
+      // C11：这次打开是来交稿的，而案件库连不上——已经记下「待交」，联网后页面会自动交一次
+      queuedOffline: false,
     }
   },
   computed: {
@@ -141,12 +144,13 @@ export default {
   },
   watch: {
     visible(v) {
-      if (!v) return
+      if (!v) { this.stopLiveRefresh(); return }
       this.localWorking = !!this.working
       this.localCloud = this.cloud || {}
       this.sessionName = ''
       this.expanded = this.mode === 'help'
       this.busy = false
+      this.queuedOffline = false
       if (this.mode === 'help') return
       // 先用页面递过来的快照把清单画出来（便宜、立刻有结果），再走一次联网重读。
       // cloudStatus 是不联网的本地快照，同事可能几小时前就交了新稿而本机还显示
@@ -157,9 +161,43 @@ export default {
       // 还是个可点的主按钮——那一下点下去就是一次什么都没交的空交稿。
       this.busy = true
       this.refresh({ online: true }).finally(() => { this.busy = false })
+      this.startLiveRefresh()
     },
   },
+  beforeUnmount() { this.stopLiveRefresh() },
   methods: {
+    // C20：清单开着的时候案件库会变（同事又交了两版），原来只在打开时和每步做完后重读，
+    // 第 ② 步就一直说「案件库里没有你还没取回的稿」。开着时每 30 秒、窗口回到前台时联网重读一次；
+    // 有一步正在做就跳过（做完那一步自己会重读）。
+    startLiveRefresh() {
+      this.stopLiveRefresh()
+      if (this.mode === 'help') return
+      this._liveTimer = setInterval(() => this.liveRefresh(), 30000)
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        this._onFocus = () => this.liveRefresh()
+        window.addEventListener('focus', this._onFocus)
+      }
+    },
+    stopLiveRefresh() {
+      if (this._liveTimer) clearInterval(this._liveTimer)
+      this._liveTimer = null
+      if (this._onFocus && typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('focus', this._onFocus)
+      this._onFocus = null
+    },
+    async liveRefresh() {
+      if (!this.visible || this.busy || this.mode === 'help' || this._liveInFlight) return
+      this._liveInFlight = true
+      const snapshot = () => JSON.stringify([this.localWorking, ...['remoteAhead', 'remoteAheadCount', 'remoteAheadBySelf', 'offline']
+        .map((k) => (this.localCloud || {})[k])])
+      const before = snapshot()
+      try {
+        await this.refresh({ online: true, quiet: true })
+        // 页面只在清单真的变了时才重拉，不是每 30 秒拉一次
+        if (snapshot() !== before) this.$emit('changed')
+      } finally {
+        this._liveInFlight = false
+      }
+    },
     close() {
       this.$emit('update:visible', false)
     },
@@ -177,6 +215,8 @@ export default {
       }
       if (step.id === 'pull-latest') {
         // 「取回同事交的 6 版」与顶栏那句「同事交了新稿 · 6 版」同源同规则
+        // C11：没联网时不知道案件库有没有新稿，不能说「没有你还没取回的稿」
+        if (this.localCloud && this.localCloud.offline) return this.$t('version.submitGuidePullOffline')
         return step.state === 'done'
           ? this.$t('version.submitGuidePullDone')
           : pullStepText((k, p) => this.$t(k, p), this.localCloud)
@@ -198,21 +238,23 @@ export default {
      *
      * @returns {Promise<boolean>} true = 撞上裁决窗口，调用方不要再往下走
      */
-    async refresh({ online = false } = {}) {
+    async refresh({ online = false, quiet = false } = {}) {
       let conflicted = false
       try {
         // Right after a commit the repository lock may still be held (ingest, idle merge, cloud fetch);
         // /status then answers VERSION_BUSY. Retry that read only — a failed read must never repaint
         // the checklist from the stale page snapshot (QA D10: step 1 came back after a commit).
+        // C29: a push under load holds the lock 4–6 s; wait it out (0.5 s, 1 s, then 2 s steps; ~24 s in all).
         let res
         for (let attempt = 0; ; attempt++) {
           try { res = await getVersionStatus(this.projectId); break } catch (e) {
-            if (e?.kind !== 'VERSION_BUSY' || attempt >= 9 || !this.visible) throw e
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            if (e?.kind !== 'VERSION_BUSY' || attempt >= 17 || !this.visible) throw e
+            await new Promise((resolve) => setTimeout(resolve, attempt < 4 ? 500 : attempt < 8 ? 1000 : 2000))
           }
         }
         const d = (res && res.data) || {}
-        this.localWorking = !!d.working
+        // C13：访达里直接改过的文件（没有工作段）也要先存成版本，否则交稿交不上去
+        this.localWorking = !!d.working || Number(d.changedCount) > 0
         conflicted = !!(d.sessionEndConflict || d.cloudConflict || d.adoptConflict)
       } catch (e) {
         console.warn('[SubmitGuide] 读取版本状态失败', e)
@@ -220,10 +262,17 @@ export default {
       try {
         const res = online ? await checkCloud(this.projectId) : await getCloudStatus(this.projectId)
         this.localCloud = (res && res.data) || this.localCloud
+        // C11（lane C 11-26）：清单一打开就知道连不上时，三步都是灰的、交稿根本没试过，
+        // 原来只有「点了交稿才失败」那条路会记下待交——联网后什么都不会发生。
+        // 律师是来交稿的：现在就记下，页面联网核对成功后自动交一次（retryQueuedSubmit）。
+        if (online && this.mode === 'guide' && this.localCloud && this.localCloud.offline && !this.queuedOffline) {
+          this.queuedOffline = true
+          this.$emit('queued')
+        }
       } catch (e) {
         console.warn('[SubmitGuide] 读取协作状态失败', e)
       }
-      this.$emit('changed')
+      if (!quiet) this.$emit('changed')
       if (conflicted) {
         this.close()
         this.$emit('conflict')
@@ -298,7 +347,18 @@ export default {
           await this.refresh()
         }
       } catch (e) {
-        uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        // C12：大文件要先开文件云端备份——弹带按钮、不会消失的说明，不当成没联网
+        if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { this.close(); return }
+        // C11：先联网核对一次，确实是没联网才转成「联网后自动交」；权限类拒绝（只读 / 已移出）
+        // 原样说给律师听，不排队——重试永远不会成功
+        await this.refresh({ online: true })
+        if (this.localCloud && this.localCloud.offline) {
+          this.$emit('queued')
+          uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
+          this.close()
+        } else {
+          uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+        }
       } finally {
         this.busy = false
       }

@@ -312,7 +312,7 @@ export default {
   "bpRetry": "Coba lagi",
   "bpErrorTitle": "Situs ini tidak dapat dijangkau",
   "bpErrorCodeLabel": "Kode galat",
-  "bpErrorNameNotResolved": "Pencarian DNS gagal — alamat mungkin salah eja atau domain mungkin tidak ada",
+  "bpErrorNameNotResolved": "Alamat ini tidak ditemukan — mungkin salah eja atau situsnya tidak ada",
   "bpErrorTimedOut": "Koneksi habis waktu",
   "bpErrorConnectionRefused": "Koneksi ditolak",
   "bpErrorConnectionReset": "Koneksi diatur ulang",

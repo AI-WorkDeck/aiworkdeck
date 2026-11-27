@@ -12,7 +12,7 @@ import { t } from '@/i18n'
 import { captureChatTimeline } from '@/components/AgentMessage/chatTimeline.mjs'
 import { nextBubbleId } from './bubbleId.js'
 import { documentEditedFromProcesses } from '@/utils/useInDocumentVisibility.js'
-import { cancelledEditedDocument, stopNoticeForCancelled } from '@/utils/agentRunControl.js'
+import { cancelledEditedDocument, cancelledNumberingNotice, stopNoticeForCancelled } from '@/utils/agentRunControl.js'
 import { isSameFileChange } from '@/utils/chatFileChange.js'
 import { ASK_USER_KIND, decodeAttr, normalizeAskUserEvent } from '@/utils/askUserAnswer.mjs'
 import { createLegacyAskUserMarkup } from './legacyAskUserMarkup.mjs'
@@ -1108,6 +1108,9 @@ export function useAgentStream() {
     const STOP_CONFIRM_TIMEOUT_MS = 15000
     let pendingStopBubble = null
     let stopConfirmTimer = null
+    // Q27：后端处理取消只要约 1ms，cancelled 事件经常比 POST /cancel 的响应先到。
+    // 记下已确认停止的气泡，迟到的响应不许再把它改回「正在停止」、20 秒后又写成「未收到后台确认」。
+    const confirmedStops = new WeakSet()
 
     /**
      * 后端的 cancelled 事件到了：把「正在停止…」落成终态文案。
@@ -1118,6 +1121,7 @@ export function useAgentStream() {
         const bubble = pendingStopBubble
         pendingStopBubble = null
         if (bubble) {
+            confirmedStops.add(bubble)
             bubble.stopNotice = stopNoticeForCancelled(payload, t)
             // 停止前已经落地的修改不会回滚：标记本轮动过文档，「撤销本次 AI 修改」据此出现
             if (cancelledEditedDocument(payload)) bubble.documentEdited = true
@@ -1194,6 +1198,11 @@ export function useAgentStream() {
         //    留着这条流，收到 cancelled 才把文案落成「已停止生成」；后端每轮收尾本来
         //    就会关流、前端退避重连，这是轮次之间的常态，不额外占用连接。
         if (!conversationId) return
+        // 在发请求之前就挂上：回执（cancelled 事件）可能比请求的响应先到（Q27）
+        if (stoppedBubble) {
+            if (stopConfirmTimer) { clearTimeout(stopConfirmTimer); stopConfirmTimer = null }
+            pendingStopBubble = stoppedBubble
+        }
         const cancelController = new AbortController()
         const cancelTimer = setTimeout(() => cancelController.abort(), 10000)
         try {
@@ -1213,14 +1222,17 @@ export function useAgentStream() {
                 // 响应体读不出来不改变结论：停止请求本身是成功的
             }
             if (!stoppedBubble) return
+            // 回执已经到了：文案已落定（已停止 / 已完成 N 次修改），什么都不改
+            if (confirmedStops.has(stoppedBubble)) return
             if (!cancelled) {
+                if (pendingStopBubble === stoppedBubble) pendingStopBubble = null
                 stoppedBubble.stopNotice = t('agentStream.stopAlreadyFinished')
                 return
             }
             // 供应商那头会不会继续计费我们承诺不了，所以在收到 cancelled 之前
             // 口径一律停在「正在停止」，不写「已停止」。
             stoppedBubble.stopNotice = t('agentStream.stopPending')
-            pendingStopBubble = stoppedBubble
+            if (pendingStopBubble !== stoppedBubble) return
             if (stopConfirmTimer) clearTimeout(stopConfirmTimer)
             stopConfirmTimer = setTimeout(() => {
                 stopConfirmTimer = null
@@ -1231,7 +1243,7 @@ export function useAgentStream() {
             }, STOP_CONFIRM_TIMEOUT_MS)
         } catch (e) {
             console.warn('[AgentStream] Failed to confirm cancel request:', e)
-            if (stoppedBubble) stoppedBubble.stopNotice = t('agentStream.stopUnconfirmed')
+            if (stoppedBubble && !confirmedStops.has(stoppedBubble)) stoppedBubble.stopNotice = t('agentStream.stopUnconfirmed')
         } finally {
             clearTimeout(cancelTimer)
         }
@@ -1773,6 +1785,8 @@ export function useAgentStream() {
                 tokenUsage.value.promptTokens += d.promptTokens || 0
                 tokenUsage.value.completionTokens += d.completionTokens || 0
                 tokenUsage.value.totalTokens += d.totalTokens || 0
+                // Q24：平台通道按余额扣费，这一轮任一次调用走了平台通道，页脚就不给律师看 token 数
+                if (d.platform === true) tokenUsage.value.platform = true
                 console.log('[AgentStream] Token Usage Updated:', tokenUsage.value)
             } catch (e) {
                 console.error('Failed to parse token_usage', e)
@@ -1928,6 +1942,9 @@ export function useAgentStream() {
                 currentAssistantBubble.value.documentEdited = true
                 currentAssistantBubble.value.stopNotice = stopNoticeForCancelled(cancelledPayload, t)
             }
+            // Q26：停止前插入/删除了条款且编号对不上，提示接在本轮回答末尾（与历史里保存的一致）
+            const numberingNotice = cancelledNumberingNotice(cancelledPayload)
+            if (numberingNotice) currentAssistantBubble.value.content += '\n\n' + numberingNotice + '\n'
             noteStopConfirmed(cancelledPayload)
             isStreaming.value = false
         } else if (evt === 'bubble_end' || evt === 'error') {
@@ -2047,7 +2064,7 @@ export function useAgentStream() {
                         bubble.content += '\n\n' + errMsg + '\n'
                     } else {
                         // X7：未归类的后端错误不再把原文拼进正文；原文进 Details
-                        bubble.errorNotice = toUserMessage(errMsg, { partial: !!String(bubble.content || '').trim(), desktop: typeof window !== 'undefined' && !!window.checkbaDesktop })
+                        bubble.errorNotice = toUserMessage(errMsg, { partial: !!String(bubble.content || '').trim(), desktop: typeof window !== 'undefined' && !!window.checkbaDesktop, accountKind: accountPayload && accountPayload.kind })
                     }
                 }
             }

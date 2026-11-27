@@ -534,15 +534,16 @@ try {
   await reset('甲方应于三十日内向乙方支付服务费。', true)
   await exec('modify_paragraph', { index: 0, newText: '甲方应于六十日内向乙方支付全部服务费。' })
   rv11 = await exec('debug_revisions')
-  check('modify_paragraph 散点小改只删"三"（非整段重写）',
-    rv11.success && delTexts(rv11).includes('三') && delTexts(rv11).every((t2) => (t2 || '').length === 1), JSON.stringify(rv11))
-  check('两处插入各自成修订（六 / 全部）', mine(rv11).filter((r) => r.type === 'Insert').length === 2, JSON.stringify(mine(rv11)))
+  // Q23：数字整词替换——三十 → 六十 删「三十」插「六十」，不是删三插六留个「十」
+  check('modify_paragraph 散点小改只删数字「三十」（非整段重写）',
+    rv11.success && JSON.stringify(delTexts(rv11)) === '["三十"]', JSON.stringify(rv11))
+  check('两处插入各自成修订（六十 / 全部）', mine(rv11).filter((r) => r.type === 'Insert').length === 2, JSON.stringify(mine(rv11)))
   check('改后段落实文正确', (await doc()) === '甲方应于六十日内向乙方支付全部服务费。', await doc())
   // dev-board#365：整段删除重写的两条来路——
   // (a) find_replace 全部替换默认走引擎原生 replaceAll，它只会把「掐掉公共前后缀的中段」
   //     整块替换：一句里两处散点改动会把两处之间没改的字一起删了重打；
   // (b) 长段落（> 500 字）首尾各改一字，旧 LCS DP 超上限直接整段一块替换。
-  const noBlock = (rv2) => delTexts(rv2).every((t2) => (t2 || '').length === 1)
+  const noBlock = (rv2) => delTexts(rv2).every((t2) => (t2 || '').length <= 2) // 一字，或数字整词「三十」（Q23）
   await reset('甲方应于三日内向乙方支付服务费。', true)
   const fr3 = await exec('find_replace', { findText: '甲方应于三日内向乙方', replaceText: '买方应于五日内向卖方', replaceAll: true })
   rv11 = await exec('debug_revisions')
@@ -554,8 +555,8 @@ try {
   await reset('甲方' + longBody + '三十日内付清。', true)
   await exec('modify_paragraph', { index: 0, newText: '买方' + longBody + '六十日内付清。' })
   rv11 = await exec('debug_revisions')
-  check('modify_paragraph 长段落（' + (longBody.length + 9) + ' 字）首尾各改一字：只删「甲/三」，不整段重写',
-    ['甲', '三'].every((t2) => delTexts(rv11).includes(t2)) && noBlock(rv11), JSON.stringify(mine(rv11).map((r) => [r.type, (r.text || '').length])))
+  check('modify_paragraph 长段落（' + (longBody.length + 9) + ' 字）首尾各改一处：只删「甲/三十」，不整段重写',
+    ['甲', '三十'].every((t2) => delTexts(rv11).includes(t2)) && noBlock(rv11), JSON.stringify(mine(rv11).map((r) => [r.type, (r.text || '').length])))
   check('长段落改后正文正确', (await doc()) === '买方' + longBody + '六十日内付清。', (await doc()).slice(-20))
   // (c) 在已带修订的同一段上再改一处（模型常见：同一条款多轮微调）——偏移不能被前一轮的
   //     修订对象带歪，仍只删一字。
@@ -899,18 +900,18 @@ try {
     await exec('replace_selection', { text: '甲方应于三十日内向乙方支付服务费。' })
     await exec('load_document', { authorName: '审阅测试' })   // 只注入作者名
     await exec('debug_set_record_changes', { on: true })
-    // 两处修订：替换产生「删三 + 插六」
+    // 两处修订：替换产生「删三十 + 插六十」（数字整词，Q23）
     await exec('find_replace', { findText: '三十日', replaceText: '六十日', replaceAll: true })
     let lr = await exec('list_revisions')
     check('list_revisions 列出修订（含类型/作者/段落上下文）',
       lr.success && lr.count >= 2 && lr.revisions.every((r) => !!r.type && !!r.author) &&
       lr.revisions.some((r) => (r.paragraph || '').includes('乙方')), JSON.stringify(lr).slice(0, 300))
-    check('删除型修订带回文本「三」', lr.revisions.some((r) => r.type === 'Delete' && r.text === '三'), JSON.stringify(lr.revisions))
-    check('插入型修订带回文本「六」', lr.revisions.some((r) => r.type === 'Insert' && r.text === '六'), JSON.stringify(lr.revisions))
+    check('删除型修订带回文本「三十」', lr.revisions.some((r) => r.type === 'Delete' && r.text === '三十'), JSON.stringify(lr.revisions))
+    check('插入型修订带回文本「六十」', lr.revisions.some((r) => r.type === 'Insert' && r.text === '六十'), JSON.stringify(lr.revisions))
 
     const insIdx = lr.revisions.findIndex((r) => r.type === 'Insert')
     check('goto_revision 定位插入型（选中新增文本）',
-      (await exec('goto_revision', { index: insIdx })).selected === '六', JSON.stringify(await exec('goto_revision', { index: insIdx })))
+      (await exec('goto_revision', { index: insIdx })).selected === '六十', JSON.stringify(await exec('goto_revision', { index: insIdx })))
 
     // 逐条接受：插入型被接受后该条消失，正文保留新字
     const n0 = lr.count
@@ -1107,15 +1108,17 @@ try {
     const dcAll = await exec('table_delete_col', { tableIndex: 0, position: 'A', count: 9 })
     check('拒绝删光全部列', dcAll.success === false, JSON.stringify(dcAll))
 
-    // 修订模式：改一格只对差异字符落修订（不是整格删了重打）
+    // 修订模式：数字整词替换（Q23）——12000 → 13000 是一个数，删 12000 插 13000，
+    // 不是删 2 插 3（读起来像 132000）
     await exec('debug_set_record_changes', { on: true })
     const rlBefore = (await exec('debug_revisions')).count
     const scRc = await exec('table_set_cell', { tableIndex: 0, cell: 'B2', text: '13000' })
-    check('修订模式下改格走最小修订', scRc.success === true && scRc.via === 'minimalRedline', JSON.stringify(scRc))
+    check('修订模式下改格成功', scRc.success === true, JSON.stringify(scRc))
     const rlAfter = await exec('debug_revisions')
     check('产生了修订记录', rlAfter.count > rlBefore, JSON.stringify({ before: rlBefore, after: rlAfter.count }))
     const rlTexts = (rlAfter.redlines || []).map((x) => x.text || '').join('/')
-    check('修订只覆盖差异字符（不含整格旧值 12000）', !/12000/.test(rlTexts), rlTexts)
+    check('修订按整个数字落：删 12000 插 13000', (rlAfter.redlines || []).some((x) => x.type === 'Delete' && x.text === '12000')
+      && (rlAfter.redlines || []).some((x) => x.type === 'Insert' && x.text === '13000'), rlTexts)
     rd = await exec('table_read', { tableIndex: 0 })
     const finalCells = await exec('table_read', { tableIndex: 0, __agent: true })
     check('正文读回新值 13000', finalCells.cells[1][1] === '13000', JSON.stringify(finalCells.cells))

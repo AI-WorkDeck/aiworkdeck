@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Vorlagenordner: Legen Sie hier die Berichtsvorlagen Ihrer Kanzlei ab; nach dem Lernen entwirft die KI Entwürfe mit deren Schriftarten, Nummerierungen und Tabellenstilen",
   "selectFilePrompt": "Wählen Sie links eine Datei aus, um eine Vorschau anzuzeigen",
   "edit": "Bearbeiten",
-  "typeLabel": "Typ: {type}",
-  "sizeLabel": "Größe: {size}",
   "renderingDoc": "Dokument wird gerendert…",
   "renderingSlides": "Präsentation wird gerendert…",
   "slidesNotShown": "{count} weitere Folien werden nicht angezeigt. Öffnen Sie die Datei, um alle zu sehen.",

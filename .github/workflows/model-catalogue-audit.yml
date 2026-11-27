@@ -22,7 +22,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+      - name: Maven setup (warm cache read-only, Central fallback mirror, short retries)
+        uses: ./.github/actions/maven-setup
       - run: mvn -B -q -f backend/plugin-api/pom.xml install -DskipTests
       - name: Verify availability, images, tools, context and every price tier
         working-directory: backend

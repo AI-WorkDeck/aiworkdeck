@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Thư mục mẫu: thả các mẫu báo cáo của công ty bạn vào đây; sau khi AI học xong, nó sẽ soạn thảo với phông chữ, đánh số và kiểu bảng của mẫu",
   "selectFilePrompt": "Chọn một tệp ở bên trái để xem trước",
   "edit": "Chỉnh sửa",
-  "typeLabel": "Loại: {type}",
-  "sizeLabel": "Kích thước: {size}",
   "renderingDoc": "Đang hiển thị tài liệu…",
   "renderingSlides": "Đang hiển thị bài thuyết trình…",
   "slidesNotShown": "Còn {count} trang chiếu chưa hiển thị. Mở tệp để xem tất cả.",

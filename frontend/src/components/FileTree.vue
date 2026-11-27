@@ -556,6 +556,12 @@
                </text>
             </text>
             <text v-if="isTagView && renamingId !== item.id" class="tag-file-location" :title="tagFileLocation(item)">{{ tagFileLocation(item) }}</text>
+            <!-- C12：仅在本机（未共享）/ 仅在同事的电脑上 -->
+            <text
+              v-if="!item.isFolder && viewMode !== 'recycle' && localOnlyByFileId[item.id]"
+              class="tree-item-due is-local-only"
+              :title="localOnlyTip(item)"
+            >{{ localOnlyLabel(item) }}</text>
             <!-- 最近到期徽标（dev-board#900）：这份文件未完成事项里最早的那条 -->
             <text
               v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && fileDueIndex[item.id] && fileDueIndex[item.id].text"
@@ -695,6 +701,12 @@
                </text>
             </text>
             <text v-if="isTagView && renamingId !== item.id" class="tag-file-location" :title="tagFileLocation(item)">{{ tagFileLocation(item) }}</text>
+            <!-- C12：仅在本机（未共享）/ 仅在同事的电脑上 -->
+            <text
+              v-if="!item.isFolder && viewMode !== 'recycle' && localOnlyByFileId[item.id]"
+              class="tree-item-due is-local-only"
+              :title="localOnlyTip(item)"
+            >{{ localOnlyLabel(item) }}</text>
             <!-- 最近到期徽标（dev-board#900）：这份文件未完成事项里最早的那条 -->
             <text
               v-if="!item.isFolder && renamingId !== item.id && viewMode !== 'recycle' && fileDueIndex[item.id] && fileDueIndex[item.id].text"
@@ -865,6 +877,7 @@ import { createRefCountsFetcher } from '@/utils/fileTreeRefCounts.js'
 import { warmDragImage, applyDragImage } from '@/utils/dragImage.js'
 import { readArchiveEntryDrag, isArchiveEntryDrag } from '@/utils/archiveEntryDrag.js'
 import { importArchiveEntry } from '@/services/api.js'
+import { getCloudLocalOnly } from '@/services/api.js'
 import { nativeEvent, nativeDataTransfer, isExternalFileDrag, compatibleDropEffect, claimExternalDrop, captureDroppedFiles, importDroppedFile } from '@/utils/fileTreeExternalDrop.js'
 import { prefetchLocalFilePath, startExternalFileDrag, clearLocalPathCache } from '@/utils/fileLocalDrag.js'
 import { isTranscribableMedia as isTranscribableMediaItem } from '@/utils/audioAttachment.js'
@@ -958,6 +971,8 @@ export default {
     return {
       files: [],
       fileLoadRequest: 0,
+      // C12：fileId → {mine, sharedBy}，来自 /api/cloud/projects/{id}/local-only
+      localOnlyByFileId: {},
       fileAccessRequest: 0,
       fileAccessBusy: false,
       loading: false,
@@ -1535,7 +1550,56 @@ export default {
     loadFiles() {
       const pending = this.loadFilesRequest()
       this._fileLoadPromise = pending
+      // C12 badges are a side read: never let it disturb the listing (or harnesses that bind a subset of methods)
+      pending.then(() => typeof this.loadLocalOnly === 'function' && this.loadLocalOnly(), () => {})
       return pending
+    },
+    // C12：哪些文件只在共享人的电脑上（自己的：仅在本机；同事的：占位，打不开）。读失败就不画徽标。
+    async loadLocalOnly() {
+      const projectId = this.projectId
+      if (!projectId) { this.localOnlyByFileId = {}; return }
+      try {
+        const res = await getCloudLocalOnly(projectId)
+        if (String(projectId) !== String(this.projectId)) return
+        const files = (res && res.data && res.data.files) || []
+        const map = {}
+        for (const f of files) if (f && f.fileId != null) map[f.fileId] = { mine: !!f.mine, sharedBy: f.sharedBy || '' }
+        this.localOnlyByFileId = map
+      } catch {
+        this.localOnlyByFileId = {}
+      }
+    },
+    localOnlyLabel(item) {
+      const e = this.localOnlyByFileId[item.id]
+      if (!e) return ''
+      if (e.mine) return this.$t('fileTree.localOnlyMine')
+      return e.sharedBy ? this.$t('fileTree.localOnlyOther', { name: e.sharedBy }) : this.$t('fileTree.localOnlyOtherUnknown')
+    },
+    localOnlyTip(item) {
+      const e = this.localOnlyByFileId[item.id]
+      if (!e) return ''
+      if (e.mine) return this.$t('fileTree.localOnlyMineTip')
+      return this.$t('fileTree.localOnlyOtherTip', { name: e.sharedBy || this.$t('fileTree.localOnlyColleague') })
+    },
+    // 同事那份只是占位：本机没有字节，说明原因而不是去打开一个不存在的文件
+    isColleaguePlaceholder(item) {
+      const e = this.localOnlyByFileId[item && item.id]
+      return !!e && !e.mine
+    },
+    explainLocalOnly(item) {
+      if (!this.isColleaguePlaceholder(item)) return false
+      // A double-click is a click (select) plus a dblclick: explain once, not twice.
+      const now = Date.now()
+      const last = this.localOnlyExplained
+      if (last && last.id === item.id && now - last.at < 1000) return true
+      this.localOnlyExplained = { id: item.id, at: now }
+      uni.showModal({
+        title: this.localOnlyLabel(item),
+        content: this.localOnlyTip(item),
+        showCancel: false,
+        confirmText: this.$t('fileTree.localOnlyOk'),
+      })
+      return true
     },
     async loadFilesRequest() {
       const requestId = ++this.fileLoadRequest
@@ -2537,7 +2601,7 @@ export default {
       if (this.selectionMode || this.viewMode === 'recycle' || this.renamingId != null || event.metaKey || event.ctrlKey || event.shiftKey || this.isTreeControlTarget(event.target)) return
       const row = event.target?.closest?.('.tree-item[data-file-id]')
       const item = this.displayFiles.find(file => String(file.id) === row?.getAttribute('data-file-id'))
-      if (item && !item.isFolder) this.$emit('file-open', item)
+      if (item && !item.isFolder && !this.explainLocalOnly(item)) this.$emit('file-open', item)
     },
     handleItemClick(item, event) {
       if (!item) return
@@ -2608,7 +2672,13 @@ export default {
       // 单选模式：清空多选，只选中当前
       this.multiSelectedIds = [item.id]
       this.selectedFileId = item.id
-      this.$emit('file-select', item)
+      // C12（lane C r2）：单击就会打开文件。同事那份占位在本机没有字节：点它只选中并说明原因，
+      // 不打开播放器、不成为「当前文档」；方向键经过（不带 event）只选中，不弹窗。
+      if (!item.isFolder && this.isColleaguePlaceholder(item)) {
+        if (event) this.explainLocalOnly(item)
+      } else {
+        this.$emit('file-select', item)
+      }
 
       // Update Active Folder for Creation Context
       if (item.isFolder) {
@@ -5088,24 +5158,16 @@ export default {
   z-index: 1;
 }
 
-/* Finder 风格：奇偶行浅色差（尽量克制） */
-.tree-list .tree-item:nth-child(odd) {
-  background-color: color-mix(in srgb, var(--awd-text) 4%, transparent);
-}
-
-.tree-list .tree-item:nth-child(even) {
-  background-color: transparent;
-}
-
+/* D19：不做奇偶行底色——灰白相间读起来像「选中了好几行」。行只有悬停与选中两种底色。 */
 .tree-item:hover {
-  background-color: var(--awd-accent-wash);
+  background-color: var(--awd-panel-hover);
 }
 
 .tree-item:active {
   background-color: var(--awd-accent-soft);
 }
 
-/* Selection stays distinct from both alternating rows and hover. */
+/* Selection stays distinct from hover. */
 .tree-list .tree-item.tree-item-selected {
   background-color: var(--awd-mint) !important; /* Forest Green Lighter Tint - darkened for visibility */
   box-shadow: var(--awd-shadow-card);

@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} 条未读协作通知",
   "clientWorkspace": "客户协作",
   "clientWorkspaceHint": "在此工作区连接律师邀请的项目，查看清单、提交材料和跟进反馈。",
+  "thisCaseClients": "这份案卷的客户（{count}）",
   "openClientWorkspace": "打开客户协作",
   "lists": "尽调清单",
   "refresh": "刷新",

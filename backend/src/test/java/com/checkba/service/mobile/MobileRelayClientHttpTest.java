@@ -241,6 +241,7 @@ class MobileRelayClientHttpTest {
                 });
 
         storageService = mock(StorageService.class);
+        when(storageService.exists(anyString())).thenReturn(true);
         when(storageService.save(anyString(), any(InputStream.class))).thenAnswer(inv -> {
             callOrder.add("save:" + inv.getArgument(0));
             savedStorageKeys.add(inv.getArgument(0));
@@ -412,6 +413,16 @@ class MobileRelayClientHttpTest {
         verify(projectFileService,never()).createFile(anyLong(),any(),anyString(),anyString(),anyLong(),any(),any(),anyLong());
         assertTrue(transferAcked.isEmpty());assertEquals(1,bridgeBodies.size(),"No new-account rebind during download");
         verify(storageService).delete(contains(".catalog-"));
+    }
+
+    @Test
+    void relayOutageIsNotReportedAsSignedOut() {
+        // Q20 (firstday-1125): signed in, relay unreachable → the catalogue said 「请先连接账户」
+        server.removeContext("/api/auth/awdk-login");
+        server.createContext("/api/auth/awdk-login", ex -> respond(ex, 503, "{\"code\":503}"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> service().catalog());
+        assertFalse(e.getMessage().contains("请先连接账户") || e.getMessage().contains("Connect your account first"), e.getMessage());
+        assertTrue(e.getMessage().contains("云端") || e.getMessage().contains("cloud service"), e.getMessage());
     }
 
     @Test
@@ -1206,6 +1217,39 @@ class MobileRelayClientHttpTest {
         service().syncFileBackups();
         assertEquals(1, deletes.get());
         verify(resource, never()).getInputStream();
+    }
+
+    /**
+     * C12 (lane C r2): a colleague's 「仅在 X 的电脑上」 placeholder has no bytes on this computer. It used to abort the
+     * whole backup run every minute (「文件不存在」), so no other file was backed up either. Skip it, back up the rest,
+     * and never delete an earlier backup copy because of a missing file.
+     */
+    @Test
+    void aFileMissingOnDiskIsSkippedTheRestIsBackedUpAndNoBackupIsDeleted() throws Exception {
+        server.createContext("/api/mobile/backup-consent", ex -> respond(ex, 200, "{\"enabled\":true,\"subscriptionActive\":true}"));
+        var missing = addNode(null, "证据10.pdf", false);
+        missing.setUid("0b8a2f62-5d1c-4f43-9a0e-3e7c6d1f2a10"); missing.setFilePath("synthetic/missing.pdf");
+        var present = addNode(null, "资料.pdf", false);
+        present.setUid("79db0af1-8912-4b62-b659-58b7baabca17"); present.setFilePath("synthetic/doc.pdf");
+        when(storageService.exists("synthetic/missing.pdf")).thenReturn(false);
+        when(storageService.load("synthetic/missing.pdf")).thenThrow(new com.checkba.storage.StorageException("文件不存在: synthetic/missing.pdf"));
+        byte[] bytes = "synthetic-backup-pdf".getBytes(StandardCharsets.UTF_8);
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        when(storageService.load("synthetic/doc.pdf")).thenReturn(new ByteArrayResource(bytes));
+        AtomicInteger uploads = new AtomicInteger(), deletes = new AtomicInteger();
+        server.createContext("/api/mobile/backup/manifest", ex -> respond(ex, 200, "{\"code\":0}"));
+        server.createContext("/api/mobile/backup/files", ex -> {
+            switch (ex.getRequestMethod()) {
+                case "PUT" -> { uploads.incrementAndGet(); ex.getRequestBody().readAllBytes(); respond(ex, 200, "{\"sha256\":\"" + hash + "\"}"); }
+                case "DELETE" -> { deletes.incrementAndGet(); respond(ex, 200, "{\"code\":0}"); }
+                default -> respond(ex, 200, "{\"files\":[{\"projectKey\":\"42\",\"id\":\"" + missing.getId() + "\",\"sha256\":\"" + "a".repeat(64) + "\"}]}");
+            }
+        });
+        service().syncFileBackups();
+        assertEquals(1, uploads.get(), "the present file is still backed up");
+        assertEquals(0, deletes.get(), "the earlier backup of the missing file is kept");
+        // lane C r3: load() logs ERROR 「文件不存在」 before it throws — once a minute. Ask first, never load it.
+        verify(storageService, never()).load("synthetic/missing.pdf");
     }
 
     @Test

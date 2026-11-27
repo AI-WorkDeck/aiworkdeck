@@ -33,7 +33,7 @@ export default {
     // X39: optional leading action { key: 'continue', title } shown before the catalogue action
     leadAction: { type: Object, default: null },
   },
-  emits: ['retry', 'sign-in', 'refresh', 'action', 'lead'],
+  emits: ['retry', 'sign-in', 'refresh', 'reconnect', 'action', 'lead'],
   data() {
     return { detailsOpen: false }
   },
@@ -57,6 +57,7 @@ export default {
       this.$emit('action', a)
       if (a === 'signIn') this.$emit('sign-in')
       else if (a === 'refresh') this.$emit('refresh')
+      else if (a === 'reconnect') this.$emit('reconnect')
       else this.$emit('retry')
     },
   },

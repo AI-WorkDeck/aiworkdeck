@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Не удалось загрузить демо-данные",
   "caseOpenPluginFailedToast": "Не удалось открыть плагин",
   "circleInviteLabel": "Код приглашения Circle Alliance (необязательно)",
-  "circleInvitePlaceholder": "например KW-ABNR-2026",
+  "circleInvitePlaceholder": "например KW-XXXX-2026",
   "circleInviteHint": "Введите приглашительный код вашей фирмы, чтобы добавить суффикс фирмы и разблокировать выделенную квоту DeepSeek",
   "bqtScanSwitch": "Вход юриста Baoqingtian по QR-коду",
   "bqtScanTitle": "Отсканируйте приложением юриста Baoqingtian, чтобы войти",

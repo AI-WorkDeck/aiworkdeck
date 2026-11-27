@@ -141,7 +141,8 @@ public class TokenUsageService {
     }
 
     /** 当前是否走平台通道。供应商解析失败按 BYOK 处理——记账问题不该拖垮对话。 */
-    private boolean isPlatformChannel() {
+    /** 本次调用走的是平台通道（官方 AI，按余额扣费）——前端据此不给律师看 token 数（Q24）。 */
+    public boolean isPlatformChannel() {
         try {
             return chatModelFactory.resolveProvider()
                     == com.checkba.config.AiModelProperties.Provider.AWD_CLOUD;

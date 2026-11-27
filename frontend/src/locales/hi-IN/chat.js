@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "आउटपुट कॉपी करें",
   "copyFailed": "कॉपी विफल रहा",
   "tokenUsageLine": "इस बारी में {n} टोकन",
+  "viewUsage": "उपयोग देखें",
   "statusError": "त्रुटि",
   "statusSuccess": "सफल",
   "statusRunning": "चल रहा है",

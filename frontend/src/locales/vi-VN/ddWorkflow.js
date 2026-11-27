@@ -14,6 +14,7 @@ export default {
   "unreadNotifications": "{count} thông báo cộng tác chưa đọc",
   "clientWorkspace": "Cộng tác khách hàng",
   "clientWorkspaceHint": "Kết nối với các dự án được mời trong không gian làm việc này để xem danh mục, nộp tài liệu và theo dõi phản hồi rà soát.",
+  "thisCaseClients": "Khách hàng của hồ sơ vụ việc này ({count})",
   "openClientWorkspace": "Mở cộng tác khách hàng",
   "lists": "Danh mục thẩm định (Due Diligence)",
   "refresh": "Làm mới",

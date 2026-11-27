@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!--
+  CI-only Maven settings, installed as ~/.m2/settings.xml by this action (action.yml).
+  Maven Central rate-limits GitHub runners (HTTP 429). Central stays first; Google's
+  mirror of Central is a second repository that Maven tries only when Central fails
+  for an artifact. Both serve the same bytes, and checksums are still verified.
+  Do not turn this into a <mirror>: a mirror replaces Central instead of backing it up.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+  <profiles>
+    <profile>
+      <id>central-with-fallback</id>
+      <repositories>
+        <repository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <repository>
+          <id>google-maven-central</id>
+          <url>https://maven-central.storage-download.googleapis.com/maven2</url>
+          <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>central</id>
+          <url>https://repo.maven.apache.org/maven2</url>
+          <snapshots><enabled>false</enabled></snapshots>
+        </pluginRepository>
+        <pluginRepository>
+          <id>google-maven-central</id>
+          <url>https://maven-central.storage-download.googleapis.com/maven2</url>
+          <snapshots><enabled>false</enabled></snapshots>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>central-with-fallback</activeProfile>
+  </activeProfiles>
+</settings>

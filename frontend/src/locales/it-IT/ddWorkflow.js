@@ -13,6 +13,7 @@ export default {
   "unreadNotifications": "{count} notifiche di collaborazione non lette",
   "clientWorkspace": "Collaborazione con il cliente",
   "clientWorkspaceHint": "Collegati ai progetti invitati in questo spazio di lavoro per visualizzare le checklist, inviare documenti e seguire le revisioni.",
+  "thisCaseClients": "Clienti di questo fascicolo ({count})",
   "openClientWorkspace": "Apri collaborazione con il cliente",
   "lists": "Checklist di due diligence",
   "refresh": "Aggiorna",

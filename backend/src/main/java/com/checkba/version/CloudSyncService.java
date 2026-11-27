@@ -755,6 +755,21 @@ public class CloudSyncService {
                 remoteRepository.save(remote);
                 return new UploadResult(UploadStatus.REMOTE_AHEAD, LangText.of("同事交了新稿，先结束手头这段工作再交稿", "A colleague submitted a new draft — please finish your current work session before submitting"));
             } catch (VersionException e) {
+                if (isAccessRefused(e)) {
+                    // C8：案件库按权限拒收（git-receive-pack not permitted）——只读成员或已被移出。重试永远
+                    // 不会成功，不许说「稍后还可以再交」，也不置「待上传」：改动留在这台电脑的版本记录里，
+                    // 但没有、也不会交到案件库。说清楚原因和该找谁。
+                    log.info("交稿被案件库按权限拒绝: project={}", projectId);
+                    RemoteRole role = remoteRoleCache.get(projectId);
+                    String owner = role != null && role.ownerName() != null ? role.ownerName()
+                            : LangText.of("案卷负责人", "the case owner");
+                    throw VersionException.userFacing(LangText.of(
+                            "交稿没有成功：你在这份案卷里是只读成员（或已不在参与人里），改动不会交到案件库。"
+                                    + "你的改动仍保存在这台电脑上。需要修改请联系" + owner + "开通协作人权限。",
+                            "Not submitted: you're a read-only member of this case file (or no longer a member), so your "
+                                    + "changes can't reach the Team Case Library. They are still saved on this computer. "
+                                    + "Ask " + owner + " for edit rights."));
+                }
                 remote.setPendingUpload(true);
                 remoteRepository.save(remote);
                 log.warn("上传/整合失败: project={}", projectId, e);
@@ -803,8 +818,23 @@ public class CloudSyncService {
         if (remoteAhead) {
             describeRemoteAhead(projectId, userId, m);
         }
+        // C8/C10 gate (lane C 11-26): this local snapshot is re-read every 15 s and after every action, and it
+        // replaced the online /check result, so 「只读成员」 / 「你已不在这份案卷里」 vanished within seconds and
+        // 「有改动还没交稿」 + 交稿 came back. Carry the last observed membership; the next /check refreshes it.
+        String removedOwner = removedFromLibrary.get(projectId);
+        if (removedOwner != null) {
+            m.put("removed", true);
+            if (!removedOwner.isEmpty()) m.put("ownerName", removedOwner);
+        } else {
+            RemoteRole role = remoteRoleCache.get(projectId);
+            if (role != null && role.myRole() != null) m.put("myRole", role.myRole());
+            if (role != null && role.ownerName() != null) m.put("ownerName", role.ownerName());
+        }
         return m;
     }
+
+    /** Last observed 「已被移出」 per project (owner name or ""), cleared when the library is readable again. */
+    private final Map<Long, String> removedFromLibrary = new ConcurrentHashMap<>();
 
     /** 单参版本（userId 未知时的纯 ref 快照）。 */
     public Map<String, Object> cloudStatus(long projectId) {
@@ -916,6 +946,10 @@ public class CloudSyncService {
             List<VersionEntry> ahead = repoService.commitsBetween(
                     projectId, repoService.mainBranch(), ORIGIN_MASTER, REMOTE_AHEAD_WALK_CAP);
             if (ahead.isEmpty()) return;
+            // C23 (lane C nit): client portal materials are not anyone's 稿 — count them apart, out of the authors
+            int materials = (int) ahead.stream().filter(e -> HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).count();
+            ahead = ahead.stream().filter(e -> !HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).toList();
+            m.put("remoteAheadMaterials", materials);
             m.put("remoteAheadCount", ahead.size());
             // 案件库确实领先了、这句话非说清是谁不可——只有这条路允许为一个名字联网一次
             Map<String, String> remoteNames = remoteDisplayNames(projectId, true);
@@ -959,31 +993,131 @@ public class CloudSyncService {
         if (remoteOpt.isEmpty()) {
             return Map.of("linked", false);
         }
+        // C24（lane C 线程转储）：联网的几步（fetch、参与人表、大文件状态）都不持仓库锁——上行被大文件备份
+        // 占满时连 TLS 握手都能卡上几分钟，持锁期间状态 / 保存 / 交稿全被拒成「正在整理版本」。只有两步
+        // 本地操作持锁：开头判合并窗口，fetch 回来后再判一次并把 origin/master 挪到位。
         ReentrantLock lock = sessionService.repoLock(projectId);
         lock.lock();
         try {
-            // 合并窗口期间不 fetch（v2 终审 I3）：fetch 会推进 origin/master，而窗口判定
-            // 靠「MERGE_HEAD 等于/是 origin/master 的祖先」反查——旧的相等判定下 fetch 一次
-            // 就把开着的冲突窗口孤儿化（三语境都对不上号，弹窗消失、裁决端点全拒）。
+            // 合并窗口期间不动 origin/master（v2 终审 I3）：窗口判定靠「MERGE_HEAD 等于/是 origin/master 的
+            // 祖先」反查，挪一次就把开着的冲突窗口孤儿化（三语境都对不上号，弹窗消失、裁决端点全拒）。
             // 状态照常给本地快照，多带 merging:true。
-            if (repoService.repositoryMerging(projectId)) {
-                Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
-                m.put("merging", true);
-                return m;
-            }
-            CloudConnection conn = connectionOf(remoteOpt.get());
-            try {
-                repoService.fetchFromOrigin(projectId, conn.getUsername(), conn.getDeviceToken());
-            } catch (Exception e) {
-                log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);
-                Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
-                m.put("offline", true);
-                return m;
-            }
-            return cloudStatus(projectId, userId);
+            if (repoService.repositoryMerging(projectId)) return mergingStatus(projectId, userId);
         } finally {
             lock.unlock();
         }
+        CloudConnection conn = connectionOf(remoteOpt.get());
+        String fetched;
+        try {
+            // 抓到专用引用上，不碰 origin/master：抓取期间开出的合并窗口也看不到它动
+            fetched = repoService.fetchOriginForCheck(projectId, conn.getUsername(), conn.getDeviceToken());
+            removedFromLibrary.remove(projectId); // readable again (e.g. re-added)
+        } catch (Exception e) {
+            Map<String, Object> m = lockedStatus(projectId, userId);
+            if (isAccessRefused(e)) {
+                // C10：案件库明确拒绝读取（git-upload-pack not permitted）= 已不在这份案卷的参与人里，
+                // 不是网络抖动；负责人名字用最近一次取到的
+                log.info("云端状态检查：案件库拒绝读取，本机账号已不在参与人里: project={}", projectId);
+                RemoteRole last = remoteRoleCache.remove(projectId);
+                m.put("removed", true);
+                if (last != null && last.ownerName() != null) m.put("ownerName", last.ownerName());
+                removedFromLibrary.put(projectId, last != null && last.ownerName() != null ? last.ownerName() : "");
+                return m;
+            }
+            log.warn("云端状态检查 fetch 失败，仅回退为离线态: project={}", projectId, e);
+            m.put("offline", true);
+            return m;
+        }
+        Map<String, Object> m;
+        lock.lock();
+        try {
+            if (repoService.repositoryMerging(projectId)) return mergingStatus(projectId, userId);
+            repoService.publishCheckedOrigin(projectId, fetched);
+            m = new HashMap<>(cloudStatus(projectId, userId));
+        } finally {
+            lock.unlock();
+        }
+        describeMyRole(projectId, remoteOpt.get(), conn, m);
+        if (objectSync != null) {
+            try {
+                List<String> blocked = objectSync.largeFilesBlockingSubmit(projectId,
+                        conn.getServerUrl() + "/git/" + remoteOpt.get().getRemoteProjectId() + ".git",
+                        conn.getUsername(), conn.getDeviceToken());
+                if (!blocked.isEmpty()) {
+                    // C12：版本里有大文件而文件云端备份没开——现在就告诉律师，别等交稿才弹一句
+                    m.put("largeFilesNeedBackup", true);
+                    m.put("largeFiles", blocked.stream().filter(p -> !p.isBlank())
+                            .map(p -> p.contains("/") ? p.substring(p.lastIndexOf('/') + 1) : p).toList());
+                }
+            } catch (Exception e) {
+                log.warn("检查大文件备份状态失败（状态照常给）: project={}", projectId, e);
+            }
+        }
+        return m;
+    }
+
+    private Map<String, Object> mergingStatus(long projectId, Long userId) {
+        Map<String, Object> m = new HashMap<>(cloudStatus(projectId, userId));
+        m.put("merging", true);
+        return m;
+    }
+
+    private Map<String, Object> lockedStatus(long projectId, Long userId) {
+        ReentrantLock lock = sessionService.repoLock(projectId);
+        lock.lock();
+        try { return new HashMap<>(cloudStatus(projectId, userId)); }
+        finally { lock.unlock(); }
+    }
+
+    /**
+     * C8/C10：我在案件库里的角色（{@code myRole}：OWNER / ADMIN / PARTICIPANT / READ_ONLY）与负责人名字
+     * （{@code ownerName}），联网核对时顺带取一次参与人表（{@value #REMOTE_ROLE_TTL_MS} 毫秒缓存）。
+     * 只读成员据此在桌面端打开只读、不给交稿——服务端照旧拒绝写入，这里只是别让律师白改一场。
+     * 取不到就不填字段，绝不因此把云端状态打成错误。
+     */
+    record RemoteRole(String myRole, String ownerName, long expiresAt) {}
+
+    static final long REMOTE_ROLE_TTL_MS = 60_000L;
+
+    private final Map<Long, RemoteRole> remoteRoleCache = new ConcurrentHashMap<>();
+
+    private void describeMyRole(long projectId, ProjectRemote remote, CloudConnection conn, Map<String, Object> m) {
+        try {
+            RemoteRole role = remoteRoleCache.get(projectId);
+            if (role == null || role.expiresAt() < System.currentTimeMillis()) {
+                JSONObject resp = JSONUtil.parseObj(httpGet(
+                        conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members",
+                        conn.getDeviceToken()));
+                if (resp.getInt("code", 1) != 0) return;
+                JSONArray rows = resp.getJSONArray("data");
+                cacheRemoteDisplayNames(projectId, rows);
+                String mine = null, owner = null;
+                if (rows != null) {
+                    for (Object o : rows) {
+                        if (!(o instanceof JSONObject row)) continue;
+                        String r = row.getStr("role");
+                        if (conn.getUsername() != null && conn.getUsername().equals(row.getStr("username"))) mine = r;
+                        if ("OWNER".equals(r) && owner == null) owner = row.getStr("displayName");
+                    }
+                }
+                role = new RemoteRole(mine, owner, System.currentTimeMillis() + REMOTE_ROLE_TTL_MS);
+                remoteRoleCache.put(projectId, role);
+            }
+            if (role.myRole() != null) m.put("myRole", role.myRole());
+            if (role.ownerName() != null) m.put("ownerName", role.ownerName());
+        } catch (Exception e) {
+            log.warn("读取我在案件库里的角色失败（状态照常给）: project={}", projectId, e);
+        }
+    }
+
+    /** 案件库明确拒绝（不是连不上）：git 的 not permitted / 401 / 403。 */
+    static boolean isAccessRefused(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            String msg = String.valueOf(t.getMessage()).toLowerCase(java.util.Locale.ROOT);
+            if (msg.contains("not permitted") || msg.contains("not authorized") || msg.contains("403 forbidden")
+                    || msg.contains("401 unauthorized")) return true;
+        }
+        return false;
     }
 
     /** 单参版本（userId 未知时的纯 ref 检查）。 */
@@ -1185,6 +1319,24 @@ public class CloudSyncService {
                     "没能把人加进来：" + resp.getStr("message", "请重试"),
                     "Couldn't add that member: " + resp.getStr("message", "please try again")));
         }
+    }
+
+    /**
+     * C9：改案件库上一位参与人的角色。权限矩阵在案件库判；本机清掉角色缓存，下一次状态读到新角色。
+     */
+    public void proxyMemberRole(long projectId, long remoteUserId, String role) {
+        ProjectRemote remote = requireRemoteBinding(projectId);
+        CloudConnection conn = connectionOf(remote);
+        String body = JSONUtil.toJsonStr(Map.of("role", role == null ? "" : role));
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPut(
+                conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members/" + remoteUserId + "/role",
+                body, conn.getDeviceToken())));
+        if (resp.getInt("code", 1) != 0) {
+            throw VersionException.userFacing(LangText.of(
+                    "没能修改角色：" + resp.getStr("message", "请重试"),
+                    "Couldn't change the role: " + resp.getStr("message", "please try again")));
+        }
+        remoteRoleCache.remove(projectId);
     }
 
     /**
@@ -1548,7 +1700,8 @@ public class CloudSyncService {
         if (repoService.repositoryMerging(projectId)) {
             throw VersionException.userFacing(LangText.of("请先把等你做选择的文件处理完", "Please finish choosing your files first"));
         }
-        if (sessionService.activeSession(projectId).isPresent()) {
+        // C27：一段只动了清单、没有任何律师改动的工作（软件自己留下的）不挡取回
+        if (sessionService.activeSession(projectId).isPresent() && !sessionService.discardIfManifestOnly(projectId, null)) {
             throw VersionException.userFacing(LangText.of("请先结束或丢弃手头这段工作，再取回最新稿", "Please finish or discard your current work session before pulling the latest draft"));
         }
         if (sessionService.onDraftBranch(projectId)) {
@@ -1751,6 +1904,30 @@ public class CloudSyncService {
         try (HttpResponse resp = req.execute()) {
             return new RawResponse(resp.getStatus(), resp.header("Content-Type"),
                     resp.header("Content-Disposition"), resp.bodyBytes());
+        } catch (Exception e) {
+            throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
+        }
+    }
+
+    /** C9 role change. Test seam like httpPost/httpDelete; sends X-Session-Id when sessionToken is set. */
+    protected String httpPut(String url, String jsonBody, String sessionToken) {
+        HttpRequest req = HttpRequest.put(url)
+                .header("Content-Type", "application/json")
+                .body(jsonBody)
+                .setConnectionTimeout(5000)
+                .setReadTimeout(15000);
+        if (sessionToken != null) {
+            req.header("X-Session-Id", sessionToken);
+        }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
+        try (HttpResponse resp = req.execute()) {
+            if (resp.getStatus() != 200) {
+                throw new IllegalStateException("云端请求失败 (HTTP " + resp.getStatus() + ")");
+            }
+            return resp.body();
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
         }

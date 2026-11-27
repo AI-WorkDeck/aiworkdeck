@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Derzeit gibt es zu viele Anfragen, daher drosselt der Modelldienst. Warten Sie eine Minute und versuchen Sie es erneut.",
   "modelUnavailable": "Das ausgewählte Modell ist derzeit nicht verfügbar. Versuchen Sie es später erneut oder wählen Sie unter dem Nachrichtenfeld ein anderes Modell.",
   "modelKeyInvalid": "Der Modellanbieter hat den Schlüssel abgelehnt, den dieses Gerät noch aus einer älteren Einrichtung verwendet. Melden Sie sich an, um stattdessen die KI von AI WorkDeck zu nutzen.",
+  "accountReconnect": "Die Verbindung zu Ihrem AI-Konto muss aktualisiert werden, daher wurde diese Anfrage nicht gesendet. Wählen Sie „Erneut anmelden“ und versuchen Sie es dann noch einmal; es geht nichts verloren.",
   "streamInterrupted": "Die Antwort wurde abgebrochen; der bisher eingetroffene Teil bleibt oben erhalten. Wählen Sie „Erneut versuchen“, um sie neu zu erstellen.",
   "streamInterruptedResumable": "Die Antwort wurde abgebrochen; der bisher eingetroffene Teil bleibt oben erhalten. Wählen Sie „Fortfahren“, um dort weiterzumachen, wo sie abgebrochen wurde, oder „Erneut versuchen“, um neu zu beginnen.",
   "streamInterruptedTwice": "Sie wurde erneut abgebrochen. Wählen Sie „Erneut versuchen“, um die gesamte Antwort neu zu erstellen.",
@@ -31,6 +32,7 @@ export default {
     "continueTooltip": "Dort weitermachen, wo es abgebrochen wurde, ohne das bereits Vorhandene neu zu erstellen",
     "refresh": "Aktualisieren",
     "signIn": "Anmelden",
+    "reconnect": "Erneut anmelden",
     "feedback": "Feedback"
   }
 }

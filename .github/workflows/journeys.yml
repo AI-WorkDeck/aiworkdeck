@@ -7,11 +7,6 @@
 name: Journeys
 on:
   pull_request:
-    paths:
-      - 'frontend/**'
-      - 'backend/**'
-      - 'official-plugins/**'
-      - '.github/workflows/journeys.yml'
   push:
     branches: [master]
   schedule:
@@ -26,7 +21,30 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  scope:
+    # Journeys runs on PRs touching frontend/, backend/, official-plugins/ or this workflow.
+    # Required on PRs, so it can't use a workflow-level paths filter (that would leave the check pending);
+    # the job below is skipped instead when nothing relevant changed, and a skipped job counts as passed.
+    name: Detect relevant changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    steps:
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate --jq '.[].filename' > /tmp/changed
+          if grep -Eq '^(frontend/|backend/|official-plugins/|[.]github/workflows/journeys[.]yml$)' /tmp/changed; then echo run=true; else echo run=false; fi >> "$GITHUB_OUTPUT"
+
   journeys:
+    needs: scope
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.scope.outputs.run == 'true') }}
     name: First-user journeys (headless)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -44,7 +62,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
+      - name: Maven setup (warm cache read-only, Central fallback mirror, short retries)
+        uses: ./.github/actions/maven-setup
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -75,6 +94,7 @@ jobs:
         working-directory: frontend
         run: VITE_API_BASE_URL=http://127.0.0.1:$BACKEND_PORT nohup npx uni --port $FRONTEND_PORT > "$RUN_DIR/out/uni.log" 2>&1 &
       - name: Wait for the servers
+        id: servers
         run: |
           for i in $(seq 1 120); do
             a=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$BACKEND_PORT/api/auth/me || true)
@@ -98,7 +118,9 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
         run: node tests/journeys/first-run-locales.mjs
       - name: Whole-app journeys (app-e2e)
-        if: ${{ !cancelled() }}
+        # Runs even if the locale journeys failed, but only when the stack actually came up; otherwise a failed
+        # build or npm ci surfaced as a misleading "缺少 puppeteer-core" here (2026-11-25).
+        if: ${{ !cancelled() && steps.servers.outcome == 'success' }}
         working-directory: frontend
         env:
           APP_E2E_BASE: http://127.0.0.1:${{ env.FRONTEND_PORT }}

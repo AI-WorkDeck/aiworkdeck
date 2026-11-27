@@ -378,6 +378,7 @@ export default {
   "copyToolOutput": "出力をコピー",
   "copyFailed": "コピーに失敗しました",
   "tokenUsageLine": "このターンで {n} トークン",
+  "viewUsage": "使用量を見る",
   "statusError": "エラー",
   "statusSuccess": "完了",
   "statusRunning": "実行中",

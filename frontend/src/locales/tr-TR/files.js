@@ -16,8 +16,6 @@ export default {
   "templateFolderHint": "Şablon klasörü: firmanızın rapor şablonlarını buraya bırakın; öğrenildikten sonra AI, yazı tipleri, numaralandırma ve tablo stilleriyle taslak hazırlar",
   "selectFilePrompt": "Önizlemek için soldan bir dosya seçin",
   "edit": "Düzenle",
-  "typeLabel": "Tür: {type}",
-  "sizeLabel": "Boyut: {size}",
   "renderingDoc": "Belge işleniyor…",
   "renderingSlides": "Sunum işleniyor…",
   "slidesNotShown": "{count} slayt daha gösterilmiyor. Tümünü görmek için dosyayı açın.",

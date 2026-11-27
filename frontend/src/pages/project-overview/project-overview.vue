@@ -97,7 +97,7 @@
             </view>
           </view>
           <view v-if="hasNamedProject && !isScratchWorkspace" class="project-meta">
-            <text v-if="!soloLocalProject" class="meta-item">{{ $t('workbench.managerLabel', { name: project.manager || userDisplayName || $t('workbench.me') }) }}</text>
+            <text v-if="!soloLocalProject" class="meta-item">{{ $t('workbench.managerLabel', { name: projectLeadName || $t('workbench.me') }) }}</text>
 
             <block v-if="project.listedCompanyName && project.listedCompanyName !== '-'">
                 <text class="meta-divider">|</text>
@@ -233,6 +233,9 @@
           <!-- D16：版面开关（左/底/右栏、分屏）与工具（截图、网页、录制）分两组 -->
           <view class="top-bar-divider" aria-hidden="true"></view>
 
+          <!-- Q28 / X-S10：窄于 880px 时截图 / 新网页 / 工作记录三个按钮收进「⋯」菜单（header-more），
+               主题与布局开关留在顶栏。 -->
+          <view class="header-tools-optional">
           <!-- 5. Screenshot (OCR)：摘录落在项目收藏里，无项目态不给 -->
           <view
             v-if="hasProject"
@@ -269,6 +272,22 @@
               <path v-for="(d, gi) in GLYPHS.record" :key="gi" :d="d" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </view>
+          </view>
+          <view class="top-bar-btn header-more-btn" :class="{ active: headerMoreOpen }" role="button" tabindex="0" aria-haspopup="menu" :aria-expanded="headerMoreOpen ? 'true' : 'false'" :aria-label="$t('workbench.moreTools')" :title="$t('workbench.moreTools')" @tap.stop="headerMoreOpen = !headerMoreOpen">
+            <text class="header-more-dots" aria-hidden="true">⋯</text>
+            <view v-if="headerMoreOpen" class="theme-menu header-more-menu" role="menu" :aria-label="$t('workbench.moreTools')" @tap.stop>
+              <view v-if="hasProject" class="theme-menu-item" role="menuitem" tabindex="-1" @tap="headerMoreOpen = false; startOcrCapture()">
+                <text class="theme-menu-text">{{ $t('workbench.ocrCapture') }}</text>
+              </view>
+              <view class="theme-menu-item" role="menuitem" tabindex="-1" @tap="headerMoreOpen = false; openBrowserTab()">
+                <text class="theme-menu-text">{{ $t('workbench.browserNewTabHint') }}</text>
+              </view>
+              <view v-if="hasNamedProject" class="theme-menu-item" :class="{ on: isRecording }" role="menuitem" tabindex="-1" @tap="headerMoreOpen = false; toggleRecording()">
+                <text class="theme-menu-text">{{ $t('workbench.recordActivity') }}</text>
+              </view>
+            </view>
+          </view>
+          <view v-if="headerMoreOpen" class="theme-menu-mask" @tap="headerMoreOpen = false"></view>
         </view>
         <view v-else>
             <!-- Client View Only Tools -->
@@ -330,7 +349,7 @@
              2026-08-19 起「项目概览」和「插件中心」也在这个数组里：它们走的都是
              普通的 toggleLeftPane 语义，单独硬编码成 rail 按钮只会让顺序有两个出处。 -->
         <view
-          v-for="p in LEFT_SIDEBAR_PLUGINS"
+          v-for="p in railShownPlugins"
           :key="p.key"
           class="rail-btn"
           :class="{ active: (p.isDynamic && p.hasDeclaredViews && !p.sidebarView && workspaceTabState('plugin', p.pluginId) === 'active') || ((leftPaneKey === p.key || (p.key === 'files' && isExplorerPane)) && !sidebarCollapsed) || (p.key === 'staging' && stagingPinned), 'is-movable': isMovablePanel(p.key), 'is-sortable': !isClientView, 'rail-dragging': draggingRailKey === p.key }"
@@ -386,11 +405,29 @@
             :aria-label="$t('calendar.railScheduleTitle', railScheduleSummary)"
           >{{ railScheduleCount > 99 ? '99+' : railScheduleCount }}</text>
         </view>
+        <!-- Q28 / X-S10：放不下的插件图标收进「更多」，不半截、不出滚动条（整理模式下照旧全列出来） -->
+        <view
+          v-if="railOverflowPlugins.length"
+          class="rail-btn rail-more-btn"
+          :class="{ active: railMoreOpen || railOverflowPlugins.some(p => leftPaneKey === p.key && !sidebarCollapsed) }"
+          role="button" tabindex="0" aria-haspopup="menu" :aria-expanded="railMoreOpen ? 'true' : 'false'"
+          :title="$t('workbench.railMore')"
+          @tap.stop="railMoreOpen = !railMoreOpen"
+        >
+          <view class="rail-icon-wrapper"><text class="rail-more-dots" aria-hidden="true">⋯</text></view>
+          <text class="rail-label">{{ $t('workbench.railMore') }}</text>
+        </view>
 
         <!-- 整理模式入口：rail 右键菜单「整理图标」（原顶栏按钮已撤，见 openRailMenu） -->
 
         </view>
 
+        <view v-if="railMoreOpen && railOverflowPlugins.length" class="theme-menu rail-more-menu" role="menu" :aria-label="$t('workbench.railMore')" @tap.stop>
+          <view v-for="p in railOverflowPlugins" :key="'more-' + p.key" class="theme-menu-item" :class="{ on: leftPaneKey === p.key && !sidebarCollapsed }" role="menuitem" tabindex="-1" @tap="railMoreOpen = false; onRailBtnTap(p.key)">
+            <text class="theme-menu-text">{{ railLabelOf(p) }}</text>
+          </view>
+        </view>
+        <view v-if="railMoreOpen" class="theme-menu-mask" @tap="railMoreOpen = false"></view>
         <!-- 项目操作常驻底部，不随上方工具列表滚动。成员浮层须能向右展开。 -->
         <view class="rail-footer">
 
@@ -544,7 +581,7 @@
         :project-name="project.name || ''"
         :cloud="collabCloud"
         :conflict-pending="adoptConflictPending"
-        :working="!!versionWorkStatus.working"
+        :working="versionUnsaved"
         :initial-tab="collabInitialTab"
         :inviter-name="userDisplayName || (currentUser && currentUser.displayName) || ''"
         @changed="onCollabChanged"
@@ -552,6 +589,7 @@
         @conflict="onCollabConflict"
         @open-history="onOpenHistoryFromCollab"
         @submit-guide="openSubmitGuide"
+        @queued="onSubmitQueuedOffline"
         @collab-help="openCollabHelp"
       />
 
@@ -560,12 +598,13 @@
       <SubmitDraftGuide
         v-model:visible="submitGuideVisible"
         :project-id="projectId"
-        :working="!!versionWorkStatus.working"
+        :working="versionUnsaved"
         :cloud="collabCloud"
         :mode="submitGuideMode"
         @changed="onCollabChanged"
         @reload-files="onVersionReloadFiles"
         @conflict="onCollabConflict"
+        @queued="onSubmitQueuedOffline"
       />
 
       <!-- 文档比较选择对话框 -->
@@ -585,7 +624,7 @@
     </view>
 
       <!-- 左侧文件树（可收起） -->
-      <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarWidth + 'px' }">
+      <view class="sidebar-left" ref="sidebarLeft" :class="{ collapsed: sidebarCollapsed, 'as-overlay': sidebarOverlay && !sidebarCollapsed }" :style="{ width: sidebarCollapsed ? '0px' : sidebarShownWidth + 'px' }">
         <!-- 批量菜单遮罩：用于点击空白关闭下拉（不弹中间） -->
         <view v-if="showBatchMenu" class="batch-menu-mask" @tap="closeBatchMenu"></view>
         <!-- 左栏标题的唯一出处。此前各面板还各画各的 header，于是「诉讼可视化」
@@ -746,6 +785,11 @@
               <text aria-hidden="true">›</text>
             </component>
             <text class="dd-client-nav-hint">{{ $t('ddWorkflow.clientWorkspaceHint') }}</text>
+            <!-- C16：在自己的案卷里，这里还要能看到并管理这份案卷的客户（上面那一项是「我作为客户受邀的项目」） -->
+            <component v-if="hasNamedProject && collabLinked && !isClientView" :is="'button'" type="button" class="dd-client-nav" @click.stop="openCollab('people')">
+              <text class="dd-client-nav-label">{{ $t('ddWorkflow.thisCaseClients', { count: projectClientCount }) }}</text>
+              <text aria-hidden="true">›</text>
+            </component>
           </view>
           <DdFilesPanel
             ref="ddFilesPanel"
@@ -768,6 +812,7 @@
           <ProjectHomePane
             v-else-if="leftPaneKey === 'home'"
             :project-id="Number(projectId)"
+            :shared-member-count="collabLinked && projectMembers && projectMembers.length ? projectMembers.length : null"
             compact
             @open-conversation="openConversationInPanel"
             @open-task-file="onTaskOpenFile"
@@ -1276,6 +1321,7 @@
                       :key="activeFileLeft.id"
                       :request-id="activeFileLeft.requestId"
                       :focus-item-id="activeFileLeft.focusItemId"
+                      :remote-signal="ddRequestSignals[String(activeFileLeft.requestId)]"
                       :project-id="projectId"
                       :client-view="isClientView"
                       :can-write="canWriteProject"
@@ -1320,12 +1366,13 @@
                       :cloud-linked="collabLinked"
                       :refresh-token="collabRefreshToken"
                       :cloud="collabCloud"
-                      :working="!!versionWorkStatus.working"
+                      :working="versionUnsaved"
                       @compare-file="onVersionCompareFile"
                       @reload-files="onVersionReloadFiles"
                       @changed="onCollabChanged"
                       @conflict="onCollabConflict"
                       @submit-guide="openSubmitGuide"
+                      @queued="onSubmitQueuedOffline"
                     />
                     <!-- 「设置」标签：与 pages/admin 薄壳页共用同一个 AdminPane
                          （照插件广场 market-detail 那套 tab 形制）。个人中心 2026-08-20
@@ -1563,6 +1610,7 @@
                       :key="activeFileRight.id"
                       :request-id="activeFileRight.requestId"
                       :focus-item-id="activeFileRight.focusItemId"
+                      :remote-signal="ddRequestSignals[String(activeFileRight.requestId)]"
                       :project-id="projectId"
                       :client-view="isClientView"
                       :can-write="canWriteProject"
@@ -1606,12 +1654,13 @@
                       :cloud-linked="collabLinked"
                       :refresh-token="collabRefreshToken"
                       :cloud="collabCloud"
-                      :working="!!versionWorkStatus.working"
+                      :working="versionUnsaved"
                       @compare-file="onVersionCompareFile"
                       @reload-files="onVersionReloadFiles"
                       @changed="onCollabChanged"
                       @conflict="onCollabConflict"
                       @submit-guide="openSubmitGuide"
+                      @queued="onSubmitQueuedOffline"
                     />
                     <!-- 「设置」标签：见左窗格同名注释 -->
                     <!-- 「欢迎」标签（dev-board#1047）：单例，照设置标签的形制。无项目态启动时自动打开，
@@ -1781,7 +1830,8 @@
             v-show="showAiPanel"
             ref="aiPanel"
             class="side-panel side-panel-ai"
-            :style="{ width: aiPanelWidth + 'px' }"
+            :class="{ 'as-overlay': aiPanelOverlay && showAiPanel }"
+            :style="{ width: aiPanelShownWidth + 'px' }"
             @dragover.prevent="handleAiDragOver"
             @dragleave="handleAiDragLeave"
             @drop="handleAiDrop"
@@ -2236,6 +2286,19 @@
         <text class="adopt-pending-go" @tap="goHandleAdoptConflict">{{ $t('workbench.goHandle') }}</text>
       </view>
 
+      <!-- C8/C10：只读成员 / 已被移出——文档打开即只读，交稿入口收起；这条说明说清原因和该找谁 -->
+      <view v-if="collabMemberBlocked && !collabMemberBarDismissed" class="adopt-pending-bar member-blocked-bar" role="status">
+        <text class="adopt-pending-text">{{ collabMemberBarText }}</text>
+        <text class="adopt-pending-go" role="button" :aria-label="$t('common.close')" @tap="collabMemberBarDismissed = true">×</text>
+      </view>
+
+      <!-- C12：版本里有大文件 / 音视频、而文件云端备份没开：保存时就说，不等交稿 -->
+      <view v-if="collabLargeFilesBlocked && !collabMemberBlocked && !largeFilesBarDismissed" class="adopt-pending-bar large-files-bar" role="status">
+        <text class="adopt-pending-text">{{ collabLargeFilesText }}</text>
+        <text class="adopt-pending-go" @tap="openBackupConsent">{{ $t('version.largeFilesEnableBackup') }}</text>
+        <text class="adopt-pending-go" role="button" :aria-label="$t('common.close')" @tap="largeFilesBarDismissed = true">×</text>
+      </view>
+
       <!-- IDE 化 Cmd+P 快速打开 -->
       <QuickOpenPanel
         v-if="quickOpenVisible && hasNamedProject"
@@ -2395,6 +2458,7 @@
         <view class="status-dot" :class="collabTone"></view>
         <text>{{ collabStateText }}</text>
       </view>
+      <CloudTransferStatus v-if="collabLinked" :project-id="projectId" />
       <BackendHealthStatus />
       <MobileBackupConsent v-if="isDesktopApp" />
       <MobileReceiveStatus v-if="isDesktopApp" :project-id="hasNamedProject ? projectId : null" @received="$refs.fileTree && $refs.fileTree.loadFiles()" />
@@ -2423,6 +2487,7 @@
 </template>
 
 <script>
+import { showLargeFileBackupBlock, OPEN_BACKUP_CONSENT_EVENT } from '@/utils/largeFileBackup.js'
 import { errorText } from '@/utils/errorToast.js'
 import { unseenMergeNeighborNotices, MERGE_NEIGHBORS_EVENT } from '@/utils/mergeNeighborNotices.js'
 import CrossBorderConsentCard from '@/components/account/CrossBorderConsentCard.vue'
@@ -2545,6 +2610,7 @@ import {
   getCloudAccountGeneration,
   getCloudStatus, // 协作 chip：这份案卷有没有放进团队案件库、状态如何
   checkCloud, // 协作 chip 的联网刷新（cloudStatus 是不联网的本地快照）
+  uploadToCloud, // C11：联网后自动交一次
   getCloudMembers, // 成员堆栈：案卷放进案件库后，同事在库那边的名单本机 /members 里没有
   getCurrentUser as getCurrentUserApi, // 顶栏头像：补一次真实接口，本地缓存只是首屏兜底
   registerMeetingFromFile, // 右键转写：音频文件注册进会议录音面板（dev-board#227）
@@ -2565,7 +2631,7 @@ import { loadSiteLinks, siteBaseUrl } from '@/utils/siteLinks.js'
 import { confirmPaidTranscription } from '@/utils/paidTranscribeGate.js'
 import { getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { mergeMembers } from '@/utils/mergeMembers.js'
-import { remoteAheadText } from '@/utils/collabWording.js'
+import { remoteAheadText, collabAgeText, COLLAB_FRESH_MS } from '@/utils/collabWording.js'
 import { versionEntryState } from '@/utils/versionEntryState.js'
 import { createVersionExitGuard } from '@/utils/versionExitGuard.js'
 import { showSheet } from '@/utils/dialog.js'
@@ -2614,6 +2680,7 @@ import MessageCenterPane from '@/components/messages/MessageCenterPane.vue'
 import { messageCenterTabMethods } from './messageCenterTab.js'
 import { pollDdClientNotifications } from '@/services/ddClient'
 import { getDdNotifications, readDdNotification } from '@/services/ddWorkflow'
+import { ddRequestSignals } from '@/utils/ddWorkflow'
 import ChatInterface from '@/components/ChatInterface.vue'
 import ChatModeSidebar from '@/components/chat/ChatModeSidebar.vue'
 import {
@@ -2639,7 +2706,7 @@ import { stagingAreaMethods } from './stagingArea.js'
 import { evidenceLinkData, evidenceLinkMethods } from './evidenceLinkActions.js'
 import { setEvidenceProjectType } from '@/utils/evidenceTags.js'
 import { tabDragSplitMethods } from './tabDragSplit.js'
-import { fitPanelWidths } from './panelWidthLimits.js'
+import { narrowLayoutMethods } from './narrowLayout.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
 import { railSortData, railSortMethods } from './railSort.js'
 import { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarCollapse.js'
@@ -2666,6 +2733,7 @@ import AccountEntry from '@/components/account/AccountEntry.vue'
 import LanguagePicker from '@/components/LanguagePicker.vue'
 import OptionalComponentsDialog from '@/components/OptionalComponentsDialog.vue'
 import MobileReceiveStatus from '@/components/MobileReceiveStatus.vue'
+import CloudTransferStatus from '@/components/collab/CloudTransferStatus.vue'
 import BackendHealthStatus from '@/components/BackendHealthStatus.vue'
 import MobileBackupConsent from '@/components/MobileBackupConsent.vue'
 import {
@@ -2710,6 +2778,7 @@ export default {
     ScratchTransferDialog,
     BackendHealthStatus,
     MobileReceiveStatus,
+    CloudTransferStatus,
     MobileBackupConsent,
     LibreOfficeEditor,
     BrowserPane,
@@ -2841,6 +2910,18 @@ export default {
       showScratchTransfer: false,
       chatWorkspaceFiles: [],
       sidebarWidth: 260, // 侧边栏宽度
+      headerMoreOpen: false, // 窄顶栏的「⋯」菜单（Q28 / X-S10）
+      // rail 一屏放得下几个插件图标（ResizeObserver 量 .rail-tools；Infinity = 都放得下）
+      railFitCount: Infinity,
+      railMoreOpen: false,
+      // 窄窗口让位（Q28，见 narrowLayout.js）：放不下时用户打开的面板以浮层抽屉显示；
+      // autoCollapsed 只记窗口自动收起的，窗口变宽时只自动打开这些。
+      sidebarOverlay: false,
+      aiPanelOverlay: false,
+      panelAutoCollapsed: { tree: false, ai: false },
+      // 窄窗时显示宽的上限（0 = 不限）；sidebarWidth / aiPanelWidth 仍是用户宽，窗口变宽后还原
+      narrowWidthCap: { tree: 0, ai: 0 },
+      narrowLayoutApplying: false,
       sidebarCollapsed: true,
       isCompactLayout: false,
       leftPaneKey: null, // Initialize to null to prevent premature loading
@@ -2983,6 +3064,7 @@ export default {
       messageCenterBadgePartial: false,
       ddClientUnread: 0,
       ddLawyerNotifications: [],
+      ddRequestSignals: {},
 
       // 网核关联拖拽（将截图证据块拖到 WPS 文档中插入标记）
       webLinkDrag: {
@@ -3042,6 +3124,15 @@ export default {
       versionStatusError: false,
       // 协作（团队案件库）状态：{linked, serverUrl, pendingUpload, remoteAhead, offline}
       collabCloud: null,
+      // C5：最近一次**联网**核对团队案件库完成的时间（ms）与是否正在核对；collabNow 每 5 秒走一格，
+      // 让「几秒前核对」的判断跟着时间变
+      collabCheckedAt: 0,
+      // C11：没联网时点了交稿：记下来，联网后自动交一次（按项目存，重启后仍在）
+      collabRetryQueued: false,
+      collabMemberBarDismissed: false,
+      largeFilesBarDismissed: false,
+      collabChecking: false,
+      collabNow: Date.now(),
       collabDialogVisible: false,
       collabInitialTab: 'casefile',
       // 交稿引导（dev-board#645）：'guide' = 从「交稿」拦下来的三步清单，'help' = 只看说明
@@ -3141,6 +3232,45 @@ export default {
     }
   },
   computed: {
+    // C16：这份案卷里凭访问码进来的客户人数（案件库名单）
+    projectClientCount() {
+      return (this.projectMembers || []).filter(m => typeof m?.role === 'string' && m.role.startsWith('CLIENT')).length
+    },
+    // C13：手头有没存成版本的改动——进行中的工作段，或者在访达里直接改名/新增/删掉的文件
+    // （没有工作段，changedCount > 0）。后者原来被当成「一致」，交稿也什么都交不上去。
+    versionUnsaved() {
+      const s = this.versionWorkStatus || {}
+      return !!s.working || Number(s.changedCount) > 0
+    },
+    collabLargeFilesBlocked() {
+      const c = this.collabCloud
+      return !!(c && c.largeFilesNeedBackup)
+    },
+    collabLargeFilesText() {
+      const names = ((this.collabCloud && this.collabCloud.largeFiles) || []).slice(0, 3)
+      return names.length
+        ? this.$t('workbench.largeFilesBar', { files: names.join(this.$t('workbench.largeFilesSep')) })
+        : this.$t('workbench.largeFilesBarNoNames')
+    },
+    // C8/C10：案件库里的身份。只读成员与已被移出的人：只读打开、不给交稿、给一条说明。
+    collabMemberBlocked() {
+      const c = this.collabCloud
+      return !!(c && c.linked !== false && (c.removed || c.myRole === 'READ_ONLY'))
+    },
+    collabMemberBarText() {
+      const c = this.collabCloud || {}
+      if (c.removed) return c.ownerName ? this.$t('workbench.removedMemberBar', { owner: c.ownerName }) : this.$t('workbench.removedMemberBarNoOwner')
+      return c.ownerName ? this.$t('workbench.readOnlyMemberBar', { owner: c.ownerName }) : this.$t('workbench.readOnlyMemberBarNoOwner')
+    },
+    // C6：负责人是案件的负责人（成员名单里 role=OWNER，共享案件以案件库为准），不是本机这位。
+    // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
+    projectLeadName() {
+      const owner = (this.projectMembers || []).find(m => m && m.role === 'OWNER')
+      const name = owner && (owner.displayName || owner.nickname)
+      return name || (this.project && this.project.manager) || this.userDisplayName || ''
+    },
+    sidebarShownWidth() { return this.narrowWidthCap.tree ? Math.min(this.sidebarWidth, this.narrowWidthCap.tree) : this.sidebarWidth },
+    aiPanelShownWidth() { return this.narrowWidthCap.ai ? Math.min(this.aiPanelWidth, this.narrowWidthCap.ai) : this.aiPanelWidth },
     filteredSwitcherProjects() {
       const query = this.projectSwitcherQuery.trim().toLocaleLowerCase()
       return this.switcherProjects.filter(p => !query || String(p.name || '').toLocaleLowerCase().includes(query))
@@ -3277,6 +3407,17 @@ export default {
         (this.fileLinkPicker && this.fileLinkPicker.visible)
       )
     },
+    // Q28：放不下时最后一格让给「更多」，其余进它的菜单；整理图标模式下全部列出（可滚动）
+    railShownPlugins() {
+      const all = this.LEFT_SIDEBAR_PLUGINS || []
+      const fit = this.railFitCount
+      if (this.railEditMode || !(fit < all.length)) return all
+      return all.slice(0, Math.max(1, fit - 1))
+    },
+    railOverflowPlugins() {
+      const all = this.LEFT_SIDEBAR_PLUGINS || []
+      return all.slice(this.railShownPlugins.length)
+    },
     LEFT_SIDEBAR_PLUGINS() {
       const user = getCurrentUser()
       // 无项目态（dev-board#1047）：rail 只留全局项（项目 / 日程 / 插件中心，以及被停到左栏的剪贴板），
@@ -3334,6 +3475,9 @@ export default {
           || this.projectId == null || this.projectId === '' || !this.project || this.project.id == null
           || !['USER', 'ADMIN'].includes(role)
           || String(this.project.id) !== String(this.projectId)) return false
+      // C8：案件库说我是只读成员（或已被移出）时只**收紧**不放宽：本机副本照样能读，但不让改——
+      // 改了也交不上去，律师会以为改动到了团队。云端角色从不用来授予写权限。
+      if (this.collabMemberBlocked) return false
       if (this.project.userId != null && String(this.project.userId) === String(uid)) return true
       if (!this.localProjectMembersLoaded
           || String(this.localProjectMembersProjectId) !== String(this.projectId)) return false
@@ -3461,22 +3605,37 @@ export default {
       }
       if (this.adoptConflictPending) return this.$t('workbench.adoptPendingText')
       const c = this.collabCloud || {}
+      if (c.removed) return this.$t('workbench.collabRemoved')
       if (c.offline) return this.$t('workbench.collabOffline')
+      // C8 gate：只读成员的待上传记录永远交不上去——身份排在「有改动还没交稿」之前，与协作弹窗同序
+      if (c.myRole === 'READ_ONLY' && !c.remoteAhead) return this.$t('version.readOnlyMemberState')
+      if (this.collabRetryQueued && c.pendingUpload) return this.$t('workbench.collabQueuedOffline')
       // 「同事交了新稿」四处同源（utils/collabWording.js）：后端给得出作者时说清楚是
       // 本人的另一台电脑还是哪位同事、几版；给不出（老服务端）才落回这句老文案。
       if (c.remoteAhead) {
         return remoteAheadText((k, params) => this.$t(k, params), c, { fallbackKey: 'workbench.collabRemoteAhead' })
       }
-      if (c.pendingUpload || this.versionWorkStatus.working) return this.$t('workbench.collabPendingUpload')
+      if (c.pendingUpload || this.versionUnsaved) return this.$t('workbench.collabPendingUpload')
+      // C5：只有刚联网核对过（15 秒内）才说「和大家的稿一致」。更早的核对只能说明当时一致——
+      // 同事可能刚交了新稿，律师据此在旧稿上动手，之后就是合并或冲突。
+      if (!this.collabFresh) {
+        if (this.collabChecking) return this.$t('workbench.collabChecking')
+        if (!this.collabCheckedAt) return this.$t('workbench.collabNotChecked')
+        return this.$t('workbench.collabInSyncAsOf', { age: collabAgeText((k, p) => this.$t(k, p), this.collabNow - this.collabCheckedAt) })
+      }
       return this.$t('workbench.collabInSync')
+    },
+    collabFresh() {
+      return !!this.collabCheckedAt && this.collabNow - this.collabCheckedAt <= COLLAB_FRESH_MS
     },
     collabTone() {
       if (this.documentMergeState.running) return 'blue'
       if (this.adoptConflictPending) return 'amber'
       const c = this.collabCloud || {}
-      if (c.offline) return 'amber'
-      if (c.remoteAhead || c.pendingUpload || this.versionWorkStatus.working) return 'blue'
-      return 'green'
+      if (c.removed || c.offline) return 'amber'
+      if (c.remoteAhead || c.pendingUpload || this.versionUnsaved) return 'blue'
+      // 核对过时不亮绿灯（C5）
+      return this.collabFresh ? 'green' : 'blue'
     },
     // 是否有权管理成员
     canManageMembers() {
@@ -3976,6 +4135,7 @@ export default {
     }
     clearTimeout(this._libreSpareTimer)
     this.teardownResponsiveListener()
+    if (this._overlayDismiss) this._overlayDismiss()
     // Epic #43: 解绑 ⌘⇧O 嵌入式编辑器监听
     // 清理轮询定时器
     if (this.fileInfoPollingIntervals) {
@@ -4461,6 +4621,7 @@ export default {
     }
     uni.$on('awd:selection-changed', this._onEditorSelectionChanged)
     this.setupResponsiveListener()
+    this.setupPanelOverlayDismiss()
     // IDE 化：窗口重新聚焦时刷新文件树——外部改动（Finder 增删改）都发生在
     // 用户切出去的时候，后端 watcher 已把数据库对齐，聚焦拉一次即可见。
     // 多实例守卫：只让活跃实例刷新（页面栈多实例地雷，PR#148/#151 模式）
@@ -4726,7 +4887,7 @@ export default {
       this._historyEscHandler = (e) => { if (e.key === 'Escape') { e.stopPropagation(); this.showHistoryDrawer = false } }
       window.addEventListener('keydown', this._historyEscHandler, true)
     },
-    projectId() { this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
+    projectId() { this.ddRequestSignals = {}; this.cancelFileTreePdfExport(); this.resetPdfPreviewPool(); this.refreshMergeNeighborUnseen() },
     'currentUser.id'() { this.resetPdfPreviewPool() },
     // 成员轮询会替换数组；只在实际权限信息变化时销毁 PDF 查看器。
     pdfPermissionIdentity() { this.resetPdfPreviewPool() },
@@ -4747,7 +4908,7 @@ export default {
     },
     // IDE 化窗口标题：「文件名 — 项目名 — AI WorkDeck」（Electron 窗口标题跟随 document.title）
     'project.name'() { this.updateWindowTitle() },
-    activeFileIdLeft() { this.updateWindowTitle(); this.pushMenuState(); this.ensureActiveTabVisible('left'); this.syncFileTreeSelectionWithActiveTab() },
+    activeFileIdLeft() { this.updateWindowTitle(); this.pushMenuState(); this.ensureActiveTabVisible('left'); this.syncFileTreeSelectionWithActiveTab(); this.recheckCollabIfStale() },
     // 菜单栏的勾选/置灰跟着这些走。编辑器与 AI 面板内部的状态走 @menu-state
     // 事件（见对应组件），这里只管工作台自己的。桥那边有浅比较+去抖，
     // 这些 watcher 只管「叫一声」，不必自己节流。
@@ -4765,10 +4926,10 @@ export default {
         if (this.leftPaneKey === 'plugin-insight') this.leftPaneKey = 'files'
       },
     },
-    activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab() },
-    sidebarCollapsed() { this.pushMenuState() },
+    activeFileIdRight() { this.pushMenuState(); this.ensureActiveTabVisible('right'); this.syncFileTreeSelectionWithActiveTab(); this.recheckCollabIfStale() },
+    sidebarCollapsed(collapsed) { this.pushMenuState(); this.onPanelOpened('tree', !collapsed) },
     showToolsPanel() { this.pushMenuState() },
-    showAiPanel() { this.pushMenuState() },
+    showAiPanel(open) { this.pushMenuState(); this.onPanelOpened('ai', open) },
     // 分屏开关会把右侧那条标签栏整个建/拆，滚轮横滚是原生挂上去的，得跟着重挂
     // （幂等，见 tabDragSplit.rebindTabsWheel）。
     splitMode() {
@@ -4954,6 +5115,7 @@ export default {
     },
     // Phase 1 外置的方法组（纯搬移，this 即页面实例）
     ...panelSwitchingMethods,
+    ...narrowLayoutMethods,
     ...menuCommandsMethods,
     ...agentClientActionMethods,
     ...librePoolMethods,
@@ -5483,6 +5645,7 @@ export default {
     async onCollabAccountChanged() {
       this.stopCollabPolling()
       this.collabCloud = null
+      if (typeof this.loadQueuedSubmit === 'function') this.loadQueuedSubmit()
       const lifecycle = this._collabStateLifecycle
       const projectId = this.projectId
       const accountGeneration = getCloudAccountGeneration()
@@ -5504,6 +5667,7 @@ export default {
       const sessionId = getSessionId()
       const accountGeneration = getCloudAccountGeneration()
       const lifecycle = this._collabStateLifecycle || 0
+      if (online) this.collabChecking = true
       try {
         const res = online ? await checkCloud(projectId) : await getCloudStatus(projectId)
         if (this._collabDisposed || projectId !== this.projectId || lifecycle !== (this._collabStateLifecycle || 0)
@@ -5515,9 +5679,28 @@ export default {
           return
         }
         this.collabCloud = (res && res.data) || null
+        // C12（lane C r3）：取回把同事的录像写进来之后，占位徽标要跟着消失，不能等重开窗口
+        if (this.collabCloud && this.collabCloud.linked) this.$refs?.fileTree?.loadLocalOnly?.()
+        // 成员名单只在已知「放进了案件库」时才并入云端参与人；协作状态落地前跑完的那次只拿到
+        // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
+        if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()
+        if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
+        if (online && typeof this.retryQueuedSubmit === 'function') this.retryQueuedSubmit()
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
+      } finally {
+        if (online && seq === this._collabStateSeq) this.collabChecking = false
       }
+    },
+    // C5：核对已经过时（> 15 秒）时立刻联网再核对一次。触发点：窗口回到前台、打开一份文件、
+    // 第一次点进文档（紧接着通常就要改字）。没放进案件库、正在核对、刚核对过都不打网络。
+    recheckCollabIfStale() {
+      if (this._collabDisposed || !this.isActiveOverviewInstance()) return
+      if (this.collabCloud && !this.collabLinked) return
+      if (this.collabChecking) return
+      this.collabNow = Date.now()
+      if (this.collabFresh) return
+      this.fetchCollabState({ online: true })
     },
     // 定时保鲜。三道守卫缺一不可：只在活跃实例上跑（页面栈多实例地雷，PR#148/#151）、
     // 窗口不可见时不打网络、没放进案件库就整个不起定时器。
@@ -5531,12 +5714,34 @@ export default {
         if (this.collabCloud && !this.collabLinked) return
         this.fetchCollabState({ online: true })
       }, 120000)
+      if (typeof this.startCollabFreshness === 'function') this.startCollabFreshness()
+    },
+    // C5：「刚核对过」的时钟与联网再核对的触发点（窗口回到前台、第一次点进文档）
+    startCollabFreshness() {
+      if (this._collabClockTimer) return
+      // 时钟：只推进 collabNow，不打网络
+      this._collabClockTimer = setInterval(() => { this.collabNow = Date.now() }, 5000)
+      this._collabOnFocus = () => this.recheckCollabIfStale()
+      this._collabOnDocInteraction = () => this.recheckCollabIfStale()
+      if (typeof window !== 'undefined') window.addEventListener('focus', this._collabOnFocus)
+      // C11：网络恢复时也核对一次（排着队的交稿据此自动交）
+      if (typeof window !== 'undefined') window.addEventListener('online', this._collabOnFocus)
+      uni.$on('awd:doc-interaction', this._collabOnDocInteraction)
+    },
+    stopCollabFreshness() {
+      if (this._collabClockTimer) { clearInterval(this._collabClockTimer); this._collabClockTimer = null }
+      if (this._collabOnFocus && typeof window !== 'undefined') window.removeEventListener('focus', this._collabOnFocus)
+      if (this._collabOnFocus && typeof window !== 'undefined') window.removeEventListener('online', this._collabOnFocus)
+      if (this._collabOnDocInteraction) uni.$off('awd:doc-interaction', this._collabOnDocInteraction)
+      this._collabOnFocus = null
+      this._collabOnDocInteraction = null
     },
     stopCollabPolling({ dispose = false } = {}) {
       if (dispose) this._collabDisposed = true
       this._collabStateLifecycle = (this._collabStateLifecycle || 0) + 1
       this._collabStateSeq = (this._collabStateSeq || 0) + 1
       if (this._collabPollTimer) { clearInterval(this._collabPollTimer); this._collabPollTimer = null }
+      if (typeof this.stopCollabFreshness === 'function') this.stopCollabFreshness()
     },
     openCollab(tab) {
       this.collabInitialTab = typeof tab === 'string' ? tab : 'casefile'
@@ -5545,7 +5750,47 @@ export default {
     // 交稿引导（dev-board#645）。页面这边只管开窗：弹窗打开后自己走一次联网的状态
     // 重读（三步清单上的勾选直接决定律师下一步点哪个按钮，用一份几分钟没刷新的快照
     // 渲染它是在骗人），读完再经 changed 事件把页面这份也带新。
+    openBackupConsent() {
+      uni.$emit(OPEN_BACKUP_CONSENT_EVENT)
+    },
+    // C11：没联网时交稿 → 记下「待交」，联网后自动交一次
+    onSubmitQueuedOffline() {
+      this.collabRetryQueued = true
+      try { uni.setStorageSync('awd_collab_retry_' + this.projectId, '1') } catch (e) { /* storage unavailable */ }
+    },
+    loadQueuedSubmit() {
+      try { this.collabRetryQueued = uni.getStorageSync('awd_collab_retry_' + this.projectId) === '1' } catch (e) { this.collabRetryQueued = false }
+    },
+    clearQueuedSubmit() {
+      this.collabRetryQueued = false
+      try { uni.removeStorageSync('awd_collab_retry_' + this.projectId) } catch (e) { /* storage unavailable */ }
+    },
+    async retryQueuedSubmit() {
+      const c = this.collabCloud || {}
+      if (!this.collabRetryQueued || this._collabRetrying || c.offline || c.removed || c.merging) return
+      if (!c.pendingUpload || this.collabMemberBlocked) { this.clearQueuedSubmit(); return }
+      // 只试一次：先清标志再交，失败也不在这里循环（律师点交稿仍可再试）
+      this._collabRetrying = true
+      this.clearQueuedSubmit()
+      try {
+        const res = await uploadToCloud(this.projectId)
+        const d = (res && res.data) || {}
+        if (d.status === 'UPLOADED') uni.showToast({ title: this.$t('workbench.queuedSubmitDone'), icon: 'none' })
+        else if (d.status === 'CONFLICT') this.onCollabConflict()
+        else if (d.message) uni.showToast({ title: d.message, icon: 'none' })
+      } catch (e) {
+        if (!showLargeFileBackupBlock(e, (k) => this.$t(k))) uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
+      } finally {
+        this._collabRetrying = false
+        this.fetchCollabState()
+      }
+    },
     openSubmitGuide() {
+      // C8：只读成员 / 已被移出：不走交稿清单（三步走完才被拒，律师会以为改动交上去了）
+      if (this.collabMemberBlocked) {
+        uni.showToast({ title: this.collabMemberBarText, icon: 'none', duration: 4000 })
+        return
+      }
       this.submitGuideMode = 'guide'
       this.submitGuideVisible = true
     },
@@ -5565,9 +5810,15 @@ export default {
     // 定时器根本没起过；律师随后在抽屉里点「放进团队案件库」，chip 就此定格在这一刻，
     // 同事再交多少稿也不会刷新——假绿灯比不显示更糟（口径见 fetchCollabState 的注释）。
     // startCollabPolling 自带 _collabPollTimer 幂等守卫，每次动作后都调一遍是安全的。
-    onCollabChanged() {
+    onCollabChanged(payload) {
       const lifecycle = this._collabStateLifecycle || 0
-      this.fetchCollabState().then(() => {
+      // C10：协作抽屉「刷新状态」刚联网核对过，直接用它的结果（再读本地快照会把它盖掉）
+      if (payload && payload.cloud) {
+        this.collabCloud = payload.cloud
+        this.collabCheckedAt = Date.now()
+        this.collabNow = this.collabCheckedAt
+      }
+      ;(payload && payload.cloud ? Promise.resolve() : this.fetchCollabState()).then(() => {
         if (this._collabDisposed || lifecycle !== (this._collabStateLifecycle || 0)) return
         if (this.collabLinked) this.startCollabPolling()
       })
@@ -5795,7 +6046,13 @@ export default {
           if (this.ddCloudTrack && !this.isClientView) {
             const projectId = this.projectId
             const notices = await getDdNotifications(projectId)
-            if (!this._ddClientPollStopped && String(projectId) === String(this.projectId)) this.ddLawyerNotifications = (notices || []).filter(notice => !notice.readAt)
+            if (!this._ddClientPollStopped && String(projectId) === String(this.projectId)) {
+              const unread = (notices || []).filter(notice => !notice.readAt)
+              this.ddLawyerNotifications = unread
+              // C21: a client's submission reloads the open checklist tab and the list counts.
+              const signals = ddRequestSignals(this.ddRequestSignals, unread)
+              if (signals !== this.ddRequestSignals) { this.ddRequestSignals = signals; this.$refs.ddFilesPanel?.fetchRequests() }
+            }
           } else this.ddLawyerNotifications = []
         }
       } catch { /* The workspace keeps its own actionable connection errors. */ }
@@ -6302,16 +6559,34 @@ export default {
     setupResponsiveListener() {
       if (typeof window === 'undefined') return
       if (this._windowResizeHandler) return
+      // Q28：rail 放得下几个插件图标（窗口高度变了重量）
+      if (typeof ResizeObserver !== 'undefined') {
+        this._railFitObserver = new ResizeObserver(() => this.measureRailFit())
+        this.$nextTick(() => { const el = this.$el && this.$el.querySelector && this.$el.querySelector('.rail-tools'); if (el) this._railFitObserver.observe(el) })
+      }
       this._windowResizeHandler = () => this.handleResponsiveResize()
       window.addEventListener('resize', this._windowResizeHandler, { passive: true })
       this.$nextTick(() => this.handleResponsiveResize())
     },
     teardownResponsiveListener() {
       if (typeof window === 'undefined') return
+      if (this._railFitObserver) { this._railFitObserver.disconnect(); this._railFitObserver = null }
       if (this._windowResizeHandler) {
         window.removeEventListener('resize', this._windowResizeHandler)
         this._windowResizeHandler = null
       }
+    },
+    // 一格的高度量第一个图标（含 margin-bottom）；放得下 n 格就显示 n 个，不够时最后一格让给「更多」
+    measureRailFit() {
+      const el = this.$el && this.$el.querySelector && this.$el.querySelector('.rail-tools')
+      const first = el && el.querySelector('.rail-btn')
+      if (!el || !first || !el.clientHeight) return
+      const style = window.getComputedStyle(first)
+      const pitch = first.offsetHeight + (parseFloat(style.marginBottom) || 0)
+      if (!pitch) return
+      const fit = Math.floor((el.clientHeight + (parseFloat(style.marginBottom) || 0)) / pitch)
+      const total = (this.LEFT_SIDEBAR_PLUGINS || []).length
+      this.railFitCount = fit >= total ? Infinity : Math.max(1, fit)
     },
     handleResponsiveResize() {
       if (typeof window === 'undefined') return
@@ -6319,14 +6594,10 @@ export default {
       const compact = viewportWidth <= 1360
       this.isCompactLayout = compact
       if (this.resizing?.active) return
-      const sidebar = this.$refs.sidebarLeft?.$el || this.$refs.sidebarLeft
-      const layout = sidebar?.parentElement
-      if (!layout?.clientWidth) return
-      const rail = layout.querySelector('.left-rail')
-      const fit = fitPanelWidths(layout.clientWidth, rail?.offsetWidth || 0,
-        this.sidebarCollapsed ? 0 : this.sidebarWidth, this.showAiPanel ? this.aiPanelWidth : 0)
-      if (!this.sidebarCollapsed) this.sidebarWidth = fit.left
-      if (this.showAiPanel) this.aiPanelWidth = fit.right
+      // 窄窗口：文档列保住 480，左栏、AI 面板按序让位（Q28，见 narrowLayout.js）
+      const geometry = this.narrowLayoutGeometry()
+      if (!geometry) return
+      this.applyNarrowLayout(geometry)
     },
     // 左栏面板切换方法组已外置 → ./panelSwitching.js（Phase 1）
     // OCR 采集与浮层生命周期方法组已外置（Phase 3c） → ./ocrCapture.js
@@ -6764,6 +7035,7 @@ export default {
           // 先确认是否已关联案件库，否则首次加载会只留下本机成员。
           this.loadProjectMembers()
           if (!this.collabLinked) return
+          if (typeof this.loadQueuedSubmit === 'function') this.loadQueuedSubmit()
           this.fetchCollabState({ online: true })
           this.startCollabPolling()
         })
@@ -6812,7 +7084,8 @@ export default {
         this.localProjectMembersLoaded = true
         // 本机名单先落地；云端网络结果只更新展示，不改变本机权限快照。
         this.projectMembers = local
-        if (!(this.collabCloud && this.collabCloud.linked)) return
+        this._membersMissingCloud = !(this.collabCloud && this.collabCloud.linked)
+        if (this._membersMissingCloud) return
         try {
             const res = await getCloudMembers(projectId)
             if (!current()) return

@@ -936,6 +936,10 @@
           <PersonalTodosPanel />
         </scroll-view>
         <scroll-view v-else-if="activeNav === 'personal_settings'" scroll-y class="config-scroll">
+          <!-- Q9：「个人资料与登录」页没登录时，第一屏先给登录，而不是语言和退出设置 -->
+          <SettingsSection v-if="isDesktop && accountLoadState === 'ready' && !account.connected" :title="$t('admin.signInCardTitle')" :description="$t('admin.signInCardText')">
+            <button class="btn-primary account-login-btn" @tap="onLoginAccount">{{ $t('account.accountEntry.loginButton') }}</button>
+          </SettingsSection>
           <PersonalSettingsPanel />
         </scroll-view>
         <scroll-view v-else-if="activeNav === 'language'" scroll-y class="config-scroll">
@@ -1677,6 +1681,13 @@ export default {
 
   },
   watch: {
+    // Q9：「个人资料与登录」顶部的登录卡要知道是否已登录；账户状态原本只在进「账户与余额」时才拉
+    activeNav: {
+      immediate: true,
+      handler(key) {
+        if (key === 'personal_settings' && this.isDesktop && this.accountLoadState !== 'ready' && typeof this.loadAccount === 'function') this.loadAccount()
+      },
+    },
     /*
      * 工作台里的「系统设置」标签是单例：已经开着时再从别处带深链进来（顶栏
      * 「已连接账户」chip → nav=account、网关错误提示 → nav=platform&service=ocr），

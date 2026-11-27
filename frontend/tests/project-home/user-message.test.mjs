@@ -98,3 +98,17 @@ test('toast text: a localized backend business message is kept; raw text never i
 test('toast text: a bare uni.request failure is a connection problem, not "that didn\'t work"', () => {
   assert.equal(errorTextFor({ errMsg: 'request:fail' }, 'Load failed', tr, { desktop: true }), 'T:errors.localServiceDown')
 })
+
+// Q21 (firstday-1125): an account-class AI failure that signing in again fixes used to show the
+// generic 「操作没有完成。请重试」 with the real reason only under Details and no way to fix it.
+test('Q21: AI account failures that a fresh sign-in fixes get their own message and a Sign In Again action', async () => {
+  const { toUserMessage } = await import('../../src/utils/userMessage.js')
+  for (const kind of ['MALFORMED', 'UNAUTHORIZED']) {
+    const m = toUserMessage('平台 AI 通道配置与当前站点不符，请刷新账户连接', { accountKind: kind })
+    assert.equal(m.key, 'accountReconnect', kind)
+    assert.equal(m.action, 'reconnect')
+    assert.match(m.detail, /请刷新账户连接/, 'the raw reason stays under Details')
+  }
+  assert.notEqual(toUserMessage('x', { accountKind: 'NETWORK' }).key, 'accountReconnect', 'a network failure is not a sign-in problem')
+  assert.notEqual(toUserMessage('x', { accountKind: 'CONFLICT' }).key, 'accountReconnect', 'no AI quota assigned is not fixed by signing in')
+})

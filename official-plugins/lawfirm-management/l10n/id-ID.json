@@ -838,5 +838,17 @@
   "cloud.purgeConfirmOk": "Matikan dan hapus",
   "cloud.purgeCancel": "Batal",
   "billing.groupNoRate": " ({n} entri tanpa tarif, tidak dihitung)",
-  "billing.groupSummaryNoRate": "{n} entri, {pending} perlu ditinjau; {h} jam dapat ditagih, tarif belum diatur"
+  "billing.groupSummaryNoRate": "{n} entri, {pending} perlu ditinjau; {h} jam dapat ditagih, tarif belum diatur",
+  "panel.t.cloudPendingLawyer": "Menunggu pengacara terkait",
+  "panel.t.cloudPendingCommittee": "Menunggu tinjauan akhir komite",
+  "panel.t.cloudApproved": "Disetujui",
+  "panel.t.cloudRejected": "Ditolak",
+  "panel.t.cloudSynced": "Progres lokal diperbarui sesuai keputusan konflik di cloud kantor.",
+  "panel.t.cloudLinked": "Tertaut ke pemeriksaan konflik cloud kantor: {0}",
+  "panel.t.cloudSync": "Ambil keputusan akhir cloud",
+  "panel.t.cloudLinkPick": "Tautkan pemeriksaan konflik cloud kantor",
+  "panel.t.cloudNone": "Belum ada catatan konflik di cloud kantor yang dapat Anda tautkan.",
+  "panel.t.cloudLinkConfirm": "Tautkan dan ambil keputusan",
+  "panel.t.cloudLinkHint": "Perkara ini sudah diperiksa konfliknya di cloud kantor? Tautkan agar progres lokal mengikuti keputusan akhir cloud.",
+  "access.commentRequired": "Isi komentar tinjauan Anda terlebih dahulu, lalu setujui atau tolak."
 }

@@ -161,3 +161,13 @@ test('引导弹窗开窗时先把三个按钮压住，等自己那次重读落�
     '重读落地后才放开按钮',
   )
 })
+
+// C13 (lane C S2): renames/adds/deletes made in Finder leave changedCount > 0 with no work session.
+// 交稿 must first save them as a version (guide step 1), not push nothing while saying 一致.
+test('C13: unsaved Finder changes (no work session) need the guide before 交稿', async () => {
+  const { submitNeedsGuide } = await import('../../src/utils/submitGuide.js')
+  const readStatus = async () => ({ data: { working: false, changedCount: 4 } })
+  assert.equal(await submitNeedsGuide({ projectId: 1, working: false, cloud: {}, readStatus }), true)
+  const clean = async () => ({ data: { working: false, changedCount: 0 } })
+  assert.equal(await submitNeedsGuide({ projectId: 1, working: false, cloud: {}, readStatus: clean }), false)
+})

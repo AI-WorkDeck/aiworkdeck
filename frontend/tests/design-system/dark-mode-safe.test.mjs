@@ -14,8 +14,21 @@ const FILES = [
 const read = (f) => readFileSync(fileURLToPath(new URL('../../src/' + f, import.meta.url)), 'utf8')
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g
 
+// Cut every open…close span by scanning with indexOf; no regex, so nothing can re-form (CodeQL #376/#377).
+function cut(text, open, close) {
+  let out = ''
+  let i = 0
+  for (let j; (j = text.indexOf(open, i)) !== -1;) {
+    out += text.slice(i, j)
+    const k = text.indexOf(close, j + open.length)
+    if (k === -1) return out
+    i = k + close.length
+  }
+  return out + text.slice(i)
+}
+
 function rawColors(src) {
-  const code = src.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const code = cut(cut(src, '<!--', '-->'), '/*', '*/').replace(/^\s*\/\/.*$/gm, '')
   const noFallbacks = code.replace(/var\(--awd-[\w-]+,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))\s*\)/g, '')
   return noFallbacks.match(COLOR) || []
 }

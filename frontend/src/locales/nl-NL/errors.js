@@ -12,6 +12,7 @@ export default {
   "rateLimited": "Er zijn op dit moment te veel verzoeken, dus de modelservice vertraagt. Wacht een minuut en probeer het opnieuw.",
   "modelUnavailable": "Het gekozen model is momenteel niet beschikbaar. Probeer het later opnieuw of kies onder het berichtvak een ander model.",
   "modelKeyInvalid": "De modelaanbieder heeft de sleutel geweigerd die dit apparaat nog gebruikt uit een oudere instelling. Log in om in plaats daarvan de AI van AI WorkDeck te gebruiken.",
+  "accountReconnect": "De verbinding met je AI-account moet worden vernieuwd, dus dit verzoek is niet verstuurd. Kies \"Opnieuw aanmelden\" en probeer het daarna opnieuw; er gaat niets verloren.",
   "streamInterrupted": "Het antwoord is afgebroken; wat tot nu toe binnenkwam blijft hierboven staan. Kies “Opnieuw proberen” om het opnieuw te genereren.",
   "streamInterruptedResumable": "Het antwoord is afgebroken; wat tot nu toe binnenkwam blijft hierboven staan. Kies “Doorgaan” om verder te gaan waar het stopte, of “Opnieuw proberen” om opnieuw te beginnen.",
   "streamInterruptedTwice": "Het is opnieuw afgebroken. Kies “Opnieuw proberen” om het hele antwoord opnieuw te genereren.",
@@ -31,6 +32,7 @@ export default {
     "continueTooltip": "Ga verder waar het stopte zonder opnieuw te genereren wat er al staat",
     "refresh": "Vernieuwen",
     "signIn": "Inloggen",
+    "reconnect": "Opnieuw aanmelden",
     "feedback": "Meldingen"
   }
 }

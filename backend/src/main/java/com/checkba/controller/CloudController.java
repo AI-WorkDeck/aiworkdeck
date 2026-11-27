@@ -35,6 +35,10 @@ public class CloudController {
             org.slf4j.LoggerFactory.getLogger(CloudController.class);
 
     private final CloudSyncService cloudSyncService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.version.cloud.ProjectObjectSyncService objectSync;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.ProjectFileService projectFileService;
     private final com.checkba.version.OfficialCloudService officialCloudService;
     private final ProjectMemberService projectMemberService;
     private final UserService userService;
@@ -199,6 +203,35 @@ public class CloudController {
         return ok(Map.of());
     }
 
+    /**
+     * C12: local-only files of the case for the file tree: {fileId?, path, name, mine, sharedBy?}. The sharer's own
+     * show 「仅在本机（未共享）」; colleagues' show 「仅在 X 的电脑上」 and can't be opened (no bytes here).
+     */
+    @GetMapping("/projects/{projectId}/local-only")
+    public ResponseEntity<Map<String, Object>> localOnly(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireMemberNonClient(projectId, sessionId);
+        List<Map<String, Object>> entries = objectSync == null ? List.of() : objectSync.localOnlyEntries(projectId);
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (Map<String, Object> e : entries) {
+            Map<String, Object> row = new java.util.HashMap<>(e);
+            if (projectFileService != null)
+                projectFileService.findByRelativePath(projectId, (String) e.get("path")).ifPresent(f -> row.put("fileId", f.getId()));
+            out.add(row);
+        }
+        return ok(Map.of("files", out));
+    }
+
+    /** Large-file transfer progress for 交稿/取回; reads a counter only, never the repository lock. */
+    @GetMapping("/projects/{projectId}/transfer")
+    public ResponseEntity<Map<String, Object>> transfer(
+            @PathVariable Long projectId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireMemberNonClient(projectId, sessionId);
+        return ok(objectSync == null ? Map.of("active", false) : objectSync.transferProgress(projectId));
+    }
+
     @GetMapping("/projects/{projectId}/status")
     public ResponseEntity<Map<String, Object>> status(
             @PathVariable Long projectId,
@@ -225,7 +258,9 @@ public class CloudController {
         return ok(Map.of(
                 "status", r.status().name(),
                 "message", r.message() == null ? "" : r.message(),
-                "affectedFileIds", r.affectedFileIds() == null ? List.of() : r.affectedFileIds()));
+                "affectedFileIds", r.affectedFileIds() == null ? List.of() : r.affectedFileIds(),
+                // C12: files this computer keeps local-only (over the free allowance, no backup): named in the result
+                "localOnlyFiles", objectSync == null ? List.of() : objectSync.localOnlyMine(projectId)));
     }
 
     @PostMapping("/projects/{projectId}/update")
@@ -307,6 +342,19 @@ public class CloudController {
         String identifier = body != null && body.get("identifier") != null
                 ? requireText(body, "identifier") : requireText(body, "username");
         cloudSyncService.proxyMembers(projectId, identifier, role);
+        return ok(Map.of());
+    }
+
+    /** C9：改案件库上一位参与人的角色（body {role}）。 */
+    @PutMapping("/projects/{projectId}/members/{remoteUserId}/role")
+    public ResponseEntity<Map<String, Object>> changeMemberRole(
+            @PathVariable Long projectId,
+            @PathVariable Long remoteUserId,
+            @RequestBody(required = false) Map<String, Object> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        requireWriteMember(projectId, sessionId);
+        String role = body != null && body.get("role") instanceof String r ? r : null;
+        cloudSyncService.proxyMemberRole(projectId, remoteUserId, role);
         return ok(Map.of());
     }
 

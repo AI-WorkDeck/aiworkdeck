@@ -284,6 +284,7 @@ import {
   LOCALE_REGISTRY,
   SYSTEM_LANGUAGE_MODE,
 } from './lib/i18n.js'
+import { errorText } from './lib/errorText.js'
 import { displayProjectName } from './lib/projectName.js'
 import { rechargeUrl, openExternal } from './lib/site.js'
 import { isQuotaLow, quotaParts } from './lib/quota.js'
@@ -406,7 +407,7 @@ async function bindRemoteProject(deviceId, projectKey) {
     onProjectChange(String(link.projectId))
     showArchiveHint(t('archiveBoundHint', { name: name || String(link.projectId) }), false)
   } catch (e) {
-    showArchiveHint((e && e.message) || t('archiveLinkUnsupported'), true)
+    showArchiveHint(errorText(e, t('archiveLinkUnsupported')), true)
   }
 }
 
@@ -616,7 +617,7 @@ async function confirmCreateProject() {
     onProjectChange(String(created.id))
     newProjectOpen.value = false
   } catch (e) {
-    newProjectError.value = (e && e.message) || t('createProjectFailed')
+    newProjectError.value = errorText(e, t('createProjectFailed'))
   } finally {
     creatingProject.value = false
   }

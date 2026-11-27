@@ -67,6 +67,7 @@ class DdWorkflowServiceTest {
     @MockBean ProjectFileAccessService access;
     @MockBean ProjectFileService fileService;
     @MockBean StorageServiceFactory storageFactory;
+    @MockBean com.checkba.version.WorkSessionService sessions;
     StorageService storage;
     Map<String, byte[]> objects;
     long projectId, requestId, itemId;
@@ -90,7 +91,7 @@ class DdWorkflowServiceTest {
             String key = i.getArgument(0); objects.put(key, ((InputStream) i.getArgument(1)).readAllBytes()); return key;
         }).when(storage).save(anyString(), any());
         doAnswer(i -> { objects.remove(i.getArgument(0)); return null; }).when(storage).delete(anyString());
-        when(fileService.createFolder(anyLong(), any(), anyString(), anyLong())).thenAnswer(i -> {
+        when(fileService.createFolderQuietly(anyLong(), any(), anyString(), anyLong())).thenAnswer(i -> {
             ProjectFile folder = new ProjectFile(); folder.setProjectId(i.getArgument(0)); folder.setParentId(i.getArgument(1));
             folder.setName(i.getArgument(2)); folder.setUserId(i.getArgument(3)); folder.setIsFolder(true); folder.setSortOrder(0);
             return files.save(folder);
@@ -453,4 +454,29 @@ class DdWorkflowServiceTest {
         assertEquals(2, submissions.findById(latest.getCurrentSubmissionId()).orElseThrow().getVersion());
         assertEquals(2, latest.getRevision()); assertEquals(2, objects.size());
     }
+
+    /** C23: a portal upload lands where the tree shows it, under its real name, and becomes its own version. */
+    @Test void portalSubmissionLandsUnderItsRealNameAndIsVersionedOnItsOwn() throws Exception {
+        publish(false);
+        submit("c23-a", true);
+        String path = "客户提供的文件/第一轮清单/营业执照.pdf";
+        assertTrue(objects.containsKey("projects/" + projectId + "/" + path), "no UUID, no client_uploads/: " + objects.keySet());
+        assertTrue(files.findAll().stream().anyMatch(f -> "营业执照.pdf".equals(f.getName())), "tree name = disk name");
+        verify(fileService, never()).createFolder(anyLong(), any(), anyString(), anyLong());
+        verify(sessions).recordSubmission(eq(projectId), eq(List.of(path)), any(), eq("营业执照"), eq(true));
+
+        // A second file of the same name in the same folder: 「 (2)」, never an overwrite.
+        submit("c23-b", true);
+        assertTrue(objects.containsKey("projects/" + projectId + "/客户提供的文件/第一轮清单/营业执照 (2).pdf"), objects.keySet().toString());
+        verify(sessions).recordSubmission(eq(projectId), eq(List.of("客户提供的文件/第一轮清单/营业执照 (2).pdf")), any(), eq("营业执照"), eq(true));
+    }
+
+    @Test void pathSegmentsNeverEscapeTheFolder() {
+        assertEquals("a_b", DdService.pathSegment("a/b"));
+        assertEquals("_", DdService.pathSegment(".."));
+        assertEquals("x", DdService.pathSegment("..x"));
+        assertEquals("清单_1_", DdService.pathSegment("清单:1?"));
+        assertEquals("_", DdService.pathSegment(null));
+    }
 }
+
