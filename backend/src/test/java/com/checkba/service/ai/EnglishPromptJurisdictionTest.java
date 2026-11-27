@@ -23,6 +23,8 @@ class EnglishPromptJurisdictionTest {
         assertTrue(identity.contains("jurisdiction-neutral"));
         assertTrue(identity.contains("When you describe what you can do"), "self-description rule sits in the identity section");
         assertTrue(identity.contains("Do not name a particular country's law as your specialty or say you research PRC law"));
+        assertTrue(identity.contains("cover mainland China law only"), "accurate about what the law tools cover");
+        assertTrue(identity.contains("When a matter is governed by PRC law, use the law tools as usual"));
         assertFalse(identity.contains("Mainland China Law"), "the English identity never claims a PRC specialty");
     }
 }
