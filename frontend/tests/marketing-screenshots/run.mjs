@@ -334,7 +334,7 @@ const SHOTS = [
     async prepare(page, { base, projectId }) {
       await openWorkbench(page, base, projectId)
       await clickTitle(page, '客户协作')
-      await waitText(page, '律师发送的邀请码')
+      await waitText(page, '律师发送的访问码')
       // The join form renders before the connection list has loaded; until it has, a 「正在加载」 line sits
       // under it, so the shot depended on timing (POLISH X52: 14086 vs 15846 px on the same code).
       await page.waitForFunction(() => {
