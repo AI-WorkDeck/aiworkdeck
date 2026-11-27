@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Экспорт в Word (с сохранением макета)",
   "ocrSearchablePdf": "Создать PDF с возможностью поиска",
   "ocrLayoutSuffix": "-макет OCR",
-  "ocrSearchableSuffix": "-с поиском"
+  "ocrSearchableSuffix": "-с поиском",
+  "localOnlyMine": "Только на этом компьютере (не общий)",
+  "localOnlyMineTip": "Превышена бесплатная квота на общий доступ: файл остаётся на вашем компьютере, коллеги видят заглушку. Включите облачное резервирование файлов и сдайте снова, чтобы поделиться.",
+  "localOnlyOther": "Только на компьютере {name}",
+  "localOnlyOtherUnknown": "Только на компьютере коллеги",
+  "localOnlyOtherTip": "Этот файл есть только на компьютере {name} и не был передан в библиотеку дел. Попросите {name} включить облачное резервирование и сдать снова.",
+  "localOnlyColleague": "коллеги",
+  "localOnlyOk": "ОК",
 }

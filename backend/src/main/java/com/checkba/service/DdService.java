@@ -66,6 +66,29 @@ public class DdService {
      */
     private final ConcurrentHashMap<String, Object> ensureFolderLocks = new ConcurrentHashMap<>();
 
+    @Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.version.WorkSessionService> workSessions;
+    @Autowired(required = false)
+    private com.checkba.repository.UserRepository users;
+
+    /** C23：路径段（文件夹名来自清单，律师可编辑）：去掉分隔符与控制字符，不以点开头。 */
+    static String pathSegment(String name) {
+        String s = name == null ? "" : name.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").trim();
+        while (s.startsWith(".")) s = s.substring(1);
+        return s.isEmpty() ? "_" : s;
+    }
+
+    private String submitterName(Long userId) {
+        if (users == null || userId == null) return null;
+        return users.findById(userId).map(u -> u.getDisplayName() != null && !u.getDisplayName().isBlank()
+                ? u.getDisplayName() : u.getUsername()).orElse(null);
+    }
+
+    private boolean isClientUser(Long userId) {
+        if (users == null || userId == null) return true;
+        return users.findById(userId).map(u -> "CLIENT".equalsIgnoreCase(u.getRole())).orElse(true);
+    }
+
     /**
      * 获取项目的尽调请求列表
      */
@@ -238,9 +261,13 @@ public class DdService {
 
         // 1. Root: "客户提供的文件"
         ProjectFile clientFolder = ensureFolder(projectId, null, "客户提供的文件", userId);
+        // C23：磁盘路径与树上的位置一致（原来是 client_uploads/<uuid>_名字，同事 Finder 里看到的与软件里的对不上）
+        List<String> segments = new ArrayList<>();
+        segments.add(pathSegment(clientFolder.getName()));
 
         // 2. Request Folder: "{RequestName}"
         ProjectFile requestFolder = ensureFolder(projectId, clientFolder.getId(), request.getName(), userId);
+        segments.add(pathSegment(requestFolder.getName()));
 
         // 3. Mirror Hierarchy: Traverse up to find path
         List<DdItem> hierarchy = new ArrayList<>();
@@ -279,6 +306,7 @@ public class DdService {
             for (int i = 0; i < hierarchy.size() - 1; i++) {
                 DdItem ancestor = hierarchy.get(i);
                 targetFolder = ensureFolder(projectId, targetFolder.getId(), ancestor.getTitle(), userId);
+                segments.add(pathSegment(targetFolder.getName()));
             }
         }
         
@@ -295,20 +323,29 @@ public class DdService {
         String rawName = (originalFilename == null) ? "" : originalFilename.replace("\\", "/");
         int slashIdx = rawName.lastIndexOf('/');
         if (slashIdx >= 0) rawName = rawName.substring(slashIdx + 1);
-        rawName = rawName.replaceAll("[^A-Za-z0-9._\\u4e00-\\u9fa5-]", "_");
+        rawName = rawName.replaceAll("[^A-Za-z0-9._ ()（）\\u4e00-\\u9fa5-]", "_").trim();
+        while (rawName.startsWith(".")) rawName = rawName.substring(1);
         if (!StringUtils.hasText(rawName) || ".".equals(rawName) || "..".equals(rawName)) {
             rawName = "upload";
         }
-        String fileName = UUID.randomUUID() + "_" + truncateToColumnWidth(rawName, 256);
-
-        String storagePath = "projects/" + projectId + "/client_uploads/" + fileName;
+        // C23：真名，不加 UUID；同一文件夹里重名时加「 (2)」「 (3)」
+        String folderPath = String.join("/", segments);
+        String fileName = truncateToColumnWidth(rawName, 256);
+        for (int n = 2; storageServiceFactory.getStorageService().exists("projects/" + projectId + "/" + folderPath + "/" + fileName)
+                || projectFileRepository.findByProjectIdAndParentIdAndName(projectId, targetFolder.getId(), fileName).isPresent(); n++) {
+            String ext = StringUtils.getFilenameExtension(rawName);
+            String base = ext == null ? rawName : rawName.substring(0, rawName.length() - ext.length() - 1);
+            fileName = truncateToColumnWidth(base + " (" + n + ")" + (ext == null ? "" : "." + ext), 256);
+        }
+        String relativePath = folderPath + "/" + fileName;
+        String storagePath = "projects/" + projectId + "/" + relativePath;
 
         // 展示名同样要落进 ProjectFile.name 的 256 字符列宽以内：此前这里直接用未清洗的
         // originalFilename，客户端传一个超长文件名就在落库时炸出
         // DataIntegrityViolationException——而这一步已经排在物理写盘之后，事务回滚也
         // 救不回已经落盘的字节，孤儿对象永久留在存储里（存储 key 带时间戳，永不覆盖，
         // 重试一次多漏一个）。
-        String displayName = truncateToColumnWidth(originalFilename, 256);
+        String displayName = fileName; // C23：树上的名字 = 磁盘上的名字
 
         try {
             // A storage failure may leave a partial object too; clean it up with DB failures.
@@ -340,6 +377,18 @@ public class DdService {
                                 try { storageServiceFactory.getStorageService().delete(storagePath); }
                                 catch (Exception ex) { log.warn("DD rollback storage cleanup failed: {}", storagePath, ex); }
                             }
+                        }
+                    });
+                // C23：落库提交之后单独存一版（作者是提交人，绝不夹带别的改动，不开工作段）
+                final String submitter = submitterName(userId);
+                final boolean byClient = isClientUser(userId);
+                final String itemTitle = item.getTitle();
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() {
+                            var sessions = workSessions == null ? null : workSessions.getIfAvailable();
+                            if (sessions != null)
+                                sessions.recordSubmission(projectId, List.of(relativePath), submitter, itemTitle, byClient);
                         }
                     });
             }
@@ -386,7 +435,7 @@ public class DdService {
         if (folderOpt.isPresent()) {
             return folderOpt.get();
         } else {
-            return projectFileService.createFolder(projectId, parentId, name, userId);
+            return projectFileService.createFolderQuietly(projectId, parentId, name, userId);
         }
     }
 

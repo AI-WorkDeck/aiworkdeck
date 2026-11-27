@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Ekspor Word (pertahankan tata letak)",
   "ocrSearchablePdf": "Buat PDF yang dapat dicari",
   "ocrLayoutSuffix": "-tata letak OCR",
-  "ocrSearchableSuffix": "-dapat dicari"
+  "ocrSearchableSuffix": "-dapat dicari",
+  "localOnlyMine": "Hanya di komputer ini (tidak dibagikan)",
+  "localOnlyMineTip": "Melebihi kuota berbagi gratis, jadi file ini tetap di komputer Anda; rekan melihat placeholder. Aktifkan cadangan file cloud lalu ajukan lagi untuk membagikannya.",
+  "localOnlyOther": "Hanya di komputer {name}",
+  "localOnlyOtherUnknown": "Hanya di komputer rekan",
+  "localOnlyOtherTip": "File ini hanya ada di komputer {name} dan tidak dibagikan ke pustaka kasus. Minta {name} mengaktifkan cadangan file cloud lalu mengajukan lagi.",
+  "localOnlyColleague": "rekan",
+  "localOnlyOk": "Oke",
 }

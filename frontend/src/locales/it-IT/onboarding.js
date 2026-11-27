@@ -43,7 +43,7 @@ export default {
     "compatHint": "Inserisci i caratteri dell'immagine, quindi richiedi il codice SMS o e-mail. Carica una nuova immagine dopo un tentativo errato o scaduto.", "compatHintEmail": "Inserisci i caratteri dell’immagine, poi richiedi il codice via email. Carica una nuova immagine dopo un tentativo errato o scaduto.",
     "compatImage": "Immagine di verifica di sicurezza",
     "compatAnswer": "6 caratteri dall'immagine",
-    "compatAnswerFirst": "Carica prima un'immagine di verifica e inserisci i suoi 6 caratteri",
+    "compatAnswerFirst": "Carica prima un'immagine di verifica e inserisci i suoi 6 caratteri", "compatAuto": "La verifica di sicurezza non si è caricata, quindi siamo passati alla verifica compatibile: inserisci i 6 caratteri dell’immagine, poi richiedi di nuovo il codice.",
     "compatContactFirst": "Inserisci prima il tuo numero di telefono o indirizzo e-mail",
     "accountNetworkFailed": "Impossibile connettersi al servizio account. Controlla la connessione e riprova.",
     "captchaFailed": "Completa il controllo di sicurezza e riprova",

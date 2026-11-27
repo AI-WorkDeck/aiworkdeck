@@ -138,6 +138,8 @@ public class ProjectMemberController {
             // 拒绝理由（Denial 名或 null）：桌面端据此把「未找到」块分三态，各给对的动作按钮。
             // 老客户端没有这个键也照常显示 message，所以服务端可以先上线。
             data.put("reason", lookup.reason());
+            // C9：已经在案卷里时回他的 userId，确认卡上的「改为协作人」据此直接改角色
+            if (lookup.memberUserId() != null) data.put("memberUserId", lookup.memberUserId());
             result.put("code", 0);
             result.put("data", data);
         } catch (IllegalArgumentException e) {
@@ -218,6 +220,29 @@ public class ProjectMemberController {
             result.put("message", e.getMessage());
             return ResponseEntity.ok(result);
         }
+    }
+
+    /** C9：改一位参与人的角色（body {role}: ADMIN | PARTICIPANT | READ_ONLY）。 */
+    @PutMapping("/{projectId}/members/{userId}/role")
+    public Map<String, Object> changeRole(
+            @PathVariable Long projectId,
+            @PathVariable Long userId,
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
+        Long requesterId = AuthController.getUserIdFromSession(sessionId);
+        if (requesterId == null) {
+            throw new IllegalArgumentException("未登录");
+        }
+        Map<String, Object> result = new HashMap<>();
+        try {
+            projectMemberService.changeRole(projectId, userId, body == null ? null : (String) body.get("role"), requesterId);
+            result.put("code", 0);
+            result.put("message", com.checkba.service.LangText.of("已修改角色", "Role changed"));
+        } catch (IllegalArgumentException | ClassCastException e) {
+            result.put("code", 1);
+            result.put("message", e.getMessage());
+        }
+        return result;
     }
 
     @DeleteMapping("/{projectId}/members/{userIdToRemove}")

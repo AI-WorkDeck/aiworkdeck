@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Xuất Word (giữ bố cục)",
   "ocrSearchablePdf": "Tạo PDF có thể tìm kiếm",
   "ocrLayoutSuffix": "-bố cục OCR",
-  "ocrSearchableSuffix": "-có thể tìm kiếm"
+  "ocrSearchableSuffix": "-có thể tìm kiếm",
+  "localOnlyMine": "Chỉ có trên máy này (chưa chia sẻ)",
+  "localOnlyMineTip": "Vượt hạn mức chia sẻ miễn phí nên tệp này chỉ ở trên máy của bạn; đồng nghiệp thấy chỗ giữ chỗ. Bật sao lưu tệp lên đám mây rồi nộp lại để chia sẻ.",
+  "localOnlyOther": "Chỉ có trên máy của {name}",
+  "localOnlyOtherUnknown": "Chỉ có trên máy của đồng nghiệp",
+  "localOnlyOtherTip": "Tệp này chỉ có trên máy của {name} và chưa được chia sẻ lên thư viện hồ sơ. Hãy nhờ {name} bật sao lưu đám mây rồi nộp lại.",
+  "localOnlyColleague": "đồng nghiệp",
+  "localOnlyOk": "Đã hiểu",
 }

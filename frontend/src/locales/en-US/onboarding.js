@@ -47,7 +47,7 @@ export default {
     compatHint: 'Enter the image characters, then request your SMS or email code. Load a new image after an incorrect or expired attempt.', compatHintEmail: 'Enter the image characters, then request your email code. Load a new image after an incorrect or expired attempt.',
     compatImage: 'Security verification image',
     compatAnswer: '6 characters from the image',
-    compatAnswerFirst: 'Load a verification image and enter its 6 characters first',
+    compatAnswerFirst: 'Load a verification image and enter its 6 characters first', compatAuto: 'The security check didn\'t load, so we switched to compatibility verification: enter the 6 characters from the image, then request your code again.',
     compatContactFirst: 'Enter your phone number or email first',
     accountNetworkFailed: 'Could not connect to the account service. Check your connection and retry.',
     captchaFailed: 'Please complete the security check and try again',

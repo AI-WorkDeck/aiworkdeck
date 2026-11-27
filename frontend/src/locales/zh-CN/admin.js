@@ -494,7 +494,7 @@ export default {
   ocrSettingsLoadFailed: '读取失败',
   ocrSettingsSaveFailed: '保存失败',
   "walletRedeemTitle": "兑换码 / 联盟所邀请码",
-  "walletRedeemPlaceholder": "输入兑换码或联盟所邀请码（如 KW-ABNR-2026）",
+  "walletRedeemPlaceholder": "输入兑换码或联盟所邀请码（如 KW-XXXX-2026）",
   "walletRedeemBtn": "兑换 / 绑定",
   "walletRedeemSubmitting": "处理中…",
   "walletRedeemSuccessGift": "兑换成功，已入账 {amount}",

@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "読み込みに失敗しました",
   "ocrSettingsSaveFailed": "保存に失敗しました",
   "walletRedeemTitle": "ギフトコード / Circle 律所招待コード",
-  "walletRedeemPlaceholder": "ギフトコードまたは Circle 律所コードを入力（例：KW-ABNR-2026）",
+  "walletRedeemPlaceholder": "ギフトコードまたは Circle 律所コードを入力（例：KW-XXXX-2026）",
   "walletRedeemBtn": "引き換え / バインド",
   "walletRedeemSubmitting": "処理中…",
   "walletRedeemSuccessGift": "{amount} を引き換えました",

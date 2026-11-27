@@ -321,6 +321,8 @@
 import { localizeSites } from '@/utils/siteNames.js'
 import { activateLicense, getLicenseStatus, getSiteStatus, selectSite, sendAccountLoginCode, loginAccount, getAccountCaptchaConfig, getAccountCaptchaChallenge, accountPasswordOperation, createBqtScanSession, pollBqtScanStatus, getAppLanguageRemote, saveAppLanguageRemote } from '@/services/api.js'
 import { setupCaptcha, teardownCaptcha } from '@/utils/captcha.js'
+import { acquireOrFallback } from '@/utils/captchaFallback.js'
+import { isDesktopHost } from '@/services/host.js'
 import { captchaFailureNotice, toCaptchaFailure } from '@/utils/captchaFailure.js'
 import { openExternalUrl } from '@/utils/externalLink.js'
 import { loadSiteLinks, siteBaseUrl, resetSiteLinks } from '@/utils/siteLinks.js'
@@ -751,7 +753,15 @@ export default {
         }
         const got = this.compatVerification
           ? { token: `local:${this.compatChallenge.id}:${this.compatAnswer.trim()}` }
-          : await this.acquireCaptchaToken()
+          : await acquireOrFallback(() => this.acquireCaptchaToken(),
+            { desktop: isDesktopHost(), provider: (this.captcha && this.captcha.provider) || (this.captchaFailure && this.captchaFailure.provider) })
+        if (got.fallback) {
+          // 桌面端 Turnstile 3 秒内没给出通过的 token：自动换成兼容验证，提示用户输入图片字符后再发
+          this.sendingCode = false
+          await this.loadCompatChallenge()
+          if (this.compatChallenge) this.errorMsg = this.$t('onboarding.unlock.compatAuto')
+          return
+        }
         if (got.failure) {
           this.errorMsg = this.captchaFailureMessage(got.failure)
           this.sendingCode = false

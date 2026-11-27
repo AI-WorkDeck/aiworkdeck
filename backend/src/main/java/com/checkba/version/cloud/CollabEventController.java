@@ -118,8 +118,17 @@ public class CollabEventController {
         m.put("commitCount", e.getCommitCount());
         m.put("target", e.getTargetUserId() == null ? null : person(e.getTargetUserId(), cache));
         m.put("detail", CollabEventService.parseDetail(e.getDetail()));
-        m.put("createdAt", e.getCreatedAt());
+        m.put("createdAt", zoned(e.getCreatedAt()));
         return m;
+    }
+
+    /**
+     * C26（lane C）：事件时间是服务器本地时钟的 LocalDateTime，原来不带时区下发；容器跑在 UTC 时，桌面端
+     * new Date() 把它当成律师本地时间，北京 11-27 凌晨的事件排到了 11-26。带上偏移量下发（ISO-8601），
+     * 各端按自己的时区分日。旧桌面端同样受益（new Date 认偏移量）。
+     */
+    static String zoned(java.time.LocalDateTime at) {
+        return at == null ? null : at.atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime().toString();
     }
 
     private String deviceName(Long tokenId) {

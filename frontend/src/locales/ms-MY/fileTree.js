@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Eksport Word (kekalkan susun atur)",
   "ocrSearchablePdf": "Jana PDF boleh cari",
   "ocrLayoutSuffix": "-susun atur OCR",
-  "ocrSearchableSuffix": "-boleh cari"
+  "ocrSearchableSuffix": "-boleh cari",
+  "localOnlyMine": "Hanya pada komputer ini (tidak dikongsi)",
+  "localOnlyMineTip": "Melebihi kuota perkongsian percuma, jadi fail ini kekal pada komputer anda; rakan sekerja melihat pemegang tempat. Hidupkan sandaran fail awan dan serahkan semula untuk berkongsi.",
+  "localOnlyOther": "Hanya pada komputer {name}",
+  "localOnlyOtherUnknown": "Hanya pada komputer rakan sekerja",
+  "localOnlyOtherTip": "Fail ini hanya ada pada komputer {name} dan tidak dikongsi ke pustaka kes. Minta {name} menghidupkan sandaran awan dan menyerahkan semula.",
+  "localOnlyColleague": "rakan sekerja",
+  "localOnlyOk": "OK",
 }

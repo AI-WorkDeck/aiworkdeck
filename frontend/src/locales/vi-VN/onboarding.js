@@ -44,7 +44,7 @@ export default {
     "compatHint": "Nhập các ký tự trong ảnh rồi nhận mã SMS hoặc email. Hãy tải ảnh mới nếu nhập sai hoặc mã hết hạn.", "compatHintEmail": "Nhập các ký tự trong hình rồi yêu cầu mã qua email. Tải hình mới sau khi nhập sai hoặc hết hạn.",
     "compatImage": "Ảnh xác minh bảo mật",
     "compatAnswer": "6 ký tự trong ảnh",
-    "compatAnswerFirst": "Vui lòng tải ảnh xác minh và nhập 6 ký tự trong ảnh trước",
+    "compatAnswerFirst": "Vui lòng tải ảnh xác minh và nhập 6 ký tự trong ảnh trước", "compatAuto": "Bước kiểm tra bảo mật không tải được nên đã chuyển sang xác minh tương thích: nhập 6 ký tự trong hình rồi yêu cầu mã lại.",
     "compatContactFirst": "Vui lòng nhập số điện thoại hoặc email trước",
     "accountNetworkFailed": "Không thể kết nối tới dịch vụ tài khoản. Vui lòng kiểm tra kết nối mạng và thử lại.",
     "captchaFailed": "Vui lòng hoàn tất bước kiểm tra bảo mật rồi thử lại",
