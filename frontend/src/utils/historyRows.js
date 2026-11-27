@@ -85,7 +85,9 @@ export function eventRowText(t, event, ctx = {}) {
     case 'MEMBER_REMOVED': return t('version.eventMemberRemoved', { who, name: targetText(t, event) })
     case 'MEMBER_ROLE_CHANGED': {
       const roleLabel = typeof ctx.roleLabel === 'function' ? ctx.roleLabel : (r) => s(r)
-      const role = roleLabel(s(event.detail && event.detail.role) || s(event.role))
+      // C9 records {fromRole, toRole}; older events carried {role}
+      const d = event.detail || {}
+      const role = roleLabel(s(d.toRole) || s(d.role) || s(event.role))
       return t('version.eventMemberRoleChanged', { who, name: targetText(t, event), role })
     }
     default: return ''

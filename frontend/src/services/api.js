@@ -4689,6 +4689,11 @@ export function addCloudMember(projectId, identifier, role) {
 
 // 案件库上移出一位参与人（dev-board#1050）：撤销客户访问码与移出同事共用。
 // remoteUserId 是案件库那一侧的 userId（参与人列表 / 签码回执的 clientUserId），不是本机 user.id。
+// C9：改案件库上一位参与人的角色（ADMIN | PARTICIPANT | READ_ONLY）
+export function changeCloudMemberRole(projectId, remoteUserId, role) {
+  return request({ url: `/api/cloud/projects/${projectId}/members/${remoteUserId}/role`, method: 'PUT', data: { role } })
+}
+
 export function removeCloudMember(projectId, remoteUserId) {
   return request({ url: `/api/cloud/projects/${projectId}/members/${remoteUserId}`, method: 'DELETE' })
 }

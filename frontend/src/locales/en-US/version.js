@@ -409,6 +409,11 @@ export default {
   revokedClientCode: 'Access code revoked',
   revokeFailed: 'Failed to revoke',
   removeFromCaseFile: 'Remove',
+  changeRoleTitle: 'Change role',
+  changeRoleReadOnlyConfirm: 'After switching to read-only, {name} can no longer edit or submit. Continue?',
+  roleChanged: '{name} is now {role}',
+  changeRoleFailed: 'Couldn’t change the role',
+  makeCollaborator: 'Make collaborator',
   removeCloudMemberConfirm: 'Remove {name} from this case file? Removing a client also revokes their access code.',
   removedFromCaseFile: 'Removed',
 
