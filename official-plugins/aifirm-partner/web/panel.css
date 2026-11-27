@@ -305,3 +305,25 @@ li.attention::marker { color: var(--awd-danger, #B23B2B); }
 
 /* Free browsing: the membership rules are a plain card under the open requests, not a frosted overlay. */
 .mp-gate-inline { width: auto; box-shadow: none; border-color: var(--awd-border-subtle, #ECEAE3); }
+
+/* Framing calls (US office): slots, AI output, the recording indicator. */
+.framing .slots { display: grid; gap: 6px; margin: 6px 0 10px; }
+.framing .slot, .framing .doc, .framing .check { display: flex; gap: 8px; align-items: flex-start; }
+.framing .docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 8px 0 12px; }
+.framing label { display: grid; gap: 4px; margin: 6px 0; }
+.framing .slot, .framing .doc, .framing label.check { display: flex; }
+.framing textarea { width: 100%; resize: vertical; }
+.framing .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.framing .ai-out { margin-top: 8px; font-size: 13px; line-height: 1.6; }
+.framing .ai-out:empty { display: none; }
+.framing .plan { padding-inline-start: 18px; display: grid; gap: 10px; }
+.framing .rec-indicator { display: inline-flex; align-items: center; gap: 6px; color: var(--awd-danger, #c0392b); font-weight: 600; }
+.framing .rec-indicator i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; animation: fr-pulse 1.2s infinite; }
+.framing .rec-indicator[hidden] { display: none; }
+@keyframes fr-pulse { 50% { opacity: .3; } }
+.framing .awd-btn { width: auto; display: inline-flex; justify-self: start; align-self: start; }
+.framing .awd-btn.awd-btn-primary { justify-self: stretch; justify-content: center; }
+.framing .section > .awd-btn, .framing .call .section > .awd-btn { margin-top: 8px; }
+.framing .call .section { padding-top: 14px; }
+.framing .doc span { font: inherit; font-size: 13px; }
+#mp-framing .split { align-items: start; }
