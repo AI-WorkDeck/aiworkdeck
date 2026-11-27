@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "匯出 Word（保留版式）",
   "ocrSearchablePdf": "產生可搜尋 PDF",
   "ocrLayoutSuffix": "-識別版式",
-  "ocrSearchableSuffix": "-可搜尋"
+  "ocrSearchableSuffix": "-可搜尋",
+  "localOnlyMine": "僅在本機（未共享）",
+  "localOnlyMineTip": "超出了免費共享額度，這份檔案只在你這台電腦上，同事看到的是佔位。開啟檔案雲端備份後再交稿即可共享。",
+  "localOnlyOther": "僅在{name}的電腦上",
+  "localOnlyOtherUnknown": "僅在同事的電腦上",
+  "localOnlyOtherTip": "這份檔案只在{name}的電腦上，沒有共享到案件庫。請{name}開啟檔案雲端備份後再交稿。",
+  "localOnlyColleague": "同事",
+  "localOnlyOk": "知道了",
 }

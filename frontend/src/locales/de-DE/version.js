@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "Öffnen Sie diesen zusammengeführten Entwurf über die Dateiliste.",
   transferUploading: 'Große Dateien werden hochgeladen: {done} / {total} MB. Bei langsamer Verbindung kann das einige Minuten dauern',
   transferDownloading: 'Große Dateien werden heruntergeladen: {done} / {total} MB. Bei langsamer Verbindung kann das einige Minuten dauern',
+  "localOnlyNoticeTitle": "Diese Dateien blieben auf diesem Computer",
+  "localOnlyNoticeBody": "Eingereicht. {files} überschritten das kostenlose Freigabekontingent und bleiben auf Ihrem Computer; Kollegen sehen einen Platzhalter. Aktivieren Sie die Cloud-Dateisicherung und reichen Sie erneut ein, um sie zu teilen.",
+  "localOnlyNoticeMore": " und insgesamt {count}",
+  "localOnlyNoticeAction": "Cloud-Dateisicherung aktivieren",
+  "localOnlyNoticeOk": "OK",
 }

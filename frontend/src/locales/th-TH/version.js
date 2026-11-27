@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "โปรดเปิดดูฉบับร่างที่รวมแล้วนี้จากรายการไฟล์",
   transferUploading: 'กำลังอัปโหลดไฟล์ขนาดใหญ่ {done} / {total} MB หากเครือข่ายช้าอาจใช้เวลาสองสามนาที',
   transferDownloading: 'กำลังดาวน์โหลดไฟล์ขนาดใหญ่ {done} / {total} MB หากเครือข่ายช้าอาจใช้เวลาสองสามนาที',
+  "localOnlyNoticeTitle": "ไฟล์เหล่านี้ยังอยู่ในคอมพิวเตอร์นี้",
+  "localOnlyNoticeBody": "ส่งแล้ว {files} เกินโควตาแชร์ฟรีและอยู่ในคอมพิวเตอร์ของคุณ เพื่อนร่วมงานจะเห็นตัวยึดตำแหน่ง เปิดการสำรองบนคลาวด์แล้วส่งใหม่เพื่อแชร์",
+  "localOnlyNoticeMore": " รวมทั้งหมด {count} ไฟล์",
+  "localOnlyNoticeAction": "เปิดการสำรองไฟล์บนคลาวด์",
+  "localOnlyNoticeOk": "ตกลง",
 }

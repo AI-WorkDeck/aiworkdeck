@@ -113,7 +113,7 @@ class BailianPlatformConnectionTest {
         when(intlAccount.platformAiBaseUrl()).thenReturn(intlBase);
         Map<String, Object> circleGatewayBody = Map.of(
                 "provider", "bailian",
-                "apiKey", "awdai_circle_abnr",
+                "apiKey", "awdai_circle_partner",
                 "baseUrl", intlBase,
                 "defaultModel", "deepseek/deepseek-chat");
         PlatformAiKeyService.Resolved resolved = PlatformAiKeyService.parseConnection(circleGatewayBody, intlAccount);

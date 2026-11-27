@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "載入示範資料失敗",
   "caseOpenPluginFailedToast": "開啟外掛程式失敗",
   "circleInviteLabel": "Circle 聯盟所邀請碼（選填）",
-  "circleInvitePlaceholder": "例如 KW-ABNR-2026",
+  "circleInvitePlaceholder": "例如 KW-XXXX-2026",
   "circleInviteHint": "輸入律師事務所專屬邀請碼，自動帶出律師事務所字尾並開通 DeepSeek 專線額度",
   "bqtScanSwitch": "包晴天律師掃碼登入",
   "bqtScanTitle": "請使用包晴天律師端 App 掃碼登入",

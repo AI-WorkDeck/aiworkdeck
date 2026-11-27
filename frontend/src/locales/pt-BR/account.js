@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Falha ao inicializar os dados de demonstração",
   "caseOpenPluginFailedToast": "Falha ao abrir o plugin",
   "circleInviteLabel": "Código de convite da Circle Alliance (opcional)",
-  "circleInvitePlaceholder": "ex.: KW-ABNR-2026",
+  "circleInvitePlaceholder": "ex.: KW-XXXX-2026",
   "circleInviteHint": "Insira o código de convite do seu escritório para anexar o sufixo do escritório e desbloquear cota dedicada do DeepSeek",
   "bqtScanSwitch": "Entrada por QR do advogado Baoqingtian",
   "bqtScanTitle": "Leia o QR com o app do advogado Baoqingtian para entrar",

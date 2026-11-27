@@ -506,7 +506,7 @@ export default {
   caseSeedDemoFailedToast: '加载演示数据失败',
   caseOpenPluginFailedToast: '打开插件失败',
   "circleInviteLabel": "Circle 联盟所邀请码（选填）",
-  "circleInvitePlaceholder": "例如 KW-ABNR-2026",
+  "circleInvitePlaceholder": "例如 KW-XXXX-2026",
   "circleInviteHint": "输入律所专属邀请码，自动带出律所后缀并开通 DeepSeek 专线额度",
   "bqtScanSwitch": "包晴天律师扫码登录",
   "bqtScanTitle": "请使用包晴天律师端 App 扫码登录",

@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Demo verileri oluşturulamadı",
   "caseOpenPluginFailedToast": "Eklenti açılamadı",
   "circleInviteLabel": "Circle Alliance davet kodu (isteğe bağlı)",
-  "circleInvitePlaceholder": "örn. KW-ABNR-2026",
+  "circleInvitePlaceholder": "örn. KW-XXXX-2026",
   "circleInviteHint": "Büro davet kodunuzu girin; büro son eki eklenir ve özel DeepSeek kotası açılır",
   "bqtScanSwitch": "Baoqingtian avukat QR girişi",
   "bqtScanTitle": "Giriş yapmak için Baoqingtian avukat uygulamasıyla tarayın",

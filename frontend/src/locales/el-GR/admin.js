@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Αποτυχία φόρτωσης",
   "ocrSettingsSaveFailed": "Αποτυχία αποθήκευσης",
   "walletRedeemTitle": "Κωδικός δώρου / Κωδικός πρόσκλησης Circle",
-  "walletRedeemPlaceholder": "Εισαγάγετε κωδικό δώρου ή κωδικό Circle (π.χ. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Εισαγάγετε κωδικό δώρου ή κωδικό Circle (π.χ. KW-XXXX-2026)",
   "walletRedeemBtn": "Εξαργήρωση / Σύνδεση",
   "walletRedeemSubmitting": "Εφαρμογή…",
   "walletRedeemSuccessGift": "Εξαργήρωση {amount} με επιτυχία",

@@ -493,7 +493,7 @@ export default {
   caseSeedDemoFailedToast: 'Failed to seed demo data',
   caseOpenPluginFailedToast: 'Failed to open plugin',
   "circleInviteLabel": "Circle Alliance Invite Code (optional)",
-  "circleInvitePlaceholder": "e.g. KW-ABNR-2026",
+  "circleInvitePlaceholder": "e.g. KW-XXXX-2026",
   "circleInviteHint": "Enter your firm invite code to attach your firm suffix and unlock dedicated DeepSeek quota",
   "bqtScanSwitch": "Baoqingtian Lawyer QR Sign-in",
   "bqtScanTitle": "Scan with Baoqingtian Lawyer App to sign in",

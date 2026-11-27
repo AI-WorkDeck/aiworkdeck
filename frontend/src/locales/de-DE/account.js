@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Demo-Daten konnten nicht initialisiert werden",
   "caseOpenPluginFailedToast": "Plugin konnte nicht geöffnet werden",
   "circleInviteLabel": "Circle-Allianz-Einladungscode (optional)",
-  "circleInvitePlaceholder": "z. B. KW-ABNR-2026",
+  "circleInvitePlaceholder": "z. B. KW-XXXX-2026",
   "circleInviteHint": "Geben Sie den Einladungscode Ihrer Kanzlei ein, um das Kanzlei-Suffix anzuhängen und dediziertes DeepSeek-Kontingent freizuschalten",
   "bqtScanSwitch": "Baoqingtian-Anwalt-QR-Login",
   "bqtScanTitle": "Zum Anmelden mit der Baoqingtian-Anwalts-App scannen",

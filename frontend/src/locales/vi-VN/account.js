@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Tạo dữ liệu demo thất bại",
   "caseOpenPluginFailedToast": "Không thể mở plugin",
   "circleInviteLabel": "Mã mời Circle Alliance (không bắt buộc)",
-  "circleInvitePlaceholder": "vd: KW-ABNR-2026",
+  "circleInvitePlaceholder": "vd: KW-XXXX-2026",
   "circleInviteHint": "Nhập mã mời của hãng luật để gắn hậu tố hãng luật và mở hạn mức DeepSeek chuyên dụng",
   "bqtScanSwitch": "Đăng nhập QR luật sư Baoqingtian",
   "bqtScanTitle": "Quét bằng ứng dụng luật sư Baoqingtian để đăng nhập",
