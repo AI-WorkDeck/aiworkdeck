@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Νέο",
+    "aria": "Νέο έγγραφο ή νέα καρτέλα προγράμματος περιήγησης",
+    "newWord": "Νέο έγγραφο Word",
+    "newExcel": "Νέο βιβλίο εργασίας Excel",
+    "newPowerPoint": "Νέα παρουσίαση PowerPoint",
+    "newBrowserTab": "Νέα καρτέλα προγράμματος περιήγησης",
+  },
   scratchCopyChoose: "Επιλέξτε περιεχόμενο για αντιγραφή",
   scratchCopySelected: "Επιλέχθηκαν {count}",
   scratchCopyFiles: "Αρχεία",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "Κάδος ανακύκλωσης",
   "loadingText": "Φόρτωση...",
   "explorerFallback": "Εξερεύνηση",
-  "newOrCopy": "Δημιουργία / Αντιγραφή",
   "emptyWorkspace": "Επιλέξτε ένα αρχείο για να ξεκινήσετε",
   "emptyWorkspaceHint": "Ανοίξτε ένα αρχείο από την εξερεύνηση στα αριστερά ή δημιουργήστε ένα νέο έγγραφο",
   "railEditEnter": "Τακτοποίηση πλαϊνής γραμμής (σύρετε για αναδιάταξη ή προσκόλληση)",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "Αδυναμία αποστολής αυτού του αρχείου",
   "shareUnsupported": "Η αποστολή δεν υποστηρίζεται σε αυτό το σύστημα",
   "shareClipboardHint": "Το αρχείο αντιγράφηκε. Μεταβείτε στο WeChat, επιλέξτε συνομιλία και πατήστε Ctrl+V για αποστολή",
-  "copyFailedNoNewFile": "Αποτυχία αντιγραφής: δεν επιστράφηκε νέο αρχείο",
-  "copyFailed": "Η αντιγραφή απέτυχε",
   "recordingStarted": "Η καταγραφή δραστηριότητας ξεκίνησε",
   "recordingStopped": "Η καταγραφή δραστηριότητας διακόπηκε",
   "insertedToDoc": "Εισήχθη στο έγγραφο",
