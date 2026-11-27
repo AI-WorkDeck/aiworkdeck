@@ -41,7 +41,7 @@ const LOCALE_REGISTRY = Object.freeze([
     shortBadge: '繁',
     prefix: 'zh-hant',
     dir: 'ltr',
-    lowaUiLang: 'zh-CN',
+    lowaUiLang: 'zh-TW',
     bcp47: 'zh-TW',
     allowHan: true,
   },
