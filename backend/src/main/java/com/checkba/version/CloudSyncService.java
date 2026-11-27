@@ -946,6 +946,10 @@ public class CloudSyncService {
             List<VersionEntry> ahead = repoService.commitsBetween(
                     projectId, repoService.mainBranch(), ORIGIN_MASTER, REMOTE_AHEAD_WALK_CAP);
             if (ahead.isEmpty()) return;
+            // C23 (lane C nit): client portal materials are not anyone's 稿 — count them apart, out of the authors
+            int materials = (int) ahead.stream().filter(e -> HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).count();
+            ahead = ahead.stream().filter(e -> !HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).toList();
+            m.put("remoteAheadMaterials", materials);
             m.put("remoteAheadCount", ahead.size());
             // 案件库确实领先了、这句话非说清是谁不可——只有这条路允许为一个名字联网一次
             Map<String, String> remoteNames = remoteDisplayNames(projectId, true);
@@ -1315,6 +1319,24 @@ public class CloudSyncService {
                     "没能把人加进来：" + resp.getStr("message", "请重试"),
                     "Couldn't add that member: " + resp.getStr("message", "please try again")));
         }
+    }
+
+    /**
+     * C9：改案件库上一位参与人的角色。权限矩阵在案件库判；本机清掉角色缓存，下一次状态读到新角色。
+     */
+    public void proxyMemberRole(long projectId, long remoteUserId, String role) {
+        ProjectRemote remote = requireRemoteBinding(projectId);
+        CloudConnection conn = connectionOf(remote);
+        String body = JSONUtil.toJsonStr(Map.of("role", role == null ? "" : role));
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPut(
+                conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members/" + remoteUserId + "/role",
+                body, conn.getDeviceToken())));
+        if (resp.getInt("code", 1) != 0) {
+            throw VersionException.userFacing(LangText.of(
+                    "没能修改角色：" + resp.getStr("message", "请重试"),
+                    "Couldn't change the role: " + resp.getStr("message", "please try again")));
+        }
+        remoteRoleCache.remove(projectId);
     }
 
     /**
@@ -1882,6 +1904,30 @@ public class CloudSyncService {
         try (HttpResponse resp = req.execute()) {
             return new RawResponse(resp.getStatus(), resp.header("Content-Type"),
                     resp.header("Content-Disposition"), resp.bodyBytes());
+        } catch (Exception e) {
+            throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
+        }
+    }
+
+    /** C9 role change. Test seam like httpPost/httpDelete; sends X-Session-Id when sessionToken is set. */
+    protected String httpPut(String url, String jsonBody, String sessionToken) {
+        HttpRequest req = HttpRequest.put(url)
+                .header("Content-Type", "application/json")
+                .body(jsonBody)
+                .setConnectionTimeout(5000)
+                .setReadTimeout(15000);
+        if (sessionToken != null) {
+            req.header("X-Session-Id", sessionToken);
+        }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
+        try (HttpResponse resp = req.execute()) {
+            if (resp.getStatus() != 200) {
+                throw new IllegalStateException("云端请求失败 (HTTP " + resp.getStatus() + ")");
+            }
+            return resp.body();
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
         }

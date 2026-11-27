@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "ส่งออก Word (คงเค้าโครง)",
   "ocrSearchablePdf": "สร้าง PDF ที่ค้นหาได้",
   "ocrLayoutSuffix": "-เค้าโครง OCR",
-  "ocrSearchableSuffix": "-ค้นหาได้"
+  "ocrSearchableSuffix": "-ค้นหาได้",
+  "localOnlyMine": "อยู่ในคอมพิวเตอร์นี้เท่านั้น (ไม่ได้แชร์)",
+  "localOnlyMineTip": "เกินโควตาแชร์ฟรี ไฟล์นี้จึงอยู่ในคอมพิวเตอร์ของคุณเท่านั้น เพื่อนร่วมงานจะเห็นตัวยึดตำแหน่ง เปิดการสำรองไฟล์บนคลาวด์แล้วส่งใหม่เพื่อแชร์",
+  "localOnlyOther": "อยู่ในคอมพิวเตอร์ของ {name} เท่านั้น",
+  "localOnlyOtherUnknown": "อยู่ในคอมพิวเตอร์ของเพื่อนร่วมงานเท่านั้น",
+  "localOnlyOtherTip": "ไฟล์นี้อยู่ในคอมพิวเตอร์ของ {name} เท่านั้นและไม่ได้แชร์ไปยังคลังคดี โปรดให้ {name} เปิดการสำรองไฟล์บนคลาวด์แล้วส่งใหม่",
+  "localOnlyColleague": "เพื่อนร่วมงาน",
+  "localOnlyOk": "ตกลง",
 }

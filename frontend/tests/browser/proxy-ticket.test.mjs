@@ -35,7 +35,8 @@ function makePane(mint) {
     uni: { getStorageSync: () => '', setStorageSync: () => {}, $on: () => {}, $off: () => {} },
   }
   const component = loadComponent('BrowserPane.vue', names, deps)
-  const base = { $t: (k) => k, $emit: () => {}, $nextTick: (fn) => fn && fn(), projectId: 7, url: '', tabId: 't1' }
+  // $refs: the web pane has no desktop mount; navigate() reads this.$refs.desktopMount (desktop branch).
+  const base = { $t: (k) => k, $emit: () => {}, $nextTick: (fn) => fn && fn(), $refs: {}, projectId: 7, url: '', tabId: 't1' }
   const vm = Object.assign(base, component.data.call(base), component.methods)
   for (const [k, def] of Object.entries(component.computed || {})) {
     const fn = typeof def === 'function' ? def : def.get

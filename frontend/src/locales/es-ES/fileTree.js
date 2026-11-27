@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Exportar Word (conservar diseño)",
   "ocrSearchablePdf": "Crear PDF con texto buscable",
   "ocrLayoutSuffix": "-diseño OCR",
-  "ocrSearchableSuffix": "-buscable"
+  "ocrSearchableSuffix": "-buscable",
+  "localOnlyMine": "Solo en este equipo (no compartido)",
+  "localOnlyMineTip": "Supera la cuota gratuita para compartir: el archivo se queda en tu equipo y tus colegas ven un marcador. Activa la copia de seguridad de archivos en la nube y vuelve a entregar para compartirlo.",
+  "localOnlyOther": "Solo en el equipo de {name}",
+  "localOnlyOtherUnknown": "Solo en el equipo de un colega",
+  "localOnlyOtherTip": "Este archivo solo está en el equipo de {name} y no se compartió en la biblioteca de casos. Pide a {name} que active la copia en la nube y vuelva a entregar.",
+  "localOnlyColleague": "un colega",
+  "localOnlyOk": "Entendido",
 }

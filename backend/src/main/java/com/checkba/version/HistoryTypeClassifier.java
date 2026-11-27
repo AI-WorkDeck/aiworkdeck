@@ -48,6 +48,8 @@ public final class HistoryTypeClassifier {
     public static final String REVERT = "revert";
     public static final String AUTO = "auto";
     public static final String UPGRADE = "upgrade";
+    /** C23：客户经门户交的材料（WorkSessionService.recordSubmission 写 kind=client-submission），按尾注认，不靠消息。 */
+    public static final String CLIENT_SUBMISSION = "client-submission";
 
     /** 见类注释：每条模板的中英两种写法都要认。 */
     private static final List<String> INITIAL_MESSAGES = List.of("初始版本", "Initial version");
@@ -74,6 +76,7 @@ public final class HistoryTypeClassifier {
         if (matches(title, REVERT_MESSAGES)) return REVERT;
         if (matches(title, PULL_MESSAGES)) return PULL;
         if (startsWithAny(title, ADOPT_PREFIXES)) return ADOPT;
+        if (CLIENT_SUBMISSION.equals(kind)) return CLIENT_SUBMISSION;
         return AUTO.equals(kind) ? AUTO : SESSION;
     }
 

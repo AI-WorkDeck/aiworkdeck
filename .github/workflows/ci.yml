@@ -251,6 +251,12 @@ jobs:
         run: node --test frontend/tests/dd-workflow/*.test.mjs
       - name: Test cloud backup consent and postpaid access
         run: node --test frontend/tests/mobile-backup/*.test.mjs
+      # Suites no other step ran (dev-board#1840); desktop/tests/test-reachability.test.js keeps it that way.
+      - name: Test frontend suites without a dedicated step
+        working-directory: frontend
+        run: npm run test:standalone
+      - name: Test shared, eval and official-plugin helper suites
+        run: node --test shared/tests/*.test.mjs scripts/eval/*.test.mjs official-plugins/aifirm-partner/tests/plugin.test.mjs official-plugins/dpia-workbench/tests/adapter.test.mjs official-plugins/pitch-materials/tests/core.test.mjs official-plugins/pitch-materials/tests/l10n.test.mjs
       - name: Test built-in Tencent Meeting request and UI contracts
         run: node --test frontend/tests/tmeet/*.test.mjs
       - name: Check emit/binding contracts
@@ -361,8 +367,13 @@ jobs:
       - name: Confirmed contract review standards and results
         working-directory: frontend
         run: node --test tests/contract-review/*.test.mjs
-      - name: Office verification API and installer build guards
-        run: node --test office-addin/taskpane/lib/api.test.js office-addin/scripts/*.test.mjs
+      # All Office/WPS task pane tests, not only api.test.js: 72 lib tests had never run in CI (dev-board#1840).
+      - name: Install Office add-in dependencies
+        working-directory: office-addin
+        run: npm ci --no-audit --no-fund
+      - name: Office task pane, verification API and installer build guards
+        working-directory: office-addin
+        run: npm test
       - name: Inline review contracts (dev-board#547)
         working-directory: frontend
         run: npm run test:inline-review
@@ -433,6 +444,16 @@ jobs:
       - name: Unit tests
         working-directory: pptx-service
         run: .venv/bin/python -m pytest -q backend/tests/unit
+      # The bundled PPT editor frontend's vitest unit specs (src/**); Playwright e2e needs a running app and is excluded.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install PPT editor frontend dependencies
+        working-directory: pptx-service/frontend
+        run: npm ci --no-audit --no-fund
+      - name: PPT editor frontend unit tests (vitest)
+        working-directory: pptx-service/frontend
+        run: npm run test:run
 
   desktop:
     name: Desktop (install deps)

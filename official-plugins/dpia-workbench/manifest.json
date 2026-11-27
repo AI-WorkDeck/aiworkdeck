@@ -1,7 +1,7 @@
 {
   "id": "dpia-workbench",
   "name": "DPIA 工作台",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "数据保护影响评估：材料溯源、事实确认、问题补答、风险与整改、持续复评及分版本报告。基于朱玲凤的 DSH DPIA Workbench 适配；需 Node.js、Python 和 LibreOffice。",
   "author": "AI WorkDeck（上游：朱玲凤 / The-Data-Galaxy）",
   "homepage": "https://github.com/The-Data-Galaxy/dsh-dpia-workbench",
