@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "이 병합본은 파일 목록에서 열어 확인해 주세요.",
   transferUploading: '대용량 파일 업로드 중 {done} / {total} MB. 연결이 느리면 몇 분 걸릴 수 있습니다',
   transferDownloading: '대용량 파일 받는 중 {done} / {total} MB. 연결이 느리면 몇 분 걸릴 수 있습니다',
+  "localOnlyNoticeTitle": "이 파일들은 이 컴퓨터에 남았습니다",
+  "localOnlyNoticeBody": "제출했습니다. {files}은(는) 무료 공유 한도를 넘어 내 컴퓨터에만 있으며 동료에게는 자리표시자가 보입니다. 공유하려면 클라우드 백업을 켜고 다시 제출하세요.",
+  "localOnlyNoticeMore": " 외 총 {count}개",
+  "localOnlyNoticeAction": "파일 클라우드 백업 켜기",
+  "localOnlyNoticeOk": "확인",
 }

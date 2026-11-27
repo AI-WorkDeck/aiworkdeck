@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Tải thất bại",
   "ocrSettingsSaveFailed": "Lưu không thành công",
   "walletRedeemTitle": "Mã quà tặng / Mã mời hãng luật Circle",
-  "walletRedeemPlaceholder": "Nhập mã quà tặng hoặc mã hãng luật Circle (vd: KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Nhập mã quà tặng hoặc mã hãng luật Circle (vd: KW-XXXX-2026)",
   "walletRedeemBtn": "Đổi / Liên kết",
   "walletRedeemSubmitting": "Đang áp dụng…",
   "walletRedeemSuccessGift": "Đã đổi thành công {amount}",

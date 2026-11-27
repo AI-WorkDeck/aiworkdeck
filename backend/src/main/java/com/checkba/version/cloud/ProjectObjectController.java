@@ -21,6 +21,10 @@ public class ProjectObjectController {
     private com.checkba.service.mobile.CloudProtocolDownloadService downloads;
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private CloudGitWriteGuard cloudWrites;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private ProjectObjectPlanService plans;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.checkba.repository.UserRepository users;
 
     private final GitAccessService access;
     private final ProjectRepoService repos;
@@ -41,23 +45,46 @@ public class ProjectObjectController {
     @GetMapping("/capabilities")
     public Map<String, Object> capabilities(@PathVariable long projectId, HttpServletRequest request) {
         authorize(request, projectId, false);
-        return Map.of("version", 1, "partBytes", ProjectObjectTransferService.PART_BYTES);
+        // C12: version stays 1 (0.91 desktops check it); new fields are only added.
+        if (plans == null) return Map.of("version", 1, "partBytes", ProjectObjectTransferService.PART_BYTES);
+        return Map.of("version", 1, "partBytes", ProjectObjectTransferService.PART_BYTES,
+                "freePerFileBytes", plans.freePerFileBytes(), "freePerProjectBytes", plans.freePerProjectBytes(),
+                "projectFreeUsedBytes", plans.projectFreeUsedBytes(projectId));
     }
 
     @GetMapping("/{sha256}")
     public Map<String, Object> status(@PathVariable long projectId, @PathVariable String sha256,
                                      @RequestParam long size, HttpServletRequest request) throws IOException {
         authorize(request, projectId, false);
-        return transfers.status(projectId, new ObjectRef(sha256, size));
+        ObjectRef object = new ObjectRef(sha256, size);
+        Map<String, Object> status = transfers.status(projectId, object);
+        // C12: a missing object that its sharer keeps local-only — colleagues show a placeholder, the pull goes on
+        if (plans != null && !Boolean.TRUE.equals(status.get("complete"))) {
+            var declared = plans.declaration(projectId, object);
+            if (declared.isPresent()) {
+                Map<String, Object> out = new java.util.HashMap<>(status);
+                out.put("localOnly", true);
+                out.put("declaredBy", declared.get().getDeclaredBy());
+                if (users != null) users.findById(declared.get().getDeclaredBy()).ifPresent(u ->
+                        out.put("declaredByName", u.getDisplayName() != null && !u.getDisplayName().isBlank() ? u.getDisplayName() : u.getUsername()));
+                if (declared.get().getNameHint() != null) out.put("nameHint", declared.get().getNameHint());
+                return out;
+            }
+        }
+        return status;
     }
 
     @PutMapping("/{sha256}/parts/{part}")
     public Map<String, Object> put(@PathVariable long projectId, @PathVariable String sha256,
                                   @PathVariable int part, @RequestParam long size,
                                   @RequestHeader("X-AWD-Part-Sha256") String partSha,
+                                  @RequestHeader(value = "X-AWD-Object-Plan", required = false) String plan,
                                   HttpServletRequest request) throws IOException {
         authorize(request, projectId, true);
         ObjectRef object = new ObjectRef(sha256, size);
+        // W review: free if this request says so OR the object already has a free reservation (parts 2..n)
+        boolean free = plans != null && ("free".equalsIgnoreCase(plan) || plans.isFreePlan(projectId, object));
+        Runnable freeReservation = free ? () -> plans.reserveFree(projectId, object) : null;
         if (request.getContentLengthLong() != ProjectObjectTransferService.partSize(object, part))
             throw new IllegalArgumentException("Invalid part length");
         transfers.putPart(projectId, object, part, partSha, request.getInputStream(),
@@ -65,20 +92,51 @@ public class ProjectObjectController {
                     authorize(request, projectId, true);
                     if(cloudWrites==null)publish.run();
                     else cloudWrites.write(projectId,null,publish);
-                }));
+                }), freeReservation);
         return Map.of("ok", true);
     }
 
     @PostMapping("/{sha256}/complete")
     public Map<String, Object> complete(@PathVariable long projectId, @PathVariable String sha256,
-                                       @RequestParam long size, HttpServletRequest request) throws IOException {
+                                       @RequestParam long size,
+                                       @RequestHeader(value = "X-AWD-Object-Plan", required = false) String plan,
+                                       HttpServletRequest request) throws IOException {
         authorize(request, projectId, true);
         locked(projectId, () -> {
             authorize(request, projectId, true);
-            Runnable publication=()->{try {transfers.complete(projectId,new ObjectRef(sha256,size));}catch(IOException e){throw new UncheckedIOException(e);}};
+            Runnable publication=()->{try {
+                ObjectRef completed=new ObjectRef(sha256,size);
+                boolean wasLocalOnly=plans!=null && plans.isDeclaredLocalOnly(projectId,completed);
+                transfers.complete(projectId,completed);
+                if(plans!=null) {
+                    // C12: reservation permanent, declaration ends; a free upload whose reservation was swept stays free (W)
+                    if("free".equalsIgnoreCase(plan))plans.markCompleteFree(projectId,completed);
+                    else plans.markComplete(projectId,completed);
+                }
+                if(wasLocalOnly)repos.materializeArrivedObject(projectId,completed); // C12: the server's own copy gets it now
+            }catch(IOException e){throw new UncheckedIOException(e);}};
             if(cloudWrites==null)publication.run();else cloudWrites.write(projectId,null,publication);
         });
         return Map.of("complete", true);
+    }
+
+    /**
+     * C12: this object stays on the sharer's computer (over the free allowance, no paid backup). History may then
+     * reference it and pre-receive accepts it. Only members with write access; the size must match the pointer
+     * (pre-receive checks sha + size); idempotent per (project, sha).
+     */
+    @PutMapping("/{sha256}/local-only")
+    public Map<String, Object> declareLocalOnly(@PathVariable long projectId, @PathVariable String sha256,
+                                                @RequestParam long size, @RequestBody(required = false) Map<String, Object> body,
+                                                HttpServletRequest request) {
+        long userId = access.authorize(request, projectId, true).userId();
+        if (!repos.isInitialized(projectId)) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND);
+        if (plans == null) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_IMPLEMENTED);
+        String hint = body != null && body.get("pathHint") instanceof String s ? s : null;
+        plans.declareLocalOnly(projectId, new ObjectRef(sha256, size), userId, hint);
+        return Map.of("ok", true);
     }
 
     @FunctionalInterface private interface IoAction { void run() throws IOException; }
@@ -132,8 +190,32 @@ public class ProjectObjectController {
         response.sendError(error.statusCode());
     }
 
+    /** C12: over the free allowance → 409 with the numbers; the desktop then declares the file local-only. */
+    @ExceptionHandler(ProjectObjectPlanService.FreeLimitException.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> freeLimit(ProjectObjectPlanService.FreeLimitException e) {
+        return org.springframework.http.ResponseEntity.status(409).body(e.body());
+    }
+
+    /**
+     * Billing refusals used to be a bare 400, indistinguishable from a malformed part (lane C/Q 11-26). They are now
+     * 409 with a named code; real protocol errors (part length, hash) stay 400.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
-    public void invalid(HttpServletResponse response) throws IOException { response.sendError(400); }
+    public org.springframework.http.ResponseEntity<Map<String, Object>> invalid(IllegalArgumentException e) {
+        String message = e.getMessage();
+        String code = billingCode(message);
+        if (code != null) return org.springframework.http.ResponseEntity.status(409).body(Map.of("code", code, "message", message));
+        return org.springframework.http.ResponseEntity.status(400).build();
+    }
+
+    static String billingCode(String message) {
+        if (message == null) return null;
+        try {
+            if (message.equals(com.checkba.service.mobile.CloudBillingText.get("storageLimit"))) return "STORAGE_LIMIT";
+            if (message.equals(com.checkba.service.mobile.CloudBillingText.get("writesPaused"))) return "WRITES_PAUSED";
+        } catch (RuntimeException unknownToken) { return null; }
+        return null;
+    }
 
     @ExceptionHandler(IOException.class)
     public void unavailable(HttpServletResponse response) throws IOException { if (!response.isCommitted()) response.sendError(409); }

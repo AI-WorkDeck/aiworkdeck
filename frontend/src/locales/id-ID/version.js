@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari daftar file.",
   transferUploading: 'Mengunggah file besar {done} / {total} MB; pada koneksi lambat ini bisa memakan beberapa menit',
   transferDownloading: 'Mengunduh file besar {done} / {total} MB; pada koneksi lambat ini bisa memakan beberapa menit',
+  "localOnlyNoticeTitle": "File ini tetap di komputer ini",
+  "localOnlyNoticeBody": "Terkirim. {files} melebihi kuota berbagi gratis dan tetap di komputer Anda; rekan melihat placeholder. Aktifkan cadangan file cloud lalu ajukan lagi untuk membagikannya.",
+  "localOnlyNoticeMore": " dan total {count}",
+  "localOnlyNoticeAction": "Aktifkan cadangan file cloud",
+  "localOnlyNoticeOk": "Oke",
 }

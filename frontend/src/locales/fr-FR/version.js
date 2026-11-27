@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "Ouvrez ce brouillon fusionné depuis la liste des fichiers.",
   transferUploading: 'Envoi des fichiers volumineux {done} / {total} Mo ; avec une connexion lente, cela peut prendre quelques minutes',
   transferDownloading: 'Récupération des fichiers volumineux {done} / {total} Mo ; avec une connexion lente, cela peut prendre quelques minutes',
+  "localOnlyNoticeTitle": "Ces fichiers sont restés sur cet ordinateur",
+  "localOnlyNoticeBody": "Remis. {files} ont dépassé le quota de partage gratuit et restent sur votre ordinateur ; vos collègues voient un espace réservé. Activez la sauvegarde cloud et remettez à nouveau pour les partager.",
+  "localOnlyNoticeMore": " et {count} au total",
+  "localOnlyNoticeAction": "Activer la sauvegarde cloud des fichiers",
+  "localOnlyNoticeOk": "OK",
 }

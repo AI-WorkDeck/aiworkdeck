@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "लोड करने में विफल",
   "ocrSettingsSaveFailed": "सहेजने में विफल",
   "walletRedeemTitle": "गिफ्ट कोड / Circle फ़र्म आमंत्रण कोड",
-  "walletRedeemPlaceholder": "गिफ्ट कोड या Circle फ़र्म कोड दर्ज करें (उदा. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "गिफ्ट कोड या Circle फ़र्म कोड दर्ज करें (उदा. KW-XXXX-2026)",
   "walletRedeemBtn": "रिडीम / बाइंड करें",
   "walletRedeemSubmitting": "लागू किया जा रहा है…",
   "walletRedeemSuccessGift": "{amount} सफलतापूर्वक रिडीम हुए",

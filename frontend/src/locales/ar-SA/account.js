@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "فشل تحميل البيانات التجريبية",
   "caseOpenPluginFailedToast": "فشل فتح الإضافة",
   "circleInviteLabel": "كود دعوة Circle Alliance (اختياري)",
-  "circleInvitePlaceholder": "مثال: KW-ABNR-2026",
+  "circleInvitePlaceholder": "مثال: KW-XXXX-2026",
   "circleInviteHint": "أدخل رمز الدعوة الخاص بمكتبك لإرفاق لاحقة المكتب والاستفادة من حصة DeepSeek المخصصة",
   "bqtScanSwitch": "تسجيل دخول المحامي عبر رمز QR من باوتشينغتيان",
   "bqtScanTitle": "امسح الرمز بتطبيق محامي باوتشينغتيان لتسجيل الدخول",

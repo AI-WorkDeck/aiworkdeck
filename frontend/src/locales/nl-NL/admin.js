@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Laden mislukt",
   "ocrSettingsSaveFailed": "Opslaan mislukt",
   "walletRedeemTitle": "Cadeaucode / Circle-kantooruitnodigingscode",
-  "walletRedeemPlaceholder": "Voer cadeaucode of Circle-kantoorcode in (bijv. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Voer cadeaucode of Circle-kantoorcode in (bijv. KW-XXXX-2026)",
   "walletRedeemBtn": "Inwisselen / Koppelen",
   "walletRedeemSubmitting": "Bezig met toepassen…",
   "walletRedeemSuccessGift": "{amount} succesvol ingewisseld",

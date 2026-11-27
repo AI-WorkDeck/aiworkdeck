@@ -34,6 +34,31 @@ public class CloudStorageQuotaService {
     private com.checkba.repository.MobileVersionObjectRepository versionObjects;
     @org.springframework.beans.factory.annotation.Autowired
     private org.springframework.beans.factory.ObjectProvider<com.checkba.version.objects.LocalVersionObjectStore> localVersionObjects;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.checkba.version.cloud.ProjectObjectPlanService> objectPlans;
+
+    /**
+     * C12 (lane W review): storage keys of the server working-copy files that are copies of a completed free
+     * object. They would otherwise count the same free 30 MB again through the ProjectFile rows.
+     */
+    private java.util.Set<String> freeWorkingCopyKeys(Long projectId, java.util.Map<Long, java.util.Set<String>> cache) {
+        if (projectId == null) return java.util.Set.of();
+        return cache.computeIfAbsent(projectId, id -> {
+            var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+            var repo = cloudRepos == null ? null : cloudRepos.getIfAvailable();
+            if (plans == null || repo == null) return java.util.Set.of();
+            var shas = plans.completedFreeShas(id);
+            if (shas.isEmpty()) return java.util.Set.of();
+            java.util.Set<String> keys = new java.util.HashSet<>();
+            for (String path : repo.headPathsPointingTo(id, shas)) keys.add("projects/" + id + "/" + path);
+            return keys;
+        });
+    }
+
+    private long freeCompletedBytes(Long projectId) {
+        var plans = objectPlans == null ? null : objectPlans.getIfAvailable();
+        return plans == null || projectId == null ? 0 : plans.completedFreeBytes(projectId);
+    }
     @Value("${storage.postpaid.enabled:false}") private boolean postpaidEnabled;
     @Value("${storage.postpaid.safety-limit-bytes:107374182400}") private long safetyLimitBytes;
     @org.springframework.beans.factory.annotation.Autowired private org.springframework.beans.factory.ObjectProvider<CloudStorageMeterService> meters;
@@ -186,6 +211,7 @@ public class CloudStorageQuotaService {
     public long usedBytes(Long userId, boolean metered) {
         long total = 0;
         java.util.Set<String> seen = new java.util.HashSet<>();
+        java.util.Map<Long, java.util.Set<String>> freeCopies = new java.util.HashMap<>();
         for (ProjectFile file : files.findCloudFilesByOwner(userId)) {
             if(metered && !projects.findById(file.getProjectId()).map(p->isBillableProject(p,userId)).orElse(false))continue;
             // A row loaded for authorization before acquiring the lock may still have its old path.
@@ -193,6 +219,7 @@ public class CloudStorageQuotaService {
                     && entityManager.contains(file)) entityManager.refresh(file);
             String key = StringUtils.hasText(file.getFilePath()) ? file.getFilePath() : file.getWpsFileId();
             if (StringUtils.hasText(key) && !seen.add(key)) continue;
+            if (StringUtils.hasText(key) && freeWorkingCopyKeys(file.getProjectId(), freeCopies).contains(key)) continue; // C12: free
             total = Math.addExact(total, measuredBytes(file));
         }
         if (mobileBackups != null) for (var backup : mobileBackups.findByUserId(userId)) {
@@ -210,7 +237,7 @@ public class CloudStorageQuotaService {
         var localObjects = localVersionObjects == null ? null : localVersionObjects.getIfAvailable();
         if (localObjects != null) for (var project : projects.findByUserIdOrderByCreatedAtDesc(userId)) {
             if(metered && !isBillableProject(project,userId))continue;
-            try { total = Math.addExact(total, localObjects.usageBytes(project.getId())); }
+            try { total = Math.addExact(total, Math.max(0, localObjects.usageBytes(project.getId()) - freeCompletedBytes(project.getId()))); }
             catch (java.io.IOException e) { throw new IllegalStateException("Version object usage unavailable", e); }
         }
         if(metered) {

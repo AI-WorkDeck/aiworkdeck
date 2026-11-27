@@ -596,4 +596,9 @@ export default {
   mergeReadonlyNeedsFile: 'Open this merged draft from the file list.',
   transferUploading: 'Uploading large files {done} / {total} MB; this can take a few minutes on a slow connection',
   transferDownloading: 'Downloading large files {done} / {total} MB; this can take a few minutes on a slow connection',
+  localOnlyNoticeTitle: 'These files stayed on this computer',
+  localOnlyNoticeBody: 'Submitted. {files} exceeded the free sharing allowance and stay on your computer; colleagues see a placeholder. Turn on cloud file backup and submit again to share them.',
+  localOnlyNoticeMore: ' and {count} in total',
+  localOnlyNoticeAction: 'Turn on cloud file backup',
+  localOnlyNoticeOk: 'OK',
 }

@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "Bu birleştirilmiş taslağı dosya listesinden açın.",
   transferUploading: 'Büyük dosyalar yükleniyor {done} / {total} MB; yavaş bağlantıda bu birkaç dakika sürebilir',
   transferDownloading: 'Büyük dosyalar indiriliyor {done} / {total} MB; yavaş bağlantıda bu birkaç dakika sürebilir',
+  "localOnlyNoticeTitle": "Bu dosyalar bu bilgisayarda kaldı",
+  "localOnlyNoticeBody": "Teslim edildi. {files} ücretsiz paylaşım kotasını aştı ve bilgisayarınızda kalıyor; iş arkadaşlarınız bir yer tutucu görür. Paylaşmak için bulut yedeğini açıp yeniden teslim edin.",
+  "localOnlyNoticeMore": " ve toplam {count}",
+  "localOnlyNoticeAction": "Bulut dosya yedeğini aç",
+  "localOnlyNoticeOk": "Tamam",
 }

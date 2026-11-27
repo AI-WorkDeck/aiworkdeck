@@ -12,6 +12,7 @@ import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
 import { withTransferProgress } from '@/utils/transferProgress.js'
+import { noticeLocalOnly } from '@/utils/localOnlyNotice.js'
 import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
 
 import { createCloudEpochGate, needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
@@ -4598,6 +4599,11 @@ export function checkCloud(projectId) {
     request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
 }
 
+// C12：这份案卷里只在共享人电脑上的文件（文件树徽标、占位）
+export function getCloudLocalOnly(projectId) {
+  return request({ url: `/api/cloud/projects/${projectId}/local-only`, method: 'GET' })
+}
+
 export function getCloudTransfer(projectId) {
   return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET' })
 }
@@ -4615,6 +4621,16 @@ const transferProgressUi = {
 export function uploadToCloud(projectId) {
   return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'upload', () =>
     request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })), transferProgressUi)
+    .then((res) => {
+      // C12：交稿成功但有文件留在本机：说清楚是哪几份、怎么共享（同一组只说一次）
+      const d = (res && res.data) || {}
+      if (d.status === 'UPLOADED') {
+        noticeLocalOnly(projectId, d.localOnlyFiles, {
+          t, showModal: (o) => uni.showModal(o), openBackup: () => uni.$emit('awd:open-backup-consent'),
+        })
+      }
+      return res
+    })
 }
 
 export function updateFromCloud(projectId) {

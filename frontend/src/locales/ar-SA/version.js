@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "افتح هذه المسودة المدمجة من قائمة الملفات.",
   transferUploading: 'جارٍ رفع الملفات الكبيرة {done} / {total} ميغابايت؛ قد يستغرق ذلك بضع دقائق على اتصال بطيء',
   transferDownloading: 'جارٍ تنزيل الملفات الكبيرة {done} / {total} ميغابايت؛ قد يستغرق ذلك بضع دقائق على اتصال بطيء',
+  "localOnlyNoticeTitle": "بقيت هذه الملفات على هذا الكمبيوتر",
+  "localOnlyNoticeBody": "تم التسليم. تجاوزت {files} حد المشاركة المجانية وبقيت على جهازك، ويرى الزملاء عنصرًا نائبًا. فعّل النسخ الاحتياطي السحابي ثم سلّم مجددًا لمشاركتها.",
+  "localOnlyNoticeMore": " و{count} إجمالًا",
+  "localOnlyNoticeAction": "تفعيل النسخ الاحتياطي السحابي",
+  "localOnlyNoticeOk": "حسنًا",
 }

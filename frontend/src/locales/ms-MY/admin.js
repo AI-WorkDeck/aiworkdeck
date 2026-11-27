@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Gagal dimuat",
   "ocrSettingsSaveFailed": "Simpan gagal",
   "walletRedeemTitle": "Kod hadiah / Kod jemputan firma Circle",
-  "walletRedeemPlaceholder": "Masukkan kod hadiah atau kod firma Circle (cth. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Masukkan kod hadiah atau kod firma Circle (cth. KW-XXXX-2026)",
   "walletRedeemBtn": "Tebus / Ikat",
   "walletRedeemSubmitting": "Sedang diproses…",
   "walletRedeemSuccessGift": "{amount} berjaya ditebus",

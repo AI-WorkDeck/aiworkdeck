@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "Open dit samengevoegde concept vanuit de bestandenlijst.",
   transferUploading: 'Grote bestanden uploaden {done} / {total} MB; bij een trage verbinding kan dit enkele minuten duren',
   transferDownloading: 'Grote bestanden downloaden {done} / {total} MB; bij een trage verbinding kan dit enkele minuten duren',
+  "localOnlyNoticeTitle": "Deze bestanden bleven op deze computer",
+  "localOnlyNoticeBody": "Ingediend. {files} gingen over het gratis deelquotum en blijven op je computer; collega’s zien een tijdelijke aanduiding. Zet de cloudback-up aan en dien opnieuw in om ze te delen.",
+  "localOnlyNoticeMore": " en {count} in totaal",
+  "localOnlyNoticeAction": "Cloudback-up van bestanden aanzetten",
+  "localOnlyNoticeOk": "OK",
 }

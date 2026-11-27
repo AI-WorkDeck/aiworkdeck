@@ -545,4 +545,9 @@ export default {
   "mergeReadonlyNeedsFile": "Apri questa bozza unita dall'elenco dei file.",
   transferUploading: 'Caricamento dei file di grandi dimensioni {done} / {total} MB; con una connessione lenta può richiedere alcuni minuti',
   transferDownloading: 'Download dei file di grandi dimensioni {done} / {total} MB; con una connessione lenta può richiedere alcuni minuti',
+  "localOnlyNoticeTitle": "Questi file sono rimasti su questo computer",
+  "localOnlyNoticeBody": "Consegnato. {files} hanno superato la quota gratuita di condivisione e restano sul tuo computer; i colleghi vedono un segnaposto. Attiva il backup cloud e consegna di nuovo per condividerli.",
+  "localOnlyNoticeMore": " e {count} in tutto",
+  "localOnlyNoticeAction": "Attiva il backup cloud dei file",
+  "localOnlyNoticeOk": "OK",
 }

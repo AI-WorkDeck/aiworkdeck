@@ -1281,17 +1281,17 @@ class AccountServiceTest {
     void circleFirmInviteCodeLoginAndRedeem() {
         transport = new StubTransport()
                 .enqueue(200, "{\"key\":\"" + KEY + "\",\"isNewUser\":true}")
-                .enqueue(200, "{\"accountId\":\"acc_abnr\",\"username\":\"alice\",\"displayName\":\"Alice (ABNR)\",\"balanceCents\":2000,\"plan\":\"free\"}");
+                .enqueue(200, "{\"accountId\":\"acc_partner\",\"username\":\"alice\",\"displayName\":\"Alice (Example)\",\"balanceCents\":2000,\"plan\":\"free\"}");
         AccountService service = service();
-        Map<String, Object> loggedIn = service.loginWithEmailCode("alice@abnr.test", "123456", "KW-ABNR-2026");
-        assertTrue(transport.bodies.get(0).contains("\"inviteCode\":\"KW-ABNR-2026\""));
-        assertEquals("Alice (ABNR)", loggedIn.get("displayName"));
+        Map<String, Object> loggedIn = service.loginWithEmailCode("alice@example.test", "123456", "KW-TEST-2026");
+        assertTrue(transport.bodies.get(0).contains("\"inviteCode\":\"KW-TEST-2026\""));
+        assertEquals("Alice (Example)", loggedIn.get("displayName"));
 
-        transport.enqueue(200, "{\"ok\":true,\"kind\":\"circle_firm\",\"code\":\"KW-KWMSG-2026\",\"firmName\":\"KWM SG\",\"suffix\":\"KWM SG\",\"amountCents\":2000,\"balanceCents\":4000,\"displayName\":\"Alice (KWM SG)\"}");
-        Map<String, Object> redeemed = service.redeemCode("KW-KWMSG-2026");
+        transport.enqueue(200, "{\"ok\":true,\"kind\":\"circle_firm\",\"code\":\"KW-TESTB-2026\",\"firmName\":\"Example Firm\",\"suffix\":\"Example Firm\",\"amountCents\":2000,\"balanceCents\":4000,\"displayName\":\"Alice (Example Firm)\"}");
+        Map<String, Object> redeemed = service.redeemCode("KW-TESTB-2026");
         assertEquals("POST https://www.aiworkdeck.com/api/account/redeem", transport.calls.get(2));
-        assertEquals("Alice (KWM SG)", redeemed.get("displayName"));
-        assertEquals("Alice (KWM SG)", service.currentDisplayNameOrNull());
+        assertEquals("Alice (Example Firm)", redeemed.get("displayName"));
+        assertEquals("Alice (Example Firm)", service.currentDisplayNameOrNull());
     }
 
     @Test
