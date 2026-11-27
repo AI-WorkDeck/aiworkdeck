@@ -43,7 +43,7 @@ export default {
     "compatHint": "Görseldeki karakterleri girin, ardından SMS veya e-posta kodunuzu isteyin. Hatalı veya süresi dolmuş bir denemeden sonra yeni bir görsel yükleyin.",
     "compatImage": "Güvenlik doğrulama görseli",
     "compatAnswer": "Görseldeki 6 karakter",
-    "compatAnswerFirst": "Önce bir doğrulama görseli yükleyin ve 6 karakterini girin",
+    "compatAnswerFirst": "Önce bir doğrulama görseli yükleyin ve 6 karakterini girin", "compatAuto": "Güvenlik denetimi yüklenmedi, bu yüzden uyumlu doğrulamaya geçildi: görseldeki 6 karakteri girin, ardından kodu yeniden isteyin.",
     "compatContactFirst": "Önce telefon numaranızı veya e-posta adresinizi girin",
     "accountNetworkFailed": "Hesap hizmetine bağlanılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
     "captchaFailed": "Lütfen güvenlik kontrolünü tamamlayıp tekrar deneyin",

@@ -44,7 +44,7 @@ export default {
     "compatHint": "輸入圖片中的字元，再獲取簡訊或電子郵件驗證碼。輸錯或過期後請換一張。",
     "compatImage": "安全驗證圖片",
     "compatAnswer": "圖片中的 6 位字元",
-    "compatAnswerFirst": "請先載入驗證圖片並填寫其中的 6 位字元",
+    "compatAnswerFirst": "請先載入驗證圖片並填寫其中的 6 位字元", "compatAuto": "安全驗證沒有載入，已改用相容驗證：請輸入圖片中的 6 位字元，再取得驗證碼。",
     "compatContactFirst": "請先填寫手機號碼或電子郵件信箱",
     "accountNetworkFailed": "無法連線帳戶服務，請檢查網路後重試",
     "captchaFailed": "請先完成安全驗證後再試",
