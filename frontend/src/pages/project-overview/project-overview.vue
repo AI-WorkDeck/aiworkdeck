@@ -8675,12 +8675,8 @@ export default {
 
     async handleOpenLawFirmPlugin(opts = {}) {
       await this.loadDynamicPlugins()
-      if (this.hasProject) {
-        this.openPluginTab('lawfirm-management')
-      } else {
-        this.leftPaneKey = 'plugin-lawfirm-management'
-        this.sidebarCollapsed = false
-      }
+      // 全所工作台（C18b）：有没有项目都开中栏工作区；没有项目时 projectId 为空，收案不挂项目
+      this.openPluginTab('lawfirm-management')
       if (opts && opts.tab) {
         setTimeout(() => {
           uni.$emit('awd:lawfirm-tab', { tab: opts.tab, ...(opts.recordId ? { recordId: opts.recordId } : {}) })
