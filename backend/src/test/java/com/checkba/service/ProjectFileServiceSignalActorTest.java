@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -128,5 +129,20 @@ class ProjectFileServiceSignalActorTest {
         service.createFolder(PROJECT_ID, null, "证据", OWNER_ID);
         verify(workSessionService).onChangeSignal(eq(PROJECT_ID), any(), any());
     }
-}
 
+    /**
+     * C23 × C27 merge (createFolder): a folder signals a change only when it is BOTH an ordinary call (not the
+     * client-upload path, which records its own version) AND not one of the app's hidden system folders.
+     * All four combinations; dropping either half of the condition turns one of them red.
+     */
+    @Test
+    void aFolderSignalsOnlyWhenItIsAnOrdinaryCallForAnOrdinaryFolder() {
+        when(projectFileRepository.existsByProjectIdAndParentIdAndNameAndIdNot(anyLong(), any(), anyString(), anyLong())).thenReturn(false);
+        service.createFolderQuietly(PROJECT_ID, null, "客户材料", OWNER_ID);    // client upload, ordinary name
+        service.createFolderQuietly(PROJECT_ID, null, ".stagezone", OWNER_ID); // client upload, system name
+        service.createFolder(PROJECT_ID, null, ".stagezone", OWNER_ID);        // ordinary call, system name
+        verify(workSessionService, never()).onChangeSignal(anyLong(), any(), any());
+        service.createFolder(PROJECT_ID, null, "证据", OWNER_ID);              // ordinary call, ordinary name
+        verify(workSessionService, times(1)).onChangeSignal(eq(PROJECT_ID), any(), any());
+    }
+}

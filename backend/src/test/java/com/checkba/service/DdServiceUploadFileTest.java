@@ -79,7 +79,7 @@ class DdServiceUploadFileTest {
         // ensureFolder 找不到就建：给个自增 id 的假文件夹，不需要真实建文件夹的副作用
         projectFileService = mock(ProjectFileService.class);
         AtomicLong folderIdSeq = new AtomicLong(1000);
-        when(projectFileService.createFolder(anyLong(), any(), anyString(), anyLong())).thenAnswer(inv -> {
+        when(projectFileService.createFolderQuietly(anyLong(), any(), anyString(), anyLong())).thenAnswer(inv -> {
             ProjectFile f = new ProjectFile();
             f.setId(folderIdSeq.incrementAndGet());
             f.setProjectId(inv.getArgument(0));

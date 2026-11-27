@@ -567,6 +567,33 @@ public class ProjectRepoService {
     }
 
     /** Commit the working tree, persisting externalized snapshots before their Git pointers. No cloud I/O. */
+    /**
+     * C23：提交工作区里除 {@code excluded} 之外的全部改动（客户交材料之前，先把服务端别处的待存改动
+     * 以系统名义单独存一版，客户那一版就只含他自己的文件）。没有可提交的回 null。
+     */
+    public String commitAllExcept(long projectId, Collection<String> excluded, String message, String kind,
+                                  String note, String authorName, String authorEmail) {
+        clearStaleIndexLock(projectId);
+        try (Repository repo = open(projectId); Git git = new Git(repo)) {
+            Status pre = git.status().call();
+            if (pre.isClean()) return null;
+            stageAll(git, pre);
+            if (excluded != null && !excluded.isEmpty()) {
+                var reset = git.reset();
+                excluded.forEach(reset::addPath);
+                reset.call();
+            }
+            Status staged = git.status().call();
+            if (staged.getAdded().isEmpty() && staged.getChanged().isEmpty() && staged.getRemoved().isEmpty()) return null;
+            StringBuilder msg = new StringBuilder(message).append("\n\n")
+                    .append(KIND_TRAILER).append(kind).append('\n').append(OBJECT_FORMAT_TRAILER);
+            if (note != null && !note.isBlank()) msg.append('\n').append(NOTE_TRAILER).append(note);
+            return git.commit().setMessage(msg.toString()).setAuthor(authorName, authorEmail).call().getName();
+        } catch (Exception e) {
+            throw new VersionException("提交失败: project=" + projectId, e);
+        }
+    }
+
     public String commitAll(long projectId, String message, String kind, String note,
                             String authorName, String authorEmail) {
         clearStaleIndexLock(projectId);

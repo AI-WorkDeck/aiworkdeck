@@ -889,6 +889,7 @@ export default {
         revert: this.$t('version.typeRevert'),
         auto: this.$t('version.typeAuto'),
         upgrade: this.$t('version.typeUpgrade'),
+        'client-submission': this.$t('version.typeClientSubmission'),
       }[e && e.type] || ''
     },
     changeTypeLabel(t) {
