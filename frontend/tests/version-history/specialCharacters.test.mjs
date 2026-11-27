@@ -66,7 +66,7 @@ test('全部隐藏后只勾选换行；其它活动文档与重建实例均同�
   const reopened = h.make()
   assert.deepEqual(reopened.viewPrefs, expected)
   await reopened.reapplyChrome()
-  assert.deepEqual(h.calls.at(-1), ['set_view_options', { ...expected, textBoundaries: false }])
+  assert.deepEqual(h.calls.at(-1), ['set_view_options', { ...expected, textBoundaries: false, bookmarks: false }])
   assert.equal(h.emitted.includes('changed'), false)
   await a.setMark('lineBreaks', false)
   assert.equal(a.formattingMarks, false)
