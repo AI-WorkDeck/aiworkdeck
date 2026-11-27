@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Taux d’honoraires de résultat (%)",
   "casePreviewConflictBtn": "Lancer le pré-contrôle de conflit",
   "caseSubmitIntakeBtn": "Soumettre le dossier et vérifier les conflits",
-  "caseIntakeEmpty": "Aucun dossier enregistré pour le moment. Cliquez sur « Nouveau dossier » ou « Charger la démo Qinghe Foods » ci-dessus pour commencer.",
+  "caseIntakeEmpty": "Aucun dossier enregistré pour le moment. Cliquez sur « Nouveau dossier » ci-dessus pour commencer.",
   "caseContractedLabel": "Montant contractuel",
   "caseImBadge": "Groupe de messagerie créé et résumé synchronisé",
   "caseMyClearanceTitle": "Vérifications de conflits qui me sont assignées",

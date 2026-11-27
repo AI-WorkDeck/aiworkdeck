@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "성과 보수 비율 (%)",
   "casePreviewConflictBtn": "이해충돌 사전 검사 실행",
   "caseSubmitIntakeBtn": "수임 정보 제출 및 이해충돌 검사",
-  "caseIntakeEmpty": "아직 수임 기록이 없습니다. 상단의 \"새 사건 수임\" 또는 \"데모 데이터 생성\"을 클릭하여 시작하세요.",
+  "caseIntakeEmpty": "아직 수임 기록이 없습니다. 상단의 \"새 사건 수임\"을 클릭하여 시작하세요.",
   "caseContractedLabel": "계약 체결됨",
   "caseImBadge": "IM 그룹 생성 및 요약 동기화 완료",
   "caseMyClearanceTitle": "내게 할당된 이해충돌 승인",

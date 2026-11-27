@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "نسبة الأتعاب الطارئة (%)",
   "casePreviewConflictBtn": "تشغيل الفحص المبدئي لتعارض المصالح",
   "caseSubmitIntakeBtn": "إرسال تسجيل القضية وفحص التعارض",
-  "caseIntakeEmpty": "لا توجد سجلات تسجيل بعد. انقر على \"تسجيل قضية جديد\" أو \"تحميل عرض Qinghe Foods التجريبي\" أعلاه للبدء.",
+  "caseIntakeEmpty": "لا توجد سجلات تسجيل بعد. انقر على \"تسجيل قضية جديد\" أعلاه للبدء.",
   "caseContractedLabel": "المتعاقد عليه",
   "caseImBadge": "تم إنشاء مجموعة الرسائل الفورية ومزامنة الملخص",
   "caseMyClearanceTitle": "تسهيلات التعارض المسندة إليّ",

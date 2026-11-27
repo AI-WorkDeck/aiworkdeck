@@ -305,6 +305,7 @@ ai:
         base-url: https://www.aiworkdeck.com
         registry-base-url: https://www.aiworkdeck.com/api/registry
         telemetry-ingest-url: https://www.aiworkdeck.com/api/telemetry
+        packs-base-url: https://www.aiworkdeck.com/plugin-packs
         account-page-url: https://www.aiworkdeck.com/zh/account
       intl:
         # 国际站已上线（2026-09-23 起开启，dev-board#846）：两个站点都可选，
@@ -315,6 +316,7 @@ ai:
         base-url: https://www.workdeck.ai
         registry-base-url: https://www.workdeck.ai/api/registry
         telemetry-ingest-url: https://www.workdeck.ai/api/telemetry
+        packs-base-url: https://workdeck.ai/plugin-packs
         account-page-url: https://www.workdeck.ai/en/account
         # 国际站服务境外用户：不征求个保法第三十九条的跨境单独同意（大陆站不写这一行 = 默认要征求）。
         # AI 服务商处理说明放在隐私政策里，随「服务条款 / 隐私政策」那一项一并同意。

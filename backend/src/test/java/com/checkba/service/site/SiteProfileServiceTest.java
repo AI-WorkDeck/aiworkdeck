@@ -182,4 +182,26 @@ class SiteProfileServiceTest {
         assertTrue(svc.multiSite());
         assertEquals(List.of("cn", "intl"), svc.availableSites().stream().map(SiteProfile::id).toList());
     }
+
+    @Test
+    @DisplayName("0.91.0：全新安装没选站 → siteChosen=false；写了 site.json、老安装、被钉住 → true")
+    void siteChosenOnlyFalseForAFreshInstall() throws Exception {
+        assertFalse(service(true, CN, "", true).siteChosen(), "fresh install, no site.json");
+        assertTrue(new SiteProfileService(true, CN, "", tempDir.toString(), props(true), true).siteChosen(), "legacy install");
+        assertTrue(service(false, CN, "", true).siteChosen(), "server mode is a deployment decision");
+        SiteStateFile.write(tempDir, new SiteStateFile.State("intl", "2026-11-26T00:00:00Z", "user"));
+        assertTrue(service(true, INTL, "intl", true).siteChosen(), "site.json written by the picker");
+    }
+
+    @Test
+    @DisplayName("0.91.0：没选站时只拦站点地址；本机测试替身、自建源照常")
+    void freshInstallBlocksOnlySiteHosts() {
+        SiteProfileService fresh = service(true, CN, "", true);
+        assertFalse(fresh.mayContact(CN + "/api/registry/plugins"));
+        assertFalse(fresh.mayContact("https://aiworkdeck.com/plugin-packs/x"));
+        assertFalse(fresh.mayContact(INTL + "/api/telemetry"));
+        assertFalse(fresh.mayContact("https://workdeck.ai/plugin-packs"));
+        assertTrue(fresh.mayContact("http://127.0.0.1:9000/registry/plugins"));
+        assertTrue(fresh.mayContact("https://packs.example.org/x"));
+    }
 }

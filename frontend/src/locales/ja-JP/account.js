@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "成功報酬率（%）",
   "casePreviewConflictBtn": "利益相反事前チェックを実行",
   "caseSubmitIntakeBtn": "受任情報と利益相反チェックを送信",
-  "caseIntakeEmpty": "受任記録はまだありません。上部の「新規案件受任」または「デモデータ作成」をクリックして始めてください。",
+  "caseIntakeEmpty": "受任記録はまだありません。上部の「新規案件受任」をクリックして始めてください。",
   "caseContractedLabel": "契約済み",
   "caseImBadge": "IMグループ作成・サマリー同期済み",
   "caseMyClearanceTitle": "自分に割り当てられた利益相反承認",

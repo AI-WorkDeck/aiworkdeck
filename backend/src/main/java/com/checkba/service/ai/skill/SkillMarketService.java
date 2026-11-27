@@ -103,6 +103,7 @@ public class SkillMarketService {
      * @throws IllegalStateException 注册表不可达或返回内容无法解析（调用方转 {code:1}，不阻断本地功能）
      */
     public List<MarketSkillView> listMarket() {
+        if (!purchaseGate.mayContact(currentRegistryUrl())) return new java.util.ArrayList<>();   // 没选站前不连任何站点
         var connection = purchaseGate.connectionSnapshot();
         String body = httpGet(currentRegistryUrl());
         purchaseGate.assertConnection(connection);
