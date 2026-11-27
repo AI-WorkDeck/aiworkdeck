@@ -240,7 +240,7 @@
           const cm = await D.call('matter', { id: child })
           const v = (cm.versions || [])[cm.versions.length - 1]
           if (!v) { out.textContent = t('noDraft'); return }
-          F.review[child] = await ai(`Check this draft against the framework the lawyer agreed with the client. List only concrete mismatches or omissions (quote the clause), then anything to confirm with the client. If it is consistent, say so in one line.\n\nFramework:\n${fw.memo}\n\nDraft (${docTitle(id)}):\n${String(v.markdown).slice(0, 30000)}`, 'aifirm-framing-review')
+          F.review[child] = await ai(`Check this draft against the framework the lawyer agreed with the client. Start with a one-line bold verdict counting what you found, e.g. **1 mismatch, 1 point to confirm**, or **Consistent with the framework** only if there is no mismatch. Then list each mismatch or omission (quote the clause and give the agreed term), then anything to confirm with the client.\n\nFramework:\n${fw.memo}\n\nDraft (${docTitle(id)}):\n${String(v.markdown).slice(0, 30000)}`, 'aifirm-framing-review')
           aiText(out, F.review[child])
         } catch (e) { out.textContent = ''; D.fail(e) } finally { btn.disabled = false }
       } } }, t('check'))
