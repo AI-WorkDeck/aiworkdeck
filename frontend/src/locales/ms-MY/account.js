@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Kadar Kontingensi (%)",
   "casePreviewConflictBtn": "Jalankan Pra-semakan Konflik",
   "caseSubmitIntakeBtn": "Hantar Pendaftaran & Semakan Konflik",
-  "caseIntakeEmpty": "Belum ada rekod pendaftaran. Klik \"Pendaftaran Kes Baharu\" atau \"Demo Qinghe Foods Seed\" di atas untuk bermula.",
+  "caseIntakeEmpty": "Belum ada rekod pendaftaran. Klik \"Pendaftaran Kes Baharu\" di atas untuk bermula.",
   "caseContractedLabel": "Berkontrak",
   "caseImBadge": "Kumpulan IM Dicipta & Ringkasan Disegerakkan",
   "caseMyClearanceTitle": "Pelepasan Konflik Ditugaskan kepada Saya",

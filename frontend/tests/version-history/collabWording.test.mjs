@@ -121,3 +121,17 @@ test('C23: client portal materials are counted apart from colleagues\' drafts', 
   assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 2, remoteAheadAuthors: ['沈砚'], remoteAheadAuthorCount: 1 }),
     'version.remoteAheadOne{"name":"沈砚","count":2}', 'unchanged without materials (and with older servers)')
 })
+
+// 客户材料的份数可能是 1：在名词有单复数的语言里，「{count} + 复数名词」会读成 "Pull the 1 new client materials"。
+// 这些语言的两句只能用与数无关的写法：名词在前，份数放括号或冒号后。
+test('client-material counts read right for 1 in languages that inflect nouns for number', async () => {
+  const inflecting = ['en-US', 'de-DE', 'el-GR', 'es-ES', 'fr-FR', 'it-IT', 'nl-NL', 'pt-BR', 'ru-RU']
+  for (const loc of inflecting) {
+    const { default: v } = await import(`../../src/locales/${loc}/version.js`)
+    for (const key of ['remoteAheadMaterials', 'remoteAheadPlusMaterials', 'submitGuidePullMaterials']) {
+      const s = v[key]
+      assert.ok(s.includes('{count}'), `${loc}.${key} keeps the count`)
+      assert.match(s, /(\(\{count\}\)|[:·] \{count\})\s*$/, `${loc}.${key} = "${s}": count must close the sentence as "({count})", ": {count}" or "· {count}"`)
+    }
+  }
+})

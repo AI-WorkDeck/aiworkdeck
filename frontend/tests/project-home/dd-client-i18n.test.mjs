@@ -16,7 +16,7 @@ const files = ['components/dd/DdClientWorkspace.vue', 'components/dd/DdClientChe
 function component(file) {
   const s = source(file)
   const body = s.slice(s.indexOf('<script>') + 8, s.indexOf('</script>')).replace(/^import .*$/gm, '').replace('export default', 'return')
-  const options = new Function('DdClientWorkspace', 'DdClientChecklist', 'ClientPortalChat', 'ddNotificationPermission', 'portalChat', body)({ render: () => null }, { render: () => null }, { render: () => null }, () => 'unavailable', async () => ({}))
+  const options = new Function('DdClientWorkspace', 'DdClientChecklist', 'ClientPortalChat', 'ddNotificationPermission', 'portalChat', 'errorTextFor', 'isRawTechnicalText', 'getAppLanguage', body)({ render: () => null }, { render: () => null }, { render: () => null }, () => 'unavailable', async () => ({}), (e, f) => f, () => false, () => 'en-US')
   const code = compile(s.match(/<template>([\s\S]*?)<\/template>/)[1], { mode: 'function', isCustomElement: tag => ['view', 'checkbox-group', 'checkbox', 'progress'].includes(tag) }).code
   options.render = new Function('Vue', code)(Vue)
   return options
@@ -38,7 +38,7 @@ test('all client templates resolve fixed copy through locale keys, including ari
 test('the actual English workspace and portal renders contain no fixed Chinese copy', async () => {
   const workspace = await render(files[0], 'en-US', { cloudConnections: [{ id: 1, displayName: 'Test server' }] })
   assert.match(workspace, /Client collaboration/); assert.match(workspace, /Join project/)
-  assert.match(workspace, /Official case library/); assert.match(workspace, /Enter invitation code/)
+  assert.match(workspace, /Official case library/); assert.match(workspace, /Enter access code/)
   assert.match(workspace, /System notifications are off/); assert.doesNotMatch(workspace, /[\p{Script=Han}]/u)
   const portal = await render(files[2], 'en-US')
   assert.match(portal, /Source code/); assert.match(portal, /https:\/\/github.com\/AI-WorkDeck\/aiworkdeck/)
@@ -96,16 +96,16 @@ test('notification translations preserve business titles and leave unfamiliar me
 
 test('known fixed server errors are translated without rewriting unfamiliar details', async () => {
   const api = serviceFixture('en-US', async () => ({ status: 403, json: async () => ({ message: '邀请已失效，请重新输入邀请码' }) }))
-  await assert.rejects(api.ddClientJson('/anything'), /invitation is no longer valid/)
+  await assert.rejects(api.ddClientJson('/anything'), /connection has expired/)
   assert.equal(api.ddClientErrorMessage('客户原样说明'), '客户原样说明')
   assert.equal(serviceFixture('zh-CN').ddClientErrorMessage('无权访问该清单'), '无权访问该清单')
 })
 
 test('portal invitation failures localize real access-code responses and keep Chinese intact', async () => {
   const responses = [
-    ['访问码无效', 'This invitation code is invalid. Check the code and retry.'],
-    ['访问码已失效', 'This invitation code has been revoked. Ask your lawyer for a new one.'],
-    ['访问码已过期，请联系律师重新发送', 'This invitation code has expired. Ask your lawyer for a new one.'],
+    ['访问码无效', 'This access code is invalid. Check the code and retry.'],
+    ['访问码已失效', 'This access code has been revoked. Ask your lawyer for a new one.'],
+    ['访问码已过期，请联系律师重新发送', 'This access code has expired. Ask your lawyer for a new one.'],
   ]
   for (const [message, english] of responses) {
     const fetch = async () => ({ status: 200, json: async () => ({ code: 1, message }) })

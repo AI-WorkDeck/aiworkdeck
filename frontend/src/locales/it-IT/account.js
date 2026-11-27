@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Percentuale sul risultato (%)",
   "casePreviewConflictBtn": "Esegui pre-verifica conflitti",
   "caseSubmitIntakeBtn": "Invia accettazione e verifica conflitti",
-  "caseIntakeEmpty": "Ancora nessuna registrazione di accettazione. Fai clic su «Nuova accettazione pratica» o «Carica demo Qinghe Foods» qui sopra per iniziare.",
+  "caseIntakeEmpty": "Ancora nessuna registrazione di accettazione. Fai clic su «Nuova accettazione pratica» qui sopra per iniziare.",
   "caseContractedLabel": "Contrattualizzato",
   "caseImBadge": "Gruppo IM creato e riepilogo sincronizzato",
   "caseMyClearanceTitle": "Verifiche conflitti assegnate a me",

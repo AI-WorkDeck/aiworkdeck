@@ -1006,7 +1006,7 @@
                     </view>
                   </view>
                 </scroll-view>
-                <view class="tabs-plus" @tap="onTabsPlusClick('left')" :title="$t('workbench.newOrCopy')">
+                <view class="tabs-plus" role="button" tabindex="0" aria-haspopup="menu" @tap="onTabsPlusClick('left', $event)" @keydown.enter.prevent="onTabsPlusClick('left', $event)" :title="$t('workbench.plusMenu.tooltip')" :aria-label="$t('workbench.plusMenu.aria')">
                   <text class="tabs-plus-icon">＋</text>
                 </view>
               </view>
@@ -1049,7 +1049,7 @@
                     </view>
                   </view>
                 </scroll-view>
-                <view class="tabs-plus" @tap="onTabsPlusClick('right')" :title="$t('workbench.newOrCopy')">
+                <view class="tabs-plus" role="button" tabindex="0" aria-haspopup="menu" @tap="onTabsPlusClick('right', $event)" @keydown.enter.prevent="onTabsPlusClick('right', $event)" :title="$t('workbench.plusMenu.tooltip')" :aria-label="$t('workbench.plusMenu.aria')">
                   <text class="tabs-plus-icon">＋</text>
                 </view>
               </view>
@@ -2308,6 +2308,7 @@
       />
 
       <!-- 命令面板（⌥⌘P）：与菜单栏读同一份命令表 -->
+      <TabsPlusMenu ref="tabsPlusMenu" @select="onTabsPlusSelect" />
       <CommandPalette
         v-if="commandPaletteVisible"
         @run="onCommandPaletteRun"
@@ -2512,6 +2513,7 @@ import BrowserPane from '@/components/BrowserPane.vue'
 import FileTree from '@/components/FileTree.vue'
 import QuickOpenPanel from '@/components/QuickOpenPanel.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
+import TabsPlusMenu from '@/components/TabsPlusMenu.vue'
 import AppMenuBar from '@/components/AppMenuBar.vue'
 import DesktopUpdateIndicator from '@/components/DesktopUpdateIndicator.vue'
 import FilePreview from '@/components/FilePreview.vue'
@@ -2578,7 +2580,6 @@ import {
   createFile,
   ensureScratchProject,
   promoteScratchProject,
-  batchCopyFiles,
   exportAiDocx,
   getProjectMembers,
   logActivity,
@@ -2784,6 +2785,7 @@ export default {
     BrowserPane,
     QuickOpenPanel,
     CommandPalette,
+    TabsPlusMenu,
     AppMenuBar,
     DesktopUpdateIndicator,
     FileTree,
@@ -4545,7 +4547,7 @@ export default {
     })
     // 余额刷新事件（充值弹窗 / SKU 购买成功后 emit）。页面栈多实例地雷：mounted 挂、
     // beforeUnmount 必须按引用 $off，否则每回来一次多一份订阅。
-    this._onWalletRefresh = () => this.loadWalletBalance()
+    this._onWalletRefresh = (payload) => this.loadWalletBalance(!!(payload && payload.fresh))
     uni.$on('awd:wallet-refresh', this._onWalletRefresh)
     // 账户连上 / 断开（登录弹层成功、utils/signOut.js，dev-board#1046）：rail 账户入口的头像、余额抬头、
     // 宽限提示都读本页的授权状态与余额，就地重拉，不刷新页面。刻意不加 isActiveOverviewInstance 守卫：
@@ -5072,10 +5074,10 @@ export default {
     // Credits 余额 chip 数据（dev-board#187）。轻端点（后端 TTL 缓存），随 onShow /
     // awd:wallet-refresh 拉取。connected:false 或失败时置 loaded=false 让 chip 整个消失，
     // 绝不摆一个「¥0.00」冒充余额。
-    async loadWalletBalance() {
+    async loadWalletBalance(fresh = false) {
       if (!isDesktopHost()) return
       try {
-        const data = await getAccountBalance()
+        const data = await getAccountBalance({ fresh })
         if (data && data.connected) {
           this.wallet = {
             loaded: true,
@@ -6501,38 +6503,49 @@ export default {
       const anyLeft = Array.isArray(this.leftFiles) ? this.leftFiles.find(t => t && t.tabType === 'web') : null
       return anyLeft || null
     },
-    async onTabsPlusClick(pane) {
-      // 规则：
-      // - 如果当前激活的是网页 Tab：新建网页 Tab
-      // - 否则：复制当前文件（后端 batchCopy），并打开新文件
-      const active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
-      if (active && this.isBrowserTab(active)) {
-        this.openBrowserTab('', pane)
+    /** D30：「＋」打开小菜单（新建 Word / Excel / PowerPoint / 浏览器标签）；不再复制当前文档。 */
+    onTabsPlusClick(pane, event) {
+      this.tabsPlusPane = pane === 'right' && this.splitMode ? 'right' : 'left'
+      // uni 的 tap 事件不一定带可用的 currentTarget：按窗格直接找这个「＋」
+      const el = this.$el?.querySelector?.(`.tabs-pane-${this.tabsPlusPane} .tabs-plus`)
+        || event?.target?.closest?.('.tabs-plus') || null
+      const anchor = el?.getBoundingClientRect ? el.getBoundingClientRect() : null
+      this.$refs.tabsPlusMenu?.open({ anchor, trigger: el })
+    },
+
+    async onTabsPlusSelect(kind) {
+      const pane = this.tabsPlusPane || 'left'
+      if (kind === 'web') {
+        this.openBrowserTab(undefined, pane)
         return
       }
-      if (!active || !active.id || !this.projectId) {
-        this.openBrowserTab('', pane)
-        return
-      }
+      if (!['docx', 'xlsx', 'pptx'].includes(kind)) return
       try {
-        const targetParentId = active.parentId != null ? active.parentId : null
-        const res = await batchCopyFiles(this.projectId, [active.id], targetParentId)
-        const created = (res && res.data && Array.isArray(res.data.files)) ? res.data.files : (res && res.files) || []
-        const createdFile = Array.isArray(created) ? created[0] : null
-        if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
-          await this.$refs.fileTree.loadFiles()
-        }
-        if (createdFile) {
-          // 强制在目标 pane 打开并保持聚焦，确保活动标签与左侧资源管理器高亮一致
-          this.focusedPane = pane === 'right' && this.splitMode ? 'right' : 'left'
-          this.openFile(createdFile)
-        } else {
-          uni.showToast({ title: this.$t('workbench.copyFailedNoNewFile'), icon: 'none' })
-        }
+        if (!this.hasProject) await this.ensureScratchWorkspaceLoaded()
+        const name = this.nextBlankOfficeName(kind)
+        const res = await createFile(this.projectId, null, name, kind, null, null)
+        const createdFile = res?.data || res
+        if (this.$refs.fileTree?.loadFiles) await this.$refs.fileTree.loadFiles()
+        if (!createdFile || !createdFile.id) throw new Error(this.$t('fileTree.createFileFailedRetry'))
+        this.focusedPane = pane
+        this.openFile(createdFile)
       } catch (e) {
-        console.error('复制文件失败', e)
-        uni.showToast({ title: errorText(e, this.$t('workbench.copyFailed')), icon: 'none' })
+        console.error('新建文件失败', e)
+        uni.showToast({ title: errorText(e, this.$t('fileTree.createFileFailedRetry')), icon: 'none' })
       }
+    },
+
+    /** 项目根目录下不重名的空白 Office 文件名，规则同资源管理器（重名加「 (2)」）。 */
+    nextBlankOfficeName(kind) {
+      const ext = '.' + kind
+      const base = this.$t(kind === 'xlsx' ? 'fileTree.defaultSpreadsheetName' : kind === 'pptx' ? 'fileTree.defaultPresentationName' : 'fileTree.defaultDocumentName')
+      const tree = this.$refs.fileTree
+      const all = [...((tree && tree.allFiles) || []), ...((tree && tree.files) || [])]
+      const used = new Set(all.filter((f) => f && (f.parentId == null)).map((f) => String(f.name || '').toLocaleLowerCase()))
+      let name = base + ext
+      let n = 2
+      while (used.has(name.toLocaleLowerCase())) name = `${base} (${n++})${ext}`
+      return name
     },
     focusFavoritePlugin(id) {
       this.openPanelInItsDock('favorites')
@@ -8662,12 +8675,8 @@ export default {
 
     async handleOpenLawFirmPlugin(opts = {}) {
       await this.loadDynamicPlugins()
-      if (this.hasProject) {
-        this.openPluginTab('lawfirm-management')
-      } else {
-        this.leftPaneKey = 'plugin-lawfirm-management'
-        this.sidebarCollapsed = false
-      }
+      // 全所工作台（C18b）：有没有项目都开中栏工作区；没有项目时 projectId 为空，收案不挂项目
+      this.openPluginTab('lawfirm-management')
       if (opts && opts.tab) {
         setTimeout(() => {
           uni.$emit('awd:lawfirm-tab', { tab: opts.tab, ...(opts.recordId ? { recordId: opts.recordId } : {}) })

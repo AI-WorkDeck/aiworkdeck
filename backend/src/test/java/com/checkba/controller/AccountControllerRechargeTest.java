@@ -27,6 +27,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 
 /**
  * dev-board#183/#184：桌面内嵌余额展示与充值新增的四个转发端点
@@ -167,10 +169,21 @@ class AccountControllerRechargeTest {
     @DisplayName("未连接账户：balance 端点走 {connected:false} 分支，根本不是异常")
     void balanceNotConnectedReturnsBusinessState() {
         when(accountService.balanceSnapshot()).thenReturn(Map.of("connected", false));
-        Map<String, Object> result = controller.balance(null);
+        Map<String, Object> result = controller.balance(null, null);
         assertEquals(0, result.get("code"));
         Map<?, ?> data = (Map<?, ?>) result.get("data");
         assertEquals(false, data.get("connected"));
+        verify(accountService, never()).clearBalanceCache();
+    }
+
+    @Test
+    @DisplayName("0.91.0：fresh=1 跳过 60 秒缓存（AI 轮次刚扣过费、钱包刚打开）")
+    void freshBalanceClearsTheCacheFirst() {
+        when(accountService.balanceSnapshot()).thenReturn(Map.of("connected", true, "balanceCents", 296));
+        controller.balance(true, null);
+        var order = inOrder(accountService);
+        order.verify(accountService).clearBalanceCache();
+        order.verify(accountService).balanceSnapshot();
     }
 
     @Test

@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Baharu",
+    "aria": "Dokumen baharu atau tab pelayar baharu",
+    "newWord": "Dokumen Word baharu",
+    "newExcel": "Buku kerja Excel baharu",
+    "newPowerPoint": "Pembentangan PowerPoint baharu",
+    "newBrowserTab": "Tab pelayar baharu",
+  },
   scratchCopyChoose: "Pilih kandungan untuk disalin",
   scratchCopySelected: "{count} dipilih",
   scratchCopyFiles: "Fail",
@@ -179,7 +187,6 @@ export default {
   "recycleBin": "Tong Kitar Semula",
   "loadingText": "Memuatkan...",
   "explorerFallback": "Penjelajah",
-  "newOrCopy": "Baharu / Pendua",
   "emptyWorkspace": "Pilih fail untuk bermula",
   "emptyWorkspaceHint": "Buka fail daripada penjelajah di sebelah kiri, atau cipta dokumen baharu",
   "railEditEnter": "Susun bar sisi (seret untuk susun semula atau dok)",
@@ -336,8 +343,6 @@ export default {
   "shareFailed": "Tidak dapat menghantar fail ini",
   "shareUnsupported": "Penghantaran tidak disokong pada sistem ini",
   "shareClipboardHint": "Fail disalin. Tukar ke WeChat, pilih sembang dan tekan Ctrl+V untuk menghantar",
-  "copyFailedNoNewFile": "Salinan gagal: tiada fail baharu dikembalikan",
-  "copyFailed": "Gagal menyalin",
   "recordingStarted": "Log aktiviti dimulakan",
   "recordingStopped": "Log aktiviti dihentikan",
   "insertedToDoc": "Dimasukkan ke dalam dokumen",

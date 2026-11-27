@@ -15,7 +15,15 @@ export function pluginViews(plugin, resolveEntry) {
   })
 }
 
+// C18b：律所管理是全所工作台，不该非要先打开一个项目才能进。它还是旧式单入口插件（左栏摘要卡 +
+// 中栏工作区），开着项目时照旧按该项目登记收案；只是没有项目时也允许打开（projectId 为空）。
+const FIRM_WIDE_PLUGIN_IDS = new Set(['lawfirm-management'])
+function isFirmWidePlugin(plugin) {
+  return !!plugin && FIRM_WIDE_PLUGIN_IDS.has(plugin.pluginId || plugin.id) && plugin.hasDeclaredViews !== true
+}
+
 export function isGlobalPlugin(plugin) {
+  if (isFirmWidePlugin(plugin)) return true
   const entry = plugin?.sidebarView || plugin?.workspaceView
     || plugin?.views?.find(view => view.placement === 'sidebar')
     || plugin?.views?.find(view => view.placement === 'workspace')
@@ -34,7 +42,7 @@ export function hasPluginPanel(plugin) {
 
 export function canOpenPluginWorkspace(plugin, hasProject) {
   if (!plugin || plugin.legacyThemeGallery || (plugin.hasDeclaredViews === true && !plugin.workspaceView)) return false
-  return !!hasProject || plugin.workspaceView?.scope === 'global'
+  return !!hasProject || plugin.workspaceView?.scope === 'global' || isFirmWidePlugin(plugin)
 }
 
 // Older theme packs used a global gallery as their preview entry. Preserve their
