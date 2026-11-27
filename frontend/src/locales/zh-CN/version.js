@@ -599,4 +599,9 @@ export default {
   mergeReadonlyNeedsFile: '这份合并稿要从文件列表里打开查看',
   transferUploading: '正在上传大文件 {done} / {total} MB，网速慢时需要几分钟',
   transferDownloading: '正在取回大文件 {done} / {total} MB，网速慢时需要几分钟',
+  localOnlyNoticeTitle: '这些文件留在了本机',
+  localOnlyNoticeBody: '已交稿。{files} 超出了免费共享额度，只在你这台电脑上，同事会看到占位。开启文件云端备份后再交稿即可共享。',
+  localOnlyNoticeMore: '等 {count} 份',
+  localOnlyNoticeAction: '开启文件云端备份',
+  localOnlyNoticeOk: '知道了',
 }

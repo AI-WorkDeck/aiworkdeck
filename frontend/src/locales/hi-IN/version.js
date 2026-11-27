@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "इस मर्ज किए गए ड्राफ़्ट को फ़ाइल सूची से खोलें।",
   transferUploading: 'बड़ी फ़ाइलें अपलोड हो रही हैं {done} / {total} MB; धीमे कनेक्शन पर कुछ मिनट लग सकते हैं',
   transferDownloading: 'बड़ी फ़ाइलें डाउनलोड हो रही हैं {done} / {total} MB; धीमे कनेक्शन पर कुछ मिनट लग सकते हैं',
+  "localOnlyNoticeTitle": "ये फ़ाइलें इसी कंप्यूटर पर रहीं",
+  "localOnlyNoticeBody": "जमा हो गया। {files} मुफ़्त साझा सीमा से अधिक थीं और आपके कंप्यूटर पर ही हैं; सहकर्मियों को प्लेसहोल्डर दिखता है। साझा करने के लिए क्लाउड फ़ाइल बैकअप चालू करें और फिर से जमा करें।",
+  "localOnlyNoticeMore": " और कुल {count}",
+  "localOnlyNoticeAction": "क्लाउड फ़ाइल बैकअप चालू करें",
+  "localOnlyNoticeOk": "ठीक है",
 }

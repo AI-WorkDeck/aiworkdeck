@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Word로 내보내기(레이아웃 유지)",
   "ocrSearchablePdf": "검색 가능한 PDF 만들기",
   "ocrLayoutSuffix": "-OCR 레이아웃",
-  "ocrSearchableSuffix": "-검색가능"
+  "ocrSearchableSuffix": "-검색가능",
+  "localOnlyMine": "이 컴퓨터에만 있음(공유 안 됨)",
+  "localOnlyMineTip": "무료 공유 한도를 넘어 이 파일은 내 컴퓨터에만 있으며 동료에게는 자리표시자가 보입니다. 공유하려면 파일 클라우드 백업을 켜고 다시 제출하세요.",
+  "localOnlyOther": "{name} 님의 컴퓨터에만 있음",
+  "localOnlyOtherUnknown": "동료의 컴퓨터에만 있음",
+  "localOnlyOtherTip": "이 파일은 {name} 님의 컴퓨터에만 있고 사건 라이브러리에 공유되지 않았습니다. {name} 님에게 클라우드 백업을 켜고 다시 제출해 달라고 요청하세요.",
+  "localOnlyColleague": "동료",
+  "localOnlyOk": "확인",
 }

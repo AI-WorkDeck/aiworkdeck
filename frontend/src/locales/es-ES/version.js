@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "Abra este borrador fusionado desde la lista de archivos.",
   transferUploading: 'Subiendo archivos grandes {done} / {total} MB; con una conexión lenta puede tardar unos minutos',
   transferDownloading: 'Descargando archivos grandes {done} / {total} MB; con una conexión lenta puede tardar unos minutos',
+  "localOnlyNoticeTitle": "Estos archivos se quedaron en este equipo",
+  "localOnlyNoticeBody": "Entregado. {files} superaron la cuota gratuita para compartir y se quedan en tu equipo; tus colegas ven un marcador. Activa la copia de seguridad en la nube y vuelve a entregar para compartirlos.",
+  "localOnlyNoticeMore": " y {count} en total",
+  "localOnlyNoticeAction": "Activar copia de seguridad en la nube",
+  "localOnlyNoticeOk": "Entendido",
 }
