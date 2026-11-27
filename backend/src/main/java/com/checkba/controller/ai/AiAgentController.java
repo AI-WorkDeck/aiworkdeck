@@ -261,6 +261,11 @@ public class AiAgentController {
         if (request.getMessage() == null || request.getMessage().isBlank()) {
             return chatError(400, LangText.of("消息内容不能为空", "Message cannot be empty"));
         }
+        // X39：只能续写本会话最后一条中途断开的回答；其余情况在入口就拒绝，不进收件箱
+        if (request.isContinueTurn() && !agentOrchestrator.canContinue(request.getConversationId())) {
+            return chatError(409, LangText.of("这条回答不能接着写，请点「重试」重新生成",
+                    "This answer can no longer be continued; select Retry to generate it again"));
+        }
 
         // Resolve before inbox persistence or model execution. A retry must not duplicate a turn.
         try {
@@ -823,6 +828,10 @@ public class AiAgentController {
         public java.util.List<String> getSkillIds() { return skillIds; }
         public void setSkillIds(java.util.List<String> skillIds) { this.skillIds = skillIds; }
         public boolean isDecisionAssistEnabled() { return decisionAssistEnabled; }
+        /** X39：接着写上一条中途断开的回答（不新建用户消息，续写追加到同一条回答）。 */
+        private boolean continueTurn;
+        public boolean isContinueTurn() { return continueTurn; }
+        public void setContinueTurn(boolean continueTurn) { this.continueTurn = continueTurn; }
         public void setDecisionAssistEnabled(boolean decisionAssistEnabled) { this.decisionAssistEnabled = decisionAssistEnabled; }
 
         /** Consent accepts JSON booleans only; Jackson's usual string/number coercion must not opt in. */

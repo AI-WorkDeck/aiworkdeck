@@ -14,7 +14,12 @@ const CONTAINER_ID = 'awd-permission-onboarding'
 
 const DEFAULT_ORDER = ['fullDiskAccess', 'screenRecording', 'microphone', 'accessibility']
 
-export function normalizePermissionItems(rawItems = []) {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.wechat=true] 是否把「完全磁盘访问」标成「微信拖入必需」。国际站用户不用微信，
+ *        这个标签对他们是噪音（0.91.0 国际站小问题），国际站传 false。
+ */
+export function normalizePermissionItems(rawItems = [], { wechat = true } = {}) {
   const byId = new Map(
     (Array.isArray(rawItems) ? rawItems : [])
       .filter((item) => item && typeof item.id === 'string')
@@ -27,7 +32,7 @@ export function normalizePermissionItems(rawItems = []) {
       status: found.status === 'granted' ? 'granted' : 'not-granted',
       supportsDragToSettings: found.supportsDragToSettings !== undefined ? !!found.supportsDragToSettings : id !== 'microphone',
       recommended: found.recommended !== undefined ? !!found.recommended : id !== 'accessibility',
-      requiredForWeChatDrop: id === 'fullDiskAccess',
+      requiredForWeChatDrop: wechat && id === 'fullDiskAccess',
     }
   })
 }

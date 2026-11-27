@@ -554,3 +554,25 @@ test('完整更新：准备阶段随 preparing 广播 stage，ready 后清空', 
   const main = fs.readFileSync(path.join(__dirname, '../main/main.js'), 'utf8')
   assert.match(main, /prepareInstaller: \(file, version, onStage\) => fullUpdate\.prepare\(file, version, onStage\)/)
 })
+
+// 0.91.0：没选站前不查更新；国际站从 GitHub 取 manifest，不连大陆域名
+test('update checks wait for a site choice and intl skips the mainland mirror', async () => {
+  const os = require('os')
+  const { chosenSite, manifestUrls, createUpdateService } = require('../main/services/update-service')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-site-'))
+  assert.strictEqual(chosenSite(dir), null)
+  const saved = process.env.CHECKBA_UPDATE_MANIFEST_URL
+  delete process.env.CHECKBA_UPDATE_MANIFEST_URL
+  try {
+    // no site yet: check() returns without starting a request
+    const svc = createUpdateService({ packaged: true, dataDir: dir, appVersion: '0.91.0' }, {})
+    const snap = await svc.check()
+    assert.notStrictEqual(snap.phase, 'checking')
+    fs.writeFileSync(path.join(dir, 'site.json'), JSON.stringify({ site: 'intl', chosenBy: 'user' }))
+    assert.strictEqual(chosenSite(dir), 'intl')
+    assert.deepStrictEqual(manifestUrls('intl'), ['https://github.com/AI-WorkDeck/aiworkdeck/releases/latest/download/manifest.json'])
+    assert.ok(manifestUrls('cn')[0].startsWith('https://www.aiworkdeck.com/'))
+  } finally {
+    if (saved !== undefined) process.env.CHECKBA_UPDATE_MANIFEST_URL = saved
+  }
+})

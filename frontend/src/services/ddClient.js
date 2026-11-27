@@ -28,6 +28,14 @@ function savePortalConnections() {
 const unpack = data => data && (data.code === 0 || data.code === 200) && data.data !== undefined ? data.data : data
 // Only exact system messages are translated; unfamiliar server and business text is retained.
 const serverErrorKeys = new Map(Object.entries(zhDdWorkflow.client.serverErrors).map(([key, message]) => [message, key]))
+// C17：界面上客户用的码统一叫「访问码」，但案件库服务端的固定报错仍是旧写法「邀请码」——按服务端原文也认，
+// 否则这几句在英文等界面里不会被翻译（服务端改了措辞之后这几行可以删）
+for (const [message, key] of [
+  ['请输入有效的邀请码', 'invalidCode'],
+  ['邀请码无效、已过期或已撤销，请核对后重试', 'invitationInvalid'],
+  ['邀请已失效，请重新输入邀请码', 'invitationExpired'],
+  ['受邀项目连接不可用，请重新输入邀请码', 'connectionUnavailable'],
+]) if (!serverErrorKeys.has(message)) serverErrorKeys.set(message, key)
 export function ddClientErrorMessage(message) {
   const key = serverErrorKeys.get(message)
   return key ? t(`ddWorkflow.client.serverErrors.${key}`) : message || t('ddWorkflow.client.errors.operationFailed')

@@ -349,8 +349,11 @@ public class AccountController {
      */
     @GetMapping("/balance")
     public Map<String, Object> balance(
+            @RequestParam(value = "fresh", required = false) Boolean fresh,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         requireUser(sessionId);
+        // 0.91.0：AI 轮次结束、打开钱包时前端带 fresh=1，跳过 60 秒缓存，别让扣过的钱还显示旧余额
+        if (Boolean.TRUE.equals(fresh)) accountService.clearBalanceCache();
         return ok(accountService.balanceSnapshot());
     }
 

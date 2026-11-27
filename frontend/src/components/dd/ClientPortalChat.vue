@@ -54,6 +54,8 @@
 
 <script>
 import { portalChat } from '@/services/ddClient.js'
+import { errorTextFor, isRawTechnicalText } from '@/utils/userMessage.js'
+import { getAppLanguage } from '@/utils/appLanguage.js'
 
 const POLL_MS = 3000
 // Until the server says otherwise (older case servers do not send uploadLimits): the long-standing 8 MiB.
@@ -175,12 +177,16 @@ export default {
     describe(e) {
       if (e?.reason === 'FILE_TOO_LARGE') return this.$t('ddWorkflow.client.chat.fileTooLarge', { size: mb(e.limitBytes || this.maxFileBytes) })
       if (e?.reason === 'UPLOAD_QUOTA_FULL') return this.$t('ddWorkflow.client.chat.quotaFull', { size: mb(e.limitBytes || 0) })
-      return e?.message || this.$t('ddWorkflow.client.chat.unavailable')
+      // C17：客户不该看到「Failed to fetch」这类原始报错——走统一错误目录（X7）；业务提示原样给
+      const msg = typeof e?.message === 'string' ? e.message.trim() : ''
+      if (msg && !isRawTechnicalText(msg) && !/NetworkError|Load failed|net::/i.test(msg)) return msg
+      return errorTextFor(e, this.$t('ddWorkflow.client.chat.unavailable'), (k, p) => this.$t(k, p))
     },
     scrollToEnd() { this.$nextTick(() => { const el = this.$refs.list; if (el) el.scrollTop = el.scrollHeight }) },
     formatTime(value) {
       const date = new Date(value)
-      return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+      // C17：按界面语言（不是浏览器默认的 en-US 「11/25, 07:04 PM」）
+      return Number.isNaN(date.getTime()) ? '' : date.toLocaleString(getAppLanguage(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
     },
   },
 }
