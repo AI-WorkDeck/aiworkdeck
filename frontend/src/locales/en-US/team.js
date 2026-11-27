@@ -16,6 +16,16 @@ export default {
   loadFailed: 'Team information is temporarily unavailable, retry shortly',
   retry: 'Retry',
 
+  emptyIntroTitle: 'Teams: work on matters with colleagues',
+
+  emptyIntroBody: 'Colleagues in a team can share projects and review each other\'s changes; the team lead sees an overview of matters and usage (projects are anonymous by default).',
+
+  emptyIntroStep1: '1. Create a team below and give it a name everyone will recognise.',
+
+  emptyIntroStep2: '2. In the team, invite colleagues by phone number, or send them the invite code.',
+
+  emptyIntroStep3: '3. Your colleague signs in to AI WorkDeck on their own computer and accepts the invite on this page.',
+
   createTitle: 'Create a team',
   createDesc: 'You become the owner and can invite colleagues by phone number.',
   teamNamePlaceholder: 'Team name, e.g. M&A Team',

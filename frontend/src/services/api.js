@@ -1817,9 +1817,10 @@ export function getAccountUsage() {
 // 顶栏 Credits chip 的轻端点（后端带 TTL 缓存，可随 onShow 高频调）：
 // { connected, balanceCents, plan, membership: { level, key, nameZh, nameEn } | null }
 // 未连接 { connected: false }；已连接但官网不可达 { connected: true, available: false }。
-export function getAccountBalance() {
+export function getAccountBalance(opts = {}) {
   return request({
-    url: '/api/account/balance',
+    // fresh：跳过后端 60 秒缓存（AI 轮次刚扣过费、钱包刚打开）
+    url: '/api/account/balance' + (opts && opts.fresh ? '?fresh=1' : ''),
     method: 'GET',
   }).then(unwrapEnvelope);
 }

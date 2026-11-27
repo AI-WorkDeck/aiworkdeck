@@ -168,7 +168,8 @@ test('接线：登录卡（解锁页与就地登录弹层共用）区分「未�
     '重试装配必须在取 token 之前',
   )
   const send = src.slice(src.indexOf('async handleSendCode()'), src.indexOf('stopCooldown()'))
-  assert.match(send, /await this\.acquireCaptchaToken\(\)/)
+  // 0.91.0：桌面端 Turnstile 经 acquireOrFallback 取 token（3 秒拿不到就改兼容验证），其余路径照旧直取
+  assert.match(send, /await acquireOrFallback\(\(\) => this\.acquireCaptchaToken\(\)/)
   assert.match(send, /captchaFailureMessage\(got\.failure\)/)
   assert.ok(
     send.indexOf('got.failure') < send.indexOf('sendAccountLoginCode('),

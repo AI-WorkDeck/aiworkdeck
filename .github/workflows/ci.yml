@@ -360,6 +360,9 @@ jobs:
       - name: Writing assistance contracts (dev-board#538)
         working-directory: frontend
         run: npm run test:completion
+      - name: Continue a cut-off answer (X39)
+        working-directory: frontend
+        run: node --test tests/chat/*.test.mjs
 
       - name: Document insight and link preview tests
         working-directory: frontend

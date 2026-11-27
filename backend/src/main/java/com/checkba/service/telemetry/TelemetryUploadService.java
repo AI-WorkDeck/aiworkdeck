@@ -143,6 +143,8 @@ public class TelemetryUploadService {
         try {
             backfillMissingRollups();
             if (!settings.rollupEnabled() || !uploadSiteUnchanged()) return;
+            // 0.91.0：全新安装还没选站时不上报（默认站是国内站，海外用户的第一次统计不能先发到大陆）
+            if (siteProfileService != null && !siteProfileService.mayContact(ingestBaseUrl)) return;
             uploadPendingRollups();
             if (settings.eventsEnabled()) {
                 uploadRecentEvents();
