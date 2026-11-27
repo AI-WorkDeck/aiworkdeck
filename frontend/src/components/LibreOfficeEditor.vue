@@ -1916,6 +1916,8 @@ export default {
         }
       }
       if (!this.docLoadFailed) await this.prepareInitialChrome()
+      // D12：首屏就把整页收进窗格（只缩不放），不在 100% 下把正文右边截掉
+      if (!this.docLoadFailed && typeof this.fitPaneWidth === 'function') this.fitPaneWidth(300)
       if (seq !== this._docLoadSeq) return
       this.bootPct = 100
       clearInterval(this._bootTimer)
