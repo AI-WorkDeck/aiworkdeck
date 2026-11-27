@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Porcentaje de cuota litis (%)",
   "casePreviewConflictBtn": "Ejecutar precomprobación de conflictos",
   "caseSubmitIntakeBtn": "Enviar admisión y comprobación de conflictos",
-  "caseIntakeEmpty": "Aún no hay registros de admisión. Haz clic en «Nueva admisión de caso» o «Cargar demostración de Qinghe Foods» arriba para comenzar.",
+  "caseIntakeEmpty": "Aún no hay registros de admisión. Haz clic en «Nueva admisión de caso» arriba para comenzar.",
   "caseContractedLabel": "Contratado",
   "caseImBadge": "Grupo de mensajería creado y resumen sincronizado",
   "caseMyClearanceTitle": "Verificaciones de conflicto asignadas a mí",

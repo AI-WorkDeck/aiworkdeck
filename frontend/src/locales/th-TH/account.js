@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "อัตราชำระตามผล (%)",
   "casePreviewConflictBtn": "ตรวจสอบความขัดแย้งเบื้องต้น",
   "caseSubmitIntakeBtn": "ส่งข้อมูลเปิดคดีและตรวจสอบความขัดแย้ง",
-  "caseIntakeEmpty": "ยังไม่มีรายการเปิดคดี คลิก \"เปิดคดีใหม่\" หรือ \"สร้างข้อมูลตัวอย่าง\" ด้านบนเพื่อเริ่มต้น",
+  "caseIntakeEmpty": "ยังไม่มีรายการเปิดคดี คลิก \"เปิดคดีใหม่\" ด้านบนเพื่อเริ่มต้น",
   "caseContractedLabel": "ทำสัญญาแล้ว",
   "caseImBadge": "สร้างกลุ่ม IM และซิงก์สรุปแล้ว",
   "caseMyClearanceTitle": "การอนุมัติความขัดแย้งที่มอบหมายให้ฉัน",

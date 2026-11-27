@@ -361,7 +361,7 @@ export default {
   "caseFieldContingencyRate": "Tỷ lệ thù lao theo kết quả (%)",
   "casePreviewConflictBtn": "Chạy kiểm tra xung đột sơ bộ",
   "caseSubmitIntakeBtn": "Gửi hồ sơ tiếp nhận & kiểm tra xung đột",
-  "caseIntakeEmpty": "Chưa có hồ sơ tiếp nhận nào. Nhấp \"Tiếp nhận vụ việc mới\" hoặc \"Tạo dữ liệu demo\" ở trên để bắt đầu.",
+  "caseIntakeEmpty": "Chưa có hồ sơ tiếp nhận nào. Nhấp \"Tiếp nhận vụ việc mới\" ở trên để bắt đầu.",
   "caseContractedLabel": "Đã ký hợp đồng",
   "caseImBadge": "Đã tạo nhóm IM & đồng bộ tóm tắt",
   "caseMyClearanceTitle": "Phê duyệt xung đột được giao cho tôi",
