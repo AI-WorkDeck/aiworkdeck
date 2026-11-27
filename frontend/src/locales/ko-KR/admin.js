@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "로드 실패",
   "ocrSettingsSaveFailed": "저장 실패",
   "walletRedeemTitle": "기프트 코드 / Circle 로펌 초대 코드",
-  "walletRedeemPlaceholder": "기프트 코드 또는 Circle 로펌 코드 입력 (예: KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "기프트 코드 또는 Circle 로펌 코드 입력 (예: KW-XXXX-2026)",
   "walletRedeemBtn": "교환 / 연결",
   "walletRedeemSubmitting": "처리 중…",
   "walletRedeemSuccessGift": "{amount}이(가) 성공적으로 교환되었습니다",

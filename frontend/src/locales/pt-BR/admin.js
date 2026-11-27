@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Falha ao carregar",
   "ocrSettingsSaveFailed": "Falha ao salvar",
   "walletRedeemTitle": "Código de presente / Código de convite da Circle",
-  "walletRedeemPlaceholder": "Insira o código de presente ou código da Circle (ex.: KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Insira o código de presente ou código da Circle (ex.: KW-XXXX-2026)",
   "walletRedeemBtn": "Resgatar / Vincular",
   "walletRedeemSubmitting": "Aplicando…",
   "walletRedeemSuccessGift": "{amount} resgatados com sucesso",

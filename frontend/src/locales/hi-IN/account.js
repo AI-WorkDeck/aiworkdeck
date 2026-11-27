@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "डेमो डेटा सीड करने में विफल",
   "caseOpenPluginFailedToast": "प्लगइन खोलने में विफल",
   "circleInviteLabel": "Circle एलायंस आमंत्रण कोड (वैकल्पिक)",
-  "circleInvitePlaceholder": "उदा. KW-ABNR-2026",
+  "circleInvitePlaceholder": "उदा. KW-XXXX-2026",
   "circleInviteHint": "अपनी फ़र्म का आमंत्रण कोड दर्ज करें ताकि फ़र्म सफ़िक्स जुड़ सके और समर्पित DeepSeek कोटा अनलॉक हो सके",
   "bqtScanSwitch": "Baoqingtian वकील QR साइन-इन",
   "bqtScanTitle": "साइन इन करने के लिए Baoqingtian वकील ऐप से स्कैन करें",

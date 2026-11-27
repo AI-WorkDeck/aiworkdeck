@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Yükleme başarısız",
   "ocrSettingsSaveFailed": "Kaydetme başarısız",
   "walletRedeemTitle": "Hediye kodu / Circle büro davet kodu",
-  "walletRedeemPlaceholder": "Hediye kodu veya Circle büro kodunu girin (örn. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Hediye kodu veya Circle büro kodunu girin (örn. KW-XXXX-2026)",
   "walletRedeemBtn": "Kullan / Bağla",
   "walletRedeemSubmitting": "Uygulanıyor…",
   "walletRedeemSuccessGift": "{amount} başarıyla kullanıldı",
