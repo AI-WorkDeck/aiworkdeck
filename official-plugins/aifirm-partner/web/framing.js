@@ -150,10 +150,14 @@
     const notes = h('textarea', { class: 'awd-input notes', rows: 7, placeholder: t('notesHint'), on: { input: () => { dr.notes = notes.value } } })
     notes.value = dr.notes ?? ((F.rec && F.rec.matterId === m.id && F.rec.text) || '')
     const recBtn = h('button', { type: 'button', class: 'awd-btn awd-btn-sm', on: { click: () => (F.rec && F.rec.active ? stopRec(recBtn, indicator, notes, dr) : startRec(m, consent, recBtn, indicator)) } }, t(recOn ? 'recStop' : 'recStart'))
-    const memo = h('textarea', { class: 'awd-input memo', rows: 9, on: { input: () => { dr.memo = memo.value } } })
+    // The memo is markdown (the client page renders it): the lawyer sees it rendered, and edits the text on demand.
+    const preview = h('div', { class: 'memo-preview' })
+    const memo = h('textarea', { class: 'awd-input memo', rows: 9, hidden: !dr.editing, on: { input: () => { dr.memo = memo.value; aiText(preview, memo.value) } } })
+    const editBtn = h('button', { type: 'button', class: 'awd-btn awd-btn-xs', hidden: Boolean(dr.editing), on: { click: () => { dr.editing = true; memo.hidden = false; editBtn.hidden = true; memo.focus() } } }, D.t('action.edit'))
     const docs = h('div', { class: 'docs', on: { change: () => { dr.docs = [...docs.querySelectorAll('input:checked')].map((x) => x.value) } } })
     const fill = (fw) => {
       memo.value = (fw && fw.memo) || ''
+      aiText(preview, memo.value)
       const chosen = new Set((fw && fw.documents) || [])
       docs.replaceChildren(...(F.catalog || []).map((x) => h('label', { class: 'doc' }, h('input', { type: 'checkbox', value: x.id, checked: chosen.has(x.id) }), h('span', {}, D.E.pick(x.title)))))
     }
@@ -179,7 +183,7 @@
     return h('div', { class: 'call' },
       section(t('recTitle'), h('label', { class: 'check' }, consent, h('span', {}, t('recConsent'))), h('div', { class: 'row' }, recBtn, indicator), h('p', { class: 'muted' }, t('recNote'))),
       section(t('notesTitle'), notes, gen),
-      section(t('planTitle'), memo, h('div', { class: 'muted' }, t('docsLabel')), docs, send))
+      section(t('planTitle'), preview, h('div', { class: 'row' }, editBtn), memo, h('div', { class: 'muted' }, t('docsLabel')), docs, send))
   }
 
   async function startRec(m, consent, btn, indicator) {

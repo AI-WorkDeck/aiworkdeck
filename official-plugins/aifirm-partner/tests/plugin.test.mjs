@@ -65,9 +65,10 @@ test('manifest: unique panel-only tools, the JAR it declares, views, connection 
 
 test('framing calls (US office): every key the tab uses exists, recording waits for consent, the tab is its own file', () => {
   const zh = load('zh-CN'), src = read('web/framing.js')
-  const keys = new Set([...src.matchAll(/\bt\('([A-Za-z][\w.]*\w)'/g)].map((m) => 'panel.m.fr.' + m[1]))
+  const keys = new Set([...src.matchAll(/(?<![.\w])t\('([A-Za-z][\w.]*\w)'/g)].map((m) => 'panel.m.fr.' + m[1]))
   for (const s of ['requested', 'scheduled', 'planned']) keys.add('panel.m.fr.stage.' + s)
   keys.add('panel.m.fr.tab')
+  for (const m of src.matchAll(/D\.t\('([\w.]+\w)'/g)) keys.add('panel.m.' + m[1]) // desk-wide keys
   assert.deepEqual([...keys].filter((k) => !(k in zh)), [])
   assert.match(src, /if \(!consent\.checked\) \{ D\.toast\(t\('recConsentNeeded'\)\); return \}/, 'no recording without the lawyer confirming every participant agreed')
   assert.ok(read('web/index.html').indexOf('framing.js') < read('web/index.html').indexOf('matters.js'), 'framing.js loads before the desk')

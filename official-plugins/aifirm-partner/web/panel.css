@@ -327,3 +327,6 @@ li.attention::marker { color: var(--awd-danger, #B23B2B); }
 .framing .call .section { padding-top: 14px; }
 .framing .doc span { font: inherit; font-size: 13px; }
 #mp-framing .split { align-items: start; }
+.framing .memo-preview { border: 1px solid var(--awd-border, #e3ded5); border-radius: 8px; padding: 10px 14px; font-size: 13.5px; line-height: 1.65; background: var(--awd-surface, #fff); }
+.framing .memo-preview:empty { display: none; }
+.framing .memo-preview p { margin: 0 0 6px; }
