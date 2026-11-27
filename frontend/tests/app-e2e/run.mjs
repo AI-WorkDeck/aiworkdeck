@@ -4058,6 +4058,7 @@ try {
       if (!merged) throw new Error('确定之后后端没有把这一份记成已合好')
     })
 
+    let j14AutoFinalized = false
     await step('J14-②：逐页裁决——这一页用律师乙的，确定这一份', async () => {
       const clicked = await page.evaluate(() => {
         const rows = [...document.querySelectorAll('.adopt-dialog .merge-cell-row')]
@@ -4090,8 +4091,14 @@ try {
       if (!confirmHandle) throw new Error('演示那一份的「这份就这么定」没有变成可点')
       await sleep(300) // let the row finish re-laying out
       await confirmHandle.asElement().click()
+      // This was the last open file, so every row is now MERGED. If a /status refresh reaches
+      // useDocumentMerge before our poll does, the app finalizes the merge itself (by design: it never
+      // leaves the lawyer at a dialog that already says everything is merged), and the conflict is gone.
+      // That counts as done too; the next steps check the history and the bytes either way.
+      // Before this, J14-② failed whenever the app won that race (run 45864355264).
       const merged = await pollUntil(async () => {
         const c = await conflictA()
+        if (!c) { j14AutoFinalized = true; return true }
         const p = mergeRowOf(c, NAME.pptxOverlap)
         return !!p && String(p.state).toUpperCase() === 'MERGED'
       }, 30000, 1000)
@@ -4100,7 +4107,14 @@ try {
     })
 
     await step('J14-②：点「就按我选的来」收尾，冲突窗关闭', async () => {
-      await mouseClickText('就按我选的来')
+      // The app may already have finalized on its own (see the step above).
+      if (!j14AutoFinalized && await conflictA()) {
+        try { await mouseClickText('就按我选的来') } catch (e) {
+          if (await conflictA()) throw e // the button vanished because the app finalized meanwhile
+          j14AutoFinalized = true
+        }
+      } else j14AutoFinalized = true
+      if (j14AutoFinalized) note('info', 'J14-②：最后一份确定后应用已自动收尾，没等律师点「就按我选的来」')
       const gone = await pollUntil(async () => !(await conflictA()), 40000, 1500)
       if (!gone) throw new Error('确认之后仓库仍停在冲突态: ' + JSON.stringify(await conflictA()).slice(0, 300))
       await page.waitForFunction(

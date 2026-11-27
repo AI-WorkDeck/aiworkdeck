@@ -53,3 +53,15 @@ test('a failed end of session keeps the first step active', async () => {
   assert.equal(vm.localWorking, true)
   assert.equal(reads.length, 0)
 })
+
+// C29 (lane C, C24 retest): the push behind 交稿 holds the lock 4–6 s on a saturated link; the checklist's
+// re-read gave up after ~4.5 s and repainted from a stale snapshot. It now waits the push out.
+test('the checklist re-read waits out a busy window as long as a push under load', async () => {
+  const statuses = Array(11).fill('busy').concat([{ working: false }])
+  const { vm, reads } = guide({ statuses })
+  const realTimeout = globalThis.setTimeout
+  globalThis.setTimeout = (fn) => realTimeout(fn, 0)
+  try { await vm.refresh() } finally { globalThis.setTimeout = realTimeout }
+  assert.equal(reads.length, 12, 'kept reading until the lock was released')
+  assert.equal(vm.localWorking, false)
+})
