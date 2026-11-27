@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Laden fehlgeschlagen",
   "ocrSettingsSaveFailed": "Speichern fehlgeschlagen",
   "walletRedeemTitle": "Geschenkcode / Circle-Kanzlei-Einladungscode",
-  "walletRedeemPlaceholder": "Geschenkcode oder Circle-Kanzlei-Code eingeben (z. B. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Geschenkcode oder Circle-Kanzlei-Code eingeben (z. B. KW-XXXX-2026)",
   "walletRedeemBtn": "Einlösen / Binden",
   "walletRedeemSubmitting": "Wird angewendet…",
   "walletRedeemSuccessGift": "{amount} erfolgreich eingelöst",

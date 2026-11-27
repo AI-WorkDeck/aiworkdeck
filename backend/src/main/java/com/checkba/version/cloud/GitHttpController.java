@@ -308,6 +308,22 @@ public class GitHttpController {
         }
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProjectObjectPlanService objectPlans;
+
+    /**
+     * C12: every object a pushed version references is either on the library (verified, as before) or declared
+     * local-only for this case with the same size. Anything else still rejects the whole push.
+     */
+    void requireObjectOrDeclared(long projectId, com.checkba.version.objects.LocalVersionObjectStore.ObjectRef object)
+            throws java.io.IOException {
+        try {
+            repoService.objects().verify(projectId, object);
+        } catch (java.io.IOException missing) {
+            if (objectPlans == null || !objectPlans.isDeclaredLocalOnly(projectId, object)) throw missing;
+        }
+    }
+
     /**
      * pre-receive 分两步：① 服务器仓库停在合并窗口（MERGING，网页端律师正在做冲突三选一）
      * 时拒收整个 push——窗口期间放进来的 push 会让 master 前进，随后的裁决提交以新 master
@@ -326,7 +342,7 @@ public class GitHttpController {
                 if (command.getType() == ReceiveCommand.Type.DELETE) continue;
                 try {
                     for (var object : repoService.objectPointersAt(pack.getRepository(), command.getNewId().name(), true))
-                        repoService.objects().verify(projectId, object);
+                        requireObjectOrDeclared(projectId, object);
                 } catch (Exception e) {
                     for (ReceiveCommand rejected : commands) rejected.setResult(
                             ReceiveCommand.Result.REJECTED_OTHER_REASON, "version objects are unavailable; upload them before submitting");

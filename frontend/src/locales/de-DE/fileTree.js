@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Als Word exportieren (Layout beibehalten)",
   "ocrSearchablePdf": "Durchsuchbares PDF erstellen",
   "ocrLayoutSuffix": "-OCR-Layout",
-  "ocrSearchableSuffix": "-durchsuchbar"
+  "ocrSearchableSuffix": "-durchsuchbar",
+  "localOnlyMine": "Nur auf diesem Computer (nicht geteilt)",
+  "localOnlyMineTip": "Über dem kostenlosen Freigabekontingent: Die Datei bleibt auf Ihrem Computer, Kollegen sehen einen Platzhalter. Aktivieren Sie die Cloud-Dateisicherung und reichen Sie erneut ein, um sie zu teilen.",
+  "localOnlyOther": "Nur auf dem Computer von {name}",
+  "localOnlyOtherUnknown": "Nur auf dem Computer eines Kollegen",
+  "localOnlyOtherTip": "Diese Datei liegt nur auf dem Computer von {name} und wurde nicht in die Fallbibliothek geteilt. Bitten Sie {name}, die Cloud-Dateisicherung zu aktivieren und erneut einzureichen.",
+  "localOnlyColleague": "einem Kollegen",
+  "localOnlyOk": "OK",
 }

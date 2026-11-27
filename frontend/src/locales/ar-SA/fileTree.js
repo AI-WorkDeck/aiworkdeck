@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "تصدير Word (مع الحفاظ على التخطيط)",
   "ocrSearchablePdf": "إنشاء PDF قابل للبحث",
   "ocrLayoutSuffix": "-تخطيط OCR",
-  "ocrSearchableSuffix": "-قابل للبحث"
+  "ocrSearchableSuffix": "-قابل للبحث",
+  "localOnlyMine": "على هذا الكمبيوتر فقط (غير مشارك)",
+  "localOnlyMineTip": "تجاوز حد المشاركة المجانية، لذا يبقى هذا الملف على جهازك ويرى الزملاء عنصرًا نائبًا. فعّل النسخ الاحتياطي السحابي للملفات ثم سلّم مجددًا لمشاركته.",
+  "localOnlyOther": "على كمبيوتر {name} فقط",
+  "localOnlyOtherUnknown": "على كمبيوتر زميل فقط",
+  "localOnlyOtherTip": "هذا الملف موجود على كمبيوتر {name} فقط ولم تتم مشاركته في مكتبة القضايا. اطلب من {name} تفعيل النسخ الاحتياطي السحابي ثم التسليم مجددًا.",
+  "localOnlyColleague": "زميل",
+  "localOnlyOk": "حسنًا",
 }

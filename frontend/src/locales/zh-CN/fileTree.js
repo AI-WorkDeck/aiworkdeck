@@ -197,4 +197,11 @@ export default {
   ocrSearchablePdf: '生成可搜索 PDF',
   ocrLayoutSuffix: '-识别版式',
   ocrSearchableSuffix: '-可搜索',
+  localOnlyMine: '仅在本机（未共享）',
+  localOnlyMineTip: '超出了免费共享额度，这份文件只在你这台电脑上，同事看到的是占位。开启文件云端备份后再交稿即可共享。',
+  localOnlyOther: '仅在{name}的电脑上',
+  localOnlyOtherUnknown: '仅在同事的电脑上',
+  localOnlyOtherTip: '这份文件只在{name}的电脑上，没有共享到案件库。请{name}开启文件云端备份后再交稿。',
+  localOnlyColleague: '同事',
+  localOnlyOk: '知道了',
 }

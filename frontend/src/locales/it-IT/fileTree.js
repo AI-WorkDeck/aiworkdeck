@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Esporta Word (mantieni impaginazione)",
   "ocrSearchablePdf": "Crea PDF ricercabile",
   "ocrLayoutSuffix": "-layout OCR",
-  "ocrSearchableSuffix": "-ricercabile"
+  "ocrSearchableSuffix": "-ricercabile",
+  "localOnlyMine": "Solo su questo computer (non condiviso)",
+  "localOnlyMineTip": "Oltre la quota gratuita di condivisione: il file resta sul tuo computer e i colleghi vedono un segnaposto. Attiva il backup cloud dei file e consegna di nuovo per condividerlo.",
+  "localOnlyOther": "Solo sul computer di {name}",
+  "localOnlyOtherUnknown": "Solo sul computer di un collega",
+  "localOnlyOtherTip": "Questo file è solo sul computer di {name} e non è stato condiviso nella libreria dei fascicoli. Chiedi a {name} di attivare il backup cloud e consegnare di nuovo.",
+  "localOnlyColleague": "un collega",
+  "localOnlyOk": "OK",
 }

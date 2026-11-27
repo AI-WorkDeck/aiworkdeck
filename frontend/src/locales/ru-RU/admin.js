@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "Ошибка загрузки",
   "ocrSettingsSaveFailed": "Ошибка сохранения",
   "walletRedeemTitle": "Подарочный код / Пригласительный код Circle",
-  "walletRedeemPlaceholder": "Введите подарочный код или код Circle (например KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Введите подарочный код или код Circle (например KW-XXXX-2026)",
   "walletRedeemBtn": "Активировать / Привязать",
   "walletRedeemSubmitting": "Применение…",
   "walletRedeemSuccessGift": "{amount} успешно активированы",

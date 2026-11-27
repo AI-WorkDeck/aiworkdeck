@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Gagal membuat data demo",
   "caseOpenPluginFailedToast": "Gagal membuka plugin",
   "circleInviteLabel": "Kode undangan Circle Alliance (opsional)",
-  "circleInvitePlaceholder": "mis. KW-ABNR-2026",
+  "circleInvitePlaceholder": "mis. KW-XXXX-2026",
   "circleInviteHint": "Masukkan kode undangan firma Anda untuk melampirkan akhiran firma dan membuka kuota DeepSeek khusus",
   "bqtScanSwitch": "Masuk QR Pengacara Baoqingtian",
   "bqtScanTitle": "Pindai dengan aplikasi Pengacara Baoqingtian untuk masuk",

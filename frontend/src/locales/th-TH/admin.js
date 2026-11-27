@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "โหลดไม่สำเร็จ",
   "ocrSettingsSaveFailed": "บันทึกไม่สำเร็จ",
   "walletRedeemTitle": "รหัสของขวัญ / รหัสเชิญสำนักงาน Circle",
-  "walletRedeemPlaceholder": "ป้อนรหัสของขวัญหรือรหัสสำนักงาน Circle (เช่น KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "ป้อนรหัสของขวัญหรือรหัสสำนักงาน Circle (เช่น KW-XXXX-2026)",
   "walletRedeemBtn": "แลกรับ / ผูก",
   "walletRedeemSubmitting": "กำลังดำเนินการ…",
   "walletRedeemSuccessGift": "แลกรับ {amount} สำเร็จ",

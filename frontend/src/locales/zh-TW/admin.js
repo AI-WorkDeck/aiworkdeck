@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "讀取失敗",
   "ocrSettingsSaveFailed": "儲存失敗",
   "walletRedeemTitle": "兌換碼 / 聯盟所邀請碼",
-  "walletRedeemPlaceholder": "輸入兌換碼或聯盟所邀請碼（如 KW-ABNR-2026）",
+  "walletRedeemPlaceholder": "輸入兌換碼或聯盟所邀請碼（如 KW-XXXX-2026）",
   "walletRedeemBtn": "兌換 / 綁定",
   "walletRedeemSubmitting": "處理中…",
   "walletRedeemSuccessGift": "兌換成功，已入帳 {amount}",

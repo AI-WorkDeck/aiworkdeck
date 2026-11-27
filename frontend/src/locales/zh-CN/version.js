@@ -410,6 +410,11 @@ export default {
   revokedClientCode: '访问码已撤销',
   revokeFailed: '撤销失败',
   removeFromCaseFile: '移出',
+  changeRoleTitle: '修改角色',
+  changeRoleReadOnlyConfirm: '改成只读后，{name} 不能再修改和交稿。确定吗？',
+  roleChanged: '已把 {name} 改为{role}',
+  changeRoleFailed: '没能修改角色',
+  makeCollaborator: '改为协作人',
   removeCloudMemberConfirm: '把 {name} 移出这份案卷？移出客户会同时作废他的访问码。',
   removedFromCaseFile: '已移出',
 
@@ -603,4 +608,9 @@ export default {
   remoteAheadMaterials: '客户交来了新材料 · {count} 份',
   remoteAheadPlusMaterials: '；另有客户材料 {count} 份',
   submitGuidePullMaterials: '取回客户交来的 {count} 份材料',
+  localOnlyNoticeTitle: '这些文件留在了本机',
+  localOnlyNoticeBody: '已交稿。{files} 超出了免费共享额度，只在你这台电脑上，同事会看到占位。开启文件云端备份后再交稿即可共享。',
+  localOnlyNoticeMore: '等 {count} 份',
+  localOnlyNoticeAction: '开启文件云端备份',
+  localOnlyNoticeOk: '知道了',
 }

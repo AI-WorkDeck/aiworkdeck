@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "สร้างข้อมูลตัวอย่างไม่สำเร็จ",
   "caseOpenPluginFailedToast": "เปิดปลั๊กอินไม่สำเร็จ",
   "circleInviteLabel": "รหัสเชิญ Circle Alliance (ไม่บังคับ)",
-  "circleInvitePlaceholder": "เช่น KW-ABNR-2026",
+  "circleInvitePlaceholder": "เช่น KW-XXXX-2026",
   "circleInviteHint": "ป้อนรหัสเชิญของสำนักงานเพื่อแนบคำต่อท้ายของสำนักงานและปลดล็อกโควตา DeepSeek เฉพาะ",
   "bqtScanSwitch": "เข้าสู่ระบบทนาย Baoqingtian ด้วย QR",
   "bqtScanTitle": "สแกนด้วยแอปทนาย Baoqingtian เพื่อเข้าสู่ระบบ",

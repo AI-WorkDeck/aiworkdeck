@@ -1,0 +1,4 @@
+{
+  "desktop/prototypes/local-data/compatibility/java-authority.test.cjs": "macOS-only Swift prototype (desktop/prototypes/local-data): an integration test that needs a built artifact (COMPAT_TEST_OUTPUT); not a Linux CI unit test.",
+  "pptx-service/frontend/e2e/*.spec.ts": "Playwright end-to-end specs against a running PPT editor; run manually with `npm run test:e2e` in pptx-service/frontend."
+}

@@ -1322,6 +1322,24 @@ public class CloudSyncService {
     }
 
     /**
+     * C9：改案件库上一位参与人的角色。权限矩阵在案件库判；本机清掉角色缓存，下一次状态读到新角色。
+     */
+    public void proxyMemberRole(long projectId, long remoteUserId, String role) {
+        ProjectRemote remote = requireRemoteBinding(projectId);
+        CloudConnection conn = connectionOf(remote);
+        String body = JSONUtil.toJsonStr(Map.of("role", role == null ? "" : role));
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPut(
+                conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members/" + remoteUserId + "/role",
+                body, conn.getDeviceToken())));
+        if (resp.getInt("code", 1) != 0) {
+            throw VersionException.userFacing(LangText.of(
+                    "没能修改角色：" + resp.getStr("message", "请重试"),
+                    "Couldn't change the role: " + resp.getStr("message", "please try again")));
+        }
+        remoteRoleCache.remove(projectId);
+    }
+
+    /**
      * 移出案件库上的一位参与人（dev-board#1050）：同事，或凭访问码进来的客户——案件库那一侧
      * 移出 CLIENT 时会连带作废他名下的访问码（{@code ProjectMemberService.removeMember}）。
      * {@code remoteUserId} 是**案件库那一侧**的 userId（参与人列表里的 userId），与本机
@@ -1886,6 +1904,30 @@ public class CloudSyncService {
         try (HttpResponse resp = req.execute()) {
             return new RawResponse(resp.getStatus(), resp.header("Content-Type"),
                     resp.header("Content-Disposition"), resp.bodyBytes());
+        } catch (Exception e) {
+            throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
+        }
+    }
+
+    /** C9 role change. Test seam like httpPost/httpDelete; sends X-Session-Id when sessionToken is set. */
+    protected String httpPut(String url, String jsonBody, String sessionToken) {
+        HttpRequest req = HttpRequest.put(url)
+                .header("Content-Type", "application/json")
+                .body(jsonBody)
+                .setConnectionTimeout(5000)
+                .setReadTimeout(15000);
+        if (sessionToken != null) {
+            req.header("X-Session-Id", sessionToken);
+        }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
+        try (HttpResponse resp = req.execute()) {
+            if (resp.getStatus() != 200) {
+                throw new IllegalStateException("云端请求失败 (HTTP " + resp.getStatus() + ")");
+            }
+            return resp.body();
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
         }
