@@ -43,7 +43,7 @@ export default {
     "compatHint": "Geben Sie die Zeichen aus dem Bild ein und fordern Sie dann Ihren SMS- oder E-Mail-Code an. Laden Sie nach einem falschen oder abgelaufenen Versuch ein neues Bild.",
     "compatImage": "Sicherheitsprüfungsbild",
     "compatAnswer": "6 Zeichen aus dem Bild",
-    "compatAnswerFirst": "Laden Sie zuerst ein Prüfbild und geben Sie dessen 6 Zeichen ein",
+    "compatAnswerFirst": "Laden Sie zuerst ein Prüfbild und geben Sie dessen 6 Zeichen ein", "compatAuto": "Die Sicherheitsprüfung wurde nicht geladen, daher wurde auf die kompatible Prüfung umgestellt: Geben Sie die 6 Zeichen aus dem Bild ein und fordern Sie den Code erneut an.",
     "compatContactFirst": "Geben Sie zuerst Ihre Telefonnummer oder E-Mail-Adresse ein",
     "accountNetworkFailed": "Verbindung zum Kontodienst konnte nicht hergestellt werden. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "captchaFailed": "Bitte absolvieren Sie die Sicherheitsprüfung und versuchen Sie es erneut",

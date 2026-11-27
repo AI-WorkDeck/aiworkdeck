@@ -43,7 +43,7 @@ export default {
     "compatHint": "Masukkan aksara imej, kemudian minta kod SMS atau e-mel anda. Muatkan imej baharu selepas percubaan yang salah atau tamat tempoh.",
     "compatImage": "Imej pengesahan keselamatan",
     "compatAnswer": "6 aksara daripada imej",
-    "compatAnswerFirst": "Muatkan imej pengesahan dan masukkan 6 aksaranya dahulu",
+    "compatAnswerFirst": "Muatkan imej pengesahan dan masukkan 6 aksaranya dahulu", "compatAuto": "Semakan keselamatan tidak dimuatkan, jadi kami beralih ke pengesahan serasi: masukkan 6 aksara daripada imej, kemudian minta kod sekali lagi.",
     "compatContactFirst": "Masukkan nombor telefon atau e-mel anda dahulu",
     "accountNetworkFailed": "Tidak dapat menyambung ke perkhidmatan akaun. Semak sambungan anda dan cuba lagi.",
     "captchaFailed": "Sila lengkapkan semakan keselamatan dan cuba lagi",

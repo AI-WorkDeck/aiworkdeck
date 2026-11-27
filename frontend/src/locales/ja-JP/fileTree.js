@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Word で書き出し（レイアウト保持）",
   "ocrSearchablePdf": "検索可能な PDF を作成",
   "ocrLayoutSuffix": "-OCRレイアウト",
-  "ocrSearchableSuffix": "-検索可能"
+  "ocrSearchableSuffix": "-検索可能",
+  "localOnlyMine": "このパソコンのみ（未共有）",
+  "localOnlyMineTip": "無料共有枠を超えたため、このファイルはお使いのパソコンにのみあります。同僚にはプレースホルダーが表示されます。共有するにはファイルのクラウドバックアップを有効にして再提出してください。",
+  "localOnlyOther": "{name}さんのパソコンのみ",
+  "localOnlyOtherUnknown": "同僚のパソコンのみ",
+  "localOnlyOtherTip": "このファイルは{name}さんのパソコンにのみあり、案件ライブラリには共有されていません。{name}さんにクラウドバックアップを有効にして再提出するよう依頼してください。",
+  "localOnlyColleague": "同僚",
+  "localOnlyOk": "OK",
 }

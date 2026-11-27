@@ -47,7 +47,7 @@ export default {
     compatHint: '输入图片中的字符，再获取短信或邮件验证码。输错或过期后请换一张。',
     compatImage: '安全验证图片',
     compatAnswer: '图片中的 6 位字符',
-    compatAnswerFirst: '请先加载验证图片并填写其中的 6 位字符',
+    compatAnswerFirst: '请先加载验证图片并填写其中的 6 位字符', compatAuto: '安全验证没有加载出来，已改用兼容验证：请输入图片中的 6 位字符，再获取验证码。',
     compatContactFirst: '请先填写手机号或邮箱',
     accountNetworkFailed: '无法连接账户服务，请检查网络后重试',
     captchaFailed: '请先完成安全验证后再试',

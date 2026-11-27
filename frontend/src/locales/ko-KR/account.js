@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "데모 데이터 생성 실패",
   "caseOpenPluginFailedToast": "플러그인을 열지 못했습니다",
   "circleInviteLabel": "Circle 얼라이언스 초대 코드 (선택)",
-  "circleInvitePlaceholder": "예: KW-ABNR-2026",
+  "circleInvitePlaceholder": "예: KW-XXXX-2026",
   "circleInviteHint": "로펌 전용 초대 코드를 입력하면 로펌 접미사가 연결되고 전용 DeepSeek 할당량이 잠금 해제됩니다",
   "bqtScanSwitch": "바오칭톈 변호사 QR 로그인",
   "bqtScanTitle": "바오칭톈 변호사 앱으로 스캔하여 로그인",

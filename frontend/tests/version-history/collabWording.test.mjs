@@ -109,3 +109,29 @@ test('引导第②步：算不出版数或作者时落回一句笼统的，不�
     'version.submitGuidePullGeneric({})'
   )
 })
+
+test('C23: client portal materials are counted apart from colleagues\' drafts', () => {
+  const t = (k, p) => k + (p ? JSON.stringify(p) : '')
+  assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 0, remoteAheadMaterials: 3 }),
+    'version.remoteAheadMaterials{"count":3}', 'only client materials: never 「交了新稿」')
+  assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 2, remoteAheadAuthors: ['沈砚'], remoteAheadAuthorCount: 1, remoteAheadMaterials: 1 }),
+    'version.remoteAheadOne{"name":"沈砚","count":2}version.remoteAheadPlusMaterials{"count":1}')
+  assert.equal(pullStepText(t, { remoteAhead: true, remoteAheadCount: 0, remoteAheadMaterials: 2 }),
+    'version.submitGuidePullMaterials{"count":2}')
+  assert.equal(remoteAheadText(t, { remoteAhead: true, remoteAheadCount: 2, remoteAheadAuthors: ['沈砚'], remoteAheadAuthorCount: 1 }),
+    'version.remoteAheadOne{"name":"沈砚","count":2}', 'unchanged without materials (and with older servers)')
+})
+
+// 客户材料的份数可能是 1：在名词有单复数的语言里，「{count} + 复数名词」会读成 "Pull the 1 new client materials"。
+// 这些语言的两句只能用与数无关的写法：名词在前，份数放括号或冒号后。
+test('client-material counts read right for 1 in languages that inflect nouns for number', async () => {
+  const inflecting = ['en-US', 'de-DE', 'el-GR', 'es-ES', 'fr-FR', 'it-IT', 'nl-NL', 'pt-BR', 'ru-RU']
+  for (const loc of inflecting) {
+    const { default: v } = await import(`../../src/locales/${loc}/version.js`)
+    for (const key of ['remoteAheadMaterials', 'remoteAheadPlusMaterials', 'submitGuidePullMaterials']) {
+      const s = v[key]
+      assert.ok(s.includes('{count}'), `${loc}.${key} keeps the count`)
+      assert.match(s, /(\(\{count\}\)|[:·] \{count\})\s*$/, `${loc}.${key} = "${s}": count must close the sentence as "({count})", ": {count}" or "· {count}"`)
+    }
+  }
+})

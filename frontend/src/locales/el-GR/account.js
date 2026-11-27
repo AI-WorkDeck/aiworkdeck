@@ -451,7 +451,7 @@ export default {
   "caseSeedDemoFailedToast": "Αποτυχία φόρτωσης δοκιμαστικών δεδομένων",
   "caseOpenPluginFailedToast": "Αποτυχία ανοίγματος του plugin",
   "circleInviteLabel": "Κωδικός πρόσκλησης Circle Alliance (προαιρετικό)",
-  "circleInvitePlaceholder": "π.χ. KW-ABNR-2026",
+  "circleInvitePlaceholder": "π.χ. KW-XXXX-2026",
   "circleInviteHint": "Εισαγάγετε τον κωδικό πρόσκλησης του γραφείου σας για να επισυναφθεί το επίθεμα του γραφείου και να ξεκλειδώσετε αποκλειστική πίστωση DeepSeek",
   "bqtScanSwitch": "Σύνδεση δικηγόρου Baoqingtian μέσω QR",
   "bqtScanTitle": "Σαρώστε με την εφαρμογή δικηγόρου Baoqingtian για σύνδεση",

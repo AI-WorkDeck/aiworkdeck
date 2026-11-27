@@ -495,7 +495,7 @@ export default {
   ocrSettingsLoadFailed: 'Failed to load',
   ocrSettingsSaveFailed: 'Save failed',
   "walletRedeemTitle": "Gift Code / Circle Firm Invite Code",
-  "walletRedeemPlaceholder": "Enter gift code or Circle firm code (e.g. KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "Enter gift code or Circle firm code (e.g. KW-XXXX-2026)",
   "walletRedeemBtn": "Redeem / Bind",
   "walletRedeemSubmitting": "Applying…",
   "walletRedeemSuccessGift": "Redeemed {amount} successfully",

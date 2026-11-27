@@ -439,6 +439,7 @@
                @message-action="$emit('message-action', $event)"
                @regenerate="openRegenerateDialog(index)"
                @retry-failed="retryFailedTurn(index)"
+               @continue-answer="continueAnswer(msg)"
                @consent-accepted="retryAfterConsent(index)"
                @stop-generation="handleAbort"
                @reading-interaction="followLatest = false"
@@ -1495,16 +1496,36 @@ export default {
         : syncDecisionAssistPreference(),
     })
     const refreshDecisionAssistPreference = () => { syncDecisionAssistPreference(true); chatSuggestions.sync() }
+    // X39：接着写中途断开的回答。续写追加进同一个气泡；后端不落用户行、写回同一条回答。
+    const continueAnswer = async (bubble) => {
+      if (!bubble || bubble.isStreaming) return
+      await sendMessage({
+        prompt: 'continue',
+        projectId: props.projectId,
+        modelId: currentModelId.value,
+        mode: currentModeId.value,
+        skillIds: currentSkillIds(),
+        continueBubble: bubble,
+      })
+    }
+    // X39：断开之后文档又保存过，就不再提供「继续」（续写会基于过期的正文）。保守：任一文件保存都算。
+    const markDocumentChangedSinceCut = () => {
+      for (const b of bubbles.value) {
+        if (b && b.role === 'ASSISTANT' && b.errorNotice && b.cutAt) b.documentChangedSinceCut = true
+      }
+    }
     onMounted(() => {
       window.addEventListener('focus', refreshDecisionAssistPreference)
       window.addEventListener('storage', refreshDecisionAssistPreference)
       uni.$on('awd:identity-updated', resolveDecisionAssistUser)
+      uni.$on('awd:file-saved', markDocumentChangedSinceCut)
       resolveDecisionAssistUser()
     })
     onBeforeUnmount(() => {
       window.removeEventListener('focus', refreshDecisionAssistPreference)
       window.removeEventListener('storage', refreshDecisionAssistPreference)
       uni.$off('awd:identity-updated', resolveDecisionAssistUser)
+      uni.$off('awd:file-saved', markDocumentChangedSinceCut)
     })
 
     const inputPrompt = ref('')
@@ -4921,6 +4942,7 @@ export default {
     })
 
     return {
+       continueAnswer,
        ocrRouteState, chooseOcrRoute, cancelOcrRoute,
        bubbles,
        currentConversationId,

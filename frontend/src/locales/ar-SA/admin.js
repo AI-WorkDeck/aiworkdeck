@@ -455,7 +455,7 @@ export default {
   "ocrSettingsLoadFailed": "فشل التحميل",
   "ocrSettingsSaveFailed": "فشل الحفظ",
   "walletRedeemTitle": "رمز هدية / رمز دعوة مكتب Circle",
-  "walletRedeemPlaceholder": "أدخل رمز الهدية أو رمز دعوة Circle (مثل KW-ABNR-2026)",
+  "walletRedeemPlaceholder": "أدخل رمز الهدية أو رمز دعوة Circle (مثل KW-XXXX-2026)",
   "walletRedeemBtn": "استبدال / ربط",
   "walletRedeemSubmitting": "جارٍ التنفيذ…",
   "walletRedeemSuccessGift": "تم الاستبدال، أُضيف {amount} إلى رصيدك",

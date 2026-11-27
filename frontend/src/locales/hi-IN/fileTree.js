@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Word में निर्यात करें (लेआउट बनाए रखें)",
   "ocrSearchablePdf": "खोजने योग्य PDF बनाएँ",
   "ocrLayoutSuffix": "-OCR लेआउट",
-  "ocrSearchableSuffix": "-खोजने योग्य"
+  "ocrSearchableSuffix": "-खोजने योग्य",
+  "localOnlyMine": "केवल इस कंप्यूटर पर (साझा नहीं)",
+  "localOnlyMineTip": "मुफ़्त साझा सीमा से अधिक, इसलिए यह फ़ाइल आपके कंप्यूटर पर ही है; सहकर्मियों को एक प्लेसहोल्डर दिखता है। साझा करने के लिए क्लाउड फ़ाइल बैकअप चालू करें और फिर से जमा करें।",
+  "localOnlyOther": "केवल {name} के कंप्यूटर पर",
+  "localOnlyOtherUnknown": "केवल एक सहकर्मी के कंप्यूटर पर",
+  "localOnlyOtherTip": "यह फ़ाइल केवल {name} के कंप्यूटर पर है और केस लाइब्रेरी में साझा नहीं हुई। {name} से क्लाउड फ़ाइल बैकअप चालू करके फिर से जमा करने को कहें।",
+  "localOnlyColleague": "एक सहकर्मी",
+  "localOnlyOk": "ठीक है",
 }

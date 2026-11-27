@@ -160,6 +160,7 @@ class MobileTransferLoopbackIntegrationTest {
         ProjectFileService desktopFiles=mock(ProjectFileService.class);when(desktopFiles.getFileTree(project.getId())).thenReturn(java.util.List.of(folder,document,unsupported));
         StorageServiceFactory desktopStorage=mock(StorageServiceFactory.class);com.checkba.storage.StorageService desktopBytes=mock(com.checkba.storage.StorageService.class);
         when(desktopStorage.getStorageService()).thenReturn(desktopBytes);when(desktopBytes.load("desktop-only.pdf")).thenReturn(new org.springframework.core.io.FileSystemResource(localFile));
+        when(desktopBytes.exists("desktop-only.pdf")).thenReturn(true); // C12: the backup asks before it loads
         String device="backup-"+suffix;Path stateDirectory=ROOT.resolve(device);Files.createDirectories(stateDirectory);
         mapper.writeValue(stateDirectory.resolve("mobile-relay.json").toFile(),Map.of("deviceId",device,
                 "token",tokens.issue(userId,"Backup synthetic desktop").plaintext(),"accountFingerprint","backup-fixture","serverUrl",baseURL()));

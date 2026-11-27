@@ -43,7 +43,7 @@ export default {
     "compatHint": "Masukkan karakter pada gambar, lalu minta kode SMS atau surel Anda. Muat gambar baru setelah percobaan yang salah atau kedaluwarsa.",
     "compatImage": "Gambar verifikasi keamanan",
     "compatAnswer": "6 karakter dari gambar",
-    "compatAnswerFirst": "Muat gambar verifikasi dan masukkan 6 karakternya terlebih dahulu",
+    "compatAnswerFirst": "Muat gambar verifikasi dan masukkan 6 karakternya terlebih dahulu", "compatAuto": "Pemeriksaan keamanan tidak termuat, jadi kami beralih ke verifikasi kompatibel: masukkan 6 karakter dari gambar, lalu minta kode lagi.",
     "compatContactFirst": "Masukkan nomor telepon atau alamat surel Anda terlebih dahulu",
     "accountNetworkFailed": "Tidak dapat terhubung ke layanan akun. Periksa koneksi Anda dan coba lagi.",
     "captchaFailed": "Silakan selesaikan pemeriksaan keamanan dan coba lagi",

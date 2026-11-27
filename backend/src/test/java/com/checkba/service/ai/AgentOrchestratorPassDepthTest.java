@@ -36,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -292,6 +295,54 @@ class AgentOrchestratorPassDepthTest {
     @DisplayName("原生伪工具 final 无正文：同样收尾，不当空响应重试")
     void pseudoFinalWithoutTextEndsTheTurn() {
         assertEquals(2, runPseudoFinal("conv-final-blank", ""));
+    }
+
+    @Test
+    @DisplayName("X39：续写不新建用户行，写回同一条回答（去掉中断标记后接着追加），提示词换成续写指令")
+    void continueTurnAppendsToTheSameAnswerWithoutAUserRow() {
+        String conv = "conv-continue";
+        when(messageService.listHistoryForAssembly(conv)).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(5L, "USER", "写一份备忘录", 0L),
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(9L, "ASSISTANT",
+                        "前半段正文。\n\n[生成出错，已中断]", 0L)));
+        when(messageService.upsertAssistantMessage(any(), any(), any(), any(), any())).thenReturn(9L);
+        StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+            @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                handler.onNext("后半段。");
+                handler.onComplete(Response.from(AiMessage.from("后半段。")));
+            }
+            @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools,
+                                           StreamingResponseHandler<AiMessage> handler) { generate(messages, handler); }
+        };
+        when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+        AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
+        request.setProjectId(1L);
+        request.setConversationId(conv);
+        request.setMessage("continue");
+        request.setModel(MODEL);
+        request.setContinueTurn(true);
+        orchestrator.handleUserMessage(request, 7L);
+
+        verify(messageService, never()).saveMessage(any(), any(), any(), eq("USER"), any(), any(), any());
+        org.mockito.ArgumentCaptor<Long> ids = org.mockito.ArgumentCaptor.forClass(Long.class);
+        org.mockito.ArgumentCaptor<String> contents = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(messageService, atLeastOnce()).upsertAssistantMessage(any(), any(), any(), ids.capture(), contents.capture());
+        assertTrue(ids.getAllValues().stream().allMatch(id -> Long.valueOf(9L).equals(id)), "always the interrupted row: " + ids.getAllValues());
+        String last = contents.getAllValues().get(contents.getAllValues().size() - 1);
+        assertTrue(last.contains("前半段正文。") && last.contains("后半段。") && !last.contains("已中断"), last);
+        assertTrue(last.indexOf("前半段正文。") < last.indexOf("后半段。"), last);
+        assertTrue(request.getMessage().contains("从断开处直接接着写") || request.getMessage().contains("Continue exactly"), request.getMessage());
+    }
+
+    @Test
+    @DisplayName("X39：最后一行不是中途断开的回答时不能续写")
+    void continueIsRefusedWhenTheLastAnswerWasNotCutOff() {
+        when(messageService.listHistoryForAssembly("conv-done")).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(9L, "ASSISTANT", "完整回答。", 0L)));
+        assertFalse(orchestrator.canContinue("conv-done"));
+        when(messageService.listHistoryForAssembly("conv-cut")).thenReturn(List.of(
+                new com.checkba.repository.ProjectAiMessageRepository.HistoryLine(9L, "ASSISTANT", "半截\n\n[生成出错，已中断]", 0L)));
+        assertTrue(orchestrator.canContinue("conv-cut"));
     }
 
     @Test

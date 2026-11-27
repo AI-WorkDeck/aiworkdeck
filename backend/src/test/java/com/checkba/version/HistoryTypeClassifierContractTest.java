@@ -144,4 +144,15 @@ class HistoryTypeClassifierContractTest {
                         + "」了。改了提交消息就要同步改 HistoryTypeClassifier，"
                         + "否则历史上这一类版本的类型标签会静默退回成「结束工作」。");
     }
+
+    @Test
+    @DisplayName("C23 客户提交：按 X-AWD-Kind=client-submission 认，消息是什么都不影响")
+    void clientSubmissionIsClassifiedByItsKind() {
+        assertEquals(HistoryTypeClassifier.CLIENT_SUBMISSION,
+                HistoryTypeClassifier.classify("客户提交了材料：证据1-送货单.pdf（清单项：送货单原件扫描件）", "client-submission"));
+        assertEquals(HistoryTypeClassifier.CLIENT_SUBMISSION,
+                HistoryTypeClassifier.classify("Client submitted materials: a.pdf", "client-submission"));
+        assertEquals(HistoryTypeClassifier.AUTO, HistoryTypeClassifier.classify("自动存档", "auto"), "the docked autosave stays auto");
+    }
 }
+

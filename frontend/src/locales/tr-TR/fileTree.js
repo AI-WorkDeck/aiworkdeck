@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Word olarak dışa aktar (düzeni koru)",
   "ocrSearchablePdf": "Aranabilir PDF oluştur",
   "ocrLayoutSuffix": "-OCR düzeni",
-  "ocrSearchableSuffix": "-aranabilir"
+  "ocrSearchableSuffix": "-aranabilir",
+  "localOnlyMine": "Yalnızca bu bilgisayarda (paylaşılmadı)",
+  "localOnlyMineTip": "Ücretsiz paylaşım kotası aşıldı; dosya bilgisayarınızda kalır, iş arkadaşlarınız bir yer tutucu görür. Paylaşmak için bulut dosya yedeğini açıp yeniden teslim edin.",
+  "localOnlyOther": "Yalnızca {name} adlı kişinin bilgisayarında",
+  "localOnlyOtherUnknown": "Yalnızca bir iş arkadaşının bilgisayarında",
+  "localOnlyOtherTip": "Bu dosya yalnızca {name} adlı kişinin bilgisayarında ve dava kitaplığında paylaşılmadı. {name} adlı kişiden bulut yedeğini açıp yeniden teslim etmesini isteyin.",
+  "localOnlyColleague": "bir iş arkadaşı",
+  "localOnlyOk": "Tamam",
 }
