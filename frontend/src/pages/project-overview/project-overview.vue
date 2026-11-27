@@ -5679,6 +5679,8 @@ export default {
           return
         }
         this.collabCloud = (res && res.data) || null
+        // C12（lane C r3）：取回把同事的录像写进来之后，占位徽标要跟着消失，不能等重开窗口
+        if (this.collabCloud && this.collabCloud.linked) this.$refs?.fileTree?.loadLocalOnly?.()
         // 成员名单只在已知「放进了案件库」时才并入云端参与人；协作状态落地前跑完的那次只拿到
         // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
         if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()

@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "Vui lòng mở bản thảo hợp nhất này từ danh sách tệp.",
   transferUploading: 'Đang tải lên tệp lớn {done} / {total} MB; với kết nối chậm có thể mất vài phút',
   transferDownloading: 'Đang tải xuống tệp lớn {done} / {total} MB; với kết nối chậm có thể mất vài phút',
+  "localOnlyNoticeTitle": "Các tệp này vẫn ở trên máy này",
+  "localOnlyNoticeBody": "Đã nộp. {files} vượt hạn mức chia sẻ miễn phí và vẫn ở trên máy của bạn; đồng nghiệp thấy chỗ giữ chỗ. Bật sao lưu đám mây rồi nộp lại để chia sẻ.",
+  "localOnlyNoticeMore": " và tổng cộng {count}",
+  "localOnlyNoticeAction": "Bật sao lưu tệp lên đám mây",
+  "localOnlyNoticeOk": "Đã hiểu",
 }

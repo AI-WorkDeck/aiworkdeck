@@ -292,15 +292,15 @@ class GitHttpProtocolTest {
         assertTrue(pushed.pushed(), pushed.message());
         org.mockito.Mockito.verify(noBackup, org.mockito.Mockito.never()).requireVersionObjectCloudConsent();
 
-        // A new large object still needs that colleague's consent before anything is uploaded.
+        // C12: a new large object within the free allowance (50 MB/file) goes up free with backup off.
         try (var out = Files.newOutputStream(receiver.workTree(2).resolve("新录音.mp4"))) {
             byte[] block = new byte[64 * 1024];
             new java.util.Random(29).nextBytes(block);
             for (int i = 0; i < 513; i++) out.write(block);
         }
         assertNotNull(receiver.commitAll(2, "media", "auto", null, "Synthetic colleague", "colleague@example.test"));
-        assertThrows(com.checkba.version.VersionException.class, () -> colleague.upload(2, remoteUrl(remote), "test", token));
-        assertEquals(1, repoService.objects().list(remote).size(), "nothing uploaded without consent");
+        colleague.upload(2, remoteUrl(remote), "test", token);
+        assertEquals(2, repoService.objects().list(remote).size(), "shared free, no backup needed");
 
         // Access is project scoped, even when another account knows the exact object digest.
         seedMembership(72002L);

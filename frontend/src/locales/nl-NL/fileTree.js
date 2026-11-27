@@ -179,5 +179,12 @@ export default {
   "ocrExportLayoutDocx": "Exporteren als Word (opmaak behouden)",
   "ocrSearchablePdf": "Doorzoekbare PDF maken",
   "ocrLayoutSuffix": "-OCR-opmaak",
-  "ocrSearchableSuffix": "-doorzoekbaar"
+  "ocrSearchableSuffix": "-doorzoekbaar",
+  "localOnlyMine": "Alleen op deze computer (niet gedeeld)",
+  "localOnlyMineTip": "Boven het gratis deelquotum: het bestand blijft op je computer en collega’s zien een tijdelijke aanduiding. Zet de cloudback-up van bestanden aan en dien opnieuw in om het te delen.",
+  "localOnlyOther": "Alleen op de computer van {name}",
+  "localOnlyOtherUnknown": "Alleen op de computer van een collega",
+  "localOnlyOtherTip": "Dit bestand staat alleen op de computer van {name} en is niet gedeeld in de dossierbibliotheek. Vraag {name} de cloudback-up aan te zetten en opnieuw in te dienen.",
+  "localOnlyColleague": "een collega",
+  "localOnlyOk": "OK",
 }

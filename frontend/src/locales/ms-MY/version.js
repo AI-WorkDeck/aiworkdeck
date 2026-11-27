@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "Buka draf gabungan ini dari senarai fail.",
   transferUploading: 'Memuat naik fail besar {done} / {total} MB; pada sambungan perlahan ini mungkin mengambil beberapa minit',
   transferDownloading: 'Memuat turun fail besar {done} / {total} MB; pada sambungan perlahan ini mungkin mengambil beberapa minit',
+  "localOnlyNoticeTitle": "Fail ini kekal pada komputer ini",
+  "localOnlyNoticeBody": "Diserahkan. {files} melebihi kuota perkongsian percuma dan kekal pada komputer anda; rakan sekerja melihat pemegang tempat. Hidupkan sandaran awan dan serahkan semula untuk berkongsi.",
+  "localOnlyNoticeMore": " dan {count} kesemuanya",
+  "localOnlyNoticeAction": "Hidupkan sandaran fail awan",
+  "localOnlyNoticeOk": "OK",
 }

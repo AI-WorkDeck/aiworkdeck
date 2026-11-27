@@ -540,4 +540,9 @@ export default {
   "mergeReadonlyNeedsFile": "這份合併稿要從檔案列表裡開啟檢視",
   transferUploading: '正在上傳大型檔案 {done} / {total} MB，網速慢時需要幾分鐘',
   transferDownloading: '正在取回大型檔案 {done} / {total} MB，網速慢時需要幾分鐘',
+  "localOnlyNoticeTitle": "這些檔案留在了本機",
+  "localOnlyNoticeBody": "已交稿。{files} 超出了免費共享額度，只在你這台電腦上，同事會看到佔位。開啟檔案雲端備份後再交稿即可共享。",
+  "localOnlyNoticeMore": "等 {count} 份",
+  "localOnlyNoticeAction": "開啟檔案雲端備份",
+  "localOnlyNoticeOk": "知道了",
 }
