@@ -158,6 +158,8 @@ public class DdService {
         if (StringUtils.hasText(textContent)) {
             parseAndCreateItems(request.getId(), textContent);
         }
+        // C31：根文件夹在律师建清单时按律师的界面语言建好；客户上传只沿用它（客户门户的请求语言是客户的）
+        clientRootFolder(projectId, userId);
 
         return request;
     }
@@ -259,8 +261,8 @@ public class DdService {
         DdRequest request = getRequest(item.getDdRequestId());
         Long projectId = request.getProjectId();
 
-        // 1. Root: "客户提供的文件"
-        ProjectFile clientFolder = ensureFolder(projectId, null, "客户提供的文件", userId);
+        // 1. Root: the client-materials folder (C31: an existing one under any known name, never renamed)
+        ProjectFile clientFolder = clientRootFolder(projectId, userId);
         // C23：磁盘路径与树上的位置一致（原来是 client_uploads/<uuid>_名字，同事 Finder 里看到的与软件里的对不上）
         List<String> segments = new ArrayList<>();
         segments.add(pathSegment(clientFolder.getName()));
@@ -790,7 +792,7 @@ public class DdService {
     }
     
     private void verifyAndSafeDeleteRequestFolder(DdRequest request, Long userId) {
-        String relativePath = "客户提供的文件/" + request.getName();
+        String relativePath = clientRootName(request.getProjectId()) + "/" + request.getName();
         ProjectFile folder = findFolderByPath(request.getProjectId(), relativePath);
         if (folder != null) {
             try {
@@ -814,13 +816,33 @@ public class DdService {
         }
         DdRequest req = getRequest(item.getDdRequestId());
         StringBuilder sb = new StringBuilder();
-        sb.append("客户提供的文件/").append(req.getName());
+        sb.append(clientRootName(req.getProjectId())).append("/").append(req.getName());
         for (DdItem i : stack) {
             sb.append("/").append(i.getTitle());
         }
         return sb.toString();
     }
     
+    /** C31：客户材料根文件夹——已有的（任何已知名字）一律沿用，没有才按当前（律师的）语言新建。 */
+    private ProjectFile clientRootFolder(Long projectId, Long userId) {
+        ProjectFile existing = findClientRoot(projectId);
+        return existing != null ? existing : ensureFolder(projectId, null, ClientFolderNames.localized(), userId);
+    }
+
+    private ProjectFile findClientRoot(Long projectId) {
+        for (String name : ClientFolderNames.aliases()) {
+            Optional<ProjectFile> f = projectFileRepository.findByProjectIdAndParentIdAndNameAndIsDeletedFalse(projectId, null, name);
+            if (f.isPresent() && Boolean.TRUE.equals(f.get().getIsFolder())) return f.get();
+        }
+        return null;
+    }
+
+    /** 路径核对用的根文件夹名：实际存在的那个；还没建时按历史名字（找不到就不会误删）。 */
+    private String clientRootName(Long projectId) {
+        ProjectFile root = findClientRoot(projectId);
+        return root != null ? root.getName() : ClientFolderNames.canonical();
+    }
+
     private ProjectFile findFolderByPath(Long projectId, String relativePath) {
         String[] parts = relativePath.split("/");
         Long parentId = null;

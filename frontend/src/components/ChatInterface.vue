@@ -1122,6 +1122,7 @@ import { getCloudWriteHeaders, createFolder, createFile, importLocalFile, getPro
 import { audioNeedingTranscription, isTranscribableMedia, transcribedAudioFileIds } from '@/utils/audioAttachment.js'
 import { getAuthHeaders, getCurrentUser, getSessionId } from '@/utils/auth.js'
 import { host } from '@/services/host.js'
+import { watchLocalServiceRecovery } from '@/utils/localServiceRecovery.js'
 import { captureDroppedFiles, importDroppedFile, isPreImportReadError } from '@/utils/fileTreeExternalDrop.js'
 import DecisionAssistControl from './DecisionAssistControl.vue'
 import ChatSuggestionControl from './ChatSuggestionControl.vue'
@@ -1522,18 +1523,23 @@ export default {
         if (b && b.role === 'ASSISTANT' && b.errorNotice && b.cutAt) b.documentChangedSinceCut = true
       }
     }
+    let stopLocalServiceWatch = null
     onMounted(() => {
       window.addEventListener('focus', refreshDecisionAssistPreference)
       window.addEventListener('storage', refreshDecisionAssistPreference)
       uni.$on('awd:identity-updated', resolveDecisionAssistUser)
       uni.$on('awd:file-saved', markDocumentChangedSinceCut)
       resolveDecisionAssistUser()
+      // C34 leftover (dev-board#1868): the local service is back after a crash/restart → the chat stream
+      // reconnects at once, so the interrupted run's Resume banner appears without a reload
+      stopLocalServiceWatch = watchLocalServiceRecovery(host.backend, () => window.dispatchEvent(new Event('awd:local-service-recovered')))
     })
     onBeforeUnmount(() => {
       window.removeEventListener('focus', refreshDecisionAssistPreference)
       window.removeEventListener('storage', refreshDecisionAssistPreference)
       uni.$off('awd:identity-updated', resolveDecisionAssistUser)
       uni.$off('awd:file-saved', markDocumentChangedSinceCut)
+      if (stopLocalServiceWatch) { stopLocalServiceWatch(); stopLocalServiceWatch = null }
     })
 
     const inputPrompt = ref('')

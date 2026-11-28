@@ -537,6 +537,8 @@ public class CloudSyncService {
                             "This case file is still in an old format in the library — please have whoever shared it submit a draft first, then pull again"));
                 }
                 manifestService.applyToDatabase(localProjectId, manifest);
+                // C33：提交里有、清单里漏登的文件也要进文件树（dev-board#1866）
+                manifestService.indexTrackedFilesMissingFromTree(localProjectId, "HEAD");
 
                 ProjectRemote remote = new ProjectRemote();
                 remote.setProjectId(localProjectId);
@@ -1518,6 +1520,7 @@ public class CloudSyncService {
             repoService.fastForwardMainline(projectId, ORIGIN_MASTER);
             var manifest = manifestService.readAtRef(projectId, "HEAD");
             if (manifest != null) manifestService.applyToDatabase(projectId, manifest);
+            manifestService.indexTrackedFilesMissingFromTree(projectId, "HEAD"); // C33
             reportPulled(projectId, conn);
             return new UpdateResult(UpdateStatus.UPDATED, affectedSince(projectId, tipBefore), null);
         }
@@ -1619,6 +1622,8 @@ public class CloudSyncService {
         String baseSha = repoService.mergeBase(projectId, tipBefore, cloudTip);
         TreeManifest base = baseSha == null ? null : manifestService.readAtRef(projectId, baseSha);
         if (cloudManifest != null) manifestService.unionApply(projectId, cloudManifest, base);
+        // C33：云端那一侧漏登的文件补成行，这一笔合并提交的清单也就带上了它们
+        manifestService.indexTrackedFilesMissingFromTree(projectId, cloudTip);
         manifestService.writeToWorkTree(projectId, manifestService.capture(projectId));
         repoService.commitMergeResolution(projectId, cloudMergeTitle(), resolutions,
                 pendingMergeStore == null ? List.of() : pendingMergeStore.all(projectId),
