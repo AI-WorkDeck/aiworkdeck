@@ -177,7 +177,7 @@
         <!-- X7：这一轮失败了——目录文案 + 重试/登录 + 详情；原始错误只在详情里 -->
         <!-- X39：长回答中途断开（非停止、非工具半途、文档没变、续写没连败两次）时多一个「继续」 -->
         <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="errorShown"
-          :actionable="isLatest || bubble.errorNotice.action === 'signIn' || bubble.errorNotice.action === 'reconnect'"
+          :actionable="isLatest || bubble.errorNotice.action === 'signIn' || bubble.errorNotice.action === 'reconnect' || bubble.errorNotice.action === 'topUp'"
           :lead-action="continueOffered ? { key: 'continue', title: $t('errors.actions.continueTooltip') } : null"
           @lead="$emit('continue-answer')" @retry="$emit('retry-failed')" @sign-in="signInForAi" @reconnect="reconnectForAi" />
     </div>

@@ -40,5 +40,5 @@ test('openWorkspace({ projectId }) asks the workbench to open that project for t
 })
 test('the init context tells plugins which project features this host has', () => {
   const src = readFileSync(new URL('../../src/components/PluginPane.vue', import.meta.url), 'utf8')
-  assert.match(src, /capabilities: \['view\.openProjectId', 'ui\.openWorkspace\.projectId'\]/)
+  assert.match(src, /capabilities: \['view\.openProjectId', 'ui\.openWorkspace\.projectId', 'ui\.setEntry'\]/)
 })

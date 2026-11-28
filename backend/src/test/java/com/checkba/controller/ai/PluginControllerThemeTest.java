@@ -84,6 +84,25 @@ class PluginControllerThemeTest {
         }
     }
 
+    /** C1: the list endpoint copies view fields one by one; the host entry point must survive that copy. */
+    @Test void listKeepsViewEntryPoint() throws Exception {
+        Path dir = pluginDirectory.resolve("review-desk");
+        Files.createDirectories(dir.resolve("web"));
+        Files.writeString(dir.resolve("web/index.html"), "<html></html>");
+        Files.writeString(dir.resolve("manifest.json"), """
+                {"id":"review-desk","name":"Review desk","version":"1.0.0",
+                 "contributes":{"views":[{"id":"main","name":"Main","entry":"web/index.html","placement":"workspace","scope":"global","entryPoint":"reviews"}]}}
+                """);
+        SystemSettingService settings = mock(SystemSettingService.class);
+        when(settings.get(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1));
+        PluginService plugins = new PluginService(settings, pluginDirectory.toString());
+        plugins.init();
+        PluginController controller = new PluginController(plugins, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+        var json = new ObjectMapper().valueToTree(controller.listPlugins().get(0));
+        assertEquals("reviews", json.path("contributes").path("views").get(0).path("entryPoint").asText());
+    }
+
     @Test void onlyAdministratorsCanChangeTheSharedThemeSelection() {
         UserRepository users = mock(UserRepository.class);
         AdminAccessService admins = mock(AdminAccessService.class);

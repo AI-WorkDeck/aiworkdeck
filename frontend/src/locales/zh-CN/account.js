@@ -273,6 +273,7 @@ export default {
   clientTab: '客户',
   usernameLabel: '用户名',
   usernamePlaceholder: '请输入用户名',
+  teamServerLoginHint: '这是团队服务器的登录页，请使用管理员为本服务器分配的用户名和密码。',
   passwordLabel: '密码',
   passwordPlaceholder: '请输入密码',
   rememberMe: '记住我',

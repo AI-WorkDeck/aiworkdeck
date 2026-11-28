@@ -30,7 +30,7 @@ WEB_ROOT="${WEB_ROOT:-/www/wwwroot/update/desktop}"
 # 本脚本连挂三轮 cron（pack 带 manifest.json 却没有 .sig，mv 直接炸），
 # 镜像停更、官网 /start 发旧版。改为列出 releases 后只认 tag 形如 v<数字> 的
 # 正式应用版。per_page=15 足够：应用版最密一天三发，15 条怎么也罩得住。
-API="https://api.github.com/repos/${REPO}/releases?per_page=15"
+API="${API:-https://api.github.com/repos/${REPO}/releases?per_page=15}"  # overridable for tests only
 
 # 回调官网 revalidate 端点用的配置（AWD_REVALIDATE_URLS / AWD_REVALIDATE_TOKEN）。
 # 不能放 WEB_ROOT 下：nginx 那个 location 只 deny .sh/.py，其它文件名公网可下载。
@@ -217,7 +217,7 @@ import json, sys
 rel = json.load(open(sys.argv[1]))
 for a in rel.get('assets', []):
     n = a['name']
-    if n.startswith('patch-') or n in ('manifest.json', 'manifest.json.sig'):
+    if n.startswith('patch-') or n in ('manifest.json', 'manifest.json.sig', 'manifest-cn.json', 'manifest-cn.json.sig'):
         print(f"{n}\t{a['size']}\t{a['browser_download_url']}")
 EOF
 
@@ -258,7 +258,7 @@ MANIFEST_READY=0
 FAILED=0
 while IFS=$'\t' read -r name size url; do
   case "$name" in
-    manifest.json|manifest.json.sig)
+    manifest.json|manifest.json.sig|manifest-cn.json|manifest-cn.json.sig)
       # manifest 很小，失败即整次放弃（不能让 assets 换了而清单还是旧的）
       curl -sfL --retry 3 --retry-delay 3 --retry-all-errors "$url" -o "$TMP/$name" || { FAILED=1; break; }
       MANIFEST_READY=1
@@ -291,6 +291,12 @@ fi
 # 客户端总是成对拉取并验签）。两个文件必须都在才动手——2026-08-19 pack release
 # 恰好带一个（pack 契约的）manifest.json 而没有 .sig，单腿落地会把桌面端
 # 更新通道的 manifest 换成 pack 的；当时全靠 mv sig 在前先炸救了一命。
+# 0.91.2+: the Release carries manifest-cn.json (mirror URLs first) next to manifest.json (GitHub first, for intl
+# clients). The mirror serves the cn one under the usual name; older releases only have manifest.json.
+if [ -f "$TMP/manifest-cn.json" ] && [ -f "$TMP/manifest-cn.json.sig" ]; then
+  mv "$TMP/manifest-cn.json" "$TMP/manifest.json"
+  mv "$TMP/manifest-cn.json.sig" "$TMP/manifest.json.sig"
+fi
 if [ "$FAILED" = "0" ] && [ "$MANIFEST_READY" = "1" ] \
    && [ -f "$TMP/manifest.json" ] && [ -f "$TMP/manifest.json.sig" ]; then
   mv "$TMP/manifest.json.sig" "$WEB_ROOT/manifest.json.sig"

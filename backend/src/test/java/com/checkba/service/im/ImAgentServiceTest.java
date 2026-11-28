@@ -270,6 +270,18 @@ class ImAgentServiceTest {
         assertEquals(1,history(owner,id).stream().filter(row -> "AGENT".equals(row.get("actorType"))).count());
     }
 
+    /** C15 (dev-board#1874): the reply says which case files were actually read, and that others were not. */
+    @Test void aGroupReplyNamesTheCaseFilesItReadAndThatOthersWereNot() {
+        Long projectId=boundProject(); String id=(String)call(owner,"projectGroup",Map.of("projectId",projectId)).get("id");
+        ImSharedProjectContext shared=mock(ImSharedProjectContext.class);
+        ReflectionTestUtils.setField(agent,"sharedProjects",shared);
+        var prepared=new ImSharedProjectContext.Prepared(projectId,List.of(owner),List.of(42L),"项目起诉状：李某为原告",List.of("起诉状.docx"),2);
+        when(shared.prepare(eq(projectId),anyList(),anyString())).thenReturn(prepared);
+        long source=send(owner,id,"李某是原告还是被告");reply(owner,id,source);jobs.remove().run();
+        String posted=history(owner,id).stream().filter(row -> "AGENT".equals(row.get("actorType"))).map(row -> String.valueOf(row.get("text"))).findFirst().orElseThrow();
+        assertTrue(posted.endsWith("已读取：起诉状.docx；另有 2 个文件未读取"), posted);
+    }
+
     @Test void emptySharedDocumentsStillRespectThreeReadAttempts() {
         grant(owner,"team",team);String id=(String)ensure(owner,"team",team,false).get("id");
         String index="one.md two.md three.md four.md";

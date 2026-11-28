@@ -26,6 +26,14 @@
         <text class="welcome-lead">{{ $t('onboarding.unlock.brand.lead') }}</text>
       </view>
 
+      <!-- C1: shown only while something waits for the lawyer (zero state would be noise; the rail button stays) -->
+      <view v-if="reviewCount > 0" class="welcome-reviews" role="button" tabindex="0" data-welcome="reviews"
+        @tap="$emit('open-reviews')" @keydown.enter.prevent="$emit('open-reviews')">
+        <text class="welcome-reviews-title">{{ $t('workbench.reviewsEntry') }}</text>
+        <text class="welcome-reviews-text">{{ $t('workbench.reviewsNeedYou', { count: reviewCount }) }}</text>
+        <text class="welcome-reviews-open">{{ $t('workbench.reviewsOpen') }}</text>
+      </view>
+
       <view class="welcome-quick-chat" @keydown.esc="showModelDropdown = false">
         <textarea
           v-model="quickPrompt"
@@ -224,8 +232,10 @@ export default {
     showOnStartup: { type: Boolean, default: true },
     /** D6：首启有可选组件可下载——一行提示，代替自动弹窗 */
     componentsSuggested: { type: Boolean, default: false },
+    /** C1: matters waiting for the lawyer across plugins serving the "reviews" entry; null = no such entry */
+    reviewCount: { type: Number, default: null },
   },
-  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc', 'start-recording', 'open-components', 'dismiss-components'],
+  emits: ['new-project', 'open-folder', 'open-file', 'open-url', 'activate-current-project', 'project-renamed', 'open-client-workspace', 'update:show-on-startup', 'create-project', 'open-local-folder', 'open-loose-files', 'open-project', 'start-chat', 'quick-create-doc', 'start-recording', 'open-components', 'dismiss-components', 'open-reviews'],
   data() {
     return {
       quickPrompt: '',
@@ -438,6 +448,36 @@ export default {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 36px;
+}
+
+/* C1: one line, not a card wall; opens the plugin's review view */
+.welcome-reviews {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
+  margin: -20px 0 28px;
+  padding: 8px 12px;
+  border: 1px solid var(--awd-border-subtle);
+  border-radius: var(--awd-radius-sm);
+  cursor: pointer;
+}
+.welcome-reviews:hover,
+.welcome-reviews:focus-visible {
+  border-color: var(--awd-accent);
+}
+.welcome-reviews-title {
+  font-weight: 600;
+  color: var(--awd-text);
+}
+.welcome-reviews-text {
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-text-2);
+}
+.welcome-reviews-open {
+  margin-inline-start: auto; /* logical property: correct side in ar-SA */
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-accent);
 }
 
 .welcome-brand {

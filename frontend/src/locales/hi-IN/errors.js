@@ -33,6 +33,7 @@ export default {
     "refresh": "रिफ्रेश करें",
     "signIn": "साइन इन करें",
     "reconnect": "फिर से साइन इन करें",
+    "topUp": "टॉप अप करें",
     "feedback": "फ़ीडबैक"
   }
 }

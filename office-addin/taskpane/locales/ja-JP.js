@@ -4,6 +4,10 @@
 export default {
   legalCopyright: "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED および AI WorkDeck コントリビューター",
   legalLicenseTrademark: "本プログラムはGNU Affero General Public License v3.0以降の下でリリースされており、いかなる保証もありません。 「AI WorkDeck」はBEIJING GONG FU INFORMATION TECHNOLOGY LIMITEDの商標です。改変版を再配布する際は、その名前を製品名として使用しないでください。詳細は商標に関する注意をご覧ください。",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · ソースコード · ライセンス · 商標",
+  legalSourceLink: "ソースコード",
+  legalLicenseLink: "ライセンス全文",
+  legalTrademarkLink: "商標に関する注意",
   apiCloudAccessRefresh: "クラウドへのアクセス権が変更されました。ページを再読み込みするか、アプリを開き直してから操作してください。ローカルファイルは削除されません。",
   defaultProjectName: "一時プロジェクト",
   cmdPptAddImage: "スライドに画像を挿入",

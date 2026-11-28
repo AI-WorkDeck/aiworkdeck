@@ -33,7 +33,7 @@ export default {
     // X39: optional leading action { key: 'continue', title } shown before the catalogue action
     leadAction: { type: Object, default: null },
   },
-  emits: ['retry', 'sign-in', 'refresh', 'reconnect', 'action', 'lead'],
+  emits: ['retry', 'sign-in', 'refresh', 'reconnect', 'top-up', 'action', 'lead'],
   data() {
     return { detailsOpen: false }
   },
@@ -58,7 +58,11 @@ export default {
       if (a === 'signIn') this.$emit('sign-in')
       else if (a === 'refresh') this.$emit('refresh')
       else if (a === 'reconnect') this.$emit('reconnect')
-      else this.$emit('retry')
+      else if (a === 'topUp') {
+        // Q29: open top-up here so every caller gets a working button; explicit click, never suppressed.
+        this.$emit('top-up')
+        import('@/utils/requireAccount.js').then((m) => m.requireRecharge()).catch(() => {})
+      } else this.$emit('retry')
     },
   },
 }

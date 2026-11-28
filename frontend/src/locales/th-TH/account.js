@@ -237,6 +237,7 @@ export default {
   "clientTab": "ไคลเอนต์",
   "usernameLabel": "ชื่อผู้ใช้",
   "usernamePlaceholder": "ป้อนชื่อผู้ใช้ของคุณ",
+  "teamServerLoginHint": "นี่คือหน้าลงชื่อเข้าใช้เซิร์ฟเวอร์ของทีม ใช้ชื่อผู้ใช้และรหัสผ่านที่ผู้ดูแลระบบตั้งไว้สำหรับเซิร์ฟเวอร์นี้",
   "passwordLabel": "รหัสผ่าน",
   "passwordPlaceholder": "กรอกรหัสผ่านของคุณ",
   "rememberMe": "จดจำฉันไว้",

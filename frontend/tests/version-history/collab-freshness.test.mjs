@@ -89,3 +89,37 @@ test('C30: every 交稿 entry point reports a landed submit', () => {
     assert.match(src, /\$emit\('changed', \{ submitted: true \}\)|\$emit\('changed', d\.status === 'UPLOADED' \? \{ submitted: true \} : undefined\)/, f)
   }
 })
+
+test('C5 retest: a shared case re-checks every 30 s while visible, one check at a time', () => {
+  const ms = Number(/\}, (\d+)\) \/\/ C5: was 120000/.exec(body('startCollabPolling'))?.[1])
+  assert.ok(ms > 0 && ms <= 30000, 'poll interval ' + ms)
+  let tick = null
+  const calls = []
+  const v = { _collabDisposed: false, _collabPollTimer: null, collabCloud: { linked: true }, collabLinked: true, collabChecking: false,
+    isActiveOverviewInstance: () => true, fetchCollabState: (o) => calls.push(o), startCollabFreshness: () => {} }
+  fn('startCollabPolling', { setInterval: (f, d) => { tick = f; assert.equal(d, ms); return 1 }, document: { hidden: false } }).call(v)
+  tick(); assert.equal(calls.length, 1)
+  v.collabChecking = true; tick(); assert.equal(calls.length, 1, 'no second check while one is running')
+  v.collabChecking = false; tick(); assert.equal(calls.length, 2)
+})
+
+test('C5 retest (CEO): the poll pauses when hidden or inactive and backs off while the library is unreachable', () => {
+  let tick = null, hidden = false
+  const calls = []
+  const v = { _collabDisposed: false, _collabPollTimer: null, collabCloud: { linked: true }, collabLinked: true, collabChecking: false, active: true,
+    isActiveOverviewInstance() { return this.active }, fetchCollabState: (o) => calls.push(o), startCollabFreshness: () => {} }
+  const doc = { get hidden() { return hidden } }
+  fn('startCollabPolling', { setInterval: (f) => { tick = f; return 1 }, document: doc }).call(v)
+  hidden = true; tick(); hidden = false; v.active = false; tick(); v.active = true
+  assert.equal(calls.length, 0, 'hidden window or inactive page: no network')
+  tick(); assert.equal(calls.length, 1)
+  v._collabPollFailures = 4                      // four failed checks in a row -> every 8th tick (4 min)
+  for (let i = 0; i < 7; i++) tick()
+  assert.equal(calls.length, 1)
+  tick(); assert.equal(calls.length, 2)
+  v._collabPollFailures = 20; v._collabPollSkipped = 0
+  for (let i = 0; i < 31; i++) tick()
+  assert.equal(calls.length, 2, 'capped at every 32nd tick (16 min)')
+  tick(); assert.equal(calls.length, 3)
+  v._collabPollFailures = 0; tick(); assert.equal(calls.length, 4, 'a success resets the back-off')
+})

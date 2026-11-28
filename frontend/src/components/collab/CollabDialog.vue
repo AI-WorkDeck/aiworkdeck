@@ -753,7 +753,8 @@ export default {
       try {
         // C10：真联网核对一次，并把结果交给页面（页面那份状态才是界面上显示的）——
         // 原来核对完只发 changed，页面随后读的是不联网的本地快照，等于白核对
-        const res = await checkCloud(this.projectId)
+        // C9: the lawyer asked explicitly - re-read the role too (a role the owner just changed shows at once)
+        const res = await checkCloud(this.projectId, { fresh: true })
         this.$emit('changed', { cloud: (res && res.data) || null })
       } catch (e) {
         uni.showToast({ title: errorText(e, this.$t('version.libraryOffline')), icon: 'none' })

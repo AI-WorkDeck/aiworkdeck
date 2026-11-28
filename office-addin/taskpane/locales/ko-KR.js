@@ -4,6 +4,10 @@
 export default {
   legalCopyright: "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED 및 AI WorkDeck 기여자",
   legalLicenseTrademark: "이 프로그램은 GNU Affero General Public License v3.0 이상의 라이선스로 배포되며, 어떠한 보증도 제공하지 않습니다. \"AI WorkDeck\"은 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED의 상표입니다. 수정된 버전을 재배포할 때 이 이름을 제품명으로 사용하지 마세요. 상표 고지를 참조하세요.",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · 소스 코드 · 라이선스 · 상표",
+  legalSourceLink: "소스 코드",
+  legalLicenseLink: "라이선스 전문",
+  legalTrademarkLink: "상표 고지",
   apiCloudAccessRefresh: "클라우드 접근 권한이 변경되었습니다. 계속하려면 페이지를 새로 고치거나 앱을 다시 여세요. 로컬 파일은 삭제되지 않습니다.",
   defaultProjectName: "임시 프로젝트",
   cmdPptAddImage: "슬라이드 이미지 삽입",

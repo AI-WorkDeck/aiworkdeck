@@ -33,6 +33,7 @@ export default {
     "refresh": "Aggiorna",
     "signIn": "Accedi",
     "reconnect": "Accedi di nuovo",
+    "topUp": "Ricarica",
     "feedback": "Segnalazioni"
   }
 }

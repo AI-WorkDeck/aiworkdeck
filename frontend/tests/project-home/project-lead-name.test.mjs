@@ -23,3 +23,16 @@ test('C6: header names the case owner, not the local user who pulled it', () => 
   assert.equal(projectLeadName.call({ projectMembers: local, project: {}, userDisplayName: '陆知微' }), '陆知微', 'own case: the owner is me')
   assert.equal(projectLeadName.call({ projectMembers: [], project: {}, userDisplayName: '' }), '', 'falls back to the 「我」 label in the template')
 })
+
+test('C6 retest (real lane C shapes): the server marks the owner; roles are ADMIN, not OWNER', () => {
+  // associate's machine: the clone made them the local owner (virtual id 0, ADMIN, owner:true)
+  const local = [{ id: 0, username: 'admin', displayName: '陆知微', role: 'ADMIN', owner: true, accountId: 'f43c' }]
+  const cloud = [{ id: 10, username: 'awd_qa-c-partner', displayName: '沈砚', role: 'ADMIN', owner: true, accountId: '7f11' },
+    { id: 11, username: 'awd_qa-c-associate', displayName: '陆知微', role: 'MEMBER', owner: false, accountId: 'f43c' }]
+  assert.equal(projectLeadName.call({ projectMembers: mergeMembers(local, cloud), project: {}, userDisplayName: '陆知微' }), '沈砚')
+  // the partner's own machine: same library list, local owner row matches the library owner
+  const partnerLocal = [{ id: 0, username: 'admin', displayName: '沈砚', role: 'ADMIN', owner: true, accountId: '7f11' }]
+  assert.equal(projectLeadName.call({ projectMembers: mergeMembers(partnerLocal, cloud), project: {}, userDisplayName: '沈砚' }), '沈砚')
+  // not shared: the local owner row decides
+  assert.equal(projectLeadName.call({ projectMembers: local, project: {}, userDisplayName: '陆知微' }), '陆知微')
+})

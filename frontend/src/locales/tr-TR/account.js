@@ -237,6 +237,7 @@ export default {
   "clientTab": "İstemci",
   "usernameLabel": "Kullanıcı adı",
   "usernamePlaceholder": "Kullanıcı adınızı girin",
+  "teamServerLoginHint": "Bu, ekip sunucunuzun oturum açma sayfasıdır. Yöneticinizin bu sunucu için oluşturduğu kullanıcı adını ve parolayı kullanın.",
   "passwordLabel": "Şifre",
   "passwordPlaceholder": "Şifrenizi girin",
   "rememberMe": "Beni hatırla",

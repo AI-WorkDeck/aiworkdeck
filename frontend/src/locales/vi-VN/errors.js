@@ -33,6 +33,7 @@ export default {
     "refresh": "Làm mới",
     "signIn": "Đăng nhập",
     "reconnect": "Đăng nhập lại",
+    "topUp": "Nạp tiền",
     "feedback": "Phản hồi"
   }
 }
