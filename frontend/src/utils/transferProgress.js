@@ -12,23 +12,49 @@ export function formatTransfer(progress, t) {
   return t(key, { done: mb(Math.min(progress.doneBytes, progress.totalBytes)), total: mb(progress.totalBytes) })
 }
 
-export async function withTransferProgress(projectId, run, { read, show, hide, t, start, interval = 2000, delay = 1500 } = {}) {
+// 进度探针在网络层失败（本机服务冻住 / 崩了）才算「失联」；「正在整理版本」这类业务回答说明服务活着。
+const UNREACHABLE = /request:fail|failed to fetch|networkerror|econnrefused|econnreset|net::err_|timeout/i
+const unreachable = (e) => !!e && UNREACHABLE.test(`${e.errMsg || ''} ${e.message || ''}`)
+
+/**
+ * C32（CEO 2026-11-27）：交稿/取回/取到本机的请求放宽到 30 分钟，慢网大文件不再被 60 秒默认超时误判。
+ * 但后端真的死了不能让律师干等 30 分钟：进度探针连续 deadAfter 次网络层失败就中止请求，
+ * 以网络错误收尾（界面归为「本机服务没响应」，可重试）。run 收到 AbortSignal，须传给 request。
+ */
+export async function withTransferProgress(projectId, run, { read, show, hide, t, start, interval = 2000, delay = 1500, deadAfter = 3 } = {}) {
   if (start) start(projectId)
   let shown = false
   let stopped = false
   let timer = null
+  let failures = 0
+  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  let declareDead = null
+  const dead = new Promise((_, reject) => { declareDead = reject })
+  dead.catch(() => {})
   const tick = async () => {
     if (stopped) return
     try {
       const res = await read(projectId)
+      failures = 0
       const text = formatTransfer((res && res.data) || res, t)
       if (!stopped && text) { show(text); shown = true }
-    } catch { /* Progress is a courtesy; the transfer itself reports its own outcome. */ }
+    } catch (e) {
+      // Progress is a courtesy; only a run of network-level failures means the service is gone.
+      failures = unreachable(e) ? failures + 1 : 0
+      if (!stopped && failures >= deadAfter) {
+        stopped = true
+        const err = new Error('request:fail local service not responding')
+        err.errMsg = err.message
+        declareDead(err)
+        if (controller) controller.abort()
+        return
+      }
+    }
     if (!stopped) timer = setTimeout(tick, interval)
   }
   timer = setTimeout(tick, delay)
   try {
-    return await run()
+    return await Promise.race([run(controller ? controller.signal : undefined), dead])
   } finally {
     stopped = true
     clearTimeout(timer)

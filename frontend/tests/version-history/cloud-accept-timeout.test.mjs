@@ -5,6 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { withTransferProgress } from '../../src/utils/transferProgress.js'
 
 const api = readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
 
@@ -14,8 +15,9 @@ function loadAccept() {
   const src = m[0].replace(/^export /, '')
   const calls = []
   const request = (opts) => { calls.push(opts); return Promise.resolve({ data: { localProjectId: 1 } }) }
+  const t = (k) => k
   // eslint-disable-next-line no-new-func
-  const accept = new Function('request', `${src}; return acceptCloudProject`)(request)
+  const accept = new Function('request', 'withTransferProgress', 't', `${src}; return acceptCloudProject`)(request, withTransferProgress, t)
   return { accept, calls }
 }
 

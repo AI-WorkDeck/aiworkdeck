@@ -4588,8 +4588,12 @@ export function unbindCloudProject(projectId) {
 export function acceptCloudProject(connectionId, remoteProjectId, localRoot) {
   const data = { connectionId, remoteProjectId }
   if (localRoot) data.localRoot = localRoot
-  // C32：大案卷慢网克隆要几分钟，不能沿用 60 秒默认超时（界面报超时而后端照常克隆完）
-  return request({ url: '/api/cloud/accept', method: 'POST', data, timeout: 1800000 })
+  // C32：大案卷慢网克隆要几分钟，不能沿用 60 秒默认超时（界面报超时而后端照常克隆完）。
+  // 还没有本地项目可查进度，存活探针用不占仓库锁的连接列表；不显示进度。
+  return withTransferProgress(null, (signal) => request({ url: '/api/cloud/accept', method: 'POST', data, timeout: 1800000, signal }), {
+    read: () => request({ url: '/api/cloud/connections', method: 'GET', timeout: 4000 }),
+    show: () => {}, hide: () => {}, t,
+  })
 }
 
 export function getCloudStatus(projectId) {
@@ -4608,7 +4612,8 @@ export function getCloudLocalOnly(projectId) {
 }
 
 export function getCloudTransfer(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET' })
+  // 也是 30 分钟大请求的存活探针：本身必须很快超时，冻住的后端几秒内就能认出来
+  return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET', timeout: 4000 })
 }
 
 // 大文件慢传时给出进度（见 utils/transferProgress.js）：不挡操作的 loading，字节在走就更新
@@ -4622,8 +4627,9 @@ const transferProgressUi = {
 }
 
 export function uploadToCloud(projectId) {
-  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'upload', () =>
-    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })), transferProgressUi)
+  // C32：慢网大文件交稿可以超过 60 秒默认超时；后端失联由 withTransferProgress 的探针提前收手
+  return withTransferProgress(projectId, (signal) => observeCloudConnectivity(projectId, 'upload', () =>
+    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST', timeout: 1800000, signal })), transferProgressUi)
     .then((res) => {
       // C12：交稿成功但有文件留在本机：说清楚是哪几份、怎么共享（同一组只说一次）
       const d = (res && res.data) || {}
@@ -4637,8 +4643,8 @@ export function uploadToCloud(projectId) {
 }
 
 export function updateFromCloud(projectId) {
-  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'update', () =>
-    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' })), transferProgressUi)
+  return withTransferProgress(projectId, (signal) => observeCloudConnectivity(projectId, 'update', () =>
+    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST', timeout: 1800000, signal })), transferProgressUi)
 }
 
 // resolutions: { [path]: 'MAIN' | 'DRAFT' | 'BOTH' }（语境映射见 AdoptConflictDialog）
