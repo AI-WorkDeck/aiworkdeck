@@ -5716,8 +5716,11 @@ export default {
         // Unknown after an account change still needs a retry; only an explicit
         // unlinked snapshot proves that there is no remote project to poll.
         if (this.collabCloud && !this.collabLinked) return
+        // C5 (retest 0.91.1): at 120 s a colleague's 交稿 went unnoticed for ~2 min while the chip said 一致.
+        // A check is a small refs query; one at a time (a slow check on a saturated link is not stacked).
+        if (this.collabChecking) return
         this.fetchCollabState({ online: true })
-      }, 120000)
+      }, 30000) // C5: was 120000
       if (typeof this.startCollabFreshness === 'function') this.startCollabFreshness()
     },
     // C5：「刚核对过」的时钟与联网再核对的触发点（窗口回到前台、第一次点进文档）

@@ -89,3 +89,16 @@ test('C30: every 交稿 entry point reports a landed submit', () => {
     assert.match(src, /\$emit\('changed', \{ submitted: true \}\)|\$emit\('changed', d\.status === 'UPLOADED' \? \{ submitted: true \} : undefined\)/, f)
   }
 })
+
+test('C5 retest: a shared case re-checks every 30 s while visible, one check at a time', () => {
+  const ms = Number(/\}, (\d+)\) \/\/ C5: was 120000/.exec(body('startCollabPolling'))?.[1])
+  assert.ok(ms > 0 && ms <= 30000, 'poll interval ' + ms)
+  let tick = null
+  const calls = []
+  const v = { _collabDisposed: false, _collabPollTimer: null, collabCloud: { linked: true }, collabLinked: true, collabChecking: false,
+    isActiveOverviewInstance: () => true, fetchCollabState: (o) => calls.push(o), startCollabFreshness: () => {} }
+  fn('startCollabPolling', { setInterval: (f, d) => { tick = f; assert.equal(d, ms); return 1 }, document: { hidden: false } }).call(v)
+  tick(); assert.equal(calls.length, 1)
+  v.collabChecking = true; tick(); assert.equal(calls.length, 1, 'no second check while one is running')
+  v.collabChecking = false; tick(); assert.equal(calls.length, 2)
+})
