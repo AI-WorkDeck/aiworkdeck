@@ -172,6 +172,11 @@ export default {
   browserNewTabHint: 'New browser tab',
   moreTools: 'More tools',
   railMore: 'More',
+  reviewsEntry: 'Reviews',
+  reviewsNeedYou: '{count} waiting for you',
+  reviewsNoneWaiting: 'Nothing waiting for you',
+  reviewsPick: 'Open reviews in',
+  reviewsPickItem: '{name} · {count} waiting',
   recordActivity: 'Activity Log',
   logout: 'Sign Out',
   // Left rail

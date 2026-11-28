@@ -172,6 +172,11 @@ export default {
   browserNewTabHint: '新建浏览器标签',
   moreTools: '更多工具',
   railMore: '更多',
+  reviewsEntry: '审阅',
+  reviewsNeedYou: '{count} 件待你处理',
+  reviewsNoneWaiting: '暂无待你处理的事项',
+  reviewsPick: '选择要打开的审阅',
+  reviewsPickItem: '{name} · {count} 件待处理',
   recordActivity: '工作记录',
   logout: '退出登录',
   // 左侧常驻栏

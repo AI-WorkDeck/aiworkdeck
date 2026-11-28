@@ -10,6 +10,7 @@
 //
 // 经展开进组件 data/methods（同 panelDocking.js 的形制），`this` 即 project-overview 页面实例。
 
+import { HOST_REVIEWS_KEY } from './reviewsEntry.js'
 import { track } from '@/utils/telemetryClient.js'
 
 const RAIL_ORDER_STORAGE_KEY = 'awd_rail_order'
@@ -90,6 +91,7 @@ export const railSortMethods = {
   /** rail 项点击：整理模式下不打开面板（iPhone 抖动态下点 app 也不启动）。 */
   onRailBtnTap(key) {
     if (this.railEditMode) return
+    if (key === HOST_REVIEWS_KEY) { this.openReviewsEntry(); return }
     this.toggleLeftPane(key)
   },
 
