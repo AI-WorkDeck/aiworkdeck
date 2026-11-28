@@ -75,7 +75,9 @@ export const panelSwitchingMethods = {
         // 关标签时的兜底（fileOpenTabs.js）与存量本地存储都还读它。
       }
 
-      if (key === 'dd-client') this.openDdClientTab()
+      // C16 (retest 0.91.1): on a lawyer's own shared case the pane leads with 「这份案卷的客户」; opening the client
+      // join page (「输入访问码 · 加入项目」) there sent the lawyer to the client side. It stays one click away in the pane.
+      if (key === 'dd-client' && !(this.hasNamedProject && this.collabLinked && !this.isClientView)) this.openDdClientTab()
 
       if (plugin && !this.sidebarCollapsed && (!plugin.sidebarView || ['calendar', 'tencent-meeting'].includes(plugin.pluginId))) this.openPluginTab(plugin.pluginId)
 
