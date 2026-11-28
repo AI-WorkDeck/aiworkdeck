@@ -326,4 +326,25 @@ class AgentRunRecoveryServiceTest {
         }
         return count;
     }
+
+    /** 输入框横幅上那颗按钮的实际文字（frontend chat.continueRun），中断说明必须叫对它的名字（C34 复测）。 */
+    private static String composerButtonLabel(String locale) throws Exception {
+        String src = java.nio.file.Files.readString(java.nio.file.Path.of("..", "frontend", "src", "locales", locale, "chat.js"));
+        var m = java.util.regex.Pattern.compile("\\bcontinueRun[\"']?\\s*:\\s*[\"']([^\"']+)[\"']").matcher(src);
+        assertTrue(m.find(), "chat.continueRun exists in " + locale);
+        return m.group(1);
+    }
+
+    @Test
+    void interruptNoticeNamesTheButtonTheLawyerActuallySees() throws Exception {
+        assertTrue(AgentRunRecoveryService.INTERRUPT_NOTICE_EN.contains(composerButtonLabel("en-US")),
+                "EN notice must name the button: " + AgentRunRecoveryService.INTERRUPT_NOTICE_EN);
+        assertTrue(AgentRunRecoveryService.INTERRUPT_NOTICE_ZH.contains("「" + composerButtonLabel("zh-CN") + "」"),
+                "ZH notice must name the button: " + AgentRunRecoveryService.INTERRUPT_NOTICE_ZH);
+        // 编排器的两条暂停说明（max_tokens）出的是同一颗按钮，也不能再叫它别的名字
+        String orchestrator = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src", "main", "java", "com", "checkba", "service", "ai", "AgentOrchestrator.java"));
+        assertFalse(orchestrator.contains("Continue button below"), "EN pause notices must say Resume");
+        assertFalse(orchestrator.contains("下方「继续」按钮"), "ZH pause notices must say 「继续执行」");
+    }
 }

@@ -538,9 +538,9 @@ public class AgentOrchestrator {
 
     /**
      * C34：纯正文回答在流式途中按此间隔写回答行（同一行，覆盖式）。后端被杀 / 崩溃时，
-     * 丢失窗口从「整段回答」缩到这一间隔；重启回收（AgentRunRecoveryService）再补「[进程中断]」与「继续」。
+     * 丢失窗口从「整段回答」缩到这一间隔（2 秒时 Q 实测在 ~470 字/秒下落后约 1300 字，改为 1 秒）；重启回收（AgentRunRecoveryService）再补「[进程中断]」与「继续」。
      */
-    long partialSaveIntervalMs = 2000;
+    long partialSaveIntervalMs = 1000;
 
     /**
      * 网页版每个用户同时活跃的轮次上限（W1 设计 §4.8 / §8-5）：防一个账户开多个标签页刷后端。
@@ -3161,8 +3161,8 @@ public class AgentOrchestrator {
                 // 纠正预算耗尽：按「存档 + 请示」暂停（同步数预算收尾的语义），绝不执行截断的调用
                 log.warn("LENGTH-truncated tool calls persisted after corrections for {}, pausing", conversationId);
                 String notice = LangText.of(
-                        "\n\n> 模型输出连续多次达到长度上限、工具调用无法完整发出，先暂停。点击下方「继续」按钮可接着执行。",
-                        "\n\n> The model's output kept hitting the length limit and the tool call could not be emitted in full; pausing here. Click the Continue button below to resume.");
+                        "\n\n> 模型输出连续多次达到长度上限、工具调用无法完整发出，先暂停。点击下方「继续执行」可接着执行。",
+                        "\n\n> The model's output kept hitting the length limit and the tool call could not be emitted in full; pausing here. Click Resume below to pick it up again.");
                 sendTextDelta(guard, notice);
                 String truncPersisted = (executionLog.length() > 0 ? executionLog.toString() : "")
                         + (aiMessage.text() != null ? aiMessage.text() : "") + notice;
@@ -3744,8 +3744,8 @@ public class AgentOrchestrator {
             if (!summaryOnly && response.finishReason() == dev.langchain4j.model.output.FinishReason.LENGTH) {
                 log.warn("Answer truncated by output length limit for {}, pausing for continuation", conversationId);
                 String notice = LangText.of(
-                        "\n\n> 回答达到单次输出长度上限被截断，点击下方「继续」按钮可接着生成。",
-                        "\n\n> The answer was cut off by the per-response output length limit. Click the Continue button below to keep generating.");
+                        "\n\n> 回答达到单次输出长度上限被截断，点击下方「继续执行」可接着生成。",
+                        "\n\n> The answer was cut off by the per-response output length limit. Click Resume below to keep generating.");
                 sendTextDelta(guard, notice);
                 String truncContent = (executionLog.length() > 0 ? executionLog.toString() + content : content) + notice;
                 saveAssistantMessage(guard, projectId, userId, truncContent);
