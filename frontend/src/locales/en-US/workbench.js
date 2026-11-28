@@ -174,9 +174,9 @@ export default {
   railMore: 'More',
   reviewsEntry: 'Reviews',
   reviewsNeedYou: '{count} waiting for you',
-  reviewsNoneWaiting: 'Nothing waiting for you',
-  reviewsPick: 'Open reviews in',
+  reviewsPick: 'Choose which reviews to open',
   reviewsPickItem: '{name} · {count} waiting',
+  reviewsOpen: 'Open ›',
   recordActivity: 'Activity Log',
   logout: 'Sign Out',
   // Left rail

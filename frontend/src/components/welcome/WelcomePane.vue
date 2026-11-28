@@ -26,11 +26,12 @@
         <text class="welcome-lead">{{ $t('onboarding.unlock.brand.lead') }}</text>
       </view>
 
-      <!-- C1: a plugin that serves the host "reviews" entry reported this account as approved -->
-      <view v-if="reviewCount !== null" class="welcome-reviews" role="button" tabindex="0" data-welcome="reviews"
+      <!-- C1: shown only while something waits for the lawyer (zero state would be noise; the rail button stays) -->
+      <view v-if="reviewCount > 0" class="welcome-reviews" role="button" tabindex="0" data-welcome="reviews"
         @tap="$emit('open-reviews')" @keydown.enter.prevent="$emit('open-reviews')">
         <text class="welcome-reviews-title">{{ $t('workbench.reviewsEntry') }}</text>
-        <text class="welcome-reviews-text">{{ reviewCount > 0 ? $t('workbench.reviewsNeedYou', { count: reviewCount }) : $t('workbench.reviewsNoneWaiting') }}</text>
+        <text class="welcome-reviews-text">{{ $t('workbench.reviewsNeedYou', { count: reviewCount }) }}</text>
+        <text class="welcome-reviews-open">{{ $t('workbench.reviewsOpen') }}</text>
       </view>
 
       <view class="welcome-quick-chat" @keydown.esc="showModelDropdown = false">
@@ -472,6 +473,11 @@ export default {
 .welcome-reviews-text {
   font-size: var(--awd-panel-fs);
   color: var(--awd-text-2);
+}
+.welcome-reviews-open {
+  margin-inline-start: auto; /* logical property: correct side in ar-SA */
+  font-size: var(--awd-panel-fs);
+  color: var(--awd-accent);
 }
 
 .welcome-brand {
