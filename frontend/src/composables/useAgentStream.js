@@ -27,6 +27,10 @@ if (typeof window !== 'undefined' && !window.__awdSseNetworkHooks) {
     window.addEventListener('online', () => {
         for (const hook of activeNetworkRecoveryHooks) hook('network-online')
     })
+    // C34 leftover (dev-board#1868): the desktop's local service came back after a crash/restart
+    window.addEventListener('awd:local-service-recovered', () => {
+        for (const hook of activeNetworkRecoveryHooks) hook('local-service-recovered')
+    })
     if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
@@ -679,7 +683,15 @@ export function useAgentStream() {
                 // 重连复用同一回调，避免每次连接都留下一个过期闭包。
                 if (!myNetworkRecoveryHook) {
                     myNetworkRecoveryHook = (reason) => {
-                        if (!isConnected.value && currentConversationId.value) scheduleReconnect(reason)
+                        if (isConnected.value || !currentConversationId.value) return
+                        // The local backend is back: don't sit out a backoff of up to 30 s that grew while it
+                        // was down (run_state INTERRUPTED and the Resume banner come with the reconnect).
+                        if (reason === 'local-service-recovered' && reconnectTimer) {
+                            clearTimeout(reconnectTimer)
+                            reconnectTimer = null
+                            reconnectAttempts = 0
+                        }
+                        scheduleReconnect(reason)
                     }
                     activeNetworkRecoveryHooks.add(myNetworkRecoveryHook)
                 }
