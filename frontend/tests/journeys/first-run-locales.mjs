@@ -34,9 +34,7 @@ const CJK = /[㐀-鿿]/
 const USER_DATA = [/^QA走查_\d+/]
 
 // Already filed in readiness/POLISH.md. step: regex on the step name; line: regex on the offending line.
-const KNOWN = [
-  { id: 'Q6', locale: 'zh-TW', step: /^settings-/, line: /默认版/ },
-]
+const KNOWN = []
 
 function wrongLanguage(locale, text) {
   const lines = text.split('\n').map((s) => s.trim()).filter(Boolean).filter((l) => !USER_DATA.some((re) => re.test(l)))
