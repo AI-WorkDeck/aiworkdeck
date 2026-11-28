@@ -57,7 +57,7 @@ export function mergeMembers(local, cloud) {
     if (hit >= 0) {
       takenLocal.add(hit)
       // 案件库是权威源：角色与加入时间以它为准；accountId 补上（本机那条可能是 null）
-      if (c.role != null) merged[hit].role = c.role
+      if (c.role != null) { merged[hit].role = c.role; merged[hit].roleFromCloud = true }
       if (c.joinedAt != null) merged[hit].joinedAt = c.joinedAt
       if (merged[hit].accountId == null && c.accountId != null) merged[hit].accountId = c.accountId
       continue
@@ -67,6 +67,7 @@ export function mergeMembers(local, cloud) {
       id: `cloud-${c.id != null ? c.id : s(c.username)}`,
       userId: null,
       fromCloud: true,
+      roleFromCloud: c.role != null,
     })
   }
 

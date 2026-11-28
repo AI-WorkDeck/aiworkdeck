@@ -23,3 +23,13 @@ test('C6: header names the case owner, not the local user who pulled it', () => 
   assert.equal(projectLeadName.call({ projectMembers: local, project: {}, userDisplayName: '陆知微' }), '陆知微', 'own case: the owner is me')
   assert.equal(projectLeadName.call({ projectMembers: [], project: {}, userDisplayName: '' }), '', 'falls back to the 「我」 label in the template')
 })
+
+test('C6 retest: the library owner wins even when my local row does not match my library row', () => {
+  // the associate's local row (clone made them OWNER) has no accountId and a username the library doesn't use
+  const local = [{ id: 1, username: 'associate', displayName: '陆知微', role: 'OWNER', accountId: null }]
+  const cloud = [{ id: 8, username: 'awd_lu-123', displayName: '陆知微', role: 'MEMBER', accountId: 'acc-lu' },
+    { id: 7, username: 'awd_shen-1', displayName: '沈砚', role: 'OWNER', accountId: 'acc-shen' }]
+  const vm = { projectMembers: mergeMembers(local, cloud), project: {}, userDisplayName: '陆知微' }
+  assert.equal(projectLeadName.call(vm), '沈砚')
+})
+
