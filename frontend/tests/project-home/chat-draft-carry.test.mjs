@@ -34,3 +34,18 @@ test('the chat stashes on leaving the temporary workspace and restores into an e
   assert.match(chat, /\(richInput\.value\.innerText \|\| ''\)\.trim\(\)\) return\s*\n\s*const carried = takeChatDraft\(draftStorage\)/, 'never overwrite what is already typed')
   assert.match(page, /:carry-draft-on-leave="isScratchWorkspace"/)
 })
+
+test('Q33: a refused send keeps its draft across a reload; an accepted send clears the stash', () => {
+  const chat = fs.readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
+  // refused before the server accepted it (nothing saved server-side): stash what is in the box
+  assert.match(chat, /failChatSubmission\(submissionTracker, attempt\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*keepUnsentDraftAcrossReload\(richInput\.value \? richInput\.value\.innerText : prompt\)/)
+  // accepted: clear it, so a later mount does not resurrect an old question
+  assert.match(chat, /return\s*\n\s*\}\s*\n\s*keepUnsentDraftAcrossReload\(''\)/)
+  assert.match(chat, /function keepUnsentDraftAcrossReload\(text\) \{[\s\S]{0,120}stashChatDraft\(draftStorage, text\)/)
+  // behaviour of the shared stash: refused -> restored once after reload; accepted -> nothing to restore
+  const s = mem()
+  stashChatDraft(s, '第四条付款期限是多少？', 1000)
+  assert.equal(takeChatDraft(s, 2000), '第四条付款期限是多少？')
+  stashChatDraft(s, '第四条付款期限是多少？', 3000); stashChatDraft(s, '', 3001)
+  assert.equal(takeChatDraft(s, 4000), '')
+})
