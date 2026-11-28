@@ -18,39 +18,60 @@ const unreachable = (e) => !!e && UNREACHABLE.test(`${e.errMsg || ''} ${e.messag
 
 /**
  * C32（CEO 2026-11-27）：交稿/取回/取到本机的请求放宽到 30 分钟，慢网大文件不再被 60 秒默认超时误判。
- * 但后端真的死了不能让律师干等 30 分钟：进度探针连续 deadAfter 次网络层失败就中止请求，
- * 以网络错误收尾（界面归为「本机服务没响应」，可重试）。run 收到 AbortSignal，须传给 request。
+ * 但后端真的死了不能让律师干等 30 分钟：看门狗判定失联就中止请求，以网络错误收尾
+ *（界面归为「本机服务没响应」，可重试）。run 收到 AbortSignal，须传给 request。
+ *
+ * 失联的两条判据，任一成立即收手：
+ *  - 探针连续 deadAfter 次网络层失败（端口拒连、探针超时）；
+ *  - 距上一次「服务有回应」（成功，或「正在整理版本」这类业务回答）已超过 staleAfter——
+ *    lane C 11-28 复测：冻住的后端让探针一直挂着不返回，旧实现等这一次探针结束再排下一次，
+ *    看门狗跟着停到 +97 s。现在探针按固定节奏发、同一时间最多一个在途，存活与否看时钟，不看某次探针。
  */
-export async function withTransferProgress(projectId, run, { read, show, hide, t, start, interval = 2000, delay = 1500, deadAfter = 3 } = {}) {
+export async function withTransferProgress(projectId, run, { read, show, hide, t, start, interval = 2000, delay = 1500, deadAfter = 3, staleAfter = 15000 } = {}) {
   if (start) start(projectId)
   let shown = false
   let stopped = false
   let timer = null
   let failures = 0
+  let inFlight = false
+  let lastAlive = Date.now()
   const controller = typeof AbortController === 'function' ? new AbortController() : null
   let declareDead = null
   const dead = new Promise((_, reject) => { declareDead = reject })
   dead.catch(() => {})
-  const tick = async () => {
+  const giveUp = () => {
     if (stopped) return
+    stopped = true
+    clearTimeout(timer)
+    const err = new Error('request:fail local service not responding')
+    err.errMsg = err.message
+    declareDead(err)
+    if (controller) controller.abort()
+  }
+  const probe = async () => {
+    inFlight = true
     try {
       const res = await read(projectId)
+      if (stopped) return
       failures = 0
+      lastAlive = Date.now()
       const text = formatTransfer((res && res.data) || res, t)
-      if (!stopped && text) { show(text); shown = true }
+      if (text) { show(text); shown = true }
     } catch (e) {
-      // Progress is a courtesy; only a run of network-level failures means the service is gone.
-      failures = unreachable(e) ? failures + 1 : 0
-      if (!stopped && failures >= deadAfter) {
-        stopped = true
-        const err = new Error('request:fail local service not responding')
-        err.errMsg = err.message
-        declareDead(err)
-        if (controller) controller.abort()
-        return
-      }
+      if (stopped) return
+      // Progress is a courtesy; only network-level failures say the service is gone.
+      if (unreachable(e)) failures++
+      else { failures = 0; lastAlive = Date.now() }
+      if (failures >= deadAfter) giveUp()
+    } finally {
+      inFlight = false
     }
-    if (!stopped) timer = setTimeout(tick, interval)
+  }
+  const tick = () => {
+    if (stopped) return
+    if (Date.now() - lastAlive >= staleAfter) { giveUp(); return }
+    if (!inFlight) probe()
+    timer = setTimeout(tick, interval)
   }
   timer = setTimeout(tick, delay)
   try {
