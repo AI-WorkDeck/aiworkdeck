@@ -47,3 +47,17 @@ test('cloud lawyer DD navigation does not migrate a visible DD entry back to fil
   methods.toggleLeftPane.call(state,'dd-files'); assert.equal(state.leftPaneKey,'dd-files')
   state.ddCloudTrack = false; state.leftPaneKey = 'home'; methods.toggleLeftPane.call(state,'dd-files'); assert.equal(state.leftPaneKey,'files')
 })
+
+test('C16 retest: 客户协作 on a lawyer\'s own shared case does not open the client join page', () => {
+  let source = readFileSync(new URL('../../src/pages/project-overview/panelSwitching.js', import.meta.url), 'utf8').replace(/^import .*$/gm, '').replace('export const panelSwitchingMethods =', 'const panelSwitchingMethods =')
+  source += '\nreturn panelSwitchingMethods'
+  const methods = new Function('isGlobalPlugin','migrateLeftPaneKey','track','isPaneAllowedWithoutProject','workbenchStorageKey','uni',source)(() => false, key => key, () => {}, isPaneAllowedWithoutProject, () => 'key', { setStorageSync() {} })
+  let opened = 0
+  const base = { hasProject: true, isClientView: false, dynamicPlugins: [], lastActiveIdsByMode: { left: {}, right: {} }, leftPaneKey: 'files', saveActiveIdsByMode() {}, sidebarCollapsed: false, openDdClientTab() { opened++ } }
+  methods.toggleLeftPane.call({ ...base, hasNamedProject: true, collabLinked: true }, 'dd-client')
+  assert.equal(opened, 0, 'own shared case: the pane leads with this case\'s clients')
+  methods.toggleLeftPane.call({ ...base, hasNamedProject: false, collabLinked: false }, 'dd-client')
+  methods.toggleLeftPane.call({ ...base, hasNamedProject: true, collabLinked: false }, 'dd-client')
+  methods.toggleLeftPane.call({ ...base, hasNamedProject: true, collabLinked: true, isClientView: true }, 'dd-client')
+  assert.equal(opened, 3, 'no shared case, or a client: the join page opens as before')
+})

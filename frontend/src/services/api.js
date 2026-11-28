@@ -4601,9 +4601,10 @@ export function getCloudStatus(projectId) {
     request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' }))
 }
 
-export function checkCloud(projectId) {
+// C9: opts.fresh only from the explicit 「刷新状态」 (re-reads the member's role; automatic checks keep the cache)
+export function checkCloud(projectId, opts = {}) {
   return observeCloudConnectivity(projectId, 'check', () =>
-    request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
+    request({ url: `/api/cloud/projects/${projectId}/check${opts.fresh ? '?fresh=1' : ''}`, method: 'POST' }))
 }
 
 // C12：这份案卷里只在共享人电脑上的文件（文件树徽标、占位）

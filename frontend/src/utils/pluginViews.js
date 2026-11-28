@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+/** Host entry points a plugin view may serve (C1); mirrors PluginManifestContractValidator.VIEW_ENTRY_POINTS. */
+export const VIEW_ENTRY_POINTS = ['reviews']
+
 // Mirror the server's validation at the UI boundary; never turn an unverified
 // contribution into an arbitrary URL. Legacy frontendEntry is handled separately.
 export function pluginViews(plugin, resolveEntry) {
@@ -11,7 +14,9 @@ export function pluginViews(plugin, resolveEntry) {
     if (typeof view.entry !== 'string' || !/^web\/[a-zA-Z0-9_./-]+$/.test(view.entry) || view.entry.split('/').some(x => !x || x === '.' || x === '..')) return []
     seen.add(view.id)
     const docks = Array.isArray(view.allowedDocks) ? view.allowedDocks.filter(x => ['left', 'right', 'bottom'].includes(x)) : ['left']
-    return [{ ...view, allowedDocks: docks, defaultDock: docks.includes(view.defaultDock) ? view.defaultDock : docks[0] || 'left', url: resolveEntry(plugin.id, view.entry) }]
+    // C1: a host entry point is honoured only where the server allows it (global workspace view, known name).
+    const entryPoint = VIEW_ENTRY_POINTS.includes(view.entryPoint) && view.placement === 'workspace' && view.scope === 'global' ? view.entryPoint : undefined
+    return [{ ...view, entryPoint, allowedDocks: docks, defaultDock: docks.includes(view.defaultDock) ? view.defaultDock : docks[0] || 'left', url: resolveEntry(plugin.id, view.entry) }]
   })
 }
 

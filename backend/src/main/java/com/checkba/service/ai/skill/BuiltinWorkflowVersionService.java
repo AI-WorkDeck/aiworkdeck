@@ -5,6 +5,8 @@ package com.checkba.service.ai.skill;
 
 import com.checkba.service.AppLanguageService;
 import com.checkba.service.SystemSettingService;
+import com.checkba.util.AppLocale;
+import com.checkba.util.ZhHantConverter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
@@ -114,6 +116,13 @@ public class BuiltinWorkflowVersionService {
         return appLanguageService != null && appLanguageService.isEnglish();
     }
 
+    /** 中文文案按界面语言出简/繁：zh-TW 界面不再显示简体的系统默认版、快捷指令与工作流规则（POLISH Q6）。 */
+    private String zh(String simplified) {
+        return simplified != null && appLanguageService != null && appLanguageService.locale() == AppLocale.ZH_TW
+                ? ZhHantConverter.toTraditional(simplified)
+                : simplified;
+    }
+
     /**
      * 列出全部内置常驻工作流在当前用户 + 当前项目下的版本状态。
      */
@@ -194,7 +203,7 @@ public class BuiltinWorkflowVersionService {
 
         String name = req != null && req.getName() != null ? req.getName().trim() : "";
         if (name.isEmpty()) {
-            name = isEnglish() ? "Custom Version" : "自定义版本";
+            name = isEnglish() ? "Custom Version" : zh("自定义版本");
         }
 
         String quickPrompt = req != null && req.getQuickPrompt() != null
@@ -358,6 +367,11 @@ public class BuiltinWorkflowVersionService {
         CardMeta meta = CARD_META.get(skillId);
 
         WorkflowVersion sysDefault = buildSystemDefaultVersion(skill);
+        // 只读展示用繁体；注入模型的仍是原文（转换器是轻量字表，长 Prompt 里偶有漏字，不让它改模型输入）
+        if (!en) {
+            sysDefault.setPromptTemplate(zh(sysDefault.getPromptTemplate()));
+            sysDefault.setOutput(zh(sysDefault.getOutput()));
+        }
         List<WorkflowVersion> customVersions = readCustomVersions(userId, skillId);
 
         List<WorkflowVersion> allVersions = new ArrayList<>(1 + customVersions.size());
@@ -403,8 +417,8 @@ public class BuiltinWorkflowVersionService {
                 ? skill.getNameEn()
                 : skill.getName());
         if (meta != null) {
-            view.setShortName(en ? meta.shortNameEn() : meta.shortNameZh());
-            view.setHint(en ? meta.hintEn() : meta.hintZh());
+            view.setShortName(en ? meta.shortNameEn() : zh(meta.shortNameZh()));
+            view.setHint(en ? meta.hintEn() : zh(meta.hintZh()));
         } else {
             view.setShortName(view.getName());
             view.setHint(skill.getDescription());
@@ -427,10 +441,10 @@ public class BuiltinWorkflowVersionService {
 
         WorkflowVersion v = new WorkflowVersion();
         v.setId(DEFAULT_VERSION_ID);
-        v.setName(en ? "System Default" : "系统默认版");
+        v.setName(en ? "System Default" : zh("系统默认版"));
         v.setSystemDefault(true);
         if (meta != null) {
-            v.setQuickPrompt(en ? meta.quickPromptEn() : meta.quickPromptZh());
+            v.setQuickPrompt(en ? meta.quickPromptEn() : zh(meta.quickPromptZh()));
         } else {
             v.setQuickPrompt(skill.getName());
         }

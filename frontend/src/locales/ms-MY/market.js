@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "Cuba kata kunci atau kategori yang berbeza",
   "submitFirstSkill": "Hantar Skill pertama anda ke pasaran Skill rasmi",
   "installedTag": "Dipasang",
+  "contentInChinese": "Dalam bahasa Cina",
   "processing": "Sedang diproses",
   "update": "Kemas kini",
   "install": "Pasang",
