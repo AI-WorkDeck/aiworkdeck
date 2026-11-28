@@ -552,6 +552,26 @@ class CloudSyncUpdateTest {
         assertTrue(svc.activeSession(7L).isEmpty(), "the empty session was discarded, not the pull refused");
     }
 
+    /**
+     * C35（dev-board#1871，lane C 0.91.1 RC）：保存版本之后、交稿还没落到案件库（上传中、或上传失败）时，
+     * 顶栏写着「和大家的稿一致」，版本记录却是「本机领先 2 版」。pendingUpload 只是一面「上次推送被拒/失败」
+     * 的旗子，本机存了还没推上去的版本时它是 false。律师据此以为同事已经拿到了自己的稿。
+     */
+    @Test
+    void aSavedVersionNotYetOnTheLibraryIsPendingUpload() throws Exception {
+        linkToBareRemote(7L);
+        cloud.uploadToCloud(7L, false);
+        assertEquals(false, cloud.cloudStatus(7L, 1L).get("pendingUpload"), "just submitted: in sync");
+
+        Files.writeString(root.resolve("projects/7/我的.txt"), "保存了、还没交（虚构）");
+        repoSvc.commitAll(7L, "保存版本", "session", null, "陆知微", "assoc@example.test");
+        assertEquals(true, cloud.cloudStatus(7L, 1L).get("pendingUpload"),
+                "a saved version the library does not have must read 「有改动还没交稿」, never 「和大家的稿一致」");
+
+        cloud.uploadToCloud(7L, false);
+        assertEquals(false, cloud.cloudStatus(7L, 1L).get("pendingUpload"), "submitted again: in sync");
+    }
+
     @Test
     void rejectedUploadNowAutoIntegratesWhenClean() throws Exception {
         linkToBareRemote(7L);
