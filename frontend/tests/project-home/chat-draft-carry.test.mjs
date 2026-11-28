@@ -38,7 +38,7 @@ test('the chat stashes on leaving the temporary workspace and restores into an e
 test('Q33: a refused send keeps its draft across a reload; an accepted send clears the stash', () => {
   const chat = fs.readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
   // refused before the server accepted it (nothing saved server-side): stash what is in the box
-  assert.match(chat, /failChatSubmission\(submissionTracker, attempt\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*keepUnsentDraftAcrossReload\(richInput\.value \? richInput\.value\.innerText : prompt\)/)
+  assert.match(chat, /const refusedText = visibleText \|\| displayText \|\| prompt\s*\n\s*if \(!visibleText && refusedText\) \{ await nextTick\(\); applyRecall\(refusedText\) \}\s*\n\s*keepUnsentDraftAcrossReload\(refusedText\)/)
   // accepted: clear it, so a later mount does not resurrect an old question
   assert.match(chat, /return\s*\n\s*\}\s*\n\s*keepUnsentDraftAcrossReload\(''\)/)
   assert.match(chat, /function keepUnsentDraftAcrossReload\(text\) \{[\s\S]{0,120}stashChatDraft\(draftStorage, text\)/)

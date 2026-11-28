@@ -3123,7 +3123,12 @@ export default {
         failChatSubmission(submissionTracker, attempt)
         // Q33: a turn refused before the server accepted it (e.g. an empty wallet) is not saved anywhere; keep
         // the kept draft across a reload too, so the lawyer doesn't lose the question they typed.
-        keepUnsentDraftAcrossReload(richInput.value ? richInput.value.innerText : prompt)
+        // On the first message the welcome box is swapped for the bottom box, so the visible box can be empty here
+        // although the draft was "kept": put the question back where the lawyer can see it.
+        const visibleText = richInput.value ? (richInput.value.innerText || '').trim() : ''
+        const refusedText = visibleText || displayText || prompt
+        if (!visibleText && refusedText) { await nextTick(); applyRecall(refusedText) }
+        keepUnsentDraftAcrossReload(refusedText)
         uni.showToast({ title: t('chat.sendFailedDraftKept'), icon: 'none' })
         return
       }
