@@ -268,7 +268,8 @@ public class ImAgentService {
             if (answer.isBlank()) throw bad("empty response");
             if (!"project".equals(snapshot.scope())) requireSpace(snapshot.userId(),snapshot.scope(),snapshot.scopeKey());
             requireProjectReplyAccess(snapshot.projectId(),snapshot.userId());
-            String output=clip(answer,8000);
+            // C15: say which case files the answer could draw on, and that the rest were not read
+            String output=clip(answer,8000)+ImSharedProjectContext.footer(projectMaterial);
             tx.executeWithoutResult(status -> {
                 ImConversation c=conversations.lockById(snapshot.conversationId()).orElseThrow();
                 ImAgentTurn turn=turns.findById(sourceId).orElseThrow();
