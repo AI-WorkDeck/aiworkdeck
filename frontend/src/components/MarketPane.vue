@@ -5,7 +5,6 @@
     <!-- Hero：深林绿编辑排版，与官网 /skills 同一套语言（见 aiworkdeckweb/DESIGN.md）。
          嵌入设置页时（standalone=false）由 .is-embedded 样式收成与其余设置分区一致的
          浅色页头，见 <style> 末尾「嵌入态」覆盖块。 -->
-.market-inline-error { margin-top: 8px; max-width: 460px; text-align: start; }
     <view class="hero">
       <view class="hero-grain"></view>
       <text class="hero-watermark">{{ $t('market.heroWatermark') }}</text>
@@ -1382,12 +1381,24 @@ $gray-light: var(--awd-surface-3);
 .kicker {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   margin-bottom: 8px;
   font-size: var(--awd-panel-fs-sec);
   letter-spacing: 0.14em;
   color: var(--awd-text-2);
+}
+
+/* Q1: a long category plus "In Chinese" wraps as whole phrases, never mid-phrase */
+.kicker > text {
+  white-space: nowrap;
+}
+
+.market-inline-error {
+  margin-top: 8px;
+  max-width: 460px;
+  text-align: start;
 }
 
 .kicker-icon {

@@ -23,3 +23,8 @@ test('skill and plugin cards tag Chinese-only entries outside a Chinese UI', () 
   assert.equal(fn({ name: '離婚協議書起草' }, 'zh-TW'), false)
   assert.equal(fn({ name: '离婚协议书起草' }, 'zh-CN'), false)
 })
+
+test('no CSS text leaks into the template (shipped in 0.91.0 via #1703)', () => {
+  const template = src.slice(0, src.indexOf('<script'))
+  assert.doesNotMatch(template, /^\s*\.[a-z-]+ \{[^}]*\}\s*$/m)
+})
