@@ -3277,7 +3277,10 @@ export default {
     // C6：负责人是案件的负责人（成员名单里 role=OWNER，共享案件以案件库为准），不是本机这位。
     // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
     projectLeadName() {
-      const owner = (this.projectMembers || []).find(m => m && m.role === 'OWNER')
+      // C6 (retest 0.91.1): the owner is the row the server marks owner=true (its role is ADMIN like any admin).
+      // mergeMembers lets the library decide once the case is shared, so a colleague's clone names the partner.
+      const members = (this.projectMembers || []).filter(Boolean)
+      const owner = members.find(m => m.owner === true) || members.find(m => m.role === 'OWNER')
       const name = owner && (owner.displayName || owner.nickname)
       return name || (this.project && this.project.manager) || this.userDisplayName || ''
     },
