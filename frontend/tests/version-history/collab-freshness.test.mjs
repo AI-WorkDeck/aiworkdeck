@@ -31,7 +31,11 @@ test('C5: 一致 only within 15 s of an online check; otherwise checking / not c
   assert.equal(COLLAB_FRESH_MS, 15000)
   assert.equal(chip({ collabCheckedAt: 100000 - 5000 }), 'workbench.collabInSync')
   assert.equal(chip({ collabCheckedAt: 100000 - 90000 }), 'workbench.collabInSyncAsOf{"age":"workbench.collabAgeMinutes{\\"n\\":1}"}')
-  assert.equal(chip({ collabCheckedAt: 100000 - 90000, collabChecking: true }), 'workbench.collabChecking')
+  // C30: a slow re-check keeps the last known state (with its age) and says it is checking, instead of
+  // replacing it with 「正在与团队核对…」 for minutes on a saturated link
+  assert.equal(chip({ collabCheckedAt: 100000 - 90000, collabChecking: true }),
+    'workbench.collabInSyncAsOf{"age":"workbench.collabAgeMinutes{\\"n\\":1}"} · workbench.collabChecking')
+  assert.equal(chip({ collabCheckedAt: 0, collabChecking: true }), 'workbench.collabChecking', 'nothing known yet: checking')
   assert.equal(chip({ collabCheckedAt: 0 }), 'workbench.collabNotChecked')
   assert.equal(chip({ collabCheckedAt: 100000 - 90000, collabCloud: { linked: true, remoteAhead: true } }), 'ahead', 'a known newer draft is still said')
 })
@@ -63,4 +67,25 @@ test('C5: age text', () => {
   assert.equal(collabAgeText(t, 4000), 'workbench.collabAgeSeconds{"n":4}')
   assert.equal(collabAgeText(t, 125000), 'workbench.collabAgeMinutes{"n":2}')
   assert.equal(collabAgeText(t, 2 * 3600000), 'workbench.collabAgeHours{"n":2}')
+})
+
+// C30 (lane C C29 run, POLISH C30): after a successful 交稿 on a saturated link the header sat on
+// 「正在与团队核对…」 for ~2 min. The push itself proves local == library: it counts as a fresh check.
+test('C30: a successful 交稿 counts as a fresh check', async () => {
+  const handler = fn('onCollabChanged', { Date: { now: () => 500000 }, Promise })
+  const v = { _collabStateLifecycle: 0, collabCheckedAt: 1000, collabNow: 1000, collabLinked: false,
+    fetchCollabState: async () => {}, startCollabPolling() {}, checkAdoptConflict() {} }
+  handler.call(v, { submitted: true })
+  assert.equal(v.collabCheckedAt, 500000)
+  assert.equal(v.collabNow, 500000)
+  const w = { ...v, collabCheckedAt: 1000, collabNow: 1000 }
+  handler.call(w)
+  assert.equal(w.collabCheckedAt, 1000, 'other changes do not pretend a check happened')
+})
+
+test('C30: every 交稿 entry point reports a landed submit', () => {
+  for (const f of ['components/collab/CollabDialog.vue', 'components/collab/SubmitDraftGuide.vue', 'components/version/CommitHistoryTab.vue']) {
+    const src = readFileSync(new URL('../../src/' + f, import.meta.url), 'utf8')
+    assert.match(src, /\$emit\('changed', \{ submitted: true \}\)|\$emit\('changed', d\.status === 'UPLOADED' \? \{ submitted: true \} : undefined\)/, f)
+  }
 })

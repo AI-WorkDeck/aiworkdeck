@@ -14,6 +14,8 @@ import { getCloudTransfer } from '@/services/api.js'
 import { formatTransfer } from '@/utils/transferProgress.js'
 
 const TRANSFER_KICK_EVENT = 'awd:cloud-transfer-kick'
+// C12 nit: a 交稿/取回 on this page shows its own progress line; stand down meanwhile (no second copy)
+const FOREGROUND_EVENT = 'awd:cloud-transfer-foreground'
 const IDLE_MS = 15000
 const ACTIVE_MS = 2000
 // 交稿/取回刚发起时字节还没开始走：先快查一阵，别等 15 秒才亮
@@ -22,23 +24,30 @@ const KICK_WINDOW_MS = 12000
 export default {
   name: 'CloudTransferStatus',
   props: { projectId: { type: [String, Number], default: null } },
-  data: () => ({ progress: null, timer: null, fastUntil: 0, seq: 0 }),
+  data: () => ({ progress: null, timer: null, fastUntil: 0, seq: 0, foreground: false }),
   computed: {
-    text() { return formatTransfer(this.progress, (k, p) => this.$t(k, p)) },
+    text() { return this.foreground ? '' : formatTransfer(this.progress, (k, p) => this.$t(k, p)) },
   },
   watch: {
     projectId() { this.progress = null; this.schedule(0) },
   },
   mounted() {
     this._onKick = (id) => { if (id == null || String(id) === String(this.projectId)) { this.fastUntil = Date.now() + KICK_WINDOW_MS; this.schedule(0) } }
-    if (typeof uni !== 'undefined' && uni.$on) uni.$on(TRANSFER_KICK_EVENT, this._onKick)
+    this._onForeground = (e) => { if (e && String(e.projectId) === String(this.projectId)) this.foreground = !!e.on }
+    if (typeof uni !== 'undefined' && uni.$on) {
+      uni.$on(TRANSFER_KICK_EVENT, this._onKick)
+      uni.$on(FOREGROUND_EVENT, this._onForeground)
+    }
     this.schedule(0)
   },
   beforeUnmount() {
     clearTimeout(this.timer)
     this.timer = null
     this.seq++
-    if (typeof uni !== 'undefined' && uni.$off) uni.$off(TRANSFER_KICK_EVENT, this._onKick)
+    if (typeof uni !== 'undefined' && uni.$off) {
+      uni.$off(TRANSFER_KICK_EVENT, this._onKick)
+      uni.$off(FOREGROUND_EVENT, this._onForeground)
+    }
   },
   methods: {
     schedule(ms) {

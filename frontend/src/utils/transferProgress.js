@@ -27,7 +27,7 @@ const unreachable = (e) => !!e && UNREACHABLE.test(`${e.errMsg || ''} ${e.messag
  *    lane C 11-28 复测：冻住的后端让探针一直挂着不返回，旧实现等这一次探针结束再排下一次，
  *    看门狗跟着停到 +97 s。现在探针按固定节奏发、同一时间最多一个在途，存活与否看时钟，不看某次探针。
  */
-export async function withTransferProgress(projectId, run, { read, show, hide, t, start, interval = 2000, delay = 1500, deadAfter = 3, staleAfter = 15000 } = {}) {
+export async function withTransferProgress(projectId, run, { read, show, hide, t, start, end, interval = 2000, delay = 1500, deadAfter = 3, staleAfter = 15000 } = {}) {
   if (start) start(projectId)
   let shown = false
   let stopped = false
@@ -80,5 +80,7 @@ export async function withTransferProgress(projectId, run, { read, show, hide, t
     stopped = true
     clearTimeout(timer)
     if (shown) hide()
+    // C12 nit: the status-bar cell stood down for this foreground line; let it come back
+    if (end) { try { end(projectId) } catch { /* progress is a courtesy */ } }
   }
 }

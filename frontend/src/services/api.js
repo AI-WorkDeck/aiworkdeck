@@ -4619,7 +4619,14 @@ export function getCloudTransfer(projectId) {
 // 大文件慢传时给出进度（见 utils/transferProgress.js）：不挡操作的 loading，字节在走就更新
 const transferProgressUi = {
   // 状态栏那一格（CloudTransferStatus）也立刻开始快查，不等它 15 秒一次的慢轮询
-  start: (projectId) => { try { uni.$emit('awd:cloud-transfer-kick', projectId) } catch { /* no event bus */ } },
+  start: (projectId) => {
+    try {
+      uni.$emit('awd:cloud-transfer-kick', projectId)
+      // C12 nit: one progress line at a time - the status-bar cell stands down while this one shows
+      uni.$emit('awd:cloud-transfer-foreground', { projectId, on: true })
+    } catch { /* no event bus */ }
+  },
+  end: (projectId) => { try { uni.$emit('awd:cloud-transfer-foreground', { projectId, on: false }) } catch { /* no event bus */ } },
   read: getCloudTransfer,
   show: (title) => uni.showLoading({ title, mask: false }),
   hide: () => uni.hideLoading(),

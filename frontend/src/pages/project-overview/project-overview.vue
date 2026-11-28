@@ -3638,9 +3638,11 @@ export default {
       // C5：只有刚联网核对过（15 秒内）才说「和大家的稿一致」。更早的核对只能说明当时一致——
       // 同事可能刚交了新稿，律师据此在旧稿上动手，之后就是合并或冲突。
       if (!this.collabFresh) {
-        if (this.collabChecking) return this.$t('workbench.collabChecking')
-        if (!this.collabCheckedAt) return this.$t('workbench.collabNotChecked')
-        return this.$t('workbench.collabInSyncAsOf', { age: collabAgeText((k, p) => this.$t(k, p), this.collabNow - this.collabCheckedAt) })
+        // C30: on a saturated link the re-check can take minutes; keep the last known state (with its age)
+        // and say it is checking, rather than replacing it with 「正在与团队核对…」 the whole time
+        if (!this.collabCheckedAt) return this.$t(this.collabChecking ? 'workbench.collabChecking' : 'workbench.collabNotChecked')
+        const asOf = this.$t('workbench.collabInSyncAsOf', { age: collabAgeText((k, p) => this.$t(k, p), this.collabNow - this.collabCheckedAt) })
+        return this.collabChecking ? asOf + ' · ' + this.$t('workbench.collabChecking') : asOf
       }
       return this.$t('workbench.collabInSync')
     },
@@ -5838,6 +5840,11 @@ export default {
       // C10：协作抽屉「刷新状态」刚联网核对过，直接用它的结果（再读本地快照会把它盖掉）
       if (payload && payload.cloud) {
         this.collabCloud = payload.cloud
+        this.collabCheckedAt = Date.now()
+        this.collabNow = this.collabCheckedAt
+      }
+      // C30: a landed 交稿 is itself proof that local == library — a fresh check, no waiting on the network
+      if (payload && payload.submitted) {
         this.collabCheckedAt = Date.now()
         this.collabNow = this.collabCheckedAt
       }
