@@ -50,7 +50,7 @@
     </div>
     <form class="message-composer">
       <component :is="'textarea'" :value="draft" maxlength="8000" rows="3" :aria-label="$t('messageCenter.composer')" :placeholder="$t('messageCenter.composer')" @input="$emit('draft', $event.target.value)" @keydown="onKeydown"></component>
-      <div class="message-send-row"><button v-if="canRequestAssistant" type="button" :disabled="agentBusy || !canReply" @click="$emit('reply')">{{ $t('messageCenter.askAssistant') }}</button><small>{{ $t('messageCenter.enterHint') }}</small><button type="button" class="primary" :disabled="!draft.trim()" @click="$emit('send')">{{ $t('messageCenter.send') }}</button></div>
+      <div class="message-send-row"><button v-if="canRequestAssistant" type="button" :disabled="agentBusy || (!canReply && !draft.trim())" @click="$emit('reply')">{{ $t('messageCenter.askAssistant') }}</button><small>{{ $t('messageCenter.enterHint') }}</small><button type="button" class="primary" :disabled="!draft.trim()" @click="$emit('send')">{{ $t('messageCenter.send') }}</button></div>
     </form>
     </div>
   </section>
