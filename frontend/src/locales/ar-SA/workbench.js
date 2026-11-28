@@ -170,7 +170,7 @@ export default {
   "reviewsNeedYou": "{count} بانتظارك",
   "reviewsPick": "اختر المراجعات التي تريد فتحها",
   "reviewsPickItem": "{name} · {count} بالانتظار",
-  "reviewsOpen": "فتح ›",
+  "reviewsOpen": "فتح ‹",
   "recordActivity": "سجل النشاط",
   "logout": "تسجيل الخروج",
   "stagingArea": "منطقة التحضير",
