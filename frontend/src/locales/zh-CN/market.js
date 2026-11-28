@@ -45,6 +45,8 @@ export default {
   submitFirstSkill: '去官网插件市场提交你的第一个技能',
 
   installedTag: '已安装',
+
+  contentInChinese: '中文',
   processing: '处理中',
   update: '更新',
   install: '安装',

@@ -43,6 +43,8 @@ export default {
   submitFirstSkill: 'Submit your first Skill on the official Skill marketplace',
 
   installedTag: 'Installed',
+
+  contentInChinese: 'In Chinese',
   processing: 'Processing',
   update: 'Update',
   install: 'Install',
