@@ -4,6 +4,8 @@ export type Permission = 'file_read' | 'file_write' | 'network' | 'editor' | 'ai
 export type Dock = 'left' | 'right' | 'bottom';
 export interface ViewDeclaration {
   id: string; name: string; entry: string; placement: 'sidebar' | 'workspace'; scope: 'project' | 'global'; defaultDock?: Dock; allowedDocks?: Dock[];
+  /** Host entry point (host 0.92+): only on a global workspace view. */
+  entryPoint?: 'reviews';
 }
 export type ConnectionAuth = { type: 'none' | 'bearer' } | {
   type: 'oauth2'; authorizationUrl: string; tokenUrl: string; clientId: string; scopes?: string[];

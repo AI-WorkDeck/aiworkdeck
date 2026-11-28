@@ -237,6 +237,7 @@ export default {
   "clientTab": "クライアント",
   "usernameLabel": "ユーザー名",
   "usernamePlaceholder": "ユーザー名を入力してください",
+  "teamServerLoginHint": "これはチームサーバーのサインイン画面です。管理者がこのサーバー用に設定したユーザー名とパスワードを使用してください。",
   "passwordLabel": "パスワード",
   "passwordPlaceholder": "パスワードを入力してください",
   "rememberMe": "ログイン状態を保持する",

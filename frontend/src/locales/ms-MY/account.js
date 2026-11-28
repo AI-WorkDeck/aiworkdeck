@@ -237,6 +237,7 @@ export default {
   "clientTab": "Klien",
   "usernameLabel": "Nama Pengguna",
   "usernamePlaceholder": "Masukkan nama pengguna anda",
+  "teamServerLoginHint": "Ini ialah log masuk pelayan pasukan anda. Gunakan nama pengguna dan kata laluan yang disediakan oleh pentadbir untuk pelayan ini.",
   "passwordLabel": "Kata laluan",
   "passwordPlaceholder": "Masukkan kata laluan anda",
   "rememberMe": "Ingat Saya",

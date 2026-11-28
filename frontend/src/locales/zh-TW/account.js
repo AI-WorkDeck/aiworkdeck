@@ -237,6 +237,7 @@ export default {
   "clientTab": "客戶",
   "usernameLabel": "使用者名稱",
   "usernamePlaceholder": "請輸入使用者名稱",
+  "teamServerLoginHint": "這是團隊伺服器的登入頁，請使用管理員為本伺服器分配的使用者名稱和密碼。",
   "passwordLabel": "密碼",
   "passwordPlaceholder": "請輸入密碼",
   "rememberMe": "記住我",

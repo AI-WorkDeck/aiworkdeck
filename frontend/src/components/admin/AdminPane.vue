@@ -1041,7 +1041,7 @@
           </SettingsSection>
         </scroll-view>
         <scroll-view v-else-if="activeNav === 'permissions'" scroll-y class="config-scroll">
-          <SettingsSection :title="$t('admin.permissionsSectionTitle')" :description="$t('admin.permissionsSectionSubtitle')">
+          <SettingsSection :title="$t('admin.permissionsSectionTitle')" :description="$t(isCnSite ? 'admin.permissionsSectionSubtitle' : 'admin.permissionsSectionSubtitleIntl')">
             <template #actions>
               <view class="awd-set-row-spread-actions">
                 <button class="comp-btn" @tap="loadPermissionsStatus">{{ $t('admin.permissionsRefreshBtn') }}</button>
@@ -1453,7 +1453,7 @@ export default {
       const metaById = {
         fullDiskAccess: {
           title: this.$t('admin.permFullDiskAccessTitle'),
-          description: this.$t('admin.permFullDiskAccessDesc'),
+          description: this.$t(this.isCnSite ? 'admin.permFullDiskAccessDesc' : 'admin.permFullDiskAccessDescIntl'),
         },
         screenRecording: {
           title: this.$t('admin.permScreenRecordingTitle'),
