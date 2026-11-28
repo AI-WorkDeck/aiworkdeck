@@ -57,6 +57,8 @@ public class ProjectMemberController {
             map.put("id", member.getId());
             map.put("userId", member.getUserId());
             map.put("role", member.getRole());
+            // C6: the case owner (project.userId) is listed as ADMIN like any admin; say who owns the case
+            map.put("owner", owner != null && owner.getId().equals(member.getUserId()));
             map.put("joinedAt", member.getJoinedAt());
             if (user != null) {
                 // username 保留一版给老客户端，前端不再读它（spec 2026-09-10 §4/§5：
@@ -86,6 +88,7 @@ public class ProjectMemberController {
                 ownerMap.put("id", 0L); // Virtual ID
                 ownerMap.put("userId", owner.getId());
                 ownerMap.put("role", "ADMIN");
+                ownerMap.put("owner", true);
                 ownerMap.put("joinedAt", null);
                 ownerMap.put("username", owner.getUsername());
                 ownerMap.put("displayName", LocalIdentityService.displayNameOf(owner.getDisplayName()));

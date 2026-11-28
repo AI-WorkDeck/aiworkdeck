@@ -99,4 +99,24 @@ class ProjectMemberClientRosterTest {
         assertEquals("acct-1", rows.get(0).get("accountId"));
         assertEquals("ADMIN", rows.get(0).get("role"));
     }
+
+    @Test
+    @DisplayName("C6：案卷负责人行标 owner=true（角色仍是 ADMIN），其他成员 owner=false")
+    void ownerRowIsMarked() {
+        ProjectMember m = new ProjectMember();
+        m.setId(5L); m.setProjectId(PROJECT); m.setUserId(LAWYER); m.setRole("MEMBER");
+        User u = new User(); u.setId(LAWYER); u.setUsername("lawyer_a"); u.setDisplayName("律师甲");
+        User owner = new User(); owner.setId(9L); owner.setUsername("partner"); owner.setDisplayName("沈砚");
+        when(pms.getMembers(PROJECT)).thenReturn(List.of(m));
+        when(pms.getMemberUsers(PROJECT)).thenReturn(List.of(u));
+        when(pms.getProjectOwner(PROJECT)).thenReturn(owner);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) controller.getMembers(PROJECT, "lawyer").get("data");
+        assertEquals(2, rows.size());
+        assertEquals("沈砚", rows.get(0).get("displayName"));
+        assertEquals("ADMIN", rows.get(0).get("role"));
+        assertEquals(true, rows.get(0).get("owner"));
+        assertEquals(false, rows.get(1).get("owner"));
+    }
 }
