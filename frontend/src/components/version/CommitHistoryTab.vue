@@ -996,7 +996,7 @@ export default {
         await this.reload()
       } catch (e) {
         if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { /* lasting dialog shown */ }
-        else if (await submitFailedOffline(this.projectId, checkCloud)) {
+        else if (await submitFailedOffline(this.projectId, checkCloud, e)) {
           this.$emit('queued')
           uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
         } else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })

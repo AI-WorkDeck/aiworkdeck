@@ -114,7 +114,11 @@ export async function submitNeedsGuide({ projectId, working, cloud, readStatus }
  * failed without queuing, so nothing went out after reconnecting. After a failed direct submit, ask the
  * library once more; true means unreachable, and the caller queues it like the guide does.
  */
-export async function submitFailedOffline(projectId, checkCloud) {
+export async function submitFailedOffline(projectId, checkCloud, err) {
+  // C32 freeze re-run: a transport failure to the local backend (uni "request:fail", incl. the transfer
+  // watchdog's) means the local service is down, not the internet. The online re-check would hang on the
+  // same dead service and keep the button busy; answer "not offline" at once so the caller shows the error.
+  if (err && /request:fail/i.test(`${err.errMsg || ''} ${err.message || ''}`)) return false
   try {
     const res = await checkCloud(projectId)
     return !!(res && res.data && res.data.offline)

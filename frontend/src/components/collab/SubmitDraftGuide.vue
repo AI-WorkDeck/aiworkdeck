@@ -351,8 +351,14 @@ export default {
         if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { this.close(); return }
         // C11：先联网核对一次，确实是没联网才转成「联网后自动交」；权限类拒绝（只读 / 已移出）
         // 原样说给律师听，不排队——重试永远不会成功
-        await this.refresh({ online: true })
-        if (this.localCloud && this.localCloud.offline) {
+        // C32 freeze re-run: a transport failure to the local backend means the local service is down,
+        // not the internet — the online re-check would hang on the same dead service. Say so at once.
+        // A refresh that fails must never swallow the message either.
+        const localDown = /request:fail/i.test(`${(e && e.errMsg) || ''} ${(e && e.message) || ''}`)
+        if (!localDown) {
+          try { await this.refresh({ online: true }) } catch (_) { /* the toast below still tells the lawyer */ }
+        }
+        if (!localDown && this.localCloud && this.localCloud.offline) {
           this.$emit('queued')
           uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
           this.close()

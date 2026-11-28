@@ -24,7 +24,8 @@ for (const [file, method] of [['components/collab/CollabDialog.vue', 'async onUp
     const src = read(file)
     const body = src.slice(src.indexOf(method), src.indexOf('\n    },\n', src.indexOf(method)))
     const handler = body.slice(body.lastIndexOf('} catch (e) {'))
-    assert.match(handler, /await submitFailedOffline\(this\.projectId, checkCloud\)/)
+    // C32: the failure is passed in, so a dead local service skips the online re-check
+    assert.match(handler, /await submitFailedOffline\(this\.projectId, checkCloud, e\)/)
     assert.match(handler, /this\.\$emit\('queued'\)/)
     assert.match(handler, /version\.submitQueuedOffline/)
     assert.ok(handler.indexOf('showLargeFileBackupBlock') < handler.indexOf('submitFailedOffline'), 'the large-file dialog still wins')
