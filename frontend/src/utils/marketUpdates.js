@@ -11,6 +11,8 @@ function parseVersion(value) {
 
 export function isPluginUpdateAvailable(market, installed) {
   if (market?.revokedReason || installed?.revokedReason) return false
+  // W39: this app is too old for that version (the backend sets requiresHostVersion); never offer it as an update
+  if (market?.requiresHostVersion) return false
   const local = installed?.version || market?.installedVersion
   const latest = parseVersion(market?.version)
   const current = parseVersion(local)

@@ -204,11 +204,12 @@
                   <text class="card-title">{{ m.name || m.id }}</text>
                   <text class="card-id">{{ m.id }} · v{{ m.version || '1.0.0' }} · {{ formatSize(m.size) }} · {{ priceTag(m) }}</text>
                   <text v-if="installedPluginVersion(m)" class="card-note">{{ $t('market.installedVersion') }} v{{ installedPluginVersion(m) }} · {{ $t('market.latestVersion') }} v{{ m.version }}</text>
+                  <text v-if="m.requiresHostVersion" class="card-note">{{ m.installed ? $t('market.updateNeedsNewerApp', { version: m.version, app: m.requiresHostVersion }) : $t('market.installNeedsNewerApp', { app: m.requiresHostVersion }) }}</text>
                 </view>
                 <view class="card-actions">
                   <component
                     :is="'button'"
-                    v-if="marketAction(m, pluginUpdateAvailable(m)) === 'install' && (!m.installed || pluginUpdateAvailable(m))"
+                    v-if="marketAction(m, pluginUpdateAvailable(m)) === 'install' && (!m.installed || pluginUpdateAvailable(m)) && !(m.requiresHostVersion && !m.installed)"
                     type="button"
                     class="act-primary"
                     :class="{ 'is-busy': !!pluginBusyId }"

@@ -123,3 +123,19 @@ test('workbench badge and mounted plugin frames follow the shared count and vers
   assert.match(page,/version: p.version/)
   assert.equal((page.match(/:key="entry.plugin.pluginId \+ ':' \+ entry.plugin.version"/g)||[]).length,2)
 })
+
+test('W39: a version this app is too old for is never offered as an update', () => {
+  assert.equal(isPluginUpdateAvailable({ version: '0.1.22', requiresHostVersion: '0.92.0' }, { version: '0.1.21' }), false)
+  assert.equal(isPluginUpdateAvailable({ version: '0.1.22' }, { version: '0.1.21' }), true, 'no field: as before')
+})
+
+test('W39: the marketplace shows why instead of an install or update button', async () => {
+  const fs = await import('node:fs')
+  const detail = fs.readFileSync(new URL('../../src/components/MarketDetailPane.vue', import.meta.url), 'utf8')
+  assert.match(detail, /v-if="marketInfo && !installedInfo && !needsPurchase && !hostUpdateNeeded"[\s\S]{0,120}@tap="doInstallPlugin"/)
+  assert.match(detail, /v-if="hostUpdateNeeded"[^>]*>\{\{ installedInfo \? \$t\('market\.updateNeedsNewerApp'/)
+  const pane = fs.readFileSync(new URL('../../src/components/MarketPane.vue', import.meta.url), 'utf8')
+  assert.match(pane, /&& !\(m\.requiresHostVersion && !m\.installed\)/)
+  const side = fs.readFileSync(new URL('../../src/components/MarketSidebarPanel.vue', import.meta.url), 'utf8')
+  assert.match(side, /canInstall: canInstall\(state\) && !m\.requiresHostVersion/)
+})
