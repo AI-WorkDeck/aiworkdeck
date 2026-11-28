@@ -4588,7 +4588,8 @@ export function unbindCloudProject(projectId) {
 export function acceptCloudProject(connectionId, remoteProjectId, localRoot) {
   const data = { connectionId, remoteProjectId }
   if (localRoot) data.localRoot = localRoot
-  return request({ url: '/api/cloud/accept', method: 'POST', data })
+  // C32：大案卷慢网克隆要几分钟，不能沿用 60 秒默认超时（界面报超时而后端照常克隆完）
+  return request({ url: '/api/cloud/accept', method: 'POST', data, timeout: 1800000 })
 }
 
 export function getCloudStatus(projectId) {
