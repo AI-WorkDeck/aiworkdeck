@@ -1097,7 +1097,8 @@ public class CloudSyncService {
                         if (!(o instanceof JSONObject row)) continue;
                         String r = row.getStr("role");
                         if (conn.getUsername() != null && conn.getUsername().equals(row.getStr("username"))) mine = r;
-                        if ("OWNER".equals(r) && owner == null) owner = row.getStr("displayName");
+                        // C6: the library marks its case owner with owner=true (role is ADMIN); older libraries never did
+                        if ((row.getBool("owner", false) || "OWNER".equals(r)) && owner == null) owner = row.getStr("displayName");
                     }
                 }
                 role = new RemoteRole(mine, owner, System.currentTimeMillis() + REMOTE_ROLE_TTL_MS);

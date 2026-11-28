@@ -112,5 +112,13 @@ class CloudRoleStatusTest {
         cloud.checkCloud(7L);
         assertNull(cloud.cloudStatus(7L, 42L).get("removed"));
     }
+
+    @Test void ownerIsTheRowMarkedOwnerEvenWhenItsRoleIsAdmin() {
+        members = "{\"code\":0,\"data\":[{\"username\":\"awd_partner\",\"displayName\":\"沈砚\",\"role\":\"ADMIN\",\"owner\":true},"
+                + "{\"username\":\"lu\",\"displayName\":\"陆知微\",\"role\":\"MEMBER\",\"owner\":false}]}";
+        Map<String, Object> st = cloud.checkCloud(7L);
+        assertEquals("MEMBER", st.get("myRole"));
+        assertEquals("沈砚", st.get("ownerName"));
+    }
 }
 
