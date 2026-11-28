@@ -201,6 +201,29 @@ class PluginMarketServiceTest {
     }
 
     @Test
+    @DisplayName("W39：注册表 minHostVersion 高于本机时标 requiresHostVersion；达标、dev 态、未声明一律不标；远端同名字段不采信")
+    void listMarketMarksVersionsThisAppIsTooOldFor() {
+        PluginMarketService svc = new PluginMarketService("http://registry.test/plugins", publicKeyPem,
+                pluginsDir.toString(), pluginService, gate) {
+            @Override protected String httpGet(String url) {
+                return "[{\"id\":\"needs-new\",\"version\":\"0.2.0\",\"minHostVersion\":\"0.92.0\"},"
+                        + "{\"id\":\"fits\",\"version\":\"0.1.0\",\"minHostVersion\":\"0.91.0\"},"
+                        + "{\"id\":\"no-field\",\"version\":\"0.1.0\",\"requiresHostVersion\":\"9.9.9\"}]";
+            }
+        };
+        svc.appVersion = "0.91.2";
+        var list = svc.listMarket();
+        assertEquals("0.92.0", list.get(0).getRequiresHostVersion());
+        assertEquals(null, list.get(1).getRequiresHostVersion());
+        assertEquals(null, list.get(2).getRequiresHostVersion(), "a registry-supplied requiresHostVersion is ignored");
+        svc.appVersion = "dev";
+        assertEquals(null, svc.listMarket().get(0).getRequiresHostVersion(), "dev builds are never blocked");
+        assertEquals(null, PluginMarketService.hostTooOldFor("not-semver", "0.91.2"));
+        assertEquals("0.92.0", PluginMarketService.hostTooOldFor("0.92.0", "0.91.9"));
+        assertEquals(null, PluginMarketService.hostTooOldFor("0.92.0", "0.92.0"));
+    }
+
+    @Test
     void retiredPluginCannotBeDownloadedEvenWithAStaleRegistry() {
         assertTrue(assertThrows(IllegalStateException.class,
                 () -> service(publicKeyPem).install("hr-template-pack")).getMessage().contains("下架"));

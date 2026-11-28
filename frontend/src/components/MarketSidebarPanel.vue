@@ -188,6 +188,7 @@
             </view>
             <component :is="'button'" type="button" v-if="row.updatable" class="msb-row-install msb-row-update" :title="$t('market.updateToVersion', { version: row.raw.version })" @click.stop="openDetail(row)"><text>{{ $t('market.update') }}</text></component>
             <view v-else-if="row.installed" class="msb-row-state ok"><text>{{ $t('market.installedShort') }}</text></view>
+            <view v-else-if="row.needsNewerApp" class="msb-row-state off" :title="$t('market.installNeedsNewerApp', { app: row.raw.requiresHostVersion })" @tap.stop="openDetail(row)"><text>{{ $t('market.needsNewerAppShort') }}</text></view>
             <view
               v-else-if="row.canInstall"
               class="msb-row-install"
@@ -458,7 +459,9 @@ export default {
           installed: installedIds.has(m.id) || !!m.installed,
           updatable: isPluginUpdateAvailable(m, this.plugins.find(p => p.id === m.id)),
           paidState: state,
-          canInstall: canInstall(state),
+          // W39: a version this app is too old for is not installable from the row; the detail explains why
+          canInstall: canInstall(state) && !m.requiresHostVersion,
+          needsNewerApp: !!m.requiresHostVersion && !(installedIds.has(m.id) || !!m.installed),
           raw: m,
         }
       })

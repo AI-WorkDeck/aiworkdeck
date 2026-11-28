@@ -146,6 +146,10 @@ public class PluginMarketService {
         private boolean updatable;
         /** 付费项且账户权益里有 plugin:{id}（免费项恒 false，前端按 priceCents 判免费） */
         private boolean purchased;
+        /** W39: the registry's minHostVersion for the version this entry describes (absent on older registries). */
+        private String minHostVersion;
+        /** W39: set (to minHostVersion) only when this app is too old to install that version; never taken from the registry. */
+        private String requiresHostVersion;
     }
 
     private String currentRegistryUrl() {
@@ -188,13 +192,15 @@ public class PluginMarketService {
             }
             view.setPurchased(view.getPriceCents() > 0 && view.getId() != null
                     && purchaseGate.purchased(MarketPurchaseGate.pluginFeature(view.getId())));
+            view.setRequiresHostVersion(hostTooOldFor(view.getMinHostVersion(), effectiveAppVersion()));
             pluginService.getPlugins().stream()
                     .filter(p -> p.getId() != null && p.getId().equals(view.getId()))
                     .findFirst()
                     .ifPresent(local -> {
                         view.setInstalled(true);
                         view.setInstalledVersion(local.getVersion());
-                        view.setUpdatable(compareSemver(view.getVersion(), local.getVersion()) > 0);
+                        view.setUpdatable(view.getRequiresHostVersion() == null
+                                && compareSemver(view.getVersion(), local.getVersion()) > 0);
                     });
         }
         purchaseGate.assertConnection(connection);
@@ -632,6 +638,16 @@ public class PluginMarketService {
         } catch (IOException e) {
             // 读不出 manifest 属验签与 rescan 链路的职责，同 checkMinHostVersion
         }
+    }
+
+    /**
+     * W39: the minHostVersion this app does not meet, else null. Same rule as the install gate
+     * ({@link #checkMinHostVersion}): unknown or non-semver values on either side never block.
+     */
+    static String hostTooOldFor(String minHostVersion, String appVersion) {
+        if (minHostVersion == null || minHostVersion.isBlank() || !com.checkba.util.Semver.isSemver(minHostVersion)) return null;
+        if (appVersion == null || !com.checkba.util.Semver.isSemver(appVersion)) return null;
+        return com.checkba.util.Semver.compare(appVersion, minHostVersion) < 0 ? minHostVersion : null;
     }
 
     /** 无法识别任一版本时返回 0（未知，不宣称有更新）；build metadata 不影响优先级。 */

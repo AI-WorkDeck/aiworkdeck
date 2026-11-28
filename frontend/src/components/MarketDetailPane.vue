@@ -144,7 +144,7 @@
             <!-- 插件：安装（带权限确认）/ 启停 / 卸载 -->
             <template v-else>
               <view
-                v-if="marketInfo && !installedInfo && !needsPurchase"
+                v-if="marketInfo && !installedInfo && !needsPurchase && !hostUpdateNeeded"
                 class="mdp-btn primary"
                 :class="{ busy }"
                 @tap="doInstallPlugin"
@@ -177,6 +177,8 @@
             </template>
           </view>
 
+          <!-- W39: this version needs a newer app; installing would be refused by the install gate anyway -->
+          <text v-if="hostUpdateNeeded" class="mdp-purchase-hint mdp-host-update" role="note">{{ installedInfo ? $t('market.updateNeedsNewerApp', { version: marketInfo.version, app: marketInfo.requiresHostVersion }) : $t('market.installNeedsNewerApp', { app: marketInfo.requiresHostVersion }) }}</text>
           <text v-if="pluginActionError" class="mdp-purchase-hint" role="alert">{{ pluginActionError }}</text>
           <text v-if="pluginActionHint" class="mdp-purchase-hint" role="status">{{ pluginActionHint }}</text>
           <view v-if="spec.kind === 'plugin' && pendingToolChangeCount" class="mdp-tool-approval" role="alert">
@@ -520,6 +522,12 @@ export default {
     },
     pendingToolChangeCount() {
       return this.spec.kind === 'plugin' ? pendingToolChanges(this.installedInfo).length : 0
+    },
+    hostUpdateNeeded() {
+      // Not installed: the install itself needs a newer app. Installed: only when the listed version is newer.
+      const m = this.marketInfo
+      if (this.spec.kind !== 'plugin' || !m || !m.requiresHostVersion) return false
+      return !this.installedInfo || m.version !== this.installedInfo.version
     },
     pluginUpdateAvailable() {
       return this.spec.kind === 'plugin' && isPluginUpdateAvailable(this.marketInfo, this.installedInfo)
