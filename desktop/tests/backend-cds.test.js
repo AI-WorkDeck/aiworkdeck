@@ -204,3 +204,16 @@ test('check-packaged-site（#1795 守卫）按装好的应用同样的参数起�
   assert.ok(cds.args.includes('-XX:SharedArchiveFile=' + path.join(ctx.resourcesPath, 'backend', 'lib.jsa')))
   assert.equal(cds.args[cds.args.indexOf('-cp') + 1].split(sep)[0], path.join(LINK_NAME, 'lib', '*'))
 })
+
+test('建不了链接（网络共享、权限、数据目录路径不可用）时静默退回：不带归档、绝对路径、不抛错', (t) => {
+  const root = tmp(t)
+  const ctx = packaged(root)
+  fs.writeFileSync(path.join(ctx.resourcesPath, 'backend', 'lib.jsa'), 'jsa')
+  // 数据目录的父路径是个文件：mkdir 失败，等同于网络共享上建不了 junction
+  fs.writeFileSync(path.join(root, 'blocked'), 'file')
+  const blocked = { ...ctx, dataDir: path.join(root, 'blocked', 'data') }
+  assert.equal(ensureBackendLink(blocked.dataDir, path.join(ctx.resourcesPath, 'backend')), null)
+  const args = javaLaunchArgs(blocked, bundled(ctx))
+  assert.ok(!args.some((a) => a.startsWith('-XX:SharedArchiveFile')))
+  assert.equal(args[args.indexOf('-cp') + 1].split(sep)[0], path.join(ctx.resourcesPath, 'backend', 'lib', '*'))
+})

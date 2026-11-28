@@ -242,6 +242,10 @@ public class ProjectRepoService {
             EXCLUDE_RULE_OFFICE_LOCK,
             EXCLUDE_RULE_NESTED_METADATA,
             ".mobile-moves/", // Recoverable mobile-move originals are not version content.
+            // The desktop shell's link to the installed backend (D21, desktop/main/services/backend-link.js).
+            // Java on Windows walks a junction as a plain directory, so a project rooted at or above the
+            // data dir would otherwise version ~130 MB of the app's jars.
+            ".awd-backend/",
             "node_modules/",
             "bower_components/",
             "__pycache__/",
