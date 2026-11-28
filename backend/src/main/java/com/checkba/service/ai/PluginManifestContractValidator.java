@@ -78,6 +78,9 @@ public final class PluginManifestContractValidator {
             }
         }
     }
+    /** Host entry points a plugin view may serve (C1). The host renders each one generically. */
+    static final Set<String> VIEW_ENTRY_POINTS = Set.of("reviews");
+
     public static void validateViews(PluginService.PluginMetadata meta, File directory) {
         if (meta.getContributes() == null || meta.getContributes().getViews() == null) return;
         Set<String> ids = new HashSet<>();
@@ -105,6 +108,10 @@ public final class PluginManifestContractValidator {
             if (view.getDefaultDock() != null && (!Set.of("left", "right", "bottom").contains(view.getDefaultDock())
                     || (view.getAllowedDocks() != null && !view.getAllowedDocks().contains(view.getDefaultDock())))) {
                 throw new IllegalArgumentException("Default dock must be allowed");
+            }
+            if (view.getEntryPoint() != null && (!VIEW_ENTRY_POINTS.contains(view.getEntryPoint())
+                    || !"workspace".equals(view.getPlacement()) || !"global".equals(view.getScope()))) {
+                throw new IllegalArgumentException("View entryPoint must be one of " + VIEW_ENTRY_POINTS + " on a global workspace view");
             }
         }
     }

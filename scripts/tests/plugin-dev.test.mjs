@@ -51,6 +51,19 @@ test('unknown permissions and malformed nested declarations fail before package 
   await assert.rejects(validatePlugin(dir), /Secret setting defaults/)
 })
 
+test('view entryPoint: only "reviews", only on a global workspace view (C1)', async t => {
+  const { dir, manifest } = await fixture(t)
+  const view = (extra) => ({ id: 'main', name: 'Main', entry: 'web/index.html', placement: 'workspace', scope: 'global', ...extra })
+  await editManifest(manifest, m => { m.contributes = { views: [view({ entryPoint: 'reviews' })] } })
+  await validatePlugin(dir)
+  await editManifest(manifest, m => { m.contributes = { views: [view({ entryPoint: 'inbox' })] } })
+  await assert.rejects(validatePlugin(dir), /entryPoint/)
+  await editManifest(manifest, m => { m.contributes = { views: [view({ entryPoint: 'reviews', scope: 'project' })] } })
+  await assert.rejects(validatePlugin(dir), /entryPoint only applies/)
+  await editManifest(manifest, m => { m.contributes = { views: [view({ entryPoint: 'reviews', placement: 'sidebar' })] } })
+  await assert.rejects(validatePlugin(dir), /entryPoint only applies/)
+})
+
 test('symlinks, declared path escape and private key material are refused', async t => {
   const { root, dir, manifest } = await fixture(t)
   await fs.writeFile(path.join(root, 'outside.html'), 'outside')
