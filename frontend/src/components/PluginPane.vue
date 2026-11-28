@@ -78,6 +78,7 @@ import { WPS_INTERNAL_HTTP_LINK_BASE } from '@/config/workbenchActions.js'
 import { preparePluginImDrag, endPluginImDrag } from '@/utils/pluginImDrag.js'
 import { ACCOUNT_CHANGED_EVENT, requirePluginSubscription } from '@/utils/requireAccount.js'
 import { loadImDirectory, addImFriend, removeImFriend } from '@/utils/imDirectory.js'
+import { setHostEntry } from '@/composables/useHostEntries.js'
 
 /** 桥协议版本 */
 const PROTOCOL = 1
@@ -564,7 +565,7 @@ export default {
         // a global view);
         // ui.openWorkspace accepts { projectId } (older hosts ignore the argument).
         openProjectId: this.fileProjectId() ? String(this.fileProjectId()) : '',
-        capabilities: ['view.openProjectId', 'ui.openWorkspace.projectId'],
+        capabilities: ['view.openProjectId', 'ui.openWorkspace.projectId', 'ui.setEntry'],
         language: getAppLanguage(),
         // 外壳自 dev-board#223 起有深浅两态，握手把当前生效的那个告诉插件
         theme: getResolvedTheme(),
@@ -819,6 +820,19 @@ export default {
         case 'files.read':
           if (!this.hasPermission('file_read')) return this.denied('file_read')
           return await this.readProjectFile(String(params.path || ''))
+
+        case 'ui.setEntry': {
+          // C1: a host entry (today only "reviews") that this plugin's declared view serves. Strict types, no
+          // coercion; the host keeps the report per account on this device only and renders the entry itself.
+          const entry = params && params.entry
+          if (!this.businessActions.declaresEntryPoint?.(this.pluginId, entry)) {
+            return { ok: false, error: { code: 'permission_denied', message: L('此插件没有声明这个入口', 'This plugin does not declare this entry') } }
+          }
+          const saved = await setHostEntry(this.pluginId, params)
+          if (saved.error === 'unavailable') return { ok: false, error: { code: 'unavailable', message: L('未连接账户', 'No account is connected') } }
+          if (saved.error) return { ok: false, error: { code: 'invalid_params', message: L('参数无效：entry、visible（布尔）、badge（0–99 的整数）', 'Invalid params: entry, visible (boolean), badge (integer 0-99)') } }
+          return { ok: true, result: saved.value }
+        }
 
         case 'ui.toast':
           uni.showToast({
