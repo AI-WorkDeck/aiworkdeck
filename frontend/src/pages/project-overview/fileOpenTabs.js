@@ -203,6 +203,10 @@ export const fileOpenTabsMethods = {
     // 由 LibreOfficeEditor（书签/quote）或 FilePreview（pdf 页码/图片框/媒体时刻）消费。
     // opts.review：计划审阅参数，挂在 tab.review 上交给 PlainTextEditor 的 review prop。
     openFile(file, opts = {}) {
+      // W note 5: a colleague's local-only file has no bytes here (desktop) or on the server (web): every entry
+      // point - tree, quick look, search - explains it instead of falling through to a generic download error
+      if (this.$refs && this.$refs.fileTree && typeof this.$refs.fileTree.explainLocalOnly === 'function'
+          && this.$refs.fileTree.explainLocalOnly(file)) return
       // 检查文件类型是否支持打开
       if (!this.isFileTypeSupported(file)) {
         uni.showModal({
