@@ -11,6 +11,7 @@
   <script src="panel-l10n.js"></script>
   <script src="firm.js"></script>
   <script src="panel.js" defer></script>
+  <!-- us-framing:start --><script src="framing.js" defer></script><!-- us-framing:end -->
   <script src="matters.js" defer></script>
 </head>
 <body>
@@ -61,6 +62,15 @@
         <section id="mp-bids" class="mp-view" hidden>
           <div id="mp-bids-list" class="mp-bids-grid"></div>
         </section>
+
+        <!-- us-framing:start -->
+        <section id="mp-framing" class="mp-view" hidden>
+          <div class="split">
+            <div id="fr-list" class="list" role="listbox"></div>
+            <article id="fr-detail" class="awd-card detail framing"></article>
+          </div>
+        </section>
+        <!-- us-framing:end -->
 
         <section id="mp-desk" class="mp-view" hidden>
           <div id="m-kpis" class="awd-kpi-grid"></div>

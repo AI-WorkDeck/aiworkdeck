@@ -56,9 +56,22 @@ test('manifest: unique panel-only tools, the JAR it declares, views, connection 
   const desk = read('web/matters.js')
   for (const t of manifest.tools) assert.ok(desk.includes(`'${t.name}'`), t.name)
   const firm = read('web/firm.js')
-  assert.match(firm, /"offices":\["tw","sv"\]/)
-  assert.equal(manifest.version, '1.0.4')
-  assert.equal(manifest.minHostVersion, '0.89.0')
+  assert.match(firm, /"offices":\["sv"\]/) // the AWD listing is the US desk only (user, 2026-11-27); Taiwan lawyers come through Draft AI
+  assert.equal(manifest.version, '1.1.0')
+  assert.equal(manifest.minHostVersion, '0.91.0') // calendar, voice and ai host services (SDK 1.6)
   assert.equal(conn.auth.type, 'awd-account')
   assert.equal(conn.operations.marketplacePreview.anonymousFallback, true)
+})
+
+test('framing calls (US office): every key the tab uses exists, recording waits for consent, the tab is its own file', () => {
+  const zh = load('zh-CN'), src = read('web/framing.js')
+  const keys = new Set([...src.matchAll(/(?<![.\w])t\('([A-Za-z][\w.]*\w)'/g)].map((m) => 'panel.m.fr.' + m[1]))
+  for (const s of ['requested', 'scheduled', 'planned']) keys.add('panel.m.fr.stage.' + s)
+  keys.add('panel.m.fr.tab')
+  for (const m of src.matchAll(/D\.t\('([\w.]+\w)'/g)) keys.add('panel.m.' + m[1]) // desk-wide keys
+  assert.deepEqual([...keys].filter((k) => !(k in zh)), [])
+  assert.match(src, /if \(!consent\.checked\) \{ D\.toast\(t\('recConsentNeeded'\)\); return \}/, 'no recording without the lawyer confirming every participant agreed')
+  assert.ok(read('web/index.html').indexOf('framing.js') < read('web/index.html').indexOf('matters.js'), 'framing.js loads before the desk')
+  assert.ok(manifest.permissions.includes('speech') && manifest.permissions.includes('tasks') && manifest.permissions.includes('ai'))
+  assert.equal(manifest.contributes.connections[0].operations.svConfig.path, '/sv/api/matter/config')
 })

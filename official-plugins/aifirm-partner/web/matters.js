@@ -98,6 +98,9 @@
     $('mp-plaza').hidden = tab !== 'plaza'
     $('mp-bids').hidden = tab !== 'bids'
     $('mp-desk').hidden = tab !== 'matters'
+    // us-framing:start
+    if ($('mp-framing')) $('mp-framing').hidden = tab !== 'framing'
+    // us-framing:end
   }
   function updateHeaderBilling() {
     const active = Boolean(S.billing && S.billing.active)
@@ -183,6 +186,11 @@
       ['bids', t('mp.tab.bids', { n: (mp.myBids || []).length })],
       ['matters', t('mp.tab.matters', { n: S.list.length })],
     ]
+    // us-framing:start
+    // Framing calls (US office only; web/framing.js): founders who booked a lawyer before any drafting.
+    if (S.office === 'sv' && window.AIF_FRAMING) tabs.push(['framing', t('fr.tab', { n: S.frCount || 0 })])
+    else if (S.tab === 'framing') S.tab = 'plaza'
+    // us-framing:end
     $('mp-tabs').replaceChildren(...tabs.map(([k, label]) => h('button', {
       type: 'button',
       class: 'awd-subnav-item' + (S.tab === k ? ' is-active' : ''),
@@ -470,6 +478,9 @@
       notifyNew(S.list)
       if (S.tab === 'plaza' && S.plazaSelected) await loadPlazaDetail(S.plazaSelected)
       if (S.tab === 'matters' && S.selected) await loadDetail(S.selected, true)
+      // us-framing:start
+      if (S.office === 'sv' && window.AIF_FRAMING) await window.AIF_FRAMING.refresh()
+      // us-framing:end
     } catch (e) { fail(e, 'panel.error.load') } finally {
       loading = false
       if (queued) { queued = false; load() }
@@ -979,6 +990,11 @@
   function init(ctx) {
     E = window.ELP
     S.ctx = ctx
+    // us-framing:start
+    if (window.AIF_FRAMING) window.AIF_FRAMING.init({ call, t, h, E, S, toast, fail,
+      setFramingCount: (n) => { if (S.frCount !== n) { S.frCount = n; renderSubscribedTabs() } },
+      openMatter: (id) => { setTab('matters'); loadDetail(id) } })
+    // us-framing:end
     let timer = null
     $('m-search').placeholder = t('filter.search')
     $('m-search').addEventListener('input', (e) => { clearTimeout(timer); timer = setTimeout(() => { S.q = e.target.value.trim(); load() }, 300) })
