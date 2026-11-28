@@ -641,6 +641,7 @@ public class PluginController {
                 vc.setScope(v.getScope());
                 vc.setDefaultDock(v.getDefaultDock());
                 vc.setAllowedDocks(v.getAllowedDocks());
+                vc.setEntryPoint(v.getEntryPoint());
                 return vc;
             }).toList());
         }

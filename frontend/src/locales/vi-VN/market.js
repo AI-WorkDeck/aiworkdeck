@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "Hãy thử từ khóa hoặc danh mục khác",
   "submitFirstSkill": "Gửi Skill đầu tiên của bạn đến chợ Skill chính thức",
   "installedTag": "Đã cài đặt",
+  "contentInChinese": "Tiếng Trung",
   "processing": "Đang xử lý",
   "update": "Cập nhật",
   "install": "Cài đặt",
