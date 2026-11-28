@@ -271,6 +271,7 @@ export default {
   clientTab: 'Client',
   usernameLabel: 'Username',
   usernamePlaceholder: 'Enter your username',
+  teamServerLoginHint: 'This is your team server\'s sign-in. Use the username and password your administrator set up for this server.',
   passwordLabel: 'Password',
   passwordPlaceholder: 'Enter your password',
   rememberMe: 'Remember Me',

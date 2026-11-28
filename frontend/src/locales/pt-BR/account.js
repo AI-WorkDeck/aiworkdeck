@@ -237,6 +237,7 @@ export default {
   "clientTab": "Cliente",
   "usernameLabel": "Nome de usuário",
   "usernamePlaceholder": "Digite seu nome de usuário",
+  "teamServerLoginHint": "Este é o login do servidor da sua equipe. Use o nome de usuário e a senha que o administrador configurou para este servidor.",
   "passwordLabel": "Senha",
   "passwordPlaceholder": "Digite sua senha",
   "rememberMe": "Manter conectado",
