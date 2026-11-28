@@ -1521,7 +1521,7 @@ public class ToolRegistry {
             payload.put("gatewayKind", kind.name());
             payload.put("reason", needsCredits ? "no_credits" : "gateway");
             payload.put("message", needsCredits
-                    ? LangText.of("账户 Credits 余额不足，请充值后重试", "Your Credits balance is insufficient. Top up and retry")
+                    ? LangText.of("AI 额度已用完，这次没有扣费，请充值后重试", "Your AI credit has run out; this request wasn't charged. Top up and retry")
                     : LangText.of("请登录 AI WorkDeck 账户后重试", "Sign in to your AI WorkDeck account and retry"));
         } else if (error instanceof com.checkba.service.account.AccountException accountError) {
             if (accountError.getKind() != com.checkba.service.account.AccountException.Kind.NOT_CONNECTED

@@ -2039,7 +2039,9 @@ export function useAgentStream() {
                     // 气泡里就地出同意卡（RootBubble），同意后原样重发这一问——不让用户跳去设置页
                     currentAssistantBubble.value.consentRequired = true
                 } else if (isCreditsRequired(accountPayload)) {
-                    currentAssistantBubble.value.content += '\n\n' + errMsg + '\n'
+                    // Q29: a catalogued notice with a 充值 button (the auto dialog below is suppressed for 60 s
+                    // after it was closed, so a second failed request used to end in plain text and no way out)
+                    currentAssistantBubble.value.errorNotice = toUserMessage(errMsg, { fallbackKey: 'balanceLow', partial: !!String(currentAssistantBubble.value.content || '').trim() })
                     promptAccountAction(accountPayload)
                 } else
                 // 地域拒绝（后端 LlmErrorClassifier.REGION_BLOCKED_MARKER）：上游返回的是一句英文

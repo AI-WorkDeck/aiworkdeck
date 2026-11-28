@@ -33,6 +33,7 @@ export default {
     "refresh": "Yenile",
     "signIn": "Giriş yap",
     "reconnect": "Yeniden oturum aç",
+    "topUp": "Bakiye yükle",
     "feedback": "Geri Bildirim"
   }
 }

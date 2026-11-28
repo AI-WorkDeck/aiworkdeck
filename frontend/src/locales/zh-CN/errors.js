@@ -33,6 +33,7 @@ export default {
     "refresh": "刷新",
     "signIn": "登录",
     "reconnect": "重新登录",
+    "topUp": "充值",
     "feedback": "反馈"
   }
 }

@@ -3950,7 +3950,7 @@ public class AgentOrchestrator {
                     && chatModelFactory.resolveProvider() == com.checkba.config.AiModelProperties.Provider.AWD_CLOUD) {
                 accountError = new com.checkba.service.account.AccountException(
                         com.checkba.service.account.AccountException.Kind.CONFLICT,
-                        LangText.of("账户 Credits 余额不足，请充值后重试", "Your Credits balance is insufficient. Top up and retry"),
+                        LangText.of("AI 额度已用完，这次没有扣费，请充值后重试", "Your AI credit has run out; this request wasn't charged. Top up and retry"),
                         "no_credits");
             }
             if (accountError != null) {
