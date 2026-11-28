@@ -333,6 +333,7 @@ public class ChatModelFactory {
         return OpenAiChatModel.builder().apiKey(key).baseUrl(baseUrl).modelName(target.modelId())
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0)
                 .customHeaders(platform ? turnHeaders(key) : java.util.Map.of())
+                .listeners(platform ? turnListeners(key) : java.util.List.of())
                 .maxTokens(maxOutputTokens).logRequests(false).logResponses(false).build();
     }
 
@@ -354,7 +355,7 @@ public class ChatModelFactory {
         PlatformAiKeyService.Resolved connection = platformConnection(); // Per-user credits, identity and usage baseline; failure is terminal.
         ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
                 .baseUrl(platformBaseUrl(connection)).modelName(modelId)
-                .customHeaders(turnHeaders(connection.apiKey()))
+                .customHeaders(turnHeaders(connection.apiKey())).listeners(turnListeners(connection.apiKey()))
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
                 .logRequests(false).logResponses(false).build();
         recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
@@ -386,7 +387,7 @@ public class ChatModelFactory {
                     com.checkba.service.LangText.of("当前辅助模型不可用或不支持所需输入", "The auxiliary model is unavailable or does not support this input"));
         ChatLanguageModel model = OpenAiChatModel.builder().apiKey(connection.apiKey())
                 .baseUrl(platformBaseUrl(connection)).modelName(modelId)
-                .customHeaders(turnHeaders(connection.apiKey()))
+                .customHeaders(turnHeaders(connection.apiKey())).listeners(turnListeners(connection.apiKey()))
                 .timeout(remainingTimeout(timeout, started)).maxRetries(0).maxTokens(maxOutputTokens)
                 .logRequests(false).logResponses(false).build();
         recordModelUse(AiModelProperties.Provider.AWD_CLOUD.name(), modelId, false);
@@ -743,12 +744,17 @@ public class ChatModelFactory {
     static java.util.Map<String, String> turnHeaders(String apiKey) {
         String tag = PlatformTurnScope.current();
         if (tag == null || !tag.matches("^[0-9a-f]{32}$")) return java.util.Map.of();
-        if (apiKey == null || !apiKey.startsWith("awdai_")) {
-            // 国际平台通道的非流式调用拿不到 OpenRouter 生成 id：这一轮的金额查不全，页脚回「查看用量」
-            TurnGenerations.markIncomplete();
-            return java.util.Map.of();
-        }
+        if (apiKey == null || !apiKey.startsWith("awdai_")) return java.util.Map.of();
         return java.util.Map.of("X-AWD-Turn", tag);
+    }
+
+    /**
+     * Q24：国际平台通道（非 awdai_）的非流式模型挂上生成 id 记录器（{@link TurnGenerations#NON_STREAMED}），
+     * 国内站靠请求头记账，不挂。
+     */
+    static java.util.List<dev.langchain4j.model.chat.listener.ChatModelListener> turnListeners(String apiKey) {
+        return apiKey != null && !apiKey.startsWith("awdai_")
+                ? java.util.List.of(TurnGenerations.NON_STREAMED) : java.util.List.of();
     }
 
     /** 缓存 key 带密钥指纹：官网撤销重发后指纹变化，旧实例自然作废。 */
@@ -763,7 +769,7 @@ public class ChatModelFactory {
             // Q24：轮次里的辅助调用要带本轮计费标记；缓存实例的请求头是固定的，所以这里单独建一个
             AiModelProperties.OpenRouter config = aiModelProperties.getOpenRouter();
             return OpenAiChatModel.builder().apiKey(apiKey).maxRetries(0).baseUrl(baseUrl).modelName(modelId)
-                    .timeout(config.getTimeout()).customHeaders(turnHeaders)
+                    .timeout(config.getTimeout()).customHeaders(turnHeaders).listeners(turnListeners(apiKey))
                     .logRequests(false).logResponses(false).build();
         }
         return modelCache.computeIfAbsent(cacheKey, k -> {
@@ -777,6 +783,7 @@ public class ChatModelFactory {
                     .baseUrl(baseUrl)
                     .modelName(modelId)
                     .timeout(config.getTimeout())
+                    .listeners(turnListeners(apiKey))
                     // logRequests 必须为 false，理由见 streamingModel 的 javadoc（请求体物化）
                     .logRequests(false)
                     .logResponses(false)

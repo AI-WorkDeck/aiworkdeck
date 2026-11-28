@@ -3,6 +3,9 @@
 
 package com.checkba.service.ai;
 
+import dev.langchain4j.model.chat.listener.ChatModelListener;
+import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -33,6 +36,23 @@ public final class TurnGenerations {
                 @Override protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) { return size() > MAX_TURNS; }
             });
 
+    private static final Pattern TURN_TAG = Pattern.compile("^[0-9a-f]{32}$");
+
+    /**
+     * 国际平台通道的非流式调用（记忆摘要、下一句建议、辅助整理…）：OpenRouter 响应体的 {@code id} 就是生成 id。
+     * langchain4j 在调用线程上同步回调，所以轮次标记直接取 {@link PlatformTurnScope#current()}；
+     * 回来的响应没有生成 id 时这一轮的金额查不全。
+     */
+    static final ChatModelListener NON_STREAMED = new ChatModelListener() {
+        @Override public void onResponse(ChatModelResponseContext context) {
+            String tag = PlatformTurnScope.current();
+            if (tag == null || !TURN_TAG.matcher(tag).matches()) return;
+            String id = context.response() == null ? null : context.response().id();
+            if (id != null && GENERATION_ID.matcher(id).matches()) record(tag, id);
+            else INCOMPLETE.put(tag, Boolean.TRUE);
+        }
+    };
+
     private TurnGenerations() {}
 
     static void record(String tag, String generationId) {
@@ -42,12 +62,6 @@ public final class TurnGenerations {
             if (ids.size() >= MAX_PER_TURN) { INCOMPLETE.put(tag, Boolean.TRUE); return; }
             if (!ids.contains(generationId)) ids.add(generationId);
         }
-    }
-
-    /** 当前轮次里发生了一次拿不到生成 id 的国际平台调用。 */
-    public static void markIncomplete() {
-        String tag = PlatformTurnScope.current();
-        if (tag != null) INCOMPLETE.put(tag, Boolean.TRUE);
     }
 
     static List<String> idsFor(String tag) {

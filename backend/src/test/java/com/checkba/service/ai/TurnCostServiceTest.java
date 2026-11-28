@@ -121,7 +121,11 @@ class TurnCostServiceTest {
         assertTrue(seen.stream().allMatch(x -> x.endsWith("Bearer sk-or-synthetic")));
         TurnGenerations.record(tag, "gen-c");          // not yet available at OpenRouter
         assertEquals(1, service("http://unused/api/account/ai/v1", intl, dir).turnCost(7L, "conv-intl", run).get("pending"));
-        PlatformTurnScope.run(tag, TurnGenerations::markIncomplete);   // an aux call without a generation id
+        PlatformTurnScope.run(tag, () -> TurnGenerations.NON_STREAMED.onResponse(   // an aux call without a generation id
+                new dev.langchain4j.model.chat.listener.ChatModelResponseContext(
+                        new dev.langchain4j.model.chat.listener.ChatModelResponse(null, "m", null, null, null),
+                        new dev.langchain4j.model.chat.listener.ChatModelRequest("m", null, null, null, java.util.List.of(), null),
+                        Map.of())));
         assertEquals(false, service("http://unused/api/account/ai/v1", intl, dir).turnCost(7L, "conv-intl", run).get("available"));
     }
 }
