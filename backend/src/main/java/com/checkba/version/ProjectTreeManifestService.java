@@ -286,6 +286,88 @@ public class ProjectTreeManifestService {
         }
     }
 
+    /**
+     * C33（dev-board#1866）：把「在提交里、却不在文件树里」的文件补成行。
+     *
+     * <p>清单只从数据库采集，库里没有行的磁盘文件（比如有人在托管目录里直接写盘，再被自动存档
+     * 收进提交）会进提交、却不进 .awd/tree.json；托管项目的克隆 / 取回又只照清单建树，
+     * 这份文件在新设备上就永远看不见。这里在应用清单之后按 {@code ref} 实际跟踪的文件补行：
+     * <ul>
+     *   <li>只补库里任何一行（含回收站里的）都对不上的路径——律师删进回收站的不复活；</li>
+     *   <li>跳过以点开头的路径段（{@code .awd/} 清单与内部文件、{@code .gitattributes} 等）；</li>
+     *   <li>本机文件夹项目（localRoot 非空）不管：它的对账会把磁盘上的新文件导进来。</li>
+     * </ul>
+     * 新行与清单新建的行同形（名字、类型、filePath、创建者 = 项目负责人），缺的父文件夹按路径补齐。
+     *
+     * @return 新补的文件行数
+     */
+    @Transactional
+    public int indexTrackedFilesMissingFromTree(long projectId, String ref) {
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project == null || (project.getLocalRoot() != null && !project.getLocalRoot().isBlank())) return 0;
+        Long ownerId = project.getUserId();
+        if (ownerId == null) return 0;
+        String prefix = "projects/" + projectId + "/";
+
+        List<ProjectFile> rows = new ArrayList<>(projectFileRepository.findByProjectId(projectId));
+        Set<String> knownFiles = new HashSet<>();
+        Map<String, ProjectFile> liveFolders = new HashMap<>();   // "parentId/name" → 在用的文件夹
+        for (ProjectFile f : rows) {
+            if (!Boolean.TRUE.equals(f.getIsFolder())) {
+                if (f.getFilePath() != null && f.getFilePath().startsWith(prefix)) {
+                    knownFiles.add(f.getFilePath().substring(prefix.length()));
+                }
+            } else if (!Boolean.TRUE.equals(f.getIsDeleted())) {
+                liveFolders.putIfAbsent(f.getParentId() + "/" + f.getName(), f);
+            }
+        }
+
+        int created = 0;
+        for (String path : repoService.listPaths(projectId, ref)) {
+            if (knownFiles.contains(path) || !WorkSessionService.isSafeRepoRelativePath(path)) continue;
+            String[] parts = path.split("/");
+            boolean hidden = false;
+            for (String part : parts) if (part.startsWith(".")) { hidden = true; break; }
+            if (hidden) continue;
+
+            Long parentId = null;
+            for (int i = 0; i < parts.length - 1; i++) {
+                String key = parentId + "/" + parts[i];
+                ProjectFile folder = liveFolders.get(key);
+                if (folder == null) {
+                    folder = newRow(projectId, ownerId, parentId, parts[i], true, null, null);
+                    liveFolders.put(key, folder);
+                }
+                parentId = folder.getId();
+            }
+            String name = parts[parts.length - 1];
+            int dot = name.lastIndexOf('.');
+            String type = dot > 0 && dot < name.length() - 1 ? name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT) : null;
+            newRow(projectId, ownerId, parentId, name, false, type, prefix + path);
+            knownFiles.add(path);
+            created++;
+        }
+        return created;
+    }
+
+    private ProjectFile newRow(long projectId, Long ownerId, Long parentId, String name, boolean folder,
+                               String fileType, String filePath) {
+        ProjectFile f = new ProjectFile();
+        f.setProjectId(projectId);
+        f.setParentId(parentId);
+        f.setName(name);
+        f.setIsFolder(folder);
+        f.setFileType(fileType);
+        f.setFilePath(filePath);
+        f.setIsDeleted(false);
+        f.setSortOrder(0);
+        f.setUserId(ownerId);
+        f.setUid(UUID.randomUUID().toString());
+        f.setCreatedAt(LocalDateTime.now());
+        f.setUpdatedAt(LocalDateTime.now());
+        return projectFileRepository.save(f);
+    }
+
     private static boolean isRootStagingNode(TreeManifest.Node node) {
         return node.isFolder() && node.parentId() == null
                 && StageQuotaService.STAGING_FOLDER_NAME.equals(node.name());

@@ -324,6 +324,32 @@ class CloudSyncUpdateTest {
         assertFalse(r.affectedFileIds().isEmpty());
     }
 
+    /**
+     * C33（dev-board#1866）：同事那边的提交里有一份文件、清单里却没有它（库里没登记就被自动存档收进去），
+     * 取回后照清单建树就看不见它。取回要按提交里实际跟踪的文件补上行。
+     */
+    @Test
+    void aPulledFileMissingFromTheColleaguesManifestStillAppears() throws Exception {
+        linkToBareRemote(7L);
+        cloud.uploadToCloud(7L, false);
+        Path peerDir = Files.createTempDirectory("cloud-peer");
+        try (Git peer = Git.cloneRepository().setURI(repoSvc.remoteOriginUrl(7L)).setDirectory(peerDir.toFile()).call()) {
+            Files.createDirectories(peerDir.resolve("证据"));
+            Files.writeString(peerDir.resolve("证据/送货单.txt"), "送货单（虚构）");
+            peer.add().addFilepattern(".").call();   // no manifest node: the C33 shape
+            peer.commit().setMessage("修改了《送货单》\n\nX-AWD-Kind: auto").setAuthor("同事", "p@example.com").call();
+            peer.push().call();
+        }
+        CloudSyncService.UpdateResult r = cloud.updateFromCloud(7L, 1L, "陆知微");
+        assertEquals(CloudSyncService.UpdateStatus.UPDATED, r.status());
+        assertEquals("送货单（虚构）", Files.readString(root.resolve("projects/7/证据/送货单.txt")));
+        ProjectFile row = dbRowsOf(7L).stream().filter(f -> "送货单.txt".equals(f.getName())).findFirst()
+                .orElseThrow(() -> new AssertionError("the pulled file has no row, so the explorer never shows it"));
+        assertEquals("projects/7/证据/送货单.txt", row.getFilePath());
+        assertTrue(dbRowsOf(7L).stream().anyMatch(f -> Boolean.TRUE.equals(f.getIsFolder()) && "证据".equals(f.getName())
+                && java.util.Objects.equals(f.getId(), row.getParentId())));
+    }
+
     @Test
     void divergedCleanUpdateMergesAndPushesBack() throws Exception {
         linkToBareRemote(7L);
