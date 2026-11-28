@@ -342,5 +342,5 @@ test('githubFirst: every urls list puts GitHub first, keeps order otherwise, cha
   assert.deepEqual(g.channels['0.91'].components[0].urls, ['https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.91.2/a.tar.gz', 'https://www.aiworkdeck.com/update/desktop/assets/a.tar.gz'])
   assert.deepEqual(g.channels['0.91'].components[1].urls, m.channels['0.91'].components[1].urls)
   assert.equal(g.channels['0.91'].components[0].sha256, 'x')
-  assert.equal(m.channels['0.91'].components[0].urls[0].includes('aiworkdeck.com'), true, 'input not mutated')
+  assert.equal(new URL(m.channels['0.91'].components[0].urls[0]).host, 'www.aiworkdeck.com', 'input not mutated')
 })
