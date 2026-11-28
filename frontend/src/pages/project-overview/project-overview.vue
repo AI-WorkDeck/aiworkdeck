@@ -5689,9 +5689,12 @@ export default {
         // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
         if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()
         if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
+        // C5: unreachable library -> the 30 s poll backs off (see startCollabPolling)
+        if (online) this._collabPollFailures = this.collabCloud && this.collabCloud.offline ? (this._collabPollFailures || 0) + 1 : 0
         if (online && typeof this.retryQueuedSubmit === 'function') this.retryQueuedSubmit()
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
+        if (online && !e.aborted) this._collabPollFailures = (this._collabPollFailures || 0) + 1
       } finally {
         if (online && seq === this._collabStateSeq) this.collabChecking = false
       }
@@ -5719,6 +5722,13 @@ export default {
         // C5 (retest 0.91.1): at 120 s a colleague's 交稿 went unnoticed for ~2 min while the chip said 一致.
         // A check is a small refs query; one at a time (a slow check on a saturated link is not stacked).
         if (this.collabChecking) return
+        // Back off while the library is unreachable: after the first failure retry at once (30 s), then 1, 2, 4 …
+        // up to 16 min between checks, so an app left open overnight with the server down does not keep knocking.
+        // One success resets it.
+        const failures = this._collabPollFailures || 0
+        this._collabPollSkipped = (this._collabPollSkipped || 0) + 1
+        if (this._collabPollSkipped < Math.min(2 ** Math.max(failures - 1, 0), 32)) return
+        this._collabPollSkipped = 0
         this.fetchCollabState({ online: true })
       }, 30000) // C5: was 120000
       if (typeof this.startCollabFreshness === 'function') this.startCollabFreshness()
