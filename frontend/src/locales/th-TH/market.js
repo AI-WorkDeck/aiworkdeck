@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "ลองใช้คำค้นหาหรือหมวดหมู่อื่น",
   "submitFirstSkill": "ส่ง Skill แรกของคุณไปยังมาร์เก็ตเพลส Skill ทางการ",
   "installedTag": "ติดตั้งแล้ว",
+  "contentInChinese": "ภาษาจีน",
   "processing": "กำลังดำเนินการ",
   "update": "อัปเดต",
   "install": "ติดตั้ง",

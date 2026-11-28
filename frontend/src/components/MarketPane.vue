@@ -5,7 +5,6 @@
     <!-- Hero：深林绿编辑排版，与官网 /skills 同一套语言（见 aiworkdeckweb/DESIGN.md）。
          嵌入设置页时（standalone=false）由 .is-embedded 样式收成与其余设置分区一致的
          浅色页头，见 <style> 末尾「嵌入态」覆盖块。 -->
-.market-inline-error { margin-top: 8px; max-width: 460px; text-align: start; }
     <view class="hero">
       <view class="hero-grain"></view>
       <text class="hero-watermark">{{ $t('market.heroWatermark') }}</text>
@@ -123,13 +122,17 @@
                       <path v-for="(d, i) in categoryGlyph(m.category)" :key="i" :d="d" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                     <text>{{ categoryLabel(m.category) }}</text>
+                    <template v-if="chineseOnly(m)">
+                      <text class="kicker-sep"></text>
+                      <text class="kicker-off">{{ $t('market.contentInChinese') }}</text>
+                    </template>
                     <template v-if="m.installed">
                       <text class="kicker-sep"></text>
                       <text class="kicker-on">{{ $t('market.installedTag') }}</text>
                     </template>
                   </view>
                   <text class="card-title">{{ m.name || m.id }}</text>
-                  <text class="card-id">{{ m.id }} · v{{ m.version || '1.0.0' }} · {{ priceTag(m) }}</text>
+                  <text class="card-id">v{{ m.version || '1.0.0' }} · {{ priceTag(m) }}</text>
                 </view>
                 <view class="card-actions">
                   <view
@@ -189,6 +192,10 @@
                       <path v-for="(d, i) in ICONS.blocks" :key="i" :d="d" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                     <text>{{ $t('market.pluginLabel') }}</text>
+                    <template v-if="chineseOnly(m)">
+                      <text class="kicker-sep"></text>
+                      <text class="kicker-off">{{ $t('market.contentInChinese') }}</text>
+                    </template>
                     <template v-if="m.installed">
                       <text class="kicker-sep"></text>
                       <text class="kicker-on">{{ $t('market.installedTag') }}</text>
@@ -549,6 +556,13 @@ export default {
       return parts.join(' · ')
     },
     /** 触发词按官网排版收成一行「引号」，超出折为 +N */
+    // Q1: registry skills are written in Chinese and the registry has no English yet. Outside a
+    // Chinese UI, say so on the card instead of leaving the user to guess (zh-TW gets converted text).
+    chineseOnly(m) {
+      const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN')
+      if (loc.startsWith('zh')) return false
+      return /[\u4e00-\u9fff]/.test(`${m.name || ''}${m.description || ''}`)
+    },
     triggerLine(triggers) {
       const list = triggers || []
       if (!list.length) return ''
@@ -1367,12 +1381,24 @@ $gray-light: var(--awd-surface-3);
 .kicker {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   margin-bottom: 8px;
   font-size: var(--awd-panel-fs-sec);
   letter-spacing: 0.14em;
   color: var(--awd-text-2);
+}
+
+/* Q1: a long category plus "In Chinese" wraps as whole phrases, never mid-phrase */
+.kicker > text {
+  white-space: nowrap;
+}
+
+.market-inline-error {
+  margin-top: 8px;
+  max-width: 460px;
+  text-align: start;
 }
 
 .kicker-icon {

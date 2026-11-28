@@ -237,6 +237,7 @@ export default {
   "clientTab": "تطبيق العميل",
   "usernameLabel": "اسم المستخدم",
   "usernamePlaceholder": "أدخل اسم المستخدم",
+  "teamServerLoginHint": "هذه صفحة تسجيل الدخول إلى خادم فريقك. استخدم اسم المستخدم وكلمة المرور اللذين أعدّهما المسؤول لهذا الخادم.",
   "passwordLabel": "كلمة المرور",
   "passwordPlaceholder": "أدخل كلمة المرور",
   "rememberMe": "تذكرني",

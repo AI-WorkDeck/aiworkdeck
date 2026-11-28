@@ -175,3 +175,18 @@ test('legal footer follows each registered locale when the language changes', as
     globalThis.document = originalDocument
   }
 })
+
+// Q10: the summary line and the three link labels were hard-coded Simplified, so zh-TW
+// (and every non-English locale) saw 「源代码 · 许可证 · 商标说明」. Each visible label now
+// carries data-legal-i18n and i18n.js fills it from the active locale.
+test('Q10：折叠行与三条链接文字都走词典（zh-TW 不再显示简体）', async () => {
+  const footer = footerOf(read('taskpane.html'))
+  for (const key of ['legalSummary', 'legalSourceLink', 'legalLicenseLink', 'legalTrademarkLink']) {
+    assert.equal((footer.match(new RegExp(`data-legal-i18n="${key}"`, 'g')) || []).length, 2, `${key} 中英两份都要挂`)
+  }
+  const zhTW = (await import('../locales/zh-TW.js')).default
+  assert.equal(zhTW.legalSummary, 'AI WorkDeck · AGPL-3.0 · 原始碼 · 授權條款 · 商標宣告')
+  for (const key of ['legalSourceLink', 'legalLicenseLink', 'legalTrademarkLink']) {
+    assert.doesNotMatch(zhTW[key], /[源代码许可证说明]{2}/)
+  }
+})

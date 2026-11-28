@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "Coba kata kunci atau kategori lain",
   "submitFirstSkill": "Kirimkan Skill pertama Anda ke marketplace Skill resmi",
   "installedTag": "Terpasang",
+  "contentInChinese": "Dalam bahasa Mandarin",
   "processing": "Sedang diproses",
   "update": "Perbarui",
   "install": "Pasang",

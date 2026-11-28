@@ -195,8 +195,8 @@ public class PlatformAiChannel {
         if (perUserApplies(userId)) {
             return perUser.resolve(userId).orElseThrow(() -> new AccountException(
                     AccountException.Kind.CONFLICT,
-                    LangText.of("本账号的「AI WorkDeck 云端」额度尚未就绪，可在插件设置页用账户 Key 刷新额度",
-                            "This account's \"AI WorkDeck Cloud\" Credits are not ready yet; refresh them with your account key on the plugin settings page")));
+                    LangText.of("本账号的「AI WorkDeck 云端」额度尚未就绪，断开账户后重新连接即可刷新额度",
+                            "This account's \"AI WorkDeck Cloud\" Credits are not ready yet; disconnect your account and connect it again to refresh them")));
         }
         if (strictMultiTenant()) {
             // 多租户实例上回落机器级 key = 拿别人的额度花钱，宁可报错
@@ -206,8 +206,8 @@ public class PlatformAiChannel {
                                 "This AI call did not carry a user identity; \"AI WorkDeck Cloud\" cannot determine whose Credits to use"));
             }
             throw new AccountException(AccountException.Kind.CONFLICT,
-                    LangText.of("本账号尚未通过账户 Key 完成直连，暂不能使用「AI WorkDeck 云端」通道",
-                            "This account has not been connected via an account key yet; the \"AI WorkDeck Cloud\" channel is unavailable"));
+                    LangText.of("本账号尚未连接 AI WorkDeck 账户，暂不能使用「AI WorkDeck 云端」通道；连接 AI WorkDeck 账户后即可使用",
+                            "This account isn't connected to an AI WorkDeck account yet, so \"AI WorkDeck Cloud\" is unavailable; connect your AI WorkDeck account to use it"));
         }
         if (!accountService.isConnected()) {
             // reason 决定前端登录弹层顶部那句说明（登录后置 4011 契约，dev-board#1046）

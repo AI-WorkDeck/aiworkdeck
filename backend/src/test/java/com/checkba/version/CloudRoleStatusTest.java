@@ -58,6 +58,22 @@ class CloudRoleStatusTest {
         assertEquals(1, memberCalls, "members are read at most once a minute");
     }
 
+    /**
+     * C9 (CEO 11-28, small version): a role changed by the owner reached this member only after the 60 s cache
+     * expired, even when the lawyer pressed 「刷新状态」. The explicit refresh reads members fresh; the automatic
+     * checks (focus, file open, every 2 min) keep the once-a-minute limit.
+     */
+    @Test void theExplicitRefreshReadsTheRoleFreshTheAutomaticChecksKeepTheCache() {
+        assertEquals("READ_ONLY", cloud.checkCloud(7L).get("myRole"));
+        members = members.replace("\"role\":\"READ_ONLY\"", "\"role\":\"EDITOR\"");   // the owner promoted lu
+        assertEquals("READ_ONLY", cloud.checkCloud(7L).get("myRole"), "automatic check: cached");
+        assertEquals(1, memberCalls);
+        assertEquals("EDITOR", cloud.checkCloud(7L, null, true).get("myRole"), "刷新状态: fresh");
+        assertEquals(2, memberCalls);
+        assertEquals("EDITOR", cloud.checkCloud(7L).get("myRole"), "and the cache holds the fresh answer");
+        assertEquals(2, memberCalls);
+    }
+
     @Test void fetchRefusedMeansRemovedWithOwnerNameNotOffline() {
         cloud.checkCloud(7L); // remember the owner while still a member
         doThrow(new VersionException("从云端更新失败", new RuntimeException("https://test.invalid/git/5.git: git-upload-pack not permitted")))

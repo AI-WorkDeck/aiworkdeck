@@ -270,6 +270,12 @@
           },
           "minItems": 1,
           "uniqueItems": true
+        },
+        "entryPoint": {
+          "description": "Host entry point this view serves (host 0.92+). Only on a global workspace view; older hosts ignore it.",
+          "enum": [
+            "reviews"
+          ]
         }
       },
       "required": [

@@ -996,6 +996,15 @@ public class CloudSyncService {
      * 多带一个 offline:true，cloudStatus 原有字段照常给（沿用 fetch 之前已知的状态）。
      */
     public Map<String, Object> checkCloud(long projectId, Long userId) {
+        return checkCloud(projectId, userId, false);
+    }
+
+    /**
+     * C9（CEO 11-28）：律师亲手点「刷新状态」时 {@code freshRole}=true——角色不走 60 秒缓存，负责人刚改的角色立刻生效；
+     * 自动核对（回到窗口、打开文件、两分钟一次）照旧「一分钟最多读一次成员名单」。
+     */
+    public Map<String, Object> checkCloud(long projectId, Long userId, boolean freshRole) {
+        if (freshRole) remoteRoleCache.remove(projectId);
         var remoteOpt = remoteRepository.findByProjectId(projectId);
         if (remoteOpt.isEmpty()) {
             return Map.of("linked", false);
