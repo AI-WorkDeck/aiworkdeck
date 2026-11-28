@@ -33,9 +33,35 @@ async function finalize(dir, version, signingKey) {
     ] }
   }
   channel.installers = installers
+  // Two signed views of the same release (0.91.1 finding): the cn mirror serves manifest-cn.json (mirror first)
+  // as its manifest.json; the GitHub Release's manifest.json, which intl clients read, lists GitHub first, so
+  // intl users no longer download patches from the cn host. Same components, sizes and hashes in both.
+  writeSigned(path.join(dir, 'patch', 'manifest-cn.json'), manifest, key)
+  writeSigned(manifestPath, githubFirst(manifest), key)
+}
+
+function writeSigned(file, manifest, key) {
   const output = Buffer.from(JSON.stringify(manifest, null, 2))
-  fs.writeFileSync(manifestPath, output)
-  fs.writeFileSync(manifestPath + '.sig', crypto.sign(null, output, key).toString('base64') + '\n')
+  fs.writeFileSync(file, output)
+  fs.writeFileSync(file + '.sig', crypto.sign(null, output, key).toString('base64') + '\n')
+}
+
+const GITHUB_HOSTS = new Set(['github.com', 'objects.githubusercontent.com'])
+function isGithub(url) {
+  try { return GITHUB_HOSTS.has(new URL(url).host) } catch { return false }
+}
+
+/** Deep copy with every `urls` list reordered GitHub first (stable; nothing added or removed). */
+function githubFirst(value) {
+  if (Array.isArray(value)) return value.map(githubFirst)
+  if (!value || typeof value !== 'object') return value
+  const out = {}
+  for (const [k, v] of Object.entries(value)) {
+    out[k] = k === 'urls' && Array.isArray(v) && v.every((u) => typeof u === 'string')
+      ? [...v.filter(isGithub), ...v.filter((u) => !isGithub(u))]
+      : githubFirst(v)
+  }
+  return out
 }
 if (require.main === module) finalize(process.argv[2], process.argv[3], process.env.UPDATE_SIGNING_KEY).catch((e) => { console.error(e.message); process.exitCode = 1 })
-module.exports = { finalize }
+module.exports = { finalize, githubFirst }
