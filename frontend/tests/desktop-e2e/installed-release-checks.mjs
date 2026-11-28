@@ -182,7 +182,8 @@ export async function checkDocumentChrome({ page, run, ext, prefix = 'release' }
   for (let i = 0; i < 2; i++) {
     const title = await page.evaluate(() => {
       const v = window.__checkbaActiveOverviewVm
-      return v.$t(v.sidebarCollapsed ? 'workbench.expandSidebar' : 'workbench.collapseSidebar')
+      // Same title the top bar renders: label plus the shortcut hint (D16 #1708).
+      return v.topBarTip(v.$t(v.sidebarCollapsed ? 'workbench.expandSidebar' : 'workbench.collapseSidebar'), 'view.sidebar')
     })
     const before = await page.evaluate(() => window.__checkbaActiveOverviewVm.sidebarCollapsed)
     const button = await page.$(`.top-bar-btn[title=${JSON.stringify(title)}]`)

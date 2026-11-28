@@ -263,6 +263,9 @@ public class AgentOrchestrator {
                 new java.util.concurrent.atomic.AtomicBoolean();
         /** 试用计量：本轮是否已向用户交付过非空助手正文（「可展示结果」，规格 §2）。 */
         private volatile boolean producedText;
+        /** C34：上一次流式途中落库的时刻与正文长度（节流用；起点是本轮开始，首存在一个间隔之后）。 */
+        volatile long lastPartialSaveAt = System.currentTimeMillis();
+        volatile int lastPartialSavedLength;
         /** 试用计量：发起本轮的本机用户（只用于写本地缓存行）。 */
         volatile Long userId;
         volatile String trialAccountFingerprint;
@@ -532,6 +535,12 @@ public class AgentOrchestrator {
      * {@code cancel(conversationId)} 与断线重连的恢复快照都靠这张表解析 runId。
      */
     private final Map<String, RunGuard> activeRuns = new ConcurrentHashMap<>();
+
+    /**
+     * C34：纯正文回答在流式途中按此间隔写回答行（同一行，覆盖式）。后端被杀 / 崩溃时，
+     * 丢失窗口从「整段回答」缩到这一间隔；重启回收（AgentRunRecoveryService）再补「[进程中断]」与「继续」。
+     */
+    long partialSaveIntervalMs = 2000;
 
     /**
      * 网页版每个用户同时活跃的轮次上限（W1 设计 §4.8 / §8-5）：防一个账户开多个标签页刷后端。
@@ -871,6 +880,24 @@ public class AgentOrchestrator {
                 persistFileChanges(guard.conversationId, guard.fileChangeTurn);
             }
         }
+    }
+
+    /**
+     * C34：流式途中的节流落库。纯正文回答原本只在工具边界与收尾时写库，后端在中途被杀
+     *（崩溃 / 冻结后被守护进程重启）就会丢掉律师已经看到的整段正文。这里每隔
+     * {@link #partialSaveIntervalMs} 把「执行日志 + 已流出的正文」覆盖写进本轮那一行
+     *（与 finishWithError 的落库口径一致），重启回收再补中断说明与「继续」。失败只记日志。
+     */
+    private void persistPartialIfDue(RunGuard guard, String projectId, Long userId, StringBuilder executionLog) {
+        if (guard.isCancelled()) return;
+        long now = System.currentTimeMillis();
+        if (now - guard.lastPartialSaveAt < partialSaveIntervalMs) return;
+        String body = guard.streamSnapshot();
+        if (body.isBlank() || body.length() == guard.lastPartialSavedLength) return;
+        guard.lastPartialSaveAt = now;
+        guard.lastPartialSavedLength = body.length();
+        String logText = executionLog == null ? "" : executionLog.toString();
+        saveAssistantMessageQuietly(guard, projectId, userId, logText + body);
     }
 
     /**
@@ -2969,7 +2996,11 @@ public class AgentOrchestrator {
         if (installIdentity != null) handler.setTurnTag(installIdentity.turnTag(conversationId, guard.runId));
 
         // 实时更新当前生成的内容 (用于断线重连恢复)
-        if (!summaryOnly) handler.setOnToken(guard::appendStream);
+        // C34：正文在流式途中按节流写回答行，后端被杀时已显示的正文不丢
+        if (!summaryOnly) handler.setOnToken(token -> {
+            guard.appendStream(token);
+            persistPartialIfDue(guard, projectId, userId, executionLog);
+        });
         // 思考增量同样进恢复日志，并随消息落库（dev-board#1060）；每次调模型另起一块思考
         guard.trace.beginModelRound(executionLog);
         handler.setOnReasoning(guard::appendReasoning);
