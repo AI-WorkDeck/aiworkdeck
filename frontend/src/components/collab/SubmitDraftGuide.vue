@@ -333,7 +333,8 @@ export default {
           const ids = d.affectedFileIds || []
           if (ids.length) this.$emit('reload-files', ids)
           this.close()
-          this.$emit('changed')
+          // C30: a landed 交稿 proves local == library; the page counts it as a fresh check
+          this.$emit('changed', { submitted: true })
         } else if (d.status === 'CONFLICT') {
           this.close()
           this.$emit('changed')
