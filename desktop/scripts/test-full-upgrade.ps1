@@ -346,6 +346,14 @@ http.createServer((req,res)=>{
     Assert-That ((Renderer 'window.checkbaDesktop.update.status()').appVersion -eq $CandidateVersion) 'Reopened renderer belongs to running candidate executable'
     Assert-That ((Renderer "localStorage.getItem('awd-upgrade-fixture')") -eq $marker) 'Renderer preference survives install and subsequent restart'
     Screenshot '04-reopened-workbench'
+    # POLISH D21: the installed candidate's backend must start with the bundled CDS archive, and
+    # the JVM must accept it at the install location (a rejected archive only logs [cds] warnings).
+    $javaCmd = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -like '*com.checkba.CheckbaApplication*' } | ForEach-Object CommandLine)
+    Assert-That ($javaCmd.Count -eq 1 -and $javaCmd[0] -like '*-XX:SharedArchiveFile=*lib.jsa*' -and $javaCmd[0] -like '*.awd-backend\lib\`**') 'Installed backend starts with the bundled CDS archive via .awd-backend'
+    $backendLog = Join-Path $dataDir 'logs/backend.log'
+    $cdsWarnings = @(Select-String -LiteralPath $backendLog -Pattern '\[cds\]' -ErrorAction SilentlyContinue)
+    $evidence.cdsWarnings = @($cdsWarnings | Select-Object -First 20 | ForEach-Object Line)
+    Assert-That ((Test-Path -LiteralPath $backendLog) -and $cdsWarnings.Count -eq 0) 'Installed backend log has no [cds] warnings (archive valid at install location)'
     foreach ($driver in $exitDrivers) {
         Assert-That ($driver.process.WaitForExit(1000)) 'Native exit-dialog driver completed'
         $record = Get-Content -LiteralPath $driver.record -Raw | ConvertFrom-Json

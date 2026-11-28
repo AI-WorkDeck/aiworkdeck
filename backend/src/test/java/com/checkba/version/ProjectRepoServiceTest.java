@@ -324,4 +324,23 @@ class ProjectRepoServiceTest {
         assertNull(s.commitAll(7L, "自动存档", "auto", null, "韩泽伟", "hzw@example.com"),
                 "补上规则后 Office 锁文件不该产生新版本");
     }
+
+    /**
+     * D21：桌面壳在数据目录里放了 .awd-backend → 安装目录 resources/backend 的链接（Windows 是 junction，
+     * Java 在 Windows 上把它当普通目录走）。律师把家目录或数据目录当成本地文件夹项目时，
+     * 这 ~130MB jar 不能进版本历史。这里用真实目录模拟 Windows 上 Java 看到的样子。
+     */
+    @Test
+    void desktopBackendLinkNeverEntersTheVersionHistory(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("projects/9/.aiworkdeck/.awd-backend/lib"));
+        Files.writeString(root.resolve("projects/9/.aiworkdeck/.awd-backend/lib/spring-core.jar"), "jar");
+        Files.writeString(root.resolve("projects/9/合同.docx"), "正文");
+
+        ProjectRepoService s = svc(root);
+        s.init(9L, "测试律师", "lawyer@example.test");
+
+        java.util.List<String> paths = s.listPaths(9L, "HEAD");
+        assertTrue(paths.contains("合同.docx"), "基准：普通文档必须被收录: " + paths);
+        assertTrue(paths.stream().noneMatch(p -> p.contains(".awd-backend")), ".awd-backend 不得进版本历史: " + paths);
+    }
 }

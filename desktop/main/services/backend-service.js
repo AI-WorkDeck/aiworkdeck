@@ -7,6 +7,7 @@ const http = require('http')
 const { randomBytes, createHash } = require('crypto')
 const { spawn, execFileSync } = require('child_process')
 const { isPortOpen } = require('./service-manager')
+const { LINK_NAME, ensureBackendLink, alignLibMtimes } = require('./backend-link')
 
 // 打包态后端端口链：默认 5269，被占则依次降级（5269 是 IANA 注册的 XMPP
 // 服务器互联口，桌面软件几乎不用；5369/5169 未注册）。dev 态保持 9696，
@@ -199,15 +200,31 @@ function jarPath(ctx) {
   return layout.kind === 'split' ? layout.appJar : layout.jar
 }
 
-function javaLaunchArgs(ctx) {
+/** 打包时生成的依赖类 CDS 归档（POLISH D21，desktop/scripts/backend-cds.js）。 */
+function cdsArchive(ctx) {
+  return path.join(ctx.resourcesPath, 'backend', 'lib.jsa')
+}
+
+function javaLaunchArgs(ctx, javaCmd) {
   // 隔离实例（AWD_HOME，问题 20）：后端所有 ${user.home}/.aiworkdeck 跟着落到 AWD_HOME 下。
   // macOS 上 JVM 的 user.home 取自账户记录、不认 $HOME，只能显式传。
   const home = ctx.awdHome ? ['-Duser.home=' + ctx.awdHome] : []
   const layout = backendLayout(ctx)
   if (layout.kind === 'fat') return [...home, '-jar', layout.jar]
-  // -cp 通配符由 JVM 展开（spawn 无 shell，不会被 glob）；分隔符按平台
+  // -cp 通配符由 JVM 展开（spawn 无 shell，不会被 glob）；分隔符按平台。
+  // lib/* 在前、app.jar 在后：CDS 归档只记录 lib/* 这段前缀，补丁的 app.jar
+  // 接在后面不影响校验（两者没有同名类/资源，顺序不改变解析结果）。
+  // 归档只配随包 JRE（同一 JVM 构建才能用）；jar 时间戳或大小对不上时 JVM
+  // 打一行 [cds] 警告后照常无归档启动。
+  // 用归档时 lib 走 <dataDir>/.awd-backend 这个相对前缀（backend-link.js；spec() 的 cwd
+  // 就是 dataDir），与 dump 时的 class path 字符串一致；链接建不了就不带归档、走绝对路径。
   const sep = process.platform === 'win32' ? ';' : ':'
-  return [...home, '-cp', layout.appJar + sep + path.join(layout.libDir, '*'), BACKEND_MAIN_CLASS]
+  // jar mtime 也要与 dump 时一致（Windows 安装不保留 mtime，见 backend-link.js）。
+  const useCds = javaCmd && javaCmd === bundledJava(ctx) && fs.existsSync(cdsArchive(ctx)) && alignLibMtimes(layout.libDir)
+  const link = useCds ? ensureBackendLink(ctx.dataDir, path.join(ctx.resourcesPath, 'backend')) : null
+  const libDir = link ? path.join(LINK_NAME, 'lib') : layout.libDir
+  const cds = link ? ['-XX:SharedArchiveFile=' + cdsArchive(ctx)] : []
+  return [...home, ...cds, '-cp', path.join(libDir, '*') + sep + layout.appJar, BACKEND_MAIN_CLASS]
 }
 
 function bundledJava(ctx) {
@@ -323,7 +340,7 @@ function spec(ctx, javaCmd) {
   if (ctx.packaged) fs.mkdirSync(cwd, { recursive: true })
   const bootOverlay = { context: { packaged: ctx.packaged, dataDir: ctx.dataDir, appVersion: ctx.appVersion, instanceId: ctx.instanceId },
     current: require('./overlay').readCurrent(ctx) }
-  return { cmd: javaCmd, args: javaLaunchArgs(ctx), env: spawnEnv(ctx), cwd, bootOverlay }
+  return { cmd: javaCmd, args: javaLaunchArgs(ctx, javaCmd), env: spawnEnv(ctx), cwd, bootOverlay }
 }
 
 // 系统 JDK 回退候选（仅打包态、仅当捆绑 JRE 启动失败时才会被用到）
