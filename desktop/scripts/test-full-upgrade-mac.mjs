@@ -203,6 +203,14 @@ try {
   check(await hash(document) === documentHash, 'Document bytes survive native upgrade')
   check(await renderer("localStorage.getItem('awd-upgrade-fixture')") === marker, 'Renderer preference survives upgrade and manual reopen')
   await screenshot('03-candidate-reopened')
+  // POLISH D21: the installed candidate's backend must start with the bundled CDS archive, and
+  // the JVM must accept it at the install location (a rejected archive only logs [cds] warnings).
+  const javaCmds = run('/bin/ps', ['-axo', 'command=']).split('\n').filter(line => line.includes('com.checkba.CheckbaApplication'))
+  check(javaCmds.length === 1 && javaCmds[0].includes('-XX:SharedArchiveFile=') && javaCmds[0].includes('lib.jsa') && javaCmds[0].includes('.awd-backend/lib/*'), 'Installed backend starts with the bundled CDS archive via .awd-backend')
+  const backendLog = path.join(dataDir, 'logs', 'backend.log')
+  const cdsWarnings = exists(backendLog) ? fs.readFileSync(backendLog, 'utf8').split('\n').filter(line => line.includes('[cds]')) : null
+  evidence.cdsWarnings = (cdsWarnings || []).slice(0, 20)
+  check(cdsWarnings !== null && cdsWarnings.length === 0, 'Installed backend log has no [cds] warnings (archive valid at install location)')
   await quit()
   evidence.result = 'PASS'
 } catch (error) {

@@ -11,6 +11,7 @@ const { filterClassList, countSharedDependencyClasses, shadowedClasses, zipEntry
 const { buildCdsForPackage } = require('../scripts/after-pack')
 const { javaLaunchArgs } = require('../main/services/backend-service')
 const overlay = require('../main/services/overlay')
+const { LINK_NAME, ensureBackendLink } = require('../main/services/backend-link')
 
 /** 最小的 stored zip（只为测中央目录解析）。 */
 function writeZip(file, names) {
@@ -74,7 +75,7 @@ test('启动参数：补丁 app.jar 生效时归档照用，补丁 jar 接在 li
   const args = javaLaunchArgs(ctx, bundled(ctx))
   assert.ok(args.some((a) => a.startsWith('-XX:SharedArchiveFile=')))
   const parts = args[args.indexOf('-cp') + 1].split(sep)
-  assert.equal(parts[0], path.join(ctx.resourcesPath, 'backend', 'lib', '*'))
+  assert.equal(parts[0], path.join(LINK_NAME, 'lib', '*'))
   assert.ok(parts[1].includes(path.join('overlay', '0.92', 'backend-app', '0.92.1')))
 })
 
@@ -132,4 +133,45 @@ test('afterPack：跨平台/跨架构构建与无随包后端时跳过，本机�
   assert.deepEqual(calls, [])
   assert.deepEqual(await buildCdsForPackage(here, d, build), { ok: true })
   assert.deepEqual(calls, [d])
+})
+
+test('启动参数：带归档时 lib 走数据目录下的 .awd-backend 相对前缀（JDK 21 归档不可搬迁）', (t) => {
+  const ctx = packaged(tmp(t))
+  fs.writeFileSync(path.join(ctx.resourcesPath, 'backend', 'lib.jsa'), 'jsa')
+  const args = javaLaunchArgs(ctx, bundled(ctx))
+  assert.equal(args[args.indexOf('-cp') + 1], path.join(LINK_NAME, 'lib', '*') + sep + path.join(ctx.resourcesPath, 'backend', 'app.jar'))
+  assert.equal(fs.realpathSync(path.join(ctx.dataDir, LINK_NAME)), fs.realpathSync(path.join(ctx.resourcesPath, 'backend')))
+})
+
+test('启动参数：数据目录里 .awd-backend 是真实目录时不动它，退回绝对路径且不带归档', (t) => {
+  const ctx = packaged(tmp(t))
+  fs.writeFileSync(path.join(ctx.resourcesPath, 'backend', 'lib.jsa'), 'jsa')
+  fs.mkdirSync(path.join(ctx.dataDir, LINK_NAME), { recursive: true })
+  fs.writeFileSync(path.join(ctx.dataDir, LINK_NAME, 'keep'), 'x')
+  const args = javaLaunchArgs(ctx, bundled(ctx))
+  assert.ok(!args.some((a) => a.startsWith('-XX:SharedArchiveFile')))
+  assert.equal(args[args.indexOf('-cp') + 1].split(sep)[0], path.join(ctx.resourcesPath, 'backend', 'lib', '*'))
+  assert.ok(fs.existsSync(path.join(ctx.dataDir, LINK_NAME, 'keep')))
+})
+
+test('ensureBackendLink：新建、重复调用不变、安装位置搬走后重新指向', (t) => {
+  const root = tmp(t)
+  const a = path.join(root, 'install A', 'backend'); fs.mkdirSync(a, { recursive: true }); fs.writeFileSync(path.join(a, 'marker'), 'A')
+  const data = path.join(root, 'data')
+  const link = ensureBackendLink(data, a)
+  assert.equal(link, path.join(data, LINK_NAME))
+  assert.equal(fs.readFileSync(path.join(link, 'marker'), 'utf8'), 'A')
+  assert.equal(ensureBackendLink(data, a), link)
+  // 搬家：旧目录消失（链接悬空），新位置重新指过去
+  const b = path.join(root, 'install B', 'backend')
+  fs.renameSync(path.join(root, 'install A'), path.join(root, 'install B'))
+  assert.equal(ensureBackendLink(data, b), link)
+  assert.equal(fs.readFileSync(path.join(link, 'marker'), 'utf8'), 'A')
+  // 指向另一个仍存在的目录也会改指
+  const c = path.join(root, 'c'); fs.mkdirSync(c); fs.writeFileSync(path.join(c, 'marker'), 'C')
+  assert.equal(ensureBackendLink(data, c), link)
+  assert.equal(fs.readFileSync(path.join(link, 'marker'), 'utf8'), 'C')
+  // 删数据目录不会顺着链接删到安装目录
+  fs.rmSync(data, { recursive: true, force: true })
+  assert.ok(fs.existsSync(path.join(c, 'marker')))
 })

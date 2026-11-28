@@ -18,6 +18,10 @@
 // At runtime the JVM checks size + mtime of every archived jar; if anything
 // differs it logs a [cds] warning and starts without the archive (-Xshare:auto).
 // Measured on Apple Silicon (backend alone, Spring "Started in"): ~4.3 s -> ~3.3 s.
+// JDK 21 archives record the dump-time class path string and are not relocatable, so every
+// run here (and backend-service at runtime) reaches lib/ through the same relative prefix,
+// .awd-backend/lib/*, with a symlink/junction named .awd-backend in its cwd (backend-link.js).
+// Each run uses its own cwd, so the verification run proves the archive survives a move.
 // Needs JDK 21.0.13+: earlier 21 updates ignore app-loader classes when the
 // install path contains a space ("AI WorkDeck.app").
 
@@ -27,6 +31,7 @@ const path = require('path');
 const http = require('http');
 const net = require('net');
 const { spawn, execFileSync } = require('child_process');
+const { LINK_NAME, ensureBackendLink } = require('../main/services/backend-link');
 
 const ARCHIVE_NAME = 'lib.jsa';
 const MAIN_CLASS = 'com.checkba.CheckbaApplication';
@@ -119,7 +124,13 @@ function postShutdown(port, token) {
     });
 }
 
-/** Start the backend, wait for Spring's "Started" line, stop it cleanly. Resolves with the reported seconds. */
+/** <dir>/.awd-backend -> <resourcesDir>/backend; returns the relative lib wildcard to put on -cp. */
+function linkedLib(dir, resourcesDir) {
+    if (!ensureBackendLink(dir, path.join(resourcesDir, 'backend'))) throw new Error(`cannot create ${LINK_NAME} link in ${dir}`);
+    return path.join(LINK_NAME, 'lib', '*');
+}
+
+/** Start the backend (cwd = home), wait for Spring's "Started" line, stop it cleanly. Resolves with the reported seconds. */
 async function runBackendOnce({ java, resourcesDir, jvmArgs, home, timeoutMs = 240000 }) {
     const backend = path.join(resourcesDir, 'backend');
     const sep = process.platform === 'win32' ? ';' : ':';
@@ -140,7 +151,7 @@ async function runBackendOnce({ java, resourcesDir, jvmArgs, home, timeoutMs = 2
     delete env.AWD_PARENT_PID;
     delete env.JAVA_TOOL_OPTIONS;
     const args = ['-Duser.home=' + home, ...jvmArgs, '-cp',
-        path.join(backend, 'lib', '*') + sep + path.join(backend, 'app.jar'), MAIN_CLASS];
+        linkedLib(home, resourcesDir) + sep + path.join(backend, 'app.jar'), MAIN_CLASS];
     const child = spawn(java, args, { cwd: home, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
@@ -200,9 +211,10 @@ async function buildBackendCds(resourcesDir, { log = console.log } = {}) {
         const filtered = path.join(work, 'classes-lib.lst');
         fs.writeFileSync(filtered, filterClassList(fs.readFileSync(classList, 'utf8')));
         fs.rmSync(archive, { force: true });
+        const dumpDir = home('dump');
         execFileSync(java, ['-Xshare:dump', '-XX:SharedClassListFile=' + filtered,
-            '-XX:SharedArchiveFile=' + archive, '-cp', path.join(libDir, '*')],
-        { stdio: ['ignore', 'ignore', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+            '-XX:SharedArchiveFile=' + archive, '-cp', linkedLib(dumpDir, resourcesDir)],
+        { cwd: dumpDir, stdio: ['ignore', 'ignore', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
         if (!fs.existsSync(archive)) throw new Error('java -Xshare:dump produced no archive');
         // The JVM writes the archive 0444. Mac signing then fails on it ("Permission denied" from
         // codesign, run 45929621427), and Squirrel.Mac can't clear quarantine on read-only files

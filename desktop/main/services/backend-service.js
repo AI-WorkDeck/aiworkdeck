@@ -7,6 +7,7 @@ const http = require('http')
 const { randomBytes, createHash } = require('crypto')
 const { spawn, execFileSync } = require('child_process')
 const { isPortOpen } = require('./service-manager')
+const { LINK_NAME, ensureBackendLink } = require('./backend-link')
 
 // 打包态后端端口链：默认 5269，被占则依次降级（5269 是 IANA 注册的 XMPP
 // 服务器互联口，桌面软件几乎不用；5369/5169 未注册）。dev 态保持 9696，
@@ -215,10 +216,14 @@ function javaLaunchArgs(ctx, javaCmd) {
   // 接在后面不影响校验（两者没有同名类/资源，顺序不改变解析结果）。
   // 归档只配随包 JRE（同一 JVM 构建才能用）；jar 时间戳或大小对不上时 JVM
   // 打一行 [cds] 警告后照常无归档启动。
+  // 用归档时 lib 走 <dataDir>/.awd-backend 这个相对前缀（backend-link.js；spec() 的 cwd
+  // 就是 dataDir），与 dump 时的 class path 字符串一致；链接建不了就不带归档、走绝对路径。
   const sep = process.platform === 'win32' ? ';' : ':'
-  const cds = javaCmd && javaCmd === bundledJava(ctx) && fs.existsSync(cdsArchive(ctx))
-    ? ['-XX:SharedArchiveFile=' + cdsArchive(ctx)] : []
-  return [...home, ...cds, '-cp', path.join(layout.libDir, '*') + sep + layout.appJar, BACKEND_MAIN_CLASS]
+  const useCds = javaCmd && javaCmd === bundledJava(ctx) && fs.existsSync(cdsArchive(ctx))
+  const link = useCds ? ensureBackendLink(ctx.dataDir, path.join(ctx.resourcesPath, 'backend')) : null
+  const libDir = link ? path.join(LINK_NAME, 'lib') : layout.libDir
+  const cds = link ? ['-XX:SharedArchiveFile=' + cdsArchive(ctx)] : []
+  return [...home, ...cds, '-cp', path.join(libDir, '*') + sep + layout.appJar, BACKEND_MAIN_CLASS]
 }
 
 function bundledJava(ctx) {
