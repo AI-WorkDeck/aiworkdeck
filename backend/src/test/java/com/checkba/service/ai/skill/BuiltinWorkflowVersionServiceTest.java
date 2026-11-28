@@ -62,6 +62,30 @@ class BuiltinWorkflowVersionServiceTest {
     }
 
     @Test
+    @DisplayName("zh-TW 界面：系统默认版名称、快捷指令与工作流规则都出繁体（POLISH Q6）")
+    void zhTwShowsTraditionalDefaultVersion() {
+        com.checkba.service.AppLanguageService lang = mock(com.checkba.service.AppLanguageService.class);
+        org.mockito.Mockito.when(lang.locale()).thenReturn(com.checkba.util.AppLocale.ZH_TW);
+        org.mockito.Mockito.when(lang.isEnglish()).thenReturn(false);
+        var tw = new BuiltinWorkflowVersionService(registry, null, lang);
+
+        var state = tw.getWorkflowState(1L, "proj-1", "contract-review");
+        assertEquals("系統預設版", state.getActiveVersionName());
+        var def = state.getVersions().get(0);
+        assertFalse(def.getQuickPrompt().contains("请"), def.getQuickPrompt());
+        assertFalse(def.getQuickPrompt().contains("审查"), def.getQuickPrompt());
+        assertFalse(def.getPromptTemplate().contains("角色与任务"), "工作流规则仍是简体");
+        assertTrue(def.getPromptTemplate().contains("角色與任務"), "工作流规则应转为繁体");
+
+        // 注入模型的生效版本仍用原文 Prompt
+        assertTrue(tw.resolveActiveVersion(1L, "proj-1", "contract-review").getPromptTemplate().contains("角色与任务"));
+
+        // zh-CN 不受影响
+        org.mockito.Mockito.when(lang.locale()).thenReturn(com.checkba.util.AppLocale.ZH_CN);
+        assertEquals("系统默认版", tw.getWorkflowState(1L, "proj-1", "contract-review").getActiveVersionName());
+    }
+
+    @Test
     @DisplayName("支持创建多个自定义版本、按项目独立切换版本，且系统默认版始终保留兜底")
     void supportsMultipleCustomVersionsAndPerProjectSelection() {
         Long userId = 42L;
