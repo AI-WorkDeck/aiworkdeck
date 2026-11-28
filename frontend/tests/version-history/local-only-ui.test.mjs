@@ -119,3 +119,22 @@ test('the 交稿 result and the tree read the local-only endpoints', () => {
   assert.match(api, /url: `\/api\/cloud\/projects\/\$\{projectId\}\/local-only`, method: 'GET'/)
   assert.match(api, /noticeLocalOnly\(projectId, d\.localOnlyFiles,/)
 })
+
+// W note 5 (0.92 item 4): the tree blocks clicks on a colleague's placeholder, but quick look and search
+// opened files through openFile directly and fell through to a generic download error. openFile asks the
+// tree first, so every entry point explains the placeholder instead.
+test('every open path (tree, quick look, search) explains a placeholder instead of downloading', () => {
+  const tabs = readFileSync(new URL('../../src/pages/project-overview/fileOpenTabs.js', import.meta.url), 'utf8')
+  const start = tabs.search(/^    openFile\(file, opts = \{\}\) \{/m)
+  assert.ok(start >= 0)
+  const src = tabs.slice(start, tabs.indexOf('\n    },', start) + 7).trim().replace(/,$/, '')
+  const openFile = vm.runInNewContext(`({${src}}).openFile`, { uni: { showModal() { throw new Error('reached the type check') } } })
+  let explained = 0
+  const page = {
+    $refs: { fileTree: { explainLocalOnly: (f) => { explained++; return f.id === 2 } } },
+    isFileTypeSupported: () => { throw new Error('a placeholder must stop before anything else') },
+  }
+  assert.equal(openFile.call(page, { id: 2, name: '庭审录像.mp4' }), undefined)
+  assert.equal(explained, 1)
+  assert.throws(() => openFile.call(page, { id: 3, name: '合同.docx' }), /a placeholder must stop|reached/, 'a normal file goes on')
+})
