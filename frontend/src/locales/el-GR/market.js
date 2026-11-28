@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "Δοκιμάστε διαφορετική λέξη-κλειδί ή κατηγορία",
   "submitFirstSkill": "Δημοσιεύστε το πρώτο σας Skill στο επίσημο marketplace του Skill",
   "installedTag": "Εγκατεστημένο",
+  "contentInChinese": "Στα κινεζικά",
   "processing": "Επεξεργασία",
   "update": "Ενημέρωση",
   "install": "Εγκατάσταση",

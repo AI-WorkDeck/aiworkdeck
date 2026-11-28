@@ -114,3 +114,14 @@ test('a slow but answering service is not declared dead', async () => {
   assert.equal(await withTransferProgress(7, () => new Promise((r) => setTimeout(() => r('ok'), 150)),
     { t, read, show() {}, hide() {}, interval: 5, delay: 5, deadAfter: 3, staleAfter: 60 }), 'ok')
 })
+
+test('C12 nit: the foreground transfer announces its end, also when it fails', async () => {
+  const ends = []
+  const ui = { t, read: async () => ({ data: { active: false } }), show() {}, hide() {}, end: (id) => ends.push(id), interval: 5, delay: 5 }
+  await withTransferProgress(7, async () => 'ok', ui)
+  await assert.rejects(withTransferProgress(8, async () => { throw new Error('refused') }, ui), /refused/)
+  assert.deepEqual(ends, [7, 8])
+  const api = readFileSync(new URL('../../src/services/api.js', import.meta.url), 'utf8')
+  assert.match(api, /uni\.\$emit\('awd:cloud-transfer-foreground', \{ projectId, on: true \}\)/)
+  assert.match(api, /end: \(projectId\) => \{ try \{ uni\.\$emit\('awd:cloud-transfer-foreground', \{ projectId, on: false \}\)/)
+})

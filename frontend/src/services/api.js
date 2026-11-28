@@ -4601,9 +4601,10 @@ export function getCloudStatus(projectId) {
     request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' }))
 }
 
-export function checkCloud(projectId) {
+// C9: opts.fresh only from the explicit 「刷新状态」 (re-reads the member's role; automatic checks keep the cache)
+export function checkCloud(projectId, opts = {}) {
   return observeCloudConnectivity(projectId, 'check', () =>
-    request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
+    request({ url: `/api/cloud/projects/${projectId}/check${opts.fresh ? '?fresh=1' : ''}`, method: 'POST' }))
 }
 
 // C12：这份案卷里只在共享人电脑上的文件（文件树徽标、占位）
@@ -4619,7 +4620,14 @@ export function getCloudTransfer(projectId) {
 // 大文件慢传时给出进度（见 utils/transferProgress.js）：不挡操作的 loading，字节在走就更新
 const transferProgressUi = {
   // 状态栏那一格（CloudTransferStatus）也立刻开始快查，不等它 15 秒一次的慢轮询
-  start: (projectId) => { try { uni.$emit('awd:cloud-transfer-kick', projectId) } catch { /* no event bus */ } },
+  start: (projectId) => {
+    try {
+      uni.$emit('awd:cloud-transfer-kick', projectId)
+      // C12 nit: one progress line at a time - the status-bar cell stands down while this one shows
+      uni.$emit('awd:cloud-transfer-foreground', { projectId, on: true })
+    } catch { /* no event bus */ }
+  },
+  end: (projectId) => { try { uni.$emit('awd:cloud-transfer-foreground', { projectId, on: false }) } catch { /* no event bus */ } },
   read: getCloudTransfer,
   show: (title) => uni.showLoading({ title, mask: false }),
   hide: () => uni.hideLoading(),

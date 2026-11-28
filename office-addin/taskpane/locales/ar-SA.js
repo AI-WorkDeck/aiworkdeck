@@ -4,6 +4,10 @@
 export default {
   legalCopyright: "حقوق النشر 2026 شركة BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED والمساهمون في AI WorkDeck",
   legalLicenseTrademark: "يُصدر هذا البرنامج بموجب رخصة جنو أفيرو العمومية (GNU Affero General Public License) الإصدار 3.0 أو أحدث، دون أي ضمان على الإطلاق. \"AI WorkDeck\" علامة تجارية لشركة BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. لا تستخدم هذا الاسم كاسم للمنتج عند إعادة توزيع نسخة معدّلة؛ راجع إشعار العلامة التجارية.",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · المصدر · الترخيص · العلامة التجارية",
+  legalSourceLink: "الشيفرة المصدرية",
+  legalLicenseLink: "نص الترخيص الكامل",
+  legalTrademarkLink: "إشعار العلامة التجارية",
   apiCloudAccessRefresh: "تغيّرت صلاحيات الوصول إلى السحابة. حدّث الصفحة أو أعد فتح التطبيق قبل المتابعة. لن تُحذف الملفات المحلية.",
   defaultProjectName: "مشروع مؤقت",
   cmdPptAddImage: "إدراج صورة في الشريحة",

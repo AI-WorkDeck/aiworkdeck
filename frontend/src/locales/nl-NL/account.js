@@ -237,6 +237,7 @@ export default {
   "clientTab": "Cliënt",
   "usernameLabel": "Gebruikersnaam",
   "usernamePlaceholder": "Voer uw gebruikersnaam in",
+  "teamServerLoginHint": "Dit is de aanmelding van je teamserver. Gebruik de gebruikersnaam en het wachtwoord die je beheerder voor deze server heeft ingesteld.",
   "passwordLabel": "Wachtwoord",
   "passwordPlaceholder": "Voer uw wachtwoord in",
   "rememberMe": "Ingelogd blijven",

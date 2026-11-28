@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "Probeer een ander trefwoord of een andere categorie",
   "submitFirstSkill": "Dien uw eerste Skill in op de officiële Skill-marktplaats",
   "installedTag": "Geïnstalleerd",
+  "contentInChinese": "In het Chinees",
   "processing": "Verwerken",
   "update": "Bijwerken",
   "install": "Installeren",

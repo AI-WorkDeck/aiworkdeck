@@ -49,7 +49,7 @@ function harness() {
   const vm = { dynamicPlugins: [], enabledSkillIds: null, hasProject: true, hasNamedProject: true, leftPaneKey: 'files',
     leftFiles: [], rightFiles: [], lastActiveIdsByMode: { left: {}, right: {} }, saveActiveIdsByMode() {},
     ...pluginWorkspaceTabMethods,
-    applyPanelDocks: rows => rows, applyRailOrder: rows => rows, ttsEnabled: true }
+    applyPanelDocks: rows => rows, applyRailOrder: rows => rows, hostReviewsRailItems: () => [], ttsEnabled: true }
   for (const name of ['loadDynamicPlugins', 'loadEnabledSkills']) vm[name] = method(page, name, deps).bind(vm)
   Object.defineProperty(vm, 'documentAvailablePlugins', { get: method(page, 'documentAvailablePlugins', deps).bind(vm) })
   Object.defineProperty(vm, 'rail', { get: method(page, 'LEFT_SIDEBAR_PLUGINS', deps).bind(vm) })

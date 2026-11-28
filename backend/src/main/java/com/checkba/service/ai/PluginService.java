@@ -352,6 +352,8 @@ public class PluginService {
     public static class PluginViewDecl {
         private String id, name, entry, placement, scope, defaultDock;
         private List<String> allowedDocks;
+        /** Host entry point this view serves (C1): only "reviews", only on a global workspace view. */
+        private String entryPoint;
     }
 
     @lombok.Data

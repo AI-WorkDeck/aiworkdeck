@@ -335,6 +335,14 @@ skill 是有代价的（注入无关指引 + 裁工具）。
 - skill 过滤在 SkillRouter.match 的 isAvailable 检查。
 - **启用插件 = 启用它携带的 skill（dev-board#132，2026-08-23）**：插件携带的 skill 惯例写 `enabled_by_default:false`（插件没装前别出现），于是「装完插件、点了启用，工具注册上了但 skill 仍禁用、对话里触发词永不命中」是第三个看不见的开关。`PluginService.setEnabled(id,true)` 在 `loadJarsIfAbsent` 之后先 `skillRegistry.rescan()` 再 `enableSkillsFromPlugin(id)`（只翻本插件 `sourcePluginId` 命中的 skill，别的插件/内置 skill 不碰）。禁用插件不反向操作——`SkillRegistry.isAvailable` 已按所属插件的启用态兜住。护栏 `PluginServiceTest.enablingPluginEnablesCarriedSkills/disablingPluginLeavesSkillStateAlone`、`SkillRegistryTest.enablingPluginEnablesItsCarriedSkills`。
 
+## 宿主通用入口「审阅」（C1，dev-board#1873，0.92）
+
+插件在**全局工作区视图**上声明 `"entryPoint": "reviews"`（目前唯一取值；校验三处同口径：`PluginManifestContractValidator.VIEW_ENTRY_POINTS`、`frontend/src/utils/pluginViews.js` 的 `VIEW_ENTRY_POINTS`、`scripts/plugin-dev.mjs` + `manifest.schema.json`），再经 `awd.call('ui.setEntry', { entry, visible, badge })` 报告是否适用与待处理数（`badge` 0–99 整数，类型不对 `invalid_params`；未声明入口 `permission_denied`；未连账户 `unavailable`）。
+- 状态**只在本机**：`composables/useHostEntries.js` 按官网 accountId 存 uni storage（`awd.hostEntries.v1`，最多 20 个账户）；不上传任何服务器（待处理法律事项数不出本机，CEO 11-28）。切账户先清空 accountKey 再重读。
+- 显示（`pages/project-overview/reviewsEntry.js`）：一个插件适用 → 徽标挂它自己的 rail 按钮 + 欢迎页一行；两个以上 → rail 末尾多一个 `host-reviews` 通用项，点开 `uni.showActionSheet` 选插件。插件名不改。
+- SDK 便利方法没加：`awd-plugin-sdk.js` 有 10 份必须逐字相同的副本（含 6 个官方插件），改它要连带插件发版；下次 SDK 同步时再补 `awd.ui.setEntry`。
+- 文案规则（owner）：只说「审阅」，不用 审定 / 定稿 / finalise。
+
 ## 已知地雷
 
 - 新增面板型插件三步缺一不可：leftSidebarPlugins.js 注册 + project-overview.vue 面板区加 v-else-if 分支 + 组件本身；漏第二步就是"加载中..."占位符（股东大会曾长期如此，现已实现）。

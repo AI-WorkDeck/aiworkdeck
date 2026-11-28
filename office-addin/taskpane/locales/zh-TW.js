@@ -3,7 +3,11 @@
 
 export default {
   legalCopyright: "版權所有 2026 北京公富信息技术有限公司及 AI WorkDeck 貢獻者",
-  legalLicenseTrademark: "本軟體依 GNU Affero General Public License v3.0 或更高版本發布，不提供任何擔保。 「AI WorkDeck」為北京公富信息技术有限公司的商標，再散佈修改版時不得使用該名稱作為產品名（詳見商標宣告）。",
+  legalLicenseTrademark: "本軟體依 GNU Affero General Public License v3.0 或更高版本發布，不提供任何擔保。「AI WorkDeck」為北京公富信息技术有限公司的商標，再散佈修改版時不得使用該名稱作為產品名（詳見商標宣告）。",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · 原始碼 · 授權條款 · 商標宣告",
+  legalSourceLink: "原始碼",
+  legalLicenseLink: "授權條款全文",
+  legalTrademarkLink: "商標宣告",
   apiCloudAccessRefresh: "雲端權限已變更，請重新整理頁面或重新開啟應用程式後再操作。本機檔案不會刪除。",
   defaultProjectName: "臨時專案",
   cmdPptAddImage: "插入投影片圖片",

@@ -395,6 +395,8 @@
           <text v-else class="rail-icon">{{ p.icon }}</text>
           <text class="rail-label">{{ railLabelOf(p) }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
+          <text v-if="p.key === HOST_REVIEWS_KEY && reviewCount > 0" class="rail-badge" :aria-label="$t('workbench.reviewsNeedYou', { count: reviewCount })">{{ reviewCount }}</text>
+          <text v-else-if="p.isDynamic && reviewBadgeOf(p.pluginId) > 0" class="rail-badge" :aria-label="$t('workbench.reviewsNeedYou', { count: reviewBadgeOf(p.pluginId) })">{{ reviewBadgeOf(p.pluginId) }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
           <!-- 日程徽标（dev-board#899）：当前项目 逾期 + 今天 的未完成事项数，0 不显；有逾期时转朱砂红 -->
@@ -1385,6 +1387,8 @@
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
                       :components-suggested="optionalComponentsSuggested"
+                      :review-count="reviewCount"
+                      @open-reviews="openReviewsEntry"
                       @open-components="openSuggestedComponents"
                       @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
@@ -1671,6 +1675,8 @@
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
                       :components-suggested="optionalComponentsSuggested"
+                      :review-count="reviewCount"
+                      @open-reviews="openReviewsEntry"
                       @open-components="openSuggestedComponents"
                       @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
@@ -2526,6 +2532,8 @@ import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
 import { builtinWorkflowTabMethods } from './builtinWorkflowTab.js'
 import PluginPane from '@/components/PluginPane.vue' // Added
 import { pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery } from '@/utils/pluginViews.js'
+import { entryViewOf, qualifyingEntries } from '@/utils/hostEntries.js'
+import { hostEntries, startHostEntries } from '@/composables/useHostEntries.js'
 import PluginGuidePane from '@/components/PluginGuidePane.vue'
 import PluginWorkspaceSummary from '@/components/PluginWorkspaceSummary.vue'
 import PluginDevPanel from '@/components/PluginDevPanel.vue'
@@ -2710,6 +2718,7 @@ import { tabDragSplitMethods } from './tabDragSplit.js'
 import { narrowLayoutMethods } from './narrowLayout.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
 import { railSortData, railSortMethods } from './railSort.js'
+import { HOST_REVIEWS_KEY, reviewsEntryMethods } from './reviewsEntry.js'
 import { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarCollapse.js'
 import { loadLastConversation } from '@/utils/lastConversation.js'
 import { uniStorage } from '@/utils/uniStorage.js'
@@ -2837,6 +2846,7 @@ export default {
   },
   data() {
     return {
+      HOST_REVIEWS_KEY,
       // 已自动合入的相邻段落还没过目的条数（mergeNeighborNotices.js），版本入口的小角标用
       mergeNeighborUnseen: 0,
       pdfRecovery: null,
@@ -3428,7 +3438,7 @@ export default {
       if (!this.hasProject || this.isLooseWorkspace) {
         // 客户协作按钮无项目态不上 rail（面板本身仍可由消息中心等入口打开，见 NO_PROJECT_PANE_KEYS）
         const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => p.key !== 'dd-client' && isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
-        return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
+        return this.applyRailOrder([...this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)), ...this.hostReviewsRailItems()])
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
@@ -3443,12 +3453,19 @@ export default {
       // 把搬到左侧的工具面板（变量库/收藏夹/剪贴板）追加在数组之后（dev-board#180）
       // applyRailOrder：最外层再套用户拖出来的顺序（dev-board#204），
       // 排序只改先后、不增删项，所以套在所有过滤/停靠之后
-      if (this.enabledSkillIds === null) return this.applyRailOrder(this.applyPanelDocks(base))
+      if (this.enabledSkillIds === null) return this.applyRailOrder([...this.applyPanelDocks(base), ...this.hostReviewsRailItems()])
       const filtered = filterPluginsByEnabledSkills(base, this.enabledSkillIds)
-      return this.applyRailOrder(this.applyPanelDocks(filtered))
+      return this.applyRailOrder([...this.applyPanelDocks(filtered), ...this.hostReviewsRailItems()])
     },
     // 版本记录 2026-08-19 挪出 rail 数组、独立渲染在「项目成员」与「暂存区」之间，
     // 模板拿不到裸导入的 VERSION_PLUGIN，包一层 computed 才能在模板里用它的 svgPaths。
+    // C1: plugins serving the host "reviews" entry that reported this account as approved (device-local state).
+    reviewEntries() {
+      return qualifyingEntries(this.dynamicPlugins, hostEntries.store, hostEntries.accountKey, 'reviews')
+    },
+    reviewCount() {
+      return this.reviewEntries.length ? this.reviewEntries.reduce((n, e) => n + e.badge, 0) : null
+    },
     VERSION_PLUGIN() {
       return VERSION_PLUGIN
     },
@@ -3673,6 +3690,8 @@ export default {
           return !!plugin?.workspaceView && this.openPluginTab(pluginId) === true
         },
         openPluginWorkspaceInProject: (pluginId, projectId) => this.openPluginWorkspaceInProject(pluginId, projectId, getTaskProjectOptions),
+        // C1: only a plugin whose declared global workspace view serves this entry may report it.
+        declaresEntryPoint: (pluginId, entry) => !!entryViewOf(this.dynamicPlugins.find(p => p.pluginId === pluginId), entry),
         openConversation: async conversation => {
           if (!await this.resolveChatInterface()) return false
           return this.loadHistoryChat(conversation)
@@ -4495,6 +4514,7 @@ export default {
     uni.$on(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
     this.refreshMergeNeighborUnseen()
     this._stopPluginUpdateChecks = startPluginUpdateChecks()
+    startHostEntries()
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
     registerQuitSave(this, async () => {
@@ -5132,6 +5152,7 @@ export default {
     // 面板停靠（dev-board#180）
     ...panelDockingMethods,
     ...railSortMethods,
+    ...reviewsEntryMethods,
     ...themeSwitchMethods,
     // Phase 3a 外置的方法组
     ...clipboardBridgeMethods,
@@ -5689,9 +5710,12 @@ export default {
         // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
         if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()
         if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
+        // C5: unreachable library -> the 30 s poll backs off (see startCollabPolling)
+        if (online) this._collabPollFailures = this.collabCloud && this.collabCloud.offline ? (this._collabPollFailures || 0) + 1 : 0
         if (online && typeof this.retryQueuedSubmit === 'function') this.retryQueuedSubmit()
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
+        if (online && !e.aborted) this._collabPollFailures = (this._collabPollFailures || 0) + 1
       } finally {
         if (online && seq === this._collabStateSeq) this.collabChecking = false
       }
@@ -5716,8 +5740,18 @@ export default {
         // Unknown after an account change still needs a retry; only an explicit
         // unlinked snapshot proves that there is no remote project to poll.
         if (this.collabCloud && !this.collabLinked) return
+        // C5 (retest 0.91.1): at 120 s a colleague's 交稿 went unnoticed for ~2 min while the chip said 一致.
+        // A check is a small refs query; one at a time (a slow check on a saturated link is not stacked).
+        if (this.collabChecking) return
+        // Back off while the library is unreachable: after the first failure retry at once (30 s), then 1, 2, 4 …
+        // up to 16 min between checks, so an app left open overnight with the server down does not keep knocking.
+        // One success resets it.
+        const failures = this._collabPollFailures || 0
+        this._collabPollSkipped = (this._collabPollSkipped || 0) + 1
+        if (this._collabPollSkipped < Math.min(2 ** Math.max(failures - 1, 0), 32)) return
+        this._collabPollSkipped = 0
         this.fetchCollabState({ online: true })
-      }, 120000)
+      }, 30000) // C5: was 120000
       if (typeof this.startCollabFreshness === 'function') this.startCollabFreshness()
     },
     // C5：「刚核对过」的时钟与联网再核对的触发点（窗口回到前台、第一次点进文档）
