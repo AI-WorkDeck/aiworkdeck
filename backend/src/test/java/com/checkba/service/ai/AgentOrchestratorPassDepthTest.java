@@ -377,6 +377,12 @@ class AgentOrchestratorPassDepthTest {
     }
 
     @Test
+    @DisplayName("C34 复测：落库的正文最多落后屏幕约 1 秒（2 秒节流在 ~470 字/秒下丢了约 1300 字）")
+    void partialSavesTrailTheScreenByAtMostAboutOneSecond() {
+        assertTrue(orchestrator.partialSaveIntervalMs <= 1000, "interval=" + orchestrator.partialSaveIntervalMs);
+    }
+
+    @Test
     @DisplayName("C34：途中落库是节流的，不是每个 token 一次")
     void partialSavesAreThrottled() {
         assertFalse(streamLongAnswer("conv-partial-throttle", 60_000)[0],

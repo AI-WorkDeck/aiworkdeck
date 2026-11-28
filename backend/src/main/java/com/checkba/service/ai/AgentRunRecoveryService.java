@@ -36,9 +36,9 @@ public class AgentRunRecoveryService {
     static final String INTERRUPT_MARKER_EN = "[Process interrupted]";
 
     static final String INTERRUPT_NOTICE_ZH =
-            "\n\n> **" + INTERRUPT_MARKER_ZH + "** 任务执行中应用被关闭，点击下方「继续」按钮可接着执行。";
+            "\n\n> **" + INTERRUPT_MARKER_ZH + "** 任务执行中应用被关闭，点击下方「继续执行」可接着执行。";
     static final String INTERRUPT_NOTICE_EN =
-            "\n\n> **" + INTERRUPT_MARKER_EN + "** The app was closed while this task was running. Click the Continue button below to resume.";
+            "\n\n> **" + INTERRUPT_MARKER_EN + "** The app was closed while this task was running. Click Resume below to pick it up again.";
 
     /** 按应用语言取本次要写入的中断说明。 */
     static String interruptNotice() {
