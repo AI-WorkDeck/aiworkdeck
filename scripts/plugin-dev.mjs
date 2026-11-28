@@ -115,6 +115,7 @@ export async function validatePlugin(directory) {
     requireFile(view.entry, true)
     if (view.placement !== 'sidebar' && (view.defaultDock || view.allowedDocks)) throw new Error('Dock options only apply to sidebar views: ' + view.id)
     if (view.defaultDock && view.allowedDocks && !view.allowedDocks.includes(view.defaultDock)) throw new Error('defaultDock must be in allowedDocks: ' + view.id)
+    if (view.entryPoint && (view.placement !== 'workspace' || view.scope !== 'global')) throw new Error('entryPoint only applies to a global workspace view: ' + view.id)
   }
   if (c.connections?.length && !manifest.permissions?.includes('network')) throw new Error('connections require network permission')
   for (const connection of c.connections || []) {

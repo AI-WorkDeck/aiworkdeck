@@ -456,6 +456,18 @@
                 </includes>
             </resource>
         </resources>
+        <!-- Configuration only (not bound): failsafe gets the same isolated home if it is ever invoked. -->
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <argLine>-Xmx6g -Duser.home=${project.build.directory}/test-home</argLine>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <!-- Keep native browser/tool output outside Surefire's test event channel (#1709). -->
             <plugin>
@@ -466,7 +478,10 @@
                     <!-- 全量套件跑到末尾常驻约 3.5GB（50+ 个 Spring 测试上下文同时存活）。不写的话堆上限是
                          机器内存的 1/4：CI 的 16GB runner 只有约 3.9GB，再多一个上下文就 Java heap space
                          （PR#1519 首次 CI 即如此）。显式给定，本机与 CI 一致。 -->
-                    <argLine>-Xmx6g</argLine>
+                    <!-- 2026-11-28: desktop-profile tests default every data path to ${user.home}/.aiworkdeck; a local run
+                         used the owner's real home and refreshed their account against production. Every test JVM gets an
+                         isolated home under target/ (TestHomeIsolationTest fails the build without it). -->
+                    <argLine>-Xmx6g -Duser.home=${project.build.directory}/test-home</argLine>
                 </configuration>
             </plugin>
 

@@ -815,7 +815,12 @@ public class CloudSyncService {
         m.put("linked", true);
         m.put("serverUrl", serverUrl);
         m.put("remoteProjectId", remote.getRemoteProjectId());
-        m.put("pendingUpload", Boolean.TRUE.equals(remote.getPendingUpload()));
+        // C35（dev-board#1871）：「有改动还没交稿」不能只看「上次推送被拒/失败」那面旗子——保存版本之后、
+        // 交稿落到案件库之前（上传中或上传失败），本机主线有案件库没有的版本，顶栏却会说「和大家的稿一致」，
+        // 律师以为同事已经拿到了自己的稿。
+        boolean localAhead = origin != null
+                && !repoService.isAncestor(projectId, repoService.mainBranch(), origin);
+        m.put("pendingUpload", Boolean.TRUE.equals(remote.getPendingUpload()) || localAhead);
         m.put("remoteAhead", remoteAhead);
         if (remoteAhead) {
             describeRemoteAhead(projectId, userId, m);

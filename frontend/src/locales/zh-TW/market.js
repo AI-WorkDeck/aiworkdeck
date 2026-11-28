@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "換個關鍵詞或分類試試",
   "submitFirstSkill": "去官網外掛市集提交你的第一個技能",
   "installedTag": "已安裝",
+  "contentInChinese": "中文",
   "processing": "處理中",
   "update": "更新",
   "install": "安裝",

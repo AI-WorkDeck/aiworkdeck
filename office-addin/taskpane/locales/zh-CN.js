@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 export const ZH = {
   legalCopyright: "版权所有 2026 北京公富信息技术有限公司及 AI WorkDeck 贡献者",
-  legalLicenseTrademark: "本软件依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。 “AI WorkDeck”为北京公富信息技术有限公司的商标，再分发修改版时不得使用该名称作为产品名（详见商标说明）。",
+  legalLicenseTrademark: "本软件依 GNU Affero General Public License v3.0 或更高版本发布，不提供任何担保。“AI WorkDeck”为北京公富信息技术有限公司的商标，再分发修改版时不得使用该名称作为产品名（详见商标说明）。",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · 源代码 · 许可证 · 商标说明",
+  legalSourceLink: "源代码",
+  legalLicenseLink: "许可证全文",
+  legalTrademarkLink: "商标说明",
   apiCloudAccessRefresh: "云端权限已变化，请刷新页面或重新打开应用后再操作。本机文件不会删除。",
   defaultProjectName: "临时项目",
   cmdPptAddImage: "插入幻灯片图片",

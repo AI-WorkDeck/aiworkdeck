@@ -4,6 +4,10 @@
 export default {
   legalCopyright: "Πνευματικά δικαιώματα 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED και συνεισφέροντες του AI WorkDeck",
   legalLicenseTrademark: "Αυτό το πρόγραμμα διατίθεται υπό την άδεια GNU Affero General Public License v3.0 ή νεότερη, ΧΩΡΙΣ ΚΑΜΙΑ ΑΠΟΛΥΤΩΣ ΕΓΓΥΗΣΗ. Το \"AI WorkDeck\" είναι εμπορικό σήμα της BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Μην χρησιμοποιείτε αυτό το όνομα ως όνομα προϊόντος κατά την αναδιανομή τροποποιημένης έκδοσης· δείτε τη σημείωση για το εμπορικό σήμα.",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · Πηγαίος κώδικας · Άδεια · Εμπορικό σήμα",
+  legalSourceLink: "Πηγαίος κώδικας",
+  legalLicenseLink: "Πλήρες κείμενο άδειας",
+  legalTrademarkLink: "Σημείωση εμπορικού σήματος",
   apiCloudAccessRefresh: "Η πρόσβαση στο cloud άλλαξε. Ανανεώστε τη σελίδα ή ανοίξτε ξανά την εφαρμογή για να συνεχίσετε. Τα τοπικά αρχεία δεν θα διαγραφούν.",
   defaultProjectName: "Προσωρινό έργο",
   cmdPptAddImage: "Εισαγωγή εικόνας στη διαφάνεια",

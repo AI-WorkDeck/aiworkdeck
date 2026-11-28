@@ -4,6 +4,10 @@
 export default {
   legalCopyright: "Bản quyền 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED và các cộng tác viên của AI WorkDeck",
   legalLicenseTrademark: "Chương trình này được phát hành theo Giấy phép GNU Affero General Public License v3.0 hoặc mới hơn, KHÔNG BẢO HÀNH HOÀN TOÀN. \"AI WorkDeck\" là nhãn hiệu của BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Không sử dụng tên này làm tên sản phẩm khi phân phối lại phiên bản đã sửa đổi; xem thông báo nhãn hiệu.",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · Mã nguồn · Giấy phép · Nhãn hiệu",
+  legalSourceLink: "Mã nguồn",
+  legalLicenseLink: "Toàn văn giấy phép",
+  legalTrademarkLink: "Thông báo nhãn hiệu",
   apiCloudAccessRefresh: "Quyền truy cập đám mây đã thay đổi. Hãy tải lại trang hoặc mở lại ứng dụng trước khi tiếp tục. Tệp trên máy sẽ không bị xóa.",
   defaultProjectName: "Dự án tạm thời",
   cmdPptAddImage: "Chèn hình ảnh vào trang chiếu",

@@ -104,6 +104,10 @@ public class ProjectObjectSyncService {
 
     private ProjectObjectPlanService plans() { return objectPlans == null ? null : objectPlans.getIfAvailable(); }
 
+    /** W note 5: the case server's declaration rows hold the declaring user's id; name the sharer from it. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.repository.UserRepository users;
+
     /** C12: the library refused a free upload (409 FREE_LIMIT); the object is declared local-only instead. */
     static final class FreeLimitReached extends IOException { FreeLimitReached() { super("FREE_LIMIT"); } }
 
@@ -258,7 +262,13 @@ public class ProjectObjectSyncService {
                 entry.put("path", path);
                 entry.put("name", path.substring(path.lastIndexOf('/') + 1));
                 entry.put("mine", Boolean.TRUE.equals(row.getMine()));
-                if (row.getDeclaredByName() != null) entry.put("sharedBy", row.getDeclaredByName());
+                String sharedBy = row.getDeclaredByName();
+                // W note 5: on the case server (web workbench) the row has only the declaring user's id
+                if (sharedBy == null && users != null && row.getDeclaredBy() != null && row.getDeclaredBy() > 0) {
+                    sharedBy = users.findById(row.getDeclaredBy()).map(u -> u.getDisplayName() != null
+                            && !u.getDisplayName().isBlank() ? u.getDisplayName() : u.getUsername()).orElse(null);
+                }
+                if (sharedBy != null) entry.put("sharedBy", sharedBy);
                 out.add(entry);
             }
         }

@@ -180,6 +180,26 @@ await awd.ui.openWorkspace();
 
 该方法无参数，只能打开当前插件自己已声明的工作区；成功返回 `{}`，无可用工作区返回 `unavailable`。宿主仍核对当前安装、启用、权限和作用域，不接受调用方指定其他插件、任意 URL 或未声明视图。旧宿主返回 `unknown_method`，应提示升级，不能声称已经打开。桥协议新增方法不代表用户客户端已升级。
 
+### 宿主通用入口：审阅（`entryPoint: "reviews"`，宿主 0.92 起）
+
+律所审阅类插件可以让宿主替它显示一个通用入口，而不要求律师记住插件名。在**全局工作区视图**上声明 `"entryPoint": "reviews"`（目前只有这一个取值；项目视图、侧栏视图或其他取值都会被校验拒绝，旧宿主忽略该字段）：
+
+```json
+{ "id": "main", "name": "…", "entry": "web/index.html", "placement": "workspace", "scope": "global", "entryPoint": "reviews" }
+```
+
+插件在得知账户状态后报告入口是否适用以及待处理数：
+
+```js
+if ((awd.context.capabilities || []).includes('ui.setEntry')) await awd.call('ui.setEntry', { entry: 'reviews', visible: approved, badge: needsYou })
+```
+
+- `visible` 必须是布尔值；`badge` 可省略（按 0），否则必须是 0–99 的整数。类型不对返回 `invalid_params`，不做转换；未声明该入口的插件调用返回 `permission_denied`；未连接账户返回 `unavailable`。
+- 宿主按当前连接的账户把最近一次报告**只存在本机**（不上传任何服务器），下次启动插件尚未运行时入口也正确；切换或退出账户后入口隐藏，直到插件再次报告。
+- 显示：数字徽标挂在插件自己的左侧按钮上；欢迎页一行「审阅 · N 件待你处理」打开该视图；两个及以上插件适用时，左侧再出现一个通用「审阅」按钮，点开先选插件。插件名称保持不变。
+- 每次核对门户状态、收到 `account.changed`、每轮轮询后调用一次即可，重复调用只保留最新一份。
+- 宿主方法名 `ui.setEntry`，经 `awd.call` 调用（SDK 便利方法随下次 SDK 同步补上）；旧宿主没有 `ui.setEntry` 能力位，返回 `unknown_method`。
+
 验收按实际入口进行：轻量插件检查主题等贡献点可用、无多余侧栏和标签；panel 插件检查主要操作与窄栏；工作区插件检查打开、单例聚焦、切换保活和关闭；所有形态检查禁用/卸载后对应入口和实例消失。
 
 ## 打开到出处与导出办公文件（宿主 0.81.0 起，待发版）

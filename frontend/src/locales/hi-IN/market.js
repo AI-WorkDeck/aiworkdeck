@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "कोई दूसरा कीवर्ड या श्रेणी आज़माएँ",
   "submitFirstSkill": "आधिकारिक Skill मार्केटप्लेस पर अपना पहला Skill सबमिट करें",
   "installedTag": "इंस्टॉल हो गया",
+  "contentInChinese": "चीनी में",
   "processing": "प्रोसेसिंग",
   "update": "अपडेट",
   "install": "इंस्टॉल",
