@@ -33,6 +33,7 @@ export default {
     "refresh": "Segar semula",
     "signIn": "Daftar masuk",
     "reconnect": "Log masuk semula",
+    "topUp": "Tambah nilai",
     "feedback": "Maklum Balas"
   }
 }

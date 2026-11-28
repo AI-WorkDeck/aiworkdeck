@@ -33,6 +33,7 @@ export default {
     "refresh": "Vernieuwen",
     "signIn": "Inloggen",
     "reconnect": "Opnieuw aanmelden",
+    "topUp": "Opwaarderen",
     "feedback": "Meldingen"
   }
 }

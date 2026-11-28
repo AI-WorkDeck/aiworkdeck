@@ -33,6 +33,7 @@ export default {
     "refresh": "重新整理",
     "signIn": "登入",
     "reconnect": "重新登入",
+    "topUp": "儲值",
     "feedback": "回饋"
   }
 }

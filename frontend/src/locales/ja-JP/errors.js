@@ -33,6 +33,7 @@ export default {
     "refresh": "更新",
     "signIn": "サインイン",
     "reconnect": "再ログイン",
+    "topUp": "チャージ",
     "feedback": "フィードバック"
   }
 }

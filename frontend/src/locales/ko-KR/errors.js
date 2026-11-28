@@ -33,6 +33,7 @@ export default {
     "refresh": "새로고침",
     "signIn": "로그인",
     "reconnect": "다시 로그인",
+    "topUp": "충전",
     "feedback": "피드백"
   }
 }

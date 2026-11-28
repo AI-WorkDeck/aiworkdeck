@@ -33,6 +33,7 @@ export default {
     "refresh": "Ανανέωση",
     "signIn": "Σύνδεση",
     "reconnect": "Νέα σύνδεση",
+    "topUp": "Ανανέωση υπολοίπου",
     "feedback": "Σχόλια"
   }
 }

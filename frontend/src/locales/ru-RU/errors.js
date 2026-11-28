@@ -33,6 +33,7 @@ export default {
     "refresh": "Обновить",
     "signIn": "Войти",
     "reconnect": "Войти снова",
+    "topUp": "Пополнить",
     "feedback": "Отзыв"
   }
 }

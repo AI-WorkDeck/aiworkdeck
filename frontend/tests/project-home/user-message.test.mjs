@@ -21,6 +21,7 @@ const cases = [
   ['HTTP 403', http(403), {}, 'forbidden'],
   ['HTTP 402', http(402), {}, 'balanceLow'],
   ['quota marker', new Error('Stream Error: AI_QUOTA_EXHAUSTED'), {}, 'balanceLow'],
+  ['credit run out (Q29)', 'AI 额度已用完，这次没有扣费，请充值后重试', {}, 'balanceLow'],
   ['HTTP 429', http(429), {}, 'rateLimited'],
   ['code 4290', Object.assign(new Error('slow down'), { code: 4290 }), {}, 'rateLimited'],
   ['model missing', new Error('Model deepseek/x not found'), {}, 'modelUnavailable'],
@@ -44,7 +45,8 @@ for (const [label, err, ctx, key] of cases) {
     const m = toUserMessage(err, ctx)
     assert.equal(m.key, key)
     assert.ok(ERROR_KEYS.includes(m.key))
-    assert.ok(['retry', 'signIn', 'refresh'].includes(m.action), m.action)
+    assert.ok(['retry', 'signIn', 'refresh', 'topUp'].includes(m.action), m.action)
+    if (key === 'balanceLow') assert.equal(m.action, 'topUp')
   })
 }
 
@@ -57,7 +59,7 @@ test('every catalogued key has text in every locale, and none of it is raw techn
       assert.ok(ns[key], `${locale}: errors.${key}`)
       assert.equal(isRawTechnicalText(ns[key]), false, `${locale}: errors.${key}`)
     }
-    for (const a of ['retry', 'details', 'refresh', 'signIn']) assert.ok(ns.actions && ns.actions[a], `${locale}: errors.actions.${a}`)
+    for (const a of ['retry', 'details', 'refresh', 'signIn', 'topUp']) assert.ok(ns.actions && ns.actions[a], `${locale}: errors.actions.${a}`)
   }
 })
 

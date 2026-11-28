@@ -33,6 +33,7 @@ export default {
     "refresh": "รีเฟรช",
     "signIn": "ลงชื่อเข้าใช้",
     "reconnect": "ลงชื่อเข้าใช้อีกครั้ง",
+    "topUp": "เติมเงิน",
     "feedback": "ข้อเสนอแนะ"
   }
 }
