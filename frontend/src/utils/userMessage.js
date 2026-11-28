@@ -125,7 +125,8 @@ const ACTIONABLE = new Set(['offline', 'timeout', 'localServiceDown', 'signInReq
   'forbidden', 'balanceLow', 'rateLimited', 'conflict', 'fileTooLarge', 'modelKeyInvalid'])
 
 // Text that must never reach a lawyer: transport/JS/Java internals, raw payloads.
-const TECHNICAL = /Failed to fetch|NetworkError|net::|ECONN|ETIMEDOUT|Cannot read propert|is not (?:a function|defined)|\bundefined\b|\bnull\b|\[object |status code|\bSSE\b|Stream Error|Broken pipe|Connection reset|\bat [\w.$]+ \(|^[A-Z][A-Za-z]+(?:Error|Exception)\b|^\s*[{[]|<\/?[a-z]/
+// request:fail is uni.request's raw transport text (C32 retest: it reached a toast verbatim)
+const TECHNICAL = /request:fail|Failed to fetch|NetworkError|net::|ECONN|ETIMEDOUT|Cannot read propert|is not (?:a function|defined)|\bundefined\b|\bnull\b|\[object |status code|\bSSE\b|Stream Error|Broken pipe|Connection reset|\bat [\w.$]+ \(|^[A-Z][A-Za-z]+(?:Error|Exception)\b|^\s*[{[]|<\/?[a-z]/
 
 function isTechnical(msg) {
   return !msg || msg.length > 200 || isRawTechnicalText(msg) || TECHNICAL.test(msg)

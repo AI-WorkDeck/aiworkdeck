@@ -336,6 +336,59 @@ class AgentOrchestratorPassDepthTest {
         assertTrue(request.getMessage().contains("从断开处直接接着写") || request.getMessage().contains("Continue exactly"), request.getMessage());
     }
 
+    /** 流式中途，messageService 是否已经把这一段正文写进了回答行（C34）。 */
+    private boolean savedMidStream(String text) {
+        return org.mockito.Mockito.mockingDetails(messageService).getInvocations().stream()
+                .anyMatch(inv -> inv.getMethod().getName().equals("upsertAssistantMessage")
+                        && String.valueOf(inv.getArguments()[4]).contains(text));
+    }
+
+    private boolean[] streamLongAnswer(String conv, long intervalMs) {
+        orchestrator.partialSaveIntervalMs = intervalMs;
+        when(messageService.upsertAssistantMessage(any(), any(), any(), any(), any())).thenReturn(11L);
+        String first = "第一段正文，律师已经在屏幕上看到了。".repeat(20);
+        boolean[] seen = new boolean[1];
+        StreamingChatLanguageModel model = new StreamingChatLanguageModel() {
+            @Override public void generate(List<ChatMessage> messages, StreamingResponseHandler<AiMessage> handler) {
+                handler.onNext(first);
+                handler.onNext("第二段。");
+                // 后端若在这一刻被杀，库里必须已经有第一段（不能只剩用户那一行）
+                seen[0] = savedMidStream(first);
+                handler.onComplete(Response.from(AiMessage.from(first + "第二段。")));
+            }
+            @Override public void generate(List<ChatMessage> messages, List<ToolSpecification> tools,
+                                           StreamingResponseHandler<AiMessage> handler) { generate(messages, handler); }
+        };
+        when(chatModelFactory.getStreamingChatModel(MODEL)).thenReturn(model);
+        AiAgentController.AgentChatRequest request = new AiAgentController.AgentChatRequest();
+        request.setProjectId(1L);
+        request.setConversationId(conv);
+        request.setMessage("写一份备忘录");
+        request.setModel(MODEL);
+        orchestrator.handleUserMessage(request, 7L);
+        return seen;
+    }
+
+    @Test
+    @DisplayName("C34：纯正文回答流式途中就落库（后端中途被杀也不丢已显示的正文）")
+    void aStreamingAnswerIsSavedBeforeTheRoundEnds() {
+        assertTrue(streamLongAnswer("conv-partial-save", 0)[0],
+                "the streamed text must be in the answer row before the round completes");
+    }
+
+    @Test
+    @DisplayName("C34 复测：落库的正文最多落后屏幕约 1 秒（2 秒节流在 ~470 字/秒下丢了约 1300 字）")
+    void partialSavesTrailTheScreenByAtMostAboutOneSecond() {
+        assertTrue(orchestrator.partialSaveIntervalMs <= 1000, "interval=" + orchestrator.partialSaveIntervalMs);
+    }
+
+    @Test
+    @DisplayName("C34：途中落库是节流的，不是每个 token 一次")
+    void partialSavesAreThrottled() {
+        assertFalse(streamLongAnswer("conv-partial-throttle", 60_000)[0],
+                "within the interval, tokens must not each hit the database");
+    }
+
     @Test
     @DisplayName("X39 + Q24：续写的模型调用带本轮计费标记（同一 runId），费用记进这一轮的页脚")
     void continueTurnRunsUnderThisRunsPlatformTurnTag(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
