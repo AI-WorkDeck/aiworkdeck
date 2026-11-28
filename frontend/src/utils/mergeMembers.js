@@ -44,7 +44,8 @@ export function mergeMembers(local, cloud) {
   const clouds = (Array.isArray(cloud) ? cloud : []).filter(Boolean)
   if (!clouds.length) return locals.slice()
 
-  const merged = locals.map((m) => ({ ...m }))
+  // C6: once the case is in the library, the library says who owns it; a local clone row's owner flag is stale
+  const merged = locals.map((m) => ({ ...m, owner: false }))
   const takenLocal = new Set()
   const extra = []
 
@@ -58,6 +59,7 @@ export function mergeMembers(local, cloud) {
       takenLocal.add(hit)
       // 案件库是权威源：角色与加入时间以它为准；accountId 补上（本机那条可能是 null）
       if (c.role != null) merged[hit].role = c.role
+      merged[hit].owner = c.owner === true
       if (c.joinedAt != null) merged[hit].joinedAt = c.joinedAt
       if (merged[hit].accountId == null && c.accountId != null) merged[hit].accountId = c.accountId
       continue

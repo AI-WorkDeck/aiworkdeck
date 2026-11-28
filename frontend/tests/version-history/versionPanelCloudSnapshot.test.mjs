@@ -277,7 +277,7 @@ test('unknown cloud after account-change failure retries on the normal timer and
     }
     owner.stopCollabPolling = parentMethod('stopCollabPolling', { clearInterval() { cleared++ } }).bind(owner)
     owner.startCollabPolling = parentMethod('startCollabPolling', { setInterval(callback, delay) {
-      assert.equal(delay, 120000); tick = callback; return 1
+      assert.equal(delay, 30000); tick = callback; return 1
     } }).bind(owner)
     owner.fetchCollabState = parentMethod('fetchCollabState', {
       checkCloud: async () => { if (++attempts === 1) throw new Error('synthetic unavailable'); return { data: { linked: true, remoteAhead: true } } },

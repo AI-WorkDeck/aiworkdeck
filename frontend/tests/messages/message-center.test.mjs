@@ -76,6 +76,23 @@ test('older queued/completed assistant jobs do not erase a later rejected messag
  f.state.status={status:'completed',messageId:10};await f.vm.loadMessages(f.vm.selectedConversation);await tick();assert.ok(f.vm.current.failures['11']);assert.match(f.host.textContent,/重试助手回复/)
  busy=false;[...f.host.querySelectorAll('button')].find(b=>b.textContent==='重试助手回复').click();await tick();assert.equal(f.vm.current.failures['11'],undefined);assert.equal(f.state.messages.length,2)
 })
+test('C35: 请助手回复 with a typed question sends it and asks about that question, not the previous message',async t=>{
+ const f=await mount(t,{conversations:[conv({localProjectId:1,agent:{scope:'project',scopeKey:'p1',name:'项目助手'}})]});await selectChat(f)
+ type(f,'证据目录明天交（虚构）');await f.vm.sendMessage();await tick()
+ assert.equal(f.calls.some(c=>c.params.action==='agentReply'),false)
+ type(f,'第四条付款期限是多少？');await tick()
+ const ask=[...f.host.querySelectorAll('button')].find(b=>b.textContent==='请助手回复');assert.equal(ask.disabled,false);ask.click();await tick();await tick()
+ const reply=f.calls.find(c=>c.params.action==='agentReply');assert.ok(reply)
+ const asked=f.state.messages.find(m=>m.text==='第四条付款期限是多少？');assert.ok(asked,'typed question was sent')
+ assert.equal(reply.params.params.messageId,asked.id);assert.equal(reply.params.params.question,'第四条付款期限是多少？')
+ assert.equal(f.calls.filter(c=>c.params.action==='agentReply').length,1);assert.equal(f.vm.current.draft,'')
+})
+test('C35: with an empty box, 请助手回复 still asks about the last message I sent',async t=>{
+ const f=await mount(t,{conversations:[conv({localProjectId:1,agent:{scope:'project',scopeKey:'p1',name:'项目助手'}})]});await selectChat(f)
+ type(f,'请看一下第五条');await f.vm.sendMessage();await tick()
+ await f.vm.askAssistant();await tick()
+ const reply=f.calls.find(c=>c.params.action==='agentReply');assert.equal(reply.params.params.question,'请看一下第五条')
+})
 test('DD conversation calls use connection identity and never leak the official user into own-message controls',async t=>{
  const f=await mount(t,{conversations:[conv({sourceId:'dd-client',connectionId:'invited-connection'})]});f.state.messages=[{id:1,senderId:7,text:'官方账号同数字不属于客户'}];await selectChat(f)
  assert.equal(f.vm.current.selfId,99);assert.equal(f.host.querySelector('.message-row.mine'),null);assert.ok(f.calls.some(c=>c.action==='ddClientIm'&&c.params.action==='messages'&&c.params.connectionId==='invited-connection'))

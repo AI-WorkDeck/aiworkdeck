@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "別のキーワードまたはカテゴリを試してください",
   "submitFirstSkill": "公式Skillマーケットプレイスに最初のSkillを投稿する",
   "installedTag": "インストール済み",
+  "contentInChinese": "中国語",
   "processing": "処理中",
   "update": "更新",
   "install": "インストール",
