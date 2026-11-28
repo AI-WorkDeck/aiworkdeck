@@ -85,7 +85,10 @@ test('包晴天积分通道拒绝：按码给「去包晴天 App」提示，不�
   }
   // 后端没认出、只留了原始响应体的字符串载荷也要认得
   assert.match(renderError('Stream Error: AI_QUOTA_EXHAUSTED: {"error":"bqt_insufficient_points"}'), /bqtInsufficientPoints/)
-  assert.match(renderError(JSON.stringify({ message: 'x', code: 1, kind: 'CONFLICT', reason: 'no_credits' })), /^\n\nx\n$/)
+  // Q29: no_credits is a catalogued notice with a 充值 button, not the raw backend sentence in the answer
+  assert.equal(renderError(JSON.stringify({ message: 'x', code: 1, kind: 'CONFLICT', reason: 'no_credits' })), '')
+  assert.equal(lastNotice && lastNotice.key, 'balanceLow')
+  assert.equal(lastNotice.action, 'topUp')
 })
 
 test('账户类载荷（JSON）：4011 → 登录引导；其余 kind 显示 message 原文而不是整段 JSON', () => {
