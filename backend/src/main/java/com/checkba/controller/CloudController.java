@@ -244,9 +244,11 @@ public class CloudController {
     @PostMapping("/projects/{projectId}/check")
     public ResponseEntity<Map<String, Object>> check(
             @PathVariable Long projectId,
+            @RequestParam(value = "fresh", defaultValue = "false") boolean fresh,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
         Long userId = requireMemberNonClient(projectId, sessionId);
-        return ok(cloudSyncService.checkCloud(projectId, userId));
+        // C9: ?fresh=1 only from the explicit 「刷新状态」 - re-read the member's role instead of the 60 s cache
+        return ok(cloudSyncService.checkCloud(projectId, userId, fresh));
     }
 
     @PostMapping("/projects/{projectId}/upload")
