@@ -307,6 +307,33 @@ class ProjectAiMessageServiceTest {
                 title, "用户的第一句话", null, pinned, null};
     }
 
+    // ---- C34 recovery title (dev-board#1868, lane Q 0.91.1 sheet) ----
+    // A conversation without an LLM title fell back to the LAST message, which after a crash recovery is the
+    // interrupted answer ending in 「> **[进程中断]** …」, so the list showed raw asterisks and the marker.
+
+    private Object[] untitled(String conversationId, String lastContent, String firstUser) {
+        return new Object[]{conversationId, java.time.LocalDateTime.now(), lastContent, null, firstUser, null, null, null};
+    }
+
+    @Test
+    void 没有生成标题时用律师自己问的那句话起名_不用AI那条被中断的回答() {
+        when(repository.findConversationSummaries(1L, 2L)).thenReturn(List.<Object[]>of(untitled("conv-cut",
+                "> **[Process interrupted]** The app was closed while this task was running. Click Resume below to pick it up again.",
+                "<p>Write a detailed memo on the supplier agreement</p>")));
+        Object title = service.listConversations(1L, 2L).get(0).get("title");
+        assertEquals("Write a detailed memo on the supplier agreement", title);
+    }
+
+    @Test
+    void 连用户那句也没有时_AI正文起名也去掉中断标记与markdown() {
+        when(repository.findConversationSummaries(1L, 2L)).thenReturn(List.<Object[]>of(untitled("conv-cut2",
+                "> **[进程中断]** 任务执行中应用被关闭，点击下方「继续执行」可接着执行。\n\n**备忘录**：供应商协议的主要风险", "")));
+        String title = String.valueOf(service.listConversations(1L, 2L).get(0).get("title"));
+        assertFalse(title.contains("*"), title);
+        assertFalse(title.contains("进程中断") || title.contains("Process interrupted"), title);
+        assertFalse(title.startsWith(">"), title);
+    }
+
     @Test
     void 置顶的会话排在最前_组内仍按仓储给的最后活跃时间倒序() {
         when(repository.findConversationSummaries(1L, 2L)).thenReturn(List.of(
