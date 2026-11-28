@@ -156,7 +156,7 @@ public class ProjectMemberService {
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setUserId(user.getId());
-        member.setRole(role);
+        member.setRole(assignableRole(role));
         try {
             projectMemberRepository.save(member);
         } catch (DataIntegrityViolationException e) {
@@ -472,6 +472,19 @@ public class ProjectMemberService {
     }
 
     private static final java.util.Set<String> ASSIGNABLE_ROLES = java.util.Set.of("ADMIN", "PARTICIPANT", "READ_ONLY");
+
+    /**
+     * Lane C retest 0.91.1: addMember stored any role string. A colleague added through the API as "MEMBER" (not a
+     * project role) could read the case, but every 交稿 was refused (git-receive-pack not permitted) and the roster
+     * showed the raw 「MEMBER」. Missing means 协作人; anything outside ADMIN / PARTICIPANT / READ_ONLY is refused.
+     */
+    static String assignableRole(String role) {
+        if (role == null || role.isBlank()) return "PARTICIPANT";
+        String r = role.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!ASSIGNABLE_ROLES.contains(r)) throw new IllegalArgumentException(LangText.of(
+                "角色无效：只能是案件管理员、协作人或只读成员", "Invalid role: use case admin, collaborator or read-only"));
+        return r;
+    }
 
     /**
      * C9：改一位参与人的角色，不用移出再加回（加入时间与一条审计事件都保住）。权限矩阵与 removeMember 同源：
