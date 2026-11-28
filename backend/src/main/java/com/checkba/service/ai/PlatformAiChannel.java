@@ -195,8 +195,8 @@ public class PlatformAiChannel {
         if (perUserApplies(userId)) {
             return perUser.resolve(userId).orElseThrow(() -> new AccountException(
                     AccountException.Kind.CONFLICT,
-                    LangText.of("本账号的「AI WorkDeck 云端」额度尚未就绪，退出登录后重新登录即可刷新",
-                            "This account's \"AI WorkDeck Cloud\" Credits are not ready yet; sign out and sign in again to refresh them")));
+                    LangText.of("本账号的「AI WorkDeck 云端」额度尚未就绪，断开账户后重新连接即可刷新额度",
+                            "This account's \"AI WorkDeck Cloud\" Credits are not ready yet; disconnect your account and connect it again to refresh them")));
         }
         if (strictMultiTenant()) {
             // 多租户实例上回落机器级 key = 拿别人的额度花钱，宁可报错
@@ -206,8 +206,8 @@ public class PlatformAiChannel {
                                 "This AI call did not carry a user identity; \"AI WorkDeck Cloud\" cannot determine whose Credits to use"));
             }
             throw new AccountException(AccountException.Kind.CONFLICT,
-                    LangText.of("本账号尚未连接 AI WorkDeck 账户，暂不能使用「AI WorkDeck 云端」通道；用 AI WorkDeck 账户重新登录即可连接",
-                            "This account isn't connected to an AI WorkDeck account yet, so \"AI WorkDeck Cloud\" is unavailable; sign in again with your AI WorkDeck account to connect it"));
+                    LangText.of("本账号尚未连接 AI WorkDeck 账户，暂不能使用「AI WorkDeck 云端」通道；连接 AI WorkDeck 账户后即可使用",
+                            "This account isn't connected to an AI WorkDeck account yet, so \"AI WorkDeck Cloud\" is unavailable; connect your AI WorkDeck account to use it"));
         }
         if (!accountService.isConnected()) {
             // reason 决定前端登录弹层顶部那句说明（登录后置 4011 契约，dev-board#1046）
