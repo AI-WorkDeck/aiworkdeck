@@ -9,7 +9,7 @@ const http = require('http')
 const crypto = require('crypto')
 const { EventEmitter } = require('events')
 const { prepareMac, createFullUpdate, deferWindowsLaunch, lockPath, windowsPowerShellEnv } = require('../main/services/full-update')
-const { finalize } = require('../scripts/finalize-update-manifest')
+const { finalize, githubFirst } = require('../scripts/finalize-update-manifest')
 function root(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'full-update-')); t.after(() => fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })); return dir }
 function get(url) { return new Promise((resolve, reject) => http.get(url, (res) => { const chunks = []; res.on('data', (b) => chunks.push(b)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) })); res.on('error', reject) }).on('error', reject)) }
 function commands(calls, version = '0.12.0') {
@@ -90,10 +90,17 @@ test('发布汇总：缺任一平台拒绝，齐套后将真实字节哈希绑�
   const entry = JSON.parse(fs.readFileSync(file)).channels['0.12'].installers.win32
   assert.equal(entry.size, 13)
   assert.equal(entry.sha256, crypto.createHash('sha256').update('synthetic exe').digest('hex'))
+  // GitHub Release manifest (intl clients read it): GitHub first
   assert.deepEqual(entry.urls, [
-    'https://www.aiworkdeck.com/update/desktop/installers/AI.WorkDeck.Setup.0.12.0.exe',
-    'https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.12.0/AI.WorkDeck.Setup.0.12.0.exe'
+    'https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.12.0/AI.WorkDeck.Setup.0.12.0.exe',
+    'https://www.aiworkdeck.com/update/desktop/installers/AI.WorkDeck.Setup.0.12.0.exe'
   ])
+  // cn mirror manifest: mirror first, same entry otherwise, separately signed
+  const cnFile = path.join(dir, 'patch/manifest-cn.json')
+  assert.ok(crypto.verify(null, fs.readFileSync(cnFile), publicKey, Buffer.from(fs.readFileSync(cnFile + '.sig', 'utf8'), 'base64')))
+  const cnEntry = JSON.parse(fs.readFileSync(cnFile)).channels['0.12'].installers.win32
+  assert.deepEqual(cnEntry.urls, [...entry.urls].reverse())
+  assert.equal(cnEntry.sha256, entry.sha256)
   const mac = JSON.parse(fs.readFileSync(file)).channels['0.12'].installers['darwin-arm64']
   assert.ok(mac.urls.every(url => url.endsWith('/AI.WorkDeck-0.12.0-arm64.dmg')))
 })
@@ -325,4 +332,15 @@ test('Mac：准备过程依次报告 mount → package → verify 三个阶段',
   const idx = (pred) => calls.findIndex(pred)
   assert.equal(stages[0][1], idx(([cmd, args]) => cmd.endsWith('hdiutil') && args[0] === 'attach'))
   assert.equal(stages[1][1], idx(([cmd]) => cmd.endsWith('ditto')))
+})
+
+test('githubFirst: every urls list puts GitHub first, keeps order otherwise, changes nothing else', () => {
+  const m = { schema: 1, channels: { '0.91': { latest: '0.91.2', components: [
+    { name: 'frontend-h5', sha256: 'x', urls: ['https://www.aiworkdeck.com/update/desktop/assets/a.tar.gz', 'https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.91.2/a.tar.gz'] },
+    { name: 'zetaoffice-wrapper', urls: ['https://github.com/x/y', 'https://www.aiworkdeck.com/z'] }] } } }
+  const g = githubFirst(m)
+  assert.deepEqual(g.channels['0.91'].components[0].urls, ['https://github.com/AI-WorkDeck/aiworkdeck/releases/download/v0.91.2/a.tar.gz', 'https://www.aiworkdeck.com/update/desktop/assets/a.tar.gz'])
+  assert.deepEqual(g.channels['0.91'].components[1].urls, m.channels['0.91'].components[1].urls)
+  assert.equal(g.channels['0.91'].components[0].sha256, 'x')
+  assert.equal(new URL(m.channels['0.91'].components[0].urls[0]).host, 'www.aiworkdeck.com', 'input not mutated')
 })
