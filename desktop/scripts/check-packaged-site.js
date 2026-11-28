@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Packaged-level check: start the backend exactly as the installed app does
-// (bundled JRE, `-cp app.jar:lib/*`, desktop profile, -Duser.home) with a site.json
-// that says intl, and require GET /api/site to report intl.
+// (bundled JRE, the JVM arguments from backend-service's javaLaunchArgs() — lib/* before
+// app.jar, plus the CDS archive when the bundle has one — cwd = data dir, desktop profile,
+// -Duser.home) with a site.json that says intl, and require GET /api/site to report intl.
 //
 // Why: 0.91.0 RC 645f0cac2 registered SiteEnvironmentPostProcessor through
 // META-INF/spring.factories, which the fat jar keeps at its ROOT. prepare-backend.js
@@ -18,6 +19,14 @@ const path = require('path');
 const net = require('net');
 const http = require('http');
 const { spawn } = require('child_process');
+const { javaLaunchArgs } = require('../main/services/backend-service');
+
+/** The installed app's launch for this bundle (backend-service.js), with home as an AWD_HOME-style isolated home. */
+function launchSpec(bundle, home) {
+    const ctx = { packaged: true, resourcesPath: bundle, dataDir: path.join(home, '.aiworkdeck'), awdHome: home };
+    const java = path.join(bundle, 'jre', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
+    return { java, args: javaLaunchArgs(ctx, java), cwd: ctx.dataDir };
+}
 
 function parseArgs(argv) {
     const args = { site: 'intl', timeoutMs: 240000 };
@@ -77,11 +86,11 @@ async function main() {
 
     const port = await freePort();
     const env = { ...process.env, SPRING_PROFILES_ACTIVE: 'desktop', SERVER_PORT: String(port) };
-    const cp = appJar + path.delimiter + path.join(libDir, '*');
+    const spec = launchSpec(bundle, home);
+    console.log(`launch: ${spec.java} ${spec.args.join(' ')} (cwd ${spec.cwd})`);
     const logFile = path.join(home, 'backend.log');
     const log = fs.openSync(logFile, 'w');
-    const child = spawn(java, ['-Duser.home=' + home, '-cp', cp, 'com.checkba.CheckbaApplication'],
-        { env, stdio: ['ignore', log, log] });
+    const child = spawn(spec.java, spec.args, { cwd: spec.cwd, env, stdio: ['ignore', log, log] });
     let exited = null;
     child.on('exit', (code) => { exited = code; });
 
@@ -109,4 +118,6 @@ async function main() {
     process.exit(1);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
+
+module.exports = { launchSpec };
