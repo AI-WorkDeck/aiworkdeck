@@ -11,7 +11,7 @@ const { filterClassList, countSharedDependencyClasses, shadowedClasses, zipEntry
 const { buildCdsForPackage } = require('../scripts/after-pack')
 const { javaLaunchArgs } = require('../main/services/backend-service')
 const overlay = require('../main/services/overlay')
-const { LINK_NAME, ensureBackendLink } = require('../main/services/backend-link')
+const { LINK_NAME, LIB_MTIME_SEC, ensureBackendLink, alignLibMtimes } = require('../main/services/backend-link')
 
 /** 最小的 stored zip（只为测中央目录解析）。 */
 function writeZip(file, names) {
@@ -174,4 +174,17 @@ test('ensureBackendLink：新建、重复调用不变、安装位置搬走后重
   // 删数据目录不会顺着链接删到安装目录
   fs.rmSync(data, { recursive: true, force: true })
   assert.ok(fs.existsSync(path.join(c, 'marker')))
+})
+
+test('alignLibMtimes：Windows 安装不保留 mtime，启动时把 lib/*.jar 改回 dump 时的统一 mtime', (t) => {
+  const ctx = packaged(tmp(t))
+  const lib = path.join(ctx.resourcesPath, 'backend', 'lib')
+  fs.writeFileSync(path.join(lib, 'a.jar'), 'a'); fs.writeFileSync(path.join(lib, 'b.jar'), 'b'); fs.writeFileSync(path.join(lib, 'notes.txt'), 'n')
+  fs.utimesSync(path.join(lib, 'b.jar'), LIB_MTIME_SEC, LIB_MTIME_SEC)
+  fs.writeFileSync(path.join(ctx.resourcesPath, 'backend', 'lib.jsa'), 'jsa')
+  const args = javaLaunchArgs(ctx, bundled(ctx))
+  assert.ok(args.some((a) => a.startsWith('-XX:SharedArchiveFile=')))
+  for (const n of ['a.jar', 'b.jar']) assert.equal(Math.floor(fs.statSync(path.join(lib, n)).mtimeMs / 1000), LIB_MTIME_SEC, n)
+  assert.notEqual(Math.floor(fs.statSync(path.join(lib, 'notes.txt')).mtimeMs / 1000), LIB_MTIME_SEC, '只动 jar')
+  assert.equal(alignLibMtimes(path.join(ctx.resourcesPath, 'missing')), false)
 })

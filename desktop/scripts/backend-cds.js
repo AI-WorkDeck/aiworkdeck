@@ -22,6 +22,8 @@
 // run here (and backend-service at runtime) reaches lib/ through the same relative prefix,
 // .awd-backend/lib/*, with a symlink/junction named .awd-backend in its cwd (backend-link.js).
 // Each run uses its own cwd, so the verification run proves the archive survives a move.
+// The archive also checks every jar's mtime, and the Windows installer does not keep mtimes,
+// so lib/*.jar are stamped with LIB_MTIME_SEC first and backend-service restores that stamp.
 // Needs JDK 21.0.13+: earlier 21 updates ignore app-loader classes when the
 // install path contains a space ("AI WorkDeck.app").
 
@@ -31,7 +33,7 @@ const path = require('path');
 const http = require('http');
 const net = require('net');
 const { spawn, execFileSync } = require('child_process');
-const { LINK_NAME, ensureBackendLink } = require('../main/services/backend-link');
+const { LINK_NAME, LIB_MTIME_SEC, ensureBackendLink, alignLibMtimes } = require('../main/services/backend-link');
 
 const ARCHIVE_NAME = 'lib.jsa';
 const MAIN_CLASS = 'com.checkba.CheckbaApplication';
@@ -199,6 +201,7 @@ async function buildBackendCds(resourcesDir, { log = console.log } = {}) {
     if (shadowed.length) {
         throw new Error(`app.jar classes also exist in lib/ (lib-first class path would change which one loads): ${shadowed.slice(0, 10).join(', ')}`);
     }
+    if (!alignLibMtimes(libDir)) throw new Error(`cannot stamp lib/*.jar mtimes to ${LIB_MTIME_SEC}`);
     const work = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-cds-'));
     try {
         const home = (name) => { const d = path.join(work, name); fs.mkdirSync(d); return d; };

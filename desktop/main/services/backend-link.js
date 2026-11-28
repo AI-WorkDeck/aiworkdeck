@@ -10,6 +10,10 @@ const fs = require('fs')
 const path = require('path')
 
 const LINK_NAME = '.awd-backend'
+// 归档还校验每个 jar 的 mtime（秒）。Windows 安装包的 7z 不存 mtime（electron-builder 用
+// -mtm=off 求可复现），装出来的 jar 都是解压时刻，归档必然失效。所以构建时把 lib/*.jar 的
+// mtime 统一成这个常量再 dump，运行时把对不上的改回来（Windows 是按用户安装，目录可写）。
+const LIB_MTIME_SEC = 1577836800 // 2020-01-01T00:00:00Z
 
 /**
  * 确保 <dir>/.awd-backend 指向 target（每次启动调用；应用被搬走后会重新指过去）。
@@ -35,4 +39,21 @@ function ensureBackendLink(dir, target) {
   }
 }
 
-module.exports = { LINK_NAME, ensureBackendLink }
+/**
+ * 把 libDir 下 mtime 不是 LIB_MTIME_SEC 的 jar 改回去（mac 安装保留 mtime，通常什么都不改；
+ * Windows 装完首启改一遍）。全部对齐返回 true；任何一个改不了返回 false，调用方不带归档启动。
+ */
+function alignLibMtimes(libDir) {
+  try {
+    for (const name of fs.readdirSync(libDir)) {
+      if (!name.endsWith('.jar')) continue
+      const file = path.join(libDir, name)
+      if (Math.floor(fs.statSync(file).mtimeMs / 1000) !== LIB_MTIME_SEC) fs.utimesSync(file, LIB_MTIME_SEC, LIB_MTIME_SEC)
+    }
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+module.exports = { LINK_NAME, LIB_MTIME_SEC, ensureBackendLink, alignLibMtimes }
