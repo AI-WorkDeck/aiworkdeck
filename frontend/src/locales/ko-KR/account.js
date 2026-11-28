@@ -237,6 +237,7 @@ export default {
   "clientTab": "클라이언트",
   "usernameLabel": "사용자 이름",
   "usernamePlaceholder": "사용자 이름을 입력하세요",
+  "teamServerLoginHint": "팀 서버 로그인 화면입니다. 관리자가 이 서버용으로 만든 사용자 이름과 비밀번호를 사용하세요.",
   "passwordLabel": "비밀번호",
   "passwordPlaceholder": "비밀번호를 입력하세요",
   "rememberMe": "로그인 상태 유지",

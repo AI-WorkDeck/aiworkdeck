@@ -237,6 +237,7 @@ export default {
   "clientTab": "Ứng dụng khách",
   "usernameLabel": "Tên đăng nhập",
   "usernamePlaceholder": "Nhập tên đăng nhập của bạn",
+  "teamServerLoginHint": "Đây là trang đăng nhập máy chủ nhóm của bạn. Hãy dùng tên người dùng và mật khẩu mà quản trị viên đã tạo cho máy chủ này.",
   "passwordLabel": "Mật khẩu",
   "passwordPlaceholder": "Nhập mật khẩu của bạn",
   "rememberMe": "Ghi nhớ đăng nhập",
