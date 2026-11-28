@@ -237,6 +237,7 @@ export default {
   "clientTab": "क्लाइंट",
   "usernameLabel": "उपयोगकर्ता नाम",
   "usernamePlaceholder": "अपना उपयोगकर्ता नाम दर्ज करें",
+  "teamServerLoginHint": "यह आपके टीम सर्वर का साइन-इन है। इस सर्वर के लिए आपके व्यवस्थापक द्वारा सेट किया गया उपयोगकर्ता नाम और पासवर्ड इस्तेमाल करें।",
   "passwordLabel": "पासवर्ड",
   "passwordPlaceholder": "अपना पासवर्ड दर्ज करें",
   "rememberMe": "मुझे याद रखें",

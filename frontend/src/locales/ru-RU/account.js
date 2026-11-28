@@ -237,6 +237,7 @@ export default {
   "clientTab": "Клиент",
   "usernameLabel": "Имя пользователя",
   "usernamePlaceholder": "Введите имя пользователя",
+  "teamServerLoginHint": "Это вход на сервер вашей команды. Используйте имя пользователя и пароль, которые администратор создал для этого сервера.",
   "passwordLabel": "Пароль",
   "passwordPlaceholder": "Введите пароль",
   "rememberMe": "Запомнить меня",

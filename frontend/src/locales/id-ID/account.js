@@ -237,6 +237,7 @@ export default {
   "clientTab": "Klien",
   "usernameLabel": "Nama pengguna",
   "usernamePlaceholder": "Masukkan nama pengguna Anda",
+  "teamServerLoginHint": "Ini adalah halaman masuk server tim Anda. Gunakan nama pengguna dan kata sandi yang disiapkan administrator untuk server ini.",
   "passwordLabel": "Kata sandi",
   "passwordPlaceholder": "Masukkan kata sandi Anda",
   "rememberMe": "Ingat Saya",
