@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "Farklı bir anahtar kelime veya kategori deneyin",
   "submitFirstSkill": "İlk Skill'inizi resmî Skill marketplace'inde yayınlayın",
   "installedTag": "Yüklü",
+  "contentInChinese": "Çince",
   "processing": "İşleniyor",
   "update": "Güncelle",
   "install": "Yükle",

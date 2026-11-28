@@ -35,6 +35,7 @@ export default {
   "tryOtherKeyword": "جرّب كلمة مفتاحية أو فئة مختلفة",
   "submitFirstSkill": "انشر أول Skill لك في سوق Skill الرسمي",
   "installedTag": "مثبّت",
+  "contentInChinese": "بالصينية",
   "processing": "قيد المعالجة",
   "update": "تحديث",
   "install": "تثبيت",

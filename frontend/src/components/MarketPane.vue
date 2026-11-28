@@ -123,13 +123,17 @@
                       <path v-for="(d, i) in categoryGlyph(m.category)" :key="i" :d="d" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                     <text>{{ categoryLabel(m.category) }}</text>
+                    <template v-if="chineseOnly(m)">
+                      <text class="kicker-sep"></text>
+                      <text class="kicker-off">{{ $t('market.contentInChinese') }}</text>
+                    </template>
                     <template v-if="m.installed">
                       <text class="kicker-sep"></text>
                       <text class="kicker-on">{{ $t('market.installedTag') }}</text>
                     </template>
                   </view>
                   <text class="card-title">{{ m.name || m.id }}</text>
-                  <text class="card-id">{{ m.id }} · v{{ m.version || '1.0.0' }} · {{ priceTag(m) }}</text>
+                  <text class="card-id">v{{ m.version || '1.0.0' }} · {{ priceTag(m) }}</text>
                 </view>
                 <view class="card-actions">
                   <view
@@ -189,6 +193,10 @@
                       <path v-for="(d, i) in ICONS.blocks" :key="i" :d="d" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                     <text>{{ $t('market.pluginLabel') }}</text>
+                    <template v-if="chineseOnly(m)">
+                      <text class="kicker-sep"></text>
+                      <text class="kicker-off">{{ $t('market.contentInChinese') }}</text>
+                    </template>
                     <template v-if="m.installed">
                       <text class="kicker-sep"></text>
                       <text class="kicker-on">{{ $t('market.installedTag') }}</text>
@@ -549,6 +557,13 @@ export default {
       return parts.join(' · ')
     },
     /** 触发词按官网排版收成一行「引号」，超出折为 +N */
+    // Q1: registry skills are written in Chinese and the registry has no English yet. Outside a
+    // Chinese UI, say so on the card instead of leaving the user to guess (zh-TW gets converted text).
+    chineseOnly(m) {
+      const loc = String((this.$i18n && this.$i18n.locale) || 'zh-CN')
+      if (loc.startsWith('zh')) return false
+      return /[\u4e00-\u9fff]/.test(`${m.name || ''}${m.description || ''}`)
+    },
     triggerLine(triggers) {
       const list = triggers || []
       if (!list.length) return ''
