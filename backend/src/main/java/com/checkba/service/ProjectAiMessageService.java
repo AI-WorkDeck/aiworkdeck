@@ -464,7 +464,11 @@ public class ProjectAiMessageService {
                     String storedTitle = row.length > 3 && row[3] != null ? row[3].toString() : null;
                     String firstUserMessage = row.length > 4 && row[4] != null ? row[4].toString() : "";
                     // 优先使用 LLM 生成的 conversationTitle，fallback 到 cleanTitle
-                    map.put("title", storedTitle != null && !storedTitle.isBlank() ? storedTitle : cleanTitle(lastMessage));
+                    // 没有生成标题时：先用律师自己问的那句话，没有才用 AI 的最后一条（C34：崩溃恢复后那条
+                    // 是带「[进程中断]」说明的半截回答，拿它起名列表里就是一串星号和中断标记）
+                    String firstAsked = cleanTitleOrNull(firstUserMessage);
+                    map.put("title", storedTitle != null && !storedTitle.isBlank() ? storedTitle
+                            : firstAsked != null ? firstAsked : cleanTitle(lastMessage));
                     // 使用 extractPreview 提取有意义的预览内容，若为空则回退到用户第一条消息
                     String preview = extractPreview(lastMessage);
                     if (preview.isEmpty() || preview.length() < 5) {
@@ -691,6 +695,13 @@ public class ProjectAiMessageService {
                 .toList();
     }
 
+    /** 同 {@link #cleanTitle}，但清完为空时返回 null（调用方据此改用下一个来源）。 */
+    private String cleanTitleOrNull(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String t = cleanTitle(raw);
+        return t.equals(LangText.of("新对话", "New chat")) ? null : t;
+    }
+
     /**
      * Clean conversation title by stripping common XML tags like <thinking>, <process>, etc.
      */
@@ -709,6 +720,13 @@ public class ProjectAiMessageService {
             .replaceAll("(?s)<artifact[^>]*>.*?</artifact>", "")
             .replaceAll("(?s)<final>.*?</final>", "")
             .replaceAll("<[^>]+>", "") // Remove any remaining tags
+            // C34: interruption notices and bare markers are not a title
+            .replaceAll("(?m)^\\s*>?\\s*\\**\\[(进程中断|Process interrupted|已中断|Interrupted|生成出错，已中断|Generation error, interrupted)\\]\\**.*$", "")
+            .replaceAll("\\[(进程中断|Process interrupted|已中断|Interrupted|生成出错，已中断|Generation error, interrupted)\\]", "")
+            // markdown is not shown in the list: bold/italics/code marks, heading and quote prefixes
+            .replaceAll("(?m)^\\s*(#{1,6}|>)\\s*", "")
+            .replaceAll("\\*\\*|__|`", "")
+            .replaceAll("\\s+", " ")
             .trim();
         
         // Truncate to reasonable length for display
