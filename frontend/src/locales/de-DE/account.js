@@ -237,6 +237,7 @@ export default {
   "clientTab": "Mandant",
   "usernameLabel": "Benutzername",
   "usernamePlaceholder": "Geben Sie Ihren Benutzernamen ein",
+  "teamServerLoginHint": "Dies ist die Anmeldung Ihres Team-Servers. Verwenden Sie den Benutzernamen und das Passwort, die Ihr Administrator für diesen Server eingerichtet hat.",
   "passwordLabel": "Passwort",
   "passwordPlaceholder": "Geben Sie Ihr Passwort ein",
   "rememberMe": "Angemeldet bleiben",

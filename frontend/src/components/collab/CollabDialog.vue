@@ -707,7 +707,8 @@ export default {
         } else {
           uni.showToast({ title: d.message || this.$t('version.submitFailedNotice'), icon: 'none' })
         }
-        this.$emit('changed')
+        // C30: a landed 交稿 proves local == library; the page counts it as a fresh check
+        this.$emit('changed', d.status === 'UPLOADED' ? { submitted: true } : undefined)
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
         else if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { /* lasting dialog shown */ }

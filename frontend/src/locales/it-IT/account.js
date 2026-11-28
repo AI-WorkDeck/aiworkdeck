@@ -237,6 +237,7 @@ export default {
   "clientTab": "Cliente",
   "usernameLabel": "Nome utente",
   "usernamePlaceholder": "Inserisci il tuo nome utente",
+  "teamServerLoginHint": "Questo è l'accesso al server del tuo team. Usa il nome utente e la password che l'amministratore ha impostato per questo server.",
   "passwordLabel": "Credenziale password",
   "passwordPlaceholder": "Inserisci la tua password",
   "rememberMe": "Ricordami",

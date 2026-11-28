@@ -237,6 +237,7 @@ export default {
   "clientTab": "Clientèle",
   "usernameLabel": "Nom d'utilisateur",
   "usernamePlaceholder": "Saisissez votre nom d'utilisateur",
+  "teamServerLoginHint": "Ceci est la connexion à votre serveur d'équipe. Utilisez le nom d'utilisateur et le mot de passe que votre administrateur a créés pour ce serveur.",
   "passwordLabel": "Mot de passe",
   "passwordPlaceholder": "Saisissez votre mot de passe",
   "rememberMe": "Se souvenir de moi",
