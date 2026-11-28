@@ -148,7 +148,7 @@ export default {
       const metaById = {
         fullDiskAccess: {
           title: this.$t('admin.permFullDiskAccessTitle'),
-          description: this.$t('admin.permFullDiskAccessDesc'),
+          description: this.$t(siteLinks().current === 'cn' ? 'admin.permFullDiskAccessDesc' : 'admin.permFullDiskAccessDescIntl'),
         },
         screenRecording: {
           title: this.$t('admin.permScreenRecordingTitle'),
