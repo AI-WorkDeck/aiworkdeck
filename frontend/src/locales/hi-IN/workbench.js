@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "नया",
+    "aria": "नया दस्तावेज़ या नया ब्राउज़र टैब",
+    "newWord": "नया Word दस्तावेज़",
+    "newExcel": "नई Excel कार्यपुस्तिका",
+    "newPowerPoint": "नया PowerPoint प्रस्तुतीकरण",
+    "newBrowserTab": "नया ब्राउज़र टैब",
+  },
   scratchCopyChoose: "कॉपी करने के लिए सामग्री चुनें",
   scratchCopySelected: "{count} चुने गए",
   scratchCopyFiles: "फ़ाइलें",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "नया ब्राउज़र टैब",
   "moreTools": "और टूल",
   "railMore": "और",
+  "reviewsEntry": "समीक्षाएँ",
+  "reviewsNeedYou": "{count} आपकी प्रतीक्षा में",
+  "reviewsPick": "चुनें कि कौन-सी समीक्षाएँ खोलनी हैं",
+  "reviewsPickItem": "{name} · {count} प्रतीक्षा में",
+  "reviewsOpen": "खोलें ›",
   "recordActivity": "गतिविधि लॉग",
   "logout": "लॉग आउट",
   "stagingArea": "स्टेजिंग एरिया",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "रीसायकल बिन",
   "loadingText": "लोड हो रहा है...",
   "explorerFallback": "एक्सप्लोरर",
-  "newOrCopy": "नया / डुप्लिकेट",
   "emptyWorkspace": "शुरू करने के लिए एक फ़ाइल चुनें",
   "emptyWorkspaceHint": "बाईं ओर एक्सप्लोरर से कोई फ़ाइल खोलें, या नया दस्तावेज़ बनाएँ",
   "railEditEnter": "साइडबार व्यवस्थित करें (पुनर्व्यवस्थित या डॉक करने के लिए खींचें)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "यह फ़ाइल भेज नहीं सकते",
   "shareUnsupported": "इस सिस्टम पर भेजना समर्थित नहीं है",
   "shareClipboardHint": "फ़ाइल कॉपी हो गई। WeChat पर जाएँ, कोई चैट चुनें और भेजने के लिए Ctrl+V दबाएँ",
-  "copyFailedNoNewFile": "कॉपी विफल: कोई नई फ़ाइल नहीं मिली",
-  "copyFailed": "कॉपी विफल",
   "recordingStarted": "गतिविधि लॉगिंग शुरू हुई",
   "recordingStopped": "गतिविधि लॉगिंग रुक गई",
   "insertedToDoc": "दस्तावेज़ में डाला गया",

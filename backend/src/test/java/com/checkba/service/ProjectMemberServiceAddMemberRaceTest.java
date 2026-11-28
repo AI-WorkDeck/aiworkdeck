@@ -76,7 +76,7 @@ class ProjectMemberServiceAddMemberRaceTest {
                 .thenThrow(new DataIntegrityViolationException("duplicate key"));
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> service.addMember(PROJECT_ID, "newmember", "MEMBER", OWNER_ID));
+                () -> service.addMember(PROJECT_ID, "newmember", "PARTICIPANT", OWNER_ID));
 
         assertEquals("用户已在项目中", e.getMessage(),
                 "应该是查重分支本该给出的提示，而不是唯一约束异常原样冒泡");

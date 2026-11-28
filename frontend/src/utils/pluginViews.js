@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 北京公富信息技术有限公司 and AI WorkDeck contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+/** Host entry points a plugin view may serve (C1); mirrors PluginManifestContractValidator.VIEW_ENTRY_POINTS. */
+export const VIEW_ENTRY_POINTS = ['reviews']
+
 // Mirror the server's validation at the UI boundary; never turn an unverified
 // contribution into an arbitrary URL. Legacy frontendEntry is handled separately.
 export function pluginViews(plugin, resolveEntry) {
@@ -11,11 +14,21 @@ export function pluginViews(plugin, resolveEntry) {
     if (typeof view.entry !== 'string' || !/^web\/[a-zA-Z0-9_./-]+$/.test(view.entry) || view.entry.split('/').some(x => !x || x === '.' || x === '..')) return []
     seen.add(view.id)
     const docks = Array.isArray(view.allowedDocks) ? view.allowedDocks.filter(x => ['left', 'right', 'bottom'].includes(x)) : ['left']
-    return [{ ...view, allowedDocks: docks, defaultDock: docks.includes(view.defaultDock) ? view.defaultDock : docks[0] || 'left', url: resolveEntry(plugin.id, view.entry) }]
+    // C1: a host entry point is honoured only where the server allows it (global workspace view, known name).
+    const entryPoint = VIEW_ENTRY_POINTS.includes(view.entryPoint) && view.placement === 'workspace' && view.scope === 'global' ? view.entryPoint : undefined
+    return [{ ...view, entryPoint, allowedDocks: docks, defaultDock: docks.includes(view.defaultDock) ? view.defaultDock : docks[0] || 'left', url: resolveEntry(plugin.id, view.entry) }]
   })
 }
 
+// C18b：律所管理是全所工作台，不该非要先打开一个项目才能进。它还是旧式单入口插件（左栏摘要卡 +
+// 中栏工作区），开着项目时照旧按该项目登记收案；只是没有项目时也允许打开（projectId 为空）。
+const FIRM_WIDE_PLUGIN_IDS = new Set(['lawfirm-management'])
+function isFirmWidePlugin(plugin) {
+  return !!plugin && FIRM_WIDE_PLUGIN_IDS.has(plugin.pluginId || plugin.id) && plugin.hasDeclaredViews !== true
+}
+
 export function isGlobalPlugin(plugin) {
+  if (isFirmWidePlugin(plugin)) return true
   const entry = plugin?.sidebarView || plugin?.workspaceView
     || plugin?.views?.find(view => view.placement === 'sidebar')
     || plugin?.views?.find(view => view.placement === 'workspace')
@@ -34,7 +47,7 @@ export function hasPluginPanel(plugin) {
 
 export function canOpenPluginWorkspace(plugin, hasProject) {
   if (!plugin || plugin.legacyThemeGallery || (plugin.hasDeclaredViews === true && !plugin.workspaceView)) return false
-  return !!hasProject || plugin.workspaceView?.scope === 'global'
+  return !!hasProject || plugin.workspaceView?.scope === 'global' || isFirmWidePlugin(plugin)
 }
 
 // Older theme packs used a global gallery as their preview entry. Preserve their

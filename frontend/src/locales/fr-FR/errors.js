@@ -14,6 +14,8 @@ export default {
   "modelKeyInvalid": "Le fournisseur du modèle a rejeté la clé que cet appareil utilise encore depuis une ancienne configuration. Connectez-vous pour utiliser à la place l’IA d’AI WorkDeck.",
   "accountReconnect": "La connexion à votre compte IA doit être actualisée, cette demande n'a donc pas été envoyée. Sélectionnez « Se reconnecter », puis réessayez ; rien n'est perdu.",
   "streamInterrupted": "La réponse a été interrompue ; ce qui est déjà arrivé est conservé ci-dessus. Sélectionnez « Réessayer » pour la générer à nouveau.",
+  "streamInterruptedResumable": "La réponse a été interrompue ; ce qui est déjà arrivé est conservé ci-dessus. Sélectionnez « Continuer » pour reprendre là où elle s'est arrêtée, ou « Réessayer » pour recommencer.",
+  "streamInterruptedTwice": "Elle a de nouveau été interrompue. Sélectionnez « Réessayer » pour générer à nouveau toute la réponse.",
   "serverError": "Un problème est survenu de notre côté et l’action n’a pas abouti. Réessayez plus tard ; si cela continue, envoyez-nous un retour via « Commentaires ».",
   "conflict": "Cet élément a été modifié ailleurs, ou l’action précédente est toujours en cours. Actualisez, puis réessayez.",
   "fileTooLarge": "Le fichier est trop volumineux (limite : {limit}). Compressez-le ou découpez-le, puis importez-le à nouveau.",
@@ -27,9 +29,11 @@ export default {
     "details": "Détails",
     "hideDetails": "Masquer les détails",
     "continue": "Continuer",
+    "continueTooltip": "Reprendre là où la réponse s'est arrêtée sans régénérer ce qui est déjà affiché",
     "refresh": "Actualiser",
     "signIn": "Se connecter",
     "reconnect": "Se reconnecter",
+    "topUp": "Recharger",
     "feedback": "Commentaires"
   }
 }

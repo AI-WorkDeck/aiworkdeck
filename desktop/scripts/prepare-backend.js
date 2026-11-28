@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { verifyBackendNatives } = require('./verify-backend-natives');
+const { appRootMetaInfEntries } = require('./backend-root-meta-inf');
 const { driverPlatformDir, findDriverBundleJar, trimDriverBundleJar } = require('./trim-driver-bundle');
 
 // Module set = `jdeps --print-module-deps` over the backend fat jar, widened
@@ -107,8 +108,30 @@ if (!fs.existsSync(mainClassFile)) {
     console.error(`Main class missing after extract: ${mainClassFile}`);
     process.exit(1);
 }
+// The fat jar keeps the app's own META-INF (spring.factories, META-INF/spring/*.imports)
+// at its root, not under BOOT-INF/classes; copy it in, or Spring auto-registration is
+// lost in the installed app (0.91.0 RC: SiteEnvironmentPostProcessor, intl -> cn).
+const rootMetaInf = appRootMetaInfEntries(
+    execFileSync(jarTool, ['-t', '-f', jarPath], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).split('\n'));
+if (rootMetaInf.length) {
+    const rootDir = path.join(work, 'root');
+    fs.mkdirSync(rootDir, { recursive: true });
+    execFileSync(jarTool, ['-x', '-f', jarPath, ...rootMetaInf], { cwd: rootDir, stdio: 'inherit' });
+    for (const entry of rootMetaInf) {
+        const dest = path.join(classesDir, ...entry.split('/'));
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.copyFileSync(path.join(rootDir, ...entry.split('/')), dest);
+    }
+}
 const appJar = path.join(backendDir, 'app.jar');
 execFileSync(jarTool, ['-c', '-f', appJar, '-C', classesDir, '.'], { stdio: 'inherit' });
+const appEntries = new Set(execFileSync(jarTool, ['-t', '-f', appJar], { encoding: 'utf8' }).split('\n').map((e) => e.trim()));
+const missing = rootMetaInf.filter((e) => !appEntries.has(e));
+if (missing.length) {
+    console.error(`app.jar is missing root META-INF entries: ${missing.join(', ')}`);
+    process.exit(1);
+}
+console.log(`app.jar root META-INF copied: ${rootMetaInf.join(', ') || '(none)'}`);
 fs.rmSync(work, { recursive: true, force: true });
 const libCount = fs.readdirSync(path.join(backendDir, 'lib')).length;
 console.log(`Backend split: app.jar ${(fs.statSync(appJar).size / 1048576).toFixed(1)}MB + lib/ ${libCount} jars`);

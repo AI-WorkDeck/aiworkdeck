@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Nuovo",
+    "aria": "Nuovo documento o nuova scheda del browser",
+    "newWord": "Nuovo documento Word",
+    "newExcel": "Nuova cartella di lavoro Excel",
+    "newPowerPoint": "Nuova presentazione PowerPoint",
+    "newBrowserTab": "Nuova scheda del browser",
+  },
   scratchCopyChoose: "Scegli i contenuti da copiare",
   scratchCopySelected: "{count} selezionati",
   scratchCopyFiles: "File",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "Nuova scheda del browser",
   "moreTools": "Altri strumenti",
   "railMore": "Altro",
+  "reviewsEntry": "Revisioni",
+  "reviewsNeedYou": "{count} in attesa di te",
+  "reviewsPick": "Scegli quali revisioni aprire",
+  "reviewsPickItem": "{name} · {count} in attesa",
+  "reviewsOpen": "Apri ›",
   "recordActivity": "Registro attività",
   "logout": "Esci",
   "stagingArea": "Area di preparazione",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "Cestino",
   "loadingText": "Caricamento...",
   "explorerFallback": "Esplora",
-  "newOrCopy": "Nuovo / Duplica",
   "emptyWorkspace": "Seleziona un file per iniziare",
   "emptyWorkspaceHint": "Apri un file dall'esploratore a sinistra oppure crea un nuovo documento",
   "railEditEnter": "Organizza la barra laterale (trascina per riordinare o ancorare)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "Impossibile inviare questo file",
   "shareUnsupported": "L'invio non è supportato su questo sistema",
   "shareClipboardHint": "File copiato. Passa a WeChat, scegli una chat e premi Ctrl+V per inviare",
-  "copyFailedNoNewFile": "Copia non riuscita: nessun nuovo file restituito",
-  "copyFailed": "Copia non riuscita",
   "recordingStarted": "Registro attività avviato",
   "recordingStopped": "Registro attività interrotto",
   "insertedToDoc": "Inserito nel documento",

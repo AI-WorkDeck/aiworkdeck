@@ -19,6 +19,7 @@ description: 插件市场领域。任务涉及插件广场页、在线 Skill 广
 - **「语音」合并插件（dev-board#66）**：概念模型是**左栏一个图标 = 一个插件，skill 只在 AI 对话生效**。语音合成（text-to-speech）与会议录音（meeting-recorder）共占 rail 'voice' 一个面板位，广场三处（左栏列表 / 整页已安装 / 详情页）都必须显示**一个**「语音」条目——分组定义 `VOICE_PLUGIN_GROUP` 与合成视图 `buildVoiceGroupSkill()` 在 `leftSidebarPlugins.js`，detail 的 spec 带 `group:true`（'voice' 不是 registry 条目，详情页不去在线广场查它）。启停一体：开关一次翻全部成员，后端 `SkillRegistry` 每次扫描后还做状态收敛（任一启用 → 全部启用），防「tab 可见但 kick-off 命不中 skill」的静默断裂。新增面板内多 tab 的合并插件时照这套（分组定义 + 三处 UI + 后端收敛名单）。
 - `frontend/src/components/MarketDetailPane.vue` — **中栏详情 tab**（overview `openMarketDetail(spec)` 打开，`tabType:'market-detail'`、id=`market-detail_{kind}_{id}`、单例、isTabVisible 常显）：头部图标+衬线标题+作者/版本/下载+动作区（Skill：安装/更新/卸载/生效方式三档；插件：安装带权限确认/启停 switch/卸载），正文触发词「」排版、能力、详细信息（标识/来源/主页，主页 emit open-url 走浏览器 tab）。
 - 两件通过 `uni.$emit('awd:market-changed')`（详情→列表）与 `'awd:market-changed-from-sidebar'`（列表→详情）互相刷新；组件卸载时 $off，不涉页面栈多实例地雷。
+- 详情页自身的插件开关成功后同时调用 `loadContribution(false)`，不能只广播给左栏：主题/样式贡献取决于后端启用态，当前详情不订阅自己发出的 `awd:market-changed`。贡献加载代次丢弃启停前的迟到响应；设置读取使用独立代次，保留在途设置读取与未保存的设置草稿，不为这个刷新重新请求在线市场。回归：`frontend/tests/plugin-sdk/market-update-detail.test.mjs`（dev-board#1766）。
 - `frontend/src/components/MarketPane.vue` — 原整页版（深绿 hero 三 tab），现只剩一个宿主：
   `frontend/src/pages/plugin-market/plugin-market.vue` 薄壳独立页（`:standalone="true"`，仅保留给直链，
   app-e2e J7 直接 goto 这个路由）。**设置页的「插件广场」导航项 2026-08-27（dev-board#206）已删**

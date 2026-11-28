@@ -156,7 +156,7 @@ public class ProjectMemberService {
         ProjectMember member = new ProjectMember();
         member.setProjectId(projectId);
         member.setUserId(user.getId());
-        member.setRole(role);
+        member.setRole(assignableRole(role));
         try {
             projectMemberRepository.save(member);
         } catch (DataIntegrityViolationException e) {
@@ -309,9 +309,18 @@ public class ProjectMemberService {
      * 的探测口，回原料等于替撞库与社工做了半件事。展示名 + 打码联系方式 + 头像
      * 足够律师确认「是不是这个人」，也就够了。
      */
+    /**
+     * {@code memberUserId}: only when already a member (C9: 「改为协作人」 from the lookup card). The
+     * requester can already see that id in the member list, so it reveals nothing new.
+     */
     public record MemberLookup(boolean found, String displayName, String avatarUrl,
                                String maskedContact, boolean alreadyMember, String currentRole,
-                               String message, String reason) {}
+                               String message, String reason, Long memberUserId) {
+        public MemberLookup(boolean found, String displayName, String avatarUrl, String maskedContact,
+                            boolean alreadyMember, String currentRole, String message, String reason) {
+            this(found, displayName, avatarUrl, maskedContact, alreadyMember, currentRole, message, reason, null);
+        }
+    }
 
     /**
      * 按手机号/邮箱找人并回一张确认卡，**不**做任何改动。
@@ -342,7 +351,8 @@ public class ProjectMemberService {
                 currentRole != null,
                 currentRole,
                 null,
-                null);
+                null,
+                currentRole != null ? user.getId() : null);
     }
 
     /** 已经在案卷里就回现在的角色，否则 null。项目负责人算 OWNER（member 表里可能没有他）。 */
@@ -459,6 +469,66 @@ public class ProjectMemberService {
             return trimmed;
         }
         return null;
+    }
+
+    private static final java.util.Set<String> ASSIGNABLE_ROLES = java.util.Set.of("ADMIN", "PARTICIPANT", "READ_ONLY");
+
+    /**
+     * Lane C retest 0.91.1: addMember stored any role string. A colleague added through the API as "MEMBER" (not a
+     * project role) could read the case, but every 交稿 was refused (git-receive-pack not permitted) and the roster
+     * showed the raw 「MEMBER」. Missing means 协作人; anything outside ADMIN / PARTICIPANT / READ_ONLY is refused.
+     */
+    static String assignableRole(String role) {
+        if (role == null || role.isBlank()) return "PARTICIPANT";
+        String r = role.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!ASSIGNABLE_ROLES.contains(r)) throw new IllegalArgumentException(LangText.of(
+                "角色无效：只能是案件管理员、协作人或只读成员", "Invalid role: use case admin, collaborator or read-only"));
+        return r;
+    }
+
+    /**
+     * C9：改一位参与人的角色，不用移出再加回（加入时间与一条审计事件都保住）。权限矩阵与 removeMember 同源：
+     * 负责人可改除自己外的任何律师；管理员只能在协作人与只读之间改，且不能把人升成管理员；谁都改不了
+     * 负责人；客户的访问由访问码决定，不在这里改。改成现有角色 = 无事发生（不记事件）。
+     * 推送权限按请求现查（GitAccessService → hasWritePermission），降为只读的人下一次交稿就会被拒。
+     */
+    @Transactional
+    public void changeRole(Long projectId, Long targetUserId, String newRole, Long requesterId) {
+        if (newRole == null || !ASSIGNABLE_ROLES.contains(newRole)) {
+            throw new IllegalArgumentException(LangText.of("不支持的角色", "Unsupported role"));
+        }
+        if (targetUserId.equals(requesterId)) {
+            throw new IllegalArgumentException(LangText.of("不能修改自己的角色", "You cannot change your own role"));
+        }
+        lockCloudMembership(projectId);
+        String requesterRole = getMemberRole(projectId, requesterId);
+        String targetRole = getMemberRole(projectId, targetUserId);
+        if (targetRole == null) {
+            throw new IllegalArgumentException(LangText.of("成员不存在", "Member not found"));
+        }
+        boolean allowed = !"OWNER".equals(targetRole) && !targetRole.startsWith("CLIENT")
+                && ("OWNER".equals(requesterRole)
+                    || ("ADMIN".equals(requesterRole)
+                        && ("PARTICIPANT".equals(targetRole) || "READ_ONLY".equals(targetRole))
+                        && !"ADMIN".equals(newRole)));
+        if (!allowed) {
+            throw new IllegalArgumentException(LangText.of("权限不足：您无法修改该成员的角色",
+                    "Insufficient permissions: you cannot change this member's role"));
+        }
+        if (newRole.equals(targetRole)) return;
+        ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException(LangText.of("成员不存在", "Member not found")));
+        member.setRole(newRole);
+        projectMemberRepository.save(member);
+        if (collabEventService != null) {
+            try {
+                collabEventService.record(com.checkba.version.cloud.CollabEvent.Kind.MEMBER_ROLE_CHANGED, projectId,
+                        requesterId, null, null, null, null, targetUserId,
+                        java.util.Map.of("fromRole", targetRole, "toRole", newRole));
+            } catch (Exception e) {
+                log.warn("协作成员事件记录失败（已吞）: kind=MEMBER_ROLE_CHANGED, project={}", projectId, e);
+            }
+        }
     }
 
     @Transactional

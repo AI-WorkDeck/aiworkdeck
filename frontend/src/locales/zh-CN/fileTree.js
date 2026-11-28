@@ -8,7 +8,7 @@ export default {
   newFileMenu: "新建文件",
   newRecording: "录音",
   defaultPresentationName: "新建演示文稿",
-  defaultSpreadsheetName: "新建工作簿",
+  defaultSpreadsheetName: "新建表格",
   recordingPluginRequired: "请先在插件详情中安装或启用“语音”，再开始录音。",
 
   externalDragFailed: '所选内容无法拖出，请确认选中的是本机现有文件后再试。',
@@ -197,4 +197,11 @@ export default {
   ocrSearchablePdf: '生成可搜索 PDF',
   ocrLayoutSuffix: '-识别版式',
   ocrSearchableSuffix: '-可搜索',
+  localOnlyMine: '仅在本机（未共享）',
+  localOnlyMineTip: '超出了免费共享额度，这份文件只在你这台电脑上，同事看到的是占位。开启文件云端备份后再交稿即可共享。',
+  localOnlyOther: '仅在{name}的电脑上',
+  localOnlyOtherUnknown: '仅在同事的电脑上',
+  localOnlyOtherTip: '这份文件只在{name}的电脑上，没有共享到案件库。请{name}开启文件云端备份后再交稿。',
+  localOnlyColleague: '同事',
+  localOnlyOk: '知道了',
 }

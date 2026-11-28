@@ -14,6 +14,8 @@ export default {
   "modelKeyInvalid": "De modelaanbieder heeft de sleutel geweigerd die dit apparaat nog gebruikt uit een oudere instelling. Log in om in plaats daarvan de AI van AI WorkDeck te gebruiken.",
   "accountReconnect": "De verbinding met je AI-account moet worden vernieuwd, dus dit verzoek is niet verstuurd. Kies \"Opnieuw aanmelden\" en probeer het daarna opnieuw; er gaat niets verloren.",
   "streamInterrupted": "Het antwoord is afgebroken; wat tot nu toe binnenkwam blijft hierboven staan. Kies “Opnieuw proberen” om het opnieuw te genereren.",
+  "streamInterruptedResumable": "Het antwoord is afgebroken; wat tot nu toe binnenkwam blijft hierboven staan. Kies “Doorgaan” om verder te gaan waar het stopte, of “Opnieuw proberen” om opnieuw te beginnen.",
+  "streamInterruptedTwice": "Het is opnieuw afgebroken. Kies “Opnieuw proberen” om het hele antwoord opnieuw te genereren.",
   "serverError": "Er ging iets mis aan onze kant en deze actie is niet afgerond. Probeer het later opnieuw; blijft het gebeuren, stuur ons dan “Meldingen”.",
   "conflict": "Dit is elders gewijzigd, of de vorige actie loopt nog. Vernieuw en probeer het opnieuw.",
   "fileTooLarge": "Het bestand is te groot (limiet {limit}). Comprimeer of splits het en upload het opnieuw.",
@@ -27,9 +29,11 @@ export default {
     "details": "Details",
     "hideDetails": "Details verbergen",
     "continue": "Doorgaan",
+    "continueTooltip": "Ga verder waar het stopte zonder opnieuw te genereren wat er al staat",
     "refresh": "Vernieuwen",
     "signIn": "Inloggen",
     "reconnect": "Opnieuw aanmelden",
+    "topUp": "Opwaarderen",
     "feedback": "Meldingen"
   }
 }

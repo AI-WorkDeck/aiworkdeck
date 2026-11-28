@@ -537,6 +537,8 @@ public class CloudSyncService {
                             "This case file is still in an old format in the library — please have whoever shared it submit a draft first, then pull again"));
                 }
                 manifestService.applyToDatabase(localProjectId, manifest);
+                // C33：提交里有、清单里漏登的文件也要进文件树（dev-board#1866）
+                manifestService.indexTrackedFilesMissingFromTree(localProjectId, "HEAD");
 
                 ProjectRemote remote = new ProjectRemote();
                 remote.setProjectId(localProjectId);
@@ -759,7 +761,8 @@ public class CloudSyncService {
                     // C8：案件库按权限拒收（git-receive-pack not permitted）——只读成员或已被移出。重试永远
                     // 不会成功，不许说「稍后还可以再交」，也不置「待上传」：改动留在这台电脑的版本记录里，
                     // 但没有、也不会交到案件库。说清楚原因和该找谁。
-                    log.info("交稿被案件库按权限拒绝: project={}", projectId);
+                    // C12b retest: the underlying git/HTTP reason must be in the log; the user-facing text replaces it.
+                    log.warn("交稿被案件库按权限拒绝: project={}, reason={}", projectId, refusalReason(e), e);
                     RemoteRole role = remoteRoleCache.get(projectId);
                     String owner = role != null && role.ownerName() != null ? role.ownerName()
                             : LangText.of("案卷负责人", "the case owner");
@@ -813,7 +816,12 @@ public class CloudSyncService {
         m.put("linked", true);
         m.put("serverUrl", serverUrl);
         m.put("remoteProjectId", remote.getRemoteProjectId());
-        m.put("pendingUpload", Boolean.TRUE.equals(remote.getPendingUpload()));
+        // C35（dev-board#1871）：「有改动还没交稿」不能只看「上次推送被拒/失败」那面旗子——保存版本之后、
+        // 交稿落到案件库之前（上传中或上传失败），本机主线有案件库没有的版本，顶栏却会说「和大家的稿一致」，
+        // 律师以为同事已经拿到了自己的稿。
+        boolean localAhead = origin != null
+                && !repoService.isAncestor(projectId, repoService.mainBranch(), origin);
+        m.put("pendingUpload", Boolean.TRUE.equals(remote.getPendingUpload()) || localAhead);
         m.put("remoteAhead", remoteAhead);
         if (remoteAhead) {
             describeRemoteAhead(projectId, userId, m);
@@ -946,6 +954,10 @@ public class CloudSyncService {
             List<VersionEntry> ahead = repoService.commitsBetween(
                     projectId, repoService.mainBranch(), ORIGIN_MASTER, REMOTE_AHEAD_WALK_CAP);
             if (ahead.isEmpty()) return;
+            // C23 (lane C nit): client portal materials are not anyone's 稿 — count them apart, out of the authors
+            int materials = (int) ahead.stream().filter(e -> HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).count();
+            ahead = ahead.stream().filter(e -> !HistoryTypeClassifier.CLIENT_SUBMISSION.equals(e.kind())).toList();
+            m.put("remoteAheadMaterials", materials);
             m.put("remoteAheadCount", ahead.size());
             // 案件库确实领先了、这句话非说清是谁不可——只有这条路允许为一个名字联网一次
             Map<String, String> remoteNames = remoteDisplayNames(projectId, true);
@@ -985,6 +997,15 @@ public class CloudSyncService {
      * 多带一个 offline:true，cloudStatus 原有字段照常给（沿用 fetch 之前已知的状态）。
      */
     public Map<String, Object> checkCloud(long projectId, Long userId) {
+        return checkCloud(projectId, userId, false);
+    }
+
+    /**
+     * C9（CEO 11-28）：律师亲手点「刷新状态」时 {@code freshRole}=true——角色不走 60 秒缓存，负责人刚改的角色立刻生效；
+     * 自动核对（回到窗口、打开文件、两分钟一次）照旧「一分钟最多读一次成员名单」。
+     */
+    public Map<String, Object> checkCloud(long projectId, Long userId, boolean freshRole) {
+        if (freshRole) remoteRoleCache.remove(projectId);
         var remoteOpt = remoteRepository.findByProjectId(projectId);
         if (remoteOpt.isEmpty()) {
             return Map.of("linked", false);
@@ -1093,7 +1114,8 @@ public class CloudSyncService {
                         if (!(o instanceof JSONObject row)) continue;
                         String r = row.getStr("role");
                         if (conn.getUsername() != null && conn.getUsername().equals(row.getStr("username"))) mine = r;
-                        if ("OWNER".equals(r) && owner == null) owner = row.getStr("displayName");
+                        // C6: the library marks its case owner with owner=true (role is ADMIN); older libraries never did
+                        if ((row.getBool("owner", false) || "OWNER".equals(r)) && owner == null) owner = row.getStr("displayName");
                     }
                 }
                 role = new RemoteRole(mine, owner, System.currentTimeMillis() + REMOTE_ROLE_TTL_MS);
@@ -1104,6 +1126,16 @@ public class CloudSyncService {
         } catch (Exception e) {
             log.warn("读取我在案件库里的角色失败（状态照常给）: project={}", projectId, e);
         }
+    }
+
+    /** Every message in the cause chain, so a refusal can be traced to the exact git/HTTP answer. */
+    static String refusalReason(Throwable e) {
+        StringBuilder out = new StringBuilder();
+        for (Throwable t = e; t != null && out.length() < 2000; t = t.getCause()) {
+            if (out.length() > 0) out.append(" <- ");
+            out.append(t.getClass().getSimpleName()).append(": ").append(t.getMessage());
+        }
+        return out.toString();
     }
 
     /** 案件库明确拒绝（不是连不上）：git 的 not permitted / 401 / 403。 */
@@ -1318,6 +1350,24 @@ public class CloudSyncService {
     }
 
     /**
+     * C9：改案件库上一位参与人的角色。权限矩阵在案件库判；本机清掉角色缓存，下一次状态读到新角色。
+     */
+    public void proxyMemberRole(long projectId, long remoteUserId, String role) {
+        ProjectRemote remote = requireRemoteBinding(projectId);
+        CloudConnection conn = connectionOf(remote);
+        String body = JSONUtil.toJsonStr(Map.of("role", role == null ? "" : role));
+        JSONObject resp = JSONUtil.parseObj(withCloudEpoch(boundCloudEpoch(projectId,conn,remote),()->httpPut(
+                conn.getServerUrl() + "/api/projects/" + remote.getRemoteProjectId() + "/members/" + remoteUserId + "/role",
+                body, conn.getDeviceToken())));
+        if (resp.getInt("code", 1) != 0) {
+            throw VersionException.userFacing(LangText.of(
+                    "没能修改角色：" + resp.getStr("message", "请重试"),
+                    "Couldn't change the role: " + resp.getStr("message", "please try again")));
+        }
+        remoteRoleCache.remove(projectId);
+    }
+
+    /**
      * 移出案件库上的一位参与人（dev-board#1050）：同事，或凭访问码进来的客户——案件库那一侧
      * 移出 CLIENT 时会连带作废他名下的访问码（{@code ProjectMemberService.removeMember}）。
      * {@code remoteUserId} 是**案件库那一侧**的 userId（参与人列表里的 userId），与本机
@@ -1496,6 +1546,7 @@ public class CloudSyncService {
             repoService.fastForwardMainline(projectId, ORIGIN_MASTER);
             var manifest = manifestService.readAtRef(projectId, "HEAD");
             if (manifest != null) manifestService.applyToDatabase(projectId, manifest);
+            manifestService.indexTrackedFilesMissingFromTree(projectId, "HEAD"); // C33
             reportPulled(projectId, conn);
             return new UpdateResult(UpdateStatus.UPDATED, affectedSince(projectId, tipBefore), null);
         }
@@ -1597,6 +1648,8 @@ public class CloudSyncService {
         String baseSha = repoService.mergeBase(projectId, tipBefore, cloudTip);
         TreeManifest base = baseSha == null ? null : manifestService.readAtRef(projectId, baseSha);
         if (cloudManifest != null) manifestService.unionApply(projectId, cloudManifest, base);
+        // C33：云端那一侧漏登的文件补成行，这一笔合并提交的清单也就带上了它们
+        manifestService.indexTrackedFilesMissingFromTree(projectId, cloudTip);
         manifestService.writeToWorkTree(projectId, manifestService.capture(projectId));
         repoService.commitMergeResolution(projectId, cloudMergeTitle(), resolutions,
                 pendingMergeStore == null ? List.of() : pendingMergeStore.all(projectId),
@@ -1882,6 +1935,30 @@ public class CloudSyncService {
         try (HttpResponse resp = req.execute()) {
             return new RawResponse(resp.getStatus(), resp.header("Content-Type"),
                     resp.header("Content-Disposition"), resp.bodyBytes());
+        } catch (Exception e) {
+            throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
+        }
+    }
+
+    /** C9 role change. Test seam like httpPost/httpDelete; sends X-Session-Id when sessionToken is set. */
+    protected String httpPut(String url, String jsonBody, String sessionToken) {
+        HttpRequest req = HttpRequest.put(url)
+                .header("Content-Type", "application/json")
+                .body(jsonBody)
+                .setConnectionTimeout(5000)
+                .setReadTimeout(15000);
+        if (sessionToken != null) {
+            req.header("X-Session-Id", sessionToken);
+        }
+        Map<String,String> frozen=CloudGitEpochClient.explicitEpoch.get();
+        if(frozen!=null)frozen.forEach(req::header);
+        try (HttpResponse resp = req.execute()) {
+            if (resp.getStatus() != 200) {
+                throw new IllegalStateException("云端请求失败 (HTTP " + resp.getStatus() + ")");
+            }
+            return resp.body();
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("云端不可达: " + e.getMessage(), e);
         }

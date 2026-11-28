@@ -255,6 +255,19 @@ test('Q21 接线：账户类 error 载荷带 kind 进 errorNotice；错误卡的
   assert.match(inline, /else if \(a === 'reconnect'\) this\.\$emit\('reconnect'\)/)
 })
 
+// ---- Q29：额度用完不再是一句死路的纯文本 ----
+test('Q29 no_credits error: catalogued notice with a 充值 button, raw backend text not in the answer', async () => {
+  const { bubble, event } = await liveStream()
+  event('error', { message: 'AI 额度已用完，这次没有扣费，请充值后重试', code: 1, kind: 'CONFLICT', reason: 'no_credits' })
+  assert.equal(bubble.errorNotice && bubble.errorNotice.key, 'balanceLow')
+  assert.equal(bubble.errorNotice.action, 'topUp')
+  assert.ok(!String(bubble.content || '').includes('额度已用完'))
+  const root = readFileSync(new URL('../../src/components/AgentMessage/RootBubble.vue', import.meta.url), 'utf8')
+  assert.match(root, /bubble\.errorNotice\.action === 'topUp'/)
+  const inline = readFileSync(new URL('../../src/components/AwdInlineError.vue', import.meta.url), 'utf8')
+  assert.match(inline, /a === 'topUp'[\s\S]{0,240}requireRecharge\(\)/)
+})
+
 // ---- Q24：平台通道的律师看不到 token 数，改给「查看用量」 ----
 test('Q24 token_usage 带 platform 时本轮记为平台通道；页脚给「查看用量」，token 数只在提示里', async () => {
   const { s, event } = await liveStream()
@@ -264,6 +277,9 @@ test('Q24 token_usage 带 platform 时本轮记为平台通道；页脚给「查
   assert.equal(s.tokenUsage.value.platform, true)
   assert.equal(s.tokenUsage.value.totalTokens, 240)
   const chat = readFileSync(new URL('../../src/components/ChatInterface.vue', import.meta.url), 'utf8')
-  assert.match(chat, /<text v-if="tokenUsage\.platform" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.viewUsage'\) \}\}<\/text>/)
+  // 0.92：本轮实扣金额取到之前（或取不到）都回落到「查看用量」
+  assert.match(chat, /<text v-else-if="tokenUsage\.platform" class="token-value token-usage-link"[^>]*@tap="openUsageSettings"[^>]*>\{\{ \$t\('chat\.viewUsage'\) \}\}<\/text>/)
+  event('token_usage', { promptTokens: 1, completionTokens: 1, totalTokens: 2, platform: true, runId: '0b6c2f1e-1111-4222-8333-944455556666' })
+  assert.equal(s.tokenUsage.value.runId, '0b6c2f1e-1111-4222-8333-944455556666')
   assert.match(chat, /openUsageSettings\(\) \{\s*if \(this\.openSettingsTab\) this\.openSettingsTab\(\{ nav: 'account' \}\)/)
 })

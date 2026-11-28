@@ -22,6 +22,8 @@ const ACTION = {
   sessionExpired: 'signIn', modelKeyInvalid: 'signIn', rateLimited: 'retry', modelUnavailable: 'retry',
   streamInterrupted: 'retry', serverError: 'retry', conflict: 'refresh', notFound: 'refresh',
   marketplaceUnavailable: 'refresh', pluginInstallFailed: 'retry', accountReconnect: 'reconnect', unknown: 'retry',
+  // Q29: retrying with an empty wallet fails the same way; the button opens top-up instead.
+  balanceLow: 'topUp',
 }
 
 // Q21: account-class failures of the AI channel (the backend's AccountException kinds) that signing
@@ -87,7 +89,7 @@ export function toUserMessage(err, ctx = {}) {
   if (RECONNECT_KINDS.has(String(ctx.accountKind || (err && err.kind) || ''))) return done('accountReconnect')
   if ((err && err.accountRequired === true) || code === 4011) return done('signInRequired')
   if (code === 4010) return done('sessionExpired')
-  if (status === 402 || code === 4020 || /AI_QUOTA_EXHAUSTED|insufficient (balance|credit)|余额不足|额度不足/i.test(text)) return done('balanceLow')
+  if (status === 402 || code === 4020 || /AI_QUOTA_EXHAUSTED|insufficient (balance|credit)|credit has run out|余额不足|额度不足|额度已用完/i.test(text)) return done('balanceLow')
   if (status === 429 || code === 4290 || /rate.?limit|too many requests|限流/i.test(text)) return done('rateLimited')
   if (KEY_INVALID.test(text)) return done('modelKeyInvalid')
   if (MODEL_UNAVAILABLE.test(text)) return done('modelUnavailable')
@@ -125,7 +127,8 @@ const ACTIONABLE = new Set(['offline', 'timeout', 'localServiceDown', 'signInReq
   'forbidden', 'balanceLow', 'rateLimited', 'conflict', 'fileTooLarge', 'modelKeyInvalid'])
 
 // Text that must never reach a lawyer: transport/JS/Java internals, raw payloads.
-const TECHNICAL = /Failed to fetch|NetworkError|net::|ECONN|ETIMEDOUT|Cannot read propert|is not (?:a function|defined)|\bundefined\b|\bnull\b|\[object |status code|\bSSE\b|Stream Error|Broken pipe|Connection reset|\bat [\w.$]+ \(|^[A-Z][A-Za-z]+(?:Error|Exception)\b|^\s*[{[]|<\/?[a-z]/
+// request:fail is uni.request's raw transport text (C32 retest: it reached a toast verbatim)
+const TECHNICAL = /request:fail|Failed to fetch|NetworkError|net::|ECONN|ETIMEDOUT|Cannot read propert|is not (?:a function|defined)|\bundefined\b|\bnull\b|\[object |status code|\bSSE\b|Stream Error|Broken pipe|Connection reset|\bat [\w.$]+ \(|^[A-Z][A-Za-z]+(?:Error|Exception)\b|^\s*[{[]|<\/?[a-z]/
 
 function isTechnical(msg) {
   return !msg || msg.length > 200 || isRawTechnicalText(msg) || TECHNICAL.test(msg)

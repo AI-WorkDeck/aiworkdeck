@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Yeni",
+    "aria": "Yeni belge veya yeni tarayıcı sekmesi",
+    "newWord": "Yeni Word belgesi",
+    "newExcel": "Yeni Excel çalışma kitabı",
+    "newPowerPoint": "Yeni PowerPoint sunusu",
+    "newBrowserTab": "Yeni tarayıcı sekmesi",
+  },
   scratchCopyChoose: "Kopyalanacak içeriği seçin",
   scratchCopySelected: "{count} seçildi",
   scratchCopyFiles: "Dosyalar",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "Yeni tarayıcı sekmesi",
   "moreTools": "Daha fazla araç",
   "railMore": "Daha fazla",
+  "reviewsEntry": "İncelemeler",
+  "reviewsNeedYou": "{count} sizi bekliyor",
+  "reviewsPick": "Açılacak incelemeleri seçin",
+  "reviewsPickItem": "{name} · {count} bekliyor",
+  "reviewsOpen": "Aç ›",
   "recordActivity": "Etkinlik Günlüğü",
   "logout": "Oturumu Kapat",
   "stagingArea": "Hazırlık Alanı",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "Geri Dönüşüm Kutusu",
   "loadingText": "Yükleniyor...",
   "explorerFallback": "Gezgin",
-  "newOrCopy": "Yeni / Kopya",
   "emptyWorkspace": "Başlamak için bir dosya seçin",
   "emptyWorkspaceHint": "Soldaki gezginden bir dosya açın veya yeni bir belge oluşturun",
   "railEditEnter": "Kenar çubuğunu düzenle (sürükleyerek sırala veya sabitle)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "Bu dosya gönderilemez",
   "shareUnsupported": "Bu sistemde gönderim desteklenmiyor",
   "shareClipboardHint": "Dosya kopyalandı. WeChat'e geçin, bir sohbet seçin ve göndermek için Ctrl+V tuşlarına basın",
-  "copyFailedNoNewFile": "Kopyalama başarısız: yeni dosya döndürülmedi",
-  "copyFailed": "Kopyalama başarısız oldu",
   "recordingStarted": "Günlük kaydı başlatıldı",
   "recordingStopped": "Günlük kaydı durduruldu",
   "insertedToDoc": "Belgeye eklendi",

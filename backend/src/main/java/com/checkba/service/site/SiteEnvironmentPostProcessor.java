@@ -70,12 +70,14 @@ public class SiteEnvironmentPostProcessor implements EnvironmentPostProcessor, O
         if (!Boolean.parseBoolean(environment.getProperty("security.local-mode", "false"))) {
             return;
         }
+        boolean legacy = legacyInstall(environment);
         String siteId = resolveSiteId(environment);
         if (siteId == null) return;
 
         String prefix = "ai.account.sites." + siteId + ".";
         Map<String, Object> values = new LinkedHashMap<>();
         values.put(RESOLVED_SITE_KEY, siteId);
+        if (legacy) values.put(LEGACY_INSTALL_KEY, "true");
         copy(environment, values, prefix + "base-url", "ai.account.base-url");
         copy(environment, values, prefix + "telemetry-ingest-url", "telemetry.ingest-url");
 
@@ -84,6 +86,14 @@ public class SiteEnvironmentPostProcessor implements EnvironmentPostProcessor, O
             String base = trimTrailingSlash(registryBase);
             values.put("ai.plugins.registry-url", base + "/plugins");
             values.put("ai.skills.registry-url", base + "/skills");
+            // 0.91.0：组件包封禁表与下载源也跟站点走（国际站不先连大陆镜像）
+            values.put("ai.packs.revoked-url", base + "/packs/revoked");
+        }
+        String packsBase = environment.getProperty(prefix + "packs-base-url");
+        if (packsBase != null && !packsBase.isBlank()) {
+            values.put("ai.packs.base-urls[0]", trimTrailingSlash(packsBase));
+            String other = otherPacksBase(environment, siteId);
+            if (other != null) values.put("ai.packs.base-urls[1]", other);
         }
 
         if (values.size() == 1) return; // 只有站点 id，说明站点表没配，别插一个空源
@@ -97,6 +107,28 @@ public class SiteEnvironmentPostProcessor implements EnvironmentPostProcessor, O
         } else {
             sources.addLast(source);
         }
+    }
+
+    /** 0.91.0：没有 site.json、但本机已有数据库的老安装（不是第一次启动）。 */
+    static final String LEGACY_INSTALL_KEY = "ai.account.legacy-install";
+
+    /**
+     * 0.91.0：老安装从没写过 site.json（一直用默认国内站、没点过站点切换）。这里只<b>判定</b>、不写盘：
+     * 在容器起来之前看一眼本机数据库在不在，记成一个属性，{@link SiteProfileService#siteChosen()} 据此把老安装
+     * 当作已选默认站点。这样「没选站之前不发站点相关请求」只拦全新安装。
+     */
+    private static boolean legacyInstall(ConfigurableEnvironment environment) {
+        Path dir = stateDir(environment);
+        return SiteStateFile.read(dir).site() == null && java.nio.file.Files.exists(dir.resolve("local.mv.db"));
+    }
+
+    private static String otherPacksBase(ConfigurableEnvironment environment, String siteId) {
+        for (String other : java.util.List.of("cn", "intl")) {
+            if (other.equals(siteId)) continue;
+            String base = environment.getProperty("ai.account.sites." + other + ".packs-base-url");
+            if (base != null && !base.isBlank()) return trimTrailingSlash(base);
+        }
+        return null;
     }
 
     /** site.json 的选择优先，其次 default-site；解析出的站点必须存在且 enabled。 */

@@ -69,7 +69,7 @@ test('藏着的时候重新落一次「全藏」', async () => {
   // 标尺不再跟 LO chrome 绑在一起：它归视图偏好（默认显示），重载后按偏好重设一遍
   assert.deepEqual(sent, [
     ['set_chrome', { menubar: false, statusbar: false, toolbars: false }],
-    ['set_view_options', { formattingMarks: true, ruler: true, textBoundaries: false }],
+    ['set_view_options', { formattingMarks: true, ruler: true, textBoundaries: false, bookmarks: false }],
     ['get_ui_state', {}],
   ])
   assert.equal(host.chromeHidden, true)
@@ -80,7 +80,7 @@ test('律师自己用逃生开关放出来的那一套，不许被一次重载�
   await host.reapplyChrome()
   assert.deepEqual(sent, [
     ['set_chrome', { menubar: true, statusbar: true, toolbars: true }],
-    ['set_view_options', { formattingMarks: true, ruler: true, textBoundaries: false }],
+    ['set_view_options', { formattingMarks: true, ruler: true, textBoundaries: false, bookmarks: false }],
     ['get_ui_state', {}],
   ])
   assert.equal(host.chromeHidden, false)
@@ -93,7 +93,7 @@ test('文本边界关闭不覆盖用户的格式标记与标尺偏好，也不�
     host.viewPrefs = { formattingMarks, ruler }
     host.$emit = event => events.push(event)
     await host.applyViewPrefs()
-    assert.deepEqual(sent[0], ['set_view_options', { formattingMarks, ruler, textBoundaries: false }])
+    assert.deepEqual(sent[0], ['set_view_options', { formattingMarks, ruler, textBoundaries: false, bookmarks: false }])
     assert.deepEqual(host.viewPrefs, { formattingMarks, ruler })
     assert.equal(events.includes('changed'), false)
   }

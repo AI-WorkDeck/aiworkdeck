@@ -85,7 +85,7 @@ test('三端语言注册表（frontend / desktop / office-addin）完全一致�
 
   const zhTw = getLocaleEntry('zh-TW')
   assert.equal(zhTw.dir, 'ltr')
-  assert.equal(zhTw.lowaUiLang, 'zh-CN')
+  assert.equal(zhTw.lowaUiLang, 'zh-TW')
   assert.equal(zhTw.allowHan, true)
 
   const ja = getLocaleEntry('ja-JP')

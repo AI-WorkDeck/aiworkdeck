@@ -41,7 +41,7 @@
         <p v-if="hasMore" class="center-hint recent-only">{{ $t('messageCenter.recentOnly') }}</p>
       </aside>
       <div class="center-detail">
-        <MessageConversationPane v-if="selectedConversation && current" :conversation="selectedConversation" :messages="current.messages" :pending-messages="current.pending" :draft="current.draft" :self-id="selectedConversation.sourceId === 'dd-client' ? current.selfId : selfId" :loading="current.loading" :has-more="current.hasMore" :error="current.error" :agent-status="current.status" :agent-busy="isAgentBusy(current)" :failures="Object.values(current.failures)" :can-reply="!!lastOwnMessage(current)" @back="selection = ''" @draft="current.draft = $event" @send="sendMessage" @retry-send="sendMessage($event)" @older="loadMessages(selectedConversation, true)" @reply="requestReply(selectedConversation, lastOwnMessage(current)?.id)" @retry-reply="requestReply(selectedConversation, $event)" @private="openPrivate" @invite="createInvite" @download="downloadAttachment" />
+        <MessageConversationPane v-if="selectedConversation && current" :conversation="selectedConversation" :messages="current.messages" :pending-messages="current.pending" :draft="current.draft" :self-id="selectedConversation.sourceId === 'dd-client' ? current.selfId : selfId" :loading="current.loading" :has-more="current.hasMore" :error="current.error" :agent-status="current.status" :agent-busy="isAgentBusy(current)" :failures="Object.values(current.failures)" :can-reply="!!lastOwnMessage(current)" @back="selection = ''" @draft="current.draft = $event" @send="sendMessage" @retry-send="sendMessage($event)" @older="loadMessages(selectedConversation, true)" @reply="askAssistant" @retry-reply="requestReply(selectedConversation, $event)" @private="openPrivate" @invite="createInvite" @download="downloadAttachment" />
         <article v-else-if="selectedNotice" class="notice-detail">
           <button class="notice-back" @click="selection = ''">{{ $t('messageCenter.back') }}</button>
           <div class="notice-paper">
@@ -79,6 +79,8 @@
 </template>
 <script>
 import { mentionsAssistant } from '@/utils/assistantMention.js'
+import { getCurrentUser } from '@/utils/auth.js'
+const isClientUser = () => { try { const user = getCurrentUser(); return !!(user && user.role === 'CLIENT') } catch (e) { return false } }
 import MessageConversationPane from './MessageConversationPane.vue'
 import { messageCenterRequest, messageCenterIdentity } from '@/services/messageCenter.js'
 import { normalizeMessageTarget } from '@/utils/messageTargets.js'
@@ -140,7 +142,10 @@ export default {
         this.conversations = (result.conversations || []).map(row => this.withProjectContext(row)); this.notifications = result.notifications || []; this.counts = result.counts || {}; this.hasMore = !!result.hasMore; this.unavailableSources = result.unavailableSources || []
         const known = new Map(this.projects.map(project => [project.key, project])); for (const project of result.projects || []) if (project.key) known.set(project.key, project); this.projects = [...known.values()]
         this.error = ''; this.accountRequired = false
-        if (result.cloudStatus === 'unavailable') { this.error = result.cloudError || this.$t('messageCenter.serviceFailed'); this.accountRequired = true }
+        // C17：客户（凭访问码进来）没有 AI WorkDeck 账户，不该被要求「连接账号」——他的项目消息走受邀连接。
+        // 只在不是客户、且没有任何受邀会话时提示连接账户。
+        const clientOnly = isClientUser() || this.conversations.some(row => row.sourceId === 'dd-client')
+        if (result.cloudStatus === 'unavailable' && !clientOnly) { this.error = result.cloudError || this.$t('messageCenter.serviceFailed'); this.accountRequired = true }
         if (!this.identityLoaded) await this.loadIdentity(ticket)
         if (this.valid(ticket) && initial && this.initialConversationId) await this.focusConversation(this.initialConversationId)
       } catch (error) { if (this.valid(ticket) && serial === this.listSerial) { this.error = error.message || this.$t('messageCenter.serviceFailed'); this.accountRequired = !!error.accountRequired } }
@@ -199,7 +204,16 @@ export default {
     },
     lastOwnMessage(state) { const id = this.selectedConversation?.sourceId === 'dd-client' ? state.selfId : this.selfId; return id == null ? null : [...state.messages].reverse().find(message => message.actorType !== 'AGENT' && String(message.senderId) === String(id)) },
     isAgentBusy(state) { return state.admitting || ['queued', 'running'].includes(state.status?.status) },
-    async sendMessage(pending) {
+    // C35: 「请助手回复」 with a typed question sends that question and asks about IT. Before, the typed text stayed in
+    // the box and the assistant answered the previous message (the last one already sent).
+    askAssistant() {
+      const conversation = this.selectedConversation
+      if (!conversation) return
+      const state = this.state(conversation)
+      if (state.draft.trim()) return this.sendMessage(undefined, { askAssistant: true })
+      return this.requestReply(conversation, this.lastOwnMessage(state)?.id)
+    },
+    async sendMessage(pending, { askAssistant = false } = {}) {
       const conversation = this.selectedConversation
       if (!conversation) return
       const state = this.state(conversation), ticket = this.ticket()
@@ -212,7 +226,7 @@ export default {
         this.mergeMessages(state, [message]); state.pending = state.pending.filter(item => item.clientMessageId !== pending.clientMessageId)
         // C14：多人群里助手只在被明确叫到（@助手）时回复；私聊 / 助手直聊才每条都答。原来按「群里只有我一个人」
         // 自动答，人数是旧的时候 30 条消息触发了 30 次真实计费的 AI 回复
-        if (this.canRequestAssistant(conversation) && (conversation.agent.private || conversation.type === 'AGENT_DIRECT' || mentionsAssistant(pending.text, conversation.agent))) this.requestReply(conversation, message.id)
+        if (this.canRequestAssistant(conversation) && (askAssistant || conversation.agent.private || conversation.type === 'AGENT_DIRECT' || mentionsAssistant(pending.text, conversation.agent))) this.requestReply(conversation, message.id)
       } catch (error) { if (this.valid(ticket)) { pending.sending = false; state.error = error.message } }
     },
     async requestReply(conversation, messageId) {

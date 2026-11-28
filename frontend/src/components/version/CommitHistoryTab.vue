@@ -889,6 +889,7 @@ export default {
         revert: this.$t('version.typeRevert'),
         auto: this.$t('version.typeAuto'),
         upgrade: this.$t('version.typeUpgrade'),
+        'client-submission': this.$t('version.typeClientSubmission'),
       }[e && e.type] || ''
     },
     changeTypeLabel(t) {
@@ -991,11 +992,12 @@ export default {
         } else {
           uni.showToast({ title: d.message || this.$t('version.submitFailedNotice'), icon: 'none' })
         }
-        this.$emit('changed')
+        // C30: a landed 交稿 proves local == library; the page counts it as a fresh check
+        this.$emit('changed', d.status === 'UPLOADED' ? { submitted: true } : undefined)
         await this.reload()
       } catch (e) {
         if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { /* lasting dialog shown */ }
-        else if (await submitFailedOffline(this.projectId, checkCloud)) {
+        else if (await submitFailedOffline(this.projectId, checkCloud, e)) {
           this.$emit('queued')
           uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
         } else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })

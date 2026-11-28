@@ -424,6 +424,9 @@ test('audit document, root UPSTREAM.md, and curated ElyOffice patch archive exis
   }
 })
 
+// Windows checkouts give the mock tree CRLF line endings; the anchors below are written with LF.
+const readLf = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
+
 test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanly and is strictly idempotent', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awd-lowa-patches-'))
   try {
@@ -437,46 +440,46 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     assert.equal(run1.status, 0, `First run failed:\n${run1.stderr}\n${run1.stdout}`)
 
     // Verify key anchors in patched files
-    const gbuildMk = fs.readFileSync(path.join(tmpDir, 'solenv/gbuild/platform/EMSCRIPTEN_INTEL_GCC.mk'), 'utf8')
+    const gbuildMk = readLf(path.join(tmpDir, 'solenv/gbuild/platform/EMSCRIPTEN_INTEL_GCC.mk'))
     assert.match(gbuildMk, /"ClassHandle"\$\(COMMA\)"FS"\$\(COMMA\)"callMain"\$\(COMMA\)"specialHTMLTargets"\]/)
 
-    const qtInstanceCxx = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtInstance.cxx'), 'utf8')
+    const qtInstanceCxx = readLf(path.join(tmpDir, 'vcl/qt5/QtInstance.cxx'))
     assert.match(qtInstanceCxx, /AAA-CJK\.ttc/)
 
-    const qtFrameCxx = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtFrame.cxx'), 'utf8')
+    const qtFrameCxx = readLf(path.join(tmpDir, 'vcl/qt5/QtFrame.cxx'))
     assert.match(qtFrameCxx, /SalFrameStyleFlags::TOOLTIP\)\n        \{\n            aWinFlags = Qt::ToolTip;\n            if \(QGuiApplication::platformName\(\) == "wasm"\)\n                aWinFlags \|= Qt::WindowTransparentForInput;/)
     assert.match(qtFrameCxx, /else if \(isPopup\(\)\)\n            aWinFlags = Qt::ToolTip \| Qt::FramelessWindowHint;/)
     assert.equal(qtFrameCxx.match(/WindowTransparentForInput/g).length, 1)
 
-    const frmpaintCxx = fs.readFileSync(path.join(tmpDir, 'sw/source/core/text/frmpaint.cxx'), 'utf8')
+    const frmpaintCxx = readLf(path.join(tmpDir, 'sw/source/core/text/frmpaint.cxx'))
     assert.match(frmpaintCxx, /FindTabFrame\(\)/)
     assert.match(frmpaintCxx, /GetExternalReviewWidth\(\)/)
 
-    const initCxx = fs.readFileSync(path.join(tmpDir, 'desktop/source/lib/init.cxx'), 'utf8')
+    const initCxx = readLf(path.join(tmpDir, 'desktop/source/lib/init.cxx'))
     assert.match(initCxx, /GetViewFrame\(\)\.GetFrame\(\)\.GetFrameInterface\(\)/)
     assert.match(initCxx, /strcmp\(pOption, "author"\) == 0/)
     assert.match(initCxx, /GetEnglishSearchFontName/)
 
-    const senderCxx = fs.readFileSync(path.join(tmpDir, 'vcl/jsdialog/jsdialogsender.cxx'), 'utf8')
+    const senderCxx = readLf(path.join(tmpDir, 'vcl/jsdialog/jsdialogsender.cxx'))
     assert.match(senderCxx, /m_aNotifierWindow->isDisposed\(\)/)
 
-    const fontCxx = fs.readFileSync(path.join(tmpDir, 'vcl/source/outdev/font.cxx'), 'utf8')
+    const fontCxx = readLf(path.join(tmpDir, 'vcl/source/outdev/font.cxx'))
     assert.match(fontCxx, /GetEnglishSearchFontName/)
 
-    const svxSdi = fs.readFileSync(path.join(tmpDir, 'svx/sdi/svx.sdi'), 'utf8')
+    const svxSdi = readLf(path.join(tmpDir, 'svx/sdi/svx.sdi'))
     assert.match(svxSdi, /SvxPageItem AttributePage SID_ATTR_PAGE/)
 
-    const swriterSdi = fs.readFileSync(path.join(tmpDir, 'sw/sdi/swriter.sdi'), 'utf8')
+    const swriterSdi = readLf(path.join(tmpDir, 'sw/sdi/swriter.sdi'))
     assert.match(swriterSdi, /SfxStringItem Category FN_PARAM_1/)
     assert.match(swriterSdi, /SfxStringItem Title FN_PARAM_1/)
     assert.match(swriterSdi, /SfxStringItem Formula FN_PARAM_1/)
 
-    const loktxdocCxx = fs.readFileSync(path.join(tmpDir, 'sw/source/uibase/uno/loktxdoc.cxx'), 'utf8')
+    const loktxdocCxx = readLf(path.join(tmpDir, 'sw/source/uibase/uno/loktxdoc.cxx'))
     assert.match(loktxdocCxx, /void GetWordCount\(/)
     assert.match(loktxdocCxx, /void GetOutline\(/)
 
     // The embedded C++ palette must remain in sync with the product tokens.
-    const header = fs.readFileSync(path.join(tmpDir, 'sc/source/ui/view/hdrcont.cxx'), 'utf8')
+    const header = readLf(path.join(tmpDir, 'sc/source/ui/view/hdrcont.cxx'))
     const roles = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'design/tokens/awd-palette.json'), 'utf8')).roles
     const roleBySetter = { FaceColor: 'bg', ButtonTextColor: 'text-2', DarkShadowColor: 'border', AccentColor: 'accent', HighlightColor: 'accent-text' }
     for (const [setter, role] of Object.entries(roleBySetter)) {
@@ -489,14 +492,14 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
     assert.equal('#' + selectedText[1], roles.light['text-on-accent'])
     assert.equal('#' + selectedText[1], roles.dark['text-on-accent'])
 
-    const fntcache = fs.readFileSync(path.join(tmpDir, 'sw/source/core/txtnode/fntcache.cxx'), 'utf8')
+    const fntcache = readLf(path.join(tmpDir, 'sw/source/core/txtnode/fntcache.cxx'))
     assert.match(fntcache, /const bool bDarkExplicit = !bChgFntColor && pVSh && bOutputToWindow\n            && aGlobalRetoucheColor\.IsDark\(\) && rFnt\.GetColor\(\)\.GetLuminance\(\) < 64;/)
     assert.match(fntcache, /if \( bChgFntColor \|\| bDarkExplicit \)/)
     assert.match(fntcache, /if \(bDarkExplicit\)\n            \{\n                if \(pCol->IsDark\(\)\)/)
-    const patattr = fs.readFileSync(path.join(tmpDir, 'sc/source/core/data/patattr.cxx'), 'utf8')
+    const patattr = readLf(path.join(tmpDir, 'sc/source/core/data/patattr.cxx'))
     assert.match(patattr, /else if \(eAutoMode == ScAutoFontColorMode::Display && aColor\.GetLuminance\(\) < 64\)/)
 
-    const ruler = fs.readFileSync(path.join(tmpDir, 'svtools/source/control/ruler.cxx'), 'utf8')
+    const ruler = readLf(path.join(tmpDir, 'svtools/source/control/ruler.cxx'))
     assert.match(ruler, /GetColorValue\(svtools::APPBACKGROUND\)\.nColor\.IsDark\(\)/)
     assert.match(ruler, /const StyleSettings& rStyleSettings = maVirDev->GetSettings\(\)\.GetStyleSettings\(\);/)
     const rulerRoles = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'design/tokens/awd-palette.json'), 'utf8')).roles.dark
@@ -506,7 +509,7 @@ test('apply-source-patches.py applies all C++ kernel & dictionary patches cleanl
       assert.equal('#' + m[1], rulerRoles[role])
     }
 
-    const qtControls = fs.readFileSync(path.join(tmpDir, 'vcl/qt5/QtGraphics_Controls.cxx'), 'utf8')
+    const qtControls = readLf(path.join(tmpDir, 'vcl/qt5/QtGraphics_Controls.cxx'))
     assert.match(qtControls, /#include <vcl\/settings\.hxx>/)
     assert.equal(qtControls.match(/MiscSettings::GetAppColorMode\(\) == 2/g).length, 2)
 
@@ -668,6 +671,17 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
         mustKeep: true,
       },
       {
+        // E1: zh-TW (Traditional) UI catalogs and registry ship alongside zh-CN
+        filename: '/instdir/share/registry/Langpack-zh-TW.xcd',
+        payload: Buffer.from('<oor:data xmlns:oor="http://openoffice.org/2001/registry">zh-TW</oor:data>', 'utf8'),
+        mustKeep: true,
+      },
+      {
+        filename: '/instdir/program/resource/zh_TW/LC_MESSAGES/sw.mo',
+        payload: Buffer.from('\xde\x12\x04\x95\x00\x00\x00\x00zh_TW_sw_mo_catalog', 'binary'),
+        mustKeep: true,
+      },
+      {
         filename: '/instdir/share/fonts/truetype/LiberationSans-Regular.ttf',
         payload: Buffer.from('TTF_LIBERATION_SANS', 'utf8'),
         mustKeep: true,
@@ -714,6 +728,8 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
     // Check CustomTarget_emscripten_fs_image.mk
     const mkPatched = fs.readFileSync(mkPath, 'utf8')
     assert.match(mkPatched, /ZZZ-aiworkdeck-locale-zh-CN\.xcd/)
+    assert.match(mkPatched, /Langpack-zh-TW\.xcd[\s\S]*resource\/zh_TW\/LC_MESSAGES/)
+    assert.doesNotMatch(mkPatched, /ZZZ-aiworkdeck-locale-zh-TW/)
     assert.match(mkPatched, /filter-out[\s\S]*%\/Lightproof\.py/)
 
     // Check repacked soffice.data and metadata
@@ -750,6 +766,8 @@ test('fs-image-patch.py strips Lightproof.py and non-zh/en dicts while preservin
     assert.ok(keptNames.has('/instdir/share/extensions/dict-zh-CN/zh_CN.dic'))
     assert.ok(keptNames.has('/instdir/share/registry/Langpack-zh-CN.xcd'))
     assert.ok(keptNames.has('/instdir/program/resource/zh_CN/LC_MESSAGES/sw.mo'))
+    assert.ok(keptNames.has('/instdir/share/registry/Langpack-zh-TW.xcd'))
+    assert.ok(keptNames.has('/instdir/program/resource/zh_TW/LC_MESSAGES/sw.mo'))
 
     // Second run must be idempotent
     const run2 = spawnSync('python3', [FS_IMAGE_PATCH_PY, tmpDir], { encoding: 'utf8' })

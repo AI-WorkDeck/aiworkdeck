@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "جديد",
+    "aria": "مستند جديد أو علامة تبويب جديدة في المتصفح",
+    "newWord": "مستند Word جديد",
+    "newExcel": "مصنف Excel جديد",
+    "newPowerPoint": "عرض PowerPoint تقديمي جديد",
+    "newBrowserTab": "علامة تبويب جديدة في المتصفح",
+  },
   scratchCopyChoose: "اختر المحتوى المراد نسخه",
   scratchCopySelected: "تم تحديد {count}",
   scratchCopyFiles: "الملفات",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "علامة تبويب جديدة في المتصفح",
   "moreTools": "مزيد من الأدوات",
   "railMore": "المزيد",
+  "reviewsEntry": "المراجعات",
+  "reviewsNeedYou": "{count} بانتظارك",
+  "reviewsPick": "اختر المراجعات التي تريد فتحها",
+  "reviewsPickItem": "{name} · {count} بالانتظار",
+  "reviewsOpen": "فتح ‹",
   "recordActivity": "سجل النشاط",
   "logout": "تسجيل الخروج",
   "stagingArea": "منطقة التحضير",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "سلة المحذوفات",
   "loadingText": "جارٍ التحميل...",
   "explorerFallback": "المستكشف",
-  "newOrCopy": "جديد / تكرار",
   "emptyWorkspace": "حدد ملفًا للبدء",
   "emptyWorkspaceHint": "افتح ملفًا من المستكشف على اليسار، أو أنشئ مستندًا جديدًا",
   "railEditEnter": "ترتيب الشريط الجانبي (اسحب لإعادة الترتيب أو التثبيت)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "يتعذر إرسال هذا الملف",
   "shareUnsupported": "الإرسال غير مدعوم على هذا النظام",
   "shareClipboardHint": "تم نسخ الملف. انتقل إلى WeChat، واختر محادثة واضغط Ctrl+V للإرسال",
-  "copyFailedNoNewFile": "فشل النسخ: لم يتم إرجاع ملف جديد",
-  "copyFailed": "فشل النسخ",
   "recordingStarted": "بدأ تسجيل النشاط",
   "recordingStopped": "توقف تسجيل النشاط",
   "insertedToDoc": "تم الإدراج في المستند",

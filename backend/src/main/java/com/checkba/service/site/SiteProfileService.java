@@ -52,12 +52,27 @@ public class SiteProfileService {
 
     private volatile String currentSiteId;
 
+    /** 没有 site.json 的老安装（启动前本机已有数据库），视同已选默认站点。 */
+    private final boolean legacyInstall;
+
     public SiteProfileService(
             @Value("${security.local-mode:false}") boolean localMode,
             @Value("${ai.account.base-url:https://www.aiworkdeck.com}") String configuredBaseUrl,
             @Value("${ai.account.resolved-site:}") String resolvedSite,
             @Value("${security.license.dir:${user.home}/.aiworkdeck}") String stateDir,
             SiteProperties properties) {
+        this(localMode, configuredBaseUrl, resolvedSite, stateDir, properties, false);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SiteProfileService(
+            @Value("${security.local-mode:false}") boolean localMode,
+            @Value("${ai.account.base-url:https://www.aiworkdeck.com}") String configuredBaseUrl,
+            @Value("${ai.account.resolved-site:}") String resolvedSite,
+            @Value("${security.license.dir:${user.home}/.aiworkdeck}") String stateDir,
+            SiteProperties properties,
+            @Value("${ai.account.legacy-install:false}") boolean legacyInstall) {
+        this.legacyInstall = legacyInstall;
         this.localMode = localMode;
         this.properties = properties;
         this.stateDir = Path.of(stateDir);
@@ -96,6 +111,49 @@ public class SiteProfileService {
 
     public boolean isPinned() {
         return pinned;
+    }
+
+    /**
+     * 用户是否已经选过站点（site.json 存在且有效），或站点由配置钉定（团队服务器、环境变量覆盖）。
+     * 全新安装、还没选站的桌面端回 false：此时不能把匿名统计、插件广场、组件包检查等站点相关请求
+     * 发到默认的国内站——国外用户的第一次启动不应先连大陆端点（0.91.0 发布前）。
+     */
+    /**
+     * 这个地址能不能现在连：选过站，或者它根本不是任何站点的地址（本机/测试替身/自建源）。
+     * 「没选站之前不发站点相关请求」拦的是默认落到站点上的请求，不拦显式指到别处的源。
+     */
+    public boolean mayContact(String url) {
+        if (siteChosen()) return true;
+        String host = hostOf(url);
+        if (host == null) return true;
+        for (SiteProperties.Site site : properties.getSites().values()) {
+            for (String u : java.util.Arrays.asList(site.getBaseUrl(), site.getRegistryBaseUrl(), site.getTelemetryIngestUrl())) {
+                String h = hostOf(u);
+                if (h != null && sameSite(host, h)) return false;
+            }
+        }
+        return !sameSite(host, "aiworkdeck.com") && !sameSite(host, "workdeck.ai");
+    }
+
+    private static String hostOf(String url) {
+        try {
+            String h = url == null ? null : java.net.URI.create(url.trim()).getHost();
+            return h == null ? null : h.toLowerCase(java.util.Locale.ROOT);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** www.example.com 与 example.com 算同一站点。 */
+    private static boolean sameSite(String a, String b) {
+        String x = a.startsWith("www.") ? a.substring(4) : a, y = b.startsWith("www.") ? b.substring(4) : b;
+        return x.equals(y) || x.endsWith("." + y) || y.endsWith("." + x);
+    }
+
+    public boolean siteChosen() {
+        if (pinned || !localMode || legacyInstall) return true;
+        String site = SiteStateFile.read(stateDir).site();
+        return site != null && !site.isBlank();
     }
 
     public SiteProfile profile() {

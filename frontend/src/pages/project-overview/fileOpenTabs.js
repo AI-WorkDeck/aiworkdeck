@@ -203,6 +203,10 @@ export const fileOpenTabsMethods = {
     // 由 LibreOfficeEditor（书签/quote）或 FilePreview（pdf 页码/图片框/媒体时刻）消费。
     // opts.review：计划审阅参数，挂在 tab.review 上交给 PlainTextEditor 的 review prop。
     openFile(file, opts = {}) {
+      // W note 5: a colleague's local-only file has no bytes here (desktop) or on the server (web): every entry
+      // point - tree, quick look, search - explains it instead of falling through to a generic download error
+      if (this.$refs && this.$refs.fileTree && typeof this.$refs.fileTree.explainLocalOnly === 'function'
+          && this.$refs.fileTree.explainLocalOnly(file)) return
       // 检查文件类型是否支持打开
       if (!this.isFileTypeSupported(file)) {
         uni.showModal({
@@ -1147,6 +1151,7 @@ export const fileOpenTabsMethods = {
     // 顶掉，律师只看得见最后一条、还以为只更新了一份。多文件时改为静音逐份重载、
     // 最后聚合成一句。单文件语义一个字不改（仍是原来的逐文件 toast）。
     async onVersionReloadFiles(affectedFileIds) {
+      this.$refs?.fileTree?.loadLocalOnly?.() // C12: a placeholder may have become a real file
       if (this._projectVersionReload) {
         const restored = await this._projectVersionReload()
         const ids = Array.isArray(affectedFileIds) ? affectedFileIds : [...new Set(Object.values(this._pdfPreviewRefs || {}).map(inst => inst.file?.id).filter(id => id != null))]

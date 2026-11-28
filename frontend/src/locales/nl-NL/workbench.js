@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Nieuw",
+    "aria": "Nieuw document of nieuw browsertabblad",
+    "newWord": "Nieuw Word-document",
+    "newExcel": "Nieuwe Excel-werkmap",
+    "newPowerPoint": "Nieuwe PowerPoint-presentatie",
+    "newBrowserTab": "Nieuw browsertabblad",
+  },
   scratchCopyChoose: "Kies inhoud om te kopiëren",
   scratchCopySelected: "{count} geselecteerd",
   scratchCopyFiles: "Bestanden",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "Nieuw browsertabblad",
   "moreTools": "Meer hulpmiddelen",
   "railMore": "Meer",
+  "reviewsEntry": "Ter beoordeling",
+  "reviewsNeedYou": "{count} wachten op u",
+  "reviewsPick": "Kies wat u wilt openen",
+  "reviewsPickItem": "{name} · {count} wachtend",
+  "reviewsOpen": "Openen ›",
   "recordActivity": "Activiteitenlogboek",
   "logout": "Uitloggen",
   "stagingArea": "Voorbereidingsgebied",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "Prullenbak",
   "loadingText": "Laden...",
   "explorerFallback": "Verkenner",
-  "newOrCopy": "Nieuw / Dupliceren",
   "emptyWorkspace": "Selecteer een bestand om te beginnen",
   "emptyWorkspaceHint": "Open een bestand via de verkenner aan de linkerkant, of maak een nieuw document",
   "railEditEnter": "Zijbalk indelen (slepen om te herordenen of vast te pinnen)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "Kan dit bestand niet verzenden",
   "shareUnsupported": "Verzenden wordt niet ondersteund op dit systeem",
   "shareClipboardHint": "Bestand gekopieerd. Ga naar WeChat, kies een chat en druk op Ctrl+V om te verzenden",
-  "copyFailedNoNewFile": "Kopiëren mislukt: er is geen nieuw bestand geretourneerd",
-  "copyFailed": "Kopiëren mislukt",
   "recordingStarted": "Loggen gestart",
   "recordingStopped": "Loggen gestopt",
   "insertedToDoc": "In het document ingevoegd",

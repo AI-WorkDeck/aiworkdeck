@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Workbench copy (pages/project-overview/project-overview.vue).
 export default {
+  plusMenu: {
+    tooltip: "New",
+    aria: "New document or browser tab",
+    newWord: "New Word document",
+    newExcel: "New Excel workbook",
+    newPowerPoint: "New PowerPoint presentation",
+    newBrowserTab: "New browser tab",
+  },
   scratchCopyChoose: "Choose content to copy",
   scratchCopySelected: "{count} selected",
   scratchCopyFiles: "Files",
@@ -164,6 +172,11 @@ export default {
   browserNewTabHint: 'New browser tab',
   moreTools: 'More tools',
   railMore: 'More',
+  reviewsEntry: 'Reviews',
+  reviewsNeedYou: '{count} waiting for you',
+  reviewsPick: 'Choose which reviews to open',
+  reviewsPickItem: '{name} · {count} waiting',
+  reviewsOpen: 'Open ›',
   recordActivity: 'Activity Log',
   logout: 'Sign Out',
   // Left rail
@@ -190,7 +203,6 @@ export default {
   loadingText: 'Loading...',
   explorerFallback: 'Explorer',
   // Tabs bar and editor area
-  newOrCopy: 'New / Duplicate',
   emptyWorkspace: 'Select a file to get started',
   emptyWorkspaceHint: 'Open a file from the explorer on the left, or create a new document',
   railEditEnter: 'Arrange sidebar (drag to reorder or dock)',
@@ -366,8 +378,6 @@ export default {
   shareFailed: 'Cannot send this file',
   shareUnsupported: 'Sending is not supported on this system',
   shareClipboardHint: 'File copied. Switch to WeChat, pick a chat and press Ctrl+V to send',
-  copyFailedNoNewFile: 'Copy failed: no new file returned',
-  copyFailed: 'Copy failed',
   recordingStarted: 'Logging started',
   recordingStopped: 'Logging stopped',
   insertedToDoc: 'Inserted into document',

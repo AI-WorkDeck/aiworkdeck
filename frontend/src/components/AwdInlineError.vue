@@ -6,7 +6,10 @@
   <view class="awd-inline-error" role="alert">
     <text class="awd-inline-error-message">{{ text }}</text>
     <view class="awd-inline-error-actions">
-      <view v-if="showAction" class="awd-inline-error-btn primary" role="button" tabindex="0"
+      <!-- X39：调用方给一个领头动作（如「继续」）时它是主按钮，目录动作（重试）退为次按钮 -->
+      <view v-if="leadAction" class="awd-inline-error-btn primary" role="button" tabindex="0" :title="leadAction.title || ''"
+        @tap.stop="$emit('lead')" @keydown.enter.prevent="$emit('lead')">{{ $t('errors.actions.' + leadAction.key) }}</view>
+      <view v-if="showAction" class="awd-inline-error-btn" :class="{ primary: !leadAction }" role="button" tabindex="0"
         @tap.stop="onAction" @keydown.enter.prevent="onAction">{{ $t('errors.actions.' + message.action) }}</view>
       <view v-if="message.detail" class="awd-inline-error-btn" role="button" tabindex="0" :aria-expanded="detailsOpen"
         @tap.stop="detailsOpen = !detailsOpen" @keydown.enter.prevent="detailsOpen = !detailsOpen">{{ $t(detailsOpen ? 'errors.actions.hideDetails' : 'errors.actions.details') }}</view>
@@ -27,8 +30,10 @@ export default {
     context: { type: Object, default: () => ({}) },
     // Hide the primary button when the caller has nothing to wire it to.
     actionable: { type: Boolean, default: true },
+    // X39: optional leading action { key: 'continue', title } shown before the catalogue action
+    leadAction: { type: Object, default: null },
   },
-  emits: ['retry', 'sign-in', 'refresh', 'reconnect', 'action'],
+  emits: ['retry', 'sign-in', 'refresh', 'reconnect', 'top-up', 'action', 'lead'],
   data() {
     return { detailsOpen: false }
   },
@@ -53,7 +58,11 @@ export default {
       if (a === 'signIn') this.$emit('sign-in')
       else if (a === 'refresh') this.$emit('refresh')
       else if (a === 'reconnect') this.$emit('reconnect')
-      else this.$emit('retry')
+      else if (a === 'topUp') {
+        // Q29: open top-up here so every caller gets a working button; explicit click, never suppressed.
+        this.$emit('top-up')
+        import('@/utils/requireAccount.js').then((m) => m.requireRecharge()).catch(() => {})
+      } else this.$emit('retry')
     },
   },
 }

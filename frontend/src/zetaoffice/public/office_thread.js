@@ -7270,6 +7270,18 @@ const EXEC = {
     if (req.textBoundaries != null) {
       try { vs.setPropertyValue('ShowTextBoundaries', !!req.textBoundaries); } catch (e) {}
     }
+    // D12：书签边界标记（灰色的 [ ]）。每段都挂着 __ai_anchor_ 书签，显示出来就是满屏方括号。
+    // 视图属性与「格式辅助 → 书签」配置两处都关；引擎版本不支持的那处静默跳过。
+    if (req.bookmarks != null) {
+      try { vs.setPropertyValue('ShowBookmarks', !!req.bookmarks); } catch (e) {}
+      try {
+        const provider = context.getServiceManager().createInstanceWithContext('com.sun.star.configuration.ConfigurationProvider', context);
+        const access = provider.createInstanceWithArguments('com.sun.star.configuration.ConfigurationUpdateAccess',
+          [mkProp('nodepath', '/org.openoffice.Office.Writer/Content/NonprintingCharacter')]);
+        access.replaceByName('Bookmarks', !!req.bookmarks);
+        access.commitChanges();
+      } catch (e) {}
+    }
     if (req.ruler != null) {
       for (const k of ['ShowRulers', 'ShowHoriRuler', 'ShowVertRuler']) {
         try { vs.setPropertyValue(k, !!req.ruler); } catch (e) {}
@@ -7283,6 +7295,7 @@ const EXEC = {
     try { out.formattingMarks = !!vs.getPropertyValue('ShowNonprintingCharacters'); } catch (e) {}
     if (req.formattingMarks != null && out.formattingMarks !== !!req.formattingMarks) return { success: false, message: 'ShowNonprintingCharacters: value not applied' };
     try { out.textBoundaries = !!vs.getPropertyValue('ShowTextBoundaries'); } catch (e) {}
+    try { out.bookmarks = !!vs.getPropertyValue('ShowBookmarks'); } catch (e) {}
     try { out.ruler = !!vs.getPropertyValue('ShowHoriRuler'); } catch (e) {}
     try { out.verticalRuler = !!vs.getPropertyValue('ShowVertRuler'); } catch (e) {}
     return out;

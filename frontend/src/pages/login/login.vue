@@ -50,6 +50,8 @@
 
           <!-- Login Form -->
           <view v-if="activeTab === 'login' && !smsStep" class="form-body swing-in">
+            <!-- Q2: this page is only reached in a browser on a team server; say which account it wants -->
+            <text class="server-hint">{{ $t('account.teamServerLoginHint') }}</text>
             <view class="input-group">
               <text class="label">{{ $t('account.usernameLabel') }}</text>
               <input class="glass-input" type="text" v-model="loginForm.username" :placeholder="$t('account.usernamePlaceholder')" placeholder-class="placeholder-style" />
@@ -528,6 +530,14 @@ export default {
   font-size: var(--awd-font-size-body);
   color: var(--awd-text-2);
   letter-spacing: 0.5px;
+}
+
+.server-hint {
+  display: block;
+  font-size: var(--awd-font-size-body);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  color: var(--awd-text-2);
 }
 
 .auth-tabs {

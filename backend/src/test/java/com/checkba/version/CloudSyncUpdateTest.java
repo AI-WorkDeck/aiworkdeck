@@ -260,6 +260,8 @@ class CloudSyncUpdateTest {
         CloudSyncService.UpdateResult r = cloud.updateFromCloud(7L, 1L, "韩泽伟");
         assertEquals(CloudSyncService.UpdateStatus.CONFLICT, r.status());
         assertTrue(repoSvc.repositoryMerging(7L));
+        // C28: while the lawyer chooses, the file keeps their own content, never git's conflict markers.
+        assertEquals("我的第二稿", Files.readString(root.resolve("projects/7/合同.txt")));
     }
 
     /**
@@ -320,6 +322,32 @@ class CloudSyncUpdateTest {
         assertEquals("内容", Files.readString(root.resolve("projects/7/同事新增.txt")));
         assertTrue(dbRowsOf(7L).stream().anyMatch(f -> "同事新增.txt".equals(f.getName())));
         assertFalse(r.affectedFileIds().isEmpty());
+    }
+
+    /**
+     * C33（dev-board#1866）：同事那边的提交里有一份文件、清单里却没有它（库里没登记就被自动存档收进去），
+     * 取回后照清单建树就看不见它。取回要按提交里实际跟踪的文件补上行。
+     */
+    @Test
+    void aPulledFileMissingFromTheColleaguesManifestStillAppears() throws Exception {
+        linkToBareRemote(7L);
+        cloud.uploadToCloud(7L, false);
+        Path peerDir = Files.createTempDirectory("cloud-peer");
+        try (Git peer = Git.cloneRepository().setURI(repoSvc.remoteOriginUrl(7L)).setDirectory(peerDir.toFile()).call()) {
+            Files.createDirectories(peerDir.resolve("证据"));
+            Files.writeString(peerDir.resolve("证据/送货单.txt"), "送货单（虚构）");
+            peer.add().addFilepattern(".").call();   // no manifest node: the C33 shape
+            peer.commit().setMessage("修改了《送货单》\n\nX-AWD-Kind: auto").setAuthor("同事", "p@example.com").call();
+            peer.push().call();
+        }
+        CloudSyncService.UpdateResult r = cloud.updateFromCloud(7L, 1L, "陆知微");
+        assertEquals(CloudSyncService.UpdateStatus.UPDATED, r.status());
+        assertEquals("送货单（虚构）", Files.readString(root.resolve("projects/7/证据/送货单.txt")));
+        ProjectFile row = dbRowsOf(7L).stream().filter(f -> "送货单.txt".equals(f.getName())).findFirst()
+                .orElseThrow(() -> new AssertionError("the pulled file has no row, so the explorer never shows it"));
+        assertEquals("projects/7/证据/送货单.txt", row.getFilePath());
+        assertTrue(dbRowsOf(7L).stream().anyMatch(f -> Boolean.TRUE.equals(f.getIsFolder()) && "证据".equals(f.getName())
+                && java.util.Objects.equals(f.getId(), row.getParentId())));
     }
 
     @Test
@@ -522,6 +550,26 @@ class CloudSyncUpdateTest {
         svc.commitNow(7L, 1L, "陆知微", null);
         assertDoesNotThrow(() -> cloud.updateFromCloud(7L, 1L, "陆知微"));
         assertTrue(svc.activeSession(7L).isEmpty(), "the empty session was discarded, not the pull refused");
+    }
+
+    /**
+     * C35（dev-board#1871，lane C 0.91.1 RC）：保存版本之后、交稿还没落到案件库（上传中、或上传失败）时，
+     * 顶栏写着「和大家的稿一致」，版本记录却是「本机领先 2 版」。pendingUpload 只是一面「上次推送被拒/失败」
+     * 的旗子，本机存了还没推上去的版本时它是 false。律师据此以为同事已经拿到了自己的稿。
+     */
+    @Test
+    void aSavedVersionNotYetOnTheLibraryIsPendingUpload() throws Exception {
+        linkToBareRemote(7L);
+        cloud.uploadToCloud(7L, false);
+        assertEquals(false, cloud.cloudStatus(7L, 1L).get("pendingUpload"), "just submitted: in sync");
+
+        Files.writeString(root.resolve("projects/7/我的.txt"), "保存了、还没交（虚构）");
+        repoSvc.commitAll(7L, "保存版本", "session", null, "陆知微", "assoc@example.test");
+        assertEquals(true, cloud.cloudStatus(7L, 1L).get("pendingUpload"),
+                "a saved version the library does not have must read 「有改动还没交稿」, never 「和大家的稿一致」");
+
+        cloud.uploadToCloud(7L, false);
+        assertEquals(false, cloud.cloudStatus(7L, 1L).get("pendingUpload"), "submitted again: in sync");
     }
 
     @Test

@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // 工作台（pages/project-overview/project-overview.vue）文案。
 export default {
+  plusMenu: {
+    tooltip: "新建",
+    aria: "新建文档或浏览器标签页",
+    newWord: "新建 Word 文档",
+    newExcel: "新建 Excel 表格",
+    newPowerPoint: "新建 PowerPoint 演示文稿",
+    newBrowserTab: "新建浏览器标签页",
+  },
   scratchCopyChoose: "选择要转存的内容",
   scratchCopySelected: "已选 {count} 项",
   scratchCopyFiles: "文件",
@@ -164,6 +172,11 @@ export default {
   browserNewTabHint: '新建浏览器标签',
   moreTools: '更多工具',
   railMore: '更多',
+  reviewsEntry: '审阅',
+  reviewsNeedYou: '{count} 件待你处理',
+  reviewsPick: '选择要打开的审阅',
+  reviewsPickItem: '{name} · {count} 件待处理',
+  reviewsOpen: '打开 ›',
   recordActivity: '工作记录',
   logout: '退出登录',
   // 左侧常驻栏
@@ -190,7 +203,6 @@ export default {
   loadingText: '加载中...',
   explorerFallback: '文件树',
   // 标签栏与编辑区
-  newOrCopy: '新建/复制',
   emptyWorkspace: '选择文件开始工作',
   emptyWorkspaceHint: '从左侧资源管理器打开文件，或新建一份文档',
   railEditEnter: '整理侧栏（拖动排序或停靠）',
@@ -364,8 +376,6 @@ export default {
   shareFailed: '无法发送这份文件',
   shareUnsupported: '当前系统不支持发送',
   shareClipboardHint: '文件已复制，切到微信选好对话后按 Ctrl+V 即可发送',
-  copyFailedNoNewFile: '复制失败：未返回新文件',
-  copyFailed: '复制失败',
   recordingStarted: '已开始记录',
   recordingStopped: '已停止记录',
   insertedToDoc: '已插入文档',

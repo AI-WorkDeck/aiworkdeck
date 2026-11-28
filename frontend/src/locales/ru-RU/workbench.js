@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Создать",
+    "aria": "Новый документ или новая вкладка браузера",
+    "newWord": "Новый документ Word",
+    "newExcel": "Новая книга Excel",
+    "newPowerPoint": "Новая презентация PowerPoint",
+    "newBrowserTab": "Новая вкладка браузера",
+  },
   scratchCopyChoose: "Выберите содержимое для копирования",
   scratchCopySelected: "Выбрано: {count}",
   scratchCopyFiles: "Файлы",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "Новая вкладка браузера",
   "moreTools": "Другие инструменты",
   "railMore": "Ещё",
+  "reviewsEntry": "Рецензирование",
+  "reviewsNeedYou": "Ждут вас: {count}",
+  "reviewsPick": "Выберите, что открыть",
+  "reviewsPickItem": "{name} · ждут: {count}",
+  "reviewsOpen": "Открыть ›",
   "recordActivity": "Журнал активности",
   "logout": "Выйти",
   "stagingArea": "Рабочая область",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "Корзина",
   "loadingText": "Загрузка...",
   "explorerFallback": "Проводник",
-  "newOrCopy": "Создать / Дублировать",
   "emptyWorkspace": "Выберите файл, чтобы начать работу",
   "emptyWorkspaceHint": "Откройте файл в проводнике слева или создайте новый документ",
   "railEditEnter": "Упорядочить боковую панель (перетащите для изменения порядка или закрепления)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "Не удалось отправить этот файл",
   "shareUnsupported": "Отправка не поддерживается в этой системе",
   "shareClipboardHint": "Файл скопирован. Переключитесь в WeChat, выберите чат и нажмите Ctrl+V для отправки",
-  "copyFailedNoNewFile": "Ошибка копирования: новый файл не возвращён",
-  "copyFailed": "Ошибка копирования",
   "recordingStarted": "Ведение журнала начато",
   "recordingStopped": "Ведение журнала остановлено",
   "insertedToDoc": "Вставлено в документ",

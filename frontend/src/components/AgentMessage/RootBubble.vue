@@ -175,9 +175,11 @@
              「用到文档」操作 chip（dev-board#212）。 -->
         <div v-if="bubble.stopNotice" class="stop-notice">{{ bubble.stopNotice }}</div>
         <!-- X7：这一轮失败了——目录文案 + 重试/登录 + 详情；原始错误只在详情里 -->
-        <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="bubble.errorNotice"
-          :actionable="isLatest || bubble.errorNotice.action === 'signIn' || bubble.errorNotice.action === 'reconnect'"
-          @retry="$emit('retry-failed')" @sign-in="signInForAi" @reconnect="reconnectForAi" />
+        <!-- X39：长回答中途断开（非停止、非工具半途、文档没变、续写没连败两次）时多一个「继续」 -->
+        <AwdInlineError v-if="bubble.errorNotice" class="bubble-error-notice" :error="errorShown"
+          :actionable="isLatest || bubble.errorNotice.action === 'signIn' || bubble.errorNotice.action === 'reconnect' || bubble.errorNotice.action === 'topUp'"
+          :lead-action="continueOffered ? { key: 'continue', title: $t('errors.actions.continueTooltip') } : null"
+          @lead="$emit('continue-answer')" @retry="$emit('retry-failed')" @sign-in="signInForAi" @reconnect="reconnectForAi" />
     </div>
   </div>
 </template>
@@ -197,6 +199,7 @@ import LegalReferencePane from '../legal/LegalReferencePane.vue'
 import { legalMessageParts, referencesFromTools, legalReadableText, allowPlainJsonLegalReferences, liveLawToolOutputs, corroborateReference } from '@/utils/legalReferences.js'
 import MarkdownPreview from '../MarkdownPreview.vue'
 import AwdInlineError from '../AwdInlineError.vue'
+import { continueDecision } from '@/utils/continueDecision.js'
 import { requireAccount } from '@/utils/requireAccount.js'
 import { stripEmoji } from '@/utils/stripEmoji.js'
 import { t } from '@/i18n'
@@ -217,7 +220,29 @@ const props = defineProps({
   reviewStates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'retry-failed', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+const emit = defineEmits(['open-artifact-tab', 'approve', 'message-action', 'answer-question', 'regenerate', 'retry-failed', 'continue-answer', 'open-review', 'stop-generation', 'open-file', 'reading-interaction', 'consent-accepted'])
+
+// X39：「继续」是否出现，以及断开提示用哪一句（可续写 / 又断开了 / 普通）
+const continueState = computed(() => {
+  const n = props.bubble && props.bubble.errorNotice
+  if (!n) return { offerContinue: false, messageKey: '' }
+  return continueDecision({
+    errorKey: n.key,
+    partialText: props.bubble.content,
+    stoppedByUser: !!props.bubble.stopNotice,
+    toolInFlight: !!props.bubble.toolInFlightAtCut,
+    documentChanged: !!props.bubble.documentChangedSinceCut,
+    failedContinues: props.bubble.failedContinues || 0,
+  })
+})
+const continueOffered = computed(() => props.isLatest && continueState.value.offerContinue)
+const errorShown = computed(() => {
+  const n = props.bubble && props.bubble.errorNotice
+  if (!n || n.key !== 'streamInterrupted') return n
+  const key = continueState.value.messageKey === 'streamInterruptedTwice' ? 'streamInterruptedTwice'
+    : continueOffered.value ? 'streamInterruptedResumable' : 'streamInterrupted'
+  return key === n.key ? n : { ...n, key }
+})
 function onConsentAccepted() {
   props.bubble.consentRequired = false
   emit('consent-accepted')

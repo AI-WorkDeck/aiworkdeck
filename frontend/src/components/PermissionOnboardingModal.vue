@@ -115,6 +115,7 @@
 <script>
 import { host } from '@/services/host.js'
 import { setGlobalOverlay } from '@/utils/overlayState.js'
+import { loadSiteLinks } from '@/utils/siteLinks.js'
 import {
   PERMISSION_ONBOARDING_EVENT,
   PERMISSION_ONBOARDING_PREF_KEY,
@@ -139,15 +140,17 @@ export default {
       focusedId: 'fullDiskAccess',
       triggerReason: '',
       autoStepQueue: [],
+      // 站点异步取得；未知前既不显示微信标签也不提微信（siteLinks() 非响应式，首启回落 cn 会误显，Q 11-28）
+      siteId: null,
     }
   },
   computed: {
     displayItems() {
-      const normalized = normalizePermissionItems(this.items)
+      const normalized = normalizePermissionItems(this.items, { wechat: this.siteId === 'cn' })
       const metaById = {
         fullDiskAccess: {
           title: this.$t('admin.permFullDiskAccessTitle'),
-          description: this.$t('admin.permFullDiskAccessDesc'),
+          description: this.$t(this.siteId === 'cn' ? 'admin.permFullDiskAccessDesc' : 'admin.permFullDiskAccessDescIntl'),
         },
         screenRecording: {
           title: this.$t('admin.permScreenRecordingTitle'),
@@ -180,6 +183,9 @@ export default {
       // 首启弹窗排队（问题 4/40）：权限窗关掉后，排在后面的「可选组件」窗才弹
       if (!v) markPermissionOnboardingStartupSettled()
     },
+  },
+  created() {
+    loadSiteLinks().then((links) => { this.siteId = links.current })
   },
   mounted() {
     this._onOpenEvent = (payload) => this.openModal(payload || {})

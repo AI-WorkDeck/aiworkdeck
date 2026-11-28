@@ -94,3 +94,24 @@ test('首启弹窗排队：权限引导启动检查结束前，可选组件窗�
   assert.doesNotMatch(body, /this\.showOptionalComponents = /)
   assert.match(body, /this\.optionalComponentsSuggested = shouldShow/)
 })
+
+test('international site: Full Disk Access is not labelled "Required for WeChat Drop"', () => {
+  const cn = normalizePermissionItems([{ id: 'fullDiskAccess', status: 'not-granted' }])
+  assert.equal(cn.find((i) => i.id === 'fullDiskAccess').requiredForWeChatDrop, true)
+  const intl = normalizePermissionItems([{ id: 'fullDiskAccess', status: 'not-granted' }], { wechat: false })
+  assert.equal(intl.find((i) => i.id === 'fullDiskAccess').requiredForWeChatDrop, false)
+  assert.equal(intl.find((i) => i.id === 'fullDiskAccess').recommended, true)
+})
+
+// Q31 (Q 11-28): siteLinks() is not reactive and returns the cn fallback before /api/site answers,
+// so a computed that called it showed the WeChat tag on a first international launch.
+// The modal keeps the site in reactive data and treats "unknown" as not-cn.
+test('PermissionOnboardingModal decides WeChat copy from reactive site data, not siteLinks()', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const src = await readFile(new URL('../../src/components/PermissionOnboardingModal.vue', import.meta.url), 'utf8')
+  assert.doesNotMatch(src, /siteLinks\(\)\.current/)
+  assert.match(src, /siteId: null/)
+  assert.match(src, /loadSiteLinks\(\)\.then\(\(links\) => \{ this\.siteId = links\.current \}\)/)
+  assert.match(src, /normalizePermissionItems\(this\.items, \{ wechat: this\.siteId === 'cn' \}\)/)
+  assert.match(src, /this\.siteId === 'cn' \? 'admin\.permFullDiskAccessDesc' : 'admin\.permFullDiskAccessDescIntl'/)
+})

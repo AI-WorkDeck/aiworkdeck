@@ -146,4 +146,33 @@ class SiteEnvironmentPostProcessorTest {
                 .filter(s -> "awdSiteProfile".equals(s.getName())).count();
         assertEquals(1, count);
     }
+
+    @Test
+    @DisplayName("0.91.0：老安装（已有本机数据库）没有 site.json → 记为 legacy、不写盘；全新安装不记")
+    void legacyInstallIsMarkedWithoutWritingFreshInstallIsNot() throws Exception {
+        StandardEnvironment fresh = env(true, true);
+        run(fresh);
+        assertNull(fresh.getProperty("ai.account.legacy-install"));
+        java.nio.file.Files.writeString(tempDir.resolve("local.mv.db"), "x");
+        StandardEnvironment legacy = env(true, true);
+        run(legacy);
+        assertEquals("true", legacy.getProperty("ai.account.legacy-install"));
+        assertNull(SiteStateFile.read(tempDir).site(), "nothing is written to the user's data dir");
+    }
+
+    @Test
+    @DisplayName("0.91.0：组件包封禁表与下载源跟着站点走，国际站不先连大陆镜像")
+    void packsFollowTheChosenSite() throws Exception {
+        chooseSite("intl");
+        StandardEnvironment environment = env(true, true);
+        environment.getPropertySources().get("applicationConfig");
+        java.util.Map<String, Object> extra = new java.util.LinkedHashMap<>();
+        extra.put("ai.account.sites.cn.packs-base-url", CN + "/plugin-packs");
+        extra.put("ai.account.sites.intl.packs-base-url", "https://workdeck.ai/plugin-packs");
+        environment.getPropertySources().addLast(new MapPropertySource("sitePacks", extra));
+        run(environment);
+        assertEquals(INTL + "/api/registry/packs/revoked", environment.getProperty("ai.packs.revoked-url"));
+        assertEquals("https://workdeck.ai/plugin-packs", environment.getProperty("ai.packs.base-urls[0]"));
+        assertEquals(CN + "/plugin-packs", environment.getProperty("ai.packs.base-urls[1]"));
+    }
 }

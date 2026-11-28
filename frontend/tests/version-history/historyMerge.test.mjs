@@ -151,6 +151,15 @@ test('改角色那句用的是角色展示名，不是后端枚举值', () => {
   assert.ok(!out.includes('ADMIN'))
 })
 
+test('C9：改角色事件带 {fromRole, toRole} 时说的是改成了什么', () => {
+  const e = ev(1, 'MEMBER_ROLE_CHANGED', {
+    actor: { userId: 9, displayName: '沈砚' }, target: { displayName: '陆知微' }, detail: { fromRole: 'PARTICIPANT', toRole: 'READ_ONLY' },
+  })
+  const out = eventRowText(t, e, { ...ctx, roleLabel: (r) => ({ READ_ONLY: '只读成员', PARTICIPANT: '协作人' })[r] || r })
+  assert.ok(out.includes('只读成员'), out)
+  assert.ok(!out.includes('协作人'), 'names the new role, not the old one: ' + out)
+})
+
 test('认不出的 kind 返回空串（老/新服务端各自多出来的类型不该渲染成半句话）', () => {
   assert.equal(eventRowText(t, ev(1, 'SOMETHING_NEW', { actor: { userId: 9, displayName: '张三' } }), ctx), '')
   assert.equal(eventRowText(t, {}, ctx), '')

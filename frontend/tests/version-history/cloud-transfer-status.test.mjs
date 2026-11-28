@@ -75,3 +75,22 @@ test('the workbench status bar mounts it for linked cases, and every submit/pull
   assert.match(api, /uni\.\$emit\('awd:cloud-transfer-kick', projectId\)/)
   assert.match(source, /const TRANSFER_KICK_EVENT = 'awd:cloud-transfer-kick'/)
 })
+
+// C12 nit (lane C r2-01a-30mb-progress.png): during a 交稿 the same 「正在上传大文件 x / y MB」 line showed twice -
+// above the guide (the foreground progress line) and in this status-bar cell, with slightly different numbers.
+// While a foreground transfer is on screen the cell stands down; it keeps polling and comes back afterwards
+// (background 交稿 after ending a session, pulls started elsewhere).
+test('the status-bar cell stands down while a foreground transfer line is shown', async () => {
+  const { vm, component, handlers } = mount({ answers: [{ active: true, direction: 'upload', doneBytes: 5 * MB, totalBytes: 29 * MB }] })
+  component.mounted.call(vm)
+  assert.equal(typeof handlers['awd:cloud-transfer-foreground'], 'function')
+  handlers['awd:cloud-transfer-foreground']({ projectId: 7, on: true })
+  await vm.poll()
+  assert.equal(vm.text, '', 'one progress line, not two')
+  handlers['awd:cloud-transfer-foreground']({ projectId: 99, on: false })
+  assert.equal(vm.text, '', 'another case ending does not bring it back')
+  handlers['awd:cloud-transfer-foreground']({ projectId: 7, on: false })
+  assert.equal(vm.text, 'version.transferUploading:5.0/29.0', 'back when the foreground transfer ends')
+  component.beforeUnmount.call(vm)
+  assert.equal(handlers['awd:cloud-transfer-foreground'], undefined)
+})

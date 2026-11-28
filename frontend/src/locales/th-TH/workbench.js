@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "ใหม่",
+    "aria": "เอกสารใหม่หรือแท็บเบราว์เซอร์ใหม่",
+    "newWord": "เอกสาร Word ใหม่",
+    "newExcel": "สมุดงาน Excel ใหม่",
+    "newPowerPoint": "งานนำเสนอ PowerPoint ใหม่",
+    "newBrowserTab": "แท็บเบราว์เซอร์ใหม่",
+  },
   scratchCopyChoose: "เลือกเนื้อหาที่จะคัดลอก",
   scratchCopySelected: "เลือกแล้ว {count} รายการ",
   scratchCopyFiles: "ไฟล์",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "แท็บเบราว์เซอร์ใหม่",
   "moreTools": "เครื่องมือเพิ่มเติม",
   "railMore": "เพิ่มเติม",
+  "reviewsEntry": "การตรวจทาน",
+  "reviewsNeedYou": "{count} รายการรอคุณ",
+  "reviewsPick": "เลือกการตรวจทานที่จะเปิด",
+  "reviewsPickItem": "{name} · รอ {count} รายการ",
+  "reviewsOpen": "เปิด ›",
   "recordActivity": "บันทึกกิจกรรม",
   "logout": "ออกจากระบบ",
   "stagingArea": "พื้นที่ชั่วคราว",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "ถังขยะ",
   "loadingText": "กำลังโหลด...",
   "explorerFallback": "ตัวสำรวจไฟล์",
-  "newOrCopy": "สร้างใหม่ / ทำสำเนา",
   "emptyWorkspace": "เลือกไฟล์เพื่อเริ่มต้นใช้งาน",
   "emptyWorkspaceHint": "เปิดไฟล์จากตัวสำรวจด้านซ้าย หรือสร้างเอกสารใหม่",
   "railEditEnter": "จัดเรียงแถบด้านข้าง (ลากเพื่อจัดลำดับหรือตรึง)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "ไม่สามารถส่งไฟล์นี้ได้",
   "shareUnsupported": "ระบบนี้ไม่รองรับการส่งไฟล์",
   "shareClipboardHint": "คัดลอกไฟล์แล้ว สลับไปที่ WeChat เลือกแชทแล้วกด Ctrl+V เพื่อส่ง",
-  "copyFailedNoNewFile": "คัดลอกไม่สำเร็จ: ไม่มีไฟล์ใหม่ที่ส่งกลับมา",
-  "copyFailed": "คัดลอกไม่สำเร็จ",
   "recordingStarted": "เริ่มบันทึกกิจกรรมแล้ว",
   "recordingStopped": "หยุดบันทึกกิจกรรมแล้ว",
   "insertedToDoc": "แทรกลงในเอกสารแล้ว",

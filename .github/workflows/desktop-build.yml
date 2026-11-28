@@ -178,7 +178,7 @@ jobs:
           # tooltips + FS/callMain exports. Hosted on the project site (versioned,
           # immutable; wasm/data served brotli so the installer stays small).
           # Unset -> upstream CDN (English UI). Build recipe: desktop/lowa-build/.
-          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zhcn-r10/
+          LOWA_BASE_URL: https://www.aiworkdeck.com/lowa-engine/24.2.8-zh-r11/
         run: |
           # Track A (Epic #43): download the LibreOffice WASM runtime (soffice.*)
           # into dist/zetaoffice/lowa and an OFL-licensed CJK font (Noto Sans SC)
@@ -287,6 +287,11 @@ jobs:
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
             --out desktop/bundled/mac-arm64 --native-platform macosx-arm64
+      # Packaged-level site check: the installed app runs `-cp app.jar:lib/*`, not the fat jar, so a
+      # Spring registration left at the fat-jar root never reaches users (0.91.0 RC: intl -> cn).
+      - name: Packaged backend honours site.json (macOS arm64)
+        if: runner.os == 'macOS'
+        run: node desktop/scripts/check-packaged-site.js --bundle desktop/bundled/mac-arm64 --site intl
       # ──────────────────────────────────────────────────────────────
       # Python 运行时 / graphviz 的缓存。
       #
@@ -329,6 +334,12 @@ jobs:
           node desktop/scripts/prepare-backend.js \
             --jar backend/target/backend-0.0.1-SNAPSHOT.jar \
             --out desktop/bundled/win-x64 --native-platform windows-x86_64
+      # Packaged-level site check: the installed app runs `-cp app.jar:lib/*`, not the fat jar, so a
+      # Spring registration left at the fat-jar root never reaches users (0.91.0 RC: intl -> cn).
+      - name: Packaged backend honours site.json (Windows x64)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: node desktop/scripts/check-packaged-site.js --bundle desktop/bundled/win-x64 --site intl
       # ──────────────────────────────────────────────────────────────
       # Python 运行时 / graphviz 的缓存。
       #

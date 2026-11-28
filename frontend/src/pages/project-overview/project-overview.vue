@@ -395,6 +395,8 @@
           <text v-else class="rail-icon">{{ p.icon }}</text>
           <text class="rail-label">{{ railLabelOf(p) }}</text>
           <text v-if="p.key === 'market' && pluginUpdateState.count > 0" class="rail-badge" :aria-label="$t('market.updateAvailableCount', { count: pluginUpdateState.count })" :title="$t('market.updateAvailableCount', { count: pluginUpdateState.count })">{{ pluginUpdateState.count > 99 ? '99+' : pluginUpdateState.count }}</text>
+          <text v-if="p.key === HOST_REVIEWS_KEY && reviewCount > 0" class="rail-badge" :aria-label="$t('workbench.reviewsNeedYou', { count: reviewCount })">{{ reviewCount }}</text>
+          <text v-else-if="p.isDynamic && reviewBadgeOf(p.pluginId) > 0" class="rail-badge" :aria-label="$t('workbench.reviewsNeedYou', { count: reviewBadgeOf(p.pluginId) })">{{ reviewBadgeOf(p.pluginId) }}</text>
           <text v-if="p.key === 'dd-client' && ddClientUnread > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddClientUnread })">{{ ddClientUnread > 99 ? '99+' : ddClientUnread }}</text>
           <text v-if="p.key === 'dd-files' && ddLawyerNotifications.length > 0" class="rail-badge" :aria-label="$t('ddWorkflow.unreadNotifications', { count: ddLawyerNotifications.length })">{{ ddLawyerNotifications.length > 99 ? '99+' : ddLawyerNotifications.length }}</text>
           <!-- 日程徽标（dev-board#899）：当前项目 逾期 + 今天 的未完成事项数，0 不显；有逾期时转朱砂红 -->
@@ -1006,7 +1008,7 @@
                     </view>
                   </view>
                 </scroll-view>
-                <view class="tabs-plus" @tap="onTabsPlusClick('left')" :title="$t('workbench.newOrCopy')">
+                <view class="tabs-plus" role="button" tabindex="0" aria-haspopup="menu" @tap="onTabsPlusClick('left', $event)" @keydown.enter.prevent="onTabsPlusClick('left', $event)" :title="$t('workbench.plusMenu.tooltip')" :aria-label="$t('workbench.plusMenu.aria')">
                   <text class="tabs-plus-icon">＋</text>
                 </view>
               </view>
@@ -1049,7 +1051,7 @@
                     </view>
                   </view>
                 </scroll-view>
-                <view class="tabs-plus" @tap="onTabsPlusClick('right')" :title="$t('workbench.newOrCopy')">
+                <view class="tabs-plus" role="button" tabindex="0" aria-haspopup="menu" @tap="onTabsPlusClick('right', $event)" @keydown.enter.prevent="onTabsPlusClick('right', $event)" :title="$t('workbench.plusMenu.tooltip')" :aria-label="$t('workbench.plusMenu.aria')">
                   <text class="tabs-plus-icon">＋</text>
                 </view>
               </view>
@@ -1385,6 +1387,8 @@
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
                       :components-suggested="optionalComponentsSuggested"
+                      :review-count="reviewCount"
+                      @open-reviews="openReviewsEntry"
                       @open-components="openSuggestedComponents"
                       @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
@@ -1671,6 +1675,8 @@
                       :current-project-id="hasNamedProject ? projectId : null"
                       :show-on-startup="showWelcomeOnStartup"
                       :components-suggested="optionalComponentsSuggested"
+                      :review-count="reviewCount"
+                      @open-reviews="openReviewsEntry"
                       @open-components="openSuggestedComponents"
                       @dismiss-components="dismissSuggestedComponents"
                       :catalog-request="welcomeCatalogRequest"
@@ -2308,6 +2314,7 @@
       />
 
       <!-- 命令面板（⌥⌘P）：与菜单栏读同一份命令表 -->
+      <TabsPlusMenu ref="tabsPlusMenu" @select="onTabsPlusSelect" />
       <CommandPalette
         v-if="commandPaletteVisible"
         @run="onCommandPaletteRun"
@@ -2512,6 +2519,7 @@ import BrowserPane from '@/components/BrowserPane.vue'
 import FileTree from '@/components/FileTree.vue'
 import QuickOpenPanel from '@/components/QuickOpenPanel.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
+import TabsPlusMenu from '@/components/TabsPlusMenu.vue'
 import AppMenuBar from '@/components/AppMenuBar.vue'
 import DesktopUpdateIndicator from '@/components/DesktopUpdateIndicator.vue'
 import FilePreview from '@/components/FilePreview.vue'
@@ -2524,6 +2532,8 @@ import BuiltinWorkflowEditor from '@/components/BuiltinWorkflowEditor.vue'
 import { builtinWorkflowTabMethods } from './builtinWorkflowTab.js'
 import PluginPane from '@/components/PluginPane.vue' // Added
 import { pluginViews, isGlobalPlugin, hasPluginNavigation, hasPluginPanel, isLegacyThemeGallery } from '@/utils/pluginViews.js'
+import { entryViewOf, qualifyingEntries } from '@/utils/hostEntries.js'
+import { hostEntries, startHostEntries } from '@/composables/useHostEntries.js'
 import PluginGuidePane from '@/components/PluginGuidePane.vue'
 import PluginWorkspaceSummary from '@/components/PluginWorkspaceSummary.vue'
 import PluginDevPanel from '@/components/PluginDevPanel.vue'
@@ -2578,7 +2588,6 @@ import {
   createFile,
   ensureScratchProject,
   promoteScratchProject,
-  batchCopyFiles,
   exportAiDocx,
   getProjectMembers,
   logActivity,
@@ -2709,6 +2718,7 @@ import { tabDragSplitMethods } from './tabDragSplit.js'
 import { narrowLayoutMethods } from './narrowLayout.js'
 import { panelDockingData, panelDockingMethods } from './panelDocking.js'
 import { railSortData, railSortMethods } from './railSort.js'
+import { HOST_REVIEWS_KEY, reviewsEntryMethods } from './reviewsEntry.js'
 import { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarCollapse.js'
 import { loadLastConversation } from '@/utils/lastConversation.js'
 import { uniStorage } from '@/utils/uniStorage.js'
@@ -2784,6 +2794,7 @@ export default {
     BrowserPane,
     QuickOpenPanel,
     CommandPalette,
+    TabsPlusMenu,
     AppMenuBar,
     DesktopUpdateIndicator,
     FileTree,
@@ -2835,6 +2846,7 @@ export default {
   },
   data() {
     return {
+      HOST_REVIEWS_KEY,
       // 已自动合入的相邻段落还没过目的条数（mergeNeighborNotices.js），版本入口的小角标用
       mergeNeighborUnseen: 0,
       pdfRecovery: null,
@@ -3265,7 +3277,10 @@ export default {
     // C6：负责人是案件的负责人（成员名单里 role=OWNER，共享案件以案件库为准），不是本机这位。
     // 同事从案件库取回的案件，本机名单里没有负责人信息时才退回本机用户。
     projectLeadName() {
-      const owner = (this.projectMembers || []).find(m => m && m.role === 'OWNER')
+      // C6 (retest 0.91.1): the owner is the row the server marks owner=true (its role is ADMIN like any admin).
+      // mergeMembers lets the library decide once the case is shared, so a colleague's clone names the partner.
+      const members = (this.projectMembers || []).filter(Boolean)
+      const owner = members.find(m => m.owner === true) || members.find(m => m.role === 'OWNER')
       const name = owner && (owner.displayName || owner.nickname)
       return name || (this.project && this.project.manager) || this.userDisplayName || ''
     },
@@ -3426,7 +3441,7 @@ export default {
       if (!this.hasProject || this.isLooseWorkspace) {
         // 客户协作按钮无项目态不上 rail（面板本身仍可由消息中心等入口打开，见 NO_PROJECT_PANE_KEYS）
         const globals = [...LEFT_SIDEBAR_PLUGINS.filter(p => p.key !== 'dd-client' && isPaneAllowedWithoutProject(p.key)), ...this.dynamicPlugins.filter(p => hasPluginNavigation(p) && isGlobalPlugin(p))]
-        return this.applyRailOrder(this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)))
+        return this.applyRailOrder([...this.applyPanelDocks(globals).filter(p => isPaneAllowedWithoutProject(p.key) || isGlobalPlugin(p)), ...this.hostReviewsRailItems()])
       }
       const base = (user && user.role === 'CLIENT')
         ? getPluginsForUser('CLIENT')
@@ -3441,12 +3456,19 @@ export default {
       // 把搬到左侧的工具面板（变量库/收藏夹/剪贴板）追加在数组之后（dev-board#180）
       // applyRailOrder：最外层再套用户拖出来的顺序（dev-board#204），
       // 排序只改先后、不增删项，所以套在所有过滤/停靠之后
-      if (this.enabledSkillIds === null) return this.applyRailOrder(this.applyPanelDocks(base))
+      if (this.enabledSkillIds === null) return this.applyRailOrder([...this.applyPanelDocks(base), ...this.hostReviewsRailItems()])
       const filtered = filterPluginsByEnabledSkills(base, this.enabledSkillIds)
-      return this.applyRailOrder(this.applyPanelDocks(filtered))
+      return this.applyRailOrder([...this.applyPanelDocks(filtered), ...this.hostReviewsRailItems()])
     },
     // 版本记录 2026-08-19 挪出 rail 数组、独立渲染在「项目成员」与「暂存区」之间，
     // 模板拿不到裸导入的 VERSION_PLUGIN，包一层 computed 才能在模板里用它的 svgPaths。
+    // C1: plugins serving the host "reviews" entry that reported this account as approved (device-local state).
+    reviewEntries() {
+      return qualifyingEntries(this.dynamicPlugins, hostEntries.store, hostEntries.accountKey, 'reviews')
+    },
+    reviewCount() {
+      return this.reviewEntries.length ? this.reviewEntries.reduce((n, e) => n + e.badge, 0) : null
+    },
     VERSION_PLUGIN() {
       return VERSION_PLUGIN
     },
@@ -3619,9 +3641,11 @@ export default {
       // C5：只有刚联网核对过（15 秒内）才说「和大家的稿一致」。更早的核对只能说明当时一致——
       // 同事可能刚交了新稿，律师据此在旧稿上动手，之后就是合并或冲突。
       if (!this.collabFresh) {
-        if (this.collabChecking) return this.$t('workbench.collabChecking')
-        if (!this.collabCheckedAt) return this.$t('workbench.collabNotChecked')
-        return this.$t('workbench.collabInSyncAsOf', { age: collabAgeText((k, p) => this.$t(k, p), this.collabNow - this.collabCheckedAt) })
+        // C30: on a saturated link the re-check can take minutes; keep the last known state (with its age)
+        // and say it is checking, rather than replacing it with 「正在与团队核对…」 the whole time
+        if (!this.collabCheckedAt) return this.$t(this.collabChecking ? 'workbench.collabChecking' : 'workbench.collabNotChecked')
+        const asOf = this.$t('workbench.collabInSyncAsOf', { age: collabAgeText((k, p) => this.$t(k, p), this.collabNow - this.collabCheckedAt) })
+        return this.collabChecking ? asOf + ' · ' + this.$t('workbench.collabChecking') : asOf
       }
       return this.$t('workbench.collabInSync')
     },
@@ -3669,6 +3693,8 @@ export default {
           return !!plugin?.workspaceView && this.openPluginTab(pluginId) === true
         },
         openPluginWorkspaceInProject: (pluginId, projectId) => this.openPluginWorkspaceInProject(pluginId, projectId, getTaskProjectOptions),
+        // C1: only a plugin whose declared global workspace view serves this entry may report it.
+        declaresEntryPoint: (pluginId, entry) => !!entryViewOf(this.dynamicPlugins.find(p => p.pluginId === pluginId), entry),
         openConversation: async conversation => {
           if (!await this.resolveChatInterface()) return false
           return this.loadHistoryChat(conversation)
@@ -4491,6 +4517,7 @@ export default {
     uni.$on(MERGE_NEIGHBORS_EVENT, this._onMergeNeighbors)
     this.refreshMergeNeighborUnseen()
     this._stopPluginUpdateChecks = startPluginUpdateChecks()
+    startHostEntries()
     this._ddClientPollStopped = false
     this.pollDdClientInbox()
     registerQuitSave(this, async () => {
@@ -4545,7 +4572,7 @@ export default {
     })
     // 余额刷新事件（充值弹窗 / SKU 购买成功后 emit）。页面栈多实例地雷：mounted 挂、
     // beforeUnmount 必须按引用 $off，否则每回来一次多一份订阅。
-    this._onWalletRefresh = () => this.loadWalletBalance()
+    this._onWalletRefresh = (payload) => this.loadWalletBalance(!!(payload && payload.fresh))
     uni.$on('awd:wallet-refresh', this._onWalletRefresh)
     // 账户连上 / 断开（登录弹层成功、utils/signOut.js，dev-board#1046）：rail 账户入口的头像、余额抬头、
     // 宽限提示都读本页的授权状态与余额，就地重拉，不刷新页面。刻意不加 isActiveOverviewInstance 守卫：
@@ -5072,10 +5099,10 @@ export default {
     // Credits 余额 chip 数据（dev-board#187）。轻端点（后端 TTL 缓存），随 onShow /
     // awd:wallet-refresh 拉取。connected:false 或失败时置 loaded=false 让 chip 整个消失，
     // 绝不摆一个「¥0.00」冒充余额。
-    async loadWalletBalance() {
+    async loadWalletBalance(fresh = false) {
       if (!isDesktopHost()) return
       try {
-        const data = await getAccountBalance()
+        const data = await getAccountBalance({ fresh })
         if (data && data.connected) {
           this.wallet = {
             loaded: true,
@@ -5128,6 +5155,7 @@ export default {
     // 面板停靠（dev-board#180）
     ...panelDockingMethods,
     ...railSortMethods,
+    ...reviewsEntryMethods,
     ...themeSwitchMethods,
     // Phase 3a 外置的方法组
     ...clipboardBridgeMethods,
@@ -5679,13 +5707,18 @@ export default {
           return
         }
         this.collabCloud = (res && res.data) || null
+        // C12（lane C r3）：取回把同事的录像写进来之后，占位徽标要跟着消失，不能等重开窗口
+        if (this.collabCloud && this.collabCloud.linked) this.$refs?.fileTree?.loadLocalOnly?.()
         // 成员名单只在已知「放进了案件库」时才并入云端参与人；协作状态落地前跑完的那次只拿到
         // 本机名单，这里得知已关联时补读一次，否则要等下次重载才看得到同事（J11）
         if (this._membersMissingCloud && this.collabCloud && this.collabCloud.linked) this.loadProjectMembers()
         if (online) { this.collabCheckedAt = Date.now(); this.collabNow = this.collabCheckedAt }
+        // C5: unreachable library -> the 30 s poll backs off (see startCollabPolling)
+        if (online) this._collabPollFailures = this.collabCloud && this.collabCloud.offline ? (this._collabPollFailures || 0) + 1 : 0
         if (online && typeof this.retryQueuedSubmit === 'function') this.retryQueuedSubmit()
       } catch (e) {
         if (!e.aborted) console.warn('[Collab] 读取协作状态失败', e)
+        if (online && !e.aborted) this._collabPollFailures = (this._collabPollFailures || 0) + 1
       } finally {
         if (online && seq === this._collabStateSeq) this.collabChecking = false
       }
@@ -5710,8 +5743,18 @@ export default {
         // Unknown after an account change still needs a retry; only an explicit
         // unlinked snapshot proves that there is no remote project to poll.
         if (this.collabCloud && !this.collabLinked) return
+        // C5 (retest 0.91.1): at 120 s a colleague's 交稿 went unnoticed for ~2 min while the chip said 一致.
+        // A check is a small refs query; one at a time (a slow check on a saturated link is not stacked).
+        if (this.collabChecking) return
+        // Back off while the library is unreachable: after the first failure retry at once (30 s), then 1, 2, 4 …
+        // up to 16 min between checks, so an app left open overnight with the server down does not keep knocking.
+        // One success resets it.
+        const failures = this._collabPollFailures || 0
+        this._collabPollSkipped = (this._collabPollSkipped || 0) + 1
+        if (this._collabPollSkipped < Math.min(2 ** Math.max(failures - 1, 0), 32)) return
+        this._collabPollSkipped = 0
         this.fetchCollabState({ online: true })
-      }, 120000)
+      }, 30000) // C5: was 120000
       if (typeof this.startCollabFreshness === 'function') this.startCollabFreshness()
     },
     // C5：「刚核对过」的时钟与联网再核对的触发点（窗口回到前台、第一次点进文档）
@@ -5813,6 +5856,11 @@ export default {
       // C10：协作抽屉「刷新状态」刚联网核对过，直接用它的结果（再读本地快照会把它盖掉）
       if (payload && payload.cloud) {
         this.collabCloud = payload.cloud
+        this.collabCheckedAt = Date.now()
+        this.collabNow = this.collabCheckedAt
+      }
+      // C30: a landed 交稿 is itself proof that local == library — a fresh check, no waiting on the network
+      if (payload && payload.submitted) {
         this.collabCheckedAt = Date.now()
         this.collabNow = this.collabCheckedAt
       }
@@ -6499,38 +6547,49 @@ export default {
       const anyLeft = Array.isArray(this.leftFiles) ? this.leftFiles.find(t => t && t.tabType === 'web') : null
       return anyLeft || null
     },
-    async onTabsPlusClick(pane) {
-      // 规则：
-      // - 如果当前激活的是网页 Tab：新建网页 Tab
-      // - 否则：复制当前文件（后端 batchCopy），并打开新文件
-      const active = pane === 'right' ? this.activeFileRight : this.activeFileLeft
-      if (active && this.isBrowserTab(active)) {
-        this.openBrowserTab('', pane)
+    /** D30：「＋」打开小菜单（新建 Word / Excel / PowerPoint / 浏览器标签）；不再复制当前文档。 */
+    onTabsPlusClick(pane, event) {
+      this.tabsPlusPane = pane === 'right' && this.splitMode ? 'right' : 'left'
+      // uni 的 tap 事件不一定带可用的 currentTarget：按窗格直接找这个「＋」
+      const el = this.$el?.querySelector?.(`.tabs-pane-${this.tabsPlusPane} .tabs-plus`)
+        || event?.target?.closest?.('.tabs-plus') || null
+      const anchor = el?.getBoundingClientRect ? el.getBoundingClientRect() : null
+      this.$refs.tabsPlusMenu?.open({ anchor, trigger: el })
+    },
+
+    async onTabsPlusSelect(kind) {
+      const pane = this.tabsPlusPane || 'left'
+      if (kind === 'web') {
+        this.openBrowserTab(undefined, pane)
         return
       }
-      if (!active || !active.id || !this.projectId) {
-        this.openBrowserTab('', pane)
-        return
-      }
+      if (!['docx', 'xlsx', 'pptx'].includes(kind)) return
       try {
-        const targetParentId = active.parentId != null ? active.parentId : null
-        const res = await batchCopyFiles(this.projectId, [active.id], targetParentId)
-        const created = (res && res.data && Array.isArray(res.data.files)) ? res.data.files : (res && res.files) || []
-        const createdFile = Array.isArray(created) ? created[0] : null
-        if (this.$refs.fileTree && this.$refs.fileTree.loadFiles) {
-          await this.$refs.fileTree.loadFiles()
-        }
-        if (createdFile) {
-          // 强制在目标 pane 打开并保持聚焦，确保活动标签与左侧资源管理器高亮一致
-          this.focusedPane = pane === 'right' && this.splitMode ? 'right' : 'left'
-          this.openFile(createdFile)
-        } else {
-          uni.showToast({ title: this.$t('workbench.copyFailedNoNewFile'), icon: 'none' })
-        }
+        if (!this.hasProject) await this.ensureScratchWorkspaceLoaded()
+        const name = this.nextBlankOfficeName(kind)
+        const res = await createFile(this.projectId, null, name, kind, null, null)
+        const createdFile = res?.data || res
+        if (this.$refs.fileTree?.loadFiles) await this.$refs.fileTree.loadFiles()
+        if (!createdFile || !createdFile.id) throw new Error(this.$t('fileTree.createFileFailedRetry'))
+        this.focusedPane = pane
+        this.openFile(createdFile)
       } catch (e) {
-        console.error('复制文件失败', e)
-        uni.showToast({ title: errorText(e, this.$t('workbench.copyFailed')), icon: 'none' })
+        console.error('新建文件失败', e)
+        uni.showToast({ title: errorText(e, this.$t('fileTree.createFileFailedRetry')), icon: 'none' })
       }
+    },
+
+    /** 项目根目录下不重名的空白 Office 文件名，规则同资源管理器（重名加「 (2)」）。 */
+    nextBlankOfficeName(kind) {
+      const ext = '.' + kind
+      const base = this.$t(kind === 'xlsx' ? 'fileTree.defaultSpreadsheetName' : kind === 'pptx' ? 'fileTree.defaultPresentationName' : 'fileTree.defaultDocumentName')
+      const tree = this.$refs.fileTree
+      const all = [...((tree && tree.allFiles) || []), ...((tree && tree.files) || [])]
+      const used = new Set(all.filter((f) => f && (f.parentId == null)).map((f) => String(f.name || '').toLocaleLowerCase()))
+      let name = base + ext
+      let n = 2
+      while (used.has(name.toLocaleLowerCase())) name = `${base} (${n++})${ext}`
+      return name
     },
     focusFavoritePlugin(id) {
       this.openPanelInItsDock('favorites')
@@ -8660,12 +8719,8 @@ export default {
 
     async handleOpenLawFirmPlugin(opts = {}) {
       await this.loadDynamicPlugins()
-      if (this.hasProject) {
-        this.openPluginTab('lawfirm-management')
-      } else {
-        this.leftPaneKey = 'plugin-lawfirm-management'
-        this.sidebarCollapsed = false
-      }
+      // 全所工作台（C18b）：有没有项目都开中栏工作区；没有项目时 projectId 为空，收案不挂项目
+      this.openPluginTab('lawfirm-management')
       if (opts && opts.tab) {
         setTimeout(() => {
           uni.$emit('awd:lawfirm-tab', { tab: opts.tab, ...(opts.recordId ? { recordId: opts.recordId } : {}) })

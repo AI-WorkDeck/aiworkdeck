@@ -14,6 +14,8 @@ export default {
   "modelKeyInvalid": "Il fornitore del modello ha rifiutato la chiave che questo dispositivo usa ancora da una vecchia configurazione. Accedi per usare invece l’AI di AI WorkDeck.",
   "accountReconnect": "La connessione all'account IA va aggiornata, quindi questa richiesta non è stata inviata. Seleziona «Accedi di nuovo» e riprova; non si perde nulla.",
   "streamInterrupted": "La risposta si è interrotta; quanto ricevuto finora resta qui sopra. Seleziona «Riprova» per generarla di nuovo.",
+  "streamInterruptedResumable": "La risposta si è interrotta; quanto ricevuto finora resta qui sopra. Seleziona «Continua» per riprendere da dove si è fermata, oppure «Riprova» per ricominciare.",
+  "streamInterruptedTwice": "Si è interrotta di nuovo. Seleziona «Riprova» per generare di nuovo l'intera risposta.",
   "serverError": "Si è verificato un problema da parte nostra e l’azione non è stata completata. Riprova più tardi; se continua, inviaci una segnalazione.",
   "conflict": "L’elemento è stato modificato altrove, oppure l’azione precedente è ancora in corso. Aggiorna e riprova.",
   "fileTooLarge": "Il file è troppo grande (limite {limit}). Comprimilo o dividilo, poi caricalo di nuovo.",
@@ -27,9 +29,11 @@ export default {
     "details": "Dettagli",
     "hideDetails": "Nascondi dettagli",
     "continue": "Continua",
+    "continueTooltip": "Riprendi da dove si è fermata senza rigenerare ciò che c'è già",
     "refresh": "Aggiorna",
     "signIn": "Accedi",
     "reconnect": "Accedi di nuovo",
+    "topUp": "Ricarica",
     "feedback": "Segnalazioni"
   }
 }

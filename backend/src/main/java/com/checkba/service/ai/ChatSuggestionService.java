@@ -39,8 +39,22 @@ public class ChatSuggestionService {
 
     public record Suggestion(String id, Long sourceMessageId, String text) {}
 
+    /** Q24：建议是在一轮结束后为这一轮生成的，费用算进这一轮；手工装配的测试里为 null。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.checkba.service.telemetry.InstallIdentityService installIdentity;
+
     public Suggestion suggest(Long userId, String conversationId, String modelId) {
+        return suggest(userId, conversationId, modelId, null);
+    }
+
+    public Suggestion suggest(Long userId, String conversationId, String modelId, String runId) {
         authorize(userId, conversationId);
+        String turnTag = installIdentity == null || runId == null || !runId.matches("[A-Za-z0-9-]{8,64}") ? null
+                : installIdentity.turnTag(conversationId, runId);
+        return PlatformTurnScope.call(turnTag, () -> suggestInTurn(userId, conversationId, modelId));
+    }
+
+    private Suggestion suggestInTurn(Long userId, String conversationId, String modelId) {
         if (!"FINISHED".equals(runs.statusName(conversationId)) || !generation.tryAcquire()) return null;
         try {
             suggestions.deleteByCreatedAtBefore(LocalDateTime.now().minusDays(30));

@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Baru",
+    "aria": "Dokumen baru atau tab peramban baru",
+    "newWord": "Dokumen Word baru",
+    "newExcel": "Buku kerja Excel baru",
+    "newPowerPoint": "Presentasi PowerPoint baru",
+    "newBrowserTab": "Tab peramban baru",
+  },
   scratchCopyChoose: "Pilih konten untuk disalin",
   scratchCopySelected: "{count} dipilih",
   scratchCopyFiles: "File",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "Tab peramban baru",
   "moreTools": "Alat lainnya",
   "railMore": "Lainnya",
+  "reviewsEntry": "Tinjauan",
+  "reviewsNeedYou": "{count} menunggu Anda",
+  "reviewsPick": "Pilih tinjauan yang akan dibuka",
+  "reviewsPickItem": "{name} · {count} menunggu",
+  "reviewsOpen": "Buka ›",
   "recordActivity": "Log Aktivitas",
   "logout": "Keluar",
   "stagingArea": "Area Penyimpanan Sementara",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "Keranjang Sampah",
   "loadingText": "Memuat...",
   "explorerFallback": "Penjelajah",
-  "newOrCopy": "Baru / Duplikat",
   "emptyWorkspace": "Pilih file untuk memulai",
   "emptyWorkspaceHint": "Buka file dari penjelajah di sebelah kiri, atau buat dokumen baru",
   "railEditEnter": "Atur bilah sisi (seret untuk mengurutkan ulang atau memasang)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "Tidak dapat mengirim berkas ini",
   "shareUnsupported": "Pengiriman tidak didukung pada sistem ini",
   "shareClipboardHint": "Berkas disalin. Beralih ke WeChat, pilih obrolan dan tekan Ctrl+V untuk mengirim",
-  "copyFailedNoNewFile": "Gagal menyalin: tidak ada berkas baru yang dikembalikan",
-  "copyFailed": "Gagal menyalin",
   "recordingStarted": "Pencatatan log dimulai",
   "recordingStopped": "Pencatatan log dihentikan",
   "insertedToDoc": "Dimasukkan ke dalam dokumen",

@@ -5,7 +5,7 @@
     <view v-if="loading" class="version-empty">{{ $t('version.loadingHistory') }}</view>
 
     <view v-else-if="loadError" class="version-error">
-      <view class="version-error-desc">{{ $t('version.loadFailedDesc') }}</view>
+      <view class="version-error-desc">{{ loadErrorLocal ? $t('errors.localServiceDown') : $t('version.loadFailedDesc') }}</view>
       <view class="awd-btn awd-btn-primary" @tap="refresh">{{ $t('common.retry') }}</view>
     </view>
 
@@ -171,6 +171,8 @@ export default {
     return {
       loading: true,
       loadError: false,
+      // dev-board#1869: the read failed only because the local service is unreachable
+      loadErrorLocal: false,
       enabled: false,
       working: false,
       changedCount: 0,
@@ -225,10 +227,19 @@ export default {
       if (shouldAcceptResponse(seq, this.refreshSeq)) this.cloud = (res && res.data) || null
     }).catch(() => {})
   },
+  created() {
+    // dev-board#1869: the local service came back (desktop health, see utils/localServiceRecovery.js)
+    if (typeof window !== 'undefined') window.addEventListener('awd:local-service-recovered', this.onLocalServiceRecovered)
+  },
   beforeUnmount() {
     this.refreshSeq += 1
+    if (typeof window !== 'undefined') window.removeEventListener('awd:local-service-recovered', this.onLocalServiceRecovered)
   },
   methods: {
+    // dev-board#1869: reload by itself once the local service is back, instead of waiting for 重试
+    onLocalServiceRecovered() {
+      if (this.loadError) return this.refresh()
+    },
     // refresh() 的触发源很多（mounted/collabRefreshToken watcher/onReload，onReload 又被
     // WorkSessionBar 结束工作段、三选一冲突弹窗 resolved/aborted 等一堆事件各自触发），
     // 互相之间可能重叠。没有请求代次的话，先发的那次 getVersionStatus 若后回，会把
@@ -267,6 +278,7 @@ export default {
         this.$emit('status-changed', { enabled: this.enabled, working: this.working, changedCount: this.changedCount, onDraft: this.onDraft })
         this.timelineKey += 1
         this.loadError = false
+        this.loadErrorLocal = false
         if (this.enabled) {
           await this.fetchDrafts()
           await this.fetchCloudState()
@@ -281,6 +293,10 @@ export default {
         // 去重复点开启。宁可显示可区分的错误态，保留 enabled 的上一次已知值。
         console.warn('[Version] 读取状态失败', e)
         this.loadError = true
+        // dev-board#1869: a transport failure to the local backend - the status bar and the action that hit it
+        // already say so; a second toast (one toast slot) could even overwrite theirs. Name it inline only.
+        this.loadErrorLocal = !!e && /request:fail/i.test(`${e.errMsg || ''} ${e.message || ''}`)
+        if (this.loadErrorLocal) return
         // Still busy after the wait: say busy (the server's own words), never 「读取失败」
         const busyText = e && e.kind === 'VERSION_BUSY' && e.message
         uni.showToast({ title: busyText || this.$t('version.loadFailedToast'), icon: 'none' })

@@ -15,7 +15,9 @@ import path from 'node:path'
 
 const RULES = {
   'zh-CN': [/插件广场/, /插件中心/, /包青天/, /懒人模式/, /Skill/, /Plugin/],
-  'zh-TW': [/外掛廣場/, /外掛中心/, /包青天/, /后/, /^回傳$/, /(?<![合一])併(?![入購])/, /懶人模式/, /Skill/, /Plugin/],
+  // 客户访问码在 zh-TW 叫「存取碼」（C17 / lane X），「訪問碼」是大陆用法；
+  // macOS 权限名按台湾系统设置：「完整磁碟取用權限」「輔助使用」
+  'zh-TW': [/外掛廣場/, /外掛中心/, /包青天/, /后/, /^回傳$/, /(?<![合一])併(?![入購])/, /懶人模式/, /Skill/, /Plugin/, /訪問碼/, /完全磁碟/, /磁碟訪問/, /訪問權限/],
   'en-US': [/Plugin Marketplace/, /^Extensions$/, /\bLog ?[Ii]n\b/, /\bLog ?[Oo]ut\b/, /^Login$/, /Lazy Mode/i, /^Sign (in|out)$/],
 }
 

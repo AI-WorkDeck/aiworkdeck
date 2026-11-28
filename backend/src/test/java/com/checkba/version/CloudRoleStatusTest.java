@@ -58,6 +58,22 @@ class CloudRoleStatusTest {
         assertEquals(1, memberCalls, "members are read at most once a minute");
     }
 
+    /**
+     * C9 (CEO 11-28, small version): a role changed by the owner reached this member only after the 60 s cache
+     * expired, even when the lawyer pressed 「刷新状态」. The explicit refresh reads members fresh; the automatic
+     * checks (focus, file open, every 2 min) keep the once-a-minute limit.
+     */
+    @Test void theExplicitRefreshReadsTheRoleFreshTheAutomaticChecksKeepTheCache() {
+        assertEquals("READ_ONLY", cloud.checkCloud(7L).get("myRole"));
+        members = members.replace("\"role\":\"READ_ONLY\"", "\"role\":\"EDITOR\"");   // the owner promoted lu
+        assertEquals("READ_ONLY", cloud.checkCloud(7L).get("myRole"), "automatic check: cached");
+        assertEquals(1, memberCalls);
+        assertEquals("EDITOR", cloud.checkCloud(7L, null, true).get("myRole"), "刷新状态: fresh");
+        assertEquals(2, memberCalls);
+        assertEquals("EDITOR", cloud.checkCloud(7L).get("myRole"), "and the cache holds the fresh answer");
+        assertEquals(2, memberCalls);
+    }
+
     @Test void fetchRefusedMeansRemovedWithOwnerNameNotOffline() {
         cloud.checkCloud(7L); // remember the owner while still a member
         doThrow(new VersionException("从云端更新失败", new RuntimeException("https://test.invalid/git/5.git: git-upload-pack not permitted")))
@@ -111,6 +127,14 @@ class CloudRoleStatusTest {
         doReturn(null).when(repo).fetchOriginForCheck(eq(7L), any(), any()); // re-added: readable again
         cloud.checkCloud(7L);
         assertNull(cloud.cloudStatus(7L, 42L).get("removed"));
+    }
+
+    @Test void ownerIsTheRowMarkedOwnerEvenWhenItsRoleIsAdmin() {
+        members = "{\"code\":0,\"data\":[{\"username\":\"awd_partner\",\"displayName\":\"沈砚\",\"role\":\"ADMIN\",\"owner\":true},"
+                + "{\"username\":\"lu\",\"displayName\":\"陆知微\",\"role\":\"MEMBER\",\"owner\":false}]}";
+        Map<String, Object> st = cloud.checkCloud(7L);
+        assertEquals("MEMBER", st.get("myRole"));
+        assertEquals("沈砚", st.get("ownerName"));
     }
 }
 

@@ -3,6 +3,10 @@
 export const EN = {
   legalCopyright: "Copyright 2026 BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED and AI WorkDeck contributors",
   legalLicenseTrademark: "This program is released under the GNU Affero General Public License v3.0 or later, with ABSOLUTELY NO WARRANTY. \"AI WorkDeck\" is a trademark of BEIJING GONG FU INFORMATION TECHNOLOGY LIMITED. Do not use that name as the product name when redistributing a modified version; see the trademark notice.",
+  legalSummary: "AI WorkDeck · AGPL-3.0 · Source · License · Trademark",
+  legalSourceLink: "Source code",
+  legalLicenseLink: "Full license",
+  legalTrademarkLink: "Trademark notice",
   apiCloudAccessRefresh: "Cloud access has changed. Refresh the page or reopen the app before continuing. Local files will not be deleted.",
   defaultProjectName: "Temporary project",
   cmdPptAddImage: "Insert slide image",

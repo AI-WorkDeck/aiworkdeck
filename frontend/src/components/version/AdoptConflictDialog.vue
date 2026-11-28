@@ -420,9 +420,14 @@ export default {
         uni.showToast({ title: this.$t('version.mergeStructuredSaved'), icon: 'none' })
       } catch (e) {
         uni.showToast({ title: errorText(e, this.$t('version.mergeStructuredFailed')), icon: 'none' })
+        return
       } finally {
         this.busy = false
       }
+      // D33：最后一份也逐页/逐格确定了、每一行都已合好时直接收尾，不再取决于有没有碰巧来一次状态刷新
+      // （有时自动关、有时还要再点「就按我选的来」）。还有要整份三选一的行就照旧等律师点。
+      await this.$nextTick()
+      if (this.rows.length && this.rows.every((r) => r.state === 'merged')) await this.confirm()
     },
     // 弹窗的 .awd-mask 是全屏遮罩，和「对比」打开的编辑区标签页没法同屏共存；
     // 先收起弹窗（不销毁，已选的三选一保留在内存里），对比看完点「继续处理」再展开——

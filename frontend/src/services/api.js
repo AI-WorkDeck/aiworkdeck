@@ -12,6 +12,7 @@ import { t } from '@/i18n'
 import { accountRequiredError, isCreditsRequired, isAccountRequired } from '@/utils/requireAccountCore.js'
 import { createCloudConnectivity } from '@/utils/cloudConnectivity.js'
 import { withTransferProgress } from '@/utils/transferProgress.js'
+import { noticeLocalOnly } from '@/utils/localOnlyNotice.js'
 import { subscribeProjectFileChanges } from '@/utils/projectFileChanges.js'
 
 import { createCloudEpochGate, needsCloudEpoch } from '../../../shared/cloud-epoch.mjs'
@@ -578,8 +579,9 @@ export function fetchCompanyBasicInfo(payload) {
 // 注：aiChat（POST /api/ai/chat）已随 v1 同步对话通道一并移除。
 // 对话走 SSE：见 /api/agent/connect + /api/agent/chat。
 
-export function requestChatSuggestion(conversationId, modelId) {
-  return request({ url: '/api/ai/suggestions', method: 'POST', data: { conversationId, modelId }, timeout: 20000, logBody: false, accountPrompt: false });
+export function requestChatSuggestion(conversationId, modelId, runId = null) {
+  // Q24：带上刚结束那一轮的 runId，建议的费用算进这一轮
+  return request({ url: '/api/ai/suggestions', method: 'POST', data: { conversationId, modelId, ...(runId ? { runId } : {}) }, timeout: 20000, logBody: false, accountPrompt: false });
 }
 
 export function recordChatSuggestionFeedback(id, feedback) {
@@ -1816,9 +1818,10 @@ export function getAccountUsage() {
 // 顶栏 Credits chip 的轻端点（后端带 TTL 缓存，可随 onShow 高频调）：
 // { connected, balanceCents, plan, membership: { level, key, nameZh, nameEn } | null }
 // 未连接 { connected: false }；已连接但官网不可达 { connected: true, available: false }。
-export function getAccountBalance() {
+export function getAccountBalance(opts = {}) {
   return request({
-    url: '/api/account/balance',
+    // fresh：跳过后端 60 秒缓存（AI 轮次刚扣过费、钱包刚打开）
+    url: '/api/account/balance' + (opts && opts.fresh ? '?fresh=1' : ''),
     method: 'GET',
   }).then(unwrapEnvelope);
 }
@@ -4585,7 +4588,12 @@ export function unbindCloudProject(projectId) {
 export function acceptCloudProject(connectionId, remoteProjectId, localRoot) {
   const data = { connectionId, remoteProjectId }
   if (localRoot) data.localRoot = localRoot
-  return request({ url: '/api/cloud/accept', method: 'POST', data })
+  // C32：大案卷慢网克隆要几分钟，不能沿用 60 秒默认超时（界面报超时而后端照常克隆完）。
+  // 还没有本地项目可查进度，存活探针用不占仓库锁的连接列表；不显示进度。
+  return withTransferProgress(null, (signal) => request({ url: '/api/cloud/accept', method: 'POST', data, timeout: 1800000, signal }), {
+    read: () => request({ url: '/api/cloud/connections', method: 'GET', timeout: 4000 }),
+    show: () => {}, hide: () => {}, t,
+  })
 }
 
 export function getCloudStatus(projectId) {
@@ -4593,19 +4601,33 @@ export function getCloudStatus(projectId) {
     request({ url: `/api/cloud/projects/${projectId}/status`, method: 'GET' }))
 }
 
-export function checkCloud(projectId) {
+// C9: opts.fresh only from the explicit 「刷新状态」 (re-reads the member's role; automatic checks keep the cache)
+export function checkCloud(projectId, opts = {}) {
   return observeCloudConnectivity(projectId, 'check', () =>
-    request({ url: `/api/cloud/projects/${projectId}/check`, method: 'POST' }))
+    request({ url: `/api/cloud/projects/${projectId}/check${opts.fresh ? '?fresh=1' : ''}`, method: 'POST' }))
+}
+
+// C12：这份案卷里只在共享人电脑上的文件（文件树徽标、占位）
+export function getCloudLocalOnly(projectId) {
+  return request({ url: `/api/cloud/projects/${projectId}/local-only`, method: 'GET' })
 }
 
 export function getCloudTransfer(projectId) {
-  return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET' })
+  // 也是 30 分钟大请求的存活探针：本身必须很快超时，冻住的后端几秒内就能认出来
+  return request({ url: `/api/cloud/projects/${projectId}/transfer`, method: 'GET', timeout: 4000 })
 }
 
 // 大文件慢传时给出进度（见 utils/transferProgress.js）：不挡操作的 loading，字节在走就更新
 const transferProgressUi = {
   // 状态栏那一格（CloudTransferStatus）也立刻开始快查，不等它 15 秒一次的慢轮询
-  start: (projectId) => { try { uni.$emit('awd:cloud-transfer-kick', projectId) } catch { /* no event bus */ } },
+  start: (projectId) => {
+    try {
+      uni.$emit('awd:cloud-transfer-kick', projectId)
+      // C12 nit: one progress line at a time - the status-bar cell stands down while this one shows
+      uni.$emit('awd:cloud-transfer-foreground', { projectId, on: true })
+    } catch { /* no event bus */ }
+  },
+  end: (projectId) => { try { uni.$emit('awd:cloud-transfer-foreground', { projectId, on: false }) } catch { /* no event bus */ } },
   read: getCloudTransfer,
   show: (title) => uni.showLoading({ title, mask: false }),
   hide: () => uni.hideLoading(),
@@ -4613,13 +4635,24 @@ const transferProgressUi = {
 }
 
 export function uploadToCloud(projectId) {
-  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'upload', () =>
-    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST' })), transferProgressUi)
+  // C32：慢网大文件交稿可以超过 60 秒默认超时；后端失联由 withTransferProgress 的探针提前收手
+  return withTransferProgress(projectId, (signal) => observeCloudConnectivity(projectId, 'upload', () =>
+    request({ url: `/api/cloud/projects/${projectId}/upload`, method: 'POST', timeout: 1800000, signal })), transferProgressUi)
+    .then((res) => {
+      // C12：交稿成功但有文件留在本机：说清楚是哪几份、怎么共享（同一组只说一次）
+      const d = (res && res.data) || {}
+      if (d.status === 'UPLOADED') {
+        noticeLocalOnly(projectId, d.localOnlyFiles, {
+          t, showModal: (o) => uni.showModal(o), openBackup: () => uni.$emit('awd:open-backup-consent'),
+        })
+      }
+      return res
+    })
 }
 
 export function updateFromCloud(projectId) {
-  return withTransferProgress(projectId, () => observeCloudConnectivity(projectId, 'update', () =>
-    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST' })), transferProgressUi)
+  return withTransferProgress(projectId, (signal) => observeCloudConnectivity(projectId, 'update', () =>
+    request({ url: `/api/cloud/projects/${projectId}/update`, method: 'POST', timeout: 1800000, signal })), transferProgressUi)
 }
 
 // resolutions: { [path]: 'MAIN' | 'DRAFT' | 'BOTH' }（语境映射见 AdoptConflictDialog）
@@ -4673,6 +4706,11 @@ export function addCloudMember(projectId, identifier, role) {
 
 // 案件库上移出一位参与人（dev-board#1050）：撤销客户访问码与移出同事共用。
 // remoteUserId 是案件库那一侧的 userId（参与人列表 / 签码回执的 clientUserId），不是本机 user.id。
+// C9：改案件库上一位参与人的角色（ADMIN | PARTICIPANT | READ_ONLY）
+export function changeCloudMemberRole(projectId, remoteUserId, role) {
+  return request({ url: `/api/cloud/projects/${projectId}/members/${remoteUserId}/role`, method: 'PUT', data: { role } })
+}
+
 export function removeCloudMember(projectId, remoteUserId) {
   return request({ url: `/api/cloud/projects/${projectId}/members/${remoteUserId}`, method: 'DELETE' })
 }
@@ -5098,3 +5136,9 @@ export function firmCloudAction(action, params = {}) {
     accountPrompt: false,
   }).then(unwrapEnvelope)
 }
+
+// Q24：一轮对话的实扣金额（国内站平台通道）。后端代查官网，凭据与计费标记不出后端。
+export const getTurnCost = (conversationId, runId) => request({
+  url: `/api/agent/turn-cost/${encodeURIComponent(conversationId)}/${encodeURIComponent(runId)}`,
+  method: 'GET'
+})

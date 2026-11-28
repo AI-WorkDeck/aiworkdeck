@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 export default {
+  "plusMenu": {
+    "tooltip": "Neu",
+    "aria": "Neues Dokument oder neuer Browser-Tab",
+    "newWord": "Neues Word-Dokument",
+    "newExcel": "Neue Excel-Arbeitsmappe",
+    "newPowerPoint": "Neue PowerPoint-Präsentation",
+    "newBrowserTab": "Neuer Browser-Tab",
+  },
   scratchCopyChoose: "Inhalte zum Kopieren auswählen",
   scratchCopySelected: "{count} ausgewählt",
   scratchCopyFiles: "Dateien",
@@ -158,6 +166,11 @@ export default {
   "browserNewTabHint": "Neuer Browser-Tab",
   "moreTools": "Weitere Werkzeuge",
   "railMore": "Mehr",
+  "reviewsEntry": "Zur Prüfung",
+  "reviewsNeedYou": "{count} warten auf Sie",
+  "reviewsPick": "Zu öffnende Prüfung wählen",
+  "reviewsPickItem": "{name} · {count} offen",
+  "reviewsOpen": "Öffnen ›",
   "recordActivity": "Aktivitätsprotokoll",
   "logout": "Abmelden",
   "stagingArea": "Staging-Bereich",
@@ -179,7 +192,6 @@ export default {
   "recycleBin": "Papierkorb",
   "loadingText": "Wird geladen...",
   "explorerFallback": "Dateibaum",
-  "newOrCopy": "Neu / Duplizieren",
   "emptyWorkspace": "Wählen Sie eine Datei aus, um zu beginnen",
   "emptyWorkspaceHint": "Öffnen Sie eine Datei aus dem Explorer auf der linken Seite oder erstellen Sie ein neues Dokument",
   "railEditEnter": "Seitenleiste anordnen (zum Neuanordnen oder Andocken ziehen)",
@@ -336,8 +348,6 @@ export default {
   "shareFailed": "Diese Datei kann nicht gesendet werden",
   "shareUnsupported": "Senden wird auf diesem System nicht unterstützt",
   "shareClipboardHint": "Datei kopiert. Wechseln Sie zu WeChat, wählen Sie einen Chat aus und drücken Sie Strg+V zum Senden",
-  "copyFailedNoNewFile": "Kopieren fehlgeschlagen: keine neue Datei zurückgegeben",
-  "copyFailed": "Kopieren fehlgeschlagen",
   "recordingStarted": "Protokollierung gestartet",
   "recordingStopped": "Protokollierung gestoppt",
   "insertedToDoc": "In das Dokument eingefügt",

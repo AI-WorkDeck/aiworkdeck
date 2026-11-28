@@ -168,7 +168,17 @@
             <view v-else class="collab-member-list">
               <view v-for="m in lawyerMembers" :key="m.username || m.id" class="collab-member-row">
                 <text class="collab-member-name">{{ m.displayName || $t('version.unnamedColleague') }}</text>
-                <text class="collab-member-role">{{ roleLabel(m.role) }}</text>
+                <!-- C9：能改的人显示一个小选择器（矩阵同案件库：负责人改任何律师；管理员只在协作人/只读之间改） -->
+                <AwdSelect
+                  v-if="roleOptionsFor(m).length"
+                  class="collab-member-role-select"
+                  :range="roleOptionsFor(m).map(roleLabel)"
+                  :value="Math.max(0, roleOptionsFor(m).indexOf(m.role))"
+                  :aria-label="$t('version.changeRoleTitle')"
+                  :disabled="memberBusy"
+                  @change="(i) => onChangeRole(m, roleOptionsFor(m)[i])"
+                />
+                <text v-else class="collab-member-role">{{ roleLabel(m.role) }}</text>
                 <!-- 移出（dev-board#1050）：同事与凭访问码进来的客户都在这里移；移出客户连带作废
                      他的访问码。能不能移（不能移自己、参与者只能移只读与客户）由案件库判。 -->
                 <text
@@ -270,7 +280,14 @@
                     {{ $t('version.alreadyInCaseFileAs', { role: roleLabel(candidate.currentRole) }) }}
                   </text>
                   <view class="collab-actions">
-                    <view class="awd-btn awd-btn-secondary awd-btn-disabled">{{ $t('version.alreadyAMember') }}</view>
+                    <!-- C9：只读的人再查一次，直接给「改为协作人」，不用先移出再加回 -->
+                    <view
+                      v-if="candidate.currentRole === 'READ_ONLY' && candidate.memberUserId != null && canPromoteReadOnly"
+                      class="awd-btn awd-btn-primary"
+                      :class="{ 'awd-btn-disabled': memberBusy }"
+                      @tap="onChangeRole({ userId: candidate.memberUserId, role: 'READ_ONLY', displayName: candidate.displayName }, 'PARTICIPANT')"
+                    >{{ $t('version.makeCollaborator') }}</view>
+                    <view v-else class="awd-btn awd-btn-secondary awd-btn-disabled">{{ $t('version.alreadyAMember') }}</view>
                     <view class="awd-btn awd-btn-secondary" @tap="clearCandidate">{{ $t('version.lookupAnother') }}</view>
                   </view>
                 </template>
@@ -328,7 +345,7 @@ import { errorText } from '@/utils/errorToast.js'
 import {
   listCloudConnections,
   shareProjectToCloud, uploadToCloud, updateFromCloud, checkCloud, getVersionStatus,
-  getCloudMembers, addCloudMember, lookupCloudMember, getOfficialCloud, removeCloudMember,
+  getCloudMembers, addCloudMember, lookupCloudMember, getOfficialCloud, removeCloudMember, changeCloudMemberRole,
   reconnectOfficialCloud, unbindCloudProject,
 } from '@/services/api.js'
 import { roleLabel, ASSIGNABLE_ROLES } from '@/config/memberRoles.js'
@@ -343,10 +360,11 @@ import { inviteLinkFor, notFoundPresentation } from '@/utils/memberLookup.js'
 import { remoteAheadText } from '@/utils/collabWording.js'
 import { submitNeedsGuide, submitFailedOffline } from '@/utils/submitGuide.js'
 import LibraryConnectionList from './LibraryConnectionList.vue'
+import AwdSelect from '@/components/AwdSelect.vue'
 
 export default {
   name: 'CollabDialog',
-  components: { LibraryConnectionList },
+  components: { LibraryConnectionList, AwdSelect },
   props: {
     visible: { type: Boolean, default: false },
     projectId: { type: [String, Number], required: true },
@@ -409,6 +427,9 @@ export default {
   computed: {
     // C16：律师与客户分开列——客户不是同事，撤销的含义也不同（作废访问码）
     lawyerMembers() { return (this.members || []).filter(m => !isClientRole(m.role)) },
+    // C9：看的人自己在案件库里的角色（checkCloud 的 myRole；负责人是 OWNER）
+    viewerRole() { return (this.cloud && this.cloud.myRole) || null },
+    canPromoteReadOnly() { return this.viewerRole === 'OWNER' || this.viewerRole === 'ADMIN' },
     clientMembers() { return (this.members || []).filter(m => isClientRole(m.role)) },
     // 登录层（z-index 9990）开着时本弹窗（9999）整块收起让路，登录完自己回来
     loginLayerOpen() {
@@ -559,7 +580,14 @@ export default {
         }
         this.tooManyLibraries = false
         uni.showToast({ title: this.$t('version.sharedToLibrary'), icon: 'none' })
-        this.$emit('changed')
+        // C9 (lane C): the viewer's role on the library is only known after an online check; without it a dialog
+        // opened before sharing never offers 改为协作人 / the role picker. Same hand-over as 刷新状态.
+        try {
+          const res = await checkCloud(this.projectId)
+          this.$emit('changed', { cloud: (res && res.data) || null })
+        } catch {
+          this.$emit('changed')
+        }
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
         else this.shareError = (e && e.message) || this.$t('version.shareToLibraryFailed')
@@ -679,11 +707,12 @@ export default {
         } else {
           uni.showToast({ title: d.message || this.$t('version.submitFailedNotice'), icon: 'none' })
         }
-        this.$emit('changed')
+        // C30: a landed 交稿 proves local == library; the page counts it as a fresh check
+        this.$emit('changed', d.status === 'UPLOADED' ? { submitted: true } : undefined)
       } catch (e) {
         if (needsCloudReconnect(e)) this.reconnectMessage = reconnectRequiredMessage(e, this.reconnectAttempted, (k) => this.$t(k))
         else if (showLargeFileBackupBlock(e, (k) => this.$t(k))) { /* lasting dialog shown */ }
-        else if (await submitFailedOffline(this.projectId, checkCloud)) {
+        else if (await submitFailedOffline(this.projectId, checkCloud, e)) {
           this.$emit('queued')
           uni.showToast({ title: this.$t('version.submitQueuedOffline'), icon: 'none' })
         } else uni.showToast({ title: errorText(e, this.$t('version.submitFailed')), icon: 'none' })
@@ -724,7 +753,8 @@ export default {
       try {
         // C10：真联网核对一次，并把结果交给页面（页面那份状态才是界面上显示的）——
         // 原来核对完只发 changed，页面随后读的是不联网的本地快照，等于白核对
-        const res = await checkCloud(this.projectId)
+        // C9: the lawyer asked explicitly - re-read the role too (a role the owner just changed shows at once)
+        const res = await checkCloud(this.projectId, { fresh: true })
         this.$emit('changed', { cloud: (res && res.data) || null })
       } catch (e) {
         uni.showToast({ title: errorText(e, this.$t('version.libraryOffline')), icon: 'none' })
@@ -741,6 +771,39 @@ export default {
         uni.showToast({ title: errorText(e, this.$t('version.loadMembersFailed')), icon: 'none' })
       } finally {
         this.membersLoading = false
+      }
+    },
+    // C9：与案件库 ProjectMemberService.changeRole 同一张矩阵。负责人自己的一行是 OWNER、管理员自己的一行是
+    // ADMIN，都不在可改范围内，所以「不能改自己」不用另判；最终由案件库裁决。
+    roleOptionsFor(m) {
+      if (!m || m.userId == null || m.role === 'OWNER' || isClientRole(m.role)) return []
+      if (this.viewerRole === 'OWNER') return ['PARTICIPANT', 'READ_ONLY', 'ADMIN']
+      if (this.viewerRole === 'ADMIN' && (m.role === 'PARTICIPANT' || m.role === 'READ_ONLY')) return ['PARTICIPANT', 'READ_ONLY']
+      return []
+    },
+    async onChangeRole(m, role) {
+      if (!m || !role || role === m.role || this.memberBusy) return
+      const name = m.displayName || this.$t('version.unnamedColleague')
+      if (role === 'READ_ONLY') {
+        const ok = await new Promise((resolve) => uni.showModal({
+          title: this.$t('version.changeRoleTitle'),
+          content: this.$t('version.changeRoleReadOnlyConfirm', { name }),
+          success: (r) => resolve(!!r.confirm),
+          fail: () => resolve(false),
+        }))
+        if (!ok) return
+      }
+      this.memberBusy = true
+      try {
+        await changeCloudMemberRole(this.projectId, m.userId, role)
+        uni.showToast({ title: this.$t('version.roleChanged', { name, role: roleLabel(role) }), icon: 'none' })
+        this.candidate = null
+        this.loadMembers()
+        this.$emit('changed')
+      } catch (e) {
+        uni.showToast({ title: errorText(e, this.$t('version.changeRoleFailed')), icon: 'none' })
+      } finally {
+        this.memberBusy = false
       }
     },
     onRemoveMember(m) {
@@ -932,6 +995,7 @@ export default {
 }
 .collab-member-name { font-size: var(--awd-font-size-body); color: var(--awd-text); }
 .collab-member-role { font-size: var(--awd-panel-fs); color: var(--awd-text-2); }
+.collab-member-role-select { min-width: 112px; font-size: var(--awd-panel-fs); }
 .collab-member-remove { font-size: var(--awd-panel-fs); color: var(--awd-danger-text); cursor: pointer; margin-left: 12px; }
 
 /* 查不到人的那一块：与候选人卡片同一个盒子形制——两者在同一个位置轮流出现，

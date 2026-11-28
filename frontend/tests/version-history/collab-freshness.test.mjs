@@ -31,7 +31,11 @@ test('C5: 一致 only within 15 s of an online check; otherwise checking / not c
   assert.equal(COLLAB_FRESH_MS, 15000)
   assert.equal(chip({ collabCheckedAt: 100000 - 5000 }), 'workbench.collabInSync')
   assert.equal(chip({ collabCheckedAt: 100000 - 90000 }), 'workbench.collabInSyncAsOf{"age":"workbench.collabAgeMinutes{\\"n\\":1}"}')
-  assert.equal(chip({ collabCheckedAt: 100000 - 90000, collabChecking: true }), 'workbench.collabChecking')
+  // C30: a slow re-check keeps the last known state (with its age) and says it is checking, instead of
+  // replacing it with 「正在与团队核对…」 for minutes on a saturated link
+  assert.equal(chip({ collabCheckedAt: 100000 - 90000, collabChecking: true }),
+    'workbench.collabInSyncAsOf{"age":"workbench.collabAgeMinutes{\\"n\\":1}"} · workbench.collabChecking')
+  assert.equal(chip({ collabCheckedAt: 0, collabChecking: true }), 'workbench.collabChecking', 'nothing known yet: checking')
   assert.equal(chip({ collabCheckedAt: 0 }), 'workbench.collabNotChecked')
   assert.equal(chip({ collabCheckedAt: 100000 - 90000, collabCloud: { linked: true, remoteAhead: true } }), 'ahead', 'a known newer draft is still said')
 })
@@ -63,4 +67,59 @@ test('C5: age text', () => {
   assert.equal(collabAgeText(t, 4000), 'workbench.collabAgeSeconds{"n":4}')
   assert.equal(collabAgeText(t, 125000), 'workbench.collabAgeMinutes{"n":2}')
   assert.equal(collabAgeText(t, 2 * 3600000), 'workbench.collabAgeHours{"n":2}')
+})
+
+// C30 (lane C C29 run, POLISH C30): after a successful 交稿 on a saturated link the header sat on
+// 「正在与团队核对…」 for ~2 min. The push itself proves local == library: it counts as a fresh check.
+test('C30: a successful 交稿 counts as a fresh check', async () => {
+  const handler = fn('onCollabChanged', { Date: { now: () => 500000 }, Promise })
+  const v = { _collabStateLifecycle: 0, collabCheckedAt: 1000, collabNow: 1000, collabLinked: false,
+    fetchCollabState: async () => {}, startCollabPolling() {}, checkAdoptConflict() {} }
+  handler.call(v, { submitted: true })
+  assert.equal(v.collabCheckedAt, 500000)
+  assert.equal(v.collabNow, 500000)
+  const w = { ...v, collabCheckedAt: 1000, collabNow: 1000 }
+  handler.call(w)
+  assert.equal(w.collabCheckedAt, 1000, 'other changes do not pretend a check happened')
+})
+
+test('C30: every 交稿 entry point reports a landed submit', () => {
+  for (const f of ['components/collab/CollabDialog.vue', 'components/collab/SubmitDraftGuide.vue', 'components/version/CommitHistoryTab.vue']) {
+    const src = readFileSync(new URL('../../src/' + f, import.meta.url), 'utf8')
+    assert.match(src, /\$emit\('changed', \{ submitted: true \}\)|\$emit\('changed', d\.status === 'UPLOADED' \? \{ submitted: true \} : undefined\)/, f)
+  }
+})
+
+test('C5 retest: a shared case re-checks every 30 s while visible, one check at a time', () => {
+  const ms = Number(/\}, (\d+)\) \/\/ C5: was 120000/.exec(body('startCollabPolling'))?.[1])
+  assert.ok(ms > 0 && ms <= 30000, 'poll interval ' + ms)
+  let tick = null
+  const calls = []
+  const v = { _collabDisposed: false, _collabPollTimer: null, collabCloud: { linked: true }, collabLinked: true, collabChecking: false,
+    isActiveOverviewInstance: () => true, fetchCollabState: (o) => calls.push(o), startCollabFreshness: () => {} }
+  fn('startCollabPolling', { setInterval: (f, d) => { tick = f; assert.equal(d, ms); return 1 }, document: { hidden: false } }).call(v)
+  tick(); assert.equal(calls.length, 1)
+  v.collabChecking = true; tick(); assert.equal(calls.length, 1, 'no second check while one is running')
+  v.collabChecking = false; tick(); assert.equal(calls.length, 2)
+})
+
+test('C5 retest (CEO): the poll pauses when hidden or inactive and backs off while the library is unreachable', () => {
+  let tick = null, hidden = false
+  const calls = []
+  const v = { _collabDisposed: false, _collabPollTimer: null, collabCloud: { linked: true }, collabLinked: true, collabChecking: false, active: true,
+    isActiveOverviewInstance() { return this.active }, fetchCollabState: (o) => calls.push(o), startCollabFreshness: () => {} }
+  const doc = { get hidden() { return hidden } }
+  fn('startCollabPolling', { setInterval: (f) => { tick = f; return 1 }, document: doc }).call(v)
+  hidden = true; tick(); hidden = false; v.active = false; tick(); v.active = true
+  assert.equal(calls.length, 0, 'hidden window or inactive page: no network')
+  tick(); assert.equal(calls.length, 1)
+  v._collabPollFailures = 4                      // four failed checks in a row -> every 8th tick (4 min)
+  for (let i = 0; i < 7; i++) tick()
+  assert.equal(calls.length, 1)
+  tick(); assert.equal(calls.length, 2)
+  v._collabPollFailures = 20; v._collabPollSkipped = 0
+  for (let i = 0; i < 31; i++) tick()
+  assert.equal(calls.length, 2, 'capped at every 32nd tick (16 min)')
+  tick(); assert.equal(calls.length, 3)
+  v._collabPollFailures = 0; tick(); assert.equal(calls.length, 4, 'a success resets the back-off')
 })
