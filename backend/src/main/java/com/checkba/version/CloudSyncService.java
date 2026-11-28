@@ -761,7 +761,8 @@ public class CloudSyncService {
                     // C8：案件库按权限拒收（git-receive-pack not permitted）——只读成员或已被移出。重试永远
                     // 不会成功，不许说「稍后还可以再交」，也不置「待上传」：改动留在这台电脑的版本记录里，
                     // 但没有、也不会交到案件库。说清楚原因和该找谁。
-                    log.info("交稿被案件库按权限拒绝: project={}", projectId);
+                    // C12b retest: the underlying git/HTTP reason must be in the log; the user-facing text replaces it.
+                    log.warn("交稿被案件库按权限拒绝: project={}, reason={}", projectId, refusalReason(e), e);
                     RemoteRole role = remoteRoleCache.get(projectId);
                     String owner = role != null && role.ownerName() != null ? role.ownerName()
                             : LangText.of("案卷负责人", "the case owner");
@@ -1115,6 +1116,16 @@ public class CloudSyncService {
         } catch (Exception e) {
             log.warn("读取我在案件库里的角色失败（状态照常给）: project={}", projectId, e);
         }
+    }
+
+    /** Every message in the cause chain, so a refusal can be traced to the exact git/HTTP answer. */
+    static String refusalReason(Throwable e) {
+        StringBuilder out = new StringBuilder();
+        for (Throwable t = e; t != null && out.length() < 2000; t = t.getCause()) {
+            if (out.length() > 0) out.append(" <- ");
+            out.append(t.getClass().getSimpleName()).append(": ").append(t.getMessage());
+        }
+        return out.toString();
     }
 
     /** 案件库明确拒绝（不是连不上）：git 的 not permitted / 401 / 403。 */
